@@ -38,11 +38,13 @@ test('M25.8 UI: tournament schedule page shows recurring templates and durable u
 
   await expect(page.getByRole('heading', { name: 'Tournament Schedule' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Recurring Templates' })).toBeVisible();
-  await expect(page.getByText('Daily River Sprint').first()).toBeVisible();
-  await expect(page.getByText('Daily 12:00 UTC').first()).toBeVisible();
-  await expect(page.getByText('2 upcoming events').first()).toBeVisible();
-  await expect(page.getByText('Friday Deepstack Major').first()).toBeVisible();
-  await expect(page.getByText('Weekly Fri 18:00 UTC').first()).toBeVisible();
+  const recurringDrawer = page.locator('[data-poker-section="recurring-templates"] details[data-poker-detail-level="advanced"]');
+  await recurringDrawer.locator('summary').click();
+  await expect(recurringDrawer.getByText('Daily River Sprint').first()).toBeVisible();
+  await expect(recurringDrawer.getByText('Daily 12:00 UTC').first()).toBeVisible();
+  await expect(recurringDrawer.getByText('2 upcoming events').first()).toBeVisible();
+  await expect(recurringDrawer.getByText('Friday Deepstack Major').first()).toBeVisible();
+  await expect(recurringDrawer.getByText('Weekly Fri 18:00 UTC').first()).toBeVisible();
   await expect(page.getByRole('heading', { name: '2026-03-12' })).toBeVisible();
   await expect(page.getByRole('heading', { name: '2026-03-13' })).toBeVisible();
   await expect(page.getByText('registered').first()).toBeVisible();

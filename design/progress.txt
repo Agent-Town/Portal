@@ -38,3 +38,29 @@ Current next-step status:
 - deterministic design tests added: e2e/300_poker_design_harness.spec.js and e2e/301_poker_design_token_contract.spec.js
 - D1 hierarchy pass started: lobby and schedule now reorder around player-first section priority
 - deterministic hierarchy tests added: e2e/302_poker_design_lobby_hierarchy_ui.spec.js and e2e/304_poker_design_schedule_hierarchy_ui.spec.js
+- D2 live-table pass implemented: current hand and submit action now lead the route, support panels are section-tagged, and play-table layout now composes differently across mobile, tablet, and desktop
+- live-table layout state now exposes deterministic `data-poker-live-state` hooks for acting, seated, entry, observer, and rail states
+- deterministic live-table design tests added: e2e/306_poker_design_live_table_priority_ui.spec.js, e2e/307_poker_design_live_table_mobile_action_ui.spec.js, e2e/321_poker_design_tablet_composition_ui.spec.js, and e2e/322_poker_design_desktop_two_column_ui.spec.js
+- visual documentation captured for D2 under artifacts/design-progress-20260316-d2-before and artifacts/design-progress-20260316-d2-after
+- D3 review, native season, and rail pass implemented: review now composes into replay-first and study-second lanes, native season now puts leaderboard ahead of economy detail, and rail routes now render as observational surfaces with explicit rail sections
+- deterministic D3 design tests added: e2e/309_poker_design_hand_review_layout_ui.spec.js, e2e/310_poker_design_hand_review_responsive_ui.spec.js, e2e/313_poker_design_rail_distinction_ui.spec.js, and e2e/314_poker_design_native_season_ui.spec.js
+- visual documentation captured for D3 under artifacts/design-progress-20260316-d3-before and artifacts/design-progress-20260316-d3-after
+- D4 operator and centaur pass implemented: operator review now groups inspection, management, and destructive controls into separate action clusters, and centaur now leads with live hand and shared action ahead of discussion and snapshot support
+- deterministic D4 design tests added: e2e/311_poker_design_operator_hierarchy_ui.spec.js, e2e/312_poker_design_operator_destructive_group_ui.spec.js, and e2e/315_poker_design_centaur_hierarchy_ui.spec.js
+- visual documentation captured for D4 under artifacts/design-progress-20260316-d4-before and artifacts/design-progress-20260316-d4-after
+- D4 accessibility/state completion implemented: poker status line now exposes deterministic state kinds, route-level loading/error shells are intentional, empty states use the shared state-card system, disabled controls are more clearly inactive, and reduced-motion users get animation-free poker state surfaces
+- deterministic D4 accessibility/state tests added: e2e/316_poker_design_focus_states_contract.spec.js, e2e/317_poker_design_disabled_states_ui.spec.js, e2e/318_poker_design_empty_loading_error_ui.spec.js, e2e/323_poker_design_contrast_contract.spec.js, e2e/324_poker_design_status_line_ui.spec.js, and e2e/325_poker_design_motion_contract.spec.js
+- visual documentation captured for the accessibility/state pass under artifacts/design-progress-20260316-d5-state
+- D5 beginner-first and international pass implemented: beginner-facing poker copy now uses AI teammate language instead of worker jargon, route and section hooks now support Simplified Chinese overlays across lobby, live table, schedule, season, and centaur, provider metadata remains hidden in supporting regions, and dormant voice-ready slots are reserved without changing current interaction order
+- deterministic D5 design tests added: e2e/326_poker_design_beginner_copy_ui.spec.js, e2e/327_poker_design_cjk_layout_ui.spec.js, e2e/328_poker_design_localized_expansion_ui.spec.js, e2e/329_poker_design_provider_neutral_ui.spec.js, e2e/330_poker_design_voice_ready_layout_contract.spec.js, and e2e/331_poker_design_international_persona_ui.spec.js
+- visual documentation captured for the D5 beginner/international pass under artifacts/design-progress-20260316-d6-locale
+- official competitive-reference research added: PokerStars-style quick-entry, action-first table design, and secondary notes or stats surfaces now explicitly shape the next design phase
+- dead-simple default / LLM-rich secondary detail is now a canonical design rule across the design pack
+- D6 simplification pass started on the real UI: lobby and schedule now keep support detail behind explicit advanced drawers while preserving the same underlying forms and state
+- live tables and tournament series in the lobby now lead with one primary route action and push history, payout, and director context into secondary drawers
+- tournament schedule now keeps recurring-template detail, admin template authoring, and event-level break or waitlist detail in explicit drawers instead of ambient full-weight cards
+- deterministic D6 tests added: e2e/332_poker_design_lobby_dead_simple_default_ui.spec.js, e2e/333_poker_design_lobby_advanced_detail_gate_ui.spec.js, e2e/334_poker_design_schedule_dead_simple_default_ui.spec.js, and e2e/335_poker_design_schedule_advanced_detail_gate_ui.spec.js
+- visual documentation captured for the D6 simplification pass under artifacts/design-progress-20260316-d7-simple
+- TLA+ formal design layer added under design/tla for route projection, admin gating, default-hidden advanced detail, locale invariance, voice-mode invariance, and no-drift human vs LLM projection rules
+- formal methods companion added: design/08_poker_play_design_v1_formal_methods.md
+- TLC validation run completed successfully for design/tla/PokerDesignProjection.tla on 2026-03-16

@@ -14,6 +14,7 @@ This file describes how users move through the poker product today and what each
 5. Every route must remain understandable to users with very basic AI knowledge.
 6. English and Simplified Chinese are the initial design-validation locales.
 7. Provider and model names are supporting metadata, not task instructions.
+8. Default player routes should open in a simple mode; richer detail belongs in explicit advanced or AI-mediated surfaces.
 
 ## 2. Core Routes
 
@@ -34,6 +35,7 @@ This file describes how users move through the poker product today and what each
   - tournament series availability
   - self-exclusion / spend policy
 - Current design risk: policy and identity compete with the main join flow
+- Dead-simple default target: the first read should be quick seat, live tables, and only a compact account strip
 - Language note: joining a table must read clearly without requiring AI terms; any provider or model label stays secondary.
 
 ## 2.2 Live Cash / Tournament Table
@@ -58,6 +60,7 @@ This file describes how users move through the poker product today and what each
   - pot
   - current street
 - Current design risk: the action form is too low in the page and visually equal to secondary tools
+- Dead-simple default target: current hand, action bar, and one AI-help entry point should dominate; notes, study, disputes, and seat-management detail should be advanced or secondary
 - Language note: action labels must stay short, clear, and resilient in English and Simplified Chinese.
 
 ## 2.3 Tournament Schedule
@@ -76,6 +79,7 @@ This file describes how users move through the poker product today and what each
   - waitlist state
   - break schedule
 - Current design risk: admin controls appear too early for normal players
+- Dead-simple default target: the first read should answer `what can I join next?` before exposing templates or admin mechanics
 - Language note: event cards should read as playable game events first, not as infrastructure or AI-service configuration.
 
 ## 2.4 Hand Review
@@ -144,6 +148,7 @@ This file describes how users move through the poker product today and what each
   - ranking rows
   - OIL deltas
 - Design note: this should read as a clean leaderboard, not as another generic card stack
+- Dead-simple default target: ranking rows lead; economy detail is secondary or advanced
 - Language note: rankings and score labels must remain legible in mixed English/Chinese numeric rows.
 
 ## 2.8 Operator Review
@@ -179,6 +184,7 @@ This file describes how users move through the poker product today and what each
   - agent recommendation
   - discussion thread
 - Design note: this is a ritual screen and should feel distinct from standard multiplayer poker
+- Dead-simple default target: verify, join, and live action must read as one clean ritual; rich explanation belongs behind the main flow
 - Language note: the human+AI partnership must be explained in plain language before any advanced AI wording.
 
 ## 3. Primary Journeys

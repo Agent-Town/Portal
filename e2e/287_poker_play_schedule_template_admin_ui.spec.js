@@ -16,6 +16,7 @@ test('M25.8 UI++: schedule page lets admins create durable recurring templates i
 
   await expect(page.getByRole('heading', { name: 'Tournament Schedule' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Schedule Admin' })).toBeVisible();
+  await page.locator('[data-poker-section="schedule-admin"] details[data-poker-detail-level="advanced"] summary').click();
   await expect(page.locator('#pokerPlayScheduleTemplateForm')).toBeVisible();
 
   await page.locator('#pokerPlayScheduleTemplateTitle').fill('Weekly Centaur Showcase');
@@ -27,11 +28,12 @@ test('M25.8 UI++: schedule page lets admins create durable recurring templates i
   await page.locator('#pokerPlayScheduleTemplateBigBlindOil').fill('150');
   await page.getByRole('button', { name: 'Create Template' }).click();
 
-  await expect(page.getByText('Weekly Centaur Showcase').first()).toBeVisible();
-  await expect(page.getByText('Weekly Sat 18:30 UTC').first()).toBeVisible();
-  await expect(page.getByText('2 generated events').first()).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Recurring Templates' })).toBeVisible();
-  await expect(page.getByText('1 upcoming event').first()).toBeVisible();
+  const recurringDrawer = page.locator('[data-poker-section="recurring-templates"] details[data-poker-detail-level="advanced"]');
+  await recurringDrawer.locator('summary').click();
+  await expect(recurringDrawer.getByText('Weekly Centaur Showcase').first()).toBeVisible();
+  await expect(recurringDrawer.getByText('Weekly Sat 18:30 UTC').first()).toBeVisible();
+  await expect(recurringDrawer.getByText('1 upcoming event').first()).toBeVisible();
   await expect(page.getByRole('heading', { name: '2026-03-14' })).toBeVisible();
 
   await context.close();

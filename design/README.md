@@ -9,6 +9,8 @@ It exists because the repo previously had strong engineering specs but no equiva
 - Poker routes only
 - Visual design, layout, spacing, typography, color, motion, responsiveness, accessibility
 - Beginner-first AI framing for users with little AI knowledge
+- Dead-simple default player UX, with richer detail demoted to explicit advanced or AI-mediated surfaces
+- One-source, two-projection design: the same structured poker state should power a dead-simple human view and a richer LLM or advanced view without drift
 - International readiness with English and Simplified Chinese as initial design-validation locales
 - Provider-neutral, service-neutral hierarchy
 - Future voice-ready structure without functional voice controls yet
@@ -17,9 +19,11 @@ It exists because the repo previously had strong engineering specs but no equiva
 ## Status
 
 - Baseline design audit completed on 2026-03-16
-- No design phase is implemented yet
+- Dead-simple simplicity pivot added on 2026-03-16 after external poker-UI research
 - These docs define the target system and the test-driven path to reach it
 - Cross-market and beginner-user constraints are now part of the canonical design definition
+- LLM-rich secondary detail is now a first-class design rule: rich context may stay available, but it must not crowd the default human route
+- A TLA+ formal layer now exists for design-state projection and visibility invariants
 
 ## Read Order
 
@@ -36,6 +40,9 @@ It exists because the repo previously had strong engineering specs but no equiva
 11. [04_poker_play_design_v1_audit_baseline.md](./04_poker_play_design_v1_audit_baseline.md)
 12. [05_poker_play_design_v1_execution_plan.md](./05_poker_play_design_v1_execution_plan.md)
 13. [06_poker_play_design_v1_test_matrix.md](./06_poker_play_design_v1_test_matrix.md)
+14. [07_poker_play_design_v1_dead_simple_research.md](./07_poker_play_design_v1_dead_simple_research.md)
+15. [08_poker_play_design_v1_formal_methods.md](./08_poker_play_design_v1_formal_methods.md)
+16. [tla/README.md](./tla/README.md)
 
 ## Source Derivation
 
@@ -52,3 +59,5 @@ These docs were derived from the current live app and the existing repo sources:
 ## Working Rule For Future Agents
 
 If a design decision is not documented in this folder, treat it as unspecified and add it here before implementation.
+
+If a design decision changes visibility, gating, or projection rules, update the TLA+ layer as well.

@@ -7,7 +7,7 @@ This document defines what the poker UI must feel like and how future design pha
 
 ## 1. Objective
 
-Transform the current poker UI from a functionally complete alpha into a human-first decision environment for global players, including users with very basic AI knowledge, without changing feature behavior.
+Transform the current poker UI from a functionally complete alpha into a dead-simple, human-first decision environment for global players, including users with very basic AI knowledge, without changing feature behavior.
 
 ## 2. Success Criteria
 
@@ -21,6 +21,9 @@ Transform the current poker UI from a functionally complete alpha into a human-f
 8. English and Simplified Chinese layouts remain composed and legible.
 9. Localized text expansion does not break hierarchy or action visibility.
 10. Provider, model, and service identity never becomes the main explanation of how to play.
+11. The default player view feels like a game surface, not a dashboard.
+12. Rich data remains available for the LLM and advanced users without crowding the default human route.
+13. The human-default and LLM-rich views remain consistent because they are projections of the same underlying route state.
 
 ## 3. Non-Goals
 
@@ -29,6 +32,7 @@ Transform the current poker UI from a functionally complete alpha into a human-f
 3. No backend changes.
 4. No API shape changes.
 5. No framework migration.
+6. No default-view clutter justified only by the existence of more data.
 
 ## 4. User Requirements
 
@@ -51,6 +55,8 @@ The player must be able to:
 4. distinguish action controls from settings and utilities,
 5. review history without wading through unrelated controls,
 6. understand the AI teammate in plain language without having to understand models or providers.
+7. ignore advanced detail and still play correctly.
+8. ask the AI for explanation instead of reading a wall of supporting UI.
 
 ## 4.2 Operator
 
@@ -78,6 +84,7 @@ The centaur user must be able to:
 3. distinguish discussion from commitment,
 4. understand the agent suggestion without digging,
 5. distinguish clearly between discussion with the AI teammate and committing the team action.
+6. stay inside a simple ritual flow without parsing every technical detail on screen.
 
 ## 4.5 International Player
 
@@ -106,6 +113,7 @@ The international player must be able to:
    - destructive.
 6. Primary action zones must prefer plain-language labels over technical AI vocabulary.
 7. Provider and model names must be visually demoted to supporting metadata when present.
+8. Rich detail that is mainly useful for the LLM or advanced users must be hidden, collapsed, or clearly secondary on the default player route.
 
 ## 6. Responsive Requirements
 
@@ -114,6 +122,7 @@ The international player must be able to:
 3. Desktop must use additional width to reduce scanning effort, not simply enlarge gaps.
 4. No poker screen may rely on a single `max-width` padding override as its only responsive behavior.
 5. Responsive layout must remain stable under English and Simplified Chinese copy lengths.
+6. Responsive layout must stay simple under those locales, not merely unbroken.
 
 ## 7. Accessibility Requirements
 
@@ -130,12 +139,25 @@ The international player must be able to:
 3. Buttons, tabs, schedules, and leaderboard rows must survive localized expansion without clipping or overlap.
 4. No primary workflow may depend on English-specific casing, tracking, or word length assumptions.
 5. Regional provider or service differences must not require redesign of the main game screens.
+6. Simplicity expectations apply equally in English and Simplified Chinese: default routes should stay short, scannable, and action-first.
 
 ## 9. Future Voice Requirements
 
 1. Discussion and action-entry surfaces must remain structurally compatible with future voice controls.
 2. Voice-readiness must not introduce fake controls before the feature exists.
 3. Future voice affordances should work across local languages and providers without changing the main game hierarchy.
+
+## 9.1 LLM-Rich Secondary Detail Requirement
+
+The product assumes an LLM is available with the user.
+
+Therefore:
+
+1. not all useful data needs to be visible by default,
+2. richer context may remain available in advanced or machine-readable layers,
+3. the default human route should optimize for clarity and action,
+4. the LLM can help users interrogate detail instead of forcing the UI to expose every metric all the time,
+5. the advanced or LLM projection must come from the same canonical route state as the human surface.
 
 ## 10. Design Review Gate
 
@@ -145,4 +167,6 @@ No phase should be considered complete until:
 2. the screen passes responsive screenshot review at mobile, tablet, and desktop,
 3. the screen remains understandable to beginner AI users,
 4. English and Simplified Chinese review passes for affected layouts,
-5. the change remains functionality-preserving.
+5. the change remains functionality-preserving,
+6. the default player view is still simpler than the previous state, not denser,
+7. any changed visibility, gating, or projection rule is reflected in the TLA+ design model.

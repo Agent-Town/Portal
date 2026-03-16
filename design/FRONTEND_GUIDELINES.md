@@ -32,6 +32,8 @@ They do not authorize functionality changes.
 6. No functionality hidden behind design work.
 7. Design work must preserve future localization readiness for English and Simplified Chinese.
 8. Design work must not make provider or model labels necessary to operate the product.
+9. Design work must treat default human UI and advanced or LLM-facing detail as separate layers.
+10. Those layers must remain projections of the same route state, not separate manually maintained views.
 
 ## 4. Required Engineering Pattern For Design Work
 
@@ -49,6 +51,10 @@ They do not authorize functionality changes.
    - thread/review content.
 5. New player-facing strings should be written so they can be externalized later without structural rewrites.
 6. Layout must survive longer translated labels without depending on manual line breaks.
+7. If a section exists primarily to expose rich context, it should default to a collapsed, hidden, or explicitly secondary presentation on player routes.
+8. Rich machine-readable context may exist in hidden support containers or advanced surfaces, but should not inflate the first-read human layout.
+9. If the same information appears in both the human default view and the advanced or LLM layer, both must be generated from the same source fields to avoid drift.
+10. If a change alters visibility, ordering, or gating logic, update the TLA+ projection model before implementation.
 
 ## 5. Responsive Rules
 
@@ -79,12 +85,22 @@ Allowed assertions:
 5. role-based control grouping,
 6. screenshot snapshots at seeded states.
 7. localized expansion and mixed-script layout resilience.
+8. default-versus-advanced detail visibility.
 
 ## 8. Voice-Ready Layout Discipline
 
 1. Reserve structural space near discussion and action inputs for future voice affordances only when the approved phase requires it.
 2. Do not add fake microphone buttons or simulated voice controls before the functional feature exists.
 3. If a route prepares a future voice slot, it must degrade cleanly to a standard text/input layout today.
+
+## 8.1 Dead-Simple Default Rule
+
+For player routes, future agents should assume:
+
+1. the human wants to act, not inspect a report,
+2. the LLM can absorb richer structured context than the human should be asked to scan,
+3. details can be offered through an advanced surface or AI interaction instead of crowding the default route.
+4. advanced or machine-readable detail must stay aligned with the visible human state because both are projections of the same route truth.
 
 ## 9. Required Doc Sync
 

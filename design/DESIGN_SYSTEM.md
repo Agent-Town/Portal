@@ -28,6 +28,10 @@ The product is not a casino skin and not a dashboard. It is a focused decision e
 9. English and Simplified Chinese are first-class validation locales for layout and copy.
 10. Provider, model, and service names are background metadata, never the primary explanation of a screen.
 11. Layouts must reserve structural room for future voice controls without adding fake voice UI today.
+12. Default player surfaces must stay sparse even if richer detail exists elsewhere.
+13. If detail is mainly useful for the LLM or advanced users, it should live in an advanced or machine-readable layer, not in the default human view.
+14. Human-simple and LLM-rich views must derive from the same underlying state and must not drift into separate truths.
+15. If a design rule can be stated as visibility, ordering, or gating logic, it should be mirrored in the TLA+ design model.
 
 ## 3. Color Tokens
 
@@ -115,6 +119,7 @@ Typography must create calm hierarchy, not western novelty.
 3. Gap between controls in a button group: `8`.
 4. Gap between metric cells: `12` mobile, `16` desktop.
 5. Localized copy must tolerate at least `30%` string expansion without overlap or clipped actions.
+6. Default player routes should not open with more than one dense context block above the fold besides the primary action plane.
 
 ## 6. Radius and Shadow Tokens
 
@@ -209,6 +214,14 @@ For live decision screens.
 - Sticky on mobile where appropriate
 - Distinct from navigation and utilities
 
+### 9.4a Advanced Detail Layer
+
+For detail that is useful but not required in the first read.
+
+- Collapsed or hidden by default on player routes
+- May contain richer metrics, notes, study detail, provider metadata, or machine-facing structured context
+- Must never outrank the primary action bar
+
 ### 9.5 Navigation Pills
 
 For route transitions only.
@@ -254,6 +267,8 @@ For future multilingual voice affordances.
 3. When AI capability is mentioned, describe the role in plain language first, for example `AI teammate suggestion`.
 4. Provider or model identity may appear only as secondary context and must never be required to understand the next action.
 5. Headings should remain short enough to scan in English and Simplified Chinese.
+6. Default player-facing paragraphs should be short enough that the user can ignore them and still act.
+7. Dense explanatory copy belongs in advanced detail or AI-mediated help, not in the first-read action zone.
 
 ## 11. Internationalization Rules
 

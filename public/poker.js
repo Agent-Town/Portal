@@ -13,6 +13,77 @@
     navigation: 'pokerButtonNav',
     destructive: 'pokerButtonDanger',
   };
+  const POKER_LOCALE_TEXT = {
+    'zh-Hans': {
+      titlePlayLobby: '实时扑克大厅',
+      subtitlePlayLobby: '现金桌和单桌锦标赛德州牌桌，带有你座位的团队笔记。',
+      titlePlaySchedule: '赛事日程',
+      subtitlePlaySchedule: '查看接下来可以报名的牌桌、候补名单和固定开赛时间。',
+      titlePlayTable: '实时牌桌',
+      subtitlePlayTable: '当前手牌、团队笔记和清晰的行动区都在这里。',
+      titleLiveSeason: '实时赛季',
+      subtitleLiveSeason: '查看基于实时牌桌结果生成的赛季排名与 OIL 数据。',
+      titleCentaurLobby: '半人马大厅',
+      subtitleCentaurLobby: '先验证同一钱包的锁仓，再与你的 AI 队友共享座位。',
+      titleCentaurTable: '半人马牌桌',
+      subtitleCentaurTable: '你与 AI 队友共享同一座位与同一个倒计时。',
+      quickSeatTitle: '快速入座',
+      quickSeatPrimary: '加入或创建牌桌',
+      quickSeatSchedule: '赛事日程',
+      quickSeatSeason: '实时赛季',
+      quickSeatRail: '公开观战',
+      quickSeatResults: '我的结果',
+      eligibilityTitle: '准备开局',
+      pokerPolicyTitle: '限额',
+      scheduleSnapshotTitle: '今日赛事',
+      scheduleAdminTitle: '赛事管理工具',
+      recurringTemplatesTitle: '重复模板',
+      seasonEconomyTitle: '赛季经济',
+      currentHandTitle: '当前手牌',
+      yourSeatTitle: '你的座位',
+      flagReviewTitle: '标记复核',
+      operatorReviewTitle: '裁判复核',
+      studyTitle: '复盘学习',
+      workerSeatAgentTitle: 'AI 队友建议',
+      workerSeatAgentAsk: '请求 AI 建议',
+      workerSeatAgentUse: '采用建议动作',
+      seatAgentSuggestionTitle: '快速 AI 提示',
+      seatThreadTitle: '团队笔记',
+      seatThreadSubmit: '发送到团队笔记',
+      autoActTitle: '自动出手帮助',
+      autoActModeSuggestions: '仅提供建议',
+      autoActModeTeammate: 'AI 队友自动',
+      autoActSave: '保存自动出手',
+      autoActOff: '关闭自动出手',
+      submitActionTitle: '提交动作',
+      submitActionSubmit: '确认动作',
+      submitActionShove: '全下',
+      submitActionTimeBank: '使用加时',
+      scheduleRegister: '报名参赛',
+      scheduleWaitlist: '加入候补',
+      scheduleUnregister: '取消报名',
+      scheduleLeaveWaitlist: '离开候补',
+      centaurDiscussionTitle: '团队讨论',
+      centaurDiscussionSubmit: '发送团队笔记',
+      centaurSubmitTitle: '锁定团队动作',
+      centaurSubmitButton: '锁定团队动作',
+      centaurVerifyTitle: '验证 Streamflow 锁仓',
+      centaurVerifyButton: '签名并验证',
+      centaurJoinTitle: '加入牌桌',
+      centaurJoinButton: '加入牌桌',
+      centaurSnapshotHourTitle: '快照小时',
+      centaurLiveHandTitle: '实时手牌',
+    },
+  };
+  const POKER_COPY_STRESS_OVERRIDES = {
+    'zh-Hans': {
+      quickSeatPrimary: '立即加入或创建实时牌桌',
+      quickSeatSchedule: '查看完整赛事日程',
+      quickSeatRail: '进入公开观战牌桌',
+      submitActionSubmit: '确认当前团队动作',
+      centaurSubmitButton: '立即锁定当前团队动作',
+    },
+  };
   let countdownTimer = null;
   let liveRefreshTimer = null;
   let liveTableStream = null;
@@ -31,10 +102,100 @@
     if (bodyEl) bodyEl.dataset.pokerView = normalizedView;
     if (frameEl) frameEl.dataset.pokerView = normalizedView;
     if (contentEl) contentEl.dataset.pokerView = normalizedView;
+    if (normalizedView !== 'play-table') {
+      setPokerLiveState('');
+    }
+    if (normalizedView !== 'centaur-table') {
+      setPokerCentaurState('');
+    }
+    applyPokerLocaleContext();
   }
 
-  function setStatus(text) {
-    if (statusEl) statusEl.textContent = text || '';
+  function setPokerLiveState(state) {
+    const normalizedState = String(state || '').trim();
+    [bodyEl, frameEl, contentEl].forEach((element) => {
+      if (!element) return;
+      if (normalizedState) {
+        element.dataset.pokerLiveState = normalizedState;
+      } else {
+        delete element.dataset.pokerLiveState;
+      }
+    });
+  }
+
+  function setPokerCentaurState(state) {
+    const normalizedState = String(state || '').trim();
+    [bodyEl, frameEl, contentEl].forEach((element) => {
+      if (!element) return;
+      if (normalizedState) {
+        element.dataset.pokerCentaurState = normalizedState;
+      } else {
+        delete element.dataset.pokerCentaurState;
+      }
+    });
+  }
+
+  function inferPokerStatusKind(text) {
+    const normalized = String(text || '').trim().toLowerCase();
+    if (!normalized) return '';
+    if (/^(loading|preparing|joining|submitting|saving|requesting|signing|finding|creating|activating|rebalancing|starting|ending|advancing|closing|resuming|pausing|locking|changing|moving|returning|sending|using|verifying)\b/.test(normalized)) {
+      return 'loading';
+    }
+    if (/(failed|failure|unavailable|required|not found|unable|error|unknown|invalid|missing)/.test(normalized)) {
+      return 'error';
+    }
+    if (/^no\b/.test(normalized)) {
+      return 'empty';
+    }
+    return 'ready';
+  }
+
+  function setStatus(text, { kind = '' } = {}) {
+    const nextText = String(text || '');
+    const statusKind = String(kind || inferPokerStatusKind(nextText) || '').trim();
+    if (!statusEl) return;
+    statusEl.textContent = nextText;
+    if (statusKind) {
+      statusEl.dataset.pokerStatusKind = statusKind;
+    } else {
+      delete statusEl.dataset.pokerStatusKind;
+    }
+  }
+
+  function normalizePokerLocale(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'zh' || normalized === 'zh-cn' || normalized === 'zh-hans' || normalized === 'zh_cn') {
+      return 'zh-Hans';
+    }
+    return 'en';
+  }
+
+  function readPokerUiLocale() {
+    return normalizePokerLocale(getRouteSearchParams().get('uiLocale') || document.documentElement.lang || 'en');
+  }
+
+  function readPokerUiCopyMode() {
+    const mode = String(getRouteSearchParams().get('uiCopy') || '').trim().toLowerCase();
+    return mode === 'stress' ? 'stress' : 'default';
+  }
+
+  function getPokerLocaleText(key, fallback = '') {
+    const locale = readPokerUiLocale();
+    const mode = readPokerUiCopyMode();
+    const localeMap = POKER_LOCALE_TEXT[locale] || {};
+    const stressMap = POKER_COPY_STRESS_OVERRIDES[locale] || {};
+    if (mode === 'stress' && typeof stressMap[key] === 'string') return stressMap[key];
+    if (typeof localeMap[key] === 'string') return localeMap[key];
+    return fallback;
+  }
+
+  function applyPokerLocaleContext() {
+    const locale = readPokerUiLocale();
+    document.documentElement.lang = locale === 'zh-Hans' ? 'zh-Hans' : 'en';
+    [bodyEl, frameEl, contentEl, document.documentElement].forEach((element) => {
+      if (!element) return;
+      element.dataset.pokerLocale = locale;
+    });
   }
 
   function escapeHtml(value) {
@@ -403,6 +564,50 @@
     `;
   }
 
+  function renderFactStrip(items) {
+    const facts = Array.isArray(items)
+      ? items
+        .map((item) => {
+          if (!item || typeof item !== 'object') return null;
+          const label = String(item.label || '').trim();
+          const value = String(item.value || '').trim();
+          if (!label || !value) return null;
+          return { label, value };
+        })
+        .filter(Boolean)
+      : [];
+    if (!facts.length) return '';
+    return `
+      <div class="pokerFactStrip">
+        ${facts.map((item) => `
+          <div class="pokerFact">
+            <div class="pokerFactLabel">${escapeHtml(item.label)}</div>
+            <div class="pokerFactValue">${escapeHtml(item.value)}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  function renderAdvancedPanel(title, summary, body, { open = false } = {}) {
+    const nextTitle = String(title || '').trim();
+    const nextSummary = String(summary || '').trim();
+    const nextBody = String(body || '').trim();
+    if (!nextTitle || !nextBody) return '';
+    return `
+      <details class="pokerAdvancedPanel" data-poker-detail-level="advanced"${open ? ' open' : ''}>
+        <summary>
+          <span class="pokerAdvancedKicker">Advanced</span>
+          <span class="pokerAdvancedTitle">${escapeHtml(nextTitle)}</span>
+          ${nextSummary ? `<span class="pokerAdvancedSummary">${escapeHtml(nextSummary)}</span>` : ''}
+        </summary>
+        <div class="pokerAdvancedBody">
+          ${nextBody}
+        </div>
+      </details>
+    `;
+  }
+
   function sectionCard(section, html, { plane = '', className = '', state = '' } = {}) {
     return {
       section,
@@ -411,6 +616,31 @@
       className,
       state,
     };
+  }
+
+  function renderStatePanel(kind, title, body, { detail = '', actionHtml = '' } = {}) {
+    const normalizedKind = String(kind || 'empty').trim() || 'empty';
+    const detailHtml = String(detail || '').trim() ? `<div class="pokerStateDetail">${detail}</div>` : '';
+    const linksHtml = String(actionHtml || '').trim() ? `<div class="pokerLinks">${actionHtml}</div>` : '';
+    return `
+      <div class="pokerStateShell" data-poker-state-kind="${escapeHtml(normalizedKind)}">
+        <div class="pokerStateEyebrow">${escapeHtml(normalizedKind)}</div>
+        <h2>${escapeHtml(title)}</h2>
+        <p>${escapeHtml(body)}</p>
+        ${detailHtml}
+        ${linksHtml}
+      </div>
+    `;
+  }
+
+  function renderStateCard(section, kind, title, body, { plane = 'supporting', className = '', detail = '', actionHtml = '' } = {}) {
+    const classes = ['pokerStateCard'];
+    if (className) classes.push(String(className));
+    return sectionCard(
+      section,
+      renderStatePanel(kind, title, body, { detail, actionHtml }),
+      { plane, className: classes.join(' '), state: kind },
+    );
   }
 
   function normalizePokerLabel(value) {
@@ -445,6 +675,122 @@
         control.classList.add(POKER_BUTTON_ROLE_CLASS[role]);
       }
     });
+    applyPokerLocaleOverlay(root);
+  }
+
+  function setPokerText(root, selector, value) {
+    const next = String(value || '').trim();
+    if (!root || !next) return;
+    const nodes = root.querySelectorAll(selector);
+    nodes.forEach((node) => {
+      node.textContent = next;
+    });
+  }
+
+  function setPokerAttr(root, selector, attr, value) {
+    const next = String(value || '').trim();
+    if (!root || !attr || !next) return;
+    const nodes = root.querySelectorAll(selector);
+    nodes.forEach((node) => {
+      node.setAttribute(attr, next);
+    });
+  }
+
+  function applyPokerLocaleOverlay(root) {
+    const locale = readPokerUiLocale();
+    if (locale === 'en') return;
+    const view = String(bodyEl?.dataset?.pokerView || '').trim();
+    const viewText = {
+      'play-lobby': {
+        title: getPokerLocaleText('titlePlayLobby'),
+        subtitle: getPokerLocaleText('subtitlePlayLobby'),
+      },
+      'play-schedule': {
+        title: getPokerLocaleText('titlePlaySchedule'),
+        subtitle: getPokerLocaleText('subtitlePlaySchedule'),
+      },
+      'play-table': {
+        title: getPokerLocaleText('titlePlayTable'),
+        subtitle: getPokerLocaleText('subtitlePlayTable'),
+      },
+      'play-native-season': {
+        title: getPokerLocaleText('titleLiveSeason'),
+        subtitle: getPokerLocaleText('subtitleLiveSeason'),
+      },
+      'centaur-lobby': {
+        title: getPokerLocaleText('titleCentaurLobby'),
+        subtitle: getPokerLocaleText('subtitleCentaurLobby'),
+      },
+      'centaur-table': {
+        title: getPokerLocaleText('titleCentaurTable'),
+        subtitle: getPokerLocaleText('subtitleCentaurTable'),
+      },
+    };
+    if (titleEl && viewText[view]?.title) titleEl.textContent = viewText[view].title;
+    if (subtitleEl && viewText[view]?.subtitle) subtitleEl.textContent = viewText[view].subtitle;
+
+    setPokerText(root, '[data-poker-section="quick-seat"] h2', getPokerLocaleText('quickSeatTitle'));
+    setPokerText(root, '#pokerPlayMatchmakeForm button[type="submit"]', getPokerLocaleText('quickSeatPrimary'));
+    setPokerText(root, '[data-poker-section="quick-seat"] a[href*="/poker/play/schedule"]', getPokerLocaleText('quickSeatSchedule'));
+    setPokerText(root, '[data-poker-section="quick-seat"] a[href*="/poker/play/seasons/native"]', getPokerLocaleText('quickSeatSeason'));
+    setPokerText(root, '[data-poker-section="quick-seat"] a[href*="/poker/play/rail"]', getPokerLocaleText('quickSeatRail'));
+    setPokerText(root, '[data-poker-section="quick-seat"] a[href*="/poker/play/results"]', getPokerLocaleText('quickSeatResults'));
+    setPokerText(root, '[data-poker-section="eligibility"] h2', getPokerLocaleText('eligibilityTitle'));
+    setPokerText(root, '[data-poker-section="poker-policy"] h2', getPokerLocaleText('pokerPolicyTitle'));
+    setPokerText(root, '[data-poker-section="schedule-snapshot"] h2', getPokerLocaleText('scheduleSnapshotTitle'));
+    setPokerText(root, '[data-poker-section="schedule-admin"] h2', getPokerLocaleText('scheduleAdminTitle'));
+    setPokerText(root, '[data-poker-section="recurring-templates"] h2', getPokerLocaleText('recurringTemplatesTitle'));
+    setPokerText(root, '[data-poker-section="season-economy"] h2', getPokerLocaleText('seasonEconomyTitle'));
+    setPokerText(root, '[data-poker-section="current-hand"] h2', getPokerLocaleText('currentHandTitle'));
+    setPokerText(root, '[data-poker-section="your-seat"] h2', getPokerLocaleText('yourSeatTitle'));
+    setPokerText(root, '[data-poker-section="flag-review"] h2', getPokerLocaleText('flagReviewTitle'));
+    setPokerText(root, '[data-poker-section="operator-review"] h2', getPokerLocaleText('operatorReviewTitle'));
+    setPokerText(root, '[data-poker-section="study-preview"] h2', getPokerLocaleText('studyTitle'));
+
+    setPokerText(root, '[data-poker-section="worker-seat-agent"] h2', getPokerLocaleText('workerSeatAgentTitle'));
+    setPokerText(root, '#pokerSeatAgentProposeButton', getPokerLocaleText('workerSeatAgentAsk'));
+    setPokerText(root, '#pokerSeatAgentCommitButton', getPokerLocaleText('workerSeatAgentUse'));
+    setPokerText(root, '[data-poker-section="seat-agent-suggestion"] h2', getPokerLocaleText('seatAgentSuggestionTitle'));
+    setPokerText(root, '[data-poker-section="seat-thread"] h2', getPokerLocaleText('seatThreadTitle'));
+    setPokerText(root, '#pokerPlayMessageForm button[type="submit"]', getPokerLocaleText('seatThreadSubmit'));
+    setPokerText(root, '[data-poker-section="auto-act"] h2', getPokerLocaleText('autoActTitle'));
+    setPokerText(root, '#pokerPlayAutoActMode option[value="propose_only"]', getPokerLocaleText('autoActModeSuggestions'));
+    setPokerText(root, '#pokerPlayAutoActMode option[value="seat_agent_auto"]', getPokerLocaleText('autoActModeTeammate'));
+    setPokerText(root, '#pokerPlayAutoActSaveButton', getPokerLocaleText('autoActSave'));
+    setPokerText(root, '#pokerPlayAutoActOffButton', getPokerLocaleText('autoActOff'));
+    setPokerText(root, '[data-poker-section="submit-action"] h2', getPokerLocaleText('submitActionTitle'));
+    setPokerText(root, '#pokerPlayActionForm button[type="submit"]', getPokerLocaleText('submitActionSubmit'));
+    setPokerText(root, '#pokerPlayShoveButton', getPokerLocaleText('submitActionShove'));
+    if (root.querySelector('#pokerPlayTimeBankButton')) {
+      const base = getPokerLocaleText('submitActionTimeBank');
+      const current = root.querySelector('#pokerPlayTimeBankButton');
+      const suffix = String(current?.textContent || '').match(/\(\+.+\)/)?.[0] || '';
+      current.textContent = `${base}${suffix ? ` ${suffix}` : ''}`.trim();
+    }
+    setPokerText(root, '[data-schedule-action-kind="register"]', getPokerLocaleText('scheduleRegister'));
+    setPokerText(root, '[data-schedule-action-kind="waitlist"]', getPokerLocaleText('scheduleWaitlist'));
+    setPokerText(root, '[data-schedule-action-kind="unregister"]', getPokerLocaleText('scheduleUnregister'));
+    setPokerText(root, '[data-schedule-action-kind="leave_waitlist"]', getPokerLocaleText('scheduleLeaveWaitlist'));
+
+    setPokerText(root, '[data-poker-section="centaur-discussion"] h2', getPokerLocaleText('centaurDiscussionTitle'));
+    setPokerText(root, '#centaurMessageForm button[type="submit"]', getPokerLocaleText('centaurDiscussionSubmit'));
+    setPokerText(root, '[data-poker-section="centaur-submit-action"] h2', getPokerLocaleText('centaurSubmitTitle'));
+    setPokerText(root, '#centaurActionForm button[type="submit"]', getPokerLocaleText('centaurSubmitButton'));
+    setPokerText(root, '[data-poker-section="centaur-verify"] h2', getPokerLocaleText('centaurVerifyTitle'));
+    setPokerText(root, '#centaurVerifyForm button[type="submit"]', getPokerLocaleText('centaurVerifyButton'));
+    setPokerText(root, '[data-poker-section="centaur-join"] h2', getPokerLocaleText('centaurJoinTitle'));
+    setPokerText(root, '[data-poker-section="centaur-snapshot-hour"] h2', getPokerLocaleText('centaurSnapshotHourTitle'));
+    setPokerText(root, '[data-poker-section="centaur-live-hand"] h2', getPokerLocaleText('centaurLiveHandTitle'));
+    if (root.querySelector('#centaurJoinForm button[type="submit"]')) {
+      const button = root.querySelector('#centaurJoinForm button[type="submit"]');
+      const currentText = String(button.textContent || '');
+      const buyInMatch = currentText.match(/\d+\s*OIL/i);
+      const amount = buyInMatch ? buyInMatch[0] : '';
+      button.textContent = `${getPokerLocaleText('centaurJoinButton')}${amount ? ` ${amount}` : ''}`.trim();
+    }
+
+    setPokerAttr(root, '#pokerPlayMessageBody', 'placeholder', '我们这一手准备怎么走？');
+    setPokerAttr(root, '#centaurMessageBody', 'placeholder', '这一手我们想采用什么线路？');
   }
 
   function reorderPokerSections(root, orderedSections) {
@@ -653,13 +999,13 @@
             <div class="pokerMeta">
               <span class="pokerBadge">${escapeHtml(item.street || 'preflop')}</span>
               <span class="pokerBadge">${Number(item.actionCount || 0)} actions</span>
-              ${item.agentProposal ? '<span class="pokerBadge">worker line</span>' : ''}
+              ${item.agentProposal ? '<span class="pokerBadge">AI note</span>' : ''}
               ${Number(item.notebookEntryCount || 0) > 0 ? `<span class="pokerBadge">${Number(item.notebookEntryCount || 0)} notebook</span>` : ''}
               ${Number(item.opponentNoteCount || 0) > 0 ? `<span class="pokerBadge">${Number(item.opponentNoteCount || 0)} opponent note${Number(item.opponentNoteCount || 0) === 1 ? '' : 's'}</span>` : ''}
             </div>
             <div class="pokerLabel">Board</div>
             ${renderPokerCards(item.communityCards || [])}
-            ${item.agentProposal ? `<p>${escapeHtml(item.agentProposal.body || 'No worker note.')}</p>` : ''}
+            ${item.agentProposal ? `<p>${escapeHtml(item.agentProposal.body || 'No AI teammate note.')}</p>` : ''}
             ${Array.isArray(item.actions) && item.actions.length ? renderPublicActionLog(item.actions, 'No public actions logged.') : '<p class="pokerMuted">No public actions logged.</p>'}
             ${item.reviewPath ? `
               <div class="pokerLinks">
@@ -987,7 +1333,7 @@
     if (!data) return '';
     const recentEntries = Array.isArray(data.recentEntries) ? data.recentEntries : [];
     const opponentNotes = Array.isArray(data.opponentNotes) ? data.opponentNotes : [];
-    return `
+    return sectionCard('study-preview', `
       <h2>Study</h2>
       <div class="pokerSummary">
         ${renderSummaryMetric('Notebook', `${Number(data.notebookCount || 0)}`)}
@@ -1005,7 +1351,113 @@
         <div class="pokerLabel">Recent Opponent Notes</div>
         ${renderNotebookEntryRows(opponentNotes, { emptyText: 'No opponent notes yet.' })}
       ` : '<p>No opponent notes saved yet.</p>'}
-    `;
+    `, { plane: 'reference' });
+  }
+
+  function resolvePlayTableDesignState(data, { rail = false } = {}) {
+    if (rail) return 'rail';
+    const hasSubmitAction = !!contentEl?.querySelector('[data-poker-section="submit-action"]');
+    if (hasSubmitAction) return 'acting';
+    if (data?.mySeat) return 'seated';
+    const hasEntryFlow = !!contentEl?.querySelector('[data-poker-section="take-seat"], [data-poker-section="waitlist"]');
+    if (hasEntryFlow) return 'entry';
+    return 'observer';
+  }
+
+  function applyPlayTableDesignLayout(data, { rail = false } = {}) {
+    const order = rail
+      ? [
+          'current-hand',
+          'table-summary',
+          'rail-view',
+          'seats',
+          'public-action-log',
+        ]
+      : [
+          'current-hand',
+          'submit-action',
+          'take-seat',
+          'waitlist',
+          'table-summary',
+          'invite-access',
+          'your-seat',
+          'seat-agent-suggestion',
+          'worker-seat-agent',
+          'seat-thread',
+          'auto-act',
+          'flag-review',
+          'table-review',
+          'study-preview',
+          'series-director',
+          'seats',
+          'public-action-log',
+          'operator-review',
+        ];
+    reorderPokerSections(contentEl, order);
+    setPokerLiveState(resolvePlayTableDesignState(data, { rail }));
+  }
+
+  function applyHandReviewDesignLayout() {
+    reorderPokerSections(contentEl, [
+      'review-summary-shell',
+      'review-result-summary',
+      'review-action-line',
+      'review-board-pot',
+      'review-human-note',
+      'review-agent-note',
+      'review-lesson-tags',
+      'review-notebook',
+      'review-opponent-notes',
+    ]);
+  }
+
+  function applyNativeSeasonDesignLayout() {
+    reorderPokerSections(contentEl, [
+      'season-summary',
+      'season-leaderboard',
+      'season-economy',
+    ]);
+  }
+
+  function applyRailDesignLayout(kind = 'series') {
+    if (kind === 'lobby') {
+      reorderPokerSections(contentEl, [
+        'rail-lobby-summary',
+        'rail-lobby-series',
+        'rail-lobby-tables',
+      ]);
+      return;
+    }
+    reorderPokerSections(contentEl, [
+      'rail-series-summary',
+      'rail-series-tables',
+      'rail-series-payouts',
+    ]);
+  }
+
+  function applyCentaurDesignLayout(data) {
+    const hasLiveHand = !!(data?.entry && data?.hand);
+    const hasVerification = !!data?.verification;
+    reorderPokerSections(contentEl, hasLiveHand
+      ? [
+          'centaur-summary',
+          'centaur-live-hand',
+          'centaur-submit-action',
+          'centaur-discussion',
+          'centaur-snapshot-hour',
+        ]
+      : hasVerification
+      ? [
+          'centaur-summary',
+          'centaur-join',
+          'centaur-snapshot-hour',
+        ]
+      : [
+          'centaur-summary',
+          'centaur-verify',
+          'centaur-snapshot-hour',
+        ]);
+    setPokerCentaurState(hasLiveHand ? 'live' : hasVerification ? 'join' : 'verify');
   }
 
   function renderPublicActionLog(actions, emptyText = 'No public actions logged yet.') {
@@ -1114,8 +1566,8 @@
   function formatAutoActLabel(mode) {
     const value = String(mode || 'off').trim().toLowerCase();
     if (value === 'check_fold') return 'check/fold';
-    if (value === 'seat_agent_auto') return 'seat-agent auto';
-    if (value === 'propose_only') return 'propose only';
+    if (value === 'seat_agent_auto') return 'AI teammate auto';
+    if (value === 'propose_only') return 'suggestions only';
     return value || 'off';
   }
 
@@ -1468,7 +1920,7 @@
       const oilBalance = Number(playPayload?.data?.oilBalance?.balance || 0);
       cards.push(`
         <h2>Live 6-Max Tables</h2>
-        <p>Play cash and single-table tournament hold’em with other users and their agents. Each seat gets a private agent thread and a live decision clock.</p>
+        <p>Play cash and single-table tournament hold’em with other users and their AI teammates. Each seat gets private team notes and a live decision clock.</p>
         ${renderMetaBadges([
           playPayload?.data?.houseId || 'house pending',
           playPayload?.data?.wallet?.address || 'wallet pending',
@@ -1488,7 +1940,7 @@
       const oilBalance = Number(centaurPayload?.data?.oilBalance?.balance || 0);
       cards.push(`
         <h2>Centaur Tournaments</h2>
-        <p>Human and AI discuss one line together under a live action clock. OIL is credited offchain from verified Streamflow lock snapshots.</p>
+        <p>You and your AI teammate talk through one move together under a live action clock. OIL is credited offchain from verified Streamflow lock snapshots.</p>
         ${renderMetaBadges([
           centaurPayload?.data?.houseId || 'house pending',
           centaurPayload?.data?.wallet?.address || 'wallet pending',
@@ -1527,8 +1979,11 @@
 
   async function loadPlayLobby() {
     clearLiveTableStream();
-    setTitle('Live Poker Lobby', 'Cash and single-table tournament hold’em with private human + agent seat threads.');
+    setTitle('Live Poker Lobby', 'Cash and single-table tournament hold’em with private team notes for your seat.');
     setStatus('Loading live tables...');
+    renderCards([
+      renderStateCard('route-loading', 'loading', 'Loading Live Poker Lobby', 'Syncing live seats, tournament series, and wallet-bound OIL state.', { plane: 'primary' }),
+    ]);
     const payload = await api('/api/poker/play/tables');
     const items = Array.isArray(payload?.data?.items) ? payload.data.items : [];
     const series = Array.isArray(payload?.data?.series) ? payload.data.series : [];
@@ -1540,42 +1995,60 @@
       ? null
       : Number(pokerPolicy?.remainingDailySpendOil || 0);
     const selfExcluded = !!pokerPolicy?.selfExcluded;
+    const liveTableCount = items.length;
+    const tournamentSeriesCount = series.length;
     renderCards([
       sectionCard('eligibility', `
-        <h2>Eligibility</h2>
-        <div class="pokerSummary">
-          ${renderSummaryMetric('House', payload?.data?.houseId || 'Pending')}
-          ${renderSummaryMetric('Wallet', payload?.data?.wallet?.address || 'Bind wallet')}
-          ${renderSummaryMetric('OIL Balance', `${oilBalance}`)}
-          ${renderSummaryMetric('Tournament Series', `${series.length}`)}
-          ${renderSummaryMetric('Live Tables', `${items.length}`)}
-        </div>
+        <h2>Ready To Play</h2>
+        <p>Your wallet is linked and your seat can stay simple. Join a table first, then open detail only when you need it.</p>
+        ${renderFactStrip([
+          { label: 'OIL', value: `${oilBalance}` },
+          { label: 'Live Tables', value: `${liveTableCount}` },
+          { label: 'Series', value: `${tournamentSeriesCount}` },
+          { label: 'Spend Today', value: `${todaySpendOil} OIL` },
+        ])}
+        ${renderAdvancedPanel('Wallet and house details', 'House identity, wallet address, and room totals.', `
+          <div class="pokerSummary">
+            ${renderSummaryMetric('House', payload?.data?.houseId || 'Pending')}
+            ${renderSummaryMetric('Wallet', payload?.data?.wallet?.address || 'Bind wallet')}
+            ${renderSummaryMetric('OIL Balance', `${oilBalance}`)}
+            ${renderSummaryMetric('Tournament Series', `${tournamentSeriesCount}`)}
+            ${renderSummaryMetric('Live Tables', `${liveTableCount}`)}
+          </div>
+        `)}
       `, { plane: 'supporting' }),
       sectionCard('poker-policy', `
-        <h2>Poker Policy</h2>
-        <p>Wallet-level guardrails apply before live poker OIL spend. Daily caps reset at UTC midnight, and self-exclusion blocks new live-poker spend until the lock expires.</p>
-        <div class="pokerSummary">
-          ${renderSummaryMetric('Daily Cap', dailySpendCapOil > 0 ? `${dailySpendCapOil} OIL` : 'unlimited')}
-          ${renderSummaryMetric('Spent Today', `${todaySpendOil} OIL`)}
-          ${renderSummaryMetric('Remaining Today', remainingDailySpendOil == null ? 'unlimited' : `${remainingDailySpendOil} OIL`)}
-          ${renderSummaryMetric('Self-Exclusion', selfExcluded ? `active until ${formatIso(pokerPolicy?.selfExcludedUntil)}` : 'inactive')}
-        </div>
-        <form id="pokerPlayPolicyForm" class="pokerForm">
-          <label>
-            Daily Spend Cap OIL
-            <input id="pokerPlayPolicyDailyCap" type="number" min="0" placeholder="0 = unlimited" value="${dailySpendCapOil > 0 ? escapeHtml(String(dailySpendCapOil)) : ''}">
-          </label>
-          <button class="pokerButton" type="submit">Save Limit</button>
-          <button id="pokerPlayPolicySelfExclude24h" class="pokerButton" type="button"${selfExcluded ? ' disabled' : ''}>Self-Exclude 24h</button>
-        </form>
+        <h2>Limits</h2>
+        <p>Set a spend cap or pause poker when you want it. This stays out of the way by default.</p>
+        ${renderFactStrip([
+          { label: 'Daily Cap', value: dailySpendCapOil > 0 ? `${dailySpendCapOil} OIL` : 'Unlimited' },
+          { label: 'Remaining', value: remainingDailySpendOil == null ? 'Unlimited' : `${remainingDailySpendOil} OIL` },
+          { label: 'Self-Exclusion', value: selfExcluded ? 'Active' : 'Inactive' },
+        ])}
+        ${renderAdvancedPanel('Open spend limits and wallet rules', 'Daily cap, self-exclusion, and the policy controls.', `
+          <div class="pokerSummary">
+            ${renderSummaryMetric('Daily Cap', dailySpendCapOil > 0 ? `${dailySpendCapOil} OIL` : 'unlimited')}
+            ${renderSummaryMetric('Spent Today', `${todaySpendOil} OIL`)}
+            ${renderSummaryMetric('Remaining Today', remainingDailySpendOil == null ? 'unlimited' : `${remainingDailySpendOil} OIL`)}
+            ${renderSummaryMetric('Self-Exclusion', selfExcluded ? `active until ${formatIso(pokerPolicy?.selfExcludedUntil)}` : 'inactive')}
+          </div>
+          <form id="pokerPlayPolicyForm" class="pokerForm">
+            <label>
+              Daily Spend Cap OIL
+              <input id="pokerPlayPolicyDailyCap" type="number" min="0" placeholder="0 = unlimited" value="${dailySpendCapOil > 0 ? escapeHtml(String(dailySpendCapOil)) : ''}">
+            </label>
+            <button class="pokerButton" type="submit">Save Limit</button>
+            <button id="pokerPlayPolicySelfExclude24h" class="pokerButton" type="button"${selfExcluded ? ' disabled' : ''}>Self-Exclude 24h</button>
+          </form>
+        `)}
       `, { plane: 'reference' }),
       sectionCard('quick-seat', `
         <h2>Quick Seat</h2>
-        <p>Matchmake into an existing live table with the same structure, create a new public one instantly if no match exists, create a sit-and-go that waits for either a full table or a configured start target, or create an invite-only table that stays out of the public lobby and rail.</p>
+        <p>Pick a game, set the table basics, and go. The room detail can wait until after you sit down.</p>
         <div class="pokerLinks">
           <a href="${escapeHtml(buildPokerHref('/poker/play/schedule'))}">Tournament Schedule</a>
-          <a href="${escapeHtml(buildPokerHref('/poker/play/seasons/native'))}">Native Season</a>
-          <a href="${escapeHtml(buildPokerHref('/poker/play/rail'))}">Open Public Rail</a>
+          <a href="${escapeHtml(buildPokerHref('/poker/play/seasons/native'))}">Live Season</a>
+          <a href="${escapeHtml(buildPokerHref('/poker/play/rail'))}">Watch Public Tables</a>
           <a href="${escapeHtml(buildPokerHref('/poker/play/results'))}">My Results</a>
         </div>
         <form id="pokerPlayMatchmakeForm" class="pokerForm">
@@ -1639,38 +2112,44 @@
             Table Title
             <input id="pokerPlayMatchmakeTitle" maxlength="96" placeholder="Optional custom title">
           </label>
-          <button class="pokerButton" type="submit"${selfExcluded ? ' disabled' : ''}>Join Or Create</button>
+          <button class="pokerButton" type="submit"${selfExcluded ? ' disabled' : ''}>Find Or Create Table</button>
         </form>
       `, { plane: 'primary' }),
       series.length
         ? sectionCard('tournament-series', `
           ${series.map((item) => `
-          <div class="pokerSplit">
-            <div>
-              <h2>${escapeHtml(item.seriesTitle || 'Tournament Series')}</h2>
-              <p>Shared tournament identity for multiple live 6-max tables before final-table convergence.</p>
-              ${renderMetaBadges([
-                item.stage || 'seating',
-                `${Number(item.tableCount || 0)} tables`,
-                Number(item.targetTableCount || 0) > 0 ? `target ${Number(item.targetTableCount || 0)}` : '',
-                `${Number(item.entrantCount || 0)} entrants`,
-                Number(item.prizePoolOil || 0) > 0 ? `${Number(item.prizePoolOil || 0)} OIL pool` : '',
-                String(item?.bountyModel || '') === 'pko_50' ? `${Number(item?.bountyPoolOil || 0)} OIL bounty` : '',
-                String(item?.bountyModel || '') === 'pko_50' ? formatTournamentBountyModelLabel(item?.bountyModel) : '',
-                Number(item.paidPlaces || 0) > 0 ? `${Number(item.paidPlaces || 0)} paid` : '',
-                item.lateRegistrationOpen ? 'late reg open' : 'late reg closed',
-                item.needsRebalance ? 'table break pending' : '',
+          <div class="pokerStack">
+            <div class="pokerSplit">
+              <div>
+                <h2>${escapeHtml(item.seriesTitle || 'Tournament Series')}</h2>
+                <p>One tournament running across linked tables. Open your seat first; use details when you need the director view.</p>
+                ${renderMetaBadges([
+                  item.stage || 'seating',
+                  `${Number(item.entrantCount || 0)} entrants`,
+                  Number(item.prizePoolOil || 0) > 0 ? `${Number(item.prizePoolOil || 0)} OIL pool` : '',
+                  item.lateRegistrationOpen ? 'late reg open' : 'late reg closed',
+                ].filter(Boolean))}
+              </div>
+              <div class="pokerLinks">
+                <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(item.currentUserTableId || item.activeTableId || '')}`))}">${item.currentUserTableId ? 'Return To Series Table' : 'Open Series Table'}</a>
+              </div>
+            </div>
+            ${renderAdvancedPanel('Open series detail', 'Payout ladder, table-break plan, and public timeline.', `
+              ${renderFactStrip([
+                { label: 'Tables', value: `${Number(item.tableCount || 0)}` },
+                { label: 'Target', value: Number(item.targetTableCount || 0) > 0 ? `${Number(item.targetTableCount || 0)}` : 'n/a' },
+                { label: 'Paid', value: Number(item.paidPlaces || 0) > 0 ? `${Number(item.paidPlaces || 0)}` : '0' },
+                { label: 'Bounty', value: String(item?.bountyModel || '') === 'pko_50' ? `${Number(item?.bountyPoolOil || 0)} OIL` : 'standard' },
               ])}
               ${item.pendingBreakTableId
                 ? `<p>Director target: collapse toward ${Number(item.targetTableCount || 0)} table${Number(item.targetTableCount || 0) === 1 ? '' : 's'} by breaking ${escapeHtml(item.pendingBreakTableId)} with ${Number(item.pendingBreakSeatCount || 0)} seat${Number(item.pendingBreakSeatCount || 0) === 1 ? '' : 's'}${item.pendingBreakBlockedByLiveTable ? ' once its live hand settles.' : '.'}</p>`
-                : (item.needsRebalance ? `<p>Director target: rebalance toward ${Number(item.targetTableCount || 0)} table${Number(item.targetTableCount || 0) === 1 ? '' : 's'} across the remaining live tables.</p>` : '')}
+                : (item.needsRebalance ? `<p>Director target: rebalance toward ${Number(item.targetTableCount || 0)} table${Number(item.targetTableCount || 0) === 1 ? '' : 's'} across the remaining live tables.</p>` : '<p>No director intervention is queued for this series right now.</p>')}
+              <div class="pokerLinks">
+                <a href="${escapeHtml(buildPokerHref(`/poker/play/series/${encodeURIComponent(item.seriesId || '')}/timeline`))}">Timeline</a>
+              </div>
               <div class="pokerLabel">Payout Ladder</div>
               ${renderPayoutPlan(item.payouts)}
-            </div>
-            <div class="pokerLinks">
-              <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(item.currentUserTableId || item.activeTableId || '')}`))}">${item.currentUserTableId ? 'Return To Series Table' : 'Open Series Table'}</a>
-              <a href="${escapeHtml(buildPokerHref(`/poker/play/series/${encodeURIComponent(item.seriesId || '')}/timeline`))}">Timeline</a>
-            </div>
+            `)}
           </div>
           `).join('')}
         `, { plane: 'supporting' })
@@ -1678,46 +2157,51 @@
       items.length
         ? sectionCard('live-tables', `
           ${items.map((item) => `
-          <div class="pokerSplit">
-            <div>
-              <h2>${escapeHtml(item.title)}</h2>
-              <p>${escapeHtml(item?.summary?.headline || 'Human + agent co-op on a shared live table.')}</p>
-              ${renderMetaBadges([
-                item.tableType,
-                item?.tableType === 'tournament' && isSitAndGoFillPolicy(item?.summary?.fillPolicy) ? formatTournamentFillPolicyLabel(item?.summary?.fillPolicy) : '',
-                item.accessMode === 'invite_only' ? 'invite-only' : '',
-                `${Number(item.smallBlindOil || 0)} / ${Number(item.bigBlindOil || 0)}`,
-                `${Number(item.buyInOil || 0)} OIL buy-in`,
-                `${Number(item?.summary?.occupancy || 0)}/${Number(item.maxSeats || 6)} seated`,
-                item?.tableType === 'tournament' && !item?.summary?.liveHand && Number(item?.summary?.seatsUntilStart || 0) > 0
-                  ? `${Number(item?.summary?.seatsUntilStart || 0)} to start`
-                  : '',
-                Number(item?.summary?.disconnectedSeatCount || 0) > 0 ? `${Number(item.summary.disconnectedSeatCount || 0)} disconnected` : '',
-                item?.summary?.liveHand ? `hand ${Number(item?.summary?.handNumber || 0)}` : 'waiting',
-                item?.tableType === 'tournament'
+          <div class="pokerStack">
+            <div class="pokerSplit">
+              <div>
+                <h2>${escapeHtml(item.title)}</h2>
+                <p>${escapeHtml(item?.summary?.headline || 'Human + agent co-op on a shared live table.')}</p>
+                ${renderMetaBadges([
+                  item.tableType,
+                  item.accessMode === 'invite_only' ? 'invite-only' : '',
+                  `${Number(item.smallBlindOil || 0)} / ${Number(item.bigBlindOil || 0)}`,
+                  `${Number(item?.summary?.occupancy || 0)}/${Number(item.maxSeats || 6)} seated`,
+                  item?.tableType === 'tournament' && !item?.summary?.liveHand && Number(item?.summary?.seatsUntilStart || 0) > 0
+                    ? `${Number(item?.summary?.seatsUntilStart || 0)} to start`
+                    : '',
+                  item?.summary?.liveHand ? `hand ${Number(item?.summary?.handNumber || 0)}` : 'waiting',
+                ].filter(Boolean))}
+              </div>
+              <div class="pokerLinks">
+                <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(item.tableId)}`))}">${item?.currentUser?.seated ? 'Return To Seat' : 'Open Table'}</a>
+              </div>
+            </div>
+            ${renderAdvancedPanel('Open table detail', 'History, buy-in detail, and extra live state.', `
+              ${renderFactStrip([
+                { label: 'Buy-In', value: `${Number(item.buyInOil || 0)} OIL` },
+                { label: 'Start Policy', value: item?.tableType === 'tournament' && isSitAndGoFillPolicy(item?.summary?.fillPolicy) ? formatTournamentFillPolicyLabel(item?.summary?.fillPolicy) : (item?.tableType === 'cash' ? 'cash table' : 'standard tournament') },
+                { label: 'Late Reg', value: item?.tableType === 'tournament'
                   ? (item?.summary?.lateRegistrationOpen
-                    ? `late reg ${Number(item?.summary?.lateRegistrationRemainingHands || 0)}`
-                    : (item?.summary?.handNumber ? 'late reg closed' : 'late reg open'))
-                  : '',
-                item?.tableType === 'tournament' && Number(item?.summary?.prizePoolOil || 0) > 0
-                  ? `${Number(item.summary.prizePoolOil || 0)} OIL pool`
-                  : '',
-                item?.tableType === 'tournament' && String(item?.summary?.bountyModel || '') === 'pko_50'
-                  ? `${Number(item.summary.bountyPoolOil || 0)} OIL bounty`
-                  : '',
-                item?.tableType === 'tournament' && String(item?.summary?.bountyModel || '') === 'pko_50'
-                  ? formatTournamentBountyModelLabel(item?.summary?.bountyModel)
-                  : '',
+                    ? `${Number(item?.summary?.lateRegistrationRemainingHands || 0)} hands left`
+                    : (item?.summary?.handNumber ? 'closed' : 'open'))
+                  : 'n/a' },
+                { label: 'Disconnected', value: `${Number(item?.summary?.disconnectedSeatCount || 0)}` },
+                { label: 'Prize Pool', value: item?.tableType === 'tournament' && Number(item?.summary?.prizePoolOil || 0) > 0
+                  ? `${Number(item.summary.prizePoolOil || 0)} OIL`
+                  : 'n/a' },
+                { label: 'Bounty', value: item?.tableType === 'tournament' && String(item?.summary?.bountyModel || '') === 'pko_50'
+                  ? `${Number(item.summary.bountyPoolOil || 0)} OIL`
+                  : (item?.tableType === 'tournament' ? formatTournamentBountyModelLabel(item?.summary?.bountyModel) : 'n/a') },
               ])}
-            </div>
-            <div class="pokerLinks">
-              <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(item.tableId)}`))}">${item?.currentUser?.seated ? 'Return To Seat' : 'Open Table'}</a>
-              <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(item.tableId)}/history`, { status: 'completed' }))}">History</a>
-            </div>
+              <div class="pokerLinks">
+                <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(item.tableId)}/history`, { status: 'completed' }))}">History</a>
+              </div>
+            `)}
           </div>
           `).join('')}
         `, { plane: 'supporting' })
-        : sectionCard('live-tables', '<h2>No live tables yet.</h2><p>Use Quick Seat to create the first matching cash or tournament table.</p>', { plane: 'supporting' }),
+        : renderStateCard('live-tables', 'empty', 'No live tables yet.', 'Use Quick Seat to create the first matching cash or tournament table.', { plane: 'supporting' }),
     ]);
     reorderPokerSections(contentEl, [
       'quick-seat',
@@ -1735,6 +2219,9 @@
     clearLiveTableStream();
     setTitle('Tournament Schedule', 'Recurring events, registration windows, and scheduled player breaks.');
     setStatus('Loading tournament schedule...');
+    renderCards([
+      renderStateCard('route-loading', 'loading', 'Loading Tournament Schedule', 'Preparing the event calendar, registration windows, and recurring templates.', { plane: 'primary' }),
+    ]);
     const adminToken = readStoredPokerAdminToken();
     const payload = await api(buildPlayScheduleApiPath());
     let adminPayload = null;
@@ -1757,102 +2244,113 @@
     const days = Array.isArray(data?.days) ? data.days : [];
     const cards = [
       sectionCard('schedule-snapshot', `
-        <h2>Schedule Snapshot</h2>
-        <div class="pokerSummary">
-          ${renderSummaryMetric('House', data?.houseId || 'Pending')}
-          ${renderSummaryMetric('Wallet', data?.wallet?.address || 'Bind wallet')}
-          ${renderSummaryMetric('Templates', `${Number(summary?.templateCount || 0)}`)}
-          ${renderSummaryMetric('Upcoming Events', `${Number(summary?.eventCount || 0)}`)}
-          ${renderSummaryMetric('Registered', `${Number(summary?.registeredCount || 0)}`)}
-          ${renderSummaryMetric('Waitlisted', `${Number(summary?.waitlistedCount || 0)}`)}
-        </div>
+        <h2>Today’s Tournaments</h2>
+        <p>See what starts next, register fast, and ignore the deeper calendar machinery until you need it.</p>
+        ${renderFactStrip([
+          { label: 'Upcoming', value: `${Number(summary?.eventCount || 0)}` },
+          { label: 'Registered', value: `${Number(summary?.registeredCount || 0)}` },
+          { label: 'Waitlisted', value: `${Number(summary?.waitlistedCount || 0)}` },
+        ])}
         <div class="pokerLinks">
           <a href="${escapeHtml(buildPokerHref('/poker/play'))}">Back To Lobby</a>
           <a href="${escapeHtml(buildPokerHref('/poker/play/results'))}">My Results</a>
         </div>
+        ${renderAdvancedPanel('Open schedule summary', 'House, wallet, template, and queue totals.', `
+          <div class="pokerSummary">
+            ${renderSummaryMetric('House', data?.houseId || 'Pending')}
+            ${renderSummaryMetric('Wallet', data?.wallet?.address || 'Bind wallet')}
+            ${renderSummaryMetric('Templates', `${Number(summary?.templateCount || 0)}`)}
+            ${renderSummaryMetric('Upcoming Events', `${Number(summary?.eventCount || 0)}`)}
+            ${renderSummaryMetric('Registered', `${Number(summary?.registeredCount || 0)}`)}
+            ${renderSummaryMetric('Waitlisted', `${Number(summary?.waitlistedCount || 0)}`)}
+          </div>
+        `)}
       `, { plane: 'supporting' }),
       adminToken
         ? sectionCard('schedule-admin', `
           <h2>Schedule Admin</h2>
-          <p>Durable recurring templates materialize real scheduled tournament tables. Create the template here; the public calendar stays on the same minimal route.</p>
-          ${adminError
-            ? `<p>Admin schedule load failed: ${escapeHtml(adminError)}</p>`
-            : `
-              <div class="pokerSummary">
-                ${renderSummaryMetric('Templates', `${Number(adminSummary?.templateCount || 0)}`)}
-                ${renderSummaryMetric('Events', `${Number(adminSummary?.eventCount || 0)}`)}
-                ${renderSummaryMetric('Next Start', adminSummary?.nextStartAt ? formatIso(adminSummary.nextStartAt) : 'none')}
-              </div>
-            `}
-          <form id="pokerPlayScheduleTemplateForm" class="pokerForm">
-            <label>
-              Title
-              <input id="pokerPlayScheduleTemplateTitle" type="text" value="Daily Centaur Sprint" maxlength="80" required>
-            </label>
-            <label>
-              First Start At
-              <input id="pokerPlayScheduleTemplateFirstStartAt" type="text" value="2026-03-13T12:00:00.000Z" placeholder="2026-03-13T12:00:00.000Z" required>
-            </label>
-            <label>
-              Recurrence
-              <select id="pokerPlayScheduleTemplateRecurrenceKind">
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-              </select>
-            </label>
-            <label>
-              Event Count
-              <input id="pokerPlayScheduleTemplateEventCount" type="number" min="1" max="12" value="3">
-            </label>
-            <label>
-              Buy-In OIL
-              <input id="pokerPlayScheduleTemplateBuyInOil" type="number" min="0" value="400">
-            </label>
-            <label>
-              Small Blind OIL
-              <input id="pokerPlayScheduleTemplateSmallBlindOil" type="number" min="1" value="50">
-            </label>
-            <label>
-              Big Blind OIL
-              <input id="pokerPlayScheduleTemplateBigBlindOil" type="number" min="1" value="100">
-            </label>
-            <button class="pokerButton" type="submit">Create Template</button>
-          </form>
-          ${adminTemplates.length
-            ? `
-              <div class="pokerStack">
-                ${adminTemplates.map((item) => `
-                  <div class="pokerMessage">
-                    <div class="pokerLabel">${escapeHtml(item?.title || 'Schedule Template')}</div>
-                    <div>${escapeHtml(item?.recurrenceLabel || 'Recurring')}</div>
-                    <div>${escapeHtml(String(item?.status || 'active'))}</div>
-                    <div>${Number(item?.generatedEventCount || 0)} generated event${Number(item?.generatedEventCount || 0) === 1 ? '' : 's'}</div>
-                    <div class="pokerLabel">${item?.nextStartAt ? `Next start ${escapeHtml(formatIso(item.nextStartAt))}` : 'No generated event yet.'}</div>
-                    ${String(item?.status || 'active') === 'active'
-                      ? `<button class="pokerButton" type="button" data-schedule-template-cancel="${escapeHtml(String(item?.templateId || ''))}">Cancel Template</button>`
-                      : ''}
-                  </div>
-                `).join('')}
-              </div>
-            `
-            : '<p>No durable schedule templates yet.</p>'}
+          <p>Admin tools stay separate from the normal player calendar.</p>
+          ${renderAdvancedPanel('Open admin schedule tools', 'Create templates and manage recurring events.', `
+            ${adminError
+              ? `<p>Admin schedule load failed: ${escapeHtml(adminError)}</p>`
+              : renderFactStrip([
+                { label: 'Templates', value: `${Number(adminSummary?.templateCount || 0)}` },
+                { label: 'Events', value: `${Number(adminSummary?.eventCount || 0)}` },
+                { label: 'Next Start', value: adminSummary?.nextStartAt ? formatIso(adminSummary.nextStartAt) : 'none' },
+              ])}
+            <form id="pokerPlayScheduleTemplateForm" class="pokerForm">
+              <label>
+                Title
+                <input id="pokerPlayScheduleTemplateTitle" type="text" value="Daily Centaur Sprint" maxlength="80" required>
+              </label>
+              <label>
+                First Start At
+                <input id="pokerPlayScheduleTemplateFirstStartAt" type="text" value="2026-03-13T12:00:00.000Z" placeholder="2026-03-13T12:00:00.000Z" required>
+              </label>
+              <label>
+                Recurrence
+                <select id="pokerPlayScheduleTemplateRecurrenceKind">
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                </select>
+              </label>
+              <label>
+                Event Count
+                <input id="pokerPlayScheduleTemplateEventCount" type="number" min="1" max="12" value="3">
+              </label>
+              <label>
+                Buy-In OIL
+                <input id="pokerPlayScheduleTemplateBuyInOil" type="number" min="0" value="400">
+              </label>
+              <label>
+                Small Blind OIL
+                <input id="pokerPlayScheduleTemplateSmallBlindOil" type="number" min="1" value="50">
+              </label>
+              <label>
+                Big Blind OIL
+                <input id="pokerPlayScheduleTemplateBigBlindOil" type="number" min="1" value="100">
+              </label>
+              <button class="pokerButton" type="submit">Create Template</button>
+            </form>
+            ${adminTemplates.length
+              ? `
+                <div class="pokerStack">
+                  ${adminTemplates.map((item) => `
+                    <div class="pokerMessage">
+                      <div class="pokerLabel">${escapeHtml(item?.title || 'Schedule Template')}</div>
+                      <div>${escapeHtml(item?.recurrenceLabel || 'Recurring')}</div>
+                      <div>${escapeHtml(String(item?.status || 'active'))}</div>
+                      <div>${Number(item?.generatedEventCount || 0)} generated event${Number(item?.generatedEventCount || 0) === 1 ? '' : 's'}</div>
+                      <div class="pokerLabel">${item?.nextStartAt ? `Next start ${escapeHtml(formatIso(item.nextStartAt))}` : 'No generated event yet.'}</div>
+                      ${String(item?.status || 'active') === 'active'
+                        ? `<button class="pokerButton" type="button" data-schedule-template-cancel="${escapeHtml(String(item?.templateId || ''))}">Cancel Template</button>`
+                        : ''}
+                    </div>
+                  `).join('')}
+                </div>
+              `
+              : '<p>No durable schedule templates yet.</p>'}
+          `)}
         `, { plane: 'reference' })
         : '',
       templates.length
         ? sectionCard('recurring-templates', `
           <h2>Recurring Templates</h2>
-          <div class="pokerStack">
-            ${templates.map((item) => `
-              <div class="pokerMessage">
-                <div class="pokerLabel">${escapeHtml(item?.title || 'Tournament Template')}</div>
-                <div>${escapeHtml(item?.recurrenceLabel || 'Ad hoc schedule')}</div>
-                <div>${Number(item?.upcomingCount || 0)} upcoming event${Number(item?.upcomingCount || 0) === 1 ? '' : 's'}</div>
-                <div class="pokerLabel">${item?.nextStartAt ? `Next start ${escapeHtml(formatIso(item.nextStartAt))}` : 'No next start yet.'}</div>
-              </div>
-            `).join('')}
-          </div>
+          <p>Use this drawer only when you want the recurring rhythm behind the current calendar.</p>
+          ${renderAdvancedPanel('Open recurring template list', 'Upcoming template cadence and next start times.', `
+            <div class="pokerStack">
+              ${templates.map((item) => `
+                <div class="pokerMessage">
+                  <div class="pokerLabel">${escapeHtml(item?.title || 'Tournament Template')}</div>
+                  <div>${escapeHtml(item?.recurrenceLabel || 'Ad hoc schedule')}</div>
+                  <div>${Number(item?.upcomingCount || 0)} upcoming event${Number(item?.upcomingCount || 0) === 1 ? '' : 's'}</div>
+                  <div class="pokerLabel">${item?.nextStartAt ? `Next start ${escapeHtml(formatIso(item.nextStartAt))}` : 'No next start yet.'}</div>
+                </div>
+              `).join('')}
+            </div>
+          `)}
         `, { plane: 'supporting' })
-        : sectionCard('recurring-templates', '<h2>Recurring Templates</h2><p>No recurring tournament templates are scheduled yet.</p>', { plane: 'supporting' }),
+        : renderStateCard('recurring-templates', 'empty', 'Recurring Templates', 'No recurring tournament templates are scheduled yet.', { plane: 'supporting' }),
     ];
     for (const day of days) {
       const items = Array.isArray(day?.items) ? day.items : [];
@@ -1866,27 +2364,33 @@
               ${renderMetaBadges([
                 String(item?.registrationStatus || 'closed'),
                 item?.scheduleRecurrenceLabel || '',
-                Number(item?.scheduledBreakCount || 0) > 0 ? `${Number(item?.scheduledBreakCount || 0)} break${Number(item?.scheduledBreakCount || 0) === 1 ? '' : 's'}` : '',
               ].filter(Boolean))}
-              <div class="pokerSummary">
-                ${renderSummaryMetric('Buy-In', `${Number(item?.buyInOil || 0)} OIL`)}
-                ${renderSummaryMetric('Entries', `${Number(item?.entryCount || 0)}`)}
-                ${renderSummaryMetric('Open Seats', `${Number(item?.openSeatCount || 0)}`)}
-                ${renderSummaryMetric('Waitlist', `${Number(item?.waitlistCount || 0)}`)}
-                ${Number(item?.nextScheduledBreakAfterHandNumber || 0) > 0 ? renderSummaryMetric('Next Break', `${String(item?.nextScheduledBreakLabel || 'Break')} after hand ${Number(item?.nextScheduledBreakAfterHandNumber || 0)}`) : ''}
-              </div>
+              ${renderFactStrip([
+                { label: 'Buy-In', value: `${Number(item?.buyInOil || 0)} OIL` },
+                { label: 'Entries', value: `${Number(item?.entryCount || 0)}` },
+                { label: 'Seats', value: `${Number(item?.openSeatCount || 0)} open` },
+              ])}
               <div class="pokerLinks">
                 ${renderPlayScheduleActionButtons(item)}
                 <a href="${escapeHtml(buildPokerHref(item?.links?.table || '/poker/play'))}">Open Lobby Table</a>
-                ${item?.links?.timeline ? `<a href="${escapeHtml(buildPokerHref(item.links.timeline))}">Series Timeline</a>` : ''}
               </div>
+              ${renderAdvancedPanel('Open event detail', 'Waitlist, scheduled breaks, and timeline links.', `
+                ${renderFactStrip([
+                  { label: 'Waitlist', value: `${Number(item?.waitlistCount || 0)}` },
+                  { label: 'Breaks', value: Number(item?.scheduledBreakCount || 0) > 0 ? `${Number(item?.scheduledBreakCount || 0)}` : 'none' },
+                  { label: 'Next Break', value: Number(item?.nextScheduledBreakAfterHandNumber || 0) > 0 ? `${String(item?.nextScheduledBreakLabel || 'Break')} after hand ${Number(item?.nextScheduledBreakAfterHandNumber || 0)}` : 'none' },
+                ])}
+                <div class="pokerLinks">
+                  ${item?.links?.timeline ? `<a href="${escapeHtml(buildPokerHref(item.links.timeline))}">Series Timeline</a>` : ''}
+                </div>
+              `)}
             </div>
             `).join('')}
         </div>
       `, { plane: 'primary' }));
     }
     if (!days.length) {
-      cards.push(sectionCard('schedule-empty', '<h2>No Scheduled Events</h2><p>No tournament events are scheduled in the current calendar window.</p>', { plane: 'primary' }));
+      cards.push(renderStateCard('schedule-empty', 'empty', 'No Scheduled Events', 'No tournament events are scheduled in the current calendar window.', { plane: 'primary' }));
     }
     renderCards(cards);
     reorderPokerSections(contentEl, [
@@ -1927,82 +2431,90 @@
     clearLiveTableStream();
     setTitle('Live Poker Rail', 'Watch public 6-max table state, final-table convergence, and live action without opening a seat.');
     setStatus('Loading rail tables...');
+    renderCards([
+      renderStateCard('route-loading', 'loading', 'Loading Public Rail', 'Preparing public table state, featured series, and spectator-safe action summaries.', { plane: 'primary' }),
+    ]);
     const payload = await api('/api/poker/play/rail');
     const items = Array.isArray(payload?.data?.items) ? payload.data.items : [];
     const series = Array.isArray(payload?.data?.series) ? payload.data.series : [];
     renderCards([
-      `
+      sectionCard('rail-lobby-summary', `
         <h2>Public Rail</h2>
         <div class="pokerSummary">
           ${renderSummaryMetric('Tournament Series', `${series.length}`)}
           ${renderSummaryMetric('Live Tables', `${items.length}`)}
           ${renderSummaryMetric('Viewer Mode', payload?.data?.viewerMode || 'public')}
         </div>
-        <p>Rail pages only expose public table state. Private human + agent seat threads, viewer-only actions, and unrevealed hole cards remain hidden.</p>
+        <p>Rail pages only expose public table state. Private team notes, viewer-only actions, and unrevealed hole cards remain hidden.</p>
         <div class="pokerLinks">
           <a href="${escapeHtml(buildPokerHref('/poker/play'))}">Open Player Lobby</a>
         </div>
-      `,
-      series.length
-        ? series.map((item) => `
-          <div class="pokerSplit">
-            <div>
-              <h2>${escapeHtml(item.seriesTitle || 'Tournament Series')}</h2>
-              <p>Watch table breaks, prize-pool movement, and the path to the final table in public mode.</p>
-              ${renderMetaBadges([
-                item.stage || 'seating',
-                `${Number(item.tableCount || 0)} tables`,
-                `${Number(item.entrantCount || 0)} entrants`,
-                Number(item.prizePoolOil || 0) > 0 ? `${Number(item.prizePoolOil || 0)} OIL pool` : '',
-                String(item?.bountyModel || '') === 'pko_50' ? `${Number(item?.bountyPoolOil || 0)} OIL bounty` : '',
-                String(item?.bountyModel || '') === 'pko_50' ? formatTournamentBountyModelLabel(item?.bountyModel) : '',
-                Number(item.paidPlaces || 0) > 0 ? `${Number(item.paidPlaces || 0)} paid` : '',
-                item.needsRebalance ? 'table break pending' : '',
-              ])}
-            </div>
-            <div class="pokerLinks">
-              <a href="${escapeHtml(buildPokerHref(`/poker/play/rail/series/${encodeURIComponent(item.seriesId || '')}`))}">Open Series Rail</a>
-              <a href="${escapeHtml(buildPokerHref(`/poker/play/rail/series/${encodeURIComponent(item.seriesId || '')}/timeline`))}">Timeline</a>
-              ${item.activeTableId ? `<a href="${escapeHtml(buildPokerHref(`/poker/play/rail/tables/${encodeURIComponent(item.activeTableId)}`))}">Open Active Table</a>` : '<span class="pokerBadge">table pending</span>'}
-            </div>
-          </div>
-        `).join('')
-        : '',
-      items.length
-        ? items.map((item) => `
-          <div class="pokerSplit">
-            <div>
-              <h2>${escapeHtml(item.title)}</h2>
-              <p>${escapeHtml(item?.summary?.headline || 'Public table state only.')}</p>
-              ${renderMetaBadges([
-                item.tableType,
-                item?.tableType === 'tournament' && isSitAndGoFillPolicy(item?.summary?.fillPolicy) ? formatTournamentFillPolicyLabel(item?.summary?.fillPolicy) : '',
-                `${Number(item.smallBlindOil || 0)} / ${Number(item.bigBlindOil || 0)}`,
-                `${Number(item?.summary?.occupancy || 0)}/${Number(item.maxSeats || 6)} seated`,
-                item?.tableType === 'tournament' && !item?.summary?.liveHand && Number(item?.summary?.seatsUntilStart || 0) > 0
-                  ? `${Number(item?.summary?.seatsUntilStart || 0)} to start`
-                  : '',
-                item?.summary?.liveHand ? `hand ${Number(item?.summary?.handNumber || 0)}` : 'waiting',
-                Number(item?.summary?.disconnectedSeatCount || 0) > 0 ? `${Number(item.summary.disconnectedSeatCount || 0)} disconnected` : '',
-                item?.tableType === 'tournament' && Number(item?.summary?.prizePoolOil || 0) > 0
-                  ? `${Number(item.summary.prizePoolOil || 0)} OIL pool`
-                  : '',
-                item?.tableType === 'tournament' && String(item?.summary?.bountyModel || '') === 'pko_50'
-                  ? `${Number(item.summary.bountyPoolOil || 0)} OIL bounty`
-                  : '',
-                item?.tableType === 'tournament' && String(item?.summary?.bountyModel || '') === 'pko_50'
-                  ? formatTournamentBountyModelLabel(item?.summary?.bountyModel)
-                  : '',
-              ].filter(Boolean))}
-            </div>
-            <div class="pokerLinks">
-              <a href="${escapeHtml(buildPokerHref(`/poker/play/rail/tables/${encodeURIComponent(item.tableId)}`))}">Open Rail Table</a>
-              <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(item.tableId)}`))}">Open Player Table</a>
-            </div>
-          </div>
-        `).join('')
-        : '<h2>No live rail tables yet.</h2><p>Open the player lobby to seat the first cash or tournament table.</p>',
+      `, { plane: 'supporting' }),
+      sectionCard('rail-lobby-series', `
+        <h2>Featured Series</h2>
+        <p>Follow series-wide movement and final-table convergence without entering a seat.</p>
+        <div class="pokerStack">
+          ${series.length
+            ? series.map((item) => `
+              <div class="pokerMessage pokerRailEntry">
+                <div class="pokerSplit">
+                  <div>
+                    <div class="pokerLabel">${escapeHtml(item.seriesTitle || 'Tournament Series')}</div>
+                    <div>${escapeHtml(item.stage || 'seating')}</div>
+                  </div>
+                  <div class="pokerMuted">${Number(item.entrantCount || 0)} entrants</div>
+                </div>
+                <p>Watch table breaks, prize-pool movement, and the path to the final table in public mode.</p>
+                ${renderMetaBadges([
+                  `${Number(item.tableCount || 0)} tables`,
+                  Number(item.prizePoolOil || 0) > 0 ? `${Number(item.prizePoolOil || 0)} OIL pool` : '',
+                  String(item?.bountyModel || '') === 'pko_50' ? `${Number(item?.bountyPoolOil || 0)} OIL bounty` : '',
+                  Number(item.paidPlaces || 0) > 0 ? `${Number(item.paidPlaces || 0)} paid` : '',
+                  item.needsRebalance ? 'table break pending' : '',
+                ].filter(Boolean))}
+                <div class="pokerLinks">
+                  <a href="${escapeHtml(buildPokerHref(`/poker/play/rail/series/${encodeURIComponent(item.seriesId || '')}`))}">Open Series Rail</a>
+                  <a href="${escapeHtml(buildPokerHref(`/poker/play/rail/series/${encodeURIComponent(item.seriesId || '')}/timeline`))}">Timeline</a>
+                  ${item.activeTableId ? `<a href="${escapeHtml(buildPokerHref(`/poker/play/rail/tables/${encodeURIComponent(item.activeTableId)}`))}">Open Active Table</a>` : '<span class="pokerBadge">table pending</span>'}
+                </div>
+              </div>
+            `).join('')
+            : '<p>No live series yet.</p>'}
+        </div>
+      `, { plane: 'reference' }),
+      sectionCard('rail-lobby-tables', `
+        <h2>Open Rail Tables</h2>
+        <div class="pokerStack">
+          ${items.length
+            ? items.map((item) => `
+              <div class="pokerMessage pokerRailEntry">
+                <div class="pokerSplit">
+                  <div>
+                    <div class="pokerLabel">${escapeHtml(item.title)}</div>
+                    <div>${escapeHtml(item?.summary?.headline || 'Public table state only.')}</div>
+                  </div>
+                  <div class="pokerMuted">${Number(item?.summary?.occupancy || 0)}/${Number(item.maxSeats || 6)} seated</div>
+                </div>
+                ${renderMetaBadges([
+                  item.tableType,
+                  item?.tableType === 'tournament' && isSitAndGoFillPolicy(item?.summary?.fillPolicy) ? formatTournamentFillPolicyLabel(item?.summary?.fillPolicy) : '',
+                  `${Number(item.smallBlindOil || 0)} / ${Number(item.bigBlindOil || 0)}`,
+                  item?.summary?.liveHand ? `hand ${Number(item?.summary?.handNumber || 0)}` : 'waiting',
+                  Number(item?.summary?.disconnectedSeatCount || 0) > 0 ? `${Number(item.summary.disconnectedSeatCount || 0)} disconnected` : '',
+                  item?.tableType === 'tournament' && Number(item?.summary?.prizePoolOil || 0) > 0 ? `${Number(item.summary.prizePoolOil || 0)} OIL pool` : '',
+                  item?.tableType === 'tournament' && String(item?.summary?.bountyModel || '') === 'pko_50' ? formatTournamentBountyModelLabel(item?.summary?.bountyModel) : '',
+                ].filter(Boolean))}
+                <div class="pokerLinks">
+                  <a href="${escapeHtml(buildPokerHref(`/poker/play/rail/tables/${encodeURIComponent(item.tableId)}`))}">Open Rail Table</a>
+                  <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(item.tableId)}`))}">Open Player Table</a>
+                </div>
+              </div>
+            `).join('')
+            : '<p>No live rail tables yet. Open the player lobby to seat the first cash or tournament table.</p>'}
+        </div>
+      `, { plane: 'reference' }),
     ]);
+    applyRailDesignLayout('lobby');
     setStatus(items.length ? `${items.length} rail table${items.length === 1 ? '' : 's'} loaded.` : 'No live rail table available.');
   }
 
@@ -2010,11 +2522,14 @@
     clearLiveTableStream();
     setTitle('Tournament Rail Series', `Public tournament-series view for ${seriesId}.`);
     if (!silent) setStatus('Loading tournament series rail...');
+    renderCards([
+      renderStateCard('route-loading', 'loading', 'Loading Tournament Rail', 'Preparing observed tables, payouts, and series-wide public state.', { plane: 'primary' }),
+    ]);
     const payload = await api(`/api/poker/play/rail/series/${encodeURIComponent(seriesId)}`);
     const series = payload?.data?.series || null;
     const tables = Array.isArray(payload?.data?.tables) ? payload.data.tables : [];
     renderCards([
-      `
+      sectionCard('rail-series-summary', `
         <h2>${escapeHtml(series?.seriesTitle || 'Tournament Series')}</h2>
         <p>Follow the full multi-table tournament field without opening a seat. Table-break state, prize pool movement, and final placements stay public here.</p>
         <div class="pokerSummary">
@@ -2038,8 +2553,8 @@
           <a href="${escapeHtml(buildPokerHref('/poker/play/rail'))}">Back To Rail</a>
           ${series?.activeTableId ? `<a href="${escapeHtml(buildPokerHref(`/poker/play/rail/tables/${encodeURIComponent(series.activeTableId)}`))}">Open Active Table</a>` : ''}
         </div>
-      `,
-      `
+      `, { plane: 'supporting' }),
+      sectionCard('rail-series-payouts', `
         <h2>Series Director</h2>
         ${renderSeriesClosureNotice(series)}
         ${String(series?.stage || '') === 'cancelled'
@@ -2055,43 +2570,51 @@
           <div class="pokerLabel">Final Placements</div>
           ${renderSeriesStandings(series.standings)}
         ` : ''}
-      `,
-      tables.length
-        ? tables.map((entry) => `
-          <div class="pokerSplit">
-            <div>
-              <h2>${escapeHtml(entry?.table?.title || entry?.table?.tableId || 'Tournament Table')}</h2>
-              <p>${escapeHtml(entry?.table?.summary?.headline || 'Public table state for the current tournament series.')}</p>
-              ${renderMetaBadges([
-                `${Number(entry?.table?.smallBlindOil || 0)} / ${Number(entry?.table?.bigBlindOil || 0)}`,
-                `${Number(entry?.table?.summary?.occupancy || 0)}/${Number(entry?.table?.maxSeats || 6)} seated`,
-                entry?.table?.summary?.liveHand ? `hand ${Number(entry?.table?.summary?.handNumber || 0)}` : 'waiting',
-                Number(entry?.review?.openDisputeCount || 0) > 0 ? `${Number(entry?.review?.openDisputeCount || 0)} reviews` : '',
-              ].filter(Boolean))}
-              ${entry?.hand ? `
+      `, { plane: 'reference' }),
+      sectionCard('rail-series-tables', `
+        <h2>Observed Tables</h2>
+        <div class="pokerStack">
+          ${tables.length
+            ? tables.map((entry) => `
+              <div class="pokerMessage pokerRailEntry">
                 <div class="pokerSplit">
                   <div>
-                    <div class="pokerLabel">Board</div>
-                    ${renderPokerCards(entry.hand.communityCards || [])}
+                    <div class="pokerLabel">${escapeHtml(entry?.table?.title || entry?.table?.tableId || 'Tournament Table')}</div>
+                    <div>${escapeHtml(entry?.table?.summary?.headline || 'Public table state for the current tournament series.')}</div>
                   </div>
-                  <div>
-                    <div class="pokerLabel">Acting Seat</div>
-                    <div>${escapeHtml(entry.hand.actingSeat ? `Seat ${Number(entry.hand.actingSeat || 0)}` : 'none')}</div>
-                  </div>
+                  <div class="pokerMuted">${Number(entry?.table?.summary?.occupancy || 0)}/${Number(entry?.table?.maxSeats || 6)} seated</div>
                 </div>
-              ` : '<p>No live hand on this table right now.</p>'}
-              <div class="pokerLabel">Seats</div>
-              ${renderSeatMarkers(entry?.seats)}
-              <div class="pokerLabel">Public Action Log</div>
-              ${renderPublicActionLog(entry?.actions)}
-            </div>
-            <div class="pokerLinks">
-              <a href="${escapeHtml(buildPokerHref(`/poker/play/rail/tables/${encodeURIComponent(entry?.table?.tableId || '')}`))}">Open Rail Table</a>
-            </div>
-          </div>
-        `).join('')
-        : '<h2>No active series tables.</h2><p>The series summary will stay here even after tables converge or close.</p>',
+                ${renderMetaBadges([
+                  `${Number(entry?.table?.smallBlindOil || 0)} / ${Number(entry?.table?.bigBlindOil || 0)}`,
+                  entry?.table?.summary?.liveHand ? `hand ${Number(entry?.table?.summary?.handNumber || 0)}` : 'waiting',
+                  Number(entry?.review?.openDisputeCount || 0) > 0 ? `${Number(entry?.review?.openDisputeCount || 0)} reviews` : '',
+                ].filter(Boolean))}
+                ${entry?.hand ? `
+                  <div class="pokerSplit">
+                    <div>
+                      <div class="pokerLabel">Board</div>
+                      ${renderPokerCards(entry.hand.communityCards || [])}
+                    </div>
+                    <div>
+                      <div class="pokerLabel">Acting Seat</div>
+                      <div>${escapeHtml(entry.hand.actingSeat ? `Seat ${Number(entry.hand.actingSeat || 0)}` : 'none')}</div>
+                    </div>
+                  </div>
+                ` : '<p>No live hand on this table right now.</p>'}
+                <div class="pokerLabel">Seats</div>
+                ${renderSeatMarkers(entry?.seats)}
+                <div class="pokerLabel">Public Action Log</div>
+                ${renderPublicActionLog(entry?.actions)}
+                <div class="pokerLinks">
+                  <a href="${escapeHtml(buildPokerHref(`/poker/play/rail/tables/${encodeURIComponent(entry?.table?.tableId || '')}`))}">Open Rail Table</a>
+                </div>
+              </div>
+            `).join('')
+            : '<p>No active series tables. The series summary will stay here even after tables converge or close.</p>'}
+        </div>
+      `, { plane: 'reference' }),
     ]);
+    applyRailDesignLayout('series');
     bindRailSeriesStream(seriesId);
     scheduleRailSeriesRefresh(seriesId);
     if (!silent) {
@@ -2160,8 +2683,11 @@
 
   async function loadPlayNativeSeason(seasonId = '') {
     clearLiveTableStream();
-    setTitle('Native Season', 'Wallet-bound live-play standings derived from durable offchain poker rows.');
-    setStatus('Loading native season leaderboard...');
+    setTitle('Live Season', 'Wallet-bound live-play standings derived from durable offchain poker rows.');
+    setStatus('Loading live season leaderboard...');
+    renderCards([
+      renderStateCard('route-loading', 'loading', 'Loading Live Season', 'Preparing the live-play leaderboard and season economy summary.', { plane: 'primary' }),
+    ]);
     const payload = await api(buildPlayNativeSeasonApiPath(seasonId));
     const data = payload?.data || {};
     const season = data?.season || {};
@@ -2173,7 +2699,7 @@
       : buildPokerHref('/poker/play/seasons/native');
     renderCards([
       sectionCard('season-summary', `
-        <h2>${escapeHtml(season?.title || season?.seasonId || 'Native Live Season')}</h2>
+        <h2>${escapeHtml(season?.title || season?.seasonId || 'Live Season')}</h2>
         <p>Native season standings come from durable live-play rows only. No mirrored operator ladder is mixed into this page.</p>
         <div class="pokerSummary" data-native-season-summary="1">
           ${renderSummaryMetric('Season', season?.seasonId || 'current')}
@@ -2213,6 +2739,7 @@
         ${renderNativeSeasonLeaderboardRows(items)}
       `, { plane: 'primary' }),
     ]);
+    applyNativeSeasonDesignLayout();
     setStatus(items.length
       ? `${items.length} native season row${items.length === 1 ? '' : 's'} loaded.`
       : 'Native season ready with no closed live-play rows yet.');
@@ -2223,6 +2750,9 @@
     const filterStatus = String(getRouteSearchParams().get('status') || '').trim();
     setTitle('Poker Hand History', `Hand history for ${tableId}.`);
     setStatus('Loading hand history...');
+    renderCards([
+      renderStateCard('route-loading', 'loading', 'Loading Hand History', 'Preparing export-ready hand rows for the selected live table.', { plane: 'primary' }),
+    ]);
     const payload = await api(buildPlayTableHistoryApiPath(tableId, { status: filterStatus }));
     const data = payload?.data || {};
     const table = data?.table || {};
@@ -2230,7 +2760,7 @@
     renderCards([
       `
         <h2>${escapeHtml(table?.title || 'Hand History')}</h2>
-        <p>Ordered hand history for one table. Only public action logs and viewer-allowed worker notes are exposed here.</p>
+        <p>Ordered hand history for one table. Only public action logs and viewer-allowed AI teammate notes are exposed here.</p>
         <div class="pokerSummary">
           ${renderSummaryMetric('Viewer Mode', data?.viewerMode || 'player')}
           ${renderSummaryMetric('Table Type', table?.tableType || 'cash')}
@@ -2346,6 +2876,9 @@
     clearLiveTableStream();
     setTitle('Poker Hand Review', `Study review for hand ${handId}.`);
     setStatus('Loading hand review...');
+    renderCards([
+      renderStateCard('route-loading', 'loading', 'Loading Hand Review', 'Preparing replay, study notes, and post-hand learning context.', { plane: 'primary' }),
+    ]);
     const payload = await api(buildPlayHandReviewApiPath(handId));
     const data = payload?.data || {};
     const table = data?.table || {};
@@ -2405,7 +2938,7 @@
       `, { plane: 'supporting' }),
       sectionCard('review-agent-note', `
         <h2>Agent Note</h2>
-        ${data?.agentNote?.body ? `<p>${escapeHtml(data.agentNote.body)}</p>` : '<p>No worker proposal was saved for this hand.</p>'}
+        ${data?.agentNote?.body ? `<p>${escapeHtml(data.agentNote.body)}</p>` : '<p>No AI teammate suggestion was saved for this hand.</p>'}
       `, { plane: 'supporting' }),
       sectionCard('review-lesson-tags', `
         <h2>Lesson Tags</h2>
@@ -2435,6 +2968,7 @@
         ${renderNotebookEntryRows(opponentNotes, { emptyText: 'No opponent notes saved for this hand yet.' })}
       `, { plane: 'reference' }),
     ]);
+    applyHandReviewDesignLayout();
     bindPlayHandReviewForms(data);
     setStatus('Hand review ready.');
   }
@@ -2443,6 +2977,9 @@
     clearLiveTableStream();
     setTitle(rail ? 'Tournament Rail Timeline' : 'Tournament Timeline', `${rail ? 'Public' : 'Player'} timeline for ${seriesId}.`);
     setStatus('Loading series timeline...');
+    renderCards([
+      renderStateCard('route-loading', 'loading', rail ? 'Loading Public Timeline' : 'Loading Tournament Timeline', 'Preparing the durable ordered event history for this tournament series.', { plane: 'primary' }),
+    ]);
     const payload = await api(buildPlaySeriesTimelineApiPath(seriesId, { rail }));
     const data = payload?.data || {};
     const series = data?.series || {};
@@ -2501,12 +3038,15 @@
     if (!adminToken) {
       setStatus('Poker admin token required.');
       renderCards([
-        '<h2>Integrity Queue</h2><p>Set `poker.adminToken` in local storage before opening the operator integrity queue.</p>',
+        renderStateCard('integrity-auth', 'error', 'Integrity Queue', 'Set `poker.adminToken` in local storage before opening the operator integrity queue.', { plane: 'primary' }),
       ]);
       return;
     }
     const filterStatus = String(getRouteSearchParams().get('status') || 'open').trim() || 'open';
     setStatus('Loading integrity queue...');
+    renderCards([
+      renderStateCard('route-loading', 'loading', 'Loading Integrity Queue', 'Preparing suspicious-play flags and operator review state.', { plane: 'primary' }),
+    ]);
     const payload = await api(buildPlayIntegrityQueueApiPath({ status: filterStatus }), {
       headers: { 'x-admin-token': adminToken },
     });
@@ -2550,11 +3090,14 @@
     if (!adminToken) {
       setStatus('Poker admin token required.');
       renderCards([
-        '<h2>Poker Ops</h2><p>Set `poker.adminToken` in local storage before opening the poker operations dashboard.</p>',
+        renderStateCard('ops-auth', 'error', 'Poker Ops', 'Set `poker.adminToken` in local storage before opening the poker operations dashboard.', { plane: 'primary' }),
       ]);
       return;
     }
     setStatus('Loading poker operations dashboard...');
+    renderCards([
+      renderStateCard('route-loading', 'loading', 'Loading Poker Ops', 'Preparing live health, disputes, reconciliation, and treasury state.', { plane: 'primary' }),
+    ]);
     const payload = await api(buildPlayOpsDashboardApiPath(), {
       headers: { 'x-admin-token': adminToken },
     });
@@ -2946,7 +3489,7 @@
     ].filter(Boolean);
 
     if (!publicRail && tableAccess?.inviteOnly) {
-      cards.push(`
+      cards.push(sectionCard('invite-access', `
         <h2>Invite Access</h2>
         <p>Only invited wallets can open or join this table. Public lobby and rail discovery stay disabled.</p>
         <div class="pokerSummary">
@@ -2966,7 +3509,7 @@
             </div>
           `
           : `<p>${mySeat ? 'Your seated wallet no longer needs the invite code to stay at the table.' : 'This page was opened with a valid invite code.'}</p>`}
-      `);
+      `, { plane: 'reference' }));
     }
 
     if (canJoin) {
@@ -2977,7 +3520,7 @@
         .join('');
       cards.push(sectionCard('take-seat', `
         <h2>Take A Seat</h2>
-        <p>${tableAccess?.inviteOnly ? 'This invite-only table still gives your seat the same private human + agent thread. Other players only see your public actions.' : 'Buying in starts a private human + agent thread for your seat. Other players only see your public actions, not your private discussion.'}</p>
+        <p>${tableAccess?.inviteOnly ? 'This invite-only table still gives your seat the same private team notes. Other players only see your public actions.' : 'Buying in starts private team notes for your seat. Other players only see your public actions, not your private discussion.'}</p>
         <form id="pokerPlayJoinForm" class="pokerForm">
           <label>
             Seat
@@ -3067,7 +3610,7 @@
           ${renderSummaryMetric('Stack', `${Number(mySeat.stackOil || 0)} OIL`)}
           ${renderSummaryMetric('Status', seatStatus)}
           ${renderSummaryMetric('Role', hand?.actingSeat === Number(mySeat.seatNumber || 0) ? 'acting now' : 'waiting')}
-          ${renderSummaryMetric('Auto-Act', formatAutoActLabel(autoAct?.mode))}
+          ${renderSummaryMetric('Auto Play', formatAutoActLabel(autoAct?.mode))}
           ${mySeat?.finishPosition ? renderSummaryMetric('Finish', `${Number(mySeat.finishPosition || 0)}`) : ''}
           ${Number(mySeat?.prizeOil || 0) > 0 ? renderSummaryMetric('Prize', `${Number(mySeat.prizeOil || 0)} OIL`) : ''}
           ${table?.tableType === 'tournament' && Number(mySeat?.currentBountyOil || 0) > 0 ? renderSummaryMetric('Current Bounty', `${Number(mySeat.currentBountyOil || 0)} OIL`) : ''}
@@ -3145,8 +3688,8 @@
     if (!publicRail && !adminClosed && mySeat) {
       const autoAct = mySeat?.autoAct && typeof mySeat.autoAct === 'object' ? mySeat.autoAct : { mode: 'off', enabled: false };
       cards.push(sectionCard('auto-act', `
-        <h2>Auto-Act</h2>
-        <p>Automation is opt-in per seat and stays visible in the live table state.</p>
+        <h2>Auto Play Help</h2>
+        <p>Automation is always optional. Turn it on only if you want your seat to keep acting by the rules you choose.</p>
         <div class="pokerSummary">
           ${renderSummaryMetric('Mode', formatAutoActLabel(autoAct?.mode))}
           ${renderSummaryMetric('Allow Disconnect', autoAct?.allowWhileDisconnected ? 'yes' : 'no')}
@@ -3157,25 +3700,25 @@
             Mode
             <select id="pokerPlayAutoActMode">
               <option value="off"${String(autoAct?.mode || 'off') === 'off' ? ' selected' : ''}>Off</option>
-              <option value="propose_only"${String(autoAct?.mode || '') === 'propose_only' ? ' selected' : ''}>Propose Only</option>
+              <option value="propose_only"${String(autoAct?.mode || '') === 'propose_only' ? ' selected' : ''}>Suggestions Only</option>
               <option value="check_fold"${String(autoAct?.mode || '') === 'check_fold' ? ' selected' : ''}>Check/Fold</option>
-              <option value="seat_agent_auto"${String(autoAct?.mode || '') === 'seat_agent_auto' ? ' selected' : ''}>Seat-Agent Auto</option>
+              <option value="seat_agent_auto"${String(autoAct?.mode || '') === 'seat_agent_auto' ? ' selected' : ''}>AI Teammate Auto</option>
             </select>
           </label>
           <label>
             <input id="pokerPlayAutoActAllowDisconnect" type="checkbox"${autoAct?.allowWhileDisconnected ? ' checked' : ''}>
             Allow while disconnected
           </label>
-          <button id="pokerPlayAutoActSaveButton" class="pokerButton" type="submit">Save Auto-Act</button>
+          <button id="pokerPlayAutoActSaveButton" class="pokerButton" type="submit">Save Auto Play</button>
         </form>
         <div class="pokerLinks">
-          <button id="pokerPlayAutoActOffButton" class="pokerButton" type="button">Turn Off Auto-Act</button>
+          <button id="pokerPlayAutoActOffButton" class="pokerButton" type="button">Turn Off Auto Play</button>
         </div>
       `, { plane: 'reference' }));
     }
 
     if (Number(review?.openDisputeCount || 0) > 0 || myDisputes.length) {
-      cards.push(`
+      cards.push(sectionCard('table-review', `
         <h2>Table Review</h2>
         <div class="pokerSummary">
           ${renderSummaryMetric('Status', review?.status || 'clear')}
@@ -3194,11 +3737,11 @@
             `).join('')}
           </div>
         ` : '<p>No seat dispute from you on this table.</p>'}
-      `);
+      `, { plane: 'reference' }));
     }
 
     if (series && table?.tableType === 'tournament') {
-      cards.push(`
+      cards.push(sectionCard('series-director', `
         <h2>Series Director</h2>
         <div class="pokerSummary">
           ${renderSummaryMetric('Series Tables', `${Number(series?.tableCount || 0)}`)}
@@ -3238,7 +3781,7 @@
           <a href="${escapeHtml(buildPokerHref(`/poker/play/series/${encodeURIComponent(series?.seriesId || '')}/timeline`))}">Series Timeline</a>
           <a href="${escapeHtml(buildPokerHref(`/poker/play/rail/series/${encodeURIComponent(series?.seriesId || '')}/timeline`))}">Public Timeline</a>
         </div>
-      `);
+      `, { plane: 'reference' }));
     }
 
     if (!publicRail && data?.study) {
@@ -3277,7 +3820,8 @@
     if (!publicRail && !adminClosed && mySeat && hand) {
       const proposal = data?.agentProposal && typeof data.agentProposal === 'object' ? data.agentProposal : null;
       cards.push(sectionCard('worker-seat-agent', `
-        <h2>Worker Seat Agent</h2>
+        <h2>AI Teammate Suggestion</h2>
+        <p>Ask your AI teammate for a plain-language suggested move, then decide whether to use it.</p>
         ${proposal
           ? `
             <div class="pokerSummary">
@@ -3285,21 +3829,23 @@
               ${renderSummaryMetric('Amount', `${Number(proposal.amountOil || 0)} OIL`)}
               ${renderSummaryMetric('Confidence', proposal.confidence || 'medium')}
             </div>
-            <p>${escapeHtml(proposal.body || 'No worker proposal body recorded.')}</p>
+            <p>${escapeHtml(proposal.body || 'No AI teammate suggestion is recorded for this hand.')}</p>
           `
-          : '<p>No worker proposal is persisted for this hand yet. Request one from the in-browser worker to keep the strategic line on the runtime path.</p>'}
+          : '<p>No AI teammate suggestion is saved for this hand yet. Ask for one when you want a quick line before you act.</p>'}
+        <div class="pokerSupportMeta" data-poker-support-kind="provider-meta" hidden aria-hidden="true"></div>
         <div class="pokerLinks">
-          <button id="pokerSeatAgentProposeButton" class="pokerButton" type="button">Request Worker Line</button>
-          ${proposal ? '<button id="pokerSeatAgentCommitButton" class="pokerButton" type="button">Commit Worker Action</button>' : ''}
+          <button id="pokerSeatAgentProposeButton" class="pokerButton" type="button">Ask AI Teammate</button>
+          ${proposal ? '<button id="pokerSeatAgentCommitButton" class="pokerButton" type="button">Use Suggested Action</button>' : ''}
         </div>
       `, { plane: 'supporting' }));
     }
 
     if (data?.suggestion && mySeat && !data?.agentProposal) {
-      cards.push(`
-        <h2>Your Agent Line</h2>
+      cards.push(sectionCard('seat-agent-suggestion', `
+        <h2>Quick AI Tip</h2>
         <p>${escapeHtml(data.suggestion.body || 'No suggestion yet.')}</p>
-      `);
+        <div class="pokerSupportMeta" data-poker-support-kind="provider-meta" hidden aria-hidden="true"></div>
+      `, { plane: 'supporting' }));
     }
 
     if (!publicRail && !adminClosed && mySeat && hand) {
@@ -3332,22 +3878,23 @@
 
     if (!publicRail && !adminClosed && mySeat && hand) {
       cards.push(sectionCard('seat-thread', `
-        <h2>Seat Thread</h2>
+        <h2>Team Notes</h2>
         <div class="pokerStack">
           ${messages.length ? messages.map((message) => `
             <div class="pokerMessage ${message.authorRole === 'agent' ? 'is-agent' : ''}">
               <div class="pokerLabel">${escapeHtml(message.authorRole)}</div>
               <div>${escapeHtml(message.body)}</div>
             </div>
-          `).join('') : '<p>No private thread yet.</p>'}
+          `).join('') : '<p>No private team notes yet.</p>'}
         </div>
         <form id="pokerPlayMessageForm" class="pokerForm">
           <label>
-            Discuss the next line
+            Discuss the next move
             <textarea id="pokerPlayMessageBody" placeholder="What line are we taking into this spot?"></textarea>
           </label>
-          <button class="pokerButton" type="submit">Send To Agent Thread</button>
+          <button class="pokerButton" type="submit">Send To Team Notes</button>
         </form>
+        <div class="pokerVoiceReadySlot" data-poker-voice-slot="seat-thread" hidden aria-hidden="true"></div>
       `, { plane: 'supporting' }));
     }
 
@@ -3382,6 +3929,7 @@
           ${hand.canUseTimeBank ? `<button id="pokerPlayTimeBankButton" class="pokerButton" type="button">Use Time Bank (+${Number(hand.timeBankRemainingSeconds || 0)}s)</button>` : ''}
           <button class="pokerButton" type="submit">Submit Action</button>
         </form>
+        <div class="pokerVoiceReadySlot" data-poker-voice-slot="submit-action" hidden aria-hidden="true"></div>
       `, { plane: 'primary', state: 'live' }));
     } else if (publicRail || actions.length) {
       cards.push(sectionCard('public-action-log', `
@@ -3399,24 +3947,37 @@
           ${renderSummaryMetric('Open Integrity Flags', `${Number(adminReview?.integritySummary?.openFlagCount || 0)}`)}
           ${renderSummaryMetric('Audit Events', `${Number(adminReview?.auditEvents?.length || 0)}`)}
         </div>
-        <div class="pokerLinks">
-          <a href="${escapeHtml(buildPokerHref('/poker/play/admin/integrity'))}">Integrity Queue</a>
-          ${adminClosed ? '' : `<button class="pokerButton" type="button" data-admin-table-close="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Close + Refund</button>`}
-          ${!adminClosed && series && table?.tableType === 'tournament' ? `<button class="pokerButton" type="button" data-admin-series-close="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}" data-admin-series-table-id="${escapeHtml(table?.tableId || '')}">Cancel Series + Refund</button>` : ''}
-          ${!adminClosed && series && table?.tableType === 'tournament' && table?.summary?.lateRegistrationOpen ? `<button class="pokerButton" type="button" data-admin-series-registration-close="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}">Close Registration</button>` : ''}
-          ${!adminClosed && series && table?.tableType === 'tournament' && series?.needsRebalance ? `<button class="pokerButton" type="button" data-admin-series-rebalance="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}">Rebalance Series</button>` : ''}
-          ${!adminClosed && series && table?.tableType === 'tournament' && series?.pendingBreakTableId ? `<button class="pokerButton" type="button" data-admin-series-break-table="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}" data-admin-break-table-id="${escapeHtml(series?.pendingBreakTableId || '')}">Break Pending Table</button>` : ''}
-          ${multiTableSeriesDirectorBreakReady ? `<button class="pokerButton" type="button" data-admin-series-break-start="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}">Start Series Break</button>` : ''}
-          ${multiTableSeriesDirectorBreakActive ? `<button class="pokerButton" type="button" data-admin-series-break-end="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}">End Series Break</button>` : ''}
-          ${!adminClosed && series && table?.tableType === 'tournament' && Array.isArray(series?.tableIds) && series.tableIds.length > 1 ? `<button class="pokerButton" type="button" data-admin-series-blinds-advance="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}">Advance Series Blinds</button>` : ''}
-          ${!adminClosed && table?.tableType === 'tournament' ? `<button class="pokerButton" type="button" data-admin-table-blinds-advance="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Advance Blinds</button>` : ''}
-          ${tournamentDirectorBreakReady ? `<button class="pokerButton" type="button" data-admin-table-break-start="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Start Break Now</button>` : ''}
-          ${!adminClosed && table?.tableType === 'tournament' && scheduledBreakActive ? `<button class="pokerButton" type="button" data-admin-table-break-end="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">End Break Early</button>` : ''}
-          ${!adminClosed && table?.tableType === 'tournament' && String(table?.status || '') === 'scheduled' ? `<button class="pokerButton" type="button" data-admin-table-start="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Start Table</button>` : ''}
-          ${series && table?.tableType === 'tournament' ? `<button class="pokerButton" type="button" data-admin-series-export="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}">Export Series Review</button>` : ''}
-          <button class="pokerButton" type="button" data-admin-export="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Export Review</button>
-          ${paused || adminClosed ? '' : `<button class="pokerButton" type="button" data-admin-table-pause="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Pause Table</button>`}
-          ${paused ? `<button class="pokerButton" type="button" data-admin-table-resume="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Resume Table</button>` : ''}
+        <div class="pokerActionCluster" data-admin-action-group="inspect">
+          <div class="pokerLabel">Inspect</div>
+          <div class="pokerLinks">
+            <a href="${escapeHtml(buildPokerHref('/poker/play/admin/integrity'))}">Integrity Queue</a>
+            ${series && table?.tableType === 'tournament' ? `<button class="pokerButton" type="button" data-admin-series-export="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}">Export Series Review</button>` : ''}
+            <button class="pokerButton" type="button" data-admin-export="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Export Review</button>
+          </div>
+        </div>
+        <div class="pokerActionCluster" data-admin-action-group="manage">
+          <div class="pokerLabel">Manage Play</div>
+          <div class="pokerLinks">
+            ${!adminClosed && series && table?.tableType === 'tournament' && table?.summary?.lateRegistrationOpen ? `<button class="pokerButton" type="button" data-admin-series-registration-close="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}">Close Registration</button>` : ''}
+            ${!adminClosed && series && table?.tableType === 'tournament' && series?.needsRebalance ? `<button class="pokerButton" type="button" data-admin-series-rebalance="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}">Rebalance Series</button>` : ''}
+            ${!adminClosed && series && table?.tableType === 'tournament' && series?.pendingBreakTableId ? `<button class="pokerButton" type="button" data-admin-series-break-table="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}" data-admin-break-table-id="${escapeHtml(series?.pendingBreakTableId || '')}">Break Pending Table</button>` : ''}
+            ${multiTableSeriesDirectorBreakReady ? `<button class="pokerButton" type="button" data-admin-series-break-start="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}">Start Series Break</button>` : ''}
+            ${multiTableSeriesDirectorBreakActive ? `<button class="pokerButton" type="button" data-admin-series-break-end="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}">End Series Break</button>` : ''}
+            ${!adminClosed && series && table?.tableType === 'tournament' && Array.isArray(series?.tableIds) && series.tableIds.length > 1 ? `<button class="pokerButton" type="button" data-admin-series-blinds-advance="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}">Advance Series Blinds</button>` : ''}
+            ${!adminClosed && table?.tableType === 'tournament' ? `<button class="pokerButton" type="button" data-admin-table-blinds-advance="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Advance Blinds</button>` : ''}
+            ${tournamentDirectorBreakReady ? `<button class="pokerButton" type="button" data-admin-table-break-start="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Start Break Now</button>` : ''}
+            ${!adminClosed && table?.tableType === 'tournament' && scheduledBreakActive ? `<button class="pokerButton" type="button" data-admin-table-break-end="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">End Break Early</button>` : ''}
+            ${!adminClosed && table?.tableType === 'tournament' && String(table?.status || '') === 'scheduled' ? `<button class="pokerButton" type="button" data-admin-table-start="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Start Table</button>` : ''}
+            ${paused || adminClosed ? '' : `<button class="pokerButton" type="button" data-admin-table-pause="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Pause Table</button>`}
+            ${paused ? `<button class="pokerButton" type="button" data-admin-table-resume="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Resume Table</button>` : ''}
+          </div>
+        </div>
+        <div class="pokerActionCluster" data-admin-action-group="destructive">
+          <div class="pokerLabel">Destructive</div>
+          <div class="pokerLinks">
+            ${adminClosed ? '' : `<button class="pokerButton" type="button" data-admin-table-close="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Close + Refund</button>`}
+            ${!adminClosed && series && table?.tableType === 'tournament' ? `<button class="pokerButton" type="button" data-admin-series-close="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}" data-admin-series-table-id="${escapeHtml(table?.tableId || '')}">Cancel Series + Refund</button>` : ''}
+          </div>
         </div>
         ${series && table?.tableType === 'tournament' && Array.isArray(series?.tableIds) && series.tableIds.length > 1 ? `
           <form id="pokerDirectorMoveSeatForm" class="pokerForm">
@@ -3949,7 +4510,7 @@
     const proposeButton = document.getElementById('pokerSeatAgentProposeButton');
     if (proposeButton && handId) {
       proposeButton.addEventListener('click', async () => {
-        setStatus('Requesting worker seat agent line...');
+        setStatus('Requesting AI teammate suggestion...');
         try {
           const gateway = await getPokerRuntimeGateway();
           if (!gateway || typeof gateway.pokerActionProposeTool !== 'function') {
@@ -3962,14 +4523,14 @@
           });
           await loadPlayTable(tableId);
         } catch (err) {
-          setStatus(`Worker proposal failed: ${err?.message || 'UNKNOWN'}`);
+          setStatus(`AI suggestion failed: ${err?.message || 'UNKNOWN'}`);
         }
       });
     }
     const commitButton = document.getElementById('pokerSeatAgentCommitButton');
     if (commitButton && handId) {
       commitButton.addEventListener('click', async () => {
-        setStatus('Committing worker action...');
+        setStatus('Using suggested AI action...');
         try {
           const gateway = await getPokerRuntimeGateway();
           if (!gateway || typeof gateway.pokerActionCommitTool !== 'function') {
@@ -3982,7 +4543,7 @@
           });
           await loadPlayTable(tableId);
         } catch (err) {
-          setStatus(`Worker commit failed: ${err?.message || 'UNKNOWN'}`);
+          setStatus(`Suggested action failed: ${err?.message || 'UNKNOWN'}`);
         }
       });
     }
@@ -4456,8 +5017,19 @@
   }
 
   async function loadPlayTable(tableId, { silent = false, rail = false } = {}) {
-    setTitle(rail ? 'Poker Rail Table' : 'Live Poker Table', rail ? `Public rail view for ${tableId}.` : `Shared 6-max table state for ${tableId}.`);
+    setTitle(rail ? 'Poker Rail Table' : 'Live Poker Table', rail ? `Public rail view for ${tableId}.` : `Current hand, team notes, and action controls for ${tableId}.`);
     if (!silent) setStatus('Loading live table...');
+    renderCards([
+      renderStateCard(
+        'route-loading',
+        'loading',
+        rail ? 'Loading Rail Table' : 'Loading Live Table',
+        rail
+          ? 'Preparing public seats, action log, and spectator-safe table state.'
+          : 'Preparing the current hand, seat state, and shared action controls.',
+        { plane: 'primary' },
+      ),
+    ]);
     const payload = await api(buildPlayTableApiPath(tableId, { rail }));
     const data = payload?.data && typeof payload.data === 'object' ? { ...payload.data } : {};
     const adminToken = rail ? '' : readStoredPokerAdminToken();
@@ -4473,6 +5045,7 @@
       }
     }
     renderCards(renderPlayTableCards(data, { rail }));
+    applyPlayTableDesignLayout(data, { rail });
     if (!rail) {
       bindPlayJoinForm(tableId);
       bindWaitlistControls(tableId);
@@ -4506,8 +5079,11 @@
 
   async function loadCentaurLobby() {
     clearLiveTableStream();
-    setTitle('Centaur Poker', 'Human + AI make one action together while the countdown runs.');
+    setTitle('Centaur Poker', 'You and your AI teammate make one action together while the countdown runs.');
     setStatus('Loading centaur lobby...');
+    renderCards([
+      renderStateCard('route-loading', 'loading', 'Loading Centaur Lobby', 'Preparing eligibility, snapshot-hour state, and shared-seat tournaments.', { plane: 'primary' }),
+    ]);
     const payload = await api('/api/poker/centaur/tournaments');
     const items = Array.isArray(payload?.data?.items) ? payload.data.items : [];
     const oilBalance = Number(payload?.data?.oilBalance?.balance || 0);
@@ -4532,7 +5108,7 @@
           <div class="pokerSplit">
             <div>
               <h2>${escapeHtml(item.title)}</h2>
-              <p>${escapeHtml(item?.summary?.headline || 'Human and AI share the same decision seat.')}</p>
+              <p>${escapeHtml(item?.summary?.headline || 'You and your AI teammate share the same decision seat.')}</p>
               ${renderMetaBadges([
                 item.status,
                 `${Number(item.buyInOil || 0)} OIL buy-in`,
@@ -4545,7 +5121,7 @@
           </div>
           `).join('')}
         `, { plane: 'primary' })
-        : sectionCard('centaur-lobby-empty', '<h2>No centaur tournaments available.</h2><p>The lobby is live, but no tournament is open yet.</p>', { plane: 'primary' }),
+        : renderStateCard('centaur-lobby-empty', 'empty', 'No centaur tournaments available.', 'The lobby is live, but no tournament is open yet.', { plane: 'primary' }),
     ]);
     setStatus(items.length ? `${items.length} centaur tournament${items.length === 1 ? '' : 's'} loaded.` : 'No centaur tournaments available.');
   }
@@ -4553,11 +5129,16 @@
   async function loadSeason(seasonId) {
     setTitle('Poker Season', `Mirrored operator detail for ${seasonId}.`);
     setStatus('Loading season detail...');
+    renderCards([
+      renderStateCard('route-loading', 'loading', 'Loading Mirrored Season', 'Preparing the mirrored operator season detail and submission tools.', { plane: 'primary' }),
+    ]);
     const payload = await api(`/api/poker/seasons/${encodeURIComponent(seasonId)}`);
     const season = payload?.data?.season || null;
     if (!season) {
       setStatus('Season not found.');
-      renderCards(['<h2>Season not found.</h2>']);
+      renderCards([
+        renderStateCard('season-missing', 'error', 'Season not found.', 'The requested mirrored season record is not available yet.', { plane: 'primary' }),
+      ]);
       return;
     }
     setStatus(`Season ${season.displayName} loaded.`);
@@ -4776,13 +5357,14 @@
     const cards = [
       sectionCard('centaur-summary', `
         <h2>${escapeHtml(tournament?.title || 'Centaur Tournament')}</h2>
-        <p>${escapeHtml(tournament?.summary?.headline || 'Human and AI act from the same seat against a live countdown.')}</p>
+        <p>${escapeHtml(tournament?.summary?.headline || 'You and your AI teammate act from the same seat against a live countdown.')}</p>
         <div class="pokerSummary">
           ${renderSummaryMetric('House', data?.houseId || 'Pending')}
           ${renderSummaryMetric('Wallet', data?.wallet?.address || 'Bind wallet')}
           ${renderSummaryMetric('OIL Balance', `${oilBalance}`)}
           ${renderSummaryMetric('Lock Status', verification?.status || 'unverified')}
         </div>
+        <div class="pokerSupportMeta" data-poker-support-kind="provider-meta" hidden aria-hidden="true"></div>
       `, { plane: 'supporting' }),
       sectionCard('centaur-snapshot-hour', `
         <h2>Snapshot Hour</h2>
@@ -4851,25 +5433,26 @@
         </div>
       `, { plane: 'primary' }));
       cards.push(sectionCard('centaur-discussion', `
-        <h2>Centaur Discussion</h2>
+        <h2>Team Discussion</h2>
         <div id="centaurMessages" class="pokerStack">
           ${messages.length ? messages.map((message) => `
             <div class="pokerMessage ${message.authorRole === 'agent' ? 'is-agent' : 'is-human'}">
               <div class="pokerLabel">${escapeHtml(message.authorRole)}</div>
               <div>${escapeHtml(message.body)}</div>
             </div>
-          `).join('') : '<p>No discussion yet.</p>'}
+          `).join('') : '<p>No team discussion yet.</p>'}
         </div>
         <form id="centaurMessageForm" class="pokerForm">
           <label>
             Discuss the next move
             <textarea id="centaurMessageBody" placeholder="What line do we want to take here?"></textarea>
           </label>
-          <button class="pokerButton" type="submit">Send Discussion Note</button>
+          <button class="pokerButton" type="submit">Send Team Note</button>
         </form>
+        <div class="pokerVoiceReadySlot" data-poker-voice-slot="centaur-discussion" hidden aria-hidden="true"></div>
       `, { plane: 'supporting' }));
       cards.push(sectionCard('centaur-submit-action', `
-        <h2>Submit Shared Action</h2>
+        <h2>Lock Team Action</h2>
         <div class="pokerStack">
           ${(Array.isArray(actions) && actions.length) ? actions.map((action) => `
             <div class="pokerRow">
@@ -4877,7 +5460,7 @@
               <span>${escapeHtml(action.actionKind)}</span>
               <span>${Number(action.amountOil || 0)} OIL</span>
             </div>
-          `).join('') : '<p>No action has been locked in yet.</p>'}
+          `).join('') : '<p>No team action has been locked in yet.</p>'}
         </div>
         <form id="centaurActionForm" class="pokerForm">
           <label>
@@ -4890,8 +5473,9 @@
             Amount OIL
             <input id="centaurActionAmount" type="number" min="0" value="${Number(tableState.minRaiseToOil || tableState.requiredCallOil || 0)}">
           </label>
-          <button class="pokerButton" type="submit">Lock Action</button>
+          <button class="pokerButton" type="submit">Lock Team Action</button>
         </form>
+        <div class="pokerVoiceReadySlot" data-poker-voice-slot="centaur-action" hidden aria-hidden="true"></div>
       `, { plane: 'primary' }));
     }
     return cards;
@@ -5005,11 +5589,15 @@
 
   async function loadCentaurTournament(tournamentId) {
     clearLiveTableStream();
-    setTitle('Centaur Table', `Shared human + AI table state for ${tournamentId}.`);
+    setTitle('Centaur Table', `Shared team seat state for ${tournamentId}.`);
     setStatus('Loading centaur table...');
+    renderCards([
+      renderStateCard('route-loading', 'loading', 'Loading Centaur Table', 'Preparing the shared seat, decision clock, and team discussion state.', { plane: 'primary' }),
+    ]);
     const payload = await api(`/api/poker/centaur/tournaments/${encodeURIComponent(tournamentId)}`);
     const data = payload?.data || {};
     renderCards(renderCentaurTournamentCards(data));
+    applyCentaurDesignLayout(data);
     bindCentaurVerifyForm(tournamentId);
     bindCentaurJoinForm(tournamentId);
     bindCentaurMessageForm(tournamentId, data?.hand?.handId || '');
@@ -5129,11 +5717,15 @@
       setPokerView('unknown');
       setTitle('Portal Poker', 'Unknown route');
       setStatus('Unknown poker route.');
-      renderCards(['<h2>Unknown poker route.</h2>']);
+      renderCards([
+        renderStateCard('route-missing', 'error', 'Unknown poker route.', 'The requested poker route is not part of the current shell.', { plane: 'primary' }),
+      ]);
     } catch (err) {
       setPokerView('error');
       setStatus(err.code ? `${err.code}: ${err.message}` : (err.message || 'Unexpected error'));
-      renderCards([`<h2>Unable to load poker page.</h2><p>${escapeHtml(err.code || err.message || 'Unexpected error')}</p>`]);
+      renderCards([
+        renderStateCard('route-error', 'error', 'Unable to load poker page.', err.code || err.message || 'Unexpected error', { plane: 'primary' }),
+      ]);
     }
   }
 

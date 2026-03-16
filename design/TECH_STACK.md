@@ -43,7 +43,8 @@ Future design phases should prefer:
 2. DOM order improvements,
 3. screen-level layout classes,
 4. deterministic screenshot assertions,
-5. minimal but meaningful motion.
+5. minimal but meaningful motion,
+6. structured advanced-detail containers instead of making every metric visible by default.
 
 Future design phases should avoid:
 
@@ -71,3 +72,4 @@ Localization and internationalization checks should use deterministic injected c
 1. Keep selectors stable when possible.
 2. If new wrapper classes or `data-*` hooks are needed for styling or tests, add them explicitly and document them.
 3. Any new visual assertions must be expressible in Playwright without live providers.
+4. If rich context is retained for LLM or advanced use, expose it through stable structured hooks or explicit advanced containers rather than default route clutter.

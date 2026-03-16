@@ -1,0 +1,42 @@
+[
+  {
+    "file": "/Users/robin/.codex/worktrees/8177/Portal/artifacts/poker-ui-overview/01_live_lobby.png",
+    "label": "Live poker lobby",
+    "route": "/poker/play?embed=1"
+  },
+  {
+    "file": "/Users/robin/.codex/worktrees/8177/Portal/artifacts/poker-ui-overview/02_live_cash_table.png",
+    "label": "Live cash table",
+    "route": "/poker/play/tables/pkt_play_cash_01?embed=1"
+  },
+  {
+    "file": "/Users/robin/.codex/worktrees/8177/Portal/artifacts/poker-ui-overview/03_tournament_schedule.png",
+    "label": "Tournament schedule",
+    "route": "/poker/play/schedule?embed=1"
+  },
+  {
+    "file": "/Users/robin/.codex/worktrees/8177/Portal/artifacts/poker-ui-overview/04_native_season_leaderboard.png",
+    "label": "Native live season leaderboard",
+    "route": "/poker/play/seasons/native/native-2026-03?embed=1"
+  },
+  {
+    "file": "/Users/robin/.codex/worktrees/8177/Portal/artifacts/poker-ui-overview/05_hand_review.png",
+    "label": "Hand review and study surface",
+    "route": "/poker/play/hands/pkplayhand_harness_6213c2ad789b8c70_2/review?embed=1"
+  },
+  {
+    "file": "/Users/robin/.codex/worktrees/8177/Portal/artifacts/poker-ui-overview/06_operator_review.png",
+    "label": "Operator review / director controls",
+    "route": "/poker/play/tables/pkt_play_capture_director_series_breaks?embed=1"
+  },
+  {
+    "file": "/Users/robin/.codex/worktrees/8177/Portal/artifacts/poker-ui-overview/07_public_rail_series.png",
+    "label": "Public rail series view",
+    "route": "/poker/play/rail/series/pkseries_b755f75c2a28d082?embed=1"
+  },
+  {
+    "file": "/Users/robin/.codex/worktrees/8177/Portal/artifacts/poker-ui-overview/08_centaur_table.png",
+    "label": "Centaur human + AI table",
+    "route": "/poker/centaur/tournaments/pkt_centaur_01?embed=1"
+  }
+]

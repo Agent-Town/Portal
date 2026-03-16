@@ -219,6 +219,71 @@ Every design phase must capture and assert:
   - primary actions remain understandable without AI jargon
   - teammate/help labels outrank provider or model metadata
 
+## F-19 - Default player routes are still too dense
+
+- Problem:
+  - the current redesign still shows too many full-weight sections in the default player view.
+- Seed:
+  - lobby, live table, schedule, season, centaur
+- Tests:
+  - `e2e/332_poker_design_lobby_dead_simple_default_ui.spec.js`
+  - `e2e/333_poker_design_live_table_dead_simple_default_ui.spec.js`
+  - `e2e/334_poker_design_schedule_dead_simple_default_ui.spec.js`
+  - `e2e/338_poker_design_season_compact_default_ui.spec.js`
+  - `e2e/339_poker_design_centaur_dead_simple_default_ui.spec.js`
+- Assertions:
+  - the default route exposes one dominant action plane
+  - dense support detail is not full-weight in the first read
+
+## F-20 - Rich detail is not yet clearly gated behind advanced surfaces
+
+- Problem:
+  - too much useful but non-essential information remains visible by default.
+- Seed:
+  - live table, schedule, season
+- Tests:
+  - `e2e/335_poker_design_advanced_detail_gate_contract.spec.js`
+- Assertions:
+  - advanced detail is collapsed, hidden, or moved to explicit secondary surfaces
+  - the player can act without reading dense support sections
+
+## F-21 - LLM-friendly context may be lost if visible clutter is reduced
+
+- Problem:
+  - simplification must not mean removing useful structured context entirely.
+- Seed:
+  - live table, centaur, study-enabled table
+- Tests:
+  - `e2e/336_poker_design_llm_support_metadata_contract.spec.js`
+- Assertions:
+  - rich support metadata still exists in machine-readable or explicit advanced form
+  - the default visible layout stays cleaner than the machine or context layer
+  - overlapping facts remain consistent between the human-default and advanced or machine-readable projections
+
+## F-22 - Player routes risk leaking operator or admin density
+
+- Problem:
+  - player surfaces can still inherit too much admin or system detail.
+- Seed:
+  - live table, schedule
+- Tests:
+  - `e2e/337_poker_design_player_route_admin_separation_ui.spec.js`
+- Assertions:
+  - player default routes do not foreground admin or operator surfaces
+  - admin controls remain clearly secondary or absent outside explicit operator states
+
+## F-23 - Chinese default mode must stay simple, not just unbroken
+
+- Problem:
+  - localization resilience alone is not enough; the simplified default layout must stay compact in Chinese too.
+- Seed:
+  - lobby, live table, centaur
+- Tests:
+  - `e2e/340_poker_design_chinese_simple_default_ui.spec.js`
+- Assertions:
+  - default Chinese routes remain action-first and compact
+  - localized detail does not force dense fallback composition
+
 ## F-16 - Simplified Chinese and localized expansion are not yet validated
 
 - Problem:

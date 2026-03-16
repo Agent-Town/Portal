@@ -5,7 +5,9 @@ Date: 2026-03-16
 Scope: redesign poker surfaces into a human-first, testable, modal-first interface system without changing functionality  
 Depends on: [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md), [FRONTEND_GUIDELINES.md](./FRONTEND_GUIDELINES.md), [APP_FLOW.md](./APP_FLOW.md), [PRD.md](./PRD.md), [TECH_STACK.md](./TECH_STACK.md), [04_poker_play_design_v1_audit_baseline.md](./04_poker_play_design_v1_audit_baseline.md), [specs/02_api_contract.md](../specs/02_api_contract.md), [AGENTS.md](../AGENTS.md)  
 Companion backlog: [02_poker_play_design_v1_backlog.md](./02_poker_play_design_v1_backlog.md)  
-Companion TDD spec: [03_poker_play_design_v1_tdd_spec.md](./03_poker_play_design_v1_tdd_spec.md)
+Companion TDD spec: [03_poker_play_design_v1_tdd_spec.md](./03_poker_play_design_v1_tdd_spec.md)  
+Reference addendum: [07_poker_play_design_v1_dead_simple_research.md](./07_poker_play_design_v1_dead_simple_research.md)
+Formal methods companion: [08_poker_play_design_v1_formal_methods.md](./08_poker_play_design_v1_formal_methods.md), [tla/PokerDesignProjection.tla](./tla/PokerDesignProjection.tla)
 
 This document defines the target poker design direction. It is intentionally strict. The goal is not to decorate the current UI. The goal is to restructure the current experience so the screens feel obvious, quiet, and fast under pressure while preserving every existing feature.
 
@@ -29,6 +31,13 @@ It still does not have:
 8. explicit beginner-first AI framing,
 9. English and Simplified Chinese layout resilience,
 10. provider-neutral and future voice-ready design rules.
+
+The design bar is now stricter than when this pack was first written:
+
+1. the default player UI must be dead simple,
+2. rich state should remain available without being fully visible,
+3. the LLM should be able to help the user explore detail,
+4. advanced detail should be explicit, not ambient clutter.
 
 Design v1 closes those gaps in this order:
 
@@ -56,6 +65,10 @@ These decisions are binding for this program.
 12. English and Simplified Chinese are required design-validation locales.
 13. Provider, model, and service names stay in supporting metadata unless the route explicitly exists to inspect them.
 14. Future voice affordances must be anticipated structurally, not improvised later.
+15. Default player routes must optimize for the next action, not for showing all available data.
+16. If a detail mainly exists for the LLM, study, or advanced players, it should be demoted to an advanced or hidden support layer.
+17. Human-default, advanced, and LLM-friendly detail layers must all project from the same canonical state.
+18. Projection, visibility, and gating rules that can be stated formally should be kept in the TLA+ design model and updated before implementation.
 
 ## 3. Current-State Problems To Solve
 
@@ -71,6 +84,8 @@ The baseline audit found these structural issues:
 8. beginner users are not explicitly guided through what the AI teammate is doing,
 9. the current design pack does not yet validate Chinese or expanded localized copy,
 10. discussion and action surfaces do not yet reserve voice-ready structure.
+11. the default player routes are still too dense relative to mature poker products,
+12. detail that should be secondary is still visible at full weight too often.
 
 ## 4. Product Surfaces To Redesign
 
@@ -82,7 +97,8 @@ Required outcome:
 2. live tables become the second read,
 3. identity and policy move to a compact supporting section,
 4. native season and schedule become tertiary navigation,
-5. AI/team-help copy uses plain language first and survives English and Simplified Chinese labels.
+5. AI/team-help copy uses plain language first and survives English and Simplified Chinese labels,
+6. policy and wallet detail compress into one compact strip or advanced layer.
 
 ## 4.2 Live Table
 
@@ -93,7 +109,8 @@ Required outcome:
 3. legal actions are visually stronger than auxiliary tools,
 4. seat thread, study, and auto-act become supporting planes,
 5. the table feels live without visual noise,
-6. any AI guidance is framed as teammate help, not model configuration.
+6. any AI guidance is framed as teammate help, not model configuration,
+7. most support detail moves into explicit advanced layers or secondary panels.
 
 ## 4.3 Tournament Schedule
 
@@ -103,7 +120,8 @@ Required outcome:
 2. player registration states are obvious,
 3. recurring templates remain visible but secondary,
 4. admin template authoring is clearly separated from player browsing,
-5. event cards remain clear across English and Simplified Chinese copy lengths.
+5. event cards remain clear across English and Simplified Chinese copy lengths,
+6. the player default view feels like a clean event picker, not a control console.
 
 ## 4.4 Hand Review
 
@@ -121,7 +139,8 @@ Required outcome:
 
 1. leaderboard information is clean and ranking-first,
 2. summary metrics are compact,
-3. table and OIL context support the ranking instead of competing with it.
+3. table and OIL context support the ranking instead of competing with it,
+4. deeper economy detail belongs behind an explicit detail layer.
 
 ## 4.6 Operator Review
 
@@ -147,7 +166,8 @@ Required outcome:
 1. lock verification, countdown, discussion, and shared decision feel like one ritual,
 2. the agent recommendation is clearly visible but not visually louder than the shared commit,
 3. the screen distinguishes `talking` from `locking`,
-4. future voice input can be added near discussion without restructuring the route.
+4. future voice input can be added near discussion without restructuring the route,
+5. the live centaur surface stays ritual-simple by default.
 
 ## 5. Screen Architecture Rules
 
@@ -169,6 +189,16 @@ Every screen must organize into:
 3. background reference plane.
 
 If a section cannot be placed into one of those three planes, it likely does not belong on that screen at full weight.
+
+## 5.2a Detail Governance
+
+Rules:
+
+1. the default player route should not expose every available metric,
+2. rich detail may exist for the LLM, but it should be machine-readable or explicitly secondary,
+3. advanced detail should be collapsed, hidden, or moved to dedicated detail or study surfaces,
+4. if a section is useful mainly for explanation rather than action, it should not crowd the first-read action plane,
+5. all projections should be sourced from one canonical route state so the simple view and advanced view cannot drift.
 
 ## 5.3 Beginner and Cross-Market Language Rules
 

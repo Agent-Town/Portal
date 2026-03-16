@@ -189,3 +189,17 @@ The first approved design work should focus on:
 2. button role separation,
 3. mobile-first reordering of the live table and lobby,
 4. route-specific composition rules.
+
+## 9. Simplicity Reset Addendum
+
+Latest product feedback changes the bar:
+
+1. the redesigned routes are still too cluttered by default,
+2. mature poker products keep most detail out of the first read,
+3. Agent Town should assume the LLM can carry more context than the default human UI should expose.
+
+Future design agents should treat this as a standing audit finding:
+
+1. default player routes remain too dense until proven otherwise,
+2. rich detail must be explicitly justified if it stays visible by default,
+3. advanced, study, and machine-facing context should be demoted unless the route exists specifically for that purpose.

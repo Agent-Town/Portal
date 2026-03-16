@@ -35,8 +35,10 @@ test('D0 token contract: lobby exposes token-backed shell and distinct action ro
   expect(tokenSnapshot.accent).toBe('#d6aa63');
   expect(tokenSnapshot.fontUi).toContain('PingFang SC');
 
-  const joinButton = page.getByRole('button', { name: 'Join Or Create' });
+  const joinButton = page.locator('#pokerPlayMatchmakeForm button[type="submit"]');
   const navLink = page.getByRole('link', { name: 'Tournament Schedule' });
+  const policyDrawer = page.locator('[data-poker-section="poker-policy"] details[data-poker-detail-level="advanced"]');
+  await policyDrawer.locator('summary').click();
   const dangerButton = page.getByRole('button', { name: 'Self-Exclude 24h' });
 
   await expect(joinButton).toHaveAttribute('data-action-role', 'primary');

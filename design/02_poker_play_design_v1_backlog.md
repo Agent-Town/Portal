@@ -62,6 +62,15 @@ To avoid collisions with existing engineering tests, this program reserves:
 30. `e2e/329_poker_design_provider_neutral_ui.spec.js`
 31. `e2e/330_poker_design_voice_ready_layout_contract.spec.js`
 32. `e2e/331_poker_design_international_persona_ui.spec.js`
+33. `e2e/332_poker_design_lobby_dead_simple_default_ui.spec.js`
+34. `e2e/333_poker_design_live_table_dead_simple_default_ui.spec.js`
+35. `e2e/334_poker_design_schedule_dead_simple_default_ui.spec.js`
+36. `e2e/335_poker_design_advanced_detail_gate_contract.spec.js`
+37. `e2e/336_poker_design_llm_support_metadata_contract.spec.js`
+38. `e2e/337_poker_design_player_route_admin_separation_ui.spec.js`
+39. `e2e/338_poker_design_season_compact_default_ui.spec.js`
+40. `e2e/339_poker_design_centaur_dead_simple_default_ui.spec.js`
+41. `e2e/340_poker_design_chinese_simple_default_ui.spec.js`
 
 Supplemental verification lanes allowed in this phase:
 
@@ -146,6 +155,21 @@ Bundle gate:
 2. centaur hierarchy tests pass,
 3. focus, disabled, empty, loading, and error tests pass,
 4. voice-ready layout contract passes where discussion/action inputs are present.
+
+### Phase D6 - Dead-simple default and LLM-rich secondary detail
+
+Goal:
+
+1. simplify the default player routes further,
+2. move rich detail into explicit advanced layers,
+3. keep machine or LLM-friendly context available without visible clutter.
+
+Bundle gate:
+
+1. lobby, table, schedule, season, and centaur default-simplicity tests pass,
+2. advanced or detail gate contract passes,
+3. machine-readable support metadata contract passes,
+4. Chinese simple-default tests pass.
 
 ## 5. Tickets
 
@@ -329,3 +353,57 @@ Bundle gate:
 - Acceptance criteria:
   - provider/service references remain visually secondary
   - voice-ready slot can be introduced without structural redesign
+
+## PDK-315 - Dead-simple lobby default
+
+- Priority: P0
+- Phase: D6
+- Goal: reduce the lobby to quick seat, live tables, and one compact account strip by default.
+- Acceptance criteria:
+  - wallet, policy, and dense metadata no longer dominate the first read
+  - schedule and season remain reachable without competing with quick seat
+
+## PDK-316 - Dead-simple live table default
+
+- Priority: P0
+- Phase: D6
+- Goal: keep current hand and action bar dominant while demoting notes, study, disputes, and movement detail to explicit secondary layers.
+- Acceptance criteria:
+  - player can act without scanning multiple support panels
+  - support detail is present but not full-weight in the default route
+
+## PDK-317 - Advanced detail gate
+
+- Priority: P0
+- Phase: D6
+- Goal: define which information is default-visible versus advanced or detail-only.
+- Acceptance criteria:
+  - advanced detail is collapsed, hidden, or moved to explicit secondary surfaces
+  - no player route leaks operator-style density by default
+
+## PDK-318 - LLM support metadata discipline
+
+- Priority: P1
+- Phase: D6
+- Goal: keep richer context available to the LLM without asking the human to parse it visually.
+- Acceptance criteria:
+  - machine-readable support containers or explicit advanced surfaces exist where needed
+  - provider, model, and service labels remain secondary or hidden from the default action plane
+
+## PDK-319 - Dead-simple schedule and season defaults
+
+- Priority: P1
+- Phase: D6
+- Goal: make schedule and season read as compact player products first.
+- Acceptance criteria:
+  - schedule opens as an event calendar, not a config surface
+  - season opens as a ranking surface, not a dense economy report
+
+## PDK-320 - Dead-simple centaur default
+
+- Priority: P1
+- Phase: D6
+- Goal: make centaur feel ritual-simple by default, with explanation and support detail demoted.
+- Acceptance criteria:
+  - verify, join, and live commit remain the dominant reads
+  - rich explanation does not crowd the shared decision flow

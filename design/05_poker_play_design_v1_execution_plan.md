@@ -30,7 +30,8 @@ Do not redesign individual screens first. Do this in order:
 5. fix review, rail, and season,
 6. fix operator and centaur,
 7. finish accessibility, loading, empty, and motion states,
-8. close beginner-copy, localization, provider-neutral, and voice-ready gaps before declaring the design system stable.
+8. close beginner-copy, localization, provider-neutral, and voice-ready gaps before declaring the design system stable,
+9. run a simplicity reset so default player routes become dead simple and richer detail moves into advanced or LLM-facing layers.
 
 This order matters because otherwise later phases will keep fighting inconsistent primitives.
 
@@ -554,6 +555,8 @@ Recommended commit sequence:
 6. review and season refinement
 7. operator and centaur refinement
 8. accessibility, loading, empty, error, and motion pass
+9. dead-simple default simplification pass
+10. advanced-detail and LLM-support pass
 
 ## 11. Definition of Done
 
@@ -563,3 +566,34 @@ A phase is done only when:
 2. the corresponding design tests pass,
 3. mobile, tablet, and desktop captures look intentionally composed,
 4. functionality remains unchanged.
+
+## 12. Simplicity Reset Follow-On
+
+After the current hierarchy and localization work, the next implementation wave should simplify rather than add.
+
+Required direction:
+
+1. default player routes should show less by default,
+2. richer detail should move into explicit advanced surfaces,
+3. machine-readable or LLM-facing context can remain available without visible clutter,
+4. player routes should benchmark closer to mature poker products than to internal operations dashboards,
+5. human-default and advanced or LLM-facing projections should stay derived from the same canonical route state.
+
+## 13. Formal Precheck Requirement
+
+Before implementing any design change that alters:
+
+1. section order,
+2. route visibility,
+3. admin-only gating,
+4. default-vs-advanced detail visibility,
+5. locale-invariant structure,
+6. voice-ready structural visibility,
+
+the agent must update:
+
+1. [design/tla/PokerDesignProjection.tla](./tla/PokerDesignProjection.tla)
+2. [design/tla/PokerDesignProjection.cfg](./tla/PokerDesignProjection.cfg)
+3. [08_poker_play_design_v1_formal_methods.md](./08_poker_play_design_v1_formal_methods.md) if the modeling boundary changed
+
+This is the design-logic equivalent of a pre-implementation proof pass.
