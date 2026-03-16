@@ -1884,6 +1884,22 @@ function getHouseMissionPanelCopy() {
   };
 }
 
+function getHouseMissionExperienceDetailCopy(selectedItem = null) {
+  const savedName = getSavedHouseHqName();
+  if (!selectedItem) {
+    return savedName
+      ? `Select an experience to inspect available entry points for ${savedName} HQ.`
+      : 'Select an experience to inspect available entry points.';
+  }
+  const title = String(selectedItem?.title || selectedItem?.displayName || selectedItem?.experienceId || '').trim() || 'Unnamed experience';
+  const experienceId = String(selectedItem?.experienceId || '').trim() || '—';
+  const activeTeamId = String(houseSurfaceState.context.activeTeamId || '').trim() || '—';
+  if (!savedName) {
+    return `Experience ${title} · ${experienceId} · active team ${activeTeamId}`;
+  }
+  return `Experience ${title} · ${experienceId} · from ${savedName} HQ · active team ${activeTeamId}`;
+}
+
 function hashHouseHqSeed(value) {
   const input = String(value || '');
   let hash = 2166136261;
@@ -2231,7 +2247,7 @@ function renderHouseExperiencesSurface() {
   emptyNode.textContent = houseSurfaceState.experiences.emptyStateText || 'No House experiences available yet.';
   emptyNode.classList.toggle('is-hidden', items.length > 0);
   if (!items.length) {
-    detailNode.textContent = 'Select an experience to inspect available entry points.';
+    detailNode.textContent = getHouseMissionExperienceDetailCopy();
     return;
   }
 
@@ -2252,7 +2268,7 @@ function renderHouseExperiencesSurface() {
     listNode.appendChild(button);
   });
 
-  detailNode.textContent = `Experience ${String(selectedItem?.title || selectedItem?.displayName || selectedItem?.experienceId || '')} · ${String(selectedItem?.experienceId || '')} · active team ${String(houseSurfaceState.context.activeTeamId || '').trim() || '—'}`;
+  detailNode.textContent = getHouseMissionExperienceDetailCopy(selectedItem);
 
   const actions = Array.isArray(selectedItem?.actions) ? selectedItem.actions : [];
   actions.forEach((action) => {
