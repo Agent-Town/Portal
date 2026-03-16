@@ -1,0 +1,88 @@
+# FRONTEND_GUIDELINES
+
+Status: Canonical design-engineering guide for poker UI work  
+Date: 2026-03-16
+
+## 1. Scope
+
+These guidelines apply to poker UI design work in:
+
+- [public/poker.html](../public/poker.html)
+- [public/poker.js](../public/poker.js)
+- supporting shell integration in [public/app.js](../public/app.js) only when needed for modal presentation
+
+They do not authorize functionality changes.
+
+## 2. Current Architecture
+
+1. Poker is a server-served HTML shell with inline CSS in [public/poker.html](../public/poker.html).
+2. Route-specific content is composed in vanilla JS in [public/poker.js](../public/poker.js).
+3. The current rendering pattern is `setTitle()` plus `renderCards()` with HTML string sections.
+4. Poker runs modal-first through `?embed=1` and must remain compatible with the hub.
+5. Admin state is keyed through `localStorage` token lookup and must not be visually confused with player state.
+
+## 3. Design-Engineering Constraints
+
+1. Do not change route semantics.
+2. Do not change API contracts.
+3. Do not rename forms, buttons, or IDs if doing so would break existing tests, unless the design phase explicitly updates the corresponding tests.
+4. No framework migrations.
+5. No CSS frameworks.
+6. No functionality hidden behind design work.
+
+## 4. Required Engineering Pattern For Design Work
+
+1. Add screen-level wrapper classes or `data-view` markers so CSS can target route-specific layouts cleanly.
+2. Keep one content order in the DOM that matches user priority, especially on mobile.
+3. Use tokens from [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md), not new inline values.
+4. Distinguish these classes structurally:
+   - page shell,
+   - screen intro,
+   - metric strip,
+   - primary action group,
+   - secondary navigation group,
+   - destructive group,
+   - supporting rail,
+   - thread/review content.
+
+## 5. Responsive Rules
+
+1. Mobile is the default DOM priority.
+2. Tablet and desktop may rearrange visually through layout only after mobile order is correct.
+3. No poker screen may rely on a single breakpoint-only patch.
+4. Every approved phase must test mobile, tablet, and desktop.
+
+## 6. Accessibility Rules
+
+1. New design classes must include visible focus styling.
+2. New button roles must preserve native button semantics.
+3. Status text must stay readable and not be the only location for critical guidance.
+4. Do not convey meaning through color alone.
+
+## 7. Design Testability Rules
+
+Future design changes must be verifiable through Playwright.
+
+Allowed assertions:
+
+1. visible section order,
+2. presence of primary action above fold,
+3. absence of horizontal overflow,
+4. computed styles for token usage,
+5. role-based control grouping,
+6. screenshot snapshots at seeded states.
+
+## 8. Required Doc Sync
+
+When a design phase changes poker UI, update:
+
+1. [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md) if tokens or component rules changed
+2. [FRONTEND_GUIDELINES.md](./FRONTEND_GUIDELINES.md) if engineering rules changed
+3. [APP_FLOW.md](./APP_FLOW.md) if screen composition expectations changed
+4. [PRD.md](./PRD.md) if design success criteria changed
+5. [progress.txt](./progress.txt)
+6. [LESSONS.md](./LESSONS.md)
+
+## 9. Default Rule For Future Agents
+
+If a proposed design improvement requires a functional change, stop and flag it explicitly. Do not smuggle it into design implementation.

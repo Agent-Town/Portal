@@ -1,0 +1,34 @@
+2026-03-16
+
+Poker design documentation initialized.
+
+Created:
+- design/README.md
+- design/DESIGN_SYSTEM.md
+- design/FRONTEND_GUIDELINES.md
+- design/APP_FLOW.md
+- design/PRD.md
+- design/TECH_STACK.md
+- design/LESSONS.md
+- design/progress.txt
+- implementation pack
+- backlog
+- design TDD spec
+- baseline audit doc
+
+Current canonical design-spec set:
+- design/01_poker_play_design_v1_implementation_pack.md
+- design/02_poker_play_design_v1_backlog.md
+- design/03_poker_play_design_v1_tdd_spec.md
+- design/04_poker_play_design_v1_audit_baseline.md
+- design/05_poker_play_design_v1_execution_plan.md
+- design/06_poker_play_design_v1_test_matrix.md
+
+Implementation status:
+- no design changes implemented
+- no design phase approved
+
+Current next-step status:
+- frontend branch created for poker design work
+- implementation sequencing documented
+- audit findings mapped to deterministic future tests
