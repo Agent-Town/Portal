@@ -1850,11 +1850,15 @@ function normalizeHouseHqName(value) {
   return String(value || '').replace(/\s+/g, ' ').trim().slice(0, 64);
 }
 
-function getSavedHouseHqName() {
-  const houseId = String(houseSurfaceState.context.houseId || '').trim();
-  if (!houseId) return '';
-  const naming = ensureHouseHqNamingState();
-  return normalizeHouseHqName(naming.savedName);
+function getSavedHouseHqName(houseId = houseSurfaceState.context.houseId) {
+  const normalizedHouseId = String(houseId || '').trim();
+  if (!normalizedHouseId) return '';
+  const currentHouseId = String(houseSurfaceState.context.houseId || '').trim();
+  if (normalizedHouseId === currentHouseId) {
+    const naming = ensureHouseHqNamingState();
+    return normalizeHouseHqName(naming.savedName);
+  }
+  return normalizeHouseHqName(readHouseHqNamingRecord(normalizedHouseId)?.name);
 }
 
 function getHouseDistrictTitle() {
@@ -1868,6 +1872,37 @@ function renderHouseDistrictHeader() {
   const titleNode = el('districtModalTitle');
   if (!titleNode) return;
   titleNode.textContent = getHouseDistrictTitle();
+}
+
+function getHouseShareCardCtaLabel({ houseId = houseSurfaceState.context.houseId, sharePath = '' } = {}) {
+  const savedName = getSavedHouseHqName(houseId);
+  const hasSharePath = String(sharePath || '').trim().startsWith('/s/');
+  if (!savedName) return hasSharePath ? 'Open share card' : 'Open share card (preview)';
+  return hasSharePath ? `Open ${savedName} HQ share card` : `Preview ${savedName} HQ share card`;
+}
+
+function getHouseShareCardMissingStatusText(houseId = houseSurfaceState.context.houseId) {
+  const savedName = getSavedHouseHqName(houseId);
+  return savedName
+    ? `No share yet for ${savedName} HQ. Opening placeholder card.`
+    : 'No share yet for this house. Opening placeholder card.';
+}
+
+function renderHouseShareCardCta({ houseId = houseSurfaceState.context.houseId, sharePath = '' } = {}) {
+  const openShareCardBtn = el('openShareCardBtn');
+  const shareCardStatus = el('shareCardStatus');
+  const normalizedHouseId = String(houseId || '').trim();
+  const resolvedSharePath = String(sharePath || '').trim();
+  if (openShareCardBtn) {
+    openShareCardBtn.textContent = getHouseShareCardCtaLabel({
+      houseId: normalizedHouseId,
+      sharePath: resolvedSharePath,
+    });
+    openShareCardBtn.disabled = !normalizedHouseId;
+  }
+  if (shareCardStatus && !normalizedHouseId) {
+    shareCardStatus.textContent = '';
+  }
 }
 
 function getHouseMissionPanelCopy() {
@@ -2039,13 +2074,14 @@ function renderHouseHqEntrySurface() {
   const agentWordNode = el('houseHqAgentWord');
   const previewNode = el('houseHqNamePreview');
   const inputNode = el('houseHqNameInput');
+  const houseId = String(houseSurfaceState.context.houseId || '').trim();
   const ready = isHouseHqFirstEntryReady();
   if (panel) panel.classList.toggle('is-hidden', !ready);
   if (startMissionBtn) startMissionBtn.disabled = !ready;
   renderHouseDistrictHeader();
+  renderHouseShareCardCta({ houseId, sharePath: resolveSharePathFromState(lastState) });
   if (!panel || !ready) return;
 
-  const houseId = String(houseSurfaceState.context.houseId || '').trim();
   const activeTeamId = String(houseSurfaceState.context.activeTeamId || '').trim();
   const naming = ensureHouseHqNamingState();
   const draftName = normalizeHouseHqName(naming.draftName || naming.savedName || naming.suggestedName) || naming.suggestedName;
@@ -9040,14 +9076,14 @@ function bindTownDistrictControls() {
       if (shareCardStatus) shareCardStatus.textContent = 'Resolving share card...';
       try {
         let sharePath = resolveSharePathFromState(lastState);
-        const houseId = String(lastState?.houseId || walletHouseId || '').trim();
+        const houseId = String(lastState?.houseId || walletHouseId || houseSurfaceState.context.houseId || '').trim();
         if (!sharePath && houseId) {
           sharePath = await lookupSharePathByHouse(houseId);
         }
         if (!sharePath) {
           sharePath = '/s/sh_missing';
           if (shareCardStatus) {
-            shareCardStatus.textContent = 'No share yet for this house. Opening placeholder card.';
+            shareCardStatus.textContent = getHouseShareCardMissingStatusText(houseId);
           }
         } else if (shareCardStatus) {
           shareCardStatus.textContent = '';
@@ -12773,16 +12809,10 @@ async function updateUI(state) {
     if (openHouseLink) openHouseLink.href = `/house?house=${encodeURIComponent(houseId)}`;
   }
 
-  const openShareCardBtn = el('openShareCardBtn');
-  const shareCardStatus = el('shareCardStatus');
-  if (openShareCardBtn) {
-    const sharePath = resolveSharePathFromState(state);
-    openShareCardBtn.textContent = sharePath ? 'Open share card' : 'Open share card (preview)';
-    openShareCardBtn.disabled = !houseId;
-  }
-  if (shareCardStatus && !houseId) {
-    shareCardStatus.textContent = '';
-  }
+  renderHouseShareCardCta({
+    houseId,
+    sharePath: resolveSharePathFromState(state),
+  });
   const matched = !!state.match?.matched;
   const matchState = el('matchState');
   if (matchState) {
