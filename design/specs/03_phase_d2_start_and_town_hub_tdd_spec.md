@@ -33,6 +33,10 @@ Any JS changes in this phase must remain presentation-only.
 3. changing map behavior,
 4. adding new district features.
 
+Cross-cutting requirement:
+
+1. all changes must satisfy `design/specs/09_global_human_first_design_requirements.md`
+
 ## 4. Measurable acceptance criteria
 
 ### 4.1 Start page
@@ -40,14 +44,16 @@ Any JS changes in this phase must remain presentation-only.
 1. at `390 x 844`, the title and primary CTA are visible without scrolling,
 2. the primary CTA is the most visually dominant interactive element,
 3. the page still feels intentional if the hero media does not render,
-4. the warning footer no longer competes visually with the main action.
+4. the warning footer no longer competes visually with the main action,
+5. the first action remains understandable to users with no AI vocabulary.
 
 ### 4.2 Town hub
 
 1. each major district reads as tappable in under 2 seconds,
 2. the selected district is visually unambiguous,
 3. the existing status or supporting copy clearly reinforces what opens next,
-4. mobile tap targets feel thumb-safe and do not require pixel hunting.
+4. mobile tap targets feel thumb-safe and do not require pixel hunting,
+5. the town metaphor remains understandable across languages.
 
 ### 4.3 Responsive composition
 
@@ -81,4 +87,3 @@ This phase is complete only when:
 1. a first-time user can identify the next action instantly on `/start`,
 2. the town hub feels obviously interactive,
 3. the app's first impression feels confident rather than tentative.
-

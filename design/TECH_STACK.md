@@ -87,6 +87,34 @@ Design implication:
 2. the design must degrade gracefully,
 3. empty or loading states must feel intentional.
 
+## 7.1 Internationalization and provider flexibility implications
+
+The product will need to support:
+
+1. different languages,
+2. different regional users,
+3. different AI models and providers,
+4. future region-specific service choices.
+
+Design implication:
+
+1. core layout should not depend on one provider brand,
+2. primary flows should not be built around provider-specific wording,
+3. text containers must tolerate localization,
+4. design choices should assume English and Chinese are both important.
+
+## 7.2 Future voice implications
+
+Voice control is not the current primary implementation.
+It is a future constraint.
+
+Design implication:
+
+1. controls need stable names,
+2. rooms and panels need obvious identities,
+3. ambiguous icon-only action clusters should be avoided,
+4. visual confirmation states matter because voice flows will need them later.
+
 ## 8. Test and verification environment
 
 Primary commands:
@@ -114,4 +142,3 @@ If a design improvement requires:
 
 then it is not a pure design task anymore.
 It must be flagged separately.
-

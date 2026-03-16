@@ -35,6 +35,10 @@ Primary files:
 2. changing district ordering,
 3. changing modal routing or modal-first architecture.
 
+Cross-cutting requirement:
+
+1. all changes must satisfy `design/specs/09_global_human_first_design_requirements.md`
+
 ## 4. Measurable acceptance criteria
 
 1. modal shell visually recedes relative to the content it contains,
@@ -42,7 +46,8 @@ Primary files:
 3. close control is obvious but not dominant,
 4. each district surface can establish one clear primary region in the first screenful,
 5. modal content remains usable at mobile, tablet, and desktop,
-6. no modal content clips behind the agent sidebar or safe area.
+6. no modal content clips behind the agent sidebar or safe area,
+7. the active room identity remains obvious enough for future voice and multilingual use.
 
 ## 5. Evidence requirements
 
@@ -65,4 +70,3 @@ This phase is complete only when:
 1. the modal shell stops fighting the content,
 2. each district begins with a more obvious hierarchy,
 3. the app still feels like one product, not several unrelated panel stacks.
-

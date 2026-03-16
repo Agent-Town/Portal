@@ -26,6 +26,10 @@ Optional JS presentation support only if needed:
 4. removing the sidebar,
 5. changing brain configuration behavior.
 
+Cross-cutting requirement:
+
+1. all changes must satisfy `design/specs/09_global_human_first_design_requirements.md`
+
 ## 4. Measurable acceptance criteria
 
 ### 4.1 Town Hall
@@ -34,7 +38,8 @@ Optional JS presentation support only if needed:
 2. avatar customization is visually secondary to the identity step,
 3. processing and mint states feel guided, not clerical,
 4. the continue action is obvious once available,
-5. mobile onboarding remains usable without feeling cramped.
+5. mobile onboarding remains usable without feeling cramped,
+6. onboarding remains understandable to users unfamiliar with agent setup concepts.
 
 ### 4.2 Agent sidebar
 
@@ -64,4 +69,3 @@ This phase is complete only when:
 1. onboarding feels guided rather than procedural,
 2. the sidebar feels like support infrastructure rather than a competing product surface,
 3. no onboarding or debug behavior changed functionally.
-

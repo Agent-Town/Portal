@@ -27,6 +27,7 @@ Use this document after reading:
 8. `design/LESSONS.md`
 9. `design/specs/00_design_tdd_protocol.md`
 10. `design/specs/01_design_audit_baseline_2026_03_16.md`
+11. `design/specs/09_global_human_first_design_requirements.md`
 
 ## 1. Execution rule
 
@@ -55,7 +56,11 @@ Every future design phase must preserve:
 5. all current feature capability,
 6. deterministic Playwright coverage,
 7. current `data-testid` hooks unless intentionally migrated with test updates,
-8. the pixel-RPG world identity.
+8. the pixel-RPG world identity,
+9. usability for low-AI-literacy users,
+10. international flexibility, especially English and Chinese,
+11. provider-agnostic primary flows,
+12. future voice-ready interaction grammar.
 
 Do not:
 
@@ -69,7 +74,9 @@ The correct design move is:
 
 1. keep the world rich,
 2. make the interface quieter,
-3. make the user's next action obvious.
+3. make the user's next action obvious,
+4. name actions in human language,
+5. avoid letting infrastructure vocabulary become the product face.
 
 ## 3. Surface inventory
 
@@ -87,6 +94,8 @@ The current frontend surfaces that must be considered together are:
 10. right-side agent sidebar and debug stack
 
 The work is not complete until all of these surfaces feel like one authored product family.
+
+They must also feel understandable to users who do not think in AI systems language.
 
 ## 4. Master findings matrix
 
@@ -110,7 +119,9 @@ Required outcome:
 4. sharper primary versus secondary versus token hierarchy,
 5. calmer chrome with a richer world layer behind it,
 6. one icon language for action and one for state, both visually consistent,
-7. a design system future agents can extend without inventing one-off fixes.
+7. a design system future agents can extend without inventing one-off fixes,
+8. token and typography rules that remain stable under English and Chinese UI,
+9. primary action naming that stays compatible with future voice control.
 
 Primary files:
 
@@ -145,7 +156,8 @@ Required outcome:
 2. the primary CTA is the obvious next step,
 3. the media frame supports rather than dominates,
 4. fallback presentation looks intentional if media is absent,
-5. the bottom of the screen remains calm on mobile.
+5. the bottom of the screen remains calm on mobile,
+6. the first action is understandable without knowing what an AI agent is.
 
 Primary files:
 
@@ -177,7 +189,8 @@ Required outcome:
 2. the next action after tapping a district is obvious,
 3. the world remains expressive without forcing interpretation,
 4. the sidebar becomes a supporting presence unless engaged,
-5. touch behavior feels intentional on mobile.
+5. touch behavior feels intentional on mobile,
+6. the map reads like places and actions, not a technical dashboard.
 
 Primary files:
 
@@ -209,7 +222,8 @@ Required outcome:
 2. one inner content surface becomes the clear focus,
 3. secondary panels step back visually,
 4. all district modals share one composition grammar,
-5. information density feels deliberate rather than stacked.
+5. information density feels deliberate rather than stacked,
+6. room identity remains obvious enough for future voice reference.
 
 Primary files:
 
@@ -247,7 +261,8 @@ Required outcome:
 2. one primary working area is obvious,
 3. discovery remains nearby but not noisy,
 4. supporting desks feel related and secondary,
-5. technical provenance stays available without dominating the first screenful.
+5. technical provenance stays available without dominating the first screenful,
+6. Library actions read as human verbs rather than AI concepts.
 
 Primary files:
 
@@ -281,7 +296,8 @@ Required outcome:
 2. each step has one dominant decision,
 3. customization is clearly secondary,
 4. processing reads as confident progress,
-5. identity completion feels meaningful rather than clerical.
+5. identity completion feels meaningful rather than clerical,
+6. the ceremony remains understandable without agent-setup literacy.
 
 Primary files:
 
@@ -312,7 +328,8 @@ Required outcome:
 1. the sidebar remains available and observable,
 2. it is visually subordinate until summoned,
 3. mobile and short-height layouts feel protected,
-4. debugging remains transparent without dominating the town.
+4. debugging remains transparent without dominating the town,
+5. the main app still reads as the product for non-technical users.
 
 Primary files:
 
@@ -389,7 +406,8 @@ Future agent must verify:
 1. display type is used sparingly,
 2. UI copy is calmer,
 3. metadata is quieter than titles,
-4. no screen feels like every line is trying to headline itself.
+4. no screen feels like every line is trying to headline itself,
+5. label choices remain short, plain, and localization-friendly.
 
 ### 5.4 Color and depth
 
@@ -406,7 +424,8 @@ Future agent must verify:
 
 1. buttons of the same role look the same everywhere,
 2. chips, pills, and tokens no longer impersonate primary controls,
-3. drawers, cards, and panels form one family.
+3. drawers, cards, and panels form one family,
+4. key controls can later be referred to cleanly in speech.
 
 ### 5.6 Motion
 
@@ -423,7 +442,8 @@ Future agent must verify:
 1. every blank state feels intentional,
 2. loading never looks like a broken surface,
 3. error language is calm and readable,
-4. these states follow the same visual system as full states.
+4. these states follow the same visual system as full states,
+5. fallback states remain understandable across languages and low technical literacy.
 
 ### 5.8 Responsiveness and accessibility
 
@@ -434,7 +454,8 @@ Future agent must verify:
 3. focus states remain visible,
 4. contrast remains adequate,
 5. screen-reader order is not harmed by visual reordering,
-6. the agent sidebar does not create unusable short-height layouts.
+6. the agent sidebar does not create unusable short-height layouts,
+7. English and Chinese remain plausible first-class UI targets.
 
 ## 6. Recommended implementation sequence
 
@@ -502,7 +523,8 @@ Every future implementation step must include:
 4. a short written rationale,
 5. confirmation that behavior did not change,
 6. passing targeted Playwright runs,
-7. passing `npm test`.
+7. passing `npm test`,
+8. explicit confirmation that the phase still satisfies `design/specs/09_global_human_first_design_requirements.md`.
 
 ## 8. File-target map for next agent
 

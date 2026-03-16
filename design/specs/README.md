@@ -14,7 +14,8 @@ Each spec should be treated as:
 1. `00_design_tdd_protocol.md`
 2. `01_design_audit_baseline_2026_03_16.md`
 3. `08_frontend_design_master_implementation_roadmap.md`
-4. approved phase spec(s) only
+4. `09_global_human_first_design_requirements.md`
+5. approved phase spec(s) only
 
 ## Spec structure
 

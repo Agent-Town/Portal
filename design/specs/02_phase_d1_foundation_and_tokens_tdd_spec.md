@@ -15,6 +15,10 @@ Establish the visual foundation required for all later design work:
 This phase is system-level.
 It should not redesign individual flows yet.
 
+Cross-cutting requirement:
+
+1. all changes must satisfy `design/specs/09_global_human_first_design_requirements.md`
+
 ## 2. Scope
 
 Primary files:
@@ -41,7 +45,8 @@ Optional markup touch only if required for semantic clarity:
 
 1. a display role and a UI role are visually distinct,
 2. body copy is calmer and more readable than headings,
-3. button text no longer looks identical in voice to large headings.
+3. button text no longer looks identical in voice to large headings,
+4. the system remains plausible for English and Chinese UI text.
 
 ### 4.2 Spacing
 
@@ -59,7 +64,8 @@ Optional markup touch only if required for semantic clarity:
 
 1. primary buttons read clearly as primary,
 2. supporting buttons do not compete with primary actions,
-3. pills and library tokens no longer look like near-equal buttons.
+3. pills and library tokens no longer look like near-equal buttons,
+4. primary action labels can remain short, human, and voice-friendly.
 
 ### 4.5 Responsiveness
 
@@ -90,4 +96,3 @@ This phase is complete only when:
 1. the visual system reads more calmly before any route-specific redesign begins,
 2. later phases can reference explicit token roles instead of one-off values,
 3. no functionality changed.
-

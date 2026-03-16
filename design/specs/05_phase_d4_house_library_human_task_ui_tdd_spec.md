@@ -16,6 +16,10 @@ The Library should feel like:
 
 not like one long administrative form.
 
+Cross-cutting requirement:
+
+1. all changes must satisfy `design/specs/09_global_human_first_design_requirements.md`
+
 ## 2. Scope
 
 Primary files:
@@ -53,7 +57,8 @@ Supporting specs to preserve:
 
 1. at mobile and desktop, the first screenful reveals one clear primary Library purpose,
 2. the user can identify where to save, discover, or open without reading the entire panel,
-3. no more than one visually dominant action cluster appears at once.
+3. no more than one visually dominant action cluster appears at once,
+4. the main Library verbs remain understandable without AI terminology.
 
 ### 5.2 Progressive disclosure
 
@@ -103,4 +108,3 @@ This phase is complete only when:
 1. the Library feels task-first,
 2. the underlying power remains intact,
 3. a non-technical user can infer what the Library is for without reading every section heading.
-

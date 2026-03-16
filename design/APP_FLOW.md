@@ -5,6 +5,13 @@ Last updated: 2026-03-16
 
 This file documents the user-facing routes and major journey surfaces relevant to design work.
 
+Cross-cutting rule:
+
+1. every major flow must remain understandable to non-technical users,
+2. every major flow must survive localization,
+3. every major flow should be describable in plain verbs,
+4. future voice interaction should be able to refer to the current room and main action clearly.
+
 ## 1. Route inventory
 
 ### 1.1 Front door
@@ -52,7 +59,8 @@ Primary user journey:
 Current design risk:
 
 1. the media frame dominates too early,
-2. if media is unavailable, the screen can look broken before it looks intentional.
+2. if media is unavailable, the screen can look broken before it looks intentional,
+3. the screen must work for users who do not know what an agent or provider is.
 
 ## 3. `/app` town hub flow
 
@@ -62,6 +70,13 @@ Primary user journey:
 2. identify the active or intended district,
 3. open a district in a modal,
 4. work inside the district without losing page-scoped worker continuity.
+
+Human-readable interpretation:
+
+1. "I am in town"
+2. "I can go to a place"
+3. "I know which place is active"
+4. "I can do one main thing there"
 
 Districts currently visible in the main hub:
 
@@ -123,7 +138,9 @@ Design consequence:
 
 1. it is a powerful tool,
 2. it can easily become visually administrative,
-3. hierarchy and progressive disclosure are essential.
+3. hierarchy and progressive disclosure are essential,
+4. primary actions must be human verbs, not AI vocabulary,
+5. the default state must still make sense across languages.
 
 ## 6. Town Hall flow
 
@@ -141,7 +158,8 @@ Design consequence:
 
 1. this is an onboarding ceremony,
 2. it should feel guided,
-3. it must not feel like a back-office form.
+3. it must not feel like a back-office form,
+4. it must be understandable by users who do not know how agents are configured.
 
 ## 7. Pony, Leaderboard, Saloon, Brain flows
 
@@ -208,5 +226,5 @@ This is mandatory because the current product reveals its biggest hierarchy and 
 1. too many systems in one scroll,
 2. task-first hierarchy not yet strong enough,
 3. advanced/manual controls still accumulate visual weight,
-4. human goals are less obvious than system structure.
-
+4. human goals are less obvious than system structure,
+5. language still risks sounding more technical than necessary for mainstream users.

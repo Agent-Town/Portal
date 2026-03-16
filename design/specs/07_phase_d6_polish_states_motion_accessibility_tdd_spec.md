@@ -28,6 +28,10 @@ Only presentation-related JS changes are allowed.
 3. heavy animation,
 4. performance-hostile decorative effects.
 
+Cross-cutting requirement:
+
+1. all changes must satisfy `design/specs/09_global_human_first_design_requirements.md`
+
 ## 4. Measurable acceptance criteria
 
 ### 4.1 Loading states
@@ -59,7 +63,8 @@ Only presentation-related JS changes are allowed.
 1. focus remains visible on all key controls,
 2. color contrast stays acceptable,
 3. no icon-only control lacks an accessible name,
-4. no status relies on color alone.
+4. no status relies on color alone,
+5. the final UI remains plausible for English and Chinese labels and future voice-target naming.
 
 ## 5. Evidence requirements
 
@@ -83,4 +88,3 @@ This phase is complete only when:
 1. the interface feels finished in motion and state transitions,
 2. the app remains calm when empty, loading, or failing,
 3. accessibility is visibly stronger than the baseline.
-

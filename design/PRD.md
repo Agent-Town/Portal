@@ -26,6 +26,32 @@ The design mandate is to make it feel:
 4. calm under complexity,
 5. consistent across all screens.
 
+It must also feel:
+
+1. globally understandable,
+2. friendly to non-technical users,
+3. game-like without becoming childish,
+4. adaptable across languages and provider stacks,
+5. ready for future voice interaction patterns.
+
+## 2.1 Audience contract
+
+The primary design audience is:
+
+1. people with very basic understanding of AI,
+2. people with very basic understanding of machine learning,
+3. people with very basic understanding of LLMs and agents,
+4. international users,
+5. Chinese users,
+6. users who care about outcomes more than technical setup.
+
+Design implication:
+
+1. the product cannot require AI fluency,
+2. the primary UI cannot depend on English-only jargon,
+3. the design should teach through place, hierarchy, verbs, and feedback,
+4. advanced technical language must stay secondary.
+
 ## 3. Core design requirements
 
 1. A first-time user should understand the next action in under 2 seconds.
@@ -34,6 +60,10 @@ The design mandate is to make it feel:
 4. The Library must feel human-meaningful, not file-system-like.
 5. The debug/agent layer must be present, but visually secondary unless actively in use.
 6. The modal-first architecture must be preserved.
+7. Primary user flows must be understandable with plain verbs rather than AI system nouns.
+8. Core surfaces must remain visually robust under localization, especially English and Chinese.
+9. Provider and model choice must not dominate primary user journeys.
+10. The interaction grammar must remain compatible with future voice control.
 
 ## 4. Screen-level requirements
 
@@ -98,7 +128,10 @@ These are the primary measurable outcomes for future phases:
 4. advanced or technical controls are hidden by default unless task-critical,
 5. visual hierarchy remains stable at mobile, tablet, and desktop,
 6. functionality remains unchanged,
-7. full Playwright suite remains green.
+7. full Playwright suite remains green,
+8. key actions remain understandable without AI jargon,
+9. primary screens remain legible under English and Chinese label conditions,
+10. the UI still reads as one calm game-like world rather than a technical control plane.
 
 ## 6. Non-goals
 
@@ -109,7 +142,8 @@ This design program does not authorize:
 3. new backend systems,
 4. social or gamified additions,
 5. route architecture changes that break modal-first continuity,
-6. adding decorative complexity in the name of polish.
+6. adding decorative complexity in the name of polish,
+7. requiring users to understand provider, model, or agent jargon in order to use the main product.
 
 ## 7. House Library-specific product direction
 
@@ -124,7 +158,12 @@ It is:
 4. better trust readability,
 5. simpler cross-device use.
 
-## 8. Approval rule
+## 8. Cross-cutting audience requirement
+
+All design phases must also satisfy:
+
+1. `design/specs/09_global_human_first_design_requirements.md`
+
+## 9. Approval rule
 
 No design phase should be implemented until the user explicitly approves that phase.
-

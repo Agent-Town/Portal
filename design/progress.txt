@@ -14,6 +14,7 @@ Current state:
   - progress.txt
 - Added phased design specs in `design/specs/`
 - Added master implementation roadmap for all currently known frontend audit findings
+- Added cross-cutting global human-first design requirements for low-AI-literacy, international, Chinese, provider-flexible, and future voice-ready design
 - Recorded March 2026 baseline audit findings for:
   - /start
   - /app town hub
@@ -27,6 +28,7 @@ Completed:
 - Current visual system documented from `public/styles.css`
 - Future design agent workflow documented
 - Frontend execution order documented from system foundation through polish
+- Cross-cutting audience and localization constraints documented for future design implementation
 
 Not yet done:
 - No design implementation phase has been approved
@@ -35,3 +37,4 @@ Not yet done:
 
 Recommended next step:
 - Approve Phase D1 before any frontend design implementation begins
+- Require every future design phase to satisfy `design/specs/09_global_human_first_design_requirements.md`

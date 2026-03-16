@@ -46,6 +46,7 @@ Read in this order before proposing changes:
 8. `specs/00_design_tdd_protocol.md`
 9. `specs/01_design_audit_baseline_2026_03_16.md`
 10. `specs/08_frontend_design_master_implementation_roadmap.md`
+11. `specs/09_global_human_first_design_requirements.md`
 
 Then read only the approved phase spec(s) you need to execute.
 

@@ -15,7 +15,8 @@ The product should feel:
 2. quiet,
 3. inevitable,
 4. readable in 2 seconds,
-5. playful in world-building but restrained in interface chrome.
+5. playful in world-building but restrained in interface chrome,
+6. globally readable without requiring AI literacy.
 
 The world may be rich.
 The interface must stay disciplined.
@@ -29,6 +30,9 @@ The interface must stay disciplined.
 5. Every surface must work intentionally at mobile, tablet, and desktop.
 6. The interface must not look like a debug tool unless it is the debug tool.
 7. The same component role must look and behave the same across all House surfaces.
+8. Primary controls must be nameable with simple human verbs.
+9. The system must tolerate localization, especially English and Chinese.
+10. The visual grammar must remain compatible with future voice control.
 
 ## 3. Current token baseline from `public/styles.css`
 
@@ -170,6 +174,26 @@ Every design change must preserve or improve:
 5. no color-only status encoding,
 6. predictable reading order in modal and drawer flows.
 
+## 6.1 Localization and global readability contract
+
+Every design change must also preserve or improve:
+
+1. support for English and Chinese label lengths,
+2. icon-first controls with localized accessible names,
+3. layouts that do not depend on English-only word length,
+4. text presentation that remains readable for Latin and Chinese scripts,
+5. primary actions that remain obvious without technical vocabulary.
+
+## 6.2 Voice-readiness contract
+
+Every design change must also preserve or improve:
+
+1. stable short action labels,
+2. unambiguous primary action naming,
+3. visible state changes not communicated by color alone,
+4. controls that can later be referenced clearly in speech,
+5. room and panel structures that make current context visually obvious.
+
 ## 7. Design system rules for future changes
 
 1. No rogue values. New spacing, color, radius, or motion values must be recorded here before use.
@@ -183,6 +207,8 @@ Every design change must preserve or improve:
 3. Reduce emphasis before adding emphasis.
 4. If a component can become quieter without losing clarity, it should.
 5. If a user must read long text to understand the next step, the hierarchy is wrong.
+6. If a user must understand AI jargon to act, the design is wrong.
+7. If a control label only works in English, it is not ready.
 
 ## 8. Approved direction, not yet implemented
 
@@ -193,7 +219,10 @@ These are approved as design direction for future phase planning, but not yet im
 3. define a formal spacing ladder,
 4. define a formal depth hierarchy,
 5. keep the world expressive while making interface surfaces quieter,
-6. move advanced controls behind progressive disclosure by default.
+6. move advanced controls behind progressive disclosure by default,
+7. use simple human verbs in primary flows,
+8. build layouts that remain composed for English and Chinese,
+9. maintain a control vocabulary that can later support voice interaction.
 
 ## 9. Pending additions required before major implementation
 
@@ -206,4 +235,3 @@ Future approved implementation phases should add explicit tokens for:
 5. focus ring,
 6. motion durations and easing curves,
 7. text roles beyond the current font assignment.
-

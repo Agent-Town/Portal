@@ -20,9 +20,11 @@ Before touching any UI file:
 1. read `design/README.md`,
 2. read all root docs in `design/`,
 3. read `design/specs/01_design_audit_baseline_2026_03_16.md`,
-4. read the approved phase spec,
-5. read any linked product and engineering specs,
-6. inspect the live app in this order:
+4. read `design/specs/08_frontend_design_master_implementation_roadmap.md`,
+5. read `design/specs/09_global_human_first_design_requirements.md`,
+6. read the approved phase spec,
+7. read any linked product and engineering specs,
+8. inspect the live app in this order:
    - mobile,
    - tablet,
    - desktop.
@@ -72,7 +74,10 @@ For every changed surface, verify:
 7. touch targets remain usable,
 8. focus states are visible,
 9. empty and loading states remain intentional,
-10. the worker/debug shell still behaves correctly.
+10. the worker/debug shell still behaves correctly,
+11. the main action is understandable without AI jargon,
+12. the screen remains plausible for English and Chinese UI,
+13. the action vocabulary remains compatible with future voice control.
 
 ## 6. Functional safety contract
 
@@ -113,4 +118,3 @@ NODE_ENV=test TEST_RESET_TOKEN=test-reset PORT=4212 npm run dev
 2. update `design/LESSONS.md`,
 3. update `design/DESIGN_SYSTEM.md` if tokens or component rules changed,
 4. summarize what remains approved but not yet implemented.
-

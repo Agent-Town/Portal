@@ -81,11 +81,49 @@ Mixed icon voices make the UI feel assembled instead of designed.
 
 If the user needs a paragraph to understand the next step, the layout is wrong.
 
-## 11. No design phase is complete until:
+## 11. The interface must teach itself without AI literacy
+
+The product cannot assume the user understands:
+
+1. models,
+2. providers,
+3. agent memory,
+4. LLMs,
+5. context systems.
+
+Primary flows must be understandable through:
+
+1. place,
+2. verbs,
+3. hierarchy,
+4. feedback.
+
+## 12. International means more than translated English
+
+A design is not global just because strings can be swapped.
+
+It must also:
+
+1. survive different text lengths,
+2. avoid English-only idioms,
+3. remain elegant for Chinese,
+4. avoid relying on culture-specific software assumptions.
+
+## 13. Future voice support begins with visual clarity
+
+Voice-ready UI starts now by making:
+
+1. rooms obvious,
+2. actions short and distinct,
+3. states visible,
+4. controls referable by simple names.
+
+## 14. No design phase is complete until:
 
 1. mobile feels intentional,
 2. tablet feels composed,
 3. desktop feels calm,
 4. empty and loading states still feel authored,
-5. the full test suite remains green.
-
+5. the full test suite remains green,
+6. the main action is understandable without AI jargon,
+7. English and Chinese remain plausible first-class targets.

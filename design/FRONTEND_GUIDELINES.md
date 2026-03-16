@@ -75,7 +75,8 @@ Not allowed without explicit separate approval:
 4. moving logic from front end to backend,
 5. breaking modal-first continuity,
 6. changing or removing analytics or state hooks,
-7. changing test semantics rather than updating tests to match approved design.
+7. changing test semantics rather than updating tests to match approved design,
+8. baking essential meaning into one language only.
 
 ## 4. Modal-first continuity guardrail
 
@@ -108,6 +109,17 @@ Required behavior:
 4. no bottom-edge collisions with the agent panel,
 5. no hidden primary action below the fold on key screens.
 
+## 6.1 Localization-safe implementation rules
+
+When changing markup or CSS:
+
+1. do not bake meaningful UI text into images,
+2. do not assume English-only label length,
+3. do not overfit widths to current English strings,
+4. keep button and chip layouts tolerant of shorter and denser Chinese labels,
+5. preserve accessible names so localized labels can later be applied cleanly,
+6. avoid decorative copy treatments that depend on Latin-only typography.
+
 ## 7. House Library-specific constraints
 
 The Library has become a large same-shell system. Design agents must preserve:
@@ -123,6 +135,24 @@ The Library has become a large same-shell system. Design agents must preserve:
 
 Visual simplification is allowed.
 Behavioral simplification is not automatically allowed.
+
+## 7.1 Human-first wording rule
+
+For primary user-facing surfaces:
+
+1. prefer outcome language over infrastructure language,
+2. prefer verbs over nouns,
+3. keep provider and model names secondary unless the user is explicitly configuring them,
+4. ensure the main task would still make sense to someone new to AI.
+
+## 7.2 Voice-ready structure rule
+
+Future design work should preserve:
+
+1. stable names for key rooms and actions,
+2. visible current-selection state,
+3. simple action groupings that can later map to spoken commands,
+4. layouts where a user can tell what is active without reading dense text.
 
 ## 8. Verification workflow for design implementation
 
@@ -142,4 +172,3 @@ For every approved design phase:
 2. If JS is needed, keep it limited to presentation state, not product logic.
 3. Prefer reusing existing semantic wrappers rather than inventing redundant container divs.
 4. Reduce visual complexity before introducing new decorative elements.
-
