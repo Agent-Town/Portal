@@ -61,6 +61,7 @@ Design implication:
 - the default interface should stay dead simple
 - deep operational detail should be available, but not forced into the main surface
 - when choosing between another dense UI block and assistant-guided explanation, prefer the assistant path unless the task requires immediate manual control
+- the assistant explanation path and the advanced-detail path must remain aligned with the same underlying truth
 
 ### 2.3 Game-like, not childish
 

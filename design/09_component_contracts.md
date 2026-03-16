@@ -104,6 +104,7 @@ Rules:
 - detailed status lists must not precede it visually
 - summary card copy must be understandable to non-technical users
 - summary card should let a user act without reading deep internal detail first
+- summary card must stay truthful to the richer detail available elsewhere; simplification must not distort meaning
 
 ### Overlay modal
 
@@ -201,6 +202,7 @@ Rules:
 - advanced disclosure must never precede the main summary or primary action
 - raw ids, dense lists, and verbose diagnostics belong here before they belong in the first viewport
 - disclosure labels must remain understandable without assuming technical knowledge
+- expanded detail must elaborate on the same underlying truth the summary surface already implies
 
 ## 7. Tabs
 

@@ -52,6 +52,7 @@ Before styling changes:
 - confirm the relevant token and component rules already exist in [design/08_design_system_spec.md](/Users/robin/.codex/worktrees/3e47/Portal/design/08_design_system_spec.md) and [design/09_component_contracts.md](/Users/robin/.codex/worktrees/3e47/Portal/design/09_component_contracts.md)
 - confirm the phase satisfies [design/11_global_audience_and_voice_requirements.md](/Users/robin/.codex/worktrees/3e47/Portal/design/11_global_audience_and_voice_requirements.md)
 - confirm the phase keeps visible UI summary-first while preserving deeper detail for advanced or assistant-guided access
+- confirm the simple view, advanced view, and assistant-facing structured detail still tell the same story
 
 ### Step 3. Design in the smallest possible scope
 

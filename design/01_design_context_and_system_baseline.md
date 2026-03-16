@@ -149,19 +149,26 @@ These are mandatory for future design work:
 - If a user can reasonably learn something by asking the assistant, that is preferable to placing another dense information block in the first viewport
 - Default screens should not force users to parse provider, runtime, or system detail when the assistant can surface it on demand
 
-### 5.7 Global-first wording and layout
+### 5.7 One truth across summary, detail, and assistant
+
+- Summary UI, advanced UI, and assistant-readable detail must all reflect the same underlying product truth
+- The simple view may omit depth, but it must not imply something different from the detailed view
+- Advanced views may expand information, but they must not redefine meaning
+- If the assistant can explain something, that explanation should align with the same structured detail the UI is built from
+
+### 5.8 Global-first wording and layout
 
 - Essential actions must be understandable without AI jargon
 - Layout must survive translated copy and CJK text
 - No essential instruction may depend on English-specific word length
 
-### 5.8 Voice-ready structure
+### 5.9 Voice-ready structure
 
 - Controls must have concise, speakable labels
 - State feedback must be short enough to be understood when read aloud
 - No critical interaction may depend on hover-only disclosure
 
-### 5.9 No rogue values
+### 5.10 No rogue values
 
 - No new hardcoded spacing, radii, colors, shadows, or typography values outside shared tokens
 - No new inline `style=` for layout or visual treatment

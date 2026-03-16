@@ -26,6 +26,12 @@ The system keeps the Agent Town world. It removes unnecessary visual noise.
 - The assistant should be able to help users reach deeper detail without the visible UI becoming a dashboard
 - Designers should prefer progressive disclosure over persistent clutter
 
+## 1.2 No-Drift Rule
+
+- Summary, advanced, and assistant-readable layers must be derived from the same meaning, even if they expose different amounts of detail
+- If a surface is simplified, it should reduce volume, not change truth
+- If a detailed surface exists, it should enrich the same structure rather than introducing a parallel explanation model
+
 ## 2. Typography
 
 ### Font roles

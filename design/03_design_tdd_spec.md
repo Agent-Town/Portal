@@ -17,6 +17,7 @@ Users should be able to act from a simple surface and learn depth through conver
 - Design changes must preserve functionality exactly
 - Design changes must improve clarity for non-technical users, not just visual taste
 - Default surfaces should reduce visible complexity while preserving dense detail in advanced or assistant-accessible views
+- Summary surfaces, advanced surfaces, and assistant-readable detail should remain semantically aligned and testable for drift
 
 ## 3. Viewport Contract
 

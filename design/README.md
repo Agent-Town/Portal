@@ -38,6 +38,20 @@ That means:
 - users should be able to learn depth by asking the assistant, not by manually parsing cluttered panels
 - design agents should simplify the visible UI before removing access to underlying detail
 
+## No-Drift Principle
+
+Borrow the useful architectural idea from `tla-precheck`: one source of truth, no drift.
+
+For design, that means:
+
+- the simple summary surface
+- the advanced or detailed surface
+- the assistant-readable structured detail
+
+must describe the same underlying product truth.
+
+Future design agents should not let those layers diverge into three separate stories.
+
 ## Read Order
 
 1. [01_design_context_and_system_baseline.md](/Users/robin/.codex/worktrees/3e47/Portal/design/01_design_context_and_system_baseline.md)

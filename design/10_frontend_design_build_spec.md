@@ -24,6 +24,7 @@ Cross-cutting rules:
 - primary controls should use short speakable labels suitable for future voice workflows
 - default surfaces should show summary and next action first, while dense detail remains available through advanced or assistant-guided access
 - do not promote raw runtime, provider, or provenance detail into the first viewport unless the task requires immediate action on it
+- when simplifying a surface, reduce visible volume without creating semantic drift from the richer detailed view or assistant-readable structured data
 
 ## 2. Phase A: Token And Component Base
 
