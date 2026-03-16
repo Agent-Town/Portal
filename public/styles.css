@@ -3880,19 +3880,67 @@ body.town-hub-page .townPrimaryAction {
 }
 
 body.town-hub-page #agentSidebar.agent-sidebar.minimized {
-  border-color: rgba(139, 113, 74, 0.9);
+  left: auto;
+  right: 18px;
+  bottom: 18px;
+  transform: none;
+  width: min(248px, calc(100vw - 28px));
+  height: calc(44px * var(--agent-panel-zoom)) !important;
+  border-width: 1px;
+  border-color: rgba(126, 111, 92, 0.34);
   background:
-    linear-gradient(180deg, rgba(255, 248, 232, 0.9), rgba(232, 211, 176, 0.88)),
-    url("/images/parchment-bg.jpg") center/cover no-repeat;
+    linear-gradient(180deg, rgba(250, 246, 238, 0.78), rgba(231, 223, 208, 0.72));
   box-shadow:
-    0 10px 20px rgba(0, 0, 0, 0.22),
-    0 0 0 1px rgba(196, 136, 58, 0.12);
+    0 10px 24px rgba(0, 0, 0, 0.16),
+    0 0 0 1px rgba(255, 255, 255, 0.24) inset;
+  backdrop-filter: blur(10px);
 }
 
 body.town-hub-page #agentSidebar.agent-sidebar.minimized .sidebar-header {
-  background:
-    linear-gradient(180deg, rgba(46, 27, 14, 0.34), rgba(46, 27, 14, 0.14)),
-    url("/images/wood-header.jpg") center/cover no-repeat;
+  padding: 5px 8px;
+  border-bottom: 0;
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+body.town-hub-page #agentSidebar.agent-sidebar.minimized .sidebar-header-main {
+  gap: 6px;
+}
+
+body.town-hub-page #agentSidebar.agent-sidebar.minimized .sidebar-header h3 {
+  color: rgba(71, 52, 33, 0.92);
+  font-family: var(--font-readable);
+  font-size: calc(14px * var(--agent-panel-text-scale));
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-shadow: none;
+}
+
+body.town-hub-page #agentSidebar.agent-sidebar.minimized .status-indicator {
+  padding: calc(2px * var(--agent-panel-text-scale)) calc(7px * var(--agent-panel-text-scale));
+  border-width: 1px;
+  border-color: rgba(126, 111, 92, 0.32);
+  background: rgba(255, 255, 255, 0.54);
+  color: rgba(78, 61, 44, 0.88);
+  box-shadow: none;
+}
+
+body.town-hub-page #agentSidebar.agent-sidebar.minimized .sidebar-header-actions {
+  gap: 4px;
+}
+
+body.town-hub-page #agentSidebar.agent-sidebar.minimized .agent-panel-zoom-toggle,
+body.town-hub-page #agentSidebar.agent-sidebar.minimized .agent-debug-toggle {
+  display: none;
+}
+
+body.town-hub-page #agentSidebar.agent-sidebar.minimized .agent-minimize-toggle {
+  min-width: calc(28px * var(--agent-panel-text-scale));
+  min-height: calc(26px * var(--agent-panel-text-scale));
+  padding: calc(2px * var(--agent-panel-text-scale)) calc(7px * var(--agent-panel-text-scale));
+  border-color: rgba(114, 95, 73, 0.22);
+  background: rgba(84, 67, 48, 0.08);
+  color: rgba(78, 61, 44, 0.84);
 }
 
 body.town-hub-page .districtBackdrop {
@@ -3902,22 +3950,24 @@ body.town-hub-page .districtBackdrop {
 
 @media (max-width: 720px) {
   body.town-hub-page #agentSidebar.agent-sidebar.minimized {
-    width: min(304px, calc(100vw - 20px));
-    height: calc(46px * var(--agent-panel-zoom)) !important;
+    right: 10px;
+    bottom: 10px;
+    width: min(224px, calc(100vw - 20px));
+    height: calc(42px * var(--agent-panel-zoom)) !important;
     border-radius: 16px;
   }
 
   body.town-hub-page #agentSidebar.agent-sidebar.minimized .sidebar-header {
-    padding: 3px 8px;
+    padding: 4px 7px;
   }
 
   body.town-hub-page #agentSidebar.agent-sidebar.minimized .sidebar-header h3 {
-    font-size: calc(15px * var(--agent-panel-text-scale));
+    font-size: calc(13px * var(--agent-panel-text-scale));
   }
 
   body.town-hub-page #agentSidebar.agent-sidebar.minimized .status-indicator {
     font-size: calc(9px * var(--agent-panel-text-scale));
-    padding: calc(2px * var(--agent-panel-text-scale)) calc(6px * var(--agent-panel-text-scale));
+    padding: calc(1px * var(--agent-panel-text-scale)) calc(6px * var(--agent-panel-text-scale));
   }
 }
 

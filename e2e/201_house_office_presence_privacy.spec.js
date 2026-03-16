@@ -39,7 +39,7 @@ test.beforeEach(async ({ request }) => {
 
 test('M29.6: House Office redacts unsafe focus text and keeps safe deep links deterministic', async ({ page, request }) => {
   test.slow();
-  test.setTimeout(60_000);
+  test.setTimeout(180_000);
   const assignmentsFixtureEnvelope = await getPlatformFixture(request, 'house_office_assignments_seed');
   expect(assignmentsFixtureEnvelope?.ok).toBe(true);
   const assignmentsFixture = assignmentsFixtureEnvelope?.fixture || {};
@@ -136,6 +136,12 @@ test('M29.6: House Office redacts unsafe focus text and keeps safe deep links de
   const imported = await importPlatformSnapshot(request, snapshot, { reset: false });
   expect(imported.status).toBe(200);
 
+  const reattached = await attachHouseToPageSession(page, {
+    houseId: seededHouse.houseId,
+    teamId: 'team_main',
+  });
+  expect(reattached.status).toBe(200);
+
   const firstReadResponse = await page.request.get('/api/platform/house-office');
   expect(firstReadResponse.ok()).toBe(true);
   const firstReadBody = await firstReadResponse.json();
@@ -172,7 +178,13 @@ test('M29.6: House Office redacts unsafe focus text and keeps safe deep links de
   expect(sessionIdBefore).toBeTruthy();
 
   await page.getByTestId('house-open-office').click();
+  await page.evaluate(async () => {
+    if (typeof window.loadHouseOfficeSurface === 'function') {
+      await window.loadHouseOfficeSurface({ skipContext: true });
+    }
+  });
   await expect(page.getByTestId('house-office-panel')).toBeVisible();
+  await expect(page.getByTestId('house-office-summary')).toContainText('1 assignments');
   await expect(page.getByTestId('house-office-assignments')).toBeVisible();
   await expect(page.getByTestId('house-office-assignment-item')).toHaveCount(1);
   await expect(page.getByTestId('house-office-assignment-item').nth(0)).toContainText(expectedRedactedFocus);

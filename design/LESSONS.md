@@ -47,3 +47,7 @@ If the readable UI layer does not include sane CJK fallbacks, mixed Latin and Si
 ### 11. Support copy must sit below the action, not beside it
 
 Status text works best as subordinate reassurance. When support text is styled like another headline or pill, it competes with the primary decision instead of helping it.
+
+### 12. Debug availability does not require visual dominance
+
+The agent dock can stay one click away while using quieter materials, smaller type, and fewer visible controls at rest. People only need the tool when they decide to reach for it.

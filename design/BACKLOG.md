@@ -286,7 +286,7 @@ Test mapping:
 
 ### DG-104 — Debug panel shell demotion
 
-Status: `planned`
+Status: `implemented`
 
 Problem:
 

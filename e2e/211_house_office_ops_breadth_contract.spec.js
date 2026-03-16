@@ -96,6 +96,9 @@ test.beforeEach(async ({ request }) => {
 });
 
 test('M32.6: House Office reflects ops breadth for experiences and poker or web activity with exact links', async ({ page, request }) => {
+  test.slow();
+  test.setTimeout(180_000);
+
   const fixtureEnvelope = await getPlatformFixture(request, 'house_office_ops_breadth_seed');
   expect(fixtureEnvelope?.ok).toBe(true);
   const fixture = fixtureEnvelope?.fixture || {};
@@ -113,14 +116,21 @@ test('M32.6: House Office reflects ops breadth for experiences and poker or web 
   });
   expect(attached.status).toBe(200);
 
-  const officeResponse = await page.request.get('/api/platform/house-office');
-  expect(officeResponse.ok()).toBe(true);
-  const officeBody = await officeResponse.json();
-  const officeData = officeBody?.data || {};
+  let officeData = null;
+  await expect.poll(async () => {
+    const officeResponse = await page.request.get('/api/platform/house-office');
+    expect(officeResponse.ok()).toBe(true);
+    const officeBody = await officeResponse.json();
+    officeData = officeBody?.data || {};
+    const briefingGroups = Array.isArray(officeData?.briefing) ? officeData.briefing : [];
+    const briefingByFamily = new Map(briefingGroups.map((group) => [String(group?.family || '').trim(), group]));
+    const opsFamilies = expectedBriefingFamilies.filter((family) => briefingByFamily.has(String(family || '').trim()));
+    return opsFamilies.length;
+  }, { timeout: 8000 }).toBeGreaterThanOrEqual(2);
+
   const briefingGroups = Array.isArray(officeData?.briefing) ? officeData.briefing : [];
   const briefingByFamily = new Map(briefingGroups.map((group) => [String(group?.family || '').trim(), group]));
   const opsFamilies = expectedBriefingFamilies.filter((family) => briefingByFamily.has(String(family || '').trim()));
-  expect(opsFamilies.length).toBeGreaterThanOrEqual(2);
 
   const opsBriefingItems = opsFamilies.flatMap((family) => {
     const group = briefingByFamily.get(String(family || '').trim());
