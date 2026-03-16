@@ -58,13 +58,14 @@ Future design agents should not let those layers diverge into three separate sto
 2. [02_design_audit_and_target_state.md](/Users/robin/.codex/worktrees/3e47/Portal/design/02_design_audit_and_target_state.md)
 3. [03_design_tdd_spec.md](/Users/robin/.codex/worktrees/3e47/Portal/design/03_design_tdd_spec.md)
 4. [04_design_agent_runbook.md](/Users/robin/.codex/worktrees/3e47/Portal/design/04_design_agent_runbook.md)
-5. [05_screen_inventory_and_selector_map.md](/Users/robin/.codex/worktrees/3e47/Portal/design/05_screen_inventory_and_selector_map.md)
-6. [06_frontend_design_delivery_backlog.md](/Users/robin/.codex/worktrees/3e47/Portal/design/06_frontend_design_delivery_backlog.md)
-7. [07_frontend_design_phase_packets.md](/Users/robin/.codex/worktrees/3e47/Portal/design/07_frontend_design_phase_packets.md)
-8. [08_design_system_spec.md](/Users/robin/.codex/worktrees/3e47/Portal/design/08_design_system_spec.md)
-9. [09_component_contracts.md](/Users/robin/.codex/worktrees/3e47/Portal/design/09_component_contracts.md)
-10. [10_frontend_design_build_spec.md](/Users/robin/.codex/worktrees/3e47/Portal/design/10_frontend_design_build_spec.md)
-11. [11_global_audience_and_voice_requirements.md](/Users/robin/.codex/worktrees/3e47/Portal/design/11_global_audience_and_voice_requirements.md)
+5. [formal/README.md](/Users/robin/.codex/worktrees/3e47/Portal/design/formal/README.md)
+6. [05_screen_inventory_and_selector_map.md](/Users/robin/.codex/worktrees/3e47/Portal/design/05_screen_inventory_and_selector_map.md)
+7. [06_frontend_design_delivery_backlog.md](/Users/robin/.codex/worktrees/3e47/Portal/design/06_frontend_design_delivery_backlog.md)
+8. [07_frontend_design_phase_packets.md](/Users/robin/.codex/worktrees/3e47/Portal/design/07_frontend_design_phase_packets.md)
+9. [08_design_system_spec.md](/Users/robin/.codex/worktrees/3e47/Portal/design/08_design_system_spec.md)
+10. [09_component_contracts.md](/Users/robin/.codex/worktrees/3e47/Portal/design/09_component_contracts.md)
+11. [10_frontend_design_build_spec.md](/Users/robin/.codex/worktrees/3e47/Portal/design/10_frontend_design_build_spec.md)
+12. [11_global_audience_and_voice_requirements.md](/Users/robin/.codex/worktrees/3e47/Portal/design/11_global_audience_and_voice_requirements.md)
 
 ## Relationship To Existing Repo Docs
 
@@ -127,3 +128,18 @@ These lock:
 - global-audience, Chinese-language, jargon, and future voice-readiness requirements
 
 Until they are superseded, they are the build-agent source of truth for frontend design implementation.
+
+## Formal Logic Layer
+
+The visual design system now has a formal companion layer under:
+
+- [formal/README.md](/Users/robin/.codex/worktrees/3e47/Portal/design/formal/README.md)
+
+Future agents should use that layer when a design change affects:
+
+- summary versus advanced disclosure
+- assistant-readable detail
+- one-primary-action rules
+- modal continuity and route stability
+
+That layer does not replace visual review. It protects logic and meaning while the rest of this folder defines the visible system.

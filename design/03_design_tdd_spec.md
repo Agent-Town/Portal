@@ -18,6 +18,7 @@ Users should be able to act from a simple surface and learn depth through conver
 - Design changes must improve clarity for non-technical users, not just visual taste
 - Default surfaces should reduce visible complexity while preserving dense detail in advanced or assistant-accessible views
 - Summary surfaces, advanced surfaces, and assistant-readable detail should remain semantically aligned and testable for drift
+- If a milestone changes disclosure logic, modal continuity, or the relationship between summary/detail/assistant layers, the formal models under [design/formal/](/Users/robin/.codex/worktrees/3e47/Portal/design/formal) must be reviewed and synced
 
 ## 3. Viewport Contract
 
@@ -50,6 +51,22 @@ Reserve these filenames for future design acceptance tests:
 - `e2e/275_design_final_visual_smoke.spec.js`
 
 These are reserved numbers only. This document does not implement them.
+
+## 4.1 Formal Logic Companion
+
+The design TDD program has a formal companion layer under:
+
+- [design/formal/README.md](/Users/robin/.codex/worktrees/3e47/Portal/design/formal/README.md)
+- [design/formal/04_formal_mapping.md](/Users/robin/.codex/worktrees/3e47/Portal/design/formal/04_formal_mapping.md)
+
+That layer is mandatory for milestones that change:
+
+- summary-first versus advanced disclosure boundaries
+- assistant-visible structured detail
+- modal continuity and route stability
+- primary-action clarity as a state rule
+
+The formal layer does not replace screenshot-backed design review. It defines the logic that the visible design must preserve.
 
 ## 5. Milestone Plan
 

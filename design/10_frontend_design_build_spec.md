@@ -25,6 +25,7 @@ Cross-cutting rules:
 - default surfaces should show summary and next action first, while dense detail remains available through advanced or assistant-guided access
 - do not promote raw runtime, provider, or provenance detail into the first viewport unless the task requires immediate action on it
 - when simplifying a surface, reduce visible volume without creating semantic drift from the richer detailed view or assistant-readable structured data
+- if a phase changes summary/detail/assistant logic or modal continuity, update the relevant model under [design/formal/](/Users/robin/.codex/worktrees/3e47/Portal/design/formal) as part of the same phase
 
 ## 2. Phase A: Token And Component Base
 

@@ -32,6 +32,11 @@ The system keeps the Agent Town world. It removes unnecessary visual noise.
 - If a surface is simplified, it should reduce volume, not change truth
 - If a detailed surface exists, it should enrich the same structure rather than introducing a parallel explanation model
 
+Formal companion:
+
+- the logic behind this rule is modeled in [design/formal/02_no_drift_summary_detail_assistant.tla](/Users/robin/.codex/worktrees/3e47/Portal/design/formal/02_no_drift_summary_detail_assistant.tla)
+- future agents changing disclosure boundaries should sync that model alongside this spec
+
 ## 2. Typography
 
 ### Font roles
