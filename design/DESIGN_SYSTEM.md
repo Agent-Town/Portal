@@ -24,6 +24,10 @@ The product is not a casino skin and not a dashboard. It is a focused decision e
 5. No hardcoded one-off values in poker-specific UI after migration to this system.
 6. Destructive actions must always look distinct from neutral actions.
 7. Navigation pills must never look like commit actions.
+8. The product must remain understandable to users with very basic AI knowledge.
+9. English and Simplified Chinese are first-class validation locales for layout and copy.
+10. Provider, model, and service names are background metadata, never the primary explanation of a screen.
+11. Layouts must reserve structural room for future voice controls without adding fake voice UI today.
 
 ## 3. Color Tokens
 
@@ -71,8 +75,8 @@ These are target poker tokens. Future implementation should map poker surfaces t
 
 Typography must create calm hierarchy, not western novelty.
 
-- `--poker-font-display: "Wellfleet", "Iowan Old Style", Georgia, serif`
-- `--poker-font-ui: "Iowan Old Style", "Palatino Linotype", Georgia, serif`
+- `--poker-font-display: "Wellfleet", "Iowan Old Style", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Serif SC", Georgia, serif`
+- `--poker-font-ui: "Iowan Old Style", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Serif SC", "Palatino Linotype", Georgia, serif`
 - `--poker-font-mono: ui-monospace, SFMono-Regular, Menlo, monospace`
 
 ### 4.1 Type Scale
@@ -91,6 +95,8 @@ Typography must create calm hierarchy, not western novelty.
 2. Section headings should not be all caps.
 3. Metadata labels may use uppercase with restrained tracking.
 4. Numeric metrics should use the metric scale, not oversized headers.
+5. CJK layouts must not depend on Latin-only tracking or forced uppercase for hierarchy.
+6. Decorative English display styling must never be required for comprehension.
 
 ## 5. Spacing Tokens
 
@@ -108,6 +114,7 @@ Typography must create calm hierarchy, not western novelty.
 2. Vertical gap between major sections: `24` mobile, `32` tablet, `40` desktop.
 3. Gap between controls in a button group: `8`.
 4. Gap between metric cells: `12` mobile, `16` desktop.
+5. Localized copy must tolerate at least `30%` string expansion without overlap or clipped actions.
 
 ## 6. Radius and Shadow Tokens
 
@@ -153,6 +160,7 @@ Disallowed motion:
 2. Primary action must appear before secondary tools.
 3. Decision-critical content should be visible in the first viewport on the live table.
 4. No horizontal overflow.
+5. Primary action labels must remain legible in English and Simplified Chinese without shrinking below body scale.
 
 ### 8.2 Tablet
 
@@ -165,6 +173,7 @@ Disallowed motion:
    - primary decision/content column,
    - secondary context rail.
 2. Operator review may expand to a wider control grid, but destructive actions still need a dedicated cluster.
+3. Supporting metadata like model, provider, locale, and service context belongs in the secondary plane only.
 
 ## 9. Core Components
 
@@ -230,7 +239,31 @@ For review, notebook, and opponent notes.
 - Structured into summary, replay, and notes zones
 - Forms appear after reading context, not before
 
-## 10. Accessibility Rules
+### 9.9 Voice-Ready Input Slot
+
+For future multilingual voice affordances.
+
+- Reserve a stable inline slot near discussion and action inputs.
+- The slot must not break layout when hidden.
+- Until voice is implemented, the space may be dormant but should not require structural redesign later.
+
+## 10. Copywriting and Language Rules
+
+1. Primary task copy must read like a game, not like an AI control panel.
+2. Avoid unexplained AI, ML, LLM, prompt, model, or agent jargon in primary action zones.
+3. When AI capability is mentioned, describe the role in plain language first, for example `AI teammate suggestion`.
+4. Provider or model identity may appear only as secondary context and must never be required to understand the next action.
+5. Headings should remain short enough to scan in English and Simplified Chinese.
+
+## 11. Internationalization Rules
+
+1. English and Simplified Chinese are mandatory design validation locales for poker surfaces.
+2. Layout must tolerate mixed-script rows, including Latin numbers next to Chinese text.
+3. Buttons, tabs, and pills must not rely on narrow English-only labels.
+4. Icons must support meaning but must not be the only way non-English users understand an action.
+5. Any future locale extension should inherit the same token and spacing system without adding one-off layout rules.
+
+## 12. Accessibility Rules
 
 1. Every interactive control must provide a visible focus state.
 2. Minimum touch target: `44x44`.
@@ -240,8 +273,9 @@ For review, notebook, and opponent notes.
    - focus ring must be obvious on dark surfaces.
 4. Disabled state must remain legible without looking active.
 5. Status updates must stay in polite live regions only where already functionally required.
+6. Plain-language labels must remain understandable without prior AI vocabulary.
 
-## 11. Anti-Patterns To Avoid
+## 13. Anti-Patterns To Avoid
 
 1. Box inside box inside box metric framing.
 2. More than one equally strong button group per section.
@@ -250,7 +284,10 @@ For review, notebook, and opponent notes.
 5. Responsive design that only reduces padding.
 6. Mixing poker palette and global sky/cream palette in the same screen without an explicit bridge.
 7. Long vertical forms above the user’s next action.
+8. Requiring users to understand AI or provider terminology before they can act.
+9. English-only hierarchy tricks that collapse in Chinese.
+10. Giving provider or model names equal weight with the main game action.
 
-## 12. Implementation Rule
+## 14. Implementation Rule
 
 No future agent may introduce new poker-specific visual values outside this document without updating this file first.

@@ -32,3 +32,4 @@ Current next-step status:
 - frontend branch created for poker design work
 - implementation sequencing documented
 - audit findings mapped to deterministic future tests
+- beginner-first AI framing, English and Simplified Chinese resilience, provider-neutral hierarchy, and future voice-ready constraints documented

@@ -20,6 +20,7 @@ They do not authorize functionality changes.
 3. The current rendering pattern is `setTitle()` plus `renderCards()` with HTML string sections.
 4. Poker runs modal-first through `?embed=1` and must remain compatible with the hub.
 5. Admin state is keyed through `localStorage` token lookup and must not be visually confused with player state.
+6. Player-facing poker copy must stay understandable to users with little or no AI vocabulary.
 
 ## 3. Design-Engineering Constraints
 
@@ -29,6 +30,8 @@ They do not authorize functionality changes.
 4. No framework migrations.
 5. No CSS frameworks.
 6. No functionality hidden behind design work.
+7. Design work must preserve future localization readiness for English and Simplified Chinese.
+8. Design work must not make provider or model labels necessary to operate the product.
 
 ## 4. Required Engineering Pattern For Design Work
 
@@ -44,6 +47,8 @@ They do not authorize functionality changes.
    - destructive group,
    - supporting rail,
    - thread/review content.
+5. New player-facing strings should be written so they can be externalized later without structural rewrites.
+6. Layout must survive longer translated labels without depending on manual line breaks.
 
 ## 5. Responsive Rules
 
@@ -51,6 +56,7 @@ They do not authorize functionality changes.
 2. Tablet and desktop may rearrange visually through layout only after mobile order is correct.
 3. No poker screen may rely on a single breakpoint-only patch.
 4. Every approved phase must test mobile, tablet, and desktop.
+5. Responsive review must include English and Simplified Chinese string overlays once a design phase touches copy-sensitive layout.
 
 ## 6. Accessibility Rules
 
@@ -58,6 +64,7 @@ They do not authorize functionality changes.
 2. New button roles must preserve native button semantics.
 3. Status text must stay readable and not be the only location for critical guidance.
 4. Do not convey meaning through color alone.
+5. If a user never notices the term `agent`, the interface should still make sense from surrounding plain-language labels.
 
 ## 7. Design Testability Rules
 
@@ -71,8 +78,15 @@ Allowed assertions:
 4. computed styles for token usage,
 5. role-based control grouping,
 6. screenshot snapshots at seeded states.
+7. localized expansion and mixed-script layout resilience.
 
-## 8. Required Doc Sync
+## 8. Voice-Ready Layout Discipline
+
+1. Reserve structural space near discussion and action inputs for future voice affordances only when the approved phase requires it.
+2. Do not add fake microphone buttons or simulated voice controls before the functional feature exists.
+3. If a route prepares a future voice slot, it must degrade cleanly to a standard text/input layout today.
+
+## 9. Required Doc Sync
 
 When a design phase changes poker UI, update:
 
@@ -83,6 +97,6 @@ When a design phase changes poker UI, update:
 5. [progress.txt](./progress.txt)
 6. [LESSONS.md](./LESSONS.md)
 
-## 9. Default Rule For Future Agents
+## 10. Default Rule For Future Agents
 
 If a proposed design improvement requires a functional change, stop and flag it explicitly. Do not smuggle it into design implementation.

@@ -25,7 +25,10 @@ It still does not have:
 4. clear action role separation,
 5. a premium operator interface,
 6. a study surface that reads as a study workflow,
-7. a distinctive centaur experience.
+7. a distinctive centaur experience,
+8. explicit beginner-first AI framing,
+9. English and Simplified Chinese layout resilience,
+10. provider-neutral and future voice-ready design rules.
 
 Design v1 closes those gaps in this order:
 
@@ -49,6 +52,10 @@ These decisions are binding for this program.
 8. The live table must be decision-first, not dashboard-first.
 9. Operator controls must be safe-by-structure, not just safe-by-label.
 10. Design work must remain deterministic and testable through Playwright.
+11. Primary copy must stay understandable to users with basic AI knowledge.
+12. English and Simplified Chinese are required design-validation locales.
+13. Provider, model, and service names stay in supporting metadata unless the route explicitly exists to inspect them.
+14. Future voice affordances must be anticipated structurally, not improvised later.
 
 ## 3. Current-State Problems To Solve
 
@@ -60,7 +67,10 @@ The baseline audit found these structural issues:
 4. review uses the same card weight for every section,
 5. operator actions are over-dense and visually flat,
 6. the current responsive layer is effectively a desktop stack with narrower padding,
-7. poker mixes a local dark-gold palette with global blue heading styles.
+7. poker mixes a local dark-gold palette with global blue heading styles,
+8. beginner users are not explicitly guided through what the AI teammate is doing,
+9. the current design pack does not yet validate Chinese or expanded localized copy,
+10. discussion and action surfaces do not yet reserve voice-ready structure.
 
 ## 4. Product Surfaces To Redesign
 
@@ -71,7 +81,8 @@ Required outcome:
 1. `Quick Seat` becomes the hero action,
 2. live tables become the second read,
 3. identity and policy move to a compact supporting section,
-4. native season and schedule become tertiary navigation.
+4. native season and schedule become tertiary navigation,
+5. AI/team-help copy uses plain language first and survives English and Simplified Chinese labels.
 
 ## 4.2 Live Table
 
@@ -81,7 +92,8 @@ Required outcome:
 2. the acting-seat state is obvious in one glance,
 3. legal actions are visually stronger than auxiliary tools,
 4. seat thread, study, and auto-act become supporting planes,
-5. the table feels live without visual noise.
+5. the table feels live without visual noise,
+6. any AI guidance is framed as teammate help, not model configuration.
 
 ## 4.3 Tournament Schedule
 
@@ -90,7 +102,8 @@ Required outcome:
 1. upcoming events dominate the page,
 2. player registration states are obvious,
 3. recurring templates remain visible but secondary,
-4. admin template authoring is clearly separated from player browsing.
+4. admin template authoring is clearly separated from player browsing,
+5. event cards remain clear across English and Simplified Chinese copy lengths.
 
 ## 4.4 Hand Review
 
@@ -99,7 +112,8 @@ Required outcome:
 1. the screen reads as `understand -> replay -> annotate`,
 2. result summary and action line appear before forms,
 3. notebook and opponent notes feel like a study rail on larger screens,
-4. exports remain available but visually secondary.
+4. exports remain available but visually secondary,
+5. study language remains understandable to users who do not know AI terminology.
 
 ## 4.5 Native Season
 
@@ -132,7 +146,8 @@ Required outcome:
 
 1. lock verification, countdown, discussion, and shared decision feel like one ritual,
 2. the agent recommendation is clearly visible but not visually louder than the shared commit,
-3. the screen distinguishes `talking` from `locking`.
+3. the screen distinguishes `talking` from `locking`,
+4. future voice input can be added near discussion without restructuring the route.
 
 ## 5. Screen Architecture Rules
 
@@ -142,7 +157,8 @@ Rules:
 
 1. the primary action must appear in the top content half of the screen on desktop,
 2. on mobile, the primary action must appear within the first viewport for the most important active state,
-3. forms used less frequently than the main action must come later.
+3. forms used less frequently than the main action must come later,
+4. primary action labels must remain clear after localization and without AI jargon.
 
 ## 5.2 Content Planes
 
@@ -154,7 +170,16 @@ Every screen must organize into:
 
 If a section cannot be placed into one of those three planes, it likely does not belong on that screen at full weight.
 
-## 5.3 Metric Use
+## 5.3 Beginner and Cross-Market Language Rules
+
+Rules:
+
+1. explain the AI role in plain language before any technical label,
+2. do not require knowledge of models, providers, prompts, or agents to act,
+3. validate key screens in English and Simplified Chinese,
+4. reserve room for future local-language voice affordances near discussion and action inputs.
+
+## 5.4 Metric Use
 
 Rules:
 
@@ -162,7 +187,7 @@ Rules:
 2. metrics should summarize, not overwhelm,
 3. metrics belong at screen tops or inside targeted compact strips.
 
-## 5.4 Action Roles
+## 5.5 Action Roles
 
 Required button families:
 
@@ -182,7 +207,8 @@ Normative rules:
 1. single-column layout,
 2. current hand and action area ahead of thread and study tools,
 3. operator controls chunked into small groups rather than one huge wall,
-4. schedule events appear before recurring templates and admin authoring.
+4. schedule events appear before recurring templates and admin authoring,
+5. key labels remain readable with Simplified Chinese copy overlays.
 
 ## 6.2 Tablet
 
@@ -198,7 +224,8 @@ Normative rules:
 
 1. a composed two-column structure is preferred where density benefits,
 2. operator and review views may use wider grids,
-3. the hero/title region should remain restrained and not consume excessive height.
+3. the hero/title region should remain restrained and not consume excessive height,
+4. provider or service metadata stays in secondary rails or compact support rows.
 
 ## 7. Accessibility and State Design
 
@@ -208,7 +235,8 @@ Required outcomes:
 2. disabled buttons that remain clearly inactive,
 3. consistent empty states per route family,
 4. readable loading states that are not only status text,
-5. non-hostile error states.
+5. non-hostile error states,
+6. beginner-readable and locale-resilient copy in primary action zones.
 
 ## 8. Motion Rules
 
@@ -235,6 +263,8 @@ Not allowed:
 | Responsive composition | Design | Route meaning remains unchanged |
 | Modal-first behavior | Design must preserve | Existing route logic |
 | Review/export data | Design may restyle | Existing backend contract |
+| Provider or model labels | Design must visually demote | Existing data surface |
+| Future voice slot reservation | Design may structure | Functional voice behavior stays out of scope |
 
 ## 10. Approval and Anti-Regression Rules
 

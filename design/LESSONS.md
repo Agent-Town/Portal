@@ -20,6 +20,9 @@ Date initialized: 2026-03-16
 5. Responsive design cannot be handled by padding reduction alone.
 6. Poker-specific color language should not borrow global sky/cream heading styling by accident.
 7. Review screens should not present forms before understanding.
+8. Poker cannot assume users understand AI terms before they play.
+9. English and Simplified Chinese resilience must be designed early, not patched later.
+10. Voice providers and model brands should be anticipated structurally, not allowed to drive the main UI.
 
 ### Rules for future design agents
 

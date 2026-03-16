@@ -17,6 +17,7 @@ It is intentionally concrete. Future agents should use this as the implementatio
    - [public/poker.html](../public/poker.html)
    - [public/poker.js](../public/poker.js)
 5. Shared global styling remains in [public/styles.css](../public/styles.css), but poker-specific styling can be isolated into a dedicated stylesheet if approved.
+6. Initial design validation must include beginner users and English plus Simplified Chinese overlays.
 
 ## 2. Recommended Implementation Order
 
@@ -28,7 +29,8 @@ Do not redesign individual screens first. Do this in order:
 4. fix live table composition,
 5. fix review, rail, and season,
 6. fix operator and centaur,
-7. finish accessibility, loading, empty, and motion states.
+7. finish accessibility, loading, empty, and motion states,
+8. close beginner-copy, localization, provider-neutral, and voice-ready gaps before declaring the design system stable.
 
 This order matters because otherwise later phases will keep fighting inconsistent primitives.
 
@@ -53,7 +55,7 @@ This order matters because otherwise later phases will keep fighting inconsisten
 
 Reserved design test block:
 
-- `e2e/300` through `e2e/325`
+- `e2e/300` through `e2e/331`
 
 Existing behavior tests likely to remain important:
 
@@ -155,12 +157,30 @@ Work:
 
 Do not rely on generic app button styles for poker once the poker role system exists.
 
+### Task D0.5 - Add copy and locale resilience hooks
+
+Files:
+
+- [public/poker.js](../public/poker.js)
+- [public/poker.html](../public/poker.html)
+
+Work:
+
+1. add stable wrappers for player-help, provider metadata, and future voice-ready input slots,
+2. ensure screen-level headings and action bars can accept longer localized labels,
+3. keep provider/model labels visually separate from the main game instruction.
+
+Why:
+
+Future design tests need stable structural hooks for beginner-copy, Chinese-layout, and voice-ready assertions.
+
 ## 4.2 Acceptance target
 
 1. token contract exists,
 2. route sections are targetable,
 3. button roles are distinguishable without reading labels,
-4. mobile, tablet, and desktop baseline screenshots still render correctly.
+4. mobile, tablet, and desktop baseline screenshots still render correctly,
+5. locale overlay screenshots remain stable for affected screens.
 
 ## 5. Phase D1 - Lobby and Schedule Hierarchy
 
@@ -197,7 +217,9 @@ Implementation notes:
 2. compress `Eligibility` into a lighter metric strip,
 3. compress `Poker Policy` into a smaller supporting section,
 4. visually elevate the primary join/create button,
-5. treat schedule, season, rail, and results links as navigation, not as primary actions.
+5. treat schedule, season, rail, and results links as navigation, not as primary actions,
+6. explain AI assistance in plain language if referenced at all,
+7. make sure localized labels still preserve quick-seat dominance.
 
 ### Lobby subcomponents to introduce
 
@@ -235,7 +257,8 @@ Implementation notes:
 1. player-facing event cards should lead the route,
 2. admin controls should be clearly contained and visually lower priority,
 3. recurring templates should read like infrastructure, not the main user task,
-4. register/waitlist actions must look stronger than timeline or lobby links.
+4. register/waitlist actions must look stronger than timeline or lobby links,
+5. event labels and break/schedule copy must remain legible in Simplified Chinese.
 
 ## 5.3 Acceptance target
 

@@ -23,11 +23,14 @@ This phase turns poker design work into measurable milestones:
 3. responsive composition,
 4. button role clarity,
 5. accessibility and state design,
-6. final route-specific refinement.
+6. final route-specific refinement,
+7. beginner-first and cross-market resilience.
 
 Reserved Playwright block:
 
-1. `300` to `325`
+1. `300` to `331`
+2. `300` to `325` cover the original design-hierarchy and accessibility program
+3. `326` to `331` cover beginner-first, international, provider-neutral, and voice-ready validation
 
 ## 2. Global Measurable Metrics
 
@@ -80,6 +83,30 @@ Required for all routes:
 2. spacing and radius values come from the design tokens,
 3. section shells and button roles remain consistent across routes.
 
+### 2.7 Beginner-Comprehension Metrics
+
+Required for player-facing routes:
+
+1. the main action remains understandable without requiring AI, LLM, model, or provider vocabulary,
+2. the AI teammate can be understood through plain-language labels,
+3. provider or model names do not outrank the main game instruction.
+
+### 2.8 Internationalization Metrics
+
+Required for touched routes:
+
+1. English and Simplified Chinese layouts remain composed,
+2. no primary control is clipped or overlapped under deterministic localized expansion,
+3. mixed-script rows remain readable in schedules, leaderboards, and hand state.
+
+### 2.9 Provider-Neutral and Voice-Ready Metrics
+
+Required for discussion and action-entry surfaces:
+
+1. provider or service metadata appears only in supporting regions,
+2. discussion and action layouts can reserve a future voice slot without changing functional order,
+3. the dormant voice-ready slot does not introduce dead visual weight today.
+
 ## 3. Test Harness Rules
 
 1. Design tests must use the same seeded harness scenarios already available in the repo whenever possible.
@@ -92,6 +119,7 @@ Required for all routes:
    - presence or absence of horizontal overflow,
    - screenshot baselines.
 4. Design tests must not assert on content that is intentionally variable across seeded states unless the seed is fixed.
+5. Localized copy tests must use deterministic fixture overlays, not live translation services.
 
 ## 4. Required Seeded States
 
@@ -102,7 +130,8 @@ At minimum, design tests must cover:
 3. `history_results_story`,
 4. `director_series_scheduled_break_ready`,
 5. `economy_native_season_story`,
-6. centaur table seeded through its existing deterministic UI flow.
+6. centaur table seeded through its existing deterministic UI flow,
+7. localized overlay variants for English and Simplified Chinese on copy-sensitive routes.
 
 ## 5. Milestone Map
 
@@ -129,7 +158,8 @@ GREEN gate:
 
 1. harness covers lobby, table, schedule, review, operator, native season, and centaur,
 2. token contract exists,
-3. baseline screenshot capture is repeatable.
+3. baseline screenshot capture is repeatable,
+4. locale overlay strategy is locked.
 
 ## M-D1 - Lobby and schedule hierarchy
 
@@ -149,7 +179,8 @@ Evaluation target:
 
 1. quick seat is the top player action,
 2. schedule events appear before templates and admin tooling,
-3. no horizontal overflow on mobile.
+3. no horizontal overflow on mobile,
+4. beginner-copy and provider-neutral checks pass on lobby and schedule.
 
 ## M-D2 - Live table redesign
 
@@ -172,7 +203,8 @@ Evaluation target:
 
 1. action area is visible in first viewport at mobile acting state,
 2. thread and study are visually secondary,
-3. destructive, navigation, and primary buttons are distinct.
+3. destructive, navigation, and primary buttons are distinct,
+4. localized labels and voice-ready structural hooks do not break action priority.
 
 ## M-D3 - Review, season, and rail
 
@@ -220,7 +252,8 @@ Evaluation target:
 1. destructive controls are visually isolated,
 2. centaur distinguishes discussion from commitment,
 3. focus and disabled states are obvious,
-4. loading and empty states are intentionally designed.
+4. loading and empty states are intentionally designed,
+5. international and voice-ready checks pass for centaur and operator surfaces where relevant.
 
 ## 6. Example Deterministic Assertions
 
@@ -232,7 +265,9 @@ Future agents should use assertions like:
 4. schedule event list appears before schedule admin container in DOM order,
 5. no element extends beyond `document.documentElement.clientWidth`,
 6. computed color values for poker buttons map to design tokens,
-7. focused buttons receive a visible outline or ring.
+7. focused buttons receive a visible outline or ring,
+8. localized action labels remain within their control bounds,
+9. provider labels appear in supporting metadata containers only.
 
 ## 7. Required Screenshot Matrix
 
@@ -244,6 +279,7 @@ Every approved phase must capture at least:
 4. hand review: mobile, tablet, desktop
 5. operator review: mobile, tablet, desktop
 6. centaur: mobile, tablet, desktop once centaur phase begins
+7. affected screens: English and Simplified Chinese overlays once localization-resilience work begins
 
 ## 8. Failure Policy
 

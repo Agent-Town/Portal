@@ -25,6 +25,7 @@ Date: 2026-03-16
 3. CSS tokenization
 4. Semantic HTML and form controls
 5. Screenshot-based regression tests
+6. Deterministic locale-specific screenshot validation for seeded states
 
 ## 4. What The Stack Does Not Support Well Today
 
@@ -32,6 +33,7 @@ Date: 2026-03-16
 2. Large-scale stateful animation systems
 3. Automatic design token pipelines
 4. Visual regression tooling out of the box
+5. Live translation-provider dependencies in deterministic design tests
 
 ## 5. Design Implication
 
@@ -61,6 +63,8 @@ Useful seeded states include:
 4. `economy_native_season_story`
 5. `waitlist_full_cash`
 6. live seated cash table flows through `pkt_play_cash_01`
+
+Localization and internationalization checks should use deterministic injected copy fixtures or seeded overlay strings, not live translation providers.
 
 ## 7. Required Design Discipline
 

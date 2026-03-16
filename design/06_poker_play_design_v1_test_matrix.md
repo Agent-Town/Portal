@@ -206,6 +206,56 @@ Every design phase must capture and assert:
   - contrast meets token expectations
   - motion rules only apply to approved surfaces and remain minimal
 
+## F-15 - Beginner users may not understand the AI framing
+
+- Problem:
+  - player-facing surfaces assume too much AI vocabulary.
+- Seed:
+  - live lobby, live table, and centaur
+- Tests:
+  - `e2e/326_poker_design_beginner_copy_ui.spec.js`
+  - `e2e/331_poker_design_international_persona_ui.spec.js`
+- Assertions:
+  - primary actions remain understandable without AI jargon
+  - teammate/help labels outrank provider or model metadata
+
+## F-16 - Simplified Chinese and localized expansion are not yet validated
+
+- Problem:
+  - layouts have not yet been checked against Chinese and longer localized strings.
+- Seed:
+  - live table, schedule, native season
+- Tests:
+  - `e2e/327_poker_design_cjk_layout_ui.spec.js`
+  - `e2e/328_poker_design_localized_expansion_ui.spec.js`
+- Assertions:
+  - no clipped or overlapping primary actions
+  - mixed-script rows remain readable
+
+## F-17 - Provider and service references may become too prominent
+
+- Problem:
+  - future design work could accidentally make provider labels central.
+- Seed:
+  - live table and centaur
+- Tests:
+  - `e2e/329_poker_design_provider_neutral_ui.spec.js`
+- Assertions:
+  - provider/model labels appear only in supporting containers
+  - main action hierarchy remains game-first
+
+## F-18 - Voice-ready structure is not yet reserved
+
+- Problem:
+  - discussion and action-entry surfaces could require structural redesign later.
+- Seed:
+  - live table and centaur
+- Tests:
+  - `e2e/330_poker_design_voice_ready_layout_contract.spec.js`
+- Assertions:
+  - future voice slot hooks exist near discussion/action inputs
+  - dormant voice-ready structure does not displace primary actions
+
 ## 4. Test Authoring Guidance
 
 When future agents implement the reserved design tests, prefer:

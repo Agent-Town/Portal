@@ -11,6 +11,9 @@ This file describes how users move through the poker product today and what each
 2. Wallet identity and house context remain visible but secondary.
 3. Every route must declare one primary action.
 4. Every route must remain understandable on mobile first.
+5. Every route must remain understandable to users with very basic AI knowledge.
+6. English and Simplified Chinese are the initial design-validation locales.
+7. Provider and model names are supporting metadata, not task instructions.
 
 ## 2. Core Routes
 
@@ -31,6 +34,7 @@ This file describes how users move through the poker product today and what each
   - tournament series availability
   - self-exclusion / spend policy
 - Current design risk: policy and identity compete with the main join flow
+- Language note: joining a table must read clearly without requiring AI terms; any provider or model label stays secondary.
 
 ## 2.2 Live Cash / Tournament Table
 
@@ -54,6 +58,7 @@ This file describes how users move through the poker product today and what each
   - pot
   - current street
 - Current design risk: the action form is too low in the page and visually equal to secondary tools
+- Language note: action labels must stay short, clear, and resilient in English and Simplified Chinese.
 
 ## 2.3 Tournament Schedule
 
@@ -71,6 +76,7 @@ This file describes how users move through the poker product today and what each
   - waitlist state
   - break schedule
 - Current design risk: admin controls appear too early for normal players
+- Language note: event cards should read as playable game events first, not as infrastructure or AI-service configuration.
 
 ## 2.4 Hand Review
 
@@ -90,6 +96,7 @@ This file describes how users move through the poker product today and what each
   - agent note
   - opponent notes
 - Current design risk: everything reads as one long identical stack rather than a study workflow
+- Language note: study labels should use plain poker language first and only mention AI analysis as supporting context.
 
 ## 2.5 Series Timeline
 
@@ -106,6 +113,7 @@ This file describes how users move through the poker product today and what each
   - entrants
   - prize pool
 - Design note: this should feel archival and structured, not like a control screen
+- Language note: timeline labels should stay archival and plain, not technical or provider-centric.
 
 ## 2.6 Public Rail
 
@@ -121,6 +129,7 @@ This file describes how users move through the poker product today and what each
   - public action history
   - series field overview
 - Design note: rail must feel lighter than the player table
+- Language note: public labels must remain understandable across locales without exposing private AI/control terminology.
 
 ## 2.7 Native Season
 
@@ -135,6 +144,7 @@ This file describes how users move through the poker product today and what each
   - ranking rows
   - OIL deltas
 - Design note: this should read as a clean leaderboard, not as another generic card stack
+- Language note: rankings and score labels must remain legible in mixed English/Chinese numeric rows.
 
 ## 2.8 Operator Review
 
@@ -153,6 +163,7 @@ This file describes how users move through the poker product today and what each
   - integrity flags
   - current series state
 - Current design risk: destructive and neutral controls look interchangeable
+- Language note: destructive verbs must remain unmistakable after localization.
 
 ## 2.9 Centaur Table
 
@@ -168,6 +179,7 @@ This file describes how users move through the poker product today and what each
   - agent recommendation
   - discussion thread
 - Design note: this is a ritual screen and should feel distinct from standard multiplayer poker
+- Language note: the human+AI partnership must be explained in plain language before any advanced AI wording.
 
 ## 3. Primary Journeys
 
@@ -221,3 +233,9 @@ Every route must define:
 4. error state.
 
 No route should render a blank long page with only status text.
+
+## 5. Voice-Ready Flow Constraint
+
+1. Discussion and action-entry surfaces should reserve a future-compatible space for multilingual voice controls.
+2. That reserved space must not change the functional flow today.
+3. Voice-ready structure must work in modal embed contexts and across English and Simplified Chinese labels.

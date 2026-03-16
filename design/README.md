@@ -8,6 +8,10 @@ It exists because the repo previously had strong engineering specs but no equiva
 
 - Poker routes only
 - Visual design, layout, spacing, typography, color, motion, responsiveness, accessibility
+- Beginner-first AI framing for users with little AI knowledge
+- International readiness with English and Simplified Chinese as initial design-validation locales
+- Provider-neutral, service-neutral hierarchy
+- Future voice-ready structure without functional voice controls yet
 - No functionality changes
 
 ## Status
@@ -15,6 +19,7 @@ It exists because the repo previously had strong engineering specs but no equiva
 - Baseline design audit completed on 2026-03-16
 - No design phase is implemented yet
 - These docs define the target system and the test-driven path to reach it
+- Cross-market and beginner-user constraints are now part of the canonical design definition
 
 ## Read Order
 

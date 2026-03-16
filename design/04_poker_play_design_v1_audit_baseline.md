@@ -53,7 +53,10 @@ Current poker shell characteristics:
 2. repeated rounded glass-like cards,
 3. one global card pattern reused for nearly every surface,
 4. minimal responsive logic,
-5. no poker-specific focus, hover, or disabled state system.
+5. no poker-specific focus, hover, or disabled state system,
+6. no explicit beginner-first AI framing,
+7. no documented English and Simplified Chinese layout validation,
+8. no reserved structure for future voice input surfaces.
 
 ## 4. Structural Audit Findings
 
@@ -63,7 +66,8 @@ Current issues:
 
 1. `Eligibility` and `Poker Policy` lead before the main join flow,
 2. the page reads like configuration before it reads like a live room,
-3. quick-seat fields are long and form-heavy.
+3. quick-seat fields are long and form-heavy,
+4. the route does not yet explain the AI/helpful-teammate role in beginner-safe language.
 
 Implementation seam:
 
@@ -76,7 +80,8 @@ Current issues:
 1. the live table is not action-first,
 2. `Submit Action` sits below many equally weighted sections,
 3. action urgency is diluted,
-4. player, admin, study, and automation surfaces all use near-identical card treatment.
+4. player, admin, study, and automation surfaces all use near-identical card treatment,
+5. action labels have not yet been validated against Simplified Chinese expansion.
 
 Implementation seam:
 
@@ -88,7 +93,8 @@ Current issues:
 
 1. admin template creation sits too early,
 2. public browsing and admin authoring share the same visual treatment,
-3. recurring templates are too heavy relative to near-term playable events.
+3. recurring templates are too heavy relative to near-term playable events,
+4. localized schedule labels and mixed-script event rows have not been validated.
 
 Implementation seam:
 
@@ -100,7 +106,8 @@ Current issues:
 
 1. summary, replay, notebook, and opponent notes all use the same card weight,
 2. the route reads as a pile of sections instead of a study workflow,
-3. forms appear too early visually.
+3. forms appear too early visually,
+4. the study route does not yet distinguish plain poker learning language from AI-analysis language.
 
 Implementation seam:
 
@@ -124,7 +131,8 @@ Current issues:
 
 1. the centaur flow is understandable but not visually distinct enough,
 2. the countdown, discussion, and commitment states are not strongly separated,
-3. the ritual nature of the screen is lost in the generic poker card system.
+3. the ritual nature of the screen is lost in the generic poker card system,
+4. no voice-ready structural reservation exists near the discussion flow.
 
 Implementation seam:
 
@@ -140,7 +148,8 @@ Observed consequence:
 
 1. mobile mostly looks like a compressed desktop stack,
 2. tablet mostly looks like a slightly wider mobile stack,
-3. desktop underuses width for clearer grouping.
+3. desktop underuses width for clearer grouping,
+4. the current layouts were not designed against English and Simplified Chinese overlays.
 
 ## 6. Accessibility Audit Findings
 
@@ -149,7 +158,8 @@ Observed gaps:
 1. poker-specific `:focus-visible` treatment is absent,
 2. disabled buttons exist but have no dedicated poker design treatment,
 3. loading and empty states often rely on plain text,
-4. status text is overused as the route’s fallback narrative.
+4. status text is overused as the route’s fallback narrative,
+5. beginner-safe copy principles are not yet visible in primary action areas.
 
 ## 7. File Map For Future Design Agents
 

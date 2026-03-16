@@ -56,11 +56,18 @@ To avoid collisions with existing engineering tests, this program reserves:
 24. `e2e/323_poker_design_contrast_contract.spec.js`
 25. `e2e/324_poker_design_status_line_ui.spec.js`
 26. `e2e/325_poker_design_motion_contract.spec.js`
+27. `e2e/326_poker_design_beginner_copy_ui.spec.js`
+28. `e2e/327_poker_design_cjk_layout_ui.spec.js`
+29. `e2e/328_poker_design_localized_expansion_ui.spec.js`
+30. `e2e/329_poker_design_provider_neutral_ui.spec.js`
+31. `e2e/330_poker_design_voice_ready_layout_contract.spec.js`
+32. `e2e/331_poker_design_international_persona_ui.spec.js`
 
 Supplemental verification lanes allowed in this phase:
 
 1. `npm run test -- --grep "poker design"`
 2. screenshot review captures using seeded states
+3. deterministic English and Simplified Chinese screenshot overlays
 
 ## 4. Phase Roadmap
 
@@ -70,13 +77,15 @@ Goal:
 
 1. establish the design harness,
 2. freeze the current route map,
-3. create token discipline before layout changes start.
+3. create token discipline before layout changes start,
+4. lock beginner-language and locale-resilience expectations.
 
 Bundle gate:
 
 1. design harness test passes,
 2. token contract exists,
-3. baseline screenshots are reproducible.
+3. baseline screenshots are reproducible,
+4. locale and copy-resilience targets are documented.
 
 ### Phase D1 - Shell, hierarchy, and button roles
 
@@ -84,13 +93,15 @@ Goal:
 
 1. replace equal-weight screen treatment with clear primary and secondary planes,
 2. separate navigation, commit, and destructive actions visually,
-3. create responsive shell behavior.
+3. create responsive shell behavior,
+4. keep primary task copy understandable for beginner AI users.
 
 Bundle gate:
 
 1. lobby, schedule, and live table hierarchy tests pass,
 2. no horizontal overflow at mobile,
-3. button role contract passes.
+3. button role contract passes,
+4. beginner-copy and provider-neutral tests pass for touched routes.
 
 ### Phase D2 - Live table redesign
 
@@ -104,7 +115,8 @@ Bundle gate:
 
 1. live table priority tests pass,
 2. mobile action visibility passes,
-3. tablet and desktop composition tests pass.
+3. tablet and desktop composition tests pass,
+4. CJK and localized expansion checks pass for the live table.
 
 ### Phase D3 - Review, season, and rail refinement
 
@@ -132,7 +144,8 @@ Bundle gate:
 
 1. operator hierarchy and destructive-group tests pass,
 2. centaur hierarchy tests pass,
-3. focus, disabled, empty, loading, and error tests pass.
+3. focus, disabled, empty, loading, and error tests pass,
+4. voice-ready layout contract passes where discussion/action inputs are present.
 
 ## 5. Tickets
 
@@ -278,3 +291,41 @@ Bundle gate:
   - focus is visible,
   - disabled is clearly inactive,
   - blank states feel intentional.
+
+## PDK-312 - Beginner-first copy and AI framing
+
+- Priority: P0
+- Phase: D1-D2
+- Goal: make primary poker actions understandable without prior AI knowledge.
+- Deliverables:
+  - plain-language labels for AI/team-help surfaces
+  - demoted provider/model references
+  - beginner-copy checks
+- Acceptance criteria:
+  - main play actions remain clear without technical AI terms
+  - provider names do not visually outrank game actions
+
+## PDK-313 - English and Simplified Chinese layout resilience
+
+- Priority: P0
+- Phase: D2-D4
+- Goal: keep layouts composed under English and Simplified Chinese labels.
+- Deliverables:
+  - localized expansion checks
+  - CJK-safe spacing and type rules
+  - mixed-script screenshot review
+- Acceptance criteria:
+  - no clipped or overlapping primary controls
+  - hierarchy remains clear in both locales
+
+## PDK-314 - Provider-neutral and voice-ready interaction architecture
+
+- Priority: P1
+- Phase: D3-D4
+- Goal: make the design flexible across providers and future voice affordances.
+- Deliverables:
+  - supporting-metadata treatment for provider/model labels
+  - reserved voice-ready layout slot near discussion/action inputs
+- Acceptance criteria:
+  - provider/service references remain visually secondary
+  - voice-ready slot can be introduced without structural redesign
