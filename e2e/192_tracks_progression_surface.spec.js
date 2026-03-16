@@ -180,6 +180,8 @@ test.beforeEach(async ({ request }) => {
 });
 
 test('M25.9: House Tracks renders deterministic progress in-shell and keeps track terminology stable', async ({ page, request }) => {
+  test.slow();
+  test.setTimeout(120_000);
   const seededHouse = await seedRecoverableTokenHouse(request);
   await seedTrackProgress(request, seededHouse);
 

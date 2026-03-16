@@ -30,7 +30,22 @@
           <span class="townDistrictLabel">Plan Wagons</span>
         </button>
       </div>
-      <div class="small" id="townSceneStatus">Plan Wagons selected: unlock and enter your house flow.</div>
+      <div class="townFocusCard" id="townFocusCard" data-testid="town-focus-card">
+        <p class="townFocusEyebrow" id="townFocusEyebrow">Start here</p>
+        <h2 class="townFocusTitle" id="townFocusTitle" data-testid="town-focus-title">Plan Wagons</h2>
+        <p class="townFocusSummary" id="townFocusSummary">Unlock your house, keep your shared work moving, and come back to the town map when you are ready.</p>
+        <div class="townFocusActions">
+          <button
+            class="btn primary townPrimaryAction"
+            id="townPrimaryAction"
+            type="button"
+            data-testid="town-primary-action"
+            data-shell-priority="primary"
+            data-district="house"
+          >Open Plan Wagons</button>
+        </div>
+        <div class="small townFocusSupport" id="townSceneStatus">Start here to unlock your house and continue your work.</div>
+      </div>
     </section>
 
     <div id="districtModalBackdrop" class="districtBackdrop is-hidden" aria-hidden="true">

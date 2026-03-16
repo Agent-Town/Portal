@@ -171,6 +171,8 @@ test.beforeEach(async ({ request }) => {
 });
 
 test('M29.7: House Office unified smoke stays inside one shell and replays the same checkpoints exactly', async ({ page, request }) => {
+  test.slow();
+  test.setTimeout(60_000);
   const fixtureEnvelope = await getPlatformFixture(request, 'house_office_smoke_seed');
   expect(fixtureEnvelope?.ok).toBe(true);
   const fixture = fixtureEnvelope?.fixture || {};

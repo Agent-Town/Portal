@@ -1,6 +1,6 @@
 baseline_commit	a56503d
-status	design-doc-foundation-created
-current_phase	d0_and_d0.5_docs_only
+status	d1_town_shell_clarity_started
+current_phase	d1_town_shell_clarity_partial
 completed_items
 - created design workspace folder
 - documented canonical source mapping for future design prompts
@@ -12,5 +12,9 @@ completed_items
 - documented atomic design backlog covering every current audit finding
 - documented design TDD milestones and reserved visual test block
 - documented execution runbook for future agentic AI design work
+- implemented a town-hub focus card with one dominant primary action
+- rewrote town-hub gate and district summaries into plainer provider-neutral language
+- reduced mobile town-shell clutter by making the primary action and dock separation explicit
+- added design coverage for source-of-truth, primary-action hierarchy, mobile clutter, mixed-script layout, and provider-neutral copy
 next_step
-- approve D0.5 or D1 from design/IMPLEMENTATION_ROADMAP.md and design/BACKLOG.md
+- finish the remaining D1 shell demotion work for the debug panel, then move into D2 House and House Office clarity

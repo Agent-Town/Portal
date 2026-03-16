@@ -35,3 +35,15 @@ If a hierarchy, button label, or layout only works in English, it is not ready f
 ### 8. Voice readiness starts with naming
 
 Future voice support is not only a speech-tech problem. It starts with short, plain-language control labels and clear step structure.
+
+### 9. One focus card is stronger than ambient emphasis
+
+On the town hub, the map, labels, status copy, and dock were all competing. A single focus card with one dominant action makes the shell readable without changing functionality.
+
+### 10. Mixed-script readiness starts in the font stack
+
+If the readable UI layer does not include sane CJK fallbacks, mixed Latin and Simplified Chinese copy will look accidental even when layout technically fits.
+
+### 11. Support copy must sit below the action, not beside it
+
+Status text works best as subordinate reassurance. When support text is styled like another headline or pill, it competes with the primary decision instead of helping it.

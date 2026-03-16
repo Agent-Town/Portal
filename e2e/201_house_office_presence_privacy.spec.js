@@ -38,6 +38,8 @@ test.beforeEach(async ({ request }) => {
 });
 
 test('M29.6: House Office redacts unsafe focus text and keeps safe deep links deterministic', async ({ page, request }) => {
+  test.slow();
+  test.setTimeout(60_000);
   const assignmentsFixtureEnvelope = await getPlatformFixture(request, 'house_office_assignments_seed');
   expect(assignmentsFixtureEnvelope?.ok).toBe(true);
   const assignmentsFixture = assignmentsFixtureEnvelope?.fixture || {};

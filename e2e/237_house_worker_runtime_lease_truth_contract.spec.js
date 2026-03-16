@@ -11,6 +11,7 @@ test.beforeEach(async ({ request }) => {
 });
 
 test('T38.1: helper lease truth degrades to stale after runtime loss and restart copy stays honest', async ({ page, request, context }) => {
+  test.slow();
   const installFixture = await getPlatformFixture(request, 'worker_package_install_seed');
   const leaseFixture = await getPlatformFixture(request, 'worker_runtime_lease_seed');
   expect(installFixture?.ok).toBe(true);

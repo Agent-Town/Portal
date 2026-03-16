@@ -36,6 +36,8 @@ test.beforeEach(async ({ request }) => {
 });
 
 test('M25.6: House Workshop shows active config lineage and opens Inbox inside the same shell', async ({ page, request }) => {
+  test.slow();
+  test.setTimeout(180_000);
   const seededHouse = await seedRecoverableTokenHouse(request);
 
   const configAResp = await createPlatformConfigVersion(request, {

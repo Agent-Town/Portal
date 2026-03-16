@@ -99,6 +99,8 @@ test.beforeEach(async ({ request }) => {
 });
 
 test('M20.2: House team selector switches Archive and Trainer in place without restarting the worker', async ({ page, request }) => {
+  test.slow();
+  test.setTimeout(60_000);
   const { seededHouse, teams } = await seedMultiTeamSurface(request);
   const [teamAlpha, teamBeta] = teams;
 

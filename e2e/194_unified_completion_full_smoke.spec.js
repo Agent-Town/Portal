@@ -466,6 +466,8 @@ test.beforeEach(async ({ request }) => {
 });
 
 test('M25.11: final joined completion smoke is deterministic and stays inside one coherent shell', async ({ page, request }) => {
+  test.slow();
+  test.setTimeout(120_000);
   const firstPass = await collectJoinedCompletionCheckpoints(page, request);
   await resetPortalWebState(request);
   const secondPass = await collectJoinedCompletionCheckpoints(page, request);

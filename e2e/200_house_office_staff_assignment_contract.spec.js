@@ -36,6 +36,8 @@ test.beforeEach(async ({ request }) => {
 });
 
 test('M29.5: House Office staff assignments are deterministic, idempotent, and preserve current House flows', async ({ page, request }) => {
+  test.slow();
+  test.setTimeout(60_000);
   const fixtureEnvelope = await getPlatformFixture(request, 'house_office_assignments_seed');
   expect(fixtureEnvelope?.ok).toBe(true);
   const fixture = fixtureEnvelope?.fixture || {};

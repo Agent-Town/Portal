@@ -10,6 +10,7 @@
   --font-display: "Wellfleet", serif;
   --font-ui: "Wellfleet", serif;
   --font-accent: "Wellfleet", serif;
+  --font-readable: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
   --agent-panel-page-inset: 0px;
   --sky-50: #e6f4ff;
   --sky-100: #b3dfff;
@@ -415,13 +416,88 @@ h3 {
 }
 
 #townSceneStatus {
-  position: absolute;
-  left: 12px;
-  bottom: 12px;
-  color: #fff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
-  z-index: 3;
+  position: relative;
+  left: auto;
+  bottom: auto;
+  z-index: 1;
   margin: 0;
+  color: inherit;
+  text-shadow: none;
+}
+
+.townFocusCard {
+  position: absolute;
+  left: 18px;
+  bottom: calc(var(--agent-panel-page-inset, 0px) + 18px);
+  z-index: 4;
+  width: min(430px, calc(100% - 36px));
+  padding: 16px 18px 14px;
+  border: 2px solid rgba(196, 136, 58, 0.84);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(33, 21, 13, 0.92), rgba(58, 34, 18, 0.88)),
+    linear-gradient(135deg, rgba(255, 226, 153, 0.08), rgba(91, 155, 213, 0.04));
+  box-shadow:
+    0 20px 42px rgba(0, 0, 0, 0.38),
+    0 0 0 1px rgba(255, 228, 160, 0.1) inset;
+  color: #fff7ea;
+  backdrop-filter: blur(10px);
+}
+
+.townFocusEyebrow {
+  margin: 0 0 8px;
+  color: rgba(255, 228, 160, 0.88);
+  font-family: var(--font-readable);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.townFocusTitle {
+  margin: 0;
+  color: #fff8ea;
+  font-family: var(--font-display), "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", serif;
+  font-size: clamp(24px, 2.3vw, 32px);
+  line-height: 1.08;
+  text-wrap: balance;
+}
+
+.townFocusSummary {
+  margin: 10px 0 0;
+  max-width: 34ch;
+  color: rgba(255, 244, 220, 0.92);
+  font-family: var(--font-readable);
+  font-size: 14px;
+  line-height: 1.5;
+  text-wrap: pretty;
+  overflow-wrap: anywhere;
+}
+
+.townFocusActions {
+  display: flex;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.townPrimaryAction {
+  min-width: min(100%, 240px);
+  min-height: 46px;
+  font-family: var(--font-readable);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-wrap: balance;
+}
+
+.townFocusSupport {
+  margin-top: 10px;
+  color: rgba(255, 228, 160, 0.84);
+  font-family: var(--font-readable);
+  font-size: 12px;
+  line-height: 1.45;
+  text-wrap: pretty;
+  overflow-wrap: anywhere;
 }
 
 .townDistrictHotspot {
@@ -475,6 +551,12 @@ h3 {
   box-shadow: 0 0 0 rgba(10, 15, 25, 0);
   text-align: center;
   line-height: 1.25;
+  font-family: var(--font-readable);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
   transition:
     background-color 160ms ease,
     border-color 160ms ease,
@@ -1600,6 +1682,32 @@ footer::before {
   .townScene {
     height: 100vh;
     min-height: 100vh;
+  }
+
+  .townFocusCard {
+    left: 10px;
+    right: 10px;
+    width: auto;
+    bottom: calc(var(--agent-panel-page-inset, 0px) + 10px);
+    padding: 14px 14px 12px;
+    border-radius: 16px;
+  }
+
+  .townFocusEyebrow {
+    font-size: 10px;
+  }
+
+  .townFocusTitle {
+    font-size: 24px;
+  }
+
+  .townFocusSummary {
+    max-width: none;
+    font-size: 13px;
+  }
+
+  .townPrimaryAction {
+    width: 100%;
   }
 
   .townDistrict-pony {
@@ -3747,19 +3855,70 @@ body.town-hub-page .townDistrictHotspot.is-active .townDistrictLabel {
 }
 
 body.town-hub-page #townSceneStatus {
-  left: 14px;
-  bottom: 14px;
-  color: var(--v0-cream);
-  border: 2px solid rgba(196, 136, 58, 0.75);
-  border-radius: 10px;
-  background: rgba(46, 27, 14, 0.76);
-  padding: 7px 10px;
-  text-shadow: none;
+  color: rgba(255, 228, 160, 0.84);
+  border: 0;
+  border-radius: 0;
+  background: none;
+  padding: 0;
+}
+
+body.town-hub-page .townFocusCard {
+  border-color: rgba(196, 136, 58, 0.88);
+  background:
+    linear-gradient(180deg, rgba(30, 18, 11, 0.92), rgba(61, 35, 17, 0.88)),
+    radial-gradient(circle at top left, rgba(255, 228, 160, 0.1), rgba(255, 228, 160, 0) 42%);
+  box-shadow:
+    0 24px 48px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 228, 160, 0.12) inset;
+}
+
+body.town-hub-page .townPrimaryAction {
+  box-shadow:
+    0 6px 0 rgba(68, 39, 19, 0.76),
+    0 14px 22px rgba(0, 0, 0, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+body.town-hub-page #agentSidebar.agent-sidebar.minimized {
+  border-color: rgba(139, 113, 74, 0.9);
+  background:
+    linear-gradient(180deg, rgba(255, 248, 232, 0.9), rgba(232, 211, 176, 0.88)),
+    url("/images/parchment-bg.jpg") center/cover no-repeat;
+  box-shadow:
+    0 10px 20px rgba(0, 0, 0, 0.22),
+    0 0 0 1px rgba(196, 136, 58, 0.12);
+}
+
+body.town-hub-page #agentSidebar.agent-sidebar.minimized .sidebar-header {
+  background:
+    linear-gradient(180deg, rgba(46, 27, 14, 0.34), rgba(46, 27, 14, 0.14)),
+    url("/images/wood-header.jpg") center/cover no-repeat;
 }
 
 body.town-hub-page .districtBackdrop {
   background: rgba(46, 27, 14, 0.64);
   backdrop-filter: blur(6px);
+}
+
+@media (max-width: 720px) {
+  body.town-hub-page #agentSidebar.agent-sidebar.minimized {
+    width: min(304px, calc(100vw - 20px));
+    height: calc(46px * var(--agent-panel-zoom)) !important;
+    border-radius: 16px;
+  }
+
+  body.town-hub-page #agentSidebar.agent-sidebar.minimized .sidebar-header {
+    padding: 3px 8px;
+  }
+
+  body.town-hub-page #agentSidebar.agent-sidebar.minimized .sidebar-header h3 {
+    font-size: calc(15px * var(--agent-panel-text-scale));
+  }
+
+  body.town-hub-page #agentSidebar.agent-sidebar.minimized .status-indicator {
+    font-size: calc(9px * var(--agent-panel-text-scale));
+    padding: calc(2px * var(--agent-panel-text-scale)) calc(6px * var(--agent-panel-text-scale));
+  }
 }
 
 body.town-hub-page .trainerBackdrop {

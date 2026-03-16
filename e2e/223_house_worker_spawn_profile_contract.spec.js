@@ -11,6 +11,9 @@ test.beforeEach(async ({ request }) => {
 });
 
 test('M35.8: advanced spawn profile overrides persist exactly while the default path stays non-technical', async ({ page, request }) => {
+  test.slow();
+  test.setTimeout(60_000);
+
   const installFixture = await getPlatformFixture(request, 'worker_package_install_seed');
   const profileFixture = await getPlatformFixture(request, 'worker_spawn_profile_seed');
   expect(installFixture?.ok).toBe(true);

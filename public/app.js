@@ -939,8 +939,8 @@ function isTownHubDistrictGateLocked(state) {
 
 function getTownHubDistrictGateStatusText() {
   const reason = getTownHubDistrictGateReason(lastState);
-  if (reason === 'onboarding') return 'Town Hall is required until onboarding is complete.';
-  if (reason === 'brain') return 'A brain must be configured before continuing.';
+  if (reason === 'onboarding') return 'Finish Town Hall before exploring the rest of town.';
+  if (reason === 'brain') return 'Finish setup in Town Hall before continuing.';
   return '';
 }
 
@@ -968,23 +968,138 @@ function applyDistrictHotspotLocks(state) {
 function districtStatusText(district) {
   const statusText = getTownHubDistrictGateStatusText();
   if (statusText) {
-    return `Locked: ${statusText}`;
+    return statusText;
   }
-  if (!district) return 'Select a district on the map.';
-  if (district === 'atlas') return 'Atlas Depot selected: district map and storefront exploration.';
-  if (district === 'registry') return 'Registry selected: capability and storefront discovery.';
-  if (district === 'poker') return 'Portal Poker selected: mirrored seasons, submissions, leaderboards, and replay manifests.';
-  if (district === 'townhall') return 'Town Hall selected: identity, ceremony, and picture management.';
-  if (district === 'saloon') return 'Saloon selected: upcoming social and co-op experiences preview.';
-  if (district === 'pony') return 'Pony Express selected: inbox and message routing.';
-  if (district === 'leaderboard') return 'Town Board selected: public rankings and team snapshots.';
-  return 'Plan Wagons selected: unlock and enter your house flow.';
+  if (!district) return 'Start with one place in town.';
+  if (district === 'atlas') return 'Browse the town map and see what is available.';
+  if (district === 'registry') return 'Browse helpers, skills, and storefront picks.';
+  if (district === 'poker') return 'Check mirrored seasons, submissions, and leaderboards.';
+  if (district === 'townhall') return 'Handle town setup, ceremony, and pictures here.';
+  if (district === 'saloon') return 'Preview social and co-op experiences.';
+  if (district === 'pony') return 'Read messages and routing updates.';
+  if (district === 'leaderboard') return 'See public rankings and team snapshots.';
+  return 'Start here to unlock your house and continue your work.';
+}
+
+function districtFocusContent(district) {
+  const next = normalizeDistrict(district || 'house');
+  const lockedStatus = getTownHubDistrictGateStatusText();
+  if (lockedStatus) {
+    return {
+      eyebrow: 'Finish setup first',
+      title: 'Town Hall',
+      summary: 'Complete the town setup here before you explore the rest of Agent Town.',
+      actionText: 'Open Town Hall',
+      actionDistrict: 'townhall',
+      supportText: lockedStatus,
+    };
+  }
+  if (next === 'atlas') {
+    return {
+      eyebrow: 'Explore the map',
+      title: 'Atlas Depot',
+      summary: 'Browse the map and see what is available across town.',
+      actionText: 'Open Atlas Depot',
+      actionDistrict: 'atlas',
+      supportText: districtStatusText(next),
+    };
+  }
+  if (next === 'registry') {
+    return {
+      eyebrow: 'Browse helpers',
+      title: 'Registry',
+      summary: 'Find skills, helper packages, and storefront picks.',
+      actionText: 'Open Registry',
+      actionDistrict: 'registry',
+      supportText: districtStatusText(next),
+    };
+  }
+  if (next === 'poker') {
+    return {
+      eyebrow: 'Track competition',
+      title: 'Portal Poker',
+      summary: 'Review seasons, submissions, and leaderboard changes.',
+      actionText: 'Open Portal Poker',
+      actionDistrict: 'poker',
+      supportText: districtStatusText(next),
+    };
+  }
+  if (next === 'townhall') {
+    return {
+      eyebrow: 'Set up town access',
+      title: 'Town Hall',
+      summary: 'Handle ceremony, identity, and pictures in one place.',
+      actionText: 'Open Town Hall',
+      actionDistrict: 'townhall',
+      supportText: districtStatusText(next),
+    };
+  }
+  if (next === 'saloon') {
+    return {
+      eyebrow: 'Meet in town',
+      title: 'Saloon',
+      summary: 'Preview social and co-op experiences waiting in town.',
+      actionText: 'Open Saloon',
+      actionDistrict: 'saloon',
+      supportText: districtStatusText(next),
+    };
+  }
+  if (next === 'pony') {
+    return {
+      eyebrow: 'Check messages',
+      title: 'Pony Express',
+      summary: 'Read inbox updates and routing notes in one place.',
+      actionText: 'Open Pony Express',
+      actionDistrict: 'pony',
+      supportText: districtStatusText(next),
+    };
+  }
+  if (next === 'leaderboard') {
+    return {
+      eyebrow: 'See the board',
+      title: 'Town Board',
+      summary: 'Check rankings and recent team snapshots.',
+      actionText: 'Open Town Board',
+      actionDistrict: 'leaderboard',
+      supportText: districtStatusText(next),
+    };
+  }
+  return {
+    eyebrow: 'Start here',
+    title: 'Plan Wagons',
+    summary: 'Unlock your house, keep your shared work moving, and come back when you are ready for the rest of town.',
+    actionText: 'Open Plan Wagons',
+    actionDistrict: 'house',
+    supportText: districtStatusText(next),
+  };
+}
+
+function renderTownFocusCard(district) {
+  if (!isTownHub) return;
+  const card = el('townFocusCard');
+  if (!card) return;
+  const eyebrow = el('townFocusEyebrow');
+  const title = el('townFocusTitle');
+  const summary = el('townFocusSummary');
+  const action = el('townPrimaryAction');
+  const status = el('townSceneStatus');
+  const content = districtFocusContent(district || 'house');
+  card.setAttribute('data-active-district', content.actionDistrict);
+  if (eyebrow) eyebrow.textContent = content.eyebrow;
+  if (title) title.textContent = content.title;
+  if (summary) summary.textContent = content.summary;
+  if (action) {
+    action.textContent = content.actionText;
+    action.setAttribute('data-district', content.actionDistrict);
+    action.setAttribute('aria-label', content.actionText);
+  }
+  if (status) status.textContent = content.supportText;
 }
 
 function setActiveDistrict(district) {
   const next = district === 'atlas' || district === 'registry' || district === 'poker' || district === 'townhall' || district === 'saloon' || district === 'pony' || district === 'leaderboard' || district === 'house'
     ? district
-    : null;
+    : (isTownHub ? 'house' : null);
   activeDistrict = next;
 
   document.querySelectorAll('.townDistrictHotspot[data-district]').forEach((hotspot) => {
@@ -995,6 +1110,7 @@ function setActiveDistrict(district) {
 
   const status = el('townSceneStatus');
   if (status) status.textContent = districtStatusText(next);
+  renderTownFocusCard(next);
 }
 
 function normalizeDistrict(district) {
@@ -1034,7 +1150,7 @@ function clearTouchDistrictPrime() {
 
 function clearDistrictSelection() {
   clearTouchDistrictPrime();
-  setActiveDistrict(null);
+  setActiveDistrict(isTownHub ? 'house' : null);
 }
 
 function bindDistrictMapInteractions() {
@@ -1101,6 +1217,16 @@ function bindDistrictMapInteractions() {
     if (!districtHotspot) {
       clearDistrictSelection();
     }
+  });
+}
+
+function bindTownFocusCardInteractions() {
+  if (!isTownHub) return;
+  const action = el('townPrimaryAction');
+  if (!action) return;
+  action.addEventListener('click', () => {
+    const district = normalizeDistrict(action.getAttribute('data-district') || activeDistrict || 'house');
+    showDistrict(district);
   });
 }
 
@@ -9869,6 +9995,7 @@ function syncTownhallGate(state) {
   const gateLocked = !!gateReason;
   const onboardingLocked = gateReason === 'onboarding';
   applyDistrictHotspotLocks(state);
+  renderTownFocusCard(activeDistrict || 'house');
 
   const closeBtn = el('districtModalClose');
   if (closeBtn) {
@@ -12901,12 +13028,14 @@ async function bootstrapInitialRouteState() {
   }
   pathMode = loadPathMode();
   const initialDistrict = explicitDistrict;
-  activeDistrict = initialDistrict;
+  const initialFocusDistrict = explicitDistrict || (isTownHub ? 'house' : null);
+  activeDistrict = initialFocusDistrict;
   updatePathButtons();
-  setActiveDistrict(initialDistrict);
+  setActiveDistrict(initialFocusDistrict);
 
   if (isTownHub) {
     bindDistrictMapInteractions();
+    bindTownFocusCardInteractions();
     bindTrainerModalInteractions();
 
     const closeBtn = el('districtModalClose');
@@ -12986,7 +13115,7 @@ async function bootstrapInitialRouteState() {
   }
 
   if (isTownHub && initialDistrict) {
-    await showDistrict(activeDistrict);
+    await showDistrict(initialDistrict);
   }
 
   if (isTownHub && initialModal === 'trainer') {

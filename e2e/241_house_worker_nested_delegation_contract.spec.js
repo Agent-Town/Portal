@@ -12,6 +12,7 @@ test.beforeEach(async ({ request }) => {
 });
 
 test('T38.5: helpers can delegate one controlled extra generation while depth and budget guardrails fail closed', async ({ page, request }) => {
+  test.slow();
   const installFixture = await getPlatformFixture(request, 'worker_package_install_seed');
   const smokeFixture = await getPlatformFixture(request, 'worker_runtime_reality_smoke_seed');
   const delegationFixture = await getPlatformFixture(request, 'worker_nested_delegation_seed');

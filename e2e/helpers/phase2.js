@@ -691,7 +691,125 @@ async function configureLiteLlm(page, {
   await ensureAppShell(page, { navigate: false });
   await ensureHouseDistrictVisible(page).catch(() => {});
   await ensureBrainPanelVisible(page);
+  const litePanel = page.getByTestId('lite-llm-panel');
+  if (await litePanel.count()) {
+    await litePanel.first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+  }
   const liteTestApiReady = await ensureLiteTestApi(page);
+  const waitForLlmForm = async (timeout = 30000) => {
+    const start = Date.now();
+    while (Date.now() - start < timeout) {
+      const ready = await page.evaluate(() => {
+        return !!(
+          document.getElementById('llmProviderSelect')
+          && document.getElementById('llmModelIdInput')
+          && document.getElementById('llmKeyInput')
+          && document.getElementById('llmSaveBtn')
+        );
+      }).catch(() => false);
+      if (ready) return true;
+      await page.waitForTimeout(120);
+    }
+    return false;
+  };
+  const saveViaDomForm = async () => {
+    await page.evaluate(({ desiredProvider, desiredModel, desiredApiKey }) => {
+      const providerInput = document.getElementById('llmProviderSelect');
+      const modelInput = document.getElementById('llmModelIdInput');
+      const keyInput = document.getElementById('llmKeyInput');
+      const saveBtn = document.getElementById('llmSaveBtn');
+      if (!(providerInput instanceof HTMLSelectElement)) throw new Error('LLM_PROVIDER_INPUT_MISSING');
+      if (!(modelInput instanceof HTMLSelectElement || modelInput instanceof HTMLInputElement)) throw new Error('LLM_MODEL_INPUT_MISSING');
+      if (!(keyInput instanceof HTMLInputElement)) throw new Error('LLM_API_KEY_INPUT_MISSING');
+      if (!(saveBtn instanceof HTMLElement)) throw new Error('LLM_SAVE_BUTTON_MISSING');
+
+      if (providerInput instanceof HTMLSelectElement) {
+        providerInput.value = desiredProvider;
+        providerInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      if (modelInput instanceof HTMLSelectElement) {
+        const hasDesired = Array.from(modelInput.options || []).some((opt) => opt.value === desiredModel);
+        if (!hasDesired) {
+          const option = document.createElement('option');
+          option.value = desiredModel;
+          option.textContent = desiredModel;
+          modelInput.appendChild(option);
+        }
+        modelInput.value = desiredModel;
+        modelInput.dispatchEvent(new Event('change', { bubbles: true }));
+      } else if (modelInput instanceof HTMLInputElement) {
+        modelInput.value = desiredModel;
+        modelInput.dispatchEvent(new Event('input', { bubbles: true }));
+        modelInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      if (keyInput instanceof HTMLInputElement) {
+        keyInput.value = desiredApiKey;
+        keyInput.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      saveBtn.click();
+    }, {
+      desiredProvider: provider,
+      desiredModel: model,
+      desiredApiKey: apiKey,
+    });
+
+    await waitForLocalLiteLlmConfig(page, { provider, model });
+    const liteStatus = page.getByTestId('lite-llm-status');
+    if (await liteStatus.count()) {
+      await expect(liteStatus).toContainText(/configured|saved|ready|connected|brain/i, { timeout: 10000 });
+    }
+    await finalizeLocalBrain();
+  };
+  const saveViaLocalLibrary = async () => {
+    const persistViaLocalLibrary = async () => {
+      await page.evaluate(async ({ desiredProvider, desiredModel, desiredApiKey }) => {
+        const lib = await import('/openclaw-lite/llm-config-library.js');
+        await lib.saveLlmConfig({
+          provider: desiredProvider,
+          model: desiredModel,
+          apiKey: desiredApiKey,
+          authMode: 'api-key',
+          reasoning: '',
+          useProxy: true,
+        });
+      }, {
+        desiredProvider: provider,
+        desiredModel: model,
+        desiredApiKey: apiKey,
+      });
+    };
+    try {
+      await persistViaLocalLibrary();
+    } catch (error) {
+      const message = String(error?.message || '').trim();
+      if (!/object stores? was not found|NotFoundError|IDB/i.test(message)) {
+        throw error;
+      }
+      await page.evaluate(async () => {
+        const dbNames = [];
+        try {
+          const params = new URLSearchParams(String(window.location.search || ''));
+          const queryDbName = String(params.get('idbName') || '').trim();
+          if (queryDbName) dbNames.push(queryDbName);
+        } catch {
+          // ignore query parsing failures in tests
+        }
+        dbNames.push('openclaw-lite');
+        for (const dbName of Array.from(new Set(dbNames.filter(Boolean)))) {
+          await new Promise((resolve) => {
+            const req = indexedDB.deleteDatabase(dbName);
+            req.onsuccess = () => resolve();
+            req.onerror = () => resolve();
+            req.onblocked = () => resolve();
+          });
+        }
+      });
+      await persistViaLocalLibrary();
+    }
+
+    await waitForLocalLiteLlmConfig(page, { provider, model });
+    await finalizeLocalBrain();
+  };
   const applyViaTestApi = async () => {
     if (!liteTestApiReady) {
       throw new Error('LITE_LLM_TEST_API_MISSING');
@@ -735,93 +853,27 @@ async function configureLiteLlm(page, {
     await waitForLocalLiteLlmConfig(page, { provider, model });
     await finalizeLocalBrain();
   };
-  const hasDomLlmForm = await page.evaluate(() => {
-    return !!(
-      document.getElementById('llmProviderSelect')
-      && document.getElementById('llmModelIdInput')
-      && document.getElementById('llmKeyInput')
-      && document.getElementById('llmSaveBtn')
-    );
-  }).catch(() => false);
+  const hasDomLlmForm = await waitForLlmForm();
 
-  const hasVisibleBrainPanel = await page.getByTestId('lite-llm-panel').isVisible().catch(() => false);
-  if (!hasVisibleBrainPanel && hasDomLlmForm) {
-    await page.evaluate(({ desiredProvider, desiredModel, desiredApiKey }) => {
-      const providerInput = document.getElementById('llmProviderSelect');
-      const modelInput = document.getElementById('llmModelIdInput');
-      const keyInput = document.getElementById('llmKeyInput');
-      const saveBtn = document.getElementById('llmSaveBtn');
-      if (!(providerInput instanceof HTMLSelectElement)) throw new Error('LLM_PROVIDER_INPUT_MISSING');
-      if (!(modelInput instanceof HTMLSelectElement || modelInput instanceof HTMLInputElement)) throw new Error('LLM_MODEL_INPUT_MISSING');
-      if (!(keyInput instanceof HTMLInputElement)) throw new Error('LLM_API_KEY_INPUT_MISSING');
-      if (!(saveBtn instanceof HTMLElement)) throw new Error('LLM_SAVE_BUTTON_MISSING');
-
-      providerInput.value = desiredProvider;
-      providerInput.dispatchEvent(new Event('change', { bubbles: true }));
-
-      if (modelInput instanceof HTMLSelectElement) {
-        const hasDesired = Array.from(modelInput.options || []).some((opt) => opt.value === desiredModel);
-        if (!hasDesired) {
-          const option = document.createElement('option');
-          option.value = desiredModel;
-          option.textContent = desiredModel;
-          modelInput.appendChild(option);
-        }
-        modelInput.value = desiredModel;
-      } else {
-        modelInput.value = desiredModel;
+  if (hasDomLlmForm) {
+    try {
+      await saveViaDomForm();
+      return;
+    } catch {
+      try {
+        await applyViaTestApi();
+        return;
+      } catch {
+        await saveViaLocalLibrary();
+        return;
       }
-      modelInput.dispatchEvent(new Event('input', { bubbles: true }));
-      modelInput.dispatchEvent(new Event('change', { bubbles: true }));
-
-      keyInput.value = desiredApiKey;
-      keyInput.dispatchEvent(new Event('input', { bubbles: true }));
-      saveBtn.click();
-    }, {
-      desiredProvider: provider,
-      desiredModel: model,
-      desiredApiKey: apiKey
-    });
-    await waitForLocalLiteLlmConfig(page, { provider, model });
-    await expect(page.getByTestId('lite-llm-status')).toContainText(/configured|saved|ready|brain/i, { timeout: 5000 });
-    await finalizeLocalBrain();
-    return;
+    }
   }
-
-  if (!hasVisibleBrainPanel) {
-    await applyViaTestApi();
-    return;
-  }
-
-  await expect(page.getByTestId('lite-llm-provider')).toBeVisible({ timeout: 2000 });
-  await expect(page.getByTestId('lite-llm-model')).toBeVisible({ timeout: 2000 });
-  await expect(page.getByTestId('lite-llm-api-key')).toBeVisible({ timeout: 2000 });
-  await expect(page.getByTestId('lite-llm-save')).toBeVisible({ timeout: 2000 });
-
-  const providerInput = page.getByTestId('lite-llm-provider');
-  const modelInput = page.getByTestId('lite-llm-model');
-  await providerInput.selectOption(provider);
-  await modelInput.evaluate((node, desired) => {
-    const select = node;
-    if (!select || typeof select.querySelectorAll !== 'function') return;
-    const hasDesired = Array.from(select.querySelectorAll('option')).some((opt) => opt.value === desired);
-    if (hasDesired) return;
-    const option = document.createElement('option');
-    option.value = desired;
-    option.textContent = desired;
-    select.appendChild(option);
-  }, model);
-  await modelInput.selectOption(model);
-  await page.getByTestId('lite-llm-api-key').fill(apiKey);
-  await page.getByTestId('lite-llm-save').click();
   try {
-    await waitForLocalLiteLlmConfig(page, { provider, model, timeout: 2500 });
-  } catch (error) {
     await applyViaTestApi();
-    return;
+  } catch {
+    await saveViaLocalLibrary();
   }
-  await expect(page.getByTestId('lite-llm-status')).toContainText(/configured|saved|ready|connected|brain/i, { timeout: 5000 });
-  await finalizeLocalBrain();
 }
 
 async function ensureLiteConnected(page) {

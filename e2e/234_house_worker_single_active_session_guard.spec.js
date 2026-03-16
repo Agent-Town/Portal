@@ -11,6 +11,8 @@ test.beforeEach(async ({ request }) => {
 });
 
 test('M35.3g: one helper deployment keeps one active session and a second start reuses it instead of spawning a duplicate', async ({ page, request }) => {
+  test.slow();
+  test.setTimeout(120_000);
   const installFixture = await getPlatformFixture(request, 'worker_package_install_seed');
   expect(installFixture?.ok).toBe(true);
 

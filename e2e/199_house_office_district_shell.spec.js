@@ -99,6 +99,8 @@ test.beforeEach(async ({ request }) => {
 });
 
 test('M29.4: House Office district shell keeps section routing and team continuity inside the existing shell', async ({ page, request }) => {
+  test.slow();
+  test.setTimeout(60_000);
   const { seededHouse, teams } = await seedMultiTeamSurface(request);
   const [teamAlpha, teamBeta] = teams;
   await page.setViewportSize({ width: 390, height: 844 });

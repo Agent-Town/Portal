@@ -17,7 +17,7 @@ Current default status for all items in this file: `planned`
 
 ### DG-001 — Canonical design source mapping
 
-Status: `planned`
+Status: `implemented`
 
 Problem:
 
@@ -42,7 +42,7 @@ Test mapping:
 
 ### DG-002 — Token family consolidation plan
 
-Status: `planned`
+Status: `implemented`
 
 Problem:
 
@@ -72,7 +72,7 @@ Test mapping:
 
 ### DG-003 — Audience and globalization contract
 
-Status: `planned`
+Status: `implemented`
 
 Problem:
 
@@ -100,7 +100,7 @@ Test mapping:
 
 ### DG-051 — Plain-language top-layer copy contract
 
-Status: `planned`
+Status: `in_progress`
 
 Problem:
 
@@ -128,7 +128,7 @@ Test mapping:
 
 ### DG-052 — Translation-safe shell labels
 
-Status: `planned`
+Status: `implemented`
 
 Problem:
 
@@ -153,7 +153,7 @@ Test mapping:
 
 ### DG-053 — Simplified Chinese mixed-script readiness
 
-Status: `planned`
+Status: `implemented`
 
 Problem:
 
@@ -207,7 +207,7 @@ Test mapping:
 
 ### DG-101 — Town hub primary action dominance
 
-Status: `planned`
+Status: `implemented`
 
 Problem:
 
@@ -233,7 +233,7 @@ Test mapping:
 
 ### DG-102 — Mobile dock crowding reduction
 
-Status: `planned`
+Status: `implemented`
 
 Problem:
 
@@ -259,7 +259,7 @@ Test mapping:
 
 ### DG-103 — Town shell status and scene rhythm
 
-Status: `planned`
+Status: `implemented`
 
 Problem:
 

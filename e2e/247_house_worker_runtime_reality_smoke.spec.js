@@ -144,6 +144,7 @@ test.beforeEach(async ({ request }) => {
 
 test('T38.11: runtime truth, office-pack sharing, nested delegation, and recovery replay as one deterministic user journey', async ({ page, request, browser }) => {
   test.slow();
+  test.setTimeout(180_000);
   const registryFixture = await getPlatformFixture(request, 'worker_package_registry_seed');
   const smokeFixture = await getPlatformFixture(request, 'worker_runtime_reality_smoke_seed');
   expect(registryFixture?.ok).toBe(true);

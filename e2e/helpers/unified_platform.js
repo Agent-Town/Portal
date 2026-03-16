@@ -1,5 +1,5 @@
 const { houseAuthHeadersFromKeyB64 } = require('./phase1');
-const { gotoAppWithLite, waitForRuntimeSessionContext } = require('./trainer');
+const { gotoAppWithLite, waitForLiteApi, waitForRuntimeSessionContext } = require('./trainer');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 const DEFAULT_COMPILED_PACK_MANIFEST_PATH = 'workspace/.agent-town/default-pack/manifest.json';
@@ -203,6 +203,81 @@ async function attachHouseToPageSession(page, {
         context: lastContext,
       })}`);
     }
+    await page.evaluate(async () => {
+      const response = await fetch('/api/state', {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store',
+      }).catch(() => null);
+      const state = response ? await response.json().catch(() => null) : null;
+      const teamCode = typeof state?.teamCode === 'string' ? state.teamCode.trim().toUpperCase() : '';
+      const walletRecoveryKey = typeof state?.walletRecoveryKey === 'string'
+        ? state.walletRecoveryKey.trim().toLowerCase()
+        : '';
+      try {
+        if (teamCode) {
+          localStorage.setItem('agentTown:teamCodeHint', teamCode);
+        } else {
+          localStorage.removeItem('agentTown:teamCodeHint');
+        }
+      } catch {
+        // ignore localStorage failures in tests
+      }
+      try {
+        if (walletRecoveryKey) {
+          localStorage.setItem('agentTown:walletRecoveryKey', walletRecoveryKey);
+        } else {
+          localStorage.removeItem('agentTown:walletRecoveryKey');
+        }
+      } catch {
+        // ignore localStorage failures in tests
+      }
+      try {
+        if (typeof walletRecoveryIntentAttempts === 'number') {
+          walletRecoveryIntentAttempts = 0;
+        }
+      } catch {
+        // ignore lexical-scope misses in tests
+      }
+    });
+    await page.evaluate(async () => {
+      if (typeof window.loadHousePlatformContext === 'function') {
+        await window.loadHousePlatformContext().catch(() => null);
+      }
+      if (typeof window.loadHouseReadiness === 'function') {
+        await window.loadHouseReadiness({ skipContext: true }).catch(() => null);
+      }
+    });
+    await page.waitForFunction(({ nextHouseId, nextTeamId }) => {
+      const summaryNode = document.querySelector('[data-testid="house-team-summary"]');
+      const readinessNode = document.querySelector('[data-testid="house-readiness-summary"]');
+      const liveReadinessNode = document.querySelector('[data-testid="house-worker-live-readiness-summary"]');
+      const teamSelectNode = document.querySelector('[data-testid="house-team-select"]');
+      if (!summaryNode && !readinessNode && !liveReadinessNode) {
+        return true;
+      }
+      const summaryText = String(summaryNode?.textContent || '').trim();
+      const readinessText = String(readinessNode?.textContent || '').trim();
+      const liveReadinessText = String(liveReadinessNode?.textContent || '').trim();
+      const selectedTeamId = String(teamSelectNode?.value || '').trim();
+      const hasAttachedSummary = !summaryNode
+        || (
+          !/attach a house/i.test(summaryText)
+          && (!nextTeamId || selectedTeamId === nextTeamId || summaryText.includes(nextTeamId))
+        );
+      const hasAttachedReadiness = !readinessNode
+        || !/attach a house/i.test(readinessText);
+      const hasAttachedLiveReadiness = !liveReadinessNode
+        || !/attach a house/i.test(liveReadinessText);
+      return hasAttachedSummary
+        && hasAttachedReadiness
+        && hasAttachedLiveReadiness;
+    }, {
+      nextHouseId: expectedHouseId,
+      nextTeamId: expectedTeamId,
+    }, {
+      timeout: 10_000,
+    });
   }
   return result;
 }
@@ -218,17 +293,41 @@ async function getPlatformContextFromPage(page) {
   });
 }
 
-async function readWorkerSessionId(page) {
-  const hasRuntimeContext = await page.evaluate(() => {
-    return !!(
-      window.__openclawLiteTest
-      && typeof window.__openclawLiteTest.runtimeSessionContext === 'function'
-    );
-  }).catch(() => false);
-  if (!hasRuntimeContext) {
-    await gotoAppWithLite(page);
+async function readWorkerSessionId(page, {
+  timeout = 15_000,
+  attempts = 2,
+} = {}) {
+  const maxAttempts = Math.max(1, Number(attempts) || 1);
+  for (let attemptIndex = 0; attemptIndex < maxAttempts; attemptIndex += 1) {
+    const hasRuntimeContext = await page.evaluate(() => {
+      return !!(
+        window.__openclawLiteTest
+        && typeof window.__openclawLiteTest.runtimeSessionContext === 'function'
+      );
+    }).catch(() => false);
+    if (!hasRuntimeContext) {
+      await gotoAppWithLite(page);
+    }
+    try {
+      return await waitForRuntimeSessionContext(page, timeout);
+    } catch (error) {
+      const message = String(error?.message || '').trim();
+      if (!/RUNTIME_SESSION_CONTEXT_TIMEOUT/.test(message) || attemptIndex >= maxAttempts - 1) {
+        throw error;
+      }
+      await waitForLiteApi(page, timeout).catch(() => null);
+      await page.evaluate(async () => {
+        if (typeof window.bootstrapVendorRuntime === 'function') {
+          await window.bootstrapVendorRuntime().catch(() => null);
+        }
+        if (typeof window.connectLiteAgent === 'function') {
+          await window.connectLiteAgent().catch(() => null);
+        }
+      }).catch(() => null);
+      await page.waitForTimeout(250 * (attemptIndex + 1));
+    }
   }
-  return await waitForRuntimeSessionContext(page);
+  throw new Error('RUNTIME_SESSION_CONTEXT_TIMEOUT:UNREACHABLE');
 }
 
 async function compileDefaultSkillPack(page, { idempotencyKey = '', force = false } = {}) {

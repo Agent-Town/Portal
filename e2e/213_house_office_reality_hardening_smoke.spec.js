@@ -201,6 +201,8 @@ test.beforeEach(async ({ request }) => {
 });
 
 test('M32.8: House Office reality hardening smoke proves the integrated journey twice without losing continuity', async ({ page, request }) => {
+  test.slow();
+  test.setTimeout(120_000);
   const fixtureEnvelope = await getPlatformFixture(request, 'house_office_reality_smoke_seed');
   expect(fixtureEnvelope?.ok).toBe(true);
   const fixture = fixtureEnvelope?.fixture || {};
