@@ -59,3 +59,18 @@ test('house console header region uses structured classes instead of inline layo
   expect(houseHtml).not.toContain('id="houseReadinessSummary" data-testid="house-readiness-summary" style=');
   expect(houseHtml).not.toContain('id="houseWorkerLiveReadinessSummary" data-testid="house-worker-live-readiness-summary" style=');
 });
+
+test('house office static markup uses section classes instead of inline spacing', async () => {
+  const housePath = path.join(process.cwd(), 'public/views/house.html');
+  const houseHtml = fs.readFileSync(housePath, 'utf8');
+
+  expect(houseHtml).toContain('data-testid="house-office-hero"');
+  expect(houseHtml).toContain('data-testid="house-office-overview-grid"');
+  expect(houseHtml).toContain('class="houseOfficeSectionHeader"');
+  expect(houseHtml).toContain('class="houseOfficeMap"');
+  expect(houseHtml).not.toContain('id="houseOfficeShareActions" data-testid="house-office-share-actions" style=');
+  expect(houseHtml).not.toContain('id="houseOfficeSelectedOffice" data-testid="house-office-selected-office" style=');
+  expect(houseHtml).not.toContain('id="houseOfficePresence" data-testid="house-office-presence" style=');
+  expect(houseHtml).not.toContain('id="houseOfficeMap" data-testid="house-office-map" style=');
+  expect(houseHtml).not.toContain('id="houseOfficeSourceManifest" data-testid="house-office-source-manifest" style=');
+});

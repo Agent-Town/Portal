@@ -1071,6 +1071,229 @@ h3 {
   }
 }
 
+.houseOfficeTitle {
+  margin: 0 0 var(--space-6);
+}
+
+.houseOfficeIntro {
+  margin-top: 0;
+}
+
+.houseOfficeHero {
+  display: grid;
+  gap: var(--space-12);
+  margin-bottom: var(--space-16);
+  padding: var(--space-16);
+  border: var(--stroke-strong);
+  border-radius: calc(var(--radius-xl) + 2px);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 246, 233, 0.95));
+  box-shadow: var(--shadow-md);
+}
+
+.houseOfficeHeroLead {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.houseOfficeEmpty,
+.houseOfficeSummary,
+.houseOfficeSourceManifest {
+  overflow-wrap: anywhere;
+}
+
+.houseOfficeShareActions {
+  margin-top: 0;
+}
+
+.houseOfficeCardMetaStrong {
+  margin-top: var(--space-6);
+}
+
+.houseOfficeOverviewGrid {
+  display: grid;
+  gap: var(--space-12);
+  margin-bottom: var(--space-16);
+}
+
+.houseOfficeOverviewCard,
+.houseOfficeSection {
+  padding: var(--space-14, 0.875rem) var(--space-16);
+  border: var(--stroke-subtle);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(180deg, rgba(255, 252, 248, 0.98), rgba(248, 241, 231, 0.96));
+  box-shadow: var(--shadow-sm);
+}
+
+.houseOfficeSectionStack {
+  display: grid;
+  gap: var(--space-12);
+}
+
+.houseOfficeSectionHeader {
+  display: grid;
+  gap: var(--space-4);
+  margin-bottom: var(--space-10);
+}
+
+.houseOfficeSectionEyebrow {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.houseOfficeSectionTitle {
+  margin: 0;
+}
+
+.houseOfficeSectionBody {
+  min-width: 0;
+}
+
+.houseOfficeSelectedOffice {
+  padding: var(--space-12);
+  border: var(--stroke-faint);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.56);
+}
+
+.houseOfficePanelButton {
+  width: 100%;
+  min-width: 0;
+  justify-content: flex-start;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+  line-height: 1.35;
+}
+
+.houseOfficeMap {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-8);
+}
+
+.houseOfficeMapButton {
+  height: 100%;
+}
+
+.houseOfficeCard {
+  padding: var(--space-12);
+  border: var(--stroke-faint);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.52);
+  overflow-wrap: anywhere;
+}
+
+.houseOfficeCardTitle {
+  font-weight: 700;
+}
+
+.houseOfficeCardMeta {
+  margin-top: var(--space-4);
+  overflow-wrap: anywhere;
+}
+
+.houseOfficeCardMetaStrong {
+  margin-top: var(--space-6);
+}
+
+.houseOfficeGroupCard {
+  padding: var(--space-12);
+  border: var(--stroke-faint);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.52);
+}
+
+.houseOfficeGroupHeading {
+  margin-bottom: var(--space-8);
+  font-weight: 700;
+}
+
+.houseOfficeBriefingItem {
+  padding: var(--space-8) 0;
+}
+
+.houseOfficeBriefingItem + .houseOfficeBriefingItem {
+  border-top: var(--stroke-faint);
+}
+
+.houseOfficeChipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  margin-top: var(--space-6);
+}
+
+.houseOfficeChipButton {
+  padding: var(--space-2) var(--space-6);
+  border: var(--stroke-faint);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.houseOfficeActionRow {
+  margin-top: var(--space-8);
+}
+
+.houseOfficeInput {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.houseOfficeActionStatus {
+  margin-top: var(--space-8);
+}
+
+.houseOfficeAdvanced {
+  margin-top: var(--space-8);
+}
+
+.houseOfficeAdvancedSummary {
+  cursor: pointer;
+}
+
+.houseOfficeAdvancedBody {
+  margin-top: var(--space-6);
+  white-space: pre-wrap;
+}
+
+.houseOfficeProfileStack {
+  margin-top: var(--space-8);
+}
+
+.houseOfficeProfileField {
+  display: block;
+  margin-top: var(--space-4);
+}
+
+.houseOfficeProfileInput {
+  margin-top: var(--space-4);
+}
+
+.houseOfficeSourceManifest {
+  margin-top: var(--space-12);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@media (min-width: 780px) {
+  .houseOfficeHero {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+  }
+
+  .houseOfficeOverviewGrid {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  }
+
+  .houseOfficeSectionStack {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 body.district-modal-open {
   overflow: hidden;
 }

@@ -149,32 +149,96 @@
 </div>
 
 <div class="panel is-hidden" id="houseOfficePanel" data-testid="house-office-panel">
-  <h2 style="margin:0 0 6px">House Office</h2>
-  <p class="small" style="margin-top:0">
-    A read-only operational overview that reuses the current House, trainer, archive, workshop, and tracks truth.
-  </p>
-  <div class="small" id="houseOfficeEmpty" data-testid="house-office-empty">Attach a house to inspect the House Office overview.</div>
-  <div class="small" id="houseOfficeSummary" data-testid="house-office-summary">No House Office overview loaded yet.</div>
-  <div class="kv" id="houseOfficeShareActions" data-testid="house-office-share-actions" style="margin-top:8px;">
-    <button class="btn" id="houseOfficeSharePackBtn" type="button" data-testid="house-office-share-pack">Share Office Pack</button>
+  <div class="houseOfficeHero" data-testid="house-office-hero">
+    <div class="houseOfficeHeroLead">
+      <h2 class="houseOfficeTitle">House Office</h2>
+      <p class="small houseOfficeIntro">
+        A read-only operational overview that reuses the current House, trainer, archive, workshop, and tracks truth.
+      </p>
+      <div class="small houseOfficeEmpty" id="houseOfficeEmpty" data-testid="house-office-empty">Attach a house to inspect the House Office overview.</div>
+      <div class="small houseOfficeSummary" id="houseOfficeSummary" data-testid="house-office-summary">No House Office overview loaded yet.</div>
+    </div>
+    <div class="kv houseOfficeShareActions" id="houseOfficeShareActions" data-testid="house-office-share-actions">
+      <button class="btn" id="houseOfficeSharePackBtn" type="button" data-testid="house-office-share-pack">Share Office Pack</button>
+    </div>
   </div>
-  <div id="houseOfficeSelectedOffice" data-testid="house-office-selected-office" style="margin-top:10px;"></div>
-  <div class="small" style="margin-top:10px;">Presence</div>
-  <div class="kv stack" id="houseOfficePresence" data-testid="house-office-presence" style="margin-top:6px;"></div>
-  <div class="small" style="margin-top:10px;">Briefing</div>
-  <div class="stack" id="houseOfficeBriefing" data-testid="house-office-briefing" style="margin-top:6px;"></div>
-  <div class="small" style="margin-top:10px;">Attention</div>
-  <div class="stack" id="houseOfficeAttention" data-testid="house-office-attention" style="margin-top:6px;"></div>
-  <div class="small" style="margin-top:10px;">Staff Assignments</div>
-  <div class="stack" id="houseOfficeAssignments" data-testid="house-office-assignments" style="margin-top:6px;"></div>
-  <div class="small" style="margin-top:10px;">Installed Helpers</div>
-  <div class="stack" id="houseOfficeDeployments" data-testid="house-office-deployments" style="margin-top:6px;"></div>
-  <div class="small" style="margin-top:10px;">Friend Links</div>
-  <div class="stack" id="houseOfficeWorkerShares" data-testid="house-office-worker-shares" style="margin-top:6px;"></div>
-  <div class="small" style="margin-top:10px;">Active Helper Sessions</div>
-  <div class="stack" id="houseOfficeWorkerSessions" data-testid="house-office-worker-sessions" style="margin-top:6px;"></div>
-  <div id="houseOfficeMap" data-testid="house-office-map" style="display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; margin-top:10px;"></div>
-  <div class="small" id="houseOfficeSourceManifest" data-testid="house-office-source-manifest" style="margin-top:10px;">
+
+  <div class="houseOfficeOverviewGrid" data-testid="house-office-overview-grid">
+    <section class="houseOfficeOverviewCard" data-testid="house-office-overview-card">
+      <div class="houseOfficeSectionHeader">
+        <div class="small houseOfficeSectionEyebrow">Overview</div>
+        <h3 class="houseOfficeSectionTitle">Selected Office</h3>
+      </div>
+      <div class="houseOfficeSectionBody houseOfficeSelectedOffice" id="houseOfficeSelectedOffice" data-testid="house-office-selected-office"></div>
+    </section>
+    <section class="houseOfficeOverviewCard" data-testid="house-office-map-card">
+      <div class="houseOfficeSectionHeader">
+        <div class="small houseOfficeSectionEyebrow">Layout</div>
+        <h3 class="houseOfficeSectionTitle">Office Map</h3>
+      </div>
+      <div class="houseOfficeMap" id="houseOfficeMap" data-testid="house-office-map"></div>
+    </section>
+  </div>
+
+  <div class="houseOfficeSectionStack">
+    <section class="houseOfficeSection">
+      <div class="houseOfficeSectionHeader">
+        <div class="small houseOfficeSectionEyebrow">Live Signal</div>
+        <h3 class="houseOfficeSectionTitle">Presence</h3>
+      </div>
+      <div class="kv stack houseOfficeSectionBody" id="houseOfficePresence" data-testid="house-office-presence"></div>
+    </section>
+
+    <section class="houseOfficeSection">
+      <div class="houseOfficeSectionHeader">
+        <div class="small houseOfficeSectionEyebrow">Briefing</div>
+        <h3 class="houseOfficeSectionTitle">What Changed</h3>
+      </div>
+      <div class="stack houseOfficeSectionBody" id="houseOfficeBriefing" data-testid="house-office-briefing"></div>
+    </section>
+
+    <section class="houseOfficeSection">
+      <div class="houseOfficeSectionHeader">
+        <div class="small houseOfficeSectionEyebrow">Attention</div>
+        <h3 class="houseOfficeSectionTitle">Needs Follow-Up</h3>
+      </div>
+      <div class="stack houseOfficeSectionBody" id="houseOfficeAttention" data-testid="house-office-attention"></div>
+    </section>
+
+    <section class="houseOfficeSection">
+      <div class="houseOfficeSectionHeader">
+        <div class="small houseOfficeSectionEyebrow">Assignments</div>
+        <h3 class="houseOfficeSectionTitle">Staff Assignments</h3>
+      </div>
+      <div class="stack houseOfficeSectionBody" id="houseOfficeAssignments" data-testid="house-office-assignments"></div>
+    </section>
+
+    <section class="houseOfficeSection">
+      <div class="houseOfficeSectionHeader">
+        <div class="small houseOfficeSectionEyebrow">Helpers</div>
+        <h3 class="houseOfficeSectionTitle">Installed Helpers</h3>
+      </div>
+      <div class="stack houseOfficeSectionBody" id="houseOfficeDeployments" data-testid="house-office-deployments"></div>
+    </section>
+
+    <section class="houseOfficeSection">
+      <div class="houseOfficeSectionHeader">
+        <div class="small houseOfficeSectionEyebrow">Sharing</div>
+        <h3 class="houseOfficeSectionTitle">Friend Links</h3>
+      </div>
+      <div class="stack houseOfficeSectionBody" id="houseOfficeWorkerShares" data-testid="house-office-worker-shares"></div>
+    </section>
+
+    <section class="houseOfficeSection">
+      <div class="houseOfficeSectionHeader">
+        <div class="small houseOfficeSectionEyebrow">Sessions</div>
+        <h3 class="houseOfficeSectionTitle">Active Helper Sessions</h3>
+      </div>
+      <div class="stack houseOfficeSectionBody" id="houseOfficeWorkerSessions" data-testid="house-office-worker-sessions"></div>
+    </section>
+  </div>
+
+  <div class="small houseOfficeSourceManifest" id="houseOfficeSourceManifest" data-testid="house-office-source-manifest">
     No House Office source manifest available yet.
   </div>
 </div>

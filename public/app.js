@@ -3528,12 +3528,7 @@ function buildHouseOfficeOfficeMetrics({
 
 function applyHouseOfficePanelButtonStyle(button) {
   if (!(button instanceof HTMLElement)) return;
-  button.style.width = '100%';
-  button.style.minWidth = '0';
-  button.style.whiteSpace = 'normal';
-  button.style.overflowWrap = 'anywhere';
-  button.style.textAlign = 'left';
-  button.style.lineHeight = '1.35';
+  button.classList.add('houseOfficePanelButton');
 }
 
 async function createHouseWorkerShare(payload = {}) {
@@ -3601,8 +3596,6 @@ function renderHouseOfficeSurface() {
 
   emptyNode.textContent = String(houseSurfaceState.office.emptyStateText || 'Attach a house to inspect the House Office overview.');
   emptyNode.classList.toggle('is-hidden', !houseSurfaceState.office.emptyStateText);
-  emptyNode.style.overflowWrap = 'anywhere';
-  summaryNode.style.overflowWrap = 'anywhere';
 
   const houseId = String(houseSurfaceState.context.houseId || '').trim();
   const activeTeamId = String(houseSurfaceState.context.activeTeamId || '').trim();
@@ -3674,11 +3667,6 @@ function renderHouseOfficeSurface() {
   }
 
   selectedOfficeNode.innerHTML = '';
-  selectedOfficeNode.style.border = '1px solid rgba(255,255,255,0.12)';
-  selectedOfficeNode.style.borderRadius = '12px';
-  selectedOfficeNode.style.padding = '10px';
-  selectedOfficeNode.style.background = 'rgba(255,255,255,0.02)';
-  selectedOfficeNode.style.overflowWrap = 'anywhere';
   if (!selectedOffice) {
     const placeholder = document.createElement('div');
     placeholder.className = 'small';
@@ -3686,21 +3674,19 @@ function renderHouseOfficeSurface() {
     selectedOfficeNode.appendChild(placeholder);
   } else {
     const heading = document.createElement('div');
-    heading.style.fontWeight = '600';
+    heading.className = 'houseOfficeCardTitle';
     heading.textContent = `${selectedOfficeLabel} · ${selectedOfficeMetrics.primaryStatus}`;
     selectedOfficeNode.appendChild(heading);
 
     if (selectedOfficePurpose) {
       const purposeNode = document.createElement('div');
-      purposeNode.className = 'small';
-      purposeNode.style.marginTop = '4px';
+      purposeNode.className = 'small houseOfficeCardMeta';
       purposeNode.textContent = selectedOfficePurpose;
       selectedOfficeNode.appendChild(purposeNode);
     }
 
     const metricsNode = document.createElement('div');
-    metricsNode.className = 'small';
-    metricsNode.style.marginTop = '6px';
+    metricsNode.className = 'small houseOfficeCardMeta houseOfficeCardMetaStrong';
     metricsNode.textContent = [
       formatHouseOfficeCountLabel(selectedOfficeMetrics.staffCount, 'staff'),
       formatHouseOfficeCountLabel(selectedOfficeMetrics.assignmentCount, 'assignment'),
@@ -3709,8 +3695,7 @@ function renderHouseOfficeSurface() {
     selectedOfficeNode.appendChild(metricsNode);
 
     const focusNode = document.createElement('div');
-    focusNode.className = 'small';
-    focusNode.style.marginTop = '6px';
+    focusNode.className = 'small houseOfficeCardMeta houseOfficeCardMetaStrong';
     focusNode.textContent = selectedOfficeMetrics.primaryFocus
       ? `Current focus: ${selectedOfficeMetrics.primaryFocus}`
       : 'Current focus: No current focus recorded.';
@@ -3763,15 +3748,10 @@ function renderHouseOfficeSurface() {
     briefing.forEach((group) => {
       const groupNode = document.createElement('section');
       groupNode.setAttribute('data-testid', 'house-office-briefing-group');
-      groupNode.style.border = '1px solid rgba(255,255,255,0.12)';
-      groupNode.style.borderRadius = '12px';
-      groupNode.style.padding = '10px';
-      groupNode.style.background = 'rgba(255,255,255,0.02)';
+      groupNode.className = 'houseOfficeGroupCard';
 
       const heading = document.createElement('div');
-      heading.className = 'small';
-      heading.style.fontWeight = '600';
-      heading.style.marginBottom = '8px';
+      heading.className = 'small houseOfficeGroupHeading';
       heading.textContent = `${String(group?.label || group?.family || 'Briefing').trim() || 'Briefing'} · ${formatHouseOfficeCountLabel((Array.isArray(group?.items) ? group.items.length : 0), 'item')}`;
       groupNode.appendChild(heading);
 
@@ -3779,40 +3759,26 @@ function renderHouseOfficeSurface() {
       items.forEach((item) => {
         const itemNode = document.createElement('article');
         itemNode.setAttribute('data-testid', 'house-office-briefing-item');
-        itemNode.style.padding = '8px 0';
-        itemNode.style.borderTop = groupNode.childElementCount > 1 ? '1px solid rgba(255,255,255,0.08)' : 'none';
+        itemNode.className = 'houseOfficeBriefingItem';
 
         const titleNode = document.createElement('div');
-        titleNode.style.fontWeight = '600';
-        titleNode.style.overflowWrap = 'anywhere';
+        titleNode.className = 'houseOfficeCardTitle';
         titleNode.textContent = String(item?.title || '').trim() || 'Briefing item';
         itemNode.appendChild(titleNode);
 
         const summaryItemNode = document.createElement('div');
-        summaryItemNode.className = 'small';
-        summaryItemNode.style.marginTop = '4px';
-        summaryItemNode.style.overflowWrap = 'anywhere';
+        summaryItemNode.className = 'small houseOfficeCardMeta';
         summaryItemNode.textContent = String(item?.summary || '').trim() || 'No summary available.';
         itemNode.appendChild(summaryItemNode);
 
         const citationRow = document.createElement('div');
-        citationRow.style.display = 'flex';
-        citationRow.style.flexWrap = 'wrap';
-        citationRow.style.gap = '6px';
-        citationRow.style.marginTop = '6px';
+        citationRow.className = 'houseOfficeChipRow';
         const citations = Array.isArray(item?.citations) ? item.citations : [];
         citations.forEach((citation) => {
           const citationNode = document.createElement('button');
           citationNode.type = 'button';
           citationNode.setAttribute('data-testid', 'house-office-briefing-citation');
-          citationNode.className = 'small';
-          citationNode.style.padding = '2px 6px';
-          citationNode.style.borderRadius = '999px';
-          citationNode.style.border = '1px solid rgba(255,255,255,0.12)';
-          citationNode.style.background = 'transparent';
-          citationNode.style.color = 'inherit';
-          citationNode.style.cursor = 'pointer';
-          citationNode.style.overflowWrap = 'anywhere';
+          citationNode.className = 'small houseOfficeChipButton';
           citationNode.textContent = `${String(citation?.sourceKind || '').trim() || 'source'}:${String(citation?.sourceId || '').trim() || 'unknown'}`;
           citationNode.addEventListener('click', async () => {
             setHouseSurfaceStatus(`Opening ${String(citation?.sourceKind || 'source')}...`);
@@ -3857,9 +3823,7 @@ function renderHouseOfficeSurface() {
       });
 
       const itemSummaryNode = document.createElement('div');
-      itemSummaryNode.className = 'small';
-      itemSummaryNode.style.marginTop = '4px';
-      itemSummaryNode.style.overflowWrap = 'anywhere';
+      itemSummaryNode.className = 'small houseOfficeCardMeta';
       itemSummaryNode.textContent = String(item?.summary || '').trim() || 'No summary available.';
       button.appendChild(itemSummaryNode);
       attentionNode.appendChild(button);
@@ -3924,14 +3888,10 @@ function renderHouseOfficeSurface() {
       const card = document.createElement('article');
       card.setAttribute('data-testid', 'house-office-deployment-item');
       card.setAttribute('data-deployment-id', deploymentId);
-      card.style.border = '1px solid rgba(255,255,255,0.12)';
-      card.style.borderRadius = '12px';
-      card.style.padding = '10px';
-      card.style.background = 'rgba(255,255,255,0.02)';
-      card.style.overflowWrap = 'anywhere';
+      card.className = 'houseOfficeCard';
 
       const heading = document.createElement('div');
-      heading.style.fontWeight = '600';
+      heading.className = 'houseOfficeCardTitle';
       heading.textContent = [
         String(deployment?.displayName || 'Helper').trim() || 'Helper',
         String(deployment?.officeLabel || 'Office').trim() || 'Office',
@@ -3940,14 +3900,12 @@ function renderHouseOfficeSurface() {
       card.appendChild(heading);
 
       const summaryLine = document.createElement('div');
-      summaryLine.className = 'small';
-      summaryLine.style.marginTop = '4px';
+      summaryLine.className = 'small houseOfficeCardMeta';
       summaryLine.textContent = String(deployment?.oneLineBenefit || deployment?.whatItDoes || 'Installed helper is ready to support this office.').trim();
       card.appendChild(summaryLine);
 
       const staffLine = document.createElement('div');
-      staffLine.className = 'small';
-      staffLine.style.marginTop = '4px';
+      staffLine.className = 'small houseOfficeCardMeta';
       const supportedSurfaces = Array.isArray(deployment?.supportedSurfaces) ? deployment.supportedSurfaces : [];
       staffLine.textContent = [
         `Staff: ${String(deployment?.staffAgentLabel || 'Assigned staff member').trim() || 'Assigned staff member'}`,
@@ -3959,8 +3917,7 @@ function renderHouseOfficeSurface() {
       const bestFor = Array.isArray(deployment?.bestFor) ? deployment.bestFor : [];
       if (bestFor.length) {
         const bestForLine = document.createElement('div');
-        bestForLine.className = 'small';
-        bestForLine.style.marginTop = '4px';
+        bestForLine.className = 'small houseOfficeCardMeta';
         bestForLine.textContent = `Best for: ${bestFor.join(', ')}`;
         card.appendChild(bestForLine);
       }
@@ -3968,8 +3925,7 @@ function renderHouseOfficeSurface() {
       const versionLabel = String(deployment?.versionLabel || '').trim();
       if (versionLabel) {
         const releaseLine = document.createElement('div');
-        releaseLine.className = 'small';
-        releaseLine.style.marginTop = '4px';
+        releaseLine.className = 'small houseOfficeCardMeta';
         releaseLine.setAttribute('data-testid', 'house-office-deployment-release');
         releaseLine.textContent = `Release: ${versionLabel}`;
         card.appendChild(releaseLine);
@@ -3978,8 +3934,7 @@ function renderHouseOfficeSurface() {
       const compatibilityLabel = String(deployment?.compatibilityLabel || '').trim();
       if (compatibilityLabel) {
         const compatibilityLine = document.createElement('div');
-        compatibilityLine.className = 'small';
-        compatibilityLine.style.marginTop = '4px';
+        compatibilityLine.className = 'small houseOfficeCardMeta';
         compatibilityLine.setAttribute('data-testid', 'house-office-deployment-compatibility');
         compatibilityLine.textContent = compatibilityLabel;
         card.appendChild(compatibilityLine);
@@ -3988,8 +3943,7 @@ function renderHouseOfficeSurface() {
       const updateStateLabel = String(deployment?.updateStateLabel || '').trim();
       if (updateStateLabel) {
         const updateLine = document.createElement('div');
-        updateLine.className = 'small';
-        updateLine.style.marginTop = '4px';
+        updateLine.className = 'small houseOfficeCardMeta';
         updateLine.setAttribute('data-testid', 'house-office-deployment-update-state');
         updateLine.textContent = updateStateLabel;
         card.appendChild(updateLine);
@@ -4003,8 +3957,7 @@ function renderHouseOfficeSurface() {
       const detachedActiveSession = !!deploymentSession && sessionPresentation.handoffRequired === true;
       const cloudOffloadedSession = !!deploymentSession && sessionPresentation.cloudOffloaded === true;
       const actionStatus = document.createElement('div');
-      actionStatus.className = 'small';
-      actionStatus.style.marginTop = '8px';
+      actionStatus.className = 'small houseOfficeActionStatus';
       actionStatus.setAttribute('data-testid', 'house-office-helper-status');
       actionStatus.textContent = !localBrainReady
         ? String(houseWorkerSupervisorState.localBrainStatusLabel || 'Configure your local brain in this browser before starting helpers.').trim()
@@ -4016,38 +3969,33 @@ function renderHouseOfficeSurface() {
       card.appendChild(actionStatus);
 
       const recoverySummaryNode = document.createElement('div');
-      recoverySummaryNode.className = 'small';
-      recoverySummaryNode.style.marginTop = '6px';
+      recoverySummaryNode.className = 'small houseOfficeCardMeta houseOfficeCardMetaStrong';
       recoverySummaryNode.setAttribute('data-testid', 'house-office-helper-recovery-summary');
       recoverySummaryNode.textContent = recoveryPresentation.lastCompletedSummary;
       card.appendChild(recoverySummaryNode);
 
       const recoveryLastActiveNode = document.createElement('div');
-      recoveryLastActiveNode.className = 'small';
-      recoveryLastActiveNode.style.marginTop = '4px';
+      recoveryLastActiveNode.className = 'small houseOfficeCardMeta';
       recoveryLastActiveNode.setAttribute('data-testid', 'house-office-helper-last-active');
       recoveryLastActiveNode.textContent = recoveryPresentation.lastActiveAgoLabel;
       card.appendChild(recoveryLastActiveNode);
 
       if (recoveryPresentation.delegationLineageLabel) {
         const lineageNode = document.createElement('div');
-        lineageNode.className = 'small';
-        lineageNode.style.marginTop = '4px';
+        lineageNode.className = 'small houseOfficeCardMeta';
         lineageNode.setAttribute('data-testid', 'house-office-helper-lineage');
         lineageNode.textContent = recoveryPresentation.delegationLineageLabel;
         card.appendChild(lineageNode);
       }
 
       const nextStepNode = document.createElement('div');
-      nextStepNode.className = 'small';
-      nextStepNode.style.marginTop = '4px';
+      nextStepNode.className = 'small houseOfficeCardMeta';
       nextStepNode.setAttribute('data-testid', 'house-office-helper-next-step');
       nextStepNode.textContent = recoveryPresentation.nextRecommendedAction;
       card.appendChild(nextStepNode);
 
       const resumeSafetyNode = document.createElement('div');
-      resumeSafetyNode.className = 'small';
-      resumeSafetyNode.style.marginTop = '4px';
+      resumeSafetyNode.className = 'small houseOfficeCardMeta';
       resumeSafetyNode.setAttribute('data-testid', 'house-office-helper-resume-safety');
       resumeSafetyNode.textContent = recoveryPresentation.resumeSafetyLabel;
       card.appendChild(resumeSafetyNode);
@@ -4057,15 +4005,12 @@ function renderHouseOfficeSurface() {
       messageInput.className = 'input';
       messageInput.placeholder = 'Ask what this helper should do next';
       messageInput.value = '';
+      messageInput.className = 'input houseOfficeInput';
       messageInput.setAttribute('data-testid', 'house-office-helper-message-input');
-      messageInput.style.marginTop = '8px';
-      messageInput.style.width = '100%';
-      messageInput.style.boxSizing = 'border-box';
       card.appendChild(messageInput);
 
       const actions = document.createElement('div');
-      actions.className = 'kv';
-      actions.style.marginTop = '8px';
+      actions.className = 'kv houseOfficeActionRow';
 
       const startBtn = document.createElement('button');
       startBtn.type = 'button';
@@ -4097,8 +4042,7 @@ function renderHouseOfficeSurface() {
       card.appendChild(actions);
 
       const manageActions = document.createElement('div');
-      manageActions.className = 'kv';
-      manageActions.style.marginTop = '8px';
+      manageActions.className = 'kv houseOfficeActionRow';
 
       const shareBtn = document.createElement('button');
       shareBtn.type = 'button';
@@ -4149,17 +4093,15 @@ function renderHouseOfficeSurface() {
       card.appendChild(manageActions);
 
       const advanced = document.createElement('details');
+      advanced.className = 'houseOfficeAdvanced';
       advanced.setAttribute('data-testid', 'house-office-deployment-advanced');
-      advanced.style.marginTop = '8px';
       const advancedSummary = document.createElement('summary');
+      advancedSummary.className = 'houseOfficeAdvancedSummary';
       advancedSummary.textContent = 'Advanced helper details';
-      advancedSummary.style.cursor = 'pointer';
       advanced.appendChild(advancedSummary);
       const advancedBody = document.createElement('div');
       advancedBody.setAttribute('data-testid', 'house-office-deployment-advanced-body');
-      advancedBody.className = 'small';
-      advancedBody.style.marginTop = '6px';
-      advancedBody.style.whiteSpace = 'pre-wrap';
+      advancedBody.className = 'small houseOfficeAdvancedBody';
       advancedBody.textContent = '';
       const advancedDetails = document.createElement('div');
       advancedDetails.textContent = [
@@ -4172,8 +4114,7 @@ function renderHouseOfficeSurface() {
       advancedBody.appendChild(advancedDetails);
 
       const profileStack = document.createElement('div');
-      profileStack.className = 'stack';
-      profileStack.style.marginTop = '8px';
+      profileStack.className = 'stack houseOfficeProfileStack';
       const profileFields = [
         ['Brain profile', 'brainProfileId', String(deployment?.runtimeDefaults?.brainProfileId || 'brain:current-runtime').trim() || 'brain:current-runtime'],
         ['Workspace seed', 'workspaceSeedRef', String(deployment?.runtimeDefaults?.workspaceSeedRef || `workspace/house-workers/${deploymentId}`).trim() || `workspace/house-workers/${deploymentId}`],
@@ -4182,19 +4123,14 @@ function renderHouseOfficeSurface() {
       ];
       for (const [label, fieldKey, value] of profileFields) {
         const fieldWrap = document.createElement('label');
-        fieldWrap.className = 'small';
-        fieldWrap.style.display = 'block';
-        fieldWrap.style.marginTop = '4px';
+        fieldWrap.className = 'small houseOfficeProfileField';
         fieldWrap.textContent = label;
         const input = document.createElement('input');
         input.type = 'text';
-        input.className = 'input';
+        input.className = 'input houseOfficeInput houseOfficeProfileInput';
         input.value = value;
         input.setAttribute('data-testid', `house-office-helper-${fieldKey}-input`);
         input.dataset.fieldKey = fieldKey;
-        input.style.marginTop = '4px';
-        input.style.width = '100%';
-        input.style.boxSizing = 'border-box';
         fieldWrap.appendChild(input);
         profileStack.appendChild(fieldWrap);
       }
@@ -4415,20 +4351,15 @@ function renderHouseOfficeSurface() {
     workerShares.forEach((share) => {
       const card = document.createElement('article');
       card.setAttribute('data-testid', 'house-office-worker-share-item');
-      card.style.border = '1px solid rgba(255,255,255,0.12)';
-      card.style.borderRadius = '12px';
-      card.style.padding = '10px';
-      card.style.background = 'rgba(255,255,255,0.02)';
-      card.style.overflowWrap = 'anywhere';
+      card.className = 'houseOfficeCard';
 
       const heading = document.createElement('div');
-      heading.style.fontWeight = '600';
+      heading.className = 'houseOfficeCardTitle';
       heading.textContent = `${String(share?.title || 'Helper Link').trim() || 'Helper Link'} · ${String(share?.statusLabel || '').trim() || 'Link status unavailable'}`;
       card.appendChild(heading);
 
       const meta = document.createElement('div');
-      meta.className = 'small';
-      meta.style.marginTop = '4px';
+      meta.className = 'small houseOfficeCardMeta';
       meta.textContent = [
         `${String(share?.memberCount || 1)} helper${Number(share?.memberCount || 1) === 1 ? '' : 's'}`,
         `${String(share?.installCount || 0)} install${Number(share?.installCount || 0) === 1 ? '' : 's'}`,
@@ -4437,14 +4368,12 @@ function renderHouseOfficeSurface() {
       card.appendChild(meta);
 
       const summaryLine = document.createElement('div');
-      summaryLine.className = 'small';
-      summaryLine.style.marginTop = '4px';
+      summaryLine.className = 'small houseOfficeCardMeta';
       summaryLine.textContent = String(share?.summary || 'Shared helper link').trim();
       card.appendChild(summaryLine);
 
       const actions = document.createElement('div');
-      actions.className = 'kv';
-      actions.style.marginTop = '8px';
+      actions.className = 'kv houseOfficeActionRow';
 
       const copyBtn = document.createElement('button');
       copyBtn.type = 'button';
@@ -4501,27 +4430,21 @@ function renderHouseOfficeSurface() {
       const recoveryPresentation = buildHouseWorkerRecoveryPresentation(session, sessionPresentation);
       const card = document.createElement('article');
       card.setAttribute('data-testid', 'house-office-worker-session-item');
-      card.style.border = '1px solid rgba(255,255,255,0.12)';
-      card.style.borderRadius = '12px';
-      card.style.padding = '10px';
-      card.style.background = 'rgba(255,255,255,0.02)';
-      card.style.overflowWrap = 'anywhere';
+      card.className = 'houseOfficeCard';
 
       const heading = document.createElement('div');
-      heading.style.fontWeight = '600';
+      heading.className = 'houseOfficeCardTitle';
       heading.textContent = String(session?.displayName || session?.deploymentLabel || 'Helper').trim() || 'Helper';
       card.appendChild(heading);
 
       const statusLine = document.createElement('div');
-      statusLine.className = 'small';
-      statusLine.style.marginTop = '4px';
+      statusLine.className = 'small houseOfficeCardMeta';
       statusLine.setAttribute('data-testid', 'house-office-worker-session-status');
       statusLine.textContent = `Status: ${sessionPresentation.statusLabel}`;
       card.appendChild(statusLine);
 
       const meta = document.createElement('div');
-      meta.className = 'small';
-      meta.style.marginTop = '4px';
+      meta.className = 'small houseOfficeCardMeta';
       meta.textContent = [
         String(session?.officeLabel || '').trim() ? `Office: ${String(session.officeLabel || '').trim()}` : '',
         String(recoveryPresentation?.delegationLineageLabel || '').trim(),
@@ -4529,66 +4452,55 @@ function renderHouseOfficeSurface() {
       card.appendChild(meta);
 
       const taskLine = document.createElement('div');
-      taskLine.className = 'small';
-      taskLine.style.marginTop = '4px';
+      taskLine.className = 'small houseOfficeCardMeta';
       taskLine.setAttribute('data-testid', 'house-office-worker-session-task');
       taskLine.textContent = `Latest task: ${String(session?.latestTask || 'No task yet.').trim() || 'No task yet.'}`;
       card.appendChild(taskLine);
 
       const replyLine = document.createElement('div');
-      replyLine.className = 'small';
-      replyLine.style.marginTop = '4px';
+      replyLine.className = 'small houseOfficeCardMeta';
       replyLine.setAttribute('data-testid', 'house-office-worker-session-reply');
       replyLine.textContent = `Latest reply: ${String(session?.latestReply || 'No reply yet.').trim() || 'No reply yet.'}`;
       card.appendChild(replyLine);
 
       const eventsLine = document.createElement('div');
-      eventsLine.className = 'small';
-      eventsLine.style.marginTop = '4px';
+      eventsLine.className = 'small houseOfficeCardMeta';
       eventsLine.textContent = `Events recorded: ${Number(session?.eventCount || 0)}`;
       card.appendChild(eventsLine);
 
       const recoverySummaryNode = document.createElement('div');
-      recoverySummaryNode.className = 'small';
-      recoverySummaryNode.style.marginTop = '6px';
+      recoverySummaryNode.className = 'small houseOfficeCardMeta houseOfficeCardMetaStrong';
       recoverySummaryNode.setAttribute('data-testid', 'house-office-worker-session-recovery-summary');
       recoverySummaryNode.textContent = recoveryPresentation.lastCompletedSummary;
       card.appendChild(recoverySummaryNode);
 
       const lastActiveNode = document.createElement('div');
-      lastActiveNode.className = 'small';
-      lastActiveNode.style.marginTop = '4px';
+      lastActiveNode.className = 'small houseOfficeCardMeta';
       lastActiveNode.setAttribute('data-testid', 'house-office-worker-session-last-active');
       lastActiveNode.textContent = recoveryPresentation.lastActiveAgoLabel;
       card.appendChild(lastActiveNode);
 
       const nextStepNode = document.createElement('div');
-      nextStepNode.className = 'small';
-      nextStepNode.style.marginTop = '4px';
+      nextStepNode.className = 'small houseOfficeCardMeta';
       nextStepNode.setAttribute('data-testid', 'house-office-worker-session-next-step');
       nextStepNode.textContent = recoveryPresentation.nextRecommendedAction;
       card.appendChild(nextStepNode);
 
       const resumeSafetyNode = document.createElement('div');
-      resumeSafetyNode.className = 'small';
-      resumeSafetyNode.style.marginTop = '4px';
+      resumeSafetyNode.className = 'small houseOfficeCardMeta';
       resumeSafetyNode.setAttribute('data-testid', 'house-office-worker-session-resume-safety');
       resumeSafetyNode.textContent = recoveryPresentation.resumeSafetyLabel;
       card.appendChild(resumeSafetyNode);
 
       const messageInput = document.createElement('input');
       messageInput.type = 'text';
-      messageInput.className = 'input';
+      messageInput.className = 'input houseOfficeInput';
       messageInput.placeholder = 'Ask this helper what it should do next.';
       messageInput.setAttribute('data-testid', 'house-office-worker-session-message-input');
-      messageInput.style.marginTop = '8px';
-      messageInput.style.width = '100%';
-      messageInput.style.boxSizing = 'border-box';
       card.appendChild(messageInput);
 
       const actions = document.createElement('div');
-      actions.className = 'kv';
-      actions.style.marginTop = '8px';
+      actions.className = 'kv houseOfficeActionRow';
 
       const askBtn = document.createElement('button');
       askBtn.type = 'button';
@@ -4607,23 +4519,20 @@ function renderHouseOfficeSurface() {
       card.appendChild(actions);
 
       const actionStatus = document.createElement('div');
-      actionStatus.className = 'small';
-      actionStatus.style.marginTop = '6px';
+      actionStatus.className = 'small houseOfficeActionStatus';
       actionStatus.textContent = sessionPresentation.actionLabel;
       card.appendChild(actionStatus);
 
       const advanced = document.createElement('details');
+      advanced.className = 'houseOfficeAdvanced';
       advanced.setAttribute('data-testid', 'house-office-worker-session-advanced');
-      advanced.style.marginTop = '8px';
       const advancedSummary = document.createElement('summary');
+      advancedSummary.className = 'houseOfficeAdvancedSummary';
       advancedSummary.textContent = 'Advanced helper details';
-      advancedSummary.style.cursor = 'pointer';
       advanced.appendChild(advancedSummary);
       const advancedBody = document.createElement('div');
       advancedBody.setAttribute('data-testid', 'house-office-worker-session-advanced-body');
-      advancedBody.className = 'small';
-      advancedBody.style.marginTop = '6px';
-      advancedBody.style.whiteSpace = 'pre-wrap';
+      advancedBody.className = 'small houseOfficeAdvancedBody';
       advancedBody.textContent = [
         `Session: ${String(session?.houseWorkerSessionId || '—').trim() || '—'}`,
         `Runtime: ${String(session?.runtimeAgentId || '—').trim() || '—'}`,
@@ -4680,8 +4589,6 @@ function renderHouseOfficeSurface() {
   }
 
   mapNode.innerHTML = '';
-  mapNode.style.gridTemplateColumns = 'repeat(2, minmax(0, 1fr))';
-  mapNode.style.gap = '8px';
   if (!offices.length) {
     const placeholder = document.createElement('div');
     placeholder.className = 'small';
@@ -4698,6 +4605,7 @@ function renderHouseOfficeSurface() {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = `btn${String(office?.officeId || '') === String(selectedOffice?.officeId || '') ? ' primary' : ''}`;
+      button.classList.add('houseOfficeMapButton');
       button.setAttribute('data-testid', 'house-office-map-office');
       button.dataset.officeId = String(office?.officeId || '');
       applyHouseOfficePanelButtonStyle(button);
@@ -4706,21 +4614,19 @@ function renderHouseOfficeSurface() {
       const displayName = String(office?.displayName || office?.slug || office?.officeId || '').trim();
       const purpose = String(office?.purpose || '').trim();
       const titleNode = document.createElement('div');
-      titleNode.style.fontWeight = '600';
+      titleNode.className = 'houseOfficeCardTitle';
       titleNode.textContent = displayName;
       button.appendChild(titleNode);
 
       if (purpose) {
         const purposeNode = document.createElement('div');
-        purposeNode.className = 'small';
-        purposeNode.style.marginTop = '4px';
+        purposeNode.className = 'small houseOfficeCardMeta';
         purposeNode.textContent = purpose;
         button.appendChild(purposeNode);
       }
 
       const metricsNode = document.createElement('div');
-      metricsNode.className = 'small';
-      metricsNode.style.marginTop = '6px';
+      metricsNode.className = 'small houseOfficeCardMeta houseOfficeCardMetaStrong';
       metricsNode.textContent = [
         formatHouseOfficeCountLabel(officeMetrics.presenceCount, 'presence'),
         formatHouseOfficeCountLabel(officeMetrics.staffCount, 'staff'),
@@ -4729,8 +4635,7 @@ function renderHouseOfficeSurface() {
       button.appendChild(metricsNode);
 
       const focusNode = document.createElement('div');
-      focusNode.className = 'small';
-      focusNode.style.marginTop = '4px';
+      focusNode.className = 'small houseOfficeCardMeta';
       focusNode.textContent = officeMetrics.primaryFocus
         ? `Focus: ${officeMetrics.primaryFocus}`
         : 'Focus: No current focus recorded.';
@@ -4753,9 +4658,6 @@ function renderHouseOfficeSurface() {
     routeLines.length ? `Routes:\n${routeLines.map((route) => `- ${route}`).join('\n')}` : 'Routes: —',
     countEntries.length ? `Counts:\n${countEntries.map(([key, value]) => `- ${key}=${value}`).join('\n')}` : 'Counts: —',
   ];
-  sourceManifestNode.style.whiteSpace = 'pre-wrap';
-  sourceManifestNode.style.wordBreak = 'break-word';
-  sourceManifestNode.style.overflowWrap = 'anywhere';
   sourceManifestNode.textContent = manifestLines.join('\n');
 }
 
@@ -5195,14 +5097,15 @@ async function loadHouseOfficeSurface({ skipContext = false } = {}) {
     if (!houseSurfaceState.office.selectedOfficeId && houseSurfaceState.office.offices[0]?.officeId) {
       houseSurfaceState.office.selectedOfficeId = String(houseSurfaceState.office.offices[0].officeId);
     }
-    await refreshHouseWorkerLocalBrainState({ force: true }).catch(() => null);
-    if (el('houseReadinessSummary')) {
-      await loadHouseReadiness({ skipContext: true }).catch(() => null);
-    }
     renderHouseOfficeSurface();
     setHouseSurfaceStatus('');
+    refreshHouseWorkerLocalBrainState({ force: true }).catch(() => null);
+    if (el('houseReadinessSummary')) {
+      loadHouseReadiness({ skipContext: true }).catch(() => null);
+    }
   } catch (err) {
     houseSurfaceState.office.loaded = true;
+    houseSurfaceState.office.offices = [];
     houseSurfaceState.office.staffAgents = [];
     houseSurfaceState.office.assignments = [];
     houseSurfaceState.office.deployments = [];
@@ -5214,6 +5117,7 @@ async function loadHouseOfficeSurface({ skipContext = false } = {}) {
     houseSurfaceState.office.deeplinks = {};
     houseSurfaceState.office.sourceManifest = null;
     houseSurfaceState.office.summary = null;
+    houseSurfaceState.office.selectedOfficeId = '';
     houseSurfaceState.office.emptyStateText = 'House Office overview unavailable.';
     renderHouseOfficeSurface();
     setHouseSurfaceStatus(`House Office unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);

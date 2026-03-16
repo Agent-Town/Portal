@@ -1,0 +1,37 @@
+{
+  "capturedAt": "2026-03-16T08:15:06.481Z",
+  "baseUrl": "http://127.0.0.1:4289",
+  "outputDir": "/Users/robin/.codex/worktrees/3e47/Portal/design/screenshots/2026-03-16-fd5-house-office",
+  "shots": [
+    {
+      "name": "01_start_mobile.png",
+      "route": "/start.html",
+      "viewport": "390x844"
+    },
+    {
+      "name": "02_house_console_mobile.png",
+      "route": "/app?district=house&liteDriver=phase1",
+      "viewport": "390x844"
+    },
+    {
+      "name": "03_house_office_preview_mobile.png",
+      "route": "/app?district=house&liteDriver=phase1",
+      "viewport": "390x844",
+      "state": "house-office-preview"
+    },
+    {
+      "name": "04_house_office_attached_mobile.png",
+      "route": "/app?district=house&liteDriver=phase1",
+      "viewport": "390x844",
+      "state": "house-office-attached-mobile",
+      "houseId": "8GS5H21Qu9SuacU5c68r327SGDueezaEbAiKikYLVLZL"
+    },
+    {
+      "name": "05_house_office_attached_desktop.png",
+      "route": "/app?district=house&liteDriver=phase1",
+      "viewport": "1440x1200",
+      "state": "house-office-attached-desktop",
+      "houseId": "8GS5H21Qu9SuacU5c68r327SGDueezaEbAiKikYLVLZL"
+    }
+  ]
+}
