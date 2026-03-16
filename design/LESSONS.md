@@ -147,3 +147,17 @@ Rule:
 1. primary actions can be large,
 2. chip rows, toolbar controls, and review toggles need a smaller button variant,
 3. always verify dense mobile clusters after increasing global control size.
+
+## 17. Guidance overlays must not hide the places they explain
+
+The D2 town HUD improved hierarchy, but the first mobile pass proved a common failure mode:
+
+1. desktop flex-basis values leaked into stacked mobile cards,
+2. the guidance layer became taller than intended,
+3. the overlay hid the upper buildings the user needed to discover.
+
+Rule:
+
+1. treat every onboarding HUD as a guide, not a curtain,
+2. recheck mobile overlays against the tappable world behind them,
+3. if the guidance obscures the places it describes, it is too large.

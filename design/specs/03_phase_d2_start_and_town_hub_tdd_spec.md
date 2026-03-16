@@ -1,6 +1,6 @@
 # Phase D2 - Start Page And Town Hub TDD Spec
 
-Status: Draft
+Status: Implemented on `codex/frontend-design`
 
 ## 1. Goal
 
@@ -87,3 +87,10 @@ This phase is complete only when:
 1. a first-time user can identify the next action instantly on `/start`,
 2. the town hub feels obviously interactive,
 3. the app's first impression feels confident rather than tentative.
+
+## 8. Implementation evidence
+
+Committed screenshot pack:
+
+1. `design/evidence/phase-d2/before/`
+2. `design/evidence/phase-d2/after/`

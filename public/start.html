@@ -15,45 +15,56 @@
       <img class="startLogo" src="/logo.jpg" alt="Agent Town logo" />
 
       <div class="startHero">
-        <iframe
-          class="startVideo"
-          src="https://www.youtube.com/embed/ZW7tUUZqhdY?rel=0"
-          title="Agent Town intro video"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          referrerpolicy="strict-origin-when-cross-origin"
-          allowfullscreen
-        ></iframe>
-
-        <section class="startAuthBox is-hidden" id="privyAuthBox" data-testid="privy-auth-box" aria-live="polite">
-          <h2 class="startAuthTitle">Sign in with Privy</h2>
-          <p class="small startAuthHelp" id="privyAuthHelp">Enter your email to receive a one-time code.</p>
-
-          <form id="privyEmailForm" class="startAuthForm">
-            <label class="small" for="privyEmailInput">Email</label>
-            <input id="privyEmailInput" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required />
-            <button class="btn primary" type="submit">Send code</button>
-          </form>
-
-          <form id="privyCodeForm" class="startAuthForm is-hidden">
-            <label class="small" for="privyCodeInput">Code</label>
-            <input id="privyCodeInput" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" required />
-            <button class="btn primary" type="submit">Verify code</button>
-          </form>
-
-          <div class="startAuthActions">
-            <button class="btn" id="privyAuthCancelBtn" type="button">Cancel</button>
+        <div class="startIntro">
+          <p class="startEyebrow">A town of rooms for people and agents</p>
+          <h1 class="startTitle">Welcome to the Wild West!</h1>
+          <p class="small startLead">Enter town, pick a place, and work with your agent without learning AI jargon first.</p>
+          <div class="startEntryActions">
+            <button class="btn primary startEnterBtn" id="enterBtn" type="button">Enter</button>
           </div>
-        </section>
+          <p class="small startStatus" id="startStatus" aria-live="polite"></p>
+        </div>
+
+        <div class="startMediaFrame">
+          <div class="startVideoFallback" aria-hidden="true">
+            <span class="startVideoFallbackBadge">Town preview</span>
+            <span class="startVideoFallbackText">If video is slow or blocked, you can still enter town right away.</span>
+          </div>
+          <iframe
+            class="startVideo"
+            src="https://www.youtube.com/embed/ZW7tUUZqhdY?rel=0"
+            title="Agent Town intro video"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerpolicy="strict-origin-when-cross-origin"
+            allowfullscreen
+          ></iframe>
+
+          <section class="startAuthBox is-hidden" id="privyAuthBox" data-testid="privy-auth-box" aria-live="polite">
+            <h2 class="startAuthTitle">Sign in with Privy</h2>
+            <p class="small startAuthHelp" id="privyAuthHelp">Enter your email to receive a one-time code.</p>
+
+            <form id="privyEmailForm" class="startAuthForm">
+              <label class="small" for="privyEmailInput">Email</label>
+              <input id="privyEmailInput" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required />
+              <button class="btn primary" type="submit">Send code</button>
+            </form>
+
+            <form id="privyCodeForm" class="startAuthForm is-hidden">
+              <label class="small" for="privyCodeInput">Code</label>
+              <input id="privyCodeInput" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" required />
+              <button class="btn primary" type="submit">Verify code</button>
+            </form>
+
+            <div class="startAuthActions">
+              <button class="btn" id="privyAuthCancelBtn" type="button">Cancel</button>
+            </div>
+          </section>
+        </div>
       </div>
 
-      <h1 class="startTitle">Welcome to the Wild West!</h1>
-      <div class="startEntryActions">
-        <button class="btn primary startEnterBtn" id="enterBtn" type="button">Enter</button>
-      </div>
-      <p class="small startStatus" id="startStatus" aria-live="polite"></p>
+      <p class="startWarning" aria-label="AI warning">AI is still imperfect. Enter anyway and judge the results inside town.</p>
     </section>
   </main>
-  <p class="startWarning" aria-label="AI warning">WARNING! CONTAINS AND PRODUCES AI SLOP</p>
 
   <script src="/privy_bridge.js?v=20260218a"></script>
   <script src="/start.js?v=20260217h"></script>

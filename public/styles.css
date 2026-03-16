@@ -368,11 +368,6 @@ h3 {
 }
 
 .townOverview h1 {
-  position: absolute;
-  left: -9999px;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
   margin: 0;
   font-size: clamp(22px, 3.2vw, 34px);
 }
@@ -395,24 +390,60 @@ h3 {
 }
 
 .townHud {
-  position: fixed;
-  top: 10px;
-  left: 12px;
-  right: 12px;
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 14px;
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
-  z-index: 60;
+  z-index: 5;
+  pointer-events: none;
 }
 
-.townHud .small {
-  color: var(--muted);
+.townHudCard {
+  max-width: min(420px, calc(100vw - 28px));
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 234, 194, 0.28);
+  border-radius: 14px;
+  background: rgba(20, 16, 12, 0.58);
+  color: #fff5d8;
+  box-shadow: 0 10px 20px rgba(8, 12, 20, 0.18);
+  backdrop-filter: blur(10px);
+}
+
+.townHudIntro {
+  flex: 1 1 320px;
+}
+
+.townHudActive {
+  flex: 0 1 340px;
+}
+
+.townEyebrow,
+.townHudStatusLabel {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 222, 154, 0.88);
+}
+
+.townTitle {
+  margin: 0 0 6px;
+  color: #fff6de;
+  font-size: clamp(28px, 4vw, 40px);
+  line-height: 0.98;
+  text-wrap: balance;
+}
+
+.townHint {
   margin: 0;
-  background: rgba(255, 252, 235, 0.84);
-  border: 2px solid rgba(44, 69, 99, 0.18);
-  border-radius: 9px;
-  padding: 6px 10px;
+  max-width: 34ch;
+  color: rgba(255, 244, 222, 0.92);
 }
 
 #townFooter {
@@ -444,23 +475,21 @@ h3 {
 }
 
 #townSceneStatus {
-  position: absolute;
-  left: 12px;
-  bottom: 12px;
-  color: #fff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
-  z-index: 3;
   margin: 0;
+  color: rgba(255, 244, 222, 0.95);
+  text-shadow: none;
+  font-size: 14px;
+  line-height: 1.4;
 }
 
 .townDistrictHotspot {
   position: absolute;
   display: inline-flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
   border: 0;
   border-radius: 16px;
-  padding: 0;
+  padding: 10px;
   margin: 0;
   appearance: none;
   background: none;
@@ -495,8 +524,8 @@ h3 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: min(84%, 320px);
-  min-height: 40px;
+  width: min(100%, 280px);
+  min-height: 42px;
   padding: 8px 12px;
   border: 2px solid rgba(255, 242, 204, 0);
   border-radius: 14px;
@@ -575,9 +604,9 @@ h3 {
 }
 
 .townDistrict-fountain .townDistrictLabel {
-  width: 100%;
-  min-height: 100%;
-  padding: 8px;
+  width: min(140px, 100%);
+  min-height: 40px;
+  padding: 6px 10px;
   border-radius: 999px;
 }
 
@@ -590,9 +619,9 @@ h3 {
 }
 
 .townDistrict-board .townDistrictLabel {
-  width: 100%;
-  min-height: 100%;
-  padding: 8px 6px;
+  width: min(160px, 100%);
+  min-height: 40px;
+  padding: 6px 10px;
 }
 
 .townDistrict-pony {
@@ -1507,14 +1536,14 @@ footer::before {
 }
 
 .startCard {
-  width: min(760px, 100%);
-  border: 3px solid var(--border);
-  border-radius: 14px;
-  background: linear-gradient(180deg, rgba(255, 250, 236, 0.98) 0%, rgba(255, 242, 214, 0.98) 100%);
-  box-shadow: 0 6px 0 rgba(44, 69, 99, 0.5), 0 18px 30px var(--shadow);
+  width: min(980px, 100%);
+  border: 2px solid var(--border);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 251, 241, 0.98) 0%, rgba(255, 244, 223, 0.98) 100%);
+  box-shadow: var(--depth-modal);
   padding: 18px;
   display: grid;
-  gap: 12px;
+  gap: 16px;
 }
 
 .startLogo {
@@ -1522,45 +1551,110 @@ footer::before {
   height: 88px;
   object-fit: cover;
   border-radius: 12px;
-  border: 3px solid var(--border);
+  border: 2px solid var(--border);
   justify-self: center;
-  box-shadow: 0 4px 0 rgba(44, 69, 99, 0.45);
+  box-shadow: 0 3px 0 rgba(44, 69, 99, 0.24);
+}
+
+.startHero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 420px);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.startIntro {
+  display: grid;
+  align-content: center;
+  gap: 14px;
+  padding: 10px 6px 10px 4px;
+}
+
+.startEyebrow {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--font-ui);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-strong);
+}
+
+.startLead {
+  margin: 0;
+  max-width: 36ch;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.startMediaFrame {
+  position: relative;
+  min-height: 100%;
+  border-radius: 16px;
+  border: 2px solid var(--border);
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(26, 40, 62, 0.96) 0%, rgba(17, 28, 44, 0.98) 100%);
+  box-shadow: 0 4px 0 rgba(44, 69, 99, 0.22), 0 18px 28px rgba(44, 69, 99, 0.16);
 }
 
 .startVideo {
+  position: relative;
+  z-index: 1;
   width: 100%;
-  aspect-ratio: 16 / 9;
-  background: #1f2f44;
+  aspect-ratio: 16 / 11;
+  background: transparent;
   border: 0;
   object-fit: cover;
   display: block;
 }
 
-.startHero {
-  position: relative;
-  border-radius: 12px;
-  border: 3px solid var(--border);
-  overflow: hidden;
-  background: #1f2f44;
-}
-
-.startHero::after {
-  content: "";
+.startVideoFallback {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(20, 30, 48, 0.1) 0%, rgba(20, 30, 48, 0.22) 100%);
+  display: grid;
+  align-content: end;
+  gap: 8px;
+  padding: 16px;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0) 24%),
+    linear-gradient(180deg, rgba(18, 30, 46, 0.14) 0%, rgba(18, 30, 46, 0.72) 100%);
+  color: #fff7e1;
   pointer-events: none;
-  z-index: 1;
+  z-index: 2;
+}
+
+.startVideoFallbackBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 228, 160, 0.42);
+  border-radius: 999px;
+  background: rgba(15, 26, 40, 0.64);
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-ui);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.startVideoFallbackText {
+  max-width: 24ch;
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .startTitle {
-  text-align: center;
   margin: 0;
+  text-wrap: balance;
 }
 
 .startEntryActions {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 10px;
   flex-wrap: wrap;
 }
@@ -1571,27 +1665,22 @@ footer::before {
 }
 
 .startStatus {
-  text-align: center;
+  text-align: left;
   min-height: 1.4em;
   margin: 0;
 }
 
 .startWarning {
-  position: fixed;
-  left: 50%;
-  bottom: 10px;
-  transform: translateX(-50%);
   margin: 0;
-  padding: 6px 10px;
-  border: 2px solid var(--border);
-  border-radius: 8px;
-  background: rgba(255, 242, 214, 0.94);
+  padding: 10px 12px;
+  border: 1px solid rgba(181, 52, 60, 0.22);
+  border-radius: 12px;
+  background: rgba(255, 245, 228, 0.98);
   color: var(--bad-strong);
-  font-family: var(--font-accent);
-  font-size: 11px;
-  letter-spacing: 0.35px;
-  text-align: center;
-  z-index: 2;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: left;
 }
 
 .startAuthBox {
@@ -1599,16 +1688,16 @@ footer::before {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  z-index: 2;
-  width: min(460px, calc(100% - 24px));
+  z-index: 3;
+  width: min(420px, calc(100% - 24px));
   border: 2px solid var(--border);
   border-radius: 12px;
-  background: rgba(255, 249, 232, 0.92);
-  padding: 12px;
+  background: rgba(255, 249, 232, 0.96);
+  padding: 14px;
   display: grid;
   gap: 10px;
-  box-shadow: 0 10px 24px rgba(25, 34, 56, 0.38);
-  backdrop-filter: blur(5px);
+  box-shadow: 0 12px 28px rgba(15, 22, 34, 0.3);
+  backdrop-filter: blur(8px);
 }
 
 .startAuthTitle {
@@ -1634,6 +1723,66 @@ footer::before {
 }
 
 @media (max-width: 720px) {
+  .startWrap {
+    align-items: flex-start;
+    padding: 18px 12px 24px;
+  }
+
+  .startCard {
+    gap: 14px;
+    padding: 16px;
+  }
+
+  .startHero {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .startIntro {
+    padding: 0;
+    gap: 12px;
+  }
+
+  .startMediaFrame {
+    order: 2;
+  }
+
+  .startVideo {
+    aspect-ratio: 16 / 10;
+  }
+
+  .townHud {
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .townHudCard {
+    max-width: min(68vw, 320px);
+    padding: 10px 12px;
+  }
+
+  .townHudIntro,
+  .townHudActive {
+    flex: none;
+  }
+
+  .townHudActive {
+    max-width: min(60vw, 260px);
+  }
+
+  .townTitle {
+    font-size: clamp(24px, 8vw, 34px);
+  }
+
+  .townHint,
+  #townSceneStatus {
+    font-size: 13px;
+  }
+
   .townScene {
     height: 100vh;
     min-height: 100vh;
@@ -1742,9 +1891,8 @@ footer::before {
   }
 
   .startWarning {
-    width: calc(100% - 16px);
-    font-size: 10px;
-    bottom: 8px;
+    width: 100%;
+    font-size: 11px;
   }
 
   .brand strong {
@@ -3741,14 +3889,14 @@ body.town-hub-page .townDistrictHotspot::before {
 }
 
 body.town-hub-page .townDistrictLabel {
-  border: 2px solid rgba(196, 136, 58, 0.78);
-  border-radius: 10px;
-  background: rgba(46, 27, 14, 0.82);
+  border: 2px solid rgba(196, 136, 58, 0.72);
+  border-radius: 12px;
+  background: rgba(46, 27, 14, 0.7);
   color: var(--v0-sun);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
   box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.35),
-    inset 0 1px 0 rgba(255, 228, 160, 0.15);
+    0 4px 12px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 228, 160, 0.12);
 }
 
 body.town-hub-page .townDistrictHotspot:hover::before,
@@ -3760,7 +3908,7 @@ body.town-hub-page .townDistrictHotspot.is-hovered::before {
 
 body.town-hub-page .townDistrictHotspot:hover .townDistrictLabel,
 body.town-hub-page .townDistrictHotspot.is-hovered .townDistrictLabel {
-  background: rgba(196, 136, 58, 0.9);
+  background: rgba(196, 136, 58, 0.86);
   border-color: rgba(255, 228, 160, 0.95);
   color: #2d180c;
   text-shadow: none;
@@ -3776,22 +3924,31 @@ body.town-hub-page .townDistrictHotspot.is-active::before {
 
 body.town-hub-page .townDistrictHotspot.is-active .townDistrictLabel {
   border-color: var(--v0-sun);
-  background: linear-gradient(180deg, rgba(196, 136, 58, 0.96), rgba(160, 82, 45, 0.96));
+  background: linear-gradient(180deg, rgba(214, 160, 92, 0.98), rgba(160, 82, 45, 0.96));
   color: #fff8ea;
   box-shadow:
-    0 10px 18px rgba(0, 0, 0, 0.4),
+    0 12px 24px rgba(0, 0, 0, 0.32),
     0 0 0 2px rgba(255, 228, 160, 0.34) inset;
 }
 
+body.town-hub-page .townHudCard {
+  border-color: rgba(255, 228, 160, 0.22);
+  background: rgba(46, 27, 14, 0.58);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+}
+
+body.town-hub-page .townEyebrow,
+body.town-hub-page .townHudStatusLabel {
+  color: rgba(255, 220, 144, 0.94);
+}
+
+body.town-hub-page .townTitle {
+  color: #fff3d8;
+}
+
+body.town-hub-page .townHint,
 body.town-hub-page #townSceneStatus {
-  left: 14px;
-  bottom: 14px;
-  color: var(--v0-cream);
-  border: 2px solid rgba(196, 136, 58, 0.75);
-  border-radius: 10px;
-  background: rgba(46, 27, 14, 0.76);
-  padding: 7px 10px;
-  text-shadow: none;
+  color: rgba(255, 247, 229, 0.92);
 }
 
 body.town-hub-page .districtBackdrop {

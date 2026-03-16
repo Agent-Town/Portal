@@ -1010,15 +1010,15 @@ function districtStatusText(district) {
   if (statusText) {
     return `Locked: ${statusText}`;
   }
-  if (!district) return 'Select a district on the map.';
-  if (district === 'atlas') return 'Atlas Depot selected: district map and storefront exploration.';
-  if (district === 'registry') return 'Registry selected: capability and storefront discovery.';
-  if (district === 'poker') return 'Portal Poker selected: mirrored seasons, submissions, leaderboards, and replay manifests.';
-  if (district === 'townhall') return 'Town Hall selected: identity, ceremony, and picture management.';
-  if (district === 'saloon') return 'Saloon selected: upcoming social and co-op experiences preview.';
-  if (district === 'pony') return 'Pony Express selected: inbox and message routing.';
-  if (district === 'leaderboard') return 'Town Board selected: public rankings and team snapshots.';
-  return 'Plan Wagons selected: unlock and enter your house flow.';
+  if (!district) return 'Choose a place on the map.';
+  if (district === 'atlas') return 'Atlas Depot is ready for maps, places, and public finds.';
+  if (district === 'registry') return 'Registry is ready for capabilities and public finds.';
+  if (district === 'poker') return 'Portal Poker is ready for seasons, submissions, and replay history.';
+  if (district === 'townhall') return 'Town Hall is ready for names, pictures, and ceremony.';
+  if (district === 'saloon') return 'Saloon is ready for social and co-op gatherings.';
+  if (district === 'pony') return 'Pony Express is ready for mail and message delivery.';
+  if (district === 'leaderboard') return 'Town Board is ready for rankings and team snapshots.';
+  return 'Plan Wagons is ready for unlocking and entering your house.';
 }
 
 function setActiveDistrict(district) {

@@ -37,14 +37,22 @@ Completed:
   - button, pill, panel, and token hierarchy calmed
   - town modal inner framing reduced
   - agent dock visual weight reduced without behavior change
+- Phase D2 implemented:
+  - `/start` now leads with title, action, and plain-language entry copy before media
+  - `/start` includes a visible media fallback overlay so the screen still feels intentional when third-party media is slow or blocked
+  - `/app` town hub now has a compact guidance HUD and visible labels for every major district
+  - mobile town HUD no longer stretches into oversized cards and no longer hides the full upper map
+  - district status copy is simpler and more human-facing
 - Verification completed for D1:
   - targeted Playwright block passed
   - full `npm test` passed
+- Verification completed for D2:
+  - targeted D2 Playwright block passed
+  - screenshot evidence captured and committed in `design/evidence/phase-d2/`
 
 Not yet done:
-- D2 through D6 are not implemented
-- No screenshots or before/after evidence pack has been committed as canonical artifacts
+- D3 through D6 are not implemented
 
 Recommended next step:
-- Approve Phase D2 before the next frontend design implementation begins
+- Implement Phase D3 after reviewing D2 screenshots
 - Require every future design phase to satisfy `design/specs/09_global_human_first_design_requirements.md`
