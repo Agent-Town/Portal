@@ -94,13 +94,29 @@ Those do not exist verbatim in this repo. The design system below is therefore g
 - Visual and interaction intent for future design work live in this folder.
 - Until a dedicated `DESIGN_SYSTEM.md` exists elsewhere, [01_design_context_and_system_baseline.md](/Users/robin/.codex/worktrees/3e47/Portal/design/01_design_context_and_system_baseline.md) is the design-system source of truth.
 
-## Reserved Design Acceptance Block
+## Current Implementation Status
 
-Future design acceptance tests should use the reserved Playwright block:
+The frontend design implementation has completed these packets on branch `codex/frontend-design-system-v0-1`:
 
-- `e2e/264` through `e2e/275`
+- `FD0` through `FD10`
 
-These tests should validate layout invariants, primary action visibility, absence of overflow, consistent empty states, reduced inline styling, and other measurable design contracts without changing functionality.
+Implemented proof currently includes:
+
+- start, town shell, dock, house console, house office, leaderboard, registry, create, trainer/brain, and shared state/motion contracts
+- screenshot packs under [design/screenshots/](/Users/robin/.codex/worktrees/3e47/Portal/design/screenshots)
+- full suite proof at `397 passed, 5 skipped`
+
+Next unlocked design packet:
+
+- `FD11`: international, Chinese, and voice-ready validation
+
+## Design Acceptance Block
+
+The current Playwright-backed design acceptance block now spans:
+
+- `e2e/264` through `e2e/277`
+
+Those tests validate layout invariants, primary action visibility, absence of overflow, consistent empty/loading/error states, reduced inline styling, and other measurable design contracts without changing functionality.
 
 ## Execution Planning
 

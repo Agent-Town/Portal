@@ -285,6 +285,73 @@ async function captureTrainerBrainScenario({ browser, metadata }) {
   await context.close();
 }
 
+async function captureDesignStatesScenario({ browser, metadata }) {
+  const context = await browser.newContext({
+    baseURL: baseUrl,
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 2,
+    isMobile: true,
+    hasTouch: true,
+  });
+  const page = await context.newPage();
+
+  await page.goto(`${baseUrl}/leaderboard`);
+  await page.getByTestId('leaderboard-empty-state').waitFor({ state: 'visible', timeout: 10000 });
+  await captureViewportShot(page, '01_leaderboard_empty_mobile.png');
+  metadata.shots.push({
+    name: '01_leaderboard_empty_mobile.png',
+    route: '/leaderboard',
+    viewport: '390x844',
+    state: 'leaderboard-empty-mobile',
+  });
+
+  await page.goto(`${baseUrl}/registry.html?q=nohitszzzzzzz`);
+  await page.getByTestId('registry-empty-state').waitFor({ state: 'visible', timeout: 10000 });
+  await captureViewportShot(page, '02_registry_empty_mobile.png');
+  metadata.shots.push({
+    name: '02_registry_empty_mobile.png',
+    route: '/registry.html?q=nohitszzzzzzz',
+    viewport: '390x844',
+    state: 'registry-empty-mobile',
+  });
+
+  await page.goto(`${baseUrl}/app?district=house&liteDriver=phase1`);
+  await waitForLiteApi(page);
+  await page.getByTestId('house-open-experiences').click();
+  await page.getByTestId('house-experiences-empty').waitFor({ state: 'visible', timeout: 10000 });
+  await captureViewportShot(page, '03_house_experiences_empty_mobile.png');
+  metadata.shots.push({
+    name: '03_house_experiences_empty_mobile.png',
+    route: '/app?district=house&liteDriver=phase1',
+    viewport: '390x844',
+    state: 'house-experiences-empty-mobile',
+  });
+
+  await page.getByTestId('house-open-house-trainer').click();
+  await page.getByTestId('house-trainer-empty').waitFor({ state: 'visible', timeout: 10000 });
+  await captureViewportShot(page, '04_house_trainer_empty_mobile.png');
+  metadata.shots.push({
+    name: '04_house_trainer_empty_mobile.png',
+    route: '/app?district=house&liteDriver=phase1',
+    viewport: '390x844',
+    state: 'house-trainer-empty-mobile',
+  });
+
+  await page.setViewportSize({ width: 1440, height: 1200 });
+  await page.waitForTimeout(250);
+  await page.getByTestId('house-open-experiences').click();
+  await page.getByTestId('house-experiences-empty').waitFor({ state: 'visible', timeout: 10000 });
+  await captureViewportShot(page, '05_house_experiences_empty_desktop.png');
+  metadata.shots.push({
+    name: '05_house_experiences_empty_desktop.png',
+    route: '/app?district=house&liteDriver=phase1',
+    viewport: '1440x1200',
+    state: 'house-experiences-empty-desktop',
+  });
+
+  await context.close();
+}
+
 async function expectPanelVisible(locator) {
   await locator.waitFor({ state: 'visible', timeout: 10000 });
 }
@@ -317,6 +384,8 @@ async function main() {
     await captureCreateScenario({ browser, api, metadata });
   } else if (scenario === 'trainer-brain') {
     await captureTrainerBrainScenario({ browser, metadata });
+  } else if (scenario === 'design-states') {
+    await captureDesignStatesScenario({ browser, metadata });
   } else {
     await captureHouseOfficeScenario({ browser, api, metadata });
   }

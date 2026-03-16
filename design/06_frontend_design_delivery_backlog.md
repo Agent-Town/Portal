@@ -1,8 +1,14 @@
 # Frontend Design Delivery Backlog
 
-Status: Planned
+Status: Active phased implementation
 
 This document converts the earlier design audit into an implementation backlog for future frontend agents.
+
+Current progress on branch `codex/frontend-design-system-v0-1`:
+
+- completed: `FD0` through `FD10`
+- next unlocked packet: `FD11`
+- latest full-suite proof: `397 passed, 5 skipped`
 
 It answers:
 
@@ -360,6 +366,12 @@ Acceptance metrics:
 
 - target surfaces no longer use ad hoc state presentation
 - motion is restrained and consistent
+
+Implementation proof:
+
+- implemented on branch `codex/frontend-design-system-v0-1`
+- acceptance contract: [e2e/277_design_states_motion_consistency_contract.spec.js](/Users/robin/.codex/worktrees/3e47/Portal/e2e/277_design_states_motion_consistency_contract.spec.js)
+- screenshot pack: [design/screenshots/2026-03-16-fd10-states-motion/README.md](/Users/robin/.codex/worktrees/3e47/Portal/design/screenshots/2026-03-16-fd10-states-motion/README.md)
 
 ### FD11. International, Chinese, And Voice-Ready Validation
 

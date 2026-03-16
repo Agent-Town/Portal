@@ -1,8 +1,13 @@
 # Frontend Design Phase Packets
 
-Status: Planned execution packets
+Status: Active execution packets
 
 This document is the handoff layer between the design backlog and the future build agent. Each packet is intentionally small enough to execute well.
+
+Current packet status on branch `codex/frontend-design-system-v0-1`:
+
+- implemented: `P1` through `P11`
+- next unlocked packet: `P12`
 
 ## Packet Format
 
@@ -332,6 +337,11 @@ Do not change:
 Success checks:
 
 - state patterns are consistent across touched screens
+
+Implementation proof:
+
+- acceptance contract: [e2e/277_design_states_motion_consistency_contract.spec.js](/Users/robin/.codex/worktrees/3e47/Portal/e2e/277_design_states_motion_consistency_contract.spec.js)
+- screenshot pack: [design/screenshots/2026-03-16-fd10-states-motion/README.md](/Users/robin/.codex/worktrees/3e47/Portal/design/screenshots/2026-03-16-fd10-states-motion/README.md)
 
 ## P12. Global Audience Packet
 

@@ -1,0 +1,38 @@
+{
+  "capturedAt": "2026-03-16T10:08:55.413Z",
+  "baseUrl": "http://127.0.0.1:4173",
+  "outputDir": "/Users/robin/.codex/worktrees/3e47/Portal/design/screenshots/2026-03-16-fd10-states-motion",
+  "scenario": "design-states",
+  "shots": [
+    {
+      "name": "01_leaderboard_empty_mobile.png",
+      "route": "/leaderboard",
+      "viewport": "390x844",
+      "state": "leaderboard-empty-mobile"
+    },
+    {
+      "name": "02_registry_empty_mobile.png",
+      "route": "/registry.html?q=nohitszzzzzzz",
+      "viewport": "390x844",
+      "state": "registry-empty-mobile"
+    },
+    {
+      "name": "03_house_experiences_empty_mobile.png",
+      "route": "/app?district=house&liteDriver=phase1",
+      "viewport": "390x844",
+      "state": "house-experiences-empty-mobile"
+    },
+    {
+      "name": "04_house_trainer_empty_mobile.png",
+      "route": "/app?district=house&liteDriver=phase1",
+      "viewport": "390x844",
+      "state": "house-trainer-empty-mobile"
+    },
+    {
+      "name": "05_house_experiences_empty_desktop.png",
+      "route": "/app?district=house&liteDriver=phase1",
+      "viewport": "1440x1200",
+      "state": "house-experiences-empty-desktop"
+    }
+  ]
+}

@@ -28,9 +28,19 @@
 
   function createWorkerStatusNode(text, { error = false } = {}) {
     const node = document.createElement('div');
-    node.className = `small registryHint${error ? ' registryHintError' : ''}`;
+    node.className = `small stateNote registryHint${error ? ' registryHintError is-error' : ''}`;
     node.textContent = String(text || '').trim();
     return node;
+  }
+
+  function setRegistryStatus(text, { error = false, loading = false } = {}) {
+    const node = el('registryStatus');
+    if (!node) return;
+    const value = String(text || '').trim();
+    node.textContent = value;
+    node.classList.toggle('is-error', !!value && !!error);
+    node.classList.toggle('is-loading', !!value && !!loading && !error);
+    node.classList.toggle('is-success', !!value && !error && !loading);
   }
 
   function createActionButton(label, {
@@ -62,14 +72,14 @@
     list.innerHTML = '';
     if (!Array.isArray(items) || items.length === 0) {
       const empty = document.createElement('article');
-      empty.className = 'registryCard';
+      empty.className = 'registryCard registryEmptyState stateMessage stateMessage-empty';
       empty.setAttribute('data-testid', 'registry-empty-state');
       empty.innerHTML = `
         <div class="registrySectionHeader">
           <div class="small registrySectionEyebrow">Search</div>
-          <h2 class="registrySectionTitle">No registry entities found.</h2>
+          <h2 class="registrySectionTitle stateMessageTitle">No registry entities found.</h2>
         </div>
-        <p class="small registryCardDescription">Try a broader query or clear the family filter.</p>
+        <p class="small registryCardDescription stateMessageCopy">Try a broader query or clear the family filter.</p>
       `;
       list.appendChild(empty);
       return;
@@ -519,7 +529,7 @@
     const family = params.get('family') || '';
     if (el('registryQuery')) el('registryQuery').value = q;
     if (el('registryFamily')) el('registryFamily').value = family;
-    if (el('registryStatus')) el('registryStatus').textContent = 'Loading registry projection...';
+    setRegistryStatus('Loading registry projection...', { loading: true });
 
     await loadWorkerShareBanner();
 
@@ -533,15 +543,15 @@
     try {
       const payload = await api(path);
       if (!payload.ok || payload?.json?.ok !== true) {
-        if (el('registryStatus')) el('registryStatus').textContent = `Registry search failed: ${payload?.json?.error?.code || 'UNKNOWN'}`;
+        setRegistryStatus(`Registry search failed: ${payload?.json?.error?.code || 'UNKNOWN'}`, { error: true });
         renderItems([]);
         return;
       }
       const items = Array.isArray(payload?.json?.data?.items) ? payload.json.data.items : [];
-      if (el('registryStatus')) el('registryStatus').textContent = `${items.length} result${items.length === 1 ? '' : 's'} loaded.`;
+      setRegistryStatus(`${items.length} result${items.length === 1 ? '' : 's'} loaded.`);
       renderItems(items);
     } catch (err) {
-      if (el('registryStatus')) el('registryStatus').textContent = `Registry search failed: ${String(err?.message || err || 'UNKNOWN')}`;
+      setRegistryStatus(`Registry search failed: ${String(err?.message || err || 'UNKNOWN')}`, { error: true });
       renderItems([]);
     }
   }

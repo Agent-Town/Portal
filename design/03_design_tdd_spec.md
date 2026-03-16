@@ -1,6 +1,6 @@
 # Design TDD Spec
 
-Status: Planned
+Status: Active phased implementation
 
 This document defines a test-driven design program for future agentic AI developers. It mirrors the structure of the product TDD specs in [`specs/`](/Users/robin/.codex/worktrees/3e47/Portal/specs), but focuses on visual and interaction quality without changing functionality.
 
@@ -35,7 +35,7 @@ Language validation target:
 
 ## 4. Reserved Acceptance Test Block
 
-Reserve these filenames for future design acceptance tests:
+Current design acceptance coverage uses these filenames:
 
 - `e2e/264_design_baseline_capture_contract.spec.js`
 - `e2e/265_start_screen_hierarchy_contract.spec.js`
@@ -45,12 +45,18 @@ Reserve these filenames for future design acceptance tests:
 - `e2e/269_agent_dock_quiet_state_contract.spec.js`
 - `e2e/270_leaderboard_empty_state_contract.spec.js`
 - `e2e/271_registry_system_alignment_contract.spec.js`
-- `e2e/272_trainer_brain_surface_consistency_contract.spec.js`
+- `e2e/272_create_surface_alignment_contract.spec.js`
 - `e2e/273_mobile_responsiveness_design_contract.spec.js`
 - `e2e/274_design_token_and_inline_style_contract.spec.js`
 - `e2e/275_design_final_visual_smoke.spec.js`
+- `e2e/276_trainer_brain_surface_consistency_contract.spec.js`
+- `e2e/277_design_states_motion_consistency_contract.spec.js`
 
-These are reserved numbers only. This document does not implement them.
+Current proof state:
+
+- the implemented design program covers `FD0` through `FD10`
+- screenshot evidence exists for each completed packet under [design/screenshots/](/Users/robin/.codex/worktrees/3e47/Portal/design/screenshots)
+- latest full-suite proof is `397 passed, 5 skipped`
 
 ## 4.1 Formal Logic Companion
 
@@ -244,6 +250,12 @@ Acceptance metrics:
 - Shared motion tokens exist and are used by redesigned surfaces
 - Empty, loading, and error patterns are consistent across the targeted surfaces
 - No decorative animation is added without a structural role
+
+Implementation status:
+
+- Implemented on branch `codex/frontend-design-system-v0-1`
+- primary proof: [e2e/277_design_states_motion_consistency_contract.spec.js](/Users/robin/.codex/worktrees/3e47/Portal/e2e/277_design_states_motion_consistency_contract.spec.js)
+- screenshot pack: [design/screenshots/2026-03-16-fd10-states-motion/README.md](/Users/robin/.codex/worktrees/3e47/Portal/design/screenshots/2026-03-16-fd10-states-motion/README.md)
 
 ### D12. Final Visual Smoke
 

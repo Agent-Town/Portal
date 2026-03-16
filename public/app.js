@@ -1307,16 +1307,22 @@ async function loadDistrictView(district) {
 function setHouseSurfaceStatus(text, isError = false) {
   const node = el('houseSurfaceStatus');
   if (!node) return;
-  node.textContent = String(text || '');
-  node.style.color = isError ? 'var(--bad)' : 'var(--muted)';
+  const value = String(text || '').trim();
+  node.textContent = value;
+  node.classList.toggle('is-error', !!value && !!isError);
+  node.classList.toggle('is-loading', !!value && !isError && /^(loading|creating|opening|switching|promoting)\b/i.test(value));
+  node.classList.toggle('is-success', !!value && !isError && !/^(loading|creating|opening|switching|promoting)\b/i.test(value));
 }
 
 function setHouseTrainerActionStatus(text, isError = false) {
   const node = el('houseTrainerActionStatus');
   if (!node) return;
-  node.textContent = String(text || '');
-  node.style.color = isError ? 'var(--bad)' : 'var(--muted)';
-  houseSurfaceState.trainer.actionStatusText = String(text || '');
+  const value = String(text || '').trim();
+  node.textContent = value;
+  node.classList.toggle('is-error', !!value && !!isError);
+  node.classList.toggle('is-loading', !!value && !isError && /^(loading|creating|opening|switching|promoting)\b/i.test(value));
+  node.classList.toggle('is-success', !!value && !isError && !/^(loading|creating|opening|switching|promoting)\b/i.test(value));
+  houseSurfaceState.trainer.actionStatusText = value;
   houseSurfaceState.trainer.actionStatusError = !!isError;
 }
 
@@ -3669,7 +3675,7 @@ function renderHouseOfficeSurface() {
   selectedOfficeNode.innerHTML = '';
   if (!selectedOffice) {
     const placeholder = document.createElement('div');
-    placeholder.className = 'small';
+    placeholder.className = 'small stateMessage stateMessage-empty stateMessage-compact';
     placeholder.textContent = 'Select a House Office area to inspect current focus and staffing.';
     selectedOfficeNode.appendChild(placeholder);
   } else {
@@ -3705,7 +3711,7 @@ function renderHouseOfficeSurface() {
   presenceNode.innerHTML = '';
   if (!presence.length) {
     const placeholder = document.createElement('div');
-    placeholder.className = 'small';
+    placeholder.className = 'small stateMessage stateMessage-empty stateMessage-compact';
     placeholder.textContent = 'No current House Office activity is available yet.';
     presenceNode.appendChild(placeholder);
   } else {
@@ -3741,7 +3747,7 @@ function renderHouseOfficeSurface() {
   briefingNode.innerHTML = '';
   if (!briefingItemCount) {
     const placeholder = document.createElement('div');
-    placeholder.className = 'small';
+    placeholder.className = 'small stateMessage stateMessage-empty stateMessage-compact';
     placeholder.textContent = 'No recent House Briefing items are available yet.';
     briefingNode.appendChild(placeholder);
   } else {
@@ -3801,7 +3807,7 @@ function renderHouseOfficeSurface() {
   attentionNode.innerHTML = '';
   if (!attention.length) {
     const placeholder = document.createElement('div');
-    placeholder.className = 'small';
+    placeholder.className = 'small stateMessage stateMessage-empty stateMessage-compact';
     placeholder.textContent = 'No House Office attention items are active right now.';
     attentionNode.appendChild(placeholder);
   } else {
@@ -3833,7 +3839,7 @@ function renderHouseOfficeSurface() {
   assignmentsNode.innerHTML = '';
   if (!assignments.length) {
     const placeholder = document.createElement('div');
-    placeholder.className = 'small';
+    placeholder.className = 'small stateMessage stateMessage-empty stateMessage-compact';
     placeholder.textContent = 'No House Office staff assignments are active yet.';
     assignmentsNode.appendChild(placeholder);
   } else {
@@ -3877,7 +3883,7 @@ function renderHouseOfficeSurface() {
   deploymentsNode.innerHTML = '';
   if (!deployments.length) {
     const placeholder = document.createElement('div');
-    placeholder.className = 'small';
+    placeholder.className = 'small stateMessage stateMessage-empty stateMessage-compact';
     placeholder.textContent = 'No installed helpers are active yet.';
     deploymentsNode.appendChild(placeholder);
   } else {
@@ -4344,7 +4350,7 @@ function renderHouseOfficeSurface() {
   workerSharesNode.innerHTML = '';
   if (!workerShares.length) {
     const placeholder = document.createElement('div');
-    placeholder.className = 'small';
+    placeholder.className = 'small stateMessage stateMessage-empty stateMessage-compact';
     placeholder.textContent = 'No helper links have been created yet.';
     workerSharesNode.appendChild(placeholder);
   } else {
@@ -4421,7 +4427,7 @@ function renderHouseOfficeSurface() {
   sessionsNode.innerHTML = '';
   if (!visibleWorkerSessions.length) {
     const placeholder = document.createElement('div');
-    placeholder.className = 'small';
+    placeholder.className = 'small stateMessage stateMessage-empty stateMessage-compact';
     placeholder.textContent = 'No active helper sessions yet.';
     sessionsNode.appendChild(placeholder);
   } else {
@@ -4591,7 +4597,7 @@ function renderHouseOfficeSurface() {
   mapNode.innerHTML = '';
   if (!offices.length) {
     const placeholder = document.createElement('div');
-    placeholder.className = 'small';
+    placeholder.className = 'small stateMessage stateMessage-empty stateMessage-compact';
     placeholder.textContent = 'No House Office areas are seeded yet.';
     mapNode.appendChild(placeholder);
   } else {
@@ -9571,7 +9577,7 @@ function renderAgentTrafficCards(nowIso) {
   list.innerHTML = '';
   if (!visible.length) {
     const empty = document.createElement('div');
-    empty.className = 'agent-traffic-empty';
+    empty.className = 'agent-traffic-empty stateMessage stateMessage-empty stateMessage-compact';
     empty.textContent = 'No traffic entries for this filter yet.';
     list.appendChild(empty);
     return;

@@ -1,10 +1,16 @@
 # Frontend Design Build Spec
 
-Status: Build-agent ready
+Status: Build-agent ready, implemented through Phase K
 
 This document translates the design audit into explicit implementation instructions.
 
 It is written for future coding agents. Work in the listed order. Do not implement phases out of sequence unless explicitly approved.
+
+Current implementation state on branch `codex/frontend-design-system-v0-1`:
+
+- implemented: Phase A through Phase K
+- next unlocked phase: Phase L
+- latest full-suite proof: `397 passed, 5 skipped`
 
 ## 1. General Build Rules
 
@@ -301,6 +307,11 @@ Cross-cutting rules:
 
 - motion is restrained and consistent
 - state presentation is coherent
+
+Implementation proof:
+
+- acceptance contract: [e2e/277_design_states_motion_consistency_contract.spec.js](/Users/robin/.codex/worktrees/3e47/Portal/e2e/277_design_states_motion_consistency_contract.spec.js)
+- screenshot pack: [design/screenshots/2026-03-16-fd10-states-motion/README.md](/Users/robin/.codex/worktrees/3e47/Portal/design/screenshots/2026-03-16-fd10-states-motion/README.md)
 
 ## 13. Phase L: Final Responsive And Accessibility Pass
 

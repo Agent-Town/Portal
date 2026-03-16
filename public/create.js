@@ -192,6 +192,16 @@ function setShareStatusVisible(visible) {
   const node = el('shareStatus');
   if (!node) return;
   node.classList.toggle('is-hidden', !visible);
+  node.classList.toggle('is-loading', !!visible);
+  node.classList.remove('is-error', 'is-success');
+}
+
+function setCreateError(text = '') {
+  const node = el('err');
+  if (!node) return;
+  const value = String(text || '').trim();
+  node.textContent = value;
+  node.classList.toggle('is-error', !!value);
 }
 
 function setHouseNavLink(houseId) {
@@ -520,7 +530,7 @@ function renderCanvas(w, h) {
           applyLocalPixel(x, y, humanColor, w);
           updateLockState();
         } catch (e) {
-          el('err').textContent = e.message;
+          setCreateError(e.message);
         }
       });
       c.appendChild(b);
@@ -908,7 +918,7 @@ async function init() {
   let ceremonyRevealPub = '';
 
   el('shareBtn').addEventListener('click', async () => {
-    el('err').textContent = '';
+    setCreateError('');
     setShareStatusVisible(true);
     try {
       const { address } = await connectWalletOrThrow();
@@ -1021,7 +1031,7 @@ async function init() {
 
       window.location.href = `/house?house=${encodeURIComponent(housePubKey)}`;
     } catch (e) {
-      el('err').textContent = e.message === 'EMPTY_CANVAS'
+      setCreateError(e.message === 'EMPTY_CANVAS'
         ? 'Add at least one pixel before locking in.'
         : e.message === 'WALLET_MISMATCH'
           ? 'Connect the same wallet you verified on the home page.'
@@ -1029,7 +1039,7 @@ async function init() {
           ? 'Wallet signature failed.'
         : e.message === 'WAITING_AGENT_REVEAL'
           ? 'Waiting for OpenClaw Lite runtime to finish the house ceremony.'
-          : e.message;
+          : e.message);
       setShareStatusVisible(false);
     }
   });
@@ -1039,5 +1049,5 @@ async function init() {
 
 init().catch((e) => {
   console.error(e);
-  el('err').textContent = e.message;
+  setCreateError(e.message);
 });

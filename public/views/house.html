@@ -145,7 +145,7 @@
       <div class="stack houseConsoleSupportList" id="houseWorkerLiveReadinessSteps" data-testid="house-worker-live-readiness-steps"></div>
     </div>
   </div>
-  <div class="small houseConsoleSurfaceStatus" id="houseSurfaceStatus">Surface status will appear here.</div>
+  <div class="small houseConsoleSurfaceStatus stateNote" id="houseSurfaceStatus">Surface status will appear here.</div>
 </div>
 
 <div class="panel is-hidden" id="houseOfficePanel" data-testid="house-office-panel">
@@ -155,8 +155,8 @@
       <p class="small houseOfficeIntro">
         A read-only operational overview that reuses the current House, trainer, archive, workshop, and tracks truth.
       </p>
-      <div class="small houseOfficeEmpty" id="houseOfficeEmpty" data-testid="house-office-empty">Attach a house to inspect the House Office overview.</div>
-      <div class="small houseOfficeSummary" id="houseOfficeSummary" data-testid="house-office-summary">No House Office overview loaded yet.</div>
+      <div class="small houseOfficeEmpty stateMessage stateMessage-empty stateMessage-compact" id="houseOfficeEmpty" data-testid="house-office-empty">Attach a house to inspect the House Office overview.</div>
+      <div class="small houseOfficeSummary stateNote" id="houseOfficeSummary" data-testid="house-office-summary">No House Office overview loaded yet.</div>
     </div>
     <div class="kv houseOfficeShareActions" id="houseOfficeShareActions" data-testid="house-office-share-actions">
       <button class="btn" id="houseOfficeSharePackBtn" type="button" data-testid="house-office-share-pack">Share Office Pack</button>
@@ -238,7 +238,7 @@
     </section>
   </div>
 
-  <div class="small houseOfficeSourceManifest" id="houseOfficeSourceManifest" data-testid="house-office-source-manifest">
+  <div class="small houseOfficeSourceManifest stateNote" id="houseOfficeSourceManifest" data-testid="house-office-source-manifest">
     No House Office source manifest available yet.
   </div>
 </div>
@@ -248,9 +248,9 @@
   <p class="small" style="margin-top:0">
     Minimal House-linked entry points stay inside the same shell and reuse the current Registry, Web, and Poker surfaces.
   </p>
-  <div class="small" id="houseExperiencesEmpty" data-testid="house-experiences-empty">No House experiences available yet.</div>
+  <div class="small stateMessage stateMessage-empty stateMessage-compact" id="houseExperiencesEmpty" data-testid="house-experiences-empty">No House experiences available yet.</div>
   <div class="kv stack" id="houseExperiencesList" data-testid="house-experiences-list"></div>
-  <div class="small" id="houseExperiencesDetail" data-testid="house-experiences-detail">Select an experience to inspect available entry points.</div>
+  <div class="small stateNote" id="houseExperiencesDetail" data-testid="house-experiences-detail">Select an experience to inspect available entry points.</div>
   <div class="kv" id="houseExperienceActions" data-testid="house-experience-actions" style="margin-top:8px;"></div>
 </div>
 
@@ -259,8 +259,8 @@
   <p class="small" style="margin-top:0">
     Active config lineage stays visible in House and Inbox remains reachable from the same shell.
   </p>
-  <div class="small" id="houseWorkshopEmpty" data-testid="house-workshop-empty">No active config is bound to this team yet.</div>
-  <div class="small" id="houseWorkshopDetail" data-testid="house-workshop-detail">Select a team with an active config binding to inspect Workshop lineage.</div>
+  <div class="small stateMessage stateMessage-empty stateMessage-compact" id="houseWorkshopEmpty" data-testid="house-workshop-empty">No active config is bound to this team yet.</div>
+  <div class="small stateNote" id="houseWorkshopDetail" data-testid="house-workshop-detail">Select a team with an active config binding to inspect Workshop lineage.</div>
   <div class="kv" style="margin-top:8px;">
     <button class="btn" id="houseWorkshopOpenInboxBtn" type="button" data-testid="house-workshop-open-inbox" data-entry-path="" disabled>Open Inbox</button>
   </div>
@@ -271,9 +271,9 @@
   <p class="small" style="margin-top:0">
     Track progress stays readable in the same shell without introducing points, badges, or extra navigation.
   </p>
-  <div class="small" id="houseTracksEmpty" data-testid="house-tracks-empty">No track progress recorded yet.</div>
+  <div class="small stateMessage stateMessage-empty stateMessage-compact" id="houseTracksEmpty" data-testid="house-tracks-empty">No track progress recorded yet.</div>
   <div class="kv stack" id="houseTracksList" data-testid="house-tracks-list"></div>
-  <div class="small" id="houseTracksDetail" data-testid="house-tracks-detail">Select a track to inspect deterministic progress.</div>
+  <div class="small stateNote" id="houseTracksDetail" data-testid="house-tracks-detail">Select a track to inspect deterministic progress.</div>
 </div>
 
 <div class="panel is-hidden" id="houseArchivePanel" data-testid="house-archive-panel">
@@ -281,9 +281,9 @@
   <p class="small" style="margin-top:0">
     Canonical traces stay in the archive even if local trainer cache entries are deleted.
   </p>
-  <div class="small" id="houseArchiveEmpty" data-testid="house-archive-empty">No canonical traces archived yet.</div>
+  <div class="small stateMessage stateMessage-empty stateMessage-compact" id="houseArchiveEmpty" data-testid="house-archive-empty">No canonical traces archived yet.</div>
   <div class="kv stack" id="houseArchiveList" data-testid="house-archive-list"></div>
-  <div class="small" id="houseArchiveDetail" data-testid="house-archive-detail">Select a trace to inspect archive counters.</div>
+  <div class="small stateNote" id="houseArchiveDetail" data-testid="house-archive-detail">Select a trace to inspect archive counters.</div>
 </div>
 
 <div class="panel is-hidden" id="houseTrainerPanel" data-testid="house-trainer-panel">
@@ -299,11 +299,11 @@
     <label class="small" for="houseTrainerApprovalIdInput">Approval ID</label>
     <input id="houseTrainerApprovalIdInput" data-testid="house-trainer-approval-input" type="text" placeholder="appr_..." />
   </div>
-  <div class="small" id="houseTrainerEmpty" data-testid="house-trainer-empty">No durable trainer jobs yet.</div>
+  <div class="small stateMessage stateMessage-empty stateMessage-compact" id="houseTrainerEmpty" data-testid="house-trainer-empty">No durable trainer jobs yet.</div>
   <div class="small" style="margin:10px 0 4px;">Jobs</div>
   <div class="kv stack" id="houseTrainerJobs" data-testid="house-trainer-jobs"></div>
   <div class="small" style="margin:10px 0 4px;">Results</div>
   <div class="kv stack" id="houseTrainerResults" data-testid="house-trainer-results"></div>
-  <div class="small" id="houseTrainerActionStatus" data-testid="house-trainer-action-status" style="min-height:1.4em;"></div>
-  <div class="small" id="houseTrainerDetail" data-testid="house-trainer-detail">Select a trainer result to inspect linked config refs.</div>
+  <div class="small stateNote" id="houseTrainerActionStatus" data-testid="house-trainer-action-status" style="min-height:1.4em;"></div>
+  <div class="small stateNote" id="houseTrainerDetail" data-testid="house-trainer-detail">Select a trainer result to inspect linked config refs.</div>
 </div>

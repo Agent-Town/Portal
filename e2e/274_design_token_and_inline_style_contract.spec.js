@@ -12,6 +12,10 @@ test('design token foundation stays present in shared styles', async () => {
   expect(styles).toContain('--radius-xl: 1.25rem;');
   expect(styles).toContain('--color-surface-base: #fff8ee;');
   expect(styles).toContain('--motion-standard: 180ms;');
+  expect(styles).toContain('--motion-fade: 160ms;');
+  expect(styles).toContain('--motion-spinner-turn: 720ms;');
+  expect(styles).toContain('.stateMessage {');
+  expect(styles).toContain('.stateNote {');
   expect(styles).toContain('.btn.quiet {');
   expect(styles).not.toMatch(/\n\.panel::before\s*\{/);
 });
@@ -54,6 +58,7 @@ test('house console header region uses structured classes instead of inline layo
   expect(houseHtml).toContain('data-testid="house-console-primary-actions"');
   expect(houseHtml).toContain('data-testid="house-console-support"');
   expect(houseHtml).toContain('class="houseConsoleDistrictShell"');
+  expect(houseHtml).toContain('class="small houseConsoleSurfaceStatus stateNote"');
   expect(houseHtml).not.toContain('id="houseOfficeDistrictShell" data-testid="house-office-district-shell" style=');
   expect(houseHtml).not.toContain('id="houseTeamSummary" data-testid="house-team-summary" style=');
   expect(houseHtml).not.toContain('id="houseReadinessSummary" data-testid="house-readiness-summary" style=');
@@ -68,6 +73,11 @@ test('house office static markup uses section classes instead of inline spacing'
   expect(houseHtml).toContain('data-testid="house-office-overview-grid"');
   expect(houseHtml).toContain('class="houseOfficeSectionHeader"');
   expect(houseHtml).toContain('class="houseOfficeMap"');
+  expect(houseHtml).toContain('class="small houseOfficeEmpty stateMessage stateMessage-empty stateMessage-compact"');
+  expect(houseHtml).toContain('class="small houseOfficeSummary stateNote"');
+  expect(houseHtml).toContain('class="small stateMessage stateMessage-empty stateMessage-compact" id="houseExperiencesEmpty"');
+  expect(houseHtml).toContain('class="small stateNote" id="houseExperiencesDetail"');
+  expect(houseHtml).toContain('class="small stateNote" id="houseTrainerActionStatus"');
   expect(houseHtml).not.toContain('id="houseOfficeShareActions" data-testid="house-office-share-actions" style=');
   expect(houseHtml).not.toContain('id="houseOfficeSelectedOffice" data-testid="house-office-selected-office" style=');
   expect(houseHtml).not.toContain('id="houseOfficePresence" data-testid="house-office-presence" style=');
@@ -83,6 +93,8 @@ test('leaderboard markup uses structured empty-state and support-rail classes', 
   expect(leaderboardHtml).toContain('data-testid="leaderboard-stat-rail"');
   expect(leaderboardHtml).toContain('data-testid="leaderboard-empty-state"');
   expect(leaderboardHtml).toContain('data-testid="leaderboard-empty-actions"');
+  expect(leaderboardHtml).toContain('class="leaderboardEmptyState stateMessage stateMessage-empty is-hidden"');
+  expect(leaderboardHtml).toContain('class="leaderboardEmptyTitle stateMessageTitle"');
   expect(leaderboardHtml).not.toContain('id="empty" style=');
 });
 
@@ -97,8 +109,11 @@ test('registry markup uses shared classes instead of a page-local visual system'
   expect(registryHtml).toContain('data-testid="registry-panel"');
   expect(registryHtml).toContain('data-testid="registry-search-form"');
   expect(registryHtml).toContain('data-testid="registry-list"');
+  expect(registryHtml).toContain('class="small registryStatus stateNote"');
   expect(registryHtml).not.toContain('<style>');
   expect(registryHtml).not.toContain('style=');
+  expect(registryScript).toContain('function setRegistryStatus(');
+  expect(registryScript).toContain('registryCard registryEmptyState stateMessage stateMessage-empty');
   expect(registryScript).not.toContain('.style.display');
   expect(registryScript).not.toContain('.style.color');
   expect(registryScript).not.toContain('.style.marginTop');
@@ -116,8 +131,11 @@ test('create markup uses structured hero and canvas classes instead of inline la
   expect(createHtml).toContain('class="createPaletteCard"');
   expect(createHtml).toContain('class="createBoardCard"');
   expect(createHtml).toContain('data-testid="create-action-row"');
+  expect(createHtml).toContain('class="pill stateNote is-hidden" id="shareStatus"');
+  expect(createHtml).toContain('class="small createError stateNote" id="err"');
   expect(createHtml).not.toContain('style=');
   expect(createScript).not.toContain("el('shareStatus').style.display");
+  expect(createScript).toContain('function setCreateError(');
 });
 
 test('trainer and brain markup use structured classes instead of inline layout styling', async () => {
