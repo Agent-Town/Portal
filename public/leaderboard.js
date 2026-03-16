@@ -426,13 +426,17 @@ function resolveShareHeroMedia(team) {
 
 function render(teams) {
   const list = el('list');
+  const empty = el('empty');
+  const panel = el('leaderboardPanel');
   list.innerHTML = '';
 
   if (!teams.length) {
-    el('empty').style.display = 'block';
+    if (panel) panel.classList.add('is-empty');
+    if (empty) empty.classList.remove('is-hidden');
     return;
   }
-  el('empty').style.display = 'none';
+  if (panel) panel.classList.remove('is-empty');
+  if (empty) empty.classList.add('is-hidden');
 
   teams.forEach((p, idx) => {
     const card = document.createElement('div');

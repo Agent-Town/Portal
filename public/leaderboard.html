@@ -28,17 +28,36 @@
       </div>
     </div>
 
-    <div class="panel">
-      <div class="kv">
-        <span class="pill" data-testid="leaderboard-signup-count">Signups: <strong id="signups">—</strong></span>
-        <span class="pill">Public teams: <strong id="teams">—</strong></span>
-        <span class="pill">Referrals: <strong id="referralsTotal">—</strong></span>
+    <div class="panel leaderboardPanel" id="leaderboardPanel" data-testid="leaderboard-panel">
+      <div class="leaderboardIntro">
+        <div class="leaderboardLead">
+          <div class="small leaderboardEyebrow">Town Board</div>
+          <h1 class="leaderboardTitle">Public teams and shared houses</h1>
+          <p class="small leaderboardIntroCopy">
+            Follow public snapshots from human + agent crews, then add the houses you want to stay in touch with.
+          </p>
+        </div>
+        <div class="kv leaderboardStatRail" data-testid="leaderboard-stat-rail">
+          <span class="pill leaderboardSupportMetric" data-testid="leaderboard-signup-count">Signups: <strong id="signups">—</strong></span>
+          <span class="pill leaderboardSupportMetric">Public teams: <strong id="teams">—</strong></span>
+          <span class="pill leaderboardSupportMetric">Referrals: <strong id="referralsTotal">—</strong></span>
+        </div>
       </div>
-      <p class="small">
-        Referrals unlock cosmetic house upgrades in the game - size, complexity, and style options.
-      </p>
-      <div class="list" id="list" data-testid="leaderboard-list"></div>
-      <div class="small" id="empty" style="display:none">No public teams yet. Create one with your agent.</div>
+
+      <div class="leaderboardBody" data-testid="leaderboard-body">
+        <div class="leaderboardEmptyState is-hidden" id="empty" data-testid="leaderboard-empty-state">
+          <div class="small leaderboardEmptyEyebrow">Start Here</div>
+          <h2 class="leaderboardEmptyTitle" data-testid="leaderboard-empty-title">No public teams yet.</h2>
+          <p class="small leaderboardEmptyCopy">
+            Create one with your agent, then return here to see it appear on the board.
+          </p>
+          <div class="kv leaderboardEmptyActions" data-testid="leaderboard-empty-actions">
+            <a class="btn primary" href="/">Open Plan Wagons</a>
+            <a class="btn quiet" href="/atlas">See Town Map</a>
+          </div>
+        </div>
+        <div class="list leaderboardList" id="list" data-testid="leaderboard-list"></div>
+      </div>
     </div>
 
     <footer>

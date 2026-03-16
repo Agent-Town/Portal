@@ -1,0 +1,20 @@
+{
+  "capturedAt": "2026-03-16T08:27:14.363Z",
+  "baseUrl": "http://127.0.0.1:4289",
+  "outputDir": "/Users/robin/.codex/worktrees/3e47/Portal/design/screenshots/2026-03-16-fd6-leaderboard",
+  "scenario": "leaderboard-empty",
+  "shots": [
+    {
+      "name": "01_leaderboard_empty_mobile.png",
+      "route": "/leaderboard",
+      "viewport": "390x844",
+      "state": "leaderboard-empty-mobile"
+    },
+    {
+      "name": "02_leaderboard_empty_desktop.png",
+      "route": "/leaderboard",
+      "viewport": "1440x1200",
+      "state": "leaderboard-empty-desktop"
+    }
+  ]
+}

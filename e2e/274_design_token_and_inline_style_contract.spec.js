@@ -74,3 +74,14 @@ test('house office static markup uses section classes instead of inline spacing'
   expect(houseHtml).not.toContain('id="houseOfficeMap" data-testid="house-office-map" style=');
   expect(houseHtml).not.toContain('id="houseOfficeSourceManifest" data-testid="house-office-source-manifest" style=');
 });
+
+test('leaderboard markup uses structured empty-state and support-rail classes', async () => {
+  const leaderboardPath = path.join(process.cwd(), 'public/leaderboard.html');
+  const leaderboardHtml = fs.readFileSync(leaderboardPath, 'utf8');
+
+  expect(leaderboardHtml).toContain('data-testid="leaderboard-panel"');
+  expect(leaderboardHtml).toContain('data-testid="leaderboard-stat-rail"');
+  expect(leaderboardHtml).toContain('data-testid="leaderboard-empty-state"');
+  expect(leaderboardHtml).toContain('data-testid="leaderboard-empty-actions"');
+  expect(leaderboardHtml).not.toContain('id="empty" style=');
+});
