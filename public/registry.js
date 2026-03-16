@@ -28,11 +28,8 @@
 
   function createWorkerStatusNode(text, { error = false } = {}) {
     const node = document.createElement('div');
-    node.className = 'registryHint';
+    node.className = `small registryHint${error ? ' registryHintError' : ''}`;
     node.textContent = String(text || '').trim();
-    if (error) {
-      node.style.color = '#8a291c';
-    }
     return node;
   }
 
@@ -44,12 +41,19 @@
     const button = document.createElement('button');
     button.type = 'button';
     button.textContent = String(label || '').trim();
-    if (className) button.className = className;
+    button.className = className || 'btn';
     if (testId) button.setAttribute('data-testid', testId);
     if (typeof onClick === 'function') {
       button.addEventListener('click', onClick);
     }
     return button;
+  }
+
+  function createBannerMessageCard(text, { error = false } = {}) {
+    const card = document.createElement('article');
+    card.className = 'registryCard';
+    card.appendChild(createWorkerStatusNode(text, { error }));
+    return card;
   }
 
   function renderItems(items) {
@@ -59,7 +63,14 @@
     if (!Array.isArray(items) || items.length === 0) {
       const empty = document.createElement('article');
       empty.className = 'registryCard';
-      empty.innerHTML = '<h2>No registry entities found.</h2><p>Try a broader query or clear the family filter.</p>';
+      empty.setAttribute('data-testid', 'registry-empty-state');
+      empty.innerHTML = `
+        <div class="registrySectionHeader">
+          <div class="small registrySectionEyebrow">Search</div>
+          <h2 class="registrySectionTitle">No registry entities found.</h2>
+        </div>
+        <p class="small registryCardDescription">Try a broader query or clear the family filter.</p>
+      `;
       list.appendChild(empty);
       return;
     }
@@ -85,13 +96,13 @@
     const projection = JSON.stringify(item?.projection || {}, null, 2);
     article.innerHTML = `
       <div class="registryCardHeader">
-        <div>
-          <h2>${escapeHtml(displayName)}</h2>
-          <div>${escapeHtml(description)}</div>
+        <div class="registryCardLead">
+          <h2 class="registryCardTitle">${escapeHtml(displayName)}</h2>
+          ${description ? `<p class="small registryCardDescription">${escapeHtml(description)}</p>` : ''}
         </div>
-        <span class="registryBadge">${escapeHtml(entityKind)}</span>
+        <span class="pill registryBadge">${escapeHtml(entityKind)}</span>
       </div>
-      <div><strong>Family:</strong> ${escapeHtml(family)}</div>
+      <p class="small registryCardMeta"><strong>Family:</strong> ${escapeHtml(family)}</p>
       <pre class="registryProjection">${escapeHtml(projection)}</pre>
     `;
     appendProofAndLoadouts(article, item);
@@ -132,60 +143,68 @@
 
     article.innerHTML = `
       <div class="registryCardHeader">
-        <div>
-          <h2>${escapeHtml(displayName)}</h2>
-          <div>${escapeHtml(oneLineBenefit || String(item?.description || '').trim())}</div>
+        <div class="registryCardLead">
+          <h2 class="registryCardTitle">${escapeHtml(displayName)}</h2>
+          <p class="small registryCardDescription">${escapeHtml(oneLineBenefit || String(item?.description || '').trim())}</p>
         </div>
-        <span class="registryBadge">${escapeHtml(bannerMode ? 'shared helper' : 'worker package')}</span>
+        <span class="pill registryBadge">${escapeHtml(bannerMode ? 'shared helper' : 'worker package')}</span>
       </div>
-      <div><strong>Family:</strong> ${escapeHtml(family)}</div>
+      <p class="small registryCardMeta"><strong>Family:</strong> ${escapeHtml(family)}</p>
     `;
 
     const copySection = document.createElement('section');
     copySection.className = 'registrySection';
-    copySection.innerHTML = '<h3>What It Does</h3>';
-    const summary = document.createElement('div');
-    summary.className = 'registryHint';
+    copySection.innerHTML = `
+      <div class="registrySectionHeader">
+        <div class="small registrySectionEyebrow">Overview</div>
+        <h3 class="registrySectionTitle">What It Does</h3>
+      </div>
+    `;
+    const copyBody = document.createElement('div');
+    copyBody.className = 'registrySectionBody';
+    const summary = document.createElement('p');
+    summary.className = 'small registryHint';
     summary.textContent = whatItDoes || 'This helper keeps work moving and explains next steps in plain language.';
-    copySection.appendChild(summary);
+    copyBody.appendChild(summary);
     if (recommendedOfficeLabel) {
-      const office = document.createElement('div');
-      office.className = 'registryHint';
+      const office = document.createElement('p');
+      office.className = 'small registryHint';
       office.textContent = `Recommended office: ${recommendedOfficeLabel}`;
-      copySection.appendChild(office);
+      copyBody.appendChild(office);
     }
     if (versionLabel) {
-      const releaseNode = document.createElement('div');
-      releaseNode.className = 'registryHint';
+      const releaseNode = document.createElement('p');
+      releaseNode.className = 'small registryHint';
       releaseNode.setAttribute('data-testid', 'registry-worker-package-release');
       releaseNode.textContent = `Release: ${versionLabel}`;
-      copySection.appendChild(releaseNode);
+      copyBody.appendChild(releaseNode);
     }
     if (compatibilityLabel) {
-      const compatibilityNode = document.createElement('div');
-      compatibilityNode.className = 'registryHint';
+      const compatibilityNode = document.createElement('p');
+      compatibilityNode.className = 'small registryHint';
       compatibilityNode.setAttribute('data-testid', 'registry-worker-package-compatibility');
       compatibilityNode.textContent = compatibilityLabel;
-      copySection.appendChild(compatibilityNode);
+      copyBody.appendChild(compatibilityNode);
     }
     if (bestFor.length) {
-      const bestForNode = document.createElement('div');
-      bestForNode.className = 'registryHint';
+      const bestForNode = document.createElement('p');
+      bestForNode.className = 'small registryHint';
       bestForNode.textContent = `Best for: ${bestFor.join(', ')}`;
-      copySection.appendChild(bestForNode);
+      copyBody.appendChild(bestForNode);
     }
     if (supportedSurfaces.length) {
-      const surfacesNode = document.createElement('div');
-      surfacesNode.className = 'registryHint';
+      const surfacesNode = document.createElement('p');
+      surfacesNode.className = 'small registryHint';
       surfacesNode.textContent = `Works across: ${supportedSurfaces.join(', ')}`;
-      copySection.appendChild(surfacesNode);
+      copyBody.appendChild(surfacesNode);
     }
     if (requiresLocalBrain) {
-      const setupNode = document.createElement('div');
-      setupNode.className = 'registryHint';
+      const setupNode = document.createElement('p');
+      setupNode.className = 'small registryHint';
       setupNode.textContent = 'Local brain setup stays local. Connect a brain after install inside the receiving House.';
-      copySection.appendChild(setupNode);
+      copyBody.appendChild(setupNode);
     }
+    copySection.appendChild(copyBody);
     article.appendChild(copySection);
 
     const actionRow = document.createElement('div');
@@ -197,33 +216,34 @@
     actionRow.appendChild(createActionButton(
       bannerMode ? String(shareEnvelope?.installActionLabel || 'Install to My House') : String(workerPackage?.install?.actionLabel || 'Install to House'),
       {
-        className: 'primary',
+        className: 'btn primary',
         testId: 'registry-worker-package-install',
         onClick: async () => {
           statusNode.textContent = bannerMode
             ? 'Installing shared helper into your House...'
             : 'Installing helper into your House...';
-          statusNode.style.color = '';
+          statusNode.classList.remove('registryHintError');
           const response = await api(installPath, {
             method: 'POST',
             body: JSON.stringify(installPayload),
           });
           if (!response.ok || response?.json?.ok !== true) {
             statusNode.textContent = String(response?.json?.error?.message || 'Helper install failed. Attach a house and select an active team first.').trim();
-            statusNode.style.color = '#8a291c';
+            statusNode.classList.add('registryHintError');
             return;
           }
           const guidance = response?.json?.data?.guidance && typeof response.json.data.guidance === 'object'
             ? response.json.data.guidance
             : {};
           statusNode.textContent = String(guidance?.nextStep || 'Helper installed into your House.').trim();
-          statusNode.style.color = '';
+          statusNode.classList.remove('registryHintError');
         },
       }
     ));
     actionRow.appendChild(createActionButton(
       bannerMode ? 'Copy Share Link' : String(workerPackage?.install?.shareLabel || 'Send to Friend'),
       {
+        className: 'btn',
         testId: 'registry-worker-package-share',
         onClick: async () => {
           const response = bannerMode
@@ -242,7 +262,7 @@
             });
           if (!response.ok || response?.json?.ok !== true) {
             statusNode.textContent = String(response?.json?.error?.message || 'Could not create a friend link right now.').trim();
-            statusNode.style.color = '#8a291c';
+            statusNode.classList.add('registryHintError');
             return;
           }
           const sharePath = String(response?.json?.data?.sharePath || '').trim();
@@ -259,13 +279,14 @@
           statusNode.textContent = absoluteSharePath
             ? `Friend link ready: ${absoluteSharePath}`
             : 'Friend link is ready.';
-          statusNode.style.color = '';
+          statusNode.classList.remove('registryHintError');
         },
       }
     ));
     actionRow.appendChild(createActionButton(
       bannerMode ? 'View Shared Details' : String(workerPackage?.install?.detailLabel || 'View Details'),
       {
+        className: 'btn quiet',
         testId: 'registry-worker-package-details',
         onClick: () => {
           details.open = !details.open;
@@ -278,14 +299,15 @@
     const advanced = document.createElement('section');
     advanced.className = 'registryAdvanced';
     const details = document.createElement('details');
+    details.className = 'registryAdvancedDetails';
     details.setAttribute('data-testid', 'registry-worker-package-advanced');
     const summaryNode = document.createElement('summary');
+    summaryNode.className = 'registryAdvancedSummary';
     summaryNode.textContent = 'Advanced runtime details';
     details.appendChild(summaryNode);
     const advancedBody = document.createElement('pre');
     advancedBody.setAttribute('data-testid', 'registry-worker-package-advanced-body');
-    advancedBody.className = 'registryProjection';
-    advancedBody.style.marginTop = '8px';
+    advancedBody.className = 'registryProjection registryAdvancedBody';
     advancedBody.textContent = JSON.stringify({
       registryEntityId: String(workerPackage?.registryEntityId || item?.registryEntityId || '').trim() || null,
       entityVersionId: String(workerPackage?.entityVersionId || item?.entityVersionId || '').trim() || null,
@@ -310,20 +332,23 @@
     const members = Array.isArray(group?.members) ? group.members : [];
     article.innerHTML = `
       <div class="registryCardHeader">
-        <div>
-          <h2>${escapeHtml(familyTitle)}</h2>
-          <div>${escapeHtml(familyDescription)}</div>
+        <div class="registryCardLead">
+          <h2 class="registryCardTitle">${escapeHtml(familyTitle)}</h2>
+          ${familyDescription ? `<p class="small registryCardDescription">${escapeHtml(familyDescription)}</p>` : ''}
         </div>
-        <span class="registryBadge">${escapeHtml(`${members.length} member${members.length === 1 ? '' : 's'}`)}</span>
+        <span class="pill registryBadge">${escapeHtml(`${members.length} member${members.length === 1 ? '' : 's'}`)}</span>
       </div>
-      <div><strong>Family:</strong> ${escapeHtml(familySlug)}</div>
+      <p class="small registryCardMeta"><strong>Family:</strong> ${escapeHtml(familySlug)}</p>
     `;
+    const membersList = document.createElement('div');
+    membersList.className = 'registryFamilyMembers';
     for (const member of members) {
       const memberWrapper = document.createElement('div');
-      memberWrapper.style.marginTop = '0.85rem';
+      memberWrapper.className = 'registryFamilyMember';
       memberWrapper.appendChild(renderEntityCard(member));
-      article.appendChild(memberWrapper);
+      membersList.appendChild(memberWrapper);
     }
+    article.appendChild(membersList);
     return article;
   }
 
@@ -340,9 +365,14 @@
     if (!items.length) return null;
     const section = document.createElement('section');
     section.className = 'registrySection';
-    section.innerHTML = '<h3>Proof Cards</h3>';
+    section.innerHTML = `
+      <div class="registrySectionHeader">
+        <div class="small registrySectionEyebrow">Proof</div>
+        <h3 class="registrySectionTitle">Proof Cards</h3>
+      </div>
+    `;
     const list = document.createElement('div');
-    list.className = 'registryMiniList';
+    list.className = 'registryMiniList registrySectionBody';
     for (const proof of items) {
       const card = document.createElement('article');
       card.className = 'registryMiniCard';
@@ -391,9 +421,14 @@
     if (!items.length) return null;
     const section = document.createElement('section');
     section.className = 'registrySection';
-    section.innerHTML = '<h3>Loadouts</h3>';
+    section.innerHTML = `
+      <div class="registrySectionHeader">
+        <div class="small registrySectionEyebrow">Setup</div>
+        <h3 class="registrySectionTitle">Loadouts</h3>
+      </div>
+    `;
     const list = document.createElement('div');
-    list.className = 'registryMiniList';
+    list.className = 'registryMiniList registrySectionBody';
     for (const loadout of items) {
       const card = document.createElement('article');
       card.className = 'registryMiniCard';
@@ -430,16 +465,17 @@
     const params = new URLSearchParams(window.location.search);
     const shareId = String(params.get('workerShare') || '').trim();
     if (!shareId) {
-      banner.style.display = 'none';
+      banner.classList.add('is-hidden');
       banner.innerHTML = '';
       return null;
     }
-    banner.style.display = '';
-    banner.innerHTML = '<div class="registryHint">Loading shared helper…</div>';
+    banner.classList.remove('is-hidden');
+    banner.innerHTML = '';
+    banner.appendChild(createBannerMessageCard('Loading shared helper…'));
     const response = await api(`/api/platform/house-workers/shares/${encodeURIComponent(shareId)}`);
     if (!response.ok || response?.json?.ok !== true) {
       banner.innerHTML = '';
-      banner.appendChild(createWorkerStatusNode(
+      banner.appendChild(createBannerMessageCard(
         String(response?.json?.error?.message || 'Shared helper link is unavailable.').trim(),
         { error: true }
       ));

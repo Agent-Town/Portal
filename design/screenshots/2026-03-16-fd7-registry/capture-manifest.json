@@ -1,0 +1,20 @@
+{
+  "capturedAt": "2026-03-16T09:03:56.821Z",
+  "baseUrl": "http://127.0.0.1:4291",
+  "outputDir": "/Users/robin/.codex/worktrees/3e47/Portal/design/screenshots/2026-03-16-fd7-registry",
+  "scenario": "registry-workers",
+  "shots": [
+    {
+      "name": "01_registry_workers_mobile.png",
+      "route": "/registry.html?family=workers",
+      "viewport": "390x844",
+      "state": "registry-workers-mobile"
+    },
+    {
+      "name": "02_registry_workers_desktop.png",
+      "route": "/registry.html?family=workers",
+      "viewport": "1440x1200",
+      "state": "registry-workers-desktop"
+    }
+  ]
+}

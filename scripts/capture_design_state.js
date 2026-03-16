@@ -149,6 +149,40 @@ async function captureLeaderboardEmptyScenario({ browser, metadata }) {
   await context.close();
 }
 
+async function captureRegistryWorkersScenario({ browser, metadata }) {
+  const context = await browser.newContext({
+    baseURL: baseUrl,
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 2,
+    isMobile: true,
+    hasTouch: true,
+  });
+  const page = await context.newPage();
+
+  await page.goto(`${baseUrl}/registry.html?family=workers`);
+  await page.getByTestId('registry-panel').waitFor({ state: 'visible', timeout: 10000 });
+  await page.getByTestId('registry-worker-package-card').waitFor({ state: 'visible', timeout: 10000 });
+  await captureViewportShot(page, '01_registry_workers_mobile.png');
+  metadata.shots.push({
+    name: '01_registry_workers_mobile.png',
+    route: '/registry.html?family=workers',
+    viewport: '390x844',
+    state: 'registry-workers-mobile',
+  });
+
+  await page.setViewportSize({ width: 1440, height: 1200 });
+  await page.waitForTimeout(250);
+  await captureViewportShot(page, '02_registry_workers_desktop.png');
+  metadata.shots.push({
+    name: '02_registry_workers_desktop.png',
+    route: '/registry.html?family=workers',
+    viewport: '1440x1200',
+    state: 'registry-workers-desktop',
+  });
+
+  await context.close();
+}
+
 async function main() {
   ensureDir(outputDir);
   const metadata = {
@@ -171,6 +205,8 @@ async function main() {
   const browser = await chromium.launch({ headless: true });
   if (scenario === 'leaderboard-empty') {
     await captureLeaderboardEmptyScenario({ browser, metadata });
+  } else if (scenario === 'registry-workers') {
+    await captureRegistryWorkersScenario({ browser, metadata });
   } else {
     await captureHouseOfficeScenario({ browser, api, metadata });
   }

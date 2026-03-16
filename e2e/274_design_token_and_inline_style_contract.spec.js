@@ -85,3 +85,21 @@ test('leaderboard markup uses structured empty-state and support-rail classes', 
   expect(leaderboardHtml).toContain('data-testid="leaderboard-empty-actions"');
   expect(leaderboardHtml).not.toContain('id="empty" style=');
 });
+
+test('registry markup uses shared classes instead of a page-local visual system', async () => {
+  const registryPath = path.join(process.cwd(), 'public/registry.html');
+  const registryHtml = fs.readFileSync(registryPath, 'utf8');
+  const registryScriptPath = path.join(process.cwd(), 'public/registry.js');
+  const registryScript = fs.readFileSync(registryScriptPath, 'utf8');
+
+  expect(registryHtml).toContain('class="registry-page"');
+  expect(registryHtml).toContain('class="panel registryFrame"');
+  expect(registryHtml).toContain('data-testid="registry-panel"');
+  expect(registryHtml).toContain('data-testid="registry-search-form"');
+  expect(registryHtml).toContain('data-testid="registry-list"');
+  expect(registryHtml).not.toContain('<style>');
+  expect(registryHtml).not.toContain('style=');
+  expect(registryScript).not.toContain('.style.display');
+  expect(registryScript).not.toContain('.style.color');
+  expect(registryScript).not.toContain('.style.marginTop');
+});

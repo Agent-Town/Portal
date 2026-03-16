@@ -467,6 +467,226 @@ h3 {
   align-content: start;
 }
 
+body.registry-page .wrap {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: var(--space-24) var(--space-16) var(--space-32);
+}
+
+.registryFrame {
+  display: grid;
+  gap: var(--space-20);
+  width: min(100%, 980px);
+  margin: 0 auto;
+  padding: var(--space-24);
+}
+
+.registryHero {
+  display: grid;
+  gap: var(--space-10);
+}
+
+.registryHeroLead {
+  display: grid;
+  gap: var(--space-6);
+  max-width: 42rem;
+}
+
+.registryEyebrow,
+.registrySectionEyebrow {
+  margin: 0;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.registryTitle,
+.registrySectionTitle {
+  margin: 0;
+  text-wrap: balance;
+}
+
+.registryIntro {
+  margin: 0;
+  text-wrap: pretty;
+}
+
+.registrySearch {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 220px) auto;
+  gap: var(--space-12);
+  align-items: stretch;
+}
+
+.registrySearchInput,
+.registrySearchSelect {
+  min-width: 0;
+  min-height: 46px;
+  border-radius: var(--radius-md);
+}
+
+.registrySearchButton {
+  min-width: 132px;
+}
+
+.registryStatus {
+  min-height: 1.5em;
+  margin: 0;
+}
+
+.registryShareBanner {
+  margin-top: calc(var(--space-8) * -1);
+}
+
+.registryList {
+  display: grid;
+  gap: var(--space-14, 0.875rem);
+}
+
+.registryCard {
+  display: grid;
+  gap: var(--space-12);
+  padding: var(--space-18, 1.125rem) var(--space-20);
+  border: var(--stroke-subtle);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(180deg, rgba(255, 252, 247, 0.98), rgba(248, 241, 231, 0.96));
+  box-shadow: var(--shadow-sm);
+  overflow-wrap: anywhere;
+}
+
+.registryCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-12);
+}
+
+.registryCardLead {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.registryCardTitle {
+  margin: 0;
+  font-size: var(--type-title-2);
+  line-height: 1.15;
+}
+
+.registryCardDescription,
+.registryCardMeta {
+  margin: 0;
+}
+
+.registryBadge {
+  align-self: flex-start;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.registryProjection,
+.registryMiniCard {
+  margin: 0;
+  padding: var(--space-12);
+  border: var(--stroke-faint);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.54);
+  overflow-wrap: anywhere;
+}
+
+.registryProjection {
+  font-family: var(--font-mono);
+  font-size: 0.78125rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.registrySection {
+  display: grid;
+  gap: var(--space-10);
+}
+
+.registrySectionHeader {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.registrySectionBody {
+  display: grid;
+  gap: var(--space-8);
+  min-width: 0;
+}
+
+.registryMiniList,
+.registryFamilyMembers {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.registryFamilyMember {
+  min-width: 0;
+}
+
+.registryActionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  align-items: center;
+}
+
+.registryHint {
+  margin: 0;
+}
+
+.registryHintError {
+  color: var(--bad-strong);
+}
+
+.registryAdvanced {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.registryAdvancedDetails {
+  border: var(--stroke-faint);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.48);
+  padding: var(--space-10) var(--space-12);
+}
+
+.registryAdvancedSummary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.registryAdvancedBody {
+  margin-top: var(--space-8);
+}
+
+@media (max-width: 760px) {
+  body.registry-page .wrap {
+    padding: var(--space-16) var(--space-12) var(--space-24);
+  }
+
+  .registryFrame {
+    padding: var(--space-16);
+  }
+
+  .registrySearch {
+    grid-template-columns: 1fr;
+  }
+
+  .registrySearchButton {
+    width: 100%;
+  }
+
+  .registryCardHeader {
+    flex-direction: column;
+  }
+}
+
 .townWrap {
   position: fixed;
   inset: 0;

@@ -5,187 +5,32 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Registry</title>
   <link rel="stylesheet" href="/styles.css">
-  <style>
-    body.registryShell {
-      margin: 0;
-      min-height: 100vh;
-      font-family: Georgia, "Times New Roman", serif;
-      background:
-        radial-gradient(circle at top, rgba(255, 223, 186, 0.9), transparent 38%),
-        linear-gradient(180deg, #efe4cd 0%, #d7c3a1 100%);
-      color: #24150d;
-    }
-    .registryFrame {
-      max-width: 960px;
-      margin: 0 auto;
-      padding: 24px 20px 32px;
-    }
-    .registryHero {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-between;
-      gap: 16px;
-      align-items: end;
-      margin-bottom: 20px;
-    }
-    .registryHero h1 {
-      margin: 0;
-      font-size: clamp(28px, 4vw, 44px);
-      letter-spacing: 0.03em;
-      text-transform: uppercase;
-    }
-    .registryHero p {
-      margin: 8px 0 0;
-      max-width: 44rem;
-      line-height: 1.5;
-    }
-    .registrySearch {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 220px auto;
-      gap: 12px;
-      margin-bottom: 20px;
-    }
-    .registrySearch input,
-    .registrySearch select,
-    .registrySearch button {
-      min-height: 44px;
-      border-radius: 999px;
-      border: 1px solid rgba(36, 21, 13, 0.18);
-      padding: 0 16px;
-      font: inherit;
-    }
-    .registrySearch button {
-      background: #24150d;
-      color: #f4ebdb;
-      cursor: pointer;
-    }
-    .registryStatus {
-      min-height: 20px;
-      margin-bottom: 12px;
-      color: #6d4d33;
-    }
-    .registryList {
-      display: grid;
-      gap: 14px;
-    }
-    .registryCard {
-      border-radius: 20px;
-      border: 1px solid rgba(36, 21, 13, 0.12);
-      background: rgba(255, 248, 237, 0.92);
-      padding: 18px 18px 16px;
-      box-shadow: 0 12px 32px rgba(66, 42, 23, 0.08);
-    }
-    .registryCardHeader {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      align-items: start;
-      margin-bottom: 8px;
-    }
-    .registryCard h2 {
-      margin: 0;
-      font-size: 20px;
-    }
-    .registryBadge {
-      border-radius: 999px;
-      background: rgba(113, 67, 36, 0.1);
-      padding: 4px 10px;
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-    .registryProjection {
-      margin: 10px 0 0;
-      padding: 12px;
-      border-radius: 14px;
-      background: rgba(36, 21, 13, 0.05);
-      white-space: pre-wrap;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 12px;
-    }
-    .registrySection {
-      margin-top: 12px;
-    }
-    .registrySection h3 {
-      margin: 0 0 8px;
-      font-size: 14px;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: #6d4d33;
-    }
-    .registryMiniList {
-      display: grid;
-      gap: 8px;
-    }
-    .registryMiniCard {
-      border-radius: 14px;
-      background: rgba(36, 21, 13, 0.05);
-      padding: 10px 12px;
-      font-size: 13px;
-      line-height: 1.45;
-    }
-    .registryActionRow {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 12px;
-    }
-    .registryActionRow button {
-      min-height: 40px;
-      border-radius: 999px;
-      border: 1px solid rgba(36, 21, 13, 0.18);
-      background: rgba(255, 248, 237, 0.9);
-      color: inherit;
-      padding: 0 14px;
-      font: inherit;
-      cursor: pointer;
-    }
-    .registryActionRow button.primary {
-      background: #24150d;
-      color: #f4ebdb;
-    }
-    .registryHint {
-      margin-top: 8px;
-      color: #6d4d33;
-      font-size: 13px;
-      line-height: 1.45;
-    }
-    .registryAdvanced details {
-      margin-top: 10px;
-    }
-    .registryAdvanced summary {
-      cursor: pointer;
-      font-weight: 600;
-    }
-    @media (max-width: 700px) {
-      .registrySearch {
-        grid-template-columns: 1fr;
-      }
-    }
-  </style>
 </head>
-<body class="registryShell">
-  <main class="registryFrame">
-    <section class="registryHero">
-      <div>
-        <h1>Registry</h1>
-        <p>Capability and storefront discovery remains separate from Atlas. Search here without mutating the active Atlas district state.</p>
-      </div>
-    </section>
-    <form id="registrySearchForm" class="registrySearch">
-      <input id="registryQuery" name="q" type="search" placeholder="Search capabilities or storefronts">
-      <select id="registryFamily" name="family">
+<body class="registry-page">
+  <div class="wrap registryWrap">
+    <main class="panel registryFrame" data-testid="registry-panel">
+      <section class="registryHero" data-testid="registry-hero">
+        <div class="registryHeroLead">
+          <div class="small registryEyebrow">Search Surface</div>
+          <h1 class="registryTitle">Registry</h1>
+          <p class="small registryIntro">Find helpers, proofs, and shared tools without changing your current district state.</p>
+        </div>
+      </section>
+      <form id="registrySearchForm" class="registrySearch" data-testid="registry-search-form">
+        <input class="field registrySearchInput" id="registryQuery" name="q" type="search" placeholder="Search capabilities or storefronts">
+        <select class="field registrySearchSelect" id="registryFamily" name="family">
         <option value="">All families</option>
         <option value="developer_workflows">Developer Workflows</option>
         <option value="registry">Registry</option>
         <option value="workers">Workers</option>
-      </select>
-      <button type="submit">Search</button>
-    </form>
-    <div id="registryStatus" class="registryStatus"></div>
-    <section id="registryWorkerShare" class="registryCard" style="display:none;" data-testid="registry-worker-share-banner"></section>
-    <section id="registryList" class="registryList" aria-live="polite"></section>
-  </main>
+        </select>
+        <button class="btn primary registrySearchButton" type="submit">Search</button>
+      </form>
+      <div id="registryStatus" class="small registryStatus" data-testid="registry-status" aria-live="polite"></div>
+      <section id="registryWorkerShare" class="registryShareBanner is-hidden" data-testid="registry-worker-share-banner"></section>
+      <section id="registryList" class="registryList" data-testid="registry-list" aria-live="polite"></section>
+    </main>
+  </div>
   <script src="/registry.js?v=20260309"></script>
 </body>
 </html>
