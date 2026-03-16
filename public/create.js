@@ -188,6 +188,27 @@ function el(id) {
   return document.getElementById(id);
 }
 
+function setCreateDataAttr(node, name, value) {
+  if (!node) return;
+  const next = String(value || '').trim();
+  if (!next) {
+    node.removeAttribute(name);
+    return;
+  }
+  node.setAttribute(name, next);
+}
+
+function syncCreateProjection({ crestReady = false } = {}) {
+  const root = el('zhcCreateRoot');
+  if (!root) return;
+  setCreateDataAttr(root, 'data-zhc-phase', 'alignment_passed');
+  setCreateDataAttr(root, 'data-zhc-overlay-state', crestReady ? 'ready' : 'blocked');
+  setCreateDataAttr(root, 'data-zhc-progress-step', '4');
+  setCreateDataAttr(root, 'data-zhc-progress-total', '9');
+  setCreateDataAttr(root, 'data-zhc-blocker-key', crestReady ? '' : 'needs_crest');
+  setCreateDataAttr(root, 'data-zhc-next-unlock', 'house');
+}
+
 function setHouseNavLink(houseId) {
   const link = el('houseNavLink');
   if (!link) return;
@@ -484,7 +505,9 @@ function hasInk() {
 }
 
 function updateLockState() {
-  el('shareBtn').disabled = !hasInk();
+  const crestReady = hasInk();
+  el('shareBtn').disabled = !crestReady;
+  syncCreateProjection({ crestReady });
 }
 
 function renderCanvas(w, h) {

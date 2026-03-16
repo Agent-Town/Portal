@@ -213,7 +213,17 @@
               </div>
               <div class="agent-debug-panel agent-debug-panel-brain is-hidden" id="agentDebugPanelBrain" data-debug-panel="brain" data-testid="agent-debug-panel-brain">
                 <div class="agent-mind-panel" id="agentMindPanel" data-testid="agent-mind-panel">
-                  <div data-testid="lite-llm-panel">
+                  <div
+                    id="zhcFirstWorkerRoot"
+                    data-testid="zhc-first-worker-root"
+                    data-zhc-phase="first_worker_online"
+                    data-zhc-overlay-state="blocked"
+                    data-zhc-progress-step="2"
+                    data-zhc-progress-total="9"
+                    data-zhc-blocker-key="needs_brain"
+                    data-zhc-next-unlock="alignment"
+                  >
+                    <div data-testid="lite-llm-panel">
                     <div class="agent-mind-title">Brain</div>
                   <div class="brain-config">
                     <div class="kv dense">
@@ -298,8 +308,10 @@
                     <div class="kv" style="margin-top: 12px;">
                       <button class="btn primary small" id="llmSaveBtn" data-testid="lite-llm-save">Connect Brain</button>
                       <button class="btn small" id="llmClearBtn" data-testid="lite-llm-clear">Clear Brain</button>
+                      <button class="btn small" id="brainContinueBtn" type="button" data-testid="brain-continue-btn" disabled>Continue</button>
                       <div class="small status-text" id="llmLine" data-testid="lite-llm-status"></div>
                     </div>
+                  </div>
                   </div>
                 </div>
               </div>

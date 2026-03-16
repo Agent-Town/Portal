@@ -984,6 +984,220 @@ function getTownHubDistrictGateStatusText() {
   return '';
 }
 
+let firstWorkerProjectionOverride = null;
+
+function setZhcDataAttr(node, name, value) {
+  if (!node) return;
+  const next = String(value || '').trim();
+  if (!next) {
+    node.removeAttribute(name);
+    return;
+  }
+  node.setAttribute(name, next);
+}
+
+function applyZhcProjection(node, projection) {
+  if (!node) return;
+  if (!projection || typeof projection !== 'object') {
+    node.removeAttribute('data-zhc-phase');
+    node.removeAttribute('data-zhc-overlay-state');
+    node.removeAttribute('data-zhc-progress-step');
+    node.removeAttribute('data-zhc-progress-total');
+    node.removeAttribute('data-zhc-blocker-key');
+    node.removeAttribute('data-zhc-next-unlock');
+    return;
+  }
+  setZhcDataAttr(node, 'data-zhc-phase', projection.phase);
+  setZhcDataAttr(node, 'data-zhc-overlay-state', projection.overlay);
+  setZhcDataAttr(node, 'data-zhc-progress-step', projection.step);
+  setZhcDataAttr(node, 'data-zhc-progress-total', projection.total);
+  setZhcDataAttr(node, 'data-zhc-blocker-key', projection.blocker);
+  setZhcDataAttr(node, 'data-zhc-next-unlock', projection.nextUnlock);
+}
+
+function setZhcPrimaryAction(buttonIds, activeId) {
+  for (const id of buttonIds) {
+    const node = el(id);
+    if (!node) continue;
+    if (id === activeId) {
+      node.setAttribute('data-zhc-primary-action', 'true');
+    } else {
+      node.removeAttribute('data-zhc-primary-action');
+    }
+  }
+}
+
+function setZhcPrimaryButton(buttonIds, activeId) {
+  setZhcPrimaryAction(buttonIds, activeId);
+  for (const id of buttonIds) {
+    const node = el(id);
+    if (!node) continue;
+    node.classList.toggle('primary', id === activeId);
+  }
+}
+
+function deriveFirstWorkerProjection(state) {
+  if (!onboardingRequired(state) || !isTownhallRegistrationComplete(state)) return null;
+
+  const isBrainConfigured = isTownhallBrainConfigured(state);
+  const projection = {
+    phase: 'first_worker_online',
+    overlay: isBrainConfigured ? 'ready' : 'blocked',
+    step: '2',
+    total: '9',
+    blocker: isBrainConfigured ? '' : 'needs_brain',
+    nextUnlock: 'alignment',
+    townhallPrimaryActionId: isBrainConfigured ? 'townhallContinueBtn' : 'townhallOpenBrainBtn',
+    brainPrimaryActionId: isBrainConfigured ? 'brainContinueBtn' : 'llmSaveBtn'
+  };
+
+  if (!firstWorkerProjectionOverride || typeof firstWorkerProjectionOverride !== 'object') {
+    return projection;
+  }
+
+  return {
+    ...projection,
+    ...firstWorkerProjectionOverride,
+    blocker: Object.prototype.hasOwnProperty.call(firstWorkerProjectionOverride, 'blocker')
+      ? firstWorkerProjectionOverride.blocker
+      : projection.blocker
+  };
+}
+
+function syncFirstWorkerProjection(state) {
+  const projection = deriveFirstWorkerProjection(state);
+  applyZhcProjection(el('townhallStepProcessing'), projection);
+  applyZhcProjection(el('zhcFirstWorkerRoot'), projection);
+  setZhcPrimaryButton(
+    ['townhallOpenBrainBtn', 'townhallContinueBtn'],
+    projection ? projection.townhallPrimaryActionId : ''
+  );
+  setZhcPrimaryButton(
+    ['llmSaveBtn', 'brainContinueBtn'],
+    projection ? projection.brainPrimaryActionId : ''
+  );
+  const brainContinueBtn = el('brainContinueBtn');
+  if (brainContinueBtn) {
+    brainContinueBtn.disabled = !(projection && projection.overlay === 'ready');
+  }
+}
+
+function deriveTownhallFounderProjection(state) {
+  if (isTownhallRegistrationComplete(state)) return null;
+
+  const base = {
+    phase: 'founders_established',
+    overlay: 'blocked',
+    step: '3',
+    total: '9',
+    blocker: 'needs_founders',
+    nextUnlock: 'alignment'
+  };
+
+  if (townhallMintInFlight) {
+    return {
+      ...base,
+      overlay: 'loading',
+      townhallPrimaryActionId: 'townhallRegisterBtn'
+    };
+  }
+
+  if (townhallStoryStep === 'processing') {
+    return {
+      ...base,
+      overlay: townhallMintLastErrorStep ? 'recoverable_error' : 'blocked',
+      townhallPrimaryActionId: 'townhallRegisterBtn'
+    };
+  }
+
+  return {
+    ...base,
+    townhallPrimaryActionId: townhallStoryStep === 'agent'
+      ? 'townhallAgentSubmitBtn'
+      : 'townhallHumanSubmitBtn'
+  };
+}
+
+function syncTownhallFounderProjection(state) {
+  const projection = deriveTownhallFounderProjection(state);
+  const usingFounderProcessingState = projection?.townhallPrimaryActionId === 'townhallRegisterBtn';
+  const processingStep = el('townhallStepProcessing');
+  applyZhcProjection(processingStep, usingFounderProcessingState ? projection : null);
+
+  const registerBtn = el('townhallRegisterBtn');
+  if (registerBtn) registerBtn.classList.toggle('is-hidden', !usingFounderProcessingState);
+
+  const openBrainBtn = el('townhallOpenBrainBtn');
+  if (openBrainBtn) openBrainBtn.classList.toggle('is-hidden', !!projection);
+
+  const continueBtn = el('townhallContinueBtn');
+  if (continueBtn) continueBtn.classList.toggle('is-hidden', !!projection);
+
+  setZhcPrimaryButton(
+    [
+      'townhallHumanSubmitBtn',
+      'townhallAgentSubmitBtn',
+      'townhallRegisterBtn',
+      'townhallOpenBrainBtn',
+      'townhallContinueBtn'
+    ],
+    projection ? projection.townhallPrimaryActionId : ''
+  );
+}
+
+function setFirstWorkerProjectionOverride(next) {
+  firstWorkerProjectionOverride = next && typeof next === 'object'
+    ? { ...next }
+    : null;
+  syncFirstWorkerProjection(lastState);
+}
+
+function isTownhallAlignmentPassed(state) {
+  if (!isTownHub) return false;
+  if (!onboardingRequired(state)) return false;
+  if (state?.signup?.complete !== true) return false;
+  if (state?.houseId) return false;
+  const signupMode = state?.signup?.mode || (state?.signup?.complete ? 'agent' : null);
+  if (signupMode !== 'agent') return false;
+  return getOnboardingStep(state) === ONBOARDING_STEP_CEREMONY;
+}
+
+function deriveAlignmentPassedProjection(state) {
+  if (!isTownhallAlignmentPassed(state)) return null;
+  return {
+    phase: 'alignment_passed',
+    overlay: 'success_feedback',
+    step: '4',
+    total: '9',
+    blocker: '',
+    nextUnlock: 'create',
+    townhallPrimaryActionId: 'townhallCreateCrestLink'
+  };
+}
+
+function syncAlignmentPassedProjection(state) {
+  const projection = deriveAlignmentPassedProjection(state);
+  const panel = el('townhallAlignmentPanel');
+  applyZhcProjection(panel, projection);
+  if (panel) panel.classList.toggle('is-hidden', !projection);
+
+  const status = el('townhallAlignmentStatus');
+  if (status) {
+    status.textContent = projection
+      ? 'You and the worker cleared the co-op gate. Create the founding crest before House opens.'
+      : '';
+  }
+
+  if (projection) {
+    setZhcPrimaryButton(
+      ['brainContinueBtn', 'townhallContinueBtn', 'townhallOpenBrainBtn', 'townhallCreateCrestLink'],
+      projection.townhallPrimaryActionId
+    );
+    return;
+  }
+  setZhcPrimaryButton(['townhallCreateCrestLink'], '');
+}
+
 function canUseTownhallSigilFlow(state) {
   if (!onboardingRequired(state)) return true;
   const step = getOnboardingStep(state);
@@ -6189,6 +6403,69 @@ const townhallDraftFieldIds = [
   'townhallAgentPrompt'
 ];
 
+const TOWNHALL_FOUNDER_DRAFT_STORAGE_KEY = 'agentTown:townhallFounderDraft:v1';
+
+function normalizeTownhallFounderDraftStep(value) {
+  return value === 'agent' ? 'agent' : 'human';
+}
+
+function getTownhallFounderDraftStorageKey(state = lastState) {
+  const teamCode = typeof state?.teamCode === 'string' ? state.teamCode.trim() : '';
+  return teamCode ? `${TOWNHALL_FOUNDER_DRAFT_STORAGE_KEY}:${teamCode}` : TOWNHALL_FOUNDER_DRAFT_STORAGE_KEY;
+}
+
+function readTownhallFounderDraft(state = lastState) {
+  try {
+    const raw = localStorage.getItem(getTownhallFounderDraftStorageKey(state));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    const profile = parsed.profile && typeof parsed.profile === 'object' ? parsed.profile : {};
+    return {
+      step: normalizeTownhallFounderDraftStep(parsed.step),
+      profile: {
+        humanName: typeof profile.humanName === 'string' ? profile.humanName : '',
+        agentName: typeof profile.agentName === 'string' ? profile.agentName : '',
+        humanPrompt: typeof profile.humanPrompt === 'string' ? profile.humanPrompt : '',
+        agentPrompt: typeof profile.agentPrompt === 'string' ? profile.agentPrompt : ''
+      }
+    };
+  } catch {
+    return null;
+  }
+}
+
+function clearTownhallFounderDraft(state = lastState) {
+  try {
+    localStorage.removeItem(getTownhallFounderDraftStorageKey(state));
+  } catch {
+    // ignore localStorage errors in restricted contexts
+  }
+}
+
+function persistTownhallFounderDraft({ state = lastState, step = null } = {}) {
+  if (isTownhallRegistrationComplete(state)) {
+    clearTownhallFounderDraft(state);
+    return;
+  }
+
+  const payload = {
+    step: normalizeTownhallFounderDraftStep(step || townhallStoryStep),
+    profile: {
+      humanName: String(el('townhallHumanName')?.value || ''),
+      agentName: String(el('townhallAgentName')?.value || ''),
+      humanPrompt: String(el('townhallHumanPrompt')?.value || ''),
+      agentPrompt: String(el('townhallAgentPrompt')?.value || '')
+    }
+  };
+
+  try {
+    localStorage.setItem(getTownhallFounderDraftStorageKey(state), JSON.stringify(payload));
+  } catch {
+    // ignore localStorage errors in restricted contexts
+  }
+}
+
 const townhallMintSteps = [
   { key: 'userEvm', role: 'user', chain: 'evm', statusId: 'townhallMintUserEvmStatus' },
   { key: 'userSolana', role: 'user', chain: 'solana', statusId: 'townhallMintUserSolanaStatus' },
@@ -6347,9 +6624,15 @@ function clearTownhallDraftDirtyFlags() {
 function bindTownhallDraftField(inputEl) {
   if (!inputEl || inputEl.dataset.townhallDraftBound === '1') return;
   inputEl.dataset.townhallDraftBound = '1';
-  const markDirty = () => markTownhallFieldDirty(inputEl);
-  inputEl.addEventListener('input', markDirty);
-  inputEl.addEventListener('change', markDirty);
+  const markDirtyAndPersist = () => {
+    markTownhallFieldDirty(inputEl);
+    persistTownhallFounderDraft();
+  };
+  inputEl.addEventListener('input', markDirtyAndPersist);
+  inputEl.addEventListener('change', markDirtyAndPersist);
+  inputEl.addEventListener('blur', () => {
+    persistTownhallFounderDraft();
+  });
 }
 
 function syncTownhallInputValue(inputEl, nextValue) {
@@ -7852,6 +8135,7 @@ async function submitTownhallRegistration() {
     pendingTownhallHumanImage = null;
     pendingTownhallAgentImage = null;
     clearTownhallDraftDirtyFlags();
+    clearTownhallFounderDraft(lastState || null);
     townhallMintDraft = normalizeTownhallMintDraftFromOnboarding(out?.onboarding || null);
     townhallMintDraftDirty = false;
     townhallMintLastErrorStep = null;
@@ -8047,6 +8331,8 @@ function bindTownhallRegistrationControls() {
       if (!requireAvatarPrompt('human')) return;
       setTownhallRegisterFeedback('');
       setTownhallStoryStep('agent');
+      persistTownhallFounderDraft({ step: 'agent' });
+      if (lastState) syncTownhallRegistrationUI(lastState);
     });
   }
 
@@ -8056,6 +8342,8 @@ function bindTownhallRegistrationControls() {
     agentBackBtn.addEventListener('click', () => {
       setTownhallRegisterFeedback('');
       setTownhallStoryStep('human');
+      persistTownhallFounderDraft({ step: 'human' });
+      if (lastState) syncTownhallRegistrationUI(lastState);
     });
   }
 
@@ -8069,8 +8357,10 @@ function bindTownhallRegistrationControls() {
       if (!requireAvatarPrompt('agent')) return;
       townhallAwaitingContinue = true;
       townhallSigilUnlockedByContinue = false;
+      persistTownhallFounderDraft({ step: 'agent' });
       setTownhallStoryStep('processing');
       setTownhallRegisterFeedback('Welcome to Agent Town, processing your registration.');
+      if (lastState) syncTownhallRegistrationUI(lastState);
       mintAllTownhallIdentitiesAndRegister();
     });
   }
@@ -8110,6 +8400,8 @@ function bindTownhallRegistrationControls() {
       if (!requireAvatarPrompt('agent')) return;
       townhallAwaitingContinue = true;
       townhallSigilUnlockedByContinue = false;
+      persistTownhallFounderDraft({ step: 'agent' });
+      if (lastState) syncTownhallRegistrationUI(lastState);
       mintAllTownhallIdentitiesAndRegister();
     });
   }
@@ -8171,7 +8463,6 @@ function syncTownhallRegistrationUI(state) {
   const required = onboardingRequired(state);
   const registrationComplete = isTownhallRegistrationComplete(state);
   const isBrainConfigured = isTownhallBrainConfigured(state);
-  const isWorkerConnected = isAnyAgentConnected(state);
   const canShowRegistrationPanel = !required || registrationComplete || onboardingStep === ONBOARDING_STEP_TOWNHALL || onboardingStep === ONBOARDING_STEP_BRAIN;
   const shouldShowSigilForOnboarding = onboardingStep === ONBOARDING_STEP_SIGIL
     || onboardingStep === ONBOARDING_STEP_CEREMONY
@@ -8183,15 +8474,21 @@ function syncTownhallRegistrationUI(state) {
     townhallRegistrationCompletedOnce = true;
   }
 
+  if (registrationComplete) {
+    clearTownhallFounderDraft(state);
+  }
+  const founderDraft = registrationComplete ? null : readTownhallFounderDraft(state);
+  const founderProfile = founderDraft?.profile || null;
+
   const humanNameInput = el('townhallHumanName');
-  syncTownhallInputValue(humanNameInput, profile.humanName || '');
+  syncTownhallInputValue(humanNameInput, founderProfile ? founderProfile.humanName : (profile.humanName || ''));
   const agentNameInput = el('townhallAgentName');
-  syncTownhallInputValue(agentNameInput, profile.agentName || '');
+  syncTownhallInputValue(agentNameInput, founderProfile ? founderProfile.agentName : (profile.agentName || ''));
 
   const humanPromptInput = el('townhallHumanPrompt');
-  syncTownhallInputValue(humanPromptInput, humanAvatar.prompt || '');
+  syncTownhallInputValue(humanPromptInput, founderProfile ? founderProfile.humanPrompt : (humanAvatar.prompt || ''));
   const agentPromptInput = el('townhallAgentPrompt');
-  syncTownhallInputValue(agentPromptInput, agentAvatar.prompt || '');
+  syncTownhallInputValue(agentPromptInput, founderProfile ? founderProfile.agentPrompt : (agentAvatar.prompt || ''));
 
   const onboardingMint = normalizeTownhallMintDraftFromOnboarding(onboarding);
   if (!townhallMintDraftDirty || registrationComplete) {
@@ -8215,14 +8512,15 @@ function syncTownhallRegistrationUI(state) {
 
   if (!required || shouldShowSigilForOnboarding) {
     townhallSigilUnlockedByContinue = true;
-  } else if (!registrationComplete || !isBrainConfigured || !isWorkerConnected || townhallAwaitingContinue) {
+  } else if (!registrationComplete || !isBrainConfigured || townhallAwaitingContinue) {
     townhallSigilUnlockedByContinue = false;
   }
 
+  const resumedStoryStep = founderDraft?.step === 'agent' ? 'agent' : 'human';
   if (registrationComplete || townhallMintInFlight || townhallAwaitingContinue || townhallStoryStep === 'processing') {
     setTownhallStoryStep('processing');
-  } else if (townhallStoryStep !== 'agent') {
-    setTownhallStoryStep('human');
+  } else {
+    setTownhallStoryStep(resumedStoryStep);
   }
 
   const registerState = el('townhallRegisterState');
@@ -8231,11 +8529,9 @@ function syncTownhallRegistrationUI(state) {
   const gateHint = el('townHallGateHint');
   if (gateHint) {
     if (onboardingStep === ONBOARDING_STEP_BRAIN && !isBrainConfigured) {
-      gateHint.textContent = 'Registration complete. Use Open Brain to configure the agent in the right-side panel, then continue here.';
-    } else if (onboardingStep === ONBOARDING_STEP_BRAIN && isBrainConfigured && !isWorkerConnected) {
-      gateHint.textContent = 'Brain configured. Waiting for your worker agent to connect.';
+      gateHint.textContent = 'Registration complete. Use Open Brain to bring your first worker online, then continue here.';
     } else if (onboardingStep === ONBOARDING_STEP_BRAIN) {
-      gateHint.textContent = 'Registration complete. Open the sigil screen to continue.';
+      gateHint.textContent = 'Brain configured. Continue to the sigil test.';
     } else if (registrationComplete) {
       gateHint.textContent = 'Registration complete.';
     } else if (required) {
@@ -8282,6 +8578,9 @@ function syncTownhallRegistrationUI(state) {
   }
 
   bindTownhallRegistrationControls();
+  syncTownhallFounderProjection(state);
+  syncFirstWorkerProjection(state);
+  syncAlignmentPassedProjection(state);
 }
 
 function bindBrainDistrictControls() {
@@ -8289,19 +8588,27 @@ function bindBrainDistrictControls() {
   if (continueBtn) {
     const state = lastState && typeof lastState === 'object' ? lastState : null;
     const isBrainConfigured = state ? isTownhallBrainConfigured(state) : false;
-    const isWorkerConnected = state ? isAnyAgentConnected(state) : false;
-    const isReady =
-      isBrainConfigured &&
-      isWorkerConnected;
 
-    continueBtn.disabled = !isReady;
+    continueBtn.disabled = !isBrainConfigured;
     continueBtn.onclick = () => {
-      hideDistrict();
+      if (activeDistrict !== 'townhall' && typeof showDistrict === 'function') {
+        showDistrict('townhall');
+      }
+      const townhallContinueBtn = el('townhallContinueBtn') || el('townhallStepProcessing');
+      if (townhallContinueBtn) {
+        if (typeof townhallContinueBtn.scrollIntoView === 'function') {
+          townhallContinueBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        if (typeof townhallContinueBtn.focus === 'function') {
+          townhallContinueBtn.focus();
+        }
+      }
       if (typeof syncTownhallGate === 'function' && lastState) {
         syncTownhallGate(lastState);
       }
     };
   }
+  syncFirstWorkerProjection(lastState);
 }
 
 function bindTownDistrictControls() {
@@ -12040,6 +12347,8 @@ async function updateUI(state) {
   updateTownHubLinks(houseId);
   syncTownhallRegistrationUI(state);
   syncTownhallGate(state);
+  syncFirstWorkerProjection(state);
+  syncAlignmentPassedProjection(state);
 
   updatePathButtons();
 
@@ -13972,6 +14281,13 @@ async function restoreLiteLlmConfigFromLocalIfNeeded(state) {
     applyLocalLiteLlmToInputs(localCfg);
 
     await applyGatewayLlmConfig(localCfg);
+    if (localCfg.configured) {
+      try {
+        await syncLiteLlmSessionConfig(localCfg);
+      } catch (err) {
+        console.warn('session llm restore skipped', err);
+      }
+    }
     if (runtimeBridge) {
       await ensureVendorRuntimeBridge(state);
       await runtimeBridge.setLlmConfig({
@@ -14015,6 +14331,12 @@ function initStep2Listener() {
 
     if (status) status.textContent = 'Configuring brain...';
     setAgentLlmStatus('Configuring brain...');
+    setFirstWorkerProjectionOverride({
+      overlay: 'loading',
+      blocker: 'needs_brain',
+      brainPrimaryActionId: 'llmSaveBtn',
+      townhallPrimaryActionId: 'townhallOpenBrainBtn'
+    });
     if (clearBtn) clearBtn.disabled = true;
     btn.disabled = true;
 
@@ -14050,6 +14372,7 @@ function initStep2Listener() {
       });
       clearLiteSkillLoopPause();
       await applyGatewayLlmConfig(localCfg);
+      await syncLiteLlmSessionConfig(localCfg);
 
       // Ensure runtime worker inherits local config for the current tab session.
       if (runtimeBridge && isVendorLite(lastState)) {
@@ -14073,6 +14396,7 @@ function initStep2Listener() {
       }
 
       await new Promise(r => setTimeout(r, 300));
+      setFirstWorkerProjectionOverride(null);
       if (status) status.textContent = 'Brain configured.';
       setAgentLlmStatus('Brain configured.');
       setLiteLlmStatus(`Brain saved locally: ${config.provider}/${config.model}. Auto-restored on return.`);
@@ -14093,6 +14417,12 @@ function initStep2Listener() {
         }
       }
     } catch (e) {
+      setFirstWorkerProjectionOverride({
+        overlay: 'recoverable_error',
+        blocker: 'needs_brain',
+        brainPrimaryActionId: 'llmSaveBtn',
+        townhallPrimaryActionId: 'townhallOpenBrainBtn'
+      });
       if (status) status.textContent = `Brain config failed: ${e.message}`;
       setAgentLlmStatus(`Brain config failed: ${e.message}`);
       setHatchStatus(`Brain config failed: ${e.message}`);
@@ -14141,6 +14471,7 @@ async function clearLiteLlmConfig() {
     });
     clearLiteSkillLoopPause();
     await applyGatewayLlmConfig({ configured: false });
+    await clearLiteLlmSessionConfig();
     if (authModeSel) {
       authModeSel.value = 'api-key';
       setLlmAuthModeUI('api-key');
@@ -14165,6 +14496,7 @@ async function clearLiteLlmConfig() {
       await runtimeBridge.setLlmConfig({ provider: '', model: '', apiKey: '' });
     }
     statusOverride = 'OpenClaw Lite LLM config cleared.';
+    setFirstWorkerProjectionOverride(null);
     setLiteLlmStatus('Not configured. Save provider, model, and API key.');
     if (lastState) updateUI(lastState);
   } catch (e) {

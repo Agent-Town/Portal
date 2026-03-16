@@ -11,8 +11,59 @@ const START_PRIVY_SESSION_CHECK_TIMEOUT_MS = 8000;
 const START_PRIVY_LOGIN_TIMEOUT_MS = 60000;
 const START_PRIVY_WALLET_WARMUP_TIMEOUT_MS = 15000;
 
+function getArrivalRoot() {
+  const node = document.getElementById('zhcArrivalRoot');
+  return node && typeof node === 'object' ? node : null;
+}
+
+function setArrivalOverlayState(state) {
+  const node = getArrivalRoot();
+  if (!node) return;
+  const next = String(state || 'ready').trim() || 'ready';
+  node.dataset.zhcOverlayState = next;
+}
+
+function setArrivalBlocker(blockerKey) {
+  const node = getArrivalRoot();
+  if (!node) return;
+  const next = String(blockerKey || '').trim();
+  if (!next) {
+    node.removeAttribute('data-zhc-blocker-key');
+    return;
+  }
+  node.setAttribute('data-zhc-blocker-key', next);
+}
+
+function setArrivalNextUnlock(nextUnlock) {
+  const node = getArrivalRoot();
+  if (!node) return;
+  const next = String(nextUnlock || '').trim();
+  if (!next) {
+    node.removeAttribute('data-zhc-next-unlock');
+    return;
+  }
+  node.setAttribute('data-zhc-next-unlock', next);
+}
+
+function createStartError(code, detail = '') {
+  const resolvedCode = String(code || 'START_ERROR').trim() || 'START_ERROR';
+  const resolvedDetail = String(detail || '').trim();
+  const err = new Error(resolvedDetail || resolvedCode);
+  err.code = resolvedCode;
+  if (resolvedDetail) err.detail = resolvedDetail;
+  return err;
+}
+
+function getStartErrorCode(err) {
+  const code = err && typeof err.code === 'string' ? err.code.trim() : '';
+  if (code) return code;
+  const message = err && typeof err.message === 'string' ? err.message.trim() : '';
+  if (/^PRIVY_[A-Z0-9_]+$/.test(message)) return message;
+  return '';
+}
+
 function explainPrivyError(err) {
-  const code = err && typeof err.code === 'string' ? err.code : '';
+  const code = getStartErrorCode(err);
   const status = Number(err && (err.status || err.statusCode || err?.cause?.status || 0)) || 0;
   const detail = String(
     (err && (err.detail || err.message || err?.cause?.message || err?.cause?.detail || '')) || ''
@@ -107,7 +158,7 @@ function createLoginUi() {
   }
 
   function cancelPending(reason = 'PRIVY_LOGIN_CANCELLED') {
-    const err = new Error(reason);
+    const err = createStartError(reason);
     for (const rejecter of [...pendingRejecters]) {
       rejecter(err);
     }
@@ -133,11 +184,11 @@ function createLoginUi() {
       };
 
       const rejecter = (err) => {
-        finishReject(err instanceof Error ? err : new Error('PRIVY_LOGIN_CANCELLED'));
+        finishReject(err instanceof Error ? err : createStartError('PRIVY_LOGIN_CANCELLED'));
       };
 
       const onCancel = () => {
-        rejecter(new Error('PRIVY_LOGIN_CANCELLED'));
+        rejecter(createStartError('PRIVY_LOGIN_CANCELLED'));
       };
 
       const onSubmit = (evt) => {
@@ -221,9 +272,7 @@ function getPrivyBridge() {
 }
 
 function createStartTimeoutError(code) {
-  const err = new Error(code);
-  err.code = code;
-  return err;
+  return createStartError(code);
 }
 
 function withStartTimeout(promise, timeoutMs, code) {
@@ -328,6 +377,7 @@ async function maybeAutoSkipStart() {
 
   if (!cfg || cfg.enabled !== true) {
     if (pathname === '/') {
+      setArrivalOverlayState('success_feedback');
       autoRedirecting = true;
       window.location.replace(appPath);
     }
@@ -343,16 +393,22 @@ async function maybeAutoSkipStart() {
       'PRIVY_SESSION_CHECK_TIMEOUT'
     );
     if (!alreadySignedIn) return;
+    setArrivalOverlayState('loading');
     await preparePrivyWalletEntry({ silent: true });
+    setArrivalOverlayState('success_feedback');
     autoRedirecting = true;
     window.location.replace(appPath);
   } catch {
+    setArrivalOverlayState('ready');
     // no-op; allow manual entry
   }
 }
 
 async function handleEnter() {
   setEntryButtonsDisabled(true);
+  setArrivalOverlayState('loading');
+  setArrivalBlocker(null);
+  setArrivalNextUnlock('first_worker');
 
   const loginUi = createLoginUi();
   try {
@@ -360,15 +416,14 @@ async function handleEnter() {
     const appPath = appPathFromConfig(cfg);
 
     if (!cfg || cfg.enabled !== true) {
+      setArrivalOverlayState('success_feedback');
       window.location.assign(appPath);
       return;
     }
 
     const hasEnsurePrivy = typeof window.ensurePrivyLogin === 'function';
     if (!hasEnsurePrivy) {
-      const out = new Error('PRIVY_BRIDGE_INIT_FAILED');
-      out.code = 'PRIVY_BRIDGE_INIT_FAILED';
-      throw out;
+      throw createStartError('PRIVY_BRIDGE_INIT_FAILED');
     }
 
     setStatus('Connecting to Privy...');
@@ -388,6 +443,7 @@ async function handleEnter() {
       setStatus('Finalizing Privy wallets...');
       await preparePrivyWalletEntry({ silent: true });
       if (loginUi && typeof loginUi.close === 'function') loginUi.close();
+      setArrivalOverlayState('success_feedback');
       setStatus('Success. Entering Agent Town...');
       window.location.assign(appPath);
       return;
@@ -400,18 +456,18 @@ async function handleEnter() {
     let transientFailures = 0;
     while (true) {
       try {
+        setArrivalOverlayState('loading');
         setStatus('Connecting to Privy...');
         const ok = await window.ensurePrivyLogin({ interactive: true, loginUi });
         if (!ok) {
-          const out = new Error('PRIVY_LOGIN_FAILED');
-          out.code = 'PRIVY_LOGIN_FAILED';
-          throw out;
+          throw createStartError('PRIVY_LOGIN_FAILED');
         }
 
         setStatus('Finalizing Privy wallets...');
         const warmup = await preparePrivyWalletEntry({ silent: false });
 
         if (loginUi && typeof loginUi.close === 'function') loginUi.close();
+        setArrivalOverlayState('success_feedback');
         setStatus(
           warmup.ready || warmup.supportedCount === 0
             ? 'Success. Entering Agent Town...'
@@ -421,15 +477,17 @@ async function handleEnter() {
         return;
       } catch (err) {
         console.error('Privy login failed', err);
-        const errCode = (err && typeof err.code === 'string' && err.code)
-          || (err && typeof err.message === 'string' && err.message)
-          || '';
+        const errCode = getStartErrorCode(err);
         if (errCode === 'PRIVY_LOGIN_CANCELLED') {
           if (loginUi && typeof loginUi.close === 'function') loginUi.close();
+          setArrivalOverlayState('recoverable_error');
+          setArrivalBlocker('needs_auth');
           setStatus(explainPrivyError(err), true);
           break;
         }
 
+        setArrivalOverlayState('recoverable_error');
+        setArrivalBlocker('needs_auth');
         setStatus(explainPrivyError(err), true);
         if (loginUi && typeof loginUi.resetForRetry === 'function') {
           loginUi.resetForRetry();
@@ -445,8 +503,14 @@ async function handleEnter() {
     }
   } catch (err) {
     console.error('Privy login failed', err);
+    setArrivalOverlayState('fatal_error');
+    setArrivalBlocker('needs_auth');
     setStatus(explainPrivyError(err), true);
   } finally {
+    if (!autoRedirecting) {
+      const overlay = getArrivalRoot()?.dataset?.zhcOverlayState || '';
+      if (overlay === 'loading') setArrivalOverlayState('ready');
+    }
     setEntryButtonsDisabled(false);
   }
 }
@@ -462,6 +526,10 @@ function maybeCanonicalizePrivyLoopbackHost() {
 
 function boot() {
   if (maybeCanonicalizePrivyLoopbackHost()) return;
+
+  setArrivalOverlayState('ready');
+  setArrivalBlocker(null);
+  setArrivalNextUnlock('first_worker');
   maybeAutoSkipStart().catch(() => { });
 
   const enterBtn = document.getElementById('enterBtn');

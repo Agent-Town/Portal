@@ -17,6 +17,7 @@ Branch: `zhc0-founders-loop`
 - `docs/zhc-subsystem-benchmark-map.md`
 - `docs/zhc-remote-branch-audit.md`
 - `docs/zhc0-screen-plan.md`
+- `docs/zhc-current-status.md`
 
 ## 1. What this branch is
 

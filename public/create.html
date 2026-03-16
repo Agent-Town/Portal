@@ -29,7 +29,17 @@
       </div>
     </div>
 
-    <div class="panel">
+    <div
+      class="panel"
+      id="zhcCreateRoot"
+      data-testid="zhc-create-root"
+      data-zhc-phase="alignment_passed"
+      data-zhc-overlay-state="blocked"
+      data-zhc-progress-step="4"
+      data-zhc-progress-total="9"
+      data-zhc-blocker-key="needs_crest"
+      data-zhc-next-unlock="house"
+    >
       <h1 style="margin:0 0 8px">Create entropy for house key.</h1>
       <p class="small" style="margin-top:0" id="createIntro">
         Human: click pixels. Agent: paint via the skill API. When it feels done, lock it in.
@@ -39,7 +49,7 @@
         <div class="palette" id="palette" data-testid="palette"></div>
         <div class="canvasGrid" id="canvas" data-testid="canvas"></div>
         <div class="kv">
-          <button class="btn primary" id="shareBtn" data-testid="share-btn" disabled>Generate house key</button>
+          <button class="btn primary" id="shareBtn" data-testid="share-btn" data-zhc-primary-action="true" disabled>Generate house key</button>
           <span class="pill" id="shareStatus" style="display:none">Working…</span>
         </div>
         <div class="small" style="margin-top:6px; color: var(--muted)" id="createNextNote">

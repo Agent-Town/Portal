@@ -4,7 +4,17 @@
       Complete onboarding and configure your brain to unlock the sigil flow.
     </div>
 
-    <div class="townhallStoryStep" id="townhallStepHuman">
+    <div
+      class="townhallStoryStep"
+      id="townhallStepHuman"
+      data-testid="zhc-townhall-founder-human"
+      data-zhc-phase="founders_established"
+      data-zhc-overlay-state="blocked"
+      data-zhc-progress-step="3"
+      data-zhc-progress-total="9"
+      data-zhc-blocker-key="needs_founders"
+      data-zhc-next-unlock="alignment"
+    >
       <h2 style="margin:0 0 6px">Hello hero! Welcome to Agent Town.</h2>
       <p class="small" style="margin-top:0">How should we call you?</p>
 
@@ -32,7 +42,17 @@
       </div>
     </div>
 
-    <div class="townhallStoryStep is-hidden" id="townhallStepAgent">
+    <div
+      class="townhallStoryStep is-hidden"
+      id="townhallStepAgent"
+      data-testid="zhc-townhall-founder-agent"
+      data-zhc-phase="founders_established"
+      data-zhc-overlay-state="blocked"
+      data-zhc-progress-step="3"
+      data-zhc-progress-total="9"
+      data-zhc-blocker-key="needs_founders"
+      data-zhc-next-unlock="alignment"
+    >
       <h2 style="margin:0 0 6px">This is your agent - you rescued it!</h2>
       <p class="small" style="margin-top:0">What should we call it?</p>
 
@@ -61,7 +81,17 @@
       </div>
     </div>
 
-    <div class="townhallStoryStep is-hidden" id="townhallStepProcessing">
+    <div
+      class="townhallStoryStep is-hidden"
+      id="townhallStepProcessing"
+      data-testid="zhc-first-worker-gate"
+      data-zhc-phase="first_worker_online"
+      data-zhc-overlay-state="blocked"
+      data-zhc-progress-step="2"
+      data-zhc-progress-total="9"
+      data-zhc-blocker-key="needs_brain"
+      data-zhc-next-unlock="alignment"
+    >
       <h2 style="margin:0 0 6px">Welcome to Agent Town, processing your registration.</h2>
 
       <div class="townhallMintChecklist" id="townhallMintChecklist">
@@ -153,8 +183,18 @@
     <div class="kv" style="margin-top:10px">
       <button class="btn primary" id="openBtn" data-testid="open-btn">Open</button>
       <span class="pill" data-testid="open-waiting" id="openWaiting" style="display:none">Waiting for agent…</span>
-      <span class="pill" id="openReady" style="display:none">Continue → <a href="/create">Ceremony</a> · <a href="/house">House</a></span>
     </div>
     <div class="small" id="openError" style="color: var(--bad);"></div>
+  </div>
+
+  <div class="panel is-hidden" id="townhallAlignmentPanel" data-testid="zhc-alignment-handoff">
+    <h2 style="margin:0 0 6px">Alignment passed</h2>
+    <p class="small" id="townhallAlignmentStatus" style="margin-top:0">
+      You and the worker cleared the co-op gate. Create the founding crest before House opens.
+    </p>
+    <div class="kv" id="openReady" style="display:none">
+      <span class="pill">Next unlock: House</span>
+      <a class="btn" id="townhallCreateCrestLink" data-testid="townhall-create-crest-link" href="/create">Create crest</a>
+    </div>
   </div>
 </div>
