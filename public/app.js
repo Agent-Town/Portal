@@ -1870,6 +1870,20 @@ function renderHouseDistrictHeader() {
   titleNode.textContent = getHouseDistrictTitle();
 }
 
+function getHouseMissionPanelCopy() {
+  const savedName = getSavedHouseHqName();
+  if (!savedName) {
+    return {
+      title: 'Mission',
+      lead: 'Pick the next shared task.',
+    };
+  }
+  return {
+    title: `Mission · ${savedName} HQ`,
+    lead: `Pick the next shared task for ${savedName} HQ.`,
+  };
+}
+
 function hashHouseHqSeed(value) {
   const input = String(value || '');
   let hash = 2166136261;
@@ -2201,11 +2215,16 @@ async function openHouseExperienceEntry(rawEntryPath) {
 }
 
 function renderHouseExperiencesSurface() {
+  const titleNode = el('houseExperiencesTitle');
+  const leadNode = el('houseExperiencesLead');
   const listNode = el('houseExperiencesList');
   const detailNode = el('houseExperiencesDetail');
   const emptyNode = el('houseExperiencesEmpty');
   const actionsNode = el('houseExperienceActions');
   if (!listNode || !detailNode || !emptyNode || !actionsNode) return;
+  const missionCopy = getHouseMissionPanelCopy();
+  if (titleNode) titleNode.textContent = missionCopy.title;
+  if (leadNode) leadNode.textContent = missionCopy.lead;
   const items = Array.isArray(houseSurfaceState.experiences.items) ? houseSurfaceState.experiences.items : [];
   listNode.innerHTML = '';
   actionsNode.innerHTML = '';
