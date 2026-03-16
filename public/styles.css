@@ -1803,10 +1803,10 @@ footer::before {
   }
 
   .townDistrict-saloon {
-    top: 33%;
-    right: 6%;
-    width: 44%;
-    height: 22%;
+    top: 34%;
+    right: 4%;
+    width: 38%;
+    height: 18%;
   }
 
   .townDistrict-wagons {
@@ -1824,10 +1824,10 @@ footer::before {
   }
 
   .townDistrict-board {
-    left: 64%;
-    top: 46%;
-    width: 28%;
-    height: 14%;
+    left: 62%;
+    top: 49%;
+    width: 24%;
+    height: 12%;
   }
 
   .townDistrict-wagons .townDistrictLabel {
