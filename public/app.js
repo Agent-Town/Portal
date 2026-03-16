@@ -1888,6 +1888,28 @@ function getHouseShareCardMissingStatusText(houseId = houseSurfaceState.context.
     : 'No share yet for this house. Opening placeholder card.';
 }
 
+function getHouseReconnectIntroText({
+  houseId = houseSurfaceState.context.houseId,
+  recovered = walletRecovered,
+} = {}) {
+  const savedName = getSavedHouseHqName(houseId);
+  if (recovered) {
+    return savedName
+      ? `We found ${savedName} HQ for this wallet. Continue with your worker in this session.`
+      : 'We found a house for this wallet. Continue with your worker in this session.';
+  }
+  return savedName
+    ? `${savedName} HQ is ready. Continue in this town session.`
+    : 'Your house is ready. Continue in this town session.';
+}
+
+function renderHouseReconnectIntro({
+  houseId = houseSurfaceState.context.houseId,
+  recovered = walletRecovered,
+} = {}) {
+  safeSetText('reconnectIntro', getHouseReconnectIntroText({ houseId, recovered }));
+}
+
 function renderHouseShareCardCta({ houseId = houseSurfaceState.context.houseId, sharePath = '' } = {}) {
   const openShareCardBtn = el('openShareCardBtn');
   const shareCardStatus = el('shareCardStatus');
@@ -2079,6 +2101,7 @@ function renderHouseHqEntrySurface() {
   if (panel) panel.classList.toggle('is-hidden', !ready);
   if (startMissionBtn) startMissionBtn.disabled = !ready;
   renderHouseDistrictHeader();
+  renderHouseReconnectIntro({ houseId });
   renderHouseShareCardCta({ houseId, sharePath: resolveSharePathFromState(lastState) });
   if (!panel || !ready) return;
 
@@ -12799,11 +12822,10 @@ async function updateUI(state) {
   if (houseId) {
     if (walletRecovered) {
       safeSetText('reconnectTitle', 'Welcome back');
-      safeSetText('reconnectIntro', 'We found a house for this wallet. Continue with your worker in this session.');
     } else {
       safeSetText('reconnectTitle', 'Reconnect to House');
-      safeSetText('reconnectIntro', 'Your house is ready. Continue in this town session.');
     }
+    renderHouseReconnectIntro({ houseId, recovered: walletRecovered });
     safeSetText('houseSnippet', `Reconnect worker session ${teamCode} to your house.`);
     const openHouseLink = el('openHouseLink');
     if (openHouseLink) openHouseLink.href = `/house?house=${encodeURIComponent(houseId)}`;

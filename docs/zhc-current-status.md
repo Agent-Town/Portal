@@ -1,7 +1,7 @@
 # ZHC Current Status Snapshot
 
-Status: M44.1 complete, M44.2 contract/mechanics complete, M44.3 Town Hall founder-progression slice complete, M44.4 modal handoff corrected and green, M44.5 HQ-first-entry modal surface green, M44.6 shared HQ naming slice green, M44.7 saved HQ name now projects into the House shell header and is green, M44.8 saved HQ name now brands the Mission lane heading/lead and is green, M44.9 saved HQ name now reaches the Mission detail line and is green, M44.10 saved HQ name now reaches the Mission empty-state copy and is green, M44.11 no-experience Mission detail hint is now truthful before save and HQ-branded after save and is green, M44.12 saved HQ name now brands the reconnect share-card action and is green  
-Last updated: 2026-03-17 01:15 +0700  
+Status: M44.1 complete, M44.2 contract/mechanics complete, M44.3 Town Hall founder-progression slice complete, M44.4 modal handoff corrected and green, M44.5 HQ-first-entry modal surface green, M44.6 shared HQ naming slice green, M44.7 saved HQ name now projects into the House shell header and is green, M44.8 saved HQ name now brands the Mission lane heading/lead and is green, M44.9 saved HQ name now reaches the Mission detail line and is green, M44.10 saved HQ name now reaches the Mission empty-state copy and is green, M44.11 no-experience Mission detail hint is now truthful before save and HQ-branded after save and is green, M44.12 saved HQ name now brands the reconnect share-card action and is green, M44.13 saved HQ name now brands the reconnect intro/support line and is green  
+Last updated: 2026-03-17 01:50 +0700  
 Branch: `zhc0-founders-loop`  
 Worktree: `/Users/robin/.openclaw/workspace/Portal-zhc0`
 
@@ -25,25 +25,25 @@ Robin clarified the constraints that currently govern the founders-loop passes:
 
 ## What landed this pass
 
-### M44.12 — saved HQ name now reaches the reconnect share-card action
-The next smallest coherent follow-on outside the Mission copy cluster is now landed in the same `/app` modal shell: the reconnect share-card action now reflects the locally saved HQ name.
+### M44.13 — saved HQ name now brands the reconnect intro/support line
+The next smallest coherent saved-HQ follow-on outside the Mission copy cluster is now landed in the same `/app` modal shell: the reconnect intro/support line now reflects the locally saved HQ name.
 
 What changed:
-- before the HQ name is saved, the reconnect action stays generic and does **not** leak draft naming into the share surface
-  - it remains `Open share card` when a share path is already present in state
-  - it remains `Open share card (preview)` when the house still has no share path in state
-- after the HQ name is saved, the reconnect action becomes HQ-branded using only the saved local name for that attached house
-  - with no share path yet: `Preview <saved HQ name> HQ share card`
-  - with a share path present: `Open <saved HQ name> HQ share card`
-- after reload, reopening the same attached house restores that HQ-branded reconnect action immediately
-- if no share exists yet and the action falls back to the placeholder card, the supporting missing-share status line now also mentions `<saved HQ name> HQ`
+- before the HQ name is saved, the reconnect intro stays generic and does **not** leak draft naming into the reconnect surface
+  - it remains `Your house is ready. Continue in this town session.` on the regular attached-house path
+- after the HQ name is saved, that reconnect intro becomes HQ-branded using only the saved local name for that attached house
+  - it becomes `<saved HQ name> HQ is ready. Continue in this town session.`
+- after reload, reopening the same attached house restores that HQ-branded reconnect intro immediately
+- the reconnect intro now resolves through a single helper, so the wallet-recovery `Welcome back` branch uses the same saved-HQ lookup without changing persistence scope
 
 Implementation details:
 - `public/app.js`
-  - widened the saved-HQ lookup helper so reconnect/share UI can read the already-persisted local name by house id without changing persistence scope
-  - added a tiny reconnect share-card CTA renderer so the button label updates both during regular state refreshes and right after the local HQ save action
-  - branded the missing-share placeholder status text with the saved HQ name when available
-- `e2e/434_zhc0_share_card_button_uses_saved_hq_name.spec.js`
+  - added a tiny reconnect-intro copy helper that reuses the existing saved-HQ local lookup plus the current recovery/non-recovery branch
+  - refreshes the reconnect intro both during normal `updateUI` state updates and immediately after the local HQ save action rerenders the House shell
+- `public/views/house.html`
+  - added the smallest stable `data-testid` on the reconnect intro line for focused founders-loop coverage
+  - aligned the static fallback line with the runtime generic reconnect intro copy
+- `e2e/435_zhc0_reconnect_intro_uses_saved_hq_name.spec.js`
   - added focused founders-loop coverage for generic-before-save behavior, HQ-branded behavior after save, and HQ-branded behavior after reload
 
 ### Why this matches the direction better
@@ -52,60 +52,66 @@ This keeps the slice narrow and immediately useful:
 - still local-only; no server/session/share persistence changes
 - still one obvious primary action in the HQ entry state
 - avoids more Mission microcopy churn
-- gives the saved shared HQ name one more early payoff on a real downstream action instead of only inside the Mission panel copy cluster
+- gives the saved shared HQ name one more early payoff in the reconnect shell without adding new actions or clutter
 
 ## New / updated contract coverage
-- added: `e2e/434_zhc0_share_card_button_uses_saved_hq_name.spec.js`
-  - verifies the reconnect share-card action stays generic before save
-  - verifies saving the HQ name promotes that action into HQ-branded copy
-  - verifies the same HQ-branded action returns after reload for the same attached house
+- added: `e2e/435_zhc0_reconnect_intro_uses_saved_hq_name.spec.js`
+  - verifies the reconnect intro stays generic before save
+  - verifies saving the HQ name promotes that intro into HQ-branded copy
+  - verifies the same HQ-branded intro returns after reload for the same attached house
 
 ## Files changed in this slice
 
 - `public/app.js`
-- `e2e/434_zhc0_share_card_button_uses_saved_hq_name.spec.js`
+- `public/views/house.html`
+- `e2e/435_zhc0_reconnect_intro_uses_saved_hq_name.spec.js`
 - `docs/zhc-current-status.md`
 
 ## Evidence runs
 
-### Focused M44.12 reconnect share-card naming check
+### Focused M44.13 reconnect intro naming check
 ```bash
-node --check public/app.js && node --check e2e/434_zhc0_share_card_button_uses_saved_hq_name.spec.js && npx playwright test e2e/434_zhc0_share_card_button_uses_saved_hq_name.spec.js
+node --check public/app.js
+node --check e2e/435_zhc0_reconnect_intro_uses_saved_hq_name.spec.js
+npx playwright test e2e/435_zhc0_reconnect_intro_uses_saved_hq_name.spec.js
 ```
 
 Result:
+- `node --check` passed for both files
 - `1 passed`
 
-### Focused founders-loop House naming / Mission / reconnect share-card sweep
+### Focused founders-loop House naming / Mission / reconnect sweep
 ```bash
-node --check public/app.js && npx playwright test e2e/420_zhc0_house_first_entry_hq_surface.spec.js e2e/421_zhc0_house_shared_naming.spec.js e2e/428_zhc0_ceremony_modal_handoff.spec.js e2e/429_zhc0_house_header_uses_saved_hq_name.spec.js e2e/430_zhc0_mission_panel_uses_saved_hq_name.spec.js e2e/431_zhc0_mission_detail_uses_saved_hq_name.spec.js e2e/432_zhc0_mission_empty_state_uses_saved_hq_name.spec.js e2e/433_zhc0_mission_empty_detail_hint_uses_saved_hq_name.spec.js e2e/434_zhc0_share_card_button_uses_saved_hq_name.spec.js e2e/188_house_experiences_surface.spec.js
+npx playwright test e2e/420_zhc0_house_first_entry_hq_surface.spec.js e2e/421_zhc0_house_shared_naming.spec.js e2e/428_zhc0_ceremony_modal_handoff.spec.js e2e/429_zhc0_house_header_uses_saved_hq_name.spec.js e2e/430_zhc0_mission_panel_uses_saved_hq_name.spec.js e2e/431_zhc0_mission_detail_uses_saved_hq_name.spec.js e2e/432_zhc0_mission_empty_state_uses_saved_hq_name.spec.js e2e/433_zhc0_mission_empty_detail_hint_uses_saved_hq_name.spec.js e2e/434_zhc0_share_card_button_uses_saved_hq_name.spec.js e2e/435_zhc0_reconnect_intro_uses_saved_hq_name.spec.js e2e/188_house_experiences_surface.spec.js
 ```
 
 Result:
-- `10 passed`
+- `11 passed`
 
 ## What I verified
 
 - the founder journey still stays inside the `/app` modal shell
 - the shared HQ naming move still saves through the same single primary action
+- the reconnect intro now stays generic before save and becomes HQ-branded after save
+- after reload for the same house, the reconnect intro still shows the saved HQ name immediately
 - the House modal header still projects the saved HQ name
 - the Mission panel heading and lead still project the saved HQ name
 - the selected Mission detail line still projects the saved HQ name
 - the Mission empty-state still projects the saved HQ name when no experiences are routed yet
 - the Mission no-experience detail hint still stays truthful before save and HQ-branded after save
-- the reconnect share-card action now stays generic before save and becomes HQ-branded after save
-- after reload for the same house, the reconnect share-card action still shows the saved HQ name immediately
-- the broader House Experiences surface contract still passes after the reconnect/share wording change
+- the reconnect share-card action still stays generic before save and becomes HQ-branded after save
+- the broader House Experiences surface contract still passes after the reconnect intro wording change
 
 ## Honest gaps / remaining debt
 
 - HQ naming still persists in browser local storage only
   - coherent for this UI slice, but still not written into server/session/platform state
-- the share-card **page/body** itself still does not reuse the saved HQ name
-  - this pass only touches the reconnect/share action wording and fallback status line inside the modal shell
+- the wallet-recovery-specific `Welcome back` reconnect intro branch now shares the same helper, but this pass did **not** add a dedicated Playwright assertion for that branch
+- the reconnect copyable message snippet still does not reuse the saved HQ name
+- the share-card page/body itself still does not reuse the saved HQ name
 - deeper downstream surfaces beyond the current House shell still do not reuse the saved HQ name consistently
-- screenshot baseline still reflects the prior M44.5–M44.11 modal shell state
-  - I did **not** capture a fresh image pack for this copy-level reconnect-action change
+- screenshot baseline still reflects the prior M44.5–M44.12 modal shell state
+  - I did **not** capture a fresh image pack for this copy-level reconnect-intro change
 
 ## What I did **not** do
 
@@ -124,12 +130,12 @@ Result:
 
 ## Next exact pickup
 
-Safest next move is still another tiny saved-HQ projection outside the Mission copy cluster.
+Safest next move is still one more tiny saved-HQ projection outside the Mission copy cluster.
 
 Best next pickup:
 1. pick one more early shell/support surface that benefits immediately from the saved HQ name without adding UI sprawl
 2. strongest remaining candidates are:
-   - the reconnect intro/support line
+   - the reconnect copyable house snippet
    - a tiny House systems/team summary line
    - a safe placeholder/share-card shell detail if it can stay local-only
 3. keep persistence local-only unless there is an exceptionally small safe path to broader state
@@ -140,5 +146,5 @@ Best next pickup:
 
 ## Repo state notes
 
-- this M44.12 reconnect/share-card projection is local in this worktree only
+- this M44.13 reconnect-intro projection is local in this worktree only
 - unrelated dirty file remains: `package-lock.json` (leave it alone unless explicitly intended)
