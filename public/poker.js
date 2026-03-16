@@ -447,6 +447,27 @@
     });
   }
 
+  function reorderPokerSections(root, orderedSections) {
+    if (!root || !Array.isArray(orderedSections) || !orderedSections.length) return;
+    const children = Array.from(root.children || []);
+    if (!children.length) return;
+    const ordered = [];
+    const used = new Set();
+    for (const section of orderedSections) {
+      children.forEach((child, index) => {
+        if (used.has(index)) return;
+        if (String(child?.dataset?.pokerSection || '') === String(section || '')) {
+          ordered.push(child);
+          used.add(index);
+        }
+      });
+    }
+    children.forEach((child, index) => {
+      if (!used.has(index)) ordered.push(child);
+    });
+    ordered.forEach((child) => root.appendChild(child));
+  }
+
   function renderPokerCards(cards) {
     const items = Array.isArray(cards) ? cards : [];
     return items.length
@@ -1698,6 +1719,13 @@
         `, { plane: 'supporting' })
         : sectionCard('live-tables', '<h2>No live tables yet.</h2><p>Use Quick Seat to create the first matching cash or tournament table.</p>', { plane: 'supporting' }),
     ]);
+    reorderPokerSections(contentEl, [
+      'quick-seat',
+      'live-tables',
+      'tournament-series',
+      'eligibility',
+      'poker-policy',
+    ]);
     bindPlayPolicyForm();
     bindPlayMatchmakeForm();
     setStatus(items.length ? `${items.length} live poker table${items.length === 1 ? '' : 's'} loaded.` : 'No live poker table available.');
@@ -1861,6 +1889,13 @@
       cards.push(sectionCard('schedule-empty', '<h2>No Scheduled Events</h2><p>No tournament events are scheduled in the current calendar window.</p>', { plane: 'primary' }));
     }
     renderCards(cards);
+    reorderPokerSections(contentEl, [
+      'schedule-snapshot',
+      'schedule-day',
+      'recurring-templates',
+      'schedule-admin',
+      'schedule-empty',
+    ]);
     setStatus(Number(summary?.eventCount || 0) > 0
       ? `${Number(summary?.eventCount || 0)} scheduled tournament event${Number(summary?.eventCount || 0) === 1 ? '' : 's'} loaded.`
       : 'No tournament events are scheduled right now.');

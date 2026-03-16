@@ -58,3 +58,18 @@ When a future design phase lands, append:
 
 1. New poker surfaces should be added with explicit view and section metadata from the start.
 2. Button roles must stay machine-detectable so design tests can verify hierarchy deterministically.
+
+## 2026-03-16 D1 Hierarchy Start
+
+### What changed
+
+1. The live lobby now reorders to player-first hierarchy: quick seat, live tables, tournament series, then identity and policy.
+2. The schedule now reorders to event-first hierarchy: snapshot, upcoming day cards, recurring templates, then admin tools.
+
+### What worked
+
+1. Post-render reordering by stable `data-poker-section` hooks preserved behavior while still changing composition deterministically.
+
+### What should become a permanent rule
+
+1. Once a route has stable section hooks, hierarchy changes should prefer structural reordering over duplicating template logic.
