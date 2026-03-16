@@ -88,45 +88,64 @@
 <div class="divider"></div>
 
 <div class="panel" id="houseConsolePanel" data-testid="house-console-panel">
-  <h2 style="margin:0 0 6px">House Console</h2>
-  <p class="small" style="margin-top:0">
-    Read-only access to the current House Office, archive, workshop, tracks, and trainer truth for this house.
-  </p>
-  <div class="kv" style="margin-bottom:8px;">
-    <label class="small" for="houseTeamSelect">Team</label>
-    <select id="houseTeamSelect" data-testid="house-team-select" aria-label="House Team"></select>
+  <div class="houseConsoleSummaryCard" data-testid="house-console-summary-card">
+    <div class="houseConsoleSummaryLead">
+      <h2 class="houseConsoleTitle">House Console</h2>
+      <p class="small houseConsoleIntro">
+        Read-only access to the current House Office, archive, workshop, tracks, and trainer truth for this house.
+      </p>
+    </div>
+    <div class="houseConsoleTeamRow">
+      <label class="small" for="houseTeamSelect">Team</label>
+      <select id="houseTeamSelect" data-testid="house-team-select" aria-label="House Team"></select>
+    </div>
+    <div class="houseConsoleSummaryStack">
+      <div class="small houseConsoleSummaryText" id="houseTeamSummary" data-testid="house-team-summary">
+        Attach a house to inspect team-specific archive and trainer records.
+      </div>
+      <div class="small houseConsoleSummaryText" id="houseReadinessSummary" data-testid="house-readiness-summary">
+        House readiness will appear here once the shell context is available.
+      </div>
+      <div class="small houseConsoleSummaryText" id="houseWorkerLiveReadinessSummary" data-testid="house-worker-live-readiness-summary">
+        House helper live readiness will appear here once the shell context is available.
+      </div>
+    </div>
   </div>
-  <div class="small" id="houseTeamSummary" data-testid="house-team-summary" style="margin-bottom:8px;">
-    Attach a house to inspect team-specific archive and trainer records.
-  </div>
-  <div class="small" id="houseReadinessSummary" data-testid="house-readiness-summary" style="margin-bottom:8px;">
-    House readiness will appear here once the shell context is available.
-  </div>
-  <div class="stack" id="houseReadinessSurfaces" data-testid="house-readiness-surfaces" style="margin-bottom:8px;"></div>
-  <div class="stack" id="houseReadinessChecklist" data-testid="house-readiness-checklist" style="margin-bottom:8px;"></div>
-  <div class="small" id="houseWorkerLiveReadinessSummary" data-testid="house-worker-live-readiness-summary" style="margin-bottom:8px;">
-    House helper live readiness will appear here once the shell context is available.
-  </div>
-  <div class="stack" id="houseWorkerLiveReadinessChecks" data-testid="house-worker-live-readiness-checks" style="margin-bottom:8px;"></div>
-  <div class="stack" id="houseWorkerLiveReadinessSteps" data-testid="house-worker-live-readiness-steps" style="margin-bottom:8px;"></div>
-  <div class="kv" style="margin-bottom:8px;">
-    <button class="btn" id="houseOfficeBtn" type="button" data-testid="house-open-office">Open Office</button>
+
+  <div class="kv houseConsolePrimaryActions" data-testid="house-console-primary-actions" data-house-action-group="primary">
+    <button class="btn primary" id="houseOfficeBtn" type="button" data-testid="house-open-office">Open Office</button>
     <button class="btn" id="houseExperiencesBtn" type="button" data-testid="house-open-experiences">Open Experiences</button>
     <button class="btn" id="houseWorkshopBtn" type="button" data-testid="house-open-workshop">Open Workshop</button>
     <button class="btn" id="houseTracksBtn" type="button" data-testid="house-open-tracks">Open Tracks</button>
     <button class="btn" id="houseArchiveBtn" type="button" data-testid="house-open-archive">Open Archive</button>
     <button class="btn" id="houseTrainerBtn" type="button" data-testid="house-open-house-trainer">Open Trainer</button>
   </div>
-  <div class="small" style="margin-bottom:6px;">House Office District</div>
-  <div id="houseOfficeDistrictShell" data-testid="house-office-district-shell" style="display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; margin-bottom:8px;">
-    <button class="btn" id="houseDistrictFrontDeskBtn" type="button" data-testid="house-office-district-section" data-section-id="front_desk" style="min-width:0; white-space:normal; text-align:left;">Front Desk</button>
-    <button class="btn" id="houseDistrictWorkshopBtn" type="button" data-testid="house-office-district-section" data-section-id="workshop_wing" style="min-width:0; white-space:normal; text-align:left;">Workshop Wing</button>
-    <button class="btn" id="houseDistrictAnalysisBtn" type="button" data-testid="house-office-district-section" data-section-id="analysis_wing" style="min-width:0; white-space:normal; text-align:left;">Analysis Wing</button>
-    <button class="btn" id="houseDistrictArchiveBtn" type="button" data-testid="house-office-district-section" data-section-id="archive_wing" style="min-width:0; white-space:normal; text-align:left;">Archive Wing</button>
-    <button class="btn" id="houseDistrictOperationsBtn" type="button" data-testid="house-office-district-section" data-section-id="operations_wing" style="min-width:0; white-space:normal; text-align:left;">Operations Wing</button>
-    <button class="btn" id="houseDistrictTracksBtn" type="button" data-testid="house-office-district-section" data-section-id="tracks_board" style="min-width:0; white-space:normal; text-align:left;">Tracks Board</button>
+
+  <div class="houseConsoleSecondaryNav" data-testid="house-console-secondary-nav" data-house-action-group="secondary">
+    <div class="small houseConsoleNavLabel">House Office District</div>
+    <div id="houseOfficeDistrictShell" class="houseConsoleDistrictShell" data-testid="house-office-district-shell">
+      <button class="btn quiet houseConsoleDistrictBtn" id="houseDistrictFrontDeskBtn" type="button" data-testid="house-office-district-section" data-section-id="front_desk">Front Desk</button>
+      <button class="btn quiet houseConsoleDistrictBtn" id="houseDistrictWorkshopBtn" type="button" data-testid="house-office-district-section" data-section-id="workshop_wing">Workshop Wing</button>
+      <button class="btn quiet houseConsoleDistrictBtn" id="houseDistrictAnalysisBtn" type="button" data-testid="house-office-district-section" data-section-id="analysis_wing">Analysis Wing</button>
+      <button class="btn quiet houseConsoleDistrictBtn" id="houseDistrictArchiveBtn" type="button" data-testid="house-office-district-section" data-section-id="archive_wing">Archive Wing</button>
+      <button class="btn quiet houseConsoleDistrictBtn" id="houseDistrictOperationsBtn" type="button" data-testid="house-office-district-section" data-section-id="operations_wing">Operations Wing</button>
+      <button class="btn quiet houseConsoleDistrictBtn" id="houseDistrictTracksBtn" type="button" data-testid="house-office-district-section" data-section-id="tracks_board">Tracks Board</button>
+    </div>
   </div>
-  <div class="small" id="houseSurfaceStatus" style="min-height:1.4em;"></div>
+
+  <div class="houseConsoleSupportStack" data-testid="house-console-support">
+    <div class="houseConsoleSupportBlock">
+      <div class="small houseConsoleSupportLabel">Readiness</div>
+      <div class="stack houseConsoleSupportList" id="houseReadinessSurfaces" data-testid="house-readiness-surfaces"></div>
+      <div class="stack houseConsoleSupportList" id="houseReadinessChecklist" data-testid="house-readiness-checklist"></div>
+    </div>
+    <div class="houseConsoleSupportBlock">
+      <div class="small houseConsoleSupportLabel">Helper Live Readiness</div>
+      <div class="stack houseConsoleSupportList" id="houseWorkerLiveReadinessChecks" data-testid="house-worker-live-readiness-checks"></div>
+      <div class="stack houseConsoleSupportList" id="houseWorkerLiveReadinessSteps" data-testid="house-worker-live-readiness-steps"></div>
+    </div>
+  </div>
+  <div class="small houseConsoleSurfaceStatus" id="houseSurfaceStatus">Surface status will appear here.</div>
 </div>
 
 <div class="panel is-hidden" id="houseOfficePanel" data-testid="house-office-panel">

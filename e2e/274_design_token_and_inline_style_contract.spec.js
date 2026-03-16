@@ -45,3 +45,17 @@ test('town shell markup keeps trainer layout classes and plain-language dock con
   expect(indexHtml).toContain('>Large</button>');
   expect(indexHtml).toContain('>Open</button>');
 });
+
+test('house console header region uses structured classes instead of inline layout styling', async () => {
+  const housePath = path.join(process.cwd(), 'public/views/house.html');
+  const houseHtml = fs.readFileSync(housePath, 'utf8');
+
+  expect(houseHtml).toContain('data-testid="house-console-summary-card"');
+  expect(houseHtml).toContain('data-testid="house-console-primary-actions"');
+  expect(houseHtml).toContain('data-testid="house-console-support"');
+  expect(houseHtml).toContain('class="houseConsoleDistrictShell"');
+  expect(houseHtml).not.toContain('id="houseOfficeDistrictShell" data-testid="house-office-district-shell" style=');
+  expect(houseHtml).not.toContain('id="houseTeamSummary" data-testid="house-team-summary" style=');
+  expect(houseHtml).not.toContain('id="houseReadinessSummary" data-testid="house-readiness-summary" style=');
+  expect(houseHtml).not.toContain('id="houseWorkerLiveReadinessSummary" data-testid="house-worker-live-readiness-summary" style=');
+});

@@ -966,6 +966,111 @@ h3 {
   display: block;
 }
 
+.houseConsoleTitle {
+  margin: 0 0 var(--space-6);
+}
+
+.houseConsoleIntro {
+  margin-top: 0;
+}
+
+.houseConsoleSummaryCard {
+  display: grid;
+  gap: var(--space-12);
+  margin-bottom: var(--space-12);
+  padding: var(--space-16);
+  border: var(--stroke-strong);
+  border-radius: calc(var(--radius-xl) + 2px);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 246, 233, 0.95));
+  box-shadow: var(--shadow-md);
+}
+
+.houseConsoleSummaryLead {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.houseConsoleTeamRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.houseConsoleTeamRow select {
+  min-width: min(220px, 100%);
+}
+
+.houseConsoleSummaryStack {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.houseConsoleSummaryText {
+  margin: 0;
+}
+
+.houseConsolePrimaryActions {
+  margin-bottom: var(--space-12);
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.houseConsoleSecondaryNav {
+  display: grid;
+  gap: var(--space-8);
+  margin-bottom: var(--space-12);
+}
+
+.houseConsoleNavLabel {
+  margin: 0;
+}
+
+.houseConsoleDistrictShell {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-8);
+}
+
+.houseConsoleDistrictBtn {
+  min-width: 0;
+  justify-content: flex-start;
+  white-space: normal;
+  text-align: left;
+}
+
+.houseConsoleSupportStack {
+  display: grid;
+  gap: var(--space-12);
+}
+
+.houseConsoleSupportBlock {
+  padding: var(--space-12) var(--space-16);
+  border: var(--stroke-faint);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.houseConsoleSupportLabel {
+  display: block;
+  margin-bottom: var(--space-8);
+  color: var(--muted);
+}
+
+.houseConsoleSupportList + .houseConsoleSupportList {
+  margin-top: var(--space-8);
+}
+
+.houseConsoleSurfaceStatus {
+  min-height: 1.4em;
+}
+
+@media (min-width: 720px) {
+  .houseConsoleSupportStack {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 body.district-modal-open {
   overflow: hidden;
 }
@@ -4099,6 +4204,20 @@ body.town-hub-page .districtModalBody .btn:active {
 body.town-hub-page .districtModalBody .btn.primary {
   background: linear-gradient(180deg, #7eb8c1 0%, #5f98a2 100%);
   color: #f5f6f0;
+}
+
+body.town-hub-page .districtModalBody .houseConsolePrimaryActions .btn:not(.primary),
+body.town-hub-page .districtModalBody .houseConsoleSecondaryNav .btn {
+  border-color: rgba(95, 119, 136, 0.22);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(246, 238, 226, 0.94));
+  color: var(--text-strong);
+  box-shadow: none;
+}
+
+body.town-hub-page .districtModalBody .houseConsolePrimaryActions .btn:first-child:not(.primary) {
+  background: linear-gradient(180deg, var(--color-accent-primary) 0%, var(--color-accent-primary-hover) 100%);
+  border-color: rgba(79, 143, 190, 0.32);
+  color: var(--color-accent-primary-ink);
 }
 
 body.town-hub-page .districtModalBody .btn.danger {
