@@ -1,0 +1,16 @@
+baseline_commit	a56503d
+status	design-doc-foundation-created
+current_phase	d0_and_d0.5_docs_only
+completed_items
+- created design workspace folder
+- documented canonical source mapping for future design prompts
+- documented current design system truth vs Brand kit reference split
+- documented route and screen hierarchy expectations
+- documented audience, globalization, Chinese, and future voice-readiness requirements
+- documented baseline audit and phased design plan
+- documented implementation roadmap for all current design findings
+- documented atomic design backlog covering every current audit finding
+- documented design TDD milestones and reserved visual test block
+- documented execution runbook for future agentic AI design work
+next_step
+- approve D0.5 or D1 from design/IMPLEMENTATION_ROADMAP.md and design/BACKLOG.md

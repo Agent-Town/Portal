@@ -1,0 +1,37 @@
+# Design Lessons
+
+## Current Lessons
+
+### 1. Production truth beats aspirational docs
+
+The live UI is governed by [public/styles.css](/Users/robin/.codex/worktrees/afe5/Portal/public/styles.css), not by the Brand kit.
+
+Any design pass that starts from the Brand kit without reconciling production first will create more drift.
+
+### 2. The shell is the product
+
+The town hub and modal-first navigation are not cosmetic choices. They protect worker continuity and give the product its identity.
+
+### 3. Debug is required, but it is not the hero
+
+The agent panel must remain present and observable. The design job is to make it subordinate, not invisible.
+
+### 4. Hierarchy beats decoration
+
+Most current UI problems come from equal emphasis, not lack of visual effects.
+
+### 5. Expressive typography must be used sparingly
+
+The western character of the product is valuable, but when the display face is also the body face, the result becomes busy and tiring.
+
+### 6. Mobile is the truth serum
+
+If a design feels crowded or ambiguous on mobile, it is usually structurally wrong, not merely in need of breakpoint tweaks.
+
+### 7. English-first is not the same as English-only
+
+If a hierarchy, button label, or layout only works in English, it is not ready for this product.
+
+### 8. Voice readiness starts with naming
+
+Future voice support is not only a speech-tech problem. It starts with short, plain-language control labels and clear step structure.
