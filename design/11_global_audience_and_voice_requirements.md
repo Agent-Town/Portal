@@ -52,7 +52,17 @@ The first viewport should avoid unexplained terms like:
 
 These may appear in advanced settings, debug areas, or clearly secondary surfaces.
 
-### 2.2 Game-like, not childish
+### 2.2 Conversation-first depth
+
+The product should assume the user can ask the built-in assistant to explain detail.
+
+Design implication:
+
+- the default interface should stay dead simple
+- deep operational detail should be available, but not forced into the main surface
+- when choosing between another dense UI block and assistant-guided explanation, prefer the assistant path unless the task requires immediate manual control
+
+### 2.3 Game-like, not childish
 
 The interface may use:
 
@@ -67,7 +77,7 @@ But it must still:
 - remain readable
 - keep operational truth clear
 
-### 2.3 Timeless over trendy
+### 2.4 Timeless over trendy
 
 Do not optimize for fleeting UI trends.
 

@@ -9,6 +9,7 @@ This document translates the current visual audit into a target state for future
 Agent Town already has a memorable world and a distinctive atmosphere. The design problem is structural: too many surfaces are styled as if they are equally important, so the user has to think harder than necessary to know where to look, what to do, and what matters now.
 
 The target product should feel more like an inviting game world and less like an insider console, while remaining timeless, operationally clear, and usable across languages and provider choices.
+The visible UI should show the minimum needed to act. Deeper operational detail should remain available through advanced views and assistant-guided explanation, not pushed into every first-view screen.
 
 ## Phase 1: Critical Structural Fixes
 
@@ -47,6 +48,7 @@ Target state:
 - A compact summary card with one primary action
 - Secondary sections grouped below with quieter styling
 - Section labels that read as structure, not decoration
+- Deep readiness and operations detail available after the overview, not ahead of it
 
 Why this matters:
 
@@ -66,6 +68,7 @@ Target state:
 - A quieter minimized state
 - Clearer expanded hierarchy
 - Consistent iconography and more restrained materials
+- The assistant remains the path to explanation; the dock should not require the user to read a wall of operational data
 
 Why this matters:
 
@@ -245,6 +248,7 @@ These decisions are already made for future agents:
 - Non-technical users should understand the main path without needing AI vocabulary
 - Chinese and international audiences must be first-class layout and typography targets
 - Future voice control should be anticipated in labels, structure, and state feedback
+- Default UI should be summary-first, while structured detail remains available for assistant-guided exploration and advanced views
 
 ## Explicit Rejections
 
@@ -255,6 +259,7 @@ Future agents should not do the following:
 - Add decorative animation that does not improve orientation
 - Introduce new panel or button variants casually
 - Add explanatory labels where hierarchy should solve the problem
+- Expose dense operational detail by default when it can live in an advanced view or be explained by the assistant
 
 ## Visual Definition Of Success
 

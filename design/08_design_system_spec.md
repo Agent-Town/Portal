@@ -15,8 +15,16 @@ The target design is:
 - cinematic at the map level
 - quiet and efficient at the task level
 - legible for non-technical users
+- dead simple in the default view, with detail preserved for assistant-guided exploration
 
 The system keeps the Agent Town world. It removes unnecessary visual noise.
+
+## 1.1 Information Architecture Rule
+
+- The primary UI should expose summary, next action, and confidence first
+- Dense runtime, provider, provenance, and operational detail should stay in structured advanced surfaces rather than the first viewport
+- The assistant should be able to help users reach deeper detail without the visible UI becoming a dashboard
+- Designers should prefer progressive disclosure over persistent clutter
 
 ## 2. Typography
 

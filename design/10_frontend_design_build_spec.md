@@ -22,6 +22,8 @@ Cross-cutting rules:
 - no essential text may be embedded in images
 - redesigned labels and controls must survive Chinese/CJK rendering and localization expansion
 - primary controls should use short speakable labels suitable for future voice workflows
+- default surfaces should show summary and next action first, while dense detail remains available through advanced or assistant-guided access
+- do not promote raw runtime, provider, or provenance detail into the first viewport unless the task requires immediate action on it
 
 ## 2. Phase A: Token And Component Base
 

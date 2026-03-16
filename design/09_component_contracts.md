@@ -103,6 +103,7 @@ Rules:
 - summary card contains the main page explanation and primary action
 - detailed status lists must not precede it visually
 - summary card copy must be understandable to non-technical users
+- summary card should let a user act without reading deep internal detail first
 
 ### Overlay modal
 
@@ -180,8 +181,28 @@ Rules:
 - advanced settings forms follow the same input system
 - browser/brain settings cannot use a separate ad hoc form visual language
 - provider/model-specific controls belong in advanced sections unless absolutely necessary in the primary flow
+- if the assistant can explain a dense setting on demand, the visible UI should keep that setting secondary by default
 
-## 6. Tabs
+## 6. Advanced Disclosure Block
+
+Purpose:
+
+- hold dense operational, provider, runtime, or provenance detail without crowding the primary interface
+
+Visual contract:
+
+- implemented with a standard `details` or equivalent secondary disclosure component
+- closed by default on first view unless the current task requires immediate action inside it
+- summary line uses `--type-body-sm` or `--type-control`
+- body uses the same card/input tokens as the rest of the product, not a debug-only mini-system
+
+Rules:
+
+- advanced disclosure must never precede the main summary or primary action
+- raw ids, dense lists, and verbose diagnostics belong here before they belong in the first viewport
+- disclosure labels must remain understandable without assuming technical knowledge
+
+## 7. Tabs
 
 Visual contract:
 
@@ -196,7 +217,7 @@ Rules:
 - tabs should read as navigation within a surface, not as primary CTAs
 - tab labels should remain short enough to survive localization
 
-## 7. Empty State
+## 8. Empty State
 
 Structure:
 
@@ -216,7 +237,7 @@ Rules:
 - no raw "No items yet" without structure
 - empty-state copy should use plain language, not internal AI terminology
 
-## 8. Agent Dock
+## 9. Agent Dock
 
 ### Minimized state
 
@@ -240,7 +261,7 @@ Rules:
 - dock must support the current screen, not compete with it
 - dock controls should be understandable and pronounceable for future voice use
 
-## 9. Town Map Hotspot Labels
+## 10. Town Map Hotspot Labels
 
 Visual contract:
 

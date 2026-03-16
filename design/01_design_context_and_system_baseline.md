@@ -21,6 +21,7 @@ The design goal is not "make it modern". The design goal is:
 - themed without becoming noisy
 - game-like without becoming childish
 - globally understandable without requiring AI literacy
+- summary-first for the user, depth-on-demand through the assistant
 
 The current app already has a strong personality. The problem is not lack of identity. The problem is that too many surfaces speak at the same volume.
 
@@ -46,6 +47,9 @@ The primary audience is not AI-native power users. The design must work for:
 - initial priority audiences:
   - broad international audience
   - Chinese audience
+
+These users should be able to rely on the built-in assistant to explain depth, history, and operational detail.
+The default visible UI should therefore not expand into a dense dashboard unless the task truly requires it.
 
 Future design work must also stay compatible with:
 
@@ -138,6 +142,13 @@ These are mandatory for future design work:
 - Tablet must feel expanded, not stretched
 - Desktop must feel authoritative, not merely larger
 
+### 5.6 Conversation reveals depth
+
+- The visible UI should prioritize summary, confidence, and next action
+- Dense operational detail should remain available in structured advanced views and stable machine-readable surfaces
+- If a user can reasonably learn something by asking the assistant, that is preferable to placing another dense information block in the first viewport
+- Default screens should not force users to parse provider, runtime, or system detail when the assistant can surface it on demand
+
 ### 5.7 Global-first wording and layout
 
 - Essential actions must be understandable without AI jargon
@@ -150,7 +161,7 @@ These are mandatory for future design work:
 - State feedback must be short enough to be understood when read aloud
 - No critical interaction may depend on hover-only disclosure
 
-### 5.6 No rogue values
+### 5.9 No rogue values
 
 - No new hardcoded spacing, radii, colors, shadows, or typography values outside shared tokens
 - No new inline `style=` for layout or visual treatment

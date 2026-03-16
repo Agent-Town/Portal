@@ -7,6 +7,7 @@ This document defines a test-driven design program for future agentic AI develop
 ## 1. Program Goal
 
 Deliver a premium, end-user-first visual system across Agent Town while preserving all existing behavior.
+Users should be able to act from a simple surface and learn depth through conversation with the assistant instead of scanning a crowded interface.
 
 ## 2. Design TDD Principles
 
@@ -15,6 +16,7 @@ Deliver a premium, end-user-first visual system across Agent Town while preservi
 - No design interpretation should be left implicit when writing implementation notes
 - Design changes must preserve functionality exactly
 - Design changes must improve clarity for non-technical users, not just visual taste
+- Default surfaces should reduce visible complexity while preserving dense detail in advanced or assistant-accessible views
 
 ## 3. Viewport Contract
 

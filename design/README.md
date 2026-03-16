@@ -15,6 +15,7 @@ Its purpose is to let future agentic AI developers improve the visual design of 
 - Empty, loading, and error states
 - Responsive behavior across mobile, tablet, and desktop
 - Accessibility as it relates to visual structure and interaction clarity
+- Information architecture for summary-first versus detail-first presentation
 
 ## Non-scope
 
@@ -25,6 +26,17 @@ Its purpose is to let future agentic AI developers improve the visual design of 
 - Backend changes
 
 If a design improvement requires a functionality change, the design agent must flag it and stop short of implementing that part.
+
+## Interaction Stance
+
+The product should assume the user has a capable assistant with them.
+
+That means:
+
+- default screens should show the minimum needed to act
+- dense operational detail should stay available through structured advanced views and machine-readable surfaces
+- users should be able to learn depth by asking the assistant, not by manually parsing cluttered panels
+- design agents should simplify the visible UI before removing access to underlying detail
 
 ## Read Order
 

@@ -51,6 +51,7 @@ Before styling changes:
 - decide which checks are screenshot review requirements
 - confirm the relevant token and component rules already exist in [design/08_design_system_spec.md](/Users/robin/.codex/worktrees/3e47/Portal/design/08_design_system_spec.md) and [design/09_component_contracts.md](/Users/robin/.codex/worktrees/3e47/Portal/design/09_component_contracts.md)
 - confirm the phase satisfies [design/11_global_audience_and_voice_requirements.md](/Users/robin/.codex/worktrees/3e47/Portal/design/11_global_audience_and_voice_requirements.md)
+- confirm the phase keeps visible UI summary-first while preserving deeper detail for advanced or assistant-guided access
 
 ### Step 3. Design in the smallest possible scope
 
@@ -124,6 +125,7 @@ Before marking a milestone complete, answer:
 - Does mobile feel designed, not tolerated?
 - Did any functionality change, even accidentally?
 - Could a basic non-technical user understand the first viewport without AI jargon?
+- Could the user learn the deeper detail by asking the assistant instead of reading another dense block?
 - Would the layout survive translated or Chinese copy?
 - Are the main controls short and clear enough for future voice interaction?
 

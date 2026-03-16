@@ -19,9 +19,10 @@ The design work should not be executed as one big redesign. It should be deliver
 1. establish the shared token and component base
 2. fix the highest-friction hierarchy problems
 3. unify the remaining major surfaces
-4. harden for international, Chinese, and non-technical comprehension
-5. polish motion, states, and accessibility
-6. prove coherence across the product
+4. keep default UI summary-first while preserving dense detail for assistant-guided exploration
+5. harden for international, Chinese, and non-technical comprehension
+6. polish motion, states, and accessibility
+7. prove coherence across the product
 
 This order matters because the current design problems are mostly architectural, not cosmetic.
 
@@ -66,6 +67,7 @@ Tasks:
 - define button hierarchy tokens
 - define summary-card and section-header component rules
 - define plain-language, non-jargon first-view rules
+- define summary-first versus advanced-detail exposure rules for assistant-guided product use
 
 Dependencies:
 
@@ -318,6 +320,7 @@ Tasks:
 - unify tabs, panels, and advanced settings treatment
 - remove ad hoc inline layout styling
 - improve hierarchy within trainer and brain panels
+- keep dense provider/runtime detail behind calmer secondary disclosure
 
 Dependencies:
 
@@ -328,6 +331,7 @@ Acceptance metrics:
 
 - advanced sections remain functional but feel part of the same product
 - no ad hoc inline layout styling remains in targeted advanced blocks
+- default views stay simpler even though the underlying detail remains available to the assistant and advanced users
 
 ### FD10. States And Motion Library
 

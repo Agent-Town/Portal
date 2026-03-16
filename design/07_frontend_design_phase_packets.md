@@ -13,6 +13,7 @@ Each packet defines:
 - exact focus
 - what not to change
 - measurable success checks
+- how to keep visible UI simple while preserving deeper detail for assistant-guided access
 
 ## P1. Token Foundation Packet
 
@@ -32,6 +33,7 @@ Focus:
 - surface tokens
 - button hierarchy tokens
 - section header / summary card rules
+- summary-first versus advanced-detail exposure rules
 
 Do not change:
 
@@ -290,6 +292,7 @@ Focus:
 - tabs
 - advanced settings details block
 - brain panel rhythm
+- summary-first default state with deeper detail still available through disclosure
 
 Do not change:
 
@@ -301,6 +304,7 @@ Success checks:
 
 - no ad hoc inline layout styling remains in targeted advanced blocks
 - advanced controls are calmer and clearer
+- dense technical detail is still available but no longer dominates the default view
 
 ## P11. States And Motion Packet
 

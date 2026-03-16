@@ -4,6 +4,11 @@ Status: Active reference
 
 This file gives future design agents a route-by-route map of the main product surfaces, the files that render them, and the most important selector clusters to inspect.
 
+Cross-cutting rule:
+
+- default screens should expose summary and next action first
+- dense record detail may remain in structured advanced surfaces so the assistant can guide users through it without turning the main UI into a dashboard
+
 ## 1. Start
 
 ### Files
