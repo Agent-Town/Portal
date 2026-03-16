@@ -12,6 +12,7 @@ Implement every finding from [DESIGN_AUDIT_BASELINE.md](/Users/robin/.codex/work
 - preserves the town-hub shell
 - preserves modal-first worker continuity
 - improves end-user comprehension first
+- keeps the human first layer dead simple while preserving rich detail for assistant interpretation and advanced review
 - keeps all work measurable and Playwright-verifiable
 - preserves low-technical-user clarity across international and Chinese use cases
 - keeps future voice interaction viable
@@ -25,6 +26,7 @@ There are five implementation tracks:
 3. hierarchy and responsive clarity
 4. cross-surface consistency
 5. polish and accessibility hardening
+6. no-drift verification discipline
 
 The tracks are not independent. Later tracks depend on earlier tracks being finished first.
 
@@ -42,6 +44,7 @@ Purpose:
 
 - establish one design source of truth
 - define token families and visual constraints before touching screens
+- establish the no-drift rule between docs, tests, captures, and shipped UI
 
 Main outputs:
 
@@ -49,6 +52,8 @@ Main outputs:
 - approved type hierarchy plan
 - approved panel/button/badge system
 - approved international, Chinese, and voice-ready design rules
+- approved LLM-first detail staging rules
+- approved design-precheck / no-drift workflow
 
 Do not start screen polish before this phase is approved.
 
@@ -70,6 +75,7 @@ Main findings covered:
 - CJK-safe typography direction
 - provider-neutral top-layer copy
 - future voice readiness
+- assistant-first detail staging rules for human simplicity
 
 ### Phase D1 — Town shell clarity
 
@@ -96,6 +102,7 @@ Purpose:
 
 - turn House into a guided human surface
 - make House Office understandable without platform fluency
+- ensure rich detail supports the assistant and advanced users without overwhelming the default human layer
 
 Main surfaces:
 
@@ -174,6 +181,7 @@ These pairs share too many visual assumptions.
 
 - design docs are the recognized source of truth
 - token plan is explicit
+- no-drift workflow is explicit
 - no implementation yet
 
 ### D0.5 gate
@@ -193,6 +201,7 @@ These pairs share too many visual assumptions.
 - House first viewport is clearly ordered by importance
 - House Office top layer is human-readable
 - technical detail is visually secondary
+- rich detail remains available but does not dominate the first visible human layer
 
 ### D3 gate
 
@@ -216,6 +225,9 @@ After every phase:
 4. update:
    - [progress.txt](/Users/robin/.codex/worktrees/afe5/Portal/design/progress.txt)
    - [LESSONS.md](/Users/robin/.codex/worktrees/afe5/Portal/design/LESSONS.md)
+5. check that docs, captures, tests, and shipped UI still describe the same surface
+
+If a future agent makes the UI “cleaner” by either deleting useful detail entirely or surfacing all of it in the first viewport, that work is out of bounds. The correct outcome is staged detail: simple first, deep second.
 
 ## 7. Practical Next Step
 

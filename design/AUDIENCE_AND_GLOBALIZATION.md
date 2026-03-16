@@ -21,6 +21,7 @@ They should still be able to:
 - understand what the app is asking them to do
 - feel that the product is helping them, not testing them
 - make progress through guided actions without studying platform jargon
+- ask the assistant about richer detail instead of manually unpacking dense screens
 
 ## 2. Product Character
 
@@ -91,7 +92,18 @@ Every screen should have:
 
 So a translated product can adapt meaning without overloading a single line.
 
-## 5. Provider And Service Neutrality
+## 5. LLM-Mediated Understanding
+
+The assistant is part of the product experience, not an optional extra.
+
+Design implication:
+
+- users should be able to learn about data by talking with the assistant instead of navigating cluttered detail-heavy screens
+- the default visual layer should stay simple enough for basic users to act confidently
+- richer operational, trust, or diagnostic detail may still exist, but it should live in advanced, secondary, or assistant-readable layers
+- detailed information should be grouped with stable labels and headings so the assistant can explain it accurately
+
+## 6. Provider And Service Neutrality
 
 The design must stay flexible across:
 
@@ -104,9 +116,9 @@ The design must stay flexible across:
 Design implication:
 
 - top-level user copy should talk about outcomes and tasks, not vendor names
-- provider-specific language belongs in advanced or debug layers, not the primary product shell
+- provider-specific language belongs in advanced, assistant-facing, or debug layers, not the primary product shell
 
-## 6. Voice Readiness
+## 7. Voice Readiness
 
 Voice control is future scope, but the design must be ready for it now.
 
@@ -125,7 +137,7 @@ The design must not assume:
 - reading dense text is acceptable on every step
 - users can easily distinguish complex parameter names by voice
 
-## 7. Timelessness Rules
+## 8. Timelessness Rules
 
 The product should feel distinct without being trapped in a short-lived trend.
 
@@ -143,20 +155,22 @@ Future work should avoid:
 - decorative motion that ages quickly
 - culture-specific metaphors that do not travel well
 
-## 8. End-User Experience Rules
+## 9. End-User Experience Rules
 
 For standard users:
 
 - the app should explain itself through layout before copy
 - every screen should answer “what do I do now?”
 - the user should not need to know what an LLM, runtime, or provider is
+- the user should not be forced to manually inspect dense operational detail to make basic progress
 
 For advanced users:
 
 - deeper detail can exist
 - but it must not define the first impression
+- and it should remain structured enough for the assistant to interpret accurately
 
-## 9. International Design Verification
+## 10. International Design Verification
 
 Future design phases must include checks for:
 
@@ -166,7 +180,7 @@ Future design phases must include checks for:
 - button and pill overflow behavior
 - layout stability when copy length changes
 
-## 10. Future Voice Verification
+## 11. Future Voice Verification
 
 Future design phases should preserve room for:
 
@@ -181,7 +195,7 @@ Without requiring:
 - a major shell redesign
 - a separate voice-only layout
 
-## 11. Current High-Risk Areas
+## 12. Current High-Risk Areas
 
 These current product patterns are risky for international/basic-user support:
 
@@ -190,5 +204,6 @@ These current product patterns are risky for international/basic-user support:
 - technical nouns too early in House Office
 - some surfaces with heavy uppercase styling
 - empty states that rely on product familiarity instead of explanation
+- operational detail that still appears too early in House and Office surfaces
 
 Future design work must reduce these risks, not normalize them.

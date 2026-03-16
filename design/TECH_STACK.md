@@ -19,6 +19,7 @@ That means:
 - full document navigation can tear it down
 - modal-first UX is not just preference, it protects continuity
 - design changes that encourage route-jumping can create runtime regressions even when they look cleaner on paper
+- because the assistant is already present, design should prefer thin human surfaces over dense manual control panels
 
 ## 3. Brand Kit Status
 
@@ -40,6 +41,7 @@ Implications:
 - future visual cleanup should prefer token consolidation over ad hoc selector overrides
 - a design agent must audit shared selectors before assuming a change is local
 - typography choices must also consider browser/system fallback behavior for Simplified Chinese and mixed-script content
+- rich detail should usually be staged through hierarchy and disclosure, not dumped into primary layout just because the page can technically hold it
 
 ## 5. Test Constraints
 
@@ -90,6 +92,7 @@ Good targets for future design-only work:
 - debug/product visual separation
 - localization-ready copy hierarchy
 - voice-ready control affordances
+- assistant-friendly detail disclosure and summary-first layout
 
 Risky areas requiring extra caution:
 

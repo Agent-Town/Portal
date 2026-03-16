@@ -4,6 +4,8 @@ Baseline commit: `a56503d`
 
 This file captures the current design audit so future agents do not have to rediscover the same problems from scratch.
 
+It should now be read with one extra rule in mind: the assistant is always with the user, so dense detail should generally be staged for assistant interpretation and advanced review, not dumped into the first human viewport.
+
 ## 1. Audit Inputs
 
 Current product sources reviewed:
@@ -31,6 +33,8 @@ Reference-only design artifacts reviewed:
 ## 2. Overall Assessment
 
 The product already has a recognizable world, but the visual system under it is fragmented. The app feels memorable and handmade, yet the hierarchy, typography discipline, responsive restraint, and component consistency are not calm enough for a premium experience.
+
+It also still exposes too much system-shaped detail in places where a standard user should instead see a short summary and rely on the assistant for deeper explanation.
 
 ## 3. Biggest Structural Problem
 
@@ -107,6 +111,7 @@ Needed state:
 - human summary first
 - technical evidence second
 - “what happened / what matters / what next” at the top
+- rich detail kept available below or behind that summary for assistant interpretation and advanced review
 
 Why it matters:
 
@@ -249,7 +254,8 @@ Do not start with cosmetic polish.
 The correct order is:
 
 1. establish one authoritative design system
-2. fix hierarchy on the hub and house surfaces
-3. reduce debug/product competition
-4. unify surface language
-5. add polish only after the structure is coherent
+2. stage detail so humans see only the minimum needed to act
+3. fix hierarchy on the hub and house surfaces
+4. reduce debug/product competition
+5. unify surface language
+6. add polish only after the structure is coherent

@@ -26,6 +26,7 @@ It should not feel:
 - cluttered
 - gamer-chaotic
 - dashboard-heavy
+- like a manual operations dashboard for basic tasks
 - toy-like
 - corporate-generic
 - visually noisy
@@ -63,6 +64,12 @@ The audience contract is defined further in [AUDIENCE_AND_GLOBALIZATION.md](/Use
 - New visual decisions must be testable.
 - Avoid visual solutions that depend on hidden timing, imprecise animation, or manual interpretation only.
 
+### 3.5.1 No-drift design contract
+
+- One design contract should govern docs, tests, screenshots, and shipped UI.
+- Future agents must not invent parallel “intended” styles that differ from what the app actually renders.
+- If the documented design contract and the shipped surface diverge, the design phase is incomplete.
+
 ### 3.6 Standard-user-first communication
 
 - Top-layer UI must speak in tasks and outcomes, not AI platform internals.
@@ -78,6 +85,19 @@ The audience contract is defined further in [AUDIENCE_AND_GLOBALIZATION.md](/Use
 
 - Controls should be clearly named and easily referable in speech.
 - The layout should support future listening, speaking, and confirmation states without being rebuilt.
+
+### 3.9 LLM-first detail, human-first simplicity
+
+- Assume the assistant is always available to help the user understand detail.
+- Keep the top layer sparse, task-first, and calm enough for a basic user to act without studying the screen.
+- Preserve rich detail in structured secondary or advanced layers instead of deleting it.
+- Dense metadata, raw identifiers, provider details, and operational evidence should be easy for the assistant to reference, but they must not become the main human surface.
+
+### 3.10 Small-surface design loops
+
+- Prefer small, proveable surface slices over giant redesign passes.
+- Solve one screen family or hierarchy problem at a time.
+- A phase should close only when the design contract, visual tests, and captured surface state all agree.
 
 ## 4. Source Of Truth
 
@@ -279,6 +299,15 @@ Rules:
 - no accidental “broken blank page” feeling
 - the text structure must survive translation and voice readout cleanly
 
+### 6.7 Advanced detail layers
+
+Rules:
+
+- detailed evidence can exist, but it must sit below or behind the primary human story
+- advanced sections should use stable headings and grouping so the assistant can reference them reliably
+- do not make users scan logs, ids, provider names, or operational metadata before they understand the task
+- do not solve clutter by deleting useful detail if it can be staged instead
+
 ## 7. Screen Hierarchy Rules
 
 Every major surface should answer these in order:
@@ -289,6 +318,8 @@ Every major surface should answer these in order:
 4. What can I ignore safely?
 
 If the user has to read technical nouns before learning what matters, the screen hierarchy is wrong.
+
+If a screen expects a human to manually parse dense evidence that the assistant could interpret instead, the hierarchy is also wrong.
 
 If the hierarchy only works in English or only works for typed interaction, it is also wrong.
 

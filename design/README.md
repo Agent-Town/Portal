@@ -4,6 +4,21 @@ This folder is the design equivalent of the repo's product and TDD spec layer.
 
 Its purpose is to let future agentic AI designers work against a documented visual contract instead of inventing style changes from scratch.
 
+The core framing for this workspace is:
+
+- human-first simplicity
+- LLM-first access to rich detail
+- one design source of truth with no drift
+
+That means the shipped UI should stay dead simple for people, while dense operational or explanatory detail can still exist in structured secondary layers that the assistant and advanced users can access.
+
+It also means future design work should follow a strict design-precheck model:
+
+- define the design contract once
+- test and capture it
+- implement from that contract
+- fail the phase if docs, tests, screenshots, and shipped UI drift apart
+
 ## Baseline
 
 - Repo baseline commit: `a56503d`
@@ -45,6 +60,8 @@ Future design work must start here so product, implementation, and design do not
   Test-driven design milestones, measurable gates, and reserved visual-regression work.
 - [AGENT_RUNBOOK.md](/Users/robin/.codex/worktrees/afe5/Portal/design/AGENT_RUNBOOK.md)
   Step-by-step execution guide for future agentic AI design work.
+- [tla/README.md](/Users/robin/.codex/worktrees/afe5/Portal/design/tla/README.md)
+  Formal design-logic models for summary-first disclosure, modal continuity, and no-drift UI-state invariants.
 - [progress.txt](/Users/robin/.codex/worktrees/afe5/Portal/design/progress.txt)
   Lightweight status log for completed design phases.
 - [LESSONS.md](/Users/robin/.codex/worktrees/afe5/Portal/design/LESSONS.md)
@@ -60,6 +77,7 @@ These files replace the missing standalone design artifacts that a future design
 - `AUDIENCE / GLOBALIZATION / VOICE requirements` -> [AUDIENCE_AND_GLOBALIZATION.md](/Users/robin/.codex/worktrees/afe5/Portal/design/AUDIENCE_AND_GLOBALIZATION.md)
 - `PRD(.md)` -> [PRD.md](/Users/robin/.codex/worktrees/afe5/Portal/design/PRD.md)
 - `TECH_STACK(.md)` -> [TECH_STACK.md](/Users/robin/.codex/worktrees/afe5/Portal/design/TECH_STACK.md)
+- `formal design logic` -> [tla/README.md](/Users/robin/.codex/worktrees/afe5/Portal/design/tla/README.md)
 - `progress(.txt)` -> [progress.txt](/Users/robin/.codex/worktrees/afe5/Portal/design/progress.txt)
 - `LESSONS(.md)` -> [LESSONS.md](/Users/robin/.codex/worktrees/afe5/Portal/design/LESSONS.md)
 
@@ -69,9 +87,11 @@ These files replace the missing standalone design artifacts that a future design
 2. Treat [public/styles.css](/Users/robin/.codex/worktrees/afe5/Portal/public/styles.css) as shipped truth until the design system is migrated.
 3. Preserve the town-hub shell, modal-first navigation, wallet-first identity, and worker continuity rules from [AGENTS.md](/Users/robin/.codex/worktrees/afe5/Portal/AGENTS.md).
 4. Treat [AUDIENCE_AND_GLOBALIZATION.md](/Users/robin/.codex/worktrees/afe5/Portal/design/AUDIENCE_AND_GLOBALIZATION.md) as a hard product requirement, not optional polish.
-5. Add measurable Playwright coverage before changing visuals that affect hierarchy, responsive layout, language flexibility, or information density.
-6. Work from [IMPLEMENTATION_ROADMAP.md](/Users/robin/.codex/worktrees/afe5/Portal/design/IMPLEMENTATION_ROADMAP.md) and [BACKLOG.md](/Users/robin/.codex/worktrees/afe5/Portal/design/BACKLOG.md) instead of improvising priorities.
-7. Update [progress.txt](/Users/robin/.codex/worktrees/afe5/Portal/design/progress.txt) and [LESSONS.md](/Users/robin/.codex/worktrees/afe5/Portal/design/LESSONS.md) after each approved phase.
+5. Assume the assistant stays with the user. Preserve rich structured detail for assistant interpretation and advanced views, but never let that detail dominate the first glance.
+6. Add measurable Playwright coverage before changing visuals that affect hierarchy, responsive layout, language flexibility, or information density.
+7. Treat design drift as a failure condition. If docs, visual tests, screenshots, and shipped CSS disagree, the phase is not done.
+8. Work from [IMPLEMENTATION_ROADMAP.md](/Users/robin/.codex/worktrees/afe5/Portal/design/IMPLEMENTATION_ROADMAP.md) and [BACKLOG.md](/Users/robin/.codex/worktrees/afe5/Portal/design/BACKLOG.md) instead of improvising priorities.
+9. Update [progress.txt](/Users/robin/.codex/worktrees/afe5/Portal/design/progress.txt) and [LESSONS.md](/Users/robin/.codex/worktrees/afe5/Portal/design/LESSONS.md) after each approved phase.
 
 ## Design Verification Philosophy
 
@@ -81,6 +101,7 @@ Design is not treated as subjective polish here. Future design work should be ve
 - DOM-level assertions for clutter, hierarchy, and touch targets
 - computed-style assertions for token usage
 - accessibility checks for contrast, focus, and readable copy hierarchy
+- information-density checks on first-visible human layers
 - existing product invariants such as [research/portal/loss.md](/Users/robin/.codex/worktrees/afe5/Portal/research/portal/loss.md)
 
 ## Important Caveat

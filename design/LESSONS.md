@@ -51,3 +51,19 @@ Status text works best as subordinate reassurance. When support text is styled l
 ### 12. Debug availability does not require visual dominance
 
 The agent dock can stay one click away while using quieter materials, smaller type, and fewer visible controls at rest. People only need the tool when they decide to reach for it.
+
+### 13. The assistant should carry detail, not the first viewport
+
+If the assistant is already with the user, the UI does not need to expose every valuable detail by default. Summary-first design plus structured advanced layers is better than either a dense dashboard or a stripped-down UI that hides useful evidence completely.
+
+### 14. Simplicity is not deletion
+
+The right fix for rich operational data is usually staging, grouping, and disclosure. Deleting detail breaks trust. Showing everything breaks usability.
+
+### 15. Design drift is a product bug
+
+If the design docs, screenshots, tests, and shipped UI disagree, the team starts designing against fiction. The right habit is a small design loop with one source of truth and visible proof at each step.
+
+### 16. Formal methods are for interaction logic, not taste
+
+TLA+ is useful for proving state and disclosure rules like summary-before-detail or modal continuity. It is not a substitute for screenshot review, spacing judgment, or typography quality.

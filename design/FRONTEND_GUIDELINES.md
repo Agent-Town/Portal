@@ -86,6 +86,27 @@ When a surface contains advanced information:
 - show human-facing summary first
 - show detailed or technical information second
 - keep raw identifiers and dense metadata behind lower-priority visual layers
+- keep detailed evidence grouped clearly enough that the assistant can reference it without forcing the human to read all of it
+
+### 4.4 LLM-assisted detail model
+
+- Assume the assistant is present and can help the user interpret data.
+- The first visible block on a screen should answer task, status, and next step without requiring the user to inspect internals.
+- Rich detail should remain available in structured secondary or advanced layers for:
+  - assistant interpretation
+  - advanced human review
+  - trust and audit needs
+- Do not turn the default UI into a dense dashboard just because the data is valuable.
+
+### 4.5 No-drift implementation rule
+
+- Do not let design docs say one thing while shipped selectors render another.
+- When a design phase changes hierarchy, spacing, or copy layers, update:
+  - shipped CSS/markup
+  - the relevant design docs
+  - the corresponding visual tests
+  - screenshot captures when the runbook requires them
+- If any of those disagree, treat it as unfinished work, not an acceptable gap.
 
 ## 5. Responsive Rules
 
@@ -122,6 +143,7 @@ For user-facing layers:
 - action-oriented
 - non-technical
 - no unexplained internal nouns at the top of a screen
+- do not require a user to manually parse dense operational detail when the same detail can live in an advanced or assistant-readable layer
 
 For debug layers:
 

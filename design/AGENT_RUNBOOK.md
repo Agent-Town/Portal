@@ -17,12 +17,20 @@ Read, in order:
 9. [design/IMPLEMENTATION_ROADMAP.md](/Users/robin/.codex/worktrees/afe5/Portal/design/IMPLEMENTATION_ROADMAP.md)
 10. [design/BACKLOG.md](/Users/robin/.codex/worktrees/afe5/Portal/design/BACKLOG.md)
 11. [design/TDD_SPEC.md](/Users/robin/.codex/worktrees/afe5/Portal/design/TDD_SPEC.md)
+12. [design/tla/README.md](/Users/robin/.codex/worktrees/afe5/Portal/design/tla/README.md)
 
 Then confirm the current product rules in:
 
 - [AGENTS.md](/Users/robin/.codex/worktrees/afe5/Portal/AGENTS.md)
 - [README.md](/Users/robin/.codex/worktrees/afe5/Portal/README.md)
 - [research/portal/loss.md](/Users/robin/.codex/worktrees/afe5/Portal/research/portal/loss.md)
+
+Assume throughout this runbook that:
+
+- the assistant stays with the user
+- humans should see the fewest possible details needed to act
+- richer detail should be staged for assistant interpretation and advanced review, not surfaced by default
+- docs, tests, captures, and shipped UI must not drift apart
 
 ## 2. Design Workflow
 
@@ -36,6 +44,16 @@ Add or extend the required design tests from [TDD_SPEC.md](/Users/robin/.codex/w
 
 Pick the exact ticket(s) from [BACKLOG.md](/Users/robin/.codex/worktrees/afe5/Portal/design/BACKLOG.md) that belong to that milestone before editing code.
 
+Treat this as a design-precheck loop:
+
+1. define or extend the contract
+2. make the design test fail
+3. implement the smallest fix
+4. capture the resulting surface
+5. update docs so nothing drifts
+
+If the milestone changes disclosure, hierarchy ordering, or modal-shell logic, also update the related TLA+ model in [design/tla](/Users/robin/.codex/worktrees/afe5/Portal/design/tla).
+
 ### Step 3 - Capture the current state
 
 At minimum, inspect the affected route at:
@@ -48,6 +66,11 @@ If the phase affects top-layer copy or layout, also inspect with:
 
 - longer translated fixture strings
 - mixed Latin plus Simplified Chinese fixture strings
+
+If the phase affects House, Office, Registry, or other detail-heavy surfaces, also inspect:
+
+- whether the first visible human layer can be understood without scanning dense metadata
+- whether detailed evidence still exists in grouped secondary or advanced layers
 
 Required route families:
 
@@ -64,6 +87,7 @@ Prefer:
 - token cleanup
 - selector simplification
 - layout hierarchy improvement
+- staging detail behind clear summary and lower-priority advanced layers
 
 Avoid:
 
@@ -96,6 +120,13 @@ If tokens or system rules changed, also update:
 
 - [design/DESIGN_SYSTEM.md](/Users/robin/.codex/worktrees/afe5/Portal/design/DESIGN_SYSTEM.md)
 
+Then explicitly verify:
+
+- current screenshots still match the intended hierarchy
+- the changed surface still matches the written design contract
+- no design drift was introduced by leaving docs or tests behind
+- the related TLA+ model still matches the interaction and disclosure rules if the milestone touched design logic
+
 ## 3. Review Questions
 
 Before finishing a design pass, answer:
@@ -108,6 +139,7 @@ Before finishing a design pass, answer:
 6. Would a low-technical user still understand this without AI vocabulary?
 7. Would this still work with translated or Chinese text?
 8. Would the main action still be understandable if spoken aloud?
+9. Can the user rely on the assistant for deeper detail instead of manually parsing a dense screen?
 
 If any answer is no, keep refining before closing the milestone.
 
@@ -130,6 +162,7 @@ Do not:
 - add more buttons to solve hierarchy
 - add more color to solve hierarchy
 - add more labels when spacing and emphasis are the real problem
+- surface logs, ids, provider names, or dense operational evidence in the top layer when a summary-first layout would work
 - bury the worker/debug panel if product rules require it
 - quietly introduce new identity or navigation concepts
 

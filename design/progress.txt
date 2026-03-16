@@ -1,4 +1,4 @@
-baseline_commit	a56503d
+baseline_commit	84831e4
 status	d1_town_shell_clarity_completed
 current_phase	d2_house_and_house_office_clarity_next
 completed_items
@@ -18,5 +18,8 @@ completed_items
 - demoted the town-shell debug panel into a quieter secondary dock at rest
 - captured before/after desktop and mobile screenshots for the D1 dock-demotion milestone
 - added design coverage for source-of-truth, primary-action hierarchy, mobile clutter, mixed-script layout, and provider-neutral copy
+- tightened the design docs so future work treats the assistant as the primary interpreter of rich detail while the human UI stays dead simple
+- added a no-drift design-precheck principle so future design work must keep docs, tests, captures, and shipped UI aligned
+- added a formal design-logic layer in design/tla for town shell, House flow, and House Office disclosure invariants
 next_step
 - start D2 House and House Office clarity, beginning with first-viewport narrative and section regrouping

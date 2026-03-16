@@ -4,6 +4,10 @@ This spec turns design work into measurable milestones for future agentic AI con
 
 The goal is not visual novelty. The goal is a more inevitable, legible, premium Portal without changing product behavior.
 
+For formalized UI-state logic that complements these visual checks, see:
+
+- [design/tla/README.md](/Users/robin/.codex/worktrees/afe5/Portal/design/tla/README.md)
+
 For the execution order and atomic work items behind these milestones, see:
 
 - [IMPLEMENTATION_ROADMAP.md](/Users/robin/.codex/worktrees/afe5/Portal/design/IMPLEMENTATION_ROADMAP.md)
@@ -22,6 +26,7 @@ In scope:
 - empty/loading/error states
 - motion discipline
 - accessibility
+- detail staging and information-density control
 
 Out of scope:
 
@@ -35,6 +40,8 @@ Out of scope:
 
 Each design milestone must be verified through measurable evidence, not taste alone.
 
+For logic-heavy hierarchy and disclosure changes, future agents should keep the related TLA+ model aligned with the milestone contract.
+
 Approved metric types:
 
 - visible control counts
@@ -45,6 +52,9 @@ Approved metric types:
 - multilingual string-fit checks
 - mixed-script rendering checks
 - voice-label clarity checks
+- first-viewport information-density checks
+- advanced-detail disclosure checks
+- design-contract drift checks
 - existing portal loss invariants
 
 ## 3. Global Design Gates
@@ -58,6 +68,8 @@ These gates apply to every milestone:
 5. product surface remains more visually prominent than instrumentation
 6. top-layer copy remains understandable for low-technical users
 7. translated or Chinese fixture text does not break primary layout on audited routes
+8. rich detail remains available without turning the first visible human layer into a dense dashboard
+9. design docs, visual tests, and captured surface state do not contradict the shipped UI
 
 ## 4. Reserved Design Test Block
 
@@ -79,6 +91,7 @@ Reserve the next visual/design-focused block for future implementation:
 - `e2e/277_globalized_copy_and_mixed_script_layout.spec.js`
 - `e2e/278_voice_ready_control_naming.spec.js`
 - `e2e/279_provider_neutral_primary_copy.spec.js`
+- `e2e/280_llm_first_detail_disclosure_contract.spec.js`
 
 ## 5. Milestones
 
@@ -98,6 +111,7 @@ Acceptance metrics:
 - every file named in the design prompt has a local equivalent
 - [public/styles.css](/Users/robin/.codex/worktrees/afe5/Portal/public/styles.css) is explicitly identified as shipped truth
 - Brand kit is documented as reference-only, not production truth
+- the no-drift execution rule is documented for future phases
 
 ### D1 - Town hub hierarchy
 
@@ -143,12 +157,14 @@ Goal:
 Required tests:
 
 - `268`
+- `280`
 
 Acceptance metrics:
 
 - top-of-surface summary uses plain-language headings and next-step cues
 - raw session/runtime/config identifiers are not in the top summary layer
 - a non-technical user can identify status, significance, and next action from the first visible block
+- advanced or assistant-readable detail remains available in lower-priority grouped sections instead of being deleted or promoted into the first summary
 
 ### D4 - Debug panel priority separation
 
@@ -252,6 +268,8 @@ Future visual tests should include, where appropriate:
 - active/inactive class or attribute assertions for primary action emphasis
 - translated fixture-string overflow checks
 - mixed-script rendering checks for action labels and summaries
+- first-viewport density counts for surfaces that expose operational detail
+- assertions that the documented design contract and the shipped surface structure still align
 
 ## 7. Regression Commands
 

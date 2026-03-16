@@ -8,6 +8,8 @@ It translates the live product contract into requirements that visual work must 
 
 Portal is a minimal Agent Town shell where a human can work with an agent, move through a town-like world, and manage a house-centered experience without being forced to understand platform internals first.
 
+The assistant should help interpret richer data so the human UI does not turn into a dense control panel.
+
 It must remain approachable for low-technical users and flexible enough for international, Chinese, and future voice-first use cases.
 
 ## 2. Primary Product Requirements
@@ -56,6 +58,18 @@ It must remain approachable for low-technical users and flexible enough for inte
 - The design must remain compatible with future voice control and future voice providers.
 - Primary task flows should be understandable through clear action naming and stable focus order, not typing-only assumptions.
 
+### 2.9 LLM-assisted detail model
+
+- The assistant is assumed to stay with the user through the product journey.
+- The top layer should expose task, status, and next step, not the full operational data model.
+- Rich detail must remain available for assistant interpretation, trust, and advanced review, but it must not dominate the first impression.
+
+### 2.10 No-drift design execution
+
+- Design intent, design tests, screenshot baselines, and shipped UI must stay aligned.
+- The product should not rely on “aspirational” design docs that drift away from the rendered app.
+- Future design work should proceed in small verified loops, not broad unverified restyling passes.
+
 ## 3. Primary User
 
 The primary user is not highly technical.
@@ -74,6 +88,7 @@ They want:
 - to know what to do next
 - to get help from an agent
 - to feel in control
+- to ask the agent about details instead of manually parsing dense dashboards
 
 Secondary design audiences:
 
@@ -89,6 +104,7 @@ Visual work must not move the product toward:
 - gamified engagement hacks
 - dashboard clutter
 - “AI control panel” complexity
+- dense human dashboards that front-load operational detail
 - new identity providers
 - framework churn for its own sake
 
@@ -106,6 +122,7 @@ The visual system succeeds when:
 - the active next step is obvious
 - the product feels quiet and intentional
 - technical complexity is staged instead of dumped
+- rich detail is still available without dominating the human layer
 - debug tools remain available without visually dominating
 - the product remains understandable across different language lengths and scripts
 - the product feels like a guided place, not a tool dashboard
@@ -118,6 +135,7 @@ The design is failing when:
 - the debug sidebar feels like a second app
 - typography is expressive everywhere instead of strategic
 - technical nouns are more prominent than human tasks
+- the user must manually scan dense operational detail to answer simple questions
 - mobile feels cramped or crowded
 - empty states read as unfinished
 - the shell assumes English-only copy length or western-only reading patterns
@@ -139,10 +157,11 @@ Priority order for future work:
 
 1. source-of-truth alignment
 2. low-technical-user clarity
-3. international and Chinese readiness
-4. visual hierarchy
-5. responsive sanity
-6. typography discipline
-7. component consistency
-8. empty/loading/error-state quality
-9. motion and micro-polish
+3. LLM-assisted human simplicity
+4. international and Chinese readiness
+5. visual hierarchy
+6. responsive sanity
+7. typography discipline
+8. component consistency
+9. empty/loading/error-state quality
+10. motion and micro-polish

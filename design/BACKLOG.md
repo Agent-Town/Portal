@@ -96,6 +96,91 @@ Test mapping:
 
 - `e2e/264_design_source_of_truth_contract.spec.js`
 
+### DG-004 — LLM-first detail and human-simplicity contract
+
+Status: `implemented`
+
+Problem:
+
+- earlier design docs stated that technical detail should be secondary, but they did not clearly define the assistant as the primary interpreter of rich detail
+
+Implementation target:
+
+- make it explicit across the design system that:
+  - the assistant stays with the user
+  - the human first layer should stay dead simple
+  - rich detail belongs in structured secondary, advanced, or assistant-readable layers
+
+Primary files:
+
+- [design/README.md](/Users/robin/.codex/worktrees/afe5/Portal/design/README.md)
+- [design/DESIGN_SYSTEM.md](/Users/robin/.codex/worktrees/afe5/Portal/design/DESIGN_SYSTEM.md)
+- [design/PRD.md](/Users/robin/.codex/worktrees/afe5/Portal/design/PRD.md)
+- [design/TDD_SPEC.md](/Users/robin/.codex/worktrees/afe5/Portal/design/TDD_SPEC.md)
+
+Acceptance metric:
+
+- the design docs explicitly require summary-first human layers and assistant-friendly structured detail layers
+
+Test mapping:
+
+- `e2e/264_design_source_of_truth_contract.spec.js`
+
+### DG-005 — No-drift design-precheck contract
+
+Status: `planned`
+
+Problem:
+
+- future design work can still drift if docs, tests, screenshots, and shipped CSS are updated unevenly
+
+Implementation target:
+
+- make the no-drift design-precheck workflow explicit and enforceable across the design workspace
+
+Primary files:
+
+- [design/README.md](/Users/robin/.codex/worktrees/afe5/Portal/design/README.md)
+- [design/TDD_SPEC.md](/Users/robin/.codex/worktrees/afe5/Portal/design/TDD_SPEC.md)
+- [design/AGENT_RUNBOOK.md](/Users/robin/.codex/worktrees/afe5/Portal/design/AGENT_RUNBOOK.md)
+- [design/IMPLEMENTATION_ROADMAP.md](/Users/robin/.codex/worktrees/afe5/Portal/design/IMPLEMENTATION_ROADMAP.md)
+
+Acceptance metric:
+
+- the design docs explicitly require future phases to keep design contract, tests, captures, and shipped UI aligned
+
+Test mapping:
+
+- `e2e/264_design_source_of_truth_contract.spec.js`
+
+### DG-006 — Formal design-logic model layer
+
+Status: `implemented`
+
+Problem:
+
+- the design workspace described logic-heavy disclosure and hierarchy rules, but there was no formal model layer for those invariants
+
+Implementation target:
+
+- add a dedicated TLA+ workspace for town shell continuity, House first-viewport logic, and House Office disclosure rules
+
+Primary files:
+
+- [design/tla/README.md](/Users/robin/.codex/worktrees/afe5/Portal/design/tla/README.md)
+- [design/tla/INVARIANTS.md](/Users/robin/.codex/worktrees/afe5/Portal/design/tla/INVARIANTS.md)
+- [design/tla/TownShell.tla](/Users/robin/.codex/worktrees/afe5/Portal/design/tla/TownShell.tla)
+- [design/tla/HouseFlow.tla](/Users/robin/.codex/worktrees/afe5/Portal/design/tla/HouseFlow.tla)
+- [design/tla/HouseOfficeDisclosure.tla](/Users/robin/.codex/worktrees/afe5/Portal/design/tla/HouseOfficeDisclosure.tla)
+
+Acceptance metric:
+
+- the design workspace now has bounded formal models for the main UI-state logic rules behind D1 and D2
+
+Test mapping:
+
+- future TLC/local formal checks
+
 ## D0.5 — Audience And Globalization Readiness
 
 ### DG-051 — Plain-language top-layer copy contract
@@ -202,6 +287,35 @@ Acceptance metrics:
 Test mapping:
 
 - `e2e/278_voice_ready_control_naming.spec.js`
+
+### DG-055 — Summary-first, assistant-ready detail staging
+
+Status: `planned`
+
+Problem:
+
+- several surfaces still risk exposing too much rich detail to humans by default even though that detail is better interpreted through the assistant or advanced views
+
+Implementation target:
+
+- stage dense detail behind clear human summaries and lower-priority advanced layers across the main product surfaces
+
+Primary files:
+
+- [public/views/house.html](/Users/robin/.codex/worktrees/afe5/Portal/public/views/house.html)
+- [public/registry.html](/Users/robin/.codex/worktrees/afe5/Portal/public/registry.html)
+- [public/app.js](/Users/robin/.codex/worktrees/afe5/Portal/public/app.js)
+- [public/styles.css](/Users/robin/.codex/worktrees/afe5/Portal/public/styles.css)
+
+Acceptance metrics:
+
+- first visible human layers stay summary-first
+- grouped advanced detail remains available
+- a low-technical user can act without scanning dense metadata
+
+Test mapping:
+
+- `e2e/280_llm_first_detail_disclosure_contract.spec.js`
 
 ## D1 — Town Shell Clarity
 
@@ -423,10 +537,12 @@ Acceptance metrics:
 
 - raw session/config/runtime identifiers do not dominate the first visible summary
 - helper state is understandable in plain language
+- richer Office detail remains available below the summary for advanced review and assistant interpretation
 
 Test mapping:
 
 - `e2e/268_house_office_plain_language_shell.spec.js`
+- `e2e/280_llm_first_detail_disclosure_contract.spec.js`
 
 ### DG-205 — House helper emphasis cleanup
 

@@ -74,6 +74,7 @@ Design requirement:
 - hotspots and labels must feel integrated, not pasted on
 - the shell must remain compatible with long-lived worker continuity
 - district labels and action language must stay short, translation-safe, and voice-friendly
+- the user should not need to inspect dense platform detail to choose the next district; the assistant can explain deeper context if needed
 
 ## 2. District And Experience Surfaces
 
@@ -100,6 +101,7 @@ Design requirement:
 - continuity and recovery read clearly
 - advanced areas are progressively disclosed
 - copy must explain the user job without assuming knowledge of agents or wallets beyond what is necessary
+- deeper house detail may exist for advanced review and assistant interpretation, but the first layer must stay simple
 
 ### 2.2 House Console
 
@@ -118,6 +120,7 @@ Design requirement:
 - human summary first
 - technical evidence second
 - translated and spoken versions of the summary should still preserve the same task order
+- the first visible layer should be short enough that the user can ask the assistant for more instead of scanning operational detail
 
 ### 2.3 House Office
 
@@ -138,6 +141,7 @@ Design requirement:
 - helper state should be explained in plain language
 - debug and runtime terms should be secondary
 - actions should remain understandable even when read aloud or translated
+- presence, briefing, and helper detail should support assistant interpretation without turning the human layer into a dense dashboard
 
 ### 2.4 Atlas / Registry / Poker
 
@@ -204,6 +208,7 @@ Design requirement:
 - summary before proof
 - proof before raw internals
 - trust language must be simple enough for non-technical and translated use
+- rich trust detail can remain available for advanced review and assistant explanation, but it must not lead the page
 
 ### 3.3 `/poker`
 
