@@ -12740,8 +12740,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const applyMinimized = (minimized) => {
       dock.classList.toggle('minimized', minimized);
-      btn.textContent = minimized ? '□' : '_';
+      btn.textContent = minimized ? 'Open' : 'Hide';
       btn.title = minimized ? 'Expand panel' : 'Minimize panel';
+      btn.setAttribute('aria-label', minimized ? 'Expand agent panel' : 'Minimize agent panel');
       saveAgentPanelMinimized(minimized);
       syncAgentPanelLayout(dock);
     };

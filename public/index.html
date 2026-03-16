@@ -51,20 +51,20 @@
         </header>
         <div class="districtModalBody trainerModalBody">
           <section class="panel trainerPanel" data-testid="trainer-root">
-            <h2 style="margin-top:0;">Quest: Portal Onboarding</h2>
+            <h2 class="trainerQuestTitle">Quest: Portal Onboarding</h2>
             <p class="muted" id="trainerStatusLine">Trainer ready.</p>
-            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px;">
+            <div class="trainerActionRow">
               <button class="btn small" id="trainerRunOnceBtn" type="button">Run 1</button>
               <button class="btn small" id="trainerRun3Btn" type="button">Run 3</button>
               <button class="btn small" id="trainerRun10Btn" type="button">Run 10</button>
               <button class="btn small" id="trainerClearAttemptsBtn" type="button" data-testid="trainer-clear-all">Clear local cache</button>
-              <label class="small" for="trainerCoachingMode">Coaching</label>
-              <select id="trainerCoachingMode" class="input" style="max-width:120px;">
+              <label class="small trainerInlineLabel" for="trainerCoachingMode">Coaching</label>
+              <select id="trainerCoachingMode" class="input trainerCompactInput">
                 <option value="approve">Off</option>
                 <option value="reject">Reject tools</option>
                 <option value="manual">Manual</option>
               </select>
-              <label class="small" style="display:flex; align-items:center; gap:6px;">
+              <label class="small trainerToggleLabel">
                 <input id="trainerAdvancedToggle" type="checkbox" />
                 Advanced
               </label>
@@ -72,7 +72,7 @@
 
             <div class="stack trainerStack">
               <div class="panel">
-                <h3 style="margin-top:0;">Attempts</h3>
+                <h3 class="trainerSectionTitle trainerSectionTitleTop">Attempts</h3>
                 <div id="trainerAttempts" data-testid="trainer-attempts"></div>
               </div>
               <div class="panel">
@@ -81,13 +81,13 @@
                   <button class="btn small trainerTab" id="trainerTabToolsBtn" type="button" data-trainer-tab="tools" data-testid="trainer-tab-tools" role="tab" aria-selected="false">Tool Lab</button>
                 </div>
                 <div id="trainerTabPanelTrace" data-trainer-panel="trace" role="tabpanel" aria-labelledby="trainerTabTraceBtn">
-                  <h3 style="margin-top:8px;">Timeline</h3>
+                  <h3 class="trainerSectionTitle trainerSectionTitleInset">Timeline</h3>
                   <div id="trainerTimeline" data-testid="trainer-timeline"></div>
                   <h3>Inspector</h3>
                   <pre id="trainerInspector" data-testid="trainer-inspector"></pre>
                 </div>
                 <div id="trainerTabPanelTools" data-trainer-panel="tools" class="is-hidden" role="tabpanel" aria-labelledby="trainerTabToolsBtn">
-                  <h3 style="margin-top:8px;">Skills Extracted From Prompt</h3>
+                  <h3 class="trainerSectionTitle trainerSectionTitleInset">Skills Extracted From Prompt</h3>
                   <pre id="trainerSkillCatalog" data-testid="trainer-skill-catalog"></pre>
                   <h3>Tool Trigger</h3>
                   <div class="trainerToolLabRow">
@@ -101,20 +101,20 @@
                 </div>
               </div>
               <div class="panel">
-                <h3 style="margin-top:0;">Transcript Integrity</h3>
+                <h3 class="trainerSectionTitle trainerSectionTitleTop">Transcript Integrity</h3>
                 <pre id="trainerIntegrity" data-testid="trainer-integrity"></pre>
               </div>
               <div class="panel">
-                <h3 style="margin-top:0;">Compare</h3>
+                <h3 class="trainerSectionTitle trainerSectionTitleTop">Compare</h3>
                 <div id="trainerCompare" data-testid="trainer-compare"></div>
               </div>
               <div class="panel">
-                <h3 style="margin-top:0;">Loadouts</h3>
+                <h3 class="trainerSectionTitle trainerSectionTitleTop">Loadouts</h3>
                 <div id="trainerLoadouts" data-testid="trainer-loadouts"></div>
               </div>
               <div class="panel">
-                <h3 style="margin-top:0;">Personal Backup</h3>
-                <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                <h3 class="trainerSectionTitle trainerSectionTitleTop">Personal Backup</h3>
+                <div class="trainerBackupActions">
                   <button class="btn small" id="trainerBackupDownloadBtn" type="button" data-testid="trainer-backup-download">Download backup</button>
                   <input id="trainerBackupUploadInput" data-testid="trainer-backup-upload" type="file" accept="application/json,.json" />
                 </div>
@@ -142,7 +142,7 @@
             aria-controls="agentDebugPane"
             aria-expanded="false"
             title="Toggle debug panel"
-          >⚙</button>
+          >Debug</button>
           <button
             id="agentPanelZoomOutBtn"
             class="btn small agent-panel-zoom-toggle"
@@ -150,7 +150,7 @@
             data-testid="agent-panel-zoom-out"
             aria-label="Decrease panel size"
             title="Decrease panel size"
-          >🔍-</button>
+          >Small</button>
           <button
             id="agentPanelZoomInBtn"
             class="btn small agent-panel-zoom-toggle"
@@ -158,8 +158,8 @@
             data-testid="agent-panel-zoom-in"
             aria-label="Increase panel size"
             title="Increase panel size"
-          >🔍+</button>
-          <button id="minimizeChatBtn" class="btn small agent-minimize-toggle" type="button" aria-label="Minimize agent panel">□</button>
+          >Large</button>
+          <button id="minimizeChatBtn" class="btn small agent-minimize-toggle" type="button" aria-label="Expand agent panel">Open</button>
         </div>
       </div>
 

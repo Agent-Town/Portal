@@ -105,11 +105,11 @@
     panel.setAttribute('data-testid', 'agent-panel');
     panel.innerHTML = `
       <div class="sidebar-header">
-        <div style="display:flex; align-items:center; gap:8px;">
+        <div class="sidebar-header-main">
           <h3>Agent Comms</h3>
           <div class="status-indicator" id="agentStatus">Idle</div>
         </div>
-        <button id="minimizeChatBtn" class="btn small" style="padding: 2px 8px; font-size: 12px;">□</button>
+        <button id="minimizeChatBtn" class="btn small agent-minimize-toggle" type="button" aria-label="Expand agent panel">Open</button>
       </div>
 
       <div class="sidebar-content">
@@ -135,7 +135,9 @@
     const panel = el('agentSidebar');
     const btn = el('minimizeChatBtn');
     if (!panel || !btn) return;
-    btn.textContent = panel.classList.contains('minimized') ? '□' : '_';
+    const minimized = panel.classList.contains('minimized');
+    btn.textContent = minimized ? 'Open' : 'Hide';
+    btn.setAttribute('aria-label', minimized ? 'Expand agent panel' : 'Minimize agent panel');
   }
 
   function setMinimized(minimized) {

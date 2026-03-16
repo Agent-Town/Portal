@@ -25,3 +25,23 @@ test('start template stays free of inline layout styling and warning-banner fall
   expect(startHtml).toContain('data-testid="start-card"');
   expect(startHtml).toContain('id="enterBtn"');
 });
+
+test('town shell markup keeps trainer layout classes and plain-language dock controls', async () => {
+  const indexPath = path.join(process.cwd(), 'public/index.html');
+  const indexHtml = fs.readFileSync(indexPath, 'utf8');
+
+  expect(indexHtml).toContain('class="trainerQuestTitle"');
+  expect(indexHtml).toContain('class="trainerActionRow"');
+  expect(indexHtml).toContain('class="input trainerCompactInput"');
+  expect(indexHtml).toContain('class="small trainerToggleLabel"');
+  expect(indexHtml).not.toContain('style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px;"');
+  expect(indexHtml).not.toContain('style="max-width:120px;"');
+  expect(indexHtml).not.toContain('>⚙<');
+  expect(indexHtml).not.toContain('>🔍-<');
+  expect(indexHtml).not.toContain('>🔍+<');
+  expect(indexHtml).not.toContain('>□<');
+  expect(indexHtml).toContain('>Debug</button>');
+  expect(indexHtml).toContain('>Small</button>');
+  expect(indexHtml).toContain('>Large</button>');
+  expect(indexHtml).toContain('>Open</button>');
+});
