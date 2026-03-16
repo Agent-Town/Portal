@@ -161,3 +161,23 @@ Rule:
 1. treat every onboarding HUD as a guide, not a curtain,
 2. recheck mobile overlays against the tappable world behind them,
 3. if the guidance obscures the places it describes, it is too large.
+
+## 18. Embedded experiences need a different modal rule than native rooms
+
+Atlas already ships its own internal shell inside the iframe.
+
+Rule:
+
+1. native district rooms can use padded modal bodies,
+2. embedded experiences often need a flush body to preserve viewport height,
+3. sticky embedded headers should not block underlying clicks when only the controls need pointer interaction.
+
+## 19. Simple rooms should not inherit large-room proportions
+
+Leaderboard, Pony, and similar lightweight rooms feel heavier than they are if they inherit the same width and height as House or Town Hall.
+
+Rule:
+
+1. large workflows can keep large envelopes,
+2. simple rooms should collapse into tighter modal widths and heights,
+3. visual weight should match task weight.

@@ -49,10 +49,20 @@ Completed:
 - Verification completed for D2:
   - targeted D2 Playwright block passed
   - screenshot evidence captured and committed in `design/evidence/phase-d2/`
+- Phase D3 implemented:
+  - district modal shell is quieter and lighter relative to room content
+  - modal body now owns spacing, while inner room panels are softer and less repetitive
+  - House, Town Hall, and simple room surfaces now begin with a clearer lead region
+  - Town Hall is centered into a stronger lead card instead of a large blank shell
+  - simple rooms like Town Board use a tighter modal envelope
+  - Atlas embed keeps its full-bleed body and no longer loses clicks behind the sticky Atlas head
+- Verification completed for D3:
+  - targeted D3 modal block passed
+  - screenshot evidence captured and committed in `design/evidence/phase-d3/`
 
 Not yet done:
-- D3 through D6 are not implemented
+- D4 through D6 are not implemented
 
 Recommended next step:
-- Implement Phase D3 after reviewing D2 screenshots
+- Implement Phase D4 after reviewing D3 screenshots
 - Require every future design phase to satisfy `design/specs/09_global_human_first_design_requirements.md`

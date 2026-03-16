@@ -1,6 +1,6 @@
 # Phase D3 - District Modal Shell TDD Spec
 
-Status: Draft
+Status: Implemented on `codex/frontend-design`
 
 ## 1. Goal
 
@@ -70,3 +70,10 @@ This phase is complete only when:
 1. the modal shell stops fighting the content,
 2. each district begins with a more obvious hierarchy,
 3. the app still feels like one product, not several unrelated panel stacks.
+
+## 8. Implementation evidence
+
+Committed screenshot pack:
+
+1. `design/evidence/phase-d3/before/`
+2. `design/evidence/phase-d3/after/`
