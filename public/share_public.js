@@ -453,6 +453,11 @@ function getResolvedShareCardLead(preview = null) {
   return hqName ? `High-distribution card for social sharing with generated ${hqName} HQ hero.` : '';
 }
 
+function getResolvedShareCardHeroPlaceholder(preview = null) {
+  const hqName = normalizeHouseHqName(preview?.hqName);
+  return hqName ? `${hqName} HQ hero will appear here once the public share card is minted.` : '';
+}
+
 function getSharePlaceholderCopy(preview = null) {
   const hqName = normalizeHouseHqName(preview?.hqName);
   if (!hqName) {
@@ -474,11 +479,14 @@ function getSharePlaceholderCopy(preview = null) {
 function applyResolvedShareShellPreview(preview = null) {
   const titleText = getResolvedShareCardTitle(preview);
   const leadText = getResolvedShareCardLead(preview);
+  const heroPlaceholderText = getResolvedShareCardHeroPlaceholder(preview);
   if (!titleText) return false;
   const title = el('shareCardTitle');
   const lead = el('shareLead');
+  const heroPlaceholder = el('shareHeroPlaceholder');
   if (title) title.textContent = titleText;
   if (lead && leadText) lead.textContent = leadText;
+  if (heroPlaceholder && heroPlaceholderText) heroPlaceholder.textContent = heroPlaceholderText;
   document.title = `${titleText} — Agent Town`;
   return true;
 }
