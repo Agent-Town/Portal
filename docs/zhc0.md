@@ -18,6 +18,7 @@ Branch: `zhc0-founders-loop`
 - `docs/zhc-remote-branch-audit.md`
 - `docs/zhc0-screen-plan.md`
 - `docs/zhc-current-status.md`
+- `docs/paperclip_integration_map.md`
 
 ## 1. What this branch is
 
