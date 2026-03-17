@@ -67,125 +67,110 @@ Verbs == {
   "share"
 }
 
-TaskRoom ==
-  [
-    "enterTown" |-> "Start",
-    "openLibrary" |-> "Town",
-    "openTownHall" |-> "Town",
-    "openWorkshop" |-> "Town",
-    "setupIdentity" |-> "TownHall",
-    "saveArtifact" |-> "HouseLibrary",
-    "openArtifact" |-> "HouseLibrary",
-    "reviewTrust" |-> "HouseLibrary",
-    "receiveDelivery" |-> "HouseLibrary",
-    "hideArtifact" |-> "HouseLibrary",
-    "followRoute" |-> "HouseLibrary"
-  ]
+TaskRoom(t) ==
+  CASE t = "enterTown" -> "Start"
+    [] t = "openLibrary" -> "Town"
+    [] t = "openTownHall" -> "Town"
+    [] t = "openWorkshop" -> "Town"
+    [] t = "setupIdentity" -> "TownHall"
+    [] t = "saveArtifact" -> "HouseLibrary"
+    [] t = "openArtifact" -> "HouseLibrary"
+    [] t = "reviewTrust" -> "HouseLibrary"
+    [] t = "receiveDelivery" -> "HouseLibrary"
+    [] t = "hideArtifact" -> "HouseLibrary"
+    [] OTHER -> "HouseLibrary"
 
-TaskSection ==
-  [
-    "enterTown" |-> "Entry",
-    "openLibrary" |-> "Library",
-    "openTownHall" |-> "TownHall",
-    "openWorkshop" |-> "Workshop",
-    "setupIdentity" |-> "TownHall",
-    "saveArtifact" |-> "KeepBox",
-    "openArtifact" |-> "MemoryTable",
-    "reviewTrust" |-> "TrustedFinds",
-    "receiveDelivery" |-> "Deliveries",
-    "hideArtifact" |-> "HiddenShelf",
-    "followRoute" |-> "RouteDesk"
-  ]
+TaskSection(task) ==
+  CASE task = "enterTown" -> "Entry"
+    [] task = "openLibrary" -> "Library"
+    [] task = "openTownHall" -> "TownHall"
+    [] task = "openWorkshop" -> "Workshop"
+    [] task = "setupIdentity" -> "TownHall"
+    [] task = "saveArtifact" -> "KeepBox"
+    [] task = "openArtifact" -> "MemoryTable"
+    [] task = "reviewTrust" -> "TrustedFinds"
+    [] task = "receiveDelivery" -> "Deliveries"
+    [] task = "hideArtifact" -> "HiddenShelf"
+    [] OTHER -> "RouteDesk"
 
-TaskSelectionSet ==
-  [
-    "enterTown" |-> {"none"},
-    "openLibrary" |-> {"none"},
-    "openTownHall" |-> {"none"},
-    "openWorkshop" |-> {"none"},
-    "setupIdentity" |-> {"none"},
-    "saveArtifact" |-> {"none"},
-    "openArtifact" |-> {"none", "artifact"},
-    "reviewTrust" |-> {"none", "publicStack"},
-    "receiveDelivery" |-> {"none", "delivery"},
-    "hideArtifact" |-> {"none", "hiddenStack"},
-    "followRoute" |-> {"none", "routeStack"}
-  ]
+TaskSelectionSet(task) ==
+  CASE task = "enterTown" -> {"none"}
+    [] task = "openLibrary" -> {"none"}
+    [] task = "openTownHall" -> {"none"}
+    [] task = "openWorkshop" -> {"none"}
+    [] task = "setupIdentity" -> {"none"}
+    [] task = "saveArtifact" -> {"none"}
+    [] task = "openArtifact" -> {"none", "artifact"}
+    [] task = "reviewTrust" -> {"none", "publicStack"}
+    [] task = "receiveDelivery" -> {"none", "delivery"}
+    [] task = "hideArtifact" -> {"none", "hiddenStack"}
+    [] OTHER -> {"none", "routeStack"}
 
-TaskTrustSet ==
-  [
-    "enterTown" |-> {"na"},
-    "openLibrary" |-> {"na"},
-    "openTownHall" |-> {"na"},
-    "openWorkshop" |-> {"na"},
-    "setupIdentity" |-> {"na"},
-    "saveArtifact" |-> {"na"},
-    "openArtifact" |-> {"na"},
-    "reviewTrust" |-> {"unknown", "verified", "blocked"},
-    "receiveDelivery" |-> {"na"},
-    "hideArtifact" |-> {"blocked"},
-    "followRoute" |-> {"unknown", "verified"}
-  ]
+TaskTrustSet(task) ==
+  CASE task = "enterTown" -> {"na"}
+    [] task = "openLibrary" -> {"na"}
+    [] task = "openTownHall" -> {"na"}
+    [] task = "openWorkshop" -> {"na"}
+    [] task = "setupIdentity" -> {"na"}
+    [] task = "saveArtifact" -> {"na"}
+    [] task = "openArtifact" -> {"na"}
+    [] task = "reviewTrust" -> {"unknown", "verified", "blocked"}
+    [] task = "receiveDelivery" -> {"na"}
+    [] task = "hideArtifact" -> {"blocked"}
+    [] OTHER -> {"unknown", "verified"}
 
-TaskDetailModeSet ==
-  [
-    "enterTown" |-> {"closed"},
-    "openLibrary" |-> {"closed"},
-    "openTownHall" |-> {"closed"},
-    "openWorkshop" |-> {"closed"},
-    "setupIdentity" |-> {"closed", "advanced"},
-    "saveArtifact" |-> {"closed", "itemDetail"},
-    "openArtifact" |-> {"closed", "itemDetail", "provenance"},
-    "reviewTrust" |-> {"closed", "itemDetail", "provenance"},
-    "receiveDelivery" |-> {"closed", "itemDetail", "provenance"},
-    "hideArtifact" |-> {"closed", "itemDetail"},
-    "followRoute" |-> {"closed", "itemDetail", "provenance"}
-  ]
+TaskDetailModeSet(task) ==
+  CASE task = "enterTown" -> {"closed"}
+    [] task = "openLibrary" -> {"closed"}
+    [] task = "openTownHall" -> {"closed"}
+    [] task = "openWorkshop" -> {"closed"}
+    [] task = "setupIdentity" -> {"closed", "advanced"}
+    [] task = "saveArtifact" -> {"closed", "itemDetail"}
+    [] task = "openArtifact" -> {"closed", "itemDetail", "provenance"}
+    [] task = "reviewTrust" -> {"closed", "itemDetail", "provenance"}
+    [] task = "receiveDelivery" -> {"closed", "itemDetail", "provenance"}
+    [] task = "hideArtifact" -> {"closed", "itemDetail"}
+    [] OTHER -> {"closed", "itemDetail", "provenance"}
 
-CommandForTask ==
-  [
-    "enterTown" |-> "cmd.enterTown",
-    "openLibrary" |-> "cmd.openLibrary",
-    "openTownHall" |-> "cmd.openTownHall",
-    "openWorkshop" |-> "cmd.openWorkshop",
-    "setupIdentity" |-> "cmd.setupIdentity",
-    "saveArtifact" |-> "cmd.saveArtifact",
-    "openArtifact" |-> "cmd.openArtifact",
-    "reviewTrust" |-> "cmd.reviewTrust",
-    "receiveDelivery" |-> "cmd.receiveDelivery",
-    "hideArtifact" |-> "cmd.hideArtifact",
-    "followRoute" |-> "cmd.followRoute"
-  ]
+CommandForTask(task) ==
+  CASE task = "enterTown" -> "cmd.enterTown"
+    [] task = "openLibrary" -> "cmd.openLibrary"
+    [] task = "openTownHall" -> "cmd.openTownHall"
+    [] task = "openWorkshop" -> "cmd.openWorkshop"
+    [] task = "setupIdentity" -> "cmd.setupIdentity"
+    [] task = "saveArtifact" -> "cmd.saveArtifact"
+    [] task = "openArtifact" -> "cmd.openArtifact"
+    [] task = "reviewTrust" -> "cmd.reviewTrust"
+    [] task = "receiveDelivery" -> "cmd.receiveDelivery"
+    [] task = "hideArtifact" -> "cmd.hideArtifact"
+    [] OTHER -> "cmd.followRoute"
 
-VoiceAlias ==
-  [
-    "en" |-> [
-      "cmd.enterTown" |-> "go_to_town",
-      "cmd.openLibrary" |-> "open_library",
-      "cmd.openTownHall" |-> "open_town_hall",
-      "cmd.openWorkshop" |-> "open_workshop",
-      "cmd.setupIdentity" |-> "continue",
-      "cmd.saveArtifact" |-> "save_to_memory",
-      "cmd.openArtifact" |-> "open_item",
-      "cmd.reviewTrust" |-> "check_source",
-      "cmd.receiveDelivery" |-> "open_delivery",
-      "cmd.hideArtifact" |-> "hide_item",
-      "cmd.followRoute" |-> "follow_route"
-    ],
-    "zh" |-> [
-      "cmd.enterTown" |-> "go_to_town_zh",
-      "cmd.openLibrary" |-> "open_library_zh",
-      "cmd.openTownHall" |-> "open_town_hall_zh",
-      "cmd.openWorkshop" |-> "open_workshop_zh",
-      "cmd.setupIdentity" |-> "continue_zh",
-      "cmd.saveArtifact" |-> "save_to_memory_zh",
-      "cmd.openArtifact" |-> "open_item_zh",
-      "cmd.reviewTrust" |-> "check_source_zh",
-      "cmd.receiveDelivery" |-> "open_delivery_zh",
-      "cmd.hideArtifact" |-> "hide_item_zh",
-      "cmd.followRoute" |-> "follow_route_zh"
-    ]
-  ]
+VoiceAlias(locale, command) ==
+  CASE locale = "en" ->
+    CASE command = "cmd.enterTown" -> "go_to_town"
+      [] command = "cmd.openLibrary" -> "open_library"
+      [] command = "cmd.openTownHall" -> "open_town_hall"
+      [] command = "cmd.openWorkshop" -> "open_workshop"
+      [] command = "cmd.setupIdentity" -> "continue"
+      [] command = "cmd.saveArtifact" -> "save_to_memory"
+      [] command = "cmd.openArtifact" -> "open_item"
+      [] command = "cmd.reviewTrust" -> "check_source"
+      [] command = "cmd.receiveDelivery" -> "open_delivery"
+      [] command = "cmd.hideArtifact" -> "hide_item"
+      [] OTHER -> "follow_route"
+    [] locale = "zh" ->
+      CASE command = "cmd.enterTown" -> "go_to_town_zh"
+        [] command = "cmd.openLibrary" -> "open_library_zh"
+        [] command = "cmd.openTownHall" -> "open_town_hall_zh"
+        [] command = "cmd.openWorkshop" -> "open_workshop_zh"
+        [] command = "cmd.setupIdentity" -> "continue_zh"
+        [] command = "cmd.saveArtifact" -> "save_to_memory_zh"
+        [] command = "cmd.openArtifact" -> "open_item_zh"
+        [] command = "cmd.reviewTrust" -> "check_source_zh"
+        [] command = "cmd.receiveDelivery" -> "open_delivery_zh"
+        [] command = "cmd.hideArtifact" -> "hide_item_zh"
+        [] OTHER -> "follow_route_zh"
+    [] OTHER -> ""
 
 PrimaryVerbOf(task, selection) ==
   CASE task = "enterTown" -> "go"
@@ -204,20 +189,163 @@ PrimaryVerbOf(task, selection) ==
     [] task = "followRoute" -> "follow"
     [] OTHER -> "open"
 
-PrimaryActionFact(task, selection) == "action." \o PrimaryVerbOf(task, selection)
+PrimaryActionFact(task, selection) ==
+  CASE PrimaryVerbOf(task, selection) = "go" -> "action.go"
+    [] PrimaryVerbOf(task, selection) = "open" -> "action.open"
+    [] PrimaryVerbOf(task, selection) = "continue" -> "action.continue"
+    [] PrimaryVerbOf(task, selection) = "save" -> "action.save"
+    [] PrimaryVerbOf(task, selection) = "check" -> "action.check"
+    [] PrimaryVerbOf(task, selection) = "hide" -> "action.hide"
+    [] PrimaryVerbOf(task, selection) = "follow" -> "action.follow"
+    [] PrimaryVerbOf(task, selection) = "bring" -> "action.bring"
+    [] OTHER -> "action.share"
+
+RoomFact(task) ==
+  CASE TaskRoom(task) = "Start" -> "room.Start"
+    [] TaskRoom(task) = "Town" -> "room.Town"
+    [] TaskRoom(task) = "HouseLibrary" -> "room.HouseLibrary"
+    [] TaskRoom(task) = "TownHall" -> "room.TownHall"
+    [] OTHER -> "room.Unknown"
+
+TaskFact(task) ==
+  CASE task = "enterTown" -> "task.enterTown"
+    [] task = "openLibrary" -> "task.openLibrary"
+    [] task = "openTownHall" -> "task.openTownHall"
+    [] task = "openWorkshop" -> "task.openWorkshop"
+    [] task = "setupIdentity" -> "task.setupIdentity"
+    [] task = "saveArtifact" -> "task.saveArtifact"
+    [] task = "openArtifact" -> "task.openArtifact"
+    [] task = "reviewTrust" -> "task.reviewTrust"
+    [] task = "receiveDelivery" -> "task.receiveDelivery"
+    [] task = "hideArtifact" -> "task.hideArtifact"
+    [] OTHER -> "task.followRoute"
+
+SectionFact(section) ==
+  CASE section = "Entry" -> "section.Entry"
+    [] section = "Library" -> "section.Library"
+    [] section = "TownHall" -> "section.TownHall"
+    [] section = "Workshop" -> "section.Workshop"
+    [] section = "KeepBox" -> "section.KeepBox"
+    [] section = "MemoryTable" -> "section.MemoryTable"
+    [] section = "TrustedFinds" -> "section.TrustedFinds"
+    [] section = "Deliveries" -> "section.Deliveries"
+    [] section = "HiddenShelf" -> "section.HiddenShelf"
+    [] OTHER -> "section.RouteDesk"
+
+SelectionFact(selection) ==
+  CASE selection = "none" -> "selection.none"
+    [] selection = "artifact" -> "selection.artifact"
+    [] selection = "publicStack" -> "selection.publicStack"
+    [] selection = "delivery" -> "selection.delivery"
+    [] selection = "hiddenStack" -> "selection.hiddenStack"
+    [] OTHER -> "selection.routeStack"
+
+TrustFact(trust) ==
+  CASE trust = "na" -> "trust.na"
+    [] trust = "unknown" -> "trust.unknown"
+    [] trust = "verified" -> "trust.verified"
+    [] OTHER -> "trust.blocked"
+
+DetailFact(detailMode) ==
+  CASE detailMode = "closed" -> "detail.closed"
+    [] detailMode = "itemDetail" -> "detail.itemDetail"
+    [] detailMode = "provenance" -> "detail.provenance"
+    [] OTHER -> "detail.advanced"
+
+LocaleFact(locale) ==
+  CASE locale = "en" -> "locale.en"
+    [] locale = "zh" -> "locale.zh"
+    [] OTHER -> "locale.unknown"
+
+GoalFact(task) ==
+  CASE task = "enterTown" -> "goal.enterTown"
+    [] task = "openLibrary" -> "goal.openLibrary"
+    [] task = "openTownHall" -> "goal.openTownHall"
+    [] task = "openWorkshop" -> "goal.openWorkshop"
+    [] task = "setupIdentity" -> "goal.setupIdentity"
+    [] task = "saveArtifact" -> "goal.saveArtifact"
+    [] task = "openArtifact" -> "goal.openArtifact"
+    [] task = "reviewTrust" -> "goal.reviewTrust"
+    [] task = "receiveDelivery" -> "goal.receiveDelivery"
+    [] task = "hideArtifact" -> "goal.hideArtifact"
+    [] OTHER -> "goal.followRoute"
+
+VerbFact(task, selection) ==
+  CASE PrimaryVerbOf(task, selection) = "go" -> "verb.go"
+    [] PrimaryVerbOf(task, selection) = "open" -> "verb.open"
+    [] PrimaryVerbOf(task, selection) = "continue" -> "verb.continue"
+    [] PrimaryVerbOf(task, selection) = "save" -> "verb.save"
+    [] PrimaryVerbOf(task, selection) = "check" -> "verb.check"
+    [] PrimaryVerbOf(task, selection) = "hide" -> "verb.hide"
+    [] PrimaryVerbOf(task, selection) = "follow" -> "verb.follow"
+    [] PrimaryVerbOf(task, selection) = "bring" -> "verb.bring"
+    [] OTHER -> "verb.share"
+
+CommandFact(task) ==
+  CASE CommandForTask(task) = "cmd.enterTown" -> "command.cmd.enterTown"
+    [] CommandForTask(task) = "cmd.openLibrary" -> "command.cmd.openLibrary"
+    [] CommandForTask(task) = "cmd.openTownHall" -> "command.cmd.openTownHall"
+    [] CommandForTask(task) = "cmd.openWorkshop" -> "command.cmd.openWorkshop"
+    [] CommandForTask(task) = "cmd.setupIdentity" -> "command.cmd.setupIdentity"
+    [] CommandForTask(task) = "cmd.saveArtifact" -> "command.cmd.saveArtifact"
+    [] CommandForTask(task) = "cmd.openArtifact" -> "command.cmd.openArtifact"
+    [] CommandForTask(task) = "cmd.reviewTrust" -> "command.cmd.reviewTrust"
+    [] CommandForTask(task) = "cmd.receiveDelivery" -> "command.cmd.receiveDelivery"
+    [] CommandForTask(task) = "cmd.hideArtifact" -> "command.cmd.hideArtifact"
+    [] OTHER -> "command.cmd.followRoute"
+
+VoiceCommandFact(task) ==
+  CASE task = "enterTown" -> "voice.command.cmd.enterTown"
+    [] task = "openLibrary" -> "voice.command.cmd.openLibrary"
+    [] task = "openTownHall" -> "voice.command.cmd.openTownHall"
+    [] task = "openWorkshop" -> "voice.command.cmd.openWorkshop"
+    [] task = "setupIdentity" -> "voice.command.cmd.setupIdentity"
+    [] task = "saveArtifact" -> "voice.command.cmd.saveArtifact"
+    [] task = "openArtifact" -> "voice.command.cmd.openArtifact"
+    [] task = "reviewTrust" -> "voice.command.cmd.reviewTrust"
+    [] task = "receiveDelivery" -> "voice.command.cmd.receiveDelivery"
+    [] task = "hideArtifact" -> "voice.command.cmd.hideArtifact"
+    [] OTHER -> "voice.command.cmd.followRoute"
+
+VoicePhraseFact(locale, task) ==
+  CASE locale = "en" ->
+    CASE task = "enterTown" -> "voice.phrase.go_to_town"
+      [] task = "openLibrary" -> "voice.phrase.open_library"
+      [] task = "openTownHall" -> "voice.phrase.open_town_hall"
+      [] task = "openWorkshop" -> "voice.phrase.open_workshop"
+      [] task = "setupIdentity" -> "voice.phrase.continue"
+      [] task = "saveArtifact" -> "voice.phrase.save_to_memory"
+      [] task = "openArtifact" -> "voice.phrase.open_item"
+      [] task = "reviewTrust" -> "voice.phrase.check_source"
+      [] task = "receiveDelivery" -> "voice.phrase.open_delivery"
+      [] task = "hideArtifact" -> "voice.phrase.hide_item"
+      [] OTHER -> "voice.phrase.follow_route"
+    [] locale = "zh" ->
+      CASE task = "enterTown" -> "voice.phrase.go_to_town_zh"
+        [] task = "openLibrary" -> "voice.phrase.open_library_zh"
+        [] task = "openTownHall" -> "voice.phrase.open_town_hall_zh"
+        [] task = "openWorkshop" -> "voice.phrase.open_workshop_zh"
+        [] task = "setupIdentity" -> "voice.phrase.continue_zh"
+        [] task = "saveArtifact" -> "voice.phrase.save_to_memory_zh"
+        [] task = "openArtifact" -> "voice.phrase.open_item_zh"
+        [] task = "reviewTrust" -> "voice.phrase.check_source_zh"
+        [] task = "receiveDelivery" -> "voice.phrase.open_delivery_zh"
+        [] task = "hideArtifact" -> "voice.phrase.hide_item_zh"
+        [] OTHER -> "voice.phrase.follow_route_zh"
+    [] OTHER -> ""
 
 HumanCoreFacts(task, focusSection, selection, trust, detailMode, locale) ==
   {
-    "room." \o TaskRoom[task],
-    "task." \o task,
-    "section." \o focusSection,
-    "selection." \o selection,
-    "trust." \o trust,
-    "detail." \o detailMode,
-    "locale." \o locale,
-    "goal." \o task,
+    RoomFact(task),
+    TaskFact(task),
+    SectionFact(focusSection),
+    SelectionFact(selection),
+    TrustFact(trust),
+    DetailFact(detailMode),
+    LocaleFact(locale),
+    GoalFact(task),
     PrimaryActionFact(task, selection),
-    "verb." \o PrimaryVerbOf(task, selection)
+    VerbFact(task, selection)
   }
 
 DetailFacts(task, selection) ==
@@ -255,9 +383,9 @@ StateFacts(task, selection) ==
 
 CanonicalFacts(task, focusSection, selection, trust, detailMode, locale) ==
   {
-    "command." \o CommandForTask[task],
-    "voice.command." \o CommandForTask[task],
-    "voice.phrase." \o VoiceAlias[locale][CommandForTask[task]]
+    CommandFact(task),
+    VoiceCommandFact(task),
+    VoicePhraseFact(locale, task)
   }
     \cup HumanCoreFacts(task, focusSection, selection, trust, detailMode, locale)
     \cup DetailFacts(task, selection)
@@ -285,7 +413,7 @@ LLMFacts(task, focusSection, selection, trust, detailMode, locale) ==
 
 HumanProjection(task, focusSection, selection, trust, detailMode, locale) ==
   [
-    room |-> TaskRoom[task],
+    room |-> TaskRoom(task),
     task |-> task,
     focus |-> focusSection,
     selection |-> selection,
@@ -298,7 +426,7 @@ HumanProjection(task, focusSection, selection, trust, detailMode, locale) ==
 
 AdvancedProjection(task, focusSection, selection, trust, detailMode, locale) ==
   [
-    room |-> TaskRoom[task],
+    room |-> TaskRoom(task),
     task |-> task,
     focus |-> focusSection,
     selection |-> selection,
@@ -306,13 +434,13 @@ AdvancedProjection(task, focusSection, selection, trust, detailMode, locale) ==
     detail |-> detailMode,
     locale |-> locale,
     primaryAction |-> PrimaryVerbOf(task, selection),
-    command |-> CommandForTask[task],
+    command |-> CommandForTask(task),
     facts |-> AdvancedFacts(task, focusSection, selection, trust, detailMode, locale)
   ]
 
 LLMProjection(task, focusSection, selection, trust, detailMode, locale) ==
   [
-    room |-> TaskRoom[task],
+    room |-> TaskRoom(task),
     task |-> task,
     focus |-> focusSection,
     selection |-> selection,
@@ -320,13 +448,13 @@ LLMProjection(task, focusSection, selection, trust, detailMode, locale) ==
     detail |-> detailMode,
     locale |-> locale,
     primaryAction |-> PrimaryVerbOf(task, selection),
-    command |-> CommandForTask[task],
+    command |-> CommandForTask(task),
     facts |-> LLMFacts(task, focusSection, selection, trust, detailMode, locale)
   ]
 
 VoiceProjection(task, focusSection, selection, trust, detailMode, locale) ==
   [
-    room |-> TaskRoom[task],
+    room |-> TaskRoom(task),
     task |-> task,
     focus |-> focusSection,
     selection |-> selection,
@@ -334,12 +462,12 @@ VoiceProjection(task, focusSection, selection, trust, detailMode, locale) ==
     detail |-> detailMode,
     locale |-> locale,
     primaryAction |-> PrimaryVerbOf(task, selection),
-    command |-> CommandForTask[task],
-    phrase |-> VoiceAlias[locale][CommandForTask[task]],
+    command |-> CommandForTask(task),
+    phrase |-> VoiceAlias(locale, task),
     facts |-> {
-      "locale." \o locale,
-      "voice.command." \o CommandForTask[task],
-      "voice.phrase." \o VoiceAlias[locale][CommandForTask[task]]
+      LocaleFact(locale),
+      VoiceCommandFact(task),
+      VoicePhraseFact(locale, task)
     }
   ]
 
@@ -348,27 +476,27 @@ VARIABLES task, focusSection, selection, trust, detailMode, voiceLocale
 vars == <<task, focusSection, selection, trust, detailMode, voiceLocale>>
 
 TypeOK ==
-  /\ task ∈ Tasks
-  /\ focusSection ∈ Sections
-  /\ selection ∈ Selections
-  /\ trust ∈ TrustStates
-  /\ detailMode ∈ DetailModes
-  /\ voiceLocale ∈ Locales
-  /\ focusSection = TaskSection[task]
+  /\ task \in Tasks
+  /\ focusSection \in Sections
+  /\ selection \in Selections
+  /\ trust \in TrustStates
+  /\ detailMode \in DetailModes
+  /\ voiceLocale \in Locales
+  /\ focusSection = TaskSection(task)
 
 TaskSelectionTrustFits ==
-  /\ selection ∈ TaskSelectionSet[task]
-  /\ trust ∈ TaskTrustSet[task]
-  /\ detailMode ∈ TaskDetailModeSet[task]
+  /\ selection \in TaskSelectionSet(task)
+  /\ trust \in TaskTrustSet(task)
+  /\ detailMode \in TaskDetailModeSet(task)
 
 TaskRoomKnown ==
-  TaskRoom[task] ∈ Rooms
+  TaskRoom(task) \in Rooms
 
 CanonicalVerbValid ==
-  PrimaryVerbOf(task, selection) ∈ Verbs
+  PrimaryVerbOf(task, selection) \in Verbs
 
 HumanSimple ==
-  Cardinality(HumanProjection(task, focusSection, selection, trust, detailMode, voiceLocale).facts ∩ {
+  Cardinality(HumanProjection(task, focusSection, selection, trust, detailMode, voiceLocale).facts \cap {
     "action.go",
     "action.open",
     "action.continue",
@@ -381,20 +509,20 @@ HumanSimple ==
   }) = 1
 
 CanonicalCoversHuman ==
-  HumanProjection(task, focusSection, selection, trust, detailMode, voiceLocale).facts
-    ⊆ CanonicalFacts(task, focusSection, selection, trust, detailMode, voiceLocale)
+    HumanProjection(task, focusSection, selection, trust, detailMode, voiceLocale).facts
+    \subseteq CanonicalFacts(task, focusSection, selection, trust, detailMode, voiceLocale)
 
 LLMCompleteness ==
-  HumanProjection(task, focusSection, selection, trust, detailMode, voiceLocale).facts
-    ⊆ LLMProjection(task, focusSection, selection, trust, detailMode, voiceLocale).facts
+    HumanProjection(task, focusSection, selection, trust, detailMode, voiceLocale).facts
+    \subseteq LLMProjection(task, focusSection, selection, trust, detailMode, voiceLocale).facts
 
 AdvancedSuperset ==
-  HumanProjection(task, focusSection, selection, trust, detailMode, voiceLocale).facts
-    ⊆ AdvancedProjection(task, focusSection, selection, trust, detailMode, voiceLocale).facts
+    HumanProjection(task, focusSection, selection, trust, detailMode, voiceLocale).facts
+    \subseteq AdvancedProjection(task, focusSection, selection, trust, detailMode, voiceLocale).facts
 
 NoTechnicalLeakInHuman ==
   HumanProjection(task, focusSection, selection, trust, detailMode, voiceLocale).facts
-    ∩ {"technical.artifactId", "technical.revisionChain", "technical.provenanceReceipt", "technical.trustProof", "technical.routeId", "technical.relayReceipt"} = {}
+    \cap {"technical.artifactId", "technical.revisionChain", "technical.provenanceReceipt", "technical.trustProof", "technical.routeId", "technical.relayReceipt"} = {}
 
 NoDrift ==
   /\ HumanProjection(task, focusSection, selection, trust, detailMode, voiceLocale).primaryAction
@@ -415,18 +543,18 @@ OpenDisclosureAddsFacts ==
       \subseteq AdvancedProjection(task, focusSection, selection, trust, detailMode, voiceLocale).facts
 
 VoiceAliasExists ==
-  ∀ t \in Tasks, l \in Locales:
-    VoiceAlias[l][CommandForTask[t]] # ""
+  \A t \in Tasks, l \in Locales:
+    VoiceAlias(l, CommandForTask(t)) # ""
 
 NoLocaleAliasCollision ==
-  ∀ l \in Locales:
-    ∀ t1, t2 \in Tasks:
+  \A l \in Locales:
+    \A t1, t2 \in Tasks:
       t1 # t2 =>
-        VoiceAlias[l][CommandForTask[t1]] # VoiceAlias[l][CommandForTask[t2]]
+        VoiceAlias(l, CommandForTask(t1)) # VoiceAlias(l, CommandForTask(t2))
 
 LocaleSwitchOnlyCommandStable ==
-  ∀ l1, l2 \in Locales:
-    CommandForTask[task] =
+  \A l1, l2 \in Locales:
+    CommandForTask(task) =
       VoiceProjection(task, focusSection, selection, trust, detailMode, l1).command
       \* command must be locale-invariant for current task
       /\ VoiceProjection(task, focusSection, selection, trust, detailMode, l1).command
@@ -441,13 +569,13 @@ Init ==
   /\ voiceLocale = "en"
 
 Next ==
-  ∃ t ∈ Tasks, s ∈ Selections, tr ∈ TrustStates, d ∈ DetailModes, l ∈ Locales:
-    /\ t ∈ Tasks
-    /\ s ∈ TaskSelectionSet[t]
-    /\ tr ∈ TaskTrustSet[t]
-    /\ d ∈ TaskDetailModeSet[t]
+  \E t \in Tasks, s \in Selections, tr \in TrustStates, d \in DetailModes, l \in Locales:
+    /\ t \in Tasks
+  /\ s \in TaskSelectionSet(t)
+  /\ tr \in TaskTrustSet(t)
+  /\ d \in TaskDetailModeSet(t)
     /\ task' = t
-    /\ focusSection' = TaskSection[t]
+    /\ focusSection' = TaskSection(t)
     /\ selection' = s
     /\ trust' = tr
     /\ detailMode' = d

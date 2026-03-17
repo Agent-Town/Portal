@@ -232,7 +232,7 @@ If TLC is not installed locally, the model should still be kept up to date and c
 
 ## Current verification status
 
-Verified locally on 2026-03-16 with TLC 2.19.
+Verified locally on 2026-03-17 with TLC 2.19.
 
 Observed result:
 
@@ -261,7 +261,15 @@ Observed result:
 3. complete search depth `4`,
 4. no invariant violations.
 
-`VoiceInteractionGrammar.tla` has not yet been verified in this environment. Run TLC with the command above once tooling is available.
+`VoiceInteractionGrammar.tla` verified locally on 2026-03-17 with TLC 2.19.
+
+Observed result:
+
+1. `11665` states generated,
+2. `108` distinct reachable states,
+3. complete search depth `2`,
+4. no invariant violations,
+5. no deadlock check requested by config.
 
 ## How future agents should use this
 

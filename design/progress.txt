@@ -49,7 +49,7 @@ Current state:
   - canonical task-to-command-to-alias mapping
   - locale-safe command alias constraints
   - no-drift checks across human, advanced, LLM, and voice projections
-  - currently documented and ready for TLC verification once tooling is available
+  - verified with TLC in this environment
 - Implemented Phase D1 foundation in `public/styles.css`
 - Recorded March 2026 baseline audit findings for:
   - /start
@@ -131,9 +131,9 @@ Completed:
 
 Not yet done:
 - no approved design phases remain after D6
-- voice-ready interaction constraints are now documented as a formal model but not yet TLC-verified in this environment
+- voice-ready interaction constraints are now documented as a formal model and are TLC-verified in this environment
 
 Recommended next step:
-- complete one design-phase milestone only after confirming the formal voice command model with TLC in a verification-capable environment
+- complete one design-phase milestone only after confirming the formal voice command model with required TLA+ checks in this environment
 - review the full D1 through D6 evidence set before proposing any new design phase
 - Require every future design phase to satisfy `design/specs/09_global_human_first_design_requirements.md`
