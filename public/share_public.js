@@ -502,7 +502,7 @@ function getSharePlaceholderCopy(preview = null) {
     title: `${hqName} HQ share card`,
     lead: `Placeholder shell for ${hqName} HQ while the public share card is still offline.`,
     heroPanelTitle: `🎨 ${hqName} HQ Hero`,
-    hero: 'Generated house hero will appear here once the public share card is minted.',
+    hero: `${hqName} HQ hero will appear here once the public share card is minted.`,
     teamPanelTitle: `👤 ${hqName} HQ Team`,
     signup: `Join ${hqName} HQ`,
     addFriend: `Add ${hqName} HQ as friend`,
