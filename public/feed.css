@@ -1,0 +1,446 @@
+/* feed.css — ZHC1 iteration feed, dark-theme mobile-first */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --bg: #0a0a0f;
+  --surface: #14141f;
+  --surface2: #1e1e2e;
+  --border: #2a2a3a;
+  --text: #e8e8f0;
+  --text2: #8888a0;
+  --accent: #6c5ce7;
+  --accent2: #a29bfe;
+  --green: #00b894;
+  --red: #ff6b6b;
+  --orange: #feca57;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow: hidden;
+}
+
+/* ── Feed modal shell ──────────────────────────────────────── */
+.feed-modal {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  max-width: 480px;
+  margin: 0 auto;
+  box-shadow: -10px 0 60px rgba(0, 0, 0, 0.5), 10px 0 60px rgba(0, 0, 0, 0.5);
+}
+
+/* ── Top bar ───────────────────────────────────────────────── */
+.top-bar {
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.top-bar-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.problem-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.iteration-label {
+  font-size: 11px;
+  color: var(--text2);
+}
+
+.top-bar-right {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.top-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text2);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.top-btn:hover {
+  background: var(--surface2);
+}
+
+/* ── Score trend ───────────────────────────────────────────── */
+.score-trend {
+  padding: 8px 16px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.sparkline {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 28px;
+}
+
+.spark-bar {
+  width: 6px;
+  border-radius: 2px;
+  background: var(--accent);
+  opacity: 0.4;
+}
+
+.spark-bar.last {
+  opacity: 1;
+  background: var(--green);
+}
+
+.trend-score {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--green);
+}
+
+.trend-label {
+  font-size: 10px;
+  color: var(--text2);
+}
+
+.trend-delta {
+  font-size: 11px;
+  color: var(--green);
+  margin-left: auto;
+}
+
+/* ── Feed tabs ─────────────────────────────────────────────── */
+.feed-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.feed-tab {
+  flex: 1;
+  padding: 10px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text2);
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.feed-tab:hover {
+  color: var(--text);
+}
+
+.feed-tab.active {
+  color: var(--accent2);
+  border-bottom-color: var(--accent);
+}
+
+/* ── Card area (scrollable) ────────────────────────────────── */
+.card-area {
+  flex: 1;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.card-area::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Experiment card ───────────────────────────────────────── */
+.experiment-card {
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+
+.experiment-card:hover {
+  background: rgba(108, 92, 231, 0.03);
+}
+
+.card-header {
+  padding: 10px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text2);
+}
+
+.card-iteration {
+  font-weight: 700;
+  color: var(--text);
+  background: var(--surface2);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.card-delta {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.card-delta.positive {
+  color: var(--green);
+  background: rgba(0, 184, 148, 0.1);
+}
+
+.card-delta.negative {
+  color: var(--red);
+  background: rgba(255, 107, 107, 0.1);
+}
+
+.card-score {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent2);
+}
+
+/* ── Visual placeholder ────────────────────────────────────── */
+.card-visual {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+}
+
+.visual-placeholder {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.visual-slide {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  gap: 12px;
+}
+
+.slide-header {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--accent2);
+}
+
+.slide-title {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.slide-body {
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.6;
+}
+
+.slide-metrics {
+  margin-top: auto;
+  display: flex;
+  gap: 12px;
+}
+
+.slide-metric {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.metric-label {
+  font-size: 9px;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.metric-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--green);
+}
+
+.metric-value.ok {
+  color: var(--orange);
+}
+
+.metric-value.bad {
+  color: var(--red);
+}
+
+/* ── Card footer ───────────────────────────────────────────── */
+.card-footer {
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.agent-summary {
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.4;
+  margin-bottom: 8px;
+  max-width: 280ch;
+}
+
+.code-ref {
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+  flex-wrap: wrap;
+}
+
+.code-ref-file {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+  background: var(--surface2);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.code-ref-diff {
+  color: var(--text2);
+}
+
+/* ── Feedback bar ──────────────────────────────────────────── */
+.feedback-bar {
+  padding: 8px 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.feedback-input {
+  flex: 1;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.feedback-input::placeholder {
+  color: var(--text2);
+}
+
+.feedback-input:focus {
+  border-color: var(--accent);
+}
+
+.mic-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.mic-btn:hover {
+  background: var(--accent2);
+}
+
+.mic-btn.recording {
+  background: var(--red);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.4); }
+  50%      { box-shadow: 0 0 0 10px rgba(255, 107, 107, 0); }
+}
+
+/* ── Responsive ────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .feed-modal {
+    max-width: 100%;
+    box-shadow: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  .feed-modal {
+    /* Already capped at 480px + margin auto — good */
+  }
+}
+
+/* ── Mobile: mic button more prominent ─────────────────────── */
+@media (max-width: 640px) {
+  .mic-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+  }
+}

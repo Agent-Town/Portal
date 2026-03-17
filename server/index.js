@@ -1938,6 +1938,14 @@ app.use('/api', (req, res, next) => {
   return next();
 });
 
+// --- ZHC1 iteration feed ---
+const { problemStoriesRouter } = require('./problem-stories');
+app.use('/api/problem-stories', problemStoriesRouter);
+const { router: evalRouter } = require('./evaluation');
+app.use('/api/problem-stories', evalRouter);
+const experimentsRouter = require('./experiments');
+app.use('/api/experiments', experimentsRouter);
+
 app.use('/api/llm', requireProxySessionAccess);
 app.use('/api/tools', requireProxySessionAccess);
 app.use('/api/privy/wallet-rpc', requireProxySessionAccess);
@@ -13260,6 +13268,7 @@ app.get('/claim', (_req, res) => res.redirect(302, '/claim-wallet'));
 app.get('/claim-wallet', (_req, res) => sendHtmlNoStore(res, 'claim-wallet.html'));
 app.get('/house', (_req, res) => sendHtmlNoStore(res, 'house.html'));
 app.get('/leaderboard', (_req, res) => sendHtmlNoStore(res, 'leaderboard.html'));
+app.get('/feed', (_req, res) => sendHtmlNoStore(res, 'feed.html'));
 app.get('/trainer', (req, res) => {
   if (String(req.query?.embed || '').trim() === '1') {
     return sendHtmlNoStore(res, 'trainer.html');
