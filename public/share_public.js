@@ -478,6 +478,11 @@ function getResolvedShareCardSignupLabel(preview = null) {
   return hqName ? `Join ${hqName} HQ` : '';
 }
 
+function getResolvedShareCardAddFriendLabel(preview = null) {
+  const hqName = normalizeHouseHqName(preview?.hqName);
+  return hqName ? `Add ${hqName} HQ as friend` : '';
+}
+
 function getSharePlaceholderCopy(preview = null) {
   const hqName = normalizeHouseHqName(preview?.hqName);
   if (!hqName) {
@@ -503,6 +508,7 @@ function applyResolvedShareShellPreview(preview = null) {
   const teamPanelTitleText = getResolvedShareCardTeamPanelTitle(preview);
   const heroPlaceholderText = getResolvedShareCardHeroPlaceholder(preview);
   const signupLabelText = getResolvedShareCardSignupLabel(preview);
+  const addFriendLabelText = getResolvedShareCardAddFriendLabel(preview);
   if (!titleText) return false;
   const title = el('shareCardTitle');
   const lead = el('shareLead');
@@ -510,12 +516,14 @@ function applyResolvedShareShellPreview(preview = null) {
   const teamPanelTitle = el('shareTeamPanelTitle');
   const heroPlaceholder = el('shareHeroPlaceholder');
   const signupBtn = el('signupBtn');
+  const addFriendBtn = el('addFriendBtn');
   if (title) title.textContent = titleText;
   if (lead && leadText) lead.textContent = leadText;
   if (heroPanelTitle && heroPanelTitleText) heroPanelTitle.textContent = heroPanelTitleText;
   if (teamPanelTitle && teamPanelTitleText) teamPanelTitle.textContent = teamPanelTitleText;
   if (heroPlaceholder && heroPlaceholderText) heroPlaceholder.textContent = heroPlaceholderText;
   if (signupBtn && signupLabelText) signupBtn.textContent = signupLabelText;
+  if (addFriendBtn && addFriendLabelText) addFriendBtn.textContent = addFriendLabelText;
   document.title = `${titleText} — Agent Town`;
   return true;
 }
