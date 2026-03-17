@@ -314,3 +314,15 @@ Rule:
 2. other Library power can remain available through disclosure and the LLM,
 3. provenance and technical detail should be deferred rather than removed,
 4. if the default Library view starts feeling like an admin console again, the design has regressed.
+
+## 32. Voice readiness should be modeled before it is UIized
+
+Future voice control should not be created as a disconnected feature after UI patterns are fixed.
+
+Rule:
+
+1. define a canonical command intent for each visible action,
+2. define locale aliases as labels on that canonical intent,
+3. make sure default screens expose the same action in one clear form,
+4. allow advanced/LLM views to expose more context without changing that one action,
+5. treat voice readiness as a semantic contract now and a visual feature later.

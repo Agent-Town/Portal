@@ -1,5 +1,5 @@
 Design workspace status
-Last updated: 2026-03-16
+Last updated: 2026-03-17
 
 Current state:
 - Created canonical design documentation folder at `design/`
@@ -45,6 +45,11 @@ Current state:
   - technical and provenance detail deferred behind disclosure
   - LLM retains the full canonical Library state
   - verified locally with TLC 2.19
+- Added fourth formal model for voice-command alignment:
+  - canonical task-to-command-to-alias mapping
+  - locale-safe command alias constraints
+  - no-drift checks across human, advanced, LLM, and voice projections
+  - currently documented and ready for TLC verification once tooling is available
 - Implemented Phase D1 foundation in `public/styles.css`
 - Recorded March 2026 baseline audit findings for:
   - /start
@@ -119,10 +124,16 @@ Completed:
   - targeted D6 regressions passed
   - screenshot evidence captured and committed in `design/evidence/phase-d6/`
   - full `npm test` passed with `410 passed, 4 skipped`
+- Added formal documentation for `design/formal/VoiceInteractionGrammar.tla` and updated:
+  - `design/formal/README.md` to include the fourth model
+  - `design/LESSONS.md` with new voice-surface alignment lesson
+  - `design/specs/00_design_tdd_protocol.md` and `design/specs/README.md` to include explicit voice-model check points
 
 Not yet done:
 - no approved design phases remain after D6
+- voice-ready interaction constraints are now documented as a formal model but not yet TLC-verified in this environment
 
 Recommended next step:
+- complete one design-phase milestone only after confirming the formal voice command model with TLC in a verification-capable environment
 - review the full D1 through D6 evidence set before proposing any new design phase
 - Require every future design phase to satisfy `design/specs/09_global_human_first_design_requirements.md`

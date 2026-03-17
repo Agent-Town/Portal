@@ -27,6 +27,7 @@ If a phase changes what the default UI summarizes versus what advanced views, th
 
 1. `../formal/README.md`
 2. `../formal/DesignProjectionNoDrift.tla`
+3. `../formal/VoiceInteractionGrammar.tla` (for command and locale alignment)
 
 ## Spec structure
 

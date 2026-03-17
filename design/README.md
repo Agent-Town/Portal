@@ -89,6 +89,7 @@ also read:
 
 1. `formal/README.md`
 2. `formal/DesignProjectionNoDrift.tla`
+3. `formal/VoiceInteractionGrammar.tla`
 
 ## Design scope guardrail
 
