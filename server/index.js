@@ -1943,8 +1943,12 @@ const { problemStoriesRouter } = require('./problem-stories');
 app.use('/api/problem-stories', problemStoriesRouter);
 const { router: evalRouter } = require('./evaluation');
 app.use('/api/problem-stories', evalRouter);
+const { experimentCardsRouter } = require('./experiment-cards');
+app.use('/api/problem-stories', experimentCardsRouter);
 const experimentsRouter = require('./experiments');
 app.use('/api/experiments', experimentsRouter);
+const { feedbackRouter } = require('./feedback');
+app.use('/api/experiment-cards', feedbackRouter);
 
 app.use('/api/llm', requireProxySessionAccess);
 app.use('/api/tools', requireProxySessionAccess);
