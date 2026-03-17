@@ -7650,7 +7650,21 @@ async function fetchPrivyTransactionStatus(transactionId) {
   if (!response.ok) {
     const err = new Error('PRIVY_TRANSACTION_STATUS_UNAVAILABLE');
     err.status = response.status >= 400 ? response.status : 502;
-    const detail = payload?.error?.message || payload?.message || rawBody;
+    let detail = payload?.error?.message || payload?.message;
+    if (detail === undefined || detail === null) {
+      const errorObj = payload?.error;
+      if (typeof errorObj === 'string') {
+        detail = errorObj;
+      } else if (errorObj && typeof errorObj === 'object') {
+        if (typeof errorObj.error === 'string' && errorObj.error.trim()) {
+          const code = typeof errorObj.code === 'string' && errorObj.code.trim() ? `${errorObj.code.trim()}: ` : '';
+          detail = `${code}${errorObj.error.trim()}`;
+        } else if (typeof errorObj.message === 'string' && errorObj.message.trim()) {
+          detail = errorObj.message.trim();
+        }
+      }
+    }
+    if (!detail) detail = rawBody;
     if (typeof detail === 'string' && detail.trim()) err.detail = detail.trim();
     throw err;
   }
@@ -7729,7 +7743,21 @@ async function relayPrivyWalletRpc({ walletId, body, authorizationSignature }) {
   if (!response.ok) {
     const err = new Error('PRIVY_WALLET_RPC_RELAY_FAILED');
     err.status = response.status >= 400 ? response.status : 502;
-    const detail = payload?.error?.message || payload?.message || rawBody;
+    let detail = payload?.error?.message || payload?.message;
+    if (detail === undefined || detail === null) {
+      const errorObj = payload?.error;
+      if (typeof errorObj === 'string') {
+        detail = errorObj;
+      } else if (errorObj && typeof errorObj === 'object') {
+        if (typeof errorObj.error === 'string' && errorObj.error.trim()) {
+          const code = typeof errorObj.code === 'string' && errorObj.code.trim() ? `${errorObj.code.trim()}: ` : '';
+          detail = `${code}${errorObj.error.trim()}`;
+        } else if (typeof errorObj.message === 'string' && errorObj.message.trim()) {
+          detail = errorObj.message.trim();
+        }
+      }
+    }
+    if (!detail) detail = rawBody;
     if (typeof detail === 'string' && detail.trim()) err.detail = detail.trim();
     throw err;
   }

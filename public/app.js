@@ -7179,6 +7179,32 @@ function collectTownhallProfilePayload() {
   return payload;
 }
 
+function extractPrivyRelayDetail(err) {
+  const candidates = [err?.data?.detail, err?.detail, err?.cause?.message];
+  for (const candidate of candidates) {
+    if (typeof candidate !== 'string') continue;
+    const raw = candidate.trim();
+    if (!raw) continue;
+    if (raw[0] === '{' && raw[raw.length - 1] === '}') {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          if (typeof parsed.error === 'string' && parsed.error.trim()) {
+            const code = typeof parsed.code === 'string' && parsed.code.trim() ? `${parsed.code.trim()}: ` : '';
+            return `${code}${parsed.error.trim()}`;
+          }
+          if (typeof parsed.message === 'string' && parsed.message.trim()) return parsed.message.trim();
+          if (typeof parsed.errorMessage === 'string' && parsed.errorMessage.trim()) return parsed.errorMessage.trim();
+        }
+      } catch {
+        // keep raw if not valid JSON
+      }
+    }
+    return raw;
+  }
+  return '';
+}
+
 function knownMintErrorMessage(err, chain = 'evm') {
   const code = String(err?.message || err || '').trim();
   if (!code) return chain === 'evm' ? 'Sepolia mint failed.' : 'Solana mint failed.';
@@ -7310,23 +7336,30 @@ function knownMintErrorMessage(err, chain = 'evm') {
       : 'Privy could not authorize the sponsored Sepolia transaction.';
   }
   if (code === 'PRIVY_WALLET_RPC_RELAY_FAILED') {
-    const detailRaw = String(err?.detail || err?.data?.detail || '').trim();
-    const detail = detailRaw.toLowerCase();
-    if (detail.includes('does not support the method')) {
+    const detail = extractPrivyRelayDetail(err);
+    const detailLower = detail.toLowerCase();
+    if (detailLower.includes('sender already has an inflight eip-7702 authorization')
+      || detailLower.includes('inflight eip-7702 authorization')
+      || detailLower.includes('sender already constructed')
+      || detailLower.includes('aa10')
+    ) {
+      return 'Privy smart-account authorization is still initializing on-chain. Wait 10–15 seconds and retry.';
+    }
+    if (detailLower.includes('does not support the method')) {
       return chain === 'solana'
         ? 'This Privy wallet cannot run sponsored Solana signAndSendTransaction in the current execution mode.'
         : 'This Privy wallet cannot run sponsored eth_sendTransaction in the current execution mode.';
     }
     if (
-      detail.includes('insufficient funds')
-      || detail.includes('exceeds the balance of the account')
-      || detail.includes('total cost (gas * gas fee + value)')
+      detailLower.includes('insufficient funds')
+      || detailLower.includes('exceeds the balance of the account')
+      || detailLower.includes('total cost (gas * gas fee + value)')
     ) {
       return chain === 'solana'
         ? 'Privy gas sponsorship did not apply; this Solana wallet has insufficient SOL.'
         : 'Privy gas sponsorship did not apply; this Sepolia wallet has insufficient ETH.';
     }
-    return detailRaw ? `Privy sponsorship relay failed: ${detailRaw}` : 'Privy sponsorship relay failed.';
+    return detail ? `Privy sponsorship relay failed: ${detail}` : 'Privy sponsorship relay failed.';
   }
   if (code.startsWith('INVALID_PRIVY_WALLET_RPC_')) {
     return chain === 'solana'
@@ -7385,12 +7418,50 @@ function knownMintErrorMessage(err, chain = 'evm') {
   return chain === 'evm' ? `Sepolia mint failed: ${code}` : `Solana mint failed: ${code}`;
 }
 
+function extractPrivyErrorText(err) {
+  const candidates = [
+    extractPrivyRelayDetail(err),
+    err?.message,
+    err?.cause?.message,
+    err?.detail,
+    err?.data?.detail
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate !== 'string') continue;
+    const text = candidate.trim();
+    if (!text) continue;
+    return text.toLowerCase();
+  }
+  return '';
+}
+
 function isPrivyWalletProxyInitError(err) {
-  const msg = String(err?.message || err || '').toLowerCase();
+  const msg = extractPrivyErrorText(err);
   return msg.includes('wallet proxy not initialized')
     || msg.includes('embedded wallet proxy not initialized')
     || msg.includes('embedded_wallet_proxy_not_initialized')
     || msg.includes('wallet_proxy_not_initialized');
+}
+
+function isPrivyWalletInflightRelayError(err) {
+  const msg = extractPrivyErrorText(err);
+  return msg.includes('aa10')
+    || msg.includes('inflight eip-7702 authorization')
+    || msg.includes('sender already constructed')
+    || msg.includes('already has an inflight');
+}
+
+function isRetryablePrivyWalletRelayError(err) {
+  const code = String(err?.message || '').trim().toUpperCase();
+  const detail = extractPrivyRelayDetail(err).toLowerCase();
+  if (code === 'PRIVY_WALLET_RPC_RELAY_FAILED') {
+    return detail.includes('aa10')
+      || detail.includes('inflight eip-7702 authorization')
+      || detail.includes('sender already constructed')
+      || detail.includes('already has an inflight');
+  }
+  return isPrivyWalletProxyInitError(err)
+    || isPrivyWalletInflightRelayError(err);
 }
 
 function inferMintErrorChain(err, fallback = 'evm') {
@@ -7454,9 +7525,12 @@ async function withPrivyProxyRetry(task, { maxAttempts = 4, onRetry = null } = {
       return await task();
     } catch (err) {
       lastErr = err;
-      if (!isPrivyWalletProxyInitError(err)) throw err;
-      await forcePrivyWalletReady({ interactive: i === 0 });
-      if (i >= 1 && typeof window.resetPrivyBridge === 'function') {
+      const isInflightRelay = isPrivyWalletInflightRelayError(err);
+      if (!isRetryablePrivyWalletRelayError(err)) throw err;
+      if (!isInflightRelay) {
+        await forcePrivyWalletReady({ interactive: i === 0 });
+      }
+      if (!isInflightRelay && i >= 1 && typeof window.resetPrivyBridge === 'function') {
         try {
           await window.resetPrivyBridge({ hard: i >= 2 });
         } catch {
@@ -7465,13 +7539,13 @@ async function withPrivyProxyRetry(task, { maxAttempts = 4, onRetry = null } = {
       }
       if (typeof onRetry === 'function') {
         try {
-          await onRetry({ attempt: i + 1, error: err });
+          await onRetry({ attempt: i + 1, error: err, reason: isInflightRelay ? 'inflight_authorization' : 'proxy_init' });
         } catch {
           // ignore retry hook errors and continue retrying
         }
       }
       if (i < attempts - 1) {
-        await sleep(180 * (i + 1));
+        await sleep(isInflightRelay ? 1500 * (i + 1) : 180 * (i + 1));
       }
     }
   }
