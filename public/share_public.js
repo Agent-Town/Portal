@@ -468,6 +468,11 @@ function getResolvedShareCardHeroPlaceholder(preview = null) {
   return hqName ? `${hqName} HQ hero will appear here once the public share card is minted.` : '';
 }
 
+function getResolvedShareCardTeamLinePrefix(preview = null) {
+  const hqName = normalizeHouseHqName(preview?.hqName);
+  return hqName ? `${hqName} HQ • ` : '';
+}
+
 function getSharePlaceholderCopy(preview = null) {
   const hqName = normalizeHouseHqName(preview?.hqName);
   if (!hqName) {
@@ -539,7 +544,8 @@ function setTeamLine(share) {
   const handle = share.humanHandle || handleFromUrl(share.xPostUrl);
   const human = handle ? `@${handle}` : '--';
   const agent = share.mode === 'token' ? (share.agentName || '$ELIZATOWN') : (share.agentName || 'OpenClaw');
-  el('teamLine').textContent = `human: ${human} | agent: ${agent}`;
+  const prefix = getResolvedShareCardTeamLinePrefix(readResolvedShareCardPreview());
+  el('teamLine').textContent = `${prefix}human: ${human} | agent: ${agent}`;
 }
 
 function setLink(linkId, missingId, url) {
