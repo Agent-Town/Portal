@@ -485,6 +485,7 @@ function getResolvedShareCardAddFriendLabel(preview = null) {
 
 function getSharePlaceholderCopy(preview = null) {
   const hqName = normalizeHouseHqName(preview?.hqName);
+  const teamLinePrefix = getResolvedShareCardTeamLinePrefix(preview);
   if (!hqName) {
     return {
       badge: 'preview',
@@ -493,6 +494,7 @@ function getSharePlaceholderCopy(preview = null) {
       heroPanelTitle: '🎨 House Hero',
       hero: 'Generated house hero will appear here once the public share card is minted.',
       teamPanelTitle: '👤 Team',
+      teamLine: `${teamLinePrefix}human: … | agent: …`,
       signup: 'Sign up',
       addFriend: 'Add as friend',
     };
@@ -504,6 +506,7 @@ function getSharePlaceholderCopy(preview = null) {
     heroPanelTitle: `🎨 ${hqName} HQ Hero`,
     hero: `${hqName} HQ hero will appear here once the public share card is minted.`,
     teamPanelTitle: `👤 ${hqName} HQ Team`,
+    teamLine: `${teamLinePrefix}human: … | agent: …`,
     signup: `Join ${hqName} HQ`,
     addFriend: `Add ${hqName} HQ as friend`,
   };
@@ -543,6 +546,7 @@ function applySharePlaceholderState(preview = null) {
   const badge = el('shareIdBadge');
   const heroPanelTitle = el('shareHeroPanelTitle');
   const teamPanelTitle = el('shareTeamPanelTitle');
+  const teamLine = el('teamLine');
   const heroPlaceholder = el('shareHeroPlaceholder');
   const signupBtn = el('signupBtn');
   const addFriendBtn = el('addFriendBtn');
@@ -551,6 +555,7 @@ function applySharePlaceholderState(preview = null) {
   if (badge) badge.textContent = copy.badge;
   if (heroPanelTitle) heroPanelTitle.textContent = copy.heroPanelTitle;
   if (teamPanelTitle) teamPanelTitle.textContent = copy.teamPanelTitle;
+  if (teamLine && copy.teamLine) teamLine.textContent = copy.teamLine;
   if (heroPlaceholder) heroPlaceholder.textContent = copy.hero;
   if (signupBtn && copy.signup) signupBtn.textContent = copy.signup;
   if (addFriendBtn && copy.addFriend) addFriendBtn.textContent = copy.addFriend;
