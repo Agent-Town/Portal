@@ -143,6 +143,16 @@ function getCardById(cardId) {
 }
 
 /**
+ * Reset all cards for a given story (used by save-game load).
+ * @param {string} storyId
+ */
+function _resetCardsForStory(storyId) {
+  if (stories.has(storyId)) {
+    stories.get(storyId).clear();
+  }
+}
+
+/**
  * Update a card in-place (by card ID, any story).
  * Used by feedback.js to set status and feedback fields.
  * @param {string} cardId
@@ -208,5 +218,6 @@ module.exports = {
   getExperimentCard,
   getCardById,
   updateCardById,
+  _resetCardsForStory,
   _resetStore: () => stories.clear(),
 };

@@ -23,6 +23,7 @@ const SAMPLE_EXPERIMENTS = [
     metricStatus: { Load: 'good', LCP: 'good', CLS: 'good', Visual: 'good' },
     age: '7m ago',
     round: 1,
+    cardId: 'sample-3',
   },
   {
     iteration: 2,
@@ -41,6 +42,7 @@ const SAMPLE_EXPERIMENTS = [
     metricStatus: { Load: 'warn', LCP: 'warn', CLS: 'bad', Visual: 'warn' },
     age: '14m ago',
     round: 1,
+    cardId: 'sample-2',
   },
   {
     iteration: 1,
@@ -58,6 +60,7 @@ const SAMPLE_EXPERIMENTS = [
     metricStatus: { Load: 'good', LCP: 'good', CLS: 'good', Visual: 'warn' },
     age: '28m ago',
     round: 1,
+    cardId: 'sample-1',
   },
 ];
 
@@ -146,6 +149,8 @@ function apiCardToDisplay(card) {
     metricStatus,
     age,
     round: card.roundNumber || 1,
+    cardId: card.id,
+    _rawCard: card,
   };
 }
 
@@ -166,7 +171,10 @@ function timeAgo(isoStr) {
 
 // ── Rendering ─────────────────────────────────────────────────
 
+let currentExperiments = [];
+
 function renderFeed(experiments) {
+  currentExperiments = experiments;
   const cardArea = document.getElementById('card-area');
   if (!cardArea) return;
 
@@ -198,6 +206,7 @@ function renderCard(exp) {
   return `
     <div class="experiment-card"
          data-testid="experiment-card"
+         data-card-id="${escHtml(exp.cardId)}"
          data-iteration="${exp.iteration}">
       <div class="card-header">
         <div class="card-meta">
@@ -209,7 +218,7 @@ function renderCard(exp) {
           <div class="card-score">${exp.score.toFixed(2)}</div>
         </div>
       </div>
-      <div class="card-visual">
+      <div class="card-visual card-clickable" data-card-id="${escHtml(exp.cardId)}">
         <div class="visual-placeholder">
           <div class="visual-slide" style="background:${exp.visualGradient}">
             <div class="slide-header">Experiment #${exp.iteration} — ${escHtml(exp.label)}</div>
@@ -220,7 +229,7 @@ function renderCard(exp) {
         </div>
       </div>
       <div class="card-footer">
-        <div class="agent-summary">${escHtml(exp.summary)}</div>
+        <div class="agent-summary card-clickable" data-card-id="${escHtml(exp.cardId)}">${escHtml(exp.summary)}</div>
         <div class="code-ref">${filesHtml}</div>
       </div>
     </div>`;
@@ -253,6 +262,254 @@ function updateScoreTrend(experiments) {
 
   const totalExps = experiments.length;
   iterLabel.textContent = `Round ${latest.round} · ${totalExps} experiment${totalExps !== 1 ? 's' : ''}`;
+}
+
+// ── Card Detail View ──────────────────────────────────────────
+
+let expandedCardId = null;
+
+async function openCardDetail(cardId) {
+  if (expandedCardId === cardId) {
+    closeCardDetail();
+    return;
+  }
+  expandedCardId = cardId;
+
+  // Find the card in current experiments or fetch from API
+  let card = null;
+  const localExp = currentExperiments.find(e => e.cardId === cardId);
+  if (localExp?._rawCard) {
+    card = localExp._rawCard;
+  }
+
+  // Fetch full card details from API (includes all scores, feedback, etc.)
+  if (!card && cardId && !cardId.startsWith('sample-')) {
+    try {
+      const res = await apiFetch(`/api/experiment-cards/${cardId}`);
+      if (res.ok) card = res.card;
+    } catch (err) {
+      console.warn('[feed:card-detail] API fetch failed:', err.message);
+    }
+  }
+
+  // Build detail view
+  const detailContainer = document.createElement('div');
+  detailContainer.id = 'card-detail';
+  detailContainer.setAttribute('data-testid', 'card-detail');
+  detailContainer.className = 'card-detail';
+
+  if (!card) {
+    detailContainer.innerHTML = `
+      <div class="card-detail-header">
+        <span class="card-detail-title">Card details unavailable</span>
+        <button class="card-detail-close" id="card-detail-close">✕</button>
+      </div>
+      <div class="card-detail-body">
+        <p>Could not load details for this experiment card.</p>
+      </div>`;
+  } else {
+    // Full individual metric scores
+    const allScores = card.scores || {};
+    const scoresHtml = Object.entries(allScores).length > 0
+      ? Object.entries(allScores).map(([name, value]) => {
+          const display = typeof value === 'number' ? value.toFixed(3) : String(value);
+          const pct = typeof value === 'number' ? Math.round(value * 100) : 50;
+          const lowerIsBetter = ['cls', 'error rate', 'load', 'lcp'].includes(name.toLowerCase());
+          const barColor = lowerIsBetter
+            ? (value < 0.1 ? 'var(--green)' : value < 0.3 ? 'var(--yellow)' : 'var(--red)')
+            : (value > 0.8 ? 'var(--green)' : value > 0.5 ? 'var(--yellow)' : 'var(--red)');
+          return `<div class="detail-score-row">
+            <span class="detail-score-name">${escHtml(name)}</span>
+            <div class="detail-score-bar-wrap">
+              <div class="detail-score-bar" style="width:${pct}%;background:${barColor}"></div>
+            </div>
+            <span class="detail-score-value">${display}</span>
+          </div>`;
+        }).join('')
+      : '<p style="color:var(--muted)">No individual scores recorded.</p>';
+
+    // Full agent explanation
+    const agentExplain = card.agentSummary || card.deltaFromLast || 'No explanation provided.';
+
+    // Full code diff summary
+    const codeRef = card.codeReference || {};
+    const diffHtml = codeRef.filePath
+      ? `<div class="detail-code">
+           <div class="detail-code-file">${escHtml(codeRef.filePath)}</div>
+           ${codeRef.commitHash ? `<div class="detail-code-hash">${escHtml(codeRef.commitHash.slice(0, 12))}</div>` : ''}
+           <div class="detail-code-diff">${escHtml(codeRef.diffSummary || 'No diff summary.')}</div>
+         </div>`
+      : '<p style="color:var(--muted)">No code reference available.</p>';
+
+    // Feedback history
+    const feedback = card.feedback;
+    let feedbackHtml = '<p style="color:var(--muted)">No feedback recorded yet.</p>';
+    if (feedback) {
+      const fModality = feedback.modality || 'unknown';
+      const fText = feedback.textContent || feedback.transcription || '';
+      const fGesture = feedback.gesture || '';
+      const fSentiment = feedback.sentiment || 'neutral';
+      const fConstraints = Array.isArray(feedback.extractedConstraints) && feedback.extractedConstraints.length > 0
+        ? feedback.extractedConstraints.map(c => `<li>${escHtml(c)}</li>`).join('')
+        : '';
+      const fTime = feedback.timestamp ? timeAgo(feedback.timestamp) : '';
+
+      feedbackHtml = `
+        <div class="detail-feedback">
+          <div class="detail-feedback-meta">
+            <span class="detail-feedback-sentiment ${fSentiment}">${escHtml(fSentiment)}</span>
+            <span>${escHtml(fModality)}${fGesture ? ' · ' + escHtml(fGesture.replace('swipe_', '')) : ''}</span>
+            ${fTime ? `<span> · ${escHtml(fTime)}</span>` : ''}
+          </div>
+          ${fText ? `<div class="detail-feedback-text">"${escHtml(fText)}"</div>` : ''}
+          ${fConstraints ? `<ul class="detail-feedback-constraints">${fConstraints}</ul>` : ''}
+        </div>`;
+    }
+
+    // Visual (larger)
+    const gradients = [
+      'linear-gradient(145deg, #1a1a2e, #16213e 50%, #0f3460)',
+      'linear-gradient(145deg, #1a1a2e, #1a0f2e 50%, #2d0f3e)',
+      'linear-gradient(145deg, #0f2027, #203a43 50%, #2c5364)',
+      'linear-gradient(145deg, #2d1b4e, #1a1a2e 50%, #0f3460)',
+      'linear-gradient(145deg, #1b2a3d, #0f3460 50%, #16213e)',
+    ];
+    const gIdx = (card.iterationNumber - 1) % gradients.length;
+    const statusBadge = card.status === 'kept' ? '✅ kept' : card.status === 'discarded' ? '❌ discarded' : '⏳ pending';
+
+    detailContainer.innerHTML = `
+      <div class="card-detail-header">
+        <div>
+          <span class="card-detail-title">#${card.iterationNumber} — ${escHtml(card.visual?.alt || `Experiment #${card.iterationNumber}`)}</span>
+          <span class="card-detail-status">${statusBadge}</span>
+        </div>
+        <button class="card-detail-close" id="card-detail-close">✕</button>
+      </div>
+      <div class="card-detail-body">
+        <div class="detail-visual-large">
+          <div class="visual-slide" style="background:${gradients[gIdx]}">
+            <div class="slide-header">Experiment #${card.iterationNumber}</div>
+            <div class="slide-title">${escHtml(card.visual?.alt || '')}</div>
+            <div class="slide-body">${escHtml(card.deltaFromLast || card.agentSummary || '')}</div>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <h4 class="detail-section-title">📊 All Metric Scores</h4>
+          <div class="detail-scores">${scoresHtml}</div>
+          <div class="detail-composite">
+            Composite: <strong>${(card.compositeScore || 0).toFixed(3)}</strong>
+            ${typeof card.deltaScore === 'number' ? ` (Δ ${card.deltaScore >= 0 ? '↑' : '↓'}${Math.abs(card.deltaScore).toFixed(3)})` : ''}
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <h4 class="detail-section-title">🤖 Agent Explanation</h4>
+          <p class="detail-explanation">${escHtml(agentExplain)}</p>
+        </div>
+
+        <div class="detail-section">
+          <h4 class="detail-section-title">📝 Code Changes</h4>
+          ${diffHtml}
+        </div>
+
+        <div class="detail-section">
+          <h4 class="detail-section-title">💬 Feedback</h4>
+          ${feedbackHtml}
+        </div>
+      </div>`;
+  }
+
+  // Remove any existing detail view
+  const existing = document.getElementById('card-detail');
+  if (existing) existing.remove();
+
+  // Insert after card area
+  const cardArea = document.getElementById('card-area');
+  if (cardArea && cardArea.parentNode) {
+    cardArea.parentNode.insertBefore(detailContainer, cardArea.nextSibling);
+  }
+
+  // Animate in
+  requestAnimationFrame(() => {
+    detailContainer.classList.add('card-detail-visible');
+  });
+
+  // Close button
+  document.getElementById('card-detail-close')?.addEventListener('click', closeCardDetail);
+
+  // Scroll detail into view
+  detailContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function closeCardDetail() {
+  expandedCardId = null;
+  const detail = document.getElementById('card-detail');
+  if (!detail) return;
+  detail.classList.remove('card-detail-visible');
+  detail.classList.add('card-detail-closing');
+  setTimeout(() => detail.remove(), 300);
+}
+
+// ── Save Game ─────────────────────────────────────────────────
+
+async function createSaveGame() {
+  const storyId = getLastStoryId();
+  if (!storyId) {
+    alert('No active problem story to save.');
+    return;
+  }
+
+  const label = prompt('Checkpoint label (optional):') || undefined;
+
+  try {
+    const res = await apiFetch('/api/save-games', {
+      method: 'POST',
+      body: JSON.stringify({ problemStoryId: storyId, label }),
+    });
+    if (res.ok) {
+      const sg = res.saveGame;
+      const iterCount = sg.totalIterationsAtSave;
+      const bestScore = sg.bestCompositeScore;
+      alert(`💾 Checkpoint saved!\n${label ? 'Label: ' + label + '\n' : ''}Iterations: ${iterCount}\nBest score: ${bestScore}`);
+    }
+  } catch (err) {
+    alert('Failed to create checkpoint: ' + err.message);
+  }
+}
+
+async function loadSaveGame() {
+  try {
+    const storyId = getLastStoryId();
+    const res = await apiFetch(`/api/save-games${storyId ? '?problemStoryId=' + storyId : ''}`);
+    if (!res.ok || !res.saveGames || res.saveGames.length === 0) {
+      alert('No checkpoints found for this story.');
+      return;
+    }
+
+    // Build a simple picker
+    const options = res.saveGames.map((sg, i) =>
+      `[${i + 1}] ${sg.label || 'Unnamed'} (${timeAgo(sg.createdAt)}) — iter ${sg.totalIterationsAtSave}, best ${sg.bestCompositeScore}`
+    ).join('\n');
+
+    const choice = prompt(`Load checkpoint:\n${options}\n\nEnter number (or cancel):`);
+    if (!choice) return;
+
+    const idx = parseInt(choice) - 1;
+    const sg = res.saveGames[idx];
+    if (!sg) {
+      alert('Invalid selection.');
+      return;
+    }
+
+    const loadRes = await apiFetch(`/api/save-games/${sg.id}/load`, { method: 'POST' });
+    if (loadRes.ok) {
+      alert(`✅ Restored to iteration ${loadRes.totalIterationsAtSave}`);
+      await loadFeedFromApi(sg.problemStoryId);
+    }
+  } catch (err) {
+    alert('Failed to load checkpoint: ' + err.message);
+  }
 }
 
 // ── Scroll position persistence ───────────────────────────────
@@ -298,6 +555,40 @@ function initClose() {
   btn.addEventListener('click', () => {
     if (window.history.length > 1) window.history.back();
     else window.location.href = '/';
+  });
+}
+
+// ── Save/Load buttons in top bar ─────────────────────────────
+
+function initSaveButtons() {
+  const saveBtn = document.querySelector('.top-btn[title="Save"]');
+  if (saveBtn) {
+    saveBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      createSaveGame();
+    });
+  }
+
+  const storyBtn = document.querySelector('.top-btn[title="Story"]');
+  if (storyBtn) {
+    storyBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      loadSaveGame();
+    });
+  }
+}
+
+// ── Card click delegation ─────────────────────────────────────
+
+function initCardClicks() {
+  const cardArea = document.getElementById('card-area');
+  if (!cardArea) return;
+
+  cardArea.addEventListener('click', (e) => {
+    const clickable = e.target.closest('.card-clickable');
+    if (!clickable) return;
+    const cardId = clickable.dataset.cardId;
+    if (cardId) openCardDetail(cardId);
   });
 }
 
@@ -385,7 +676,7 @@ async function seedTestData() {
       agentSummary: 'High-contrast dark palette. Accent only on CTAs. Accessibility AA reached.',
       deltaFromLast: 'First iteration — establishing baseline.',
       visual: { type: 'css_gradient', alt: 'Color System — high-contrast dark palette' },
-      codeReference: { filePath: 'theme.css', diffSummary: '+18 -34', commitHash: '' },
+      codeReference: { filePath: 'theme.css', diffSummary: '+18 -34', commitHash: 'a1b2c3d4e5f6' },
       scores: { 'Response time': 0.85, 'Visual quality': 0.80 },
       compositeScore: 0.83,
       status: 'kept',
@@ -396,7 +687,7 @@ async function seedTestData() {
       agentSummary: 'Full-width gradient hero with centered CTA and floating nav. CLS regression on nav.',
       deltaFromLast: 'Bolder hero but nav instability.',
       visual: { type: 'css_gradient', alt: 'Layout A — full-width hero' },
-      codeReference: { filePath: 'hero.css', diffSummary: '+31 -12', commitHash: '' },
+      codeReference: { filePath: 'hero.css', diffSummary: '+31 -12', commitHash: 'b2c3d4e5f6a7' },
       scores: { 'Response time': 0.70, 'Visual quality': 0.72, 'CLS': 0.30 },
       compositeScore: 0.87,
       status: 'discarded',
@@ -407,7 +698,7 @@ async function seedTestData() {
       agentSummary: 'Moved CTA inline with hero headline. Added trust badges. Reduced nav to 4 items.',
       deltaFromLast: 'Fixed CLS, improved visual weight balance.',
       visual: { type: 'css_gradient', alt: 'Layout B — inline CTA + social proof' },
-      codeReference: { filePath: 'hero.css', diffSummary: '+24 -18', commitHash: '' },
+      codeReference: { filePath: 'hero.css', diffSummary: '+24 -18', commitHash: 'c3d4e5f6a7b8' },
       scores: { 'Response time': 0.92, 'Visual quality': 0.90, 'CLS': 0.95 },
       compositeScore: 0.91,
       status: 'pending_review',
@@ -476,6 +767,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   initTabs();
   initMic();
   initClose();
+  initSaveButtons();
+  initCardClicks();
   injectTestButton();
 
   const cardArea = document.getElementById('card-area');

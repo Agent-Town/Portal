@@ -1949,6 +1949,12 @@ const experimentsRouter = require('./experiments');
 app.use('/api/experiments', experimentsRouter);
 const { feedbackRouter } = require('./feedback');
 app.use('/api/experiment-cards', feedbackRouter);
+const { router: cardDetailRouter } = require('./experiment-card-detail');
+app.use('/api/experiment-cards', cardDetailRouter);
+const { router: saveGameRouter } = require('./save-game');
+app.use('/api/save-games', saveGameRouter);
+const iterationLoopRouter = require('./iteration-loop');
+app.use('/api/iteration-loop', iterationLoopRouter);
 
 app.use('/api/llm', requireProxySessionAccess);
 app.use('/api/tools', requireProxySessionAccess);
