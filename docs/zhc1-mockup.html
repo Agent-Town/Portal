@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ZHC1 — Iteration Feed Loop</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0a0f;--surface:#14141f;--surface2:#1e1e2e;--border:#2a2a3a;--text:#e8e8f0;--text2:#8888a0;--accent:#6c5ce7;--accent2:#a29bfe;--green:#00b894;--red:#ff6b6b;--orange:#feca57}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow:hidden}
+.app-shell{position:fixed;inset:0;background:linear-gradient(135deg,#0d0d1a,#1a1a2e);display:flex;align-items:center;justify-content:center;opacity:.3;filter:blur(8px)}
+.app-shell-label{font-size:14px;color:var(--text2);text-transform:uppercase;letter-spacing:3px}
+.feed-modal{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;max-width:480px;margin:0 auto;box-shadow:-10px 0 60px rgba(0,0,0,.5),10px 0 60px rgba(0,0,0,.5)}
+.screen{display:none;flex-direction:column;height:100%}
+.screen.active{display:flex}
+.top-bar{padding:12px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);flex-shrink:0}
+.top-bar-left{display:flex;flex-direction:column;gap:2px}
+.problem-title{font-size:13px;font-weight:600;color:var(--text);max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iteration-label{font-size:11px;color:var(--text2)}
+.top-bar-right{display:flex;gap:8px}
+.top-btn{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text2);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.score-trend{padding:8px 16px 12px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sparkline{display:flex;align-items:flex-end;gap:3px;height:28px}
+.spark-bar{width:6px;border-radius:2px;background:var(--accent);opacity:.4}
+.spark-bar:last-child{opacity:1;background:var(--green)}
+.trend-score{font-size:18px;font-weight:700;color:var(--green)}
+.trend-label{font-size:10px;color:var(--text2)}
+.trend-delta{font-size:11px;color:var(--green);margin-left:auto}
+.feed-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
+.feed-tab{flex:1;padding:10px;text-align:center;font-size:12px;font-weight:600;color:var(--text2);background:none;border:none;cursor:pointer;border-bottom:2px solid transparent}
+.feed-tab.active{color:var(--accent2);border-bottom-color:var(--accent)}
+.card-area{flex:1;overflow-y:auto;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch}
+.card-area::-webkit-scrollbar{display:none}
+.experiment-card{scroll-snap-align:start;display:flex;flex-direction:column;border-bottom:1px solid var(--border)}
+.card-header{padding:10px 16px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+.card-meta{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2)}
+.card-iteration{font-weight:700;color:var(--text);background:var(--surface2);padding:2px 8px;border-radius:4px}
+.card-delta{display:flex;align-items:center;gap:3px;padding:2px 8px;border-radius:4px;font-weight:600;font-size:11px}
+.card-delta.positive{color:var(--green);background:rgba(0,184,148,.1)}
+.card-delta.negative{color:var(--red);background:rgba(255,107,107,.1)}
+.card-score{font-size:13px;font-weight:700;color:var(--accent2)}
+.card-visual{flex:1;display:flex;align-items:center;justify-content:center;padding:12px}
+.visual-placeholder{width:100%;aspect-ratio:16/10;border-radius:12px;overflow:hidden}
+.visual-slide{width:100%;height:100%;display:flex;flex-direction:column;padding:20px;gap:12px}
+.slide-header{font-size:11px;text-transform:uppercase;letter-spacing:2px;color:var(--accent2)}
+.slide-title{font-size:18px;font-weight:700;line-height:1.3}
+.slide-body{font-size:13px;color:var(--text2);line-height:1.6}
+.slide-metrics{margin-top:auto;display:flex;gap:12px}
+.slide-metric{flex:1;background:rgba(0,0,0,.3);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:2px}
+.metric-label{font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:1px}
+.metric-value{font-size:16px;font-weight:700;color:var(--green)}
+.metric-value.ok{color:var(--orange)}
+.metric-value.bad{color:var(--red)}
+.card-footer{padding:10px 16px;border-top:1px solid var(--border);flex-shrink:0}
+.agent-summary{font-size:13px;color:var(--text2);line-height:1.4;margin-bottom:8px}
+.code-ref{font-size:11px;display:flex;align-items:center;gap:6px;color:var(--accent);flex-wrap:wrap}
+.code-ref-file{font-family:'SF Mono','Fira Code',monospace;background:var(--surface2);padding:2px 6px;border-radius:3px}
+.code-ref-diff{color:var(--text2)}
+.feedback-bar{padding:8px 12px;display:flex;gap:8px;align-items:center;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0}
+.feedback-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:8px 14px;font-size:13px;color:var(--text);outline:none}
+.feedback-input::placeholder{color:var(--text2)}
+.mic-btn{width:36px;height:36px;border-radius:50%;border:none;background:var(--accent);color:#fff;font-size:16px;cursor:pointer;flex-shrink:0}
+.mic-btn.recording{background:var(--red);animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,107,107,.4)}50%{box-shadow:0 0 0 10px rgba(255,107,107,0)}}
+.discovery-card{padding:16px;border-bottom:1px solid var(--border)}
+.discovery-problem{font-size:13px;font-weight:600;margin-bottom:6px;line-height:1.4}
+.discovery-meta{display:flex;gap:12px;font-size:11px;color:var(--text2)}
+.discovery-tag{display:inline-block;padding:2px 6px;background:var(--surface2);border-radius:4px;font-size:10px;color:var(--accent2)}
+.discovery-action{margin-top:10px;font-size:12px;color:var(--accent);cursor:pointer}
+.eval-setup{padding:24px 16px;display:flex;flex-direction:column;gap:16px;overflow-y:auto}
+.eval-title{font-size:20px;font-weight:700;text-align:center}
+.eval-subtitle{font-size:13px;color:var(--text2);text-align:center;line-height:1.5}
+.eval-metric{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;display:flex;justify-content:space-between;align-items:center}
+.eval-metric-name{font-size:14px;font-weight:600}
+.eval-metric-desc{font-size:11px;color:var(--text2)}
+.eval-add-btn{width:100%;padding:10px;border-radius:10px;border:1px dashed var(--border);background:none;color:var(--text2);font-size:13px;cursor:pointer}
+.eval-confirm-btn{width:100%;padding:14px;border-radius:12px;border:none;background:var(--accent);color:#fff;font-size:15px;font-weight:700;cursor:pointer}
+.convergence-bar{background:rgba(0,184,148,.1);border-top:1px solid rgba(0,184,148,.2);padding:10px 16px;flex-shrink:0}
+.convergence-text{font-size:12px;color:var(--green);text-align:center}
+.nav-pills{position:fixed;top:10px;right:10px;display:flex;flex-direction:column;gap:6px;z-index:100}
+.nav-btn{padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text2);font-size:11px;cursor:pointer}
+.nav-btn.active{border-color:var(--accent);color:var(--text)}
+.conv-btn{padding:10px 20px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;border:none}
+.conv-btn-primary{background:var(--green);color:#fff}
+.conv-btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+@media(max-width:480px){.feed-modal{max-width:100%;box-shadow:none}}
+</style>
+</head>
+<body>
+<div class="app-shell"><div class="app-shell-label">Agent Town — House HQ</div></div>
+<div class="nav-pills">
+  <button class="nav-btn active" onclick="show('feed')">Private Feed</button>
+  <button class="nav-btn" onclick="show('eval')">Eval Setup</button>
+  <button class="nav-btn" onclick="show('discovery')">Discovery</button>
+  <button class="nav-btn" onclick="show('converge')">Converged</button>
+</div>
+<div class="feed-modal">
+
+<!-- SCREEN: Private Feed -->
+<div class="screen active" id="s-feed">
+  <div class="top-bar">
+    <div class="top-bar-left">
+      <div class="problem-title">Optimize landing page conversion rate</div>
+      <div class="iteration-label">Round 4 · 11 experiments</div>
+    </div>
+    <div class="top-bar-right">
+      <button class="top-btn" title="Save">💾</button>
+      <button class="top-btn" title="Story">📋</button>
+    </div>
+  </div>
+  <div class="score-trend">
+    <div class="sparkline">
+      <div class="spark-bar" style="height:35%"></div>
+      <div class="spark-bar" style="height:45%"></div>
+      <div class="spark-bar" style="height:52%"></div>
+      <div class="spark-bar" style="height:61%"></div>
+      <div class="spark-bar" style="height:58%"></div>
+      <div class="spark-bar" style="height:68%"></div>
+      <div class="spark-bar" style="height:74%"></div>
+      <div class="spark-bar" style="height:79%"></div>
+      <div class="spark-bar" style="height:83%"></div>
+      <div class="spark-bar" style="height:87%"></div>
+      <div class="spark-bar" style="height:91%"></div>
+    </div>
+    <div>
+      <div class="trend-score">0.91</div>
+      <div class="trend-label">composite score</div>
+    </div>
+    <div class="trend-delta">↑ 0.08 from last</div>
+  </div>
+  <div class="feed-tabs">
+    <button class="feed-tab active">My Experiments</button>
+    <button class="feed-tab">Discovery 🔒</button>
+  </div>
+  <div class="card-area">
+    <!-- Card #11 -->
+    <div class="experiment-card">
+      <div class="card-header">
+        <div class="card-meta"><span class="card-iteration">#11</span><span>Round 4 · 7m ago</span></div>
+        <div style="display:flex;align-items:center;gap:8px"><div class="card-delta positive">↑ 0.04</div><div class="card-score">0.91</div></div>
+      </div>
+      <div class="card-visual">
+        <div class="visual-placeholder">
+          <div class="visual-slide" style="background:linear-gradient(145deg,#1a1a2e,#16213e 50%,#0f3460)">
+            <div class="slide-header">Experiment #11 — Layout B</div>
+            <div class="slide-title">Hero with inline CTA + social proof above fold</div>
+            <div class="slide-body">Moved CTA into hero headline. Added trust badges and testimonial strip. Reduced nav to 4 items.</div>
+            <div class="slide-metrics">
+              <div class="slide-metric"><div class="metric-label">Load</div><div class="metric-value">1.2s</div></div>
+              <div class="slide-metric"><div class="metric-label">LCP</div><div class="metric-value">1.8s</div></div>
+              <div class="slide-metric"><div class="metric-label">CLS</div><div class="metric-value">0.02</div></div>
+              <div class="slide-metric"><div class="metric-label">Visual</div><div class="metric-value">9/10</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card-footer">
+        <div class="agent-summary">CTA inline with hero. Trust badges strip. Nav trimmed to 4 items.</div>
+        <div class="code-ref"><span class="code-ref-file">hero.css</span><span class="code-ref-diff">+24 −18</span><span class="code-ref-file">nav.css</span><span class="code-ref-diff">+3 −15</span></div>
+      </div>
+    </div>
+    <!-- Card #10 -->
+    <div class="experiment-card">
+      <div class="card-header">
+        <div class="card-meta"><span class="card-iteration">#10</span><span>Round 4 · 14m ago</span></div>
+        <div style="display:flex;align-items:center;gap:8px"><div class="card-delta negative">↓ 0.02</div><div class="card-score">0.87</div></div>
+      </div>
+      <div class="card-visual">
+        <div class="visual-placeholder">
+          <div class="visual-slide" style="background:linear-gradient(145deg,#1a1a2e,#1a0f2e 50%,#2d0f3e)">
+            <div class="slide-header">Experiment #10 — Layout A</div>
+            <div class="slide-title">Full-width hero with centered CTA and floating nav</div>
+            <div class="slide-body">Bolder hero with gradient. Floating nav caused CLS regression.</div>
+            <div class="slide-metrics">
+              <div class="slide-metric"><div class="metric-label">Load</div><div class="metric-value ok">1.6s</div></div>
+              <div class="slide-metric"><div class="metric-label">LCP</div><div class="metric-value ok">2.4s</div></div>
+              <div class="slide-metric"><div class="metric-label">CLS</div><div class="metric-value bad">0.12</div></div>
+              <div class="slide-metric"><div class="metric-label">Visual</div><div class="metric-value ok">7/10</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card-footer">
+        <div class="agent-summary">Full-width gradient hero. Floating nav caused stability issues. Discarded.</div>
+        <div class="code-ref"><span class="code-ref-file">hero.css</span><span class="code-ref-diff">+31 −12</span><span class="code-ref-file">nav.css</span><span class="code-ref-diff">+42 −8</span></div>
+      </div>
+    </div>
+    <!-- Card #9 -->
+    <div class="experiment-card">
+      <div class="card-header">
+        <div class="card-meta"><span class="card-iteration">#9</span><span>Round 3 · 28m ago</span></div>
+        <div style="display:flex;align-items:center;gap:8px"><div class="card-delta positive">↑ 0.06</div><div class="card-score">0.83</div></div>
+      </div>
+      <div class="card-visual">
+        <div class="visual-placeholder">
+          <div class="visual-slide" style="background:linear-gradient(145deg,#0f2027,#203a43 50%,#2c5364)">
+            <div class="slide-header">Experiment #9 — Color System</div>
+            <div class="slide-title">High-contrast dark palette, accent on CTAs only</div>
+            <div class="slide-body">Reduced color noise. CTAs as only saturated element. Accessibility AA reached.</div>
+            <div class="slide-metrics">
+              <div class="slide-metric"><div class="metric-label">Load</div><div class="metric-value">1.1s</div></div>
+              <div class="slide-metric"><div class="metric-label">LCP</div><div class="metric-value">1.9s</div></div>
+              <div class="slide-metric"><div class="metric-label">CLS</div><div class="metric-value">0.01</div></div>
+              <div class="slide-metric"><div class="metric-label">Visual</div><div class="metric-value ok">8/10</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card-footer">
+        <div class="agent-summary">High-contrast dark palette. CTA-only saturation. User feedback: "like the direction."</div>
+        <div class="code-ref"><span class="code-ref-file">theme.css</span><span class="code-ref-diff">+18 −34</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="feedback-bar">
+    <input class="feedback-input" placeholder="Tell the agent what to improve…"/>
+    <button class="mic-btn" onclick="this.classList.toggle('recording')">🎙</button>
+  </div>
+</div>
+
+<!-- SCREEN: Eval Setup -->
+<div class="screen" id="s-eval">
+  <div class="top-bar">
+    <div class="top-bar-left"><div class="problem-title">New Problem</div></div>
+    <div class="top-bar-right"><button class="top-btn">←</button></div>
+  </div>
+  <div class="eval-setup">
+    <div class="eval-title">How will you measure success?</div>
+    <div class="eval-subtitle">Your agent needs to know what "better" means.<br>Define metrics now — or your experiments will be garbage.</div>
+    <div class="eval-metric">
+      <div><div class="eval-metric-name">⏱ Page load time</div><div class="eval-metric-desc">Minimize · Target: &lt; 2 seconds</div></div>
+      <div style="display:flex;gap:6px"><button style="width:28px;height:28px;border-radius:6px;border:none;background:var(--green);color:#fff;font-size:12px;cursor:pointer">✓</button></div>
+    </div>
+    <div class="eval-metric">
+      <div><div class="eval-metric-name">📐 Layout stability (CLS)</div><div class="eval-metric-desc">Minimize · Target: &lt; 0.1</div></div>
+      <div style="display:flex;gap:6px"><button style="width:28px;height:28px;border-radius:6px;border:none;background:var(--green);color:#fff;font-size:12px;cursor:pointer">✓</button></div>
+    </div>
+    <div class="eval-metric">
+      <div><div class="eval-metric-name">🎨 Visual quality</div><div class="eval-metric-desc">Maximize · Qualitative: "Does it look professional?"</div></div>
+      <div style="display:flex;gap:6px"><button style="width:28px;height:28px;border-radius:6px;border:none;background:var(--green);color:#fff;font-size:12px;cursor:pointer">✓</button></div>
+    </div>
+    <button class="eval-add-btn">+ Add a metric…</button>
+    <div style="text-align:center;font-size:11px;color:var(--orange);padding:6px">⚠ Define at least 1 metric before starting experiments</div>
+    <button class="eval-confirm-btn">Confirm & Start →</button>
+  </div>
+</div>
+
+<!-- SCREEN: Discovery -->
+<div class="screen" id="s-discovery">
+  <div class="top-bar">
+    <div class="top-bar-left"><div class="problem-title">Discovery Feed</div></div>
+    <div class="top-bar-right"><button class="top-btn">🔍</button></div>
+  </div>
+  <div class="feed-tabs">
+    <button class="feed-tab">My Experiments</button>
+    <button class="feed-tab active">Discovery 🔓</button>
+  </div>
+  <div class="card-area" style="scroll-snap-type:none">
+    <div class="discovery-card">
+      <div class="discovery-problem">"Optimized SaaS landing page for mobile. 1.8% → 4.2% CTA click rate."</div>
+      <div class="discovery-meta"><span>12 experiments</span><span>·</span><span>Score: 0.94</span><span>·</span><span>8 rounds</span></div>
+      <div style="margin-top:8px;display:flex;gap:4px"><span class="discovery-tag">landing-page</span><span class="discovery-tag">mobile</span><span class="discovery-tag">conversion</span></div>
+      <div class="discovery-action">→ Use insights from this journey</div>
+    </div>
+    <div class="discovery-card">
+      <div class="discovery-problem">"Reduced CLS from 0.3 to 0.02 on product grid by fixing image aspect ratios."</div>
+      <div class="discovery-meta"><span>9 experiments</span><span>·</span><span>Score: 0.88</span><span>·</span><span>5 rounds</span></div>
+      <div style="margin-top:8px;display:flex;gap:4px"><span class="discovery-tag">cls</span><span class="discovery-tag">performance</span><span class="discovery-tag">images</span></div>
+      <div class="discovery-action">→ Use insights from this journey</div>
+    </div>
+    <div class="discovery-card">
+      <div class="discovery-problem">"Dark mode design system with accessible contrast. WCAG AA as quantitative metric."</div>
+      <div class="discovery-meta"><span>15 experiments</span><span>·</span><span>Score: 0.91</span><span>·</span><span>10 rounds</span></div>
+      <div style="margin-top:8px;display:flex;gap:4px"><span class="discovery-tag">dark-mode</span><span class="discovery-tag">accessibility</span><span class="discovery-tag">design-system</span></div>
+      <div class="discovery-action">→ Use insights from this journey</div>
+    </div>
+  </div>
+  <div class="feedback-bar"><input class="feedback-input" placeholder="Search similar problems…"/></div>
+</div>
+
+<!-- SCREEN: Converged -->
+<div class="screen" id="s-converge">
+  <div class="top-bar">
+    <div class="top-bar-left">
+      <div class="problem-title">Optimize landing page conversion rate</div>
+      <div class="iteration-label">✅ Converged · 11 experiments · 4 rounds</div>
+    </div>
+    <div class="top-bar-right"><button class="top-btn">💾</button></div>
+  </div>
+  <div class="score-trend">
+    <div class="sparkline">
+      <div class="spark-bar" style="height:35%"></div><div class="spark-bar" style="height:45%"></div><div class="spark-bar" style="height:52%"></div><div class="spark-bar" style="height:61%"></div><div class="spark-bar" style="height:58%"></div><div class="spark-bar" style="height:68%"></div><div class="spark-bar" style="height:74%"></div><div class="spark-bar" style="height:79%"></div><div class="spark-bar" style="height:83%"></div><div class="spark-bar" style="height:87%"></div><div class="spark-bar" style="height:91%"></div>
+    </div>
+    <div><div class="trend-score">0.91</div><div class="trend-label">final score</div></div>
+    <div class="trend-delta" style="color:var(--text2)">↑ 0.56 from baseline</div>
+  </div>
+  <div class="convergence-bar"><div class="convergence-text">🎯 Your solution converged. Ready to share?</div></div>
+  <div class="card-area" style="scroll-snap-type:none">
+    <div style="padding:20px;text-align:center">
+      <div style="font-size:48px;margin-bottom:12px">🚀</div>
+      <div style="font-size:18px;font-weight:700;margin-bottom:8px">Publish your journey</div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.6;max-width:300px;margin:0 auto 20px">Others with similar problems can learn from your dead ends, pivots, and what worked.</div>
+      <div style="display:flex;gap:10px;justify-content:center"><button class="conv-btn conv-btn-primary">Publish to Discovery Feed</button><button class="conv-btn conv-btn-secondary">Save & Continue</button></div>
+    </div>
+    <div class="experiment-card">
+      <div class="card-header">
+        <div class="card-meta"><span class="card-iteration" style="background:rgba(0,184,148,.2);color:var(--green)">🏆 Best</span><span>#11 · Round 4</span></div>
+        <div class="card-score">0.91</div>
+      </div>
+      <div class="card-visual">
+        <div class="visual-placeholder">
+          <div class="visual-slide" style="background:linear-gradient(145deg,#1a1a2e,#16213e 50%,#0f3460)">
+            <div class="slide-header">Experiment #11 — Layout B</div>
+            <div class="slide-title">Hero with inline CTA + social proof above fold</div>
+            <div class="slide-body">Final solution. Inline CTA, trust badges, reduced nav. All metrics green.</div>
+            <div class="slide-metrics">
+              <div class="slide-metric"><div class="metric-label">Load</div><div class="metric-value">1.2s</div></div>
+              <div class="slide-metric"><div class="metric-label">LCP</div><div class="metric-value">1.8s</div></div>
+              <div class="slide-metric"><div class="metric-label">CLS</div><div class="metric-value">0.02</div></div>
+              <div class="slide-metric"><div class="metric-label">Visual</div><div class="metric-value">9/10</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card-footer">
+        <div class="agent-summary">Final: CTA inline with hero. Trust badges. Nav trimmed. All metrics passing.</div>
+        <div class="code-ref"><span class="code-ref-file">hero.css</span><span class="code-ref-diff">+24 −18</span><span class="code-ref-file">nav.css</span><span class="code-ref-diff">+3 −15</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="feedback-bar"><input class="feedback-input" placeholder="Rate your satisfaction (1-5)…"/></div>
+</div>
+
+</div>
+
+<script>
+function show(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('s-' + name).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+}
+</script>
+</body>
+</html>
