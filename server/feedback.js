@@ -345,6 +345,7 @@ feedbackRouter.post('/:id/feedback', (req, res) => {
 // ---------------------------------------------------------------------------
 
 module.exports = {
+  router: feedbackRouter,
   feedbackRouter,
   extractConstraints,
   extractPreferences,

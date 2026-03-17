@@ -793,33 +793,37 @@ router.post('/:id/eval-proposals/metrics', (req, res) => {
 });
 
 /**
- * POST /api/problem-stories/:id/eval-confirm
+ * Confirm the evaluation function for a Problem Story.
  *
- * Confirm the evaluation function:
- *  - Requires ≥1 metric
+ * Steps:
+ *  - Validates story exists, has ≥1 metric, and isn't already confirmed
  *  - Sets confirmedAt
  *  - Sets baseline scores (placeholder 0.5)
  *  - Transitions status to 'active'
  *
- * Body: {} (empty — no params needed)
+ * @param {string} storyId — Problem Story ID
+ * @returns {{ ok: true, problemStoryId: string, status: string, evaluationFunction: object }}
+ * @throws {Error} with .statusCode for HTTP mapping
  */
-router.post('/:id/eval-confirm', (req, res) => {
-  const story = getProblemStory(req.params.id);
+function confirmEvaluation(storyId) {
+  const story = getProblemStory(storyId);
   if (!story) {
-    return res.status(404).json({ error: 'Problem Story not found' });
+    const err = new Error('Problem Story not found');
+    err.statusCode = 404;
+    throw err;
   }
 
   if (story.evaluationFunction.metrics.length === 0) {
-    return res.status(400).json({
-      error: 'Cannot confirm evaluation without at least one metric.',
-    });
+    const err = new Error('Cannot confirm evaluation without at least one metric.');
+    err.statusCode = 400;
+    throw err;
   }
 
   if (story.evaluationFunction.confirmedAt) {
-    return res.status(400).json({
-      error: 'Evaluation already confirmed.',
-      confirmedAt: story.evaluationFunction.confirmedAt,
-    });
+    const err = new Error('Evaluation already confirmed.');
+    err.statusCode = 400;
+    err.detail = { confirmedAt: story.evaluationFunction.confirmedAt };
+    throw err;
   }
 
   const now = new Date().toISOString();
@@ -841,11 +845,34 @@ router.post('/:id/eval-confirm', (req, res) => {
   story.status = 'active';
   story.updatedAt = now;
 
-  res.json({
+  return {
     problemStoryId: story.id,
     status: story.status,
     evaluationFunction: story.evaluationFunction,
-  });
+  };
+}
+
+/**
+ * POST /api/problem-stories/:id/eval-confirm
+ *
+ * Confirm the evaluation function:
+ *  - Requires ≥1 metric
+ *  - Sets confirmedAt
+ *  - Sets baseline scores (placeholder 0.5)
+ *  - Transitions status to 'active'
+ *
+ * Body: {} (empty — no params needed)
+ */
+router.post('/:id/eval-confirm', (req, res) => {
+  try {
+    const result = confirmEvaluation(req.params.id);
+    res.json(result);
+  } catch (err) {
+    const statusCode = err.statusCode || 500;
+    const body = { error: err.message };
+    if (err.detail) Object.assign(body, err.detail);
+    res.status(statusCode).json(body);
+  }
 });
 
 // ─── Mid-loop metric editing (T014) ───────────────────────────────
@@ -1059,6 +1086,7 @@ router.put('/:id/evaluation', (req, res) => {
 
 module.exports = {
   router,
+  confirmEvaluation,
   generateMetricProposals,
   parseNaturalLanguageMetric,
   rescoreAllCards,

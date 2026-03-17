@@ -8,8 +8,8 @@
  *   GET  /                        → ranked discovery feed
  *   POST /:id/pull-context        → pull insights from a stream into your story
  *
- * Data source: problem-stories store filtered by status === 'published'.
- * Self-contained — no dependency on publication.js.
+ * Data source: publication store (publishedStreams Map) as primary,
+ * with fallback to problem-stories filtered by status === 'published'.
  *
  * Tests satisfied:
  *   T080: Discovery feed shows only published streams
@@ -19,6 +19,7 @@
 
 const express = require('express');
 const { listProblemStories, getProblemStory, updateProblemStory } = require('./problem-stories');
+const { publishedStreams: pubStreamsMap, listPublishedStreams } = require('./publication');
 
 // ── Keyword extraction & similarity ────────────────────────────────
 
@@ -77,40 +78,45 @@ function keywordSimilarity(a, b) {
   return shared / union.size;
 }
 
-// ── Publication store (thin wrapper over problem-stories) ──────────
+// ── Published streams — publication store + problem-stories fallback ──
 
 /**
- * Get all published problem stories ("published streams").
- * T080: Only streams with status === 'published' appear in the feed.
+ * Get all published streams.
  *
- * @returns {Array}
+ * Primary source: publication store (PublishedStream objects with enriched
+ * data: bestCompositeScore, convergenceSpeed, discoveryKeywords, cards, etc.)
+ * Fallback: problem-stories with status === 'published' (for backward compat
+ * with stories published before the publication flow existed).
+ *
+ * When a story exists in both stores, the PublishedStream (enriched version)
+ * takes priority.
+ *
+ * @returns {Array} merged list of published streams
  */
 function getPublishedStreams() {
-  return listProblemStories().filter((s) => s.status === 'published');
+  // Index publication store by problemStoryId for lookup
+  const pubByStoryId = new Map();
+  for (const ps of listPublishedStreams()) {
+    pubByStoryId.set(ps.problemStoryId, ps);
+  }
+
+  // Get all problem stories with status 'published'
+  const publishedStories = listProblemStories().filter((s) => s.status === 'published');
+
+  // Merge: prefer PublishedStream (enriched), fall back to problem story
+  const results = [];
+  for (const story of publishedStories) {
+    if (pubByStoryId.has(story.id)) {
+      results.push(pubByStoryId.get(story.id));
+    } else {
+      results.push(story);
+    }
+  }
+
+  return results;
 }
 
-/**
- * Build a summary object for a published stream suitable for the feed.
- *
- * @param {object} story
- * @returns {object}
- */
-function buildStreamSummary(story) {
-  return {
-    id: story.id,
-    problemDescription: truncate(story.problemDescription, 200),
-    problemDomain: extractDomain(story),
-    status: story.status,
-    totalIterations: story.totalIterations || 0,
-    feedbackRounds: (story.feedbackRounds || []).length,
-    constraintCount: (story.constraints || []).length,
-    metricCount: (story.evaluationFunction?.metrics || []).length,
-    tags: buildTags(story),
-    qualitySignals: buildQualitySignals(story),
-    createdAt: story.createdAt,
-    updatedAt: story.updatedAt,
-  };
-}
+// ── Stream summary builder ─────────────────────────────────────────
 
 /** Truncate text to maxLen characters, appending ellipsis if truncated. */
 function truncate(text, maxLen = 200) {
@@ -157,11 +163,10 @@ function buildTags(story) {
 }
 
 /**
- * Build quality signal summary for sorting/display.
+ * Build quality signal summary for sorting/display (problem-story shape).
  */
 function buildQualitySignals(story) {
   const feedbackRounds = story.feedbackRounds || [];
-  const cards = story.experimentCards || []; // might not exist directly
   return {
     totalIterations: story.totalIterations || 0,
     feedbackRoundCount: feedbackRounds.length,
@@ -171,21 +176,85 @@ function buildQualitySignals(story) {
   };
 }
 
+/**
+ * Build a summary object for a published stream suitable for the feed.
+ *
+ * Handles two shapes:
+ *   1. PublishedStream (from publication store) — enriched with
+ *      bestCompositeScore, convergenceSpeed, discoveryKeywords, cards, etc.
+ *   2. Problem Story (backward compat) — raw story with constraints, metrics, etc.
+ *
+ * @param {object} stream — PublishedStream or Problem Story
+ * @returns {object}
+ */
+function buildStreamSummary(stream) {
+  const isPubStream = stream.codeFingerprint !== undefined || stream.discoveryKeywords !== undefined;
+
+  if (isPubStream) {
+    // Enriched data from publication store
+    return {
+      id: stream.id,
+      problemStoryId: stream.problemStoryId,
+      problemDescription: truncate(stream.problemDescription, 200),
+      problemDomain: stream.problemDomain || [],
+      status: 'published',
+      totalIterations: stream.totalIterations || 0,
+      convergenceSpeed: stream.convergenceSpeed || 0,
+      bestCompositeScore: stream.bestCompositeScore || 0,
+      cardCount: (stream.cards || []).length,
+      feedbackRounds: (stream.feedbackRounds || []).length,
+      discoveryKeywords: stream.discoveryKeywords || [],
+      codeFingerprint: stream.codeFingerprint || null,
+      userSatisfaction: stream.userSatisfaction || null,
+      publishedAt: stream.publishedAt,
+      tags: [],
+      qualitySignals: {
+        totalIterations: stream.totalIterations || 0,
+        feedbackRoundCount: (stream.feedbackRounds || []).length,
+        isConverged: true,
+        bestCompositeScore: stream.bestCompositeScore || 0,
+        convergenceSpeed: stream.convergenceSpeed || 0,
+      },
+    };
+  }
+
+  // Legacy problem-story shape (backward compat)
+  return {
+    id: stream.id,
+    problemDescription: truncate(stream.problemDescription, 200),
+    problemDomain: extractDomain(stream),
+    status: stream.status,
+    totalIterations: stream.totalIterations || 0,
+    feedbackRounds: (stream.feedbackRounds || []).length,
+    constraintCount: (stream.constraints || []).length,
+    metricCount: (stream.evaluationFunction?.metrics || []).length,
+    tags: buildTags(stream),
+    qualitySignals: buildQualitySignals(stream),
+    createdAt: stream.createdAt,
+    updatedAt: stream.updatedAt,
+  };
+}
+
 // ── Insight extraction for pull-context (T082) ─────────────────────
 
 /**
  * Extract key insights from a published stream for context pulling.
  * Returns context entries that can be appended to the requester's story.
  *
- * @param {object} stream — the published problem story
+ * @param {object} stream — the PublishedStream or problem story
+ * @param {object} [originalStory] — the original problem story (needed when
+ *   stream is a PublishedStream to access constraints and evaluationFunction)
  * @returns {Array<{source: string, insight: string, category: string}>}
  */
-function extractInsights(stream) {
+function extractInsights(stream, originalStory) {
   const entries = [];
   const streamId = stream.id;
 
-  // Extract constraint insights
-  const constraints = stream.constraints || [];
+  // Use originalStory for constraint/metric data if provided; otherwise use stream
+  const story = originalStory || stream;
+
+  // Extract constraint insights (from problem story)
+  const constraints = story.constraints || [];
   for (const c of constraints) {
     if (typeof c.description === 'string' && c.description.trim()) {
       entries.push({
@@ -197,9 +266,8 @@ function extractInsights(stream) {
   }
 
   // Extract approach insights from feedback rounds
-  const feedbackRounds = stream.feedbackRounds || [];
+  const feedbackRounds = stream.feedbackRounds || story.feedbackRounds || [];
   for (const round of feedbackRounds) {
-    // Feedback round may contain approaches, preferences, or suggested approaches
     const approaches = round.approaches || round.suggestedApproaches || [];
     for (const a of approaches) {
       if (typeof a === 'string' && a.trim()) {
@@ -218,9 +286,9 @@ function extractInsights(stream) {
     }
   }
 
-  // Extract metric insights (baseline/target scores)
-  const metrics = stream.evaluationFunction?.metrics || [];
-  const baselines = stream.evaluationFunction?.baselineScores || {};
+  // Extract metric insights (from problem story)
+  const metrics = story.evaluationFunction?.metrics || [];
+  const baselines = story.evaluationFunction?.baselineScores || {};
   for (const m of metrics) {
     if (typeof m.name === 'string') {
       const baseline = baselines[m.name];
@@ -236,6 +304,19 @@ function extractInsights(stream) {
         insight,
         category: 'metric',
       });
+    }
+  }
+
+  // Extract card-based insights from PublishedStream (if available)
+  if (stream.cards && Array.isArray(stream.cards)) {
+    for (const card of stream.cards) {
+      if (card.agentSummary && card.agentSummary.trim()) {
+        entries.push({
+          source: `discovery:${streamId}`,
+          insight: card.agentSummary.trim(),
+          category: 'approach',
+        });
+      }
     }
   }
 
@@ -286,16 +367,18 @@ router.get('/', (req, res) => {
     userKeywords = extractKeywords(userStory.problemDescription);
   }
 
-  // Get all published streams
+  // Get all published streams — exclude own story (check both PublishedStream ID and problemStoryId)
   let streams = getPublishedStreams()
-    .filter((s) => s.id !== problemStoryId); // Exclude own story
+    .filter((s) => s.id !== problemStoryId && s.problemStoryId !== problemStoryId);
 
   // Filter by domain tag if provided
   if (problemDomain) {
     const domain = problemDomain.toLowerCase();
     streams = streams.filter((s) => {
-      const storyDomain = extractDomain(s);
-      return storyDomain === domain;
+      const storyDomain = s.discoveryKeywords
+        ? s.discoveryKeywords.some((k) => k.includes(domain))
+        : extractDomain(s) === domain;
+      return storyDomain;
     });
   }
 
@@ -305,15 +388,19 @@ router.get('/', (req, res) => {
   // Rank: by similarity if problemStoryId provided, else by recency
   if (problemStoryId && userKeywords.length > 0) {
     for (const item of results) {
+      const source = streams.find((s) => s.id === item.id);
       const streamKeywords = extractKeywords(
-        // Use the original story's description for better matching
-        streams.find((s) => s.id === item.id)?.problemDescription || item.problemDescription
+        source?.problemDescription || item.problemDescription
       );
       item.similarityScore = keywordSimilarity(userKeywords, streamKeywords);
     }
     results.sort((a, b) => (b.similarityScore || 0) - (a.similarityScore || 0));
   } else {
-    results.sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')));
+    results.sort((a, b) => {
+      const aTime = a.publishedAt || a.updatedAt || a.createdAt || '';
+      const bTime = b.publishedAt || b.updatedAt || b.createdAt || '';
+      return bTime.localeCompare(aTime);
+    });
   }
 
   // Paginate
@@ -337,6 +424,9 @@ router.get('/', (req, res) => {
  *   (streamId can also come from the URL :id param — either works)
  *
  * T082: Pull insights from a discovery stream into your Problem Story's context array.
+ *
+ * Looks up the stream first in the publication store (by PublishedStream ID
+ * or by problemStoryId), falling back to problem-stories for backward compat.
  */
 router.post('/:id/pull-context', (req, res) => {
   const urlStreamId = typeof req.params.id === 'string' ? req.params.id.trim() : '';
@@ -347,28 +437,57 @@ router.post('/:id/pull-context', (req, res) => {
   if (!streamId) return res.status(400).json({ ok: false, error: 'MISSING_STREAM_ID' });
   if (!problemStoryId) return res.status(400).json({ ok: false, error: 'MISSING_PROBLEM_STORY_ID' });
 
-  // Load the published stream
-  const stream = getProblemStory(streamId);
-  if (!stream) {
-    return res.status(404).json({ ok: false, error: 'STREAM_NOT_FOUND' });
-  }
-  if (stream.status !== 'published') {
-    return res.status(403).json({ ok: false, error: 'STREAM_NOT_PUBLISHED' });
-  }
-
   // Load the user's Problem Story
   const userStory = getProblemStory(problemStoryId);
   if (!userStory) {
     return res.status(404).json({ ok: false, error: 'PROBLEM_STORY_NOT_FOUND' });
   }
 
-  // Don't pull from yourself
-  if (streamId === problemStoryId) {
-    return res.status(400).json({ ok: false, error: 'CANNOT_PULL_FROM_SELF' });
+  // Look up stream: try publication store first (by PublishedStream ID or problemStoryId)
+  let stream = pubStreamsMap.get(streamId);
+  let originalStory = null;
+
+  if (stream) {
+    // Found in publication store — get original problem story for constraint/metric extraction
+    originalStory = getProblemStory(stream.problemStoryId);
+    // Check self-pull against the original problem story ID
+    if (stream.problemStoryId === problemStoryId) {
+      return res.status(400).json({ ok: false, error: 'CANNOT_PULL_FROM_SELF' });
+    }
+  } else {
+    // Try looking up by problemStoryId in publication store
+    let foundByStoryId = null;
+    for (const ps of listPublishedStreams()) {
+      if (ps.problemStoryId === streamId) {
+        foundByStoryId = ps;
+        break;
+      }
+    }
+
+    if (foundByStoryId) {
+      stream = foundByStoryId;
+      originalStory = getProblemStory(stream.problemStoryId);
+      if (stream.problemStoryId === problemStoryId) {
+        return res.status(400).json({ ok: false, error: 'CANNOT_PULL_FROM_SELF' });
+      }
+    } else {
+      // Fall back to problem-stories lookup (backward compat)
+      stream = getProblemStory(streamId);
+      if (!stream) {
+        return res.status(404).json({ ok: false, error: 'STREAM_NOT_FOUND' });
+      }
+      if (stream.status !== 'published') {
+        return res.status(403).json({ ok: false, error: 'STREAM_NOT_PUBLISHED' });
+      }
+      // Self-pull check
+      if (streamId === problemStoryId) {
+        return res.status(400).json({ ok: false, error: 'CANNOT_PULL_FROM_SELF' });
+      }
+    }
   }
 
-  // Extract insights from the published stream
-  const insights = extractInsights(stream);
+  // Extract insights — pass originalStory for constraint/metric data when using PublishedStream
+  const insights = extractInsights(stream, originalStory);
   if (insights.length === 0) {
     return res.json({ ok: true, pulled: 0, insights: [], problemStory: userStory });
   }

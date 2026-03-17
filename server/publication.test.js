@@ -5,22 +5,17 @@
  */
 
 const assert = require('assert');
-const express = require('express');
 
 process.env.NODE_ENV = 'test';
 
-// Reset stores before requiring anything
-const { createProblemStory, _resetStore: resetProblemStore, getProblemStory, updateProblemStory, listProblemStories } = require('./problem-stories');
-const { createExperimentCard, _resetStore: resetCardsStore, listExperimentCards } = require('./experiment-cards');
+// All module requires are deferred into main() to avoid singleton store
+// initialization issues when multiple test files share the same process.
 
-const { _resetStore: resetSaveGameStore } = require('./save-game');
-const { _resetStore: resetPubStore, router: publicationRouter, codeFingerprint, extractKeywords } = require('./publication');
-const { router: saveGameRouter } = require('./save-game');
-const { problemStoriesRouter } = require('./problem-stories');
-const { experimentCardsRouter } = require('./experiment-cards');
-const { feedbackRouter } = require('./feedback');
+let publicationRouter, saveGameRouter, problemStoriesRouter, experimentCardsRouter, feedbackRouter;
+let codeFingerprint, extractKeywords;
 
 function createTestApp() {
+  const express = require('express');
   const app = express();
   app.use(express.json());
   app.use('/api/problem-stories', problemStoriesRouter);
@@ -47,15 +42,41 @@ function ok(cond, label) {
 }
 
 function reset() {
-  resetProblemStore();
-  resetCardsStore();
-  resetSaveGameStore();
-  resetPubStore();
+  const { _resetStore: r1 } = require('./problem-stories');
+  const { _resetStore: r2 } = require('./experiment-cards');
+  const { _resetStore: r3 } = require('./save-game');
+  const { _resetStore: r4 } = require('./publication');
+  r1(); r2(); r3(); r4();
+}
+
+/** Load all modules and reset all stores before any test runs. */
+function resetAll() {
+  // Require all modules (loading their routers/exports into module cache)
+  const ps = require('./problem-stories');
+  const ec = require('./experiment-cards');
+  const sg = require('./save-game');
+  const pub = require('./publication');
+  const fb = require('./feedback');
+
+  // Bind module-level references used by createTestApp and tests
+  problemStoriesRouter = ps.problemStoriesRouter;
+  experimentCardsRouter = ec.experimentCardsRouter;
+  saveGameRouter = sg.router;
+  publicationRouter = pub.router;
+  feedbackRouter = fb.feedbackRouter;
+  codeFingerprint = pub.codeFingerprint;
+  extractKeywords = pub.extractKeywords;
+
+  // Reset all singleton stores to clean state
+  ps._resetStore();
+  ec._resetStore();
+  sg._resetStore();
+  pub._resetStore();
 }
 
 function post(app, path, body) {
   return new Promise((resolve, reject) => {
-    const req = { method: 'POST', path, body, headers: {} };
+    const req = { method: 'POST', url: path, body, headers: {} };
     const res = {
       statusCode: 200,
       body: null,
@@ -71,7 +92,7 @@ function post(app, path, body) {
 
 function get(app, path) {
   return new Promise((resolve, reject) => {
-    const req = { method: 'GET', path, headers: {}, query: {} };
+    const req = { method: 'GET', url: path, headers: {}, query: {} };
     const res = {
       statusCode: 200,
       body: null,
@@ -87,7 +108,7 @@ function get(app, path) {
 
 function put(app, path, body) {
   return new Promise((resolve, reject) => {
-    const req = { method: 'PUT', path, body, headers: {} };
+    const req = { method: 'PUT', url: path, body, headers: {} };
     const res = {
       statusCode: 200,
       body: null,
@@ -320,7 +341,7 @@ async function main() {
   console.log('🧪 Publication + Fork Tests (T062, T070, T071)\n');
 
   try {
-    reset();
+    resetAll();
     const app = createTestApp();
 
     await testT062_Fork(app);

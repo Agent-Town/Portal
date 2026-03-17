@@ -261,6 +261,16 @@ router.get('/published-streams/:id', (req, res) => {
   res.json({ ok: true, publishedStream: ps });
 });
 
+// ── List helper ────────────────────────────────────────────────────
+
+/**
+ * List all published streams.
+ * @returns {Array<object>} Array of PublishedStream objects
+ */
+function listPublishedStreams() {
+  return Array.from(publishedStreams.values());
+}
+
 // ── Exports ────────────────────────────────────────────────────────
 
 module.exports = {
@@ -268,5 +278,6 @@ module.exports = {
   publishedStreams,
   codeFingerprint,
   extractKeywords,
+  listPublishedStreams,
   _resetStore: () => publishedStreams.clear(),
 };
