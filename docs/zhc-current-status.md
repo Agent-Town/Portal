@@ -1,7 +1,7 @@
 # ZHC Current Status Snapshot
 
-Status: M44.1 complete, M44.2 contract/mechanics complete, M44.3 Town Hall founder-progression slice complete, M44.4 modal handoff corrected and green, M44.5 HQ-first-entry modal surface green, M44.6 shared HQ naming slice green, M44.7 saved HQ name now projects into the House shell header and is green, M44.8 saved HQ name now brands the Mission lane heading/lead and is green, M44.9 saved HQ name now reaches the Mission detail line and is green, M44.10 saved HQ name now reaches the Mission empty-state copy and is green, M44.11 no-experience Mission detail hint is now truthful before save and HQ-branded after save and is green, M44.12 saved HQ name now brands the reconnect share-card action and is green, M44.13 saved HQ name now brands the reconnect intro/support line and is green, M44.14 saved HQ name now brands the reconnect copyable house snippet and is green, M44.15 wallet-recovery-specific reconnect intro coverage is now explicit and green, M44.16 saved HQ name now brands the House systems/team summary line and is green, M44.17 saved HQ name now brands the share-card placeholder shell/body and is green, M44.18 founders-loop coverage now directly exercises the House systems summary helper when no team context is attached and is green, M44.19 outer share-card modal title/chrome now uses the saved HQ name and is green, M44.20 resolved `/s/:id` share-path coverage for that outer HQ-branded modal title is now explicit and green, M44.21 already-hydrated resolved share-state coverage for that outer HQ-branded modal title is now explicit and green, M44.22 resolved inner share-card title now uses the saved HQ name on the embedded public share shell and is green, M44.23 resolved inner share lead now uses the saved HQ name on the embedded public share shell and is green, M44.24 resolved inner share hero placeholder now uses the saved HQ name on the embedded public share shell and is green, M44.25 resolved inner share hero panel heading now uses the saved HQ name on the embedded public share shell and is green, M44.26 resolved inner share team panel heading now uses the saved HQ name on the embedded public share shell and is green, M44.27 resolved inner share team line now uses the saved HQ name on the embedded public share shell and is green, M44.28 resolved inner share primary action label now uses the saved HQ name on the embedded public share shell and is green, M44.29 resolved inner share secondary action label now uses the saved HQ name on the embedded public share shell and is green  
-Last updated: 2026-03-17 11:49 +0700  
+Status: M44.1 complete, M44.2 contract/mechanics complete, M44.3 Town Hall founder-progression slice complete, M44.4 modal handoff corrected and green, M44.5 HQ-first-entry modal surface green, M44.6 shared HQ naming slice green, M44.7 saved HQ name now projects into the House shell header and is green, M44.8 saved HQ name now brands the Mission lane heading/lead and is green, M44.9 saved HQ name now reaches the Mission detail line and is green, M44.10 saved HQ name now reaches the Mission empty-state copy and is green, M44.11 no-experience Mission detail hint is now truthful before save and HQ-branded after save and is green, M44.12 saved HQ name now brands the reconnect share-card action and is green, M44.13 saved HQ name now brands the reconnect intro/support line and is green, M44.14 saved HQ name now brands the reconnect copyable house snippet and is green, M44.15 wallet-recovery-specific reconnect intro coverage is now explicit and green, M44.16 saved HQ name now brands the House systems/team summary line and is green, M44.17 saved HQ name now brands the share-card placeholder shell/body and is green, M44.18 founders-loop coverage now directly exercises the House systems summary helper when no team context is attached and is green, M44.19 outer share-card modal title/chrome now uses the saved HQ name and is green, M44.20 resolved `/s/:id` share-path coverage for that outer HQ-branded modal title is now explicit and green, M44.21 already-hydrated resolved share-state coverage for that outer HQ-branded modal title is now explicit and green, M44.22 resolved inner share-card title now uses the saved HQ name on the embedded public share shell and is green, M44.23 resolved inner share lead now uses the saved HQ name on the embedded public share shell and is green, M44.24 resolved inner share hero placeholder now uses the saved HQ name on the embedded public share shell and is green, M44.25 resolved inner share hero panel heading now uses the saved HQ name on the embedded public share shell and is green, M44.26 resolved inner share team panel heading now uses the saved HQ name on the embedded public share shell and is green, M44.27 resolved inner share team line now uses the saved HQ name on the embedded public share shell and is green, M44.28 resolved inner share primary action label now uses the saved HQ name on the embedded public share shell and is green, M44.29 resolved inner share secondary action label now uses the saved HQ name on the embedded public share shell and is green, M44.30 placeholder share-card action labels now use the saved HQ name on the embedded public share shell and is green  
+Last updated: 2026-03-17 13:59 +0700  
 Branch: `zhc0-founders-loop`  
 Worktree: `/Users/robin/.openclaw/workspace/Portal-zhc0`
 
@@ -25,31 +25,31 @@ Robin clarified the constraints that currently govern the founders-loop passes:
 
 ## What landed this pass
 
-### M44.29 — resolved inner share secondary action now reuses the saved HQ name
-This pass stayed test-first and deliberately kept the scope tiny.
+### M44.30 — placeholder share action labels now reuse the saved HQ name
+This pass stayed test-first and stayed deliberately tiny.
 
 What changed:
-- added a focused founders-loop assertion for the **inner** embedded public share secondary action label on a resolved `/s/:id` path
-- kept that secondary action generic before HQ save
-- branded that same secondary action as `Add ${saved HQ name} HQ as friend` after HQ save
-- reused the existing local/session preview record path instead of expanding share payload architecture
+- added a focused founders-loop assertion for the **placeholder** embedded public share action labels on `/s/sh_missing`
+- kept both placeholder actions generic before HQ save (`Sign up`, `Add as friend`)
+- branded both placeholder actions as `Join ${saved HQ name} HQ` and `Add ${saved HQ name} HQ as friend` after HQ save
+- continued using the existing local/session preview record path instead of expanding share payload architecture
 - kept the founder journey modal-first on `/app`
 - made **no** server/share payload changes
 - made **no** route changes
-- made **no** persistence broadening beyond the existing browser local/session storage behavior
-- left the real share/friend-add payload contract alone
+- made **no** persistence broadening beyond existing browser local/session storage behavior
+- left the real share/friend-add payload contract untouched
 
 Implementation details:
-- `e2e/451_zhc0_resolved_share_card_secondary_action_uses_saved_hq_name.spec.js`
-  - creates a real resolved share for the attached house
-  - proves the embedded inner secondary action stays `Add as friend` before HQ save on that resolved `/s/:id` path
-  - proves the embedded inner secondary action becomes `Add ${saved HQ name} HQ as friend` after HQ save on that same resolved path
-  - proves the share-id badge still stays the real share id, so this is not the placeholder branch
-  - proves the branded inner secondary action survives reload and reopen
+- `e2e/452_zhc0_share_card_placeholder_action_labels_uses_saved_hq_name.spec.js`
+  - verifies placeholder share uses generic action labels before HQ save on `/s/sh_missing?embed=1`
+  - verifies those same labels become `Join ${saved HQ name} HQ` and `Add ${saved HQ name} HQ as friend` after HQ save on `/s/sh_missing?embed=1`
+  - verifies the placeholder badge remains `preview` so this is not the resolved share branch
+  - verifies branded placeholder action labels survive reload and reopen
 - `public/share_public.js`
-  - reads the matching resolved-share preview record and rewrites the inner public share secondary action label while leaving the real share/friend-add payload untouched
+  - applied the same saved-HQ naming pattern to placeholder action labels (`signup`, `addFriend`)
+  - keeps placeholder path behavior purely cosmetic via local preview state
 - `docs/zhc-current-status.md`
-  - updated snapshot, evidence, gaps, and next pickup
+  - updated snapshot, evidence, and next pickup
 
 ### Why this matches the direction better
 This is still the right size:
@@ -63,11 +63,13 @@ This is still the right size:
 - extends the existing share-shell branding line by exactly one small inner action surface
 
 ## New / updated contract coverage
-- added: `e2e/451_zhc0_resolved_share_card_secondary_action_uses_saved_hq_name.spec.js`
-  - verifies the embedded inner secondary action is still generic before HQ save on a resolved `/s/:id` path
-  - verifies the same embedded inner secondary action becomes `Add ${saved HQ name} HQ as friend` after HQ save on that resolved path
-  - verifies the real share id badge remains visible on that path
-  - verifies the branded inner secondary action survives reload and reopen
+- added: `e2e/452_zhc0_share_card_placeholder_action_labels_uses_saved_hq_name.spec.js`
+  - verifies both placeholder action labels are generic before HQ save on a placeholder `/s/sh_missing?embed=1` path
+  - verifies those same labels become `Join ${saved HQ name} HQ` and `Add ${saved HQ name} HQ as friend` after HQ save on that placeholder path
+  - verifies the placeholder badge remains `preview` so this remains the placeholder branch
+  - verifies the branded placeholder action labels survive reload and reopen
+- retained: `e2e/451_zhc0_resolved_share_card_secondary_action_uses_saved_hq_name.spec.js`
+  - confirms the embedded inner secondary action branch still stays correct on the resolved `/s/:id` path
 - retained: `e2e/450_zhc0_resolved_share_card_primary_action_uses_saved_hq_name.spec.js`
   - confirms the embedded inner primary action branch still stays correct on the same resolved path
 - retained: `e2e/449_zhc0_resolved_share_card_team_line_uses_saved_hq_name.spec.js`
@@ -95,30 +97,33 @@ This is still the right size:
 
 - `public/share_public.js`
 - `e2e/451_zhc0_resolved_share_card_secondary_action_uses_saved_hq_name.spec.js`
+- `e2e/452_zhc0_share_card_placeholder_action_labels_uses_saved_hq_name.spec.js`
 - `docs/zhc-current-status.md`
 
 ## Evidence runs
 
-### Focused resolved-share inner-secondary-action check
+### Focused placeholder-and-share action labels check
 ```bash
 export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && nvm use 24 >/dev/null
 node - <<'NODE'
 const fs = require('fs');
-for (const file of ['public/share_public.js', 'e2e/451_zhc0_resolved_share_card_secondary_action_uses_saved_hq_name.spec.js']) {
+for (const file of ['public/share_public.js', 'e2e/452_zhc0_share_card_placeholder_action_labels_uses_saved_hq_name.spec.js']) {
   new Function(fs.readFileSync(file, 'utf8'));
 }
 NODE
-npx playwright test e2e/439_zhc0_share_card_placeholder_uses_saved_hq_name.spec.js e2e/441_zhc0_share_card_modal_title_uses_saved_hq_name.spec.js e2e/442_zhc0_share_card_modal_title_resolved_share_path.spec.js e2e/443_zhc0_share_card_modal_title_hydrated_resolved_share_path.spec.js e2e/444_zhc0_resolved_share_card_inner_title_uses_saved_hq_name.spec.js e2e/445_zhc0_resolved_share_card_inner_lead_uses_saved_hq_name.spec.js e2e/446_zhc0_resolved_share_card_inner_hero_placeholder_uses_saved_hq_name.spec.js e2e/447_zhc0_resolved_share_card_inner_hero_heading_uses_saved_hq_name.spec.js e2e/448_zhc0_resolved_share_card_inner_team_heading_uses_saved_hq_name.spec.js e2e/449_zhc0_resolved_share_card_team_line_uses_saved_hq_name.spec.js e2e/450_zhc0_resolved_share_card_primary_action_uses_saved_hq_name.spec.js e2e/451_zhc0_resolved_share_card_secondary_action_uses_saved_hq_name.spec.js
+npx playwright test e2e/439_zhc0_share_card_placeholder_uses_saved_hq_name.spec.js e2e/450_zhc0_resolved_share_card_primary_action_uses_saved_hq_name.spec.js e2e/451_zhc0_resolved_share_card_secondary_action_uses_saved_hq_name.spec.js e2e/452_zhc0_share_card_placeholder_action_labels_uses_saved_hq_name.spec.js
 ```
 
 Result:
 - both syntax-only parse checks passed
-- Playwright result: `12 passed`
+- Playwright result: `13 passed`
 
 ## What I verified
 
 - the founder journey still stays inside the `/app` modal shell
-- on a resolved `/s/:id` share path, the embedded inner public share secondary action still stays generic before HQ save
+- on a placeholder share path (`/s/sh_missing?embed=1`), the embedded inner action labels stay generic before HQ save (`Sign up`, `Add as friend`)
+- after HQ save, those placeholder action labels brand correctly as `Join ${saved HQ name} HQ` and `Add ${saved HQ name} HQ as friend`
+- the resolved-share embedded secondary action still stays generic before HQ save
 - after HQ save, that same embedded inner secondary action brands correctly as `Add ${saved HQ name} HQ as friend`
 - the embedded share still shows the real share id badge, so this remains the resolved-share branch rather than placeholder fallback
 - the HQ-branded inner secondary action survives reload and reopen through the existing local/session browser state path
@@ -171,9 +176,9 @@ If we keep trimming this seam one notch at a time, the cleanest next move is:
 ## Repo state notes
 
 - most recent local commit:
-  - `f00b5b2 feat: brand resolved share primary action with saved hq name`
+  - `3de7bcb feat: brand resolved share secondary action with saved hq name`
 - intended local commit for this slice:
-  - `feat: brand resolved share secondary action with saved hq name`
+  - `feat: brand resolved share placeholder action labels with saved hq name`
 - recent earlier local commits include:
   - `3b9cf03 feat: brand resolved share team line with saved hq name`
   - `a38f4ae feat: brand resolved share team heading with saved hq name`

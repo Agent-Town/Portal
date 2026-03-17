@@ -491,6 +491,8 @@ function getSharePlaceholderCopy(preview = null) {
       title: 'Share Card',
       lead: 'Placeholder shell for a house whose public share card is still offline.',
       hero: 'Generated house hero will appear here once the public share card is minted.',
+      signup: 'Sign up',
+      addFriend: 'Add as friend',
     };
   }
   return {
@@ -498,6 +500,8 @@ function getSharePlaceholderCopy(preview = null) {
     title: `${hqName} HQ share card`,
     lead: `Placeholder shell for ${hqName} HQ while the public share card is still offline.`,
     hero: `${hqName} HQ hero will appear here once the public share card is minted.`,
+    signup: `Join ${hqName} HQ`,
+    addFriend: `Add ${hqName} HQ as friend`,
   };
 }
 
@@ -534,10 +538,14 @@ function applySharePlaceholderState(preview = null) {
   const lead = el('shareLead');
   const badge = el('shareIdBadge');
   const heroPlaceholder = el('shareHeroPlaceholder');
+  const signupBtn = el('signupBtn');
+  const addFriendBtn = el('addFriendBtn');
   if (title) title.textContent = copy.title;
   if (lead) lead.textContent = copy.lead;
   if (badge) badge.textContent = copy.badge;
   if (heroPlaceholder) heroPlaceholder.textContent = copy.hero;
+  if (signupBtn && copy.signup) signupBtn.textContent = copy.signup;
+  if (addFriendBtn && copy.addFriend) addFriendBtn.textContent = copy.addFriend;
   document.title = `${copy.title} — Agent Town`;
   const err = el('err');
   if (err) err.textContent = '';
