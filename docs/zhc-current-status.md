@@ -1,7 +1,7 @@
 # ZHC Current Status Snapshot
 
-Status: M44.1 complete, M44.2 contract/mechanics complete, M44.3 Town Hall founder-progression slice complete, M44.4 modal handoff corrected and green, M44.5 HQ-first-entry modal surface green, M44.6 shared HQ naming slice green, M44.7 saved HQ name now projects into the House shell header and is green, M44.8 saved HQ name now brands the Mission lane heading/lead and is green, M44.9 saved HQ name now reaches the Mission detail line and is green, M44.10 saved HQ name now reaches the Mission empty-state copy and is green, M44.11 no-experience Mission detail hint is now truthful before save and HQ-branded after save and is green, M44.12 saved HQ name now brands the reconnect share-card action and is green, M44.13 saved HQ name now brands the reconnect intro/support line and is green, M44.14 saved HQ name now brands the reconnect copyable house snippet and is green, M44.15 wallet-recovery-specific reconnect intro coverage is now explicit and green, M44.16 saved HQ name now brands the House systems/team summary line and is green, M44.17 saved HQ name now brands the share-card placeholder shell/body and is green, M44.18 founders-loop coverage now directly exercises the House systems summary helper when no team context is attached and is green, M44.19 outer share-card modal title/chrome now uses the saved HQ name and is green, M44.20 resolved `/s/:id` share-path coverage for that outer HQ-branded modal title is now explicit and green  
-Last updated: 2026-03-17 03:40 +0700  
+Status: M44.1 complete, M44.2 contract/mechanics complete, M44.3 Town Hall founder-progression slice complete, M44.4 modal handoff corrected and green, M44.5 HQ-first-entry modal surface green, M44.6 shared HQ naming slice green, M44.7 saved HQ name now projects into the House shell header and is green, M44.8 saved HQ name now brands the Mission lane heading/lead and is green, M44.9 saved HQ name now reaches the Mission detail line and is green, M44.10 saved HQ name now reaches the Mission empty-state copy and is green, M44.11 no-experience Mission detail hint is now truthful before save and HQ-branded after save and is green, M44.12 saved HQ name now brands the reconnect share-card action and is green, M44.13 saved HQ name now brands the reconnect intro/support line and is green, M44.14 saved HQ name now brands the reconnect copyable house snippet and is green, M44.15 wallet-recovery-specific reconnect intro coverage is now explicit and green, M44.16 saved HQ name now brands the House systems/team summary line and is green, M44.17 saved HQ name now brands the share-card placeholder shell/body and is green, M44.18 founders-loop coverage now directly exercises the House systems summary helper when no team context is attached and is green, M44.19 outer share-card modal title/chrome now uses the saved HQ name and is green, M44.20 resolved `/s/:id` share-path coverage for that outer HQ-branded modal title is now explicit and green, M44.21 already-hydrated resolved share-state coverage for that outer HQ-branded modal title is now explicit and green  
+Last updated: 2026-03-17 07:23 +0700  
 Branch: `zhc0-founders-loop`  
 Worktree: `/Users/robin/.openclaw/workspace/Portal-zhc0`
 
@@ -25,11 +25,12 @@ Robin clarified the constraints that currently govern the founders-loop passes:
 
 ## What landed this pass
 
-### M44.20 — resolved `/s/:id` share-path coverage for the outer HQ-branded modal title
-This pass took the exact M44.19 pickup and stayed test-first.
+### M44.21 — already-hydrated resolved share-state coverage for the outer HQ-branded modal title
+This pass took the exact M44.20 pickup and stayed test-first.
 
 What changed:
-- added a focused founders-loop assertion for a **real resolved** `/s/:id` share path
+- added a focused founders-loop assertion for the branch where the session already carries a resolved share before the House share-card click
+- proved the opener can reuse hydrated share state instead of falling back to the lookup-by-house request path
 - kept the founder journey modal-first on `/app`
 - made **no** app code changes
 - made **no** share payload/body changes
@@ -37,12 +38,14 @@ What changed:
 - made **no** route or UI architecture changes
 
 Implementation details:
-- `e2e/442_zhc0_share_card_modal_title_resolved_share_path.spec.js`
-  - seeds a recoverable-token house plus a real share record
-  - proves the House share-card opener resolves to `/s/<shareId>?embed=1` instead of the preview fallback path
-  - proves the outer modal title still stays generic before HQ naming on that resolved share path
-  - proves the same outer modal title becomes `${saved HQ name} HQ share card` after HQ save on that resolved share path
-  - proves the HQ-branded title survives reload on the resolved share path as well
+- `e2e/443_zhc0_share_card_modal_title_hydrated_resolved_share_path.spec.js`
+  - attaches the house to the page session first, then creates the house share so the active session is hydrated with `share.id`
+  - proves `/api/state` already carries the resolved share id before the share-card opener is clicked
+  - proves the opener reaches `/s/<shareId>?embed=1` through the hydrated branch
+  - proves no `GET /api/share/by-house/:houseId` lookup is needed on that path
+  - proves the outer modal title still stays generic before HQ naming on that hydrated resolved path
+  - proves the same outer modal title becomes `${saved HQ name} HQ share card` after HQ save on that same hydrated resolved path
+  - proves the branded title survives reload while the share stays hydrated in session state
 - `docs/zhc-current-status.md`
   - updated snapshot, evidence, gaps, and next pickup
 
@@ -55,58 +58,66 @@ This is the right size for the follow-on:
 - no route churn
 - no share architecture expansion
 - no broad UI churn
-- closes the precise confidence gap left by M44.19 without inventing a wider share rewrite
+- closes the exact remaining confidence gap left by M44.20 without inventing a wider share rewrite
 
 ## New / updated contract coverage
-- added: `e2e/442_zhc0_share_card_modal_title_resolved_share_path.spec.js`
-  - verifies the outer share-card modal title is still `Share Card` before HQ save on a resolved `/s/:id` path
-  - verifies the same outer modal title becomes `${saved HQ name} HQ share card` after HQ save on that resolved path
-  - verifies the branded title survives reload on the resolved path
+- added: `e2e/443_zhc0_share_card_modal_title_hydrated_resolved_share_path.spec.js`
+  - verifies the session already contains the resolved share id before click
+  - verifies the opener does **not** need the lookup-by-house fallback on that branch
+  - verifies the outer share-card modal title is still `Share Card` before HQ save on that hydrated resolved path
+  - verifies the same outer modal title becomes `${saved HQ name} HQ share card` after HQ save on that hydrated resolved path
+  - verifies the branded title survives reload on the hydrated resolved path
+- retained: `e2e/442_zhc0_share_card_modal_title_resolved_share_path.spec.js`
+  - confirms the lookup-by-house success branch still stays correct
 - retained: `e2e/441_zhc0_share_card_modal_title_uses_saved_hq_name.spec.js`
-  - confirms the already-landed preview-fallback branch still stays correct
+  - confirms the preview-fallback branch still stays correct
 - retained: `e2e/439_zhc0_share_card_placeholder_uses_saved_hq_name.spec.js`
   - confirms the inner placeholder shell/body copy still stays HQ-branded inside the embedded share card
 
 ## Files changed in this slice
 
-- `e2e/442_zhc0_share_card_modal_title_resolved_share_path.spec.js`
+- `e2e/443_zhc0_share_card_modal_title_hydrated_resolved_share_path.spec.js`
 - `docs/zhc-current-status.md`
 
 ## Evidence runs
 
-### Focused resolved-share-path check
+### Focused hydrated-share-state check
 ```bash
-node --check e2e/442_zhc0_share_card_modal_title_resolved_share_path.spec.js
 node --check e2e/441_zhc0_share_card_modal_title_uses_saved_hq_name.spec.js
-npx playwright test e2e/441_zhc0_share_card_modal_title_uses_saved_hq_name.spec.js e2e/442_zhc0_share_card_modal_title_resolved_share_path.spec.js
-npx playwright test e2e/439_zhc0_share_card_placeholder_uses_saved_hq_name.spec.js e2e/441_zhc0_share_card_modal_title_uses_saved_hq_name.spec.js e2e/442_zhc0_share_card_modal_title_resolved_share_path.spec.js
+node --check e2e/442_zhc0_share_card_modal_title_resolved_share_path.spec.js
+node --check e2e/443_zhc0_share_card_modal_title_hydrated_resolved_share_path.spec.js
+npx playwright test e2e/439_zhc0_share_card_placeholder_uses_saved_hq_name.spec.js e2e/441_zhc0_share_card_modal_title_uses_saved_hq_name.spec.js e2e/442_zhc0_share_card_modal_title_resolved_share_path.spec.js e2e/443_zhc0_share_card_modal_title_hydrated_resolved_share_path.spec.js
 ```
 
 Result:
-- both `node --check` commands passed
-- Playwright pair: `2 passed`
-- Playwright trio: `3 passed`
+- all three `node --check` commands passed
+- Playwright quartet: `4 passed`
 
 ## What I verified
 
 - the founder journey still stays inside the `/app` modal shell
-- with a real share seeded, the House share-card opener now lands on a resolved `/s/<shareId>?embed=1` frame path in the existing modal shell
-- before HQ naming, the outer modal title still stays generic as `Share Card` on that resolved path
-- after HQ naming, the outer modal title brands correctly as `${saved HQ name} HQ share card` on that same resolved path
-- the HQ-branded outer title survives reload via the existing local-only naming record
-- the preview-fallback path from M44.19 still stays green
+- once the house is attached first and the share is created after that, `/api/state` already carries the resolved share id before the click
+- on that hydrated branch, the House share-card opener reaches `/s/<shareId>?embed=1` without hitting the lookup-by-house fallback request
+- before HQ naming, the outer modal title still stays generic as `Share Card` on that hydrated resolved path
+- after HQ naming, the outer modal title brands correctly as `${saved HQ name} HQ share card` on that same hydrated resolved path
+- the HQ-branded outer title survives reload via the existing local-only naming record while the resolved share stays hydrated in session state
+- the lookup-by-house success branch from M44.20 still stays green
+- the preview-fallback branch from M44.19 still stays green
 - the inner placeholder-shell assertions from M44.17 still stay green
 
 ## Honest gaps / remaining debt
 
 - HQ naming still persists in browser local storage only
   - coherent for this UI slice, but still not written into server/session/platform state
-- this new resolved-share-path coverage proves the **lookup-by-house success branch** from the House opener
-  - it does **not** separately prove a branch where resolved share metadata is already hydrated into `lastState` before the click, if that path matters later
 - real minted share payload/body content still does not intentionally reuse the saved HQ name
 - deeper downstream surfaces beyond the current House/share shell still do not reuse the saved HQ name consistently
 - the screenshot baseline still reflects the earlier modal shell state
   - I did **not** capture a fresh image pack for this slice
+- the outer share-card modal-title surface is now covered across:
+  - preview fallback (`/s/sh_missing`)
+  - lookup-by-house success to resolved `/s/:id`
+  - already-hydrated resolved share state
+  - but deeper downstream HQ-name propagation beyond that chrome still remains broader follow-on work
 
 ## What I did **not** do
 
@@ -127,7 +138,7 @@ Result:
 
 If we keep trimming this surface one notch at a time, the cleanest next move is:
 
-1. add one tiny founders-loop assertion for the branch where the share-card opener already has a resolved share path in hydrated state (`lastState.share.sharePath` / `lastState.share.id`), not just the lookup-by-house success path exercised here
+1. decide whether the next tiny win should stay on share-shell branding or step one layer deeper into the public share payload/body copy
 2. keep it test-first and modal-only on `/app`
 3. keep persistence local-only unless there is an exceptionally small safe path to broader state
 4. keep the next move just as narrow
@@ -138,8 +149,9 @@ If we keep trimming this surface one notch at a time, the cleanest next move is:
 ## Repo state notes
 
 - local commit for this slice:
-  - `test: cover resolved share modal title path`
+  - pending
 - recent earlier local commits include:
+  - `af72a6d test: cover resolved share modal title path`
   - `e6be8cc feat: brand share modal title with saved hq name`
   - `1b15671 test: cover no-team house summary branch`
   - `c664cbf feat: brand share placeholder shell with saved hq name`
