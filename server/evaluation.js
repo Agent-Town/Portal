@@ -22,6 +22,12 @@ const {
   updateProblemStory,
   createProblemStory,
 } = require('./problem-stories');
+const {
+  listExperimentCards,
+  updateCardById,
+  getCardById,
+} = require('./experiment-cards');
+const { generateScores } = require('./experiment-runner');
 
 const router = express.Router();
 router.use(express.json());
@@ -842,10 +848,218 @@ router.post('/:id/eval-confirm', (req, res) => {
   });
 });
 
+// ─── Mid-loop metric editing (T014) ───────────────────────────────
+
+/**
+ * Rescore all existing experiment cards for a problem story.
+ *
+ * For each card:
+ *  - Saves old scores in a `legacyScores` array entry (with timestamp)
+ *  - Generates new scores using the updated metrics + baselines
+ *  - Updates compositeScore
+ *
+ * @param {string} problemStoryId
+ * @param {object[]} metrics — the new metrics array
+ * @param {object} baselineScores — metric ID → baseline score
+ * @returns {{ rescored: number, errors: string[] }}
+ */
+function rescoreAllCards(problemStoryId, metrics, baselineScores) {
+  const cards = listExperimentCards(problemStoryId);
+  let rescored = 0;
+  const errors = [];
+
+  if (!cards.length) return { rescored: 0, errors: [] };
+
+  // First pass: rescore all cards, store legacy scores
+  for (let i = 0; i < cards.length; i++) {
+    const card = cards[i];
+
+    // Save old scores into legacyScores
+    const legacyEntry = {
+      timestamp: new Date().toISOString(),
+      scores: { ...card.scores },
+      compositeScore: card.compositeScore,
+      deltaScore: card.deltaScore,
+      reason: 'metric_change',
+    };
+
+    if (!card.legacyScores) card.legacyScores = [];
+    card.legacyScores.push(legacyEntry);
+
+    // Generate new scores using the scoring engine
+    try {
+      const { scores, compositeScore } = generateScores(
+        metrics,
+        baselineScores,
+        i % 3 // cycle through experiment indices for variety
+      );
+
+      updateCardById(card.id, {
+        scores,
+        compositeScore,
+      });
+      rescored++;
+    } catch (err) {
+      errors.push(`Card ${card.id}: ${err.message}`);
+    }
+  }
+
+  // Second pass: recalculate deltaScore based on new compositeScores
+  const updatedCards = listExperimentCards(problemStoryId);
+  // Sort by iterationNumber ascending for delta calculation
+  const sorted = [...updatedCards].sort((a, b) => a.iterationNumber - b.iterationNumber);
+
+  for (let i = 0; i < sorted.length; i++) {
+    const card = sorted[i];
+    let deltaScore = 0;
+    if (i > 0) {
+      const prevCard = sorted[i - 1];
+      deltaScore = Math.round((card.compositeScore - prevCard.compositeScore) * 100) / 100;
+    }
+    updateCardById(card.id, { deltaScore });
+  }
+
+  return { rescored, errors };
+}
+
+/**
+ * PUT /api/problem-stories/:id/evaluation
+ *
+ * Mid-loop metric editing (T014).
+ * Allows modifying metrics after experiments have started.
+ * Automatically rescores all existing experiment cards.
+ *
+ * Body:
+ *   { addMetric?: object }    — metric to add (name, type, direction required)
+ *   { removeMetricId?: string } — metric ID to remove
+ *   { updateMetric?: { id, ...fields } } — metric fields to update
+ */
+router.put('/:id/evaluation', (req, res) => {
+  const story = getProblemStory(req.params.id);
+  if (!story) {
+    return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  }
+
+  if (story.status !== 'active') {
+    return res.status(400).json({
+      ok: false,
+      error: 'STORY_NOT_ACTIVE',
+      message: 'Evaluation can only be modified for active problem stories.',
+    });
+  }
+
+  const { addMetric, removeMetricId, updateMetric } = req.body;
+  const metrics = story.evaluationFunction.metrics;
+  const baselineScores = story.evaluationFunction.baselineScores || {};
+  let changed = false;
+
+  // ── Add metric ──
+  if (addMetric) {
+    if (!addMetric.name || !addMetric.type || !addMetric.direction) {
+      return res.status(400).json({
+        ok: false,
+        error: 'INVALID_METRIC',
+        message: 'addMetric requires name, type, and direction.',
+      });
+    }
+
+    const metric = {
+      id: randomUUID(),
+      name: addMetric.name,
+      type: addMetric.type,
+      direction: addMetric.direction,
+      unit: addMetric.unit,
+      range: addMetric.range,
+      assessmentPrompt: addMetric.assessmentPrompt,
+      weight: typeof addMetric.weight === 'number' ? addMetric.weight : 1,
+      confidence: 0.5,
+      rationale: addMetric.rationale || `Mid-loop addition: ${addMetric.name}`,
+    };
+
+    metrics.push(metric);
+    // Set baseline for new metric
+    baselineScores[metric.id] = 0.5;
+    changed = true;
+  }
+
+  // ── Remove metric ──
+  if (removeMetricId) {
+    const idx = metrics.findIndex((m) => m.id === removeMetricId);
+    if (idx === -1) {
+      return res.status(404).json({
+        ok: false,
+        error: 'METRIC_NOT_FOUND',
+        message: `Metric ${removeMetricId} not found.`,
+      });
+    }
+    metrics.splice(idx, 1);
+    delete baselineScores[removeMetricId];
+    changed = true;
+  }
+
+  // ── Update metric ──
+  if (updateMetric) {
+    if (!updateMetric.id) {
+      return res.status(400).json({
+        ok: false,
+        error: 'INVALID_UPDATE',
+        message: 'updateMetric requires an id field.',
+      });
+    }
+
+    const idx = metrics.findIndex((m) => m.id === updateMetric.id);
+    if (idx === -1) {
+      return res.status(404).json({
+        ok: false,
+        error: 'METRIC_NOT_FOUND',
+        message: `Metric ${updateMetric.id} not found.`,
+      });
+    }
+
+    // Merge allowed fields
+    const allowedFields = ['name', 'type', 'direction', 'unit', 'range', 'assessmentPrompt', 'weight', 'rationale'];
+    for (const field of allowedFields) {
+      if (updateMetric[field] !== undefined) {
+        metrics[idx][field] = updateMetric[field];
+      }
+    }
+    changed = true;
+  }
+
+  if (!changed) {
+    return res.status(400).json({
+      ok: false,
+      error: 'NO_CHANGES',
+      message: 'Provide at least one of: addMetric, removeMetricId, updateMetric.',
+    });
+  }
+
+  // Persist metric changes
+  story.evaluationFunction.metrics = metrics;
+  story.evaluationFunction.baselineScores = baselineScores;
+  story.updatedAt = new Date().toISOString();
+  updateProblemStory(story.id, story);
+
+  // Rescore all existing cards with the new metrics
+  const { rescored, errors } = rescoreAllCards(story.id, metrics, baselineScores);
+
+  res.json({
+    ok: true,
+    data: {
+      problemStoryId: story.id,
+      metrics,
+      rescoredCards: rescored,
+      rescoreErrors: errors.length > 0 ? errors : undefined,
+      message: `Metrics updated. ${rescored} cards rescored.`,
+    },
+  });
+});
+
 // ─── Exports ────────────────────────────────────────────────────────
 
 module.exports = {
   router,
   generateMetricProposals,
   parseNaturalLanguageMetric,
+  rescoreAllCards,
 };

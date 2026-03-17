@@ -15,8 +15,9 @@
  */
 
 const express = require('express');
-const { listExperimentCards, createExperimentCard } = require('./experiment-cards');
+const { listExperimentCards } = require('./experiment-cards');
 const { getProblemStory, updateProblemStory } = require('./problem-stories');
+const { runExperimentRound } = require('./experiment-runner');
 
 // ── Convergence detection constants ─────────────────────────────────
 
@@ -25,53 +26,6 @@ const IMPROVEMENT_RATE_THRESHOLD = 0.03;
 
 /** Number of consecutive rounds with low improvement before declaring convergence */
 const CONVERGENCE_PLATEAU_ROUNDS = 3;
-
-// ── Experiment runner stub ─────────────────────────────────────────
-
-/**
- * Run an experiment round for a Problem Story.
- *
- * In production this would call the experiment engine (LLM, code gen, etc).
- * For now it generates mock cards so the iteration loop can be tested end-to-end.
- *
- * @param {string} problemStoryId
- * @param {number} roundNumber
- * @param {object} story — the Problem Story (for constraints/preferences context)
- * @returns {object[]} array of created cards
- */
-function runExperimentRound(problemStoryId, roundNumber, story) {
-  const now = new Date().toISOString();
-
-  // Generate 2–3 mock cards per round
-  const numCards = 2 + Math.floor(Math.random() * 2); // 2 or 3
-
-  const cards = [];
-  for (let i = 0; i < numCards; i++) {
-    // Simulate improving scores over rounds (with some noise)
-    const baseImprovement = Math.min(roundNumber * 0.08, 0.6);
-    const noise = (Math.random() - 0.3) * 0.15; // slight upward bias + variance
-    const compositeScore = Math.max(0.1, Math.min(0.99,
-      0.3 + baseImprovement + noise + (i * 0.03)
-    ));
-
-    const card = createExperimentCard(problemStoryId, {
-      roundNumber,
-      compositeScore,
-      agentSummary: `Round ${roundNumber} experiment variant ${i + 1}`,
-      deltaFromLast: `Iterating on feedback from round ${roundNumber - 1 || 'baseline'}`,
-      visual: {
-        type: 'css_gradient',
-        url: '',
-        alt: `Experiment round ${roundNumber} variant ${i + 1}`,
-      },
-      status: 'pending_review',
-    });
-
-    cards.push(card);
-  }
-
-  return cards;
-}
 
 // ── Helpers ────────────────────────────────────────────────────────
 
@@ -243,7 +197,7 @@ router.use(express.json());
  * Trigger next experiment round after feedback.
  * Body: { problemStoryId: string }
  */
-router.post('/next-round', (req, res) => {
+router.post('/next-round', async (req, res) => {
   const { problemStoryId } = req.body;
 
   if (!problemStoryId || typeof problemStoryId !== 'string') {
@@ -272,26 +226,30 @@ router.post('/next-round', (req, res) => {
     });
   }
 
-  // Determine next round number
-  const nextRound = currentRound + 1;
+  try {
+    // Run experiment round via the real experiment runner
+    const result = await runExperimentRound({
+      problemStoryId,
+      timeBudgetMs: 7 * 60 * 1000,
+    });
 
-  // Run experiment round (creates new cards)
-  const newCards = runExperimentRound(problemStoryId, nextRound, story);
-
-  // Update Problem Story total iterations
-  story.totalIterations = (story.totalIterations || 0) + newCards.length;
-  story.updatedAt = new Date().toISOString();
-  updateProblemStory(problemStoryId, story);
-
-  res.json({
-    ok: true,
-    data: {
-      roundNumber: nextRound,
-      cardsCreated: newCards.length,
-      cards: newCards,
-      message: `Round ${nextRound} started with ${newCards.length} experiment variants`,
-    },
-  });
+    res.json({
+      ok: true,
+      data: {
+        roundNumber: result.roundNumber,
+        cardsCreated: result.cards.length,
+        cards: result.cards,
+        warnings: result.warnings || [],
+        message: `Round ${result.roundNumber} started with ${result.cards.length} experiment variants`,
+      },
+    });
+  } catch (err) {
+    const status = err.message.includes('not found') ? 404 : 400;
+    res.status(status).json({
+      ok: false,
+      error: err.message,
+    });
+  }
 });
 
 /**
@@ -372,14 +330,4 @@ router.get('/score-trend', (req, res) => {
 
 // ── Exports ────────────────────────────────────────────────────────
 
-module.exports = {
-  router,
-  runExperimentRound,
-  getCurrentRoundNumber,
-  hasReviewedCardsInCurrentRound,
-  computeRoundSummaries,
-  computeImprovementRates,
-  checkConvergence,
-  IMPROVEMENT_RATE_THRESHOLD,
-  CONVERGENCE_PLATEAU_ROUNDS,
-};
+module.exports = router;

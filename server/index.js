@@ -1955,6 +1955,10 @@ const { router: saveGameRouter } = require('./save-game');
 app.use('/api/save-games', saveGameRouter);
 const iterationLoopRouter = require('./iteration-loop');
 app.use('/api/iteration-loop', iterationLoopRouter);
+const { router: discoveryRouter } = require('./discovery');
+app.use('/api/discovery-feed', discoveryRouter);
+const { router: publicationRouter } = require('./publication');
+app.use('/api', publicationRouter);
 
 app.use('/api/llm', requireProxySessionAccess);
 app.use('/api/tools', requireProxySessionAccess);
