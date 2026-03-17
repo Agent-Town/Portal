@@ -435,6 +435,19 @@ function readShareCardPreview() {
   }
 }
 
+function readResolvedShareCardPreview() {
+  if (isPlaceholderShareId()) return null;
+  const preview = readShareCardPreview();
+  if (!preview) return null;
+  const currentSharePath = `/s/${encodeURIComponent(String(shareId || '').trim())}`;
+  return preview.sharePath === currentSharePath ? preview : null;
+}
+
+function getResolvedShareCardTitle(preview = null) {
+  const hqName = normalizeHouseHqName(preview?.hqName);
+  return hqName ? `${hqName} HQ share card` : '';
+}
+
 function getSharePlaceholderCopy(preview = null) {
   const hqName = normalizeHouseHqName(preview?.hqName);
   if (!hqName) {
@@ -451,6 +464,15 @@ function getSharePlaceholderCopy(preview = null) {
     lead: `Placeholder shell for ${hqName} HQ while the public share card is still offline.`,
     hero: `${hqName} HQ hero will appear here once the public share card is minted.`,
   };
+}
+
+function applyResolvedShareShellPreview(preview = null) {
+  const titleText = getResolvedShareCardTitle(preview);
+  if (!titleText) return false;
+  const title = el('shareCardTitle');
+  if (title) title.textContent = titleText;
+  document.title = `${titleText} — Agent Town`;
+  return true;
 }
 
 function applySharePlaceholderState(preview = null) {
@@ -572,10 +594,12 @@ async function addShareAsFriend(targetShareId) {
 
 async function init() {
   const placeholderPreview = isPlaceholderShareId() ? readShareCardPreview() : null;
+  const resolvedPreview = isPlaceholderShareId() ? null : readResolvedShareCardPreview();
   if (isPlaceholderShareId()) {
     applySharePlaceholderState(placeholderPreview);
   } else {
     el('shareIdBadge').textContent = shareId;
+    applyResolvedShareShellPreview(resolvedPreview);
   }
 
   await initHouseNavLink();

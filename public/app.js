@@ -1413,6 +1413,9 @@ async function lookupSharePathByHouse(houseId) {
 function routeToShareCard(sharePath, { houseId = houseSurfaceState.context.houseId } = {}) {
   const normalized = String(sharePath || '').trim();
   if (!normalized) return;
+  if (normalized.startsWith('/s/')) {
+    persistShareCardPreviewRecord({ houseId, sharePath: normalized });
+  }
   const resolved = routeToPopupMode(normalized);
   if (resolved?.mode === 'frame') {
     const frameTitle = normalized.startsWith('/s/')
