@@ -1841,11 +1841,8 @@ footer::before {
 }
 
 .startAuthBox {
-  position: absolute;
-  inset: auto 16px 16px 16px;
-  z-index: 2;
-  width: auto;
-  max-width: none;
+  width: 100%;
+  max-width: 420px;
   border: 2px solid var(--border);
   border-radius: 14px;
   background: rgba(255, 249, 232, 0.94);
@@ -1948,8 +1945,8 @@ footer::before {
   }
 
   .startAuthBox {
-    inset: auto 12px 12px 12px;
     padding: 12px;
+    max-width: none;
   }
 
   .startWarning {
@@ -2090,8 +2087,8 @@ footer::before {
   }
 
   .startAuthBox {
-    inset: auto 12px 12px 12px;
     padding: 12px;
+    max-width: none;
   }
 
   .startWarning {

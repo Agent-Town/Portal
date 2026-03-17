@@ -367,6 +367,27 @@ function appPathFromConfig(cfg) {
   return cfg && typeof cfg.appPath === 'string' && cfg.appPath ? cfg.appPath : '/app';
 }
 
+function setStartEntryActionLabel(isReturningUser) {
+  const enterBtn = document.getElementById('enterBtn');
+  if (!enterBtn) return;
+  const label = isReturningUser ? 'Login' : 'Sign up';
+  enterBtn.textContent = label;
+}
+
+async function getReturningStartUserState() {
+  const cfg = await getCachedPrivyConfig();
+  if (!cfg || cfg.enabled !== true) return false;
+  if (typeof window.ensurePrivyLogin !== 'function') return false;
+  try {
+    return !!(await withStartTimeout(
+      window.ensurePrivyLogin({ interactive: false, requireSession: true }),
+      START_PRIVY_SESSION_CHECK_TIMEOUT_MS,
+      'PRIVY_SESSION_CHECK_TIMEOUT'
+    ));
+  } catch {
+    return false;
+  }
+}
 async function maybeAutoSkipStart() {
   const pathname = window.location.pathname;
   if (pathname !== '/' && pathname !== '/start') return;
@@ -376,6 +397,7 @@ async function maybeAutoSkipStart() {
   const appPath = appPathFromConfig(cfg);
 
   if (!cfg || cfg.enabled !== true) {
+    setStartEntryActionLabel(false);
     if (pathname === '/') {
       setArrivalOverlayState('success_feedback');
       autoRedirecting = true;
@@ -384,14 +406,14 @@ async function maybeAutoSkipStart() {
     return;
   }
 
-  if (typeof window.ensurePrivyLogin !== 'function') return;
+  if (typeof window.ensurePrivyLogin !== 'function') {
+    setStartEntryActionLabel(false);
+    return;
+  }
 
   try {
-    const alreadySignedIn = await withStartTimeout(
-      window.ensurePrivyLogin({ interactive: false, requireSession: true }),
-      START_PRIVY_SESSION_CHECK_TIMEOUT_MS,
-      'PRIVY_SESSION_CHECK_TIMEOUT'
-    );
+    const alreadySignedIn = await getReturningStartUserState();
+    setStartEntryActionLabel(!!alreadySignedIn);
     if (!alreadySignedIn) return;
     setArrivalOverlayState('loading');
     await preparePrivyWalletEntry({ silent: true });
@@ -400,6 +422,7 @@ async function maybeAutoSkipStart() {
     window.location.replace(appPath);
   } catch {
     setArrivalOverlayState('ready');
+    setStartEntryActionLabel(false);
     // no-op; allow manual entry
   }
 }
@@ -430,7 +453,7 @@ async function handleEnter() {
     let alreadySignedIn = false;
     try {
       alreadySignedIn = !!(await withStartTimeout(
-        window.ensurePrivyLogin({ interactive: false }),
+        window.ensurePrivyLogin({ interactive: false, requireSession: true }),
         START_PRIVY_SESSION_CHECK_TIMEOUT_MS,
         'PRIVY_SESSION_CHECK_TIMEOUT'
       ));
@@ -439,6 +462,7 @@ async function handleEnter() {
       console.warn('silent privy login check failed; falling back to interactive login', err);
       alreadySignedIn = false;
     }
+    setStartEntryActionLabel(!!alreadySignedIn);
     if (alreadySignedIn) {
       setStatus('Finalizing Privy wallets...');
       await preparePrivyWalletEntry({ silent: true });
@@ -449,6 +473,7 @@ async function handleEnter() {
       return;
     }
 
+    setStartEntryActionLabel(false);
     if (loginUi && typeof loginUi.primeEmailStep === 'function') {
       loginUi.primeEmailStep();
     }

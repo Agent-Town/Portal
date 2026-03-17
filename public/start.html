@@ -59,10 +59,31 @@
 
           <div class="startEntryActions">
             <button class="btn primary startEnterBtn" id="enterBtn" type="button" aria-label="Enter" data-zhc-primary-action="true">
-              Enter town
+              Sign up
             </button>
           </div>
           <p class="small startStatus" id="startStatus" aria-live="polite"></p>
+
+          <section class="startAuthBox is-hidden" id="privyAuthBox" data-testid="privy-auth-box" aria-live="polite">
+            <h2 class="startAuthTitle">Sign in with Privy</h2>
+            <p class="small startAuthHelp" id="privyAuthHelp">Enter your email to receive a one-time code.</p>
+
+            <form id="privyEmailForm" class="startAuthForm">
+              <label class="small" for="privyEmailInput">Email</label>
+              <input id="privyEmailInput" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required />
+              <button class="btn primary" type="submit">Send code</button>
+            </form>
+
+            <form id="privyCodeForm" class="startAuthForm is-hidden">
+              <label class="small" for="privyCodeInput">Code</label>
+              <input id="privyCodeInput" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" required />
+              <button class="btn primary" type="submit">Verify code</button>
+            </form>
+
+            <div class="startAuthActions">
+              <button class="btn" id="privyAuthCancelBtn" type="button">Cancel</button>
+            </div>
+          </section>
         </section>
 
         <section class="startHeroColumn">
@@ -76,26 +97,6 @@
               allowfullscreen
             ></iframe>
 
-            <section class="startAuthBox is-hidden" id="privyAuthBox" data-testid="privy-auth-box" aria-live="polite">
-              <h2 class="startAuthTitle">Sign in with Privy</h2>
-              <p class="small startAuthHelp" id="privyAuthHelp">Enter your email to receive a one-time code.</p>
-
-              <form id="privyEmailForm" class="startAuthForm">
-                <label class="small" for="privyEmailInput">Email</label>
-                <input id="privyEmailInput" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required />
-                <button class="btn primary" type="submit">Send code</button>
-              </form>
-
-              <form id="privyCodeForm" class="startAuthForm is-hidden">
-                <label class="small" for="privyCodeInput">Code</label>
-                <input id="privyCodeInput" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" required />
-                <button class="btn primary" type="submit">Verify code</button>
-              </form>
-
-              <div class="startAuthActions">
-                <button class="btn" id="privyAuthCancelBtn" type="button">Cancel</button>
-              </div>
-            </section>
           </div>
 
           <section class="startHeroNote" aria-label="Founders loop promise">
