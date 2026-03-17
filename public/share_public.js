@@ -458,6 +458,11 @@ function getResolvedShareCardHeroPanelTitle(preview = null) {
   return hqName ? `🎨 ${hqName} HQ Hero` : '';
 }
 
+function getResolvedShareCardTeamPanelTitle(preview = null) {
+  const hqName = normalizeHouseHqName(preview?.hqName);
+  return hqName ? `👤 ${hqName} HQ Team` : '';
+}
+
 function getResolvedShareCardHeroPlaceholder(preview = null) {
   const hqName = normalizeHouseHqName(preview?.hqName);
   return hqName ? `${hqName} HQ hero will appear here once the public share card is minted.` : '';
@@ -485,15 +490,18 @@ function applyResolvedShareShellPreview(preview = null) {
   const titleText = getResolvedShareCardTitle(preview);
   const leadText = getResolvedShareCardLead(preview);
   const heroPanelTitleText = getResolvedShareCardHeroPanelTitle(preview);
+  const teamPanelTitleText = getResolvedShareCardTeamPanelTitle(preview);
   const heroPlaceholderText = getResolvedShareCardHeroPlaceholder(preview);
   if (!titleText) return false;
   const title = el('shareCardTitle');
   const lead = el('shareLead');
   const heroPanelTitle = el('shareHeroPanelTitle');
+  const teamPanelTitle = el('shareTeamPanelTitle');
   const heroPlaceholder = el('shareHeroPlaceholder');
   if (title) title.textContent = titleText;
   if (lead && leadText) lead.textContent = leadText;
   if (heroPanelTitle && heroPanelTitleText) heroPanelTitle.textContent = heroPanelTitleText;
+  if (teamPanelTitle && teamPanelTitleText) teamPanelTitle.textContent = teamPanelTitleText;
   if (heroPlaceholder && heroPlaceholderText) heroPlaceholder.textContent = heroPlaceholderText;
   document.title = `${titleText} — Agent Town`;
   return true;

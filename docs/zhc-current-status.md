@@ -1,7 +1,7 @@
 # ZHC Current Status Snapshot
 
-Status: M44.1 complete, M44.2 contract/mechanics complete, M44.3 Town Hall founder-progression slice complete, M44.4 modal handoff corrected and green, M44.5 HQ-first-entry modal surface green, M44.6 shared HQ naming slice green, M44.7 saved HQ name now projects into the House shell header and is green, M44.8 saved HQ name now brands the Mission lane heading/lead and is green, M44.9 saved HQ name now reaches the Mission detail line and is green, M44.10 saved HQ name now reaches the Mission empty-state copy and is green, M44.11 no-experience Mission detail hint is now truthful before save and HQ-branded after save and is green, M44.12 saved HQ name now brands the reconnect share-card action and is green, M44.13 saved HQ name now brands the reconnect intro/support line and is green, M44.14 saved HQ name now brands the reconnect copyable house snippet and is green, M44.15 wallet-recovery-specific reconnect intro coverage is now explicit and green, M44.16 saved HQ name now brands the House systems/team summary line and is green, M44.17 saved HQ name now brands the share-card placeholder shell/body and is green, M44.18 founders-loop coverage now directly exercises the House systems summary helper when no team context is attached and is green, M44.19 outer share-card modal title/chrome now uses the saved HQ name and is green, M44.20 resolved `/s/:id` share-path coverage for that outer HQ-branded modal title is now explicit and green, M44.21 already-hydrated resolved share-state coverage for that outer HQ-branded modal title is now explicit and green, M44.22 resolved inner share-card title now uses the saved HQ name on the embedded public share shell and is green, M44.23 resolved inner share lead now uses the saved HQ name on the embedded public share shell and is green, M44.24 resolved inner share hero placeholder now uses the saved HQ name on the embedded public share shell and is green, M44.25 resolved inner share hero panel heading now uses the saved HQ name on the embedded public share shell and is green  
-Last updated: 2026-03-17 11:19 +0700  
+Status: M44.1 complete, M44.2 contract/mechanics complete, M44.3 Town Hall founder-progression slice complete, M44.4 modal handoff corrected and green, M44.5 HQ-first-entry modal surface green, M44.6 shared HQ naming slice green, M44.7 saved HQ name now projects into the House shell header and is green, M44.8 saved HQ name now brands the Mission lane heading/lead and is green, M44.9 saved HQ name now reaches the Mission detail line and is green, M44.10 saved HQ name now reaches the Mission empty-state copy and is green, M44.11 no-experience Mission detail hint is now truthful before save and HQ-branded after save and is green, M44.12 saved HQ name now brands the reconnect share-card action and is green, M44.13 saved HQ name now brands the reconnect intro/support line and is green, M44.14 saved HQ name now brands the reconnect copyable house snippet and is green, M44.15 wallet-recovery-specific reconnect intro coverage is now explicit and green, M44.16 saved HQ name now brands the House systems/team summary line and is green, M44.17 saved HQ name now brands the share-card placeholder shell/body and is green, M44.18 founders-loop coverage now directly exercises the House systems summary helper when no team context is attached and is green, M44.19 outer share-card modal title/chrome now uses the saved HQ name and is green, M44.20 resolved `/s/:id` share-path coverage for that outer HQ-branded modal title is now explicit and green, M44.21 already-hydrated resolved share-state coverage for that outer HQ-branded modal title is now explicit and green, M44.22 resolved inner share-card title now uses the saved HQ name on the embedded public share shell and is green, M44.23 resolved inner share lead now uses the saved HQ name on the embedded public share shell and is green, M44.24 resolved inner share hero placeholder now uses the saved HQ name on the embedded public share shell and is green, M44.25 resolved inner share hero panel heading now uses the saved HQ name on the embedded public share shell and is green, M44.26 resolved inner share team panel heading now uses the saved HQ name on the embedded public share shell and is green  
+Last updated: 2026-03-17 11:26 +0700  
 Branch: `zhc0-founders-loop`  
 Worktree: `/Users/robin/.openclaw/workspace/Portal-zhc0`
 
@@ -25,31 +25,31 @@ Robin clarified the constraints that currently govern the founders-loop passes:
 
 ## What landed this pass
 
-### M44.25 — resolved inner share hero panel heading now reuses the saved HQ name
+### M44.26 — resolved inner share team panel heading now reuses the saved HQ name
 This pass stayed test-first and deliberately kept the scope tiny.
 
 What changed:
-- added a focused founders-loop assertion for the **inner** embedded public share hero panel heading on a resolved `/s/:id` path
-- kept that hero panel heading generic before HQ save
-- branded that same hero panel heading as `🎨 ${saved HQ name} HQ Hero` after HQ save
+- added a focused founders-loop assertion for the **inner** embedded public share team panel heading on a resolved `/s/:id` path
+- kept that team panel heading generic before HQ save
+- branded that same team panel heading as `👤 ${saved HQ name} HQ Team` after HQ save
 - reused the existing local/session preview record path instead of expanding share payload architecture
 - kept the founder journey modal-first on `/app`
 - made **no** server/share payload changes
 - made **no** route changes
 - made **no** persistence broadening beyond the existing browser local/session storage behavior
-- left the real minted share media/prompt/body contract alone
+- left the real team payload/action contract alone
 
 Implementation details:
-- `e2e/447_zhc0_resolved_share_card_inner_hero_heading_uses_saved_hq_name.spec.js`
+- `e2e/448_zhc0_resolved_share_card_inner_team_heading_uses_saved_hq_name.spec.js`
   - creates a real resolved share for the attached house
-  - proves the embedded inner hero panel heading stays `🎨 House Hero` before HQ save on that resolved `/s/:id` path
-  - proves the embedded inner hero panel heading becomes `🎨 ${saved HQ name} HQ Hero` after HQ save on that same resolved path
+  - proves the embedded inner team panel heading stays `👤 Team` before HQ save on that resolved `/s/:id` path
+  - proves the embedded inner team panel heading becomes `👤 ${saved HQ name} HQ Team` after HQ save on that same resolved path
   - proves the share-id badge still stays the real share id, so this is not the placeholder branch
-  - proves the branded inner hero panel heading survives reload and reopen
+  - proves the branded inner team panel heading survives reload and reopen
 - `public/share.html`
-  - gives the inner hero panel heading a stable id/testid so this seam can be asserted directly without broad DOM coupling
+  - gives the inner team panel heading a stable id/testid so this seam can be asserted directly without broad DOM coupling
 - `public/share_public.js`
-  - reads the matching resolved-share preview record and applies the saved HQ name to the inner public share hero panel heading while leaving the real media payload contract alone
+  - reads the matching resolved-share preview record and applies the saved HQ name to the inner public share team panel heading while leaving the real payload/action contract alone
 - `docs/zhc-current-status.md`
   - updated snapshot, evidence, gaps, and next pickup
 
@@ -65,11 +65,13 @@ This is still the right size:
 - extends the existing share-shell branding line by exactly one small inner surface
 
 ## New / updated contract coverage
-- added: `e2e/447_zhc0_resolved_share_card_inner_hero_heading_uses_saved_hq_name.spec.js`
-  - verifies the embedded inner hero panel heading is still generic before HQ save on a resolved `/s/:id` path
-  - verifies the same embedded inner hero panel heading becomes `🎨 ${saved HQ name} HQ Hero` after HQ save on that resolved path
+- added: `e2e/448_zhc0_resolved_share_card_inner_team_heading_uses_saved_hq_name.spec.js`
+  - verifies the embedded inner team panel heading is still generic before HQ save on a resolved `/s/:id` path
+  - verifies the same embedded inner team panel heading becomes `👤 ${saved HQ name} HQ Team` after HQ save on that resolved path
   - verifies the real share id badge remains visible on that path
-  - verifies the branded inner hero panel heading survives reload and reopen
+  - verifies the branded inner team panel heading survives reload and reopen
+- retained: `e2e/447_zhc0_resolved_share_card_inner_hero_heading_uses_saved_hq_name.spec.js`
+  - confirms the embedded inner hero panel heading branch still stays correct on the same resolved path
 - retained: `e2e/446_zhc0_resolved_share_card_inner_hero_placeholder_uses_saved_hq_name.spec.js`
   - confirms the embedded inner hero placeholder branch still stays correct on the same resolved path
 - retained: `e2e/445_zhc0_resolved_share_card_inner_lead_uses_saved_hq_name.spec.js`
@@ -89,34 +91,35 @@ This is still the right size:
 
 - `public/share.html`
 - `public/share_public.js`
-- `e2e/447_zhc0_resolved_share_card_inner_hero_heading_uses_saved_hq_name.spec.js`
+- `e2e/448_zhc0_resolved_share_card_inner_team_heading_uses_saved_hq_name.spec.js`
 - `docs/zhc-current-status.md`
 
 ## Evidence runs
 
-### Focused resolved-share inner-hero-heading check
+### Focused resolved-share inner-team-heading check
 ```bash
 export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && nvm use 24 >/dev/null
 node - <<'NODE'
 const fs = require('fs');
-for (const file of ['public/share_public.js', 'e2e/447_zhc0_resolved_share_card_inner_hero_heading_uses_saved_hq_name.spec.js']) {
+for (const file of ['public/share_public.js', 'e2e/448_zhc0_resolved_share_card_inner_team_heading_uses_saved_hq_name.spec.js']) {
   new Function(fs.readFileSync(file, 'utf8'));
 }
 NODE
-npx playwright test e2e/439_zhc0_share_card_placeholder_uses_saved_hq_name.spec.js e2e/441_zhc0_share_card_modal_title_uses_saved_hq_name.spec.js e2e/442_zhc0_share_card_modal_title_resolved_share_path.spec.js e2e/443_zhc0_share_card_modal_title_hydrated_resolved_share_path.spec.js e2e/444_zhc0_resolved_share_card_inner_title_uses_saved_hq_name.spec.js e2e/445_zhc0_resolved_share_card_inner_lead_uses_saved_hq_name.spec.js e2e/446_zhc0_resolved_share_card_inner_hero_placeholder_uses_saved_hq_name.spec.js e2e/447_zhc0_resolved_share_card_inner_hero_heading_uses_saved_hq_name.spec.js
+npx playwright test e2e/439_zhc0_share_card_placeholder_uses_saved_hq_name.spec.js e2e/441_zhc0_share_card_modal_title_uses_saved_hq_name.spec.js e2e/442_zhc0_share_card_modal_title_resolved_share_path.spec.js e2e/443_zhc0_share_card_modal_title_hydrated_resolved_share_path.spec.js e2e/444_zhc0_resolved_share_card_inner_title_uses_saved_hq_name.spec.js e2e/445_zhc0_resolved_share_card_inner_lead_uses_saved_hq_name.spec.js e2e/446_zhc0_resolved_share_card_inner_hero_placeholder_uses_saved_hq_name.spec.js e2e/447_zhc0_resolved_share_card_inner_hero_heading_uses_saved_hq_name.spec.js e2e/448_zhc0_resolved_share_card_inner_team_heading_uses_saved_hq_name.spec.js
 ```
 
 Result:
 - both syntax-only parse checks passed
-- Playwright octet: `8 passed`
+- Playwright nonet: `9 passed`
 
 ## What I verified
 
 - the founder journey still stays inside the `/app` modal shell
-- on a resolved `/s/:id` share path, the embedded inner public share hero panel heading still stays generic before HQ save
-- after HQ save, that same embedded inner hero panel heading brands correctly as `🎨 ${saved HQ name} HQ Hero`
+- on a resolved `/s/:id` share path, the embedded inner public share team panel heading still stays generic before HQ save
+- after HQ save, that same embedded inner team panel heading brands correctly as `👤 ${saved HQ name} HQ Team`
 - the embedded share still shows the real share id badge, so this remains the resolved-share branch rather than placeholder fallback
-- the HQ-branded inner hero panel heading survives reload and reopen through the existing local/session browser state path
+- the HQ-branded inner team panel heading survives reload and reopen through the existing local/session browser state path
+- the inner hero panel heading coverage from M44.25 still stays green
 - the inner hero placeholder coverage from M44.24 still stays green
 - the inner lead coverage from M44.23 still stays green
 - the inner title coverage from M44.22 still stays green
@@ -127,19 +130,20 @@ Result:
 
 - HQ naming still persists in browser local storage only
   - coherent for this UI slice, but still not written into server/session/platform state
-- the resolved-share inner hero panel heading branding still comes from the local/session preview path, not from the real server share payload
-- real minted share media prompt/body content still does not intentionally reuse the saved HQ name
+- the resolved-share inner team panel heading branding still comes from the local/session preview path, not from the real server share payload
+- real team line/action copy still does not intentionally reuse the saved HQ name
 - deeper downstream surfaces beyond the current House/share shell still do not reuse the saved HQ name consistently
 - the screenshot baseline still reflects the earlier modal shell state
   - I did **not** capture a fresh image pack for this slice
 
 ## What I did **not** do
 
-- no push
+- no push for this slice yet
 - did **not** change route architecture or move the founder flow out of `/app`
 - did **not** broaden persistence scope beyond existing browser storage
 - did **not** broaden share architecture or payload generation
 - did **not** change the real public share media/lead/body payload contract
+- did **not** change the real team line or action-label contract
 - did **not** update deeper machine/spec artifacts (`docs/founders-loop-state-model.md`, `design/specs/10_founders_loop_ui_state_projection.md`, `design/specs/11_zhc0_ui_evidence_contract.md`, `specs/43_zhc0_founders_loop_state_contract.md`, `machines/FoundersLoop.machine.ts`)
 
 ## Blockers
@@ -151,7 +155,7 @@ Result:
 If we keep trimming this seam one notch at a time, the cleanest next move is:
 
 1. keep the work on the resolved public share shell rather than broadening architecture
-2. if we want one more tiny HQ-branding surface without touching server payloads, target the resolved inner team panel heading next
+2. if we want one more tiny HQ-branding surface without touching server payloads, target the resolved inner team line or primary action label next
 3. keep it test-first and modal-only on `/app`
 4. keep it just as narrow
    - one obvious primary action per state
@@ -161,8 +165,9 @@ If we keep trimming this seam one notch at a time, the cleanest next move is:
 ## Repo state notes
 
 - local commit for this slice:
-  - `feat: brand resolved share hero heading with saved hq name`
+  - `feat: brand resolved share team heading with saved hq name`
 - recent earlier local commits include:
+  - `39e9f91 feat: brand resolved share hero heading with saved hq name`
   - `ccbf4c8 feat: brand resolved share hero placeholder with saved hq name`
   - `c751900 feat: brand resolved share lead with saved hq name`
   - `1ec8a0b feat: brand resolved share title with saved hq name`
