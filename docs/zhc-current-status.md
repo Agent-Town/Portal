@@ -1,7 +1,7 @@
 # ZHC Current Status Snapshot
 
-Status: M44.1 complete, M44.2 contract/mechanics complete, M44.3 Town Hall founder-progression slice complete, M44.4 modal handoff corrected and green, M44.5 HQ-first-entry modal surface green, M44.6 shared HQ naming slice green, M44.7 saved HQ name now projects into the House shell header and is green, M44.8 saved HQ name now brands the Mission lane heading/lead and is green, M44.9 saved HQ name now reaches the Mission detail line and is green, M44.10 saved HQ name now reaches the Mission empty-state copy and is green, M44.11 no-experience Mission detail hint is now truthful before save and HQ-branded after save and is green, M44.12 saved HQ name now brands the reconnect share-card action and is green, M44.13 saved HQ name now brands the reconnect intro/support line and is green, M44.14 saved HQ name now brands the reconnect copyable house snippet and is green, M44.15 wallet-recovery-specific reconnect intro coverage is now explicit and green, M44.16 saved HQ name now brands the House systems/team summary line and is green, M44.17 saved HQ name now brands the share-card placeholder shell/body and is green, M44.18 founders-loop coverage now directly exercises the House systems summary helper when no team context is attached and is green, M44.19 outer share-card modal title/chrome now uses the saved HQ name and is green, M44.20 resolved `/s/:id` share-path coverage for that outer HQ-branded modal title is now explicit and green, M44.21 already-hydrated resolved share-state coverage for that outer HQ-branded modal title is now explicit and green, M44.22 resolved inner share-card title now uses the saved HQ name on the embedded public share shell and is green, M44.23 resolved inner share lead now uses the saved HQ name on the embedded public share shell and is green, M44.24 resolved inner share hero placeholder now uses the saved HQ name on the embedded public share shell and is green, M44.25 resolved inner share hero panel heading now uses the saved HQ name on the embedded public share shell and is green, M44.26 resolved inner share team panel heading now uses the saved HQ name on the embedded public share shell and is green, M44.27 resolved inner share team line now uses the saved HQ name on the embedded public share shell and is green, M44.28 resolved inner share primary action label now uses the saved HQ name on the embedded public share shell and is green, M44.29 resolved inner share secondary action label now uses the saved HQ name on the embedded public share shell and is green, M44.30 placeholder share-card action labels now use the saved HQ name on the embedded public share shell and is green, M44.31 placeholder inner share team heading now uses the saved HQ name on the embedded public share shell and is green, M44.32 placeholder inner share hero heading now uses the saved HQ name on the embedded public share shell and is green, M44.34 placeholder inner share title now uses the saved HQ name on the embedded public share shell and is green, M44.35 placeholder inner share team line now uses the saved HQ name on the embedded public share shell and is green
-Last updated: 2026-03-17 14:33 +0700  
+Status: M44.1 complete, M44.2 contract/mechanics complete, M44.3 Town Hall founder-progression slice complete, M44.4 modal handoff corrected and green, M44.5 HQ-first-entry modal surface green, M44.6 shared HQ naming slice green, M44.7 saved HQ name now projects into the House shell header and is green, M44.8 saved HQ name now brands the Mission lane heading/lead and is green, M44.9 saved HQ name now reaches the Mission detail line and is green, M44.10 saved HQ name now reaches the Mission empty-state copy and is green, M44.11 no-experience Mission detail hint is now truthful before save and HQ-branded after save and is green, M44.12 saved HQ name now brands the reconnect share-card action and is green, M44.13 saved HQ name now brands the reconnect intro/support line and is green, M44.14 saved HQ name now brands the reconnect copyable house snippet and is green, M44.15 wallet-recovery-specific reconnect intro coverage is now explicit and green, M44.16 saved HQ name now brands the House systems/team summary line and is green, M44.17 saved HQ name now brands the share-card placeholder shell/body and is green, M44.18 founders-loop coverage now directly exercises the House systems summary helper when no team context is attached and is green, M44.19 outer share-card modal title/chrome now uses the saved HQ name and is green, M44.20 resolved `/s/:id` share-path coverage for that outer HQ-branded modal title is now explicit and green, M44.21 already-hydrated resolved share-state coverage for that outer HQ-branded modal title is now explicit and green, M44.22 resolved inner share-card title now uses the saved HQ name on the embedded public share shell and is green, M44.23 resolved inner share lead now uses the saved HQ name on the embedded public share shell and is green, M44.24 resolved inner share hero placeholder now uses the saved HQ name on the embedded public share shell and is green, M44.25 resolved inner share hero panel heading now uses the saved HQ name on the embedded public share shell and is green, M44.26 resolved inner share team panel heading now uses the saved HQ name on the embedded public share shell and is green, M44.27 resolved inner share team line now uses the saved HQ name on the embedded public share shell and is green, M44.28 resolved inner share primary action label now uses the saved HQ name on the embedded public share shell and is green, M44.29 resolved inner share secondary action label now uses the saved HQ name on the embedded public share shell and is green, M44.30 placeholder share-card action labels now use the saved HQ name on the embedded public share shell and is green, M44.31 placeholder inner share team heading now uses the saved HQ name on the embedded public share shell and is green, M44.32 placeholder inner share hero heading now uses the saved HQ name on the embedded public share shell and is green, M44.34 placeholder inner share title now uses the saved HQ name on the embedded public share shell and is green, M44.35 placeholder inner share team line now uses the saved HQ name on the embedded public share shell and is green, M44.36 placeholder inner share lead now uses the saved HQ name on the embedded public share shell and is green
+Last updated: 2026-03-17 14:35 +0700  
 Branch: `zhc0-founders-loop`  
 Worktree: `/Users/robin/.openclaw/workspace/Portal-zhc0`
 
@@ -136,6 +136,22 @@ Implementation details:
   - verifies `#shareIdBadge` remains `preview` in both states
   - verifies the branded placeholder team line survives reload and reopen
 
+### M44.36 — placeholder inner share lead now reuses the saved HQ name
+This pass stayed test-first and stayed deliberately tiny.
+
+What changed:
+- added a focused founders-loop assertion for the **placeholder** embedded public share lead line on `/s/sh_missing`
+- kept share lead generic before HQ save (`Placeholder shell for a house whose public share card is still offline.`)
+- branded it as `Placeholder shell for ${saved HQ name} HQ while the public share card is still offline.` after HQ save
+- kept it to local/session placeholder preview flow only; no share payload or route changes
+
+Implementation details:
+- `e2e/458_zhc0_share_card_placeholder_lead_uses_saved_hq_name.spec.js`
+  - verifies placeholder share lead is generic before HQ save on `/s/sh_missing?embed=1`
+  - verifies it becomes `Placeholder shell for ${customName} HQ while the public share card is still offline.` after HQ save on that placeholder path
+  - verifies `#shareIdBadge` remains `preview` in both states
+  - verifies the branded placeholder share lead survives reload and reopen
+
 ### Why this matches the direction better
 This is still the right size:
 - still modal-only for the founder journey on `/app`
@@ -173,6 +189,11 @@ This is still the right size:
   - verifies it becomes `${customName} HQ • human: … | agent: …` after HQ save on that placeholder path
   - verifies the placeholder badge remains `preview` so this remains the placeholder branch
   - verifies the branded placeholder team line survives reload and reopen
+- added: `e2e/458_zhc0_share_card_placeholder_lead_uses_saved_hq_name.spec.js`
+  - verifies placeholder share lead is generic before HQ save on `/s/sh_missing?embed=1`
+  - verifies it becomes `Placeholder shell for ${customName} HQ while the public share card is still offline.` after HQ save on that placeholder path
+  - verifies the placeholder badge remains `preview` so this remains the placeholder branch
+  - verifies the branded placeholder share lead survives reload and reopen
 - retained: `e2e/452_zhc0_share_card_placeholder_action_labels_uses_saved_hq_name.spec.js`
   - verifies both placeholder action labels are generic before HQ save on a placeholder `/s/sh_missing?embed=1` path
   - verifies those same labels become `Join ${saved HQ name} HQ` and `Add ${saved HQ name} HQ as friend` after HQ save on that placeholder path
@@ -205,25 +226,25 @@ This is still the right size:
 
 ## Files changed in this slice
 
-- `public/share_public.js`
 - `e2e/457_zhc0_share_card_placeholder_team_line_uses_saved_hq_name.spec.js`
+- `e2e/458_zhc0_share_card_placeholder_lead_uses_saved_hq_name.spec.js`
 - `docs/zhc-current-status.md`
 
 ## Evidence runs
 
-### Focused placeholder team-line microcopy check
+### Focused placeholder lead microcopy check
 ```bash
 export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && nvm use 24 >/dev/null
 node - <<'NODE'
 const fs = require('fs');
 for (const file of [
   'public/share_public.js',
-  'e2e/457_zhc0_share_card_placeholder_team_line_uses_saved_hq_name.spec.js',
+  'e2e/458_zhc0_share_card_placeholder_lead_uses_saved_hq_name.spec.js',
 ]) {
   new Function(fs.readFileSync(file, 'utf8'));
 }
 NODE
-npx playwright test e2e/457_zhc0_share_card_placeholder_team_line_uses_saved_hq_name.spec.js
+npx playwright test e2e/458_zhc0_share_card_placeholder_lead_uses_saved_hq_name.spec.js
 ```
 
 Result:
@@ -238,6 +259,7 @@ Result:
 - on placeholder share, team heading remains `👤 Team` before save and becomes `👤 ${saved HQ name} HQ Team` after save
 - on placeholder share, hero heading remains `🎨 House Hero` before save and becomes `🎨 ${saved HQ name} HQ Hero` after save
 - on placeholder share, team line remains `human: … | agent: …` before save and becomes `${saved HQ name} HQ • human: … | agent: …` after save
+- on placeholder share, lead remains `Placeholder shell for a house whose public share card is still offline.` before save and becomes `Placeholder shell for ${saved HQ name} HQ while the public share card is still offline.` after save
 - the resolved-share embedded secondary action still stays generic before HQ save
 - after HQ save, that same embedded inner secondary action brands correctly as `Add ${saved HQ name} HQ as friend`
 - the embedded share still shows the `preview` badge, so this remains the placeholder branch
@@ -257,7 +279,7 @@ Result:
 - HQ naming still persists in browser local storage only
   - coherent for this UI slice, but still not written into server/session/platform state
 - the resolved-share inner action branding still comes from the local/session preview path, not from the real server share payload
-- the remaining share-shell microcopy still does not intentionally reuse the saved HQ name everywhere
+- outside M44, the current share-shell and downstream surfaces still do not intentionally reuse the saved HQ name everywhere
 - deeper downstream surfaces beyond the current House/share shell still do not reuse the saved HQ name consistently
 - the screenshot baseline in-repo still reflects the earlier modal shell state
   - I captured fresh manual screenshots for review, but I did **not** add a new screenshot baseline pack in the repo
@@ -278,15 +300,9 @@ Result:
 
 ## Next exact pickup
 
-If we keep trimming this seam one notch at a time, the cleanest next move is:
+M44 is complete across all logged seams (M44.1 → M44.36).
 
-1. keep the work on the resolved public share shell rather than broadening architecture
-2. if we want one more tiny HQ-branding surface without touching server payloads, target one more tiny line of share-shell microcopy next
-3. keep it test-first and modal-only on `/app`
-4. keep it just as narrow
-   - one obvious primary action per state
-   - no share architecture expansion
-   - no broad UI churn
+For the next run, switch to the next milestone slice rather than squeezing additional M44 microcopy.
 
 ## Repo state notes
 
