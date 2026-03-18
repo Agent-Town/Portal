@@ -1291,6 +1291,15 @@
     initSaveBtn();
     initConvergenceButtons();
 
+    // Ensure a server session exists (sets et_session cookie needed for LLM proxy)
+    try {
+      await apiFetch('/api/state');
+    } catch {
+      // /api/state may return HTML on the iterate page — that's OK,
+      // the important thing is the server sets the et_session cookie.
+      try { await fetch('/api/state'); } catch { /* ignore */ }
+    }
+
     // Connect to the gateway that agent_panel.js initializes
     await connectGateway();
 

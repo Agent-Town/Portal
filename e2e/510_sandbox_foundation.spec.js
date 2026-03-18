@@ -67,10 +67,12 @@ test.describe('Sandbox Foundation (SA-T001–T007)', () => {
     expect(['webcontainer', 'fallback']).toContain(sandboxType);
   });
 
-  test('SA-T005: COEP header set on /iterate route', async ({ page }) => {
+  test('SA-T005: COOP header set on /iterate route (COEP deferred for worker compat)', async ({ page }) => {
     const response = await page.goto('/iterate');
-    const coep = response.headers()['cross-origin-embedder-policy'];
-    expect(coep).toBe('require-corp');
+    // COEP removed because it blocks same-origin Workers with ERR_BLOCKED_BY_RESPONSE.
+    // COOP is still set for security.
+    const coop = response.headers()['cross-origin-opener-policy'];
+    expect(coop).toBe('same-origin');
   });
 
   test('SA-T007: sandbox.js exports expected API', async ({ page }) => {

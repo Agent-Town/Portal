@@ -286,16 +286,7 @@
 <script src="/wallet_client.js"></script>
 <script src="/privy_bridge.js"></script>
 <script src="/app.js"></script>
-<script>
-  (() => {
-    const rebind = () => {
-      if (typeof window.setupAgentInterface === 'function') window.setupAgentInterface();
-    };
-    requestAnimationFrame(rebind);
-    setTimeout(rebind, 250);
-    setTimeout(rebind, 1000);
-  })();
-</script>
+<script src="/iterate-init.js"></script>
 <script src="/iterate.js"></script>
 </body>
 </html>

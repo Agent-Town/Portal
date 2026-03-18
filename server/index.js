@@ -1876,10 +1876,10 @@ function setSecurityHeaders(req, res, next) {
   res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
   res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
-  // WebContainers require COEP for SharedArrayBuffer access on the iterate page.
-  if (reqPath === '/iterate') {
-    res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
-  }
+  // Note: WebContainers need COEP require-corp for SharedArrayBuffer,
+  // but this blocks same-origin Workers with ERR_BLOCKED_BY_RESPONSE.
+  // COEP is NOT set here — the sandbox falls back to iframe+esbuild mode.
+  // WebContainer support can be added later with proper CORP headers on all resources.
   res.setHeader('X-Frame-Options', allowSameOriginFrame ? 'SAMEORIGIN' : 'DENY');
 
   const connectSrc = ["'self'", 'https://eth.llamarpc.com', 'https://rpc.ankr.com'];
