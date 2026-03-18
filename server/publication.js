@@ -162,8 +162,9 @@ router.post('/published-streams', (req, res) => {
   // Load all cards for this story
   const allCards = listExperimentCards(problemStoryId);
 
-  // Filter to kept/refined only
-  const keptOrRefined = allCards.filter(c => c.status === 'kept' || c.status === 'refined');
+  // Include all cards (kept, refined, discarded, pending) for learning system.
+  // Downstream consumers can filter by status as needed.
+  const keptOrRefined = allCards;
 
   // Collect all feedback rounds from the story
   const feedbackRounds = Array.isArray(story.feedbackRounds) ? [...story.feedbackRounds] : [];

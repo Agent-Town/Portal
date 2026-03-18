@@ -122,4 +122,84 @@ router.get('/snapshot/:id/meta', (req, res) => {
   });
 });
 
-module.exports = { sandboxSnapshotRouter: router, _resetStore: () => snapshots.clear() };
+// ── Library item bridge ──────────────────────────────────────
+// Store a snapshot as a library-style item with lineage tracking.
+
+/** @type {Map<string, object>} */
+const libraryItems = new Map();
+
+router.post('/snapshot/:id/publish', (req, res) => {
+  const snap = snapshots.get(req.params.id);
+  if (!snap) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+
+  const parentArtifactId = typeof req.body?.parentArtifactId === 'string'
+    ? req.body.parentArtifactId.trim() : null;
+  const problemDescription = typeof req.body?.problemDescription === 'string'
+    ? req.body.problemDescription.slice(0, 500) : '';
+  const convergenceScore = typeof req.body?.convergenceScore === 'number'
+    ? req.body.convergenceScore : 0;
+  const entrypoint = typeof req.body?.entrypoint === 'string'
+    ? req.body.entrypoint.slice(0, 200) : 'src/index.ts';
+
+  const itemId = crypto.randomUUID();
+  const item = {
+    id: itemId,
+    type: 'sandbox_snapshot',
+    content_type: snap.contentType,
+    content_hash: snap.contentHash,
+    snapshotId: snap.id,
+    size: snap.size,
+    createdAt: new Date().toISOString(),
+    metadata: {
+      problemDescription,
+      convergenceScore,
+      entrypoint,
+      parentArtifactId,
+      problemStoryId: snap.problemStoryId || '',
+      iterationTrace: null,
+    },
+  };
+
+  libraryItems.set(itemId, item);
+  res.status(201).json({ ok: true, item });
+});
+
+// GET /api/sandbox/library — list all library items
+router.get('/library', (_req, res) => {
+  const items = Array.from(libraryItems.values())
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  res.json({ ok: true, items });
+});
+
+// GET /api/sandbox/library/:id — single item
+router.get('/library/:id', (req, res) => {
+  const item = libraryItems.get(req.params.id);
+  if (!item) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  res.json({ ok: true, item });
+});
+
+// GET /api/sandbox/library/:id/lineage — fork genealogy
+router.get('/library/:id/lineage', (req, res) => {
+  const chain = [];
+  let currentId = req.params.id;
+  const seen = new Set();
+
+  while (currentId && !seen.has(currentId)) {
+    seen.add(currentId);
+    const item = libraryItems.get(currentId);
+    if (!item) break;
+    chain.unshift(item.id);
+    currentId = item.metadata?.parentArtifactId || null;
+  }
+
+  if (chain.length === 0) {
+    return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  }
+
+  res.json({ ok: true, lineage: chain });
+});
+
+module.exports = {
+  sandboxSnapshotRouter: router,
+  _resetStore: () => { snapshots.clear(); libraryItems.clear(); },
+};

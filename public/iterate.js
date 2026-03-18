@@ -797,6 +797,60 @@
     } catch { /* non-critical */ }
   }
 
+  // ── Export ─────────────────────────────────────────────────
+  function initExportBtn() {
+    const exportBtn = el('exportBtn');
+    if (!exportBtn) return;
+    exportBtn.addEventListener('click', async () => {
+      if (!sandbox || typeof sandbox.exportZip !== 'function') {
+        appendMessage('system', 'Sandbox not available — nothing to export.');
+        return;
+      }
+      exportBtn.disabled = true;
+      exportBtn.textContent = 'Exporting...';
+      try {
+        // Export from sandbox
+        const zip = await sandbox.exportZip();
+        // Store on server
+        const res = await fetch('/api/sandbox/snapshot', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/octet-stream',
+            'x-problem-story-id': storyId || '',
+          },
+          body: zip,
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'Store failed');
+
+        // Publish as library item
+        const pubRes = await apiFetch(`/api/sandbox/snapshot/${data.id}/publish`, {
+          method: 'POST',
+          body: JSON.stringify({
+            problemDescription: el('problemTitle')?.textContent || '',
+            convergenceScore: parseFloat(el('scoreValue')?.textContent || '0') || 0,
+            entrypoint: 'src/index.ts',
+          }),
+        });
+
+        appendMessage('system', `Workspace exported! Snapshot: ${data.id.slice(0, 8)}... (${(data.size / 1024).toFixed(1)} KB). Library item: ${pubRes.item?.id?.slice(0, 8)}...`);
+
+        // Also offer download
+        const blob = new Blob([zip], { type: 'application/zip' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `iterate-snapshot-${Date.now()}.zip`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        appendMessage('system', `Export failed: ${e.message}`);
+      }
+      exportBtn.disabled = false;
+      exportBtn.textContent = 'Export';
+    });
+  }
+
   // ── Save game ─────────────────────────────────────────────
   function initSaveBtn() {
     const saveBtn = el('saveBtn');
@@ -983,6 +1037,7 @@
     initBrainStep();
     initProblemInput();
     initChat();
+    initExportBtn();
     initSaveBtn();
     initConvergenceButtons();
 
