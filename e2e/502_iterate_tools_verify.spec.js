@@ -65,6 +65,9 @@ async function callIterateTool(page, action, params) {
 }
 
 test.describe('Iterate tools — full verification', () => {
+  test.beforeEach(async ({ request }) => {
+    await request.post('/__test__/reset', { headers: { 'x-test-reset': 'test-reset' } });
+  });
 
   test('getState returns current iterate state', async ({ page }) => {
     await reachActiveLoop(page, 'Test problem for state check');

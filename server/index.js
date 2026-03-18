@@ -1882,7 +1882,17 @@ function setSecurityHeaders(req, res, next) {
   // WebContainer support can be added later with proper CORP headers on all resources.
   res.setHeader('X-Frame-Options', allowSameOriginFrame ? 'SAMEORIGIN' : 'DENY');
 
-  const connectSrc = ["'self'", 'https://eth.llamarpc.com', 'https://rpc.ankr.com'];
+  const connectSrc = [
+    "'self'",
+    'https://eth.llamarpc.com', 'https://rpc.ankr.com',
+    // LLM provider endpoints for direct browser-to-provider calls (no backend proxy).
+    // Keys stay in the browser — the server never sees them.
+    'https://openrouter.ai', 'https://api.openai.com', 'https://api.anthropic.com',
+    'https://api.groq.com', 'https://api.together.xyz', 'https://api.minimax.chat',
+    'https://api.moonshot.cn', 'https://api-inference.huggingface.co',
+    'https://integrate.api.nvidia.com', 'https://api.venice.ai',
+    'https://generativelanguage.googleapis.com',
+  ];
   if (!isProd) {
     // Local development often runs UI/API on different localhost ports.
     connectSrc.push(

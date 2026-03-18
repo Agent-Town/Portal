@@ -58,44 +58,19 @@ test('diagnose gateway chain', async ({ page }) => {
   });
   console.log('Gateway check:', JSON.stringify(gatewayCheck));
 
-  // 3. Set LLM config — must push to worker via gateway, not just IndexedDB
+  // 3. Save LLM config to IndexedDB — iterate.js will auto-push to worker
   await page.evaluate(async ({ apiKey }) => {
-    // Save to IndexedDB (for persistence)
     try {
       const lib = await import('/openclaw-lite/llm-config-library.js');
       await lib.saveLlmConfig({ provider: 'openrouter', model: 'anthropic/claude-sonnet-4-5', apiKey });
       console.log('LLM config saved to IndexedDB');
     } catch (e) {
-      console.log('LLM config IDB save failed:', e.message);
-    }
-
-    // Push to worker via gateway (the actual config the worker uses)
-    try {
-      const mod = await import('/openclaw-lite/gateway.js');
-      let gw = mod.default || mod;
-      if (gw instanceof Promise) gw = await gw;
-      if (gw && typeof gw.send === 'function') {
-        const proxyBase = window.location.origin + '/api/llm/proxy/' + encodeURIComponent('https://openrouter.ai/api/v1');
-        gw.send({
-          type: 'gateway.command.setLlmConfig',
-          apiKey: apiKey,
-          api: 'openai-completions',
-          provider: 'openrouter',
-          modelRef: 'openrouter/anthropic/claude-sonnet-4-5',
-          modelId: 'anthropic/claude-sonnet-4-5',
-          baseUrl: proxyBase,
-          reasoning: '',
-          useProxy: false, // already proxied via the base URL
-        });
-        console.log('LLM config pushed to worker via gateway');
-      }
-    } catch (e) {
-      console.log('Gateway LLM push failed:', e.message);
+      console.log('LLM config save failed:', e.message);
     }
   }, { apiKey: OPENROUTER_KEY });
 
-  // Give the worker time to process the config
-  await page.waitForTimeout(1000);
+  // Wait for iterate.js to push config to worker
+  await page.waitForTimeout(3000);
 
   // 4. Check if worker is running
   const workerCheck = await page.evaluate(async () => {

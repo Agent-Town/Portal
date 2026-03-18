@@ -440,6 +440,70 @@
 
   // buildIteratePrompt removed — conversation-flow.js handles step-specific prompts
 
+  // ── LLM Config Push ────────────────────────────────────────
+  // On the main app, app.js calls restoreLiteLlmConfigFromLocalIfNeeded()
+  // which reads IndexedDB and pushes to the worker. On /iterate that doesn't
+  // run because lastState is null. We do it manually here.
+  async function pushSavedLlmConfigToWorker() {
+    if (!gateway || typeof gateway.send !== 'function') return;
+    try {
+      const lib = await import('/openclaw-lite/llm-config-library.js');
+      const cfg = await lib.loadLlmConfig();
+      if (!cfg?.configured || !cfg.provider || !cfg.model || !cfg.apiKey) return;
+
+      // All LLM calls go DIRECTLY from the browser to the provider.
+      // The backend NEVER sees the API key — pure frontend.
+      const provider = cfg.provider;
+      const model = cfg.model;
+      const modelRef = cfg.modelRef || `${provider}/${model}`;
+
+      // Direct provider URL — no backend proxy
+      const baseUrl = providerDirectUrl(provider);
+
+      // API adapter type
+      let api = '';
+      if (provider === 'openai' || provider === 'ollama' || provider === 'openrouter' || provider === 'together' || provider === 'groq') {
+        api = 'openai-completions';
+      }
+
+      gateway.send({
+        type: 'gateway.command.setLlmConfig',
+        apiKey: cfg.apiKey,
+        api,
+        provider,
+        modelRef,
+        modelId: model,
+        baseUrl,
+        reasoning: cfg.reasoning || '',
+        useProxy: false, // NEVER proxy — keys stay in the browser
+      });
+
+      console.log(`Iterate: pushed LLM config to worker — ${provider}/${model}`);
+    } catch (e) {
+      console.warn('Iterate: LLM config push failed:', e.message);
+    }
+  }
+
+  function providerDirectUrl(provider) {
+    // Direct browser-to-provider URLs. No backend proxy — keys stay in browser.
+    const map = {
+      openai: 'https://api.openai.com/v1',
+      openrouter: 'https://openrouter.ai/api/v1',
+      anthropic: 'https://api.anthropic.com/v1',
+      google: 'https://generativelanguage.googleapis.com/v1beta',
+      groq: 'https://api.groq.com/openai/v1',
+      together: 'https://api.together.xyz/v1',
+      minimax: 'https://api.minimax.chat/v1',
+      moonshot: 'https://api.moonshot.cn/v1',
+      'kimi-coding': 'https://api.moonshot.cn/v1',
+      huggingface: 'https://api-inference.huggingface.co/v1',
+      nvidia: 'https://integrate.api.nvidia.com/v1',
+      venice: 'https://api.venice.ai/api/v1',
+      ollama: 'http://127.0.0.1:11434/v1',
+    };
+    return map[provider] || '';
+  }
+
   // ── Agent Tool Handlers ────────────────────────────────────
   // The agent (via OpenClaw Lite worker) calls tools like
   // agent_town_iterate_set_problem, agent_town_iterate_submit_code, etc.
@@ -1302,6 +1366,9 @@
 
     // Connect to the gateway that agent_panel.js initializes
     await connectGateway();
+
+    // Push saved LLM config to the worker (the worker doesn't auto-restore on /iterate)
+    await pushSavedLlmConfigToWorker();
 
     // Boot the code sandbox (WebContainer or fallback)
     bootSandbox();
