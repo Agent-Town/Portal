@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Iterate — Agent Town</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/iterate.css">
+</head>
+<body>
+<main class="iterate-page" data-testid="iterate-page">
+
+  <!-- Phase: Identity -->
+  <section class="iterate-step iterate-identity" id="stepIdentity" data-testid="step-identity">
+    <div class="panel iterate-card">
+      <h1 class="iterate-heading">Meet your pair.</h1>
+      <p class="iterate-lead">Name yourself and your agent to begin.</p>
+
+      <div class="iterate-pair">
+        <div class="iterate-avatar-col">
+          <div class="iterate-avatar-wrap">
+            <img class="iterate-avatar" src="/brand-kit/default_user_avatar.png" alt="Your avatar" id="userAvatarImg" data-testid="user-avatar">
+            <label class="iterate-avatar-upload-label" for="userAvatarUpload" title="Upload your avatar">
+              <span class="iterate-avatar-upload-icon">+</span>
+            </label>
+            <input type="file" id="userAvatarUpload" data-testid="user-avatar-upload" accept="image/*" class="iterate-avatar-upload-input">
+          </div>
+          <label class="iterate-label" for="userName">Your name</label>
+          <input class="pixel-input iterate-name-input" type="text" id="userName" data-testid="user-name-input" placeholder="Your name" maxlength="30" autocomplete="off">
+        </div>
+        <div class="iterate-pair-divider">&</div>
+        <div class="iterate-avatar-col">
+          <div class="iterate-avatar-wrap">
+            <img class="iterate-avatar" src="/brand-kit/default_agent_avatar.png" alt="Agent avatar" id="agentAvatarImg" data-testid="agent-avatar">
+            <label class="iterate-avatar-upload-label" for="agentAvatarUpload" title="Upload agent avatar">
+              <span class="iterate-avatar-upload-icon">+</span>
+            </label>
+            <input type="file" id="agentAvatarUpload" data-testid="agent-avatar-upload" accept="image/*" class="iterate-avatar-upload-input">
+          </div>
+          <label class="iterate-label" for="agentName">Agent name</label>
+          <input class="pixel-input iterate-name-input" type="text" id="agentName" data-testid="agent-name-input" placeholder="OpenClaw" value="OpenClaw" maxlength="30" autocomplete="off">
+        </div>
+      </div>
+
+      <button class="btn primary iterate-continue-btn" id="identityContinueBtn" data-testid="identity-continue-btn" disabled>Continue</button>
+    </div>
+  </section>
+
+  <!-- Phase: Brain Config (guided step wrapping the dock) -->
+  <section class="iterate-step iterate-brain is-hidden" id="stepBrain" data-testid="brain-config">
+    <div class="panel iterate-card">
+      <div class="iterate-brain-header">
+        <img class="iterate-avatar iterate-avatar-sm" src="/brand-kit/default_agent_avatar.png" alt="Agent" id="brainAgentAvatar">
+        <div>
+          <h1 class="iterate-heading" id="brainTitle">Give your agent a brain.</h1>
+          <p class="iterate-lead">Your agent needs an LLM to think. Connect one below.</p>
+        </div>
+      </div>
+
+      <!-- One-click OpenRouter connect -->
+      <div class="iterate-openrouter-connect" data-testid="openrouter-connect">
+        <button class="btn primary iterate-openrouter-btn" id="openrouterConnectBtn" data-testid="openrouter-connect-btn">
+          Connect with OpenRouter (free)
+        </button>
+        <p class="iterate-openrouter-hint">One click. Free models with tool calling included. No credit card needed.</p>
+        <p class="iterate-status" id="openrouterStatus"></p>
+      </div>
+
+      <div class="iterate-brain-divider">
+        <span class="iterate-brain-divider-text">or</span>
+      </div>
+
+      <!-- Manual path -->
+      <div class="iterate-manual-hint">
+        <p class="iterate-lead">Already have an API key? Use the <strong>Agent Dock</strong> at the bottom to configure any provider manually.</p>
+      </div>
+
+      <!-- Free model info -->
+      <details class="iterate-free-details">
+        <summary class="iterate-free-summary">Which free models work?</summary>
+        <div class="iterate-free-hint" data-testid="brain-free-hint">
+          <p class="iterate-free-models-intro">These free OpenRouter models support tool calling (required by your agent):</p>
+          <ul class="iterate-free-model-list">
+            <li><strong>MiniMax M2.5</strong> — minimax/minimax-m2.5:free</li>
+            <li><strong>Nemotron 3 Super 120B</strong> — nvidia/nemotron-3-super-120b-a12b:free</li>
+            <li><strong>Nemotron 3 Nano 30B</strong> — nvidia/nemotron-3-nano-30b-a3b:free</li>
+            <li><strong>Step 3.5 Flash</strong> — stepfun/step-3.5-flash:free</li>
+            <li><strong>Trinity Large</strong> — arcee-ai/trinity-large-preview:free</li>
+          </ul>
+          <p class="iterate-free-models"><a href="https://openrouter.ai/models?q=free&supported_parameters=tools" target="_blank" rel="noopener">See all free models with tool support</a></p>
+        </div>
+      </details>
+
+      <!-- Status: detected brain config -->
+      <div class="iterate-brain-status" id="brainDetectedStatus" data-testid="brain-detected-status">
+        <p class="iterate-brain-detected is-hidden" id="brainDetected" data-testid="brain-detected">
+          Brain connected: <strong id="brainDetectedModel">--</strong>
+        </p>
+      </div>
+
+      <button class="btn primary iterate-continue-btn" id="iterateBrainContinueBtn" data-testid="brain-continue-btn" disabled>Continue</button>
+      <p class="iterate-status" id="iterateBrainStatusText"></p>
+    </div>
+  </section>
+
+  <!-- Phase: Problem Input -->
+  <section class="iterate-step iterate-problem is-hidden" id="stepProblem" data-testid="step-problem">
+    <div class="panel iterate-card">
+      <h1 class="iterate-heading">What problem should we solve?</h1>
+      <p class="iterate-lead">Describe a problem, challenge, or goal. Your agent will figure out how to evaluate and iterate on solutions.</p>
+      <textarea class="pixel-input iterate-textarea" id="problemInput" data-testid="problem-input" placeholder="e.g. My landing page converts at 2%. I want to get it to 5% without changing the product..." rows="5"></textarea>
+      <button class="btn primary iterate-continue-btn" id="startBtn" data-testid="start-btn" disabled>Start iterating</button>
+    </div>
+  </section>
+
+  <!-- Phase: Active Loop -->
+  <section class="iterate-step iterate-active is-hidden" id="stepActive" data-testid="active-loop">
+
+    <!-- Top bar -->
+    <div class="iterate-topbar">
+      <div class="iterate-topbar-left">
+        <h2 class="iterate-problem-title" id="problemTitle">Problem</h2>
+        <p class="iterate-round-label" id="roundLabel">Starting...</p>
+      </div>
+      <div class="iterate-topbar-right">
+        <button class="btn small" id="saveBtn" title="Save checkpoint" data-testid="save-btn">Save</button>
+      </div>
+    </div>
+
+    <!-- Score trend -->
+    <div class="iterate-score-trend" id="scoreTrend" data-testid="score-trend">
+      <div class="iterate-sparkline" id="sparkline"></div>
+      <div class="iterate-score-info">
+        <span class="iterate-score-value" id="scoreValue">--</span>
+        <span class="iterate-score-label">score</span>
+      </div>
+    </div>
+
+    <!-- Convergence status -->
+    <div class="iterate-convergence is-hidden" id="convergenceStatus" data-testid="convergence-status"></div>
+
+    <!-- Two-column layout: conversation + feed -->
+    <div class="iterate-workspace">
+
+      <!-- Conversation column -->
+      <div class="iterate-conversation-col">
+        <div class="iterate-conversation" id="conversationThread" data-testid="conversation-thread"></div>
+      </div>
+
+      <!-- Feed column -->
+      <div class="iterate-feed-col">
+        <h3 class="iterate-section-title">Experiments</h3>
+        <div class="iterate-feed" id="experimentFeed" data-testid="experiment-feed"></div>
+      </div>
+
+    </div>
+
+    <!-- Chat input bar -->
+    <div class="iterate-chat-bar">
+      <input class="pixel-input iterate-chat-input" type="text" id="iterateChatInput" data-testid="chat-input" placeholder="Talk to your agent..." autocomplete="off">
+      <button class="btn primary small" id="iterateChatSendBtn" data-testid="chat-send-btn">Send</button>
+    </div>
+
+  </section>
+
+  <!-- Convergence resolution -->
+  <div class="iterate-convergence-message is-hidden" id="convergenceMessage" data-testid="convergence-message">
+    <div class="panel iterate-card iterate-card-center">
+      <h2 class="iterate-heading">Your solution is converging.</h2>
+      <p class="iterate-lead" id="convergenceDetail"></p>
+      <div class="iterate-btn-row">
+        <button class="btn primary" id="publishBtn">Publish</button>
+        <button class="btn" id="keepGoingBtn">Keep iterating</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script type="module" src="/openclaw-lite/gateway.js"></script>
+<script src="/openclaw-lite/runtime-bridge.js"></script>
+<script src="/agent_panel.js"></script>
+<script src="/skill_actions_plugin.js"></script>
+<script src="/trainer_namespace_plugin.js"></script>
+<script src="/wallet_client.js"></script>
+<script src="/privy_bridge.js"></script>
+<script src="/app.js"></script>
+<script>
+  // Upgrade the basic panel created by agent_panel.js:
+  // Load the full panel markup (with zoom, debug, brain config)
+  // and replace the basic one, then rebind app.js handlers.
+  (async () => {
+    try {
+      const res = await fetch('/agent_panel_full.html');
+      if (!res.ok) throw new Error(res.status);
+      const html = await res.text();
+      const existing = document.getElementById('agentSidebar');
+      if (existing) {
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = html;
+        const full = wrapper.firstElementChild;
+        if (full) existing.replaceWith(full);
+      }
+    } catch { /* keep basic panel */ }
+    const rebind = () => {
+      if (typeof window.setupAgentInterface === 'function') window.setupAgentInterface();
+    };
+    requestAnimationFrame(rebind);
+    setTimeout(rebind, 250);
+  })();
+</script>
+<script src="/iterate.js"></script>
+</body>
+</html>

@@ -1938,6 +1938,10 @@ app.use('/api', (req, res, next) => {
   return next();
 });
 
+// --- OpenRouter OAuth PKCE (iterate prototype) ---
+const { openrouterOAuthRouter } = require('./openrouter-oauth');
+app.use('/api/iterate/oauth/openrouter', openrouterOAuthRouter);
+
 // --- ZHC1 iteration feed ---
 const { problemStoriesRouter } = require('./problem-stories');
 app.use('/api/problem-stories', problemStoriesRouter);
@@ -13283,6 +13287,7 @@ app.get('/claim-wallet', (_req, res) => sendHtmlNoStore(res, 'claim-wallet.html'
 app.get('/house', (_req, res) => sendHtmlNoStore(res, 'house.html'));
 app.get('/leaderboard', (_req, res) => sendHtmlNoStore(res, 'leaderboard.html'));
 app.get('/feed', (_req, res) => sendHtmlNoStore(res, 'feed.html'));
+app.get('/iterate', (_req, res) => sendHtmlNoStore(res, 'iterate.html'));
 app.get('/trainer', (req, res) => {
   if (String(req.query?.embed || '').trim() === '1') {
     return sendHtmlNoStore(res, 'trainer.html');

@@ -1,0 +1,770 @@
+/* iterate.css — ZHC1 iteration loop, Agent Town branded, responsive */
+
+/* ── Page shell ──────────────────────────────────────────── */
+.iterate-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background:
+    radial-gradient(circle at 15% 12%, rgba(255, 255, 255, 0.7) 0, transparent 30%),
+    radial-gradient(circle at 78% 22%, rgba(255, 255, 255, 0.58) 0, transparent 25%),
+    linear-gradient(180deg, #9ad8ff 0%, #6bb8e5 52%, #5ba8d5 100%);
+  font-family: var(--font-ui);
+  color: var(--text-strong);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.is-hidden {
+  display: none !important;
+}
+
+/* ── Shared step layout ──────────────────────────────────── */
+.iterate-step {
+  width: 100%;
+  max-width: 960px;
+  padding: var(--space-4);
+}
+
+.iterate-card {
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-6);
+  box-shadow: var(--depth-surface);
+}
+
+.iterate-card-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+/* ── Typography ──────────────────────────────────────────── */
+.iterate-heading {
+  font-family: var(--font-display);
+  font-size: 24px;
+  color: var(--text-strong);
+  margin: 0 0 var(--space-2);
+}
+
+.iterate-heading-sm {
+  font-family: var(--font-display);
+  font-size: 18px;
+  color: var(--text-strong);
+  margin: var(--space-2) 0 0;
+}
+
+.iterate-lead {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0 0 var(--space-5);
+  line-height: 1.5;
+}
+
+.iterate-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  display: block;
+  margin-bottom: var(--space-1);
+}
+
+.iterate-section-title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  color: var(--text);
+  margin: 0 0 var(--space-3);
+}
+
+.iterate-status {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: var(--space-3);
+}
+
+/* ── Avatars ─────────────────────────────────────────────── */
+.iterate-avatar-wrap {
+  position: relative;
+  display: inline-block;
+  margin: 0 auto var(--space-2);
+}
+
+.iterate-avatar {
+  width: 120px;
+  height: 120px;
+  border: 3px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--cream-100);
+  display: block;
+  object-fit: cover;
+}
+
+.iterate-avatar-upload-label {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  width: 30px;
+  height: 30px;
+  background: var(--sky-500);
+  color: #fff;
+  border: 2px solid var(--panel);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 700;
+  transition: background 0.15s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.iterate-avatar-upload-label:hover {
+  background: var(--sky-600);
+}
+
+.iterate-avatar-upload-input {
+  display: none;
+}
+
+.iterate-avatar-sm {
+  width: 48px;
+  height: 48px;
+  margin: 0;
+}
+
+.iterate-avatar-lg {
+  width: 140px;
+  height: 140px;
+}
+
+.iterate-avatar-pulse {
+  animation: iterate-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes iterate-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.03); }
+}
+
+.iterate-avatar-mini {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  image-rendering: pixelated;
+  flex-shrink: 0;
+}
+
+/* ── Identity step ───────────────────────────────────────── */
+.iterate-identity {
+  padding-top: 10vh;
+}
+
+.iterate-pair {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--space-5);
+  margin-bottom: var(--space-6);
+}
+
+.iterate-avatar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 0 0 160px;
+}
+
+.iterate-pair-divider {
+  font-family: var(--font-display);
+  font-size: 28px;
+  color: var(--muted);
+  padding-top: 28px;
+}
+
+.iterate-name-input {
+  text-align: center;
+  max-width: 140px;
+}
+
+/* ── Brain config step ───────────────────────────────────── */
+.iterate-brain {
+  padding-top: 10vh;
+}
+
+.iterate-brain-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.iterate-form-group {
+  margin-bottom: var(--space-4);
+}
+
+.iterate-select {
+  width: 100%;
+  appearance: auto;
+}
+
+.iterate-custom-model {
+  margin-top: var(--space-2);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.iterate-custom-model::placeholder {
+  font-size: 12px;
+}
+
+/* ── Brain config step ────────────────────────────────────── */
+.iterate-brain {
+  padding-top: 6vh;
+}
+
+.iterate-brain-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.iterate-free-hint {
+  background: var(--cream-50);
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--gold-500);
+  border-radius: var(--radius-sm);
+  padding: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.iterate-free-hint-title {
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--text-strong);
+  margin: 0 0 var(--space-2);
+}
+
+.iterate-free-steps {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.6;
+  padding-left: var(--space-5);
+  margin: 0 0 var(--space-2);
+}
+
+.iterate-free-steps a {
+  color: var(--sky-600);
+  text-decoration: underline;
+}
+
+.iterate-free-models {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.iterate-free-models a {
+  color: var(--sky-600);
+}
+
+.iterate-brain-status {
+  margin-bottom: var(--space-3);
+}
+
+.iterate-brain-detected {
+  font-size: 13px;
+  color: var(--good);
+  padding: var(--space-2) var(--space-3);
+  background: rgba(107, 179, 107, 0.1);
+  border: 1px solid rgba(107, 179, 107, 0.3);
+  border-radius: var(--radius-sm);
+}
+
+/* ── OpenRouter connect button ────────────────────────────── */
+.iterate-openrouter-connect {
+  text-align: center;
+  margin-bottom: var(--space-4);
+}
+
+.iterate-openrouter-btn {
+  font-size: 15px;
+  padding: var(--space-3) var(--space-6);
+  width: 100%;
+  max-width: 360px;
+}
+
+.iterate-openrouter-hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: var(--space-2);
+}
+
+.iterate-brain-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+}
+
+.iterate-brain-divider::before,
+.iterate-brain-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-soft);
+}
+
+.iterate-brain-divider-text {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.iterate-manual-hint {
+  text-align: center;
+  margin-bottom: var(--space-4);
+}
+
+.iterate-manual-hint .iterate-lead {
+  font-size: 13px;
+  margin-bottom: 0;
+}
+
+.iterate-free-details {
+  margin-bottom: var(--space-4);
+}
+
+.iterate-free-summary {
+  font-size: 13px;
+  color: var(--sky-600);
+  cursor: pointer;
+  text-align: center;
+}
+
+.iterate-free-summary:hover {
+  color: var(--sky-700);
+}
+
+.iterate-free-models-intro {
+  font-size: 13px;
+  color: var(--text);
+  margin: var(--space-2) 0;
+}
+
+.iterate-free-model-list {
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.8;
+  padding-left: var(--space-5);
+  margin: 0 0 var(--space-2);
+}
+
+.iterate-free-model-list code {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ── Problem step ────────────────────────────────────────── */
+.iterate-problem {
+  padding-top: 10vh;
+}
+
+.iterate-textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 120px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: var(--space-4);
+}
+
+/* ── Buttons ─────────────────────────────────────────────── */
+.iterate-continue-btn {
+  display: block;
+  width: 100%;
+  max-width: 280px;
+  margin: 0 auto;
+}
+
+.iterate-btn-row {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: center;
+}
+
+/* ── Active loop layout ──────────────────────────────────── */
+.iterate-active {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  padding: 0;
+  max-width: 100%;
+}
+
+.iterate-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-primary);
+  border-bottom: 2px solid var(--border-soft);
+  flex-shrink: 0;
+}
+
+.iterate-topbar-left {
+  min-width: 0;
+}
+
+.iterate-problem-title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  color: var(--text-strong);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.iterate-round-label {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 2px 0 0;
+}
+
+/* ── Score trend ─────────────────────────────────────────── */
+.iterate-score-trend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  background: var(--surface-secondary);
+  border-bottom: 1px solid var(--border-soft);
+  flex-shrink: 0;
+}
+
+.iterate-sparkline {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 24px;
+  flex: 1;
+}
+
+.iterate-sparkline-bar {
+  flex: 1;
+  max-width: 12px;
+  background: var(--sky-400);
+  border-radius: 2px 2px 0 0;
+  min-height: 2px;
+  transition: height 0.3s ease;
+}
+
+.iterate-sparkline-bar.current {
+  background: var(--gold-500);
+}
+
+.iterate-score-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+
+.iterate-score-value {
+  font-family: var(--font-display);
+  font-size: 18px;
+  color: var(--sky-600);
+}
+
+.iterate-score-label {
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+/* ── Convergence ─────────────────────────────────────────── */
+.iterate-convergence {
+  padding: var(--space-2) var(--space-4);
+  background: var(--cream-200);
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 12px;
+  color: var(--text);
+  text-align: center;
+}
+
+/* ── Workspace (conversation + feed) ─────────────────────── */
+.iterate-workspace {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.iterate-conversation-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid var(--border-soft);
+}
+
+.iterate-feed-col {
+  flex: 0 0 380px;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-3) var(--space-4);
+  overflow-y: auto;
+  background: var(--surface-secondary);
+}
+
+.iterate-conversation {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.iterate-feed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* ── Chat bar ────────────────────────────────────────────── */
+.iterate-chat-bar {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  padding-bottom: calc(var(--space-3) + var(--agent-panel-page-inset, 0px));
+  background: var(--surface-primary);
+  border-top: 2px solid var(--border-soft);
+  flex-shrink: 0;
+}
+
+.iterate-chat-input {
+  flex: 1;
+  font-size: 14px;
+}
+
+/* ── Chat messages ───────────────────────────────────────── */
+.iterate-msg {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  max-width: 85%;
+}
+
+.iterate-msg-user {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.iterate-msg-agent {
+  align-self: flex-start;
+}
+
+.iterate-msg-system {
+  align-self: center;
+  max-width: 90%;
+}
+
+.iterate-msg-bubble {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.iterate-msg-user .iterate-msg-bubble {
+  background: var(--sky-100);
+  color: var(--text-strong);
+  border: 1px solid var(--sky-200);
+}
+
+.iterate-msg-agent .iterate-msg-bubble {
+  background: var(--panel);
+  color: var(--text-strong);
+  border: 1px solid var(--border-soft);
+}
+
+.iterate-msg-system .iterate-msg-bubble {
+  background: var(--cream-200);
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+  border: 1px dashed var(--border-soft);
+}
+
+.iterate-msg-name {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+
+.iterate-msg-body {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Experiment cards ────────────────────────────────────── */
+.iterate-exp-card {
+  background: var(--panel);
+  border: 2px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.iterate-exp-card:hover {
+  border-color: var(--sky-400);
+  box-shadow: 0 2px 8px rgba(91, 155, 213, 0.18);
+}
+
+.iterate-exp-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+
+.iterate-exp-card-round {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.iterate-exp-card-score {
+  font-family: var(--font-display);
+  font-size: 16px;
+  color: var(--sky-600);
+}
+
+.iterate-exp-card-delta {
+  font-size: 11px;
+  margin-left: var(--space-1);
+}
+
+.iterate-exp-card-delta.positive { color: var(--good); }
+.iterate-exp-card-delta.negative { color: var(--bad); }
+
+.iterate-exp-card-visual {
+  height: 48px;
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-2);
+  border: 1px solid var(--border-soft);
+}
+
+.iterate-exp-card-summary {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.iterate-exp-card-status {
+  font-size: 11px;
+  margin-top: var(--space-2);
+  color: var(--muted);
+}
+
+/* ── Metric review cards ─────────────────────────────────── */
+.iterate-metric-card {
+  background: var(--panel);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.iterate-metric-card-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.iterate-metric-card-type {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.iterate-metric-card-rationale {
+  font-size: 12px;
+  color: var(--text);
+  margin-top: var(--space-1);
+  line-height: 1.4;
+}
+
+.iterate-metrics-actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+/* ── Responsive ──────────────────────────────────────────── */
+
+/* Mobile: single column, feed below conversation */
+@media (max-width: 819px) {
+  .iterate-identity { padding-top: 5vh; }
+  .iterate-brain { padding-top: 5vh; }
+  .iterate-problem { padding-top: 5vh; }
+
+  .iterate-card {
+    padding: var(--space-4);
+  }
+
+  .iterate-pair {
+    gap: var(--space-3);
+  }
+
+  .iterate-avatar {
+    width: 96px;
+    height: 96px;
+  }
+
+  .iterate-avatar-col {
+    flex: 0 0 130px;
+  }
+
+  .iterate-workspace {
+    flex-direction: column;
+  }
+
+  .iterate-conversation-col {
+    flex: 1;
+    border-right: none;
+    border-bottom: 1px solid var(--border-soft);
+    max-height: 50%;
+  }
+
+  .iterate-feed-col {
+    flex: 1;
+    min-height: 200px;
+  }
+}
+
+/* Tablet */
+@media (min-width: 820px) and (max-width: 1279px) {
+  .iterate-feed-col {
+    flex: 0 0 320px;
+  }
+}
+
+/* Desktop */
+@media (min-width: 1280px) {
+  .iterate-feed-col {
+    flex: 0 0 420px;
+  }
+}
