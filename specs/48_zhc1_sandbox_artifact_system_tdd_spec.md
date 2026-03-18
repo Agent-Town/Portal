@@ -41,8 +41,9 @@ All tests must satisfy at least one of these metric classes:
 | **Compilation** | TypeScript compiles without errors | Exit code 0, no `error TS` in stderr |
 | **Execution** | Code runs and produces output | `process.exitCode === 0`, stdout non-empty |
 | **Isolation** | Sandbox cannot escape boundaries | Network requests fail, filesystem capped |
-| **Snapshot fidelity** | Export/import produces identical workspace | `sha256(export1) === sha256(export2)` after re-mount |
+| **Snapshot fidelity** | Zip export/import produces identical workspace | Re-mounted zip produces same file contents and execution output |
 | **Card artifact** | Experiment card contains code + output | `card.artifact.source !== null && card.artifact.outputPreview !== null` |
+| **Snapshot size** | Zip export is smaller than raw binary | `zipSnapshot.length < binarySnapshot.length` |
 | **Transfer** | Snapshot loads in a different session | Mount succeeds, entrypoint executes, output matches |
 | **Registry presence** | Artifact discoverable in catalog | `GET /api/registry/search?q=...` returns entity with matching `content_hash` |
 | **ERC-8004 mint** | Token exists on-chain with correct URI | `erc8004Registrations` row exists, `agentURI` starts with `ipfs://` |
@@ -184,9 +185,9 @@ Dependencies: SA-T001
 
 Given: Experiment round is complete
 When: Agent marks best card
-Then: `card.artifact.snapshotBinary` is a non-null Uint8Array with length > 0.
+Then: `card.artifact.snapshotZip` is a non-null Uint8Array (zip) with length > 0.
 
-Success metric: `card.artifact.snapshotBinary instanceof Uint8Array && card.artifact.snapshotBinary.length > 0`
+Success metric: `card.artifact.snapshotZip instanceof Uint8Array && card.artifact.snapshotZip.length > 0`
 
 ### SA-T014: Agent-submitted card with artifact accepted by API
 
@@ -264,9 +265,9 @@ Dependencies: SA-T013
 
 Given: Experiment card has a workspace with TypeScript source and compiled output
 When: User clicks "Export" (or equivalent)
-Then: `webcontainer.export('/', { format: 'binary' })` returns a `Uint8Array` with `length > 100`.
+Then: `webcontainer.export('/', { format: 'zip' })` returns a compressed `Uint8Array` with valid zip header (first 2 bytes `0x50 0x4B`).
 
-Success metric: `typeof snapshot === 'object' && snapshot instanceof Uint8Array && snapshot.length > 100`
+Success metric: `snapshot instanceof Uint8Array && snapshot.length > 100 && snapshot[0] === 0x50 && snapshot[1] === 0x4B`
 
 ### SA-T031: Exported snapshot can be re-mounted
 
@@ -274,8 +275,8 @@ Phase: transferability
 Priority: P0
 Dependencies: SA-T030
 
-Given: A binary snapshot has been exported
-When: A new WebContainer boots and calls `mount(snapshotBinary)`
+Given: A zip snapshot has been exported
+When: A new WebContainer boots and calls `mount(snapshotZip)`
 Then: Mount succeeds. Files from original workspace are present. `src/index.ts` (or entrypoint) exists.
 
 Success metric: `await wc2.fs.readFile(entrypoint, 'utf-8')` returns non-empty string matching original source.
@@ -286,7 +287,7 @@ Phase: transferability
 Priority: P0
 Dependencies: SA-T031
 
-Given: Snapshot has been exported and re-mounted in a new WebContainer
+Given: Zip snapshot has been exported and re-mounted in a new WebContainer
 When: Code is compiled and executed in the new container
 Then: stdout matches the original execution output.
 
@@ -298,11 +299,11 @@ Phase: transferability
 Priority: P0
 Dependencies: SA-T030
 
-Given: Snapshot binary has been exported
+Given: Zip snapshot has been exported
 When: Stored via library API
-Then: `library_item` row exists with `type: 'sandbox_snapshot'`, `content_hash: 'sha256:...'`. Item retrievable by ID.
+Then: `library_item` row exists with `type: 'sandbox_snapshot'`, `content_type: 'application/zip'`, `content_hash: 'sha256:...'`. Item retrievable by ID.
 
-Success metric: `getLibraryItemById(id)` returns item with `type === 'sandbox_snapshot'` and `content_hash` starting with `sha256:`.
+Success metric: `getLibraryItemById(id)` returns item with `type === 'sandbox_snapshot'` and `content_type === 'application/zip'` and `content_hash` starting with `sha256:`.
 
 ### SA-T034: Snapshot importable by different user
 
@@ -340,9 +341,9 @@ Dependencies: SA-T013, IT-T080
 
 Given: Problem story is converged with code artifacts
 When: `POST /api/published-streams` is called
-Then: Published stream has `codeFingerprint` computed as SHA-256 of the best card's snapshot binary.
+Then: Published stream has `codeFingerprint` computed as SHA-256 of the best card's snapshot zip.
 
-Success metric: `publishedStream.codeFingerprint` is a 64-character hex string. `publishedStream.codeFingerprint === sha256hex(bestCard.artifact.snapshotBinary)`.
+Success metric: `publishedStream.codeFingerprint` is a 64-character hex string. `publishedStream.codeFingerprint === sha256hex(bestCard.artifact.snapshotZip)`.
 
 ### SA-T041: Artifact registered in registry
 
@@ -390,11 +391,11 @@ Phase: erc8004
 Priority: P1
 Dependencies: SA-T030
 
-Given: Converged artifact with exported snapshot
+Given: Converged artifact with exported zip snapshot
 When: User initiates minting flow
-Then: Snapshot binary is pinned to IPFS. An `ipfs://` URI is returned.
+Then: Zip snapshot is pinned to IPFS. An `ipfs://` URI is returned.
 
-Success metric: Pin response contains `IpfsHash` (CID). URI format: `ipfs://{CID}`.
+Success metric: Pin response contains `IpfsHash` (CID). URI format: `ipfs://{CID}`. Pinned content is valid zip (starts with `PK` header).
 
 ### SA-T051: ERC-8004 token minted with artifact URI
 
@@ -522,7 +523,7 @@ Given: Converged experiment with code artifact
 When: Export → store as library item → import in new session → mount → compile → run
 Then: Output matches original. Library item exists. Round-trip complete.
 
-Success metric: `output2 === output1`. `libraryItem.type === 'sandbox_snapshot'`. `libraryItem.content_hash` is valid SHA-256.
+Success metric: `output2 === output1`. `libraryItem.type === 'sandbox_snapshot'`. `libraryItem.content_type === 'application/zip'`. `libraryItem.content_hash` is valid SHA-256.
 
 ### SA-T092: Full publication + discovery smoke test
 

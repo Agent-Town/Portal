@@ -82,7 +82,7 @@ A user describes a problem. Their agent writes TypeScript that solves it. The ag
 
 2. **All LLM calls go through the OpenClaw Lite worker** using the user's own API key. The server stores artifacts only.
 
-3. **Snapshots are the unit of transfer.** A WebContainer `export('/', { format: 'binary' })` produces a `Uint8Array`. That blob is the artifact. It can be mounted, forked, published, minted.
+3. **Snapshots are the unit of transfer.** A WebContainer `export('/', { format: 'zip' })` produces a compressed `Uint8Array`. That zip is the artifact. It can be mounted, forked, published, minted. Zip is preferred over raw binary to minimize storage and transfer costs.
 
 4. **The iteration trace is the reputation signal.** What the agent tried, what the user rejected, what converged — this is the evidence chain stored alongside the artifact.
 
@@ -115,7 +115,7 @@ Extend experiment cards to hold code artifacts.
 **Experiment card extensions:**
 - `artifact.source`: TypeScript source files (FileSystemTree JSON)
 - `artifact.compiled`: compiled JavaScript (for instant replay without recompilation)
-- `artifact.snapshotBinary`: WebContainer `export()` binary (Uint8Array, stored as base64 in memory or binary blob)
+- `artifact.snapshotZip`: WebContainer `export('/', { format: 'zip' })` compressed archive (Uint8Array)
 - `artifact.outputType`: `'terminal'` | `'html'` | `'data'` — what the sandbox produced
 - `artifact.outputPreview`: screenshot or rendered HTML string for card visual
 - `artifact.entrypoint`: main file path (e.g., `src/index.ts`)
@@ -149,10 +149,11 @@ Export artifacts as portable snapshots that can be given to other users.
 
 **Export flow:**
 1. User clicks "Export" on a converged experiment
-2. `webcontainer.export('/', { format: 'binary' })` → `Uint8Array`
-3. Snapshot stored as a `library_item` (type: `'sandbox_snapshot'`)
+2. `webcontainer.export('/', { format: 'zip' })` → compressed `Uint8Array`
+3. Snapshot stored as a `library_item` (type: `'sandbox_snapshot'`, content_type: `'application/zip'`)
 4. `library_item_revisions` track each export version
 5. Snapshot includes: source, compiled output, package.json, config
+6. Zip format typically 3-10x smaller than raw binary, reducing storage + IPFS pinning costs
 
 **Import flow:**
 1. User discovers an artifact in the feed, registry, or library
@@ -255,7 +256,7 @@ The system improves by observing how users solve problems.
   artifact: {
     source: FileSystemTree | null,      // TypeScript source files
     compiled: FileSystemTree | null,     // Compiled JS output
-    snapshotBinary: Uint8Array | null,   // Full WebContainer export
+    snapshotZip: Uint8Array | null,       // WebContainer export (zip compressed)
     outputType: 'terminal' | 'html' | 'data' | null,
     outputPreview: string | null,        // Rendered output for card visual
     entrypoint: string | null,          // e.g. 'src/index.ts'
@@ -271,7 +272,7 @@ The system improves by observing how users solve problems.
 ```javascript
 {
   type: 'sandbox_snapshot',
-  content_type: 'application/octet-stream',
+  content_type: 'application/zip',
   content_hash: 'sha256:...',          // Hash of snapshot binary
   metadata: {
     problemDescription: string,
@@ -332,8 +333,8 @@ process.output.pipeTo(new WritableStream({
   write(chunk) { capturedOutput += chunk; }
 }));
 
-// Export for transfer
-const snapshot = await wc.export('/', { format: 'binary' });
+// Export for transfer (zip for storage efficiency)
+const snapshot = await wc.export('/', { format: 'zip' });
 ```
 
 ### Fallback: iframe + esbuild-wasm
