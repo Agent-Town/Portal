@@ -673,6 +673,43 @@
   line-height: 1.4;
 }
 
+.iterate-exp-card-output {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+  background: var(--sky-900);
+  color: #e0e0e0;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-2);
+  max-height: 100px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  border: 1px solid var(--border-soft);
+}
+
+.iterate-exp-card-badge {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  vertical-align: middle;
+  margin-left: var(--space-1);
+}
+
+.iterate-exp-card-badge.good {
+  background: rgba(107, 179, 107, 0.2);
+  color: var(--good);
+}
+
+.iterate-exp-card-badge.bad {
+  background: rgba(230, 57, 70, 0.2);
+  color: var(--bad);
+}
+
 .iterate-exp-card-status {
   font-size: 11px;
   margin-top: var(--space-2);

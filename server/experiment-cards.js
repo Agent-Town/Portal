@@ -107,6 +107,19 @@ function createExperimentCard(problemStoryId, opts = {}) {
     // Status + feedback
     status: VALID_STATUSES.includes(opts.status) ? opts.status : 'pending_review',
     feedback: opts.feedback || null,
+
+    // Code artifact (Phase S1 — sandbox system)
+    artifact: opts.artifact ? {
+      source: opts.artifact.source || null,
+      compiled: opts.artifact.compiled || null,
+      snapshotZip: null, // Binary — stored separately, not in JSON
+      outputType: ['terminal', 'html', 'data'].includes(opts.artifact.outputType) ? opts.artifact.outputType : null,
+      outputPreview: clampString(opts.artifact.outputPreview || '', 10000),
+      entrypoint: clampString(opts.artifact.entrypoint || '', 200),
+      dependencies: Array.isArray(opts.artifact.dependencies) ? opts.artifact.dependencies.slice(0, 50) : null,
+      executionMs: typeof opts.artifact.executionMs === 'number' ? opts.artifact.executionMs : null,
+      exitCode: typeof opts.artifact.exitCode === 'number' ? opts.artifact.exitCode : null,
+    } : null,
   };
 
   cards.set(card.id, card);

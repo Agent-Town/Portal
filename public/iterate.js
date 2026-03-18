@@ -24,6 +24,7 @@
   let userAvatar = DEFAULT_USER_AVATAR;
   let agentAvatar = DEFAULT_AGENT_AVATAR;
   let gateway = null;
+  let sandbox = null;
   let storyId = null;
   let currentRound = 0;
   let experimentCards = [];
@@ -513,6 +514,104 @@
     if (storyId && text.toLowerCase().includes('metric') && currentRound === 0) {
       showMetricConfirmAction();
     }
+
+    // Detect code blocks and offer to run them in the sandbox
+    const files = extractCodeFromMessage(text);
+    if (files && storyId) {
+      showRunCodeAction(files, text);
+    }
+  }
+
+  function showRunCodeAction(files, agentMessage) {
+    const thread = el('conversationThread');
+    if (!thread) return;
+
+    const action = document.createElement('div');
+    action.className = 'iterate-msg iterate-msg-system';
+    action.setAttribute('data-testid', 'run-code-action');
+    const fileCount = Object.keys(files).length;
+    const sandboxLabel = sandbox?.ready ? `Run in sandbox (${sandbox.type})` : 'Sandbox not available';
+
+    action.innerHTML = `
+      <div class="iterate-msg-bubble">
+        <p>Agent produced ${fileCount} TypeScript file${fileCount > 1 ? 's' : ''}.</p>
+        <div class="iterate-metrics-actions">
+          <button class="btn primary small" data-action="run-code" ${sandbox?.ready ? '' : 'disabled'}>${sandboxLabel}</button>
+          <button class="btn small" data-action="save-card">Save as experiment card</button>
+        </div>
+      </div>
+    `;
+    thread.appendChild(action);
+    thread.scrollTop = thread.scrollHeight;
+
+    action.querySelector('[data-action="run-code"]')?.addEventListener('click', async () => {
+      action.querySelector('[data-action="run-code"]').disabled = true;
+      action.querySelector('[data-action="run-code"]').textContent = 'Running...';
+      appendMessage('system', 'Compiling and running code in sandbox...');
+
+      const result = await runCodeInSandbox(files);
+
+      const outputText = result.exitCode === 0
+        ? `Output:\n${result.stdout || '(no output)'}`
+        : `Error (exit ${result.exitCode}):\n${result.stderr || '(no error details)'}`;
+      appendMessage('system', `Sandbox result (${result.executionMs}ms):\n${outputText}`);
+
+      // Create experiment card with the artifact
+      try {
+        const card = await apiFetch(`/api/problem-stories/${storyId}/experiment-cards`, {
+          method: 'POST',
+          body: JSON.stringify({
+            agentSummary: agentMessage.slice(0, 280),
+            compositeScore: result.exitCode === 0 ? 0.5 : 0.1,
+            artifact: {
+              source: files,
+              outputType: 'terminal',
+              outputPreview: (result.stdout || result.stderr || '').slice(0, 2000),
+              entrypoint: 'src/index.ts',
+              executionMs: result.executionMs,
+              exitCode: result.exitCode,
+            },
+          }),
+        });
+        if (card.ok && card.card) {
+          renderExperimentCard(card.card);
+          experimentCards.push(card.card);
+          await updateScoreTrend();
+        }
+      } catch (e) {
+        appendMessage('system', `Failed to save card: ${e.message}`);
+      }
+
+      action.remove();
+    });
+
+    action.querySelector('[data-action="save-card"]')?.addEventListener('click', async () => {
+      try {
+        const card = await apiFetch(`/api/problem-stories/${storyId}/experiment-cards`, {
+          method: 'POST',
+          body: JSON.stringify({
+            agentSummary: agentMessage.slice(0, 280),
+            compositeScore: 0.3,
+            artifact: {
+              source: files,
+              outputType: null,
+              outputPreview: null,
+              entrypoint: 'src/index.ts',
+              executionMs: null,
+              exitCode: null,
+            },
+          }),
+        });
+        if (card.ok && card.card) {
+          renderExperimentCard(card.card);
+          experimentCards.push(card.card);
+          appendMessage('system', 'Code saved as experiment card.');
+        }
+      } catch (e) {
+        appendMessage('system', `Failed to save card: ${e.message}`);
+      }
+      action.remove();
+    });
   }
 
   function showMetricConfirmAction() {
@@ -615,17 +714,29 @@
     const delta = card.deltaScore || 0;
     const deltaClass = delta > 0 ? 'positive' : delta < 0 ? 'negative' : '';
     const deltaText = delta > 0 ? `+${delta.toFixed(2)}` : delta < 0 ? delta.toFixed(2) : '';
+    const hasArtifact = card.artifact?.outputPreview;
     const gradient = card.visual?.url || 'linear-gradient(135deg, var(--sky-200), var(--sky-400))';
+
+    // Show real output if artifact exists, otherwise show gradient placeholder
+    const visualHtml = hasArtifact
+      ? `<pre class="iterate-exp-card-output" data-testid="card-visual">${escapeHtml(card.artifact.outputPreview.slice(0, 500))}</pre>`
+      : `<div class="iterate-exp-card-visual" data-testid="card-visual" style="background: ${gradient}"></div>`;
+
+    const artifactBadge = card.artifact?.exitCode === 0
+      ? '<span class="iterate-exp-card-badge good">ran</span>'
+      : card.artifact?.exitCode != null
+        ? '<span class="iterate-exp-card-badge bad">error</span>'
+        : '';
 
     cardEl.innerHTML = `
       <div class="iterate-exp-card-header">
-        <span class="iterate-exp-card-round">R${card.roundNumber || currentRound} · E${card.iterationNumber || '?'}</span>
+        <span class="iterate-exp-card-round">R${card.roundNumber || currentRound} · E${card.iterationNumber || '?'} ${artifactBadge}</span>
         <span>
           <span class="iterate-exp-card-score">${(card.compositeScore || 0).toFixed(2)}</span>
           ${deltaText ? `<span class="iterate-exp-card-delta ${deltaClass}">${deltaText}</span>` : ''}
         </span>
       </div>
-      <div class="iterate-exp-card-visual" data-testid="card-visual" style="background: ${gradient}"></div>
+      ${visualHtml}
       <div class="iterate-exp-card-summary">${escapeHtml(card.agentSummary || 'Experiment')}</div>
       <div class="iterate-exp-card-status">${card.status === 'kept' ? 'Kept' : card.status === 'discarded' ? 'Discarded' : 'Pending review'}</div>
     `;
@@ -729,6 +840,93 @@
     });
   }
 
+  // ── Sandbox ────────────────────────────────────────────────
+  async function bootSandbox() {
+    try {
+      const mod = await import('/sandbox.js');
+      sandbox = await mod.createSandbox();
+      console.log(`Sandbox ready: ${sandbox.type}`);
+    } catch (e) {
+      console.warn('Sandbox boot deferred:', e.message);
+      // Sandbox is optional — the iterate loop works without it (text-only mode)
+    }
+  }
+
+  /**
+   * Run TypeScript code in the sandbox and return the result.
+   * If sandbox isn't available, returns a stub result.
+   */
+  async function runCodeInSandbox(files, entrypoint) {
+    if (!sandbox || !sandbox.ready) {
+      return {
+        stdout: '(sandbox not available — text-only mode)',
+        stderr: '',
+        exitCode: 0,
+        executionMs: 0,
+        phase: 'skipped',
+      };
+    }
+    try {
+      return await sandbox.run(files, entrypoint);
+    } catch (e) {
+      return {
+        stdout: '',
+        stderr: `Sandbox error: ${e.message}`,
+        exitCode: 1,
+        executionMs: 0,
+        phase: 'error',
+      };
+    }
+  }
+
+  /**
+   * Export the current sandbox workspace as a zip and store it on the server.
+   * Returns { snapshotId, contentHash, size } or null on failure.
+   */
+  async function exportAndStoreSnapshot(cardId) {
+    if (!sandbox || typeof sandbox.exportZip !== 'function') return null;
+    try {
+      const zip = await sandbox.exportZip();
+      const res = await fetch('/api/sandbox/snapshot', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          'x-problem-story-id': storyId || '',
+          'x-card-id': cardId || '',
+        },
+        body: zip,
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Extract TypeScript code blocks from an agent message.
+   * Returns a files object { 'src/index.ts': '...' } or null.
+   */
+  function extractCodeFromMessage(text) {
+    // Match fenced code blocks with ts/typescript language
+    const tsPattern = /```(?:typescript|ts)\s*\n([\s\S]*?)```/gi;
+    const matches = [...text.matchAll(tsPattern)];
+    if (matches.length === 0) return null;
+
+    // Single block → src/index.ts
+    if (matches.length === 1) {
+      return { 'src/index.ts': matches[0][1].trim() };
+    }
+
+    // Multiple blocks → src/index.ts, src/module1.ts, etc.
+    const files = {};
+    matches.forEach((m, i) => {
+      const name = i === 0 ? 'src/index.ts' : `src/module${i}.ts`;
+      files[name] = m[1].trim();
+    });
+    return files;
+  }
+
   // ── Session Context debug panel ────────────────────────────
   // app.js's poll loop calls /api/state which doesn't work on the iterate
   // page (no portal session). We populate the session context debug panel
@@ -756,6 +954,7 @@
         `currentRound: ${currentRound}`,
         `experimentCards: ${experimentCards.length}`,
         `gateway: ${gateway ? 'connected' : 'not connected'}`,
+        `sandbox: ${sandbox ? `${sandbox.type} (${sandbox.ready ? 'ready' : 'not ready'})` : 'not booted'}`,
       ];
       panel.textContent = lines.join('\n');
     }, 2000);
@@ -790,9 +989,10 @@
     // Connect to the gateway that agent_panel.js initializes
     await connectGateway();
 
+    // Boot the code sandbox (WebContainer or fallback)
+    bootSandbox();
+
     // Seed the session context debug panel with iterate-specific info.
-    // app.js's poll() calls /api/state which may not work on the iterate page,
-    // so we populate the panel directly when it becomes visible.
     startSessionContextUpdater();
 
     goToPhase('identity');
