@@ -689,11 +689,19 @@
 
   function sendToAgent(text) {
     if (gateway && typeof gateway.send === 'function') {
-      gateway.send({ type: 'chat', text }).catch(e => {
+      try {
+        const result = gateway.send({ type: 'chat', text });
+        // gateway.send() may or may not return a Promise
+        if (result && typeof result.catch === 'function') {
+          result.catch(e => {
+            appendMessage('system', `Send failed: ${e.message}`);
+          });
+        }
+      } catch (e) {
         appendMessage('system', `Send failed: ${e.message}`);
-      });
+      }
     } else {
-      appendMessage('system', 'Agent not connected. Use the Agent Dock at the bottom.');
+      appendMessage('system', 'Agent not connected. Configure brain in the Agent Dock at the bottom, then send a message there first to initialize the connection.');
     }
   }
 
