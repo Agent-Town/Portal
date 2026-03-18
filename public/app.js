@@ -11624,6 +11624,19 @@ async function dispatchExperienceIntent(tool, rawParams = {}, options = {}) {
       envelope = await runExperienceUiWebOpen(params);
     } else if (toolName === 'agent_town_ui_pony_compose') {
       envelope = await runExperienceUiPonyCompose(params);
+    // ── Iterate page tools ──────────────────────────────────
+    } else if (toolName === 'agent_town_iterate_set_problem') {
+      envelope = await runIterateTool('setProblem', params);
+    } else if (toolName === 'agent_town_iterate_propose_metrics') {
+      envelope = await runIterateTool('proposeMetrics', params);
+    } else if (toolName === 'agent_town_iterate_confirm_metrics') {
+      envelope = await runIterateTool('confirmMetrics', params);
+    } else if (toolName === 'agent_town_iterate_submit_code') {
+      envelope = await runIterateTool('submitCode', params);
+    } else if (toolName === 'agent_town_iterate_submit_scores') {
+      envelope = await runIterateTool('submitScores', params);
+    } else if (toolName === 'agent_town_iterate_get_state') {
+      envelope = await runIterateTool('getState', params);
     } else {
       envelope = makeExperienceIntentEnvelope({
         ok: false,
@@ -11647,6 +11660,34 @@ async function dispatchExperienceIntent(tool, rawParams = {}, options = {}) {
 
   pushExperienceIntentTraceEvent({ source, tool: toolName, params, envelope });
   return envelope;
+}
+
+// ── Iterate page tool bridge ──────────────────────────────────
+// Routes tool calls to iterate.js via CustomEvents. iterate.js registers
+// handlers when it loads. If the iterate page isn't loaded, tools fail gracefully.
+async function runIterateTool(action, params) {
+  return new Promise((resolve) => {
+    const requestId = `it_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const timeout = setTimeout(() => {
+      window.removeEventListener('iterate.toolResponse', handler);
+      resolve(makeExperienceIntentEnvelope({
+        ok: false, applied: false,
+        error: { code: 'ITERATE_NOT_LOADED', message: 'Iterate page not available or tool timed out.' }
+      }));
+    }, 10000);
+
+    function handler(evt) {
+      if (evt.detail?.requestId !== requestId) return;
+      window.removeEventListener('iterate.toolResponse', handler);
+      clearTimeout(timeout);
+      resolve(evt.detail.envelope || makeExperienceIntentEnvelope({ ok: false, applied: false }));
+    }
+
+    window.addEventListener('iterate.toolResponse', handler);
+    window.dispatchEvent(new CustomEvent('iterate.toolRequest', {
+      detail: { requestId, action, params }
+    }));
+  });
 }
 
 window.AgentTownExperienceIntent = {

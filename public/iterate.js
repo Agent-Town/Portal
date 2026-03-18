@@ -440,6 +440,244 @@
 
   // buildIteratePrompt removed — conversation-flow.js handles step-specific prompts
 
+  // ── Agent Tool Handlers ────────────────────────────────────
+  // The agent (via OpenClaw Lite worker) calls tools like
+  // agent_town_iterate_set_problem, agent_town_iterate_submit_code, etc.
+  // app.js routes these via CustomEvents to us.
+
+  function initIterateTools() {
+    window.addEventListener('iterate.toolRequest', async (evt) => {
+      const { requestId, action, params } = evt.detail || {};
+      if (!requestId || !action) return;
+
+      let envelope;
+      try {
+        switch (action) {
+          case 'setProblem':
+            envelope = handleSetProblem(params);
+            break;
+          case 'proposeMetrics':
+            envelope = handleProposeMetrics(params);
+            break;
+          case 'confirmMetrics':
+            envelope = await handleConfirmMetrics(params);
+            break;
+          case 'submitCode':
+            envelope = await handleSubmitCode(params);
+            break;
+          case 'submitScores':
+            envelope = await handleSubmitScores(params);
+            break;
+          case 'getState':
+            envelope = handleGetState();
+            break;
+          default:
+            envelope = { ok: false, applied: false, error: { code: 'UNKNOWN_ACTION', message: `Unknown iterate action: ${action}` } };
+        }
+      } catch (e) {
+        envelope = { ok: false, applied: false, error: { code: 'ITERATE_ERROR', message: e.message } };
+      }
+
+      window.dispatchEvent(new CustomEvent('iterate.toolResponse', {
+        detail: { requestId, envelope }
+      }));
+    });
+  }
+
+  function handleSetProblem(params) {
+    const description = String(params?.problemDescription || '').trim();
+    if (!description || description.length < 5) {
+      return { ok: false, applied: false, error: { code: 'INVALID_PARAM', message: 'problemDescription must be at least 5 chars' } };
+    }
+
+    // Fill the problem input and update UI
+    const input = el('problemInput');
+    if (input) input.value = description;
+
+    const titleEl = el('problemTitle');
+    if (titleEl) titleEl.textContent = description.slice(0, 80) + (description.length > 80 ? '...' : '');
+
+    appendMessage('system', `Problem set: "${description.slice(0, 100)}${description.length > 100 ? '...' : ''}"`);
+
+    return { ok: true, applied: true, stateSnapshot: { problemDescription: description } };
+  }
+
+  function handleProposeMetrics(params) {
+    const metrics = Array.isArray(params?.metrics) ? params.metrics : [];
+    if (metrics.length === 0) {
+      return { ok: false, applied: false, error: { code: 'INVALID_PARAM', message: 'metrics array required' } };
+    }
+
+    // Show metrics as cards in the conversation
+    const thread = el('conversationThread');
+    if (!thread) return { ok: false, applied: false, error: { code: 'UI_NOT_READY', message: 'Conversation thread not available' } };
+
+    const metricsHtml = metrics.map(m =>
+      `<div class="iterate-metric-card" data-testid="metric-card">
+        <div class="iterate-metric-card-name">${escapeHtml(m.name || '')}</div>
+        <div class="iterate-metric-card-type">${escapeHtml(m.type || '')} · ${escapeHtml(m.direction || '')}</div>
+        ${m.rationale ? `<div class="iterate-metric-card-rationale">${escapeHtml(m.rationale)}</div>` : ''}
+      </div>`
+    ).join('');
+
+    const msg = document.createElement('div');
+    msg.className = 'iterate-msg iterate-msg-system';
+    msg.setAttribute('data-testid', 'proposed-metrics');
+    msg.innerHTML = `
+      <div class="iterate-msg-bubble">
+        <p><strong>Proposed metrics:</strong></p>
+        ${metricsHtml}
+        <div class="iterate-metrics-actions" style="margin-top: 8px;">
+          <button class="btn primary small" data-action="confirm-metrics">Confirm metrics</button>
+          <button class="btn small" data-action="revise-metrics">Revise</button>
+        </div>
+      </div>
+    `;
+    thread.appendChild(msg);
+    thread.scrollTop = thread.scrollHeight;
+
+    // Store proposed metrics for confirmation
+    window.__iterateProposedMetrics = metrics;
+
+    msg.querySelector('[data-action="confirm-metrics"]')?.addEventListener('click', async () => {
+      msg.querySelector('[data-action="confirm-metrics"]').disabled = true;
+      msg.querySelector('[data-action="confirm-metrics"]').textContent = 'Confirming...';
+      await handleConfirmMetrics({ metrics: window.__iterateProposedMetrics });
+      msg.querySelector('.iterate-metrics-actions')?.remove();
+    });
+
+    msg.querySelector('[data-action="revise-metrics"]')?.addEventListener('click', () => {
+      appendMessage('system', 'Tell the agent what to change about the metrics.');
+    });
+
+    return { ok: true, applied: true, stateSnapshot: { metricsCount: metrics.length } };
+  }
+
+  async function handleConfirmMetrics(params) {
+    const metrics = Array.isArray(params?.metrics) ? params.metrics : (window.__iterateProposedMetrics || []);
+    if (!storyId) {
+      return { ok: false, applied: false, error: { code: 'NO_STORY', message: 'No problem story active' } };
+    }
+
+    try {
+      for (const m of metrics) {
+        await apiFetch(`/api/problem-stories/${storyId}/eval-proposals/metrics`, {
+          method: 'POST',
+          body: JSON.stringify({ name: m.name, type: m.type || 'qualitative', direction: m.direction || 'maximize', weight: m.weight }),
+        });
+      }
+      await apiFetch(`/api/problem-stories/${storyId}/eval-confirm`, { method: 'POST' });
+      appendMessage('system', `${metrics.length} metrics confirmed. Ready for experiments.`);
+      return { ok: true, applied: true, stateSnapshot: { metricsConfirmed: true, count: metrics.length } };
+    } catch (e) {
+      return { ok: false, applied: false, error: { code: 'API_ERROR', message: e.message } };
+    }
+  }
+
+  async function handleSubmitCode(params) {
+    const files = params?.files;
+    const summary = String(params?.summary || 'Agent experiment').slice(0, 280);
+    const score = typeof params?.compositeScore === 'number' ? Math.max(0, Math.min(1, params.compositeScore)) : 0.5;
+
+    if (!files || typeof files !== 'object' || Object.keys(files).length === 0) {
+      return { ok: false, applied: false, error: { code: 'INVALID_PARAM', message: 'files object required with at least one file' } };
+    }
+    if (!storyId) {
+      return { ok: false, applied: false, error: { code: 'NO_STORY', message: 'No problem story active' } };
+    }
+
+    // Run in sandbox if available
+    let sandboxResult = null;
+    if (sandbox?.ready) {
+      appendMessage('system', 'Running code in sandbox...');
+      sandboxResult = await runCodeInSandbox(files);
+      const outputText = sandboxResult.exitCode === 0
+        ? `Output:\n${sandboxResult.stdout || '(no output)'}`
+        : `Error (exit ${sandboxResult.exitCode}):\n${sandboxResult.stderr || ''}`;
+      appendMessage('system', `Sandbox (${sandboxResult.executionMs}ms):\n${outputText}`);
+    }
+
+    // Create experiment card
+    try {
+      const card = await apiFetch(`/api/problem-stories/${storyId}/experiment-cards`, {
+        method: 'POST',
+        body: JSON.stringify({
+          agentSummary: summary,
+          compositeScore: sandboxResult ? (sandboxResult.exitCode === 0 ? score : 0.1) : score,
+          roundNumber: currentRound + 1,
+          artifact: {
+            source: files,
+            outputType: 'terminal',
+            outputPreview: sandboxResult ? (sandboxResult.stdout || sandboxResult.stderr || '').slice(0, 2000) : null,
+            entrypoint: Object.keys(files).find(k => k.includes('index')) || Object.keys(files)[0],
+            executionMs: sandboxResult?.executionMs || null,
+            exitCode: sandboxResult?.exitCode ?? null,
+          },
+        }),
+      });
+
+      if (card.ok && card.card) {
+        renderExperimentCard(card.card);
+        experimentCards.push(card.card);
+        currentRound++;
+        await updateScoreTrend();
+      }
+
+      return {
+        ok: true, applied: true,
+        stateSnapshot: {
+          cardId: card.card?.id,
+          exitCode: sandboxResult?.exitCode ?? null,
+          stdout: (sandboxResult?.stdout || '').slice(0, 500),
+          stderr: (sandboxResult?.stderr || '').slice(0, 500),
+          compositeScore: card.card?.compositeScore,
+        }
+      };
+    } catch (e) {
+      return { ok: false, applied: false, error: { code: 'API_ERROR', message: e.message } };
+    }
+  }
+
+  async function handleSubmitScores(params) {
+    const scores = params?.scores;
+    const cardId = params?.cardId;
+    if (!scores || !cardId) {
+      return { ok: false, applied: false, error: { code: 'INVALID_PARAM', message: 'scores and cardId required' } };
+    }
+
+    // Update the card's scores on the server via feedback
+    try {
+      await apiFetch(`/api/experiment-cards/${cardId}/feedback`, {
+        method: 'POST',
+        body: JSON.stringify({
+          modality: 'text',
+          textContent: `Agent self-assessment: ${JSON.stringify(scores)}`,
+        }),
+      });
+      await updateScoreTrend();
+      return { ok: true, applied: true, stateSnapshot: { cardId, scoresSubmitted: true } };
+    } catch (e) {
+      return { ok: false, applied: false, error: { code: 'API_ERROR', message: e.message } };
+    }
+  }
+
+  function handleGetState() {
+    return {
+      ok: true, applied: true,
+      stateSnapshot: {
+        phase: currentPhase,
+        storyId,
+        currentRound,
+        experimentCount: experimentCards.length,
+        sandboxReady: !!sandbox?.ready,
+        sandboxType: sandbox?.type || null,
+        flowStep: flow?.currentStep || null,
+        userName,
+        agentName,
+      }
+    };
+  }
+
   // ── Active Loop — Conversation ────────────────────────────
   // Chat input removed — the Agent Dock handles all chat.
   // Agent messages are mirrored into our conversation thread via the gateway listener.
@@ -1048,7 +1286,7 @@
     initIdentity();
     initBrainStep();
     initProblemInput();
-    // Chat handled by the Agent Dock — no separate chat init needed
+    initIterateTools();
     initExportBtn();
     initSaveBtn();
     initConvergenceButtons();
