@@ -5308,14 +5308,9 @@ app.post('/api/agent/lite/llm/config', (req, res) => {
   const lite = ensureLiteState(s);
   const onboarding = ensureSessionOnboarding(s);
 
-  // agent_solo sessions (iterate page) skip townhall registration
-  if (s.flow !== 'agent_solo' && onboarding.required === true && onboarding.registrationComplete !== true) {
-    return res.status(409).json({
-      ok: false,
-      error: 'ONBOARDING_TOWNHALL_REQUIRED',
-      message: 'Complete Town Hall registration before configuring brain.'
-    });
-  }
+  // Townhall gate removed for brain config. The LLM API key is never stored
+  // server-side — this endpoint only tracks metadata (provider, model name).
+  // The actual key stays in the browser (IndexedDB + worker memory).
 
   let payload;
   try {
