@@ -43,6 +43,60 @@ function getOnboardingStep(state) {
   return ONBOARDING_STEP_CEREMONY;
 }
 
+const ONBOARDING_STEPPER_STEPS = [
+  { id: ONBOARDING_STEP_TOWNHALL, labelKey: 'stepper.townhall', num: 1 },
+  { id: ONBOARDING_STEP_BRAIN, labelKey: 'stepper.brain', num: 2 },
+  { id: ONBOARDING_STEP_SIGIL, labelKey: 'stepper.sigil', num: 3 },
+  { id: ONBOARDING_STEP_CEREMONY, labelKey: 'stepper.ceremony', num: 4 }
+];
+
+function renderOnboardingStepper(currentStep) {
+  const body = el('districtModalBody');
+  if (!body) return;
+  if (!onboardingRequired(lastState)) {
+    const existing = body.querySelector('.onboarding-stepper');
+    if (existing) existing.remove();
+    return;
+  }
+
+  let container = body.querySelector('.onboarding-stepper');
+  if (!container) {
+    container = document.createElement('div');
+    container.className = 'onboarding-stepper';
+    body.insertBefore(container, body.firstChild);
+  }
+  container.innerHTML = '';
+
+  const stepIndex = ONBOARDING_STEPPER_STEPS.findIndex(s => s.id === currentStep);
+
+  for (let i = 0; i < ONBOARDING_STEPPER_STEPS.length; i++) {
+    if (i > 0) {
+      const line = document.createElement('div');
+      line.className = 'onboarding-stepper-line';
+      if (i <= stepIndex) line.classList.add('is-complete');
+      container.appendChild(line);
+    }
+    const step = ONBOARDING_STEPPER_STEPS[i];
+    const node = document.createElement('div');
+    node.className = 'onboarding-stepper-node';
+    node.setAttribute('data-testid', `stepper-step-${step.id}`);
+    if (i === stepIndex) node.classList.add('is-active');
+    else if (i < stepIndex) node.classList.add('is-complete');
+
+    const circle = document.createElement('div');
+    circle.className = 'onboarding-stepper-circle';
+    circle.textContent = i < stepIndex ? '\u2713' : String(step.num);
+    node.appendChild(circle);
+
+    const label = document.createElement('div');
+    label.className = 'onboarding-stepper-label';
+    label.textContent = tApp(step.labelKey);
+    node.appendChild(label);
+
+    container.appendChild(node);
+  }
+}
+
 function readTeamCodeHint() {
   try {
     return String(localStorage.getItem(TEAM_CODE_HINT_STORAGE_KEY) || '').trim();
@@ -338,6 +392,7 @@ let wallet = null;
 let walletAddr = null;
 let walletRecoveryIntentAttempts = 0;
 let redirecting = false;
+let agentDockAutoExpandedOnce = false;
 let pendingWalletCheck = false;
 let pendingLiteConnect = false;
 let pendingLlmSave = false;
@@ -479,7 +534,8 @@ const districtViews = {
   pony: { title: 'Pony Express', viewPath: '/views/pony.html' },
   leaderboard: { title: 'Town Board', viewPath: '/views/leaderboard.html' },
   brain: { title: 'Connect Brain', viewPath: '/views/brain.html' },
-  sigil: { title: 'Sigil Test', viewPath: '/views/sigil.html' }
+  sigil: { title: 'Sigil Test', viewPath: '/views/sigil.html' },
+  ceremony: { title: 'Create House Key', viewPath: '/create?embed=1' }
 };
 
 function setNodeText(id, key, vars = {}) {
@@ -1068,6 +1124,7 @@ function getTownHubDistrictGateReason(state) {
   if (step === ONBOARDING_STEP_TOWNHALL) return 'onboarding';
   if (step === ONBOARDING_STEP_BRAIN) return 'brain';
   if (step === ONBOARDING_STEP_SIGIL) return 'sigil';
+  if (step === ONBOARDING_STEP_CEREMONY) return 'ceremony';
   return null;
 }
 
@@ -1080,6 +1137,7 @@ function getTownHubDistrictGateStatusText() {
   if (reason === 'onboarding') return tApp('townhall.gate_hint');
   if (reason === 'brain') return tApp('brain.help');
   if (reason === 'sigil') return tApp('sigil.match_detail');
+  if (reason === 'ceremony') return tApp('ceremony.gate_hint');
   return '';
 }
 
@@ -1521,17 +1579,23 @@ function setTownhallMintStepStatus(step, kind) {
 
 function syncTownhallMintChecklist(draft, { activeStep = null, errorStep = null } = {}) {
   const safeDraft = draft && typeof draft === 'object' ? draft : createEmptyTownhallMintDraft();
+  let doneCount = 0;
   for (const step of townhallMintSteps) {
+    let kind = 'pending';
     if (errorStep && step.key === errorStep) {
-      setTownhallMintStepStatus(step, 'error');
-      continue;
+      kind = 'error';
+    } else if (activeStep && step.key === activeStep) {
+      kind = 'running';
+    } else if (hasTownhallMintIdentity(safeDraft, step.role, step.chain)) {
+      kind = 'done';
     }
-    if (activeStep && step.key === activeStep) {
-      setTownhallMintStepStatus(step, 'running');
-      continue;
-    }
-    setTownhallMintStepStatus(step, hasTownhallMintIdentity(safeDraft, step.role, step.chain) ? 'done' : 'pending');
+    setTownhallMintStepStatus(step, kind);
+    const pill = el(step.statusId);
+    if (pill) pill.setAttribute('data-mint-status', kind);
+    if (kind === 'done') doneCount++;
   }
+  const bar = el('townhallMintProgressBar');
+  if (bar) bar.style.width = `${(doneCount / townhallMintSteps.length) * 100}%`;
 }
 
 let townhallMintDraft = createEmptyTownhallMintDraft();
@@ -1554,6 +1618,11 @@ function setTownhallStoryStep(step) {
   if (humanStep) humanStep.classList.toggle('is-hidden', next !== 'human');
   if (agentStep) agentStep.classList.toggle('is-hidden', next !== 'agent');
   if (processingStep) processingStep.classList.toggle('is-hidden', next !== 'processing');
+  const activeStep = next === 'human' ? humanStep : next === 'agent' ? agentStep : processingStep;
+  if (activeStep) {
+    activeStep.classList.add('is-entering');
+    setTimeout(() => activeStep.classList.remove('is-entering'), 220);
+  }
 }
 
 function setTownhallCustomizeOpen(kind, open) {
@@ -3173,8 +3242,43 @@ async function mintAllTownhallIdentitiesAndRegister() {
   }
 }
 
+function bindTownhallNameValidation() {
+  const fields = [
+    { inputId: 'townhallHumanName', countId: 'townhallHumanNameCount', errorId: 'townhallHumanNameError' },
+    { inputId: 'townhallAgentName', countId: 'townhallAgentNameCount', errorId: 'townhallAgentNameError' }
+  ];
+  for (const f of fields) {
+    const input = el(f.inputId);
+    if (!input || input.dataset.validationBound) continue;
+    input.dataset.validationBound = 'true';
+    const countEl = el(f.countId);
+    const errorEl = el(f.errorId);
+    const maxLen = 48;
+    const updateCount = () => {
+      const len = (input.value || '').length;
+      if (countEl) {
+        countEl.textContent = `${len} / ${maxLen}`;
+        countEl.classList.toggle('is-over', len > maxLen);
+      }
+    };
+    updateCount();
+    input.addEventListener('input', updateCount);
+    input.addEventListener('blur', () => {
+      if (!errorEl) return;
+      const val = (input.value || '').trim();
+      if (!val) errorEl.textContent = tApp('townhall.validation.name_required');
+      else if (val.length > maxLen) errorEl.textContent = tApp('townhall.validation.name_too_long');
+      else errorEl.textContent = '';
+    });
+    input.addEventListener('input', () => {
+      if (errorEl) errorEl.textContent = '';
+    });
+  }
+}
+
 function bindTownhallRegistrationControls() {
   for (const input of getTownhallDraftFieldNodes()) bindTownhallDraftField(input);
+  bindTownhallNameValidation();
 
   const requireName = (kind) => {
     const isHuman = kind === 'human';
@@ -4738,6 +4842,12 @@ async function showDistrict(district) {
     return;
   }
 
+  if (safeDistrict === 'ceremony') {
+    openRouteInModalFrame('/create?embed=1', tApp('ceremony.title'));
+    renderOnboardingStepper(getOnboardingStep(lastState));
+    return;
+  }
+
   const modal = el('districtModalBackdrop');
   const body = el('districtModalBody');
   const title = el('districtModalTitle');
@@ -4746,6 +4856,7 @@ async function showDistrict(district) {
   setDistrictModalTheme(districtModalThemeByDistrict[safeDistrict] || 'house');
 
   if (title) title.textContent = cfg.title;
+  if (modal) modal.classList.remove('is-closing');
   if (modal) modal.classList.remove('is-hidden');
   if (modal) modal.setAttribute('aria-hidden', 'false');
   document.body.classList.add('district-modal-open');
@@ -4758,6 +4869,7 @@ async function showDistrict(district) {
       body.innerHTML = html;
       if (body.classList.contains('is-loading')) body.classList.remove('is-loading');
     }
+    renderOnboardingStepper(getOnboardingStep(lastState));
     if (safeDistrict === 'brain') {
       try {
         let localCfg = getLocalLiteLlm();
@@ -4791,9 +4903,9 @@ async function showDistrict(district) {
   }
 }
 
-function hideDistrict() {
-  if (isTownhallGateLocked(lastState)) return;
+function hideDistrictImmediate() {
   const modal = el('districtModalBackdrop');
+  if (modal) modal.classList.remove('is-closing');
   currentDistrict = null;
   lastDistrictLoad += 1;
   clearTouchDistrictPrime();
@@ -4808,6 +4920,25 @@ function hideDistrict() {
     body.classList.remove('is-loading');
   }
   clearTownBoardPoll();
+}
+
+function hideDistrict() {
+  if (isTownhallGateLocked(lastState)) return;
+  const modal = el('districtModalBackdrop');
+  if (modal && !modal.classList.contains('is-hidden') && !modal.classList.contains('is-closing')) {
+    modal.classList.add('is-closing');
+    const finishHide = () => {
+      if (!modal.classList.contains('is-closing')) return;
+      modal.classList.remove('is-closing');
+      hideDistrictImmediate();
+    };
+    modal.addEventListener('animationend', finishHide, { once: true });
+    setTimeout(() => {
+      if (modal.classList.contains('is-closing')) finishHide();
+    }, 200);
+    return;
+  }
+  hideDistrictImmediate();
 }
 
 function updateTownHubLinks(houseId) {
@@ -5222,6 +5353,15 @@ function renderSigils(state) {
   if (!grid) return;
   grid.innerHTML = '';
 
+  // Add explainer above grid if not already present
+  let explainer = grid.previousElementSibling;
+  if (!explainer || !explainer.classList.contains('sigil-explainer')) {
+    explainer = document.createElement('div');
+    explainer.className = 'sigil-explainer small';
+    explainer.textContent = tApp('sigil.explainer');
+    grid.parentNode.insertBefore(explainer, grid);
+  }
+
   const confirmedHumanSel = typeof state?.human?.selected === 'string' && state.human.selected
     ? state.human.selected
     : null;
@@ -5236,29 +5376,33 @@ function renderSigils(state) {
     btn.setAttribute('data-testid', `sigil-${item.id}`);
     btn.dataset.elementId = item.id;
 
-    const left = document.createElement('div');
-    const icon = item.icon ? `<span class="sigilIcon" aria-hidden="true">${item.icon}</span>` : '';
-    left.innerHTML = `<div class="name">${icon}<span>${item.label}</span></div><div class="hint">${tApp('sigil.pick_hint')}</div>`;
+    if (item.icon) {
+      const iconDiv = document.createElement('div');
+      iconDiv.className = 'sigilIcon';
+      iconDiv.setAttribute('aria-hidden', 'true');
+      iconDiv.textContent = item.icon;
+      btn.appendChild(iconDiv);
+    }
 
-    const right = document.createElement('div');
-    right.style.display = 'grid';
-    right.style.gap = '6px';
-    right.style.justifyItems = 'end';
+    const nameSpan = document.createElement('div');
+    nameSpan.className = 'name';
+    nameSpan.textContent = item.label;
+    btn.appendChild(nameSpan);
+
+    const picks = document.createElement('div');
+    picks.className = 'sigil-picks';
 
     const you = document.createElement('div');
     you.className = 'pill';
-    you.style.padding = '4px 8px';
     you.textContent = humanSel === item.id ? tApp('sigil.pick_you') : '';
 
     const agent = document.createElement('div');
     agent.className = 'pill';
-    agent.style.padding = '4px 8px';
     agent.textContent = agentSel === item.id ? tApp('sigil.pick_agent') : '';
 
-    right.appendChild(you);
-    right.appendChild(agent);
-    btn.appendChild(left);
-    btn.appendChild(right);
+    picks.appendChild(you);
+    picks.appendChild(agent);
+    btn.appendChild(picks);
 
     if (humanSel === item.id || agentSel === item.id) {
       btn.classList.add('selected');
@@ -5855,6 +5999,22 @@ function syncTownhallGate(state) {
     showDistrict('brain');
   } else if (gateReason === 'sigil' && (currentDistrict !== 'sigil' || modalHidden)) {
     showDistrict('sigil');
+  } else if (gateReason === 'ceremony' && (currentDistrict !== 'ceremony' || modalHidden)) {
+    showDistrict('ceremony');
+  }
+
+  renderOnboardingStepper(getOnboardingStep(state));
+
+  if (!agentDockAutoExpandedOnce && (gateReason === 'brain' || gateReason === 'sigil' || gateReason === 'ceremony')) {
+    agentDockAutoExpandedOnce = true;
+    const dock = el('agentSidebar');
+    if (dock && dock.classList.contains('minimized')) {
+      dock.classList.remove('minimized');
+      dock.classList.add('dock-attention');
+      if (typeof syncAgentPanelLayout === 'function') syncAgentPanelLayout(dock);
+      document.body.classList.add('agent-panel-expanded');
+      setTimeout(() => dock.classList.remove('dock-attention'), 5000);
+    }
   }
 }
 
@@ -6402,6 +6562,27 @@ function stopOpenRouterOAuthPoll() {
   if (!openRouterOAuthPollTimer) return;
   clearInterval(openRouterOAuthPollTimer);
   openRouterOAuthPollTimer = null;
+}
+
+// --- Ceremony embed completion listener ---
+let ceremonyCompleteListenerBound = false;
+function bindCeremonyCompleteListener() {
+  if (ceremonyCompleteListenerBound) return;
+  ceremonyCompleteListenerBound = true;
+  window.addEventListener('message', async (event) => {
+    const payload = event?.data;
+    if (!payload || typeof payload !== 'object') return;
+    if (String(payload.type || '') !== 'agenttown:ceremony-complete') return;
+    const houseId = String(payload.houseId || '').trim();
+    if (!houseId) return;
+    try {
+      const state = await api('/api/state');
+      updateUI(state);
+    } catch (err) {
+      console.warn('ceremony complete state refresh failed', err);
+    }
+    hideDistrictImmediate();
+  });
 }
 
 function bindOpenRouterOAuthMessageListener() {
@@ -8238,29 +8419,33 @@ function renderSigilsLegacy(state) {
     btn.setAttribute('data-testid', `sigil-${item.id}`);
     btn.dataset.elementId = item.id;
 
-    const left = document.createElement('div');
-    const icon = item.icon ? `<span class="sigilIcon" aria-hidden="true">${item.icon}</span>` : '';
-    left.innerHTML = `<div class="name">${icon}<span>${item.label}</span></div><div class="hint">${tApp('sigil.pick_hint')}</div>`;
+    if (item.icon) {
+      const iconDiv = document.createElement('div');
+      iconDiv.className = 'sigilIcon';
+      iconDiv.setAttribute('aria-hidden', 'true');
+      iconDiv.textContent = item.icon;
+      btn.appendChild(iconDiv);
+    }
 
-    const right = document.createElement('div');
-    right.style.display = 'grid';
-    right.style.gap = '6px';
-    right.style.justifyItems = 'end';
+    const nameSpan = document.createElement('div');
+    nameSpan.className = 'name';
+    nameSpan.textContent = item.label;
+    btn.appendChild(nameSpan);
+
+    const picks = document.createElement('div');
+    picks.className = 'sigil-picks';
 
     const you = document.createElement('div');
     you.className = 'pill';
-    you.style.padding = '4px 8px';
     you.textContent = humanSel === item.id ? tApp('sigil.pick_you') : '';
 
     const agent = document.createElement('div');
     agent.className = 'pill';
-    agent.style.padding = '4px 8px';
     agent.textContent = agentSel === item.id ? tApp('sigil.pick_agent') : '';
 
-    right.appendChild(you);
-    right.appendChild(agent);
-    btn.appendChild(left);
-    btn.appendChild(right);
+    picks.appendChild(you);
+    picks.appendChild(agent);
+    btn.appendChild(picks);
 
     if (humanSel === item.id || agentSel === item.id) {
       btn.classList.add('selected');
@@ -9076,6 +9261,7 @@ async function bootstrapInitialRouteState() {
 
 async function init() {
   await bootstrapInitialRouteState();
+  bindCeremonyCompleteListener();
 
   // Keep agent/debug controls interactive even if runtime bootstrap stalls.
   setupAgentInterface();

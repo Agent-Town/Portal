@@ -612,6 +612,15 @@ h3 {
     linear-gradient(180deg, rgba(44, 69, 99, 0.28) 0%, rgba(44, 69, 99, 0.44) 100%);
   backdrop-filter: blur(2px);
   pointer-events: all;
+  animation: modalFadeIn 160ms ease;
+}
+
+.districtBackdrop.is-closing {
+  animation: modalFadeIn 140ms ease reverse forwards;
+}
+
+.districtBackdrop.is-closing .districtModal {
+  animation: modalSlideUp 180ms ease reverse forwards;
 }
 
 .trainerBackdrop {
@@ -637,7 +646,7 @@ h3 {
     0 26px 48px rgba(44, 69, 99, 0.38);
   background:
     linear-gradient(155deg, rgba(255, 249, 236, 0.98) 0%, rgba(255, 241, 216, 0.98) 58%, rgba(255, 233, 190, 0.98) 100%);
-  animation: panelRise 180ms ease;
+  animation: modalSlideUp 220ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
   color: var(--text-strong);
 }
 
@@ -1083,10 +1092,155 @@ body.trainer-modal-open {
   min-height: 1.4em;
 }
 
+/* Onboarding stepper */
+.onboarding-stepper {
+  display: flex;
+  align-items: center;
+  padding: 12px 18px 8px;
+  border-bottom: 2px solid rgba(44, 69, 99, 0.12);
+  margin-bottom: 12px;
+}
+
+.onboarding-stepper-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.onboarding-stepper-circle {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border);
+  border-radius: 50%;
+  background: var(--cream-100);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  transition: background-color 300ms ease, border-color 300ms ease, box-shadow 300ms ease, color 300ms ease;
+}
+
+.onboarding-stepper-node.is-active .onboarding-stepper-circle {
+  background: var(--gold-500);
+  border-color: var(--text-strong);
+  color: var(--text-strong);
+  box-shadow: 0 0 0 4px rgba(255, 217, 90, 0.3);
+}
+
+.onboarding-stepper-node.is-complete .onboarding-stepper-circle {
+  background: var(--good);
+  border-color: var(--good);
+  color: #fff;
+}
+
+.onboarding-stepper-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.onboarding-stepper-node.is-active .onboarding-stepper-label {
+  color: var(--text-strong);
+  font-weight: 700;
+}
+
+.onboarding-stepper-line {
+  flex: 1;
+  height: 3px;
+  background: var(--border);
+  opacity: 0.3;
+  margin: 0 6px;
+  align-self: flex-start;
+  margin-top: 16px;
+  border-radius: 2px;
+  transition: opacity 300ms ease, background-color 300ms ease;
+}
+
+.onboarding-stepper-line.is-complete {
+  opacity: 1;
+  background: var(--good);
+}
+
+/* Townhall form polish */
+.townhallFieldWrap {
+  position: relative;
+}
+
+.townhallFieldWrap input[type="text"] {
+  padding-right: 60px;
+}
+
+.townhallCharCount {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.townhallCharCount.is-over {
+  color: var(--bad);
+  font-weight: 700;
+}
+
+.townhallInlineError {
+  font-size: 12px;
+  color: var(--bad);
+  min-height: 1.4em;
+  margin-top: 2px;
+  transition: opacity 200ms ease;
+}
+
+/* Townhall sub-step transitions */
+.townhallStoryStep {
+  transition: opacity 200ms ease;
+}
+
+.townhallStoryStep.is-entering {
+  animation: modalFadeIn 200ms ease;
+}
+
+/* Minting progress bar */
+.townhallMintProgress {
+  height: 6px;
+  border-radius: 3px;
+  margin-bottom: 12px;
+  background: rgba(44, 69, 99, 0.12);
+  overflow: hidden;
+}
+
+.townhallMintProgressBar {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--gold-500), var(--good));
+  transition: width 400ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.pill[data-mint-status="running"] {
+  border-color: var(--accent);
+}
+
+.pill[data-mint-status="done"] {
+  animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Dock attention */
+#agentSidebar.agent-sidebar.dock-attention {
+  animation: dockAttention 1.6s ease-in-out 3;
+}
+
 .grid6 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 14px;
 }
 
 @media (min-width: 560px) {
@@ -1097,34 +1251,61 @@ body.trainer-modal-open {
 
 .sigil {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  text-align: center;
+  gap: 6px;
   width: 100%;
-  text-align: left;
+  padding: 16px 12px;
+  min-height: 100px;
+  border-radius: 14px;
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 200ms ease;
+}
+
+.sigil:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(44, 69, 99, 0.18);
 }
 
 .sigil .name {
   font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  gap: 14px;
+  display: block;
+  font-size: 14px;
 }
 
 .sigil .sigilIcon {
-  font-size: 18px;
+  font-size: 40px;
   line-height: 1;
+  display: block;
+  margin-bottom: 4px;
 }
 
-.sigil .hint {
-  color: var(--muted);
+.sigil-picks {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.sigil-picks .pill {
   font-size: 11px;
+  padding: 2px 8px;
+  min-width: 48px;
+  transition: background-color 200ms ease;
 }
 
 .sigil.selected {
   border-color: var(--good-strong);
-  background: #e4f7dd;
-  box-shadow: 0 0 0 3px rgba(107, 179, 107, 0.3);
+  background: linear-gradient(180deg, #e8f8e0 0%, #d4f0c8 100%);
+  box-shadow: 0 0 0 3px rgba(107, 179, 107, 0.3), 0 8px 16px rgba(44, 69, 99, 0.18);
+  transform: translateY(-2px);
+}
+
+.sigil-explainer {
+  text-align: center;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .status {
@@ -1481,6 +1662,27 @@ footer::before {
     transform: translateY(0);
     opacity: 1;
   }
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalSlideUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes dockAttention {
+  0%, 100% { box-shadow: 0 14px 42px rgba(0,0,0,0.42); }
+  50% { box-shadow: 0 14px 42px rgba(0,0,0,0.42), 0 0 0 3px rgba(255,217,90,0.5); }
+}
+
+@keyframes popIn {
+  0% { transform: scale(0.85); opacity: 0.6; }
+  60% { transform: scale(1.08); }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 .startWrap {
