@@ -25,6 +25,7 @@
   let agentAvatar = DEFAULT_AGENT_AVATAR;
   let gateway = null;
   let sandbox = null;
+  let flow = null; // ConversationFlow instance
   let storyId = null;
   let currentRound = 0;
   let experimentCards = [];
@@ -411,20 +412,22 @@
         const titleEl = el('problemTitle');
         if (titleEl) titleEl.textContent = description.slice(0, 80) + (description.length > 80 ? '...' : '');
 
-        // Send problem to agent via the dock's gateway
-        appendMessage('system', `Problem submitted: "${description.slice(0, 100)}${description.length > 100 ? '...' : ''}"`);
+        // Initialize the conversation flow
+        const { ConversationFlow } = await import('/conversation-flow.js');
+        flow = new ConversationFlow();
+        flow.onStepChange = (step) => {
+          const label = el('roundLabel');
+          if (label) label.textContent = flow.getStepLabel();
+        };
 
-        if (gateway && typeof gateway.send === 'function') {
-          try {
-            await gateway.send({
-              type: 'chat',
-              text: buildIteratePrompt(description),
-            });
-          } catch (e) {
-            appendMessage('system', `Could not reach agent: ${e.message}. Configure your brain in the Agent Dock below.`);
-          }
+        appendMessage('system', `Problem submitted. ${flow.getStepLabel()}...`);
+
+        // Send step 1 prompt to the agent
+        const prompt = await flow.buildPrompt({ problemDescription: description });
+        if (prompt) {
+          sendToAgent(prompt);
         } else {
-          appendMessage('system', 'Agent not connected. Use the Agent Dock at the bottom to connect a brain and chat.');
+          appendMessage('system', 'Agent not connected. Use the Agent Dock at the bottom to connect a brain.');
         }
 
       } catch (e) {
@@ -435,18 +438,7 @@
     });
   }
 
-  function buildIteratePrompt(problemDescription) {
-    return [
-      `I need help solving this problem: "${problemDescription}"`,
-      '',
-      'Please:',
-      '1. Ask me 2-3 clarifying questions to understand the scope better.',
-      '2. Then propose 3-5 metrics we could use to evaluate whether a solution is good.',
-      '3. For each metric, explain why it matters for this specific problem.',
-      '',
-      'Once we agree on the metrics, you\'ll start generating experiment proposals.',
-    ].join('\n');
-  }
+  // buildIteratePrompt removed — conversation-flow.js handles step-specific prompts
 
   // ── Active Loop — Conversation ────────────────────────────
   function initChat() {
@@ -509,20 +501,73 @@
     thread.scrollTop = thread.scrollHeight;
   }
 
-  // ── Agent message handling ────────────────────────────────
+  // ── Agent message handling (flow-aware) ─────────────────────
   function handleAgentMessage(text) {
-    if (storyId && text.toLowerCase().includes('metric') && currentRound === 0) {
-      showMetricConfirmAction();
-    }
+    if (!flow) return;
 
-    // Detect code blocks and offer to run them in the sandbox
-    const files = extractCodeFromMessage(text);
-    if (files && storyId) {
-      showRunCodeAction(files, text);
+    const result = flow.processAgentMessage(text);
+
+    // Update step label
+    const roundLabel = el('roundLabel');
+    if (roundLabel) roundLabel.textContent = flow.getStepLabel();
+
+    switch (result.nextAction) {
+      case 'confirm':
+        showConfirmAction(result.artifact);
+        break;
+      case 'run_code':
+        handleCodeFromAgent(result.codeFiles, text);
+        break;
+      case 'advance':
+        flow.confirmArtifact(result.artifact);
+        advanceFlow();
+        break;
+      case 'wait':
+        // Agent is still conversing
+        break;
     }
   }
 
-  function showRunCodeAction(files, agentMessage) {
+  function showConfirmAction(artifact) {
+    const thread = el('conversationThread');
+    if (!thread) return;
+    thread.querySelectorAll('[data-testid="confirm-action"]').forEach(e => e.remove());
+
+    const typeName = artifact?.type?.replace(/_/g, ' ') || 'artifact';
+    const action = document.createElement('div');
+    action.className = 'iterate-msg iterate-msg-system';
+    action.setAttribute('data-testid', 'confirm-action');
+    action.innerHTML = `
+      <div class="iterate-msg-bubble">
+        <p>Agent proposed a <strong>${escapeHtml(typeName)}</strong>. Review above, then confirm or ask for changes.</p>
+        <div class="iterate-metrics-actions">
+          <button class="btn primary small" data-action="confirm">Confirm and continue</button>
+          <button class="btn small" data-action="revise">Ask for changes</button>
+        </div>
+      </div>
+    `;
+    thread.appendChild(action);
+    thread.scrollTop = thread.scrollHeight;
+
+    action.querySelector('[data-action="confirm"]').addEventListener('click', async () => {
+      action.remove();
+      flow.confirmArtifact(artifact);
+
+      // Store metrics on server when evaluation contract is confirmed
+      if (artifact.type === 'evaluation_contract' && storyId) {
+        await storeMetricsOnServer(artifact);
+      }
+
+      advanceFlow();
+    });
+
+    action.querySelector('[data-action="revise"]').addEventListener('click', () => {
+      action.remove();
+      sendToAgent('I want to change this. Let me explain.');
+    });
+  }
+
+  async function handleCodeFromAgent(files, agentMessage) {
     const thread = el('conversationThread');
     if (!thread) return;
 
@@ -537,7 +582,7 @@
         <p>Agent produced ${fileCount} TypeScript file${fileCount > 1 ? 's' : ''}.</p>
         <div class="iterate-metrics-actions">
           <button class="btn primary small" data-action="run-code" ${sandbox?.ready ? '' : 'disabled'}>${sandboxLabel}</button>
-          <button class="btn small" data-action="save-card">Save as experiment card</button>
+          <button class="btn small" data-action="save-card">Save as card only</button>
         </div>
       </div>
     `;
@@ -550,19 +595,22 @@
       appendMessage('system', 'Compiling and running code in sandbox...');
 
       const result = await runCodeInSandbox(files);
-
       const outputText = result.exitCode === 0
         ? `Output:\n${result.stdout || '(no output)'}`
         : `Error (exit ${result.exitCode}):\n${result.stderr || '(no error details)'}`;
       appendMessage('system', `Sandbox result (${result.executionMs}ms):\n${outputText}`);
 
-      // Create experiment card with the artifact
+      // Record in the flow
+      flow.recordExperiment(files, result);
+
+      // Create experiment card
       try {
         const card = await apiFetch(`/api/problem-stories/${storyId}/experiment-cards`, {
           method: 'POST',
           body: JSON.stringify({
             agentSummary: agentMessage.slice(0, 280),
             compositeScore: result.exitCode === 0 ? 0.5 : 0.1,
+            roundNumber: flow.experimentRound + 1,
             artifact: {
               source: files,
               outputType: 'terminal',
@@ -576,6 +624,7 @@
         if (card.ok && card.card) {
           renderExperimentCard(card.card);
           experimentCards.push(card.card);
+          currentRound = flow.experimentRound + 1;
           await updateScoreTrend();
         }
       } catch (e) {
@@ -583,6 +632,15 @@
       }
 
       action.remove();
+
+      // Send output to agent for scoring (step 5)
+      const scoringPrompt = await flow.buildPrompt({
+        exitCode: result.exitCode,
+        stdout: (result.stdout || '').slice(0, 2000),
+        stderr: (result.stderr || '').slice(0, 1000),
+        executionMs: result.executionMs,
+      });
+      if (scoringPrompt) sendToAgent(scoringPrompt);
     });
 
     action.querySelector('[data-action="save-card"]')?.addEventListener('click', async () => {
@@ -592,14 +650,7 @@
           body: JSON.stringify({
             agentSummary: agentMessage.slice(0, 280),
             compositeScore: 0.3,
-            artifact: {
-              source: files,
-              outputType: null,
-              outputPreview: null,
-              entrypoint: 'src/index.ts',
-              executionMs: null,
-              exitCode: null,
-            },
+            artifact: { source: files, outputType: null, outputPreview: null, entrypoint: 'src/index.ts', executionMs: null, exitCode: null },
           }),
         });
         if (card.ok && card.card) {
@@ -614,55 +665,35 @@
     });
   }
 
-  function showMetricConfirmAction() {
-    const thread = el('conversationThread');
-    if (!thread) return;
-    if (thread.querySelector('[data-testid="confirm-metrics-action"]')) return;
-
-    const action = document.createElement('div');
-    action.className = 'iterate-msg iterate-msg-system';
-    action.setAttribute('data-testid', 'confirm-metrics-action');
-    action.innerHTML = `
-      <div class="iterate-msg-bubble">
-        <p>When you're happy with the proposed metrics, confirm them to start experimenting.</p>
-        <div class="iterate-metrics-actions">
-          <button class="btn primary small" id="confirmMetricsBtn">Confirm metrics</button>
-          <button class="btn small" id="askMoreBtn">Ask more questions</button>
-        </div>
-      </div>
-    `;
-    thread.appendChild(action);
-    thread.scrollTop = thread.scrollHeight;
-
-    el('confirmMetricsBtn')?.addEventListener('click', confirmMetrics);
-    el('askMoreBtn')?.addEventListener('click', () => {
-      action.remove();
-      if (gateway && typeof gateway.send === 'function') {
-        gateway.send({ type: 'chat', text: 'I have more questions about the metrics before confirming.' });
-      }
-    });
-  }
-
-  async function confirmMetrics() {
-    if (!storyId) return;
-    appendMessage('system', 'Confirming metrics and starting experiments...');
-
+  async function storeMetricsOnServer(evalContract) {
+    if (!storyId || !evalContract?.metrics) return;
     try {
-      const proposals = await apiFetch(`/api/problem-stories/${storyId}/eval-proposals`);
-      const metrics = proposals.allMetrics || proposals.proposedMetrics || [];
-
-      if (metrics.length === 0) {
+      for (const m of evalContract.metrics) {
         await apiFetch(`/api/problem-stories/${storyId}/eval-proposals/metrics`, {
           method: 'POST',
-          body: JSON.stringify({ name: 'Solution quality', type: 'qualitative', direction: 'maximize' }),
+          body: JSON.stringify({ name: m.name, type: m.type, direction: m.direction, weight: m.weight }),
         });
       }
-
       await apiFetch(`/api/problem-stories/${storyId}/eval-confirm`, { method: 'POST' });
-      appendMessage('system', 'Metrics confirmed! Running first experiment round...');
-      await runExperimentRound();
     } catch (e) {
-      appendMessage('system', `Error confirming metrics: ${e.message}`);
+      appendMessage('system', `Warning: could not store metrics: ${e.message}`);
+    }
+  }
+
+  async function advanceFlow() {
+    if (!flow) return;
+    appendMessage('system', flow.getStepLabel());
+    const prompt = await flow.buildPrompt();
+    if (prompt) sendToAgent(prompt);
+  }
+
+  function sendToAgent(text) {
+    if (gateway && typeof gateway.send === 'function') {
+      gateway.send({ type: 'chat', text }).catch(e => {
+        appendMessage('system', `Send failed: ${e.message}`);
+      });
+    } else {
+      appendMessage('system', 'Agent not connected. Use the Agent Dock at the bottom.');
     }
   }
 
@@ -1009,6 +1040,7 @@
         `experimentCards: ${experimentCards.length}`,
         `gateway: ${gateway ? 'connected' : 'not connected'}`,
         `sandbox: ${sandbox ? `${sandbox.type} (${sandbox.ready ? 'ready' : 'not ready'})` : 'not booted'}`,
+        `flow: ${flow ? JSON.stringify(flow.toJSON()) : 'not initialized'}`,
       ];
       panel.textContent = lines.join('\n');
     }, 2000);
