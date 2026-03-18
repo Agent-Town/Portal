@@ -143,8 +143,7 @@ test.describe('Iterate page — visual verification', () => {
     // Verify key elements are present
     await expect(page.locator('[data-testid="conversation-thread"]')).toBeVisible();
     await expect(page.locator('[data-testid="experiment-feed"]')).toBeAttached(); // May be hidden column on small viewport
-    await expect(page.locator('[data-testid="chat-input"]')).toBeVisible();
-    await expect(page.locator('[data-testid="chat-send-btn"]')).toBeVisible();
+    // Chat is handled by the dock — no separate chat bar
     await expect(page.locator('[data-testid="export-btn"]')).toBeVisible();
     await expect(page.locator('[data-testid="save-btn"]')).toBeVisible();
     await expect(page.locator('[data-testid="score-trend"]')).toBeVisible();
@@ -161,13 +160,7 @@ test.describe('Iterate page — visual verification', () => {
     const hasJsError = allTexts.some(t => t.includes('Cannot read properties'));
     expect(hasJsError).toBe(false);
 
-    // Type a message in the iterate chat bar — should not crash
-    await page.locator('[data-testid="chat-input"]').fill('testing 1 2 3');
-    await page.locator('[data-testid="chat-send-btn"]').click();
-
-    // User message should appear in conversation
-    const userMsg = page.locator('[data-testid="msg-user"]').first();
-    await expect(userMsg).toBeVisible();
+    // Chat is handled by the dock at the bottom — no separate chat bar to test
 
     await page.screenshot({ path: 'test-results/iterate-04-active-loop.png', fullPage: true });
 

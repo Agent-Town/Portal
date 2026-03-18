@@ -5298,7 +5298,8 @@ app.post('/api/agent/lite/llm/config', (req, res) => {
   const lite = ensureLiteState(s);
   const onboarding = ensureSessionOnboarding(s);
 
-  if (onboarding.required === true && onboarding.registrationComplete !== true) {
+  // agent_solo sessions (iterate page) skip townhall registration
+  if (s.flow !== 'agent_solo' && onboarding.required === true && onboarding.registrationComplete !== true) {
     return res.status(409).json({
       ok: false,
       error: 'ONBOARDING_TOWNHALL_REQUIRED',

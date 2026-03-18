@@ -441,36 +441,8 @@
   // buildIteratePrompt removed — conversation-flow.js handles step-specific prompts
 
   // ── Active Loop — Conversation ────────────────────────────
-  function initChat() {
-    const input = el('iterateChatInput');
-    const sendBtn = el('iterateChatSendBtn');
-
-    async function handleSend() {
-      const text = input.value.trim();
-      if (!text) return;
-      input.value = '';
-      appendMessage('user', text);
-
-      // Send via the dock's gateway
-      if (gateway && typeof gateway.send === 'function') {
-        try {
-          await gateway.send({ type: 'chat', text });
-        } catch (e) {
-          appendMessage('system', `Send failed: ${e.message}`);
-        }
-      } else {
-        appendMessage('system', 'Agent not connected. Use the Agent Dock at the bottom to connect a brain.');
-      }
-    }
-
-    sendBtn.addEventListener('click', handleSend);
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        handleSend();
-      }
-    });
-  }
+  // Chat input removed — the Agent Dock handles all chat.
+  // Agent messages are mirrored into our conversation thread via the gateway listener.
 
   function appendMessage(role, text) {
     const thread = el('conversationThread');
@@ -1076,7 +1048,7 @@
     initIdentity();
     initBrainStep();
     initProblemInput();
-    initChat();
+    // Chat handled by the Agent Dock — no separate chat init needed
     initExportBtn();
     initSaveBtn();
     initConvergenceButtons();
