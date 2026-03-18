@@ -1200,6 +1200,7 @@ function normalizeDistrict(district) {
     || district === 'leaderboard'
     || district === 'brain'
     || district === 'sigil'
+    || district === 'ceremony'
     || district === 'house'
     ? district
     : 'house';
@@ -1618,11 +1619,6 @@ function setTownhallStoryStep(step) {
   if (humanStep) humanStep.classList.toggle('is-hidden', next !== 'human');
   if (agentStep) agentStep.classList.toggle('is-hidden', next !== 'agent');
   if (processingStep) processingStep.classList.toggle('is-hidden', next !== 'processing');
-  const activeStep = next === 'human' ? humanStep : next === 'agent' ? agentStep : processingStep;
-  if (activeStep) {
-    activeStep.classList.add('is-entering');
-    setTimeout(() => activeStep.classList.remove('is-entering'), 220);
-  }
 }
 
 function setTownhallCustomizeOpen(kind, open) {
@@ -4827,11 +4823,17 @@ async function showDistrict(district) {
 
   const safeDistrict = normalizeDistrict(district);
   if (isTownHubDistrictGateLocked(lastState) && safeDistrict !== 'townhall') {
-    setActiveDistrict('townhall');
-    const statusText = getTownHubDistrictGateStatusText();
-    const status = el('townSceneStatus');
-    if (status && statusText) status.textContent = `Locked: ${statusText}`;
-    return;
+    const gateReason = getTownHubDistrictGateReason(lastState);
+    const gateAllowed = (gateReason === 'brain' && safeDistrict === 'brain')
+      || (gateReason === 'sigil' && safeDistrict === 'sigil')
+      || (gateReason === 'ceremony' && safeDistrict === 'ceremony');
+    if (!gateAllowed) {
+      setActiveDistrict('townhall');
+      const statusText = getTownHubDistrictGateStatusText();
+      const status = el('townSceneStatus');
+      if (status && statusText) status.textContent = `Locked: ${statusText}`;
+      return;
+    }
   }
   const currentLoad = ++lastDistrictLoad;
   currentDistrict = safeDistrict;
@@ -5995,11 +5997,11 @@ function syncTownhallGate(state) {
   const modalHidden = !backdrop || backdrop.classList.contains('is-hidden');
   if (onboardingLocked && (currentDistrict !== 'townhall' || modalHidden)) {
     showDistrict('townhall');
-  } else if (gateReason === 'brain' && (currentDistrict !== 'brain' || modalHidden)) {
+  } else if (gateReason === 'brain' && currentDistrict !== 'brain' && modalHidden) {
     showDistrict('brain');
-  } else if (gateReason === 'sigil' && (currentDistrict !== 'sigil' || modalHidden)) {
+  } else if (gateReason === 'sigil' && currentDistrict !== 'sigil' && modalHidden) {
     showDistrict('sigil');
-  } else if (gateReason === 'ceremony' && (currentDistrict !== 'ceremony' || modalHidden)) {
+  } else if (gateReason === 'ceremony' && currentDistrict !== 'ceremony' && modalHidden) {
     showDistrict('ceremony');
   }
 
