@@ -759,6 +759,14 @@ const OPENAI_CODEX_OAUTH_MAX_ATTEMPTS = 200;
 
 const openAiCodexOAuthAttemptsById = new Map();
 const openAiCodexOAuthAttemptsByState = new Map();
+
+const OPENROUTER_OAUTH_CALLBACK_PATH = '/api/agent/lite/llm/oauth/openrouter/callback';
+const OPENROUTER_OAUTH_AUTH_URL = 'https://openrouter.ai/auth';
+const OPENROUTER_OAUTH_EXCHANGE_URL = 'https://openrouter.ai/api/v1/auth/keys';
+const OPENROUTER_OAUTH_ATTEMPT_TTL_MS = 10 * 60 * 1000;
+const OPENROUTER_OAUTH_MAX_ATTEMPTS = 200;
+const openRouterOAuthAttemptsById = new Map();
+const openRouterOAuthAttemptsByState = new Map();
 let openAiCodexOAuthCallbackServer = null;
 let openAiCodexOAuthCallbackServerStarting = null;
 let openAiCodexOAuthCallbackServerState = {
@@ -1263,6 +1271,145 @@ async function exchangeOpenAiCodexAuthorizationCode({ code, verifier, redirectUr
       refreshToken,
       expiresAtMs: Date.now() + expiresIn * 1000
     };
+  } catch (err) {
+    return {
+      ok: false,
+      error: 'TOKEN_EXCHANGE_UNAVAILABLE',
+      message: String(err?.message || 'token endpoint unavailable')
+    };
+  }
+}
+
+// --- OpenRouter OAuth helpers ---
+
+function cleanupOpenRouterOAuthAttempts() {
+  const now = Date.now();
+  for (const [attemptId, attempt] of openRouterOAuthAttemptsById.entries()) {
+    if (!attempt || typeof attempt !== 'object') {
+      openRouterOAuthAttemptsById.delete(attemptId);
+      continue;
+    }
+    if (!Number.isFinite(Number(attempt.expiresAtMs)) || Number(attempt.expiresAtMs) < now) {
+      if (attempt.state) openRouterOAuthAttemptsByState.delete(attempt.state);
+      openRouterOAuthAttemptsById.delete(attemptId);
+    }
+  }
+}
+
+function registerOpenRouterOAuthAttempt(attempt) {
+  cleanupOpenRouterOAuthAttempts();
+  const id = String(attempt?.id || '').trim();
+  const state = String(attempt?.state || '').trim();
+  if (!id || !state) return;
+  openRouterOAuthAttemptsById.set(id, attempt);
+  openRouterOAuthAttemptsByState.set(state, id);
+  if (openRouterOAuthAttemptsById.size <= OPENROUTER_OAUTH_MAX_ATTEMPTS) return;
+  const ordered = Array.from(openRouterOAuthAttemptsById.values())
+    .sort((a, b) => Number(a?.createdAtMs || 0) - Number(b?.createdAtMs || 0));
+  while (openRouterOAuthAttemptsById.size > OPENROUTER_OAUTH_MAX_ATTEMPTS && ordered.length > 0) {
+    const stale = ordered.shift();
+    const staleId = String(stale?.id || '').trim();
+    const staleState = String(stale?.state || '').trim();
+    if (staleId) openRouterOAuthAttemptsById.delete(staleId);
+    if (staleState) openRouterOAuthAttemptsByState.delete(staleState);
+  }
+}
+
+function openRouterOAuthAttemptSummary(attempt) {
+  return {
+    id: attempt.id,
+    state: attempt.state,
+    status: attempt.status,
+    createdAtMs: attempt.createdAtMs,
+    expiresAtMs: attempt.expiresAtMs,
+    codeReceivedAtMs: attempt.codeReceivedAtMs || null,
+    exchangedAtMs: attempt.exchangedAtMs || null,
+    lastError: attempt.lastError || null,
+    hasCode: !!attempt.code
+  };
+}
+
+function buildOpenRouterOAuthCallbackPage({ ok, state, code, error, message }) {
+  const payload = {
+    type: 'agenttown:openrouter-oauth-callback',
+    ok: !!ok,
+    state: state || '',
+    code: code || '',
+    error: error || ''
+  };
+  const payloadJson = JSON.stringify(payload).replace(/</g, '\\u003c');
+  const heading = ok ? 'Authentication successful' : 'Authentication failed';
+  const bodyMessage = ok
+    ? (message || 'You can return to Agent Town.')
+    : (message || 'OAuth callback failed. Return to Agent Town to retry.');
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtmlAttr(heading)}</title>
+</head>
+<body style="font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; padding: 20px; background: #f7f2df; color: #2b2418;">
+  <h2 style="margin: 0 0 8px;">${escapeHtmlAttr(heading)}</h2>
+  <p style="margin: 0;">${escapeHtmlAttr(bodyMessage)}</p>
+  <script>
+  (() => {
+    const payload = ${payloadJson};
+    try {
+      if (window.opener && !window.opener.closed) {
+        window.opener.postMessage(payload, '*');
+      }
+    } catch {}
+    setTimeout(() => { try { window.close(); } catch {} }, 200);
+  })();
+  </script>
+</body>
+</html>`;
+}
+
+async function exchangeOpenRouterAuthorizationCode({ code, verifier }) {
+  if (process.env.NODE_ENV === 'test') {
+    const codeText = String(code || '').trim();
+    if (!codeText.startsWith('test-code')) {
+      return { ok: false, error: 'TOKEN_EXCHANGE_FAILED', message: 'invalid_grant', status: 400 };
+    }
+    return {
+      ok: true,
+      apiKey: `sk-or-test-key-${codeText.replace(/[^a-z0-9]/gi, '')}`,
+      userId: 'openrouter-test-user'
+    };
+  }
+
+  try {
+    const response = await fetch(OPENROUTER_OAUTH_EXCHANGE_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        code: String(code || '').trim(),
+        code_verifier: String(verifier || '').trim(),
+        code_challenge_method: 'S256'
+      })
+    });
+
+    const text = await response.text().catch(() => '');
+    if (!response.ok) {
+      return {
+        ok: false,
+        error: 'TOKEN_EXCHANGE_FAILED',
+        status: response.status,
+        message: text || response.statusText || 'token exchange failed'
+      };
+    }
+
+    let json = null;
+    try { json = JSON.parse(text); } catch { json = null; }
+    const apiKey = typeof json?.key === 'string' ? json.key.trim() : '';
+    const userId = typeof json?.user_id === 'string' ? json.user_id.trim() : '';
+    if (!apiKey) {
+      return { ok: false, error: 'TOKEN_RESPONSE_INVALID', message: 'OpenRouter key response missing API key' };
+    }
+    return { ok: true, apiKey, userId };
   } catch (err) {
     return {
       ok: false,
@@ -3924,6 +4071,181 @@ app.post('/api/agent/lite/llm/oauth/openai-codex/exchange', async (req, res) => 
     credential: attempt.credential,
     oauthProfile: attempt.credential,
     attempt: openAiCodexOAuthAttemptSummary(attempt)
+  });
+});
+
+// --- OpenRouter OAuth routes ---
+
+app.post('/api/agent/lite/llm/oauth/openrouter/start', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  cleanupOpenRouterOAuthAttempts();
+
+  const { verifier, challenge } = createOpenAiCodexPkce();
+  const state = createOpenAiCodexOAuthState();
+  const attemptId = `ortr_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
+  const createdAtMs = Date.now();
+
+  const callbackUri = String(
+    process.env.OPENROUTER_OAUTH_REDIRECT_URI
+      || `${req.protocol}://${req.get('host')}${OPENROUTER_OAUTH_CALLBACK_PATH}`
+  ).trim();
+
+  const authUrl = new URL(OPENROUTER_OAUTH_AUTH_URL);
+  authUrl.searchParams.set('callback_url', callbackUri);
+  authUrl.searchParams.set('code_challenge', challenge);
+  authUrl.searchParams.set('code_challenge_method', 'S256');
+  authUrl.searchParams.set('state', state);
+
+  registerOpenRouterOAuthAttempt({
+    id: attemptId,
+    state,
+    verifier,
+    callbackUri,
+    createdAtMs,
+    expiresAtMs: createdAtMs + OPENROUTER_OAUTH_ATTEMPT_TTL_MS,
+    sessionId: s.sessionId,
+    teamCode: s.teamCode,
+    status: 'pending',
+    code: '',
+    lastError: '',
+    codeReceivedAtMs: 0,
+    exchangedAtMs: 0,
+    credential: null
+  });
+
+  res.json({
+    ok: true,
+    attemptId,
+    state,
+    authorizeUrl: authUrl.toString(),
+    callbackUri,
+    expiresAtMs: createdAtMs + OPENROUTER_OAUTH_ATTEMPT_TTL_MS
+  });
+});
+
+app.get(OPENROUTER_OAUTH_CALLBACK_PATH, (req, res) => {
+  cleanupOpenRouterOAuthAttempts();
+
+  const state = String(req.query?.state || '').trim();
+  const code = String(req.query?.code || '').trim();
+  const oauthError = String(req.query?.error || '').trim();
+
+  const attemptId = state ? openRouterOAuthAttemptsByState.get(state) : '';
+  const attempt = attemptId ? openRouterOAuthAttemptsById.get(attemptId) : null;
+
+  if (!state || !attempt) {
+    const html = buildOpenRouterOAuthCallbackPage({
+      ok: false, state, code,
+      error: oauthError || 'UNKNOWN_STATE',
+      message: 'Unknown or expired OAuth state. Start OAuth again from Agent Town.'
+    });
+    res.status(400).setHeader('content-type', 'text/html; charset=utf-8').end(html);
+    return;
+  }
+
+  if (oauthError) {
+    attempt.status = 'failed';
+    attempt.lastError = oauthError;
+    const html = buildOpenRouterOAuthCallbackPage({
+      ok: false, state, code, error: oauthError,
+      message: 'OAuth authorization was not completed.'
+    });
+    res.status(400).setHeader('content-type', 'text/html; charset=utf-8').end(html);
+    return;
+  }
+
+  if (!code) {
+    attempt.status = 'failed';
+    attempt.lastError = 'MISSING_CODE';
+    const html = buildOpenRouterOAuthCallbackPage({
+      ok: false, state, code: '', error: 'MISSING_CODE',
+      message: 'Missing authorization code in callback URL.'
+    });
+    res.status(400).setHeader('content-type', 'text/html; charset=utf-8').end(html);
+    return;
+  }
+
+  attempt.code = code;
+  attempt.status = 'code_received';
+  attempt.codeReceivedAtMs = Date.now();
+  attempt.lastError = '';
+
+  const html = buildOpenRouterOAuthCallbackPage({
+    ok: true, state, code,
+    message: 'Authorization received. You can return to Agent Town.'
+  });
+  res.setHeader('content-type', 'text/html; charset=utf-8').end(html);
+});
+
+app.get('/api/agent/lite/llm/oauth/openrouter/status', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  cleanupOpenRouterOAuthAttempts();
+  const attemptId = typeof req.query?.attemptId === 'string' ? req.query.attemptId.trim() : '';
+  if (!attemptId) return res.status(400).json({ ok: false, error: 'MISSING_ATTEMPT_ID' });
+  const attempt = openRouterOAuthAttemptsById.get(attemptId);
+  if (!attempt) return res.status(404).json({ ok: false, error: 'OAUTH_ATTEMPT_NOT_FOUND' });
+  if (attempt.sessionId !== s.sessionId) return res.status(403).json({ ok: false, error: 'OAUTH_ATTEMPT_FORBIDDEN' });
+  return res.json({ ok: true, attempt: openRouterOAuthAttemptSummary(attempt) });
+});
+
+app.post('/api/agent/lite/llm/oauth/openrouter/exchange', async (req, res) => {
+  const s = ensureHumanSession(req, res);
+  cleanupOpenRouterOAuthAttempts();
+
+  const requestedAttemptId = typeof req.body?.attemptId === 'string' ? req.body.attemptId.trim() : '';
+  if (!requestedAttemptId) return res.status(400).json({ ok: false, error: 'MISSING_ATTEMPT_ID' });
+
+  const attempt = openRouterOAuthAttemptsById.get(requestedAttemptId);
+  if (!attempt) return res.status(404).json({ ok: false, error: 'OAUTH_ATTEMPT_NOT_FOUND' });
+  if (attempt.sessionId !== s.sessionId) return res.status(403).json({ ok: false, error: 'OAUTH_ATTEMPT_FORBIDDEN' });
+
+  if (!attempt.code) {
+    return res.status(409).json({
+      ok: false,
+      error: 'CODE_PENDING',
+      attempt: openRouterOAuthAttemptSummary(attempt)
+    });
+  }
+
+  if (attempt.credential && attempt.status === 'exchanged') {
+    return res.json({
+      ok: true,
+      credential: attempt.credential,
+      attempt: openRouterOAuthAttemptSummary(attempt)
+    });
+  }
+
+  const exchanged = await exchangeOpenRouterAuthorizationCode({
+    code: attempt.code,
+    verifier: attempt.verifier
+  });
+
+  if (!exchanged.ok) {
+    attempt.status = 'failed';
+    attempt.lastError = exchanged.message || exchanged.error || 'TOKEN_EXCHANGE_FAILED';
+    return res.status(502).json({
+      ok: false,
+      error: exchanged.error || 'TOKEN_EXCHANGE_FAILED',
+      message: exchanged.message || '',
+      attempt: openRouterOAuthAttemptSummary(attempt)
+    });
+  }
+
+  attempt.status = 'exchanged';
+  attempt.exchangedAtMs = Date.now();
+  attempt.lastError = '';
+  attempt.credential = {
+    provider: 'openrouter',
+    apiKey: exchanged.apiKey,
+    userId: exchanged.userId || ''
+  };
+  attempt.code = '';
+  attempt.verifier = '';
+
+  return res.json({
+    ok: true,
+    credential: attempt.credential,
+    attempt: openRouterOAuthAttemptSummary(attempt)
   });
 });
 
@@ -7981,6 +8303,8 @@ if (process.env.NODE_ENV === 'test') {
     rateBuckets.clear();
     ponyRateBuckets.clear();
     erc8004OptOutNonces.clear();
+    openRouterOAuthAttemptsById.clear();
+    openRouterOAuthAttemptsByState.clear();
     res.json({ ok: true });
   });
 }

@@ -391,6 +391,11 @@ let openAiCodexOAuthAttempt = null;
 let openAiCodexOAuthPollTimer = null;
 let openAiCodexOAuthExchangeInFlight = false;
 let openAiCodexOAuthMessageListenerBound = false;
+const OPENROUTER_OAUTH_MESSAGE_TYPE = 'agenttown:openrouter-oauth-callback';
+let openRouterOAuthAttempt = null;
+let openRouterOAuthPollTimer = null;
+let openRouterOAuthExchangeInFlight = false;
+let openRouterOAuthMessageListenerBound = false;
 const AGENT_DEBUG_REFRESH_MS = 2200;
 const AGENT_DEBUG_EVENT_LIMIT = 160;
 const AGENT_DEBUG_TRAFFIC_LIMIT = 220;
@@ -3448,6 +3453,7 @@ function bindBrainDistrictControls() {
       }
     };
   }
+  bindBrainTierControls();
 }
 
 function bindTownDistrictControls() {
@@ -6390,6 +6396,212 @@ async function launchLlmOauthInNewTab() {
   startOpenAiCodexOAuthPoll();
 }
 
+// --- OpenRouter OAuth flow ---
+
+function stopOpenRouterOAuthPoll() {
+  if (!openRouterOAuthPollTimer) return;
+  clearInterval(openRouterOAuthPollTimer);
+  openRouterOAuthPollTimer = null;
+}
+
+function bindOpenRouterOAuthMessageListener() {
+  if (openRouterOAuthMessageListenerBound) return;
+  openRouterOAuthMessageListenerBound = true;
+  window.addEventListener('message', async (event) => {
+    const payload = event?.data;
+    if (!payload || typeof payload !== 'object') return;
+    if (String(payload.type || '') !== OPENROUTER_OAUTH_MESSAGE_TYPE) return;
+    const incomingState = String(payload.state || '').trim();
+    const incomingError = String(payload.error || '').trim();
+    if (!incomingState || incomingError) return;
+    const activeState = String(openRouterOAuthAttempt?.state || '').trim();
+    if (activeState && incomingState === activeState) {
+      await completeOpenRouterOAuthFromUi();
+    }
+  });
+}
+
+async function exchangeOpenRouterOAuthAttempt({ attemptId }) {
+  const result = await api('/api/agent/lite/llm/oauth/openrouter/exchange', {
+    method: 'POST',
+    body: JSON.stringify({ attemptId: String(attemptId).trim() })
+  });
+  return result;
+}
+
+async function autoConfigureBrainFromOpenRouter(credential) {
+  const apiKey = String(credential?.apiKey || '').trim();
+  if (!apiKey) throw new Error('TOKEN_RESPONSE_INVALID');
+
+  const defaultModel = LlmCatalog && typeof LlmCatalog.getDefaultFreeOpenRouterModel === 'function'
+    ? LlmCatalog.getDefaultFreeOpenRouterModel()
+    : 'openrouter/hunter-alpha';
+
+  const config = {
+    provider: 'openrouter',
+    model: defaultModel,
+    credential: apiKey,
+    authMode: 'api-key',
+    reasoning: '',
+    useProxy: true,
+    modelRef: `openrouter/${defaultModel}`
+  };
+
+  const lib = await loadLiteLlmLibrary();
+  await lib.saveLlmConfig({
+    provider: config.provider,
+    model: config.model,
+    apiKey: config.credential,
+    authMode: config.authMode,
+    reasoning: config.reasoning,
+    useProxy: config.useProxy
+  });
+
+  const localCfg = setLocalLiteLlm({
+    loaded: true,
+    configured: true,
+    provider: config.provider,
+    model: config.model,
+    modelRef: config.modelRef,
+    credential: config.credential,
+    authMode: config.authMode,
+    reasoning: config.reasoning,
+    useProxy: config.useProxy,
+    apiKeySet: true
+  });
+  clearLiteSkillLoopPause();
+  await applyGatewayLlmConfig(localCfg);
+
+  if (runtimeBridge && isVendorLite(lastState)) {
+    try {
+      await ensureVendorRuntimeBridge(lastState);
+      await runtimeBridge.setLlmConfig({
+        provider: config.provider,
+        model: config.model,
+        apiKey: config.credential
+      });
+    } catch (err) {
+      console.warn('runtime bridge llm sync failed after OpenRouter OAuth', err);
+    }
+  }
+
+  await new Promise(r => setTimeout(r, 300));
+  if (lastState) updateUI(lastState);
+}
+
+async function completeOpenRouterOAuthFromUi() {
+  if (openRouterOAuthExchangeInFlight) return;
+  openRouterOAuthExchangeInFlight = true;
+  const statusEl = el('openRouterOAuthStatus');
+  try {
+    const attemptId = String(openRouterOAuthAttempt?.attemptId || '').trim();
+    if (!attemptId) throw new Error('START_OAUTH_FIRST');
+
+    const result = await exchangeOpenRouterOAuthAttempt({ attemptId });
+    const credential = result?.credential || null;
+    if (!credential) throw new Error('TOKEN_RESPONSE_INVALID');
+
+    stopOpenRouterOAuthPoll();
+    await autoConfigureBrainFromOpenRouter(credential);
+
+    if (statusEl) statusEl.textContent = tApp('brain.tier.free.status.complete');
+    const continueBtn = el('brainContinueBtn');
+    if (continueBtn) continueBtn.disabled = false;
+    openRouterOAuthAttempt = null;
+  } catch (err) {
+    const code = String(err?.message || '').trim();
+    if (code === 'CODE_PENDING') {
+      if (statusEl) statusEl.textContent = tApp('brain.tier.free.status.started');
+      return;
+    }
+    if (statusEl) statusEl.textContent = tApp('brain.tier.free.status.failed', { message: code || 'OAUTH_EXCHANGE_FAILED' });
+    throw err;
+  } finally {
+    openRouterOAuthExchangeInFlight = false;
+  }
+}
+
+function startOpenRouterOAuthPoll() {
+  stopOpenRouterOAuthPoll();
+  openRouterOAuthPollTimer = setInterval(async () => {
+    try {
+      await completeOpenRouterOAuthFromUi();
+    } catch (err) {
+      const code = String(err?.message || '').trim();
+      if (code === 'CODE_PENDING') return;
+      stopOpenRouterOAuthPoll();
+    }
+  }, 1500);
+}
+
+async function launchOpenRouterOAuthInNewTab() {
+  bindOpenRouterOAuthMessageListener();
+  const statusEl = el('openRouterOAuthStatus');
+
+  const started = await api('/api/agent/lite/llm/oauth/openrouter/start', {
+    method: 'POST',
+    body: JSON.stringify({})
+  });
+  const authorizeUrl = String(started?.authorizeUrl || '').trim();
+  const attemptId = String(started?.attemptId || '').trim();
+  const state = String(started?.state || '').trim();
+  if (!authorizeUrl || !attemptId || !state) {
+    throw new Error('OAUTH_START_FAILED');
+  }
+
+  openRouterOAuthAttempt = { attemptId, state, startedAtMs: Date.now() };
+  const popup = window.open(authorizeUrl, '_blank', 'noopener,noreferrer');
+  if (!popup) {
+    throw new Error('POPUP_BLOCKED');
+  }
+  if (statusEl) statusEl.textContent = tApp('brain.tier.free.status.started');
+  startOpenRouterOAuthPoll();
+}
+
+function bindBrainTierControls() {
+  const oauthBtn = el('openRouterOAuthBtn');
+  if (oauthBtn) {
+    oauthBtn.onclick = async () => {
+      oauthBtn.disabled = true;
+      const statusEl = el('openRouterOAuthStatus');
+      try {
+        await launchOpenRouterOAuthInNewTab();
+      } catch (err) {
+        const code = String(err?.message || '').trim();
+        const msg = code === 'POPUP_BLOCKED'
+          ? tApp('brain.error.popup_blocked')
+          : tApp('brain.tier.free.status.failed', { message: code || 'UNKNOWN' });
+        if (statusEl) statusEl.textContent = msg;
+      } finally {
+        oauthBtn.disabled = false;
+      }
+    };
+  }
+
+  const ollamaBtn = el('brainOllamaBtn');
+  if (ollamaBtn) {
+    ollamaBtn.onclick = () => {
+      const details = el('brainTierApiKeyDetails');
+      if (details) details.open = true;
+      const providerSel = el('llmProviderSelect');
+      if (providerSel) {
+        const selected = applyLlmProviderModelSelection('ollama', getDefaultLlmModelForProvider('ollama'));
+        providerSel.value = selected.provider;
+        const modelInput = el('llmModelIdInput');
+        if (modelInput) modelInput.value = selected.model;
+        syncModelRefFromInputs();
+      }
+    };
+  }
+
+  // Auto-open tier 2 if config already exists (for test compatibility)
+  const localCfg = getLocalLiteLlm();
+  if (localCfg?.configured) {
+    const details = el('brainTierApiKeyDetails');
+    if (details) details.open = true;
+  }
+}
+
 function getDefaultLlmModelForProvider(provider) {
   if (LlmCatalog && typeof LlmCatalog.getDefaultModel === 'function') {
     return LlmCatalog.getDefaultModel(provider);
@@ -7950,6 +8162,8 @@ async function clearLiteLlmConfig() {
   pendingLlmClear = true;
   openAiCodexOAuthAttempt = null;
   stopOpenAiCodexOAuthPoll();
+  openRouterOAuthAttempt = null;
+  stopOpenRouterOAuthPoll();
   clearBtn.disabled = true;
   setLiteLlmStatus(tApp('brain.status.clearing'));
   try {

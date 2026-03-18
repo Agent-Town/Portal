@@ -1,100 +1,131 @@
 <div class="panel">
-    <h2 id="brainPanelTitle">Connect Brain</h2>
-    <p class="small" id="brainPanelHelp">Configure the Language Model (LLM) that powers your Agent. This is the "brain" of your agent.</p>
+    <h2 id="brainPanelTitle">Give your agent a brain</h2>
+    <p class="small" id="brainPanelHelp">Your agent needs an AI brain to think. Pick the easiest option to get started.</p>
 
-    <div class="brain-config" style="margin-top: 20px;">
-        <div class="kv dense">
-            <label class="small-label" id="brainProviderLabel">Provider</label>
-            <select class="input" id="llmProviderSelect" data-testid="lite-llm-provider">
-                <option value="openai">openai</option>
-                <option value="ollama">ollama</option>
-                <option value="openai-codex">openai-codex</option>
-                <option value="anthropic">anthropic</option>
-                <option value="openrouter">openrouter</option>
-                <option value="litellm">litellm</option>
-                <option value="amazon-bedrock">amazon-bedrock</option>
-                <option value="vercel-ai-gateway">vercel-ai-gateway</option>
-                <option value="moonshot">moonshot</option>
-                <option value="kimi-coding">kimi-coding</option>
-                <option value="minimax">minimax</option>
-                <option value="opencode">opencode</option>
-                <option value="zai">zai</option>
-                <option value="glm">glm</option>
-                <option value="synthetic">synthetic</option>
-                <option value="qianfan">qianfan</option>
-                <option value="qwen-portal">qwen-portal</option>
-                <option value="qwen">qwen</option>
-                <option value="together">together</option>
-                <option value="cloudflare-ai-gateway">cloudflare-ai-gateway</option>
-                <option value="xiaomi">xiaomi</option>
-                <option value="venice">venice</option>
-                <option value="huggingface">huggingface</option>
-                <option value="vllm">vllm</option>
-                <option value="nvidia">nvidia</option>
-                <option value="google">google</option>
-                <option value="groq">groq</option>
-                <option value="test-local">test-local</option>
-            </select>
-
-            <label class="small-label" id="brainModelLabel">Model ID</label>
-            <select class="input" id="llmModelIdInput" data-testid="lite-llm-model">
-                <option value="gpt-4o">gpt-4o</option>
-                <option value="gpt-4o-mini">gpt-4o-mini</option>
-            </select>
-
-            <label class="small-label" id="brainAuthLabel">Auth mode</label>
-            <select class="input" id="llmAuthModeSelect" data-testid="lite-llm-auth">
-                <option value="api-key">API Key</option>
-                <option value="oauth-json" id="brainAuthOauthOption">OpenAI OAuth Profile / Token</option>
-            </select>
-
-            <label class="small-label" id="brainOauthLabel">OAuth profile JSON / token</label>
-            <textarea class="input" id="llmOauthProfileInput" rows="3"
-                placeholder="Paste OAuth profile JSON or raw access token (id_token callback URLs are not supported)."
-                style="display: none;"></textarea>
-            <div class="small" id="llmOauthProfileHint"></div>
-            <div class="small" id="llmProviderWarning" style="color: var(--bad);"></div>
-            <button class="btn small" id="llmOauthLaunchBtn" type="button" style="display:none; justify-self:start;"
-                data-testid="lite-llm-oauth-launch">Start OAuth in new tab</button>
-            <button class="btn small" id="llmOauthCompleteBtn" type="button" style="display:none; justify-self:start;"
-                data-testid="lite-llm-oauth-complete">Complete OAuth</button>
-
-            <label class="small-label" id="brainApiKeyLabel">API Key</label>
-            <input class="input" id="llmKeyInput" type="password" placeholder="sk-..." data-testid="lite-llm-api-key" />
-        </div>
-
-        <details style="margin-top: 14px; border: 1px solid #444; border-radius: 4px; padding: 10px;">
-            <summary class="small" id="brainAdvancedSummary" style="cursor: pointer;">Advanced Settings</summary>
-            <div class="kv dense" style="margin-top: 10px;">
-                <label class="small-label" id="brainBaseUrlLabel">Base URL (Optional)</label>
-                <input class="input" id="llmBaseUrlInput" placeholder="https://api.openai.com/v1" />
-
-                <label class="small-label" id="brainThinkingLabel">Thinking Level</label>
-                <select class="input" id="llmThinkingInput">
-                    <option value="">Default</option>
-                    <option value="low">Low</option>
-                    <option value="high">High</option>
-                    <option value="xhigh">XHigh</option>
-                </select>
-
-                <label class="small" id="brainUseProxyLabel" style="display:flex; align-items:center; gap:8px; margin-top:4px;">
-                    <input id="llmUseProxyInput" type="checkbox" checked />
-                    Use Proxy (Recommended)
-                </label>
-            </div>
-        </details>
-
-        <input id="llmModelRefInput" type="hidden" />
-        <input id="llmApiInput" type="hidden" />
-
-        <div class="kv" style="margin-top: 20px;">
-            <button class="btn primary" id="llmSaveBtn" data-testid="lite-llm-save">Connect Brain</button>
-            <button class="btn" id="llmClearBtn" data-testid="lite-llm-clear">Clear Brain</button>
-            <div class="small status-text hide" id="llmLine" data-testid="lite-llm-status"></div>
-        </div>
+    <!-- Tier 1: Free OpenRouter -->
+    <div class="brain-tier brain-tier-primary" style="margin-top: 20px;" id="brainTierFree">
+        <h3 style="margin: 0 0 6px;" id="brainTierFreeTitle">Get started free</h3>
+        <p class="small" id="brainTierFreeHelp">Sign up with OpenRouter for a free AI brain. No credit card needed.</p>
+        <button class="btn primary" id="openRouterOAuthBtn" type="button" style="margin-top: 10px;"
+            data-testid="openrouter-oauth-btn">Get free brain with OpenRouter</button>
+        <div class="brain-tier-status small" id="openRouterOAuthStatus" data-testid="openrouter-oauth-status"></div>
     </div>
 
-    <div class="divider" style="margin: 24px 0;"></div>
+    <div class="divider" style="margin: 20px 0;"></div>
+
+    <!-- Tier 2: Own API key -->
+    <div class="brain-tier" id="brainTierApiKey">
+        <details id="brainTierApiKeyDetails">
+            <summary id="brainTierApiKeyTitle">I have my own API key</summary>
+            <div class="brain-config" style="margin-top: 14px;">
+                <div class="kv dense">
+                    <label class="small-label" id="brainProviderLabel">Provider</label>
+                    <select class="input" id="llmProviderSelect" data-testid="lite-llm-provider">
+                        <option value="openai">openai</option>
+                        <option value="ollama">ollama</option>
+                        <option value="openai-codex">openai-codex</option>
+                        <option value="anthropic">anthropic</option>
+                        <option value="openrouter">openrouter</option>
+                        <option value="litellm">litellm</option>
+                        <option value="amazon-bedrock">amazon-bedrock</option>
+                        <option value="vercel-ai-gateway">vercel-ai-gateway</option>
+                        <option value="moonshot">moonshot</option>
+                        <option value="kimi-coding">kimi-coding</option>
+                        <option value="minimax">minimax</option>
+                        <option value="opencode">opencode</option>
+                        <option value="zai">zai</option>
+                        <option value="glm">glm</option>
+                        <option value="synthetic">synthetic</option>
+                        <option value="qianfan">qianfan</option>
+                        <option value="qwen-portal">qwen-portal</option>
+                        <option value="qwen">qwen</option>
+                        <option value="together">together</option>
+                        <option value="cloudflare-ai-gateway">cloudflare-ai-gateway</option>
+                        <option value="xiaomi">xiaomi</option>
+                        <option value="venice">venice</option>
+                        <option value="huggingface">huggingface</option>
+                        <option value="vllm">vllm</option>
+                        <option value="nvidia">nvidia</option>
+                        <option value="google">google</option>
+                        <option value="groq">groq</option>
+                        <option value="test-local">test-local</option>
+                    </select>
+
+                    <label class="small-label" id="brainModelLabel">Model ID</label>
+                    <select class="input" id="llmModelIdInput" data-testid="lite-llm-model">
+                        <option value="gpt-4o">gpt-4o</option>
+                        <option value="gpt-4o-mini">gpt-4o-mini</option>
+                    </select>
+
+                    <label class="small-label" id="brainAuthLabel">Auth mode</label>
+                    <select class="input" id="llmAuthModeSelect" data-testid="lite-llm-auth">
+                        <option value="api-key">API Key</option>
+                        <option value="oauth-json" id="brainAuthOauthOption">OpenAI OAuth Profile / Token</option>
+                    </select>
+
+                    <label class="small-label" id="brainOauthLabel">OAuth profile JSON / token</label>
+                    <textarea class="input" id="llmOauthProfileInput" rows="3"
+                        placeholder="Paste OAuth profile JSON or raw access token (id_token callback URLs are not supported)."
+                        style="display: none;"></textarea>
+                    <div class="small" id="llmOauthProfileHint"></div>
+                    <div class="small" id="llmProviderWarning" style="color: var(--bad);"></div>
+                    <button class="btn small" id="llmOauthLaunchBtn" type="button" style="display:none; justify-self:start;"
+                        data-testid="lite-llm-oauth-launch">Start OAuth in new tab</button>
+                    <button class="btn small" id="llmOauthCompleteBtn" type="button" style="display:none; justify-self:start;"
+                        data-testid="lite-llm-oauth-complete">Complete OAuth</button>
+
+                    <label class="small-label" id="brainApiKeyLabel">API Key</label>
+                    <input class="input" id="llmKeyInput" type="password" placeholder="sk-..." data-testid="lite-llm-api-key" />
+                </div>
+
+                <details style="margin-top: 14px; border: 1px solid #444; border-radius: 4px; padding: 10px;">
+                    <summary class="small" id="brainAdvancedSummary" style="cursor: pointer;">Advanced Settings</summary>
+                    <div class="kv dense" style="margin-top: 10px;">
+                        <label class="small-label" id="brainBaseUrlLabel">Base URL (Optional)</label>
+                        <input class="input" id="llmBaseUrlInput" placeholder="https://api.openai.com/v1" />
+
+                        <label class="small-label" id="brainThinkingLabel">Thinking Level</label>
+                        <select class="input" id="llmThinkingInput">
+                            <option value="">Default</option>
+                            <option value="low">Low</option>
+                            <option value="high">High</option>
+                            <option value="xhigh">XHigh</option>
+                        </select>
+
+                        <label class="small" id="brainUseProxyLabel" style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+                            <input id="llmUseProxyInput" type="checkbox" checked />
+                            Use Proxy (Recommended)
+                        </label>
+                    </div>
+                </details>
+
+                <input id="llmModelRefInput" type="hidden" />
+                <input id="llmApiInput" type="hidden" />
+
+                <div class="kv" style="margin-top: 20px;">
+                    <button class="btn primary" id="llmSaveBtn" data-testid="lite-llm-save">Connect Brain</button>
+                    <button class="btn" id="llmClearBtn" data-testid="lite-llm-clear">Clear Brain</button>
+                    <div class="small status-text hide" id="llmLine" data-testid="lite-llm-status"></div>
+                </div>
+            </div>
+        </details>
+    </div>
+
+    <div class="divider" style="margin: 20px 0;"></div>
+
+    <!-- Tier 3: Local model -->
+    <div class="brain-tier" id="brainTierLocal">
+        <details id="brainTierLocalDetails">
+            <summary id="brainTierLocalTitle">Use a local model (Ollama)</summary>
+            <div style="margin-top: 10px;">
+                <p class="small" id="brainTierLocalHelp">Run a model on your own machine with Ollama. Requires Ollama installed and running.</p>
+                <button class="btn" id="brainOllamaBtn" type="button" style="margin-top: 8px;"
+                    data-testid="brain-ollama-btn">Configure Ollama</button>
+            </div>
+        </details>
+    </div>
+
+    <div class="divider" style="margin: 20px 0;"></div>
 
     <div class="kv right" style="margin-top: 20px;">
         <button class="btn primary" id="brainContinueBtn" disabled>Continue</button>
