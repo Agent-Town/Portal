@@ -826,11 +826,35 @@
     ordered.forEach((child) => root.appendChild(child));
   }
 
+  function parsePokerCard(raw) {
+    const text = String(raw || '').trim();
+    if (!text || text === '--' || text === '??') return { rank: text, suit: '', symbol: '', display: text, hidden: text === '??' };
+    const SUIT_MAP = { s: '♠', h: '♥', d: '♦', c: '♣' };
+    const RANK_MAP = { T: '10', J: 'J', Q: 'Q', K: 'K', A: 'A' };
+    if (text.length >= 2) {
+      const rankChar = text.charAt(0);
+      const suitChar = text.charAt(text.length - 1).toLowerCase();
+      if (SUIT_MAP[suitChar]) {
+        const rank = RANK_MAP[rankChar] || rankChar;
+        return { rank, suit: suitChar, symbol: SUIT_MAP[suitChar], display: `${rank}${SUIT_MAP[suitChar]}`, hidden: false };
+      }
+    }
+    return { rank: text, suit: '', symbol: '', display: text, hidden: false };
+  }
+
   function renderPokerCards(cards) {
     const items = Array.isArray(cards) ? cards : [];
-    return items.length
-      ? `<div class="pokerCardStrip">${items.map((card) => `<span class="pokerMiniCard">${escapeHtml(card)}</span>`).join('')}</div>`
-      : '<div class="pokerCardStrip"><span class="pokerMiniCard">--</span></div>';
+    if (!items.length) {
+      return '<div class="pokerCardStrip"><span class="pokerMiniCard" data-card-hidden="true">?</span></div>';
+    }
+    return `<div class="pokerCardStrip">${items.map((card) => {
+      const parsed = parsePokerCard(card);
+      if (parsed.hidden) {
+        return '<span class="pokerMiniCard" data-card-hidden="true">?</span>';
+      }
+      const suitAttr = parsed.suit ? ` data-suit="${escapeHtml(parsed.suit)}"` : '';
+      return `<span class="pokerMiniCard"${suitAttr}>${escapeHtml(parsed.display)}</span>`;
+    }).join('')}</div>`;
   }
 
   function renderPayoutPlan(payouts) {
@@ -1513,15 +1537,28 @@
   function renderPublicActionLog(actions, emptyText = 'No public actions logged yet.') {
     const items = Array.isArray(actions) ? actions : [];
     if (!items.length) return `<p>${escapeHtml(emptyText)}</p>`;
+    const ACTION_STYLE = {
+      fold: 'var(--poker-text-tertiary)',
+      check: 'var(--poker-info)',
+      call: 'var(--poker-text-primary)',
+      bet: 'var(--poker-accent-gold-strong)',
+      raise: 'var(--poker-accent-gold-strong)',
+      all_in: 'var(--poker-danger)',
+      allin: 'var(--poker-danger)',
+    };
     return `
-      <div class="pokerStack">
-        ${items.slice(-10).map((action) => `
-          <div class="pokerRow">
-            <span>${escapeHtml(action.seatLabel || 'Seat')}</span>
-            <span>${escapeHtml(action.actionKind || 'act')}</span>
-            <span>${Number(action.amountOil || 0)} OIL</span>
+      <div class="pokerStack" style="gap: 2px;">
+        ${items.slice(-10).map((action) => {
+          const kind = String(action.actionKind || 'act').toLowerCase();
+          const color = ACTION_STYLE[kind] || 'var(--poker-text-secondary)';
+          const amount = Number(action.amountOil || 0);
+          return `
+          <div class="pokerRow" style="padding: 8px 0; gap: 8px;">
+            <span style="font-weight: 500; min-width: 60px;">${escapeHtml(action.seatLabel || 'Seat')}</span>
+            <span style="color: ${color}; font-weight: 600; text-transform: uppercase; font-size: 13px; letter-spacing: 0.04em;">${escapeHtml(action.actionKind || 'act')}</span>
+            <span style="margin-left: auto; font-family: var(--poker-font-mono); font-size: 13px; color: var(--poker-text-secondary);">${amount > 0 ? `${amount} OIL` : ''}</span>
           </div>
-        `).join('')}
+        `}).join('')}
       </div>
     `;
   }
@@ -1574,26 +1611,33 @@
     if (!items.length) return '<p>No seats are filled yet.</p>';
     return `
       <div class="pokerStack">
-        ${items.map((seat) => `
-          <div class="pokerRow">
-            <div>
-              <div class="pokerLabel">Seat ${Number(seat.seatNumber || 0)}</div>
-              <div>${escapeHtml(seat.displayName || `Seat ${seat.seatNumber}`)}</div>
+        ${items.map((seat) => {
+          const isAct = seat.isActing;
+          const isYou = seat.isViewer;
+          const statusBadges = [
+            isYou ? 'you' : '',
+            isAct ? 'acting' : '',
+            seat.folded ? 'folded' : '',
+            seat.allIn ? 'all-in' : '',
+            seat.presenceStatus === 'disconnected' ? 'disconnected' : '',
+          ].filter(Boolean);
+          return `
+          <div class="pokerRow" style="${isAct ? 'border-color: rgba(201, 149, 46, 0.25);' : ''}">
+            <div style="flex: 1 1 auto; min-width: 0;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${isAct ? 'var(--poker-accent-gold)' : seat.folded ? 'var(--poker-text-tertiary)' : 'var(--poker-success)'}; box-shadow: 0 0 6px ${isAct ? 'rgba(201, 149, 46, 0.5)' : 'transparent'};"></span>
+                <strong style="color: ${isYou ? 'var(--poker-accent-gold)' : 'var(--poker-text-primary)'};">${escapeHtml(seat.displayName || `Seat ${seat.seatNumber}`)}</strong>
+              </div>
+              <div class="pokerMeta" style="margin-top: 6px;">
+                <span class="pokerBadge">${Number(seat.stackOil || 0)} OIL</span>
+                ${statusBadges.map((badge) => `<span class="pokerBadge">${escapeHtml(badge)}</span>`).join('')}
+              </div>
             </div>
-            <div class="pokerMeta">
-              ${seat.isViewer ? '<span class="pokerBadge">you</span>' : ''}
-              ${seat.isActing ? '<span class="pokerBadge">acting</span>' : ''}
-              <span class="pokerBadge">${escapeHtml(formatPlaySeatStatus(seat.status || 'open'))}</span>
-              ${seat.presenceStatus === 'disconnected' ? '<span class="pokerBadge">disconnected</span>' : ''}
-              <span class="pokerBadge">${Number(seat.stackOil || 0)} OIL</span>
-              ${seat.folded ? '<span class="pokerBadge">folded</span>' : ''}
-              ${seat.allIn ? '<span class="pokerBadge">all-in</span>' : ''}
-            </div>
-            <div>
+            <div style="flex: 0 0 auto;">
               ${renderPokerCards(Array.isArray(seat.holeCards) && seat.holeCards.length ? seat.holeCards : Array.from({ length: Number(seat.hiddenCardCount || 0) }, () => '??'))}
             </div>
           </div>
-        `).join('')}
+        `}).join('')}
       </div>
     `;
   }
