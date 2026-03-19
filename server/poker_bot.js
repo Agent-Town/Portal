@@ -11,7 +11,7 @@ const {
 // ---------------------------------------------------------------------------
 
 const BOT_CONFIG = {
-  enabled: String(process.env.POKER_BOTS_ENABLED || 'true').toLowerCase() !== 'false',
+  enabled: String(process.env.POKER_BOTS_ENABLED || 'false').toLowerCase() === 'true',
   fillDelayMs: Number(process.env.POKER_BOTS_FILL_DELAY_MS) || 5000,
   minHumansToFill: Number(process.env.POKER_BOTS_MIN_HUMANS) || 1,
   botsPerTable: Number(process.env.POKER_BOTS_PER_TABLE) || 2,
