@@ -8294,7 +8294,21 @@ function initStep2Listener() {
         }
       }
 
-      await new Promise(r => setTimeout(r, 300));
+      // Signal the server that brain is configured so onboarding step advances.
+      // Never send provider, model, or key details — those stay local only.
+      try {
+        const serverSync = await api('/api/agent/lite/llm/config', {
+          method: 'PUT',
+          body: JSON.stringify({ hasCredential: true })
+        });
+        if (serverSync?.ok) {
+          const freshState = await api('/api/state');
+          if (freshState?.ok) lastState = freshState;
+        }
+      } catch (syncErr) {
+        console.warn('server brain signal failed (brain still saved locally)', syncErr);
+      }
+
       if (status) status.textContent = tApp('brain.status.configured');
       setAgentLlmStatus(tApp('brain.status.configured'));
       setLiteLlmStatus(formatBrainSavedLocalStatus(config.provider, config.model));
