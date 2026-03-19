@@ -620,11 +620,6 @@
     `;
   }
 
-  function renderAgentContext(section, data) {
-    const json = JSON.stringify(data);
-    return `<div class="pokerAgentContext" data-poker-agent-section="${escapeHtml(section)}" hidden aria-hidden="true">${escapeHtml(json)}</div>`;
-  }
-
   function sectionCard(section, html, { plane = '', className = '', state = '' } = {}) {
     return {
       section,
@@ -3570,49 +3565,6 @@
           ${table?.summary?.liveHand ? renderSummaryMetric('Pot', `${Number(hand?.potOil || 0)} OIL`) : ''}
           ${publicRail ? '' : renderSummaryMetric('Your OIL', `${oilBalance}`)}
         </div>
-        ${renderAgentContext('table-summary', {
-          tableType: table?.tableType || 'cash',
-          status: paused ? 'paused' : (table?.status || 'open'),
-          inviteOnly: !!tableAccess?.inviteOnly,
-          blinds: { small: Number(table?.smallBlindOil || 0), big: Number(table?.bigBlindOil || 0) },
-          buyInOil: Number(table?.buyInOil || 0),
-          blindReturnPolicy: table?.tableType === 'cash' ? String(table?.summary?.blindReturnPolicy || 'post_big_blind') : undefined,
-          fillPolicy: table?.tableType === 'tournament' ? table?.summary?.fillPolicy : undefined,
-          startTargetSeats: table?.tableType === 'tournament' ? Number(table?.summary?.startTargetSeats || table?.minPlayers || 2) : undefined,
-          seatsUntilStart: Number(table?.summary?.seatsUntilStart || 0),
-          blindLevel: Number(table?.summary?.blindLevel || hand?.blindLevel || 0) || 1,
-          nextBlindLevel: Number(table?.summary?.nextBlindLevel || 0),
-          handsUntilBlindIncrease: Number(table?.summary?.handsUntilBlindIncrease || 0),
-          pendingBlindAdvanceCount: Number(table?.summary?.pendingBlindAdvanceCount || 0),
-          scheduledStartAt: table?.summary?.scheduledStartAt || null,
-          lateRegistrationOpen: !!table?.summary?.lateRegistrationOpen,
-          lateRegistrationRemainingHands: Number(table?.summary?.lateRegistrationRemainingHands || 0),
-          entryCount: Number(table?.summary?.entryCount || 0),
-          scheduledBreakCount: Number(table?.summary?.scheduledBreakCount || 0),
-          completedScheduledBreakCount: Number(table?.summary?.completedScheduledBreakCount || 0),
-          scheduledBreakUntilAt: table?.summary?.scheduledBreakUntilAt || null,
-          nextScheduledBreakAfterHandNumber: Number(table?.summary?.nextScheduledBreakAfterHandNumber || 0),
-          bountyModel: table?.summary?.bountyModel || null,
-          bountyPerEntryOil: Number(table?.summary?.bountyPerEntryOil || 0),
-          reentryLimit: Number(table?.summary?.reentryLimit || 0),
-          acceptedReentryCount: Number(table?.summary?.acceptedReentryCount || 0),
-          prizePoolOil: Number(table?.summary?.prizePoolOil || 0),
-          bountyPoolOil: Number(table?.summary?.bountyPoolOil || 0),
-          paidPlaces: Number(table?.summary?.paidPlaces || 0),
-          waitlistCount: Number(table?.summary?.waitlistCount || 0),
-          disconnectedSeatCount: Number(table?.summary?.disconnectedSeatCount || 0),
-          oilBalance: publicRail ? null : oilBalance,
-          refundedTotalOil: adminClosed ? Number(table?.state?.refundedTotalOil || 0) : 0,
-          occupancy: Number(table?.summary?.occupancy || 0),
-          maxSeats: Number(table?.maxSeats || 6),
-          adminClosed,
-          scheduledBreakActive,
-          completedAt: table?.summary?.completedAt || null,
-          liveHand: !!table?.summary?.liveHand,
-          handNumber: Number(table?.summary?.handNumber || 0),
-          closeReason: table?.state?.closeReason || null,
-          pausedReason: table?.state?.pausedReason || null,
-        })}
         ${renderAdvancedPanel('Full table details', 'All table metrics and tournament state.', `
           <div class="pokerSummary">
             ${renderSummaryMetric('Type', table?.tableType || 'cash')}
@@ -3783,26 +3735,6 @@
           ${renderSummaryMetric('Stack', `${Number(mySeat.stackOil || 0)} OIL`)}
           ${renderSummaryMetric('Status', seatStatus)}
         </div>
-        ${renderAgentContext('your-seat', {
-          seatNumber: Number(mySeat.seatNumber || 0),
-          stackOil: Number(mySeat.stackOil || 0),
-          status: mySeat.status,
-          role: hand?.actingSeat === Number(mySeat.seatNumber || 0) ? 'acting now' : 'waiting',
-          autoPlay: autoAct?.mode || 'off',
-          finishPosition: mySeat?.finishPosition || null,
-          prizeOil: Number(mySeat?.prizeOil || 0),
-          currentBountyOil: Number(mySeat?.currentBountyOil || 0),
-          bountyWonOil: Number(mySeat?.bountyWonOil || 0),
-          registered: String(mySeat.status || '').toLowerCase() === 'registered',
-          busted: String(mySeat.status || '').toLowerCase() === 'busted',
-          leaveQueued,
-          seatSittingOut,
-          seatAway,
-          blindObligation: blindObligation || null,
-          waitlistPromotion: waitlistPromotion || null,
-          scheduledBreakActive,
-          adminClosed,
-        })}
         ${renderAdvancedPanel('Seat details', 'Role, auto play, finish, prize, and bounty.', `
           <div class="pokerSummary">
             ${renderSummaryMetric('Role', hand?.actingSeat === Number(mySeat.seatNumber || 0) ? 'acting now' : 'waiting')}
@@ -3935,28 +3867,6 @@
           ${renderSummaryMetric('Prize Pool', `${Number(series?.prizePoolOil || 0)} OIL`)}
           ${renderSummaryMetric('Entries', `${Number(series?.entryCount || 0)}`)}
         </div>
-        ${renderAgentContext('series-director', {
-          tableCount: Number(series?.tableCount || 0),
-          targetTableCount: Number(series?.targetTableCount || 0),
-          stage: series?.stage || 'seating',
-          needsRebalance: !!series?.needsRebalance,
-          scheduledStartAt: series?.scheduledStartAt || null,
-          scheduledBreakActive: !!series?.scheduledBreakActive,
-          scheduledBreakUntilAt: series?.scheduledBreakUntilAt || null,
-          scheduledBreakTableCount: Number(series?.scheduledBreakTableCount || 0),
-          nextScheduledBreakAfterHandNumber: Number(series?.nextScheduledBreakAfterHandNumber || 0),
-          entryCount: Number(series?.entryCount || 0),
-          bountyModel: series?.bountyModel || null,
-          bountyPerEntryOil: Number(series?.bountyPerEntryOil || 0),
-          acceptedReentryCount: Number(series?.acceptedReentryCount || 0),
-          prizePoolOil: Number(series?.prizePoolOil || 0),
-          bountyPoolOil: Number(series?.bountyPoolOil || 0),
-          totalBountyAwardedOil: Number(series?.totalBountyAwardedOil || 0),
-          paidPlaces: Number(series?.paidPlaces || 0),
-          refundedTotalOil: Number(series?.refundedTotalOil || 0),
-          pendingBreakTableId: series?.pendingBreakTableId || null,
-          pendingBreakSeatCount: Number(series?.pendingBreakSeatCount || 0),
-        })}
         ${renderSeriesClosureNotice(series)}
         ${renderAdvancedPanel('Full series details', 'All series metrics, payouts, and standings.', `
           <div class="pokerSummary">
