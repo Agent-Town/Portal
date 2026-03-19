@@ -62,14 +62,18 @@ Agent calls agent_town_ui_open_modal({ modal: 'poker' })
 
 ### 4.3 Key integration points
 
+Poker uses the manifest-based experience plugin system (see `specs/30_experience_plugin_system_spec.md`).
+
 | Component | File | Role |
 |-----------|------|------|
-| Saloon view | `public/views/saloon.html` | Themed landing with poker links |
-| District config | `public/app.js` `districtViews` | Registers saloon and poker |
+| Experience manifest | `public/experiences/poker/manifest.json` | Auto-registers poker in district system |
+| Saloon view | `public/views/saloon.html` | Auto-populated with poker links from manifest |
+| Experience loader | `server/experience_loader.js` | Discovers manifest, serves `/api/experiences` |
+| Client registry | `public/app.js` `loadExperienceRegistry()` | Auto-registers district, theme, modal name |
 | Link handler | `public/app.js` `onDistrictModalLinkClick` | Intercepts poker links in saloon |
 | Route resolver | `public/app.js` `routeToPopupMode` | Returns `{ mode: 'frame' }` for poker paths |
 | Poker embed | `public/poker.html` + `public/poker.js` | Poker UI with `?embed=1` support |
-| Modal theme | `public/styles.css` `[data-theme="poker"]` | Visual theme for poker iframe modal |
+| Modal theme | Injected dynamically from manifest `theme` | Visual theme for poker iframe modal |
 | Agent intent | `public/app.js` `runExperienceUiOpenModal` | Programmatic modal opening |
 
 ### 4.4 Parent-child runtime
@@ -128,32 +132,34 @@ The Saloon landing and Poker iframe share the same Wild West visual language:
 
 ## 7. Modal Theme
 
-### 7.1 Poker theme definition
+The poker modal theme is defined in `public/experiences/poker/manifest.json` and injected dynamically at runtime by the experience plugin system. No static CSS is needed.
 
-```css
-body.town-hub-page .districtModal[data-theme="poker"] {
-  border-color: #7a4420;
-  --modal-rivet-core: #d4901a;
-  --modal-rivet-mid: #7a4420;
-  --modal-rivet-edge: #2e1608;
+```json
+{
+  "theme": {
+    "borderColor": "#7a4420",
+    "rivetCore": "#d4901a",
+    "rivetMid": "#7a4420",
+    "rivetEdge": "#2e1608"
+  }
 }
 ```
 
-### 7.2 Theme mapping
-
-In `app.js` `districtModalThemeByDistrict`:
-- `poker` → `'poker'` (was `'leaderboard'`)
+See `specs/30_experience_plugin_system_spec.md` for the full plugin system architecture.
 
 ## 8. Files Changed
 
 | File | Change |
 |------|--------|
-| `public/views/saloon.html` | Saloon experience landing with poker entry |
+| `public/experiences/poker/manifest.json` | Experience manifest (plugin registration) |
+| `public/views/saloon.html` | Template with auto-populated experience links |
 | `public/poker.html` | Wild West saloon CSS redesign |
-| `public/poker.js` | Enhanced card rendering with suit symbols |
-| `public/app.js` | Poker modal theme mapping |
-| `public/styles.css` | Poker modal theme CSS |
+| `public/poker.js` | Enhanced card rendering, crisp UI, suit symbols |
+| `server/experience_loader.js` | Experience discovery and registry API |
+| `server/index.js` | Mount experience loader |
 | `specs/28_poker_saloon_experience_spec.md` | This spec |
+| `specs/29_agent_town_experience_creation_guide.md` | Experience creation guide |
+| `specs/30_experience_plugin_system_spec.md` | Plugin system architecture spec |
 | `design/APP_FLOW.md` | Updated with saloon-to-poker flow |
 
 ## 9. Agent Tool Reference
