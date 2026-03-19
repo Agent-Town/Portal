@@ -10,6 +10,7 @@ const {
   normalizeSeatNumber,
   pickTimeoutAction,
 } = require('./poker_play');
+const { isBotWalletSubject, pickBotAction, getBotPersonality } = require('./poker_bot');
 
 const DEFAULT_PLAY_PRESENCE_TIMEOUT_SECONDS = 30;
 const DEFAULT_PLAY_RECONNECT_GRACE_SECONDS = 90;
@@ -4856,6 +4857,28 @@ function resolveSeatAutoActDecision(deps, table, hand, seats, actingSeatNumber) 
   if (!table?.tableId || !hand?.handId || !seatNumber) return null;
   const seat = (Array.isArray(seats) ? seats : []).find((entry) => normalizeSeatNumber(entry?.seatNumber) === seatNumber) || null;
   if (!seat?.walletSubject) return null;
+
+  // Bot player instant decision — bypass normal auto-act policies
+  if (isBotWalletSubject(seat.walletSubject)) {
+    const botPersonality = getBotPersonality(seat.walletSubject);
+    const decision = pickBotAction({
+      handState: hand.state,
+      seatNumber,
+      table,
+      personality: botPersonality,
+    });
+    if (decision) {
+      return {
+        mode: 'bot_player',
+        seat,
+        actionKind: decision.actionKind,
+        amountOil: decision.amountOil,
+        proposalId: null,
+        reason: `bot_${botPersonality}`,
+      };
+    }
+  }
+
   const policy = getPokerPlaySeatAutoActPolicy(table, seat.walletSubject);
   const mode = normalizePokerPlayAutoActMode(policy?.mode, 'off');
   if (mode === 'off' || mode === 'propose_only') return null;
