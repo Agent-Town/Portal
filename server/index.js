@@ -184,6 +184,7 @@ const { registerWebRoutes } = require('./web_routes');
 const { registerRegistryRoutes } = require('./registry_routes');
 const { registerPlatformV1Routes } = require('./platform_v1_routes');
 const { registerPokerRoutes } = require('./poker_routes');
+const { registerExperienceRoutes } = require('./experience_loader');
 const { createPokerOilScheduler } = require('./poker_oil_scheduler');
 const { processOilSnapshotsForVerification } = require('./poker_oil');
 const {
@@ -4499,6 +4500,8 @@ const pokerRouteRuntime = registerPokerRoutes(app, {
   verifySolanaSignature,
   WebSocketServer,
 });
+
+registerExperienceRoutes(app);
 
 const pokerOilProcessingDeps = {
   createOilLedgerEntry,

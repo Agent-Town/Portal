@@ -8,7 +8,12 @@
 
 This document defines the process for creating a new experience in Agent Town. An "experience" is a self-contained interactive surface (game, tool, viewer, etc.) that lives inside the Agent Town modal system and is discoverable from the town map.
 
-Any AI agent or developer following this guide should be able to ship a new experience with minimal changes to the shared codebase.
+Experiences use a **manifest-based plugin system**. Adding a new experience requires:
+- Dropping a `manifest.json` in `public/experiences/<name>/`
+- Creating your frontend and backend files
+- One small edit to `server/index.js` to mount routes (because dependency injection is app-specific)
+
+**Zero edits to `app.js`, `styles.css`, or `saloon.html` are needed.** The plugin system handles district registration, modal themes, and parent-district links automatically.
 
 ## 2. Architecture Principle
 
@@ -24,345 +29,222 @@ Town Map (index.html + app.js)
 
 The key constraint: **the worker runtime is page-scoped JavaScript**. Full page navigation kills it. Experiences must run inside the modal iframe so the agent stays connected.
 
-## 3. Anatomy of an Experience
+## 3. Plugin System
 
-An experience consists of these layers:
+### 3.1 How it works
 
-### 3.1 Experience-specific files (your code)
+1. Server scans `public/experiences/*/manifest.json` at startup
+2. `GET /api/experiences` serves the registry to the client
+3. Client auto-registers each experience:
+   - Adds to `districtViews` (modal config)
+   - Adds to `EXPERIENCE_UI_MODAL_NAMES` (agent tool whitelist)
+   - Adds to `districtModalThemeByDistrict` (visual theme)
+   - Injects theme CSS into `<head>` dynamically
+4. When a parent district view loads (e.g., Saloon), child experiences auto-populate as links
+5. `routeToPopupMode` auto-routes experience URL prefixes to iframe mode
+
+### 3.2 Manifest schema
+
+Create `public/experiences/<name>/manifest.json`:
+
+```json
+{
+  "name": "<name>",
+  "title": "Human-readable Title",
+  "parentDistrict": "saloon",
+  "entryLabel": "Button label for the primary CTA",
+  "entryPrimary": true,
+  "secondaryLinks": [
+    { "href": "/<name>/sub-route", "label": "Secondary link" }
+  ],
+  "embedPath": "/<name>?embed=1",
+  "routePrefix": "/<name>",
+  "theme": {
+    "borderColor": "#hex",
+    "rivetCore": "#hex",
+    "rivetMid": "#hex",
+    "rivetEdge": "#hex"
+  }
+}
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name` | Yes | Must match directory name. Lowercase, no hyphens. |
+| `title` | Yes | Shown in modal header and saloon links. |
+| `embedPath` | Yes | URL loaded in iframe. Must include `?embed=1`. |
+| `routePrefix` | Yes | URL prefix for route detection (e.g., `/poker`). |
+| `parentDistrict` | No | Which district shows entry links (e.g., `saloon`). |
+| `entryLabel` | No | Primary CTA text. Defaults to `title`. |
+| `entryPrimary` | No | If true, renders as primary button in parent. |
+| `secondaryLinks` | No | Additional navigation links shown in parent. |
+| `theme` | No | Modal border and rivet colors. Injected as CSS. |
+
+### 3.3 What the manifest automates
+
+| Previously manual | Now automatic |
+|---|---|
+| `app.js` districtViews entry | Auto from manifest `name` + `embedPath` |
+| `app.js` EXPERIENCE_UI_MODAL_NAMES entry | Auto from manifest `name` |
+| `app.js` districtModalThemeByDistrict entry | Auto from manifest `name` |
+| `styles.css` `[data-theme]` rule | Injected from manifest `theme` |
+| `saloon.html` links | Auto-populated from `parentDistrict` + `secondaryLinks` |
+| `routeToPopupMode` route matching | Auto from manifest `routePrefix` |
+
+### 3.4 What still requires manual wiring
+
+| File | Why |
+|------|-----|
+| `server/index.js` | Route mounting needs app-specific dependency injection (~5 lines) |
+| `public/skill.md` | Agent tool documentation needs human-written context |
+
+## 4. Anatomy of an Experience
+
+### 4.1 Experience-specific files (your code)
 
 | Layer | Files | Purpose |
 |-------|-------|---------|
-| Frontend shell | `public/<name>.html` | HTML shell with inline CSS and design tokens |
-| Frontend logic | `public/<name>.js` | Vanilla JS rendering, API calls, state management |
+| Manifest | `public/experiences/<name>/manifest.json` | Plugin config |
+| Frontend shell | `public/<name>.html` | HTML shell with inline CSS |
+| Frontend logic | `public/<name>.js` | Vanilla JS rendering |
 | Backend routes | `server/<name>_routes.js` | Express API endpoints |
-| Backend service | `server/<name>_service.js` | Business logic (optional, for complex experiences) |
+| Backend service | `server/<name>_service.js` | Business logic (optional) |
 | Backend store | `server/<name>_store.js` | Data persistence (optional) |
 
-### 3.2 Integration points (minimal changes to shared files)
+### 4.2 Manual integration (server only)
 
-| File | Change | Lines touched |
-|------|--------|---------------|
-| `server/index.js` | Require and mount routes, serve HTML shell | ~5-10 lines |
-| `public/app.js` | Add to `districtViews`, `EXPERIENCE_UI_MODAL_NAMES`, `districtModalThemeByDistrict` | ~3 lines |
-| `public/styles.css` | Add `[data-theme="<name>"]` modal theme | ~5 lines |
-| `public/views/saloon.html` (or new view) | Add entry link | ~1-3 lines |
-| `public/skill.md` | Document agent tools and policy | ~20-40 lines |
+In `server/index.js`:
 
-### 3.3 Documentation
+```javascript
+// Require
+const { register<Name>Routes } = require('./<name>_routes');
 
-| File | Purpose |
-|------|---------|
-| `specs/<N>_<name>_spec.md` | Full spec: architecture, flows, agent tools, testing |
-| `design/APP_FLOW.md` | Add journey to the route map |
-
-## 4. Step-by-Step Process
-
-### Step 1: Create the frontend shell
-
-Create `public/<name>.html`:
-
-```html
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Your Experience</title>
-  <link rel="stylesheet" href="/styles.css">
-  <style>
-    /* Experience-specific CSS tokens and styles */
-    :root {
-      --<name>-surface-0: #...;
-      --<name>-accent: #...;
-      /* ... */
-    }
-    /* Component styles using your tokens */
-  </style>
-</head>
-<body>
-  <main id="<name>Root">
-    <!-- Minimal shell; JS renders content -->
-  </main>
-  <script src="/wallet_client.js"></script>
-  <script src="/<name>.js"></script>
-</body>
-</html>
+// Mount (after other routes)
+register<Name>Routes(app, { /* deps */ });
 ```
+
+## 5. Step-by-Step Process
+
+### Step 1: Create the manifest
+
+```bash
+mkdir -p public/experiences/<name>
+```
+
+Create `public/experiences/<name>/manifest.json` per the schema above.
+
+### Step 2: Create the frontend shell
+
+Create `public/<name>.html` — HTML shell with inline CSS design tokens. Must work in `?embed=1` mode.
 
 **Rules:**
 - No framework dependencies. Vanilla HTML/CSS/JS only.
-- Define all visual tokens as CSS custom properties.
-- Must work in both standalone mode and `?embed=1` (iframe) mode.
+- Define visual tokens as CSS custom properties.
 - Mobile-first responsive design.
 
-### Step 2: Create the frontend logic
+### Step 3: Create the frontend logic
 
-Create `public/<name>.js`:
-
-```javascript
-(function () {
-  const isEmbedded = new URLSearchParams(window.location.search).get('embed') === '1';
-
-  // API helper with wallet identity headers
-  async function api(path, options = {}) {
-    const headers = { Accept: 'application/json', 'content-type': 'application/json', ...options.headers };
-    const response = await fetch(path, { credentials: 'include', cache: 'no-store', ...options, headers });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(body?.error?.message || `HTTP_${response.status}`);
-    return body;
-  }
-
-  // Render functions that output HTML strings
-  function render(data) {
-    // Build HTML from data, set innerHTML
-  }
-
-  // Route handling
-  async function load() {
-    const data = await api('/api/<name>/state');
-    render(data);
-  }
-
-  load();
-})();
-```
+Create `public/<name>.js` — self-contained IIFE with API calls and HTML rendering.
 
 **Rules:**
-- Self-contained IIFE, no global pollution.
-- All rendering via HTML string composition + `innerHTML`.
+- All rendering via HTML string composition.
 - Use `escapeHtml()` for all user data.
-- Keep the human UI crisp — minimal text, essential metrics only.
+- Keep human UI crisp — minimal text, essential metrics only.
 - Agent gets data through backend APIs, not the DOM.
 
-### Step 3: Create backend routes
+### Step 4: Create backend routes
 
-Create `server/<name>_routes.js`:
-
-```javascript
-function register<Name>Routes(app, deps) {
-  // State endpoint (agent reads this via worker tools)
-  app.get('/api/<name>/state', async (req, res) => {
-    // Return full state — this is what agents consume
-    res.json({ ok: true, data: { /* ... */ } });
-  });
-
-  // Action endpoints
-  app.post('/api/<name>/action', async (req, res) => {
-    // Validate, execute, return result
-    res.json({ ok: true, data: { /* ... */ } });
-  });
-
-  // HTML shell route
-  app.get('/<name>', (req, res) => {
-    if (req.query.embed === '1') {
-      return res.sendFile('<name>.html', { root: 'public' });
-    }
-    // Redirect to modal entry when not embedded
-    return res.redirect(302, `/?district=<parent>&<name>Path=/<name>`);
-  });
-}
-
-module.exports = { register<Name>Routes };
-```
+Create `server/<name>_routes.js` with state and action endpoints.
 
 **Rules:**
-- State endpoints return the **complete** state object. This is what agents read.
-- Action endpoints validate inputs and return results.
-- The HTML route must redirect non-embed requests to the modal entry path.
+- State endpoints return the complete state object (agents consume this).
 - Follow the standard response envelope: `{ ok: true/false, data: {...} }`.
+- HTML route must redirect non-embed requests to modal entry path.
 
-### Step 4: Mount routes in server/index.js
+### Step 5: Mount routes in server/index.js
 
-```javascript
-// At top — require
-const { register<Name>Routes } = require('./<name>_routes');
+This is the only shared file you edit.
 
-// In route setup — mount
-register<Name>Routes(app, { store, sessions });
-```
+### Step 6: Document agent tools in skill.md
 
-### Step 5: Register in the district system
+Add a section to `public/skill.md` with worker tools and agent policy.
 
-In `public/app.js`, add to these three objects:
+### Step 7: Write the spec
 
-```javascript
-// 1. districtViews — register the experience
-const districtViews = {
-  // ... existing entries ...
-  <name>: { title: 'Your Experience', viewPath: '/<name>?embed=1' },
-};
+Create `specs/<N>_<name>_spec.md` covering architecture, flows, agent tools, and testing.
 
-// 2. EXPERIENCE_UI_MODAL_NAMES — allow agent to open it
-const EXPERIENCE_UI_MODAL_NAMES = new Set([
-  // ... existing entries ...
-  '<name>',
-]);
+### Step 8: Write tests
 
-// 3. districtModalThemeByDistrict — visual theme
-const districtModalThemeByDistrict = {
-  // ... existing entries ...
-  <name>: '<name>',
-};
-```
+Create Playwright tests in `e2e/` for API contracts and UI behavior.
 
-Then add the frame routing in `showDistrict()` if your experience uses iframe mode (most do):
+## 6. Integration Checklist
 
-```javascript
-// In the frame-based district block:
-if (safeDistrict === '<name>') {
-  frameUrl = '/<name>?embed=1';
-  frameTitle = 'Your Experience';
-}
-```
-
-### Step 6: Add modal theme CSS
-
-In `public/styles.css`:
-
-```css
-body.town-hub-page .districtModal[data-theme="<name>"] {
-  border-color: #<your-accent>;
-  --modal-rivet-core: #<light-accent>;
-  --modal-rivet-mid: #<your-accent>;
-  --modal-rivet-edge: #<dark-accent>;
-}
-```
-
-### Step 7: Add entry point in a district view
-
-For experiences reachable from the Saloon, edit `public/views/saloon.html`:
-
-```html
-<a class="btn" href="/<name>">Your Experience</a>
-```
-
-The existing `onDistrictModalLinkClick` handler will intercept the click and open your experience as an iframe modal — no additional wiring needed, as long as your route is handled by `routeToPopupMode()`.
-
-If your experience needs its own route detection (like poker has `isPokerRoutePath`), add that function and wire it into `routeToPopupMode()`.
-
-### Step 8: Document agent tools in skill.md
-
-Add a section to `public/skill.md`:
-
-```markdown
-## <Name> worker tools
-
-- `<name>_state_get`
-  - Reads `GET /api/<name>/state` for current experience state.
-- `<name>_action_<verb>`
-  - Executes `POST /api/<name>/action` with validated parameters.
-
-### <Name> agent policy
-
-- [Rules specific to your experience]
-- Never commit actions without server confirmation.
-- Keep private data private to the acting participant.
-```
-
-### Step 9: Write the spec
-
-Create `specs/<N>_<name>_experience_spec.md` covering:
-
-1. **Objective** — what problem does this experience solve
-2. **Architecture** — navigation flow, integration points, file manifest
-3. **Agent tools** — what APIs the agent uses, what policy it follows
-4. **Visual design** — aesthetic direction, theme, tokens
-5. **Testing** — how to verify manually and with Playwright
-
-### Step 10: Write tests
-
-Create Playwright tests in `e2e/`:
-
-```javascript
-// e2e/<NNN>_<name>_contract.spec.js — API contract tests
-// e2e/<NNN>_<name>_ui.spec.js — UI behavior tests
-```
-
-**Required coverage:**
-- State endpoint returns expected shape
-- Actions validate inputs and return results
-- Embed mode renders correctly
-- Modal integration works (open from Saloon, navigate within)
-
-## 5. Integration Checklist
-
-Before creating a PR, verify:
-
+- [ ] `public/experiences/<name>/manifest.json` exists and is valid
 - [ ] Experience works standalone at `/<name>?embed=1`
-- [ ] Experience opens from Saloon (or parent district) via link click
-- [ ] Modal transitions smoothly from district HTML to iframe
-- [ ] Agent can open experience via `agent_town_ui_open_modal({ modal: '<name>' })`
-- [ ] Agent can read full state via documented API endpoints
-- [ ] Agent can take actions via documented API endpoints
-- [ ] `skill.md` documents all agent tools and policy
-- [ ] Spec file exists with architecture, flows, and testing guidance
-- [ ] Human UI is crisp — no text walls, essential info only
-- [ ] Mobile-first responsive layout works
-- [ ] No framework dependencies added
-- [ ] `poker.js` / `poker.html` pattern followed for rendering
-- [ ] Non-embed route redirects to modal entry
+- [ ] Experience opens from parent district via auto-populated link
+- [ ] Agent can open it via `agent_town_ui_open_modal({ modal: '<name>' })`
+- [ ] Agent can read state and take actions via documented APIs
+- [ ] `skill.md` documents agent tools and policy
+- [ ] Spec file exists
+- [ ] Human UI is crisp — no text walls
+- [ ] Mobile responsive
+- [ ] No framework dependencies
+- [ ] `server/index.js` mounts routes
 - [ ] All existing tests still pass
-
-## 6. What Goes in the PR
-
-A well-structured experience PR should contain:
-
-**Experience-specific files (bulk of changes):**
-- `public/<name>.html` — frontend shell
-- `public/<name>.js` — frontend logic
-- `server/<name>_routes.js` — backend API
-- `server/<name>_service.js` — business logic (if needed)
-- `server/<name>_store.js` — persistence (if needed)
-- `e2e/<NNN>_<name>_*.spec.js` — tests
-- `specs/<N>_<name>_spec.md` — documentation
-
-**Minimal shared-file changes (the integration seam):**
-- `server/index.js` — ~5-10 lines to mount routes
-- `public/app.js` — ~3-5 lines for district registration
-- `public/styles.css` — ~5 lines for modal theme
-- `public/views/saloon.html` — ~1-3 lines for entry link
-- `public/skill.md` — ~20-40 lines for agent tool docs
-- `design/APP_FLOW.md` — ~5-10 lines for journey documentation
-
-**The ratio should be roughly 95% experience-specific code, 5% integration.**
 
 ## 7. Reference Implementation
 
 The poker experience is the canonical reference:
 
-| Component | File | Size |
-|-----------|------|------|
-| Frontend shell | `public/poker.html` | ~1400 lines (CSS + HTML) |
-| Frontend logic | `public/poker.js` | ~5800 lines |
-| Backend routes | `server/poker_routes.js` | ~8800 lines |
-| Backend service | `server/poker_play_service.js` | ~12800 lines |
-| Backend store | `server/web_poker_store.js` | ~5800 lines |
-| Spec | `specs/28_poker_saloon_experience_spec.md` | Experience integration |
-| Design docs | `design/` directory | Design system, guidelines, app flow |
-| Tests | `e2e/175-340_poker_*.spec.js` | ~200 test files |
+| Component | File |
+|-----------|------|
+| Manifest | `public/experiences/poker/manifest.json` |
+| Frontend shell | `public/poker.html` |
+| Frontend logic | `public/poker.js` |
+| Backend routes | `server/poker_routes.js` |
+| Backend service | `server/poker_play_service.js` |
+| Spec | `specs/28_poker_saloon_experience_spec.md` |
 
-Integration seam (shared files):
-- `server/index.js`: 10 lines
-- `public/app.js`: 3 lines (`districtViews`, `EXPERIENCE_UI_MODAL_NAMES`, theme)
-- `public/styles.css`: 5 lines (poker theme)
-- `public/views/saloon.html`: 4 links
-- `public/skill.md`: 28 lines (poker worker tools + policy)
+## 8. How it works end-to-end
 
-## 8. Design Conventions
+```
+1. Server starts
+   → experience_loader scans public/experiences/*/manifest.json
+   → Registers GET /api/experiences endpoint
+   → Logs "Discovered 1 experience(s): poker"
+
+2. Browser loads Agent Town
+   → app.js calls loadExperienceRegistry()
+   → Fetches GET /api/experiences
+   → For each experience:
+     - Adds to districtViews, EXPERIENCE_UI_MODAL_NAMES, theme mapping
+     - Injects theme CSS into document head
+
+3. User clicks Saloon
+   → showDistrict('saloon') loads saloon.html
+   → bindTownDistrictControls() calls populateSaloonExperiences()
+   → Finds experiences with parentDistrict='saloon'
+   → Renders entry links (primary CTA + secondary links)
+
+4. User clicks "Sit down at the table"
+   → onDistrictModalLinkClick intercepts click
+   → routeToPopupMode('/poker') matches isPokerRoutePath
+   → Returns { mode: 'frame', url: '/poker?embed=1' }
+   → Modal transitions to poker iframe
+
+5. Agent calls agent_town_ui_open_modal({ modal: 'poker' })
+   → 'poker' is in EXPERIENCE_UI_MODAL_NAMES (added by loader)
+   → showDistrict('poker') finds it in registeredExperiences
+   → Opens iframe directly
+```
+
+## 9. Design Conventions
 
 - **No frameworks.** Vanilla HTML/CSS/JS only.
 - **Modal-first.** Experiences run inside the district modal iframe.
-- **Agent uses APIs, not DOM.** All agent interaction through backend endpoints documented in `skill.md`.
-- **Crisp human UI.** Show only what's needed for the next action. Details in advanced panels.
-- **Responsive.** Mobile-first, single column → tablet → desktop.
+- **Agent uses APIs, not DOM.** Documented in `skill.md`.
+- **Crisp human UI.** Essential info only. Details in advanced panels.
+- **Manifest-driven.** No shared-file edits except `server/index.js`.
+- **Responsive.** Mobile-first, single column → desktop.
 - **Accessible.** 44px touch targets, visible focus states, 4.5:1 contrast.
-- **Deterministic tests.** Every feature has Playwright coverage.
-
-## 9. Naming Conventions
-
-- Files: `<name>.html`, `<name>.js`, `<name>_routes.js`
-- CSS tokens: `--<name>-surface-0`, `--<name>-accent`, etc.
-- API routes: `/api/<name>/...`
-- District key: lowercase, no hyphens (e.g., `poker`, `saloon`, `atlas`)
-- Spec file: `specs/<NN>_<name>_<topic>_spec.md`
-- Test files: `e2e/<NNN>_<name>_<topic>.spec.js`
+- **Deterministic tests.** Playwright coverage required.

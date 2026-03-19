@@ -432,7 +432,6 @@ const districtViews = {
   house: { title: 'Plan Wagons', viewPath: '/views/house.html' },
   atlas: { title: 'Atlas Depot', viewPath: '/atlas?embed=1' },
   registry: { title: 'Registry', viewPath: '/registry?embed=1' },
-  poker: { title: 'Portal Poker', viewPath: '/poker?embed=1' },
   townhall: { title: 'Town Hall', viewPath: '/views/townhall.html' },
   saloon: { title: 'Saloon', viewPath: '/views/saloon.html' },
   pony: { title: 'Pony Express', viewPath: '/views/pony.html' },
@@ -440,6 +439,7 @@ const districtViews = {
   brain: { title: 'Connect Brain', viewPath: '/views/brain.html' },
   sigil: { title: 'Sigil Test', viewPath: '/views/sigil.html' }
 };
+let registeredExperiences = [];
 const districtViewCache = new Map();
 let currentDistrict = null;
 let lastDistrictLoad = 0;
@@ -456,7 +456,7 @@ const popupDistrictByPath = {
   '/registry': 'registry',
   '/house': 'house'
 };
-const EXPERIENCE_UI_MODAL_NAMES = new Set(['atlas', 'registry', 'poker', 'pony', 'townhall', 'saloon', 'leaderboard', 'house', 'brain', 'sigil']);
+const EXPERIENCE_UI_MODAL_NAMES = new Set(['atlas', 'registry', 'pony', 'townhall', 'saloon', 'leaderboard', 'house', 'brain', 'sigil']);
 const EXPERIENCE_UI_CONFIRMATION_REQUIRED_TOOLS = new Set(['agent_town_ui_publish_post']);
 const EXPERIENCE_INTENT_TRACE_LIMIT = 200;
 const experienceIntentTrace = [];
@@ -478,6 +478,36 @@ let experienceIntentPonyState = {
   subject: '',
   draft: ''
 };
+async function loadExperienceRegistry() {
+  try {
+    const resp = await fetch('/api/experiences', { cache: 'no-store' });
+    if (!resp.ok) return;
+    const body = await resp.json();
+    registeredExperiences = Array.isArray(body?.data) ? body.data : [];
+    for (const exp of registeredExperiences) {
+      const name = String(exp.name || '').trim();
+      if (!name) continue;
+      districtViews[name] = { title: exp.title, viewPath: exp.embedPath };
+      EXPERIENCE_UI_MODAL_NAMES.add(name);
+      districtModalThemeByDistrict[name] = name;
+      if (exp.theme && exp.theme.borderColor) {
+        const style = document.createElement('style');
+        style.textContent = [
+          `body.town-hub-page .districtModal[data-theme="${name}"] {`,
+          `  border-color: ${exp.theme.borderColor};`,
+          `  --modal-rivet-core: ${exp.theme.rivetCore};`,
+          `  --modal-rivet-mid: ${exp.theme.rivetMid};`,
+          `  --modal-rivet-edge: ${exp.theme.rivetEdge};`,
+          `}`
+        ].join('\n');
+        document.head.appendChild(style);
+      }
+    }
+  } catch {
+    // Experience registry unavailable — built-in districts still work
+  }
+}
+
 let houseSurfaceState = {
   activeSurface: '',
   context: {
@@ -3696,11 +3726,39 @@ function bindBrainDistrictControls() {
   }
 }
 
+function populateSaloonExperiences() {
+  const container = document.getElementById('saloonExperiences');
+  if (!container) return;
+  const children = registeredExperiences.filter((e) => e.parentDistrict === 'saloon');
+  if (!children.length) {
+    container.innerHTML = '';
+    return;
+  }
+  container.innerHTML = children.map((exp) => `
+    <div class="panel">
+      <h2 style="margin:0 0 6px">${exp.title || exp.name}</h2>
+      <div class="kv" style="margin-top:10px">
+        <a class="btn primary" href="${exp.routePrefix}">${exp.entryLabel || exp.title}</a>
+      </div>
+      ${Array.isArray(exp.secondaryLinks) && exp.secondaryLinks.length ? `
+        <div class="kv" style="margin-top:8px">
+          ${exp.secondaryLinks.map((link) => `<a class="btn" href="${link.href}">${link.label}</a>`).join('')}
+        </div>
+      ` : ''}
+      <div class="small" style="margin-top:8px; color: var(--muted)">
+        Runs inside this window. Your house agent stays connected while you play.
+      </div>
+    </div>
+    <div class="divider"></div>
+  `).join('');
+}
+
 function bindTownDistrictControls() {
   bindTownhallRegistrationControls();
   if (lastState) syncTownhallRegistrationUI(lastState);
   bindBrainDistrictControls();
   bindPonyComposeControls();
+  populateSaloonExperiences();
 
   const connectWalletBtn = el('connectWalletBtn');
   if (connectWalletBtn) {
@@ -4261,6 +4319,19 @@ function routeToPopupMode(rawHref) {
       title: inferPokerModalTitle(path)
     };
   }
+  const matchedExperience = registeredExperiences.find((e) => {
+    const prefix = String(e.routePrefix || '');
+    return prefix && path !== prefix && path.startsWith(prefix + '/');
+  });
+  if (matchedExperience) {
+    const expParams = new URLSearchParams(parsed.search || '');
+    expParams.set('embed', '1');
+    return {
+      mode: 'frame',
+      url: `${parsed.pathname}?${expParams.toString()}${parsed.hash}`,
+      title: matchedExperience.title
+    };
+  }
   if (path === '/wall') {
     return { mode: 'district', district: 'leaderboard' };
   }
@@ -4586,7 +4657,6 @@ const districtModalThemeByDistrict = {
   house: 'house',
   atlas: 'atlas',
   registry: 'atlas',
-  poker: 'poker',
   townhall: 'townhall',
   saloon: 'saloon',
   pony: 'pony',
@@ -5167,22 +5237,28 @@ async function showDistrict(district) {
   currentDistrict = safeDistrict;
   setActiveDistrict(safeDistrict);
 
-  if (safeDistrict === 'atlas' || safeDistrict === 'registry' || safeDistrict === 'poker') {
+  if (safeDistrict === 'atlas' || safeDistrict === 'registry') {
     let frameUrl = '/atlas?embed=1';
     let frameTitle = 'Atlas Depot';
     if (safeDistrict === 'registry') {
       frameUrl = '/registry?embed=1';
       frameTitle = 'Registry';
-    } else if (safeDistrict === 'poker') {
-      const params = new URLSearchParams(window.location.search);
-      const requestedRoute = String(experienceIntentPokerState.route || params.get('pokerPath') || '/poker').trim();
-      frameUrl = normalizePokerEmbedUrl(requestedRoute || '/poker');
-      frameTitle = inferPokerModalTitle(frameUrl);
-      experienceIntentPokerState = {
-        route: normalizePokerStateRoute(frameUrl)
-      };
     }
     openRouteInModalFrame(frameUrl, frameTitle);
+    return;
+  }
+  if (safeDistrict === 'poker') {
+    const params = new URLSearchParams(window.location.search);
+    const requestedRoute = String(experienceIntentPokerState.route || params.get('pokerPath') || '/poker').trim();
+    const frameUrl = normalizePokerEmbedUrl(requestedRoute || '/poker');
+    const frameTitle = inferPokerModalTitle(frameUrl);
+    experienceIntentPokerState = { route: normalizePokerStateRoute(frameUrl) };
+    openRouteInModalFrame(frameUrl, frameTitle);
+    return;
+  }
+  const registeredExp = registeredExperiences.find((e) => e.name === safeDistrict);
+  if (registeredExp) {
+    openRouteInModalFrame(registeredExp.embedPath, registeredExp.title);
     return;
   }
 
@@ -9255,6 +9331,7 @@ async function bootstrapInitialRouteState() {
   if (isTownHub) {
     bindDistrictMapInteractions();
     bindTrainerModalInteractions();
+    loadExperienceRegistry().catch(() => {});
 
     const closeBtn = el('districtModalClose');
     if (closeBtn) {

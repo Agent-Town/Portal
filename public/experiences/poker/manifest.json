@@ -1,0 +1,20 @@
+{
+  "name": "poker",
+  "title": "Portal Poker",
+  "parentDistrict": "saloon",
+  "entryLabel": "Sit down at the table",
+  "entryPrimary": true,
+  "secondaryLinks": [
+    { "href": "/poker/play/schedule", "label": "Tournament schedule" },
+    { "href": "/poker/play/rail", "label": "Watch from the rail" },
+    { "href": "/poker/play/seasons/native", "label": "Season standings" }
+  ],
+  "embedPath": "/poker?embed=1",
+  "routePrefix": "/poker",
+  "theme": {
+    "borderColor": "#7a4420",
+    "rivetCore": "#d4901a",
+    "rivetMid": "#7a4420",
+    "rivetEdge": "#2e1608"
+  }
+}
