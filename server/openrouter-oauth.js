@@ -52,9 +52,9 @@ function cleanup() {
 router.post('/start', (req, res) => {
   cleanup();
 
-  const callbackUrl = `${req.protocol}://${req.get('host')}/api/iterate/oauth/openrouter/callback?attemptId=${attemptId}`;
   const { verifier, challenge } = createPkce();
   const attemptId = `or_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
+  const callbackUrl = `${req.protocol}://${req.get('host')}/api/iterate/oauth/openrouter/callback?attemptId=${attemptId}`;
   const now = Date.now();
 
   attemptsById.set(attemptId, {
