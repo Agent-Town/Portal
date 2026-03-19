@@ -3224,6 +3224,12 @@ async function mintAllTownhallIdentitiesAndRegister() {
     await submitTownhallRegistration();
     townhallMintLastErrorStep = null;
     setTownhallRegisterFeedback(tApp('townhall.feedback.registration_complete_continue'));
+
+    // Auto-advance to brain district after successful registration
+    const nextStep = lastState ? getOnboardingStep(lastState) : null;
+    if (nextStep === ONBOARDING_STEP_BRAIN) {
+      setTimeout(() => showDistrict('brain'), 600);
+    }
   } catch (err) {
     townhallSigilUnlockedByContinue = false;
     const raw = String(err?.message || err || 'Mint failed.');
@@ -8328,6 +8334,16 @@ function initStep2Listener() {
           setHatchStatus(tApp('hatch.status.brain_configured_runtime_boot_failed'));
         }
       }
+
+      // Refresh state and re-bind brain controls so Continue enables
+      try {
+        const freshState = await api('/api/state');
+        if (freshState?.ok) {
+          lastState = freshState;
+          updateUI(lastState);
+        }
+      } catch (_) { /* state refresh best-effort */ }
+      bindBrainDistrictControls();
     } catch (e) {
       const failed = formatBrainConfigFailedStatus(e.message);
       if (status) status.textContent = failed;
