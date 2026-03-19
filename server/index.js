@@ -5308,9 +5308,18 @@ app.post('/api/agent/lite/llm/config', (req, res) => {
   const lite = ensureLiteState(s);
   const onboarding = ensureSessionOnboarding(s);
 
-  // Townhall gate removed for brain config. The LLM API key is never stored
-  // server-side — this endpoint only tracks metadata (provider, model name).
-  // The actual key stays in the browser (IndexedDB + worker memory).
+  // Townhall gate: still enforced for Privy-enabled sessions (portal onboarding).
+  // Skipped for: iterate page (referer), agent_solo sessions, non-Privy environments.
+  const brainReferer = String(req.get('referer') || '').trim();
+  const isFromIterate = brainReferer.includes('/iterate');
+  const skipTownhallGate = isFromIterate || s.flow === 'agent_solo' || !PRIVY_ENABLED;
+  if (!skipTownhallGate && onboarding.required === true && onboarding.registrationComplete !== true) {
+    return res.status(409).json({
+      ok: false,
+      error: 'ONBOARDING_TOWNHALL_REQUIRED',
+      message: 'Complete Town Hall registration before configuring brain.'
+    });
+  }
 
   let payload;
   try {
