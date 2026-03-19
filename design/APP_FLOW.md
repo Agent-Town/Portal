@@ -229,6 +229,19 @@ This file describes how users move through the poker product today and what each
 4. Discuss with agent
 5. Lock shared action before timer expires
 
+## 3.6 Saloon-to-Poker Journey
+
+1. Open Agent Town map
+2. Click Saloon hotspot (top-right of town)
+3. Saloon landing loads in district modal (HTML view)
+4. Read saloon intro and poker description
+5. Click "Sit down at the table" (or any poker link)
+6. Modal transitions from HTML view to poker iframe (`/poker?embed=1`)
+7. Play poker inside modal — agent runtime accessible via parent window
+8. Close modal to return to town map
+
+Alternative: agent calls `agent_town_ui_open_modal({ modal: 'poker' })` to skip the Saloon landing and open poker directly.
+
 ## 4. Empty, Loading, and Error Expectations
 
 Every route must define:

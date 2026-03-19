@@ -3869,6 +3869,13 @@ body.town-hub-page .districtModal[data-theme="saloon"] {
   --modal-rivet-edge: #3e2414;
 }
 
+body.town-hub-page .districtModal[data-theme="poker"] {
+  border-color: #7a4420;
+  --modal-rivet-core: #d4901a;
+  --modal-rivet-mid: #7a4420;
+  --modal-rivet-edge: #2e1608;
+}
+
 body.town-hub-page .districtModal[data-theme="pony"] {
   border-color: #6d8eb0;
   --modal-rivet-core: #b8d5f1;

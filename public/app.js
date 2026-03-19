@@ -4586,7 +4586,7 @@ const districtModalThemeByDistrict = {
   house: 'house',
   atlas: 'atlas',
   registry: 'atlas',
-  poker: 'leaderboard',
+  poker: 'poker',
   townhall: 'townhall',
   saloon: 'saloon',
   pony: 'pony',
