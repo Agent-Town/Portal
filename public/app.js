@@ -3228,7 +3228,7 @@ async function mintAllTownhallIdentitiesAndRegister() {
     // Auto-advance to brain district after successful registration
     const nextStep = lastState ? getOnboardingStep(lastState) : null;
     if (nextStep === ONBOARDING_STEP_BRAIN) {
-      setTimeout(() => showDistrict('brain'), 600);
+      showDistrict('brain');
     }
   } catch (err) {
     townhallSigilUnlockedByContinue = false;
