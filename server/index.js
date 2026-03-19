@@ -4958,10 +4958,6 @@ app.get('/api/state', (req, res) => {
       driver: lite.driver,
       runtimeReady: !!lite.runtimeReady,
       llmConfigured: !!lite.llmConfigured,
-      llmProvider: lite.llmProvider || null,
-      llmModel: lite.llmModel || null,
-      llmAuthMode: lite.llmAuthMode || 'api-key',
-      llmApiKeySet: !!lite.llmApiKeySet,
       runtimeVersion: lite.runtimeVersion || null,
       lastError: typeof lite.lastError === 'string' && lite.lastError ? lite.lastError : null
     },
@@ -5003,9 +4999,7 @@ app.post('/api/hatch/complete', (req, res) => {
     lite: {
       driver: lite.driver,
       runtimeReady: !!lite.runtimeReady,
-      llmConfigured: !!lite.llmConfigured,
-      llmProvider: lite.llmProvider || null,
-      llmModel: lite.llmModel || null
+      llmConfigured: !!lite.llmConfigured
     }
   });
 });
@@ -5293,11 +5287,7 @@ app.get('/api/agent/lite/llm/config', (req, res) => {
   updateLiteRuntimeReady(s);
   res.json({
     ok: true,
-    configured: !!lite.llmConfigured,
-    provider: lite.llmProvider || null,
-    model: lite.llmModel || null,
-    authMode: lite.llmAuthMode || 'api-key',
-    apiKeySet: !!lite.llmApiKeySet
+    configured: !!lite.llmConfigured
   });
 });
 
@@ -5319,21 +5309,10 @@ app.post('/api/agent/lite/llm/config', (req, res) => {
     });
   }
 
-  let payload;
-  try {
-    payload = normalizeLiteLlmPayload(req.body || {});
-  } catch (err) {
-    return res.status(400).json({ ok: false, error: String(err?.message || 'INVALID_LLM_CONFIG') });
-  }
-
+  // Only mark brain as configured for onboarding progression.
+  // LLM details (provider, model, key) stay browser-local — never stored server-side.
   lite.llmConfigured = true;
-  lite.llmProvider = payload.provider;
-  lite.llmModel = payload.model;
-  lite.llmModelRef = payload.modelRef;
   lite.llmConfiguredAt = nowIso();
-  lite.llmApiKeySet = payload.hasCredential !== false;
-  lite.llmAuthMode = payload.authMode || 'api-key';
-  lite.llmApiKeyHash = null;
 
   if (lite.runtimeBooted === true) {
     s.agent.connected = true;
@@ -5354,12 +5333,7 @@ app.post('/api/agent/lite/llm/config', (req, res) => {
 
   res.json({
     ok: true,
-    configured: !!lite.llmConfigured,
-    provider: lite.llmProvider,
-    model: lite.llmModel,
-    authMode: lite.llmAuthMode || 'api-key',
-    apiKeySet: !!lite.llmApiKeySet,
-    runtimeReady: !!lite.runtimeReady
+    configured: !!lite.llmConfigured
   });
 });
 
@@ -5368,13 +5342,7 @@ app.delete('/api/agent/lite/llm/config', (req, res) => {
   const lite = ensureLiteState(s);
 
   lite.llmConfigured = false;
-  lite.llmProvider = null;
-  lite.llmModel = null;
-  lite.llmModelRef = null;
   lite.llmConfiguredAt = null;
-  lite.llmApiKeySet = false;
-  lite.llmApiKeyHash = null;
-  lite.llmAuthMode = null;
 
   if (s.agent.source === 'openclaw-lite') {
     s.agent.connected = false;
@@ -5387,11 +5355,7 @@ app.delete('/api/agent/lite/llm/config', (req, res) => {
 
   res.json({
     ok: true,
-    configured: false,
-    provider: null,
-    model: null,
-    apiKeySet: false,
-    runtimeReady: !!lite.runtimeReady
+    configured: false
   });
 });
 

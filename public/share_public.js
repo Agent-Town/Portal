@@ -450,7 +450,7 @@ function getResolvedShareCardTitle(preview = null) {
 
 function getResolvedShareCardLead(preview = null) {
   const hqName = normalizeHouseHqName(preview?.hqName);
-  return hqName ? `High-distribution card for social sharing with generated ${hqName} HQ hero.` : '';
+  return hqName ? `Share your ${hqName} HQ with the world.` : '';
 }
 
 function getResolvedShareCardHeroPanelTitle(preview = null) {

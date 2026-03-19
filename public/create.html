@@ -40,9 +40,9 @@
       data-zhc-blocker-key="needs_crest"
       data-zhc-next-unlock="house"
     >
-      <h1 style="margin:0 0 8px">Create entropy for house key.</h1>
-      <p class="small" style="margin-top:0" id="createIntro">
-        Human: click pixels. Agent: paint via the skill API. When it feels done, lock it in.
+      <h1 class="section-title" style="font-size: clamp(20px, 3vw, 28px);">Paint your house key.</h1>
+      <p class="section-desc" id="createIntro">
+        Click pixels. Your agent paints too. Lock it in when it feels right.
       </p>
 
       <div class="canvasWrap">
@@ -52,8 +52,8 @@
           <button class="btn primary" id="shareBtn" data-testid="share-btn" data-zhc-primary-action="true" disabled>Generate house key</button>
           <span class="pill" id="shareStatus" style="display:none">Working…</span>
         </div>
-        <div class="small" style="margin-top:6px; color: var(--muted)" id="createNextNote">
-          Next: unlock the house with a wallet signature. Then you and the agent can read/write encrypted entries.
+        <div class="small status-text mt-1" id="createNextNote">
+          Next: unlock the house with a wallet signature.
         </div>
       </div>
       <div class="small" id="err" style="color: var(--bad)"></div>

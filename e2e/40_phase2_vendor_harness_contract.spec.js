@@ -15,8 +15,8 @@ test('phase2 harness exposes lite runtime contract and bootstrap endpoint', asyn
   expect(state.lite.driver).toBe('vendor');
   expect(state.lite.runtimeReady).toBe(false);
   expect(state.lite.llmConfigured).toBe(false);
-  expect(state.lite.llmProvider ?? null).toBeNull();
-  expect(state.lite.llmModel ?? null).toBeNull();
+  expect(state.lite.llmProvider).toBeUndefined();
+  expect(state.lite.llmModel).toBeUndefined();
   expect(state.lite.runtimeVersion ?? null).toBeNull();
   expect(state.lite.lastError ?? null).toBeNull();
 
@@ -35,5 +35,8 @@ test('phase2 harness exposes lite runtime contract and bootstrap endpoint', asyn
   const llm = await llmResp.json();
   expect(llm.ok).toBe(true);
   expect(llm.configured).toBe(false);
-  expect(llm.apiKeySet).toBe(false);
+  // Server no longer exposes LLM details — only the configured flag.
+  expect(llm.apiKeySet).toBeUndefined();
+  expect(llm.provider).toBeUndefined();
+  expect(llm.model).toBeUndefined();
 });

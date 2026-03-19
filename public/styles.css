@@ -6,8 +6,17 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: "Smokum";
+  src: url("/brand-kit/fonts/Smokum-Regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
 :root {
   --font-display: "Wellfleet", "Songti SC", "STSong", serif;
+  --font-western: "Smokum", "Wellfleet", serif;
   --font-ui: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
     "Microsoft YaHei", "Noto Sans CJK SC", "Helvetica Neue", Arial, sans-serif;
   --font-accent: "Wellfleet", "Songti SC", "STSong", serif;
@@ -473,6 +482,17 @@ h3 {
   cursor: pointer;
   z-index: 2;
   transition: transform 120ms ease;
+  animation: hotspotBreathe 4s ease-in-out infinite;
+}
+
+.townDistrictHotspot:nth-child(2) { animation-delay: 0.7s; }
+.townDistrictHotspot:nth-child(3) { animation-delay: 1.4s; }
+.townDistrictHotspot:nth-child(4) { animation-delay: 2.1s; }
+.townDistrictHotspot:nth-child(5) { animation-delay: 2.8s; }
+.townDistrictHotspot:nth-child(6) { animation-delay: 3.5s; }
+
+.townDistrictHotspot.is-active {
+  animation: hotspotPulse 3s ease-in-out infinite;
 }
 
 .townDistrictHotspot::before {
@@ -641,6 +661,7 @@ h3 {
     linear-gradient(180deg, rgba(44, 69, 99, 0.28) 0%, rgba(44, 69, 99, 0.44) 100%);
   backdrop-filter: blur(2px);
   pointer-events: all;
+  animation: backdropFade 200ms ease;
 }
 
 .trainerBackdrop {
@@ -664,7 +685,7 @@ h3 {
   box-shadow: var(--depth-modal);
   background:
     linear-gradient(155deg, rgba(255, 249, 236, 0.98) 0%, rgba(255, 243, 220, 0.98) 58%, rgba(255, 237, 203, 0.98) 100%);
-  animation: panelRise 180ms ease;
+  animation: modalEnter 240ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
   color: var(--text-strong);
 }
 
@@ -938,6 +959,38 @@ body.trainer-modal-open {
   display: none !important;
 }
 
+/* --- Utility classes (replacing common inline styles) --- */
+.mt-0  { margin-top: 0; }
+.mt-1  { margin-top: var(--space-1); }
+.mt-2  { margin-top: var(--space-2); }
+.mt-3  { margin-top: var(--space-3); }
+.mt-4  { margin-top: var(--space-4); }
+.mb-0  { margin-bottom: 0; }
+.mb-1  { margin-bottom: var(--space-1); }
+.mb-2  { margin-bottom: var(--space-2); }
+.gap-2 { gap: var(--space-2); }
+.gap-3 { gap: var(--space-3); }
+
+.section-title {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.section-desc {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.error-text {
+  color: var(--bad);
+}
+
+.status-text {
+  color: var(--muted);
+}
+
 .hero {
   display: grid;
   gap: 14px;
@@ -946,9 +999,10 @@ body.trainer-modal-open {
 
 .hero h1 {
   margin: 0;
-  font-size: clamp(24px, 4vw, 36px);
-  line-height: 1.24;
-  letter-spacing: 0.7px;
+  font-family: var(--font-western);
+  font-size: clamp(28px, 4.5vw, 44px);
+  line-height: 1.15;
+  letter-spacing: 1px;
   color: var(--text-strong);
   text-shadow: 0 2px 0 rgba(255, 255, 255, 0.45);
 }
@@ -1094,8 +1148,13 @@ body.trainer-modal-open {
   transition: transform 90ms ease, box-shadow 120ms ease, filter 150ms ease, background-color 150ms ease;
 }
 
+.btn:hover:not(:disabled):not([disabled]) {
+  transform: translateY(-1px);
+}
+
 .btn:hover {
-  filter: brightness(1.01);
+  filter: brightness(1.06) saturate(1.04);
+  box-shadow: 0 3px 0 rgba(44, 69, 99, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.8);
   text-decoration: none;
 }
 
@@ -1110,7 +1169,8 @@ body.trainer-modal-open {
 }
 
 .btn.primary:hover {
-  background: linear-gradient(180deg, #8bd1ff 0%, #6aa8dd 100%);
+  background: linear-gradient(180deg, #92d8ff 0%, #72b0e5 100%);
+  box-shadow: 0 3px 0 rgba(44, 69, 99, 0.26), 0 8px 20px rgba(91, 155, 213, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .btn.danger {
@@ -1561,6 +1621,32 @@ footer::before {
     transform: translateY(0);
     opacity: 1;
   }
+}
+
+@keyframes hotspotPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(196, 136, 58, 0); }
+  50% { box-shadow: 0 0 18px 4px rgba(196, 136, 58, 0.18); }
+}
+
+@keyframes hotspotBreathe {
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 1; }
+}
+
+@keyframes modalEnter {
+  0% {
+    transform: translateY(12px) scale(0.97);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes backdropFade {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
 }
 
 .startWrap {
@@ -4091,6 +4177,9 @@ body.town-hub-page .townDistrictHotspot::before {
 }
 
 body.town-hub-page .townDistrictLabel {
+  font-family: var(--font-western);
+  font-size: clamp(13px, 1.6vw, 18px);
+  letter-spacing: 0.8px;
   border: 2px solid rgba(196, 136, 58, 0.78);
   border-radius: 10px;
   background: rgba(46, 27, 14, 0.82);
@@ -4595,9 +4684,9 @@ body.town-hub-page .districtModal.is-district .districtModalBody > * {
 
 #agentSidebar .sidebar-header h3 {
   color: var(--v0-sun);
-  font-family: "Rye", "Rock Salt", serif;
-  font-size: calc(18px * var(--agent-panel-text-scale));
-  letter-spacing: 0.35px;
+  font-family: "Smokum", "Rye", "Rock Salt", serif;
+  font-size: calc(22px * var(--agent-panel-text-scale));
+  letter-spacing: 0.5px;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.56);
 }
 
@@ -4874,8 +4963,9 @@ body.share-page .shareModalTitle {
 body.share-page .shareModalTitle h1 {
   margin: 0;
   color: var(--v0-sun);
-  font-family: "Rye", "Wellfleet", serif;
-  letter-spacing: 0.4px;
+  font-family: "Smokum", "Rye", "Wellfleet", serif;
+  font-size: clamp(24px, 3.5vw, 36px);
+  letter-spacing: 0.5px;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
 }
 

@@ -14034,19 +14034,12 @@ async function applyGatewayLlmConfig(config) {
 }
 
 async function syncLiteLlmSessionConfig(config) {
-  const provider = String(config?.provider || '').trim();
-  const model = String(config?.model || '').trim();
-  const modelRef = String(config?.modelRef || `${provider}/${model}`).trim();
-  if (!provider || !model) return null;
+  const configured = config?.configured !== false;
+  if (!configured) return null;
+  // Only signal that the brain step is done. Never send provider, model, or key details.
   return await api('/api/agent/lite/llm/config', {
     method: 'POST',
-    body: JSON.stringify({
-      provider,
-      model,
-      modelRef,
-      authMode: config?.authMode === 'oauth-json' ? 'oauth-json' : 'api-key',
-      hasCredential: config?.configured !== false && !!String(config?.credential || '').trim()
-    })
+    body: JSON.stringify({ configured: true })
   });
 }
 

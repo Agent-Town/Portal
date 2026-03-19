@@ -68,7 +68,7 @@ test('M44.23 resolved inner share lead stays generic before HQ save and brands i
   await shareCardButton.click();
   await expect(shareFrameHost).toHaveAttribute('src', resolvedSrcPattern);
   await expect(shareFrame.getByTestId('share-lead')).toHaveText(
-    'High-distribution card for social sharing with generated house hero.'
+    'Share your house with the world.'
   );
   await expect(shareFrame.locator('#shareIdBadge')).toHaveText(share.shareId);
 
@@ -84,7 +84,7 @@ test('M44.23 resolved inner share lead stays generic before HQ save and brands i
   await shareCardButton.click();
   await expect(shareFrameHost).toHaveAttribute('src', resolvedSrcPattern);
   await expect(shareFrame.getByTestId('share-lead')).toHaveText(
-    `High-distribution card for social sharing with generated ${customName} HQ hero.`
+    `Share your ${customName} HQ with the world.`
   );
   await expect(shareFrame.locator('#shareIdBadge')).toHaveText(share.shareId);
 
@@ -97,7 +97,7 @@ test('M44.23 resolved inner share lead stays generic before HQ save and brands i
   await shareCardButton.click();
   await expect(shareFrameHost).toHaveAttribute('src', resolvedSrcPattern);
   await expect(shareFrame.getByTestId('share-lead')).toHaveText(
-    `High-distribution card for social sharing with generated ${customName} HQ hero.`
+    `Share your ${customName} HQ with the world.`
   );
   await expect(shareFrame.locator('#shareIdBadge')).toHaveText(share.shareId);
 });

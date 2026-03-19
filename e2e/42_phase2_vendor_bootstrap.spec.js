@@ -73,13 +73,16 @@ test('vendor runtime uses local-only LLM config without server runtime boot stat
   const state = await fetchSessionState(page);
   expect(state.lite).toBeTruthy();
   expect(state.lite.driver).toBe('vendor');
-  expect(state.lite.llmConfigured).toBe(false);
-  expect(state.lite.llmProvider ?? null).toBeNull();
-  expect(state.lite.llmModel ?? null).toBeNull();
+  // Server only tracks that brain is configured — no provider/model/key details.
+  expect(state.lite.llmConfigured).toBe(true);
+  expect(state.lite.llmProvider).toBeUndefined();
+  expect(state.lite.llmModel).toBeUndefined();
   expect(state.lite.runtimeReady).toBe(false);
   expect(state.lite.runtimeVersion ?? null).toBeNull();
   expect(state.lite.lastError ?? null).toBeNull();
+  // LLM details stay browser-local only.
   await expect.poll(() => readLocalMetaValue(page, 'llmProvider')).toBe('test-local');
   await expect.poll(() => readLocalMetaValue(page, 'llmModelId')).toBe('deterministic');
+  // API key must never appear in server-side state.
   expect(JSON.stringify(state)).not.toContain('phase2-test-key');
 });
