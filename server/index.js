@@ -1967,12 +1967,10 @@ const { router: evalRouter } = require('./evaluation');
 app.use('/api/problem-stories', evalRouter);
 const { experimentCardsRouter } = require('./experiment-cards');
 app.use('/api/problem-stories', experimentCardsRouter);
-const experimentsRouter = require('./experiments');
-app.use('/api/experiments', experimentsRouter);
+// experiments.js (simulated runner) removed — agent creates experiments via tools.
+// experiment-card-detail.js removed — iterate page reads cards via experiment-cards.js.
 const { feedbackRouter } = require('./feedback');
 app.use('/api/experiment-cards', feedbackRouter);
-const { router: cardDetailRouter } = require('./experiment-card-detail');
-app.use('/api/experiment-cards', cardDetailRouter);
 const { router: saveGameRouter } = require('./save-game');
 app.use('/api/save-games', saveGameRouter);
 const iterationLoopRouter = require('./iteration-loop');
@@ -13309,7 +13307,7 @@ app.get('/claim', (_req, res) => res.redirect(302, '/claim-wallet'));
 app.get('/claim-wallet', (_req, res) => sendHtmlNoStore(res, 'claim-wallet.html'));
 app.get('/house', (_req, res) => sendHtmlNoStore(res, 'house.html'));
 app.get('/leaderboard', (_req, res) => sendHtmlNoStore(res, 'leaderboard.html'));
-app.get('/feed', (_req, res) => sendHtmlNoStore(res, 'feed.html'));
+// /feed route removed — replaced by /iterate experience.
 app.get('/iterate', (_req, res) => sendHtmlNoStore(res, 'iterate.html'));
 app.get('/trainer', (req, res) => {
   if (String(req.query?.embed || '').trim() === '1') {

@@ -17,7 +17,7 @@
 const express = require('express');
 const { listExperimentCards } = require('./experiment-cards');
 const { getProblemStory, updateProblemStory } = require('./problem-stories');
-const { runExperimentRound } = require('./experiment-runner');
+// experiment-runner.js removed — experiments are created by the agent via tools.
 
 // ── Convergence detection constants ─────────────────────────────────
 
@@ -227,20 +227,19 @@ router.post('/next-round', async (req, res) => {
   }
 
   try {
-    // Run experiment round via the real experiment runner
-    const result = await runExperimentRound({
-      problemStoryId,
-      timeBudgetMs: 7 * 60 * 1000,
-    });
+    // Experiment runner removed — agent creates experiments via tools.
+    // This endpoint now just returns the current round state.
+    const cards = listExperimentCards(problemStoryId);
+    const roundNumber = getCurrentRoundNumber(problemStoryId) + 1;
 
     res.json({
       ok: true,
       data: {
-        roundNumber: result.roundNumber,
-        cardsCreated: result.cards.length,
-        cards: result.cards,
-        warnings: result.warnings || [],
-        message: `Round ${result.roundNumber} started with ${result.cards.length} experiment variants`,
+        roundNumber,
+        cardsCreated: 0,
+        cards: [],
+        warnings: ['Experiments are now created by the agent via agent_town_iterate_submit_code tool.'],
+        message: `Round ${roundNumber} — ask the agent to generate experiments.`,
       },
     });
   } catch (err) {

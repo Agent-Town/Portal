@@ -27,7 +27,17 @@ const {
   updateCardById,
   getCardById,
 } = require('./experiment-cards');
-const { generateScores } = require('./experiment-runner');
+// experiment-runner.js removed — scoring is done by the agent via tools.
+// generateScores stub for legacy metric-edit rescoring path:
+function generateScores(metrics, baselineScores) {
+  const scores = {};
+  for (const m of metrics) {
+    scores[m.id] = baselineScores[m.id] ?? 0.5;
+  }
+  const values = Object.values(scores);
+  const compositeScore = values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+  return { scores, compositeScore };
+}
 
 const router = express.Router();
 router.use(express.json());

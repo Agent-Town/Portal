@@ -176,13 +176,23 @@ test.describe('Smoke Tests (SA-T090–T092)', () => {
     });
     await request.post(`/api/problem-stories/${story.id}/eval-confirm`);
 
-    // 3. Run experiments
-    const expRes = await request.post('/api/experiments/start', {
-      data: { problemStoryId: story.id },
+    // 3. Create experiment card (agent creates these via tools now)
+    const expRes = await request.post(`/api/problem-stories/${story.id}/experiment-cards`, {
+      data: {
+        agentSummary: 'Caching middleware implementation',
+        compositeScore: 0.75,
+        status: 'kept',
+        artifact: {
+          source: { 'src/index.ts': 'console.log("cached")' },
+          outputType: 'terminal',
+          outputPreview: 'cached',
+          entrypoint: 'src/index.ts',
+          exitCode: 0,
+        },
+      },
     });
     const exp = await expRes.json();
     expect(exp.ok).toBe(true);
-    expect(exp.cards.length).toBeGreaterThanOrEqual(1);
 
     // 4. Finish and publish
     await request.fetch(`/api/problem-stories/${story.id}/finish`, { method: 'PUT' });
