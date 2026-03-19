@@ -620,6 +620,11 @@
     `;
   }
 
+  function renderAgentContext(section, data) {
+    const json = JSON.stringify(data);
+    return `<div class="pokerAgentContext" data-poker-agent-section="${escapeHtml(section)}" hidden aria-hidden="true">${escapeHtml(json)}</div>`;
+  }
+
   function sectionCard(section, html, { plane = '', className = '', state = '' } = {}) {
     return {
       section,
@@ -1406,7 +1411,6 @@
     const opponentNotes = Array.isArray(data.opponentNotes) ? data.opponentNotes : [];
     return sectionCard('study-preview', `
       <h2>Study</h2>
-      <p>Keep review tools nearby without making them part of the live decision lane.</p>
       ${renderFactStrip([
         { label: 'Notebook', value: `${Number(data.notebookCount || 0)}` },
         { label: 'Opponent Notes', value: `${Number(data.opponentNoteCount || 0)}` },
@@ -3552,48 +3556,83 @@
       sectionCard('table-summary', `
         <h2>${escapeHtml(table?.title || 'Live Table')}</h2>
         <p>${escapeHtml(
-          adminClosed
-            ? (table?.state?.closeReason || 'Table closed by operator.')
-            : scheduledBreakActive
-            ? `${String(table?.summary?.scheduledBreakLabel || 'Scheduled break')} is active until ${formatIso(table?.summary?.scheduledBreakUntilAt)}.`
-            : paused
-            ? (table?.state?.pausedReason ? `Table paused: ${table.state.pausedReason}` : 'Table paused by operator.')
-            : sitAndGoWaiting
-            ? `Sit-and-go is waiting for ${Number(table?.summary?.seatsUntilStart || 0)} more seat${Number(table?.summary?.seatsUntilStart || 0) === 1 ? '' : 's'} before hand 1 starts.`
-            : (table?.summary?.completedAt ? 'Previous cycle complete. Seats can rotate back in for the next match.' : (table?.summary?.liveHand ? 'A live hand is in progress.' : 'Waiting for enough players to post blinds.'))
+          adminClosed ? 'Closed'
+            : paused ? 'Paused'
+            : scheduledBreakActive ? 'Break'
+            : sitAndGoWaiting ? 'Waiting for players'
+            : table?.summary?.liveHand ? 'Live hand in progress'
+            : table?.summary?.completedAt ? 'Complete'
+            : 'Waiting for players'
         )}</p>
         <div class="pokerSummary">
-          ${renderSummaryMetric('Type', table?.tableType || 'cash')}
-          ${renderSummaryMetric('Status', paused ? 'paused' : (table?.status || 'open'))}
-          ${tableAccess?.inviteOnly ? renderSummaryMetric('Access', 'invite-only') : ''}
           ${renderSummaryMetric('Blinds', `${Number(table?.smallBlindOil || 0)} / ${Number(table?.bigBlindOil || 0)}`)}
-          ${renderSummaryMetric('Buy-In', `${Number(table?.buyInOil || 0)} OIL`)}
-          ${table?.tableType === 'cash' ? renderSummaryMetric('Blind Return', String(table?.summary?.blindReturnPolicy || 'post_big_blind').replace(/_/g, ' ')) : ''}
-          ${table?.tableType === 'tournament' ? renderSummaryMetric('Start Policy', formatTournamentFillPolicyLabel(table?.summary?.fillPolicy)) : ''}
-          ${table?.tableType === 'tournament' ? renderSummaryMetric('Start Target', `${Number(table?.summary?.startTargetSeats || table?.minPlayers || 2)}`) : ''}
-          ${table?.tableType === 'tournament' && !table?.summary?.liveHand && !table?.summary?.completedAt ? renderSummaryMetric('Seats To Start', `${Number(table?.summary?.seatsUntilStart || 0)}`) : ''}
-          ${table?.tableType === 'tournament' ? renderSummaryMetric('Level', `${Number(table?.summary?.blindLevel || hand?.blindLevel || 0) || 1}`) : ''}
-          ${table?.tableType === 'tournament' ? renderSummaryMetric('Next Level', Number(table?.summary?.nextBlindLevel || 0) > 0 ? `${Number(table?.summary?.nextBlindLevel || 0)}` : 'final') : ''}
-          ${table?.tableType === 'tournament' ? renderSummaryMetric('Hands To Next', Number(table?.summary?.nextBlindLevel || 0) > 0 ? `${Number(table?.summary?.handsUntilBlindIncrease || 0)}` : '0') : ''}
-          ${table?.tableType === 'tournament' && Number(table?.summary?.pendingBlindAdvanceCount || 0) > 0 ? renderSummaryMetric('Queued Blinds', `${Number(table?.summary?.pendingBlindAdvanceCount || 0)}`) : ''}
-          ${table?.tableType === 'tournament' && table?.summary?.scheduledStartAt ? renderSummaryMetric('Scheduled Start', formatIso(table?.summary?.scheduledStartAt)) : ''}
-          ${table?.tableType === 'tournament' ? renderSummaryMetric('Late Reg', table?.summary?.lateRegistrationOpen ? 'open' : 'closed') : ''}
-          ${table?.tableType === 'tournament' ? renderSummaryMetric('Late Reg Hands', `${Number(table?.summary?.lateRegistrationRemainingHands || 0)}`) : ''}
-          ${table?.tableType === 'tournament' ? renderSummaryMetric('Entries', `${Number(table?.summary?.entryCount || 0)}`) : ''}
-          ${table?.tableType === 'tournament' && Number(table?.summary?.scheduledBreakCount || 0) > 0 ? renderSummaryMetric('Breaks', `${Number(table?.summary?.completedScheduledBreakCount || 0)}/${Number(table?.summary?.scheduledBreakCount || 0)}`) : ''}
-          ${table?.tableType === 'tournament' && scheduledBreakActive ? renderSummaryMetric('Break Until', formatIso(table?.summary?.scheduledBreakUntilAt)) : ''}
-          ${table?.tableType === 'tournament' && Number(table?.summary?.nextScheduledBreakAfterHandNumber || 0) > 0 ? renderSummaryMetric('Next Break', `${String(table?.summary?.nextScheduledBreakLabel || 'Break')} after hand ${Number(table?.summary?.nextScheduledBreakAfterHandNumber || 0)}`) : ''}
-          ${table?.tableType === 'tournament' ? renderSummaryMetric('Bounty Mode', formatTournamentBountyModelLabel(table?.summary?.bountyModel)) : ''}
-          ${table?.tableType === 'tournament' && Number(table?.summary?.bountyPerEntryOil || 0) > 0 ? renderSummaryMetric('Starting Bounty', `${Number(table?.summary?.bountyPerEntryOil || 0)} OIL`) : ''}
-          ${table?.tableType === 'tournament' && Number(table?.summary?.reentryLimit || 0) > 0 ? renderSummaryMetric('Re-Entry', `${Number(table?.summary?.acceptedReentryCount || 0)}/${Number(table?.summary?.reentryLimit || 0)}`) : ''}
-          ${table?.tableType === 'tournament' ? renderSummaryMetric('Prize Pool', `${Number(table?.summary?.prizePoolOil || 0)} OIL`) : ''}
-          ${table?.tableType === 'tournament' && Number(table?.summary?.bountyPoolOil || 0) > 0 ? renderSummaryMetric('Bounty Pool', `${Number(table?.summary?.bountyPoolOil || 0)} OIL`) : ''}
-          ${table?.tableType === 'tournament' ? renderSummaryMetric('Paid Places', `${Number(table?.summary?.paidPlaces || 0)}`) : ''}
-          ${Number(table?.summary?.waitlistCount || 0) > 0 ? renderSummaryMetric('Waitlist', `${Number(table?.summary?.waitlistCount || 0)}`) : ''}
-          ${Number(table?.summary?.disconnectedSeatCount || 0) > 0 ? renderSummaryMetric('Disconnected', `${Number(table?.summary?.disconnectedSeatCount || 0)}`) : ''}
-          ${publicRail ? renderSummaryMetric('Viewer Mode', 'public rail') : renderSummaryMetric('Your OIL', `${oilBalance}`)}
-          ${adminClosed ? renderSummaryMetric('Refunded', `${Number(table?.state?.refundedTotalOil || 0)} OIL`) : ''}
+          ${renderSummaryMetric('Seats', `${Number(table?.summary?.occupancy || 0)}/${Number(table?.maxSeats || 6)}`)}
+          ${table?.summary?.liveHand ? renderSummaryMetric('Pot', `${Number(hand?.potOil || 0)} OIL`) : ''}
+          ${publicRail ? '' : renderSummaryMetric('Your OIL', `${oilBalance}`)}
         </div>
+        ${renderAgentContext('table-summary', {
+          tableType: table?.tableType || 'cash',
+          status: paused ? 'paused' : (table?.status || 'open'),
+          inviteOnly: !!tableAccess?.inviteOnly,
+          blinds: { small: Number(table?.smallBlindOil || 0), big: Number(table?.bigBlindOil || 0) },
+          buyInOil: Number(table?.buyInOil || 0),
+          blindReturnPolicy: table?.tableType === 'cash' ? String(table?.summary?.blindReturnPolicy || 'post_big_blind') : undefined,
+          fillPolicy: table?.tableType === 'tournament' ? table?.summary?.fillPolicy : undefined,
+          startTargetSeats: table?.tableType === 'tournament' ? Number(table?.summary?.startTargetSeats || table?.minPlayers || 2) : undefined,
+          seatsUntilStart: Number(table?.summary?.seatsUntilStart || 0),
+          blindLevel: Number(table?.summary?.blindLevel || hand?.blindLevel || 0) || 1,
+          nextBlindLevel: Number(table?.summary?.nextBlindLevel || 0),
+          handsUntilBlindIncrease: Number(table?.summary?.handsUntilBlindIncrease || 0),
+          pendingBlindAdvanceCount: Number(table?.summary?.pendingBlindAdvanceCount || 0),
+          scheduledStartAt: table?.summary?.scheduledStartAt || null,
+          lateRegistrationOpen: !!table?.summary?.lateRegistrationOpen,
+          lateRegistrationRemainingHands: Number(table?.summary?.lateRegistrationRemainingHands || 0),
+          entryCount: Number(table?.summary?.entryCount || 0),
+          scheduledBreakCount: Number(table?.summary?.scheduledBreakCount || 0),
+          completedScheduledBreakCount: Number(table?.summary?.completedScheduledBreakCount || 0),
+          scheduledBreakUntilAt: table?.summary?.scheduledBreakUntilAt || null,
+          nextScheduledBreakAfterHandNumber: Number(table?.summary?.nextScheduledBreakAfterHandNumber || 0),
+          bountyModel: table?.summary?.bountyModel || null,
+          bountyPerEntryOil: Number(table?.summary?.bountyPerEntryOil || 0),
+          reentryLimit: Number(table?.summary?.reentryLimit || 0),
+          acceptedReentryCount: Number(table?.summary?.acceptedReentryCount || 0),
+          prizePoolOil: Number(table?.summary?.prizePoolOil || 0),
+          bountyPoolOil: Number(table?.summary?.bountyPoolOil || 0),
+          paidPlaces: Number(table?.summary?.paidPlaces || 0),
+          waitlistCount: Number(table?.summary?.waitlistCount || 0),
+          disconnectedSeatCount: Number(table?.summary?.disconnectedSeatCount || 0),
+          oilBalance: publicRail ? null : oilBalance,
+          refundedTotalOil: adminClosed ? Number(table?.state?.refundedTotalOil || 0) : 0,
+          occupancy: Number(table?.summary?.occupancy || 0),
+          maxSeats: Number(table?.maxSeats || 6),
+          adminClosed,
+          scheduledBreakActive,
+          completedAt: table?.summary?.completedAt || null,
+          liveHand: !!table?.summary?.liveHand,
+          handNumber: Number(table?.summary?.handNumber || 0),
+          closeReason: table?.state?.closeReason || null,
+          pausedReason: table?.state?.pausedReason || null,
+        })}
+        ${renderAdvancedPanel('Full table details', 'All table metrics and tournament state.', `
+          <div class="pokerSummary">
+            ${renderSummaryMetric('Type', table?.tableType || 'cash')}
+            ${renderSummaryMetric('Status', paused ? 'paused' : (table?.status || 'open'))}
+            ${tableAccess?.inviteOnly ? renderSummaryMetric('Access', 'invite-only') : ''}
+            ${renderSummaryMetric('Buy-In', `${Number(table?.buyInOil || 0)} OIL`)}
+            ${table?.tableType === 'cash' ? renderSummaryMetric('Blind Return', String(table?.summary?.blindReturnPolicy || 'post_big_blind').replace(/_/g, ' ')) : ''}
+            ${table?.tableType === 'tournament' ? renderSummaryMetric('Start Policy', formatTournamentFillPolicyLabel(table?.summary?.fillPolicy)) : ''}
+            ${table?.tableType === 'tournament' ? renderSummaryMetric('Level', `${Number(table?.summary?.blindLevel || hand?.blindLevel || 0) || 1}`) : ''}
+            ${table?.tableType === 'tournament' ? renderSummaryMetric('Next Level', Number(table?.summary?.nextBlindLevel || 0) > 0 ? `${Number(table?.summary?.nextBlindLevel || 0)}` : 'final') : ''}
+            ${table?.tableType === 'tournament' ? renderSummaryMetric('Hands To Next', Number(table?.summary?.nextBlindLevel || 0) > 0 ? `${Number(table?.summary?.handsUntilBlindIncrease || 0)}` : '0') : ''}
+            ${table?.tableType === 'tournament' ? renderSummaryMetric('Entries', `${Number(table?.summary?.entryCount || 0)}`) : ''}
+            ${table?.tableType === 'tournament' ? renderSummaryMetric('Late Reg', table?.summary?.lateRegistrationOpen ? 'open' : 'closed') : ''}
+            ${table?.tableType === 'tournament' ? renderSummaryMetric('Prize Pool', `${Number(table?.summary?.prizePoolOil || 0)} OIL`) : ''}
+            ${table?.tableType === 'tournament' ? renderSummaryMetric('Paid Places', `${Number(table?.summary?.paidPlaces || 0)}`) : ''}
+            ${Number(table?.summary?.waitlistCount || 0) > 0 ? renderSummaryMetric('Waitlist', `${Number(table?.summary?.waitlistCount || 0)}`) : ''}
+            ${Number(table?.summary?.disconnectedSeatCount || 0) > 0 ? renderSummaryMetric('Disconnected', `${Number(table?.summary?.disconnectedSeatCount || 0)}`) : ''}
+            ${adminClosed ? renderSummaryMetric('Refunded', `${Number(table?.state?.refundedTotalOil || 0)} OIL`) : ''}
+          </div>
+        `)}
         ${renderMetaBadges([
           table?.tableType === 'tournament' && isSitAndGoFillPolicy(table?.summary?.fillPolicy) ? formatTournamentFillPolicyLabel(table?.summary?.fillPolicy) : '',
           tableAccess?.inviteOnly ? 'invite-only' : '',
@@ -3624,7 +3663,6 @@
       `, { plane: 'supporting' }),
       publicRail ? sectionCard('rail-view', `
         <h2>Rail View</h2>
-        <p>Watching public table state only. Private seat-thread discussion and seat-only actions stay hidden here, even while the hand is live.</p>
       `, { plane: 'reference' }) : '',
       sectionCard('seats', `
         <h2>Seats</h2>
@@ -3635,7 +3673,6 @@
     if (!publicRail && tableAccess?.inviteOnly) {
       cards.push(sectionCard('invite-access', `
         <h2>Invite Access</h2>
-        <p>Only invited wallets can open or join this table. Public lobby and rail discovery stay disabled.</p>
         <div class="pokerSummary">
           ${renderSummaryMetric('Mode', 'invite-only')}
           ${tableAccess?.viewerAuthorizedByInvite ? renderSummaryMetric('Invite', 'validated') : ''}
@@ -3664,7 +3701,6 @@
         .join('');
       cards.push(sectionCard('take-seat', `
         <h2>Take A Seat</h2>
-        <p>${tableAccess?.inviteOnly ? 'This invite-only table still gives your seat the same private team notes. Other players only see your public actions.' : 'Buying in starts private team notes for your seat. Other players only see your public actions, not your private discussion.'}</p>
         <form id="pokerPlayJoinForm" class="pokerForm">
           <label>
             Seat
@@ -3686,14 +3722,7 @@
     if (canWaitlist) {
       cards.push(sectionCard('waitlist', `
         <h2>Waitlist</h2>
-        <p>${table?.tableType === 'tournament'
-          ? (tableAccess?.inviteOnly
-            ? 'This invite-only tournament is full. Invited wallets can still queue, and the first eligible waiting wallet is promoted when a seat opens before the schedule locks.'
-            : 'The tournament is full. Queue a buy-in and the first eligible waiting wallet is promoted when a seat opens before the schedule locks.')
-          : (tableAccess?.inviteOnly
-            ? 'This invite-only table is full. Invited wallets can still queue, and the first eligible waiting wallet is promoted when a seat opens.'
-            : 'The table is full. Queue a buy-in and the first eligible waiting wallet is promoted when a seat opens.')}
-        </p>
+        <p>Table full. Join the waitlist.</p>
         ${waitlist?.viewerQueued
           ? `
             <div class="pokerSummary">
@@ -3753,26 +3782,37 @@
           ${renderSummaryMetric('Seat', `${Number(mySeat.seatNumber || 0)}`)}
           ${renderSummaryMetric('Stack', `${Number(mySeat.stackOil || 0)} OIL`)}
           ${renderSummaryMetric('Status', seatStatus)}
-          ${renderSummaryMetric('Role', hand?.actingSeat === Number(mySeat.seatNumber || 0) ? 'acting now' : 'waiting')}
-          ${renderSummaryMetric('Auto Play', formatAutoActLabel(autoAct?.mode))}
-          ${mySeat?.finishPosition ? renderSummaryMetric('Finish', `${Number(mySeat.finishPosition || 0)}`) : ''}
-          ${Number(mySeat?.prizeOil || 0) > 0 ? renderSummaryMetric('Prize', `${Number(mySeat.prizeOil || 0)} OIL`) : ''}
-          ${table?.tableType === 'tournament' && Number(mySeat?.currentBountyOil || 0) > 0 ? renderSummaryMetric('Current Bounty', `${Number(mySeat.currentBountyOil || 0)} OIL`) : ''}
-          ${Number(mySeat?.bountyWonOil || 0) > 0 ? renderSummaryMetric('Bounty Won', `${Number(mySeat.bountyWonOil || 0)} OIL`) : ''}
         </div>
-        ${String(mySeat.status || '').toLowerCase() === 'registered' ? '<p>Your buy-in is posted. You are registered for the next hand and can use the seat thread before cards are dealt to you.</p>' : ''}
-        ${table?.tableType === 'tournament' && String(mySeat.status || '').toLowerCase() === 'busted' && Number(table?.summary?.reentryLimit || 0) > 0 ? '<p>Your last tournament entry busted. Re-entry stays available until late registration closes or the table schedule locks.</p>' : ''}
-        ${table?.tableType === 'tournament' && scheduledBreakActive ? `<p>Scheduled break: ${escapeHtml(String(table?.summary?.scheduledBreakLabel || 'Break'))} until ${escapeHtml(formatIso(table?.summary?.scheduledBreakUntilAt))}.</p>` : ''}
-        ${table?.tableType === 'tournament' && Number(table?.summary?.pendingBlindAdvanceCount || 0) > 0 ? `<p>Director queued ${Number(table?.summary?.pendingBlindAdvanceCount || 0)} blind advance${Number(table?.summary?.pendingBlindAdvanceCount || 0) === 1 ? '' : 's'}; the next hand starts at level ${Number(table?.summary?.upcomingBlindLevel || table?.summary?.blindLevel || hand?.blindLevel || 1)}.</p>` : ''}
-        ${leaveQueued ? '<p>Your cash-out is queued. You stay in this hand, then your remaining stack returns to OIL automatically.</p>' : ''}
-        ${seatSittingOut ? '<p>Your seat is marked to sit out. You keep the same wallet-bound seat and can return without rebuying.</p>' : ''}
-        ${seatAway ? '<p>Your seat is marked away. The wallet-bound seat stays yours until you return or cash out.</p>' : ''}
-        ${table?.tableType === 'cash' && (seatSittingOut || seatAway) ? `<p>Return policy: ${String(table?.summary?.blindReturnPolicy || 'post_big_blind') === 'wait_for_big_blind' ? 'wait for big blind.' : `post big blind (${Number(table?.bigBlindOil || 0)} OIL).`}</p>` : ''}
-        ${blindObligation?.status === 'posted' ? `<p>Blind obligation posted: ${Number(blindObligation?.blindAmountOil || 0)} OIL big blind.</p>` : ''}
-        ${blindObligation?.status === 'waiting' ? `<p>Blind obligation pending: wait for big blind before rejoining normal rotation.</p>` : ''}
-        ${waitlistPromotion?.source === 'tournament_waitlist' ? '<p>Promoted from the tournament waitlist.</p>' : ''}
-        ${adminClosed ? `<p>This table was closed by an operator.${Number(table?.state?.refundedTotalOil || 0) > 0 ? ` Refunds issued: ${Number(table?.state?.refundedTotalOil || 0)} OIL total.` : ''}</p>` : ''}
-        ${mySeat?.finishPosition ? `<p>You currently hold finish position ${Number(mySeat.finishPosition || 0)}.${Number(mySeat?.prizeOil || 0) > 0 ? ` Prize paid: ${Number(mySeat.prizeOil || 0)} OIL.` : ''}${Number(mySeat?.bountyWonOil || 0) > 0 ? ` Bounty won: ${Number(mySeat.bountyWonOil || 0)} OIL.` : ''}</p>` : ''}
+        ${renderAgentContext('your-seat', {
+          seatNumber: Number(mySeat.seatNumber || 0),
+          stackOil: Number(mySeat.stackOil || 0),
+          status: mySeat.status,
+          role: hand?.actingSeat === Number(mySeat.seatNumber || 0) ? 'acting now' : 'waiting',
+          autoPlay: autoAct?.mode || 'off',
+          finishPosition: mySeat?.finishPosition || null,
+          prizeOil: Number(mySeat?.prizeOil || 0),
+          currentBountyOil: Number(mySeat?.currentBountyOil || 0),
+          bountyWonOil: Number(mySeat?.bountyWonOil || 0),
+          registered: String(mySeat.status || '').toLowerCase() === 'registered',
+          busted: String(mySeat.status || '').toLowerCase() === 'busted',
+          leaveQueued,
+          seatSittingOut,
+          seatAway,
+          blindObligation: blindObligation || null,
+          waitlistPromotion: waitlistPromotion || null,
+          scheduledBreakActive,
+          adminClosed,
+        })}
+        ${renderAdvancedPanel('Seat details', 'Role, auto play, finish, prize, and bounty.', `
+          <div class="pokerSummary">
+            ${renderSummaryMetric('Role', hand?.actingSeat === Number(mySeat.seatNumber || 0) ? 'acting now' : 'waiting')}
+            ${renderSummaryMetric('Auto Play', formatAutoActLabel(autoAct?.mode))}
+            ${mySeat?.finishPosition ? renderSummaryMetric('Finish', `${Number(mySeat.finishPosition || 0)}`) : ''}
+            ${Number(mySeat?.prizeOil || 0) > 0 ? renderSummaryMetric('Prize', `${Number(mySeat.prizeOil || 0)} OIL`) : ''}
+            ${table?.tableType === 'tournament' && Number(mySeat?.currentBountyOil || 0) > 0 ? renderSummaryMetric('Current Bounty', `${Number(mySeat.currentBountyOil || 0)} OIL`) : ''}
+            ${Number(mySeat?.bountyWonOil || 0) > 0 ? renderSummaryMetric('Bounty Won', `${Number(mySeat.bountyWonOil || 0)} OIL`) : ''}
+          </div>
+        `)}
         ${adminClosed ? '' : `
           <div class="pokerLinks">
             ${table?.tableType === 'cash' ? `<button id="pokerPlaySitOutButton" class="pokerButton" type="button"${seatSittingOut || seatAway ? ' disabled' : ''}>Sit Out Next Hand</button>` : ''}
@@ -3789,41 +3829,42 @@
               </label>
               <button class="pokerButton" type="submit">Reload Stack</button>
             </form>
-            <div class="pokerLabel">Seat Movement</div>
-            ${cashMovement?.seatChangeAllowed && seatChangeOpenSeatNumbers.length ? `
-              <form id="pokerPlaySeatChangeForm" class="pokerForm">
-                <label>
-                  Open Seat
-                  <select id="pokerPlaySeatChangeNumber">
-                    ${seatChangeOpenSeatNumbers.map((seatNumber) => `<option value="${seatNumber}">Seat ${seatNumber}</option>`).join('')}
-                  </select>
-                </label>
-                <button id="pokerPlaySeatChangeButton" class="pokerButton" type="submit">Change Seat</button>
-              </form>
-            ` : '<p>Seat changes open between hands when another cash seat is available.</p>'}
-            ${transferOptions.length ? `
-              <form id="pokerPlayTransferForm" class="pokerForm" data-transfer-options="${transferOptionsJson}">
-                <label>
-                  Compatible Table
-                  <select id="pokerPlayTransferTableId">
-                    ${transferOptions.map((entry) => `
-                      <option value="${escapeHtml(entry.tableId)}">
-                        ${escapeHtml(entry.title)} · ${Number(entry.occupancy || 0)}/${Number(entry.maxSeats || 6)} · ${Number(entry.smallBlindOil || 0)}/${Number(entry.bigBlindOil || 0)}
-                      </option>
-                    `).join('')}
-                  </select>
-                </label>
-                <label>
-                  Target Seat
-                  <select id="pokerPlayTransferSeatNumber">
-                    ${defaultTransferTarget
-                      ? defaultTransferTarget.openSeatNumbers.map((seatNumber) => `<option value="${seatNumber}">Seat ${seatNumber}</option>`).join('')
-                      : ''}
-                  </select>
-                </label>
-                <button id="pokerPlayTransferButton" class="pokerButton" type="submit">Transfer Table</button>
-              </form>
-            ` : '<p>No compatible cash table is open for transfer right now.</p>'}
+            ${renderAdvancedPanel('Seat movement', 'Change seat or transfer to another table.', `
+              ${cashMovement?.seatChangeAllowed && seatChangeOpenSeatNumbers.length ? `
+                <form id="pokerPlaySeatChangeForm" class="pokerForm">
+                  <label>
+                    Open Seat
+                    <select id="pokerPlaySeatChangeNumber">
+                      ${seatChangeOpenSeatNumbers.map((seatNumber) => `<option value="${seatNumber}">Seat ${seatNumber}</option>`).join('')}
+                    </select>
+                  </label>
+                  <button id="pokerPlaySeatChangeButton" class="pokerButton" type="submit">Change Seat</button>
+                </form>
+              ` : ''}
+              ${transferOptions.length ? `
+                <form id="pokerPlayTransferForm" class="pokerForm" data-transfer-options="${transferOptionsJson}">
+                  <label>
+                    Compatible Table
+                    <select id="pokerPlayTransferTableId">
+                      ${transferOptions.map((entry) => `
+                        <option value="${escapeHtml(entry.tableId)}">
+                          ${escapeHtml(entry.title)} · ${Number(entry.occupancy || 0)}/${Number(entry.maxSeats || 6)} · ${Number(entry.smallBlindOil || 0)}/${Number(entry.bigBlindOil || 0)}
+                        </option>
+                      `).join('')}
+                    </select>
+                  </label>
+                  <label>
+                    Target Seat
+                    <select id="pokerPlayTransferSeatNumber">
+                      ${defaultTransferTarget
+                        ? defaultTransferTarget.openSeatNumbers.map((seatNumber) => `<option value="${seatNumber}">Seat ${seatNumber}</option>`).join('')
+                        : ''}
+                    </select>
+                  </label>
+                  <button id="pokerPlayTransferButton" class="pokerButton" type="submit">Transfer Table</button>
+                </form>
+              ` : ''}
+            `)}
             ` : ''}
         `}
       `, { plane: 'supporting' }));
@@ -3833,7 +3874,6 @@
       const autoAct = mySeat?.autoAct && typeof mySeat.autoAct === 'object' ? mySeat.autoAct : { mode: 'off', enabled: false };
       cards.push(sectionCard('auto-act', `
         <h2>Auto Play Help</h2>
-        <p>Leave automation closed unless you want the seat to keep acting by a rule.</p>
         ${renderFactStrip([
           { label: 'Mode', value: formatAutoActLabel(autoAct?.mode) },
           { label: 'Allow Disconnect', value: autoAct?.allowWhileDisconnected ? 'yes' : 'no' },
@@ -3866,7 +3906,6 @@
     if (Number(review?.openDisputeCount || 0) > 0 || myDisputes.length) {
       cards.push(sectionCard('table-review', `
         <h2>Table Review</h2>
-        <p>Keep review detail folded away unless something is already open.</p>
         ${renderFactStrip([
           { label: 'Status', value: review?.status || 'clear' },
           { label: 'Open Disputes', value: `${Number(review?.openDisputeCount || 0)}` },
@@ -3891,39 +3930,53 @@
       cards.push(sectionCard('series-director', `
         <h2>Series Director</h2>
         <div class="pokerSummary">
-          ${renderSummaryMetric('Series Tables', `${Number(series?.tableCount || 0)}`)}
-          ${renderSummaryMetric('Target Tables', `${Number(series?.targetTableCount || 0)}`)}
           ${renderSummaryMetric('Stage', series?.stage || 'seating')}
-          ${renderSummaryMetric('Break Pending', series?.needsRebalance ? 'yes' : 'no')}
-          ${series?.scheduledStartAt ? renderSummaryMetric('Scheduled Start', formatIso(series?.scheduledStartAt)) : ''}
-          ${series?.scheduledBreakActive ? renderSummaryMetric('Break Until', formatIso(series?.scheduledBreakUntilAt)) : ''}
-          ${Number(series?.scheduledBreakTableCount || 0) > 0 ? renderSummaryMetric('Break Tables', `${Number(series?.scheduledBreakTableCount || 0)}`) : ''}
-          ${Number(series?.nextScheduledBreakAfterHandNumber || 0) > 0 ? renderSummaryMetric('Next Break', `${String(series?.nextScheduledBreakLabel || 'Break')} after hand ${Number(series?.nextScheduledBreakAfterHandNumber || 0)}`) : ''}
-          ${renderSummaryMetric('Entries', `${Number(series?.entryCount || 0)}`)}
-          ${renderSummaryMetric('Bounty Mode', formatTournamentBountyModelLabel(series?.bountyModel))}
-          ${Number(series?.bountyPerEntryOil || 0) > 0 ? renderSummaryMetric('Starting Bounty', `${Number(series?.bountyPerEntryOil || 0)} OIL`) : ''}
-          ${Number(series?.acceptedReentryCount || 0) > 0 || Number(table?.summary?.reentryLimit || 0) > 0 ? renderSummaryMetric('Re-Entries', `${Number(series?.acceptedReentryCount || 0)}`) : ''}
+          ${renderSummaryMetric('Tables', `${Number(series?.tableCount || 0)}`)}
           ${renderSummaryMetric('Prize Pool', `${Number(series?.prizePoolOil || 0)} OIL`)}
-          ${Number(series?.bountyPoolOil || 0) > 0 ? renderSummaryMetric('Bounty Pool', `${Number(series?.bountyPoolOil || 0)} OIL`) : ''}
-          ${Number(series?.totalBountyAwardedOil || 0) > 0 ? renderSummaryMetric('Bounty Paid', `${Number(series?.totalBountyAwardedOil || 0)} OIL`) : ''}
-          ${renderSummaryMetric('Paid Places', `${Number(series?.paidPlaces || 0)}`)}
-          ${Number(series?.refundedTotalOil || 0) > 0 ? renderSummaryMetric('Refunded', `${Number(series?.refundedTotalOil || 0)} OIL`) : ''}
+          ${renderSummaryMetric('Entries', `${Number(series?.entryCount || 0)}`)}
         </div>
+        ${renderAgentContext('series-director', {
+          tableCount: Number(series?.tableCount || 0),
+          targetTableCount: Number(series?.targetTableCount || 0),
+          stage: series?.stage || 'seating',
+          needsRebalance: !!series?.needsRebalance,
+          scheduledStartAt: series?.scheduledStartAt || null,
+          scheduledBreakActive: !!series?.scheduledBreakActive,
+          scheduledBreakUntilAt: series?.scheduledBreakUntilAt || null,
+          scheduledBreakTableCount: Number(series?.scheduledBreakTableCount || 0),
+          nextScheduledBreakAfterHandNumber: Number(series?.nextScheduledBreakAfterHandNumber || 0),
+          entryCount: Number(series?.entryCount || 0),
+          bountyModel: series?.bountyModel || null,
+          bountyPerEntryOil: Number(series?.bountyPerEntryOil || 0),
+          acceptedReentryCount: Number(series?.acceptedReentryCount || 0),
+          prizePoolOil: Number(series?.prizePoolOil || 0),
+          bountyPoolOil: Number(series?.bountyPoolOil || 0),
+          totalBountyAwardedOil: Number(series?.totalBountyAwardedOil || 0),
+          paidPlaces: Number(series?.paidPlaces || 0),
+          refundedTotalOil: Number(series?.refundedTotalOil || 0),
+          pendingBreakTableId: series?.pendingBreakTableId || null,
+          pendingBreakSeatCount: Number(series?.pendingBreakSeatCount || 0),
+        })}
         ${renderSeriesClosureNotice(series)}
-        ${series?.scheduledBreakActive ? `<p>Scheduled break is active across ${Number(series?.scheduledBreakTableCount || 0)} table${Number(series?.scheduledBreakTableCount || 0) === 1 ? '' : 's'} until ${escapeHtml(formatIso(series?.scheduledBreakUntilAt))}.</p>` : ''}
-        ${String(series?.stage || '') === 'cancelled'
-          ? '<p>No active tables remain in this series. Operator review and export stay available on the closed table records.</p>'
-          : series?.pendingBreakTableId
-          ? `<p>${escapeHtml(series.pendingBreakTableId)} is the current break candidate with ${Number(series?.pendingBreakSeatCount || 0)} active seat${Number(series?.pendingBreakSeatCount || 0) === 1 ? '' : 's'}${series?.pendingBreakBlockedByLiveTable ? '; the table must finish its live hand before seats can move.' : '.'}</p>`
-          : (series?.needsRebalance
-            ? `<p>Director target: rebalance toward ${Number(series?.targetTableCount || 0)} table${Number(series?.targetTableCount || 0) === 1 ? '' : 's'} across the current live field.</p>`
-            : '<p>The tournament series is currently balanced for its active field.</p>')}
-        <div class="pokerLabel">Payout Ladder</div>
-        ${renderPayoutPlan(series?.payouts)}
-        ${Array.isArray(series?.standings) && series.standings.length ? `
-          <div class="pokerLabel">Final Placements</div>
-          ${renderSeriesStandings(series.standings)}
-        ` : ''}
+        ${renderAdvancedPanel('Full series details', 'All series metrics, payouts, and standings.', `
+          <div class="pokerSummary">
+            ${renderSummaryMetric('Target Tables', `${Number(series?.targetTableCount || 0)}`)}
+            ${renderSummaryMetric('Break Pending', series?.needsRebalance ? 'yes' : 'no')}
+            ${series?.scheduledStartAt ? renderSummaryMetric('Scheduled Start', formatIso(series?.scheduledStartAt)) : ''}
+            ${series?.scheduledBreakActive ? renderSummaryMetric('Break Until', formatIso(series?.scheduledBreakUntilAt)) : ''}
+            ${renderSummaryMetric('Bounty Mode', formatTournamentBountyModelLabel(series?.bountyModel))}
+            ${Number(series?.bountyPerEntryOil || 0) > 0 ? renderSummaryMetric('Starting Bounty', `${Number(series?.bountyPerEntryOil || 0)} OIL`) : ''}
+            ${Number(series?.bountyPoolOil || 0) > 0 ? renderSummaryMetric('Bounty Pool', `${Number(series?.bountyPoolOil || 0)} OIL`) : ''}
+            ${renderSummaryMetric('Paid Places', `${Number(series?.paidPlaces || 0)}`)}
+            ${Number(series?.refundedTotalOil || 0) > 0 ? renderSummaryMetric('Refunded', `${Number(series?.refundedTotalOil || 0)} OIL`) : ''}
+          </div>
+          <div class="pokerLabel">Payout Ladder</div>
+          ${renderPayoutPlan(series?.payouts)}
+          ${Array.isArray(series?.standings) && series.standings.length ? `
+            <div class="pokerLabel">Final Placements</div>
+            ${renderSeriesStandings(series.standings)}
+          ` : ''}
+        `)}
         <div class="pokerLinks">
           <a href="${escapeHtml(buildPokerHref(`/poker/play/series/${encodeURIComponent(series?.seriesId || '')}/timeline`))}">Series Timeline</a>
           <a href="${escapeHtml(buildPokerHref(`/poker/play/rail/series/${encodeURIComponent(series?.seriesId || '')}/timeline`))}">Public Timeline</a>
@@ -3960,7 +4013,6 @@
           </div>
         </div>
         ${renderMatchedPots(hand?.result)}
-        ${seats.some((seat) => seat.isActing && seat.presenceStatus === 'disconnected') ? '<p>The acting seat is disconnected. The reconnect grace window is holding the clock before timeout action takes over.</p>' : ''}
       `, { plane: 'primary' }));
     }
 
@@ -3968,7 +4020,6 @@
       const proposal = data?.agentProposal && typeof data.agentProposal === 'object' ? data.agentProposal : null;
       cards.push(sectionCard('worker-seat-agent', `
         <h2>AI Teammate Suggestion</h2>
-        <p>Ask for a quick line when you want it. The full rationale stays hidden until you open it.</p>
         ${proposal
           ? renderFactStrip([
             { label: 'Action', value: proposal.actionKind || 'hold' },
@@ -3998,8 +4049,7 @@
     if (!publicRail && !adminClosed && mySeat && hand) {
       cards.push(sectionCard('flag-review', `
         <h2>Flag Hand For Review</h2>
-        <p>Only open this if there is a real rule, turn-order, disconnect, or settlement issue.</p>
-        ${hasOpenMyHandDispute ? '<p>You already flagged this hand for review.</p>' : '<p>No open review from your seat.</p>'}
+        ${hasOpenMyHandDispute ? '<p>You already flagged this hand for review.</p>' : ''}
         ${renderAdvancedPanel('Open review form', 'Category and note for the operator queue.', `
           <form id="pokerPlayDisputeForm" class="pokerForm">
             <label>
@@ -4028,7 +4078,6 @@
     if (!publicRail && !adminClosed && mySeat && hand) {
       cards.push(sectionCard('seat-thread', `
         <h2>Team Notes</h2>
-        <p>Open the team note thread when you want the full back-and-forth. The table stays cleaner when it is closed.</p>
         ${renderFactStrip([
           { label: 'Messages', value: `${messages.length}` },
           { label: 'Latest', value: messages.length ? String(messages[messages.length - 1]?.authorRole || 'team') : 'none' },
@@ -4057,7 +4106,7 @@
     if (!publicRail && !adminClosed && mySeat && hand && paused) {
       cards.push(sectionCard('submit-action', `
         <h2>Submit Action</h2>
-        <p>Table play is paused by an operator. Your seat thread remains visible, but no new poker action can be submitted until the table resumes.</p>
+        <p>Paused</p>
       `, { plane: 'primary', state: 'paused' }));
     } else if (!publicRail && !adminClosed && mySeat && hand && Array.isArray(hand.viewerAllowedActions) && hand.viewerAllowedActions.length) {
       const shoveToOil = Number(mySeat.committedStreetOil || 0) + Number(mySeat.stackOil || 0);
