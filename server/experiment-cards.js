@@ -27,6 +27,19 @@ function getCardsForStory(storyId) {
 
 const VALID_STATUSES = ['pending_review', 'kept', 'discarded', 'refined'];
 
+function truncateSourceMap(sourceMap, maxTotalBytes) {
+  if (!sourceMap || typeof sourceMap !== 'object') return null;
+  let total = 0;
+  const result = {};
+  for (const [path, content] of Object.entries(sourceMap)) {
+    const str = typeof content === 'string' ? content : '';
+    total += str.length;
+    if (total > maxTotalBytes) break;
+    result[String(path).slice(0, 200)] = str;
+  }
+  return Object.keys(result).length > 0 ? result : null;
+}
+
 function clampString(value, maxLen) {
   if (typeof value !== 'string') return '';
   return value.length > maxLen ? value.slice(0, maxLen) : value;
@@ -110,8 +123,8 @@ function createExperimentCard(problemStoryId, opts = {}) {
 
     // Code artifact (Phase S1 — sandbox system)
     artifact: opts.artifact ? {
-      source: opts.artifact.source || null,
-      compiled: opts.artifact.compiled || null,
+      source: truncateSourceMap(opts.artifact.source, 500000),  // 500KB max
+      compiled: truncateSourceMap(opts.artifact.compiled, 500000),
       snapshotZip: null, // Binary — stored separately, not in JSON
       outputType: ['terminal', 'html', 'data'].includes(opts.artifact.outputType) ? opts.artifact.outputType : null,
       outputPreview: clampString(opts.artifact.outputPreview || '', 10000),

@@ -19,8 +19,26 @@ const router = Router();
 /** @type {Map<string, { id: string, contentHash: string, size: number, createdAt: string, problemStoryId: string, cardId: string, data: Buffer }>} */
 const snapshots = new Map();
 
+const SNAPSHOT_TTL_MS = 60 * 60 * 1000; // 1 hour
+const MAX_SNAPSHOTS = 100;
+
 function sha256hex(buf) {
   return crypto.createHash('sha256').update(buf).digest('hex');
+}
+
+function cleanupSnapshots() {
+  const now = Date.now();
+  for (const [id, snap] of snapshots) {
+    const created = new Date(snap.createdAt).getTime();
+    if (now - created > SNAPSHOT_TTL_MS) snapshots.delete(id);
+  }
+  // Hard cap: evict oldest if over limit
+  if (snapshots.size > MAX_SNAPSHOTS) {
+    const sorted = [...snapshots.entries()].sort((a, b) => a[1].createdAt.localeCompare(b[1].createdAt));
+    while (snapshots.size > MAX_SNAPSHOTS) {
+      snapshots.delete(sorted.shift()[0]);
+    }
+  }
 }
 
 // ── Routes ──────────────────────────────────────────────────
@@ -29,6 +47,7 @@ function sha256hex(buf) {
 // Content-Type: application/octet-stream (raw binary body)
 // Headers: x-problem-story-id, x-card-id (optional metadata)
 router.post('/snapshot', (req, res) => {
+  cleanupSnapshots();
   const chunks = [];
   const maxSize = 50 * 1024 * 1024; // 50 MB limit
   let totalSize = 0;

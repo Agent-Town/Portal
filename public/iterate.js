@@ -121,7 +121,13 @@
 
   function setAvatarSrc(imgId, src) {
     const img = el(imgId);
-    if (img) img.src = src;
+    if (!img) return;
+    // Validate data URLs to prevent injection from tampered localStorage
+    if (src && src.startsWith('data:') && !src.startsWith('data:image/')) {
+      img.src = DEFAULT_USER_AVATAR;
+      return;
+    }
+    img.src = src;
   }
 
   function initAvatarUpload(inputId, imgId, onLoaded) {
@@ -148,6 +154,9 @@
   let brainPollTimer = null;
   let oauthAttemptId = null;
   let oauthPollTimer = null;
+  let oauthExchangeInFlight = false;
+  let oauthPollCount = 0;
+  const OAUTH_POLL_MAX = 120; // ~3 minutes at 1.5s intervals
 
   const DEFAULT_FREE_MODEL = 'minimax/minimax-m2.5:free';
   const DEFAULT_FREE_PROVIDER = 'openrouter';
@@ -218,8 +227,18 @@
 
   function startOAuthPoll() {
     stopOAuthPoll();
+    oauthPollCount = 0;
     oauthPollTimer = setInterval(async () => {
       if (!oauthAttemptId) return;
+      oauthPollCount++;
+      if (oauthPollCount > OAUTH_POLL_MAX) {
+        stopOAuthPoll();
+        const statusEl = el('openrouterStatus');
+        if (statusEl) statusEl.textContent = 'OAuth timed out. Try again.';
+        const btn = el('openrouterConnectBtn');
+        if (btn) btn.disabled = false;
+        return;
+      }
 
       try {
         const status = await apiFetch(`/api/iterate/oauth/openrouter/status?attemptId=${oauthAttemptId}`);
@@ -254,6 +273,8 @@
   }
 
   async function exchangeOpenRouterCode() {
+    if (oauthExchangeInFlight) return;
+    oauthExchangeInFlight = true;
     const statusEl = el('openrouterStatus');
     if (statusEl) statusEl.textContent = 'Exchanging code for API key...';
 
@@ -286,6 +307,8 @@
       if (statusEl) statusEl.textContent = `Exchange failed: ${e.message}`;
       const btn = el('openrouterConnectBtn');
       if (btn) btn.disabled = false;
+    } finally {
+      oauthExchangeInFlight = false;
     }
   }
 
@@ -331,13 +354,19 @@
     return false;
   }
 
+  let brainPollCount = 0;
+  const BRAIN_POLL_MAX = 200; // ~5 minutes at 1.5s intervals
+
   function startBrainDetectionLoop() {
     stopBrainDetectionLoop();
+    brainPollCount = 0;
     brainPollTimer = setInterval(async () => {
-      const ready = await checkBrainConfig();
-      if (ready && currentPhase === 'brain_config') {
-        // Don't auto-advance — let user click Continue
+      brainPollCount++;
+      if (brainPollCount > BRAIN_POLL_MAX) {
+        stopBrainDetectionLoop();
+        return;
       }
+      await checkBrainConfig();
     }, 1500);
   }
 
@@ -1226,11 +1255,11 @@
   async function runCodeInSandbox(files, entrypoint) {
     if (!sandbox || !sandbox.ready) {
       return {
-        stdout: '(sandbox not available — text-only mode)',
-        stderr: '',
-        exitCode: 0,
+        stdout: '',
+        stderr: 'Sandbox not available — code was not executed.',
+        exitCode: null,
         executionMs: 0,
-        phase: 'skipped',
+        phase: 'unavailable',
       };
     }
     try {
@@ -1338,6 +1367,14 @@
   function escapeAttr(str) {
     return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
+
+  // ── Cleanup ────────────────────────────────────────────────
+  function cleanupAllTimers() {
+    stopBrainDetectionLoop();
+    stopOAuthPoll();
+    if (sessionCtxTimer) { clearInterval(sessionCtxTimer); sessionCtxTimer = null; }
+  }
+  window.addEventListener('beforeunload', cleanupAllTimers);
 
   // ── Init ──────────────────────────────────────────────────
   async function init() {

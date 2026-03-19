@@ -52,7 +52,7 @@ function cleanup() {
 router.post('/start', (req, res) => {
   cleanup();
 
-  const callbackUrl = `${req.protocol}://${req.get('host')}/api/iterate/oauth/openrouter/callback`;
+  const callbackUrl = `${req.protocol}://${req.get('host')}/api/iterate/oauth/openrouter/callback?attemptId=${attemptId}`;
   const { verifier, challenge } = createPkce();
   const attemptId = `or_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
   const now = Date.now();
@@ -84,22 +84,24 @@ router.post('/start', (req, res) => {
 
 // GET /callback — OpenRouter redirects here with ?code=...
 router.get('/callback', (req, res) => {
+  cleanup();
   const code = typeof req.query?.code === 'string' ? req.query.code.trim() : '';
+  const attemptId = typeof req.query?.attemptId === 'string' ? req.query.attemptId.trim() : '';
 
   if (!code) {
     return res.status(400).send('Missing authorization code from OpenRouter.');
   }
 
-  // Find the most recent pending attempt
-  let matched = null;
-  for (const [, attempt] of attemptsById) {
-    if (attempt.status === 'pending') {
-      matched = attempt;
-    }
+  // Look up the specific attempt by ID (prevents CSRF matching wrong attempt)
+  const matched = attemptId ? attemptsById.get(attemptId) : null;
+
+  if (!matched || matched.status !== 'pending') {
+    return res.status(400).send('OAuth attempt not found or expired. Please try again.');
   }
 
-  if (!matched) {
-    return res.status(400).send('No pending OAuth attempt found. Please try again.');
+  if (Date.now() > matched.expiresAtMs) {
+    attemptsById.delete(attemptId);
+    return res.status(400).send('OAuth attempt expired. Please try again.');
   }
 
   matched.code = code;
