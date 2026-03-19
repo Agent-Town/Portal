@@ -40,6 +40,26 @@ function codeFingerprint(text) {
 }
 
 /**
+ * Build fingerprint input from actual code artifacts when available,
+ * falling back to problem description if no code exists.
+ */
+function buildCodeFingerprintInput(cards, fallbackDescription) {
+  // Collect all artifact source code from kept/best cards
+  const sources = [];
+  for (const card of cards) {
+    if (card.artifact?.source && typeof card.artifact.source === 'object') {
+      for (const [path, content] of Object.entries(card.artifact.source)) {
+        if (typeof content === 'string' && content.length > 0) {
+          sources.push(`${path}:${content}`);
+        }
+      }
+    }
+  }
+  // Use code if available, otherwise fall back to description
+  return sources.length > 0 ? sources.join('\n') : (fallbackDescription || '');
+}
+
+/**
  * Extract keywords from problem description.
  * Very simple: split on non-word chars, deduplicate, return top N.
  * @param {string} text
@@ -185,7 +205,7 @@ router.post('/published-streams', (req, res) => {
     publishedAt: new Date().toISOString(),
     problemDescription: story.problemDescription,
     problemDomain: [],
-    codeFingerprint: codeFingerprint(story.problemDescription),
+    codeFingerprint: codeFingerprint(buildCodeFingerprintInput(allCards, story.problemDescription)),
     totalIterations: story.totalIterations || allCards.length,
     convergenceSpeed,
     bestCompositeScore: Math.round(bestCompositeScore * 100) / 100,

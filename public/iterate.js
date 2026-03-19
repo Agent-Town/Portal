@@ -1008,41 +1008,8 @@
     }
   }
 
-  // ── Experiment execution ──────────────────────────────────
-  async function runExperimentRound() {
-    if (!storyId) return;
-
-    const roundLabel = el('roundLabel');
-    if (roundLabel) roundLabel.textContent = 'Running experiments...';
-
-    try {
-      const result = await apiFetch('/api/experiments/start', {
-        method: 'POST',
-        body: JSON.stringify({ problemStoryId: storyId, timeBudgetMs: 420000 }),
-      });
-
-      currentRound = result.roundNumber || currentRound + 1;
-      if (roundLabel) roundLabel.textContent = `Round ${currentRound} · ${result.cards?.length || 0} experiments`;
-
-      if (result.cards) {
-        result.cards.forEach(card => renderExperimentCard(card));
-        experimentCards.push(...result.cards);
-      }
-
-      await updateScoreTrend();
-      await checkConvergence();
-
-      if (gateway && typeof gateway.send === 'function' && result.cards?.length) {
-        const best = result.cards.reduce((a, b) => (a.compositeScore > b.compositeScore ? a : b));
-        gateway.send({
-          type: 'chat',
-          text: `Round ${currentRound} complete. ${result.cards.length} experiments. Best score: ${best.compositeScore.toFixed(2)}. Summary: "${best.agentSummary}". Please ask for my feedback or suggest what to try next.`,
-        });
-      }
-    } catch (e) {
-      appendMessage('system', `Experiment error: ${e.message}`);
-    }
-  }
+  // runExperimentRound removed — experiments are now created by the agent
+  // via agent_town_iterate_submit_code tool, not the simulated server endpoint.
 
   function renderExperimentCard(card) {
     const feed = el('experimentFeed');
@@ -1232,7 +1199,8 @@
 
     el('keepGoingBtn')?.addEventListener('click', () => {
       hide('convergenceMessage');
-      runExperimentRound();
+      appendMessage('system', 'Continuing iteration. Ask the agent for the next experiment.');
+      sendToAgent('Please generate another experiment round, incorporating all feedback so far.');
     });
   }
 
@@ -1275,53 +1243,8 @@
     }
   }
 
-  /**
-   * Export the current sandbox workspace as a zip and store it on the server.
-   * Returns { snapshotId, contentHash, size } or null on failure.
-   */
-  async function exportAndStoreSnapshot(cardId) {
-    if (!sandbox || typeof sandbox.exportZip !== 'function') return null;
-    try {
-      const zip = await sandbox.exportZip();
-      const res = await fetch('/api/sandbox/snapshot', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/octet-stream',
-          'x-problem-story-id': storyId || '',
-          'x-card-id': cardId || '',
-        },
-        body: zip,
-      });
-      if (!res.ok) return null;
-      return await res.json();
-    } catch {
-      return null;
-    }
-  }
-
-  /**
-   * Extract TypeScript code blocks from an agent message.
-   * Returns a files object { 'src/index.ts': '...' } or null.
-   */
-  function extractCodeFromMessage(text) {
-    // Match fenced code blocks with ts/typescript language
-    const tsPattern = /```(?:typescript|ts)\s*\n([\s\S]*?)```/gi;
-    const matches = [...text.matchAll(tsPattern)];
-    if (matches.length === 0) return null;
-
-    // Single block → src/index.ts
-    if (matches.length === 1) {
-      return { 'src/index.ts': matches[0][1].trim() };
-    }
-
-    // Multiple blocks → src/index.ts, src/module1.ts, etc.
-    const files = {};
-    matches.forEach((m, i) => {
-      const name = i === 0 ? 'src/index.ts' : `src/module${i}.ts`;
-      files[name] = m[1].trim();
-    });
-    return files;
-  }
+  // exportAndStoreSnapshot removed — export button handler does this inline.
+  // extractCodeFromMessage removed — conversation-flow.js handles code extraction.
 
   // ── Session Context debug panel ────────────────────────────
   // app.js's poll loop calls /api/state which doesn't work on the iterate
