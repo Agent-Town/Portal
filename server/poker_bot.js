@@ -398,7 +398,35 @@ function runBotSeatManager(deps) {
 // Admin API helper
 // ---------------------------------------------------------------------------
 
-function registerBotRoutes(app) {
+function fillTableWithBots(deps, tableId, { count } = {}) {
+  if (!tableId) return [];
+  const table = typeof deps.getPokerPlayTableById === 'function'
+    ? deps.getPokerPlayTableById(tableId)
+    : null;
+  if (!table) return [];
+  const seats = typeof deps.listPokerPlaySeatsByTable === 'function'
+    ? deps.listPokerPlaySeatsByTable(tableId)
+    : [];
+  const activeSeatList = seats.filter((seat) => {
+    const status = String(seat?.status || '').toLowerCase();
+    return status !== 'busted' && status !== 'advanced' && status !== 'paid' && status !== 'void_refund';
+  });
+  const maxSeats = Number(table.maxSeats || 6);
+  const available = maxSeats - activeSeatList.length;
+  const toSeat = Math.min(
+    typeof count === 'number' && count > 0 ? count : available,
+    available,
+    POKER_BOTS.length
+  );
+  if (toSeat <= 0) return [];
+  return seatBotsAtTable(deps, tableId, toSeat, seats, table);
+}
+
+let _botRouteDeps = null;
+
+function registerBotRoutes(app, deps) {
+  _botRouteDeps = deps || null;
+
   app.get('/api/poker/bots/config', (_req, res) => {
     res.json({ ok: true, data: getBotConfig() });
   });
@@ -411,6 +439,17 @@ function registerBotRoutes(app) {
 
   app.get('/api/poker/bots', (_req, res) => {
     res.json({ ok: true, data: { bots: POKER_BOTS, config: getBotConfig() } });
+  });
+
+  app.post('/api/poker/bots/fill/:tableId', (req, res) => {
+    const d = _botRouteDeps;
+    if (!d) return res.status(500).json({ ok: false, error: { code: 'NOT_READY', message: 'Bot system not initialized.' } });
+    const tableId = String(req.params.tableId || '').trim();
+    if (!tableId) return res.status(400).json({ ok: false, error: { code: 'MISSING_TABLE_ID', message: 'Table ID is required.' } });
+    const count = typeof req.body?.count === 'number' ? req.body.count : undefined;
+    const seated = fillTableWithBots(d, tableId, { count });
+    console.log(`[poker_bot] Manual fill: ${seated.length} bot(s) at ${tableId}`);
+    res.json({ ok: true, data: { seated: seated.length, bots: seated.map((s) => ({ seatNumber: s.seatNumber, displayName: s.displayName, walletSubject: s.walletSubject })) } });
   });
 }
 

@@ -3610,6 +3610,7 @@
             <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(table?.tableId || '')}/history`, { status: 'completed' }))}">Hand History</a>
             <a href="${escapeHtml(buildPokerHref('/poker/play/results'))}">My Results</a>
             ${series && table?.tableType === 'tournament' ? `<a href="${escapeHtml(buildPokerHref(`/poker/play/series/${encodeURIComponent(series?.seriesId || '')}/timeline`))}">Series Timeline</a>` : ''}
+            ${Number(table?.summary?.openSeatCount || 0) > 0 && !adminClosed ? `<button id="pokerFillBotsButton" class="pokerButton" type="button" data-table-id="${escapeHtml(table?.tableId || '')}">Fill with Bots</button>` : ''}
           </div>
         `}
       `, { plane: 'supporting' }),
@@ -4147,6 +4148,28 @@
     }
 
     return cards;
+  }
+
+  function bindFillBotsButton(tableId) {
+    const button = document.getElementById('pokerFillBotsButton');
+    if (!button) return;
+    button.addEventListener('click', async () => {
+      if (button.disabled) return;
+      button.disabled = true;
+      button.textContent = 'Filling...';
+      setStatus('Filling table with bots...');
+      try {
+        await api(`/api/poker/bots/fill/${encodeURIComponent(tableId)}`, {
+          method: 'POST',
+          body: JSON.stringify({}),
+        });
+        await loadPlayTable(tableId);
+      } catch (err) {
+        setStatus(`Bot fill failed: ${err.code || err.message || 'UNKNOWN'}`);
+        button.disabled = false;
+        button.textContent = 'Fill with Bots';
+      }
+    });
   }
 
   function bindPlayJoinForm(tableId) {
@@ -5162,6 +5185,7 @@
     renderCards(renderPlayTableCards(data, { rail }));
     applyPlayTableDesignLayout(data, { rail });
     if (!rail) {
+      bindFillBotsButton(tableId);
       bindPlayJoinForm(tableId);
       bindWaitlistControls(tableId);
       bindPlayReloadForm(tableId);

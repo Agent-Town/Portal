@@ -4504,15 +4504,16 @@ const pokerRouteRuntime = registerPokerRoutes(app, {
 registerExperienceRoutes(app);
 
 const { runBotSeatManager, registerBotRoutes } = require('./poker_bot');
-registerBotRoutes(app);
-runBotSeatManager({
+const pokerBotDeps = {
   listPokerPlayTables: (...args) => listPokerPlayTables(...args),
   listPokerPlaySeatsByTable: (...args) => listPokerPlaySeatsByTable(...args),
   getPokerPlayTableById: (...args) => getPokerPlayTableById(...args),
   upsertPokerPlaySeat: (...args) => upsertPokerPlaySeat(...args),
   createOilLedgerEntry: (...args) => createOilLedgerEntry(...args),
   nowIso: () => new Date().toISOString(),
-});
+};
+registerBotRoutes(app, pokerBotDeps);
+runBotSeatManager(pokerBotDeps);
 
 const pokerOilProcessingDeps = {
   createOilLedgerEntry,
