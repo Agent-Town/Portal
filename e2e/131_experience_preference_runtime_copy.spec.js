@@ -110,6 +110,17 @@ test('mainland preset localizes deep house runtime errors', async ({ page }) => 
   const preference = buildPreference('cn-mainland');
 
   await seedExperiencePreference(page, 'cn-mainland');
+  await page.route('**/api/experience/bootstrap', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        defaultPresetId: 'global-default',
+        current: preference,
+      })
+    });
+  });
   await page.route('**/api/state', async (route) => {
     await route.fulfill({
       status: 200,
