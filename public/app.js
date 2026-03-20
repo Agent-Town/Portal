@@ -6693,9 +6693,39 @@ async function completeOpenRouterOAuthFromUi() {
     stopOpenRouterOAuthPoll();
     await autoConfigureBrainFromOpenRouter(credential);
 
+    // Signal the server that brain is configured (mirrors manual Connect Brain path)
+    try {
+      const serverSync = await api('/api/agent/lite/llm/config', {
+        method: 'PUT',
+        body: JSON.stringify({ hasCredential: true })
+      });
+      if (serverSync?.ok) {
+        const freshState = await api('/api/state');
+        if (freshState?.ok) lastState = freshState;
+      }
+    } catch (syncErr) {
+      console.warn('server brain signal failed after OpenRouter OAuth (brain still saved locally)', syncErr);
+    }
+
+    // Bootstrap runtime and connect agent so the user can actually talk
+    if (isVendorLite(lastState)) {
+      const booted = await bootstrapVendorRuntime();
+      if (booted) {
+        await connectLiteAgent();
+      }
+    }
+
+    // Refresh state and re-bind so Continue enables correctly
+    try {
+      const freshState = await api('/api/state');
+      if (freshState?.ok) {
+        lastState = freshState;
+        updateUI(lastState);
+      }
+    } catch (_) { /* best-effort */ }
+    bindBrainDistrictControls();
+
     if (statusEl) statusEl.textContent = tApp('brain.tier.free.status.complete');
-    const continueBtn = el('brainContinueBtn');
-    if (continueBtn) continueBtn.disabled = false;
     openRouterOAuthAttempt = null;
   } catch (err) {
     const code = String(err?.message || '').trim();
@@ -7746,19 +7776,21 @@ async function bootstrapVendorRuntime() {
   runtimeBootstrapPromise = (async () => {
     pendingRuntimeBootstrap = true;
     try {
-      const manifestResp = await fetch('/openclaw-lite/manifest.json', {
-        credentials: 'include',
-        cache: 'no-store'
-      });
-      if (!manifestResp.ok) throw new Error(`MANIFEST_HTTP_${manifestResp.status}`);
-      const manifest = await manifestResp.json().catch(() => ({}));
-      const runtimeWorkerRaw = manifest?.entrypoints?.runtimeWorker;
-      const runtimeWorkerPath =
-        typeof runtimeWorkerRaw === 'string' &&
-          runtimeWorkerRaw.startsWith('/openclaw-lite/') &&
-          !runtimeWorkerRaw.startsWith('node:')
-          ? runtimeWorkerRaw
-          : '/openclaw-lite/runtime-worker.js';
+      // Try manifest first; fall back to default paths if missing/invalid
+      let runtimeWorkerPath = '/openclaw-lite/runtime-worker.js';
+      try {
+        const manifestResp = await fetch('/openclaw-lite/manifest.json', {
+          credentials: 'include',
+          cache: 'no-store'
+        });
+        if (manifestResp.ok) {
+          const manifest = await manifestResp.json().catch(() => ({}));
+          const raw = manifest?.entrypoints?.runtimeWorker;
+          if (typeof raw === 'string' && raw.startsWith('/openclaw-lite/') && !raw.startsWith('node:')) {
+            runtimeWorkerPath = raw;
+          }
+        }
+      } catch (_) { /* manifest optional — use default path */ }
       fetch(runtimeWorkerPath, {
         credentials: 'include',
         cache: 'no-store'
