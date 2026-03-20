@@ -1,5 +1,13 @@
 const { expect } = require('@playwright/test');
+const { DEFAULT_TEST_TOKEN_ADDRESS } = require('./phase1');
 const { selectStartPreset } = require('./experience');
+
+const TEST_TOWNHALL_MINT_IDS = {
+  userEvm: '11155111:456',
+  userSolana: 'solana:user-asset-789',
+  agentEvm: '11155111:457',
+  agentSolana: 'solana:agent-asset-790'
+};
 
 async function fetchSessionState(page) {
   return page.evaluate(async () => {
@@ -81,6 +89,40 @@ async function pressOpenViaAgentApi(page) {
   return { teamCode };
 }
 
+async function isHouseRoute(page) {
+  return /\/house(?:\?|$)/.test(String(page.url() || ''));
+}
+
+async function waitForHouseRoute(page, timeout = 2000) {
+  if (await isHouseRoute(page)) return true;
+  try {
+    await page.waitForURL((url) => /\/house(?:\?|$)/.test(String(url || '')), { timeout });
+    return true;
+  } catch {
+    return await isHouseRoute(page);
+  }
+}
+
+async function waitForWalletCheckProgress(page, {
+  priorStatus = '',
+  timeout = 2500
+} = {}) {
+  const walletStatus = page.locator('#walletStatus');
+  try {
+    await expect.poll(async () => {
+      if (await isHouseRoute(page)) return 'house';
+      if (await walletStatus.count()) {
+        const nextStatus = String((await walletStatus.first().textContent().catch(() => '')) || '').trim();
+        if (nextStatus && nextStatus !== String(priorStatus || '').trim()) return 'status';
+      }
+      return 'wait';
+    }, { timeout }).not.toBe('wait');
+    return true;
+  } catch {
+    return await isHouseRoute(page);
+  }
+}
+
 async function ensureAppShell(page, { navigate = true } = {}) {
   if (navigate) {
     await page.goto('/');
@@ -146,6 +188,66 @@ async function ensureHouseDistrictVisible(page) {
   await expect(body).not.toHaveClass(/is-loading/, { timeout: 5000 });
 }
 
+async function ensureTownhallDistrictVisible(page) {
+  const townhallVisible = async () => {
+    const candidates = [
+      page.locator('#townhallStepHuman'),
+      page.locator('#townhallStepAgent'),
+      page.locator('#townhallStepProcessing'),
+      page.getByTestId('townhall-single-path-note'),
+      page.locator('#step1Panel'),
+      page.locator('#step2Panel')
+    ];
+    for (const locator of candidates) {
+      const count = await locator.count().catch(() => 0);
+      if (!count) continue;
+      if (await locator.first().isVisible().catch(() => false)) return true;
+    }
+    return false;
+  };
+
+  if (await isHouseRoute(page)) return;
+  if (await townhallVisible()) return;
+
+  const backdrop = page.locator('#districtModalBackdrop');
+  if (await backdrop.isVisible().catch(() => false)) {
+    const closeBtn = page.locator('#districtModalClose');
+    if (await closeBtn.isVisible().catch(() => false)) {
+      await closeBtn.click();
+    }
+  }
+
+  if (await isHouseRoute(page)) return;
+  if (await townhallVisible()) return;
+
+  const openTownhallBtn = page.getByRole('button', { name: /Open Town Hall/i });
+  if (await openTownhallBtn.count()) {
+    const target = openTownhallBtn.first();
+    if (await target.isVisible().catch(() => false)) {
+      await target.click();
+    }
+  }
+
+  if (!(await townhallVisible()) && !(await isHouseRoute(page))) {
+    const townhallSpot = page.locator('.townDistrictHotspot[data-district="townhall"]');
+    if (await townhallSpot.count()) {
+      await townhallSpot.first().click({ force: true }).catch(() => {});
+    }
+  }
+
+  await expect.poll(async () => {
+    if (await isHouseRoute(page)) return 'house';
+    if (await townhallVisible()) return 'townhall';
+    return 'wait';
+  }, { timeout: 8000 }).not.toBe('wait');
+
+  if (await isHouseRoute(page)) return;
+  const body = page.locator('#districtModalBody');
+  if (await body.count()) {
+    await expect(body).not.toHaveClass(/is-loading/, { timeout: 5000 }).catch(() => {});
+  }
+}
+
 async function ensureAgentPanelExpanded(page) {
   const sidebar = page.locator('#agentSidebar');
   if (!(await sidebar.count())) return;
@@ -177,11 +279,12 @@ async function ensureBrainPanelVisible(page) {
 
 async function enterHatch(page, intent = 'signin', { navigate = true } = {}) {
   await ensureAppShell(page, { navigate });
+  if (await isHouseRoute(page)) return;
 
   const legacyAuthBtn = page.getByTestId(`auth-${intent}`);
   if (await legacyAuthBtn.count()) {
     const target = legacyAuthBtn.first();
-    if (await target.isVisible()) {
+    if (await target.isVisible().catch(() => false)) {
       await target.click();
       const legacyHatchPanel = page.getByTestId('hatch-panel');
       if (await legacyHatchPanel.count()) {
@@ -191,53 +294,108 @@ async function enterHatch(page, intent = 'signin', { navigate = true } = {}) {
     }
   }
 
-  await ensureHouseDistrictVisible(page);
-  const preferredPath = page.getByTestId(intent === 'signin' ? 'path-human' : 'path-coop');
-  if (await preferredPath.count()) {
-    const target = preferredPath.first();
-    if (await target.isVisible()) {
-      await target.click();
+  await ensureTownhallDistrictVisible(page);
+  await expect.poll(async () => {
+    if (await isHouseRoute(page)) return 'house';
+    const candidates = [
+      page.locator('#townhallStepHuman'),
+      page.locator('#townhallStepAgent'),
+      page.locator('#townhallStepProcessing'),
+      page.getByTestId('townhall-single-path-note'),
+      page.locator('#step1Panel'),
+      page.locator('#step2Panel')
+    ];
+    for (const locator of candidates) {
+      const count = await locator.count().catch(() => 0);
+      if (!count) continue;
+      if (await locator.first().isVisible().catch(() => false)) return 'townhall';
     }
-  }
-
-  const hatchPanel = page.getByTestId('hatch-panel');
-  if (await hatchPanel.count()) {
-    await expect(hatchPanel).toBeVisible({ timeout: 1500 });
-  } else {
-    const pathPanel = page.locator('#pathPanel');
-    if (await pathPanel.count()) {
-      await expect(pathPanel).toBeVisible({ timeout: 1500 });
-    } else {
-      await expect(page.getByTestId('skill-link')).toBeVisible({ timeout: 3000 });
-    }
-  }
+    return 'wait';
+  }, { timeout: 5000 }).not.toBe('wait');
 }
 
 async function completeHatch(page) {
   const hatchPanel = page.getByTestId('hatch-panel');
   if (await hatchPanel.count()) {
     await expect(hatchPanel).toBeVisible({ timeout: 1000 });
-  } else {
-    await ensureHouseDistrictVisible(page);
+    const btn = page.getByTestId('hatch-btn');
+    if (await btn.count()) {
+      const target = btn.first();
+      if (await target.isVisible().catch(() => false)) {
+        await target.click();
+      }
+    }
+    const status = page.getByTestId('hatch-status');
+    if (await status.count()) {
+      await expect(status).toContainText(/continue|setup|configure|ready|connect|complete|activated/i, { timeout: 2000 });
+    }
+    return;
   }
 
-  const btn = page.getByTestId('hatch-btn');
-  if (await btn.count()) {
-    const target = btn.first();
-    if (await target.isVisible()) {
-      await target.click();
+  await ensureTownhallDistrictVisible(page);
+}
+
+async function completeTownhallStory(page, {
+  humanName = 'Robin',
+  agentName = 'OpenClaw',
+  humanPrompt = 'Human prompt text',
+  agentPrompt = 'Agent prompt text'
+} = {}) {
+  await ensureTownhallDistrictVisible(page);
+
+  const stateBefore = await fetchSessionState(page).catch(() => null);
+  if (stateBefore?.onboarding?.registrationComplete === true) {
+    return;
+  }
+
+  const connectWalletBtn = page.getByRole('button', { name: /Connect wallet|Disconnect wallet/i });
+  if (await connectWalletBtn.count()) {
+    const target = connectWalletBtn.first();
+    if (await target.isVisible().catch(() => false)) {
+      const label = String((await target.textContent().catch(() => '')) || '');
+      if (/connect/i.test(label)) {
+        await target.click().catch(() => {});
+      }
     }
   }
 
-  const status = page.getByTestId('hatch-status');
-  if (await status.count()) {
-    await expect(status).toContainText(/continue|setup|configure|ready|connect|complete|activated/i, { timeout: 2000 });
-  } else {
-    const setupStatus = page.locator('#walletStatus');
-    if (await setupStatus.count()) {
-      await expect(setupStatus.first()).toBeVisible({ timeout: 2000 });
-    }
+  const walletAddrNode = page.locator('#walletAddr');
+  let solanaAddress = DEFAULT_TEST_TOKEN_ADDRESS;
+  if (await walletAddrNode.count()) {
+    const raw = String((await walletAddrNode.first().textContent().catch(() => '')) || '').trim();
+    if (raw && raw !== '—') solanaAddress = raw;
   }
+
+  const registerResp = await postAgentRoute(page, '/api/townhall/register', {
+    profile: {
+      humanName,
+      agentName,
+      humanAvatar: { prompt: humanPrompt },
+      agentAvatar: { prompt: agentPrompt }
+    },
+    erc8004: {
+      user: {
+        evm: { id: TEST_TOWNHALL_MINT_IDS.userEvm, chain: 'sepolia' },
+        solana: { id: TEST_TOWNHALL_MINT_IDS.userSolana, cluster: 'devnet' }
+      },
+      agent: {
+        evm: { id: TEST_TOWNHALL_MINT_IDS.agentEvm, chain: 'sepolia' },
+        solana: { id: TEST_TOWNHALL_MINT_IDS.agentSolana, cluster: 'devnet' }
+      }
+    },
+    wallet: {
+      chain: 'solana',
+      address: solanaAddress
+    }
+  });
+  if (!registerResp?.ok || !registerResp?.body?.ok) {
+    const reason = String(registerResp?.body?.error || `HTTP_${registerResp?.status || 500}`);
+    throw new Error(`TOWNHALL_REGISTER_FAILED:${reason}`);
+  }
+
+  await page.reload();
+  await ensureTownhallDistrictVisible(page);
+  await expect(page.locator('#townhallRegisterState')).toContainText('Registered', { timeout: 5000 });
 }
 
 async function configureLiteLlm(page, {
@@ -303,14 +461,42 @@ async function ensureLiteConnected(page) {
 async function hatchAndConnectLite(page, intent = 'signin') {
   await enterHatch(page, intent);
   await completeHatch(page);
+  await completeTownhallStory(page);
   await configureLiteLlm(page);
   await ensureLiteConnected(page);
+
+  const continueBtn = page.getByTestId('townhall-continue-btn');
+  const sigilKeyBtn = page.getByTestId('sigil-key');
+  await expect.poll(async () => {
+    if (await sigilKeyBtn.count() && await sigilKeyBtn.first().isVisible().catch(() => false)) return 'sigil';
+    if (
+      await continueBtn.count()
+      && await continueBtn.first().isVisible().catch(() => false)
+      && await continueBtn.first().isEnabled().catch(() => false)
+    ) return 'continue';
+    return 'wait';
+  }, { timeout: 10000 }).not.toBe('wait');
+
+  const readyState = await (async () => {
+    if (await sigilKeyBtn.count() && await sigilKeyBtn.first().isVisible().catch(() => false)) return 'sigil';
+    if (
+      await continueBtn.count()
+      && await continueBtn.first().isVisible().catch(() => false)
+      && await continueBtn.first().isEnabled().catch(() => false)
+    ) return 'continue';
+    return 'wait';
+  })();
+
+  if (readyState === 'continue') {
+    await continueBtn.first().click();
+  }
+  await expect(sigilKeyBtn).toBeVisible({ timeout: 5000 });
 }
 
 async function unlockGateWithSigil(page, sigil = 'key') {
   const sigilBtn = page.getByTestId(`sigil-${sigil}`);
   if (!(await sigilBtn.count()) || !(await sigilBtn.first().isVisible().catch(() => false))) {
-    await ensureHouseDistrictVisible(page);
+    await ensureTownhallDistrictVisible(page);
   }
   await expect(sigilBtn).toBeVisible({ timeout: 3000 });
   await sigilBtn.click();
@@ -366,7 +552,16 @@ async function reachCreateViaLite(page) {
 }
 
 async function triggerWalletProfileCheck(page) {
-  await ensureHouseDistrictVisible(page).catch(() => {});
+  if (await isHouseRoute(page)) return;
+  await ensureTownhallDistrictVisible(page).catch(() => {});
+  if (await isHouseRoute(page)) return;
+
+  const walletStatus = page.locator('#walletStatus');
+  const priorStatus = await (async () => {
+    if (!(await walletStatus.count())) return '';
+    return String((await walletStatus.first().textContent().catch(() => '')) || '').trim();
+  })();
+
   const candidates = [
     page.getByTestId('hatch-wallet-check'),
     page.locator('#hatchWalletCheckBtn'),
@@ -376,13 +571,27 @@ async function triggerWalletProfileCheck(page) {
     page.locator('#connectWalletBtn')
   ];
   for (const locator of candidates) {
-    const count = await locator.count();
+    if (await isHouseRoute(page)) return;
+    const count = await locator.count().catch(() => 0);
     if (!count) continue;
     const target = locator.first();
-    if (!(await target.isVisible())) continue;
-    await target.click();
-    return;
+    if (!(await target.isVisible().catch(() => false))) continue;
+
+    const enabled = await target.isEnabled().catch(() => false);
+    if (!enabled) {
+      if (await waitForWalletCheckProgress(page, { priorStatus, timeout: 2500 })) return;
+      continue;
+    }
+
+    try {
+      await target.click({ timeout: 1500 });
+      return;
+    } catch (error) {
+      if (await waitForWalletCheckProgress(page, { priorStatus, timeout: 2500 })) return;
+      throw error;
+    }
   }
+  if (await waitForHouseRoute(page, 2500)) return;
   throw new Error('NO_HATCH_WALLET_TRIGGER');
 }
 
