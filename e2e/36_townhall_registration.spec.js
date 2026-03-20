@@ -740,10 +740,15 @@ test('required town hall onboarding locks district switching until registration 
 
   await completeTownhallStory(page, { humanPrompt: 'Human prompt', agentPrompt: 'Agent prompt' });
 
-  await expect(page.locator('#townhallRegisterState')).toContainText('Registered');
+  await expect.poll(async () => page.evaluate(async () => {
+    const stateResp = await fetch('/api/state', { credentials: 'include' });
+    const state = await stateResp.json().catch(() => ({}));
+    return state?.onboarding?.registrationComplete === true;
+  }), { timeout: 8000 }).toBe(true);
   await expect(page.locator('#districtModalBackdrop')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open Saloon' })).toHaveAttribute('aria-disabled', 'true');
   await configureBrain(page);
+  await openTownhallPanel(page);
   await expect(page.getByTestId('townhall-continue-btn')).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Open Saloon' })).toHaveAttribute('aria-disabled', 'true');
 });

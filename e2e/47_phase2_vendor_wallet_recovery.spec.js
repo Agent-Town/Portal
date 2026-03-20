@@ -42,7 +42,8 @@ test('wallet without mapping stays in setup flow and keeps brain controls visibl
 
   await page.waitForTimeout(2200);
   expect(page.url()).not.toMatch(/\/house\?house=/);
-  await expect(page.locator('#pathPanel')).toBeVisible();
+  await expect(page.locator('#townhallRegisterPanel')).toBeVisible();
+  await expect(page.locator('#townhallStepHuman')).toBeVisible();
   await ensureBrainPanelVisible(page);
   await expect(page.getByTestId('lite-llm-panel')).toBeVisible();
   expectNonceLookupSequence(calls);

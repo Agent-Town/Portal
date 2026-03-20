@@ -47,7 +47,8 @@ test('wallet with no profile remains in setup flow and exposes brain config cont
 
   await page.waitForTimeout(2100);
   expect(page.url()).not.toMatch(/\/house\?house=/);
-  await expect(page.locator('#pathPanel')).toBeVisible();
+  await expect(page.locator('#townhallRegisterPanel')).toBeVisible();
+  await expect(page.locator('#townhallStepHuman')).toBeVisible();
   await ensureBrainPanelVisible(page);
   await expect(page.getByTestId('lite-llm-panel')).toBeVisible();
 });
