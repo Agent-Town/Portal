@@ -1059,6 +1059,30 @@ body.trainer-modal-open {
   background: linear-gradient(90deg, transparent 0%, rgba(44, 69, 99, 0.6) 15%, rgba(44, 69, 99, 0.6) 85%, transparent 100%);
 }
 
+.brain-tier {
+  padding: 16px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.brain-tier-primary {
+  border-color: var(--accent);
+  background: rgba(44, 69, 99, 0.15);
+}
+
+.brain-tier details summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--fg);
+}
+
+.brain-tier-status {
+  margin-top: 8px;
+  font-size: 13px;
+  min-height: 1.4em;
+}
+
 .grid6 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

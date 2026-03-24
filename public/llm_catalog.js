@@ -12,7 +12,7 @@
     ollama: Object.freeze(['gpt-oss:20b', 'gpt-oss:120b', 'llama3.3', 'llama3.2:latest', 'qwen2.5:7b']),
     'openai-codex': Object.freeze(['gpt-5.3-codex', 'gpt-5-codex']),
     anthropic: Object.freeze(['claude-opus-4-6', 'claude-3-5-sonnet-20240620', 'claude-3-5-haiku-20241022']),
-    openrouter: Object.freeze(['anthropic/claude-sonnet-4-5']),
+    openrouter: Object.freeze(['anthropic/claude-sonnet-4-5', 'openrouter/hunter-alpha', 'openrouter/healer-alpha', 'nvidia/nemotron-3-super-120b-a12b:free']),
     litellm: Object.freeze(['claude-opus-4-6']),
     'amazon-bedrock': Object.freeze(['us.anthropic.claude-opus-4-6-v1:0']),
     'vercel-ai-gateway': Object.freeze(['anthropic/claude-opus-4.6']),
@@ -112,6 +112,20 @@
     'test-local'
   ]);
 
+  const FREE_OPENROUTER_MODELS = Object.freeze([
+    Object.freeze({ id: 'openrouter/hunter-alpha', label: 'Hunter Alpha (free)', contextWindow: 1000000 }),
+    Object.freeze({ id: 'openrouter/healer-alpha', label: 'Healer Alpha (free)', contextWindow: 262144 }),
+    Object.freeze({ id: 'nvidia/nemotron-3-super-120b-a12b:free', label: 'Nemotron 120B (free)', contextWindow: 262144 })
+  ]);
+
+  function getFreeOpenRouterModels() {
+    return [...FREE_OPENROUTER_MODELS];
+  }
+
+  function getDefaultFreeOpenRouterModel() {
+    return FREE_OPENROUTER_MODELS[0].id;
+  }
+
   function normalizePolicy(input) {
     const raw = String(
       input?.providerPolicy
@@ -193,6 +207,7 @@
     PROVIDER_ALIASES,
     GLOBAL_PROVIDER_ORDER,
     CN_PROVIDER_ORDER,
+    FREE_OPENROUTER_MODELS,
     normalizePolicy,
     normalizeProvider,
     getProviderOrder,
@@ -205,6 +220,8 @@
     isDiscouragedProvider,
     getProviderWarning,
     defaultProviderApi,
-    defaultProviderBaseUrl
+    defaultProviderBaseUrl,
+    getFreeOpenRouterModels,
+    getDefaultFreeOpenRouterModel
   };
 }));
