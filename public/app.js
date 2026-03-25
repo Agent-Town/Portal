@@ -3495,13 +3495,9 @@ function bindBrainDistrictControls() {
   const continueBtn = el('brainContinueBtn');
   if (continueBtn) {
     const state = lastState && typeof lastState === 'object' ? lastState : null;
-    const isBrainConfigured = state ? isTownhallBrainConfigured(state) : false;
-    const isWorkerConnected = state ? isAnyAgentConnected(state) : false;
-    const isReady =
-      isBrainConfigured &&
-      isWorkerConnected;
+    const isBrainConfigured = state ? isTownhallBrainConfigured(state) : isLocalLiteLlmConfigured();
 
-    continueBtn.disabled = !isReady;
+    continueBtn.disabled = !isBrainConfigured;
     continueBtn.onclick = () => {
       hideDistrict();
       if (typeof syncTownhallGate === 'function' && lastState) {
