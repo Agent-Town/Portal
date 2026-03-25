@@ -9121,6 +9121,23 @@ self.addEventListener("message", async (ev) => {
       await metaSet("llmBaseUrl", state.llmBaseUrl);
       await metaSet("llmReasoning", state.llmReasoning);
       await metaSet("llmUseProxy", state.llmUseProxy);
+
+      // Auto-grant origin for direct LLM calls (useProxy: false).
+      if (!useProxy && baseUrl) {
+        const llmOrigin = parseUrlOrigin(baseUrl);
+        if (llmOrigin && !matchingOriginGrant({ origin: llmOrigin, capability: "llm", method: "POST" })) {
+          state.originGrants.push({
+            id: randomId("og"),
+            origin: llmOrigin,
+            capability: "llm",
+            scope: "session",
+            methods: ["POST"],
+            createdAtMs: nowMs(),
+          });
+          log(`auto-granted llm origin: ${llmOrigin}`);
+        }
+      }
+
       trainerCheckpointForConfigChange("llm-config").catch(() => {});
 
       log(
