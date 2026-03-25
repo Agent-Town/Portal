@@ -26,7 +26,7 @@ function parseModelRef(modelRef, fallbackProvider = 'openai', fallbackModelId = 
 
 function defaultProviderApi(provider) {
   const p = String(provider || '').trim();
-  if (p === 'openai' || p === 'ollama') return 'openai-completions';
+  if (p === 'openai' || p === 'ollama' || p === 'openrouter') return 'openai-completions';
   return '';
 }
 
@@ -37,6 +37,12 @@ function defaultProviderBaseUrl(provider) {
   }
   if (p === 'ollama') {
     return 'http://127.0.0.1:11434/v1';
+  }
+  if (p === 'openrouter') {
+    return 'https://openrouter.ai/api/v1';
+  }
+  if (p === 'anthropic') {
+    return 'https://api.anthropic.com/v1';
   }
   return '';
 }
