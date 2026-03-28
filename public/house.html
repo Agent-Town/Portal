@@ -45,7 +45,7 @@
       </div>
 
       <div class="small" id="status" style="margin-top:10px; color: var(--muted);"></div>
-      <div class="small" id="error" style="margin-top:6px; color: var(--bad);"></div>
+      <div class="small" id="error" role="alert" style="margin-top:6px; color: var(--bad);"></div>
     </div>
 
     <div class="panel" id="agentStatePanel" style="margin-top: 14px;">
@@ -59,7 +59,7 @@
         <input id="uploadAgentStateInput" type="file" accept="application/zip,.zip,application/json,.json" class="is-hidden" />
       </div>
       <div class="small" id="agentStateStatus" style="margin-top:10px; color: var(--muted);"></div>
-      <div class="small" id="agentStateError" style="margin-top:6px; color: var(--bad);"></div>
+      <div class="small" id="agentStateError" role="alert" style="margin-top:6px; color: var(--bad);"></div>
 
       <div class="divider" style="margin: 14px 0;"></div>
       <h3 style="margin:0 0 6px" id="houseMindTitle">Mind configuration</h3>
@@ -223,7 +223,7 @@
       </div>
 
       <div class="small" id="anchorStatus" style="margin-top:8px; color: var(--muted)"></div>
-      <div class="small" id="anchorError" style="margin-top:6px; color: var(--bad)"></div>
+      <div class="small" id="anchorError" role="alert" style="margin-top:6px; color: var(--bad)"></div>
 
       <div class="divider" style="margin: 14px 0;"></div>
       <div class="row two" style="gap: 14px; align-items: start;">
@@ -264,7 +264,7 @@
           <span class="pill" id="shareAgentPress">Agent pressed: …</span>
         </div>
 
-        <div class="small" id="shareError" style="margin-top:6px; color: var(--bad);"></div>
+        <div class="small" id="shareError" role="alert" style="margin-top:6px; color: var(--bad);"></div>
       </div>
 
       <div class="is-hidden" id="shareActive">
@@ -293,7 +293,7 @@
             <button class="btn" id="saveSharePosts">Save links</button>
             <span class="pill" id="sharePostsStatus" style="display:none">Saved</span>
           </div>
-          <div class="small" id="sharePostsError" style="margin-top:6px; color: var(--bad);"></div>
+          <div class="small" id="sharePostsError" role="alert" style="margin-top:6px; color: var(--bad);"></div>
         </div>
       </div>
     </div>
@@ -310,7 +310,7 @@
         <button class="btn" id="publicClearBtn" disabled>Clear</button>
         <span class="pill" id="publicUploadStatus" style="display:none">Saved</span>
       </div>
-      <div class="small" id="publicUploadError" style="margin-top:6px; color: var(--bad);"></div>
+      <div class="small" id="publicUploadError" role="alert" style="margin-top:6px; color: var(--bad);"></div>
       <div class="public-media-preview is-hidden" id="publicPreview">
         <div class="small" id="publicPreviewLabel">Current public image</div>
         <img id="publicPreviewImg" alt="Public house image" />

@@ -13,7 +13,7 @@
         <input id="townhallHumanName" type="text" maxlength="48" placeholder="Promptmancer" />
         <span class="townhallCharCount" id="townhallHumanNameCount">0 / 48</span>
       </div>
-      <div class="townhallInlineError" id="townhallHumanNameError"></div>
+      <div class="townhallInlineError" id="townhallHumanNameError" role="alert"></div>
 
       <div class="townhallAvatarBlock">
         <div class="small" id="townhallHumanAvatarLabel">Your avatar</div>
@@ -45,7 +45,7 @@
         <input id="townhallAgentName" type="text" maxlength="48" placeholder="OpenClaw" />
         <span class="townhallCharCount" id="townhallAgentNameCount">0 / 48</span>
       </div>
-      <div class="townhallInlineError" id="townhallAgentNameError"></div>
+      <div class="townhallInlineError" id="townhallAgentNameError" role="alert"></div>
 
       <div class="townhallAvatarBlock">
         <div class="small" id="townhallAgentAvatarLabel">Agent avatar</div>
@@ -106,7 +106,7 @@
         <button class="btn primary" id="townhallContinueBtn" data-testid="townhall-continue-btn" disabled>Continue</button>
         <span class="pill" id="townhallRegisterState">Not registered</span>
       </div>
-      <div class="small" id="townhallRegisterError" style="margin-top:6px; color: var(--bad);"></div>
+      <div class="small" id="townhallRegisterError" role="alert" style="margin-top:6px; color: var(--bad);"></div>
     </div>
 
     <!-- Wallet & technical details hidden behind expandable -->
