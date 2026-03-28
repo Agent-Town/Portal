@@ -1803,6 +1803,139 @@ app.use('/api/tools', requireProxySessionAccess);
 app.use('/api/privy/wallet-rpc', requireProxySessionAccess);
 app.use('/api/privy/transactions', requireProxySessionAccess);
 
+// ---------------------------------------------------------------------------
+// Robust LLM proxy override (registered BEFORE vendor routes so it wins).
+// The vendor proxyGeneric uses Readable.fromWeb() which can fail on some
+// Node.js versions.  This route uses Node-native http(s).request + pipe
+// which is reliable across all versions.
+// ---------------------------------------------------------------------------
+
+function robustLlmProxy(req, res) {
+  // Decode upstream base URL from the route param.
+  const encodedBase = (req.params.encodedBase || '').trim();
+  if (!encodedBase) return res.status(400).json({ ok: false, error: 'INVALID_UPSTREAM_BASE' });
+
+  let decodedBase;
+  try { decodedBase = decodeURIComponent(encodedBase); } catch {
+    return res.status(400).json({ ok: false, error: 'INVALID_UPSTREAM_BASE' });
+  }
+  if (!/^https?:\/\//i.test(decodedBase)) {
+    return res.status(400).json({ ok: false, error: 'INVALID_UPSTREAM_BASE' });
+  }
+
+  // Append wildcard tail (e.g. "chat/completions").
+  const tail = req.params[0] || '';
+  let upstreamUrl;
+  try {
+    const base = decodedBase.endsWith('/') ? decodedBase : decodedBase + '/';
+    upstreamUrl = new URL(tail, base);
+  } catch {
+    return res.status(400).json({ ok: false, error: 'INVALID_UPSTREAM_URL' });
+  }
+
+  // Block private / localhost targets (SSRF protection).
+  const host = upstreamUrl.hostname.toLowerCase();
+  if (host === 'localhost' || host.endsWith('.localhost') || host === '0.0.0.0' || host.endsWith('.local')) {
+    return res.status(403).json({ ok: false, error: 'UPSTREAM_HOST_BLOCKED' });
+  }
+  if (net.isIP(host)) {
+    return res.status(403).json({ ok: false, error: 'UPSTREAM_HOST_BLOCKED' });
+  }
+
+  // Copy query string from original request if any.
+  const qIdx = req.originalUrl.indexOf('?');
+  if (qIdx >= 0) upstreamUrl.search = req.originalUrl.slice(qIdx);
+
+  // Build forwarded headers (strip hop-by-hop + cookie + host).
+  const fwdHeaders = {};
+  const skipHeaders = new Set([
+    'host', 'cookie', 'content-length', 'connection',
+    'transfer-encoding', 'upgrade', 'keep-alive',
+    'proxy-authorization', 'proxy-connection', 'te', 'trailer'
+  ]);
+  for (const [k, v] of Object.entries(req.headers)) {
+    if (!skipHeaders.has(k.toLowerCase())) fwdHeaders[k] = v;
+  }
+
+  const method = (req.method || 'POST').toUpperCase();
+  let bodyStr = (method !== 'GET' && method !== 'HEAD')
+    ? (req.rawBody || JSON.stringify(req.body || {}))
+    : undefined;
+
+  // Sanitize tool names for providers that require ^[a-zA-Z0-9_-]{1,128}$
+  // (e.g. OpenRouter → Anthropic/Google).  Replace dots and other invalid
+  // chars with underscores so the request isn't rejected with 400.
+  if (bodyStr) {
+    try {
+      const parsed = JSON.parse(bodyStr);
+      let sanitized = false;
+      if (Array.isArray(parsed.tools)) {
+        for (const tool of parsed.tools) {
+          if (tool.function && typeof tool.function.name === 'string') {
+            const clean = tool.function.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+            if (clean !== tool.function.name) {
+              tool.function.name = clean;
+              sanitized = true;
+            }
+          }
+        }
+      }
+      // Also sanitize tool_call names in messages (assistant messages referencing tools)
+      if (Array.isArray(parsed.messages)) {
+        for (const msg of parsed.messages) {
+          if (Array.isArray(msg.tool_calls)) {
+            for (const tc of msg.tool_calls) {
+              if (tc.function && typeof tc.function.name === 'string') {
+                const clean = tc.function.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+                if (clean !== tc.function.name) {
+                  tc.function.name = clean;
+                  sanitized = true;
+                }
+              }
+            }
+          }
+        }
+      }
+      if (sanitized) bodyStr = JSON.stringify(parsed);
+    } catch { /* not JSON, forward as-is */ }
+  }
+
+  if (bodyStr) fwdHeaders['content-length'] = String(Buffer.byteLength(bodyStr));
+
+  const lib = upstreamUrl.protocol === 'https:' ? https : http;
+  const proxyReq = lib.request(upstreamUrl.toString(), { method, headers: fwdHeaders }, (proxyRes) => {
+    // Forward status + headers (skip hop-by-hop).
+    res.status(proxyRes.statusCode);
+    for (const [k, v] of Object.entries(proxyRes.headers)) {
+      const lk = k.toLowerCase();
+      if (lk === 'transfer-encoding' || lk === 'connection' || lk === 'keep-alive') continue;
+      try { res.setHeader(k, v); } catch { /* skip invalid */ }
+    }
+    proxyRes.on('error', (err) => {
+      console.error('[llm-proxy] proxyRes stream error:', err.message);
+    });
+    res.on('error', (err) => {
+      console.error('[llm-proxy] client res stream error:', err.message);
+    });
+    proxyRes.pipe(res);
+  });
+
+  proxyReq.on('error', (err) => {
+    console.error('[llm-proxy] upstream request error:', err.message);
+    if (!res.headersSent) {
+      res.status(502).json({ ok: false, error: 'UPSTREAM_UNAVAILABLE', message: err.message });
+    } else {
+      res.end();
+    }
+  });
+
+  if (bodyStr) proxyReq.write(bodyStr);
+  proxyReq.end();
+}
+
+app.all('/api/llm/proxy/:encodedBase/*', robustLlmProxy);
+app.all('/api/llm/proxy/:encodedBase', robustLlmProxy);
+
 // OpenClaw Lite compatibility: proxy OpenAI-compatible provider calls from browser runtime.
 registerLlmRoutes(app);
 
@@ -4284,6 +4417,64 @@ app.get('/api/agent/lite/llm/config', (req, res) => {
 });
 
 app.post('/api/agent/lite/llm/config', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const lite = ensureLiteState(s);
+  const onboarding = ensureSessionOnboarding(s);
+
+  if (onboarding.required === true && onboarding.registrationComplete !== true) {
+    return res.status(409).json({
+      ok: false,
+      error: 'ONBOARDING_TOWNHALL_REQUIRED',
+      message: 'Complete Town Hall registration before configuring brain.'
+    });
+  }
+
+  let payload;
+  try {
+    payload = normalizeLiteLlmPayload(req.body || {});
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: String(err?.message || 'INVALID_LLM_CONFIG') });
+  }
+
+  lite.llmConfigured = true;
+  lite.llmProvider = payload.provider;
+  lite.llmModel = payload.model;
+  lite.llmModelRef = payload.modelRef;
+  lite.llmConfiguredAt = nowIso();
+  lite.llmApiKeySet = payload.hasCredential !== false;
+  lite.llmAuthMode = payload.authMode || 'api-key';
+  lite.llmApiKeyHash = null;
+
+  if (lite.runtimeBooted === true) {
+    s.agent.connected = true;
+    s.agent.source = 'openclaw-lite';
+    s.agent.name = s.agent.name || 'OpenClaw Lite';
+    s.shareApproval = s.shareApproval || { human: false, agent: false };
+    s.shareApproval.agent = true;
+  }
+
+  updateLiteRuntimeReady(s);
+  if (
+    onboarding.required && onboarding.registrationComplete
+    && onboarding.step !== ONBOARDING_STEP_CEREMONY
+    && onboarding.step !== ONBOARDING_STEP_DONE
+  ) {
+    onboarding.step = ONBOARDING_STEP_SIGIL;
+  }
+
+  res.json({
+    ok: true,
+    configured: !!lite.llmConfigured,
+    provider: lite.llmProvider,
+    model: lite.llmModel,
+    authMode: lite.llmAuthMode || 'api-key',
+    apiKeySet: !!lite.llmApiKeySet,
+    runtimeReady: !!lite.runtimeReady
+  });
+});
+
+// The frontend brain-save handler sends PUT; treat identically to POST.
+app.put('/api/agent/lite/llm/config', (req, res) => {
   const s = ensureHumanSession(req, res);
   const lite = ensureLiteState(s);
   const onboarding = ensureSessionOnboarding(s);
