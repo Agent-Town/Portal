@@ -1545,8 +1545,25 @@ function syncTownhallMintChecklist(draft, { activeStep = null, errorStep = null 
     if (pill) pill.setAttribute('data-mint-status', kind);
     if (kind === 'done') doneCount++;
   }
+  const pct = `${(doneCount / townhallMintSteps.length) * 100}%`;
   const bar = el('townhallMintProgressBar');
-  if (bar) bar.style.width = `${(doneCount / townhallMintSteps.length) * 100}%`;
+  if (bar) bar.style.width = pct;
+  // Also update the brain view's banner progress bar
+  const brainBar = el('brainMintProgressBar');
+  if (brainBar) brainBar.style.width = pct;
+}
+
+/** Show/hide the mint-in-progress banner at top of brain view. */
+function syncBrainMintBanner() {
+  const banner = el('brainMintBanner');
+  if (!banner) return;
+  if (townhallMintInFlight) {
+    banner.classList.remove('is-hidden');
+    const msg = el('brainMintBannerMsg');
+    if (msg) msg.textContent = 'Registering your identities in the background\u2026';
+  } else {
+    banner.classList.add('is-hidden');
+  }
 }
 
 let townhallMintDraft = createEmptyTownhallMintDraft();
@@ -3096,6 +3113,10 @@ async function mintAllTownhallIdentitiesAndRegister() {
       throw new Error(knownMintErrorMessage(walletErr, chain));
     }
 
+    // Immediately navigate to brain so user can configure while minting runs
+    showDistrict('brain');
+    syncBrainMintBanner();
+
     const mintUserEvm = async () => {
       const userEvm = await runTownhallMintStep('userEvm', () => mintTownhallEvmIdentity({
         subject: 'human',
@@ -3175,11 +3196,10 @@ async function mintAllTownhallIdentitiesAndRegister() {
     townhallMintLastErrorStep = null;
     setTownhallRegisterFeedback(tApp('townhall.feedback.registration_complete_continue'));
 
-    // Auto-advance to brain district after successful registration
-    const nextStep = lastState ? getOnboardingStep(lastState) : null;
-    if (nextStep === ONBOARDING_STEP_BRAIN) {
-      showDistrict('brain');
-    }
+    // Registration done — update banner to show completion
+    const bannerMsg = el('brainMintBannerMsg');
+    if (bannerMsg) bannerMsg.textContent = 'Registration complete!';
+    setTimeout(() => syncBrainMintBanner(), 2000);
   } catch (err) {
     townhallSigilUnlockedByContinue = false;
     const raw = String(err?.message || err || 'Mint failed.');
@@ -3187,8 +3207,12 @@ async function mintAllTownhallIdentitiesAndRegister() {
       ? knownMintErrorMessage(err, inferMintErrorChain(err, 'evm'))
       : raw;
     setTownhallRegisterFeedback(msg, true);
+    // Show error in brain banner if we're on brain view
+    const bannerMsg = el('brainMintBannerMsg');
+    if (bannerMsg) bannerMsg.textContent = 'Registration issue \u2014 ' + msg;
   } finally {
     townhallMintInFlight = false;
+    syncBrainMintBanner();
     const cfg = townhallMintConfig || fallbackTownhallMintConfig();
     applyTownhallMintConfig(cfg);
   }
@@ -4743,7 +4767,9 @@ async function showDistrict(district) {
     const gateReason = getTownHubDistrictGateReason(lastState);
     const gateAllowed = (gateReason === 'brain' && safeDistrict === 'brain')
       || (gateReason === 'sigil' && safeDistrict === 'sigil')
-      || (gateReason === 'ceremony' && safeDistrict === 'ceremony');
+      || (gateReason === 'ceremony' && safeDistrict === 'ceremony')
+      // Allow navigating to brain during mint (parallel onboarding)
+      || (gateReason === 'onboarding' && safeDistrict === 'brain' && townhallMintInFlight);
     if (!gateAllowed) {
       setActiveDistrict('townhall');
       const statusText = getTownHubDistrictGateStatusText();

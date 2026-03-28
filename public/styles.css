@@ -1284,6 +1284,63 @@ body.trainer-modal-open {
   animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
+/* Brain mint-in-progress banner */
+.brainMintBanner {
+  background: linear-gradient(135deg, rgba(255, 217, 90, 0.15), rgba(76, 175, 80, 0.10));
+  border: 1px solid rgba(255, 217, 90, 0.3);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+}
+
+.brainMintBanner.is-hidden {
+  display: none;
+}
+
+.brainMintBannerText {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.brainMintBannerIcon {
+  font-size: 16px;
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Advanced details toggle (used in townhall for wallet/blockchain info) */
+.townhallAdvancedDetails {
+  border: 1px solid rgba(44, 69, 99, 0.08);
+  border-radius: 6px;
+  padding: 6px 10px;
+  background: rgba(255, 250, 240, 0.3);
+  margin-top: 8px;
+}
+
+.townhallAdvancedDetails summary {
+  user-select: none;
+}
+
+.townhallAdvancedDetails[open] {
+  padding-bottom: 10px;
+}
+
+/* Compact layout for onboarding panels */
+.districtModalBody > .panel {
+  padding: 14px 18px;
+}
+
+.districtModalBody > .panel > h2:first-child {
+  margin-top: 0;
+}
+
 /* Dock attention */
 #agentSidebar.agent-sidebar.dock-attention {
   animation: dockAttention 1.6s ease-in-out 3;

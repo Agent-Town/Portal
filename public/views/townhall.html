@@ -4,13 +4,6 @@
       Complete onboarding and configure your brain to unlock the sigil flow.
     </div>
 
-    <div class="kv" style="margin-bottom:8px;">
-      <button class="btn" id="connectWalletBtn" type="button" data-testid="hatch-wallet-connect">Connect wallet</button>
-      <button class="btn" id="hatchWalletCheckBtn" type="button" data-testid="hatch-wallet-check">Check wallet</button>
-      <span class="pill"><span id="townhallWalletPrefix">Wallet:</span> <strong id="walletAddr">—</strong></span>
-    </div>
-    <div class="small" id="walletStatus" style="min-height:1.4em;"></div>
-
     <div class="townhallStoryStep" id="townhallStepHuman">
       <h2 id="townhallHumanTitle" style="margin:0 0 6px">Hello hero! Welcome to Agent Town.</h2>
       <p class="small" id="townhallHumanHelp" style="margin-top:0">How should we call you?</p>
@@ -77,38 +70,57 @@
     </div>
 
     <div class="townhallStoryStep is-hidden" id="townhallStepProcessing">
-      <h2 id="townhallProcessingTitle" style="margin:0 0 6px">Welcome to Agent Town, processing your registration.</h2>
+      <h2 id="townhallProcessingTitle" style="margin:0 0 6px">Setting things up for you...</h2>
+      <p class="small" style="margin-top:0; color: var(--muted);">Registering your identities on-chain. This takes a moment.</p>
 
       <div class="townhallMintProgress" id="townhallMintProgress">
         <div class="townhallMintProgressBar" id="townhallMintProgressBar" style="width: 0%"></div>
       </div>
-      <div class="townhallMintChecklist" id="townhallMintChecklist">
-        <div class="townhallMintChecklistRow">
-          <span id="townhallMintUserEvmLabel">User is registering on Ethereum</span>
-          <span class="pill" id="townhallMintUserEvmStatus" data-testid="townhall-mint-user-evm-status">Pending</span>
+      <div class="small" id="townhallRegisterStatus" style="margin-top:4px; color: var(--muted);"></div>
+
+      <!-- Technical mint details hidden by default -->
+      <details class="townhallAdvancedDetails" id="townhallMintDetails">
+        <summary class="small" style="cursor:pointer; color: var(--muted);">Show details</summary>
+        <div class="townhallMintChecklist" id="townhallMintChecklist">
+          <div class="townhallMintChecklistRow">
+            <span id="townhallMintUserEvmLabel">User is registering on Ethereum</span>
+            <span class="pill" id="townhallMintUserEvmStatus" data-testid="townhall-mint-user-evm-status">Pending</span>
+          </div>
+          <div class="townhallMintChecklistRow">
+            <span id="townhallMintUserSolanaLabel">User is registering on Solana</span>
+            <span class="pill" id="townhallMintUserSolanaStatus" data-testid="townhall-mint-user-solana-status">Pending</span>
+          </div>
+          <div class="townhallMintChecklistRow">
+            <span id="townhallMintAgentEvmLabel">Agent is registering on Ethereum</span>
+            <span class="pill" id="townhallMintAgentEvmStatus" data-testid="townhall-mint-agent-evm-status">Pending</span>
+          </div>
+          <div class="townhallMintChecklistRow">
+            <span id="townhallMintAgentSolanaLabel">Agent is registering on Solana</span>
+            <span class="pill" id="townhallMintAgentSolanaStatus" data-testid="townhall-mint-agent-solana-status">Pending</span>
+          </div>
         </div>
-        <div class="townhallMintChecklistRow">
-          <span id="townhallMintUserSolanaLabel">User is registering on Solana</span>
-          <span class="pill" id="townhallMintUserSolanaStatus" data-testid="townhall-mint-user-solana-status">Pending</span>
-        </div>
-        <div class="townhallMintChecklistRow">
-          <span id="townhallMintAgentEvmLabel">Agent is registering on Ethereum</span>
-          <span class="pill" id="townhallMintAgentEvmStatus" data-testid="townhall-mint-agent-evm-status">Pending</span>
-        </div>
-        <div class="townhallMintChecklistRow">
-          <span id="townhallMintAgentSolanaLabel">Agent is registering on Solana</span>
-          <span class="pill" id="townhallMintAgentSolanaStatus" data-testid="townhall-mint-agent-solana-status">Pending</span>
-        </div>
-      </div>
+      </details>
 
       <div class="kv" style="margin-top:10px;">
         <button class="btn" id="townhallRegisterBtn" data-testid="townhall-register-btn">Retry registration</button>
-        <button class="btn primary" id="townhallContinueBtn" data-testid="townhall-continue-btn" disabled>Continue to sigil test</button>
+        <button class="btn primary" id="townhallContinueBtn" data-testid="townhall-continue-btn" disabled>Continue</button>
         <span class="pill" id="townhallRegisterState">Not registered</span>
       </div>
-      <div class="small" id="townhallRegisterStatus" style="margin-top:8px; color: var(--muted);"></div>
       <div class="small" id="townhallRegisterError" style="margin-top:6px; color: var(--bad);"></div>
     </div>
+
+    <!-- Wallet & technical details hidden behind expandable -->
+    <details class="townhallAdvancedDetails" style="margin-top:12px;">
+      <summary class="small" style="cursor:pointer; color: var(--muted);">Advanced: Wallet &amp; identity</summary>
+      <div style="margin-top:8px;">
+        <div class="kv" style="margin-bottom:8px;">
+          <button class="btn" id="connectWalletBtn" type="button" data-testid="hatch-wallet-connect">Connect wallet</button>
+          <button class="btn" id="hatchWalletCheckBtn" type="button" data-testid="hatch-wallet-check">Check wallet</button>
+          <span class="pill"><span id="townhallWalletPrefix">Wallet:</span> <strong id="walletAddr">&mdash;</strong></span>
+        </div>
+        <div class="small" id="walletStatus" style="min-height:1.4em;"></div>
+      </div>
+    </details>
   </div>
 </div>
 
