@@ -49015,10 +49015,33 @@ function parseConfiguredModelRef() {
   }
   return { provider: providerHint, modelId: rawRef };
 }
+// Fallback provider-to-baseURL map for when model registry has no entry.
+const PROVIDER_DEFAULT_BASE_URLS = {
+  "openai": "",
+  "ollama": "http://127.0.0.1:11434/v1",
+  "openrouter": "https://openrouter.ai/api/v1",
+  "anthropic": "https://api.anthropic.com",
+  "groq": "https://api.groq.com/openai/v1",
+  "cerebras": "https://api.cerebras.ai/v1",
+  "xai": "https://api.x.ai/v1",
+  "mistral": "https://api.mistral.ai/v1",
+  "huggingface": "https://router.huggingface.co/v1",
+  "together": "https://api.together.xyz/v1",
+  "nvidia": "https://integrate.api.nvidia.com/v1",
+  "venice": "https://api.venice.ai/api/v1",
+  "google": "https://generativelanguage.googleapis.com/v1beta",
+  "minimax": "https://api.minimax.io/anthropic",
+  "kimi-coding": "https://api.kimi.com/coding",
+  "amazon-bedrock": "https://bedrock-runtime.us-east-1.amazonaws.com",
+  "openai-codex": "https://chatgpt.com/backend-api"
+};
+function providerFallbackBaseUrl(provider) {
+  return PROVIDER_DEFAULT_BASE_URLS[String(provider || "").trim()] || "";
+}
 function resolveLlmBaseUrl({ provider, templateBaseUrl }) {
   const explicitBase = String(state.llmBaseUrl || "").trim();
   const useProxy = state.llmUseProxy !== false;
-  const baseRaw = explicitBase || String(templateBaseUrl || "").trim() || defaultLlmBaseUrl();
+  const baseRaw = explicitBase || String(templateBaseUrl || "").trim() || providerFallbackBaseUrl(provider) || defaultLlmBaseUrl();
   const origin = safeOrigin();
   const resolved = new URL(baseRaw, origin || "http://localhost");
   if (useProxy) {
@@ -49036,8 +49059,22 @@ function resolveLlmBaseUrl({ provider, templateBaseUrl }) {
     consume: false
   });
   if (!access.allowed) {
-    log(`llm base blocked by allowlist (fallback to same-origin): ${resolved.toString()}`);
-    return defaultLlmBaseUrl();
+    // Auto-grant LLM origin access for configured providers (useProxy=false).
+    const llmOrigin = parseUrlOrigin(resolved.toString());
+    if (llmOrigin) {
+      state.originGrants.push({
+        id: "llm-auto-" + llmOrigin.replace(/[^a-z0-9]/gi, "_"),
+        origin: llmOrigin,
+        capability: "llm",
+        scope: "persistent",
+        methods: ["POST"],
+        createdAtMs: Date.now()
+      });
+      log(`llm auto-granted origin access for ${llmOrigin}`);
+      return resolved.toString();
+    }
+    log(`llm base blocked by allowlist (fallback to proxy): ${resolved.toString()}`);
+    return llmProxyBaseUrl(resolved.toString());
   }
   return resolved.toString();
 }

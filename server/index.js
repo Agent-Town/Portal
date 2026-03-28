@@ -1661,6 +1661,25 @@ const PRIVY_CONNECT_SRC_DEFAULT = [
   'wss://*.rpc.privy.systems',
   'wss://rpc.privy.systems'
 ];
+// LLM provider domains the browser worker may call directly (useProxy=false).
+const LLM_CONNECT_SRC = [
+  'https://openrouter.ai',
+  'https://api.openai.com',
+  'https://api.anthropic.com',
+  'https://api.groq.com',
+  'https://api.cerebras.ai',
+  'https://api.x.ai',
+  'https://api.mistral.ai',
+  'https://router.huggingface.co',
+  'https://api.together.xyz',
+  'https://integrate.api.nvidia.com',
+  'https://api.venice.ai',
+  'https://generativelanguage.googleapis.com',
+  'https://api.minimax.io',
+  'https://api.moonshot.cn',
+  'https://dashscope.aliyuncs.com',
+  'https://open.bigmodel.cn',
+];
 const connectSrc = [
   "'self'",
   'https://esm.sh',
@@ -1668,6 +1687,7 @@ const connectSrc = [
   'https://cdn.skypack.dev',
   'https://eth.llamarpc.com',
   'https://rpc.ankr.com',
+  ...LLM_CONNECT_SRC,
   ...SOLANA_CONNECT_SRC,
   ...(PRIVY_ENABLED ? PRIVY_CONNECT_SRC_DEFAULT : []),
   ...CSP_CONNECT_SRC_EXTRA
