@@ -4,6 +4,13 @@
       Complete onboarding and configure your brain to unlock the sigil flow.
     </div>
 
+    <div class="kv" style="margin-bottom:8px;">
+      <button class="btn" id="connectWalletBtn" type="button" data-testid="hatch-wallet-connect">Connect wallet</button>
+      <button class="btn" id="hatchWalletCheckBtn" type="button" data-testid="hatch-wallet-check">Check wallet</button>
+      <span class="pill"><span id="townhallWalletPrefix">Wallet:</span> <strong id="walletAddr">—</strong></span>
+    </div>
+    <div class="small" id="walletStatus" style="min-height:1.4em;"></div>
+
     <div class="townhallStoryStep" id="townhallStepHuman">
       <h2 id="townhallHumanTitle" style="margin:0 0 6px">Hello hero! Welcome to Agent Town.</h2>
       <p class="small" id="townhallHumanHelp" style="margin-top:0">How should we call you?</p>
@@ -139,13 +146,10 @@
       Configure Brain in the right panel, then keep the worker connected while you run the sigil test.
     </p>
     <div class="kv">
-      <button class="btn" id="connectWalletBtn" type="button">Connect wallet</button>
-      <span class="pill">Wallet: <strong id="walletAddr">—</strong></span>
       <button class="btn" id="workerReconnectBtn" data-testid="worker-reconnect-btn" type="button">Reconnect worker</button>
       <a class="btn primary" href="/skill.md" target="_blank" data-testid="skill-link">View worker playbook</a>
       <span class="pill status" data-testid="agent-status"><span class="dot" id="agentDot"></span><span id="agentStatusText">Agent not connected</span></span>
     </div>
-    <div class="small" id="walletStatus" style="min-height:1.4em;"></div>
   </div>
 
   <div class="divider" id="stepDivider"></div>

@@ -14,7 +14,13 @@ async function openHatchVia(page, intent = 'signin', { navigate = false } = {}) 
 }
 
 async function captureVisibleHatchControls(page) {
-  const candidateIds = ['path-human', 'path-coop', 'path-agent', 'skill-link', 'lite-llm-panel'];
+  const candidateIds = [
+    'townhall-human-submit-btn',
+    'townhall-agent-submit-btn',
+    'townhall-register-btn',
+    'townhall-continue-btn',
+    'lite-llm-panel'
+  ];
   const ids = [];
   for (const id of candidateIds) {
     const locator = page.getByTestId(id);

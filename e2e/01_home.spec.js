@@ -7,7 +7,7 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-test('home loads, hides visual team code, and keeps skill link reachable', async ({ page, request }) => {
+test('home loads, hides visual team code, and keeps the worker playbook file reachable', async ({ page, request }) => {
   await enterHatch(page, 'signin');
 
   const state = await page.evaluate(async () => {
@@ -16,9 +16,9 @@ test('home loads, hides visual team code, and keeps skill link reachable', async
   });
   expect(String(state?.teamCode || '')).toMatch(/^TEAM-[A-Z0-9]{4}-[A-Z0-9]{4}$/);
   await expect(page.getByTestId('team-code')).toHaveCount(0);
-  await expect(page.getByTestId('skill-link')).toBeVisible();
+  await expect(page.locator('#townhallStepHuman')).toBeVisible();
 
-  // skill.md is reachable and looks like a skill file (frontmatter)
+  // skill.md is still reachable directly even though the old house-side skill link is gone.
   const resp = await request.get('/skill.md');
   expect(resp.ok()).toBeTruthy();
   const txt = await resp.text();

@@ -505,8 +505,6 @@ const appWalletClient = window.initWalletClient ? window.initWalletClient() : nu
 let walletHouseId = null;
 let walletRecovered = false;
 const WALLET_STORAGE_KEY = 'agentTownWallet';
-const PATH_STORAGE_KEY = 'agentTownStartRole';
-const TOKEN_ERROR_KEY = 'agentTownTokenError';
 const SIGNUP_COMPLETE_AT_KEY = 'agentTownSignupCompleteAt';
 const SHARE_CACHE_KEY = 'agentTownShareCache';
 const TOKEN_MINT = 'CZRsbB6BrHsAmGKeoxyfwzCyhttXvhfEukXCWnseBAGS';
@@ -523,8 +521,6 @@ const SOLANA_WEB3_MODULE_FALLBACK_URLS = [
   'https://cdn.jsdelivr.net/npm/@solana/web3.js@1.98.4/+esm',
   'https://cdn.skypack.dev/@solana/web3.js@1.98.4'
 ];
-// Single path: every session uses the in-browser worker agent.
-let pathMode = 'coop';
 let activeDistrict = 'house';
 const districtViews = {
   house: { title: 'Plan Wagons', viewPath: '/views/house.html' },
@@ -657,17 +653,8 @@ function applyExperiencePreferenceToUi() {
   setNodeText('townhallContinueBtn', 'townhall.continue_sigil');
   setNodeText('townhallSinglePathTitle', 'townhall.single_path.title');
   setNodeText('townhallSinglePathHelp', 'townhall.single_path.help');
-  setNodeText('townhallPathTitle', 'townhall.path.title');
-  setNodeText('townhallPathHelp', 'townhall.path.help');
-  setNodeText('townhallWalletPrefix', 'townhall.wallet_prefix');
-  setNodeText('pathHumanBtn', 'townhall.path.human');
-  setNodeText('pathCoopBtn', 'townhall.path.coop');
-  setNodeText('pathAgentBtn', 'townhall.path.agent');
-  setNodeText('tokenVerifyBtn', 'common.check_wallet');
-  setNodeText('townhallTokenTitle', 'townhall.token.title');
-  setNodeText('townhallTokenHelp', 'townhall.token.help');
-  setNodeText('tokenCreateLink', 'townhall.token.create_house');
-  setNodeText('tokenStatusText', 'townhall.token.waiting');
+  setNodeText('houseOverviewTitle', 'house.overview.title');
+  setNodeText('houseOverviewHelp', 'house.overview.help');
   setNodeText('reconnectTitle', 'townhall.reconnect.title');
   setNodeText('reconnectIntro', 'townhall.reconnect.help');
   setNodeText('copyHouse', 'townhall.copy_house');
@@ -676,6 +663,7 @@ function applyExperiencePreferenceToUi() {
   setNodeText('openShareCardBtn', 'townhall.open_share_card_preview');
   setNodeText('sigilWorkerStepTitle', 'sigil.worker_step');
   setNodeText('step1Intro', 'sigil.worker_help');
+  setNodeText('townhallWalletPrefix', 'townhall.wallet_prefix');
   setNodeText('connectWalletBtn', 'sigil.connect_wallet');
   setNodeText('hatchWalletCheckBtn', 'common.check_wallet');
   setNodeText('workerReconnectBtn', 'sigil.reconnect_worker');
@@ -1059,44 +1047,6 @@ function clearWalletCache() {
   } catch {
     // ignore storage errors
   }
-}
-
-function loadPathMode() {
-  return 'coop';
-}
-
-function savePathMode(_mode) {
-  try {
-    localStorage.setItem(PATH_STORAGE_KEY, 'coop');
-  } catch {
-    // ignore storage errors
-  }
-}
-
-function loadTokenError() {
-  try {
-    const msg = localStorage.getItem(TOKEN_ERROR_KEY);
-    if (msg) localStorage.removeItem(TOKEN_ERROR_KEY);
-    return msg || null;
-  } catch {
-    return null;
-  }
-}
-
-function setTokenError(msg) {
-  const tokenError = el('tokenError');
-  if (tokenError) tokenError.textContent = msg || '';
-}
-
-function updatePathButtons() {
-  pathMode = 'coop';
-}
-
-function setPathMode(_mode, { persist = true, refresh = true } = {}) {
-  pathMode = 'coop';
-  if (persist) savePathMode('coop');
-  updatePathButtons();
-  if (refresh && lastState) updateUI(lastState);
 }
 
 function onboardingRequired(state) {
@@ -3545,13 +3495,9 @@ function bindBrainDistrictControls() {
   const continueBtn = el('brainContinueBtn');
   if (continueBtn) {
     const state = lastState && typeof lastState === 'object' ? lastState : null;
-    const isBrainConfigured = state ? isTownhallBrainConfigured(state) : false;
-    const isWorkerConnected = state ? isAnyAgentConnected(state) : false;
-    const isReady =
-      isBrainConfigured &&
-      isWorkerConnected;
+    const isBrainConfigured = state ? isTownhallBrainConfigured(state) : isLocalLiteLlmConfigured();
 
-    continueBtn.disabled = !isReady;
+    continueBtn.disabled = !isBrainConfigured;
     continueBtn.onclick = () => {
       hideDistrict();
       if (typeof syncTownhallGate === 'function' && lastState) {
@@ -3622,41 +3568,6 @@ function bindTownDistrictControls() {
         }), true);
       } finally {
         workerReconnectBtn.disabled = false;
-      }
-    };
-  }
-
-  const tokenVerifyBtn = el('tokenVerifyBtn');
-  if (tokenVerifyBtn) {
-    tokenVerifyBtn.onclick = async () => {
-      setTokenError('');
-      setTokenStatus({ active: true, good: false, text: tApp('token.status.checking') });
-      tokenVerifyBtn.disabled = true;
-      try {
-        const result = await verifyTokenOwnership();
-        if (result?.eligible) {
-          setTokenStatus({ active: true, good: true, text: tApp('token.status.verified') });
-        } else {
-          setTokenStatus({ active: true, good: false, text: tApp('token.status.not_found') });
-        }
-      } catch (e) {
-        const msg = e.message === 'ALREADY_SIGNED_UP'
-          ? tApp('token.error.already_signed_up')
-          : e.message === 'BAD_SIGNATURE'
-            ? tApp('token.error.bad_signature')
-            : e.message === 'SIGNATURE_FORMAT'
-              ? tApp('token.error.bad_signature')
-              : e.message === 'RPC_UNAVAILABLE'
-                ? 'Token check is unavailable. Try again.'
-                : e.message === 'NO_SOLANA_WALLET'
-                  ? tApp('wallet.error.no_solana_wallet')
-                  : e.message === 'NO_SOLANA_SIGN'
-                    ? tApp('wallet.error.no_solana_sign')
-                    : e.message;
-        setTokenError(msg);
-        setTokenStatus({ active: true, good: false, text: tApp('token.status.failed') });
-      } finally {
-        tokenVerifyBtn.disabled = false;
       }
     };
   }
@@ -6081,8 +5992,6 @@ async function updateUI(state) {
   updateTownHubLinks(houseId);
   syncTownhallRegistrationUI(state);
   syncTownhallGate(state);
-
-  updatePathButtons();
 
   // Agent status
   const connected = !!state.agent?.connected;
@@ -9220,14 +9129,11 @@ async function bootstrapInitialRouteState() {
     window.history.replaceState({}, '', nextUrl);
   }
 
-  const tokenErr = loadTokenError();
   const districtParam = params.get('district');
   const pathDistrict = popupDistrictByPath[window.location.pathname] || null;
   const explicitDistrict = explicitDistrictFromInput(districtParam) || explicitDistrictFromInput(pathDistrict);
-  pathMode = loadPathMode();
   const initialDistrict = explicitDistrict;
   activeDistrict = initialDistrict;
-  updatePathButtons();
   setActiveDistrict(initialDistrict);
 
   if (isTownHub) {
@@ -9314,10 +9220,6 @@ async function bootstrapInitialRouteState() {
 
   if (isTownHub && initialDistrict) {
     await showDistrict(activeDistrict);
-  }
-
-  if (tokenErr) {
-    setTokenError(tokenErr);
   }
 
   updateWalletUI();
