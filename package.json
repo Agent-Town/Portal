@@ -28,7 +28,8 @@
     "gen:erc8004-images:nano:oauth": "node scripts/generate_nano_banana_images_oauth.js",
     "test": "playwright test",
     "test:headed": "playwright test --headed",
-    "test:ui": "playwright test --ui"
+    "test:ui": "playwright test --ui",
+    "test:founders-plot": "NODE_ENV=test node --test 'tests-founders-plot/*.test.js'"
   },
   "dependencies": {
     "@solana/web3.js": "^1.98.4",

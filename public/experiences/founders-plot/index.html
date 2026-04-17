@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Founders Plot — Agent Town</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="/experiences/founders-plot/founders-plot.css" />
+</head>
+<body class="fp-body" data-testid="fp-root">
+
+  <header class="fp-header" role="banner">
+    <div class="fp-header__brand">
+      <span class="fp-header__mark" aria-hidden="true">✦</span>
+      <h1 class="fp-header__title">Founders Plot</h1>
+    </div>
+    <div class="fp-header__quest" data-testid="fp-quest">
+      <span class="fp-pill fp-pill--teal" data-testid="fp-quest-step">Loading…</span>
+      <span class="fp-header__subtitle" data-testid="fp-quest-hint"></span>
+    </div>
+    <div class="fp-header__inventory" data-testid="fp-inventory-strip">
+      <span class="fp-res" data-res="wood"><span class="fp-res__icon" aria-hidden="true">🪵</span><span class="fp-res__value" data-testid="fp-res-wood">0</span></span>
+      <span class="fp-res" data-res="stone"><span class="fp-res__icon" aria-hidden="true">🪨</span><span class="fp-res__value" data-testid="fp-res-stone">0</span></span>
+      <span class="fp-res" data-res="food"><span class="fp-res__icon" aria-hidden="true">🌾</span><span class="fp-res__value" data-testid="fp-res-food">0</span></span>
+      <span class="fp-res" data-res="coin"><span class="fp-res__icon" aria-hidden="true">🪙</span><span class="fp-res__value" data-testid="fp-res-coin">20</span></span>
+    </div>
+    <div class="fp-header__hq">
+      <span class="fp-pill fp-pill--brass" data-testid="fp-hq-level">HQ Lv 1</span>
+      <span class="fp-pill fp-pill--ochre" data-testid="fp-hq-xp">0 XP</span>
+    </div>
+  </header>
+
+  <main class="fp-main">
+    <section class="fp-plot" aria-label="Founders Plot grid">
+      <div class="fp-plot__scene">
+        <div class="fp-plot__grid" id="fp-grid" data-testid="fp-grid" role="grid"></div>
+      </div>
+      <div class="fp-plot__legend">
+        <button class="fp-brass-btn" id="fp-close-palette" data-testid="fp-close-palette" hidden>Cancel placement</button>
+        <div class="fp-palette" id="fp-palette" data-testid="fp-palette" hidden></div>
+      </div>
+    </section>
+
+    <aside class="fp-side" aria-label="Selection and agent">
+      <section class="fp-parchment fp-panel" data-testid="fp-building-panel">
+        <header class="fp-panel__head">
+          <h2 class="fp-panel__title" id="fp-bld-title">Select a tile</h2>
+        </header>
+        <div class="fp-panel__body" id="fp-bld-body">
+          <p class="fp-helper">Click a tile on the plot. Empty tiles can host a building. Ready buildings can be upgraded. Buildings with outputs can be collected.</p>
+        </div>
+      </section>
+
+      <section class="fp-parchment fp-panel" data-testid="fp-foreman-panel">
+        <header class="fp-panel__head">
+          <h2 class="fp-panel__title">The Foreman</h2>
+          <button class="fp-brass-btn fp-brass-btn--small" id="fp-foreman-toggle" data-testid="fp-foreman-toggle" aria-expanded="true">Hide</button>
+        </header>
+        <div class="fp-panel__body" id="fp-foreman-body">
+          <p class="fp-foreman-status" data-testid="fp-foreman-status">Foreman will introduce itself after your first collect.</p>
+          <details class="fp-disclosure" data-testid="fp-foreman-disclosure">
+            <summary class="fp-disclosure__summary">Permissions</summary>
+            <form id="fp-policy-form" class="fp-policy">
+              <label><input type="checkbox" name="collectOutputs" data-testid="fp-policy-collect" /> Collect finished outputs (HQ 2+)</label>
+              <label><input type="checkbox" name="queueProduction" data-testid="fp-policy-queue" /> Queue production (HQ 3+)</label>
+              <label><input type="checkbox" name="setPriority" data-testid="fp-policy-priority" /> Set one building priority (HQ 4+)</label>
+              <label><input type="checkbox" name="sellSurplusFood" data-testid="fp-policy-sell" /> Sell surplus food (HQ 5+)</label>
+              <label class="fp-policy__danger"><input type="checkbox" name="emergencyPause" data-testid="fp-policy-pause" /> Emergency pause (stop autonomy)</label>
+              <button type="submit" class="fp-brass-btn" data-testid="fp-policy-save">Save permissions</button>
+            </form>
+          </details>
+          <div class="fp-foreman__approvals" data-testid="fp-approvals"></div>
+          <button class="fp-teal-btn" id="fp-foreman-act" data-testid="fp-foreman-act">Ask the Foreman</button>
+        </div>
+      </section>
+
+      <section class="fp-parchment fp-panel" data-testid="fp-jobs-panel">
+        <header class="fp-panel__head">
+          <h2 class="fp-panel__title">Action queue</h2>
+        </header>
+        <div class="fp-panel__body" id="fp-jobs-body">
+          <p class="fp-helper">No jobs running.</p>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <button class="fp-drawer-toggle" id="fp-drawer-toggle" data-testid="fp-drawer-toggle" aria-controls="fp-recap-drawer">Recap</button>
+  <aside class="fp-drawer" id="fp-recap-drawer" data-testid="fp-recap-drawer" aria-hidden="true">
+    <header class="fp-drawer__head">
+      <h2 class="fp-drawer__title">While you were away</h2>
+      <button class="fp-brass-btn" id="fp-drawer-close" aria-label="Close recap">Close</button>
+    </header>
+    <div class="fp-drawer__body" id="fp-recap-body" data-testid="fp-recap-body">
+      <p class="fp-helper">Nothing new yet.</p>
+    </div>
+  </aside>
+
+  <div class="fp-toast" id="fp-toast" data-testid="fp-toast" hidden></div>
+
+  <script src="/experiences/founders-plot/founders-plot.js" defer></script>
+</body>
+</html>

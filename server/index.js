@@ -27,6 +27,9 @@ const { createServerHouseVaultBackend } = require('./houseVaultBackend');
 const { createPostageVerifier } = require('./postageVerifier');
 const { emitMilestone } = require('./milestones');
 const { computeRewardsSummary } = require('./rewards');
+const { createFoundersPlotRouter } = require('./founders_plot/routes');
+const { createExperiencesRouter } = require('./founders_plot/experiences');
+const { resetFoundersPlotStore } = require('./founders_plot/store');
 const {
   createSession,
   getSessionById,
@@ -2068,6 +2071,32 @@ function collectWalletCandidatesFromHeaders(req) {
   return out;
 }
 
+function resolveFoundersPlotIdentity(req, res) {
+  const session = ensureHumanSession(req, res);
+  const houseId = typeof session?.houseCeremony?.houseId === 'string'
+    ? session.houseCeremony.houseId.trim()
+    : '';
+  if (houseId) {
+    return {
+      pairId: `house:${houseId}`,
+      houseId
+    };
+  }
+
+  const walletCandidate = collectWalletCandidatesFromHeaders(req)[0] || null;
+  if (walletCandidate) {
+    return {
+      pairId: `wallet:${walletCandidate.chain}:${walletCandidate.address}`,
+      houseId: null
+    };
+  }
+
+  return {
+    pairId: `session:${session.sessionId}`,
+    houseId: null
+  };
+}
+
 function collectTownhallWalletCandidatesFromPayload(walletPayload) {
   const wallet = walletPayload && typeof walletPayload === 'object' ? walletPayload : null;
   if (!wallet) return [];
@@ -3627,6 +3656,26 @@ function verifyHouseAuth(req, house) {
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, time: nowIso() });
 });
+
+// --- Experience registry + Founders Plot (Phase 1 city-builder slice) ---
+app.use('/api/experiences', createExperiencesRouter({
+  publicDir: path.join(__dirname, '..', 'public'),
+}));
+
+function foundersPlotSessionMiddleware(req, res, next) {
+  try {
+    // Establish or refresh the session cookie before identity resolution,
+    // since resolveIdentity is called without access to `res`.
+    ensureHumanSession(req, res);
+  } catch { /* identity will fall back to empty pairId */ }
+  next();
+}
+app.use('/api/founders-plot', foundersPlotSessionMiddleware);
+const foundersPlotRouter = createFoundersPlotRouter({
+  resolveIdentity: (req) => resolveFoundersPlotIdentity(req, null),
+  nowMs: () => Date.now(),
+});
+app.use(foundersPlotRouter);
 
 app.get('/api/session', (req, res) => {
   const s = ensureHumanSession(req, res);
@@ -8305,6 +8354,7 @@ if (process.env.NODE_ENV === 'test') {
     erc8004OptOutNonces.clear();
     openRouterOAuthAttemptsById.clear();
     openRouterOAuthAttemptsByState.clear();
+    try { require('./founders_plot/store').resetFoundersPlotStore(); } catch {}
     res.json({ ok: true });
   });
 }
@@ -9485,6 +9535,10 @@ function sendHtmlNoStore(res, fileName) {
 
 app.get('/', (_req, res) => sendHtmlNoStore(res, HOME_ROUTE_FILE));
 app.get('/start', (_req, res) => sendHtmlNoStore(res, 'start.html'));
+app.get('/founders-plot', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  return res.sendFile(path.join(PUBLIC_DIR, 'experiences', 'founders-plot', 'index.html'));
+});
 app.get('/app', (_req, res) => sendHtmlNoStore(res, 'index.html'));
 app.get('/create', (_req, res) => sendHtmlNoStore(res, 'create.html'));
 app.get('/inbox/:houseId', (_req, res) => sendHtmlNoStore(res, 'inbox.html'));
