@@ -1,0 +1,24 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "brain-connect-panel",
+  "type": "registry:block",
+  "title": "Brain Connect Panel",
+  "description": "Friendly brain connection block with progressive disclosure for advanced provider setup.",
+  "registryDependencies": [
+    "frontier-base",
+    "parchment-panel",
+    "brass-button"
+  ],
+  "files": [
+    {
+      "path": "registry-source/agent-town/brain-connect-panel/brain-connect-panel.tsx",
+      "type": "registry:component",
+      "target": "src/components/blocks/brain-connect-panel.tsx"
+    },
+    {
+      "path": "registry-source/agent-town/brain-connect-panel/brain-connect-panel.contract.md",
+      "type": "registry:file",
+      "target": "docs/contracts/brain-connect-panel.md"
+    }
+  ]
+}

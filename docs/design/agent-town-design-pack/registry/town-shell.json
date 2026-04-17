@@ -1,0 +1,23 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "town-shell",
+  "type": "registry:block",
+  "title": "Town Shell",
+  "description": "Scenic hub shell with hotspot navigation and a single objective status line.",
+  "registryDependencies": [
+    "frontier-base",
+    "hotspot-sign"
+  ],
+  "files": [
+    {
+      "path": "registry-source/agent-town/town-shell/town-shell.tsx",
+      "type": "registry:component",
+      "target": "src/components/blocks/town-shell.tsx"
+    },
+    {
+      "path": "registry-source/agent-town/town-shell/town-shell.contract.md",
+      "type": "registry:file",
+      "target": "docs/contracts/town-shell.md"
+    }
+  ]
+}

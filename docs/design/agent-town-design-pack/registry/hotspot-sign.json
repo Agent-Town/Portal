@@ -1,0 +1,22 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "hotspot-sign",
+  "type": "registry:ui",
+  "title": "Hotspot Sign",
+  "description": "District hotspot label primitive for the town shell.",
+  "registryDependencies": [
+    "frontier-base"
+  ],
+  "files": [
+    {
+      "path": "registry-source/agent-town/hotspot-sign/hotspot-sign.tsx",
+      "type": "registry:component",
+      "target": "src/components/ui/hotspot-sign.tsx"
+    },
+    {
+      "path": "registry-source/agent-town/hotspot-sign/hotspot-sign.contract.md",
+      "type": "registry:file",
+      "target": "docs/contracts/hotspot-sign.md"
+    }
+  ]
+}

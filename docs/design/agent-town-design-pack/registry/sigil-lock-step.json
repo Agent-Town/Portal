@@ -1,0 +1,24 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "sigil-lock-step",
+  "type": "registry:block",
+  "title": "Sigil Lock Step",
+  "description": "Mirrored lock ritual block for human and worker coordination.",
+  "registryDependencies": [
+    "frontier-base",
+    "brass-button",
+    "status-pill"
+  ],
+  "files": [
+    {
+      "path": "registry-source/agent-town/sigil-lock-step/sigil-lock-step.tsx",
+      "type": "registry:component",
+      "target": "src/components/blocks/sigil-lock-step.tsx"
+    },
+    {
+      "path": "registry-source/agent-town/sigil-lock-step/sigil-lock-step.contract.md",
+      "type": "registry:file",
+      "target": "docs/contracts/sigil-lock-step.md"
+    }
+  ]
+}

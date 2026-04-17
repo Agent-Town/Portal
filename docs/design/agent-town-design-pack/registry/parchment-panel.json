@@ -1,0 +1,22 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "parchment-panel",
+  "type": "registry:ui",
+  "title": "Parchment Panel",
+  "description": "Primary parchment reading surface for shell and onboarding content.",
+  "registryDependencies": [
+    "frontier-base"
+  ],
+  "files": [
+    {
+      "path": "registry-source/agent-town/parchment-panel/parchment-panel.tsx",
+      "type": "registry:component",
+      "target": "src/components/ui/parchment-panel.tsx"
+    },
+    {
+      "path": "registry-source/agent-town/parchment-panel/parchment-panel.contract.md",
+      "type": "registry:file",
+      "target": "docs/contracts/parchment-panel.md"
+    }
+  ]
+}

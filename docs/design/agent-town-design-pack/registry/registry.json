@@ -1,0 +1,91 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "name": "agent-town",
+  "homepage": "https://registry.agent.town",
+  "items": [
+    {
+      "name": "frontier-base",
+      "type": "registry:base",
+      "title": "Frontier Base",
+      "description": "Core Agent Town frontier shell tokens, motion variables, and layout utilities."
+    },
+    {
+      "name": "parchment-panel",
+      "type": "registry:ui",
+      "title": "Parchment Panel",
+      "description": "Primary parchment reading surface for shell and onboarding UI."
+    },
+    {
+      "name": "brass-button",
+      "type": "registry:ui",
+      "title": "Brass Button",
+      "description": "Tactile button primitive for shell and onboarding actions."
+    },
+    {
+      "name": "status-pill",
+      "type": "registry:ui",
+      "title": "Status Pill",
+      "description": "Compact status capsule for connected, pending, waiting, and unlocked states."
+    },
+    {
+      "name": "frontier-field",
+      "type": "registry:ui",
+      "title": "Frontier Field",
+      "description": "Labeled shell form field primitive."
+    },
+    {
+      "name": "sheet-frame",
+      "type": "registry:ui",
+      "title": "Sheet Frame",
+      "description": "Drawer and sheet shell primitive."
+    },
+    {
+      "name": "hotspot-sign",
+      "type": "registry:ui",
+      "title": "Hotspot Sign",
+      "description": "District hotspot label primitive."
+    },
+    {
+      "name": "start-gate",
+      "type": "registry:block",
+      "title": "Start Gate",
+      "description": "Entry hero block for the Wild West / town gate surface."
+    },
+    {
+      "name": "town-shell",
+      "type": "registry:block",
+      "title": "Town Shell",
+      "description": "Scenic hub shell with hotspot navigation and status line."
+    },
+    {
+      "name": "district-modal",
+      "type": "registry:block",
+      "title": "District Modal",
+      "description": "Building-style modal shell for district interiors."
+    },
+    {
+      "name": "townhall-onboarding",
+      "type": "registry:block",
+      "title": "Town Hall Onboarding",
+      "description": "Story-first onboarding block for human, agent, and registration steps."
+    },
+    {
+      "name": "brain-connect-panel",
+      "type": "registry:block",
+      "title": "Brain Connect Panel",
+      "description": "Friendly brain connection block with progressive disclosure."
+    },
+    {
+      "name": "sigil-lock-step",
+      "type": "registry:block",
+      "title": "Sigil Lock Step",
+      "description": "Mirrored lock ritual block for human and worker coordination."
+    },
+    {
+      "name": "agent-comms-drawer",
+      "type": "registry:block",
+      "title": "Agent Comms Drawer",
+      "description": "Context-aware helper drawer for receipts, approvals, and chat."
+    }
+  ]
+}

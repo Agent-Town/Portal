@@ -1,0 +1,24 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "district-modal",
+  "type": "registry:block",
+  "title": "District Modal",
+  "description": "Framed building-style modal shell for district interiors.",
+  "registryDependencies": [
+    "frontier-base",
+    "parchment-panel",
+    "brass-button"
+  ],
+  "files": [
+    {
+      "path": "registry-source/agent-town/district-modal/district-modal.tsx",
+      "type": "registry:component",
+      "target": "src/components/blocks/district-modal.tsx"
+    },
+    {
+      "path": "registry-source/agent-town/district-modal/district-modal.contract.md",
+      "type": "registry:file",
+      "target": "docs/contracts/district-modal.md"
+    }
+  ]
+}

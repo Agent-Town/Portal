@@ -1,0 +1,23 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "townhall-onboarding",
+  "type": "registry:block",
+  "title": "Town Hall Onboarding",
+  "description": "Story-first onboarding block for human, agent, registration, and progress steps.",
+  "registryDependencies": [
+    "frontier-base",
+    "parchment-panel"
+  ],
+  "files": [
+    {
+      "path": "registry-source/agent-town/townhall-onboarding/townhall-onboarding.tsx",
+      "type": "registry:component",
+      "target": "src/components/blocks/townhall-onboarding.tsx"
+    },
+    {
+      "path": "registry-source/agent-town/townhall-onboarding/townhall-onboarding.contract.md",
+      "type": "registry:file",
+      "target": "docs/contracts/townhall-onboarding.md"
+    }
+  ]
+}

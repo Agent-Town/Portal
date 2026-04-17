@@ -1,0 +1,22 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "status-pill",
+  "type": "registry:ui",
+  "title": "Status Pill",
+  "description": "Compact status capsule for connected, pending, waiting, and unlocked states.",
+  "registryDependencies": [
+    "frontier-base"
+  ],
+  "files": [
+    {
+      "path": "registry-source/agent-town/status-pill/status-pill.tsx",
+      "type": "registry:component",
+      "target": "src/components/ui/status-pill.tsx"
+    },
+    {
+      "path": "registry-source/agent-town/status-pill/status-pill.contract.md",
+      "type": "registry:file",
+      "target": "docs/contracts/status-pill.md"
+    }
+  ]
+}
