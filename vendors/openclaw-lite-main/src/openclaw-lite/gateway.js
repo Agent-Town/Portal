@@ -1206,6 +1206,17 @@ async function init() {
       if (!res?.ok) throw new Error(String(res?.error || "TOOLS_REGISTRY_FAILED"));
       return res.info || null;
     },
+    async invokeTool({ tool, params = {} } = {}) {
+      const toolName = typeof tool === "string" ? tool.trim() : "";
+      if (!toolName) throw new Error("TOOL_NAME_REQUIRED");
+      const res = await sendWorkerRequest({
+        requestType: "gateway.command.tools.invoke",
+        responseType: "worker.tools.invoke",
+        payload: { toolName, params: params && typeof params === "object" ? params : {} },
+      });
+      if (!res?.ok) throw new Error(String(res?.error || "TOOLS_INVOKE_FAILED"));
+      return res.result || null;
+    },
     async runToolSmoke({ count = 5 } = {}) {
       const res = await sendWorkerRequest({
         requestType: "gateway.command.tools.smoke",

@@ -529,6 +529,7 @@ let activeDistrict = 'house';
 const districtViews = {
   house: { title: 'Plan Wagons', viewPath: '/views/house.html' },
   atlas: { title: 'Atlas Depot', viewPath: '/atlas?embed=1' },
+  'founders-plot': { title: 'Founders Plot', viewPath: '/founders-plot?embed=1' },
   townhall: { title: 'Town Hall', viewPath: '/views/townhall.html' },
   saloon: { title: 'Saloon', viewPath: '/views/saloon.html' },
   pony: { title: 'Pony Express', viewPath: '/views/pony.html' },
@@ -793,9 +794,10 @@ const isTownHub = !!document.getElementById('districtMap') && !!document.getElem
 const popupDistrictByPath = {
   '/leaderboard': 'leaderboard',
   '/wall': 'leaderboard',
-  '/house': 'house'
+  '/house': 'house',
+  '/founders-plot': 'founders-plot'
 };
-const EXPERIENCE_UI_MODAL_NAMES = new Set(['atlas', 'pony', 'townhall', 'saloon', 'leaderboard', 'house', 'brain', 'sigil']);
+const EXPERIENCE_UI_MODAL_NAMES = new Set(['atlas', 'pony', 'townhall', 'saloon', 'leaderboard', 'house', 'brain', 'sigil', 'founders-plot']);
 const EXPERIENCE_UI_CONFIRMATION_REQUIRED_TOOLS = new Set(['agent_town_ui_publish_post']);
 const EXPERIENCE_INTENT_TRACE_LIMIT = 200;
 const experienceIntentTrace = [];
@@ -1169,6 +1171,7 @@ function districtStatusText(district) {
   }
   if (!district) return tApp('district.status.select');
   if (district === 'atlas') return tApp('district.status.atlas');
+  if (district === 'founders-plot') return 'Founders Plot is ready.';
   if (district === 'townhall') return tApp('district.status.townhall');
   if (district === 'saloon') return tApp('district.status.saloon');
   if (district === 'pony') return tApp('district.status.pony');
@@ -1177,7 +1180,13 @@ function districtStatusText(district) {
 }
 
 function setActiveDistrict(district) {
-  const next = district === 'atlas' || district === 'townhall' || district === 'saloon' || district === 'pony' || district === 'leaderboard' || district === 'house'
+  const next = district === 'atlas'
+    || district === 'founders-plot'
+    || district === 'townhall'
+    || district === 'saloon'
+    || district === 'pony'
+    || district === 'leaderboard'
+    || district === 'house'
     ? district
     : null;
   activeDistrict = next;
@@ -1194,6 +1203,7 @@ function setActiveDistrict(district) {
 
 function normalizeDistrict(district) {
   return district === 'atlas'
+    || district === 'founders-plot'
     || district === 'townhall'
     || district === 'saloon'
     || district === 'pony'
@@ -1208,6 +1218,7 @@ function normalizeDistrict(district) {
 
 function explicitDistrictFromInput(district) {
   return district === 'atlas'
+    || district === 'founders-plot'
     || district === 'townhall'
     || district === 'saloon'
     || district === 'pony'
@@ -3224,12 +3235,6 @@ async function mintAllTownhallIdentitiesAndRegister() {
     await submitTownhallRegistration();
     townhallMintLastErrorStep = null;
     setTownhallRegisterFeedback(tApp('townhall.feedback.registration_complete_continue'));
-
-    // Auto-advance to brain district after successful registration
-    const nextStep = lastState ? getOnboardingStep(lastState) : null;
-    if (nextStep === ONBOARDING_STEP_BRAIN) {
-      showDistrict('brain');
-    }
   } catch (err) {
     townhallSigilUnlockedByContinue = false;
     const raw = String(err?.message || err || 'Mint failed.');
@@ -4309,6 +4314,7 @@ function setDistrictModalMode(mode) {
 const districtModalThemeByDistrict = {
   house: 'house',
   atlas: 'atlas',
+  'founders-plot': 'house',
   townhall: 'townhall',
   saloon: 'saloon',
   pony: 'pony',
@@ -4336,6 +4342,7 @@ function inferDistrictModalThemeFromUrl(url) {
   }
   const path = parsed.pathname || '';
   if (path === '/atlas') return 'atlas';
+  if (path === '/founders-plot' || path === '/founders-plot.html') return 'house';
   if (path === '/wall' || path === '/leaderboard') return 'leaderboard';
   if (path === '/house') return 'house';
   if (path === '/create' || path === '/claim' || path === '/claim-wallet' || path === '/trainer') return 'trainer';
@@ -4603,7 +4610,7 @@ async function runExperienceUiOpenModal(rawParams) {
   }
   const modal = String(rawParams.modal || '').trim().toLowerCase();
   if (!EXPERIENCE_UI_MODAL_NAMES.has(modal)) {
-    return invalidExperienceParam('modal must be one of atlas|pony|townhall|saloon|leaderboard|house|brain|sigil');
+    return invalidExperienceParam('modal must be one of atlas|pony|townhall|saloon|leaderboard|house|brain|sigil|founders-plot');
   }
   const params = rawParams.params;
   if (params != null && !isPlainRecord(params)) {
@@ -4832,7 +4839,7 @@ async function showDistrict(district) {
     const gateReason = getTownHubDistrictGateReason(lastState);
     const gateAllowed = (gateReason === 'brain' && safeDistrict === 'brain')
       || (gateReason === 'sigil' && safeDistrict === 'sigil')
-      || (gateReason === 'ceremony' && safeDistrict === 'ceremony');
+      || (gateReason === 'ceremony' && (safeDistrict === 'ceremony' || safeDistrict === 'founders-plot'));
     if (!gateAllowed) {
       setActiveDistrict('townhall');
       const statusText = getTownHubDistrictGateStatusText();
@@ -4847,6 +4854,11 @@ async function showDistrict(district) {
 
   if (safeDistrict === 'atlas') {
     openRouteInModalFrame('/atlas?embed=1', 'Atlas Depot');
+    return;
+  }
+
+  if (safeDistrict === 'founders-plot') {
+    openRouteInModalFrame('/founders-plot?embed=1', 'Founders Plot');
     return;
   }
 
@@ -6110,6 +6122,9 @@ async function updateUI(state) {
     if (openHouseLink) openHouseLink.href = `/house?house=${encodeURIComponent(houseId)}`;
   }
 
+  const openFoundersPlotLink = el('openFoundersPlotLink');
+  if (openFoundersPlotLink) openFoundersPlotLink.href = '/founders-plot';
+
   const openShareCardBtn = el('openShareCardBtn');
   const shareCardStatus = el('shareCardStatus');
   if (openShareCardBtn) {
@@ -6141,7 +6156,7 @@ async function updateUI(state) {
   const openReady = el('openReady');
   if (openReady) {
     openReady.style.display = complete ? 'inline-flex' : 'none';
-    openReady.innerHTML = `${tApp('sigil.open_ready_prefix')} <a href="/create">${tApp('sigil.open_ready_ceremony')}</a> · <a href="/house">${tApp('sigil.open_ready_house')}</a>`;
+    openReady.innerHTML = `${tApp('sigil.open_ready_prefix')} <a href="/create">${tApp('sigil.open_ready_ceremony')}</a> · <a href="/house">${tApp('sigil.open_ready_house')}</a> · <a href="/founders-plot">Founders Plot</a>`;
   }
 
   const waiting = !!state.human?.openPressed && !complete;

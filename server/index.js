@@ -21,6 +21,9 @@ loadDotEnv();
 
 const { parseCookies, nowIso, randomHex } = require('./util');
 const { readStore, writeStore, getStorePath } = require('./store');
+const { createExperiencesRouter } = require('./experience_loader');
+const { createFoundersPlotRouter } = require('./founders_plot/routes');
+const { resetFoundersPlotStore } = require('./founders_plot/store');
 const { getAtlasSnapshot, searchAtlasAgents } = require('./atlas');
 const { createPonyTransportService } = require('./ponyTransport');
 const { createServerHouseVaultBackend } = require('./houseVaultBackend');
@@ -1704,6 +1707,8 @@ function setSecurityHeaders(req, res, next) {
   const allowSameOriginFrame = (
     reqPath.startsWith('/s/')
     || reqPath === '/atlas'
+    || reqPath === '/founders-plot'
+    || reqPath === '/founders-plot.html'
     || reqPath === '/create'
     || reqPath === '/house'
     || reqPath === '/inbox'
@@ -2066,6 +2071,28 @@ function collectWalletCandidatesFromHeaders(req) {
   add('evm', req.header('x-wallet-evm-address'));
   add('solana', req.header('x-wallet-solana-address'));
   return out;
+}
+
+function resolveFoundersPlotIdentity(req, res) {
+  const session = ensureHumanSession(req, res);
+  const houseId = typeof session?.houseCeremony?.houseId === 'string' ? session.houseCeremony.houseId.trim() : '';
+  if (houseId) {
+    return {
+      pairId: `house:${houseId}`,
+      houseId
+    };
+  }
+  const walletCandidate = collectWalletCandidatesFromHeaders(req)[0] || null;
+  if (walletCandidate) {
+    return {
+      pairId: `wallet:${walletCandidate.chain}:${walletCandidate.address}`,
+      houseId: null
+    };
+  }
+  return {
+    pairId: `session:${session?.teamCode || session?.sessionId || 'anonymous'}`,
+    houseId: null
+  };
 }
 
 function collectTownhallWalletCandidatesFromPayload(walletPayload) {
@@ -3763,6 +3790,11 @@ app.post('/api/experience/preference', (req, res) => {
     experiencePreference: cloneExperiencePreference(experiencePreference)
   });
 });
+
+app.use('/api/experiences', createExperiencesRouter());
+app.use(createFoundersPlotRouter({
+  resolveIdentity: resolveFoundersPlotIdentity
+}));
 
 app.post('/api/hatch/complete', (req, res) => {
   const s = ensureHumanSession(req, res);
@@ -8300,6 +8332,7 @@ if (process.env.NODE_ENV === 'test') {
     });
     invalidateAtlasStoreCaches();
     resetAllSessions();
+    resetFoundersPlotStore();
     rateBuckets.clear();
     ponyRateBuckets.clear();
     erc8004OptOutNonces.clear();
@@ -9426,6 +9459,7 @@ function isAtlasEmbedModalRequest(req) {
   if (!embed) return false;
   const fetchDest = String(req.get('sec-fetch-dest') || '').trim().toLowerCase();
   if (fetchDest !== 'iframe' && fetchDest !== 'frame') return false;
+  if (hasSameOriginNavigationContext(req)) return true;
   const fetchSite = String(req.get('sec-fetch-site') || '').trim().toLowerCase();
   return fetchSite === 'same-origin' || fetchSite === 'same-site';
 }
@@ -9433,6 +9467,12 @@ function isAtlasEmbedModalRequest(req) {
 function atlasModalRedirectPath() {
   const params = new URLSearchParams();
   params.set('district', 'atlas');
+  return `/?${params.toString()}`;
+}
+
+function foundersPlotModalRedirectPath() {
+  const params = new URLSearchParams();
+  params.set('district', 'founders-plot');
   return `/?${params.toString()}`;
 }
 
@@ -9450,6 +9490,18 @@ app.get('/atlas', (req, res) => {
     return sendHtmlNoStore(res, 'atlas.html');
   }
   return res.redirect(302, atlasModalRedirectPath());
+});
+
+// Founders Plot is modal-first for runtime continuity, matching the town hub worker model.
+app.get('/founders-plot.html', (_req, res) => {
+  return res.redirect(302, foundersPlotModalRedirectPath());
+});
+
+app.get('/founders-plot', (req, res) => {
+  if (isAtlasEmbedModalRequest(req)) {
+    return sendHtmlNoStore(res, 'founders-plot.html');
+  }
+  return res.redirect(302, foundersPlotModalRedirectPath());
 });
 
 app.use(

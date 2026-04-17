@@ -47669,8 +47669,11 @@ async function apiJson(url, opts = {}) {
     });
   }
   if (!res.ok) {
-    const err2 = data?.error || `HTTP_${res.status}`;
-    throw new Error(err2);
+    const errorCode = typeof data?.error === "string" ? data.error : typeof data?.error?.code === "string" ? data.error.code : `HTTP_${res.status}`;
+    const err2 = new Error(String(errorCode || `HTTP_${res.status}`));
+    err2.payload = data;
+    err2.status = res.status;
+    throw err2;
   }
   return data;
 }
@@ -48047,6 +48050,49 @@ async function runAgentTownStateGetPonyInbox(params, toolName = "agent_town_stat
     const message = String(e?.message || "STATE_GET_PONY_INBOX_FAILED");
     const code = normalizeToolErrorCode(message, "UNSUPPORTED");
     return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message, { houseId: houseId || null }));
+  }
+}
+function makeFoundersPlotIdempotencyKey(toolName = "et.plot.action") {
+  const normalized = String(toolName || "et.plot.action").trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "_");
+  return `${normalized}:${randomId("fp")}`;
+}
+function withFoundersPlotIdempotency(params, toolName) {
+  const safeParams = isPlainObject(params) ? { ...params } : {};
+  const rawKey = typeof safeParams.idempotencyKey === "string" ? safeParams.idempotencyKey.trim() : "";
+  if (!rawKey) safeParams.idempotencyKey = makeFoundersPlotIdempotencyKey(toolName);
+  return safeParams;
+}
+async function runFoundersPlotTool(params, toolName) {
+  const startedAtMs = nowMs();
+  const normalizedToolName = String(toolName || "").trim();
+  const safeParams = normalizedToolName === "et.plot.get_state" ? isPlainObject(params) ? { ...params } : {} : withFoundersPlotIdempotency(params, normalizedToolName);
+  try {
+    const payload = normalizedToolName === "et.plot.get_state" ? await apiJson("/api/founders-plot/state", { method: "GET" }) : await apiJson(`/api/founders-plot/tool/${encodeURIComponent(normalizedToolName)}`, {
+      method: "POST",
+      body: JSON.stringify({
+        actor: "AGENT",
+        ...safeParams
+      })
+    });
+    const stateSnapshot = normalizedToolName === "et.plot.get_state" ? payload?.state || null : payload?.data?.state || null;
+    const resultData = normalizedToolName === "et.plot.get_state" ? {
+      state: stateSnapshot,
+      simulation: payload?.simulation || null,
+      worldDelta: null
+    } : {
+      result: payload?.data || null,
+      state: stateSnapshot,
+      worldDelta: payload?.worldDelta || null
+    };
+    return withToolMeta(normalizedToolName, startedAtMs, makeToolSuccess(resultData));
+  } catch (e) {
+    const payload = isPlainObject(e?.payload) ? e.payload : {};
+    const errorNode = isPlainObject(payload?.error) ? payload.error : null;
+    const code = normalizeToolErrorCode(errorNode?.code || e?.message || "SERVER_ERROR", "SERVER_ERROR");
+    const message = String(errorNode?.message || e?.message || code || "Founders Plot tool failed");
+    const details = isPlainObject(errorNode?.details) ? errorNode.details : {};
+    const retryable = typeof errorNode?.retryable === "boolean" ? errorNode.retryable : code === "RATE_LIMITED" || code === "SIMULATION_DESYNC" || code === "SERVER_ERROR";
+    return withToolMeta(normalizedToolName, startedAtMs, makeToolFailure(code, message, details, retryable));
   }
 }
 async function runAgentTownUiIntentTool(params, toolName) {
@@ -49276,6 +49322,54 @@ var LITE_TOOL_SPECS = [
     sampleArgs: { houseId: "hs_example_house" }
   },
   {
+    name: "et.plot.get_state",
+    label: "Founders Plot Get State",
+    description: "Read the current Founders Plot state for the active human+agent session.",
+    sampleArgs: {}
+  },
+  {
+    name: "et.plot.place_building",
+    label: "Founders Plot Place Building",
+    description: "Request a building placement on one valid Founders Plot pad.",
+    sampleArgs: { type: "LUMBER_CAMP", x: 1, y: 0, idempotencyKey: "place_lumber_1_0" }
+  },
+  {
+    name: "et.plot.queue_job",
+    label: "Founders Plot Queue Job",
+    description: "Queue the next production or market job on a ready building.",
+    sampleArgs: { buildingId: "bld_lumber", idempotencyKey: "queue_bld_lumber" }
+  },
+  {
+    name: "et.plot.collect_outputs",
+    label: "Founders Plot Collect Outputs",
+    description: "Collect finished outputs on a completed Founders Plot job.",
+    sampleArgs: { buildingId: "bld_lumber", idempotencyKey: "collect_bld_lumber" }
+  },
+  {
+    name: "et.plot.upgrade_building",
+    label: "Founders Plot Upgrade Building",
+    description: "Start an HQ or building upgrade when allowed or after approval.",
+    sampleArgs: { buildingId: "bld_lumber", idempotencyKey: "upgrade_bld_lumber" }
+  },
+  {
+    name: "et.plot.set_priority",
+    label: "Founders Plot Set Priority",
+    description: "Set one Founders Plot building priority once the unlock is available.",
+    sampleArgs: { buildingId: "bld_lumber", priority: "WOOD", idempotencyKey: "priority_bld_lumber_wood" }
+  },
+  {
+    name: "et.plot.claim_reward",
+    label: "Founders Plot Claim Reward",
+    description: "Claim a pending Founders Plot reward.",
+    sampleArgs: { rewardKey: "hq_level_2", idempotencyKey: "claim_hq_level_2" }
+  },
+  {
+    name: "et.plot.request_user_approval",
+    label: "Founders Plot Request Approval",
+    description: "Create a visible approval card for a sensitive Founders Plot action.",
+    sampleArgs: { tool: "et.plot.place_building", title: "Approve new building", body: "Allow the foreman to place a Lumber Camp.", payload: { type: "LUMBER_CAMP", x: 1, y: 0 }, idempotencyKey: "approval_place_lumber" }
+  },
+  {
     name: "agent_town_ui_open_modal",
     label: "Agent Town UI Open Modal",
     description: "Opens a whitelisted app modal without route replacement.",
@@ -49600,6 +49694,17 @@ async function dispatchLiteTool(name, params, _signal, _onUpdate, toolCallId = n
     case "agent_town_state_get_pony_inbox": {
       const envelope = await runAgentTownStateGetPonyInbox(params || {}, "agent_town_state_get_pony_inbox");
       return envelopeToToolResult(envelope, "agent_town_state_get_pony_inbox");
+    }
+    case "et.plot.get_state":
+    case "et.plot.place_building":
+    case "et.plot.queue_job":
+    case "et.plot.collect_outputs":
+    case "et.plot.upgrade_building":
+    case "et.plot.set_priority":
+    case "et.plot.claim_reward":
+    case "et.plot.request_user_approval": {
+      const envelope = await runFoundersPlotTool(params || {}, normalizedName);
+      return envelopeToToolResult(envelope, normalizedName);
     }
     case "agent_town_ui_open_modal":
     case "agent_town_ui_atlas_search":
@@ -54300,6 +54405,17 @@ ${extraContext}` : text;
         requestId: String(msg.requestId || ""),
         ok: true,
         info: getToolRegistryInfo()
+      });
+      return;
+    }
+    if (msg.type === "gateway.command.tools.invoke") {
+      const toolName = typeof msg.toolName === "string" ? msg.toolName.trim() : "";
+      const result = await dispatchLiteTool(toolName, msg.params || {}, void 0, void 0);
+      post({
+        type: "worker.tools.invoke",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result
       });
       return;
     }

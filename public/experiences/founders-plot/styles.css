@@ -1,0 +1,435 @@
+@font-face {
+  font-family: "Smokum";
+  src: url("/brand-kit/fonts/Smokum-Regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+:root {
+  --fp-ochre: #c4883a;
+  --fp-sand: #f5e6c8;
+  --fp-sand-deep: #e8d5a8;
+  --fp-rust: #a0522d;
+  --fp-teal: #5b8a8a;
+  --fp-brass: #8b7d3c;
+  --fp-wood: #2e1b0e;
+  --fp-cream: #fff8e8;
+  --fp-sun: #ffe4a0;
+}
+
+html,
+body.founders-plot-page {
+  min-height: 100%;
+}
+
+body.founders-plot-page {
+  margin: 0;
+  color: var(--fp-wood);
+  background:
+    radial-gradient(circle at top left, rgba(255, 248, 232, 0.95), rgba(255, 248, 232, 0) 36%),
+    linear-gradient(180deg, rgba(255, 228, 160, 0.72), rgba(245, 230, 200, 0.92)),
+    linear-gradient(180deg, #bf9161 0%, #8b5e3c 100%);
+}
+
+html.founders-plot-embed body.founders-plot-page {
+  background:
+    radial-gradient(circle at top left, rgba(255, 248, 232, 0.9), rgba(255, 248, 232, 0) 36%),
+    linear-gradient(180deg, rgba(255, 228, 160, 0.66), rgba(245, 230, 200, 0.94));
+}
+
+.foundersPlotRoot {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.foundersPlotRoot .panel {
+  border: 1px solid rgba(46, 27, 14, 0.12);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 248, 232, 0.95), rgba(245, 230, 200, 0.98));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    0 18px 40px rgba(46, 27, 14, 0.12);
+}
+
+.foundersHero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 20px;
+  align-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(91, 138, 138, 0.22), transparent 40%),
+    linear-gradient(180deg, rgba(255, 248, 232, 0.98), rgba(232, 213, 168, 0.96));
+}
+
+.foundersEyebrow,
+.foundersLabel {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(46, 27, 14, 0.72);
+}
+
+.foundersHero h1,
+.foundersQuestCard h2,
+.foundersBoardCard h2 {
+  margin: 6px 0 10px;
+  font-family: "Smokum", var(--font-display), serif;
+  font-size: clamp(32px, 5vw, 48px);
+  line-height: 0.95;
+  color: var(--fp-wood);
+}
+
+.foundersQuestCard h2,
+.foundersBoardCard h2,
+.foundersSelectionCard h2 {
+  font-size: 32px;
+}
+
+.foundersHero p,
+.foundersQuestCard p,
+.foundersForemanCard p,
+.foundersSelectionCard p {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.foundersHeroAction {
+  display: grid;
+  gap: 10px;
+  justify-items: end;
+}
+
+.foundersPrimaryCta {
+  min-width: 240px;
+  padding: 14px 20px;
+  border: 1px solid rgba(46, 27, 14, 0.12);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(91, 138, 138, 0.96), rgba(73, 113, 113, 0.98));
+  color: var(--fp-cream);
+  font-family: var(--font-display);
+  font-size: 17px;
+  box-shadow: 0 10px 22px rgba(91, 138, 138, 0.22);
+}
+
+.foundersPrimaryCta:disabled {
+  opacity: 0.55;
+  box-shadow: none;
+}
+
+.foundersHeroStatus {
+  max-width: 260px;
+  text-align: right;
+}
+
+.foundersStatusStrip {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr) 220px;
+  gap: 14px;
+  margin-top: 16px;
+  padding: 18px 20px;
+}
+
+.foundersLevelCard,
+.foundersQueueCard {
+  display: grid;
+  gap: 8px;
+}
+
+.foundersLevelValue {
+  font-family: "Smokum", var(--font-display), serif;
+  font-size: 42px;
+  line-height: 1;
+}
+
+.foundersLevelBar {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(46, 27, 14, 0.08);
+  overflow: hidden;
+}
+
+.foundersLevelFill {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, var(--fp-ochre), var(--fp-sun));
+  transition: width 240ms ease;
+}
+
+.foundersInventory {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(88px, 1fr));
+  gap: 10px;
+}
+
+.foundersInventoryItem {
+  padding: 10px 12px;
+  border: 1px solid rgba(46, 27, 14, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.44);
+}
+
+.foundersInventoryItem strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 18px;
+}
+
+.foundersLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.18fr) minmax(340px, 420px);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.foundersBoardCard,
+.foundersSidebar {
+  min-height: 0;
+}
+
+.foundersBoardCard {
+  padding: 20px;
+}
+
+.foundersPanelHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: end;
+}
+
+.foundersBoard {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.foundersBoardTile {
+  position: relative;
+  min-height: 126px;
+  padding: 14px;
+  border: 1px solid rgba(46, 27, 14, 0.12);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 248, 232, 0.92), rgba(232, 213, 168, 0.82));
+  text-align: left;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.foundersBoardTile:hover {
+  transform: translateY(-2px);
+}
+
+.foundersBoardTile.is-selectable {
+  cursor: pointer;
+}
+
+.foundersBoardTile.is-selected {
+  border-color: rgba(91, 138, 138, 0.68);
+  box-shadow: 0 16px 32px rgba(91, 138, 138, 0.18);
+}
+
+.foundersBoardTile.is-empty {
+  background:
+    linear-gradient(180deg, rgba(255, 248, 232, 0.88), rgba(255, 228, 160, 0.6));
+  border-style: dashed;
+}
+
+.foundersBoardTile.is-scenic {
+  border-style: dotted;
+  opacity: 0.52;
+}
+
+.foundersBoardTile.is-hq {
+  background:
+    radial-gradient(circle at top right, rgba(255, 228, 160, 0.7), transparent 36%),
+    linear-gradient(180deg, rgba(196, 136, 58, 0.22), rgba(232, 213, 168, 0.94));
+}
+
+.foundersBoardTileTitle {
+  font-family: var(--font-display);
+  font-size: 18px;
+}
+
+.foundersBoardTileMeta {
+  margin-top: 8px;
+  font-size: 13px;
+  color: rgba(46, 27, 14, 0.72);
+}
+
+.foundersQueueListWrap {
+  margin-top: 18px;
+}
+
+.foundersQueueList {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.foundersQueueItem {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.44);
+  border: 1px solid rgba(46, 27, 14, 0.08);
+}
+
+.foundersSidebar {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.foundersSidebar .panel {
+  padding: 18px;
+}
+
+.foundersActions,
+.foundersPermissionsList,
+.foundersApprovalList,
+.foundersRewardsList,
+.foundersPriorityRow {
+  display: grid;
+  gap: 10px;
+}
+
+.foundersActions button,
+.foundersApprovalActions button,
+.foundersRewardsList button,
+.foundersPriorityRow button,
+.foundersPermissionsList button {
+  justify-self: start;
+}
+
+.foundersDataRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(46, 27, 14, 0.08);
+}
+
+.foundersDataRow:last-child {
+  border-bottom: 0;
+}
+
+.foundersBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(91, 138, 138, 0.14);
+  color: var(--fp-teal);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.foundersBadge.is-warn {
+  background: rgba(160, 82, 45, 0.12);
+  color: var(--fp-rust);
+}
+
+.foundersPermissionItem,
+.foundersApprovalItem,
+.foundersRewardItem {
+  padding: 12px;
+  border: 1px solid rgba(46, 27, 14, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.44);
+}
+
+.foundersPermissionToggle {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.foundersApprovalActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.foundersRecapDrawer {
+  margin-top: 16px;
+  padding: 18px 20px;
+}
+
+.foundersRecapDrawer summary {
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 18px;
+}
+
+.foundersRecapBody {
+  margin-top: 14px;
+}
+
+.foundersRecapList {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.foundersRecapItem {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.44);
+}
+
+.foundersFooterNote {
+  margin-top: 16px;
+  padding: 14px 18px;
+}
+
+.foundersEmptyState {
+  color: rgba(46, 27, 14, 0.66);
+}
+
+.foundersInlineButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 1040px) {
+  .foundersStatusStrip,
+  .foundersLayout,
+  .foundersHero {
+    grid-template-columns: 1fr;
+  }
+
+  .foundersHeroAction {
+    justify-items: start;
+  }
+
+  .foundersHeroStatus {
+    text-align: left;
+  }
+}
+
+@media (max-width: 720px) {
+  .foundersPlotRoot {
+    padding: 12px;
+  }
+
+  .foundersBoard {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .foundersInventory {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

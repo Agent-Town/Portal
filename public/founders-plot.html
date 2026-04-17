@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agent Town — Founders Plot</title>
+  <meta name="description" content="Founders Plot starter district" />
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="stylesheet" href="/styles.css?v=20260319a" />
+  <link rel="stylesheet" href="/experiences/founders-plot/styles.css?v=20260418a" />
+</head>
+<body class="founders-plot-page">
+  <div class="foundersPlotRoot">
+    <header class="panel foundersHero" data-testid="founders-hero">
+      <div class="foundersHeroCopy">
+        <div class="foundersEyebrow">Founders Plot</div>
+        <h1 id="foundersTitle">Establish the first productive district</h1>
+        <p id="foundersSubtitle">You choose the layout. The foreman handles the repeat work you trust it with.</p>
+      </div>
+      <div class="foundersHeroAction">
+        <button class="btn primary foundersPrimaryCta" id="questCtaBtn" type="button" data-testid="founders-quest-cta">Loading…</button>
+        <div class="small foundersHeroStatus" id="questStatusLine">Syncing plot…</div>
+      </div>
+    </header>
+
+    <section class="panel foundersStatusStrip" data-testid="founders-status-strip">
+      <div class="foundersLevelCard">
+        <div class="foundersLabel">HQ</div>
+        <div class="foundersLevelValue" id="hqLevelValue">1</div>
+        <div class="foundersLevelBar">
+          <div class="foundersLevelFill" id="hqLevelFill"></div>
+        </div>
+        <div class="small" id="hqProgressText">0 / 25 XP</div>
+      </div>
+      <div class="foundersInventory" id="inventoryStrip" data-testid="founders-inventory"></div>
+      <div class="foundersQueueCard">
+        <div class="foundersLabel">Queue</div>
+        <div class="small" id="queueSummaryText">No active jobs.</div>
+      </div>
+    </section>
+
+    <main class="foundersLayout">
+      <section class="panel foundersBoardCard">
+        <div class="foundersPanelHeader">
+          <div>
+            <div class="foundersLabel">Settlement board</div>
+            <h2>The six starter pads</h2>
+          </div>
+          <div class="small" id="boardHint">Select a pad or building to inspect it.</div>
+        </div>
+        <div class="foundersBoard" id="plotBoard" data-testid="founders-board"></div>
+        <div class="foundersQueueListWrap">
+          <div class="foundersLabel">Timers and queues</div>
+          <div class="foundersQueueList" id="queueList" data-testid="founders-queue-list"></div>
+        </div>
+      </section>
+
+      <aside class="foundersSidebar">
+        <section class="panel foundersQuestCard" data-testid="founders-quest-panel">
+          <div class="foundersLabel">Current quest</div>
+          <h2 id="questTitle">Loading…</h2>
+          <p id="questBody">Reading the settlement ledger.</p>
+        </section>
+
+        <section class="panel foundersSelectionCard" data-testid="founders-selection-panel">
+          <div class="foundersLabel">Selected pad</div>
+          <div id="selectionCard"></div>
+        </section>
+
+        <section class="panel foundersForemanCard" data-testid="founders-foreman-panel">
+          <div class="foundersLabel">Foreman</div>
+          <p id="foremanRecommendation">The foreman is reading the plot.</p>
+          <div class="small" id="foremanToolsLine">Allowed tools: observation only.</div>
+        </section>
+
+        <section class="panel foundersPermissionsCard" data-testid="founders-permissions-panel">
+          <div class="foundersLabel">Permissions</div>
+          <div id="permissionsList"></div>
+        </section>
+
+        <section class="panel foundersApprovalsCard" data-testid="founders-approvals-panel">
+          <div class="foundersLabel">Approvals</div>
+          <div id="approvalsList">No pending approvals.</div>
+        </section>
+
+        <section class="panel foundersRewardsCard" data-testid="founders-rewards-panel">
+          <div class="foundersLabel">Rewards</div>
+          <div id="rewardsList">No rewards ready.</div>
+        </section>
+      </aside>
+    </main>
+
+    <details class="panel foundersRecapDrawer" id="recapDrawer" data-testid="founders-recap-drawer">
+      <summary>While you were away</summary>
+      <div class="foundersRecapBody">
+        <div class="small" id="recapSummaryText">No new recap lines yet.</div>
+        <div class="foundersRecapList" id="recapList"></div>
+        <div class="foundersRecapActions">
+          <button class="btn small" id="markRecapReadBtn" type="button">Mark recap read</button>
+        </div>
+      </div>
+    </details>
+
+    <section class="panel foundersFooterNote">
+      <div class="small" id="plotStatusLine">Waiting for plot state…</div>
+    </section>
+  </div>
+
+  <script src="/experiences/founders-plot/app.js?v=20260418a" defer></script>
+</body>
+</html>

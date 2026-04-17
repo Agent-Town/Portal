@@ -74,6 +74,14 @@ test('skill.md keeps the minimal external-agent contract', async ({ request }) =
   expect(txt).toContain('Keep polling `GET /api/agent/state?teamCode=...` during ceremony too.');
   expect(txt).toContain('GET /api/agent/house/material?teamCode=');
   expect(txt).toContain('POST /api/agent/house/connect');
+  expect(txt).toContain('## Founders Plot Tools');
+  expect(txt).toContain('agent_town_ui_open_modal({ modal: "founders-plot", params: {} })');
+  expect(txt).toContain('et.plot.get_state');
+  expect(txt).toContain('et.plot.place_building');
+  expect(txt).toContain('et.plot.collect_outputs');
+  expect(txt).toContain('et.plot.request_user_approval');
+  expect(txt).toContain('Mutation tools require `idempotencyKey`; provide one when you call them.');
+  expect(txt).toContain('If policy blocks the action, request approval instead of simulating success.');
 
   expect(txt).toContain('Start polling immediately after connect.');
   expect(txt).toContain('Default polling interval: 1 second.');

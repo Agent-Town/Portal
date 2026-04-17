@@ -267,6 +267,208 @@ Response shape:
 }
 ```
 
+### GET `/api/experiences`
+Returns manifest-discovered experience metadata for the current build.
+
+Response shape:
+```json
+{
+  "ok": true,
+  "experiences": [
+    {
+      "id": "founders-plot",
+      "slug": "founders-plot",
+      "name": "Founders Plot",
+      "kind": "district",
+      "route": "/founders-plot",
+      "modalRoute": "/?district=founders-plot",
+      "version": "1.0.0",
+      "summary": "Persistent personal shard where the human and foreman agent build the first productive district together.",
+      "manifestHash": "<sha256 hex>",
+      "manifest": {
+        "id": "founders-plot",
+        "tools": ["et.plot.get_state", "et.plot.place_building"]
+      }
+    }
+  ]
+}
+```
+
+---
+
+## Founders Plot
+
+Founders Plot is the first persistent city-builder slice. The server owns rules, timers, event logs, recap generation, and replayability.
+
+### GET `/api/founders-plot/state`
+Reads or creates the current plot for the active session/wallet identity and returns the authoritative state snapshot.
+
+Response shape:
+```json
+{
+  "ok": true,
+  "simulation": {
+    "advancedMs": 0,
+    "ticks": 0,
+    "clamped": false
+  },
+  "state": {
+    "plot": {
+      "plotId": "plot_...",
+      "hqLevel": 1,
+      "inventory": { "wood": 0, "stone": 0, "food": 0, "coin": 0 }
+    },
+    "policy": {
+      "observeAndSuggest": true,
+      "collectOutputs": false,
+      "queueProduction": false,
+      "setPriority": false,
+      "sellSurplusFood": false,
+      "sellDailyCoinCap": 20,
+      "maxAutonomousActionsPerHour": 8,
+      "emergencyPause": false
+    },
+    "quest": {
+      "title": "Place the first Lumber Camp"
+    },
+    "pads": [],
+    "buildings": [],
+    "jobs": [],
+    "rewards": [],
+    "recap": {
+      "unseenCount": 0,
+      "recent": [],
+      "lines": [],
+      "pendingApprovals": []
+    },
+    "progress": {
+      "currentLevel": 1,
+      "next": { "xpCurrent": 0, "xpRequired": 25, "ratio": 0 }
+    },
+    "stateHash": "<sha256 hex>"
+  }
+}
+```
+
+### POST `/api/founders-plot/tool/:toolName`
+Executes one typed Founders Plot tool for the current plot identity.
+
+Supported tool names:
+- `et.plot.get_state`
+- `et.plot.place_building`
+- `et.plot.queue_job`
+- `et.plot.collect_outputs`
+- `et.plot.upgrade_building`
+- `et.plot.set_priority`
+- `et.plot.claim_reward`
+- `et.plot.request_user_approval`
+
+Mutation request shape:
+```json
+{
+  "actor": "AGENT",
+  "idempotencyKey": "place_lumber_1_0",
+  "...toolArgs": true
+}
+```
+
+Response shape:
+```json
+{
+  "ok": true,
+  "data": {
+    "state": { "...authoritative snapshot..." }
+  },
+  "worldDelta": {
+    "inventory": { "wood": 3, "stone": 0, "food": 0, "coin": 0 },
+    "changed": ["JOB_COLLECTED"]
+  },
+  "error": null
+}
+```
+
+Error codes:
+- `UNAUTHORIZED`
+- `FORBIDDEN_POLICY`
+- `INVALID_STATE`
+- `OUT_OF_RESOURCES`
+- `OUT_OF_BOUNDS`
+- `BUILD_SLOT_OCCUPIED`
+- `JOB_ALREADY_RUNNING`
+- `RATE_LIMITED`
+- `IDEMPOTENCY_CONFLICT`
+- `SIMULATION_DESYNC`
+- `SERVER_ERROR`
+
+### POST `/api/founders-plot/policy`
+Updates one human-controlled policy toggle.
+
+Request shape:
+```json
+{ "key": "collectOutputs", "value": true }
+```
+
+### POST `/api/founders-plot/approvals/:approvalId/resolve`
+Resolves one pending approval card.
+
+Request shape:
+```json
+{ "decision": "approve", "note": "optional" }
+```
+
+### GET `/api/founders-plot/recap`
+Returns the current unseen recap lines generated from the event log.
+
+### POST `/api/founders-plot/recap/read`
+Marks recap lines as seen for the active plot.
+
+### GET `/api/founders-plot/replay`
+Returns the event-log replay bundle and current `stateHash` for deterministic verification.
+
+Response shape:
+```json
+{
+  "ok": true,
+  "replay": {
+    "events": [],
+    "finalHash": "<sha256 hex>"
+  },
+  "currentHash": "<sha256 hex>"
+}
+```
+
+### GET `/api/founders-plot/public`
+Returns read-only public plot summary cards.
+
+Response shape:
+```json
+{
+  "ok": true,
+  "plots": [
+    {
+      "plotId": "plot_...",
+      "houseId": "hs_...",
+      "hqLevel": 2,
+      "headline": "Build a Farm Plot",
+      "productivityScore": 61,
+      "buildings": [{ "type": "LUMBER_CAMP", "label": "Lumber Camp", "level": 1 }],
+      "inventory": { "wood": 6, "stone": 0, "food": 0, "coin": 14 },
+      "rewardCount": 1
+    }
+  ]
+}
+```
+
+### GET `/api/founders-plot/public/:plotId`
+Returns one read-only public plot summary.
+
+### GET `/api/founders-plot/summary`
+Returns the active plot's read-only public summary for social/leaderboard surfaces.
+
+Notes:
+- Public summary routes intentionally do not expose internal pair/session identifiers such as `pairId`.
+- `productivityScore` is a derived leaderboard-facing metric, not a mutable gameplay input.
+
 Notes:
 - Used by `/start`, `/app`, `/house`, and `/create` to resolve the active preference without forking the co-op flow.
 - Browser-language suggestion is client-side only; this endpoint returns canonical session state plus registry metadata.
