@@ -364,3 +364,90 @@ Why:
 So yes, I think your instinct is right.
 
 If forced to choose one team today, I would choose the **first branch team**, then give them a very explicit import brief from the second branch instead of funding both in parallel.
+
+## Future-version compatibility audit
+
+This matters because Founders Plot does **not** need to be “deep enough” in v0 if the current save model can carry players forward cleanly.
+
+My read: **it can**, with good implementation discipline.
+
+### Current persistence shape
+Player progress is already stored server-side in persistent SQLite tables, not just in browser memory.
+
+The reviewed branches persist, in various forms:
+- plot/core progression state
+- buildings
+- jobs
+- permissions/policy
+- approvals
+- event log / replay inputs
+- idempotency records
+
+That is a solid base for expanding the game later without wiping progress.
+
+### Current identity continuity
+The first branch ties Founders Plot progress to a stable server-side identity with this priority:
+- `house:<houseId>`
+- `wallet:<chain>:<address>`
+- `session:<teamCode|sessionId|anonymous>` fallback
+
+That is the key property that makes long-lived progression feasible. If the same player comes back under the same house or wallet identity, the same plot can be loaded.
+
+### What can safely evolve later
+These are all realistically compatible with existing player progress:
+- new buildings unlocked at later HQ levels
+- new quests layered on top of existing state
+- new rewards
+- new permissions / autonomy tiers
+- richer recap/replay views
+- economy tuning (costs, durations, outputs)
+- broader midgame and lategame depth
+
+In other words: **v0 can be small**, and the game can still grow forward.
+
+### Why extension is feasible here
+A good property of the current design is that progression is mostly derived from persisted state, not from fragile hand-authored one-off story checkpoints.
+
+That means future versions can look at facts like:
+- HQ level
+- built structures
+- first collection completed or not
+- unlocked permissions
+
+…and then show the correct next content for an existing player.
+
+That is exactly what you want if the game is going to deepen over time.
+
+### The real compatibility risks
+The team should treat these as explicit constraints:
+
+1. **Do not break identity continuity casually**
+   - if you later change how plots are keyed, add a migration/link step
+   - otherwise old progress can become orphaned even if the data still exists
+
+2. **Prefer additive save evolution**
+   - adding new fields is easy
+   - changing the meaning of old fields is risky
+
+3. **Be careful with board/layout changes**
+   - adding new pads is fine
+   - moving/removing existing pads requires a real migration because buildings already have coordinates
+
+4. **Do not rename core types lightly**
+   - building types, job kinds, event meanings, and policy keys are part of the save contract now
+
+### What I recommend the team add soon
+To make later versions safer, I’d explicitly add:
+- a save/schema version for Founders Plot state
+- formal migration helpers for compatibility changes
+- at least one seeded regression test that loads an older v0 plot into a newer version
+
+### Practical conclusion
+Yes, the game can start simple and become much deeper later **without wiping player progress**.
+
+I would describe that as a real design advantage of the current architecture, not just a theoretical hope.
+
+The right operating rule is:
+- ship v0 simply
+- treat persistence and identity as a compatibility surface
+- evolve the game additively
