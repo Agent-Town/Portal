@@ -18,13 +18,19 @@ Compared with the other version, it is much more complete on:
 - test coverage breadth
 - first-class spec/docs pack
 
-But it is weaker on **Portal shell integration polish**. In this tip, Founders Plot exists as a direct route and manifest-backed experience, but it is not clearly wired into the town modal flow the same way the other branch was.
+But after a higher-effort re-audit, I would **not** treat it as the active delivery branch right now.
 
-So the clean read is:
+Two reasons:
+- it is weaker on **Portal shell integration polish**
+- more importantly, it has a **real browser blocker** after the first construction completes
+
+So the cleaner read is now:
 - **this branch wins on game/system truth**
-- **the other branch wins on shell integration polish**
+- **the other branch is still the safer branch to actively continue if only one team stays funded**
 
-That likely means the right next move is a merge strategy, not a winner-take-all choice.
+That changes the practical recommendation.
+
+If Robin keeps only one lane active, I would keep the **first branch team** moving and use this branch as a **donor branch** for logic, tests, and docs.
 
 ## What I validated
 
@@ -184,7 +190,7 @@ The design reads more like honest event-sourced bookkeeping than over-claiming �
 
 That’s the right posture.
 
-## 5) This branch has a real browser UI action-surface bug
+## 5) This branch has a specific client/server contract bug in the real browser flow
 **Priority:** High
 
 This is the biggest newly confirmed product blocker in the branch.
@@ -195,7 +201,22 @@ In a real browser run of `/founders-plot`:
 - manual Lumber Camp placement worked
 - quest text updated correctly to `collect-first-wood`
 - after advancing construction, server state said the Lumber Camp was `READY`
-- but the UI showed the building as `Idle` and exposed no Queue / Collect / Upgrade action buttons
+- server-derived UI state also said `canQueue: true`
+- but the page showed the building as `Idle` and exposed no Queue / Collect / Upgrade action buttons
+
+### Stronger root-cause hypothesis from re-audit
+This no longer looks like a vague rendering glitch. It looks like a concrete client/server seam bug.
+
+Server-side:
+- `buildingUiState()` computes `canQueue`, `canCollect`, and `canUpgrade`
+- those booleans are included in `state.buildings`
+
+Client-side:
+- `renderBuildingPanel()` does **not** use `building.canQueue` or `building.canCollect`
+- instead it checks `def.produces` from `bundle.buildingDefs[type]`
+- but the state payload assembled in `buildState()` does **not** include `buildingDefs`
+
+That means the browser can receive a building that is truly queueable, while the UI still renders no queue action because it is looking at the wrong contract surface.
 
 ### Evidence
 - browser capture from local test run
@@ -204,9 +225,20 @@ In a real browser run of `/founders-plot`:
   - `tmp/founders-plot-browser-check/01-initial.png`
   - `tmp/founders-plot-browser-check/02-after-place.png`
   - `tmp/founders-plot-browser-check/03-after-construction.png`
+- server logic:
+  - `server/founders_plot/engine.js` -> `buildingUiState()` and `buildState()`
+- client logic:
+  - `public/experiences/founders-plot/founders-plot.js` -> `renderBuildingPanel()` and `normalizeBundle()`
 
 ### Practical meaning
 The second branch is stronger on game logic, but the direct browser experience still has a real first-loop blocker. A player can place the first Lumber Camp, then gets stuck because the next action surface does not appear.
+
+### Recommended fix
+Pick one contract and use it consistently:
+- best option: make the client render from `building.canQueue`, `building.canCollect`, and `building.canUpgrade`
+- secondary option: include a fully serializable `buildingDefs` shape in the state payload and keep client logic aligned with that
+
+I strongly prefer the first option, because it keeps the server authoritative for action availability.
 
 ### Conclusion
 Do not describe this branch as fully browser-playable yet. The server/test harness says the loop is valid, but the real page currently breaks at the first post-construction interaction.
@@ -292,41 +324,57 @@ Even before reading every test in depth, the shape alone suggests this branch wa
 
 ## Recommended decision
 
-I would not pick one branch and throw away the other.
+After the re-audit, I would no longer frame this as a clean merge-base winner.
 
-I’d use this decision rule:
+If Robin were funding both teams and willing to pay for reconciliation work, then yes, a merge strategy could still make sense.
 
-### If the priority is “which team got the actual game design more right?”
-Choose **`feature/founders-plot-phase1`** as the primary foundation.
+But if Robin wants **one active team only**, I would now recommend this instead:
 
-### If the priority is “which branch is easier to fold into the existing Portal shell right this second?”
-The other branch still has useful integration ideas to harvest.
+### Practical recommendation
+- keep **`codex/founders-plot-phase1-isolated`** as the active delivery lane
+- treat **`feature/founders-plot-phase1`** as a donor branch
+- explicitly harvest the strongest ideas from this branch into the working branch
 
-### My recommendation
-Use **`feature/founders-plot-phase1` as the gameplay/system base**, then selectively port in the stronger shell-integration ideas from `codex/founders-plot-phase1-isolated`.
+### Why this changed
+Because the most important question is not just “which branch has better architecture?”
+It is “which branch is safest to continue right now without stalling the product?”
 
-That is the least dumb path.
+This branch still loses that practical test because:
+- the real browser flow is blocked after first construction
+- the Portal shell/modal path is weaker
+- the passing E2E suite proves backend/test-loop health, not full browser usability
 
-## Suggested merge plan
+### What should be harvested from this branch
+- first-loop quest truth
+- approval event visibility
+- replay/recap framing
+- richer spec/design docs
+- broader tests
 
-1. **Keep the `feature/founders-plot-phase1` backend/gameplay model**
-   - quest logic
-   - event logging
-   - replay/recap
-   - tests
-   - spec package
+That gives Robin the best trade: keep the branch that already works end-to-end in the browser, but import the stronger systems thinking from this one.
 
-2. **Import the better Portal shell integration concepts from the isolated branch**
-   - district/modal entry behavior
-   - town-shell handoff UX
-   - any browser/live validation scaffolding that proved useful
+## Suggested harvest plan
 
-3. **Do one reconciliation pass focused only on seams**
-   - modal/opening flow
-   - experience registry exposure
-   - shell navigation
-   - approval UX clarity
+1. **Keep the `codex/founders-plot-phase1-isolated` branch as the shipping base**
+   - preserve the working browser flow
+   - preserve the Portal shell/modal integration path
+
+2. **Harvest from `feature/founders-plot-phase1` selectively**
+   - quest logic for Lumber Camp -> first wood
+   - approval-event logging discipline
+   - replay/recap honesty
+   - stronger tests
+   - stronger docs/spec pack
+
+3. **Avoid blind copying of the current standalone-page UI layer**
+   - fix the client/server action-surface seam first
+   - then port only what survives real browser validation
+
+4. **Do one narrow reconciliation pass on interfaces, not a whole-branch replacement**
+   - quest sequencing
+   - approval visibility
    - doc/tool contract sync
+   - test import
 
 ## Retest checklist after reconciliation
 

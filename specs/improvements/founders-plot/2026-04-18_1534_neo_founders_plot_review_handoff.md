@@ -106,6 +106,7 @@ This branch should adopt that idea.
 - explicit event emission for approval request / resolve lifecycle
 - replay visibility for those events
 - recap visibility where appropriate
+- ideally clearer event names than the donor branch’s current generic `AGENT_PERMISSION_CHANGED`
 
 ### Why it matters
 Approval is one of the core trust boundaries in the game. If it is important enough to block actions, it is important enough to appear in the audit trail.
@@ -173,11 +174,19 @@ Important caution: the other branch is **not** just a superset upgrade.
 In real browser testing, it currently gets stuck after the first Lumber Camp construction finishes:
 - quest says collect first wood
 - server says the Lumber Camp is `READY`
+- server-derived state says it is queueable
 - but the page exposes no Queue / Collect / Upgrade action buttons
+
+The re-audit suggests this is likely a client/server contract seam:
+- server-side building UI state includes booleans like `canQueue`
+- client-side rendering instead checks `buildingDefs[type].produces`
+- the state payload does not appear to include `buildingDefs`, so the UI can hide valid actions
 
 ### Practical implication
 Do not tell this team to “just switch to the other branch.”
 Tell them to selectively port the stronger ideas above into the working branch.
+
+If they borrow from that UI, they should prefer server-authoritative flags like `canQueue`, `canCollect`, and `canUpgrade` over reconstructing action availability in the browser.
 
 ## Findings
 
