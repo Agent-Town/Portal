@@ -4,6 +4,7 @@ function replayFromEvents(events = []) {
   const plot = {};
   const buildings = new Map();
   const jobs = new Map();
+  const approvals = new Map();
   const policy = {
     observeAndSuggest: DEFAULT_POLICY.observeAndSuggest,
     collectOutputs: DEFAULT_POLICY.collectOutputs,
@@ -40,6 +41,9 @@ function replayFromEvents(events = []) {
     if (data.job && typeof data.job === 'object' && data.job.jobId) {
       jobs.set(data.job.jobId, { ...data.job });
     }
+    if (data.approval && typeof data.approval === 'object' && data.approval.approvalId) {
+      approvals.set(data.approval.approvalId, { ...data.approval });
+    }
     if (data.policy && typeof data.policy === 'object' && data.policy.key) {
       if (Object.prototype.hasOwnProperty.call(policy, data.policy.key)) {
         policy[data.policy.key] = data.policy.value;
@@ -60,7 +64,11 @@ function replayFromEvents(events = []) {
     }
     if (event?.type === 'OUTPUT_COLLECTED' && data.building?.buildingId) {
       for (const job of jobs.values()) {
-        if (job.buildingId === data.building.buildingId && job.status === 'COMPLETED') {
+        if (
+          job.buildingId === data.building.buildingId
+          && job.status === 'COMPLETED'
+          && (job.kind === 'PRODUCE' || job.kind === 'SELL')
+        ) {
           job.status = 'CLAIMED';
         }
       }
@@ -83,12 +91,27 @@ function replayFromEvents(events = []) {
       if (a.startedAt !== b.startedAt) return a.startedAt - b.startedAt;
       return String(a.jobId || '').localeCompare(String(b.jobId || ''));
     }),
+    approvals: Array.from(approvals.values()).sort((a, b) => {
+      if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt;
+      return String(a.approvalId || '').localeCompare(String(b.approvalId || ''));
+    }),
     policy,
     meta
   };
 
   return {
     eventCount: Array.isArray(events) ? events.length : 0,
+    events: Array.isArray(events)
+      ? events.map((event) => ({
+        seq: event.seq,
+        type: event.type,
+        actor: event.actor,
+        createdAt: event.createdAt,
+        explanation: event.explanation || '',
+        recapLine: event.recapLine || '',
+        data: event && typeof event.data === 'object' ? event.data : {}
+      }))
+      : [],
     finalState,
     finalHash: stateHash(stateHashPayload(finalState))
   };

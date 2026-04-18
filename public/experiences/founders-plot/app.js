@@ -592,6 +592,7 @@
     const label = (() => {
       if (!action) return 'No action available';
       if (action.type === 'PLACE_BUILDING') return `Place ${BUILDING_LABELS[action.buildingType] || action.buildingType}`;
+      if (action.type === 'QUEUE_JOB') return 'Queue the first job';
       if (action.type === 'COLLECT_OUTPUTS') return 'Collect outputs';
       if (action.type === 'UPGRADE_HQ') return 'Upgrade Headquarters';
       if (action.type === 'ENABLE_PERMISSION') return 'Enable permission';
@@ -599,7 +600,7 @@
       return 'Continue';
     })();
     cta.textContent = label;
-    cta.disabled = pendingAction;
+    cta.disabled = pendingAction || !action;
     cta.onclick = async () => {
       if (!action) return;
       try {
@@ -615,6 +616,13 @@
             x: pad.x,
             y: pad.y,
             idempotencyKey: `quest-place:${action.buildingType}:${pad.x}:${pad.y}:${Date.now()}`
+          });
+          return;
+        }
+        if (action.type === 'QUEUE_JOB' && action.buildingId) {
+          await runTool('et.plot.queue_job', {
+            buildingId: action.buildingId,
+            idempotencyKey: `quest-queue:${action.buildingId}:${Date.now()}`
           });
           return;
         }

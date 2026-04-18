@@ -485,15 +485,20 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
   router.post('/api/founders-plot/approvals/:approvalId/resolve', (req, res) => {
     try {
       const { state, nowMs } = withState(req, res);
+      const events = [];
       const data = applyResolveApproval(state, {
         approvalId: String(req.params.approvalId || '').trim(),
         decision: String(req.body?.decision || '').trim().toLowerCase(),
         note: typeof req.body?.note === 'string' ? req.body.note : ''
       }, {
         nowMs,
-        appendEvent: null
+        appendEvent: (event) => events.push({
+          ...event,
+          createdAt: event.createdAt || nowMs
+        })
       });
       savePlotGraph(state);
+      appendEvents(state.plot.plotId, events);
       res.json({
         ok: true,
         data,

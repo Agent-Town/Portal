@@ -18,6 +18,9 @@ const EVENT_TYPES = {
   JOB_COMPLETED: 'JOB_COMPLETED',
   OUTPUT_COLLECTED: 'OUTPUT_COLLECTED',
   HQ_UPGRADED: 'HQ_UPGRADED',
+  APPROVAL_REQUESTED: 'APPROVAL_REQUESTED',
+  APPROVAL_APPROVED: 'APPROVAL_APPROVED',
+  APPROVAL_REJECTED: 'APPROVAL_REJECTED',
   AGENT_PERMISSION_CHANGED: 'AGENT_PERMISSION_CHANGED',
   AGENT_ACTION_EXECUTED: 'AGENT_ACTION_EXECUTED',
   REWARD_CLAIMED: 'REWARD_CLAIMED',
@@ -449,7 +452,11 @@ function runningJobForBuilding(state, buildingId) {
 }
 
 function completedUnclaimedJobsForBuilding(state, buildingId) {
-  return state.jobs.filter((job) => job.buildingId === buildingId && job.status === 'COMPLETED');
+  return state.jobs.filter((job) => (
+    job.buildingId === buildingId
+    && job.status === 'COMPLETED'
+    && (job.kind === 'PRODUCE' || job.kind === 'SELL')
+  ));
 }
 
 function isBuildPad(x, y) {
@@ -628,6 +635,22 @@ function buildingSnapshot(building) {
   };
 }
 
+function approvalSnapshot(approval) {
+  return {
+    approvalId: approval.approvalId,
+    plotId: approval.plotId,
+    requestedBy: approval.requestedBy,
+    tool: approval.tool,
+    title: approval.title,
+    body: approval.body,
+    status: approval.status,
+    payload: copyJson(approval.payload || {}),
+    createdAt: approval.createdAt,
+    resolvedAt: approval.resolvedAt,
+    resolutionNote: approval.resolutionNote || ''
+  };
+}
+
 function plotSnapshot(state) {
   return {
     plotId: state.plot.plotId,
@@ -693,7 +716,6 @@ function pushHqReward(state, level, nowMs) {
 
 function nextQuest(state) {
   const hasType = (type) => state.buildings.some((building) => building.type === type);
-  const hasOutputReady = (type) => state.buildings.some((building) => building.type === type && building.state === 'OUTPUT_READY');
   if (!hasType('LUMBER_CAMP')) {
     return {
       step: 'place_lumber_camp',
@@ -702,13 +724,33 @@ function nextQuest(state) {
       primaryAction: { type: 'PLACE_BUILDING', buildingType: 'LUMBER_CAMP' }
     };
   }
-  if (!state.meta.firstCollectedTypes.includes('LUMBER_CAMP') && hasOutputReady('LUMBER_CAMP')) {
-    const lumber = state.buildings.find((building) => building.type === 'LUMBER_CAMP');
+  if (!state.meta.firstCollectedTypes.includes('LUMBER_CAMP')) {
+    const lumber = state.buildings.find((building) => building.type === 'LUMBER_CAMP') || null;
+    const runningJob = lumber ? runningJobForBuilding(state, lumber.buildingId) : null;
+    const completedJobs = lumber ? completedUnclaimedJobsForBuilding(state, lumber.buildingId) : [];
+    if (completedJobs.length > 0 || lumber?.state === 'OUTPUT_READY') {
+      return {
+        step: 'collect_first_wood',
+        title: 'Collect your first wood',
+        body: 'Bring in the first finished haul before pushing Headquarters to level 2.',
+        primaryAction: { type: 'COLLECT_OUTPUTS', buildingId: lumber?.buildingId || null }
+      };
+    }
+    if (lumber?.state === 'READY' && !runningJob) {
+      return {
+        step: 'collect_first_wood',
+        title: 'Collect your first wood',
+        body: 'Queue the first Lumber Camp job, then collect the output before upgrading Headquarters.',
+        primaryAction: { type: 'QUEUE_JOB', buildingId: lumber.buildingId }
+      };
+    }
     return {
       step: 'collect_first_wood',
-      title: 'Collect your first lumber',
-      body: 'Bring in the finished wood to stock the headquarters.',
-      primaryAction: { type: 'COLLECT_OUTPUTS', buildingId: lumber?.buildingId || null }
+      title: 'Collect your first wood',
+      body: runningJob
+        ? 'The first lumber run is underway. Wait for it to finish, then collect the output before upgrading Headquarters.'
+        : 'Let the Lumber Camp finish construction. The first wood haul comes before Headquarters level 2.',
+      primaryAction: null
     };
   }
   if (state.plot.hqLevel < 2) {
@@ -797,7 +839,19 @@ function recommendationText(state) {
     return 'Set a Lumber Camp first. Wood unlocks the entire rest of the plot.';
   }
   if (quest.step === 'collect_first_wood') {
-    return 'Your first lumber is ready. Collect it now so Headquarters can grow.';
+    const lumber = state.buildings.find((building) => building.type === 'LUMBER_CAMP') || null;
+    const runningJob = lumber ? runningJobForBuilding(state, lumber.buildingId) : null;
+    const completedJobs = lumber ? completedUnclaimedJobsForBuilding(state, lumber.buildingId) : [];
+    if (completedJobs.length > 0 || lumber?.state === 'OUTPUT_READY') {
+      return 'Your first wood is ready. Collect it before chasing Headquarters level 2.';
+    }
+    if (lumber?.state === 'READY' && !runningJob) {
+      return 'Queue one Lumber Camp job, then collect that first haul before upgrading Headquarters.';
+    }
+    if (runningJob) {
+      return 'The first lumber run is underway. Collect it as soon as it finishes.';
+    }
+    return 'Let the Lumber Camp finish construction. The first haul still comes before Headquarters level 2.';
   }
   if (state.policy.emergencyPause) {
     return 'The foreman is paused. Lift the emergency pause before asking for autonomous work.';
@@ -873,6 +927,12 @@ function stateHashPayload(state) {
     plot: plotSnapshot(state),
     buildings: state.buildings.map((building) => buildingSnapshot(building)),
     jobs: state.jobs.map((job) => jobSnapshot(job)),
+    approvals: state.approvals
+      .map((approval) => approvalSnapshot(approval))
+      .sort((a, b) => {
+        if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt;
+        return String(a.approvalId || '').localeCompare(String(b.approvalId || ''));
+      }),
     policy: {
       observeAndSuggest: state.policy.observeAndSuggest,
       collectOutputs: state.policy.collectOutputs,
@@ -1621,6 +1681,16 @@ function applyRequestUserApproval(state, { requestedBy = 'AGENT', tool, title, b
     resolutionNote: ''
   };
   state.approvals.push(approval);
+  pushEvent(ctx.appendEvent, {
+    type: EVENT_TYPES.APPROVAL_REQUESTED,
+    actor: requestedBy === 'AGENT' ? 'AGENT' : 'HUMAN',
+    explanation: `${approval.title} is waiting for a human decision.`,
+    recapLine: `Approval requested: ${approval.title}.`,
+    data: {
+      plot: plotSnapshot(state),
+      approval: approvalSnapshot(approval)
+    }
+  });
   return {
     approvalId: approval.approvalId,
     status: approval.status
@@ -1675,6 +1745,16 @@ function applyResolveApproval(state, { approvalId, decision, note = '' }, ctx) {
   approval.status = decision === 'approve' ? 'APPROVED' : 'REJECTED';
   approval.resolvedAt = ctx.nowMs;
   approval.resolutionNote = note || '';
+  pushEvent(ctx.appendEvent, {
+    type: approval.status === 'APPROVED' ? EVENT_TYPES.APPROVAL_APPROVED : EVENT_TYPES.APPROVAL_REJECTED,
+    actor: 'HUMAN',
+    explanation: `${approval.title} was ${approval.status === 'APPROVED' ? 'approved' : 'rejected'}.`,
+    recapLine: `${approval.title} was ${approval.status === 'APPROVED' ? 'approved' : 'rejected'}.`,
+    data: {
+      plot: plotSnapshot(state),
+      approval: approvalSnapshot(approval)
+    }
+  });
   return {
     approvalId,
     status: approval.status

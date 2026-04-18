@@ -316,7 +316,7 @@ Response shape:
     "plot": {
       "plotId": "plot_...",
       "hqLevel": 1,
-      "inventory": { "wood": 0, "stone": 0, "food": 0, "coin": 0 }
+      "inventory": { "wood": 0, "stone": 0, "food": 0, "coin": 20 }
     },
     "policy": {
       "observeAndSuggest": true,
@@ -329,10 +329,20 @@ Response shape:
       "emergencyPause": false
     },
     "quest": {
-      "title": "Place the first Lumber Camp"
+      "step": "place_lumber_camp",
+      "title": "Raise your first work camp"
     },
-    "pads": [],
-    "buildings": [],
+    "pads": [
+      { "x": 0, "y": 0, "label": "Northwest Pad", "occupied": false, "building": null },
+      { "x": 1, "y": 0, "label": "North Pad", "occupied": false, "building": null },
+      { "x": 2, "y": 0, "label": "Northeast Pad", "occupied": false, "building": null },
+      { "x": 0, "y": 1, "label": "West Pad", "occupied": false, "building": null },
+      { "x": 2, "y": 1, "label": "East Pad", "occupied": false, "building": null },
+      { "x": 1, "y": 2, "label": "South Pad", "occupied": false, "building": null }
+    ],
+    "buildings": [
+      { "buildingId": "bld_...", "type": "HQ", "level": 1, "x": 1, "y": 1, "state": "READY", "completedJobs": [] }
+    ],
     "jobs": [],
     "rewards": [],
     "recap": {
@@ -380,8 +390,8 @@ Response shape:
     "state": { "...authoritative snapshot..." }
   },
   "worldDelta": {
-    "inventory": { "wood": 3, "stone": 0, "food": 0, "coin": 0 },
-    "changed": ["JOB_COLLECTED"]
+    "inventory": { "wood": 0, "stone": 0, "food": 0, "coin": 14 },
+    "changed": ["BUILDING_PLACED", "BUILDING_STARTED"]
   },
   "error": null
 }
@@ -411,6 +421,11 @@ Request shape:
 ### POST `/api/founders-plot/approvals/:approvalId/resolve`
 Resolves one pending approval card.
 
+Side effects:
+- appends one approval-resolution event to the event log,
+- removes the approval from `state.foreman.pendingApprovals`,
+- makes the result visible in recap/replay output.
+
 Request shape:
 ```json
 { "decision": "approve", "note": "optional" }
@@ -430,7 +445,33 @@ Response shape:
 {
   "ok": true,
   "replay": {
-    "events": [],
+    "eventCount": 4,
+    "events": [
+      {
+        "seq": 3,
+        "type": "APPROVAL_REQUESTED",
+        "actor": "AGENT",
+        "recapLine": "Approval requested: Approve the HQ upgrade.",
+        "data": {
+          "approval": {
+            "approvalId": "apr_...",
+            "status": "PENDING"
+          }
+        }
+      },
+      {
+        "seq": 4,
+        "type": "APPROVAL_APPROVED",
+        "actor": "HUMAN",
+        "recapLine": "Approve the HQ upgrade was approved.",
+        "data": {
+          "approval": {
+            "approvalId": "apr_...",
+            "status": "APPROVED"
+          }
+        }
+      }
+    ],
     "finalHash": "<sha256 hex>"
   },
   "currentHash": "<sha256 hex>"

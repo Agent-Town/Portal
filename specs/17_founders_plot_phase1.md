@@ -240,14 +240,15 @@ The CTA opens **Founders Plot**.
    - place a **Lumber Camp**,
    - collect the first wood,
    - ask the agent for advice.
+   - the quest must remain on **first wood** from placement through construction and first production; it must **not** jump to HQ 2 before the first wood collection completes.
 
 4. The agent introduces itself as the **Foreman** and gives one recommendation.
 
 ### 6.3 First 15 minutes
 The player:
+- upgrades Headquarters to Level 2,
 - places a Farm Plot,
 - collects food,
-- upgrades Headquarters to Level 2,
 - unlocks the agent’s first automation ability: **collect finished jobs**.
 
 ### 6.4 First 30 minutes
@@ -593,6 +594,9 @@ Minimum event types:
 - `JOB_COMPLETED`
 - `OUTPUT_COLLECTED`
 - `HQ_UPGRADED`
+- `APPROVAL_REQUESTED`
+- `APPROVAL_APPROVED`
+- `APPROVAL_REJECTED`
 - `AGENT_PERMISSION_CHANGED`
 - `AGENT_ACTION_EXECUTED`
 - `RECAP_GENERATED`
@@ -602,6 +606,8 @@ Event logs must support:
 - recap generation,
 - debugging,
 - and deterministic re-simulation checks.
+
+Approval request/resolve must be treated as first-class visible events. A future rebuild is not allowed to hide approval state transitions in silent row updates.
 
 ---
 
@@ -741,6 +747,11 @@ Claims quest or level rewards.
 
 ### `et.plot.request_user_approval`
 Creates a UI-visible approval request for sensitive actions.
+
+Normative rule:
+- creating an approval request must append an `APPROVAL_REQUESTED` event,
+- resolving one must append either `APPROVAL_APPROVED` or `APPROVAL_REJECTED`,
+- both must appear in recap output and replay event output.
 
 ## 14.2 Required error codes
 - `UNAUTHORIZED`
@@ -888,7 +899,8 @@ For every feature:
 2. implement the narrowest change,
 3. add at least one deterministic E2E if user-visible,
 4. add replay coverage if it changes state transitions,
-5. only then refactor.
+5. update the affected spec and API contract examples in the same change,
+6. only then refactor.
 
 ---
 
@@ -1000,6 +1012,7 @@ This is the minimum initial suite.
 - `FP-IT-008` recap reflects actual offline events only
 - `FP-IT-009` idempotent mutation replays identical result
 - `FP-IT-010` event log replay reproduces final state hash
+- `FP-IT-011` approval request and resolve events appear in recap and replay audit output
 
 ## 19.4 End-to-end tests
 - `FP-E2E-001` onboarding handoff opens Founders Plot
@@ -1010,6 +1023,7 @@ This is the minimum initial suite.
 - `FP-E2E-006` reload/resume restores state and recap drawer
 - `FP-E2E-007` emergency pause stops autonomous actions instantly
 - `FP-E2E-008` denied agent upgrade request produces approval card instead of mutation
+- `FP-E2E-009` first-loop quest stays on first wood until collection, and the first Lumber Camp remains queueable/collectable in the browser
 
 ## 19.5 Replay and perf tests
 - `FP-RPL-001` same seed + same actions => same state hash
