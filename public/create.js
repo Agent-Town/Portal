@@ -535,20 +535,17 @@ async function init() {
     }
   }
   if (!st.signup?.complete) {
-    if (isCeremonyEmbedMode) return;
     window.location.href = '/';
     return;
   }
   if (requestedToken && !soloMode) {
-    if (!isCeremonyEmbedMode) {
-      try {
-        localStorage.setItem('agentTownPathMode', 'token');
-        localStorage.setItem('agentTownTokenError', 'Verify your wallet to create a token-gated house.');
-      } catch {
-        // ignore storage errors
-      }
-      window.location.href = '/';
+    try {
+      localStorage.setItem('agentTownPathMode', 'token');
+      localStorage.setItem('agentTownTokenError', 'Verify your wallet to create a token-gated house.');
+    } catch {
+      // ignore storage errors
     }
+    window.location.href = '/';
     return;
   }
   applyCreateCopy({ soloMode });
@@ -967,16 +964,7 @@ async function init() {
         })
       });
 
-      if (isCeremonyEmbedMode) {
-        try {
-          window.parent.postMessage({
-            type: 'agenttown:ceremony-complete',
-            houseId: housePubKey
-          }, '*');
-        } catch {}
-      } else {
-        window.location.href = `/house?house=${encodeURIComponent(housePubKey)}`;
-      }
+      window.location.href = `/house?house=${encodeURIComponent(housePubKey)}`;
     } catch (e) {
       const message = e.message === 'EMPTY_CANVAS'
         ? tCreate('create.error.empty_canvas')
