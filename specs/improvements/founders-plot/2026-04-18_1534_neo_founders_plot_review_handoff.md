@@ -12,13 +12,22 @@
 
 Founders Plot is promising and already playable end-to-end. The core architecture is strong.
 
-The newest version I reviewed was mostly **spec/polish/shell plumbing**, not a core gameplay fix. The most important gameplay issue is still present:
+If you only want to keep **one** team moving, this is the safer team to keep, because this branch is the one that actually works through the whole first gameplay loop in the browser.
+
+But do **not** keep it unchanged. The other branch had several stronger ideas that should be imported here.
+
+The newest version I reviewed on this branch was mostly **spec/polish/shell plumbing**, not a core gameplay fix. The most important gameplay issue is still present:
 
 - after placing the first Lumber Camp, the quest jumps to `upgrade_hq_2` too early
 - it only switches to `collect_first_wood` once production finishes
 - after collection, it snaps back to `upgrade_hq_2`
 
 That behavior still conflicts with the intended onboarding flow.
+
+So my practical recommendation is:
+- **continue with this team**
+- **stop paying both teams in parallel if that’s a concern**
+- **hand this team a concrete import list from `origin/feature/founders-plot-phase1`**
 
 ## What I validated
 
@@ -58,6 +67,117 @@ It did **not** touch:
 
 ### Practical meaning
 The newer version improved documentation and some shell/config polish, but it did not change the Founders Plot core simulation or the onboarding quest logic.
+
+## What this team should import from the other branch
+
+The second team’s branch (`origin/feature/founders-plot-phase1`) is not the one I would keep as the active lane right now, because its direct browser flow still has a first-loop blocker.
+
+But it did contain several stronger ideas that are worth explicitly porting into this branch.
+
+## Import list from `origin/feature/founders-plot-phase1`
+
+## A) Fix the early quest progression using the second branch’s better first-loop logic
+**Priority:** Very high
+
+The strongest thing in the other branch was the first-run quest truth.
+
+Its quest logic did the early sequence more cleanly:
+- no Lumber Camp -> place Lumber Camp
+- Lumber Camp exists but first wood not collected -> collect first wood
+- only later move into the next expansion step
+
+That is better than the current behavior in this branch, where HQ2 surfaces too early.
+
+### What to import
+- the principle from the other branch’s `currentQuest()` logic, not necessarily a blind file copy
+- specifically: first wood collection should block HQ2 guidance
+
+### Why it matters
+This is the clearest user-facing flaw in the current branch, and the other branch already proved a better direction.
+
+## B) Import the stronger approval-event audit trail
+**Priority:** High
+
+The other branch was better at making approval requests and approval resolutions visible as real events that feed replay/audit.
+
+This branch should adopt that idea.
+
+### What to import
+- explicit event emission for approval request / resolve lifecycle
+- replay visibility for those events
+- recap visibility where appropriate
+
+### Why it matters
+Approval is one of the core trust boundaries in the game. If it is important enough to block actions, it is important enough to appear in the audit trail.
+
+## C) Import the fuller spec and design-pack discipline
+**Priority:** High
+
+The other branch had a materially stronger documentation package.
+
+Useful assets/patterns there included:
+- `docs/specs/agent-town-founders-plot-phase1-spec.md`
+- `docs/design/agent-town-design-pack/*`
+- tighter local docs under `public/experiences/founders-plot/`
+
+### What to import
+- the missing product/design/spec material
+- especially one reconciled source of truth for:
+  - onboarding sequence
+  - unlock order
+  - permission ladder
+  - replay/recap promises
+  - public summary semantics
+
+### Why it matters
+Right now too much truth is split between goals, code, and specs. The other branch did a better job of making the product legible.
+
+## D) Import the cleaner replay/recap framing
+**Priority:** Medium to High
+
+The other branch had the better conceptual posture here.
+
+### What to import
+- replay described as honest event/audit reconstruction, not magical full simulation claims
+- recap generated from real events with clearer separation between public summary and full internal state
+- any canonical hashing/state-bundle normalization patterns that improve determinism and inspectability
+
+### Why it matters
+This improves trust and keeps the system honest about what it actually proves.
+
+## E) Import the broader test discipline
+**Priority:** High
+
+The other branch had a stronger overall test surface.
+
+Useful test assets/patterns there included:
+- `tests-founders-plot/fp-contract.test.js`
+- `tests-founders-plot/fp-http.test.js`
+- `tests-founders-plot/fp-perf.test.js`
+- `tests-founders-plot/fp-unit.test.js`
+- `e2e/200_founders_plot.spec.js`
+
+### What to import
+- broader backend and contract coverage
+- stronger replay/approval regression tests
+- a deterministic first-loop quest-order regression test
+
+### Why it matters
+This branch currently wins on working browser flow, but it should steal the other branch’s deeper validation discipline.
+
+## F) Do **not** import the broken standalone-page behavior blindly
+**Priority:** Very high
+
+Important caution: the other branch is **not** just a superset upgrade.
+
+In real browser testing, it currently gets stuck after the first Lumber Camp construction finishes:
+- quest says collect first wood
+- server says the Lumber Camp is `READY`
+- but the page exposes no Queue / Collect / Upgrade action buttons
+
+### Practical implication
+Do not tell this team to “just switch to the other branch.”
+Tell them to selectively port the stronger ideas above into the working branch.
 
 ## Findings
 
@@ -168,19 +288,28 @@ Keep `specs/17_founders_plot_phase1.md`, but make sure the live implementation a
 
 ## Recommended implementation order
 
-1. **Fix quest sequencing in `server/founders_plot/engine.js`**
+1. **Fix quest sequencing in `server/founders_plot/engine.js` using the second branch’s better first-loop logic as the reference direction**
    - highest user-facing impact
    - smallest targeted fix
    - easy to prove with a regression test
 
 2. **Add replay/recap events for approval lifecycle**
+   - borrow the stronger audit-trail idea from the second branch
    - strengthens the trust story
    - makes the auditability claim more honest
 
-3. **Bring `specs/02_api_contract.md` back in sync**
+3. **Bring the spec/docs package up toward the second branch’s standard**
+   - reconcile onboarding, unlock order, and permission rules into one honest source of truth
    - prevents future confusion for frontend, QA, and agent tooling
 
-4. **Revisit `productivityScore` once onboarding is correct**
+4. **Broaden the automated test surface**
+   - import the second branch’s stronger discipline around contract/http/unit coverage
+   - lock in the quest-order fix and approval visibility behavior
+
+5. **Bring `specs/02_api_contract.md` back in sync**
+   - update examples from live responses, not stale hand-written payloads
+
+6. **Revisit `productivityScore` once onboarding is correct**
    - lower urgency than the flow bug
 
 ## Retest checklist after fixes
@@ -202,8 +331,27 @@ The most effective handoff is **not just one markdown file**. I recommend this p
 2. **One implementation ticket per concrete issue**:
    - quest-order fix
    - approval audit trail fix
+   - spec/design reconciliation
+   - broader regression test import
    - API spec sync
    - optional scoring cleanup
 3. **A retest pass after changes land**, using the checklist above.
 
 That keeps the communication clear and keeps the work from dissolving into one vague "please improve Founders Plot" task.
+
+## Decision recommendation
+
+Since you do **not** want to pay two teams at the same time, I think the practical move is:
+
+- **keep the first branch team active**
+- **stop the second branch as an active implementation lane**
+- **treat the second branch as a donor of ideas, tests, and docs**
+
+Why:
+- the first branch currently has the working end-to-end browser flow
+- the second branch has better systems thinking, but it is not actually shippable as-is because the browser flow gets stuck
+- paying both teams now is probably wasteful unless you specifically want a competitive bakeoff
+
+So yes, I think your instinct is right.
+
+If forced to choose one team today, I would choose the **first branch team**, then give them a very explicit import brief from the second branch instead of funding both in parallel.
