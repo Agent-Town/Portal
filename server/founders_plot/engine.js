@@ -62,14 +62,14 @@ const CONSTRUCTION_SLOTS_BY_HQ = {
 const HQ_UPGRADE_RULES = {
   1: {
     nextLevel: 2,
-    cost: { wood: 20, food: 10 },
-    xpRequired: 25,
+    cost: { wood: 20 },
+    xpRequired: 15,
     durationMs: 2 * 60 * 1000
   },
   2: {
     nextLevel: 3,
-    cost: { wood: 30, stone: 20 },
-    xpRequired: 50,
+    cost: { wood: 30, food: 20 },
+    xpRequired: 45,
     durationMs: 3 * 60 * 1000
   },
   3: {
@@ -81,7 +81,7 @@ const HQ_UPGRADE_RULES = {
   4: {
     nextLevel: 5,
     cost: { wood: 60, stone: 50, food: 30 },
-    xpRequired: 140,
+    xpRequired: 135,
     durationMs: 5 * 60 * 1000
   }
 };
@@ -714,6 +714,42 @@ function pushHqReward(state, level, nowMs) {
   });
 }
 
+function firstCollectionQuest(state, {
+  type,
+  step,
+  title,
+  queuedBody,
+  runningBody,
+  collectingBody
+}) {
+  const building = state.buildings.find((entry) => entry.type === type) || null;
+  if (!building || state.meta.firstCollectedTypes.includes(type)) return null;
+  const runningJob = runningJobForBuilding(state, building.buildingId);
+  const completedJobs = completedUnclaimedJobsForBuilding(state, building.buildingId);
+  if (completedJobs.length > 0 || building.state === 'OUTPUT_READY') {
+    return {
+      step,
+      title,
+      body: collectingBody,
+      primaryAction: { type: 'COLLECT_OUTPUTS', buildingId: building.buildingId }
+    };
+  }
+  if (building.state === 'READY' && !runningJob) {
+    return {
+      step,
+      title,
+      body: queuedBody,
+      primaryAction: { type: 'QUEUE_JOB', buildingId: building.buildingId }
+    };
+  }
+  return {
+    step,
+    title,
+    body: runningBody,
+    primaryAction: null
+  };
+}
+
 function nextQuest(state) {
   const hasType = (type) => state.buildings.some((building) => building.type === type);
   if (!hasType('LUMBER_CAMP')) {
@@ -724,44 +760,34 @@ function nextQuest(state) {
       primaryAction: { type: 'PLACE_BUILDING', buildingType: 'LUMBER_CAMP' }
     };
   }
-  if (!state.meta.firstCollectedTypes.includes('LUMBER_CAMP')) {
-    const lumber = state.buildings.find((building) => building.type === 'LUMBER_CAMP') || null;
-    const runningJob = lumber ? runningJobForBuilding(state, lumber.buildingId) : null;
-    const completedJobs = lumber ? completedUnclaimedJobsForBuilding(state, lumber.buildingId) : [];
-    if (completedJobs.length > 0 || lumber?.state === 'OUTPUT_READY') {
-      return {
-        step: 'collect_first_wood',
-        title: 'Collect your first wood',
-        body: 'Bring in the first finished haul before pushing Headquarters to level 2.',
-        primaryAction: { type: 'COLLECT_OUTPUTS', buildingId: lumber?.buildingId || null }
-      };
-    }
-    if (lumber?.state === 'READY' && !runningJob) {
-      return {
-        step: 'collect_first_wood',
-        title: 'Collect your first wood',
-        body: 'Queue the first Lumber Camp job, then collect the output before upgrading Headquarters.',
-        primaryAction: { type: 'QUEUE_JOB', buildingId: lumber.buildingId }
-      };
-    }
-    return {
-      step: 'collect_first_wood',
-      title: 'Collect your first wood',
-      body: runningJob
-        ? 'The first lumber run is underway. Wait for it to finish, then collect the output before upgrading Headquarters.'
-        : 'Let the Lumber Camp finish construction. The first wood haul comes before Headquarters level 2.',
-      primaryAction: null
-    };
+  const firstWoodQuest = firstCollectionQuest(state, {
+    type: 'LUMBER_CAMP',
+    step: 'collect_first_wood',
+    title: 'Collect your first wood',
+    queuedBody: 'Queue the first Lumber Camp job, then collect the output before upgrading Headquarters.',
+    runningBody: 'The first lumber run is underway. Wait for it to finish, then collect the output before upgrading Headquarters.',
+    collectingBody: 'Bring in the first finished haul before pushing Headquarters to level 2.'
+  });
+  if (firstWoodQuest) {
+    return firstWoodQuest;
   }
   if (state.plot.hqLevel < 2) {
     return {
       step: 'upgrade_hq_2',
       title: 'Open Headquarters level 2',
-      body: 'Spend wood and food to unlock your first farm and the foreman collect permission tier.',
+      body: 'Spend wood to unlock your first farm and the foreman collect permission tier.',
       primaryAction: { type: 'UPGRADE_HQ' }
     };
   }
   if (!hasType('FARM_PLOT')) {
+    if (state.policy.collectOutputs !== true) {
+      return {
+        step: 'grant_collect_permission',
+        title: 'Teach the foreman to collect',
+        body: 'Enable the collect permission before opening the Farm Plot so the first automation tier is explicit and visible.',
+        primaryAction: { type: 'ENABLE_PERMISSION', permission: 'collectOutputs' }
+      };
+    }
     return {
       step: 'place_farm_plot',
       title: 'Plant the first farm',
@@ -769,20 +795,31 @@ function nextQuest(state) {
       primaryAction: { type: 'PLACE_BUILDING', buildingType: 'FARM_PLOT' }
     };
   }
-  if (state.plot.hqLevel >= 2 && state.policy.collectOutputs !== true) {
-    return {
-      step: 'grant_collect_permission',
-      title: 'Teach the foreman to collect',
-      body: 'Enable the collect permission so the agent can harvest finished work for you.',
-      primaryAction: { type: 'ENABLE_PERMISSION', permission: 'collectOutputs' }
-    };
+  const firstFoodQuest = firstCollectionQuest(state, {
+    type: 'FARM_PLOT',
+    step: 'collect_first_food',
+    title: 'Collect your first food',
+    queuedBody: 'Queue the first Farm Plot job so the town can bank food before reaching Headquarters level 3.',
+    runningBody: 'The first harvest is underway. Collect that food before pushing Headquarters to level 3.',
+    collectingBody: 'Collect the first food haul before opening Headquarters level 3.'
+  });
+  if (firstFoodQuest) {
+    return firstFoodQuest;
   }
   if (state.plot.hqLevel < 3) {
     return {
       step: 'upgrade_hq_3',
       title: 'Reach Headquarters level 3',
-      body: 'Unlock the Quarry and a second construction slot for the plot.',
+      body: 'Spend wood and food to unlock the Quarry, the next agent tier, and a second construction slot.',
       primaryAction: { type: 'UPGRADE_HQ' }
+    };
+  }
+  if (state.policy.queueProduction !== true) {
+    return {
+      step: 'grant_queue_permission',
+      title: 'Teach the foreman to queue work',
+      body: 'Enable queue permission now that the plot can sustain multiple producers.',
+      primaryAction: { type: 'ENABLE_PERMISSION', permission: 'queueProduction' }
     };
   }
   if (!hasType('QUARRY')) {
@@ -793,12 +830,31 @@ function nextQuest(state) {
       primaryAction: { type: 'PLACE_BUILDING', buildingType: 'QUARRY' }
     };
   }
+  const firstStoneQuest = firstCollectionQuest(state, {
+    type: 'QUARRY',
+    step: 'collect_first_stone',
+    title: 'Collect your first stone',
+    queuedBody: 'Queue the first quarry job before moving on to Headquarters level 4.',
+    runningBody: 'The first quarry batch is underway. Collect that stone before moving to Headquarters level 4.',
+    collectingBody: 'Collect the first stone haul before opening Headquarters level 4.'
+  });
+  if (firstStoneQuest) {
+    return firstStoneQuest;
+  }
   if (state.plot.hqLevel < 4) {
     return {
       step: 'upgrade_hq_4',
       title: 'Reach Headquarters level 4',
       body: 'This expands your storage and opens the Workshop for construction buffs.',
       primaryAction: { type: 'UPGRADE_HQ' }
+    };
+  }
+  if (state.policy.setPriority !== true) {
+    return {
+      step: 'grant_priority_permission',
+      title: 'Teach the foreman one priority',
+      body: 'Enable one priority control now that the plot has multiple live resource lanes.',
+      primaryAction: { type: 'ENABLE_PERMISSION', permission: 'setPriority' }
     };
   }
   if (!hasType('WORKSHOP')) {
@@ -825,6 +881,14 @@ function nextQuest(state) {
       primaryAction: { type: 'PLACE_BUILDING', buildingType: 'MARKET_STALL' }
     };
   }
+  if (state.policy.sellSurplusFood !== true) {
+    return {
+      step: 'grant_sell_permission',
+      title: 'Teach the foreman to sell surplus food',
+      body: 'Enable the final Phase 1 permission once the Market Stall is on the plot.',
+      primaryAction: { type: 'ENABLE_PERMISSION', permission: 'sellSurplusFood' }
+    };
+  }
   return {
     step: 'optimize_founders_plot',
     title: 'Tune the settlement',
@@ -838,20 +902,38 @@ function recommendationText(state) {
   if (quest.step === 'place_lumber_camp') {
     return 'Set a Lumber Camp first. Wood unlocks the entire rest of the plot.';
   }
-  if (quest.step === 'collect_first_wood') {
-    const lumber = state.buildings.find((building) => building.type === 'LUMBER_CAMP') || null;
-    const runningJob = lumber ? runningJobForBuilding(state, lumber.buildingId) : null;
-    const completedJobs = lumber ? completedUnclaimedJobsForBuilding(state, lumber.buildingId) : [];
-    if (completedJobs.length > 0 || lumber?.state === 'OUTPUT_READY') {
-      return 'Your first wood is ready. Collect it before chasing Headquarters level 2.';
+  if (quest.step === 'collect_first_wood' || quest.step === 'collect_first_food' || quest.step === 'collect_first_stone') {
+    const type = quest.step === 'collect_first_food'
+      ? 'FARM_PLOT'
+      : quest.step === 'collect_first_stone'
+        ? 'QUARRY'
+        : 'LUMBER_CAMP';
+    const label = BUILDING_RULES[type]?.label || type;
+    const building = state.buildings.find((entry) => entry.type === type) || null;
+    const runningJob = building ? runningJobForBuilding(state, building.buildingId) : null;
+    const completedJobs = building ? completedUnclaimedJobsForBuilding(state, building.buildingId) : [];
+    if (completedJobs.length > 0 || building?.state === 'OUTPUT_READY') {
+      return `Your first ${label.toLowerCase()} haul is ready. Collect it before moving to the next Headquarters milestone.`;
     }
-    if (lumber?.state === 'READY' && !runningJob) {
-      return 'Queue one Lumber Camp job, then collect that first haul before upgrading Headquarters.';
+    if (building?.state === 'READY' && !runningJob) {
+      return `Queue one ${label} job, then collect that first haul before moving to the next Headquarters milestone.`;
     }
     if (runningJob) {
-      return 'The first lumber run is underway. Collect it as soon as it finishes.';
+      return `The first ${label.toLowerCase()} run is underway. Collect it as soon as it finishes.`;
     }
-    return 'Let the Lumber Camp finish construction. The first haul still comes before Headquarters level 2.';
+    return `Let the ${label} finish construction. The first haul still comes before the next Headquarters milestone.`;
+  }
+  if (quest.step === 'grant_collect_permission') {
+    return 'Collect permission is the first trust milestone. Enable it before expanding into food.';
+  }
+  if (quest.step === 'grant_queue_permission') {
+    return 'Queue permission matters once multiple producers exist. Enable it before adding more parallel work.';
+  }
+  if (quest.step === 'grant_priority_permission') {
+    return 'Priority control becomes useful now that the plot has real tradeoffs between wood, food, and stone.';
+  }
+  if (quest.step === 'grant_sell_permission') {
+    return 'Sell permission is the final automation tier. Only enable it once you trust the Market Stall loop.';
   }
   if (state.policy.emergencyPause) {
     return 'The foreman is paused. Lift the emergency pause before asking for autonomous work.';
@@ -1763,18 +1845,27 @@ function applyResolveApproval(state, { approvalId, decision, note = '' }, ctx) {
 
 function summarizePublic(state) {
   const built = state.buildings.filter((building) => building.type !== 'HQ' && building.state !== 'UNDER_CONSTRUCTION');
-  const productivityScore = (
-    (state.plot.hqLevel * 25)
-    + (built.length * 12)
-    + Math.min(40, Math.floor((state.plot.inventory.wood + state.plot.inventory.stone + state.plot.inventory.food) / 4))
-    + (state.meta.pendingRewards.length * 3)
-  );
+  const claimedOperationalJobs = state.jobs.filter((job) => (
+    job.status === 'CLAIMED'
+    && (job.kind === 'PRODUCE' || job.kind === 'SELL')
+  )).length;
+  const scoreBreakdown = {
+    hqLevel: state.plot.hqLevel * 20,
+    builtStructures: built.length * 10,
+    firstCollections: state.meta.firstCollectedTypes.length * 8,
+    completedJobs: claimedOperationalJobs * 4,
+    automationUnlocks: unlockedPermissionKeys(state.plot.hqLevel).length * 4
+  };
+  const progressScore = Object.values(scoreBreakdown).reduce((sum, value) => sum + normalizeCount(value), 0);
   return {
     plotId: state.plot.plotId,
     houseId: state.plot.houseId || null,
     hqLevel: state.plot.hqLevel,
     headline: state.meta.publicHeadline || nextQuest(state).title,
-    productivityScore,
+    scoreKind: 'founders_progress_v1',
+    scoreLabel: 'Founders progress',
+    progressScore,
+    scoreBreakdown,
     buildings: built.map((building) => ({
       type: building.type,
       label: BUILDING_RULES[building.type]?.label || building.type,

@@ -247,12 +247,15 @@ The CTA opens **Founders Plot**.
 ### 6.3 First 15 minutes
 The player:
 - upgrades Headquarters to Level 2,
+- enables the agent’s first automation ability: **collect finished jobs**,
 - places a Farm Plot,
 - collects food,
-- unlocks the agent’s first automation ability: **collect finished jobs**.
+- understands that permission tiers are taught one at a time before the next major district expansion.
 
 ### 6.4 First 30 minutes
 The player:
+- reaches Headquarters level 3,
+- unlocks queue permission,
 - unlocks Quarry,
 - experiences queue pressure and build choice tension,
 - sees the agent collect or queue a task under permission,
@@ -344,24 +347,28 @@ Unlocked at entry.
 Unlock:
 - Farm Plot
 - agent may **collect finished outputs** from approved buildings
+- tutorial order: enable collect permission before opening the first Farm Plot
 
 ### HQ Level 3
 Unlock:
 - Quarry
 - second concurrent construction slot
 - agent may **queue one production job** on approved buildings
+- tutorial order: enable queue permission before opening the Quarry lane
 
 ### HQ Level 4
 Unlock:
 - Workshop
 - improved storage cap
 - agent may **set one building priority** (wood / stone / food emphasis)
+- tutorial order: enable one priority before the Workshop lane becomes the next optimization layer
 
 ### HQ Level 5
 Unlock:
 - Market Stall
 - “overnight planner” recap
 - agent may **sell surplus food for coin** within a daily sell cap
+- tutorial order: place the Market Stall, then explicitly enable sell permission
 
 Phase 1 stops here.
 
@@ -415,10 +422,18 @@ These are authoritative system rules, not LLM suggestions.
 
 ## 9.4 Upgrade cost baselines
 ### HQ upgrade costs
-- HQ 1 -> 2: 20 wood, 10 food, 25 XP
-- HQ 2 -> 3: 30 wood, 20 stone, 50 XP
+- HQ 1 -> 2: 20 wood, 15 XP
+- HQ 2 -> 3: 30 wood, 20 food, 45 XP
 - HQ 3 -> 4: 40 wood, 30 stone, 20 food, 90 XP
-- HQ 4 -> 5: 60 wood, 50 stone, 30 food, 140 XP
+- HQ 4 -> 5: 60 wood, 50 stone, 30 food, 135 XP
+
+### Economic validity rule
+Every HQ upgrade must require only resources that are already producible at lower HQ levels.
+
+That means:
+- HQ 1 -> 2 cannot require food or stone,
+- HQ 2 -> 3 cannot require stone,
+- only HQ 3+ upgrades may require all three core resources.
 
 ### XP sources
 - place first instance of each building: +10 XP
@@ -472,13 +487,13 @@ The agent may **not** in Phase 1:
 ## 10.3 Agent permission ladder
 Agent permissions unlock by HQ level and must be visible in the UI.
 
-| Permission | HQ Level | Default | Human approval required |
-|---|---:|---|---|
-| Observe + suggest | 1 | enabled | no |
-| Collect outputs | 2 | disabled until toggled on | yes |
-| Queue production | 3 | disabled until toggled on | yes |
-| Set one priority | 4 | disabled until toggled on | yes |
-| Sell surplus food | 5 | disabled until toggled on | yes, plus daily coin cap |
+| Permission | HQ Level | Default | Tutorial timing | Human approval required |
+|---|---:|---|---|---|
+| Observe + suggest | 1 | enabled | available at entry | no |
+| Collect outputs | 2 | disabled until toggled on | immediately after HQ 2, before Farm Plot | yes |
+| Queue production | 3 | disabled until toggled on | immediately after HQ 3, before Quarry | yes |
+| Set one priority | 4 | disabled until toggled on | immediately after HQ 4, before Workshop optimization | yes |
+| Sell surplus food | 5 | disabled until toggled on | after Market Stall placement | yes, plus daily coin cap |
 
 ## 10.4 Explainability rule
 Every autonomous action by the agent must create:
@@ -1013,6 +1028,7 @@ This is the minimum initial suite.
 - `FP-IT-009` idempotent mutation replays identical result
 - `FP-IT-010` event log replay reproduces final state hash
 - `FP-IT-011` approval request and resolve events appear in recap and replay audit output
+- `FP-IT-012` HQ upgrade costs only require already-unlocked resources at each tier
 
 ## 19.4 End-to-end tests
 - `FP-E2E-001` onboarding handoff opens Founders Plot
@@ -1024,6 +1040,8 @@ This is the minimum initial suite.
 - `FP-E2E-007` emergency pause stops autonomous actions instantly
 - `FP-E2E-008` denied agent upgrade request produces approval card instead of mutation
 - `FP-E2E-009` first-loop quest stays on first wood until collection, and the first Lumber Camp remains queueable/collectable in the browser
+- `FP-E2E-010` HQ 2 teaches collect permission before Farm Plot and the next HQ cost only uses already-unlocked resources
+- `FP-E2E-011` public summary exposes explicit progress-score semantics instead of a vague productivity score
 
 ## 19.5 Replay and perf tests
 - `FP-RPL-001` same seed + same actions => same state hash
@@ -1222,7 +1240,7 @@ Expose enough of the plot to the wider town to create anticipation for later soc
 
 ### Tasks
 - town card / profile view for a plot,
-- simple productivity or beauty score,
+- explicit public progress score with published basis,
 - leaderboard stub,
 - visitor mode (read-only).
 

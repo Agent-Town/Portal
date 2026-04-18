@@ -109,9 +109,11 @@ test('Founders Plot survives reload, exposes recap from event logs, and keeps pu
     return await resp.json().catch(() => ({}));
   });
   expect(summaryPayload?.ok).toBe(true);
-  expect(summaryPayload?.summary?.productivityScore).toBeGreaterThan(0);
+  expect(summaryPayload?.summary?.progressScore).toBeGreaterThan(0);
+  expect(summaryPayload?.summary?.scoreKind).toBe('founders_progress_v1');
   expect(summaryPayload?.summary?.plotId).toMatch(/^plot_/);
   expect(summaryPayload?.summary).not.toHaveProperty('pairId');
+  expect(summaryPayload?.summary).not.toHaveProperty('productivityScore');
 
   const publicPayload = await page.evaluate(async (plotId) => {
     const resp = await fetch(`/api/founders-plot/public/${encodeURIComponent(plotId)}`, { credentials: 'include' });
@@ -119,6 +121,7 @@ test('Founders Plot survives reload, exposes recap from event logs, and keeps pu
   }, summaryPayload.summary.plotId);
   expect(publicPayload?.ok).toBe(true);
   expect(publicPayload?.plot?.plotId).toBe(summaryPayload.summary.plotId);
-  expect(publicPayload?.plot?.productivityScore).toBe(summaryPayload.summary.productivityScore);
+  expect(publicPayload?.plot?.progressScore).toBe(summaryPayload.summary.progressScore);
+  expect(publicPayload?.plot?.scoreKind).toBe(summaryPayload.summary.scoreKind);
   expect(publicPayload?.plot).not.toHaveProperty('pairId');
 });

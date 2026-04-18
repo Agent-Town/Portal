@@ -353,7 +353,7 @@ Response shape:
     },
     "progress": {
       "currentLevel": 1,
-      "next": { "xpCurrent": 0, "xpRequired": 25, "ratio": 0 }
+      "next": { "xpCurrent": 0, "xpRequired": 15, "ratio": 0, "cost": { "wood": 20 } }
     },
     "stateHash": "<sha256 hex>"
   }
@@ -490,8 +490,17 @@ Response shape:
       "plotId": "plot_...",
       "houseId": "hs_...",
       "hqLevel": 2,
-      "headline": "Build a Farm Plot",
-      "productivityScore": 61,
+      "headline": "Teach the foreman to collect",
+      "scoreKind": "founders_progress_v1",
+      "scoreLabel": "Founders progress",
+      "progressScore": 68,
+      "scoreBreakdown": {
+        "hqLevel": 40,
+        "builtStructures": 10,
+        "firstCollections": 8,
+        "completedJobs": 6,
+        "automationUnlocks": 4
+      },
       "buildings": [{ "type": "LUMBER_CAMP", "label": "Lumber Camp", "level": 1 }],
       "inventory": { "wood": 6, "stone": 0, "food": 0, "coin": 14 },
       "rewardCount": 1
@@ -508,7 +517,8 @@ Returns the active plot's read-only public summary for social/leaderboard surfac
 
 Notes:
 - Public summary routes intentionally do not expose internal pair/session identifiers such as `pairId`.
-- `productivityScore` is a derived leaderboard-facing metric, not a mutable gameplay input.
+- `progressScore` is a public progress metric with published semantics, not a mutable gameplay input.
+- `scoreKind === "founders_progress_v1"` means the score measures visible progression milestones, not hidden throughput estimates.
 
 Notes:
 - Used by `/start`, `/app`, `/house`, and `/create` to resolve the active preference without forking the co-op flow.
