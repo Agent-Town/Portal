@@ -32,6 +32,7 @@ async function invokeTool(page, toolName, params = {}) {
 
 async function readSessionHeader(page) {
   await page.getByTestId('agent-debug-tab-session').click();
+  await page.locator('#agentDebugRefreshBtn').click();
   await expect.poll(async () => {
     const text = await page.getByTestId('agent-debug-session').textContent();
     return String(text || '').includes('"trainerNamespacePlugin"');

@@ -9,8 +9,26 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function randomPort(min = 6200, span = 300) {
-  return min + Math.floor(Math.random() * span);
+async function getFreePort(host = '127.0.0.1') {
+  return await new Promise((resolve, reject) => {
+    const server = createServer();
+    server.once('error', reject);
+    server.listen(0, host, () => {
+      const address = server.address();
+      const port = address && typeof address === 'object' ? Number(address.port || 0) : 0;
+      server.close((closeError) => {
+        if (closeError) {
+          reject(closeError);
+          return;
+        }
+        if (!Number.isFinite(port) || port <= 0) {
+          reject(new Error('FREE_PORT_UNAVAILABLE'));
+          return;
+        }
+        resolve(port);
+      });
+    });
+  });
 }
 
 function startPrivyApiStub({ port, transactionId, transactionHash }) {
@@ -112,8 +130,11 @@ async function stopServer(child) {
 }
 
 test('privy transaction status accepts same-origin fetch metadata but still rejects explicit cross-origin headers', async () => {
-  const appPort = randomPort(6200, 200);
-  const stubPort = randomPort(6500, 200);
+  let appPort = await getFreePort();
+  let stubPort = await getFreePort();
+  while (stubPort === appPort) {
+    stubPort = await getFreePort();
+  }
   const transactionId = '11111111-2222-4333-8444-555555555555';
   const transactionHash = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
   const storePath = path.join(

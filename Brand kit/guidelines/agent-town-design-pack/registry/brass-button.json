@@ -1,0 +1,22 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "brass-button",
+  "type": "registry:ui",
+  "title": "Brass Button",
+  "description": "Tactile shell button primitive with primary, secondary, and danger variants.",
+  "registryDependencies": [
+    "frontier-base"
+  ],
+  "files": [
+    {
+      "path": "registry-source/agent-town/brass-button/brass-button.tsx",
+      "type": "registry:component",
+      "target": "src/components/ui/brass-button.tsx"
+    },
+    {
+      "path": "registry-source/agent-town/brass-button/brass-button.contract.md",
+      "type": "registry:file",
+      "target": "docs/contracts/brass-button.md"
+    }
+  ]
+}

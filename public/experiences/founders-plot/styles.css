@@ -26,6 +26,7 @@ body.founders-plot-page {
 body.founders-plot-page {
   margin: 0;
   color: var(--fp-wood);
+  font-family: "Wellfleet", serif;
   background:
     radial-gradient(circle at top left, rgba(255, 248, 232, 0.95), rgba(255, 248, 232, 0) 36%),
     linear-gradient(180deg, rgba(255, 228, 160, 0.72), rgba(245, 230, 200, 0.92)),

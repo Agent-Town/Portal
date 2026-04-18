@@ -1,0 +1,24 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "start-gate",
+  "type": "registry:block",
+  "title": "Start Gate",
+  "description": "Entry hero block for the opening Wild West / town gate screen.",
+  "registryDependencies": [
+    "frontier-base",
+    "parchment-panel",
+    "brass-button"
+  ],
+  "files": [
+    {
+      "path": "registry-source/agent-town/start-gate/start-gate.tsx",
+      "type": "registry:component",
+      "target": "src/components/blocks/start-gate.tsx"
+    },
+    {
+      "path": "registry-source/agent-town/start-gate/start-gate.contract.md",
+      "type": "registry:file",
+      "target": "docs/contracts/start-gate.md"
+    }
+  ]
+}

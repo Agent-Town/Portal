@@ -1,0 +1,32 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "frontier-base",
+  "type": "registry:base",
+  "title": "Frontier Base",
+  "description": "Core Agent Town frontier shell tokens, motion variables, and base theme utilities.",
+  "files": [
+    {
+      "path": "registry-source/agent-town/frontier-base/agent-town-theme.css",
+      "type": "registry:style",
+      "target": "src/styles/agent-town-theme.css"
+    },
+    {
+      "path": "registry-source/agent-town/frontier-base/design-tokens.ts",
+      "type": "registry:lib",
+      "target": "src/lib/design-tokens/agent-town.ts"
+    }
+  ],
+  "cssVars": {
+    "light": {
+      "at-ochre-500": "#c4883a",
+      "at-sand-100": "#f5e6c8",
+      "at-sand-200": "#e8d5a8",
+      "at-rust-600": "#a0522d",
+      "at-teal-600": "#5b8a8a",
+      "at-brass-700": "#8b7d3c",
+      "at-wood-950": "#2e1b0e",
+      "at-cream-50": "#fff8e8",
+      "at-sun-200": "#ffe4a0"
+    }
+  }
+}

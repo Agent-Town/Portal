@@ -1,0 +1,24 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "agent-comms-drawer",
+  "type": "registry:block",
+  "title": "Agent Comms Drawer",
+  "description": "Context-aware helper drawer for receipts, approvals, and agent chat.",
+  "registryDependencies": [
+    "frontier-base",
+    "sheet-frame",
+    "status-pill"
+  ],
+  "files": [
+    {
+      "path": "registry-source/agent-town/agent-comms-drawer/agent-comms-drawer.tsx",
+      "type": "registry:component",
+      "target": "src/components/blocks/agent-comms-drawer.tsx"
+    },
+    {
+      "path": "registry-source/agent-town/agent-comms-drawer/agent-comms-drawer.contract.md",
+      "type": "registry:file",
+      "target": "docs/contracts/agent-comms-drawer.md"
+    }
+  ]
+}

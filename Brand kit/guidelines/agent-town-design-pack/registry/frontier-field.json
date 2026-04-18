@@ -1,0 +1,22 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "frontier-field",
+  "type": "registry:ui",
+  "title": "Frontier Field",
+  "description": "Labeled shell field primitive for onboarding forms.",
+  "registryDependencies": [
+    "frontier-base"
+  ],
+  "files": [
+    {
+      "path": "registry-source/agent-town/frontier-field/frontier-field.tsx",
+      "type": "registry:component",
+      "target": "src/components/ui/frontier-field.tsx"
+    },
+    {
+      "path": "registry-source/agent-town/frontier-field/frontier-field.contract.md",
+      "type": "registry:file",
+      "target": "docs/contracts/frontier-field.md"
+    }
+  ]
+}

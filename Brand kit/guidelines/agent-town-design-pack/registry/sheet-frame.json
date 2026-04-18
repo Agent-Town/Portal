@@ -1,0 +1,22 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "sheet-frame",
+  "type": "registry:ui",
+  "title": "Sheet Frame",
+  "description": "Drawer and mobile sheet shell primitive.",
+  "registryDependencies": [
+    "frontier-base"
+  ],
+  "files": [
+    {
+      "path": "registry-source/agent-town/sheet-frame/sheet-frame.tsx",
+      "type": "registry:component",
+      "target": "src/components/ui/sheet-frame.tsx"
+    },
+    {
+      "path": "registry-source/agent-town/sheet-frame/sheet-frame.contract.md",
+      "type": "registry:file",
+      "target": "docs/contracts/sheet-frame.md"
+    }
+  ]
+}

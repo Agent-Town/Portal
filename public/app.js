@@ -3785,10 +3785,10 @@ function loadAgentPanelMinimized() {
 function loadAgentPanelDebugVisible() {
   try {
     const raw = localStorage.getItem(AGENT_PANEL_DEBUG_VISIBLE_KEY);
-    if (raw === null) return true;
+    if (raw === null) return !loadAgentPanelMinimized();
     return raw === '1';
   } catch {
-    return true;
+    return !loadAgentPanelMinimized();
   }
 }
 

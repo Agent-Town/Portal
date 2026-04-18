@@ -8,6 +8,11 @@ This docs set is designed for users who are new to local agents and model provid
 - [Which Provider Should I Pick?](/docs/which-provider.md)
 - [Providers Overview](/docs/providers/README.md)
 
+## Product and design specs
+
+- [Founders Plot Phase 1 spec](/specs/17_founders_plot_phase1.md)
+- [Agent Town design pack](/Brand%20kit/guidelines/agent-town-design-pack/README.md)
+
 ## Principles
 
 - Local-first setup by default.

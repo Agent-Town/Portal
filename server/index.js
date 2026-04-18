@@ -4295,10 +4295,15 @@ app.get('/api/agent/lite/llm/config', (req, res) => {
   });
 });
 
-app.post('/api/agent/lite/llm/config', (req, res) => {
+function handleLiteLlmConfigUpsert(req, res) {
   const s = ensureHumanSession(req, res);
   const lite = ensureLiteState(s);
   const onboarding = ensureSessionOnboarding(s);
+  const rawBody = req.body && typeof req.body === 'object' ? req.body : {};
+  const hasProviderFields = Object.prototype.hasOwnProperty.call(rawBody, 'provider')
+    || Object.prototype.hasOwnProperty.call(rawBody, 'model')
+    || Object.prototype.hasOwnProperty.call(rawBody, 'modelRef')
+    || Object.prototype.hasOwnProperty.call(rawBody, 'authMode');
 
   if (onboarding.required === true && onboarding.registrationComplete !== true) {
     return res.status(409).json({
@@ -4308,21 +4313,30 @@ app.post('/api/agent/lite/llm/config', (req, res) => {
     });
   }
 
-  let payload;
-  try {
-    payload = normalizeLiteLlmPayload(req.body || {});
-  } catch (err) {
-    return res.status(400).json({ ok: false, error: String(err?.message || 'INVALID_LLM_CONFIG') });
-  }
+  if (hasProviderFields) {
+    let payload;
+    try {
+      payload = normalizeLiteLlmPayload(rawBody);
+    } catch (err) {
+      return res.status(400).json({ ok: false, error: String(err?.message || 'INVALID_LLM_CONFIG') });
+    }
 
-  lite.llmConfigured = true;
-  lite.llmProvider = payload.provider;
-  lite.llmModel = payload.model;
-  lite.llmModelRef = payload.modelRef;
-  lite.llmConfiguredAt = nowIso();
-  lite.llmApiKeySet = payload.hasCredential !== false;
-  lite.llmAuthMode = payload.authMode || 'api-key';
-  lite.llmApiKeyHash = null;
+    lite.llmConfigured = true;
+    lite.llmProvider = payload.provider;
+    lite.llmModel = payload.model;
+    lite.llmModelRef = payload.modelRef;
+    lite.llmConfiguredAt = nowIso();
+    lite.llmApiKeySet = payload.hasCredential !== false;
+    lite.llmAuthMode = payload.authMode || 'api-key';
+    lite.llmApiKeyHash = null;
+  } else {
+    if (onboarding.required === true) {
+      lite.llmConfigured = rawBody.hasCredential !== false;
+      lite.llmConfiguredAt = nowIso();
+      lite.llmApiKeySet = rawBody.hasCredential !== false;
+      lite.llmAuthMode = lite.llmAuthMode || 'api-key';
+    }
+  }
 
   if (lite.runtimeBooted === true) {
     s.agent.connected = true;
@@ -4350,7 +4364,10 @@ app.post('/api/agent/lite/llm/config', (req, res) => {
     apiKeySet: !!lite.llmApiKeySet,
     runtimeReady: !!lite.runtimeReady
   });
-});
+}
+
+app.post('/api/agent/lite/llm/config', handleLiteLlmConfigUpsert);
+app.put('/api/agent/lite/llm/config', handleLiteLlmConfigUpsert);
 
 app.delete('/api/agent/lite/llm/config', (req, res) => {
   const s = ensureHumanSession(req, res);

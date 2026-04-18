@@ -162,6 +162,19 @@ async function ensureAgentPanelExpanded(page) {
 
 async function ensureBrainPanelVisible(page) {
   await ensureAgentPanelExpanded(page);
+  const debugPane = page.getByTestId('agent-debug-pane');
+  if (await debugPane.count()) {
+    const paneVisible = await debugPane.first().isVisible().catch(() => false);
+    if (!paneVisible) {
+      const toggle = page.getByTestId('agent-debug-toggle');
+      if (await toggle.count()) {
+        const target = toggle.first();
+        if (await target.isVisible().catch(() => false)) {
+          await target.click();
+        }
+      }
+    }
+  }
   const brainTab = page.getByTestId('agent-debug-tab-brain');
   if (await brainTab.count()) {
     const target = brainTab.first();

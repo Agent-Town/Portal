@@ -86,6 +86,19 @@ async function openTrainerFromSidebar(page) {
   if (minimized) {
     await page.locator('#agentSidebar .sidebar-header').click();
   }
+  const debugPane = page.getByTestId('agent-debug-pane');
+  if (await debugPane.count()) {
+    const paneVisible = await debugPane.first().isVisible().catch(() => false);
+    if (!paneVisible) {
+      const toggle = page.getByTestId('agent-debug-toggle');
+      if (await toggle.count()) {
+        const target = toggle.first();
+        if (await target.isVisible().catch(() => false)) {
+          await target.click();
+        }
+      }
+    }
+  }
   await page.getByTestId('agent-open-trainer').click();
   await page.getByTestId('trainer-modal').waitFor({ state: 'visible', timeout: 5000 });
   await page.getByTestId('trainer-root').waitFor({ state: 'visible', timeout: 5000 });
