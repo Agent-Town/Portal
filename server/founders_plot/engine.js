@@ -367,6 +367,7 @@ function initialPlotForIdentity({ pairId, houseId = null, nowMs }) {
     claimedRewards: [],
     seenBuildingTypes: ['HQ'],
     collectedBuildingTypes: [],
+    agentTiersXpAwarded: [],
     lastDailyBonusDay: null,
     dailySoldCoin: 0,
     dailySellDay: nowDayKey(nowMs),
@@ -784,14 +785,28 @@ function consumeActionApproval(bundle, actionName, requestedParams, nowMs) {
   return approval;
 }
 
-function markAgentAction(bundle, pendingEvents, actionName, explanation, nowMs) {
+function markAgentAction(bundle, pendingEvents, actionName, explanation, nowMs, permissionKey = null) {
   createEvent(pendingEvents, {
     plotId: bundle.plot.plotId,
     eventType: 'AGENT_ACTION_EXECUTED',
     actor: 'AGENT',
     summary: `Foreman action: ${actionName}`,
     explanation,
-    data: { actionName },
+    data: { actionName, permissionKey: permissionKey || null },
+    createdAt: nowMs
+  });
+  if (!permissionKey) return;
+  const awarded = Array.isArray(bundle.plot.agentTiersXpAwarded) ? bundle.plot.agentTiersXpAwarded : [];
+  if (awarded.includes(permissionKey)) return;
+  bundle.plot.agentTiersXpAwarded = [...awarded, permissionKey];
+  addTownXp(bundle.plot, 10);
+  createEvent(pendingEvents, {
+    plotId: bundle.plot.plotId,
+    eventType: 'XP_AWARDED',
+    actor: 'AGENT',
+    summary: `First agent automation in ${permissionKey} tier: +10 XP.`,
+    explanation: `Awarded +10 town XP for the first successful agent action in the ${permissionKey} permission tier.`,
+    data: { amount: 10, reason: 'first_agent_tier_automation', permissionKey },
     createdAt: nowMs
   });
 }
@@ -1541,7 +1556,8 @@ function queueJob({
         if (safeKind === 'SELL') {
           bundle.plot.dailySoldCoin += Number(spec.output.coin || 0);
         }
-        markAgentAction(bundle, pendingEvents, 'queue_job', job.explanation, nowMs);
+        const tierKey = safeKind === 'SELL' ? 'sellSurplusFood' : 'queueProduction';
+        markAgentAction(bundle, pendingEvents, 'queue_job', job.explanation, nowMs, tierKey);
       }
       return {
         ok: true,
@@ -1630,7 +1646,7 @@ function collectOutputs({
         createdAt: nowMs
       });
       if (safeActor === 'AGENT') {
-        markAgentAction(bundle, pendingEvents, 'collect_outputs', 'Foreman collected finished outputs from an approved building.', nowMs);
+        markAgentAction(bundle, pendingEvents, 'collect_outputs', 'Foreman collected finished outputs from an approved building.', nowMs, 'collectOutputs');
       }
       return {
         ok: true,
@@ -1799,7 +1815,7 @@ function setPriority({
         createdAt: nowMs
       });
       if (safeActor === 'AGENT') {
-        markAgentAction(bundle, pendingEvents, 'set_priority', `Foreman set ${BUILDING_LABELS[building.type]} priority to ${safePriority}.`, nowMs);
+        markAgentAction(bundle, pendingEvents, 'set_priority', `Foreman set ${BUILDING_LABELS[building.type]} priority to ${safePriority}.`, nowMs, 'setPriority');
       }
       return {
         ok: true,

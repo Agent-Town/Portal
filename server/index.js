@@ -3662,17 +3662,10 @@ app.use('/api/experiences', createExperiencesRouter({
   publicDir: path.join(__dirname, '..', 'public'),
 }));
 
-function foundersPlotSessionMiddleware(req, res, next) {
-  try {
-    // Establish or refresh the session cookie before identity resolution,
-    // since resolveIdentity is called without access to `res`.
-    ensureHumanSession(req, res);
-  } catch { /* identity will fall back to empty pairId */ }
-  next();
-}
-app.use('/api/founders-plot', foundersPlotSessionMiddleware);
 const foundersPlotRouter = createFoundersPlotRouter({
-  resolveIdentity: (req) => resolveFoundersPlotIdentity(req, null),
+  // Pass both req and res so ensureHumanSession can set the session cookie
+  // on first contact. The router always invokes this with (req, res).
+  resolveIdentity: (req, res) => resolveFoundersPlotIdentity(req, res),
   nowMs: () => Date.now(),
 });
 app.use(foundersPlotRouter);

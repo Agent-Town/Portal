@@ -116,8 +116,11 @@
   function renderQuest(snapshot) {
     const q = snapshot && snapshot.quest;
     if (!q || !els.quest) return;
-    els.quest.textContent = q.label || q.stepId || 'Chart the plot';
-    if (els.questHint) els.questHint.textContent = q.hint || '';
+    // Server emits {id, title, body, primaryAction}. Older shapes used
+    // {stepId, label, hint}. Accept either so future spec tweaks don't
+    // silently leave "Loading…" in the banner.
+    els.quest.textContent = q.title || q.label || q.stepId || q.id || 'Chart the plot';
+    if (els.questHint) els.questHint.textContent = q.body || q.hint || '';
   }
 
   function renderGrid(bundle) {

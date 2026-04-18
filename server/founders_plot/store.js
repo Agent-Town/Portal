@@ -36,7 +36,16 @@ function toJson(value, fallback = {}) {
 }
 
 function ensureDb() {
-  if (db) return db;
+  if (db && statements) return db;
+  // Guard against a prior partial init (db opened but schema/statements setup
+  // threw). Reset and retry cleanly so the next call either succeeds fully or
+  // surfaces the underlying error every time, rather than serving null-statement
+  // crashes forever.
+  if (db) {
+    try { db.close(); } catch { /* ignore */ }
+    db = null;
+    statements = null;
+  }
   const filePath = getFoundersPlotStorePath();
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   db = new DatabaseSync(filePath);
@@ -58,6 +67,7 @@ function ensureDb() {
       claimed_rewards_json TEXT NOT NULL DEFAULT '[]',
       seen_building_types_json TEXT NOT NULL DEFAULT '[]',
       collected_building_types_json TEXT NOT NULL DEFAULT '[]',
+      agent_tiers_xp_awarded_json TEXT NOT NULL DEFAULT '[]',
       last_daily_bonus_day TEXT,
       daily_sold_coin INTEGER NOT NULL DEFAULT 0,
       daily_sell_day TEXT,
@@ -158,6 +168,16 @@ function ensureDb() {
     );
     CREATE INDEX IF NOT EXISTS founder_approvals_plot_idx ON founder_approvals (plot_id, status, updated_at);
   `);
+  // Lightweight migration: add agent_tiers_xp_awarded_json if missing from pre-existing DBs.
+  try {
+    const cols = db.prepare("PRAGMA table_info(founder_plots)").all();
+    const hasColumn = cols.some((c) => c.name === 'agent_tiers_xp_awarded_json');
+    if (!hasColumn) {
+      db.exec("ALTER TABLE founder_plots ADD COLUMN agent_tiers_xp_awarded_json TEXT NOT NULL DEFAULT '[]';");
+    }
+  } catch {
+    /* ignore migration check errors; fresh DBs created above already have the column */
+  }
   statements = buildStatements(db);
   return db;
 }
@@ -170,12 +190,12 @@ function buildStatements(database) {
       INSERT INTO founder_plots (
         plot_id, pair_id, house_id, status, hq_level, town_xp, inventory_json, storage_caps_json,
         construction_slots, next_build_buff_pct, claimed_rewards_json, seen_building_types_json,
-        collected_building_types_json, last_daily_bonus_day, daily_sold_coin, daily_sell_day,
+        collected_building_types_json, agent_tiers_xp_awarded_json, last_daily_bonus_day, daily_sold_coin, daily_sell_day,
         last_viewed_at, pending_recap_from, pending_recap_to, created_at, updated_at, last_simulated_at
       ) VALUES (
         @plot_id, @pair_id, @house_id, @status, @hq_level, @town_xp, @inventory_json, @storage_caps_json,
         @construction_slots, @next_build_buff_pct, @claimed_rewards_json, @seen_building_types_json,
-        @collected_building_types_json, @last_daily_bonus_day, @daily_sold_coin, @daily_sell_day,
+        @collected_building_types_json, @agent_tiers_xp_awarded_json, @last_daily_bonus_day, @daily_sold_coin, @daily_sell_day,
         @last_viewed_at, @pending_recap_from, @pending_recap_to, @created_at, @updated_at, @last_simulated_at
       )
       ON CONFLICT(plot_id) DO UPDATE SET
@@ -191,6 +211,7 @@ function buildStatements(database) {
         claimed_rewards_json = excluded.claimed_rewards_json,
         seen_building_types_json = excluded.seen_building_types_json,
         collected_building_types_json = excluded.collected_building_types_json,
+        agent_tiers_xp_awarded_json = excluded.agent_tiers_xp_awarded_json,
         last_daily_bonus_day = excluded.last_daily_bonus_day,
         daily_sold_coin = excluded.daily_sold_coin,
         daily_sell_day = excluded.daily_sell_day,
@@ -378,6 +399,7 @@ function hydratePlot(row) {
     claimedRewards: parseJson(row.claimed_rewards_json, []),
     seenBuildingTypes: parseJson(row.seen_building_types_json, []),
     collectedBuildingTypes: parseJson(row.collected_building_types_json, []),
+    agentTiersXpAwarded: parseJson(row.agent_tiers_xp_awarded_json, []),
     lastDailyBonusDay: row.last_daily_bonus_day || null,
     dailySoldCoin: Number(row.daily_sold_coin || 0),
     dailySellDay: row.daily_sell_day || null,
@@ -405,6 +427,7 @@ function dehydratePlot(plot) {
     claimed_rewards_json: toJson(plot.claimedRewards || [], []),
     seen_building_types_json: toJson(plot.seenBuildingTypes || [], []),
     collected_building_types_json: toJson(plot.collectedBuildingTypes || [], []),
+    agent_tiers_xp_awarded_json: toJson(plot.agentTiersXpAwarded || [], []),
     last_daily_bonus_day: plot.lastDailyBonusDay || null,
     daily_sold_coin: Number(plot.dailySoldCoin || 0),
     daily_sell_day: plot.dailySellDay || null,
