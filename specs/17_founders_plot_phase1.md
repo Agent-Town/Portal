@@ -728,6 +728,25 @@ These invariants are mandatory and testable.
 9. Agent actions must respect policy flags and caps.
 10. Replaying the same event log from the same initial snapshot must produce the same final state hash.
 
+## 13.6 Save compatibility contract
+Founders Plot is allowed to start small, but save data must support additive future expansion without wiping player progress.
+
+Required rules:
+- Every persisted plot save must carry an explicit `schemaVersion`.
+- Loading an older save must run a named migration path before gameplay logic reads the state.
+- The loader must persist the canonical migrated shape after a successful forward migration.
+- Additive metadata that the current phase does not actively interpret must survive round-trip persistence in `meta.extensions`.
+- Core compatibility surfaces must not be renamed casually: building types, event types, permission keys, and occupied pad coordinates all require explicit migration if they change.
+
+Extension policy:
+- Adding new buildings, later HQ levels, new quest steps, and richer recap/public summary views is allowed.
+- Rebalancing costs, durations, and rewards is allowed.
+- Removing or relocating existing build pads requires a real migration because saved buildings already persist `x`/`y`.
+- Renaming a building or permission key without migration is a save-contract break.
+
+Testing requirement:
+- A seeded compatibility regression must load a legacy v0 plot into the current version and prove that the migrated save exposes the current `schemaVersion` and preserves additive extension metadata.
+
 ---
 
 ## 14. Tool and API contract
@@ -1029,6 +1048,7 @@ This is the minimum initial suite.
 - `FP-IT-010` event log replay reproduces final state hash
 - `FP-IT-011` approval request and resolve events appear in recap and replay audit output
 - `FP-IT-012` HQ upgrade costs only require already-unlocked resources at each tier
+- `FP-IT-013` a legacy v0 plot save migrates to the current schema version and preserves additive extension metadata
 
 ## 19.4 End-to-end tests
 - `FP-E2E-001` onboarding handoff opens Founders Plot

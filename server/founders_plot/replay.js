@@ -1,4 +1,10 @@
-const { AUTONOMY_TIER_BY_POLICY, DEFAULT_POLICY, stateHash, stateHashPayload } = require('./engine');
+const {
+  AUTONOMY_TIER_BY_POLICY,
+  DEFAULT_POLICY,
+  FOUNDERS_PLOT_SCHEMA_VERSION,
+  stateHash,
+  stateHashPayload
+} = require('./engine');
 
 function replayFromEvents(events = []) {
   const plot = {};
@@ -16,6 +22,7 @@ function replayFromEvents(events = []) {
     emergencyPause: DEFAULT_POLICY.emergencyPause
   };
   const meta = {
+    schemaVersion: FOUNDERS_PLOT_SCHEMA_VERSION,
     workshopBuffCharges: 0,
     pendingRewards: [],
     claimedRewards: [],

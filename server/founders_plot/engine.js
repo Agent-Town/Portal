@@ -204,8 +204,25 @@ const XP_RULES = {
   dailyReturn: 5
 };
 
+const FOUNDERS_PLOT_SCHEMA_VERSION = 1;
 const MAX_OFFLINE_MS = 8 * 60 * 60 * 1000;
 const SIMULATION_TICK_MS = 60 * 1000;
+
+const META_CORE_KEYS = new Set([
+  'schemaVersion',
+  'extensions',
+  'pendingRewards',
+  'claimedRewards',
+  'firstPlacedTypes',
+  'firstCollectedTypes',
+  'automationAwards',
+  'dailyReturnDay',
+  'workshopBuffCharges',
+  'recapSeenSeq',
+  'lastGeneratedRecapSeq',
+  'publicHeadline',
+  'questDismissedAt'
+]);
 
 function nowBucketHour(nowMs) {
   return new Date(nowMs).toISOString().slice(0, 13);
@@ -242,6 +259,17 @@ function normalizeCount(value) {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
+function normalizeSchemaVersion(value, fallback = 0) {
+  const numeric = Math.floor(Number(value));
+  if (!Number.isFinite(numeric) || numeric < 0) return fallback;
+  return numeric;
+}
+
+function copyPersistedValue(value) {
+  if (value === null || typeof value !== 'object') return value;
+  return copyJson(value);
+}
+
 function normalizeInventory(raw = {}) {
   return {
     wood: normalizeCount(raw.wood),
@@ -269,6 +297,17 @@ function normalizePolicy(raw = {}) {
   };
 }
 
+function collectMetaExtensions(raw = {}) {
+  const extensions = raw.extensions && typeof raw.extensions === 'object' && !Array.isArray(raw.extensions)
+    ? copyPersistedValue(raw.extensions)
+    : {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (key === 'extensions' || META_CORE_KEYS.has(key) || value === undefined) continue;
+    extensions[key] = copyPersistedValue(value);
+  }
+  return extensions;
+}
+
 function normalizeMeta(raw = {}) {
   const pendingRewards = Array.isArray(raw.pendingRewards) ? raw.pendingRewards.map((reward) => ({
     key: String(reward?.key || ''),
@@ -291,6 +330,7 @@ function normalizeMeta(raw = {}) {
     ? raw.automationAwards.map((entry) => String(entry || '')).filter(Boolean)
     : [];
   return {
+    schemaVersion: normalizeSchemaVersion(raw.schemaVersion, FOUNDERS_PLOT_SCHEMA_VERSION),
     pendingRewards,
     claimedRewards,
     firstPlacedTypes,
@@ -301,7 +341,8 @@ function normalizeMeta(raw = {}) {
     recapSeenSeq: normalizeCount(raw.recapSeenSeq),
     lastGeneratedRecapSeq: normalizeCount(raw.lastGeneratedRecapSeq),
     publicHeadline: typeof raw.publicHeadline === 'string' ? raw.publicHeadline : '',
-    questDismissedAt: normalizeCount(raw.questDismissedAt)
+    questDismissedAt: normalizeCount(raw.questDismissedAt),
+    extensions: collectMetaExtensions(raw)
   };
 }
 
@@ -362,11 +403,50 @@ function createInitialPlot({ pairId, houseId = null, nowMs = Date.now() }) {
     jobs: [],
     policy: createInitialPolicy(nowMs),
     approvals: [],
-    meta: normalizeMeta({})
+    meta: normalizeMeta({ schemaVersion: FOUNDERS_PLOT_SCHEMA_VERSION })
   };
 }
 
-function normalizeLoadedState(raw) {
+function loadedStateSchemaVersion(raw) {
+  if (!raw || typeof raw !== 'object') return 0;
+  const meta = raw.meta && typeof raw.meta === 'object' ? raw.meta : {};
+  return normalizeSchemaVersion(meta.schemaVersion, 0);
+}
+
+function migrateStateV0ToV1(raw) {
+  const next = raw && typeof raw === 'object' ? copyJson(raw) : {};
+  const meta = next.meta && typeof next.meta === 'object' ? next.meta : {};
+  meta.extensions = collectMetaExtensions(meta);
+  meta.schemaVersion = FOUNDERS_PLOT_SCHEMA_VERSION;
+  next.meta = meta;
+  return next;
+}
+
+function prepareLoadedState(raw) {
+  if (!raw || typeof raw !== 'object') {
+    return {
+      state: null,
+      migrated: false,
+      fromVersion: 0,
+      toVersion: FOUNDERS_PLOT_SCHEMA_VERSION
+    };
+  }
+  let migratedRaw = copyJson(raw);
+  const fromVersion = loadedStateSchemaVersion(migratedRaw);
+  let toVersion = fromVersion;
+  if (toVersion < 1) {
+    migratedRaw = migrateStateV0ToV1(migratedRaw);
+    toVersion = FOUNDERS_PLOT_SCHEMA_VERSION;
+  }
+  return {
+    state: normalizeLoadedStateObject(migratedRaw),
+    migrated: toVersion !== fromVersion,
+    fromVersion,
+    toVersion
+  };
+}
+
+function normalizeLoadedStateObject(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const plot = raw.plot && typeof raw.plot === 'object' ? raw.plot : {};
   const hqLevel = Math.min(5, Math.max(1, Math.floor(Number(plot.hqLevel || 1) || 1)));
@@ -433,6 +513,10 @@ function normalizeLoadedState(raw) {
     })).filter((approval) => approval.approvalId) : [],
     meta: normalizeMeta(raw.meta)
   };
+}
+
+function normalizeLoadedState(raw) {
+  return prepareLoadedState(raw).state;
 }
 
 function getHqBuilding(state) {
@@ -1026,6 +1110,7 @@ function stateHashPayload(state) {
       emergencyPause: state.policy.emergencyPause
     },
     meta: {
+      schemaVersion: state.meta.schemaVersion,
       workshopBuffCharges: state.meta.workshopBuffCharges,
       pendingRewards: state.meta.pendingRewards.map((reward) => ({ key: reward.key, type: reward.type, grant: reward.grant })),
       claimedRewards: state.meta.claimedRewards,
@@ -1086,6 +1171,9 @@ function stateView(state, recentEvents = []) {
     progress: {
       currentLevel: state.plot.hqLevel,
       next: progressToNextHq(state)
+    },
+    compatibility: {
+      schemaVersion: state.meta.schemaVersion
     },
     stateHash: stateHash(stateHashPayload(state))
   };
@@ -1888,6 +1976,7 @@ module.exports = {
   BUILDING_TYPES,
   DEFAULT_POLICY,
   EVENT_TYPES,
+  FOUNDERS_PLOT_SCHEMA_VERSION,
   HQ_UPGRADE_RULES,
   MAX_OFFLINE_MS,
   PERMISSION_RULES,
@@ -1909,6 +1998,7 @@ module.exports = {
   getHqBuilding,
   nextQuest,
   normalizeLoadedState,
+  prepareLoadedState,
   pendingApprovalsView,
   recommendationText,
   requireApprovedAction,

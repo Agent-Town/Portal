@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
 const { getStorePath } = require('../store');
-const { normalizeLoadedState } = require('./engine');
+const { prepareLoadedState } = require('./engine');
 
 let db = null;
 let statements = null;
@@ -388,7 +388,7 @@ function loadPlotGraphById(plotId) {
   const plotRow = statements.plotById.get(plotId);
   if (!plotRow) return null;
   const plot = mapPlotRow(plotRow);
-  const state = normalizeLoadedState({
+  const prepared = prepareLoadedState({
     plot,
     buildings: statements.listBuildingsForPlot.all(plotId).map(mapBuildingRow),
     jobs: statements.listJobsForPlot.all(plotId).map(mapJobRow),
@@ -396,6 +396,10 @@ function loadPlotGraphById(plotId) {
     approvals: statements.listApprovalsForPlot.all(plotId).map(mapApprovalRow),
     meta: parseJsonObject(plotRow.meta_json, {})
   });
+  const state = prepared.state;
+  if (prepared.migrated && state?.plot?.plotId) {
+    savePlotGraph(state);
+  }
   return state;
 }
 

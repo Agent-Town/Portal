@@ -355,10 +355,18 @@ Response shape:
       "currentLevel": 1,
       "next": { "xpCurrent": 0, "xpRequired": 15, "ratio": 0, "cost": { "wood": 20 } }
     },
+    "compatibility": {
+      "schemaVersion": 1
+    },
     "stateHash": "<sha256 hex>"
   }
 }
 ```
+
+Compatibility notes:
+- `state.compatibility.schemaVersion` is the canonical persisted save-schema version for the loaded plot.
+- Older saves may be migrated forward on read before the state snapshot is returned.
+- Additive metadata that current gameplay does not interpret must survive persistence under internal `meta.extensions`; loaders must not silently drop it.
 
 ### POST `/api/founders-plot/tool/:toolName`
 Executes one typed Founders Plot tool for the current plot identity.

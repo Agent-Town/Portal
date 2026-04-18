@@ -51,6 +51,7 @@ test('worker tools enforce approval boundaries and preserve idempotent Founders 
   expect(initialState.envelope?.ok).toBe(true);
   expect(initialState.envelope?.data?.state?.plot?.hqLevel).toBe(1);
   expect(initialState.envelope?.data?.state?.quest?.title).toBeTruthy();
+  expect(initialState.envelope?.data?.state?.compatibility?.schemaVersion).toBe(1);
 
   const blockedPlace = await invokeWorkerTool(page, 'et.plot.place_building', {
     type: 'LUMBER_CAMP',
