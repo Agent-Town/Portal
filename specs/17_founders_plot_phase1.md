@@ -1,5 +1,6 @@
 
 # Agent Town — Founders Plot Phase 1 Specification
+> Implementation note: the follow-on Founders Plot V1.1 sprint is defined by [18_founders_plot_v1_1_refined.md](/specs/18_founders_plot_v1_1_refined.md), [18_founders_plot_v1_1_tdd_acceptance_matrix.md](/specs/18_founders_plot_v1_1_tdd_acceptance_matrix.md), and [19_founders_plot_future_specs_backlog.md](/specs/19_founders_plot_future_specs_backlog.md). Treat those refined P0/P1/P2 boundaries as canonical for the next sprint.
 ## Human + Agent Collaboration City-Builder Slice
 **Version:** v1.0 working draft  
 **Date:** 2026-04-17  

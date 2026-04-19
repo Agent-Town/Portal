@@ -4,6 +4,7 @@ const {
   BUILDING_RULES,
   EVENT_TYPES,
   MAX_OFFLINE_MS,
+  applyAcceptContract,
   applyClaimReward,
   applyCollectOutputs,
   applyPlaceBuilding,
@@ -11,14 +12,28 @@ const {
   applyQueueJob,
   applyRequestUserApproval,
   applyResolveApproval,
+  applyResumeScheduler,
+  applyPauseScheduler,
+  applyEnableCollectReadyOutputs,
+  applyReceiptCorrection,
+  applySetStandingOrder,
   applySetPriority,
+  applyTurnInContract,
   applyUpgradeBuilding,
+  buildForemanObservation,
+  buildSafeForemanCandidates,
   buildWorldDelta,
+  chooseForemanCandidateWithTestBrain,
   createInitialPlot,
-  nextQuest,
+  foremanRuntimeStatus,
   pendingApprovalsView,
+  resolvePrimaryGoal,
+  schedulerStatusView,
   simulatePlot,
+  startForemanSession,
   stateView,
+  heartbeatForemanSession,
+  pauseForemanSession,
   summarizePublic
 } = require('./engine');
 const {
@@ -99,7 +114,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         houseId: identity.houseId || null,
         nowMs
       });
-      state.meta.publicHeadline = nextQuest(state).title;
+      state.meta.publicHeadline = resolvePrimaryGoal(state, { nowMs }).title;
       savePlotGraph(state);
       appendEvents(state.plot.plotId, [
         {
@@ -125,8 +140,10 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       state.plot.updatedAt = nowMs;
       savePlotGraph(state);
     }
-    if (!state.meta.publicHeadline) {
-      state.meta.publicHeadline = nextQuest(state).title;
+    const contractsBefore = hashJson(state.meta.contracts || {});
+    const headline = resolvePrimaryGoal(state, { nowMs }).title;
+    if (!state.meta.publicHeadline || state.meta.publicHeadline !== headline || contractsBefore !== hashJson(state.meta.contracts || {})) {
+      state.meta.publicHeadline = headline;
       savePlotGraph(state);
     }
     return state;
@@ -163,6 +180,44 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         pendingApprovals: pendingApprovalsView(state)
       }
     };
+  }
+
+  function persistStateAndEvents(state, events = []) {
+    savePlotGraph(state);
+    if (Array.isArray(events) && events.length > 0) {
+      return appendEvents(state.plot.plotId, events);
+    }
+    return [];
+  }
+
+  function readForemanBearer(req) {
+    const auth = String(req.headers?.authorization || '').trim();
+    if (!auth || !/^Bearer\s+/i.test(auth)) return '';
+    return auth.replace(/^Bearer\s+/i, '').trim();
+  }
+
+  function requireForemanRuntime(req, res) {
+    const { state, nowMs } = withState(req, res);
+    const token = readForemanBearer(req);
+    const runtime = foremanRuntimeStatus(state);
+    if (!token || !runtime?.token || token !== runtime.token) {
+      const error = new Error('FOREMAN_RUNTIME_REQUIRED');
+      error.details = { reason: 'TOKEN_REQUIRED' };
+      throw error;
+    }
+    if (runtime.status === 'PAUSED') {
+      const error = new Error('STALE_RUNTIME');
+      error.details = { runtimeId: runtime.runtimeId, status: runtime.status };
+      throw error;
+    }
+    if (runtime.expiresAt && runtime.expiresAt < nowMs) {
+      runtime.status = 'STALE';
+      savePlotGraph(state);
+      const error = new Error('STALE_RUNTIME');
+      error.details = { runtimeId: runtime.runtimeId, status: runtime.status };
+      throw error;
+    }
+    return { state, nowMs, runtime };
   }
 
   function withState(req, res) {
@@ -233,6 +288,19 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
     }
 
     try {
+      const rawArgs = req.body && typeof req.body === 'object' ? req.body : {};
+      if (String(rawArgs.actor || '').trim().toUpperCase() === 'AGENT') {
+        return res.status(403).json(makeToolEnvelope({
+          ok: false,
+          error: {
+            code: 'ACTOR_SPOOF_REJECTED',
+            message: 'Agent actions must come through the Foreman runtime route.',
+            retryable: false,
+            details: {}
+          },
+          worldDelta: null
+        }));
+      }
       if (toolName === 'et.plot.get_state') {
         const { state } = withState(req, res);
         return res.json(makeToolEnvelope({
@@ -244,8 +312,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         }));
       }
 
-      const rawArgs = req.body && typeof req.body === 'object' ? req.body : {};
-      const actor = String(rawArgs.actor || 'HUMAN').trim().toUpperCase() === 'AGENT' ? 'AGENT' : 'HUMAN';
+      const actor = 'HUMAN';
       const ctx = mutationContext(req, res, toolName, rawArgs);
       if (ctx.replayResponse) {
         return res.json(ctx.replayResponse);
@@ -303,6 +370,42 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
           body: typeof rawArgs.body === 'string' ? rawArgs.body.trim() : '',
           payload: rawArgs.payload && typeof rawArgs.payload === 'object' ? rawArgs.payload : {}
         }, mutationHelpers);
+      } else if (toolName === 'et.plot.contracts.get_state') {
+        data = {
+          contracts: buildStatePayload(ctx.state).contracts
+        };
+      } else if (toolName === 'et.plot.contracts.accept') {
+        data = applyAcceptContract(ctx.state, {
+          contractId: String(rawArgs.contractId || '').trim()
+        }, mutationHelpers);
+      } else if (toolName === 'et.plot.contracts.turn_in') {
+        data = applyTurnInContract(ctx.state, {
+          contractId: String(rawArgs.contractId || '').trim()
+        }, mutationHelpers);
+      } else if (toolName === 'et.foreman.policy.get_standing_order') {
+        data = {
+          standingOrder: buildStatePayload(ctx.state).foreman?.standingOrder
+        };
+      } else if (toolName === 'et.foreman.policy.set_standing_order') {
+        data = applySetStandingOrder(ctx.state, {
+          standingOrder: String(rawArgs.standingOrder || '').trim()
+        }, mutationHelpers);
+      } else if (toolName === 'et.foreman.scheduler.get_status') {
+        data = {
+          scheduler: schedulerStatusView(ctx.state)
+        };
+      } else if (toolName === 'et.foreman.scheduler.enable_collect_ready_outputs') {
+        data = {
+          scheduler: applyEnableCollectReadyOutputs(ctx.state, mutationHelpers)
+        };
+      } else if (toolName === 'et.foreman.scheduler.pause') {
+        data = {
+          scheduler: applyPauseScheduler(ctx.state, mutationHelpers)
+        };
+      } else if (toolName === 'et.foreman.scheduler.resume') {
+        data = {
+          scheduler: applyResumeScheduler(ctx.state, mutationHelpers)
+        };
       } else {
         const error = new Error('INVALID_STATE');
         error.details = { tool: toolName };
@@ -326,9 +429,9 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         ? 401
         : normalized.code === 'OUT_OF_BOUNDS' || normalized.code === 'INVALID_STATE'
           ? 400
-          : normalized.code === 'OUT_OF_RESOURCES' || normalized.code === 'FORBIDDEN_POLICY'
+          : normalized.code === 'OUT_OF_RESOURCES' || normalized.code === 'FORBIDDEN_POLICY' || normalized.code === 'ACTOR_SPOOF_REJECTED' || normalized.code === 'FOREMAN_RUNTIME_REQUIRED' || normalized.code === 'STALE_RUNTIME'
             ? 403
-            : normalized.code === 'BUILD_SLOT_OCCUPIED' || normalized.code === 'JOB_ALREADY_RUNNING' || normalized.code === 'IDEMPOTENCY_CONFLICT'
+            : normalized.code === 'BUILD_SLOT_OCCUPIED' || normalized.code === 'JOB_ALREADY_RUNNING' || normalized.code === 'IDEMPOTENCY_CONFLICT' || normalized.code === 'CONTRACT_ACTIVE_EXISTS'
               ? 409
               : normalized.code === 'RATE_LIMITED'
                 ? 429
@@ -437,7 +540,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         afterSeq: 0,
         limit: 5000
       });
-      const replay = replayFromEvents(events);
+      const replay = replayFromEvents(events, state);
       res.json({
         ok: true,
         replay,
@@ -511,6 +614,378 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         error: normalized.code,
         details: normalized.details
       });
+    }
+  });
+
+  router.get('/api/founders-plot/contracts/state', (req, res) => {
+    try {
+      const { state } = withState(req, res);
+      res.json({
+        ok: true,
+        contracts: buildStatePayload(state).contracts
+      });
+    } catch (error) {
+      const normalized = normalizeToolError(error);
+      res.status(normalized.code === 'UNAUTHORIZED' ? 401 : 500).json({
+        ok: false,
+        error: normalized
+      });
+    }
+  });
+
+  router.post('/api/founders-plot/contracts/accept', (req, res) => {
+    try {
+      const rawArgs = req.body && typeof req.body === 'object' ? req.body : {};
+      const ctx = mutationContext(req, res, 'et.plot.contracts.accept', rawArgs);
+      if (ctx.replayResponse) return res.json(ctx.replayResponse);
+      const events = [];
+      const result = applyAcceptContract(ctx.state, {
+        contractId: String(rawArgs.contractId || '').trim()
+      }, {
+        nowMs: ctx.nowMs,
+        appendEvent: (event) => events.push({ ...event, createdAt: event.createdAt || ctx.nowMs })
+      });
+      const payload = {
+        ok: true,
+        contract: result.contract,
+        state: buildStatePayload(ctx.state)
+      };
+      persistMutation(ctx.state, 'et.plot.contracts.accept', ctx.idempotencyKey, ctx.argsHash, payload, events);
+      res.json(payload);
+    } catch (error) {
+      const normalized = normalizeToolError(error);
+      res.status(normalized.code === 'CONTRACT_ACTIVE_EXISTS' ? 409 : 400).json({
+        ok: false,
+        error: normalized
+      });
+    }
+  });
+
+  router.post('/api/founders-plot/contracts/turn-in', (req, res) => {
+    try {
+      const rawArgs = req.body && typeof req.body === 'object' ? req.body : {};
+      const ctx = mutationContext(req, res, 'et.plot.contracts.turn_in', rawArgs);
+      if (ctx.replayResponse) return res.json(ctx.replayResponse);
+      const events = [];
+      const result = applyTurnInContract(ctx.state, {
+        contractId: String(rawArgs.contractId || '').trim()
+      }, {
+        nowMs: ctx.nowMs,
+        appendEvent: (event) => events.push({ ...event, createdAt: event.createdAt || ctx.nowMs })
+      });
+      const payload = {
+        ok: true,
+        contract: result.contract,
+        state: buildStatePayload(ctx.state)
+      };
+      persistMutation(ctx.state, 'et.plot.contracts.turn_in', ctx.idempotencyKey, ctx.argsHash, payload, events);
+      res.json(payload);
+    } catch (error) {
+      const normalized = normalizeToolError(error);
+      res.status(400).json({
+        ok: false,
+        error: normalized
+      });
+    }
+  });
+
+  router.post('/api/founders-plot/foreman/session/start', (req, res) => {
+    try {
+      const { state, nowMs } = withState(req, res);
+      const raw = req.body && typeof req.body === 'object' ? req.body : {};
+      const runtime = startForemanSession(state, {
+        runtimeId: String(raw.runtimeId || '').trim(),
+        nowMs,
+        pack: {
+          skillLoaded: raw?.pack?.skillLoaded === true,
+          toolsLoaded: raw?.pack?.toolsLoaded === true,
+          goalsLoaded: raw?.pack?.goalsLoaded === true
+        }
+      });
+      state.plot.updatedAt = nowMs;
+      persistStateAndEvents(state, [
+        {
+          type: EVENT_TYPES.FOREMAN_SESSION_STARTED,
+          actor: 'SYSTEM',
+          explanation: 'Foreman runtime session started.',
+          recapLine: '',
+          data: {
+            runtimeId: runtime.runtimeId,
+            foremanSessionId: runtime.sessionId
+          },
+          createdAt: nowMs
+        }
+      ]);
+      res.json({
+        ok: true,
+        runtime
+      });
+    } catch (error) {
+      const normalized = normalizeToolError(error);
+      res.status(500).json({ ok: false, error: normalized });
+    }
+  });
+
+  router.post('/api/founders-plot/foreman/session/heartbeat', (req, res) => {
+    try {
+      const { state, nowMs, runtime } = requireForemanRuntime(req, res);
+      const raw = req.body && typeof req.body === 'object' ? req.body : {};
+      const updated = heartbeatForemanSession(state, {
+        nowMs,
+        pack: raw.pack && typeof raw.pack === 'object' ? raw.pack : {}
+      });
+      persistStateAndEvents(state, []);
+      res.json({
+        ok: true,
+        runtime: {
+          ...updated,
+          token: runtime.token
+        }
+      });
+    } catch (error) {
+      const normalized = normalizeToolError(error);
+      res.status(403).json({ ok: false, error: normalized });
+    }
+  });
+
+  router.post('/api/founders-plot/foreman/session/pause', (req, res) => {
+    try {
+      const { state, nowMs } = requireForemanRuntime(req, res);
+      const paused = pauseForemanSession(state, { nowMs });
+      persistStateAndEvents(state, [
+        {
+          type: EVENT_TYPES.FOREMAN_SESSION_PAUSED,
+          actor: 'HUMAN',
+          explanation: 'Foreman runtime paused.',
+          recapLine: 'Foreman paused.',
+          data: {
+            runtimeId: paused.runtimeId,
+            foremanSessionId: paused.sessionId
+          },
+          createdAt: nowMs
+        }
+      ]);
+      res.json({
+        ok: true,
+        runtime: paused
+      });
+    } catch (error) {
+      const normalized = normalizeToolError(error);
+      res.status(403).json({ ok: false, error: normalized });
+    }
+  });
+
+  router.get('/api/founders-plot/foreman/observation', (req, res) => {
+    try {
+      const { state, nowMs, runtime } = requireForemanRuntime(req, res);
+      const recentEvents = listRecentEvents(state.plot.plotId, 48);
+      const observation = buildForemanObservation(state, {
+        runtimeId: runtime.runtimeId,
+        nowMs,
+        recentEvents
+      });
+      observation.claimLease = true;
+      const safeCandidates = buildSafeForemanCandidates(state, observation);
+      const decision = chooseForemanCandidateWithTestBrain({
+        observation,
+        safeCandidates
+      });
+      state.meta.foremanLastDecision = decision;
+      persistStateAndEvents(state, []);
+      res.json({
+        ok: true,
+        observation,
+        safeCandidates,
+        decision,
+        runtime: {
+          ...runtime,
+          token: undefined
+        }
+      });
+    } catch (error) {
+      const normalized = normalizeToolError(error);
+      res.status(403).json({ ok: false, error: normalized });
+    }
+  });
+
+  router.post('/api/founders-plot/foreman/tool/:toolName', (req, res) => {
+    try {
+      const toolName = String(req.params.toolName || '').trim();
+      const rawArgs = req.body && typeof req.body === 'object' ? req.body : {};
+      const { state, nowMs, runtime } = requireForemanRuntime(req, res);
+      const idempotencyKey = typeof rawArgs.idempotencyKey === 'string' ? rawArgs.idempotencyKey.trim() : '';
+      if (toolName !== 'et.plot.get_state' && !idempotencyKey) {
+        throw Object.assign(new Error('INVALID_STATE'), { details: { reason: 'MISSING_IDEMPOTENCY_KEY', tool: toolName } });
+      }
+      if (toolName === 'et.plot.get_state') {
+        return res.json({
+          ok: true,
+          data: {
+            state: buildStatePayload(state)
+          }
+        });
+      }
+
+      const argsHash = hashJson({ toolName, args: rawArgs, runtimeId: runtime.runtimeId });
+      const previous = getIdempotency(state.plot.plotId, idempotencyKey);
+      if (previous) {
+        if (previous.argsSha !== argsHash) {
+          throw Object.assign(new Error('IDEMPOTENCY_CONFLICT'), { details: { idempotencyKey, tool: toolName } });
+        }
+        return res.json(previous.response);
+      }
+
+      const eventBuffer = [];
+      const mutationHelpers = {
+        nowMs,
+        actorMeta: {
+          runtimeId: runtime.runtimeId,
+          foremanSessionId: runtime.sessionId,
+          tokenScope: ['founders_plot:tool']
+        },
+        appendEvent: (event) => eventBuffer.push({
+          ...event,
+          createdAt: event.createdAt || nowMs
+        })
+      };
+      let result = null;
+      if (toolName === 'et.plot.collect_outputs') {
+        result = applyCollectOutputs(state, {
+          actor: 'AGENT',
+          buildingId: String(rawArgs.buildingId || '').trim()
+        }, mutationHelpers);
+      } else if (toolName === 'et.plot.queue_job') {
+        result = applyQueueJob(state, {
+          actor: 'AGENT',
+          buildingId: String(rawArgs.buildingId || '').trim()
+        }, mutationHelpers);
+      } else if (toolName === 'et.plot.place_building') {
+        result = applyPlaceBuilding(state, {
+          actor: 'AGENT',
+          type: String(rawArgs.type || '').trim(),
+          x: Number(rawArgs.x),
+          y: Number(rawArgs.y),
+          approvalId: typeof rawArgs.approvalId === 'string' ? rawArgs.approvalId.trim() : null
+        }, mutationHelpers);
+      } else if (toolName === 'et.plot.upgrade_building') {
+        result = applyUpgradeBuilding(state, {
+          actor: 'AGENT',
+          buildingId: typeof rawArgs.buildingId === 'string' ? rawArgs.buildingId.trim() : null,
+          approvalId: typeof rawArgs.approvalId === 'string' ? rawArgs.approvalId.trim() : null
+        }, mutationHelpers);
+      } else {
+        throw Object.assign(new Error('INVALID_STATE'), { details: { tool: toolName } });
+      }
+
+      const lastSeq = listRecentEvents(state.plot.plotId, 1)[0]?.seq || 0;
+      const action = toolName === 'et.plot.collect_outputs' ? 'collect_ready_outputs' : toolName;
+      const receipt = {
+        receiptId: `rcpt_${crypto.randomBytes(6).toString('hex')}`,
+        action,
+        result: 'completed',
+        reason: String(state.meta.foremanLastDecision?.planCard?.reason || 'Executed the safest useful action.'),
+        authorityUsed: 'Foreman runtime token (server-authenticated)',
+        standingOrderUsed: buildStatePayload(state).foreman?.standingOrder || '',
+        correctionOptions: ['ASK_ME_NEXT_TIME', 'PAUSE_FOREMAN'],
+        createdAt: nowMs,
+        eventId: lastSeq + eventBuffer.length + 1
+      };
+      state.meta.foremanReceipts = [receipt, ...(state.meta.foremanReceipts || [])].slice(0, 12);
+      state.meta.foremanLastReceiptId = receipt.receiptId;
+      state.meta.scheduler.collectReadyOutputs.runCount += action === 'collect_ready_outputs' ? 1 : 0;
+      state.meta.scheduler.collectReadyOutputs.nextRunAtMs = nowMs + 15_000;
+      state.meta.scheduler.collectReadyOutputs.lease = {
+        runtimeId: '',
+        claimedAtMs: 0,
+        expiresAtMs: 0
+      };
+      eventBuffer.push({
+        type: EVENT_TYPES.FOREMAN_RECEIPT_CREATED,
+        actor: 'SYSTEM',
+        explanation: `Foreman receipt created for ${action}.`,
+        recapLine: '',
+        data: {
+          receipt
+        },
+        createdAt: nowMs
+      });
+      const payload = {
+        ok: true,
+        result: {
+          mutationApplied: true
+        },
+        receipt,
+        state: buildStatePayload(state)
+      };
+      saveIdempotency(state.plot.plotId, idempotencyKey, {
+        tool: toolName,
+        argsSha: argsHash,
+        response: payload,
+        createdAt: nowMs
+      });
+      const insertedEvents = persistStateAndEvents(state, eventBuffer);
+      const receiptEvent = insertedEvents.find((event) => event.type === EVENT_TYPES.FOREMAN_RECEIPT_CREATED) || null;
+      if (receiptEvent && state.meta.foremanReceipts[0]) {
+        state.meta.foremanReceipts[0].eventId = receiptEvent.seq;
+        payload.receipt.eventId = receiptEvent.seq;
+        payload.state = buildStatePayload(state);
+        savePlotGraph(state);
+      }
+      res.json(payload);
+    } catch (error) {
+      const normalized = normalizeToolError(error);
+      const status = normalized.code === 'FOREMAN_RUNTIME_REQUIRED' || normalized.code === 'STALE_RUNTIME'
+        ? 403
+        : normalized.code === 'IDEMPOTENCY_CONFLICT'
+          ? 409
+          : 400;
+      res.status(status).json({ ok: false, error: normalized });
+    }
+  });
+
+  router.post('/api/founders-plot/foreman/receipt/correction', (req, res) => {
+    try {
+      const { state, nowMs } = withState(req, res);
+      const raw = req.body && typeof req.body === 'object' ? req.body : {};
+      const result = applyReceiptCorrection(state, {
+        correction: String(raw.correction || '').trim()
+      }, { nowMs });
+      const correction = String(raw.correction || '').trim().toUpperCase();
+      const events = [];
+      if (correction === 'ASK_ME_NEXT_TIME') {
+        events.push({
+          type: EVENT_TYPES.SCHEDULER_PAUSED,
+          actor: 'HUMAN',
+          explanation: 'The player asked the Foreman to ask next time before repeating this automation.',
+          recapLine: 'Foreman auto-collect was told to ask next time.',
+          data: {
+            correction,
+            scheduler: schedulerStatusView(state)
+          },
+          createdAt: nowMs
+        });
+      } else if (correction === 'PAUSE_FOREMAN') {
+        events.push({
+          type: EVENT_TYPES.FOREMAN_SESSION_PAUSED,
+          actor: 'HUMAN',
+          explanation: 'The player paused the Foreman from the latest receipt controls.',
+          recapLine: 'Foreman paused from the latest receipt.',
+          data: {
+            correction,
+            runtime: foremanRuntimeStatus(state)
+          },
+          createdAt: nowMs
+        });
+      }
+      persistStateAndEvents(state, events);
+      res.json({
+        ok: true,
+        result,
+        state: buildStatePayload(state)
+      });
+    } catch (error) {
+      const normalized = normalizeToolError(error);
+      res.status(400).json({ ok: false, error: normalized });
     }
   });
 

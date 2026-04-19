@@ -78,6 +78,8 @@
     if (!panel) return;
     syncPanelLayout(panel);
     schedulePanelLayoutSync(panel);
+    setTimeout(() => schedulePanelLayoutSync(panel), 50);
+    setTimeout(() => schedulePanelLayoutSync(panel), 250);
     if (typeof ResizeObserver === 'function') {
       if (!panelLayoutObserver) {
         panelLayoutObserver = new ResizeObserver(() => {

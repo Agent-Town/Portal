@@ -48070,7 +48070,6 @@ async function runFoundersPlotTool(params, toolName) {
     const payload = normalizedToolName === "et.plot.get_state" ? await apiJson("/api/founders-plot/state", { method: "GET" }) : await apiJson(`/api/founders-plot/tool/${encodeURIComponent(normalizedToolName)}`, {
       method: "POST",
       body: JSON.stringify({
-        actor: "AGENT",
         ...safeParams
       })
     });
@@ -49370,6 +49369,60 @@ var LITE_TOOL_SPECS = [
     sampleArgs: { tool: "et.plot.place_building", title: "Approve new building", body: "Allow the foreman to place a Lumber Camp.", payload: { type: "LUMBER_CAMP", x: 1, y: 0 }, idempotencyKey: "approval_place_lumber" }
   },
   {
+    name: "et.plot.contracts.get_state",
+    label: "Founders Plot Contract State",
+    description: "Read the living Contract Board for the active Founders Plot.",
+    sampleArgs: {}
+  },
+  {
+    name: "et.plot.contracts.accept",
+    label: "Founders Plot Accept Contract",
+    description: "Accept one offered Founders Plot contract.",
+    sampleArgs: { contractId: "con_supply_001", idempotencyKey: "contract_accept_supply_001" }
+  },
+  {
+    name: "et.plot.contracts.turn_in",
+    label: "Founders Plot Turn In Contract",
+    description: "Turn in one ready Founders Plot contract.",
+    sampleArgs: { contractId: "con_supply_001", idempotencyKey: "contract_turn_in_supply_001" }
+  },
+  {
+    name: "et.foreman.policy.get_standing_order",
+    label: "Founders Plot Get Standing Order",
+    description: "Read Clover's current Standing Order.",
+    sampleArgs: {}
+  },
+  {
+    name: "et.foreman.policy.set_standing_order",
+    label: "Founders Plot Set Standing Order",
+    description: "Set Clover to Careful Steward or Bold Founder.",
+    sampleArgs: { standingOrder: "CAREFUL_STEWARD", idempotencyKey: "standing_order_careful" }
+  },
+  {
+    name: "et.foreman.scheduler.get_status",
+    label: "Founders Plot Scheduler Status",
+    description: "Read the Collect ready outputs preset status.",
+    sampleArgs: {}
+  },
+  {
+    name: "et.foreman.scheduler.enable_collect_ready_outputs",
+    label: "Founders Plot Enable Collect Ready Outputs",
+    description: "Enable the one shipped V1.1 Foreman routine.",
+    sampleArgs: { idempotencyKey: "scheduler_enable_collect_ready" }
+  },
+  {
+    name: "et.foreman.scheduler.pause",
+    label: "Founders Plot Pause Scheduler",
+    description: "Pause Clover's Collect ready outputs routine.",
+    sampleArgs: { idempotencyKey: "scheduler_pause_collect_ready" }
+  },
+  {
+    name: "et.foreman.scheduler.resume",
+    label: "Founders Plot Resume Scheduler",
+    description: "Resume Clover's Collect ready outputs routine.",
+    sampleArgs: { idempotencyKey: "scheduler_resume_collect_ready" }
+  },
+  {
     name: "agent_town_ui_open_modal",
     label: "Agent Town UI Open Modal",
     description: "Opens a whitelisted app modal without route replacement.",
@@ -49702,7 +49755,16 @@ async function dispatchLiteTool(name, params, _signal, _onUpdate, toolCallId = n
     case "et.plot.upgrade_building":
     case "et.plot.set_priority":
     case "et.plot.claim_reward":
-    case "et.plot.request_user_approval": {
+    case "et.plot.request_user_approval":
+    case "et.plot.contracts.get_state":
+    case "et.plot.contracts.accept":
+    case "et.plot.contracts.turn_in":
+    case "et.foreman.policy.get_standing_order":
+    case "et.foreman.policy.set_standing_order":
+    case "et.foreman.scheduler.get_status":
+    case "et.foreman.scheduler.enable_collect_ready_outputs":
+    case "et.foreman.scheduler.pause":
+    case "et.foreman.scheduler.resume": {
       const envelope = await runFoundersPlotTool(params || {}, normalizedName);
       return envelopeToToolResult(envelope, normalizedName);
     }

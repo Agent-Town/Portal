@@ -123,6 +123,117 @@ const FOUNDERS_PLOT_TOOL_SPECS = [
       additionalProperties: false
     },
     resultSchema: { type: 'object' }
+  },
+  {
+    name: 'et.plot.contracts.get_state',
+    description: 'Return the Contract Board state for the current Founders Plot.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      additionalProperties: false
+    },
+    resultSchema: { type: 'object' }
+  },
+  {
+    name: 'et.plot.contracts.accept',
+    description: 'Accept one offered Founders Plot contract.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        contractId: { type: 'string' },
+        idempotencyKey: { type: 'string' }
+      },
+      required: ['contractId', 'idempotencyKey'],
+      additionalProperties: false
+    },
+    resultSchema: { type: 'object' }
+  },
+  {
+    name: 'et.plot.contracts.turn_in',
+    description: 'Turn in one ready Founders Plot contract.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        contractId: { type: 'string' },
+        idempotencyKey: { type: 'string' }
+      },
+      required: ['contractId', 'idempotencyKey'],
+      additionalProperties: false
+    },
+    resultSchema: { type: 'object' }
+  },
+  {
+    name: 'et.foreman.policy.get_standing_order',
+    description: 'Get the current Foreman standing order.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      additionalProperties: false
+    },
+    resultSchema: { type: 'object' }
+  },
+  {
+    name: 'et.foreman.policy.set_standing_order',
+    description: 'Set the Foreman standing order to Careful Steward or Bold Founder.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        standingOrder: { type: 'string', enum: ['CAREFUL_STEWARD', 'BOLD_FOUNDER'] },
+        idempotencyKey: { type: 'string' }
+      },
+      required: ['standingOrder', 'idempotencyKey'],
+      additionalProperties: false
+    },
+    resultSchema: { type: 'object' }
+  },
+  {
+    name: 'et.foreman.scheduler.get_status',
+    description: 'Return the current Founders Plot scheduler status.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      additionalProperties: false
+    },
+    resultSchema: { type: 'object' }
+  },
+  {
+    name: 'et.foreman.scheduler.enable_collect_ready_outputs',
+    description: 'Enable the one supported V1.1 scheduler preset: collect ready outputs.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        idempotencyKey: { type: 'string' }
+      },
+      required: ['idempotencyKey'],
+      additionalProperties: false
+    },
+    resultSchema: { type: 'object' }
+  },
+  {
+    name: 'et.foreman.scheduler.pause',
+    description: 'Pause the active Foreman scheduler preset.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        idempotencyKey: { type: 'string' }
+      },
+      required: ['idempotencyKey'],
+      additionalProperties: false
+    },
+    resultSchema: { type: 'object' }
+  },
+  {
+    name: 'et.foreman.scheduler.resume',
+    description: 'Resume the active Foreman scheduler preset.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        idempotencyKey: { type: 'string' }
+      },
+      required: ['idempotencyKey'],
+      additionalProperties: false
+    },
+    resultSchema: { type: 'object' }
   }
 ];
 

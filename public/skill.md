@@ -303,13 +303,35 @@ After the house/founders opening sequence, the next district is **Founders Plot*
   - Claims a pending recap/level reward.
 - `et.plot.request_user_approval`
   - Creates a visible approval card instead of forcing a sensitive action.
+- `et.plot.contracts.get_state`
+  - Reads the living Contract Board with current offers, active contract, and completed requests.
+- `et.plot.contracts.accept`
+  - Accepts one `SUPPLY` or `BUILD` contract. Only one contract may be active.
+- `et.plot.contracts.turn_in`
+  - Turns in the active contract once it is ready.
+- `et.foreman.policy.get_standing_order`
+  - Reads Clover's current Standing Order.
+- `et.foreman.policy.set_standing_order`
+  - Sets Clover to `CAREFUL_STEWARD` or `BOLD_FOUNDER`.
+- `et.foreman.scheduler.get_status`
+  - Reads the Collect ready outputs preset state.
+- `et.foreman.scheduler.enable_collect_ready_outputs`
+  - Enables the one shipped V1.1 automatic routine.
+- `et.foreman.scheduler.pause`
+  - Pauses the shipped Collect ready outputs routine.
+- `et.foreman.scheduler.resume`
+  - Resumes the shipped Collect ready outputs routine.
 
 ### Founders Plot behavior rules
 
 - Observe first with `et.plot.get_state`.
+- Respect the Current Goal and the Standing Order before choosing a mutation.
+- Use the Contract Board as the first civic choice after HQ2.
 - If policy blocks the action, request approval instead of simulating success.
 - Mutation tools require `idempotencyKey`; provide one when you call them.
 - Treat `FORBIDDEN_POLICY`, `OUT_OF_RESOURCES`, `BUILD_SLOT_OCCUPIED`, and `JOB_ALREADY_RUNNING` as real world-state blockers, not prompt wording.
+- Never try to spoof the Foreman by sending `actor: "AGENT"` on the human route.
+- Use the Foreman-authenticated route only when the runtime session actually exists.
 - Use recap lines and the current quest to explain why you acted.
 
 ### UI intent policy

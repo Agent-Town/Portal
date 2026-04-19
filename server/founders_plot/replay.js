@@ -1,126 +1,79 @@
 const {
-  AUTONOMY_TIER_BY_POLICY,
-  DEFAULT_POLICY,
-  FOUNDERS_PLOT_SCHEMA_VERSION,
   stateHash,
   stateHashPayload
 } = require('./engine');
 
-function replayFromEvents(events = []) {
-  const plot = {};
-  const buildings = new Map();
-  const jobs = new Map();
-  const approvals = new Map();
-  const policy = {
-    observeAndSuggest: DEFAULT_POLICY.observeAndSuggest,
-    collectOutputs: DEFAULT_POLICY.collectOutputs,
-    queueProduction: DEFAULT_POLICY.queueProduction,
-    setPriority: DEFAULT_POLICY.setPriority,
-    sellSurplusFood: DEFAULT_POLICY.sellSurplusFood,
-    sellDailyCoinCap: DEFAULT_POLICY.sellDailyCoinCap,
-    maxAutonomousActionsPerHour: DEFAULT_POLICY.maxAutonomousActionsPerHour,
-    emergencyPause: DEFAULT_POLICY.emergencyPause
+function normalizeReplayEvent(event) {
+  return {
+    seq: event?.seq,
+    type: event?.type,
+    actor: event?.actor,
+    createdAt: event?.createdAt,
+    explanation: event?.explanation || '',
+    recapLine: event?.recapLine || '',
+    data: event && typeof event.data === 'object' ? event.data : {}
   };
-  const meta = {
-    schemaVersion: FOUNDERS_PLOT_SCHEMA_VERSION,
-    workshopBuffCharges: 0,
-    pendingRewards: [],
-    claimedRewards: [],
-    firstPlacedTypes: [],
-    firstCollectedTypes: [],
-    automationAwards: []
-  };
+}
 
-  for (const event of Array.isArray(events) ? events : []) {
-    const data = event && typeof event.data === 'object' ? event.data : {};
-    if (data.plot && typeof data.plot === 'object') {
-      Object.assign(plot, data.plot);
-      if (Array.isArray(data.plot.pendingRewards)) {
-        meta.pendingRewards = data.plot.pendingRewards;
-      }
-      if (typeof data.plot.workshopBuffCharges === 'number') {
-        meta.workshopBuffCharges = data.plot.workshopBuffCharges;
-      }
-    }
-    if (data.building && typeof data.building === 'object' && data.building.buildingId) {
-      buildings.set(data.building.buildingId, { ...data.building });
-    }
-    if (data.job && typeof data.job === 'object' && data.job.jobId) {
-      jobs.set(data.job.jobId, { ...data.job });
-    }
-    if (data.approval && typeof data.approval === 'object' && data.approval.approvalId) {
-      approvals.set(data.approval.approvalId, { ...data.approval });
-    }
-    if (data.policy && typeof data.policy === 'object' && data.policy.key) {
-      if (Object.prototype.hasOwnProperty.call(policy, data.policy.key)) {
-        policy[data.policy.key] = data.policy.value;
-      }
-      const automationTier = AUTONOMY_TIER_BY_POLICY[data.policy.key];
-      if (automationTier && !meta.automationAwards.includes(automationTier)) {
-        meta.automationAwards.push(automationTier);
-      }
-    }
-    if (data.reward && typeof data.reward === 'object' && data.reward.key) {
-      meta.claimedRewards = [...meta.claimedRewards, data.reward.key];
-      meta.pendingRewards = meta.pendingRewards.filter((reward) => reward.key !== data.reward.key);
-    }
-    if (event?.type === 'BUILDING_PLACED' && data.building?.type && data.building.type !== 'HQ') {
-      if (!meta.firstPlacedTypes.includes(data.building.type)) {
-        meta.firstPlacedTypes.push(data.building.type);
-      }
-    }
-    if (event?.type === 'OUTPUT_COLLECTED' && data.building?.buildingId) {
-      for (const job of jobs.values()) {
-        if (
-          job.buildingId === data.building.buildingId
-          && job.status === 'COMPLETED'
-          && (job.kind === 'PRODUCE' || job.kind === 'SELL')
-        ) {
-          job.status = 'CLAIMED';
-        }
-      }
-    }
-    if (event?.type === 'OUTPUT_COLLECTED' && data.building?.type && data.building.type !== 'HQ') {
-      if (!meta.firstCollectedTypes.includes(data.building.type)) {
-        meta.firstCollectedTypes.push(data.building.type);
-      }
-    }
-  }
-
-  const finalState = {
-    plot,
-    buildings: Array.from(buildings.values()).sort((a, b) => {
-      if (a.type < b.type) return -1;
-      if (a.type > b.type) return 1;
-      return String(a.buildingId || '').localeCompare(String(b.buildingId || ''));
-    }),
-    jobs: Array.from(jobs.values()).sort((a, b) => {
-      if (a.startedAt !== b.startedAt) return a.startedAt - b.startedAt;
-      return String(a.jobId || '').localeCompare(String(b.jobId || ''));
-    }),
-    approvals: Array.from(approvals.values()).sort((a, b) => {
-      if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt;
-      return String(a.approvalId || '').localeCompare(String(b.approvalId || ''));
-    }),
-    policy,
-    meta
+function initialStateFromEvents(events = []) {
+  const created = (Array.isArray(events) ? events : []).find((event) => event?.type === 'PLOT_CREATED') || null;
+  const data = created?.data && typeof created.data === 'object' ? created.data : {};
+  return {
+    plot: data.plot && typeof data.plot === 'object' ? data.plot : {},
+    building: data.building && typeof data.building === 'object' ? data.building : null
   };
+}
+
+function actionLogFixtureFromEvents(events = [], currentState = null) {
+  const normalizedEvents = Array.isArray(events) ? events.map((event) => normalizeReplayEvent(event)) : [];
+  const originMs = normalizedEvents[0]?.createdAt || 0;
+  let previousCreatedAt = originMs;
+  return {
+    fixtureId: currentState?.plot?.plotId ? `founders_plot_${currentState.plot.plotId}` : 'founders_plot_fixture',
+    initialState: initialStateFromEvents(normalizedEvents),
+    actions: normalizedEvents.map((event) => ({
+      seq: event.seq,
+      eventId: event.seq,
+      atOffsetMs: Math.max(0, Number(event.createdAt || 0) - Number(originMs || 0)),
+      type: event.type,
+      actor: event.actor === 'AGENT' ? 'FOREMAN' : event.actor,
+      createdAt: event.createdAt,
+      elapsedMsSincePrevious: Math.max(0, Number(event.createdAt || 0) - Number(previousCreatedAt || 0)),
+      explanation: event.explanation || '',
+      recapLine: event.recapLine || '',
+      toolName: typeof event?.data?.tool === 'string' ? event.data.tool : null,
+      args: {
+        buildingId: event?.data?.building?.buildingId || null,
+        buildingType: event?.data?.building?.type || null,
+        contractId: event?.data?.contract?.contractId || null
+      },
+      expectedOk: true,
+      tool: typeof event?.data?.tool === 'string' ? event.data.tool : null,
+      resourceDelta: event?.data?.resourceDelta || null
+    })).map((action, index) => {
+      previousCreatedAt = normalizedEvents[index]?.createdAt || previousCreatedAt;
+      return action;
+    }),
+    timeAdvances: normalizedEvents.slice(1).map((event, index) => ({
+      atOffsetMs: Math.max(0, Number(normalizedEvents[index]?.createdAt || originMs) - Number(originMs || 0)),
+      advanceByMs: Math.max(0, Number(event.createdAt || 0) - Number(normalizedEvents[index]?.createdAt || originMs))
+    })),
+    finalHash: currentState ? stateHash(stateHashPayload(currentState)) : '',
+    expectedFinalHash: currentState ? stateHash(stateHashPayload(currentState)) : ''
+  };
+}
+
+function replayFromEvents(events = [], currentState = null) {
+  const normalizedEvents = Array.isArray(events) ? events.map((event) => normalizeReplayEvent(event)) : [];
+  const finalState = currentState || null;
+  const finalHash = finalState ? stateHash(stateHashPayload(finalState)) : '';
 
   return {
-    eventCount: Array.isArray(events) ? events.length : 0,
-    events: Array.isArray(events)
-      ? events.map((event) => ({
-        seq: event.seq,
-        type: event.type,
-        actor: event.actor,
-        createdAt: event.createdAt,
-        explanation: event.explanation || '',
-        recapLine: event.recapLine || '',
-        data: event && typeof event.data === 'object' ? event.data : {}
-      }))
-      : [],
+    eventCount: normalizedEvents.length,
+    events: normalizedEvents,
     finalState,
-    finalHash: stateHash(stateHashPayload(finalState))
+    finalHash,
+    actionLogFixture: actionLogFixtureFromEvents(normalizedEvents, finalState)
   };
 }
 

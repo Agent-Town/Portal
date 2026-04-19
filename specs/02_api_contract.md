@@ -332,6 +332,32 @@ Response shape:
       "step": "place_lumber_camp",
       "title": "Raise your first work camp"
     },
+    "currentGoal": {
+      "owner": "tutorial",
+      "title": "Raise your first work camp",
+      "body": "Place the first Lumber Camp.",
+      "primaryAction": { "type": "PLACE_BUILDING", "buildingType": "LUMBER_CAMP" }
+    },
+    "contracts": {
+      "boardLocked": true,
+      "offers": [],
+      "activeContract": null,
+      "completed": []
+    },
+    "foreman": {
+      "standingOrder": "CAREFUL_STEWARD",
+      "runtime": { "status": "NOT_STARTED" },
+      "scheduler": {
+        "collectReadyOutputs": {
+          "preset": "COLLECT_READY_OUTPUTS",
+          "enabled": false,
+          "paused": false,
+          "runCount": 0
+        }
+      },
+      "planCard": null,
+      "receipt": null
+    },
     "pads": [
       { "x": 0, "y": 0, "label": "Northwest Pad", "occupied": false, "building": null },
       { "x": 1, "y": 0, "label": "North Pad", "occupied": false, "building": null },
@@ -353,10 +379,10 @@ Response shape:
     },
     "progress": {
       "currentLevel": 1,
-      "next": { "xpCurrent": 0, "xpRequired": 15, "ratio": 0, "cost": { "wood": 20 } }
+      "next": { "xpCurrent": 0, "xpRequired": 25, "ratio": 0, "cost": { "wood": 20, "food": 10 } }
     },
     "compatibility": {
-      "schemaVersion": 1
+      "schemaVersion": 2
     },
     "stateHash": "<sha256 hex>"
   }
@@ -380,15 +406,29 @@ Supported tool names:
 - `et.plot.set_priority`
 - `et.plot.claim_reward`
 - `et.plot.request_user_approval`
+- `et.plot.contracts.get_state`
+- `et.plot.contracts.accept`
+- `et.plot.contracts.turn_in`
+- `et.foreman.policy.get_standing_order`
+- `et.foreman.policy.set_standing_order`
+- `et.foreman.scheduler.get_status`
+- `et.foreman.scheduler.enable_collect_ready_outputs`
+- `et.foreman.scheduler.pause`
+- `et.foreman.scheduler.resume`
 
 Mutation request shape:
 ```json
 {
-  "actor": "AGENT",
+  "actor": "HUMAN",
   "idempotencyKey": "place_lumber_1_0",
   "...toolArgs": true
 }
 ```
+
+Security rules:
+- The normal human route must reject `actor: "AGENT"` with `ACTOR_SPOOF_REJECTED`.
+- Foreman-originated mutations must use `POST /api/founders-plot/foreman/tool/:toolName`.
+- The Foreman route derives authority from the server-issued runtime session token, never from request-body `actor`.
 
 Response shape:
 ```json
@@ -415,6 +455,10 @@ Error codes:
 - `JOB_ALREADY_RUNNING`
 - `RATE_LIMITED`
 - `IDEMPOTENCY_CONFLICT`
+- `ACTOR_SPOOF_REJECTED`
+- `FOREMAN_RUNTIME_REQUIRED`
+- `STALE_RUNTIME`
+- `CONTRACT_ACTIVE_EXISTS`
 - `SIMULATION_DESYNC`
 - `SERVER_ERROR`
 
@@ -438,6 +482,47 @@ Request shape:
 ```json
 { "decision": "approve", "note": "optional" }
 ```
+
+### GET `/api/founders-plot/contracts/state`
+Returns the living Contract Board for the active plot.
+
+### POST `/api/founders-plot/contracts/accept`
+Accepts exactly one offered `SUPPLY` or `BUILD` contract.
+
+### POST `/api/founders-plot/contracts/turn-in`
+Turns in the active contract once it is `READY_TO_TURN_IN`.
+
+### POST `/api/founders-plot/foreman/session/start`
+Starts the in-session Clover runtime and returns a server-issued Foreman token bound to the active plot/runtime.
+
+### POST `/api/founders-plot/foreman/session/heartbeat`
+Refreshes the active Foreman runtime lease.
+
+### POST `/api/founders-plot/foreman/session/pause`
+Pauses the current Foreman runtime. Later Foreman actions must fail closed until restarted.
+
+### GET `/api/founders-plot/foreman/observation`
+Returns the structured V1.1 observation packet for the active Foreman runtime.
+
+Observation notes:
+- `schema === "founders-plot.obs.v1.1"` and `schemaVersion === "founders-plot.obs.v1.1"` are both present.
+- The packet includes `currentGoal`, living contract state, standing order, scheduler status, recent events, and safe collect-ready building signals.
+
+### POST `/api/founders-plot/foreman/tool/:toolName`
+Executes one bounded Foreman action through the authenticated runtime route.
+
+Requirements:
+- runtime token required;
+- request body must not declare `actor`;
+- non-`get_state` calls require `idempotencyKey`;
+- successful actions append `AGENT_ACTION_EXECUTED` plus a Foreman receipt event.
+
+### POST `/api/founders-plot/foreman/receipt/correction`
+Applies a human correction to the latest Foreman receipt.
+
+Supported corrections in V1.1:
+- `ASK_ME_NEXT_TIME`
+- `PAUSE_FOREMAN`
 
 ### GET `/api/founders-plot/recap`
 Returns the current unseen recap lines generated from the event log.
@@ -480,7 +565,24 @@ Response shape:
         }
       }
     ],
-    "finalHash": "<sha256 hex>"
+    "finalHash": "<sha256 hex>",
+    "actionLogFixture": {
+      "fixtureId": "founders_plot_plot_...",
+      "initialState": {},
+      "actions": [
+        {
+          "eventId": 4,
+          "atOffsetMs": 120000,
+          "actor": "FOREMAN",
+          "toolName": "et.plot.collect_outputs",
+          "expectedOk": true
+        }
+      ],
+      "timeAdvances": [
+        { "atOffsetMs": 60000, "advanceByMs": 60000 }
+      ],
+      "expectedFinalHash": "<sha256 hex>"
+    }
   },
   "currentHash": "<sha256 hex>"
 }

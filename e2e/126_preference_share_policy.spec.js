@@ -37,8 +37,10 @@ test('mainland preset localizes share-link save recovery errors', async ({ page 
     if (human instanceof HTMLInputElement) human.value = 'https://example.com/post/123';
     const agent = document.getElementById('shareAgentPost');
     if (agent instanceof HTMLInputElement) agent.value = 'https://www.moltbook.com/post/456';
-    const button = document.getElementById('saveSharePosts');
-    if (button instanceof HTMLButtonElement) button.click();
+  });
+  await page.evaluate(() => {
+    const save = document.getElementById('saveSharePosts');
+    if (save instanceof HTMLButtonElement) save.click();
   });
 
   await expect(page.locator('#sharePostsError')).toHaveText('未找到当前会话对应的分享链接。请重新生成分享链接。');

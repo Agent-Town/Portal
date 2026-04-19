@@ -7,7 +7,7 @@
   <meta name="description" content="Founders Plot starter district" />
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="stylesheet" href="/styles.css?v=20260319a" />
-  <link rel="stylesheet" href="/experiences/founders-plot/styles.css?v=20260418a" />
+  <link rel="stylesheet" href="/experiences/founders-plot/styles.css?v=20260420a" />
 </head>
 <body class="founders-plot-page">
   <div class="foundersPlotRoot">
@@ -56,25 +56,57 @@
       </section>
 
       <aside class="foundersSidebar">
-        <section class="panel foundersQuestCard" data-testid="founders-quest-panel">
-          <div class="foundersLabel">Current quest</div>
-          <h2 id="questTitle">Loading…</h2>
+        <section class="panel foundersQuestCard" data-testid="founders-current-goal">
+          <div class="foundersPanelHeader foundersPanelHeaderCompact">
+            <div>
+              <div class="foundersLabel">Current goal</div>
+              <h2 id="questTitle">Loading…</h2>
+            </div>
+            <div class="foundersBadge" id="goalOwnerBadge">Tutorial</div>
+          </div>
           <p id="questBody">Reading the settlement ledger.</p>
+          <div class="small foundersGoalSupport" id="questStatusLine">Syncing plot…</div>
         </section>
 
         <section class="panel foundersSelectionCard" data-testid="founders-selection-panel">
-          <div class="foundersLabel">Selected pad</div>
+          <div class="foundersLabel">Action sheet</div>
           <div id="selectionCard"></div>
         </section>
 
+        <section class="panel foundersContractCard" data-testid="founders-contract-board">
+          <div class="foundersPanelHeader foundersPanelHeaderCompact">
+            <div>
+              <div class="foundersLabel">Contract board</div>
+              <h2>Town requests</h2>
+            </div>
+            <div class="small" id="contractBoardStatus">Locked until HQ2.</div>
+          </div>
+          <div id="contractBoard"></div>
+        </section>
+
         <section class="panel foundersForemanCard" data-testid="founders-foreman-panel">
-          <div class="foundersLabel">Foreman</div>
+          <div class="foundersPanelHeader foundersPanelHeaderCompact">
+            <div>
+              <div class="foundersLabel">Foreman</div>
+              <h2>Clover</h2>
+            </div>
+            <div class="foundersBadge" id="foremanStatusBadge" data-testid="founders-foreman-status">Foreman not started</div>
+          </div>
           <p id="foremanRecommendation">The foreman is reading the plot.</p>
-          <div class="small" id="foremanToolsLine">Allowed tools: observation only.</div>
+          <div class="small" id="foremanToolsLine">Clover can help with routine work you trust it with.</div>
+          <div class="foundersInlineButtons foundersForemanControls">
+            <button class="btn small" id="foremanStartBtn" type="button" data-testid="foreman-start-btn">Start Clover</button>
+            <button class="btn small" id="foremanPauseBtn" type="button" data-testid="foreman-pause-btn">Pause Foreman</button>
+            <button class="btn small" id="foremanRunNowBtn" type="button" data-testid="foreman-run-now-btn">Run now</button>
+          </div>
+          <div class="foundersSubpanel" id="standingOrderCard" data-testid="founders-standing-order"></div>
+          <div class="foundersSubpanel" id="planCard" data-testid="founders-plan-card"></div>
+          <div class="foundersSubpanel" id="schedulerCard"></div>
+          <div class="foundersSubpanel" id="receiptCard" data-testid="founders-receipt"></div>
         </section>
 
         <section class="panel foundersPermissionsCard" data-testid="founders-permissions-panel">
-          <div class="foundersLabel">Permissions</div>
+          <div class="foundersLabel">Delegation</div>
           <div id="permissionsList"></div>
         </section>
 
@@ -106,6 +138,6 @@
     </section>
   </div>
 
-  <script src="/experiences/founders-plot/app.js?v=20260418a" defer></script>
+  <script src="/experiences/founders-plot/app.js?v=20260420a" defer></script>
 </body>
 </html>

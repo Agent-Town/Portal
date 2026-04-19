@@ -1,0 +1,123 @@
+const { expect } = require('@playwright/test');
+const { hatchAndConnectLite, pressOpenViaAgentApi, unlockGateWithSigil } = require('./phase2');
+
+async function openFoundersPlotFrame(page) {
+  await hatchAndConnectLite(page, 'signup');
+  await unlockGateWithSigil(page, 'key');
+  await page.getByTestId('open-btn').click();
+  await pressOpenViaAgentApi(page);
+
+  await page.goto('/app?district=founders-plot');
+  await expect(page.locator('#districtModalBackdrop:not(.is-hidden)')).toHaveCount(1, { timeout: 5000 });
+  await expect(page.locator('#districtModalTitle')).toHaveText('Founders Plot');
+
+  const iframe = page.locator('#districtModalBody iframe.districtFrame');
+  await expect(iframe).toHaveCount(1, { timeout: 5000 });
+  const handle = await iframe.elementHandle();
+  const frame = await handle.contentFrame();
+  expect(frame).toBeTruthy();
+  await frame.waitForFunction(() => {
+    return !!window.__foundersPlotTest?.getState?.()?.state?.stateHash;
+  }, null, { timeout: 5000 });
+  return frame;
+}
+
+async function getPlotState(frame) {
+  return frame.evaluate(() => window.__foundersPlotTest.getState()?.state || null);
+}
+
+async function runPlotTool(frame, toolName, args = {}) {
+  return frame.evaluate(async ({ name, params }) => {
+    return await window.__foundersPlotTest.runTool(name, params || {});
+  }, { name: toolName, params: args || {} });
+}
+
+async function postJson(frame, url, body = {}) {
+  return frame.evaluate(async ({ targetUrl, targetBody }) => {
+    const response = await fetch(targetUrl, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(targetBody || {})
+    });
+    return await response.json().catch(() => ({}));
+  }, { targetUrl: url, targetBody: body || {} });
+}
+
+async function getJson(frame, url) {
+  return frame.evaluate(async (targetUrl) => {
+    const response = await fetch(targetUrl, { credentials: 'include' });
+    return await response.json().catch(() => ({}));
+  }, url);
+}
+
+async function advancePlot(frame, ms) {
+  return frame.evaluate(async (targetMs) => {
+    return await window.__foundersPlotTest.advance(targetMs);
+  }, ms);
+}
+
+async function placeFirstLumberCamp(frame, keyPrefix = 'v11-place-lumber') {
+  const pads = await getPlotState(frame);
+  const firstPad = Array.isArray(pads?.pads) ? pads.pads.find((pad) => pad && pad.occupied === false) : null;
+  if (!firstPad) throw new Error('NO_OPEN_PAD');
+  return runPlotTool(frame, 'et.plot.place_building', {
+    type: 'LUMBER_CAMP',
+    x: firstPad.x,
+    y: firstPad.y,
+    idempotencyKey: `${keyPrefix}:${Date.now()}`
+  });
+}
+
+async function bootstrapToHq2(frame) {
+  const placed = await placeFirstLumberCamp(frame, 'bootstrap-lumber');
+  if (!placed?.ok) {
+    throw new Error(`BOOTSTRAP_PLACE_FAILED:${placed?.error?.code || 'UNKNOWN'}`);
+  }
+
+  await advancePlot(frame, 31_000);
+
+  const lumberBuildingId = await frame.evaluate(() => {
+    const state = window.__foundersPlotTest.getState()?.state;
+    const lumber = Array.isArray(state?.buildings)
+      ? state.buildings.find((building) => building?.type === 'LUMBER_CAMP')
+      : null;
+    return String(lumber?.buildingId || '');
+  });
+  if (!lumberBuildingId) throw new Error('NO_LUMBER_CAMP');
+
+  for (let index = 0; index < 4; index += 1) {
+    const queueResp = await runPlotTool(frame, 'et.plot.queue_job', {
+      buildingId: lumberBuildingId,
+      idempotencyKey: `bootstrap-hq2:queue:${index}`
+    });
+    if (!queueResp?.ok) throw new Error(`BOOTSTRAP_QUEUE_FAILED:${queueResp?.error?.code || 'UNKNOWN'}`);
+    await advancePlot(frame, 61_000);
+    const collectResp = await runPlotTool(frame, 'et.plot.collect_outputs', {
+      buildingId: lumberBuildingId,
+      idempotencyKey: `bootstrap-hq2:collect:${index}`
+    });
+    if (!collectResp?.ok) throw new Error(`BOOTSTRAP_COLLECT_FAILED:${collectResp?.error?.code || 'UNKNOWN'}`);
+  }
+
+  const upgradeResp = await runPlotTool(frame, 'et.plot.upgrade_building', {
+    idempotencyKey: 'bootstrap-hq2:upgrade'
+  });
+  if (!upgradeResp?.ok) {
+    throw new Error(`BOOTSTRAP_UPGRADE_FAILED:${upgradeResp?.error?.code || 'UNKNOWN'}`);
+  }
+  await advancePlot(frame, 121_000);
+  await frame.waitForFunction(() => window.__foundersPlotTest.getState()?.state?.plot?.hqLevel === 2, null, { timeout: 5000 });
+  return getPlotState(frame);
+}
+
+module.exports = {
+  advancePlot,
+  bootstrapToHq2,
+  getJson,
+  getPlotState,
+  openFoundersPlotFrame,
+  placeFirstLumberCamp,
+  postJson,
+  runPlotTool
+};

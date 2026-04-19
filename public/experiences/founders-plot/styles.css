@@ -206,6 +206,10 @@ html.founders-plot-embed body.founders-plot-page {
   align-items: end;
 }
 
+.foundersPanelHeaderCompact {
+  align-items: start;
+}
+
 .foundersBoard {
   display: grid;
   grid-template-columns: repeat(3, minmax(120px, 1fr));
@@ -293,11 +297,18 @@ html.founders-plot-embed body.founders-plot-page {
   padding: 18px;
 }
 
+.foundersGoalSupport {
+  margin-top: 12px;
+}
+
 .foundersActions,
 .foundersPermissionsList,
 .foundersApprovalList,
 .foundersRewardsList,
-.foundersPriorityRow {
+.foundersPriorityRow,
+.foundersContractList,
+.foundersContractMeta,
+.foundersSubpanel {
   display: grid;
   gap: 10px;
 }
@@ -343,11 +354,101 @@ html.founders-plot-embed body.founders-plot-page {
 
 .foundersPermissionItem,
 .foundersApprovalItem,
-.foundersRewardItem {
+.foundersRewardItem,
+.foundersContractItem,
+.foundersReceiptBody,
+.foundersPlanBody,
+.foundersSchedulerBody,
+.foundersStandingOrderBody {
   padding: 12px;
   border: 1px solid rgba(46, 27, 14, 0.08);
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.44);
+}
+
+.foundersContractItem.is-active {
+  border-color: rgba(91, 138, 138, 0.32);
+  background: rgba(91, 138, 138, 0.08);
+}
+
+.foundersContractHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: start;
+}
+
+.foundersContractItem strong,
+.foundersSubpanel strong {
+  font-size: 16px;
+}
+
+.foundersContractKicker {
+  margin-top: 4px;
+  font-size: 13px;
+  color: rgba(46, 27, 14, 0.72);
+}
+
+.foundersContractMeta {
+  margin-top: 10px;
+}
+
+.foundersContractAction {
+  margin-top: 10px;
+}
+
+.foundersForemanControls {
+  margin-top: 12px;
+}
+
+.foundersSubpanel {
+  margin-top: 12px;
+}
+
+.foundersSubpanel:empty {
+  display: none;
+}
+
+.foundersStatusGood {
+  color: var(--fp-teal);
+}
+
+.foundersStatusWarn {
+  color: var(--fp-rust);
+}
+
+.foundersReceiptActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.foundersStandingOrderChoices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.foundersStandingOrderChoice {
+  display: grid;
+  gap: 4px;
+  width: calc(50% - 4px);
+  min-width: 132px;
+  text-align: left;
+}
+
+.foundersStandingOrderChoice .small {
+  line-height: 1.4;
+}
+
+.foundersSchedulerRow,
+.foundersReceiptMeta,
+.foundersPlanMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
 }
 
 .foundersPermissionToggle {
@@ -432,5 +533,9 @@ html.founders-plot-embed body.founders-plot-page {
 
   .foundersInventory {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .foundersStandingOrderChoice {
+    width: 100%;
   }
 }

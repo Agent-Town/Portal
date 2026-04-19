@@ -42,7 +42,7 @@ async function runLumberCycle(frame, buildingId, keyPrefix) {
   }, { targetBuildingId: buildingId, prefix: keyPrefix });
 }
 
-test('later progression costs only require already-unlocked resources and teaches permission before the next building', async ({ page }) => {
+test('later progression costs only require already-unlocked resources and HQ2 leads directly into the first Farm Plot', async ({ page }) => {
   const frame = await openFoundersPlotFrame(page);
 
   await frame.getByTestId('founders-quest-cta').click();
@@ -52,7 +52,7 @@ test('later progression costs only require already-unlocked resources and teache
 
   const initialProgress = await frame.evaluate(() => window.__foundersPlotTest.getState()?.state?.progress?.next || null);
   expect(initialProgress?.cost?.wood || 0).toBeGreaterThan(0);
-  expect(initialProgress?.cost?.food || 0).toBe(0);
+  expect(initialProgress?.cost?.food || 0).toBeGreaterThan(0);
   expect(initialProgress?.cost?.stone || 0).toBe(0);
 
   const lumberBuildingId = await frame.evaluate(() => {
@@ -101,18 +101,27 @@ test('later progression costs only require already-unlocked resources and teache
       nextCost: state?.progress?.next?.cost || {}
     };
   });
-  expect(afterHq2.questStep).toBe('grant_collect_permission');
+  expect(afterHq2.questStep).toBe('place_farm_plot');
   expect(afterHq2.permissions).toContain('collectOutputs');
-  expect(afterHq2.nextCost.food || 0).toBeGreaterThan(0);
-  expect(afterHq2.nextCost.stone || 0).toBe(0);
+  expect(afterHq2.nextCost.food || 0).toBe(0);
+  expect(afterHq2.nextCost.stone || 0).toBeGreaterThan(0);
+
+  await runLumberCycle(frame, lumberBuildingId, 'hq2-farm-funding');
+  await frame.waitForFunction(() => {
+    return (window.__foundersPlotTest.getState()?.state?.plot?.inventory?.wood || 0) >= 10;
+  }, null, { timeout: 5000 });
 
   await frame.getByTestId('founders-quest-cta').click();
   await frame.waitForFunction(() => {
-    return window.__foundersPlotTest.getState()?.state?.policy?.collectOutputs === true;
+    const state = window.__foundersPlotTest.getState()?.state;
+    return Array.isArray(state?.buildings) && state.buildings.some((building) => building?.type === 'FARM_PLOT');
   }, null, { timeout: 5000 });
+  await frame.evaluate(async () => {
+    await window.__foundersPlotTest.advance(46_000);
+  });
 
-  const afterCollectPermission = await frame.evaluate(() => window.__foundersPlotTest.getState()?.state?.quest?.step || '');
-  expect(afterCollectPermission).toBe('place_farm_plot');
+  const afterFarmPlot = await frame.evaluate(() => window.__foundersPlotTest.getState()?.state?.quest?.step || '');
+  expect(afterFarmPlot).toBe('choose_first_contract');
 });
 
 test('public summary uses explicit progress score semantics instead of a vague productivity score', async ({ page }) => {

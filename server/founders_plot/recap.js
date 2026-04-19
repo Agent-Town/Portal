@@ -5,6 +5,7 @@ function buildRecap(events = [], { afterSeq = 0, limit = 8 } = {}) {
   const visible = rows.filter((event) => typeof event.recapLine === 'string' && event.recapLine.trim());
   const lines = visible.slice(-Math.max(1, limit)).map((event) => ({
     seq: event.seq,
+    eventId: event.seq,
     type: event.type,
     createdAt: event.createdAt,
     line: event.recapLine

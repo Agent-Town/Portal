@@ -2,7 +2,7 @@
 
 Status: Active  
 Audience: Engineering only
-Last updated: 2026-04-18
+Last updated: 2026-04-20
 
 ## Goal
 
@@ -90,9 +90,15 @@ Keep `skill.md` evolution testable as we:
 | Trainer namespace human-agent coop verification loop | `public/trainer_namespace_plugin.js`, `public/trainer.js` | builder demonstration + repeat invocation + evidence-backed verification flow remains deterministic in trainer tooling | `e2e/107_trainer_namespace_coop_canvas.spec.js` (`trainer namespace supports a deterministic human-agent coop loop for canvas verification`) |
 | Experience UI intent tools (modal open / Atlas search / Pony compose) | `public/skill.md`, `public/app.js`, `vendors/openclaw-lite-main/src/openclaw-lite/gateway.js`, `vendors/openclaw-lite-main/src/openclaw-lite/worker.js` | worker tools `agent_town_ui_open_modal`, `agent_town_ui_atlas_search`, `agent_town_ui_pony_compose` dispatch through strict browser intent whitelist; no route replacement, no arbitrary DOM access | `e2e/108_experience_intent_open_modal.spec.js`, `e2e/109_experience_intent_atlas_search.spec.js`, `e2e/110_experience_intent_pony_compose.spec.js` |
 | Experience intent continuity + policy guards | `public/app.js`, `vendors/openclaw-lite-main/src/openclaw-lite/gateway.js` | deterministic intent envelope + trace, team/worker continuity under multi-intent flow, deterministic rejection codes (`UI_INTENT_UNKNOWN`, `UI_INTENT_INVALID_PARAM`, `CONFIRMATION_REQUIRED`) | `e2e/111_experience_intent_worker_continuity.spec.js`, `e2e/112_experience_intent_policy_negative.spec.js` |
-| Founders Plot modal + foreman tool contract | `public/skill.md`, `public/app.js`, `server/founders_plot/*`, `vendors/openclaw-lite-main/src/openclaw-lite/gateway.js`, `vendors/openclaw-lite-main/src/openclaw-lite/worker.js` | Founders Plot stays modal-first in the town shell; worker exposes typed `et.plot.*` tools plus `founders-plot` modal open path; approvals remain explicit and deterministic | `e2e/132_founders_plot_registry_handoff.spec.js`, `e2e/133_founders_plot_runtime_contract.spec.js`, `e2e/134_founders_plot_resume_recap.spec.js` |
+| Founders Plot modal + foreman tool contract | `public/skill.md`, `public/app.js`, `server/founders_plot/*`, `vendors/openclaw-lite-main/src/openclaw-lite/gateway.js`, `vendors/openclaw-lite-main/src/openclaw-lite/worker.js` | Founders Plot stays modal-first in the town shell; worker exposes typed `et.plot.*`, contract, standing-order, and scheduler tools plus `founders-plot` modal open path; approvals remain explicit and deterministic | `e2e/132_founders_plot_registry_handoff.spec.js`, `e2e/133_founders_plot_runtime_contract.spec.js`, `e2e/134_founders_plot_resume_recap.spec.js`, `e2e/145_founders_plot_v11_ui_surfaces.spec.js` |
 
 ## Progress Log
+
+### 2026-04-20
+
+- Extended the Founders Plot skill/runtime contract to include V1.1 contract, standing-order, and scheduler tools.
+- Added browser-level V1.1 UI surface coverage for the Current Goal, Contract Board, Standing Order controls, Foreman status, Plan Card, and receipt corrections (`e2e/145_founders_plot_v11_ui_surfaces.spec.js`).
+- Updated the worker contract baseline to schema version 2 and the refined V1.1 bounded tool family.
 
 ### 2026-04-18
 

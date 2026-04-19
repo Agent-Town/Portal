@@ -32,6 +32,8 @@
   let selectedKey = 'hq';
   let pollTimer = null;
   let pendingAction = false;
+  let gatewayPromise = null;
+  let foremanRuntimeToken = '';
 
   function readTeamCodeHint() {
     try {
@@ -49,6 +51,26 @@
     } catch {
       // ignore
     }
+  }
+
+  async function initGateway() {
+    if (window.__openclawLiteTest) return window.__openclawLiteTest;
+    if (!gatewayPromise) {
+      gatewayPromise = import('/openclaw-lite/gateway.js').then((module) => module.default || module);
+    }
+    return gatewayPromise;
+  }
+
+  async function apiText(url, opts = {}) {
+    const response = await fetch(url, {
+      credentials: 'include',
+      cache: 'no-store',
+      ...opts
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP_${response.status}`);
+    }
+    return await response.text();
   }
 
   async function api(url, opts = {}) {
@@ -75,6 +97,14 @@
     return data;
   }
 
+  async function foremanApi(url, opts = {}) {
+    const headers = {
+      ...(opts.headers || {}),
+      authorization: `Bearer ${foremanRuntimeToken}`
+    };
+    return api(url, { ...opts, headers });
+  }
+
   function setText(id, value) {
     const node = document.getElementById(id);
     if (node) node.textContent = value;
@@ -87,6 +117,98 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+  }
+
+  function prettyGoalOwner(owner) {
+    switch (String(owner || '').toLowerCase()) {
+      case 'approval':
+        return 'Needs your say-so';
+      case 'contract_ready':
+      case 'contract_progress':
+        return 'Active contract';
+      case 'receipt':
+        return 'Latest receipt';
+      case 'optimization':
+        return 'Town stability';
+      default:
+        return 'Tutorial';
+    }
+  }
+
+  function prettyStandingOrder(order) {
+    return String(order || '').toUpperCase() === 'BOLD_FOUNDER' ? 'Bold Founder' : 'Careful Steward';
+  }
+
+  function standingOrderSummary(order) {
+    return String(order || '').toUpperCase() === 'BOLD_FOUNDER'
+      ? 'Push growth when the move is still safe.'
+      : 'Protect supplies and ask before spending.';
+  }
+
+  function prettyContractStatus(status) {
+    return String(status || '')
+      .toLowerCase()
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (match) => match.toUpperCase());
+  }
+
+  function formatResourceList(values = {}) {
+    const order = ['wood', 'stone', 'food', 'coin', 'townXp'];
+    const labels = {
+      wood: 'wood',
+      stone: 'stone',
+      food: 'food',
+      coin: 'coin',
+      townXp: 'Town XP'
+    };
+    return order
+      .filter((key) => Number(values?.[key] || 0) > 0)
+      .map((key) => `${Number(values[key])} ${labels[key]}`)
+      .join(', ');
+  }
+
+  function formatContractRequirements(contract) {
+    const requirements = contract?.requirements || {};
+    if (String(contract?.kind || '').toUpperCase() === 'BUILD' && requirements.buildingType) {
+      return `Build at least one ${BUILDING_LABELS[requirements.buildingType] || requirements.buildingType}.`;
+    }
+    const resourceText = formatResourceList(requirements);
+    return resourceText ? `Deliver ${resourceText}.` : 'No listed requirement.';
+  }
+
+  function formatContractRewards(contract) {
+    const rewardText = formatResourceList(contract?.rewards || {});
+    return rewardText ? `Rewards: ${rewardText}.` : 'No listed reward.';
+  }
+
+  function foremanStatusMeta(status) {
+    switch (String(status || 'NOT_STARTED').toUpperCase()) {
+      case 'BOOTING':
+        return { label: 'Foreman saddling up', tone: 'good' };
+      case 'OBSERVING':
+        return { label: 'Foreman watching', tone: 'good' };
+      case 'THINKING':
+        return { label: 'Foreman thinking', tone: 'good' };
+      case 'WAITING_FOR_PERMISSION':
+        return { label: 'Needs your say-so', tone: 'warn' };
+      case 'ACTING':
+        return { label: 'Foreman working', tone: 'good' };
+      case 'PAUSED':
+        return { label: 'Foreman paused', tone: 'warn' };
+      case 'STALE':
+        return { label: 'Foreman lost the trail', tone: 'warn' };
+      case 'ERROR':
+        return { label: 'Foreman needs help', tone: 'warn' };
+      default:
+        return { label: 'Foreman not started', tone: 'warn' };
+    }
+  }
+
+  function focusPanel(id) {
+    const node = document.getElementById(id);
+    if (node) {
+      node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
   }
 
   function formatDuration(endsAt) {
@@ -314,6 +436,61 @@
     });
   }
 
+  async function setStandingOrder(standingOrder) {
+    return runTool('et.foreman.policy.set_standing_order', {
+      standingOrder,
+      idempotencyKey: `standing-order:${standingOrder}:${Date.now()}`
+    });
+  }
+
+  async function acceptContract(contractId) {
+    pendingAction = true;
+    setStatusLine('Accepting contract…');
+    try {
+      const response = await api('/api/founders-plot/contracts/accept', {
+        method: 'POST',
+        body: JSON.stringify({
+          contractId,
+          idempotencyKey: `contract-accept:${contractId}:${Date.now()}`
+        })
+      });
+      currentState = { ok: true, state: response.state };
+      setStatusLine('Contract accepted.');
+      renderAll();
+      return response;
+    } catch (error) {
+      setStatusLine(`Could not accept contract: ${error.message}.`);
+      throw error;
+    } finally {
+      pendingAction = false;
+      renderAll();
+    }
+  }
+
+  async function turnInContract(contractId) {
+    pendingAction = true;
+    setStatusLine('Turning in contract…');
+    try {
+      const response = await api('/api/founders-plot/contracts/turn-in', {
+        method: 'POST',
+        body: JSON.stringify({
+          contractId,
+          idempotencyKey: `contract-turn-in:${contractId}:${Date.now()}`
+        })
+      });
+      currentState = { ok: true, state: response.state };
+      setStatusLine('Contract turned in.');
+      renderAll();
+      return response;
+    } catch (error) {
+      setStatusLine(`Could not turn in contract: ${error.message}.`);
+      throw error;
+    } finally {
+      pendingAction = false;
+      renderAll();
+    }
+  }
+
   function buildTypeButtons(container, types, pad) {
     const row = document.createElement('div');
     row.className = 'foundersInlineButtons';
@@ -446,16 +623,348 @@
     node.innerHTML = '<div class="foundersEmptyState">Select a pad or building to inspect it.</div>';
   }
 
+  function renderContracts(state) {
+    const node = document.getElementById('contractBoard');
+    if (!node) return;
+    const statusNode = document.getElementById('contractBoardStatus');
+    const contracts = state?.contracts || {};
+    const offers = Array.isArray(contracts.offers) ? contracts.offers : [];
+    const activeContract = contracts.activeContract || null;
+    if (contracts.boardLocked) {
+      if (statusNode) statusNode.textContent = 'Opens at HQ2.';
+      node.innerHTML = '<div class="foundersEmptyState">Town requests arrive once Headquarters reaches level 2.</div>';
+      return;
+    }
+
+    if (statusNode) {
+      statusNode.textContent = activeContract
+        ? `Active: ${activeContract.title}`
+        : `${offers.length} offers ready.`;
+    }
+
+    const cards = [];
+    if (activeContract) {
+      cards.push(`
+        <article class="foundersContractItem is-active">
+          <div class="foundersContractHeader">
+            <div>
+              <strong>${htmlEscape(activeContract.title)}</strong>
+              <div class="foundersContractKicker">${htmlEscape(activeContract.requester)} · ${htmlEscape(activeContract.institution)}</div>
+            </div>
+            <span class="foundersBadge">${htmlEscape(prettyContractStatus(activeContract.status))}</span>
+          </div>
+          <div class="small">${htmlEscape(activeContract.whyNow || '')}</div>
+          <div class="foundersContractMeta">
+            <div class="small">${htmlEscape(formatContractRequirements(activeContract))}</div>
+            <div class="small">${htmlEscape(formatContractRewards(activeContract))}</div>
+            <div class="small">${htmlEscape(activeContract.philosophyHint || '')}</div>
+          </div>
+          <div class="foundersContractAction">
+            <button
+              class="btn small"
+              type="button"
+              data-contract-turn-in="${htmlEscape(activeContract.contractId)}"
+              ${activeContract.status === 'READY_TO_TURN_IN' && !pendingAction ? '' : 'disabled'}
+            >
+              ${activeContract.status === 'READY_TO_TURN_IN' ? 'Turn in contract' : 'In progress'}
+            </button>
+          </div>
+        </article>
+      `);
+    }
+
+    if (offers.length > 0) {
+      cards.push(...offers.map((offer) => `
+        <article class="foundersContractItem" data-testid="contract-offer">
+          <div class="foundersContractHeader">
+            <div>
+              <strong>${htmlEscape(offer.title)}</strong>
+              <div class="foundersContractKicker">${htmlEscape(offer.requester)} · ${htmlEscape(offer.institution)}</div>
+            </div>
+            <span class="foundersBadge">${htmlEscape(offer.kind)}</span>
+          </div>
+          <div class="small">${htmlEscape(offer.whyNow || '')}</div>
+          <div class="foundersContractMeta">
+            <div class="small">${htmlEscape(formatContractRequirements(offer))}</div>
+            <div class="small">${htmlEscape(formatContractRewards(offer))}</div>
+            <div class="small">${htmlEscape(offer.philosophyHint || '')}</div>
+          </div>
+          <div class="foundersContractAction">
+            <button
+              class="btn small"
+              type="button"
+              data-contract-accept="${htmlEscape(offer.contractId)}"
+              ${activeContract || pendingAction ? 'disabled' : ''}
+            >
+              Accept ${htmlEscape(offer.kind.toLowerCase())} request
+            </button>
+          </div>
+        </article>
+      `));
+    }
+
+    node.innerHTML = cards.length > 0
+      ? `<div class="foundersContractList">${cards.join('')}</div>`
+      : '<div class="foundersEmptyState">No town requests are waiting right now.</div>';
+
+    node.querySelectorAll('[data-contract-accept]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        try {
+          await acceptContract(button.getAttribute('data-contract-accept') || '');
+        } catch {
+          // status line already updated
+        }
+      });
+    });
+    node.querySelectorAll('[data-contract-turn-in]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        if (button.hasAttribute('disabled')) return;
+        try {
+          await turnInContract(button.getAttribute('data-contract-turn-in') || '');
+        } catch {
+          // status line already updated
+        }
+      });
+    });
+  }
+
   function renderForeman(state) {
-    setText('foremanRecommendation', state.foreman?.recommendation || 'The foreman is waiting for a clear order.');
-    const allowed = Array.isArray(state.foreman?.allowedTools) ? state.foreman.allowedTools.join(', ') : 'observation only';
-    setText('foremanToolsLine', `Allowed tools: ${allowed}`);
+    const runtime = state?.foreman?.runtime || {};
+    const status = foremanStatusMeta(runtime.status);
+    const badge = document.getElementById('foremanStatusBadge');
+    if (badge) {
+      badge.textContent = status.label;
+      badge.className = `foundersBadge ${status.tone === 'warn' ? 'is-warn' : ''}`;
+    }
+
+    const recommendation = state?.foreman?.recommendation || 'Clover is watching. No safe action inside your standing order.';
+    setText('foremanRecommendation', recommendation);
+
+    const toolsLine = (() => {
+      if (!runtime.runtimeId) return 'Start Clover when you are ready for in-session help.';
+      if (runtime.status === 'PAUSED') return 'Automation is paused until you wake Clover again.';
+      if (runtime.status === 'STALE' || runtime.status === 'ERROR') return 'Clover needs a fresh start before any automatic work.';
+      return 'Clover can observe, plan, and handle one safe routine task you have allowed.';
+    })();
+    setText('foremanToolsLine', toolsLine);
+
+    const startBtn = document.getElementById('foremanStartBtn');
+    const pauseBtn = document.getElementById('foremanPauseBtn');
+    const runNowBtn = document.getElementById('foremanRunNowBtn');
+    if (startBtn) {
+      startBtn.disabled = pendingAction || ['BOOTING', 'OBSERVING', 'THINKING', 'ACTING'].includes(String(runtime.status || '').toUpperCase());
+      startBtn.textContent = runtime.runtimeId ? 'Restart Clover' : 'Start Clover';
+      startBtn.onclick = async () => {
+        try {
+          pendingAction = true;
+          setStatusLine('Starting Clover…');
+          const response = await startForemanRuntime();
+          setStatusLine(response?.ok ? 'Clover is ready to watch the town.' : 'Clover could not start. You can still play by hand.');
+          renderAll();
+        } catch (error) {
+          setStatusLine(`Clover could not start. You can still play by hand. (${error.message})`);
+        } finally {
+          pendingAction = false;
+          renderAll();
+        }
+      };
+    }
+    if (pauseBtn) {
+      pauseBtn.disabled = pendingAction || !runtime.runtimeId || String(runtime.status || '').toUpperCase() === 'PAUSED';
+      pauseBtn.onclick = async () => {
+        try {
+          pendingAction = true;
+          await pauseForemanRuntime();
+          setStatusLine('Foreman paused.');
+        } catch (error) {
+          setStatusLine(`Could not pause Clover: ${error.message}.`);
+        } finally {
+          pendingAction = false;
+          renderAll();
+        }
+      };
+    }
+    if (runNowBtn) {
+      runNowBtn.disabled = pendingAction || !runtime.runtimeId || ['PAUSED', 'STALE', 'ERROR', 'NOT_STARTED'].includes(String(runtime.status || '').toUpperCase());
+      runNowBtn.onclick = async () => {
+        try {
+          pendingAction = true;
+          setStatusLine('Clover is taking a look…');
+          const response = await runForemanTick();
+          if (response?.receipt) {
+            setStatusLine('Clover handled one safe task.');
+          } else {
+            setStatusLine('Clover watched but did not choose an action.');
+          }
+        } catch (error) {
+          setStatusLine(`Clover watched but did not choose an action. (${error.message})`);
+        } finally {
+          pendingAction = false;
+          renderAll();
+        }
+      };
+    }
+
+    const standingOrderNode = document.getElementById('standingOrderCard');
+    if (standingOrderNode) {
+      const activeOrder = state?.foreman?.standingOrder || 'CAREFUL_STEWARD';
+      standingOrderNode.innerHTML = `
+        <div class="foundersStandingOrderBody">
+          <div class="foundersLabel">Standing order</div>
+          <strong>${htmlEscape(prettyStandingOrder(activeOrder))}</strong>
+          <div class="small">${htmlEscape(standingOrderSummary(activeOrder))}</div>
+          <div class="foundersStandingOrderChoices">
+            <button class="btn small foundersStandingOrderChoice" type="button" data-standing-order="CAREFUL_STEWARD" data-testid="standing-order-careful" ${activeOrder === 'CAREFUL_STEWARD' || pendingAction ? 'disabled' : ''}>
+              <strong>Careful Steward</strong>
+              <span class="small">Protect supplies and ask before spending.</span>
+            </button>
+            <button class="btn small foundersStandingOrderChoice" type="button" data-standing-order="BOLD_FOUNDER" data-testid="standing-order-bold" ${activeOrder === 'BOLD_FOUNDER' || pendingAction ? 'disabled' : ''}>
+              <strong>Bold Founder</strong>
+              <span class="small">Push growth when the move is still safe.</span>
+            </button>
+          </div>
+        </div>
+      `;
+      standingOrderNode.querySelectorAll('[data-standing-order]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          try {
+            await setStandingOrder(button.getAttribute('data-standing-order') || '');
+          } catch {
+            // status line already updated
+          }
+        });
+      });
+    }
+
+    const planNode = document.getElementById('planCard');
+    const planCard = state?.foreman?.planCard || null;
+    if (planNode) {
+      if (!planCard) {
+        planNode.innerHTML = `
+          <div class="foundersPlanBody">
+            <div class="foundersLabel">Foreman plan</div>
+            <div class="small">Clover is watching. No safe action inside your standing order.</div>
+          </div>
+        `;
+      } else {
+        planNode.innerHTML = `
+          <div class="foundersPlanBody">
+            <div class="foundersLabel">Foreman plan</div>
+            <strong>${htmlEscape(planCard.headline || 'Foreman plan')}</strong>
+            <div class="foundersPlanMeta">
+              <span class="foundersBadge ${planCard.canActNow ? '' : 'is-warn'}">${htmlEscape(String(planCard.goalServed || 'town_stability').replace(/_/g, ' '))}</span>
+              <span class="small">${htmlEscape(planCard.canActNow ? 'Can act now' : 'Watching only')}</span>
+            </div>
+            <div class="small">${htmlEscape(planCard.observation || '')}</div>
+            <div class="small">${htmlEscape(planCard.recommendation || '')}</div>
+            <div class="small">${htmlEscape(planCard.reason || '')}</div>
+            ${planCard.standingOrderInfluence ? `<div class="small">${htmlEscape(planCard.standingOrderInfluence)}</div>` : ''}
+            ${planCard.alternative ? `<div class="small">${htmlEscape(planCard.alternative)}</div>` : ''}
+          </div>
+        `;
+      }
+    }
+
+    const schedulerNode = document.getElementById('schedulerCard');
+    if (schedulerNode) {
+      const task = state?.foreman?.scheduler?.collectReadyOutputs || {};
+      const schedulerLabel = task.enabled
+        ? (task.paused ? 'Ask me next time' : 'Collect ready outputs is enabled')
+        : 'Collect ready outputs is off';
+      schedulerNode.innerHTML = `
+        <div class="foundersSchedulerBody">
+          <div class="foundersLabel">Foreman routine</div>
+          <strong>${htmlEscape(schedulerLabel)}</strong>
+          <div class="small">This helps only while you keep Founders Plot open.</div>
+          <div class="foundersSchedulerRow">
+            <button class="btn small" type="button" id="schedulerCollectToggle" data-testid="scheduler-collect-toggle" ${pendingAction || !runtime.runtimeId ? 'disabled' : ''}>
+              ${task.enabled && task.paused !== true ? 'Ask me next time' : 'Enable collect ready outputs'}
+            </button>
+            <span class="small">${task.runCount ? `${task.runCount} successful run${task.runCount === 1 ? '' : 's'}` : 'No automatic collection yet.'}</span>
+          </div>
+        </div>
+      `;
+      const toggleBtn = document.getElementById('schedulerCollectToggle');
+      if (toggleBtn) {
+        toggleBtn.onclick = async () => {
+          try {
+            if (task.enabled && task.paused !== true) {
+              await applyReceiptCorrection('ASK_ME_NEXT_TIME');
+              setStatusLine('Clover will ask next time before collecting automatically.');
+            } else {
+              await enableCollectReadyOutputs();
+              setStatusLine('Collect ready outputs is enabled.');
+            }
+          } catch (error) {
+            setStatusLine(`Could not update Clover’s routine: ${error.message}.`);
+          } finally {
+            renderAll();
+          }
+        };
+      }
+    }
+
+    const receiptNode = document.getElementById('receiptCard');
+    const receipt = state?.foreman?.receipt || null;
+    if (receiptNode) {
+      if (!receipt) {
+        receiptNode.innerHTML = `
+          <div class="foundersReceiptBody">
+            <div class="foundersLabel">Latest receipt</div>
+            <div class="small">Clover has not acted yet.</div>
+          </div>
+        `;
+      } else {
+        receiptNode.innerHTML = `
+          <div class="foundersReceiptBody">
+            <div class="foundersLabel">Latest receipt</div>
+            <strong>${htmlEscape(receipt.action === 'collect_ready_outputs' ? 'Clover collected ready output' : receipt.action || 'Foreman action')}</strong>
+            <div class="foundersReceiptMeta">
+              <span class="small">Event #${htmlEscape(String(receipt.eventId || '0'))}</span>
+              ${receipt.standingOrderUsed ? `<span class="small">${htmlEscape(prettyStandingOrder(receipt.standingOrderUsed))}</span>` : ''}
+              ${receipt.authorityUsed ? `<span class="small">${htmlEscape(receipt.authorityUsed)}</span>` : ''}
+            </div>
+            <div class="small">${htmlEscape(receipt.reason || receipt.result || '')}</div>
+            <div class="foundersReceiptActions">
+              <button class="btn small" type="button" id="receiptAskNextTime" data-testid="receipt-ask-next-time" ${pendingAction ? 'disabled' : ''}>Ask me next time</button>
+              <button class="btn small" type="button" id="receiptPauseForeman" data-testid="receipt-pause-foreman" ${pendingAction ? 'disabled' : ''}>Pause Foreman</button>
+            </div>
+          </div>
+        `;
+        const askBtn = document.getElementById('receiptAskNextTime');
+        if (askBtn) {
+          askBtn.onclick = async () => {
+            try {
+              await applyReceiptCorrection('ASK_ME_NEXT_TIME');
+              setStatusLine('Clover will ask next time before repeating that routine.');
+            } catch (error) {
+              setStatusLine(`Could not update Clover’s routine: ${error.message}.`);
+            } finally {
+              renderAll();
+            }
+          };
+        }
+        const pauseReceiptBtn = document.getElementById('receiptPauseForeman');
+        if (pauseReceiptBtn) {
+          pauseReceiptBtn.onclick = async () => {
+            try {
+              await applyReceiptCorrection('PAUSE_FOREMAN');
+              setStatusLine('Foreman paused.');
+            } catch (error) {
+              setStatusLine(`Could not pause Clover: ${error.message}.`);
+            } finally {
+              renderAll();
+            }
+          };
+        }
+      }
+    }
   }
 
   function permissionConfig() {
     return [
       { key: 'observeAndSuggest', label: 'Observe + suggest', level: 1 },
-      { key: 'collectOutputs', label: 'Collect outputs', level: 2 },
+      { key: 'collectOutputs', label: 'Collect outputs', level: 1 },
       { key: 'queueProduction', label: 'Queue production', level: 3 },
       { key: 'setPriority', label: 'Set one priority', level: 4 },
       { key: 'sellSurplusFood', label: 'Sell surplus food', level: 5 }
@@ -574,21 +1083,24 @@
     }
     node.innerHTML = lines.map((item) => `
       <div class="foundersRecapItem">
-        <strong>#${htmlEscape(String(item.seq))}</strong>
+        <strong>Event #${htmlEscape(String(item.eventId || item.seq))}</strong>
         <div class="small">${htmlEscape(item.line)}</div>
       </div>
     `).join('');
   }
 
   function renderQuest(state) {
-    const quest = state?.quest || {};
-    setText('questTitle', quest.title || 'Set the first productive district');
-    setText('questBody', quest.body || 'Choose a meaningful next step for the settlement.');
+    const currentGoal = state?.currentGoal || state?.quest || {};
+    setText('questTitle', currentGoal.title || state?.quest?.title || 'Set the first productive district');
+    setText('questBody', currentGoal.body || state?.quest?.body || 'Choose a meaningful next step for the settlement.');
+    setText('goalOwnerBadge', prettyGoalOwner(currentGoal.owner));
     setQuestStatus(`${state?.recap?.unseenCount || 0} unseen recap lines · ${state?.foreman?.pendingApprovals?.length || 0} pending approvals`);
 
     const cta = document.getElementById('questCtaBtn');
     if (!cta) return;
-    const action = quest.primaryAction && typeof quest.primaryAction === 'object' ? quest.primaryAction : null;
+    const action = currentGoal.primaryAction && typeof currentGoal.primaryAction === 'object'
+      ? currentGoal.primaryAction
+      : (state?.quest?.primaryAction && typeof state.quest.primaryAction === 'object' ? state.quest.primaryAction : null);
     const label = (() => {
       if (!action) return 'No action available';
       if (action.type === 'PLACE_BUILDING') return `Place ${BUILDING_LABELS[action.buildingType] || action.buildingType}`;
@@ -596,6 +1108,9 @@
       if (action.type === 'COLLECT_OUTPUTS') return 'Collect outputs';
       if (action.type === 'UPGRADE_HQ') return 'Upgrade Headquarters';
       if (action.type === 'ENABLE_PERMISSION') return 'Enable permission';
+      if (action.type === 'TURN_IN_CONTRACT') return 'Turn in contract';
+      if (action.type === 'VIEW_CONTRACT_BOARD') return 'Open Contract Board';
+      if (action.type === 'RESOLVE_APPROVAL') return 'Review approval';
       if (action.type === 'QUEUE_BEST_JOB') return 'Queue best job';
       return 'Continue';
     })();
@@ -643,6 +1158,20 @@
           await updatePolicy(action.permission, true);
           return;
         }
+        if (action.type === 'TURN_IN_CONTRACT' && action.contractId) {
+          await turnInContract(action.contractId);
+          return;
+        }
+        if (action.type === 'VIEW_CONTRACT_BOARD') {
+          focusPanel('contractBoard');
+          setStatusLine('Contract Board is ready.');
+          return;
+        }
+        if (action.type === 'RESOLVE_APPROVAL') {
+          focusPanel('approvalsList');
+          setStatusLine('An approval is waiting for your decision.');
+          return;
+        }
         if (action.type === 'QUEUE_BEST_JOB') {
           const candidate = (state.buildings || []).find((building) => (
             building.type !== 'HQ'
@@ -688,6 +1217,7 @@
     renderBoard(state);
     renderQuest(state);
     renderSelection(state);
+    renderContracts(state);
     renderForeman(state);
     renderPermissions(state);
     renderApprovals(state);
@@ -748,6 +1278,155 @@
     return payload;
   }
 
+  async function startForemanRuntime() {
+    const gateway = await initGateway();
+    let skillLoaded = false;
+    let toolsLoaded = false;
+    let goalsLoaded = false;
+
+    if (gateway && typeof gateway.visitExperience === 'function') {
+      const visit = await gateway.visitExperience({ url: '/experiences/founders-plot/skill.md' }).catch(() => null);
+      skillLoaded = !!visit?.ok;
+    }
+    try {
+      const toolsText = await apiText('/experiences/founders-plot/tools.md');
+      toolsLoaded = typeof toolsText === 'string' && toolsText.includes('Founders Plot Tool Surface');
+    } catch {
+      toolsLoaded = false;
+    }
+    try {
+      const goalsText = await apiText('/experiences/founders-plot/goals.md');
+      goalsLoaded = typeof goalsText === 'string' && goalsText.includes('Founders Plot Goals');
+    } catch {
+      goalsLoaded = false;
+    }
+
+    const payload = await api('/api/founders-plot/foreman/session/start', {
+      method: 'POST',
+      body: JSON.stringify({
+        pack: {
+          skillLoaded,
+          toolsLoaded,
+          goalsLoaded
+        }
+      })
+    });
+    foremanRuntimeToken = String(payload?.runtime?.token || '');
+    await loadState();
+    return payload;
+  }
+
+  async function heartbeatForemanRuntime() {
+    const payload = await foremanApi('/api/founders-plot/foreman/session/heartbeat', {
+      method: 'POST',
+      body: JSON.stringify({})
+    });
+    await loadState();
+    return payload;
+  }
+
+  async function pauseForemanRuntime() {
+    const payload = await foremanApi('/api/founders-plot/foreman/session/pause', {
+      method: 'POST',
+      body: JSON.stringify({})
+    });
+    await loadState();
+    return payload;
+  }
+
+  async function getForemanObservation() {
+    return await foremanApi('/api/founders-plot/foreman/observation', {
+      method: 'GET'
+    });
+  }
+
+  async function enableCollectReadyOutputs() {
+    const response = await api('/api/founders-plot/tool/et.foreman.scheduler.enable_collect_ready_outputs', {
+      method: 'POST',
+      body: JSON.stringify({
+        idempotencyKey: `scheduler-enable:${Date.now()}`
+      })
+    });
+    currentState = { ok: true, state: response.data?.state || response.state || currentState?.state || null };
+    renderAll();
+    return {
+      ok: true,
+      scheduler: response.data?.scheduler || response.scheduler || null
+    };
+  }
+
+  async function getSchedulerStatus() {
+    const payload = await api('/api/founders-plot/state');
+    return {
+      ok: true,
+      scheduler: payload?.state?.foreman?.scheduler || payload?.state?.scheduler || null
+    };
+  }
+
+  async function runForemanTick() {
+    if (!foremanRuntimeToken) {
+      return {
+        ok: false,
+        error: { code: 'FOREMAN_RUNTIME_REQUIRED' }
+      };
+    }
+    const heartbeat = await heartbeatForemanRuntime().catch((error) => error);
+    if (heartbeat instanceof Error) {
+      await loadState().catch(() => null);
+      if (heartbeat.message === 'STALE_RUNTIME' || heartbeat.message === 'FOREMAN_RUNTIME_REQUIRED') {
+        return {
+          ok: true,
+          result: { mutationApplied: false },
+          receipt: currentState?.state?.foreman?.receipt || null
+        };
+      }
+      throw heartbeat;
+    }
+    const observation = await getForemanObservation().catch((error) => error);
+    if (observation instanceof Error) {
+      await loadState().catch(() => null);
+      if (observation.message === 'STALE_RUNTIME' || observation.message === 'FOREMAN_RUNTIME_REQUIRED') {
+        return {
+          ok: true,
+          result: { mutationApplied: false },
+          receipt: currentState?.state?.foreman?.receipt || null
+        };
+      }
+      throw observation;
+    }
+    const chosenId = String(observation?.decision?.chosenCandidateId || '');
+    const safeCandidates = Array.isArray(observation?.safeCandidates) ? observation.safeCandidates : [];
+    const chosen = safeCandidates.find((candidate) => candidate?.candidateId === chosenId) || null;
+    if (!chosen || chosen.canActNow !== true) {
+      await loadState();
+      return {
+        ok: true,
+        result: { mutationApplied: false },
+        receipt: currentState?.state?.foreman?.receipt || null
+      };
+    }
+    const payload = await foremanApi(`/api/founders-plot/foreman/tool/${encodeURIComponent(chosen.toolName)}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        buildingId: chosen.buildingId,
+        idempotencyKey: `foreman:${chosen.candidateId}:${Date.now()}`
+      })
+    });
+    currentState = { ok: true, state: payload.state };
+    renderAll();
+    return payload;
+  }
+
+  async function applyReceiptCorrection(correction) {
+    const payload = await api('/api/founders-plot/foreman/receipt/correction', {
+      method: 'POST',
+      body: JSON.stringify({ correction })
+    });
+    currentState = { ok: true, state: payload.state };
+    renderAll();
+    return payload;
+  }
+
   function startPolling() {
     if (pollTimer) clearInterval(pollTimer);
     pollTimer = setInterval(() => {
@@ -787,7 +1466,15 @@
     updatePolicy,
     resolveApproval,
     claimReward,
-    advance: advanceForTest
+    advance: advanceForTest,
+    startForemanRuntime,
+    heartbeatForemanRuntime,
+    pauseForemanRuntime,
+    getForemanObservation,
+    enableCollectReadyOutputs,
+    getSchedulerStatus,
+    runForemanTick,
+    applyReceiptCorrection
   };
 
   applyEmbedMode();

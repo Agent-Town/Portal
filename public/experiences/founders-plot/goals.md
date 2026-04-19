@@ -2,7 +2,11 @@
 
 - Place the first Lumber Camp.
 - Collect the first wood.
+- Claim the one-time First Timber reward without duplicating it.
 - Upgrade Headquarters to level 2.
-- Keep the quest on first wood until that collection is complete.
+- Place the first Farm Plot before drifting into optimization.
+- Choose one living contract from a named town requester.
+- Give Clover one Standing Order: Careful Steward or Bold Founder.
 - Teach the foreman one safe automation at a time.
+- Let the real in-session Foreman collect one ready output through the authenticated route.
 - Reach Headquarters level 5 without breaking determinism or trust.

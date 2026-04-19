@@ -18,14 +18,27 @@ const EVENT_TYPES = {
   JOB_COMPLETED: 'JOB_COMPLETED',
   OUTPUT_COLLECTED: 'OUTPUT_COLLECTED',
   HQ_UPGRADED: 'HQ_UPGRADED',
+  CONTRACT_OFFERED: 'CONTRACT_OFFERED',
+  CONTRACT_ACCEPTED: 'CONTRACT_ACCEPTED',
+  CONTRACT_COMPLETED: 'CONTRACT_COMPLETED',
   APPROVAL_REQUESTED: 'APPROVAL_REQUESTED',
   APPROVAL_APPROVED: 'APPROVAL_APPROVED',
   APPROVAL_REJECTED: 'APPROVAL_REJECTED',
   AGENT_PERMISSION_CHANGED: 'AGENT_PERMISSION_CHANGED',
   AGENT_ACTION_EXECUTED: 'AGENT_ACTION_EXECUTED',
+  FOREMAN_STANDING_ORDER_CHANGED: 'FOREMAN_STANDING_ORDER_CHANGED',
+  FOREMAN_SESSION_STARTED: 'FOREMAN_SESSION_STARTED',
+  FOREMAN_SESSION_HEARTBEAT: 'FOREMAN_SESSION_HEARTBEAT',
+  FOREMAN_SESSION_PAUSED: 'FOREMAN_SESSION_PAUSED',
+  FOREMAN_RECEIPT_CREATED: 'FOREMAN_RECEIPT_CREATED',
+  SCHEDULER_ENABLED: 'SCHEDULER_ENABLED',
+  SCHEDULER_PAUSED: 'SCHEDULER_PAUSED',
+  SCHEDULER_RESUMED: 'SCHEDULER_RESUMED',
   REWARD_CLAIMED: 'REWARD_CLAIMED',
   RECAP_GENERATED: 'RECAP_GENERATED'
 };
+
+const STANDING_ORDERS = ['CAREFUL_STEWARD', 'BOLD_FOUNDER'];
 
 const BUILD_PADS = [
   { x: 0, y: 0, label: 'Northwest Pad' },
@@ -62,14 +75,14 @@ const CONSTRUCTION_SLOTS_BY_HQ = {
 const HQ_UPGRADE_RULES = {
   1: {
     nextLevel: 2,
-    cost: { wood: 20 },
-    xpRequired: 15,
+    cost: { wood: 20, food: 10 },
+    xpRequired: 25,
     durationMs: 2 * 60 * 1000
   },
   2: {
     nextLevel: 3,
-    cost: { wood: 30, food: 20 },
-    xpRequired: 45,
+    cost: { wood: 30, stone: 20 },
+    xpRequired: 50,
     durationMs: 3 * 60 * 1000
   },
   3: {
@@ -97,8 +110,8 @@ const BUILDING_RULES = {
   LUMBER_CAMP: {
     label: 'Lumber Camp',
     unlockLevel: 1,
-    buildCost: { coin: 6 },
-    buildDurationMs: 60 * 1000,
+    buildCost: {},
+    buildDurationMs: 30 * 1000,
     maxLevel: 2,
     production: {
       1: { kind: 'PRODUCE', input: {}, output: { wood: 6 }, durationMs: 60 * 1000 },
@@ -111,8 +124,8 @@ const BUILDING_RULES = {
   FARM_PLOT: {
     label: 'Farm Plot',
     unlockLevel: 2,
-    buildCost: { wood: 10, coin: 6 },
-    buildDurationMs: 90 * 1000,
+    buildCost: { wood: 10, coin: 5 },
+    buildDurationMs: 45 * 1000,
     maxLevel: 2,
     production: {
       1: { kind: 'PRODUCE', input: {}, output: { food: 6 }, durationMs: 90 * 1000 },
@@ -125,8 +138,8 @@ const BUILDING_RULES = {
   QUARRY: {
     label: 'Quarry',
     unlockLevel: 3,
-    buildCost: { wood: 14, coin: 8 },
-    buildDurationMs: 90 * 1000,
+    buildCost: { wood: 15, coin: 5 },
+    buildDurationMs: 60 * 1000,
     maxLevel: 2,
     production: {
       1: { kind: 'PRODUCE', input: {}, output: { stone: 4 }, durationMs: 90 * 1000 },
@@ -139,8 +152,8 @@ const BUILDING_RULES = {
   WORKSHOP: {
     label: 'Workshop',
     unlockLevel: 4,
-    buildCost: { wood: 20, stone: 12, coin: 10 },
-    buildDurationMs: 120 * 1000,
+    buildCost: { wood: 20, stone: 10, coin: 10 },
+    buildDurationMs: 90 * 1000,
     maxLevel: 2,
     production: {
       1: { kind: 'PRODUCE', input: { wood: 8, stone: 4 }, output: { workshop_buff: 1 }, durationMs: 60 * 1000 },
@@ -153,7 +166,7 @@ const BUILDING_RULES = {
   MARKET_STALL: {
     label: 'Market Stall',
     unlockLevel: 5,
-    buildCost: { wood: 18, stone: 8, coin: 12 },
+    buildCost: { wood: 15, stone: 10, coin: 10 },
     buildDurationMs: 90 * 1000,
     maxLevel: 2,
     production: {
@@ -168,7 +181,7 @@ const BUILDING_RULES = {
 
 const PERMISSION_RULES = [
   { key: 'observeAndSuggest', level: 1, defaultValue: true },
-  { key: 'collectOutputs', level: 2, defaultValue: false },
+  { key: 'collectOutputs', level: 1, defaultValue: false },
   { key: 'queueProduction', level: 3, defaultValue: false },
   { key: 'setPriority', level: 4, defaultValue: false },
   { key: 'sellSurplusFood', level: 5, defaultValue: false }
@@ -199,12 +212,14 @@ const DEFAULT_POLICY = {
 const XP_RULES = {
   firstPlacement: 10,
   firstCollection: 5,
+  firstTimberRewardXp: 10,
   hqUpgrade: 20,
+  contractTurnIn: 8,
   automationTier: 10,
   dailyReturn: 5
 };
 
-const FOUNDERS_PLOT_SCHEMA_VERSION = 1;
+const FOUNDERS_PLOT_SCHEMA_VERSION = 2;
 const MAX_OFFLINE_MS = 8 * 60 * 60 * 1000;
 const SIMULATION_TICK_MS = 60 * 1000;
 
@@ -221,7 +236,15 @@ const META_CORE_KEYS = new Set([
   'recapSeenSeq',
   'lastGeneratedRecapSeq',
   'publicHeadline',
-  'questDismissedAt'
+  'questDismissedAt',
+  'firstTimberRewarded',
+  'standingOrder',
+  'contracts',
+  'scheduler',
+  'foremanRuntime',
+  'foremanReceipts',
+  'foremanLastDecision',
+  'foremanLastReceiptId'
 ]);
 
 function nowBucketHour(nowMs) {
@@ -297,6 +320,130 @@ function normalizePolicy(raw = {}) {
   };
 }
 
+function normalizeStandingOrder(value) {
+  const normalized = String(value || '').trim().toUpperCase();
+  if (STANDING_ORDERS.includes(normalized)) return normalized;
+  return 'CAREFUL_STEWARD';
+}
+
+function normalizeContractRequirements(raw = {}) {
+  return {
+    wood: normalizeCount(raw.wood),
+    stone: normalizeCount(raw.stone),
+    food: normalizeCount(raw.food),
+    coin: normalizeCount(raw.coin),
+    buildingType: typeof raw.buildingType === 'string' ? raw.buildingType : ''
+  };
+}
+
+function normalizeContract(raw = {}) {
+  return {
+    contractId: String(raw.contractId || ''),
+    kind: String(raw.kind || '').toUpperCase(),
+    requester: String(raw.requester || ''),
+    institution: String(raw.institution || ''),
+    whyNow: String(raw.whyNow || ''),
+    townSignal: String(raw.townSignal || ''),
+    philosophyHint: String(raw.philosophyHint || ''),
+    title: String(raw.title || ''),
+    description: String(raw.description || ''),
+    status: String(raw.status || 'OFFERED'),
+    requirements: normalizeContractRequirements(raw.requirements || {}),
+    rewards: {
+      wood: normalizeCount(raw?.rewards?.wood),
+      stone: normalizeCount(raw?.rewards?.stone),
+      food: normalizeCount(raw?.rewards?.food),
+      coin: normalizeCount(raw?.rewards?.coin),
+      townXp: normalizeCount(raw?.rewards?.townXp)
+    },
+    acceptedAt: normalizeCount(raw.acceptedAt),
+    completedAt: normalizeCount(raw.completedAt)
+  };
+}
+
+function normalizeContracts(raw = {}) {
+  return {
+    offers: Array.isArray(raw.offers) ? raw.offers.map((contract) => normalizeContract(contract)).filter((contract) => contract.contractId) : [],
+    activeContract: raw.activeContract ? normalizeContract(raw.activeContract) : null,
+    completed: Array.isArray(raw.completed) ? raw.completed.map((contract) => normalizeContract(contract)).filter((contract) => contract.contractId) : []
+  };
+}
+
+function defaultCollectScheduler() {
+  return {
+    preset: 'COLLECT_READY_OUTPUTS',
+    enabled: false,
+    paused: false,
+    runtimeScope: 'active_foreman_session',
+    nextRunAtMs: 0,
+    runCount: 0,
+    lease: {
+      runtimeId: '',
+      claimedAtMs: 0,
+      expiresAtMs: 0
+    },
+    lastResult: null
+  };
+}
+
+function normalizeScheduler(raw = {}) {
+  const source = raw.collectReadyOutputs && typeof raw.collectReadyOutputs === 'object'
+    ? raw.collectReadyOutputs
+    : raw;
+  return {
+    collectReadyOutputs: {
+      ...defaultCollectScheduler(),
+      enabled: source.enabled === true,
+      paused: source.paused === true,
+      nextRunAtMs: normalizeCount(source.nextRunAtMs),
+      runCount: normalizeCount(source.runCount),
+      lease: {
+        runtimeId: String(source?.lease?.runtimeId || ''),
+        claimedAtMs: normalizeCount(source?.lease?.claimedAtMs),
+        expiresAtMs: normalizeCount(source?.lease?.expiresAtMs)
+      },
+      lastResult: source.lastResult && typeof source.lastResult === 'object'
+        ? copyPersistedValue(source.lastResult)
+        : null
+    }
+  };
+}
+
+function normalizeForemanRuntime(raw = {}) {
+  return {
+    runtimeId: String(raw.runtimeId || ''),
+    sessionId: String(raw.sessionId || ''),
+    token: String(raw.token || ''),
+    status: String(raw.status || 'NOT_STARTED'),
+    startedAt: normalizeCount(raw.startedAt),
+    lastHeartbeatAt: normalizeCount(raw.lastHeartbeatAt),
+    expiresAt: normalizeCount(raw.expiresAt),
+    pausedAt: normalizeCount(raw.pausedAt),
+    lastError: String(raw.lastError || ''),
+    pack: {
+      skillLoaded: raw?.pack?.skillLoaded === true,
+      toolsLoaded: raw?.pack?.toolsLoaded === true,
+      goalsLoaded: raw?.pack?.goalsLoaded === true
+    }
+  };
+}
+
+function normalizeForemanReceipt(raw = {}) {
+  return {
+    receiptId: String(raw.receiptId || ''),
+    action: String(raw.action || ''),
+    result: String(raw.result || ''),
+    reason: String(raw.reason || ''),
+    authorityUsed: String(raw.authorityUsed || ''),
+    standingOrderUsed: String(raw.standingOrderUsed || ''),
+    correctionOptions: Array.isArray(raw.correctionOptions)
+      ? raw.correctionOptions.map((entry) => String(entry || '')).filter(Boolean)
+      : [],
+    eventId: normalizeCount(raw.eventId),
+    createdAt: normalizeCount(raw.createdAt)
+  };
+}
+
 function collectMetaExtensions(raw = {}) {
   const extensions = raw.extensions && typeof raw.extensions === 'object' && !Array.isArray(raw.extensions)
     ? copyPersistedValue(raw.extensions)
@@ -342,6 +489,18 @@ function normalizeMeta(raw = {}) {
     lastGeneratedRecapSeq: normalizeCount(raw.lastGeneratedRecapSeq),
     publicHeadline: typeof raw.publicHeadline === 'string' ? raw.publicHeadline : '',
     questDismissedAt: normalizeCount(raw.questDismissedAt),
+    firstTimberRewarded: raw.firstTimberRewarded === true,
+    standingOrder: normalizeStandingOrder(raw.standingOrder),
+    contracts: normalizeContracts(raw.contracts),
+    scheduler: normalizeScheduler(raw.scheduler),
+    foremanRuntime: normalizeForemanRuntime(raw.foremanRuntime),
+    foremanReceipts: Array.isArray(raw.foremanReceipts)
+      ? raw.foremanReceipts.map((receipt) => normalizeForemanReceipt(receipt)).filter((receipt) => receipt.receiptId)
+      : [],
+    foremanLastDecision: raw.foremanLastDecision && typeof raw.foremanLastDecision === 'object'
+      ? copyPersistedValue(raw.foremanLastDecision)
+      : null,
+    foremanLastReceiptId: typeof raw.foremanLastReceiptId === 'string' ? raw.foremanLastReceiptId : '',
     extensions: collectMetaExtensions(raw)
   };
 }
@@ -417,6 +576,20 @@ function migrateStateV0ToV1(raw) {
   const next = raw && typeof raw === 'object' ? copyJson(raw) : {};
   const meta = next.meta && typeof next.meta === 'object' ? next.meta : {};
   meta.extensions = collectMetaExtensions(meta);
+  meta.schemaVersion = 1;
+  next.meta = meta;
+  return next;
+}
+
+function migrateStateV1ToV2(raw) {
+  const next = raw && typeof raw === 'object' ? copyJson(raw) : {};
+  const meta = next.meta && typeof next.meta === 'object' ? next.meta : {};
+  meta.firstTimberRewarded = meta.firstTimberRewarded === true;
+  meta.standingOrder = normalizeStandingOrder(meta.standingOrder);
+  meta.contracts = normalizeContracts(meta.contracts);
+  meta.scheduler = normalizeScheduler(meta.scheduler);
+  meta.foremanRuntime = normalizeForemanRuntime(meta.foremanRuntime);
+  meta.foremanReceipts = Array.isArray(meta.foremanReceipts) ? meta.foremanReceipts : [];
   meta.schemaVersion = FOUNDERS_PLOT_SCHEMA_VERSION;
   next.meta = meta;
   return next;
@@ -436,6 +609,10 @@ function prepareLoadedState(raw) {
   let toVersion = fromVersion;
   if (toVersion < 1) {
     migratedRaw = migrateStateV0ToV1(migratedRaw);
+    toVersion = 1;
+  }
+  if (toVersion < FOUNDERS_PLOT_SCHEMA_VERSION) {
+    migratedRaw = migrateStateV1ToV2(migratedRaw);
     toVersion = FOUNDERS_PLOT_SCHEMA_VERSION;
   }
   return {
@@ -561,7 +738,22 @@ function unlockedPermissionKeys(hqLevel) {
 }
 
 function unlockedToolNames(state) {
-  const tools = ['et.plot.get_state', 'et.plot.request_user_approval', 'et.plot.place_building', 'et.plot.upgrade_building', 'et.plot.claim_reward'];
+  const tools = [
+    'et.plot.get_state',
+    'et.plot.request_user_approval',
+    'et.plot.place_building',
+    'et.plot.upgrade_building',
+    'et.plot.claim_reward',
+    'et.plot.contracts.get_state',
+    'et.plot.contracts.accept',
+    'et.plot.contracts.turn_in',
+    'et.foreman.policy.get_standing_order',
+    'et.foreman.policy.set_standing_order',
+    'et.foreman.scheduler.get_status',
+    'et.foreman.scheduler.enable_collect_ready_outputs',
+    'et.foreman.scheduler.pause',
+    'et.foreman.scheduler.resume'
+  ];
   if (state.plot.hqLevel >= 2) tools.push('et.plot.collect_outputs');
   if (state.plot.hqLevel >= 3) tools.push('et.plot.queue_job');
   if (state.plot.hqLevel >= 4) tools.push('et.plot.set_priority');
@@ -599,6 +791,69 @@ function addInventory(plot, delta) {
   clampInventoryToCaps(plot);
 }
 
+function inventorySnapshot(plot) {
+  return {
+    wood: normalizeCount(plot?.inventory?.wood),
+    stone: normalizeCount(plot?.inventory?.stone),
+    food: normalizeCount(plot?.inventory?.food),
+    coin: normalizeCount(plot?.inventory?.coin)
+  };
+}
+
+function emptyResourceDeltaBlock() {
+  return {
+    wood: 0,
+    stone: 0,
+    food: 0,
+    coin: 0,
+    townXp: 0
+  };
+}
+
+function mergeResourceDelta(target, patch) {
+  const next = { ...(target || emptyResourceDeltaBlock()) };
+  for (const key of Object.keys(emptyResourceDeltaBlock())) {
+    next[key] = normalizeCount(next[key]) + normalizeCount(patch?.[key]);
+  }
+  return next;
+}
+
+function captureResourceDelta(state, { before, consumed = {}, produced = {}, collected = {}, rewarded = {}, cappedLost = {} } = {}) {
+  return {
+    before: before || { ...inventorySnapshot(state.plot), townXp: normalizeCount(state.plot.townXp) },
+    consumed: mergeResourceDelta(emptyResourceDeltaBlock(), consumed),
+    produced: mergeResourceDelta(emptyResourceDeltaBlock(), produced),
+    collected: mergeResourceDelta(emptyResourceDeltaBlock(), collected),
+    rewarded: mergeResourceDelta(emptyResourceDeltaBlock(), rewarded),
+    cappedLost: mergeResourceDelta(emptyResourceDeltaBlock(), cappedLost),
+    after: { ...inventorySnapshot(state.plot), townXp: normalizeCount(state.plot.townXp) }
+  };
+}
+
+function addInventoryWithCaps(plot, delta) {
+  const before = inventorySnapshot(plot);
+  const safeDelta = delta && typeof delta === 'object' ? delta : {};
+  const cappedLost = { wood: 0, stone: 0, food: 0, coin: 0 };
+  for (const resource of ['wood', 'stone', 'food', 'coin']) {
+    const current = normalizeCount(plot.inventory[resource]);
+    const gain = normalizeCount(safeDelta[resource]);
+    if (gain <= 0) continue;
+    if (resource === 'coin') {
+      plot.inventory.coin = current + gain;
+      continue;
+    }
+    const cap = normalizeCount(plot.storageCaps[resource]);
+    const next = current + gain;
+    plot.inventory[resource] = Math.min(cap, next);
+    cappedLost[resource] = Math.max(0, next - plot.inventory[resource]);
+  }
+  return {
+    before,
+    after: inventorySnapshot(plot),
+    cappedLost
+  };
+}
+
 function addXp(state, amount) {
   state.plot.townXp = normalizeCount(state.plot.townXp) + normalizeCount(amount);
 }
@@ -633,6 +888,22 @@ function maybeAwardAutomationXp(state, policyKey) {
     return true;
   }
   return false;
+}
+
+function maybeApplyFirstTimberReward(state) {
+  if (state.meta.firstTimberRewarded === true) return null;
+  if (!state.meta.firstCollectedTypes.includes('LUMBER_CAMP')) return null;
+  state.meta.firstTimberRewarded = true;
+  const reward = {
+    food: 10,
+    townXp: XP_RULES.firstTimberRewardXp
+  };
+  const inventoryGain = addInventoryWithCaps(state.plot, { food: reward.food });
+  addXp(state, reward.townXp);
+  return {
+    reward,
+    inventoryGain
+  };
 }
 
 function getPendingApproval(state, approvalId) {
@@ -798,6 +1069,105 @@ function pushHqReward(state, level, nowMs) {
   });
 }
 
+function contractDeckForStarterBoard() {
+  return [
+    normalizeContract({
+      contractId: randomId('con'),
+      kind: 'SUPPLY',
+      requester: 'Mara Vale',
+      institution: 'Canteen Guild',
+      title: 'Camp kitchen timber run',
+      description: 'Deliver starter provisions and timber to keep the cookfires going.',
+      whyNow: 'The kitchen stores are thin while new workers arrive.',
+      townSignal: 'Short rations at the camp kitchens',
+      philosophyHint: 'Stabilize the town before chasing expansion.',
+      status: 'OFFERED',
+      requirements: { wood: 6 },
+      rewards: { coin: 4, townXp: XP_RULES.contractTurnIn }
+    }),
+    normalizeContract({
+      contractId: randomId('con'),
+      kind: 'BUILD',
+      requester: 'Jon Weaver',
+      institution: 'Town Hall Works',
+      title: 'Raise a proper farm',
+      description: 'Build the first Farm Plot so the settlement can feed itself.',
+      whyNow: 'Town Hall wants the first permanent food lane opened.',
+      townSignal: 'Growth pressure from new arrivals',
+      philosophyHint: 'Build for tomorrow, not just today.',
+      status: 'OFFERED',
+      requirements: { buildingType: 'FARM_PLOT' },
+      rewards: { coin: 5, townXp: XP_RULES.contractTurnIn + 2 }
+    })
+  ];
+}
+
+function ensureContractBoard(state) {
+  if (state.plot.hqLevel < 2) return;
+  const contracts = state.meta.contracts;
+  if (contracts.activeContract) return;
+  if (Array.isArray(contracts.offers) && contracts.offers.length > 0) return;
+  contracts.offers = contractDeckForStarterBoard();
+}
+
+function activeContract(state) {
+  return state?.meta?.contracts?.activeContract || null;
+}
+
+function contractRequirementStatus(state, contract) {
+  if (!contract) return {
+    ready: false,
+    missing: {}
+  };
+  if (contract.kind === 'BUILD') {
+    const buildingType = String(contract?.requirements?.buildingType || '');
+    const ready = !!state.buildings.find((building) => building.type === buildingType && building.state !== 'UNDER_CONSTRUCTION');
+    return {
+      ready,
+      missing: ready ? {} : { buildingType }
+    };
+  }
+  const missing = {};
+  let ready = true;
+  for (const resource of ['wood', 'stone', 'food', 'coin']) {
+    const need = normalizeCount(contract?.requirements?.[resource]);
+    const have = normalizeCount(state?.plot?.inventory?.[resource]);
+    if (need > have) {
+      ready = false;
+      missing[resource] = need - have;
+    }
+  }
+  return { ready, missing };
+}
+
+function refreshActiveContractState(state) {
+  const contract = activeContract(state);
+  if (!contract || contract.status === 'COMPLETED' || contract.status === 'CANCELLED_BY_SYSTEM') return contract;
+  const status = contractRequirementStatus(state, contract);
+  contract.status = status.ready ? 'READY_TO_TURN_IN' : 'ACTIVE';
+  return contract;
+}
+
+function foremanStandingOrder(state) {
+  return normalizeStandingOrder(state?.meta?.standingOrder);
+}
+
+function foremanRuntimeStatus(state) {
+  return state?.meta?.foremanRuntime || normalizeForemanRuntime({});
+}
+
+function latestForemanReceipt(state) {
+  const receipts = Array.isArray(state?.meta?.foremanReceipts) ? state.meta.foremanReceipts : [];
+  return receipts.length > 0 ? receipts[0] : null;
+}
+
+function appendForemanReceipt(state, receipt) {
+  const normalized = normalizeForemanReceipt(receipt);
+  state.meta.foremanReceipts = [normalized, ...(state.meta.foremanReceipts || [])].slice(0, 12);
+  state.meta.foremanLastReceiptId = normalized.receiptId;
+  return normalized;
+}
+
 function firstCollectionQuest(state, {
   type,
   step,
@@ -835,6 +1205,8 @@ function firstCollectionQuest(state, {
 }
 
 function nextQuest(state) {
+  ensureContractBoard(state);
+  refreshActiveContractState(state);
   const hasType = (type) => state.buildings.some((building) => building.type === type);
   if (!hasType('LUMBER_CAMP')) {
     return {
@@ -859,24 +1231,43 @@ function nextQuest(state) {
     return {
       step: 'upgrade_hq_2',
       title: 'Open Headquarters level 2',
-      body: 'Spend wood to unlock your first farm and the foreman collect permission tier.',
+      body: 'Spend your first timber and provisions to unlock the Farm Plot and the town contract board.',
       primaryAction: { type: 'UPGRADE_HQ' }
     };
   }
   if (!hasType('FARM_PLOT')) {
-    if (state.policy.collectOutputs !== true) {
-      return {
-        step: 'grant_collect_permission',
-        title: 'Teach the foreman to collect',
-        body: 'Enable the collect permission before opening the Farm Plot so the first automation tier is explicit and visible.',
-        primaryAction: { type: 'ENABLE_PERMISSION', permission: 'collectOutputs' }
-      };
-    }
     return {
       step: 'place_farm_plot',
       title: 'Plant the first farm',
-      body: 'A Farm Plot keeps the settlement fed and opens the next upgrade path.',
+      body: 'A Farm Plot opens the first steady food lane and satisfies the town\'s first build request.',
       primaryAction: { type: 'PLACE_BUILDING', buildingType: 'FARM_PLOT' }
+    };
+  }
+  const contract = activeContract(state);
+  if (!contract && Array.isArray(state.meta.contracts.offers) && state.meta.contracts.offers.length > 0) {
+    return {
+      step: 'choose_first_contract',
+      title: 'Choose who to help first',
+      body: 'Pick one living town request from the Contract Board.',
+      primaryAction: { type: 'VIEW_CONTRACT_BOARD' }
+    };
+  }
+  if (contract && contract.status === 'READY_TO_TURN_IN') {
+    return {
+      step: 'turn_in_contract',
+      title: `Complete: ${contract.title}`,
+      body: `${contract.requester} is ready to receive the finished work.`,
+      primaryAction: { type: 'TURN_IN_CONTRACT', contractId: contract.contractId }
+    };
+  }
+  if (contract && contract.status === 'ACTIVE') {
+    return {
+      step: 'progress_contract',
+      title: `Advance: ${contract.title}`,
+      body: contract.kind === 'BUILD'
+        ? 'Complete the requested structure and return to the board.'
+        : 'Gather the requested supplies and return to the board.',
+      primaryAction: { type: 'VIEW_CONTRACT_BOARD' }
     };
   }
   const firstFoodQuest = firstCollectionQuest(state, {
@@ -894,7 +1285,7 @@ function nextQuest(state) {
     return {
       step: 'upgrade_hq_3',
       title: 'Reach Headquarters level 3',
-      body: 'Spend wood and food to unlock the Quarry, the next agent tier, and a second construction slot.',
+      body: 'Spend wood and stone to unlock the Quarry and the next production lane.',
       primaryAction: { type: 'UPGRADE_HQ' }
     };
   }
@@ -981,8 +1372,259 @@ function nextQuest(state) {
   };
 }
 
+function isTutorialQuestStep(step) {
+  return [
+    'place_lumber_camp',
+    'collect_first_wood',
+    'upgrade_hq_2',
+    'place_farm_plot',
+    'choose_first_contract'
+  ].includes(String(step || ''));
+}
+
+function resolvePrimaryGoal(state, { nowMs = Date.now() } = {}) {
+  refreshActiveContractState(state);
+  const approvals = pendingApprovalsView(state);
+  if (approvals.length > 0) {
+    return {
+      owner: 'approval',
+      priority: 1,
+      title: approvals[0].title,
+      body: approvals[0].body,
+      primaryAction: { type: 'RESOLVE_APPROVAL', approvalId: approvals[0].approvalId }
+    };
+  }
+
+  const quest = nextQuest(state);
+  const contract = activeContract(state);
+  const latestReceipt = latestForemanReceipt(state);
+  if (isTutorialQuestStep(quest.step)) {
+    return {
+      owner: 'tutorial',
+      priority: 3,
+      title: quest.title,
+      body: quest.body,
+      primaryAction: quest.primaryAction
+    };
+  }
+  if (contract && contract.status === 'READY_TO_TURN_IN') {
+    return {
+      owner: 'contract_ready',
+      priority: 4,
+      title: `Turn in: ${contract.title}`,
+      body: `${contract.requester} is waiting for the finished work.`,
+      primaryAction: { type: 'TURN_IN_CONTRACT', contractId: contract.contractId }
+    };
+  }
+  if (contract && contract.status === 'ACTIVE') {
+    return {
+      owner: 'contract_progress',
+      priority: 5,
+      title: contract.title,
+      body: contract.kind === 'BUILD'
+        ? 'Advance the requested construction.'
+        : 'Gather the requested supplies.',
+      primaryAction: { type: 'VIEW_CONTRACT_BOARD' }
+    };
+  }
+  if (latestReceipt && nowMs - normalizeCount(latestReceipt.createdAt) < 5 * 60 * 1000) {
+    return {
+      owner: 'receipt',
+      priority: 6,
+      title: 'Foreman receipt ready',
+      body: latestReceipt.reason || latestReceipt.result,
+      primaryAction: null
+    };
+  }
+  return {
+    owner: 'optimization',
+    priority: 7,
+    title: quest.title,
+    body: quest.body,
+    primaryAction: quest.primaryAction
+  };
+}
+
+function observationBuildingState(state, building) {
+  if (!building) return 'EMPTY_PAD';
+  if (building.state === 'UNDER_CONSTRUCTION') return 'CONSTRUCTING';
+  if (building.state === 'UPGRADING') return 'UPGRADING';
+  if (building.state === 'OUTPUT_READY') return 'OUTPUT_READY';
+  if (building.state === 'PRODUCING') return 'PRODUCING';
+  return 'IDLE';
+}
+
+function buildForemanObservation(state, { runtimeId = '', nowMs = Date.now(), recentEvents = [] } = {}) {
+  ensureContractBoard(state);
+  refreshActiveContractState(state);
+  const goal = resolvePrimaryGoal(state, { nowMs });
+  const mappedGoalOwner = goal.owner === 'approval'
+    ? 'approval'
+    : goal.owner === 'contract_ready' || goal.owner === 'contract_progress'
+      ? 'active_contract'
+      : goal.owner === 'receipt'
+        ? 'foreman'
+        : 'tutorial';
+  return {
+    schema: 'founders-plot.obs.v1.1',
+    schemaVersion: 'founders-plot.obs.v1.1',
+    plotId: state.plot.plotId,
+    nowMs,
+    runtimeId: String(runtimeId || ''),
+    currentGoal: {
+      owner: mappedGoalOwner,
+      text: `${goal.title}: ${goal.body}`,
+      priorityRank: goal.priority,
+      ownerRaw: goal.owner,
+      title: goal.title,
+      body: goal.body,
+      priority: goal.priority
+    },
+    inventory: inventorySnapshot(state.plot),
+    townXp: normalizeCount(state.plot.townXp),
+    hqLevel: normalizeCount(state.plot.hqLevel),
+    storageCaps: copyJson(state.plot.storageCaps),
+    buildings: BUILD_PADS.map((pad) => {
+      const building = state.buildings.find((entry) => entry.x === pad.x && entry.y === pad.y) || null;
+      return {
+        pad: { x: pad.x, y: pad.y, label: pad.label },
+        buildingId: building?.buildingId || '',
+        type: building?.type || '',
+        state: observationBuildingState(state, building),
+        jobEndsAtMs: runningJobForBuilding(state, building?.buildingId)?.endsAt || 0,
+        outputReady: building && building.state === 'OUTPUT_READY'
+          ? (() => {
+              const buffer = copyJson(building.outputBuffer || emptyOutputBuffer());
+              const resource = ['wood', 'stone', 'food', 'coin'].find((key) => normalizeCount(buffer[key]) > 0) || '';
+              return resource ? { resource, qty: normalizeCount(buffer[resource]), buffer } : null;
+            })()
+          : null
+      };
+    }),
+    activeContract: activeContract(state),
+    standingOrder: foremanStandingOrder(state),
+    permissions: {
+      collectOutputs: !!state.policy.collectOutputs,
+      queueProduction: !!state.policy.queueProduction,
+      spendCoinCap: normalizeCount(state.policy.sellDailyCoinCap),
+      setPriority: !!state.policy.setPriority,
+      sellSurplusFood: !!state.policy.sellSurplusFood
+    },
+    scheduler: {
+      enabled: state.meta.scheduler.collectReadyOutputs.enabled === true,
+      activePresets: state.meta.scheduler.collectReadyOutputs.enabled === true ? ['COLLECT_READY_OUTPUTS'] : [],
+      paused: state.meta.scheduler.collectReadyOutputs.paused === true,
+      collectReadyOutputs: copyJson(state.meta.scheduler.collectReadyOutputs)
+    },
+    allowedTools: unlockedToolNames(state),
+    recentEvents: recentEventsView(recentEvents).map((event) => ({
+      eventId: `evt_${event.seq}`,
+      seq: event.seq,
+      type: event.type,
+      summary: event.recapLine || event.explanation || '',
+      atMs: event.createdAt,
+      createdAt: event.createdAt
+    }))
+  };
+}
+
+function scoreCollectCandidate(state, candidate, observation) {
+  let score = 50;
+  const contract = observation.activeContract;
+  const building = getBuilding(state, candidate.buildingId);
+  if (contract?.status === 'ACTIVE' || contract?.status === 'READY_TO_TURN_IN') {
+    const requirementResource = ['wood', 'stone', 'food', 'coin'].find((resource) => normalizeCount(contract?.requirements?.[resource]) > 0) || '';
+    if (requirementResource && normalizeCount(building?.outputBuffer?.[requirementResource]) > 0) score += 30;
+  }
+  if (foremanStandingOrder(state) === 'CAREFUL_STEWARD') {
+    score += building?.type === 'FARM_PLOT' ? 12 : 4;
+  } else {
+    score += building?.type === 'LUMBER_CAMP' ? 12 : 6;
+  }
+  return score;
+}
+
+function claimSchedulerLease(state, runtimeId, nowMs) {
+  const task = state.meta.scheduler.collectReadyOutputs;
+  const lease = task.lease || { runtimeId: '', claimedAtMs: 0, expiresAtMs: 0 };
+  const activeRuntimeId = String(runtimeId || '');
+  if (!activeRuntimeId) return false;
+  if (lease.runtimeId && lease.runtimeId !== activeRuntimeId && normalizeCount(lease.expiresAtMs) > nowMs) {
+    return false;
+  }
+  task.lease = {
+    runtimeId: activeRuntimeId,
+    claimedAtMs: nowMs,
+    expiresAtMs: nowMs + 10_000
+  };
+  return true;
+}
+
+function buildSafeForemanCandidates(state, observation) {
+  refreshActiveContractState(state);
+  const candidates = [];
+  const scheduler = state.meta.scheduler.collectReadyOutputs;
+  const runtime = foremanRuntimeStatus(state);
+  const schedulerCanRun = scheduler.enabled === true
+    && scheduler.paused !== true
+    && (observation?.claimLease === true ? claimSchedulerLease(state, observation?.runtimeId, normalizeCount(observation?.nowMs)) : true);
+  if (
+    runtime.status !== 'PAUSED'
+    && state.policy.collectOutputs === true
+  ) {
+    for (const building of state.buildings) {
+      if (building.type === 'HQ' || building.state !== 'OUTPUT_READY') continue;
+      const score = scoreCollectCandidate(state, building, observation);
+      candidates.push({
+        candidateId: `collect:${building.buildingId}`,
+        toolName: 'et.plot.collect_outputs',
+        buildingId: building.buildingId,
+        reason: `Collect ready output from ${BUILDING_RULES[building.type].label}.`,
+        goalServed: observation?.activeContract?.contractId ? 'active_contract' : 'town_stability',
+        requiresApproval: false,
+        canActNow: schedulerCanRun,
+        score
+      });
+    }
+  }
+  return candidates.sort((a, b) => b.score - a.score || String(a.candidateId).localeCompare(String(b.candidateId)));
+}
+
+function chooseForemanCandidateWithTestBrain({ observation, safeCandidates = [] } = {}) {
+  const candidates = Array.isArray(safeCandidates) ? safeCandidates : [];
+  if (candidates.length === 0) {
+    return {
+      chosenCandidateId: null,
+      planCard: null
+    };
+  }
+  const chosen = candidates[0];
+  const standingOrder = normalizeStandingOrder(observation?.standingOrder);
+  const influence = standingOrder === 'BOLD_FOUNDER'
+    ? 'Bold Founder leans toward visible growth and momentum when the move is still safe.'
+    : 'Careful Steward favors stable reserves and predictable town upkeep.';
+  return {
+    chosenCandidateId: chosen.candidateId,
+    planCard: {
+      headline: 'Foreman plan',
+      goalServed: chosen.goalServed,
+      observation: chosen.reason,
+      recommendation: `Use ${chosen.toolName} on ${chosen.buildingId}.`,
+      reason: standingOrder === 'BOLD_FOUNDER'
+        ? 'This keeps the town moving and signals visible momentum.'
+        : 'This is the safest useful action that protects the town’s baseline flow.',
+      standingOrderInfluence: influence,
+      canActNow: chosen.canActNow === true,
+      proposedTool: chosen.toolName,
+      requiresApproval: chosen.requiresApproval === true,
+      alternative: candidates[1] ? `Alternative: ${candidates[1].reason}` : ''
+    }
+  };
+}
+
 function recommendationText(state) {
   const quest = nextQuest(state);
+  const contract = activeContract(state);
   if (quest.step === 'place_lumber_camp') {
     return 'Set a Lumber Camp first. Wood unlocks the entire rest of the plot.';
   }
@@ -1010,14 +1652,11 @@ function recommendationText(state) {
   if (quest.step === 'grant_collect_permission') {
     return 'Collect permission is the first trust milestone. Enable it before expanding into food.';
   }
-  if (quest.step === 'grant_queue_permission') {
-    return 'Queue permission matters once multiple producers exist. Enable it before adding more parallel work.';
+  if (quest.step === 'choose_first_contract') {
+    return 'Choose which town request matters first. The contract board is the first real civic choice.';
   }
-  if (quest.step === 'grant_priority_permission') {
-    return 'Priority control becomes useful now that the plot has real tradeoffs between wood, food, and stone.';
-  }
-  if (quest.step === 'grant_sell_permission') {
-    return 'Sell permission is the final automation tier. Only enable it once you trust the Market Stall loop.';
+  if (quest.step === 'turn_in_contract' && contract) {
+    return `${contract.requester} is waiting. Turn in the contract before drifting back to optimization.`;
   }
   if (state.policy.emergencyPause) {
     return 'The foreman is paused. Lift the emergency pause before asking for autonomous work.';
@@ -1116,12 +1755,40 @@ function stateHashPayload(state) {
       claimedRewards: state.meta.claimedRewards,
       firstPlacedTypes: state.meta.firstPlacedTypes,
       firstCollectedTypes: state.meta.firstCollectedTypes,
-      automationAwards: state.meta.automationAwards
+      automationAwards: state.meta.automationAwards,
+      firstTimberRewarded: state.meta.firstTimberRewarded,
+      standingOrder: state.meta.standingOrder,
+      contracts: state.meta.contracts,
+      scheduler: state.meta.scheduler,
+      foremanRuntime: {
+        runtimeId: state.meta.foremanRuntime.runtimeId,
+        sessionId: state.meta.foremanRuntime.sessionId,
+        status: state.meta.foremanRuntime.status,
+        startedAt: state.meta.foremanRuntime.startedAt,
+        lastHeartbeatAt: state.meta.foremanRuntime.lastHeartbeatAt,
+        expiresAt: state.meta.foremanRuntime.expiresAt,
+        pack: state.meta.foremanRuntime.pack
+      },
+      foremanReceipts: state.meta.foremanReceipts
     }
   };
 }
 
 function stateView(state, recentEvents = []) {
+  ensureContractBoard(state);
+  refreshActiveContractState(state);
+  const currentGoal = resolvePrimaryGoal(state);
+  const observation = buildForemanObservation(state, {
+    runtimeId: state.meta.foremanRuntime.runtimeId,
+    nowMs: Date.now(),
+    recentEvents
+  });
+  const safeCandidates = buildSafeForemanCandidates(state, observation);
+  const decision = chooseForemanCandidateWithTestBrain({
+    observation,
+    safeCandidates
+  });
+  state.meta.foremanLastDecision = decision;
   return {
     plot: plotSnapshot(state),
     policy: {
@@ -1138,11 +1805,27 @@ function stateView(state, recentEvents = []) {
       buildingTypes: availableBuildingTypes(state),
       permissions: unlockedPermissionKeys(state.plot.hqLevel)
     },
+    currentGoal,
     quest: nextQuest(state),
+    contracts: {
+      boardLocked: state.plot.hqLevel < 2,
+      offers: copyJson(state.meta.contracts.offers),
+      activeContract: copyJson(state.meta.contracts.activeContract),
+      completed: copyJson(state.meta.contracts.completed)
+    },
     foreman: {
       recommendation: recommendationText(state),
       allowedTools: unlockedToolNames(state),
-      pendingApprovals: pendingApprovalsView(state)
+      pendingApprovals: pendingApprovalsView(state),
+      standingOrder: foremanStandingOrder(state),
+      runtime: {
+        ...copyJson(state.meta.foremanRuntime),
+        token: undefined
+      },
+      scheduler: copyJson(state.meta.scheduler),
+      planCard: decision.planCard,
+      receipt: latestForemanReceipt(state),
+      lastDecision: decision
     },
     pads: buildPadsView(state),
     buildings: state.buildings.map((building) => ({
@@ -1218,6 +1901,7 @@ function completeRunningJob(state, job, nowMs, appendEvent) {
     return;
   }
 
+  const before = { ...inventorySnapshot(state.plot), townXp: normalizeCount(state.plot.townXp) };
   job.status = 'COMPLETED';
   building.updatedAt = nowMs;
 
@@ -1244,6 +1928,7 @@ function completeRunningJob(state, job, nowMs, appendEvent) {
       state.plot.storageCaps = getStorageCaps(state.plot.hqLevel);
       state.plot.constructionSlots = getConstructionSlots(state.plot.hqLevel);
       addXp(state, XP_RULES.hqUpgrade);
+      ensureContractBoard(state);
       pushHqReward(state, state.plot.hqLevel, nowMs);
       building.state = 'READY';
       pushEvent(appendEvent, {
@@ -1254,7 +1939,8 @@ function completeRunningJob(state, job, nowMs, appendEvent) {
         data: {
           plot: plotSnapshot(state),
           building: buildingSnapshot(building),
-          job: jobSnapshot(job)
+          job: jobSnapshot(job),
+          resourceDelta: captureResourceDelta(state, { before })
         }
       });
     } else {
@@ -1268,7 +1954,8 @@ function completeRunningJob(state, job, nowMs, appendEvent) {
         data: {
           plot: plotSnapshot(state),
           building: buildingSnapshot(building),
-          job: jobSnapshot(job)
+          job: jobSnapshot(job),
+          resourceDelta: captureResourceDelta(state, { before })
         }
       });
     }
@@ -1296,7 +1983,18 @@ function completeRunningJob(state, job, nowMs, appendEvent) {
     data: {
       plot: plotSnapshot(state),
       building: buildingSnapshot(building),
-      job: jobSnapshot(job)
+      job: jobSnapshot(job),
+      resourceDelta: captureResourceDelta(state, {
+        before,
+        produced: output.workshop_buff
+          ? {}
+          : {
+            wood: output.wood,
+            stone: output.stone,
+            food: output.food,
+            coin: output.coin
+          }
+      })
     }
   });
 }
@@ -1389,6 +2087,7 @@ function applyPlaceBuilding(state, { actor = 'HUMAN', type, x, y, approvalId = n
     requireApprovedAction(state, approvalId, 'et.plot.place_building');
   }
 
+  const before = { ...inventorySnapshot(state.plot), townXp: normalizeCount(state.plot.townXp) };
   spendInventory(state.plot, BUILDING_RULES[type].buildCost || {});
   const building = {
     buildingId: randomId('bld'),
@@ -1404,7 +2103,7 @@ function applyPlaceBuilding(state, { actor = 'HUMAN', type, x, y, approvalId = n
     updatedAt: ctx.nowMs
   };
   state.buildings.push(building);
-  maybeAwardPlacementXp(state, type);
+  const placementAwarded = maybeAwardPlacementXp(state, type);
   const job = startJob(state, {
     building,
     kind: 'CONSTRUCT',
@@ -1426,7 +2125,12 @@ function applyPlaceBuilding(state, { actor = 'HUMAN', type, x, y, approvalId = n
     recapLine: `${BUILDING_RULES[type].label} was placed on the plot.`,
     data: {
       plot: plotSnapshot(state),
-      building: buildingSnapshot(building)
+      building: buildingSnapshot(building),
+      resourceDelta: captureResourceDelta(state, {
+        before,
+        consumed: BUILDING_RULES[type].buildCost || {},
+        rewarded: placementAwarded ? { townXp: XP_RULES.firstPlacement } : {}
+      })
     }
   });
   pushEvent(ctx.appendEvent, {
@@ -1447,6 +2151,7 @@ function applyPlaceBuilding(state, { actor = 'HUMAN', type, x, y, approvalId = n
       explanation: `Foreman placed ${BUILDING_RULES[type].label} on approved pad ${x},${y}.`,
       recapLine: `Foreman placed ${BUILDING_RULES[type].label} with approval.`,
       data: {
+        ...(ctx.actorMeta || {}),
         tool: 'et.plot.place_building',
         plot: plotSnapshot(state),
         building: buildingSnapshot(building)
@@ -1505,6 +2210,7 @@ function applyQueueJob(state, { actor = 'HUMAN', buildingId }, ctx) {
     }
   }
 
+  const before = { ...inventorySnapshot(state.plot), townXp: normalizeCount(state.plot.townXp) };
   spendInventory(state.plot, production.input || {});
   const explanation = actor === 'AGENT'
     ? building.type === 'MARKET_STALL'
@@ -1531,7 +2237,11 @@ function applyQueueJob(state, { actor = 'HUMAN', buildingId }, ctx) {
     data: {
       plot: plotSnapshot(state),
       building: buildingSnapshot(building),
-      job: jobSnapshot(job)
+      job: jobSnapshot(job),
+      resourceDelta: captureResourceDelta(state, {
+        before,
+        consumed: production.input || {}
+      })
     }
   });
   if (actor === 'AGENT') {
@@ -1543,6 +2253,7 @@ function applyQueueJob(state, { actor = 'HUMAN', buildingId }, ctx) {
         ? 'Foreman queued a market sale.'
         : `Foreman queued work at ${BUILDING_RULES[building.type].label}.`,
       data: {
+        ...(ctx.actorMeta || {}),
         tool: 'et.plot.queue_job',
         plot: plotSnapshot(state),
         building: buildingSnapshot(building),
@@ -1564,7 +2275,7 @@ function applyCollectOutputs(state, { actor = 'HUMAN', buildingId }, ctx) {
     throw error;
   }
   if (actor === 'AGENT') {
-    ensureAgentPermission(state, 'collectOutputs', 2);
+    ensureAgentPermission(state, 'collectOutputs', 1);
     ensureAgentActionBudget(state, ctx.nowMs);
   }
   const delta = {
@@ -1576,9 +2287,10 @@ function applyCollectOutputs(state, { actor = 'HUMAN', buildingId }, ctx) {
   if (!delta.wood && !delta.stone && !delta.food && !delta.coin) {
     const error = new Error('INVALID_STATE');
     error.details = { buildingId, reason: 'NO_OUTPUT_READY' };
-    throw error;
+      throw error;
   }
-  addInventory(state.plot, delta);
+  const before = { ...inventorySnapshot(state.plot), townXp: normalizeCount(state.plot.townXp) };
+  const inventoryGain = addInventoryWithCaps(state.plot, delta);
   building.outputBuffer = emptyOutputBuffer();
   building.state = 'READY';
   building.updatedAt = ctx.nowMs;
@@ -1587,7 +2299,8 @@ function applyCollectOutputs(state, { actor = 'HUMAN', buildingId }, ctx) {
     job.status = 'CLAIMED';
     job.claimedAt = ctx.nowMs;
   }
-  maybeAwardCollectionXp(state, building.type);
+  const firstCollectionAwarded = maybeAwardCollectionXp(state, building.type);
+  const firstTimberReward = building.type === 'LUMBER_CAMP' ? maybeApplyFirstTimberReward(state) : null;
   const explanation = actor === 'AGENT'
     ? `Foreman collected finished goods from ${BUILDING_RULES[building.type].label}.`
     : `Collected outputs from ${BUILDING_RULES[building.type].label}.`;
@@ -1596,12 +2309,22 @@ function applyCollectOutputs(state, { actor = 'HUMAN', buildingId }, ctx) {
     actor,
     explanation,
     recapLine: actor === 'AGENT'
-      ? `Foreman collected ${BUILDING_RULES[building.type].label} outputs because permission was enabled.`
+      ? `Foreman collected ${BUILDING_RULES[building.type].label} outputs under ${foremanStandingOrder(state) === 'BOLD_FOUNDER' ? 'Bold Founder' : 'Careful Steward'} because collect permission was enabled.`
       : `${BUILDING_RULES[building.type].label} outputs were collected.`,
     data: {
       plot: plotSnapshot(state),
       building: buildingSnapshot(building),
-      output: copyJson(delta)
+      output: copyJson(delta),
+      firstTimberReward: firstTimberReward ? copyJson(firstTimberReward.reward) : null,
+      resourceDelta: captureResourceDelta(state, {
+        before,
+        collected: delta,
+        rewarded: mergeResourceDelta(
+          firstCollectionAwarded ? { townXp: XP_RULES.firstCollection } : {},
+          firstTimberReward ? { food: firstTimberReward.reward.food, townXp: firstTimberReward.reward.townXp } : {}
+        ),
+        cappedLost: inventoryGain.cappedLost
+      })
     }
   });
   if (actor === 'AGENT') {
@@ -1611,6 +2334,7 @@ function applyCollectOutputs(state, { actor = 'HUMAN', buildingId }, ctx) {
       explanation,
       recapLine: `Foreman collected outputs from ${BUILDING_RULES[building.type].label}.`,
       data: {
+        ...(ctx.actorMeta || {}),
         tool: 'et.plot.collect_outputs',
         plot: plotSnapshot(state),
         building: buildingSnapshot(building),
@@ -1620,7 +2344,8 @@ function applyCollectOutputs(state, { actor = 'HUMAN', buildingId }, ctx) {
   }
   return {
     buildingId,
-    collected: delta
+    collected: delta,
+    firstTimberReward: firstTimberReward ? copyJson(firstTimberReward.reward) : null
   };
 }
 
@@ -1681,6 +2406,7 @@ function applyUpgradeBuilding(state, { actor = 'HUMAN', buildingId = null, appro
     nextLabel = `${BUILDING_RULES[target.type].label} -> level ${rule.toLevel}`;
   }
 
+  const before = { ...inventorySnapshot(state.plot), townXp: normalizeCount(state.plot.townXp) };
   spendInventory(state.plot, cost || {});
   const explanation = actor === 'AGENT'
     ? `Foreman started the approved upgrade: ${nextLabel}.`
@@ -1703,7 +2429,11 @@ function applyUpgradeBuilding(state, { actor = 'HUMAN', buildingId = null, appro
     data: {
       plot: plotSnapshot(state),
       building: buildingSnapshot(target),
-      job: jobSnapshot(job)
+      job: jobSnapshot(job),
+      resourceDelta: captureResourceDelta(state, {
+        before,
+        consumed: cost || {}
+      })
     }
   });
   if (actor === 'AGENT') {
@@ -1713,6 +2443,7 @@ function applyUpgradeBuilding(state, { actor = 'HUMAN', buildingId = null, appro
       explanation,
       recapLine: `Foreman started the approved upgrade ${nextLabel}.`,
       data: {
+        ...(ctx.actorMeta || {}),
         tool: 'et.plot.upgrade_building',
         plot: plotSnapshot(state),
         building: buildingSnapshot(target),
@@ -1770,6 +2501,7 @@ function applySetPriority(state, { actor = 'HUMAN', buildingId, priority }, ctx)
       explanation: `Foreman set ${BUILDING_RULES[building.type].label} priority to ${priority}.`,
       recapLine: `Foreman changed a building priority.`,
       data: {
+        ...(ctx.actorMeta || {}),
         tool: 'et.plot.set_priority',
         plot: plotSnapshot(state),
         building: buildingSnapshot(building),
@@ -1791,12 +2523,14 @@ function applyClaimReward(state, { rewardKey }, ctx) {
     throw error;
   }
   const grant = reward.grant && typeof reward.grant === 'object' ? reward.grant : {};
-  if (grant.coin) {
-    state.plot.inventory.coin = normalizeCount(state.plot.inventory.coin) + normalizeCount(grant.coin);
-  }
-  if (grant.town_xp) {
-    addXp(state, normalizeCount(grant.town_xp));
-  }
+  const before = { ...inventorySnapshot(state.plot), townXp: normalizeCount(state.plot.townXp) };
+  addInventoryWithCaps(state.plot, {
+    wood: grant.wood,
+    stone: grant.stone,
+    food: grant.food,
+    coin: grant.coin
+  });
+  addXp(state, normalizeCount(grant.town_xp || grant.townXp));
   state.meta.pendingRewards = state.meta.pendingRewards.filter((entry) => entry.key !== rewardKey);
   awardOnce(state.meta.claimedRewards, rewardKey);
   pushEvent(ctx.appendEvent, {
@@ -1810,7 +2544,17 @@ function applyClaimReward(state, { rewardKey }, ctx) {
         key: reward.key,
         type: reward.type,
         grant: reward.grant
-      }
+      },
+      resourceDelta: captureResourceDelta(state, {
+        before,
+        rewarded: {
+          wood: grant.wood,
+          stone: grant.stone,
+          food: grant.food,
+          coin: grant.coin,
+          townXp: grant.town_xp || grant.townXp
+        }
+      })
     }
   });
   return {
@@ -1905,6 +2649,242 @@ function applyPolicyChange(state, { key, value }, ctx) {
   };
 }
 
+function applySetStandingOrder(state, { standingOrder }, ctx) {
+  const next = normalizeStandingOrder(standingOrder);
+  state.meta.standingOrder = next;
+  pushEvent(ctx.appendEvent, {
+    type: EVENT_TYPES.FOREMAN_STANDING_ORDER_CHANGED,
+    actor: 'HUMAN',
+    explanation: `Foreman standing order set to ${next}.`,
+    recapLine: `Standing order changed to ${next === 'BOLD_FOUNDER' ? 'Bold Founder' : 'Careful Steward'}.`,
+    data: {
+      plot: plotSnapshot(state),
+      standingOrder: next
+    }
+  });
+  return { standingOrder: next };
+}
+
+function applyAcceptContract(state, { contractId }, ctx) {
+  ensureContractBoard(state);
+  if (activeContract(state)) {
+    const error = new Error('CONTRACT_ACTIVE_EXISTS');
+    error.details = {
+      activeContractId: activeContract(state).contractId
+    };
+    throw error;
+  }
+  const offer = state.meta.contracts.offers.find((contract) => contract.contractId === contractId) || null;
+  if (!offer) {
+    const error = new Error('INVALID_STATE');
+    error.details = { contractId };
+    throw error;
+  }
+  state.meta.contracts.offers = state.meta.contracts.offers.filter((contract) => contract.contractId !== contractId);
+  state.meta.contracts.activeContract = {
+    ...copyJson(offer),
+    status: 'ACTIVE',
+    acceptedAt: ctx.nowMs
+  };
+  refreshActiveContractState(state);
+  pushEvent(ctx.appendEvent, {
+    type: EVENT_TYPES.CONTRACT_ACCEPTED,
+    actor: 'HUMAN',
+    explanation: `${offer.requester}'s contract was accepted.`,
+    recapLine: `Accepted contract from ${offer.requester}.`,
+    data: {
+      plot: plotSnapshot(state),
+      contract: copyJson(state.meta.contracts.activeContract)
+    }
+  });
+  return {
+    contract: copyJson(state.meta.contracts.activeContract)
+  };
+}
+
+function applyTurnInContract(state, { contractId }, ctx) {
+  refreshActiveContractState(state);
+  const contract = activeContract(state);
+  if (!contract || contract.contractId !== contractId) {
+    const error = new Error('INVALID_STATE');
+    error.details = { contractId };
+    throw error;
+  }
+  if (contract.status !== 'READY_TO_TURN_IN') {
+    const error = new Error('INVALID_STATE');
+    error.details = {
+      contractId,
+      status: contract.status
+    };
+    throw error;
+  }
+  const before = { ...inventorySnapshot(state.plot), townXp: normalizeCount(state.plot.townXp) };
+  let consumed = {};
+  if (contract.kind === 'SUPPLY') {
+    consumed = {
+      wood: contract.requirements.wood,
+      stone: contract.requirements.stone,
+      food: contract.requirements.food,
+      coin: contract.requirements.coin
+    };
+    spendInventory(state.plot, consumed);
+  }
+  addInventoryWithCaps(state.plot, {
+    wood: contract.rewards.wood,
+    stone: contract.rewards.stone,
+    food: contract.rewards.food,
+    coin: contract.rewards.coin
+  });
+  addXp(state, contract.rewards.townXp);
+  const completed = {
+    ...copyJson(contract),
+    status: 'COMPLETED',
+    completedAt: ctx.nowMs
+  };
+  state.meta.contracts.completed.push(completed);
+  state.meta.contracts.activeContract = null;
+  pushEvent(ctx.appendEvent, {
+    type: EVENT_TYPES.CONTRACT_COMPLETED,
+    actor: 'HUMAN',
+    explanation: `${contract.title} completed for ${contract.requester}.`,
+    recapLine: `${contract.requester} received ${contract.title}.`,
+    data: {
+      plot: plotSnapshot(state),
+      contract: copyJson(completed),
+      resourceDelta: captureResourceDelta(state, {
+        before,
+        consumed,
+        rewarded: {
+          wood: contract.rewards.wood,
+          stone: contract.rewards.stone,
+          food: contract.rewards.food,
+          coin: contract.rewards.coin,
+          townXp: contract.rewards.townXp
+        }
+      })
+    }
+  });
+  return {
+    contract: copyJson(completed)
+  };
+}
+
+function schedulerStatusView(state) {
+  return copyJson(state.meta.scheduler);
+}
+
+function applyEnableCollectReadyOutputs(state, ctx) {
+  state.meta.scheduler.collectReadyOutputs.enabled = true;
+  state.meta.scheduler.collectReadyOutputs.paused = false;
+  state.meta.scheduler.collectReadyOutputs.nextRunAtMs = ctx.nowMs;
+  pushEvent(ctx.appendEvent, {
+    type: EVENT_TYPES.SCHEDULER_ENABLED,
+    actor: 'HUMAN',
+    explanation: 'Collect ready outputs automation enabled.',
+    recapLine: 'Collect ready outputs automation enabled.',
+    data: {
+      scheduler: schedulerStatusView(state)
+    }
+  });
+  return schedulerStatusView(state);
+}
+
+function applyPauseScheduler(state, ctx) {
+  state.meta.scheduler.collectReadyOutputs.paused = true;
+  pushEvent(ctx.appendEvent, {
+    type: EVENT_TYPES.SCHEDULER_PAUSED,
+    actor: 'HUMAN',
+    explanation: 'Collect ready outputs automation paused.',
+    recapLine: 'Collect ready outputs automation paused.',
+    data: {
+      scheduler: schedulerStatusView(state)
+    }
+  });
+  return schedulerStatusView(state);
+}
+
+function applyResumeScheduler(state, ctx) {
+  state.meta.scheduler.collectReadyOutputs.enabled = true;
+  state.meta.scheduler.collectReadyOutputs.paused = false;
+  state.meta.scheduler.collectReadyOutputs.nextRunAtMs = ctx.nowMs;
+  pushEvent(ctx.appendEvent, {
+    type: EVENT_TYPES.SCHEDULER_RESUMED,
+    actor: 'HUMAN',
+    explanation: 'Collect ready outputs automation resumed.',
+    recapLine: 'Collect ready outputs automation resumed.',
+    data: {
+      scheduler: schedulerStatusView(state)
+    }
+  });
+  return schedulerStatusView(state);
+}
+
+function startForemanSession(state, { runtimeId = '', nowMs, pack = {} }) {
+  const nextRuntimeId = runtimeId || randomId('rt');
+  const sessionId = randomId('frs');
+  const token = randomId('fpt');
+  state.meta.foremanRuntime = normalizeForemanRuntime({
+    runtimeId: nextRuntimeId,
+    sessionId,
+    token,
+    status: 'OBSERVING',
+    startedAt: nowMs,
+    lastHeartbeatAt: nowMs,
+    expiresAt: nowMs + (2 * 60 * 1000),
+    pack
+  });
+  return {
+    runtimeId: nextRuntimeId,
+    sessionId,
+    token,
+    status: state.meta.foremanRuntime.status
+  };
+}
+
+function heartbeatForemanSession(state, { nowMs, pack = {} }) {
+  state.meta.foremanRuntime = normalizeForemanRuntime({
+    ...state.meta.foremanRuntime,
+    status: state.meta.foremanRuntime.status === 'PAUSED' ? 'PAUSED' : 'OBSERVING',
+    lastHeartbeatAt: nowMs,
+    expiresAt: nowMs + (2 * 60 * 1000),
+    pack: {
+      ...state.meta.foremanRuntime.pack,
+      ...pack
+    }
+  });
+  return copyJson(state.meta.foremanRuntime);
+}
+
+function pauseForemanSession(state, { nowMs }) {
+  state.meta.foremanRuntime.status = 'PAUSED';
+  state.meta.foremanRuntime.pausedAt = nowMs;
+  return copyJson(state.meta.foremanRuntime);
+}
+
+function applyReceiptCorrection(state, { correction }, ctx) {
+  const normalized = String(correction || '').trim().toUpperCase();
+  if (normalized === 'ASK_ME_NEXT_TIME') {
+    state.meta.scheduler.collectReadyOutputs.enabled = false;
+    state.meta.scheduler.collectReadyOutputs.paused = true;
+    return {
+      correction: normalized,
+      scheduler: schedulerStatusView(state)
+    };
+  }
+  if (normalized === 'PAUSE_FOREMAN') {
+    state.meta.foremanRuntime.status = 'PAUSED';
+    state.meta.foremanRuntime.pausedAt = ctx.nowMs;
+    state.meta.scheduler.collectReadyOutputs.paused = true;
+    return {
+      correction: normalized,
+      runtime: copyJson(state.meta.foremanRuntime)
+    };
+  }
+  const error = new Error('INVALID_STATE');
+  error.details = { correction };
+  throw error;
+}
+
 function applyResolveApproval(state, { approvalId, decision, note = '' }, ctx) {
   const approval = getPendingApproval(state, approvalId);
   if (!approval) {
@@ -1982,18 +2962,29 @@ module.exports = {
   PERMISSION_RULES,
   XP_RULES,
   activeConstructionJobs,
+  applyAcceptContract,
   applyClaimReward,
   applyCollectOutputs,
+  applyEnableCollectReadyOutputs,
+  applyPauseScheduler,
   applyPlaceBuilding,
   applyPolicyChange,
   applyQueueJob,
   applyRequestUserApproval,
   applyResolveApproval,
+  applyReceiptCorrection,
+  applyResumeScheduler,
+  applySetStandingOrder,
   applySetPriority,
+  applyTurnInContract,
   applyUpgradeBuilding,
   availableBuildingTypes,
+  buildForemanObservation,
+  buildSafeForemanCandidates,
   buildWorldDelta,
+  chooseForemanCandidateWithTestBrain,
   createInitialPlot,
+  foremanRuntimeStatus,
   getBuilding,
   getHqBuilding,
   nextQuest,
@@ -2002,7 +2993,12 @@ module.exports = {
   pendingApprovalsView,
   recommendationText,
   requireApprovedAction,
+  resolvePrimaryGoal,
+  schedulerStatusView,
   simulatePlot,
+  heartbeatForemanSession,
+  pauseForemanSession,
+  startForemanSession,
   stateHash,
   stateHashPayload,
   stateView,
