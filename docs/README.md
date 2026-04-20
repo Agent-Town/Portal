@@ -15,6 +15,8 @@ This docs set is designed for users who are new to local agents and model provid
 - [Founders Plot V1.1 TDD acceptance matrix](/specs/18_founders_plot_v1_1_tdd_acceptance_matrix.md)
 - [Founders Plot V1.1 feedback resolution](/specs/18_founders_plot_v1_1_feedback_resolution.md)
 - [Founders Plot future specs backlog](/specs/19_founders_plot_future_specs_backlog.md)
+- [Founders Plot real-LLM foreman + provider-safe tool naming](/specs/22_founders_plot_real_llm_foreman_and_provider_safe_tools.md)
+- [Real-LLM chat validation and `test-local` split](/specs/23_real_llm_chat_validation_and_test_local_split.md)
 - [Agent Town design pack](/Brand%20kit/guidelines/agent-town-design-pack/README.md)
 
 ## Founders Plot implementation note

@@ -1,27 +1,29 @@
 # Founders Plot Tool Surface
 
-The Founders Plot runtime exposes a deliberately small tool family:
+The Founders Plot runtime exposes a deliberately small worker-facing tool family:
 
-- `et.plot.get_state`
-- `et.plot.place_building`
-- `et.plot.queue_job`
-- `et.plot.collect_outputs`
-- `et.plot.upgrade_building`
-- `et.plot.set_priority`
-- `et.plot.claim_reward`
-- `et.plot.request_user_approval`
-- `et.plot.town.get_signals`
-- `et.plot.town.upgrade_landmark`
-- `et.plot.journal.get_entries`
-- `et.plot.contracts.get_state`
-- `et.plot.contracts.accept`
-- `et.plot.contracts.turn_in`
-- `et.foreman.policy.get_standing_order`
-- `et.foreman.policy.set_standing_order`
-- `et.foreman.scheduler.get_status`
-- `et.foreman.scheduler.enable_collect_ready_outputs`
-- `et.foreman.scheduler.pause`
-- `et.foreman.scheduler.resume`
+- `founders_plot_get_state`
+- `founders_plot_place_building`
+- `founders_plot_queue_job`
+- `founders_plot_collect_outputs`
+- `founders_plot_upgrade_building`
+- `founders_plot_set_priority`
+- `founders_plot_claim_reward`
+- `founders_plot_request_user_approval`
+- `founders_plot_town_get_signals`
+- `founders_plot_town_upgrade_landmark`
+- `founders_plot_journal_get_entries`
+- `founders_plot_contracts_get_state`
+- `founders_plot_contracts_accept`
+- `founders_plot_contracts_turn_in`
+- `founders_plot_foreman_policy_get_standing_order`
+- `founders_plot_foreman_policy_set_standing_order`
+- `founders_plot_foreman_scheduler_get_status`
+- `founders_plot_foreman_scheduler_enable_collect_ready_outputs`
+- `founders_plot_foreman_scheduler_pause`
+- `founders_plot_foreman_scheduler_resume`
+
+The worker/LLM surface uses these underscore aliases. The canonical server/API/replay routes remain the dotted `et.plot.*` and `et.foreman.*` ids.
 
 ## V1.2 boundaries
 
@@ -51,7 +53,7 @@ The Founders Plot runtime exposes a deliberately small tool family:
 
 ## Approval audit rules
 
-- `et.plot.request_user_approval` creates a visible approval card for the human.
+- `founders_plot_request_user_approval` creates a visible approval card for the human.
 - Creating the card appends an `APPROVAL_REQUESTED` event to the Founders Plot event log.
 - Resolving the card appends either `APPROVAL_APPROVED` or `APPROVAL_REJECTED`.
 - Those approval events must appear in both recap output and replay output.

@@ -9,6 +9,7 @@ const {
   runPlotTool,
   startForemanRuntime
 } = require('./helpers/founders_plot');
+const { mockFoundersPlotForemanSelection } = require('./helpers/founders_plot_llm');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -48,6 +49,10 @@ test('scheduler collects a ready output without clicking Run now', async ({ page
   const before = await getPlotState(frame);
   const beforeWood = Number(before?.plot?.inventory?.wood || 0);
   expect(Number(before?.buildings?.find((entry) => entry?.buildingId === lumberBuildingId)?.outputBuffer?.wood || 0)).toBeGreaterThan(0);
+  await mockFoundersPlotForemanSelection(page, {
+    candidateId: `collect:${lumberBuildingId}`,
+    reason: 'Careful Steward clears the ready lumber before it starts drifting.'
+  });
 
   const policy = await postJson(frame, '/api/founders-plot/policy', { key: 'collectOutputs', value: true });
   expect(policy?.ok).toBe(true);
@@ -90,6 +95,10 @@ test('scheduler does not duplicate a collect when close start commands race', as
   expect(started?.ok).toBe(true);
 
   const lumberBuildingId = await prepareReadyLumber(frame, 'v12-hardening-race');
+  await mockFoundersPlotForemanSelection(page, {
+    candidateId: `collect:${lumberBuildingId}`,
+    reason: 'Careful Steward clears the ready lumber before it starts drifting.'
+  });
   const policy = await postJson(frame, '/api/founders-plot/policy', { key: 'collectOutputs', value: true });
   expect(policy?.ok).toBe(true);
 

@@ -9,6 +9,7 @@ const {
   runPlotTool,
   startForemanRuntime
 } = require('./helpers/founders_plot');
+const { mockFoundersPlotForemanSelection } = require('./helpers/founders_plot_llm');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -76,7 +77,11 @@ test('worker-mediated foreman mutation still succeeds and preserves worker attri
   const frame = await openFoundersPlotFrame(page);
   const started = await startForemanRuntime(frame);
   expect(started?.ok).toBe(true);
-  await prepareReadyCollect(frame, 'v12-hardening-worker');
+  const lumberBuildingId = await prepareReadyCollect(frame, 'v12-hardening-worker');
+  await mockFoundersPlotForemanSelection(page, {
+    candidateId: `collect:${lumberBuildingId}`,
+    reason: 'Careful Steward clears the ready lumber before it starts drifting.'
+  });
 
   const enabled = await frame.evaluate(async () => window.__foundersPlotTest.enableCollectReadyOutputs());
   expect(enabled?.ok).toBe(true);

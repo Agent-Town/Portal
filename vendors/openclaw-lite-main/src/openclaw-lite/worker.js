@@ -3083,6 +3083,91 @@ const LITE_TOOL_SPECS = [
   },
 ];
 
+const PROVIDER_SAFE_TOOL_NAME_RE = /^[A-Za-z0-9_-]+$/;
+const EXPLICIT_LLM_TOOL_NAME_ALIASES = Object.freeze({
+  "et.plot.get_state": "founders_plot_get_state",
+  "et.plot.place_building": "founders_plot_place_building",
+  "et.plot.queue_job": "founders_plot_queue_job",
+  "et.plot.collect_outputs": "founders_plot_collect_outputs",
+  "et.plot.upgrade_building": "founders_plot_upgrade_building",
+  "et.plot.set_priority": "founders_plot_set_priority",
+  "et.plot.claim_reward": "founders_plot_claim_reward",
+  "et.plot.request_user_approval": "founders_plot_request_user_approval",
+  "et.plot.town.get_signals": "founders_plot_town_get_signals",
+  "et.plot.town.upgrade_landmark": "founders_plot_town_upgrade_landmark",
+  "et.plot.journal.get_entries": "founders_plot_journal_get_entries",
+  "et.plot.contracts.get_state": "founders_plot_contracts_get_state",
+  "et.plot.contracts.accept": "founders_plot_contracts_accept",
+  "et.plot.contracts.turn_in": "founders_plot_contracts_turn_in",
+  "et.foreman.policy.get_standing_order": "founders_plot_foreman_policy_get_standing_order",
+  "et.foreman.policy.set_standing_order": "founders_plot_foreman_policy_set_standing_order",
+  "et.foreman.scheduler.get_status": "founders_plot_foreman_scheduler_get_status",
+  "et.foreman.scheduler.enable_collect_ready_outputs": "founders_plot_foreman_scheduler_enable_collect_ready_outputs",
+  "et.foreman.scheduler.pause": "founders_plot_foreman_scheduler_pause",
+  "et.foreman.scheduler.resume": "founders_plot_foreman_scheduler_resume",
+});
+
+function makeFallbackLlmToolName(name = "") {
+  const raw = String(name || "").trim();
+  if (!raw) return "tool";
+  const normalized = raw
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .replace(/_+/g, "_");
+  if (!normalized) return "tool";
+  if (/^[a-z_]/.test(normalized)) return normalized;
+  return `tool_${normalized}`;
+}
+
+function buildLiteToolAliasTables() {
+  const canonicalToLlm = new Map();
+  const llmToCanonical = new Map();
+  for (const spec of LITE_TOOL_SPECS) {
+    const canonicalName = String(spec?.name || "").trim();
+    if (!canonicalName) continue;
+    let llmName = EXPLICIT_LLM_TOOL_NAME_ALIASES[canonicalName]
+      || (PROVIDER_SAFE_TOOL_NAME_RE.test(canonicalName) ? canonicalName : makeFallbackLlmToolName(canonicalName));
+    if (llmToCanonical.has(llmName) && llmToCanonical.get(llmName) !== canonicalName) {
+      let suffix = 2;
+      while (llmToCanonical.has(`${llmName}_${suffix}`) && llmToCanonical.get(`${llmName}_${suffix}`) !== canonicalName) {
+        suffix += 1;
+      }
+      llmName = `${llmName}_${suffix}`;
+    }
+    canonicalToLlm.set(canonicalName, llmName);
+    llmToCanonical.set(llmName, canonicalName);
+  }
+  return { canonicalToLlm, llmToCanonical };
+}
+
+const LITE_TOOL_ALIAS_TABLES = buildLiteToolAliasTables();
+
+function llmToolNameForCanonicalTool(name = "") {
+  const canonicalName = String(name || "").trim();
+  return LITE_TOOL_ALIAS_TABLES.canonicalToLlm.get(canonicalName) || makeFallbackLlmToolName(canonicalName);
+}
+
+function canonicalToolNameFromLlmTool(name = "") {
+  const raw = String(name || "").trim();
+  return LITE_TOOL_ALIAS_TABLES.llmToCanonical.get(raw) || raw;
+}
+
+function buildLiteToolDescriptor(spec, { llmFacing = false } = {}) {
+  const canonicalName = String(spec?.name || "");
+  const llmName = llmToolNameForCanonicalTool(canonicalName);
+  return {
+    name: llmFacing ? llmName : canonicalName,
+    canonicalName,
+    llmName,
+    label: spec?.label,
+    description: spec?.description,
+    parameters: makeLiteToolSchema(),
+    execute: async (toolCallId, params, signal, onUpdate) =>
+      dispatchLiteTool(canonicalName, params, signal, onUpdate, toolCallId),
+  };
+}
+
 function makeLiteToolSchema() {
   return {
     type: "object",
@@ -3099,7 +3184,8 @@ function liteToolResult(text, details = {}) {
 }
 
 async function dispatchLiteTool(name, params, _signal, _onUpdate, toolCallId = null) {
-  const normalizedName = String(name || "");
+  const requestedName = String(name || "").trim();
+  const normalizedName = canonicalToolNameFromLlmTool(requestedName);
   const normalizedToolCallId = typeof toolCallId === "string" && toolCallId.trim() ? toolCallId.trim() : randomId("tc");
   if (isTrainerNamespaceToolName(normalizedName) && !trainerNamespaceEnabled()) {
     const startedAtMs = nowMs();
@@ -3412,14 +3498,14 @@ function getLiteTools() {
   const specs = trainerNamespaceEnabled()
     ? LITE_TOOL_SPECS
     : LITE_TOOL_SPECS.filter((spec) => !isTrainerNamespaceToolName(spec?.name));
-  return specs.map((spec) => ({
-    name: spec.name,
-    label: spec.label,
-    description: spec.description,
-    parameters: makeLiteToolSchema(),
-    execute: async (toolCallId, params, signal, onUpdate) =>
-      dispatchLiteTool(spec.name, params, signal, onUpdate, toolCallId),
-  }));
+  return specs.map((spec) => buildLiteToolDescriptor(spec, { llmFacing: false }));
+}
+
+function getLlmLiteTools() {
+  const specs = trainerNamespaceEnabled()
+    ? LITE_TOOL_SPECS
+    : LITE_TOOL_SPECS.filter((spec) => !isTrainerNamespaceToolName(spec?.name));
+  return specs.map((spec) => buildLiteToolDescriptor(spec, { llmFacing: true }));
 }
 
 function getToolRegistryInfo() {
@@ -3428,6 +3514,10 @@ function getToolRegistryInfo() {
     trainerNamespaceEnabled: trainerNamespaceEnabled(),
     count: tools.length,
     names: tools.map((t) => t.name),
+    tools: tools.map((tool) => ({
+      name: String(tool?.name || ""),
+      llmName: String(tool?.llmName || tool?.name || ""),
+    })),
     dispatchPath: LITE_TOOL_DISPATCH_PATH,
   };
 }
@@ -3439,6 +3529,7 @@ async function trainerBuildRegistrySnapshot() {
     const schemaSha256 = await sha256HexFromJson(tool?.parameters || {});
     rows.push({
       name: String(tool?.name || ""),
+      llmName: String(tool?.llmName || tool?.name || ""),
       schemaSha256,
       version: null,
     });
@@ -3450,6 +3541,7 @@ async function trainerBuildRegistrySnapshot() {
   });
   const registrySha256 = await sha256HexFromJson(rows.map((row) => ({
     name: row.name,
+    llmName: row.llmName,
     schemaSha256: row.schemaSha256,
     version: row.version,
   })));
@@ -5381,7 +5473,7 @@ function buildLiteSystemPrompt({ model, tools, contextFiles, skillsPrompt = "" }
 
 async function buildLitePromptPreview({ model, tools } = {}) {
   const resolvedModel = model || getConfiguredModel();
-  const resolvedTools = Array.isArray(tools) ? tools : getLiteTools();
+  const resolvedTools = Array.isArray(tools) ? tools : getLlmLiteTools();
   const workspacePrompt = await buildWorkspaceContextFiles();
   const skillsPrompt = await buildLiteSkillsPrompt();
   const systemPrompt = buildLiteSystemPrompt({
@@ -5734,7 +5826,7 @@ async function runAgentTurn(userText, opts = {}) {
     return { messages: generatedMessages, persisted: persistToTranscript };
   }
 
-  const tools = getLiteTools();
+  const tools = getLlmLiteTools();
   const promptPreview = await buildLitePromptPreview({ model, tools });
   if (promptPreview.usedFiles.length) {
     log(
@@ -7418,7 +7510,7 @@ ${runtimeSections.combinedContext}`;
   const recordToTranscript = params?.recordToTranscript !== false;
   const emitChat = params?.emitChat === true ? true : params?.emitChat === false ? false : recordToTranscript;
   const registrySnapshot = await trainerBuildRegistrySnapshot();
-  const tools = getLiteTools();
+  const tools = getLlmLiteTools();
   const preview = await buildLitePromptPreview({ model: getConfiguredModel(), tools });
   const llmRequestMessages = state.transcript
     .slice()
@@ -7624,7 +7716,13 @@ ${runtimeSections.combinedContext}`;
     }
 
     const resultsById = trainerExtractToolResults(generated);
-    const knownRegistryTools = new Set((registrySnapshot.tools || []).map((tool) => String(tool?.name || "")));
+    const knownRegistryTools = new Set();
+    for (const tool of registrySnapshot.tools || []) {
+      const canonicalName = String(tool?.name || "").trim();
+      const llmName = String(tool?.llmName || "").trim();
+      if (canonicalName) knownRegistryTools.add(canonicalName);
+      if (llmName) knownRegistryTools.add(llmName);
+    }
     for (const call of requestedToolCalls) {
       const result = resultsById.get(call.toolCallId) || null;
       const missing = !result;
@@ -8447,6 +8545,245 @@ async function foundersPlotWorkerFetch(path, { method = "GET", token = "", body 
   return payload;
 }
 
+const FOUNDERS_PLOT_FOREMAN_SELECTION_TOOL_NAME = "founders_plot_foreman_select_candidate";
+
+function foundersPlotStandingOrderInfluenceText(standingOrder = "") {
+  return String(standingOrder || "").trim().toUpperCase() === "BOLD_FOUNDER"
+    ? "Bold Founder leans toward visible progress when the move is still safe."
+    : "Careful Steward favors dependable reserves and stable town upkeep.";
+}
+
+function buildFoundersPlotForemanPromptObservation(observation = {}) {
+  return {
+    standingOrder: String(observation?.standingOrder || "CAREFUL_STEWARD").trim() || "CAREFUL_STEWARD",
+    currentGoal: observation?.currentGoal || null,
+    activeContract: observation?.activeContract || null,
+    runtime: observation?.runtime || null,
+    scheduler: observation?.scheduler || null,
+  };
+}
+
+function buildFoundersPlotForemanPromptCandidates(safeCandidates = []) {
+  return (Array.isArray(safeCandidates) ? safeCandidates : []).map((candidate) => ({
+    candidateId: String(candidate?.candidateId || ""),
+    toolName: String(candidate?.toolName || ""),
+    llmToolName: llmToolNameForCanonicalTool(candidate?.toolName || ""),
+    buildingId: String(candidate?.buildingId || ""),
+    reason: String(candidate?.reason || ""),
+    goalServed: String(candidate?.goalServed || ""),
+    requiresApproval: candidate?.requiresApproval === true,
+    canActNow: candidate?.canActNow === true,
+    score: Number.isFinite(Number(candidate?.score)) ? Number(candidate.score) : 0,
+  }));
+}
+
+function buildFoundersPlotForemanSystemPrompt() {
+  return [
+    "You are Clover, the bounded Founders Plot foreman.",
+    "Choose at most one already-safe candidate for this worker-owned tick.",
+    "Only use the provided selection tool.",
+    "Never invent candidate ids, tools, or buildings.",
+    `Call ${FOUNDERS_PLOT_FOREMAN_SELECTION_TOOL_NAME} exactly once.`,
+    "If no listed candidate should run right now, pass an empty candidateId and explain why.",
+  ].join("\n");
+}
+
+function buildFoundersPlotForemanDecisionPrompt({ observation, safeCandidates = [] } = {}) {
+  const promptObservation = buildFoundersPlotForemanPromptObservation(observation);
+  const promptCandidates = buildFoundersPlotForemanPromptCandidates(safeCandidates);
+  return [
+    "Pick the single safest useful candidate for this tick.",
+    "Prefer actions that match the standing order, advance the current goal, and avoid unnecessary drift.",
+    "",
+    "Observation JSON:",
+    stableJsonStringify(promptObservation),
+    "",
+    "Actionable safe candidates JSON:",
+    stableJsonStringify(promptCandidates),
+    "",
+    `Use ${FOUNDERS_PLOT_FOREMAN_SELECTION_TOOL_NAME} with one candidateId from the list above.`,
+  ].join("\n");
+}
+
+function buildFoundersPlotForemanPlanCard({ observation, candidate, safeCandidates = [], summaryText = "", selectionReason = "" } = {}) {
+  const normalizedStandingOrder = String(observation?.standingOrder || "CAREFUL_STEWARD").trim() || "CAREFUL_STEWARD";
+  const alternative = (Array.isArray(safeCandidates) ? safeCandidates : []).find(
+    (entry) => String(entry?.candidateId || "") !== String(candidate?.candidateId || ""),
+  ) || null;
+  const reasonText = selectionReason || summaryText || (
+    normalizedStandingOrder === "BOLD_FOUNDER"
+      ? "This keeps the town moving without stepping outside the safe action list."
+      : "This preserves the town's dependable baseline before taking on more risk."
+  );
+  const buildingId = String(candidate?.buildingId || "").trim();
+  const targetSuffix = buildingId ? ` on ${buildingId}` : "";
+  return {
+    headline: "Foreman plan",
+    goalServed: String(candidate?.goalServed || "town_stability"),
+    observation: String(candidate?.reason || ""),
+    recommendation: `Use ${String(candidate?.toolName || "")}${targetSuffix}.`,
+    reason: reasonText,
+    standingOrderInfluence: foundersPlotStandingOrderInfluenceText(normalizedStandingOrder),
+    canActNow: candidate?.canActNow === true,
+    proposedTool: String(candidate?.toolName || ""),
+    requiresApproval: candidate?.requiresApproval === true,
+    alternative: alternative ? `Alternative: ${String(alternative.reason || "")}` : "",
+  };
+}
+
+function buildFoundersPlotWorkerDecision({ observation, candidate, safeCandidates = [], summaryText = "", selectionReason = "" } = {}) {
+  const model = getConfiguredModel();
+  return {
+    source: "OPENCLAW_LITE_LLM",
+    chosenCandidateId: String(candidate?.candidateId || ""),
+    chosenTool: String(candidate?.toolName || ""),
+    llmToolName: llmToolNameForCanonicalTool(candidate?.toolName || ""),
+    llm: {
+      provider: String(model?.provider || "").trim() || null,
+      modelId: String(model?.id || "").trim() || null,
+      modelRef: String(state.llmModelRef || "").trim() || null,
+    },
+    planCard: buildFoundersPlotForemanPlanCard({
+      observation,
+      candidate,
+      safeCandidates,
+      summaryText,
+      selectionReason,
+    }),
+  };
+}
+
+async function runFoundersPlotForemanLlmSelection({ observation, safeCandidates = [] } = {}) {
+  const actionableCandidates = Array.isArray(safeCandidates) ? safeCandidates.filter(Boolean) : [];
+  if (actionableCandidates.length === 0) {
+    return {
+      candidate: null,
+      decision: null,
+      assistantText: "",
+      selectionReason: "",
+      explicitNoop: true,
+    };
+  }
+  const apiKey = String(state.llmApiKey || "").trim();
+  if (!apiKey) {
+    throw new Error("LLM_NOT_CONFIGURED");
+  }
+  const model = getConfiguredModel();
+  const prompt = {
+    role: "user",
+    content: buildFoundersPlotForemanDecisionPrompt({
+      observation,
+      safeCandidates: actionableCandidates,
+    }),
+    timestamp: nowMs(),
+  };
+  let selection = null;
+  const tools = [
+    {
+      name: FOUNDERS_PLOT_FOREMAN_SELECTION_TOOL_NAME,
+      canonicalName: FOUNDERS_PLOT_FOREMAN_SELECTION_TOOL_NAME,
+      llmName: FOUNDERS_PLOT_FOREMAN_SELECTION_TOOL_NAME,
+      label: "Founders Plot Foreman Select Candidate",
+      description: "Select exactly one safe Founders Plot candidate for this tick. Use an empty candidateId when no action should run now.",
+      parameters: {
+        type: "object",
+        properties: {
+          candidateId: {
+            type: "string",
+            description: "One candidateId from the provided safe candidate list, or an empty string for no action.",
+          },
+          reason: {
+            type: "string",
+            description: "A short justification tied to the standing order, current goal, or current pressure.",
+          },
+        },
+        required: ["candidateId", "reason"],
+        additionalProperties: false,
+      },
+      execute: async (_toolCallId, params) => {
+        const requestedCandidateId = typeof params?.candidateId === "string" ? params.candidateId.trim() : "";
+        const reason = typeof params?.reason === "string" ? params.reason.trim() : "";
+        const candidate = actionableCandidates.find(
+          (entry) => String(entry?.candidateId || "") === requestedCandidateId,
+        ) || null;
+        selection = {
+          candidateId: requestedCandidateId,
+          candidate,
+          reason,
+        };
+        return liteToolResult(
+          candidate
+            ? `Selected ${candidate.candidateId}.`
+            : requestedCandidateId
+              ? `Candidate ${requestedCandidateId} is not valid for this tick.`
+              : "No action selected for this tick.",
+          {
+            accepted: !!candidate || requestedCandidateId === "",
+            candidateId: candidate ? candidate.candidateId : "",
+            reason,
+          },
+        );
+      },
+    },
+  ];
+  const context = {
+    systemPrompt: buildFoundersPlotForemanSystemPrompt(),
+    messages: [],
+    tools,
+  };
+  const config = {
+    model,
+    apiKey,
+    reasoning: state.llmReasoning || undefined,
+    convertToLlm: (messages) => messages.filter(
+      (message) => message && (message.role === "user" || message.role === "assistant" || message.role === "toolResult"),
+    ),
+  };
+  const abortController = new AbortController();
+  const generatedMessages = [];
+  const stream = agentLoop([prompt], context, config, abortController.signal);
+  for await (const event of stream) {
+    if (event.type !== "message_end") continue;
+    const message = event.message;
+    if (!message || typeof message !== "object" || typeof message.role !== "string") continue;
+    generatedMessages.push(message);
+  }
+  let assistantText = "";
+  for (const message of generatedMessages) {
+    if (message.role !== "assistant") continue;
+    const text = textFromMessageContent(message.content).trim();
+    if (text) assistantText = text;
+  }
+  if (!selection) {
+    throw new Error("FOREMAN_LLM_NO_SELECTION");
+  }
+  if (!selection.candidateId) {
+    return {
+      candidate: null,
+      decision: null,
+      assistantText,
+      selectionReason: selection.reason || "",
+      explicitNoop: true,
+    };
+  }
+  if (!selection.candidate) {
+    throw new Error("FOREMAN_LLM_INVALID_SELECTION");
+  }
+  return {
+    candidate: selection.candidate,
+    decision: buildFoundersPlotWorkerDecision({
+      observation,
+      candidate: selection.candidate,
+      safeCandidates: actionableCandidates,
+      summaryText: assistantText,
+      selectionReason: selection.reason || "",
+    }),
+    assistantText,
+    selectionReason: selection.reason || "",
+    explicitNoop: false,
+  };
+}
+
 async function runFoundersPlotForemanTick({ token = "" } = {}) {
   const normalizedToken = String(token || "").trim();
   if (!normalizedToken) {
@@ -8463,10 +8800,11 @@ async function runFoundersPlotForemanTick({ token = "" } = {}) {
     method: "GET",
     token: normalizedToken,
   });
-  const chosenId = String(observation?.decision?.chosenCandidateId || "");
   const safeCandidates = Array.isArray(observation?.safeCandidates) ? observation.safeCandidates : [];
-  const chosen = safeCandidates.find((candidate) => candidate?.candidateId === chosenId) || null;
-  if (!chosen || chosen.canActNow !== true) {
+  const actionableCandidates = safeCandidates.filter(
+    (candidate) => candidate && candidate.canActNow === true && candidate.requiresApproval !== true,
+  );
+  if (actionableCandidates.length === 0) {
     return {
       ok: true,
       result: { mutationApplied: false },
@@ -8476,12 +8814,31 @@ async function runFoundersPlotForemanTick({ token = "" } = {}) {
       runtimeId: String(observation?.runtime?.runtimeId || ""),
     };
   }
-  const payload = await foundersPlotWorkerFetch(`/api/founders-plot/foreman/tool/${encodeURIComponent(String(chosen.toolName || ""))}`, {
+  const selection = await runFoundersPlotForemanLlmSelection({
+    observation,
+    safeCandidates: actionableCandidates,
+  });
+  if (selection?.explicitNoop === true || !selection?.candidate || !selection?.decision) {
+    return {
+      ok: true,
+      result: {
+        mutationApplied: false,
+        reason: selection?.selectionReason || selection?.assistantText || "",
+      },
+      receipt: null,
+      decision: selection?.decision || null,
+      workerCommandId,
+      workerTraceId,
+      runtimeId: String(observation?.runtime?.runtimeId || ""),
+    };
+  }
+  const payload = await foundersPlotWorkerFetch(`/api/founders-plot/foreman/tool/${encodeURIComponent(String(selection.candidate.toolName || ""))}`, {
     method: "POST",
     token: normalizedToken,
     body: {
-      buildingId: chosen.buildingId,
-      idempotencyKey: `foreman:${String(chosen.candidateId || "candidate")}:${Date.now()}`,
+      buildingId: selection.candidate.buildingId,
+      idempotencyKey: `foreman:${String(selection.candidate.candidateId || "candidate")}:${Date.now()}`,
+      decision: selection.decision,
       origin: "OPENCLAW_LITE_WORKER",
       workerCommandId,
       workerTraceId,
@@ -8492,6 +8849,7 @@ async function runFoundersPlotForemanTick({ token = "" } = {}) {
     ...payload,
     workerCommandId,
     workerTraceId,
+    decision: selection.decision,
     runtimeId: String(observation?.runtime?.runtimeId || ""),
   };
 }
@@ -9469,7 +9827,7 @@ self.addEventListener("message", async (ev) => {
 
     if (msg.type === "gateway.command.systemPrompt.preview") {
       const model = getConfiguredModel();
-      const tools = getLiteTools();
+      const tools = getLlmLiteTools();
       const preview = await buildLitePromptPreview({ model, tools });
       post({
         type: "worker.systemPrompt.preview",

@@ -11,6 +11,7 @@ const {
   runPlotTool,
   startForemanRuntime
 } = require('./helpers/founders_plot');
+const { mockFoundersPlotForemanSelection } = require('./helpers/founders_plot_llm');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -127,6 +128,10 @@ test('Run now dispatches a worker-owned Foreman tick and production app code avo
     return String(lumber?.buildingId || '');
   });
   expect(lumberBuildingId).toMatch(/^bld_/);
+  await mockFoundersPlotForemanSelection(page, {
+    candidateId: `collect:${lumberBuildingId}`,
+    reason: 'Careful Steward clears the ready lumber before it starts drifting.'
+  });
 
   const queueResp = await runPlotTool(frame, 'et.plot.queue_job', {
     buildingId: lumberBuildingId,

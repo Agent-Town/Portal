@@ -281,61 +281,62 @@ When running in the in-browser OpenClaw Lite runtime, prefer explicit Agent Town
 After the house/founders opening sequence, the next district is **Founders Plot**.
 
 - Open it in the town shell with `agent_town_ui_open_modal({ modal: "founders-plot", params: {} })` when a modal path is needed.
-- Prefer typed `et.plot.*` tools over freeform HTTP for plot actions.
+- Prefer typed `founders_plot_*` worker tools over freeform HTTP for plot actions.
+- Worker-facing aliases use underscore names; server/API/replay routes remain dotted `et.plot.*` and `et.foreman.*` ids.
 
 ### Founders Plot state + mutation tools
 
-- `et.plot.get_state`
+- `founders_plot_get_state`
   - Reads the authoritative plot state, quest, permissions, recap, jobs, and rewards.
-- `et.plot.place_building`
+- `founders_plot_place_building`
   - Requests a building placement on one allowed pad.
   - Human approval is required in Phase 1.
-- `et.plot.queue_job`
+- `founders_plot_queue_job`
   - Queues the next production/sell job on a ready building.
-- `et.plot.collect_outputs`
+- `founders_plot_collect_outputs`
   - Collects completed outputs on one building when permission allows.
-- `et.plot.upgrade_building`
+- `founders_plot_upgrade_building`
   - Starts an HQ or building upgrade.
   - Human approval is required for HQ-sensitive upgrades in Phase 1.
-- `et.plot.set_priority`
+- `founders_plot_set_priority`
   - Sets one building priority when the unlock is available.
-- `et.plot.claim_reward`
+- `founders_plot_claim_reward`
   - Claims a pending recap/level reward.
-- `et.plot.request_user_approval`
+- `founders_plot_request_user_approval`
   - Creates a visible approval card instead of forcing a sensitive action.
-- `et.plot.town.get_signals`
+- `founders_plot_town_get_signals`
   - Reads the four visible town signals that tell you how the town is feeling.
-- `et.plot.town.upgrade_landmark`
+- `founders_plot_town_upgrade_landmark`
   - Raises the Public Square Welcome Sign when the plot can afford it.
-- `et.plot.journal.get_entries`
+- `founders_plot_journal_get_entries`
   - Reads the compact Town Journal derived from contract, signal, landmark, and Clover events.
-- `et.plot.contracts.get_state`
+- `founders_plot_contracts_get_state`
   - Reads the living Contract Board with current offers, active contract, and completed requests.
-- `et.plot.contracts.accept`
+- `founders_plot_contracts_accept`
   - Accepts one `SUPPLY`, `BUILD`, or `PREPARATION` contract. Only one contract may be active.
-- `et.plot.contracts.turn_in`
+- `founders_plot_contracts_turn_in`
   - Turns in the active contract once it is ready.
-- `et.foreman.policy.get_standing_order`
+- `founders_plot_foreman_policy_get_standing_order`
   - Reads Clover's current Standing Order.
-- `et.foreman.policy.set_standing_order`
+- `founders_plot_foreman_policy_set_standing_order`
   - Sets Clover to `CAREFUL_STEWARD` or `BOLD_FOUNDER`.
-- `et.foreman.scheduler.get_status`
+- `founders_plot_foreman_scheduler_get_status`
   - Reads the Collect ready outputs preset state.
-- `et.foreman.scheduler.enable_collect_ready_outputs`
+- `founders_plot_foreman_scheduler_enable_collect_ready_outputs`
   - Enables the one shipped V1.2 in-session automatic routine.
-- `et.foreman.scheduler.pause`
+- `founders_plot_foreman_scheduler_pause`
   - Pauses the shipped Collect ready outputs routine.
-- `et.foreman.scheduler.resume`
+- `founders_plot_foreman_scheduler_resume`
   - Resumes the shipped Collect ready outputs routine.
 
 ### Founders Plot behavior rules
 
-- Observe first with `et.plot.get_state`.
+- Observe first with `founders_plot_get_state`.
 - Respect the Current Goal and the Standing Order before choosing a mutation.
 - Use the Contract Board as the first civic choice after HQ2.
 - Treat requesters as recurring people and institutions, not disposable strings.
 - Watch for `PREPARATION` requests with a soft deadline and avoid promising them unless the town can finish them.
-- Use `et.plot.town.get_signals` and `et.plot.journal.get_entries` to explain how the town changed.
+- Use `founders_plot_town_get_signals` and `founders_plot_journal_get_entries` to explain how the town changed.
 - The Welcome Sign is an optional coin sink; it should never be treated as tutorial-gating.
 - If policy blocks the action, request approval instead of simulating success.
 - Mutation tools require `idempotencyKey`; provide one when you call them.

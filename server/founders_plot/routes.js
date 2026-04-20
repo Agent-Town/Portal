@@ -24,7 +24,6 @@ const {
   buildForemanObservation,
   buildSafeForemanCandidates,
   buildWorldDelta,
-  chooseForemanCandidateWithTestBrain,
   createInitialPlot,
   foremanRuntimeStatus,
   pendingApprovalsView,
@@ -54,6 +53,66 @@ const { FOUNDERS_PLOT_TOOL_SPECS, getToolSpec } = require('./tools');
 
 function hashJson(value) {
   return crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
+}
+
+function normalizeForemanPlanCard(rawPlanCard) {
+  if (!rawPlanCard || typeof rawPlanCard !== 'object' || Array.isArray(rawPlanCard)) {
+    return null;
+  }
+  const text = (value, fallback = '') => typeof value === 'string' ? value.trim() || fallback : fallback;
+  return {
+    headline: text(rawPlanCard.headline, 'Foreman plan'),
+    goalServed: text(rawPlanCard.goalServed),
+    observation: text(rawPlanCard.observation),
+    recommendation: text(rawPlanCard.recommendation),
+    reason: text(rawPlanCard.reason),
+    standingOrderInfluence: text(rawPlanCard.standingOrderInfluence),
+    canActNow: rawPlanCard.canActNow === true,
+    proposedTool: text(rawPlanCard.proposedTool),
+    requiresApproval: rawPlanCard.requiresApproval === true,
+    alternative: text(rawPlanCard.alternative)
+  };
+}
+
+function normalizeForemanDecisionPayload(rawDecision, fallbackToolName = '') {
+  if (!rawDecision || typeof rawDecision !== 'object' || Array.isArray(rawDecision)) {
+    return null;
+  }
+  const text = (value) => typeof value === 'string' ? value.trim() : '';
+  const chosenCandidateId = text(rawDecision.chosenCandidateId);
+  const chosenTool = text(rawDecision.chosenTool) || text(fallbackToolName);
+  const llmToolName = text(rawDecision.llmToolName);
+  const source = text(rawDecision.source);
+  const planCard = normalizeForemanPlanCard(rawDecision.planCard);
+  const llmRaw = rawDecision.llm && typeof rawDecision.llm === 'object' && !Array.isArray(rawDecision.llm)
+    ? rawDecision.llm
+    : null;
+  const llm = llmRaw ? {
+    provider: text(llmRaw.provider) || null,
+    modelId: text(llmRaw.modelId) || null,
+    modelRef: text(llmRaw.modelRef) || null
+  } : null;
+  if (!chosenCandidateId && !chosenTool && !planCard) {
+    return null;
+  }
+  return {
+    ...(source ? { source } : {}),
+    chosenCandidateId: chosenCandidateId || null,
+    chosenTool: chosenTool || null,
+    ...(llmToolName ? { llmToolName } : {}),
+    ...(llm ? { llm } : {}),
+    planCard: planCard || null
+  };
+}
+
+function hashForemanMutationArgs(toolName, rawArgs, runtimeId) {
+  const args = rawArgs && typeof rawArgs === 'object' ? { ...rawArgs } : {};
+  delete args.decision;
+  return hashJson({
+    toolName,
+    args,
+    runtimeId
+  });
 }
 
 function normalizeIdentity(raw) {
@@ -945,17 +1004,18 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       });
       observation.claimLease = true;
       const safeCandidates = buildSafeForemanCandidates(state, observation);
-      const decision = chooseForemanCandidateWithTestBrain({
-        observation,
-        safeCandidates
-      });
-      state.meta.foremanLastDecision = decision;
-      persistStateAndEvents(state, []);
+      const persistedDecision = state.meta.foremanLastDecision && typeof state.meta.foremanLastDecision === 'object'
+        ? state.meta.foremanLastDecision
+        : null;
       res.json({
         ok: true,
         observation,
         safeCandidates,
-        decision,
+        decision: persistedDecision || {
+          chosenCandidateId: null,
+          chosenTool: null,
+          planCard: null
+        },
         runtime: {
           ...runtime,
           token: undefined
@@ -993,8 +1053,11 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       if (FOREMAN_MUTATION_TOOL_NAMES.has(toolName)) {
         workerMeta = normalizeWorkerCommandMeta(rawArgs, runtime);
       }
+      const decision = FOREMAN_MUTATION_TOOL_NAMES.has(toolName)
+        ? normalizeForemanDecisionPayload(rawArgs.decision, toolName)
+        : null;
 
-      const argsHash = hashJson({ toolName, args: rawArgs, runtimeId: runtime.runtimeId });
+      const argsHash = hashForemanMutationArgs(toolName, rawArgs, runtime.runtimeId);
       const previous = getIdempotency(state.plot.plotId, idempotencyKey);
       if (previous) {
         if (previous.argsSha !== argsHash) {
@@ -1004,6 +1067,9 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       }
 
       const eventBuffer = [];
+      if (workerMeta && decision) {
+        state.meta.foremanLastDecision = decision;
+      }
       if (workerMeta) {
         eventBuffer.push({
           ...buildWorkerCommandEvent(EVENT_TYPES.FOREMAN_WORKER_COMMAND_STARTED, workerMeta, {

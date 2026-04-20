@@ -2094,17 +2094,9 @@ function stateView(state, recentEvents = []) {
   ensureContractBoard(state, Date.now());
   refreshActiveContractState(state, Date.now());
   const currentGoal = resolvePrimaryGoal(state);
-  const observation = buildForemanObservation(state, {
-    runtimeId: state.meta.foremanRuntime.runtimeId,
-    nowMs: Date.now(),
-    recentEvents
-  });
-  const safeCandidates = buildSafeForemanCandidates(state, observation);
-  const decision = chooseForemanCandidateWithTestBrain({
-    observation,
-    safeCandidates
-  });
-  state.meta.foremanLastDecision = decision;
+  const decision = state.meta.foremanLastDecision && typeof state.meta.foremanLastDecision === 'object'
+    ? copyJson(state.meta.foremanLastDecision)
+    : null;
   const journalEntries = buildTownJournalEntries(recentEvents);
   return {
     plot: plotSnapshot(state),
@@ -2152,7 +2144,7 @@ function stateView(state, recentEvents = []) {
         token: undefined
       },
       scheduler: copyJson(state.meta.scheduler),
-      planCard: decision.planCard,
+      planCard: decision?.planCard || null,
       receipt: latestForemanReceipt(state),
       lastDecision: decision
     },

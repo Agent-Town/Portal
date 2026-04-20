@@ -2,11 +2,9 @@ const { test, expect } = require('@playwright/test');
 const {
   EVENT_TYPES,
   applySetStandingOrder,
-  buildForemanObservation,
-  buildSafeForemanCandidates,
-  chooseForemanCandidateWithTestBrain,
   createInitialPlot,
-  resolvePrimaryGoal
+  resolvePrimaryGoal,
+  stateView
 } = require('../server/founders_plot/engine');
 
 test('standing order defaults to Careful Steward and changing it emits an audit event', async () => {
@@ -29,10 +27,10 @@ test('standing order defaults to Careful Steward and changing it emits an audit 
   expect(events.some((event) => event?.type === EVENT_TYPES.FOREMAN_STANDING_ORDER_CHANGED)).toBe(true);
 });
 
-test('the deterministic test brain changes plan-card language with standing order and only picks safe candidates', async () => {
+test('state view only surfaces a persisted worker foreman decision instead of inventing a fresh server-side choice', async () => {
   const state = createInitialPlot({
-    pairId: 'test-brain-standing-order',
-    houseId: 'house_test_brain_standing_order',
+    pairId: 'worker-decision-standing-order',
+    houseId: 'house_worker_decision_standing_order',
     nowMs: 1_713_456_100_000
   });
 
@@ -72,39 +70,36 @@ test('the deterministic test brain changes plan-card language with standing orde
     updatedAt: state.plot.createdAt
   });
 
-  state.meta.standingOrder = 'CAREFUL_STEWARD';
-  const carefulObservation = buildForemanObservation(state, {
-    runtimeId: 'rt_careful',
-    nowMs: 1_713_456_100_100,
-    recentEvents: []
-  });
-  const carefulCandidates = buildSafeForemanCandidates(state, carefulObservation);
-  const carefulDecision = chooseForemanCandidateWithTestBrain({
-    observation: carefulObservation,
-    safeCandidates: carefulCandidates
-  });
+  const beforeWorkerDecision = stateView(state, []);
+  expect(beforeWorkerDecision?.foreman?.lastDecision || null).toBeNull();
+  expect(beforeWorkerDecision?.foreman?.planCard || null).toBeNull();
 
-  state.meta.standingOrder = 'BOLD_FOUNDER';
-  const boldObservation = buildForemanObservation(state, {
-    runtimeId: 'rt_bold',
-    nowMs: 1_713_456_100_100,
-    recentEvents: []
-  });
-  const boldCandidates = buildSafeForemanCandidates(state, boldObservation);
-  const boldDecision = chooseForemanCandidateWithTestBrain({
-    observation: boldObservation,
-    safeCandidates: boldCandidates
-  });
+  state.meta.foremanLastDecision = {
+    chosenCandidateId: 'collect:bld_farm_test',
+    chosenTool: 'et.plot.collect_outputs',
+    planCard: {
+      headline: 'Foreman plan',
+      goalServed: 'active_contract',
+      observation: 'Collect ready output from Farm Plot.',
+      recommendation: 'Use et.plot.collect_outputs on bld_farm_test.',
+      reason: 'Careful Steward clears dependable stock before expansion.',
+      standingOrderInfluence: 'Careful Steward favors predictable reserves.',
+      canActNow: true,
+      proposedTool: 'et.plot.collect_outputs',
+      requiresApproval: false,
+      alternative: ''
+    }
+  };
 
-  expect(Array.isArray(carefulCandidates)).toBe(true);
-  expect(Array.isArray(boldCandidates)).toBe(true);
-  expect(carefulDecision?.chosenCandidateId).toBeTruthy();
-  expect(boldDecision?.chosenCandidateId).toBeTruthy();
-  expect(carefulCandidates.some((candidate) => candidate?.candidateId === carefulDecision?.chosenCandidateId)).toBe(true);
-  expect(boldCandidates.some((candidate) => candidate?.candidateId === boldDecision?.chosenCandidateId)).toBe(true);
-  expect(carefulDecision?.planCard?.reason).not.toBe(boldDecision?.planCard?.reason);
-  expect(carefulDecision?.planCard?.standingOrderInfluence).toMatch(/careful/i);
-  expect(boldDecision?.planCard?.standingOrderInfluence).toMatch(/bold/i);
+  const afterWorkerDecision = stateView(state, []);
+  expect(afterWorkerDecision?.foreman?.lastDecision).toEqual(expect.objectContaining({
+    chosenCandidateId: 'collect:bld_farm_test',
+    chosenTool: 'et.plot.collect_outputs'
+  }));
+  expect(afterWorkerDecision?.foreman?.planCard).toEqual(expect.objectContaining({
+    reason: 'Careful Steward clears dependable stock before expansion.',
+    standingOrderInfluence: 'Careful Steward favors predictable reserves.'
+  }));
 });
 
 test('goal arbitration gives the primary CTA to approvals before tutorial, and tutorial before contract progress', async () => {
