@@ -77,7 +77,10 @@ html.founders-plot-embed body.founders-plot-page {
 
 .foundersHero h1,
 .foundersQuestCard h2,
-.foundersBoardCard h2 {
+.foundersBoardCard h2,
+.foundersSignalsCard h2,
+.foundersJournalCard h2,
+.foundersLandmarkCard h2 {
   margin: 6px 0 10px;
   font-family: "Smokum", var(--font-display), serif;
   font-size: clamp(32px, 5vw, 48px);
@@ -87,7 +90,10 @@ html.founders-plot-embed body.founders-plot-page {
 
 .foundersQuestCard h2,
 .foundersBoardCard h2,
-.foundersSelectionCard h2 {
+.foundersSelectionCard h2,
+.foundersSignalsCard h2,
+.foundersJournalCard h2,
+.foundersLandmarkCard h2 {
   font-size: 32px;
 }
 
@@ -308,7 +314,10 @@ html.founders-plot-embed body.founders-plot-page {
 .foundersPriorityRow,
 .foundersContractList,
 .foundersContractMeta,
-.foundersSubpanel {
+.foundersSubpanel,
+.foundersSignalsCard,
+.foundersJournalCard,
+.foundersLandmarkCard {
   display: grid;
   gap: 10px;
 }
@@ -395,6 +404,51 @@ html.founders-plot-embed body.founders-plot-page {
 
 .foundersContractAction {
   margin-top: 10px;
+}
+
+.foundersSignalItem,
+.foundersJournalItem,
+.foundersLandmarkBody,
+.foundersRecapSection {
+  padding: 12px;
+  border: 1px solid rgba(46, 27, 14, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.44);
+}
+
+.foundersSignalHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.foundersSignalBar {
+  margin-top: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(46, 27, 14, 0.1);
+  overflow: hidden;
+}
+
+.foundersSignalFill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--fp-ochre), var(--fp-sun));
+}
+
+.foundersSignalFill.is-low {
+  background: linear-gradient(90deg, rgba(160, 82, 45, 0.9), rgba(196, 136, 58, 0.9));
+}
+
+.foundersSignalFill.is-strong {
+  background: linear-gradient(90deg, rgba(91, 138, 138, 0.95), rgba(255, 228, 160, 0.9));
+}
+
+.foundersRecapSectionList {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
 }
 
 .foundersForemanControls {

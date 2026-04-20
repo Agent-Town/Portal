@@ -125,6 +125,40 @@ const FOUNDERS_PLOT_TOOL_SPECS = [
     resultSchema: { type: 'object' }
   },
   {
+    name: 'et.plot.town.get_signals',
+    description: 'Return the four visible town signals for the current Founders Plot.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      additionalProperties: false
+    },
+    resultSchema: { type: 'object' }
+  },
+  {
+    name: 'et.plot.town.upgrade_landmark',
+    description: 'Upgrade the Public Square Welcome Sign when the plot can afford it.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        landmarkId: { type: 'string', enum: ['public_square_welcome_sign'] },
+        idempotencyKey: { type: 'string' }
+      },
+      required: ['landmarkId', 'idempotencyKey'],
+      additionalProperties: false
+    },
+    resultSchema: { type: 'object' }
+  },
+  {
+    name: 'et.plot.journal.get_entries',
+    description: 'Return the compact Town Journal entries derived from Founders Plot events.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      additionalProperties: false
+    },
+    resultSchema: { type: 'object' }
+  },
+  {
     name: 'et.plot.contracts.get_state',
     description: 'Return the Contract Board state for the current Founders Plot.',
     inputSchema: {

@@ -318,6 +318,34 @@ Response shape:
       "hqLevel": 1,
       "inventory": { "wood": 0, "stone": 0, "food": 0, "coin": 20 }
     },
+    "townSignals": {
+      "depotReadiness": 50,
+      "marketConfidence": 50,
+      "neighborGoodwill": 50,
+      "publicCharm": 0,
+      "bands": {
+        "depotReadiness": "STEADY",
+        "marketConfidence": "STEADY",
+        "neighborGoodwill": "STEADY",
+        "publicCharm": "LOW"
+      }
+    },
+    "requesters": [
+      {
+        "requesterId": "jasper_depot_clerk",
+        "displayName": "Jasper at the Depot",
+        "institution": "Atlas Depot",
+        "completedContracts": 0,
+        "missedContracts": 0
+      }
+    ],
+    "landmarks": {
+      "publicSquare": {
+        "landmarkId": "public_square_welcome_sign",
+        "level": 0,
+        "label": "Open Dust Lot"
+      }
+    },
     "policy": {
       "observeAndSuggest": true,
       "collectOutputs": false,
@@ -375,14 +403,25 @@ Response shape:
       "unseenCount": 0,
       "recent": [],
       "lines": [],
+      "sections": [
+        { "title": "What you did", "lines": [] },
+        { "title": "What the town produced", "lines": [] },
+        { "title": "Who asked for help", "lines": [] },
+        { "title": "What changed in town", "lines": [] },
+        { "title": "What Clover did", "lines": [] },
+        { "title": "What needs your decision now", "lines": [] }
+      ],
       "pendingApprovals": []
+    },
+    "journal": {
+      "entries": []
     },
     "progress": {
       "currentLevel": 1,
       "next": { "xpCurrent": 0, "xpRequired": 25, "ratio": 0, "cost": { "wood": 20, "food": 10 } }
     },
     "compatibility": {
-      "schemaVersion": 2
+      "schemaVersion": 3
     },
     "stateHash": "<sha256 hex>"
   }
@@ -406,6 +445,9 @@ Supported tool names:
 - `et.plot.set_priority`
 - `et.plot.claim_reward`
 - `et.plot.request_user_approval`
+- `et.plot.town.get_signals`
+- `et.plot.town.upgrade_landmark`
+- `et.plot.journal.get_entries`
 - `et.plot.contracts.get_state`
 - `et.plot.contracts.accept`
 - `et.plot.contracts.turn_in`
@@ -424,6 +466,16 @@ Mutation request shape:
   "...toolArgs": true
 }
 ```
+
+Read-only tool note:
+- `et.plot.get_state`
+- `et.plot.town.get_signals`
+- `et.plot.journal.get_entries`
+- `et.plot.contracts.get_state`
+- `et.foreman.policy.get_standing_order`
+- `et.foreman.scheduler.get_status`
+
+Those read-only calls do not require `idempotencyKey`.
 
 Security rules:
 - The normal human route must reject `actor: "AGENT"` with `ACTOR_SPOOF_REJECTED`.
@@ -487,7 +539,7 @@ Request shape:
 Returns the living Contract Board for the active plot.
 
 ### POST `/api/founders-plot/contracts/accept`
-Accepts exactly one offered `SUPPLY` or `BUILD` contract.
+Accepts exactly one offered `SUPPLY`, `BUILD`, or `PREPARATION` contract.
 
 ### POST `/api/founders-plot/contracts/turn-in`
 Turns in the active contract once it is `READY_TO_TURN_IN`.
@@ -502,11 +554,11 @@ Refreshes the active Foreman runtime lease.
 Pauses the current Foreman runtime. Later Foreman actions must fail closed until restarted.
 
 ### GET `/api/founders-plot/foreman/observation`
-Returns the structured V1.1 observation packet for the active Foreman runtime.
+Returns the structured V1.2 observation packet for the active Foreman runtime.
 
 Observation notes:
-- `schema === "founders-plot.obs.v1.1"` and `schemaVersion === "founders-plot.obs.v1.1"` are both present.
-- The packet includes `currentGoal`, living contract state, standing order, scheduler status, recent events, and safe collect-ready building signals.
+- `schema === "founders-plot.obs.v1.2"` and `schemaVersion === "founders-plot.obs.v1.2"` are both present.
+- The packet includes `currentGoal`, living contract state, town signals, standing order, scheduler status, recent events, and safe collect-ready building signals.
 
 ### POST `/api/founders-plot/foreman/tool/:toolName`
 Executes one bounded Foreman action through the authenticated runtime route.
@@ -516,6 +568,7 @@ Requirements:
 - request body must not declare `actor`;
 - non-`get_state` calls require `idempotencyKey`;
 - successful actions append `AGENT_ACTION_EXECUTED` plus a Foreman receipt event.
+- worker-owned commands may also append `FOREMAN_WORKER_COMMAND_STARTED` and `FOREMAN_WORKER_COMMAND_COMPLETED`.
 
 ### POST `/api/founders-plot/foreman/receipt/correction`
 Applies a human correction to the latest Foreman receipt.
@@ -526,6 +579,15 @@ Supported corrections in V1.1:
 
 ### GET `/api/founders-plot/recap`
 Returns the current unseen recap lines generated from the event log.
+
+Recap notes:
+- `recap.sections` is a fixed, player-facing section list:
+  - `What you did`
+  - `What the town produced`
+  - `Who asked for help`
+  - `What changed in town`
+  - `What Clover did`
+  - `What needs your decision now`
 
 ### POST `/api/founders-plot/recap/read`
 Marks recap lines as seen for the active plot.

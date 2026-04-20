@@ -303,10 +303,16 @@ After the house/founders opening sequence, the next district is **Founders Plot*
   - Claims a pending recap/level reward.
 - `et.plot.request_user_approval`
   - Creates a visible approval card instead of forcing a sensitive action.
+- `et.plot.town.get_signals`
+  - Reads the four visible town signals that tell you how the town is feeling.
+- `et.plot.town.upgrade_landmark`
+  - Raises the Public Square Welcome Sign when the plot can afford it.
+- `et.plot.journal.get_entries`
+  - Reads the compact Town Journal derived from contract, signal, landmark, and Clover events.
 - `et.plot.contracts.get_state`
   - Reads the living Contract Board with current offers, active contract, and completed requests.
 - `et.plot.contracts.accept`
-  - Accepts one `SUPPLY` or `BUILD` contract. Only one contract may be active.
+  - Accepts one `SUPPLY`, `BUILD`, or `PREPARATION` contract. Only one contract may be active.
 - `et.plot.contracts.turn_in`
   - Turns in the active contract once it is ready.
 - `et.foreman.policy.get_standing_order`
@@ -327,11 +333,16 @@ After the house/founders opening sequence, the next district is **Founders Plot*
 - Observe first with `et.plot.get_state`.
 - Respect the Current Goal and the Standing Order before choosing a mutation.
 - Use the Contract Board as the first civic choice after HQ2.
+- Treat requesters as recurring people and institutions, not disposable strings.
+- Watch for `PREPARATION` requests with a soft deadline and avoid promising them unless the town can finish them.
+- Use `et.plot.town.get_signals` and `et.plot.journal.get_entries` to explain how the town changed.
+- The Welcome Sign is an optional coin sink; it should never be treated as tutorial-gating.
 - If policy blocks the action, request approval instead of simulating success.
 - Mutation tools require `idempotencyKey`; provide one when you call them.
 - Treat `FORBIDDEN_POLICY`, `OUT_OF_RESOURCES`, `BUILD_SLOT_OCCUPIED`, and `JOB_ALREADY_RUNNING` as real world-state blockers, not prompt wording.
 - Never try to spoof the Foreman by sending `actor: "AGENT"` on the human route.
 - Use the Foreman-authenticated route only when the runtime session actually exists.
+- When the UI offers a `Run now` Foreman action, the real observe -> decide -> tool-call loop must come through the OpenClaw Lite worker command path.
 - Use recap lines and the current quest to explain why you acted.
 
 ### UI intent policy

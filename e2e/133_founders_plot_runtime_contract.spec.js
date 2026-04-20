@@ -53,14 +53,14 @@ test('worker registry exposes the bounded Founders Plot foreman tool family', as
   expect(names).toContain('et.foreman.scheduler.resume');
 });
 
-test('worker tools preserve the schema-v2 Founders Plot state and idempotent human-route mutations', async ({ page }) => {
+test('worker tools preserve the schema-v3 Founders Plot state and idempotent human-route mutations', async ({ page }) => {
   await gotoAppWithLite(page, { trainerNamespace: true });
 
   const initialState = await invokeWorkerTool(page, 'et.plot.get_state');
   expect(initialState.envelope?.ok).toBe(true);
   expect(initialState.envelope?.data?.state?.plot?.hqLevel).toBe(1);
   expect(initialState.envelope?.data?.state?.quest?.title).toBeTruthy();
-  expect(initialState.envelope?.data?.state?.compatibility?.schemaVersion).toBe(2);
+  expect(initialState.envelope?.data?.state?.compatibility?.schemaVersion).toBe(3);
 
   const placed = await invokeWorkerTool(page, 'et.plot.place_building', {
     type: 'LUMBER_CAMP',

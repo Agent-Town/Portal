@@ -55,11 +55,13 @@
     if (!root || !body) return;
     if (!dock || dock.classList.contains('is-hidden')) {
       root.style.setProperty('--agent-panel-page-inset', '0px');
+      body.style.paddingBottom = '0px';
       body.classList.remove('agent-panel-expanded');
       return;
     }
     const insetPx = Math.max(0, Math.round(dock.getBoundingClientRect().height || 0));
     root.style.setProperty('--agent-panel-page-inset', `${insetPx}px`);
+    body.style.paddingBottom = `${insetPx}px`;
     body.classList.toggle('agent-panel-expanded', !dock.classList.contains('minimized'));
   }
 

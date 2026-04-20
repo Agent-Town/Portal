@@ -67,7 +67,7 @@ test('the Foreman runtime boots through OpenClaw Lite, exposes the observation p
     return await window.__foundersPlotTest.getForemanObservation();
   });
   expect(observation?.ok).toBe(true);
-  expect(observation?.observation?.schema).toBe('founders-plot.obs.v1.1');
+  expect(observation?.observation?.schema).toBe('founders-plot.obs.v1.2');
   expect(Array.isArray(observation?.safeCandidates)).toBe(true);
 
   const placed = await placeFirstLumberCamp(frame, 'v11-runtime-lumber');

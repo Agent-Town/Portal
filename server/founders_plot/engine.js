@@ -1,4 +1,22 @@
 const crypto = require('crypto');
+const {
+  REQUESTERS_V12,
+  applyRequesterContractOutcome,
+  createRequesterSnapshot,
+  defaultRequesterState,
+  findRequester,
+  generateContractBoardOffers,
+  markRequesterSeen,
+  normalizeRequesterList
+} = require('./contract_deck');
+const {
+  SIGNAL_KEYS,
+  applySignalDelta,
+  defaultTownSignals,
+  normalizeSignalDelta,
+  normalizeTownSignals,
+  signalBand
+} = require('./town_signals');
 
 const BUILDING_TYPES = [
   'HQ',
@@ -21,6 +39,7 @@ const EVENT_TYPES = {
   CONTRACT_OFFERED: 'CONTRACT_OFFERED',
   CONTRACT_ACCEPTED: 'CONTRACT_ACCEPTED',
   CONTRACT_COMPLETED: 'CONTRACT_COMPLETED',
+  CONTRACT_MISSED: 'CONTRACT_MISSED',
   APPROVAL_REQUESTED: 'APPROVAL_REQUESTED',
   APPROVAL_APPROVED: 'APPROVAL_APPROVED',
   APPROVAL_REJECTED: 'APPROVAL_REJECTED',
@@ -34,6 +53,13 @@ const EVENT_TYPES = {
   SCHEDULER_ENABLED: 'SCHEDULER_ENABLED',
   SCHEDULER_PAUSED: 'SCHEDULER_PAUSED',
   SCHEDULER_RESUMED: 'SCHEDULER_RESUMED',
+  REQUESTER_SEEN: 'REQUESTER_SEEN',
+  TOWN_SIGNAL_CHANGED: 'TOWN_SIGNAL_CHANGED',
+  LANDMARK_UPGRADED: 'LANDMARK_UPGRADED',
+  TOWN_JOURNAL_ENTRY_CREATED: 'TOWN_JOURNAL_ENTRY_CREATED',
+  FOREMAN_WORKER_COMMAND_STARTED: 'FOREMAN_WORKER_COMMAND_STARTED',
+  FOREMAN_WORKER_COMMAND_COMPLETED: 'FOREMAN_WORKER_COMMAND_COMPLETED',
+  FOREMAN_WORKER_COMMAND_FAILED: 'FOREMAN_WORKER_COMMAND_FAILED',
   REWARD_CLAIMED: 'REWARD_CLAIMED',
   RECAP_GENERATED: 'RECAP_GENERATED'
 };
@@ -219,7 +245,13 @@ const XP_RULES = {
   dailyReturn: 5
 };
 
-const FOUNDERS_PLOT_SCHEMA_VERSION = 2;
+const PUBLIC_SQUARE_COST = { wood: 4, coin: 8 };
+const PUBLIC_SQUARE_REWARD = {
+  townXp: 8,
+  signalDelta: { publicCharm: 10 }
+};
+
+const FOUNDERS_PLOT_SCHEMA_VERSION = 3;
 const MAX_OFFLINE_MS = 8 * 60 * 60 * 1000;
 const SIMULATION_TICK_MS = 60 * 1000;
 
@@ -240,11 +272,16 @@ const META_CORE_KEYS = new Set([
   'firstTimberRewarded',
   'standingOrder',
   'contracts',
+  'contractDeck',
   'scheduler',
   'foremanRuntime',
+  'foremanWorker',
   'foremanReceipts',
   'foremanLastDecision',
-  'foremanLastReceiptId'
+  'foremanLastReceiptId',
+  'townSignals',
+  'requesters',
+  'landmarks'
 ]);
 
 function nowBucketHour(nowMs) {
@@ -327,37 +364,77 @@ function normalizeStandingOrder(value) {
 }
 
 function normalizeContractRequirements(raw = {}) {
+  const resourcesSource = raw.resources && typeof raw.resources === 'object' ? raw.resources : raw;
+  const buildingsSource = Array.isArray(raw.buildings)
+    ? raw.buildings
+    : raw.buildingType
+      ? [{ buildingType: raw.buildingType, minCount: 1 }]
+      : [];
   return {
-    wood: normalizeCount(raw.wood),
-    stone: normalizeCount(raw.stone),
-    food: normalizeCount(raw.food),
-    coin: normalizeCount(raw.coin),
-    buildingType: typeof raw.buildingType === 'string' ? raw.buildingType : ''
+    resources: {
+      wood: normalizeCount(resourcesSource.wood),
+      stone: normalizeCount(resourcesSource.stone),
+      food: normalizeCount(resourcesSource.food),
+      coin: normalizeCount(resourcesSource.coin)
+    },
+    buildings: buildingsSource.map((entry) => ({
+      buildingType: String(entry?.buildingType || ''),
+      minCount: Math.max(1, normalizeCount(entry?.minCount || 1))
+    })).filter((entry) => entry.buildingType)
   };
 }
 
 function normalizeContract(raw = {}) {
+  const rewardsSource = raw.rewards && typeof raw.rewards === 'object' ? raw.rewards : {};
+  const townMoment = raw.townMoment && typeof raw.townMoment === 'object' ? raw.townMoment : null;
   return {
     contractId: String(raw.contractId || ''),
+    plotId: String(raw.plotId || ''),
+    version: String(raw.version || 'v1.2'),
     kind: String(raw.kind || '').toUpperCase(),
-    requester: String(raw.requester || ''),
-    institution: String(raw.institution || ''),
+    status: String(raw.status || 'OFFERED').toUpperCase(),
+    requesterId: String(raw.requesterId || ''),
+    requesterSnapshot: {
+      displayName: String(raw?.requesterSnapshot?.displayName || raw.requester || ''),
+      institution: String(raw?.requesterSnapshot?.institution || raw.institution || ''),
+      roleTitle: String(raw?.requesterSnapshot?.roleTitle || ''),
+      portraitEmoji: String(raw?.requesterSnapshot?.portraitEmoji || '')
+    },
     whyNow: String(raw.whyNow || ''),
-    townSignal: String(raw.townSignal || ''),
+    townBenefit: String(raw.townBenefit || raw.description || ''),
     philosophyHint: String(raw.philosophyHint || ''),
     title: String(raw.title || ''),
-    description: String(raw.description || ''),
-    status: String(raw.status || 'OFFERED'),
     requirements: normalizeContractRequirements(raw.requirements || {}),
     rewards: {
-      wood: normalizeCount(raw?.rewards?.wood),
-      stone: normalizeCount(raw?.rewards?.stone),
-      food: normalizeCount(raw?.rewards?.food),
-      coin: normalizeCount(raw?.rewards?.coin),
-      townXp: normalizeCount(raw?.rewards?.townXp)
+      resources: {
+        wood: normalizeCount(rewardsSource?.resources?.wood ?? rewardsSource?.wood),
+        stone: normalizeCount(rewardsSource?.resources?.stone ?? rewardsSource?.stone),
+        food: normalizeCount(rewardsSource?.resources?.food ?? rewardsSource?.food),
+        coin: normalizeCount(rewardsSource?.resources?.coin ?? rewardsSource?.coin)
+      },
+      townXp: normalizeCount(rewardsSource?.townXp),
+      signalDelta: normalizeSignalDelta(rewardsSource?.signalDelta || {})
     },
-    acceptedAt: normalizeCount(raw.acceptedAt),
-    completedAt: normalizeCount(raw.completedAt)
+    missEffect: raw.missEffect && typeof raw.missEffect === 'object'
+      ? {
+        signalDelta: normalizeSignalDelta(raw.missEffect.signalDelta || {}),
+        recapLine: String(raw.missEffect.recapLine || '')
+      }
+      : null,
+    townMoment: townMoment
+      ? {
+        momentId: String(townMoment.momentId || ''),
+        label: String(townMoment.label || ''),
+        dueAtMs: normalizeCount(townMoment.dueAtMs),
+        softDeadline: townMoment.softDeadline !== false
+      }
+      : null,
+    deckKey: String(raw.deckKey || ''),
+    generationSeed: String(raw.generationSeed || ''),
+    offeredAtMs: normalizeCount(raw.offeredAtMs),
+    acceptedAtMs: normalizeCount(raw.acceptedAtMs || raw.acceptedAt),
+    completedAtMs: normalizeCount(raw.completedAtMs || raw.completedAt),
+    missedAtMs: normalizeCount(raw.missedAtMs)
   };
 }
 
@@ -444,6 +521,37 @@ function normalizeForemanReceipt(raw = {}) {
   };
 }
 
+function normalizeContractDeck(raw = {}) {
+  return {
+    version: typeof raw.version === 'string' ? raw.version : 'v1.2',
+    refreshCount: normalizeCount(raw.refreshCount),
+    boardStateKey: String(raw.boardStateKey || ''),
+    recentContractKeys: Array.isArray(raw.recentContractKeys)
+      ? raw.recentContractKeys.map((entry) => String(entry || '')).filter(Boolean).slice(-6)
+      : []
+  };
+}
+
+function normalizeLandmarks(raw = {}) {
+  const publicSquare = raw.publicSquare && typeof raw.publicSquare === 'object' ? raw.publicSquare : {};
+  const level = Math.min(1, Math.max(0, Math.floor(Number(publicSquare.level || 0) || 0)));
+  return {
+    publicSquare: {
+      landmarkId: 'public_square_welcome_sign',
+      level,
+      label: level >= 1 ? 'Welcome Sign' : 'Open Dust Lot',
+      upgradedAtMs: normalizeCount(publicSquare.upgradedAtMs)
+    }
+  };
+}
+
+function normalizeForemanWorker(raw = {}) {
+  return {
+    lastWorkerCommandId: String(raw.lastWorkerCommandId || ''),
+    lastWorkerTraceId: String(raw.lastWorkerTraceId || '')
+  };
+}
+
 function collectMetaExtensions(raw = {}) {
   const extensions = raw.extensions && typeof raw.extensions === 'object' && !Array.isArray(raw.extensions)
     ? copyPersistedValue(raw.extensions)
@@ -492,8 +600,10 @@ function normalizeMeta(raw = {}) {
     firstTimberRewarded: raw.firstTimberRewarded === true,
     standingOrder: normalizeStandingOrder(raw.standingOrder),
     contracts: normalizeContracts(raw.contracts),
+    contractDeck: normalizeContractDeck(raw.contractDeck),
     scheduler: normalizeScheduler(raw.scheduler),
     foremanRuntime: normalizeForemanRuntime(raw.foremanRuntime),
+    foremanWorker: normalizeForemanWorker(raw.foremanWorker),
     foremanReceipts: Array.isArray(raw.foremanReceipts)
       ? raw.foremanReceipts.map((receipt) => normalizeForemanReceipt(receipt)).filter((receipt) => receipt.receiptId)
       : [],
@@ -501,6 +611,9 @@ function normalizeMeta(raw = {}) {
       ? copyPersistedValue(raw.foremanLastDecision)
       : null,
     foremanLastReceiptId: typeof raw.foremanLastReceiptId === 'string' ? raw.foremanLastReceiptId : '',
+    townSignals: normalizeTownSignals(raw.townSignals),
+    requesters: normalizeRequesterList(raw.requesters),
+    landmarks: normalizeLandmarks(raw.landmarks),
     extensions: collectMetaExtensions(raw)
   };
 }
@@ -590,7 +703,21 @@ function migrateStateV1ToV2(raw) {
   meta.scheduler = normalizeScheduler(meta.scheduler);
   meta.foremanRuntime = normalizeForemanRuntime(meta.foremanRuntime);
   meta.foremanReceipts = Array.isArray(meta.foremanReceipts) ? meta.foremanReceipts : [];
-  meta.schemaVersion = FOUNDERS_PLOT_SCHEMA_VERSION;
+  meta.schemaVersion = 2;
+  next.meta = meta;
+  return next;
+}
+
+function migrateStateV2ToV3(raw) {
+  const next = raw && typeof raw === 'object' ? copyJson(raw) : {};
+  const meta = next.meta && typeof next.meta === 'object' ? next.meta : {};
+  meta.contracts = normalizeContracts(meta.contracts);
+  meta.contractDeck = normalizeContractDeck(meta.contractDeck);
+  meta.townSignals = normalizeTownSignals(meta.townSignals);
+  meta.requesters = normalizeRequesterList(meta.requesters);
+  meta.landmarks = normalizeLandmarks(meta.landmarks);
+  meta.foremanWorker = normalizeForemanWorker(meta.foremanWorker);
+  meta.schemaVersion = 3;
   next.meta = meta;
   return next;
 }
@@ -613,6 +740,10 @@ function prepareLoadedState(raw) {
   }
   if (toVersion < FOUNDERS_PLOT_SCHEMA_VERSION) {
     migratedRaw = migrateStateV1ToV2(migratedRaw);
+    toVersion = 2;
+  }
+  if (toVersion < FOUNDERS_PLOT_SCHEMA_VERSION) {
+    migratedRaw = migrateStateV2ToV3(migratedRaw);
     toVersion = FOUNDERS_PLOT_SCHEMA_VERSION;
   }
   return {
@@ -744,6 +875,9 @@ function unlockedToolNames(state) {
     'et.plot.place_building',
     'et.plot.upgrade_building',
     'et.plot.claim_reward',
+    'et.plot.town.get_signals',
+    'et.plot.town.upgrade_landmark',
+    'et.plot.journal.get_entries',
     'et.plot.contracts.get_state',
     'et.plot.contracts.accept',
     'et.plot.contracts.turn_in',
@@ -856,6 +990,28 @@ function addInventoryWithCaps(plot, delta) {
 
 function addXp(state, amount) {
   state.plot.townXp = normalizeCount(state.plot.townXp) + normalizeCount(amount);
+}
+
+function applyTownSignals(state, delta = {}, { actor = 'SYSTEM', reason = 'CONTRACT_COMPLETED', sourceId = '', appendEvent = null, nowMs = Date.now() } = {}) {
+  const applied = applySignalDelta(state.meta.townSignals, delta, nowMs);
+  state.meta.townSignals = applied.after;
+  const changedKeys = Object.keys(applied.delta || {});
+  if (changedKeys.length > 0) {
+    pushEvent(appendEvent, {
+      type: EVENT_TYPES.TOWN_SIGNAL_CHANGED,
+      actor,
+      explanation: `Town signals changed because of ${String(reason || '').toLowerCase().replace(/_/g, ' ')}.`,
+      recapLine: '',
+      data: {
+        reason,
+        sourceId: String(sourceId || ''),
+        before: applied.before,
+        delta: applied.delta,
+        after: applied.after
+      }
+    });
+  }
+  return applied;
 }
 
 function awardOnce(list, key) {
@@ -1069,45 +1225,72 @@ function pushHqReward(state, level, nowMs) {
   });
 }
 
-function contractDeckForStarterBoard() {
-  return [
-    normalizeContract({
-      contractId: randomId('con'),
-      kind: 'SUPPLY',
-      requester: 'Mara Vale',
-      institution: 'Canteen Guild',
-      title: 'Camp kitchen timber run',
-      description: 'Deliver starter provisions and timber to keep the cookfires going.',
-      whyNow: 'The kitchen stores are thin while new workers arrive.',
-      townSignal: 'Short rations at the camp kitchens',
-      philosophyHint: 'Stabilize the town before chasing expansion.',
-      status: 'OFFERED',
-      requirements: { wood: 6 },
-      rewards: { coin: 4, townXp: XP_RULES.contractTurnIn }
-    }),
-    normalizeContract({
-      contractId: randomId('con'),
-      kind: 'BUILD',
-      requester: 'Jon Weaver',
-      institution: 'Town Hall Works',
-      title: 'Raise a proper farm',
-      description: 'Build the first Farm Plot so the settlement can feed itself.',
-      whyNow: 'Town Hall wants the first permanent food lane opened.',
-      townSignal: 'Growth pressure from new arrivals',
-      philosophyHint: 'Build for tomorrow, not just today.',
-      status: 'OFFERED',
-      requirements: { buildingType: 'FARM_PLOT' },
-      rewards: { coin: 5, townXp: XP_RULES.contractTurnIn + 2 }
-    })
-  ];
+function contractRequesterName(contract) {
+  return String(contract?.requesterSnapshot?.displayName || contract?.requester || '');
 }
 
-function ensureContractBoard(state) {
+function contractRequesterInstitution(contract) {
+  return String(contract?.requesterSnapshot?.institution || contract?.institution || '');
+}
+
+function pushRecentContractKeys(state, offers = []) {
+  const keys = Array.isArray(state?.meta?.contractDeck?.recentContractKeys)
+    ? state.meta.contractDeck.recentContractKeys.slice(-6)
+    : [];
+  for (const offer of offers) {
+    const deckKey = String(offer?.deckKey || '');
+    if (!deckKey) continue;
+    keys.push(deckKey);
+    while (keys.length > 6) keys.shift();
+  }
+  state.meta.contractDeck.recentContractKeys = keys;
+}
+
+function contractBoardStateKey(state) {
+  const builtTypes = Array.isArray(state?.buildings)
+    ? state.buildings
+      .filter((building) => String(building?.state || '') !== 'UNDER_CONSTRUCTION')
+      .map((building) => String(building?.type || '').trim())
+      .filter(Boolean)
+      .sort()
+    : [];
+  return JSON.stringify({
+    hqLevel: normalizeCount(state?.plot?.hqLevel),
+    builtTypes
+  });
+}
+
+function refreshContractBoard(state, nowMs = Date.now()) {
+  if (state.plot.hqLevel < 2) return [];
+  if (activeContract(state)) return state.meta.contracts.offers;
+  const offers = generateContractBoardOffers({
+    state,
+    nowMs,
+    refreshCount: state.meta.contractDeck.refreshCount,
+    recentContractKeys: state.meta.contractDeck.recentContractKeys,
+    idFactory: () => randomId('con')
+  }).map((offer) => normalizeContract(offer));
+  state.meta.contracts.offers = offers;
+  state.meta.contractDeck.refreshCount += 1;
+  state.meta.contractDeck.boardStateKey = contractBoardStateKey(state);
+  pushRecentContractKeys(state, offers);
+  state.meta.requesters = offers.reduce((requesters, offer) => (
+    markRequesterSeen(requesters, offer.requesterId, nowMs)
+  ), state.meta.requesters);
+  return offers;
+}
+
+function ensureContractBoard(state, nowMs = Date.now()) {
   if (state.plot.hqLevel < 2) return;
   const contracts = state.meta.contracts;
   if (contracts.activeContract) return;
-  if (Array.isArray(contracts.offers) && contracts.offers.length > 0) return;
-  contracts.offers = contractDeckForStarterBoard();
+  const nextBoardStateKey = contractBoardStateKey(state);
+  if (
+    Array.isArray(contracts.offers)
+    && contracts.offers.length > 0
+    && state.meta.contractDeck.boardStateKey === nextBoardStateKey
+  ) return;
+  refreshContractBoard(state, nowMs);
 }
 
 function activeContract(state) {
@@ -1120,17 +1303,30 @@ function contractRequirementStatus(state, contract) {
     missing: {}
   };
   if (contract.kind === 'BUILD') {
-    const buildingType = String(contract?.requirements?.buildingType || '');
-    const ready = !!state.buildings.find((building) => building.type === buildingType && building.state !== 'UNDER_CONSTRUCTION');
+    const requirements = Array.isArray(contract?.requirements?.buildings)
+      ? contract.requirements.buildings
+      : [];
+    const missing = {};
+    let ready = true;
+    for (const requirement of requirements) {
+      const count = state.buildings.filter((building) => (
+        building.type === requirement.buildingType
+        && building.state !== 'UNDER_CONSTRUCTION'
+      )).length;
+      if (count < requirement.minCount) {
+        ready = false;
+        missing[requirement.buildingType] = requirement.minCount - count;
+      }
+    }
     return {
       ready,
-      missing: ready ? {} : { buildingType }
+      missing
     };
   }
   const missing = {};
   let ready = true;
   for (const resource of ['wood', 'stone', 'food', 'coin']) {
-    const need = normalizeCount(contract?.requirements?.[resource]);
+    const need = normalizeCount(contract?.requirements?.resources?.[resource]);
     const have = normalizeCount(state?.plot?.inventory?.[resource]);
     if (need > have) {
       ready = false;
@@ -1140,9 +1336,21 @@ function contractRequirementStatus(state, contract) {
   return { ready, missing };
 }
 
-function refreshActiveContractState(state) {
+function refreshActiveContractState(state, nowMs = Date.now()) {
   const contract = activeContract(state);
   if (!contract || contract.status === 'COMPLETED' || contract.status === 'CANCELLED_BY_SYSTEM') return contract;
+  if (
+    contract.kind === 'PREPARATION'
+    && contract.townMoment?.softDeadline === true
+    && normalizeCount(contract.townMoment?.dueAtMs) > 0
+    && normalizeCount(contract.townMoment?.dueAtMs) <= nowMs
+    && contract.status !== 'READY_TO_TURN_IN'
+    && contract.status !== 'MISSED'
+  ) {
+    contract.status = 'MISSED';
+    contract.missedAtMs = nowMs;
+    return contract;
+  }
   const status = contractRequirementStatus(state, contract);
   contract.status = status.ready ? 'READY_TO_TURN_IN' : 'ACTIVE';
   return contract;
@@ -1256,7 +1464,7 @@ function nextQuest(state) {
     return {
       step: 'turn_in_contract',
       title: `Complete: ${contract.title}`,
-      body: `${contract.requester} is ready to receive the finished work.`,
+      body: `${contractRequesterName(contract)} is ready to receive the finished work.`,
       primaryAction: { type: 'TURN_IN_CONTRACT', contractId: contract.contractId }
     };
   }
@@ -1412,11 +1620,25 @@ function resolvePrimaryGoal(state, { nowMs = Date.now() } = {}) {
       owner: 'contract_ready',
       priority: 4,
       title: `Turn in: ${contract.title}`,
-      body: `${contract.requester} is waiting for the finished work.`,
+      body: `${contractRequesterName(contract)} is waiting for the finished work.`,
       primaryAction: { type: 'TURN_IN_CONTRACT', contractId: contract.contractId }
     };
   }
   if (contract && contract.status === 'ACTIVE') {
+    const dueAtMs = normalizeCount(contract?.townMoment?.dueAtMs);
+    if (
+      contract.kind === 'PREPARATION'
+      && dueAtMs > nowMs
+      && dueAtMs - nowMs <= 2 * 60 * 1000
+    ) {
+      return {
+        owner: 'contract_progress',
+        priority: 5,
+        title: `${contract.title} is due soon`,
+        body: `${contractRequesterName(contract)} is still waiting before ${String(contract?.townMoment?.label || 'the town moment').toLowerCase()}.`,
+        primaryAction: { type: 'VIEW_CONTRACT_BOARD' }
+      };
+    }
     return {
       owner: 'contract_progress',
       priority: 5,
@@ -1434,6 +1656,18 @@ function resolvePrimaryGoal(state, { nowMs = Date.now() } = {}) {
       title: 'Foreman receipt ready',
       body: latestReceipt.reason || latestReceipt.result,
       primaryAction: null
+    };
+  }
+  if (canUpgradePublicSquare(state)) {
+    return {
+      owner: 'landmark',
+      priority: 8,
+      title: 'Raise the Welcome Sign',
+      body: 'Spend a little wood and coin so the square feels like the start of a real town.',
+      primaryAction: {
+        type: 'UPGRADE_LANDMARK',
+        landmarkId: 'public_square_welcome_sign'
+      }
     };
   }
   return {
@@ -1455,8 +1689,8 @@ function observationBuildingState(state, building) {
 }
 
 function buildForemanObservation(state, { runtimeId = '', nowMs = Date.now(), recentEvents = [] } = {}) {
-  ensureContractBoard(state);
-  refreshActiveContractState(state);
+  ensureContractBoard(state, nowMs);
+  refreshActiveContractState(state, nowMs);
   const goal = resolvePrimaryGoal(state, { nowMs });
   const mappedGoalOwner = goal.owner === 'approval'
     ? 'approval'
@@ -1466,8 +1700,8 @@ function buildForemanObservation(state, { runtimeId = '', nowMs = Date.now(), re
         ? 'foreman'
         : 'tutorial';
   return {
-    schema: 'founders-plot.obs.v1.1',
-    schemaVersion: 'founders-plot.obs.v1.1',
+    schema: 'founders-plot.obs.v1.2',
+    schemaVersion: 'founders-plot.obs.v1.2',
     plotId: state.plot.plotId,
     nowMs,
     runtimeId: String(runtimeId || ''),
@@ -1481,6 +1715,7 @@ function buildForemanObservation(state, { runtimeId = '', nowMs = Date.now(), re
       priority: goal.priority
     },
     inventory: inventorySnapshot(state.plot),
+    townSignals: copyJson(state.meta.townSignals),
     townXp: normalizeCount(state.plot.townXp),
     hqLevel: normalizeCount(state.plot.hqLevel),
     storageCaps: copyJson(state.plot.storageCaps),
@@ -1656,7 +1891,7 @@ function recommendationText(state) {
     return 'Choose which town request matters first. The contract board is the first real civic choice.';
   }
   if (quest.step === 'turn_in_contract' && contract) {
-    return `${contract.requester} is waiting. Turn in the contract before drifting back to optimization.`;
+    return `${contractRequesterName(contract)} is waiting. Turn in the contract before drifting back to optimization.`;
   }
   if (state.policy.emergencyPause) {
     return 'The foreman is paused. Lift the emergency pause before asking for autonomous work.';
@@ -1727,6 +1962,79 @@ function recentEventsView(events) {
     .reverse();
 }
 
+function signalLabel(signalKey) {
+  switch (String(signalKey || '')) {
+    case 'depotReadiness':
+      return 'Depot Readiness';
+    case 'marketConfidence':
+      return 'Market Confidence';
+    case 'neighborGoodwill':
+      return 'Neighbor Goodwill';
+    case 'publicCharm':
+      return 'Public Charm';
+    default:
+      return String(signalKey || '');
+  }
+}
+
+function buildTownJournalEntries(events = []) {
+  const rows = [];
+  for (const event of Array.isArray(events) ? events : []) {
+    if (!event) continue;
+    if (event.type === EVENT_TYPES.CONTRACT_ACCEPTED || event.type === EVENT_TYPES.CONTRACT_COMPLETED || event.type === EVENT_TYPES.CONTRACT_MISSED) {
+      const contract = event?.data?.contract || {};
+      rows.push({
+        journalId: `journal_evt_${event.seq}`,
+        eventId: event.seq,
+        atMs: normalizeCount(event.createdAt),
+        category: 'REQUEST',
+        title: String(contract.title || event.type.replace(/_/g, ' ')),
+        body: String(event.recapLine || event.explanation || ''),
+        requesterId: String(contract.requesterId || event?.data?.requesterId || '')
+      });
+      continue;
+    }
+    if (event.type === EVENT_TYPES.TOWN_SIGNAL_CHANGED) {
+      const after = event?.data?.after || {};
+      const changedKey = SIGNAL_KEYS.find((key) => Number(event?.data?.delta?.[key] || 0) !== 0) || '';
+      rows.push({
+        journalId: `journal_evt_${event.seq}`,
+        eventId: event.seq,
+        atMs: normalizeCount(event.createdAt),
+        category: 'SIGNAL',
+        title: changedKey ? signalLabel(changedKey) : 'Town changed',
+        body: changedKey
+          ? `${signalLabel(changedKey)} shifted to ${signalBand(after[changedKey]).toLowerCase()}.`
+          : String(event.explanation || ''),
+        signalKey: changedKey || undefined
+      });
+      continue;
+    }
+    if (event.type === EVENT_TYPES.LANDMARK_UPGRADED) {
+      rows.push({
+        journalId: `journal_evt_${event.seq}`,
+        eventId: event.seq,
+        atMs: normalizeCount(event.createdAt),
+        category: 'LANDMARK',
+        title: 'Welcome Sign raised',
+        body: String(event.recapLine || event.explanation || '')
+      });
+      continue;
+    }
+    if (event.type === EVENT_TYPES.FOREMAN_RECEIPT_CREATED || event.type === EVENT_TYPES.AGENT_ACTION_EXECUTED) {
+      rows.push({
+        journalId: `journal_evt_${event.seq}`,
+        eventId: event.seq,
+        atMs: normalizeCount(event.createdAt),
+        category: 'FOREMAN',
+        title: 'Clover handled one routine',
+        body: String(event.recapLine || event.explanation || '')
+      });
+    }
+  }
+  return rows.reverse().slice(0, 12);
+}
+
 function stateHashPayload(state) {
   return {
     plot: plotSnapshot(state),
@@ -1759,6 +2067,7 @@ function stateHashPayload(state) {
       firstTimberRewarded: state.meta.firstTimberRewarded,
       standingOrder: state.meta.standingOrder,
       contracts: state.meta.contracts,
+      contractDeck: state.meta.contractDeck,
       scheduler: state.meta.scheduler,
       foremanRuntime: {
         runtimeId: state.meta.foremanRuntime.runtimeId,
@@ -1769,14 +2078,18 @@ function stateHashPayload(state) {
         expiresAt: state.meta.foremanRuntime.expiresAt,
         pack: state.meta.foremanRuntime.pack
       },
-      foremanReceipts: state.meta.foremanReceipts
+      foremanWorker: state.meta.foremanWorker,
+      foremanReceipts: state.meta.foremanReceipts,
+      townSignals: state.meta.townSignals,
+      requesters: state.meta.requesters,
+      landmarks: state.meta.landmarks
     }
   };
 }
 
 function stateView(state, recentEvents = []) {
-  ensureContractBoard(state);
-  refreshActiveContractState(state);
+  ensureContractBoard(state, Date.now());
+  refreshActiveContractState(state, Date.now());
   const currentGoal = resolvePrimaryGoal(state);
   const observation = buildForemanObservation(state, {
     runtimeId: state.meta.foremanRuntime.runtimeId,
@@ -1789,8 +2102,21 @@ function stateView(state, recentEvents = []) {
     safeCandidates
   });
   state.meta.foremanLastDecision = decision;
+  const journalEntries = buildTownJournalEntries(recentEvents);
   return {
     plot: plotSnapshot(state),
+    townSignals: {
+      ...copyJson(state.meta.townSignals),
+      bands: Object.fromEntries(SIGNAL_KEYS.map((key) => [key, signalBand(state.meta.townSignals[key])])),
+      labels: {
+        depotReadiness: 'Depot Readiness',
+        marketConfidence: 'Market Confidence',
+        neighborGoodwill: 'Neighbor Goodwill',
+        publicCharm: 'Public Charm'
+      }
+    },
+    requesters: copyJson(state.meta.requesters),
+    landmarks: copyJson(state.meta.landmarks),
     policy: {
       observeAndSuggest: state.policy.observeAndSuggest,
       collectOutputs: state.policy.collectOutputs,
@@ -1850,6 +2176,9 @@ function stateView(state, recentEvents = []) {
     recap: {
       unseenCount: Math.max(0, recentEvents.filter((event) => event.seq > state.meta.recapSeenSeq).length),
       recent: recentEventsView(recentEvents)
+    },
+    journal: {
+      entries: journalEntries
     },
     progress: {
       currentLevel: state.plot.hqLevel,
@@ -1999,9 +2328,51 @@ function completeRunningJob(state, job, nowMs, appendEvent) {
   });
 }
 
+function applyMissedPreparationContract(state, contract, nowMs, appendEvent) {
+  if (!contract || contract.kind !== 'PREPARATION' || contract.status === 'MISSED') return null;
+  contract.status = 'MISSED';
+  contract.missedAtMs = nowMs;
+  const missed = copyJson(contract);
+  state.meta.contracts.completed.push(missed);
+  state.meta.contracts.activeContract = null;
+  state.meta.requesters = applyRequesterContractOutcome(state.meta.requesters, {
+    requesterId: contract.requesterId,
+    status: 'MISSED',
+    contractId: contract.contractId,
+    nowMs
+  });
+  const signalResult = applyTownSignals(state, contract?.missEffect?.signalDelta || {}, {
+    actor: 'SYSTEM',
+    reason: 'CONTRACT_MISSED',
+    sourceId: contract.contractId,
+    appendEvent,
+    nowMs
+  });
+  pushEvent(appendEvent, {
+    type: EVENT_TYPES.CONTRACT_MISSED,
+    actor: 'SYSTEM',
+    explanation: `${contract.title} was missed.`,
+    recapLine: String(contract?.missEffect?.recapLine || `${contractRequesterName(contract)} did not get ${contract.title} in time.`),
+    data: {
+      contract: missed,
+      requesterId: contract.requesterId,
+      requesterSnapshot: copyJson(contract.requesterSnapshot || {}),
+      signalDelta: signalResult.delta
+    }
+  });
+  refreshContractBoard(state, nowMs);
+  return missed;
+}
+
 function simulatePlot(state, toMs, appendEvent) {
   const safeTargetMs = Math.max(state.plot.lastSimulatedAt, Math.min(toMs, state.plot.lastSimulatedAt + MAX_OFFLINE_MS));
   if (safeTargetMs <= state.plot.lastSimulatedAt) {
+    if (activeContract(state)?.kind === 'PREPARATION') {
+      const contract = activeContract(state);
+      if (normalizeCount(contract?.townMoment?.dueAtMs) > 0 && normalizeCount(contract.townMoment.dueAtMs) <= safeTargetMs) {
+        applyMissedPreparationContract(state, contract, safeTargetMs, appendEvent);
+      }
+    }
     ensureDailyReward(state, safeTargetMs);
     return { simulatedToMs: state.plot.lastSimulatedAt, clamped: false };
   }
@@ -2014,6 +2385,10 @@ function simulatePlot(state, toMs, appendEvent) {
     completions.sort((a, b) => a.endsAt - b.endsAt);
     for (const job of completions) {
       completeRunningJob(state, job, job.endsAt || nextTick, appendEvent);
+    }
+    const contract = activeContract(state);
+    if (contract?.kind === 'PREPARATION' && normalizeCount(contract?.townMoment?.dueAtMs) > 0 && normalizeCount(contract.townMoment.dueAtMs) <= nextTick) {
+      applyMissedPreparationContract(state, contract, normalizeCount(contract.townMoment.dueAtMs) || nextTick, appendEvent);
     }
     cursor = nextTick;
   }
@@ -2666,9 +3041,9 @@ function applySetStandingOrder(state, { standingOrder }, ctx) {
 }
 
 function applyAcceptContract(state, { contractId }, ctx) {
-  ensureContractBoard(state);
+  ensureContractBoard(state, ctx.nowMs);
   if (activeContract(state)) {
-    const error = new Error('CONTRACT_ACTIVE_EXISTS');
+    const error = new Error('INVALID_STATE');
     error.details = {
       activeContractId: activeContract(state).contractId
     };
@@ -2684,14 +3059,23 @@ function applyAcceptContract(state, { contractId }, ctx) {
   state.meta.contracts.activeContract = {
     ...copyJson(offer),
     status: 'ACTIVE',
-    acceptedAt: ctx.nowMs
+    acceptedAtMs: ctx.nowMs,
+    townMoment: offer.townMoment
+      ? {
+        ...copyJson(offer.townMoment),
+        dueAtMs: normalizeCount(offer?.townMoment?.dueAtMs) > 0
+          ? normalizeCount(offer.townMoment.dueAtMs)
+          : ctx.nowMs + (10 * 60 * 1000)
+      }
+      : null
   };
-  refreshActiveContractState(state);
+  state.meta.requesters = markRequesterSeen(state.meta.requesters, offer.requesterId, ctx.nowMs);
+  refreshActiveContractState(state, ctx.nowMs);
   pushEvent(ctx.appendEvent, {
     type: EVENT_TYPES.CONTRACT_ACCEPTED,
     actor: 'HUMAN',
-    explanation: `${offer.requester}'s contract was accepted.`,
-    recapLine: `Accepted contract from ${offer.requester}.`,
+    explanation: `${contractRequesterName(offer)}'s contract was accepted.`,
+    recapLine: `Accepted contract from ${contractRequesterName(offer)}.`,
     data: {
       plot: plotSnapshot(state),
       contract: copyJson(state.meta.contracts.activeContract)
@@ -2703,7 +3087,7 @@ function applyAcceptContract(state, { contractId }, ctx) {
 }
 
 function applyTurnInContract(state, { contractId }, ctx) {
-  refreshActiveContractState(state);
+  refreshActiveContractState(state, ctx.nowMs);
   const contract = activeContract(state);
   if (!contract || contract.contractId !== contractId) {
     const error = new Error('INVALID_STATE');
@@ -2722,43 +3106,60 @@ function applyTurnInContract(state, { contractId }, ctx) {
   let consumed = {};
   if (contract.kind === 'SUPPLY') {
     consumed = {
-      wood: contract.requirements.wood,
-      stone: contract.requirements.stone,
-      food: contract.requirements.food,
-      coin: contract.requirements.coin
+      wood: contract.requirements.resources.wood,
+      stone: contract.requirements.resources.stone,
+      food: contract.requirements.resources.food,
+      coin: contract.requirements.resources.coin
     };
     spendInventory(state.plot, consumed);
   }
   addInventoryWithCaps(state.plot, {
-    wood: contract.rewards.wood,
-    stone: contract.rewards.stone,
-    food: contract.rewards.food,
-    coin: contract.rewards.coin
+    wood: contract.rewards.resources.wood,
+    stone: contract.rewards.resources.stone,
+    food: contract.rewards.resources.food,
+    coin: contract.rewards.resources.coin
   });
   addXp(state, contract.rewards.townXp);
+  const signalResult = applyTownSignals(state, contract.rewards.signalDelta || {}, {
+    actor: 'HUMAN',
+    reason: 'CONTRACT_COMPLETED',
+    sourceId: contract.contractId,
+    appendEvent: ctx.appendEvent,
+    nowMs: ctx.nowMs
+  });
   const completed = {
     ...copyJson(contract),
     status: 'COMPLETED',
-    completedAt: ctx.nowMs
+    completedAtMs: ctx.nowMs
   };
   state.meta.contracts.completed.push(completed);
   state.meta.contracts.activeContract = null;
+  state.meta.requesters = applyRequesterContractOutcome(state.meta.requesters, {
+    requesterId: contract.requesterId,
+    status: 'COMPLETED',
+    contractId: contract.contractId,
+    nowMs: ctx.nowMs
+  });
+  refreshContractBoard(state, ctx.nowMs);
   pushEvent(ctx.appendEvent, {
     type: EVENT_TYPES.CONTRACT_COMPLETED,
     actor: 'HUMAN',
-    explanation: `${contract.title} completed for ${contract.requester}.`,
-    recapLine: `${contract.requester} received ${contract.title}.`,
+    explanation: `${contract.title} completed for ${contractRequesterName(contract)}.`,
+    recapLine: `${contractRequesterName(contract)} says ${contract.townBenefit || `${contract.title} helped the town`}.`,
     data: {
       plot: plotSnapshot(state),
       contract: copyJson(completed),
+      requesterId: contract.requesterId,
+      requesterSnapshot: copyJson(contract.requesterSnapshot || {}),
+      signalDelta: signalResult.delta,
       resourceDelta: captureResourceDelta(state, {
         before,
         consumed,
         rewarded: {
-          wood: contract.rewards.wood,
-          stone: contract.rewards.stone,
-          food: contract.rewards.food,
-          coin: contract.rewards.coin,
+          wood: contract.rewards.resources.wood,
+          stone: contract.rewards.resources.stone,
+          food: contract.rewards.resources.food,
+          coin: contract.rewards.resources.coin,
           townXp: contract.rewards.townXp
         }
       })
@@ -2766,6 +3167,69 @@ function applyTurnInContract(state, { contractId }, ctx) {
   });
   return {
     contract: copyJson(completed)
+  };
+}
+
+function canUpgradePublicSquare(state) {
+  const landmark = state?.meta?.landmarks?.publicSquare;
+  if (!landmark || normalizeCount(landmark.level) >= 1) return false;
+  for (const [resource, amount] of Object.entries(PUBLIC_SQUARE_COST)) {
+    if (normalizeCount(state?.plot?.inventory?.[resource]) < normalizeCount(amount)) return false;
+  }
+  return true;
+}
+
+function applyUpgradeLandmark(state, { landmarkId }, ctx) {
+  const normalizedId = String(landmarkId || '').trim();
+  if (normalizedId !== 'public_square_welcome_sign') {
+    const error = new Error('INVALID_STATE');
+    error.details = { landmarkId };
+    throw error;
+  }
+  const landmark = state.meta.landmarks.publicSquare;
+  if (normalizeCount(landmark.level) >= 1) {
+    return {
+      landmark: copyJson(landmark),
+      resourceDelta: captureResourceDelta(state, { before: { ...inventorySnapshot(state.plot), townXp: normalizeCount(state.plot.townXp) } }),
+      signalDelta: {}
+    };
+  }
+  const before = { ...inventorySnapshot(state.plot), townXp: normalizeCount(state.plot.townXp) };
+  spendInventory(state.plot, PUBLIC_SQUARE_COST);
+  addXp(state, PUBLIC_SQUARE_REWARD.townXp);
+  landmark.level = 1;
+  landmark.label = 'Welcome Sign';
+  landmark.upgradedAtMs = ctx.nowMs;
+  const signalResult = applyTownSignals(state, PUBLIC_SQUARE_REWARD.signalDelta, {
+    actor: 'HUMAN',
+    reason: 'LANDMARK_UPGRADED',
+    sourceId: landmark.landmarkId,
+    appendEvent: ctx.appendEvent,
+    nowMs: ctx.nowMs
+  });
+  pushEvent(ctx.appendEvent, {
+    type: EVENT_TYPES.LANDMARK_UPGRADED,
+    actor: 'HUMAN',
+    explanation: 'The Public Square Welcome Sign was raised.',
+    recapLine: 'The Public Square now has a proper Welcome Sign.',
+    data: {
+      landmark: copyJson(landmark),
+      signalDelta: signalResult.delta,
+      resourceDelta: captureResourceDelta(state, {
+        before,
+        consumed: PUBLIC_SQUARE_COST,
+        rewarded: { townXp: PUBLIC_SQUARE_REWARD.townXp }
+      })
+    }
+  });
+  return {
+    landmark: copyJson(landmark),
+    resourceDelta: captureResourceDelta(state, {
+      before,
+      consumed: PUBLIC_SQUARE_COST,
+      rewarded: { townXp: PUBLIC_SQUARE_REWARD.townXp }
+    }),
+    signalDelta: signalResult.delta
   };
 }
 
@@ -2977,11 +3441,14 @@ module.exports = {
   applySetStandingOrder,
   applySetPriority,
   applyTurnInContract,
+  applyUpgradeLandmark,
   applyUpgradeBuilding,
   availableBuildingTypes,
   buildForemanObservation,
   buildSafeForemanCandidates,
+  buildTownJournalEntries,
   buildWorldDelta,
+  canUpgradePublicSquare,
   chooseForemanCandidateWithTestBrain,
   createInitialPlot,
   foremanRuntimeStatus,

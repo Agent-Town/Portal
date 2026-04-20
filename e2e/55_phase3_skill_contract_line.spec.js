@@ -80,11 +80,18 @@ test('skill.md keeps the minimal external-agent contract', async ({ request }) =
   expect(txt).toContain('et.plot.place_building');
   expect(txt).toContain('et.plot.collect_outputs');
   expect(txt).toContain('et.plot.request_user_approval');
+  expect(txt).toContain('et.plot.town.get_signals');
+  expect(txt).toContain('et.plot.town.upgrade_landmark');
+  expect(txt).toContain('et.plot.journal.get_entries');
   expect(txt).toContain('et.plot.contracts.get_state');
   expect(txt).toContain('et.plot.contracts.accept');
   expect(txt).toContain('et.plot.contracts.turn_in');
   expect(txt).toContain('et.foreman.policy.set_standing_order');
   expect(txt).toContain('et.foreman.scheduler.enable_collect_ready_outputs');
+  expect(txt).toContain('Accepts one `SUPPLY`, `BUILD`, or `PREPARATION` contract.');
+  expect(txt).toContain('Treat requesters as recurring people and institutions, not disposable strings.');
+  expect(txt).toContain('Use `et.plot.town.get_signals` and `et.plot.journal.get_entries` to explain how the town changed.');
+  expect(txt).toContain('When the UI offers a `Run now` Foreman action, the real observe -> decide -> tool-call loop must come through the OpenClaw Lite worker command path.');
   expect(txt).toContain('Never try to spoof the Foreman by sending `actor: "AGENT"` on the human route.');
   expect(txt).toContain('Mutation tools require `idempotencyKey`; provide one when you call them.');
   expect(txt).toContain('If policy blocks the action, request approval instead of simulating success.');

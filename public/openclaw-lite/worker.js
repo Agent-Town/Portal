@@ -54283,6 +54283,74 @@ async function boot() {
   }
 }
 var bootReady = boot();
+async function foundersPlotWorkerFetch(path4, { method = "GET", token = "", body = null } = {}) {
+  const headers = {};
+  if (token) headers.authorization = `Bearer ${String(token || "").trim()}`;
+  if (body != null) headers["content-type"] = "application/json";
+  const response = await fetch(String(path4 || ""), {
+    method,
+    credentials: "include",
+    cache: "no-store",
+    headers,
+    body: body != null ? JSON.stringify(body) : void 0
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload?.ok === false) {
+    const errorCode = String(payload?.error?.code || payload?.error || `HTTP_${response.status}`);
+    const error = new Error(errorCode);
+    error.payload = payload;
+    throw error;
+  }
+  return payload;
+}
+async function runFoundersPlotForemanTick({ token = "" } = {}) {
+  const normalizedToken = String(token || "").trim();
+  if (!normalizedToken) {
+    throw new Error("FOREMAN_RUNTIME_REQUIRED");
+  }
+  const workerCommandId = randomId("fpwcmd");
+  const workerTraceId = randomId("fpwtrace");
+  await foundersPlotWorkerFetch("/api/founders-plot/foreman/session/heartbeat", {
+    method: "POST",
+    token: normalizedToken,
+    body: {}
+  });
+  const observation = await foundersPlotWorkerFetch("/api/founders-plot/foreman/observation", {
+    method: "GET",
+    token: normalizedToken
+  });
+  const chosenId = String(observation?.decision?.chosenCandidateId || "");
+  const safeCandidates = Array.isArray(observation?.safeCandidates) ? observation.safeCandidates : [];
+  const chosen = safeCandidates.find((candidate) => candidate?.candidateId === chosenId) || null;
+  if (!chosen || chosen.canActNow !== true) {
+    return {
+      ok: true,
+      result: { mutationApplied: false },
+      receipt: null,
+      workerCommandId,
+      workerTraceId,
+      runtimeId: String(observation?.runtime?.runtimeId || "")
+    };
+  }
+  const payload = await foundersPlotWorkerFetch(`/api/founders-plot/foreman/tool/${encodeURIComponent(String(chosen.toolName || ""))}`, {
+    method: "POST",
+    token: normalizedToken,
+    body: {
+      buildingId: chosen.buildingId,
+      idempotencyKey: `foreman:${String(chosen.candidateId || "candidate")}:${Date.now()}`,
+      origin: "OPENCLAW_LITE_WORKER",
+      workerCommandId,
+      workerTraceId,
+      runtimeId: String(observation?.runtime?.runtimeId || "")
+    }
+  });
+  return {
+    ...payload,
+    workerCommandId,
+    workerTraceId,
+    runtimeId: String(observation?.runtime?.runtimeId || "")
+  };
+}
 self.addEventListener("message", async (ev) => {
   const msg = ev.data;
   if (!msg || typeof msg.type !== "string") return;
@@ -54459,6 +54527,25 @@ ${extraContext}` : text;
         ok: true,
         result
       });
+      return;
+    }
+    if (msg.type === "gateway.command.foundersPlot.foremanTick") {
+      try {
+        const result = await runFoundersPlotForemanTick(msg.params || {});
+        post({
+          type: "worker.foundersPlot.foremanTick",
+          requestId: String(msg.requestId || ""),
+          ok: true,
+          result
+        });
+      } catch (e) {
+        post({
+          type: "worker.foundersPlot.foremanTick",
+          requestId: String(msg.requestId || ""),
+          ok: false,
+          error: e?.message || String(e || "FOUNDERS_PLOT_FOREMAN_TICK_FAILED")
+        });
+      }
       return;
     }
     if (msg.type === "gateway.command.tools.registry") {

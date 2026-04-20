@@ -6,6 +6,7 @@ const {
   getJson,
   openFoundersPlotFrame,
   postJson,
+  runLumberCycle,
   runPlotTool
 } = require('./helpers/founders_plot');
 
@@ -15,7 +16,7 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-test('Contract Board stays locked before HQ2 and then offers one SUPPLY and one BUILD contract with stakeholder context', async ({ page }) => {
+test('Contract Board stays locked before HQ2 and then offers living-town SUPPLY, BUILD, and PREPARATION requests with requester context', async ({ page }) => {
   const frame = await openFoundersPlotFrame(page);
 
   const before = await getPlotState(frame);
@@ -25,17 +26,20 @@ test('Contract Board stays locked before HQ2 and then offers one SUPPLY and one 
   const hq2State = await bootstrapToHq2(frame);
   expect(hq2State?.contracts?.boardLocked).toBe(false);
   expect(Array.isArray(hq2State?.contracts?.offers)).toBe(true);
-  expect(hq2State.contracts.offers).toHaveLength(2);
+  expect(hq2State.contracts.offers).toHaveLength(3);
 
   const kinds = hq2State.contracts.offers.map((offer) => offer?.kind).sort();
-  expect(kinds).toEqual(['BUILD', 'SUPPLY']);
+  expect(kinds).toEqual(['BUILD', 'PREPARATION', 'SUPPLY']);
   for (const offer of hq2State.contracts.offers) {
     expect(offer).toEqual(expect.objectContaining({
       contractId: expect.stringMatching(/^con_/),
-      requester: expect.any(String),
-      institution: expect.any(String),
+      requesterId: expect.any(String),
+      requesterSnapshot: expect.objectContaining({
+        displayName: expect.any(String),
+        institution: expect.any(String)
+      }),
       whyNow: expect.any(String),
-      townSignal: expect.any(String),
+      townBenefit: expect.any(String),
       philosophyHint: expect.any(String)
     }));
   }
@@ -62,7 +66,7 @@ test('only one contract can be active, BUILD turn-in recognizes the Farm Plot, a
     idempotencyKey: 'v11-contract-supply:blocked-accept'
   });
   expect(blockedSecondAccept?.ok).toBe(false);
-  expect(blockedSecondAccept?.error?.code).toBe('CONTRACT_ACTIVE_EXISTS');
+  expect(blockedSecondAccept?.error?.code).toBe('INVALID_STATE');
 
   const lumberBuildingId = String(
     (state?.buildings || []).find((building) => building?.type === 'LUMBER_CAMP')?.buildingId || ''
@@ -107,29 +111,31 @@ test('only one contract can be active, BUILD turn-in recognizes the Farm Plot, a
 
   const recap = await getJson(frame, '/api/founders-plot/recap');
   expect(recap?.ok).toBe(true);
-  expect(recap?.recap?.lines?.some((line) => String(line?.line || '').includes(buildOffer.requester))).toBe(true);
+  expect(recap?.recap?.lines?.some((line) => String(line?.line || '').includes(buildOffer.requesterSnapshot.displayName))).toBe(true);
 
-  await postJson(frame, '/api/founders-plot/contracts/accept', {
-    contractId: supplyOffer.contractId,
+  const refreshedSnapshot = await getJson(frame, '/api/founders-plot/state');
+  const refreshedState = refreshedSnapshot?.state || null;
+  const refreshedSupplyOffer = refreshedState?.contracts?.offers?.find((offer) => offer?.kind === 'SUPPLY');
+  expect(refreshedSupplyOffer?.contractId).toBeTruthy();
+
+  const acceptedSupply = await postJson(frame, '/api/founders-plot/contracts/accept', {
+    contractId: refreshedSupplyOffer.contractId,
     idempotencyKey: 'v11-contract-supply:accept'
   });
+  expect(acceptedSupply?.ok).toBe(true);
 
   const supplySnapshot = await getJson(frame, '/api/founders-plot/state');
   const supplyState = supplySnapshot?.state || null;
   const activeSupply = supplyState?.contracts?.activeContract || null;
   expect(activeSupply?.kind).toBe('SUPPLY');
 
-  const extraQueue2 = await runPlotTool(frame, 'et.plot.queue_job', {
-    buildingId: lumberBuildingId,
-    idempotencyKey: 'v11-contract-supply:lumber-queue'
-  });
-  expect(extraQueue2?.ok).toBe(true);
-  await advancePlot(frame, 61_000);
-  const extraCollect2 = await runPlotTool(frame, 'et.plot.collect_outputs', {
-    buildingId: lumberBuildingId,
-    idempotencyKey: 'v11-contract-supply:lumber-collect'
-  });
-  expect(extraCollect2?.ok).toBe(true);
+  for (let index = 0; index < 3; index += 1) {
+    const cycle = await runLumberCycle(frame, lumberBuildingId, `v11-contract-supply:${index}`);
+    expect(cycle?.ok).toBe(true);
+    const readyState = await getPlotState(frame);
+    if (readyState?.contracts?.activeContract?.status === 'READY_TO_TURN_IN') break;
+  }
+  expect((await getPlotState(frame))?.contracts?.activeContract?.status).toBe('READY_TO_TURN_IN');
 
   const firstTurnIn = await postJson(frame, '/api/founders-plot/contracts/turn-in', {
     contractId: activeSupply.contractId,

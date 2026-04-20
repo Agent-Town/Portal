@@ -1,12 +1,11 @@
 const { test, expect } = require('@playwright/test');
 const {
-  advancePlot,
   bootstrapToHq2,
   getJson,
   getPlotState,
   openFoundersPlotFrame,
   postJson,
-  runPlotTool
+  runLumberCycle,
 } = require('./helpers/founders_plot');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
@@ -37,17 +36,13 @@ test('replay exposes resource deltas for economy events and returns an action-lo
   );
   expect(lumberBuildingId).toMatch(/^bld_/);
 
-  const queueResp = await runPlotTool(frame, 'et.plot.queue_job', {
-    buildingId: lumberBuildingId,
-    idempotencyKey: 'v11-ledger-supply:lumber-queue'
-  });
-  expect(queueResp?.ok).toBe(true);
-  await advancePlot(frame, 61_000);
-  const collectResp = await runPlotTool(frame, 'et.plot.collect_outputs', {
-    buildingId: lumberBuildingId,
-    idempotencyKey: 'v11-ledger-supply:lumber-collect'
-  });
-  expect(collectResp?.ok).toBe(true);
+  for (let index = 0; index < 3; index += 1) {
+    const cycle = await runLumberCycle(frame, lumberBuildingId, `v11-ledger-supply:${index}`);
+    expect(cycle?.ok).toBe(true);
+    const supplyState = await getPlotState(frame);
+    if (supplyState?.contracts?.activeContract?.status === 'READY_TO_TURN_IN') break;
+  }
+  expect((await getPlotState(frame))?.contracts?.activeContract?.status).toBe('READY_TO_TURN_IN');
 
   const turnIn = await postJson(frame, '/api/founders-plot/contracts/turn-in', {
     contractId: supplyOffer.contractId,

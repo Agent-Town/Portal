@@ -111,13 +111,85 @@ async function bootstrapToHq2(frame) {
   return getPlotState(frame);
 }
 
+async function startForemanRuntime(frame) {
+  const started = await frame.evaluate(async () => {
+    return await window.__foundersPlotTest.startForemanRuntime();
+  });
+  await frame.waitForFunction(() => {
+    const runtime = window.__foundersPlotTest.getState()?.state?.foreman?.runtime;
+    return runtime?.status === 'OBSERVING' && typeof runtime?.runtimeId === 'string' && runtime.runtimeId.length > 0;
+  }, null, { timeout: 10_000 });
+  return started;
+}
+
+async function runProductionCycle(frame, buildingId, keyPrefix = 'plot-cycle') {
+  const queueResp = await runPlotTool(frame, 'et.plot.queue_job', {
+    buildingId,
+    idempotencyKey: `${keyPrefix}:queue:${Date.now()}`
+  });
+  if (!queueResp?.ok) return queueResp;
+  await advancePlot(frame, 91_000);
+  return await runPlotTool(frame, 'et.plot.collect_outputs', {
+    buildingId,
+    idempotencyKey: `${keyPrefix}:collect:${Date.now()}`
+  });
+}
+
+async function runLumberCycle(frame, buildingId, keyPrefix = 'plot-lumber-cycle') {
+  const queueResp = await runPlotTool(frame, 'et.plot.queue_job', {
+    buildingId,
+    idempotencyKey: `${keyPrefix}:queue:${Date.now()}`
+  });
+  if (!queueResp?.ok) return queueResp;
+  await advancePlot(frame, 61_000);
+  return await runPlotTool(frame, 'et.plot.collect_outputs', {
+    buildingId,
+    idempotencyKey: `${keyPrefix}:collect:${Date.now()}`
+  });
+}
+
+async function getOfferByKind(frame, kind) {
+  const state = await getPlotState(frame);
+  return Array.isArray(state?.contracts?.offers)
+    ? state.contracts.offers.find((contract) => String(contract?.kind || '').toUpperCase() === String(kind || '').toUpperCase()) || null
+    : null;
+}
+
+async function acceptContractOffer(frame, contractId, keyPrefix = 'contract-accept') {
+  const response = await postJson(frame, '/api/founders-plot/contracts/accept', {
+    contractId,
+    idempotencyKey: `${keyPrefix}:${Date.now()}`
+  });
+  await frame.evaluate(async () => {
+    await window.__foundersPlotTest.loadState();
+  });
+  return response;
+}
+
+async function turnInActiveContract(frame, contractId, keyPrefix = 'contract-turn-in') {
+  const response = await postJson(frame, '/api/founders-plot/contracts/turn-in', {
+    contractId,
+    idempotencyKey: `${keyPrefix}:${Date.now()}`
+  });
+  await frame.evaluate(async () => {
+    await window.__foundersPlotTest.loadState();
+  });
+  return response;
+}
+
 module.exports = {
   advancePlot,
+  acceptContractOffer,
   bootstrapToHq2,
   getJson,
+  getOfferByKind,
   getPlotState,
   openFoundersPlotFrame,
   placeFirstLumberCamp,
   postJson,
-  runPlotTool
+  runLumberCycle,
+  runPlotTool,
+  runProductionCycle,
+  startForemanRuntime,
+  turnInActiveContract
 };

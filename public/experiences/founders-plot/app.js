@@ -126,6 +126,8 @@
       case 'contract_ready':
       case 'contract_progress':
         return 'Active contract';
+      case 'landmark':
+        return 'Town square';
       case 'receipt':
         return 'Latest receipt';
       case 'optimization':
@@ -167,18 +169,71 @@
       .join(', ');
   }
 
+  function contractRequesterDisplay(contract) {
+    return String(contract?.requesterSnapshot?.displayName || contract?.requester || 'Town request');
+  }
+
+  function contractInstitutionDisplay(contract) {
+    return String(contract?.requesterSnapshot?.institution || contract?.institution || 'Founders Plot');
+  }
+
+  function formatSignalDelta(values = {}) {
+    const labels = {
+      depotReadiness: 'Depot Readiness',
+      marketConfidence: 'Market Confidence',
+      neighborGoodwill: 'Neighbor Goodwill',
+      publicCharm: 'Public Charm'
+    };
+    return ['depotReadiness', 'marketConfidence', 'neighborGoodwill', 'publicCharm']
+      .filter((key) => Number(values?.[key] || 0) !== 0)
+      .map((key) => `${Number(values[key]) > 0 ? '+' : ''}${Number(values[key])} ${labels[key]}`)
+      .join(', ');
+  }
+
   function formatContractRequirements(contract) {
     const requirements = contract?.requirements || {};
-    if (String(contract?.kind || '').toUpperCase() === 'BUILD' && requirements.buildingType) {
-      return `Build at least one ${BUILDING_LABELS[requirements.buildingType] || requirements.buildingType}.`;
+    const buildingRequirements = Array.isArray(requirements.buildings) ? requirements.buildings : [];
+    if (buildingRequirements.length > 0) {
+      return buildingRequirements
+        .map((entry) => `Build ${Number(entry?.minCount || 1)} ${BUILDING_LABELS[entry?.buildingType] || entry?.buildingType}.`)
+        .join(' ');
     }
-    const resourceText = formatResourceList(requirements);
+    const resourceText = formatResourceList(requirements.resources || requirements);
     return resourceText ? `Deliver ${resourceText}.` : 'No listed requirement.';
   }
 
   function formatContractRewards(contract) {
-    const rewardText = formatResourceList(contract?.rewards || {});
-    return rewardText ? `Rewards: ${rewardText}.` : 'No listed reward.';
+    const rewards = contract?.rewards || {};
+    const rewardText = formatResourceList(rewards.resources || rewards);
+    const signalText = formatSignalDelta(rewards.signalDelta || {});
+    const parts = [];
+    if (rewardText) parts.push(`Rewards: ${rewardText}.`);
+    if (Number(rewards.townXp || 0) > 0) parts.push(`Adds ${Number(rewards.townXp)} Town XP.`);
+    if (signalText) parts.push(`Town change: ${signalText}.`);
+    return parts.length > 0 ? parts.join(' ') : 'No listed reward.';
+  }
+
+  function signalBandLabel(band) {
+    switch (String(band || '').toUpperCase()) {
+      case 'LOW':
+        return 'Low';
+      case 'STRONG':
+        return 'Strong';
+      default:
+        return 'Steady';
+    }
+  }
+
+  function signalList(state) {
+    const townSignals = state?.townSignals || {};
+    const labels = townSignals.labels || {};
+    const bands = townSignals.bands || {};
+    return ['depotReadiness', 'marketConfidence', 'neighborGoodwill', 'publicCharm'].map((key) => ({
+      key,
+      label: labels[key] || key,
+      value: Number(townSignals[key] || 0),
+      band: String(bands[key] || 'STEADY')
+    }));
   }
 
   function foremanStatusMeta(status) {
@@ -649,14 +704,16 @@
           <div class="foundersContractHeader">
             <div>
               <strong>${htmlEscape(activeContract.title)}</strong>
-              <div class="foundersContractKicker">${htmlEscape(activeContract.requester)} · ${htmlEscape(activeContract.institution)}</div>
+              <div class="foundersContractKicker">${htmlEscape(contractRequesterDisplay(activeContract))} · ${htmlEscape(contractInstitutionDisplay(activeContract))}</div>
             </div>
             <span class="foundersBadge">${htmlEscape(prettyContractStatus(activeContract.status))}</span>
           </div>
-          <div class="small">${htmlEscape(activeContract.whyNow || '')}</div>
+          <div class="small">${htmlEscape(activeContract.whyNow || activeContract.townBenefit || '')}</div>
           <div class="foundersContractMeta">
             <div class="small">${htmlEscape(formatContractRequirements(activeContract))}</div>
             <div class="small">${htmlEscape(formatContractRewards(activeContract))}</div>
+            ${activeContract.townBenefit ? `<div class="small">${htmlEscape(activeContract.townBenefit)}</div>` : ''}
+            ${activeContract.townMoment?.label ? `<div class="small">Town moment: ${htmlEscape(activeContract.townMoment.label)}</div>` : ''}
             <div class="small">${htmlEscape(activeContract.philosophyHint || '')}</div>
           </div>
           <div class="foundersContractAction">
@@ -679,7 +736,7 @@
           <div class="foundersContractHeader">
             <div>
               <strong>${htmlEscape(offer.title)}</strong>
-              <div class="foundersContractKicker">${htmlEscape(offer.requester)} · ${htmlEscape(offer.institution)}</div>
+              <div class="foundersContractKicker">${htmlEscape(contractRequesterDisplay(offer))} · ${htmlEscape(contractInstitutionDisplay(offer))}</div>
             </div>
             <span class="foundersBadge">${htmlEscape(offer.kind)}</span>
           </div>
@@ -687,6 +744,8 @@
           <div class="foundersContractMeta">
             <div class="small">${htmlEscape(formatContractRequirements(offer))}</div>
             <div class="small">${htmlEscape(formatContractRewards(offer))}</div>
+            ${offer.townBenefit ? `<div class="small">${htmlEscape(offer.townBenefit)}</div>` : ''}
+            ${offer.townMoment?.label ? `<div class="small">Town moment: ${htmlEscape(offer.townMoment.label)}</div>` : ''}
             <div class="small">${htmlEscape(offer.philosophyHint || '')}</div>
           </div>
           <div class="foundersContractAction">
@@ -726,6 +785,81 @@
         }
       });
     });
+  }
+
+  function renderSignals(state) {
+    const node = document.getElementById('signalsPanel');
+    if (!node) return;
+    const rows = signalList(state);
+    node.innerHTML = rows.map((signal) => `
+      <div class="foundersSignalItem" data-testid="signal-${htmlEscape(signal.key)}">
+        <div class="foundersSignalHeader">
+          <strong>${htmlEscape(signal.label)}</strong>
+          <span class="foundersBadge ${signal.band === 'LOW' ? 'is-warn' : ''}">${htmlEscape(signalBandLabel(signal.band))}</span>
+        </div>
+        <div class="foundersSignalBar" aria-hidden="true">
+          <div class="foundersSignalFill is-${htmlEscape(signal.band.toLowerCase())}" style="width:${Math.max(0, Math.min(100, signal.value))}%"></div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function renderLandmark(state) {
+    const node = document.getElementById('publicSquareCard');
+    if (!node) return;
+    const landmark = state?.landmarks?.publicSquare || {};
+    const canUpgrade = Number(landmark.level || 0) < 1
+      && Number(state?.plot?.inventory?.wood || 0) >= 4
+      && Number(state?.plot?.inventory?.coin || 0) >= 8;
+    node.innerHTML = `
+      <div class="foundersLandmarkBody">
+        <div class="foundersLabel">Public square</div>
+        <strong>${htmlEscape(landmark.level >= 1 ? 'Welcome Sign' : 'Open Dust Lot')}</strong>
+        <div class="small">${htmlEscape(
+          landmark.level >= 1
+            ? 'The square feels settled enough to greet newcomers.'
+            : 'A simple welcome sign would make the plot feel like a town.'
+        )}</div>
+        <div class="small">${landmark.level >= 1 ? 'Built.' : 'Cost: 4 wood, 8 coin.'}</div>
+        <div class="foundersContractAction">
+          <button class="btn small" type="button" id="publicSquareUpgradeBtn" data-testid="public-square-upgrade-btn" ${landmark.level >= 1 || pendingAction || !canUpgrade ? 'disabled' : ''}>
+            ${landmark.level >= 1 ? 'Welcome Sign raised' : 'Raise the Welcome Sign'}
+          </button>
+        </div>
+      </div>
+    `;
+    const button = document.getElementById('publicSquareUpgradeBtn');
+    if (button) {
+      button.onclick = async () => {
+        try {
+          await runTool('et.plot.town.upgrade_landmark', {
+            landmarkId: 'public_square_welcome_sign',
+            idempotencyKey: `landmark:${Date.now()}`
+          });
+        } catch {
+          // status line already updated
+        }
+      };
+    }
+  }
+
+  function renderJournal(state) {
+    const node = document.getElementById('journalList');
+    if (!node) return;
+    const entries = Array.isArray(state?.journal?.entries) ? state.journal.entries : [];
+    if (entries.length === 0) {
+      node.innerHTML = '<div class="foundersEmptyState">No fresh town notes yet.</div>';
+      return;
+    }
+    node.innerHTML = entries.map((entry) => `
+      <div class="foundersJournalItem">
+        <div class="foundersSignalHeader">
+          <strong>${htmlEscape(entry.title || entry.category || 'Town note')}</strong>
+          <span class="foundersBadge">${htmlEscape(String(entry.category || 'NOTE').toLowerCase())}</span>
+        </div>
+        <div class="small">${htmlEscape(entry.body || '')}</div>
+      </div>
+    `).join('');
   }
 
   function renderForeman(state) {
@@ -922,7 +1056,6 @@
             <div class="foundersReceiptMeta">
               <span class="small">Event #${htmlEscape(String(receipt.eventId || '0'))}</span>
               ${receipt.standingOrderUsed ? `<span class="small">${htmlEscape(prettyStandingOrder(receipt.standingOrderUsed))}</span>` : ''}
-              ${receipt.authorityUsed ? `<span class="small">${htmlEscape(receipt.authorityUsed)}</span>` : ''}
             </div>
             <div class="small">${htmlEscape(receipt.reason || receipt.result || '')}</div>
             <div class="foundersReceiptActions">
@@ -1074,14 +1207,25 @@
 
   function renderRecap(state) {
     const lines = Array.isArray(state?.recap?.lines) ? state.recap.lines : [];
+    const sections = Array.isArray(state?.recap?.sections) ? state.recap.sections : [];
     setText('recapSummaryText', lines.length > 0 ? `${lines.length} recap lines ready.` : 'No new recap lines yet.');
     const node = document.getElementById('recapList');
     if (!node) return;
-    if (lines.length === 0) {
+    if (lines.length === 0 && sections.every((section) => !Array.isArray(section?.lines) || section.lines.length === 0)) {
       node.innerHTML = '<div class="foundersEmptyState">The plot has been quiet since your last visit.</div>';
       return;
     }
-    node.innerHTML = lines.map((item) => `
+    const sectionHtml = sections.map((section) => `
+      <div class="foundersRecapSection">
+        <strong>${htmlEscape(section.title || 'Update')}</strong>
+        <div class="foundersRecapSectionList">
+          ${(Array.isArray(section?.lines) && section.lines.length > 0 ? section.lines : [{ line: 'No new notes.' }]).map((item) => `
+            <div class="small">${htmlEscape(item.line || 'No new notes.')}</div>
+          `).join('')}
+        </div>
+      </div>
+    `).join('');
+    node.innerHTML = sectionHtml || lines.map((item) => `
       <div class="foundersRecapItem">
         <strong>Event #${htmlEscape(String(item.eventId || item.seq))}</strong>
         <div class="small">${htmlEscape(item.line)}</div>
@@ -1107,6 +1251,7 @@
       if (action.type === 'QUEUE_JOB') return 'Queue the first job';
       if (action.type === 'COLLECT_OUTPUTS') return 'Collect outputs';
       if (action.type === 'UPGRADE_HQ') return 'Upgrade Headquarters';
+      if (action.type === 'UPGRADE_LANDMARK') return 'Raise the Welcome Sign';
       if (action.type === 'ENABLE_PERMISSION') return 'Enable permission';
       if (action.type === 'TURN_IN_CONTRACT') return 'Turn in contract';
       if (action.type === 'VIEW_CONTRACT_BOARD') return 'Open Contract Board';
@@ -1151,6 +1296,13 @@
         if (action.type === 'UPGRADE_HQ') {
           await runTool('et.plot.upgrade_building', {
             idempotencyKey: `quest-upgrade-hq:${Date.now()}`
+          });
+          return;
+        }
+        if (action.type === 'UPGRADE_LANDMARK' && action.landmarkId) {
+          await runTool('et.plot.town.upgrade_landmark', {
+            landmarkId: action.landmarkId,
+            idempotencyKey: `quest-landmark:${action.landmarkId}:${Date.now()}`
           });
           return;
         }
@@ -1218,11 +1370,14 @@
     renderQuest(state);
     renderSelection(state);
     renderContracts(state);
+    renderSignals(state);
+    renderLandmark(state);
     renderForeman(state);
     renderPermissions(state);
     renderApprovals(state);
     renderRewards(state);
     renderQueue(state);
+    renderJournal(state);
     renderRecap(state);
   }
 
@@ -1247,7 +1402,8 @@
         currentState.state.recap = {
           ...(currentState.state.recap || {}),
           unseenCount: payload.recap?.unseenCount || 0,
-          lines: Array.isArray(payload.recap?.lines) ? payload.recap.lines : []
+          lines: Array.isArray(payload.recap?.lines) ? payload.recap.lines : [],
+          sections: Array.isArray(payload.recap?.sections) ? payload.recap.sections : []
         };
         renderRecap(currentState.state);
       }
@@ -1370,50 +1526,27 @@
         error: { code: 'FOREMAN_RUNTIME_REQUIRED' }
       };
     }
-    const heartbeat = await heartbeatForemanRuntime().catch((error) => error);
-    if (heartbeat instanceof Error) {
+    const gateway = await initGateway();
+    if (!gateway || typeof gateway.foundersPlotForemanTick !== 'function') {
+      throw new Error('FOREMAN_WORKER_UNAVAILABLE');
+    }
+    let payload;
+    try {
+      payload = await gateway.foundersPlotForemanTick({
+        token: foremanRuntimeToken
+      });
+    } catch (error) {
       await loadState().catch(() => null);
-      if (heartbeat.message === 'STALE_RUNTIME' || heartbeat.message === 'FOREMAN_RUNTIME_REQUIRED') {
+      if (error?.message === 'STALE_RUNTIME' || error?.message === 'FOREMAN_RUNTIME_REQUIRED') {
         return {
           ok: true,
           result: { mutationApplied: false },
           receipt: currentState?.state?.foreman?.receipt || null
         };
       }
-      throw heartbeat;
+      throw error;
     }
-    const observation = await getForemanObservation().catch((error) => error);
-    if (observation instanceof Error) {
-      await loadState().catch(() => null);
-      if (observation.message === 'STALE_RUNTIME' || observation.message === 'FOREMAN_RUNTIME_REQUIRED') {
-        return {
-          ok: true,
-          result: { mutationApplied: false },
-          receipt: currentState?.state?.foreman?.receipt || null
-        };
-      }
-      throw observation;
-    }
-    const chosenId = String(observation?.decision?.chosenCandidateId || '');
-    const safeCandidates = Array.isArray(observation?.safeCandidates) ? observation.safeCandidates : [];
-    const chosen = safeCandidates.find((candidate) => candidate?.candidateId === chosenId) || null;
-    if (!chosen || chosen.canActNow !== true) {
-      await loadState();
-      return {
-        ok: true,
-        result: { mutationApplied: false },
-        receipt: currentState?.state?.foreman?.receipt || null
-      };
-    }
-    const payload = await foremanApi(`/api/founders-plot/foreman/tool/${encodeURIComponent(chosen.toolName)}`, {
-      method: 'POST',
-      body: JSON.stringify({
-        buildingId: chosen.buildingId,
-        idempotencyKey: `foreman:${chosen.candidateId}:${Date.now()}`
-      })
-    });
-    currentState = { ok: true, state: payload.state };
-    renderAll();
+    await loadState();
     return payload;
   }
 

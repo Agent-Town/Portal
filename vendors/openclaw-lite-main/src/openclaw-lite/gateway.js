@@ -1020,6 +1020,17 @@ async function init() {
     return res.result || null;
   }
 
+  async function foundersPlotForemanTickRequest(params = {}) {
+    const res = await sendWorkerRequest({
+      requestType: "gateway.command.foundersPlot.foremanTick",
+      responseType: "worker.foundersPlot.foremanTick",
+      payload: { params },
+      timeoutMs: EXPERIENCE_RUN_REQUEST_TIMEOUT_MS,
+    });
+    if (!res?.ok) throw new Error(String(res?.error || "FOUNDERS_PLOT_FOREMAN_TICK_FAILED"));
+    return res.result || null;
+  }
+
   async function trainerListAttemptsRequest(params = {}) {
     const res = await sendWorkerRequest({
       requestType: "gateway.command.trainer.attempts.list",
@@ -1533,6 +1544,9 @@ async function init() {
     async visitExperience({ url } = {}) {
       return visitExperienceRequest({ url });
     },
+    async foundersPlotForemanTick(params = {}) {
+      return foundersPlotForemanTickRequest(params);
+    },
     async trainerListAttempts(params = {}) {
       return trainerListAttemptsRequest(params);
     },
@@ -1602,6 +1616,7 @@ async function init() {
   gatewayEvents.runtimeSessionContext = runtimeSessionContextRequest;
   gatewayEvents.experienceRun = experienceRunRequest;
   gatewayEvents.visitExperience = visitExperienceRequest;
+  gatewayEvents.foundersPlotForemanTick = foundersPlotForemanTickRequest;
   gatewayEvents.trainerListAttempts = trainerListAttemptsRequest;
   gatewayEvents.trainerGetAttempt = trainerGetAttemptRequest;
   gatewayEvents.trainerCompare = trainerCompareRequest;

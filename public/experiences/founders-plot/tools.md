@@ -10,6 +10,9 @@ The Founders Plot runtime exposes a deliberately small tool family:
 - `et.plot.set_priority`
 - `et.plot.claim_reward`
 - `et.plot.request_user_approval`
+- `et.plot.town.get_signals`
+- `et.plot.town.upgrade_landmark`
+- `et.plot.journal.get_entries`
 - `et.plot.contracts.get_state`
 - `et.plot.contracts.accept`
 - `et.plot.contracts.turn_in`
@@ -20,22 +23,28 @@ The Founders Plot runtime exposes a deliberately small tool family:
 - `et.foreman.scheduler.pause`
 - `et.foreman.scheduler.resume`
 
-## V1.1 boundaries
+## V1.2 boundaries
 
-- Use `SUPPLY` and `BUILD` contracts only.
+- Use `SUPPLY`, `BUILD`, and `PREPARATION` contracts only.
 - Only one contract may be active at a time.
+- Contract offers come from named recurring requesters and carry a `requesterSnapshot`.
+- The town exposes four civic signals: `depotReadiness`, `marketConfidence`, `neighborGoodwill`, and `publicCharm`.
+- The only landmark in scope is `public_square_welcome_sign`.
 - Standing Order v0 is limited to `CAREFUL_STEWARD` and `BOLD_FOUNDER`.
 - The only shipped scheduler preset is `COLLECT_READY_OUTPUTS`.
 - The first autonomous mutation must come through the Foreman-authenticated route, not a spoofed `actor` field.
+- The visible `Run now` Foreman tick must be owned by the OpenClaw Lite worker command path, not page glue.
 
 ## Contract rules
 
+- Read-only tools do not require `idempotencyKey`.
 - Every mutation tool requires `idempotencyKey`.
 - The server is authoritative for action validity and outcomes.
 - Policy-blocked sensitive actions must fail with a real error instead of simulating success.
 - Agent placement or HQ upgrade attempts must request approval first when Phase 1 policy requires it.
 - `POST /api/founders-plot/tool/:toolName` is the human route and must reject `actor: "AGENT"` with `ACTOR_SPOOF_REJECTED`.
 - `POST /api/founders-plot/foreman/tool/:toolName` is the Foreman route and requires server-issued runtime authority.
+- Worker-owned Foreman mutations append `FOREMAN_WORKER_COMMAND_STARTED`, `AGENT_ACTION_EXECUTED`, and `FOREMAN_WORKER_COMMAND_COMPLETED` events.
 
 ## Approval audit rules
 
@@ -55,4 +64,5 @@ The Founders Plot runtime exposes a deliberately small tool family:
 - Policy toggles: `POST /api/founders-plot/policy`
 - Approval resolution: `POST /api/founders-plot/approvals/:approvalId/resolve`
 - Recap read model: `GET /api/founders-plot/recap`
+- Journal read model: `POST /api/founders-plot/tool/et.plot.journal.get_entries`
 - Replay audit: `GET /api/founders-plot/replay`

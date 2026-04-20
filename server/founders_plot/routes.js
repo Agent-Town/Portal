@@ -15,6 +15,7 @@ const {
   applyResumeScheduler,
   applyPauseScheduler,
   applyEnableCollectReadyOutputs,
+  applyUpgradeLandmark,
   applyReceiptCorrection,
   applySetStandingOrder,
   applySetPriority,
@@ -165,13 +166,20 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
   }
 
   function buildStatePayload(state) {
+    const beforeSnapshot = hashJson({
+      contracts: state.meta.contracts,
+      contractDeck: state.meta.contractDeck,
+      requesters: state.meta.requesters,
+      foremanLastDecision: state.meta.foremanLastDecision,
+      publicHeadline: state.meta.publicHeadline
+    });
     const recentEvents = listRecentEvents(state.plot.plotId, 48);
     const view = stateView(state, recentEvents);
     const recap = buildRecap(recentEvents, {
       afterSeq: state.meta.recapSeenSeq,
       limit: 8
     });
-    return {
+    const payload = {
       ...view,
       recap: {
         ...view.recap,
@@ -180,6 +188,17 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         pendingApprovals: pendingApprovalsView(state)
       }
     };
+    const afterSnapshot = hashJson({
+      contracts: state.meta.contracts,
+      contractDeck: state.meta.contractDeck,
+      requesters: state.meta.requesters,
+      foremanLastDecision: state.meta.foremanLastDecision,
+      publicHeadline: state.meta.publicHeadline
+    });
+    if (beforeSnapshot !== afterSnapshot) {
+      savePlotGraph(state);
+    }
+    return payload;
   }
 
   function persistStateAndEvents(state, events = []) {
@@ -259,6 +278,77 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
     };
   }
 
+  const READ_ONLY_TOOL_NAMES = new Set([
+    'et.plot.town.get_signals',
+    'et.plot.journal.get_entries',
+    'et.plot.contracts.get_state',
+    'et.foreman.policy.get_standing_order',
+    'et.foreman.scheduler.get_status'
+  ]);
+
+  function readOnlyToolData(toolName, state) {
+    const payload = buildStatePayload(state);
+    if (toolName === 'et.plot.town.get_signals') {
+      return {
+        signals: payload.townSignals
+      };
+    }
+    if (toolName === 'et.plot.journal.get_entries') {
+      return {
+        entries: payload.journal?.entries || []
+      };
+    }
+    if (toolName === 'et.plot.contracts.get_state') {
+      return {
+        contracts: payload.contracts
+      };
+    }
+    if (toolName === 'et.foreman.policy.get_standing_order') {
+      return {
+        standingOrder: payload.foreman?.standingOrder
+      };
+    }
+    if (toolName === 'et.foreman.scheduler.get_status') {
+      return {
+        scheduler: schedulerStatusView(state)
+      };
+    }
+    return null;
+  }
+
+  function normalizeWorkerCommandMeta(rawArgs = {}, runtime = {}) {
+    const origin = String(rawArgs.origin || '').trim().toUpperCase();
+    if (origin !== 'OPENCLAW_LITE_WORKER') return null;
+    const workerCommandId = String(rawArgs.workerCommandId || '').trim();
+    const workerTraceId = String(rawArgs.workerTraceId || '').trim();
+    return {
+      origin,
+      workerCommandId,
+      workerTraceId,
+      runtimeId: String(runtime.runtimeId || rawArgs.runtimeId || '').trim(),
+      foremanSessionId: String(runtime.sessionId || '').trim()
+    };
+  }
+
+  function buildWorkerCommandEvent(type, workerMeta, { toolName = '', buildingId = '', error = null } = {}) {
+    return {
+      type,
+      actor: 'AGENT',
+      explanation: type === EVENT_TYPES.FOREMAN_WORKER_COMMAND_FAILED
+        ? `Worker-owned Foreman command failed for ${toolName}.`
+        : type === EVENT_TYPES.FOREMAN_WORKER_COMMAND_COMPLETED
+          ? `Worker-owned Foreman command completed for ${toolName}.`
+          : `Worker-owned Foreman command started for ${toolName}.`,
+      recapLine: '',
+      data: {
+        ...workerMeta,
+        tool: String(toolName || ''),
+        buildingId: String(buildingId || ''),
+        ...(error ? { error } : {})
+      }
+    };
+  }
+
   function persistMutation(state, toolName, idempotencyKey, argsHash, envelope, events) {
     savePlotGraph(state);
     if (events.length > 0) {
@@ -306,6 +396,18 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         return res.json(makeToolEnvelope({
           ok: true,
           data: {
+            state: buildStatePayload(state)
+          },
+          worldDelta: null
+        }));
+      }
+      const readOnlyState = READ_ONLY_TOOL_NAMES.has(toolName) ? withState(req, res) : null;
+      if (readOnlyState) {
+        const { state } = readOnlyState;
+        return res.json(makeToolEnvelope({
+          ok: true,
+          data: {
+            ...readOnlyToolData(toolName, state),
             state: buildStatePayload(state)
           },
           worldDelta: null
@@ -370,6 +472,18 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
           body: typeof rawArgs.body === 'string' ? rawArgs.body.trim() : '',
           payload: rawArgs.payload && typeof rawArgs.payload === 'object' ? rawArgs.payload : {}
         }, mutationHelpers);
+      } else if (toolName === 'et.plot.town.get_signals') {
+        data = {
+          signals: buildStatePayload(ctx.state).townSignals
+        };
+      } else if (toolName === 'et.plot.town.upgrade_landmark') {
+        data = applyUpgradeLandmark(ctx.state, {
+          landmarkId: String(rawArgs.landmarkId || '').trim()
+        }, mutationHelpers);
+      } else if (toolName === 'et.plot.journal.get_entries') {
+        data = {
+          entries: buildStatePayload(ctx.state).journal?.entries || []
+        };
       } else if (toolName === 'et.plot.contracts.get_state') {
         data = {
           contracts: buildStatePayload(ctx.state).contracts
@@ -809,10 +923,17 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
   });
 
   router.post('/api/founders-plot/foreman/tool/:toolName', (req, res) => {
+    let state = null;
+    let nowMs = 0;
+    let runtime = null;
+    let workerMeta = null;
+    let toolName = '';
+    let rawArgs = {};
     try {
-      const toolName = String(req.params.toolName || '').trim();
-      const rawArgs = req.body && typeof req.body === 'object' ? req.body : {};
-      const { state, nowMs, runtime } = requireForemanRuntime(req, res);
+      toolName = String(req.params.toolName || '').trim();
+      rawArgs = req.body && typeof req.body === 'object' ? req.body : {};
+      ({ state, nowMs, runtime } = requireForemanRuntime(req, res));
+      workerMeta = normalizeWorkerCommandMeta(rawArgs, runtime);
       const idempotencyKey = typeof rawArgs.idempotencyKey === 'string' ? rawArgs.idempotencyKey.trim() : '';
       if (toolName !== 'et.plot.get_state' && !idempotencyKey) {
         throw Object.assign(new Error('INVALID_STATE'), { details: { reason: 'MISSING_IDEMPOTENCY_KEY', tool: toolName } });
@@ -836,12 +957,22 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       }
 
       const eventBuffer = [];
+      if (workerMeta) {
+        eventBuffer.push({
+          ...buildWorkerCommandEvent(EVENT_TYPES.FOREMAN_WORKER_COMMAND_STARTED, workerMeta, {
+            toolName,
+            buildingId: rawArgs.buildingId
+          }),
+          createdAt: nowMs
+        });
+      }
       const mutationHelpers = {
         nowMs,
         actorMeta: {
           runtimeId: runtime.runtimeId,
           foremanSessionId: runtime.sessionId,
-          tokenScope: ['founders_plot:tool']
+          tokenScope: ['founders_plot:tool'],
+          ...(workerMeta || {})
         },
         appendEvent: (event) => eventBuffer.push({
           ...event,
@@ -875,6 +1006,18 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         }, mutationHelpers);
       } else {
         throw Object.assign(new Error('INVALID_STATE'), { details: { tool: toolName } });
+      }
+
+      if (workerMeta) {
+        state.meta.foremanWorker.lastWorkerCommandId = workerMeta.workerCommandId;
+        state.meta.foremanWorker.lastWorkerTraceId = workerMeta.workerTraceId;
+        eventBuffer.push({
+          ...buildWorkerCommandEvent(EVENT_TYPES.FOREMAN_WORKER_COMMAND_COMPLETED, workerMeta, {
+            toolName,
+            buildingId: rawArgs.buildingId
+          }),
+          createdAt: nowMs
+        });
       }
 
       const lastSeq = listRecentEvents(state.plot.plotId, 1)[0]?.seq || 0;
@@ -933,6 +1076,20 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       }
       res.json(payload);
     } catch (error) {
+      if (state && workerMeta) {
+        state.meta.foremanWorker.lastWorkerCommandId = workerMeta.workerCommandId;
+        state.meta.foremanWorker.lastWorkerTraceId = workerMeta.workerTraceId;
+        persistStateAndEvents(state, [
+          {
+            ...buildWorkerCommandEvent(EVENT_TYPES.FOREMAN_WORKER_COMMAND_FAILED, workerMeta, {
+              toolName,
+              buildingId: rawArgs.buildingId,
+              error: normalizeToolError(error)
+            }),
+            createdAt: nowMs || Date.now()
+          }
+        ]);
+      }
       const normalized = normalizeToolError(error);
       const status = normalized.code === 'FOREMAN_RUNTIME_REQUIRED' || normalized.code === 'STALE_RUNTIME'
         ? 403

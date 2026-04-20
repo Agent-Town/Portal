@@ -22,7 +22,7 @@ test('HQ2 surface shows the living Contract Board, Current Goal, and Standing Or
   await expect(frame.getByTestId('founders-current-goal')).toBeVisible();
   await expect(frame.getByTestId('founders-current-goal')).toContainText(/farm|contract|tutorial/i);
   await expect(frame.getByTestId('founders-contract-board')).toBeVisible();
-  await expect(frame.getByTestId('contract-offer')).toHaveCount(2);
+  await expect(frame.getByTestId('contract-offer')).toHaveCount(3);
   await expect(frame.getByTestId('founders-standing-order')).toBeVisible();
   await expect(frame.getByTestId('standing-order-careful')).toBeVisible();
   await expect(frame.getByTestId('standing-order-bold')).toBeVisible();
