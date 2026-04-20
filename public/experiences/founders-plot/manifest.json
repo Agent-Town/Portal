@@ -22,6 +22,18 @@
     "et.plot.upgrade_building",
     "et.plot.set_priority",
     "et.plot.claim_reward",
-    "et.plot.request_user_approval"
+    "et.plot.request_user_approval",
+    "et.plot.town.get_signals",
+    "et.plot.town.upgrade_landmark",
+    "et.plot.journal.get_entries",
+    "et.plot.contracts.get_state",
+    "et.plot.contracts.accept",
+    "et.plot.contracts.turn_in",
+    "et.foreman.policy.get_standing_order",
+    "et.foreman.policy.set_standing_order",
+    "et.foreman.scheduler.get_status",
+    "et.foreman.scheduler.enable_collect_ready_outputs",
+    "et.foreman.scheduler.pause",
+    "et.foreman.scheduler.resume"
   ]
 }

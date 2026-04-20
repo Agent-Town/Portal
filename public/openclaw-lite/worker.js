@@ -54351,6 +54351,202 @@ async function runFoundersPlotForemanTick({ token = "" } = {}) {
     runtimeId: String(observation?.runtime?.runtimeId || "")
   };
 }
+var FOUNDERS_PLOT_SCHEDULER_MIN_DELAY_MS = 250;
+var FOUNDERS_PLOT_SCHEDULER_MAX_DELAY_MS = 3e4;
+var foundersPlotScheduler = {
+  active: false,
+  taskKind: "COLLECT_READY_OUTPUTS",
+  token: "",
+  timerId: null,
+  tickRunning: false,
+  nextRunAtMs: 0,
+  lastRunAtMs: 0,
+  lastStatus: "STOPPED",
+  lastErrorCode: "",
+  consecutiveErrors: 0,
+  lastStopReason: ""
+};
+function clearFoundersPlotSchedulerTimer() {
+  if (foundersPlotScheduler.timerId != null) {
+    clearTimeout(foundersPlotScheduler.timerId);
+    foundersPlotScheduler.timerId = null;
+  }
+}
+function snapshotFoundersPlotScheduler() {
+  return {
+    active: foundersPlotScheduler.active === true,
+    taskKind: foundersPlotScheduler.taskKind,
+    tickRunning: foundersPlotScheduler.tickRunning === true,
+    nextRunAtMs: Number(foundersPlotScheduler.nextRunAtMs || 0),
+    lastRunAtMs: Number(foundersPlotScheduler.lastRunAtMs || 0),
+    lastStatus: String(foundersPlotScheduler.lastStatus || "STOPPED"),
+    lastErrorCode: String(foundersPlotScheduler.lastErrorCode || ""),
+    consecutiveErrors: Number(foundersPlotScheduler.consecutiveErrors || 0),
+    hasToken: !!String(foundersPlotScheduler.token || "").trim(),
+    lastStopReason: String(foundersPlotScheduler.lastStopReason || "")
+  };
+}
+function postFoundersPlotSchedulerStatus(requestId = "") {
+  post({
+    type: "worker.foundersPlot.scheduler.status",
+    requestId: String(requestId || ""),
+    ok: true,
+    result: snapshotFoundersPlotScheduler()
+  });
+}
+function postFoundersPlotSchedulerTick(type, data = {}) {
+  post({
+    type,
+    ok: true,
+    data
+  });
+}
+function stopFoundersPlotScheduler({ reason = "HUMAN_PAUSED", lastStatus = "" } = {}) {
+  clearFoundersPlotSchedulerTimer();
+  foundersPlotScheduler.active = false;
+  foundersPlotScheduler.token = "";
+  foundersPlotScheduler.tickRunning = false;
+  foundersPlotScheduler.nextRunAtMs = 0;
+  foundersPlotScheduler.lastStopReason = String(reason || "");
+  foundersPlotScheduler.lastStatus = String(lastStatus || "STOPPED") || "STOPPED";
+  return snapshotFoundersPlotScheduler();
+}
+function scheduleFoundersPlotDueCheck(delayMs = 0) {
+  clearFoundersPlotSchedulerTimer();
+  if (!foundersPlotScheduler.active) return;
+  const normalizedDelay = Math.max(
+    FOUNDERS_PLOT_SCHEDULER_MIN_DELAY_MS,
+    Math.min(FOUNDERS_PLOT_SCHEDULER_MAX_DELAY_MS, Number(delayMs || 0))
+  );
+  foundersPlotScheduler.timerId = setTimeout(() => {
+    runFoundersPlotSchedulerDueCheck().catch((error) => {
+      foundersPlotScheduler.lastStatus = "ERROR";
+      foundersPlotScheduler.lastErrorCode = String(error?.message || "SCHEDULER_ERROR");
+      foundersPlotScheduler.consecutiveErrors += 1;
+      postFoundersPlotSchedulerTick("worker.foundersPlot.scheduler.tick.failed", {
+        error: foundersPlotScheduler.lastErrorCode
+      });
+      postFoundersPlotSchedulerStatus();
+    });
+  }, normalizedDelay);
+}
+async function startFoundersPlotScheduler({ token = "", taskKind = "COLLECT_READY_OUTPUTS" } = {}) {
+  const normalizedToken = String(token || "").trim();
+  if (!normalizedToken) {
+    foundersPlotScheduler.active = false;
+    foundersPlotScheduler.token = "";
+    foundersPlotScheduler.lastStatus = "TOKEN_MISSING";
+    foundersPlotScheduler.lastErrorCode = "FOREMAN_RUNTIME_REQUIRED";
+    foundersPlotScheduler.lastStopReason = "ERROR";
+    clearFoundersPlotSchedulerTimer();
+    return snapshotFoundersPlotScheduler();
+  }
+  foundersPlotScheduler.active = true;
+  foundersPlotScheduler.taskKind = String(taskKind || "COLLECT_READY_OUTPUTS").trim() || "COLLECT_READY_OUTPUTS";
+  foundersPlotScheduler.token = normalizedToken;
+  foundersPlotScheduler.lastStatus = "WAITING";
+  foundersPlotScheduler.lastErrorCode = "";
+  foundersPlotScheduler.consecutiveErrors = 0;
+  foundersPlotScheduler.lastStopReason = "";
+  scheduleFoundersPlotDueCheck(0);
+  return snapshotFoundersPlotScheduler();
+}
+async function runFoundersPlotSchedulerDueCheck() {
+  if (!foundersPlotScheduler.active || foundersPlotScheduler.tickRunning) return;
+  if (!String(foundersPlotScheduler.token || "").trim()) {
+    foundersPlotScheduler.lastStatus = "TOKEN_MISSING";
+    stopFoundersPlotScheduler({ reason: "ERROR", lastStatus: "TOKEN_MISSING" });
+    postFoundersPlotSchedulerStatus();
+    return;
+  }
+  foundersPlotScheduler.tickRunning = true;
+  clearFoundersPlotSchedulerTimer();
+  try {
+    await foundersPlotWorkerFetch("/api/founders-plot/foreman/session/heartbeat", {
+      method: "POST",
+      token: foundersPlotScheduler.token,
+      body: {}
+    });
+    const observationPayload = await foundersPlotWorkerFetch("/api/founders-plot/foreman/observation", {
+      method: "GET",
+      token: foundersPlotScheduler.token
+    });
+    const task = observationPayload?.observation?.scheduler?.collectReadyOutputs || observationPayload?.scheduler?.collectReadyOutputs || null;
+    if (!task?.enabled || task.paused === true) {
+      foundersPlotScheduler.lastStatus = "WAITING";
+      scheduleFoundersPlotDueCheck(5e3);
+      return;
+    }
+    const now = Date.now();
+    const nextRunAtMs = Number(task?.nextRunAtMs || 0);
+    foundersPlotScheduler.nextRunAtMs = nextRunAtMs;
+    if (nextRunAtMs > now) {
+      foundersPlotScheduler.lastStatus = "WAITING";
+      scheduleFoundersPlotDueCheck(nextRunAtMs - now);
+      return;
+    }
+    const safeCandidates = Array.isArray(observationPayload?.safeCandidates) ? observationPayload.safeCandidates : [];
+    const hasActionableCandidate = safeCandidates.some((candidate) => candidate?.canActNow === true);
+    if (!hasActionableCandidate) {
+      foundersPlotScheduler.lastStatus = "NOOP";
+      foundersPlotScheduler.lastRunAtMs = now;
+      postFoundersPlotSchedulerTick("worker.foundersPlot.scheduler.tick.noop", {
+        taskKind: foundersPlotScheduler.taskKind,
+        nextRunAtMs
+      });
+      scheduleFoundersPlotDueCheck(15e3);
+      return;
+    }
+    foundersPlotScheduler.lastStatus = "RUNNING";
+    postFoundersPlotSchedulerTick("worker.foundersPlot.scheduler.tick.started", {
+      taskKind: foundersPlotScheduler.taskKind,
+      nextRunAtMs
+    });
+    const result = await runFoundersPlotForemanTick({ token: foundersPlotScheduler.token });
+    foundersPlotScheduler.lastRunAtMs = Date.now();
+    foundersPlotScheduler.lastErrorCode = "";
+    foundersPlotScheduler.consecutiveErrors = 0;
+    if (result?.result?.mutationApplied === true) {
+      foundersPlotScheduler.lastStatus = "WAITING";
+      postFoundersPlotSchedulerTick("worker.foundersPlot.scheduler.tick.completed", {
+        taskKind: foundersPlotScheduler.taskKind,
+        receiptId: String(result?.receipt?.receiptId || ""),
+        action: String(result?.receipt?.action || "")
+      });
+      scheduleFoundersPlotDueCheck(0);
+      return;
+    }
+    foundersPlotScheduler.lastStatus = "NOOP";
+    postFoundersPlotSchedulerTick("worker.foundersPlot.scheduler.tick.noop", {
+      taskKind: foundersPlotScheduler.taskKind,
+      nextRunAtMs: foundersPlotScheduler.nextRunAtMs
+    });
+    scheduleFoundersPlotDueCheck(15e3);
+  } catch (error) {
+    const code = String(error?.message || error?.payload?.error?.code || "SCHEDULER_ERROR");
+    foundersPlotScheduler.lastErrorCode = code;
+    if (code === "FOREMAN_RUNTIME_REQUIRED" || code === "STALE_RUNTIME") {
+      stopFoundersPlotScheduler({ reason: "ERROR", lastStatus: "STALE" });
+      postFoundersPlotSchedulerStatus();
+      return;
+    }
+    foundersPlotScheduler.lastStatus = "ERROR";
+    foundersPlotScheduler.consecutiveErrors += 1;
+    const retryAfterMs = Number(
+      error?.payload?.error?.details?.retryAfterMs || error?.payload?.details?.retryAfterMs || 0
+    );
+    const delayMs = code === "RATE_LIMITED" && retryAfterMs > 0 ? retryAfterMs : Math.min(3e4, 5e3 * foundersPlotScheduler.consecutiveErrors);
+    postFoundersPlotSchedulerTick("worker.foundersPlot.scheduler.tick.failed", {
+      taskKind: foundersPlotScheduler.taskKind,
+      error: code,
+      retryAfterMs: delayMs
+    });
+    scheduleFoundersPlotDueCheck(delayMs);
+  } finally {
+    foundersPlotScheduler.tickRunning = false;
+    postFoundersPlotSchedulerStatus();
+  }
+}
 self.addEventListener("message", async (ev) => {
   const msg = ev.data;
   if (!msg || typeof msg.type !== "string") return;
@@ -54432,6 +54628,7 @@ ${extraContext}` : text;
       return;
     }
     if (msg.type === "gateway.event.pagehide") {
+      stopFoundersPlotScheduler({ reason: "PAGE_UNLOAD" });
       await writeCheckpoint("pagehide");
       return;
     }
@@ -54439,6 +54636,8 @@ ${extraContext}` : text;
       const st = String(msg.state || "");
       if (st === "hidden") {
         await writeCheckpoint("pagehide");
+      } else if (st === "visible" && foundersPlotScheduler.active) {
+        scheduleFoundersPlotDueCheck(0);
       }
       return;
     }
@@ -54546,6 +54745,41 @@ ${extraContext}` : text;
           error: e?.message || String(e || "FOUNDERS_PLOT_FOREMAN_TICK_FAILED")
         });
       }
+      return;
+    }
+    if (msg.type === "gateway.command.foundersPlot.scheduler.start") {
+      try {
+        const result = await startFoundersPlotScheduler(msg.params || {});
+        post({
+          type: "worker.foundersPlot.scheduler.status",
+          requestId: String(msg.requestId || ""),
+          ok: true,
+          result
+        });
+      } catch (e) {
+        post({
+          type: "worker.foundersPlot.scheduler.status",
+          requestId: String(msg.requestId || ""),
+          ok: false,
+          error: e?.message || String(e || "FOUNDERS_PLOT_SCHEDULER_START_FAILED")
+        });
+      }
+      return;
+    }
+    if (msg.type === "gateway.command.foundersPlot.scheduler.stop") {
+      const result = stopFoundersPlotScheduler({
+        reason: String(msg?.params?.reason || "HUMAN_PAUSED")
+      });
+      post({
+        type: "worker.foundersPlot.scheduler.status",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result
+      });
+      return;
+    }
+    if (msg.type === "gateway.command.foundersPlot.scheduler.status") {
+      postFoundersPlotSchedulerStatus(String(msg.requestId || ""));
       return;
     }
     if (msg.type === "gateway.command.tools.registry") {

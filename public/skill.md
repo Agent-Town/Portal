@@ -322,7 +322,7 @@ After the house/founders opening sequence, the next district is **Founders Plot*
 - `et.foreman.scheduler.get_status`
   - Reads the Collect ready outputs preset state.
 - `et.foreman.scheduler.enable_collect_ready_outputs`
-  - Enables the one shipped V1.1 automatic routine.
+  - Enables the one shipped V1.2 in-session automatic routine.
 - `et.foreman.scheduler.pause`
   - Pauses the shipped Collect ready outputs routine.
 - `et.foreman.scheduler.resume`
@@ -339,9 +339,11 @@ After the house/founders opening sequence, the next district is **Founders Plot*
 - The Welcome Sign is an optional coin sink; it should never be treated as tutorial-gating.
 - If policy blocks the action, request approval instead of simulating success.
 - Mutation tools require `idempotencyKey`; provide one when you call them.
+- `COLLECT_READY_OUTPUTS` works only while this page stays open; do not promise off-session Clover behavior.
+- If the page reloads, restart Clover before claiming any routine can run again in that tab.
 - Treat `FORBIDDEN_POLICY`, `OUT_OF_RESOURCES`, `BUILD_SLOT_OCCUPIED`, and `JOB_ALREADY_RUNNING` as real world-state blockers, not prompt wording.
 - Never try to spoof the Foreman by sending `actor: "AGENT"` on the human route.
-- Use the Foreman-authenticated route only when the runtime session actually exists.
+- Use the Foreman-authenticated route only when the runtime session actually exists, and only through the OpenClaw Lite worker-origin path.
 - When the UI offers a `Run now` Foreman action, the real observe -> decide -> tool-call loop must come through the OpenClaw Lite worker command path.
 - Use recap lines and the current quest to explain why you acted.
 

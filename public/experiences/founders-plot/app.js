@@ -34,6 +34,19 @@
   let pendingAction = false;
   let gatewayPromise = null;
   let foremanRuntimeToken = '';
+  let localForemanRuntimeId = '';
+  let workerSchedulerStatus = {
+    active: false,
+    taskKind: 'COLLECT_READY_OUTPUTS',
+    tickRunning: false,
+    nextRunAtMs: 0,
+    lastRunAtMs: 0,
+    lastStatus: 'STOPPED',
+    lastErrorCode: '',
+    consecutiveErrors: 0,
+    hasToken: false,
+    lastStopReason: ''
+  };
 
   function readTeamCodeHint() {
     try {
@@ -277,6 +290,41 @@
 
   function stateData() {
     return currentState && currentState.state ? currentState.state : null;
+  }
+
+  function normalizeWorkerSchedulerStatus(value = {}) {
+    return {
+      active: value?.active === true,
+      taskKind: String(value?.taskKind || 'COLLECT_READY_OUTPUTS'),
+      tickRunning: value?.tickRunning === true,
+      nextRunAtMs: Number(value?.nextRunAtMs || 0),
+      lastRunAtMs: Number(value?.lastRunAtMs || 0),
+      lastStatus: String(value?.lastStatus || 'STOPPED'),
+      lastErrorCode: String(value?.lastErrorCode || ''),
+      consecutiveErrors: Number(value?.consecutiveErrors || 0),
+      hasToken: value?.hasToken === true,
+      lastStopReason: String(value?.lastStopReason || '')
+    };
+  }
+
+  function localForemanRuntimeStatus(serverRuntime = {}) {
+    const serverRuntimeId = String(serverRuntime?.runtimeId || '');
+    const localRuntimeId = String(localForemanRuntimeId || '');
+    const hasServerRuntime = !!serverRuntimeId;
+    const hasLocalToken = !!foremanRuntimeToken && localRuntimeId === serverRuntimeId;
+    const serverStatus = String(serverRuntime?.status || 'NOT_STARTED').toUpperCase();
+    const serverHealthy = ['BOOTING', 'OBSERVING', 'THINKING', 'ACTING'].includes(serverStatus);
+    const needsRestart = hasServerRuntime && serverHealthy && !hasLocalToken;
+    const actionable = hasServerRuntime && hasLocalToken && serverHealthy;
+    return {
+      hasServerRuntime,
+      hasLocalToken,
+      needsRestart,
+      actionable,
+      serverStatus,
+      serverRuntimeId,
+      localRuntimeId
+    };
   }
 
   function findBuilding(buildingId) {
@@ -864,7 +912,10 @@
 
   function renderForeman(state) {
     const runtime = state?.foreman?.runtime || {};
-    const status = foremanStatusMeta(runtime.status);
+    const runtimeLocal = localForemanRuntimeStatus(runtime);
+    const status = runtimeLocal.needsRestart
+      ? { label: 'Needs a fresh start', tone: 'warn' }
+      : foremanStatusMeta(runtime.status);
     const badge = document.getElementById('foremanStatusBadge');
     if (badge) {
       badge.textContent = status.label;
@@ -876,8 +927,11 @@
 
     const toolsLine = (() => {
       if (!runtime.runtimeId) return 'Start Clover when you are ready for in-session help.';
+      if (runtimeLocal.needsRestart) return 'Restart Clover before any routine can run in this tab.';
       if (runtime.status === 'PAUSED') return 'Automation is paused until you wake Clover again.';
-      if (runtime.status === 'STALE' || runtime.status === 'ERROR') return 'Clover needs a fresh start before any automatic work.';
+      if (runtime.status === 'STALE' || runtime.status === 'ERROR' || ['ERROR', 'STALE', 'TOKEN_MISSING'].includes(String(workerSchedulerStatus.lastStatus || '').toUpperCase())) {
+        return 'Clover needs a fresh start.';
+      }
       return 'Clover can observe, plan, and handle one safe routine task you have allowed.';
     })();
     setText('foremanToolsLine', toolsLine);
@@ -886,7 +940,7 @@
     const pauseBtn = document.getElementById('foremanPauseBtn');
     const runNowBtn = document.getElementById('foremanRunNowBtn');
     if (startBtn) {
-      startBtn.disabled = pendingAction || ['BOOTING', 'OBSERVING', 'THINKING', 'ACTING'].includes(String(runtime.status || '').toUpperCase());
+      startBtn.disabled = pendingAction;
       startBtn.textContent = runtime.runtimeId ? 'Restart Clover' : 'Start Clover';
       startBtn.onclick = async () => {
         try {
@@ -904,7 +958,7 @@
       };
     }
     if (pauseBtn) {
-      pauseBtn.disabled = pendingAction || !runtime.runtimeId || String(runtime.status || '').toUpperCase() === 'PAUSED';
+      pauseBtn.disabled = pendingAction || !runtimeLocal.actionable || String(runtime.status || '').toUpperCase() === 'PAUSED';
       pauseBtn.onclick = async () => {
         try {
           pendingAction = true;
@@ -919,7 +973,7 @@
       };
     }
     if (runNowBtn) {
-      runNowBtn.disabled = pendingAction || !runtime.runtimeId || ['PAUSED', 'STALE', 'ERROR', 'NOT_STARTED'].includes(String(runtime.status || '').toUpperCase());
+      runNowBtn.disabled = pendingAction || !runtimeLocal.actionable || ['PAUSED', 'STALE', 'ERROR', 'NOT_STARTED'].includes(String(runtime.status || '').toUpperCase());
       runNowBtn.onclick = async () => {
         try {
           pendingAction = true;
@@ -1002,16 +1056,24 @@
     const schedulerNode = document.getElementById('schedulerCard');
     if (schedulerNode) {
       const task = state?.foreman?.scheduler?.collectReadyOutputs || {};
-      const schedulerLabel = task.enabled
-        ? (task.paused ? 'Ask me next time' : 'Collect ready outputs is enabled')
-        : 'Collect ready outputs is off';
+      const schedulerLabel = task.paused === true
+        ? 'Clover will ask next time.'
+        : task.enabled && !runtimeLocal.actionable
+          ? 'Restart Clover to resume this routine.'
+          : ['ERROR', 'STALE', 'TOKEN_MISSING'].includes(String(workerSchedulerStatus.lastStatus || '').toUpperCase())
+            ? 'Clover needs a fresh start.'
+            : task.enabled && workerSchedulerStatus.active
+              ? 'Clover is watching for ready outputs while this tab is open.'
+              : task.enabled
+                ? 'Collect ready outputs is enabled.'
+                : 'Collect ready outputs is off.';
       schedulerNode.innerHTML = `
         <div class="foundersSchedulerBody">
           <div class="foundersLabel">Foreman routine</div>
           <strong>${htmlEscape(schedulerLabel)}</strong>
           <div class="small">This helps only while you keep Founders Plot open.</div>
           <div class="foundersSchedulerRow">
-            <button class="btn small" type="button" id="schedulerCollectToggle" data-testid="scheduler-collect-toggle" ${pendingAction || !runtime.runtimeId ? 'disabled' : ''}>
+            <button class="btn small" type="button" id="schedulerCollectToggle" data-testid="scheduler-collect-toggle" ${pendingAction || !runtimeLocal.actionable ? 'disabled' : ''}>
               ${task.enabled && task.paused !== true ? 'Ask me next time' : 'Enable collect ready outputs'}
             </button>
             <span class="small">${task.runCount ? `${task.runCount} successful run${task.runCount === 1 ? '' : 's'}` : 'No automatic collection yet.'}</span>
@@ -1385,6 +1447,7 @@
     try {
       const payload = await api('/api/founders-plot/state');
       currentState = payload;
+      await syncWorkerScheduler(payload?.state || null);
       const quest = payload?.state?.quest?.title || 'Settlement ready.';
       setStatusLine(`Plot synchronized. ${quest}`);
       renderAll();
@@ -1436,6 +1499,12 @@
 
   async function startForemanRuntime() {
     const gateway = await initGateway();
+    if (gateway && typeof gateway.foundersPlotSchedulerStop === 'function') {
+      await gateway.foundersPlotSchedulerStop({ reason: 'RUNTIME_RESTART' }).catch(() => null);
+    }
+    foremanRuntimeToken = '';
+    localForemanRuntimeId = '';
+    workerSchedulerStatus = normalizeWorkerSchedulerStatus();
     let skillLoaded = false;
     let toolsLoaded = false;
     let goalsLoaded = false;
@@ -1468,6 +1537,7 @@
       })
     });
     foremanRuntimeToken = String(payload?.runtime?.token || '');
+    localForemanRuntimeId = String(payload?.runtime?.runtimeId || '');
     await loadState();
     return payload;
   }
@@ -1486,6 +1556,7 @@
       method: 'POST',
       body: JSON.stringify({})
     });
+    await stopWorkerScheduler('HUMAN_PAUSED');
     await loadState();
     return payload;
   }
@@ -1504,6 +1575,7 @@
       })
     });
     currentState = { ok: true, state: response.data?.state || response.state || currentState?.state || null };
+    await syncWorkerScheduler(currentState?.state || null);
     renderAll();
     return {
       ok: true,
@@ -1513,17 +1585,21 @@
 
   async function getSchedulerStatus() {
     const payload = await api('/api/founders-plot/state');
+    const local = await syncWorkerScheduler(payload?.state || null);
     return {
       ok: true,
-      scheduler: payload?.state?.foreman?.scheduler || payload?.state?.scheduler || null
+      scheduler: payload?.state?.foreman?.scheduler || payload?.state?.scheduler || null,
+      local
     };
   }
 
   async function runForemanTick() {
-    if (!foremanRuntimeToken) {
+    const runtimeLocal = localForemanRuntimeStatus(currentState?.state?.foreman?.runtime || {});
+    if (!runtimeLocal.actionable) {
       return {
-        ok: false,
-        error: { code: 'FOREMAN_RUNTIME_REQUIRED' }
+        ok: true,
+        result: { mutationApplied: false },
+        receipt: currentState?.state?.foreman?.receipt || null
       };
     }
     const gateway = await initGateway();
@@ -1536,6 +1612,11 @@
         token: foremanRuntimeToken
       });
     } catch (error) {
+      if (error?.message === 'STALE_RUNTIME' || error?.message === 'FOREMAN_RUNTIME_REQUIRED') {
+        foremanRuntimeToken = '';
+        localForemanRuntimeId = '';
+        await stopWorkerScheduler('ERROR');
+      }
       await loadState().catch(() => null);
       if (error?.message === 'STALE_RUNTIME' || error?.message === 'FOREMAN_RUNTIME_REQUIRED') {
         return {
@@ -1556,8 +1637,73 @@
       body: JSON.stringify({ correction })
     });
     currentState = { ok: true, state: payload.state };
+    await syncWorkerScheduler(currentState?.state || null);
     renderAll();
     return payload;
+  }
+
+  async function stopWorkerScheduler(reason = 'HUMAN_PAUSED') {
+    const gateway = await initGateway().catch(() => null);
+    if (!gateway || typeof gateway.foundersPlotSchedulerStop !== 'function') {
+      workerSchedulerStatus = normalizeWorkerSchedulerStatus({
+        active: false,
+        lastStatus: 'STOPPED',
+        lastStopReason: reason
+      });
+      return workerSchedulerStatus;
+    }
+    const status = await gateway.foundersPlotSchedulerStop({ reason }).catch(() => null);
+    workerSchedulerStatus = normalizeWorkerSchedulerStatus(status || {
+      active: false,
+      lastStatus: 'STOPPED',
+      lastStopReason: reason
+    });
+    return workerSchedulerStatus;
+  }
+
+  async function syncWorkerScheduler(state = null) {
+    const serverState = state || stateData();
+    const runtimeLocal = localForemanRuntimeStatus(serverState?.foreman?.runtime || {});
+    const task = serverState?.foreman?.scheduler?.collectReadyOutputs || {};
+    const shouldCheckWorker = runtimeLocal.hasServerRuntime || task.enabled === true || !!foremanRuntimeToken;
+    if (!shouldCheckWorker) {
+      workerSchedulerStatus = normalizeWorkerSchedulerStatus();
+      return workerSchedulerStatus;
+    }
+    const gateway = await initGateway().catch(() => null);
+    if (!gateway || typeof gateway.foundersPlotSchedulerStatus !== 'function') {
+      workerSchedulerStatus = normalizeWorkerSchedulerStatus({
+        active: false,
+        lastStatus: 'ERROR',
+        lastErrorCode: 'FOREMAN_WORKER_UNAVAILABLE'
+      });
+      return workerSchedulerStatus;
+    }
+    let nextStatus = await gateway.foundersPlotSchedulerStatus().catch((error) => ({
+      active: false,
+      lastStatus: 'ERROR',
+      lastErrorCode: String(error?.message || 'FOREMAN_WORKER_UNAVAILABLE')
+    }));
+    const shouldBeActive = runtimeLocal.actionable && task.enabled === true && task.paused !== true;
+    if (shouldBeActive && nextStatus?.active !== true) {
+      nextStatus = await gateway.foundersPlotSchedulerStart({
+        token: foremanRuntimeToken,
+        taskKind: 'COLLECT_READY_OUTPUTS'
+      }).catch((error) => ({
+        active: false,
+        lastStatus: String(error?.message || 'ERROR').toUpperCase() === 'STALE_RUNTIME' ? 'STALE' : 'ERROR',
+        lastErrorCode: String(error?.message || 'FOUNDERS_PLOT_SCHEDULER_START_FAILED')
+      }));
+    } else if (!shouldBeActive && nextStatus?.active === true) {
+      nextStatus = await gateway.foundersPlotSchedulerStop({
+        reason: runtimeLocal.needsRestart ? 'RUNTIME_RESTART' : task.paused === true ? 'HUMAN_PAUSED' : 'ERROR'
+      }).catch(() => ({
+        active: false,
+        lastStatus: 'STOPPED'
+      }));
+    }
+    workerSchedulerStatus = normalizeWorkerSchedulerStatus(nextStatus);
+    return workerSchedulerStatus;
   }
 
   function startPolling() {
@@ -1595,6 +1741,8 @@
   window.__foundersPlotTest = {
     loadState,
     getState: () => currentState,
+    getLocalForemanRuntimeStatus: () => localForemanRuntimeStatus(currentState?.state?.foreman?.runtime || {}),
+    getWorkerSchedulerStatus: () => ({ ...workerSchedulerStatus }),
     runTool,
     updatePolicy,
     resolveApproval,

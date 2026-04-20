@@ -1768,7 +1768,10 @@ function scoreCollectCandidate(state, candidate, observation) {
   const contract = observation.activeContract;
   const building = getBuilding(state, candidate.buildingId);
   if (contract?.status === 'ACTIVE' || contract?.status === 'READY_TO_TURN_IN') {
-    const requirementResource = ['wood', 'stone', 'food', 'coin'].find((resource) => normalizeCount(contract?.requirements?.[resource]) > 0) || '';
+    const requirementResource = ['wood', 'stone', 'food', 'coin'].find((resource) => (
+      normalizeCount(contract?.requirements?.resources?.[resource]) > 0
+      || normalizeCount(contract?.requirements?.[resource]) > 0
+    )) || '';
     if (requirementResource && normalizeCount(building?.outputBuffer?.[requirementResource]) > 0) score += 30;
   }
   if (foremanStandingOrder(state) === 'CAREFUL_STEWARD') {

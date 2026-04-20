@@ -76,9 +76,18 @@ function normalizeIdentity(raw) {
 function normalizeToolError(error) {
   const code = typeof error?.message === 'string' && error.message ? error.message : 'SERVER_ERROR';
   const retryable = code === 'RATE_LIMITED' || code === 'SIMULATION_DESYNC' || code === 'SERVER_ERROR';
+  const message = (() => {
+    if (code === 'FOREMAN_WORKER_ORIGIN_REQUIRED') {
+      return 'Foreman mutations must originate from the OpenClaw Lite worker command path.';
+    }
+    if (code === 'FOREMAN_WORKER_RUNTIME_MISMATCH') {
+      return 'Foreman mutations must use the current Clover runtime.';
+    }
+    return code;
+  })();
   return {
     code,
-    message: code,
+    message,
     retryable,
     details: error?.details && typeof error.details === 'object' ? error.details : {}
   };
@@ -285,6 +294,14 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
     'et.foreman.policy.get_standing_order',
     'et.foreman.scheduler.get_status'
   ]);
+  const FOREMAN_MUTATION_TOOL_NAMES = new Set([
+    'et.plot.collect_outputs',
+    'et.plot.queue_job',
+    'et.plot.place_building',
+    'et.plot.upgrade_building'
+  ]);
+  const WORKER_COMMAND_ID_RE = /^fpwcmd_\d+_[a-f0-9]+$/i;
+  const WORKER_TRACE_ID_RE = /^fpwtrace_\d+_[a-f0-9]+$/i;
 
   function readOnlyToolData(toolName, state) {
     const payload = buildStatePayload(state);
@@ -318,14 +335,42 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
 
   function normalizeWorkerCommandMeta(rawArgs = {}, runtime = {}) {
     const origin = String(rawArgs.origin || '').trim().toUpperCase();
-    if (origin !== 'OPENCLAW_LITE_WORKER') return null;
+    if (origin !== 'OPENCLAW_LITE_WORKER') {
+      const error = new Error('FOREMAN_WORKER_ORIGIN_REQUIRED');
+      error.details = { reason: 'INVALID_ORIGIN' };
+      throw error;
+    }
     const workerCommandId = String(rawArgs.workerCommandId || '').trim();
+    if (!WORKER_COMMAND_ID_RE.test(workerCommandId)) {
+      const error = new Error('FOREMAN_WORKER_ORIGIN_REQUIRED');
+      error.details = { reason: 'INVALID_WORKER_COMMAND_ID' };
+      throw error;
+    }
     const workerTraceId = String(rawArgs.workerTraceId || '').trim();
+    if (!WORKER_TRACE_ID_RE.test(workerTraceId)) {
+      const error = new Error('FOREMAN_WORKER_ORIGIN_REQUIRED');
+      error.details = { reason: 'INVALID_WORKER_TRACE_ID' };
+      throw error;
+    }
+    const requestedRuntimeId = String(rawArgs.runtimeId || '').trim();
+    if (!requestedRuntimeId) {
+      const error = new Error('FOREMAN_WORKER_ORIGIN_REQUIRED');
+      error.details = { reason: 'MISSING_RUNTIME_ID' };
+      throw error;
+    }
+    if (requestedRuntimeId !== String(runtime.runtimeId || '').trim()) {
+      const error = new Error('FOREMAN_WORKER_RUNTIME_MISMATCH');
+      error.details = {
+        expectedRuntimeId: String(runtime.runtimeId || '').trim(),
+        runtimeId: requestedRuntimeId
+      };
+      throw error;
+    }
     return {
       origin,
       workerCommandId,
       workerTraceId,
-      runtimeId: String(runtime.runtimeId || rawArgs.runtimeId || '').trim(),
+      runtimeId: String(runtime.runtimeId || '').trim(),
       foremanSessionId: String(runtime.sessionId || '').trim()
     };
   }
@@ -933,7 +978,6 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       toolName = String(req.params.toolName || '').trim();
       rawArgs = req.body && typeof req.body === 'object' ? req.body : {};
       ({ state, nowMs, runtime } = requireForemanRuntime(req, res));
-      workerMeta = normalizeWorkerCommandMeta(rawArgs, runtime);
       const idempotencyKey = typeof rawArgs.idempotencyKey === 'string' ? rawArgs.idempotencyKey.trim() : '';
       if (toolName !== 'et.plot.get_state' && !idempotencyKey) {
         throw Object.assign(new Error('INVALID_STATE'), { details: { reason: 'MISSING_IDEMPOTENCY_KEY', tool: toolName } });
@@ -945,6 +989,9 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
             state: buildStatePayload(state)
           }
         });
+      }
+      if (FOREMAN_MUTATION_TOOL_NAMES.has(toolName)) {
+        workerMeta = normalizeWorkerCommandMeta(rawArgs, runtime);
       }
 
       const argsHash = hashJson({ toolName, args: rawArgs, runtimeId: runtime.runtimeId });
@@ -1091,7 +1138,10 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         ]);
       }
       const normalized = normalizeToolError(error);
-      const status = normalized.code === 'FOREMAN_RUNTIME_REQUIRED' || normalized.code === 'STALE_RUNTIME'
+      const status = normalized.code === 'FOREMAN_RUNTIME_REQUIRED'
+        || normalized.code === 'STALE_RUNTIME'
+        || normalized.code === 'FOREMAN_WORKER_ORIGIN_REQUIRED'
+        || normalized.code === 'FOREMAN_WORKER_RUNTIME_MISMATCH'
         ? 403
         : normalized.code === 'IDEMPOTENCY_CONFLICT'
           ? 409

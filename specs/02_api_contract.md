@@ -481,6 +481,8 @@ Security rules:
 - The normal human route must reject `actor: "AGENT"` with `ACTOR_SPOOF_REJECTED`.
 - Foreman-originated mutations must use `POST /api/founders-plot/foreman/tool/:toolName`.
 - The Foreman route derives authority from the server-issued runtime session token, never from request-body `actor`.
+- The Foreman runtime token is memory-only on the page side and must not be persisted to durable browser storage.
+- A page reload may leave the server runtime healthy while the local page is no longer actionable; the UI must require a fresh Clover restart in that tab.
 
 Response shape:
 ```json
@@ -509,6 +511,8 @@ Error codes:
 - `IDEMPOTENCY_CONFLICT`
 - `ACTOR_SPOOF_REJECTED`
 - `FOREMAN_RUNTIME_REQUIRED`
+- `FOREMAN_WORKER_ORIGIN_REQUIRED`
+- `FOREMAN_WORKER_RUNTIME_MISMATCH`
 - `STALE_RUNTIME`
 - `CONTRACT_ACTIVE_EXISTS`
 - `SIMULATION_DESYNC`
@@ -547,6 +551,11 @@ Turns in the active contract once it is `READY_TO_TURN_IN`.
 ### POST `/api/founders-plot/foreman/session/start`
 Starts the in-session Clover runtime and returns a server-issued Foreman token bound to the active plot/runtime.
 
+Runtime notes:
+- the token is memory-only on the page side;
+- reloading the page does not preserve local control of the runtime;
+- in-session scheduler automation must stop until Clover is started again in the new page session.
+
 ### POST `/api/founders-plot/foreman/session/heartbeat`
 Refreshes the active Foreman runtime lease.
 
@@ -567,6 +576,8 @@ Requirements:
 - runtime token required;
 - request body must not declare `actor`;
 - non-`get_state` calls require `idempotencyKey`;
+- mutation calls must include `origin: "OPENCLAW_LITE_WORKER"`, `workerCommandId`, `workerTraceId`, and the matching `runtimeId`;
+- direct runtime-token mutation attempts without valid worker metadata must fail with `FOREMAN_WORKER_ORIGIN_REQUIRED` or `FOREMAN_WORKER_RUNTIME_MISMATCH`;
 - successful actions append `AGENT_ACTION_EXECUTED` plus a Foreman receipt event.
 - worker-owned commands may also append `FOREMAN_WORKER_COMMAND_STARTED` and `FOREMAN_WORKER_COMMAND_COMPLETED`.
 

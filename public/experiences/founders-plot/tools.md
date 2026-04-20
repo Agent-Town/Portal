@@ -34,6 +34,8 @@ The Founders Plot runtime exposes a deliberately small tool family:
 - The only shipped scheduler preset is `COLLECT_READY_OUTPUTS`.
 - The first autonomous mutation must come through the Foreman-authenticated route, not a spoofed `actor` field.
 - The visible `Run now` Foreman tick must be owned by the OpenClaw Lite worker command path, not page glue.
+- `COLLECT_READY_OUTPUTS` runs in-session only while the Founders Plot page and worker stay open.
+- Reloading the page loses local control of Clover until the human starts Clover again in that tab.
 
 ## Contract rules
 
@@ -44,6 +46,7 @@ The Founders Plot runtime exposes a deliberately small tool family:
 - Agent placement or HQ upgrade attempts must request approval first when Phase 1 policy requires it.
 - `POST /api/founders-plot/tool/:toolName` is the human route and must reject `actor: "AGENT"` with `ACTOR_SPOOF_REJECTED`.
 - `POST /api/founders-plot/foreman/tool/:toolName` is the Foreman route and requires server-issued runtime authority.
+- Foreman mutation calls must include `origin: "OPENCLAW_LITE_WORKER"`, `workerCommandId`, `workerTraceId`, and the matching `runtimeId`.
 - Worker-owned Foreman mutations append `FOREMAN_WORKER_COMMAND_STARTED`, `AGENT_ACTION_EXECUTED`, and `FOREMAN_WORKER_COMMAND_COMPLETED` events.
 
 ## Approval audit rules

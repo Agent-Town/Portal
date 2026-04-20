@@ -8,6 +8,10 @@ async function openFoundersPlotFrame(page) {
   await pressOpenViaAgentApi(page);
 
   await page.goto('/app?district=founders-plot');
+  return await getOpenFoundersPlotFrame(page);
+}
+
+async function getOpenFoundersPlotFrame(page) {
   await expect(page.locator('#districtModalBackdrop:not(.is-hidden)')).toHaveCount(1, { timeout: 5000 });
   await expect(page.locator('#districtModalTitle')).toHaveText('Founders Plot');
 
@@ -181,6 +185,7 @@ module.exports = {
   advancePlot,
   acceptContractOffer,
   bootstrapToHq2,
+  getOpenFoundersPlotFrame,
   getJson,
   getOfferByKind,
   getPlotState,

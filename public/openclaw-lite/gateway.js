@@ -895,6 +895,36 @@ async function init() {
     if (!res?.ok) throw new Error(String(res?.error || "FOUNDERS_PLOT_FOREMAN_TICK_FAILED"));
     return res.result || null;
   }
+  async function foundersPlotSchedulerStartRequest(params = {}) {
+    const res = await sendWorkerRequest({
+      requestType: "gateway.command.foundersPlot.scheduler.start",
+      responseType: "worker.foundersPlot.scheduler.status",
+      payload: { params },
+      timeoutMs: EXPERIENCE_RUN_REQUEST_TIMEOUT_MS
+    });
+    if (!res?.ok) throw new Error(String(res?.error || "FOUNDERS_PLOT_SCHEDULER_START_FAILED"));
+    return res.result || null;
+  }
+  async function foundersPlotSchedulerStopRequest(params = {}) {
+    const res = await sendWorkerRequest({
+      requestType: "gateway.command.foundersPlot.scheduler.stop",
+      responseType: "worker.foundersPlot.scheduler.status",
+      payload: { params },
+      timeoutMs: EXPERIENCE_RUN_REQUEST_TIMEOUT_MS
+    });
+    if (!res?.ok) throw new Error(String(res?.error || "FOUNDERS_PLOT_SCHEDULER_STOP_FAILED"));
+    return res.result || null;
+  }
+  async function foundersPlotSchedulerStatusRequest(params = {}) {
+    const res = await sendWorkerRequest({
+      requestType: "gateway.command.foundersPlot.scheduler.status",
+      responseType: "worker.foundersPlot.scheduler.status",
+      payload: { params },
+      timeoutMs: EXPERIENCE_RUN_REQUEST_TIMEOUT_MS
+    });
+    if (!res?.ok) throw new Error(String(res?.error || "FOUNDERS_PLOT_SCHEDULER_STATUS_FAILED"));
+    return res.result || null;
+  }
   async function trainerListAttemptsRequest(params = {}) {
     const res = await sendWorkerRequest({
       requestType: "gateway.command.trainer.attempts.list",
@@ -1396,6 +1426,15 @@ async function init() {
     async foundersPlotForemanTick(params = {}) {
       return foundersPlotForemanTickRequest(params);
     },
+    async foundersPlotSchedulerStart(params = {}) {
+      return foundersPlotSchedulerStartRequest(params);
+    },
+    async foundersPlotSchedulerStop(params = {}) {
+      return foundersPlotSchedulerStopRequest(params);
+    },
+    async foundersPlotSchedulerStatus(params = {}) {
+      return foundersPlotSchedulerStatusRequest(params);
+    },
     async trainerListAttempts(params = {}) {
       return trainerListAttemptsRequest(params);
     },
@@ -1464,6 +1503,9 @@ async function init() {
   gatewayEvents.experienceRun = experienceRunRequest;
   gatewayEvents.visitExperience = visitExperienceRequest;
   gatewayEvents.foundersPlotForemanTick = foundersPlotForemanTickRequest;
+  gatewayEvents.foundersPlotSchedulerStart = foundersPlotSchedulerStartRequest;
+  gatewayEvents.foundersPlotSchedulerStop = foundersPlotSchedulerStopRequest;
+  gatewayEvents.foundersPlotSchedulerStatus = foundersPlotSchedulerStatusRequest;
   gatewayEvents.trainerListAttempts = trainerListAttemptsRequest;
   gatewayEvents.trainerGetAttempt = trainerGetAttemptRequest;
   gatewayEvents.trainerCompare = trainerCompareRequest;

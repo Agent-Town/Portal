@@ -91,6 +91,8 @@ test('skill.md keeps the minimal external-agent contract', async ({ request }) =
   expect(txt).toContain('Accepts one `SUPPLY`, `BUILD`, or `PREPARATION` contract.');
   expect(txt).toContain('Treat requesters as recurring people and institutions, not disposable strings.');
   expect(txt).toContain('Use `et.plot.town.get_signals` and `et.plot.journal.get_entries` to explain how the town changed.');
+  expect(txt).toContain('`COLLECT_READY_OUTPUTS` works only while this page stays open; do not promise off-session Clover behavior.');
+  expect(txt).toContain('If the page reloads, restart Clover before claiming any routine can run again in that tab.');
   expect(txt).toContain('When the UI offers a `Run now` Foreman action, the real observe -> decide -> tool-call loop must come through the OpenClaw Lite worker command path.');
   expect(txt).toContain('Never try to spoof the Foreman by sending `actor: "AGENT"` on the human route.');
   expect(txt).toContain('Mutation tools require `idempotencyKey`; provide one when you call them.');
