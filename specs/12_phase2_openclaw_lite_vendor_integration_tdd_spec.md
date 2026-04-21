@@ -113,13 +113,13 @@ Required UI test ids:
 
 Required API:
 
-1. `POST /api/agent/lite/llm/config`
-2. `GET /api/agent/lite/llm/config`
+1. `POST /api/agent/lite/llm/config` (legacy in later revisions; replaced by client-only config plus `POST /api/onboarding/brain/complete`)
+2. `GET /api/agent/lite/llm/config` (legacy compatibility probe only in later revisions)
 
 Rules:
 
 1. Before LLM config save: runtime may be booted but not action-ready (`lite.runtimeReady=false`).
-2. After successful save: `lite.llmConfigured=true`; runtime can become action-ready.
+2. After successful save: the browser keeps the LLM config locally; later revisions advance onboarding with a config-free completion route instead of sending config to the backend.
 3. `GET` responses and `/api/state` MUST NOT expose raw API key (only boolean/metadata).
 4. In test mode, a deterministic non-network provider profile must be supported (for example `provider=test-local`, `model=deterministic`).
 

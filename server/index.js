@@ -891,36 +891,6 @@ function parseModelRef(modelRef, fallbackProvider = 'openai', fallbackModelId = 
   };
 }
 
-function normalizeLiteLlmPayload(body) {
-  const providerInput = typeof body?.provider === 'string' ? body.provider.trim() : '';
-  const modelInput = typeof body?.model === 'string' ? body.model.trim() : '';
-  const modelRefInput = typeof body?.modelRef === 'string' ? body.modelRef.trim() : '';
-  const rawAuthMode = typeof body?.authMode === 'string' ? body.authMode.trim() : '';
-  const normalizedAuthMode = rawAuthMode === 'oauth-json' ? 'oauth-json' : 'api-key';
-  const hasCredential = body?.hasCredential === false ? false : true;
-
-  if (!providerInput && !modelRefInput) throw new Error('MISSING_LLM_PROVIDER');
-  if (!modelInput && !modelRefInput) throw new Error('MISSING_LLM_MODEL');
-
-  const parsed = modelRefInput
-    ? parseModelRef(modelRefInput, providerInput || 'openai', modelInput || 'gpt-4o-mini')
-    : parseModelRef(`${providerInput}/${modelInput}`, providerInput || 'openai', modelInput || 'gpt-4o-mini');
-
-  const provider = String(parsed.provider || '').trim();
-  const model = String(parsed.modelId || '').trim();
-  const modelRef = String(parsed.modelRef || '').trim();
-  if (!provider) throw new Error('MISSING_LLM_PROVIDER');
-  if (!model) throw new Error('MISSING_LLM_MODEL');
-
-  return {
-    provider,
-    model,
-    modelRef,
-    authMode: normalizedAuthMode,
-    hasCredential
-  };
-}
-
 function toBase64Url(input) {
   return Buffer.from(input)
     .toString('base64')
@@ -1553,18 +1523,13 @@ function normalizeOnboardingStep(value) {
   }
 }
 
-function isOnboardingBrainConfigured(session) {
-  if (!session || typeof session !== 'object') return false;
-  if (session.flow === 'agent_solo') return true;
-  return !!session?.lite?.llmConfigured;
-}
-
 function getOnboardingStepFromSession(session) {
   const onboarding = session?.onboarding && typeof session.onboarding === 'object' ? session.onboarding : {};
   if (onboarding.required !== true) return ONBOARDING_STEP_DONE;
   if (onboarding.registrationComplete !== true) return ONBOARDING_STEP_TOWNHALL;
-  if (!isOnboardingBrainConfigured(session)) return ONBOARDING_STEP_BRAIN;
-  if (session?.signup?.complete !== true) return ONBOARDING_STEP_SIGIL;
+  const explicitStep = normalizeOnboardingStep(onboarding.step);
+  if (explicitStep && explicitStep !== ONBOARDING_STEP_TOWNHALL) return explicitStep;
+  if (session?.signup?.complete !== true) return ONBOARDING_STEP_BRAIN;
   if (session?.houseCeremony?.houseId) return ONBOARDING_STEP_DONE;
   return ONBOARDING_STEP_CEREMONY;
 }
@@ -1669,6 +1634,7 @@ const connectSrc = [
   'https://esm.sh',
   'https://cdn.jsdelivr.net',
   'https://cdn.skypack.dev',
+  'https://openrouter.ai',
   'https://eth.llamarpc.com',
   'https://rpc.ankr.com',
   ...SOLANA_CONNECT_SRC,
@@ -3742,11 +3708,11 @@ app.get('/api/state', (req, res) => {
     lite: {
       driver: lite.driver,
       runtimeReady: !!lite.runtimeReady,
-      llmConfigured: !!lite.llmConfigured,
-      llmProvider: lite.llmProvider || null,
-      llmModel: lite.llmModel || null,
-      llmAuthMode: lite.llmAuthMode || 'api-key',
-      llmApiKeySet: !!lite.llmApiKeySet,
+      llmConfigured: false,
+      llmProvider: null,
+      llmModel: null,
+      llmAuthMode: null,
+      llmApiKeySet: false,
       runtimeVersion: lite.runtimeVersion || null,
       lastError: typeof lite.lastError === 'string' && lite.lastError ? lite.lastError : null
     },
@@ -3824,9 +3790,9 @@ app.post('/api/hatch/complete', (req, res) => {
     lite: {
       driver: lite.driver,
       runtimeReady: !!lite.runtimeReady,
-      llmConfigured: !!lite.llmConfigured,
-      llmProvider: lite.llmProvider || null,
-      llmModel: lite.llmModel || null
+      llmConfigured: false,
+      llmProvider: null,
+      llmModel: null
     }
   });
 });
@@ -4282,28 +4248,29 @@ app.post('/api/agent/lite/llm/oauth/openrouter/exchange', async (req, res) => {
 });
 
 app.get('/api/agent/lite/llm/config', (req, res) => {
-  const s = ensureHumanSession(req, res);
-  const lite = ensureLiteState(s);
-  updateLiteRuntimeReady(s);
   res.json({
     ok: true,
-    configured: !!lite.llmConfigured,
-    provider: lite.llmProvider || null,
-    model: lite.llmModel || null,
-    authMode: lite.llmAuthMode || 'api-key',
-    apiKeySet: !!lite.llmApiKeySet
+    configured: false,
+    provider: null,
+    model: null,
+    authMode: null,
+    apiKeySet: false,
+    clientOnly: true,
+    deprecated: true
   });
 });
 
-function handleLiteLlmConfigUpsert(req, res) {
+function rejectLiteLlmConfigMutation(_req, res) {
+  return res.status(410).json({
+    ok: false,
+    error: 'LLM_CONFIG_CLIENT_ONLY',
+    message: 'LLM config is stored in browser-local state only. Use /api/onboarding/brain/complete after local save.'
+  });
+}
+
+app.post('/api/onboarding/brain/complete', (req, res) => {
   const s = ensureHumanSession(req, res);
-  const lite = ensureLiteState(s);
   const onboarding = ensureSessionOnboarding(s);
-  const rawBody = req.body && typeof req.body === 'object' ? req.body : {};
-  const hasProviderFields = Object.prototype.hasOwnProperty.call(rawBody, 'provider')
-    || Object.prototype.hasOwnProperty.call(rawBody, 'model')
-    || Object.prototype.hasOwnProperty.call(rawBody, 'modelRef')
-    || Object.prototype.hasOwnProperty.call(rawBody, 'authMode');
 
   if (onboarding.required === true && onboarding.registrationComplete !== true) {
     return res.status(409).json({
@@ -4313,91 +4280,29 @@ function handleLiteLlmConfigUpsert(req, res) {
     });
   }
 
-  if (hasProviderFields) {
-    let payload;
-    try {
-      payload = normalizeLiteLlmPayload(rawBody);
-    } catch (err) {
-      return res.status(400).json({ ok: false, error: String(err?.message || 'INVALID_LLM_CONFIG') });
-    }
-
-    lite.llmConfigured = true;
-    lite.llmProvider = payload.provider;
-    lite.llmModel = payload.model;
-    lite.llmModelRef = payload.modelRef;
-    lite.llmConfiguredAt = nowIso();
-    lite.llmApiKeySet = payload.hasCredential !== false;
-    lite.llmAuthMode = payload.authMode || 'api-key';
-    lite.llmApiKeyHash = null;
+  if (onboarding.required !== true) {
+    onboarding.step = s.houseCeremony?.houseId ? ONBOARDING_STEP_DONE : ONBOARDING_STEP_SIGIL;
+  } else if (s.signup?.complete === true) {
+    onboarding.step = s.houseCeremony?.houseId ? ONBOARDING_STEP_DONE : ONBOARDING_STEP_CEREMONY;
   } else {
-    if (onboarding.required === true) {
-      lite.llmConfigured = rawBody.hasCredential !== false;
-      lite.llmConfiguredAt = nowIso();
-      lite.llmApiKeySet = rawBody.hasCredential !== false;
-      lite.llmAuthMode = lite.llmAuthMode || 'api-key';
-    }
-  }
-
-  if (lite.runtimeBooted === true) {
-    s.agent.connected = true;
-    s.agent.source = 'openclaw-lite';
-    s.agent.name = s.agent.name || 'OpenClaw Lite';
-    s.shareApproval = s.shareApproval || { human: false, agent: false };
-    s.shareApproval.agent = true;
-  }
-
-  updateLiteRuntimeReady(s);
-  if (
-    onboarding.required && onboarding.registrationComplete
-    && onboarding.step !== ONBOARDING_STEP_CEREMONY
-    && onboarding.step !== ONBOARDING_STEP_DONE
-  ) {
     onboarding.step = ONBOARDING_STEP_SIGIL;
   }
 
   res.json({
     ok: true,
-    configured: !!lite.llmConfigured,
-    provider: lite.llmProvider,
-    model: lite.llmModel,
-    authMode: lite.llmAuthMode || 'api-key',
-    apiKeySet: !!lite.llmApiKeySet,
-    runtimeReady: !!lite.runtimeReady
+    onboarding: cloneOnboarding(onboarding),
+    nextStep: onboarding.step
   });
-}
+});
 
-app.post('/api/agent/lite/llm/config', handleLiteLlmConfigUpsert);
-app.put('/api/agent/lite/llm/config', handleLiteLlmConfigUpsert);
+app.post('/api/agent/lite/llm/config', rejectLiteLlmConfigMutation);
+app.put('/api/agent/lite/llm/config', rejectLiteLlmConfigMutation);
 
 app.delete('/api/agent/lite/llm/config', (req, res) => {
-  const s = ensureHumanSession(req, res);
-  const lite = ensureLiteState(s);
-
-  lite.llmConfigured = false;
-  lite.llmProvider = null;
-  lite.llmModel = null;
-  lite.llmModelRef = null;
-  lite.llmConfiguredAt = null;
-  lite.llmApiKeySet = false;
-  lite.llmApiKeyHash = null;
-  lite.llmAuthMode = null;
-
-  if (s.agent.source === 'openclaw-lite') {
-    s.agent.connected = false;
-    s.agent.source = null;
-  }
-  s.shareApproval = s.shareApproval || { human: false, agent: false };
-  s.shareApproval.agent = s.agent.source === 'external';
-
-  updateLiteRuntimeReady(s);
-
-  res.json({
-    ok: true,
-    configured: false,
-    provider: null,
-    model: null,
-    apiKeySet: false,
-    runtimeReady: !!lite.runtimeReady
+  return res.status(410).json({
+    ok: false,
+    error: 'LLM_CONFIG_CLIENT_ONLY',
+    message: 'LLM config is stored in browser-local state only.'
   });
 });
 

@@ -144,6 +144,10 @@ The server must validate:
 
 The current implementation has the server/test-brain produce safe candidates and choose the candidate. That is acceptable for this hardening sprint.
 
+Historical note:
+- This paragraph describes the V1.2 hardening sprint only.
+- The later corrective addendum [specs/25_founders_plot_v1_3_1_foreman_llm_restore.md](/private/tmp/portal-founders-plot-v1-3-1-signoff/specs/25_founders_plot_v1_3_1_foreman_llm_restore.md) restores live LLM choice on the worker side while preserving deterministic test-brain coverage.
+
 Do not change the product copy to claim deep independent Foreman reasoning. The correct player-facing language is:
 
 > Clover followed the safe plan for this town state.

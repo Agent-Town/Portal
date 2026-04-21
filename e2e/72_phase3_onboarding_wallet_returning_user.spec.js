@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { configureBrain } = require('./helpers/brain');
 const { installMockSolanaWallet } = require('./helpers/phase1');
 const {
   makeCeremonyRevealPair,
@@ -596,12 +597,7 @@ test('walleted returning user does not re-run townhall onboarding flow after ful
   await completeTownhallStory(page);
   await expect(page.locator('#townhallRegisterState')).toContainText('Registered', { timeout: 12000 });
 
-  const brainResp = await postJson(page, '/api/agent/lite/llm/config', {
-    provider: 'openai',
-    model: 'gpt-4o-mini'
-  });
-  expect(brainResp.ok).toBe(true);
-  expect(brainResp.body?.ok).toBe(true);
+  await configureBrain(page);
 
   const teamCode = await connectAgentWithTeamCode(page);
   await unlockGateWithSigil(page, 'key');

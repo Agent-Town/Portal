@@ -1116,8 +1116,7 @@ function isTownhallGateLocked(state) {
 }
 
 function isTownhallBrainConfigured(state) {
-  if (onboardingRequired(state)) return !!state?.lite?.llmConfigured;
-  return !!(state?.lite?.llmConfigured || isLocalLiteLlmConfigured());
+  return isLocalLiteLlmConfigured();
 }
 
 function getTownHubDistrictGateReason(state) {
@@ -6750,18 +6749,18 @@ async function completeOpenRouterOAuthFromUi() {
     stopOpenRouterOAuthPoll();
     await autoConfigureBrainFromOpenRouter(credential);
 
-    // Signal the server that brain is configured (mirrors manual Connect Brain path)
+    // Advance onboarding without sending provider/model/key details to the server.
     try {
-      const serverSync = await api('/api/agent/lite/llm/config', {
-        method: 'PUT',
-        body: JSON.stringify({ hasCredential: true })
+      const onboardingSync = await api('/api/onboarding/brain/complete', {
+        method: 'POST',
+        body: JSON.stringify({})
       });
-      if (serverSync?.ok) {
+      if (onboardingSync?.ok) {
         const freshState = await api('/api/state');
         if (freshState?.ok) lastState = freshState;
       }
     } catch (syncErr) {
-      console.warn('server brain signal failed after OpenRouter OAuth (brain still saved locally)', syncErr);
+      console.warn('onboarding brain completion failed after OpenRouter OAuth (brain still saved locally)', syncErr);
     }
 
     // Bootstrap runtime and connect agent so the user can actually talk
@@ -8392,19 +8391,18 @@ function initStep2Listener() {
         }
       }
 
-      // Signal the server that brain is configured so onboarding step advances.
-      // Never send provider, model, or key details — those stay local only.
+      // Advance onboarding without sending provider, model, or key details.
       try {
-        const serverSync = await api('/api/agent/lite/llm/config', {
-          method: 'PUT',
-          body: JSON.stringify({ hasCredential: true })
+        const onboardingSync = await api('/api/onboarding/brain/complete', {
+          method: 'POST',
+          body: JSON.stringify({})
         });
-        if (serverSync?.ok) {
+        if (onboardingSync?.ok) {
           const freshState = await api('/api/state');
           if (freshState?.ok) lastState = freshState;
         }
       } catch (syncErr) {
-        console.warn('server brain signal failed (brain still saved locally)', syncErr);
+        console.warn('onboarding brain completion failed (brain still saved locally)', syncErr);
       }
 
       if (status) status.textContent = tApp('brain.status.configured');

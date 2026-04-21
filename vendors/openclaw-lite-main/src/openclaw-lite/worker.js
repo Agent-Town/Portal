@@ -2565,6 +2565,22 @@ function llmProxyBaseUrl(upstreamBaseUrl) {
   return u.toString();
 }
 
+function withOpenRouterBrowserHeaders(model) {
+  if (!model || String(model?.provider || "").trim() !== "openrouter") return model;
+  const headers = { ...(model?.headers || {}) };
+  const runtimeOrigin = safeOrigin();
+  if (runtimeOrigin && !headers["HTTP-Referer"]) {
+    headers["HTTP-Referer"] = runtimeOrigin;
+  }
+  if (!headers["X-Title"]) {
+    headers["X-Title"] = "Agent Town";
+  }
+  return {
+    ...model,
+    headers,
+  };
+}
+
 function parseConfiguredModelRef() {
   const providerHint = String(state.llmProvider || "openai").trim() || "openai";
   const modelHint = String(state.llmModelId || "gpt-4o-mini").trim() || "gpt-4o-mini";
@@ -2587,6 +2603,10 @@ function resolveLlmBaseUrl({ provider, templateBaseUrl }) {
 
   const origin = safeOrigin();
   const resolved = new URL(baseRaw, origin || "http://localhost");
+  if (provider === "openrouter") {
+    // Keep user-supplied OpenRouter config client-side. Browser calls go direct.
+    return resolved.toString();
+  }
   if (useProxy) {
     const isOpenAiDefaultPath = provider === "openai" && !explicitBase;
     if (isOpenAiDefaultPath) {
@@ -2625,7 +2645,7 @@ function getConfiguredModel() {
   const baseUrl = resolveLlmBaseUrl({ provider, templateBaseUrl: template?.baseUrl || "" });
 
   if (template) {
-    return {
+    return withOpenRouterBrowserHeaders({
       ...template,
       id: modelId,
       name: template.name || modelId,
@@ -2633,11 +2653,11 @@ function getConfiguredModel() {
       provider,
       baseUrl,
       headers: { ...(template.headers || {}) },
-    };
+    });
   }
 
   /** @type {import("@mariozechner/pi-ai").Model<any>} */
-  return {
+  return withOpenRouterBrowserHeaders({
     id: modelId,
     name: modelId,
     api,
@@ -2649,7 +2669,7 @@ function getConfiguredModel() {
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: 128_000,
     maxTokens: 4096,
-  };
+  });
 }
 
 function normalizeReasoningLevel(value) {
@@ -5785,6 +5805,202 @@ async function runAgentTurn(userText, opts = {}) {
   return { messages: generatedMessages, persisted: persistToTranscript };
 }
 
+async function runSilentLlmTextTurn({ userText = "", systemPrompt = "", source = "unknown" } = {}) {
+  const promptText = String(userText || "");
+  const prompt = {
+    role: "user",
+    content: promptText,
+    timestamp: nowMs(),
+  };
+
+  const configuredModel = getConfiguredModel();
+  const model = (() => {
+    if (String(configuredModel?.provider || "").trim() !== "openrouter") {
+      return configuredModel;
+    }
+    return withOpenRouterBrowserHeaders({
+      ...configuredModel,
+      // Keep Foreman LLM selection client-only. The browser talks to OpenRouter directly.
+      baseUrl: "https://openrouter.ai/api/v1",
+    });
+  })();
+  const apiKey = state.llmApiKey || "";
+  if (!apiKey) {
+    throw new Error("LLM_NOT_CONFIGURED");
+  }
+
+  recordLastLlmInputDebug({
+    source,
+    userText: promptText,
+    displayUserText: promptText,
+    promptText,
+    extraContext: "",
+    extraContextSections: [],
+    runtimeContext: null,
+    runtimeAppState: null,
+    runtimeContextPrompt: null,
+    runtimeExperiencePrompt: null,
+    activeSkillPrompt: null,
+    coopChatPrompt: null,
+  });
+
+  const context = {
+    systemPrompt: typeof systemPrompt === "string" ? systemPrompt : "",
+    messages: [],
+    tools: [],
+  };
+
+  const config = {
+    model,
+    apiKey,
+    reasoning: state.llmReasoning || undefined,
+    convertToLlm: (messages) => messages.filter((m) => m && (m.role === "user" || m.role === "assistant" || m.role === "toolResult")),
+  };
+
+  const abortController = new AbortController();
+  const stream = agentLoop([prompt], context, config, abortController.signal);
+  let assistantText = "";
+  let assistantStopReason = "";
+  let assistantErrorMessage = "";
+
+  for await (const event of stream) {
+    if (event.type !== "message_end") continue;
+    const m = event.message;
+    if (!m || typeof m !== "object" || m.role !== "assistant") continue;
+    const text = textFromMessageContent(m.content).trim();
+    if (text) assistantText = text;
+    const stopReason = String(m.stopReason || "").trim().toLowerCase();
+    if (stopReason) assistantStopReason = stopReason;
+    const errorText = typeof m.errorMessage === "string" ? m.errorMessage.trim() : "";
+    if (errorText) assistantErrorMessage = errorText;
+  }
+
+  if (assistantText === LLM_NOT_CONFIGURED_MESSAGE) {
+    throw new Error("LLM_NOT_CONFIGURED");
+  }
+  if (assistantErrorMessage || assistantStopReason === "error" || assistantStopReason === "aborted") {
+    throw new Error(assistantErrorMessage || "LLM_RUN_FAILED");
+  }
+  if (!assistantText) {
+    throw new Error("LLM_EMPTY_RESPONSE");
+  }
+
+  return assistantText;
+}
+
+function foremanUsesDeterministicTestBrain() {
+  const provider = String(state.llmProvider || "").trim().toLowerCase();
+  const modelId = String(state.llmModelId || "").trim().toLowerCase();
+  const modelRef = String(state.llmModelRef || "").trim().toLowerCase();
+  return provider === "test-local" || modelId === "deterministic" || modelRef === "test-local/deterministic";
+}
+
+function extractFirstJsonObjectText(rawValue) {
+  const text = String(rawValue || "");
+  const start = text.indexOf("{");
+  if (start < 0) return "";
+  let depth = 0;
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === "{") depth += 1;
+    if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return text.slice(start, index + 1);
+      }
+    }
+  }
+  return "";
+}
+
+function parseForemanLlmDecision(rawText = "") {
+  const raw = String(rawText || "").trim();
+  if (!raw) return { chosenCandidateId: null, parsed: null };
+  if (/^NO_ACTION$/i.test(raw)) {
+    return { chosenCandidateId: null, parsed: null };
+  }
+
+  const maybeJson = raw.startsWith("{") ? raw : extractFirstJsonObjectText(raw);
+  if (maybeJson) {
+    try {
+      const parsed = JSON.parse(maybeJson);
+      const candidateValue = parsed?.chosenCandidateId ?? parsed?.candidateId ?? parsed?.selection ?? parsed?.choice ?? "";
+      const normalized = String(candidateValue || "").trim();
+      if (!normalized || /^NO_ACTION$/i.test(normalized)) {
+        return { chosenCandidateId: null, parsed };
+      }
+      return { chosenCandidateId: normalized, parsed };
+    } catch {
+      // Fall through to raw-token parsing below.
+    }
+  }
+
+  return { chosenCandidateId: raw, parsed: null };
+}
+
+async function chooseForemanCandidateWithLlm({ observation = null, safeCandidates = [] } = {}) {
+  const actionableCandidates = (Array.isArray(safeCandidates) ? safeCandidates : []).filter((candidate) => candidate?.canActNow === true);
+  if (actionableCandidates.length === 0) {
+    return {
+      chosenCandidateId: null,
+      source: "llm",
+      rawText: "",
+    };
+  }
+
+  const promptPayload = {
+    standingOrder: observation?.standingOrder || null,
+    currentGoal: observation?.currentGoal || null,
+    activeContract: observation?.activeContract || null,
+    scheduler: observation?.scheduler || null,
+    safeCandidates: actionableCandidates.map((candidate) => ({
+      candidateId: String(candidate?.candidateId || ""),
+      toolName: String(candidate?.toolName || ""),
+      buildingId: String(candidate?.buildingId || ""),
+      reason: String(candidate?.reason || ""),
+      goalServed: String(candidate?.goalServed || ""),
+      score: Number.isFinite(Number(candidate?.score)) ? Number(candidate.score) : 0,
+    })),
+  };
+  const promptText = [
+    "Choose Clover's next safe Founders Plot action.",
+    "Reply with minified JSON only.",
+    'Format: {"chosenCandidateId":"candidate-id"} or {"chosenCandidateId":"NO_ACTION"}.',
+    "Do not invent candidate IDs and do not add commentary.",
+    JSON.stringify(promptPayload),
+  ].join("\n");
+  const systemPrompt = [
+    "You are Clover, the Founders Plot foreman.",
+    "Pick exactly one actionable candidateId from the provided safe candidates or choose NO_ACTION.",
+    "You must stay inside the provided safe candidate list.",
+    "Return JSON only.",
+  ].join(" ");
+
+  const rawText = await runSilentLlmTextTurn({
+    userText: promptText,
+    systemPrompt,
+    source: "founders-plot.foreman.decision",
+  });
+  const parsed = parseForemanLlmDecision(rawText);
+  const chosenCandidateId = String(parsed?.chosenCandidateId || "").trim();
+  if (!chosenCandidateId) {
+    return {
+      chosenCandidateId: null,
+      source: "llm",
+      rawText,
+    };
+  }
+  const chosen = actionableCandidates.find((candidate) => String(candidate?.candidateId || "") === chosenCandidateId) || null;
+  if (!chosen) {
+    throw new Error("FOREMAN_LLM_INVALID_CHOICE");
+  }
+  return {
+    chosenCandidateId,
+    source: "llm",
+    rawText,
+  };
+}
+
 // --- Approvals ---
 const approvals = new Map();
 
@@ -8463,8 +8679,31 @@ async function runFoundersPlotForemanTick({ token = "" } = {}) {
     method: "GET",
     token: normalizedToken,
   });
-  const chosenId = String(observation?.decision?.chosenCandidateId || "");
   const safeCandidates = Array.isArray(observation?.safeCandidates) ? observation.safeCandidates : [];
+  let decision = null;
+  if (foremanUsesDeterministicTestBrain()) {
+    decision = {
+      chosenCandidateId: String(observation?.decision?.chosenCandidateId || ""),
+      source: "test_brain",
+      rawText: "",
+    };
+  } else {
+    decision = await chooseForemanCandidateWithLlm({
+      observation: observation?.observation || null,
+      safeCandidates,
+    });
+  }
+  const chosenId = String(decision?.chosenCandidateId || "");
+  if (decision && (decision.source === "llm" || decision.source === "test_brain")) {
+    await foundersPlotWorkerFetch("/api/founders-plot/foreman/decision", {
+      method: "POST",
+      token: normalizedToken,
+      body: {
+        chosenCandidateId: chosenId || null,
+        source: decision.source,
+      },
+    });
+  }
   const chosen = safeCandidates.find((candidate) => candidate?.candidateId === chosenId) || null;
   if (!chosen || chosen.canActNow !== true) {
     return {

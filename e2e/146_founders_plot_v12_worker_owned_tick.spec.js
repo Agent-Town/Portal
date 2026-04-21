@@ -110,10 +110,17 @@ test('schema-2 saves migrate to schema 3 with living-town defaults and no resour
 test('Run now dispatches a worker-owned Foreman tick and production app code avoids direct Foreman tool fetches', async ({ page }) => {
   const appJs = fs.readFileSync(path.join(__dirname, '..', 'public/experiences/founders-plot/app.js'), 'utf8');
   expect(appJs).not.toMatch(/\/api\/founders-plot\/foreman\/tool\//);
+  const llmPaths = [];
+  page.on('request', (request) => {
+    const pathname = new URL(request.url()).pathname;
+    if (!pathname.startsWith('/api/llm/')) return;
+    llmPaths.push(pathname);
+  });
 
   const frame = await openFoundersPlotFrame(page);
   const started = await startForemanRuntime(frame);
   expect(started?.ok).toBe(true);
+  const llmPathCountBeforeForemanTick = llmPaths.length;
 
   const placed = await placeFirstLumberCamp(frame, 'v12-worker-owned');
   expect(placed?.ok).toBe(true);
@@ -162,4 +169,5 @@ test('Run now dispatches a worker-owned Foreman tick and production app code avo
   }));
   expect(actionEvent?.data?.workerCommandId).toMatch(/^fpwcmd_/);
   expect(actionEvent?.data?.workerTraceId).toMatch(/^fpwtrace_/);
+  expect(llmPaths.length).toBe(llmPathCountBeforeForemanTick);
 });

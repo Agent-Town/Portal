@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { configureBrain } = require('./helpers/brain');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -322,20 +323,6 @@ async function openTownhallPanel(page) {
   }, { timeout: 8000 }).toBe(true);
 }
 
-async function configureBrain(page, {
-  provider = 'openai',
-  model = 'gpt-4o-mini'
-} = {}) {
-  const response = await page.request.post('/api/agent/lite/llm/config', {
-    headers: { 'content-type': 'application/json' },
-    data: JSON.stringify({ provider, model })
-  });
-  expect(response.ok()).toBeTruthy();
-  const payload = await response.json().catch(() => ({}));
-  expect(payload.ok).toBe(true);
-  expect(payload.configured).toBe(true);
-}
-
 test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
@@ -377,7 +364,7 @@ test('town hall one-click registration saves names/prompts/all ERC-8004 IDs to s
   await expect(page.locator('#townhallMintAgentSolanaStatus')).toContainText('Done');
   await expect(page.locator('#townhallRegisterState')).toContainText('Registered');
   await expect(page.getByTestId('townhall-continue-btn')).toBeDisabled();
-  await configureBrain(page);
+  await configureBrain(page, { reopen: () => openTownhallPanel(page) });
   await expect(page.getByTestId('townhall-continue-btn')).toBeEnabled();
   await page.getByTestId('townhall-continue-btn').click();
   await expect(page.getByTestId('open-btn')).toBeVisible();
@@ -743,7 +730,29 @@ test('required town hall onboarding locks district switching until registration 
   await expect(page.locator('#townhallRegisterState')).toContainText('Registered');
   await expect(page.locator('#districtModalBackdrop')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open Saloon' })).toHaveAttribute('aria-disabled', 'true');
-  await configureBrain(page);
+  const serverRegistration = await page.request.post('/api/townhall/register', {
+    headers: { 'content-type': 'application/json' },
+    data: JSON.stringify({
+      profile: {
+        humanName: 'Robin',
+        agentName: 'OpenClaw',
+        humanAvatar: { prompt: 'Human prompt' },
+        agentAvatar: { prompt: 'Agent prompt' }
+      },
+      erc8004: {
+        user: {
+          evm: { id: '11155111:1001' },
+          solana: { id: 'solana:user-1001' }
+        },
+        agent: {
+          evm: { id: '11155111:1002' },
+          solana: { id: 'solana:agent-1002' }
+        }
+      }
+    })
+  });
+  expect(serverRegistration.ok()).toBeTruthy();
+  await configureBrain(page, { refreshUi: false });
   await expect(page.getByTestId('townhall-continue-btn')).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Open Saloon' })).toHaveAttribute('aria-disabled', 'true');
 });

@@ -36,4 +36,5 @@ test('phase2 harness exposes lite runtime contract and bootstrap endpoint', asyn
   expect(llm.ok).toBe(true);
   expect(llm.configured).toBe(false);
   expect(llm.apiKeySet).toBe(false);
+  expect(llm.clientOnly).toBe(true);
 });

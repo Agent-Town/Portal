@@ -7,7 +7,7 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-test('agent drawer starts minimized with debug hidden and brain sync avoids llm config route errors', async ({ page }) => {
+test('agent drawer starts minimized with debug hidden and brain sync avoids legacy llm config route errors', async ({ page }) => {
   const consoleIssues = [];
   page.on('console', (msg) => {
     const type = msg.type();
@@ -26,7 +26,7 @@ test('agent drawer starts minimized with debug hidden and brain sync avoids llm 
 
   const llmSyncIssues = consoleIssues.filter((entry) => {
     return entry.text.includes('/api/agent/lite/llm/config')
-      || entry.text.includes('server brain signal failed');
+      || entry.text.includes('onboarding brain completion failed');
   });
   expect(llmSyncIssues).toEqual([]);
 });

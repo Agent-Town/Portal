@@ -12,21 +12,43 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-test('openrouter brain config routes agent turns through the OpenRouter proxy path', async ({ page }) => {
+test('openrouter brain config keeps the browser on a direct OpenRouter path', async ({ page }) => {
   await enterHatch(page, 'signup');
   await completeHatch(page);
 
   const llmPaths = [];
-  await page.route('**/api/llm/**', async (route) => {
-    const pathname = new URL(route.request().url()).pathname;
-    llmPaths.push(pathname);
+  const backendProxyPaths = [];
+  page.on('request', (request) => {
+    const pathname = new URL(request.url()).pathname;
+    if (!pathname.startsWith('/api/llm/')) return;
+    backendProxyPaths.push(pathname);
+  });
+  await page.route('**/openrouter.ai/api/v1/chat/completions', async (route) => {
+    llmPaths.push(route.request().url());
     await route.fulfill({
-      status: 502,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        ok: false,
-        error: 'TEST_LLM_BLOCKED'
-      })
+      status: 200,
+      contentType: 'text/event-stream',
+      body: [
+        `data: ${JSON.stringify({
+          id: 'chatcmpl-openrouter-direct',
+          object: 'chat.completion.chunk',
+          created: Math.floor(Date.now() / 1000),
+          model: 'nvidia/nemotron-3-super-120b-a12b:free',
+          choices: [{
+            index: 0,
+            delta: { role: 'assistant', content: 'READY' },
+            finish_reason: null
+          }]
+        })}\n\n`,
+        `data: ${JSON.stringify({
+          id: 'chatcmpl-openrouter-direct',
+          object: 'chat.completion.chunk',
+          created: Math.floor(Date.now() / 1000),
+          model: 'nvidia/nemotron-3-super-120b-a12b:free',
+          choices: [{ index: 0, delta: {}, finish_reason: 'stop' }]
+        })}\n\n`,
+        'data: [DONE]\n\n'
+      ].join('')
     });
   });
 
@@ -47,7 +69,6 @@ test('openrouter brain config routes agent turns through the OpenRouter proxy pa
     }
   });
 
-  await expect.poll(() => llmPaths[0] || '', { timeout: 5_000 }).toContain('/api/llm/proxy/');
-  expect(llmPaths[0]).toContain(encodeURIComponent('https://openrouter.ai/api/v1'));
-  expect(llmPaths.some((path) => path.startsWith('/api/llm/openai/v1'))).toBe(false);
+  await expect.poll(() => llmPaths[0] || '', { timeout: 5_000 }).toContain('https://openrouter.ai/api/v1/chat/completions');
+  expect(backendProxyPaths).toEqual([]);
 });

@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { configureBrain } = require('./helpers/brain');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -164,7 +165,7 @@ async function openTownhallPanel(page) {
       await closeBtn.click();
     } else {
       // Locked onboarding can open Town Hall immediately without a visible close button.
-      await expect(page.locator('#townhallStepHuman')).toBeVisible();
+      await expect.poll(townhallVisible, { timeout: 8000 }).toBe(true);
       return;
     }
   }
@@ -177,21 +178,7 @@ async function openTownhallPanel(page) {
   if (!(await townhallVisible())) {
     await page.getByRole('button', { name: 'Open Town Hall' }).click();
   }
-  await expect(page.locator('#townhallStepHuman')).toBeVisible();
-}
-
-async function configureBrain(page, {
-  provider = 'openai',
-  model = 'gpt-4o-mini'
-} = {}) {
-  const response = await page.request.post('/api/agent/lite/llm/config', {
-    headers: { 'content-type': 'application/json' },
-    data: JSON.stringify({ provider, model })
-  });
-  expect(response.ok()).toBeTruthy();
-  const payload = await response.json().catch(() => ({}));
-  expect(payload.ok).toBe(true);
-  expect(payload.configured).toBe(true);
+  await expect.poll(townhallVisible, { timeout: 8000 }).toBe(true);
 }
 
 test('town hall one-click flow mints all 4 identities and saves registration', async ({ page }) => {
@@ -315,7 +302,7 @@ test('town hall one-click flow mints all 4 identities and saves registration', a
   await expect(page.locator('#townhallRegisterState')).toContainText('Registered');
   await expect(page.locator('#districtModalBackdrop')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open Saloon' })).toHaveAttribute('aria-disabled', 'false');
-  await configureBrain(page);
+  await configureBrain(page, { reopen: () => openTownhallPanel(page) });
   await expect(page.getByTestId('townhall-continue-btn')).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Open Saloon' })).toHaveAttribute('aria-disabled', 'false');
 

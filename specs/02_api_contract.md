@@ -383,6 +383,11 @@ Response shape:
           "runCount": 0
         }
       },
+      "lastDecision": {
+        "chosenCandidateId": null,
+        "planCard": null,
+        "source": "server_default"
+      },
       "planCard": null,
       "receipt": null
     },
@@ -568,6 +573,30 @@ Returns the structured V1.2 observation packet for the active Foreman runtime.
 Observation notes:
 - `schema === "founders-plot.obs.v1.2"` and `schemaVersion === "founders-plot.obs.v1.2"` are both present.
 - The packet includes `currentGoal`, living contract state, town signals, standing order, scheduler status, recent events, and safe collect-ready building signals.
+- `decision` is the deterministic test-brain fallback recommendation included for test stability and UI fallback rendering.
+- Live Clover ticks may override that fallback by syncing an `llm` decision before invoking the bounded mutation route.
+
+### POST `/api/founders-plot/foreman/decision`
+Persists the worker-selected Foreman choice for the active runtime before Clover invokes a bounded tool.
+
+Requirements:
+- runtime token required;
+- request body includes only the bounded decision payload, never LLM credentials or provider config;
+- `chosenCandidateId` must be empty/null or must match one of the current safe candidates for that runtime;
+- valid `source` values are `llm`, `test_brain`, and `server_default`.
+
+Privacy notes:
+- Foreman LLM configuration remains client-side only.
+- For the live OpenRouter Foreman path, the browser calls `https://openrouter.ai/api/v1` directly.
+- For the general OpenRouter brain path, the browser also calls `https://openrouter.ai/api/v1` directly instead of `/api/llm/proxy/*`.
+- The backend receives only the validated decision sync payload, for example:
+
+```json
+{
+  "chosenCandidateId": "collect:bld_1234abcd",
+  "source": "llm"
+}
+```
 
 ### POST `/api/founders-plot/foreman/tool/:toolName`
 Executes one bounded Foreman action through the authenticated runtime route.
@@ -816,8 +845,8 @@ Response shape:
 ```
 
 ### GET `/api/agent/lite/llm/config` (human)
-Returns non-secret server-side LLM metadata for the current session.
-This endpoint is legacy for the local-only vendor flow.
+Legacy compatibility probe for the old brain-config route.
+The browser keeps the actual LLM configuration local-only, and this endpoint never exposes provider/model/auth/key state.
 
 Response shape:
 ```json
@@ -826,43 +855,57 @@ Response shape:
   "configured": false,
   "provider": null,
   "model": null,
-  "apiKeySet": false
+  "authMode": null,
+  "apiKeySet": false,
+  "clientOnly": true,
+  "deprecated": true
 }
 ```
 
 ### POST `/api/agent/lite/llm/config` (human)
-Saves server-side LLM provider/model metadata.
-Local-only vendor flow does not require calling this endpoint.
-- `onboarding` — Town Hall onboarding state:
-  - `required` (boolean) — whether Town Hall gating is enforced in this deployment.
-  - `registrationComplete` (boolean)
-  - `profile.humanName`, `profile.agentName`
-  - `profile.humanAvatar` / `profile.agentAvatar` (`image`, `prompt`, `source`, `updatedAt`)
-  - `erc8004.user.evm` (`id`, `chain`, `txHash`, `updatedAt`)
-  - `erc8004.user.solana` (`id`, `cluster`, `txSig`, `updatedAt`)
-  - `erc8004.agent.evm` (`id`, `chain`, `txHash`, `updatedAt`)
-  - `erc8004.agent.solana` (`id`, `cluster`, `txSig`, `updatedAt`)
-  -  "provider": "openai",
-  "model": "gpt-4o-mini",
-  "apiKey": "sk-..."
+Legacy route. Mutations are rejected so the browser cannot accidentally send LLM config to the backend.
+
+Response shape:
+```json
+{
+  "ok": false,
+  "error": "LLM_CONFIG_CLIENT_ONLY",
+  "message": "LLM config is stored in browser-local state only. Use /api/onboarding/brain/complete after local save."
 }
 ```
 
+### POST `/api/onboarding/brain/complete` (human)
+Advances onboarding past the Brain step after the browser has already saved the LLM config locally.
+This route never accepts provider/model/auth/key fields.
+
+Accepted body:
+```json
+{}
+```
+
+Response shape:
+```json
+{
+  "ok": true,
+  "onboarding": {
+    "required": true,
+    "registrationComplete": true,
+    "step": "sigil"
+  },
+  "nextStep": "sigil"
+}
+```
+
+Effects:
+- advances onboarding from `brain` to `sigil` once Town Hall registration is complete;
+- if signup is already complete, advances to `ceremony` or `done` instead of regressing;
+- stores only onboarding progression, never browser LLM config.
+
 Errors:
-- `HATCH_REQUIRED`
-- `MISSING_LLM_PROVIDER`
-- `MISSING_LLM_MODEL`
-- `MISSING_LLM_API_KEY`
 - `ONBOARDING_TOWNHALL_REQUIRED` (HTTP 409 when Town Hall registration is still incomplete and onboarding gating is required)
 
 ### DELETE `/api/agent/lite/llm/config` (human)
-Clears server-side LLM configuration metadata for the current session.
-
-Behavior:
-- sets `lite.llmConfigured=false`
-- clears `lite.llmProvider` and `lite.llmModel`
-- keeps API key secret material server-hidden
-- disconnects `agent.source="openclaw-lite"` until configuration is saved again
+Legacy route. Mutations are rejected with `LLM_CONFIG_CLIENT_ONLY`.
 
 ### POST `/api/agent/lite/llm/oauth/openai-codex/start` (human)
 Starts a PKCE OAuth attempt for OpenAI Codex (ChatGPT subscription auth).
@@ -1221,8 +1264,8 @@ Response shape:
 ```
 
 ### GET `/api/agent/lite/llm/config` (human)
-Returns non-secret server-side LLM metadata for the current session.
-This endpoint is legacy for the local-only vendor flow.
+Legacy compatibility probe for the old brain-config route.
+The browser keeps the actual LLM configuration local-only, and this endpoint never exposes provider/model/auth/key state.
 
 Response shape:
 ```json
@@ -1231,38 +1274,57 @@ Response shape:
   "configured": false,
   "provider": null,
   "model": null,
-  "apiKeySet": false
+  "authMode": null,
+  "apiKeySet": false,
+  "clientOnly": true,
+  "deprecated": true
 }
 ```
 
 ### POST `/api/agent/lite/llm/config` (human)
-Saves server-side LLM provider/model metadata.
-Local-only vendor flow does not require calling this endpoint.
+Legacy route. Mutations are rejected so the browser cannot accidentally send LLM config to the backend.
 
-Body:
+Response shape:
 ```json
 {
-  "provider": "openai",
-  "model": "gpt-4o-mini",
-  "apiKey": "sk-..."
+  "ok": false,
+  "error": "LLM_CONFIG_CLIENT_ONLY",
+  "message": "LLM config is stored in browser-local state only. Use /api/onboarding/brain/complete after local save."
 }
 ```
 
+### POST `/api/onboarding/brain/complete` (human)
+Advances onboarding past the Brain step after the browser has already saved the LLM config locally.
+This route never accepts provider/model/auth/key fields.
+
+Accepted body:
+```json
+{}
+```
+
+Response shape:
+```json
+{
+  "ok": true,
+  "onboarding": {
+    "required": true,
+    "registrationComplete": true,
+    "step": "sigil"
+  },
+  "nextStep": "sigil"
+}
+```
+
+Effects:
+- advances onboarding from `brain` to `sigil` once Town Hall registration is complete;
+- if signup is already complete, advances to `ceremony` or `done` instead of regressing;
+- stores only onboarding progression, never browser LLM config.
+
 Errors:
-- `HATCH_REQUIRED`
-- `MISSING_LLM_PROVIDER`
-- `MISSING_LLM_MODEL`
-- `MISSING_LLM_API_KEY`
 - `ONBOARDING_TOWNHALL_REQUIRED` (HTTP 409 when Town Hall registration is still incomplete and onboarding gating is required)
 
 ### DELETE `/api/agent/lite/llm/config` (human)
-Clears server-side LLM configuration metadata for the current session.
-
-Behavior:
-- sets `lite.llmConfigured=false`
-- clears `lite.llmProvider` and `lite.llmModel`
-- keeps API key secret material server-hidden
-- disconnects `agent.source="openclaw-lite"` until configuration is saved again
+Legacy route. Mutations are rejected with `LLM_CONFIG_CLIENT_ONLY`.
 
 ### POST `/api/agent/lite/llm/oauth/openai-codex/start` (human)
 Starts a PKCE OAuth attempt for OpenAI Codex (ChatGPT subscription auth).

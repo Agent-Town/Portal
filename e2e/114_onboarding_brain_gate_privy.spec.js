@@ -88,11 +88,8 @@ test('brain config is blocked until Town Hall registration when Privy onboarding
     const resetResp = await api.post('/__test__/reset', { headers: { 'x-test-reset': 'test-reset' } });
     expect(resetResp.ok()).toBeTruthy();
 
-    const blockedResp = await api.post('/api/agent/lite/llm/config', {
-      data: {
-        provider: 'openai',
-        model: 'gpt-4o-mini'
-      }
+    const blockedResp = await api.post('/api/onboarding/brain/complete', {
+      data: {}
     });
     expect(blockedResp.status()).toBe(409);
     const blockedBody = await blockedResp.json();
@@ -124,16 +121,13 @@ test('brain config is blocked until Town Hall registration when Privy onboarding
     expect(registerBody?.ok).toBe(true);
     expect(registerBody?.onboarding?.registrationComplete).toBe(true);
 
-    const allowedResp = await api.post('/api/agent/lite/llm/config', {
-      data: {
-        provider: 'openai',
-        model: 'gpt-4o-mini'
-      }
+    const allowedResp = await api.post('/api/onboarding/brain/complete', {
+      data: {}
     });
     expect(allowedResp.ok()).toBeTruthy();
     const allowedBody = await allowedResp.json();
     expect(allowedBody?.ok).toBe(true);
-    expect(allowedBody?.configured).toBe(true);
+    expect(allowedBody?.nextStep).toBe('sigil');
   } finally {
     if (api) await api.dispose();
     await stopServer(launched.child);

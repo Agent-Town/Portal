@@ -73,13 +73,19 @@ function normalizeProviderModel(provider, model) {
   return modelTrim;
 }
 
+function defaultUseProxy(provider, explicitValue) {
+  if (explicitValue === false) return false;
+  if (explicitValue === true) return true;
+  return String(provider || '').trim() === 'openrouter' ? false : true;
+}
+
 export async function saveLlmConfig({ provider, model, apiKey, authMode, reasoning, useProxy }) {
   const providerTrim = String(provider || '').trim();
   const modelTrim = normalizeProviderModel(providerTrim, model);
   const keyTrim = String(apiKey || '').trim();
   const normalizedAuthMode = String(authMode || '').trim() === 'oauth-json' ? 'oauth-json' : 'api-key';
   const normalizedReasoning = normalizeReasoning(reasoning);
-  const normalizedUseProxy = useProxy !== false;
+  const normalizedUseProxy = defaultUseProxy(providerTrim, useProxy);
   if (!providerTrim) throw new Error('MISSING_LLM_PROVIDER');
   if (!modelTrim) throw new Error('MISSING_LLM_MODEL');
   if (!keyTrim) throw new Error('MISSING_LLM_API_KEY');
@@ -136,7 +142,7 @@ export async function loadLlmConfig() {
     apiKey: typeof apiKey === 'string' ? apiKey : '',
     authMode: authMode === 'oauth-json' ? 'oauth-json' : 'api-key',
     reasoning: normalizeReasoning(reasoning),
-    useProxy: useProxy !== false,
+    useProxy: defaultUseProxy(provider, useProxy),
     apiKeySet: !!apiKey
   };
 }

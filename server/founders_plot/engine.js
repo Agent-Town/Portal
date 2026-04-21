@@ -1828,15 +1828,25 @@ function buildSafeForemanCandidates(state, observation) {
   return candidates.sort((a, b) => b.score - a.score || String(a.candidateId).localeCompare(String(b.candidateId)));
 }
 
-function chooseForemanCandidateWithTestBrain({ observation, safeCandidates = [] } = {}) {
+function normalizeForemanDecisionSource(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'llm' || raw === 'test_brain' || raw === 'server_default') return raw;
+  return 'server_default';
+}
+
+function buildForemanDecision({ observation, safeCandidates = [], chosenCandidateId = null, source = 'server_default' } = {}) {
   const candidates = Array.isArray(safeCandidates) ? safeCandidates : [];
-  if (candidates.length === 0) {
+  const normalizedChosenId = typeof chosenCandidateId === 'string' ? chosenCandidateId.trim() : '';
+  const chosen = normalizedChosenId
+    ? candidates.find((candidate) => String(candidate?.candidateId || '') === normalizedChosenId) || null
+    : null;
+  if (!chosen) {
     return {
       chosenCandidateId: null,
-      planCard: null
+      planCard: null,
+      source: normalizeForemanDecisionSource(source)
     };
   }
-  const chosen = candidates[0];
   const standingOrder = normalizeStandingOrder(observation?.standingOrder);
   const influence = standingOrder === 'BOLD_FOUNDER'
     ? 'Bold Founder leans toward visible growth and momentum when the move is still safe.'
@@ -1856,8 +1866,26 @@ function chooseForemanCandidateWithTestBrain({ observation, safeCandidates = [] 
       proposedTool: chosen.toolName,
       requiresApproval: chosen.requiresApproval === true,
       alternative: candidates[1] ? `Alternative: ${candidates[1].reason}` : ''
-    }
+    },
+    source: normalizeForemanDecisionSource(source)
   };
+}
+
+function chooseForemanCandidateWithTestBrain({ observation, safeCandidates = [] } = {}) {
+  const candidates = Array.isArray(safeCandidates) ? safeCandidates : [];
+  if (candidates.length === 0) {
+    return {
+      chosenCandidateId: null,
+      planCard: null,
+      source: 'test_brain'
+    };
+  }
+  return buildForemanDecision({
+    observation,
+    safeCandidates: candidates,
+    chosenCandidateId: String(candidates[0]?.candidateId || ''),
+    source: 'test_brain'
+  });
 }
 
 function recommendationText(state) {
@@ -2100,10 +2128,42 @@ function stateView(state, recentEvents = []) {
     recentEvents
   });
   const safeCandidates = buildSafeForemanCandidates(state, observation);
-  const decision = chooseForemanCandidateWithTestBrain({
-    observation,
-    safeCandidates
-  });
+  const persistedDecision = state.meta.foremanLastDecision && typeof state.meta.foremanLastDecision === 'object'
+    ? copyPersistedValue(state.meta.foremanLastDecision)
+    : null;
+  const persistedChoiceId = typeof persistedDecision?.chosenCandidateId === 'string'
+    ? persistedDecision.chosenCandidateId.trim()
+    : '';
+  const matchingPersistedCandidate = persistedChoiceId
+    ? safeCandidates.find((candidate) => String(candidate?.candidateId || '') === persistedChoiceId) || null
+    : null;
+  let decision = null;
+  if (matchingPersistedCandidate) {
+    decision = buildForemanDecision({
+      observation,
+      safeCandidates,
+      chosenCandidateId: persistedChoiceId,
+      source: persistedDecision?.source || 'server_default'
+    });
+  } else if (
+    normalizeForemanDecisionSource(persistedDecision?.source) === 'llm'
+    && persistedDecision?.planCard
+    && typeof persistedDecision.planCard === 'object'
+  ) {
+    decision = {
+      ...persistedDecision,
+      source: 'llm',
+      planCard: {
+        ...copyPersistedValue(persistedDecision.planCard),
+        canActNow: false
+      }
+    };
+  } else {
+    decision = chooseForemanCandidateWithTestBrain({
+      observation,
+      safeCandidates
+    });
+  }
   state.meta.foremanLastDecision = decision;
   const journalEntries = buildTownJournalEntries(recentEvents);
   return {
@@ -3448,6 +3508,7 @@ module.exports = {
   applyUpgradeBuilding,
   availableBuildingTypes,
   buildForemanObservation,
+  buildForemanDecision,
   buildSafeForemanCandidates,
   buildTownJournalEntries,
   buildWorldDelta,

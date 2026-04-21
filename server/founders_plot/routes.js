@@ -22,6 +22,7 @@ const {
   applyTurnInContract,
   applyUpgradeBuilding,
   buildForemanObservation,
+  buildForemanDecision,
   buildSafeForemanCandidates,
   buildWorldDelta,
   chooseForemanCandidateWithTestBrain,
@@ -949,8 +950,6 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         observation,
         safeCandidates
       });
-      state.meta.foremanLastDecision = decision;
-      persistStateAndEvents(state, []);
       res.json({
         ok: true,
         observation,
@@ -960,6 +959,50 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
           ...runtime,
           token: undefined
         }
+      });
+    } catch (error) {
+      const normalized = normalizeToolError(error);
+      res.status(403).json({ ok: false, error: normalized });
+    }
+  });
+
+  router.post('/api/founders-plot/foreman/decision', express.json(), (req, res) => {
+    try {
+      const { state, nowMs, runtime } = requireForemanRuntime(req, res);
+      const observation = buildForemanObservation(state, {
+        runtimeId: runtime.runtimeId,
+        nowMs,
+        recentEvents: listRecentEvents(state.plot.plotId, 48)
+      });
+      const safeCandidates = buildSafeForemanCandidates(state, observation);
+      const chosenCandidateId = typeof req.body?.chosenCandidateId === 'string'
+        ? req.body.chosenCandidateId.trim()
+        : '';
+      if (chosenCandidateId && !safeCandidates.some((candidate) => String(candidate?.candidateId || '') === chosenCandidateId)) {
+        throw Object.assign(new Error('INVALID_STATE'), {
+          details: {
+            reason: 'INVALID_FOREMAN_DECISION_CANDIDATE',
+            chosenCandidateId
+          }
+        });
+      }
+      const decision = chosenCandidateId
+        ? buildForemanDecision({
+          observation,
+          safeCandidates,
+          chosenCandidateId,
+          source: typeof req.body?.source === 'string' ? req.body.source : 'llm'
+        })
+        : {
+          chosenCandidateId: null,
+          planCard: null,
+          source: typeof req.body?.source === 'string' ? req.body.source : 'llm'
+        };
+      state.meta.foremanLastDecision = decision;
+      persistStateAndEvents(state, []);
+      res.json({
+        ok: true,
+        decision
       });
     } catch (error) {
       const normalized = normalizeToolError(error);
