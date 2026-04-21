@@ -21,8 +21,12 @@ test('HQ2 surface shows the living Contract Board, Current Goal, and Standing Or
 
   await expect(frame.getByTestId('founders-current-goal')).toBeVisible();
   await expect(frame.getByTestId('founders-current-goal')).toContainText(/farm|contract|tutorial/i);
+  await expect(frame.getByTestId('founders-drawer-tray')).toBeVisible();
+  await frame.locator('[data-drawer-trigger="contracts"]').click();
   await expect(frame.getByTestId('founders-contract-board')).toBeVisible();
   await expect(frame.getByTestId('contract-offer')).toHaveCount(3);
+  await frame.locator('[data-close-drawer="contracts"]').click();
+  await frame.locator('[data-drawer-trigger="foreman"]').click();
   await expect(frame.getByTestId('founders-standing-order')).toBeVisible();
   await expect(frame.getByTestId('standing-order-careful')).toBeVisible();
   await expect(frame.getByTestId('standing-order-bold')).toBeVisible();
@@ -36,8 +40,10 @@ test('the Foreman panel shows a plan and receipt controls after the first automa
   const frame = await openFoundersPlotFrame(page);
   await bootstrapToHq2(frame);
 
+  await frame.getByTestId('founders-clover-avatar').click();
   await frame.getByTestId('foreman-start-btn').click();
   await expect(frame.getByTestId('founders-foreman-status')).toContainText(/watching|thinking|working/i);
+  await frame.locator('[data-close-drawer="foreman"]').click();
 
   const standingOrderState = await getPlotState(frame);
   expect(standingOrderState?.foreman?.standingOrder).toBe('CAREFUL_STEWARD');
@@ -86,6 +92,7 @@ test('the Foreman panel shows a plan and receipt controls after the first automa
   const policy = await postJson(frame, '/api/founders-plot/policy', { key: 'collectOutputs', value: true });
   expect(policy?.ok).toBe(true);
 
+  await frame.locator('[data-drawer-trigger="foreman"]').click();
   await frame.getByTestId('scheduler-collect-toggle').click();
   await frame.getByTestId('foreman-run-now-btn').click();
 

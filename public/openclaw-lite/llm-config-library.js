@@ -1,5 +1,11 @@
 import { getRecord, putRecord } from '/openclaw-lite/vendor/shared/idb.js';
 
+const DEFAULT_FREE_OPENROUTER_MODEL = 'nvidia/nemotron-3-super-120b-a12b:free';
+const RETIRED_OPENROUTER_MODELS = new Set([
+  'openrouter/hunter-alpha',
+  'openrouter/healer-alpha'
+]);
+
 function parseModelRef(modelRef, fallbackProvider = 'openai', fallbackModelId = 'gpt-4o-mini') {
   const ref = String(modelRef || '').trim();
   if (!ref) {
@@ -26,7 +32,7 @@ function parseModelRef(modelRef, fallbackProvider = 'openai', fallbackModelId = 
 
 function defaultProviderApi(provider) {
   const p = String(provider || '').trim();
-  if (p === 'openai' || p === 'ollama') return 'openai-completions';
+  if (p === 'openai' || p === 'ollama' || p === 'openrouter') return 'openai-completions';
   return '';
 }
 
@@ -35,6 +41,7 @@ function defaultProviderBaseUrl(provider) {
   if (p === 'openai') {
     return new URL('/api/llm/openai/v1', window.location.origin).toString();
   }
+  if (p === 'openrouter') return 'https://openrouter.ai/api/v1';
   if (p === 'ollama') {
     return 'http://127.0.0.1:11434/v1';
   }
@@ -57,9 +64,18 @@ function normalizeReasoning(value) {
   return '';
 }
 
-export async function saveLlmConfig({ provider, model, apiKey, authMode, reasoning, useProxy }) {
+function normalizeProviderModel(provider, model) {
   const providerTrim = String(provider || '').trim();
   const modelTrim = String(model || '').trim();
+  if (providerTrim === 'openrouter' && (!modelTrim || RETIRED_OPENROUTER_MODELS.has(modelTrim))) {
+    return DEFAULT_FREE_OPENROUTER_MODEL;
+  }
+  return modelTrim;
+}
+
+export async function saveLlmConfig({ provider, model, apiKey, authMode, reasoning, useProxy }) {
+  const providerTrim = String(provider || '').trim();
+  const modelTrim = normalizeProviderModel(providerTrim, model);
   const keyTrim = String(apiKey || '').trim();
   const normalizedAuthMode = String(authMode || '').trim() === 'oauth-json' ? 'oauth-json' : 'api-key';
   const normalizedReasoning = normalizeReasoning(reasoning);
@@ -95,13 +111,23 @@ export async function saveLlmConfig({ provider, model, apiKey, authMode, reasoni
 }
 
 export async function loadLlmConfig() {
-  const provider = await metaGet('llmProvider');
-  const model = await metaGet('llmModelId');
-  const modelRef = await metaGet('llmModelRef');
+  const providerRaw = await metaGet('llmProvider');
+  const modelRaw = await metaGet('llmModelId');
+  const modelRefRaw = await metaGet('llmModelRef');
   const apiKey = await metaGet('llmApiKey');
   const authMode = await metaGet('llmAuthMode');
   const reasoning = await metaGet('llmReasoning');
   const useProxy = await metaGet('llmUseProxy');
+  const provider = typeof providerRaw === 'string' ? providerRaw.trim() : '';
+  const model = normalizeProviderModel(provider, modelRaw);
+  const modelRef = provider && model ? `${provider}/${model}` : '';
+  const migrated = model !== String(modelRaw || '').trim() || (modelRef || null) !== (typeof modelRefRaw === 'string' ? modelRefRaw : null);
+  if (migrated && provider && model) {
+    await metaSet('llmApi', defaultProviderApi(provider) || null);
+    await metaSet('llmModelRef', modelRef || null);
+    await metaSet('llmModelId', model || null);
+    await metaSet('llmBaseUrl', defaultProviderBaseUrl(provider) || null);
+  }
   return {
     configured: !!(provider && model && apiKey),
     provider: provider || null,

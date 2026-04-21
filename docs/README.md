@@ -15,12 +15,16 @@ This docs set is designed for users who are new to local agents and model provid
 - [Founders Plot V1.1 TDD acceptance matrix](/specs/18_founders_plot_v1_1_tdd_acceptance_matrix.md)
 - [Founders Plot V1.1 feedback resolution](/specs/18_founders_plot_v1_1_feedback_resolution.md)
 - [Founders Plot future specs backlog](/specs/19_founders_plot_future_specs_backlog.md)
+- [Founders Plot V1.2 living town spec](/specs/20_founders_plot_v1_2_living_town.md)
+- [Founders Plot V1.2 hardening spec](/specs/21_founders_plot_v1_2_hardening.md)
+- [Founders Plot V1.3 visual game-surface spec](/specs/22_founders_plot_v1_3_visual_game_surface.md)
 - [Agent Town design pack](/Brand%20kit/guidelines/agent-town-design-pack/README.md)
+- [Agent Town V1.3 implementation start pack note](/docs/design/agent-town-v1.3-implementation-start-pack.md)
 
 ## Founders Plot implementation note
 
-The current implementation sprint is driven by the refined V1.1 documents in `specs/18_*` and `specs/19_*`.
-Any earlier broader V1.1 scope notes should be treated as superseded unless they are explicitly restated there.
+The current implementation sprint is driven by the V1.3 visual game-surface documents in `specs/22_*` together with the checked-in design-pack addenda under `Brand kit/guidelines/agent-town-design-pack/`.
+V1.2 gameplay and hardening specs remain the system baseline unless the V1.3 spec explicitly changes the presentation layer.
 
 ## Principles
 

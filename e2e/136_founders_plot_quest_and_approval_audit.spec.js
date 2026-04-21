@@ -59,7 +59,7 @@ test('first loop stays on first wood until collection and keeps the camp actiona
 
   expect(await readQuestStep(frame)).toBe('collect_first_wood');
 
-  await frame.getByTestId('board-tile-0-0').click();
+  await frame.getByTestId('founders-stage-object-LUMBER_CAMP').click();
   await expect(frame.getByTestId('selection-queue')).toBeVisible({ timeout: 5000 });
   await frame.getByTestId('selection-queue').click();
 
@@ -86,7 +86,7 @@ test('first loop stays on first wood until collection and keeps the camp actiona
 
   expect(await readQuestStep(frame)).toBe('collect_first_wood');
 
-  await frame.getByTestId('board-tile-0-0').click();
+  await frame.getByTestId('founders-stage-object-LUMBER_CAMP').click();
   await expect(frame.getByTestId('selection-collect')).toBeVisible({ timeout: 5000 });
   await frame.getByTestId('selection-collect').click();
 
@@ -120,6 +120,7 @@ test('approval request and resolution appear in recap and replay audit events', 
   });
   expect(approvalId).toMatch(/^apr_/);
 
+  await frame.locator('[data-drawer-trigger="approvals"]').click();
   await expect(frame.getByTestId('founders-approvals-panel')).toContainText('Approve the HQ upgrade');
   await frame.getByTestId('founders-approvals-panel').getByRole('button', { name: 'Approve' }).click();
 

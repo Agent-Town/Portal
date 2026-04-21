@@ -38,16 +38,28 @@ test('V1.2 surfaces recap sections, signal and journal panels, and avoids forbid
   expect(policy?.ok).toBe(true);
   const enabled = await frame.evaluate(async () => window.__foundersPlotTest.enableCollectReadyOutputs());
   expect(enabled?.ok).toBe(true);
+  await frame.getByTestId('founders-clover-avatar').click();
   await frame.getByTestId('foreman-run-now-btn').click();
   await frame.waitForFunction(() => {
     return !!window.__foundersPlotTest.getState()?.state?.foreman?.receipt?.receiptId;
   }, null, { timeout: 10_000 });
+  await frame.locator('[data-close-drawer="foreman"]').click();
 
   await expect(frame.getByTestId('founders-current-goal')).toBeVisible();
+  await expect(frame.getByTestId('founders-clover-avatar')).toBeVisible();
+  await expect(frame.getByTestId('founders-drawer-tray')).toBeVisible();
+
+  await frame.locator('[data-drawer-trigger="contracts"]').click();
   await expect(frame.getByTestId('founders-contract-board')).toBeVisible();
-  await expect(frame.getByTestId('founders-foreman-panel')).toBeVisible();
+  await frame.locator('[data-close-drawer="contracts"]').click();
+  await frame.locator('[data-drawer-trigger="signals"]').click();
   await expect(frame.getByTestId('founders-signals-panel')).toBeVisible();
+  await frame.locator('[data-close-drawer="signals"]').click();
+  await frame.locator('[data-drawer-trigger="journal"]').click();
   await expect(frame.getByTestId('founders-journal-panel')).toBeVisible();
+  await frame.locator('[data-close-drawer="journal"]').click();
+  await frame.locator('[data-drawer-trigger="foreman"]').click();
+  await expect(frame.getByTestId('founders-foreman-panel')).toBeVisible();
 
   const bodyText = (await frame.locator('body').textContent()).toLowerCase();
   for (const word of FORBIDDEN_WORDS) {
@@ -79,9 +91,8 @@ test('V1.2 mobile, tablet, and desktop layouts keep the new surfaces readable wi
   for (const viewport of viewports) {
     await page.setViewportSize(viewport);
     await expect(frame.getByTestId('founders-current-goal')).toBeVisible();
-    await expect(frame.getByTestId('founders-contract-board')).toBeVisible();
-    await expect(frame.getByTestId('founders-signals-panel')).toBeVisible();
-    await expect(frame.getByTestId('founders-journal-panel')).toBeVisible();
+    await expect(frame.getByTestId('founders-plot-stage')).toBeVisible();
+    await expect(frame.getByTestId('founders-drawer-tray')).toBeVisible();
 
     const boxes = await frame.evaluate(() => {
       function rectOf(testId) {
@@ -91,17 +102,17 @@ test('V1.2 mobile, tablet, and desktop layouts keep the new surfaces readable wi
         return { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right, width: rect.width, height: rect.height };
       }
       return {
+        status: rectOf('founders-status-strip'),
         goal: rectOf('founders-current-goal'),
-        contracts: rectOf('founders-contract-board'),
-        signals: rectOf('founders-signals-panel'),
-        journal: rectOf('founders-journal-panel')
+        stage: rectOf('founders-plot-stage'),
+        tray: rectOf('founders-drawer-tray')
       };
     });
 
+    expect(boxes.status?.height).toBeGreaterThan(0);
     expect(boxes.goal?.height).toBeGreaterThan(0);
-    expect(boxes.contracts?.height).toBeGreaterThan(0);
-    expect(boxes.signals?.height).toBeGreaterThan(0);
-    expect(boxes.journal?.height).toBeGreaterThan(0);
-    expect(boxes.goal?.bottom).toBeLessThanOrEqual(boxes.journal?.bottom + 2000);
+    expect(boxes.stage?.height).toBeGreaterThan(0);
+    expect(boxes.tray?.height).toBeGreaterThan(0);
+    expect(boxes.stage?.top).toBeGreaterThanOrEqual(boxes.status?.bottom - 4);
   }
 });

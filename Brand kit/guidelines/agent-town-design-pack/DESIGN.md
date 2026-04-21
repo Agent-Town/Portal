@@ -1,5 +1,5 @@
 # DESIGN.md
-_Status: canonical for shell + onboarding surfaces_
+_Status: canonical for shell, onboarding, and Founders Plot V1 game surfaces_
 
 ## 1. Purpose
 
@@ -411,3 +411,248 @@ If a new pattern is required:
 ## 17. Deprecation note
 
 Legacy pixel-font or pixel-border treatments may remain only in prototypes or internal tools. They are no longer valid defaults for public shell work.
+
+---
+
+# V1.3 Addendum — Founders Plot Visual Game-Surface Law
+
+_Status: canonical for Agent Town: Founders Plot V1 game-surface work_
+
+## D1. Principle: the world is the interface
+
+Founders Plot is the flagship V1 game surface. The normal player screen must be a **scenic town stage**, not a panel dashboard.
+
+Players should primarily act by selecting things in the world:
+
+- HQ;
+- empty build lots;
+- Lumber Camp;
+- Farm Plot;
+- Quarry;
+- Workshop;
+- Market Stall;
+- Contract Board;
+- Public Square / Welcome Sign;
+- Clover / Foreman Hut;
+- Town Journal.
+
+Panels may explain or confirm, but panels must not be the main composition.
+
+## D2. Scenic plot dominance
+
+The scenic plot area must dominate the default screen.
+
+Minimum target:
+
+- desktop: scenic plot uses at least 60% of above-the-fold visual area;
+- mobile: scenic plot appears before any long-form management panel;
+- no stacked permanent side panels on the default view.
+
+## D3. Text budget
+
+Default visible text must stay low.
+
+Targets:
+
+- desktop default visible words: **<= 120**;
+- mobile default visible words: **<= 80**;
+- no more than 3 prose blocks visible by default:
+  1. current goal;
+  2. selected object / action hint;
+  3. Clover one-line receipt or suggestion.
+
+If more explanation is needed, use a drawer, tooltip, journal, or details disclosure.
+
+## D4. Panel transformation law
+
+Convert current panels into diegetic or contextual objects:
+
+| Former visible panel | V1.3 game-surface replacement |
+|---|---|
+| Current goal panel | compact quest banner / goal ribbon |
+| Settlement board | scenic plot stage |
+| Building cards | in-world building objects |
+| Contract board panel | physical Contract Board object |
+| Town signals panel | small town-bell / signal icons |
+| Public square panel | visible Public Square / Welcome Sign |
+| Foreman panel | Clover in scene + Foreman drawer |
+| Delegation panel | Foreman Hut / Standing Orders drawer |
+| Approvals panel | badge + Approval Inbox drawer |
+| Rewards panel | sparkles / claim badge on source object |
+| Journal panel | Town Journal icon / book drawer |
+| Recap drawer | Morning Brief / Town Journal section |
+
+## D5. Building state visual language
+
+Every Founders Plot building object must support these state classes:
+
+- `locked`
+- `buildable`
+- `under-construction`
+- `idle`
+- `producing`
+- `ready`
+- `blocked`
+- `upgradable`
+- `selected`
+
+The visual treatment must combine shape/icon/text/accessibility. Color alone is not enough.
+
+## D6. Clover embodiment
+
+Clover must have visible states:
+
+- `idle`
+- `observing`
+- `thinking`
+- `acting`
+- `waiting-approval`
+- `paused`
+- `needs-restart`
+
+Clover should be represented by a character, not only a text card. The normal game screen must never make the Foreman feel like only a scheduler setting.
+
+## D7. Contextual action sheets
+
+Detail surfaces appear only after player intent:
+
+- selecting a building opens a contextual action sheet;
+- selecting Clover opens the Foreman drawer;
+- selecting the Contract Board opens contracts;
+- selecting the Journal opens recap/history;
+- selecting the Welcome Sign opens charm / public square details.
+
+The contextual sheet may contain buttons, timers, requirements, and receipts. It should not stay open as a permanent dashboard unless the player pins it.
+
+## D8. Founders Plot surface recipes
+
+### D8.1 Scenic plot stage
+
+Purpose:
+- make the home plot feel like a place;
+- hold buildings, Clover, contracts, public square, timers, and resource feedback.
+
+Rules:
+- must be the largest visual object on the default game screen;
+- must support absolute-positioned or grid-positioned world objects;
+- must provide accessible names and keyboard traversal for every interactive object;
+- must not become a decorative image behind unrelated panels.
+
+### D8.2 World building object
+
+Purpose:
+- represent a real game entity and expose its current state.
+
+Recipe:
+- illustrated building or object silhouette;
+- state badge / timer / ready marker layered on top;
+- hover/focus affordance;
+- short label only when needed;
+- click/tap opens contextual action sheet.
+
+### D8.3 Game HUD
+
+Purpose:
+- show only core resources, HQ level, and current goal.
+
+Rules:
+- compact and stable;
+- no debug identifiers;
+- no raw runtime/worker terminology;
+- no more than one current objective visible.
+
+### D8.4 Context action sheet
+
+Purpose:
+- explain and confirm actions for the currently selected object.
+
+Rules:
+- appears after object selection or current goal focus;
+- contains one primary action whenever possible;
+- secondary details collapsible;
+- mobile: bottom sheet; desktop: bottom or right contextual panel.
+
+### D8.5 Resource flyout
+
+Purpose:
+- make collection and rewards feel tactile.
+
+Rules:
+- short format like `+3 wood`;
+- appears near source object;
+- respects reduced motion;
+- cannot be the only record of resource change; state remains server-derived.
+
+### D8.6 Timer ring / progress marker
+
+Purpose:
+- show production/construction progress visually.
+
+Rules:
+- visible on producing or under-construction objects;
+- must have text fallback / aria label;
+- must not require reading a full queue panel.
+
+### D8.7 Foreman avatar / Clover marker
+
+Purpose:
+- embody AI help inside the town.
+
+Rules:
+- visible in normal game state;
+- state changes must be visible and accessible;
+- one-line bubble or receipt only; long logs move to drawer;
+- no runtime/debug jargon in normal copy.
+
+## D9. GenAI asset implementation rules
+
+### D9.1 Asset generation prompt frame
+
+Use this frame for generated Founders Plot assets:
+
+```text
+Warm frontier storybook game asset for Agent Town: Founders Plot.
+Non-pixel illustrated style, sunlit dusty frontier civic-builder, friendly and practical.
+Wood, brass, parchment, ochre, cream, muted teal accents. Clear readable silhouette.
+No guns, no violence-forward cowboy trope, no cyberpunk, no generic fantasy village, no text embedded in image.
+Transparent background where appropriate. Optimized for web UI and mobile readability.
+```
+
+### D9.2 Asset acceptance criteria
+
+Every generated asset must pass:
+
+- matches `BRAND.md` frontier storybook rules;
+- readable at 64px and 128px;
+- consistent perspective with other Founders Plot buildings;
+- no embedded accidental text;
+- no hallucinated trademarks or recognizable third-party IP;
+- optimized for web;
+- listed in `asset-manifest.json` or equivalent.
+
+### D9.3 Preferred file placement
+
+Recommended layout:
+
+```text
+public/experiences/founders-plot/assets/
+  scene/
+  buildings/
+  clover/
+  icons/
+  effects/
+  asset-manifest.json
+```
+
+### D9.4 Screenshot states
+
+Founders Plot visual PRs must capture at least:
+
+- first load / starter plot;
+- selected building;
+- producing building;
+- ready-to-collect building;
+- active contract available;
+- Clover acting;
+- Clover waiting approval;
+- mobile default state.

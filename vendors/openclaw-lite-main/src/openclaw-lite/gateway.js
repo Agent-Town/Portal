@@ -665,8 +665,13 @@ async function init() {
     const thinking = normalizeThinkingLevel(llmThinkingInput?.value || "");
     const useProxy = llmUseProxyInput ? llmUseProxyInput.checked !== false : true;
     const defaultOpenAiProxyBase = new URL("/api/llm/openai/v1", window.location.origin).toString();
-    if (!api && modelParsed.provider === "openai") api = "openai-completions";
-    const baseUrl = baseOverride || (modelParsed.provider === "openai" ? defaultOpenAiProxyBase : "");
+    const defaultOpenRouterBase = "https://openrouter.ai/api/v1";
+    if (!api && (modelParsed.provider === "openai" || modelParsed.provider === "openrouter")) api = "openai-completions";
+    const baseUrl = baseOverride || (modelParsed.provider === "openai"
+      ? defaultOpenAiProxyBase
+      : modelParsed.provider === "openrouter"
+        ? defaultOpenRouterBase
+        : "");
 
     sendToWorker({
       type: "gateway.command.setLlmConfig",

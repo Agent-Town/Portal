@@ -39,11 +39,14 @@ test('reload shows a restart-needed Clover state instead of an actionable runtim
   let frame = await openFoundersPlotFrame(page);
   const started = await startForemanRuntime(frame);
   expect(started?.ok).toBe(true);
+  await frame.getByTestId('founders-clover-avatar').click();
   await expect(frame.getByTestId('foreman-run-now-btn')).toBeEnabled();
 
   await page.reload();
   frame = await getOpenFoundersPlotFrame(page);
 
+  await expect(frame.getByTestId('founders-clover-avatar')).toHaveClass(/at-fp-clover--restart-needed/);
+  await frame.getByTestId('founders-clover-avatar').click();
   await expect(frame.locator('#foremanToolsLine')).toContainText(/fresh start|restart clover/i);
   await expect(frame.getByTestId('foreman-run-now-btn')).toBeDisabled();
 
@@ -62,6 +65,7 @@ test('restart restores local actionability and reactivates the scheduler loop', 
   await page.reload();
   frame = await getOpenFoundersPlotFrame(page);
 
+  await frame.getByTestId('founders-clover-avatar').click();
   await frame.getByTestId('foreman-start-btn').click();
   await expect(frame.locator('#foremanToolsLine')).not.toContainText(/fresh start|restart clover/i);
   await expect(frame.getByTestId('foreman-run-now-btn')).toBeEnabled();
@@ -94,6 +98,7 @@ test('reload prevents scheduler action until Clover is restarted in this tab', a
 
   await page.reload();
   frame = await getOpenFoundersPlotFrame(page);
+  await expect(frame.getByTestId('founders-clover-avatar')).toHaveClass(/at-fp-clover--restart-needed/);
   const lumberBuildingId = await prepareReadyAfterReload(frame, 'v12-hardening-reload-blocked');
   const before = await getPlotState(frame);
   const replayBefore = await getJson(frame, '/api/founders-plot/replay');
@@ -113,5 +118,6 @@ test('reload prevents scheduler action until Clover is restarted in this tab', a
     ? replayAfter.replay.events.filter((event) => event?.type === 'AGENT_ACTION_EXECUTED').length
     : 0;
   expect(afterActionCount).toBe(beforeActionCount);
+  await frame.getByTestId('founders-clover-avatar').click();
   await expect(frame.locator('#foremanToolsLine')).toContainText(/fresh start|restart clover/i);
 });

@@ -94,7 +94,8 @@ test('Founders Plot survives reload, exposes recap from event logs, and keeps pu
   const stateHashAfterReload = await frame.evaluate(() => window.__foundersPlotTest.getState()?.state?.stateHash || '');
   expect(stateHashAfterReload).toBe(stateHashBeforeReload);
 
-  await frame.locator('[data-testid="founders-recap-drawer"] summary').click();
+  await frame.locator('[data-drawer-trigger="recap"]').click();
+  await expect(frame.getByTestId('founders-recap-drawer')).toBeVisible();
   await expect(frame.locator('#recapList')).toContainText('Lumber Camp', { timeout: 5000 });
 
   const replayPayload = await page.evaluate(async () => {

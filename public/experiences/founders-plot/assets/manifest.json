@@ -1,0 +1,1136 @@
+{
+  "schemaVersion": "founders-plot-assets-v1",
+  "styleFamily": "agent-town-frontier-storybook-v1",
+  "generatedAt": "2026-04-21T04:37:00.610Z",
+  "reviewStatus": "approved",
+  "assets": [
+    {
+      "id": "scene_founders_plot_desktop",
+      "kind": "scene",
+      "src": "/experiences/founders-plot/assets/scenes/founders-plot-desktop.webp",
+      "width": 2048,
+      "height": 1280,
+      "transparent": false,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "hitbox": {
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      "zIndexHint": 0,
+      "path": "scenes/founders-plot-desktop.webp",
+      "intendedUse": "scene:scene_founders_plot_desktop",
+      "promptFile": "prompts/scene.md#founders-plot-desktop",
+      "promptSummary": "Frontier Storybook scene asset for scene_founders_plot_desktop.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG + sips + cwebp",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "bytes": 21034,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "scene_founders_plot_mobile",
+      "kind": "scene",
+      "src": "/experiences/founders-plot/assets/scenes/founders-plot-mobile.webp",
+      "width": 1170,
+      "height": 1800,
+      "transparent": false,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "hitbox": {
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      "zIndexHint": 0,
+      "path": "scenes/founders-plot-mobile.webp",
+      "intendedUse": "scene:scene_founders_plot_mobile",
+      "promptFile": "prompts/scene.md#founders-plot-mobile",
+      "promptSummary": "Frontier Storybook scene asset for scene_founders_plot_mobile.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG + sips + cwebp",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "bytes": 14428,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "building_hq_level_1",
+      "kind": "building",
+      "buildingType": "HQ",
+      "state": "level_1",
+      "src": "/experiences/founders-plot/assets/buildings/hq-lv1.webp",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.86
+      },
+      "hitbox": {
+        "x": 0.2,
+        "y": 0.18,
+        "w": 0.58,
+        "h": 0.64
+      },
+      "zIndexHint": 30,
+      "path": "buildings/hq-lv1.webp",
+      "intendedUse": "building:building_hq_level_1",
+      "promptFile": "prompts/buildings.md#hq-levels",
+      "promptSummary": "Frontier Storybook building asset for building_hq_level_1.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG + sips + cwebp",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "bytes": 6640,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "building_hq_level_2",
+      "kind": "building",
+      "buildingType": "HQ",
+      "state": "level_2",
+      "src": "/experiences/founders-plot/assets/buildings/hq-lv2.webp",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.86
+      },
+      "hitbox": {
+        "x": 0.16,
+        "y": 0.16,
+        "w": 0.64,
+        "h": 0.66
+      },
+      "zIndexHint": 31,
+      "path": "buildings/hq-lv2.webp",
+      "intendedUse": "building:building_hq_level_2",
+      "promptFile": "prompts/buildings.md#hq-levels",
+      "promptSummary": "Frontier Storybook building asset for building_hq_level_2.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG + sips + cwebp",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "bytes": 6680,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "building_hq_level_3",
+      "kind": "building",
+      "buildingType": "HQ",
+      "state": "level_3",
+      "src": "/experiences/founders-plot/assets/buildings/hq-lv3.webp",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.86
+      },
+      "hitbox": {
+        "x": 0.14,
+        "y": 0.12,
+        "w": 0.68,
+        "h": 0.7
+      },
+      "zIndexHint": 32,
+      "path": "buildings/hq-lv3.webp",
+      "intendedUse": "building:building_hq_level_3",
+      "promptFile": "prompts/buildings.md#hq-levels",
+      "promptSummary": "Frontier Storybook building asset for building_hq_level_3.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG + sips + cwebp",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "bytes": 7462,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "building_hq_level_4",
+      "kind": "building",
+      "buildingType": "HQ",
+      "state": "level_4",
+      "src": "/experiences/founders-plot/assets/buildings/hq-lv4.webp",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.86
+      },
+      "hitbox": {
+        "x": 0.12,
+        "y": 0.08,
+        "w": 0.72,
+        "h": 0.76
+      },
+      "zIndexHint": 33,
+      "path": "buildings/hq-lv4.webp",
+      "intendedUse": "building:building_hq_level_4",
+      "promptFile": "prompts/buildings.md#hq-levels",
+      "promptSummary": "Frontier Storybook building asset for building_hq_level_4.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG + sips + cwebp",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "bytes": 7730,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "building_hq_level_5",
+      "kind": "building",
+      "buildingType": "HQ",
+      "state": "level_5",
+      "src": "/experiences/founders-plot/assets/buildings/hq-lv5.webp",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.86
+      },
+      "hitbox": {
+        "x": 0.12,
+        "y": 0.08,
+        "w": 0.74,
+        "h": 0.76
+      },
+      "zIndexHint": 34,
+      "path": "buildings/hq-lv5.webp",
+      "intendedUse": "building:building_hq_level_5",
+      "promptFile": "prompts/buildings.md#hq-levels",
+      "promptSummary": "Frontier Storybook building asset for building_hq_level_5.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG + sips + cwebp",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "bytes": 8184,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "building_lumber_camp_base",
+      "kind": "building",
+      "buildingType": "LUMBER_CAMP",
+      "state": "base",
+      "src": "/experiences/founders-plot/assets/buildings/lumber-camp.webp",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.86
+      },
+      "hitbox": {
+        "x": 0.18,
+        "y": 0.2,
+        "w": 0.64,
+        "h": 0.62
+      },
+      "zIndexHint": 24,
+      "path": "buildings/lumber-camp.webp",
+      "intendedUse": "building:building_lumber_camp_base",
+      "promptFile": "prompts/buildings.md#lumber-camp",
+      "promptSummary": "Frontier Storybook building asset for building_lumber_camp_base.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG + sips + cwebp",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "bytes": 5594,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "building_farm_plot_base",
+      "kind": "building",
+      "buildingType": "FARM_PLOT",
+      "state": "base",
+      "src": "/experiences/founders-plot/assets/buildings/farm-plot.webp",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.88
+      },
+      "hitbox": {
+        "x": 0.16,
+        "y": 0.24,
+        "w": 0.7,
+        "h": 0.56
+      },
+      "zIndexHint": 18,
+      "path": "buildings/farm-plot.webp",
+      "intendedUse": "building:building_farm_plot_base",
+      "promptFile": "prompts/buildings.md#farm-plot",
+      "promptSummary": "Frontier Storybook building asset for building_farm_plot_base.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG + sips + cwebp",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "bytes": 6374,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "building_quarry_base",
+      "kind": "building",
+      "buildingType": "QUARRY",
+      "state": "base",
+      "src": "/experiences/founders-plot/assets/buildings/quarry.webp",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.88
+      },
+      "hitbox": {
+        "x": 0.16,
+        "y": 0.2,
+        "w": 0.7,
+        "h": 0.62
+      },
+      "zIndexHint": 20,
+      "path": "buildings/quarry.webp",
+      "intendedUse": "building:building_quarry_base",
+      "promptFile": "prompts/buildings.md#quarry",
+      "promptSummary": "Frontier Storybook building asset for building_quarry_base.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG + sips + cwebp",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "bytes": 5742,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "building_workshop_base",
+      "kind": "building",
+      "buildingType": "WORKSHOP",
+      "state": "base",
+      "src": "/experiences/founders-plot/assets/buildings/workshop.webp",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.86
+      },
+      "hitbox": {
+        "x": 0.18,
+        "y": 0.18,
+        "w": 0.64,
+        "h": 0.66
+      },
+      "zIndexHint": 22,
+      "path": "buildings/workshop.webp",
+      "intendedUse": "building:building_workshop_base",
+      "promptFile": "prompts/buildings.md#workshop",
+      "promptSummary": "Frontier Storybook building asset for building_workshop_base.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG + sips + cwebp",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "bytes": 6152,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "building_market_stall_base",
+      "kind": "building",
+      "buildingType": "MARKET_STALL",
+      "state": "base",
+      "src": "/experiences/founders-plot/assets/buildings/market-stall.webp",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.88
+      },
+      "hitbox": {
+        "x": 0.16,
+        "y": 0.2,
+        "w": 0.7,
+        "h": 0.6
+      },
+      "zIndexHint": 22,
+      "path": "buildings/market-stall.webp",
+      "intendedUse": "building:building_market_stall_base",
+      "promptFile": "prompts/buildings.md#market-stall",
+      "promptSummary": "Frontier Storybook building asset for building_market_stall_base.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG + sips + cwebp",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "bytes": 5664,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "object_contract_board_base",
+      "kind": "object",
+      "state": "base",
+      "src": "/experiences/founders-plot/assets/objects/contract-board.webp",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.9
+      },
+      "hitbox": {
+        "x": 0.26,
+        "y": 0.22,
+        "w": 0.48,
+        "h": 0.58
+      },
+      "zIndexHint": 14,
+      "path": "objects/contract-board.webp",
+      "intendedUse": "object:object_contract_board_base",
+      "promptFile": "prompts/buildings.md#contract-board",
+      "promptSummary": "Frontier Storybook object asset for object_contract_board_base.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG + sips + cwebp",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "bytes": 3416,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "object_public_square_welcome_sign_base",
+      "kind": "object",
+      "state": "base",
+      "src": "/experiences/founders-plot/assets/objects/welcome-sign.webp",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.9
+      },
+      "hitbox": {
+        "x": 0.2,
+        "y": 0.22,
+        "w": 0.6,
+        "h": 0.56
+      },
+      "zIndexHint": 12,
+      "path": "objects/welcome-sign.webp",
+      "intendedUse": "object:object_public_square_welcome_sign_base",
+      "promptFile": "prompts/buildings.md#welcome-sign",
+      "promptSummary": "Frontier Storybook object asset for object_public_square_welcome_sign_base.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG + sips + cwebp",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "bytes": 4094,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "object_public_square_welcome_sign_upgraded",
+      "kind": "object",
+      "state": "upgraded",
+      "src": "/experiences/founders-plot/assets/objects/welcome-sign-upgraded.webp",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.9
+      },
+      "hitbox": {
+        "x": 0.2,
+        "y": 0.22,
+        "w": 0.6,
+        "h": 0.56
+      },
+      "zIndexHint": 12,
+      "path": "objects/welcome-sign-upgraded.webp",
+      "intendedUse": "object:object_public_square_welcome_sign_upgraded",
+      "promptFile": "prompts/buildings.md#welcome-sign",
+      "promptSummary": "Frontier Storybook object asset for object_public_square_welcome_sign_upgraded.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG + sips + cwebp",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "bytes": 4538,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "object_foreman_hut_base",
+      "kind": "object",
+      "state": "base",
+      "src": "/experiences/founders-plot/assets/objects/foreman-hut.webp",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.88
+      },
+      "hitbox": {
+        "x": 0.18,
+        "y": 0.18,
+        "w": 0.64,
+        "h": 0.66
+      },
+      "zIndexHint": 18,
+      "path": "objects/foreman-hut.webp",
+      "intendedUse": "object:object_foreman_hut_base",
+      "promptFile": "prompts/buildings.md#foreman-hut",
+      "promptSummary": "Frontier Storybook object asset for object_foreman_hut_base.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG + sips + cwebp",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "bytes": 5880,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "object_empty_lot_buildable",
+      "kind": "object",
+      "state": "buildable",
+      "src": "/experiences/founders-plot/assets/objects/empty-lot.webp",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.92
+      },
+      "hitbox": {
+        "x": 0.2,
+        "y": 0.28,
+        "w": 0.58,
+        "h": 0.46
+      },
+      "zIndexHint": 10,
+      "path": "objects/empty-lot.webp",
+      "intendedUse": "object:object_empty_lot_buildable",
+      "promptFile": "prompts/buildings.md#lots",
+      "promptSummary": "Frontier Storybook object asset for object_empty_lot_buildable.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG + sips + cwebp",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "bytes": 4488,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "object_locked_lot",
+      "kind": "object",
+      "state": "locked",
+      "src": "/experiences/founders-plot/assets/objects/locked-lot.webp",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.92
+      },
+      "hitbox": {
+        "x": 0.2,
+        "y": 0.28,
+        "w": 0.58,
+        "h": 0.46
+      },
+      "zIndexHint": 10,
+      "path": "objects/locked-lot.webp",
+      "intendedUse": "object:object_locked_lot",
+      "promptFile": "prompts/buildings.md#lots",
+      "promptSummary": "Frontier Storybook object asset for object_locked_lot.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG + sips + cwebp",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "bytes": 4114,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "clover_idle",
+      "kind": "character",
+      "state": "idle",
+      "src": "/experiences/founders-plot/assets/characters/clover-idle.webp",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "hitbox": {
+        "x": 0.28,
+        "y": 0.18,
+        "w": 0.44,
+        "h": 0.72
+      },
+      "zIndexHint": 40,
+      "path": "characters/clover-idle.webp",
+      "intendedUse": "character:clover_idle",
+      "promptFile": "prompts/clover.md#clover-states",
+      "promptSummary": "Frontier Storybook character asset for clover_idle.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG + sips + cwebp",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "bytes": 9296,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "clover_observing",
+      "kind": "character",
+      "state": "observing",
+      "src": "/experiences/founders-plot/assets/characters/clover-observing.webp",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "hitbox": {
+        "x": 0.28,
+        "y": 0.18,
+        "w": 0.44,
+        "h": 0.72
+      },
+      "zIndexHint": 40,
+      "path": "characters/clover-observing.webp",
+      "intendedUse": "character:clover_observing",
+      "promptFile": "prompts/clover.md#clover-states",
+      "promptSummary": "Frontier Storybook character asset for clover_observing.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG + sips + cwebp",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "bytes": 9656,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "clover_thinking",
+      "kind": "character",
+      "state": "thinking",
+      "src": "/experiences/founders-plot/assets/characters/clover-thinking.webp",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "hitbox": {
+        "x": 0.28,
+        "y": 0.18,
+        "w": 0.44,
+        "h": 0.72
+      },
+      "zIndexHint": 40,
+      "path": "characters/clover-thinking.webp",
+      "intendedUse": "character:clover_thinking",
+      "promptFile": "prompts/clover.md#clover-states",
+      "promptSummary": "Frontier Storybook character asset for clover_thinking.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG + sips + cwebp",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "bytes": 10178,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "clover_acting",
+      "kind": "character",
+      "state": "acting",
+      "src": "/experiences/founders-plot/assets/characters/clover-acting.webp",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "hitbox": {
+        "x": 0.28,
+        "y": 0.18,
+        "w": 0.44,
+        "h": 0.72
+      },
+      "zIndexHint": 40,
+      "path": "characters/clover-acting.webp",
+      "intendedUse": "character:clover_acting",
+      "promptFile": "prompts/clover.md#clover-states",
+      "promptSummary": "Frontier Storybook character asset for clover_acting.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG + sips + cwebp",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "bytes": 9498,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "clover_waiting_approval",
+      "kind": "character",
+      "state": "waiting-approval",
+      "src": "/experiences/founders-plot/assets/characters/clover-waiting-approval.webp",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "hitbox": {
+        "x": 0.28,
+        "y": 0.18,
+        "w": 0.44,
+        "h": 0.72
+      },
+      "zIndexHint": 40,
+      "path": "characters/clover-waiting-approval.webp",
+      "intendedUse": "character:clover_waiting_approval",
+      "promptFile": "prompts/clover.md#clover-states",
+      "promptSummary": "Frontier Storybook character asset for clover_waiting_approval.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG + sips + cwebp",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "bytes": 9972,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "clover_paused",
+      "kind": "character",
+      "state": "paused",
+      "src": "/experiences/founders-plot/assets/characters/clover-paused.webp",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "hitbox": {
+        "x": 0.28,
+        "y": 0.18,
+        "w": 0.44,
+        "h": 0.72
+      },
+      "zIndexHint": 40,
+      "path": "characters/clover-paused.webp",
+      "intendedUse": "character:clover_paused",
+      "promptFile": "prompts/clover.md#clover-states",
+      "promptSummary": "Frontier Storybook character asset for clover_paused.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG + sips + cwebp",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "bytes": 9160,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "clover_restart_needed",
+      "kind": "character",
+      "state": "restart-needed",
+      "src": "/experiences/founders-plot/assets/characters/clover-restart-needed.webp",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "hitbox": {
+        "x": 0.28,
+        "y": 0.18,
+        "w": 0.44,
+        "h": 0.72
+      },
+      "zIndexHint": 40,
+      "path": "characters/clover-restart-needed.webp",
+      "intendedUse": "character:clover_restart_needed",
+      "promptFile": "prompts/clover.md#clover-states",
+      "promptSummary": "Frontier Storybook character asset for clover_restart_needed.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG + sips + cwebp",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "bytes": 10142,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "overlay_construction",
+      "kind": "overlay",
+      "state": "construction",
+      "src": "/experiences/founders-plot/assets/overlays/construction.svg",
+      "width": 72,
+      "height": 72,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "hitbox": {
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      "zIndexHint": 50,
+      "path": "overlays/construction.svg",
+      "intendedUse": "overlay:overlay_construction",
+      "promptFile": "prompts/style-lock.md",
+      "promptSummary": "Frontier Storybook overlay asset for overlay_construction.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "svg-inline-optimized",
+      "bytes": 673,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "overlay_ready_sparkle",
+      "kind": "overlay",
+      "state": "ready",
+      "src": "/experiences/founders-plot/assets/overlays/sparkle.svg",
+      "width": 72,
+      "height": 72,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "hitbox": {
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      "zIndexHint": 50,
+      "path": "overlays/sparkle.svg",
+      "intendedUse": "overlay:overlay_ready_sparkle",
+      "promptFile": "prompts/style-lock.md",
+      "promptSummary": "Frontier Storybook overlay asset for overlay_ready_sparkle.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "svg-inline-optimized",
+      "bytes": 693,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "overlay_blocked_badge",
+      "kind": "overlay",
+      "state": "blocked",
+      "src": "/experiences/founders-plot/assets/overlays/blocked.svg",
+      "width": 72,
+      "height": 72,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "hitbox": {
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      "zIndexHint": 50,
+      "path": "overlays/blocked.svg",
+      "intendedUse": "overlay:overlay_blocked_badge",
+      "promptFile": "prompts/style-lock.md",
+      "promptSummary": "Frontier Storybook overlay asset for overlay_blocked_badge.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "svg-inline-optimized",
+      "bytes": 628,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "overlay_upgrade_badge",
+      "kind": "overlay",
+      "state": "upgrade",
+      "src": "/experiences/founders-plot/assets/overlays/upgrade.svg",
+      "width": 72,
+      "height": 72,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "hitbox": {
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      "zIndexHint": 50,
+      "path": "overlays/upgrade.svg",
+      "intendedUse": "overlay:overlay_upgrade_badge",
+      "promptFile": "prompts/style-lock.md",
+      "promptSummary": "Frontier Storybook overlay asset for overlay_upgrade_badge.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "svg-inline-optimized",
+      "bytes": 622,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "overlay_approval_needed",
+      "kind": "overlay",
+      "state": "approval",
+      "src": "/experiences/founders-plot/assets/overlays/approval.svg",
+      "width": 72,
+      "height": 72,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "hitbox": {
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      "zIndexHint": 50,
+      "path": "overlays/approval.svg",
+      "intendedUse": "overlay:overlay_approval_needed",
+      "promptFile": "prompts/style-lock.md",
+      "promptSummary": "Frontier Storybook overlay asset for overlay_approval_needed.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "svg-inline-optimized",
+      "bytes": 671,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "overlay_contract_available",
+      "kind": "overlay",
+      "state": "contract",
+      "src": "/experiences/founders-plot/assets/overlays/contract.svg",
+      "width": 72,
+      "height": 72,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "hitbox": {
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      "zIndexHint": 50,
+      "path": "overlays/contract.svg",
+      "intendedUse": "overlay:overlay_contract_available",
+      "promptFile": "prompts/style-lock.md",
+      "promptSummary": "Frontier Storybook overlay asset for overlay_contract_available.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "svg-inline-optimized",
+      "bytes": 738,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    },
+    {
+      "id": "overlay_producing_timer_frame",
+      "kind": "overlay",
+      "state": "timer",
+      "src": "/experiences/founders-plot/assets/overlays/timer-frame.svg",
+      "width": 72,
+      "height": 72,
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "hitbox": {
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      "zIndexHint": 50,
+      "path": "overlays/timer-frame.svg",
+      "intendedUse": "overlay:overlay_producing_timer_frame",
+      "promptFile": "prompts/style-lock.md",
+      "promptSummary": "Frontier Storybook overlay asset for overlay_producing_timer_frame.",
+      "license": "project-owned-generated",
+      "generationToolModel": "Codex scripted SVG",
+      "reviewer": "codex-human",
+      "approvalStatus": "approved",
+      "optimizationStatus": "svg-inline-optimized",
+      "bytes": 770,
+      "styleReview": {
+        "passed": true,
+        "score": 5,
+        "reviewer": "codex-human"
+      }
+    }
+  ]
+}

@@ -141,6 +141,7 @@ test('Run now dispatches a worker-owned Foreman tick and production app code avo
   const enabled = await frame.evaluate(async () => window.__foundersPlotTest.enableCollectReadyOutputs());
   expect(enabled?.ok).toBe(true);
 
+  await frame.getByTestId('founders-clover-avatar').click();
   await frame.getByTestId('foreman-run-now-btn').click();
   await frame.waitForFunction(() => {
     return window.__foundersPlotTest.getState()?.state?.foreman?.receipt?.action === 'collect_ready_outputs';

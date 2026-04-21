@@ -29,12 +29,19 @@
   ];
 
   let currentState = null;
-  let selectedKey = 'hq';
+  let selectedKey = '';
+  let activeDrawer = '';
   let pollTimer = null;
   let pendingAction = false;
   let gatewayPromise = null;
+  let assetManifestPromise = null;
+  let assetMap = {};
+  let effectsController = null;
+  let manualForemanActingUntilMs = 0;
   let foremanRuntimeToken = '';
   let localForemanRuntimeId = '';
+  let lastActionTargetObjectId = '';
+  let lastRenderedHqLevel = 0;
   let workerSchedulerStatus = {
     active: false,
     taskKind: 'COLLECT_READY_OUTPUTS',
@@ -72,6 +79,25 @@
       gatewayPromise = import('/openclaw-lite/gateway.js').then((module) => module.default || module);
     }
     return gatewayPromise;
+  }
+
+  async function loadAssetManifest() {
+    if (!assetManifestPromise) {
+      assetManifestPromise = fetch('/experiences/founders-plot/assets/asset-manifest.json', {
+        credentials: 'include',
+        cache: 'no-store'
+      }).then(async (response) => {
+        if (!response.ok) throw new Error(`HTTP_${response.status}`);
+        const manifest = await response.json().catch(() => null);
+        const entries = Array.isArray(manifest?.assets) ? manifest.assets : [];
+        assetMap = Object.fromEntries(entries.map((entry) => [String(entry?.id || ''), entry]));
+        return manifest;
+      }).catch(() => {
+        assetMap = {};
+        return null;
+      });
+    }
+    return assetManifestPromise;
   }
 
   async function apiText(url, opts = {}) {
@@ -272,13 +298,6 @@
     }
   }
 
-  function focusPanel(id) {
-    const node = document.getElementById(id);
-    if (node) {
-      node.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  }
-
   function formatDuration(endsAt) {
     const remainingMs = Math.max(0, Number(endsAt || 0) - Date.now());
     const totalSeconds = Math.ceil(remainingMs / 1000);
@@ -313,12 +332,16 @@
     const hasServerRuntime = !!serverRuntimeId;
     const hasLocalToken = !!foremanRuntimeToken && localRuntimeId === serverRuntimeId;
     const serverStatus = String(serverRuntime?.status || 'NOT_STARTED').toUpperCase();
-    const serverHealthy = ['BOOTING', 'OBSERVING', 'THINKING', 'ACTING'].includes(serverStatus);
-    const needsRestart = hasServerRuntime && serverHealthy && !hasLocalToken;
+    const expiresAt = Number(serverRuntime?.expiresAt || 0);
+    const expired = expiresAt > 0 && expiresAt <= Date.now();
+    const serverHealthy = ['BOOTING', 'OBSERVING', 'THINKING', 'ACTING'].includes(serverStatus) && !expired;
+    const needsRestart = hasServerRuntime && ((!hasLocalToken && serverHealthy) || expired);
     const actionable = hasServerRuntime && hasLocalToken && serverHealthy;
     return {
       hasServerRuntime,
       hasLocalToken,
+      expired,
+      expiresAt,
       needsRestart,
       actionable,
       serverStatus,
@@ -359,6 +382,100 @@
     return stateData()?.pads?.find((pad) => !pad.occupied) || null;
   }
 
+  function buildingTypeForId(buildingId) {
+    return findBuilding(buildingId)?.type || '';
+  }
+
+  function objectIdForBuildingId(buildingId) {
+    return String(buildingTypeForId(buildingId) || '');
+  }
+
+  function objectIdForCandidateId(candidateId) {
+    const raw = String(candidateId || '');
+    if (!raw) return '';
+    if (raw.startsWith('collect:')) return objectIdForBuildingId(raw.slice('collect:'.length));
+    return '';
+  }
+
+  function setLastActionTarget(objectId) {
+    lastActionTargetObjectId = String(objectId || '');
+  }
+
+  function setActionTargetFromTool(toolName, args = {}) {
+    switch (String(toolName || '')) {
+      case 'et.plot.place_building':
+        setLastActionTarget(String(args.type || ''));
+        return;
+      case 'et.plot.queue_job':
+      case 'et.plot.collect_outputs':
+      case 'et.plot.set_priority':
+        setLastActionTarget(objectIdForBuildingId(args.buildingId));
+        return;
+      case 'et.plot.upgrade_building':
+        setLastActionTarget(args.buildingId ? objectIdForBuildingId(args.buildingId) : 'HQ');
+        return;
+      case 'et.plot.town.upgrade_landmark':
+        setLastActionTarget('PUBLIC_SQUARE');
+        return;
+      case 'et.plot.claim_reward':
+        setLastActionTarget('PUBLIC_SQUARE');
+        return;
+      default:
+        setLastActionTarget('');
+    }
+  }
+
+  function currentDecisionTargetObjectId(state) {
+    return objectIdForCandidateId(state?.foreman?.lastDecision?.chosenCandidateId || '');
+  }
+
+  function selectionExists(state) {
+    if (!state) return false;
+    if (selectedKey === 'hq') return true;
+    if (selectedKey.startsWith('building:')) return !!findSelected();
+    if (selectedKey.startsWith('pad:')) return !!emptyPadFromSelection();
+    return false;
+  }
+
+  function openDrawer(drawerKey, options = {}) {
+    activeDrawer = String(drawerKey || '');
+    if (!activeDrawer) return;
+    if (options.clearSelection !== false) {
+      selectedKey = '';
+    }
+    if (activeDrawer === 'recap') {
+      loadRecap().catch(() => {});
+    }
+    renderAll();
+  }
+
+  function closeDrawer() {
+    activeDrawer = '';
+    renderAll();
+  }
+
+  function focusPanel(id) {
+    const node = document.getElementById(id);
+    if (!node) return;
+    const drawerById = {
+      contractBoard: 'contracts',
+      approvalsList: 'approvals',
+      recapList: 'recap',
+      journalList: 'journal',
+      signalsPanel: 'signals'
+    };
+    const drawerKey = drawerById[id] || '';
+    if (drawerKey) {
+      openDrawer(drawerKey, { clearSelection: false });
+      requestAnimationFrame(() => {
+        const nextNode = document.getElementById(id);
+        nextNode?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+      return;
+    }
+    node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
   function setStatusLine(text) {
     setText('plotStatusLine', text);
   }
@@ -391,11 +508,20 @@
   function renderInventory(state) {
     const node = document.getElementById('inventoryStrip');
     if (!node) return;
+    const shortLabel = (key) => {
+      if (key === 'wood') return 'W';
+      if (key === 'stone') return 'S';
+      if (key === 'food') return 'F';
+      if (key === 'coin') return 'C';
+      if (key === 'xp') return 'XP';
+      return String(key || '').slice(0, 2).toUpperCase();
+    };
     node.innerHTML = inventoryRows(state).map((item) => {
       const meta = item.cap != null ? `${item.value} / ${item.cap}` : String(item.value);
       return `
-        <div class="foundersInventoryItem" data-testid="inventory-${item.key}">
+        <div class="foundersInventoryItem" data-testid="inventory-${item.key}" aria-label="${htmlEscape(`${item.label} ${meta}`)}">
           <div class="foundersLabel">${htmlEscape(item.label)}</div>
+          <div class="foundersInventoryShort" aria-hidden="true">${htmlEscape(shortLabel(item.key))}</div>
           <strong>${htmlEscape(meta)}</strong>
         </div>
       `;
@@ -405,47 +531,64 @@
   function renderBoard(state) {
     const node = document.getElementById('plotBoard');
     if (!node) return;
-    const padMap = new Map((state?.pads || []).map((pad) => [`${pad.x},${pad.y}`, pad]));
-    const buildingByCoord = new Map((state?.buildings || []).map((building) => [`${building.x},${building.y}`, building]));
-    node.innerHTML = BOARD_ORDER.map((cell) => {
-      const key = `${cell.x},${cell.y}`;
-      const building = buildingByCoord.get(key) || null;
-      const pad = padMap.get(key) || null;
-      const isScenic = !building && !pad;
-      const selectionKey = building
-        ? (building.type === 'HQ' ? 'hq' : `building:${building.buildingId}`)
-        : (pad ? `pad:${key}` : `scenic:${key}`);
-      const classes = ['foundersBoardTile'];
-      if (building?.type === 'HQ') classes.push('is-hq');
-      if (pad && !pad.occupied) classes.push('is-empty');
-      if (isScenic) classes.push('is-scenic');
-      if (selectedKey === selectionKey) classes.push('is-selected');
-      if (!isScenic) classes.push('is-selectable');
-      const title = building
-        ? `${BUILDING_LABELS[building.type] || building.type}`
-        : (pad ? `${pad.label}` : 'Frontier scrub');
-      const meta = building
-        ? `Lvl ${building.level} · ${building.state.toLowerCase().replace(/_/g, ' ')}`
-        : (pad ? 'Open build pad' : 'Scenic space');
-      return `
-        <button
-          class="${classes.join(' ')}"
-          type="button"
-          ${isScenic ? 'disabled' : ''}
-          data-select-key="${htmlEscape(selectionKey)}"
-          data-testid="board-tile-${cell.x}-${cell.y}"
-        >
-          <div class="foundersBoardTileTitle">${htmlEscape(title)}</div>
-          <div class="foundersBoardTileMeta">${htmlEscape(meta)}</div>
-        </button>
-      `;
-    }).join('');
+    const stageContainer = node.closest('[data-testid="founders-plot-stage"]');
+    if (stageContainer instanceof HTMLElement) {
+      stageContainer.dataset.activeDrawer = activeDrawer || '';
+    }
+    const sceneApi = window.FoundersPlotSceneState;
+    const renderApi = window.FoundersPlotSceneRender;
+    if (!sceneApi || !renderApi || typeof sceneApi.createSceneState !== 'function' || typeof renderApi.renderPlotStage !== 'function') {
+      node.innerHTML = '<div class="foundersEmptyState">Loading the town surface…</div>';
+      return;
+    }
 
-    node.querySelectorAll('[data-select-key]').forEach((button) => {
+    const scene = sceneApi.createSceneState(state, {
+      selectedKey,
+      activeDrawer,
+      localForemanRuntimeStatus: localForemanRuntimeStatus(state?.foreman?.runtime || {}),
+      workerSchedulerStatus,
+      manualForemanActing: Date.now() < manualForemanActingUntilMs,
+      lastActionTargetObjectId: lastActionTargetObjectId || currentDecisionTargetObjectId(state)
+    });
+    renderApi.renderPlotStage(node, scene, { assetMap });
+
+    const drawerTray = document.getElementById('drawerTray');
+    if (drawerTray && typeof renderApi.renderDrawerTray === 'function') {
+      renderApi.renderDrawerTray(drawerTray, scene);
+      drawerTray.querySelectorAll('[data-drawer-trigger]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const nextDrawer = button.getAttribute('data-drawer-trigger') || '';
+          if (nextDrawer) {
+            openDrawer(nextDrawer);
+          }
+        });
+      });
+    }
+
+    node.querySelectorAll('[data-scene-object-id]').forEach((button) => {
       button.addEventListener('click', () => {
-        selectedKey = button.getAttribute('data-select-key') || selectedKey;
+        const drawerKey = button.getAttribute('data-drawer-key') || '';
+        if (drawerKey) {
+          openDrawer(drawerKey);
+          return;
+        }
+        const nextSelection = button.getAttribute('data-selection-key') || '';
+        if (!nextSelection) return;
+        selectedKey = nextSelection;
+        activeDrawer = '';
         renderAll();
       });
+    });
+
+    const effectsLayer = document.getElementById('foundersEffectsLayer');
+    if (!effectsController && window.FoundersPlotEffects?.createEffectsController) {
+      effectsController = window.FoundersPlotEffects.createEffectsController();
+    }
+    effectsController?.sync({
+      layerNode: effectsLayer,
+      stageNode: node,
+      nextState: state,
+      scene
     });
   }
 
@@ -461,6 +604,7 @@
   }
 
   async function runTool(name, args = {}, actor = 'HUMAN') {
+    setActionTargetFromTool(name, args || {});
     pendingAction = true;
     setStatusLine(`Running ${name}…`);
     try {
@@ -491,6 +635,7 @@
   }
 
   async function updatePolicy(key, value) {
+    setLastActionTarget('FOREMAN_HUT');
     pendingAction = true;
     setStatusLine(`Updating ${key}…`);
     try {
@@ -512,6 +657,7 @@
   }
 
   async function resolveApproval(approvalId, decision) {
+    setLastActionTarget('FOREMAN_HUT');
     pendingAction = true;
     setStatusLine(`${decision === 'approve' ? 'Approving' : 'Rejecting'} request…`);
     try {
@@ -533,6 +679,7 @@
   }
 
   async function claimReward(rewardKey) {
+    setLastActionTarget('PUBLIC_SQUARE');
     return runTool('et.plot.claim_reward', {
       rewardKey,
       idempotencyKey: `claim:${rewardKey}:${Date.now()}`
@@ -540,6 +687,7 @@
   }
 
   async function setStandingOrder(standingOrder) {
+    setLastActionTarget('FOREMAN_HUT');
     return runTool('et.foreman.policy.set_standing_order', {
       standingOrder,
       idempotencyKey: `standing-order:${standingOrder}:${Date.now()}`
@@ -547,6 +695,7 @@
   }
 
   async function acceptContract(contractId) {
+    setLastActionTarget('CONTRACT_BOARD');
     pendingAction = true;
     setStatusLine('Accepting contract…');
     try {
@@ -571,6 +720,7 @@
   }
 
   async function turnInContract(contractId) {
+    setLastActionTarget('CONTRACT_BOARD');
     pendingAction = true;
     setStatusLine('Turning in contract…');
     try {
@@ -617,9 +767,28 @@
   function renderSelection(state) {
     const node = document.getElementById('selectionCard');
     if (!node) return;
+    const sheet = document.getElementById('selectionSheet');
+    const titleNode = document.getElementById('selectionSheetTitle');
+    const clearBtn = document.getElementById('selectionClearBtn');
     node.innerHTML = '';
     const selectedBuilding = findSelected();
     const selectedPad = emptyPadFromSelection();
+    if (clearBtn) {
+      clearBtn.hidden = !selectedBuilding && !selectedPad;
+      clearBtn.onclick = () => {
+        selectedKey = '';
+        renderAll();
+      };
+    }
+
+    if (sheet) {
+      sheet.hidden = !selectedBuilding && !selectedPad;
+    }
+    if (!selectedBuilding && !selectedPad) {
+      if (titleNode) titleNode.textContent = 'Selected object';
+      node.innerHTML = '';
+      return;
+    }
 
     if (selectedBuilding) {
       const runningJob = selectedBuilding.runningJob || null;
@@ -628,6 +797,7 @@
       actions.className = 'foundersActions';
       const title = document.createElement('h2');
       title.textContent = BUILDING_LABELS[selectedBuilding.type] || selectedBuilding.type;
+      if (titleNode) titleNode.textContent = title.textContent;
       node.appendChild(title);
 
       const rows = document.createElement('div');
@@ -709,21 +879,33 @@
       }
 
       node.appendChild(actions);
+      if (sheet) sheet.hidden = false;
       return;
     }
 
     if (selectedPad) {
       const title = document.createElement('h2');
       title.textContent = selectedPad.label;
+      if (titleNode) titleNode.textContent = 'Build here';
       node.appendChild(title);
       const description = document.createElement('p');
       description.textContent = 'Choose the next building for this open pad.';
       node.appendChild(description);
       buildTypeButtons(node, state.unlocks.buildingTypes || [], selectedPad);
+      if (sheet) sheet.hidden = false;
       return;
     }
 
-    node.innerHTML = '<div class="foundersEmptyState">Select a pad or building to inspect it.</div>';
+    if (titleNode) titleNode.textContent = 'Next step';
+    const goal = state?.currentGoal || state?.quest || {};
+    const message = document.createElement('div');
+    message.className = 'foundersObjectGoal';
+    message.innerHTML = `
+      <strong>${htmlEscape(goal.title || 'Grow the first district')}</strong>
+      <div class="small foundersObjectGoalText">${htmlEscape(goal.body || 'Tap the highlighted place in town to inspect it.')}</div>
+    `;
+    node.appendChild(message);
+    if (sheet) sheet.hidden = false;
   }
 
   function renderContracts(state) {
@@ -1312,7 +1494,9 @@
       if (action.type === 'PLACE_BUILDING') return `Place ${BUILDING_LABELS[action.buildingType] || action.buildingType}`;
       if (action.type === 'QUEUE_JOB') return 'Queue the first job';
       if (action.type === 'COLLECT_OUTPUTS') return 'Collect outputs';
-      if (action.type === 'UPGRADE_HQ') return 'Upgrade Headquarters';
+      if (action.type === 'UPGRADE_HQ' || action.type === 'UPGRADE_BUILDING') {
+        return action.buildingId ? 'Upgrade building' : 'Upgrade Headquarters';
+      }
       if (action.type === 'UPGRADE_LANDMARK') return 'Raise the Welcome Sign';
       if (action.type === 'ENABLE_PERMISSION') return 'Enable permission';
       if (action.type === 'TURN_IN_CONTRACT') return 'Turn in contract';
@@ -1355,8 +1539,9 @@
           });
           return;
         }
-        if (action.type === 'UPGRADE_HQ') {
+        if (action.type === 'UPGRADE_HQ' || action.type === 'UPGRADE_BUILDING') {
           await runTool('et.plot.upgrade_building', {
+            buildingId: action.buildingId,
             idempotencyKey: `quest-upgrade-hq:${Date.now()}`
           });
           return;
@@ -1377,12 +1562,12 @@
           return;
         }
         if (action.type === 'VIEW_CONTRACT_BOARD') {
-          focusPanel('contractBoard');
+          openDrawer('contracts', { clearSelection: false });
           setStatusLine('Contract Board is ready.');
           return;
         }
         if (action.type === 'RESOLVE_APPROVAL') {
-          focusPanel('approvalsList');
+          openDrawer('approvals', { clearSelection: false });
           setStatusLine('An approval is waiting for your decision.');
           return;
         }
@@ -1408,13 +1593,54 @@
     };
   }
 
+  function renderDrawerState() {
+    const layer = document.getElementById('foundersDrawerLayer');
+    const drawerIds = ['contracts', 'foreman', 'journal', 'signals', 'rewards', 'approvals', 'recap'];
+    if (!(layer instanceof HTMLElement)) return;
+    layer.hidden = !activeDrawer;
+    drawerIds.forEach((key) => {
+      const node = document.getElementById(`foundersDrawer-${key}`);
+      if (node instanceof HTMLElement) {
+        node.hidden = key !== activeDrawer;
+      }
+    });
+  }
+
+  function renderStageMood(state) {
+    const moodLine = document.getElementById('plotStageMood');
+    if (!(moodLine instanceof HTMLElement)) return;
+    if (activeDrawer === 'contracts') {
+      moodLine.textContent = 'Town requests are pinned on the board.';
+      return;
+    }
+    if (activeDrawer === 'foreman') {
+      moodLine.textContent = 'Clover keeps one safe eye on the plot.';
+      return;
+    }
+    const receipt = state?.foreman?.receipt || null;
+    if (receipt?.action === 'collect_ready_outputs') {
+      moodLine.textContent = 'The plot feels busy and capable today.';
+      return;
+    }
+    moodLine.textContent = 'A warm frontier plot ready to grow.';
+  }
+
   function renderProgress(state) {
+    const currentLevel = state?.progress?.currentLevel || state?.plot?.hqLevel || 1;
     const progress = state?.progress?.next || null;
-    setText('hqLevelValue', String(state?.progress?.currentLevel || state?.plot?.hqLevel || 1));
+    setText('hqLevelValue', String(currentLevel));
     const fill = document.getElementById('hqLevelFill');
     if (fill) {
       fill.style.width = `${Math.round((progress?.ratio || 0) * 100)}%`;
     }
+    const levelCard = document.querySelector('.foundersHudLevel');
+    if (levelCard instanceof HTMLElement && currentLevel > lastRenderedHqLevel) {
+      levelCard.classList.remove('is-level-up');
+      void levelCard.offsetWidth;
+      levelCard.classList.add('is-level-up');
+      window.setTimeout(() => levelCard.classList.remove('is-level-up'), 760);
+    }
+    lastRenderedHqLevel = currentLevel;
     if (progress) {
       setText('hqProgressText', `${progress.xpCurrent} / ${progress.xpRequired} XP`);
     } else {
@@ -1428,8 +1654,9 @@
     document.title = `Agent Town — Founders Plot (HQ ${state.progress?.currentLevel || state.plot?.hqLevel || 1})`;
     renderProgress(state);
     renderInventory(state);
-    renderBoard(state);
     renderQuest(state);
+    renderStageMood(state);
+    renderBoard(state);
     renderSelection(state);
     renderContracts(state);
     renderSignals(state);
@@ -1441,10 +1668,12 @@
     renderQueue(state);
     renderJournal(state);
     renderRecap(state);
+    renderDrawerState();
   }
 
   async function loadState() {
     try {
+      await loadAssetManifest().catch(() => null);
       const payload = await api('/api/founders-plot/state');
       currentState = payload;
       await syncWorkerScheduler(payload?.state || null);
@@ -1498,6 +1727,7 @@
   }
 
   async function startForemanRuntime() {
+    setLastActionTarget('FOREMAN_HUT');
     const gateway = await initGateway();
     if (gateway && typeof gateway.foundersPlotSchedulerStop === 'function') {
       await gateway.foundersPlotSchedulerStop({ reason: 'RUNTIME_RESTART' }).catch(() => null);
@@ -1543,6 +1773,7 @@
   }
 
   async function heartbeatForemanRuntime() {
+    setLastActionTarget('FOREMAN_HUT');
     const payload = await foremanApi('/api/founders-plot/foreman/session/heartbeat', {
       method: 'POST',
       body: JSON.stringify({})
@@ -1552,6 +1783,7 @@
   }
 
   async function pauseForemanRuntime() {
+    setLastActionTarget('FOREMAN_HUT');
     const payload = await foremanApi('/api/founders-plot/foreman/session/pause', {
       method: 'POST',
       body: JSON.stringify({})
@@ -1568,6 +1800,7 @@
   }
 
   async function enableCollectReadyOutputs() {
+    setLastActionTarget('FOREMAN_HUT');
     const response = await api('/api/founders-plot/tool/et.foreman.scheduler.enable_collect_ready_outputs', {
       method: 'POST',
       body: JSON.stringify({
@@ -1602,11 +1835,19 @@
         receipt: currentState?.state?.foreman?.receipt || null
       };
     }
+    setLastActionTarget(currentDecisionTargetObjectId(currentState?.state) || 'FOREMAN_HUT');
     const gateway = await initGateway();
     if (!gateway || typeof gateway.foundersPlotForemanTick !== 'function') {
       throw new Error('FOREMAN_WORKER_UNAVAILABLE');
     }
     let payload;
+    manualForemanActingUntilMs = Date.now() + 1600;
+    renderAll();
+    window.setTimeout(() => {
+      if (Date.now() >= manualForemanActingUntilMs) {
+        renderAll();
+      }
+    }, 1650);
     try {
       payload = await gateway.foundersPlotForemanTick({
         token: foremanRuntimeToken
@@ -1632,6 +1873,7 @@
   }
 
   async function applyReceiptCorrection(correction) {
+    setLastActionTarget('FOREMAN_HUT');
     const payload = await api('/api/founders-plot/foreman/receipt/correction', {
       method: 'POST',
       body: JSON.stringify({ correction })
@@ -1722,20 +1964,28 @@
   }
 
   function bindUi() {
-    const recapDrawer = document.getElementById('recapDrawer');
-    if (recapDrawer) {
-      recapDrawer.addEventListener('toggle', () => {
-        if (recapDrawer.open) {
-          loadRecap().catch(() => {});
-        }
-      });
-    }
     const markRecapReadBtn = document.getElementById('markRecapReadBtn');
     if (markRecapReadBtn) {
       markRecapReadBtn.addEventListener('click', () => {
         markRecapRead();
       });
     }
+    const drawerBackdrop = document.getElementById('foundersDrawerBackdrop');
+    if (drawerBackdrop) {
+      drawerBackdrop.addEventListener('click', () => {
+        closeDrawer();
+      });
+    }
+    document.querySelectorAll('[data-close-drawer]').forEach((button) => {
+      button.addEventListener('click', () => {
+        closeDrawer();
+      });
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && activeDrawer) {
+        closeDrawer();
+      }
+    });
   }
 
   window.__foundersPlotTest = {
@@ -1743,6 +1993,20 @@
     getState: () => currentState,
     getLocalForemanRuntimeStatus: () => localForemanRuntimeStatus(currentState?.state?.foreman?.runtime || {}),
     getWorkerSchedulerStatus: () => ({ ...workerSchedulerStatus }),
+    getActiveDrawer: () => activeDrawer,
+    openDrawer,
+    closeDrawer,
+    collectSurfaceMetrics: () => {
+      const metrics = window.FoundersPlotVisualMetrics?.collectSurfaceMetrics?.({
+        root: document.body,
+        stageNode: document.getElementById('plotBoard')
+      }) || null;
+      if (metrics) {
+        const questCta = document.getElementById('questCtaBtn');
+        metrics.primaryCtasAboveFold = questCta && questCta.getBoundingClientRect().top < window.innerHeight ? 1 : 0;
+      }
+      return metrics;
+    },
     runTool,
     updatePolicy,
     resolveApproval,
@@ -1760,6 +2024,9 @@
 
   applyEmbedMode();
   bindUi();
+  loadAssetManifest().then(() => {
+    renderAll();
+  }).catch(() => {});
   loadState().catch(() => {});
   startPolling();
 })();

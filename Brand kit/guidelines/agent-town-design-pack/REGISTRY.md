@@ -1,5 +1,5 @@
 # REGISTRY.md
-_Status: starter private registry definition for shell + onboarding_
+_Status: starter private registry definition for shell, onboarding, and Founders Plot V1 game surface_
 
 ## 1. Purpose
 
@@ -221,3 +221,111 @@ When generating UI code:
 - do not restyle registry blocks ad hoc
 - extend through variants, slots, and documented props
 - if you find yourself copying a shell section twice, it belongs in the registry
+
+---
+
+# V1.3 Addendum — Founders Plot Registry Expansion
+
+_Status: canonical for Agent Town: Founders Plot V1 game-surface components_
+
+## R1. Expanded scope
+
+`@agent-town` now governs:
+
+- DOM shell surfaces;
+- onboarding surfaces;
+- helper drawers;
+- Founders Plot V1 scenic game-surface DOM blocks;
+- world-object interaction primitives;
+- game HUD, action sheets, and diegetic state markers.
+
+This registry is **not** a full canvas/game-engine renderer. It does govern the current DOM-based Founders Plot visual game surface until a future renderer rewrite is explicitly approved.
+
+## R2. New game-surface item taxonomy
+
+### Base
+
+`game-surface-base`
+- Founders Plot game-surface tokens;
+- object-layer utilities;
+- accessibility utilities;
+- reduced-motion helpers.
+
+### UI primitives
+
+- `world-object`
+- `building-state-badge`
+- `timer-ring`
+- `resource-flyout`
+- `town-journal-trigger`
+- `approval-inbox-trigger`
+
+### Blocks
+
+- `founders-plot-stage`
+- `game-top-hud`
+- `context-action-sheet`
+- `clover-foreman`
+- `contract-board-object`
+
+## R3. Item usage rules
+
+### `game-surface-base`
+Use before building any Founders Plot visual surface.
+
+### `founders-plot-stage`
+Use for the dominant scenic plot layer.
+
+### `game-top-hud`
+Use for HQ level, core resources, and one current objective.
+
+### `world-object`
+Use for clickable/tappable in-world buildings and town objects.
+
+### `building-state-badge`
+Use for ready, producing, blocked, buildable, upgrade, and selected states.
+
+### `timer-ring`
+Use for construction and production progress.
+
+### `resource-flyout`
+Use for short collect/reward feedback such as `+3 wood`.
+
+### `context-action-sheet`
+Use for selected-object actions on desktop and mobile.
+
+### `clover-foreman`
+Use to embody Clover states in the world.
+
+### `contract-board-object`
+Use for the physical contract-board entry point.
+
+### `town-journal-trigger`
+Use for recap/history entry points.
+
+### `approval-inbox-trigger`
+Use for pending approval badges and drawer entry points.
+
+## R4. Founders Plot registry law
+
+For V1.3 visual game-surface work:
+
+1. Install/use `game-surface-base` before building any new Founders Plot screen primitives.
+2. Use `founders-plot-stage` for the scenic plot composition.
+3. Represent buildings through `world-object` plus `building-state-badge` / `timer-ring`.
+4. Use `context-action-sheet` for selected object details.
+5. Use `clover-foreman` for Clover embodiment; do not build Foreman as a normal status card.
+6. Use `resource-flyout` and `timer-ring` for game feel, but keep the server state authoritative.
+7. If a one-off component starts to repeat, promote it to the registry and add a contract.
+
+## R5. Asset registry rule
+
+Generated visual assets are not shadcn components, but they must still be registry-adjacent and manifest-driven.
+
+Required asset manifest path:
+
+```text
+public/experiences/founders-plot/assets/asset-manifest.json
+```
+
+The manifest must list every generated or sourced asset used by the scenic game surface.

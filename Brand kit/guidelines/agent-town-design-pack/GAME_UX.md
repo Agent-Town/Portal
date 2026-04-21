@@ -1,5 +1,5 @@
 # GAME_UX.md
-_Status: canonical for shell + onboarding surfaces_
+_Status: canonical for shell, onboarding, and Founders Plot V1 game surfaces_
 
 ## 1. UX thesis
 
@@ -414,3 +414,224 @@ The later city-builder may replace the current town shell as the dominant home s
 - one obvious next step
 - AI as helper, not hidden complexity
 - place-first navigation
+
+---
+
+# V1.3 Addendum — Founders Plot Game-Surface UX Law
+
+_Status: canonical for Agent Town: Founders Plot V1 game-surface work_
+
+## U1. Founders Plot UX thesis
+
+Founders Plot is the primary V1 game surface after onboarding.
+
+The player should not feel they are managing panels. They should feel they are improving a visible frontier plot with Clover nearby.
+
+The default game loop should read visually:
+
+1. see town state;
+2. see one current goal;
+3. click the relevant building/object;
+4. take one action;
+5. watch the town respond;
+6. let Clover handle a bounded routine task when trusted.
+
+## U2. The five-second game test
+
+A person viewing the default screen for five seconds should answer:
+
+- “This is a town-building game.”
+- “That is my plot.”
+- “That highlighted object is what I should do next.”
+- “That character is my AI helper.”
+- “Something is producing / ready / blocked.”
+
+If a five-second viewer says “dashboard”, “admin panel”, “task manager”, or “AI config screen”, the UI has failed.
+
+## U3. One current owner of attention
+
+Founders Plot must arbitrate attention in this order:
+
+1. blocking approval or broken runtime truth;
+2. tutorial / current goal blocker;
+3. ready contract turn-in;
+4. ready production / collection;
+5. active contract progress suggestion;
+6. optional Foreman optimization;
+7. journal / recap / secondary history.
+
+The UI, Clover suggestion, and primary CTA must point to the same highest-priority item whenever possible.
+
+## U4. Founders Plot primary screen map
+
+### U4.1 Founders Plot Game Surface
+
+The post-onboarding home-town screen.
+
+Purpose:
+- make Agent Town feel like a real game;
+- make the existing V1 systems visible in the world;
+- give the player one clear next action;
+- keep Clover present and legible.
+
+Required regions:
+
+- compact top HUD;
+- scenic plot stage;
+- in-world buildings and town objects;
+- Clover / Foreman presence;
+- contextual action sheet;
+- drawers for contracts, journal, approvals, and Foreman details.
+
+This screen is allowed to become the default return destination once onboarding is complete.
+
+## U5. Default layout
+
+Default desktop layout:
+
+1. top HUD with HQ level, resources, and current goal;
+2. scenic plot stage as dominant area;
+3. contextual action sheet, closed or minimal unless an object is selected;
+4. drawer entry points for Foreman, contracts, approvals, and journal.
+
+Default mobile layout:
+
+1. compact HUD;
+2. scenic plot;
+3. bottom action sheet;
+4. drawer buttons; no permanent stacked panels.
+
+## U6. Interaction model
+
+Players interact through world objects:
+
+- click/tap empty lot -> build sheet;
+- click/tap HQ -> upgrade sheet;
+- click/tap Lumber Camp/Farm/Quarry/etc. -> queue/collect/inspect sheet;
+- click/tap Contract Board -> contract drawer;
+- click/tap Clover -> Foreman drawer;
+- click/tap Journal -> recap/history drawer;
+- click/tap Welcome Sign -> Public Square / charm drawer.
+
+## U7. Required object states
+
+Each building/object must have clear visual and accessible states:
+
+- locked;
+- buildable;
+- under construction;
+- idle;
+- producing;
+- ready;
+- blocked;
+- upgradable;
+- selected.
+
+## U8. Foreman UX
+
+Clover is a character in the world.
+
+Clover states:
+
+- idle: standing near Foreman Hut/HQ;
+- observing: subtle attention indicator;
+- thinking: short non-blocking bubble;
+- acting: movement/intent indicator toward target object if feasible;
+- waiting approval: visible badge and drawer prompt;
+- paused: calm paused marker;
+- needs restart: friendly restart prompt.
+
+Clover copy rule: one short sentence by default, details only on expand.
+
+## U9. Text compression
+
+Default visible text limits:
+
+- desktop: <= 120 words;
+- mobile: <= 80 words;
+- max 3 visible prose blocks;
+- all debug/provider/runtime words absent in normal gameplay.
+
+## U10. Drawers and sheets
+
+Default hidden or minimized:
+
+- Contract details;
+- Town Journal;
+- Approvals;
+- Foreman receipts;
+- Standing Orders;
+- debug/worker details.
+
+Open drawers must not obscure the current primary action unless the drawer itself contains that action.
+
+## U11. Visual feedback
+
+Minimum game-feel feedback:
+
+- placement/construction animation;
+- production timer/progress indicator;
+- ready-to-collect marker;
+- resource flyout on collect/reward;
+- contract paper pin / availability indicator;
+- Clover action receipt;
+- HQ level-up moment.
+
+All motion must respect reduced motion.
+
+## U12. Founders Plot measurable acceptance criteria
+
+### U12.1 Visual hierarchy
+
+- scenic plot is the largest default region;
+- no more than one primary CTA visible;
+- no stacked permanent management panels on the default screen;
+- no debug/provider/runtime terms visible in normal gameplay.
+
+### U12.2 Text budget
+
+- desktop default visible words <= 120;
+- mobile default visible words <= 80;
+- no more than 3 prose blocks visible by default.
+
+### U12.3 Object interaction
+
+- every P0 object is clickable/tappable;
+- every P0 object is keyboard reachable;
+- every P0 object has an accessible name and state;
+- selecting an object opens the correct contextual sheet/drawer.
+
+### U12.4 Foreman embodiment
+
+- Clover is visible on default screen;
+- `acting`, `waiting-approval`, `paused`, and `needs-restart` states have distinct visual treatments;
+- a Foreman scheduler action produces visible world feedback and a receipt.
+
+### U12.5 Screenshot baselines
+
+Required viewports:
+
+- 390px mobile;
+- 768px tablet;
+- 1280px desktop;
+- 1440px wide desktop if layout changes materially.
+
+Required states:
+
+- initial plot;
+- selected building;
+- producing;
+- ready to collect;
+- active contract;
+- Clover acting;
+- Clover waiting approval;
+- reduced-motion mode if animation code changed.
+
+## U13. Rules for AI developers working on Founders Plot UI
+
+- Start by making the town state visible in-world before adding any panel.
+- Convert panels into objects, drawers, badges, tooltips, or sheets where possible.
+- Do not add a new visible text block unless it owns the current player decision.
+- Do not expose debug/runtime/provider jargon in the normal game surface.
+- Use `REGISTRY.md` before inventing primitives.
+- Test the five-second game test with screenshots before finalizing.

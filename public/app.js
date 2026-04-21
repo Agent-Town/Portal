@@ -6641,7 +6641,7 @@ async function autoConfigureBrainFromOpenRouter(credential) {
 
   const defaultModel = LlmCatalog && typeof LlmCatalog.getDefaultFreeOpenRouterModel === 'function'
     ? LlmCatalog.getDefaultFreeOpenRouterModel()
-    : 'openrouter/hunter-alpha';
+    : 'nvidia/nemotron-3-super-120b-a12b:free';
 
   const config = {
     provider: 'openrouter',
@@ -6850,13 +6850,15 @@ function defaultProviderApi(provider) {
     return LlmCatalog.defaultProviderApi(provider);
   }
   const normalized = String(provider || '').trim();
-  return normalized === 'openai' || normalized === 'ollama' ? 'openai-completions' : '';
+  return normalized === 'openai' || normalized === 'ollama' || normalized === 'openrouter' ? 'openai-completions' : '';
 }
 
 function defaultProviderBaseUrl(provider) {
   if (LlmCatalog && typeof LlmCatalog.defaultProviderBaseUrl === 'function') {
     return LlmCatalog.defaultProviderBaseUrl(provider, window.location.origin);
   }
+  const normalized = String(provider || '').trim();
+  if (normalized === 'openrouter') return 'https://openrouter.ai/api/v1';
   return '';
 }
 
@@ -6902,12 +6904,15 @@ function resolveLlmModelRefFromInputs(provider, model) {
     ? (LlmCatalog.normalizeProvider(providerInput) || providerInput || fallbackProvider)
     : (providerInput || fallbackProvider);
   const modelTrim = String(model || '').trim();
+  const normalizedModel = LlmCatalog && typeof LlmCatalog.normalizeModelForProvider === 'function'
+    ? LlmCatalog.normalizeModelForProvider(normalizedProvider, modelTrim)
+    : modelTrim;
 
   if (normalizedProvider === 'custom') {
-    return parseModelRefFromText(modelTrim || 'gpt-4o-mini', fallbackProvider, 'gpt-4o-mini');
+    return parseModelRefFromText(normalizedModel || 'gpt-4o-mini', fallbackProvider, 'gpt-4o-mini');
   }
 
-  const resolvedModel = modelTrim || getDefaultLlmModelForProvider(normalizedProvider);
+  const resolvedModel = normalizedModel || getDefaultLlmModelForProvider(normalizedProvider);
   return {
     provider: normalizedProvider,
     modelId: resolvedModel,

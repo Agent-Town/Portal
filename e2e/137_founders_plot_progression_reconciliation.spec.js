@@ -83,7 +83,7 @@ test('later progression costs only require already-unlocked resources and HQ2 le
     return (window.__foundersPlotTest.getState()?.state?.plot?.inventory?.wood || 0) >= 20;
   }, null, { timeout: 5000 });
 
-  await frame.getByTestId('board-tile-1-1').click();
+  await frame.getByTestId('founders-stage-object-HQ').click();
   await expect(frame.getByTestId('selection-upgrade')).toBeVisible({ timeout: 5000 });
   await frame.getByTestId('selection-upgrade').click();
   await frame.evaluate(async () => {

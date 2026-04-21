@@ -1,5 +1,5 @@
 # BRAND.md
-_Status: canonical for shell + onboarding surfaces_
+_Status: canonical for shell, onboarding, and Founders Plot V1 game surfaces_
 
 ## 1. Brand thesis
 
@@ -298,3 +298,180 @@ Any AI developer editing shell or onboarding surfaces must follow these rules:
 Previous shell assumptions around pixel-art UI, pixel fonts, or 8-bit affordances are superseded by this document for all flagship frontend work.
 
 The old style may remain in prototypes, internal tools, or world sub-experiences, but it is no longer the primary face of Agent Town.
+
+---
+
+# V1.3 Addendum — Founders Plot Game-Surface Brand Law
+
+_Status: canonical for Agent Town: Founders Plot V1 game-surface work_
+
+## A1. Agent Town / Founders Plot hierarchy
+
+This hierarchy is locked for all public-facing UI:
+
+- **Agent Town** is the product and masterbrand.
+- **Founders Plot** is the launch chapter, starting campaign, and first home-town loop.
+- Use **Agent Town: Founders Plot** when both continuity and clarity are useful.
+- Do not present Founders Plot as a separate product or as a small side mode.
+
+The first chapter fantasy is:
+
+> “I am founding my first settlement with an AI partner.”
+
+Not:
+
+> “I am testing an automation framework.”
+
+## A2. Founders Plot brand law
+
+Founders Plot is the major frontend experience for Agent Town V1. Its default screen must communicate:
+
+1. this is a warm frontier town-building game;
+2. this plot belongs to the player;
+3. Clover is the AI Foreman helping inside the world;
+4. the next action is obvious without reading a wall of text;
+5. progress is visible through buildings, signs, animations, and town objects.
+
+Founders Plot should feel:
+
+- warm, dusty, hopeful, newly settled;
+- practical and civic, not lawless or violent;
+- storybook / illustrated / tactile;
+- authored by the player;
+- small enough to understand, but alive enough to care about.
+
+Founders Plot must not feel:
+
+- like a dashboard about a town;
+- like an idle spreadsheet with flavor art;
+- like a generic mobile resource clone;
+- like a provider/runtime demo;
+- like a grim western or cowboy parody.
+
+## A3. The player role
+
+The player is the **Founder** first, then gradually becomes an **Operator**, then later a **Governor**.
+
+For V1 screens, do not overstate later governance. The V1 promise is:
+
+> “You founded a real place with your agent. It grows, it has needs, and you always know what to do next.”
+
+## A4. The Foreman role
+
+Clover is the player’s AI Foreman.
+
+Clover is:
+
+- visible in the scene;
+- helpful but bounded;
+- practical and concise;
+- accountable through short receipts;
+- never framed as mysterious magic.
+
+Clover should say things like:
+
+- “The farm is ready. I can collect it.”
+- “Wood is blocking the contract.”
+- “I’ll ask before spending coin.”
+
+Clover should not say things like:
+
+- “Scheduler preset executed.”
+- “Runtime token refreshed.”
+- “Worker origin metadata validated.”
+
+## A5. V1 vocabulary additions
+
+Approved player-facing nouns for Founders Plot:
+
+- plot
+- HQ
+- Foreman
+- Foreman Hut
+- Lumber Camp
+- Farm Plot
+- Quarry
+- Workshop
+- Market Stall
+- Contract Board
+- Public Square
+- Welcome Sign
+- Town Journal
+- Town Signal
+- Standing Order
+- Morning Brief
+- Receipt
+- Approval
+
+Avoid in normal gameplay UI:
+
+- scheduler
+- runtime
+- bearer token
+- worker origin
+- API route
+- JSON schema
+- cron
+- lease
+- tool namespace
+- trace id
+
+Technical terms may exist in backstage/debug screens only.
+
+## A6. GenAI asset brand law
+
+Generated assets are allowed, but they are subject to brand law.
+
+### A6.1 Required style
+
+Assets must be:
+
+- non-pixel unless a future per-experience spec explicitly says otherwise;
+- warm frontier storybook / illustrated;
+- readable at mobile size;
+- consistent in lighting, line weight, and silhouette;
+- friendly, practical, and civic;
+- optimized for web delivery.
+
+### A6.2 Negative style rules
+
+Do not generate or ship assets that look like:
+
+- grimdark westerns;
+- violent gunfighter fantasy;
+- cyberpunk / neon sci-fi;
+- generic fantasy village;
+- hyper-real photography;
+- cheap mobile idle-game clip art;
+- meme cowboy parody;
+- pixel font or 8-bit UI unless scoped to an internal prototype.
+
+### A6.3 Asset provenance
+
+Every generated asset must be listed in an asset manifest with:
+
+- file path;
+- intended use;
+- prompt or prompt summary;
+- generation tool/model if known;
+- human reviewer;
+- approval status;
+- optimization status.
+
+### A6.4 Canonical Founders Plot asset set
+
+The first game-surface asset set must include:
+
+- scenic plot background;
+- HQ states;
+- Lumber Camp states;
+- Farm Plot states;
+- Quarry states;
+- Workshop states;
+- Market Stall states;
+- Contract Board states;
+- Public Square / Welcome Sign states;
+- Foreman Hut;
+- Clover idle / observing / acting / waiting states;
+- resource icons;
+- timer / ready / blocked / upgrade visual markers.

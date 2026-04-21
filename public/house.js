@@ -769,7 +769,7 @@ function defaultProviderApi(provider) {
     return LlmCatalog.defaultProviderApi(provider);
   }
   const normalized = String(provider || '').trim();
-  return normalized === 'openai' || normalized === 'ollama' ? 'openai-completions' : '';
+  return normalized === 'openai' || normalized === 'ollama' || normalized === 'openrouter' ? 'openai-completions' : '';
 }
 
 function defaultProviderBaseUrl(provider) {
@@ -778,6 +778,7 @@ function defaultProviderBaseUrl(provider) {
   }
   const normalized = String(provider || '').trim();
   if (normalized === 'openai') return new URL('/api/llm/openai/v1', window.location.origin).toString();
+  if (normalized === 'openrouter') return 'https://openrouter.ai/api/v1';
   if (normalized === 'ollama') return 'http://127.0.0.1:11434/v1';
   return '';
 }

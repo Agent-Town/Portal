@@ -12,7 +12,7 @@
     ollama: Object.freeze(['gpt-oss:20b', 'gpt-oss:120b', 'llama3.3', 'llama3.2:latest', 'qwen2.5:7b']),
     'openai-codex': Object.freeze(['gpt-5.3-codex', 'gpt-5-codex']),
     anthropic: Object.freeze(['claude-opus-4-6', 'claude-3-5-sonnet-20240620', 'claude-3-5-haiku-20241022']),
-    openrouter: Object.freeze(['anthropic/claude-sonnet-4-5', 'openrouter/hunter-alpha', 'openrouter/healer-alpha', 'nvidia/nemotron-3-super-120b-a12b:free']),
+    openrouter: Object.freeze(['nvidia/nemotron-3-super-120b-a12b:free', 'anthropic/claude-sonnet-4-5']),
     litellm: Object.freeze(['claude-opus-4-6']),
     'amazon-bedrock': Object.freeze(['us.anthropic.claude-opus-4-6-v1:0']),
     'vercel-ai-gateway': Object.freeze(['anthropic/claude-opus-4.6']),
@@ -113,10 +113,13 @@
   ]);
 
   const FREE_OPENROUTER_MODELS = Object.freeze([
-    Object.freeze({ id: 'openrouter/hunter-alpha', label: 'Hunter Alpha (free)', contextWindow: 1000000 }),
-    Object.freeze({ id: 'openrouter/healer-alpha', label: 'Healer Alpha (free)', contextWindow: 262144 }),
     Object.freeze({ id: 'nvidia/nemotron-3-super-120b-a12b:free', label: 'Nemotron 120B (free)', contextWindow: 262144 })
   ]);
+
+  const RETIRED_OPENROUTER_MODELS = Object.freeze(new Set([
+    'openrouter/hunter-alpha',
+    'openrouter/healer-alpha'
+  ]));
 
   function getFreeOpenRouterModels() {
     return [...FREE_OPENROUTER_MODELS];
@@ -124,6 +127,16 @@
 
   function getDefaultFreeOpenRouterModel() {
     return FREE_OPENROUTER_MODELS[0].id;
+  }
+
+  function normalizeModelForProvider(provider, model) {
+    const normalizedProvider = normalizeProvider(provider);
+    const rawModel = String(model || '').trim();
+    if (!rawModel) return getDefaultModel(normalizedProvider);
+    if (normalizedProvider === 'openrouter' && RETIRED_OPENROUTER_MODELS.has(rawModel)) {
+      return getDefaultFreeOpenRouterModel();
+    }
+    return rawModel;
   }
 
   function normalizePolicy(input) {
@@ -189,7 +202,7 @@
 
   function defaultProviderApi(provider) {
     const normalized = String(provider || '').trim();
-    if (normalized === 'openai' || normalized === 'ollama') return 'openai-completions';
+    if (normalized === 'openai' || normalized === 'ollama' || normalized === 'openrouter') return 'openai-completions';
     return '';
   }
 
@@ -198,6 +211,7 @@
     if (normalized === 'openai') {
       return new URL('/api/llm/openai/v1', origin || 'http://localhost').toString();
     }
+    if (normalized === 'openrouter') return 'https://openrouter.ai/api/v1';
     if (normalized === 'ollama') return 'http://127.0.0.1:11434/v1';
     return '';
   }
@@ -221,6 +235,7 @@
     getProviderWarning,
     defaultProviderApi,
     defaultProviderBaseUrl,
+    normalizeModelForProvider,
     getFreeOpenRouterModels,
     getDefaultFreeOpenRouterModel
   };

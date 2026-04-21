@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72" fill="none">
+<defs>
+  <linearGradient id="skyGradient" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#f9efd7"/>
+    <stop offset="100%" stop-color="#f6d8a8"/>
+  </linearGradient>
+  <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+    <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="rgba(61, 32, 15, 0.18)"/>
+  </filter>
+</defs>
+
+
+      <circle cx="36" cy="36" r="28" fill="#a85b3d"/>
+      <rect x="32" y="18" width="8" height="24" rx="4" fill="#fff7e6"/>
+      <rect x="32" y="48" width="8" height="8" rx="4" fill="#fff7e6"/>
+    
+</svg>

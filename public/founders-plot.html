@@ -7,167 +7,212 @@
   <meta name="description" content="Founders Plot starter district" />
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="stylesheet" href="/styles.css?v=20260319a" />
-  <link rel="stylesheet" href="/experiences/founders-plot/styles.css?v=20260420a" />
+  <link rel="stylesheet" href="/experiences/founders-plot/styles.css?v=20260421a" />
 </head>
 <body class="founders-plot-page">
-  <div class="foundersPlotRoot">
-    <header class="panel foundersHero" data-testid="founders-hero">
-      <div class="foundersHeroCopy">
-        <div class="foundersEyebrow">Founders Plot</div>
-        <h1 id="foundersTitle">Establish the first productive district</h1>
-        <p id="foundersSubtitle">You choose the layout. The foreman handles the repeat work you trust it with.</p>
+  <div class="foundersPlotRoot foundersGameShell" data-testid="founders-game-shell">
+    <header class="foundersTopHud" data-testid="founders-status-strip">
+      <div class="foundersHudBrand" data-testid="founders-hero">
+        <div class="foundersEyebrow">Agent Town</div>
+        <h1 id="foundersTitle">Founders Plot</h1>
+        <p class="small foundersHudStatus" id="plotStageMood">A frontier plot ready to grow.</p>
       </div>
-      <div class="foundersHeroAction">
-        <button class="btn primary foundersPrimaryCta" id="questCtaBtn" type="button" data-testid="founders-quest-cta">Loading…</button>
-        <div class="small foundersHeroStatus" id="questStatusLine">Syncing plot…</div>
-      </div>
-    </header>
 
-    <section class="panel foundersStatusStrip" data-testid="founders-status-strip">
-      <div class="foundersLevelCard">
+      <div class="foundersHudLevel foundersHudCard">
         <div class="foundersLabel">HQ</div>
         <div class="foundersLevelValue" id="hqLevelValue">1</div>
-        <div class="foundersLevelBar">
+        <div class="foundersLevelBar" aria-hidden="true">
           <div class="foundersLevelFill" id="hqLevelFill"></div>
         </div>
         <div class="small" id="hqProgressText">0 / 25 XP</div>
       </div>
-      <div class="foundersInventory" id="inventoryStrip" data-testid="founders-inventory"></div>
-      <div class="foundersQueueCard">
-        <div class="foundersLabel">Queue</div>
+
+      <div class="foundersHudInventory foundersHudCard">
+        <div class="foundersLabel">Stores</div>
+        <div class="foundersInventory" id="inventoryStrip" data-testid="founders-inventory"></div>
+      </div>
+
+      <div class="foundersHudQueue foundersHudCard">
+        <div class="foundersLabel">Town pulse</div>
         <div class="small" id="queueSummaryText">No active jobs.</div>
+      </div>
+    </header>
+
+    <section class="foundersObjectiveRibbon foundersSurfacePanel" data-testid="founders-current-goal">
+      <div class="foundersObjectiveCopy">
+        <div class="foundersLabel">Current objective</div>
+        <h2 id="questTitle">Loading…</h2>
+        <p id="questBody">Reading the settlement ledger.</p>
+        <div class="foundersObjectiveMeta">
+          <span class="foundersBadge" id="goalOwnerBadge">Tutorial</span>
+        </div>
+      </div>
+      <div class="foundersObjectiveAction">
+        <button class="btn primary foundersPrimaryCta" id="questCtaBtn" type="button" data-testid="founders-quest-cta">Loading…</button>
+        <div class="sr-only" id="questStatusLine" aria-live="polite">Syncing plot…</div>
       </div>
     </section>
 
-    <main class="foundersLayout">
-      <section class="panel foundersBoardCard">
-        <div class="foundersPanelHeader">
-          <div>
-            <div class="foundersLabel">Settlement board</div>
-            <h2>The six starter pads</h2>
-          </div>
-          <div class="small" id="boardHint">Select a pad or building to inspect it.</div>
+    <main class="foundersGameMain">
+      <section class="foundersStageRegion">
+        <div class="foundersStageFrame" data-testid="founders-plot-stage">
+          <div class="foundersBoard" id="plotBoard" data-testid="founders-board"></div>
+          <div class="foundersEffectsLayer" id="foundersEffectsLayer" aria-hidden="true"></div>
         </div>
-        <div class="foundersBoard" id="plotBoard" data-testid="founders-board"></div>
-        <div class="foundersQueueListWrap">
-          <div class="foundersLabel">Timers and queues</div>
-          <div class="foundersQueueList" id="queueList" data-testid="founders-queue-list"></div>
+
+        <nav class="foundersDrawerTray" id="drawerTray" data-testid="founders-drawer-tray" aria-label="Town drawers"></nav>
+      </section>
+
+      <section class="foundersBottomSheet foundersSurfacePanel" id="selectionSheet" data-testid="founders-selection-panel" hidden>
+        <div class="foundersBottomSheetHeader">
+          <div>
+            <div class="foundersLabel">Action sheet</div>
+            <h2 id="selectionSheetTitle">Next step</h2>
+          </div>
+          <button class="btn small foundersSheetClose" id="selectionClearBtn" type="button" hidden>Back to plot</button>
+        </div>
+        <div id="selectionCard"></div>
+      </section>
+    </main>
+
+    <div class="foundersDrawerLayer" id="foundersDrawerLayer" hidden>
+      <button class="foundersDrawerBackdrop" id="foundersDrawerBackdrop" type="button" aria-label="Close drawer"></button>
+
+      <section class="foundersDrawer" id="foundersDrawer-contracts" hidden aria-labelledby="foundersDrawerTitle-contracts">
+        <header class="foundersDrawerHeader">
+          <div>
+            <div class="foundersLabel">Town requests</div>
+            <h2 id="foundersDrawerTitle-contracts">Contract Board</h2>
+          </div>
+          <button class="btn small foundersDrawerClose" type="button" data-close-drawer="contracts">Close</button>
+        </header>
+        <div class="foundersDrawerBody" id="founders-contract-board" data-testid="founders-contract-board">
+          <div class="small foundersDrawerLead" id="contractBoardStatus">Locked until HQ2.</div>
+          <div id="contractBoard"></div>
         </div>
       </section>
 
-      <aside class="foundersSidebar">
-        <section class="panel foundersQuestCard" data-testid="founders-current-goal">
-          <div class="foundersPanelHeader foundersPanelHeaderCompact">
-            <div>
-              <div class="foundersLabel">Current goal</div>
-              <h2 id="questTitle">Loading…</h2>
-            </div>
-            <div class="foundersBadge" id="goalOwnerBadge">Tutorial</div>
+      <section class="foundersDrawer" id="foundersDrawer-foreman" hidden aria-labelledby="foundersDrawerTitle-foreman">
+        <header class="foundersDrawerHeader">
+          <div>
+            <div class="foundersLabel">Foreman</div>
+            <h2 id="foundersDrawerTitle-foreman">Clover</h2>
           </div>
-          <p id="questBody">Reading the settlement ledger.</p>
-          <div class="small foundersGoalSupport" id="questStatusLine">Syncing plot…</div>
-        </section>
-
-        <section class="panel foundersSelectionCard" data-testid="founders-selection-panel">
-          <div class="foundersLabel">Action sheet</div>
-          <div id="selectionCard"></div>
-        </section>
-
-        <section class="panel foundersContractCard" data-testid="founders-contract-board">
-          <div class="foundersPanelHeader foundersPanelHeaderCompact">
-            <div>
-              <div class="foundersLabel">Contract board</div>
-              <h2>Town requests</h2>
-            </div>
-            <div class="small" id="contractBoardStatus">Locked until HQ2.</div>
-          </div>
-          <div id="contractBoard"></div>
-        </section>
-
-        <section class="panel foundersSignalsCard" data-testid="founders-signals-panel">
-          <div class="foundersPanelHeader foundersPanelHeaderCompact">
-            <div>
-              <div class="foundersLabel">Town signals</div>
-              <h2>How the town feels</h2>
-            </div>
-          </div>
-          <div id="signalsPanel"></div>
-        </section>
-
-        <section class="panel foundersLandmarkCard" data-testid="founders-public-square-panel">
-          <div class="foundersPanelHeader foundersPanelHeaderCompact">
-            <div>
-              <div class="foundersLabel">Public square</div>
-              <h2>Welcome Sign</h2>
-            </div>
-          </div>
-          <div id="publicSquareCard"></div>
-        </section>
-
-        <section class="panel foundersForemanCard" data-testid="founders-foreman-panel">
-          <div class="foundersPanelHeader foundersPanelHeaderCompact">
-            <div>
-              <div class="foundersLabel">Foreman</div>
-              <h2>Clover</h2>
-            </div>
+          <button class="btn small foundersDrawerClose" type="button" data-close-drawer="foreman">Close</button>
+        </header>
+        <div class="foundersDrawerBody foundersDrawerBodyWide" id="founders-foreman-panel" data-testid="founders-foreman-panel">
+          <div class="foundersForemanIntro">
             <div class="foundersBadge" id="foremanStatusBadge" data-testid="founders-foreman-status">Foreman not started</div>
-          </div>
-          <p id="foremanRecommendation">The foreman is reading the plot.</p>
-          <div class="small" id="foremanToolsLine">Clover can help with routine work you trust it with.</div>
-          <div class="foundersInlineButtons foundersForemanControls">
-            <button class="btn small" id="foremanStartBtn" type="button" data-testid="foreman-start-btn">Start Clover</button>
-            <button class="btn small" id="foremanPauseBtn" type="button" data-testid="foreman-pause-btn">Pause Foreman</button>
-            <button class="btn small" id="foremanRunNowBtn" type="button" data-testid="foreman-run-now-btn">Run now</button>
-          </div>
-          <div class="foundersSubpanel" id="standingOrderCard" data-testid="founders-standing-order"></div>
-          <div class="foundersSubpanel" id="planCard" data-testid="founders-plan-card"></div>
-          <div class="foundersSubpanel" id="schedulerCard"></div>
-          <div class="foundersSubpanel" id="receiptCard" data-testid="founders-receipt"></div>
-        </section>
-
-        <section class="panel foundersPermissionsCard" data-testid="founders-permissions-panel">
-          <div class="foundersLabel">Delegation</div>
-          <div id="permissionsList"></div>
-        </section>
-
-        <section class="panel foundersApprovalsCard" data-testid="founders-approvals-panel">
-          <div class="foundersLabel">Approvals</div>
-          <div id="approvalsList">No pending approvals.</div>
-        </section>
-
-        <section class="panel foundersRewardsCard" data-testid="founders-rewards-panel">
-          <div class="foundersLabel">Rewards</div>
-          <div id="rewardsList">No rewards ready.</div>
-        </section>
-
-        <section class="panel foundersJournalCard" data-testid="founders-journal-panel">
-          <div class="foundersPanelHeader foundersPanelHeaderCompact">
-            <div>
-              <div class="foundersLabel">Town journal</div>
-              <h2>Recent notes</h2>
+            <p id="foremanRecommendation">The foreman is reading the plot.</p>
+            <div class="small" id="foremanToolsLine">Clover can help with routine work you trust it with.</div>
+            <div class="foundersInlineButtons foundersForemanControls">
+              <button class="btn small" id="foremanStartBtn" type="button" data-testid="foreman-start-btn">Start Clover</button>
+              <button class="btn small" id="foremanPauseBtn" type="button" data-testid="foreman-pause-btn">Pause Foreman</button>
+              <button class="btn small" id="foremanRunNowBtn" type="button" data-testid="foreman-run-now-btn">Run now</button>
             </div>
           </div>
-          <div id="journalList"></div>
-        </section>
-      </aside>
-    </main>
-
-    <details class="panel foundersRecapDrawer" id="recapDrawer" data-testid="founders-recap-drawer">
-      <summary>While you were away</summary>
-      <div class="foundersRecapBody">
-        <div class="small" id="recapSummaryText">No new recap lines yet.</div>
-        <div class="foundersRecapList" id="recapList"></div>
-        <div class="foundersRecapActions">
-          <button class="btn small" id="markRecapReadBtn" type="button">Mark recap read</button>
+          <div class="foundersDrawerGrid">
+            <div class="foundersSubpanel" id="standingOrderCard" data-testid="founders-standing-order"></div>
+            <div class="foundersSubpanel" id="planCard" data-testid="founders-plan-card"></div>
+            <div class="foundersSubpanel" id="schedulerCard"></div>
+            <div class="foundersSubpanel" id="receiptCard" data-testid="founders-receipt"></div>
+            <div class="foundersDrawerSection">
+              <div class="foundersLabel">Delegation</div>
+              <div id="permissionsList" data-testid="founders-permissions-panel"></div>
+            </div>
+          </div>
         </div>
-      </div>
-    </details>
+      </section>
 
-    <section class="panel foundersFooterNote">
-      <div class="small" id="plotStatusLine">Waiting for plot state…</div>
-    </section>
+      <section class="foundersDrawer" id="foundersDrawer-journal" hidden aria-labelledby="foundersDrawerTitle-journal">
+        <header class="foundersDrawerHeader">
+          <div>
+            <div class="foundersLabel">Town notes</div>
+            <h2 id="foundersDrawerTitle-journal">Journal</h2>
+          </div>
+          <button class="btn small foundersDrawerClose" type="button" data-close-drawer="journal">Close</button>
+        </header>
+        <div class="foundersDrawerBody" id="founders-journal-panel" data-testid="founders-journal-panel">
+          <div id="journalList"></div>
+        </div>
+      </section>
+
+      <section class="foundersDrawer" id="foundersDrawer-signals" hidden aria-labelledby="foundersDrawerTitle-signals">
+        <header class="foundersDrawerHeader">
+          <div>
+            <div class="foundersLabel">Town pulse</div>
+            <h2 id="foundersDrawerTitle-signals">Signals & Square</h2>
+          </div>
+          <button class="btn small foundersDrawerClose" type="button" data-close-drawer="signals">Close</button>
+        </header>
+        <div class="foundersDrawerBody foundersDrawerBodyWide">
+          <section id="founders-signals-panel" data-testid="founders-signals-panel">
+            <div class="foundersDrawerLead small">How the town feels right now.</div>
+            <div id="signalsPanel"></div>
+          </section>
+          <section class="foundersDrawerSection" id="founders-public-square-panel" data-testid="founders-public-square-panel">
+            <div class="foundersLabel">Public square</div>
+            <div id="publicSquareCard"></div>
+          </section>
+          <section class="foundersDrawerSection">
+            <div class="foundersLabel">Timers & queues</div>
+            <div class="foundersQueueList" id="queueList" data-testid="founders-queue-list"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="foundersDrawer" id="foundersDrawer-rewards" hidden aria-labelledby="foundersDrawerTitle-rewards">
+        <header class="foundersDrawerHeader">
+          <div>
+            <div class="foundersLabel">Rewards</div>
+            <h2 id="foundersDrawerTitle-rewards">Ready to claim</h2>
+          </div>
+          <button class="btn small foundersDrawerClose" type="button" data-close-drawer="rewards">Close</button>
+        </header>
+        <div class="foundersDrawerBody" id="founders-rewards-panel" data-testid="founders-rewards-panel">
+          <div id="rewardsList">No rewards ready.</div>
+        </div>
+      </section>
+
+      <section class="foundersDrawer" id="foundersDrawer-approvals" hidden aria-labelledby="foundersDrawerTitle-approvals">
+        <header class="foundersDrawerHeader">
+          <div>
+            <div class="foundersLabel">Approvals</div>
+            <h2 id="foundersDrawerTitle-approvals">Needs your say-so</h2>
+          </div>
+          <button class="btn small foundersDrawerClose" type="button" data-close-drawer="approvals">Close</button>
+        </header>
+        <div class="foundersDrawerBody" id="founders-approvals-panel" data-testid="founders-approvals-panel">
+          <div id="approvalsList">No pending approvals.</div>
+        </div>
+      </section>
+
+      <section class="foundersDrawer foundersRecapDrawer" id="foundersDrawer-recap" hidden aria-labelledby="foundersDrawerTitle-recap">
+        <header class="foundersDrawerHeader">
+          <div>
+            <div class="foundersLabel">Morning brief</div>
+            <h2 id="foundersDrawerTitle-recap">While you were away</h2>
+          </div>
+          <button class="btn small foundersDrawerClose" type="button" data-close-drawer="recap">Close</button>
+        </header>
+        <div class="foundersDrawerBody" id="recapDrawer" data-testid="founders-recap-drawer">
+          <div class="small" id="recapSummaryText">No new recap lines yet.</div>
+          <div class="foundersRecapList" id="recapList"></div>
+          <div class="foundersRecapActions">
+            <button class="btn small" id="markRecapReadBtn" type="button">Mark recap read</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="sr-only" id="plotStatusLine" aria-live="polite">Waiting for plot state…</div>
+    <div class="sr-only" id="boardHint">Select a building or lot to inspect it.</div>
   </div>
 
-  <script src="/experiences/founders-plot/app.js?v=20260420a" defer></script>
+  <script src="/experiences/founders-plot/scene_state.js?v=20260421a" defer></script>
+  <script src="/experiences/founders-plot/scene_render.js?v=20260421a" defer></script>
+  <script src="/experiences/founders-plot/effects.js?v=20260421a" defer></script>
+  <script src="/experiences/founders-plot/visual_metrics.js?v=20260421a" defer></script>
+  <script src="/experiences/founders-plot/app.js?v=20260421a" defer></script>
 </body>
 </html>

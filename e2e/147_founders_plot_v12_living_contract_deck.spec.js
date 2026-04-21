@@ -79,6 +79,7 @@ test('the HQ2 board shows recurring requesters, snapshots requester identity, an
   expect(kinds).toEqual(expect.arrayContaining(['SUPPLY', 'BUILD']));
   expect(offers.every((contract) => contract?.requesterId && contract?.requesterSnapshot?.displayName)).toBe(true);
 
+  await frame.locator('[data-drawer-trigger="contracts"]').click();
   const boardText = await frame.getByTestId('founders-contract-board').textContent();
   expect(boardText).toMatch(/Atlas Depot|Market Circle|Neighbor Row|Town Hall/);
 
