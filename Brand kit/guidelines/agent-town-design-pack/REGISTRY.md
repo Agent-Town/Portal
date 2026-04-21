@@ -329,3 +329,125 @@ public/experiences/founders-plot/assets/asset-manifest.json
 ```
 
 The manifest must list every generated or sourced asset used by the scenic game surface.
+
+# V1.3.1 Addendum — Signoff Registry Items
+
+_Status: canonical for Agent Town: Founders Plot V1.3.1 visual-surface signoff_
+
+## R6. V1.3.1 registry extensions
+
+These items extend the V1.3 game-surface registry. They exist to prevent one-off fixes from becoming unreviewable style drift.
+
+### `hero-frame-baseline`
+
+Purpose:
+- standardize the canonical launch-grade hero screenshot and its review metadata.
+
+Contract:
+- captures full app route at 1280px;
+- contains no normal-surface debug panels;
+- references approved primary-view assets;
+- stored as a screenshot baseline and linked from the V1.3.1 spec or release note.
+
+Required metadata:
+
+```json
+{
+  "frameId": "founders-v1-3-1-hero-1280",
+  "route": "/app?district=founders-plot",
+  "viewport": { "width": 1280, "height": 900 },
+  "approvedBy": "name-or-handle",
+  "approvedAt": "YYYY-MM-DD",
+  "notes": "short signoff note"
+}
+```
+
+### `clover-target-link`
+
+Purpose:
+- make Clover's `acting` state visibly connected to the target world object.
+
+Contract:
+- receives `state`, `targetObjectId`, `targetLabel`, `actionVerb`;
+- renders only when Clover is acting or when the selected action needs target explanation;
+- supports reduced motion;
+- exposes `data-testid="clover-target-link"`;
+- has accessible text describing target and action.
+
+### `objective-attention-ring`
+
+Purpose:
+- give exactly one current object the strongest attention treatment.
+
+Contract:
+- supports attention levels: `none`, `available`, `recommended`, `blocked`;
+- only one `recommended` object by default;
+- works without relying only on color;
+- mobile treatment is quieter than desktop.
+
+### `mobile-label-controller`
+
+Purpose:
+- centralize label visibility rules at mobile widths.
+
+Contract:
+- hides nonessential labels on mobile;
+- allows selected object label;
+- allows objective-relevant label;
+- allows compact state icon/badge for ready/blocked states;
+- exposes testable counts for visible labels.
+
+### `badge-stack-governor`
+
+Purpose:
+- prevent badges/pills from accumulating into dashboard clutter.
+
+Contract:
+- enforces badge priority;
+- max 2 visible object badges on desktop;
+- max 1 visible object badge on mobile unless selected;
+- excess state moves to sheet/tooltip.
+
+### `devtools-quarantine-toggle`
+
+Purpose:
+- make backstage/debug surfaces available without polluting the normal game surface.
+
+Contract:
+- debug UI hidden by default;
+- can be enabled only through explicit debug/dev mode;
+- does not appear in first-run or normal Founders Plot screenshots;
+- debug mode is visually marked as non-player-facing.
+
+## R7. Asset approval registry rule
+
+`asset-manifest.json` must now support human approval metadata for primary-view assets.
+
+Each primary-view asset entry must include:
+
+```json
+{
+  "id": "hq-lv1",
+  "path": "assets/buildings/hq-lv1.webp",
+  "kind": "building|scene|character|effect|icon",
+  "usage": "primary-view|secondary|debug|unused",
+  "source": "generated|handmade|licensed|unknown",
+  "prompt": "optional prompt or prompt reference",
+  "approvalStatus": "draft|needs_revision|approved",
+  "approvedBy": "name-or-handle|null",
+  "approvedAt": "YYYY-MM-DD|null",
+  "approvalNotes": "short note"
+}
+```
+
+V1.3.1 final signoff requires `usage: primary-view` assets to be `approvalStatus: approved`.
+
+## R8. Registry executable-stub rule
+
+When a registry item is referenced by `REGISTRY.md`, the branch should include one of:
+
+- an actual reusable component/module;
+- a documented contract file under the registry docs;
+- a deliberate note explaining why the current implementation is still local and when it will be promoted.
+
+This prevents the registry from becoming aspirational text that AI developers cannot use.

@@ -635,3 +635,162 @@ Required states:
 - Do not expose debug/runtime/provider jargon in the normal game surface.
 - Use `REGISTRY.md` before inventing primitives.
 - Test the five-second game test with screenshots before finalizing.
+
+# V1.3.1 Addendum — Visual-Surface Signoff UX Law
+
+_Status: canonical for Agent Town: Founders Plot V1.3.1 visual-surface signoff_
+
+## U14. V1.3.1 sprint thesis
+
+V1.3.1 is not a new systems sprint. It is a focused signoff pass on V1.3.
+
+The current V1.3 direction is structurally correct: scene-first, drawer/sheet secondary systems, Clover in-world, visual adapter architecture, and meaningful tests. V1.3.1 must finish the polish that determines whether the product feels launch-grade.
+
+## U15. Locked wins from V1.3
+
+Do not reopen these unless a serious regression is found:
+
+- scene-first Founders Plot surface;
+- visual state adapter / renderer / effects split;
+- secondary systems in drawers/sheets;
+- Clover visible in-world;
+- restart/runtime-truth preserved;
+- targeted Playwright coverage for hierarchy, object mapping, mobile, reduced motion, and assets.
+
+## U16. Full-route game test
+
+The player-facing game test applies to the full player route, not only the iframe or embedded experience frame.
+
+A five-second viewer of the actual app route must not see a large worker/debug console as part of the normal game surface.
+A five-second viewer of the actual app route must not see Agent Comms / worker-debug console chrome as part of the normal game surface.
+
+The answer should be:
+
+> “This is a frontier town-building game, and Clover is helping me.”
+
+Not:
+
+> “This is a game embedded above Agent Comms / Worker Tools / Brain config.”
+
+## U17. Clover acting UX
+
+When Clover acts, the player must know:
+
+1. what Clover is doing;
+2. which world object Clover is doing it to;
+3. whether it succeeded, failed, or needs approval.
+
+Default presentation:
+
+- Clover moves/anchors/points toward the target or shows a target-link treatment;
+- the target object also reacts;
+- one short receipt appears;
+- details remain expandable in the Foreman drawer.
+
+Bad presentation:
+
+- Clover bubble says “acting” but target is unclear;
+- only a text receipt explains the action;
+- the action is visible only in logs.
+
+## U18. Mobile label suppression rules
+
+Mobile should feel calmer than desktop, not more annotated.
+
+At mobile widths:
+
+- default object labels are hidden unless selected or objective-relevant;
+- buildable lot labels are suppressed unless the lot is the recommended next step;
+- label meaning should move into icons, badges, focus states, and the bottom sheet;
+- the objective ribbon carries the main instruction;
+- the selected sheet carries secondary text.
+
+Metric:
+
+- mobile default stage labels visible <= 3;
+- mobile default visible word count target <= 65, hard max <= 80;
+- no overlapping object labels in the baseline screenshots.
+
+## U19. Objective-relevant lot emphasis
+
+When several build lots are unlocked, the game must still show one next action.
+
+Rules:
+
+- current goal resolver selects at most one `recommended` world object;
+- other legal lots stay `available` but visually muted;
+- the current objective ribbon, primary CTA, and Clover suggestion should reference the recommended object;
+- if no single recommendation exists, the UI may show a neutral “choose a lot” state, but that is not the default tutorial path.
+
+## U20. Badge and signal discipline
+
+Badges, pills, and labels must not recreate dashboard clutter.
+
+Rules:
+
+- default object badges use priority ordering;
+- mobile defaults show fewer badges than desktop;
+- multi-signal details live in selected-object sheet;
+- town signals remain secondary unless they own the current attention priority.
+
+## U21. Scope-hygiene UX rule
+
+Non-game platform work such as OpenRouter/proxy migration may be important, but it must not be part of normal Founders Plot signoff unless the sprint explicitly says so.
+
+The review experience should be clean:
+
+- one branch story;
+- one owner for unrelated migration work if it remains;
+- separate tests and rollback plan;
+- no mixed approval where visual signoff implicitly approves provider/proxy changes.
+
+## U22. V1.3.1 measurable UX gates
+
+### U22.1 Product direction gate
+
+Pass criteria:
+
+- five-second viewer reads it as a frontier town-building game;
+- one current goal is obvious;
+- Clover is visibly in-world;
+- no normal-surface debug console is visible.
+
+### U22.2 Art direction gate
+
+Pass criteria:
+
+- canonical hero frame approved by named human art/design owner;
+- no primary-view placeholder-grade assets;
+- asset manifest approval metadata complete.
+
+### U22.3 Embodiment gate
+
+Pass criteria:
+
+- Clover `acting` target link visible in screenshot and testable in DOM;
+- target object reacts to Clover action;
+- blocked/restart-needed truth remains visible and friendly.
+
+### U22.4 Mobile gate
+
+Pass criteria:
+
+- mobile stage breathes;
+- default stage labels <= 3;
+- visible words hard max <= 80, target <= 65;
+- no label overlap in baseline screenshots.
+
+### U22.5 Goal-emphasis gate
+
+Pass criteria:
+
+- exactly one primary recommended object in tutorial/default states;
+- non-recommended available lots are visually quieter;
+- CTA and recommendation agree.
+
+### U22.6 Scope gate
+
+Pass criteria:
+
+- OpenRouter/proxy changes split out or documented in `specs/OPENROUTER_SCOPE_QUARANTINE.md`;
+- separate owner signoff recorded if not split.

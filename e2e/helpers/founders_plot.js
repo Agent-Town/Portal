@@ -2,13 +2,22 @@ const { expect } = require('@playwright/test');
 const { hatchAndConnectLite, pressOpenViaAgentApi, unlockGateWithSigil } = require('./phase2');
 
 async function openFoundersPlotFrame(page) {
+  await openFoundersPlotRoute(page);
+  return await getOpenFoundersPlotFrame(page);
+}
+
+async function openFoundersPlotRoute(page, { debug = false, route = '/app' } = {}) {
   await hatchAndConnectLite(page, 'signup');
   await unlockGateWithSigil(page, 'key');
   await page.getByTestId('open-btn').click();
   await pressOpenViaAgentApi(page);
-
-  await page.goto('/app?district=founders-plot');
-  return await getOpenFoundersPlotFrame(page);
+  const params = new URLSearchParams();
+  params.set('district', 'founders-plot');
+  if (debug) params.set('debug', '1');
+  await page.goto(`${route}?${params.toString()}`);
+  await expect(page.locator('#districtModalBackdrop:not(.is-hidden)')).toHaveCount(1, { timeout: 5000 });
+  await expect(page.locator('#districtModalTitle')).toHaveText('Founders Plot');
+  return page;
 }
 
 async function getOpenFoundersPlotFrame(page) {
@@ -190,6 +199,7 @@ module.exports = {
   getOfferByKind,
   getPlotState,
   openFoundersPlotFrame,
+  openFoundersPlotRoute,
   placeFirstLumberCamp,
   postJson,
   runLumberCycle,

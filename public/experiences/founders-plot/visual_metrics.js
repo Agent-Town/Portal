@@ -131,6 +131,28 @@
     return textNodesUnder(root).map((node) => String(node.textContent || '').trim()).join(' ');
   }
 
+  function visibleStageLabels(root = document.body) {
+    return Array.from(root.querySelectorAll('.at-fp-objectLabel'))
+      .filter((node) => elementVisible(node));
+  }
+
+  function mobileLabelOverlapCount(root = document.body) {
+    const labels = visibleStageLabels(root);
+    let overlaps = 0;
+    for (let index = 0; index < labels.length; index += 1) {
+      const leftRect = labels[index].getBoundingClientRect();
+      for (let nextIndex = index + 1; nextIndex < labels.length; nextIndex += 1) {
+        const rightRect = labels[nextIndex].getBoundingClientRect();
+        const intersects = leftRect.left < rightRect.right
+          && leftRect.right > rightRect.left
+          && leftRect.top < rightRect.bottom
+          && leftRect.bottom > rightRect.top;
+        if (intersects) overlaps += 1;
+      }
+    }
+    return overlaps;
+  }
+
   function collectSurfaceMetrics(options = {}) {
     const root = options.root || document.body;
     const stageNode = options.stageNode || document.querySelector('[data-testid="founders-plot-stage"]') || document.getElementById('plotBoard');
@@ -146,7 +168,9 @@
       duplicateDomIdCount: duplicateDomIdCount(document),
       stageVisibleAreaRatio: stageVisibleAreaRatio(stageNode, viewportWidth, viewportHeight, viewportTop),
       horizontalOverflow: hasHorizontalOverflow(document.documentElement),
-      visibleText: visibleText(root)
+      visibleText: visibleText(root),
+      mobileVisibleStageLabels: visibleStageLabels(root).length,
+      mobileLabelOverlapCount: mobileLabelOverlapCount(root)
     };
   }
 
@@ -160,6 +184,7 @@
     duplicateDomIdCount,
     elementVisible,
     hasHorizontalOverflow,
+    mobileLabelOverlapCount,
     stageVisibleAreaRatio
   };
 });

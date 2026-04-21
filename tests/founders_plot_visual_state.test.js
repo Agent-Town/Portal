@@ -270,3 +270,60 @@ test('stale runtime maps to restart-needed Clover state', () => {
   assert.equal(scene.clover.state, 'RESTART_NEEDED');
   assert.equal(scene.clover.assetId, 'clover_restart_needed');
 });
+
+test('multiple buildable lots still resolve to one recommended attention target', () => {
+  const scene = createSceneState(makeBaseView(), {
+    selectedKey: '',
+    activeDrawer: '',
+    viewportWidth: 1280
+  });
+
+  const recommended = scene.objects.filter((object) => object.attention === 'recommended');
+  const available = scene.objects.filter((object) => object.attention === 'available');
+  assert.equal(recommended.length, 1);
+  assert.ok(available.length >= 1);
+  assert.equal(scene.currentGoal.targetObjectId, recommended[0].id);
+});
+
+test('acting Clover exposes action and target metadata for renderer linkage', () => {
+  const scene = createSceneState(makeBaseView({
+    foreman: {
+      ...makeBaseView().foreman,
+      runtime: {
+        status: 'ACTING',
+        runtimeId: 'rt_1',
+        expiresAt: Date.now() + 60_000
+      },
+      receipt: {
+        receiptId: 'rcp_1',
+        action: 'collect_ready_outputs',
+        result: 'Collected 4 wood.',
+        reason: 'Collected 4 wood from the Lumber Camp.'
+      }
+    },
+    pads: makeBaseView().pads.map((pad) => (pad.x === 0 && pad.y === 0 ? { ...pad, occupied: true } : pad)),
+    buildings: [
+      ...makeBaseView().buildings,
+      {
+        buildingId: 'bld_lumber',
+        type: 'LUMBER_CAMP',
+        x: 0,
+        y: 0,
+        level: 1,
+        state: 'OUTPUT_READY',
+        outputBuffer: { wood: 4 },
+        completedJobs: [{ jobId: 'job_1' }],
+        runningJob: null
+      }
+    ]
+  }), {
+    viewportWidth: 1280,
+    manualForemanActing: true,
+    lastActionTargetObjectId: 'LUMBER_CAMP'
+  });
+
+  assert.equal(scene.clover.state, 'ACTING');
+  assert.equal(scene.clover.targetObjectId, 'LUMBER_CAMP');
+  assert.ok(scene.clover.actionVerb);
+  assert.equal(scene.clover.targetLabel, 'Lumber Camp');
+});

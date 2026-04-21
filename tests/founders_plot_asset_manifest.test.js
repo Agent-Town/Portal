@@ -67,3 +67,21 @@ test('every asset entry is approved, prompt-linked, and points at a real file un
 
   assert.ok(totalBytes <= 2_800_000, `asset pack too large: ${totalBytes}`);
 });
+
+test('primary-view assets have named human approval metadata and hero-frame signoff data', () => {
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  const assets = Array.isArray(manifest?.assets) ? manifest.assets : [];
+  const primaryView = assets.filter((asset) => asset?.usage === 'primary-view');
+
+  assert.ok(primaryView.length > 10);
+  primaryView.forEach((asset) => {
+    assert.equal(asset?.approvalStatus, 'approved');
+    assert.ok(String(asset?.approvedBy || '').trim(), `missing approvedBy for ${asset?.id}`);
+    assert.match(String(asset?.approvedAt || ''), /^\d{4}-\d{2}-\d{2}$/, `invalid approvedAt for ${asset?.id}`);
+    assert.ok(String(asset?.approvalNotes || '').trim(), `missing approvalNotes for ${asset?.id}`);
+  });
+
+  assert.equal(manifest?.heroFrame?.approvalStatus, 'approved');
+  assert.ok(String(manifest?.heroFrame?.approvedBy || '').trim());
+  assert.match(String(manifest?.heroFrame?.approvedAt || ''), /^\d{4}-\d{2}-\d{2}$/);
+});

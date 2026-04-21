@@ -12,10 +12,10 @@ The project is no longer only a minimal landing page. It contains both:
 Before making product/UI changes, read the relevant docs in this order:
 
 1. `AGENTS.md` — repo workflow and non-negotiable coding rules.
-2. [`Brand kit/guidelines/agent-town-design-pack/BRAND.md`](Brand%20kit/guidelines/agent-town-design-pack/BRAND.md) — product identity, tone, naming, copy, character, and asset law.
-3. [`Brand kit/guidelines/agent-town-design-pack/DESIGN.md`](Brand%20kit/guidelines/agent-town-design-pack/DESIGN.md) — visual law, tokens, layout, game-surface composition, accessibility, and anti-patterns.
-4. [`Brand kit/guidelines/agent-town-design-pack/GAME_UX.md`](Brand%20kit/guidelines/agent-town-design-pack/GAME_UX.md) — UX flows, hierarchy, game-surface interaction rules, and measurable acceptance criteria.
-5. [`Brand kit/guidelines/agent-town-design-pack/REGISTRY.md`](Brand%20kit/guidelines/agent-town-design-pack/REGISTRY.md) — approved `@agent-town` components/blocks and registry governance.
+2. `BRAND.md` — product identity, tone, naming, copy, character, and asset law.
+3. `DESIGN.md` — visual law, tokens, layout, game-surface composition, accessibility, and anti-patterns.
+4. `GAME_UX.md` — UX flows, hierarchy, game-surface interaction rules, and measurable acceptance criteria.
+5. `REGISTRY.md` — approved `@agent-town` components/blocks and registry governance.
 6. The active sprint spec in `specs/`.
 
 Do not duplicate detailed style rules in `AGENTS.md`. Put durable design/UX rules in the design docs above and link to them here.
@@ -79,7 +79,7 @@ npm run build:openclaw-lite
 - `public/openclaw-lite/` — built OpenClaw Lite browser artifacts; keep in sync with vendor changes.
 - `e2e/` — Playwright tests and acceptance criteria.
 - `specs/` — product + API specifications.
-- design docs: `Brand kit/guidelines/agent-town-design-pack/*.md`.
+- design docs: `BRAND.md`, `DESIGN.md`, `GAME_UX.md`, `REGISTRY.md`.
 
 ## Definition of done
 
@@ -219,3 +219,18 @@ When implementing a sprint spec:
 3. Do not add future-roadmap systems unless explicitly required.
 4. Document any ambiguity before coding.
 5. Produce a final implementation report with changed files, tests, screenshots, and known limitations.
+
+## Founders Plot V1.3.1 signoff-pass rule
+
+When implementing the V1.3.1 visual-surface signoff pass:
+
+- treat the existing V1.3 scene-first architecture as a locked win;
+- do not rewrite the shell or add gameplay systems;
+- read `BRAND.md`, `DESIGN.md`, `GAME_UX.md`, and `REGISTRY.md` before coding;
+- update those docs when durable visual/UX rules change;
+- keep normal Founders Plot gameplay free of Agent Comms / Worker Tools / Skill Context / Worker Traffic / Brain / Session Context / Trainer panels unless explicit debug mode is enabled;
+- make Clover `ACTING` target-linked and testable;
+- reduce mobile label density through the design-system rules, not one-off CSS hacks;
+- ensure only the objective-relevant lot gets primary attention by default;
+- split or quarantine unrelated OpenRouter/proxy changes with a separate owner and rollback note;
+- capture full-route screenshots, not only embedded experience screenshots.

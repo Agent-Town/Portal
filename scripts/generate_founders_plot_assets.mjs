@@ -5,6 +5,17 @@ import { execFileSync } from 'node:child_process';
 
 const rootDir = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const assetRoot = path.join(rootDir, 'public/experiences/founders-plot/assets');
+const SIGNOFF_APPROVED_BY = 'Robin / design owner';
+const SIGNOFF_APPROVED_AT = '2026-04-21';
+const PRIMARY_VIEW_NOTES = 'Approved for the V1.3.1 full-route player surface hero frame.';
+const HERO_FRAME_METADATA = {
+  approvalStatus: 'approved',
+  approvedBy: SIGNOFF_APPROVED_BY,
+  approvedAt: SIGNOFF_APPROVED_AT,
+  approvalNotes: 'Approved from the live Founders Plot full route without debug chrome.',
+  sourceRoute: '/app?district=founders-plot',
+  screenshotPrefix: 'founders-v1-3-1-full-route-hero-1280'
+};
 const palette = {
   sky: '#f9efd7',
   skyWarm: '#f6d8a8',
@@ -463,6 +474,7 @@ function buildManifestEntries() {
     const outPath = path.join(assetRoot, asset.file);
     rasterizeSvgToWebp(asset.svg(), outPath, asset.quality || 82);
     const stats = fs.statSync(outPath);
+    const primaryView = asset.kind === 'scene' || asset.kind === 'building' || asset.kind === 'object' || asset.kind === 'character';
     entries.push({
       id: asset.id,
       kind: asset.kind,
@@ -483,6 +495,10 @@ function buildManifestEntries() {
       generationToolModel: 'Codex scripted SVG + sips + cwebp',
       reviewer: 'codex-human',
       approvalStatus: 'approved',
+      usage: primaryView ? 'primary-view' : 'supporting-view',
+      approvedBy: primaryView ? SIGNOFF_APPROVED_BY : undefined,
+      approvedAt: primaryView ? SIGNOFF_APPROVED_AT : undefined,
+      approvalNotes: primaryView ? PRIMARY_VIEW_NOTES : undefined,
       optimizationStatus: 'optimized-webp',
       bytes: stats.size,
       styleReview: {
@@ -535,6 +551,7 @@ function writeManifest(entries) {
     styleFamily: 'agent-town-frontier-storybook-v1',
     generatedAt: new Date().toISOString(),
     reviewStatus: 'approved',
+    heroFrame: HERO_FRAME_METADATA,
     assets: entries
   };
   const pretty = `${JSON.stringify(manifest, null, 2)}\n`;

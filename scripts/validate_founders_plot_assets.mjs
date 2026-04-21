@@ -52,6 +52,12 @@ function main() {
   if (manifest?.styleFamily !== 'agent-town-frontier-storybook-v1') {
     fail(`Unexpected styleFamily: ${manifest?.styleFamily || 'missing'}`);
   }
+  if (manifest?.heroFrame?.approvalStatus !== 'approved') {
+    fail('Missing approved heroFrame metadata');
+  }
+  if (!manifest?.heroFrame?.approvedBy || !manifest?.heroFrame?.approvedAt || !manifest?.heroFrame?.approvalNotes) {
+    fail('heroFrame metadata is incomplete');
+  }
   const assets = Array.isArray(manifest?.assets) ? manifest.assets : [];
   const byId = new Map(assets.map((asset) => [String(asset?.id || ''), asset]));
 
@@ -70,6 +76,11 @@ function main() {
     if (!asset?.license) fail(`Asset ${id} missing license`);
     if (!asset?.reviewer) fail(`Asset ${id} missing reviewer`);
     if (!asset?.approvalStatus) fail(`Asset ${id} missing approvalStatus`);
+    if (String(asset?.usage || '') === 'primary-view') {
+      if (!asset?.approvedBy) fail(`Primary-view asset ${id} missing approvedBy`);
+      if (!asset?.approvedAt) fail(`Primary-view asset ${id} missing approvedAt`);
+      if (!asset?.approvalNotes) fail(`Primary-view asset ${id} missing approvalNotes`);
+    }
     if (!asset?.optimizationStatus) fail(`Asset ${id} missing optimizationStatus`);
     if (!asset?.styleReview?.passed) fail(`Asset ${id} missing passed style review`);
     totalBytes += Number(asset?.bytes || 0);

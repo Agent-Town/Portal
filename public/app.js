@@ -1199,6 +1199,7 @@ function setActiveDistrict(district) {
 
   const status = el('townSceneStatus');
   if (status) status.textContent = districtStatusText(next);
+  syncAgentPanelSurfaceVisibility();
 }
 
 function normalizeDistrict(district) {
@@ -1228,6 +1229,45 @@ function explicitDistrictFromInput(district) {
     || district === 'house'
     ? district
     : null;
+}
+
+function hasExplicitRouteDebug() {
+  try {
+    return new URLSearchParams(window.location.search).get('debug') === '1';
+  } catch {
+    return false;
+  }
+}
+
+function currentSurfaceDistrict() {
+  const paramsDistrict = explicitDistrictFromInput(new URLSearchParams(window.location.search).get('district'));
+  const pathDistrict = explicitDistrictFromInput(popupDistrictByPath[window.location.pathname] || null);
+  return currentDistrict || activeDistrict || paramsDistrict || pathDistrict || null;
+}
+
+function syncAgentPanelSurfaceVisibility(panel = null) {
+  const dock = panel || el('agentSidebar');
+  if (!dock) return;
+  const debugRoute = hasExplicitRouteDebug();
+  const district = currentSurfaceDistrict();
+  const hideForPlayerSurface = district === 'founders-plot' && !debugRoute;
+
+  dock.classList.toggle('is-hidden', hideForPlayerSurface);
+  dock.setAttribute('aria-hidden', hideForPlayerSurface ? 'true' : 'false');
+
+  if (debugRoute && district === 'founders-plot') {
+    dock.classList.remove('minimized');
+    dock.classList.remove('debug-collapsed');
+    const debugBtn = el('agentDebugToggleBtn');
+    if (debugBtn) debugBtn.setAttribute('aria-expanded', 'true');
+  }
+
+  if (hideForPlayerSurface) {
+    document.body.classList.remove('agent-panel-expanded');
+  }
+
+  syncAgentPanelLayout(dock);
+  scheduleAgentPanelLayoutSync(dock);
 }
 
 function clearTouchDistrictPrime() {
@@ -7665,9 +7705,7 @@ function applyVisibility(state) {
     }
   }
 
-  // Keep the Agent panel available on every page/state.
-  if (sidebar) sidebar.classList.remove('is-hidden');
-  syncAgentPanelLayout(sidebar);
+  syncAgentPanelSurfaceVisibility(sidebar);
 }
 
 async function checkWalletStep() {
@@ -8745,11 +8783,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     applyPanelZoom(loadAgentPanelZoomStep(), { persist: false });
     bindAgentPanelLayout(dock);
+    syncAgentPanelSurfaceVisibility(dock);
 
     btn.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
       applyMinimized(!dock.classList.contains('minimized'));
+      syncAgentPanelSurfaceVisibility(dock);
     });
 
     if (debugBtn) {
@@ -8757,6 +8797,7 @@ document.addEventListener('DOMContentLoaded', () => {
         event.preventDefault();
         event.stopPropagation();
         applyDebugVisible(dock.classList.contains('debug-collapsed'));
+        syncAgentPanelSurfaceVisibility(dock);
       });
     }
     if (zoomOutBtn) {

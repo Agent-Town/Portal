@@ -37,6 +37,7 @@
   let assetManifestPromise = null;
   let assetMap = {};
   let effectsController = null;
+  let currentScene = null;
   let manualForemanActingUntilMs = 0;
   let foremanRuntimeToken = '';
   let localForemanRuntimeId = '';
@@ -538,6 +539,7 @@
     const sceneApi = window.FoundersPlotSceneState;
     const renderApi = window.FoundersPlotSceneRender;
     if (!sceneApi || !renderApi || typeof sceneApi.createSceneState !== 'function' || typeof renderApi.renderPlotStage !== 'function') {
+      currentScene = null;
       node.innerHTML = '<div class="foundersEmptyState">Loading the town surface…</div>';
       return;
     }
@@ -545,11 +547,13 @@
     const scene = sceneApi.createSceneState(state, {
       selectedKey,
       activeDrawer,
+      viewportWidth: window.innerWidth,
       localForemanRuntimeStatus: localForemanRuntimeStatus(state?.foreman?.runtime || {}),
       workerSchedulerStatus,
       manualForemanActing: Date.now() < manualForemanActingUntilMs,
       lastActionTargetObjectId: lastActionTargetObjectId || currentDecisionTargetObjectId(state)
     });
+    currentScene = scene;
     renderApi.renderPlotStage(node, scene, { assetMap });
 
     const drawerTray = document.getElementById('drawerTray');
@@ -1479,17 +1483,32 @@
 
   function renderQuest(state) {
     const currentGoal = state?.currentGoal || state?.quest || {};
-    setText('questTitle', currentGoal.title || state?.quest?.title || 'Set the first productive district');
-    setText('questBody', currentGoal.body || state?.quest?.body || 'Choose a meaningful next step for the settlement.');
-    setText('goalOwnerBadge', prettyGoalOwner(currentGoal.owner));
+    const sceneGoal = currentScene?.currentGoal || {};
+    const title = sceneGoal.title || currentGoal.title || state?.quest?.title || 'Set the first productive district';
+    const body = sceneGoal.body || currentGoal.body || state?.quest?.body || 'Choose a meaningful next step for the settlement.';
+    const owner = sceneGoal.owner || currentGoal.owner;
+    const targetObjectId = String(sceneGoal.targetObjectId || '');
+    const targetLabel = String(sceneGoal.targetLabel || '');
+    const sceneCtaLabel = String(sceneGoal.primaryCtaLabel || '').trim();
+
+    setText('questTitle', title);
+    setText('questBody', body);
+    setText('goalOwnerBadge', prettyGoalOwner(owner));
     setQuestStatus(`${state?.recap?.unseenCount || 0} unseen recap lines · ${state?.foreman?.pendingApprovals?.length || 0} pending approvals`);
+
+    const ribbon = document.querySelector('[data-testid="founders-current-goal"]');
+    if (ribbon instanceof HTMLElement) {
+      ribbon.setAttribute('data-target-object-id', targetObjectId);
+      ribbon.setAttribute('data-owner', String(owner || 'tutorial'));
+      ribbon.setAttribute('data-has-target', targetObjectId ? 'true' : 'false');
+    }
 
     const cta = document.getElementById('questCtaBtn');
     if (!cta) return;
     const action = currentGoal.primaryAction && typeof currentGoal.primaryAction === 'object'
       ? currentGoal.primaryAction
       : (state?.quest?.primaryAction && typeof state.quest.primaryAction === 'object' ? state.quest.primaryAction : null);
-    const label = (() => {
+    const label = sceneCtaLabel || (() => {
       if (!action) return 'No action available';
       if (action.type === 'PLACE_BUILDING') return `Place ${BUILDING_LABELS[action.buildingType] || action.buildingType}`;
       if (action.type === 'QUEUE_JOB') return 'Queue the first job';
@@ -1507,11 +1526,15 @@
     })();
     cta.textContent = label;
     cta.disabled = pendingAction || !action;
+    cta.setAttribute('data-target-object-id', targetObjectId);
+    cta.setAttribute('data-target-label', targetLabel);
     cta.onclick = async () => {
       if (!action) return;
       try {
         if (action.type === 'PLACE_BUILDING') {
-          const pad = emptyPadFromSelection() || firstEmptyPad();
+          const pad = targetObjectId.startsWith('PAD:')
+            ? state.pads.find((candidate) => `PAD:${candidate.x},${candidate.y}` === targetObjectId)
+            : (emptyPadFromSelection() || firstEmptyPad());
           if (!pad) {
             setStatusLine('No open pad is available.');
             return;
@@ -1651,12 +1674,13 @@
   function renderAll() {
     const state = stateData();
     if (!state) return;
+    currentScene = null;
     document.title = `Agent Town — Founders Plot (HQ ${state.progress?.currentLevel || state.plot?.hqLevel || 1})`;
     renderProgress(state);
     renderInventory(state);
+    renderBoard(state);
     renderQuest(state);
     renderStageMood(state);
-    renderBoard(state);
     renderSelection(state);
     renderContracts(state);
     renderSignals(state);
@@ -1991,6 +2015,7 @@
   window.__foundersPlotTest = {
     loadState,
     getState: () => currentState,
+    getScene: () => currentScene,
     getLocalForemanRuntimeStatus: () => localForemanRuntimeStatus(currentState?.state?.foreman?.runtime || {}),
     getWorkerSchedulerStatus: () => ({ ...workerSchedulerStatus }),
     getActiveDrawer: () => activeDrawer,

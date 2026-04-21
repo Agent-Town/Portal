@@ -475,3 +475,88 @@ The first game-surface asset set must include:
 - Clover idle / observing / acting / waiting states;
 - resource icons;
 - timer / ready / blocked / upgrade visual markers.
+
+# V1.3.1 Addendum — Flagship Frontier Storybook Finish
+
+_Status: canonical for Agent Town: Founders Plot V1.3.1 visual-surface signoff_
+
+## B13. V1.3.1 brand objective
+
+The V1.3 implementation already moved Founders Plot from a panel-heavy dashboard toward a scene-first game surface. V1.3.1 must finish that work. This is a **polish and signoff pass**, not a redesign and not a gameplay-systems sprint.
+
+The final player-facing frame must communicate in five seconds:
+
+> “This is Agent Town. This is my frontier plot. Clover is helping in the world.”
+
+It must not communicate:
+
+> “This is a game frame embedded inside a developer or agent-runtime console.”
+
+## B14. Flagship hero-frame standard
+
+Founders Plot needs one canonical hero frame for review and future comparison.
+
+A hero frame is the approved 1280px desktop default state for the first playable Founders Plot surface. It should show:
+
+- the scenic Founders Plot stage as the dominant composition;
+- HQ or the current anchor building;
+- Clover visible in-world;
+- the objective-relevant object or lot clearly emphasized;
+- no open debug/runtime/provider panels;
+- enough warmth, depth, and object richness to feel launch-grade, not placeholder-grade.
+
+The hero frame is not a marketing mockup. It is a real screenshot from the app route.
+
+## B15. Art-direction signoff metadata
+
+Generated or sourced visual assets are not considered brand-approved merely because they pass validation. They must carry review metadata in the Founders Plot asset manifest or an adjacent approval record.
+
+Required approval fields for primary-view assets:
+
+```json
+{
+  "approvalStatus": "draft|needs_revision|approved",
+  "approvedBy": "name-or-handle",
+  "approvedAt": "YYYY-MM-DD or null",
+  "approvalNotes": "short human-readable note"
+}
+```
+
+For V1.3.1 final signoff, all primary-view assets must be approved by a named human art/design owner.
+
+Primary-view assets include:
+
+- stage background / scenic frame;
+- HQ;
+- buildable lot art;
+- Clover idle/thinking/acting/blocked/waiting visual states or sprites;
+- objective attention treatment;
+- Contract Board / Public Square / Welcome Sign if visible on the default screen.
+
+## B16. Placeholder rejection rule
+
+An asset should be rejected or marked `needs_revision` if it reads as:
+
+- generic vector placeholder;
+- flat UI icon pretending to be a building;
+- AI-art mismatch against the Agent Town frontier-storybook world;
+- inconsistent perspective, lighting, or scale;
+- decorative western clipart;
+- embedded text that will blur on mobile;
+- a copied or recognizable third-party game/IP style.
+
+## B17. Clover brand rule
+
+Clover is the player's AI Foreman and should feel like an embodied helper in the world.
+
+For V1.3.1, the most important improvement is not more dialogue. It is **world linkage**:
+
+- when Clover is acting, the player should visually understand which world object Clover is acting on;
+- Clover must not feel like a mascot floating over a scheduler card;
+- Clover state changes should be readable by silhouette, posture, location, or target-link treatment before reading text.
+
+## B18. Scope hygiene brand rule
+
+OpenRouter, proxy, Brain, provider, runtime, worker traffic, and similar platform/backend topics are not part of the Founders Plot brand surface.
+
+They may exist in backstage/dev surfaces, but they must not affect the normal V1.3.1 visual-signoff review unless explicitly listed in the sprint's scope-hygiene note.

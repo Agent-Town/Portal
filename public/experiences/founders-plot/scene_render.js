@@ -24,6 +24,9 @@
     if (object?.selected) classes.push('at-fp-stage-object--selected');
     if (object?.goalTarget) classes.push('at-fp-stage-object--goal-target');
     if (object?.drawerKey) classes.push('at-fp-stage-object--drawer');
+    if (object?.attention) classes.push(`at-fp-stage-object--attention-${String(object.attention).toLowerCase()}`);
+    if (object?.labelVisible === false) classes.push('at-fp-stage-object--label-hidden');
+    if (object?.actionLinked) classes.push('at-fp-stage-object--action-linked');
     return classes.join(' ');
   }
 
@@ -72,6 +75,55 @@
     }
   }
 
+  function cloverAriaLabel(scene) {
+    const state = String(scene?.clover?.state || 'NOT_STARTED').toUpperCase();
+    const actionVerb = String(scene?.clover?.actionVerb || 'watching').trim();
+    const targetLabel = String(scene?.clover?.targetLabel || 'the plot').trim();
+    if (state === 'ACTING') {
+      return `Clover is ${actionVerb} ${targetLabel}. Open the Foreman drawer.`;
+    }
+    if (state === 'WAITING_FOR_PERMISSION') {
+      return `Clover is waiting on ${targetLabel}. Open the Foreman drawer.`;
+    }
+    if (state === 'RESTART_NEEDED' || state === 'ERROR') {
+      return 'Clover needs a fresh start. Open the Foreman drawer.';
+    }
+    return `Clover is ${actionVerb} ${targetLabel}. Open the Foreman drawer.`;
+  }
+
+  function cloverTargetLink(scene) {
+    const clover = scene?.clover || null;
+    const target = Array.isArray(scene?.objects)
+      ? scene.objects.find((object) => object.id === clover?.targetObjectId)
+      : null;
+    if (!clover || !target || String(clover.state || '').toUpperCase() !== 'ACTING') return '';
+    const reducedMotion = typeof window !== 'undefined'
+      && typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const dx = Number(target.x || 0) - Number(clover.x || 0);
+    const dy = Number(target.y || 0) - Number(clover.y || 0);
+    const length = Math.max(0.04, Math.sqrt((dx * dx) + (dy * dy)));
+    const angle = Math.atan2(dy, dx);
+    const linkStyle = [
+      `left:${Number(clover.x || 0.76) * 100}%;`,
+      `top:${Number(clover.y || 0.64) * 100}%;`,
+      `width:${length * 100}%;`,
+      `transform:translateY(-50%) rotate(${angle}rad);`
+    ].join('');
+    return `
+      <div
+        class="at-fp-cloverTargetLink"
+        data-testid="clover-target-link"
+        data-target-object-id="${htmlEscape(target.id || '')}"
+        data-reduced-motion="${reducedMotion ? 'true' : 'false'}"
+        aria-hidden="true"
+        style="${linkStyle}"
+      >
+        <span class="at-fp-cloverTargetLinkBeam"></span>
+      </div>
+    `;
+  }
+
   function renderPlotStage(node, scene, options = {}) {
     if (!(node instanceof HTMLElement) || !scene) return;
     const assetMap = options.assetMap || {};
@@ -82,6 +134,8 @@
     const objectsMarkup = (scene.objects || []).map((object) => {
       const asset = resolveAsset(assetMap, object.assetId);
       const badges = Array.isArray(object.badges) ? object.badges : [];
+      const actionLinked = String(scene?.clover?.state || '').toUpperCase() === 'ACTING'
+        && String(scene?.clover?.targetObjectId || '') === String(object.id || '');
       const style = [
         `--fp-x:${Number(object.x || 0)};`,
         `--fp-y:${Number(object.y || 0)};`,
@@ -95,6 +149,8 @@
           data-selection-key="${htmlEscape(object.selectionKey || '')}"
           data-drawer-key="${htmlEscape(object.drawerKey || '')}"
           data-testid="${htmlEscape(object.testId || '')}"
+          data-attention="${htmlEscape(object.attention || 'none')}"
+          data-action-linked="${actionLinked ? 'true' : 'false'}"
           aria-label="${htmlEscape(object.ariaLabel || object.label || object.id)}"
           style="${style}"
         >
@@ -104,7 +160,7 @@
             ${badges.map((badge) => badgeMarkup(badge)).join('')}
           </span>
           ${timerMarkup(object.timer)}
-          <span class="at-fp-objectLabel">${htmlEscape(object.label || '')}</span>
+          ${object.labelVisible === false ? '' : `<span class="at-fp-objectLabel">${htmlEscape(object.label || '')}</span>`}
         </button>
       `;
     }).join('');
@@ -125,18 +181,28 @@
       </div>
       <div class="at-fp-stageObjects">
         ${objectsMarkup}
-        <button
-          class="at-fp-clover at-fp-clover--${htmlEscape(cloverStateClass(scene.clover?.state || 'NOT_STARTED'))}"
-          type="button"
-          data-scene-object-id="CLOVER"
-          data-drawer-key="foreman"
-          data-testid="founders-clover-avatar"
-          aria-label="Clover, ${htmlEscape(String(scene.clover?.state || 'idle').replace(/_/g, ' ').toLowerCase())}. Open Foreman drawer."
+        ${cloverTargetLink(scene)}
+        <div
+          class="at-fp-cloverWrap"
+          data-testid="clover-foreman"
+          data-state="${htmlEscape(cloverStateClass(scene.clover?.state || 'NOT_STARTED'))}"
+          data-target-object-id="${htmlEscape(scene.clover?.targetObjectId || '')}"
+          aria-label="${htmlEscape(cloverAriaLabel(scene))}"
           style="${cloverStyle}"
         >
-          ${imageMarkup(cloverAsset, 'Clover')}
-          <span class="at-fp-cloverBubble" data-testid="founders-clover-bubble">${htmlEscape(scene.clover?.bubbleText || '')}</span>
-        </button>
+          <button
+            class="at-fp-clover at-fp-clover--${htmlEscape(cloverStateClass(scene.clover?.state || 'NOT_STARTED'))}"
+            type="button"
+            data-scene-object-id="CLOVER"
+            data-drawer-key="foreman"
+            data-testid="founders-clover-avatar"
+            data-target-object-id="${htmlEscape(scene.clover?.targetObjectId || '')}"
+            aria-label="${htmlEscape(cloverAriaLabel(scene))}"
+          >
+            ${imageMarkup(cloverAsset, 'Clover')}
+            <span class="at-fp-cloverBubble" data-testid="founders-clover-bubble">${htmlEscape(scene.clover?.bubbleText || '')}</span>
+          </button>
+        </div>
       </div>
       <div class="at-fp-stageCaption" aria-hidden="true">Your frontier plot</div>
     `;

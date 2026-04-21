@@ -656,3 +656,216 @@ Founders Plot visual PRs must capture at least:
 - Clover acting;
 - Clover waiting approval;
 - mobile default state.
+
+# V1.3.1 Addendum — Visual-Surface Signoff Law
+
+_Status: canonical for Agent Town: Founders Plot V1.3.1 visual-surface signoff_
+
+## D10. Purpose of V1.3.1
+
+V1.3.1 is a finish pass on the current V1.3 scene-first implementation.
+
+Do not reopen the shell architecture or add new gameplay systems. The purpose is to make the existing scene-first surface pass final visual/product signoff.
+
+The five mandatory finish areas are:
+
+1. flagship frontier-storybook art quality;
+2. Clover `acting` target linkage;
+3. mobile label-density reduction;
+4. objective-relevant lot emphasis;
+5. scope quarantine for unrelated OpenRouter/proxy changes.
+
+Additionally, the full-route player surface must not show Agent Comms / worker-debug panels during normal gameplay.
+
+## D11. Full-route player-surface quarantine
+
+The normal Founders Plot player surface is the full app route, not only the embedded Founders Plot frame.
+
+Normal route examples:
+
+```text
+/app?district=founders-plot
+/app#founders-plot
+/founders-plot
+```
+
+On those normal routes, the player must not see the following unless an explicit developer/debug mode is active:
+
+- `Agent Comms` as a large persistent debug console;
+- `Worker Tools`;
+- `Skill Context`;
+- `Worker Traffic`;
+- `Brain` provider details;
+- `Session Context`;
+- `Trainer`;
+- raw runtime IDs, worker command IDs, tokens, or provider/model jargon.
+
+Allowed normal-surface replacements:
+
+- Clover one-line bubble;
+- Foreman drawer with player-facing receipts;
+- small approval/notification badge;
+- explicit `Developer Tools` button only when debug mode is enabled.
+
+Debug mode must be opt-in through one of:
+
+- `?debug=1`;
+- local dev flag;
+- authenticated/admin-only developer route;
+- explicit `Developer Tools` toggle hidden from first-run players.
+
+## D12. Hero composition standard
+
+The default hero composition must be a real app screenshot, not a Figma-only mockup.
+
+Required hero screenshot:
+
+```text
+e2e/.../snapshots/founders-v1-3-1-hero-1280.png
+```
+
+The hero composition must satisfy:
+
+- scenic stage is the largest visual object;
+- there is one obvious next object or action;
+- Clover is visible;
+- no debug/runtime/provider panel is visible;
+- primary-view assets are approved in the asset manifest;
+- the frame feels like a warm frontier-storybook game, not placeholder UI.
+
+## D13. Art-quality standard for generated assets
+
+Generated assets are allowed, but V1.3.1 requires a higher bar than technical validity.
+
+Primary-view assets must show:
+
+- consistent perspective;
+- consistent sunlit frontier lighting;
+- clear silhouette at 64px and 128px;
+- object richness appropriate for a flagship game screen;
+- coherent material language: wood, brass, cloth, paper, stone, dusty ground, warm light;
+- no blurred or embedded accidental text;
+- no third-party trade dress.
+
+Asset validation must include both machine checks and named human art-direction approval metadata.
+
+## D14. Clover target-link law
+
+When Clover is in `acting` state, the visual system must link Clover to the target world object.
+
+At least one of these treatments must be implemented:
+
+1. **target-relative re-anchoring** — Clover moves or appears beside the target object;
+2. **path / gesture line** — a visible line, arrow, footprints, dust trail, or pointer from Clover to target;
+3. **shared action highlight** — Clover and target share a synchronized action effect that clearly pairs them;
+4. **equivalent treatment** approved by design/product.
+
+Required data attributes or equivalent test hooks:
+
+```html
+<div data-testid="clover-foreman" data-state="acting" data-target-object-id="...">
+<div data-testid="clover-target-link" data-target-object-id="...">
+```
+
+Accessible text must describe the action target, for example:
+
+> “Clover is collecting from the Farm Plot.”
+
+## D15. Mobile label-density law
+
+Mobile must preserve the stage-first read.
+
+At widths <= 430px:
+
+- nonessential object labels are hidden by default;
+- the selected object may show its label;
+- the objective-relevant object may show a short label;
+- blocked or ready states may show compact icons/badges instead of full labels;
+- long labels move to the objective ribbon or selected-object sheet;
+- labels must not overlap or cover the scenic focal area.
+
+Mobile default visible text target for V1.3.1:
+
+- hard maximum: **<= 80 words**;
+- target: **<= 65 words**;
+- default stage labels visible: **<= 3**.
+
+## D16. Buildable-lot attention law
+
+The UI must distinguish between **available** and **recommended** lots.
+
+Definitions:
+
+- `available`: a lot/building action is legal but not the current best next step;
+- `recommended`: the lot/building is objective-relevant and should receive the strongest attention treatment.
+
+Rules:
+
+- only one object may receive primary attention by default;
+- available but non-recommended lots must be visually quieter;
+- the objective ribbon, Clover suggestion, and primary attention object should agree whenever possible;
+- attention treatment must be visually clear without excessive labels.
+
+Required state fields or equivalent:
+
+```ts
+type AttentionLevel = "none" | "available" | "recommended" | "blocked";
+```
+
+Required test hooks or equivalent:
+
+```html
+<div data-testid="world-object" data-attention="recommended">
+<div data-testid="world-object" data-attention="available">
+```
+
+## D17. Badge stacking law
+
+Badges must not turn the scene back into a dashboard.
+
+Per object, default visible badges:
+
+- maximum 2 visible badges on desktop;
+- maximum 1 visible badge on mobile, unless the object is selected;
+- additional information moves to hover/focus tooltip or selected action sheet.
+
+Priority for badges:
+
+1. blocked / needs attention;
+2. ready;
+3. producing / timer;
+4. upgradeable;
+5. available.
+
+## D18. OpenRouter/proxy scope quarantine
+
+OpenRouter/proxy/LLM transport work must not be mixed into the V1.3.1 visual signoff path unless explicitly quarantined.
+
+If such files are present in the branch, the branch must include a markdown note:
+
+```text
+specs/OPENROUTER_SCOPE_QUARANTINE.md
+```
+
+That note must list:
+
+- files changed;
+- owner/reviewer;
+- reason the changes are in the branch;
+- tests proving they do not affect Founders Plot visual signoff;
+- rollback plan.
+
+Prefer splitting those changes into a separate branch. If not split, they require separate owner signoff.
+
+## D19. Required V1.3.1 screenshots
+
+V1.3.1 visual PRs must capture:
+
+- full app route hero at 1280px;
+- full app route mobile at 390px;
+- embedded/internal Founders Plot hero at 1280px if it differs from full route;
+- Clover acting with target link;
+- mobile selected-object sheet;
+- objective-relevant lot emphasis;
+- debug mode disabled normal view;
+- debug mode enabled view if debug UI changed.

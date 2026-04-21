@@ -8,7 +8,10 @@ Use the checked-in Agent Town design pack for shell, onboarding, and Founders Pl
 - [Shell, onboarding, and game-surface UX law](./agent-town-design-pack/GAME_UX.md)
 - [Registry law](./agent-town-design-pack/REGISTRY.md)
 - [V1.3 design-source handoff](./agent-town-design-pack/agent-town-founders-plot-v1.3-design-source-handoff.md)
+- [V1.3.1 governance changelog](./agent-town-design-pack/CHANGELOG_V1.3.1.md)
 - [Founders Plot Phase 1 product spec](../../../specs/17_founders_plot_phase1.md)
 - [Founders Plot V1.3 visual game-surface spec](../../../specs/22_founders_plot_v1_3_visual_game_surface.md)
+- [Founders Plot V1.3.1 visual signoff pass](../../../specs/23_founders_plot_v1_3_1_visual_signoff_pass.md)
+- [Founders Plot V1.3.1 TDD acceptance matrix](../../../specs/24_founders_plot_v1_3_1_tdd_acceptance_matrix.md)
 
-The extracted pack under `Brand kit/guidelines/agent-town-design-pack/` is the repo-local copy of the user-supplied design source and should be treated as the canonical shell/onboarding/game-surface reference for this workspace.
+The extracted pack under `Brand kit/guidelines/agent-town-design-pack/` is the repo-local copy of the user-supplied design source and should be treated as the canonical shell/onboarding/game-surface reference for this workspace. The V1.3.1 signoff pass extends that canon with full-route quarantine, primary-view asset approval metadata, Clover target-linking, mobile label suppression, and objective-attention governance.
