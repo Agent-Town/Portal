@@ -287,6 +287,62 @@ function manifestEntry({
   state = '',
   usage = 'primary-view'
 }) {
+  const normalizedId = String(id || '').trim();
+  const normalizedRole = String(role || '').trim();
+  const normalizedBuildingType = String(buildingType || '').trim().toUpperCase();
+  const worldObjectId = (() => {
+    if (normalizedBuildingType === 'HQ') return 'hq';
+    if (normalizedBuildingType === 'LUMBER_CAMP') return 'lumber_camp';
+    if (normalizedBuildingType === 'FARM_PLOT') return 'farm_plot';
+    if (normalizedBuildingType === 'QUARRY') return 'quarry';
+    if (normalizedBuildingType === 'WORKSHOP') return 'workshop';
+    if (normalizedBuildingType === 'MARKET_STALL') return 'market_stall';
+    if (normalizedId.includes('contract_board')) return 'contract_board';
+    if (normalizedId.includes('public_square')) return 'public_square';
+    if (normalizedId.includes('foreman_hut')) return 'foreman_hut';
+    if (normalizedId.includes('journal')) return 'journal';
+    if (normalizedId.includes('approval_inbox')) return 'approval_inbox';
+    if (normalizedId.includes('empty_lot') || normalizedId.includes('locked_lot')) return 'lot';
+    return '';
+  })();
+  const characterId = normalizedId.startsWith('clover_') ? 'clover' : undefined;
+  const layerRole = (() => {
+    if (normalizedId.startsWith('founders_plot_scene_')) return 'scene-base';
+    if (normalizedId.startsWith('founders_plot_overlay_')) return 'effects';
+    if (characterId) return 'character';
+    if (worldObjectId) return 'live-object';
+    return undefined;
+  })();
+  const sceneLayering = normalizedId.startsWith('founders_plot_scene_')
+    ? {
+      mode: 'layered_plates',
+      containsLiveStatefulObjects: false,
+      allowedBakedContent: ['terrain', 'roads', 'far_horizon', 'ambient_decor'],
+      forbiddenBakedContent: [
+        'hq',
+        'lumber_camp',
+        'farm_plot',
+        'quarry',
+        'workshop',
+        'market_stall',
+        'contract_board',
+        'public_square',
+        'foreman_hut',
+        'clover',
+        'timer_rings',
+        'objective_markers'
+      ]
+    }
+    : undefined;
+  const visualTier = normalizedBuildingType === 'HQ'
+    ? ({
+      level_1: 'starter',
+      level_2: 'starter',
+      level_3: 'improved',
+      level_4: 'improved',
+      level_5: 'established'
+    }[String(state || '').trim().toLowerCase()] || 'starter')
+    : undefined;
   const absolutePath = path.join(rootDir, srcPath);
   const byteSize = fs.statSync(absolutePath).size;
   return {
@@ -321,6 +377,12 @@ function manifestEntry({
       ? 'Pending final human review for the V1.4.2 route integration.'
       : `Approved for ${role.replace(/_/g, ' ')} use in the V1.4.2 rebuild.`,
     replaces,
+    layerRole,
+    sceneLayering,
+    stateDriven: layerRole === 'scene-base' ? undefined : ['live-object', 'character', 'effects'].includes(layerRole),
+    worldObjectId: worldObjectId || undefined,
+    characterId,
+    visualTier,
     transparent,
     anchor,
     hitbox,

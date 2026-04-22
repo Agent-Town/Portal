@@ -51,6 +51,20 @@ const REQUIRED_IDS = [
 ];
 const BYTE_BUDGET = 4_500_000;
 const ALLOWED_GENERATORS = new Set(['gpt-image-2', 'codex-svg', 'reference-normalized']);
+const REQUIRED_LAYERED_FORBIDDEN = [
+  'hq',
+  'lumber_camp',
+  'farm_plot',
+  'quarry',
+  'workshop',
+  'market_stall',
+  'contract_board',
+  'public_square',
+  'foreman_hut',
+  'clover',
+  'timer_rings',
+  'objective_markers'
+];
 
 function fail(message) {
   throw new Error(message);
@@ -149,6 +163,21 @@ function main() {
     }
     if (!asset?.optimizationStatus) fail(`Asset ${id} missing optimizationStatus`);
     if (asset?.styleReview?.passed !== true) fail(`Asset ${id} failed styleReview`);
+    if (String(id).startsWith('founders_plot_scene_')) {
+      if (asset?.layerRole !== 'scene-base') fail(`Scene asset ${id} must declare layerRole=scene-base`);
+      if (asset?.sceneLayering?.mode !== 'layered_plates') fail(`Scene asset ${id} must declare layered_plates mode`);
+      if (asset?.sceneLayering?.containsLiveStatefulObjects !== false) fail(`Scene asset ${id} must forbid baked live objects`);
+      for (const forbiddenId of REQUIRED_LAYERED_FORBIDDEN) {
+        if (!Array.isArray(asset?.sceneLayering?.forbiddenBakedContent) || !asset.sceneLayering.forbiddenBakedContent.includes(forbiddenId)) {
+          fail(`Scene asset ${id} missing forbidden baked content ${forbiddenId}`);
+        }
+      }
+    }
+    if (String(id).startsWith('clover_')) {
+      if (asset?.layerRole !== 'character') fail(`Clover asset ${id} must declare layerRole=character`);
+      if (asset?.characterId !== 'clover') fail(`Clover asset ${id} must declare characterId=clover`);
+      if (asset?.stateDriven !== true) fail(`Clover asset ${id} must be stateDriven`);
+    }
     validateReferenceInputs(asset);
     totalBytes += Number(asset?.bytes || 0);
   }

@@ -27,13 +27,30 @@
     if (object?.attention) classes.push(`at-fp-stage-object--attention-${String(object.attention).toLowerCase()}`);
     if (object?.labelVisible === true) classes.push('at-fp-stage-object--label-pinned');
     if (object?.actionLinked) classes.push('at-fp-stage-object--action-linked');
+    if (object?.overlayRole) classes.push(`fp-overlay-${String(object.overlayRole).toLowerCase()}`);
+    if (object?.overlayWeight) classes.push(`at-fp-overlayWeight--${String(object.overlayWeight).toLowerCase()}`);
     return classes.join(' ');
   }
 
   function badgeMarkup(badge) {
+    const classes = [
+      'at-fp-state-badge',
+      'at-fp-overlayPill',
+      `at-fp-state-badge--${htmlEscape(String(badge?.tone || 'neutral'))}`,
+      `fp-overlay-${htmlEscape(String(badge?.overlayRole || 'status'))}`
+    ];
+    if (badge?.iconOnly) classes.push('at-fp-state-badge--iconOnly');
     return `
-      <span class="at-fp-state-badge at-fp-state-badge--${htmlEscape(String(badge?.tone || 'neutral'))}" data-badge-type="${htmlEscape(badge?.type || '')}">
-        ${htmlEscape(badge?.label || '')}
+      <span
+        class="${classes.join(' ')}"
+        data-badge-type="${htmlEscape(badge?.type || '')}"
+        data-overlay-role="${htmlEscape(badge?.overlayRole || 'status')}"
+        data-overlay-weight="${htmlEscape(badge?.overlayWeight || 'medium')}"
+        data-mobile-hidden="${badge?.mobileHidden ? 'true' : 'false'}"
+        data-icon-only="${badge?.iconOnly ? 'true' : 'false'}"
+      >
+        <span class="at-fp-state-badgeGlyph" aria-hidden="true"></span>
+        <span class="at-fp-state-badgeText">${htmlEscape(badge?.displayLabel || badge?.label || '')}</span>
       </span>
     `;
   }
@@ -143,18 +160,37 @@
     ].includes(String(state || '').toUpperCase());
   }
 
+  function hqAccentMarkup(object) {
+    if (String(object?.worldObjectId || '') !== 'hq') return '';
+    const tier = String(object?.visualTier || '').toLowerCase();
+    if (!tier) return '';
+    return `
+      <span
+        class="at-fp-hqCivicAccent at-fp-hqCivicAccent--${htmlEscape(tier)}"
+        data-visual-tier="${htmlEscape(tier)}"
+        aria-hidden="true"
+      >
+        <span class="at-fp-hqCivicAccentCore"></span>
+      </span>
+    `;
+  }
+
   function renderPlotStage(node, scene, options = {}) {
     if (!(node instanceof HTMLElement) || !scene) return;
     const assetMap = options.assetMap || {};
     node.classList.add('at-fp-stage');
     node.style.setProperty('--fp-stage-desktop', `url('${scene.stageBackgrounds?.desktop || ''}')`);
     node.style.setProperty('--fp-stage-mobile', `url('${scene.stageBackgrounds?.mobile || scene.stageBackgrounds?.desktop || ''}')`);
+    node.dataset.layerRole = 'scene-base';
+    node.dataset.sceneAssetId = String(scene.stageBackgrounds?.desktopAssetId || '');
+    node.dataset.sceneLayering = String(scene.stageBackgrounds?.layerMode || 'layered_plates');
 
     const objectsMarkup = (scene.objects || []).map((object) => {
       const asset = resolveAsset(assetMap, object.assetId);
       const badges = Array.isArray(object.badges) ? object.badges : [];
       const actionLinked = String(scene?.clover?.state || '').toUpperCase() === 'ACTING'
         && String(scene?.clover?.targetObjectId || '') === String(object.id || '');
+      const objectClasses = objectClassList({ ...object, actionLinked });
       const style = [
         `--fp-x:${Number(object.x || 0)};`,
         `--fp-y:${Number(object.y || 0)};`,
@@ -162,24 +198,37 @@
       ].join('');
       return `
         <button
-          class="${objectClassList(object)}"
+          class="${objectClasses}"
           type="button"
           data-scene-object-id="${htmlEscape(object.id)}"
           data-selection-key="${htmlEscape(object.selectionKey || '')}"
           data-drawer-key="${htmlEscape(object.drawerKey || '')}"
           data-testid="${htmlEscape(object.testId || '')}"
           data-attention="${htmlEscape(object.attention || 'none')}"
+          data-layer-role="live-object"
+          data-world-object="${htmlEscape(object.worldObjectId || '')}"
+          data-overlay-role="${htmlEscape(object.overlayRole || 'ambient')}"
+          data-overlay-weight="${htmlEscape(object.overlayWeight || 'quiet')}"
+          data-asset-id="${htmlEscape(object.assetId || '')}"
+          data-visual-tier="${htmlEscape(object.visualTier || '')}"
+          data-hq-level="${htmlEscape(object.hqLevel || '')}"
           data-action-linked="${actionLinked ? 'true' : 'false'}"
+          data-clover-linked="${actionLinked ? 'true' : 'false'}"
           aria-label="${htmlEscape(object.ariaLabel || object.label || object.id)}"
           style="${style}"
         >
           <span class="at-fp-objectShadow" aria-hidden="true"></span>
           ${imageMarkup(asset, object.label || object.id)}
+          ${hqAccentMarkup(object)}
           <span class="at-fp-objectBadges" aria-hidden="true">
             ${badges.map((badge) => badgeMarkup(badge)).join('')}
           </span>
           ${timerMarkup(object.timer)}
-          <span class="at-fp-objectLabel">${htmlEscape(object.label || '')}</span>
+          <span
+            class="at-fp-objectLabel fp-overlay-${htmlEscape(object.overlayRole || 'ambient')}"
+            data-overlay-role="${htmlEscape(object.overlayRole || 'ambient')}"
+            data-overlay-weight="${htmlEscape(object.overlayWeight || 'quiet')}"
+          >${htmlEscape(object.label || '')}</span>
         </button>
       `;
     }).join('');
@@ -191,30 +240,43 @@
     ].join('');
 
     node.innerHTML = `
-      <div class="at-fp-stageBackdrop" aria-hidden="true">
+      <div
+        class="at-fp-stageBackdrop"
+        data-layer-role="scene-base"
+        data-scene-asset-id="${htmlEscape(scene.stageBackgrounds?.desktopAssetId || '')}"
+        aria-hidden="true"
+      >
         <div class="at-fp-stageLight"></div>
         <div class="at-fp-stageRoad"></div>
         <div class="at-fp-stagePatch at-fp-stagePatch--one"></div>
         <div class="at-fp-stagePatch at-fp-stagePatch--two"></div>
         <div class="at-fp-stagePatch at-fp-stagePatch--three"></div>
       </div>
-      <div class="at-fp-stageObjects">
+      <div class="at-fp-stageObjects" data-layer-role="live-object">
         ${objectsMarkup}
         ${cloverTargetLink(scene)}
         <div
-          class="at-fp-cloverWrap"
+          class="at-fp-cloverWrap is-grounded"
           data-testid="clover-foreman"
+          data-layer-role="character"
           data-state="${htmlEscape(cloverStateClass(scene.clover?.state || 'NOT_STARTED'))}"
           data-target-object-id="${htmlEscape(scene.clover?.targetObjectId || '')}"
+          data-grounded="true"
           aria-label="${htmlEscape(cloverAriaLabel(scene))}"
           style="${cloverStyle}"
         >
+          <span class="at-fp-cloverGroundShadow" aria-hidden="true"></span>
           <button
             class="at-fp-clover at-fp-clover--${htmlEscape(cloverStateClass(scene.clover?.state || 'NOT_STARTED'))}"
             type="button"
             data-scene-object-id="CLOVER"
             data-drawer-key="foreman"
             data-testid="founders-clover-avatar"
+            data-layer-role="character"
+            data-world-object="clover"
+            data-overlay-role="primary-action"
+            data-overlay-weight="${htmlEscape(String(scene?.clover?.state || '').toUpperCase() === 'ACTING' ? 'strong' : 'medium')}"
+            data-asset-id="${htmlEscape(scene.clover?.assetId || '')}"
             data-target-object-id="${htmlEscape(scene.clover?.targetObjectId || '')}"
             aria-label="${htmlEscape(cloverAriaLabel(scene))}"
           >

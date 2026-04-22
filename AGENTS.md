@@ -32,6 +32,31 @@ When the active sprint uses GPT Image 2 / `gpt-image-2`:
 - do not request transparent backgrounds from GPT Image 2; post-process sprite-like assets after generation;
 - do not ship untracked generated-image bundles or temporary capture folders.
 
+## V1.4.2 acceptance cleanup rules
+
+When implementing the V1.4.2 acceptance cleanup:
+
+- treat the GPT Image 2 art baseline as product-owner-approved;
+- do not start a broad asset rebuild;
+- preserve the Start Gate copy `WARNING! CONTAINS AND PRODUCES AI SLOP.` as product-owner-approved;
+- implement the layered-plates scene model with separate `scene-base`, `scene-ambient`, `live-object`, `character`, `effects`, and `ui-overlay` responsibilities;
+- do not bake stateful gameplay objects into scene backgrounds;
+- reduce same-weight floating labels and repeated `Build here` text;
+- on mobile, keep only selected, recommended, or urgent labels visible by default;
+- Clover must visibly act on a target object without requiring a drawer or debug panel;
+- HQ progression must be visually readable;
+- do not add new gameplay systems in this cleanup patch.
+
+Read before implementation:
+
+- `specs/31_founders_plot_v1_4_2_acceptance_cleanup.md`
+- `specs/32_founders_plot_v1_4_2_acceptance_cleanup_tdd_matrix.md`
+- `docs/visual/VISUAL_SIGNOFF_SHEET_V1_4_2.md`
+- `docs/visual/SCENE_LAYERING_DECISION_V1_4_2.md`
+- `Brand kit/guidelines/agent-town-design-pack/DESIGN.md`
+- `Brand kit/guidelines/agent-town-design-pack/GAME_UX.md`
+- `Brand kit/guidelines/agent-town-design-pack/REGISTRY.md`
+
 ## Primary goals
 
 1. **Game-first frontend** — the default player-facing experience must feel like a real Agent Town game, not a dashboard.

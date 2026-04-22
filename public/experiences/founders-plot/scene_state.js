@@ -76,6 +76,19 @@
     civic: 48,
     charm: 44
   };
+  const WORLD_OBJECT_IDS = {
+    HQ: 'hq',
+    LUMBER_CAMP: 'lumber_camp',
+    FARM_PLOT: 'farm_plot',
+    QUARRY: 'quarry',
+    WORKSHOP: 'workshop',
+    MARKET_STALL: 'market_stall',
+    CONTRACT_BOARD: 'contract_board',
+    PUBLIC_SQUARE: 'public_square',
+    FOREMAN_HUT: 'foreman_hut',
+    JOURNAL: 'journal',
+    APPROVAL_INBOX: 'approval_inbox'
+  };
 
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
@@ -239,6 +252,83 @@
     return selected || attention === 'recommended';
   }
 
+  function worldObjectIdFor(objectId, buildingType = '') {
+    if (buildingType && WORLD_OBJECT_IDS[upper(buildingType)]) return WORLD_OBJECT_IDS[upper(buildingType)];
+    if (String(objectId || '').startsWith('PAD:')) return 'lot';
+    return WORLD_OBJECT_IDS[String(objectId || '')] || String(objectId || '').trim().toLowerCase();
+  }
+
+  function hqVisualTier(level) {
+    const normalized = clamp(number(level || 1), 1, 5);
+    if (normalized >= 5) return 'established';
+    if (normalized >= 3) return 'improved';
+    return 'starter';
+  }
+
+  function badgeOverlayDefaults(badge = {}) {
+    switch (String(badge.type || '').trim()) {
+      case 'build':
+        return { overlayRole: 'available', overlayWeight: 'quiet' };
+      case 'locked':
+      case 'blocked':
+      case 'restart':
+        return { overlayRole: 'status', overlayWeight: 'medium' };
+      case 'ready':
+        return { overlayRole: 'status', overlayWeight: 'medium' };
+      case 'approval':
+        return { overlayRole: 'status', overlayWeight: 'strong' };
+      case 'contract':
+      case 'foreman':
+      case 'civic':
+      case 'charm':
+        return { overlayRole: 'ambient', overlayWeight: 'quiet' };
+      default:
+        return { overlayRole: 'status', overlayWeight: 'medium' };
+    }
+  }
+
+  function badgeShouldRender(badge = {}, context = {}) {
+    const {
+      selected = false,
+      goalTarget = false,
+      viewportWidth = 1280
+    } = context;
+    if (badge.showWhenSelected && !selected && !goalTarget) return false;
+    if (badge.showWhenGoal && !goalTarget) return false;
+    if (badge.overlayRole === 'ambient' && !badge.alwaysVisible && !selected && !goalTarget) return false;
+    if (badge.overlayRole === 'available' && number(viewportWidth, 1280) <= 430 && !selected && !goalTarget) return false;
+    return true;
+  }
+
+  function decorateBadges(badges = [], context = {}) {
+    const { viewportWidth = 1280, goalTarget = false } = context;
+    const mobile = number(viewportWidth, 1280) <= 430;
+    const decorated = badges
+      .map((badge) => {
+        const defaults = badgeOverlayDefaults(badge);
+        return {
+          ...defaults,
+          ...badge,
+          displayLabel: badge.displayLabel || badge.label,
+          mobileHidden: badge.mobileHidden === true || (mobile && badge.overlayRole === 'available' && !goalTarget)
+        };
+      })
+      .filter((badge) => badgeShouldRender(badge, context))
+      .map((badge) => ({
+        ...badge,
+        iconOnly: badge.iconOnly === true || (mobile && badge.overlayRole === 'available' && !goalTarget)
+      }));
+    return capBadges(decorated, context);
+  }
+
+  function objectOverlayMeta(object, { selected = false, goalTarget = false, attention = 'none' } = {}) {
+    if (goalTarget) return { overlayRole: 'objective', overlayWeight: 'strong' };
+    if (selected) return { overlayRole: 'primary-action', overlayWeight: 'medium' };
+    if (attention === 'available') return { overlayRole: 'available', overlayWeight: 'quiet' };
+    if (attention === 'blocked') return { overlayRole: 'status', overlayWeight: 'medium' };
+    return { overlayRole: 'ambient', overlayWeight: 'quiet' };
+  }
+
   function buildingBadges(building, state, view) {
     const badges = [];
     if (state === 'READY') {
@@ -249,28 +339,37 @@
       badges.push({
         type: 'ready',
         label: resources ? `Ready: ${resources}` : 'Ready to collect',
-        tone: 'good'
+        tone: 'good',
+        overlayRole: 'status',
+        overlayWeight: 'medium'
       });
     }
     if (state === 'PRODUCING') {
       badges.push({
         type: 'timer',
         label: 'Producing',
-        tone: 'neutral'
+        tone: 'neutral',
+        overlayRole: 'status',
+        overlayWeight: 'quiet',
+        showWhenSelected: true
       });
     }
     if (state === 'UNDER_CONSTRUCTION') {
       badges.push({
         type: 'construction',
         label: 'Under construction',
-        tone: 'warn'
+        tone: 'warn',
+        overlayRole: 'status',
+        overlayWeight: 'medium'
       });
     }
     if (state === 'UPGRADE_READY') {
       badges.push({
         type: 'upgrade',
         label: 'Upgrade ready',
-        tone: 'neutral'
+        tone: 'neutral',
+        overlayRole: 'status',
+        overlayWeight: 'medium'
       });
     }
     if (
@@ -282,7 +381,9 @@
       badges.push({
         type: 'blocked',
         label: 'Queueing still locked',
-        tone: 'warn'
+        tone: 'warn',
+        overlayRole: 'status',
+        overlayWeight: 'medium'
       });
     }
     return badges;
@@ -519,16 +620,19 @@
         id: 'HQ',
         kind: 'building',
         buildingType: 'HQ',
+        worldObjectId: 'hq',
         label: labelForBuilding('HQ'),
         state: hqState,
         x: 0.65,
         y: 0.44,
         z: 32,
+        hqLevel: clamp(number(hqBuilding?.level || 1), 1, 5),
+        visualTier: hqVisualTier(hqBuilding?.level || 1),
         assetId: assetIdForBuilding(hqBuilding, hqState),
         badges: buildingBadges(hqBuilding, hqState, view),
         timer: timerForBuilding(hqBuilding),
         primaryAction,
-        ariaLabel: `${labelForBuilding('HQ')}, ${stateLabel(hqState)}, ${primaryAction.label}.`,
+        ariaLabel: `${labelForBuilding('HQ')} level ${clamp(number(hqBuilding?.level || 1), 1, 5)}, ${stateLabel(hqState)}, ${primaryAction.label}.`,
         selectionKey: 'hq',
         testId: 'founders-stage-object-HQ'
       });
@@ -550,12 +654,13 @@
           id: objectId,
           kind: 'building',
           buildingType: building.type,
+          worldObjectId: worldObjectIdFor(objectId, building.type),
           label: labelForBuilding(building.type),
           state,
-        x: layout.x,
-        y: layout.y,
-        z: layout.z,
-        assetId: assetIdForBuilding(building, state),
+          x: layout.x,
+          y: layout.y,
+          z: layout.z,
+          assetId: assetIdForBuilding(building, state),
           badges: buildingBadges(building, state, view),
           timer: timerForBuilding(building),
           primaryAction,
@@ -572,6 +677,7 @@
       objects.push({
         id: objectId,
         kind: 'lot',
+        worldObjectId: 'lot',
         label: String(layout.label || pad.label || 'Open lot'),
         state,
         x: layout.x,
@@ -579,8 +685,25 @@
         z: layout.z,
         assetId: state === 'LOCKED' ? 'founders_plot_locked_lot_v1_4_2' : 'founders_plot_empty_lot_v1_4_2',
         badges: state === 'BUILDABLE'
-          ? [{ type: 'build', label: 'Build here', tone: 'neutral' }]
-          : [{ type: 'locked', label: 'Locked lot', tone: 'warn' }],
+          ? [{
+            type: 'build',
+            label: 'Build here',
+            displayLabel: '+',
+            tone: 'neutral',
+            overlayRole: 'available',
+            overlayWeight: 'quiet',
+            iconOnly: true,
+            mobileHidden: true
+          }]
+          : [{
+            type: 'locked',
+            label: 'Locked lot',
+            displayLabel: 'Locked',
+            tone: 'warn',
+            overlayRole: 'status',
+            overlayWeight: 'quiet',
+            showWhenSelected: true
+          }],
         timer: null,
         primaryAction,
         ariaLabel: `${layout.label || pad.label || 'Lot'}, ${stateLabel(state)}, ${primaryAction.label}.`,
@@ -602,6 +725,7 @@
     objects.push({
       id: 'CONTRACT_BOARD',
       kind: 'object',
+      worldObjectId: 'contract_board',
       label: 'Contract Board',
       state: contractsState,
       x: SPECIAL_OBJECT_LAYOUT.CONTRACT_BOARD.x,
@@ -610,10 +734,10 @@
       assetId: 'founders_plot_contract_board_v1_4_2',
       badges: [
         view?.contracts?.activeContract?.status === 'READY_TO_TURN_IN'
-          ? { type: 'contract', label: 'Turn-in ready', tone: 'good' }
+          ? { type: 'contract', label: 'Turn-in ready', tone: 'good', overlayRole: 'status', overlayWeight: 'medium', alwaysVisible: true }
           : view?.contracts?.boardLocked
-            ? { type: 'locked', label: 'Unlocks at HQ2', tone: 'warn' }
-            : { type: 'contract', label: 'Town requests', tone: 'neutral' }
+            ? { type: 'locked', label: 'Unlocks at HQ2', tone: 'warn', overlayRole: 'status', overlayWeight: 'medium', alwaysVisible: true }
+            : { type: 'contract', label: 'Town requests', displayLabel: 'Requests', tone: 'neutral', overlayRole: 'ambient', overlayWeight: 'quiet', showWhenSelected: true }
       ],
       timer: null,
       primaryAction: contractAction,
@@ -632,6 +756,7 @@
     objects.push({
       id: 'PUBLIC_SQUARE',
       kind: 'object',
+      worldObjectId: 'public_square',
       label: 'Welcome Sign',
       state: publicSquareState,
       x: SPECIAL_OBJECT_LAYOUT.PUBLIC_SQUARE.x,
@@ -640,8 +765,8 @@
       assetId: 'founders_plot_public_square_v1_4_2',
       badges: [
         publicSquareLevel > 0
-          ? { type: 'charm', label: 'Square raised', tone: 'good' }
-          : { type: 'civic', label: 'Civic project', tone: 'neutral' }
+          ? { type: 'charm', label: 'Square raised', displayLabel: 'Raised', tone: 'good', overlayRole: 'ambient', overlayWeight: 'quiet', showWhenSelected: true }
+          : { type: 'civic', label: 'Civic project', displayLabel: 'Civic', tone: 'neutral', overlayRole: 'ambient', overlayWeight: 'quiet', showWhenSelected: true }
       ],
       timer: null,
       primaryAction: squareAction,
@@ -655,6 +780,7 @@
     objects.push({
       id: 'JOURNAL',
       kind: 'object',
+      worldObjectId: 'journal',
       label: 'Town Journal',
       state: journalState,
       x: SPECIAL_OBJECT_LAYOUT.JOURNAL.x,
@@ -663,8 +789,8 @@
       assetId: 'founders_plot_journal_trigger_v1_4_2',
       badges: [
         unseenRecap > 0
-          ? { type: 'ready', label: `${unseenRecap} new note${unseenRecap === 1 ? '' : 's'}`, tone: 'good' }
-          : { type: 'civic', label: journalEntries.length > 0 ? 'Town record' : 'Journal stand', tone: 'neutral' }
+          ? { type: 'ready', label: `${unseenRecap} new note${unseenRecap === 1 ? '' : 's'}`, displayLabel: `${unseenRecap}`, tone: 'good', overlayRole: 'status', overlayWeight: 'medium', alwaysVisible: true }
+          : { type: 'civic', label: journalEntries.length > 0 ? 'Town record' : 'Journal stand', displayLabel: 'Journal', tone: 'neutral', overlayRole: 'ambient', overlayWeight: 'quiet', showWhenSelected: true }
       ],
       timer: null,
       primaryAction: journalAction,
@@ -678,6 +804,7 @@
     objects.push({
       id: 'APPROVAL_INBOX',
       kind: 'object',
+      worldObjectId: 'approval_inbox',
       label: 'Approval Bell',
       state: approvalState,
       x: SPECIAL_OBJECT_LAYOUT.APPROVAL_INBOX.x,
@@ -686,8 +813,8 @@
       assetId: 'founders_plot_approval_inbox_v1_4_2',
       badges: [
         pendingApprovals.length > 0
-          ? { type: 'approval', label: `${pendingApprovals.length} waiting`, tone: 'warn' }
-          : { type: 'civic', label: 'Inbox clear', tone: 'neutral' }
+          ? { type: 'approval', label: `${pendingApprovals.length} waiting`, displayLabel: `${pendingApprovals.length}`, tone: 'warn', overlayRole: 'status', overlayWeight: 'strong', alwaysVisible: true }
+          : { type: 'civic', label: 'Inbox clear', displayLabel: 'Clear', tone: 'neutral', overlayRole: 'ambient', overlayWeight: 'quiet', showWhenSelected: true }
       ],
       timer: null,
       primaryAction: approvalAction,
@@ -710,6 +837,7 @@
     objects.push({
       id: 'FOREMAN_HUT',
       kind: 'object',
+      worldObjectId: 'foreman_hut',
       label: 'Foreman Hut',
       state: foremanObjectState,
       x: SPECIAL_OBJECT_LAYOUT.FOREMAN_HUT.x,
@@ -718,10 +846,10 @@
       assetId: 'founders_plot_foreman_hut_v1_4_2',
       badges: [
         options?.localForemanRuntimeStatus?.needsRestart || options?.localForemanRuntimeStatus?.expired || runtimeStatus === 'ERROR'
-            ? { type: 'restart', label: 'Needs a fresh start', tone: 'warn' }
+            ? { type: 'restart', label: 'Needs a fresh start', displayLabel: 'Restart', tone: 'warn', overlayRole: 'status', overlayWeight: 'strong', alwaysVisible: true }
             : runtimeStatus === 'NOT_STARTED'
-              ? { type: 'foreman', label: 'Start Clover', tone: 'neutral' }
-              : { type: 'foreman', label: pendingApprovals.length > 0 ? 'Clover is waiting' : 'Clover nearby', tone: 'neutral' }
+              ? { type: 'foreman', label: 'Start Clover', displayLabel: 'Clover', tone: 'neutral', overlayRole: 'ambient', overlayWeight: 'quiet', showWhenSelected: true }
+              : { type: 'foreman', label: pendingApprovals.length > 0 ? 'Clover is waiting' : 'Clover nearby', displayLabel: 'Clover', tone: 'neutral', overlayRole: 'ambient', overlayWeight: 'quiet', showWhenSelected: true }
       ],
       timer: null,
       primaryAction: foremanAction,
@@ -735,12 +863,15 @@
       const attention = objectAttention(object, goalObjectId);
       const selected = selectedObjectId === object.id;
       const goalTarget = goalObjectId === object.id;
-      const badges = capBadges(object.badges, { viewportWidth, selected });
+      const overlayMeta = objectOverlayMeta(object, { selected, goalTarget, attention });
+      const badges = decorateBadges(object.badges, { viewportWidth, selected, goalTarget, attention, object });
       return {
         ...object,
         selected,
         goalTarget,
         attention,
+        overlayRole: overlayMeta.overlayRole,
+        overlayWeight: overlayMeta.overlayWeight,
         badges,
         labelVisible: shouldShowLabel(object, { viewportWidth, selected, attention })
       };
@@ -759,7 +890,10 @@
     const drawerItems = drawers(view, options);
     const stageBackgrounds = {
       desktop: '/experiences/founders-plot/assets/scenes/founders-plot-desktop.webp',
-      mobile: '/experiences/founders-plot/assets/scenes/founders-plot-mobile.webp'
+      mobile: '/experiences/founders-plot/assets/scenes/founders-plot-mobile.webp',
+      desktopAssetId: 'founders_plot_scene_desktop_v1_4_2',
+      mobileAssetId: 'founders_plot_scene_mobile_v1_4_2',
+      layerMode: 'layered_plates'
     };
 
     return {

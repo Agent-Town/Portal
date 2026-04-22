@@ -114,6 +114,10 @@ npx shadcn@latest add @agent-town/townhall-onboarding
 - `generated-asset-candidate-folder`
 - `prompt-provenance-validator`
 - `hero-cast-reference-card`
+- `scene-layer-plate`
+- `world-overlay-marker`
+- `clover-action-link`
+- `hq-progression-visual`
 
 ## 7. Governance rules
 
@@ -144,6 +148,14 @@ For V1.4.2 and later visual-production sprints:
 - manifest entries must keep prompt and reference provenance;
 - screenshot signoff is required before gameplay or primary-view use;
 - hero-cast platform assets stay quarantined from default Founders Plot gameplay unless a later spec explicitly changes that boundary.
+
+For the V1.4.2 acceptance cleanup:
+
+- scene backgrounds must use the layered-plates model;
+- overlay markers must carry semantic roles instead of defaulting to one shared pill style;
+- mobile available-lot labels must stay quiet by default;
+- Clover action proof must remain visible without opening the Foreman drawer;
+- HQ progression visuals must expose readable starter, improved, and established tiers.
 
 ## 8. Block contracts
 
@@ -240,6 +252,74 @@ When generating UI code:
 - do not restyle registry blocks ad hoc
 - extend through variants, slots, and documented props
 - if you find yourself copying a shell section twice, it belongs in the registry
+
+## 14. V1.4.2 cleanup primitives
+
+### `scene-layer-plate`
+
+Declares scene background plates that contain terrain or atmosphere but no stateful live objects.
+
+```ts
+type SceneLayerPlate = {
+  id: string;
+  layerRole: "scene-base" | "scene-ambient";
+  sceneLayering: {
+    mode: "layered_plates";
+    containsLiveStatefulObjects: false;
+    allowedBakedContent: string[];
+    forbiddenBakedContent: string[];
+  };
+};
+```
+
+### `world-overlay-marker`
+
+Canonical semantic overlay for map labels and badges.
+
+```ts
+type WorldOverlayVariant =
+  | "objective"
+  | "primary-action"
+  | "available"
+  | "status"
+  | "ambient"
+  | "debug";
+```
+
+Rules:
+
+- `objective`: max one visible;
+- `debug`: never visible in normal gameplay;
+- `available`: quiet, icon or stake preferred, hidden text on mobile;
+- `status`: compact icon or badge;
+- `ambient`: low priority.
+
+### `clover-action-link`
+
+Renders Clover-to-target action relationship without opening the Foreman drawer.
+
+```ts
+type CloverActionLinkProps = {
+  cloverState: "idle" | "thinking" | "acting" | "waiting" | "blocked";
+  targetObjectId?: string;
+  targetAnchor?: { x: number; y: number };
+  showWhenDrawerClosed: boolean;
+};
+```
+
+### `hq-progression-visual`
+
+Renders HQ upgrade visual state.
+
+```ts
+type HqProgressionTier = "starter" | "improved" | "established";
+```
+
+Mapping:
+
+- HQ 1 -> `starter`
+- HQ 3 -> `improved`
+- HQ 5 -> `established`
 
 ---
 
