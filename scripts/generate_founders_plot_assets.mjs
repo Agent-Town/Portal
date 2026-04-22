@@ -8,11 +8,14 @@ const rootDir = path.resolve(path.dirname(new URL(import.meta.url).pathname), '.
 const foundersAssetRoot = path.join(rootDir, 'public', 'experiences', 'founders-plot', 'assets');
 const platformAssetRoot = path.join(rootDir, 'public', 'assets');
 const promptRoot = path.join(rootDir, 'specs', 'prompts', 'v1_4_2');
+const patch2PromptRoot = path.join(rootDir, 'specs', 'prompts', 'v1_4_2_patch_2');
+const patch2PromptMirrorRoot = path.join(rootDir, 'public', 'experiences', 'founders-plot', 'assets', 'prompts', 'v1_4_2_patch_2');
 
 const STYLE_FAMILY = 'agent-town-frontier-storybook-v1_4_2';
 const SCHEMA_VERSION = 'v1.4.2';
 const APPROVED_BY = 'Robin / design owner';
 const APPROVED_AT = '2026-04-22';
+const PATCH2_RELEASE = 'v1.4.2-patch2-mobile-hq';
 const HERO_FRAME = {
   approvalStatus: 'approved',
   approvedBy: APPROVED_BY,
@@ -85,6 +88,18 @@ function pngOrJpegToWebp(inputPath, outputPath, quality = 86) {
   ensureDir(path.dirname(outputPath));
   const cwebp = resolveBinary(['/opt/homebrew/bin/cwebp', '/usr/local/bin/cwebp', 'cwebp']);
   run(cwebp, ['-quiet', '-q', String(quality), inputPath, '-o', outputPath]);
+}
+
+function fileDataUrl(filePath) {
+  const extension = path.extname(filePath).toLowerCase();
+  const mimeType = extension === '.webp'
+    ? 'image/webp'
+    : extension === '.png'
+      ? 'image/png'
+      : extension === '.jpg' || extension === '.jpeg'
+        ? 'image/jpeg'
+        : 'application/octet-stream';
+  return `data:${mimeType};base64,${fs.readFileSync(filePath).toString('base64')}`;
 }
 
 function cropAndKeyToWebp(inputPath, outputPath, cropRect, {
@@ -247,6 +262,12 @@ function ensurePrompt(relativePath, content) {
   return relativePath;
 }
 
+function ensurePromptMirror(relativePath, content) {
+  const absolutePath = path.join(rootDir, relativePath);
+  writeText(absolutePath, content);
+  return relativePath;
+}
+
 function relativePublicSrc(relativePath) {
   return `/${relativePath.replace(/^public\//, '').replace(/\\/g, '/')}`;
 }
@@ -271,6 +292,7 @@ function manifestEntry({
   generationMode,
   model,
   promptFile,
+  promptMirrorFile = '',
   referenceInputs,
   candidateId = '',
   candidatePath = '',
@@ -358,6 +380,7 @@ function manifestEntry({
     generationMode,
     model,
     promptFile,
+    promptMirrorFile: promptMirrorFile || undefined,
     promptHash: sha256ForFile(promptFile),
     referenceInputs,
     referenceHashes: referenceHashMap(referenceInputs),
@@ -567,6 +590,339 @@ function buildSvgAsset({
   });
 }
 
+function buildCompositeGptAsset({
+  id,
+  role,
+  srcPath,
+  promptFile,
+  promptMirrorFile,
+  referenceInputs,
+  candidatePath,
+  candidateId,
+  width,
+  height,
+  alt,
+  transparent = true,
+  anchor = null,
+  hitbox = null,
+  zIndexHint = 10,
+  buildingType = '',
+  state = '',
+  replaces = ''
+}) {
+  return manifestEntry({
+    id,
+    role,
+    generatedBy: 'gpt-image-2',
+    generationMode: 'codex_patch2_composite',
+    model: 'gpt-image-2',
+    promptFile,
+    promptMirrorFile,
+    referenceInputs,
+    candidateId,
+    candidatePath,
+    postProcessing: ['crop', 'background-removal', 'hq-composite', 'webp-compression'],
+    dimensions: dimensionsOf(srcPath, width, height),
+    alt,
+    replaces: replaces || srcPath,
+    srcPath,
+    transparent,
+    anchor,
+    hitbox,
+    zIndexHint,
+    buildingType,
+    state
+  });
+}
+
+function hqPatch2PromptContent({
+  assetId,
+  level,
+  outputTarget
+}) {
+  const label = `HQ level ${level}`;
+  const intent = level === 1
+    ? 'Create the humble claim-cabin headquarters milestone for the Patch 2 mobile/HQ acceptance pass.'
+    : level === 5
+      ? 'Create the frontier town-hall headquarters milestone for the Patch 2 mobile/HQ acceptance pass.'
+      : `Create the upgraded civic-office headquarters milestone for Patch 2 level ${level}.`;
+  const positivePrompt = level === 1
+    ? 'Warm frontier storybook civic-builder HQ, humble claim cabin, small footprint, simple porch, rough timber and canvas details, modest sign and crate, low compact roofline, readable at gameplay scale, no text.'
+    : level === 5
+      ? 'Warm frontier storybook civic-builder HQ, frontier town hall, largest silhouette, tower, bell, flag, polished steps, banners, public-facing entrance, readable at gameplay scale, no text.'
+      : 'Warm frontier storybook civic-builder HQ, expanded homestead civic office, wider footprint, stronger porch and awning, visible planning props, mid-tier civic identity, readable at gameplay scale, no text.';
+  return `${promptFrontMatter({
+    assetId,
+    assetGroup: 'founders_plot_buildings',
+    model: 'gpt-image-2',
+    generationMode: 'codex_patch2_composite',
+    outputTarget,
+    referenceInputs: [REF_PLATFORM, CAND_BUILDING_PACK, 'specs/prompts/v1_4_2_patch_2/hq_progression_l1_l3_l5.md']
+  })}${gptPromptBody({
+    title: label,
+    intent,
+    positivePrompt,
+    outputRequirements: 'Standalone gameplay object at roughly 512x512. Must remain clearly distinct from HQ levels 1, 3, and 5 at gameplay scale.',
+    postProcessingNotes: 'Use the approved V1.4.2 HQ base crop and compose the Patch 2 ladder with deterministic Codex-authored civic additions. Mirror this prompt into the public asset prompt folder.',
+    acceptanceChecks: 'Pass unique file hash checks, browser-canvas visual delta checks, and the gameplay-scale gallery screenshot review without relying on labels.'
+  })}`;
+}
+
+function hqCompositeConfig(level) {
+  const commonDefs = `
+    <defs>
+      <linearGradient id="woodGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#9a6641"/>
+        <stop offset="100%" stop-color="#6f442c"/>
+      </linearGradient>
+      <linearGradient id="roofGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#7ea3a2"/>
+        <stop offset="100%" stop-color="#4d6d70"/>
+      </linearGradient>
+      <linearGradient id="brassGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#f4d596"/>
+        <stop offset="100%" stop-color="#b98533"/>
+      </linearGradient>
+      <linearGradient id="stoneGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#cbb6a1"/>
+        <stop offset="100%" stop-color="#9d866f"/>
+      </linearGradient>
+      <filter id="softShadow" x="-40%" y="-40%" width="180%" height="180%">
+        <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="rgba(61,32,15,0.18)"/>
+      </filter>
+    </defs>
+  `;
+  if (level === 1) {
+    return {
+      baseWidth: 330,
+      baseBottom: 54,
+      backdrop: `
+        <svg viewBox="0 0 512 512" aria-hidden="true">
+          ${commonDefs}
+          <ellipse cx="256" cy="438" rx="168" ry="36" fill="rgba(61,32,15,0.18)"/>
+        </svg>
+      `,
+      foreground: `
+        <svg viewBox="0 0 512 512" aria-hidden="true">
+          ${commonDefs}
+          <g filter="url(#softShadow)">
+            <rect x="114" y="298" width="12" height="82" rx="6" fill="url(#woodGrad)"/>
+            <rect x="96" y="280" width="44" height="28" rx="8" fill="url(#woodGrad)"/>
+            <rect x="342" y="350" width="50" height="34" rx="6" fill="url(#woodGrad)"/>
+            <rect x="322" y="360" width="22" height="24" rx="5" fill="#8d5a39"/>
+          </g>
+        </svg>
+      `
+    };
+  }
+  if (level === 2) {
+    return {
+      baseWidth: 348,
+      baseBottom: 50,
+      backdrop: `
+        <svg viewBox="0 0 512 512" aria-hidden="true">
+          ${commonDefs}
+          <ellipse cx="258" cy="438" rx="178" ry="38" fill="rgba(61,32,15,0.18)"/>
+          <g filter="url(#softShadow)">
+            <rect x="156" y="276" width="88" height="86" rx="12" fill="url(#woodGrad)"/>
+            <path d="M146 286L200 242L254 286Z" fill="url(#roofGrad)"/>
+          </g>
+        </svg>
+      `,
+      foreground: `
+        <svg viewBox="0 0 512 512" aria-hidden="true">
+          ${commonDefs}
+          <g filter="url(#softShadow)">
+            <path d="M282 298h88l-18 26h-88z" fill="#d8b37a"/>
+            <rect x="374" y="278" width="10" height="90" rx="5" fill="url(#woodGrad)"/>
+            <circle cx="379" cy="292" r="9" fill="url(#brassGrad)"/>
+          </g>
+        </svg>
+      `
+    };
+  }
+  if (level === 3) {
+    return {
+      baseWidth: 378,
+      baseBottom: 44,
+      backdrop: `
+        <svg viewBox="0 0 512 512" aria-hidden="true">
+          ${commonDefs}
+          <ellipse cx="258" cy="440" rx="188" ry="40" fill="rgba(61,32,15,0.18)"/>
+          <g filter="url(#softShadow)">
+            <rect x="88" y="244" width="142" height="118" rx="16" fill="url(#woodGrad)"/>
+            <path d="M74 254L158 196L244 254Z" fill="url(#roofGrad)"/>
+            <rect x="112" y="278" width="24" height="42" rx="6" fill="#d3b08a"/>
+            <rect x="386" y="230" width="16" height="138" rx="8" fill="url(#woodGrad)"/>
+            <circle cx="394" cy="250" r="11" fill="url(#brassGrad)"/>
+          </g>
+        </svg>
+      `,
+      foreground: `
+        <svg viewBox="0 0 512 512" aria-hidden="true">
+          ${commonDefs}
+          <g filter="url(#softShadow)">
+            <path d="M246 312h118l-20 30H228z" fill="#d8b37a"/>
+            <rect x="108" y="328" width="54" height="42" rx="8" fill="#8b5a38"/>
+            <rect x="170" y="342" width="26" height="30" rx="7" fill="url(#stoneGrad)"/>
+            <rect x="366" y="350" width="26" height="32" rx="7" fill="url(#woodGrad)"/>
+          </g>
+        </svg>
+      `
+    };
+  }
+  if (level === 4) {
+    return {
+      baseWidth: 396,
+      baseBottom: 40,
+      backdrop: `
+        <svg viewBox="0 0 512 512" aria-hidden="true">
+          ${commonDefs}
+          <ellipse cx="258" cy="442" rx="196" ry="42" fill="rgba(61,32,15,0.18)"/>
+          <g filter="url(#softShadow)">
+            <rect x="82" y="236" width="156" height="126" rx="16" fill="url(#woodGrad)"/>
+            <path d="M70 246L158 186L248 246Z" fill="url(#roofGrad)"/>
+            <rect x="360" y="186" width="48" height="112" rx="14" fill="url(#woodGrad)"/>
+            <path d="M352 198L384 156L418 198Z" fill="url(#roofGrad)"/>
+          </g>
+        </svg>
+      `,
+      foreground: `
+        <svg viewBox="0 0 512 512" aria-hidden="true">
+          ${commonDefs}
+          <g filter="url(#softShadow)">
+            <path d="M236 314h132l-26 32H210z" fill="#d8b37a"/>
+            <rect x="118" y="326" width="50" height="42" rx="8" fill="#8b5a38"/>
+            <rect x="372" y="250" width="8" height="86" rx="4" fill="url(#woodGrad)"/>
+            <path d="M378 254h44v16h-44z" fill="#f1d3a0"/>
+            <rect x="414" y="248" width="8" height="76" rx="4" fill="url(#woodGrad)"/>
+            <path d="M420 252h36v16h-36z" fill="#b65d40"/>
+          </g>
+        </svg>
+      `
+    };
+  }
+  return {
+    baseWidth: 420,
+    baseBottom: 32,
+    backdrop: `
+      <svg viewBox="0 0 512 512" aria-hidden="true">
+        ${commonDefs}
+        <ellipse cx="258" cy="444" rx="204" ry="44" fill="rgba(61,32,15,0.18)"/>
+        <g filter="url(#softShadow)">
+          <rect x="70" y="228" width="170" height="132" rx="18" fill="url(#woodGrad)"/>
+          <path d="M56 240L156 176L258 240Z" fill="url(#roofGrad)"/>
+          <rect x="338" y="118" width="78" height="164" rx="16" fill="url(#stoneGrad)"/>
+          <path d="M326 130L377 76L430 130Z" fill="url(#roofGrad)"/>
+          <rect x="370" y="88" width="12" height="56" rx="6" fill="#855233"/>
+          <path d="M382 88h42l-8 18h-34z" fill="#194b5e"/>
+          <circle cx="377" cy="184" r="14" fill="#8a5a39"/>
+          <rect x="364" y="182" width="26" height="46" rx="12" fill="#f2d595"/>
+        </g>
+      </svg>
+    `,
+    foreground: `
+      <svg viewBox="0 0 512 512" aria-hidden="true">
+        ${commonDefs}
+        <g filter="url(#softShadow)">
+          <path d="M208 312h144l-32 40H176z" fill="#e7c895"/>
+          <rect x="190" y="352" width="148" height="16" rx="8" fill="#c8a47a"/>
+          <rect x="202" y="370" width="124" height="14" rx="7" fill="#b98b62"/>
+          <rect x="214" y="386" width="100" height="12" rx="6" fill="#9d734f"/>
+          <rect x="120" y="316" width="54" height="44" rx="10" fill="#8b5a38"/>
+          <rect x="364" y="292" width="10" height="84" rx="5" fill="url(#woodGrad)"/>
+          <path d="M372 296h48v18h-48z" fill="#f2d595"/>
+          <rect x="420" y="292" width="10" height="84" rx="5" fill="url(#woodGrad)"/>
+          <path d="M428 296h40v18h-40z" fill="#b65d40"/>
+        </g>
+      </svg>
+    `
+  };
+}
+
+function hqCompositeHtml({ level, baseSrc }) {
+  const config = hqCompositeConfig(level);
+  return `
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <style>
+          html, body {
+            margin: 0;
+            width: 512px;
+            height: 512px;
+            overflow: hidden;
+            background: transparent;
+          }
+          .hqCanvas {
+            position: relative;
+            width: 512px;
+            height: 512px;
+            isolation: isolate;
+            background: transparent;
+          }
+          .hqLayer,
+          .hqForeground,
+          .hqBackdrop {
+            position: absolute;
+            inset: 0;
+          }
+          .hqBackdrop,
+          .hqForeground {
+            z-index: 1;
+            pointer-events: none;
+          }
+          .hqBase {
+            position: absolute;
+            left: 50%;
+            bottom: ${config.baseBottom}px;
+            width: ${config.baseWidth}px;
+            height: auto;
+            transform: translateX(-50%);
+            z-index: 2;
+            filter: drop-shadow(0 14px 24px rgba(61, 32, 15, 0.22));
+          }
+          .hqForeground {
+            z-index: 3;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="hqCanvas">
+          <div class="hqBackdrop">${config.backdrop}</div>
+          <img class="hqBase" src="${baseSrc}" alt="" />
+          <div class="hqForeground">${config.foreground}</div>
+        </div>
+      </body>
+    </html>
+  `;
+}
+
+async function renderPatch2HqAssets() {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fp-v142-patch2-hq-'));
+  const baseHqPath = path.join(tempDir, 'hq-base.webp');
+  cropAndKeyToWebp(path.join(rootDir, CAND_BUILDING_PACK), baseHqPath, { x: 0, y: 0, w: 512, h: 512 }, { quality: 92 });
+  const baseSrc = fileDataUrl(baseHqPath);
+  const { chromium } = await import('playwright');
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage({ viewport: { width: 512, height: 512 }, deviceScaleFactor: 1 });
+  try {
+    for (const level of [1, 2, 3, 4, 5]) {
+      const html = hqCompositeHtml({ level, baseSrc });
+      await page.setContent(html, { waitUntil: 'load' });
+      await page.waitForFunction(() => Array.from(document.images).every((img) => img.complete));
+      const pngPath = path.join(tempDir, `hq-lv${level}.png`);
+      await page.screenshot({ path: pngPath, omitBackground: true });
+      pngOrJpegToWebp(pngPath, path.join(rootDir, `public/experiences/founders-plot/assets/buildings/hq-lv${level}.webp`), 90);
+    }
+  } finally {
+    await page.close();
+    await browser.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
 function buildPromptFiles() {
   const prompts = [];
 
@@ -643,6 +999,17 @@ function buildPromptFiles() {
       postProcessingNotes: 'Extract the matching cell from building-pack-sheet-c01, remove the light cream background, and compress to WebP.',
       acceptanceChecks: `${label} must sit cleanly on the Founders Plot stage and read immediately as a clickable world object.`
     })}`);
+  }
+
+  for (const level of [1, 2, 3, 4, 5]) {
+    const assetId = `founders_plot_hq_lv${level}_v1_4_2`;
+    const outputTarget = `public/experiences/founders-plot/assets/buildings/hq-lv${level}.webp`;
+    const specPromptPath = `specs/prompts/v1_4_2_patch_2/${assetId}.md`;
+    const mirrorPromptPath = `public/experiences/founders-plot/assets/prompts/v1_4_2_patch_2/${assetId}.md`;
+    const promptContent = hqPatch2PromptContent({ assetId, level, outputTarget });
+    prompts.push(specPromptPath);
+    ensurePrompt(specPromptPath, promptContent);
+    ensurePromptMirror(mirrorPromptPath, promptContent);
   }
 
   const civicPromptSpecs = [
@@ -765,7 +1132,7 @@ function buildPromptFiles() {
   return prompts;
 }
 
-function buildAssets() {
+async function buildAssets() {
   const entries = [];
 
   const sceneDefs = [
@@ -799,12 +1166,38 @@ function buildAssets() {
     entries.push(buildGptImageAsset(asset));
   }
 
+  await renderPatch2HqAssets();
+
+  const hqDefs = [
+    ['founders_plot_hq_lv1_v1_4_2', 'public/experiences/founders-plot/assets/buildings/hq-lv1.webp', 'level_1', 'Headquarters cabin level 1'],
+    ['founders_plot_hq_lv2_v1_4_2', 'public/experiences/founders-plot/assets/buildings/hq-lv2.webp', 'level_2', 'Headquarters cabin level 2'],
+    ['founders_plot_hq_lv3_v1_4_2', 'public/experiences/founders-plot/assets/buildings/hq-lv3.webp', 'level_3', 'Headquarters civic office level 3'],
+    ['founders_plot_hq_lv4_v1_4_2', 'public/experiences/founders-plot/assets/buildings/hq-lv4.webp', 'level_4', 'Headquarters civic office level 4'],
+    ['founders_plot_hq_lv5_v1_4_2', 'public/experiences/founders-plot/assets/buildings/hq-lv5.webp', 'level_5', 'Headquarters frontier town hall level 5']
+  ];
+
+  for (const [id, srcPath, state, alt] of hqDefs) {
+    entries.push(buildCompositeGptAsset({
+      id,
+      role: 'founders_plot_building',
+      srcPath,
+      promptFile: `specs/prompts/v1_4_2_patch_2/${id}.md`,
+      promptMirrorFile: `public/experiences/founders-plot/assets/prompts/v1_4_2_patch_2/${id}.md`,
+      referenceInputs: [REF_PLATFORM, CAND_BUILDING_PACK, 'specs/prompts/v1_4_2_patch_2/hq_progression_l1_l3_l5.md'],
+      candidatePath: CAND_BUILDING_PACK,
+      candidateId: `patch2-hq:${state}`,
+      width: 512,
+      height: 512,
+      alt,
+      anchor: { x: 0.5, y: 0.86 },
+      hitbox: { x: 0.16, y: 0.18, w: 0.68, h: 0.66 },
+      zIndexHint: 32,
+      buildingType: 'HQ',
+      state
+    }));
+  }
+
   const buildingDefs = [
-    ['founders_plot_hq_lv1_v1_4_2', 'public/experiences/founders-plot/assets/buildings/hq-lv1.webp', { x: 0, y: 0 }, 'HQ', 'level_1', 'Headquarters cabin level 1'],
-    ['founders_plot_hq_lv2_v1_4_2', 'public/experiences/founders-plot/assets/buildings/hq-lv2.webp', { x: 0, y: 0 }, 'HQ', 'level_2', 'Headquarters cabin level 2'],
-    ['founders_plot_hq_lv3_v1_4_2', 'public/experiences/founders-plot/assets/buildings/hq-lv3.webp', { x: 0, y: 0 }, 'HQ', 'level_3', 'Headquarters cabin level 3'],
-    ['founders_plot_hq_lv4_v1_4_2', 'public/experiences/founders-plot/assets/buildings/hq-lv4.webp', { x: 0, y: 0 }, 'HQ', 'level_4', 'Headquarters cabin level 4'],
-    ['founders_plot_hq_lv5_v1_4_2', 'public/experiences/founders-plot/assets/buildings/hq-lv5.webp', { x: 0, y: 0 }, 'HQ', 'level_5', 'Headquarters cabin level 5'],
     ['founders_plot_lumber_camp_v1_4_2', 'public/experiences/founders-plot/assets/buildings/lumber-camp.webp', { x: 512, y: 0 }, 'LUMBER_CAMP', 'base', 'Lumber Camp'],
     ['founders_plot_farm_plot_v1_4_2', 'public/experiences/founders-plot/assets/buildings/farm-plot.webp', { x: 1024, y: 0 }, 'FARM_PLOT', 'base', 'Farm Plot'],
     ['founders_plot_quarry_v1_4_2', 'public/experiences/founders-plot/assets/buildings/quarry.webp', { x: 0, y: 512 }, 'QUARRY', 'base', 'Quarry'],
@@ -1034,9 +1427,15 @@ function writeManifest(entries) {
   const manifest = {
     schemaVersion: SCHEMA_VERSION,
     styleFamily: STYLE_FAMILY,
+    release: PATCH2_RELEASE,
     generatedAt: new Date().toISOString(),
     reviewStatus: 'approved',
     heroFrame: HERO_FRAME,
+    promptRoots: [
+      'specs/prompts/v1_4_2',
+      'specs/prompts/v1_4_2_patch_2',
+      'public/experiences/founders-plot/assets/prompts/v1_4_2_patch_2'
+    ],
     referenceInputs: [
       REF_PLATFORM,
       REF_LOGO,
@@ -1066,11 +1465,14 @@ function main() {
   ensureDir(foundersAssetRoot);
   ensureDir(platformAssetRoot);
   ensureDir(promptRoot);
+  ensureDir(patch2PromptRoot);
+  ensureDir(patch2PromptMirrorRoot);
   buildPromptFiles();
-  const entries = buildAssets();
-  writeManifest(entries);
-  const totalBytes = entries.reduce((sum, entry) => sum + Number(entry.byteSize || 0), 0);
-  console.log(`Generated V1.4.2 asset pack: ${entries.length} assets, ${totalBytes} bytes.`);
+  return buildAssets().then((entries) => {
+    writeManifest(entries);
+    const totalBytes = entries.reduce((sum, entry) => sum + Number(entry.byteSize || 0), 0);
+    console.log(`Generated V1.4.2 asset pack: ${entries.length} assets, ${totalBytes} bytes.`);
+  });
 }
 
-main();
+await main();

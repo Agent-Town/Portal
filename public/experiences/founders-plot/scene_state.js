@@ -239,6 +239,34 @@
     return sorted.slice(0, 2);
   }
 
+  function viewportClass(viewportWidth = 1280) {
+    const normalized = number(viewportWidth, 1280);
+    if (normalized <= 480) return 'mobile';
+    if (normalized <= 900) return 'tablet';
+    return 'desktop';
+  }
+
+  function mobileSignalPriority(role = '') {
+    switch (String(role || '').trim()) {
+      case 'critical':
+        return 100;
+      case 'objective':
+        return 92;
+      case 'clover':
+        return 84;
+      case 'selected':
+        return 76;
+      case 'status':
+        return 64;
+      case 'locked':
+        return 44;
+      case 'available':
+        return 32;
+      default:
+        return 12;
+    }
+  }
+
   function objectAttention(object, goalObjectId) {
     if (String(object?.id || '') === String(goalObjectId || '')) return 'recommended';
     if (object?.state === 'BLOCKED' || object?.state === 'LOCKED') return 'blocked';
@@ -246,10 +274,57 @@
     return 'none';
   }
 
-  function shouldShowLabel(object, { viewportWidth = 1280, selected = false, attention = 'none' } = {}) {
-    const mobile = number(viewportWidth, 1280) <= 430;
-    if (mobile) return selected || attention === 'recommended';
-    return selected || attention === 'recommended';
+  function objectLabelRole(object, context = {}) {
+    const {
+      selected = false,
+      goalTarget = false,
+      cloverTarget = false
+    } = context;
+    if (selected) return 'selected';
+    if (goalTarget) return 'objective';
+    if (cloverTarget) return 'clover';
+    if (object?.state === 'BLOCKED') return 'critical';
+    if (object?.state === 'LOCKED') return 'locked';
+    if (object?.kind === 'lot' && object?.state === 'BUILDABLE') return 'available';
+    return 'ambient';
+  }
+
+  function badgeLabelRole(badge = {}, context = {}) {
+    const {
+      selected = false,
+      goalTarget = false,
+      cloverTarget = false
+    } = context;
+    const type = String(badge?.type || '').trim();
+    if (type === 'approval' || type === 'restart' || type === 'blocked') return 'critical';
+    if (goalTarget) return 'objective';
+    if (selected) return 'selected';
+    if (cloverTarget) return 'clover';
+    if (type === 'build') return 'available';
+    if (type === 'locked') return 'locked';
+    if (String(badge?.overlayRole || '').trim() === 'status') return 'status';
+    return 'ambient';
+  }
+
+  function shouldShowLabel(object, {
+    viewportWidth = 1280,
+    selected = false,
+    attention = 'none',
+    labelRole = '',
+    cloverTarget = false,
+    cloverState = ''
+  } = {}) {
+    const mobile = viewportClass(viewportWidth) === 'mobile';
+    if (mobile) {
+      if (String(cloverState || '').toUpperCase() === 'ACTING') {
+        if (selected) return true;
+        if (String(labelRole || '').trim() === 'critical') return true;
+        if (cloverTarget) return false;
+        return false;
+      }
+      return ['objective', 'selected', 'clover', 'critical'].includes(String(labelRole || '').trim()) || (cloverTarget && !selected);
+    }
+    return selected || attention === 'recommended' || cloverTarget;
   }
 
   function worldObjectIdFor(objectId, buildingType = '') {
@@ -263,6 +338,13 @@
     if (normalized >= 5) return 'established';
     if (normalized >= 3) return 'improved';
     return 'starter';
+  }
+
+  function hqScale(level) {
+    const normalized = clamp(number(level || 1), 1, 5);
+    if (normalized >= 5) return 1.08;
+    if (normalized >= 3) return 1.01;
+    return 0.92;
   }
 
   function badgeOverlayDefaults(badge = {}) {
@@ -291,25 +373,36 @@
     const {
       selected = false,
       goalTarget = false,
-      viewportWidth = 1280
+      viewportWidth = 1280,
+      cloverTarget = false
     } = context;
+    const mobile = viewportClass(viewportWidth) === 'mobile';
+    const labelRole = String(badge?.labelRole || '').trim();
     if (badge.showWhenSelected && !selected && !goalTarget) return false;
     if (badge.showWhenGoal && !goalTarget) return false;
     if (badge.overlayRole === 'ambient' && !badge.alwaysVisible && !selected && !goalTarget) return false;
-    if (badge.overlayRole === 'available' && number(viewportWidth, 1280) <= 430 && !selected && !goalTarget) return false;
+    if (badge.overlayRole === 'available' && mobile && !selected && !goalTarget) return false;
+    if (mobile) {
+      if (labelRole === 'critical') return true;
+      if (selected || goalTarget) return labelRole !== 'ambient' || badge.alwaysVisible === true;
+      if (cloverTarget) return labelRole === 'clover' || labelRole === 'critical';
+      return false;
+    }
     return true;
   }
 
   function decorateBadges(badges = [], context = {}) {
-    const { viewportWidth = 1280, goalTarget = false } = context;
-    const mobile = number(viewportWidth, 1280) <= 430;
+    const { viewportWidth = 1280, goalTarget = false, cloverTarget = false, cloverState = '' } = context;
+    const mobile = viewportClass(viewportWidth) === 'mobile';
     const decorated = badges
       .map((badge) => {
         const defaults = badgeOverlayDefaults(badge);
+        const labelRole = badgeLabelRole(badge, context);
         return {
           ...defaults,
           ...badge,
           displayLabel: badge.displayLabel || badge.label,
+          labelRole,
           mobileHidden: badge.mobileHidden === true || (mobile && badge.overlayRole === 'available' && !goalTarget)
         };
       })
@@ -318,7 +411,15 @@
         ...badge,
         iconOnly: badge.iconOnly === true || (mobile && badge.overlayRole === 'available' && !goalTarget)
       }));
-    return capBadges(decorated, context);
+    const capped = capBadges(decorated, context);
+    const prioritized = capped.slice().sort((left, right) => mobileSignalPriority(right.labelRole) - mobileSignalPriority(left.labelRole));
+    if (mobile && String(cloverState || '').toUpperCase() === 'ACTING' && cloverTarget) {
+      return prioritized.filter((badge) => badge.labelRole === 'critical').slice(0, 1);
+    }
+    if (mobile && !(context.selected || goalTarget)) {
+      return prioritized.filter((badge) => badge.labelRole === 'critical');
+    }
+    return prioritized;
   }
 
   function objectOverlayMeta(object, { selected = false, goalTarget = false, attention = 'none' } = {}) {
@@ -628,6 +729,7 @@
         z: 32,
         hqLevel: clamp(number(hqBuilding?.level || 1), 1, 5),
         visualTier: hqVisualTier(hqBuilding?.level || 1),
+        scale: hqScale(hqBuilding?.level || 1),
         assetId: assetIdForBuilding(hqBuilding, hqState),
         badges: buildingBadges(hqBuilding, hqState, view),
         timer: timerForBuilding(hqBuilding),
@@ -859,21 +961,42 @@
     });
 
     const viewportWidth = number(options?.viewportWidth, 1280);
+    const currentCloverState = cloverState(view, options);
+    const cloverTargetObjectId = String(currentCloverState?.targetObjectId || '');
     return objects.map((object) => {
       const attention = objectAttention(object, goalObjectId);
       const selected = selectedObjectId === object.id;
       const goalTarget = goalObjectId === object.id;
+      const cloverTarget = cloverTargetObjectId === object.id;
       const overlayMeta = objectOverlayMeta(object, { selected, goalTarget, attention });
-      const badges = decorateBadges(object.badges, { viewportWidth, selected, goalTarget, attention, object });
+      const labelRole = objectLabelRole(object, { viewportWidth, selected, goalTarget, attention, cloverTarget });
+      const badges = decorateBadges(object.badges, {
+        viewportWidth,
+        selected,
+        goalTarget,
+        attention,
+        object,
+        cloverTarget,
+        cloverState: currentCloverState?.state || ''
+      });
       return {
         ...object,
         selected,
         goalTarget,
+        cloverTarget,
         attention,
         overlayRole: overlayMeta.overlayRole,
         overlayWeight: overlayMeta.overlayWeight,
+        labelRole,
         badges,
-        labelVisible: shouldShowLabel(object, { viewportWidth, selected, attention })
+        labelVisible: shouldShowLabel(object, {
+          viewportWidth,
+          selected,
+          attention,
+          labelRole,
+          cloverTarget,
+          cloverState: currentCloverState?.state || ''
+        })
       };
     });
   }
@@ -948,12 +1071,16 @@
     DRAWER_CONFIG,
     PRODUCT_LABEL,
     assetIdForBuilding,
+    badgeLabelRole,
     buildingVisualState,
     cloverState,
     createSceneState,
     drawerBadges,
     goalTargetObjectId,
+    mobileSignalPriority,
+    objectLabelRole,
     selectionKeyToObjectId,
+    viewportClass,
     stateLabel
   };
 });

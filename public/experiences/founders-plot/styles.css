@@ -238,6 +238,7 @@ html.founders-plot-embed body.founders-plot-page {
 
 .foundersPrimaryCta {
   min-width: 220px;
+  min-height: 44px;
   padding: 14px 18px;
   border: 1px solid rgba(46, 27, 14, 0.14);
   border-radius: 16px;
@@ -561,12 +562,19 @@ html.founders-plot-embed body.founders-plot-page {
   display: inline-grid;
   position: absolute;
   justify-items: center;
+  min-width: 44px;
+  min-height: 44px;
   gap: 6px;
   border: 0;
   background: none;
   padding: 0;
   color: var(--fp-ink);
   text-align: center;
+}
+
+.at-fp-stage-object {
+  transform: translate(-50%, -84%) scale(var(--fp-scale, 1));
+  transform-origin: center bottom;
 }
 
 .at-fp-cloverWrap,
@@ -878,13 +886,17 @@ html.founders-plot-embed body.founders-plot-page {
     transform 140ms ease;
 }
 
+.at-fp-objectLabel[data-label-role="critical"] {
+  background: linear-gradient(180deg, rgba(168, 91, 61, 0.98), rgba(133, 64, 44, 0.98));
+  color: var(--fp-cream);
+  border-color: rgba(91, 57, 37, 0.34);
+}
+
 .at-fp-stage-object:hover .at-fp-objectLabel,
 .at-fp-stage-object:focus .at-fp-objectLabel,
 .at-fp-stage-object:focus-visible .at-fp-objectLabel,
 .at-fp-stage-object--selected .at-fp-objectLabel,
-.at-fp-stage-object--goal-target .at-fp-objectLabel,
-.at-fp-stage-object--label-pinned .at-fp-objectLabel,
-.at-fp-stage-object--attention-recommended .at-fp-objectLabel {
+.at-fp-stage-object--label-pinned .at-fp-objectLabel {
   opacity: 1;
   transform: translateY(0);
 }
@@ -924,6 +936,12 @@ html.founders-plot-embed body.founders-plot-page {
   transition:
     opacity 140ms ease,
     transform 140ms ease;
+}
+
+.at-fp-overlayPill[data-label-role="critical"] {
+  background: linear-gradient(180deg, rgba(168, 91, 61, 0.96), rgba(133, 64, 44, 0.98));
+  color: var(--fp-cream);
+  border-color: rgba(91, 57, 37, 0.34);
 }
 
 .at-fp-clover:hover .at-fp-cloverBubble,
@@ -1462,6 +1480,12 @@ html.founders-plot-embed body.founders-plot-page {
     font-size: 10px;
   }
 
+  .at-fp-objectLabel {
+    max-width: 13ch;
+    padding: 3px 9px;
+    font-size: 12px;
+  }
+
   .foundersDrawerLayer {
     padding: 10px;
   }
@@ -1495,6 +1519,44 @@ html.founders-plot-embed body.founders-plot-page {
 
   .at-fp-overlayPill[data-mobile-hidden="true"] {
     display: none;
+  }
+
+  .at-fp-overlayPill[data-label-role="ambient"],
+  .at-fp-overlayPill[data-label-role="available"],
+  .at-fp-overlayPill[data-label-role="locked"] {
+    display: none;
+  }
+
+  .at-fp-stage-object[data-world-object="lot"][data-attention="available"] .at-fp-objectLabel,
+  .at-fp-stage-object[data-world-object="lot"][data-label-role="available"] .at-fp-objectLabel {
+    display: none;
+  }
+
+  .at-fp-stage-object[data-world-object="lot"]::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: 16%;
+    width: 16px;
+    height: 32px;
+    transform: translateX(-50%);
+    border-radius: 8px 8px 4px 4px;
+    background:
+      linear-gradient(180deg, rgba(133, 82, 51, 0.96), rgba(91, 57, 37, 0.98));
+    box-shadow: 0 6px 12px rgba(61, 32, 15, 0.12);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .at-fp-stage-object[data-world-object="lot"][data-attention="available"]::after {
+    opacity: 0.86;
+  }
+
+  .at-fp-stage-object[data-world-object="lot"][data-attention="blocked"]::after {
+    opacity: 0.76;
+    background:
+      radial-gradient(circle at 50% 34%, rgba(255, 247, 230, 0.72) 0 18%, rgba(255, 247, 230, 0) 20%),
+      linear-gradient(180deg, rgba(123, 85, 55, 0.9), rgba(91, 57, 37, 0.98));
   }
 }
 

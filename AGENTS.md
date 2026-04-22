@@ -282,6 +282,16 @@ When implementing the V1.3.1 visual-surface signoff pass:
 - split or quarantine unrelated OpenRouter/proxy changes with a separate owner and rollback note;
 - capture full-route screenshots, not only embedded experience screenshots.
 
+## Founders Plot V1.4.2 Patch 2 visual acceptance guardrail
+
+When implementing Founders Plot visual acceptance fixes:
+
+- do not satisfy visual requirements with metadata-only changes;
+- mobile calmness must be proven on the real 390px route with screenshots and label/clip metrics;
+- HQ progression must be proven with real distinct assets, visual-delta checks, and gameplay-scale screenshots;
+- preserve owner-approved V1.4.2 art baseline and `AI SLOP` Start Gate copy;
+- do not add gameplay systems, runtime architecture changes, new contracts, new resources, or hero-cast gameplay cameos during visual acceptance cleanup.
+
 
 ---
 

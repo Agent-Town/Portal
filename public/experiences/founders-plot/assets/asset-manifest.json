@@ -1,7 +1,8 @@
 {
   "schemaVersion": "v1.4.2",
   "styleFamily": "agent-town-frontier-storybook-v1_4_2",
-  "generatedAt": "2026-04-22T14:28:19.000Z",
+  "release": "v1.4.2-patch2-mobile-hq",
+  "generatedAt": "2026-04-22T16:26:48.751Z",
   "reviewStatus": "approved",
   "heroFrame": {
     "approvalStatus": "approved",
@@ -11,6 +12,11 @@
     "sourceRoute": "/app?district=founders-plot",
     "screenshotPrefix": "founders-v1-4-2-full-route-hero-1280"
   },
+  "promptRoots": [
+    "specs/prompts/v1_4_2",
+    "specs/prompts/v1_4_2_patch_2",
+    "public/experiences/founders-plot/assets/prompts/v1_4_2_patch_2"
+  ],
   "referenceInputs": [
     "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
     "docs/brand/reference/platform/agent-town-logo-reference.jpg",
@@ -198,23 +204,27 @@
       "src": "/experiences/founders-plot/assets/buildings/hq-lv1.webp",
       "status": "approved",
       "generatedBy": "gpt-image-2",
-      "generationMode": "codex_builtin",
+      "generationMode": "codex_patch2_composite",
       "model": "gpt-image-2",
-      "promptFile": "specs/prompts/v1_4_2/founders_plot_hq_lv1_v1_4_2.md",
-      "promptHash": "1f68d2f0f33f3f495f77150cf69bfd7b45c8b5f3e2d17e90628bdc8580f42bc3",
+      "promptFile": "specs/prompts/v1_4_2_patch_2/founders_plot_hq_lv1_v1_4_2.md",
+      "promptMirrorFile": "public/experiences/founders-plot/assets/prompts/v1_4_2_patch_2/founders_plot_hq_lv1_v1_4_2.md",
+      "promptHash": "1a2e8f820f0c71ce84af2425f9f0e670052849759b8e81f5be65caaf28de6527",
       "referenceInputs": [
         "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
-        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png"
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png",
+        "specs/prompts/v1_4_2_patch_2/hq_progression_l1_l3_l5.md"
       ],
       "referenceHashes": {
         "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
-        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png": "1fc9fa1c3be494d3d6842b127f02feac7a892833bc27a8b3ea3ad7432e370ad5"
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png": "1fc9fa1c3be494d3d6842b127f02feac7a892833bc27a8b3ea3ad7432e370ad5",
+        "specs/prompts/v1_4_2_patch_2/hq_progression_l1_l3_l5.md": "8850cceb27aa904eacac819ee0eee61a98a21ea073e2ceb9ea1c1a5e6aaef013"
       },
-      "candidateId": "sheet-c01:0,0",
+      "candidateId": "patch2-hq:level_1",
       "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png",
       "postProcessing": [
         "crop",
         "background-removal",
+        "hq-composite",
         "webp-compression"
       ],
       "dimensions": {
@@ -223,8 +233,8 @@
       },
       "width": 512,
       "height": 512,
-      "byteSize": 60628,
-      "bytes": 60628,
+      "byteSize": 48582,
+      "bytes": 48582,
       "containsIntentionalText": false,
       "alt": "Headquarters cabin level 1",
       "approvedBy": "Robin / design owner",
@@ -266,23 +276,27 @@
       "src": "/experiences/founders-plot/assets/buildings/hq-lv2.webp",
       "status": "approved",
       "generatedBy": "gpt-image-2",
-      "generationMode": "codex_builtin",
+      "generationMode": "codex_patch2_composite",
       "model": "gpt-image-2",
-      "promptFile": "specs/prompts/v1_4_2/founders_plot_hq_lv2_v1_4_2.md",
-      "promptHash": "93252c2f66a333bb8838c137d5b30f8d37eb483decbd3b3bc6a7f27c00016a5a",
+      "promptFile": "specs/prompts/v1_4_2_patch_2/founders_plot_hq_lv2_v1_4_2.md",
+      "promptMirrorFile": "public/experiences/founders-plot/assets/prompts/v1_4_2_patch_2/founders_plot_hq_lv2_v1_4_2.md",
+      "promptHash": "56d0a01688e2c9c943d8342387c822ddf95f6f886738be316cf7a6f68b6f2e19",
       "referenceInputs": [
         "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
-        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png"
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png",
+        "specs/prompts/v1_4_2_patch_2/hq_progression_l1_l3_l5.md"
       ],
       "referenceHashes": {
         "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
-        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png": "1fc9fa1c3be494d3d6842b127f02feac7a892833bc27a8b3ea3ad7432e370ad5"
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png": "1fc9fa1c3be494d3d6842b127f02feac7a892833bc27a8b3ea3ad7432e370ad5",
+        "specs/prompts/v1_4_2_patch_2/hq_progression_l1_l3_l5.md": "8850cceb27aa904eacac819ee0eee61a98a21ea073e2ceb9ea1c1a5e6aaef013"
       },
-      "candidateId": "sheet-c01:0,0",
+      "candidateId": "patch2-hq:level_2",
       "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png",
       "postProcessing": [
         "crop",
         "background-removal",
+        "hq-composite",
         "webp-compression"
       ],
       "dimensions": {
@@ -291,8 +305,8 @@
       },
       "width": 512,
       "height": 512,
-      "byteSize": 60628,
-      "bytes": 60628,
+      "byteSize": 49464,
+      "bytes": 49464,
       "containsIntentionalText": false,
       "alt": "Headquarters cabin level 2",
       "approvedBy": "Robin / design owner",
@@ -334,23 +348,27 @@
       "src": "/experiences/founders-plot/assets/buildings/hq-lv3.webp",
       "status": "approved",
       "generatedBy": "gpt-image-2",
-      "generationMode": "codex_builtin",
+      "generationMode": "codex_patch2_composite",
       "model": "gpt-image-2",
-      "promptFile": "specs/prompts/v1_4_2/founders_plot_hq_lv3_v1_4_2.md",
-      "promptHash": "d77ba402408aac8af5c73f7e3ee5134fe5fc26e5966006e2bf64f5ee6f2cb942",
+      "promptFile": "specs/prompts/v1_4_2_patch_2/founders_plot_hq_lv3_v1_4_2.md",
+      "promptMirrorFile": "public/experiences/founders-plot/assets/prompts/v1_4_2_patch_2/founders_plot_hq_lv3_v1_4_2.md",
+      "promptHash": "6f0781ca606bc8c94907a57e1b471928fbbe6c6c8c4bc38ffccf2b9f7687140d",
       "referenceInputs": [
         "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
-        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png"
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png",
+        "specs/prompts/v1_4_2_patch_2/hq_progression_l1_l3_l5.md"
       ],
       "referenceHashes": {
         "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
-        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png": "1fc9fa1c3be494d3d6842b127f02feac7a892833bc27a8b3ea3ad7432e370ad5"
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png": "1fc9fa1c3be494d3d6842b127f02feac7a892833bc27a8b3ea3ad7432e370ad5",
+        "specs/prompts/v1_4_2_patch_2/hq_progression_l1_l3_l5.md": "8850cceb27aa904eacac819ee0eee61a98a21ea073e2ceb9ea1c1a5e6aaef013"
       },
-      "candidateId": "sheet-c01:0,0",
+      "candidateId": "patch2-hq:level_3",
       "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png",
       "postProcessing": [
         "crop",
         "background-removal",
+        "hq-composite",
         "webp-compression"
       ],
       "dimensions": {
@@ -359,10 +377,10 @@
       },
       "width": 512,
       "height": 512,
-      "byteSize": 60628,
-      "bytes": 60628,
+      "byteSize": 52988,
+      "bytes": 52988,
       "containsIntentionalText": false,
-      "alt": "Headquarters cabin level 3",
+      "alt": "Headquarters civic office level 3",
       "approvedBy": "Robin / design owner",
       "approvedAt": "2026-04-22",
       "approvalNotes": "Approved for founders plot building use in the V1.4.2 rebuild.",
@@ -402,23 +420,27 @@
       "src": "/experiences/founders-plot/assets/buildings/hq-lv4.webp",
       "status": "approved",
       "generatedBy": "gpt-image-2",
-      "generationMode": "codex_builtin",
+      "generationMode": "codex_patch2_composite",
       "model": "gpt-image-2",
-      "promptFile": "specs/prompts/v1_4_2/founders_plot_hq_lv4_v1_4_2.md",
-      "promptHash": "49797e39609bf5b318936ab75890e5d660a2600410be8dfa130b6cc5eac2230e",
+      "promptFile": "specs/prompts/v1_4_2_patch_2/founders_plot_hq_lv4_v1_4_2.md",
+      "promptMirrorFile": "public/experiences/founders-plot/assets/prompts/v1_4_2_patch_2/founders_plot_hq_lv4_v1_4_2.md",
+      "promptHash": "6adf7edbdaf6b78952149f54d33578c6622922e935c4aaf2e5292f4afbbd4d47",
       "referenceInputs": [
         "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
-        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png"
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png",
+        "specs/prompts/v1_4_2_patch_2/hq_progression_l1_l3_l5.md"
       ],
       "referenceHashes": {
         "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
-        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png": "1fc9fa1c3be494d3d6842b127f02feac7a892833bc27a8b3ea3ad7432e370ad5"
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png": "1fc9fa1c3be494d3d6842b127f02feac7a892833bc27a8b3ea3ad7432e370ad5",
+        "specs/prompts/v1_4_2_patch_2/hq_progression_l1_l3_l5.md": "8850cceb27aa904eacac819ee0eee61a98a21ea073e2ceb9ea1c1a5e6aaef013"
       },
-      "candidateId": "sheet-c01:0,0",
+      "candidateId": "patch2-hq:level_4",
       "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png",
       "postProcessing": [
         "crop",
         "background-removal",
+        "hq-composite",
         "webp-compression"
       ],
       "dimensions": {
@@ -427,10 +449,10 @@
       },
       "width": 512,
       "height": 512,
-      "byteSize": 60628,
-      "bytes": 60628,
+      "byteSize": 54842,
+      "bytes": 54842,
       "containsIntentionalText": false,
-      "alt": "Headquarters cabin level 4",
+      "alt": "Headquarters civic office level 4",
       "approvedBy": "Robin / design owner",
       "approvedAt": "2026-04-22",
       "approvalNotes": "Approved for founders plot building use in the V1.4.2 rebuild.",
@@ -470,23 +492,27 @@
       "src": "/experiences/founders-plot/assets/buildings/hq-lv5.webp",
       "status": "approved",
       "generatedBy": "gpt-image-2",
-      "generationMode": "codex_builtin",
+      "generationMode": "codex_patch2_composite",
       "model": "gpt-image-2",
-      "promptFile": "specs/prompts/v1_4_2/founders_plot_hq_lv5_v1_4_2.md",
-      "promptHash": "0348c9f721fa406db21a9c9a1432a26adbfcb369c7a2a1355307fc362ca87b5a",
+      "promptFile": "specs/prompts/v1_4_2_patch_2/founders_plot_hq_lv5_v1_4_2.md",
+      "promptMirrorFile": "public/experiences/founders-plot/assets/prompts/v1_4_2_patch_2/founders_plot_hq_lv5_v1_4_2.md",
+      "promptHash": "a618dc7b608408f34b4fe3fd8710bae3753063f99c22e38c4c5925897f73bf21",
       "referenceInputs": [
         "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
-        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png"
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png",
+        "specs/prompts/v1_4_2_patch_2/hq_progression_l1_l3_l5.md"
       ],
       "referenceHashes": {
         "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
-        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png": "1fc9fa1c3be494d3d6842b127f02feac7a892833bc27a8b3ea3ad7432e370ad5"
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png": "1fc9fa1c3be494d3d6842b127f02feac7a892833bc27a8b3ea3ad7432e370ad5",
+        "specs/prompts/v1_4_2_patch_2/hq_progression_l1_l3_l5.md": "8850cceb27aa904eacac819ee0eee61a98a21ea073e2ceb9ea1c1a5e6aaef013"
       },
-      "candidateId": "sheet-c01:0,0",
+      "candidateId": "patch2-hq:level_5",
       "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png",
       "postProcessing": [
         "crop",
         "background-removal",
+        "hq-composite",
         "webp-compression"
       ],
       "dimensions": {
@@ -495,10 +521,10 @@
       },
       "width": 512,
       "height": 512,
-      "byteSize": 60628,
-      "bytes": 60628,
+      "byteSize": 56744,
+      "bytes": 56744,
       "containsIntentionalText": false,
-      "alt": "Headquarters cabin level 5",
+      "alt": "Headquarters frontier town hall level 5",
       "approvedBy": "Robin / design owner",
       "approvedAt": "2026-04-22",
       "approvalNotes": "Approved for founders plot building use in the V1.4.2 rebuild.",

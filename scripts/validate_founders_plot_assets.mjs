@@ -102,6 +102,9 @@ function main() {
   if (manifest?.styleFamily !== 'agent-town-frontier-storybook-v1_4_2') {
     fail(`Unexpected styleFamily: ${manifest?.styleFamily || 'missing'}`);
   }
+  if (manifest?.release !== 'v1.4.2-patch2-mobile-hq') {
+    fail(`Unexpected release: ${manifest?.release || 'missing'}`);
+  }
   if (manifest?.heroFrame?.approvalStatus !== 'approved') {
     fail('heroFrame approval metadata must be approved');
   }
@@ -147,6 +150,11 @@ function main() {
     if (!asset?.promptFile) fail(`Asset ${id} missing promptFile`);
     const promptPath = path.join(repoRoot, String(asset.promptFile));
     if (!fs.existsSync(promptPath)) fail(`Asset ${id} promptFile does not exist: ${asset.promptFile}`);
+    if (String(asset?.buildingType || '').toUpperCase() === 'HQ') {
+      if (!asset?.promptMirrorFile) fail(`HQ asset ${id} missing promptMirrorFile`);
+      const promptMirrorPath = path.join(repoRoot, String(asset.promptMirrorFile));
+      if (!fs.existsSync(promptMirrorPath)) fail(`HQ asset ${id} promptMirrorFile does not exist: ${asset.promptMirrorFile}`);
+    }
     if (!asset?.promptHash) fail(`Asset ${id} missing promptHash`);
     if (!asset?.candidateId) fail(`Asset ${id} missing candidateId`);
     if (!asset?.candidatePath) fail(`Asset ${id} missing candidatePath`);

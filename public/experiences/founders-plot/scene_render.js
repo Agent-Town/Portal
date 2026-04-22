@@ -43,6 +43,9 @@
     return `
       <span
         class="${classes.join(' ')}"
+        data-scene-chip
+        data-status-badge
+        data-label-role="${htmlEscape(badge?.labelRole || 'ambient')}"
         data-badge-type="${htmlEscape(badge?.type || '')}"
         data-overlay-role="${htmlEscape(badge?.overlayRole || 'status')}"
         data-overlay-weight="${htmlEscape(badge?.overlayWeight || 'medium')}"
@@ -194,7 +197,8 @@
       const style = [
         `--fp-x:${Number(object.x || 0)};`,
         `--fp-y:${Number(object.y || 0)};`,
-        `--fp-z:${Number(object.z || 0)};`
+        `--fp-z:${Number(object.z || 0)};`,
+        `--fp-scale:${Number(object.scale || 1)};`
       ].join('');
       return `
         <button
@@ -226,6 +230,10 @@
           ${timerMarkup(object.timer)}
           <span
             class="at-fp-objectLabel fp-overlay-${htmlEscape(object.overlayRole || 'ambient')}"
+            data-world-label
+            data-object-label
+            data-label-role="${htmlEscape(object.labelRole || 'ambient')}"
+            data-label-object-id="${htmlEscape(object.id)}"
             data-overlay-role="${htmlEscape(object.overlayRole || 'ambient')}"
             data-overlay-weight="${htmlEscape(object.overlayWeight || 'quiet')}"
           >${htmlEscape(object.label || '')}</span>
@@ -281,7 +289,12 @@
             aria-label="${htmlEscape(cloverAriaLabel(scene))}"
           >
             ${imageMarkup(cloverAsset, 'Clover')}
-            <span class="at-fp-cloverBubble${cloverBubblePersistent(scene.clover?.state) ? ' at-fp-cloverBubble--persistent' : ''}" data-testid="founders-clover-bubble">${htmlEscape(scene.clover?.bubbleText || '')}</span>
+            <span
+              class="at-fp-cloverBubble${cloverBubblePersistent(scene.clover?.state) ? ' at-fp-cloverBubble--persistent' : ''}"
+              data-testid="founders-clover-bubble"
+              data-world-label
+              data-label-role="clover"
+            >${htmlEscape(scene.clover?.bubbleText || '')}</span>
           </button>
         </div>
       </div>
