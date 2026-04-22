@@ -12,6 +12,10 @@ test('the Founders Plot asset manifest is complete, dimensionally correct, and u
   const manifest = await response.json();
   const assets = Array.isArray(manifest?.assets) ? manifest.assets : [];
   expect(manifest?.styleFamily).toBe('agent-town-frontier-storybook-v1');
+  expect(Array.isArray(manifest?.referenceInputs)).toBe(true);
+  expect(manifest?.videoReference?.url).toBe('https://www.youtube.com/watch?v=ZW7tUUZqhdY');
+  expect(manifest?.videoReference?.usage).toBe('tone_motion_story_reference_only');
+  expect(manifest?.videoReference?.frameExtractionRequired).toBe(false);
   expect(assets.length).toBeGreaterThanOrEqual(32);
 
   await page.goto('/founders-plot?embed=1');
@@ -60,6 +64,12 @@ test('the Founders Plot asset manifest is complete, dimensionally correct, and u
     expect(inspectedAsset?.naturalHeight).toBe(asset.height);
     expect(asset?.promptFile).toBeTruthy();
     expect(asset?.license).toBeTruthy();
+    expect(asset?.sourceTool).toBeTruthy();
+    expect(asset?.referenceSource).toBeTruthy();
+    expect(Array.isArray(asset?.referenceFiles)).toBe(true);
+    expect(asset?.rightsStatus).toBeTruthy();
+    expect(Array.isArray(asset?.postProcessing)).toBe(true);
+    expect(asset?.approvalScope).toBe('gameplay_asset');
     expect(asset?.styleReview?.passed).toBe(true);
     expect(asset?.reviewer).toBeTruthy();
     expect(asset?.approvalStatus).toBe('approved');

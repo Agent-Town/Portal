@@ -586,30 +586,48 @@ Do not use “AI-powered” as decoration for deterministic-only helper behavior
 
 Clover is the canonical in-game Foreman for Founders Plot V1. Supporting characters from trailers, hero videos, or brand explorations may not replace Clover without a later product decision.
 
-### Hero-video and remembered character policy
+### Platform hero cast
 
-The product owner remembers prior hero-video/script material involving:
+The platform hero cast is now recovered from owner-supplied source images:
 
-- Lobster
-- Chibi girl
-- Wizard kid
-- Prairie dog
+- Prairie Dog Ranger
+- Sheriff Lobster
+- Chibi Homesteader Girl
+- Wizard Kid
 
-These are **candidate remembered brand assets** until their source files/script are recovered and approved.
+Canonical hierarchy:
 
-They may inform:
+- Clover / Foreman: gameplay-canonical Founders Plot helper
+- Prairie Dog Ranger: platform mascot
+- Sheriff Lobster: comedic brand mascot
+- Chibi Homesteader Girl: founder/player archetype
+- Wizard Kid: creator/vibecoding archetype
+
+Rule:
+
+> Clover is the gameplay partner.  
+> The hero cast is the platform ensemble.
+
+The hero cast may inform:
 
 - marketing tone;
-- visual mood;
-- optional future cameos;
-- hero/trailer material.
+- onboarding/loading atmosphere;
+- hero/trailer material;
+- optional future cameos or requester concepts.
 
-They must not automatically become:
+It must not automatically become:
 
-- gameplay NPCs;
-- new quest givers;
+- gameplay NPC clutter;
 - replacement Foremen;
-- new mechanics;
-- in-world clutter.
+- new V1 mechanics;
+- a persistent ensemble on the default gameplay route.
+
+The canonical video source is:
+
+```text
+https://www.youtube.com/watch?v=ZW7tUUZqhdY
+```
+
+That video is approved for tone, motion, and story reference only. Frame extraction is not required for V1.4.1.
 
 Use `docs/brand/HERO_VIDEO_SOURCE_INDEX.md` as the source-of-truth status file.

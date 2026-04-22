@@ -13,8 +13,17 @@ test('primary-view assets carry human approval metadata and hero-frame signoff m
   const heroFrame = manifest?.heroFrame || null;
 
   expect(primaryViewAssets.length).toBeGreaterThan(10);
+  expect(Array.isArray(manifest?.referenceInputs)).toBe(true);
+  expect(manifest?.videoReference?.url).toBe('https://www.youtube.com/watch?v=ZW7tUUZqhdY');
+  expect(manifest?.videoReference?.frameExtractionRequired).toBe(false);
   primaryViewAssets.forEach((asset) => {
     expect(asset.approvalStatus).toBe('approved');
+    expect(String(asset.sourceTool || '').trim().length).toBeGreaterThan(0);
+    expect(String(asset.referenceSource || '').trim().length).toBeGreaterThan(0);
+    expect(Array.isArray(asset.referenceFiles)).toBe(true);
+    expect(String(asset.rightsStatus || '').trim().length).toBeGreaterThan(0);
+    expect(Array.isArray(asset.postProcessing)).toBe(true);
+    expect(asset.approvalScope).toBe('gameplay_asset');
     expect(String(asset.approvedBy || '').trim().length).toBeGreaterThan(0);
     expect(String(asset.approvedAt || '').trim()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(String(asset.approvalNotes || '').trim().length).toBeGreaterThan(0);

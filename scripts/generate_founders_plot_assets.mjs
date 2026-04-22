@@ -16,6 +16,20 @@ const HERO_FRAME_METADATA = {
   sourceRoute: '/app?district=founders-plot',
   screenshotPrefix: 'founders-v1-3-1-full-route-hero-1280'
 };
+const REFERENCE_INPUTS = [
+  'docs/brand/reference/hero-cast/prairie-dog-ranger-source.png',
+  'docs/brand/reference/hero-cast/sheriff-lobster-source.jpeg',
+  'docs/brand/reference/hero-cast/chibi-homesteader-girl-source.png',
+  'docs/brand/reference/hero-cast/wizard-kid-source.png'
+];
+const VIDEO_REFERENCE = {
+  url: 'https://www.youtube.com/watch?v=ZW7tUUZqhdY',
+  usage: 'tone_motion_story_reference_only',
+  frameExtractionRequired: false
+};
+const COMMON_GAMEPLAY_REFERENCE_SOURCE = 'founders_plot_internal_asset_pack_v1_3';
+const COMMON_RIGHTS_STATUS = 'generated_project_owned';
+const GAMEPLAY_APPROVAL_SCOPE = 'gameplay_asset';
 const palette = {
   sky: '#f9efd7',
   skyWarm: '#f6d8a8',
@@ -492,6 +506,12 @@ function buildManifestEntries() {
       promptFile: asset.promptFile,
       promptSummary: `Frontier Storybook ${asset.kind} asset for ${asset.id}.`,
       license: 'project-owned-generated',
+      sourceTool: 'Codex scripted SVG + sips + cwebp',
+      referenceSource: COMMON_GAMEPLAY_REFERENCE_SOURCE,
+      referenceFiles: [],
+      rightsStatus: COMMON_RIGHTS_STATUS,
+      postProcessing: ['svg-authoring', 'sips-png-rasterization', 'cwebp-compression'],
+      approvalScope: GAMEPLAY_APPROVAL_SCOPE,
       generationToolModel: 'Codex scripted SVG + sips + cwebp',
       reviewer: 'codex-human',
       approvalStatus: 'approved',
@@ -529,6 +549,12 @@ function buildManifestEntries() {
       promptFile: asset.promptFile,
       promptSummary: `Frontier Storybook ${asset.kind} asset for ${asset.id}.`,
       license: 'project-owned-generated',
+      sourceTool: 'Codex scripted SVG',
+      referenceSource: COMMON_GAMEPLAY_REFERENCE_SOURCE,
+      referenceFiles: [],
+      rightsStatus: COMMON_RIGHTS_STATUS,
+      postProcessing: ['svg-authoring', 'svg-inline-optimization'],
+      approvalScope: GAMEPLAY_APPROVAL_SCOPE,
       generationToolModel: 'Codex scripted SVG',
       reviewer: 'codex-human',
       approvalStatus: 'approved',
@@ -552,6 +578,8 @@ function writeManifest(entries) {
     generatedAt: new Date().toISOString(),
     reviewStatus: 'approved',
     heroFrame: HERO_FRAME_METADATA,
+    referenceInputs: REFERENCE_INPUTS,
+    videoReference: VIDEO_REFERENCE,
     assets: entries
   };
   const pretty = `${JSON.stringify(manifest, null, 2)}\n`;

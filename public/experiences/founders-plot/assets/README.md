@@ -30,7 +30,14 @@ The V1.3 pack was produced inside the repo from deterministic vector masters usi
 - `sips` for SVG to PNG rasterization;
 - `cwebp` for final `.webp` optimization.
 
-Every shipped asset is listed in the manifest with prompt reference, license, review status, and optimization state.
+Every shipped asset is listed in the manifest with prompt reference, license, review status, optimization state, provenance fields, and approval scope.
+
+V1.4.1 note:
+
+- the gameplay asset pack remains Clover-first and plot-first;
+- recovered hero-cast references live under `docs/brand/reference/hero-cast/`;
+- the hero video is recorded as a tone/motion/story reference only;
+- no video stills are extracted or committed in this asset pack.
 
 ## Rebuild and validation
 

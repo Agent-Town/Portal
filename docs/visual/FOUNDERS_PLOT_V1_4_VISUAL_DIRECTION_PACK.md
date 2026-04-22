@@ -214,25 +214,26 @@ Signoff requires:
 
 ## 10. Hero-media linkage
 
-If the prior hero video/script material is recovered, use it here as a **tone and character reference**, not as automatic gameplay scope.
+The platform hero cast is now recovered from owner-supplied images.
 
-Candidate remembered elements:
+Recovered cast:
 
-- Lobster;
-- Chibi girl;
-- Wizard kid;
-- Prairie dog.
+- Prairie Dog Ranger
+- Sheriff Lobster
+- Chibi Homesteader Girl
+- Wizard Kid
 
-Possible use after recovery:
+Use the cast as:
 
-- marketing/trailer cast;
-- style reference for charm and humor;
-- future visitor/event cameos;
-- optional non-interactive visual easter eggs if approved.
+- marketing/onboarding/loading reference,
+- charm and tone reference for future asset work,
+- future visitor/event inspiration after a later spec.
 
-Not allowed in V1.4:
+The hero video URL is approved as a tone/motion/story reference only. Video-frame extraction is not part of V1.4.1.
+
+Not allowed in V1.4.1:
 
 - replacing Clover;
 - adding new NPC gameplay systems;
 - adding new quests/contracts;
-- inserting unrelated mascot clutter into the main plot.
+- making the default plot surface read as a mascot ensemble.

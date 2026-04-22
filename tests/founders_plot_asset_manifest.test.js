@@ -42,6 +42,10 @@ test('asset manifest uses the Founders Plot visual schema and contains the P0 pa
 
   assert.equal(manifest.schemaVersion, 'founders-plot-assets-v1');
   assert.equal(manifest.styleFamily, 'agent-town-frontier-storybook-v1');
+  assert.ok(Array.isArray(manifest?.referenceInputs));
+  assert.equal(manifest?.videoReference?.url, 'https://www.youtube.com/watch?v=ZW7tUUZqhdY');
+  assert.equal(manifest?.videoReference?.usage, 'tone_motion_story_reference_only');
+  assert.equal(manifest?.videoReference?.frameExtractionRequired, false);
   REQUIRED_IDS.forEach((id) => assert.ok(ids.has(id), `missing ${id}`));
 });
 
@@ -56,6 +60,12 @@ test('every asset entry is approved, prompt-linked, and points at a real file un
     assert.ok(relativePath, `missing path for ${asset?.id}`);
     assert.ok(fs.existsSync(filePath), `missing file for ${asset?.id}`);
     assert.equal(asset?.license, 'project-owned-generated');
+    assert.ok(asset?.sourceTool, `missing sourceTool for ${asset?.id}`);
+    assert.ok(asset?.referenceSource, `missing referenceSource for ${asset?.id}`);
+    assert.ok(Array.isArray(asset?.referenceFiles), `missing referenceFiles for ${asset?.id}`);
+    assert.ok(asset?.rightsStatus, `missing rightsStatus for ${asset?.id}`);
+    assert.ok(Array.isArray(asset?.postProcessing), `missing postProcessing for ${asset?.id}`);
+    assert.equal(asset?.approvalScope, 'gameplay_asset');
     assert.equal(asset?.approvalStatus, 'approved');
     assert.equal(asset?.reviewer, 'codex-human');
     assert.ok(asset?.promptFile, `missing promptFile for ${asset?.id}`);

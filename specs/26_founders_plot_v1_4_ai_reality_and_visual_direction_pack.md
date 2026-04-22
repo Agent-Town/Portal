@@ -65,19 +65,18 @@ The real-LLM Foreman patch may be based on an older V1.2 hardening line. Do **no
 
 ### 2.3 Hero video / script material
 
-The product owner remembers an earlier hero-video/script concept with:
+This V1.4 note was superseded by the V1.4.1 addendum once Robin supplied the recovered hero-cast reference images.
 
-- a Lobster,
-- a Chibi girl,
-- a Wizard kid,
-- a Prairie dog.
+Current source of truth:
 
-Those source materials were **not found in the currently provided local artifact set** during this spec preparation. Therefore:
+- `specs/28_founders_plot_v1_4_1_hero_cast_video_addendum.md`
+- `docs/brand/HERO_VIDEO_SOURCE_INDEX.md`
 
-- treat them as **candidate existing brand material**, not invented canon;
-- search the repo/project archive for them during this sprint;
-- index them if found;
-- only promote them to canonical brand assets after the actual files/script are recovered and approved by a named design owner.
+Current rule:
+
+- the hero cast is recovered owner-supplied brand-reference material;
+- the YouTube hero video is a tone/motion/story reference only;
+- video-frame extraction is not required for the current sprint.
 
 ---
 

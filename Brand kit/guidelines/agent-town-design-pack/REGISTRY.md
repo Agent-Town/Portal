@@ -530,3 +530,38 @@ Requirements:
 - score table;
 - named reviewer;
 - pass/fail decision.
+
+### `hero-cast-reference-card`
+
+Reference-card pattern for one hero-cast character.
+
+Requirements:
+
+- source image path;
+- canonical role;
+- approval scope;
+- usage notes;
+- explicit non-gameplay warning when applicable.
+
+### `asset-approval-scope-badge`
+
+Internal review badge for asset scope.
+
+Requirements:
+
+- allowed values:
+  - `brand_reference`
+  - `marketing_asset`
+  - `gameplay_asset`
+- never shown in normal gameplay;
+- used in review and manifest tooling only.
+
+### `hero-video-frame-index`
+
+Optional future marketing registry concept for extracted hero-video stills.
+
+Requirements:
+
+- not required for V1.4.1;
+- only created if explicit extraction work is later approved;
+- records timestamp, preserve/avoid notes, and approved usage.

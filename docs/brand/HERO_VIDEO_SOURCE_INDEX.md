@@ -1,67 +1,81 @@
 # Agent Town Hero Video Source Index
 
-status: partial
+status: found
 searched_at: 2026-04-22
-searched_branch: codex/founders-plot-v1-4-ai-reality
+searched_branch: codex/founders-plot-v1-4-1-hero-cast
 searched_terms:
   - hero video
   - hero-video
-  - trailer
-  - script
-  - storyboard
-  - lobster
-  - chibi
-  - wizard kid
   - prairie dog
-  - prairie-dog
-  - prarie dog
+  - sheriff lobster
+  - chibi homesteader
+  - wizard kid
+  - Robin supplied reference images
 searched_paths:
-  - docs/
-  - specs/
-  - public/
-  - public/assets/
-  - public/experiences/
-  - Brand kit/
-  - scripts/
+  - docs/brand/reference/hero-cast/
+  - docs/brand/
+  - docs/visual/
+  - Brand kit/guidelines/agent-town-design-pack/
 sources:
-  - path: Brand kit/src/app/components/CharacterStyleGuide.tsx
-    type: asset-note
-    summary: Brand-kit character guide includes an OpenClaw lobster sheriff mascot and a chibi human sheriff reference.
-    provenance: internal_brand_kit
+  - path: docs/brand/reference/hero-cast/prairie-dog-ranger-source.png
+    type: image
+    summary: Owner-supplied Prairie Dog Ranger reference; primary platform mascot reference.
+    provenance: owned
     recommended_use: marketing_reference
-  - path: Brand kit/src/app/App.tsx
-    type: asset-note
-    summary: Brand-kit app imports the lobster sheriff art asset used by the character guide.
-    provenance: internal_brand_kit
+  - path: docs/brand/reference/hero-cast/sheriff-lobster-source.jpeg
+    type: image
+    summary: Owner-supplied Sheriff Lobster reference; comedic platform mascot concept.
+    provenance: owned
     recommended_use: marketing_reference
-  - path: Brand kit/src/app/components/MotionGuide.tsx
-    type: design-note
-    summary: Motion guidance mentions 4-6 frames for chibi characters, which supports the remembered chibi direction but does not recover a trailer script.
-    provenance: internal_brand_kit
+  - path: docs/brand/reference/hero-cast/chibi-homesteader-girl-source.png
+    type: image
+    summary: Owner-supplied founder/player-archetype reference.
+    provenance: owned
     recommended_use: marketing_reference
-not_found_in_repo:
-  - wizard kid source file or script
-  - prairie dog source file or script
-  - recovered hero-video storyboard
-  - recovered trailer script
+  - path: docs/brand/reference/hero-cast/wizard-kid-source.png
+    type: image
+    summary: Owner-supplied creator/vibecoding archetype reference.
+    provenance: owned
+    recommended_use: marketing_reference
+  - path: https://www.youtube.com/watch?v=ZW7tUUZqhdY
+    type: video
+    summary: Canonical hero-video URL; approved for tone, motion, and story reference only.
+    provenance: owned
+    recommended_use: marketing_reference
+not_checked_in_by_instruction:
+  - docs/brand/reference/hero-video/stills/
+  - docs/brand/HERO_VIDEO_FRAME_INDEX.md
+video_reference_policy:
+  usage: tone_motion_story_reference_only
+  frameExtractionRequired: false
+  extractedInThisSprint: false
 open_questions:
-  - Was the remembered hero-video/script stored outside this repo or in an older archive export?
-  - Is the lobster sheriff intended as direct source material for Agent Town marketing, or only as OpenClaw framework branding?
-  - Should the chibi sheriff art be treated as framework collateral only, or as a broader Agent Town tone reference?
+  - If later marketing work needs stills, Robin must explicitly request a separate extraction task.
+  - Historical storyboard/script artifacts may still exist outside this repo, but they are no longer required for V1.4.1 implementation.
 
 ## Search Result
 
-The repo contains partial evidence for the remembered character set:
+The hero cast is now recovered inside the repo from owner-supplied source images.
 
-- Lobster: present in the brand kit as the OpenClaw sheriff mascot.
-- Chibi: present in the brand kit as the ElizaOS sheriff and as general character-style guidance.
-- Wizard kid: not recovered.
-- Prairie dog: not recovered.
+Recovered and canonical for brand-reference use:
 
-No authoritative hero-video script, storyboard, or trailer brief was recovered from the searched repo paths.
+- Prairie Dog Ranger
+- Sheriff Lobster
+- Chibi Homesteader Girl
+- Wizard Kid
 
-## Recommended Use
+The YouTube hero video is also canonically recorded, but only as a tone/motion/story reference.
 
-- Use the recovered lobster/chibi material as tone and mood-board input only.
-- Keep Clover as the canonical Founders Plot Foreman.
-- Request the original hero-video/script source from the product owner before promoting any remembered cast into canonical marketing media.
+## Approved Use
+
+- brand reference
+- marketing reference
+- onboarding/loading/interstitial direction
+- future platform/NPC exploration
+
+## Not Approved By Default
+
+- replacing Clover in Founders Plot
+- full-cast ensemble on the default gameplay route
+- new gameplay systems derived from the hero video
+- required video-frame extraction in this sprint

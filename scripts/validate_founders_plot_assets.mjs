@@ -58,6 +58,18 @@ function main() {
   if (!manifest?.heroFrame?.approvedBy || !manifest?.heroFrame?.approvedAt || !manifest?.heroFrame?.approvalNotes) {
     fail('heroFrame metadata is incomplete');
   }
+  if (!Array.isArray(manifest?.referenceInputs) || manifest.referenceInputs.length < 4) {
+    fail('Missing referenceInputs metadata');
+  }
+  if (manifest?.videoReference?.url !== 'https://www.youtube.com/watch?v=ZW7tUUZqhdY') {
+    fail('Missing or unexpected videoReference.url');
+  }
+  if (manifest?.videoReference?.usage !== 'tone_motion_story_reference_only') {
+    fail('Missing or unexpected videoReference.usage');
+  }
+  if (manifest?.videoReference?.frameExtractionRequired !== false) {
+    fail('videoReference.frameExtractionRequired must be false');
+  }
   const assets = Array.isArray(manifest?.assets) ? manifest.assets : [];
   const byId = new Map(assets.map((asset) => [String(asset?.id || ''), asset]));
 
@@ -74,6 +86,12 @@ function main() {
     if (!fs.existsSync(filePath)) fail(`Missing asset file for ${id}: ${filePath}`);
     if (!asset?.promptFile) fail(`Asset ${id} missing promptFile`);
     if (!asset?.license) fail(`Asset ${id} missing license`);
+    if (!asset?.sourceTool) fail(`Asset ${id} missing sourceTool`);
+    if (!asset?.referenceSource) fail(`Asset ${id} missing referenceSource`);
+    if (!Array.isArray(asset?.referenceFiles)) fail(`Asset ${id} missing referenceFiles`);
+    if (!asset?.rightsStatus) fail(`Asset ${id} missing rightsStatus`);
+    if (!Array.isArray(asset?.postProcessing)) fail(`Asset ${id} missing postProcessing`);
+    if (!asset?.approvalScope) fail(`Asset ${id} missing approvalScope`);
     if (!asset?.reviewer) fail(`Asset ${id} missing reviewer`);
     if (!asset?.approvalStatus) fail(`Asset ${id} missing approvalStatus`);
     if (String(asset?.usage || '') === 'primary-view') {

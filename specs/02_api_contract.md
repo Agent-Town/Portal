@@ -2642,3 +2642,25 @@ houseId: <houseId>
 ```
 
 `keyWrapSig` is no longer stored; clients should re-sign the House Key Wrap message to derive the wrap key during recovery.
+
+---
+
+## Founders Plot Asset Manifest
+
+### GET `/experiences/founders-plot/assets/asset-manifest.json`
+Returns the Founders Plot asset-pack manifest.
+
+Contract notes:
+- `schemaVersion === "founders-plot-assets-v1"`;
+- top-level metadata includes `heroFrame`, `referenceInputs`, and `videoReference`;
+- `videoReference.url === "https://www.youtube.com/watch?v=ZW7tUUZqhdY"`;
+- `videoReference.usage === "tone_motion_story_reference_only"`;
+- `videoReference.frameExtractionRequired === false`;
+- each asset entry includes:
+  - `sourceTool`
+  - `referenceSource`
+  - `referenceFiles`
+  - `rightsStatus`
+  - `postProcessing`
+  - `approvalScope`
+- Founders Plot gameplay assets remain `approvalScope: "gameplay_asset"` and do not imply that the hero-cast ensemble ships on the default gameplay route.

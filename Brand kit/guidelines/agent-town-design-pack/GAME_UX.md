@@ -837,3 +837,20 @@ The default Founders Plot route must pass the five-second test:
 ### Hero-video/script reuse
 
 Hero-video material may support tone and marketing alignment, but gameplay UI must remain centered on the home plot and Clover. Supporting trailer characters should not become persistent UI clutter.
+
+### Hero-cast boundary
+
+The recovered platform hero cast may appear in:
+
+- landing-page hero art;
+- onboarding or loading surfaces;
+- marketing and brand story panels;
+- future NPC/worldbuilding concepts after a later spec.
+
+The default Founders Plot gameplay route must not become a mascot ensemble screen.
+
+A five-second reading of the route should still be:
+
+1. this is my town;
+2. this is the next action;
+3. Clover is helping me.

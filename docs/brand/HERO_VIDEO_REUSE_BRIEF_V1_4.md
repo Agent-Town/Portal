@@ -1,142 +1,102 @@
 # Agent Town Hero Video Reuse Brief — V1.4
 
 **Status:** source-recovery and reuse brief  
-**Purpose:** make sure existing hero-video/script work is reused if available, without inventing canon or expanding gameplay scope.  
-**Sprint:** V1.4 AI Reality + Visual Direction
+**Purpose:** document the safe reuse boundary for the recovered hero cast and hero video without expanding gameplay scope  
+**Sprint baseline:** V1.4 AI Reality + Visual Direction  
+**V1.4.1 update:** the hero cast is now recovered from owner-supplied images
 
----
+## 1. Recovered source set
 
-## 1. Known remembered material
+The current canonical hero-cast source set is:
 
-The product owner remembers prior hero-video/script material from the branding/prompting work that included:
+- Prairie Dog Ranger
+- Sheriff Lobster
+- Chibi Homesteader Girl
+- Wizard Kid
 
-- a Lobster;
-- a Chibi girl;
-- a Wizard kid;
-- a Prairie dog.
-
-The actual source file/script was not found in the currently provided local artifact set during preparation of this spec pack.
-
-Therefore, these are currently **candidate remembered brand assets**, not canonical game entities.
-
----
-
-## 2. Required recovery process
-
-Search the repo and available project archive for:
+These references now live in:
 
 ```text
-hero video
-hero-video
-trailer
-script
-storyboard
-lobster
-chibi
-wizard kid
-prairie dog
-prairie-dog
-prarie dog
+docs/brand/reference/hero-cast/
 ```
 
-Search paths:
+The hero video URL is also canonically known:
 
 ```text
-.
-docs/
-specs/
-public/
-public/assets/
-public/experiences/
-Brand kit/
-marketing/
-prompts/
-art/
-assets/
+https://www.youtube.com/watch?v=ZW7tUUZqhdY
 ```
 
-Recommended command:
+The video remains a tone/motion/story reference only.
 
-```bash
-grep -RniE "hero video|hero-video|trailer|script|lobster|chibi|wizard kid|prairie dog|prairie-dog|prarie dog" . \
-  --exclude-dir=node_modules \
-  --exclude-dir=.git \
-  --exclude-dir=test-results
-```
+## 2. Required source-of-truth file
 
----
-
-## 3. Required output
-
-Create or update:
+Maintain:
 
 ```text
 docs/brand/HERO_VIDEO_SOURCE_INDEX.md
 ```
 
-with:
+The source index must record:
 
-```yaml
-status: found | partial | not_found_in_repo
-searched_at: YYYY-MM-DD
-searched_branch: string
-searched_terms:
-  - hero video
-  - lobster
-  - chibi
-  - wizard kid
-  - prairie dog
-sources:
-  - path: string
-    type: script | storyboard | prompt | asset | video | image | note
-    summary: string
-    provenance: owned | generated_project_owned | licensed | unknown
-    recommended_use: marketing_reference | in_game_reference | do_not_use | needs_review
-open_questions:
-  - string
-```
+- recovered reference files,
+- the canonical video URL,
+- provenance,
+- approved usage,
+- the rule that frame extraction is not required for V1.4.1.
 
----
+## 3. Reuse rules
 
-## 4. Reuse rules
+The recovered hero media may be used for:
 
-If recovered, the hero-video/script material may be used for:
-
-- visual tone;
-- cinematic opening/trailer direction;
-- mood board input;
-- optional future cameo/event inspiration;
-- asset-generation reference if rights are clear.
+- marketing tone,
+- onboarding/loading/interstitial direction,
+- hero key art and platform identity,
+- future optional cameo/NPC inspiration after a later spec,
+- controlled asset-generation reference with clear provenance.
 
 It must **not** be used to:
 
-- replace Clover as the Foreman;
-- add P0 gameplay systems;
-- add uncontrolled mascots to the core game screen;
-- imply a finished trailer exists if only prompts or fragments exist;
+- replace Clover as the Foreman,
+- add P0 gameplay systems,
+- add uncontrolled mascots to the core gameplay surface,
+- imply that the current sprint requires video-frame extraction,
 - train an external model unless rights/provenance are approved.
 
----
+## 4. Character handling
 
-## 5. Character handling
-
-| Character | V1.4 status | Allowed use | Not allowed |
+| Character | V1.4.1 status | Allowed use | Not allowed |
 |---|---|---|---|
-| Lobster | candidate remembered hero cast | marketing/tone/reference after source recovery | new gameplay system |
-| Chibi girl | candidate remembered hero cast | marketing/tone/reference after source recovery | replacing player avatar model |
-| Wizard kid | candidate remembered hero cast | marketing/tone/reference after source recovery | magic-system scope expansion |
-| Prairie dog | candidate remembered hero cast | marketing/tone/reference after source recovery | cluttering core plot without purpose |
+| Prairie Dog Ranger | recovered platform mascot source | marketing, onboarding, brand warmth | cluttering the core plot screen |
+| Sheriff Lobster | recovered comedic mascot source | marketing and hero-art reference after style refresh | new gameplay system |
+| Chibi Homesteader Girl | recovered founder archetype source | marketing, avatar concept, onboarding reference | replacing player identity model by default |
+| Wizard Kid | recovered creator archetype source | marketing, creation/vibecoding identity | magic-system scope expansion |
 | Clover | canonical in-game Foreman | core gameplay helper | replacement by hero cast |
 
----
+## 5. Video rule
 
-## 6. Optional future direction
+The hero video is approved only as:
 
-If the hero cast is recovered and approved, a later marketing/content spec may define:
+- tone reference,
+- motion reference,
+- story reference.
 
-- a 20–30 second Agent Town teaser;
-- an intro splash animation;
-- non-interactive background cameos;
-- a seasonal visitor/event pack.
+For V1.4.1:
 
-That is out of scope for V1.4.
+- do not download the video,
+- do not extract stills,
+- do not add `docs/brand/HERO_VIDEO_FRAME_INDEX.md`,
+- do not block gameplay or visual implementation on video processing.
+
+If later marketing work needs stills, create a separate `hero-video-marketing-extraction` task.
+
+## 6. Future direction
+
+A later marketing/content spec may define:
+
+- a 20–30 second teaser,
+- an intro splash animation,
+- non-interactive background cameos,
+- platform hero art refreshes,
+- seasonal or future visitor packs.
+
+Those are separate from the current Founders Plot V1 gameplay scope.

@@ -912,13 +912,22 @@ Every new primary-view asset must record:
 ```yaml
 assetId: string
 sourceTool: string
+referenceSource: string
 promptFile: string | null
 referenceFiles: string[]
 rightsStatus: owned | generated_project_owned | licensed | reference_only | unknown
+postProcessing: string[]
 approvedBy: string | needs_human_signoff
 approvedAt: string | null
 approvalNotes: string
+approvalScope: brand_reference | marketing_asset | gameplay_asset
 ```
+
+For V1.4.1 hero-cast work:
+
+- the recovered hero images are the primary reference inputs;
+- the hero video is a tone/motion/story reference only;
+- video-frame extraction is optional future marketing work, not a required gameplay sprint task.
 
 ### No vague polish requests
 

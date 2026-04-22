@@ -70,12 +70,15 @@ The shell is now a **warm frontier storybook** system:
 
 A game world can still be stylized and readable, but the shell and Founders Plot V1 game surface must no longer inherit pixel-font, 8-bit-border, or novelty-retro defaults.
 
-## V1.3 addendum set
+## Addendum set
 
-The current checked-in V1.3 governance additions are:
+The checked-in Founders Plot addenda now include:
 
 - `CHANGELOG_V1.3.md`
 - `agent-town-founders-plot-v1.3-design-source-handoff.md`
 - `specs/22_founders_plot_v1_3_visual_game_surface.md`
+- `specs/23_founders_plot_v1_3_1_visual_signoff_pass.md`
+- `specs/26_founders_plot_v1_4_ai_reality_and_visual_direction_pack.md`
+- `specs/28_founders_plot_v1_4_1_hero_cast_video_addendum.md`
 
-These expand the pack from shell/onboarding law into the first scenic game-surface law for Agent Town: Founders Plot.
+These extend the pack from shell/onboarding law into scenic game-surface law, AI-reality guardrails, and recovered hero-cast governance for Agent Town: Founders Plot.
