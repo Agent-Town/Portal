@@ -74,7 +74,7 @@ test('reduced motion disables continuous motion while scene buttons stay keyboar
   const afterWood = await frame.getByTestId('inventory-wood').textContent();
   expect(afterWood).not.toBe(beforeWood);
 
-  await expect(frame.getByTestId('founders-game-shell')).toHaveScreenshot('founders-v1-3-reduced-motion-1280.png', {
+  await expect(frame.getByTestId('founders-game-shell')).toHaveScreenshot('founders-v1-4-2-reduced-motion-1280.png', {
     animations: 'disabled',
     caret: 'hide',
     maxDiffPixelRatio: 0.03

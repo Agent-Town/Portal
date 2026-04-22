@@ -19,7 +19,31 @@ test('scene objects render the live plot states and clicking them opens the acti
   await expect(frame.getByTestId('founders-stage-object-CONTRACT_BOARD')).toBeVisible();
   await expect(frame.getByTestId('founders-stage-object-PUBLIC_SQUARE')).toBeVisible();
   await expect(frame.getByTestId('founders-stage-object-FOREMAN_HUT')).toBeVisible();
+  await expect(frame.getByTestId('founders-stage-object-JOURNAL')).toBeVisible();
+  await expect(frame.getByTestId('founders-stage-object-APPROVAL_INBOX')).toBeVisible();
   await expect(frame.getByTestId('founders-stage-object-lot-0-0')).toBeVisible();
+
+  const initialLabelCount = await frame.evaluate(() => {
+    return Array.from(document.querySelectorAll('.at-fp-objectLabel'))
+      .filter((node) => Number(window.getComputedStyle(node).opacity || '0') > 0.5)
+      .length;
+  });
+  expect(initialLabelCount).toBeLessThanOrEqual(1);
+
+  const journal = frame.getByTestId('founders-stage-object-JOURNAL');
+  await journal.focus();
+  await expect.poll(async () => {
+    const journalLabelOpacity = await journal.locator('.at-fp-objectLabel').evaluate((node) => window.getComputedStyle(node).opacity);
+    return Number(journalLabelOpacity);
+  }).toBeGreaterThan(0.5);
+
+  await journal.click();
+  await expect(frame.locator('#foundersDrawer-journal')).toBeVisible();
+  await frame.locator('[data-close-drawer="journal"]').click();
+
+  await frame.getByTestId('founders-stage-object-APPROVAL_INBOX').click();
+  await expect(frame.locator('#foundersDrawer-approvals')).toBeVisible();
+  await frame.locator('[data-close-drawer="approvals"]').click();
 
   const sampledStates = await frame.evaluate(() => {
     const base = window.__foundersPlotTest.getState()?.state;
@@ -70,7 +94,7 @@ test('scene objects render the live plot states and clicking them opens the acti
   await lumber.click();
   await expect(frame.getByTestId('selection-collect')).toBeVisible();
   await expect(frame.locator('#selectionSheetTitle')).toHaveText(/Lumber Camp/i);
-  await expect(frame.getByTestId('founders-game-shell')).toHaveScreenshot('founders-v1-3-object-selected-1280.png', {
+  await expect(frame.getByTestId('founders-game-shell')).toHaveScreenshot('founders-v1-4-2-object-selected-1280.png', {
     animations: 'disabled',
     caret: 'hide',
     maxDiffPixelRatio: 0.03

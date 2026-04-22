@@ -24,16 +24,19 @@ This docs set is designed for users who are new to local agents and model provid
 - [Founders Plot V1.4 TDD acceptance matrix](/specs/27_founders_plot_v1_4_tdd_acceptance_matrix.md)
 - [Founders Plot V1.4.1 hero-cast and video addendum](/specs/28_founders_plot_v1_4_1_hero_cast_video_addendum.md)
 - [Founders Plot V1.4.1 TDD acceptance matrix](/specs/29_founders_plot_v1_4_1_tdd_acceptance_matrix.md)
+- [Founders Plot V1.4.2 GPT Image 2 full asset rebuild spec](/specs/29_founders_plot_v1_4_2_gpt_image_2_full_asset_rebuild.md)
+- [Founders Plot V1.4.2 TDD acceptance matrix](/specs/30_founders_plot_v1_4_2_tdd_acceptance_matrix.md)
 - [Agent Town design pack](/Brand%20kit/guidelines/agent-town-design-pack/README.md)
 - [Agent Town V1.3 implementation start pack note](/docs/design/agent-town-v1.3-implementation-start-pack.md)
 - [Agent Town V1.3.1 signoff pack note](/docs/design/agent-town-v1.3.1-signoff-pack.md)
 - [Agent Town V1.4 AI reality + visual direction pack note](/docs/design/agent-town-v1.4-ai-reality-visual-direction-pack.md)
 - [Agent Town V1.4.1 hero-cast addendum note](/docs/design/agent-town-v1.4.1-hero-cast-video-addendum.md)
+- [Agent Town V1.4.2 GPT Image 2 pack note](/docs/design/agent-town-v1.4.2-gpt-image-2-full-asset-rebuild-pack.md)
 
 ## Founders Plot implementation note
 
-The current implementation lane is driven by the V1.4 AI-reality documents in `specs/26_*` and `specs/27_*`, then refined by the V1.4.1 hero-cast addendum in `specs/28_*` and `specs/29_*` together with the checked-in design-pack addenda under `Brand kit/guidelines/agent-town-design-pack/`.
-V1.3.1 remains the gameplay-surface baseline, V1.4 remains the AI-reality/runtime baseline, and V1.4.1 adds recovered hero-cast governance without changing the core Clover-first route.
+The current implementation lane is driven by the V1.4 AI-reality documents in `specs/26_*` and `specs/27_*`, the V1.4.1 hero-cast addendum in `specs/28_*`, and the V1.4.2 GPT Image 2 asset-rebuild lane in `specs/29_founders_plot_v1_4_2_gpt_image_2_full_asset_rebuild.md` and `specs/30_founders_plot_v1_4_2_tdd_acceptance_matrix.md`.
+V1.3.1 remains the gameplay-surface baseline, V1.4 remains the AI-reality/runtime baseline, V1.4.1 keeps hero-cast governance honest, and V1.4.2 adds prompt-provenanced visual production and screenshot-first signoff.
 
 ## Principles
 

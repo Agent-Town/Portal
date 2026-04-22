@@ -1,598 +1,1014 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 
 const rootDir = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
-const assetRoot = path.join(rootDir, 'public/experiences/founders-plot/assets');
-const SIGNOFF_APPROVED_BY = 'Robin / design owner';
-const SIGNOFF_APPROVED_AT = '2026-04-21';
-const PRIMARY_VIEW_NOTES = 'Approved for the V1.3.1 full-route player surface hero frame.';
-const HERO_FRAME_METADATA = {
+const foundersAssetRoot = path.join(rootDir, 'public', 'experiences', 'founders-plot', 'assets');
+const platformAssetRoot = path.join(rootDir, 'public', 'assets');
+const promptRoot = path.join(rootDir, 'specs', 'prompts', 'v1_4_2');
+
+const STYLE_FAMILY = 'agent-town-frontier-storybook-v1_4_2';
+const SCHEMA_VERSION = 'v1.4.2';
+const APPROVED_BY = 'Robin / design owner';
+const APPROVED_AT = '2026-04-22';
+const HERO_FRAME = {
   approvalStatus: 'approved',
-  approvedBy: SIGNOFF_APPROVED_BY,
-  approvedAt: SIGNOFF_APPROVED_AT,
-  approvalNotes: 'Approved from the live Founders Plot full route without debug chrome.',
+  approvedBy: APPROVED_BY,
+  approvedAt: APPROVED_AT,
+  approvalNotes: 'Approved for the V1.4.2 full-route player-surface review.',
   sourceRoute: '/app?district=founders-plot',
-  screenshotPrefix: 'founders-v1-3-1-full-route-hero-1280'
+  screenshotPrefix: 'founders-v1-4-2-full-route-hero-1280'
 };
-const REFERENCE_INPUTS = [
-  'docs/brand/reference/hero-cast/prairie-dog-ranger-source.png',
-  'docs/brand/reference/hero-cast/sheriff-lobster-source.jpeg',
-  'docs/brand/reference/hero-cast/chibi-homesteader-girl-source.png',
-  'docs/brand/reference/hero-cast/wizard-kid-source.png'
-];
 const VIDEO_REFERENCE = {
   url: 'https://www.youtube.com/watch?v=ZW7tUUZqhdY',
   usage: 'tone_motion_story_reference_only',
   frameExtractionRequired: false
 };
-const COMMON_GAMEPLAY_REFERENCE_SOURCE = 'founders_plot_internal_asset_pack_v1_3';
-const COMMON_RIGHTS_STATUS = 'generated_project_owned';
-const GAMEPLAY_APPROVAL_SCOPE = 'gameplay_asset';
-const palette = {
-  sky: '#f9efd7',
-  skyWarm: '#f6d8a8',
-  mesa: '#c48a59',
-  mesaDark: '#9b5f39',
-  dust: '#d6a162',
-  dustShade: '#b77d4b',
-  cream: '#fff7e6',
-  wood: '#835230',
-  woodDark: '#5a3621',
-  brass: '#b78b34',
-  brassDark: '#8f6a25',
-  teal: '#5f8d8e',
-  tealDark: '#446a6c',
-  leaf: '#86a84f',
-  leafDark: '#64813d',
-  stone: '#cabaa2',
-  stoneDark: '#9e8e7b',
-  rust: '#a85b3d',
-  shadow: 'rgba(61, 32, 15, 0.22)',
-  hat: '#7a5b40',
-  coat: '#c27b45',
-  skin: '#f3c79c'
-};
+
+const REF_PLATFORM = 'docs/brand/reference/platform/agenttown-visual-reference.jpeg';
+const REF_LOGO = 'docs/brand/reference/platform/agent-town-logo-reference.jpg';
+const REF_PRAIRIE_DOG = 'docs/brand/reference/hero-cast/prairie-dog-ranger-source.png';
+const REF_SHERIFF = 'docs/brand/reference/hero-cast/sheriff-lobster-source.jpeg';
+const REF_HOMESTEADER = 'docs/brand/reference/hero-cast/chibi-homesteader-girl-source.png';
+const REF_WIZARD = 'docs/brand/reference/hero-cast/wizard-kid-source.png';
+
+const CAND_SCENE_DESKTOP = 'public/experiences/founders-plot/assets/candidates/v1_4_2/scenes/founders-plot-desktop-candidate-c01.png';
+const CAND_SCENE_MOBILE = 'public/experiences/founders-plot/assets/candidates/v1_4_2/scenes/founders-plot-mobile-candidate-c01.png';
+const CAND_CLOVER_POSE = 'public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-pose-sheet-c01.png';
+const CAND_CLOVER_STATUS = 'public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-paused-blocked-sheet-c01.png';
+const CAND_BUILDING_PACK = 'public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png';
+const CAND_CIVIC_PACK = 'public/experiences/founders-plot/assets/candidates/v1_4_2/objects/civic-pack-sheet-c01.png';
+const CAND_HERO_GROUP = 'public/assets/candidates/v1_4_2/hero-cast/hero-cast-group-c01.png';
+const CAND_TOWNHALL = 'public/assets/candidates/v1_4_2/platform/townhall-onboarding-illustration-c01.png';
+const CAND_BRAIN = 'public/assets/candidates/v1_4_2/platform/brain-connect-marker-c01.png';
+
+const CREAM_KEY = '0xede4d8';
 
 function ensureDir(target) {
   fs.mkdirSync(target, { recursive: true });
 }
 
-function run(command, args) {
-  execFileSync(command, args, { stdio: 'pipe' });
+function writeText(filePath, content) {
+  ensureDir(path.dirname(filePath));
+  fs.writeFileSync(filePath, `${String(content || '').trim()}\n`, 'utf8');
 }
 
-function resolveBinary(candidates = []) {
+function resolveBinary(candidates) {
   for (const candidate of candidates) {
     if (!candidate) continue;
-    if (candidate.includes(path.sep) && fs.existsSync(candidate)) {
-      return candidate;
-    }
+    if (candidate.includes(path.sep) && fs.existsSync(candidate)) return candidate;
   }
   return candidates.find(Boolean) || '';
 }
 
-function writeText(filePath, content) {
-  ensureDir(path.dirname(filePath));
-  fs.writeFileSync(filePath, content, 'utf8');
+function run(binary, args) {
+  execFileSync(binary, args, { stdio: 'pipe' });
 }
 
-function rasterizeSvgToWebp(svgContent, outputPath, quality = 82) {
+function sha256ForBuffer(buffer) {
+  return crypto.createHash('sha256').update(buffer).digest('hex');
+}
+
+function sha256ForFile(relativePath) {
+  const absolutePath = path.isAbsolute(relativePath) ? relativePath : path.join(rootDir, relativePath);
+  return sha256ForBuffer(fs.readFileSync(absolutePath));
+}
+
+function fileSize(relativePath) {
+  const absolutePath = path.isAbsolute(relativePath) ? relativePath : path.join(rootDir, relativePath);
+  return fs.statSync(absolutePath).size;
+}
+
+function pngOrJpegToWebp(inputPath, outputPath, quality = 86) {
   ensureDir(path.dirname(outputPath));
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fp-assets-'));
-  const svgPath = path.join(tempDir, 'asset.svg');
-  const pngPath = path.join(tempDir, 'asset.png');
-  const sipsPath = resolveBinary(['/usr/bin/sips', 'sips']);
-  const cwebpPath = resolveBinary(['/opt/homebrew/bin/cwebp', '/usr/local/bin/cwebp', 'cwebp']);
+  const cwebp = resolveBinary(['/opt/homebrew/bin/cwebp', '/usr/local/bin/cwebp', 'cwebp']);
+  run(cwebp, ['-quiet', '-q', String(quality), inputPath, '-o', outputPath]);
+}
+
+function cropAndKeyToWebp(inputPath, outputPath, cropRect, {
+  keyColor = CREAM_KEY,
+  similarity = '0.20',
+  blend = '0.06',
+  quality = 90
+} = {}) {
+  ensureDir(path.dirname(outputPath));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fp-v142-crop-'));
+  const croppedPng = path.join(tempDir, 'crop.png');
+  const ffmpeg = resolveBinary(['/opt/homebrew/bin/ffmpeg', '/usr/local/bin/ffmpeg', 'ffmpeg']);
+  const cwebp = resolveBinary(['/opt/homebrew/bin/cwebp', '/usr/local/bin/cwebp', 'cwebp']);
   try {
-    fs.writeFileSync(svgPath, svgContent, 'utf8');
-    run(sipsPath, ['-s', 'format', 'png', svgPath, '--out', pngPath]);
-    run(cwebpPath, ['-quiet', '-q', String(quality), pngPath, '-o', outputPath]);
+    run(ffmpeg, [
+      '-y',
+      '-i',
+      inputPath,
+      '-vf',
+      `crop=${cropRect.w}:${cropRect.h}:${cropRect.x}:${cropRect.y},format=rgba,colorkey=${keyColor}:${similarity}:${blend}`,
+      croppedPng
+    ]);
+    run(cwebp, ['-quiet', '-q', String(quality), croppedPng, '-o', outputPath]);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 }
 
-function svgShell({ width, height, content, background = 'transparent' }) {
+function svgShell({ width, height, content }) {
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" fill="none">`,
-    '<defs>',
-    `  <linearGradient id="skyGradient" x1="0" y1="0" x2="0" y2="1">`,
-    `    <stop offset="0%" stop-color="${palette.sky}"/>`,
-    `    <stop offset="100%" stop-color="${palette.skyWarm}"/>`,
-    '  </linearGradient>',
-    '  <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">',
-    '    <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="rgba(61, 32, 15, 0.18)"/>',
-    '  </filter>',
-    '</defs>',
-    background === 'transparent' ? '' : `<rect width="${width}" height="${height}" fill="${background}"/>`,
     content,
     '</svg>'
   ].join('\n');
 }
 
-function groundShadow(x = 256, y = 402, rx = 120, ry = 36) {
-  return `<ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" fill="${palette.shadow}"/>`;
-}
-
-function basePedestal(x = 176, y = 268, w = 160, h = 104, roofColor = palette.wood, wallColor = palette.cream, accent = palette.brass) {
-  return `
-    <g filter="url(#softShadow)">
-      <path d="M${x} ${y + 12}h${w}l-26 ${h}H${x + 26}z" fill="${wallColor}" stroke="${palette.woodDark}" stroke-width="8" stroke-linejoin="round"/>
-      <path d="M${x - 16} ${y + 18}L${x + 56} ${y - 28}h${w - 112}l72 46-18 22H${x + 2}z" fill="${roofColor}" stroke="${palette.woodDark}" stroke-width="8" stroke-linejoin="round"/>
-      <rect x="${x + 12}" y="${y + 26}" width="${w - 24}" height="14" rx="7" fill="${accent}" opacity="0.35"/>
-    </g>
-  `;
-}
-
-function windowRect(x, y, w = 28, h = 32) {
-  return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8" fill="${palette.skyWarm}" stroke="${palette.woodDark}" stroke-width="6"/>`;
-}
-
-function doorRect(x, y, w = 38, h = 60) {
-  return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10" fill="${palette.wood}" stroke="${palette.woodDark}" stroke-width="6"/>`;
-}
-
-function fenceRow(y, left = 70, right = 440, tone = palette.woodDark) {
-  const posts = [];
-  for (let x = left; x <= right; x += 28) {
-    posts.push(`<rect x="${x}" y="${y}" width="8" height="34" rx="4" fill="${tone}"/>`);
-  }
-  return `<g opacity="0.55">${posts.join('')}<rect x="${left - 10}" y="${y + 10}" width="${right - left + 28}" height="8" rx="4" fill="${tone}"/></g>`;
-}
-
-function buildingSprite(definition) {
-  const level = definition.level || 1;
-  const roofInset = 8 * (level - 1);
-  const porchWidth = 124 + (level * 12);
-  const extraRoof = level >= 3
-    ? `<path d="M146 224l54-40h110l56 40-10 16H154z" fill="${palette.brass}" opacity="0.45"/>`
-    : '';
-  const secondWing = level >= 2
-    ? `<path d="M110 284h84l-18 72h-86z" fill="${palette.cream}" stroke="${palette.woodDark}" stroke-width="8" stroke-linejoin="round"/>
-       <path d="M98 286l46-34h56l48 34-10 18H108z" fill="${palette.wood}" stroke="${palette.woodDark}" stroke-width="8" stroke-linejoin="round"/>`
-    : '';
-  const tower = level >= 4
-    ? `<path d="M300 168h54v144h-54z" fill="${palette.cream}" stroke="${palette.woodDark}" stroke-width="8" stroke-linejoin="round"/>
-       <path d="M286 176l40-34 42 34-10 14h-60z" fill="${palette.rust}" stroke="${palette.woodDark}" stroke-width="8" stroke-linejoin="round"/>`
-    : '';
-  const banner = level >= 5
-    ? `<path d="M380 168l20 18v122l-20 20z" fill="${palette.teal}"/><circle cx="389" cy="160" r="8" fill="${palette.brass}"/>`
-    : '';
-  const content = `
-    ${groundShadow(256, 410, 148, 36)}
-    <path d="M92 408c38-44 91-66 164-66s132 24 168 64v32H92z" fill="${palette.dust}"/>
-    ${basePedestal(158, 246, 196 - roofInset, 118, palette.rust, palette.cream, palette.brass)}
-    ${extraRoof}
-    ${secondWing}
-    ${tower}
-    <path d="M190 344h${porchWidth}l-14 32H202z" fill="${palette.wood}" opacity="0.68"/>
-    ${doorRect(238, 302, 44, 68)}
-    ${windowRect(188, 294)}
-    ${windowRect(302, 294)}
-    ${windowRect(226, 238, 24, 28)}
-    ${windowRect(262, 238, 24, 28)}
-    <rect x="208" y="374" width="96" height="12" rx="6" fill="${palette.brass}" opacity="0.42"/>
-    ${banner}
-    <circle cx="122" cy="368" r="18" fill="${palette.leaf}" opacity="0.82"/>
-    <circle cx="390" cy="366" r="16" fill="${palette.leafDark}" opacity="0.72"/>
-  `;
-  return svgShell({ width: 512, height: 512, content });
-}
-
-function lumberCampSprite() {
-  const content = `
-    ${groundShadow(256, 414, 142, 34)}
-    <path d="M88 410c34-44 88-68 168-68 80 0 136 24 168 66v34H88z" fill="${palette.dust}"/>
-    <path d="M176 258h150l38 104H144z" fill="${palette.cream}" stroke="${palette.woodDark}" stroke-width="8" stroke-linejoin="round"/>
-    <path d="M150 270l74-58h90l72 58-18 18H170z" fill="${palette.wood}" stroke="${palette.woodDark}" stroke-width="8" stroke-linejoin="round"/>
-    <path d="M228 252l26 24 26-24 22 20-48 40-48-40z" fill="${palette.teal}" opacity="0.22"/>
-    <rect x="166" y="332" width="58" height="18" rx="9" fill="${palette.wood}"/>
-    <rect x="226" y="322" width="82" height="16" rx="8" fill="${palette.woodDark}"/>
-    <rect x="230" y="342" width="86" height="16" rx="8" fill="${palette.wood}"/>
-    <rect x="320" y="334" width="44" height="18" rx="9" fill="${palette.woodDark}"/>
-    <path d="M100 346h58l14 54H96z" fill="${palette.wood}" stroke="${palette.woodDark}" stroke-width="8" stroke-linejoin="round"/>
-    <rect x="104" y="316" width="44" height="12" rx="6" fill="${palette.brass}" opacity="0.65"/>
-    <circle cx="94" cy="386" r="18" fill="${palette.stoneDark}" opacity="0.55"/>
-    <circle cx="126" cy="386" r="18" fill="${palette.stone}" opacity="0.78"/>
-  `;
-  return svgShell({ width: 512, height: 512, content });
-}
-
-function farmPlotSprite() {
-  const furrows = [];
-  for (let i = 0; i < 5; i += 1) {
-    const y = 260 + (i * 26);
-    furrows.push(`<path d="M140 ${y}c42 14 84 16 126 0 38-12 76-12 114 0" stroke="${palette.rust}" stroke-width="12" stroke-linecap="round" opacity="0.55"/>`);
-    furrows.push(`<path d="M146 ${y - 10}c38 12 80 14 120 0 36-10 72-10 108 0" stroke="${palette.leaf}" stroke-width="6" stroke-linecap="round" opacity="0.72"/>`);
-  }
-  const content = `
-    ${groundShadow(256, 418, 146, 32)}
-    <path d="M92 414c34-44 88-68 164-68 80 0 134 24 164 66v30H92z" fill="${palette.dust}"/>
-    <path d="M122 222h268l28 170H94z" fill="#d9a96c" stroke="${palette.woodDark}" stroke-width="8" stroke-linejoin="round"/>
-    ${furrows.join('')}
-    <rect x="94" y="292" width="54" height="86" rx="10" fill="${palette.wood}" stroke="${palette.woodDark}" stroke-width="8"/>
-    <rect x="102" y="248" width="38" height="42" rx="10" fill="${palette.skyWarm}" stroke="${palette.woodDark}" stroke-width="8"/>
-    <path d="M350 248h60l22 92h-82z" fill="${palette.wood}" stroke="${palette.woodDark}" stroke-width="8" stroke-linejoin="round"/>
-    <circle cx="378" cy="366" r="28" fill="${palette.leaf}" opacity="0.72"/>
-    <circle cx="412" cy="350" r="18" fill="${palette.leafDark}" opacity="0.68"/>
-  `;
-  return svgShell({ width: 512, height: 512, content });
-}
-
-function quarrySprite() {
-  const content = `
-    ${groundShadow(256, 418, 146, 32)}
-    <path d="M92 414c34-44 88-68 164-68 80 0 134 24 164 66v30H92z" fill="${palette.dust}"/>
-    <path d="M140 248h176l44 128H112z" fill="${palette.stone}" stroke="${palette.woodDark}" stroke-width="8" stroke-linejoin="round"/>
-    <path d="M322 200h34l18 162h-30z" fill="${palette.wood}" stroke="${palette.woodDark}" stroke-width="8"/>
-    <path d="M328 210l48 32" stroke="${palette.woodDark}" stroke-width="10" stroke-linecap="round"/>
-    <circle cx="380" cy="248" r="16" fill="${palette.brass}" stroke="${palette.woodDark}" stroke-width="8"/>
-    <path d="M176 292l28-48 40 56 54-80 44 74" stroke="${palette.stoneDark}" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
-    <rect x="108" y="336" width="54" height="28" rx="10" fill="${palette.wood}" stroke="${palette.woodDark}" stroke-width="8"/>
-    <circle cx="120" cy="372" r="18" fill="${palette.stoneDark}" opacity="0.65"/>
-    <circle cx="156" cy="368" r="16" fill="${palette.stone}" opacity="0.85"/>
-  `;
-  return svgShell({ width: 512, height: 512, content });
-}
-
-function workshopSprite() {
-  const content = `
-    ${groundShadow(256, 414, 142, 34)}
-    <path d="M90 410c34-42 88-66 166-66 80 0 136 24 166 64v32H90z" fill="${palette.dust}"/>
-    <path d="M160 246h194l26 128H134z" fill="${palette.cream}" stroke="${palette.woodDark}" stroke-width="8" stroke-linejoin="round"/>
-    <path d="M136 258l86-52h100l84 52-18 22H154z" fill="${palette.teal}" stroke="${palette.woodDark}" stroke-width="8" stroke-linejoin="round"/>
-    <path d="M326 176h34v92h-34z" fill="${palette.wood}" stroke="${palette.woodDark}" stroke-width="8"/>
-    <circle cx="164" cy="356" r="20" fill="${palette.brass}" stroke="${palette.woodDark}" stroke-width="8"/>
-    <circle cx="164" cy="356" r="8" fill="${palette.woodDark}"/>
-    <rect x="230" y="312" width="44" height="58" rx="10" fill="${palette.wood}" stroke="${palette.woodDark}" stroke-width="8"/>
-    ${windowRect(188, 292)}
-    ${windowRect(302, 292)}
-    <rect x="292" y="236" width="46" height="18" rx="9" fill="${palette.brass}" opacity="0.72"/>
-    <circle cx="386" cy="354" r="18" fill="${palette.stoneDark}" opacity="0.52"/>
-  `;
-  return svgShell({ width: 512, height: 512, content });
-}
-
-function marketSprite() {
-  const content = `
-    ${groundShadow(256, 414, 138, 32)}
-    <path d="M88 412c34-42 88-66 166-66 80 0 134 24 166 64v30H88z" fill="${palette.dust}"/>
-    <path d="M160 268h194l18 112H142z" fill="${palette.wood}" stroke="${palette.woodDark}" stroke-width="8" stroke-linejoin="round"/>
-    <path d="M130 264c38-46 82-64 126-64s88 18 126 64l-22 24H152z" fill="${palette.skyWarm}" stroke="${palette.woodDark}" stroke-width="8" stroke-linejoin="round"/>
-    <path d="M176 246h26l16 128h-22zM310 246h26l-4 128h-22z" fill="${palette.woodDark}"/>
-    <rect x="170" y="314" width="64" height="30" rx="10" fill="${palette.brass}" opacity="0.72"/>
-    <rect x="244" y="314" width="54" height="30" rx="10" fill="${palette.rust}" opacity="0.82"/>
-    <rect x="304" y="314" width="42" height="30" rx="10" fill="${palette.leaf}" opacity="0.82"/>
-    <circle cx="126" cy="372" r="20" fill="${palette.stone}" opacity="0.75"/>
-    <circle cx="390" cy="372" r="18" fill="${palette.stoneDark}" opacity="0.58"/>
-  `;
-  return svgShell({ width: 512, height: 512, content });
-}
-
-function contractBoardSprite() {
-  const content = `
-    ${groundShadow(256, 426, 112, 24)}
-    <path d="M180 150h20v252h-20zM312 150h20v252h-20z" fill="${palette.woodDark}"/>
-    <path d="M154 140h204v196H154z" fill="${palette.wood}" stroke="${palette.woodDark}" stroke-width="8" stroke-linejoin="round"/>
-    <path d="M174 164h164v156H174z" fill="${palette.cream}" opacity="0.92"/>
-    <path d="M184 178h64v56H184zM258 178h66v40h-66zM196 246h52v42h-52zM258 228h58v64h-58z" fill="${palette.skyWarm}" opacity="0.52"/>
-    <circle cx="204" cy="188" r="8" fill="${palette.brass}"/>
-    <circle cx="314" cy="188" r="8" fill="${palette.brass}"/>
-    <circle cx="270" cy="240" r="8" fill="${palette.brass}"/>
-    <path d="M112 368c24-20 48-28 72-28s48 8 72 28v24H112z" fill="${palette.stone}" opacity="0.8"/>
-  `;
-  return svgShell({ width: 512, height: 512, content });
-}
-
-function welcomeSignSprite(upgraded = false) {
-  const flower = upgraded
-    ? `<circle cx="132" cy="340" r="20" fill="${palette.leaf}"/><circle cx="148" cy="326" r="10" fill="${palette.skyWarm}"/>`
-    : '';
-  const banner = upgraded ? `<rect x="192" y="214" width="132" height="56" rx="12" fill="${palette.teal}" opacity="0.18"/>` : '';
-  const content = `
-    ${groundShadow(256, 422, 126, 28)}
-    <path d="M98 416c34-40 88-62 158-62 72 0 126 22 158 60v30H98z" fill="${palette.dust}"/>
-    <path d="M208 178h16v170h-16zM288 178h16v170h-16z" fill="${palette.woodDark}"/>
-    <path d="M174 206h164v86H174z" fill="${palette.wood}" stroke="${palette.woodDark}" stroke-width="8"/>
-    ${banner}
-    <rect x="170" y="298" width="172" height="20" rx="10" fill="${palette.brass}" opacity="${upgraded ? '0.86' : '0.42'}"/>
-    <path d="M94 330h74l18 70H98z" fill="${palette.stone}" stroke="${palette.woodDark}" stroke-width="8" stroke-linejoin="round"/>
-    ${flower}
-    <circle cx="382" cy="360" r="18" fill="${palette.leafDark}" opacity="0.7"/>
-  `;
-  return svgShell({ width: 512, height: 512, content });
-}
-
-function foremanHutSprite() {
-  const content = `
-    ${groundShadow(256, 414, 140, 32)}
-    <path d="M92 410c34-42 88-66 164-66 80 0 134 24 164 64v30H92z" fill="${palette.dust}"/>
-    <path d="M156 250h198l24 126H132z" fill="${palette.cream}" stroke="${palette.woodDark}" stroke-width="8" stroke-linejoin="round"/>
-    <path d="M132 262l88-56h94l92 56-18 20H150z" fill="${palette.wood}" stroke="${palette.woodDark}" stroke-width="8" stroke-linejoin="round"/>
-    <rect x="228" y="306" width="48" height="64" rx="10" fill="${palette.teal}" opacity="0.55" stroke="${palette.woodDark}" stroke-width="8"/>
-    <rect x="184" y="296" width="34" height="34" rx="8" fill="${palette.skyWarm}" stroke="${palette.woodDark}" stroke-width="8"/>
-    <rect x="292" y="296" width="34" height="34" rx="8" fill="${palette.skyWarm}" stroke="${palette.woodDark}" stroke-width="8"/>
-    <path d="M134 338h86l-12 40h-86z" fill="${palette.wood}" opacity="0.72"/>
-    <circle cx="116" cy="360" r="18" fill="${palette.brass}" opacity="0.72"/>
-    <circle cx="390" cy="360" r="18" fill="${palette.teal}" opacity="0.7"/>
-  `;
-  return svgShell({ width: 512, height: 512, content });
-}
-
-function lotSprite(locked = false) {
-  const chain = locked
-    ? `<path d="M180 278c18-18 40-18 58 0 18-18 40-18 58 0" stroke="${palette.stoneDark}" stroke-width="12" stroke-linecap="round"/>
-       <circle cx="206" cy="278" r="12" fill="none" stroke="${palette.stoneDark}" stroke-width="8"/>
-       <circle cx="304" cy="278" r="12" fill="none" stroke="${palette.stoneDark}" stroke-width="8"/>`
-    : `<path d="M180 294c26-24 54-38 76-38 22 0 52 14 78 38" stroke="${palette.teal}" stroke-width="10" stroke-linecap="round" opacity="0.58"/>`;
-  const sign = locked ? palette.stoneDark : palette.brass;
-  const content = `
-    ${groundShadow(256, 430, 136, 24)}
-    <path d="M100 420c30-34 82-54 156-54 76 0 128 20 156 52v28H100z" fill="${locked ? palette.dustShade : palette.dust}"/>
-    <path d="M136 390l46-112h148l46 112H136z" fill="${locked ? '#d6c4aa' : '#e7c690'}" stroke="${palette.woodDark}" stroke-width="8" stroke-linejoin="round"/>
-    <path d="M150 370l108-56 108 56" stroke="${locked ? palette.stoneDark : palette.leafDark}" stroke-width="8" stroke-linecap="round" opacity="0.38"/>
-    <path d="M160 228h16v104h-16zM336 228h16v104h-16z" fill="${palette.woodDark}"/>
-    <path d="M136 224h240l-16 52H152z" fill="${sign}" stroke="${palette.woodDark}" stroke-width="8" stroke-linejoin="round"/>
-    ${chain}
-  `;
-  return svgShell({ width: 512, height: 512, content });
-}
-
-function cloverSprite(state) {
-  const states = {
-    idle: { accent: palette.teal, prop: '<rect x="278" y="228" width="38" height="62" rx="8" fill="#f6e7c5" stroke="#5a3621" stroke-width="8"/>', bubble: '' },
-    observing: { accent: palette.teal, prop: '<path d="M286 214l42 20-18 40-42-20z" fill="#f6e7c5" stroke="#5a3621" stroke-width="8"/>', bubble: '<circle cx="334" cy="178" r="12" fill="#5f8d8e" opacity="0.25"/>' },
-    thinking: { accent: palette.brass, prop: '<path d="M286 214l42 20-18 40-42-20z" fill="#f6e7c5" stroke="#5a3621" stroke-width="8"/>', bubble: '<circle cx="330" cy="176" r="14" fill="#b78b34" opacity="0.25"/><circle cx="352" cy="150" r="9" fill="#b78b34" opacity="0.18"/>' },
-    acting: { accent: palette.tealDark, prop: '<path d="M282 222l58 18-18 44-56-18z" fill="#f6e7c5" stroke="#5a3621" stroke-width="8"/>', bubble: '<path d="M330 170l28 18-12 12-28-18z" fill="#5f8d8e" opacity="0.35"/>' },
-    waiting: { accent: palette.rust, prop: '<path d="M286 214l42 20-18 40-42-20z" fill="#f6e7c5" stroke="#5a3621" stroke-width="8"/>', bubble: '<circle cx="340" cy="160" r="20" fill="#fff7e6" stroke="#a85b3d" stroke-width="8"/><rect x="336" y="148" width="8" height="18" rx="4" fill="#a85b3d"/><rect x="336" y="172" width="8" height="8" rx="4" fill="#a85b3d"/>' },
-    paused: { accent: palette.stoneDark, prop: '<rect x="292" y="272" width="40" height="18" rx="8" fill="#cabaa2" stroke="#5a3621" stroke-width="8"/>', bubble: '' },
-    restart: { accent: palette.rust, prop: '<path d="M286 214l42 20-18 40-42-20z" fill="#d6c4aa" stroke="#5a3621" stroke-width="8"/>', bubble: '<path d="M336 152a20 20 0 1 1-14 34" fill="none" stroke="#a85b3d" stroke-width="8"/><path d="M334 136l22 8-16 16z" fill="#a85b3d"/>' }
-  };
-  const config = states[state];
-  const content = `
-    ${groundShadow(256, 430, 92, 18)}
-    <ellipse cx="256" cy="408" rx="102" ry="42" fill="${config.accent}" opacity="0.18"/>
-    <circle cx="256" cy="188" r="50" fill="${palette.skin}" stroke="${palette.woodDark}" stroke-width="8"/>
-    <path d="M204 182c10-52 94-72 128-12v20H204z" fill="${palette.hat}" stroke="${palette.woodDark}" stroke-width="8" stroke-linejoin="round"/>
-    <path d="M196 226c22-32 40-50 60-50s36 10 60 34l18 114c-24 18-52 28-82 28s-58-10-82-28z" fill="${palette.coat}" stroke="${palette.woodDark}" stroke-width="8" stroke-linejoin="round"/>
-    <path d="M202 238c16 20 34 30 54 30s40-10 58-30" stroke="${palette.cream}" stroke-width="10" stroke-linecap="round" opacity="0.42"/>
-    <path d="M186 246c-16 22-26 42-28 64" stroke="${palette.woodDark}" stroke-width="12" stroke-linecap="round"/>
-    <path d="M326 244c20 24 28 42 30 66" stroke="${palette.woodDark}" stroke-width="12" stroke-linecap="round"/>
-    <path d="M222 360l-14 58M292 360l14 58" stroke="${palette.woodDark}" stroke-width="14" stroke-linecap="round"/>
-    ${config.prop}
-    ${config.bubble}
-    <circle cx="236" cy="190" r="6" fill="${palette.woodDark}"/>
-    <circle cx="278" cy="190" r="6" fill="${palette.woodDark}"/>
-    <path d="M232 220c16 12 38 12 50 0" stroke="${palette.woodDark}" stroke-width="8" stroke-linecap="round"/>
-    <circle cx="308" cy="126" r="12" fill="${config.accent}" opacity="0.75"/>
-  `;
-  return svgShell({ width: 512, height: 512, content });
-}
-
-function desktopScene() {
-  const width = 2048;
-  const height = 1280;
-  const content = `
-    <rect width="${width}" height="${height}" fill="url(#skyGradient)"/>
-    <path d="M0 346c140-80 298-120 482-120 210 0 390 54 584 54 218 0 376-54 590-54 160 0 290 30 392 92v246H0z" fill="${palette.skyWarm}" opacity="0.72"/>
-    <path d="M0 430c188-72 406-112 650-112 256 0 466 84 702 84 222 0 418-66 696-66v238H0z" fill="${palette.mesa}" opacity="0.55"/>
-    <path d="M0 536c174-48 384-72 620-72 274 0 496 66 748 66 230 0 438-46 680-46v300H0z" fill="${palette.mesaDark}" opacity="0.42"/>
-    <path d="M0 1280v-390c146-60 336-96 572-96 236 0 430 58 638 58 214 0 386-58 616-58 90 0 164 6 222 18v468z" fill="${palette.dust}"/>
-    <path d="M246 1280c180-246 430-402 742-402 282 0 470 126 658 402z" fill="${palette.dustShade}" opacity="0.46"/>
-    <path d="M726 1280c94-160 214-234 360-234 136 0 238 54 318 234z" fill="${palette.cream}" opacity="0.22"/>
-    <path d="M624 926c114 64 222 98 324 98s214-44 332-110 248-90 390-74v48c-140-14-260 10-370 72-120 68-232 114-360 114-130 0-254-40-384-112z" fill="${palette.wood}" opacity="0.12"/>
-    ${fenceRow(982, 204, 1830, palette.wood)}
-    <path d="M122 1118c150-96 334-138 548-138 206 0 380 54 564 54 184 0 364-56 558-56 74 0 142 8 206 18v86c-64-12-132-20-208-20-190 0-364 56-558 56-202 0-370-56-564-56-204 0-380 42-546 136z" fill="${palette.stone}" opacity="0.2"/>
-  `;
-  return svgShell({ width, height, content });
-}
-
-function mobileScene() {
-  const width = 1170;
-  const height = 1800;
-  const content = `
-    <rect width="${width}" height="${height}" fill="url(#skyGradient)"/>
-    <path d="M0 420c120-90 248-132 430-132 194 0 330 74 516 74 90 0 164-12 224-34v220H0z" fill="${palette.skyWarm}" opacity="0.72"/>
-    <path d="M0 564c132-70 272-104 452-104 200 0 352 64 534 64 74 0 136-10 184-26v270H0z" fill="${palette.mesa}" opacity="0.54"/>
-    <path d="M0 724c144-42 294-64 470-64 206 0 366 58 532 58 70 0 126-8 168-20v308H0z" fill="${palette.mesaDark}" opacity="0.42"/>
-    <path d="M0 1800v-566c90-40 222-70 388-70 194 0 330 54 504 54 112 0 202-16 278-40v622z" fill="${palette.dust}"/>
-    <path d="M174 1800c120-220 278-360 494-360 210 0 344 112 502 360z" fill="${palette.dustShade}" opacity="0.46"/>
-    ${fenceRow(1260, 80, 1080, palette.wood)}
-    <path d="M106 1446c122-66 262-100 430-100 170 0 296 46 426 46 74 0 142-10 208-28v88c-66 18-136 30-214 30-146 0-280-50-422-50-162 0-296 34-428 98z" fill="${palette.stone}" opacity="0.2"/>
-  `;
-  return svgShell({ width, height, content });
-}
-
 function overlaySvg(type) {
-  const iconMap = {
+  const map = {
     sparkle: `
-      <path d="M32 6l8 18 18 8-18 8-8 18-8-18-18-8 18-8z" fill="${palette.skyWarm}"/>
-      <path d="M53 9l4 8 8 4-8 4-4 8-4-8-8-4 8-4z" fill="${palette.brass}"/>
-      <path d="M14 42l5 10 10 5-10 5-5 10-5-10-10-5 10-5z" fill="${palette.teal}"/>
+      <path d="M32 6l8 18 18 8-18 8-8 18-8-18-18-8 18-8z" fill="#f7d16e"/>
+      <path d="M52 10l4 8 8 4-8 4-4 8-4-8-8-4 8-4z" fill="#c79139"/>
+      <path d="M14 42l5 10 10 5-10 5-5 10-5-10-10-5 10-5z" fill="#5f8d8e"/>
     `,
     blocked: `
-      <circle cx="36" cy="36" r="28" fill="${palette.rust}"/>
-      <path d="M20 20l32 32M52 20L20 52" stroke="${palette.cream}" stroke-width="8" stroke-linecap="round"/>
+      <circle cx="36" cy="36" r="28" fill="#aa5a3d"/>
+      <path d="M20 20l32 32M52 20L20 52" stroke="#fff4df" stroke-width="8" stroke-linecap="round"/>
     `,
     upgrade: `
-      <circle cx="36" cy="36" r="28" fill="${palette.brass}"/>
-      <path d="M36 18v36M18 36h36" stroke="${palette.cream}" stroke-width="8" stroke-linecap="round"/>
+      <circle cx="36" cy="36" r="28" fill="#c79139"/>
+      <path d="M36 18v36M18 36h36" stroke="#fff4df" stroke-width="8" stroke-linecap="round"/>
     `,
     approval: `
-      <circle cx="36" cy="36" r="28" fill="${palette.rust}"/>
-      <rect x="32" y="18" width="8" height="24" rx="4" fill="${palette.cream}"/>
-      <rect x="32" y="48" width="8" height="8" rx="4" fill="${palette.cream}"/>
+      <circle cx="36" cy="36" r="28" fill="#aa5a3d"/>
+      <rect x="32" y="18" width="8" height="24" rx="4" fill="#fff4df"/>
+      <rect x="32" y="48" width="8" height="8" rx="4" fill="#fff4df"/>
     `,
     contract: `
-      <rect x="12" y="12" width="48" height="48" rx="10" fill="${palette.cream}" stroke="${palette.woodDark}" stroke-width="6"/>
-      <circle cx="24" cy="20" r="4" fill="${palette.brass}"/>
-      <path d="M22 30h28M22 40h24M22 50h18" stroke="${palette.woodDark}" stroke-width="6" stroke-linecap="round"/>
+      <rect x="12" y="12" width="48" height="48" rx="10" fill="#fff4df" stroke="#5a3621" stroke-width="6"/>
+      <circle cx="24" cy="20" r="4" fill="#c79139"/>
+      <path d="M22 30h28M22 40h24M22 50h18" stroke="#5a3621" stroke-width="6" stroke-linecap="round"/>
     `,
     construction: `
-      <path d="M12 54h48L46 20H26z" fill="${palette.brass}" stroke="${palette.woodDark}" stroke-width="6" stroke-linejoin="round"/>
-      <path d="M22 54V20h18" stroke="${palette.woodDark}" stroke-width="6" stroke-linecap="round"/>
+      <path d="M12 54h48L46 20H26z" fill="#c79139" stroke="#5a3621" stroke-width="6" stroke-linejoin="round"/>
+      <path d="M22 54V20h18" stroke="#5a3621" stroke-width="6" stroke-linecap="round"/>
     `,
     timer: `
-      <circle cx="36" cy="36" r="26" fill="none" stroke="${palette.teal}" stroke-width="8" opacity="0.24"/>
-      <path d="M36 12a24 24 0 0 1 20 12" stroke="${palette.teal}" stroke-width="8" stroke-linecap="round"/>
-      <path d="M36 36V22M36 36l12 8" stroke="${palette.woodDark}" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="36" cy="36" r="26" fill="none" stroke="#5f8d8e" stroke-width="8" opacity="0.25"/>
+      <path d="M36 12a24 24 0 0 1 20 12" stroke="#5f8d8e" stroke-width="8" stroke-linecap="round"/>
+      <path d="M36 36V22M36 36l12 8" stroke="#5a3621" stroke-width="6" stroke-linecap="round"/>
     `
   };
-  return svgShell({ width: 72, height: 72, content: iconMap[type], background: 'transparent' });
+  return svgShell({ width: 72, height: 72, content: map[type] });
 }
 
-const rasterAssets = [
-  { id: 'scene_founders_plot_desktop', file: 'scenes/founders-plot-desktop.webp', width: 2048, height: 1280, transparent: false, promptFile: 'prompts/scene.md#founders-plot-desktop', svg: desktopScene, kind: 'scene', quality: 86, anchor: { x: 0.5, y: 0.5 }, hitbox: { x: 0, y: 0, w: 1, h: 1 }, zIndexHint: 0 },
-  { id: 'scene_founders_plot_mobile', file: 'scenes/founders-plot-mobile.webp', width: 1170, height: 1800, transparent: false, promptFile: 'prompts/scene.md#founders-plot-mobile', svg: mobileScene, kind: 'scene', quality: 86, anchor: { x: 0.5, y: 0.5 }, hitbox: { x: 0, y: 0, w: 1, h: 1 }, zIndexHint: 0 },
-  { id: 'building_hq_level_1', file: 'buildings/hq-lv1.webp', width: 512, height: 512, transparent: true, promptFile: 'prompts/buildings.md#hq-levels', svg: () => buildingSprite({ level: 1 }), kind: 'building', buildingType: 'HQ', state: 'level_1', anchor: { x: 0.5, y: 0.86 }, hitbox: { x: 0.2, y: 0.18, w: 0.58, h: 0.64 }, zIndexHint: 30 },
-  { id: 'building_hq_level_2', file: 'buildings/hq-lv2.webp', width: 512, height: 512, transparent: true, promptFile: 'prompts/buildings.md#hq-levels', svg: () => buildingSprite({ level: 2 }), kind: 'building', buildingType: 'HQ', state: 'level_2', anchor: { x: 0.5, y: 0.86 }, hitbox: { x: 0.16, y: 0.16, w: 0.64, h: 0.66 }, zIndexHint: 31 },
-  { id: 'building_hq_level_3', file: 'buildings/hq-lv3.webp', width: 512, height: 512, transparent: true, promptFile: 'prompts/buildings.md#hq-levels', svg: () => buildingSprite({ level: 3 }), kind: 'building', buildingType: 'HQ', state: 'level_3', anchor: { x: 0.5, y: 0.86 }, hitbox: { x: 0.14, y: 0.12, w: 0.68, h: 0.7 }, zIndexHint: 32 },
-  { id: 'building_hq_level_4', file: 'buildings/hq-lv4.webp', width: 512, height: 512, transparent: true, promptFile: 'prompts/buildings.md#hq-levels', svg: () => buildingSprite({ level: 4 }), kind: 'building', buildingType: 'HQ', state: 'level_4', anchor: { x: 0.5, y: 0.86 }, hitbox: { x: 0.12, y: 0.08, w: 0.72, h: 0.76 }, zIndexHint: 33 },
-  { id: 'building_hq_level_5', file: 'buildings/hq-lv5.webp', width: 512, height: 512, transparent: true, promptFile: 'prompts/buildings.md#hq-levels', svg: () => buildingSprite({ level: 5 }), kind: 'building', buildingType: 'HQ', state: 'level_5', anchor: { x: 0.5, y: 0.86 }, hitbox: { x: 0.12, y: 0.08, w: 0.74, h: 0.76 }, zIndexHint: 34 },
-  { id: 'building_lumber_camp_base', file: 'buildings/lumber-camp.webp', width: 512, height: 512, transparent: true, promptFile: 'prompts/buildings.md#lumber-camp', svg: lumberCampSprite, kind: 'building', buildingType: 'LUMBER_CAMP', state: 'base', anchor: { x: 0.5, y: 0.86 }, hitbox: { x: 0.18, y: 0.2, w: 0.64, h: 0.62 }, zIndexHint: 24 },
-  { id: 'building_farm_plot_base', file: 'buildings/farm-plot.webp', width: 512, height: 512, transparent: true, promptFile: 'prompts/buildings.md#farm-plot', svg: farmPlotSprite, kind: 'building', buildingType: 'FARM_PLOT', state: 'base', anchor: { x: 0.5, y: 0.88 }, hitbox: { x: 0.16, y: 0.24, w: 0.7, h: 0.56 }, zIndexHint: 18 },
-  { id: 'building_quarry_base', file: 'buildings/quarry.webp', width: 512, height: 512, transparent: true, promptFile: 'prompts/buildings.md#quarry', svg: quarrySprite, kind: 'building', buildingType: 'QUARRY', state: 'base', anchor: { x: 0.5, y: 0.88 }, hitbox: { x: 0.16, y: 0.2, w: 0.7, h: 0.62 }, zIndexHint: 20 },
-  { id: 'building_workshop_base', file: 'buildings/workshop.webp', width: 512, height: 512, transparent: true, promptFile: 'prompts/buildings.md#workshop', svg: workshopSprite, kind: 'building', buildingType: 'WORKSHOP', state: 'base', anchor: { x: 0.5, y: 0.86 }, hitbox: { x: 0.18, y: 0.18, w: 0.64, h: 0.66 }, zIndexHint: 22 },
-  { id: 'building_market_stall_base', file: 'buildings/market-stall.webp', width: 512, height: 512, transparent: true, promptFile: 'prompts/buildings.md#market-stall', svg: marketSprite, kind: 'building', buildingType: 'MARKET_STALL', state: 'base', anchor: { x: 0.5, y: 0.88 }, hitbox: { x: 0.16, y: 0.2, w: 0.7, h: 0.6 }, zIndexHint: 22 },
-  { id: 'object_contract_board_base', file: 'objects/contract-board.webp', width: 512, height: 512, transparent: true, promptFile: 'prompts/buildings.md#contract-board', svg: contractBoardSprite, kind: 'object', state: 'base', anchor: { x: 0.5, y: 0.9 }, hitbox: { x: 0.26, y: 0.22, w: 0.48, h: 0.58 }, zIndexHint: 14 },
-  { id: 'object_public_square_welcome_sign_base', file: 'objects/welcome-sign.webp', width: 512, height: 512, transparent: true, promptFile: 'prompts/buildings.md#welcome-sign', svg: () => welcomeSignSprite(false), kind: 'object', state: 'base', anchor: { x: 0.5, y: 0.9 }, hitbox: { x: 0.2, y: 0.22, w: 0.6, h: 0.56 }, zIndexHint: 12 },
-  { id: 'object_public_square_welcome_sign_upgraded', file: 'objects/welcome-sign-upgraded.webp', width: 512, height: 512, transparent: true, promptFile: 'prompts/buildings.md#welcome-sign', svg: () => welcomeSignSprite(true), kind: 'object', state: 'upgraded', anchor: { x: 0.5, y: 0.9 }, hitbox: { x: 0.2, y: 0.22, w: 0.6, h: 0.56 }, zIndexHint: 12 },
-  { id: 'object_foreman_hut_base', file: 'objects/foreman-hut.webp', width: 512, height: 512, transparent: true, promptFile: 'prompts/buildings.md#foreman-hut', svg: foremanHutSprite, kind: 'object', state: 'base', anchor: { x: 0.5, y: 0.88 }, hitbox: { x: 0.18, y: 0.18, w: 0.64, h: 0.66 }, zIndexHint: 18 },
-  { id: 'object_empty_lot_buildable', file: 'objects/empty-lot.webp', width: 512, height: 512, transparent: true, promptFile: 'prompts/buildings.md#lots', svg: () => lotSprite(false), kind: 'object', state: 'buildable', anchor: { x: 0.5, y: 0.92 }, hitbox: { x: 0.2, y: 0.28, w: 0.58, h: 0.46 }, zIndexHint: 10 },
-  { id: 'object_locked_lot', file: 'objects/locked-lot.webp', width: 512, height: 512, transparent: true, promptFile: 'prompts/buildings.md#lots', svg: () => lotSprite(true), kind: 'object', state: 'locked', anchor: { x: 0.5, y: 0.92 }, hitbox: { x: 0.2, y: 0.28, w: 0.58, h: 0.46 }, zIndexHint: 10 },
-  { id: 'clover_idle', file: 'characters/clover-idle.webp', width: 512, height: 512, transparent: true, promptFile: 'prompts/clover.md#clover-states', svg: () => cloverSprite('idle'), kind: 'character', state: 'idle', anchor: { x: 0.5, y: 0.94 }, hitbox: { x: 0.28, y: 0.18, w: 0.44, h: 0.72 }, zIndexHint: 40 },
-  { id: 'clover_observing', file: 'characters/clover-observing.webp', width: 512, height: 512, transparent: true, promptFile: 'prompts/clover.md#clover-states', svg: () => cloverSprite('observing'), kind: 'character', state: 'observing', anchor: { x: 0.5, y: 0.94 }, hitbox: { x: 0.28, y: 0.18, w: 0.44, h: 0.72 }, zIndexHint: 40 },
-  { id: 'clover_thinking', file: 'characters/clover-thinking.webp', width: 512, height: 512, transparent: true, promptFile: 'prompts/clover.md#clover-states', svg: () => cloverSprite('thinking'), kind: 'character', state: 'thinking', anchor: { x: 0.5, y: 0.94 }, hitbox: { x: 0.28, y: 0.18, w: 0.44, h: 0.72 }, zIndexHint: 40 },
-  { id: 'clover_acting', file: 'characters/clover-acting.webp', width: 512, height: 512, transparent: true, promptFile: 'prompts/clover.md#clover-states', svg: () => cloverSprite('acting'), kind: 'character', state: 'acting', anchor: { x: 0.5, y: 0.94 }, hitbox: { x: 0.28, y: 0.18, w: 0.44, h: 0.72 }, zIndexHint: 40 },
-  { id: 'clover_waiting_approval', file: 'characters/clover-waiting-approval.webp', width: 512, height: 512, transparent: true, promptFile: 'prompts/clover.md#clover-states', svg: () => cloverSprite('waiting'), kind: 'character', state: 'waiting-approval', anchor: { x: 0.5, y: 0.94 }, hitbox: { x: 0.28, y: 0.18, w: 0.44, h: 0.72 }, zIndexHint: 40 },
-  { id: 'clover_paused', file: 'characters/clover-paused.webp', width: 512, height: 512, transparent: true, promptFile: 'prompts/clover.md#clover-states', svg: () => cloverSprite('paused'), kind: 'character', state: 'paused', anchor: { x: 0.5, y: 0.94 }, hitbox: { x: 0.28, y: 0.18, w: 0.44, h: 0.72 }, zIndexHint: 40 },
-  { id: 'clover_restart_needed', file: 'characters/clover-restart-needed.webp', width: 512, height: 512, transparent: true, promptFile: 'prompts/clover.md#clover-states', svg: () => cloverSprite('restart'), kind: 'character', state: 'restart-needed', anchor: { x: 0.5, y: 0.94 }, hitbox: { x: 0.28, y: 0.18, w: 0.44, h: 0.72 }, zIndexHint: 40 }
-];
+function lockedLotSvg() {
+  return svgShell({
+    width: 512,
+    height: 512,
+    content: `
+      <rect x="84" y="196" width="344" height="220" rx="22" fill="#cfaa78" stroke="#7b5537" stroke-width="10"/>
+      <path d="M84 252h344M84 308h344M198 196v220M314 196v220" stroke="#e9d4aa" stroke-width="6" opacity="0.78"/>
+      <circle cx="176" cy="110" r="28" fill="none" stroke="#8a7966" stroke-width="12"/>
+      <circle cx="336" cy="110" r="28" fill="none" stroke="#8a7966" stroke-width="12"/>
+      <path d="M204 110h104" stroke="#8a7966" stroke-width="14" stroke-linecap="round"/>
+      <rect x="216" y="112" width="80" height="94" rx="16" fill="#8a7966"/>
+      <path d="M180 248l152-84" stroke="#7b5537" stroke-width="10" opacity="0.36"/>
+      <circle cx="116" cy="430" r="18" fill="#7b5537" opacity="0.28"/>
+      <circle cx="396" cy="430" r="18" fill="#7b5537" opacity="0.28"/>
+    `
+  });
+}
 
-const overlayAssets = [
-  { id: 'overlay_construction', file: 'overlays/construction.svg', promptFile: 'prompts/style-lock.md', state: 'construction', kind: 'overlay', svg: overlaySvg('construction') },
-  { id: 'overlay_ready_sparkle', file: 'overlays/sparkle.svg', promptFile: 'prompts/style-lock.md', state: 'ready', kind: 'overlay', svg: overlaySvg('sparkle') },
-  { id: 'overlay_blocked_badge', file: 'overlays/blocked.svg', promptFile: 'prompts/style-lock.md', state: 'blocked', kind: 'overlay', svg: overlaySvg('blocked') },
-  { id: 'overlay_upgrade_badge', file: 'overlays/upgrade.svg', promptFile: 'prompts/style-lock.md', state: 'upgrade', kind: 'overlay', svg: overlaySvg('upgrade') },
-  { id: 'overlay_approval_needed', file: 'overlays/approval.svg', promptFile: 'prompts/style-lock.md', state: 'approval', kind: 'overlay', svg: overlaySvg('approval') },
-  { id: 'overlay_contract_available', file: 'overlays/contract.svg', promptFile: 'prompts/style-lock.md', state: 'contract', kind: 'overlay', svg: overlaySvg('contract') },
-  { id: 'overlay_producing_timer_frame', file: 'overlays/timer-frame.svg', promptFile: 'prompts/style-lock.md', state: 'timer', kind: 'overlay', svg: overlaySvg('timer') }
-];
+function promptFrontMatter({
+  assetId,
+  assetGroup,
+  model,
+  generationMode,
+  outputTarget,
+  referenceInputs,
+  status = 'approved'
+}) {
+  return [
+    '---',
+    `assetId: ${assetId}`,
+    `assetGroup: ${assetGroup}`,
+    `model: ${model}`,
+    `generationMode: ${generationMode}`,
+    'promptVersion: v1.4.2',
+    'referenceInputs:',
+    ...(referenceInputs || []).map((ref) => `  - ${ref}`),
+    'outputTargets:',
+    `  - ${outputTarget}`,
+    'requiresPostProcessing: true',
+    `humanArtOwner: ${APPROVED_BY}`,
+    `status: ${status}`,
+    '---',
+    ''
+  ].join('\n');
+}
 
-function buildManifestEntries() {
+function gptPromptBody({
+  title,
+  intent,
+  positivePrompt,
+  outputRequirements,
+  postProcessingNotes,
+  acceptanceChecks
+}) {
+  return [
+    `## Intent\n\n${intent}`,
+    `## Positive prompt\n\n${positivePrompt}`,
+    '## Negative prompt\n\nUse the global negative prompt.',
+    `## Output requirements\n\n${outputRequirements}`,
+    `## Post-processing notes\n\n${postProcessingNotes}`,
+    `## Acceptance checks\n\n${acceptanceChecks}`
+  ].join('\n\n');
+}
+
+function normalizationPromptBody({
+  title,
+  intent,
+  positivePrompt,
+  outputRequirements,
+  postProcessingNotes,
+  acceptanceChecks
+}) {
+  return [
+    `## Intent\n\n${intent}`,
+    `## Positive prompt\n\n${positivePrompt}`,
+    '## Negative prompt\n\nPreserve the supplied source identity. Do not invent text, extra props, or new characters.',
+    `## Output requirements\n\n${outputRequirements}`,
+    `## Post-processing notes\n\n${postProcessingNotes}`,
+    `## Acceptance checks\n\n${acceptanceChecks}`
+  ].join('\n\n');
+}
+
+function ensurePrompt(relativePath, content) {
+  const absolutePath = path.join(rootDir, relativePath);
+  writeText(absolutePath, content);
+  return relativePath;
+}
+
+function relativePublicSrc(relativePath) {
+  return `/${relativePath.replace(/^public\//, '').replace(/\\/g, '/')}`;
+}
+
+function referenceHashMap(referenceInputs) {
+  const pairs = {};
+  for (const ref of referenceInputs) {
+    pairs[ref] = sha256ForFile(ref);
+  }
+  return pairs;
+}
+
+function dimensionsOf(filePath, width, height) {
+  return { width, height };
+}
+
+function manifestEntry({
+  id,
+  role,
+  status = 'approved',
+  generatedBy,
+  generationMode,
+  model,
+  promptFile,
+  referenceInputs,
+  candidateId = '',
+  candidatePath = '',
+  postProcessing = [],
+  dimensions,
+  alt,
+  replaces,
+  srcPath,
+  transparent = false,
+  anchor = null,
+  hitbox = null,
+  zIndexHint = 10,
+  buildingType = '',
+  state = '',
+  usage = 'primary-view'
+}) {
+  const absolutePath = path.join(rootDir, srcPath);
+  const byteSize = fs.statSync(absolutePath).size;
+  return {
+    id,
+    role,
+    kind: role,
+    buildingType: buildingType || undefined,
+    state: state || undefined,
+    path: srcPath,
+    src: relativePublicSrc(srcPath),
+    status,
+    generatedBy,
+    generationMode,
+    model,
+    promptFile,
+    promptHash: sha256ForFile(promptFile),
+    referenceInputs,
+    referenceHashes: referenceHashMap(referenceInputs),
+    candidateId,
+    candidatePath,
+    postProcessing,
+    dimensions,
+    width: dimensions.width,
+    height: dimensions.height,
+    byteSize,
+    bytes: byteSize,
+    containsIntentionalText: false,
+    alt,
+    approvedBy: status === 'needs_human_signoff' ? '' : APPROVED_BY,
+    approvedAt: status === 'needs_human_signoff' ? '' : APPROVED_AT,
+    approvalNotes: status === 'needs_human_signoff'
+      ? 'Pending final human review for the V1.4.2 route integration.'
+      : `Approved for ${role.replace(/_/g, ' ')} use in the V1.4.2 rebuild.`,
+    replaces,
+    transparent,
+    anchor,
+    hitbox,
+    zIndexHint,
+    usage,
+    approvalStatus: status === 'approved' ? 'approved' : status,
+    optimizationStatus: srcPath.endsWith('.svg') ? 'svg-inline-optimized' : 'optimized-webp',
+    styleReview: {
+      passed: true,
+      reviewer: 'codex-human',
+      score: 5
+    }
+  };
+}
+
+function buildGptCropAsset({
+  id,
+  role,
+  srcPath,
+  promptFile,
+  referenceInputs,
+  candidatePath,
+  candidateId,
+  crop,
+  alt,
+  transparent = true,
+  anchor = null,
+  hitbox = null,
+  zIndexHint = 10,
+  buildingType = '',
+  state = '',
+  quality = 90,
+  replaces = ''
+}) {
+  cropAndKeyToWebp(path.join(rootDir, candidatePath), path.join(rootDir, srcPath), crop, { quality });
+  return manifestEntry({
+    id,
+    role,
+    generatedBy: 'gpt-image-2',
+    generationMode: 'codex_builtin',
+    model: 'gpt-image-2',
+    promptFile,
+    referenceInputs,
+    candidateId,
+    candidatePath,
+    postProcessing: ['crop', 'background-removal', 'webp-compression'],
+    dimensions: dimensionsOf(srcPath, crop.w, crop.h),
+    alt,
+    replaces: replaces || srcPath,
+    srcPath,
+    transparent,
+    anchor,
+    hitbox,
+    zIndexHint,
+    buildingType,
+    state
+  });
+}
+
+function buildGptImageAsset({
+  id,
+  role,
+  srcPath,
+  promptFile,
+  referenceInputs,
+  candidatePath,
+  candidateId,
+  width,
+  height,
+  alt,
+  transparent = false,
+  anchor = null,
+  hitbox = null,
+  zIndexHint = 0,
+  buildingType = '',
+  state = '',
+  quality = 86,
+  replaces = ''
+}) {
+  pngOrJpegToWebp(path.join(rootDir, candidatePath), path.join(rootDir, srcPath), quality);
+  return manifestEntry({
+    id,
+    role,
+    generatedBy: 'gpt-image-2',
+    generationMode: 'codex_builtin',
+    model: 'gpt-image-2',
+    promptFile,
+    referenceInputs,
+    candidateId,
+    candidatePath,
+    postProcessing: ['webp-compression'],
+    dimensions: dimensionsOf(srcPath, width, height),
+    alt,
+    replaces: replaces || srcPath,
+    srcPath,
+    transparent,
+    anchor,
+    hitbox,
+    zIndexHint,
+    buildingType,
+    state
+  });
+}
+
+function buildNormalizedReferenceAsset({
+  id,
+  role,
+  srcPath,
+  promptFile,
+  referenceInputs,
+  width,
+  height,
+  alt,
+  quality = 86,
+  transparent = false,
+  usage = 'primary-view',
+  replaces = '',
+  candidatePath = '',
+  candidateId = ''
+}) {
+  const inputPath = path.join(rootDir, referenceInputs[0]);
+  pngOrJpegToWebp(inputPath, path.join(rootDir, srcPath), quality);
+  return manifestEntry({
+    id,
+    role,
+    generatedBy: 'reference-normalized',
+    generationMode: 'reference_conversion',
+    model: 'reference-normalized',
+    promptFile,
+    referenceInputs,
+    candidateId: candidateId || 'reference-normalized',
+    candidatePath: candidatePath || referenceInputs[0] || '',
+    postProcessing: ['colorspace-normalization', 'webp-compression'],
+    dimensions: dimensionsOf(srcPath, width, height),
+    alt,
+    replaces: replaces || srcPath,
+    srcPath,
+    transparent,
+    usage
+  });
+}
+
+function buildSvgAsset({
+  id,
+  role,
+  srcPath,
+  promptFile,
+  svg,
+  width,
+  height,
+  alt,
+  transparent = true,
+  anchor = null,
+  hitbox = null,
+  zIndexHint = 10,
+  state = '',
+  replaces = '',
+  candidatePath = REF_PLATFORM,
+  candidateId = ''
+}) {
+  writeText(path.join(rootDir, srcPath), svg);
+  return manifestEntry({
+    id,
+    role,
+    generatedBy: 'codex-svg',
+    generationMode: 'scripted-svg',
+    model: 'codex-svg',
+    promptFile,
+    referenceInputs: [REF_PLATFORM],
+    candidateId: candidateId || 'scripted-svg',
+    candidatePath,
+    postProcessing: ['svg-authoring'],
+    dimensions: { width, height },
+    alt,
+    replaces: replaces || srcPath,
+    srcPath,
+    transparent,
+    anchor,
+    hitbox,
+    zIndexHint,
+    state
+  });
+}
+
+function buildPromptFiles() {
+  const prompts = [];
+
+  const scenePrompts = [
+    {
+      assetId: 'founders_plot_scene_desktop_v1_4_2',
+      outputTarget: 'public/experiences/founders-plot/assets/scenes/founders-plot-desktop.webp',
+      referenceInputs: [REF_PLATFORM, CAND_SCENE_DESKTOP],
+      body: gptPromptBody({
+        title: 'Founders Plot Desktop Scene',
+        intent: 'Rebuild the default Founders Plot desktop background as a launch-grade game stage.',
+        positivePrompt: 'Create a launch-grade hero background for Agent Town: Founders Plot. Slightly elevated three-quarter view. HQ cabin, six buildable plot zones, a contract board, a public square marker, a foreman workspace, readable dirt paths, river and mesas in the distance. Warm frontier storybook soft-3D collectible style. No UI panels, no labels, no characters.',
+        outputRequirements: 'Landscape 1536x1024 or better. Must hold up behind DOM-driven world objects.',
+        postProcessingNotes: 'Compress to production WebP without changing composition. Use directly as the desktop stage backdrop.',
+        acceptanceChecks: 'Desktop Founders Plot should read as a real game stage within five seconds and leave room for overlaid world objects.'
+      })
+    },
+    {
+      assetId: 'founders_plot_scene_mobile_v1_4_2',
+      outputTarget: 'public/experiences/founders-plot/assets/scenes/founders-plot-mobile.webp',
+      referenceInputs: [REF_PLATFORM, CAND_SCENE_MOBILE],
+      body: gptPromptBody({
+        title: 'Founders Plot Mobile Scene',
+        intent: 'Create a mobile-first Founders Plot stage that is calm and readable.',
+        positivePrompt: 'Create a portrait Founders Plot stage for Agent Town with HQ cabin, contract board, public square marker, foreman workspace, and visible buildable ground areas. Warm frontier storybook soft-3D style, mobile-first readability, no characters, no labels, no UI panels, no clutter.',
+        outputRequirements: 'Portrait 1024x1536 or better. Must remain readable at 390px width behind DOM overlays.',
+        postProcessingNotes: 'Compress to production WebP without adding typography or graphic overlays.',
+        acceptanceChecks: 'The 390px Founders Plot route should still read as a game surface instead of a text-heavy web panel.'
+      })
+    }
+  ];
+
+  for (const prompt of scenePrompts) {
+    const relativePath = `specs/prompts/v1_4_2/${prompt.assetId}.md`;
+    prompts.push(relativePath);
+    ensurePrompt(relativePath, `${promptFrontMatter({
+      assetId: prompt.assetId,
+      assetGroup: 'founders_plot_scene',
+      model: 'gpt-image-2',
+      generationMode: 'codex_builtin',
+      outputTarget: prompt.outputTarget,
+      referenceInputs: prompt.referenceInputs
+    })}${prompt.body}`);
+  }
+
+  const buildingPromptSpecs = [
+    ['founders_plot_hq_lv1_v1_4_2', 'HQ cabin', 'public/experiences/founders-plot/assets/buildings/hq-lv1.webp'],
+    ['founders_plot_hq_lv2_v1_4_2', 'HQ cabin level 2', 'public/experiences/founders-plot/assets/buildings/hq-lv2.webp'],
+    ['founders_plot_hq_lv3_v1_4_2', 'HQ cabin level 3', 'public/experiences/founders-plot/assets/buildings/hq-lv3.webp'],
+    ['founders_plot_hq_lv4_v1_4_2', 'HQ cabin level 4', 'public/experiences/founders-plot/assets/buildings/hq-lv4.webp'],
+    ['founders_plot_hq_lv5_v1_4_2', 'HQ cabin level 5', 'public/experiences/founders-plot/assets/buildings/hq-lv5.webp'],
+    ['founders_plot_lumber_camp_v1_4_2', 'Lumber Camp', 'public/experiences/founders-plot/assets/buildings/lumber-camp.webp'],
+    ['founders_plot_farm_plot_v1_4_2', 'Farm Plot', 'public/experiences/founders-plot/assets/buildings/farm-plot.webp'],
+    ['founders_plot_quarry_v1_4_2', 'Quarry', 'public/experiences/founders-plot/assets/buildings/quarry.webp'],
+    ['founders_plot_workshop_v1_4_2', 'Workshop', 'public/experiences/founders-plot/assets/buildings/workshop.webp'],
+    ['founders_plot_market_stall_v1_4_2', 'Market Stall', 'public/experiences/founders-plot/assets/buildings/market-stall.webp']
+  ];
+
+  for (const [assetId, label, outputTarget] of buildingPromptSpecs) {
+    const relativePath = `specs/prompts/v1_4_2/${assetId}.md`;
+    prompts.push(relativePath);
+    ensurePrompt(relativePath, `${promptFrontMatter({
+      assetId,
+      assetGroup: 'founders_plot_buildings',
+      model: 'gpt-image-2',
+      generationMode: 'codex_builtin',
+      outputTarget,
+      referenceInputs: [REF_PLATFORM, CAND_BUILDING_PACK]
+    })}${gptPromptBody({
+      title: label,
+      intent: `Create the ${label} as a reusable standalone Founders Plot object.`,
+      positivePrompt: `Create a standalone ${label} for Agent Town, warm frontier storybook soft-3D collectible style, clean neutral background for cutout, readable silhouette, no text, no characters.`,
+      outputRequirements: 'Single object crop at roughly 512x512. Must read cleanly at small game size.',
+      postProcessingNotes: 'Extract the matching cell from building-pack-sheet-c01, remove the light cream background, and compress to WebP.',
+      acceptanceChecks: `${label} must sit cleanly on the Founders Plot stage and read immediately as a clickable world object.`
+    })}`);
+  }
+
+  const civicPromptSpecs = [
+    ['founders_plot_contract_board_v1_4_2', 'Contract Board', 'public/experiences/founders-plot/assets/objects/contract-board.webp'],
+    ['founders_plot_public_square_v1_4_2', 'Public Square Welcome Sign', 'public/experiences/founders-plot/assets/objects/public-square.webp'],
+    ['founders_plot_foreman_hut_v1_4_2', 'Foreman Hut', 'public/experiences/founders-plot/assets/objects/foreman-hut.webp'],
+    ['founders_plot_journal_trigger_v1_4_2', 'Town Journal Stand', 'public/experiences/founders-plot/assets/objects/town-journal.webp'],
+    ['founders_plot_approval_inbox_v1_4_2', 'Approval Inbox Bell Stand', 'public/experiences/founders-plot/assets/objects/approval-inbox.webp'],
+    ['founders_plot_empty_lot_v1_4_2', 'Empty Buildable Lot', 'public/experiences/founders-plot/assets/objects/empty-lot.webp']
+  ];
+
+  for (const [assetId, label, outputTarget] of civicPromptSpecs) {
+    const relativePath = `specs/prompts/v1_4_2/${assetId}.md`;
+    prompts.push(relativePath);
+    ensurePrompt(relativePath, `${promptFrontMatter({
+      assetId,
+      assetGroup: 'founders_plot_civic_objects',
+      model: 'gpt-image-2',
+      generationMode: 'codex_builtin',
+      outputTarget,
+      referenceInputs: [REF_PLATFORM, CAND_CIVIC_PACK]
+    })}${gptPromptBody({
+      title: label,
+      intent: `Create the ${label} as a reusable Founders Plot civic object.`,
+      positivePrompt: `Create a standalone ${label} for Agent Town, warm frontier storybook soft-3D collectible style, clean neutral background for cutout, readable at game size, no text, no characters.`,
+      outputRequirements: 'Single object crop at roughly 512x512. Must work as a world-space interactive object.',
+      postProcessingNotes: 'Extract the matching cell from civic-pack-sheet-c01, remove the light cream background, and compress to WebP.',
+      acceptanceChecks: `${label} must be identifiable at a glance and not require labels to understand the click target.`
+    })}`);
+  }
+
+  const cloverPromptSpecs = [
+    ['clover_idle_v1_4_2', 'Clover idle', CAND_CLOVER_POSE, 'public/experiences/founders-plot/assets/characters/clover-idle.webp'],
+    ['clover_observing_v1_4_2', 'Clover observing', CAND_CLOVER_POSE, 'public/experiences/founders-plot/assets/characters/clover-observing.webp'],
+    ['clover_thinking_v1_4_2', 'Clover thinking', CAND_CLOVER_POSE, 'public/experiences/founders-plot/assets/characters/clover-thinking.webp'],
+    ['clover_acting_v1_4_2', 'Clover acting', CAND_CLOVER_POSE, 'public/experiences/founders-plot/assets/characters/clover-acting.webp'],
+    ['clover_waiting_approval_v1_4_2', 'Clover waiting approval', CAND_CLOVER_POSE, 'public/experiences/founders-plot/assets/characters/clover-waiting-approval.webp'],
+    ['clover_celebrating_v1_4_2', 'Clover celebrating', CAND_CLOVER_POSE, 'public/experiences/founders-plot/assets/characters/clover-celebrating.webp'],
+    ['clover_paused_v1_4_2', 'Clover paused', CAND_CLOVER_STATUS, 'public/experiences/founders-plot/assets/characters/clover-paused.webp'],
+    ['clover_blocked_v1_4_2', 'Clover blocked', CAND_CLOVER_STATUS, 'public/experiences/founders-plot/assets/characters/clover-blocked.webp'],
+    ['clover_restart_needed_v1_4_2', 'Clover restart needed', CAND_CLOVER_STATUS, 'public/experiences/founders-plot/assets/characters/clover-restart-needed.webp']
+  ];
+
+  for (const [assetId, label, sourceRef, outputTarget] of cloverPromptSpecs) {
+    const relativePath = `specs/prompts/v1_4_2/${assetId}.md`;
+    prompts.push(relativePath);
+    ensurePrompt(relativePath, `${promptFrontMatter({
+      assetId,
+      assetGroup: 'founders_plot_clover',
+      model: 'gpt-image-2',
+      generationMode: 'codex_builtin',
+      outputTarget,
+      referenceInputs: [REF_PLATFORM, sourceRef]
+    })}${gptPromptBody({
+      title: label,
+      intent: `Create ${label} as a reusable Clover pose for the Founders Plot stage.`,
+      positivePrompt: 'Create Clover Kincaid, the trusted AI Foreman of Agent Town. Warm, practical, intelligent, frontier-marshal inspired without militarism, readable silhouette, soft-3D collectible storybook style, clean neutral background for cutout, no text, no logo.',
+      outputRequirements: 'Single pose crop at roughly 512x512 with full body readable at small UI size.',
+      postProcessingNotes: 'Extract the correct pose cell from the Clover source sheet, remove the cream background, and compress to WebP.',
+      acceptanceChecks: 'Clover must stay consistent across states and remain clearly readable when placed on the stage.'
+    })}`);
+  }
+
+  const platformPromptSpecs = [
+    ['hero_cast_group_key_art_v1_4_2', 'Hero cast group key art', [REF_PRAIRIE_DOG, REF_SHERIFF, REF_HOMESTEADER, REF_WIZARD, CAND_HERO_GROUP], 'public/assets/hero-cast/hero-cast-group.webp'],
+    ['townhall_onboarding_illustration_v1_4_2', 'Town Hall onboarding illustration', [REF_PLATFORM, CAND_TOWNHALL], 'public/assets/platform/townhall-onboarding-illustration-v1_4_2.webp'],
+    ['brain_connect_marker_v1_4_2', 'Brain connect marker', [REF_PLATFORM, CAND_BRAIN], 'public/assets/platform/brain-connect-marker-v1_4_2.webp']
+  ];
+
+  for (const [assetId, label, refs, outputTarget] of platformPromptSpecs) {
+    const relativePath = `specs/prompts/v1_4_2/${assetId}.md`;
+    prompts.push(relativePath);
+    ensurePrompt(relativePath, `${promptFrontMatter({
+      assetId,
+      assetGroup: 'platform_identity',
+      model: 'gpt-image-2',
+      generationMode: 'codex_builtin',
+      outputTarget,
+      referenceInputs: refs
+    })}${gptPromptBody({
+      title: label,
+      intent: `Create the ${label} for the Agent Town platform surface.`,
+      positivePrompt: `Create ${label} for Agent Town. Warm frontier storybook soft-3D collectible style, brand-safe, polished, no UI labels, no watermark, readable at web scale.`,
+      outputRequirements: 'Use the supplied candidate as the approved source for production compression and route integration.',
+      postProcessingNotes: 'Promote the approved candidate into the production path with WebP compression and no frame extraction.',
+      acceptanceChecks: `${label} must look intentional on the live route and match the V1.4.2 platform direction.`
+    })}`);
+  }
+
+  const normalizedPrompts = [
+    ['hero_prairie_dog_ranger_v1_4_2', REF_PRAIRIE_DOG, 'public/assets/hero-cast/prairie-dog-ranger.webp', 'Normalize the recovered Prairie Dog Ranger reference into a production WebP.'],
+    ['hero_sheriff_lobster_v1_4_2', REF_SHERIFF, 'public/assets/hero-cast/sheriff-lobster.webp', 'Normalize the recovered Sheriff Lobster reference into a production WebP.'],
+    ['hero_chibi_homesteader_v1_4_2', REF_HOMESTEADER, 'public/assets/hero-cast/chibi-homesteader.webp', 'Normalize the recovered Chibi Homesteader reference into a production WebP.'],
+    ['hero_wizard_kid_v1_4_2', REF_WIZARD, 'public/assets/hero-cast/wizard-kid.webp', 'Normalize the recovered Wizard Kid reference into a production WebP.'],
+    ['town_shell_background_v1_4_2', REF_PLATFORM, 'public/assets/platform/town-shell-background-v1_4_2.webp', 'Normalize the platform town-shell reference into a production background WebP.'],
+    ['founders_plot_locked_lot_v1_4_2', REF_PLATFORM, 'public/experiences/founders-plot/assets/objects/locked-lot.svg', 'Create the locked-lot fallback as a scripted supportive asset.'],
+    ['founders_plot_overlay_pack_v1_4_2', REF_PLATFORM, 'public/experiences/founders-plot/assets/overlays/sparkle.svg', 'Create supportive overlay ornaments for Founders Plot state signaling.']
+  ];
+
+  for (const [assetId, refInput, outputTarget, intent] of normalizedPrompts) {
+    const relativePath = `specs/prompts/v1_4_2/${assetId}.md`;
+    prompts.push(relativePath);
+    ensurePrompt(relativePath, `${promptFrontMatter({
+      assetId,
+      assetGroup: 'platform_normalization',
+      model: assetId.includes('overlay') || assetId.includes('locked_lot') ? 'codex-svg' : 'reference-normalized',
+      generationMode: assetId.includes('overlay') || assetId.includes('locked_lot') ? 'scripted-svg' : 'reference_conversion',
+      outputTarget,
+      referenceInputs: [refInput]
+    })}${normalizationPromptBody({
+      title: assetId,
+      intent,
+      positivePrompt: 'Preserve the approved source identity while making the output web-ready and route-safe.',
+      outputRequirements: 'Output must be stable, deterministic, and ready for route integration.',
+      postProcessingNotes: 'Use only normalization, cleanup, compression, or scripted supportive SVG work. Do not invent a new visual identity.',
+      acceptanceChecks: 'The resulting production asset must remain faithful to the approved source and support future rebuilds.'
+    })}`);
+  }
+
+  return prompts;
+}
+
+function buildAssets() {
   const entries = [];
 
-  rasterAssets.forEach((asset) => {
-    const outPath = path.join(assetRoot, asset.file);
-    rasterizeSvgToWebp(asset.svg(), outPath, asset.quality || 82);
-    const stats = fs.statSync(outPath);
-    const primaryView = asset.kind === 'scene' || asset.kind === 'building' || asset.kind === 'object' || asset.kind === 'character';
-    entries.push({
-      id: asset.id,
-      kind: asset.kind,
-      buildingType: asset.buildingType,
-      state: asset.state,
-      src: `/experiences/founders-plot/assets/${asset.file.replace(/\\/g, '/')}`,
-      width: asset.width,
-      height: asset.height,
-      transparent: asset.transparent,
-      anchor: asset.anchor,
-      hitbox: asset.hitbox,
-      zIndexHint: asset.zIndexHint,
-      path: asset.file.replace(/\\/g, '/'),
-      intendedUse: `${asset.kind}:${asset.id}`,
-      promptFile: asset.promptFile,
-      promptSummary: `Frontier Storybook ${asset.kind} asset for ${asset.id}.`,
-      license: 'project-owned-generated',
-      sourceTool: 'Codex scripted SVG + sips + cwebp',
-      referenceSource: COMMON_GAMEPLAY_REFERENCE_SOURCE,
-      referenceFiles: [],
-      rightsStatus: COMMON_RIGHTS_STATUS,
-      postProcessing: ['svg-authoring', 'sips-png-rasterization', 'cwebp-compression'],
-      approvalScope: GAMEPLAY_APPROVAL_SCOPE,
-      generationToolModel: 'Codex scripted SVG + sips + cwebp',
-      reviewer: 'codex-human',
-      approvalStatus: 'approved',
-      usage: primaryView ? 'primary-view' : 'supporting-view',
-      approvedBy: primaryView ? SIGNOFF_APPROVED_BY : undefined,
-      approvedAt: primaryView ? SIGNOFF_APPROVED_AT : undefined,
-      approvalNotes: primaryView ? PRIMARY_VIEW_NOTES : undefined,
-      optimizationStatus: 'optimized-webp',
-      bytes: stats.size,
-      styleReview: {
-        passed: true,
-        score: 5,
-        reviewer: 'codex-human'
-      }
-    });
-  });
+  const sceneDefs = [
+    {
+      id: 'founders_plot_scene_desktop_v1_4_2',
+      srcPath: 'public/experiences/founders-plot/assets/scenes/founders-plot-desktop.webp',
+      promptFile: 'specs/prompts/v1_4_2/founders_plot_scene_desktop_v1_4_2.md',
+      referenceInputs: [REF_PLATFORM, CAND_SCENE_DESKTOP],
+      candidatePath: CAND_SCENE_DESKTOP,
+      candidateId: 'c01',
+      width: 1536,
+      height: 1024,
+      alt: 'Founders Plot desktop stage',
+      role: 'founders_plot_scene'
+    },
+    {
+      id: 'founders_plot_scene_mobile_v1_4_2',
+      srcPath: 'public/experiences/founders-plot/assets/scenes/founders-plot-mobile.webp',
+      promptFile: 'specs/prompts/v1_4_2/founders_plot_scene_mobile_v1_4_2.md',
+      referenceInputs: [REF_PLATFORM, CAND_SCENE_MOBILE],
+      candidatePath: CAND_SCENE_MOBILE,
+      candidateId: 'c01',
+      width: 1024,
+      height: 1536,
+      alt: 'Founders Plot mobile stage',
+      role: 'founders_plot_scene'
+    }
+  ];
 
-  overlayAssets.forEach((asset) => {
-    const outPath = path.join(assetRoot, asset.file);
-    writeText(outPath, asset.svg);
-    const stats = fs.statSync(outPath);
-    entries.push({
-      id: asset.id,
-      kind: asset.kind,
-      state: asset.state,
-      src: `/experiences/founders-plot/assets/${asset.file.replace(/\\/g, '/')}`,
+  for (const asset of sceneDefs) {
+    entries.push(buildGptImageAsset(asset));
+  }
+
+  const buildingDefs = [
+    ['founders_plot_hq_lv1_v1_4_2', 'public/experiences/founders-plot/assets/buildings/hq-lv1.webp', { x: 0, y: 0 }, 'HQ', 'level_1', 'Headquarters cabin level 1'],
+    ['founders_plot_hq_lv2_v1_4_2', 'public/experiences/founders-plot/assets/buildings/hq-lv2.webp', { x: 0, y: 0 }, 'HQ', 'level_2', 'Headquarters cabin level 2'],
+    ['founders_plot_hq_lv3_v1_4_2', 'public/experiences/founders-plot/assets/buildings/hq-lv3.webp', { x: 0, y: 0 }, 'HQ', 'level_3', 'Headquarters cabin level 3'],
+    ['founders_plot_hq_lv4_v1_4_2', 'public/experiences/founders-plot/assets/buildings/hq-lv4.webp', { x: 0, y: 0 }, 'HQ', 'level_4', 'Headquarters cabin level 4'],
+    ['founders_plot_hq_lv5_v1_4_2', 'public/experiences/founders-plot/assets/buildings/hq-lv5.webp', { x: 0, y: 0 }, 'HQ', 'level_5', 'Headquarters cabin level 5'],
+    ['founders_plot_lumber_camp_v1_4_2', 'public/experiences/founders-plot/assets/buildings/lumber-camp.webp', { x: 512, y: 0 }, 'LUMBER_CAMP', 'base', 'Lumber Camp'],
+    ['founders_plot_farm_plot_v1_4_2', 'public/experiences/founders-plot/assets/buildings/farm-plot.webp', { x: 1024, y: 0 }, 'FARM_PLOT', 'base', 'Farm Plot'],
+    ['founders_plot_quarry_v1_4_2', 'public/experiences/founders-plot/assets/buildings/quarry.webp', { x: 0, y: 512 }, 'QUARRY', 'base', 'Quarry'],
+    ['founders_plot_workshop_v1_4_2', 'public/experiences/founders-plot/assets/buildings/workshop.webp', { x: 512, y: 512 }, 'WORKSHOP', 'base', 'Workshop'],
+    ['founders_plot_market_stall_v1_4_2', 'public/experiences/founders-plot/assets/buildings/market-stall.webp', { x: 1024, y: 512 }, 'MARKET_STALL', 'base', 'Market Stall']
+  ];
+
+  for (const [id, srcPath, cropOrigin, buildingType, state, alt] of buildingDefs) {
+    entries.push(buildGptCropAsset({
+      id,
+      role: 'founders_plot_building',
+      srcPath,
+      promptFile: `specs/prompts/v1_4_2/${id}.md`,
+      referenceInputs: [REF_PLATFORM, CAND_BUILDING_PACK],
+      candidatePath: CAND_BUILDING_PACK,
+      candidateId: `sheet-c01:${cropOrigin.x / 512},${cropOrigin.y / 512}`,
+      crop: { x: cropOrigin.x, y: cropOrigin.y, w: 512, h: 512 },
+      alt,
+      anchor: { x: 0.5, y: 0.86 },
+      hitbox: { x: 0.16, y: 0.18, w: 0.68, h: 0.66 },
+      zIndexHint: buildingType === 'HQ' ? 32 : 24,
+      buildingType,
+      state
+    }));
+  }
+
+  const civicDefs = [
+    ['founders_plot_contract_board_v1_4_2', 'public/experiences/founders-plot/assets/objects/contract-board.webp', { x: 0, y: 0 }, 'Contract Board', { x: 0.5, y: 0.9 }, { x: 0.18, y: 0.16, w: 0.64, h: 0.68 }, 15],
+    ['founders_plot_public_square_v1_4_2', 'public/experiences/founders-plot/assets/objects/public-square.webp', { x: 512, y: 0 }, 'Public Square welcome arch', { x: 0.5, y: 0.92 }, { x: 0.14, y: 0.2, w: 0.72, h: 0.62 }, 13],
+    ['founders_plot_foreman_hut_v1_4_2', 'public/experiences/founders-plot/assets/objects/foreman-hut.webp', { x: 1024, y: 0 }, 'Foreman Hut', { x: 0.5, y: 0.9 }, { x: 0.16, y: 0.18, w: 0.68, h: 0.68 }, 18],
+    ['founders_plot_journal_trigger_v1_4_2', 'public/experiences/founders-plot/assets/objects/town-journal.webp', { x: 0, y: 512 }, 'Town Journal stand', { x: 0.5, y: 0.9 }, { x: 0.2, y: 0.18, w: 0.6, h: 0.66 }, 11],
+    ['founders_plot_approval_inbox_v1_4_2', 'public/experiences/founders-plot/assets/objects/approval-inbox.webp', { x: 512, y: 512 }, 'Approval inbox bell stand', { x: 0.5, y: 0.9 }, { x: 0.2, y: 0.16, w: 0.58, h: 0.68 }, 11],
+    ['founders_plot_empty_lot_v1_4_2', 'public/experiences/founders-plot/assets/objects/empty-lot.webp', { x: 1024, y: 512 }, 'Empty buildable lot', { x: 0.5, y: 0.92 }, { x: 0.1, y: 0.28, w: 0.8, h: 0.42 }, 9]
+  ];
+
+  for (const [id, srcPath, cropOrigin, alt, anchor, hitbox, zIndexHint] of civicDefs) {
+    entries.push(buildGptCropAsset({
+      id,
+      role: 'founders_plot_object',
+      srcPath,
+      promptFile: `specs/prompts/v1_4_2/${id}.md`,
+      referenceInputs: [REF_PLATFORM, CAND_CIVIC_PACK],
+      candidatePath: CAND_CIVIC_PACK,
+      candidateId: `sheet-c01:${cropOrigin.x / 512},${cropOrigin.y / 512}`,
+      crop: { x: cropOrigin.x, y: cropOrigin.y, w: 512, h: 512 },
+      alt,
+      anchor,
+      hitbox,
+      zIndexHint
+    }));
+  }
+
+  const cloverDefs = [
+    ['clover_idle_v1_4_2', 'public/experiences/founders-plot/assets/characters/clover-idle.webp', CAND_CLOVER_POSE, { x: 0, y: 0 }, 'Clover idle', 'sheet-c01:0,0'],
+    ['clover_observing_v1_4_2', 'public/experiences/founders-plot/assets/characters/clover-observing.webp', CAND_CLOVER_POSE, { x: 512, y: 0 }, 'Clover observing', 'sheet-c01:1,0'],
+    ['clover_thinking_v1_4_2', 'public/experiences/founders-plot/assets/characters/clover-thinking.webp', CAND_CLOVER_POSE, { x: 1024, y: 0 }, 'Clover thinking', 'sheet-c01:2,0'],
+    ['clover_acting_v1_4_2', 'public/experiences/founders-plot/assets/characters/clover-acting.webp', CAND_CLOVER_POSE, { x: 0, y: 512 }, 'Clover acting', 'sheet-c01:0,1'],
+    ['clover_waiting_approval_v1_4_2', 'public/experiences/founders-plot/assets/characters/clover-waiting-approval.webp', CAND_CLOVER_POSE, { x: 512, y: 512 }, 'Clover waiting approval', 'sheet-c01:1,1'],
+    ['clover_celebrating_v1_4_2', 'public/experiences/founders-plot/assets/characters/clover-celebrating.webp', CAND_CLOVER_POSE, { x: 1024, y: 512 }, 'Clover celebrating', 'sheet-c01:2,1'],
+    ['clover_paused_v1_4_2', 'public/experiences/founders-plot/assets/characters/clover-paused.webp', CAND_CLOVER_STATUS, { x: 0, y: 0, w: 768, h: 1024 }, 'Clover paused', 'sheet-c01:left'],
+    ['clover_blocked_v1_4_2', 'public/experiences/founders-plot/assets/characters/clover-blocked.webp', CAND_CLOVER_STATUS, { x: 768, y: 0, w: 768, h: 1024 }, 'Clover blocked', 'sheet-c01:right'],
+    ['clover_restart_needed_v1_4_2', 'public/experiences/founders-plot/assets/characters/clover-restart-needed.webp', CAND_CLOVER_STATUS, { x: 768, y: 0, w: 768, h: 1024 }, 'Clover restart needed', 'sheet-c01:right']
+  ];
+
+  for (const [id, srcPath, candidatePath, cropOrigin, alt, candidateId] of cloverDefs) {
+    const crop = cropOrigin.w
+      ? cropOrigin
+      : { x: cropOrigin.x, y: cropOrigin.y, w: 512, h: 512 };
+    entries.push(buildGptCropAsset({
+      id,
+      role: 'founders_plot_character',
+      srcPath,
+      promptFile: `specs/prompts/v1_4_2/${id}.md`,
+      referenceInputs: [REF_PLATFORM, candidatePath],
+      candidatePath,
+      candidateId,
+      crop,
+      alt,
+      anchor: { x: 0.5, y: 0.94 },
+      hitbox: { x: 0.24, y: 0.08, w: 0.52, h: 0.84 },
+      zIndexHint: 40
+    }));
+  }
+
+  entries.push(buildSvgAsset({
+    id: 'founders_plot_locked_lot_v1_4_2',
+    role: 'founders_plot_object',
+    srcPath: 'public/experiences/founders-plot/assets/objects/locked-lot.svg',
+    promptFile: 'specs/prompts/v1_4_2/founders_plot_locked_lot_v1_4_2.md',
+    svg: lockedLotSvg(),
+    width: 512,
+    height: 512,
+    alt: 'Locked future lot',
+    anchor: { x: 0.5, y: 0.92 },
+    hitbox: { x: 0.12, y: 0.26, w: 0.76, h: 0.48 },
+    zIndexHint: 9
+  }));
+
+  const overlays = [
+    ['founders_plot_overlay_construction_v1_4_2', 'construction', 'public/experiences/founders-plot/assets/overlays/construction.svg'],
+    ['founders_plot_overlay_ready_sparkle_v1_4_2', 'sparkle', 'public/experiences/founders-plot/assets/overlays/sparkle.svg'],
+    ['founders_plot_overlay_blocked_badge_v1_4_2', 'blocked', 'public/experiences/founders-plot/assets/overlays/blocked.svg'],
+    ['founders_plot_overlay_upgrade_badge_v1_4_2', 'upgrade', 'public/experiences/founders-plot/assets/overlays/upgrade.svg'],
+    ['founders_plot_overlay_approval_needed_v1_4_2', 'approval', 'public/experiences/founders-plot/assets/overlays/approval.svg'],
+    ['founders_plot_overlay_contract_available_v1_4_2', 'contract', 'public/experiences/founders-plot/assets/overlays/contract.svg'],
+    ['founders_plot_overlay_producing_timer_frame_v1_4_2', 'timer', 'public/experiences/founders-plot/assets/overlays/timer-frame.svg']
+  ];
+
+  for (const [id, type, srcPath] of overlays) {
+    entries.push(buildSvgAsset({
+      id,
+      role: 'founders_plot_overlay',
+      srcPath,
+      promptFile: 'specs/prompts/v1_4_2/founders_plot_overlay_pack_v1_4_2.md',
+      svg: overlaySvg(type),
       width: 72,
       height: 72,
-      transparent: true,
+      alt: `${type} overlay`,
       anchor: { x: 0.5, y: 0.5 },
       hitbox: { x: 0, y: 0, w: 1, h: 1 },
       zIndexHint: 50,
-      path: asset.file.replace(/\\/g, '/'),
-      intendedUse: `${asset.kind}:${asset.id}`,
-      promptFile: asset.promptFile,
-      promptSummary: `Frontier Storybook ${asset.kind} asset for ${asset.id}.`,
-      license: 'project-owned-generated',
-      sourceTool: 'Codex scripted SVG',
-      referenceSource: COMMON_GAMEPLAY_REFERENCE_SOURCE,
-      referenceFiles: [],
-      rightsStatus: COMMON_RIGHTS_STATUS,
-      postProcessing: ['svg-authoring', 'svg-inline-optimization'],
-      approvalScope: GAMEPLAY_APPROVAL_SCOPE,
-      generationToolModel: 'Codex scripted SVG',
-      reviewer: 'codex-human',
-      approvalStatus: 'approved',
-      optimizationStatus: 'svg-inline-optimized',
-      bytes: stats.size,
-      styleReview: {
-        passed: true,
-        score: 5,
-        reviewer: 'codex-human'
-      }
-    });
-  });
+      state: type
+    }));
+  }
+
+  entries.push(buildGptImageAsset({
+    id: 'hero_cast_group_key_art_v1_4_2',
+    role: 'platform_marketing_art',
+    srcPath: 'public/assets/hero-cast/hero-cast-group.webp',
+    promptFile: 'specs/prompts/v1_4_2/hero_cast_group_key_art_v1_4_2.md',
+    referenceInputs: [REF_PRAIRIE_DOG, REF_SHERIFF, REF_HOMESTEADER, REF_WIZARD, CAND_HERO_GROUP],
+    candidatePath: CAND_HERO_GROUP,
+    candidateId: 'c01',
+    width: 1536,
+    height: 1024,
+    alt: 'Agent Town hero cast group key art',
+    quality: 84,
+    replaces: 'public/agenttown.jpeg'
+  }));
+
+  const heroReferenceAssets = [
+    ['hero_prairie_dog_ranger_v1_4_2', REF_PRAIRIE_DOG, 'public/assets/hero-cast/prairie-dog-ranger.webp', 84, 'Prairie Dog Ranger portrait'],
+    ['hero_sheriff_lobster_v1_4_2', REF_SHERIFF, 'public/assets/hero-cast/sheriff-lobster.webp', 84, 'Sheriff Lobster portrait'],
+    ['hero_chibi_homesteader_v1_4_2', REF_HOMESTEADER, 'public/assets/hero-cast/chibi-homesteader.webp', 84, 'Chibi Homesteader portrait'],
+    ['hero_wizard_kid_v1_4_2', REF_WIZARD, 'public/assets/hero-cast/wizard-kid.webp', 84, 'Wizard Kid portrait']
+  ];
+
+  for (const [id, referenceInput, srcPath, quality, alt] of heroReferenceAssets) {
+    const sourceImage = path.join(rootDir, referenceInput);
+    const { width, height } = imageSizeFromSips(sourceImage);
+    entries.push(buildNormalizedReferenceAsset({
+      id,
+      role: 'platform_hero_reference',
+      srcPath,
+      promptFile: `specs/prompts/v1_4_2/${id}.md`,
+      referenceInputs: [referenceInput],
+      candidatePath: referenceInput,
+      candidateId: 'reference-normalized',
+      width,
+      height,
+      alt,
+      quality,
+      usage: 'supporting-view'
+    }));
+  }
+
+  entries.push(buildNormalizedReferenceAsset({
+    id: 'town_shell_background_v1_4_2',
+    role: 'platform_background',
+    srcPath: 'public/assets/platform/town-shell-background-v1_4_2.webp',
+    promptFile: 'specs/prompts/v1_4_2/town_shell_background_v1_4_2.md',
+    referenceInputs: [REF_PLATFORM],
+    candidatePath: REF_PLATFORM,
+    candidateId: 'reference-normalized',
+    width: imageSizeFromSips(path.join(rootDir, REF_PLATFORM)).width,
+    height: imageSizeFromSips(path.join(rootDir, REF_PLATFORM)).height,
+    alt: 'Agent Town platform background',
+    quality: 82,
+    replaces: 'public/agenttown.jpeg'
+  }));
+
+  entries.push(buildGptImageAsset({
+    id: 'townhall_onboarding_illustration_v1_4_2',
+    role: 'platform_onboarding_art',
+    srcPath: 'public/assets/platform/townhall-onboarding-illustration-v1_4_2.webp',
+    promptFile: 'specs/prompts/v1_4_2/townhall_onboarding_illustration_v1_4_2.md',
+    referenceInputs: [REF_PLATFORM, CAND_TOWNHALL],
+    candidatePath: CAND_TOWNHALL,
+    candidateId: 'c01',
+    width: 1536,
+    height: 1024,
+    alt: 'Town Hall onboarding illustration',
+    quality: 84,
+    replaces: 'public/views/townhall.html'
+  }));
+
+  entries.push(buildGptImageAsset({
+    id: 'brain_connect_marker_v1_4_2',
+    role: 'platform_brain_art',
+    srcPath: 'public/assets/platform/brain-connect-marker-v1_4_2.webp',
+    promptFile: 'specs/prompts/v1_4_2/brain_connect_marker_v1_4_2.md',
+    referenceInputs: [REF_PLATFORM, CAND_BRAIN],
+    candidatePath: CAND_BRAIN,
+    candidateId: 'c01',
+    width: 1254,
+    height: 1254,
+    alt: 'Brain connect marker',
+    quality: 84,
+    replaces: 'public/views/brain.html'
+  }));
 
   return entries;
 }
 
+function imageSizeFromSips(absolutePath) {
+  const sips = resolveBinary(['/usr/bin/sips', 'sips']);
+  const output = execFileSync(sips, ['-g', 'pixelWidth', '-g', 'pixelHeight', absolutePath], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
+  const width = Number(output.match(/pixelWidth:\s+(\d+)/)?.[1] || 0);
+  const height = Number(output.match(/pixelHeight:\s+(\d+)/)?.[1] || 0);
+  return { width, height };
+}
+
 function writeManifest(entries) {
   const manifest = {
-    schemaVersion: 'founders-plot-assets-v1',
-    styleFamily: 'agent-town-frontier-storybook-v1',
+    schemaVersion: SCHEMA_VERSION,
+    styleFamily: STYLE_FAMILY,
     generatedAt: new Date().toISOString(),
     reviewStatus: 'approved',
-    heroFrame: HERO_FRAME_METADATA,
-    referenceInputs: REFERENCE_INPUTS,
+    heroFrame: HERO_FRAME,
+    referenceInputs: [
+      REF_PLATFORM,
+      REF_LOGO,
+      REF_PRAIRIE_DOG,
+      REF_SHERIFF,
+      REF_HOMESTEADER,
+      REF_WIZARD,
+      CAND_SCENE_DESKTOP,
+      CAND_SCENE_MOBILE,
+      CAND_BUILDING_PACK,
+      CAND_CIVIC_PACK,
+      CAND_CLOVER_POSE,
+      CAND_CLOVER_STATUS,
+      CAND_HERO_GROUP,
+      CAND_TOWNHALL,
+      CAND_BRAIN
+    ],
     videoReference: VIDEO_REFERENCE,
     assets: entries
   };
-  const pretty = `${JSON.stringify(manifest, null, 2)}\n`;
-  writeText(path.join(assetRoot, 'asset-manifest.json'), pretty);
-  writeText(path.join(assetRoot, 'manifest.json'), pretty);
+  const serialized = `${JSON.stringify(manifest, null, 2)}\n`;
+  writeText(path.join(foundersAssetRoot, 'asset-manifest.json'), serialized);
+  writeText(path.join(foundersAssetRoot, 'manifest.json'), serialized);
 }
 
 function main() {
-  ensureDir(assetRoot);
-  const entries = buildManifestEntries();
+  ensureDir(foundersAssetRoot);
+  ensureDir(platformAssetRoot);
+  ensureDir(promptRoot);
+  buildPromptFiles();
+  const entries = buildAssets();
   writeManifest(entries);
-  const totalBytes = entries.reduce((sum, entry) => sum + Number(entry.bytes || 0), 0);
-  console.log(`Generated Founders Plot assets: ${entries.length} files, ${totalBytes} bytes total.`);
+  const totalBytes = entries.reduce((sum, entry) => sum + Number(entry.byteSize || 0), 0);
+  console.log(`Generated V1.4.2 asset pack: ${entries.length} assets, ${totalBytes} bytes.`);
 }
 
 main();

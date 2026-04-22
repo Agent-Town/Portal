@@ -5,6 +5,7 @@ const { test, expect } = require('@playwright/test');
 const repoRoot = path.resolve(__dirname, '..');
 const manifestPath = path.join(repoRoot, 'public/experiences/founders-plot/assets/asset-manifest.json');
 const heroDir = path.join(repoRoot, 'e2e/162_founders_plot_full_route_player_surface.spec.js-snapshots');
+const ALLOWED_GENERATORS = ['gpt-image-2', 'codex-svg', 'reference-normalized'];
 
 test('primary-view assets carry human approval metadata and hero-frame signoff metadata', async () => {
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
@@ -18,12 +19,15 @@ test('primary-view assets carry human approval metadata and hero-frame signoff m
   expect(manifest?.videoReference?.frameExtractionRequired).toBe(false);
   primaryViewAssets.forEach((asset) => {
     expect(asset.approvalStatus).toBe('approved');
-    expect(String(asset.sourceTool || '').trim().length).toBeGreaterThan(0);
-    expect(String(asset.referenceSource || '').trim().length).toBeGreaterThan(0);
-    expect(Array.isArray(asset.referenceFiles)).toBe(true);
-    expect(String(asset.rightsStatus || '').trim().length).toBeGreaterThan(0);
+    expect(ALLOWED_GENERATORS).toContain(asset.generatedBy);
+    expect(String(asset.model || '').trim().length).toBeGreaterThan(0);
+    expect(String(asset.generationMode || '').trim().length).toBeGreaterThan(0);
+    expect(Array.isArray(asset.referenceInputs)).toBe(true);
+    expect(asset.referenceInputs.length).toBeGreaterThan(0);
+    expect(asset.referenceHashes).toBeTruthy();
     expect(Array.isArray(asset.postProcessing)).toBe(true);
-    expect(asset.approvalScope).toBe('gameplay_asset');
+    expect(String(asset.candidateId || '').trim().length).toBeGreaterThan(0);
+    expect(String(asset.candidatePath || '').trim().length).toBeGreaterThan(0);
     expect(String(asset.approvedBy || '').trim().length).toBeGreaterThan(0);
     expect(String(asset.approvedAt || '').trim()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(String(asset.approvalNotes || '').trim().length).toBeGreaterThan(0);
@@ -34,7 +38,7 @@ test('primary-view assets carry human approval metadata and hero-frame signoff m
   expect(String(heroFrame.approvedBy || '').trim().length).toBeGreaterThan(0);
   expect(String(heroFrame.approvedAt || '').trim()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   expect(String(heroFrame.sourceRoute || '')).toContain('district=founders-plot');
-  expect(String(heroFrame.screenshotPrefix || '')).toContain('founders-v1-3-1-full-route-hero-1280');
+  expect(String(heroFrame.screenshotPrefix || '')).toContain('founders-v1-4-2-full-route-hero-1280');
 });
 
 test('hero screenshot metadata points at a real captured baseline', async () => {

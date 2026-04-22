@@ -1,5 +1,5 @@
 # GAME_UX.md
-_Status: canonical for shell, onboarding, and Founders Plot V1 game surfaces_
+_Status: canonical for shell, onboarding, Founders Plot V1 game surfaces, and V1.4.2 screenshot-first signoff_
 
 ## 1. UX thesis
 
@@ -21,6 +21,19 @@ The public journey is:
 4. connect its brain
 5. complete the sigil ritual
 6. open house / continue into the town
+
+## 1.1 V1.4.2 UX objective
+
+This sprint changes the visual asset layer, not the gameplay loop. The same systems should feel more like a launch-quality game because the art, world objects, Clover states, and onboarding visuals read more clearly and more warmly.
+
+In five seconds, a player should understand:
+
+1. this is a town-building game;
+2. this is my plot or town;
+3. this is the next thing to do;
+4. Clover is helping me.
+
+If the screen reads as a dashboard, asset browser, or AI demo, it fails.
 
 ## 2. What stays from current Portal
 
@@ -85,6 +98,22 @@ Persistent helper surface for:
 
 ### 4.8 Backstage Tools
 Trainer, debug, raw tools, traffic, and advanced brain controls.
+
+## 4.9 Screenshot-first signoff
+
+The signoff artifact for player-facing art changes is the actual route screenshot, not the loose asset file.
+
+Required V1.4.2 screenshot review surfaces:
+
+- Founders Plot full player route desktop and mobile;
+- Founders Plot selected building;
+- Founders Plot Clover acting state;
+- Start Gate desktop;
+- town shell / hub desktop;
+- Town Hall onboarding first step;
+- Brain Connect default collapsed state.
+
+The full player route must remain free of Agent Comms / worker-debug console chrome unless explicit debug mode is enabled.
 
 ## 5. Golden path: first-time player
 

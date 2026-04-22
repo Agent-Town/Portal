@@ -117,6 +117,11 @@ test('empty plot maps to HQ plus buildable lots', () => {
 
   assert.equal(scene.hqLevel, 1);
   assert.ok(scene.objects.some((object) => object.id === 'HQ'));
+  assert.ok(scene.objects.some((object) => object.id === 'CONTRACT_BOARD'));
+  assert.ok(scene.objects.some((object) => object.id === 'PUBLIC_SQUARE'));
+  assert.ok(scene.objects.some((object) => object.id === 'FOREMAN_HUT'));
+  assert.ok(scene.objects.some((object) => object.id === 'JOURNAL'));
+  assert.ok(scene.objects.some((object) => object.id === 'APPROVAL_INBOX'));
   const lots = scene.objects.filter((object) => object.kind === 'lot');
   assert.equal(lots.length, 6);
   assert.ok(lots.every((object) => object.state === 'BUILDABLE'));
@@ -143,7 +148,7 @@ test('a built Lumber Camp maps to the right world object', () => {
 
   const lumber = scene.objects.find((object) => object.id === 'LUMBER_CAMP');
   assert.ok(lumber);
-  assert.equal(lumber.assetId, 'building_lumber_camp_base');
+  assert.equal(lumber.assetId, 'founders_plot_lumber_camp_v1_4_2');
   assert.equal(lumber.selectionKey, 'building:bld_lumber');
 });
 
@@ -223,6 +228,42 @@ test('contract-ready state marks the Contract Board as ready', () => {
   assert.ok(board.badges.some((badge) => /turn-in ready/i.test(String(badge.label))));
 });
 
+test('journal trigger and approval inbox map to the promoted civic objects', () => {
+  const scene = createSceneState(makeBaseView({
+    foreman: {
+      ...makeBaseView().foreman,
+      pendingApprovals: [
+        {
+          approvalId: 'apr_1',
+          title: 'Approve the spend'
+        }
+      ]
+    },
+    recap: {
+      unseenCount: 2
+    },
+    journal: {
+      entries: [
+        {
+          journalId: 'journal_1',
+          title: 'The town woke up early.'
+        }
+      ]
+    }
+  }));
+
+  const journal = scene.objects.find((object) => object.id === 'JOURNAL');
+  const approvals = scene.objects.find((object) => object.id === 'APPROVAL_INBOX');
+  assert.ok(journal);
+  assert.ok(approvals);
+  assert.equal(journal.assetId, 'founders_plot_journal_trigger_v1_4_2');
+  assert.equal(approvals.assetId, 'founders_plot_approval_inbox_v1_4_2');
+  assert.equal(journal.drawerKey, 'journal');
+  assert.equal(approvals.drawerKey, 'approvals');
+  assert.equal(journal.state, 'READY');
+  assert.equal(approvals.state, 'READY');
+});
+
 test('pending approval takes over the objective target and Clover state', () => {
   const scene = createSceneState(makeBaseView({
     currentGoal: {
@@ -244,8 +285,9 @@ test('pending approval takes over the objective target and Clover state', () => 
     }
   }));
 
-  assert.equal(scene.currentGoal.targetObjectId, 'FOREMAN_HUT');
+  assert.equal(scene.currentGoal.targetObjectId, 'APPROVAL_INBOX');
   assert.equal(scene.clover.state, 'WAITING_FOR_PERMISSION');
+  assert.equal(scene.clover.targetObjectId, 'APPROVAL_INBOX');
 });
 
 test('stale runtime maps to restart-needed Clover state', () => {
@@ -268,7 +310,61 @@ test('stale runtime maps to restart-needed Clover state', () => {
   });
 
   assert.equal(scene.clover.state, 'RESTART_NEEDED');
-  assert.equal(scene.clover.assetId, 'clover_restart_needed');
+  assert.equal(scene.clover.assetId, 'clover_restart_needed_v1_4_2');
+});
+
+test('runtime error maps Clover to the blocked asset', () => {
+  const scene = createSceneState(makeBaseView({
+    foreman: {
+      ...makeBaseView().foreman,
+      runtime: {
+        status: 'ERROR',
+        runtimeId: 'rt_1',
+        expiresAt: Date.now() + 60_000
+      }
+    }
+  }), {
+    localForemanRuntimeStatus: {
+      hasServerRuntime: true,
+      hasLocalToken: true,
+      expired: false,
+      needsRestart: false
+    }
+  });
+
+  assert.equal(scene.clover.state, 'ERROR');
+  assert.equal(scene.clover.assetId, 'clover_blocked_v1_4_2');
+});
+
+test('recently completed contracts let Clover celebrate at the contract board', () => {
+  const now = Date.now();
+  const scene = createSceneState(makeBaseView({
+    foreman: {
+      ...makeBaseView().foreman,
+      runtime: {
+        status: 'OBSERVING',
+        runtimeId: 'rt_1',
+        expiresAt: now + 60_000
+      }
+    },
+    contracts: {
+      boardLocked: false,
+      offers: [],
+      activeContract: null,
+      completed: [
+        {
+          contractId: 'ctr_done',
+          title: 'Market Banner',
+          townBenefit: 'The town square finally feels welcoming.',
+          completedAtMs: now - 30_000
+        }
+      ]
+    }
+  }));
+
+  assert.equal(scene.clover.state, 'CELEBRATING');
+  assert.equal(scene.clover.assetId, 'clover_celebrating_v1_4_2');
+  assert.equal(scene.clover.targetObjectId, 'CONTRACT_BOARD');
 });
 
 test('multiple buildable lots still resolve to one recommended attention target', () => {

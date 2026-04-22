@@ -37,7 +37,7 @@ test('multiple buildable lots still resolve to one recommended next object', asy
   expect(alignment.ctaText.length).toBeGreaterThan(0);
   expect(alignment.cloverTarget).toBe(alignment.recommended[0]);
 
-  await expect(frame.getByTestId('founders-game-shell')).toHaveScreenshot('founders-v1-3-1-objective-lot-emphasis-1280.png', {
+  await expect(frame.getByTestId('founders-game-shell')).toHaveScreenshot('founders-v1-4-2-objective-lot-emphasis-1280.png', {
     animations: 'disabled',
     caret: 'hide',
     maxDiffPixelRatio: 0.03

@@ -22,7 +22,7 @@ test('mobile hides nonessential labels by default and avoids label overlap', asy
   const selectedMetrics = await frame.evaluate(() => window.__foundersPlotTest.collectSurfaceMetrics());
   expect(selectedMetrics.mobileVisibleStageLabels).toBeLessThanOrEqual(3);
 
-  await expect(frame.getByTestId('founders-game-shell')).toHaveScreenshot('founders-v1-3-1-mobile-selected-object-390.png', {
+  await expect(frame.getByTestId('founders-game-shell')).toHaveScreenshot('founders-v1-4-2-mobile-selected-object-390.png', {
     animations: 'disabled',
     caret: 'hide',
     maxDiffPixelRatio: 0.03

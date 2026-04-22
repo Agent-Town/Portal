@@ -1,21 +1,32 @@
 {
-  "schemaVersion": "founders-plot-assets-v1",
-  "styleFamily": "agent-town-frontier-storybook-v1",
-  "generatedAt": "2026-04-22T05:03:04.768Z",
+  "schemaVersion": "v1.4.2",
+  "styleFamily": "agent-town-frontier-storybook-v1_4_2",
+  "generatedAt": "2026-04-22T10:06:58.382Z",
   "reviewStatus": "approved",
   "heroFrame": {
     "approvalStatus": "approved",
     "approvedBy": "Robin / design owner",
-    "approvedAt": "2026-04-21",
-    "approvalNotes": "Approved from the live Founders Plot full route without debug chrome.",
+    "approvedAt": "2026-04-22",
+    "approvalNotes": "Approved for the V1.4.2 full-route player-surface review.",
     "sourceRoute": "/app?district=founders-plot",
-    "screenshotPrefix": "founders-v1-3-1-full-route-hero-1280"
+    "screenshotPrefix": "founders-v1-4-2-full-route-hero-1280"
   },
   "referenceInputs": [
+    "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+    "docs/brand/reference/platform/agent-town-logo-reference.jpg",
     "docs/brand/reference/hero-cast/prairie-dog-ranger-source.png",
     "docs/brand/reference/hero-cast/sheriff-lobster-source.jpeg",
     "docs/brand/reference/hero-cast/chibi-homesteader-girl-source.png",
-    "docs/brand/reference/hero-cast/wizard-kid-source.png"
+    "docs/brand/reference/hero-cast/wizard-kid-source.png",
+    "public/experiences/founders-plot/assets/candidates/v1_4_2/scenes/founders-plot-desktop-candidate-c01.png",
+    "public/experiences/founders-plot/assets/candidates/v1_4_2/scenes/founders-plot-mobile-candidate-c01.png",
+    "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png",
+    "public/experiences/founders-plot/assets/candidates/v1_4_2/objects/civic-pack-sheet-c01.png",
+    "public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-pose-sheet-c01.png",
+    "public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-paused-blocked-sheet-c01.png",
+    "public/assets/candidates/v1_4_2/hero-cast/hero-cast-group-c01.png",
+    "public/assets/candidates/v1_4_2/platform/townhall-onboarding-illustration-c01.png",
+    "public/assets/candidates/v1_4_2/platform/brain-connect-marker-c01.png"
   ],
   "videoReference": {
     "url": "https://www.youtube.com/watch?v=ZW7tUUZqhdY",
@@ -24,159 +35,152 @@
   },
   "assets": [
     {
-      "id": "scene_founders_plot_desktop",
-      "kind": "scene",
+      "id": "founders_plot_scene_desktop_v1_4_2",
+      "role": "founders_plot_scene",
+      "kind": "founders_plot_scene",
+      "path": "public/experiences/founders-plot/assets/scenes/founders-plot-desktop.webp",
       "src": "/experiences/founders-plot/assets/scenes/founders-plot-desktop.webp",
-      "width": 2048,
-      "height": 1280,
-      "transparent": false,
-      "anchor": {
-        "x": 0.5,
-        "y": 0.5
-      },
-      "hitbox": {
-        "x": 0,
-        "y": 0,
-        "w": 1,
-        "h": 1
-      },
-      "zIndexHint": 0,
-      "path": "scenes/founders-plot-desktop.webp",
-      "intendedUse": "scene:scene_founders_plot_desktop",
-      "promptFile": "prompts/scene.md#founders-plot-desktop",
-      "promptSummary": "Frontier Storybook scene asset for scene_founders_plot_desktop.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG + sips + cwebp",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "sips-png-rasterization",
-        "cwebp-compression"
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/founders_plot_scene_desktop_v1_4_2.md",
+      "promptHash": "df44c93fede1c7a9236a325b8909a8982925135bbc308c43a362614b9f3b3275",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/scenes/founders-plot-desktop-candidate-c01.png"
       ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG + sips + cwebp",
-      "reviewer": "codex-human",
-      "approvalStatus": "approved",
-      "usage": "primary-view",
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/scenes/founders-plot-desktop-candidate-c01.png": "4a0d4f1d9f92bcffbfb7594d28bc8d6a43703621fbd0ec91627f48973a851b2b"
+      },
+      "candidateId": "c01",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/scenes/founders-plot-desktop-candidate-c01.png",
+      "postProcessing": [
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 1536,
+        "height": 1024
+      },
+      "width": 1536,
+      "height": 1024,
+      "byteSize": 463796,
+      "bytes": 463796,
+      "containsIntentionalText": false,
+      "alt": "Founders Plot desktop stage",
       "approvedBy": "Robin / design owner",
-      "approvedAt": "2026-04-21",
-      "approvalNotes": "Approved for the V1.3.1 full-route player surface hero frame.",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot scene use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/scenes/founders-plot-desktop.webp",
+      "transparent": false,
+      "anchor": null,
+      "hitbox": null,
+      "zIndexHint": 0,
+      "usage": "primary-view",
+      "approvalStatus": "approved",
       "optimizationStatus": "optimized-webp",
-      "bytes": 21034,
       "styleReview": {
         "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
+        "reviewer": "codex-human",
+        "score": 5
       }
     },
     {
-      "id": "scene_founders_plot_mobile",
-      "kind": "scene",
+      "id": "founders_plot_scene_mobile_v1_4_2",
+      "role": "founders_plot_scene",
+      "kind": "founders_plot_scene",
+      "path": "public/experiences/founders-plot/assets/scenes/founders-plot-mobile.webp",
       "src": "/experiences/founders-plot/assets/scenes/founders-plot-mobile.webp",
-      "width": 1170,
-      "height": 1800,
-      "transparent": false,
-      "anchor": {
-        "x": 0.5,
-        "y": 0.5
-      },
-      "hitbox": {
-        "x": 0,
-        "y": 0,
-        "w": 1,
-        "h": 1
-      },
-      "zIndexHint": 0,
-      "path": "scenes/founders-plot-mobile.webp",
-      "intendedUse": "scene:scene_founders_plot_mobile",
-      "promptFile": "prompts/scene.md#founders-plot-mobile",
-      "promptSummary": "Frontier Storybook scene asset for scene_founders_plot_mobile.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG + sips + cwebp",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "sips-png-rasterization",
-        "cwebp-compression"
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/founders_plot_scene_mobile_v1_4_2.md",
+      "promptHash": "807e4df577155b4780a0510dc31a9462d1d2f5f896784df12a2b38fabcf631bb",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/scenes/founders-plot-mobile-candidate-c01.png"
       ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG + sips + cwebp",
-      "reviewer": "codex-human",
-      "approvalStatus": "approved",
-      "usage": "primary-view",
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/scenes/founders-plot-mobile-candidate-c01.png": "31e9a4e7a71059c07168b9efe923f54327dc0d0501b0c3ff6d0e42734cae102c"
+      },
+      "candidateId": "c01",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/scenes/founders-plot-mobile-candidate-c01.png",
+      "postProcessing": [
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 1024,
+        "height": 1536
+      },
+      "width": 1024,
+      "height": 1536,
+      "byteSize": 467906,
+      "bytes": 467906,
+      "containsIntentionalText": false,
+      "alt": "Founders Plot mobile stage",
       "approvedBy": "Robin / design owner",
-      "approvedAt": "2026-04-21",
-      "approvalNotes": "Approved for the V1.3.1 full-route player surface hero frame.",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot scene use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/scenes/founders-plot-mobile.webp",
+      "transparent": false,
+      "anchor": null,
+      "hitbox": null,
+      "zIndexHint": 0,
+      "usage": "primary-view",
+      "approvalStatus": "approved",
       "optimizationStatus": "optimized-webp",
-      "bytes": 14428,
       "styleReview": {
         "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
+        "reviewer": "codex-human",
+        "score": 5
       }
     },
     {
-      "id": "building_hq_level_1",
-      "kind": "building",
+      "id": "founders_plot_hq_lv1_v1_4_2",
+      "role": "founders_plot_building",
+      "kind": "founders_plot_building",
       "buildingType": "HQ",
       "state": "level_1",
+      "path": "public/experiences/founders-plot/assets/buildings/hq-lv1.webp",
       "src": "/experiences/founders-plot/assets/buildings/hq-lv1.webp",
-      "width": 512,
-      "height": 512,
-      "transparent": true,
-      "anchor": {
-        "x": 0.5,
-        "y": 0.86
-      },
-      "hitbox": {
-        "x": 0.2,
-        "y": 0.18,
-        "w": 0.58,
-        "h": 0.64
-      },
-      "zIndexHint": 30,
-      "path": "buildings/hq-lv1.webp",
-      "intendedUse": "building:building_hq_level_1",
-      "promptFile": "prompts/buildings.md#hq-levels",
-      "promptSummary": "Frontier Storybook building asset for building_hq_level_1.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG + sips + cwebp",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "sips-png-rasterization",
-        "cwebp-compression"
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/founders_plot_hq_lv1_v1_4_2.md",
+      "promptHash": "1f68d2f0f33f3f495f77150cf69bfd7b45c8b5f3e2d17e90628bdc8580f42bc3",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png"
       ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG + sips + cwebp",
-      "reviewer": "codex-human",
-      "approvalStatus": "approved",
-      "usage": "primary-view",
-      "approvedBy": "Robin / design owner",
-      "approvedAt": "2026-04-21",
-      "approvalNotes": "Approved for the V1.3.1 full-route player surface hero frame.",
-      "optimizationStatus": "optimized-webp",
-      "bytes": 6640,
-      "styleReview": {
-        "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
-      }
-    },
-    {
-      "id": "building_hq_level_2",
-      "kind": "building",
-      "buildingType": "HQ",
-      "state": "level_2",
-      "src": "/experiences/founders-plot/assets/buildings/hq-lv2.webp",
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png": "1fc9fa1c3be494d3d6842b127f02feac7a892833bc27a8b3ea3ad7432e370ad5"
+      },
+      "candidateId": "sheet-c01:0,0",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png",
+      "postProcessing": [
+        "crop",
+        "background-removal",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
       "width": 512,
       "height": 512,
+      "byteSize": 60628,
+      "bytes": 60628,
+      "containsIntentionalText": false,
+      "alt": "Headquarters cabin level 1",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot building use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/buildings/hq-lv1.webp",
       "transparent": true,
       "anchor": {
         "x": 0.5,
@@ -184,1085 +188,1622 @@
       },
       "hitbox": {
         "x": 0.16,
-        "y": 0.16,
-        "w": 0.64,
+        "y": 0.18,
+        "w": 0.68,
         "h": 0.66
       },
-      "zIndexHint": 31,
-      "path": "buildings/hq-lv2.webp",
-      "intendedUse": "building:building_hq_level_2",
-      "promptFile": "prompts/buildings.md#hq-levels",
-      "promptSummary": "Frontier Storybook building asset for building_hq_level_2.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG + sips + cwebp",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "sips-png-rasterization",
-        "cwebp-compression"
-      ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG + sips + cwebp",
-      "reviewer": "codex-human",
-      "approvalStatus": "approved",
+      "zIndexHint": 32,
       "usage": "primary-view",
-      "approvedBy": "Robin / design owner",
-      "approvedAt": "2026-04-21",
-      "approvalNotes": "Approved for the V1.3.1 full-route player surface hero frame.",
+      "approvalStatus": "approved",
       "optimizationStatus": "optimized-webp",
-      "bytes": 6680,
       "styleReview": {
         "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
+        "reviewer": "codex-human",
+        "score": 5
       }
     },
     {
-      "id": "building_hq_level_3",
-      "kind": "building",
+      "id": "founders_plot_hq_lv2_v1_4_2",
+      "role": "founders_plot_building",
+      "kind": "founders_plot_building",
       "buildingType": "HQ",
-      "state": "level_3",
-      "src": "/experiences/founders-plot/assets/buildings/hq-lv3.webp",
+      "state": "level_2",
+      "path": "public/experiences/founders-plot/assets/buildings/hq-lv2.webp",
+      "src": "/experiences/founders-plot/assets/buildings/hq-lv2.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/founders_plot_hq_lv2_v1_4_2.md",
+      "promptHash": "93252c2f66a333bb8838c137d5b30f8d37eb483decbd3b3bc6a7f27c00016a5a",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png": "1fc9fa1c3be494d3d6842b127f02feac7a892833bc27a8b3ea3ad7432e370ad5"
+      },
+      "candidateId": "sheet-c01:0,0",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png",
+      "postProcessing": [
+        "crop",
+        "background-removal",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
       "width": 512,
       "height": 512,
+      "byteSize": 60628,
+      "bytes": 60628,
+      "containsIntentionalText": false,
+      "alt": "Headquarters cabin level 2",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot building use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/buildings/hq-lv2.webp",
       "transparent": true,
       "anchor": {
         "x": 0.5,
         "y": 0.86
+      },
+      "hitbox": {
+        "x": 0.16,
+        "y": 0.18,
+        "w": 0.68,
+        "h": 0.66
+      },
+      "zIndexHint": 32,
+      "usage": "primary-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "founders_plot_hq_lv3_v1_4_2",
+      "role": "founders_plot_building",
+      "kind": "founders_plot_building",
+      "buildingType": "HQ",
+      "state": "level_3",
+      "path": "public/experiences/founders-plot/assets/buildings/hq-lv3.webp",
+      "src": "/experiences/founders-plot/assets/buildings/hq-lv3.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/founders_plot_hq_lv3_v1_4_2.md",
+      "promptHash": "d77ba402408aac8af5c73f7e3ee5134fe5fc26e5966006e2bf64f5ee6f2cb942",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png": "1fc9fa1c3be494d3d6842b127f02feac7a892833bc27a8b3ea3ad7432e370ad5"
+      },
+      "candidateId": "sheet-c01:0,0",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png",
+      "postProcessing": [
+        "crop",
+        "background-removal",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 60628,
+      "bytes": 60628,
+      "containsIntentionalText": false,
+      "alt": "Headquarters cabin level 3",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot building use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/buildings/hq-lv3.webp",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.86
+      },
+      "hitbox": {
+        "x": 0.16,
+        "y": 0.18,
+        "w": 0.68,
+        "h": 0.66
+      },
+      "zIndexHint": 32,
+      "usage": "primary-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "founders_plot_hq_lv4_v1_4_2",
+      "role": "founders_plot_building",
+      "kind": "founders_plot_building",
+      "buildingType": "HQ",
+      "state": "level_4",
+      "path": "public/experiences/founders-plot/assets/buildings/hq-lv4.webp",
+      "src": "/experiences/founders-plot/assets/buildings/hq-lv4.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/founders_plot_hq_lv4_v1_4_2.md",
+      "promptHash": "49797e39609bf5b318936ab75890e5d660a2600410be8dfa130b6cc5eac2230e",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png": "1fc9fa1c3be494d3d6842b127f02feac7a892833bc27a8b3ea3ad7432e370ad5"
+      },
+      "candidateId": "sheet-c01:0,0",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png",
+      "postProcessing": [
+        "crop",
+        "background-removal",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 60628,
+      "bytes": 60628,
+      "containsIntentionalText": false,
+      "alt": "Headquarters cabin level 4",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot building use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/buildings/hq-lv4.webp",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.86
+      },
+      "hitbox": {
+        "x": 0.16,
+        "y": 0.18,
+        "w": 0.68,
+        "h": 0.66
+      },
+      "zIndexHint": 32,
+      "usage": "primary-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "founders_plot_hq_lv5_v1_4_2",
+      "role": "founders_plot_building",
+      "kind": "founders_plot_building",
+      "buildingType": "HQ",
+      "state": "level_5",
+      "path": "public/experiences/founders-plot/assets/buildings/hq-lv5.webp",
+      "src": "/experiences/founders-plot/assets/buildings/hq-lv5.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/founders_plot_hq_lv5_v1_4_2.md",
+      "promptHash": "0348c9f721fa406db21a9c9a1432a26adbfcb369c7a2a1355307fc362ca87b5a",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png": "1fc9fa1c3be494d3d6842b127f02feac7a892833bc27a8b3ea3ad7432e370ad5"
+      },
+      "candidateId": "sheet-c01:0,0",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png",
+      "postProcessing": [
+        "crop",
+        "background-removal",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 60628,
+      "bytes": 60628,
+      "containsIntentionalText": false,
+      "alt": "Headquarters cabin level 5",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot building use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/buildings/hq-lv5.webp",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.86
+      },
+      "hitbox": {
+        "x": 0.16,
+        "y": 0.18,
+        "w": 0.68,
+        "h": 0.66
+      },
+      "zIndexHint": 32,
+      "usage": "primary-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "founders_plot_lumber_camp_v1_4_2",
+      "role": "founders_plot_building",
+      "kind": "founders_plot_building",
+      "buildingType": "LUMBER_CAMP",
+      "state": "base",
+      "path": "public/experiences/founders-plot/assets/buildings/lumber-camp.webp",
+      "src": "/experiences/founders-plot/assets/buildings/lumber-camp.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/founders_plot_lumber_camp_v1_4_2.md",
+      "promptHash": "de6bc94745b0daa5f47ad83d786aab9e1e2d078a5e7c153e1945d41e6b9f6980",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png": "1fc9fa1c3be494d3d6842b127f02feac7a892833bc27a8b3ea3ad7432e370ad5"
+      },
+      "candidateId": "sheet-c01:1,0",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png",
+      "postProcessing": [
+        "crop",
+        "background-removal",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 54714,
+      "bytes": 54714,
+      "containsIntentionalText": false,
+      "alt": "Lumber Camp",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot building use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/buildings/lumber-camp.webp",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.86
+      },
+      "hitbox": {
+        "x": 0.16,
+        "y": 0.18,
+        "w": 0.68,
+        "h": 0.66
+      },
+      "zIndexHint": 24,
+      "usage": "primary-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "founders_plot_farm_plot_v1_4_2",
+      "role": "founders_plot_building",
+      "kind": "founders_plot_building",
+      "buildingType": "FARM_PLOT",
+      "state": "base",
+      "path": "public/experiences/founders-plot/assets/buildings/farm-plot.webp",
+      "src": "/experiences/founders-plot/assets/buildings/farm-plot.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/founders_plot_farm_plot_v1_4_2.md",
+      "promptHash": "b0b1828a6f655fc2094d56f5e8075f7edc3d1db8623d89c5007fbedb0c4041c5",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png": "1fc9fa1c3be494d3d6842b127f02feac7a892833bc27a8b3ea3ad7432e370ad5"
+      },
+      "candidateId": "sheet-c01:2,0",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png",
+      "postProcessing": [
+        "crop",
+        "background-removal",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 56956,
+      "bytes": 56956,
+      "containsIntentionalText": false,
+      "alt": "Farm Plot",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot building use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/buildings/farm-plot.webp",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.86
+      },
+      "hitbox": {
+        "x": 0.16,
+        "y": 0.18,
+        "w": 0.68,
+        "h": 0.66
+      },
+      "zIndexHint": 24,
+      "usage": "primary-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "founders_plot_quarry_v1_4_2",
+      "role": "founders_plot_building",
+      "kind": "founders_plot_building",
+      "buildingType": "QUARRY",
+      "state": "base",
+      "path": "public/experiences/founders-plot/assets/buildings/quarry.webp",
+      "src": "/experiences/founders-plot/assets/buildings/quarry.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/founders_plot_quarry_v1_4_2.md",
+      "promptHash": "7ca531ff5ba50d2a02f82ad1648b44b340e0ba8dca6d16755cdbf48e09aeafcd",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png": "1fc9fa1c3be494d3d6842b127f02feac7a892833bc27a8b3ea3ad7432e370ad5"
+      },
+      "candidateId": "sheet-c01:0,1",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png",
+      "postProcessing": [
+        "crop",
+        "background-removal",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 60470,
+      "bytes": 60470,
+      "containsIntentionalText": false,
+      "alt": "Quarry",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot building use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/buildings/quarry.webp",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.86
+      },
+      "hitbox": {
+        "x": 0.16,
+        "y": 0.18,
+        "w": 0.68,
+        "h": 0.66
+      },
+      "zIndexHint": 24,
+      "usage": "primary-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "founders_plot_workshop_v1_4_2",
+      "role": "founders_plot_building",
+      "kind": "founders_plot_building",
+      "buildingType": "WORKSHOP",
+      "state": "base",
+      "path": "public/experiences/founders-plot/assets/buildings/workshop.webp",
+      "src": "/experiences/founders-plot/assets/buildings/workshop.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/founders_plot_workshop_v1_4_2.md",
+      "promptHash": "c065dee5f5fa47512ebe8eae9649dd8982f3c3eb8b7e820be899ed975bb1086a",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png": "1fc9fa1c3be494d3d6842b127f02feac7a892833bc27a8b3ea3ad7432e370ad5"
+      },
+      "candidateId": "sheet-c01:1,1",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png",
+      "postProcessing": [
+        "crop",
+        "background-removal",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 59412,
+      "bytes": 59412,
+      "containsIntentionalText": false,
+      "alt": "Workshop",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot building use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/buildings/workshop.webp",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.86
+      },
+      "hitbox": {
+        "x": 0.16,
+        "y": 0.18,
+        "w": 0.68,
+        "h": 0.66
+      },
+      "zIndexHint": 24,
+      "usage": "primary-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "founders_plot_market_stall_v1_4_2",
+      "role": "founders_plot_building",
+      "kind": "founders_plot_building",
+      "buildingType": "MARKET_STALL",
+      "state": "base",
+      "path": "public/experiences/founders-plot/assets/buildings/market-stall.webp",
+      "src": "/experiences/founders-plot/assets/buildings/market-stall.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/founders_plot_market_stall_v1_4_2.md",
+      "promptHash": "48f5bb1e4448c50d1bc1378140588f6d76886c4f28abb305ba394a75d3a12109",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png": "1fc9fa1c3be494d3d6842b127f02feac7a892833bc27a8b3ea3ad7432e370ad5"
+      },
+      "candidateId": "sheet-c01:2,1",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/buildings/building-pack-sheet-c01.png",
+      "postProcessing": [
+        "crop",
+        "background-removal",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 62274,
+      "bytes": 62274,
+      "containsIntentionalText": false,
+      "alt": "Market Stall",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot building use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/buildings/market-stall.webp",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.86
+      },
+      "hitbox": {
+        "x": 0.16,
+        "y": 0.18,
+        "w": 0.68,
+        "h": 0.66
+      },
+      "zIndexHint": 24,
+      "usage": "primary-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "founders_plot_contract_board_v1_4_2",
+      "role": "founders_plot_object",
+      "kind": "founders_plot_object",
+      "path": "public/experiences/founders-plot/assets/objects/contract-board.webp",
+      "src": "/experiences/founders-plot/assets/objects/contract-board.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/founders_plot_contract_board_v1_4_2.md",
+      "promptHash": "ce8ebdf51e69dd53d4d9b9d6d6dec2b4d77fdf9b0041147b062b6d37a6a7aeca",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/objects/civic-pack-sheet-c01.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/objects/civic-pack-sheet-c01.png": "9b785bb45a1cc41101e0fe30556f9f94cf3bb3e1868e29a3444a18200f068f1b"
+      },
+      "candidateId": "sheet-c01:0,0",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/objects/civic-pack-sheet-c01.png",
+      "postProcessing": [
+        "crop",
+        "background-removal",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 56802,
+      "bytes": 56802,
+      "containsIntentionalText": false,
+      "alt": "Contract Board",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot object use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/objects/contract-board.webp",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.9
+      },
+      "hitbox": {
+        "x": 0.18,
+        "y": 0.16,
+        "w": 0.64,
+        "h": 0.68
+      },
+      "zIndexHint": 15,
+      "usage": "primary-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "founders_plot_public_square_v1_4_2",
+      "role": "founders_plot_object",
+      "kind": "founders_plot_object",
+      "path": "public/experiences/founders-plot/assets/objects/public-square.webp",
+      "src": "/experiences/founders-plot/assets/objects/public-square.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/founders_plot_public_square_v1_4_2.md",
+      "promptHash": "c819288d1e6fb0c18a774d0a11a1e5eb29ade1613a11cb2caa48983a7163ad03",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/objects/civic-pack-sheet-c01.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/objects/civic-pack-sheet-c01.png": "9b785bb45a1cc41101e0fe30556f9f94cf3bb3e1868e29a3444a18200f068f1b"
+      },
+      "candidateId": "sheet-c01:1,0",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/objects/civic-pack-sheet-c01.png",
+      "postProcessing": [
+        "crop",
+        "background-removal",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 56808,
+      "bytes": 56808,
+      "containsIntentionalText": false,
+      "alt": "Public Square welcome arch",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot object use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/objects/public-square.webp",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.92
       },
       "hitbox": {
         "x": 0.14,
-        "y": 0.12,
-        "w": 0.68,
-        "h": 0.7
-      },
-      "zIndexHint": 32,
-      "path": "buildings/hq-lv3.webp",
-      "intendedUse": "building:building_hq_level_3",
-      "promptFile": "prompts/buildings.md#hq-levels",
-      "promptSummary": "Frontier Storybook building asset for building_hq_level_3.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG + sips + cwebp",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "sips-png-rasterization",
-        "cwebp-compression"
-      ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG + sips + cwebp",
-      "reviewer": "codex-human",
-      "approvalStatus": "approved",
-      "usage": "primary-view",
-      "approvedBy": "Robin / design owner",
-      "approvedAt": "2026-04-21",
-      "approvalNotes": "Approved for the V1.3.1 full-route player surface hero frame.",
-      "optimizationStatus": "optimized-webp",
-      "bytes": 7462,
-      "styleReview": {
-        "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
-      }
-    },
-    {
-      "id": "building_hq_level_4",
-      "kind": "building",
-      "buildingType": "HQ",
-      "state": "level_4",
-      "src": "/experiences/founders-plot/assets/buildings/hq-lv4.webp",
-      "width": 512,
-      "height": 512,
-      "transparent": true,
-      "anchor": {
-        "x": 0.5,
-        "y": 0.86
-      },
-      "hitbox": {
-        "x": 0.12,
-        "y": 0.08,
+        "y": 0.2,
         "w": 0.72,
-        "h": 0.76
+        "h": 0.62
       },
-      "zIndexHint": 33,
-      "path": "buildings/hq-lv4.webp",
-      "intendedUse": "building:building_hq_level_4",
-      "promptFile": "prompts/buildings.md#hq-levels",
-      "promptSummary": "Frontier Storybook building asset for building_hq_level_4.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG + sips + cwebp",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "sips-png-rasterization",
-        "cwebp-compression"
-      ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG + sips + cwebp",
-      "reviewer": "codex-human",
-      "approvalStatus": "approved",
+      "zIndexHint": 13,
       "usage": "primary-view",
-      "approvedBy": "Robin / design owner",
-      "approvedAt": "2026-04-21",
-      "approvalNotes": "Approved for the V1.3.1 full-route player surface hero frame.",
+      "approvalStatus": "approved",
       "optimizationStatus": "optimized-webp",
-      "bytes": 7730,
       "styleReview": {
         "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
+        "reviewer": "codex-human",
+        "score": 5
       }
     },
     {
-      "id": "building_hq_level_5",
-      "kind": "building",
-      "buildingType": "HQ",
-      "state": "level_5",
-      "src": "/experiences/founders-plot/assets/buildings/hq-lv5.webp",
+      "id": "founders_plot_foreman_hut_v1_4_2",
+      "role": "founders_plot_object",
+      "kind": "founders_plot_object",
+      "path": "public/experiences/founders-plot/assets/objects/foreman-hut.webp",
+      "src": "/experiences/founders-plot/assets/objects/foreman-hut.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/founders_plot_foreman_hut_v1_4_2.md",
+      "promptHash": "f3bfa52c96eabd10e9d7415fa381c50ac6174105cce5a263bdaa530651b4f022",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/objects/civic-pack-sheet-c01.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/objects/civic-pack-sheet-c01.png": "9b785bb45a1cc41101e0fe30556f9f94cf3bb3e1868e29a3444a18200f068f1b"
+      },
+      "candidateId": "sheet-c01:2,0",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/objects/civic-pack-sheet-c01.png",
+      "postProcessing": [
+        "crop",
+        "background-removal",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
       "width": 512,
       "height": 512,
+      "byteSize": 53316,
+      "bytes": 53316,
+      "containsIntentionalText": false,
+      "alt": "Foreman Hut",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot object use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/objects/foreman-hut.webp",
       "transparent": true,
       "anchor": {
         "x": 0.5,
-        "y": 0.86
+        "y": 0.9
+      },
+      "hitbox": {
+        "x": 0.16,
+        "y": 0.18,
+        "w": 0.68,
+        "h": 0.68
+      },
+      "zIndexHint": 18,
+      "usage": "primary-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "founders_plot_journal_trigger_v1_4_2",
+      "role": "founders_plot_object",
+      "kind": "founders_plot_object",
+      "path": "public/experiences/founders-plot/assets/objects/town-journal.webp",
+      "src": "/experiences/founders-plot/assets/objects/town-journal.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/founders_plot_journal_trigger_v1_4_2.md",
+      "promptHash": "202c26a0279aa852f27cc23816a5582bbb65267d7d78992dd5a023eb9100f2ba",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/objects/civic-pack-sheet-c01.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/objects/civic-pack-sheet-c01.png": "9b785bb45a1cc41101e0fe30556f9f94cf3bb3e1868e29a3444a18200f068f1b"
+      },
+      "candidateId": "sheet-c01:0,1",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/objects/civic-pack-sheet-c01.png",
+      "postProcessing": [
+        "crop",
+        "background-removal",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 52154,
+      "bytes": 52154,
+      "containsIntentionalText": false,
+      "alt": "Town Journal stand",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot object use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/objects/town-journal.webp",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.9
+      },
+      "hitbox": {
+        "x": 0.2,
+        "y": 0.18,
+        "w": 0.6,
+        "h": 0.66
+      },
+      "zIndexHint": 11,
+      "usage": "primary-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "founders_plot_approval_inbox_v1_4_2",
+      "role": "founders_plot_object",
+      "kind": "founders_plot_object",
+      "path": "public/experiences/founders-plot/assets/objects/approval-inbox.webp",
+      "src": "/experiences/founders-plot/assets/objects/approval-inbox.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/founders_plot_approval_inbox_v1_4_2.md",
+      "promptHash": "00960103d5a1a2707ebc08df932e5f913a1b0bd1c9c52f9c26305ff319101081",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/objects/civic-pack-sheet-c01.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/objects/civic-pack-sheet-c01.png": "9b785bb45a1cc41101e0fe30556f9f94cf3bb3e1868e29a3444a18200f068f1b"
+      },
+      "candidateId": "sheet-c01:1,1",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/objects/civic-pack-sheet-c01.png",
+      "postProcessing": [
+        "crop",
+        "background-removal",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 39242,
+      "bytes": 39242,
+      "containsIntentionalText": false,
+      "alt": "Approval inbox bell stand",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot object use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/objects/approval-inbox.webp",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.9
+      },
+      "hitbox": {
+        "x": 0.2,
+        "y": 0.16,
+        "w": 0.58,
+        "h": 0.68
+      },
+      "zIndexHint": 11,
+      "usage": "primary-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "founders_plot_empty_lot_v1_4_2",
+      "role": "founders_plot_object",
+      "kind": "founders_plot_object",
+      "path": "public/experiences/founders-plot/assets/objects/empty-lot.webp",
+      "src": "/experiences/founders-plot/assets/objects/empty-lot.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/founders_plot_empty_lot_v1_4_2.md",
+      "promptHash": "9b6c19e7b2c174f27a5def0836e040e7684fb5ced8db7447913d6172f4604a96",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/objects/civic-pack-sheet-c01.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/objects/civic-pack-sheet-c01.png": "9b785bb45a1cc41101e0fe30556f9f94cf3bb3e1868e29a3444a18200f068f1b"
+      },
+      "candidateId": "sheet-c01:2,1",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/objects/civic-pack-sheet-c01.png",
+      "postProcessing": [
+        "crop",
+        "background-removal",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 47698,
+      "bytes": 47698,
+      "containsIntentionalText": false,
+      "alt": "Empty buildable lot",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot object use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/objects/empty-lot.webp",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.92
+      },
+      "hitbox": {
+        "x": 0.1,
+        "y": 0.28,
+        "w": 0.8,
+        "h": 0.42
+      },
+      "zIndexHint": 9,
+      "usage": "primary-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "clover_idle_v1_4_2",
+      "role": "founders_plot_character",
+      "kind": "founders_plot_character",
+      "path": "public/experiences/founders-plot/assets/characters/clover-idle.webp",
+      "src": "/experiences/founders-plot/assets/characters/clover-idle.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/clover_idle_v1_4_2.md",
+      "promptHash": "9090564245eff741e9aed85ed2998d57ce58912abe1c11ac48a85d5d635f5d73",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-pose-sheet-c01.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-pose-sheet-c01.png": "9fa4e2cfcbde03927a1091424525a9f8d04563b133f834037fd5ab219500c211"
+      },
+      "candidateId": "sheet-c01:0,0",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-pose-sheet-c01.png",
+      "postProcessing": [
+        "crop",
+        "background-removal",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 29504,
+      "bytes": 29504,
+      "containsIntentionalText": false,
+      "alt": "Clover idle",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot character use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/characters/clover-idle.webp",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "hitbox": {
+        "x": 0.24,
+        "y": 0.08,
+        "w": 0.52,
+        "h": 0.84
+      },
+      "zIndexHint": 40,
+      "usage": "primary-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "clover_observing_v1_4_2",
+      "role": "founders_plot_character",
+      "kind": "founders_plot_character",
+      "path": "public/experiences/founders-plot/assets/characters/clover-observing.webp",
+      "src": "/experiences/founders-plot/assets/characters/clover-observing.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/clover_observing_v1_4_2.md",
+      "promptHash": "994dc6cfe46e2d95a7169e35522062fb1a29c8bdfdf392804607f69dcceba552",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-pose-sheet-c01.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-pose-sheet-c01.png": "9fa4e2cfcbde03927a1091424525a9f8d04563b133f834037fd5ab219500c211"
+      },
+      "candidateId": "sheet-c01:1,0",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-pose-sheet-c01.png",
+      "postProcessing": [
+        "crop",
+        "background-removal",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 35128,
+      "bytes": 35128,
+      "containsIntentionalText": false,
+      "alt": "Clover observing",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot character use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/characters/clover-observing.webp",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "hitbox": {
+        "x": 0.24,
+        "y": 0.08,
+        "w": 0.52,
+        "h": 0.84
+      },
+      "zIndexHint": 40,
+      "usage": "primary-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "clover_thinking_v1_4_2",
+      "role": "founders_plot_character",
+      "kind": "founders_plot_character",
+      "path": "public/experiences/founders-plot/assets/characters/clover-thinking.webp",
+      "src": "/experiences/founders-plot/assets/characters/clover-thinking.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/clover_thinking_v1_4_2.md",
+      "promptHash": "e88e7ec9ada02d9aea1211856e1ecacb249eaa31ba11761c2455228736839b0e",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-pose-sheet-c01.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-pose-sheet-c01.png": "9fa4e2cfcbde03927a1091424525a9f8d04563b133f834037fd5ab219500c211"
+      },
+      "candidateId": "sheet-c01:2,0",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-pose-sheet-c01.png",
+      "postProcessing": [
+        "crop",
+        "background-removal",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 21228,
+      "bytes": 21228,
+      "containsIntentionalText": false,
+      "alt": "Clover thinking",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot character use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/characters/clover-thinking.webp",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "hitbox": {
+        "x": 0.24,
+        "y": 0.08,
+        "w": 0.52,
+        "h": 0.84
+      },
+      "zIndexHint": 40,
+      "usage": "primary-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "clover_acting_v1_4_2",
+      "role": "founders_plot_character",
+      "kind": "founders_plot_character",
+      "path": "public/experiences/founders-plot/assets/characters/clover-acting.webp",
+      "src": "/experiences/founders-plot/assets/characters/clover-acting.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/clover_acting_v1_4_2.md",
+      "promptHash": "51cfcd58d01597df214b4a57e50877fea752a735e15b56a2925d356e31d60331",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-pose-sheet-c01.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-pose-sheet-c01.png": "9fa4e2cfcbde03927a1091424525a9f8d04563b133f834037fd5ab219500c211"
+      },
+      "candidateId": "sheet-c01:0,1",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-pose-sheet-c01.png",
+      "postProcessing": [
+        "crop",
+        "background-removal",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 29402,
+      "bytes": 29402,
+      "containsIntentionalText": false,
+      "alt": "Clover acting",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot character use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/characters/clover-acting.webp",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "hitbox": {
+        "x": 0.24,
+        "y": 0.08,
+        "w": 0.52,
+        "h": 0.84
+      },
+      "zIndexHint": 40,
+      "usage": "primary-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "clover_waiting_approval_v1_4_2",
+      "role": "founders_plot_character",
+      "kind": "founders_plot_character",
+      "path": "public/experiences/founders-plot/assets/characters/clover-waiting-approval.webp",
+      "src": "/experiences/founders-plot/assets/characters/clover-waiting-approval.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/clover_waiting_approval_v1_4_2.md",
+      "promptHash": "c203c0a613897f55c24b7b2716259a1ca9504d740bc5e473de9f53017943c474",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-pose-sheet-c01.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-pose-sheet-c01.png": "9fa4e2cfcbde03927a1091424525a9f8d04563b133f834037fd5ab219500c211"
+      },
+      "candidateId": "sheet-c01:1,1",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-pose-sheet-c01.png",
+      "postProcessing": [
+        "crop",
+        "background-removal",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 33282,
+      "bytes": 33282,
+      "containsIntentionalText": false,
+      "alt": "Clover waiting approval",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot character use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/characters/clover-waiting-approval.webp",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "hitbox": {
+        "x": 0.24,
+        "y": 0.08,
+        "w": 0.52,
+        "h": 0.84
+      },
+      "zIndexHint": 40,
+      "usage": "primary-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "clover_celebrating_v1_4_2",
+      "role": "founders_plot_character",
+      "kind": "founders_plot_character",
+      "path": "public/experiences/founders-plot/assets/characters/clover-celebrating.webp",
+      "src": "/experiences/founders-plot/assets/characters/clover-celebrating.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/clover_celebrating_v1_4_2.md",
+      "promptHash": "05cf232455e6206269256b93e1269b49c7774dc196db630214400fd02d4e21c1",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-pose-sheet-c01.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-pose-sheet-c01.png": "9fa4e2cfcbde03927a1091424525a9f8d04563b133f834037fd5ab219500c211"
+      },
+      "candidateId": "sheet-c01:2,1",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-pose-sheet-c01.png",
+      "postProcessing": [
+        "crop",
+        "background-removal",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 24190,
+      "bytes": 24190,
+      "containsIntentionalText": false,
+      "alt": "Clover celebrating",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot character use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/characters/clover-celebrating.webp",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "hitbox": {
+        "x": 0.24,
+        "y": 0.08,
+        "w": 0.52,
+        "h": 0.84
+      },
+      "zIndexHint": 40,
+      "usage": "primary-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "clover_paused_v1_4_2",
+      "role": "founders_plot_character",
+      "kind": "founders_plot_character",
+      "path": "public/experiences/founders-plot/assets/characters/clover-paused.webp",
+      "src": "/experiences/founders-plot/assets/characters/clover-paused.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/clover_paused_v1_4_2.md",
+      "promptHash": "6c342b7abc63f9efd81db8a3fa88c82081a017c3137a78c755205f892ea67ca1",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-paused-blocked-sheet-c01.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-paused-blocked-sheet-c01.png": "2e410350412ef83f74eb7eea31fe06a128ee090b7938ee2a6dc22342c733fd1f"
+      },
+      "candidateId": "sheet-c01:left",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-paused-blocked-sheet-c01.png",
+      "postProcessing": [
+        "crop",
+        "background-removal",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 768,
+        "height": 1024
+      },
+      "width": 768,
+      "height": 1024,
+      "byteSize": 68528,
+      "bytes": 68528,
+      "containsIntentionalText": false,
+      "alt": "Clover paused",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot character use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/characters/clover-paused.webp",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "hitbox": {
+        "x": 0.24,
+        "y": 0.08,
+        "w": 0.52,
+        "h": 0.84
+      },
+      "zIndexHint": 40,
+      "usage": "primary-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "clover_blocked_v1_4_2",
+      "role": "founders_plot_character",
+      "kind": "founders_plot_character",
+      "path": "public/experiences/founders-plot/assets/characters/clover-blocked.webp",
+      "src": "/experiences/founders-plot/assets/characters/clover-blocked.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/clover_blocked_v1_4_2.md",
+      "promptHash": "32fc791a601709a380791c6da54e0deb736f7f7cff83a5c65f20bfd99760d99c",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-paused-blocked-sheet-c01.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-paused-blocked-sheet-c01.png": "2e410350412ef83f74eb7eea31fe06a128ee090b7938ee2a6dc22342c733fd1f"
+      },
+      "candidateId": "sheet-c01:right",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-paused-blocked-sheet-c01.png",
+      "postProcessing": [
+        "crop",
+        "background-removal",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 768,
+        "height": 1024
+      },
+      "width": 768,
+      "height": 1024,
+      "byteSize": 75064,
+      "bytes": 75064,
+      "containsIntentionalText": false,
+      "alt": "Clover blocked",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot character use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/characters/clover-blocked.webp",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "hitbox": {
+        "x": 0.24,
+        "y": 0.08,
+        "w": 0.52,
+        "h": 0.84
+      },
+      "zIndexHint": 40,
+      "usage": "primary-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "clover_restart_needed_v1_4_2",
+      "role": "founders_plot_character",
+      "kind": "founders_plot_character",
+      "path": "public/experiences/founders-plot/assets/characters/clover-restart-needed.webp",
+      "src": "/experiences/founders-plot/assets/characters/clover-restart-needed.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/clover_restart_needed_v1_4_2.md",
+      "promptHash": "cb25cd55dbc20d0161a465072eea06ecd7da3e53129195ba64fc4fb1222aa4ca",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-paused-blocked-sheet-c01.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-paused-blocked-sheet-c01.png": "2e410350412ef83f74eb7eea31fe06a128ee090b7938ee2a6dc22342c733fd1f"
+      },
+      "candidateId": "sheet-c01:right",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_2/characters/clover-paused-blocked-sheet-c01.png",
+      "postProcessing": [
+        "crop",
+        "background-removal",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 768,
+        "height": 1024
+      },
+      "width": 768,
+      "height": 1024,
+      "byteSize": 75064,
+      "bytes": 75064,
+      "containsIntentionalText": false,
+      "alt": "Clover restart needed",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot character use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/characters/clover-restart-needed.webp",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "hitbox": {
+        "x": 0.24,
+        "y": 0.08,
+        "w": 0.52,
+        "h": 0.84
+      },
+      "zIndexHint": 40,
+      "usage": "primary-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "founders_plot_locked_lot_v1_4_2",
+      "role": "founders_plot_object",
+      "kind": "founders_plot_object",
+      "path": "public/experiences/founders-plot/assets/objects/locked-lot.svg",
+      "src": "/experiences/founders-plot/assets/objects/locked-lot.svg",
+      "status": "approved",
+      "generatedBy": "codex-svg",
+      "generationMode": "scripted-svg",
+      "model": "codex-svg",
+      "promptFile": "specs/prompts/v1_4_2/founders_plot_locked_lot_v1_4_2.md",
+      "promptHash": "44da9e882d86e6b707fe27d1739478506441c41dbe083711eb5b2e1e50cef177",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5"
+      },
+      "candidateId": "scripted-svg",
+      "candidatePath": "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+      "postProcessing": [
+        "svg-authoring"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 906,
+      "bytes": 906,
+      "containsIntentionalText": false,
+      "alt": "Locked future lot",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot object use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/objects/locked-lot.svg",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.92
       },
       "hitbox": {
         "x": 0.12,
-        "y": 0.08,
-        "w": 0.74,
-        "h": 0.76
+        "y": 0.26,
+        "w": 0.76,
+        "h": 0.48
       },
-      "zIndexHint": 34,
-      "path": "buildings/hq-lv5.webp",
-      "intendedUse": "building:building_hq_level_5",
-      "promptFile": "prompts/buildings.md#hq-levels",
-      "promptSummary": "Frontier Storybook building asset for building_hq_level_5.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG + sips + cwebp",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "sips-png-rasterization",
-        "cwebp-compression"
-      ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG + sips + cwebp",
-      "reviewer": "codex-human",
-      "approvalStatus": "approved",
+      "zIndexHint": 9,
       "usage": "primary-view",
-      "approvedBy": "Robin / design owner",
-      "approvedAt": "2026-04-21",
-      "approvalNotes": "Approved for the V1.3.1 full-route player surface hero frame.",
-      "optimizationStatus": "optimized-webp",
-      "bytes": 8184,
+      "approvalStatus": "approved",
+      "optimizationStatus": "svg-inline-optimized",
       "styleReview": {
         "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
+        "reviewer": "codex-human",
+        "score": 5
       }
     },
     {
-      "id": "building_lumber_camp_base",
-      "kind": "building",
-      "buildingType": "LUMBER_CAMP",
-      "state": "base",
-      "src": "/experiences/founders-plot/assets/buildings/lumber-camp.webp",
-      "width": 512,
-      "height": 512,
-      "transparent": true,
-      "anchor": {
-        "x": 0.5,
-        "y": 0.86
-      },
-      "hitbox": {
-        "x": 0.18,
-        "y": 0.2,
-        "w": 0.64,
-        "h": 0.62
-      },
-      "zIndexHint": 24,
-      "path": "buildings/lumber-camp.webp",
-      "intendedUse": "building:building_lumber_camp_base",
-      "promptFile": "prompts/buildings.md#lumber-camp",
-      "promptSummary": "Frontier Storybook building asset for building_lumber_camp_base.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG + sips + cwebp",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "sips-png-rasterization",
-        "cwebp-compression"
-      ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG + sips + cwebp",
-      "reviewer": "codex-human",
-      "approvalStatus": "approved",
-      "usage": "primary-view",
-      "approvedBy": "Robin / design owner",
-      "approvedAt": "2026-04-21",
-      "approvalNotes": "Approved for the V1.3.1 full-route player surface hero frame.",
-      "optimizationStatus": "optimized-webp",
-      "bytes": 5594,
-      "styleReview": {
-        "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
-      }
-    },
-    {
-      "id": "building_farm_plot_base",
-      "kind": "building",
-      "buildingType": "FARM_PLOT",
-      "state": "base",
-      "src": "/experiences/founders-plot/assets/buildings/farm-plot.webp",
-      "width": 512,
-      "height": 512,
-      "transparent": true,
-      "anchor": {
-        "x": 0.5,
-        "y": 0.88
-      },
-      "hitbox": {
-        "x": 0.16,
-        "y": 0.24,
-        "w": 0.7,
-        "h": 0.56
-      },
-      "zIndexHint": 18,
-      "path": "buildings/farm-plot.webp",
-      "intendedUse": "building:building_farm_plot_base",
-      "promptFile": "prompts/buildings.md#farm-plot",
-      "promptSummary": "Frontier Storybook building asset for building_farm_plot_base.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG + sips + cwebp",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "sips-png-rasterization",
-        "cwebp-compression"
-      ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG + sips + cwebp",
-      "reviewer": "codex-human",
-      "approvalStatus": "approved",
-      "usage": "primary-view",
-      "approvedBy": "Robin / design owner",
-      "approvedAt": "2026-04-21",
-      "approvalNotes": "Approved for the V1.3.1 full-route player surface hero frame.",
-      "optimizationStatus": "optimized-webp",
-      "bytes": 6374,
-      "styleReview": {
-        "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
-      }
-    },
-    {
-      "id": "building_quarry_base",
-      "kind": "building",
-      "buildingType": "QUARRY",
-      "state": "base",
-      "src": "/experiences/founders-plot/assets/buildings/quarry.webp",
-      "width": 512,
-      "height": 512,
-      "transparent": true,
-      "anchor": {
-        "x": 0.5,
-        "y": 0.88
-      },
-      "hitbox": {
-        "x": 0.16,
-        "y": 0.2,
-        "w": 0.7,
-        "h": 0.62
-      },
-      "zIndexHint": 20,
-      "path": "buildings/quarry.webp",
-      "intendedUse": "building:building_quarry_base",
-      "promptFile": "prompts/buildings.md#quarry",
-      "promptSummary": "Frontier Storybook building asset for building_quarry_base.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG + sips + cwebp",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "sips-png-rasterization",
-        "cwebp-compression"
-      ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG + sips + cwebp",
-      "reviewer": "codex-human",
-      "approvalStatus": "approved",
-      "usage": "primary-view",
-      "approvedBy": "Robin / design owner",
-      "approvedAt": "2026-04-21",
-      "approvalNotes": "Approved for the V1.3.1 full-route player surface hero frame.",
-      "optimizationStatus": "optimized-webp",
-      "bytes": 5742,
-      "styleReview": {
-        "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
-      }
-    },
-    {
-      "id": "building_workshop_base",
-      "kind": "building",
-      "buildingType": "WORKSHOP",
-      "state": "base",
-      "src": "/experiences/founders-plot/assets/buildings/workshop.webp",
-      "width": 512,
-      "height": 512,
-      "transparent": true,
-      "anchor": {
-        "x": 0.5,
-        "y": 0.86
-      },
-      "hitbox": {
-        "x": 0.18,
-        "y": 0.18,
-        "w": 0.64,
-        "h": 0.66
-      },
-      "zIndexHint": 22,
-      "path": "buildings/workshop.webp",
-      "intendedUse": "building:building_workshop_base",
-      "promptFile": "prompts/buildings.md#workshop",
-      "promptSummary": "Frontier Storybook building asset for building_workshop_base.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG + sips + cwebp",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "sips-png-rasterization",
-        "cwebp-compression"
-      ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG + sips + cwebp",
-      "reviewer": "codex-human",
-      "approvalStatus": "approved",
-      "usage": "primary-view",
-      "approvedBy": "Robin / design owner",
-      "approvedAt": "2026-04-21",
-      "approvalNotes": "Approved for the V1.3.1 full-route player surface hero frame.",
-      "optimizationStatus": "optimized-webp",
-      "bytes": 6152,
-      "styleReview": {
-        "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
-      }
-    },
-    {
-      "id": "building_market_stall_base",
-      "kind": "building",
-      "buildingType": "MARKET_STALL",
-      "state": "base",
-      "src": "/experiences/founders-plot/assets/buildings/market-stall.webp",
-      "width": 512,
-      "height": 512,
-      "transparent": true,
-      "anchor": {
-        "x": 0.5,
-        "y": 0.88
-      },
-      "hitbox": {
-        "x": 0.16,
-        "y": 0.2,
-        "w": 0.7,
-        "h": 0.6
-      },
-      "zIndexHint": 22,
-      "path": "buildings/market-stall.webp",
-      "intendedUse": "building:building_market_stall_base",
-      "promptFile": "prompts/buildings.md#market-stall",
-      "promptSummary": "Frontier Storybook building asset for building_market_stall_base.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG + sips + cwebp",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "sips-png-rasterization",
-        "cwebp-compression"
-      ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG + sips + cwebp",
-      "reviewer": "codex-human",
-      "approvalStatus": "approved",
-      "usage": "primary-view",
-      "approvedBy": "Robin / design owner",
-      "approvedAt": "2026-04-21",
-      "approvalNotes": "Approved for the V1.3.1 full-route player surface hero frame.",
-      "optimizationStatus": "optimized-webp",
-      "bytes": 5664,
-      "styleReview": {
-        "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
-      }
-    },
-    {
-      "id": "object_contract_board_base",
-      "kind": "object",
-      "state": "base",
-      "src": "/experiences/founders-plot/assets/objects/contract-board.webp",
-      "width": 512,
-      "height": 512,
-      "transparent": true,
-      "anchor": {
-        "x": 0.5,
-        "y": 0.9
-      },
-      "hitbox": {
-        "x": 0.26,
-        "y": 0.22,
-        "w": 0.48,
-        "h": 0.58
-      },
-      "zIndexHint": 14,
-      "path": "objects/contract-board.webp",
-      "intendedUse": "object:object_contract_board_base",
-      "promptFile": "prompts/buildings.md#contract-board",
-      "promptSummary": "Frontier Storybook object asset for object_contract_board_base.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG + sips + cwebp",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "sips-png-rasterization",
-        "cwebp-compression"
-      ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG + sips + cwebp",
-      "reviewer": "codex-human",
-      "approvalStatus": "approved",
-      "usage": "primary-view",
-      "approvedBy": "Robin / design owner",
-      "approvedAt": "2026-04-21",
-      "approvalNotes": "Approved for the V1.3.1 full-route player surface hero frame.",
-      "optimizationStatus": "optimized-webp",
-      "bytes": 3416,
-      "styleReview": {
-        "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
-      }
-    },
-    {
-      "id": "object_public_square_welcome_sign_base",
-      "kind": "object",
-      "state": "base",
-      "src": "/experiences/founders-plot/assets/objects/welcome-sign.webp",
-      "width": 512,
-      "height": 512,
-      "transparent": true,
-      "anchor": {
-        "x": 0.5,
-        "y": 0.9
-      },
-      "hitbox": {
-        "x": 0.2,
-        "y": 0.22,
-        "w": 0.6,
-        "h": 0.56
-      },
-      "zIndexHint": 12,
-      "path": "objects/welcome-sign.webp",
-      "intendedUse": "object:object_public_square_welcome_sign_base",
-      "promptFile": "prompts/buildings.md#welcome-sign",
-      "promptSummary": "Frontier Storybook object asset for object_public_square_welcome_sign_base.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG + sips + cwebp",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "sips-png-rasterization",
-        "cwebp-compression"
-      ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG + sips + cwebp",
-      "reviewer": "codex-human",
-      "approvalStatus": "approved",
-      "usage": "primary-view",
-      "approvedBy": "Robin / design owner",
-      "approvedAt": "2026-04-21",
-      "approvalNotes": "Approved for the V1.3.1 full-route player surface hero frame.",
-      "optimizationStatus": "optimized-webp",
-      "bytes": 4094,
-      "styleReview": {
-        "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
-      }
-    },
-    {
-      "id": "object_public_square_welcome_sign_upgraded",
-      "kind": "object",
-      "state": "upgraded",
-      "src": "/experiences/founders-plot/assets/objects/welcome-sign-upgraded.webp",
-      "width": 512,
-      "height": 512,
-      "transparent": true,
-      "anchor": {
-        "x": 0.5,
-        "y": 0.9
-      },
-      "hitbox": {
-        "x": 0.2,
-        "y": 0.22,
-        "w": 0.6,
-        "h": 0.56
-      },
-      "zIndexHint": 12,
-      "path": "objects/welcome-sign-upgraded.webp",
-      "intendedUse": "object:object_public_square_welcome_sign_upgraded",
-      "promptFile": "prompts/buildings.md#welcome-sign",
-      "promptSummary": "Frontier Storybook object asset for object_public_square_welcome_sign_upgraded.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG + sips + cwebp",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "sips-png-rasterization",
-        "cwebp-compression"
-      ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG + sips + cwebp",
-      "reviewer": "codex-human",
-      "approvalStatus": "approved",
-      "usage": "primary-view",
-      "approvedBy": "Robin / design owner",
-      "approvedAt": "2026-04-21",
-      "approvalNotes": "Approved for the V1.3.1 full-route player surface hero frame.",
-      "optimizationStatus": "optimized-webp",
-      "bytes": 4538,
-      "styleReview": {
-        "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
-      }
-    },
-    {
-      "id": "object_foreman_hut_base",
-      "kind": "object",
-      "state": "base",
-      "src": "/experiences/founders-plot/assets/objects/foreman-hut.webp",
-      "width": 512,
-      "height": 512,
-      "transparent": true,
-      "anchor": {
-        "x": 0.5,
-        "y": 0.88
-      },
-      "hitbox": {
-        "x": 0.18,
-        "y": 0.18,
-        "w": 0.64,
-        "h": 0.66
-      },
-      "zIndexHint": 18,
-      "path": "objects/foreman-hut.webp",
-      "intendedUse": "object:object_foreman_hut_base",
-      "promptFile": "prompts/buildings.md#foreman-hut",
-      "promptSummary": "Frontier Storybook object asset for object_foreman_hut_base.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG + sips + cwebp",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "sips-png-rasterization",
-        "cwebp-compression"
-      ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG + sips + cwebp",
-      "reviewer": "codex-human",
-      "approvalStatus": "approved",
-      "usage": "primary-view",
-      "approvedBy": "Robin / design owner",
-      "approvedAt": "2026-04-21",
-      "approvalNotes": "Approved for the V1.3.1 full-route player surface hero frame.",
-      "optimizationStatus": "optimized-webp",
-      "bytes": 5880,
-      "styleReview": {
-        "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
-      }
-    },
-    {
-      "id": "object_empty_lot_buildable",
-      "kind": "object",
-      "state": "buildable",
-      "src": "/experiences/founders-plot/assets/objects/empty-lot.webp",
-      "width": 512,
-      "height": 512,
-      "transparent": true,
-      "anchor": {
-        "x": 0.5,
-        "y": 0.92
-      },
-      "hitbox": {
-        "x": 0.2,
-        "y": 0.28,
-        "w": 0.58,
-        "h": 0.46
-      },
-      "zIndexHint": 10,
-      "path": "objects/empty-lot.webp",
-      "intendedUse": "object:object_empty_lot_buildable",
-      "promptFile": "prompts/buildings.md#lots",
-      "promptSummary": "Frontier Storybook object asset for object_empty_lot_buildable.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG + sips + cwebp",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "sips-png-rasterization",
-        "cwebp-compression"
-      ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG + sips + cwebp",
-      "reviewer": "codex-human",
-      "approvalStatus": "approved",
-      "usage": "primary-view",
-      "approvedBy": "Robin / design owner",
-      "approvedAt": "2026-04-21",
-      "approvalNotes": "Approved for the V1.3.1 full-route player surface hero frame.",
-      "optimizationStatus": "optimized-webp",
-      "bytes": 4488,
-      "styleReview": {
-        "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
-      }
-    },
-    {
-      "id": "object_locked_lot",
-      "kind": "object",
-      "state": "locked",
-      "src": "/experiences/founders-plot/assets/objects/locked-lot.webp",
-      "width": 512,
-      "height": 512,
-      "transparent": true,
-      "anchor": {
-        "x": 0.5,
-        "y": 0.92
-      },
-      "hitbox": {
-        "x": 0.2,
-        "y": 0.28,
-        "w": 0.58,
-        "h": 0.46
-      },
-      "zIndexHint": 10,
-      "path": "objects/locked-lot.webp",
-      "intendedUse": "object:object_locked_lot",
-      "promptFile": "prompts/buildings.md#lots",
-      "promptSummary": "Frontier Storybook object asset for object_locked_lot.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG + sips + cwebp",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "sips-png-rasterization",
-        "cwebp-compression"
-      ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG + sips + cwebp",
-      "reviewer": "codex-human",
-      "approvalStatus": "approved",
-      "usage": "primary-view",
-      "approvedBy": "Robin / design owner",
-      "approvedAt": "2026-04-21",
-      "approvalNotes": "Approved for the V1.3.1 full-route player surface hero frame.",
-      "optimizationStatus": "optimized-webp",
-      "bytes": 4114,
-      "styleReview": {
-        "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
-      }
-    },
-    {
-      "id": "clover_idle",
-      "kind": "character",
-      "state": "idle",
-      "src": "/experiences/founders-plot/assets/characters/clover-idle.webp",
-      "width": 512,
-      "height": 512,
-      "transparent": true,
-      "anchor": {
-        "x": 0.5,
-        "y": 0.94
-      },
-      "hitbox": {
-        "x": 0.28,
-        "y": 0.18,
-        "w": 0.44,
-        "h": 0.72
-      },
-      "zIndexHint": 40,
-      "path": "characters/clover-idle.webp",
-      "intendedUse": "character:clover_idle",
-      "promptFile": "prompts/clover.md#clover-states",
-      "promptSummary": "Frontier Storybook character asset for clover_idle.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG + sips + cwebp",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "sips-png-rasterization",
-        "cwebp-compression"
-      ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG + sips + cwebp",
-      "reviewer": "codex-human",
-      "approvalStatus": "approved",
-      "usage": "primary-view",
-      "approvedBy": "Robin / design owner",
-      "approvedAt": "2026-04-21",
-      "approvalNotes": "Approved for the V1.3.1 full-route player surface hero frame.",
-      "optimizationStatus": "optimized-webp",
-      "bytes": 9296,
-      "styleReview": {
-        "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
-      }
-    },
-    {
-      "id": "clover_observing",
-      "kind": "character",
-      "state": "observing",
-      "src": "/experiences/founders-plot/assets/characters/clover-observing.webp",
-      "width": 512,
-      "height": 512,
-      "transparent": true,
-      "anchor": {
-        "x": 0.5,
-        "y": 0.94
-      },
-      "hitbox": {
-        "x": 0.28,
-        "y": 0.18,
-        "w": 0.44,
-        "h": 0.72
-      },
-      "zIndexHint": 40,
-      "path": "characters/clover-observing.webp",
-      "intendedUse": "character:clover_observing",
-      "promptFile": "prompts/clover.md#clover-states",
-      "promptSummary": "Frontier Storybook character asset for clover_observing.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG + sips + cwebp",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "sips-png-rasterization",
-        "cwebp-compression"
-      ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG + sips + cwebp",
-      "reviewer": "codex-human",
-      "approvalStatus": "approved",
-      "usage": "primary-view",
-      "approvedBy": "Robin / design owner",
-      "approvedAt": "2026-04-21",
-      "approvalNotes": "Approved for the V1.3.1 full-route player surface hero frame.",
-      "optimizationStatus": "optimized-webp",
-      "bytes": 9656,
-      "styleReview": {
-        "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
-      }
-    },
-    {
-      "id": "clover_thinking",
-      "kind": "character",
-      "state": "thinking",
-      "src": "/experiences/founders-plot/assets/characters/clover-thinking.webp",
-      "width": 512,
-      "height": 512,
-      "transparent": true,
-      "anchor": {
-        "x": 0.5,
-        "y": 0.94
-      },
-      "hitbox": {
-        "x": 0.28,
-        "y": 0.18,
-        "w": 0.44,
-        "h": 0.72
-      },
-      "zIndexHint": 40,
-      "path": "characters/clover-thinking.webp",
-      "intendedUse": "character:clover_thinking",
-      "promptFile": "prompts/clover.md#clover-states",
-      "promptSummary": "Frontier Storybook character asset for clover_thinking.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG + sips + cwebp",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "sips-png-rasterization",
-        "cwebp-compression"
-      ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG + sips + cwebp",
-      "reviewer": "codex-human",
-      "approvalStatus": "approved",
-      "usage": "primary-view",
-      "approvedBy": "Robin / design owner",
-      "approvedAt": "2026-04-21",
-      "approvalNotes": "Approved for the V1.3.1 full-route player surface hero frame.",
-      "optimizationStatus": "optimized-webp",
-      "bytes": 10178,
-      "styleReview": {
-        "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
-      }
-    },
-    {
-      "id": "clover_acting",
-      "kind": "character",
-      "state": "acting",
-      "src": "/experiences/founders-plot/assets/characters/clover-acting.webp",
-      "width": 512,
-      "height": 512,
-      "transparent": true,
-      "anchor": {
-        "x": 0.5,
-        "y": 0.94
-      },
-      "hitbox": {
-        "x": 0.28,
-        "y": 0.18,
-        "w": 0.44,
-        "h": 0.72
-      },
-      "zIndexHint": 40,
-      "path": "characters/clover-acting.webp",
-      "intendedUse": "character:clover_acting",
-      "promptFile": "prompts/clover.md#clover-states",
-      "promptSummary": "Frontier Storybook character asset for clover_acting.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG + sips + cwebp",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "sips-png-rasterization",
-        "cwebp-compression"
-      ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG + sips + cwebp",
-      "reviewer": "codex-human",
-      "approvalStatus": "approved",
-      "usage": "primary-view",
-      "approvedBy": "Robin / design owner",
-      "approvedAt": "2026-04-21",
-      "approvalNotes": "Approved for the V1.3.1 full-route player surface hero frame.",
-      "optimizationStatus": "optimized-webp",
-      "bytes": 9498,
-      "styleReview": {
-        "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
-      }
-    },
-    {
-      "id": "clover_waiting_approval",
-      "kind": "character",
-      "state": "waiting-approval",
-      "src": "/experiences/founders-plot/assets/characters/clover-waiting-approval.webp",
-      "width": 512,
-      "height": 512,
-      "transparent": true,
-      "anchor": {
-        "x": 0.5,
-        "y": 0.94
-      },
-      "hitbox": {
-        "x": 0.28,
-        "y": 0.18,
-        "w": 0.44,
-        "h": 0.72
-      },
-      "zIndexHint": 40,
-      "path": "characters/clover-waiting-approval.webp",
-      "intendedUse": "character:clover_waiting_approval",
-      "promptFile": "prompts/clover.md#clover-states",
-      "promptSummary": "Frontier Storybook character asset for clover_waiting_approval.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG + sips + cwebp",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "sips-png-rasterization",
-        "cwebp-compression"
-      ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG + sips + cwebp",
-      "reviewer": "codex-human",
-      "approvalStatus": "approved",
-      "usage": "primary-view",
-      "approvedBy": "Robin / design owner",
-      "approvedAt": "2026-04-21",
-      "approvalNotes": "Approved for the V1.3.1 full-route player surface hero frame.",
-      "optimizationStatus": "optimized-webp",
-      "bytes": 9972,
-      "styleReview": {
-        "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
-      }
-    },
-    {
-      "id": "clover_paused",
-      "kind": "character",
-      "state": "paused",
-      "src": "/experiences/founders-plot/assets/characters/clover-paused.webp",
-      "width": 512,
-      "height": 512,
-      "transparent": true,
-      "anchor": {
-        "x": 0.5,
-        "y": 0.94
-      },
-      "hitbox": {
-        "x": 0.28,
-        "y": 0.18,
-        "w": 0.44,
-        "h": 0.72
-      },
-      "zIndexHint": 40,
-      "path": "characters/clover-paused.webp",
-      "intendedUse": "character:clover_paused",
-      "promptFile": "prompts/clover.md#clover-states",
-      "promptSummary": "Frontier Storybook character asset for clover_paused.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG + sips + cwebp",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "sips-png-rasterization",
-        "cwebp-compression"
-      ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG + sips + cwebp",
-      "reviewer": "codex-human",
-      "approvalStatus": "approved",
-      "usage": "primary-view",
-      "approvedBy": "Robin / design owner",
-      "approvedAt": "2026-04-21",
-      "approvalNotes": "Approved for the V1.3.1 full-route player surface hero frame.",
-      "optimizationStatus": "optimized-webp",
-      "bytes": 9160,
-      "styleReview": {
-        "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
-      }
-    },
-    {
-      "id": "clover_restart_needed",
-      "kind": "character",
-      "state": "restart-needed",
-      "src": "/experiences/founders-plot/assets/characters/clover-restart-needed.webp",
-      "width": 512,
-      "height": 512,
-      "transparent": true,
-      "anchor": {
-        "x": 0.5,
-        "y": 0.94
-      },
-      "hitbox": {
-        "x": 0.28,
-        "y": 0.18,
-        "w": 0.44,
-        "h": 0.72
-      },
-      "zIndexHint": 40,
-      "path": "characters/clover-restart-needed.webp",
-      "intendedUse": "character:clover_restart_needed",
-      "promptFile": "prompts/clover.md#clover-states",
-      "promptSummary": "Frontier Storybook character asset for clover_restart_needed.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG + sips + cwebp",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "sips-png-rasterization",
-        "cwebp-compression"
-      ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG + sips + cwebp",
-      "reviewer": "codex-human",
-      "approvalStatus": "approved",
-      "usage": "primary-view",
-      "approvedBy": "Robin / design owner",
-      "approvedAt": "2026-04-21",
-      "approvalNotes": "Approved for the V1.3.1 full-route player surface hero frame.",
-      "optimizationStatus": "optimized-webp",
-      "bytes": 10142,
-      "styleReview": {
-        "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
-      }
-    },
-    {
-      "id": "overlay_construction",
-      "kind": "overlay",
+      "id": "founders_plot_overlay_construction_v1_4_2",
+      "role": "founders_plot_overlay",
+      "kind": "founders_plot_overlay",
       "state": "construction",
+      "path": "public/experiences/founders-plot/assets/overlays/construction.svg",
       "src": "/experiences/founders-plot/assets/overlays/construction.svg",
+      "status": "approved",
+      "generatedBy": "codex-svg",
+      "generationMode": "scripted-svg",
+      "model": "codex-svg",
+      "promptFile": "specs/prompts/v1_4_2/founders_plot_overlay_pack_v1_4_2.md",
+      "promptHash": "af4b0e7ba87f4af5b899296bdf254ac12e9e6fc806385e000276597bacfb7c7e",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5"
+      },
+      "candidateId": "scripted-svg",
+      "candidatePath": "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+      "postProcessing": [
+        "svg-authoring"
+      ],
+      "dimensions": {
+        "width": 72,
+        "height": 72
+      },
       "width": 72,
       "height": 72,
+      "byteSize": 308,
+      "bytes": 308,
+      "containsIntentionalText": false,
+      "alt": "construction overlay",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot overlay use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/overlays/construction.svg",
       "transparent": true,
       "anchor": {
         "x": 0.5,
@@ -1275,38 +1816,53 @@
         "h": 1
       },
       "zIndexHint": 50,
-      "path": "overlays/construction.svg",
-      "intendedUse": "overlay:overlay_construction",
-      "promptFile": "prompts/style-lock.md",
-      "promptSummary": "Frontier Storybook overlay asset for overlay_construction.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "svg-inline-optimization"
-      ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG",
-      "reviewer": "codex-human",
+      "usage": "primary-view",
       "approvalStatus": "approved",
       "optimizationStatus": "svg-inline-optimized",
-      "bytes": 673,
       "styleReview": {
         "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
+        "reviewer": "codex-human",
+        "score": 5
       }
     },
     {
-      "id": "overlay_ready_sparkle",
-      "kind": "overlay",
-      "state": "ready",
+      "id": "founders_plot_overlay_ready_sparkle_v1_4_2",
+      "role": "founders_plot_overlay",
+      "kind": "founders_plot_overlay",
+      "state": "sparkle",
+      "path": "public/experiences/founders-plot/assets/overlays/sparkle.svg",
       "src": "/experiences/founders-plot/assets/overlays/sparkle.svg",
+      "status": "approved",
+      "generatedBy": "codex-svg",
+      "generationMode": "scripted-svg",
+      "model": "codex-svg",
+      "promptFile": "specs/prompts/v1_4_2/founders_plot_overlay_pack_v1_4_2.md",
+      "promptHash": "af4b0e7ba87f4af5b899296bdf254ac12e9e6fc806385e000276597bacfb7c7e",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5"
+      },
+      "candidateId": "scripted-svg",
+      "candidatePath": "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+      "postProcessing": [
+        "svg-authoring"
+      ],
+      "dimensions": {
+        "width": 72,
+        "height": 72
+      },
       "width": 72,
       "height": 72,
+      "byteSize": 329,
+      "bytes": 329,
+      "containsIntentionalText": false,
+      "alt": "sparkle overlay",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot overlay use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/overlays/sparkle.svg",
       "transparent": true,
       "anchor": {
         "x": 0.5,
@@ -1319,38 +1875,53 @@
         "h": 1
       },
       "zIndexHint": 50,
-      "path": "overlays/sparkle.svg",
-      "intendedUse": "overlay:overlay_ready_sparkle",
-      "promptFile": "prompts/style-lock.md",
-      "promptSummary": "Frontier Storybook overlay asset for overlay_ready_sparkle.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "svg-inline-optimization"
-      ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG",
-      "reviewer": "codex-human",
+      "usage": "primary-view",
       "approvalStatus": "approved",
       "optimizationStatus": "svg-inline-optimized",
-      "bytes": 693,
       "styleReview": {
         "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
+        "reviewer": "codex-human",
+        "score": 5
       }
     },
     {
-      "id": "overlay_blocked_badge",
-      "kind": "overlay",
+      "id": "founders_plot_overlay_blocked_badge_v1_4_2",
+      "role": "founders_plot_overlay",
+      "kind": "founders_plot_overlay",
       "state": "blocked",
+      "path": "public/experiences/founders-plot/assets/overlays/blocked.svg",
       "src": "/experiences/founders-plot/assets/overlays/blocked.svg",
+      "status": "approved",
+      "generatedBy": "codex-svg",
+      "generationMode": "scripted-svg",
+      "model": "codex-svg",
+      "promptFile": "specs/prompts/v1_4_2/founders_plot_overlay_pack_v1_4_2.md",
+      "promptHash": "af4b0e7ba87f4af5b899296bdf254ac12e9e6fc806385e000276597bacfb7c7e",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5"
+      },
+      "candidateId": "scripted-svg",
+      "candidatePath": "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+      "postProcessing": [
+        "svg-authoring"
+      ],
+      "dimensions": {
+        "width": 72,
+        "height": 72
+      },
       "width": 72,
       "height": 72,
+      "byteSize": 263,
+      "bytes": 263,
+      "containsIntentionalText": false,
+      "alt": "blocked overlay",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot overlay use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/overlays/blocked.svg",
       "transparent": true,
       "anchor": {
         "x": 0.5,
@@ -1363,38 +1934,53 @@
         "h": 1
       },
       "zIndexHint": 50,
-      "path": "overlays/blocked.svg",
-      "intendedUse": "overlay:overlay_blocked_badge",
-      "promptFile": "prompts/style-lock.md",
-      "promptSummary": "Frontier Storybook overlay asset for overlay_blocked_badge.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "svg-inline-optimization"
-      ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG",
-      "reviewer": "codex-human",
+      "usage": "primary-view",
       "approvalStatus": "approved",
       "optimizationStatus": "svg-inline-optimized",
-      "bytes": 628,
       "styleReview": {
         "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
+        "reviewer": "codex-human",
+        "score": 5
       }
     },
     {
-      "id": "overlay_upgrade_badge",
-      "kind": "overlay",
+      "id": "founders_plot_overlay_upgrade_badge_v1_4_2",
+      "role": "founders_plot_overlay",
+      "kind": "founders_plot_overlay",
       "state": "upgrade",
+      "path": "public/experiences/founders-plot/assets/overlays/upgrade.svg",
       "src": "/experiences/founders-plot/assets/overlays/upgrade.svg",
+      "status": "approved",
+      "generatedBy": "codex-svg",
+      "generationMode": "scripted-svg",
+      "model": "codex-svg",
+      "promptFile": "specs/prompts/v1_4_2/founders_plot_overlay_pack_v1_4_2.md",
+      "promptHash": "af4b0e7ba87f4af5b899296bdf254ac12e9e6fc806385e000276597bacfb7c7e",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5"
+      },
+      "candidateId": "scripted-svg",
+      "candidatePath": "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+      "postProcessing": [
+        "svg-authoring"
+      ],
+      "dimensions": {
+        "width": 72,
+        "height": 72
+      },
       "width": 72,
       "height": 72,
+      "byteSize": 257,
+      "bytes": 257,
+      "containsIntentionalText": false,
+      "alt": "upgrade overlay",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot overlay use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/overlays/upgrade.svg",
       "transparent": true,
       "anchor": {
         "x": 0.5,
@@ -1407,38 +1993,53 @@
         "h": 1
       },
       "zIndexHint": 50,
-      "path": "overlays/upgrade.svg",
-      "intendedUse": "overlay:overlay_upgrade_badge",
-      "promptFile": "prompts/style-lock.md",
-      "promptSummary": "Frontier Storybook overlay asset for overlay_upgrade_badge.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "svg-inline-optimization"
-      ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG",
-      "reviewer": "codex-human",
+      "usage": "primary-view",
       "approvalStatus": "approved",
       "optimizationStatus": "svg-inline-optimized",
-      "bytes": 622,
       "styleReview": {
         "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
+        "reviewer": "codex-human",
+        "score": 5
       }
     },
     {
-      "id": "overlay_approval_needed",
-      "kind": "overlay",
+      "id": "founders_plot_overlay_approval_needed_v1_4_2",
+      "role": "founders_plot_overlay",
+      "kind": "founders_plot_overlay",
       "state": "approval",
+      "path": "public/experiences/founders-plot/assets/overlays/approval.svg",
       "src": "/experiences/founders-plot/assets/overlays/approval.svg",
+      "status": "approved",
+      "generatedBy": "codex-svg",
+      "generationMode": "scripted-svg",
+      "model": "codex-svg",
+      "promptFile": "specs/prompts/v1_4_2/founders_plot_overlay_pack_v1_4_2.md",
+      "promptHash": "af4b0e7ba87f4af5b899296bdf254ac12e9e6fc806385e000276597bacfb7c7e",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5"
+      },
+      "candidateId": "scripted-svg",
+      "candidatePath": "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+      "postProcessing": [
+        "svg-authoring"
+      ],
+      "dimensions": {
+        "width": 72,
+        "height": 72
+      },
       "width": 72,
       "height": 72,
+      "byteSize": 306,
+      "bytes": 306,
+      "containsIntentionalText": false,
+      "alt": "approval overlay",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot overlay use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/overlays/approval.svg",
       "transparent": true,
       "anchor": {
         "x": 0.5,
@@ -1451,38 +2052,53 @@
         "h": 1
       },
       "zIndexHint": 50,
-      "path": "overlays/approval.svg",
-      "intendedUse": "overlay:overlay_approval_needed",
-      "promptFile": "prompts/style-lock.md",
-      "promptSummary": "Frontier Storybook overlay asset for overlay_approval_needed.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "svg-inline-optimization"
-      ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG",
-      "reviewer": "codex-human",
+      "usage": "primary-view",
       "approvalStatus": "approved",
       "optimizationStatus": "svg-inline-optimized",
-      "bytes": 671,
       "styleReview": {
         "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
+        "reviewer": "codex-human",
+        "score": 5
       }
     },
     {
-      "id": "overlay_contract_available",
-      "kind": "overlay",
+      "id": "founders_plot_overlay_contract_available_v1_4_2",
+      "role": "founders_plot_overlay",
+      "kind": "founders_plot_overlay",
       "state": "contract",
+      "path": "public/experiences/founders-plot/assets/overlays/contract.svg",
       "src": "/experiences/founders-plot/assets/overlays/contract.svg",
+      "status": "approved",
+      "generatedBy": "codex-svg",
+      "generationMode": "scripted-svg",
+      "model": "codex-svg",
+      "promptFile": "specs/prompts/v1_4_2/founders_plot_overlay_pack_v1_4_2.md",
+      "promptHash": "af4b0e7ba87f4af5b899296bdf254ac12e9e6fc806385e000276597bacfb7c7e",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5"
+      },
+      "candidateId": "scripted-svg",
+      "candidatePath": "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+      "postProcessing": [
+        "svg-authoring"
+      ],
+      "dimensions": {
+        "width": 72,
+        "height": 72
+      },
       "width": 72,
       "height": 72,
+      "byteSize": 373,
+      "bytes": 373,
+      "containsIntentionalText": false,
+      "alt": "contract overlay",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot overlay use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/overlays/contract.svg",
       "transparent": true,
       "anchor": {
         "x": 0.5,
@@ -1495,38 +2111,53 @@
         "h": 1
       },
       "zIndexHint": 50,
-      "path": "overlays/contract.svg",
-      "intendedUse": "overlay:overlay_contract_available",
-      "promptFile": "prompts/style-lock.md",
-      "promptSummary": "Frontier Storybook overlay asset for overlay_contract_available.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "svg-inline-optimization"
-      ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG",
-      "reviewer": "codex-human",
+      "usage": "primary-view",
       "approvalStatus": "approved",
       "optimizationStatus": "svg-inline-optimized",
-      "bytes": 738,
       "styleReview": {
         "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
+        "reviewer": "codex-human",
+        "score": 5
       }
     },
     {
-      "id": "overlay_producing_timer_frame",
-      "kind": "overlay",
+      "id": "founders_plot_overlay_producing_timer_frame_v1_4_2",
+      "role": "founders_plot_overlay",
+      "kind": "founders_plot_overlay",
       "state": "timer",
+      "path": "public/experiences/founders-plot/assets/overlays/timer-frame.svg",
       "src": "/experiences/founders-plot/assets/overlays/timer-frame.svg",
+      "status": "approved",
+      "generatedBy": "codex-svg",
+      "generationMode": "scripted-svg",
+      "model": "codex-svg",
+      "promptFile": "specs/prompts/v1_4_2/founders_plot_overlay_pack_v1_4_2.md",
+      "promptHash": "af4b0e7ba87f4af5b899296bdf254ac12e9e6fc806385e000276597bacfb7c7e",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5"
+      },
+      "candidateId": "scripted-svg",
+      "candidatePath": "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+      "postProcessing": [
+        "svg-authoring"
+      ],
+      "dimensions": {
+        "width": 72,
+        "height": 72
+      },
       "width": 72,
       "height": 72,
+      "byteSize": 405,
+      "bytes": 405,
+      "containsIntentionalText": false,
+      "alt": "timer overlay",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for founders plot overlay use in the V1.4.2 rebuild.",
+      "replaces": "public/experiences/founders-plot/assets/overlays/timer-frame.svg",
       "transparent": true,
       "anchor": {
         "x": 0.5,
@@ -1539,29 +2170,430 @@
         "h": 1
       },
       "zIndexHint": 50,
-      "path": "overlays/timer-frame.svg",
-      "intendedUse": "overlay:overlay_producing_timer_frame",
-      "promptFile": "prompts/style-lock.md",
-      "promptSummary": "Frontier Storybook overlay asset for overlay_producing_timer_frame.",
-      "license": "project-owned-generated",
-      "sourceTool": "Codex scripted SVG",
-      "referenceSource": "founders_plot_internal_asset_pack_v1_3",
-      "referenceFiles": [],
-      "rightsStatus": "generated_project_owned",
-      "postProcessing": [
-        "svg-authoring",
-        "svg-inline-optimization"
-      ],
-      "approvalScope": "gameplay_asset",
-      "generationToolModel": "Codex scripted SVG",
-      "reviewer": "codex-human",
+      "usage": "primary-view",
       "approvalStatus": "approved",
       "optimizationStatus": "svg-inline-optimized",
-      "bytes": 770,
       "styleReview": {
         "passed": true,
-        "score": 5,
-        "reviewer": "codex-human"
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "hero_cast_group_key_art_v1_4_2",
+      "role": "platform_marketing_art",
+      "kind": "platform_marketing_art",
+      "path": "public/assets/hero-cast/hero-cast-group.webp",
+      "src": "/assets/hero-cast/hero-cast-group.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/hero_cast_group_key_art_v1_4_2.md",
+      "promptHash": "23c2c3989fdbea7bc01a75a45f980e631a90b56abdb7609a539dbd91244bf065",
+      "referenceInputs": [
+        "docs/brand/reference/hero-cast/prairie-dog-ranger-source.png",
+        "docs/brand/reference/hero-cast/sheriff-lobster-source.jpeg",
+        "docs/brand/reference/hero-cast/chibi-homesteader-girl-source.png",
+        "docs/brand/reference/hero-cast/wizard-kid-source.png",
+        "public/assets/candidates/v1_4_2/hero-cast/hero-cast-group-c01.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/hero-cast/prairie-dog-ranger-source.png": "18bfe6c7f9f8cbdf8dd1b1442b0b177260ec21129e989a119494d97572d35089",
+        "docs/brand/reference/hero-cast/sheriff-lobster-source.jpeg": "b8b0bc21cb58d1fc019919fe8ff027f494eb0f4c9f92b9088a3b28c296f359d2",
+        "docs/brand/reference/hero-cast/chibi-homesteader-girl-source.png": "f6b39e514299c0c0ab13bf470f878b1b1350b0f16d94bdd54c8c652e4f5cc7e2",
+        "docs/brand/reference/hero-cast/wizard-kid-source.png": "5ca9798b535a7bfa52cecd3aa0f442ee03c3be3b204d9dc8bcba87afc54dd0ea",
+        "public/assets/candidates/v1_4_2/hero-cast/hero-cast-group-c01.png": "cfbe04131b3d27431931a496df4163e14393a46dab43fd242b99c8375aa37e94"
+      },
+      "candidateId": "c01",
+      "candidatePath": "public/assets/candidates/v1_4_2/hero-cast/hero-cast-group-c01.png",
+      "postProcessing": [
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 1536,
+        "height": 1024
+      },
+      "width": 1536,
+      "height": 1024,
+      "byteSize": 341742,
+      "bytes": 341742,
+      "containsIntentionalText": false,
+      "alt": "Agent Town hero cast group key art",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for platform marketing art use in the V1.4.2 rebuild.",
+      "replaces": "public/agenttown.jpeg",
+      "transparent": false,
+      "anchor": null,
+      "hitbox": null,
+      "zIndexHint": 0,
+      "usage": "primary-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "hero_prairie_dog_ranger_v1_4_2",
+      "role": "platform_hero_reference",
+      "kind": "platform_hero_reference",
+      "path": "public/assets/hero-cast/prairie-dog-ranger.webp",
+      "src": "/assets/hero-cast/prairie-dog-ranger.webp",
+      "status": "approved",
+      "generatedBy": "reference-normalized",
+      "generationMode": "reference_conversion",
+      "model": "reference-normalized",
+      "promptFile": "specs/prompts/v1_4_2/hero_prairie_dog_ranger_v1_4_2.md",
+      "promptHash": "268919e246cac5c27ec6d82fb4e455d711fe6ac41805ccfb861b2510793ba376",
+      "referenceInputs": [
+        "docs/brand/reference/hero-cast/prairie-dog-ranger-source.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/hero-cast/prairie-dog-ranger-source.png": "18bfe6c7f9f8cbdf8dd1b1442b0b177260ec21129e989a119494d97572d35089"
+      },
+      "candidateId": "reference-normalized",
+      "candidatePath": "docs/brand/reference/hero-cast/prairie-dog-ranger-source.png",
+      "postProcessing": [
+        "colorspace-normalization",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 1365,
+        "height": 2048
+      },
+      "width": 1365,
+      "height": 2048,
+      "byteSize": 473744,
+      "bytes": 473744,
+      "containsIntentionalText": false,
+      "alt": "Prairie Dog Ranger portrait",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for platform hero reference use in the V1.4.2 rebuild.",
+      "replaces": "public/assets/hero-cast/prairie-dog-ranger.webp",
+      "transparent": false,
+      "anchor": null,
+      "hitbox": null,
+      "zIndexHint": 10,
+      "usage": "supporting-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "hero_sheriff_lobster_v1_4_2",
+      "role": "platform_hero_reference",
+      "kind": "platform_hero_reference",
+      "path": "public/assets/hero-cast/sheriff-lobster.webp",
+      "src": "/assets/hero-cast/sheriff-lobster.webp",
+      "status": "approved",
+      "generatedBy": "reference-normalized",
+      "generationMode": "reference_conversion",
+      "model": "reference-normalized",
+      "promptFile": "specs/prompts/v1_4_2/hero_sheriff_lobster_v1_4_2.md",
+      "promptHash": "560871b678080ae44c915c601683dda881c3f7c8500cc5ed1d0a07f8f02dfa63",
+      "referenceInputs": [
+        "docs/brand/reference/hero-cast/sheriff-lobster-source.jpeg"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/hero-cast/sheriff-lobster-source.jpeg": "b8b0bc21cb58d1fc019919fe8ff027f494eb0f4c9f92b9088a3b28c296f359d2"
+      },
+      "candidateId": "reference-normalized",
+      "candidatePath": "docs/brand/reference/hero-cast/sheriff-lobster-source.jpeg",
+      "postProcessing": [
+        "colorspace-normalization",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "width": 1024,
+      "height": 1024,
+      "byteSize": 53128,
+      "bytes": 53128,
+      "containsIntentionalText": false,
+      "alt": "Sheriff Lobster portrait",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for platform hero reference use in the V1.4.2 rebuild.",
+      "replaces": "public/assets/hero-cast/sheriff-lobster.webp",
+      "transparent": false,
+      "anchor": null,
+      "hitbox": null,
+      "zIndexHint": 10,
+      "usage": "supporting-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "hero_chibi_homesteader_v1_4_2",
+      "role": "platform_hero_reference",
+      "kind": "platform_hero_reference",
+      "path": "public/assets/hero-cast/chibi-homesteader.webp",
+      "src": "/assets/hero-cast/chibi-homesteader.webp",
+      "status": "approved",
+      "generatedBy": "reference-normalized",
+      "generationMode": "reference_conversion",
+      "model": "reference-normalized",
+      "promptFile": "specs/prompts/v1_4_2/hero_chibi_homesteader_v1_4_2.md",
+      "promptHash": "a3306ee19d1c9036ec0521efb20efd06a7369d2666ffa962ba0dd62f07bd5193",
+      "referenceInputs": [
+        "docs/brand/reference/hero-cast/chibi-homesteader-girl-source.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/hero-cast/chibi-homesteader-girl-source.png": "f6b39e514299c0c0ab13bf470f878b1b1350b0f16d94bdd54c8c652e4f5cc7e2"
+      },
+      "candidateId": "reference-normalized",
+      "candidatePath": "docs/brand/reference/hero-cast/chibi-homesteader-girl-source.png",
+      "postProcessing": [
+        "colorspace-normalization",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "width": 1024,
+      "height": 1024,
+      "byteSize": 65116,
+      "bytes": 65116,
+      "containsIntentionalText": false,
+      "alt": "Chibi Homesteader portrait",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for platform hero reference use in the V1.4.2 rebuild.",
+      "replaces": "public/assets/hero-cast/chibi-homesteader.webp",
+      "transparent": false,
+      "anchor": null,
+      "hitbox": null,
+      "zIndexHint": 10,
+      "usage": "supporting-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "hero_wizard_kid_v1_4_2",
+      "role": "platform_hero_reference",
+      "kind": "platform_hero_reference",
+      "path": "public/assets/hero-cast/wizard-kid.webp",
+      "src": "/assets/hero-cast/wizard-kid.webp",
+      "status": "approved",
+      "generatedBy": "reference-normalized",
+      "generationMode": "reference_conversion",
+      "model": "reference-normalized",
+      "promptFile": "specs/prompts/v1_4_2/hero_wizard_kid_v1_4_2.md",
+      "promptHash": "bcecf6c6bfc0a863e54df1e12b26dabfa82e0b2a9ea8623bc2af50bfdb3be719",
+      "referenceInputs": [
+        "docs/brand/reference/hero-cast/wizard-kid-source.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/hero-cast/wizard-kid-source.png": "5ca9798b535a7bfa52cecd3aa0f442ee03c3be3b204d9dc8bcba87afc54dd0ea"
+      },
+      "candidateId": "reference-normalized",
+      "candidatePath": "docs/brand/reference/hero-cast/wizard-kid-source.png",
+      "postProcessing": [
+        "colorspace-normalization",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 1024,
+        "height": 1536
+      },
+      "width": 1024,
+      "height": 1536,
+      "byteSize": 74192,
+      "bytes": 74192,
+      "containsIntentionalText": false,
+      "alt": "Wizard Kid portrait",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for platform hero reference use in the V1.4.2 rebuild.",
+      "replaces": "public/assets/hero-cast/wizard-kid.webp",
+      "transparent": false,
+      "anchor": null,
+      "hitbox": null,
+      "zIndexHint": 10,
+      "usage": "supporting-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "town_shell_background_v1_4_2",
+      "role": "platform_background",
+      "kind": "platform_background",
+      "path": "public/assets/platform/town-shell-background-v1_4_2.webp",
+      "src": "/assets/platform/town-shell-background-v1_4_2.webp",
+      "status": "approved",
+      "generatedBy": "reference-normalized",
+      "generationMode": "reference_conversion",
+      "model": "reference-normalized",
+      "promptFile": "specs/prompts/v1_4_2/town_shell_background_v1_4_2.md",
+      "promptHash": "db1c2fc67ef05db73bcfff3fcfb38a1580e300a8b0474c637381ca16d76c6449",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5"
+      },
+      "candidateId": "reference-normalized",
+      "candidatePath": "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+      "postProcessing": [
+        "colorspace-normalization",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 1280,
+        "height": 714
+      },
+      "width": 1280,
+      "height": 714,
+      "byteSize": 105346,
+      "bytes": 105346,
+      "containsIntentionalText": false,
+      "alt": "Agent Town platform background",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for platform background use in the V1.4.2 rebuild.",
+      "replaces": "public/agenttown.jpeg",
+      "transparent": false,
+      "anchor": null,
+      "hitbox": null,
+      "zIndexHint": 10,
+      "usage": "primary-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "townhall_onboarding_illustration_v1_4_2",
+      "role": "platform_onboarding_art",
+      "kind": "platform_onboarding_art",
+      "path": "public/assets/platform/townhall-onboarding-illustration-v1_4_2.webp",
+      "src": "/assets/platform/townhall-onboarding-illustration-v1_4_2.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/townhall_onboarding_illustration_v1_4_2.md",
+      "promptHash": "7471aafb45845be8d700475fa78d22fb1487aa71e9014c33119e8e08d998c250",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/assets/candidates/v1_4_2/platform/townhall-onboarding-illustration-c01.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/assets/candidates/v1_4_2/platform/townhall-onboarding-illustration-c01.png": "fb5b5f96f5709e2916014b6a720f8986800606baf01947ebc8f4274bd00d7ab5"
+      },
+      "candidateId": "c01",
+      "candidatePath": "public/assets/candidates/v1_4_2/platform/townhall-onboarding-illustration-c01.png",
+      "postProcessing": [
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 1536,
+        "height": 1024
+      },
+      "width": 1536,
+      "height": 1024,
+      "byteSize": 257686,
+      "bytes": 257686,
+      "containsIntentionalText": false,
+      "alt": "Town Hall onboarding illustration",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for platform onboarding art use in the V1.4.2 rebuild.",
+      "replaces": "public/views/townhall.html",
+      "transparent": false,
+      "anchor": null,
+      "hitbox": null,
+      "zIndexHint": 0,
+      "usage": "primary-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
+      }
+    },
+    {
+      "id": "brain_connect_marker_v1_4_2",
+      "role": "platform_brain_art",
+      "kind": "platform_brain_art",
+      "path": "public/assets/platform/brain-connect-marker-v1_4_2.webp",
+      "src": "/assets/platform/brain-connect-marker-v1_4_2.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_2/brain_connect_marker_v1_4_2.md",
+      "promptHash": "f6f6a158911847552173104270f390eb41cb548534a7a723141af83b0410ff57",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/assets/candidates/v1_4_2/platform/brain-connect-marker-c01.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/assets/candidates/v1_4_2/platform/brain-connect-marker-c01.png": "8da5a054f04cbb9a6ee3b0ecd2bbfc8fe4fca9fd9fc4fbf9fc342e41e29d6209"
+      },
+      "candidateId": "c01",
+      "candidatePath": "public/assets/candidates/v1_4_2/platform/brain-connect-marker-c01.png",
+      "postProcessing": [
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "width": 1254,
+      "height": 1254,
+      "byteSize": 212724,
+      "bytes": 212724,
+      "containsIntentionalText": false,
+      "alt": "Brain connect marker",
+      "approvedBy": "Robin / design owner",
+      "approvedAt": "2026-04-22",
+      "approvalNotes": "Approved for platform brain art use in the V1.4.2 rebuild.",
+      "replaces": "public/views/brain.html",
+      "transparent": false,
+      "anchor": null,
+      "hitbox": null,
+      "zIndexHint": 0,
+      "usage": "primary-view",
+      "approvalStatus": "approved",
+      "optimizationStatus": "optimized-webp",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-human",
+        "score": 5
       }
     }
   ]

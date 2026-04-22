@@ -1,5 +1,5 @@
 # REGISTRY.md
-_Status: starter private registry definition for shell, onboarding, and Founders Plot V1 game surface_
+_Status: starter private registry definition for shell, onboarding, Founders Plot V1 game surface, and V1.4.2 asset-governance contracts_
 
 ## 1. Purpose
 
@@ -106,6 +106,15 @@ npx shadcn@latest add @agent-town/townhall-onboarding
 - `sigil-lock-step`
 - `agent-comms-drawer`
 
+### V1.4.2 asset-governance items
+- `gpt-image-2-prompt-contract`
+- `asset-manifest-entry`
+- `asset-inventory-row`
+- `visual-signoff-sheet`
+- `generated-asset-candidate-folder`
+- `prompt-provenance-validator`
+- `hero-cast-reference-card`
+
 ## 7. Governance rules
 
 ### 7.1 Base token changes
@@ -125,6 +134,16 @@ Do not add a new primitive unless:
 - it cannot be expressed with the current registry
 - it solves a repeated shell/onboarding problem
 - it gets documented in `DESIGN.md`
+
+### 7.4 Asset-governance rules
+
+For V1.4.2 and later visual-production sprints:
+
+- every generated production asset must map to a durable prompt contract;
+- candidate folders are part of the registry workflow, not ad hoc scratch space;
+- manifest entries must keep prompt and reference provenance;
+- screenshot signoff is required before gameplay or primary-view use;
+- hero-cast platform assets stay quarantined from default Founders Plot gameplay unless a later spec explicitly changes that boundary.
 
 ## 8. Block contracts
 

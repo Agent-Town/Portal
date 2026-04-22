@@ -1,5 +1,5 @@
 # BRAND.md
-_Status: canonical for shell, onboarding, and Founders Plot V1 game surfaces_
+_Status: canonical for shell, onboarding, Founders Plot V1 game surfaces, and V1.4.2 asset governance_
 
 ## 1. Brand thesis
 
@@ -80,6 +80,41 @@ Humans arrive first with curiosity and uncertainty. Agents arrive as companions,
 
 The player is not “booting software.”
 The player is **crossing the gate into town**.
+
+## 4.1 Naming hierarchy and role boundary
+
+- **Agent Town** is the masterbrand and the game/product identity.
+- **Founders Plot** is the launch chapter.
+- Use **Agent Town: Founders Plot** when continuity helps, but do not collapse the whole product into the Founders Plot name.
+
+V1.4.2 keeps the recovered role hierarchy explicit:
+
+- **Clover Kincaid** is the gameplay partner and Foreman on the default Founders Plot route.
+- The recovered hero cast is the **platform ensemble**:
+  - Prairie Dog Ranger
+  - Sheriff Lobster
+  - Chibi Homesteader Girl
+  - Wizard Kid
+
+The hero cast is approved for brand, marketing, onboarding atmosphere, loading/interstitial work, and future requester exploration. It is not approved to replace Clover or crowd the default Founders Plot gameplay screen.
+
+## 4.2 V1.4.2 asset standard
+
+Player-facing art in this sprint must feel like:
+
+- warm frontier storybook;
+- soft-3D collectible;
+- hopeful, civic, and handcrafted;
+- readable at game UI size.
+
+It must not feel like:
+
+- placeholder prototype art;
+- cyberpunk or sterile SaaS art;
+- cowboy parody;
+- a hero-cast ensemble pasted into gameplay by default.
+
+Primary-view assets and other production route assets must be approved by a named human art/design owner before they are treated as shipped gameplay or marketing surfaces.
 
 ## 5. Canonical default trio
 

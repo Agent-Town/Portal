@@ -23,18 +23,19 @@
     MARKET_STALL: 2
   };
   const PAD_LAYOUT = {
-    '0,0': { x: 0.23, y: 0.38, z: 24, label: 'Northwest Pad' },
-    '1,0': { x: 0.50, y: 0.24, z: 30, label: 'North Pad' },
-    '2,0': { x: 0.77, y: 0.38, z: 24, label: 'Northeast Pad' },
-    '0,1': { x: 0.18, y: 0.60, z: 18, label: 'West Pad' },
-    '2,1': { x: 0.82, y: 0.60, z: 18, label: 'East Pad' },
-    '1,2': { x: 0.50, y: 0.78, z: 12, label: 'South Pad' }
+    '0,0': { x: 0.13, y: 0.55, z: 16, label: 'Southwest Pad' },
+    '1,0': { x: 0.27, y: 0.40, z: 22, label: 'West Pad' },
+    '2,0': { x: 0.42, y: 0.28, z: 28, label: 'North Pad' },
+    '0,1': { x: 0.86, y: 0.40, z: 22, label: 'Northeast Pad' },
+    '2,1': { x: 0.88, y: 0.68, z: 14, label: 'East Pad' },
+    '1,2': { x: 0.77, y: 0.90, z: 10, label: 'South Pad' }
   };
   const SPECIAL_OBJECT_LAYOUT = {
-    CONTRACT_BOARD: { x: 0.90, y: 0.38, z: 16 },
-    PUBLIC_SQUARE: { x: 0.10, y: 0.78, z: 10 },
-    FOREMAN_HUT: { x: 0.88, y: 0.80, z: 12 },
-    JOURNAL: { x: 0.10, y: 0.16, z: 8 }
+    CONTRACT_BOARD: { x: 0.81, y: 0.66, z: 18 },
+    PUBLIC_SQUARE: { x: 0.55, y: 0.78, z: 16 },
+    FOREMAN_HUT: { x: 0.18, y: 0.90, z: 18 },
+    JOURNAL: { x: 0.09, y: 0.86, z: 10 },
+    APPROVAL_INBOX: { x: 0.93, y: 0.84, z: 12 }
   };
   const DEBUG_TERMS = [
     'provider',
@@ -205,7 +206,7 @@
       return 'PUBLIC_SQUARE';
     }
     if (actionType === 'RESOLVE_APPROVAL' || (Array.isArray(view?.foreman?.pendingApprovals) && view.foreman.pendingApprovals.length > 0)) {
-      return 'FOREMAN_HUT';
+      return 'APPROVAL_INBOX';
     }
     return selectionKeyToObjectId(selectedKey, view);
   }
@@ -235,8 +236,7 @@
   function shouldShowLabel(object, { viewportWidth = 1280, selected = false, attention = 'none' } = {}) {
     const mobile = number(viewportWidth, 1280) <= 430;
     if (mobile) return selected || attention === 'recommended';
-    if (selected || attention === 'recommended') return true;
-    return object?.id === 'HQ' || object?.id === 'CONTRACT_BOARD' || object?.id === 'FOREMAN_HUT';
+    return selected || attention === 'recommended';
   }
 
   function buildingBadges(building, state, view) {
@@ -290,14 +290,14 @@
 
   function assetIdForBuilding(building, state) {
     const type = upper(building?.type);
-    if (type === 'HQ') return `building_hq_level_${clamp(number(building?.level || 1), 1, 5)}`;
-    if (type === 'LUMBER_CAMP') return 'building_lumber_camp_base';
-    if (type === 'FARM_PLOT') return 'building_farm_plot_base';
-    if (type === 'QUARRY') return 'building_quarry_base';
-    if (type === 'WORKSHOP') return 'building_workshop_base';
-    if (type === 'MARKET_STALL') return 'building_market_stall_base';
-    if (state === 'LOCKED') return 'object_locked_lot';
-    return 'object_empty_lot_buildable';
+    if (type === 'HQ') return `founders_plot_hq_lv${clamp(number(building?.level || 1), 1, 5)}_v1_4_2`;
+    if (type === 'LUMBER_CAMP') return 'founders_plot_lumber_camp_v1_4_2';
+    if (type === 'FARM_PLOT') return 'founders_plot_farm_plot_v1_4_2';
+    if (type === 'QUARRY') return 'founders_plot_quarry_v1_4_2';
+    if (type === 'WORKSHOP') return 'founders_plot_workshop_v1_4_2';
+    if (type === 'MARKET_STALL') return 'founders_plot_market_stall_v1_4_2';
+    if (state === 'LOCKED') return 'founders_plot_locked_lot_v1_4_2';
+    return 'founders_plot_empty_lot_v1_4_2';
   }
 
   function objectPrimaryAction(objectId, view, building) {
@@ -309,6 +309,8 @@
     }
     if (objectId === 'PUBLIC_SQUARE') return { label: 'Inspect square', action: 'drawer:signals' };
     if (objectId === 'FOREMAN_HUT') return { label: 'Talk to Clover', action: 'drawer:foreman' };
+    if (objectId === 'JOURNAL') return { label: 'Read journal', action: 'drawer:journal' };
+    if (objectId === 'APPROVAL_INBOX') return { label: 'Review approvals', action: 'drawer:approvals' };
     if (objectId.startsWith('PAD:')) return { label: 'Build here', action: `select:${objectId}` };
     if (building) {
       const state = upper(building?.state);
@@ -327,19 +329,30 @@
     return 'helping with';
   }
 
+  function latestCompletedContract(view) {
+    const completed = Array.isArray(view?.contracts?.completed) ? view.contracts.completed : [];
+    return completed
+      .filter((contract) => contract && String(contract.contractId || '').trim())
+      .sort((left, right) => number(right?.completedAtMs) - number(left?.completedAtMs))[0] || null;
+  }
+
   function cloverState(view, options) {
     const runtime = view?.foreman?.runtime || {};
     const local = options?.localForemanRuntimeStatus || {};
     const pendingApprovals = Array.isArray(view?.foreman?.pendingApprovals) ? view.foreman.pendingApprovals : [];
     const receipt = view?.foreman?.receipt || null;
     const runtimeStatus = upper(runtime.status, 'NOT_STARTED');
+    const latestContract = latestCompletedContract(view);
+    const celebrationFresh = latestContract && number(latestContract.completedAtMs) > 0
+      ? (Date.now() - number(latestContract.completedAtMs)) < 5 * 60 * 1000
+      : false;
     const targetObjectId = options?.lastActionTargetObjectId || goalTargetObjectId(view, options?.selectedKey || '');
 
     if (pendingApprovals.length > 0) {
       return {
         state: 'WAITING_FOR_PERMISSION',
         bubbleText: cleanShortCopy(pendingApprovals[0]?.title, 'I need your say-so before the next move.'),
-        targetObjectId: 'FOREMAN_HUT',
+        targetObjectId: 'APPROVAL_INBOX',
         actionVerb: 'waiting on'
       };
     }
@@ -373,6 +386,17 @@
         bubbleText: cleanShortCopy(receipt?.summary || receipt?.reason || view?.foreman?.recommendation, 'Clover is handling one safe task.'),
         targetObjectId,
         actionVerb: actionVerbForReceipt(receipt)
+      };
+    }
+    if (celebrationFresh && runtimeStatus !== 'NOT_STARTED') {
+      return {
+        state: 'CELEBRATING',
+        bubbleText: cleanShortCopy(
+          latestContract?.townBenefit || `${latestContract?.title || 'That town request'} landed well.`,
+          'The town cheered for that finished request.'
+        ),
+        targetObjectId: 'CONTRACT_BOARD',
+        actionVerb: 'celebrating at'
       };
     }
     if (runtimeStatus === 'THINKING') {
@@ -481,6 +505,9 @@
     const selectedObjectId = selectionKeyToObjectId(String(options?.selectedKey || ''), view);
     const goalObjectId = goalTargetObjectId(view, String(options?.selectedKey || ''), view);
     const objects = [];
+    const journalEntries = Array.isArray(view?.journal?.entries) ? view.journal.entries : [];
+    const pendingApprovals = Array.isArray(view?.foreman?.pendingApprovals) ? view.foreman.pendingApprovals : [];
+    const unseenRecap = number(view?.recap?.unseenCount || 0);
 
     const hqBuilding = Array.isArray(view?.buildings)
       ? view.buildings.find((entry) => upper(entry?.type) === 'HQ')
@@ -494,8 +521,8 @@
         buildingType: 'HQ',
         label: labelForBuilding('HQ'),
         state: hqState,
-        x: 0.50,
-        y: 0.49,
+        x: 0.65,
+        y: 0.44,
         z: 32,
         assetId: assetIdForBuilding(hqBuilding, hqState),
         badges: buildingBadges(hqBuilding, hqState, view),
@@ -525,10 +552,10 @@
           buildingType: building.type,
           label: labelForBuilding(building.type),
           state,
-          x: layout.x,
-          y: layout.y,
-          z: layout.z,
-          assetId: assetIdForBuilding(building, state),
+        x: layout.x,
+        y: layout.y,
+        z: layout.z,
+        assetId: assetIdForBuilding(building, state),
           badges: buildingBadges(building, state, view),
           timer: timerForBuilding(building),
           primaryAction,
@@ -550,7 +577,7 @@
         x: layout.x,
         y: layout.y,
         z: layout.z,
-        assetId: state === 'LOCKED' ? 'object_locked_lot' : 'object_empty_lot_buildable',
+        assetId: state === 'LOCKED' ? 'founders_plot_locked_lot_v1_4_2' : 'founders_plot_empty_lot_v1_4_2',
         badges: state === 'BUILDABLE'
           ? [{ type: 'build', label: 'Build here', tone: 'neutral' }]
           : [{ type: 'locked', label: 'Locked lot', tone: 'warn' }],
@@ -580,7 +607,7 @@
       x: SPECIAL_OBJECT_LAYOUT.CONTRACT_BOARD.x,
       y: SPECIAL_OBJECT_LAYOUT.CONTRACT_BOARD.y,
       z: SPECIAL_OBJECT_LAYOUT.CONTRACT_BOARD.z,
-      assetId: 'object_contract_board_base',
+      assetId: 'founders_plot_contract_board_v1_4_2',
       badges: [
         view?.contracts?.activeContract?.status === 'READY_TO_TURN_IN'
           ? { type: 'contract', label: 'Turn-in ready', tone: 'good' }
@@ -610,9 +637,7 @@
       x: SPECIAL_OBJECT_LAYOUT.PUBLIC_SQUARE.x,
       y: SPECIAL_OBJECT_LAYOUT.PUBLIC_SQUARE.y,
       z: SPECIAL_OBJECT_LAYOUT.PUBLIC_SQUARE.z,
-      assetId: publicSquareLevel > 0
-        ? 'object_public_square_welcome_sign_upgraded'
-        : 'object_public_square_welcome_sign_base',
+      assetId: 'founders_plot_public_square_v1_4_2',
       badges: [
         publicSquareLevel > 0
           ? { type: 'charm', label: 'Square raised', tone: 'good' }
@@ -625,15 +650,62 @@
       testId: 'founders-stage-object-PUBLIC_SQUARE'
     });
 
-    const foremanObjectState = Array.isArray(view?.foreman?.pendingApprovals) && view.foreman.pendingApprovals.length > 0
-      ? 'READY'
-      : options?.localForemanRuntimeStatus?.needsRestart || options?.localForemanRuntimeStatus?.expired
+    const journalAction = objectPrimaryAction('JOURNAL', view, null);
+    const journalState = unseenRecap > 0 ? 'READY' : 'IDLE';
+    objects.push({
+      id: 'JOURNAL',
+      kind: 'object',
+      label: 'Town Journal',
+      state: journalState,
+      x: SPECIAL_OBJECT_LAYOUT.JOURNAL.x,
+      y: SPECIAL_OBJECT_LAYOUT.JOURNAL.y,
+      z: SPECIAL_OBJECT_LAYOUT.JOURNAL.z,
+      assetId: 'founders_plot_journal_trigger_v1_4_2',
+      badges: [
+        unseenRecap > 0
+          ? { type: 'ready', label: `${unseenRecap} new note${unseenRecap === 1 ? '' : 's'}`, tone: 'good' }
+          : { type: 'civic', label: journalEntries.length > 0 ? 'Town record' : 'Journal stand', tone: 'neutral' }
+      ],
+      timer: null,
+      primaryAction: journalAction,
+      ariaLabel: `Town Journal, ${stateLabel(journalState)}, ${journalAction.label}.`,
+      drawerKey: 'journal',
+      testId: 'founders-stage-object-JOURNAL'
+    });
+
+    const approvalAction = objectPrimaryAction('APPROVAL_INBOX', view, null);
+    const approvalState = pendingApprovals.length > 0 ? 'READY' : 'IDLE';
+    objects.push({
+      id: 'APPROVAL_INBOX',
+      kind: 'object',
+      label: 'Approval Bell',
+      state: approvalState,
+      x: SPECIAL_OBJECT_LAYOUT.APPROVAL_INBOX.x,
+      y: SPECIAL_OBJECT_LAYOUT.APPROVAL_INBOX.y,
+      z: SPECIAL_OBJECT_LAYOUT.APPROVAL_INBOX.z,
+      assetId: 'founders_plot_approval_inbox_v1_4_2',
+      badges: [
+        pendingApprovals.length > 0
+          ? { type: 'approval', label: `${pendingApprovals.length} waiting`, tone: 'warn' }
+          : { type: 'civic', label: 'Inbox clear', tone: 'neutral' }
+      ],
+      timer: null,
+      primaryAction: approvalAction,
+      ariaLabel: `Approval Bell, ${stateLabel(approvalState)}, ${approvalAction.label}.`,
+      drawerKey: 'approvals',
+      testId: 'founders-stage-object-APPROVAL_INBOX'
+    });
+
+    const runtimeStatus = upper(view?.foreman?.runtime?.status);
+    const foremanObjectState = options?.localForemanRuntimeStatus?.needsRestart || options?.localForemanRuntimeStatus?.expired || runtimeStatus === 'ERROR'
         ? 'BLOCKED'
-        : upper(view?.foreman?.runtime?.status) === 'PAUSED'
+        : runtimeStatus === 'PAUSED'
           ? 'IDLE'
-          : upper(view?.foreman?.runtime?.status) === 'NOT_STARTED'
+          : runtimeStatus === 'NOT_STARTED'
             ? 'BUILDABLE'
-            : 'PRODUCING';
+            : ['BOOTING', 'OBSERVING', 'THINKING', 'ACTING'].includes(runtimeStatus)
+              ? 'PRODUCING'
+              : 'IDLE';
     const foremanAction = objectPrimaryAction('FOREMAN_HUT', view, null);
     objects.push({
       id: 'FOREMAN_HUT',
@@ -643,13 +715,13 @@
       x: SPECIAL_OBJECT_LAYOUT.FOREMAN_HUT.x,
       y: SPECIAL_OBJECT_LAYOUT.FOREMAN_HUT.y,
       z: SPECIAL_OBJECT_LAYOUT.FOREMAN_HUT.z,
-      assetId: 'object_foreman_hut_base',
+      assetId: 'founders_plot_foreman_hut_v1_4_2',
       badges: [
-        Array.isArray(view?.foreman?.pendingApprovals) && view.foreman.pendingApprovals.length > 0
-          ? { type: 'approval', label: `${view.foreman.pendingApprovals.length} waiting`, tone: 'warn' }
-          : options?.localForemanRuntimeStatus?.needsRestart || options?.localForemanRuntimeStatus?.expired
+        options?.localForemanRuntimeStatus?.needsRestart || options?.localForemanRuntimeStatus?.expired || runtimeStatus === 'ERROR'
             ? { type: 'restart', label: 'Needs a fresh start', tone: 'warn' }
-            : { type: 'foreman', label: 'Clover nearby', tone: 'neutral' }
+            : runtimeStatus === 'NOT_STARTED'
+              ? { type: 'foreman', label: 'Start Clover', tone: 'neutral' }
+              : { type: 'foreman', label: pendingApprovals.length > 0 ? 'Clover is waiting' : 'Clover nearby', tone: 'neutral' }
       ],
       timer: null,
       primaryAction: foremanAction,
@@ -715,15 +787,16 @@
         targetLabel: cloverTarget?.label || '',
         actionVerb: cloverBase.actionVerb || actionVerbForReceipt(view?.foreman?.receipt || {}),
         assetId: {
-          NOT_STARTED: 'clover_idle',
-          OBSERVING: 'clover_observing',
-          THINKING: 'clover_thinking',
-          ACTING: 'clover_acting',
-          WAITING_FOR_PERMISSION: 'clover_waiting_approval',
-          PAUSED: 'clover_paused',
-          RESTART_NEEDED: 'clover_restart_needed',
-          ERROR: 'clover_restart_needed'
-        }[cloverBase.state] || 'clover_idle',
+          NOT_STARTED: 'clover_idle_v1_4_2',
+          OBSERVING: 'clover_observing_v1_4_2',
+        THINKING: 'clover_thinking_v1_4_2',
+        ACTING: 'clover_acting_v1_4_2',
+        CELEBRATING: 'clover_celebrating_v1_4_2',
+        WAITING_FOR_PERMISSION: 'clover_waiting_approval_v1_4_2',
+        PAUSED: 'clover_paused_v1_4_2',
+        ERROR: 'clover_blocked_v1_4_2',
+        RESTART_NEEDED: 'clover_restart_needed_v1_4_2',
+      }[cloverBase.state] || 'clover_idle_v1_4_2',
         x: cloverPosition.x,
         y: cloverPosition.y
       },

@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
+const ALLOWED_GENERATORS = ['gpt-image-2', 'codex-svg', 'reference-normalized'];
 
 test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
@@ -11,12 +12,14 @@ test('the Founders Plot asset manifest is complete, dimensionally correct, and u
   expect(response.ok()).toBe(true);
   const manifest = await response.json();
   const assets = Array.isArray(manifest?.assets) ? manifest.assets : [];
-  expect(manifest?.styleFamily).toBe('agent-town-frontier-storybook-v1');
+  expect(manifest?.schemaVersion).toBe('v1.4.2');
+  expect(manifest?.styleFamily).toBe('agent-town-frontier-storybook-v1_4_2');
   expect(Array.isArray(manifest?.referenceInputs)).toBe(true);
   expect(manifest?.videoReference?.url).toBe('https://www.youtube.com/watch?v=ZW7tUUZqhdY');
   expect(manifest?.videoReference?.usage).toBe('tone_motion_story_reference_only');
   expect(manifest?.videoReference?.frameExtractionRequired).toBe(false);
-  expect(assets.length).toBeGreaterThanOrEqual(32);
+  expect(manifest?.heroFrame?.screenshotPrefix).toBe('founders-v1-4-2-full-route-hero-1280');
+  expect(assets.length).toBeGreaterThanOrEqual(43);
 
   await page.goto('/founders-plot?embed=1');
   const inspected = await page.evaluate(async (assetEntries) => {
@@ -63,20 +66,25 @@ test('the Founders Plot asset manifest is complete, dimensionally correct, and u
     expect(inspectedAsset?.naturalWidth).toBe(asset.width);
     expect(inspectedAsset?.naturalHeight).toBe(asset.height);
     expect(asset?.promptFile).toBeTruthy();
-    expect(asset?.license).toBeTruthy();
-    expect(asset?.sourceTool).toBeTruthy();
-    expect(asset?.referenceSource).toBeTruthy();
-    expect(Array.isArray(asset?.referenceFiles)).toBe(true);
-    expect(asset?.rightsStatus).toBeTruthy();
+    expect(ALLOWED_GENERATORS).toContain(asset?.generatedBy);
+    expect(asset?.generationMode).toBeTruthy();
+    expect(asset?.model).toBeTruthy();
+    expect(asset?.candidateId).toBeTruthy();
+    expect(asset?.candidatePath).toBeTruthy();
+    expect(Array.isArray(asset?.referenceInputs)).toBe(true);
+    expect(asset?.referenceInputs?.length).toBeGreaterThan(0);
+    expect(asset?.referenceHashes).toBeTruthy();
     expect(Array.isArray(asset?.postProcessing)).toBe(true);
-    expect(asset?.approvalScope).toBe('gameplay_asset');
+    expect(asset?.status).toBe('approved');
     expect(asset?.styleReview?.passed).toBe(true);
-    expect(asset?.reviewer).toBeTruthy();
     expect(asset?.approvalStatus).toBe('approved');
+    expect(asset?.approvedBy).toBeTruthy();
+    expect(asset?.approvedAt).toBeTruthy();
+    expect(asset?.approvalNotes).toBeTruthy();
   }
 
   transparentRequired.forEach((asset) => {
     expect(byId.get(asset.id)?.hasAlpha).toBe(true);
   });
-  expect(totalBytes).toBeLessThanOrEqual(2_800_000);
+  expect(totalBytes).toBeLessThanOrEqual(4_500_000);
 });

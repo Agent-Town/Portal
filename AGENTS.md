@@ -13,12 +13,24 @@ Before making product/UI changes, read the relevant docs in this order:
 
 1. `AGENTS.md` — repo workflow and non-negotiable coding rules.
 2. `BRAND.md` — product identity, tone, naming, copy, character, and asset law.
-3. `DESIGN.md` — visual law, tokens, layout, game-surface composition, accessibility, and anti-patterns.
-4. `GAME_UX.md` — UX flows, hierarchy, game-surface interaction rules, and measurable acceptance criteria.
-5. `REGISTRY.md` — approved `@agent-town` components/blocks and registry governance.
+3. `DESIGN.md` — visual law, tokens, layout, game-surface composition, accessibility, and asset-generation law.
+4. `GAME_UX.md` — UX flows, hierarchy, game-surface interaction rules, screenshot signoff rules, and measurable acceptance criteria.
+5. `REGISTRY.md` — approved `@agent-town` components/blocks, visual contracts, and asset-governance primitives.
 6. The active sprint spec in `specs/`.
 
 Do not duplicate detailed style rules in `AGENTS.md`. Put durable design/UX rules in the design docs above and link to them here.
+
+## V1.4.2 GPT Image 2 asset workflow
+
+When the active sprint uses GPT Image 2 / `gpt-image-2`:
+
+- create or update the prompt file before generating production assets;
+- keep durable prompts under `specs/prompts/`;
+- generate into candidate folders first, not directly into production paths;
+- record prompt hash, reference hashes, model, candidate id, post-processing, byte size, and human signoff in the manifest;
+- use actual route screenshots as the signoff surface;
+- do not request transparent backgrounds from GPT Image 2; post-process sprite-like assets after generation;
+- do not ship untracked generated-image bundles or temporary capture folders.
 
 ## Primary goals
 
@@ -69,16 +81,25 @@ Rebuild OpenClaw Lite artifacts after vendor runtime changes:
 npm run build:openclaw-lite
 ```
 
+Optional `design.md` lint, when available:
+```bash
+npx @google/design.md lint DESIGN.md
+```
+
 ## Where to change things
 
 - `public/` — HTML/CSS/JS, visual assets, experience clients.
 - `public/experiences/founders-plot/` — Founders Plot client, style, packs, assets.
+- `public/experiences/founders-plot/assets/` — Founders Plot production and candidate assets.
 - `server/` — Express API + session logic + server-authoritative game state.
 - `server/founders_plot/` — Founders Plot engine, store, routes, tools, recap/replay.
 - `vendors/openclaw-lite-main/src/openclaw-lite/` — OpenClaw Lite source runtime.
 - `public/openclaw-lite/` — built OpenClaw Lite browser artifacts; keep in sync with vendor changes.
 - `e2e/` — Playwright tests and acceptance criteria.
+- `tests/` — lower-level validation tests.
 - `specs/` — product + API specifications.
+- `specs/prompts/` — durable prompt source files for generated assets.
+- `docs/visual/` — inventories, schemas, signoff sheets, and visual-process docs.
 - design docs: `BRAND.md`, `DESIGN.md`, `GAME_UX.md`, `REGISTRY.md`.
 
 ## Definition of done
@@ -90,6 +111,7 @@ A change is not done until:
 - `npm run build:openclaw-lite` has been run when worker/vendor code changed;
 - design/UX docs are updated when durable design behavior changed;
 - screenshot baselines are added/updated for player-facing UI changes;
+- generated production assets have prompt provenance and manifest approval metadata;
 - normal gameplay contains no backstage/debug/provider/runtime jargon;
 - accessibility checks pass for new interactive surfaces;
 - the active sprint spec’s measurable metrics are satisfied.

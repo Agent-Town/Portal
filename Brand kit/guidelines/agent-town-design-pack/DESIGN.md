@@ -1,5 +1,47 @@
+---
+version: "v1.4.2"
+name: "Agent Town Warm Frontier Storybook"
+description: "Machine-readable design tokens and human-readable visual law for Agent Town, Founders Plot, and the governed asset rebuild."
+colors:
+  primary: "#7A3F22"
+  secondary: "#2F5D50"
+  tertiary: "#D99A3D"
+  background: "#F7E8C8"
+  surface: "#FFF3D6"
+  ink: "#2A1A0D"
+  brass: "#C7892E"
+  sage: "#6F8A58"
+  focus: "#2B76C4"
+typography:
+  display:
+    fontFamily: "var(--font-display, Georgia, serif)"
+    fontSize: "2.75rem"
+    fontWeight: "800"
+  body:
+    fontFamily: "var(--font-body, system-ui, sans-serif)"
+    fontSize: "1rem"
+    fontWeight: "500"
+  label:
+    fontFamily: "var(--font-body, system-ui, sans-serif)"
+    fontSize: "0.78rem"
+    fontWeight: "800"
+components:
+  game-stage:
+    backgroundColor: "{colors.background}"
+    textColor: "{colors.ink}"
+  panel-parchment:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.ink}"
+  objective-ribbon:
+    backgroundColor: "{colors.tertiary}"
+    textColor: "{colors.ink}"
+  button-primary:
+    backgroundColor: "{colors.primary}"
+    textColor: "#FFF7E8"
+---
+
 # DESIGN.md
-_Status: canonical for shell, onboarding, and Founders Plot V1 game surfaces_
+_Status: canonical for shell, onboarding, Founders Plot V1 game surfaces, and V1.4.2 asset-generation law_
 
 ## 1. Purpose
 
@@ -20,6 +62,44 @@ This file governs:
 - responsive rules
 - anti-patterns
 - implementation constraints
+
+## 1.1 V1.4.2 overview
+
+Agent Town uses a warm frontier storybook design system. The UI must feel like a game world first and a control surface second. The player should see a town, a current goal, and Clover helping inside that town.
+
+This file now carries both machine-readable tokens in front matter and human-readable visual law in the markdown body.
+
+## Asset Generation Law
+
+All V1.4.2 player-facing production art must be:
+
+- governed by a durable prompt file under `specs/prompts/`;
+- generated or rebuilt through a reproducible candidate-first workflow;
+- tied to reference inputs that live in the repo;
+- tracked in the asset manifest with prompt hash, reference hashes, candidate id, post-processing, dimensions, byte size, and human approval;
+- judged inside the actual route, not only as isolated artwork.
+
+Rules:
+
+- do not generate directly into production paths without candidate review;
+- do not request transparent backgrounds from GPT Image 2; cut out or mask after generation when needed;
+- do not rely on readable embedded text in generated art unless explicitly approved;
+- do not treat screenshots as optional; full-route review is part of the asset contract.
+
+## V1.4.2 signoff and route validation
+
+The signoff surface is the full-route player experience. At minimum, review:
+
+- Founders Plot desktop full-route;
+- Founders Plot mobile full-route;
+- selected-building state;
+- Clover acting state with `clover-target-link`;
+- Start Gate;
+- town shell / hub;
+- Town Hall onboarding;
+- Brain Connect.
+
+The route must still read as Agent Town even after the asset swap. Visual polish does not justify dashboard chrome, debug leakage, or gameplay-scope drift.
 
 ## 2. Current basis
 

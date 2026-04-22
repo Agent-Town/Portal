@@ -56,7 +56,7 @@ test('normal full route hides Agent Comms and the debug surface during Founders 
   expect(state.agentSidebarVisible).toBe(false);
   expect(state.debugPaneVisible).toBe(false);
 
-  await expect(page).toHaveScreenshot('founders-v1-3-1-full-route-hero-1280.png', {
+  await expect(page).toHaveScreenshot('founders-v1-4-2-full-route-hero-1280.png', {
     animations: 'disabled',
     caret: 'hide',
     maxDiffPixelRatio: 0.03
@@ -70,7 +70,7 @@ test('normal full route hides Agent Comms and the debug surface during Founders 
   expect(mobileState.agentSidebarVisible).toBe(false);
   expect(mobileState.debugPaneVisible).toBe(false);
 
-  await expect(page).toHaveScreenshot('founders-v1-3-1-full-route-mobile-390.png', {
+  await expect(page).toHaveScreenshot('founders-v1-4-2-full-route-mobile-390.png', {
     animations: 'disabled',
     caret: 'hide',
     maxDiffPixelRatio: 0.03
@@ -89,7 +89,7 @@ test('explicit debug route reveals the Agent Comms and debug surface', async ({ 
   await expect(page.getByText('Worker Traffic', { exact: true })).toBeVisible();
   await expect(page.getByText('Trainer', { exact: true })).toBeVisible();
 
-  await expect(page).toHaveScreenshot('founders-v1-3-1-debug-enabled-1280.png', {
+  await expect(page).toHaveScreenshot('founders-v1-4-2-debug-enabled-1280.png', {
     animations: 'disabled',
     caret: 'hide',
     maxDiffPixelRatio: 0.03

@@ -25,7 +25,7 @@
     if (object?.goalTarget) classes.push('at-fp-stage-object--goal-target');
     if (object?.drawerKey) classes.push('at-fp-stage-object--drawer');
     if (object?.attention) classes.push(`at-fp-stage-object--attention-${String(object.attention).toLowerCase()}`);
-    if (object?.labelVisible === false) classes.push('at-fp-stage-object--label-hidden');
+    if (object?.labelVisible === true) classes.push('at-fp-stage-object--label-pinned');
     if (object?.actionLinked) classes.push('at-fp-stage-object--action-linked');
     return classes.join(' ');
   }
@@ -63,12 +63,15 @@
         return 'thinking';
       case 'ACTING':
         return 'acting';
+      case 'CELEBRATING':
+        return 'celebrating';
       case 'WAITING_FOR_PERMISSION':
         return 'waiting-approval';
+      case 'ERROR':
+        return 'blocked';
       case 'PAUSED':
         return 'paused';
       case 'RESTART_NEEDED':
-      case 'ERROR':
         return 'restart-needed';
       default:
         return 'idle';
@@ -82,10 +85,16 @@
     if (state === 'ACTING') {
       return `Clover is ${actionVerb} ${targetLabel}. Open the Foreman drawer.`;
     }
+    if (state === 'CELEBRATING') {
+      return `Clover is celebrating at ${targetLabel}. Open the Foreman drawer.`;
+    }
     if (state === 'WAITING_FOR_PERMISSION') {
       return `Clover is waiting on ${targetLabel}. Open the Foreman drawer.`;
     }
-    if (state === 'RESTART_NEEDED' || state === 'ERROR') {
+    if (state === 'ERROR') {
+      return 'Clover is blocked and needs help. Open the Foreman drawer.';
+    }
+    if (state === 'RESTART_NEEDED') {
       return 'Clover needs a fresh start. Open the Foreman drawer.';
     }
     return `Clover is ${actionVerb} ${targetLabel}. Open the Foreman drawer.`;
@@ -124,6 +133,16 @@
     `;
   }
 
+  function cloverBubblePersistent(state) {
+    return [
+      'ACTING',
+      'CELEBRATING',
+      'WAITING_FOR_PERMISSION',
+      'ERROR',
+      'RESTART_NEEDED'
+    ].includes(String(state || '').toUpperCase());
+  }
+
   function renderPlotStage(node, scene, options = {}) {
     if (!(node instanceof HTMLElement) || !scene) return;
     const assetMap = options.assetMap || {};
@@ -160,7 +179,7 @@
             ${badges.map((badge) => badgeMarkup(badge)).join('')}
           </span>
           ${timerMarkup(object.timer)}
-          ${object.labelVisible === false ? '' : `<span class="at-fp-objectLabel">${htmlEscape(object.label || '')}</span>`}
+          <span class="at-fp-objectLabel">${htmlEscape(object.label || '')}</span>
         </button>
       `;
     }).join('');
@@ -200,7 +219,7 @@
             aria-label="${htmlEscape(cloverAriaLabel(scene))}"
           >
             ${imageMarkup(cloverAsset, 'Clover')}
-            <span class="at-fp-cloverBubble" data-testid="founders-clover-bubble">${htmlEscape(scene.clover?.bubbleText || '')}</span>
+            <span class="at-fp-cloverBubble${cloverBubblePersistent(scene.clover?.state) ? ' at-fp-cloverBubble--persistent' : ''}" data-testid="founders-clover-bubble">${htmlEscape(scene.clover?.bubbleText || '')}</span>
           </button>
         </div>
       </div>

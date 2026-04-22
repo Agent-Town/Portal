@@ -637,9 +637,17 @@ html.founders-plot-embed body.founders-plot-page {
   animation: founders-idle-drift 3.6s ease-in-out infinite;
 }
 
+.at-fp-clover--celebrating .at-fp-objectSprite {
+  animation: founders-ready-bounce 1.3s ease-in-out infinite;
+}
+
 .at-fp-stage-object--locked .at-fp-objectSprite,
 .at-fp-clover--restart-needed .at-fp-objectSprite {
   filter: grayscale(0.42) saturate(0.76) opacity(0.82);
+}
+
+.at-fp-clover--blocked .at-fp-objectSprite {
+  filter: grayscale(0.55) saturate(0.68) opacity(0.88);
 }
 
 .at-fp-stage-object--selected .at-fp-objectSprite,
@@ -773,10 +781,22 @@ html.founders-plot-embed body.founders-plot-page {
   font-size: 13px;
   font-weight: 700;
   box-shadow: 0 8px 16px rgba(61, 32, 15, 0.12);
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
 }
 
-.at-fp-stage-object--label-hidden .at-fp-objectLabel {
-  display: none;
+.at-fp-stage-object:hover .at-fp-objectLabel,
+.at-fp-stage-object:focus .at-fp-objectLabel,
+.at-fp-stage-object:focus-visible .at-fp-objectLabel,
+.at-fp-stage-object--selected .at-fp-objectLabel,
+.at-fp-stage-object--goal-target .at-fp-objectLabel,
+.at-fp-stage-object--label-pinned .at-fp-objectLabel,
+.at-fp-stage-object--attention-recommended .at-fp-objectLabel {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .at-fp-stage-caption,
@@ -805,6 +825,19 @@ html.founders-plot-embed body.founders-plot-page {
   font-size: 13px;
   font-weight: 700;
   color: var(--fp-ink);
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.at-fp-clover:hover .at-fp-cloverBubble,
+.at-fp-clover:focus .at-fp-cloverBubble,
+.at-fp-clover:focus-visible .at-fp-cloverBubble,
+.at-fp-cloverBubble--persistent {
+  opacity: 1;
+  transform: translateY(0) scale(1);
 }
 
 .at-fp-cloverTargetLink {
@@ -1468,9 +1501,15 @@ html.founders-plot-embed body.founders-plot-page {
   .at-fp-clover--observing .at-fp-objectSprite,
   .at-fp-clover--thinking .at-fp-objectSprite,
   .at-fp-clover--acting .at-fp-objectSprite,
+  .at-fp-clover--celebrating .at-fp-objectSprite,
   .at-fp-clover--waiting-for-permission .at-fp-objectSprite,
   .at-fp-clover--waiting-approval .at-fp-objectSprite {
     animation: none !important;
+  }
+
+  .at-fp-objectLabel,
+  .at-fp-cloverBubble {
+    transition: none !important;
   }
 
   .at-fp-cloverTargetLinkBeam {

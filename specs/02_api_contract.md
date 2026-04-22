@@ -2651,16 +2651,29 @@ houseId: <houseId>
 Returns the Founders Plot asset-pack manifest.
 
 Contract notes:
-- `schemaVersion === "founders-plot-assets-v1"`;
+- `schemaVersion === "v1.4.2"`;
+- `styleFamily === "agent-town-frontier-storybook-v1_4_2"`;
 - top-level metadata includes `heroFrame`, `referenceInputs`, and `videoReference`;
 - `videoReference.url === "https://www.youtube.com/watch?v=ZW7tUUZqhdY"`;
 - `videoReference.usage === "tone_motion_story_reference_only"`;
 - `videoReference.frameExtractionRequired === false`;
+- `heroFrame.screenshotPrefix === "founders-v1-4-2-full-route-hero-1280"`;
 - each asset entry includes:
-  - `sourceTool`
-  - `referenceSource`
-  - `referenceFiles`
-  - `rightsStatus`
+  - `generatedBy`
+  - `generationMode`
+  - `model`
+  - `promptFile`
+  - `promptHash`
+  - `referenceInputs`
+  - `referenceHashes`
+  - `candidateId`
+  - `candidatePath`
   - `postProcessing`
-  - `approvalScope`
-- Founders Plot gameplay assets remain `approvalScope: "gameplay_asset"` and do not imply that the hero-cast ensemble ships on the default gameplay route.
+  - `byteSize`
+  - `approvedBy`
+  - `approvedAt`
+  - `approvalNotes`
+  - `styleReview`
+- player-facing production assets in the shipped pack use `status: "approved"`;
+- the V1.4.2 pack may mix `generatedBy: "gpt-image-2"` scene/object art with governed `codex-svg` overlays and `reference-normalized` supporting assets when that keeps route integration more stable;
+- Founders Plot gameplay remains Clover-first; the hero-cast ensemble is used for platform identity and onboarding surfaces, not the default gameplay loop.

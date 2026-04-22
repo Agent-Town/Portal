@@ -109,6 +109,16 @@ Rules:
 - do not create `docs/brand/HERO_VIDEO_FRAME_INDEX.md` unless Robin explicitly asks later;
 - if future marketing/cinematic work needs frame extraction, create a separate `hero-video-marketing-extraction` task.
 
+## V1.4.2 continuation note
+
+V1.4.2 treats the four owner-supplied cast files as the primary recovered hero-cast references and adds platform reference images under `docs/brand/reference/platform/`.
+
+The V1.4.2 asset sprint may use those files to normalize platform/marketing art, but the same boundary remains in force:
+
+- the hero cast is platform identity;
+- Clover is the gameplay partner;
+- the hero video stays a tone/motion/story reference only unless Robin explicitly requests a later extraction sprint.
+
 ## Asset-pipeline requirements
 
 The Founders Plot asset manifest and future brand-asset manifests must support provenance fields that make the recovered hero-cast inputs explicit.
@@ -167,4 +177,3 @@ V1.4.1 implementation must:
    - honest source-index status and no-extraction rule,
    - manifest provenance support,
    - gameplay-surface quarantine.
-

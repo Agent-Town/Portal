@@ -398,7 +398,7 @@ h3 {
   overflow: hidden;
   background:
     linear-gradient(180deg, rgba(8, 14, 24, 0.12), rgba(8, 14, 24, 0.24)),
-    url("/agenttown.jpeg") center/cover no-repeat;
+    url("/assets/platform/town-shell-background-v1_4_2.webp") center/cover no-repeat;
   box-shadow: inset 0 0 0 1px rgba(255, 234, 194, 0.1);
 }
 
@@ -1141,6 +1141,37 @@ body.trainer-modal-open {
   min-height: 1.4em;
 }
 
+.brainIntroIllustration,
+.townhallStoryIllustration {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  width: min(680px, 100%);
+  border: 2px solid rgba(44, 69, 99, 0.12);
+  border-radius: calc(var(--radius) + 2px);
+  background:
+    linear-gradient(180deg, rgba(255, 250, 235, 0.96), rgba(255, 243, 214, 0.94));
+  box-shadow: 0 2px 8px rgba(30, 58, 86, 0.08);
+}
+
+.brainIntroIllustration img,
+.townhallStoryIllustration img {
+  width: 100%;
+  border-radius: calc(var(--radius) - 2px);
+  border: 1px solid rgba(44, 69, 99, 0.12);
+  background: rgba(255, 248, 226, 0.8);
+  object-fit: cover;
+}
+
+.brainIntroIllustration img {
+  max-height: 220px;
+}
+
+.townhallStoryIllustration img {
+  max-height: 240px;
+}
+
 /* Onboarding stepper */
 .onboarding-stepper {
   display: flex;
@@ -1752,6 +1783,10 @@ footer::before {
   padding: 24px 14px;
   position: relative;
   z-index: 1;
+  background:
+    radial-gradient(circle at 16% 18%, rgba(255, 227, 143, 0.35), rgba(255, 227, 143, 0) 24%),
+    linear-gradient(180deg, rgba(25, 18, 11, 0.32), rgba(25, 18, 11, 0.55)),
+    url("/assets/hero-cast/hero-cast-group.webp") center/cover no-repeat;
 }
 
 .startCard {
@@ -1809,6 +1844,58 @@ footer::before {
   font-family: var(--font-display);
   font-size: clamp(22px, 3.5vw, 32px);
   letter-spacing: 0.02em;
+  color: var(--text-strong);
+}
+
+.startCastShelf {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 2px solid rgba(44, 69, 99, 0.1);
+  border-radius: var(--radius);
+  background: rgba(255, 248, 226, 0.7);
+}
+
+.startCastShelfTitle {
+  margin: 0;
+  text-align: center;
+  font-weight: 700;
+}
+
+.startCastGrid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.startCastCard {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 8px;
+  border-radius: 16px;
+  border: 1px solid rgba(44, 69, 99, 0.1);
+  background: rgba(255, 255, 255, 0.58);
+  box-shadow: 0 10px 18px rgba(44, 69, 99, 0.08);
+}
+
+.startCastCard img {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  object-position: center top;
+  display: block;
+  border-radius: 12px;
+  border: 1px solid rgba(44, 69, 99, 0.08);
+  background: rgba(255, 248, 226, 0.8);
+}
+
+.startCastCard figcaption {
+  margin: 0;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.3;
   color: var(--text-strong);
 }
 
@@ -2050,6 +2137,10 @@ footer::before {
 }
 
 @media (max-width: 520px) {
+  .startCastGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .startPreferenceOptions {
     grid-template-columns: 1fr;
   }
@@ -4044,7 +4135,7 @@ body.town-hub-page {
 body.town-hub-page .townScene {
   background:
     linear-gradient(180deg, rgba(46, 27, 14, 0.14), rgba(46, 27, 14, 0.3)),
-    url("/agenttown.jpeg") center/cover no-repeat;
+    url("/assets/platform/town-shell-background-v1_4_2.webp") center/cover no-repeat;
 }
 
 body.town-hub-page .townScene::before {
@@ -4052,9 +4143,11 @@ body.town-hub-page .townScene::before {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0.24;
-  mix-blend-mode: soft-light;
-  background: url("/images/town-bg.jpeg") center/cover no-repeat;
+  opacity: 1;
+  background:
+    radial-gradient(circle at 18% 22%, rgba(255, 242, 202, 0.24), rgba(255, 242, 202, 0) 26%),
+    radial-gradient(circle at 82% 18%, rgba(130, 196, 218, 0.18), rgba(130, 196, 218, 0) 24%),
+    linear-gradient(180deg, rgba(255, 239, 205, 0.05), rgba(31, 20, 12, 0.16));
 }
 
 body.town-hub-page .townDistrictHotspot {

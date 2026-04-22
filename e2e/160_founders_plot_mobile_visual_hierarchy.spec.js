@@ -44,7 +44,7 @@ test('mobile Founders Plot keeps the stage first, the tray compact, and the layo
   await frame.getByTestId('founders-stage-object-HQ').click();
   await expect(frame.getByTestId('founders-selection-panel')).toContainText(/Headquarters/i);
 
-  await expect(frame.getByTestId('founders-game-shell')).toHaveScreenshot('founders-v1-3-object-selected-390.png', {
+  await expect(frame.getByTestId('founders-game-shell')).toHaveScreenshot('founders-v1-4-2-object-selected-390.png', {
     animations: 'disabled',
     caret: 'hide',
     maxDiffPixelRatio: 0.03
@@ -52,7 +52,7 @@ test('mobile Founders Plot keeps the stage first, the tray compact, and the layo
 
   await frame.locator('[data-drawer-trigger="contracts"]').click();
   await expect(frame.getByTestId('founders-contract-board')).toBeVisible();
-  await expect(frame.locator('#foundersDrawer-contracts')).toHaveScreenshot('founders-v1-3-contract-drawer-390.png', {
+  await expect(frame.locator('#foundersDrawer-contracts')).toHaveScreenshot('founders-v1-4-2-contract-drawer-390.png', {
     animations: 'disabled',
     caret: 'hide',
     maxDiffPixelRatio: 0.03

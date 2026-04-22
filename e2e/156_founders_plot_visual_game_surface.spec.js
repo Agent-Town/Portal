@@ -15,9 +15,9 @@ test('Founders Plot defaults to a scenic game surface with one obvious CTA and s
   await expect(frame.getByTestId('founders-quest-cta')).toBeVisible();
 
   const cases = [
-    { width: 390, height: 844, maxWords: 80, minStageRatio: 0.58, maxPanels: 2, screenshot: 'founders-v1-3-home-390.png' },
-    { width: 768, height: 1024, maxWords: 120, minStageRatio: 0.52, maxPanels: 3, screenshot: 'founders-v1-3-home-768.png' },
-    { width: 1280, height: 900, maxWords: 120, minStageRatio: 0.56, maxPanels: 3, screenshot: 'founders-v1-3-home-1280.png' }
+    { width: 390, height: 844, maxWords: 80, minStageRatio: 0.58, maxPanels: 2, screenshot: 'founders-v1-4-2-home-390.png' },
+    { width: 768, height: 1024, maxWords: 120, minStageRatio: 0.52, maxPanels: 3, screenshot: 'founders-v1-4-2-home-768.png' },
+    { width: 1280, height: 900, maxWords: 120, minStageRatio: 0.56, maxPanels: 3, screenshot: 'founders-v1-4-2-home-1280.png' }
   ];
 
   for (const entry of cases) {

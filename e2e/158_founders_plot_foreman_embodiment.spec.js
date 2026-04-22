@@ -10,21 +10,28 @@ const {
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 const FORBIDDEN = /\b(runtime|token|openclaw|json|schema|worker)\b/i;
 
+async function bubbleOpacity(locator) {
+  return await locator.evaluate((node) => Number(window.getComputedStyle(node).opacity || '0'));
+}
+
 test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-test('Clover is visible by default, changes state, and shows a compact in-world action receipt', async ({ page }) => {
+test('Clover stays quiet until selected or active, then shows a compact in-world action receipt', async ({ page }) => {
   const frame = await openFoundersPlotFrame(page);
   await bootstrapToHq2(frame);
 
   const clover = frame.getByTestId('founders-clover-avatar');
   const bubble = frame.getByTestId('founders-clover-bubble');
   await expect(clover).toBeVisible();
-  await expect(bubble).toBeVisible();
+  expect(await bubbleOpacity(bubble)).toBeLessThan(0.1);
   const bubbleText = String(await bubble.textContent() || '').trim();
   expect(bubbleText.length).toBeLessThanOrEqual(90);
   expect(bubbleText).not.toMatch(FORBIDDEN);
+
+  await clover.hover();
+  await expect.poll(() => bubbleOpacity(bubble)).toBeGreaterThan(0.5);
 
   await clover.click();
   await expect(frame.getByTestId('founders-foreman-panel')).toBeVisible();
@@ -55,6 +62,7 @@ test('Clover is visible by default, changes state, and shows a compact in-world 
   const actionPromise = runNow.click();
   await expect(clover).toHaveClass(/at-fp-clover--acting/);
   await actionPromise;
+  await expect.poll(() => bubbleOpacity(bubble)).toBeGreaterThan(0.5);
   await frame.waitForFunction(() => {
     return document.querySelector('[data-testid="founders-stage-object-LUMBER_CAMP"]')?.classList.contains('is-action-highlight') === true;
   }, null, { timeout: 5_000 }).catch(() => null);
@@ -67,7 +75,7 @@ test('Clover is visible by default, changes state, and shows a compact in-world 
   await expect(frame.getByTestId('founders-receipt')).toContainText(/collect/i);
   await expect(bubble).not.toContainText(FORBIDDEN);
 
-  await expect(frame.getByTestId('founders-game-shell')).toHaveScreenshot('founders-v1-3-clover-action-1280.png', {
+  await expect(frame.getByTestId('founders-game-shell')).toHaveScreenshot('founders-v1-4-2-clover-action-1280.png', {
     animations: 'disabled',
     caret: 'hide',
     maxDiffPixelRatio: 0.03
