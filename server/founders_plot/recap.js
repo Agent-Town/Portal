@@ -7,15 +7,42 @@ const SECTION_TITLES = [
   'What needs your decision now'
 ];
 
+const HIDDEN_RECAP_EVENT_TYPES = new Set([
+  'FOREMAN_CONTEXT_ASSEMBLED',
+  'FOREMAN_LLM_REQUESTED',
+  'FOREMAN_LLM_DECISION_SELECTED',
+  'FOREMAN_TOOL_ALIAS_MAPPED',
+  'FOREMAN_ACTION_REJECTED',
+  'FOREMAN_WORKER_COMMAND_STARTED',
+  'FOREMAN_WORKER_COMMAND_COMPLETED',
+  'FOREMAN_WORKER_COMMAND_FAILED'
+]);
+
+function isHiddenRecapEvent(event) {
+  return HIDDEN_RECAP_EVENT_TYPES.has(String(event?.type || '').toUpperCase());
+}
+
 function lineForEvent(event) {
-  return typeof event?.recapLine === 'string' && event.recapLine.trim()
-    ? event.recapLine.trim()
-    : (typeof event?.explanation === 'string' ? event.explanation.trim() : '');
+  if (typeof event?.recapLine === 'string' && event.recapLine.trim()) {
+    return event.recapLine.trim();
+  }
+  if (isHiddenRecapEvent(event)) {
+    return '';
+  }
+  return typeof event?.explanation === 'string' ? event.explanation.trim() : '';
 }
 
 function classifySection(event) {
   const type = String(event?.type || '').toUpperCase();
-  if (type === 'FOREMAN_RECEIPT_CREATED' || type === 'AGENT_ACTION_EXECUTED' || type.startsWith('FOREMAN_WORKER_COMMAND_')) {
+  if (
+    type === 'FOREMAN_RECEIPT_CREATED'
+    || type === 'AGENT_ACTION_EXECUTED'
+    || type.startsWith('FOREMAN_WORKER_COMMAND_')
+    || type.startsWith('FOREMAN_LLM_')
+    || type === 'FOREMAN_CONTEXT_ASSEMBLED'
+    || type === 'FOREMAN_TOOL_ALIAS_MAPPED'
+    || type === 'FOREMAN_ACTION_REJECTED'
+  ) {
     return 'What Clover did';
   }
   if (type === 'APPROVAL_REQUESTED' || type === 'APPROVAL_RESOLVED') {

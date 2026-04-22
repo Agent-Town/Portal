@@ -20,14 +20,17 @@ This docs set is designed for users who are new to local agents and model provid
 - [Founders Plot V1.3 visual game-surface spec](/specs/22_founders_plot_v1_3_visual_game_surface.md)
 - [Founders Plot V1.3.1 visual signoff pass](/specs/23_founders_plot_v1_3_1_visual_signoff_pass.md)
 - [Founders Plot V1.3.1 TDD acceptance matrix](/specs/24_founders_plot_v1_3_1_tdd_acceptance_matrix.md)
+- [Founders Plot V1.4 AI reality and visual direction pack](/specs/26_founders_plot_v1_4_ai_reality_and_visual_direction_pack.md)
+- [Founders Plot V1.4 TDD acceptance matrix](/specs/27_founders_plot_v1_4_tdd_acceptance_matrix.md)
 - [Agent Town design pack](/Brand%20kit/guidelines/agent-town-design-pack/README.md)
 - [Agent Town V1.3 implementation start pack note](/docs/design/agent-town-v1.3-implementation-start-pack.md)
 - [Agent Town V1.3.1 signoff pack note](/docs/design/agent-town-v1.3.1-signoff-pack.md)
+- [Agent Town V1.4 AI reality + visual direction pack note](/docs/design/agent-town-v1.4-ai-reality-visual-direction-pack.md)
 
 ## Founders Plot implementation note
 
-The current implementation sprint is driven by the V1.3.1 visual-signoff documents in `specs/23_*` and `specs/24_*` together with the checked-in design-pack addenda under `Brand kit/guidelines/agent-town-design-pack/`.
-V1.2 gameplay and hardening specs remain the system baseline unless the V1.3/V1.3.1 specs explicitly change the presentation layer.
+The current implementation sprint is driven by the V1.4 AI-reality documents in `specs/26_*` and `specs/27_*` together with the checked-in design-pack addenda under `Brand kit/guidelines/agent-town-design-pack/`.
+V1.3.1 remains the visual baseline, and V1.2 gameplay/hardening remains the systems baseline unless the V1.4 specs explicitly change the worker/runtime contract.
 
 ## Principles
 

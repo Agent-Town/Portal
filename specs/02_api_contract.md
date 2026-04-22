@@ -560,9 +560,14 @@ Runtime notes:
 - the token is memory-only on the page side;
 - reloading the page does not preserve local control of the runtime;
 - in-session scheduler automation must stop until Clover is started again in the new page session.
+- request body may include `pack.skillLoaded`, `pack.heartbeatLoaded`, `pack.toolsLoaded`, `pack.goalsLoaded`, and `pack.safetyLoaded` booleans so the runtime records which experience-pack docs were available when Clover started.
 
 ### POST `/api/founders-plot/foreman/session/heartbeat`
 Refreshes the active Foreman runtime lease.
+
+Runtime notes:
+- request body may repeat the same `pack.*Loaded` booleans as `/session/start`;
+- the response keeps the same runtime id/session id and extends the server lease only while the token remains fresh.
 
 ### POST `/api/founders-plot/foreman/session/pause`
 Pauses the current Foreman runtime. Later Foreman actions must fail closed until restarted.
@@ -575,6 +580,9 @@ Observation notes:
 - The packet includes `currentGoal`, living contract state, town signals, standing order, scheduler status, recent events, and safe collect-ready building signals.
 - `decision` is the deterministic test-brain fallback recommendation included for test stability and UI fallback rendering.
 - Live Clover ticks may override that fallback by syncing an `llm` decision before invoking the bounded mutation route.
+- Response also includes:
+  - `recentReceipts`: the latest Foreman receipts for player-facing recap continuity.
+  - `toolRegistry`: the canonical `FOUNDERS_PLOT_TOOL_SPECS` registry used to derive provider-safe aliases.
 
 ### POST `/api/founders-plot/foreman/decision`
 Persists the worker-selected Foreman choice for the active runtime before Clover invokes a bounded tool.
@@ -584,6 +592,16 @@ Requirements:
 - request body includes only the bounded decision payload, never LLM credentials or provider config;
 - `chosenCandidateId` must be empty/null or must match one of the current safe candidates for that runtime;
 - valid `source` values are `llm`, `test_brain`, and `server_default`.
+- request body may include:
+  - `selectedCandidateId` and `chosenCandidateId`
+  - `confidence`, `reason`, `playerFacingLine`, `noopCode`
+  - `modelInvocationId` or `testBrainInvocationId`
+  - `provider`, `model`, `llmToolName`
+  - `workerCommandId`, `workerTraceId`
+  - `pack.packHash`
+  - `pack.files.skillMdHash`, `heartbeatMdHash`, `toolsMdHash`, `goalsMdHash`, `safetyMdHash`
+  - `toolContract.source` and `toolContract.aliasMap`
+  - `contextSummary.contextVersion`, `contextSummary.completeness`, and `contextSummary.safeCandidates`
 
 Privacy notes:
 - Foreman LLM configuration remains client-side only.
@@ -594,9 +612,43 @@ Privacy notes:
 ```json
 {
   "chosenCandidateId": "collect:bld_1234abcd",
-  "source": "llm"
+  "selectedCandidateId": "collect:bld_1234abcd",
+  "source": "llm",
+  "confidence": 0.93,
+  "reason": "Collect ready output from Lumber Camp.",
+  "playerFacingLine": "I collected ready goods because the town could use the supplies.",
+  "noopCode": null,
+  "modelInvocationId": "fpllm_1234abcd",
+  "provider": "openrouter",
+  "model": "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
+  "llmToolName": "founders_plot_foreman_select_candidate",
+  "workerCommandId": "fpwcmd_1234_abcd",
+  "workerTraceId": "fpwtrace_1234_abcd",
+  "pack": {
+    "packHash": "sha256...",
+    "files": {
+      "skillMdHash": "sha256...",
+      "heartbeatMdHash": "sha256...",
+      "toolsMdHash": "sha256...",
+      "goalsMdHash": "sha256..."
+    }
+  },
+  "toolContract": {
+    "source": "merged",
+    "aliasMap": {
+      "founders_plot_collect_outputs": "et.plot.collect_outputs"
+    }
+  },
+  "contextSummary": {
+    "contextVersion": "founders-plot-foreman-context.v1",
+    "completeness": { "canAct": true, "issues": [] }
+  }
 }
 ```
+
+Audit notes:
+- valid syncs append `FOREMAN_CONTEXT_ASSEMBLED`, `FOREMAN_LLM_REQUESTED`, and either `FOREMAN_LLM_DECISION_SELECTED` or `FOREMAN_LLM_DECISION_NOOP`;
+- invalid selected candidates append `FOREMAN_ACTION_REJECTED` without mutating plot state.
 
 ### POST `/api/founders-plot/foreman/tool/:toolName`
 Executes one bounded Foreman action through the authenticated runtime route.
@@ -628,6 +680,7 @@ Recap notes:
   - `What changed in town`
   - `What Clover did`
   - `What needs your decision now`
+- technical V1.4 audit events such as context assembly, LLM request bookkeeping, provider-safe alias mapping, and worker-command scaffolding stay in replay/event detail rather than the player-facing recap lines unless they emit an explicit player-facing `recapLine`.
 
 ### POST `/api/founders-plot/recap/read`
 Marks recap lines as seen for the active plot.

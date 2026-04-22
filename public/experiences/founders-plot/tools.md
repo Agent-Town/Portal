@@ -69,3 +69,52 @@ The Founders Plot runtime exposes a deliberately small tool family:
 - Recap read model: `GET /api/founders-plot/recap`
 - Journal read model: `POST /api/founders-plot/tool/et.plot.journal.get_entries`
 - Replay audit: `GET /api/founders-plot/replay`
+
+---
+
+## V1.4 Foreman AI Reality Update
+
+### Tool naming model
+
+Canonical server/replay names remain dotted:
+
+```text
+et.plot.collect_outputs
+et.plot.queue_job
+et.plot.request_user_approval
+```
+
+LLM/provider-facing names must be provider-safe aliases:
+
+```text
+founders_plot_collect_outputs
+founders_plot_queue_job
+founders_plot_request_user_approval
+```
+
+The worker must record the alias map in the decision trace.
+
+### P0 Foreman selection tool
+
+For V1.4, Clover should usually select among server-provided safe candidates via:
+
+```text
+founders_plot_foreman_select_candidate
+```
+
+### Rules
+
+- Do not invent candidate IDs.
+- Do not invent tools.
+- If no candidate is useful, select `null` and use a no-op code.
+- The server validates the selected candidate again before mutation.
+
+### Compact tool guide requirement
+
+The provider request must also include a compact guide for actual canonical tools, including:
+
+- what the tool does;
+- when to use it;
+- required arguments;
+- key error codes;
+- whether it can spend resources or requires approval.

@@ -57,6 +57,172 @@ function hashJson(value) {
   return crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
 
+function normalizeForemanPack(raw = {}) {
+  return {
+    skillLoaded: raw?.skillLoaded === true,
+    heartbeatLoaded: raw?.heartbeatLoaded === true,
+    toolsLoaded: raw?.toolsLoaded === true,
+    goalsLoaded: raw?.goalsLoaded === true,
+    safetyLoaded: raw?.safetyLoaded === true
+  };
+}
+
+function safeString(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function safeFiniteNumber(value, fallback = 0) {
+  const normalized = Number(value);
+  return Number.isFinite(normalized) ? normalized : fallback;
+}
+
+function normalizeForemanDecisionPayload(raw = {}) {
+  const aliasMap = raw?.toolContract?.aliasMap && typeof raw.toolContract.aliasMap === 'object'
+    ? Object.fromEntries(
+        Object.entries(raw.toolContract.aliasMap)
+          .map(([alias, canonical]) => [String(alias || '').trim(), safeString(canonical)])
+          .filter(([alias, canonical]) => alias && canonical)
+      )
+    : {};
+  return {
+    selectedCandidateId: safeString(raw?.selectedCandidateId || raw?.chosenCandidateId),
+    source: safeString(raw?.source || 'llm') || 'llm',
+    confidence: safeFiniteNumber(raw?.confidence, 0),
+    reason: safeString(raw?.reason),
+    playerFacingLine: safeString(raw?.playerFacingLine),
+    noopCode: safeString(raw?.noopCode).toUpperCase() || null,
+    modelInvocationId: safeString(raw?.modelInvocationId),
+    testBrainInvocationId: safeString(raw?.testBrainInvocationId),
+    provider: safeString(raw?.provider),
+    model: safeString(raw?.model),
+    llmToolName: safeString(raw?.llmToolName),
+    workerCommandId: safeString(raw?.workerCommandId),
+    workerTraceId: safeString(raw?.workerTraceId),
+    packHash: safeString(raw?.pack?.packHash),
+    skillMdHash: safeString(raw?.pack?.files?.skillMdHash),
+    heartbeatMdHash: safeString(raw?.pack?.files?.heartbeatMdHash),
+    toolsMdHash: safeString(raw?.pack?.files?.toolsMdHash),
+    goalsMdHash: safeString(raw?.pack?.files?.goalsMdHash),
+    safetyMdHash: safeString(raw?.pack?.files?.safetyMdHash),
+    aliasMap,
+    toolContractSource: safeString(raw?.toolContract?.source),
+    contextSummary: raw?.contextSummary && typeof raw.contextSummary === 'object' ? raw.contextSummary : null
+  };
+}
+
+function buildForemanDecisionMeta(payload = {}, selectedCandidate = null, runtime = null) {
+  const canonicalToolName = safeString(selectedCandidate?.toolName);
+  const providerSafeToolName = canonicalToolName
+    ? Object.entries(payload.aliasMap || {}).find(([, canonical]) => canonical === canonicalToolName)?.[0] || ''
+    : '';
+  return {
+    runtimeId: safeString(runtime?.runtimeId),
+    foremanSessionId: safeString(runtime?.sessionId),
+    workerCommandId: payload.workerCommandId,
+    workerTraceId: payload.workerTraceId,
+    modelInvocationId: payload.modelInvocationId || null,
+    testBrainInvocationId: payload.testBrainInvocationId || null,
+    provider: payload.provider || null,
+    model: payload.model || null,
+    packHash: payload.packHash || null,
+    skillMdHash: payload.skillMdHash || null,
+    heartbeatMdHash: payload.heartbeatMdHash || null,
+    toolsMdHash: payload.toolsMdHash || null,
+    goalsMdHash: payload.goalsMdHash || null,
+    safetyMdHash: payload.safetyMdHash || null,
+    selectedCandidateId: payload.selectedCandidateId || null,
+    llmToolName: payload.llmToolName || null,
+    providerSafeToolName: providerSafeToolName || null,
+    canonicalToolName: canonicalToolName || null,
+    confidence: payload.confidence,
+    noopCode: payload.noopCode || null,
+    contextSummary: payload.contextSummary
+  };
+}
+
+function buildForemanDecisionEvents(payload = {}, decisionMeta = {}, { selectedCandidate = null, nowMs = Date.now(), rejectedError = null } = {}) {
+  const events = [
+    {
+      type: EVENT_TYPES.FOREMAN_CONTEXT_ASSEMBLED,
+      actor: 'AGENT',
+      explanation: 'Clover assembled the Founders Plot Foreman context pack.',
+      recapLine: '',
+      data: {
+        ...decisionMeta,
+        completeness: payload?.contextSummary?.completeness || null,
+        toolContractSource: payload?.toolContractSource || null
+      },
+      createdAt: nowMs
+    },
+    {
+      type: EVENT_TYPES.FOREMAN_LLM_REQUESTED,
+      actor: 'AGENT',
+      explanation: payload.source === 'test_brain'
+        ? 'Clover asked the Test Brain to choose a safe candidate.'
+        : 'Clover asked the LLM to choose a safe candidate.',
+      recapLine: '',
+      data: decisionMeta,
+      createdAt: nowMs
+    }
+  ];
+  if (payload.selectedCandidateId) {
+    events.push({
+      type: EVENT_TYPES.FOREMAN_LLM_DECISION_SELECTED,
+      actor: 'AGENT',
+      explanation: 'Clover selected one safe candidate.',
+      recapLine: '',
+      data: {
+        ...decisionMeta,
+        selectedCandidate: selectedCandidate ? {
+          candidateId: selectedCandidate.candidateId,
+          toolName: selectedCandidate.toolName,
+          buildingId: selectedCandidate.buildingId
+        } : null,
+        reason: payload.reason || null,
+        playerFacingLine: payload.playerFacingLine || null
+      },
+      createdAt: nowMs
+    });
+    if (decisionMeta.providerSafeToolName || payload.llmToolName) {
+      events.push({
+        type: EVENT_TYPES.FOREMAN_TOOL_ALIAS_MAPPED,
+        actor: 'AGENT',
+        explanation: 'Clover mapped the provider-safe tool alias to the canonical Founders Plot tool.',
+        recapLine: '',
+        data: decisionMeta,
+        createdAt: nowMs
+      });
+    }
+  } else {
+    events.push({
+      type: EVENT_TYPES.FOREMAN_LLM_DECISION_NOOP,
+      actor: 'AGENT',
+      explanation: 'Clover watched the plot and chose a no-op.',
+      recapLine: payload.playerFacingLine || 'Clover watched the plot and held position.',
+      data: {
+        ...decisionMeta,
+        reason: payload.reason || null,
+        playerFacingLine: payload.playerFacingLine || null
+      },
+      createdAt: nowMs
+    });
+  }
+  if (rejectedError) {
+    events.push({
+      type: EVENT_TYPES.FOREMAN_ACTION_REJECTED,
+      actor: 'AGENT',
+      explanation: 'Clover suggested a move, but the server rejected it.',
+      recapLine: '',
+      data: {
+        ...decisionMeta,
+        error: rejectedError
+      },
+      createdAt: nowMs
+    });
+  }
+  return events;
+}
+
 function normalizeIdentity(raw) {
   if (!raw) return null;
   if (typeof raw === 'string') {
@@ -376,7 +542,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
     };
   }
 
-  function buildWorkerCommandEvent(type, workerMeta, { toolName = '', buildingId = '', error = null } = {}) {
+  function buildWorkerCommandEvent(type, workerMeta, { toolName = '', buildingId = '', error = null, extraData = null } = {}) {
     return {
       type,
       actor: 'AGENT',
@@ -390,7 +556,8 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         ...workerMeta,
         tool: String(toolName || ''),
         buildingId: String(buildingId || ''),
-        ...(error ? { error } : {})
+        ...(error ? { error } : {}),
+        ...(extraData && typeof extraData === 'object' ? extraData : {})
       }
     };
   }
@@ -856,11 +1023,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       const runtime = startForemanSession(state, {
         runtimeId: String(raw.runtimeId || '').trim(),
         nowMs,
-        pack: {
-          skillLoaded: raw?.pack?.skillLoaded === true,
-          toolsLoaded: raw?.pack?.toolsLoaded === true,
-          goalsLoaded: raw?.pack?.goalsLoaded === true
-        }
+        pack: normalizeForemanPack(raw?.pack || {})
       });
       state.plot.updatedAt = nowMs;
       persistStateAndEvents(state, [
@@ -892,7 +1055,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       const raw = req.body && typeof req.body === 'object' ? req.body : {};
       const updated = heartbeatForemanSession(state, {
         nowMs,
-        pack: raw.pack && typeof raw.pack === 'object' ? raw.pack : {}
+        pack: normalizeForemanPack(raw?.pack || {})
       });
       persistStateAndEvents(state, []);
       res.json({
@@ -954,6 +1117,8 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         ok: true,
         observation,
         safeCandidates,
+        recentReceipts: Array.isArray(state.meta.foremanReceipts) ? state.meta.foremanReceipts.slice(0, 4) : [],
+        toolRegistry: FOUNDERS_PLOT_TOOL_SPECS,
         decision,
         runtime: {
           ...runtime,
@@ -975,31 +1140,56 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         recentEvents: listRecentEvents(state.plot.plotId, 48)
       });
       const safeCandidates = buildSafeForemanCandidates(state, observation);
-      const chosenCandidateId = typeof req.body?.chosenCandidateId === 'string'
-        ? req.body.chosenCandidateId.trim()
-        : '';
-      if (chosenCandidateId && !safeCandidates.some((candidate) => String(candidate?.candidateId || '') === chosenCandidateId)) {
+      const payload = normalizeForemanDecisionPayload(req.body || {});
+      const selectedCandidate = payload.selectedCandidateId
+        ? safeCandidates.find((candidate) => String(candidate?.candidateId || '') === payload.selectedCandidateId) || null
+        : null;
+      const decisionMeta = buildForemanDecisionMeta(payload, selectedCandidate, runtime);
+      if (payload.selectedCandidateId && !selectedCandidate) {
+        persistStateAndEvents(state, buildForemanDecisionEvents(payload, decisionMeta, {
+          selectedCandidate: null,
+          nowMs,
+          rejectedError: {
+            code: 'INVALID_FOREMAN_DECISION_CANDIDATE',
+            chosenCandidateId: payload.selectedCandidateId
+          }
+        }));
         throw Object.assign(new Error('INVALID_STATE'), {
           details: {
             reason: 'INVALID_FOREMAN_DECISION_CANDIDATE',
-            chosenCandidateId
+            chosenCandidateId: payload.selectedCandidateId
           }
         });
       }
-      const decision = chosenCandidateId
-        ? buildForemanDecision({
-          observation,
-          safeCandidates,
-          chosenCandidateId,
-          source: typeof req.body?.source === 'string' ? req.body.source : 'llm'
-        })
+      const decision = payload.selectedCandidateId
+        ? {
+            ...buildForemanDecision({
+              observation,
+              safeCandidates,
+              chosenCandidateId: payload.selectedCandidateId,
+              source: payload.source
+            }),
+            confidence: payload.confidence,
+            reason: payload.reason,
+            playerFacingLine: payload.playerFacingLine,
+            noopCode: payload.noopCode,
+            meta: decisionMeta
+          }
         : {
-          chosenCandidateId: null,
-          planCard: null,
-          source: typeof req.body?.source === 'string' ? req.body.source : 'llm'
-        };
+            chosenCandidateId: null,
+            planCard: null,
+            source: payload.source,
+            confidence: payload.confidence,
+            reason: payload.reason,
+            playerFacingLine: payload.playerFacingLine,
+            noopCode: payload.noopCode,
+            meta: decisionMeta
+          };
       state.meta.foremanLastDecision = decision;
-      persistStateAndEvents(state, []);
+      persistStateAndEvents(state, buildForemanDecisionEvents(payload, decisionMeta, {
+        selectedCandidate,
+        nowMs
+      }));
       res.json({
         ok: true,
         decision
@@ -1017,6 +1207,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
     let workerMeta = null;
     let toolName = '';
     let rawArgs = {};
+    let decisionEventMeta = null;
     try {
       toolName = String(req.params.toolName || '').trim();
       rawArgs = req.body && typeof req.body === 'object' ? req.body : {};
@@ -1036,6 +1227,28 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       if (FOREMAN_MUTATION_TOOL_NAMES.has(toolName)) {
         workerMeta = normalizeWorkerCommandMeta(rawArgs, runtime);
       }
+      decisionEventMeta = state?.meta?.foremanLastDecision?.meta && typeof state.meta.foremanLastDecision.meta === 'object'
+        ? {
+            selectedCandidateId: state.meta.foremanLastDecision.meta.selectedCandidateId || null,
+            llmToolName: state.meta.foremanLastDecision.meta.llmToolName || rawArgs.llmToolName || null,
+            providerSafeToolName: state.meta.foremanLastDecision.meta.providerSafeToolName || null,
+            canonicalToolName: state.meta.foremanLastDecision.meta.canonicalToolName || rawArgs.canonicalToolName || toolName,
+            modelInvocationId: state.meta.foremanLastDecision.meta.modelInvocationId || null,
+            testBrainInvocationId: state.meta.foremanLastDecision.meta.testBrainInvocationId || null,
+            provider: state.meta.foremanLastDecision.meta.provider || null,
+            model: state.meta.foremanLastDecision.meta.model || null,
+            packHash: state.meta.foremanLastDecision.meta.packHash || null,
+            skillMdHash: state.meta.foremanLastDecision.meta.skillMdHash || null,
+            heartbeatMdHash: state.meta.foremanLastDecision.meta.heartbeatMdHash || null,
+            toolsMdHash: state.meta.foremanLastDecision.meta.toolsMdHash || null,
+            goalsMdHash: state.meta.foremanLastDecision.meta.goalsMdHash || null,
+            safetyMdHash: state.meta.foremanLastDecision.meta.safetyMdHash || null
+          }
+        : {
+            selectedCandidateId: safeString(rawArgs.selectedCandidateId) || null,
+            llmToolName: safeString(rawArgs.llmToolName) || null,
+            canonicalToolName: safeString(rawArgs.canonicalToolName) || toolName
+          };
 
       const argsHash = hashJson({ toolName, args: rawArgs, runtimeId: runtime.runtimeId });
       const previous = getIdempotency(state.plot.plotId, idempotencyKey);
@@ -1051,7 +1264,8 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         eventBuffer.push({
           ...buildWorkerCommandEvent(EVENT_TYPES.FOREMAN_WORKER_COMMAND_STARTED, workerMeta, {
             toolName,
-            buildingId: rawArgs.buildingId
+            buildingId: rawArgs.buildingId,
+            extraData: decisionEventMeta
           }),
           createdAt: nowMs
         });
@@ -1062,7 +1276,8 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
           runtimeId: runtime.runtimeId,
           foremanSessionId: runtime.sessionId,
           tokenScope: ['founders_plot:tool'],
-          ...(workerMeta || {})
+          ...(workerMeta || {}),
+          ...(decisionEventMeta || {})
         },
         appendEvent: (event) => eventBuffer.push({
           ...event,
@@ -1104,7 +1319,8 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         eventBuffer.push({
           ...buildWorkerCommandEvent(EVENT_TYPES.FOREMAN_WORKER_COMMAND_COMPLETED, workerMeta, {
             toolName,
-            buildingId: rawArgs.buildingId
+            buildingId: rawArgs.buildingId,
+            extraData: decisionEventMeta
           }),
           createdAt: nowMs
         });
@@ -1116,7 +1332,12 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         receiptId: `rcpt_${crypto.randomBytes(6).toString('hex')}`,
         action,
         result: 'completed',
-        reason: String(state.meta.foremanLastDecision?.planCard?.reason || 'Executed the safest useful action.'),
+        reason: String(
+          state.meta.foremanLastDecision?.playerFacingLine
+          || state.meta.foremanLastDecision?.reason
+          || state.meta.foremanLastDecision?.planCard?.reason
+          || 'Executed the safest useful action.'
+        ),
         authorityUsed: 'Foreman runtime token (server-authenticated)',
         standingOrderUsed: buildStatePayload(state).foreman?.standingOrder || '',
         correctionOptions: ['ASK_ME_NEXT_TIME', 'PAUSE_FOREMAN'],
@@ -1136,7 +1357,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         type: EVENT_TYPES.FOREMAN_RECEIPT_CREATED,
         actor: 'SYSTEM',
         explanation: `Foreman receipt created for ${action}.`,
-        recapLine: '',
+        recapLine: receipt.reason,
         data: {
           receipt
         },
@@ -1174,8 +1395,20 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
             ...buildWorkerCommandEvent(EVENT_TYPES.FOREMAN_WORKER_COMMAND_FAILED, workerMeta, {
               toolName,
               buildingId: rawArgs.buildingId,
-              error: normalizeToolError(error)
+              error: normalizeToolError(error),
+              extraData: decisionEventMeta
             }),
+            createdAt: nowMs || Date.now()
+          },
+          {
+            type: EVENT_TYPES.FOREMAN_ACTION_REJECTED,
+            actor: 'AGENT',
+            explanation: 'Clover suggested a move, but the server rejected it.',
+            recapLine: '',
+            data: {
+              ...(decisionEventMeta || {}),
+              error: normalizeToolError(error)
+            },
             createdAt: nowMs || Date.now()
           }
         ]);

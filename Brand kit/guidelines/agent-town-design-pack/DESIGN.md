@@ -869,3 +869,69 @@ V1.3.1 visual PRs must capture:
 - objective-relevant lot emphasis;
 - debug mode disabled normal view;
 - debug mode enabled view if debug UI changed.
+
+
+---
+
+## V1.4 update: reference-led visual direction workflow
+
+### Visual direction pack before visual implementation
+
+For major Founders Plot visual changes, implementation must start from:
+
+```text
+docs/visual/FOUNDERS_PLOT_V1_4_VISUAL_DIRECTION_PACK.md
+```
+
+The pack must include:
+
+- mood board inventory;
+- reference board inventory;
+- anti-examples;
+- desktop/mobile/Clover acting paintover requirements;
+- weak asset list;
+- visual-platform usage rules;
+- named art/design signoff fields.
+
+### Visual platforms are production tools, not art directors
+
+Scenario, Firefly, image editing tools, or similar systems may be used for:
+
+- asset variants;
+- character poses;
+- background/object replacements;
+- icon and ornament exploration;
+- consistency workflows.
+
+They may not decide the final product composition or sign off the hero frame. A named human design/art owner must approve primary-view assets.
+
+### Asset provenance rule
+
+Every new primary-view asset must record:
+
+```yaml
+assetId: string
+sourceTool: string
+promptFile: string | null
+referenceFiles: string[]
+rightsStatus: owned | generated_project_owned | licensed | reference_only | unknown
+approvedBy: string | needs_human_signoff
+approvedAt: string | null
+approvalNotes: string
+```
+
+### No vague polish requests
+
+Do not implement from notes like:
+
+- “make it more premium”;
+- “make it more magical”;
+- “make it more alive.”
+
+Translate them into concrete redlines:
+
+- replace asset X;
+- hide label Y on mobile;
+- make only objective lot glow;
+- add target-link treatment to Clover acting;
+- update screenshot Z.

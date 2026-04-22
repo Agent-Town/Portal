@@ -2,7 +2,7 @@
   "id": "founders-plot",
   "name": "Founders Plot",
   "kind": "district",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "summary": "Scenic frontier plot where the human and Clover the foreman grow the first living district together.",
   "route": "/founders-plot",
   "modalRoute": "/?district=founders-plot",

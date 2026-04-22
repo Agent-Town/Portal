@@ -34,6 +34,7 @@
   let pollTimer = null;
   let pendingAction = false;
   let gatewayPromise = null;
+  let llmLibraryPromise = null;
   let assetManifestPromise = null;
   let assetMap = {};
   let effectsController = null;
@@ -55,6 +56,12 @@
     hasToken: false,
     lastStopReason: ''
   };
+  const FOREMAN_PACK_DOCS = [
+    { key: 'heartbeat', url: '/experiences/founders-plot/heartbeat.md', workspaceName: 'heartbeat.md' },
+    { key: 'tools', url: '/experiences/founders-plot/tools.md', workspaceName: 'tools.md' },
+    { key: 'goals', url: '/experiences/founders-plot/goals.md', workspaceName: 'goals.md' },
+    { key: 'safety', url: '/experiences/founders-plot/safety.md', workspaceName: 'safety.md' }
+  ];
 
   function readTeamCodeHint() {
     try {
@@ -80,6 +87,13 @@
       gatewayPromise = import('/openclaw-lite/gateway.js').then((module) => module.default || module);
     }
     return gatewayPromise;
+  }
+
+  async function loadLiteLlmLibrary() {
+    if (!llmLibraryPromise) {
+      llmLibraryPromise = import('/openclaw-lite/llm-config-library.js');
+    }
+    return llmLibraryPromise;
   }
 
   async function loadAssetManifest() {
@@ -143,6 +157,122 @@
       authorization: `Bearer ${foremanRuntimeToken}`
     };
     return api(url, { ...opts, headers });
+  }
+
+  function unwrapGatewayResult(result) {
+    if (result && typeof result === 'object' && result.ok === true && result.data && typeof result.data === 'object') {
+      return result.data;
+    }
+    return result && typeof result === 'object' ? result : null;
+  }
+
+  function resolveGatewayControlApi(gateway) {
+    if (window.__openclawLiteTest && typeof window.__openclawLiteTest === 'object') {
+      return window.__openclawLiteTest;
+    }
+    return gateway && typeof gateway === 'object' ? gateway : null;
+  }
+
+  function defaultProviderApi(provider) {
+    const normalized = String(provider || '').trim().toLowerCase();
+    if (normalized === 'openai' || normalized === 'openrouter' || normalized === 'ollama') {
+      return 'openai-completions';
+    }
+    return '';
+  }
+
+  function defaultProviderBaseUrl(provider) {
+    const normalized = String(provider || '').trim().toLowerCase();
+    if (normalized === 'openai') {
+      return new URL('/api/llm/openai/v1', window.location.origin).toString();
+    }
+    if (normalized === 'openrouter') {
+      return 'https://openrouter.ai/api/v1';
+    }
+    if (normalized === 'ollama') {
+      return 'http://127.0.0.1:11434/v1';
+    }
+    return '';
+  }
+
+  async function syncSharedLlmConfigToGateway(gateway) {
+    const control = resolveGatewayControlApi(gateway);
+    if (!control || typeof control.setLlmConfig !== 'function') return null;
+    const lib = await loadLiteLlmLibrary().catch(() => null);
+    if (!lib || typeof lib.loadLlmConfig !== 'function') return null;
+    const config = await lib.loadLlmConfig().catch(() => null);
+    if (!config?.configured) return null;
+    const provider = String(config.provider || '').trim();
+    const model = String(config.model || '').trim();
+    const modelRef = String(config.modelRef || (provider && model ? `${provider}/${model}` : '')).trim();
+    const apiKey = String(config.apiKey || '').trim();
+    if (!provider || !model || !modelRef || !apiKey) return null;
+    return await control.setLlmConfig({
+      provider,
+      modelRef,
+      modelId: model,
+      apiKey,
+      api: defaultProviderApi(provider),
+      baseUrl: defaultProviderBaseUrl(provider),
+      reasoning: String(config.reasoning || '').trim(),
+      useProxy: config.useProxy !== false
+    });
+  }
+
+  async function mirrorForemanPackDocToWorker(gateway, { siteRoot = '', workspaceName = '', content = '' } = {}) {
+    const control = resolveGatewayControlApi(gateway);
+    const normalizedName = String(workspaceName || '').trim();
+    const normalizedContent = typeof content === 'string' ? content : '';
+    if (!control || typeof control.workspaceWriteFile !== 'function' || !normalizedName || !normalizedContent.trim()) {
+      return false;
+    }
+    const normalizedSiteRoot = String(siteRoot || '').trim();
+    const targets = new Set([`workspace/${normalizedName}`]);
+    if (normalizedSiteRoot.startsWith('workspace/skills/')) {
+      targets.add(`${normalizedSiteRoot.replace(/\/+$/, '')}/${normalizedName}`);
+    }
+    for (const path of targets) {
+      await control.workspaceWriteFile({ path, content: normalizedContent });
+    }
+    return true;
+  }
+
+  async function syncForemanPackDocsToWorker(gateway) {
+    const packState = {
+      heartbeatLoaded: false,
+      toolsLoaded: false,
+      goalsLoaded: false,
+      safetyLoaded: false
+    };
+    if (!gateway) return packState;
+    const control = resolveGatewayControlApi(gateway);
+    const skillState = control && typeof control.skillState === 'function'
+      ? await control.skillState().catch(() => null)
+      : null;
+    const skillData = unwrapGatewayResult(skillState);
+    const siteRoot = String(skillData?.siteRoot || '').trim();
+
+    const results = await Promise.all(FOREMAN_PACK_DOCS.map(async (doc) => {
+      try {
+        const text = await apiText(doc.url);
+        const loaded = typeof text === 'string' && text.trim().length > 0;
+        if (loaded) {
+          await mirrorForemanPackDocToWorker(gateway, {
+            siteRoot,
+            workspaceName: doc.workspaceName,
+            content: text
+          });
+        }
+        return [doc.key, loaded];
+      } catch {
+        return [doc.key, false];
+      }
+    }));
+
+    for (const [key, loaded] of results) {
+      packState[`${key}Loaded`] = loaded === true;
+    }
+    return packState;
   }
 
   function setText(id, value) {
@@ -1753,6 +1883,7 @@
   async function startForemanRuntime() {
     setLastActionTarget('FOREMAN_HUT');
     const gateway = await initGateway();
+    await syncSharedLlmConfigToGateway(gateway).catch(() => null);
     if (gateway && typeof gateway.foundersPlotSchedulerStop === 'function') {
       await gateway.foundersPlotSchedulerStop({ reason: 'RUNTIME_RESTART' }).catch(() => null);
     }
@@ -1760,33 +1891,30 @@
     localForemanRuntimeId = '';
     workerSchedulerStatus = normalizeWorkerSchedulerStatus();
     let skillLoaded = false;
+    let heartbeatLoaded = false;
     let toolsLoaded = false;
     let goalsLoaded = false;
+    let safetyLoaded = false;
 
     if (gateway && typeof gateway.visitExperience === 'function') {
       const visit = await gateway.visitExperience({ url: '/experiences/founders-plot/skill.md' }).catch(() => null);
       skillLoaded = !!visit?.ok;
     }
-    try {
-      const toolsText = await apiText('/experiences/founders-plot/tools.md');
-      toolsLoaded = typeof toolsText === 'string' && toolsText.includes('Founders Plot Tool Surface');
-    } catch {
-      toolsLoaded = false;
-    }
-    try {
-      const goalsText = await apiText('/experiences/founders-plot/goals.md');
-      goalsLoaded = typeof goalsText === 'string' && goalsText.includes('Founders Plot Goals');
-    } catch {
-      goalsLoaded = false;
-    }
+    const packSync = await syncForemanPackDocsToWorker(gateway).catch(() => null);
+    heartbeatLoaded = packSync?.heartbeatLoaded === true;
+    toolsLoaded = packSync?.toolsLoaded === true;
+    goalsLoaded = packSync?.goalsLoaded === true;
+    safetyLoaded = packSync?.safetyLoaded === true;
 
     const payload = await api('/api/founders-plot/foreman/session/start', {
       method: 'POST',
       body: JSON.stringify({
         pack: {
           skillLoaded,
+          heartbeatLoaded,
           toolsLoaded,
-          goalsLoaded
+          goalsLoaded,
+          safetyLoaded
         }
       })
     });

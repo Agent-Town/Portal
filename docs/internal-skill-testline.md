@@ -2,7 +2,7 @@
 
 Status: Active  
 Audience: Engineering only
-Last updated: 2026-04-20
+Last updated: 2026-04-22
 
 ## Goal
 
@@ -93,6 +93,7 @@ Keep `skill.md` evolution testable as we:
 | Founders Plot modal + foreman tool contract | `public/skill.md`, `public/app.js`, `server/founders_plot/*`, `vendors/openclaw-lite-main/src/openclaw-lite/gateway.js`, `vendors/openclaw-lite-main/src/openclaw-lite/worker.js` | Founders Plot stays modal-first in the town shell; worker exposes typed `et.plot.*`, contract, standing-order, and scheduler tools plus `founders-plot` modal open path; approvals remain explicit and deterministic | `e2e/132_founders_plot_registry_handoff.spec.js`, `e2e/133_founders_plot_runtime_contract.spec.js`, `e2e/134_founders_plot_resume_recap.spec.js`, `e2e/145_founders_plot_v11_ui_surfaces.spec.js` |
 | Founders Plot V1.2 living-town + worker-owned foreman loop contract | `public/skill.md`, `public/experiences/founders-plot/tools.md`, `public/experiences/founders-plot/goals.md`, `public/app.js`, `server/founders_plot/*`, `vendors/openclaw-lite-main/src/openclaw-lite/gateway.js`, `vendors/openclaw-lite-main/src/openclaw-lite/worker.js` | skill/docs name the V1.2 tool family (`et.plot.town.get_signals`, `et.plot.town.upgrade_landmark`, `et.plot.journal.get_entries`), recurring requesters, soft-deadline `PREPARATION` contracts, and the requirement that `Run now` executes through the OpenClaw Lite worker command path | `e2e/146_founders_plot_v12_worker_owned_tick.spec.js`, `e2e/147_founders_plot_v12_living_contract_deck.spec.js`, `e2e/148_founders_plot_v12_town_signals_and_journal.spec.js`, `e2e/149_founders_plot_v12_public_square_coin_sink.spec.js`, `e2e/150_founders_plot_v12_recap_and_ui.spec.js`, `e2e/55_phase3_skill_contract_line.spec.js` |
 | Founders Plot V1.2 hardening runtime-truth + in-session scheduler contract | `public/skill.md`, `public/experiences/founders-plot/manifest.json`, `public/experiences/founders-plot/heartbeat.md`, `public/experiences/founders-plot/tools.md`, `public/app.js`, `server/founders_plot/*`, `vendors/openclaw-lite-main/src/openclaw-lite/gateway.js`, `vendors/openclaw-lite-main/src/openclaw-lite/worker.js` | the only shipped scheduler preset is `COLLECT_READY_OUTPUTS`, it runs only through the in-session OpenClaw Lite worker loop, Foreman mutations require worker-origin metadata, and reloads require a fresh Clover start before any routine can run again | `e2e/151_founders_plot_v12_hardening_scheduler_interval.spec.js`, `e2e/152_founders_plot_v12_hardening_worker_origin.spec.js`, `e2e/153_founders_plot_v12_hardening_contract_scoring.spec.js`, `e2e/154_founders_plot_v12_hardening_pack_contract.spec.js`, `e2e/155_founders_plot_v12_hardening_reload_runtime_truth.spec.js`, `e2e/55_phase3_skill_contract_line.spec.js` |
+| Founders Plot V1.4 AI-reality Foreman context + provider-safe alias contract | `public/experiences/founders-plot/{skill,heartbeat,tools,goals}.md`, `public/experiences/founders-plot/app.js`, `server/founders_plot/{routes,engine,recap}.js`, `vendors/openclaw-lite-main/src/openclaw-lite/{worker,founders-plot-foreman-context}.js` | every Clover cognition turn assembles experience-pack hashes, provider-safe alias metadata, safe candidates, and replay-visible decision events; the Founders Plot iframe mirrors the shared client-only brain config into its own worker before runtime start; the backend stores only validated decision metadata and never receives provider credentials | `tests/founders_plot_foreman_context_assembler.test.js`, `tests/founders_plot_tool_alias_registry.test.js`, `tests/founders_plot_heartbeat_context_hash.test.js`, `e2e/172_founders_plot_foreman_llm_tick.spec.js`, `e2e/174_founders_plot_v1_4_scope_quarantine.spec.js`, `e2e/175_founders_plot_v1_4_visual_regression_survives_llm_port.spec.js`, `e2e/176_founders_plot_foreman_context_includes_pack_docs.spec.js`, `e2e/177_founders_plot_provider_safe_tool_context.spec.js`, `e2e/178_founders_plot_llm_foreman_selects_candidate.spec.js`, `e2e/179_founders_plot_invalid_llm_candidate_rejected.spec.js`, `e2e/180_founders_plot_llm_receipt_and_recap_trace.spec.js`, `e2e/181_founders_plot_heartbeat_and_tools_change_decision_context.spec.js`, `e2e/182_founders_plot_real_llm_foreman_smoke.spec.js` |
 
 ## Progress Log
 
@@ -204,3 +205,8 @@ When adding/changing skill behavior, update this document with:
 - source files touched,
 - test file and test name,
 - known gaps if partially implemented.
+### 2026-04-22
+
+- Added the V1.4 AI-reality Foreman contract row covering pack-context assembly, provider-safe alias exposure, replay-visible decision metadata, and the client-only brain-config mirror into the Founders Plot iframe worker.
+- Added deterministic V1.4 coverage for scope quarantine, visual-regression survival, pack-doc inclusion, provider-safe alias prompts, valid LLM selection, invalid candidate rejection, replay/recap trace fidelity, and heartbeat/tools context drift (`e2e/172`, `e2e/174` to `e2e/182`).
+- Added worker-side unit coverage for the context assembler, alias registry, heartbeat hash drift, visual-direction pack presence, and hero-source index honesty.

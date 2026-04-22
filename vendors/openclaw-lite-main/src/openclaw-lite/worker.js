@@ -23,6 +23,13 @@ import {
 } from "./shared/crypto.js";
 import { deleteByKeys, getAllFromIndex, getRecord, openDb, putRecord } from "./shared/idb.js";
 import { vfsGetUtf8, vfsListPaths, vfsPutBytes, vfsPutUtf8, vfsReadAllBytes } from "./shared/vfs.js";
+import {
+  FOREMAN_SELECTION_TOOL_NAME,
+  buildFoundersPlotDecisionPrompt,
+  buildFoundersPlotForemanContext,
+  buildNoopDecision,
+  chooseFoundersPlotCandidateWithTestBrain,
+} from "./founders-plot-foreman-context.js";
 
 const OPENCLAW_VERSION = __OPENCLAW_VERSION__;
 const PI_VERSIONS = __PI_VERSIONS__;
@@ -63,6 +70,7 @@ const VISIT_COMPAT_BASENAMES = new Set([
   "heartbeat.md",
   "goals.md",
   "tools.md",
+  "safety.md",
   "penalty.md",
   "rules.md",
   "messaging.md",
@@ -753,6 +761,7 @@ function trainerDocRoleFromPath(pathValue) {
   if (lowered === "tools.md" || lowered === "tool.md") return "tools";
   if (lowered === "heartbeat.md") return "heartbeat";
   if (lowered === "goals.md" || lowered === "goal.md") return "goals";
+  if (lowered === "safety.md") return "safety";
   if (lowered === "penalty.md") return "penalty";
   return "other";
 }
@@ -3636,6 +3645,7 @@ function trainerIsLoadoutSensitiveWorkspacePath(pathValue) {
     base === "heartbeat.md" ||
     base === "goals.md" ||
     base === "goal.md" ||
+    base === "safety.md" ||
     base === "penalty.md"
   );
 }
@@ -5915,89 +5925,79 @@ function extractFirstJsonObjectText(rawValue) {
 
 function parseForemanLlmDecision(rawText = "") {
   const raw = String(rawText || "").trim();
-  if (!raw) return { chosenCandidateId: null, parsed: null };
+  if (!raw) {
+    return buildNoopDecision("HEARTBEAT_OK", "The model returned an empty response.", "I stayed put because the town did not need a safe move right now.");
+  }
   if (/^NO_ACTION$/i.test(raw)) {
-    return { chosenCandidateId: null, parsed: null };
+    return buildNoopDecision("HEARTBEAT_OK", "The model chose a calm no-op.", "I stayed put because nothing urgent needed a safe move.");
   }
 
   const maybeJson = raw.startsWith("{") ? raw : extractFirstJsonObjectText(raw);
   if (maybeJson) {
     try {
       const parsed = JSON.parse(maybeJson);
-      const candidateValue = parsed?.chosenCandidateId ?? parsed?.candidateId ?? parsed?.selection ?? parsed?.choice ?? "";
-      const normalized = String(candidateValue || "").trim();
-      if (!normalized || /^NO_ACTION$/i.test(normalized)) {
-        return { chosenCandidateId: null, parsed };
+      const candidateValue = parsed?.selectedCandidateId ?? parsed?.chosenCandidateId ?? parsed?.candidateId ?? parsed?.selection ?? parsed?.choice ?? "";
+      const normalizedCandidateId = String(candidateValue || "").trim();
+      const noopCode = parsed?.noopCode == null ? null : String(parsed.noopCode || "").trim().toUpperCase();
+      if (!normalizedCandidateId || /^NO_ACTION$/i.test(normalizedCandidateId)) {
+        return {
+          selectedCandidateId: null,
+          confidence: Number.isFinite(Number(parsed?.confidence)) ? Number(parsed.confidence) : 1,
+          reason: String(parsed?.reason || "The model chose a calm no-op.").trim(),
+          playerFacingLine: String(parsed?.playerFacingLine || "I stayed put because nothing urgent needed a safe move.").trim(),
+          noopCode: noopCode || "HEARTBEAT_OK",
+          parsed,
+        };
       }
-      return { chosenCandidateId: normalized, parsed };
+      return {
+        selectedCandidateId: normalizedCandidateId,
+        confidence: Number.isFinite(Number(parsed?.confidence)) ? Number(parsed.confidence) : 0.5,
+        reason: String(parsed?.reason || "").trim(),
+        playerFacingLine: String(parsed?.playerFacingLine || "").trim(),
+        noopCode: noopCode || null,
+        parsed,
+      };
     } catch {
       // Fall through to raw-token parsing below.
     }
   }
 
-  return { chosenCandidateId: raw, parsed: null };
+  return {
+    selectedCandidateId: raw,
+    confidence: 0.5,
+    reason: "",
+    playerFacingLine: "",
+    noopCode: null,
+    parsed: null,
+  };
 }
 
-async function chooseForemanCandidateWithLlm({ observation = null, safeCandidates = [] } = {}) {
-  const actionableCandidates = (Array.isArray(safeCandidates) ? safeCandidates : []).filter((candidate) => candidate?.canActNow === true);
-  if (actionableCandidates.length === 0) {
-    return {
-      chosenCandidateId: null,
-      source: "llm",
-      rawText: "",
-    };
-  }
-
-  const promptPayload = {
-    standingOrder: observation?.standingOrder || null,
-    currentGoal: observation?.currentGoal || null,
-    activeContract: observation?.activeContract || null,
-    scheduler: observation?.scheduler || null,
-    safeCandidates: actionableCandidates.map((candidate) => ({
-      candidateId: String(candidate?.candidateId || ""),
-      toolName: String(candidate?.toolName || ""),
-      buildingId: String(candidate?.buildingId || ""),
-      reason: String(candidate?.reason || ""),
-      goalServed: String(candidate?.goalServed || ""),
-      score: Number.isFinite(Number(candidate?.score)) ? Number(candidate.score) : 0,
-    })),
-  };
-  const promptText = [
-    "Choose Clover's next safe Founders Plot action.",
-    "Reply with minified JSON only.",
-    'Format: {"chosenCandidateId":"candidate-id"} or {"chosenCandidateId":"NO_ACTION"}.',
-    "Do not invent candidate IDs and do not add commentary.",
-    JSON.stringify(promptPayload),
-  ].join("\n");
+async function chooseForemanCandidateWithLlm({ context = null } = {}) {
+  const modelInvocationId = randomId("fpllm");
   const systemPrompt = [
     "You are Clover, the Founders Plot foreman.",
-    "Pick exactly one actionable candidateId from the provided safe candidates or choose NO_ACTION.",
-    "You must stay inside the provided safe candidate list.",
+    "Pick exactly one safe candidateId from the provided safe candidate list or choose a no-op.",
+    "You must stay inside the provided safe candidate list and follow the pack guidance.",
     "Return JSON only.",
   ].join(" ");
+  const promptText = buildFoundersPlotDecisionPrompt(context);
 
   const rawText = await runSilentLlmTextTurn({
     userText: promptText,
     systemPrompt,
-    source: "founders-plot.foreman.decision",
+    source: `founders-plot.foreman.decision:${modelInvocationId}`,
   });
   const parsed = parseForemanLlmDecision(rawText);
-  const chosenCandidateId = String(parsed?.chosenCandidateId || "").trim();
-  if (!chosenCandidateId) {
-    return {
-      chosenCandidateId: null,
-      source: "llm",
-      rawText,
-    };
-  }
-  const chosen = actionableCandidates.find((candidate) => String(candidate?.candidateId || "") === chosenCandidateId) || null;
-  if (!chosen) {
-    throw new Error("FOREMAN_LLM_INVALID_CHOICE");
-  }
   return {
-    chosenCandidateId,
+    selectedCandidateId: String(parsed?.selectedCandidateId || "").trim() || null,
+    confidence: Number.isFinite(Number(parsed?.confidence)) ? Number(parsed.confidence) : 0.5,
+    reason: String(parsed?.reason || "").trim(),
+    playerFacingLine: String(parsed?.playerFacingLine || "").trim(),
+    noopCode: parsed?.noopCode ? String(parsed.noopCode || "").trim() : null,
     source: "llm",
     rawText,
+    modelInvocationId,
+    llmToolName: FOREMAN_SELECTION_TOOL_NAME,
   };
 }
 
@@ -7103,6 +7103,10 @@ async function resolveExperienceWorkspaceFiles(params = {}) {
     tools: {
       required: false,
       paths: dedupePaths([sitePath("TOOLS.md"), sitePath("tools.md"), "workspace/TOOLS.md", "workspace/tools.md"]),
+    },
+    safety: {
+      required: false,
+      paths: dedupePaths([sitePath("SAFETY.md"), sitePath("safety.md"), "workspace/SAFETY.md", "workspace/safety.md"]),
     },
     penalty: {
       required: false,
@@ -8663,6 +8667,66 @@ async function foundersPlotWorkerFetch(path, { method = "GET", token = "", body 
   return payload;
 }
 
+const FOUNDERS_PLOT_FOREMAN_PACK_DOCS = [
+  { key: "skill", url: "/experiences/founders-plot/skill.md", workspaceName: "skill.md" },
+  { key: "heartbeat", url: "/experiences/founders-plot/heartbeat.md", workspaceName: "heartbeat.md" },
+  { key: "tools", url: "/experiences/founders-plot/tools.md", workspaceName: "tools.md" },
+  { key: "goals", url: "/experiences/founders-plot/goals.md", workspaceName: "goals.md" },
+  { key: "safety", url: "/experiences/founders-plot/safety.md", workspaceName: "safety.md" },
+];
+
+function currentConfiguredModelRef() {
+  const parsed = parseConfiguredModelRef();
+  const provider = String(parsed?.provider || state.llmProvider || "").trim();
+  const modelId = String(parsed?.modelId || state.llmModelId || "").trim();
+  if (provider && modelId) return `${provider}/${modelId}`;
+  return provider || modelId || "";
+}
+
+async function hydrateFoundersPlotForemanPackFiles(resolvedPack = null) {
+  const files = resolvedPack?.files && typeof resolvedPack.files === "object"
+    ? { ...resolvedPack.files }
+    : {};
+  const resolvedPaths = resolvedPack?.resolvedPaths && typeof resolvedPack.resolvedPaths === "object"
+    ? { ...resolvedPack.resolvedPaths }
+    : {};
+  const siteRoot = typeof resolvedPack?.siteRoot === "string" && resolvedPack.siteRoot.startsWith("workspace/skills/")
+    ? resolvedPack.siteRoot.replace(/\/+$/, "")
+    : "";
+
+  for (const descriptor of FOUNDERS_PLOT_FOREMAN_PACK_DOCS) {
+    const key = String(descriptor?.key || "").trim();
+    const existing = typeof files[key] === "string" ? files[key] : "";
+    if (existing.trim()) continue;
+    let response = null;
+    try {
+      response = await fetch(String(descriptor?.url || ""), {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      });
+    } catch {
+      response = null;
+    }
+    if (!response?.ok) continue;
+    const text = await response.text().catch(() => "");
+    if (!String(text || "").trim()) continue;
+    files[key] = text;
+    const workspacePath = `workspace/${descriptor.workspaceName}`;
+    resolvedPaths[key] = workspacePath;
+    await vfsPutUtf8(workspacePath, text);
+    if (siteRoot) {
+      await vfsPutUtf8(`${siteRoot}/${descriptor.workspaceName}`, text);
+    }
+  }
+
+  return {
+    ...(resolvedPack || {}),
+    files,
+    resolvedPaths,
+  };
+}
+
 async function runFoundersPlotForemanTick({ token = "" } = {}) {
   const normalizedToken = String(token || "").trim();
   if (!normalizedToken) {
@@ -8680,31 +8744,88 @@ async function runFoundersPlotForemanTick({ token = "" } = {}) {
     token: normalizedToken,
   });
   const safeCandidates = Array.isArray(observation?.safeCandidates) ? observation.safeCandidates : [];
+  const resolvedPack = await hydrateFoundersPlotForemanPackFiles(await resolveExperienceWorkspaceFiles({}));
+  const context = await buildFoundersPlotForemanContext({
+    plotId: observation?.observation?.plotId || observation?.runtime?.plotId || "",
+    foremanId: "clover",
+    runtimeId: String(observation?.runtime?.runtimeId || ""),
+    packFiles: {
+      skill: resolvedPack?.files?.skill || "",
+      heartbeat: resolvedPack?.files?.heartbeat || "",
+      tools: resolvedPack?.files?.tools || "",
+      goals: resolvedPack?.files?.goals || "",
+      safety: resolvedPack?.files?.safety || resolvedPack?.files?.penalty || "",
+    },
+    toolRegistry: Array.isArray(observation?.toolRegistry) ? observation.toolRegistry : [],
+    observation: observation?.observation || null,
+    activeGoal: observation?.observation?.currentGoal || null,
+    activeContract: observation?.observation?.activeContract || null,
+    permissions: observation?.observation?.permissions || null,
+    scheduler: observation?.observation?.scheduler || null,
+    recentEvents: observation?.observation?.recentEvents || [],
+    recentReceipts: observation?.recentReceipts || [],
+    safeCandidates,
+  });
   let decision = null;
   if (foremanUsesDeterministicTestBrain()) {
     decision = {
-      chosenCandidateId: String(observation?.decision?.chosenCandidateId || ""),
+      ...chooseFoundersPlotCandidateWithTestBrain(context),
       source: "test_brain",
       rawText: "",
+      testBrainInvocationId: randomId("fptb"),
+      llmToolName: FOREMAN_SELECTION_TOOL_NAME,
     };
   } else {
     decision = await chooseForemanCandidateWithLlm({
-      observation: observation?.observation || null,
-      safeCandidates,
+      context,
     });
   }
-  const chosenId = String(decision?.chosenCandidateId || "");
+  const chosenId = String(decision?.selectedCandidateId || "").trim();
   if (decision && (decision.source === "llm" || decision.source === "test_brain")) {
+    const configuredModel = getConfiguredModel();
     await foundersPlotWorkerFetch("/api/founders-plot/foreman/decision", {
       method: "POST",
       token: normalizedToken,
       body: {
         chosenCandidateId: chosenId || null,
+        selectedCandidateId: chosenId || null,
         source: decision.source,
+        confidence: Number.isFinite(Number(decision?.confidence)) ? Number(decision.confidence) : 0.5,
+        reason: String(decision?.reason || "").trim(),
+        playerFacingLine: String(decision?.playerFacingLine || "").trim(),
+        noopCode: decision?.noopCode ? String(decision.noopCode || "").trim() : null,
+        modelInvocationId: decision?.modelInvocationId || null,
+        testBrainInvocationId: decision?.testBrainInvocationId || null,
+        provider: decision.source === "llm" ? String(configuredModel?.provider || "") : "test-local",
+        model: decision.source === "llm"
+          ? currentConfiguredModelRef()
+          : "test-local/deterministic",
+        llmToolName: decision?.llmToolName || FOREMAN_SELECTION_TOOL_NAME,
+        workerCommandId,
+        workerTraceId,
+        pack: {
+          packHash: context?.pack?.packHash || null,
+          files: {
+            skillMdHash: context?.pack?.files?.skillMd?.hash || null,
+            heartbeatMdHash: context?.pack?.files?.heartbeatMd?.hash || null,
+            toolsMdHash: context?.pack?.files?.toolsMd?.hash || null,
+            goalsMdHash: context?.pack?.files?.goalsMd?.hash || null,
+            safetyMdHash: context?.pack?.files?.safetyMd?.hash || null,
+          },
+        },
+        toolContract: {
+          source: context?.toolContract?.source || "server-tool-registry",
+          aliasMap: context?.toolContract?.aliasMap || {},
+        },
+        contextSummary: {
+          contextVersion: context?.contextVersion || "",
+          completeness: context?.completeness || {},
+          safeCandidates: context?.safeCandidates || [],
+        },
       },
     });
   }
-  const chosen = safeCandidates.find((candidate) => candidate?.candidateId === chosenId) || null;
+  const chosen = (Array.isArray(context?.safeCandidates) ? context.safeCandidates : []).find((candidate) => candidate?.candidateId === chosenId) || null;
   if (!chosen || chosen.canActNow !== true) {
     return {
       ok: true,
@@ -8725,6 +8846,9 @@ async function runFoundersPlotForemanTick({ token = "" } = {}) {
       workerCommandId,
       workerTraceId,
       runtimeId: String(observation?.runtime?.runtimeId || ""),
+      selectedCandidateId: String(chosen?.candidateId || ""),
+      llmToolName: decision?.llmToolName || FOREMAN_SELECTION_TOOL_NAME,
+      canonicalToolName: String(chosen?.canonicalToolName || chosen?.toolName || ""),
     },
   });
   return {

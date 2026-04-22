@@ -234,3 +234,48 @@ When implementing the V1.3.1 visual-surface signoff pass:
 - ensure only the objective-relevant lot gets primary attention by default;
 - split or quarantine unrelated OpenRouter/proxy changes with a separate owner and rollback note;
 - capture full-route screenshots, not only embedded experience screenshots.
+
+
+---
+
+## V1.4 AI reality + visual-direction governance
+
+### Canonical design-doc paths
+
+Coding agents must read the design docs before changing player-facing UI. If root-level docs exist, they may be mirrors. The canonical repo path must be one of:
+
+1. root files: `BRAND.md`, `DESIGN.md`, `GAME_UX.md`, `REGISTRY.md`; or
+2. nested files: `Brand kit/guidelines/agent-town-design-pack/BRAND.md`, `DESIGN.md`, `GAME_UX.md`, `REGISTRY.md`.
+
+If both exist, verify they are equivalent or that the root files clearly redirect to the nested canonical files. Do not leave `AGENTS.md` pointing at missing design docs.
+
+### Foreman AI truth rule
+
+Do not claim Clover/Foreman uses AI during gameplay unless a Foreman decision produces one of:
+
+- `modelInvocationId`; or
+- `testBrainInvocationId` from the same worker/runtime path used by live play.
+
+The OpenClaw Lite worker must own Foreman cognition. Backend routes validate and execute world mutations; they must not choose Foreman actions as a shortcut.
+
+### Experience-pack context rule
+
+Every Founders Plot Foreman cognition turn must include or explicitly mark the status of:
+
+- `skill.md`
+- `heartbeat.md`
+- `tools.md`
+- `goals.md`
+- optional `safety.md`
+
+A heartbeat without tool descriptions is incomplete. If `tools.md` or the canonical tool registry cannot be loaded, the Foreman must no-op or ask for recovery; it must not act.
+
+### Visual-direction workflow rule
+
+Do not start a broad visual-art sprint from vague instructions such as “make it more premium.” First create or update:
+
+- `docs/visual/FOUNDERS_PLOT_V1_4_VISUAL_DIRECTION_PACK.md`
+- `docs/brand/HERO_VIDEO_SOURCE_INDEX.md`
+- `docs/brand/HERO_VIDEO_REUSE_BRIEF_V1_4.md`
+
+The visual direction pack is the input for later art implementation. It is not optional when changing the flagship Founders Plot surface.

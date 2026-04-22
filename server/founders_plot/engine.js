@@ -50,6 +50,12 @@ const EVENT_TYPES = {
   FOREMAN_SESSION_HEARTBEAT: 'FOREMAN_SESSION_HEARTBEAT',
   FOREMAN_SESSION_PAUSED: 'FOREMAN_SESSION_PAUSED',
   FOREMAN_RECEIPT_CREATED: 'FOREMAN_RECEIPT_CREATED',
+  FOREMAN_CONTEXT_ASSEMBLED: 'FOREMAN_CONTEXT_ASSEMBLED',
+  FOREMAN_LLM_REQUESTED: 'FOREMAN_LLM_REQUESTED',
+  FOREMAN_LLM_DECISION_SELECTED: 'FOREMAN_LLM_DECISION_SELECTED',
+  FOREMAN_LLM_DECISION_NOOP: 'FOREMAN_LLM_DECISION_NOOP',
+  FOREMAN_TOOL_ALIAS_MAPPED: 'FOREMAN_TOOL_ALIAS_MAPPED',
+  FOREMAN_ACTION_REJECTED: 'FOREMAN_ACTION_REJECTED',
   SCHEDULER_ENABLED: 'SCHEDULER_ENABLED',
   SCHEDULER_PAUSED: 'SCHEDULER_PAUSED',
   SCHEDULER_RESUMED: 'SCHEDULER_RESUMED',
@@ -499,8 +505,10 @@ function normalizeForemanRuntime(raw = {}) {
     lastError: String(raw.lastError || ''),
     pack: {
       skillLoaded: raw?.pack?.skillLoaded === true,
+      heartbeatLoaded: raw?.pack?.heartbeatLoaded === true,
       toolsLoaded: raw?.pack?.toolsLoaded === true,
-      goalsLoaded: raw?.pack?.goalsLoaded === true
+      goalsLoaded: raw?.pack?.goalsLoaded === true,
+      safetyLoaded: raw?.pack?.safetyLoaded === true
     }
   };
 }
@@ -2139,12 +2147,22 @@ function stateView(state, recentEvents = []) {
     : null;
   let decision = null;
   if (matchingPersistedCandidate) {
-    decision = buildForemanDecision({
+    decision = {
+      ...copyPersistedValue(persistedDecision),
+      ...buildForemanDecision({
       observation,
       safeCandidates,
       chosenCandidateId: persistedChoiceId,
       source: persistedDecision?.source || 'server_default'
-    });
+      }),
+      confidence: Number.isFinite(Number(persistedDecision?.confidence)) ? Number(persistedDecision.confidence) : 0,
+      reason: typeof persistedDecision?.reason === 'string' ? persistedDecision.reason : '',
+      playerFacingLine: typeof persistedDecision?.playerFacingLine === 'string' ? persistedDecision.playerFacingLine : '',
+      noopCode: typeof persistedDecision?.noopCode === 'string' ? persistedDecision.noopCode : null,
+      meta: persistedDecision?.meta && typeof persistedDecision.meta === 'object'
+        ? copyPersistedValue(persistedDecision.meta)
+        : null
+    };
   } else if (
     normalizeForemanDecisionSource(persistedDecision?.source) === 'llm'
     && persistedDecision?.planCard
@@ -2156,7 +2174,14 @@ function stateView(state, recentEvents = []) {
       planCard: {
         ...copyPersistedValue(persistedDecision.planCard),
         canActNow: false
-      }
+      },
+      confidence: Number.isFinite(Number(persistedDecision?.confidence)) ? Number(persistedDecision.confidence) : 0,
+      reason: typeof persistedDecision?.reason === 'string' ? persistedDecision.reason : '',
+      playerFacingLine: typeof persistedDecision?.playerFacingLine === 'string' ? persistedDecision.playerFacingLine : '',
+      noopCode: typeof persistedDecision?.noopCode === 'string' ? persistedDecision.noopCode : null,
+      meta: persistedDecision?.meta && typeof persistedDecision.meta === 'object'
+        ? copyPersistedValue(persistedDecision.meta)
+        : null
     };
   } else {
     decision = chooseForemanCandidateWithTestBrain({

@@ -451,3 +451,82 @@ When a registry item is referenced by `REGISTRY.md`, the branch should include o
 - a deliberate note explaining why the current implementation is still local and when it will be promoted.
 
 This prevents the registry from becoming aspirational text that AI developers cannot use.
+
+
+---
+
+## V1.4 registry additions
+
+These items are approved as registry targets for the AI reality + visual-direction workflow.
+
+### `foreman-decision-receipt`
+
+Normal player-facing one-line receipt after a Foreman action.
+
+Requirements:
+
+- no provider/model/debug jargon;
+- expandable audit link only if appropriate;
+- references the visible game reason;
+- tied to replay event ID.
+
+### `foreman-debug-trace-panel`
+
+Debug-only panel for worker/model/tool context traces.
+
+Requirements:
+
+- hidden in normal gameplay;
+- shows model/test-brain invocation ID;
+- shows pack hashes;
+- shows provider-safe alias and canonical tool;
+- shows selected candidate and server validation result.
+
+### `visual-direction-pack-template`
+
+Markdown template block for visual signoff packs.
+
+Requirements:
+
+- mood board;
+- reference board;
+- anti-examples;
+- paintover list;
+- weak asset list;
+- screenshot rubric;
+- art owner field.
+
+### `hero-media-source-index`
+
+Markdown/source-index pattern for prior hero video/script recovery.
+
+Requirements:
+
+- status field;
+- searched terms;
+- searched paths;
+- recovered sources;
+- provenance;
+- recommended use;
+- open questions.
+
+### `reference-board-card`
+
+Small doc/UI primitive for annotating references by principle instead of copying.
+
+Requirements:
+
+- borrow-this field;
+- do-not-borrow field;
+- rights/provenance field.
+
+### `screenshot-signoff-panel`
+
+Review surface for comparing candidate screenshots.
+
+Requirements:
+
+- desktop/mobile/Clover acting states;
+- score table;
+- named reviewer;
+- pass/fail decision.

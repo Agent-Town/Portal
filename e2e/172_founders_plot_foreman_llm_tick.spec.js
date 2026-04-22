@@ -161,6 +161,40 @@ test('live Foreman ticks use a client-only OpenRouter call and persist an llm-so
   expect(backendLlmPaths).toEqual([]);
   expect(decisionSyncBodies[0]).toEqual({
     chosenCandidateId,
-    source: 'llm'
+    selectedCandidateId: chosenCandidateId,
+    source: 'llm',
+    confidence: expect.any(Number),
+    reason: expect.any(String),
+    playerFacingLine: expect.any(String),
+    noopCode: null,
+    modelInvocationId: expect.stringMatching(/^fpllm_/),
+    testBrainInvocationId: null,
+    provider: 'openrouter',
+    model: `openrouter/${OPENROUTER_MODEL}`,
+    llmToolName: 'founders_plot_foreman_select_candidate',
+    workerCommandId: expect.stringMatching(/^fpwcmd_/),
+    workerTraceId: expect.stringMatching(/^fpwtrace_/),
+    pack: expect.objectContaining({
+      packHash: expect.any(String),
+      files: expect.objectContaining({
+        skillMdHash: expect.any(String),
+        heartbeatMdHash: expect.any(String),
+        toolsMdHash: expect.any(String),
+        goalsMdHash: expect.any(String)
+      })
+    }),
+    toolContract: expect.objectContaining({
+      source: 'merged',
+      aliasMap: expect.objectContaining({
+        founders_plot_collect_outputs: 'et.plot.collect_outputs'
+      })
+    }),
+    contextSummary: expect.objectContaining({
+      contextVersion: 'founders-plot-foreman-context.v1',
+      completeness: expect.objectContaining({
+        canAct: true
+      }),
+      safeCandidates: expect.any(Array)
+    })
   });
 });

@@ -794,3 +794,46 @@ Pass criteria:
 
 - OpenRouter/proxy changes split out or documented in `specs/OPENROUTER_SCOPE_QUARANTINE.md`;
 - separate owner signoff recorded if not split.
+
+
+---
+
+## V1.4 update: AI gameplay truth and hero-frame UX
+
+### Foreman gameplay truth path
+
+Normal gameplay must represent Clover as an AI partner only when the real path exists:
+
+```text
+structured observation
++ skill.md
++ heartbeat.md
++ tools.md
++ goals.md
++ safe candidates
+→ LLM/Test Brain choice
+→ server-authoritative tool execution
+→ in-world feedback
+→ receipt/replay/recap
+```
+
+### Player-facing Foreman receipt
+
+After Clover acts, show one concise line in normal gameplay:
+
+> “I collected lumber because the Contract Board needs wood.”
+
+Do not show provider/model/runtime/tool jargon unless the player opens an explicit debug/audit surface.
+
+### Hero-frame test
+
+The default Founders Plot route must pass the five-second test:
+
+1. It reads as a town-building game.
+2. The next action is obvious.
+3. Clover is visibly the helper.
+4. The town state is legible through the scene, not through text panels.
+
+### Hero-video/script reuse
+
+Hero-video material may support tone and marketing alignment, but gameplay UI must remain centered on the home plot and Clover. Supporting trailer characters should not become persistent UI clutter.

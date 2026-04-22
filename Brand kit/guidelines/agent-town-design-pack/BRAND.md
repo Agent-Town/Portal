@@ -560,3 +560,56 @@ For V1.3.1, the most important improvement is not more dialogue. It is **world l
 OpenRouter, proxy, Brain, provider, runtime, worker traffic, and similar platform/backend topics are not part of the Founders Plot brand surface.
 
 They may exist in backstage/dev surfaces, but they must not affect the normal V1.3.1 visual-signoff review unless explicitly listed in the sprint's scope-hygiene note.
+
+
+---
+
+## V1.4 update: AI partner truth and hero-media canon
+
+### AI partner truth
+
+Agent Town may only present Clover as an AI partner when Clover actually participates through the OpenClaw Lite worker + LLM/Test Brain decision loop.
+
+Player-facing copy may say:
+
+> “Clover noticed the lumber was ready and collected it.”
+
+Only if the event trail proves:
+
+```text
+worker observation → LLM/Test Brain decision → server-authoritative tool call → receipt/replay
+```
+
+Do not use “AI-powered” as decoration for deterministic-only helper behavior.
+
+### Clover remains the core Founders Plot helper
+
+Clover is the canonical in-game Foreman for Founders Plot V1. Supporting characters from trailers, hero videos, or brand explorations may not replace Clover without a later product decision.
+
+### Hero-video and remembered character policy
+
+The product owner remembers prior hero-video/script material involving:
+
+- Lobster
+- Chibi girl
+- Wizard kid
+- Prairie dog
+
+These are **candidate remembered brand assets** until their source files/script are recovered and approved.
+
+They may inform:
+
+- marketing tone;
+- visual mood;
+- optional future cameos;
+- hero/trailer material.
+
+They must not automatically become:
+
+- gameplay NPCs;
+- new quest givers;
+- replacement Foremen;
+- new mechanics;
+- in-world clutter.
+
+Use `docs/brand/HERO_VIDEO_SOURCE_INDEX.md` as the source-of-truth status file.
