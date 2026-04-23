@@ -1,5 +1,25 @@
 (() => {
   const PanelI18n = window.AgentTownI18n || null;
+  const PANEL_FALLBACK_COPY = {
+    'agent.panel.title': 'Agent Comms',
+    'agent.panel.status.idle': 'Idle',
+    'agent.panel.status.connected': 'Connected',
+    'agent.panel.status.offline': 'Offline',
+    'agent.panel.chat_placeholder': 'Message agent...',
+    'agent.panel.send': 'Send',
+    'agent.panel.new_session': 'New session',
+    'agent.panel.trainer': 'Trainer',
+    'agent.panel.system_logs': 'System Logs',
+    'agent.panel.debug.expand': 'Expand panel',
+    'agent.panel.debug.minimize': 'Minimize panel',
+    'agent.panel.log.gateway_unavailable': 'Gateway unavailable: {{message}}',
+    'agent.panel.message.gateway_unavailable': 'Agent gateway unavailable.',
+    'agent.panel.message.failed_to_send': 'Failed to send: {{message}}',
+    'agent.panel.message.transcript_reset_unavailable': 'Transcript reset is unavailable.',
+    'agent.panel.message.new_session_started': 'New session started.',
+    'agent.panel.log.new_session_started': 'New session started.',
+    'agent.panel.message.new_session_failed': 'New session failed: {{message}}',
+  };
   const isCeremonyEmbed = (
     window.__agentTownCeremonyEmbed === true
     || document.documentElement.classList.contains('ceremony-embed')
@@ -20,9 +40,17 @@
   }
 
   function tPanel(key, vars = {}) {
-    if (!PanelI18n || typeof PanelI18n.t !== 'function') return key;
+    const i18n = window.AgentTownI18n || PanelI18n || null;
+    if (!i18n || typeof i18n.t !== 'function') {
+      const template = PANEL_FALLBACK_COPY[key];
+      if (!template) return key;
+      return String(template).replace(/\{\{\s*(\w+)\s*\}\}/g, (_, name) => {
+        const value = vars?.[name];
+        return value == null ? '' : String(value);
+      });
+    }
     const locale = String(document.documentElement.lang || 'en').trim() || 'en';
-    return PanelI18n.t(key, vars, locale);
+    return i18n.t(key, vars, locale);
   }
 
   function loadMinimizedPreference() {
@@ -46,7 +74,8 @@
   function setStatus(text) {
     const node = el('agentStatus');
     if (!node) return;
-    node.textContent = text || tPanel('agent.panel.status.idle');
+    const raw = String(text || '').trim();
+    node.textContent = PANEL_FALLBACK_COPY[raw] || raw || tPanel('agent.panel.status.idle');
   }
 
   function syncPanelLayout(panel = null) {

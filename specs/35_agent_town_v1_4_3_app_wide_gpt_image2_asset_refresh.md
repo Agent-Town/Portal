@@ -1,6 +1,6 @@
 # Agent Town V1.4.3 — App-Wide GPT Image 2 Asset Refresh Specification
 
-**Status:** ready for implementation planning  
+**Status:** implemented on release branch, with final release-candidate cleanup applied  
 **Target branch name:** `codex/agent-town-v1-4-3-app-wide-gpt-image2-refresh`  
 **Depends on:** Founders Plot V1.4.2 Patch 2 signoff branch, or latest accepted Founders Plot visual baseline  
 **Primary goal:** upgrade the visual appeal of the whole Agent Town app outside the Founders Plot gameplay asset pack, using Codex + GPT Image 2 in a controlled, prompt-versioned, manifest-backed pipeline.
@@ -18,6 +18,15 @@ The sprint is not about new gameplay. It is a **visual production and integratio
 The core outcome:
 
 > A new user should move from Start Gate → town shell → Town Hall / Brain / House / Founders Plot without feeling that different parts of the app belong to different visual eras.
+
+### 0.1 Release-candidate cleanup note
+
+The final release line includes one narrow cleanup patch on top of the visual refresh:
+
+- raw `agent.panel.*` fallback keys must never appear in normal player-facing routes, even if the shared agent panel boots before the i18n bundle is ready;
+- raw wallet error codes such as `NO_SOLANA_WALLET` must never appear in player-facing copy;
+- the app-wide signoff sheet must reflect the current automated proof, current owner-approved baseline decisions, and any remaining caveats truthfully;
+- this cleanup does not reopen asset generation, gameplay, economy, runtime, or Founders Plot art scope.
 
 ---
 

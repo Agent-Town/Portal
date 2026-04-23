@@ -15,6 +15,23 @@ const ExperienceProfiles = window.AgentTownExperienceProfiles || null;
 const ExperienceRuntime = window.AgentTownExperienceRuntime || null;
 const AppI18n = window.AgentTownI18n || null;
 const LlmCatalog = window.AgentTownLlmCatalog || null;
+const APP_I18N_FALLBACK_COPY = {
+  'agent.panel.title': 'Agent Comms',
+  'agent.panel.status.idle': 'Idle',
+  'agent.panel.status.connected': 'Connected',
+  'agent.panel.status.offline': 'Offline',
+  'wallet.error.no_solana_wallet': 'Connect or restore your wallet to continue.',
+  'wallet.error.no_solana_wallet_short': 'Connect or restore your wallet to continue.',
+  'wallet.error.no_solana_sign': 'Reconnect your wallet so it can sign the request.',
+  'wallet.error.no_solana_sign_short': 'Reconnect your wallet so it can sign the request.',
+};
+
+function interpolateFallbackTemplate(template, vars = {}) {
+  return String(template).replace(/\{\{\s*(\w+)\s*\}\}/g, (_, name) => {
+    const value = vars?.[name];
+    return value == null ? '' : String(value);
+  });
+}
 
 function normalizeOnboardingStep(value) {
   switch (String(value || '').trim()) {
@@ -358,8 +375,12 @@ function getCurrentExperiencePreference() {
 
 function tApp(key, vars = {}) {
   const preference = getCurrentExperiencePreference();
-  if (!AppI18n || typeof AppI18n.t !== 'function') return key;
-  return AppI18n.t(key, vars, preference.locale || 'en');
+  const i18n = window.AgentTownI18n || AppI18n || null;
+  if (!i18n || typeof i18n.t !== 'function') {
+    const template = APP_I18N_FALLBACK_COPY[key];
+    return template ? interpolateFallbackTemplate(template, vars) : key;
+  }
+  return i18n.t(key, vars, preference.locale || 'en');
 }
 
 function isMainlandFriendlyExperience(preference = getCurrentExperiencePreference()) {

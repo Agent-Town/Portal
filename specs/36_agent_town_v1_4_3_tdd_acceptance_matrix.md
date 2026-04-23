@@ -23,15 +23,16 @@ This file defines measurable tests for the app-wide asset refresh. The implement
 
 | ID | Test file | Goal | Metric / assertion |
 |---|---|---|---|
-| V143-E01 | `e2e/191_agent_town_v1_4_3_start_gate_visual.spec.js` | Start Gate visual refresh | Desktop and mobile screenshots exist; Start Gate uses V1.4.3 asset; CTA visible; AI SLOP copy visible and not clipped. |
-| V143-E02 | `e2e/192_agent_town_v1_4_3_town_shell_visual.spec.js` | Town shell refresh | District hub uses V1.4.3 background/icons; no debug panels visible by default; modal-first navigation preserved. |
-| V143-E03 | `e2e/193_agent_town_v1_4_3_townhall_brain_visual.spec.js` | Town Hall + Brain visuals | Onboarding and Brain connect surfaces use V1.4.3 platform assets; no provider/runtime jargon above primary fold unless in advanced panel. |
-| V143-E04 | `e2e/194_agent_town_v1_4_3_secondary_surfaces_visual.spec.js` | House/Pony/Saloon/Sigil/Atlas/Leaderboard refresh | Each route/modal contains the intended asset or explicitly accepted no-image state. |
-| V143-E05 | `e2e/195_agent_town_v1_4_3_mobile_platform_visual.spec.js` | Mobile platform coherence | 390px screenshots show no clipped hero copy, no horizontal overflow, and readable primary CTA. |
-| V143-E06 | `e2e/196_agent_town_v1_4_3_asset_usage_and_budget.spec.js` | Route-level asset proof | Captured network/resource URLs include V1.4.3 assets and exclude retired assets unless fallback is intentional. |
-| V143-E07 | `e2e/197_agent_town_v1_4_3_debug_boundary.spec.js` | Normal routes remain game-first | Agent Comms/Worker Tools/Brain debug surfaces remain hidden on normal routes; debug route still works if explicitly enabled. |
-| V143-E08 | `e2e/198_agent_town_v1_4_3_founders_plot_non_regression.spec.js` | Founders Plot not reopened | Founders Plot default route still passes latest accepted visual tests. |
+| V143-E01 | `e2e/194_agent_town_v1_4_3_start_gate_visual.spec.js` | Start Gate visual refresh | Desktop and mobile screenshots exist; Start Gate uses V1.4.3 asset; CTA visible; AI SLOP copy visible and not clipped. |
+| V143-E02 | `e2e/195_agent_town_v1_4_3_town_shell_visual.spec.js` | Town shell refresh | District hub uses V1.4.3 background/icons; no debug panels visible by default; modal-first navigation preserved. |
+| V143-E03 | `e2e/196_agent_town_v1_4_3_townhall_brain_visual.spec.js` | Town Hall + Brain visuals | Onboarding and Brain connect surfaces use V1.4.3 platform assets; no provider/runtime jargon above primary fold unless in advanced panel. |
+| V143-E04 | `e2e/197_agent_town_v1_4_3_secondary_surfaces_visual.spec.js` | House/Pony/Saloon/Sigil/Atlas/Leaderboard refresh | Each route/modal contains the intended asset or explicitly accepted no-image state. |
+| V143-E05 | `e2e/198_agent_town_v1_4_3_mobile_platform_visual.spec.js` | Mobile platform coherence | 390px screenshots show no clipped hero copy, no horizontal overflow, and readable primary CTA. |
+| V143-E06 | `e2e/199_agent_town_v1_4_3_asset_usage_and_budget.spec.js` | Route-level asset proof | Captured network/resource URLs include V1.4.3 assets and exclude retired assets unless fallback is intentional. |
+| V143-E07 | `e2e/200_agent_town_v1_4_3_debug_boundary.spec.js` | Normal routes remain game-first | Agent Comms/Worker Tools/Brain debug surfaces remain hidden on normal routes; debug route still works if explicitly enabled. |
+| V143-E08 | `e2e/201_agent_town_v1_4_3_founders_plot_non_regression.spec.js` | Founders Plot not reopened | Founders Plot default route still passes latest accepted visual tests. |
 | V143-E09 | `e2e/162_founders_plot_full_route_player_surface.spec.js` | Full-route mobile calmness parity | The full `/app?district=founders-plot` route at 390px inherits the embedded frame mobile calmness law: no non-objective scene labels, no clipped labels, and no excess primary-attention overlays after desktop-to-mobile resize. |
+| V143-E10 | `e2e/200_agent_town_v1_4_3_debug_boundary.spec.js` | Release-candidate player-copy hygiene | Normal player-facing routes never render raw `agent.panel.*` keys or `NO_SOLANA_WALLET` codes, even when shared route chrome boots before i18n settles. |
 
 ---
 

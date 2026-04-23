@@ -410,10 +410,10 @@ async function makePonyInboxRegistration(krootBytes) {
 
 function legacyPonyUpgradeErrorMsg(err) {
   if (err?.message === 'NO_SOLANA_WALLET') {
-    return 'Legacy house needs a one-time inbox key upgrade. Install/connect a Solana wallet, then reload.';
+    return 'Connect or restore your wallet to use Pony Express.';
   }
   if (err?.message === 'NO_SOLANA_SIGN') {
-    return 'Legacy house needs a one-time inbox key upgrade. Wallet must support message signing.';
+    return 'Reconnect your wallet so Pony Express can finish its one-time inbox upgrade.';
   }
   if (err?.message === 'WALLET_NOT_CONNECTED') {
     return 'Legacy house needs a one-time inbox key upgrade. Connect the house wallet and reload.';
@@ -529,7 +529,7 @@ async function hydrateInboxItemsForDisplay({ houseId, items, ponyInboxPrivWrap }
   try {
     privateKey = await loadInboxPrivateKey({ houseId, ponyInboxPrivWrap });
   } catch (e) {
-    if (e?.message === 'NO_SOLANA_WALLET') keyLoadError = 'Connect a Solana wallet to decrypt.';
+    if (e?.message === 'NO_SOLANA_WALLET') keyLoadError = 'Connect or restore your wallet to decrypt Pony Express mail.';
     else if (e?.message === 'NO_SOLANA_SIGN') keyLoadError = 'Wallet does not support message signing.';
     else if (e?.message === 'KEY_WRAP_UNAVAILABLE') keyLoadError = 'No wallet key-wrap is available for this house.';
     else if (e?.message === 'HOUSE_ID_MISMATCH') keyLoadError = 'Wallet key-wrap does not match this house.';
@@ -650,6 +650,16 @@ function setFriendsStatus(msg) {
   el.textContent = msg || '';
 }
 
+function friendlyInboxErrorMessage(err) {
+  const raw = String(err?.message || '').trim();
+  if (raw === 'NO_SOLANA_WALLET') return 'Connect or restore your wallet to use Pony Express.';
+  if (raw === 'NO_SOLANA_SIGN') return 'Reconnect your wallet so Pony Express can sign the inbox request.';
+  if (raw === 'HOUSE_AUTH_NOT_READY' || raw === 'HOUSE_AUTH_REQUIRED' || raw === 'HOUSE_AUTH_INVALID') {
+    return 'Unlock this house first at /house and then open Pony Express from the same tab.';
+  }
+  return raw || 'UNKNOWN_ERROR';
+}
+
 function setComposeReceiver(value) {
   const toInput = document.getElementById('toInput');
   if (!toInput) return;
@@ -739,11 +749,7 @@ async function loadInternal() {
     data = await authedApi({ houseId, url: `/api/pony/inbox?houseId=${encodeURIComponent(houseId)}` });
     setInboxError('');
   } catch (e) {
-    if (e.message === 'HOUSE_AUTH_NOT_READY' || e.message === 'HOUSE_AUTH_REQUIRED' || e.message === 'HOUSE_AUTH_INVALID') {
-      setInboxError('Unlock this house first at /house and then open inbox from the same tab.');
-    } else {
-      setInboxError(`Error: ${e.message}`);
-    }
+    setInboxError(friendlyInboxErrorMessage(e));
     return;
   }
 
@@ -850,7 +856,7 @@ async function send() {
       sendStatus.textContent = 'Error: receiver does not publish Pony inbox keys yet.';
       return;
     }
-    sendStatus.textContent = `Error: ${e.message}`;
+    sendStatus.textContent = friendlyInboxErrorMessage(e);
   }
 }
 
@@ -869,7 +875,7 @@ async function addFriend() {
     await loadFriends(houseId);
     setFriendsStatus('Added.');
   } catch (e) {
-    setFriendsStatus(`Error: ${e.message}`);
+    setFriendsStatus(friendlyInboxErrorMessage(e));
   }
 }
 
