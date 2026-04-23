@@ -118,6 +118,11 @@ npx shadcn@latest add @agent-town/townhall-onboarding
 - `world-overlay-marker`
 - `clover-action-link`
 - `hq-progression-visual`
+- `platform-start-gate-hero`
+- `platform-town-shell-background`
+- `platform-district-icon`
+- `platform-illustration-card`
+- `platform-empty-state`
 
 ## 7. Governance rules
 
@@ -244,6 +249,21 @@ Use for mirrored lock / trust ritual steps.
 
 ### `agent-comms-drawer`
 Use for helper receipts, approvals, and context-aware chat.
+
+### `platform-start-gate-hero`
+Use for the Start Gate V1.4.3 hero background. Prompt and manifest provenance are required.
+
+### `platform-town-shell-background`
+Use for the town-shell scenic background. Prompt and manifest provenance are required.
+
+### `platform-district-icon`
+Use for town-shell district preview thumbnails. Variants cover `townhall`, `founders_plot`, `brain`, `house`, `pony`, `saloon`, `sigil`, `atlas`, and `leaderboard`.
+
+### `platform-illustration-card`
+Use for approved platform route illustrations with caption and optional CTA context.
+
+### `platform-empty-state`
+Use for empty/loading/error states that carry V1.4.3 generic ornamentation instead of plain placeholders.
 
 ## 13. Registry law for AI developers
 

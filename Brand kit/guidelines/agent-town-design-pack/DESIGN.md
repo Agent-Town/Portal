@@ -66,6 +66,19 @@ sceneLayers:
   effects: "effects"
   overlays: "ui-overlay"
   backgroundContainsLiveStatefulObjects: false
+assetGeneration:
+  v1_4_3:
+    model: gpt-image-2
+    scope: app-wide-platform-assets
+    styleFamily: agent-town-frontier-storybook-v1_4_3
+    promptsAreSource: true
+    manifestRequired: true
+    humanSignoffRequired: true
+    transparentBackgroundPolicy: clean-background-plus-postprocess
+    appWideManifest: public/assets/platform/asset-manifest.json
+    promptRoots:
+      - specs/prompts/v1_4_3
+      - public/assets/platform/prompts/v1_4_3
 ---
 
 # DESIGN.md
@@ -132,6 +145,12 @@ The signoff surface is the full-route player experience. At minimum, review:
 - Brain Connect.
 
 The route must still read as Agent Town even after the asset swap. Visual polish does not justify dashboard chrome, debug leakage, or gameplay-scope drift.
+
+## V1.4.3 App-Wide Asset Refresh
+
+All non-game platform assets must now follow the same prompt-versioned GPT Image 2 pipeline used for Founders Plot. The goal is visual coherence across Start Gate, town shell, Town Hall, Brain, House, Pony, Saloon, Sigil, Atlas, Leaderboard, and share/claim surfaces.
+
+Generated assets must be treated as rebuildable source outputs. The durable source is the prompt file + references + manifest record + human signoff, not only the `.webp` file.
 
 ## V1.4.2 acceptance cleanup
 

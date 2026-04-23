@@ -1521,6 +1521,19 @@ html.founders-plot-embed body.founders-plot-page {
     display: none;
   }
 
+  .at-fp-clover:hover .at-fp-cloverBubble,
+  .at-fp-clover:focus .at-fp-cloverBubble,
+  .at-fp-clover:focus-visible .at-fp-cloverBubble {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+
+  .at-fp-cloverBubble--persistent,
+  .at-fp-cloverBubble--mobile-pinned {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
   .at-fp-overlayPill[data-label-role="ambient"],
   .at-fp-overlayPill[data-label-role="available"],
   .at-fp-overlayPill[data-label-role="locked"] {

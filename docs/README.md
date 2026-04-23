@@ -30,6 +30,8 @@ This docs set is designed for users who are new to local agents and model provid
 - [Founders Plot V1.4.2 acceptance cleanup TDD matrix](/specs/32_founders_plot_v1_4_2_acceptance_cleanup_tdd_matrix.md)
 - [Founders Plot V1.4.2 Patch 2 mobile calmness and HQ progression spec](/specs/33_founders_plot_v1_4_2_patch_2_mobile_calmness_and_hq_progression.md)
 - [Founders Plot V1.4.2 Patch 2 TDD acceptance matrix](/specs/34_founders_plot_v1_4_2_patch_2_tdd_acceptance_matrix.md)
+- [Agent Town V1.4.3 app-wide GPT Image 2 asset refresh spec](/specs/35_agent_town_v1_4_3_app_wide_gpt_image2_asset_refresh.md)
+- [Agent Town V1.4.3 TDD acceptance matrix](/specs/36_agent_town_v1_4_3_tdd_acceptance_matrix.md)
 - [Agent Town design pack](/Brand%20kit/guidelines/agent-town-design-pack/README.md)
 - [Agent Town V1.3 implementation start pack note](/docs/design/agent-town-v1.3-implementation-start-pack.md)
 - [Agent Town V1.3.1 signoff pack note](/docs/design/agent-town-v1.3.1-signoff-pack.md)
@@ -38,6 +40,7 @@ This docs set is designed for users who are new to local agents and model provid
 - [Agent Town V1.4.2 GPT Image 2 pack note](/docs/design/agent-town-v1.4.2-gpt-image-2-full-asset-rebuild-pack.md)
 - [Agent Town V1.4.2 acceptance cleanup pack note](/docs/design/agent-town-v1.4.2-acceptance-cleanup-pack.md)
 - [Agent Town V1.4.2 Patch 2 mobile + HQ pack note](/docs/design/agent-town-v1.4.2-patch2-mobile-hq-pack.md)
+- [Agent Town V1.4.3 app-wide GPT Image 2 refresh pack note](/docs/design/agent-town-v1.4.3-app-wide-gpt-image2-refresh-pack.md)
 
 ## Founders Plot implementation note
 
@@ -47,6 +50,8 @@ V1.3.1 remains the gameplay-surface baseline, V1.4 remains the AI-reality/runtim
 The current follow-up sprint is the V1.4.2 acceptance-cleanup lane in `specs/31_*` and `specs/32_*`, which assumes the V1.4.2 art baseline is approved and focuses on route-level polish: signoff truth, overlay hierarchy, mobile calmness, Clover grounding, HQ progression readability, and layered-plates scene truth.
 
 The current patch lane is `specs/33_*` and `specs/34_*`, which keeps scope narrow: stricter 390px calmness, stronger HQ level 1/3/5 progression, Patch 2 screenshot proof, and no gameplay/runtime expansion.
+
+The current app-wide visual-production lane is `specs/35_*` and `specs/36_*`, which refreshes non-Founders-Plot platform art across Start Gate, the town shell, Town Hall, Brain, House, Pony, Saloon, Sigil, Atlas, Leaderboard, and empty states while preserving the accepted Founders Plot gameplay pack.
 
 ## Principles
 

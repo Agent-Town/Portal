@@ -467,6 +467,7 @@ let agentDebugTrafficMuteDepth = 0;
 let agentPanelLayoutObserver = null;
 let agentPanelLayoutResizeBound = false;
 let agentPanelLayoutDeferredSyncBound = false;
+let agentPanelLayoutTransitionBound = false;
 let trainerScriptLoadPromise = null;
 let skillActionPluginCache = {
   activeSkillPath: '',
@@ -4086,10 +4087,18 @@ function scheduleAgentPanelLayoutSync(panel = null) {
   setTimeout(run, 0);
 }
 
+function scheduleAgentPanelLayoutSettledSync(panel = null) {
+  const dock = panel || el('agentSidebar');
+  if (!dock) return;
+  scheduleAgentPanelLayoutSync(dock);
+  setTimeout(() => scheduleAgentPanelLayoutSync(dock), 160);
+  setTimeout(() => scheduleAgentPanelLayoutSync(dock), 360);
+}
+
 function bindAgentPanelLayout(panel) {
   if (!panel) return;
   syncAgentPanelLayout(panel);
-  scheduleAgentPanelLayoutSync(panel);
+  scheduleAgentPanelLayoutSettledSync(panel);
   if (typeof ResizeObserver === 'function') {
     if (!agentPanelLayoutObserver) {
       agentPanelLayoutObserver = new ResizeObserver(() => {
@@ -4109,15 +4118,24 @@ function bindAgentPanelLayout(panel) {
   if (!agentPanelLayoutDeferredSyncBound) {
     agentPanelLayoutDeferredSyncBound = true;
     window.addEventListener('load', () => {
-      scheduleAgentPanelLayoutSync(panel);
+      scheduleAgentPanelLayoutSettledSync(panel);
     }, { once: true });
     if (document.fonts && typeof document.fonts.ready?.then === 'function') {
       document.fonts.ready
         .then(() => {
-          scheduleAgentPanelLayoutSync(panel);
+          scheduleAgentPanelLayoutSettledSync(panel);
         })
         .catch(() => {});
     }
+  }
+  if (!agentPanelLayoutTransitionBound) {
+    agentPanelLayoutTransitionBound = true;
+    panel.addEventListener('transitionend', (event) => {
+      if (event.target !== panel) return;
+      const propertyName = String(event.propertyName || '');
+      if (propertyName && !['height', 'min-height', 'width'].includes(propertyName)) return;
+      scheduleAgentPanelLayoutSettledSync(panel);
+    });
   }
 }
 

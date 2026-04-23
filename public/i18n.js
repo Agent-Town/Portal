@@ -41,7 +41,7 @@
       'start.hero.alt': 'Agent Town intro',
       'start.title': 'Welcome to the Wild West!',
       'start.enter': 'Enter',
-      'start.warning': 'WARNING! CONTAINS AND PRODUCES AI SLOP',
+      'start.warning': 'WARNING! CONTAINS AND PRODUCES AI SLOP.',
       'start.status.select_preset': 'Choose a path before entering Agent Town.',
       'start.status.connecting_privy': 'Connecting to Privy...',
       'start.status.entering': 'Success. Entering Agent Town...',

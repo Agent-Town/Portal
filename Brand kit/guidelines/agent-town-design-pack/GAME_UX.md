@@ -96,6 +96,20 @@ At least HQ Level 1, Level 3, and Level 5 must read as distinct states in the sc
 
 Use background plates for atmosphere and live object layers for state. If a building can be placed, upgraded, locked, producing, or targeted by Clover, it cannot be only baked into the scene background.
 
+## App-wide visual coherence rule
+
+A user moving through Start Gate, Town Shell, Town Hall, Brain, House, Pony Express, Saloon, Sigil, Atlas, Leaderboard, and Founders Plot should feel they are in one Agent Town product.
+
+Platform surfaces may use richer brand/hero-cast visuals than Founders Plot gameplay, but they must not distract from the V1 product priority: Founders Plot is the launch chapter and Clover is the gameplay partner.
+
+### Route-level acceptance
+
+Each refreshed surface must pass the five-second test:
+1. What is this place?
+2. What can I do next?
+3. Does it feel like Agent Town?
+4. Is debug/provider/runtime complexity hidden unless intentionally opened?
+
 ## 2. What stays from current Portal
 
 Keep:

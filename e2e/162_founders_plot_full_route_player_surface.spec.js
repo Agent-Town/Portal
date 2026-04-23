@@ -11,6 +11,7 @@ const FORBIDDEN_LABELS = [
   'Session Context',
   'Trainer'
 ];
+const ALLOWED_MOBILE_ROLES = new Set(['objective', 'selected', 'clover', 'critical']);
 
 test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
@@ -44,6 +45,80 @@ async function hostSurfaceState(page) {
   }, FORBIDDEN_LABELS);
 }
 
+async function visibleStageMetrics(frame) {
+  return frame.evaluate(({ allowedRoles }) => {
+    const stage = document.querySelector('.at-fp-stage');
+    const stageRect = stage?.getBoundingClientRect();
+    const isVisible = (node) => {
+      if (!(node instanceof HTMLElement)) return false;
+      const style = window.getComputedStyle(node);
+      if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity || '1') === 0) return false;
+      if (node.hidden) return false;
+      const rect = node.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return false;
+      if (!stageRect) return true;
+      return rect.right > stageRect.left && rect.left < stageRect.right && rect.bottom > stageRect.top && rect.top < stageRect.bottom;
+    };
+    const textElements = Array.from(document.querySelectorAll([
+      '[data-world-label]',
+      '[data-scene-chip]',
+      '[data-object-label]',
+      '[data-lot-label]',
+      '[data-status-badge]',
+      '[data-object-state-badge]',
+      '.scene-chip',
+      '.world-label',
+      '.object-label',
+      '.lot-label',
+      '.at-fp-objectLabel',
+      '.at-fp-overlayPill',
+      '.at-fp-cloverBubble'
+    ].join(',')))
+      .filter(isVisible)
+      .map((node) => {
+        const rect = node.getBoundingClientRect();
+        const text = String(node.textContent || '').replace(/\s+/g, ' ').trim();
+        return {
+          text,
+          role: String(node.getAttribute('data-label-role') || '').trim(),
+          clipped: node.scrollWidth > node.clientWidth + 1
+            || node.scrollHeight > node.clientHeight + 1
+            || rect.left < stageRect.left - 2
+            || rect.top < stageRect.top - 2
+            || rect.right > stageRect.right + 2
+            || rect.bottom > stageRect.bottom + 2,
+          overlayWeight: String(node.getAttribute('data-overlay-weight') || '').trim()
+        };
+      })
+      .filter((item) => item.text.length > 0);
+
+    const visibleWords = textElements.reduce((sum, item) => sum + item.text.split(/\s+/).filter(Boolean).length, 0);
+    const persistentWorldLabels = textElements.length;
+    const clippedLabelCount = textElements.filter((item) => item.clipped).length;
+    const nonObjectiveTextLabels = textElements.filter((item) => !allowedRoles.includes(item.role)).length;
+    const sameWeightPillCount = Array.from(document.querySelectorAll('.at-fp-overlayPill'))
+      .filter(isVisible)
+      .filter((node) => ['medium', 'strong'].includes(String(node.getAttribute('data-overlay-weight') || '')))
+      .length;
+    const primaryAttentionObjects = Array.from(document.querySelectorAll('[data-scene-object-id]'))
+      .filter(isVisible)
+      .filter((node) => {
+        const weight = String(node.getAttribute('data-overlay-weight') || '');
+        const attention = String(node.getAttribute('data-attention') || '');
+        return weight === 'strong' || attention === 'recommended';
+      }).length;
+
+    return {
+      visibleWords,
+      persistentWorldLabels,
+      clippedLabelCount,
+      nonObjectiveTextLabels,
+      sameWeightPillCount,
+      primaryAttentionObjects
+    };
+  }, { allowedRoles: [...ALLOWED_MOBILE_ROLES] });
+}
+
 test('normal full route hides Agent Comms and the debug surface during Founders Plot gameplay', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await openFoundersPlotRoute(page);
@@ -69,6 +144,14 @@ test('normal full route hides Agent Comms and the debug surface during Founders 
   expect(mobileState.foundLabels).toEqual([]);
   expect(mobileState.agentSidebarVisible).toBe(false);
   expect(mobileState.debugPaneVisible).toBe(false);
+
+  const mobileMetrics = await visibleStageMetrics(frame);
+  expect(mobileMetrics.persistentWorldLabels).toBeLessThanOrEqual(3);
+  expect(mobileMetrics.visibleWords).toBeLessThanOrEqual(24);
+  expect(mobileMetrics.nonObjectiveTextLabels).toBe(0);
+  expect(mobileMetrics.clippedLabelCount).toBe(0);
+  expect(mobileMetrics.primaryAttentionObjects).toBeLessThanOrEqual(2);
+  expect(mobileMetrics.sameWeightPillCount).toBeLessThanOrEqual(2);
 
   await expect(page).toHaveScreenshot('founders-v1-4-2-full-route-mobile-390.png', {
     animations: 'disabled',

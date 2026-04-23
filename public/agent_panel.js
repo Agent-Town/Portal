@@ -13,6 +13,7 @@
   let panelLayoutObserver = null;
   let panelLayoutResizeBound = false;
   let panelLayoutDeferredSyncBound = false;
+  let panelLayoutTransitionBound = false;
 
   function el(id) {
     return document.getElementById(id);
@@ -76,10 +77,18 @@
     setTimeout(run, 0);
   }
 
+  function schedulePanelLayoutSettledSync(panel = null) {
+    const dock = panel || el('agentSidebar');
+    if (!dock) return;
+    schedulePanelLayoutSync(dock);
+    setTimeout(() => schedulePanelLayoutSync(dock), 160);
+    setTimeout(() => schedulePanelLayoutSync(dock), 360);
+  }
+
   function bindPanelLayout(panel) {
     if (!panel) return;
     syncPanelLayout(panel);
-    schedulePanelLayoutSync(panel);
+    schedulePanelLayoutSettledSync(panel);
     setTimeout(() => schedulePanelLayoutSync(panel), 50);
     setTimeout(() => schedulePanelLayoutSync(panel), 250);
     if (typeof ResizeObserver === 'function') {
@@ -101,15 +110,24 @@
     if (!panelLayoutDeferredSyncBound) {
       panelLayoutDeferredSyncBound = true;
       window.addEventListener('load', () => {
-        schedulePanelLayoutSync(panel);
+        schedulePanelLayoutSettledSync(panel);
       }, { once: true });
       if (document.fonts && typeof document.fonts.ready?.then === 'function') {
         document.fonts.ready
           .then(() => {
-            schedulePanelLayoutSync(panel);
+            schedulePanelLayoutSettledSync(panel);
           })
           .catch(() => {});
       }
+    }
+    if (!panelLayoutTransitionBound) {
+      panelLayoutTransitionBound = true;
+      panel.addEventListener('transitionend', (event) => {
+        if (event.target !== panel) return;
+        const propertyName = String(event.propertyName || '');
+        if (propertyName && !['height', 'min-height', 'width'].includes(propertyName)) return;
+        schedulePanelLayoutSettledSync(panel);
+      });
     }
   }
 
@@ -187,7 +205,7 @@
     syncMinimizeLabel();
     saveMinimizedPreference(!!minimized);
     syncPanelLayout(panel);
-    schedulePanelLayoutSync(panel);
+    schedulePanelLayoutSettledSync(panel);
   }
 
   async function initGateway() {

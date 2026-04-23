@@ -657,6 +657,22 @@ It must not automatically become:
 - new V1 mechanics;
 - a persistent ensemble on the default gameplay route.
 
+## V1.4.3 Platform Asset Direction
+
+The entire Agent Town app should share one visual language: warm frontier storybook / soft-3D collectible / civic-builder optimism.
+
+Founders Plot is the launch chapter, but the app shell, onboarding, Brain connect, House, Pony Express, Saloon, Sigil, Atlas, Leaderboard, and Start Gate must feel like parts of the same world.
+
+### Platform hero cast
+
+The Lobster, Chibi Homesteader, Wizard Kid, and Prairie Dog Ranger are approved as platform hero-cast references for brand, onboarding, loading, marketing, and Start Gate surfaces.
+
+They are not default Founders Plot gameplay actors unless a future gameplay spec explicitly adds them.
+
+### AI SLOP copy
+
+The line `WARNING! CONTAINS AND PRODUCES AI SLOP.` is product-owner-approved humorous brand copy. Treat it as intentionally playful, not as an error.
+
 The canonical video source is:
 
 ```text

@@ -39,6 +39,7 @@
   let assetMap = {};
   let effectsController = null;
   let currentScene = null;
+  let viewportSyncTimer = null;
   let manualForemanActingUntilMs = 0;
   let foremanRuntimeToken = '';
   let localForemanRuntimeId = '';
@@ -724,6 +725,18 @@
       nextState: state,
       scene
     });
+  }
+
+  function syncViewportScenePolicy() {
+    if (!currentState?.state) return;
+    if (viewportSyncTimer) {
+      clearTimeout(viewportSyncTimer);
+      viewportSyncTimer = null;
+    }
+    viewportSyncTimer = setTimeout(() => {
+      viewportSyncTimer = null;
+      renderAll();
+    }, 80);
   }
 
   function actionButton(label, onClick, testId, disabled = false) {
@@ -2177,6 +2190,7 @@
 
   applyEmbedMode();
   bindUi();
+  window.addEventListener('resize', syncViewportScenePolicy, { passive: true });
   loadAssetManifest().then(() => {
     renderAll();
   }).catch(() => {});

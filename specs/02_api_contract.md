@@ -2677,3 +2677,43 @@ Contract notes:
 - player-facing production assets in the shipped pack use `status: "approved"`;
 - the V1.4.2 pack may mix `generatedBy: "gpt-image-2"` scene/object art with governed `codex-svg` overlays and `reference-normalized` supporting assets when that keeps route integration more stable;
 - Founders Plot gameplay remains Clover-first; the hero-cast ensemble is used for platform identity and onboarding surfaces, not the default gameplay loop.
+
+---
+
+## App-Wide Platform Asset Manifest
+
+### GET `/assets/platform/asset-manifest.json`
+Returns the app-wide V1.4.3 platform asset manifest for non-Founders-Plot routes.
+
+Contract notes:
+- `schemaVersion === "v1.4.3"`;
+- `styleFamily === "agent-town-frontier-storybook-v1_4_3"`;
+- `modelFamily === "gpt-image-2"`;
+- top-level metadata includes `approvalStatus`, `approvedBy`, `approvedAt`, `totalBytes`, and `budgetBytes`;
+- each asset entry includes:
+  - `id`
+  - `path`
+  - `surface`
+  - `role`
+  - `model`
+  - `promptFile`
+  - `promptHash`
+  - `promptMirrorFile`
+  - `referenceInputs`
+  - `referenceHashes`
+  - `candidatePaths`
+  - `postProcessing`
+  - `width`
+  - `height`
+  - `bytes`
+  - `format`
+  - `usedBy`
+  - `approvalStatus`
+  - `approvedBy`
+  - `approvedAt`
+  - `approvalNotes`
+  - `replaces`
+  - `rollbackPath`
+  - `futureUse`
+- `model: "gpt-image-2"` entries must have prompt provenance;
+- the V1.4.3 platform pack refreshes Start Gate, town shell, Town Hall, Brain, House, Pony, Saloon, Sigil, Atlas, Leaderboard, and generic empty-state ornamentation without reopening accepted Founders Plot gameplay art.

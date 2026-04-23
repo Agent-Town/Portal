@@ -1,0 +1,597 @@
+{
+  "schemaVersion": "v1.4.3",
+  "styleFamily": "agent-town-frontier-storybook-v1_4_3",
+  "modelFamily": "gpt-image-2",
+  "generatedAt": "2026-04-23T03:17:27.925Z",
+  "approvalStatus": "approved_with_caveats",
+  "approvedBy": "Robin",
+  "approvedAt": "2026-04-23",
+  "totalBytes": 3790694,
+  "budgetBytes": 8388608,
+  "assets": [
+    {
+      "id": "start_gate_hero_v1_4_3",
+      "path": "public/assets/platform/start_gate/start-gate-hero-v1_4_3.webp",
+      "surface": "start_gate",
+      "role": "hero_background",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_3/start_gate_hero_v1_4_3.md",
+      "promptHash": "sha256:3fcea65ecbadd46875214e48a1a055f45628689ecf43128855df398702713ef0",
+      "promptMirrorFile": "public/assets/platform/prompts/v1_4_3/start_gate_hero_v1_4_3.md",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/assets/hero-cast/hero-cast-group.webp"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "sha256:60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/assets/hero-cast/hero-cast-group.webp": "sha256:4a61d458de446e5ead955d831dcffa6428df2d8e0a786661de917877ddf3b465"
+      },
+      "candidatePaths": [
+        "public/assets/candidates/v1_4_3/start_gate/start-gate-hero-c01.png"
+      ],
+      "postProcessing": [
+        "webp_compression"
+      ],
+      "width": 1536,
+      "height": 1024,
+      "bytes": 219182,
+      "format": "webp",
+      "usedBy": [
+        "public/start.html",
+        "public/styles.css"
+      ],
+      "approvalStatus": "approved_with_caveats",
+      "approvedBy": "Robin",
+      "approvedAt": "2026-04-23",
+      "approvalNotes": "Approved with caveats for the V1.4.3 Start Gate hero baseline pending route screenshot review.",
+      "replaces": [
+        "public/background.webp",
+        "public/assets/hero-cast/hero-cast-group.webp"
+      ],
+      "rollbackPath": "public/assets/hero-cast/hero-cast-group.webp",
+      "futureUse": false
+    },
+    {
+      "id": "town_shell_background_v1_4_3",
+      "path": "public/assets/platform/town_shell/town-shell-background-v1_4_3.webp",
+      "surface": "town_shell",
+      "role": "hero_background",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_3/town_shell_background_v1_4_3.md",
+      "promptHash": "sha256:c64927a32b89d63d4b5086ed724351c573ee3ae9a72a1e3983471532cc7b86df",
+      "promptMirrorFile": "public/assets/platform/prompts/v1_4_3/town_shell_background_v1_4_3.md",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/assets/platform/town-shell-background-v1_4_2.webp"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "sha256:60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/assets/platform/town-shell-background-v1_4_2.webp": "sha256:fd6089c4e0a9a82e471771cdadead66bc7a10ed1c75e80272097d35ed54dc4ae"
+      },
+      "candidatePaths": [
+        "public/assets/candidates/v1_4_3/town_shell/town-shell-background-c01.png"
+      ],
+      "postProcessing": [
+        "webp_compression"
+      ],
+      "width": 1536,
+      "height": 1024,
+      "bytes": 381390,
+      "format": "webp",
+      "usedBy": [
+        "public/index.html",
+        "public/styles.css"
+      ],
+      "approvalStatus": "approved_with_caveats",
+      "approvedBy": "Robin",
+      "approvedAt": "2026-04-23",
+      "approvalNotes": "Approved with caveats for the V1.4.3 town shell baseline pending route screenshot review.",
+      "replaces": [
+        "public/assets/platform/town-shell-background-v1_4_2.webp"
+      ],
+      "rollbackPath": "public/assets/platform/town-shell-background-v1_4_2.webp",
+      "futureUse": false
+    },
+    {
+      "id": "townhall_onboarding_illustration_v1_4_3",
+      "path": "public/assets/platform/townhall/townhall-onboarding-illustration-v1_4_3.webp",
+      "surface": "townhall",
+      "role": "illustration",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_3/townhall_onboarding_v1_4_3.md",
+      "promptHash": "sha256:a6e09abb48e1b89dae59a58b2b703f3c095bd919ea0b0220fb806d53fb2e9288",
+      "promptMirrorFile": "public/assets/platform/prompts/v1_4_3/townhall_onboarding_v1_4_3.md",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/assets/platform/townhall-onboarding-illustration-v1_4_2.webp"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "sha256:60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/assets/platform/townhall-onboarding-illustration-v1_4_2.webp": "sha256:f56d0a44431bde4ca4da7f27c3aa451574dfb8ce84ee732e2af887b62ffb391a"
+      },
+      "candidatePaths": [
+        "public/assets/candidates/v1_4_3/townhall/townhall-onboarding-c01.png"
+      ],
+      "postProcessing": [
+        "webp_compression"
+      ],
+      "width": 1536,
+      "height": 1024,
+      "bytes": 231202,
+      "format": "webp",
+      "usedBy": [
+        "public/views/townhall.html",
+        "public/styles.css"
+      ],
+      "approvalStatus": "approved_with_caveats",
+      "approvedBy": "Robin",
+      "approvedAt": "2026-04-23",
+      "approvalNotes": "Approved with caveats for the V1.4.3 Town Hall onboarding art pending screenshot review.",
+      "replaces": [
+        "public/assets/platform/townhall-onboarding-illustration-v1_4_2.webp"
+      ],
+      "rollbackPath": "public/assets/platform/townhall-onboarding-illustration-v1_4_2.webp",
+      "futureUse": false
+    },
+    {
+      "id": "brain_connect_illustration_v1_4_3",
+      "path": "public/assets/platform/brain/brain-connect-illustration-v1_4_3.webp",
+      "surface": "brain",
+      "role": "illustration",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_3/brain_connect_v1_4_3.md",
+      "promptHash": "sha256:2ab5fe4a530cd4524afbe6ae66c2b651f89062b1e172d7a4994cae89d9329f58",
+      "promptMirrorFile": "public/assets/platform/prompts/v1_4_3/brain_connect_v1_4_3.md",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/assets/platform/brain-connect-marker-v1_4_2.webp"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "sha256:60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/assets/platform/brain-connect-marker-v1_4_2.webp": "sha256:9534cc9312fbdc5f257f4f3fea4d37dc00da4fd3920a403fcd20bab3fb5b8ad3"
+      },
+      "candidatePaths": [
+        "public/assets/candidates/v1_4_3/brain/brain-connect-c01.png"
+      ],
+      "postProcessing": [
+        "webp_compression"
+      ],
+      "width": 1536,
+      "height": 1024,
+      "bytes": 289688,
+      "format": "webp",
+      "usedBy": [
+        "public/views/brain.html",
+        "public/styles.css"
+      ],
+      "approvalStatus": "approved_with_caveats",
+      "approvedBy": "Robin",
+      "approvedAt": "2026-04-23",
+      "approvalNotes": "Approved with caveats for the V1.4.3 Brain connect art pending screenshot review.",
+      "replaces": [
+        "public/assets/platform/brain-connect-marker-v1_4_2.webp"
+      ],
+      "rollbackPath": "public/assets/platform/brain-connect-marker-v1_4_2.webp",
+      "futureUse": false
+    },
+    {
+      "id": "house_claim_share_illustration_v1_4_3",
+      "path": "public/assets/platform/house/house-claim-share-illustration-v1_4_3.webp",
+      "surface": "house",
+      "role": "illustration",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_3/house_home_claim_share_v1_4_3.md",
+      "promptHash": "sha256:4d171da478250809d6f965c67fc3826eea17b9df044c3a55ccde1c2d4269a268",
+      "promptMirrorFile": "public/assets/platform/prompts/v1_4_3/house_home_claim_share_v1_4_3.md",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/agenttown.jpeg"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "sha256:60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/agenttown.jpeg": "sha256:60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5"
+      },
+      "candidatePaths": [
+        "public/assets/candidates/v1_4_3/house/house-claim-share-c01.png"
+      ],
+      "postProcessing": [
+        "webp_compression"
+      ],
+      "width": 1536,
+      "height": 1024,
+      "bytes": 297070,
+      "format": "webp",
+      "usedBy": [
+        "public/views/house.html",
+        "public/share.html",
+        "public/claim-wallet.html",
+        "public/styles.css"
+      ],
+      "approvalStatus": "approved_with_caveats",
+      "approvedBy": "Robin",
+      "approvedAt": "2026-04-23",
+      "approvalNotes": "Approved with caveats for house, claim, and share surfaces pending screenshot review.",
+      "replaces": [],
+      "rollbackPath": "public/agenttown.jpeg",
+      "futureUse": false
+    },
+    {
+      "id": "pony_express_illustration_v1_4_3",
+      "path": "public/assets/platform/pony/pony-express-illustration-v1_4_3.webp",
+      "surface": "pony",
+      "role": "illustration",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_3/pony_express_v1_4_3.md",
+      "promptHash": "sha256:1144108a06482918bd53980aa541ccaa465460d46254e3841ff7a4e75956724c",
+      "promptMirrorFile": "public/assets/platform/prompts/v1_4_3/pony_express_v1_4_3.md",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/images/parchment-bg.jpg"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "sha256:60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/images/parchment-bg.jpg": "sha256:359b0b26c27f452834b1881f07774af6d6254d2dc708e987ef78c09341b12e22"
+      },
+      "candidatePaths": [
+        "public/assets/candidates/v1_4_3/pony/pony-express-c01.png"
+      ],
+      "postProcessing": [
+        "webp_compression"
+      ],
+      "width": 1717,
+      "height": 916,
+      "bytes": 200612,
+      "format": "webp",
+      "usedBy": [
+        "public/views/pony.html",
+        "public/index.html",
+        "public/styles.css"
+      ],
+      "approvalStatus": "approved_with_caveats",
+      "approvedBy": "Robin",
+      "approvedAt": "2026-04-23",
+      "approvalNotes": "Approved with caveats for Pony Express pending screenshot review.",
+      "replaces": [],
+      "rollbackPath": null,
+      "futureUse": false
+    },
+    {
+      "id": "saloon_future_games_hub_v1_4_3",
+      "path": "public/assets/platform/saloon/saloon-future-games-hub-v1_4_3.webp",
+      "surface": "saloon",
+      "role": "illustration",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_3/saloon_future_games_hub_v1_4_3.md",
+      "promptHash": "sha256:cf959312e54a0cbd7123b786ef9dbbe33d2abcc344e31b455db72010d8cd9879",
+      "promptMirrorFile": "public/assets/platform/prompts/v1_4_3/saloon_future_games_hub_v1_4_3.md",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/images/wood-header.jpg"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "sha256:60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/images/wood-header.jpg": "sha256:78d29a53735af919827f46a815f82c13442555ff3c39603915daf76eb7b299c4"
+      },
+      "candidatePaths": [
+        "public/assets/candidates/v1_4_3/saloon/saloon-future-games-c01.png"
+      ],
+      "postProcessing": [
+        "webp_compression"
+      ],
+      "width": 1536,
+      "height": 1024,
+      "bytes": 321512,
+      "format": "webp",
+      "usedBy": [
+        "public/views/saloon.html",
+        "public/index.html",
+        "public/styles.css"
+      ],
+      "approvalStatus": "approved_with_caveats",
+      "approvedBy": "Robin",
+      "approvedAt": "2026-04-23",
+      "approvalNotes": "Approved with caveats for Saloon pending screenshot review.",
+      "replaces": [],
+      "rollbackPath": null,
+      "futureUse": false
+    },
+    {
+      "id": "sigil_ceremony_illustration_v1_4_3",
+      "path": "public/assets/platform/sigil/sigil-ceremony-illustration-v1_4_3.webp",
+      "surface": "sigil",
+      "role": "illustration",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_3/sigil_ceremony_v1_4_3.md",
+      "promptHash": "sha256:1329146efbbd3340db7b3d086479721bb06079c6ef9e064edf328166b2a82e0d",
+      "promptMirrorFile": "public/assets/platform/prompts/v1_4_3/sigil_ceremony_v1_4_3.md",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/images/parchment-bg.jpg"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "sha256:60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/images/parchment-bg.jpg": "sha256:359b0b26c27f452834b1881f07774af6d6254d2dc708e987ef78c09341b12e22"
+      },
+      "candidatePaths": [
+        "public/assets/candidates/v1_4_3/sigil/sigil-ceremony-c01.png"
+      ],
+      "postProcessing": [
+        "webp_compression"
+      ],
+      "width": 1536,
+      "height": 1024,
+      "bytes": 255122,
+      "format": "webp",
+      "usedBy": [
+        "public/views/sigil.html"
+      ],
+      "approvalStatus": "approved_with_caveats",
+      "approvedBy": "Robin",
+      "approvedAt": "2026-04-23",
+      "approvalNotes": "Approved with caveats for Sigil pending screenshot review.",
+      "replaces": [],
+      "rollbackPath": null,
+      "futureUse": false
+    },
+    {
+      "id": "atlas_leaderboard_illustration_v1_4_3",
+      "path": "public/assets/platform/atlas/atlas-leaderboard-illustration-v1_4_3.webp",
+      "surface": "atlas",
+      "role": "illustration",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_3/atlas_leaderboard_v1_4_3.md",
+      "promptHash": "sha256:6663220216ab5160ba68462dbe1c592fea0261ab6e67c24a2a07febaa8eff3b0",
+      "promptMirrorFile": "public/assets/platform/prompts/v1_4_3/atlas_leaderboard_v1_4_3.md",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/images/atlas-map-bg.jpg"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "sha256:60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/images/atlas-map-bg.jpg": "sha256:ba62bbafd0852ebcd10e4191f0858d9315652034735639ba163a0c6afc41e60a"
+      },
+      "candidatePaths": [
+        "public/assets/candidates/v1_4_3/atlas/atlas-leaderboard-c01.png"
+      ],
+      "postProcessing": [
+        "webp_compression"
+      ],
+      "width": 1536,
+      "height": 1024,
+      "bytes": 361104,
+      "format": "webp",
+      "usedBy": [
+        "public/atlas.html",
+        "public/views/leaderboard.html",
+        "public/styles.css",
+        "public/index.html"
+      ],
+      "approvalStatus": "approved_with_caveats",
+      "approvedBy": "Robin",
+      "approvedAt": "2026-04-23",
+      "approvalNotes": "Approved with caveats for Atlas and Leaderboard pending screenshot review.",
+      "replaces": [
+        "public/images/atlas-map-bg.jpg"
+      ],
+      "rollbackPath": "public/images/atlas-map-bg.jpg",
+      "futureUse": false
+    },
+    {
+      "id": "ui_ornaments_empty_states_v1_4_3",
+      "path": "public/assets/platform/generic/ui-ornaments-empty-states-v1_4_3.webp",
+      "surface": "generic",
+      "role": "empty_state",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_3/ui_ornaments_empty_states_v1_4_3.md",
+      "promptHash": "sha256:ed94b05fae639bf1dbad3344ed31a29e809e679746959a4111a83350866afef1",
+      "promptMirrorFile": "public/assets/platform/prompts/v1_4_3/ui_ornaments_empty_states_v1_4_3.md",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg",
+        "public/images/parchment-bg.jpg"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "sha256:60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5",
+        "public/images/parchment-bg.jpg": "sha256:359b0b26c27f452834b1881f07774af6d6254d2dc708e987ef78c09341b12e22"
+      },
+      "candidatePaths": [
+        "public/assets/candidates/v1_4_3/generic/ui-ornaments-empty-states-c01.png"
+      ],
+      "postProcessing": [
+        "webp_compression"
+      ],
+      "width": 1536,
+      "height": 1024,
+      "bytes": 225890,
+      "format": "webp",
+      "usedBy": [
+        "public/share.html",
+        "public/views/leaderboard.html",
+        "public/styles.css"
+      ],
+      "approvalStatus": "approved_with_caveats",
+      "approvedBy": "Robin",
+      "approvedAt": "2026-04-23",
+      "approvalNotes": "Approved with caveats for generic empty-state ornamentation pending screenshot review.",
+      "replaces": [],
+      "rollbackPath": null,
+      "futureUse": false
+    },
+    {
+      "id": "hero_cast_group_existing_v1_4_3",
+      "path": "public/assets/hero-cast/hero-cast-group.webp",
+      "surface": "brand",
+      "role": "card_art",
+      "model": "existing",
+      "promptFile": null,
+      "promptHash": null,
+      "promptMirrorFile": null,
+      "referenceInputs": [
+        "docs/brand/reference/hero-cast/prairie-dog-ranger-source.png",
+        "docs/brand/reference/hero-cast/sheriff-lobster-source.jpeg",
+        "docs/brand/reference/hero-cast/chibi-homesteader-girl-source.png",
+        "docs/brand/reference/hero-cast/wizard-kid-source.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/hero-cast/prairie-dog-ranger-source.png": "sha256:18bfe6c7f9f8cbdf8dd1b1442b0b177260ec21129e989a119494d97572d35089",
+        "docs/brand/reference/hero-cast/sheriff-lobster-source.jpeg": "sha256:b8b0bc21cb58d1fc019919fe8ff027f494eb0f4c9f92b9088a3b28c296f359d2",
+        "docs/brand/reference/hero-cast/chibi-homesteader-girl-source.png": "sha256:f6b39e514299c0c0ab13bf470f878b1b1350b0f16d94bdd54c8c652e4f5cc7e2",
+        "docs/brand/reference/hero-cast/wizard-kid-source.png": "sha256:5ca9798b535a7bfa52cecd3aa0f442ee03c3be3b204d9dc8bcba87afc54dd0ea"
+      },
+      "candidatePaths": [],
+      "postProcessing": [
+        "reference_normalization"
+      ],
+      "width": 1536,
+      "height": 1024,
+      "bytes": 341742,
+      "format": "webp",
+      "usedBy": [
+        "public/styles.css",
+        "public/start.html"
+      ],
+      "approvalStatus": "approved_with_caveats",
+      "approvedBy": "Robin",
+      "approvedAt": "2026-04-23",
+      "approvalNotes": "Owner-supplied hero cast group remains approved for platform and marketing contexts.",
+      "replaces": [],
+      "rollbackPath": null,
+      "futureUse": false
+    },
+    {
+      "id": "hero_prairie_dog_ranger_existing_v1_4_3",
+      "path": "public/assets/hero-cast/prairie-dog-ranger.webp",
+      "surface": "brand",
+      "role": "card_art",
+      "model": "existing",
+      "promptFile": null,
+      "promptHash": null,
+      "promptMirrorFile": null,
+      "referenceInputs": [
+        "docs/brand/reference/hero-cast/prairie-dog-ranger-source.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/hero-cast/prairie-dog-ranger-source.png": "sha256:18bfe6c7f9f8cbdf8dd1b1442b0b177260ec21129e989a119494d97572d35089"
+      },
+      "candidatePaths": [],
+      "postProcessing": [
+        "reference_normalization"
+      ],
+      "width": 1365,
+      "height": 2048,
+      "bytes": 473744,
+      "format": "webp",
+      "usedBy": [
+        "public/start.html"
+      ],
+      "approvalStatus": "approved_with_caveats",
+      "approvedBy": "Robin",
+      "approvedAt": "2026-04-23",
+      "approvalNotes": "Owner-supplied hero portrait remains approved for platform contexts.",
+      "replaces": [],
+      "rollbackPath": null,
+      "futureUse": false
+    },
+    {
+      "id": "hero_sheriff_lobster_existing_v1_4_3",
+      "path": "public/assets/hero-cast/sheriff-lobster.webp",
+      "surface": "brand",
+      "role": "card_art",
+      "model": "existing",
+      "promptFile": null,
+      "promptHash": null,
+      "promptMirrorFile": null,
+      "referenceInputs": [
+        "docs/brand/reference/hero-cast/sheriff-lobster-source.jpeg"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/hero-cast/sheriff-lobster-source.jpeg": "sha256:b8b0bc21cb58d1fc019919fe8ff027f494eb0f4c9f92b9088a3b28c296f359d2"
+      },
+      "candidatePaths": [],
+      "postProcessing": [
+        "reference_normalization"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "bytes": 53128,
+      "format": "webp",
+      "usedBy": [
+        "public/start.html"
+      ],
+      "approvalStatus": "approved_with_caveats",
+      "approvedBy": "Robin",
+      "approvedAt": "2026-04-23",
+      "approvalNotes": "Owner-supplied hero portrait remains approved for platform contexts.",
+      "replaces": [],
+      "rollbackPath": null,
+      "futureUse": false
+    },
+    {
+      "id": "hero_chibi_homesteader_existing_v1_4_3",
+      "path": "public/assets/hero-cast/chibi-homesteader.webp",
+      "surface": "brand",
+      "role": "card_art",
+      "model": "existing",
+      "promptFile": null,
+      "promptHash": null,
+      "promptMirrorFile": null,
+      "referenceInputs": [
+        "docs/brand/reference/hero-cast/chibi-homesteader-girl-source.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/hero-cast/chibi-homesteader-girl-source.png": "sha256:f6b39e514299c0c0ab13bf470f878b1b1350b0f16d94bdd54c8c652e4f5cc7e2"
+      },
+      "candidatePaths": [],
+      "postProcessing": [
+        "reference_normalization"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "bytes": 65116,
+      "format": "webp",
+      "usedBy": [
+        "public/start.html"
+      ],
+      "approvalStatus": "approved_with_caveats",
+      "approvedBy": "Robin",
+      "approvedAt": "2026-04-23",
+      "approvalNotes": "Owner-supplied hero portrait remains approved for platform contexts.",
+      "replaces": [],
+      "rollbackPath": null,
+      "futureUse": false
+    },
+    {
+      "id": "hero_wizard_kid_existing_v1_4_3",
+      "path": "public/assets/hero-cast/wizard-kid.webp",
+      "surface": "brand",
+      "role": "card_art",
+      "model": "existing",
+      "promptFile": null,
+      "promptHash": null,
+      "promptMirrorFile": null,
+      "referenceInputs": [
+        "docs/brand/reference/hero-cast/wizard-kid-source.png"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/hero-cast/wizard-kid-source.png": "sha256:5ca9798b535a7bfa52cecd3aa0f442ee03c3be3b204d9dc8bcba87afc54dd0ea"
+      },
+      "candidatePaths": [],
+      "postProcessing": [
+        "reference_normalization"
+      ],
+      "width": 1024,
+      "height": 1536,
+      "bytes": 74192,
+      "format": "webp",
+      "usedBy": [
+        "public/start.html"
+      ],
+      "approvalStatus": "approved_with_caveats",
+      "approvedBy": "Robin",
+      "approvedAt": "2026-04-23",
+      "approvalNotes": "Owner-supplied hero portrait remains approved for platform contexts.",
+      "replaces": [],
+      "rollbackPath": null,
+      "futureUse": false
+    }
+  ]
+}

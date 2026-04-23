@@ -703,6 +703,15 @@
     };
   }
 
+  function mobileBubblePinned(clover = {}, { activeDrawer = '', selectedObjectId = '', goalObjectId = '' } = {}) {
+    const state = upper(clover?.state);
+    if (['ACTING', 'CELEBRATING', 'WAITING_FOR_PERMISSION', 'ERROR', 'RESTART_NEEDED'].includes(state)) return true;
+    if (String(activeDrawer || '') === 'foreman') return true;
+    if (String(selectedObjectId || '') === 'FOREMAN_HUT') return true;
+    if (['FOREMAN_HUT', 'APPROVAL_INBOX'].includes(String(goalObjectId || ''))) return true;
+    return false;
+  }
+
   function createWorldObjects(view, options) {
     const selectedObjectId = selectionKeyToObjectId(String(options?.selectedKey || ''), view);
     const goalObjectId = goalTargetObjectId(view, String(options?.selectedKey || ''), view);
@@ -1055,7 +1064,8 @@
         RESTART_NEEDED: 'clover_restart_needed_v1_4_2',
       }[cloverBase.state] || 'clover_idle_v1_4_2',
         x: cloverPosition.x,
-        y: cloverPosition.y
+        y: cloverPosition.y,
+        mobileBubblePinned: mobileBubblePinned(cloverBase, { activeDrawer: options.activeDrawer, selectedObjectId, goalObjectId })
       },
       drawers: drawerItems,
       drawerBadges: drawerBadges(view),

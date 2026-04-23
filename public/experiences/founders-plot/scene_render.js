@@ -290,7 +290,7 @@
           >
             ${imageMarkup(cloverAsset, 'Clover')}
             <span
-              class="at-fp-cloverBubble${cloverBubblePersistent(scene.clover?.state) ? ' at-fp-cloverBubble--persistent' : ''}"
+              class="at-fp-cloverBubble${cloverBubblePersistent(scene.clover?.state) ? ' at-fp-cloverBubble--persistent' : ''}${scene.clover?.mobileBubblePinned ? ' at-fp-cloverBubble--mobile-pinned' : ''}"
               data-testid="founders-clover-bubble"
               data-world-label
               data-label-role="clover"

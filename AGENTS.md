@@ -292,6 +292,27 @@ When implementing Founders Plot visual acceptance fixes:
 - preserve owner-approved V1.4.2 art baseline and `AI SLOP` Start Gate copy;
 - do not add gameplay systems, runtime architecture changes, new contracts, new resources, or hero-cast gameplay cameos during visual acceptance cleanup.
 
+## V1.4.3 app-wide GPT Image 2 asset refresh guardrail
+
+The app-wide asset refresh is a visual-production sprint, not a gameplay sprint.
+
+Before changing platform assets, read:
+- `BRAND.md`
+- `DESIGN.md`
+- `GAME_UX.md`
+- `REGISTRY.md`
+- `specs/35_agent_town_v1_4_3_app_wide_gpt_image2_asset_refresh.md`
+- `docs/visual/APP_WIDE_ASSET_INVENTORY_V1_4_3.md`
+
+Rules:
+- Prompts are source files.
+- No generated production asset without a prompt file and manifest entry.
+- Preserve the owner-approved `WARNING! CONTAINS AND PRODUCES AI SLOP.` Start Gate copy.
+- Do not reopen accepted Founders Plot gameplay assets unless a Founders Plot patch says so.
+- Do not add gameplay systems, resources, contracts, persistent foreman, doctrine, or social systems.
+- Keep normal app routes game-first and debug/provider/runtime details backstage.
+- Capture screenshot baselines for every refreshed route.
+
 
 ---
 
