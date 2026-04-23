@@ -1216,6 +1216,11 @@ body.trainer-modal-open {
   width: min(760px, 100%);
 }
 
+.platformIllustrationCard--sigil img {
+  max-height: 320px;
+  object-position: center center;
+}
+
 /* Onboarding stepper */
 .onboarding-stepper {
   display: flex;

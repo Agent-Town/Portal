@@ -3601,7 +3601,15 @@ function syncTownhallRegistrationUI(state) {
   if (justCompletedRegistration && !townhallMintInFlight) {
     townhallAwaitingContinue = false;
     townhallSigilUnlockedByContinue = false;
-    hideDistrict();
+    queueMicrotask(() => {
+      if (required && getOnboardingStep(lastState) === ONBOARDING_STEP_BRAIN) {
+        showDistrict('brain').catch((err) => {
+          console.warn('failed to switch from townhall to brain after registration', err);
+        });
+        return;
+      }
+      hideDistrict();
+    });
   }
 
   bindTownhallRegistrationControls();

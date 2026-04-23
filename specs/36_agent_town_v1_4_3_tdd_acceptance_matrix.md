@@ -33,6 +33,8 @@ This file defines measurable tests for the app-wide asset refresh. The implement
 | V143-E08 | `e2e/201_agent_town_v1_4_3_founders_plot_non_regression.spec.js` | Founders Plot not reopened | Founders Plot default route still passes latest accepted visual tests. |
 | V143-E09 | `e2e/162_founders_plot_full_route_player_surface.spec.js` | Full-route mobile calmness parity | The full `/app?district=founders-plot` route at 390px inherits the embedded frame mobile calmness law: no non-objective scene labels, no clipped labels, and no excess primary-attention overlays after desktop-to-mobile resize. |
 | V143-E10 | `e2e/200_agent_town_v1_4_3_debug_boundary.spec.js` | Release-candidate player-copy hygiene | Normal player-facing routes never render raw `agent.panel.*` keys or `NO_SOLANA_WALLET` codes, even when shared route chrome boots before i18n settles. |
+| V143-E11 | `e2e/120_onboarding_privy_required.spec.js` | Registration-to-Brain handoff | When Town Hall registration completes and Brain is the next required onboarding step, an open Town Hall modal swaps directly into the Brain district instead of leaving the user stranded on Town Hall. |
+| V143-E12 | `e2e/120_onboarding_privy_required.spec.js` and `e2e/197_agent_town_v1_4_3_secondary_surfaces_visual.spec.js` | Standalone Sigil reconnect continuity | The standalone Sigil route keeps wallet and worker reconnect controls visible, and the route screenshot does not repeat redundant Sigil heading chrome around the ceremony illustration. |
 
 ---
 

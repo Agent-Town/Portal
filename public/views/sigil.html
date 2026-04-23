@@ -1,21 +1,29 @@
-<figure class="platformIllustrationCard platformIllustrationCard--wide" data-testid="sigil-platform-illustration">
+<figure class="platformIllustrationCard platformIllustrationCard--wide platformIllustrationCard--sigil" data-testid="sigil-platform-illustration">
     <img src="/assets/platform/sigil/sigil-ceremony-illustration-v1_4_3.webp" alt="Co-op sigil ritual table with lock, tokens, and glowing lines" />
     <figcaption class="small">The Sigil step should feel like a shared ritual between you and your agent.</figcaption>
 </figure>
 
-<div class="panel spaced" data-testid="townhall-single-path-note">
-    <h2 id="sigilModalTitle" style="margin:0 0 6px">Sigil Test</h2>
-    <p class="small" id="sigilModalIntro" style="margin-top:0">
-        Welcome to the House Ceremony. You need to prove the bond with your agent.
+<div class="panel" id="step1Panel">
+    <h2 id="sigilWorkerStepTitle" style="margin:0 0 6px">Step 1 — Worker Agent</h2>
+    <p class="small" style="margin-top:0" id="step1Intro">
+        Configure Brain in the right panel, then keep the worker connected while you run the sigil test.
     </p>
+    <div class="kv">
+      <button class="btn" id="connectWalletBtn" type="button">Connect wallet</button>
+      <span class="pill">Wallet: <strong id="walletAddr">—</strong></span>
+      <button class="btn" id="workerReconnectBtn" data-testid="worker-reconnect-btn" type="button">Reconnect worker</button>
+      <a class="btn primary" href="/skill.md" target="_blank" data-testid="skill-link">View worker playbook</a>
+      <span class="pill status" data-testid="agent-status"><span class="dot" id="agentDot"></span><span id="agentStatusText">Agent not connected</span></span>
+    </div>
+    <div class="small" id="walletStatus" style="min-height:1.4em;"></div>
 </div>
 
-
+<div class="divider" id="stepDivider"></div>
 
 <div style="max-width: 600px; margin: 0 auto;">
     <div class="panel" id="step2Panel">
-        <h2 id="sigilModalHeading" style="margin:0 0 6px">Sigil Test</h2>
-        <p class="small" id="sigilModalHelp" style="margin-top:0">You pick a sigil. The worker mirrors it. If both match, the lock opens.
+        <h2 id="sigilHeading" style="margin:0 0 6px">Step 2 — Sigil Test</h2>
+        <p class="small" id="sigilHelp" style="margin-top:0">You pick a sigil. The worker mirrors it. If both match, the lock opens.
         </p>
 
         <div class="grid6" id="sigilGrid" data-testid="sigil-grid"></div>

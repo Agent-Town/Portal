@@ -93,6 +93,28 @@ test('stepper shows brain as active with townhall complete', async ({ page }) =>
   await page.screenshot({ path: `${DIR}/privy_02_stepper_brain.png` });
 });
 
+test('registration completion swaps the open townhall modal into brain config', async ({ page }) => {
+  await installMockSolanaWallet(page);
+  await enterThenActivateOnboarding(page, 'townhall_profile');
+
+  await page.evaluate(async () => {
+    const state = await (await fetch('/api/state', { credentials: 'include' })).json();
+    state.onboarding = {
+      ...(state.onboarding || {}),
+      required: true,
+      registrationComplete: true,
+      step: 'brain'
+    };
+    if (!state.lite) state.lite = {};
+    state.lite.llmConfigured = false;
+    if (typeof window.updateUI === 'function') await window.updateUI(state);
+  });
+
+  await expect(page.locator('#brainTierFree')).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('[data-testid="stepper-step-brain"]')).toHaveClass(/is-active/);
+  await expect(page.locator('#townhallRegisterPanel')).toHaveCount(0);
+});
+
 test('agent dock auto-expands at brain step', async ({ page }) => {
   await installMockSolanaWallet(page);
   await enterThenActivateOnboarding(page, 'brain');
@@ -111,6 +133,7 @@ test('sigil grid: 40px icons, explainer, picks, stepper at step 3', async ({ pag
   await installMockSolanaWallet(page);
   await enterThenActivateOnboarding(page, 'sigil', { llmConfigured: true });
 
+  await expect(page.getByTestId('worker-reconnect-btn')).toBeVisible({ timeout: 5000 });
   const sigilIcons = page.locator('.sigilIcon');
   await expect(sigilIcons.first()).toBeVisible({ timeout: 5000 });
   expect(await sigilIcons.count()).toBeGreaterThanOrEqual(4);

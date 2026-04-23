@@ -25,6 +25,8 @@ The final release line includes one narrow cleanup patch on top of the visual re
 
 - raw `agent.panel.*` fallback keys must never appear in normal player-facing routes, even if the shared agent panel boots before the i18n bundle is ready;
 - raw wallet error codes such as `NO_SOLANA_WALLET` must never appear in player-facing copy;
+- successful Town Hall registration must hand off directly into the Brain district when Brain is the next required onboarding step;
+- the standalone Sigil route must keep the worker reconnect controls available whenever onboarding reaches Sigil before the worker is live, and it must not duplicate unnecessary title chrome around the ceremony illustration;
 - the app-wide signoff sheet must reflect the current automated proof, current owner-approved baseline decisions, and any remaining caveats truthfully;
 - this cleanup does not reopen asset generation, gameplay, economy, runtime, or Founders Plot art scope.
 
