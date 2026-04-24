@@ -27,6 +27,10 @@ The final release line includes one narrow cleanup patch on top of the visual re
 - raw wallet error codes such as `NO_SOLANA_WALLET` must never appear in player-facing copy;
 - successful Town Hall registration must hand off directly into the Brain district when Brain is the next required onboarding step;
 - the standalone Sigil route must keep the worker reconnect controls available whenever onboarding reaches Sigil before the worker is live, and it must not duplicate unnecessary title chrome around the ceremony illustration;
+- the gated `/app` onboarding route must keep the same live Sigil mirror continuity after Brain setup, so a connected worker can mirror the human pick without relying on a test-only agent-select shortcut;
+- any LLM/provider-facing worker tool registry and trainer-callable app surface must expose underscore-safe tool names instead of dotted names, while canonical dotted tool IDs remain internal for routing, replay, and server-side semantics;
+- ceremony commit/reveal exchange must be collision-safe on the release line, so a conflicting second worker context cannot overwrite the committed ceremony material and trigger a later `COMMIT_MISMATCH`;
+- the house-key ceremony surface must use the approved ceremony illustration and explain the story moment in player-facing copy: the human and agent are moving into their own house and creating a joined key together before it opens;
 - the app-wide signoff sheet must reflect the current automated proof, current owner-approved baseline decisions, and any remaining caveats truthfully;
 - this cleanup does not reopen asset generation, gameplay, economy, runtime, or Founders Plot art scope.
 

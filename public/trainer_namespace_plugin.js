@@ -124,11 +124,12 @@
     }));
     if (!includeAliases) return rows;
     for (const [alias, canonical] of Object.entries(TOOL_ALIAS_MAP)) {
+      const canonicalRow = TOOL_ROWS.find((row) => row.name === canonical) || null;
       rows.push({
         name: alias,
         canonical,
         tier: "alias",
-        description: `Alias for ${canonical}`,
+        description: canonicalRow?.description || `Alias for ${canonical}`,
         alias: true,
       });
     }

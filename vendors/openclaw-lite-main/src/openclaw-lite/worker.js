@@ -136,7 +136,7 @@ function resolveTrainerNamespaceEnabledFromWorkerLocation() {
 }
 
 function isTrainerNamespaceToolName(toolName) {
-  return String(toolName || "").trim().startsWith(TRAINER_NAMESPACE_TOOL_PREFIX);
+  return resolveLiteCanonicalToolName(toolName).startsWith(TRAINER_NAMESPACE_TOOL_PREFIX);
 }
 
 function trainerNamespaceEnabled() {
@@ -1282,6 +1282,8 @@ async function runAgentTownCeremonyReveal(params, toolName = "agent_town_ceremon
       body: JSON.stringify({
         teamCode,
         sealedForHuman,
+        commit: entry.commit,
+        revealPub: entry.revealPub,
       }),
     });
     entry.revealedAtMs = nowMs();
@@ -3112,6 +3114,42 @@ const LITE_TOOL_SPECS = [
   },
 ];
 
+function buildProviderSafeLiteToolName(toolName = "") {
+  const canonical = String(toolName || "").trim();
+  if (!canonical) return "";
+  if (!canonical.includes(".")) return canonical;
+  return canonical
+    .replace(/[^a-zA-Z0-9_-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+const LITE_TOOL_PROVIDER_ALIAS_TO_CANONICAL = new Map();
+const LITE_TOOL_CANONICAL_TO_PROVIDER_ALIAS = new Map();
+for (const spec of LITE_TOOL_SPECS) {
+  const canonicalName = String(spec?.name || "").trim();
+  const providerName = buildProviderSafeLiteToolName(canonicalName);
+  if (!canonicalName || !providerName || providerName === canonicalName) continue;
+  if (!LITE_TOOL_PROVIDER_ALIAS_TO_CANONICAL.has(providerName)) {
+    LITE_TOOL_PROVIDER_ALIAS_TO_CANONICAL.set(providerName, canonicalName);
+  }
+  if (!LITE_TOOL_CANONICAL_TO_PROVIDER_ALIAS.has(canonicalName)) {
+    LITE_TOOL_CANONICAL_TO_PROVIDER_ALIAS.set(canonicalName, providerName);
+  }
+}
+
+function resolveLiteCanonicalToolName(toolName = "") {
+  const raw = String(toolName || "").trim();
+  if (!raw) return "";
+  return LITE_TOOL_PROVIDER_ALIAS_TO_CANONICAL.get(raw) || raw;
+}
+
+function resolveLiteProviderToolName(toolName = "") {
+  const canonicalName = resolveLiteCanonicalToolName(toolName);
+  if (!canonicalName) return "";
+  return LITE_TOOL_CANONICAL_TO_PROVIDER_ALIAS.get(canonicalName) || canonicalName;
+}
+
 function makeLiteToolSchema() {
   return {
     type: "object",
@@ -3128,19 +3166,23 @@ function liteToolResult(text, details = {}) {
 }
 
 async function dispatchLiteTool(name, params, _signal, _onUpdate, toolCallId = null) {
-  const normalizedName = String(name || "");
+  const requestedName = String(name || "").trim();
+  const normalizedName = resolveLiteCanonicalToolName(requestedName);
+  const providerSafeName = resolveLiteProviderToolName(requestedName);
   const normalizedToolCallId = typeof toolCallId === "string" && toolCallId.trim() ? toolCallId.trim() : randomId("tc");
   if (isTrainerNamespaceToolName(normalizedName) && !trainerNamespaceEnabled()) {
     const startedAtMs = nowMs();
     const envelope = withToolMeta(
-      normalizedName,
+      providerSafeName,
       startedAtMs,
       makeToolFailure("TOOL_NOT_FOUND", `Tool ${normalizedName} not found`, {
         toolCallId: normalizedToolCallId,
-        tool: normalizedName,
+        tool: providerSafeName,
+        requestedTool: requestedName || providerSafeName,
+        canonicalTool: normalizedName,
       }),
     );
-    return envelopeToToolResult(envelope, normalizedName);
+    return envelopeToToolResult(envelope, providerSafeName);
   }
   const capture = state.trainer?.activeCapture || null;
   const coaching = trainerNormalizeCoachingState(state.trainer?.coaching);
@@ -3152,7 +3194,8 @@ async function dispatchLiteTool(name, params, _signal, _onUpdate, toolCallId = n
       {
         turnId: capture.turnId || null,
         toolCallId: normalizedToolCallId,
-        name: normalizedName,
+        name: providerSafeName,
+        canonicalName: normalizedName,
         args: isPlainObject(params) ? params : {},
         status: "pending",
       },
@@ -3179,7 +3222,8 @@ async function dispatchLiteTool(name, params, _signal, _onUpdate, toolCallId = n
       {
         action: decision === "approve" ? "tool.approve" : "tool.reject",
         toolCallId: normalizedToolCallId,
-        name: normalizedName,
+        name: providerSafeName,
+        canonicalName: normalizedName,
         pendingSeq: pendingEvent?.seq || null,
       },
       { parentSpanId: pendingEvent?.spanId || capture.turnSpanId || null },
@@ -3188,14 +3232,16 @@ async function dispatchLiteTool(name, params, _signal, _onUpdate, toolCallId = n
     if (decision !== "approve") {
       const startedAtMs = nowMs();
       const envelope = withToolMeta(
-        normalizedName,
+        providerSafeName,
         startedAtMs,
         makeToolFailure("APPROVAL_REJECTED", "Tool call rejected by coach", {
           toolCallId: normalizedToolCallId,
-          tool: normalizedName,
+          tool: providerSafeName,
+          requestedTool: requestedName || providerSafeName,
+          canonicalTool: normalizedName,
         }),
       );
-      return envelopeToToolResult(envelope, normalizedName);
+      return envelopeToToolResult(envelope, providerSafeName);
     }
   }
 
@@ -3243,47 +3289,47 @@ async function dispatchLiteTool(name, params, _signal, _onUpdate, toolCallId = n
     }
     case "trainer.list_runs": {
       const envelope = await runTrainerListRuns(params || {}, "trainer.list_runs");
-      return envelopeToToolResult(envelope, "trainer.list_runs");
+      return envelopeToToolResult(envelope, providerSafeName);
     }
     case "trainer.get_run": {
       const envelope = await runTrainerGetRun(params || {}, "trainer.get_run");
-      return envelopeToToolResult(envelope, "trainer.get_run");
+      return envelopeToToolResult(envelope, providerSafeName);
     }
     case "trainer.get_event": {
       const envelope = await runTrainerGetEvent(params || {}, "trainer.get_event");
-      return envelopeToToolResult(envelope, "trainer.get_event");
+      return envelopeToToolResult(envelope, providerSafeName);
     }
     case "trainer.list_actions": {
       const envelope = await runTrainerListActions(params || {}, "trainer.list_actions");
-      return envelopeToToolResult(envelope, "trainer.list_actions");
+      return envelopeToToolResult(envelope, providerSafeName);
     }
     case "trainer.invoke_action": {
       const envelope = await runTrainerInvokeAction(params || {}, "trainer.invoke_action", normalizedToolCallId);
-      return envelopeToToolResult(envelope, "trainer.invoke_action");
+      return envelopeToToolResult(envelope, providerSafeName);
     }
     case "trainer.list_evidence": {
       const envelope = await runTrainerListEvidence(params || {}, "trainer.list_evidence");
-      return envelopeToToolResult(envelope, "trainer.list_evidence");
+      return envelopeToToolResult(envelope, providerSafeName);
     }
     case "trainer.get_transcript_integrity": {
       const envelope = runTrainerGetTranscriptIntegrity(params || {}, "trainer.get_transcript_integrity");
-      return envelopeToToolResult(envelope, "trainer.get_transcript_integrity");
+      return envelopeToToolResult(envelope, providerSafeName);
     }
     case "trainer.get_session_context": {
       const envelope = await runTrainerGetSessionContext(params || {}, "trainer.get_session_context");
-      return envelopeToToolResult(envelope, "trainer.get_session_context");
+      return envelopeToToolResult(envelope, providerSafeName);
     }
     case "trainer.explain_not_used": {
       const envelope = await runTrainerExplainNotUsed(params || {}, "trainer.explain_not_used");
-      return envelopeToToolResult(envelope, "trainer.explain_not_used");
+      return envelopeToToolResult(envelope, providerSafeName);
     }
     case "trainer.delete_trace": {
       const envelope = await runTrainerDeleteTrace(params || {}, "trainer.delete_trace");
-      return envelopeToToolResult(envelope, "trainer.delete_trace");
+      return envelopeToToolResult(envelope, providerSafeName);
     }
     case "trainer.clear_traces": {
       const envelope = await runTrainerClearTraces(params || {}, "trainer.clear_traces");
-      return envelopeToToolResult(envelope, "trainer.clear_traces");
+      return envelopeToToolResult(envelope, providerSafeName);
     }
     case "agent_town_ceremony_commit": {
       const envelope = await runAgentTownCeremonyCommit(params || {}, "agent_town_ceremony_commit");
@@ -3335,7 +3381,7 @@ async function dispatchLiteTool(name, params, _signal, _onUpdate, toolCallId = n
     case "et.foreman.scheduler.pause":
     case "et.foreman.scheduler.resume": {
       const envelope = await runFoundersPlotTool(params || {}, normalizedName);
-      return envelopeToToolResult(envelope, normalizedName);
+      return envelopeToToolResult(envelope, providerSafeName);
     }
     case "agent_town_ui_open_modal":
     case "agent_town_ui_atlas_search":
@@ -3425,14 +3471,16 @@ async function dispatchLiteTool(name, params, _signal, _onUpdate, toolCallId = n
           ? "STATE_TOOL_UNKNOWN"
           : "TOOL_NOT_FOUND";
       const envelope = withToolMeta(
-        normalizedName,
+        providerSafeName,
         startedAtMs,
         makeToolFailure(notFoundCode, `Tool ${normalizedName} not found`, {
           toolCallId: normalizedToolCallId,
-          tool: normalizedName,
+          tool: providerSafeName,
+          requestedTool: requestedName || providerSafeName,
+          canonicalTool: normalizedName,
         }),
       );
-      return envelopeToToolResult(envelope, normalizedName);
+      return envelopeToToolResult(envelope, providerSafeName);
     }
   }
 }
@@ -3441,14 +3489,19 @@ function getLiteTools() {
   const specs = trainerNamespaceEnabled()
     ? LITE_TOOL_SPECS
     : LITE_TOOL_SPECS.filter((spec) => !isTrainerNamespaceToolName(spec?.name));
-  return specs.map((spec) => ({
-    name: spec.name,
-    label: spec.label,
-    description: spec.description,
-    parameters: makeLiteToolSchema(),
-    execute: async (toolCallId, params, signal, onUpdate) =>
-      dispatchLiteTool(spec.name, params, signal, onUpdate, toolCallId),
-  }));
+  return specs.map((spec) => {
+    const canonicalName = String(spec?.name || "").trim();
+    const providerName = resolveLiteProviderToolName(canonicalName);
+    return {
+      name: providerName,
+      canonicalName,
+      label: spec.label,
+      description: spec.description,
+      parameters: makeLiteToolSchema(),
+      execute: async (toolCallId, params, signal, onUpdate) =>
+        dispatchLiteTool(providerName, params, signal, onUpdate, toolCallId),
+    };
+  });
 }
 
 function getToolRegistryInfo() {
@@ -3468,6 +3521,7 @@ async function trainerBuildRegistrySnapshot() {
     const schemaSha256 = await sha256HexFromJson(tool?.parameters || {});
     rows.push({
       name: String(tool?.name || ""),
+      canonicalName: String(tool?.canonicalName || tool?.name || ""),
       schemaSha256,
       version: null,
     });
@@ -3479,6 +3533,7 @@ async function trainerBuildRegistrySnapshot() {
   });
   const registrySha256 = await sha256HexFromJson(rows.map((row) => ({
     name: row.name,
+    canonicalName: row.canonicalName,
     schemaSha256: row.schemaSha256,
     version: row.version,
   })));
@@ -4397,15 +4452,22 @@ async function runTrainerInvokeAction(params, toolName = "trainer.invoke_action"
   if (!actionId) {
     return withToolMeta(toolName, startedAtMs, makeToolFailure("INVALID_ARGUMENTS", "Missing actionId"));
   }
-  if (actionId.startsWith("trainer.")) {
+  const canonicalActionId = resolveLiteCanonicalToolName(actionId);
+  if (isTrainerNamespaceToolName(canonicalActionId)) {
     return withToolMeta(
       toolName,
       startedAtMs,
       makeToolFailure("INVALID_ARGUMENTS", "trainer.invoke_action only supports non-trainer actionIds"),
     );
   }
-  const knownTools = new Set(getLiteTools().map((tool) => String(tool?.name || "")));
-  if (!knownTools.has(actionId)) {
+  const knownTools = new Set();
+  for (const tool of getLiteTools()) {
+    const providerName = String(tool?.name || "").trim();
+    const canonicalName = String(tool?.canonicalName || "").trim();
+    if (providerName) knownTools.add(providerName);
+    if (canonicalName) knownTools.add(canonicalName);
+  }
+  if (!knownTools.has(actionId) && !knownTools.has(canonicalActionId)) {
     return withToolMeta(toolName, startedAtMs, makeToolFailure("NOT_FOUND", `Unknown actionId: ${actionId}`));
   }
 

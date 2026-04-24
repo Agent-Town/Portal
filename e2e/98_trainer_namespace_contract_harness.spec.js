@@ -24,9 +24,11 @@ test('trainer namespace tools are discoverable when enabled', async ({ page }) =
   await openTrainerToolsTab(page);
 
   const enabledTools = await listTrainerToolNames(page);
-  expect(enabledTools).toContain('trainer.list_runs');
-  expect(enabledTools).toContain('trainer.list_actions');
-  expect(enabledTools).toContain('trainer.invoke_action');
+  expect(enabledTools).toContain('trainer_list_runs');
+  expect(enabledTools).toContain('trainer_list_actions');
+  expect(enabledTools).toContain('trainer_invoke_action');
+  const trainerTools = enabledTools.filter((name) => String(name || '').startsWith('trainer'));
+  expect(trainerTools.some((name) => String(name || '').includes('.'))).toBe(false);
 });
 
 test('runtime feature flag cannot be bypassed by query/localStorage overrides', async ({ page }) => {

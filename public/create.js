@@ -84,6 +84,24 @@ function applyCreateCopy({ soloMode = false } = {}) {
   if (heading) heading.textContent = tCreate('create.heading');
   const intro = el('createIntro');
   if (intro) intro.textContent = soloMode ? tCreate('create.intro.solo') : tCreate('create.intro.coop');
+  const ceremonyCaption = el('createCeremonyCaption');
+  if (ceremonyCaption) ceremonyCaption.textContent = soloMode
+    ? tCreate('create.ceremony.caption.solo')
+    : tCreate('create.ceremony.caption.coop');
+  const ceremonyTitle = el('createCeremonyTitle');
+  if (ceremonyTitle) ceremonyTitle.textContent = tCreate('create.ceremony.title');
+  const ceremonyLead = el('createCeremonyLead');
+  if (ceremonyLead) ceremonyLead.textContent = soloMode
+    ? tCreate('create.ceremony.lead.solo')
+    : tCreate('create.ceremony.lead.coop');
+  const ceremonyStepHuman = el('createCeremonyStepHuman');
+  if (ceremonyStepHuman) ceremonyStepHuman.textContent = tCreate('create.ceremony.step.human');
+  const ceremonyStepAgent = el('createCeremonyStepAgent');
+  if (ceremonyStepAgent) ceremonyStepAgent.textContent = soloMode
+    ? tCreate('create.ceremony.step.agent.solo')
+    : tCreate('create.ceremony.step.agent.coop');
+  const ceremonyStepHouse = el('createCeremonyStepHouse');
+  if (ceremonyStepHouse) ceremonyStepHouse.textContent = tCreate('create.ceremony.step.house');
   const shareBtn = el('shareBtn');
   if (shareBtn) shareBtn.textContent = tCreate('create.generate');
   const shareStatus = el('shareStatus');
@@ -904,7 +922,11 @@ async function init() {
         });
         await api('/api/human/house/reveal', {
           method: 'POST',
-          body: JSON.stringify({ sealedForAgent })
+          body: JSON.stringify({
+            sealedForAgent,
+            commit: humanCommit,
+            revealPub: ceremonyRevealPub
+          })
         });
         nudgeCreateSkillLoop(80);
 

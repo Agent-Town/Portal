@@ -192,7 +192,9 @@ async function handleCommand(command, payload) {
         method: 'POST',
         body: {
           teamCode,
-          sealedForHuman
+          sealedForHuman,
+          commit: runtime.ceremony.commit,
+          revealPub: runtime.ceremony.revealPub
         }
       });
       runtime.ceremony.revealed = true;

@@ -34,23 +34,24 @@ test('worker registry exposes the bounded Founders Plot foreman tool family', as
   const registry = await page.evaluate(async () => window.__openclawLiteTest.getToolRegistryInfo());
   const names = Array.isArray(registry?.names) ? registry.names : [];
 
-  expect(names).toContain('et.plot.get_state');
-  expect(names).toContain('et.plot.place_building');
-  expect(names).toContain('et.plot.queue_job');
-  expect(names).toContain('et.plot.collect_outputs');
-  expect(names).toContain('et.plot.upgrade_building');
-  expect(names).toContain('et.plot.set_priority');
-  expect(names).toContain('et.plot.claim_reward');
-  expect(names).toContain('et.plot.request_user_approval');
-  expect(names).toContain('et.plot.contracts.get_state');
-  expect(names).toContain('et.plot.contracts.accept');
-  expect(names).toContain('et.plot.contracts.turn_in');
-  expect(names).toContain('et.foreman.policy.get_standing_order');
-  expect(names).toContain('et.foreman.policy.set_standing_order');
-  expect(names).toContain('et.foreman.scheduler.get_status');
-  expect(names).toContain('et.foreman.scheduler.enable_collect_ready_outputs');
-  expect(names).toContain('et.foreman.scheduler.pause');
-  expect(names).toContain('et.foreman.scheduler.resume');
+  expect(names).toContain('et_plot_get_state');
+  expect(names).toContain('et_plot_place_building');
+  expect(names).toContain('et_plot_queue_job');
+  expect(names).toContain('et_plot_collect_outputs');
+  expect(names).toContain('et_plot_upgrade_building');
+  expect(names).toContain('et_plot_set_priority');
+  expect(names).toContain('et_plot_claim_reward');
+  expect(names).toContain('et_plot_request_user_approval');
+  expect(names).toContain('et_plot_contracts_get_state');
+  expect(names).toContain('et_plot_contracts_accept');
+  expect(names).toContain('et_plot_contracts_turn_in');
+  expect(names).toContain('et_foreman_policy_get_standing_order');
+  expect(names).toContain('et_foreman_policy_set_standing_order');
+  expect(names).toContain('et_foreman_scheduler_get_status');
+  expect(names).toContain('et_foreman_scheduler_enable_collect_ready_outputs');
+  expect(names).toContain('et_foreman_scheduler_pause');
+  expect(names).toContain('et_foreman_scheduler_resume');
+  expect(names.some((name) => String(name || '').includes('.'))).toBe(false);
 });
 
 test('worker tools preserve the schema-v3 Founders Plot state and idempotent human-route mutations', async ({ page }) => {

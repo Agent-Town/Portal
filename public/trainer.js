@@ -260,15 +260,18 @@
       const name = String(row?.name || "").trim();
       if (!name) continue;
       map.set(name, row);
+      const canonical = normalizeTrainerNamespaceToolName(name);
+      if (canonical) map.set(canonical, row);
     }
     return map;
   }
 
   function findTrainerNamespaceTool(toolName) {
     const map = trainerNamespaceToolsMap();
+    const raw = String(toolName || "").trim();
     const canonical = normalizeTrainerNamespaceToolName(toolName);
-    if (!canonical) return null;
-    return map.get(canonical) || null;
+    if (!raw && !canonical) return null;
+    return map.get(raw) || map.get(canonical) || null;
   }
 
   function listTrackedEvidenceRows() {
@@ -768,7 +771,7 @@
         locationSearch: window.location.search,
       }) === true;
       trainerNamespaceTools = trainerNamespaceEnabled
-        ? trainerPlugin.listTools({ includeAliases: false })
+        ? trainerPlugin.listTools({ includeAliases: true }).filter((row) => row?.alias === true)
         : [];
       if (trainerNamespaceEnabled && typeof trainerPlugin.getDiagnostics === "function") {
         trainerNamespaceDiagnostics = trainerPlugin.getDiagnostics({
@@ -781,7 +784,7 @@
     state.trainerNamespaceDiagnostics = trainerNamespaceDiagnostics;
     const trainerNamespaceToolNames = state.trainerNamespaceTools
       .map((row) => String(row?.name || "").trim())
-      .filter((name) => name && name.startsWith(TRAINER_NAMESPACE_TOOL_PREFIX));
+      .filter((name) => name && isTrainerNamespaceToolName(name));
     state.toolNames = Array.from(new Set(toolNames.concat(dynamicToolNames, trainerNamespaceToolNames)));
     if (!state.selectedToolName || !state.toolNames.includes(state.selectedToolName)) {
       state.selectedToolName = state.toolNames[0] || "";
@@ -1502,6 +1505,10 @@
         }
         trackActionEvidence(result?.evidence || []);
       }
+      const trainerToolDef = isTrainerNamespace ? findTrainerNamespaceTool(toolName) : null;
+      const trainerDisplayName = trainerToolDef?.name
+        ? String(trainerToolDef.name).trim()
+        : String(toolName || "").trim();
       state.toolLastResult = isSkillAction
         ? {
           ok: result?.ok === true,
@@ -1519,7 +1526,7 @@
           ? {
             ...(result && typeof result === "object" ? result : {}),
             ok: result?.ok === true,
-            tool: normalizeTrainerNamespaceToolName(toolName),
+            tool: trainerDisplayName,
             durationMs: Number.isFinite(Number(result?.durationMs))
               ? Number(result.durationMs)
               : Date.now() - startedAt,

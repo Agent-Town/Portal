@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { installMockSolanaWallet } = require('./helpers/phase1');
-const { enterHatch, triggerWalletProfileCheck } = require('./helpers/phase2');
+const { enterHatch, triggerWalletProfileCheck, connectAgentViaApi, configureLiteLlm } = require('./helpers/phase2');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 const DIR = '/tmp/portal-screenshots';
@@ -59,6 +59,47 @@ async function enterThenActivateOnboarding(page, step, extras = {}) {
   await page.waitForTimeout(step === 'ceremony' ? 3000 : 1500);
 }
 
+async function openAppThenActivateOnboarding(page, step, extras = {}) {
+  await page.route('**/api/state', async (route) => {
+    let json;
+    try {
+      const response = await route.fetch();
+      json = await response.json();
+    } catch {
+      json = { ok: true };
+    }
+    if (!json.onboarding) json.onboarding = {};
+    json.onboarding.required = true;
+    json.onboarding.registrationComplete = step !== 'townhall_profile';
+    json.onboarding.step = step;
+    if (extras.llmConfigured) {
+      if (!json.lite) json.lite = {};
+      json.lite.llmConfigured = true;
+    }
+    if (extras.signupComplete) {
+      if (!json.signup) json.signup = {};
+      json.signup.complete = true;
+    }
+    await route.fulfill({ body: JSON.stringify(json) });
+  });
+
+  await page.goto('/app');
+  await page.waitForTimeout(1000);
+
+  const districtForStep = {
+    townhall_profile: 'townhall',
+    brain: 'brain',
+    sigil: 'sigil',
+    ceremony: 'ceremony'
+  };
+  await page.evaluate(async (d) => {
+    const state = await (await fetch('/api/state', { credentials: 'include' })).json();
+    if (typeof window.updateUI === 'function') await window.updateUI(state);
+    if (typeof window.showDistrict === 'function') await window.showDistrict(d);
+  }, districtForStep[step] || 'townhall');
+  await page.waitForTimeout(step === 'ceremony' ? 3000 : 1500);
+}
+
 test('stepper renders at townhall step with step 1 active', async ({ page }) => {
   await installMockSolanaWallet(page);
   await enterThenActivateOnboarding(page, 'townhall_profile');
@@ -79,6 +120,7 @@ test('stepper shows brain as active with townhall complete', async ({ page }) =>
   await installMockSolanaWallet(page);
   await enterThenActivateOnboarding(page, 'brain');
 
+  await expect(page.getByTestId('brain-connect-illustration')).toBeVisible({ timeout: 3000 });
   await expect(page.locator('#brainTierFree')).toBeVisible({ timeout: 3000 });
 
   const stepperNodes = page.locator('.onboarding-stepper-node');
@@ -150,11 +192,48 @@ test('sigil grid: 40px icons, explainer, picks, stepper at step 3', async ({ pag
   await page.screenshot({ path: `${DIR}/privy_04_sigil_grid.png` });
 });
 
+test('the gated /app sigil route triggers the live worker loop after brain setup', async ({ page }) => {
+  await installMockSolanaWallet(page);
+  await openAppThenActivateOnboarding(page, 'sigil', { llmConfigured: true });
+  await configureLiteLlm(page, {
+    provider: 'test-local',
+    model: 'deterministic',
+    apiKey: 'phase2-test-key'
+  });
+  await connectAgentViaApi(page, { agentName: 'OpenClaw Lite' });
+  await page.evaluate(async () => {
+    const mod = await import('/openclaw-lite/gateway.js');
+    let gateway = mod?.default || mod;
+    if (gateway && typeof gateway.then === 'function') gateway = await gateway;
+    const original = typeof gateway?.experienceRun === 'function'
+      ? gateway.experienceRun.bind(gateway)
+      : null;
+    window.__appSigilExperienceRunCalls = 0;
+    if (original) {
+      gateway.experienceRun = async (...args) => {
+        window.__appSigilExperienceRunCalls += 1;
+        return await original(...args);
+      };
+    }
+  });
+
+  await page.evaluate(async () => {
+    const state = await (await fetch('/api/state', { credentials: 'include' })).json();
+    if (typeof window.updateUI === 'function') await window.updateUI(state);
+  });
+
+  await expect(page.getByTestId('worker-reconnect-btn')).toBeVisible({ timeout: 5000 });
+  await page.getByTestId('sigil-key').click();
+
+  await expect.poll(() => page.evaluate(() => window.__appSigilExperienceRunCalls || 0), { timeout: 12000 }).toBeGreaterThan(0);
+});
+
 test('ceremony embeds /create?embed=1 iframe with stepper at step 4', async ({ page }) => {
   await installMockSolanaWallet(page);
   await enterThenActivateOnboarding(page, 'ceremony', { llmConfigured: true, signupComplete: true });
 
   const iframe = page.locator('.districtFrame');
+  const frame = page.frameLocator('.districtFrame');
   await expect(iframe).toBeVisible({ timeout: 5000 });
   expect(await iframe.getAttribute('src')).toContain('/create?embed=1');
 
@@ -162,6 +241,12 @@ test('ceremony embeds /create?embed=1 iframe with stepper at step 4', async ({ p
   await expect(page.locator('[data-testid="stepper-step-townhall_profile"]')).toHaveClass(/is-complete/);
   await expect(page.locator('[data-testid="stepper-step-brain"]')).toHaveClass(/is-complete/);
   await expect(page.locator('[data-testid="stepper-step-sigil"]')).toHaveClass(/is-complete/);
+  await expect(frame.getByTestId('create-ceremony-illustration')).toBeVisible();
+  await expect(frame.getByTestId('create-ceremony-explainer')).toBeVisible();
+  await expect(frame.getByText('You and your agent are moving into your house')).toBeVisible();
+  await expect(frame.getByText('Paint a few pixels to add your side of the house key.')).toBeVisible();
+  await expect(frame.getByText('Your agent creates the matching side in the background.')).toBeVisible();
+  await expect(frame.getByText('When both sides come together, the joined key opens your house.')).toBeVisible();
 
   await page.screenshot({ path: `${DIR}/privy_05_ceremony_embed.png` });
 });

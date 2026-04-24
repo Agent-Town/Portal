@@ -80,7 +80,7 @@ test('ceremony rejects plaintext reveals and relays sealed envelopes only', asyn
     teamCode
   });
   const humanRevealResp = await request.post('/api/human/house/reveal', {
-    data: { sealedForAgent }
+    data: { sealedForAgent, commit: humanCommit, revealPub: humanPair.publicKeyB64 }
   });
   expect(humanRevealResp.ok()).toBeTruthy();
 
@@ -91,7 +91,7 @@ test('ceremony rejects plaintext reveals and relays sealed envelopes only', asyn
     teamCode
   });
   const agentRevealResp = await request.post('/api/agent/house/reveal', {
-    data: { teamCode, sealedForHuman }
+    data: { teamCode, sealedForHuman, commit: agentCommit, revealPub: agentPair.publicKeyB64 }
   });
   expect(agentRevealResp.ok()).toBeTruthy();
 
@@ -128,4 +128,92 @@ test('ceremony rejects plaintext reveals and relays sealed envelopes only', asyn
     teamCode
   });
   expect(Buffer.compare(recoveredRh, rh)).toBe(0);
+});
+
+test('ceremony commit and reveal cannot be overwritten by a conflicting second context', async ({ request }) => {
+  const stateResp = await request.get('/api/state');
+  expect(stateResp.ok()).toBeTruthy();
+  const state = await stateResp.json();
+  const teamCode = state.teamCode;
+
+  const connectResp = await request.post('/api/agent/connect', {
+    data: { teamCode, agentName: 'BoundaryBot' }
+  });
+  expect(connectResp.ok()).toBeTruthy();
+
+  const rh = crypto.randomBytes(32);
+  const ra = crypto.randomBytes(32);
+  const altRa = crypto.randomBytes(32);
+  const humanPair = makeCeremonyRevealPair();
+  const agentPair = makeCeremonyRevealPair();
+  const altAgentPair = makeCeremonyRevealPair();
+  const humanCommit = sha256(rh).toString('base64');
+  const agentCommit = sha256(ra).toString('base64');
+  const altAgentCommit = sha256(altRa).toString('base64');
+
+  const humanCommitResp = await request.post('/api/human/house/commit', {
+    data: { commit: humanCommit, revealPub: humanPair.publicKeyB64 }
+  });
+  expect(humanCommitResp.ok()).toBeTruthy();
+
+  const firstAgentCommitResp = await request.post('/api/agent/house/commit', {
+    data: { teamCode, commit: agentCommit, revealPub: agentPair.publicKeyB64 }
+  });
+  expect(firstAgentCommitResp.ok()).toBeTruthy();
+
+  const conflictingCommitResp = await request.post('/api/agent/house/commit', {
+    data: { teamCode, commit: altAgentCommit, revealPub: altAgentPair.publicKeyB64 }
+  });
+  expect(conflictingCommitResp.status()).toBe(409);
+  await expect(conflictingCommitResp.json()).resolves.toMatchObject({ ok: false, error: 'CEREMONY_COMMIT_LOCKED' });
+
+  const sealedForAgent = encryptCeremonyReveal({
+    revealBytes: rh,
+    recipientRevealPubB64: agentPair.publicKeyB64,
+    direction: 'human_to_agent',
+    teamCode
+  });
+  const humanRevealResp = await request.post('/api/human/house/reveal', {
+    data: { sealedForAgent, commit: humanCommit, revealPub: humanPair.publicKeyB64 }
+  });
+  expect(humanRevealResp.ok()).toBeTruthy();
+
+  const conflictingReveal = encryptCeremonyReveal({
+    revealBytes: altRa,
+    recipientRevealPubB64: humanPair.publicKeyB64,
+    direction: 'agent_to_human',
+    teamCode
+  });
+  const conflictingRevealResp = await request.post('/api/agent/house/reveal', {
+    data: {
+      teamCode,
+      sealedForHuman: conflictingReveal,
+      commit: altAgentCommit,
+      revealPub: altAgentPair.publicKeyB64
+    }
+  });
+  expect(conflictingRevealResp.status()).toBe(409);
+  await expect(conflictingRevealResp.json()).resolves.toMatchObject({ ok: false, error: 'CEREMONY_COMMIT_MISMATCH' });
+
+  const sealedForHuman = encryptCeremonyReveal({
+    revealBytes: ra,
+    recipientRevealPubB64: humanPair.publicKeyB64,
+    direction: 'agent_to_human',
+    teamCode
+  });
+  const agentRevealResp = await request.post('/api/agent/house/reveal', {
+    data: { teamCode, sealedForHuman, commit: agentCommit, revealPub: agentPair.publicKeyB64 }
+  });
+  expect(agentRevealResp.ok()).toBeTruthy();
+
+  const humanMaterialResp = await request.get('/api/human/house/material');
+  expect(humanMaterialResp.ok()).toBeTruthy();
+  const humanMaterial = await humanMaterialResp.json();
+  const recoveredRa = decryptCeremonyReveal({
+    sealed: humanMaterial.agentRevealSealed,
+    privateKey: humanPair.privateKey,
+    direction: 'agent_to_human',
+    teamCode
+  });
+  expect(Buffer.compare(recoveredRa, ra)).toBe(0);
 });

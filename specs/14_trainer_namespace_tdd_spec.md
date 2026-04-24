@@ -73,7 +73,7 @@ Success metrics:
 
 ## 5.2 Namespace Model
 
-Namespace: `trainer.*` (displayed to agent as `trainer_*` aliases if needed for tool compatibility).
+Namespace: `trainer.*` canonically, but any provider-facing worker registry and trainer-callable app surface must export underscore-safe aliases because OpenRouter-compatible tool calling rejects dotted names.
 
 Canonical tool IDs (v1):
 
@@ -89,7 +89,7 @@ Canonical tool IDs (v1):
 10. `trainer.delete_trace` (approval-gated)
 11. `trainer.clear_traces` (approval-gated)
 
-Compatibility aliases (optional):
+Provider-facing aliases (required for live LLM/tool registries):
 
 1. `trainer_list_runs` -> `trainer.list_runs`
 2. `trainer_invoke_action` -> `trainer.invoke_action`
@@ -338,7 +338,7 @@ Mandatory controls:
 
 Acceptance criteria:
 
-1. Agent sees `trainer.list_runs`, `trainer.list_actions`, `trainer.invoke_action` in tool registry when trainer namespace feature flag is enabled.
+1. Agent sees `trainer_list_runs`, `trainer_list_actions`, `trainer_invoke_action` in the provider-facing tool registry when trainer namespace feature flag is enabled.
 2. Feature flag off -> tools absent.
 
 Tests:

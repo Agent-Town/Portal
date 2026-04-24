@@ -5858,6 +5858,26 @@ app.post('/api/agent/house/commit', (req, res) => {
     return res.status(400).json({ ok: false, error: String(err?.message || 'INVALID_CEREMONY_COMMIT') });
   }
 
+  const existingCommit = typeof s.houseCeremony?.agentCommit === 'string' ? s.houseCeremony.agentCommit.trim() : '';
+  const existingRevealPub = typeof s.houseCeremony?.agentRevealPub === 'string' ? s.houseCeremony.agentRevealPub.trim() : '';
+  if (existingCommit || existingRevealPub) {
+    const commitMismatch = existingCommit && existingCommit !== commit;
+    const revealMismatch = revealPub && existingRevealPub && existingRevealPub !== revealPub;
+    if (commitMismatch || revealMismatch) {
+      return res.status(409).json({
+        ok: false,
+        error: 'CEREMONY_COMMIT_LOCKED',
+        agentCommit: existingCommit || null,
+        agentRevealPub: existingRevealPub || null
+      });
+    }
+    return res.json({
+      ok: true,
+      agentRevealPub: existingRevealPub || revealPub || null,
+      locked: true
+    });
+  }
+
   s.houseCeremony.agentCommit = commit;
   if (revealPub) s.houseCeremony.agentRevealPub = revealPub;
   s.houseCeremony.createdAt = s.houseCeremony.createdAt || nowIso();
@@ -5867,6 +5887,8 @@ app.post('/api/agent/house/commit', (req, res) => {
 app.post('/api/agent/house/reveal', (req, res) => {
   const teamCode = typeof req.body?.teamCode === 'string' ? req.body.teamCode.trim() : '';
   const sealedRaw = req.body?.sealedForHuman || req.body?.sealedReveal || req.body?.sealed || null;
+  const commitRaw = req.body?.commit;
+  const revealPubRaw = req.body?.revealPub;
   if (!teamCode) return res.status(400).json({ ok: false, error: 'MISSING_TEAM_CODE' });
   const s = getSessionByTeamCode(teamCode);
   if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
@@ -5878,6 +5900,27 @@ app.post('/api/agent/house/reveal', (req, res) => {
     sealed = normalizeCeremonySealedReveal(sealedRaw, { required: true });
   } catch (err) {
     return res.status(400).json({ ok: false, error: String(err?.message || 'INVALID_REVEAL_ENVELOPE') });
+  }
+
+  let commit = '';
+  let revealPub = '';
+  try {
+    commit = commitRaw == null ? '' : normalizeCeremonyCommit(commitRaw);
+    revealPub = revealPubRaw == null ? '' : normalizeCeremonyRevealPub(revealPubRaw, { required: false });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: String(err?.message || 'INVALID_CEREMONY_COMMIT') });
+  }
+
+  const existingCommit = typeof s.houseCeremony?.agentCommit === 'string' ? s.houseCeremony.agentCommit.trim() : '';
+  const existingRevealPub = typeof s.houseCeremony?.agentRevealPub === 'string' ? s.houseCeremony.agentRevealPub.trim() : '';
+  if (commit && existingCommit && commit !== existingCommit) {
+    return res.status(409).json({ ok: false, error: 'CEREMONY_COMMIT_MISMATCH' });
+  }
+  if (revealPub && existingRevealPub && revealPub !== existingRevealPub) {
+    return res.status(409).json({ ok: false, error: 'CEREMONY_REVEAL_PUB_MISMATCH' });
+  }
+  if (s.houseCeremony?.agentRevealSealed) {
+    return res.json({ ok: true, houseId: s.houseCeremony.houseId || null, locked: true });
   }
 
   s.houseCeremony.agentRevealSealed = sealed;
@@ -5899,6 +5942,25 @@ app.post('/api/human/house/commit', (req, res) => {
   } catch (err) {
     return res.status(400).json({ ok: false, error: String(err?.message || 'INVALID_CEREMONY_COMMIT') });
   }
+  const existingCommit = typeof s.houseCeremony?.humanCommit === 'string' ? s.houseCeremony.humanCommit.trim() : '';
+  const existingRevealPub = typeof s.houseCeremony?.humanRevealPub === 'string' ? s.houseCeremony.humanRevealPub.trim() : '';
+  if (existingCommit || existingRevealPub) {
+    const commitMismatch = existingCommit && existingCommit !== commit;
+    const revealMismatch = revealPub && existingRevealPub && existingRevealPub !== revealPub;
+    if (commitMismatch || revealMismatch) {
+      return res.status(409).json({
+        ok: false,
+        error: 'CEREMONY_COMMIT_LOCKED',
+        humanCommit: existingCommit || null,
+        humanRevealPub: existingRevealPub || null
+      });
+    }
+    return res.json({
+      ok: true,
+      humanRevealPub: existingRevealPub || revealPub || null,
+      locked: true
+    });
+  }
   s.houseCeremony.humanCommit = commit;
   if (revealPub) s.houseCeremony.humanRevealPub = revealPub;
   s.houseCeremony.createdAt = s.houseCeremony.createdAt || nowIso();
@@ -5908,6 +5970,8 @@ app.post('/api/human/house/commit', (req, res) => {
 app.post('/api/human/house/reveal', (req, res) => {
   const s = ensureHumanSession(req, res);
   const sealedRaw = req.body?.sealedForAgent || req.body?.sealedReveal || req.body?.sealed || null;
+  const commitRaw = req.body?.commit;
+  const revealPubRaw = req.body?.revealPub;
   if (!s.houseCeremony?.agentCommit) return res.status(409).json({ ok: false, error: 'WAITING_AGENT_COMMIT' });
   if (!s.houseCeremony?.agentRevealPub) return res.status(409).json({ ok: false, error: 'WAITING_AGENT_REVEAL_PUB' });
 
@@ -5916,6 +5980,27 @@ app.post('/api/human/house/reveal', (req, res) => {
     sealed = normalizeCeremonySealedReveal(sealedRaw, { required: true });
   } catch (err) {
     return res.status(400).json({ ok: false, error: String(err?.message || 'INVALID_REVEAL_ENVELOPE') });
+  }
+
+  let commit = '';
+  let revealPub = '';
+  try {
+    commit = commitRaw == null ? '' : normalizeCeremonyCommit(commitRaw);
+    revealPub = revealPubRaw == null ? '' : normalizeCeremonyRevealPub(revealPubRaw, { required: false });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: String(err?.message || 'INVALID_CEREMONY_COMMIT') });
+  }
+
+  const existingCommit = typeof s.houseCeremony?.humanCommit === 'string' ? s.houseCeremony.humanCommit.trim() : '';
+  const existingRevealPub = typeof s.houseCeremony?.humanRevealPub === 'string' ? s.houseCeremony.humanRevealPub.trim() : '';
+  if (commit && existingCommit && commit !== existingCommit) {
+    return res.status(409).json({ ok: false, error: 'CEREMONY_COMMIT_MISMATCH' });
+  }
+  if (revealPub && existingRevealPub && revealPub !== existingRevealPub) {
+    return res.status(409).json({ ok: false, error: 'CEREMONY_REVEAL_PUB_MISMATCH' });
+  }
+  if (s.houseCeremony?.humanRevealSealed) {
+    return res.json({ ok: true, houseId: s.houseCeremony.houseId || null, locked: true });
   }
 
   s.houseCeremony.humanRevealSealed = sealed;

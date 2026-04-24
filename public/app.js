@@ -4323,7 +4323,9 @@ async function refreshTrainerNamespacePluginCache(runtimeState = null) {
     runtimeFeatureFlag: runtimeFlag,
     locationSearch: window.location.search,
   }) === true;
-  const tools = enabled ? plugin.listTools({ includeAliases: false }) : [];
+  const tools = enabled
+    ? plugin.listTools({ includeAliases: true }).filter((row) => row?.alias === true)
+    : [];
   const diagnostics = enabled && typeof plugin.getDiagnostics === 'function'
     ? plugin.getDiagnostics({})
     : null;
@@ -7565,8 +7567,13 @@ function appendHomeSkillLoopError(reason, message) {
   appendAgentLog(`Home skill step failed (${normalizedReason || 'state'}): ${normalizedMessage}`);
 }
 
+function isHomeSkillLoopPath(pathname = window.location.pathname) {
+  const path = String(pathname || '').trim();
+  return path === '/' || path === '/app';
+}
+
 function shouldRunHomeSkillLoop(state) {
-  if (window.location.pathname !== '/') return false;
+  if (!isHomeSkillLoopPath()) return false;
   if (!isVendorLite(state)) return false;
   if (!isLocalLiteLlmConfigured()) return false;
   if (!isAnyAgentConnected(state)) return false;
@@ -7579,8 +7586,9 @@ function homeSkillPrompt(state = {}) {
   const step = String(state?.experience?.step || '').trim();
   const nextAgentAction = String(state?.experience?.nextAgentAction || '').trim();
   const prompt = [
-    'Read workspace/SKILL.md and execute exactly the next required safe step for this Agent Town home-page co-op flow.',
+    'Read workspace/SKILL.md and execute exactly the next required safe step for this Agent Town co-op flow.',
     'Primary goal: complete signup by mirroring human sigil selection and pressing Open after the human.',
+    'This flow may be running from the Start Gate or the gated /app onboarding modal.',
     'Use runtime session context values for origin/teamCode/houseId exactly as provided.',
     'Start from the current experience state and perform at most one safe step per turn.',
     'If experience.step is "mirror_sigil", mirror human.selected via /api/agent/select.',

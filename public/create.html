@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
   <link rel="apple-touch-icon" href="/logo.jpg" />
-  <link rel="stylesheet" href="/styles.css?v=20260319a" />
+  <link rel="stylesheet" href="/styles.css?v=20260423a" />
 </head>
 <body>
   <div class="wrap">
@@ -29,11 +29,30 @@
       </div>
     </div>
 
+    <figure class="platformIllustrationCard platformIllustrationCard--wide platformIllustrationCard--sigil" data-testid="create-ceremony-illustration">
+      <img src="/assets/platform/sigil/sigil-ceremony-illustration-v1_4_3.webp" alt="Human and agent beginning their shared house ceremony together" />
+      <figcaption class="small" id="createCeremonyCaption">You and your agent are creating the key that opens your shared house.</figcaption>
+    </figure>
+
     <div class="panel">
       <h1 style="margin:0 0 8px" id="createHeading">Create entropy for house key.</h1>
       <p class="small" style="margin-top:0" id="createIntro">
         Human: click pixels. Agent: paint via the skill API. When it feels done, lock it in.
       </p>
+      <div
+        class="small"
+        id="createCeremonyExplainer"
+        data-testid="create-ceremony-explainer"
+        style="margin:0 0 16px; padding:12px 14px; border:1px solid rgba(90, 59, 32, 0.16); border-radius:16px; background:rgba(255, 248, 231, 0.86); color:var(--ink)"
+      >
+        <strong id="createCeremonyTitle" style="display:block; margin-bottom:6px">You and your agent are moving into your house</strong>
+        <div id="createCeremonyLead" style="margin-bottom:8px">This ceremony is the move-in moment. You and your agent create a joined key together before the house opens.</div>
+        <ol style="margin:0; padding-left:18px">
+          <li id="createCeremonyStepHuman">Paint a few pixels to add your side of the house key.</li>
+          <li id="createCeremonyStepAgent">Your agent creates the matching side in the background.</li>
+          <li id="createCeremonyStepHouse">When both sides come together, the joined key opens your house.</li>
+        </ol>
+      </div>
 
       <div class="canvasWrap">
         <div class="palette" id="palette" data-testid="palette"></div>
@@ -43,7 +62,7 @@
           <span class="pill" id="shareStatus" style="display:none">Working…</span>
         </div>
         <div class="small" style="margin-top:6px; color: var(--muted)" id="createNextNote">
-          Next: unlock the house with a wallet signature. Then you and the agent can read/write encrypted entries.
+          Next: once the joined key is ready, you and the agent can step into the house and read or write encrypted entries.
         </div>
       </div>
       <div class="small" id="err" style="color: var(--bad)"></div>
@@ -59,10 +78,10 @@
   <script src="/openclaw-lite/runtime-bridge.js?v=20260213"></script>
   <script src="/experience_profiles.js?v=20260309a"></script>
   <script src="/experience_runtime.js?v=20260309a"></script>
-  <script src="/i18n.js?v=20260310b"></script>
+  <script src="/i18n.js?v=20260423a"></script>
   <script src="/wallet_client.js?v=20260217h"></script>
   <script src="/privy_bridge.js?v=20260218a"></script>
-  <script src="/create.js?v=20260310b"></script>
+  <script src="/create.js?v=20260423a"></script>
   <script src="/agent_panel.js?v=20260222a"></script>
 </body>
 </html>
