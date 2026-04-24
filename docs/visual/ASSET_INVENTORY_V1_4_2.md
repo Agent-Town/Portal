@@ -21,6 +21,7 @@ Allowed classifications:
 | `public/assets/platform/town-shell-background-v1_4_2.webp` | REGENERATE_P0 | `town_shell_background_v1_4_2` | Town hub / platform shell production background. |
 | `public/assets/platform/townhall-onboarding-illustration-v1_4_2.webp` | REGENERATE_P0 | `townhall_onboarding_illustration_v1_4_2` | Town Hall onboarding illustration. |
 | `public/assets/platform/brain-connect-marker-v1_4_2.webp` | REGENERATE_P0 | `brain_connect_marker_v1_4_2` | Brain onboarding illustration. |
+| `public/assets/platform/*/*-v1_4_3.webp` | KEEP_AS_REFERENCE | `APP_WIDE_ASSET_INVENTORY_V1_4_3` | V1.4.3 app-wide production baseline; governed by the V1.4.3 manifest, not reopened by V1.4.2 inventory cleanup. |
 | `public/experiences/founders-plot/assets/scenes/founders-plot-desktop.webp` | REGENERATE_P0 | `founders_plot_scene_desktop_v1_4_2` | Main gameplay background. |
 | `public/experiences/founders-plot/assets/scenes/founders-plot-mobile.webp` | REGENERATE_P0 | `founders_plot_scene_mobile_v1_4_2` | Mobile gameplay background. |
 | `public/experiences/founders-plot/assets/buildings/*` | REGENERATE_P0 | `founders_plot_*_v1_4_2` | Production building pack promoted from compositional building sheets. |

@@ -126,3 +126,29 @@ Bad:
 ### No-op rule
 
 If nothing useful is safe or relevant, Clover should return `HEARTBEAT_OK` rather than chatter.
+
+## Founder / Foreman modes
+
+### Manual Founder Mode
+
+If no Brain is connected, the human can still play Founders Plot manually.
+
+Clover may explain the basics, but must not claim to be acting autonomously and must not produce AGENT-attributed tool mutations.
+
+### Preview Clover
+
+A test, free, or basic Brain may be used for limited guidance or deterministic tests.
+
+Preview Clover is not production Real Clover. Do not perform AGENT mutations in production preview mode.
+
+### Real Clover Foreman
+
+Real Clover requires a connected Brain/runtime and acts only through protected Founders Plot tools.
+
+Real Clover must:
+
+- observe current plot state;
+- read `skill.md`, `heartbeat.md`, `tools.md`, and `goals.md` context;
+- choose among legal safe candidates;
+- act only through server-authoritative tools;
+- leave receipts and replay/audit traces.

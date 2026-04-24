@@ -1,8 +1,16 @@
 (function agentTownAccessFactory(globalScope) {
   const MODES = Object.freeze({
     MANUAL_FOUNDER: 'MANUAL_FOUNDER',
+    PREVIEW_CLOVER: 'PREVIEW_CLOVER',
     REAL_CLOVER: 'REAL_CLOVER',
     OFFICIAL_TOWN: 'OFFICIAL_TOWN'
+  });
+
+  const BRAIN_QUALITIES = Object.freeze({
+    NONE: 'none',
+    TEST: 'test',
+    PREVIEW: 'preview',
+    REAL: 'real'
   });
 
   const START_DESTINATION = '/app?district=founders-plot&entry=play-first';
@@ -55,26 +63,88 @@
     return { recommended: false, reason: '' };
   }
 
+  function cleanLower(value) {
+    return String(value || '').trim().toLowerCase();
+  }
+
+  function hasCredential(config = {}) {
+    return !!(
+      config.apiKeySet === true
+      || config.credentialPresent === true
+      || String(config.apiKey || config.credential || '').trim()
+    );
+  }
+
+  function classifyBrainQuality(config = {}) {
+    const provider = cleanLower(config.provider);
+    const model = cleanLower(config.model || config.modelId);
+    const modelRef = cleanLower(config.modelRef || (provider && model ? `${provider}/${model}` : ''));
+    const text = `${provider} ${model} ${modelRef}`;
+    const credentialPresent = hasCredential(config);
+    const configured = bool(config.configured ?? config.brainConfigured ?? (provider && model && credentialPresent));
+    if (!configured) return BRAIN_QUALITIES.NONE;
+    if (!provider || !model) return BRAIN_QUALITIES.PREVIEW;
+
+    if (/\b(test-local|deterministic|mock|no-?op|noop)\b/.test(text)) {
+      return BRAIN_QUALITIES.TEST;
+    }
+    if (!credentialPresent || /(^|[/:_\s-])(free|basic)(\b|$)/.test(text)) {
+      return BRAIN_QUALITIES.PREVIEW;
+    }
+    return BRAIN_QUALITIES.REAL;
+  }
+
+  function brainQualityCanRunRealForeman(quality, input = {}) {
+    if (quality === BRAIN_QUALITIES.REAL) return true;
+    if (quality === BRAIN_QUALITIES.TEST) return bool(input.allowTestBrainForRealClover ?? input.testHarnessAllowed);
+    if (quality === BRAIN_QUALITIES.PREVIEW) return bool(input.allowPreviewBrainForRealClover);
+    return false;
+  }
+
   function buildAccessState(input = {}) {
     const state = input.state && typeof input.state === 'object' ? input.state : {};
     const onboarding = state.onboarding && typeof state.onboarding === 'object' ? state.onboarding : {};
-    const authenticated = bool(input.authenticated ?? state.authenticated ?? true);
-    const brainConfigured = bool(input.brainConfigured ?? state.brain?.configured);
+    const authenticated = bool(input.authenticated ?? state.authenticated ?? false);
+    const provider = input.provider || state.brain?.provider || null;
+    const model = input.model || state.brain?.model || state.brain?.modelId || null;
+    const modelRef = input.modelRef || state.brain?.modelRef || null;
+    const apiKeySet = input.apiKeySet ?? input.credentialPresent ?? state.brain?.apiKeySet ?? state.brain?.credentialPresent;
+    const brainQuality = classifyBrainQuality({
+      configured: input.brainConfigured ?? state.brain?.configured,
+      provider,
+      model,
+      modelRef,
+      apiKeySet,
+      apiKey: input.apiKey ?? state.brain?.apiKey,
+      credential: input.credential ?? state.brain?.credential
+    });
+    const brainConfigured = brainQuality !== BRAIN_QUALITIES.NONE;
+    const realBrainReady = brainQualityCanRunRealForeman(brainQuality, input);
     const runtimeReady = bool(input.runtimeReady ?? state.foreman?.runtimeReady);
-    const testBrainOnly = bool(input.testBrainOnly ?? state.brain?.testBrainOnly);
+    const testBrainOnly = brainQuality === BRAIN_QUALITIES.TEST && !realBrainReady;
     const townHallComplete = bool(
       input.townHallComplete
       ?? onboarding.registrationComplete
       ?? state.townHall?.complete
     );
     const official = townHallComplete;
-    const realClover = brainConfigured && runtimeReady;
+    const realClover = realBrainReady && runtimeReady;
+    const previewClover = brainConfigured && !realBrainReady;
     const mode = official
       ? MODES.OFFICIAL_TOWN
       : realClover
         ? MODES.REAL_CLOVER
-        : MODES.MANUAL_FOUNDER;
+        : previewClover
+          ? MODES.PREVIEW_CLOVER
+          : MODES.MANUAL_FOUNDER;
     const recommendation = inferTownHallRecommended({ state, progression: input.progression || {} });
+    const disabledReason = !brainConfigured
+      ? 'BRAIN_REQUIRED'
+      : !realBrainReady
+        ? 'REAL_BRAIN_REQUIRED'
+        : runtimeReady
+          ? ''
+          : 'RUNTIME_NOT_READY';
 
     return {
       authenticated,
@@ -87,17 +157,23 @@
       },
       brain: {
         configured: brainConfigured,
+        quality: brainQuality,
+        realReady: realBrainReady,
+        previewOnly: brainConfigured && !realBrainReady,
+        testHarnessAllowed: bool(input.allowTestBrainForRealClover ?? input.testHarnessAllowed),
         runtimeReady,
         requiredForRealForeman: true,
-        provider: input.provider || state.brain?.provider || null,
-        model: input.model || state.brain?.model || null,
+        provider,
+        model,
+        modelRef,
         testBrainOnly
       },
       clover: {
         guideAvailable: authenticated,
-        realForemanAvailable: brainConfigured && runtimeReady,
-        schedulerEnabled: brainConfigured && runtimeReady,
-        disabledReason: brainConfigured ? (runtimeReady ? '' : 'RUNTIME_NOT_READY') : 'BRAIN_REQUIRED'
+        previewAvailable: brainConfigured,
+        realForemanAvailable: realBrainReady && runtimeReady,
+        schedulerEnabled: realBrainReady && runtimeReady,
+        disabledReason
       },
       townHall: {
         complete: townHallComplete,
@@ -112,6 +188,7 @@
     return !!(
       accessState?.authenticated
       && accessState?.brain?.configured === true
+      && accessState?.brain?.realReady === true
       && accessState?.brain?.runtimeReady === true
       && accessState?.clover?.realForemanAvailable === true
     );
@@ -144,10 +221,12 @@
 
   const api = Object.freeze({
     MODES,
+    BRAIN_QUALITIES,
     START_DESTINATION,
     buildAccessState,
     canOpenDistrict,
     canRunRealForeman,
+    classifyBrainQuality,
     districtGateReason,
     normalizeDistrict
   });

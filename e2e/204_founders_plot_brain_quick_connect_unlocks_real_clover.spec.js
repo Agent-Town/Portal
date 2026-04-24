@@ -7,7 +7,7 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-test('Brain Quick Connect saves local Brain config and unlocks real Clover start controls', async ({ page }) => {
+test('Brain Quick Connect saves free OpenRouter config as Preview Clover, not Real Clover', async ({ page }) => {
   await page.goto('/app?district=founders-plot&entry=play-first');
   const frame = await getOpenFoundersPlotFrame(page);
 
@@ -20,6 +20,10 @@ test('Brain Quick Connect saves local Brain config and unlocks real Clover start
   await expect.poll(async () => {
     return await frame.evaluate(() => window.__foundersPlotTest.getBrainStatus().configured);
   }, { timeout: 5000 }).toBe(true);
-  await expect(frame.getByTestId('foreman-start-btn')).toHaveText('Start Clover');
-  await expect(frame.getByTestId('founders-foreman-status')).not.toContainText('Manual Founder Mode');
+  await expect.poll(async () => {
+    return await frame.evaluate(() => window.__foundersPlotTest.getBrainStatus().quality);
+  }, { timeout: 5000 }).toBe('preview');
+  await expect(frame.getByTestId('foreman-start-btn')).toHaveText('Upgrade Brain');
+  await expect(frame.getByTestId('founders-foreman-status')).toContainText('Preview Clover');
+  await expect(frame.getByTestId('foreman-run-now-btn')).toBeDisabled();
 });

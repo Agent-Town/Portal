@@ -74,7 +74,11 @@ HEARTBEAT_OK: Brain required for real Foreman action.
 
 ### Purpose
 
-`heartbeat.md` tells Clover **when and why** to think. It does not define the full tool contract. The worker must also include `tools.md` in the same cognition turn.
+`heartbeat.md` tells Clover **when and why** to think.
+
+It does not define the full tool contract.
+
+The worker must also include `tools.md` in the same cognition turn.
 
 ### Cadence
 
@@ -118,3 +122,13 @@ Return `HEARTBEAT_OK` if:
 ### Safety rule
 
 Never mutate world state directly from the model response. Select a safe candidate and let the server validate the canonical tool call.
+
+## Brain Readiness
+
+Do not run a Foreman heartbeat that can mutate world state unless Real Clover is active.
+
+If no Brain is connected, return no-op and surface a friendly Brain-required message.
+
+If only Preview/Test Brain is active, provide guidance only and do not perform production AGENT mutations.
+
+If Real Clover is active, heartbeat turns may evaluate safe candidates and act through protected tools according to current permissions and policy.

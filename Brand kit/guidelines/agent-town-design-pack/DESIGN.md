@@ -1298,3 +1298,13 @@ Do not satisfy visual progression through metadata alone. HQ progression require
 - visual delta test;
 - gameplay-scale screenshot;
 - no-label screenshot.
+
+## Play-First Onboarding Visual Rule
+
+The Founders Plot entry path should look like starting a game, not completing setup paperwork.
+
+- The first visible state should emphasize the town and first action.
+- Brain/Town Hall/Sigil/Ceremony affordances may appear later as contextual invitations.
+- Brain Quick Connect should be a compact sheet or drawer, not a blocking full-screen configuration wall.
+- Manual Founder Mode copy should be warm and clear.
+- Real Clover lock state should feel like a future capability, not a failure state.

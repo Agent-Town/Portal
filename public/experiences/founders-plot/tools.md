@@ -102,8 +102,14 @@ The Founders Plot runtime exposes a deliberately small tool family:
 ## HTTP surfaces
 
 - Tool execution: `POST /api/founders-plot/tool/:toolName`
-- Contract routes: `GET /api/founders-plot/contracts/state`, `POST /api/founders-plot/contracts/accept`, `POST /api/founders-plot/contracts/turn-in`
-- Foreman session routes: `POST /api/founders-plot/foreman/session/start`, `POST /api/founders-plot/foreman/session/heartbeat`, `POST /api/founders-plot/foreman/session/pause`
+- Contract routes:
+  `GET /api/founders-plot/contracts/state`,
+  `POST /api/founders-plot/contracts/accept`,
+  `POST /api/founders-plot/contracts/turn-in`
+- Foreman session routes:
+  `POST /api/founders-plot/foreman/session/start`,
+  `POST /api/founders-plot/foreman/session/heartbeat`,
+  `POST /api/founders-plot/foreman/session/pause`
 - Foreman observation route: `GET /api/founders-plot/foreman/observation`
 - Foreman execution route: `POST /api/founders-plot/foreman/tool/:toolName`
 - Foreman receipt correction route: `POST /api/founders-plot/foreman/receipt/correction`
@@ -161,3 +167,22 @@ The provider request must also include a compact guide for actual canonical tool
 - required arguments;
 - key error codes;
 - whether it can spend resources or requires approval.
+
+## Brain-Required Foreman Mutations
+
+Foreman mutation tools require Real Clover readiness.
+
+If the caller lacks Real Clover readiness, mutation tools must return:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "BRAIN_REQUIRED",
+    "message": "Connect a Brain to let Clover act as your Foreman.",
+    "retryable": false
+  }
+}
+```
+
+The server must not mutate world state and must not emit AGENT action events on `BRAIN_REQUIRED`.

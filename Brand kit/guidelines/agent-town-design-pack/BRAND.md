@@ -707,3 +707,15 @@ Town Hall is aspirational:
 > Make your growing settlement official.
 
 It should feel like a civic milestone, not a paperwork wall.
+
+### Play-First Promise
+
+Agent Town should first invite the player to found a place, not to configure a stack.
+
+The correct early tone is welcoming, practical, playful, honest about Clover's current capability, and aspirational about making the town official later.
+
+Use language like:
+
+> Start your plot now. Clover can guide the basics. Connect a Brain when you are ready for Clover to truly help.
+
+Do not imply that setup is complete when it is not. Do not imply that Real Clover exists without a production Brain.

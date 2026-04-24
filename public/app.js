@@ -1158,20 +1158,28 @@ function isTownhallBrainConfigured(state) {
 }
 
 function buildTownHubAccessState(state = lastState) {
+  const authenticated = state?.authenticated === false || state?.auth?.authenticated === false
+    ? false
+    : true;
+  const localBrain = getLocalLiteLlm();
   if (AgentTownAccess && typeof AgentTownAccess.buildAccessState === 'function') {
     return AgentTownAccess.buildAccessState({
-      authenticated: true,
+      authenticated,
       state: state || {},
       brainConfigured: isTownhallBrainConfigured(state),
+      provider: localBrain.provider || null,
+      model: localBrain.model || null,
+      modelRef: localBrain.modelRef || null,
+      apiKeySet: localBrain.apiKeySet === true,
       runtimeReady: false
     });
   }
   return {
-    authenticated: true,
+    authenticated,
     foundersPlot: {
-      playable: true,
+      playable: authenticated,
       mode: isTownhallRegistrationComplete(state) ? 'OFFICIAL_TOWN' : 'MANUAL_FOUNDER',
-      blockedReason: ''
+      blockedReason: authenticated ? '' : 'AUTH_REQUIRED'
     },
     brain: {
       configured: isTownhallBrainConfigured(state),
@@ -1195,11 +1203,13 @@ function buildTownHubAccessState(state = lastState) {
 
 function canOpenTownHubDistrict(district, state = lastState) {
   const safeDistrict = normalizeDistrict(district);
+  const access = buildTownHubAccessState(state);
+  if (!access.authenticated) return false;
   if (safeDistrict === 'founders-plot') return true;
   if (safeDistrict === 'house') return true;
   if (safeDistrict === 'townhall' || safeDistrict === 'brain') return true;
   if (AgentTownAccess && typeof AgentTownAccess.canOpenDistrict === 'function') {
-    return AgentTownAccess.canOpenDistrict(safeDistrict, buildTownHubAccessState(state), state || {});
+    return AgentTownAccess.canOpenDistrict(safeDistrict, access, state || {});
   }
   if (safeDistrict === 'sigil') {
     return isTownhallRegistrationComplete(state) && isTownhallBrainConfigured(state);

@@ -10,7 +10,7 @@ const {
 } = require('./helpers/founders_plot');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
-const OPENROUTER_MODEL = 'nvidia/nemotron-3-super-120b-a12b:free';
+const OPENROUTER_MODEL = 'anthropic/claude-sonnet-4-5';
 
 test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });

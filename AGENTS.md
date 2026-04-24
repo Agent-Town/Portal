@@ -339,6 +339,24 @@ When changing onboarding/gating:
 - verify Founders Plot is reachable immediately after authenticated entry;
 - verify Real Clover remains locked without Brain.
 
+### V1.4.4 cleanup acceptance rules
+
+The release-candidate cleanup preserves the play-first ladder and tightens the gates:
+
+1. Play Now
+2. Manual Founder Mode
+3. Connect Brain
+4. Real Clover Foreman
+5. Visit Town Hall / Make it official
+
+Manual Founder Mode requires no Brain and may not create AGENT-attributed world mutations.
+
+Real Clover Foreman requires a real connected Brain/runtime. Free, no-op, basic, or test Brain configs must not unlock production Real Clover by default.
+
+Authentication helpers must fail closed. Unknown auth state is unauthenticated unless the caller explicitly provides an authenticated state.
+
+When touching this path, update behavior tests for Start Gate play-first routing, unknown auth, no-Brain Foreman mutation denial, and free/test Brain gating.
+
 
 ---
 

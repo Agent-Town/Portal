@@ -129,6 +129,9 @@ async function bootstrapToHq2(frame) {
 
 async function seedForemanBrain(frame) {
   await frame.evaluate(async () => {
+    if (window.__foundersPlotTest && typeof window.__foundersPlotTest.setBrainHarnessMode === 'function') {
+      await window.__foundersPlotTest.setBrainHarnessMode({ allowTestBrainForRealClover: true });
+    }
     let currentBrain = null;
     if (window.__foundersPlotTest && typeof window.__foundersPlotTest.refreshBrainStatus === 'function') {
       currentBrain = await window.__foundersPlotTest.refreshBrainStatus();
@@ -144,6 +147,9 @@ async function seedForemanBrain(frame) {
         authMode: 'api-key',
         useProxy: false
       });
+    }
+    if (window.__foundersPlotTest && typeof window.__foundersPlotTest.setBrainHarnessMode === 'function') {
+      await window.__foundersPlotTest.setBrainHarnessMode({ allowTestBrainForRealClover: true });
     }
     const gatewayTestApi = window.__openclawLiteTest || window.parent?.__openclawLiteTest || null;
     if (needsLocalSeed && gatewayTestApi && typeof gatewayTestApi.setLlmConfig === 'function') {

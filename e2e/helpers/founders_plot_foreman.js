@@ -6,7 +6,7 @@ const {
   startForemanRuntime,
 } = require('./founders_plot');
 
-const OPENROUTER_MODEL = 'nvidia/nemotron-3-super-120b-a12b:free';
+const OPENROUTER_MODEL = 'anthropic/claude-sonnet-4-5';
 
 function ssePayload(chunks) {
   return chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join('') + 'data: [DONE]\n\n';

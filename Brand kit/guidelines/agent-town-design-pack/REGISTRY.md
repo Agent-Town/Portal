@@ -806,3 +806,45 @@ Must include:
 - prompt/provenance path;
 - approval state;
 - visual-delta test status.
+
+## V1.4.4 Onboarding Primitives
+
+### `play-first-start-gate`
+
+Routes an authenticated Privy/test user directly into Founders Plot play-first mode.
+
+Required states:
+
+- unauthenticated;
+- auth pending;
+- authenticated redirecting;
+- error/fallback.
+
+### `manual-founder-mode-badge`
+
+Explains that the user can play manually without Brain.
+
+Required copy:
+
+- no Brain required;
+- no AGENT mutations;
+- Connect Brain CTA when appropriate.
+
+### `brain-quick-connect-sheet`
+
+Connects a real Brain only after the player has entered the game.
+
+Required states:
+
+- none;
+- preview/test;
+- real ready;
+- blocked/invalid.
+
+### `real-clover-locked-callout`
+
+Friendly guard when Clover actions require Brain.
+
+Required error code:
+
+- `BRAIN_REQUIRED`

@@ -1055,3 +1055,11 @@ A new player entering after login should be able to answer:
 3. Can I start without configuring an AI Brain?
 4. What does Brain connection unlock?
 5. Where do I go later to make my town official?
+
+### Cleanup UX Gates
+
+Manual play may not be blocked by Brain, Town Hall, Sigil, Ceremony, or ERC-8004.
+
+Real Clover may be blocked by Brain/runtime readiness.
+
+Manual Founder Mode copy must not imply real AI autonomy. Preview/test Brain copy must not imply production Real Clover. Real Clover copy must make Brain connection and approved tools clear without provider jargon in the normal play surface.

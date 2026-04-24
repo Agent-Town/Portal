@@ -108,3 +108,12 @@ Clover should:
 1. return `HEARTBEAT_OK` or the relevant no-op code;
 2. avoid idle chatter;
 3. keep the UI calm.
+
+## First-Session Mode Ladder
+
+1. Enter Founders Plot through Play Now.
+2. Build manually in Manual Founder Mode.
+3. Let Clover guide the basics.
+4. When the first routine-help opportunity appears, offer Connect Brain.
+5. After Brain connection, Real Clover may perform approved tool actions.
+6. After HQ growth, invite the player to Town Hall to make the town identity official.

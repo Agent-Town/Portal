@@ -1430,6 +1430,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       const normalized = normalizeToolError(error);
       const status = normalized.code === 'FOREMAN_RUNTIME_REQUIRED'
         || normalized.code === 'STALE_RUNTIME'
+        || normalized.code === 'BRAIN_REQUIRED'
         || normalized.code === 'FOREMAN_WORKER_ORIGIN_REQUIRED'
         || normalized.code === 'FOREMAN_WORKER_RUNTIME_MISMATCH'
         ? 403

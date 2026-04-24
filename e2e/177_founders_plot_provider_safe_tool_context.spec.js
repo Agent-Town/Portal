@@ -45,11 +45,16 @@ test('Foreman provider request exposes provider-safe aliases instead of dotted t
 
   const requestBody = JSON.parse(requestRaw || '{}');
   const promptContent = Array.isArray(requestBody?.messages)
-    ? requestBody.messages.map((message) => String(message?.content || '')).join('\n')
+    ? requestBody.messages.map((message) => (
+        typeof message?.content === 'string'
+          ? message.content
+          : JSON.stringify(message?.content || '')
+      )).join('\n')
     : '';
+  const normalizedPromptContent = promptContent.replace(/\\"/g, '"');
 
-  expect(promptContent).toContain('founders_plot_foreman_select_candidate');
-  expect(promptContent).toContain('founders_plot_collect_outputs');
-  expect(promptContent).toContain('"canonicalName":"et.plot.collect_outputs"');
-  expect(promptContent).not.toContain('"name":"et.plot.collect_outputs"');
+  expect(normalizedPromptContent).toContain('founders_plot_foreman_select_candidate');
+  expect(normalizedPromptContent).toContain('founders_plot_collect_outputs');
+  expect(normalizedPromptContent).toContain('"canonicalName":"et.plot.collect_outputs"');
+  expect(normalizedPromptContent).not.toContain('"name":"et.plot.collect_outputs"');
 });
