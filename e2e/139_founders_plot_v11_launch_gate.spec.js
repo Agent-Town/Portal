@@ -20,7 +20,7 @@ test('fresh Founders Plot shows one obvious first action without technical game-
   await expect(frame.getByTestId('founders-quest-cta')).toBeVisible({ timeout: 5000 });
   await expect(frame.getByTestId('founders-quest-cta')).toContainText(/lumber|build|place/i);
 
-  const mainText = await frame.locator('body').textContent();
+  const mainText = await frame.locator('body').innerText();
   expect(String(mainText || '')).not.toMatch(/\b(provider|oauth|debug|runtime|wallet|blockchain)\b/i);
 
   const state = await getPlotState(frame);

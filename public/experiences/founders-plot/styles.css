@@ -307,6 +307,11 @@ html.founders-plot-embed body.founders-plot-page {
   background: rgba(95, 141, 142, 0.12);
 }
 
+.foundersTrayButton--official {
+  border-color: rgba(196, 136, 58, 0.36);
+  background: rgba(255, 228, 160, 0.34);
+}
+
 .foundersTrayIcon {
   width: 16px;
   height: 16px;
@@ -323,6 +328,10 @@ html.founders-plot-embed body.founders-plot-page {
 .foundersTrayIcon--reward,
 .foundersTrayIcon--sun {
   background: linear-gradient(180deg, var(--fp-brass), var(--fp-ochre));
+}
+
+.foundersTrayIcon--official {
+  background: linear-gradient(180deg, var(--fp-ochre), var(--fp-brass));
 }
 
 .foundersTrayIcon--approval {
@@ -1117,6 +1126,36 @@ html.founders-plot-embed body.founders-plot-page {
 
 .foundersSubpanel:empty {
   display: none;
+}
+
+.foundersBrainQuickConnect {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(196, 136, 58, 0.28);
+  background:
+    radial-gradient(circle at 14% 0%, rgba(255, 228, 160, 0.22), transparent 34%),
+    rgba(255, 248, 232, 0.62);
+}
+
+.foundersBrainQuickFields {
+  display: grid;
+  grid-template-columns: minmax(72px, auto) minmax(0, 1fr);
+  gap: 8px 10px;
+  align-items: center;
+}
+
+.foundersBrainQuickFields input,
+.foundersBrainQuickFields select {
+  width: 100%;
+  min-height: 36px;
+  border-radius: 12px;
+  border: 1px solid rgba(46, 27, 14, 0.18);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--fp-ink);
+  padding: 7px 10px;
+  font: inherit;
 }
 
 .foundersDataRow {

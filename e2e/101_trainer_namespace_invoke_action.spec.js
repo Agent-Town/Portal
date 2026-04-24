@@ -39,11 +39,11 @@ test('trainer.invoke_action validates inputs and executes action requests with p
   await openTrainerFromSidebar(page);
   await openTrainerToolsTab(page);
 
-  const missing = await invokeTool(page, 'trainer.invoke_action', {});
+  const missing = await invokeTool(page, 'trainer_invoke_action', {});
   expect(missing?.ok).toBe(false);
   expect(String(missing?.code || '')).toBe('TRAINER_PARAM_INVALID');
 
-  const unknown = await invokeTool(page, 'trainer.invoke_action', { actionId: 'does.not.exist', params: {} });
+  const unknown = await invokeTool(page, 'trainer_invoke_action', { actionId: 'does.not.exist', params: {} });
   expect(unknown?.ok).toBe(false);
   expect(String(unknown?.code || '')).toBe('TRAINER_NOT_FOUND');
 
@@ -54,7 +54,7 @@ test('trainer.invoke_action validates inputs and executes action requests with p
   });
   expect(teamCode).toMatch(/^TEAM-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
 
-  const success = await invokeTool(page, 'trainer.invoke_action', {
+  const success = await invokeTool(page, 'trainer_invoke_action', {
     actionId: 'canvas.image',
     params: { teamCode },
   });

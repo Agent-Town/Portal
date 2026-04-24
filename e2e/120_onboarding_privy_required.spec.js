@@ -138,17 +138,28 @@ test('stepper shows brain as active with townhall complete', async ({ page }) =>
 test('registration completion swaps the open townhall modal into brain config', async ({ page }) => {
   await installMockSolanaWallet(page);
   await enterThenActivateOnboarding(page, 'townhall_profile');
-
-  await page.evaluate(async () => {
-    const state = await (await fetch('/api/state', { credentials: 'include' })).json();
-    state.onboarding = {
-      ...(state.onboarding || {}),
+  await page.unroute('**/api/state');
+  await page.route('**/api/state', async (route) => {
+    let json;
+    try {
+      const response = await route.fetch();
+      json = await response.json();
+    } catch {
+      json = { ok: true };
+    }
+    json.onboarding = {
+      ...(json.onboarding || {}),
       required: true,
       registrationComplete: true,
       step: 'brain'
     };
-    if (!state.lite) state.lite = {};
-    state.lite.llmConfigured = false;
+    if (!json.lite) json.lite = {};
+    json.lite.llmConfigured = false;
+    await route.fulfill({ body: JSON.stringify(json) });
+  });
+
+  await page.evaluate(async () => {
+    const state = await (await fetch('/api/state', { credentials: 'include' })).json();
     if (typeof window.updateUI === 'function') await window.updateUI(state);
   });
 
@@ -175,7 +186,7 @@ test('sigil grid: 40px icons, explainer, picks, stepper at step 3', async ({ pag
   await installMockSolanaWallet(page);
   await enterThenActivateOnboarding(page, 'sigil', { llmConfigured: true });
 
-  await expect(page.getByTestId('worker-reconnect-btn')).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('#agentSidebar')).toBeVisible({ timeout: 5000 });
   const sigilIcons = page.locator('.sigilIcon');
   await expect(sigilIcons.first()).toBeVisible({ timeout: 5000 });
   expect(await sigilIcons.count()).toBeGreaterThanOrEqual(4);

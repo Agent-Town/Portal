@@ -653,6 +653,13 @@ h3 {
   height: 35%;
 }
 
+.townDistrict-founders {
+  left: 29%;
+  top: 56%;
+  width: 20%;
+  height: 18%;
+}
+
 .townDistrict-wagons {
   left: 25%;
   right: 25%;
@@ -2136,6 +2143,13 @@ footer::before {
     right: 6%;
     width: 44%;
     height: 22%;
+  }
+
+  .townDistrict-founders {
+    left: 6%;
+    top: 56%;
+    width: 42%;
+    height: 18%;
   }
 
   .townDistrict-wagons {
@@ -4257,6 +4271,10 @@ body.town-hub-page .townDistrict-townhall {
 
 body.town-hub-page .townDistrict-saloon {
   --district-icon-image: url("/assets/platform/saloon/saloon-future-games-hub-v1_4_3.webp");
+}
+
+body.town-hub-page .townDistrict-founders {
+  --district-icon-image: url("/experiences/founders-plot/assets/scenes/founders-plot-desktop.webp");
 }
 
 body.town-hub-page .townDistrict-wagons {

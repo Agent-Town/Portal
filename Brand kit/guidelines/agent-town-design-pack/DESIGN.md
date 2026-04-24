@@ -181,6 +181,78 @@ Founders Plot uses layered plates:
 
 Background plates must not contain stateful objects such as HQ, production buildings, Contract Board, Public Square, Foreman Hut, Clover, timer rings, or objective markers.
 
+## V1.4.4 Onboarding Mode Visual Language
+
+### Manual Founder Mode badge
+
+Use a quiet helper badge, not an error badge.
+
+Recommended text:
+
+```text
+Manual Founder Mode
+Clover can guide the basics.
+```
+
+Visual treatment:
+
+- low-emphasis parchment/charm styling;
+- not red/error;
+- positioned near Clover/Foreman controls;
+- never above the primary objective.
+
+### Brain Quick Connect CTA
+
+Use one warm primary action:
+
+```text
+Connect a Brain
+```
+
+Subcopy:
+
+```text
+Let Clover reason about your town and help with approved actions.
+```
+
+Visual treatment:
+
+- contextual sheet or compact card;
+- no debug tabs;
+- no provider wall on first view;
+- advanced settings link may exist but is secondary.
+
+### Town Hall invite
+
+Use civic/progression styling, not setup-error styling.
+
+Recommended text:
+
+```text
+Make it official
+```
+
+Subcopy:
+
+```text
+Your settlement is growing. Visit Town Hall to set your public role.
+```
+
+### Forbidden normal-gameplay visuals
+
+Do not present missing Brain or missing Town Hall as failure states during manual play.
+
+Forbidden normal-gameplay copy:
+
+- `LLM not configured`
+- `runtime missing`
+- `provider error`
+- `NO_SOLANA_WALLET`
+- raw onboarding enum names
+- raw localization keys
+
+Raw diagnostics belong only in debug/dev surfaces.
+
 ### Clover grounding
 
 Clover must read as physically present:

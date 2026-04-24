@@ -1,6 +1,7 @@
 const ExperienceProfiles = window.AgentTownExperienceProfiles || null;
 const ExperienceRuntime = window.AgentTownExperienceRuntime || null;
 const I18n = window.AgentTownI18n || null;
+const PLAY_FIRST_DESTINATION = '/app?district=founders-plot&entry=play-first';
 
 let cachedPrivyConfig = null;
 let autoRedirecting = false;
@@ -392,6 +393,21 @@ function appPathFromConfig(cfg) {
   return cfg && typeof cfg.appPath === 'string' && cfg.appPath ? cfg.appPath : '/app';
 }
 
+function playFirstAppPathFromConfig(cfg) {
+  const basePath = appPathFromConfig(cfg);
+  let parsed;
+  try {
+    parsed = new URL(basePath, window.location.origin);
+  } catch {
+    return PLAY_FIRST_DESTINATION;
+  }
+  if (parsed.origin !== window.location.origin) return PLAY_FIRST_DESTINATION;
+  if (parsed.pathname !== '/app') return basePath;
+  parsed.searchParams.set('district', 'founders-plot');
+  parsed.searchParams.set('entry', 'play-first');
+  return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+}
+
 async function maybeAutoSkipStart() {
   const pathname = window.location.pathname;
   if (pathname !== '/' && pathname !== '/start') return;
@@ -401,7 +417,7 @@ async function maybeAutoSkipStart() {
   if (!bootstrap?.hasExplicitChoice) return;
 
   const cfg = await getCachedPrivyConfig();
-  const appPath = appPathFromConfig(cfg);
+  const appPath = playFirstAppPathFromConfig(cfg);
 
   if (!cfg || cfg.enabled !== true) {
     if (pathname === '/') {
@@ -446,7 +462,7 @@ async function handleEnter() {
   const loginUi = createLoginUi();
   try {
     const cfg = await getCachedPrivyConfig();
-    const appPath = appPathFromConfig(cfg);
+    const appPath = playFirstAppPathFromConfig(cfg);
 
     if (!cfg || cfg.enabled !== true) {
       window.location.assign(appPath);

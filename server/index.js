@@ -9480,7 +9480,8 @@ function atlasModalRedirectPath() {
 function foundersPlotModalRedirectPath() {
   const params = new URLSearchParams();
   params.set('district', 'founders-plot');
-  return `/?${params.toString()}`;
+  params.set('entry', 'play-first');
+  return `/app?${params.toString()}`;
 }
 
 app.get('/openclaw-lite/manifest.json', (_req, res) => {

@@ -45,6 +45,13 @@
   let localForemanRuntimeId = '';
   let lastActionTargetObjectId = '';
   let lastRenderedHqLevel = 0;
+  let sharedBrainStatus = {
+    loaded: false,
+    configured: false,
+    provider: '',
+    model: '',
+    modelRef: ''
+  };
   let workerSchedulerStatus = {
     active: false,
     taskKind: 'COLLECT_READY_OUTPUTS',
@@ -95,6 +102,77 @@
       llmLibraryPromise = import('/openclaw-lite/llm-config-library.js');
     }
     return llmLibraryPromise;
+  }
+
+  function defaultBrainModel(provider = '') {
+    const normalized = String(provider || '').trim().toLowerCase();
+    if (normalized === 'openrouter') return 'nvidia/nemotron-3-super-120b-a12b:free';
+    if (normalized === 'ollama') return 'llama3.2';
+    return 'gpt-4o-mini';
+  }
+
+  function normalizeSharedBrainStatus(config = null) {
+    const provider = String(config?.provider || '').trim();
+    const model = String(config?.model || '').trim();
+    const modelRef = String(config?.modelRef || (provider && model ? `${provider}/${model}` : '')).trim();
+    return {
+      loaded: true,
+      configured: config?.configured === true && !!provider && !!model && !!String(config?.apiKey || config?.credential || '').trim(),
+      provider,
+      model,
+      modelRef
+    };
+  }
+
+  async function refreshSharedBrainStatus({ render = false } = {}) {
+    const lib = await loadLiteLlmLibrary().catch(() => null);
+    if (!lib || typeof lib.loadLlmConfig !== 'function') {
+      sharedBrainStatus = { loaded: true, configured: false, provider: '', model: '', modelRef: '' };
+      return sharedBrainStatus;
+    }
+    sharedBrainStatus = normalizeSharedBrainStatus(await lib.loadLlmConfig().catch(() => null));
+    if (render) renderAll();
+    return sharedBrainStatus;
+  }
+
+  function isBrainConfiguredForForeman() {
+    return sharedBrainStatus.configured === true;
+  }
+
+  function buildFoundersAccessState(state = stateData()) {
+    const runtimeLocal = localForemanRuntimeStatus(state?.foreman?.runtime || {});
+    const builder = window.AgentTownAccess?.buildAccessState;
+    if (typeof builder === 'function') {
+      return builder({
+        authenticated: true,
+        state: state || {},
+        brainConfigured: isBrainConfiguredForForeman(),
+        runtimeReady: runtimeLocal.actionable === true,
+        provider: sharedBrainStatus.provider || null,
+        model: sharedBrainStatus.model || null
+      });
+    }
+    return {
+      foundersPlot: {
+        playable: true,
+        mode: isBrainConfiguredForForeman() && runtimeLocal.actionable ? 'REAL_CLOVER' : 'MANUAL_FOUNDER'
+      },
+      brain: {
+        configured: isBrainConfiguredForForeman(),
+        runtimeReady: runtimeLocal.actionable === true,
+        requiredForRealForeman: true
+      },
+      clover: {
+        guideAvailable: true,
+        realForemanAvailable: isBrainConfiguredForForeman() && runtimeLocal.actionable === true,
+        schedulerEnabled: isBrainConfiguredForForeman() && runtimeLocal.actionable === true,
+        disabledReason: isBrainConfiguredForForeman() ? 'RUNTIME_NOT_READY' : 'BRAIN_REQUIRED'
+      },
+      townHall: {
+        complete: false,
+        recommended: Number(state?.plot?.hqLevel || 0) >= 2
+      }
+    };
   }
 
   async function loadAssetManifest() {
@@ -316,6 +394,106 @@
     return String(order || '').toUpperCase() === 'BOLD_FOUNDER'
       ? 'Push growth when the move is still safe.'
       : 'Protect supplies and ask before spending.';
+  }
+
+  function brainModeLabel(access = buildFoundersAccessState()) {
+    const mode = String(access?.foundersPlot?.mode || '').toUpperCase();
+    if (mode === 'OFFICIAL_TOWN') return 'Official Founder';
+    if (mode === 'REAL_CLOVER') return 'Real Clover Foreman';
+    return 'Manual Founder Mode';
+  }
+
+  function brainModeCopy(access = buildFoundersAccessState()) {
+    const mode = String(access?.foundersPlot?.mode || '').toUpperCase();
+    if (mode === 'OFFICIAL_TOWN') {
+      return 'Your town identity is set. Clover can use your configured Brain when enabled.';
+    }
+    if (mode === 'REAL_CLOVER') {
+      return 'Clover is using your Brain and can help with approved actions.';
+    }
+    return 'Clover can guide the basics. Connect a Brain to unlock real Foreman help.';
+  }
+
+  function townHallInviteCopy(state = stateData()) {
+    const access = buildFoundersAccessState(state);
+    if (access?.townHall?.complete === true || access?.townHall?.recommended !== true) return '';
+    return 'Your settlement is growing. Visit Town Hall to set your public role.';
+  }
+
+  function renderBrainQuickConnectCard() {
+    const provider = sharedBrainStatus.provider || 'openrouter';
+    const model = sharedBrainStatus.model || defaultBrainModel(provider);
+    return `
+      <div class="foundersBrainQuickConnect" data-testid="brain-quick-connect-sheet">
+        <div class="foundersLabel">Brain Quick Connect</div>
+        <strong>Connect a Brain</strong>
+        <div class="small">Let Clover reason about your town and help with approved actions.</div>
+        <div class="foundersBrainQuickFields">
+          <label class="small" for="foundersBrainProvider">Provider</label>
+          <select id="foundersBrainProvider" data-testid="brain-quick-provider">
+            <option value="openrouter" ${provider === 'openrouter' ? 'selected' : ''}>OpenRouter</option>
+            <option value="openai" ${provider === 'openai' ? 'selected' : ''}>OpenAI</option>
+            <option value="ollama" ${provider === 'ollama' ? 'selected' : ''}>Ollama</option>
+          </select>
+          <label class="small" for="foundersBrainModel">Model</label>
+          <input id="foundersBrainModel" data-testid="brain-quick-model" type="text" value="${htmlEscape(model)}" />
+          <label class="small" for="foundersBrainKey">Local key</label>
+          <input id="foundersBrainKey" data-testid="brain-quick-key" type="password" autocomplete="off" placeholder="Stored only in this browser" />
+        </div>
+        <div class="foundersInlineButtons">
+          <button class="btn primary small" type="button" id="foundersBrainSaveBtn" data-testid="brain-quick-save">Save Brain</button>
+          <a class="btn small" href="/app?district=brain&entry=brain-settings" target="_top" rel="noopener">Full settings</a>
+        </div>
+        <div class="small" id="foundersBrainQuickStatus" data-testid="brain-quick-status"></div>
+      </div>
+    `;
+  }
+
+  function bindBrainQuickConnectCard(root = document) {
+    const providerSelect = root.querySelector('#foundersBrainProvider');
+    const modelInput = root.querySelector('#foundersBrainModel');
+    const keyInput = root.querySelector('#foundersBrainKey');
+    const saveBtn = root.querySelector('#foundersBrainSaveBtn');
+    const status = root.querySelector('#foundersBrainQuickStatus');
+    if (providerSelect && modelInput && providerSelect.dataset.bound !== '1') {
+      providerSelect.dataset.bound = '1';
+      providerSelect.addEventListener('change', () => {
+        const nextProvider = String(providerSelect.value || '').trim();
+        if (!String(modelInput.value || '').trim()) {
+          modelInput.value = defaultBrainModel(nextProvider);
+        }
+      });
+    }
+    if (!saveBtn || saveBtn.dataset.bound === '1') return;
+    saveBtn.dataset.bound = '1';
+    saveBtn.addEventListener('click', async () => {
+      const provider = String(providerSelect?.value || '').trim();
+      const model = String(modelInput?.value || '').trim() || defaultBrainModel(provider);
+      const apiKey = String(keyInput?.value || '').trim();
+      if (!provider || !model || !apiKey) {
+        if (status) status.textContent = 'Add a provider, model, and local key to connect a Brain.';
+        return;
+      }
+      saveBtn.disabled = true;
+      if (status) status.textContent = 'Saving Brain locally...';
+      try {
+        const lib = await loadLiteLlmLibrary();
+        if (!lib || typeof lib.saveLlmConfig !== 'function') throw new Error('BRAIN_CONFIG_UNAVAILABLE');
+        await lib.saveLlmConfig({ provider, model, apiKey, authMode: 'api-key' });
+        await refreshSharedBrainStatus({ render: false });
+        if (status) status.textContent = 'Brain connected. Clover can now use real Foreman help when started.';
+        setStatusLine('Brain connected. Start Clover when you want real Foreman help.');
+        await stopWorkerScheduler('BRAIN_CONFIG_CHANGED').catch(() => null);
+        foremanRuntimeToken = '';
+        localForemanRuntimeId = '';
+        await loadState().catch(() => null);
+        renderAll();
+      } catch (error) {
+        if (status) status.textContent = `Could not save Brain: ${String(error?.message || 'UNKNOWN')}`;
+      } finally {
+        saveBtn.disabled = false;
+      }
+    });
   }
 
   function prettyContractStatus(status) {
@@ -690,6 +868,22 @@
     const drawerTray = document.getElementById('drawerTray');
     if (drawerTray && typeof renderApi.renderDrawerTray === 'function') {
       renderApi.renderDrawerTray(drawerTray, scene);
+      const townHallInvite = townHallInviteCopy(state);
+      if (townHallInvite) {
+        const inviteButton = document.createElement('button');
+        inviteButton.className = 'foundersTrayButton foundersTrayButton--official';
+        inviteButton.type = 'button';
+        inviteButton.setAttribute('data-testid', 'townhall-official-invite');
+        inviteButton.innerHTML = `
+          <span class="foundersTrayIcon foundersTrayIcon--official" aria-hidden="true"></span>
+          <span class="foundersTrayLabel">Make it official</span>
+        `;
+        inviteButton.title = townHallInvite;
+        inviteButton.addEventListener('click', () => {
+          window.top.location.href = '/app?district=townhall&entry=make-official';
+        });
+        drawerTray.appendChild(inviteButton);
+      }
       drawerTray.querySelectorAll('[data-drawer-trigger]').forEach((button) => {
         button.addEventListener('click', () => {
           const nextDrawer = button.getAttribute('data-drawer-trigger') || '';
@@ -1242,19 +1436,27 @@
   function renderForeman(state) {
     const runtime = state?.foreman?.runtime || {};
     const runtimeLocal = localForemanRuntimeStatus(runtime);
-    const status = runtimeLocal.needsRestart
+    const access = buildFoundersAccessState(state);
+    const brainConfigured = isBrainConfiguredForForeman();
+    const status = !brainConfigured
+      ? { label: brainModeLabel(access), tone: '' }
+      : runtimeLocal.needsRestart
       ? { label: 'Needs a fresh start', tone: 'warn' }
       : foremanStatusMeta(runtime.status);
     const badge = document.getElementById('foremanStatusBadge');
     if (badge) {
       badge.textContent = status.label;
+      badge.setAttribute('data-mode', String(access?.foundersPlot?.mode || 'MANUAL_FOUNDER'));
       badge.className = `foundersBadge ${status.tone === 'warn' ? 'is-warn' : ''}`;
     }
 
-    const recommendation = state?.foreman?.recommendation || 'Clover is watching. No safe action inside your standing order.';
+    const recommendation = !brainConfigured
+      ? brainModeCopy(access)
+      : state?.foreman?.recommendation || 'Clover is watching. No safe action inside your standing order.';
     setText('foremanRecommendation', recommendation);
 
     const toolsLine = (() => {
+      if (!brainConfigured) return 'Manual play stays open. Connect a Brain when you want Clover to act as your Foreman.';
       if (!runtime.runtimeId) return 'Start Clover when you are ready for in-session help.';
       if (runtimeLocal.needsRestart) return 'Restart Clover before any routine can run in this tab.';
       if (runtime.status === 'PAUSED') return 'Automation is paused until you wake Clover again.';
@@ -1270,8 +1472,14 @@
     const runNowBtn = document.getElementById('foremanRunNowBtn');
     if (startBtn) {
       startBtn.disabled = pendingAction;
-      startBtn.textContent = runtime.runtimeId ? 'Restart Clover' : 'Start Clover';
+      startBtn.textContent = brainConfigured ? (runtime.runtimeId ? 'Restart Clover' : 'Start Clover') : 'Connect a Brain';
       startBtn.onclick = async () => {
+        if (!brainConfigured) {
+          const card = document.querySelector('[data-testid="brain-quick-connect-sheet"]');
+          if (card && typeof card.scrollIntoView === 'function') card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          setStatusLine('Connect a Brain to unlock real Foreman help.');
+          return;
+        }
         try {
           pendingAction = true;
           setStatusLine('Starting Clover…');
@@ -1279,7 +1487,7 @@
           setStatusLine(response?.ok ? 'Clover is ready to watch the town.' : 'Clover could not start. You can still play by hand.');
           renderAll();
         } catch (error) {
-          setStatusLine(`Clover could not start. You can still play by hand. (${error.message})`);
+          setStatusLine(error?.playerMessage || 'Clover could not start. You can still play by hand.');
         } finally {
           pendingAction = false;
           renderAll();
@@ -1287,7 +1495,7 @@
       };
     }
     if (pauseBtn) {
-      pauseBtn.disabled = pendingAction || !runtimeLocal.actionable || String(runtime.status || '').toUpperCase() === 'PAUSED';
+      pauseBtn.disabled = pendingAction || !brainConfigured || !runtimeLocal.actionable || String(runtime.status || '').toUpperCase() === 'PAUSED';
       pauseBtn.onclick = async () => {
         try {
           pendingAction = true;
@@ -1302,8 +1510,12 @@
       };
     }
     if (runNowBtn) {
-      runNowBtn.disabled = pendingAction || !runtimeLocal.actionable || ['PAUSED', 'STALE', 'ERROR', 'NOT_STARTED'].includes(String(runtime.status || '').toUpperCase());
+      runNowBtn.disabled = pendingAction || !brainConfigured || !runtimeLocal.actionable || ['PAUSED', 'STALE', 'ERROR', 'NOT_STARTED'].includes(String(runtime.status || '').toUpperCase());
       runNowBtn.onclick = async () => {
+        if (!brainConfigured) {
+          setStatusLine('Connect a Brain to let Clover act as your Foreman.');
+          return;
+        }
         try {
           pendingAction = true;
           setStatusLine('Clover is taking a look…');
@@ -1314,7 +1526,7 @@
             setStatusLine('Clover watched but did not choose an action.');
           }
         } catch (error) {
-          setStatusLine(`Clover watched but did not choose an action. (${error.message})`);
+          setStatusLine(error?.playerMessage || 'Clover watched but did not choose an action.');
         } finally {
           pendingAction = false;
           renderAll();
@@ -1356,7 +1568,9 @@
     const planNode = document.getElementById('planCard');
     const planCard = state?.foreman?.planCard || null;
     if (planNode) {
-      if (!planCard) {
+      if (!brainConfigured) {
+        planNode.innerHTML = renderBrainQuickConnectCard();
+      } else if (!planCard) {
         planNode.innerHTML = `
           <div class="foundersPlanBody">
             <div class="foundersLabel">Foreman plan</div>
@@ -1385,7 +1599,9 @@
     const schedulerNode = document.getElementById('schedulerCard');
     if (schedulerNode) {
       const task = state?.foreman?.scheduler?.collectReadyOutputs || {};
-      const schedulerLabel = task.paused === true
+      const schedulerLabel = !brainConfigured
+        ? 'Connect a Brain to unlock Foreman routines.'
+        : task.paused === true
         ? 'Clover will ask next time.'
         : task.enabled && !runtimeLocal.actionable
           ? 'Restart Clover to resume this routine.'
@@ -1402,7 +1618,7 @@
           <strong>${htmlEscape(schedulerLabel)}</strong>
           <div class="small">This helps only while you keep Founders Plot open.</div>
           <div class="foundersSchedulerRow">
-            <button class="btn small" type="button" id="schedulerCollectToggle" data-testid="scheduler-collect-toggle" ${pendingAction || !runtimeLocal.actionable ? 'disabled' : ''}>
+            <button class="btn small" type="button" id="schedulerCollectToggle" data-testid="scheduler-collect-toggle" ${pendingAction || !brainConfigured || !runtimeLocal.actionable ? 'disabled' : ''}>
               ${task.enabled && task.paused !== true ? 'Ask me next time' : 'Enable collect ready outputs'}
             </button>
             <span class="small">${task.runCount ? `${task.runCount} successful run${task.runCount === 1 ? '' : 's'}` : 'No automatic collection yet.'}</span>
@@ -1412,6 +1628,10 @@
       const toggleBtn = document.getElementById('schedulerCollectToggle');
       if (toggleBtn) {
         toggleBtn.onclick = async () => {
+          if (!brainConfigured) {
+            setStatusLine('Connect a Brain to let Clover run Foreman routines.');
+            return;
+          }
           try {
             if (task.enabled && task.paused !== true) {
               await applyReceiptCorrection('ASK_ME_NEXT_TIME');
@@ -1421,7 +1641,7 @@
               setStatusLine('Collect ready outputs is enabled.');
             }
           } catch (error) {
-            setStatusLine(`Could not update Clover’s routine: ${error.message}.`);
+            setStatusLine(error?.playerMessage || 'Could not update Clover’s routine.');
           } finally {
             renderAll();
           }
@@ -1483,6 +1703,7 @@
         }
       }
     }
+    bindBrainQuickConnectCard(document);
   }
 
   function permissionConfig() {
@@ -1894,9 +2115,20 @@
   }
 
   async function startForemanRuntime() {
+    await refreshSharedBrainStatus({ render: false }).catch(() => null);
+    if (!isBrainConfiguredForForeman()) {
+      const error = new Error('BRAIN_REQUIRED');
+      error.playerMessage = 'Connect a Brain to let Clover act as your Foreman.';
+      throw error;
+    }
     setLastActionTarget('FOREMAN_HUT');
     const gateway = await initGateway();
-    await syncSharedLlmConfigToGateway(gateway).catch(() => null);
+    const syncedBrain = await syncSharedLlmConfigToGateway(gateway).catch(() => null);
+    if (!syncedBrain) {
+      const error = new Error('BRAIN_REQUIRED');
+      error.playerMessage = 'Connect a Brain to let Clover act as your Foreman.';
+      throw error;
+    }
     if (gateway && typeof gateway.foundersPlotSchedulerStop === 'function') {
       await gateway.foundersPlotSchedulerStop({ reason: 'RUNTIME_RESTART' }).catch(() => null);
     }
@@ -1922,6 +2154,7 @@
     const payload = await api('/api/founders-plot/foreman/session/start', {
       method: 'POST',
       body: JSON.stringify({
+        brainReady: true,
         pack: {
           skillLoaded,
           heartbeatLoaded,
@@ -1965,6 +2198,11 @@
   }
 
   async function enableCollectReadyOutputs() {
+    if (!isBrainConfiguredForForeman()) {
+      throw Object.assign(new Error('BRAIN_REQUIRED'), {
+        playerMessage: 'Connect a Brain to let Clover run Foreman routines.'
+      });
+    }
     setLastActionTarget('FOREMAN_HUT');
     const response = await api('/api/founders-plot/tool/et.foreman.scheduler.enable_collect_ready_outputs', {
       method: 'POST',
@@ -1992,6 +2230,18 @@
   }
 
   async function runForemanTick() {
+    if (!isBrainConfiguredForForeman()) {
+      return {
+        ok: false,
+        error: {
+          code: 'BRAIN_REQUIRED',
+          message: 'Connect a Brain to let Clover act as your Foreman.',
+          retryable: false
+        },
+        result: { mutationApplied: false },
+        receipt: currentState?.state?.foreman?.receipt || null
+      };
+    }
     const runtimeLocal = localForemanRuntimeStatus(currentState?.state?.foreman?.runtime || {});
     if (!runtimeLocal.actionable) {
       return {
@@ -2072,7 +2322,8 @@
     const serverState = state || stateData();
     const runtimeLocal = localForemanRuntimeStatus(serverState?.foreman?.runtime || {});
     const task = serverState?.foreman?.scheduler?.collectReadyOutputs || {};
-    const shouldCheckWorker = runtimeLocal.hasServerRuntime || task.enabled === true || !!foremanRuntimeToken;
+    const brainConfigured = isBrainConfiguredForForeman();
+    const shouldCheckWorker = brainConfigured && (runtimeLocal.hasServerRuntime || task.enabled === true || !!foremanRuntimeToken);
     if (!shouldCheckWorker) {
       workerSchedulerStatus = normalizeWorkerSchedulerStatus();
       return workerSchedulerStatus;
@@ -2091,7 +2342,7 @@
       lastStatus: 'ERROR',
       lastErrorCode: String(error?.message || 'FOREMAN_WORKER_UNAVAILABLE')
     }));
-    const shouldBeActive = runtimeLocal.actionable && task.enabled === true && task.paused !== true;
+    const shouldBeActive = brainConfigured && runtimeLocal.actionable && task.enabled === true && task.paused !== true;
     if (shouldBeActive && nextStatus?.active !== true) {
       nextStatus = await gateway.foundersPlotSchedulerStart({
         token: foremanRuntimeToken,
@@ -2157,6 +2408,13 @@
     loadState,
     getState: () => currentState,
     getScene: () => currentScene,
+    getBrainStatus: () => ({ ...sharedBrainStatus }),
+    refreshBrainStatus: () => refreshSharedBrainStatus({ render: true }),
+    saveBrainConfigForTest: async (config = {}) => {
+      const lib = await loadLiteLlmLibrary();
+      await lib.saveLlmConfig(config || {});
+      return await refreshSharedBrainStatus({ render: true });
+    },
     getLocalForemanRuntimeStatus: () => localForemanRuntimeStatus(currentState?.state?.foreman?.runtime || {}),
     getWorkerSchedulerStatus: () => ({ ...workerSchedulerStatus }),
     getActiveDrawer: () => activeDrawer,
@@ -2191,6 +2449,7 @@
   applyEmbedMode();
   bindUi();
   window.addEventListener('resize', syncViewportScenePolicy, { passive: true });
+  refreshSharedBrainStatus({ render: true }).catch(() => {});
   loadAssetManifest().then(() => {
     renderAll();
   }).catch(() => {});

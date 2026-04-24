@@ -10,6 +10,41 @@ async function openDistrict(page, district) {
   await expect(page.locator('#districtModalBackdrop')).toBeVisible();
 }
 
+async function prepareSigilVisualGate(page) {
+  await page.route('**/api/state', async (route) => {
+    let json;
+    try {
+      const response = await route.fetch();
+      json = await response.json();
+    } catch {
+      json = { ok: true };
+    }
+    json.onboarding = {
+      ...(json.onboarding || {}),
+      required: true,
+      registrationComplete: true,
+      step: 'sigil'
+    };
+    await route.fulfill({ body: JSON.stringify(json) });
+  });
+  await page.evaluate(async () => {
+    const lib = await import('/openclaw-lite/llm-config-library.js');
+    await lib.saveLlmConfig({
+      provider: 'test-local',
+      model: 'deterministic',
+      apiKey: 'test-local-key',
+      authMode: 'api-key',
+      useProxy: false
+    });
+  });
+  await page.reload();
+  await page.waitForFunction(() => typeof window.showDistrict === 'function');
+  await page.evaluate(async () => {
+    const state = await (await fetch('/api/state', { credentials: 'include' })).json();
+    if (typeof window.updateUI === 'function') await window.updateUI(state);
+  });
+}
+
 test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
@@ -60,6 +95,7 @@ test('secondary platform surfaces render the V1.4.3 asset pack', async ({ page }
     maxDiffPixelRatio: 0.04
   });
 
+  await prepareSigilVisualGate(page);
   await openDistrict(page, 'sigil');
   await expect(page.getByTestId('sigil-platform-illustration')).toBeVisible();
   await expect(page.locator('#districtModalBackdrop .districtModal').first()).toHaveScreenshot('agent-town-v1-4-3-sigil-modal-1280.png', {

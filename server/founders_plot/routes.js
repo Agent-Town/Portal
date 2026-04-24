@@ -250,6 +250,9 @@ function normalizeToolError(error) {
     if (code === 'FOREMAN_WORKER_RUNTIME_MISMATCH') {
       return 'Foreman mutations must use the current Clover runtime.';
     }
+    if (code === 'BRAIN_REQUIRED') {
+      return 'Connect a Brain to let Clover act as your Foreman.';
+    }
     return code;
   })();
   return {
@@ -409,6 +412,11 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       runtime.status = 'STALE';
       savePlotGraph(state);
       const error = new Error('STALE_RUNTIME');
+      error.details = { runtimeId: runtime.runtimeId, status: runtime.status };
+      throw error;
+    }
+    if (runtime.brainReady !== true) {
+      const error = new Error('BRAIN_REQUIRED');
       error.details = { runtimeId: runtime.runtimeId, status: runtime.status };
       throw error;
     }
@@ -1020,10 +1028,16 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
     try {
       const { state, nowMs } = withState(req, res);
       const raw = req.body && typeof req.body === 'object' ? req.body : {};
+      if (raw.brainReady !== true) {
+        const error = new Error('BRAIN_REQUIRED');
+        error.details = { reason: 'BRAIN_NOT_READY' };
+        throw error;
+      }
       const runtime = startForemanSession(state, {
         runtimeId: String(raw.runtimeId || '').trim(),
         nowMs,
-        pack: normalizeForemanPack(raw?.pack || {})
+        pack: normalizeForemanPack(raw?.pack || {}),
+        brainReady: raw.brainReady === true
       });
       state.plot.updatedAt = nowMs;
       persistStateAndEvents(state, [
@@ -1045,7 +1059,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       });
     } catch (error) {
       const normalized = normalizeToolError(error);
-      res.status(500).json({ ok: false, error: normalized });
+      res.status(normalized.code === 'BRAIN_REQUIRED' ? 403 : 500).json({ ok: false, error: normalized });
     }
   });
 

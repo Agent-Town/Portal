@@ -51,5 +51,5 @@ test('start page skips OTP modal when Privy session already exists', async ({ pa
   });
 
   await page.goto('/start');
-  await expect(page).toHaveURL(/\/app$/, { timeout: 8000 });
+  await expect(page).toHaveURL(/\/app\?district=founders-plot&entry=play-first$/, { timeout: 8000 });
 });

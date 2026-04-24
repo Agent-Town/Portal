@@ -682,3 +682,28 @@ https://www.youtube.com/watch?v=ZW7tUUZqhdY
 That video is approved for tone, motion, and story reference only. Frame extraction is not required for V1.4.1.
 
 Use `docs/brand/HERO_VIDEO_SOURCE_INDEX.md` as the source-of-truth status file.
+
+## V1.4.4 Play-First Product Language
+
+Agent Town should invite players into the town before asking them to complete deep setup.
+
+Preferred public phrasing:
+
+> Play first. Configure deeper when Clover has shown why it matters.
+
+### Clover language
+
+Clover has two early states:
+
+1. **Guide Clover** — helps the player understand the basics in Manual Founder Mode.
+2. **Real Clover Foreman** — uses the player’s connected Brain to reason and act through approved tools.
+
+Do not call Guide Clover “autonomous” or “thinking with a Brain.”
+
+### Town Hall language
+
+Town Hall is aspirational:
+
+> Make your growing settlement official.
+
+It should feel like a civic milestone, not a paperwork wall.

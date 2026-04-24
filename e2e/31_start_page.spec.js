@@ -7,7 +7,7 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-test('start page renders chooser/video embed/welcome and Enter opens app page after a path is chosen', async ({ page }) => {
+test('start page renders chooser/video embed/welcome and Play Founders Plot opens the game after a path is chosen', async ({ page }) => {
   await page.route('**/api/privy/config', async (route) => {
     await route.fulfill({
       status: 200,
@@ -28,11 +28,11 @@ test('start page renders chooser/video embed/welcome and Enter opens app page af
   await expect(page.getByText('Choose your path')).toBeVisible();
   await expect(page.locator('img.startLogo')).toBeVisible();
   await expect(page.locator('iframe.startVideo')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Enter' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Play Founders Plot' })).toBeDisabled();
 
   await selectStartPreset(page, 'global-default');
-  await expect(page.getByRole('button', { name: 'Enter' })).toBeEnabled();
-  await page.getByRole('button', { name: 'Enter' }).click();
-  await expect(page).toHaveURL(/\/app$/);
+  await expect(page.getByRole('button', { name: 'Play Founders Plot' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Play Founders Plot' }).click();
+  await expect(page).toHaveURL(/\/app\?district=founders-plot&entry=play-first$/);
   await expect(page.locator('#districtMap')).toBeVisible();
 });

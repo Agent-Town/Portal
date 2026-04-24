@@ -265,6 +265,80 @@ Use for approved platform route illustrations with caption and optional CTA cont
 ### `platform-empty-state`
 Use for empty/loading/error states that carry V1.4.3 generic ornamentation instead of plain placeholders.
 
+## V1.4.4 Onboarding Components
+
+### `play-first-entry-card`
+
+Purpose: primary Start Gate / Town Shell card that routes authenticated users into Founders Plot.
+
+Required props:
+
+```ts
+type PlayFirstEntryCardProps = {
+  title: string;
+  subtitle: string;
+  ctaLabel: string;
+  destination: 'founders-plot';
+  requiresAuth: true;
+};
+```
+
+### `clover-mode-badge`
+
+Purpose: shows whether Clover is in Manual Founder Mode or Real Foreman Mode.
+
+Required props:
+
+```ts
+type CloverModeBadgeProps = {
+  mode: 'MANUAL_FOUNDER' | 'REAL_CLOVER' | 'OFFICIAL_TOWN';
+  brainConfigured: boolean;
+  runtimeReady: boolean;
+};
+```
+
+### `brain-quick-connect-sheet`
+
+Purpose: compact in-game Brain connection surface.
+
+Required props:
+
+```ts
+type BrainQuickConnectSheetProps = {
+  providerOptions: ProviderOption[];
+  selectedProvider?: string;
+  selectedModel?: string;
+  onSave: (config: BrainConfig) => Promise<void>;
+  onOpenFullSettings: () => void;
+  onDismiss: () => void;
+};
+```
+
+### `townhall-official-invite`
+
+Purpose: non-blocking progression invite after HQ2 / first contract / public identity attempt.
+
+Required props:
+
+```ts
+type TownHallOfficialInviteProps = {
+  reason: 'HQ2_REACHED' | 'FIRST_CONTRACT_DONE' | 'PUBLIC_FEATURE_ATTEMPT';
+  onOpenTownHall: () => void;
+  onDismiss: () => void;
+};
+```
+
+### `manual-foreman-locked-control`
+
+Purpose: disabled/locked state for real Foreman controls when Brain is missing.
+
+Required behavior:
+
+- friendly copy;
+- no raw debug/provider language;
+- direct path to Brain Quick Connect;
+- no blocking of manual human actions.
+
 ## 13. Registry law for AI developers
 
 When generating UI code:

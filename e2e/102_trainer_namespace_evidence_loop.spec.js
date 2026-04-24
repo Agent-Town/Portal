@@ -46,13 +46,13 @@ test('trainer.list_evidence supports deterministic freshness and expiry windows 
   });
   expect(teamCode).toMatch(/^TEAM-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
 
-  const invoke = await invokeTool(page, 'trainer.invoke_action', {
+  const invoke = await invokeTool(page, 'trainer_invoke_action', {
     actionId: 'canvas.image',
     params: { teamCode },
   });
   expect(invoke?.ok).toBe(true);
 
-  const fresh = await invokeTool(page, 'trainer.list_evidence', {
+  const fresh = await invokeTool(page, 'trainer_list_evidence', {
     actionId: 'canvas.image',
     freshOnly: true,
   });
@@ -70,7 +70,7 @@ test('trainer.list_evidence supports deterministic freshness and expiry windows 
   expect(atMs).toBeGreaterThan(0);
   const futureNow = atMs + ttlMs + 1;
 
-  const allFuture = await invokeTool(page, 'trainer.list_evidence', {
+  const allFuture = await invokeTool(page, 'trainer_list_evidence', {
     actionId: 'canvas.image',
     freshOnly: false,
     __nowMs: futureNow,
@@ -80,7 +80,7 @@ test('trainer.list_evidence supports deterministic freshness and expiry windows 
   expect(allFutureRows.length).toBeGreaterThan(0);
   expect(allFutureRows.some((row) => row?.expired === true)).toBeTruthy();
 
-  const freshFuture = await invokeTool(page, 'trainer.list_evidence', {
+  const freshFuture = await invokeTool(page, 'trainer_list_evidence', {
     actionId: 'canvas.image',
     freshOnly: true,
     __nowMs: futureNow,

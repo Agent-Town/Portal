@@ -48,7 +48,7 @@ test('trainer namespace redacts secret-like values from diagnostics and avoids l
 
   const rawSecret = 'sk-live-abcdefghijklmnopqrstuvwxyz123456';
 
-  const invoke = await invokeTool(page, 'trainer.invoke_action', {
+  const invoke = await invokeTool(page, 'trainer_invoke_action', {
     actionId: 'canvas.image',
     params: {
       teamCode,
@@ -58,7 +58,7 @@ test('trainer namespace redacts secret-like values from diagnostics and avoids l
   });
   expect(invoke?.ok).toBe(true);
 
-  const sessionContext = await invokeTool(page, 'trainer.get_session_context', {});
+  const sessionContext = await invokeTool(page, 'trainer_get_session_context', {});
   expect(sessionContext?.ok).toBe(true);
   const sessionDump = JSON.stringify(sessionContext || {});
   expect(sessionDump).not.toContain(rawSecret);

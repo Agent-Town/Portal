@@ -59,25 +59,25 @@ test('trainer diagnostics tools expose transcript integrity + not-used reasons a
   await openTrainerFromSidebar(page);
   await openTrainerToolsTab(page);
 
-  const missingAction = await invokeTool(page, 'trainer.invoke_action', {
+  const missingAction = await invokeTool(page, 'trainer_invoke_action', {
     actionId: 'does.not.exist',
     params: {},
   });
   expect(missingAction?.ok).toBe(false);
   expect(String(missingAction?.code || '')).toBe('TRAINER_NOT_FOUND');
 
-  const integrity = await invokeTool(page, 'trainer.get_transcript_integrity', {});
+  const integrity = await invokeTool(page, 'trainer_get_transcript_integrity', {});
   expect(integrity?.ok).toBe(true);
   expect(integrity?.transcriptIntegrity && typeof integrity.transcriptIntegrity === 'object').toBeTruthy();
   expect(Number.isFinite(Number(integrity?.transcriptIntegrity?.syntheticCount || 0))).toBe(true);
   expect(Array.isArray(integrity?.transcriptIntegrity?.syntheticRecent)).toBeTruthy();
 
-  const explain = await invokeTool(page, 'trainer.explain_not_used', { actionId: 'canvas.paint' });
+  const explain = await invokeTool(page, 'trainer_explain_not_used', { actionId: 'canvas.paint' });
   expect(explain?.ok).toBe(true);
   expect(explain?.actionId).toBe('canvas.paint');
   expect(Array.isArray(explain?.reasonCodes)).toBeTruthy();
 
-  const sessionTool = await invokeTool(page, 'trainer.get_session_context', {});
+  const sessionTool = await invokeTool(page, 'trainer_get_session_context', {});
   expect(sessionTool?.ok).toBe(true);
   expect(sessionTool?.trainerNamespace && typeof sessionTool.trainerNamespace === 'object').toBeTruthy();
   expect(sessionTool?.trainerNamespace?.tierPolicy && typeof sessionTool.trainerNamespace.tierPolicy === 'object').toBeTruthy();

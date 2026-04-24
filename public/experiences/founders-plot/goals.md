@@ -1,5 +1,52 @@
 # Founders Plot Goals
 
+## First-session goal ladder
+
+### Goal 1 - Start the settlement manually
+
+The player enters Founders Plot after login.
+
+Clover says, in Manual Founder Mode:
+
+> This is your first plot. I'll guide the basics while you build by hand.
+
+Expected player actions:
+
+1. inspect the first objective;
+2. select the relevant lot/building;
+3. perform the first build or production action;
+4. collect first output.
+
+### Goal 2 - Show why Clover needs a Brain
+
+After the player sees a ready output, bottleneck, or contract need:
+
+Clover may say:
+
+> I can help watch for routine town work. Connect a Brain when you want me to reason and act as your Foreman.
+
+The player can dismiss and continue manually.
+
+### Goal 3 - Unlock Real Clover
+
+If the player connects a Brain:
+
+Clover says:
+
+> Brain connected. I can now reason about your town and help with approved actions.
+
+Clover may then use the Real Foreman path.
+
+### Goal 4 - Make the town official later
+
+After HQ2 or first contract:
+
+Clover may say:
+
+> Your settlement is growing. Visit Town Hall when you want to make it official.
+
+Town Hall is optional for the first loop.
+
 - Place the first Lumber Camp.
 - Collect the first wood.
 - Claim the one-time First Timber reward without duplicating it.

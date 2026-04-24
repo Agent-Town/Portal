@@ -1004,3 +1004,54 @@ Show the 390px screenshot for five seconds. A reviewer must be able to answer:
 4. Where is Clover / what is Clover doing, if relevant?
 
 Failure to answer these means the mobile screen fails even if automated metrics pass.
+
+## V1.4.4 Play-First Onboarding Ladder
+
+Agent Town must teach itself through play first and deeper setup second.
+
+### Player journey
+
+```text
+Start Gate -> Privy login -> Founders Plot manual play
+                 -> Brain Quick Connect when Clover can help
+                 -> Town Hall later for official identity
+```
+
+### Mode law
+
+#### Manual Founder Mode
+
+- Default mode after first login.
+- Brain not required.
+- Player can build, queue, collect, accept contracts, and progress manually.
+- Clover may explain the basics but cannot perform AGENT-attributed world actions.
+
+#### Real Clover Foreman Mode
+
+- Requires connected Brain and runtime readiness.
+- Clover may observe, choose among safe candidates, act through typed tools, and explain actions.
+- Server remains world truth.
+
+#### Official Town Mode
+
+- Unlocked through Town Hall.
+- Handles public identity, profile, ERC-8004/passport-style setup, and future reputation/governance features.
+- Must not block the first Founders Plot loop.
+
+### Attention rules
+
+1. Never show a blocking Brain setup modal before the first game action.
+2. Never show a blocking Town Hall onboarding modal before the first game action.
+3. Brain CTA must be contextual and dismissible.
+4. Town Hall invite must be aspirational and non-blocking.
+5. Real Foreman controls must show friendly copy when Brain is missing.
+
+### Five-second test
+
+A new player entering after login should be able to answer:
+
+1. What game am I playing?
+2. What is the next action?
+3. Can I start without configuring an AI Brain?
+4. What does Brain connection unlock?
+5. Where do I go later to make my town official?

@@ -40,7 +40,7 @@ test('start page shows actionable message when Privy reports invalid native app 
 
   await page.goto('/start');
   await selectStartPreset(page, 'global-default');
-  await page.getByRole('button', { name: 'Enter' }).click();
+  await page.getByRole('button', { name: 'Play Founders Plot' }).click();
   await expect(
     page.getByText(
       'Privy rejected your app/client ID. Verify PRIVY_APP_ID and remove PRIVY_CLIENT_ID unless it is a web app client.'

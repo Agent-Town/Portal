@@ -6,13 +6,16 @@ async function openFoundersPlotFrame(page) {
   return await getOpenFoundersPlotFrame(page);
 }
 
-async function openFoundersPlotRoute(page, { debug = false, route = '/app' } = {}) {
-  await hatchAndConnectLite(page, 'signup');
-  await unlockGateWithSigil(page, 'key');
-  await page.getByTestId('open-btn').click();
-  await pressOpenViaAgentApi(page);
+async function openFoundersPlotRoute(page, { debug = false, route = '/app', legacyOnboarding = false } = {}) {
+  if (legacyOnboarding) {
+    await hatchAndConnectLite(page, 'signup');
+    await unlockGateWithSigil(page, 'key');
+    await page.getByTestId('open-btn').click();
+    await pressOpenViaAgentApi(page);
+  }
   const params = new URLSearchParams();
   params.set('district', 'founders-plot');
+  params.set('entry', 'play-first');
   if (debug) params.set('debug', '1');
   await page.goto(`${route}?${params.toString()}`);
   await expect(page.locator('#districtModalBackdrop:not(.is-hidden)')).toHaveCount(1, { timeout: 5000 });
@@ -124,7 +127,41 @@ async function bootstrapToHq2(frame) {
   return getPlotState(frame);
 }
 
+async function seedForemanBrain(frame) {
+  await frame.evaluate(async () => {
+    let currentBrain = null;
+    if (window.__foundersPlotTest && typeof window.__foundersPlotTest.refreshBrainStatus === 'function') {
+      currentBrain = await window.__foundersPlotTest.refreshBrainStatus();
+    } else if (window.__foundersPlotTest && typeof window.__foundersPlotTest.getBrainStatus === 'function') {
+      currentBrain = window.__foundersPlotTest.getBrainStatus();
+    }
+    const needsLocalSeed = currentBrain?.configured !== true;
+    if (needsLocalSeed && window.__foundersPlotTest && typeof window.__foundersPlotTest.saveBrainConfigForTest === 'function') {
+      await window.__foundersPlotTest.saveBrainConfigForTest({
+        provider: 'test-local',
+        model: 'deterministic',
+        apiKey: 'test-local-key',
+        authMode: 'api-key',
+        useProxy: false
+      });
+    }
+    const gatewayTestApi = window.__openclawLiteTest || window.parent?.__openclawLiteTest || null;
+    if (needsLocalSeed && gatewayTestApi && typeof gatewayTestApi.setLlmConfig === 'function') {
+      await gatewayTestApi.setLlmConfig({
+        provider: 'test-local',
+        modelRef: 'test-local/deterministic',
+        modelId: 'deterministic',
+        api: 'mock',
+        baseUrl: '',
+        apiKey: 'test-local-key',
+        useProxy: false
+      });
+    }
+  });
+}
+
 async function startForemanRuntime(frame) {
+  await seedForemanBrain(frame);
   const started = await frame.evaluate(async () => {
     return await window.__foundersPlotTest.startForemanRuntime();
   });
@@ -205,6 +242,7 @@ module.exports = {
   runLumberCycle,
   runPlotTool,
   runProductionCycle,
+  seedForemanBrain,
   startForemanRuntime,
   turnInActiveContract
 };

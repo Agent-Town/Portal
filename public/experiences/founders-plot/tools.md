@@ -1,5 +1,48 @@
 # Founders Plot Tool Surface
 
+## Manual Mode vs Real Foreman authorization
+
+### Human/manual tools
+
+Human/manual tools may be used by the authenticated player in Manual Founder Mode:
+
+- place building;
+- queue production;
+- collect output;
+- accept contract;
+- turn in contract;
+- upgrade building where allowed.
+
+These actions must be attributed to `HUMAN`.
+
+### Foreman tools
+
+Foreman mutation tools require Real Clover Foreman Mode:
+
+- connected Brain;
+- OpenClaw Lite worker/runtime readiness;
+- worker-origin metadata where required;
+- complete context pack;
+- server-provided safe candidate;
+- policy/permission acceptance.
+
+If the Brain is missing, Foreman mutation tools must fail closed with a friendly player-facing reason:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "BRAIN_REQUIRED",
+    "message": "Connect a Brain to let Clover act as your Foreman.",
+    "retryable": false
+  }
+}
+```
+
+### Spoof rejection
+
+Human routes must reject any attempt to spoof `actor: "AGENT"`.
+
 The Founders Plot runtime exposes a deliberately small tool family:
 
 - `et.plot.get_state`

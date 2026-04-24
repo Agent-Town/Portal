@@ -3,7 +3,8 @@ const {
   advancePlot,
   bootstrapToHq2,
   openFoundersPlotFrame,
-  runPlotTool
+  runPlotTool,
+  seedForemanBrain
 } = require('./helpers/founders_plot');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
@@ -14,6 +15,7 @@ test.beforeEach(async ({ request }) => {
 
 async function putCloverIntoActingState(frame) {
   await bootstrapToHq2(frame);
+  await seedForemanBrain(frame);
   await frame.getByTestId('founders-clover-avatar').click();
   await frame.getByTestId('foreman-start-btn').click();
 

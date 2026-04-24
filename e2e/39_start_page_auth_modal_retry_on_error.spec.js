@@ -37,9 +37,9 @@ test('start page keeps auth modal open after Privy login failure so user can ret
 
   await page.goto('/start');
   await selectStartPreset(page, 'global-default');
-  await page.getByRole('button', { name: 'Enter' }).click();
+  await page.getByRole('button', { name: 'Play Founders Plot' }).click();
   await expect(page.locator('[data-testid="privy-auth-box"]')).toBeVisible({ timeout: 2500 });
   await expect(page.getByText('Could not complete Privy login.')).toBeVisible({ timeout: 4000 });
   await expect(page.locator('[data-testid="privy-auth-box"]')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Enter' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Play Founders Plot' })).toBeEnabled();
 });

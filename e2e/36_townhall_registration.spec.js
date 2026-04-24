@@ -672,7 +672,7 @@ test('town hall draft fields persist after blur before save', async ({ page }) =
   await expect(page.locator('#townhallAgentPrompt')).toHaveValue('Draft agent prompt');
 });
 
-test('required town hall onboarding locks district switching until registration is saved', async ({ page }) => {
+test('town hall onboarding keeps regular districts available while official registration is saved', async ({ page }) => {
   await mockTownhallMintFlow(page);
 
   let mockedOnboarding = makeOnboarding(false);
@@ -723,13 +723,13 @@ test('required town hall onboarding locks district switching until registration 
 
   await expect(page.locator('#townhallRegisterPanel')).toBeVisible();
   await expect(page.locator('#districtModalClose')).toBeHidden();
-  await expect(page.getByRole('button', { name: 'Open Saloon' })).toHaveAttribute('aria-disabled', 'true');
+  await expect(page.getByRole('button', { name: 'Open Saloon' })).toHaveAttribute('aria-disabled', 'false');
 
   await completeTownhallStory(page, { humanPrompt: 'Human prompt', agentPrompt: 'Agent prompt' });
 
   await expect(page.locator('#townhallRegisterState')).toContainText('Registered');
   await expect(page.locator('#districtModalBackdrop')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Open Saloon' })).toHaveAttribute('aria-disabled', 'true');
+  await expect(page.getByRole('button', { name: 'Open Saloon' })).toHaveAttribute('aria-disabled', 'false');
   const serverRegistration = await page.request.post('/api/townhall/register', {
     headers: { 'content-type': 'application/json' },
     data: JSON.stringify({
@@ -754,5 +754,5 @@ test('required town hall onboarding locks district switching until registration 
   expect(serverRegistration.ok()).toBeTruthy();
   await configureBrain(page, { refreshUi: false });
   await expect(page.getByTestId('townhall-continue-btn')).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Open Saloon' })).toHaveAttribute('aria-disabled', 'true');
+  await expect(page.getByRole('button', { name: 'Open Saloon' })).toHaveAttribute('aria-disabled', 'false');
 });

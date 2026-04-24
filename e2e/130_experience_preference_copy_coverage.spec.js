@@ -81,7 +81,7 @@ test('mainland preset localizes create page ceremony copy', async ({ page }) => 
   await expect(page.locator('#createHeading')).toHaveText('为 house key 创造熵值。');
   await expect(page.locator('#createIntro')).toHaveText('人类点击像素，Agent 通过 skill API 绘制。感觉完成后就锁定它。');
   await expect(page.locator('#shareBtn')).toHaveText('生成 house key');
-  await expect(page.locator('#createNextNote')).toHaveText('下一步：用钱包签名解锁 house。之后你和 Agent 都可以读写加密条目。');
+  await expect(page.locator('#createNextNote')).toHaveText('下一步：当 joined key 准备好后，你和 Agent 就可以一起进入 house，读写加密条目。');
   await expect(page.locator('#createNavHomeLink')).toHaveText('首页');
 });
 

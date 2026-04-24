@@ -34,7 +34,7 @@ test('trainer.list_actions reflects active skill and updates after skill switch'
   await openTrainerFromSidebar(page);
   await openTrainerToolsTab(page);
 
-  const before = await invokeTool(page, 'trainer.list_actions', {});
+  const before = await invokeTool(page, 'trainer_list_actions', {});
   expect(before?.ok).toBe(true);
   const beforeIds = Array.isArray(before?.actions) ? before.actions.map((row) => String(row?.id || '')) : [];
   expect(beforeIds).toContain('canvas.paint');
@@ -48,7 +48,7 @@ test('trainer.list_actions reflects active skill and updates after skill switch'
         await window.__agentTownTrainerRefresh();
       }
     });
-    const after = await invokeTool(page, 'trainer.list_actions', {});
+    const after = await invokeTool(page, 'trainer_list_actions', {});
     afterIds = Array.isArray(after?.actions) ? after.actions.map((row) => String(row?.id || '')) : [];
     return afterIds.includes('health.check') && afterIds.includes('health.strict_fail');
   }, { timeout: 8000 }).toBe(true);

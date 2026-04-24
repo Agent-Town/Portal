@@ -28,7 +28,7 @@ test('Start Gate uses the V1.4.3 hero art and hero-cast strip', async ({ page })
   await expect(page.getByTestId('start-hero-cast-strip')).toBeVisible();
   await expect(page.getByLabel('AI warning')).toContainText('WARNING! CONTAINS AND PRODUCES AI SLOP.');
   await selectStartPreset(page, 'global-default');
-  await expect(page.getByRole('button', { name: 'Enter' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Play Founders Plot' })).toBeEnabled();
 
   await expect(page.getByTestId('start-card')).toHaveScreenshot('agent-town-v1-4-3-start-gate-desktop-1280.png', {
     animations: 'disabled',

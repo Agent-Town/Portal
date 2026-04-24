@@ -62,7 +62,7 @@ test('start page uses email+code auth box for Privy login before entering app', 
   await page.goto('/start');
 
   await selectStartPreset(page, 'global-default');
-  await page.getByRole('button', { name: 'Enter' }).click();
+  await page.getByRole('button', { name: 'Play Founders Plot' }).click();
   await expect(page.locator('[data-testid="privy-auth-box"]')).toBeVisible();
   await expect(page.getByText('Enter your email to receive a one-time code.')).toBeVisible();
 
@@ -74,6 +74,6 @@ test('start page uses email+code auth box for Privy login before entering app', 
   await page.locator('#privyCodeInput').fill('123456');
   await page.locator('#privyCodeForm').getByRole('button', { name: 'Verify code' }).click();
 
-  await expect(page).toHaveURL(/\/app$/);
+  await expect(page).toHaveURL(/\/app\?district=founders-plot&entry=play-first$/);
   await expect(page.locator('#districtMap')).toBeVisible();
 });

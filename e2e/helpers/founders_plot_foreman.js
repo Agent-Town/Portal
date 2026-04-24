@@ -37,6 +37,20 @@ function makeTextChunks({ id, model, text }) {
 }
 
 async function configureOpenRouterBrain(page, { apiKey = 'or-test-key' } = {}) {
+  await page.evaluate(async ({ provider, modelId, apiKey: value }) => {
+    const lib = await import('/openclaw-lite/llm-config-library.js');
+    await lib.saveLlmConfig({
+      provider,
+      model: modelId,
+      apiKey: value,
+      authMode: 'api-key',
+      useProxy: false
+    });
+  }, {
+    provider: 'openrouter',
+    modelId: OPENROUTER_MODEL,
+    apiKey
+  });
   return await page.evaluate(async ({ provider, modelRef, modelId, api, baseUrl, apiKey: value }) => {
     return await window.__openclawLiteTest.setLlmConfig({
       provider,
@@ -58,6 +72,16 @@ async function configureOpenRouterBrain(page, { apiKey = 'or-test-key' } = {}) {
 }
 
 async function configureDeterministicBrain(page) {
+  await page.evaluate(async () => {
+    const lib = await import('/openclaw-lite/llm-config-library.js');
+    await lib.saveLlmConfig({
+      provider: 'test-local',
+      model: 'deterministic',
+      apiKey: 'test-local-key',
+      authMode: 'api-key',
+      useProxy: false
+    });
+  });
   return await page.evaluate(async () => {
     return await window.__openclawLiteTest.setLlmConfig({
       provider: 'test-local',

@@ -6,7 +6,8 @@ const {
   openFoundersPlotFrame,
   placeFirstLumberCamp,
   postJson,
-  runPlotTool
+  runPlotTool,
+  seedForemanBrain
 } = require('./helpers/founders_plot');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
@@ -30,7 +31,7 @@ test('HQ2 surface shows the living Contract Board, Current Goal, and Standing Or
   await expect(frame.getByTestId('founders-standing-order')).toBeVisible();
   await expect(frame.getByTestId('standing-order-careful')).toBeVisible();
   await expect(frame.getByTestId('standing-order-bold')).toBeVisible();
-  await expect(frame.getByTestId('founders-foreman-status')).toContainText(/Foreman|Clover/i);
+  await expect(frame.getByTestId('founders-foreman-status')).toContainText(/Manual Founder Mode|Foreman|Clover/i);
 
   const mainText = await frame.locator('body').textContent();
   expect(String(mainText || '')).not.toMatch(/\b(runtime|worker debug|json|mcp)\b/i);
@@ -39,6 +40,7 @@ test('HQ2 surface shows the living Contract Board, Current Goal, and Standing Or
 test('the Foreman panel shows a plan and receipt controls after the first automated collect', async ({ page }) => {
   const frame = await openFoundersPlotFrame(page);
   await bootstrapToHq2(frame);
+  await seedForemanBrain(frame);
 
   await frame.getByTestId('founders-clover-avatar').click();
   await frame.getByTestId('foreman-start-btn').click();

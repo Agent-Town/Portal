@@ -503,6 +503,7 @@ function normalizeForemanRuntime(raw = {}) {
     expiresAt: normalizeCount(raw.expiresAt),
     pausedAt: normalizeCount(raw.pausedAt),
     lastError: String(raw.lastError || ''),
+    brainReady: raw.brainReady === true,
     pack: {
       skillLoaded: raw?.pack?.skillLoaded === true,
       heartbeatLoaded: raw?.pack?.heartbeatLoaded === true,
@@ -3371,7 +3372,7 @@ function applyResumeScheduler(state, ctx) {
   return schedulerStatusView(state);
 }
 
-function startForemanSession(state, { runtimeId = '', nowMs, pack = {} }) {
+function startForemanSession(state, { runtimeId = '', nowMs, pack = {}, brainReady = false }) {
   const nextRuntimeId = runtimeId || randomId('rt');
   const sessionId = randomId('frs');
   const token = randomId('fpt');
@@ -3383,6 +3384,7 @@ function startForemanSession(state, { runtimeId = '', nowMs, pack = {} }) {
     startedAt: nowMs,
     lastHeartbeatAt: nowMs,
     expiresAt: nowMs + (2 * 60 * 1000),
+    brainReady: brainReady === true,
     pack
   });
   return {

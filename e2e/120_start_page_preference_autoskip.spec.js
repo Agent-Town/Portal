@@ -50,5 +50,5 @@ test('stored preference still allows start-page auto-skip for an already signed-
   });
 
   await page.goto('/start');
-  await expect(page).toHaveURL(/\/app$/, { timeout: 8000 });
+  await expect(page).toHaveURL(/\/app\?district=founders-plot&entry=play-first$/, { timeout: 8000 });
 });

@@ -6,7 +6,8 @@ const {
   openFoundersPlotFrame,
   placeFirstLumberCamp,
   postJson,
-  runPlotTool
+  runPlotTool,
+  startForemanRuntime
 } = require('./helpers/founders_plot');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
@@ -16,7 +17,7 @@ test.beforeEach(async ({ request }) => {
 });
 
 async function prepareReadyLumberWithRuntime(frame) {
-  const started = await frame.evaluate(async () => window.__foundersPlotTest.startForemanRuntime());
+  const started = await startForemanRuntime(frame);
   expect(started?.ok).toBe(true);
 
   const placed = await placeFirstLumberCamp(frame, 'v11-scheduler-lumber');

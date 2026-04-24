@@ -46,24 +46,24 @@ test('trainer namespace supports a deterministic human-agent coop loop for canva
   });
   expect(teamCode).toMatch(/^TEAM-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
 
-  const before = await invokeTool(page, 'trainer.explain_not_used', { actionId: 'canvas.image' });
+  const before = await invokeTool(page, 'trainer_explain_not_used', { actionId: 'canvas.image' });
   expect(before?.ok).toBe(true);
   expect(before?.actionExists).toBe(true);
   expect(Number(before?.freshEvidenceCount || 0)).toBe(0);
 
-  const humanDemo = await invokeTool(page, 'trainer.invoke_action', {
+  const humanDemo = await invokeTool(page, 'trainer_invoke_action', {
     actionId: 'canvas.image',
     params: { teamCode },
   });
   expect(humanDemo?.ok).toBe(true);
 
-  const agentRepeat = await invokeTool(page, 'trainer.invoke_action', {
+  const agentRepeat = await invokeTool(page, 'trainer_invoke_action', {
     actionId: 'canvas.image',
     params: { teamCode },
   });
   expect(agentRepeat?.ok).toBe(true);
 
-  const evidence = await invokeTool(page, 'trainer.list_evidence', {
+  const evidence = await invokeTool(page, 'trainer_list_evidence', {
     actionId: 'canvas.image',
     freshOnly: true,
   });
@@ -71,11 +71,11 @@ test('trainer namespace supports a deterministic human-agent coop loop for canva
   expect(Array.isArray(evidence?.evidence)).toBeTruthy();
   expect((evidence?.evidence || []).length).toBeGreaterThan(0);
 
-  const after = await invokeTool(page, 'trainer.explain_not_used', { actionId: 'canvas.image' });
+  const after = await invokeTool(page, 'trainer_explain_not_used', { actionId: 'canvas.image' });
   expect(after?.ok).toBe(true);
   expect(Number(after?.freshEvidenceCount || 0)).toBeGreaterThan(0);
 
-  const actions = await invokeTool(page, 'trainer.list_actions', {});
+  const actions = await invokeTool(page, 'trainer_list_actions', {});
   expect(actions?.ok).toBe(true);
   const canvasImage = (Array.isArray(actions?.actions) ? actions.actions : [])
     .find((row) => String(row?.id || '') === 'canvas.image');

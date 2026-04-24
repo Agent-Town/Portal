@@ -15,11 +15,27 @@ const ExperienceProfiles = window.AgentTownExperienceProfiles || null;
 const ExperienceRuntime = window.AgentTownExperienceRuntime || null;
 const AppI18n = window.AgentTownI18n || null;
 const LlmCatalog = window.AgentTownLlmCatalog || null;
+const AgentTownAccess = window.AgentTownAccess || null;
 const APP_I18N_FALLBACK_COPY = {
   'agent.panel.title': 'Agent Comms',
   'agent.panel.status.idle': 'Idle',
   'agent.panel.status.connected': 'Connected',
   'agent.panel.status.offline': 'Offline',
+  'agent.panel.chat_placeholder': 'Message agent...',
+  'agent.panel.send': 'Send',
+  'agent.panel.new_session': 'New session',
+  'agent.panel.trainer': 'Trainer',
+  'agent.panel.system_logs': 'System Logs',
+  'agent.panel.approvals': 'Approvals',
+  'agent.panel.debug.toggle': 'Toggle debug panel',
+  'agent.panel.debug.show': 'Show debug panel',
+  'agent.panel.debug.hide': 'Hide debug panel',
+  'agent.panel.debug.zoom_out': 'Decrease panel size',
+  'agent.panel.debug.zoom_in': 'Increase panel size',
+  'agent.panel.debug.zoom_out_percent': 'Decrease panel size ({{percent}}%)',
+  'agent.panel.debug.zoom_in_percent': 'Increase panel size ({{percent}}%)',
+  'agent.panel.debug.expand': 'Expand panel',
+  'agent.panel.debug.minimize': 'Minimize panel',
   'wallet.error.no_solana_wallet': 'Connect or restore your wallet to continue.',
   'wallet.error.no_solana_wallet_short': 'Connect or restore your wallet to continue.',
   'wallet.error.no_solana_sign': 'Reconnect your wallet so it can sign the request.',
@@ -1141,6 +1157,69 @@ function isTownhallBrainConfigured(state) {
   return isLocalLiteLlmConfigured();
 }
 
+function buildTownHubAccessState(state = lastState) {
+  if (AgentTownAccess && typeof AgentTownAccess.buildAccessState === 'function') {
+    return AgentTownAccess.buildAccessState({
+      authenticated: true,
+      state: state || {},
+      brainConfigured: isTownhallBrainConfigured(state),
+      runtimeReady: false
+    });
+  }
+  return {
+    authenticated: true,
+    foundersPlot: {
+      playable: true,
+      mode: isTownhallRegistrationComplete(state) ? 'OFFICIAL_TOWN' : 'MANUAL_FOUNDER',
+      blockedReason: ''
+    },
+    brain: {
+      configured: isTownhallBrainConfigured(state),
+      runtimeReady: false,
+      requiredForRealForeman: true
+    },
+    clover: {
+      guideAvailable: true,
+      realForemanAvailable: false,
+      schedulerEnabled: false,
+      disabledReason: isTownhallBrainConfigured(state) ? 'RUNTIME_NOT_READY' : 'BRAIN_REQUIRED'
+    },
+    townHall: {
+      complete: isTownhallRegistrationComplete(state),
+      requiredForPublicIdentity: true,
+      recommended: false,
+      recommendedReason: ''
+    }
+  };
+}
+
+function canOpenTownHubDistrict(district, state = lastState) {
+  const safeDistrict = normalizeDistrict(district);
+  if (safeDistrict === 'founders-plot') return true;
+  if (safeDistrict === 'house') return true;
+  if (safeDistrict === 'townhall' || safeDistrict === 'brain') return true;
+  if (AgentTownAccess && typeof AgentTownAccess.canOpenDistrict === 'function') {
+    return AgentTownAccess.canOpenDistrict(safeDistrict, buildTownHubAccessState(state), state || {});
+  }
+  if (safeDistrict === 'sigil') {
+    return isTownhallRegistrationComplete(state) && isTownhallBrainConfigured(state);
+  }
+  if (safeDistrict === 'ceremony') return !!state?.signup?.complete;
+  return true;
+}
+
+function getTownHubDistrictGateReasonForDistrict(district, state = lastState) {
+  const safeDistrict = normalizeDistrict(district);
+  if (canOpenTownHubDistrict(safeDistrict, state)) return '';
+  if (AgentTownAccess && typeof AgentTownAccess.districtGateReason === 'function') {
+    return AgentTownAccess.districtGateReason(safeDistrict, buildTownHubAccessState(state), state || {});
+  }
+  if (safeDistrict === 'sigil' && !isTownhallRegistrationComplete(state)) return 'TOWNHALL_REQUIRED';
+  if (safeDistrict === 'sigil' && !isTownhallBrainConfigured(state)) return 'BRAIN_REQUIRED';
+  if (safeDistrict === 'ceremony' && !state?.signup?.complete) return 'SIGIL_REQUIRED';
+  return getTownHubDistrictGateReason(state) || 'TOWNHALL_REQUIRED';
+}
+
 function getTownHubDistrictGateReason(state) {
   if (!isTownHub) return null;
   const step = getOnboardingStep(state);
@@ -1176,19 +1255,29 @@ function canUseTownhallSigilFlow(state) {
 
 function applyDistrictHotspotLocks(state) {
   if (!isTownHub) return;
-  const gateLocked = isTownHubDistrictGateLocked(state);
   document.querySelectorAll('.townDistrictHotspot[data-district]').forEach((hotspot) => {
     const district = normalizeDistrict(hotspot.getAttribute('data-district') || 'house');
-    const blocked = gateLocked && district !== 'townhall';
+    const blocked = !canOpenTownHubDistrict(district, state);
     hotspot.classList.toggle('is-locked', blocked);
     hotspot.setAttribute('aria-disabled', blocked ? 'true' : 'false');
   });
 }
 
-function districtStatusText(district) {
+function townHubDistrictLockText(district, state = lastState) {
+  const reason = getTownHubDistrictGateReasonForDistrict(district, state);
+  if (reason === 'BRAIN_REQUIRED' || reason === 'brain') return 'Connect a Brain to continue that setup path.';
+  if (reason === 'SIGIL_REQUIRED' || reason === 'sigil') return 'Finish the Sigil Test before the house-key ceremony.';
+  if (reason === 'AUTH_REQUIRED') return 'Sign in to enter Agent Town.';
+  if (reason === 'TOWNHALL_REQUIRED' || reason === 'onboarding') {
+    return 'Visit Town Hall when you want to make your settlement official.';
+  }
   const statusText = getTownHubDistrictGateStatusText();
-  if (statusText) {
-    return tApp('district.status.locked', { status: statusText });
+  return statusText || 'This district is not ready yet.';
+}
+
+function districtStatusText(district) {
+  if (district && !canOpenTownHubDistrict(district, lastState)) {
+    return tApp('district.status.locked', { status: townHubDistrictLockText(district, lastState) });
   }
   if (!district) return tApp('district.status.select');
   if (district === 'atlas') return tApp('district.status.atlas');
@@ -1323,7 +1412,7 @@ function bindDistrictMapInteractions() {
         return;
       }
 
-      if (isTownHubDistrictGateLocked(lastState) && district !== 'townhall') {
+      if (!canOpenTownHubDistrict(district, lastState)) {
         setActiveDistrict('townhall');
         ev.preventDefault();
         return;
@@ -1347,7 +1436,7 @@ function bindDistrictMapInteractions() {
     });
 
     hotspot.addEventListener('click', () => {
-      if (isTownHubDistrictGateLocked(lastState) && district !== 'townhall') {
+      if (!canOpenTownHubDistrict(district, lastState)) {
         setActiveDistrict('townhall');
         return;
       }
@@ -4120,7 +4209,9 @@ function scheduleAgentPanelLayoutSettledSync(panel = null) {
   const dock = panel || el('agentSidebar');
   if (!dock) return;
   scheduleAgentPanelLayoutSync(dock);
+  setTimeout(() => scheduleAgentPanelLayoutSync(dock), 50);
   setTimeout(() => scheduleAgentPanelLayoutSync(dock), 160);
+  setTimeout(() => scheduleAgentPanelLayoutSync(dock), 250);
   setTimeout(() => scheduleAgentPanelLayoutSync(dock), 360);
 }
 
@@ -4925,18 +5016,12 @@ async function showDistrict(district) {
   if (!isTownHub) return;
 
   const safeDistrict = normalizeDistrict(district);
-  if (isTownHubDistrictGateLocked(lastState) && safeDistrict !== 'townhall') {
-    const gateReason = getTownHubDistrictGateReason(lastState);
-    const gateAllowed = (gateReason === 'brain' && safeDistrict === 'brain')
-      || (gateReason === 'sigil' && safeDistrict === 'sigil')
-      || (gateReason === 'ceremony' && (safeDistrict === 'ceremony' || safeDistrict === 'founders-plot'));
-    if (!gateAllowed) {
-      setActiveDistrict('townhall');
-      const statusText = getTownHubDistrictGateStatusText();
-      const status = el('townSceneStatus');
-      if (status && statusText) status.textContent = `Locked: ${statusText}`;
-      return;
-    }
+  if (!canOpenTownHubDistrict(safeDistrict, lastState)) {
+    setActiveDistrict('townhall');
+    const statusText = townHubDistrictLockText(safeDistrict, lastState);
+    const status = el('townSceneStatus');
+    if (status && statusText) status.textContent = `Locked: ${statusText}`;
+    return;
   }
   const currentLoad = ++lastDistrictLoad;
   currentDistrict = safeDistrict;
@@ -6086,7 +6171,8 @@ function syncTownhallGate(state) {
   if (!isTownHub) return;
   const gateReason = getTownHubDistrictGateReason(state);
   const gateLocked = !!gateReason;
-  const onboardingLocked = gateReason === 'onboarding';
+  const foundersPlotOpen = currentDistrict === 'founders-plot' || activeDistrict === 'founders-plot';
+  const onboardingLocked = gateReason === 'onboarding' && !foundersPlotOpen;
   applyDistrictHotspotLocks(state);
 
   const closeBtn = el('districtModalClose');
@@ -6095,7 +6181,7 @@ function syncTownhallGate(state) {
     closeBtn.disabled = onboardingLocked;
   }
 
-  if (!gateLocked) return;
+  if (!gateLocked || foundersPlotOpen) return;
 
   const statusText = getTownHubDistrictGateStatusText();
   const status = el('townSceneStatus');

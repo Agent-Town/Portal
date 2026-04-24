@@ -42,8 +42,8 @@ test('start page enters app even when Privy wallet auto-create fails', async ({ 
 
   await page.goto('/start');
   await selectStartPreset(page, 'global-default');
-  await page.getByRole('button', { name: 'Enter' }).click();
+  await page.getByRole('button', { name: 'Play Founders Plot' }).click();
   await page.locator('#privyEmailInput').fill('wallet-fail@example.com');
   await page.locator('#privyEmailForm').getByRole('button', { name: 'Send code' }).click();
-  await expect(page).toHaveURL(/\/app$/);
+  await expect(page).toHaveURL(/\/app\?district=founders-plot&entry=play-first$/);
 });

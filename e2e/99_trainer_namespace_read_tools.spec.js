@@ -59,7 +59,7 @@ test('trainer namespace read tools return deterministic run, event, and session 
   await openTrainerFromSidebar(page);
   await openTrainerToolsTab(page);
 
-  const runsResult = await invokeTool(page, 'trainer.list_runs', { limit: 20 });
+  const runsResult = await invokeTool(page, 'trainer_list_runs', { limit: 20 });
   expect(runsResult?.ok).toBe(true);
   const runs = Array.isArray(runsResult?.runs) ? runsResult.runs : [];
   expect(runs.length).toBeGreaterThan(0);
@@ -72,7 +72,7 @@ test('trainer namespace read tools return deterministic run, event, and session 
   const attemptId = String(runs[0]?.attemptId || '').trim();
   expect(attemptId.length).toBeGreaterThan(0);
 
-  const runResult = await invokeTool(page, 'trainer.get_run', { attemptId });
+  const runResult = await invokeTool(page, 'trainer_get_run', { attemptId });
   expect(runResult?.ok).toBe(true);
   expect(String(runResult?.attemptId || '')).toBe(attemptId);
   const run = runResult?.run && typeof runResult.run === 'object' ? runResult.run : {};
@@ -82,13 +82,13 @@ test('trainer namespace read tools return deterministic run, event, and session 
   expect(Number.isFinite(seq)).toBe(true);
   expect(seq).toBeGreaterThan(0);
 
-  const eventResult = await invokeTool(page, 'trainer.get_event', { attemptId, seq });
+  const eventResult = await invokeTool(page, 'trainer_get_event', { attemptId, seq });
   expect(eventResult?.ok).toBe(true);
   expect(String(eventResult?.attemptId || '')).toBe(attemptId);
   expect(Number(eventResult?.seq || 0)).toBe(seq);
   expect(eventResult?.event && typeof eventResult.event === 'object').toBeTruthy();
 
-  const sessionResult = await invokeTool(page, 'trainer.get_session_context', {});
+  const sessionResult = await invokeTool(page, 'trainer_get_session_context', {});
   expect(sessionResult?.ok).toBe(true);
   expect(sessionResult?.sessionContext && typeof sessionResult.sessionContext === 'object').toBeTruthy();
   expect(sessionResult?.sessionContext?.runtimeContext && typeof sessionResult.sessionContext.runtimeContext === 'object').toBeTruthy();

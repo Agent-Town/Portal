@@ -42,12 +42,12 @@ test('trainer destructive tools require approval token, allow one operation, and
   await openTrainerFromSidebar(page);
   await openTrainerToolsTab(page);
 
-  const runs = await invokeTool(page, 'trainer.list_runs', { limit: 1 });
+  const runs = await invokeTool(page, 'trainer_list_runs', { limit: 1 });
   expect(runs?.ok).toBe(true);
   const attemptId = String(runs?.runs?.[0]?.attemptId || '');
   expect(attemptId.length).toBeGreaterThan(0);
 
-  const blockedDelete = await invokeTool(page, 'trainer.delete_trace', { attemptId });
+  const blockedDelete = await invokeTool(page, 'trainer_delete_trace', { attemptId });
   expect(blockedDelete?.ok).toBe(false);
   expect(String(blockedDelete?.code || '')).toBe('TRAINER_APPROVAL_REQUIRED');
 
@@ -61,14 +61,14 @@ test('trainer destructive tools require approval token, allow one operation, and
   const approvalToken = String(approval?.token || '');
   expect(approvalToken.length).toBeGreaterThan(0);
 
-  const approvedDelete = await invokeTool(page, 'trainer.delete_trace', {
+  const approvedDelete = await invokeTool(page, 'trainer_delete_trace', {
     attemptId,
     approvalToken,
   });
   expect(approvedDelete?.ok).toBe(true);
   expect(String(approvedDelete?.attemptId || '')).toBe(attemptId);
 
-  const consumedDelete = await invokeTool(page, 'trainer.delete_trace', {
+  const consumedDelete = await invokeTool(page, 'trainer_delete_trace', {
     attemptId,
     approvalToken,
   });
@@ -87,7 +87,7 @@ test('trainer destructive tools require approval token, allow one operation, and
   const expiresAtMs = Number(expiredApproval?.expiresAtMs || 0);
   expect(expiresAtMs).toBeGreaterThan(0);
 
-  const expiredClear = await invokeTool(page, 'trainer.clear_traces', {
+  const expiredClear = await invokeTool(page, 'trainer_clear_traces', {
     approvalToken: expiredToken,
     __nowMs: expiresAtMs + 1,
   });

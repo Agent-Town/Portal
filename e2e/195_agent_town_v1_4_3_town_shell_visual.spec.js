@@ -16,7 +16,7 @@ test('Town shell uses the V1.4.3 background and district preview icons', async (
   await page.setViewportSize({ width: 1280, height: 1100 });
   await page.goto('/app');
   await expect(page.locator('#districtMap')).toBeVisible();
-  await expect(page.locator('.townDistrictIcon')).toHaveCount(6);
+  await expect(page.locator('.townDistrictIcon')).toHaveCount(7);
   await expect(page.getByTestId('agent-debug-pane')).toBeHidden();
 
   await expect(page.locator('#townScenePanel')).toHaveScreenshot('agent-town-v1-4-3-town-shell-desktop-1280.png', {

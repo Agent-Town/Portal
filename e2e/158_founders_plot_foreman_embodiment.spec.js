@@ -4,7 +4,8 @@ const {
   bootstrapToHq2,
   openFoundersPlotFrame,
   postJson,
-  runPlotTool
+  runPlotTool,
+  seedForemanBrain
 } = require('./helpers/founders_plot');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
@@ -21,6 +22,7 @@ test.beforeEach(async ({ request }) => {
 test('Clover stays quiet until selected or active, then shows a compact in-world action receipt', async ({ page }) => {
   const frame = await openFoundersPlotFrame(page);
   await bootstrapToHq2(frame);
+  await seedForemanBrain(frame);
 
   const clover = frame.getByTestId('founders-clover-avatar');
   const bubble = frame.getByTestId('founders-clover-bubble');

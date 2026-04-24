@@ -313,6 +313,32 @@ Rules:
 - Keep normal app routes game-first and debug/provider/runtime details backstage.
 - Capture screenshot baselines for every refreshed route.
 
+## V1.4.4 play-first onboarding guardrail
+
+Founders Plot is now the first gameplay chapter of Agent Town and must be playable before full Town Hall onboarding.
+
+Coding agents must preserve this ladder:
+
+1. **Play Now** — after Privy/test authentication, the user can enter Founders Plot and play manually.
+2. **Connect Brain** — required only for real Clover Foreman behavior and LLM-mediated actions.
+3. **Visit Town Hall** — later optional path for public identity, ERC-8004/passport-style setup, and advanced onboarding.
+
+Rules:
+
+- Do not block Founders Plot manual play on Town Hall registration, Brain configuration, Sigil, or Ceremony.
+- Do not fake AI behavior when Brain is missing.
+- Manual Founder Mode may show deterministic guide suggestions, but must not create AGENT/Clover world mutations.
+- Real Clover Foreman mode requires Brain/runtime readiness and must use the existing OpenClaw Lite worker/tool path.
+- Town Hall onboarding must remain available but must not interrupt the first manual loop.
+- Keep normal gameplay free of raw provider/runtime/wallet/debug jargon.
+
+When changing onboarding/gating:
+
+- update the V1.4.4 onboarding tests;
+- preserve existing Town Hall full-onboarding tests;
+- verify Founders Plot is reachable immediately after authenticated entry;
+- verify Real Clover remains locked without Brain.
+
 
 ---
 

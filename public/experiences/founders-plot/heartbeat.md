@@ -1,5 +1,30 @@
 # Founders Plot Heartbeat
 
+## Brain requirement for heartbeat action
+
+If Clover is in Manual Founder Mode or Brain is not configured:
+
+- do not run autonomous heartbeat actions;
+- do not call mutation tools;
+- do not create Foreman receipts;
+- do not attribute events to AGENT/Clover;
+- optionally surface a non-blocking guide suggestion to the UI.
+
+If Clover is in Real Clover Foreman Mode:
+
+- run heartbeat according to existing cadence and scheduler rules;
+- include `skill.md`, `heartbeat.md`, `tools.md`, `goals.md`, observation, safe candidates, and policy state in the decision context;
+- choose one safe candidate or return `HEARTBEAT_OK`;
+- server validation remains authoritative.
+
+## No-op rule
+
+If Brain/runtime/context is missing, the correct heartbeat output is:
+
+```text
+HEARTBEAT_OK: Brain required for real Foreman action.
+```
+
 ## Runtime boundary
 
 - Clover runs in-session only in V1.2.

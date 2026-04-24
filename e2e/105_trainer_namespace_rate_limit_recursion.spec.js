@@ -46,7 +46,7 @@ test('trainer namespace enforces rate limits and blocks recursive dispatch attem
   };
   const perTurnNowBase = Date.now();
 
-  const t1 = await invokeTool(page, 'trainer.list_runs', {
+  const t1 = await invokeTool(page, 'trainer_list_runs', {
     limit: 5,
     __turnKey: 'turn-A',
     __policy: perTurnPolicy,
@@ -54,7 +54,7 @@ test('trainer namespace enforces rate limits and blocks recursive dispatch attem
   });
   expect(t1?.ok).toBe(true);
 
-  const t2 = await invokeTool(page, 'trainer.list_runs', {
+  const t2 = await invokeTool(page, 'trainer_list_runs', {
     limit: 5,
     __turnKey: 'turn-A',
     __policy: perTurnPolicy,
@@ -62,7 +62,7 @@ test('trainer namespace enforces rate limits and blocks recursive dispatch attem
   });
   expect(t2?.ok).toBe(true);
 
-  const t3 = await invokeTool(page, 'trainer.list_runs', {
+  const t3 = await invokeTool(page, 'trainer_list_runs', {
     limit: 5,
     __turnKey: 'turn-A',
     __policy: perTurnPolicy,
@@ -71,7 +71,7 @@ test('trainer namespace enforces rate limits and blocks recursive dispatch attem
   expect(t3?.ok).toBe(false);
   expect(String(t3?.code || '')).toBe('TRAINER_RATE_LIMITED');
 
-  const nextTurn = await invokeTool(page, 'trainer.list_runs', {
+  const nextTurn = await invokeTool(page, 'trainer_list_runs', {
     limit: 5,
     __turnKey: 'turn-B',
     __policy: perTurnPolicy,
@@ -92,7 +92,7 @@ test('trainer namespace enforces rate limits and blocks recursive dispatch attem
   };
   const minuteNowBase = Date.now() + 1000;
 
-  const minute1 = await invokeTool(page, 'trainer.list_runs', {
+  const minute1 = await invokeTool(page, 'trainer_list_runs', {
     limit: 5,
     __turnKey: 'minute-turn',
     __policy: minutePolicy,
@@ -100,7 +100,7 @@ test('trainer namespace enforces rate limits and blocks recursive dispatch attem
   });
   expect(minute1?.ok).toBe(true);
 
-  const minuteBlocked = await invokeTool(page, 'trainer.list_runs', {
+  const minuteBlocked = await invokeTool(page, 'trainer_list_runs', {
     limit: 5,
     __turnKey: 'minute-turn',
     __policy: minutePolicy,
@@ -109,7 +109,7 @@ test('trainer namespace enforces rate limits and blocks recursive dispatch attem
   expect(minuteBlocked?.ok).toBe(false);
   expect(String(minuteBlocked?.code || '')).toBe('TRAINER_RATE_LIMITED');
 
-  const minuteReset = await invokeTool(page, 'trainer.list_runs', {
+  const minuteReset = await invokeTool(page, 'trainer_list_runs', {
     limit: 5,
     __turnKey: 'minute-turn',
     __policy: minutePolicy,
@@ -122,7 +122,7 @@ test('trainer namespace enforces rate limits and blocks recursive dispatch attem
     if (!plugin || typeof plugin.invokeTool !== 'function') return null;
     let nested = null;
     const outer = await plugin.invokeTool({
-      toolName: 'trainer.list_runs',
+      toolName: 'trainer_list_runs',
       params: {
         limit: 1,
         __turnKey: 'rec-outer',
@@ -135,7 +135,7 @@ test('trainer namespace enforces rate limits and blocks recursive dispatch attem
       gatewayApi: {
         trainerListAttempts: async () => {
           nested = await plugin.invokeTool({
-            toolName: 'trainer.list_runs',
+            toolName: 'trainer_list_runs',
             params: {
               limit: 1,
               __turnKey: 'rec-inner',

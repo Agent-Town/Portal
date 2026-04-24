@@ -6,7 +6,8 @@ const {
   openFoundersPlotFrame,
   placeFirstLumberCamp,
   postJson,
-  runPlotTool
+  runPlotTool,
+  startForemanRuntime
 } = require('./helpers/founders_plot');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
@@ -46,9 +47,7 @@ test('the human route rejects actor spoofing and the foreman route requires runt
 test('the Foreman runtime boots through OpenClaw Lite, exposes the observation packet, and acts through the authenticated route', async ({ page }) => {
   const frame = await openFoundersPlotFrame(page);
 
-  const started = await frame.evaluate(async () => {
-    return await window.__foundersPlotTest.startForemanRuntime();
-  });
+  const started = await startForemanRuntime(frame);
   expect(started?.ok).toBe(true);
   expect(started?.runtime?.runtimeId).toMatch(/^rt_/);
 

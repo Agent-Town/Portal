@@ -46,6 +46,20 @@ function makeTextChunks({ id, model, text }) {
 
 test('live Foreman ticks use a client-only OpenRouter call and persist an llm-sourced decision before acting', async ({ page }) => {
   const frame = await openFoundersPlotFrame(page);
+  await page.evaluate(async ({ provider, model, apiKey }) => {
+    const lib = await import('/openclaw-lite/llm-config-library.js');
+    await lib.saveLlmConfig({
+      provider,
+      model,
+      apiKey,
+      authMode: 'api-key',
+      useProxy: false
+    });
+  }, {
+    provider: 'openrouter',
+    model: OPENROUTER_MODEL,
+    apiKey: 'or-test-key'
+  });
   const configured = await page.evaluate(async ({ provider, modelRef, modelId, api, baseUrl, apiKey }) => {
     return await window.__openclawLiteTest.setLlmConfig({
       provider,

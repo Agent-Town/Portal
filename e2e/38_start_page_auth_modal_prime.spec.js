@@ -59,10 +59,10 @@ test('start page opens auth modal immediately while Privy bridge login is still 
 
   await page.goto('/start');
   await selectStartPreset(page, 'global-default');
-  await page.getByRole('button', { name: 'Enter' }).click();
+  await page.getByRole('button', { name: 'Play Founders Plot' }).click();
   await expect(page.locator('[data-testid="privy-auth-box"]')).toBeVisible({ timeout: 500 });
 
   await page.locator('#privyEmailInput').fill('fast@example.com');
   await page.locator('#privyEmailForm').getByRole('button', { name: 'Send code' }).click();
-  await expect(page).toHaveURL(/\/app$/);
+  await expect(page).toHaveURL(/\/app\?district=founders-plot&entry=play-first$/);
 });
