@@ -4295,7 +4295,9 @@ body.town-hub-page .townScene::before {
 
 body.town-hub-page .townDistrictHotspot {
   border: 0;
-  border-radius: 14px;
+  border-radius: 18px;
+  justify-content: flex-end;
+  padding: 6px;
 }
 
 body.town-hub-page .townDistrictHotspot::before {
@@ -4310,6 +4312,12 @@ body.town-hub-page .townDistrictHotspot::before {
 }
 
 body.town-hub-page .townDistrictLabel {
+  width: auto;
+  min-width: min(100%, 128px);
+  max-width: min(100%, 220px);
+  min-height: 34px;
+  opacity: 0;
+  transform: translateY(5px);
   border: 2px solid rgba(196, 136, 58, 0.78);
   border-radius: 10px;
   background: rgba(46, 27, 14, 0.82);
@@ -4318,16 +4326,16 @@ body.town-hub-page .townDistrictLabel {
   box-shadow:
     0 2px 8px rgba(0, 0, 0, 0.35),
     inset 0 1px 0 rgba(255, 228, 160, 0.15);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
 }
 
 body.town-hub-page .townDistrictIcon {
-  border-color: rgba(255, 228, 160, 0.82);
-  background:
-    linear-gradient(180deg, rgba(255, 248, 230, 0.18), rgba(46, 27, 14, 0.08)),
-    var(--district-icon-image, none) center/cover no-repeat;
-  box-shadow:
-    0 10px 18px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  display: none;
 }
 
 body.town-hub-page .townDistrictHotspot:hover::before,
@@ -4338,20 +4346,122 @@ body.town-hub-page .townDistrictHotspot.is-hovered::before {
 }
 
 body.town-hub-page .townDistrictHotspot:hover .townDistrictLabel,
-body.town-hub-page .townDistrictHotspot.is-hovered .townDistrictLabel {
+body.town-hub-page .townDistrictHotspot.is-hovered .townDistrictLabel,
+body.town-hub-page .townDistrictHotspot:focus-visible .townDistrictLabel,
+body.town-hub-page .townDistrictHotspot.is-active .townDistrictLabel {
+  opacity: 1;
+  transform: translateY(0);
   background: rgba(196, 136, 58, 0.9);
   border-color: rgba(255, 228, 160, 0.95);
   color: #2d180c;
   text-shadow: none;
 }
 
-body.town-hub-page .townDistrictHotspot:hover .townDistrictIcon,
-body.town-hub-page .townDistrictHotspot.is-hovered .townDistrictIcon {
-  border-color: rgba(255, 240, 192, 0.95);
-  box-shadow:
-    0 14px 20px rgba(0, 0, 0, 0.36),
-    0 0 0 3px rgba(255, 228, 160, 0.18);
-  transform: translateX(-50%) translateY(-1px);
+body.town-hub-page .townDistrict-fountain {
+  left: 68%;
+  top: 23%;
+  width: 24%;
+  height: 30%;
+}
+
+body.town-hub-page .townDistrict-board {
+  left: 43%;
+  top: 41%;
+  width: 20%;
+  height: 20%;
+}
+
+body.town-hub-page .townDistrict-pony {
+  top: 48%;
+  left: 0;
+  width: 26%;
+  height: 34%;
+}
+
+body.town-hub-page .townDistrict-townhall {
+  top: 9%;
+  left: 36%;
+  width: 27%;
+  height: 31%;
+}
+
+body.town-hub-page .townDistrict-saloon {
+  top: 20%;
+  left: 6%;
+  right: auto;
+  width: 27%;
+  height: 33%;
+}
+
+body.town-hub-page .townDistrict-founders {
+  left: 26%;
+  top: 57%;
+  width: 23%;
+  height: 22%;
+}
+
+body.town-hub-page .townDistrict-wagons {
+  left: auto;
+  right: 4%;
+  bottom: 8%;
+  width: 30%;
+  height: 32%;
+}
+
+body.town-hub-page .townDistrict-wagons .townDistrictLabel {
+  width: auto;
+  min-height: 36px;
+}
+
+@media (max-width: 720px) {
+  body.town-hub-page .townDistrict-fountain {
+    left: 58%;
+    top: 25%;
+    width: 38%;
+    height: 26%;
+  }
+
+  body.town-hub-page .townDistrict-board {
+    left: 38%;
+    top: 40%;
+    width: 32%;
+    height: 20%;
+  }
+
+  body.town-hub-page .townDistrict-pony {
+    top: 48%;
+    left: 0;
+    width: 36%;
+    height: 27%;
+  }
+
+  body.town-hub-page .townDistrict-townhall {
+    top: 8%;
+    left: 30%;
+    width: 42%;
+    height: 27%;
+  }
+
+  body.town-hub-page .townDistrict-saloon {
+    top: 20%;
+    left: 0;
+    width: 38%;
+    height: 28%;
+  }
+
+  body.town-hub-page .townDistrict-founders {
+    left: 20%;
+    top: 57%;
+    width: 35%;
+    height: 20%;
+  }
+
+  body.town-hub-page .townDistrict-wagons {
+    right: 0;
+    bottom: 8%;
+    width: 42%;
+    height: 28%;
+  }
 }
 
 body.town-hub-page .townDistrictHotspot.is-active::before {

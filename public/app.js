@@ -1292,6 +1292,9 @@ function districtStatusText(district) {
   if (!district) return tApp('district.status.select');
   if (district === 'atlas') return tApp('district.status.atlas');
   if (district === 'founders-plot') return 'Founders Plot is ready.';
+  if (district === 'brain') return 'Connect or adjust your Brain settings.';
+  if (district === 'sigil') return tApp('sigil.title');
+  if (district === 'ceremony') return tApp('ceremony.title');
   if (district === 'townhall') return tApp('district.status.townhall');
   if (district === 'saloon') return tApp('district.status.saloon');
   if (district === 'pony') return tApp('district.status.pony');
@@ -1306,6 +1309,9 @@ function setActiveDistrict(district) {
     || district === 'saloon'
     || district === 'pony'
     || district === 'leaderboard'
+    || district === 'brain'
+    || district === 'sigil'
+    || district === 'ceremony'
     || district === 'house'
     ? district
     : null;
@@ -1346,6 +1352,7 @@ function explicitDistrictFromInput(district) {
     || district === 'leaderboard'
     || district === 'brain'
     || district === 'sigil'
+    || district === 'ceremony'
     || district === 'house'
     ? district
     : null;
