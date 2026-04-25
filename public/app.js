@@ -65,6 +65,7 @@ function normalizeOnboardingStep(value) {
 function getOnboardingStep(state) {
   const onboarding = state?.onboarding || {};
   if (onboarding.required !== true) return ONBOARDING_STEP_DONE;
+  if (state?.houseId) return ONBOARDING_STEP_DONE;
 
   const explicitStep = normalizeOnboardingStep(onboarding.step);
   if (explicitStep) return explicitStep;
@@ -72,7 +73,6 @@ function getOnboardingStep(state) {
   if (onboarding.registrationComplete !== true) return ONBOARDING_STEP_TOWNHALL;
   if (!isTownhallBrainConfigured(state)) return ONBOARDING_STEP_BRAIN;
   if (!state?.signup?.complete) return ONBOARDING_STEP_SIGIL;
-  if (state?.houseId) return ONBOARDING_STEP_DONE;
   return ONBOARDING_STEP_CEREMONY;
 }
 

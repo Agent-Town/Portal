@@ -18,9 +18,43 @@ async function installMockSolanaWallet(page, {
   await page.addInitScript(({ addr, sig, includeDisconnect }) => {
     const signatureBytes = Uint8Array.from(sig);
     const signResult = { signature: signatureBytes, publicKey: { toString: () => addr } };
+    const decodeMessage = (message) => {
+      try {
+        if (typeof message === 'string') return message;
+        if (message instanceof Uint8Array) return new TextDecoder().decode(message);
+        if (message instanceof ArrayBuffer) return new TextDecoder().decode(new Uint8Array(message));
+        if (ArrayBuffer.isView(message)) {
+          return new TextDecoder().decode(new Uint8Array(message.buffer, message.byteOffset, message.byteLength));
+        }
+        return '';
+      } catch {
+        return '';
+      }
+    };
+    const recordSignedMessage = (message) => {
+      const text = decodeMessage(message);
+      if (!text) return;
+      const current = Array.isArray(window.__mockSolanaSignedMessages)
+        ? window.__mockSolanaSignedMessages
+        : [];
+      current.push(text);
+      window.__mockSolanaSignedMessages = current;
+      try {
+        window.localStorage.setItem('__mockSolanaSignedMessages', JSON.stringify(current));
+      } catch {
+        // ignore test recorder storage failures
+      }
+    };
+    const sign = async (message) => {
+      recordSignedMessage(message);
+      return signResult;
+    };
     const walletProvider = {
-      request: async ({ method }) => {
-        if (method === 'signMessage' || method === 'solana_signMessage') return signResult;
+      request: async ({ method, params }) => {
+        if (method === 'signMessage' || method === 'solana_signMessage') {
+          recordSignedMessage(Array.isArray(params) ? params[0] : null);
+          return signResult;
+        }
         if (method === 'signAndSendTransaction' || method === 'solana_signAndSendTransaction') {
           return { signature: 'mock-solana-signature' };
         }
@@ -32,13 +66,13 @@ async function installMockSolanaWallet(page, {
     window.solana = {
       isPhantom: true,
       connect: async () => ({ publicKey: { toString: () => addr } }),
-      signMessage: async () => signResult,
+      signMessage: sign,
       ...(includeDisconnect ? { disconnect: async () => {} } : {})
     };
     window.__PRIVY_WALLET_BRIDGE__ = {
       connectSolana: async () => ({ address: addr, provider: walletProvider, wallet: walletProvider }),
       disconnectSolana: async () => {},
-      signSolanaMessage: async () => signResult
+      signSolanaMessage: async ({ message, bytes } = {}) => sign(bytes || message)
     };
   }, { addr: address, sig: signature, includeDisconnect: withDisconnect });
 }

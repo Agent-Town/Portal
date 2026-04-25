@@ -19,6 +19,8 @@ created_at: 2026-04-24
 | T6 | `tests/v1_4_4_markdown_readability.test.js` | Node/TAP | Proves new docs are LLM-readable markdown. | No one-line specs; no giant prose lines; required headings present. |
 | T7 | Existing V1.4.4 tests | Regression | Preserve Play-First behavior. | All still pass. |
 | T8 | Existing visual/player-surface tests | Regression | Preserve V1.4.3/V1.4.2 UI wins. | All still pass or baselines intentionally updated. |
+| T9 | `e2e/120_onboarding_privy_required.spec.js` | Playwright | Proves direct `/app?district=house` honors existing `houseId` even when stale onboarding state says `ceremony`. | Plan Wagons remains open; Town Hall and ceremony iframe do not reappear. |
+| T10 | `e2e/38_phase1_create_ceremony_regression.spec.js` | Playwright | Proves ceremony house init sends the wallet key-wrap signature expected by production server verification. | `/api/house/init` receives `keyWrapSig`; key-wrap message contains `houseId` and no `origin:` line. |
 
 ## 2. Detailed test requirements
 
@@ -115,6 +117,54 @@ Suggested rules:
 - required headings present;
 - front matter parseable if present.
 
+### T9 — Direct house route after ceremony
+
+Test steps:
+
+1. Open `/app?district=house`.
+2. Mock a real app-state shape with:
+
+```text
+onboarding.required = true
+onboarding.registrationComplete = true
+onboarding.step = ceremony
+signup.complete = true
+houseId = <existing house id>
+```
+
+3. Assert the modal remains on `Plan Wagons`.
+4. Assert the Town Hall registration panel is absent.
+5. Assert the ceremony iframe is absent.
+6. Wait through a poll interval and assert the route does not downgrade.
+
+Metric:
+
+```text
+StaleCeremonyHouseRouteDowngrade = 0
+```
+
+### T10 — Ceremony key-wrap signature
+
+Test steps:
+
+1. Run the real create-page co-op ceremony regression path.
+2. Capture the `/api/house/init` payload.
+3. Assert `keyWrapSig` is present and decodes to a 64-byte Solana signature.
+4. Assert the signed key-wrap message is:
+
+```text
+ElizaTown House Key Wrap
+houseId: <houseId>
+```
+
+5. Assert the signed key-wrap message does not include `origin:`.
+
+Metric:
+
+```text
+ProductionHouseInitMissingUnlockSignature = 0
+```
+
 ## 3. Metrics
 
 | Metric | Measurement | Pass threshold |
@@ -127,13 +177,15 @@ Suggested rules:
 | `NoBrainAgentEventRate` | replay/event check | 0 |
 | `MarkdownReadabilityPassRate` | Node/TAP readability test | 100% |
 | `OutOfScopeGameplayChanges` | scope guard / reviewer check | 0 |
+| `StaleCeremonyHouseRouteDowngrade` | direct house route regression test | 0 |
+| `ProductionHouseInitMissingUnlockSignature` | create ceremony regression test | 0 |
 
 ## 4. Release gate
 
 The patch is release-candidate ready only when:
 
 ```text
-T1 through T8 pass
+T1 through T10 pass
 AND no gameplay/system scope was added
 AND implementation report is complete
 ```

@@ -14,6 +14,18 @@ test.beforeEach(async ({ request }) => {
 test('create flow preserves ceremony + house generation and keeps house-auth meta access', async ({ page, request }) => {
   await installMockSolanaWallet(page);
   await reachCreateViaLite(page);
+  await page.evaluate(() => {
+    try {
+      localStorage.removeItem('__mockSolanaSignedMessages');
+    } catch {}
+    window.__mockSolanaSignedMessages = [];
+  });
+
+  const houseInitPayloads = [];
+  await page.route('**/api/house/init', async (route) => {
+    houseInitPayloads.push(route.request().postDataJSON());
+    await route.continue();
+  });
 
   await page.getByTestId('px-0-0').click();
   await expect(page.getByTestId('px-0-0')).toHaveAttribute('data-color', /[1-9]/);
@@ -180,6 +192,23 @@ test('create flow preserves ceremony + house generation and keeps house-auth met
 
   const houseId = new URL(page.url()).searchParams.get('house');
   expect(houseId).toBeTruthy();
+  expect(houseInitPayloads.length).toBe(1);
+  const houseInitPayload = houseInitPayloads[0] || {};
+  expect(houseInitPayload.houseId).toBe(houseId);
+  expect(Buffer.from(String(houseInitPayload.keyWrapSig || ''), 'base64')).toHaveLength(64);
+
+  const signedMessages = await page.evaluate(() => {
+    try {
+      return JSON.parse(localStorage.getItem('__mockSolanaSignedMessages') || '[]');
+    } catch {
+      return [];
+    }
+  });
+  const keyWrapMessages = signedMessages.filter((message) =>
+    String(message || '').startsWith('ElizaTown House Key Wrap')
+  );
+  expect(keyWrapMessages).toContain(['ElizaTown House Key Wrap', `houseId: ${houseId}`].join('\n'));
+  expect(keyWrapMessages.some((message) => String(message || '').includes('origin:'))).toBe(false);
 
   const connectWalletBtn = page.getByRole('button', { name: /Connect wallet|Disconnect wallet/ });
   const walletLabel = (await connectWalletBtn.textContent()) || '';

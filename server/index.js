@@ -1527,10 +1527,10 @@ function getOnboardingStepFromSession(session) {
   const onboarding = session?.onboarding && typeof session.onboarding === 'object' ? session.onboarding : {};
   if (onboarding.required !== true) return ONBOARDING_STEP_DONE;
   if (onboarding.registrationComplete !== true) return ONBOARDING_STEP_TOWNHALL;
+  if (session?.houseCeremony?.houseId) return ONBOARDING_STEP_DONE;
   const explicitStep = normalizeOnboardingStep(onboarding.step);
   if (explicitStep && explicitStep !== ONBOARDING_STEP_TOWNHALL) return explicitStep;
   if (session?.signup?.complete !== true) return ONBOARDING_STEP_BRAIN;
-  if (session?.houseCeremony?.houseId) return ONBOARDING_STEP_DONE;
   return ONBOARDING_STEP_CEREMONY;
 }
 
@@ -2937,8 +2937,9 @@ function ensureSessionOnboarding(session) {
   onboarding.required = ONBOARDING_REQUIRED;
   onboarding.registrationComplete = onboarding.registrationComplete === true;
   onboarding.step = normalizeOnboardingStep(onboarding.step);
-  if (!onboarding.step) {
-    onboarding.step = getOnboardingStepFromSession(session);
+  const derivedStep = getOnboardingStepFromSession(session);
+  if (!onboarding.step || (session?.houseCeremony?.houseId && derivedStep === ONBOARDING_STEP_DONE)) {
+    onboarding.step = derivedStep;
   }
   onboarding.registeredAt = typeof onboarding.registeredAt === 'string' ? onboarding.registeredAt : null;
 

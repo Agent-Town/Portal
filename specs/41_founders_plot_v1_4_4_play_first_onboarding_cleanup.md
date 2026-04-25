@@ -611,6 +611,40 @@ The final team report must include:
 
 ## 12. Machine-readable summary
 
+## 12.1 RC route and ceremony hotfix note
+
+QA found one production-path blocker after the cleanup branch reached commit `0f25a8f`.
+
+Observed behavior:
+
+```text
+/app?district=house briefly opened Plan Wagons,
+then downgraded into the Town Hall/onboarding shell with step 4 active.
+```
+
+The regenerated standalone route at `/views/house.html` rendered correctly, so this was a state-gating bug rather than an asset or view bug.
+
+Required RC truth:
+
+- Once `houseId` exists, onboarding is complete even if a stale explicit `onboarding.step` still says `ceremony`.
+- The server and app shell must both derive `done` before honoring stale ceremony state.
+- The ceremony client must send `keyWrapSig` to `/api/house/init` for real Privy/Solana wallet users.
+- The ceremony key-wrap signature message must match the server-verifiable recovery message:
+
+```text
+ElizaTown House Key Wrap
+houseId: <houseId>
+```
+
+Do not include the current browser origin in the primary ceremony key-wrap signature.
+Origin fallback remains only for legacy recovery attempts on the house page.
+
+Regression coverage:
+
+- `e2e/120_onboarding_privy_required.spec.js` includes the stale-ceremony direct-house route case.
+- `e2e/38_phase1_create_ceremony_regression.spec.js` asserts that `/api/house/init` includes `keyWrapSig`.
+- The same test asserts that the signed key-wrap message has no `origin:` line.
+
 ```yaml
 spec_id: 41_founders_plot_v1_4_4_play_first_onboarding_cleanup
 version: v1.4.4-cleanup
@@ -623,6 +657,8 @@ must_fix:
   - free_preview_brain_not_real_clover
   - protected_foreman_no_brain_behavior_test
   - markdown_readability_reformat
+  - stale_ceremony_house_route_done_truth
+  - ceremony_house_init_key_wrap_signature
 non_goals:
   - new_gameplay_systems
   - persistent_foreman

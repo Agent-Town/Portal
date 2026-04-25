@@ -956,7 +956,7 @@ async function init() {
       const ponyInbox = await makePonyInboxRegistration(Kroot);
 
       // 3.5) Wrap K_root with a deterministic wallet signature for recovery.
-      const wrapMsg = buildKeyWrapMessage({ houseId: housePubKey, origin: window.location.origin });
+      const wrapMsg = buildKeyWrapMessage({ houseId: housePubKey });
       const wrapSig = await signMessageBytes(wrapMsg);
       const wrapKeyBytes = await sha256(wrapSig);
       const wrapKey = await crypto.subtle.importKey('raw', wrapKeyBytes, { name: 'AES-GCM' }, false, ['encrypt']);
@@ -983,6 +983,7 @@ async function init() {
             address
           },
           keyWrap,
+          keyWrapSig: b64(wrapSig),
           houseAuthKey,
           ponyInboxPub: ponyInbox.ponyInboxPub,
           ponyInboxPrivWrap: ponyInbox.ponyInboxPrivWrap

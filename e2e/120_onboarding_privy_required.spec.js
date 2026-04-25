@@ -281,6 +281,54 @@ test('ceremony postMessage closes modal', async ({ page }) => {
   await page.screenshot({ path: `${DIR}/privy_06_ceremony_complete.png` });
 });
 
+test('direct house route stays on Plan Wagons when a house exists despite stale ceremony step', async ({ page }) => {
+  await installMockSolanaWallet(page);
+  const houseId = 'StaleCeremonyHouse111111111111111111111111111';
+
+  await page.route('**/api/state', async (route) => {
+    let json;
+    try {
+      const response = await route.fetch();
+      json = await response.json();
+    } catch {
+      json = { ok: true };
+    }
+    json.authenticated = true;
+    json.onboarding = {
+      ...(json.onboarding || {}),
+      required: true,
+      registrationComplete: true,
+      step: 'ceremony'
+    };
+    json.lite = {
+      ...(json.lite || {}),
+      llmConfigured: true
+    };
+    json.signup = {
+      ...(json.signup || {}),
+      complete: true
+    };
+    json.ceremony = {
+      ...(json.ceremony || {}),
+      houseId
+    };
+    json.houseId = houseId;
+    await route.fulfill({ body: JSON.stringify(json) });
+  });
+
+  await page.goto('/app?district=house');
+  await expect(page.locator('#districtModalBackdrop:not(.is-hidden)')).toHaveCount(1, { timeout: 5000 });
+  await expect(page.locator('#districtModalTitle')).toHaveText('Plan Wagons');
+  await expect(page.getByTestId('house-platform-illustration')).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('#townhallRegisterPanel')).toHaveCount(0);
+  await expect(page.locator('.districtFrame')).toHaveCount(0);
+
+  await page.waitForTimeout(1800);
+  await expect(page.locator('#districtModalTitle')).toHaveText('Plan Wagons');
+  await expect(page.getByTestId('house-platform-illustration')).toBeVisible();
+  await expect(page.locator('#townhallRegisterPanel')).toHaveCount(0);
+});
+
 test('townhall char count and inline validation', async ({ page }) => {
   await installMockSolanaWallet(page);
   await enterThenActivateOnboarding(page, 'townhall_profile');
