@@ -21,6 +21,7 @@ created_at: 2026-04-24
 | T8 | Existing visual/player-surface tests | Regression | Preserve V1.4.3/V1.4.2 UI wins. | All still pass or baselines intentionally updated. |
 | T9 | `e2e/120_onboarding_privy_required.spec.js` | Playwright | Proves direct `/app?district=house` honors existing `houseId` even when stale onboarding state says `ceremony`. | Plan Wagons remains open; Town Hall and ceremony iframe do not reappear. |
 | T10 | `e2e/38_phase1_create_ceremony_regression.spec.js` | Playwright | Proves ceremony house init sends the wallet key-wrap signature expected by production server verification. | `/api/house/init` receives `keyWrapSig`; key-wrap message contains `houseId` and no `origin:` line. |
+| T11 | `e2e/213_rc_incognito_house_route_verification.spec.js` | Playwright | Proves RC House-route verification uses a clean isolated browser context instead of stale cookies/localStorage. | Clean no-session route redirects to Start Gate; clean seeded-house route stays on Plan Wagons after reload and stale ceremony state. |
 
 ## 2. Detailed test requirements
 
@@ -165,6 +166,37 @@ Metric:
 ProductionHouseInitMissingUnlockSignature = 0
 ```
 
+### T11 — Incognito-safe House route verification
+
+Test cases:
+
+1. Start from a new empty browser context.
+2. Mock production-style Privy gating with no signed-in user.
+3. Open `/app?district=house`.
+4. Assert the route redirects to `/start`.
+5. Start from a new empty browser context again.
+6. Create or seed a recoverable house using only that context-owned session.
+7. Open `/app?district=house`.
+8. Reload the same route.
+9. Force a stale `onboarding.step = ceremony` state response while preserving the created `houseId`.
+10. Assert the route remains on `Plan Wagons` / House and does not reopen Town Hall or Ceremony.
+
+Screenshot evidence:
+
+```text
+/tmp/portal-screenshots/rc-incognito-house-deeplink-start.png
+/tmp/portal-screenshots/rc-incognito-seeded-house-route.png
+/tmp/portal-screenshots/rc-incognito-stale-ceremony-house-route.png
+```
+
+Metrics:
+
+```text
+CleanHouseDeeplinkWithoutSessionRedirectsStart = 1
+CleanSeededHouseRouteReloadPassRate = 100%
+CleanSeededStaleCeremonyDowngrade = 0
+```
+
 ## 3. Metrics
 
 | Metric | Measurement | Pass threshold |
@@ -179,13 +211,16 @@ ProductionHouseInitMissingUnlockSignature = 0
 | `OutOfScopeGameplayChanges` | scope guard / reviewer check | 0 |
 | `StaleCeremonyHouseRouteDowngrade` | direct house route regression test | 0 |
 | `ProductionHouseInitMissingUnlockSignature` | create ceremony regression test | 0 |
+| `CleanHouseDeeplinkWithoutSessionRedirectsStart` | clean isolated context route test | 1 |
+| `CleanSeededHouseRouteReloadPassRate` | clean isolated seeded-house route test | 100% |
+| `CleanSeededStaleCeremonyDowngrade` | clean isolated stale-state route test | 0 |
 
 ## 4. Release gate
 
 The patch is release-candidate ready only when:
 
 ```text
-T1 through T10 pass
+T1 through T11 pass
 AND no gameplay/system scope was added
 AND implementation report is complete
 ```

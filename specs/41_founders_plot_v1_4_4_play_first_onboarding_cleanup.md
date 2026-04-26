@@ -645,6 +645,31 @@ Regression coverage:
 - `e2e/38_phase1_create_ceremony_regression.spec.js` asserts that `/api/house/init` includes `keyWrapSig`.
 - The same test asserts that the signed key-wrap message has no `origin:` line.
 
+## 12.2 Incognito-safe RC verification addendum
+
+QA later found that manual `/app?district=house` checks can be misleading when run in a normal browser window.
+Old `et_session` cookies or local browser state can make the route look valid even when a clean browser has no completed house session.
+
+Required verification rule:
+
+- A clean incognito browser with no completed house session should redirect `/app?district=house` to Start Gate.
+- A clean isolated browser may prove post-house continuity only after it creates or seeds a house in that same isolated context.
+- The accepted deterministic seed path is:
+
+```text
+new empty browser context
+seed/create recoverable test house through the context-owned session
+open /app?district=house
+reload /app?district=house
+force stale onboarding.step = ceremony in /api/state
+verify Plan Wagons/House remains open
+```
+
+Regression coverage:
+
+- `e2e/213_rc_incognito_house_route_verification.spec.js` proves the clean no-session redirect.
+- The same test proves the clean seeded-house route, reload, and stale-ceremony route truth.
+
 ```yaml
 spec_id: 41_founders_plot_v1_4_4_play_first_onboarding_cleanup
 version: v1.4.4-cleanup
@@ -659,6 +684,7 @@ must_fix:
   - markdown_readability_reformat
   - stale_ceremony_house_route_done_truth
   - ceremony_house_init_key_wrap_signature
+  - incognito_safe_house_route_verification
 non_goals:
   - new_gameplay_systems
   - persistent_foreman
