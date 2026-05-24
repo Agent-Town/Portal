@@ -62,6 +62,7 @@ const EVENT_TYPES = {
   REQUESTER_SEEN: 'REQUESTER_SEEN',
   TOWN_SIGNAL_CHANGED: 'TOWN_SIGNAL_CHANGED',
   LANDMARK_UPGRADED: 'LANDMARK_UPGRADED',
+  TOWN_OPPORTUNITY_RESOLVED: 'TOWN_OPPORTUNITY_RESOLVED',
   TOWN_JOURNAL_ENTRY_CREATED: 'TOWN_JOURNAL_ENTRY_CREATED',
   FOREMAN_WORKER_COMMAND_STARTED: 'FOREMAN_WORKER_COMMAND_STARTED',
   FOREMAN_WORKER_COMMAND_COMPLETED: 'FOREMAN_WORKER_COMMAND_COMPLETED',
@@ -257,6 +258,123 @@ const PUBLIC_SQUARE_REWARD = {
   signalDelta: { publicCharm: 10 }
 };
 
+const FIRST_TOWN_OPPORTUNITY = {
+  opportunityId: 'first_campfire_choice',
+  title: 'A campfire decision',
+  body: 'The first timber haul draws neighbors to the square. Choose the town mood you want to build around.',
+  sourceObjectId: 'PUBLIC_SQUARE',
+  options: [
+    {
+      optionId: 'raise_waymarkers',
+      label: 'Raise waymarkers',
+      body: 'Spend wood on trail signs so travelers and depot runners find the plot faster.',
+      cost: { wood: 4, coin: 2 },
+      reward: { townXp: 6 },
+      signalDelta: { depotReadiness: 8, publicCharm: 4 },
+      cloverTradeoff: {
+        pro: 'Depot reach.',
+        con: 'Costs early wood and coin.'
+      },
+      outcomeTitle: 'Waymarkers raised',
+      outcomeBody: 'The depot route is easier to follow, and the square feels a little more official.'
+    },
+    {
+      optionId: 'host_neighbor_supper',
+      label: 'Host a neighbor supper',
+      body: 'Spend food on a warm first meal so nearby families feel invited into the new town.',
+      cost: { food: 4, coin: 2 },
+      reward: { townXp: 6 },
+      signalDelta: { neighborGoodwill: 10, marketConfidence: 3 },
+      cloverTradeoff: {
+        pro: 'Goodwill.',
+        con: 'Uses the food cushion.'
+      },
+      outcomeTitle: 'Neighbor supper hosted',
+      outcomeBody: 'The first shared meal gives the town a friendlier reputation.'
+    }
+  ]
+};
+
+const SUPPLY_COUNCIL_OPPORTUNITY = {
+  opportunityId: 'first_supply_council_choice',
+  title: 'A supply council',
+  body: 'The first choice has neighbors talking. Choose how the town gathers enough supplies to open Headquarters level 2.',
+  sourceObjectId: 'PUBLIC_SQUARE',
+  options: [
+    {
+      optionId: 'hire_depot_haulers',
+      label: 'Hire depot haulers',
+      body: 'Spend coin for a fast wood and food drop that gets the Headquarters upgrade moving.',
+      cost: { coin: 4 },
+      reward: { townXp: 4, resources: { wood: 20, food: 4 } },
+      signalDelta: { depotReadiness: 8, marketConfidence: -2 },
+      cloverTradeoff: {
+        pro: 'Fast HQ2 supplies.',
+        con: 'Costs coin; market dips.'
+      },
+      outcomeTitle: 'Depot haulers hired',
+      outcomeBody: 'A paid crew brings the missing stores, and the depot route starts to feel real.'
+    },
+    {
+      optionId: 'host_work_bee',
+      label: 'Host a work bee',
+      body: 'Keep coin in reserve and invite neighbors to haul enough wood and food together.',
+      cost: {},
+      reward: { townXp: 4, resources: { wood: 18, food: 4 } },
+      signalDelta: { neighborGoodwill: 7, publicCharm: 3 },
+      cloverTradeoff: {
+        pro: 'Saves coin; goodwill.',
+        con: 'Slightly less wood.'
+      },
+      outcomeTitle: 'Work bee hosted',
+      outcomeBody: 'Neighbors pitch in with a communal haul, leaving coin ready for the next build.'
+    }
+  ]
+};
+
+const LEVEL_TWO_CHARTER_OPPORTUNITY = {
+  opportunityId: 'level_two_charter_choice',
+  title: 'A level 2 charter',
+  body: 'With Headquarters level 2 open, the town wants a first civic priority. Choose the next lane.',
+  sourceObjectId: 'PUBLIC_SQUARE',
+  options: [
+    {
+      optionId: 'seed_farm_coop',
+      label: 'Seed the farm co-op',
+      body: 'Spend coin on seed stock so the first Farm Plot starts with neighbors already bought in.',
+      cost: { coin: 3 },
+      reward: { townXp: 5, resources: { wood: 10, food: 8 } },
+      signalDelta: { neighborGoodwill: 6, publicCharm: 3 },
+      cloverTradeoff: {
+        pro: 'Food safety.',
+        con: 'Delays request momentum.'
+      },
+      outcomeTitle: 'Farm co-op seeded',
+      outcomeBody: 'The town has enough lumber for the Farm Plot and a food cushion for the next push.'
+    },
+    {
+      optionId: 'organize_request_board',
+      label: 'Organize request board',
+      body: 'Spend coin to frame the first town requests and reserve stone for sturdier work.',
+      cost: { coin: 3 },
+      reward: { townXp: 5, resources: { wood: 10, stone: 4 } },
+      signalDelta: { marketConfidence: 6, depotReadiness: 4 },
+      cloverTradeoff: {
+        pro: 'Request momentum.',
+        con: 'Less food safety.'
+      },
+      outcomeTitle: 'Request board organized',
+      outcomeBody: 'The town is ready to track outside work, and the next Farm Plot still has enough lumber.'
+    }
+  ]
+};
+
+const TOWN_OPPORTUNITY_TEMPLATES = [
+  FIRST_TOWN_OPPORTUNITY,
+  SUPPLY_COUNCIL_OPPORTUNITY,
+  LEVEL_TWO_CHARTER_OPPORTUNITY
+];
+
 const FOUNDERS_PLOT_SCHEMA_VERSION = 3;
 const MAX_OFFLINE_MS = 8 * 60 * 60 * 1000;
 const SIMULATION_TICK_MS = 60 * 1000;
@@ -287,7 +405,8 @@ const META_CORE_KEYS = new Set([
   'foremanLastReceiptId',
   'townSignals',
   'requesters',
-  'landmarks'
+  'landmarks',
+  'townOpportunities'
 ]);
 
 function nowBucketHour(nowMs) {
@@ -554,6 +673,87 @@ function normalizeLandmarks(raw = {}) {
   };
 }
 
+function normalizeResourceDelta(raw = {}) {
+  return {
+    wood: normalizeCount(raw.wood),
+    stone: normalizeCount(raw.stone),
+    food: normalizeCount(raw.food),
+    coin: normalizeCount(raw.coin)
+  };
+}
+
+function normalizeTownOpportunityOption(raw = {}) {
+  return {
+    optionId: String(raw.optionId || ''),
+    label: String(raw.label || ''),
+    body: String(raw.body || ''),
+    cost: normalizeResourceDelta(raw.cost || {}),
+    reward: {
+      townXp: normalizeCount(raw?.reward?.townXp ?? raw?.reward?.town_xp),
+      resources: normalizeResourceDelta(raw?.reward?.resources || raw?.reward?.resourceDelta || {})
+    },
+    signalDelta: normalizeSignalDelta(raw.signalDelta || {}),
+    cloverTradeoff: {
+      pro: String(raw?.cloverTradeoff?.pro || raw?.tradeoff?.pro || ''),
+      con: String(raw?.cloverTradeoff?.con || raw?.tradeoff?.con || '')
+    },
+    outcomeTitle: String(raw.outcomeTitle || raw.label || ''),
+    outcomeBody: String(raw.outcomeBody || raw.body || '')
+  };
+}
+
+function normalizeTownOpportunity(raw = {}) {
+  if (!raw || typeof raw !== 'object') return null;
+  const opportunityId = String(raw.opportunityId || '');
+  if (!opportunityId) return null;
+  return {
+    opportunityId,
+    title: String(raw.title || ''),
+    body: String(raw.body || ''),
+    sourceObjectId: String(raw.sourceObjectId || 'PUBLIC_SQUARE'),
+    offeredAtMs: normalizeCount(raw.offeredAtMs),
+    options: Array.isArray(raw.options)
+      ? raw.options.map((option) => normalizeTownOpportunityOption(option)).filter((option) => option.optionId)
+      : []
+  };
+}
+
+function normalizeTownOpportunityResult(raw = {}) {
+  return {
+    opportunityId: String(raw.opportunityId || ''),
+    optionId: String(raw.optionId || ''),
+    title: String(raw.title || raw.outcomeTitle || ''),
+    body: String(raw.body || raw.outcomeBody || ''),
+    cost: normalizeResourceDelta(raw.cost || {}),
+    reward: {
+      townXp: normalizeCount(raw?.reward?.townXp ?? raw?.reward?.town_xp),
+      resources: normalizeResourceDelta(raw?.reward?.resources || raw?.reward?.resourceDelta || {})
+    },
+    signalDelta: normalizeSignalDelta(raw.signalDelta || {}),
+    resolvedAtMs: normalizeCount(raw.resolvedAtMs)
+  };
+}
+
+function normalizeTownOpportunities(raw = {}) {
+  return {
+    active: normalizeTownOpportunity(raw.active || raw.current || null),
+    completed: Array.isArray(raw.completed)
+      ? raw.completed.map((entry) => normalizeTownOpportunityResult(entry)).filter((entry) => entry.opportunityId && entry.optionId).slice(-8)
+      : []
+  };
+}
+
+function townOpportunityTemplateSnapshot(template, nowMs = Date.now()) {
+  return normalizeTownOpportunity({
+    opportunityId: template.opportunityId,
+    title: template.title,
+    body: template.body,
+    sourceObjectId: template.sourceObjectId,
+    offeredAtMs: nowMs,
+    options: template.options
+  });
+}
+
 function normalizeForemanWorker(raw = {}) {
   return {
     lastWorkerCommandId: String(raw.lastWorkerCommandId || ''),
@@ -623,6 +823,7 @@ function normalizeMeta(raw = {}) {
     townSignals: normalizeTownSignals(raw.townSignals),
     requesters: normalizeRequesterList(raw.requesters),
     landmarks: normalizeLandmarks(raw.landmarks),
+    townOpportunities: normalizeTownOpportunities(raw.townOpportunities),
     extensions: collectMetaExtensions(raw)
   };
 }
@@ -886,6 +1087,7 @@ function unlockedToolNames(state) {
     'et.plot.claim_reward',
     'et.plot.town.get_signals',
     'et.plot.town.upgrade_landmark',
+    'et.plot.town.resolve_opportunity',
     'et.plot.journal.get_entries',
     'et.plot.contracts.get_state',
     'et.plot.contracts.accept',
@@ -1021,6 +1223,48 @@ function applyTownSignals(state, delta = {}, { actor = 'SYSTEM', reason = 'CONTR
     });
   }
   return applied;
+}
+
+function completedOpportunityIds(state) {
+  return new Set((state?.meta?.townOpportunities?.completed || []).map((entry) => String(entry.opportunityId || '')));
+}
+
+function isTownOpportunityUnlocked(state, opportunityId) {
+  const completed = completedOpportunityIds(state);
+  if (opportunityId === FIRST_TOWN_OPPORTUNITY.opportunityId) {
+    return Array.isArray(state.meta.firstCollectedTypes) && state.meta.firstCollectedTypes.includes('LUMBER_CAMP');
+  }
+  if (opportunityId === SUPPLY_COUNCIL_OPPORTUNITY.opportunityId) {
+    return completed.has(FIRST_TOWN_OPPORTUNITY.opportunityId);
+  }
+  if (opportunityId === LEVEL_TWO_CHARTER_OPPORTUNITY.opportunityId) {
+    return completed.has(SUPPLY_COUNCIL_OPPORTUNITY.opportunityId) && normalizeCount(state?.plot?.hqLevel) >= 2;
+  }
+  return false;
+}
+
+function ensureTownOpportunity(state, nowMs = Date.now()) {
+  if (!state?.meta) return null;
+  state.meta.townOpportunities = normalizeTownOpportunities(state.meta.townOpportunities);
+  if (state.meta.townOpportunities.active) return state.meta.townOpportunities.active;
+  const completed = completedOpportunityIds(state);
+  const nextTemplate = TOWN_OPPORTUNITY_TEMPLATES.find((template) => (
+    !completed.has(template.opportunityId) && isTownOpportunityUnlocked(state, template.opportunityId)
+  ));
+  if (!nextTemplate) return null;
+  state.meta.townOpportunities.active = townOpportunityTemplateSnapshot(nextTemplate, nowMs);
+  return state.meta.townOpportunities.active;
+}
+
+function activeTownOpportunity(state, nowMs = Date.now()) {
+  return ensureTownOpportunity(state, nowMs);
+}
+
+function canAffordCost(plot, cost = {}) {
+  for (const [resource, amount] of Object.entries(cost || {})) {
+    if (normalizeCount(amount) > normalizeCount(plot?.inventory?.[resource])) return false;
+  }
+  return true;
 }
 
 function awardOnce(list, key) {
@@ -1613,6 +1857,19 @@ function resolvePrimaryGoal(state, { nowMs = Date.now() } = {}) {
   }
 
   const quest = nextQuest(state);
+  const opportunity = activeTownOpportunity(state, nowMs);
+  if (opportunity) {
+    return {
+      owner: 'opportunity',
+      priority: 2,
+      title: opportunity.title,
+      body: opportunity.body,
+      primaryAction: {
+        type: 'VIEW_TOWN_OPPORTUNITY',
+        opportunityId: opportunity.opportunityId
+      }
+    };
+  }
   const contract = activeContract(state);
   const latestReceipt = latestForemanReceipt(state);
   if (isTutorialQuestStep(quest.step)) {
@@ -1707,7 +1964,10 @@ function buildForemanObservation(state, { runtimeId = '', nowMs = Date.now(), re
       ? 'active_contract'
       : goal.owner === 'receipt'
         ? 'foreman'
-        : 'tutorial';
+        : goal.owner === 'opportunity'
+          ? 'town_opportunity'
+          : 'tutorial';
+  const companion = companionAdvice(state, { goal });
   return {
     schema: 'founders-plot.obs.v1.2',
     schemaVersion: 'founders-plot.obs.v1.2',
@@ -1746,6 +2006,8 @@ function buildForemanObservation(state, { runtimeId = '', nowMs = Date.now(), re
       };
     }),
     activeContract: activeContract(state),
+    townOpportunity: copyJson(state.meta.townOpportunities?.active || null),
+    companionAdvice: copyJson(companion),
     standingOrder: foremanStandingOrder(state),
     permissions: {
       collectOutputs: !!state.policy.collectOutputs,
@@ -1898,6 +2160,10 @@ function chooseForemanCandidateWithTestBrain({ observation, safeCandidates = [] 
 }
 
 function recommendationText(state) {
+  const opportunity = activeTownOpportunity(state);
+  if (opportunity) {
+    return 'A town opportunity is waiting at the Public Square. Compare the costs and choose the mood you want the settlement to grow toward.';
+  }
   const quest = nextQuest(state);
   const contract = activeContract(state);
   if (quest.step === 'place_lumber_camp') {
@@ -1949,6 +2215,171 @@ function recommendationText(state) {
     return 'Your next permanent unlock is an HQ upgrade. Spend toward that before sidegrades.';
   }
   return 'Keep one resource producer active at all times and use the Workshop buff before expensive builds.';
+}
+
+function missingResourceSummary(cost = {}, inventory = {}) {
+  return ['wood', 'stone', 'food', 'coin']
+    .map((key) => {
+      const missing = Math.max(0, normalizeCount(cost?.[key]) - normalizeCount(inventory?.[key]));
+      return missing > 0 ? `${missing} ${key}` : '';
+    })
+    .filter(Boolean)
+    .join(', ');
+}
+
+function firstOpenPadObjectId(state) {
+  const pad = BUILD_PADS.find((entry) => !state.buildings.some((building) => building.x === entry.x && building.y === entry.y));
+  return pad ? `PAD:${pad.x},${pad.y}` : 'HQ';
+}
+
+function companionOpportunitySceneLine(opportunity) {
+  switch (String(opportunity?.opportunityId || '')) {
+    case 'first_campfire_choice':
+      return 'Clover: waymarkers grow depot reach; supper grows goodwill.';
+    case 'first_supply_council_choice':
+      return 'Clover: haulers are faster; work bee saves coin.';
+    case 'level_two_charter_choice':
+      return 'Clover: farm co-op buys food safety; request board builds contract momentum.';
+    default:
+      return 'Clover: compare cost, reward, and town mood before choosing.';
+  }
+}
+
+function companionOptionTradeoffs(opportunity) {
+  return (Array.isArray(opportunity?.options) ? opportunity.options : []).map((option) => ({
+    optionId: option.optionId,
+    label: option.label,
+    pro: String(option?.cloverTradeoff?.pro || 'Useful for the current town plan.'),
+    con: String(option?.cloverTradeoff?.con || 'Changes the next resource tradeoff.')
+  }));
+}
+
+function companionAdvice(state, { goal = null } = {}) {
+  const opportunity = activeTownOpportunity(state);
+  if (opportunity) {
+    const tradeoffs = companionOptionTradeoffs(opportunity);
+    return {
+      mode: 'town_choice_tradeoff',
+      headline: 'Clover tradeoff',
+      sceneLine: companionOpportunitySceneLine(opportunity),
+      recommendation: 'Clover sees a town opportunity at the Public Square; compare choices before spending because each option changes the next bottleneck.',
+      targetObjectId: 'PUBLIC_SQUARE',
+      bottleneck: 'town_choice',
+      tradeoffs
+    };
+  }
+
+  const quest = goal || resolvePrimaryGoal(state);
+  const step = String(nextQuest(state).step || '');
+  if (step === 'place_lumber_camp') {
+    return {
+      mode: 'bottleneck',
+      headline: 'Clover bottleneck',
+      sceneLine: 'Clover: start with wood; every early unlock needs it.',
+      recommendation: 'Clover suggests placing a Lumber Camp first so the town can fund construction, choices, and HQ2.',
+      targetObjectId: firstOpenPadObjectId(state),
+      bottleneck: 'wood'
+    };
+  }
+
+  const firstProduction = {
+    collect_first_wood: 'LUMBER_CAMP',
+    collect_first_food: 'FARM_PLOT',
+    collect_first_stone: 'QUARRY'
+  }[step] || '';
+  if (firstProduction) {
+    const building = state.buildings.find((entry) => entry.type === firstProduction) || null;
+    const label = BUILDING_RULES[firstProduction]?.label || firstProduction;
+    const runningJob = building ? runningJobForBuilding(state, building.buildingId) : null;
+    const completedJobs = building ? completedUnclaimedJobsForBuilding(state, building.buildingId) : [];
+    if (building?.state === 'UNDER_CONSTRUCTION' || building?.state === 'UPGRADING') {
+      return {
+        mode: 'timer',
+        headline: 'Clover timer',
+        sceneLine: `Clover: ${label.toLowerCase()} is building; queue work when it opens.`,
+        recommendation: `Wait for ${label} construction to finish, then queue its first production job.`,
+        targetObjectId: firstProduction,
+        bottleneck: 'construction_timer'
+      };
+    }
+    if (completedJobs.length > 0 || building?.state === 'OUTPUT_READY') {
+      return {
+        mode: 'next_action',
+        headline: 'Clover next step',
+        sceneLine: `Clover: collect ${label.toLowerCase()} output before spending again.`,
+        recommendation: `Collect the ready ${label} output. That clears the current bottleneck and reveals the next choice.`,
+        targetObjectId: firstProduction,
+        bottleneck: 'ready_output'
+      };
+    }
+    if (building?.state === 'READY' && !runningJob) {
+      return {
+        mode: 'next_action',
+        headline: 'Clover next step',
+        sceneLine: `Clover: queue ${label.toLowerCase()} now; the next unlock needs it.`,
+        recommendation: `Queue one ${label} job, then collect the first haul before upgrading or branching.`,
+        targetObjectId: firstProduction,
+        bottleneck: 'idle_producer'
+      };
+    }
+    if (runningJob) {
+      return {
+        mode: 'timer',
+        headline: 'Clover timer',
+        sceneLine: `Clover: ${label.toLowerCase()} is working; watch the timer.`,
+        recommendation: `Let the ${label} finish, then collect immediately so the town can move on.`,
+        targetObjectId: firstProduction,
+        bottleneck: 'production_timer'
+      };
+    }
+    return {
+      mode: 'timer',
+      headline: 'Clover timer',
+      sceneLine: `Clover: ${label.toLowerCase()} is not ready yet; check the build slot.`,
+      recommendation: `Get ${label} built before chasing the next Headquarters milestone.`,
+      targetObjectId: firstProduction,
+      bottleneck: 'construction_timer'
+    };
+  }
+
+  if (step.startsWith('upgrade_hq') || String(quest?.primaryAction?.type || '') === 'UPGRADE_HQ') {
+    const rule = HQ_UPGRADE_RULES[state.plot.hqLevel] || null;
+    const missing = rule ? missingResourceSummary(rule.cost || {}, state.plot.inventory || {}) : '';
+    return {
+      mode: missing ? 'bottleneck' : 'unlock',
+      headline: missing ? 'Clover bottleneck' : 'Clover unlock',
+      sceneLine: missing
+        ? `Clover: HQ upgrade still needs ${missing}.`
+        : 'Clover: upgrade HQ now; it opens the next play lane.',
+      recommendation: missing
+        ? `Close the resource gap for HQ${rule?.nextLevel || state.plot.hqLevel + 1}: ${missing}.`
+        : 'Start the Headquarters upgrade while the town has enough stores.',
+      targetObjectId: 'HQ',
+      bottleneck: missing ? 'hq_resources' : 'hq_unlock'
+    };
+  }
+
+  const outputReady = state.buildings.find((building) => building.state === 'OUTPUT_READY' && building.type !== 'HQ');
+  if (outputReady) {
+    const label = BUILDING_RULES[outputReady.type]?.label || outputReady.type;
+    return {
+      mode: 'next_action',
+      headline: 'Clover next step',
+      sceneLine: `Clover: collect from ${label} before queuing more work.`,
+      recommendation: `Collect ready output from ${label}; full buffers slow the next plan down.`,
+      targetObjectId: outputReady.type,
+      bottleneck: 'ready_output'
+    };
+  }
+
+  return {
+    mode: 'stewardship',
+    headline: 'Clover read',
+    sceneLine: 'Clover: keep one producer active and protect reserves.',
+    recommendation: recommendationText(state),
+    targetObjectId: quest?.primaryAction?.buildingType || 'FOREMAN_HUT',
+    bottleneck: 'steady_growth'
+  };
 }
 
 function buildPadsView(state) {
@@ -2021,6 +2452,18 @@ function buildTownJournalEntries(events = []) {
   const rows = [];
   for (const event of Array.isArray(events) ? events : []) {
     if (!event) continue;
+    if (event.type === EVENT_TYPES.TOWN_OPPORTUNITY_RESOLVED) {
+      const result = event?.data?.result || {};
+      rows.push({
+        journalId: `journal_evt_${event.seq}`,
+        eventId: event.seq,
+        atMs: normalizeCount(event.createdAt),
+        category: 'OPPORTUNITY',
+        title: String(result.title || 'Town choice made'),
+        body: String(result.body || event.recapLine || event.explanation || '')
+      });
+      continue;
+    }
     if (event.type === EVENT_TYPES.CONTRACT_ACCEPTED || event.type === EVENT_TYPES.CONTRACT_COMPLETED || event.type === EVENT_TYPES.CONTRACT_MISSED) {
       const contract = event?.data?.contract || {};
       rows.push({
@@ -2122,7 +2565,8 @@ function stateHashPayload(state) {
       foremanReceipts: state.meta.foremanReceipts,
       townSignals: state.meta.townSignals,
       requesters: state.meta.requesters,
-      landmarks: state.meta.landmarks
+      landmarks: state.meta.landmarks,
+      townOpportunities: state.meta.townOpportunities
     }
   };
 }
@@ -2191,6 +2635,7 @@ function stateView(state, recentEvents = []) {
     });
   }
   state.meta.foremanLastDecision = decision;
+  const companion = companionAdvice(state, { goal: currentGoal });
   const journalEntries = buildTownJournalEntries(recentEvents);
   return {
     plot: plotSnapshot(state),
@@ -2206,6 +2651,7 @@ function stateView(state, recentEvents = []) {
     },
     requesters: copyJson(state.meta.requesters),
     landmarks: copyJson(state.meta.landmarks),
+    townOpportunity: copyJson(state.meta.townOpportunities),
     policy: {
       observeAndSuggest: state.policy.observeAndSuggest,
       collectOutputs: state.policy.collectOutputs,
@@ -2229,7 +2675,8 @@ function stateView(state, recentEvents = []) {
       completed: copyJson(state.meta.contracts.completed)
     },
     foreman: {
-      recommendation: recommendationText(state),
+      recommendation: companion.recommendation || recommendationText(state),
+      companionAdvice: companion,
       allowedTools: unlockedToolNames(state),
       pendingApprovals: pendingApprovalsView(state),
       standingOrder: foremanStandingOrder(state),
@@ -2765,6 +3212,7 @@ function applyCollectOutputs(state, { actor = 'HUMAN', buildingId }, ctx) {
   }
   const firstCollectionAwarded = maybeAwardCollectionXp(state, building.type);
   const firstTimberReward = building.type === 'LUMBER_CAMP' ? maybeApplyFirstTimberReward(state) : null;
+  if (building.type === 'LUMBER_CAMP') ensureTownOpportunity(state, ctx.nowMs);
   const explanation = actor === 'AGENT'
     ? `Foreman collected finished goods from ${BUILDING_RULES[building.type].label}.`
     : `Collected outputs from ${BUILDING_RULES[building.type].label}.`;
@@ -3322,6 +3770,85 @@ function applyUpgradeLandmark(state, { landmarkId }, ctx) {
   };
 }
 
+function applyResolveTownOpportunity(state, { opportunityId, optionId }, ctx) {
+  const opportunity = activeTownOpportunity(state, ctx.nowMs);
+  if (!opportunity || String(opportunity.opportunityId || '') !== String(opportunityId || '')) {
+    const error = new Error('INVALID_STATE');
+    error.details = { opportunityId, reason: 'NO_ACTIVE_OPPORTUNITY' };
+    throw error;
+  }
+  const option = opportunity.options.find((candidate) => String(candidate.optionId || '') === String(optionId || '')) || null;
+  if (!option) {
+    const error = new Error('INVALID_STATE');
+    error.details = { opportunityId, optionId, reason: 'UNKNOWN_OPTION' };
+    throw error;
+  }
+  if (!canAffordCost(state.plot, option.cost)) {
+    const error = new Error('OUT_OF_RESOURCES');
+    error.details = { opportunityId, optionId, cost: copyJson(option.cost), inventory: inventorySnapshot(state.plot) };
+    throw error;
+  }
+
+  const before = { ...inventorySnapshot(state.plot), townXp: normalizeCount(state.plot.townXp) };
+  spendInventory(state.plot, option.cost);
+  addInventory(state.plot, option.reward.resources);
+  addXp(state, option.reward.townXp);
+  const signalResult = applyTownSignals(state, option.signalDelta, {
+    actor: 'HUMAN',
+    reason: 'TOWN_OPPORTUNITY_RESOLVED',
+    sourceId: opportunity.opportunityId,
+    appendEvent: ctx.appendEvent,
+    nowMs: ctx.nowMs
+  });
+  const result = normalizeTownOpportunityResult({
+    opportunityId: opportunity.opportunityId,
+    optionId: option.optionId,
+    title: option.outcomeTitle,
+    body: option.outcomeBody,
+    cost: option.cost,
+    reward: option.reward,
+    signalDelta: signalResult.delta,
+    resolvedAtMs: ctx.nowMs
+  });
+  state.meta.townOpportunities.completed.push(result);
+  state.meta.townOpportunities.completed = state.meta.townOpportunities.completed.slice(-8);
+  state.meta.townOpportunities.active = null;
+  pushEvent(ctx.appendEvent, {
+    type: EVENT_TYPES.TOWN_OPPORTUNITY_RESOLVED,
+    actor: 'HUMAN',
+    explanation: `${option.label} resolved the town opportunity.`,
+    recapLine: result.body || `${option.label} shaped the town mood.`,
+    data: {
+      opportunity: copyJson(opportunity),
+      option: copyJson(option),
+      result: copyJson(result),
+      signalDelta: signalResult.delta,
+      resourceDelta: captureResourceDelta(state, {
+        before,
+        consumed: option.cost,
+        rewarded: {
+          ...option.reward.resources,
+          townXp: option.reward.townXp
+        }
+      })
+    }
+  });
+  return {
+    opportunityId: opportunity.opportunityId,
+    optionId: option.optionId,
+    result: copyJson(result),
+    resourceDelta: captureResourceDelta(state, {
+      before,
+      consumed: option.cost,
+      rewarded: {
+        ...option.reward.resources,
+        townXp: option.reward.townXp
+      }
+    }),
+    signalDelta: signalResult.delta
+  };
+}
+
 function schedulerStatusView(state) {
   return copyJson(state.meta.scheduler);
 }
@@ -3528,6 +4055,7 @@ module.exports = {
   applyResolveApproval,
   applyReceiptCorrection,
   applyResumeScheduler,
+  applyResolveTownOpportunity,
   applySetStandingOrder,
   applySetPriority,
   applyTurnInContract,
@@ -3541,6 +4069,7 @@ module.exports = {
   buildWorldDelta,
   canUpgradePublicSquare,
   chooseForemanCandidateWithTestBrain,
+  companionAdvice,
   createInitialPlot,
   foremanRuntimeStatus,
   getBuilding,

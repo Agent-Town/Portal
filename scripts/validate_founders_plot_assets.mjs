@@ -33,6 +33,16 @@ const REQUIRED_IDS = [
   'clover_paused_v1_4_2',
   'clover_blocked_v1_4_2',
   'clover_restart_needed_v1_4_2',
+  'clover_idle_v1_4_4',
+  'clover_observing_v1_4_4',
+  'clover_thinking_v1_4_4',
+  'clover_acting_v1_4_4',
+  'clover_waiting_approval_v1_4_4',
+  'clover_celebrating_v1_4_4',
+  'clover_paused_v1_4_4',
+  'clover_blocked_v1_4_4',
+  'clover_restart_needed_v1_4_4',
+  'founders_plot_supply_crates_prop_v1_4_4',
   'founders_plot_overlay_construction_v1_4_2',
   'founders_plot_overlay_ready_sparkle_v1_4_2',
   'founders_plot_overlay_blocked_badge_v1_4_2',
@@ -91,6 +101,42 @@ function validateReferenceInputs(asset) {
   }
 }
 
+function validateWorldProps(manifest, byId) {
+  const worldProps = Array.isArray(manifest?.worldProps) ? manifest.worldProps : [];
+  if (worldProps.length === 0) fail('Manifest must declare worldProps for ambient prop references');
+  const propIds = new Set();
+  const assetIds = new Set();
+  for (const prop of worldProps) {
+    const propId = String(prop?.propId || '').trim();
+    const assetId = String(prop?.assetId || '').trim();
+    if (!propId) fail('worldProps entry missing propId');
+    if (!assetId) fail(`worldProps.${propId || 'unknown'} missing assetId`);
+    if (propIds.has(propId)) fail(`Duplicate world prop id: ${propId}`);
+    propIds.add(propId);
+    assetIds.add(assetId);
+    const asset = byId.get(assetId);
+    if (!asset) fail(`World prop ${propId} references unregistered asset ${assetId}`);
+    if (asset?.layerRole !== 'world-prop') fail(`World prop asset ${assetId} must declare layerRole=world-prop`);
+    if (String(asset?.propId || '') !== propId) fail(`World prop asset ${assetId} propId mismatch`);
+    if (asset?.stateDriven !== false) fail(`World prop asset ${assetId} must be stateDriven=false`);
+    if (Number(prop?.x) < 0 || Number(prop?.x) > 1 || Number(prop?.y) < 0 || Number(prop?.y) > 1) {
+      fail(`World prop ${propId} must use normalized x/y coordinates`);
+    }
+    if (Number(prop?.scale || 0) <= 0) fail(`World prop ${propId} must declare positive scale`);
+  }
+
+  const sceneStatePath = path.join(repoRoot, 'public/experiences/founders-plot/scene_state.js');
+  const sceneSource = fs.readFileSync(sceneStatePath, 'utf8');
+  const propAssetRefs = Array.from(sceneSource.matchAll(/assetId:\s*['"]([^'"]+)['"]/g))
+    .map((match) => match[1])
+    .filter((assetId) => String(assetId).includes('_prop_'));
+  for (const assetId of propAssetRefs) {
+    if (!assetIds.has(assetId)) {
+      fail(`Scene state references unregistered world prop asset ${assetId}`);
+    }
+  }
+}
+
 function main() {
   if (!fs.existsSync(manifestPath)) {
     fail(`Missing manifest: ${manifestPath}`);
@@ -128,10 +174,17 @@ function main() {
   }
 
   const assets = Array.isArray(manifest?.assets) ? manifest.assets : [];
-  const byId = new Map(assets.map((asset) => [String(asset?.id || ''), asset]));
+  const byId = new Map();
+  for (const asset of assets) {
+    const id = String(asset?.id || '').trim();
+    if (!id) fail('Asset entry missing id');
+    if (byId.has(id)) fail(`Duplicate asset id: ${id}`);
+    byId.set(id, asset);
+  }
   REQUIRED_IDS.forEach((id) => {
     if (!byId.has(id)) fail(`Missing required asset: ${id}`);
   });
+  validateWorldProps(manifest, byId);
 
   let totalBytes = 0;
   for (const asset of assets) {

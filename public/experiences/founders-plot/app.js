@@ -40,6 +40,7 @@
   let assetMap = {};
   let effectsController = null;
   let currentScene = null;
+  let sceneActionRegistry = new Map();
   let viewportSyncTimer = null;
   let manualForemanActingUntilMs = 0;
   let foremanRuntimeToken = '';
@@ -616,6 +617,31 @@
       .join(', ');
   }
 
+  function canAffordResources(state, cost = {}) {
+    const inventory = state?.plot?.inventory || {};
+    return ['wood', 'stone', 'food', 'coin'].every((key) => Number(cost?.[key] || 0) <= Number(inventory?.[key] || 0));
+  }
+
+  function formatOpportunityReward(option = {}) {
+    const parts = [];
+    const townXp = Number(option?.reward?.townXp || 0);
+    const resourceText = formatResourceList(option?.reward?.resources || {});
+    const signalText = formatSignalDelta(option?.signalDelta || {});
+    if (townXp > 0) parts.push(`+${townXp} Town XP`);
+    if (resourceText) parts.push(`+${resourceText}`);
+    if (signalText) parts.push(signalText);
+    return parts.join('; ');
+  }
+
+  function formatCloverTradeoff(option = {}) {
+    const pro = String(option?.cloverTradeoff?.pro || '').trim();
+    const con = String(option?.cloverTradeoff?.con || '').trim();
+    if (pro && con) return `Clover: ${pro} Tradeoff: ${con}`;
+    if (pro) return `Clover: ${pro}`;
+    if (con) return `Tradeoff: ${con}`;
+    return '';
+  }
+
   function formatContractRequirements(contract) {
     const requirements = contract?.requirements || {};
     const buildingRequirements = Array.isArray(requirements.buildings) ? requirements.buildings : [];
@@ -802,6 +828,7 @@
         setLastActionTarget(args.buildingId ? objectIdForBuildingId(args.buildingId) : 'HQ');
         return;
       case 'et.plot.town.upgrade_landmark':
+      case 'et.plot.town.resolve_opportunity':
         setLastActionTarget('PUBLIC_SQUARE');
         return;
       case 'et.plot.claim_reward':
@@ -834,6 +861,51 @@
       loadRecap().catch(() => {});
     }
     renderAll();
+  }
+
+  function applyScenePick(pick = {}) {
+    const drawerKey = String(pick?.drawerKey || '').trim();
+    if (drawerKey) {
+      openDrawer(drawerKey);
+      return true;
+    }
+    const nextSelection = String(pick?.selectionKey || '').trim();
+    if (nextSelection) {
+      selectedKey = nextSelection;
+      activeDrawer = '';
+      renderAll();
+      return true;
+    }
+    const gridCellId = String(pick?.gridCellId || '').trim();
+    if (gridCellId) {
+      setStatusLine(pick?.locked ? 'That grid cell is not ready for building yet.' : 'Choose a highlighted plot space to build.');
+      return true;
+    }
+    return false;
+  }
+
+  function scenePickFromNode(button, source = 'scene-dom-hook') {
+    if (!(button instanceof HTMLElement)) return null;
+    return {
+      objectId: String(button.getAttribute('data-scene-object-id') || ''),
+      selectionKey: String(button.getAttribute('data-selection-key') || ''),
+      drawerKey: String(button.getAttribute('data-drawer-key') || ''),
+      worldObjectId: String(button.getAttribute('data-world-object') || ''),
+      testId: String(button.getAttribute('data-testid') || ''),
+      source,
+      activation: true,
+      atMs: Date.now()
+    };
+  }
+
+  function bindThreeScenePick(node) {
+    if (!(node instanceof HTMLElement) || node.dataset.threePickBound === '1') return;
+    node.dataset.threePickBound = '1';
+    node.addEventListener('founders:three-pick', (event) => {
+      const pick = event?.detail || null;
+      if (!pick || pick.activation !== true) return;
+      applyScenePick(pick);
+    });
   }
 
   function closeDrawer() {
@@ -869,6 +941,12 @@
 
   function setQuestStatus(text) {
     setText('questStatusLine', text);
+  }
+
+  function clampSceneCoordinate(value, fallback = 0.5) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return fallback;
+    return Math.max(0.08, Math.min(0.92, numeric));
   }
 
   function queueSummary(state) {
@@ -941,6 +1019,8 @@
     });
     currentScene = scene;
     renderApi.renderPlotStage(node, scene, { assetMap });
+    bindThreeScenePick(node);
+    renderSceneActionControls(node, state, scene);
 
     const drawerTray = document.getElementById('drawerTray');
     if (drawerTray && typeof renderApi.renderDrawerTray === 'function') {
@@ -973,16 +1053,7 @@
 
     node.querySelectorAll('[data-scene-object-id]').forEach((button) => {
       button.addEventListener('click', () => {
-        const drawerKey = button.getAttribute('data-drawer-key') || '';
-        if (drawerKey) {
-          openDrawer(drawerKey);
-          return;
-        }
-        const nextSelection = button.getAttribute('data-selection-key') || '';
-        if (!nextSelection) return;
-        selectedKey = nextSelection;
-        activeDrawer = '';
-        renderAll();
+        applyScenePick(scenePickFromNode(button));
       });
     });
 
@@ -1019,6 +1090,311 @@
     button.disabled = disabled || pendingAction;
     button.addEventListener('click', onClick);
     return button;
+  }
+
+  function sceneObject(scene, objectId) {
+    return Array.isArray(scene?.objects)
+      ? scene.objects.find((object) => String(object?.id || '') === String(objectId || '')) || null
+      : null;
+  }
+
+  function padFromObjectId(state, objectId) {
+    const raw = String(objectId || '');
+    if (!raw.startsWith('PAD:')) return null;
+    const [xText, yText] = raw.slice('PAD:'.length).split(',');
+    const x = Number(xText);
+    const y = Number(yText);
+    return Array.isArray(state?.pads)
+      ? state.pads.find((pad) => Number(pad?.x) === x && Number(pad?.y) === y && pad.occupied === false) || null
+      : null;
+  }
+
+  function actionSafeId(value) {
+    return String(value || 'action').replace(/[^a-z0-9_-]+/ig, '-').replace(/^-+|-+$/g, '') || 'action';
+  }
+
+  function addSceneAction(actions, action) {
+    if (!action?.id || !action?.label || !action?.objectId) return;
+    if (actions.some((entry) => entry.id === action.id)) return;
+    actions.push(action);
+  }
+
+  function selectedBuildingForScene(scene, state) {
+    const selectedObjectId = String(scene?.selectedObjectId || '');
+    if (!selectedObjectId || selectedObjectId.startsWith('PAD:')) return null;
+    if (selectedObjectId === 'HQ') {
+      return Array.isArray(state?.buildings) ? state.buildings.find((building) => building?.type === 'HQ') || null : null;
+    }
+    return Array.isArray(state?.buildings)
+      ? state.buildings.find((building) => String(building?.type || '') === selectedObjectId || String(building?.buildingId || '') === selectedObjectId) || null
+      : null;
+  }
+
+  function buildSceneActions(state, scene) {
+    const actions = [];
+    const selectedObjectId = String(scene?.selectedObjectId || '');
+    const selectedPad = padFromObjectId(state, selectedObjectId);
+    const selectedBuilding = selectedBuildingForScene(scene, state);
+    const goalAction = state?.currentGoal?.primaryAction && typeof state.currentGoal.primaryAction === 'object'
+      ? state.currentGoal.primaryAction
+      : (state?.quest?.primaryAction && typeof state.quest.primaryAction === 'object' ? state.quest.primaryAction : null);
+    const goalTargetId = String(scene?.currentGoal?.targetObjectId || '');
+    const activeOpportunity = state?.townOpportunity?.active || null;
+
+    if (activeOpportunity?.opportunityId) {
+      for (const option of Array.isArray(activeOpportunity.options) ? activeOpportunity.options : []) {
+        addSceneAction(actions, {
+          id: `town-option:${option.optionId}`,
+          kind: 'town-option',
+          objectId: 'PUBLIC_SQUARE',
+          label: option.label || 'Choose town play',
+          detail: formatOpportunityReward(option) || formatResourceList(option.cost || {}),
+          advice: formatCloverTradeoff(option),
+          opportunityId: activeOpportunity.opportunityId,
+          optionId: option.optionId,
+          testId: `founders-scene-action-town-option-${actionSafeId(option.optionId)}`,
+          disabled: !canAffordResources(state, option.cost || {})
+        });
+      }
+      return actions;
+    }
+
+    if (selectedPad) {
+      for (const type of state?.unlocks?.buildingTypes || []) {
+        addSceneAction(actions, {
+          id: `place:${type}:${selectedPad.x}:${selectedPad.y}`,
+          kind: 'place',
+          objectId: selectedObjectId,
+          label: `Place ${BUILDING_LABELS[type] || type}`,
+          detail: selectedPad.label || 'Open lot',
+          buildingType: type,
+          x: selectedPad.x,
+          y: selectedPad.y,
+          testId: `founders-scene-action-place-${actionSafeId(type)}`
+        });
+      }
+      return actions;
+    }
+
+    if (selectedBuilding) {
+      const runningJob = selectedBuilding.runningJob || null;
+      const completedJobs = Array.isArray(selectedBuilding.completedJobs) ? selectedBuilding.completedJobs : [];
+      const selectedSceneObject = String(selectedBuilding.type || selectedObjectId);
+      if (completedJobs.length > 0) {
+        addSceneAction(actions, {
+          id: `collect:${selectedBuilding.buildingId}`,
+          kind: 'collect',
+          objectId: selectedSceneObject,
+          label: 'Collect outputs',
+          detail: BUILDING_LABELS[selectedBuilding.type] || selectedBuilding.type,
+          buildingId: selectedBuilding.buildingId,
+          testId: 'founders-scene-action-collect'
+        });
+      } else if (!runningJob && selectedBuilding.type !== 'HQ' && selectedBuilding.state === 'READY') {
+        addSceneAction(actions, {
+          id: `queue:${selectedBuilding.buildingId}`,
+          kind: 'queue',
+          objectId: selectedSceneObject,
+          label: selectedBuilding.type === 'MARKET_STALL' ? 'Queue market sale' : 'Queue job',
+          detail: BUILDING_LABELS[selectedBuilding.type] || selectedBuilding.type,
+          buildingId: selectedBuilding.buildingId,
+          testId: 'founders-scene-action-queue'
+        });
+      }
+      if (!runningJob && (UPGRADE_CAPS[selectedBuilding.type] || 1) > Number(selectedBuilding.level || 1)) {
+        addSceneAction(actions, {
+          id: `upgrade:${selectedBuilding.buildingId}`,
+          kind: 'upgrade',
+          objectId: selectedSceneObject,
+          label: selectedBuilding.type === 'HQ' ? 'Upgrade Headquarters' : 'Upgrade building',
+          detail: `Level ${selectedBuilding.level || 1}`,
+          buildingId: selectedBuilding.type === 'HQ' ? '' : selectedBuilding.buildingId,
+          testId: 'founders-scene-action-upgrade'
+        });
+      }
+      return actions;
+    }
+
+    if (goalAction && goalTargetId) {
+      if (goalAction.type === 'PLACE_BUILDING') {
+        const pad = padFromObjectId(state, goalTargetId);
+        if (pad) {
+          addSceneAction(actions, {
+            id: `goal-place:${goalAction.buildingType}:${pad.x}:${pad.y}`,
+            kind: 'place',
+            objectId: goalTargetId,
+            label: `Place ${BUILDING_LABELS[goalAction.buildingType] || goalAction.buildingType}`,
+            detail: pad.label || 'Open lot',
+            buildingType: goalAction.buildingType,
+            x: pad.x,
+            y: pad.y,
+            testId: `founders-scene-action-place-${actionSafeId(goalAction.buildingType)}`
+          });
+        }
+      } else if (goalAction.type === 'QUEUE_JOB' && goalAction.buildingId) {
+        const building = findBuilding(goalAction.buildingId);
+        addSceneAction(actions, {
+          id: `goal-queue:${goalAction.buildingId}`,
+          kind: 'queue',
+          objectId: goalTargetId,
+          label: 'Queue job',
+          detail: BUILDING_LABELS[building?.type] || 'Building',
+          buildingId: goalAction.buildingId,
+          testId: 'founders-scene-action-queue'
+        });
+      } else if (goalAction.type === 'COLLECT_OUTPUTS' && goalAction.buildingId) {
+        const building = findBuilding(goalAction.buildingId);
+        addSceneAction(actions, {
+          id: `goal-collect:${goalAction.buildingId}`,
+          kind: 'collect',
+          objectId: goalTargetId,
+          label: 'Collect outputs',
+          detail: BUILDING_LABELS[building?.type] || 'Building',
+          buildingId: goalAction.buildingId,
+          testId: 'founders-scene-action-collect'
+        });
+      } else if (goalAction.type === 'UPGRADE_HQ' || goalAction.type === 'UPGRADE_BUILDING') {
+        addSceneAction(actions, {
+          id: `goal-upgrade:${goalAction.buildingId || 'hq'}`,
+          kind: 'upgrade',
+          objectId: goalTargetId,
+          label: goalAction.buildingId ? 'Upgrade building' : 'Upgrade Headquarters',
+          detail: scene?.currentGoal?.targetLabel || '',
+          buildingId: goalAction.buildingId || '',
+          testId: 'founders-scene-action-upgrade'
+        });
+      } else if (goalAction.type === 'UPGRADE_LANDMARK') {
+        addSceneAction(actions, {
+          id: `goal-landmark:${goalAction.landmarkId}`,
+          kind: 'landmark',
+          objectId: goalTargetId,
+          label: 'Raise the Welcome Sign',
+          detail: 'Public Square',
+          landmarkId: goalAction.landmarkId,
+          testId: 'founders-scene-action-landmark'
+        });
+      } else if (goalAction.type === 'VIEW_CONTRACT_BOARD') {
+        addSceneAction(actions, {
+          id: 'goal-open-contract-board',
+          kind: 'drawer',
+          objectId: 'CONTRACT_BOARD',
+          label: 'Open Contract Board',
+          detail: 'Town requests',
+          drawerKey: 'contracts',
+          testId: 'founders-scene-action-open-contract-board'
+        });
+      }
+    }
+
+    return actions;
+  }
+
+  function renderSceneActionControls(stageNode, state, scene) {
+    sceneActionRegistry = new Map();
+    if (!(stageNode instanceof HTMLElement)) return;
+    const actions = buildSceneActions(state, scene);
+    if (actions.length === 0) return;
+    const anchorObject = sceneObject(scene, actions[0].objectId) || sceneObject(scene, scene?.currentGoal?.targetObjectId) || null;
+    if (!anchorObject) return;
+    const layer = document.createElement('div');
+    layer.className = 'at-fp-sceneActions';
+    layer.dataset.testid = 'founders-scene-actions';
+    layer.setAttribute('data-testid', 'founders-scene-actions');
+    layer.setAttribute('data-anchor-object-id', anchorObject.id || '');
+    layer.style.setProperty('--fp-action-x', String(clampSceneCoordinate(anchorObject.x, 0.5)));
+    layer.style.setProperty('--fp-action-y', String(clampSceneCoordinate(anchorObject.y, 0.5)));
+    const kicker = document.createElement('div');
+    kicker.className = 'at-fp-sceneActionsKicker';
+    kicker.textContent = anchorObject.label || 'Scene action';
+    layer.appendChild(kicker);
+    const row = document.createElement('div');
+    row.className = 'at-fp-sceneActionsRow';
+    actions.slice(0, 4).forEach((action) => {
+      sceneActionRegistry.set(action.id, action);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'at-fp-sceneActionButton';
+      button.disabled = pendingAction || action.disabled === true;
+      button.setAttribute('data-scene-action-id', action.id);
+      button.setAttribute('data-scene-action-kind', action.kind);
+      button.setAttribute('data-testid', action.testId || `founders-scene-action-${actionSafeId(action.id)}`);
+      if (action.advice) {
+        button.setAttribute('data-has-advice', 'true');
+        button.setAttribute('data-clover-advice', action.advice);
+      }
+      button.innerHTML = `
+        <span>${htmlEscape(action.label)}</span>
+        ${action.detail ? `<small>${htmlEscape(action.detail)}</small>` : ''}
+        ${action.advice ? `<small class="at-fp-sceneActionAdvice">${htmlEscape(action.advice)}</small>` : ''}
+      `;
+      row.appendChild(button);
+    });
+    layer.appendChild(row);
+    stageNode.appendChild(layer);
+    row.querySelectorAll('[data-scene-action-id]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const action = sceneActionRegistry.get(button.getAttribute('data-scene-action-id') || '');
+        if (!action || button.hasAttribute('disabled')) return;
+        try {
+          await executeSceneAction(action);
+        } catch {
+          // status line already updated
+        }
+      });
+    });
+  }
+
+  async function executeSceneAction(action) {
+    if (!action) return;
+    if (action.kind === 'place') {
+      selectedKey = `pad:${action.x},${action.y}`;
+      await runTool('et.plot.place_building', {
+        type: action.buildingType,
+        x: action.x,
+        y: action.y,
+        idempotencyKey: `scene-place:${action.buildingType}:${action.x}:${action.y}:${Date.now()}`
+      });
+      selectedKey = '';
+      renderAll();
+      return;
+    }
+    if (action.kind === 'queue') {
+      await runTool('et.plot.queue_job', {
+        buildingId: action.buildingId,
+        idempotencyKey: `scene-queue:${action.buildingId}:${Date.now()}`
+      });
+      return;
+    }
+    if (action.kind === 'collect') {
+      await runTool('et.plot.collect_outputs', {
+        buildingId: action.buildingId,
+        idempotencyKey: `scene-collect:${action.buildingId}:${Date.now()}`
+      });
+      return;
+    }
+    if (action.kind === 'upgrade') {
+      await runTool('et.plot.upgrade_building', {
+        buildingId: action.buildingId || undefined,
+        idempotencyKey: `scene-upgrade:${action.buildingId || 'hq'}:${Date.now()}`
+      });
+      return;
+    }
+    if (action.kind === 'landmark') {
+      await runTool('et.plot.town.upgrade_landmark', {
+        landmarkId: action.landmarkId,
+        idempotencyKey: `scene-landmark:${action.landmarkId}:${Date.now()}`
+      });
+      return;
+    }
+    if (action.kind === 'town-option') {
+      await resolveTownOpportunity(action.opportunityId, action.optionId);
+      return;
+    }
+    if (action.kind === 'drawer' && action.drawerKey) {
+      openDrawer(action.drawerKey, { clearSelection: false });
+      if (action.objectId) setLastActionTarget(action.objectId);
+      setStatusLine(action.label || 'Opened scene panel.');
+    }
   }
 
   async function runTool(name, args = {}, actor = 'HUMAN') {
@@ -1101,6 +1477,15 @@
     return runTool('et.plot.claim_reward', {
       rewardKey,
       idempotencyKey: `claim:${rewardKey}:${Date.now()}`
+    });
+  }
+
+  async function resolveTownOpportunity(opportunityId, optionId) {
+    setLastActionTarget('PUBLIC_SQUARE');
+    return runTool('et.plot.town.resolve_opportunity', {
+      opportunityId,
+      optionId,
+      idempotencyKey: `town-opportunity:${opportunityId}:${optionId}:${Date.now()}`
     });
   }
 
@@ -1456,10 +1841,59 @@
     const node = document.getElementById('publicSquareCard');
     if (!node) return;
     const landmark = state?.landmarks?.publicSquare || {};
+    const opportunity = state?.townOpportunity?.active || null;
+    const completedOpportunities = Array.isArray(state?.townOpportunity?.completed)
+      ? state.townOpportunity.completed
+      : [];
+    const latestOpportunity = completedOpportunities[completedOpportunities.length - 1] || null;
     const canUpgrade = Number(landmark.level || 0) < 1
       && Number(state?.plot?.inventory?.wood || 0) >= 4
       && Number(state?.plot?.inventory?.coin || 0) >= 8;
+    const opportunityHtml = opportunity ? `
+      <div class="foundersLandmarkBody foundersOpportunityBody" data-testid="town-opportunity-card">
+        <div class="foundersSignalHeader">
+          <div>
+            <div class="foundersLabel">Town opportunity</div>
+            <strong>${htmlEscape(opportunity.title || 'Town choice')}</strong>
+          </div>
+          <span class="foundersBadge is-good">Choice</span>
+        </div>
+        <div class="small">${htmlEscape(opportunity.body || '')}</div>
+        <div class="foundersOpportunityChoices">
+          ${(Array.isArray(opportunity.options) ? opportunity.options : []).map((option) => {
+            const affordable = canAffordResources(state, option.cost || {});
+            const costText = formatResourceList(option.cost || {}) || 'No cost';
+            const rewardText = formatOpportunityReward(option) || 'Town mood changes';
+            const tradeoffText = formatCloverTradeoff(option);
+            return `
+              <button
+                class="btn small foundersOpportunityChoice"
+                type="button"
+                data-town-opportunity-option="${htmlEscape(option.optionId || '')}"
+                data-testid="town-opportunity-option-${htmlEscape(option.optionId || '')}"
+                ${pendingAction || !affordable ? 'disabled' : ''}
+              >
+                <strong>${htmlEscape(option.label || 'Choose')}</strong>
+                <span>${htmlEscape(option.body || '')}</span>
+                <span>Cost: ${htmlEscape(costText)}.</span>
+                <span>${htmlEscape(rewardText)}.</span>
+                ${tradeoffText ? `<span>${htmlEscape(tradeoffText)}.</span>` : ''}
+                ${affordable ? '' : '<span>Need more supplies.</span>'}
+              </button>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    ` : latestOpportunity ? `
+      <div class="foundersLandmarkBody foundersOpportunityBody" data-testid="town-opportunity-result">
+        <div class="foundersLabel">Last town choice</div>
+        <strong>${htmlEscape(latestOpportunity.title || 'Town choice resolved')}</strong>
+        <div class="small">${htmlEscape(latestOpportunity.body || '')}</div>
+        <div class="small">${htmlEscape(formatOpportunityReward(latestOpportunity) || 'Town mood changed.')}</div>
+      </div>
+    ` : '';
     node.innerHTML = `
+      ${opportunityHtml}
       <div class="foundersLandmarkBody">
         <div class="foundersLabel">Public square</div>
         <strong>${htmlEscape(landmark.level >= 1 ? 'Welcome Sign' : 'Open Dust Lot')}</strong>
@@ -1489,6 +1923,19 @@
         }
       };
     }
+    node.querySelectorAll('[data-town-opportunity-option]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        if (button.hasAttribute('disabled')) return;
+        try {
+          await resolveTownOpportunity(
+            String(opportunity?.opportunityId || ''),
+            String(button.getAttribute('data-town-opportunity-option') || '')
+          );
+        } catch {
+          // status line already updated
+        }
+      });
+    });
   }
 
   function renderJournal(state) {
@@ -1528,9 +1975,10 @@
       badge.className = `foundersBadge ${status.tone === 'warn' ? 'is-warn' : ''}`;
     }
 
-    const recommendation = !realBrainReady
-      ? brainModeCopy(access)
-      : state?.foreman?.recommendation || 'Clover is watching. No safe action inside your standing order.';
+    const companionRecommendation = state?.foreman?.companionAdvice?.recommendation
+      || state?.foreman?.recommendation
+      || 'Clover is watching. No safe action inside your standing order.';
+    const recommendation = companionRecommendation || (!realBrainReady ? brainModeCopy(access) : '');
     setText('foremanRecommendation', recommendation);
 
     const toolsLine = (() => {
@@ -1972,6 +2420,7 @@
         return action.buildingId ? 'Upgrade building' : 'Upgrade Headquarters';
       }
       if (action.type === 'UPGRADE_LANDMARK') return 'Raise the Welcome Sign';
+      if (action.type === 'VIEW_TOWN_OPPORTUNITY') return 'Choose town play';
       if (action.type === 'ENABLE_PERMISSION') return 'Enable permission';
       if (action.type === 'TURN_IN_CONTRACT') return 'Turn in contract';
       if (action.type === 'VIEW_CONTRACT_BOARD') return 'Open Contract Board';
@@ -2029,6 +2478,12 @@
             landmarkId: action.landmarkId,
             idempotencyKey: `quest-landmark:${action.landmarkId}:${Date.now()}`
           });
+          return;
+        }
+        if (action.type === 'VIEW_TOWN_OPPORTUNITY') {
+          openDrawer('signals', { clearSelection: false });
+          setLastActionTarget('PUBLIC_SQUARE');
+          setStatusLine('Public Square has a town choice waiting.');
           return;
         }
         if (action.type === 'ENABLE_PERMISSION' && action.permission) {
@@ -2474,6 +2929,10 @@
     if (params.get('embed') === '1') {
       document.documentElement.classList.add('founders-plot-embed');
     }
+    if (params.get('presentation') === 'fullscreen' || params.get('fullscreen') === '1') {
+      document.documentElement.classList.add('founders-plot-fullscreen');
+      document.body?.classList?.add('founders-plot-fullscreen-body');
+    }
   }
 
   function bindUi() {
@@ -2505,6 +2964,7 @@
     loadState,
     getState: () => currentState,
     getScene: () => currentScene,
+    getThreeSceneInfo: () => window.FoundersPlotThreeRenderer?.getStageInfo?.(document.getElementById('plotBoard')) || null,
     getBrainStatus: () => ({ ...sharedBrainStatus }),
     refreshBrainStatus: () => refreshSharedBrainStatus({ render: true }),
     setBrainHarnessMode: async (policy = {}) => {

@@ -4504,9 +4504,14 @@ function onDistrictModalLinkClick(ev) {
 
 function setDistrictModalMode(mode) {
   const modal = document.querySelector('#districtModalBackdrop .districtModal');
+  const backdrop = el('districtModalBackdrop');
   if (!modal) return;
   modal.classList.toggle('is-district', mode === 'district');
-  modal.classList.toggle('is-frame', mode === 'frame');
+  modal.classList.toggle('is-frame', mode === 'frame' || mode === 'fullscreen-frame');
+  modal.classList.toggle('is-fullscreen-frame', mode === 'fullscreen-frame');
+  if (backdrop) {
+    backdrop.classList.toggle('is-fullscreen-frame', mode === 'fullscreen-frame');
+  }
 }
 
 const districtModalThemeByDistrict = {
@@ -4987,28 +4992,32 @@ window.AgentTownExperienceIntent = {
   }
 };
 
-function openRouteInModalFrame(url, title) {
+function openRouteInModalFrame(url, title, options = {}) {
   if (!isTownHub) return;
 
   const body = el('districtModalBody');
   const backdrop = el('districtModalBackdrop');
   const modalTitle = el('districtModalTitle');
   const safeTitle = title || 'District detail';
+  const fullscreenFrame = options?.presentation === 'fullscreen';
   const loadId = ++lastDistrictLoad;
   currentDistrict = null;
   clearTownBoardPoll();
-  setDistrictModalMode('frame');
+  setDistrictModalMode(fullscreenFrame ? 'fullscreen-frame' : 'frame');
   setDistrictModalTheme(inferDistrictModalThemeFromUrl(url));
 
   if (body) {
     if (modalTitle) modalTitle.textContent = safeTitle;
     body.innerHTML = '';
     const wrap = document.createElement('div');
-    wrap.className = 'districtFrameWrap';
+    wrap.className = fullscreenFrame ? 'districtFrameWrap districtFrameWrap--fullscreen' : 'districtFrameWrap';
     const frame = document.createElement('iframe');
     frame.className = 'districtFrame';
     frame.title = safeTitle;
     frame.loading = 'eager';
+    if (fullscreenFrame) {
+      frame.dataset.presentation = 'fullscreen';
+    }
     frame.setAttribute('referrerpolicy', 'no-referrer-when-downgrade');
     frame.src = url;
     wrap.appendChild(frame);
@@ -5050,7 +5059,9 @@ async function showDistrict(district) {
   }
 
   if (safeDistrict === 'founders-plot') {
-    openRouteInModalFrame('/founders-plot?embed=1', 'Founders Plot');
+    openRouteInModalFrame('/founders-plot?embed=1&presentation=fullscreen', 'Founders Plot', {
+      presentation: 'fullscreen'
+    });
     return;
   }
 

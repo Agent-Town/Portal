@@ -931,6 +931,66 @@ h3 {
   display: block;
 }
 
+.districtBackdrop.is-fullscreen-frame {
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 0;
+  background: #1f130c;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.districtModal.is-fullscreen-frame {
+  width: 100vw;
+  max-width: none;
+  height: 100vh;
+  height: 100dvh;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: hidden;
+  background: #1f130c;
+}
+
+.districtModal.is-fullscreen-frame .districtModalHeader {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 12;
+  justify-content: flex-end;
+  width: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.districtModal.is-fullscreen-frame .districtModalHeader h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.districtModal.is-fullscreen-frame .districtModalBody {
+  padding: 0;
+  overflow: hidden;
+  background: #1f130c;
+}
+
+.districtModal.is-fullscreen-frame .districtFrameWrap,
+.districtFrameWrap--fullscreen {
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: #1f130c;
+}
+
 body.district-modal-open {
   overflow: hidden;
 }
@@ -4778,6 +4838,59 @@ body.town-hub-page .districtModal.is-district .districtModalBody {
 body.town-hub-page .districtModal.is-district .districtModalBody > * {
   width: 100%;
   max-width: 100%;
+}
+
+body.town-hub-page .districtBackdrop.is-fullscreen-frame {
+  padding: 0;
+  background: #1f130c;
+}
+
+body.town-hub-page .districtModal.is-fullscreen-frame {
+  width: 100vw;
+  max-width: none;
+  height: 100vh;
+  height: 100dvh;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: hidden;
+  background: #1f130c;
+}
+
+body.town-hub-page .districtModal.is-fullscreen-frame .districtModalHeader {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 12;
+  justify-content: flex-end;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+body.town-hub-page .districtModal.is-fullscreen-frame .districtModalHeader h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+body.town-hub-page .districtModal.is-fullscreen-frame .districtModalBody,
+body.town-hub-page .districtModal.is-fullscreen-frame .districtFrameWrap {
+  overflow: hidden;
+  background: #1f130c;
+}
+
+body.town-hub-page .districtModal.is-fullscreen-frame .districtFrameWrap {
+  height: 100%;
+  border: 0;
+  border-radius: 0;
 }
 
 .atlas-page .atlas-modal-backdrop {

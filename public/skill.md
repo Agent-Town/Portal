@@ -307,6 +307,8 @@ After the house/founders opening sequence, the next district is **Founders Plot*
   - Reads the four visible town signals that tell you how the town is feeling.
 - `et.plot.town.upgrade_landmark`
   - Raises the Public Square Welcome Sign when the plot can afford it.
+- `et.plot.town.resolve_opportunity`
+  - Resolves the active Public Square town opportunity after the human chooses one option.
 - `et.plot.journal.get_entries`
   - Reads the compact Town Journal derived from contract, signal, landmark, and Clover events.
 - `et.plot.contracts.get_state`
@@ -332,10 +334,13 @@ After the house/founders opening sequence, the next district is **Founders Plot*
 
 - Observe first with `et.plot.get_state`.
 - Respect the Current Goal and the Standing Order before choosing a mutation.
+- Use `foreman.companionAdvice` to explain the current bottleneck or town-choice tradeoff before suggesting an action.
 - Use the Contract Board as the first civic choice after HQ2.
 - Treat requesters as recurring people and institutions, not disposable strings.
 - Watch for `PREPARATION` requests with a soft deadline and avoid promising them unless the town can finish them.
 - Use `et.plot.town.get_signals` and `et.plot.journal.get_entries` to explain how the town changed.
+- Town opportunities are human preference choices; explain the option costs and town-signal tradeoffs, and call `et.plot.town.resolve_opportunity` only after the human has selected an option.
+- Public Square opportunities can chain during the first session; after each resolution, observe state again before recommending the next build or upgrade.
 - The Welcome Sign is an optional coin sink; it should never be treated as tutorial-gating.
 - If policy blocks the action, request approval instead of simulating success.
 - Mutation tools require `idempotencyKey`; provide one when you call them.

@@ -6,8 +6,8 @@
   <title>Agent Town — Founders Plot</title>
   <meta name="description" content="Founders Plot starter district" />
   <link rel="icon" href="/favicon.ico" sizes="any" />
-  <link rel="stylesheet" href="/styles.css?v=20260319a" />
-  <link rel="stylesheet" href="/experiences/founders-plot/styles.css?v=20260421a" />
+  <link rel="stylesheet" href="/styles.css?v=20260524a" />
+  <link rel="stylesheet" href="/experiences/founders-plot/styles.css?v=20260524a" />
 </head>
 <body class="founders-plot-page">
   <div class="foundersPlotRoot foundersGameShell" data-testid="founders-game-shell">
@@ -103,7 +103,7 @@
         <div class="foundersDrawerBody foundersDrawerBodyWide" id="founders-foreman-panel" data-testid="founders-foreman-panel">
           <div class="foundersForemanIntro">
             <div class="foundersBadge" id="foremanStatusBadge" data-testid="founders-foreman-status">Foreman not started</div>
-            <p id="foremanRecommendation">The foreman is reading the plot.</p>
+            <p id="foremanRecommendation" data-testid="founders-companion-advice">The foreman is reading the plot.</p>
             <div class="small" id="foremanToolsLine">Clover can help with routine work you trust it with.</div>
             <div class="foundersInlineButtons foundersForemanControls">
               <button class="btn small" id="foremanStartBtn" type="button" data-testid="foreman-start-btn">Start Clover</button>
@@ -210,10 +210,11 @@
   </div>
 
   <script src="/experiences/founders-plot/scene_state.js?v=20260421a" defer></script>
+  <script src="/experiences/founders-plot/three_scene_bundle.js?v=20260524a" defer></script>
   <script src="/experiences/founders-plot/scene_render.js?v=20260421a" defer></script>
   <script src="/experiences/founders-plot/effects.js?v=20260421a" defer></script>
   <script src="/experiences/founders-plot/visual_metrics.js?v=20260421a" defer></script>
   <script src="/agent_town_access.js?v=20260424a" defer></script>
-  <script src="/experiences/founders-plot/app.js?v=20260421a" defer></script>
+  <script src="/experiences/founders-plot/app.js?v=20260524a" defer></script>
 </body>
 </html>

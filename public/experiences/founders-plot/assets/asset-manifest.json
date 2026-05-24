@@ -39,6 +39,19 @@
     "usage": "tone_motion_story_reference_only",
     "frameExtractionRequired": false
   },
+  "worldProps": [
+    {
+      "propId": "supply_crates",
+      "assetId": "founders_plot_supply_crates_prop_v1_4_4",
+      "label": "Supply Crates",
+      "state": "AMBIENT",
+      "x": 0.34,
+      "y": 0.71,
+      "z": 11,
+      "scale": 0.5,
+      "usage": "ambient-world-prop"
+    }
+  ],
   "assets": [
     {
       "id": "founders_plot_scene_desktop_v1_4_2",
@@ -2775,6 +2788,700 @@
         "passed": true,
         "reviewer": "codex-human",
         "score": 5
+      }
+    },
+    {
+      "id": "clover_idle_v1_4_4",
+      "role": "founders_plot_character",
+      "kind": "founders_plot_character",
+      "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-idle.webp",
+      "src": "/experiences/founders-plot/assets/characters/v1_4_4/clover-idle.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_4/clover_v2_sprite_sheet.md",
+      "promptHash": "c16f63a0178fe93fd7168119abec4d66c22d534c4efc57ebfe56c38600e3d80c",
+      "referenceInputs": [
+        "public/experiences/founders-plot/assets/characters/clover-idle.webp",
+        "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png"
+      ],
+      "referenceHashes": {
+        "public/experiences/founders-plot/assets/characters/clover-idle.webp": "876312ee0fbd41cd30261d60929aeef4122624994eaf3e5e541cf7348562c6fd",
+        "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png": "6db2b020b016366d9ea2ed03d11ee93d51dcb48f1946f250cd55ee209666f90b"
+      },
+      "candidateId": "clover-v2-sheet:0,0",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png",
+      "postProcessing": [
+        "sprite-sheet-generation",
+        "magenta-chroma-key-removal",
+        "grid-crop",
+        "alpha-png-export",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 32388,
+      "bytes": 32388,
+      "sha256": "8d72dc73ad6d9c4f11da7b76199980a3874941890d7e4907c48ec9427b202356",
+      "containsIntentionalText": false,
+      "alt": "Clover idle",
+      "approvedBy": "Codex implementation pass",
+      "approvedAt": "2026-05-24",
+      "approvalNotes": "Generated and normalized for the Three.js Clover V2 sprite cleanup; ready for design-owner review.",
+      "replaces": "public/experiences/founders-plot/assets/characters/clover-idle.webp",
+      "layerRole": "character",
+      "stateDriven": true,
+      "characterId": "clover",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "hitbox": {
+        "x": 0.24,
+        "y": 0.08,
+        "w": 0.52,
+        "h": 0.84
+      },
+      "zIndexHint": 40,
+      "usage": "primary-view",
+      "approvalStatus": "implementation-ready",
+      "optimizationStatus": "normalized-alpha-webp",
+      "sourceSpriteSheet": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-visual-qa",
+        "score": 4,
+        "notes": "Cleaner full-body Clover silhouette for Three.js sprite use; minor edge color should be reviewed on final art pass."
+      }
+    },
+    {
+      "id": "clover_observing_v1_4_4",
+      "role": "founders_plot_character",
+      "kind": "founders_plot_character",
+      "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-observing.webp",
+      "src": "/experiences/founders-plot/assets/characters/v1_4_4/clover-observing.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_4/clover_v2_sprite_sheet.md",
+      "promptHash": "c16f63a0178fe93fd7168119abec4d66c22d534c4efc57ebfe56c38600e3d80c",
+      "referenceInputs": [
+        "public/experiences/founders-plot/assets/characters/clover-idle.webp",
+        "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png"
+      ],
+      "referenceHashes": {
+        "public/experiences/founders-plot/assets/characters/clover-idle.webp": "876312ee0fbd41cd30261d60929aeef4122624994eaf3e5e541cf7348562c6fd",
+        "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png": "6db2b020b016366d9ea2ed03d11ee93d51dcb48f1946f250cd55ee209666f90b"
+      },
+      "candidateId": "clover-v2-sheet:1,0",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png",
+      "postProcessing": [
+        "sprite-sheet-generation",
+        "magenta-chroma-key-removal",
+        "grid-crop",
+        "alpha-png-export",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 33440,
+      "bytes": 33440,
+      "sha256": "8a3406a0c140935a4cd95c73ff1c9359443dde8692cc181ec1fa30353d54f12b",
+      "containsIntentionalText": false,
+      "alt": "Clover observing",
+      "approvedBy": "Codex implementation pass",
+      "approvedAt": "2026-05-24",
+      "approvalNotes": "Generated and normalized for the Three.js Clover V2 sprite cleanup; ready for design-owner review.",
+      "replaces": "public/experiences/founders-plot/assets/characters/clover-observing.webp",
+      "layerRole": "character",
+      "stateDriven": true,
+      "characterId": "clover",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "hitbox": {
+        "x": 0.24,
+        "y": 0.08,
+        "w": 0.52,
+        "h": 0.84
+      },
+      "zIndexHint": 40,
+      "usage": "primary-view",
+      "approvalStatus": "implementation-ready",
+      "optimizationStatus": "normalized-alpha-webp",
+      "sourceSpriteSheet": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-visual-qa",
+        "score": 4,
+        "notes": "Cleaner full-body Clover silhouette for Three.js sprite use; minor edge color should be reviewed on final art pass."
+      }
+    },
+    {
+      "id": "clover_thinking_v1_4_4",
+      "role": "founders_plot_character",
+      "kind": "founders_plot_character",
+      "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-thinking.webp",
+      "src": "/experiences/founders-plot/assets/characters/v1_4_4/clover-thinking.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_4/clover_v2_sprite_sheet.md",
+      "promptHash": "c16f63a0178fe93fd7168119abec4d66c22d534c4efc57ebfe56c38600e3d80c",
+      "referenceInputs": [
+        "public/experiences/founders-plot/assets/characters/clover-idle.webp",
+        "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png"
+      ],
+      "referenceHashes": {
+        "public/experiences/founders-plot/assets/characters/clover-idle.webp": "876312ee0fbd41cd30261d60929aeef4122624994eaf3e5e541cf7348562c6fd",
+        "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png": "6db2b020b016366d9ea2ed03d11ee93d51dcb48f1946f250cd55ee209666f90b"
+      },
+      "candidateId": "clover-v2-sheet:2,0",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png",
+      "postProcessing": [
+        "sprite-sheet-generation",
+        "magenta-chroma-key-removal",
+        "grid-crop",
+        "alpha-png-export",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 28632,
+      "bytes": 28632,
+      "sha256": "1f1c99c21f0e5bab129380ee9821b2789fc3477192df39de1e5d67c9def020fa",
+      "containsIntentionalText": false,
+      "alt": "Clover thinking",
+      "approvedBy": "Codex implementation pass",
+      "approvedAt": "2026-05-24",
+      "approvalNotes": "Generated and normalized for the Three.js Clover V2 sprite cleanup; ready for design-owner review.",
+      "replaces": "public/experiences/founders-plot/assets/characters/clover-thinking.webp",
+      "layerRole": "character",
+      "stateDriven": true,
+      "characterId": "clover",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "hitbox": {
+        "x": 0.24,
+        "y": 0.08,
+        "w": 0.52,
+        "h": 0.84
+      },
+      "zIndexHint": 40,
+      "usage": "primary-view",
+      "approvalStatus": "implementation-ready",
+      "optimizationStatus": "normalized-alpha-webp",
+      "sourceSpriteSheet": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-visual-qa",
+        "score": 4,
+        "notes": "Cleaner full-body Clover silhouette for Three.js sprite use; minor edge color should be reviewed on final art pass."
+      }
+    },
+    {
+      "id": "clover_acting_v1_4_4",
+      "role": "founders_plot_character",
+      "kind": "founders_plot_character",
+      "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-acting.webp",
+      "src": "/experiences/founders-plot/assets/characters/v1_4_4/clover-acting.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_4/clover_v2_sprite_sheet.md",
+      "promptHash": "c16f63a0178fe93fd7168119abec4d66c22d534c4efc57ebfe56c38600e3d80c",
+      "referenceInputs": [
+        "public/experiences/founders-plot/assets/characters/clover-idle.webp",
+        "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png"
+      ],
+      "referenceHashes": {
+        "public/experiences/founders-plot/assets/characters/clover-idle.webp": "876312ee0fbd41cd30261d60929aeef4122624994eaf3e5e541cf7348562c6fd",
+        "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png": "6db2b020b016366d9ea2ed03d11ee93d51dcb48f1946f250cd55ee209666f90b"
+      },
+      "candidateId": "clover-v2-sheet:0,1",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png",
+      "postProcessing": [
+        "sprite-sheet-generation",
+        "magenta-chroma-key-removal",
+        "grid-crop",
+        "alpha-png-export",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 33258,
+      "bytes": 33258,
+      "sha256": "d8660fb58cfa05e1823b650d27d3b83846cded672aaf477cc0b22afc5648fe3d",
+      "containsIntentionalText": false,
+      "alt": "Clover acting",
+      "approvedBy": "Codex implementation pass",
+      "approvedAt": "2026-05-24",
+      "approvalNotes": "Generated and normalized for the Three.js Clover V2 sprite cleanup; ready for design-owner review.",
+      "replaces": "public/experiences/founders-plot/assets/characters/clover-acting.webp",
+      "layerRole": "character",
+      "stateDriven": true,
+      "characterId": "clover",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "hitbox": {
+        "x": 0.24,
+        "y": 0.08,
+        "w": 0.52,
+        "h": 0.84
+      },
+      "zIndexHint": 40,
+      "usage": "primary-view",
+      "approvalStatus": "implementation-ready",
+      "optimizationStatus": "normalized-alpha-webp",
+      "sourceSpriteSheet": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-visual-qa",
+        "score": 4,
+        "notes": "Cleaner full-body Clover silhouette for Three.js sprite use; minor edge color should be reviewed on final art pass."
+      }
+    },
+    {
+      "id": "clover_waiting_approval_v1_4_4",
+      "role": "founders_plot_character",
+      "kind": "founders_plot_character",
+      "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-waiting-approval.webp",
+      "src": "/experiences/founders-plot/assets/characters/v1_4_4/clover-waiting-approval.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_4/clover_v2_sprite_sheet.md",
+      "promptHash": "c16f63a0178fe93fd7168119abec4d66c22d534c4efc57ebfe56c38600e3d80c",
+      "referenceInputs": [
+        "public/experiences/founders-plot/assets/characters/clover-idle.webp",
+        "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png"
+      ],
+      "referenceHashes": {
+        "public/experiences/founders-plot/assets/characters/clover-idle.webp": "876312ee0fbd41cd30261d60929aeef4122624994eaf3e5e541cf7348562c6fd",
+        "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png": "6db2b020b016366d9ea2ed03d11ee93d51dcb48f1946f250cd55ee209666f90b"
+      },
+      "candidateId": "clover-v2-sheet:1,1",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png",
+      "postProcessing": [
+        "sprite-sheet-generation",
+        "magenta-chroma-key-removal",
+        "grid-crop",
+        "alpha-png-export",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 29756,
+      "bytes": 29756,
+      "sha256": "87a2acda54bb34ab9a9ccf375c94da183a28a8d76c4a3dbdf555855636c92038",
+      "containsIntentionalText": false,
+      "alt": "Clover waiting approval",
+      "approvedBy": "Codex implementation pass",
+      "approvedAt": "2026-05-24",
+      "approvalNotes": "Generated and normalized for the Three.js Clover V2 sprite cleanup; ready for design-owner review.",
+      "replaces": "public/experiences/founders-plot/assets/characters/clover-waiting-approval.webp",
+      "layerRole": "character",
+      "stateDriven": true,
+      "characterId": "clover",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "hitbox": {
+        "x": 0.24,
+        "y": 0.08,
+        "w": 0.52,
+        "h": 0.84
+      },
+      "zIndexHint": 40,
+      "usage": "primary-view",
+      "approvalStatus": "implementation-ready",
+      "optimizationStatus": "normalized-alpha-webp",
+      "sourceSpriteSheet": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-visual-qa",
+        "score": 4,
+        "notes": "Cleaner full-body Clover silhouette for Three.js sprite use; minor edge color should be reviewed on final art pass."
+      }
+    },
+    {
+      "id": "clover_celebrating_v1_4_4",
+      "role": "founders_plot_character",
+      "kind": "founders_plot_character",
+      "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-celebrating.webp",
+      "src": "/experiences/founders-plot/assets/characters/v1_4_4/clover-celebrating.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_4/clover_v2_sprite_sheet.md",
+      "promptHash": "c16f63a0178fe93fd7168119abec4d66c22d534c4efc57ebfe56c38600e3d80c",
+      "referenceInputs": [
+        "public/experiences/founders-plot/assets/characters/clover-idle.webp",
+        "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png"
+      ],
+      "referenceHashes": {
+        "public/experiences/founders-plot/assets/characters/clover-idle.webp": "876312ee0fbd41cd30261d60929aeef4122624994eaf3e5e541cf7348562c6fd",
+        "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png": "6db2b020b016366d9ea2ed03d11ee93d51dcb48f1946f250cd55ee209666f90b"
+      },
+      "candidateId": "clover-v2-sheet:2,1",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png",
+      "postProcessing": [
+        "sprite-sheet-generation",
+        "magenta-chroma-key-removal",
+        "grid-crop",
+        "alpha-png-export",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 34042,
+      "bytes": 34042,
+      "sha256": "fab52e922fda35485a00b37b8d4fc7d7a263b6e343fdf90748c7b73f9e1583d3",
+      "containsIntentionalText": false,
+      "alt": "Clover celebrating",
+      "approvedBy": "Codex implementation pass",
+      "approvedAt": "2026-05-24",
+      "approvalNotes": "Generated and normalized for the Three.js Clover V2 sprite cleanup; ready for design-owner review.",
+      "replaces": "public/experiences/founders-plot/assets/characters/clover-celebrating.webp",
+      "layerRole": "character",
+      "stateDriven": true,
+      "characterId": "clover",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "hitbox": {
+        "x": 0.24,
+        "y": 0.08,
+        "w": 0.52,
+        "h": 0.84
+      },
+      "zIndexHint": 40,
+      "usage": "primary-view",
+      "approvalStatus": "implementation-ready",
+      "optimizationStatus": "normalized-alpha-webp",
+      "sourceSpriteSheet": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-visual-qa",
+        "score": 4,
+        "notes": "Cleaner full-body Clover silhouette for Three.js sprite use; minor edge color should be reviewed on final art pass."
+      }
+    },
+    {
+      "id": "clover_paused_v1_4_4",
+      "role": "founders_plot_character",
+      "kind": "founders_plot_character",
+      "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-paused.webp",
+      "src": "/experiences/founders-plot/assets/characters/v1_4_4/clover-paused.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_4/clover_v2_sprite_sheet.md",
+      "promptHash": "c16f63a0178fe93fd7168119abec4d66c22d534c4efc57ebfe56c38600e3d80c",
+      "referenceInputs": [
+        "public/experiences/founders-plot/assets/characters/clover-idle.webp",
+        "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png"
+      ],
+      "referenceHashes": {
+        "public/experiences/founders-plot/assets/characters/clover-idle.webp": "876312ee0fbd41cd30261d60929aeef4122624994eaf3e5e541cf7348562c6fd",
+        "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png": "6db2b020b016366d9ea2ed03d11ee93d51dcb48f1946f250cd55ee209666f90b"
+      },
+      "candidateId": "clover-v2-sheet:0,2",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png",
+      "postProcessing": [
+        "sprite-sheet-generation",
+        "magenta-chroma-key-removal",
+        "grid-crop",
+        "alpha-png-export",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 31558,
+      "bytes": 31558,
+      "sha256": "1e8bc2a502ab0d5ce31acb69edcf05b8966d17b843985b0ad18bcae1d36340f5",
+      "containsIntentionalText": false,
+      "alt": "Clover paused",
+      "approvedBy": "Codex implementation pass",
+      "approvedAt": "2026-05-24",
+      "approvalNotes": "Generated and normalized for the Three.js Clover V2 sprite cleanup; ready for design-owner review.",
+      "replaces": "public/experiences/founders-plot/assets/characters/clover-paused.webp",
+      "layerRole": "character",
+      "stateDriven": true,
+      "characterId": "clover",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "hitbox": {
+        "x": 0.24,
+        "y": 0.08,
+        "w": 0.52,
+        "h": 0.84
+      },
+      "zIndexHint": 40,
+      "usage": "primary-view",
+      "approvalStatus": "implementation-ready",
+      "optimizationStatus": "normalized-alpha-webp",
+      "sourceSpriteSheet": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-visual-qa",
+        "score": 4,
+        "notes": "Cleaner full-body Clover silhouette for Three.js sprite use; minor edge color should be reviewed on final art pass."
+      }
+    },
+    {
+      "id": "clover_blocked_v1_4_4",
+      "role": "founders_plot_character",
+      "kind": "founders_plot_character",
+      "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-blocked.webp",
+      "src": "/experiences/founders-plot/assets/characters/v1_4_4/clover-blocked.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_4/clover_v2_sprite_sheet.md",
+      "promptHash": "c16f63a0178fe93fd7168119abec4d66c22d534c4efc57ebfe56c38600e3d80c",
+      "referenceInputs": [
+        "public/experiences/founders-plot/assets/characters/clover-idle.webp",
+        "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png"
+      ],
+      "referenceHashes": {
+        "public/experiences/founders-plot/assets/characters/clover-idle.webp": "876312ee0fbd41cd30261d60929aeef4122624994eaf3e5e541cf7348562c6fd",
+        "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png": "6db2b020b016366d9ea2ed03d11ee93d51dcb48f1946f250cd55ee209666f90b"
+      },
+      "candidateId": "clover-v2-sheet:1,2",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png",
+      "postProcessing": [
+        "sprite-sheet-generation",
+        "magenta-chroma-key-removal",
+        "grid-crop",
+        "alpha-png-export",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 27956,
+      "bytes": 27956,
+      "sha256": "e6bf5fcdde1ea157e1ec49c72cc354ad218412accb44be92619f507309493a12",
+      "containsIntentionalText": false,
+      "alt": "Clover blocked",
+      "approvedBy": "Codex implementation pass",
+      "approvedAt": "2026-05-24",
+      "approvalNotes": "Generated and normalized for the Three.js Clover V2 sprite cleanup; ready for design-owner review.",
+      "replaces": "public/experiences/founders-plot/assets/characters/clover-blocked.webp",
+      "layerRole": "character",
+      "stateDriven": true,
+      "characterId": "clover",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "hitbox": {
+        "x": 0.24,
+        "y": 0.08,
+        "w": 0.52,
+        "h": 0.84
+      },
+      "zIndexHint": 40,
+      "usage": "primary-view",
+      "approvalStatus": "implementation-ready",
+      "optimizationStatus": "normalized-alpha-webp",
+      "sourceSpriteSheet": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-visual-qa",
+        "score": 4,
+        "notes": "Cleaner full-body Clover silhouette for Three.js sprite use; minor edge color should be reviewed on final art pass."
+      }
+    },
+    {
+      "id": "clover_restart_needed_v1_4_4",
+      "role": "founders_plot_character",
+      "kind": "founders_plot_character",
+      "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-restart-needed.webp",
+      "src": "/experiences/founders-plot/assets/characters/v1_4_4/clover-restart-needed.webp",
+      "status": "approved",
+      "generatedBy": "gpt-image-2",
+      "generationMode": "codex_builtin",
+      "model": "gpt-image-2",
+      "promptFile": "specs/prompts/v1_4_4/clover_v2_sprite_sheet.md",
+      "promptHash": "c16f63a0178fe93fd7168119abec4d66c22d534c4efc57ebfe56c38600e3d80c",
+      "referenceInputs": [
+        "public/experiences/founders-plot/assets/characters/clover-idle.webp",
+        "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png"
+      ],
+      "referenceHashes": {
+        "public/experiences/founders-plot/assets/characters/clover-idle.webp": "876312ee0fbd41cd30261d60929aeef4122624994eaf3e5e541cf7348562c6fd",
+        "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png": "6db2b020b016366d9ea2ed03d11ee93d51dcb48f1946f250cd55ee209666f90b"
+      },
+      "candidateId": "clover-v2-sheet:2,2",
+      "candidatePath": "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png",
+      "postProcessing": [
+        "sprite-sheet-generation",
+        "magenta-chroma-key-removal",
+        "grid-crop",
+        "alpha-png-export",
+        "webp-compression"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 30984,
+      "bytes": 30984,
+      "sha256": "ebd4c5f47d88ebcd9617337fb99b7b04928ca5be1a1087759507b0db676bce74",
+      "containsIntentionalText": false,
+      "alt": "Clover restart needed",
+      "approvedBy": "Codex implementation pass",
+      "approvedAt": "2026-05-24",
+      "approvalNotes": "Generated and normalized for the Three.js Clover V2 sprite cleanup; ready for design-owner review.",
+      "replaces": "public/experiences/founders-plot/assets/characters/clover-restart-needed.webp",
+      "layerRole": "character",
+      "stateDriven": true,
+      "characterId": "clover",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "hitbox": {
+        "x": 0.24,
+        "y": 0.08,
+        "w": 0.52,
+        "h": 0.84
+      },
+      "zIndexHint": 40,
+      "usage": "primary-view",
+      "approvalStatus": "implementation-ready",
+      "optimizationStatus": "normalized-alpha-webp",
+      "sourceSpriteSheet": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-visual-qa",
+        "score": 4,
+        "notes": "Cleaner full-body Clover silhouette for Three.js sprite use; minor edge color should be reviewed on final art pass."
+      }
+    },
+    {
+      "id": "founders_plot_supply_crates_prop_v1_4_4",
+      "role": "founders_plot_world_prop",
+      "kind": "founders_plot_world_prop",
+      "propId": "supply_crates",
+      "path": "public/experiences/founders-plot/assets/props/supply-crates.svg",
+      "src": "/experiences/founders-plot/assets/props/supply-crates.svg",
+      "status": "approved",
+      "generatedBy": "codex-svg",
+      "generationMode": "repo_native_import_stand_in",
+      "model": "codex-svg",
+      "promptFile": "specs/prompts/v1_4_4/founders_plot_supply_crates_prop_v1_4_4.md",
+      "promptHash": "1ecd0280aae91d286a169f7a635b81e4904d3cf294d15a54fabbd6c861d25599",
+      "referenceInputs": [
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg"
+      ],
+      "referenceHashes": {
+        "docs/brand/reference/platform/agenttown-visual-reference.jpeg": "60f3da0f0a39bdcb7f86c7dda6ad24bfebd49d55693a5a053c737e6dfe6399f5"
+      },
+      "candidateId": "repo-svg:supply-crates",
+      "candidatePath": "public/experiences/founders-plot/assets/props/supply-crates.svg",
+      "postProcessing": [
+        "repo-native-svg",
+        "manifest-registration"
+      ],
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "width": 512,
+      "height": 512,
+      "byteSize": 2168,
+      "bytes": 2168,
+      "sha256": "dae5081cfaa36eb3bb09b379823427831aa0e5ebef7ebe245ea0b42b481fbfe2",
+      "containsIntentionalText": false,
+      "alt": "Stack of frontier supply crates",
+      "approvedBy": "Codex implementation pass",
+      "approvedAt": "2026-05-24",
+      "approvalNotes": "Registered as an ambient world-prop pipeline example for imported or generated 2D billboard assets.",
+      "layerRole": "world-prop",
+      "stateDriven": false,
+      "worldObjectId": "supply_crates",
+      "transparent": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.92
+      },
+      "hitbox": {
+        "x": 0.16,
+        "y": 0.18,
+        "w": 0.68,
+        "h": 0.66
+      },
+      "zIndexHint": 11,
+      "usage": "ambient-world-prop",
+      "approvalStatus": "implementation-ready",
+      "optimizationStatus": "source-svg",
+      "styleReview": {
+        "passed": true,
+        "reviewer": "codex-visual-qa",
+        "score": 4,
+        "notes": "Repo-native SVG prop validates the manifest path for future generated or imported 2D world props."
       }
     }
   ]

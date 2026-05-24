@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Stack of frontier supply crates">
+  <defs>
+    <linearGradient id="crateTop" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#d79a54"/>
+      <stop offset="1" stop-color="#9e6438"/>
+    </linearGradient>
+    <linearGradient id="crateFace" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#b87842"/>
+      <stop offset="1" stop-color="#765038"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="18" stdDeviation="16" flood-color="#3d200f" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+  <g fill="none" fill-rule="evenodd">
+    <ellipse cx="260" cy="410" rx="172" ry="46" fill="#3d200f" opacity="0.16"/>
+    <g filter="url(#softShadow)">
+      <path d="M96 210l142-68 114 54-145 72z" fill="url(#crateTop)"/>
+      <path d="M96 210l111 58v114L96 322z" fill="url(#crateFace)"/>
+      <path d="M207 268l145-72v112l-145 74z" fill="#8c5a39"/>
+      <path d="M136 231l32-15 114 58-31 16zM248 178l33 16-143 70-32-16z" fill="#e7b56d" opacity="0.72"/>
+      <path d="M124 274l59 30M124 304l59 31M226 303l95-47M226 335l95-49" stroke="#553826" stroke-width="12" stroke-linecap="round" opacity="0.72"/>
+      <path d="M207 268v114M96 210l111 58 145-72" stroke="#4f3323" stroke-width="10" stroke-linejoin="round" opacity="0.8"/>
+    </g>
+    <g transform="translate(238 116)" filter="url(#softShadow)">
+      <path d="M14 82l113-54 91 44-116 57z" fill="#d49a55"/>
+      <path d="M14 82l88 47v88l-88-48z" fill="#a86d3f"/>
+      <path d="M102 129l116-57v86l-116 59z" fill="#765038"/>
+      <path d="M40 96l24-12 91 46-25 13zM137 47l26 13-116 56-25-13z" fill="#efc377" opacity="0.72"/>
+      <path d="M37 132l42 22M119 155l76-37" stroke="#513522" stroke-width="10" stroke-linecap="round" opacity="0.72"/>
+      <path d="M102 129v88M14 82l88 47 116-57" stroke="#4f3323" stroke-width="8" stroke-linejoin="round" opacity="0.8"/>
+    </g>
+    <path d="M146 377c48 26 120 34 177 17" stroke="#fff3cd" stroke-width="6" stroke-linecap="round" opacity="0.38"/>
+  </g>
+</svg>

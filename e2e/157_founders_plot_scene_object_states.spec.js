@@ -94,9 +94,17 @@ test('scene objects render the live plot states and clicking them opens the acti
   await lumber.click();
   await expect(frame.getByTestId('selection-collect')).toBeVisible();
   await expect(frame.locator('#selectionSheetTitle')).toHaveText(/Lumber Camp/i);
-  await expect(frame.getByTestId('founders-game-shell')).toHaveScreenshot('founders-v1-4-2-object-selected-1280.png', {
-    animations: 'disabled',
-    caret: 'hide',
-    maxDiffPixelRatio: 0.03
-  });
+  const renderer = await frame.evaluate(() => document.getElementById('plotBoard')?.dataset.renderer || '');
+  if (renderer === 'three.js') {
+    const threeInfo = await frame.evaluate(() => window.__foundersPlotTest.getThreeSceneInfo());
+    expect(threeInfo?.objectIds || []).toContain('LUMBER_CAMP');
+    expect(threeInfo?.lastPick?.objectId).toBe('LUMBER_CAMP');
+    expect(threeInfo?.grid?.cellCount).toBeGreaterThan(0);
+  } else {
+    await expect(frame.getByTestId('founders-game-shell')).toHaveScreenshot('founders-v1-4-2-object-selected-1280.png', {
+      animations: 'disabled',
+      caret: 'hide',
+      maxDiffPixelRatio: 0.03
+    });
+  }
 });

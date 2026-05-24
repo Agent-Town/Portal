@@ -50,6 +50,7 @@ Town Hall is optional for the first loop.
 - Place the first Lumber Camp.
 - Collect the first wood.
 - Claim the one-time First Timber reward without duplicating it.
+- Choose the first Public Square town opportunity and let its tradeoff visibly change town signals.
 - Upgrade Headquarters to level 2.
 - Place the first Farm Plot before drifting into optimization.
 - Choose one living contract from a named town requester.

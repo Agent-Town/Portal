@@ -479,6 +479,53 @@ html.founders-plot-embed body.founders-plot-page {
     var(--fp-stage-desktop) center/cover no-repeat;
 }
 
+.at-fp-threeViewport {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: #f3d8a6;
+}
+
+.at-fp-threeCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.at-fp-stage--threejs {
+  background: #f3d8a6;
+}
+
+.at-fp-stage--threejs .at-fp-stageBackdrop {
+  opacity: 0;
+}
+
+.at-fp-stage--threejs::after {
+  opacity: 0;
+}
+
+.at-fp-stage--threejs .at-fp-objectSprite,
+.at-fp-stage--threejs .at-fp-objectShadow,
+.at-fp-stage--threejs .at-fp-cloverGroundShadow,
+.at-fp-stage--threejs .at-fp-hqCivicAccent,
+.at-fp-stage--threejs .at-fp-objectBadges,
+.at-fp-stage--threejs .at-fp-timer-ring {
+  opacity: 0 !important;
+}
+
+.at-fp-stage--threejs .at-fp-objectLabel,
+.at-fp-stage--threejs .at-fp-cloverBubble {
+  opacity: 0 !important;
+}
+
+.at-fp-stage--threejs .at-fp-stage-object:focus .at-fp-objectLabel,
+.at-fp-stage--threejs .at-fp-stage-object:focus-visible .at-fp-objectLabel,
+.at-fp-stage--threejs .at-fp-clover:focus .at-fp-cloverBubble,
+.at-fp-stage--threejs .at-fp-clover:focus-visible .at-fp-cloverBubble {
+  opacity: 1 !important;
+}
+
 .at-fp-stage::after {
   content: "";
   position: absolute;
@@ -610,6 +657,8 @@ html.founders-plot-embed body.founders-plot-page {
 .at-fp-stage-object:focus-visible,
 .at-fp-clover:focus,
 .at-fp-clover:focus-visible,
+.at-fp-sceneActionButton:focus,
+.at-fp-sceneActionButton:focus-visible,
 .foundersTrayButton:focus,
 .foundersTrayButton:focus-visible,
 .foundersDrawerClose:focus,
@@ -619,6 +668,128 @@ html.founders-plot-embed body.founders-plot-page {
   outline: 3px solid rgba(95, 141, 142, 0.64);
   outline-offset: 4px;
   box-shadow: 0 0 0 4px rgba(95, 141, 142, 0.2);
+}
+
+.at-fp-sceneActions {
+  position: absolute;
+  left: clamp(160px, calc(var(--fp-action-x, 0.5) * 100%), calc(100% - 160px));
+  top: clamp(104px, calc(var(--fp-action-y, 0.5) * 100%), calc(100% - 104px));
+  z-index: 46;
+  display: grid;
+  width: min(340px, calc(100% - 24px));
+  gap: 6px;
+  transform: translate(-50%, -112%);
+  pointer-events: auto;
+}
+
+.at-fp-sceneActionsKicker {
+  justify-self: center;
+  max-width: min(260px, 100%);
+  min-height: 24px;
+  padding: 4px 9px;
+  border: 1px solid rgba(46, 27, 14, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 247, 230, 0.94);
+  color: var(--fp-ink-soft);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 10px 24px rgba(61, 32, 15, 0.14);
+}
+
+.at-fp-sceneActionsRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(134px, 1fr));
+  gap: 6px;
+}
+
+.at-fp-sceneActionButton {
+  appearance: none;
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  min-width: 0;
+  min-height: 56px;
+  padding: 8px 10px;
+  border: 1px solid rgba(46, 27, 14, 0.18);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(255, 231, 142, 0.98), rgba(223, 170, 72, 0.98));
+  color: var(--fp-ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.12;
+  text-align: center;
+  letter-spacing: 0;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.58),
+    0 12px 26px rgba(61, 32, 15, 0.2);
+}
+
+.at-fp-sceneActionButton[data-has-advice="true"] {
+  min-height: 92px;
+}
+
+.at-fp-sceneActionButton span,
+.at-fp-sceneActionButton small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.at-fp-sceneActionButton small {
+  color: rgba(46, 27, 14, 0.72);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.at-fp-sceneActionAdvice {
+  color: rgba(36, 82, 80, 0.88);
+}
+
+.at-fp-sceneActionButton:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.64),
+    0 16px 30px rgba(61, 32, 15, 0.24);
+}
+
+.at-fp-sceneActionButton:active {
+  transform: translateY(0);
+}
+
+.at-fp-sceneActionButton:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.25);
+  opacity: 0.62;
+}
+
+@media (max-width: 640px) {
+  .at-fp-sceneActions {
+    left: clamp(132px, calc(var(--fp-action-x, 0.5) * 100%), calc(100% - 132px));
+    top: clamp(96px, calc(var(--fp-action-y, 0.5) * 100%), calc(100% - 88px));
+    width: min(264px, calc(100% - 18px));
+    transform: translate(-50%, -108%);
+  }
+
+  .at-fp-sceneActionsRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .at-fp-sceneActionButton {
+    min-height: 48px;
+    padding: 7px 9px;
+    font-size: 12px;
+  }
+
+  .at-fp-sceneActionButton[data-has-advice="true"] {
+    min-height: 96px;
+  }
 }
 
 .at-fp-objectShadow {
@@ -1085,6 +1256,77 @@ html.founders-plot-embed body.founders-plot-page {
   animation: founders-resource-flyout 900ms ease forwards;
 }
 
+.at-fp-scene-feedback {
+  position: absolute;
+  left: var(--fp-feedback-left, 50%);
+  top: var(--fp-feedback-top, 44%);
+  z-index: 62;
+  display: grid;
+  gap: 3px;
+  width: min(340px, calc(100% - 24px));
+  min-height: 58px;
+  align-content: center;
+  padding: 10px 14px;
+  border: 1px solid rgba(46, 27, 14, 0.15);
+  border-radius: 8px;
+  background: rgba(255, 247, 230, 0.96);
+  color: var(--fp-ink);
+  text-align: center;
+  transform: translate(-50%, -108%);
+  pointer-events: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.62),
+    0 16px 32px rgba(61, 32, 15, 0.2);
+  animation: founders-scene-feedback 3200ms ease forwards;
+}
+
+.at-fp-scene-feedback strong,
+.at-fp-scene-feedback span {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  letter-spacing: 0;
+}
+
+.at-fp-scene-feedback strong {
+  font-size: 14px;
+  line-height: 1.14;
+}
+
+.at-fp-scene-feedback span {
+  color: var(--fp-ink-soft);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.18;
+}
+
+.at-fp-scene-feedback[data-feedback-tone="choice"] {
+  border-color: rgba(95, 141, 142, 0.28);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.62),
+    0 0 0 4px rgba(95, 141, 142, 0.12),
+    0 16px 32px rgba(61, 32, 15, 0.2);
+}
+
+.at-fp-scene-feedback[data-feedback-tone="unlock"] {
+  border-color: rgba(196, 136, 58, 0.34);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.62),
+    0 0 0 4px rgba(246, 211, 145, 0.16),
+    0 16px 32px rgba(61, 32, 15, 0.2);
+}
+
+.at-fp-stage--threejs .at-fp-stage-object.is-action-highlight::before {
+  content: "";
+  position: absolute;
+  inset: 18% 14% 14%;
+  border: 2px solid rgba(95, 141, 142, 0.42);
+  border-radius: 28px;
+  pointer-events: none;
+  opacity: 1;
+  animation: founders-scene-ring 1100ms ease forwards;
+}
+
 .foundersActions,
 .foundersPriorityRow,
 .foundersContractList,
@@ -1188,6 +1430,37 @@ html.founders-plot-embed body.founders-plot-page {
 .foundersBadge.is-warn {
   background: rgba(168, 91, 61, 0.12);
   color: var(--fp-rust);
+}
+
+.foundersBadge.is-good {
+  background: rgba(76, 132, 99, 0.14);
+  color: #2f654c;
+}
+
+.foundersOpportunityChoices {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.foundersOpportunityChoice {
+  display: grid;
+  justify-content: start;
+  gap: 5px;
+  width: 100%;
+  min-height: 128px;
+  padding: 10px;
+  border-radius: 8px;
+  text-align: left;
+  white-space: normal;
+  letter-spacing: 0;
+}
+
+.foundersOpportunityChoice span {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--fp-muted);
+  letter-spacing: 0;
 }
 
 .foundersInlineButtons,
@@ -1314,6 +1587,38 @@ html.founders-plot-embed body.founders-plot-page {
   100% {
     opacity: 0;
     transform: translate(calc(-50% + var(--fp-flyout-x, 0px)), calc(-50% + var(--fp-flyout-y, -60px))) scale(1.02);
+  }
+}
+
+@keyframes founders-scene-feedback {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -98%) scale(0.96);
+  }
+  10%, 78% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -118%) scale(1);
+  }
+}
+
+@keyframes founders-scene-ring {
+  0% {
+    box-shadow:
+      0 0 0 0 rgba(255, 247, 230, 0.78),
+      0 0 0 0 rgba(95, 141, 142, 0.2);
+  }
+  45% {
+    box-shadow:
+      0 0 0 8px rgba(255, 247, 230, 0.42),
+      0 0 0 18px rgba(95, 141, 142, 0.16);
+  }
+  100% {
+    box-shadow:
+      0 0 0 16px rgba(255, 247, 230, 0),
+      0 0 0 28px rgba(95, 141, 142, 0);
   }
 }
 
@@ -1780,10 +2085,496 @@ html.founders-plot-embed body.founders-plot-page {
   }
 }
 
+html.founders-plot-fullscreen,
+html.founders-plot-fullscreen body.founders-plot-page {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  overflow: hidden;
+  background: #1f130c;
+}
+
+.founders-plot-fullscreen body.founders-plot-page {
+  color: var(--fp-ink);
+}
+
+.founders-plot-fullscreen .foundersPlotRoot {
+  width: 100%;
+  max-width: none;
+  height: 100vh;
+  height: 100dvh;
+  margin: 0;
+  padding: 12px;
+  box-sizing: border-box;
+}
+
+.founders-plot-fullscreen .foundersGameShell {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 10px;
+}
+
+.founders-plot-fullscreen .foundersTopHud {
+  grid-template-columns: minmax(180px, 0.75fr) minmax(108px, 124px) minmax(360px, 1.55fr) minmax(200px, 0.8fr);
+  gap: 10px;
+  align-items: stretch;
+}
+
+.founders-plot-fullscreen .foundersHudBrand,
+.founders-plot-fullscreen .foundersHudCard {
+  min-height: 86px;
+  padding: 10px 12px;
+  border-radius: 18px;
+}
+
+.founders-plot-fullscreen .foundersEyebrow,
+.founders-plot-fullscreen .foundersLabel {
+  display: block;
+  font-size: 11px;
+  line-height: 1.1;
+}
+
+.founders-plot-fullscreen .foundersHudBrand h1 {
+  font-size: clamp(30px, 3.1vw, 42px);
+  line-height: 0.95;
+}
+
+.founders-plot-fullscreen .foundersHudStatus,
+.founders-plot-fullscreen .foundersHudQueue .small,
+.founders-plot-fullscreen #hqProgressText {
+  display: block;
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.founders-plot-fullscreen .foundersLevelValue {
+  font-size: 36px;
+}
+
+.founders-plot-fullscreen .foundersLevelBar {
+  display: block;
+  height: 8px;
+}
+
+.founders-plot-fullscreen .foundersInventory {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.founders-plot-fullscreen .foundersInventoryItem {
+  min-width: 0;
+  padding: 8px 9px;
+  border-radius: 13px;
+  text-align: left;
+}
+
+.founders-plot-fullscreen .foundersInventoryItem .foundersLabel {
+  display: block;
+}
+
+.founders-plot-fullscreen .foundersInventoryShort {
+  display: none;
+}
+
+.founders-plot-fullscreen .foundersInventoryItem strong {
+  font-size: 15px;
+  line-height: 1.15;
+}
+
+.founders-plot-fullscreen .foundersObjectiveRibbon {
+  position: relative;
+  z-index: 3;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 247, 230, 0.96), rgba(241, 223, 188, 0.98));
+  backdrop-filter: none;
+  pointer-events: none;
+}
+
+.founders-plot-fullscreen .foundersObjectiveRibbon .foundersLabel,
+.founders-plot-fullscreen .foundersObjectiveMeta,
+.founders-plot-fullscreen .foundersObjectiveRibbon p {
+  display: block;
+}
+
+.founders-plot-fullscreen .foundersObjectiveCopy {
+  gap: 4px;
+  min-width: 0;
+}
+
+.founders-plot-fullscreen .foundersObjectiveRibbon h2 {
+  display: block;
+  overflow: visible;
+  font-size: clamp(24px, 2.4vw, 34px);
+  line-height: 1;
+  -webkit-line-clamp: unset;
+}
+
+.founders-plot-fullscreen .foundersObjectiveRibbon p {
+  max-width: 64ch;
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.founders-plot-fullscreen .foundersObjectiveAction {
+  justify-items: end;
+  pointer-events: auto;
+}
+
+.founders-plot-fullscreen .foundersPrimaryCta {
+  min-width: 196px;
+  min-height: 46px;
+  padding: 12px 16px;
+  font-size: 16px;
+  line-height: 1.1;
+  white-space: normal;
+}
+
+.founders-plot-fullscreen .foundersGameMain {
+  position: relative;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0;
+}
+
+.founders-plot-fullscreen .foundersStageRegion {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.founders-plot-fullscreen .foundersStageFrame {
+  height: 100%;
+  min-height: 0;
+  border-radius: 18px;
+}
+
+.founders-plot-fullscreen .foundersBoard,
+.founders-plot-fullscreen .at-fp-stage {
+  height: 100%;
+  min-height: 0;
+}
+
+.founders-plot-fullscreen .foundersDrawerTray {
+  gap: 8px;
+  align-items: stretch;
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  padding-bottom: 2px;
+}
+
+.founders-plot-fullscreen .foundersTrayButton {
+  flex: 0 0 auto;
+  justify-content: center;
+  min-height: 44px;
+  padding: 8px 12px;
+  gap: 8px;
+  border-radius: 14px;
+}
+
+.founders-plot-fullscreen .foundersTrayLabel {
+  font-size: 14px;
+  line-height: 1.1;
+}
+
+.founders-plot-fullscreen .foundersTrayBadge {
+  min-width: 22px;
+  height: 22px;
+  font-size: 12px;
+}
+
+.founders-plot-fullscreen .foundersBottomSheet {
+  position: absolute;
+  left: 12px;
+  bottom: 62px;
+  z-index: 8;
+  width: min(460px, calc(100% - 24px));
+  max-height: min(42vh, 390px);
+  overflow: auto;
+  padding: 14px 16px;
+  border-radius: 18px;
+}
+
+.founders-plot-fullscreen .foundersBottomSheet h2 {
+  font-size: 28px;
+}
+
+.founders-plot-fullscreen .foundersDataRow,
+.founders-plot-fullscreen .foundersObjectGoalText,
+.founders-plot-fullscreen .foundersActions,
+.founders-plot-fullscreen .foundersSubpanel,
+.founders-plot-fullscreen .foundersDrawerLead,
+.founders-plot-fullscreen .foundersQueueItem,
+.founders-plot-fullscreen .foundersContractItem,
+.founders-plot-fullscreen .foundersRewardItem,
+.founders-plot-fullscreen .foundersApprovalItem {
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.founders-plot-fullscreen .at-fp-cloverBubble {
+  max-width: 20ch;
+  padding: 9px 12px;
+  font-size: 13px;
+}
+
+.founders-plot-fullscreen .at-fp-state-badge {
+  min-height: 22px;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+.founders-plot-fullscreen .at-fp-objectLabel {
+  max-width: 16ch;
+  padding: 4px 10px;
+  font-size: 13px;
+}
+
+@media (max-width: 920px) {
+  .founders-plot-fullscreen .foundersPlotRoot {
+    padding: 8px;
+  }
+
+  .founders-plot-fullscreen .foundersGameShell {
+    grid-template-rows: auto auto minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .founders-plot-fullscreen .foundersTopHud {
+    grid-template-columns: minmax(0, 1fr) minmax(88px, 108px);
+    gap: 7px;
+  }
+
+  .founders-plot-fullscreen .foundersHudBrand,
+  .founders-plot-fullscreen .foundersHudCard {
+    min-height: auto;
+    padding: 8px 10px;
+    border-radius: 15px;
+  }
+
+  .founders-plot-fullscreen .foundersEyebrow,
+  .founders-plot-fullscreen .foundersHudQueue {
+    display: none;
+  }
+
+  .founders-plot-fullscreen .foundersHudBrand h1 {
+    font-size: 24px;
+  }
+
+  .founders-plot-fullscreen .foundersHudStatus {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: 13px;
+    line-height: 1.2;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+  }
+
+  .founders-plot-fullscreen .foundersLevelValue {
+    font-size: 28px;
+  }
+
+  .founders-plot-fullscreen .foundersHudInventory {
+    grid-column: 1 / 3;
+  }
+
+  .founders-plot-fullscreen .foundersHudInventory > .foundersLabel,
+  .founders-plot-fullscreen .foundersInventoryItem .foundersLabel {
+    display: none;
+  }
+
+  .founders-plot-fullscreen .foundersInventoryShort {
+    display: block;
+    font-size: 10px;
+  }
+
+  .founders-plot-fullscreen .foundersInventoryItem {
+    padding: 6px 5px;
+    text-align: center;
+  }
+
+  .founders-plot-fullscreen .foundersInventoryItem strong {
+    font-size: 14px;
+  }
+
+  .founders-plot-fullscreen .foundersObjectiveRibbon {
+    gap: 8px;
+    padding: 8px 10px;
+  }
+
+  .founders-plot-fullscreen .foundersObjectiveRibbon .foundersLabel,
+  .founders-plot-fullscreen .foundersObjectiveMeta,
+  .founders-plot-fullscreen .foundersObjectiveRibbon p {
+    display: none;
+  }
+
+  .founders-plot-fullscreen .foundersObjectiveRibbon h2 {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: 19px;
+    line-height: 1.05;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .founders-plot-fullscreen .foundersPrimaryCta {
+    min-width: 0;
+    min-height: 42px;
+    padding: 10px 12px;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+
+  .founders-plot-fullscreen .foundersStageRegion {
+    gap: 8px;
+  }
+
+  .founders-plot-fullscreen .foundersStageFrame {
+    border-radius: 14px;
+  }
+
+  .founders-plot-fullscreen .foundersTrayButton {
+    min-height: 42px;
+    padding: 8px 10px;
+  }
+
+  .founders-plot-fullscreen .foundersTrayLabel {
+    font-size: 13px;
+  }
+
+  .founders-plot-fullscreen .foundersBottomSheet {
+    left: 8px;
+    bottom: 54px;
+    width: calc(100% - 16px);
+    max-height: min(44vh, 340px);
+    padding: 12px 14px;
+  }
+}
+
+@media (max-height: 720px) and (min-width: 781px) {
+  .founders-plot-fullscreen .foundersGameShell {
+    gap: 8px;
+  }
+
+  .founders-plot-fullscreen .foundersHudBrand,
+  .founders-plot-fullscreen .foundersHudCard {
+    min-height: 72px;
+    padding: 8px 10px;
+    border-radius: 16px;
+  }
+
+  .founders-plot-fullscreen .foundersHudBrand {
+    gap: 3px;
+  }
+
+  .founders-plot-fullscreen .foundersHudBrand h1 {
+    font-size: 30px;
+  }
+
+  .founders-plot-fullscreen .foundersHudStatus {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: 13px;
+    line-height: 1.2;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+  }
+
+  .founders-plot-fullscreen .foundersLevelValue {
+    font-size: 30px;
+  }
+
+  .founders-plot-fullscreen .foundersLevelBar {
+    height: 6px;
+  }
+
+  .founders-plot-fullscreen .foundersInventoryItem {
+    padding: 6px 8px;
+  }
+
+  .founders-plot-fullscreen .foundersInventoryItem strong {
+    font-size: 14px;
+  }
+
+  .founders-plot-fullscreen .foundersObjectiveRibbon {
+    padding: 8px 12px;
+  }
+
+  .founders-plot-fullscreen .foundersObjectiveRibbon p,
+  .founders-plot-fullscreen .foundersObjectiveMeta {
+    display: none;
+  }
+
+  .founders-plot-fullscreen .foundersObjectiveRibbon h2 {
+    font-size: 24px;
+  }
+
+  .founders-plot-fullscreen .foundersPrimaryCta {
+    min-height: 42px;
+    padding: 10px 14px;
+    font-size: 15px;
+  }
+
+  .founders-plot-fullscreen .foundersStageRegion {
+    gap: 8px;
+  }
+}
+
+@media (max-width: 420px), (max-height: 620px) {
+  .founders-plot-fullscreen .foundersTopHud {
+    gap: 6px;
+  }
+
+  .founders-plot-fullscreen .foundersHudBrand,
+  .founders-plot-fullscreen .foundersHudCard {
+    padding: 7px 8px;
+  }
+
+  .founders-plot-fullscreen .foundersHudStatus,
+  .founders-plot-fullscreen #hqProgressText {
+    display: none;
+  }
+
+  .founders-plot-fullscreen .foundersHudBrand h1 {
+    font-size: 21px;
+  }
+
+  .founders-plot-fullscreen .foundersLevelValue {
+    font-size: 24px;
+  }
+
+  .founders-plot-fullscreen .foundersInventoryItem {
+    padding: 5px 3px;
+  }
+
+  .founders-plot-fullscreen .foundersInventoryItem strong {
+    font-size: 13px;
+  }
+
+  .founders-plot-fullscreen .foundersObjectiveRibbon h2 {
+    font-size: 18px;
+  }
+
+  .founders-plot-fullscreen .foundersPrimaryCta {
+    min-height: 40px;
+    padding: 8px 10px;
+    font-size: 14px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .foundersLevelFill,
   .at-fp-objectSprite,
   .at-fp-resource-flyout,
+  .at-fp-scene-feedback,
+  .at-fp-stage-object.is-action-highlight::before,
   .foundersHudLevel.is-level-up {
     animation: none !important;
     transition: none !important;

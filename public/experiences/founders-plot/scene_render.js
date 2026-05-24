@@ -178,10 +178,25 @@
     `;
   }
 
+  function syncThreeScene(node, scene, options = {}) {
+    const viewport = node.querySelector('[data-three-scene-viewport]');
+    const threeApi = typeof window !== 'undefined' ? window.FoundersPlotThreeRenderer : null;
+    if (!viewport || !threeApi || typeof threeApi.renderPlotScene !== 'function') {
+      node.dataset.renderer = 'dom-layered';
+      return;
+    }
+    const info = threeApi.renderPlotScene(node, viewport, scene, {
+      assetMap: options.assetMap || {}
+    });
+    node.dataset.renderer = 'three.js';
+    node.dataset.threeObjectCount = String(info?.objectCount || 0);
+  }
+
   function renderPlotStage(node, scene, options = {}) {
     if (!(node instanceof HTMLElement) || !scene) return;
     const assetMap = options.assetMap || {};
     node.classList.add('at-fp-stage');
+    node.classList.add('at-fp-stage--threejs');
     node.style.setProperty('--fp-stage-desktop', `url('${scene.stageBackgrounds?.desktop || ''}')`);
     node.style.setProperty('--fp-stage-mobile', `url('${scene.stageBackgrounds?.mobile || scene.stageBackgrounds?.desktop || ''}')`);
     node.dataset.layerRole = 'scene-base';
@@ -211,6 +226,9 @@
           data-attention="${htmlEscape(object.attention || 'none')}"
           data-layer-role="live-object"
           data-world-object="${htmlEscape(object.worldObjectId || '')}"
+          data-grid-cell-id="${htmlEscape(object.gridCellId || '')}"
+          data-grid-col="${htmlEscape(object.gridCol ?? '')}"
+          data-grid-row="${htmlEscape(object.gridRow ?? '')}"
           data-overlay-role="${htmlEscape(object.overlayRole || 'ambient')}"
           data-overlay-weight="${htmlEscape(object.overlayWeight || 'quiet')}"
           data-asset-id="${htmlEscape(object.assetId || '')}"
@@ -249,6 +267,12 @@
 
     node.innerHTML = `
       <div
+        class="at-fp-threeViewport"
+        data-three-scene-viewport
+        data-testid="founders-three-scene"
+        aria-hidden="true"
+      ></div>
+      <div
         class="at-fp-stageBackdrop"
         data-layer-role="scene-base"
         data-scene-asset-id="${htmlEscape(scene.stageBackgrounds?.desktopAssetId || '')}"
@@ -260,7 +284,7 @@
         <div class="at-fp-stagePatch at-fp-stagePatch--two"></div>
         <div class="at-fp-stagePatch at-fp-stagePatch--three"></div>
       </div>
-      <div class="at-fp-stageObjects" data-layer-role="live-object">
+      <div class="at-fp-stageObjects" data-layer-role="semantic-object-hooks" data-three-semantic-layer="true">
         ${objectsMarkup}
         ${cloverTargetLink(scene)}
         <div
@@ -282,6 +306,9 @@
             data-testid="founders-clover-avatar"
             data-layer-role="character"
             data-world-object="clover"
+            data-grid-cell-id="${htmlEscape(scene.clover?.gridCellId || '')}"
+            data-grid-col="${htmlEscape(scene.clover?.gridCol ?? '')}"
+            data-grid-row="${htmlEscape(scene.clover?.gridRow ?? '')}"
             data-overlay-role="primary-action"
             data-overlay-weight="${htmlEscape(String(scene?.clover?.state || '').toUpperCase() === 'ACTING' ? 'strong' : 'medium')}"
             data-asset-id="${htmlEscape(scene.clover?.assetId || '')}"
@@ -300,6 +327,7 @@
       </div>
       <div class="at-fp-stageCaption" aria-hidden="true">Your frontier plot</div>
     `;
+    syncThreeScene(node, scene, { assetMap });
   }
 
   function renderDrawerTray(node, scene) {

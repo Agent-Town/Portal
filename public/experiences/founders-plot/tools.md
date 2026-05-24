@@ -55,6 +55,7 @@ The Founders Plot runtime exposes a deliberately small tool family:
 - `et.plot.request_user_approval`
 - `et.plot.town.get_signals`
 - `et.plot.town.upgrade_landmark`
+- `et.plot.town.resolve_opportunity`
 - `et.plot.journal.get_entries`
 - `et.plot.contracts.get_state`
 - `et.plot.contracts.accept`
@@ -73,6 +74,9 @@ The Founders Plot runtime exposes a deliberately small tool family:
 - Contract offers come from named recurring requesters and carry a `requesterSnapshot`.
 - The town exposes four civic signals: `depotReadiness`, `marketConfidence`, `neighborGoodwill`, and `publicCharm`.
 - The only landmark in scope is `public_square_welcome_sign`.
+- Public Square town opportunities are player preference choices; Clover may explain tradeoffs, but `et.plot.town.resolve_opportunity` should run only after the human chooses an option.
+- Early Public Square opportunities can chain; after resolving one, re-read state before proposing the next build, upgrade, or choice.
+- `foreman.companionAdvice` is the shared-state companion readout for current bottlenecks and Public Square pros/cons; surface it as advice, not as permission to bypass the human choice.
 - Standing Order v0 is limited to `CAREFUL_STEWARD` and `BOLD_FOUNDER`.
 - The only shipped scheduler preset is `COLLECT_READY_OUTPUTS`.
 - The first autonomous mutation must come through the Foreman-authenticated route, not a spoofed `actor` field.

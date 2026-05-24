@@ -12,6 +12,7 @@ const {
   applyQueueJob,
   applyRequestUserApproval,
   applyResolveApproval,
+  applyResolveTownOpportunity,
   applyResumeScheduler,
   applyPauseScheduler,
   applyEnableCollectReadyOutputs,
@@ -348,6 +349,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
     const beforeSnapshot = hashJson({
       contracts: state.meta.contracts,
       contractDeck: state.meta.contractDeck,
+      townOpportunities: state.meta.townOpportunities,
       requesters: state.meta.requesters,
       foremanLastDecision: state.meta.foremanLastDecision,
       publicHeadline: state.meta.publicHeadline
@@ -370,6 +372,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
     const afterSnapshot = hashJson({
       contracts: state.meta.contracts,
       contractDeck: state.meta.contractDeck,
+      townOpportunities: state.meta.townOpportunities,
       requesters: state.meta.requesters,
       foremanLastDecision: state.meta.foremanLastDecision,
       publicHeadline: state.meta.publicHeadline
@@ -700,6 +703,11 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       } else if (toolName === 'et.plot.town.upgrade_landmark') {
         data = applyUpgradeLandmark(ctx.state, {
           landmarkId: String(rawArgs.landmarkId || '').trim()
+        }, mutationHelpers);
+      } else if (toolName === 'et.plot.town.resolve_opportunity') {
+        data = applyResolveTownOpportunity(ctx.state, {
+          opportunityId: String(rawArgs.opportunityId || '').trim(),
+          optionId: String(rawArgs.optionId || '').trim()
         }, mutationHelpers);
       } else if (toolName === 'et.plot.journal.get_entries') {
         data = {

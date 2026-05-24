@@ -82,6 +82,7 @@ test('skill.md keeps the minimal external-agent contract', async ({ request }) =
   expect(txt).toContain('et.plot.request_user_approval');
   expect(txt).toContain('et.plot.town.get_signals');
   expect(txt).toContain('et.plot.town.upgrade_landmark');
+  expect(txt).toContain('et.plot.town.resolve_opportunity');
   expect(txt).toContain('et.plot.journal.get_entries');
   expect(txt).toContain('et.plot.contracts.get_state');
   expect(txt).toContain('et.plot.contracts.accept');
@@ -90,7 +91,9 @@ test('skill.md keeps the minimal external-agent contract', async ({ request }) =
   expect(txt).toContain('et.foreman.scheduler.enable_collect_ready_outputs');
   expect(txt).toContain('Accepts one `SUPPLY`, `BUILD`, or `PREPARATION` contract.');
   expect(txt).toContain('Treat requesters as recurring people and institutions, not disposable strings.');
+  expect(txt).toContain('Use `foreman.companionAdvice` to explain the current bottleneck or town-choice tradeoff before suggesting an action.');
   expect(txt).toContain('Use `et.plot.town.get_signals` and `et.plot.journal.get_entries` to explain how the town changed.');
+  expect(txt).toContain('Town opportunities are human preference choices; explain the option costs and town-signal tradeoffs, and call `et.plot.town.resolve_opportunity` only after the human has selected an option.');
   expect(txt).toContain('`COLLECT_READY_OUTPUTS` works only while this page stays open; do not promise off-session Clover behavior.');
   expect(txt).toContain('If the page reloads, restart Clover before claiming any routine can run again in that tab.');
   expect(txt).toContain('When the UI offers a `Run now` Foreman action, the real observe -> decide -> tool-call loop must come through the OpenClaw Lite worker command path.');

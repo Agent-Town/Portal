@@ -34,6 +34,8 @@ This docs set is designed for users who are new to local agents and model provid
 - [Agent Town V1.4.3 TDD acceptance matrix](/specs/36_agent_town_v1_4_3_tdd_acceptance_matrix.md)
 - [Founders Plot V1.4.4 play-first onboarding spec](/specs/39_founders_plot_v1_4_4_play_first_onboarding.md)
 - [Founders Plot V1.4.4 play-first onboarding TDD matrix](/specs/40_founders_plot_v1_4_4_play_first_onboarding_tdd_matrix.md)
+- [Founders Plot Three.js playable slice](/specs/43_founders_plot_threejs_playable_slice.md)
+- [Founders Plot 2D asset pipeline](/specs/44_founders_plot_2d_asset_pipeline.md)
 - [Play-first onboarding ladder V1.4.4](/docs/product/PLAY_FIRST_ONBOARDING_LADDER_V1_4_4.md)
 - [Agent Town design pack](/Brand%20kit/guidelines/agent-town-design-pack/README.md)
 - [Agent Town V1.3 implementation start pack note](/docs/design/agent-town-v1.3-implementation-start-pack.md)
@@ -58,6 +60,10 @@ The current patch lane is `specs/33_*` and `specs/34_*`, which keeps scope narro
 The current app-wide visual-production lane is `specs/35_*` and `specs/36_*`, which refreshes non-Founders-Plot platform art across Start Gate, the town shell, Town Hall, Brain, House, Pony, Saloon, Sigil, Atlas, Leaderboard, and empty states while preserving the accepted Founders Plot gameplay pack.
 
 The current onboarding lane is `specs/39_*` and `specs/40_*`, which makes Founders Plot playable immediately after authenticated entry, keeps manual play independent from Town Hall/Brain/Sigil/Ceremony, and gates only real Clover Foreman behavior behind Brain/runtime readiness.
+
+The current playable-game lane is `specs/43_*`, which moves Founders Plot toward a Three.js browser-playable scene while preserving the server-authoritative simulation, `et.plot.*` tool contract, worker-first Foreman behavior, and modal-first app flow.
+
+The current 2D asset-production lane is `specs/44_*`, which normalizes GPT Image 2 and externally imported sprite sheets into alpha PNG/WebP assets for the Three.js world, starting with the Clover V2 sprite cleanup.
 
 ## Principles
 

@@ -149,6 +149,21 @@ const FOUNDERS_PLOT_TOOL_SPECS = [
     resultSchema: { type: 'object' }
   },
   {
+    name: 'et.plot.town.resolve_opportunity',
+    description: 'Resolve the active Public Square town opportunity after the human chooses one option.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        opportunityId: { type: 'string' },
+        optionId: { type: 'string', enum: ['raise_waymarkers', 'host_neighbor_supper'] },
+        idempotencyKey: { type: 'string' }
+      },
+      required: ['opportunityId', 'optionId', 'idempotencyKey'],
+      additionalProperties: false
+    },
+    resultSchema: { type: 'object' }
+  },
+  {
     name: 'et.plot.journal.get_entries',
     description: 'Return the compact Town Journal entries derived from Founders Plot events.',
     inputSchema: {
