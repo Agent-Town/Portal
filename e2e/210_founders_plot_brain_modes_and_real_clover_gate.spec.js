@@ -13,9 +13,10 @@ test('No Brain, Preview Brain, and Real Brain expose distinct Clover gates', asy
   await frame.getByTestId('founders-clover-avatar').click();
 
   await expect(frame.getByTestId('founders-foreman-status')).toContainText('Manual Founder Mode');
-  await expect(frame.getByTestId('foreman-start-btn')).toHaveText('Connect a Brain');
+  await expect(frame.getByTestId('foreman-start-btn')).toHaveText('Log in with ChatGPT');
   await expect(frame.getByTestId('foreman-run-now-btn')).toBeDisabled();
 
+  await frame.getByTestId('brain-advanced-toggle').click();
   await frame.getByTestId('brain-quick-provider').selectOption('openrouter');
   await frame.getByTestId('brain-quick-model').fill('nvidia/nemotron-3-super-120b-a12b:free');
   await frame.getByTestId('brain-quick-key').fill('or-free-test-key');

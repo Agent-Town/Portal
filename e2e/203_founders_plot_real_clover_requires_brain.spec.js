@@ -16,10 +16,12 @@ test('real Clover controls are Brain-gated while manual actions keep working', a
   const frame = await getOpenFoundersPlotFrame(page);
 
   await frame.getByTestId('founders-clover-avatar').click();
-  await expect(frame.getByTestId('foreman-start-btn')).toHaveText('Connect a Brain');
+  await expect(frame.getByTestId('foreman-start-btn')).toHaveText('Log in with ChatGPT');
   await expect(frame.getByTestId('foreman-run-now-btn')).toBeDisabled();
   await expect(frame.getByTestId('scheduler-collect-toggle')).toBeDisabled();
   await expect(frame.getByTestId('brain-quick-connect-sheet')).toBeVisible();
+  await expect(frame.getByTestId('chatgpt-brain-login')).toHaveText('Log in with ChatGPT');
+  await expect(frame.getByTestId('brain-advanced-toggle')).toContainText('Use another brain');
 
   const bodyText = await frame.locator('body').innerText();
   expect(bodyText).not.toMatch(/LLM not configured|runtime missing|provider error|NO_SOLANA_WALLET/i);

@@ -248,7 +248,7 @@ Keep the full provider list available, but change:
 For `cn-mainland`:
 
 - recommend `qwen`, `glm`, `moonshot`, `kimi-coding`, `minimax`, `ollama`
-- do not make `openai-codex` the default
+- do not make `openai-codex` the default for mainland-friendly provider recommendations, except on explicitly ChatGPT-first Brain connection surfaces
 - show a preset-aware warning when the user manually chooses OpenAI providers
 
 This keeps the current path intact while making the recommended path adaptive.

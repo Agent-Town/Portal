@@ -55,7 +55,7 @@ Play manually now. Clover can guide the basics.
 ```
 
 ```text
-Connect a Brain to let Clover reason about your town and perform approved Foreman actions.
+Log in with ChatGPT to let Clover reason about your town and perform approved Foreman actions.
 ```
 
 ```text

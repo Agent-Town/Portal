@@ -40,7 +40,7 @@ What is not unlocked:
 ### Step 2 — Connect Brain
 
 **When:** after the player has seen a meaningful moment where Clover could help.  
-**Requirement:** provider/model/API key/OAuth through existing Brain system.  
+**Requirement:** ChatGPT login through existing `openai-codex` OAuth first; provider/model/API key setup remains available as an advanced alternative.
 **Destination:** Brain Quick Connect sheet, not full onboarding wall.
 
 Player promise:
@@ -98,10 +98,10 @@ What Town Hall must not do:
 | Start CTA | `Play Founders Plot` |
 | Manual mode badge | `Manual Founder Mode` |
 | Manual mode helper | `Build by hand for now. Clover can guide the basics.` |
-| Brain CTA | `Connect a Brain` |
-| Brain CTA helper | `Let Clover reason about your town and help with approved actions.` |
+| Brain CTA | `Log in with ChatGPT` |
+| Brain CTA helper | `Let Clover use your ChatGPT subscription to help with approved actions.` |
 | Brain connected badge | `Real Clover Foreman` |
-| Brain connected helper | `Clover is using your Brain and can help with routine work.` |
+| Brain connected helper | `ChatGPT is connected. Clover can help with routine work.` |
 | Town Hall invite | `Make it official` |
 | Town Hall helper | `Your settlement is growing. Visit Town Hall to set your public role and prepare for future identity features.` |
 

@@ -926,6 +926,24 @@ async function init() {
     if (!res?.ok) throw new Error(String(res?.error || "FOUNDERS_PLOT_SCHEDULER_STATUS_FAILED"));
     return res.result || null;
   }
+  async function codexBudgetStatusRequest(params = {}) {
+    const res = await sendWorkerRequest({
+      requestType: "gateway.command.codexBudget.status",
+      responseType: "worker.codexBudget.status",
+      payload: { params }
+    });
+    if (!res?.ok) throw new Error(String(res?.error || "CODEX_BUDGET_STATUS_FAILED"));
+    return res.result || null;
+  }
+  async function codexBudgetSetRequest(params = {}) {
+    const res = await sendWorkerRequest({
+      requestType: "gateway.command.codexBudget.set",
+      responseType: "worker.codexBudget.status",
+      payload: { params }
+    });
+    if (!res?.ok) throw new Error(String(res?.error || "CODEX_BUDGET_SET_FAILED"));
+    return res.result || null;
+  }
   async function trainerListAttemptsRequest(params = {}) {
     const res = await sendWorkerRequest({
       requestType: "gateway.command.trainer.attempts.list",
@@ -1069,6 +1087,12 @@ async function init() {
         await new Promise((resolve) => setTimeout(resolve, 25 * (attempt + 1)));
       }
       return lastResult;
+    },
+    async codexBudgetStatus(params = {}) {
+      return codexBudgetStatusRequest(params);
+    },
+    async codexBudgetSet(params = {}) {
+      return codexBudgetSetRequest(params);
     },
     async countCheckpoints() {
       const req = indexedDB.open("openclaw-lite", 1);
@@ -1436,6 +1460,12 @@ async function init() {
     async foundersPlotSchedulerStatus(params = {}) {
       return foundersPlotSchedulerStatusRequest(params);
     },
+    async codexBudgetStatus(params = {}) {
+      return codexBudgetStatusRequest(params);
+    },
+    async codexBudgetSet(params = {}) {
+      return codexBudgetSetRequest(params);
+    },
     async trainerListAttempts(params = {}) {
       return trainerListAttemptsRequest(params);
     },
@@ -1507,6 +1537,8 @@ async function init() {
   gatewayEvents.foundersPlotSchedulerStart = foundersPlotSchedulerStartRequest;
   gatewayEvents.foundersPlotSchedulerStop = foundersPlotSchedulerStopRequest;
   gatewayEvents.foundersPlotSchedulerStatus = foundersPlotSchedulerStatusRequest;
+  gatewayEvents.codexBudgetStatus = codexBudgetStatusRequest;
+  gatewayEvents.codexBudgetSet = codexBudgetSetRequest;
   gatewayEvents.trainerListAttempts = trainerListAttemptsRequest;
   gatewayEvents.trainerGetAttempt = trainerGetAttemptRequest;
   gatewayEvents.trainerCompare = trainerCompareRequest;

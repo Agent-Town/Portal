@@ -282,6 +282,10 @@ Implement the following mode split:
 | Preview Clover / Test Brain | Test/local or free/basic | No, unless explicitly test-only | dev/test or limited preview | “Preview guidance only.” |
 | Real Clover Foreman | Real Brain + runtime ready | Yes, through protected route only | production | “Clover can reason and act with your approval.” |
 
+The production-first Real Brain path is ChatGPT login through the existing `openai-codex`
+PKCE/OAuth flow. The old provider/model/API-key Brain setup must remain available as an
+advanced alternative, but it should not be the main first-session CTA.
+
 ### 5.3 Production rule
 
 In production, a model/provider marked as free/basic/test/no-op must not unlock full Real Clover AGENT mutation controls.
@@ -318,7 +322,7 @@ The exact labels may differ, but the state machine must support the policy above
 Manual Founder Mode must say something like:
 
 ```text
-You can build manually now. Connect a Brain when you want Clover to reason and act.
+You can build manually now. Log in with ChatGPT when you want Clover to reason and act.
 ```
 
 Preview mode must say something like:
@@ -388,7 +392,7 @@ Recommended response shape:
   "ok": false,
   "error": {
     "code": "BRAIN_REQUIRED",
-    "message": "Connect a Brain to let Clover act as your Foreman.",
+    "message": "Log in with ChatGPT to let Clover act as your Foreman.",
     "retryable": false
   }
 }
@@ -669,6 +673,26 @@ Regression coverage:
 
 - `e2e/213_rc_incognito_house_route_verification.spec.js` proves the clean no-session redirect.
 - The same test proves the clean seeded-house route, reload, and stale-ceremony route truth.
+
+## 12.3 ChatGPT allocation and Codex app-server bridge
+
+The ChatGPT-first Brain flow now includes a Clover game budget before Clover spends subscription-backed LLM turns.
+
+Required product truth:
+
+- “Log in with ChatGPT” remains the primary Brain CTA.
+- The old provider/API-key Brain setup remains available under “Use another brain.”
+- Users can set a 5-hour and weekly percentage allocation for Founders Plot.
+- Portal reads live Codex app-server limits through `/api/agent/lite/codex/rate-limits`, which calls `account/rateLimits/read` on the local `codex app-server`.
+- The bridge exposes sanitized quota fields only; no account email, OAuth token, refresh token, or raw app-server output may be returned to the browser.
+- OpenClaw Lite enforces the local game allocation before a Clover LLM turn.
+- If Codex app-server is unavailable or the user is not logged in, the UI shows recovery guidance and keeps enforcing local budget tracking.
+
+Regression coverage:
+
+- `e2e/215_founders_plot_codex_budget.spec.js` proves bridge-backed UI rendering, allocation persistence, failure fallback, and pre-LLM budget blocking.
+- `e2e/214_founders_plot_chatgpt_brain_login.spec.js` keeps the ChatGPT CTA/login persistence contract covered.
+- `e2e/204_founders_plot_brain_quick_connect_unlocks_real_clover.spec.js` keeps the alternative provider path available and preview-only.
 
 ```yaml
 spec_id: 41_founders_plot_v1_4_4_play_first_onboarding_cleanup

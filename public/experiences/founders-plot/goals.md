@@ -23,7 +23,7 @@ After the player sees a ready output, bottleneck, or contract need:
 
 Clover may say:
 
-> I can help watch for routine town work. Connect a Brain when you want me to reason and act as your Foreman.
+> I can help watch for routine town work. Log in with ChatGPT when you want me to reason and act as your Foreman.
 
 The player can dismiss and continue manually.
 

@@ -20,6 +20,11 @@ const { loadDotEnv } = require('./env');
 loadDotEnv();
 
 const { parseCookies, nowIso, randomHex } = require('./util');
+const {
+  readCodexAppServerRateLimits,
+  resetCodexAppServerRateLimitsFixture,
+  setCodexAppServerRateLimitsFixture
+} = require('./codex_app_server_bridge');
 const { readStore, writeStore, getStorePath } = require('./store');
 const { createExperiencesRouter } = require('./experience_loader');
 const { createFoundersPlotRouter } = require('./founders_plot/routes');
@@ -1753,6 +1758,22 @@ app.use('/api/llm', requireProxySessionAccess);
 app.use('/api/tools', requireProxySessionAccess);
 app.use('/api/privy/wallet-rpc', requireProxySessionAccess);
 app.use('/api/privy/transactions', requireProxySessionAccess);
+app.use('/api/agent/lite/codex', requireProxySessionAccess);
+
+app.get('/api/agent/lite/codex/rate-limits', async (_req, res) => {
+  try {
+    const payload = await readCodexAppServerRateLimits();
+    res.json(payload);
+  } catch (error) {
+    const code = typeof error?.code === 'string' && error.code ? error.code : 'CODEX_APP_SERVER_UNAVAILABLE';
+    const status = Number(error?.status) || (code === 'CODEX_APP_SERVER_TIMEOUT' ? 504 : 503);
+    res.status(status).json({
+      ok: false,
+      error: code,
+      message: typeof error?.message === 'string' && error.message ? error.message : 'Codex app-server is unavailable.'
+    });
+  }
+});
 
 // OpenClaw Lite compatibility: proxy OpenAI-compatible provider calls from browser runtime.
 registerLlmRoutes(app);
@@ -8341,12 +8362,27 @@ if (process.env.NODE_ENV === 'test') {
     invalidateAtlasStoreCaches();
     resetAllSessions();
     resetFoundersPlotStore();
+    resetCodexAppServerRateLimitsFixture();
     rateBuckets.clear();
     ponyRateBuckets.clear();
     erc8004OptOutNonces.clear();
     openRouterOAuthAttemptsById.clear();
     openRouterOAuthAttemptsByState.clear();
     res.json({ ok: true });
+  });
+
+  app.post('/__test__/codex-app-server/rate-limits', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    if (req.body?.clear === true) {
+      resetCodexAppServerRateLimitsFixture();
+      return res.json({ ok: true, cleared: true });
+    }
+    const fixture = req.body?.fixture && typeof req.body.fixture === 'object' ? req.body.fixture : req.body;
+    setCodexAppServerRateLimitsFixture(fixture);
+    return res.json({ ok: true });
   });
 }
 

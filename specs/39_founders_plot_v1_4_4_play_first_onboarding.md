@@ -98,7 +98,7 @@ The app must clearly distinguish three modes.
 
 | Mode | Brain required? | What the player can do | What Clover can do | Product copy |
 |---|---:|---|---|---|
-| **Manual Founder Mode** | No | Play core Founders Plot manually: build, collect, accept contracts, upgrade. | Deterministic tutorial/guide suggestions only. No LLM, no autonomous actions. | “Clover can guide the basics. Connect a Brain to unlock real Foreman help.” |
+| **Manual Founder Mode** | No | Play core Founders Plot manually: build, collect, accept contracts, upgrade. | Deterministic tutorial/guide suggestions only. No LLM, no autonomous actions. | “Clover can guide the basics. Log in with ChatGPT to unlock real Foreman help.” |
 | **Real Clover Foreman Mode** | Yes | Full V1 game loop plus bounded Foreman actions. | Uses OpenClaw Lite worker + Brain/LLM/Test Brain path to observe, choose among safe candidates, act, explain. | “Clover is now thinking with your Brain and can help with approved actions.” |
 | **Town Hall Official Mode** | Not directly, but likely useful | Public identity, deeper profile, advanced agent setup, ERC-8004 / registration, future governance. | Advanced settings and future autonomy configuration. | “Make your town official at Town Hall.” |
 
@@ -319,7 +319,7 @@ Manual mode:
 
 ```text
 Manual Founder Mode
-Clover can guide the basics. Connect a Brain to unlock real Foreman help.
+Clover can guide the basics. Log in with ChatGPT to unlock real Foreman help.
 ```
 
 Real Foreman mode:
@@ -359,11 +359,11 @@ Create or adapt a compact sheet from the existing Brain district behavior.
 
 Required content:
 
-- one-sentence value statement;
-- provider/model selection using existing provider catalog;
-- credential/OAuth path using existing Brain code;
-- “Save and unlock Clover” CTA;
-- “Maybe later” secondary action;
+- primary “Log in with ChatGPT” CTA using the existing `openai-codex` PKCE/OAuth path;
+- one-sentence value statement for ChatGPT subscribers;
+- visible connected state after the ChatGPT credential is saved locally;
+- advanced “Use another brain” path with provider/model/API-key selection using the existing provider catalog;
+- manual callback/code completion affordance for PKCE recovery;
 - link to full Brain settings.
 
 Forbidden in quick sheet:
@@ -386,7 +386,7 @@ In Manual Founder Mode:
 Example disabled tooltip/copy:
 
 ```text
-Connect a Brain to let Clover reason and act as your Foreman.
+Log in with ChatGPT to let Clover reason and act as your Foreman.
 ```
 
 Do not show:
@@ -491,8 +491,8 @@ Build by hand for now. Clover can guide the basics.
 ```
 
 ```text
-Connect a Brain
-Let Clover reason about your town and help with approved actions.
+Log in with ChatGPT
+Let Clover use your ChatGPT subscription to help with approved actions.
 ```
 
 ```text
@@ -598,7 +598,8 @@ Minimum required tests:
 ### WP4 — Brain Quick Connect
 
 - Implement compact Brain connection sheet.
-- Reuse existing provider/model/OAuth/API-key storage logic.
+- Make ChatGPT login the primary path, backed by the existing `openai-codex` OAuth/API-key storage logic.
+- Keep provider/model/API-key setup as an advanced alternative path.
 - On success, switch Clover mode to Real Foreman if runtime is ready.
 - Add “full Brain settings” link.
 

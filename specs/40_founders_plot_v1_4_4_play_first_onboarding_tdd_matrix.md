@@ -101,7 +101,7 @@
 
 **Assertions:**
 
-- Foreman attempt shows friendly `Connect a Brain` copy.
+- Foreman attempt shows friendly `Log in with ChatGPT` copy.
 - No raw `LLM not configured` or `runtime missing` in normal gameplay.
 - No world mutation attributed to Clover.
 - Manual action succeeds.

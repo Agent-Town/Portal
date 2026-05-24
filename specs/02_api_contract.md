@@ -963,6 +963,10 @@ Legacy route. Mutations are rejected with `LLM_CONFIG_CLIENT_ONLY`.
 ### POST `/api/agent/lite/llm/oauth/openai-codex/start` (human)
 Starts a PKCE OAuth attempt for OpenAI Codex (ChatGPT subscription auth).
 
+Founders Plot uses this route as the primary “Log in with ChatGPT” Brain CTA.
+Provider/API-key Brain setup remains a separate advanced fallback and must not
+replace this route for the ChatGPT-first flow.
+
 Behavior:
 - creates deterministic in-memory attempt state (`attemptId`, `state`, `code_verifier`, expiry)
 - returns the OpenAI authorization URL with PKCE challenge
@@ -1382,6 +1386,10 @@ Legacy route. Mutations are rejected with `LLM_CONFIG_CLIENT_ONLY`.
 ### POST `/api/agent/lite/llm/oauth/openai-codex/start` (human)
 Starts a PKCE OAuth attempt for OpenAI Codex (ChatGPT subscription auth).
 
+Founders Plot uses this route as the primary “Log in with ChatGPT” Brain CTA.
+Provider/API-key Brain setup remains a separate advanced fallback and must not
+replace this route for the ChatGPT-first flow.
+
 Behavior:
 - creates deterministic in-memory attempt state (`attemptId`, `state`, `code_verifier`, expiry)
 - returns the OpenAI authorization URL with PKCE challenge
@@ -1459,6 +1467,55 @@ Errors:
 - `TOKEN_EXCHANGE_UNAVAILABLE`
 - `TOKEN_RESPONSE_INVALID`
 - `ACCOUNT_ID_MISSING`
+
+### GET `/api/agent/lite/codex/rate-limits` (human)
+Reads the local Codex app-server rate-limit snapshot for the current ChatGPT/Codex account.
+
+Implementation notes:
+- Portal spawns `codex app-server --listen stdio://` locally and calls `account/rateLimits/read`.
+- The bridge returns only quota fields needed by OpenClaw Lite; it must not return account email, OAuth tokens, refresh tokens, or raw app-server process output.
+- This endpoint is same-origin/session protected like the LLM proxy family.
+- Founders Plot uses this data for the ChatGPT allocation UI and for pre-turn Clover budget checks.
+
+Success response shape:
+```json
+{
+  "ok": true,
+  "source": "codex-app-server",
+  "fetchedAtMs": 1770000000000,
+  "rateLimits": {
+    "limitId": "codex",
+    "limitName": "Codex",
+    "primary": { "usedPercent": 19, "windowDurationMins": 300, "resetsAt": 1770000000000 },
+    "secondary": { "usedPercent": 4, "windowDurationMins": 10080, "resetsAt": 1770000000000 },
+    "credits": { "hasCredits": false, "unlimited": false, "balance": "0" },
+    "planType": "pro",
+    "rateLimitReachedType": null
+  },
+  "rateLimitsByLimitId": {
+    "codex": {
+      "limitId": "codex",
+      "limitName": "Codex",
+      "primary": { "usedPercent": 19, "windowDurationMins": 300, "resetsAt": 1770000000000 },
+      "secondary": { "usedPercent": 4, "windowDurationMins": 10080, "resetsAt": 1770000000000 },
+      "credits": { "hasCredits": false, "unlimited": false, "balance": "0" },
+      "planType": "pro",
+      "rateLimitReachedType": null
+    }
+  }
+}
+```
+
+Errors:
+- `CODEX_APP_SERVER_UNAVAILABLE`
+- `CODEX_APP_SERVER_TIMEOUT`
+- `CODEX_RATE_LIMITS_UNAVAILABLE`
+
+OpenClaw Lite behavior:
+- user allocation settings are stored browser-locally in IndexedDB;
+- Clover checks the 5-hour and weekly local game allocation before each ChatGPT/Codex LLM turn;
+- live app-server data is used to show subscription usage/reset status and to fail closed when the upstream subscription limit is reached;
+- if app-server is unavailable, the UI must show local-only budget guidance and continue enforcing the local game allocation instead of silently ignoring limits.
 
 ---
 

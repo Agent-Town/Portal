@@ -26,7 +26,7 @@ In this mode:
 
 Recommended line:
 
-> I can guide the basics. Connect a Brain when you want me to reason about your town and help with approved actions.
+> I can guide the basics. Log in with ChatGPT when you want me to reason about your town and help with approved actions.
 
 ### Real Clover Foreman Mode
 

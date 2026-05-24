@@ -1,6 +1,9 @@
 (function foundersPlotBootstrap() {
   const TEAM_CODE_HINT_STORAGE_KEY = 'agentTown:teamCodeHint';
   const BRAIN_HARNESS_POLICY_STORAGE_KEY = 'foundersPlot:testBrainHarnessPolicy';
+  const OPENAI_CODEX_OAUTH_MESSAGE_TYPE = 'agenttown:openai-codex-oauth-callback';
+  const CHATGPT_BRAIN_PROVIDER = 'openai-codex';
+  const CHATGPT_BRAIN_MODEL = 'gpt-5.3-codex';
   const BUILDING_LABELS = {
     HQ: 'Headquarters',
     LUMBER_CAMP: 'Lumber Camp',
@@ -36,7 +39,12 @@
   let pendingAction = false;
   let gatewayPromise = null;
   let llmLibraryPromise = null;
+  let budgetLibraryPromise = null;
   let assetManifestPromise = null;
+  let chatGptOAuthAttempt = null;
+  let chatGptOAuthPollTimer = null;
+  let chatGptOAuthExchangeInFlight = false;
+  let chatGptOAuthMessageListenerBound = false;
   let assetMap = {};
   let effectsController = null;
   let currentScene = null;
@@ -57,6 +65,8 @@
     realReady: false,
     previewOnly: false
   };
+  let codexBudgetStatus = null;
+  let codexBudgetRefreshInFlight = false;
   let brainHarnessPolicy = loadBrainHarnessPolicy();
   let workerSchedulerStatus = {
     active: false,
@@ -110,8 +120,16 @@
     return llmLibraryPromise;
   }
 
+  async function loadLiteBudgetLibrary() {
+    if (!budgetLibraryPromise) {
+      budgetLibraryPromise = import('/openclaw-lite/llm-budget-library.js');
+    }
+    return budgetLibraryPromise;
+  }
+
   function defaultBrainModel(provider = '') {
     const normalized = String(provider || '').trim().toLowerCase();
+    if (normalized === CHATGPT_BRAIN_PROVIDER) return CHATGPT_BRAIN_MODEL;
     if (normalized === 'openrouter') return 'nvidia/nemotron-3-super-120b-a12b:free';
     if (normalized === 'ollama') return 'llama3.2';
     return 'gpt-4o-mini';
@@ -181,6 +199,91 @@
     sharedBrainStatus = normalizeSharedBrainStatus(await lib.loadLlmConfig().catch(() => null));
     if (render) renderAll();
     return sharedBrainStatus;
+  }
+
+  function codexBudgetFallbackStatus(error = null) {
+    const settings = {
+      enabled: true,
+      fiveHourPercent: 10,
+      weeklyPercent: 25,
+      perTurnPercent: 1
+    };
+    return {
+      ok: true,
+      enabled: true,
+      source: 'local-fallback',
+      settings,
+      live: {
+        primary: { usedPercent: 0, windowDurationMins: 300, resetsAt: null },
+        secondary: { usedPercent: 0, windowDurationMins: 10080, resetsAt: null }
+      },
+      local: {
+        fiveHourSpentPercent: 0,
+        weeklySpentPercent: 0,
+        fiveHourRemainingPercent: settings.fiveHourPercent,
+        weeklyRemainingPercent: settings.weeklyPercent,
+        nextTurnPercent: 1
+      },
+      limits: {
+        liveLimitReached: false,
+        localLimitReached: false,
+        fiveHourWouldExceed: false,
+        weeklyWouldExceed: false
+      },
+      canSpend: true,
+      error: error ? String(error?.message || error) : ''
+    };
+  }
+
+  async function refreshCodexBudgetStatus({ render = false, refresh = true } = {}) {
+    if (codexBudgetRefreshInFlight) return codexBudgetStatus;
+    codexBudgetRefreshInFlight = true;
+    try {
+      const gateway = await initGateway().catch(() => null);
+      if (gateway && typeof gateway.codexBudgetStatus === 'function') {
+        codexBudgetStatus = await gateway.codexBudgetStatus({ refresh });
+      } else {
+        const lib = await loadLiteBudgetLibrary().catch(() => null);
+        codexBudgetStatus = lib && typeof lib.refreshCodexBudgetStatus === 'function'
+          ? await lib.refreshCodexBudgetStatus()
+          : codexBudgetFallbackStatus();
+      }
+    } catch (error) {
+      const lib = await loadLiteBudgetLibrary().catch(() => null);
+      codexBudgetStatus = lib && typeof lib.refreshCodexBudgetStatus === 'function'
+        ? await lib.refreshCodexBudgetStatus().catch(() => codexBudgetFallbackStatus(error))
+        : codexBudgetFallbackStatus(error);
+    } finally {
+      codexBudgetRefreshInFlight = false;
+    }
+    if (render) renderAll();
+    return codexBudgetStatus;
+  }
+
+  async function saveCodexBudgetFromUi() {
+    const fiveHourInput = document.getElementById('foundersCodexBudgetFiveHour');
+    const weeklyInput = document.getElementById('foundersCodexBudgetWeekly');
+    const settings = {
+      enabled: true,
+      fiveHourPercent: Number(fiveHourInput?.value || 10),
+      weeklyPercent: Number(weeklyInput?.value || 25),
+      perTurnPercent: 1
+    };
+    const lib = await loadLiteBudgetLibrary().catch(() => null);
+    if (lib && typeof lib.saveCodexBudgetSettings === 'function') {
+      await lib.saveCodexBudgetSettings(settings);
+    }
+    const gateway = await initGateway().catch(() => null);
+    if (gateway && typeof gateway.codexBudgetSet === 'function') {
+      codexBudgetStatus = await gateway.codexBudgetSet({ settings, refresh: true });
+    } else {
+      codexBudgetStatus = lib && typeof lib.refreshCodexBudgetStatus === 'function'
+        ? await lib.refreshCodexBudgetStatus()
+        : codexBudgetFallbackStatus();
+    }
+    setStatusLine('Clover game budget saved.');
+    renderAll();
+    return codexBudgetStatus;
   }
 
   function isBrainConfiguredForForeman() {
@@ -322,6 +425,9 @@
 
   function defaultProviderApi(provider) {
     const normalized = String(provider || '').trim().toLowerCase();
+    if (normalized === CHATGPT_BRAIN_PROVIDER) {
+      return 'openai-codex-responses';
+    }
     if (normalized === 'openai' || normalized === 'openrouter' || normalized === 'ollama') {
       return 'openai-completions';
     }
@@ -330,6 +436,9 @@
 
   function defaultProviderBaseUrl(provider) {
     const normalized = String(provider || '').trim().toLowerCase();
+    if (normalized === CHATGPT_BRAIN_PROVIDER) {
+      return 'https://chatgpt.com/backend-api';
+    }
     if (normalized === 'openai') {
       return new URL('/api/llm/openai/v1', window.location.origin).toString();
     }
@@ -483,7 +592,7 @@
     if (mode === 'PREVIEW_CLOVER') {
       return 'Preview guidance is available. Real Clover actions require a production Brain.';
     }
-    return 'You can build manually now. Clover will guide the basics. Connect a Brain when you want Clover to reason and act as your Foreman.';
+    return 'You can build manually now. Clover will guide the basics. Log in with ChatGPT when you want Clover to reason and act as your Foreman.';
   }
 
   function townHallInviteCopy(state = stateData()) {
@@ -492,41 +601,381 @@
     return 'Your settlement is growing. Visit Town Hall to set your public role.';
   }
 
-  function renderBrainQuickConnectCard() {
-    const provider = sharedBrainStatus.provider || 'openrouter';
-    const model = sharedBrainStatus.model || defaultBrainModel(provider);
+  function isChatGptBrainConnected() {
+    return sharedBrainStatus.configured === true
+      && String(sharedBrainStatus.provider || '').trim().toLowerCase() === CHATGPT_BRAIN_PROVIDER;
+  }
+
+  function chatGptBrainStatusCopy() {
+    if (isChatGptBrainConnected()) {
+      return sharedBrainStatus.realReady === true
+        ? 'ChatGPT is connected. Start Clover when you want Foreman help.'
+        : 'ChatGPT login is saved. Clover may need a supported Codex model before acting.';
+    }
+    if (chatGptOAuthAttempt) {
+      return 'Finish ChatGPT login in the new tab. Clover will connect when the login returns.';
+    }
+    return 'Use your ChatGPT subscription to power Clover in this browser.';
+  }
+
+  function formatBudgetNumber(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return '0';
+    if (Math.abs(numeric - Math.round(numeric)) < 0.05) return String(Math.round(numeric));
+    return numeric.toFixed(1);
+  }
+
+  function resetCopy(resetsAt) {
+    const target = Number(resetsAt);
+    if (!Number.isFinite(target) || target <= Date.now()) return 'reset soon';
+    const minutes = Math.max(1, Math.round((target - Date.now()) / 60000));
+    if (minutes < 90) return `${minutes}m reset`;
+    const hours = Math.round(minutes / 60);
+    if (hours < 48) return `${hours}h reset`;
+    return `${Math.round(hours / 24)}d reset`;
+  }
+
+  function codexBudgetSourceCopy(status) {
+    const source = String(status?.source || '').trim();
+    if (source === 'codex-app-server' || source === 'test-fixture' || source === 'env-fixture') {
+      return 'Codex app-server';
+    }
+    if (status?.error) return 'Local budget only';
+    return 'Checking limits';
+  }
+
+  function renderCodexBudgetCard() {
+    const status = codexBudgetStatus || codexBudgetFallbackStatus();
+    const settings = status.settings || {};
+    const local = status.local || {};
+    const live = status.live || {};
+    const primary = live.primary || {};
+    const secondary = live.secondary || {};
+    const liveConnected = ['codex-app-server', 'test-fixture', 'env-fixture'].includes(String(status.source || ''));
+    const fiveCap = Number(settings.fiveHourPercent || 10);
+    const weeklyCap = Number(settings.weeklyPercent || 25);
+    const fiveSpent = Number(local.fiveHourSpentPercent || 0);
+    const weeklySpent = Number(local.weeklySpentPercent || 0);
+    const fiveFill = Math.max(0, Math.min(100, (fiveSpent / Math.max(1, fiveCap)) * 100));
+    const weeklyFill = Math.max(0, Math.min(100, (weeklySpent / Math.max(1, weeklyCap)) * 100));
+    const badgeClass = status.canSpend === false || !liveConnected ? 'is-warn' : '';
     return `
-      <div class="foundersBrainQuickConnect" data-testid="brain-quick-connect-sheet">
-        <div class="foundersLabel">Brain Quick Connect</div>
-        <strong>Connect a Brain</strong>
-        <div class="small">Let Clover reason about your town and help with approved actions.</div>
-        <div class="foundersBrainQuickFields">
-          <label class="small" for="foundersBrainProvider">Provider</label>
-          <select id="foundersBrainProvider" data-testid="brain-quick-provider">
-            <option value="openrouter" ${provider === 'openrouter' ? 'selected' : ''}>OpenRouter</option>
-            <option value="openai" ${provider === 'openai' ? 'selected' : ''}>OpenAI</option>
-            <option value="ollama" ${provider === 'ollama' ? 'selected' : ''}>Ollama</option>
-          </select>
-          <label class="small" for="foundersBrainModel">Model</label>
-          <input id="foundersBrainModel" data-testid="brain-quick-model" type="text" value="${htmlEscape(model)}" />
-          <label class="small" for="foundersBrainKey">Local key</label>
-          <input id="foundersBrainKey" data-testid="brain-quick-key" type="password" autocomplete="off" placeholder="Stored only in this browser" />
+      <div class="foundersCodexBudgetBody" data-testid="codex-budget-card">
+        <div class="foundersCodexBudgetHeader">
+          <div>
+            <div class="foundersLabel">Clover game budget</div>
+            <strong>ChatGPT allocation</strong>
+          </div>
+          <span class="foundersBadge ${badgeClass}" data-testid="codex-budget-source">${htmlEscape(codexBudgetSourceCopy(status))}</span>
         </div>
-        <div class="foundersInlineButtons">
-          <button class="btn primary small" type="button" id="foundersBrainSaveBtn" data-testid="brain-quick-save">Save Brain</button>
-          <a class="btn small" href="/app?district=brain&entry=brain-settings" target="_top" rel="noopener">Full settings</a>
+        <div class="foundersCodexBudgetGrid">
+          <label class="small" for="foundersCodexBudgetFiveHour">5-hour max</label>
+          <input id="foundersCodexBudgetFiveHour" data-testid="codex-budget-five-hour-percent" type="number" min="1" max="100" step="1" value="${htmlEscape(String(fiveCap))}" />
+          <label class="small" for="foundersCodexBudgetWeekly">Weekly max</label>
+          <input id="foundersCodexBudgetWeekly" data-testid="codex-budget-weekly-percent" type="number" min="1" max="100" step="1" value="${htmlEscape(String(weeklyCap))}" />
         </div>
-        <div class="small" id="foundersBrainQuickStatus" data-testid="brain-quick-status"></div>
+        <div class="foundersCodexBudgetMeters">
+          <div class="foundersCodexBudgetMeter">
+            <div class="foundersCodexBudgetMeterTrack"><span style="width: ${fiveFill}%"></span></div>
+            <div class="small" data-testid="codex-budget-five-hour-status">
+              Game ${htmlEscape(formatBudgetNumber(fiveSpent))} / ${htmlEscape(formatBudgetNumber(fiveCap))}% · subscription ${htmlEscape(formatBudgetNumber(primary.usedPercent))}% · ${htmlEscape(resetCopy(primary.resetsAt))}
+            </div>
+          </div>
+          <div class="foundersCodexBudgetMeter">
+            <div class="foundersCodexBudgetMeterTrack"><span style="width: ${weeklyFill}%"></span></div>
+            <div class="small" data-testid="codex-budget-weekly-status">
+              Week ${htmlEscape(formatBudgetNumber(weeklySpent))} / ${htmlEscape(formatBudgetNumber(weeklyCap))}% · subscription ${htmlEscape(formatBudgetNumber(secondary.usedPercent))}% · ${htmlEscape(resetCopy(secondary.resetsAt))}
+            </div>
+          </div>
+        </div>
+        ${status.error ? '<div class="small foundersCodexBudgetWarning" data-testid="codex-budget-warning">Open Codex, sign in with ChatGPT, then refresh Clover limits.</div>' : ''}
+        <div class="foundersInlineButtons foundersCodexBudgetActions">
+          <button class="btn small" type="button" id="foundersCodexBudgetSave" data-testid="codex-budget-save">Save budget</button>
+          <button class="btn small" type="button" id="foundersCodexBudgetRefresh" data-testid="codex-budget-refresh">Refresh limits</button>
+        </div>
       </div>
     `;
   }
 
+  function bindCodexBudgetControls() {
+    const saveBtn = document.getElementById('foundersCodexBudgetSave');
+    if (saveBtn) {
+      saveBtn.onclick = async () => {
+        try {
+          saveBtn.disabled = true;
+          await saveCodexBudgetFromUi();
+        } catch (error) {
+          setStatusLine(`Could not save Clover budget: ${error.message}.`);
+        } finally {
+          saveBtn.disabled = false;
+        }
+      };
+    }
+    const refreshBtn = document.getElementById('foundersCodexBudgetRefresh');
+    if (refreshBtn) {
+      refreshBtn.onclick = async () => {
+        try {
+          refreshBtn.disabled = true;
+          codexBudgetStatus = await refreshCodexBudgetStatus({ render: false, refresh: true });
+          setStatusLine(codexBudgetStatus?.error
+            ? 'Clover is using local budget tracking until Codex app-server is available.'
+            : 'Clover budget refreshed.');
+          renderAll();
+        } catch (error) {
+          setStatusLine(`Could not refresh Clover budget: ${error.message}.`);
+        } finally {
+          refreshBtn.disabled = false;
+        }
+      };
+    }
+  }
+
+  function renderBrainQuickConnectCard() {
+    const provider = sharedBrainStatus.provider && sharedBrainStatus.provider !== CHATGPT_BRAIN_PROVIDER
+      ? sharedBrainStatus.provider
+      : 'openrouter';
+    const model = sharedBrainStatus.model || defaultBrainModel(provider);
+    const chatGptConnected = isChatGptBrainConnected();
+    const advancedOpen = provider !== 'openrouter' || sharedBrainStatus.configured === true && !chatGptConnected;
+    return `
+      <div class="foundersBrainQuickConnect foundersChatGptBrainConnect" data-testid="brain-quick-connect-sheet">
+        <div class="foundersChatGptBrainHero">
+          <div>
+            <div class="foundersLabel">ChatGPT brain</div>
+            <strong>${chatGptConnected ? 'ChatGPT connected' : 'Log in with ChatGPT'}</strong>
+            <div class="small">${htmlEscape(chatGptBrainStatusCopy())}</div>
+          </div>
+          <span class="foundersBadge ${chatGptConnected ? '' : 'is-warn'}" data-testid="chatgpt-brain-state">
+            ${chatGptConnected ? 'Connected' : 'Recommended'}
+          </span>
+        </div>
+        <div class="foundersChatGptPromise">
+          <span>Subscription</span>
+          <span>OpenClaw Lite</span>
+          <span>Local</span>
+        </div>
+        ${renderCodexBudgetCard()}
+        <div class="foundersInlineButtons foundersChatGptActions">
+          <button class="btn primary small" type="button" id="foundersChatGptLoginBtn" data-testid="chatgpt-brain-login" ${chatGptConnected ? 'disabled' : ''}>
+            ${chatGptConnected ? 'ChatGPT connected' : 'Log in with ChatGPT'}
+          </button>
+          <button class="btn small" type="button" id="foundersChatGptCompleteBtn" data-testid="chatgpt-brain-complete">
+            I finished login
+          </button>
+        </div>
+        <details class="foundersChatGptManualFinish">
+          <summary>Having trouble finishing login?</summary>
+          <div class="foundersBrainQuickFields">
+            <label class="small" for="foundersChatGptCallbackInput">Callback</label>
+            <input id="foundersChatGptCallbackInput" data-testid="chatgpt-brain-callback" type="text" autocomplete="off" placeholder="Paste callback URL or code" />
+          </div>
+        </details>
+        <details class="foundersBrainAdvancedOptions" data-testid="brain-advanced-options" ${advancedOpen ? 'open' : ''}>
+          <summary data-testid="brain-advanced-toggle">Use another brain</summary>
+          <div class="small">OpenRouter, OpenAI API keys, and local providers remain available.</div>
+          <div class="foundersBrainQuickFields">
+            <label class="small" for="foundersBrainProvider">Provider</label>
+            <select id="foundersBrainProvider" data-testid="brain-quick-provider">
+              <option value="openrouter" ${provider === 'openrouter' ? 'selected' : ''}>OpenRouter</option>
+              <option value="openai" ${provider === 'openai' ? 'selected' : ''}>OpenAI</option>
+              <option value="ollama" ${provider === 'ollama' ? 'selected' : ''}>Ollama</option>
+            </select>
+            <label class="small" for="foundersBrainModel">Model</label>
+            <input id="foundersBrainModel" data-testid="brain-quick-model" type="text" value="${htmlEscape(model)}" />
+            <label class="small" for="foundersBrainKey">Local key</label>
+            <input id="foundersBrainKey" data-testid="brain-quick-key" type="password" autocomplete="off" placeholder="Stored only in this browser" />
+          </div>
+          <div class="foundersInlineButtons">
+            <button class="btn small" type="button" id="foundersBrainSaveBtn" data-testid="brain-quick-save">Save alternative brain</button>
+            <a class="btn small" href="/app?district=brain&entry=brain-settings" target="_top" rel="noopener">Full settings</a>
+          </div>
+        </details>
+        <div class="small" id="foundersBrainQuickStatus" data-testid="brain-quick-status">
+          ${chatGptOAuthAttempt ? htmlEscape(chatGptBrainStatusCopy()) : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  function setBrainQuickStatus(message) {
+    const status = document.getElementById('foundersBrainQuickStatus');
+    if (status) status.textContent = String(message || '');
+  }
+
+  function stopChatGptOAuthPoll() {
+    if (!chatGptOAuthPollTimer) return;
+    clearInterval(chatGptOAuthPollTimer);
+    chatGptOAuthPollTimer = null;
+  }
+
+  function bindChatGptOAuthMessageListener() {
+    if (chatGptOAuthMessageListenerBound) return;
+    chatGptOAuthMessageListenerBound = true;
+    window.addEventListener('message', async (event) => {
+      const payload = event?.data;
+      if (!payload || typeof payload !== 'object') return;
+      if (String(payload.type || '') !== OPENAI_CODEX_OAUTH_MESSAGE_TYPE) return;
+      const incomingState = String(payload.state || '').trim();
+      const incomingCode = String(payload.code || '').trim();
+      const incomingError = String(payload.error || '').trim();
+      if (!incomingState || incomingError) return;
+      const activeState = String(chatGptOAuthAttempt?.state || '').trim();
+      if (activeState && incomingState === activeState) {
+        await completeChatGptOAuthFromFounders({ callbackInput: '' });
+        return;
+      }
+      if (incomingCode) {
+        await completeChatGptOAuthFromFounders({ callbackInput: `${incomingCode}#${incomingState}` });
+      }
+    });
+  }
+
+  async function saveChatGptBrainCredential(credential = {}) {
+    const access = String(credential?.access || credential?.apiKey || '').trim();
+    if (!access) throw new Error('TOKEN_RESPONSE_INVALID');
+    const lib = await loadLiteLlmLibrary();
+    if (!lib || typeof lib.saveLlmConfig !== 'function') throw new Error('BRAIN_CONFIG_UNAVAILABLE');
+    await lib.saveLlmConfig({
+      provider: CHATGPT_BRAIN_PROVIDER,
+      model: CHATGPT_BRAIN_MODEL,
+      apiKey: access,
+      authMode: 'oauth-json',
+      useProxy: true
+    });
+    await refreshSharedBrainStatus({ render: false });
+    await refreshCodexBudgetStatus({ render: false, refresh: true }).catch(() => null);
+    await stopWorkerScheduler('BRAIN_CONFIG_CHANGED').catch(() => null);
+    foremanRuntimeToken = '';
+    localForemanRuntimeId = '';
+    await loadState().catch(() => null);
+    setStatusLine('ChatGPT connected. Start Clover when you want Foreman help.');
+    renderAll();
+    return sharedBrainStatus;
+  }
+
+  async function exchangeChatGptOAuthAttempt({ attemptId = '', callbackInput = '' } = {}) {
+    const payload = {};
+    if (attemptId) payload.attemptId = String(attemptId).trim();
+    if (callbackInput) payload.callbackInput = String(callbackInput).trim();
+    return await api('/api/agent/lite/llm/oauth/openai-codex/exchange', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  async function completeChatGptOAuthFromFounders({ callbackInput = '' } = {}) {
+    if (chatGptOAuthExchangeInFlight) return null;
+    chatGptOAuthExchangeInFlight = true;
+    try {
+      const normalizedInput = String(callbackInput || '').trim();
+      const attemptId = String(chatGptOAuthAttempt?.attemptId || '').trim();
+      if (!attemptId && !normalizedInput) throw new Error('START_OAUTH_FIRST');
+      setBrainQuickStatus('Completing ChatGPT login...');
+      const result = await exchangeChatGptOAuthAttempt({ attemptId, callbackInput: normalizedInput });
+      const returnedAttemptId = String(result?.attempt?.id || '').trim();
+      const returnedState = String(result?.attempt?.state || '').trim();
+      if (returnedAttemptId) {
+        chatGptOAuthAttempt = {
+          attemptId: returnedAttemptId,
+          state: returnedState || String(chatGptOAuthAttempt?.state || '').trim(),
+          startedAtMs: Date.now()
+        };
+      }
+      const credential = result?.credential || result?.oauthProfile || null;
+      if (!credential) throw new Error('TOKEN_RESPONSE_INVALID');
+      await saveChatGptBrainCredential(credential);
+      stopChatGptOAuthPoll();
+      chatGptOAuthAttempt = null;
+      setBrainQuickStatus('ChatGPT connected. Start Clover when you want Foreman help.');
+      return result;
+    } catch (error) {
+      const code = String(error?.message || '').trim();
+      if (code === 'CODE_PENDING') {
+        setBrainQuickStatus('Waiting for ChatGPT login to finish...');
+        return null;
+      }
+      const message = code === 'START_OAUTH_FIRST'
+        ? 'Start ChatGPT login first.'
+        : `Could not connect ChatGPT: ${code || 'UNKNOWN'}`;
+      setBrainQuickStatus(message);
+      throw error;
+    } finally {
+      chatGptOAuthExchangeInFlight = false;
+    }
+  }
+
+  function startChatGptOAuthPoll() {
+    stopChatGptOAuthPoll();
+    chatGptOAuthPollTimer = setInterval(async () => {
+      try {
+        await completeChatGptOAuthFromFounders({ callbackInput: '' });
+      } catch (error) {
+        const code = String(error?.message || '').trim();
+        if (code === 'CODE_PENDING') return;
+        stopChatGptOAuthPoll();
+      }
+    }, 1500);
+  }
+
+  async function launchChatGptOAuthFromFounders() {
+    bindChatGptOAuthMessageListener();
+    setBrainQuickStatus('Opening ChatGPT login...');
+    const started = await api('/api/agent/lite/llm/oauth/openai-codex/start', {
+      method: 'POST',
+      body: JSON.stringify({ provider: CHATGPT_BRAIN_PROVIDER, originator: 'founders-plot' })
+    });
+    const authorizeUrl = String(started?.authorizeUrl || '').trim();
+    const attemptId = String(started?.attemptId || '').trim();
+    const state = String(started?.state || '').trim();
+    if (!authorizeUrl || !attemptId || !state) throw new Error('OAUTH_START_FAILED');
+    chatGptOAuthAttempt = { attemptId, state, startedAtMs: Date.now() };
+    const popup = window.open(authorizeUrl, '_blank', 'noopener,noreferrer');
+    if (!popup) throw new Error('POPUP_BLOCKED');
+    setBrainQuickStatus('Finish ChatGPT login in the new tab. Clover will connect when it returns.');
+    startChatGptOAuthPoll();
+    return started;
+  }
+
   function bindBrainQuickConnectCard(root = document) {
+    const chatGptLoginBtn = root.querySelector('#foundersChatGptLoginBtn');
+    const chatGptCompleteBtn = root.querySelector('#foundersChatGptCompleteBtn');
+    const chatGptCallbackInput = root.querySelector('#foundersChatGptCallbackInput');
     const providerSelect = root.querySelector('#foundersBrainProvider');
     const modelInput = root.querySelector('#foundersBrainModel');
     const keyInput = root.querySelector('#foundersBrainKey');
     const saveBtn = root.querySelector('#foundersBrainSaveBtn');
     const status = root.querySelector('#foundersBrainQuickStatus');
+    if (chatGptLoginBtn && chatGptLoginBtn.dataset.bound !== '1') {
+      chatGptLoginBtn.dataset.bound = '1';
+      chatGptLoginBtn.addEventListener('click', async () => {
+        chatGptLoginBtn.disabled = true;
+        try {
+          await launchChatGptOAuthFromFounders();
+        } catch (error) {
+          const code = String(error?.message || '').trim();
+          setBrainQuickStatus(code === 'POPUP_BLOCKED'
+            ? 'Popup blocked. Allow popups and try ChatGPT login again.'
+            : `Could not start ChatGPT login: ${code || 'UNKNOWN'}`);
+        } finally {
+          if (!isChatGptBrainConnected()) chatGptLoginBtn.disabled = false;
+        }
+      });
+    }
+    if (chatGptCompleteBtn && chatGptCompleteBtn.dataset.bound !== '1') {
+      chatGptCompleteBtn.dataset.bound = '1';
+      chatGptCompleteBtn.addEventListener('click', async () => {
+        chatGptCompleteBtn.disabled = true;
+        try {
+          await completeChatGptOAuthFromFounders({
+            callbackInput: String(chatGptCallbackInput?.value || '').trim()
+          });
+        } catch {
+          // Status text already carries the user-facing error.
+        } finally {
+          chatGptCompleteBtn.disabled = false;
+        }
+      });
+    }
     if (providerSelect && modelInput && providerSelect.dataset.bound !== '1') {
       providerSelect.dataset.bound = '1';
       providerSelect.addEventListener('change', () => {
@@ -1534,9 +1983,13 @@
     setText('foremanRecommendation', recommendation);
 
     const toolsLine = (() => {
-      if (!brainConfigured) return 'Manual play stays open. Connect a Brain when you want Clover to act as your Foreman.';
+      if (!brainConfigured) return 'Manual play stays open. Log in with ChatGPT when you want Clover to act as your Foreman.';
       if (!realBrainReady) return 'This Brain is preview-only. Manual play stays open until you connect a production Brain.';
-      if (!runtime.runtimeId) return 'Start Clover when you are ready for in-session help.';
+      if (!runtime.runtimeId) {
+        return isChatGptBrainConnected()
+          ? 'ChatGPT is connected. Start Clover when you are ready for in-session help.'
+          : 'Start Clover when you are ready for in-session help.';
+      }
       if (runtimeLocal.needsRestart) return 'Restart Clover before any routine can run in this tab.';
       if (runtime.status === 'PAUSED') return 'Automation is paused until you wake Clover again.';
       if (runtime.status === 'STALE' || runtime.status === 'ERROR' || ['ERROR', 'STALE', 'TOKEN_MISSING'].includes(String(workerSchedulerStatus.lastStatus || '').toUpperCase())) {
@@ -1552,7 +2005,7 @@
     if (startBtn) {
       startBtn.disabled = pendingAction;
       startBtn.textContent = !brainConfigured
-        ? 'Connect a Brain'
+        ? 'Log in with ChatGPT'
         : !realBrainReady
           ? 'Upgrade Brain'
           : (runtime.runtimeId ? 'Restart Clover' : 'Start Clover');
@@ -1562,7 +2015,7 @@
           if (card && typeof card.scrollIntoView === 'function') card.scrollIntoView({ block: 'center', behavior: 'smooth' });
           setStatusLine(brainConfigured
             ? 'Connect a production Brain to unlock Real Clover actions.'
-            : 'Connect a Brain to unlock real Foreman help.');
+            : 'Log in with ChatGPT to unlock real Foreman help.');
           return;
         }
         try {
@@ -1600,7 +2053,7 @@
         if (!realBrainReady) {
           setStatusLine(brainConfigured
             ? 'Connect a production Brain to let Clover act as your Foreman.'
-            : 'Connect a Brain to let Clover act as your Foreman.');
+            : 'Log in with ChatGPT to let Clover act as your Foreman.');
           return;
         }
         try {
@@ -1613,7 +2066,10 @@
             setStatusLine('Clover watched but did not choose an action.');
           }
         } catch (error) {
-          setStatusLine(error?.playerMessage || 'Clover watched but did not choose an action.');
+          const code = String(error?.message || '').trim();
+          setStatusLine(error?.playerMessage || (code === 'CODEX_BUDGET_EXCEEDED'
+            ? 'Clover paused before spending a ChatGPT turn. Adjust the game budget or wait for the next window.'
+            : 'Clover watched but did not choose an action.'));
         } finally {
           pendingAction = false;
           renderAll();
@@ -1661,8 +2117,10 @@
         planNode.innerHTML = `
           <div class="foundersPlanBody">
             <div class="foundersLabel">Foreman plan</div>
+            ${isChatGptBrainConnected() ? '<span class="foundersBadge" data-testid="chatgpt-brain-state">ChatGPT connected</span>' : ''}
             <div class="small">Clover is watching. No safe action inside your standing order.</div>
           </div>
+          ${isChatGptBrainConnected() ? renderCodexBudgetCard() : ''}
         `;
       } else {
         planNode.innerHTML = `
@@ -1679,7 +2137,12 @@
             ${planCard.standingOrderInfluence ? `<div class="small">${htmlEscape(planCard.standingOrderInfluence)}</div>` : ''}
             ${planCard.alternative ? `<div class="small">${htmlEscape(planCard.alternative)}</div>` : ''}
           </div>
+          ${isChatGptBrainConnected() ? renderCodexBudgetCard() : ''}
         `;
+      }
+      bindCodexBudgetControls();
+      if (!codexBudgetStatus) {
+        refreshCodexBudgetStatus({ render: true, refresh: true }).catch(() => null);
       }
     }
 
@@ -1687,7 +2150,7 @@
     if (schedulerNode) {
       const task = state?.foreman?.scheduler?.collectReadyOutputs || {};
       const schedulerLabel = !brainConfigured
-        ? 'Connect a Brain to unlock Foreman routines.'
+        ? 'Log in with ChatGPT to unlock Foreman routines.'
         : !realBrainReady
         ? 'Preview Brain cannot run Foreman routines.'
         : task.paused === true
@@ -1720,7 +2183,7 @@
           if (!realBrainReady) {
             setStatusLine(brainConfigured
               ? 'Connect a production Brain to let Clover run Foreman routines.'
-              : 'Connect a Brain to let Clover run Foreman routines.');
+              : 'Log in with ChatGPT to let Clover run Foreman routines.');
             return;
           }
           try {
@@ -2211,7 +2674,7 @@
       const error = new Error('BRAIN_REQUIRED');
       error.playerMessage = isBrainConfiguredForForeman()
         ? 'Connect a production Brain to let Clover act as your Foreman.'
-        : 'Connect a Brain to let Clover act as your Foreman.';
+        : 'Log in with ChatGPT to let Clover act as your Foreman.';
       throw error;
     }
     setLastActionTarget('FOREMAN_HUT');
@@ -2219,7 +2682,7 @@
     const syncedBrain = await syncSharedLlmConfigToGateway(gateway).catch(() => null);
     if (!syncedBrain) {
       const error = new Error('BRAIN_REQUIRED');
-      error.playerMessage = 'Connect a Brain to let Clover act as your Foreman.';
+      error.playerMessage = 'Log in with ChatGPT to let Clover act as your Foreman.';
       throw error;
     }
     if (gateway && typeof gateway.foundersPlotSchedulerStop === 'function') {
@@ -2295,7 +2758,7 @@
       throw Object.assign(new Error('BRAIN_REQUIRED'), {
         playerMessage: isBrainConfiguredForForeman()
           ? 'Connect a production Brain to let Clover run Foreman routines.'
-          : 'Connect a Brain to let Clover run Foreman routines.'
+          : 'Log in with ChatGPT to let Clover run Foreman routines.'
       });
     }
     setLastActionTarget('FOREMAN_HUT');
@@ -2332,7 +2795,7 @@
           code: 'BRAIN_REQUIRED',
           message: isBrainConfiguredForForeman()
             ? 'Connect a production Brain to let Clover act as your Foreman.'
-            : 'Connect a Brain to let Clover act as your Foreman.',
+            : 'Log in with ChatGPT to let Clover act as your Foreman.',
           retryable: false
         },
         result: { mutationApplied: false },
@@ -2548,13 +3011,24 @@
     enableCollectReadyOutputs,
     getSchedulerStatus,
     runForemanTick,
-    applyReceiptCorrection
+    applyReceiptCorrection,
+    getCodexBudgetStatus: () => codexBudgetStatus,
+    refreshCodexBudgetStatus: () => refreshCodexBudgetStatus({ render: true, refresh: true }),
+    setCodexBudgetForTest: async (params = {}) => {
+      const gateway = await initGateway();
+      if (!gateway || typeof gateway.codexBudgetSet !== 'function') throw new Error('CODEX_BUDGET_UNAVAILABLE');
+      codexBudgetStatus = await gateway.codexBudgetSet(params);
+      renderAll();
+      return codexBudgetStatus;
+    }
   };
 
   applyEmbedMode();
   bindUi();
   window.addEventListener('resize', syncViewportScenePolicy, { passive: true });
-  refreshSharedBrainStatus({ render: true }).catch(() => {});
+  refreshSharedBrainStatus({ render: true })
+    .then(() => (isChatGptBrainConnected() ? refreshCodexBudgetStatus({ render: true, refresh: true }) : null))
+    .catch(() => {});
   loadAssetManifest().then(() => {
     renderAll();
   }).catch(() => {});

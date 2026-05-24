@@ -202,12 +202,14 @@
 
   function defaultProviderApi(provider) {
     const normalized = String(provider || '').trim();
+    if (normalized === 'openai-codex') return 'openai-codex-responses';
     if (normalized === 'openai' || normalized === 'ollama' || normalized === 'openrouter') return 'openai-completions';
     return '';
   }
 
   function defaultProviderBaseUrl(provider, origin) {
     const normalized = String(provider || '').trim();
+    if (normalized === 'openai-codex') return 'https://chatgpt.com/backend-api';
     if (normalized === 'openai') {
       return new URL('/api/llm/openai/v1', origin || 'http://localhost').toString();
     }

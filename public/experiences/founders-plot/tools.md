@@ -33,7 +33,7 @@ If the Brain is missing, Foreman mutation tools must fail closed with a friendly
   "ok": false,
   "error": {
     "code": "BRAIN_REQUIRED",
-    "message": "Connect a Brain to let Clover act as your Foreman.",
+    "message": "Log in with ChatGPT to let Clover act as your Foreman.",
     "retryable": false
   }
 }
@@ -179,7 +179,7 @@ If the caller lacks Real Clover readiness, mutation tools must return:
   "ok": false,
   "error": {
     "code": "BRAIN_REQUIRED",
-    "message": "Connect a Brain to let Clover act as your Foreman.",
+    "message": "Log in with ChatGPT to let Clover act as your Foreman.",
     "retryable": false
   }
 }

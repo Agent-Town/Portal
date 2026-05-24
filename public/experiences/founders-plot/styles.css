@@ -1130,13 +1130,150 @@ html.founders-plot-embed body.founders-plot-page {
 
 .foundersBrainQuickConnect {
   display: grid;
-  gap: 10px;
-  padding: 12px;
+  gap: 12px;
+  padding: 14px;
   border-radius: 18px;
   border: 1px solid rgba(196, 136, 58, 0.28);
   background:
     radial-gradient(circle at 14% 0%, rgba(255, 228, 160, 0.22), transparent 34%),
     rgba(255, 248, 232, 0.62);
+}
+
+.foundersChatGptBrainConnect {
+  border-color: rgba(28, 122, 115, 0.24);
+  background:
+    linear-gradient(135deg, rgba(238, 255, 244, 0.82), rgba(255, 248, 232, 0.72));
+  box-shadow: 0 14px 34px rgba(45, 88, 77, 0.12);
+}
+
+.foundersChatGptBrainHero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.foundersChatGptBrainHero strong {
+  display: block;
+  margin: 2px 0 4px;
+  font-size: 18px;
+  line-height: 1.15;
+}
+
+.foundersChatGptPromise {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.foundersChatGptPromise span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(46, 27, 14, 0.08);
+  color: var(--fp-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.foundersCodexBudgetBody {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(28, 122, 115, 0.16);
+  background: rgba(255, 255, 255, 0.46);
+}
+
+.foundersCodexBudgetHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.foundersCodexBudgetHeader strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.foundersCodexBudgetGrid {
+  display: grid;
+  grid-template-columns: minmax(84px, auto) minmax(0, 1fr);
+  gap: 8px 10px;
+  align-items: center;
+}
+
+.foundersCodexBudgetGrid input {
+  width: 100%;
+  min-height: 34px;
+  border-radius: 12px;
+  border: 1px solid rgba(46, 27, 14, 0.16);
+  background: rgba(255, 255, 255, 0.74);
+  color: var(--fp-ink);
+  padding: 6px 9px;
+  font: inherit;
+}
+
+.foundersCodexBudgetMeters,
+.foundersCodexBudgetMeter {
+  display: grid;
+  gap: 6px;
+}
+
+.foundersCodexBudgetMeterTrack {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(46, 27, 14, 0.1);
+}
+
+.foundersCodexBudgetMeterTrack span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--fp-teal), var(--fp-gold));
+}
+
+.foundersCodexBudgetWarning {
+  color: var(--fp-rust);
+}
+
+.foundersCodexBudgetActions {
+  justify-content: flex-start;
+}
+
+.foundersChatGptActions {
+  align-items: center;
+}
+
+.foundersChatGptActions .btn {
+  justify-content: center;
+}
+
+.foundersChatGptManualFinish,
+.foundersBrainAdvancedOptions {
+  display: grid;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.foundersChatGptManualFinish summary,
+.foundersBrainAdvancedOptions summary {
+  cursor: pointer;
+  color: var(--fp-teal-deep);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.foundersBrainAdvancedOptions[open] {
+  padding-top: 10px;
+  border-top: 1px solid rgba(46, 27, 14, 0.1);
 }
 
 .foundersBrainQuickFields {

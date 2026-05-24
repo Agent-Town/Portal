@@ -38,6 +38,16 @@ const MAIN_AGENT_ID = "main";
 const MAIN_SESSION_KEY = "agent:main:main";
 const TRANSCRIPT_DIGEST_QUEUE_META_KEY = "transcriptDigestQueueV1";
 const TRANSCRIPT_DIGEST_QUEUE_MAX = 500;
+const CODEX_BUDGET_SETTINGS_META_KEY = "codexBudgetSettingsV1";
+const CODEX_BUDGET_LEDGER_META_KEY = "codexBudgetLedgerV1";
+const CODEX_BUDGET_SNAPSHOT_META_KEY = "codexBudgetSnapshotV1";
+const CODEX_BUDGET_ENDPOINT = "/api/agent/lite/codex/rate-limits";
+const CODEX_BUDGET_DEFAULTS = Object.freeze({
+  enabled: true,
+  fiveHourPercent: 10,
+  weeklyPercent: 25,
+  perTurnPercent: 1,
+});
 const LITE_TOOL_DISPATCH_PATH = "lite_tool_dispatch_v1";
 const DEFAULT_WEB_FETCH_MAX_BYTES = 262_144;
 const MAX_WEB_FETCH_MAX_BYTES = 1_048_576;
@@ -1019,6 +1029,222 @@ async function apiJson(url, opts = {}) {
     throw err;
   }
   return data;
+}
+
+function clampBudgetPercent(value, fallback) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.max(1, Math.min(100, Math.round(numeric)));
+}
+
+function normalizeCodexBudgetSettings(value = {}) {
+  const input = value && typeof value === "object" ? value : {};
+  return {
+    enabled: input.enabled === false ? false : true,
+    fiveHourPercent: clampBudgetPercent(input.fiveHourPercent, CODEX_BUDGET_DEFAULTS.fiveHourPercent),
+    weeklyPercent: clampBudgetPercent(input.weeklyPercent, CODEX_BUDGET_DEFAULTS.weeklyPercent),
+    perTurnPercent: clampBudgetPercent(input.perTurnPercent, CODEX_BUDGET_DEFAULTS.perTurnPercent),
+  };
+}
+
+function normalizeCodexBudgetSpendEvent(event) {
+  if (!event || typeof event !== "object") return null;
+  const spentAtMs = Number(event.spentAtMs);
+  const amountPercent = Number(event.amountPercent);
+  if (!Number.isFinite(spentAtMs) || spentAtMs <= 0) return null;
+  if (!Number.isFinite(amountPercent) || amountPercent <= 0) return null;
+  return {
+    spentAtMs: Math.round(spentAtMs),
+    amountPercent: Math.max(0.1, Math.min(100, amountPercent)),
+    source: typeof event.source === "string" ? event.source.slice(0, 80) : "llm-turn",
+  };
+}
+
+function normalizeCodexBudgetLedger(value = {}) {
+  const input = value && typeof value === "object" ? value : {};
+  const cutoff = nowMs() - 10080 * 60 * 1000;
+  const events = Array.isArray(input.events)
+    ? input.events.map(normalizeCodexBudgetSpendEvent).filter(Boolean)
+    : [];
+  return {
+    v: 1,
+    events: events
+      .filter((event) => event.spentAtMs >= cutoff)
+      .sort((a, b) => a.spentAtMs - b.spentAtMs)
+      .slice(-500),
+  };
+}
+
+function codexBudgetRollingSpendPercent(ledger, windowMins) {
+  const cutoff = nowMs() - Number(windowMins || 0) * 60 * 1000;
+  return (Array.isArray(ledger?.events) ? ledger.events : [])
+    .filter((event) => event.spentAtMs >= cutoff)
+    .reduce((sum, event) => sum + Number(event.amountPercent || 0), 0);
+}
+
+function selectCodexRateLimitBucket(snapshot = null) {
+  const byId = snapshot?.rateLimitsByLimitId && typeof snapshot.rateLimitsByLimitId === "object"
+    ? snapshot.rateLimitsByLimitId
+    : {};
+  if (byId.codex) return byId.codex;
+  const codexLike = Object.values(byId).find((entry) => {
+    const id = String(entry?.limitId || "").toLowerCase();
+    const name = String(entry?.limitName || "").toLowerCase();
+    return id.includes("codex") || name.includes("codex");
+  });
+  if (codexLike) return codexLike;
+  if (snapshot?.rateLimits) return snapshot.rateLimits;
+  return Object.values(byId)[0] || null;
+}
+
+function codexBudgetWindowStatus(bucket, key) {
+  const source = bucket && typeof bucket === "object" ? bucket[key] : null;
+  return {
+    usedPercent: Number.isFinite(Number(source?.usedPercent)) ? Number(source.usedPercent) : 0,
+    windowDurationMins: Number.isFinite(Number(source?.windowDurationMins)) ? Number(source.windowDurationMins) : null,
+    resetsAt: Number.isFinite(Number(source?.resetsAt)) ? Number(source.resetsAt) : null,
+  };
+}
+
+function deriveCodexBudgetStatus({ settings, ledger, snapshot = null, error = null } = {}) {
+  const normalizedSettings = normalizeCodexBudgetSettings(settings);
+  const normalizedLedger = normalizeCodexBudgetLedger(ledger);
+  const bucket = selectCodexRateLimitBucket(snapshot);
+  const fiveHourSpentPercent = codexBudgetRollingSpendPercent(normalizedLedger, 300);
+  const weeklySpentPercent = codexBudgetRollingSpendPercent(normalizedLedger, 10080);
+  const primary = codexBudgetWindowStatus(bucket, "primary");
+  const secondary = codexBudgetWindowStatus(bucket, "secondary");
+  const liveLimitReached = !!bucket?.rateLimitReachedType || primary.usedPercent >= 100 || secondary.usedPercent >= 100;
+  const nextTurnPercent = normalizedSettings.perTurnPercent;
+  const fiveHourWouldExceed = fiveHourSpentPercent + nextTurnPercent > normalizedSettings.fiveHourPercent;
+  const weeklyWouldExceed = weeklySpentPercent + nextTurnPercent > normalizedSettings.weeklyPercent;
+  const localLimitReached = fiveHourWouldExceed || weeklyWouldExceed;
+  const enabled = normalizedSettings.enabled !== false;
+  const source = snapshot?.source || (error ? "local-fallback" : "local-only");
+  const canSpend = enabled && !liveLimitReached && !localLimitReached;
+  return {
+    ok: true,
+    enabled,
+    source,
+    bucket: bucket || null,
+    settings: normalizedSettings,
+    live: {
+      planType: bucket?.planType || null,
+      limitId: bucket?.limitId || null,
+      limitName: bucket?.limitName || null,
+      primary,
+      secondary,
+      rateLimitReachedType: bucket?.rateLimitReachedType || null,
+    },
+    local: {
+      fiveHourSpentPercent: Math.round(fiveHourSpentPercent * 10) / 10,
+      weeklySpentPercent: Math.round(weeklySpentPercent * 10) / 10,
+      fiveHourRemainingPercent: Math.max(0, Math.round((normalizedSettings.fiveHourPercent - fiveHourSpentPercent) * 10) / 10),
+      weeklyRemainingPercent: Math.max(0, Math.round((normalizedSettings.weeklyPercent - weeklySpentPercent) * 10) / 10),
+      nextTurnPercent,
+    },
+    limits: {
+      liveLimitReached,
+      localLimitReached,
+      fiveHourWouldExceed,
+      weeklyWouldExceed,
+    },
+    canSpend,
+    error: error ? String(error?.message || error) : "",
+  };
+}
+
+function isCodexSubscriptionBrainConfigured() {
+  const provider = String(state.llmProvider || "").trim().toLowerCase();
+  const api = String(state.llmApi || "").trim().toLowerCase();
+  const modelRef = String(state.llmModelRef || "").trim().toLowerCase();
+  return provider === "openai-codex" || api === "openai-codex-responses" || modelRef.startsWith("openai-codex/");
+}
+
+async function persistCodexBudgetSettings(settings) {
+  state.codexBudgetSettings = normalizeCodexBudgetSettings(settings);
+  await metaSet(CODEX_BUDGET_SETTINGS_META_KEY, state.codexBudgetSettings);
+  return state.codexBudgetSettings;
+}
+
+async function persistCodexBudgetLedger(ledger) {
+  state.codexBudgetLedger = normalizeCodexBudgetLedger(ledger);
+  await metaSet(CODEX_BUDGET_LEDGER_META_KEY, state.codexBudgetLedger);
+  return state.codexBudgetLedger;
+}
+
+async function refreshCodexBudgetSnapshot() {
+  try {
+    const snapshot = await apiJson(CODEX_BUDGET_ENDPOINT, { method: "GET" });
+    state.codexBudgetSnapshot = snapshot;
+    state.codexBudgetLastError = "";
+    await metaSet(CODEX_BUDGET_SNAPSHOT_META_KEY, snapshot);
+    return snapshot;
+  } catch (error) {
+    state.codexBudgetLastError = error?.message || String(error || "CODEX_APP_SERVER_UNAVAILABLE");
+    return state.codexBudgetSnapshot || null;
+  }
+}
+
+async function getCodexBudgetStatus({ fetchLive = true } = {}) {
+  const settings = normalizeCodexBudgetSettings(state.codexBudgetSettings);
+  const ledger = normalizeCodexBudgetLedger(state.codexBudgetLedger);
+  state.codexBudgetSettings = settings;
+  state.codexBudgetLedger = ledger;
+  let snapshot = state.codexBudgetSnapshot || null;
+  let error = state.codexBudgetLastError ? new Error(state.codexBudgetLastError) : null;
+  if (fetchLive) {
+    snapshot = await refreshCodexBudgetSnapshot();
+    error = state.codexBudgetLastError ? new Error(state.codexBudgetLastError) : null;
+  }
+  const status = deriveCodexBudgetStatus({ settings, ledger, snapshot, error });
+  state.codexBudgetLastStatus = status;
+  return status;
+}
+
+function codexBudgetBlockedMessage(status) {
+  if (status?.limits?.liveLimitReached) {
+    return "Your ChatGPT/Codex subscription limit is reached. Clover paused before spending another turn.";
+  }
+  if (status?.limits?.fiveHourWouldExceed) {
+    return `Clover hit the ${status?.settings?.fiveHourPercent || 0}% game budget for this 5-hour window.`;
+  }
+  if (status?.limits?.weeklyWouldExceed) {
+    return `Clover hit the ${status?.settings?.weeklyPercent || 0}% game budget for this week.`;
+  }
+  return "Clover paused before spending a ChatGPT turn.";
+}
+
+async function assertCodexBudgetAllowsTurn({ source = "llm-turn" } = {}) {
+  if (!isCodexSubscriptionBrainConfigured()) return null;
+  const status = await getCodexBudgetStatus({ fetchLive: true });
+  if (status.canSpend) return status;
+  const error = new Error("CODEX_BUDGET_EXCEEDED");
+  error.playerMessage = codexBudgetBlockedMessage(status);
+  error.budgetStatus = status;
+  error.source = source;
+  throw error;
+}
+
+async function recordCodexBudgetSpend({ source = "llm-turn", preflight = null } = {}) {
+  if (!isCodexSubscriptionBrainConfigured()) return null;
+  const settings = normalizeCodexBudgetSettings(state.codexBudgetSettings);
+  const ledger = normalizeCodexBudgetLedger(state.codexBudgetLedger);
+  ledger.events.push({
+    spentAtMs: nowMs(),
+    amountPercent: settings.perTurnPercent,
+    source,
+  });
+  await persistCodexBudgetLedger(ledger);
+  const status = deriveCodexBudgetStatus({
+    settings,
+    ledger: state.codexBudgetLedger,
+    snapshot: state.codexBudgetSnapshot || preflight?.snapshot || null,
+    error: state.codexBudgetLastError ? new Error(state.codexBudgetLastError) : null,
+  });
+  state.codexBudgetLastStatus = status;
+  post({ type: "worker.codexBudget.status", ok: true, result: status });
+  return status;
 }
 
 function normalizeToolErrorCode(message, fallback = "UNSUPPORTED") {
@@ -5826,6 +6052,7 @@ async function runAgentTurn(userText, opts = {}) {
     return { messages: generatedMessages, persisted: persistToTranscript };
   }
 
+  const codexBudgetPreflight = await assertCodexBudgetAllowsTurn({ source: "agent-turn" });
   const tools = getLiteTools();
   const promptPreview = await buildLitePromptPreview({ model, tools });
   if (promptPreview.usedFiles.length) {
@@ -5874,6 +6101,7 @@ async function runAgentTurn(userText, opts = {}) {
   if (persistToTranscript) {
     await persistTranscript({ repair: true });
   }
+  await recordCodexBudgetSpend({ source: "agent-turn", preflight: codexBudgetPreflight });
   return { messages: generatedMessages, persisted: persistToTranscript };
 }
 
@@ -5900,6 +6128,7 @@ async function runSilentLlmTextTurn({ userText = "", systemPrompt = "", source =
   if (!apiKey) {
     throw new Error("LLM_NOT_CONFIGURED");
   }
+  const codexBudgetPreflight = await assertCodexBudgetAllowsTurn({ source });
 
   recordLastLlmInputDebug({
     source,
@@ -5957,6 +6186,7 @@ async function runSilentLlmTextTurn({ userText = "", systemPrompt = "", source =
     throw new Error("LLM_EMPTY_RESPONSE");
   }
 
+  await recordCodexBudgetSpend({ source, preflight: codexBudgetPreflight });
   return assistantText;
 }
 
@@ -8484,6 +8714,11 @@ const state = {
   llmUseProxy: true,
   llmApiKey: null,
   lastLlmInput: null,
+  codexBudgetSettings: CODEX_BUDGET_DEFAULTS,
+  codexBudgetLedger: { v: 1, events: [] },
+  codexBudgetSnapshot: null,
+  codexBudgetLastStatus: null,
+  codexBudgetLastError: "",
   secretStore: {},
   agentTownCeremonyByTeam: {},
   originGrants: [],
@@ -8538,6 +8773,14 @@ async function loadStateFromIdb() {
   const llmUseProxyStored = await metaGet("llmUseProxy");
   state.llmUseProxy = llmUseProxyStored === false ? false : true;
   state.llmApiKey = (await metaGet("llmApiKey")) || null;
+  state.codexBudgetSettings = normalizeCodexBudgetSettings(await metaGet(CODEX_BUDGET_SETTINGS_META_KEY));
+  state.codexBudgetLedger = normalizeCodexBudgetLedger(await metaGet(CODEX_BUDGET_LEDGER_META_KEY));
+  state.codexBudgetSnapshot = (await metaGet(CODEX_BUDGET_SNAPSHOT_META_KEY)) || null;
+  state.codexBudgetLastStatus = deriveCodexBudgetStatus({
+    settings: state.codexBudgetSettings,
+    ledger: state.codexBudgetLedger,
+    snapshot: state.codexBudgetSnapshot,
+  });
   const secretStoreRaw = (await metaGet("secretStoreV1")) || {};
   state.secretStore = {};
   if (secretStoreRaw && typeof secretStoreRaw === "object" && !Array.isArray(secretStoreRaw)) {
@@ -9320,6 +9563,54 @@ self.addEventListener("message", async (ev) => {
             reasoning: state.llmReasoning || null,
             useProxy: state.llmUseProxy !== false,
           }),
+        });
+      }
+      return;
+    }
+
+    if (msg.type === "gateway.command.codexBudget.status") {
+      try {
+        const refresh = msg?.params?.refresh !== false;
+        const result = await getCodexBudgetStatus({ fetchLive: refresh });
+        post({
+          type: "worker.codexBudget.status",
+          requestId: String(msg.requestId || ""),
+          ok: true,
+          result,
+        });
+      } catch (e) {
+        post({
+          type: "worker.codexBudget.status",
+          requestId: String(msg.requestId || ""),
+          ok: false,
+          error: e?.message || String(e || "CODEX_BUDGET_STATUS_FAILED"),
+        });
+      }
+      return;
+    }
+
+    if (msg.type === "gateway.command.codexBudget.set") {
+      try {
+        const params = msg.params && typeof msg.params === "object" ? msg.params : {};
+        await persistCodexBudgetSettings(params.settings || params);
+        if (params.clearLedger === true) {
+          await persistCodexBudgetLedger({ v: 1, events: [] });
+        } else if (params.ledger && typeof params.ledger === "object") {
+          await persistCodexBudgetLedger(params.ledger);
+        }
+        const result = await getCodexBudgetStatus({ fetchLive: params.refresh !== false });
+        post({
+          type: "worker.codexBudget.status",
+          requestId: String(msg.requestId || ""),
+          ok: true,
+          result,
+        });
+      } catch (e) {
+        post({
+          type: "worker.codexBudget.status",
+          requestId: String(msg.requestId || ""),
+          ok: false,
+          error: e?.message || String(e || "CODEX_BUDGET_SET_FAILED"),
         });
       }
       return;

@@ -12,6 +12,7 @@ test('Brain Quick Connect saves free OpenRouter config as Preview Clover, not Re
   const frame = await getOpenFoundersPlotFrame(page);
 
   await frame.getByTestId('founders-clover-avatar').click();
+  await frame.getByTestId('brain-advanced-toggle').click();
   await frame.getByTestId('brain-quick-provider').selectOption('openrouter');
   await frame.getByTestId('brain-quick-model').fill('nvidia/nemotron-3-super-120b-a12b:free');
   await frame.getByTestId('brain-quick-key').fill('or-test-key');

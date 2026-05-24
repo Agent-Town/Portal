@@ -28,8 +28,8 @@ async function writeFileEnsured(p, content) {
 
 async function readVendorPinnedVersions({ repoRoot }) {
   const vendorPkgPath = path.join(repoRoot, "vendor", "openclaw-main", "package.json");
-  assert(await fileExists(vendorPkgPath), `MISSING_VENDOR_OPENCLAW:${vendorPkgPath}`);
-  const pkg = await readJson(vendorPkgPath);
+  const fallbackPkgPath = path.join(repoRoot, "package.json");
+  const pkg = await (await fileExists(vendorPkgPath) ? readJson(vendorPkgPath) : readJson(fallbackPkgPath));
 
   const openclawVersion = typeof pkg.version === "string" ? pkg.version.trim() : "";
   assert(openclawVersion, "VENDOR_OPENCLAW_VERSION_MISSING");

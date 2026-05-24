@@ -49,15 +49,7 @@ async function buildVendorProject() {
   const hasOpenclaw = await exists(path.join(openclawMainPath, 'package.json'));
 
   if (!hasOpenclaw) {
-    console.log('[openclaw-lite] missing openclaw-main, attempting submodule update...');
-    try {
-      await execAsync('git submodule update --init --recursive', { cwd: vendorRoot });
-    } catch (e) {
-      console.warn('[openclaw-lite] git submodule failed, trying manual clone...', e.message);
-      // Fallback: manual clone if git submodule is broken in this environment
-      await execAsync('rm -rf vendor/openclaw-main', { cwd: vendorRoot });
-      await execAsync('git clone https://github.com/openclaw/openclaw.git vendor/openclaw-main', { cwd: vendorRoot });
-    }
+    console.warn('[openclaw-lite] missing openclaw-main; using Lite vendor package pins for build metadata.');
   }
 
   // Install dependencies
