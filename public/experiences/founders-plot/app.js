@@ -2,6 +2,13 @@
   const TEAM_CODE_HINT_STORAGE_KEY = 'agentTown:teamCodeHint';
   const BRAIN_HARNESS_POLICY_STORAGE_KEY = 'foundersPlot:testBrainHarnessPolicy';
   const OPENAI_CODEX_OAUTH_MESSAGE_TYPE = 'agenttown:openai-codex-oauth-callback';
+  const FOUNDERS_FEATURE_FLAGS_PARAM = (() => {
+    try {
+      return String(new URLSearchParams(window.location.search || '').get('foundersFeatureFlags') || '').trim();
+    } catch {
+      return '';
+    }
+  })();
   const BUILDING_LABELS = {
     HQ: 'Headquarters',
     LUMBER_CAMP: 'Lumber Camp',
@@ -36,6 +43,11 @@
     { x: 1, y: 2 },
     { x: 2, y: 2 }
   ];
+  const FUTURE_DRAWER_FEATURES = {
+    settlements: 'FEATURE_FOUNDERS_V25_SECOND_SETTLEMENT',
+    operating: 'FEATURE_FOUNDERS_V30_OPERATING_MODEL',
+    creator: 'FEATURE_FOUNDERS_V45_CREATOR_BUILDINGS'
+  };
 
   let currentState = null;
   let selectedKey = '';
@@ -81,6 +93,8 @@
     vault: null,
     error: ''
   };
+  let analyticsEvents = [];
+  const analyticsSeen = new Set();
   let brainHarnessPolicy = loadBrainHarnessPolicy();
   let workerSchedulerStatus = {
     active: false,
@@ -481,6 +495,9 @@
     const teamCodeHint = readTeamCodeHint();
     if (teamCodeHint && headers['x-team-code-hint'] === undefined) {
       headers['x-team-code-hint'] = teamCodeHint;
+    }
+    if (FOUNDERS_FEATURE_FLAGS_PARAM && headers['x-founders-plot-feature-flags'] === undefined) {
+      headers['x-founders-plot-feature-flags'] = FOUNDERS_FEATURE_FLAGS_PARAM;
     }
     const response = await fetch(url, {
       credentials: 'include',
@@ -1346,6 +1363,102 @@
     lastActionTargetObjectId = String(objectId || '');
   }
 
+  function roadmapFeatureEnabled(featureKey = '', state = stateData()) {
+    if (!featureKey) return true;
+    return state?.featureFlags?.[featureKey] === true;
+  }
+
+  function drawerFeatureEnabled(drawerKey = '', state = stateData()) {
+    return roadmapFeatureEnabled(FUTURE_DRAWER_FEATURES[String(drawerKey || '')] || '', state);
+  }
+
+  function analyticsEnabled() {
+    return typeof window !== 'undefined';
+  }
+
+  function trackedEventCount(name = '') {
+    return analyticsEvents.filter((event) => event.name === name).length;
+  }
+
+  function trackFoundersEvent(name = '', payload = {}, options = {}) {
+    const eventName = String(name || '').trim();
+    if (!eventName || !analyticsEnabled()) return null;
+    const seenKey = options.key ? `${eventName}:${String(options.key || '')}` : options.once === true ? eventName : '';
+    if (seenKey && analyticsSeen.has(seenKey)) return null;
+    if (seenKey) analyticsSeen.add(seenKey);
+    const event = {
+      name: eventName,
+      atMs: Date.now(),
+      plotId: String(stateData()?.plot?.plotId || ''),
+      hqLevel: Number(stateData()?.plot?.hqLevel || stateData()?.progress?.currentLevel || 1),
+      ...payload
+    };
+    analyticsEvents = [...analyticsEvents, event].slice(-80);
+    window.__foundersPlotAnalytics = analyticsEvents;
+    try {
+      window.localStorage?.setItem('foundersPlot:localAnalyticsEvents', JSON.stringify(analyticsEvents));
+    } catch {
+      // Local analytics are best-effort only.
+    }
+    return event;
+  }
+
+  function trackContractAccepted(contractId = '') {
+    const id = String(contractId || '').trim();
+    if (!id) return null;
+    const event = trackFoundersEvent('founders.contract_offer_chosen', {
+      contractId: id,
+      count: trackedEventCount('founders.contract_offer_chosen') + 1
+    }, { key: id });
+    const completedCount = Array.isArray(stateData()?.contracts?.completed) ? stateData().contracts.completed.length : 0;
+    if (event && (trackedEventCount('founders.contract_offer_chosen') >= 2 || completedCount >= 1)) {
+      trackFoundersEvent('founders.second_contract_chosen', { contractId: id }, { once: true });
+    }
+    return event;
+  }
+
+  function trackContractCompleted(contractId = '') {
+    const id = String(contractId || '').trim();
+    if (!id) return null;
+    return trackFoundersEvent('founders.contract_completed', { contractId: id }, { key: id });
+  }
+
+  function resetAnalyticsForTest() {
+    analyticsEvents = [];
+    analyticsSeen.clear();
+    if (typeof window !== 'undefined') window.__foundersPlotAnalytics = analyticsEvents;
+  }
+
+  function maybeTrackStateAnalytics(state) {
+    if (!state) return;
+    const params = new URLSearchParams(window.location.search || '');
+    if (params.get('entry') === 'play-first' || params.get('presentation') === 'fullscreen' || params.get('embed') === '1') {
+      trackFoundersEvent('founders.entered_play_first', {
+        entry: params.get('entry') || '',
+        presentation: params.get('presentation') || '',
+        embed: params.get('embed') || ''
+      }, { once: true });
+    }
+    const buildings = Array.isArray(state.buildings) ? state.buildings : [];
+    if (buildings.some((building) => String(building?.type || '').toUpperCase() !== 'HQ')) {
+      trackFoundersEvent('founders.first_building_placed', {}, { once: true });
+    }
+    const contracts = state.contracts || {};
+    if ((Array.isArray(contracts.offers) && contracts.offers.length > 0) || contracts.activeContract) {
+      trackFoundersEvent('founders.first_contract_viewed', {}, { once: true });
+    }
+    if (contracts.recommendation || state?.foreman?.recommendation || state?.foreman?.companionAdvice?.recommendation) {
+      trackFoundersEvent('founders.clover_advice_seen', {}, { once: true });
+    }
+    if (contracts.activeContract?.contractId) {
+      trackContractAccepted(contracts.activeContract.contractId);
+    }
+    const completedContracts = Array.isArray(contracts.completed) ? contracts.completed : [];
+    for (const contract of completedContracts) {
+      trackContractCompleted(contract?.contractId);
+    }
+  }
+
   function setActionTargetFromTool(toolName, args = {}) {
     switch (String(toolName || '')) {
       case 'et.plot.place_building':
@@ -1412,10 +1525,15 @@
   function openDrawer(drawerKey, options = {}) {
     activeDrawer = String(drawerKey || '');
     if (!activeDrawer) return;
+    if (!drawerFeatureEnabled(activeDrawer)) {
+      activeDrawer = '';
+      return;
+    }
     if (options.clearSelection !== false) {
       selectedKey = '';
     }
     if (activeDrawer === 'recap') {
+      trackFoundersEvent('founders.morning_brief_opened', {}, { once: true });
       loadRecap().catch(() => {});
     }
     renderAll();
@@ -1707,10 +1825,12 @@
       : (state?.quest?.primaryAction && typeof state.quest.primaryAction === 'object' ? state.quest.primaryAction : null);
     const goalTargetId = String(scene?.currentGoal?.targetObjectId || '');
     const activeOpportunity = state?.townOpportunity?.active || null;
-    const activeScenario = state?.scenarios?.active || null;
-    const scenarioOffers = Array.isArray(state?.scenarios?.offers) ? state.scenarios.offers : [];
+    const scenariosEnabled = roadmapFeatureEnabled('FEATURE_FOUNDERS_V16_SCENARIOS', state);
+    const identityEnabled = roadmapFeatureEnabled('FEATURE_FOUNDERS_V17_TOWN_IDENTITY', state);
+    const activeScenario = scenariosEnabled ? state?.scenarios?.active || null : null;
+    const scenarioOffers = scenariosEnabled && Array.isArray(state?.scenarios?.offers) ? state.scenarios.offers : [];
     const publicSquare = state?.landmarks?.publicSquare || {};
-    const publicSquareStyles = Array.isArray(publicSquare.availableStyles) ? publicSquare.availableStyles : [];
+    const publicSquareStyles = identityEnabled && Array.isArray(publicSquare.availableStyles) ? publicSquare.availableStyles : [];
 
     if (selectedPad) {
       for (const entry of visibleBuildCatalog(state)) {
@@ -2120,6 +2240,11 @@
       } else {
         await loadState();
       }
+      if (name === 'et.plot.place_building') {
+        trackFoundersEvent('founders.first_building_placed', {
+          buildingType: String(args?.type || '')
+        }, { once: true });
+      }
       setStatusLine(`${name} complete.`);
       renderAll();
       return response;
@@ -2317,6 +2442,7 @@
         })
       });
       currentState = { ok: true, state: response.state };
+      trackContractAccepted(contractId);
       setStatusLine('Contract accepted.');
       renderAll();
       return response;
@@ -2342,6 +2468,7 @@
         })
       });
       currentState = { ok: true, state: response.state };
+      trackContractCompleted(contractId);
       setStatusLine('Contract turned in.');
       renderAll();
       return response;
@@ -2535,6 +2662,12 @@
     const contracts = state?.contracts || {};
     const offers = Array.isArray(contracts.offers) ? contracts.offers : [];
     const activeContract = contracts.activeContract || null;
+    if (!contracts.boardLocked && (offers.length > 0 || activeContract)) {
+      trackFoundersEvent('founders.first_contract_viewed', {
+        offerCount: offers.length,
+        hasActiveContract: !!activeContract
+      }, { once: true });
+    }
     if (contracts.boardLocked) {
       if (statusNode) statusNode.textContent = 'Opens at HQ2.';
       node.innerHTML = '<div class="foundersEmptyState">Town requests arrive once Headquarters reaches level 2.</div>';
@@ -2668,15 +2801,17 @@
       ? state.townOpportunity.completed
       : [];
     const latestOpportunity = completedOpportunities[completedOpportunities.length - 1] || null;
-    const activeScenario = state?.scenarios?.active || null;
-    const scenarioOffers = Array.isArray(state?.scenarios?.offers) ? state.scenarios.offers : [];
-    const completedScenarios = Array.isArray(state?.scenarios?.completed) ? state.scenarios.completed : [];
+    const scenariosEnabled = roadmapFeatureEnabled('FEATURE_FOUNDERS_V16_SCENARIOS', state);
+    const identityEnabled = roadmapFeatureEnabled('FEATURE_FOUNDERS_V17_TOWN_IDENTITY', state);
+    const activeScenario = scenariosEnabled ? state?.scenarios?.active || null : null;
+    const scenarioOffers = scenariosEnabled && Array.isArray(state?.scenarios?.offers) ? state.scenarios.offers : [];
+    const completedScenarios = scenariosEnabled && Array.isArray(state?.scenarios?.completed) ? state.scenarios.completed : [];
     const latestScenario = completedScenarios[completedScenarios.length - 1] || null;
     const canUpgrade = Number(landmark.level || 0) < 1
       && Number(state?.plot?.inventory?.wood || 0) >= 4
       && Number(state?.plot?.inventory?.coin || 0) >= 8;
-    const styleOptions = Array.isArray(landmark.availableStyles) ? landmark.availableStyles : [];
-    const styleHtml = Number(landmark.level || 0) >= 1 && styleOptions.length > 0 ? `
+    const styleOptions = identityEnabled && Array.isArray(landmark.availableStyles) ? landmark.availableStyles : [];
+    const styleHtml = identityEnabled && Number(landmark.level || 0) >= 1 && styleOptions.length > 0 ? `
       <div class="foundersLandmarkBody foundersIdentityBody" data-testid="town-identity-card">
         <div class="foundersSignalHeader">
           <div>
@@ -2707,8 +2842,8 @@
         </div>
       </div>
     ` : '';
-    const postcard = currentPostcard || state?.townPostcards?.latest || null;
-    const postcardHtml = postcard ? `
+    const postcard = identityEnabled ? currentPostcard || state?.townPostcards?.latest || null : null;
+    const postcardHtml = identityEnabled && postcard ? `
       <div class="foundersLandmarkBody foundersPostcard" data-testid="postcard-preview">
         <div class="foundersSignalHeader">
           <div>
@@ -2723,7 +2858,7 @@
         <div class="small">${htmlEscape((postcard.flyoverStops || []).map((stop) => stop.label).join(' -> ') || 'Public Square flyover')}</div>
       </div>
     ` : '';
-    const cardHtml = currentPlotCard ? `
+    const cardHtml = identityEnabled && currentPlotCard ? `
       <div class="foundersLandmarkBody foundersPlotCard" data-testid="plot-card-preview">
         <div class="foundersLabel">Plot card</div>
         <strong>${htmlEscape(currentPlotCard.title || 'Agent Town: Founders Plot')}</strong>
@@ -2981,6 +3116,9 @@
       || 'Clover is watching. No safe action inside your standing order.';
     const recommendation = companionRecommendation || (!realBrainReady ? brainModeCopy(access) : '');
     setText('foremanRecommendation', recommendation);
+    if (recommendation) {
+      trackFoundersEvent('founders.clover_advice_seen', {}, { once: true });
+    }
 
     const toolsLine = (() => {
       if (!brainConfigured) return 'Manual play stays open. Connect a Brain when you want Clover to act as your Foreman.';
@@ -3685,6 +3823,12 @@
   function renderSettlements(state) {
     const node = document.getElementById('governorLedger');
     if (!node) return;
+    const settlementsEnabled = roadmapFeatureEnabled('FEATURE_FOUNDERS_V25_SECOND_SETTLEMENT', state);
+    const regionalEnabled = roadmapFeatureEnabled('FEATURE_FOUNDERS_V35_REGIONAL_GOVERNANCE', state);
+    if (!settlementsEnabled && !regionalEnabled) {
+      node.innerHTML = '';
+      return;
+    }
     const ledger = state?.settlements || {};
     const settlements = Array.isArray(ledger.settlements) ? ledger.settlements : [];
     const gate = ledger.stabilityGate || {};
@@ -3692,12 +3836,12 @@
     const hasSecondSettlement = settlements.some((entry) => entry.settlementId === 'town_2');
     const launchReady = String(expedition.status || '').toUpperCase() === 'READY';
     const criteria = Array.isArray(gate.criteria) ? gate.criteria : [];
-    const regional = state?.regionalNetwork || {};
+    const regional = regionalEnabled ? state?.regionalNetwork || {} : {};
     const regionalGate = regional.gate || {};
     const regionalCriteria = Array.isArray(regionalGate.criteria) ? regionalGate.criteria : [];
-    const routes = Array.isArray(regional.routes) ? regional.routes : [];
-    const contracts = Array.isArray(regional.contracts) ? regional.contracts : [];
-    const issues = Array.isArray(regional.issues) ? regional.issues : [];
+    const routes = regionalEnabled && Array.isArray(regional.routes) ? regional.routes : [];
+    const contracts = regionalEnabled && Array.isArray(regional.contracts) ? regional.contracts : [];
+    const issues = regionalEnabled && Array.isArray(regional.issues) ? regional.issues : [];
     const reserves = regional.sharedReserves || {};
     node.innerHTML = `
       <section class="foundersGovernorSummary" data-testid="governor-ledger-summary">
@@ -3745,7 +3889,7 @@
           `;
         }).join('')}
       </div>
-      <section class="foundersRegionalPanel" data-testid="regional-ledger-panel">
+      ${regionalEnabled ? `<section class="foundersRegionalPanel" data-testid="regional-ledger-panel">
         <div class="foundersSignalHeader">
           <div>
             <div class="foundersLabel">Regional Ledger</div>
@@ -3833,7 +3977,7 @@
             `;
           }).join('')}
         </div>
-      </section>
+      </section>` : ''}
     `;
     const launchButton = document.getElementById('settlerExpeditionLaunchBtn');
     if (launchButton) {
@@ -3995,6 +4139,12 @@
   function renderOperatingModel(state) {
     const node = document.getElementById('operatingModelPanel');
     if (!node) return;
+    const operatingEnabled = roadmapFeatureEnabled('FEATURE_FOUNDERS_V30_OPERATING_MODEL', state);
+    const operatingStyleSharingEnabled = roadmapFeatureEnabled('FEATURE_FOUNDERS_V40_OPERATING_STYLE_SHARING', state);
+    if (!operatingEnabled) {
+      node.innerHTML = '';
+      return;
+    }
     const operating = state?.operatingModel || {};
     const gate = operating.gate || {};
     const criteria = Array.isArray(gate.criteria) ? gate.criteria : [];
@@ -4060,7 +4210,7 @@
           `;
         }).join('')}
       </div>
-      <section class="foundersDrawerSection foundersOperatingShare" data-testid="operating-style-section">
+      ${operatingStyleSharingEnabled ? `<section class="foundersDrawerSection foundersOperatingShare" data-testid="operating-style-section">
         <div class="foundersSignalHeader">
           <div>
             <div class="foundersLabel">Share style</div>
@@ -4070,7 +4220,7 @@
           <button class="btn small" type="button" data-operating-style-generate="1" data-testid="operating-style-generate-btn" ${pendingAction ? 'disabled' : ''}>Generate</button>
         </div>
         ${stylePreviewHtml || '<div class="small" data-testid="operating-style-card-empty">Generate a public operating style when you want to compare town-running ideas.</div>'}
-      </section>
+      </section>` : ''}
       <section class="foundersDrawerSection">
         <div class="foundersLabel">Capability Web</div>
         <div class="foundersOperatingGrid">
@@ -4165,6 +4315,10 @@
   function renderCreatorExtensions(state) {
     const node = document.getElementById('creatorExtensionsPanel');
     if (!node) return;
+    if (!roadmapFeatureEnabled('FEATURE_FOUNDERS_V45_CREATOR_BUILDINGS', state)) {
+      node.innerHTML = '';
+      return;
+    }
     const creator = state?.creatorExtensions || {};
     const catalog = Array.isArray(creator.catalog) ? creator.catalog : [];
     const installed = Array.isArray(creator.installed) ? creator.installed : [];
@@ -4527,6 +4681,9 @@
     const layer = document.getElementById('foundersDrawerLayer');
     const drawerIds = ['contracts', 'foreman', 'settlements', 'operating', 'creator', 'journal', 'signals', 'rewards', 'approvals', 'recap'];
     if (!(layer instanceof HTMLElement)) return;
+    if (activeDrawer && !drawerFeatureEnabled(activeDrawer)) {
+      activeDrawer = '';
+    }
     layer.hidden = !activeDrawer;
     drawerIds.forEach((key) => {
       const node = document.getElementById(`foundersDrawer-${key}`);
@@ -4585,6 +4742,7 @@
   function renderAll() {
     const state = stateData();
     if (!state) return;
+    maybeTrackStateAnalytics(state);
     currentScene = null;
     document.title = `Agent Town — Founders Plot (HQ ${state.progress?.currentLevel || state.plot?.hqLevel || 1})`;
     renderProgress(state);
@@ -4943,6 +5101,9 @@
       body: JSON.stringify({ correction })
     });
     currentState = { ok: true, state: payload.state };
+    trackFoundersEvent('founders.clover_teaching_clicked', {
+      correction: String(correction || '')
+    });
     await syncWorkerScheduler(currentState?.state || null);
     renderAll();
     return payload;
@@ -4955,6 +5116,9 @@
       body: JSON.stringify({ correction })
     });
     currentState = { ok: true, state: payload.state };
+    trackFoundersEvent('founders.clover_teaching_clicked', {
+      correction: String(correction || '')
+    });
     renderAll();
     return payload;
   }
@@ -5163,6 +5327,8 @@
     getLocalForemanRuntimeStatus: () => localForemanRuntimeStatus(currentState?.state?.foreman?.runtime || {}),
     getWorkerSchedulerStatus: () => ({ ...workerSchedulerStatus }),
     getActiveDrawer: () => activeDrawer,
+    getAnalyticsEvents: () => analyticsEvents.slice(),
+    resetAnalyticsForTest,
     openDrawer,
     closeDrawer,
     collectSurfaceMetrics: () => {

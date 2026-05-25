@@ -1367,6 +1367,7 @@ class FoundersPlotThreeStage {
 
   info() {
     const canvas = this.renderer.domElement;
+    const uptimeMs = Math.max(1, this.now() - this.startTime);
     const targetMap = new Map();
     this.pickables.forEach((object) => {
       const data = object.userData || {};
@@ -1424,6 +1425,10 @@ class FoundersPlotThreeStage {
         selectedDetail: this.coverageInfo.selectedDetail
       },
       renderCount: this.renderCount,
+      performance: {
+        uptimeMs,
+        averageFps: Math.round((this.renderCount / (uptimeMs / 1000)) * 10) / 10
+      },
       canvasWidth: canvas.width,
       canvasHeight: canvas.height,
       clientWidth: canvas.clientWidth,

@@ -1,8 +1,8 @@
 # Founders Plot Roadmap Slice Plan: V1.6 to V4+
 
-Status: active implementation plan
-Branch: `codex/founders-plot-threejs-playable-slice`
-Date: 2026-05-25
+Status: roadmap alignment plan with gated prototypes
+Branch: `codex/founders-plot-roadmap-v15-v45-completion`
+Date: 2026-05-26
 
 ## Scope
 
@@ -12,21 +12,27 @@ implementation slices for the current Three.js branch.
 The roadmap rule remains unchanged: Three.js renders the world surface; server
 state and `et.plot.*` tools remain the gameplay authority.
 
+Future slices in this document are prototype baselines. They must stay hidden
+from normal V1.5 players until the matching feature flag and release gate are
+approved. With flags off, future tools, future mutation endpoints, future
+Three.js objects, future state coverage domains, and future drawers/cards must
+not appear.
+
 ## Slice Order
 
-| Slice | Roadmap Layer | Implementation Target | Status |
-| --- | --- | --- | --- |
-| V1.4.5 Account Vault / Brain Restore | Return continuity and trust | Browser-encrypted Brain vault, explicit unlock restore, agent backup summary, wrong-wallet denial, and fresh-browser restore into Real Clover. | Implemented and validated in this branch. |
-| V1.6 Civic Projects and Short Scenarios | Scenario preparation | Storm Prep at Public Square with progress, soft miss, recap, Three.js civic project anchor, and Clover pressure copy. | Implemented and validated in this branch. |
-| V1.7 Town Identity, Pride, and Plot Cards | Aesthetic/civic identity | Public Square style choice, visible Three.js landmark variant, public-safe plot card export, postcard capture, camera flyover state, and cosmetic-only persistence. | Implemented and validated in this branch. |
-| V2.0 Persistent Foreman Governance | Delegation governance | Time-boxed Foreman leases, revoke/pause, Exception Inbox, scene anchors, Morning Brief receipts, and bounded while-away collect-ready help proven through closed-page server sweep coverage. | Implemented with a persistent one-town collect-ready routine in this branch. |
-| V2.1 Doctrine Lite and Teaching UI | Preference teaching | 2-4 reversible Foreman preferences with deterministic suggestion ranking and recap receipts. | Implemented and validated in this branch. |
-| V2.5 Settler Expedition / Second Settlement | Multi-settlement delegation | Stability gate, second settlement shard, Governor Ledger, independent inventories/events. | Implemented and validating in this branch. |
-| V3.0 Operating Model and Capability Web | Operating model | Charter choice, capability unlocks, contract deck weighting, visible banners/signage. | Implemented and validating in this branch. |
-| V3.1 Specialist Foremen | Staffing | Two specialist roles, domain-scoped tools, conflict approvals, pause/reassign. | Implemented and validating in this branch. |
-| V3.5 Settlement Network / Regional Governance | Regional allocation | Supply routes, regional contracts, regional map nodes, route visuals, jump-to-town camera focus, regional ledger. | Implemented and validating in this branch. |
-| V4.0 Shareable Operating Styles | Social operating identity | Public-safe operating-style export, public lookup, and inspiration-only comparison. | Implemented and validating in this branch. |
-| V4.5 Creator Buildings and District Experiences | Curated extension | Creator building manifest validation, typed tools/state, curated local import governance, asset-governance provenance, credit-only creator model, uninstall/rollback. | Implemented and validating in this branch with one curated local creator pack. |
+| Slice | Roadmap Layer | product_stage | player_visible_by_default | feature_flag | release_gate_required | Implementation Target |
+| --- | --- | --- | --- | --- | --- | --- |
+| V1.4.5 Account Vault / Brain Restore | Return continuity and trust | gated_experimental | false | n/a, release-gated by Brain Vault security gate | true | Browser-encrypted Brain vault, explicit unlock restore, agent backup summary, wrong-wallet denial, and fresh-browser restore into Real Clover. |
+| V1.6 Civic Projects and Short Scenarios | Scenario preparation | gated_experimental | false | `FEATURE_FOUNDERS_V16_SCENARIOS` | true | Storm Prep at Public Square with progress, soft miss, recap, Three.js civic project anchor, and Clover pressure copy. |
+| V1.7 Town Identity, Pride, and Plot Cards | Aesthetic/civic identity | gated_experimental | false | `FEATURE_FOUNDERS_V17_TOWN_IDENTITY` | true | Public Square style choice, visible Three.js landmark variant, public-safe plot card export, postcard capture, camera flyover state, and cosmetic-only persistence. |
+| V2.0 Persistent Foreman Governance | Delegation governance | prototype | false | `FEATURE_FOUNDERS_V20_PERSISTENT_FOREMAN` | true | Time-boxed Foreman leases, revoke/pause, Exception Inbox, scene anchors, Morning Brief receipts, and bounded while-away collect-ready help proven through closed-page server sweep coverage. |
+| V2.1 Doctrine Lite and Teaching UI | Preference teaching | prototype | false | `FEATURE_FOUNDERS_V21_DOCTRINE_LITE` | true | 2-4 reversible Foreman preferences with deterministic suggestion ranking and recap receipts. |
+| V2.5 Settler Expedition / Second Settlement | Multi-settlement delegation | prototype | false | `FEATURE_FOUNDERS_V25_SECOND_SETTLEMENT` | true | Stability gate, second settlement shard, Governor Ledger, independent inventories/events. |
+| V3.0 Operating Model and Capability Web | Operating model | prototype | false | `FEATURE_FOUNDERS_V30_OPERATING_MODEL` | true | Charter choice, capability unlocks, contract deck weighting, visible banners/signage. |
+| V3.1 Specialist Foremen | Staffing | prototype | false | `FEATURE_FOUNDERS_V31_SPECIALISTS` | true | Two specialist roles, domain-scoped tools, conflict approvals, pause/reassign. |
+| V3.5 Settlement Network / Regional Governance | Regional allocation | prototype | false | `FEATURE_FOUNDERS_V35_REGIONAL_GOVERNANCE` | true | Supply routes, regional contracts, regional map nodes, route visuals, jump-to-town camera focus, regional ledger. |
+| V4.0 Shareable Operating Styles | Social operating identity | prototype | false | `FEATURE_FOUNDERS_V40_OPERATING_STYLE_SHARING` | true | Public-safe operating-style export, public lookup, and inspiration-only comparison. |
+| V4.5 Creator Buildings and District Experiences | Curated extension | prototype | false | `FEATURE_FOUNDERS_V45_CREATOR_BUILDINGS` | true | Creator building manifest validation, typed tools/state, curated local import governance, asset-governance provenance, credit-only creator model, uninstall/rollback. |
 
 ## Current Next Hours Of Gameplay
 
@@ -288,27 +294,29 @@ feel like:
 ### V5+ Boundary
 
 - The roadmap's V5+ section is intentionally not an implementation slice. It
-  names possible future directions such as agent-managed districts,
-  inter-agent economies, public works, reputation, services marketplace, world
-  events, and cross-framework participation.
+  names a staged future ladder: V5.0 World Layer / Civ Map, V5.1 Public
+  Districts / Social Presence, V5.2 Agent Services / Civic Marketplace, V5.3
+  World Events / Public Works, V5.4 Controlled Free-Play Sandbox Districts,
+  and V6+ Agent Civilization.
 - Do not enter V5+ from this goal. The roadmap guardrails require stronger
   evidence first: single-town retention, trusted persistent Foreman behavior,
   understandable multi-town governance, safe public/shareable operating style,
   and identity/reputation security review.
+- Free-play is a late sandbox milestone, not the next production promise.
 - The next responsible V5+ action is a security/product discovery spec, not
   gameplay implementation.
 
 ## V2 Boundary
 
-V1.4.5 account/wallet Brain vault restore is implemented as the trust baseline
+V1.4.5 account/wallet Brain vault restore has a gated implementation baseline
 for returning players. V2.0 Foreman governance is implemented for in-session
 routine help, leases, revocation, exceptions, and one persistent while-away
 collect-ready routine. This still does not mean Clover has broad off-session
 authority.
 
-Doctrine Lite is now implemented as player-visible preference teaching, while
+Doctrine Lite has a gated prototype baseline as player-visible preference teaching, while
 remaining separate from permissions and leases. V2.5 Settler Expedition /
-Second Settlement now adds the first multi-settlement shard, but only after the
+Second Settlement has a gated prototype for the first multi-settlement shard, but only after the
 single-settlement governance gate is satisfied:
 
 - Town 1 and Town 2 inventories/events stay isolated;
@@ -316,7 +324,7 @@ single-settlement governance gate is satisfied:
   founding tasks;
 - the Three.js scene has a Governor Ledger anchor and `STATE:settlements`
   coverage;
-V3.0 Operating Model is now implemented as a Ridge-Outpost-gated Town Charter
+V3.0 Operating Model has a gated prototype as a Ridge-Outpost-gated Town Charter
 plus a small Capability Web. It deliberately does not broaden background
 Foreman autonomy:
 
@@ -326,7 +334,7 @@ Foreman autonomy:
 - capability nodes remain narrow operating-model affordances, not a science
   tree.
 
-V3.1 Specialist Foremen is now implemented as staffing lanes under Clover rather
+V3.1 Specialist Foremen has a gated prototype as staffing lanes under Clover rather
 than separate autonomous Brains:
 
 - Builder Foreman and Quartermaster each have explicit eligible domains and
@@ -337,7 +345,7 @@ than separate autonomous Brains:
 - `STATE:specialists` keeps the staffing layer visible in the Three.js state
   coverage.
 
-V3.5 Regional Governance is now implemented as regional allocation over bounded
+V3.5 Regional Governance has a gated prototype as regional allocation over bounded
 routes, not as a free shared inventory:
 
 - the Ridge Supply Route has exact source/destination towns and a fixed
@@ -347,7 +355,7 @@ routes, not as a free shared inventory:
 - `STATE:regional-network` and Three.js route links keep regional state visible
   from the Governor Ledger.
 
-V4.0 Shareable Operating Styles is now implemented as a public-safe social
+V4.0 Shareable Operating Styles has a gated prototype as a public-safe social
 identity export, not as template import authority:
 
 - style cards summarize how a town runs without private Brain/config/log data;
@@ -355,7 +363,7 @@ identity export, not as template import authority:
 - imported cards are comparison/inspiration only and cannot grant assets,
   resources, permissions, or Capability Web nodes.
 
-V4.5 Creator Buildings is now implemented as a curated extension baseline, not
+V4.5 Creator Buildings has a gated prototype as a curated extension baseline, not
 as an open creator marketplace:
 
 - approved manifests are validated before appearing in the catalog;

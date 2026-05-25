@@ -5059,7 +5059,10 @@ async function showDistrict(district) {
   }
 
   if (safeDistrict === 'founders-plot') {
-    openRouteInModalFrame('/founders-plot?embed=1&presentation=fullscreen', 'Founders Plot', {
+    const foundersParams = new URLSearchParams('embed=1&presentation=fullscreen');
+    const requestedFeatureFlags = new URLSearchParams(window.location.search || '').get('foundersFeatureFlags');
+    if (requestedFeatureFlags) foundersParams.set('foundersFeatureFlags', requestedFeatureFlags);
+    openRouteInModalFrame(`/founders-plot?${foundersParams.toString()}`, 'Founders Plot', {
       presentation: 'fullscreen'
     });
     return;

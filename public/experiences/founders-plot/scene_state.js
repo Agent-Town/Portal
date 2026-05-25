@@ -90,6 +90,24 @@
     { key: 'approvals', label: 'Approvals', icon: 'approval' },
     { key: 'recap', label: 'Morning brief', icon: 'sun' }
   ];
+  const DRAWER_FEATURES = {
+    settlements: 'FEATURE_FOUNDERS_V25_SECOND_SETTLEMENT',
+    operating: 'FEATURE_FOUNDERS_V30_OPERATING_MODEL',
+    creator: 'FEATURE_FOUNDERS_V45_CREATOR_BUILDINGS'
+  };
+  const COVERAGE_FEATURES = {
+    'civic-scenarios': 'FEATURE_FOUNDERS_V16_SCENARIOS',
+    'town-identity': 'FEATURE_FOUNDERS_V17_TOWN_IDENTITY',
+    'town-postcards': 'FEATURE_FOUNDERS_V17_TOWN_IDENTITY',
+    settlements: 'FEATURE_FOUNDERS_V25_SECOND_SETTLEMENT',
+    'regional-network': 'FEATURE_FOUNDERS_V35_REGIONAL_GOVERNANCE',
+    'operating-model': 'FEATURE_FOUNDERS_V30_OPERATING_MODEL',
+    'creator-extensions': 'FEATURE_FOUNDERS_V45_CREATOR_BUILDINGS',
+    'foreman-governance': 'FEATURE_FOUNDERS_V20_PERSISTENT_FOREMAN',
+    'foreman-persistent': 'FEATURE_FOUNDERS_V20_PERSISTENT_FOREMAN',
+    'foreman-doctrine': 'FEATURE_FOUNDERS_V21_DOCTRINE_LITE',
+    'foreman-specialists': 'FEATURE_FOUNDERS_V31_SPECIALISTS'
+  };
   const BADGE_PRIORITY = {
     approval: 100,
     restart: 96,
@@ -130,6 +148,11 @@
   function number(value, fallback = 0) {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  function roadmapFeatureEnabled(view, featureKey = '') {
+    if (!featureKey) return true;
+    return view?.featureFlags?.[featureKey] === true;
   }
 
   function gridCoordForPoint(x, y) {
@@ -1516,9 +1539,7 @@
       }
     ];
 
-    return {
-      version: 'founders-plot-state-coverage-v1',
-      domains: [
+    const domains = [
         { id: 'plot-resources', label: 'Plot resources and storage caps', tier: 'canvas-hud', source: 'plot.inventory + plot.storageCaps' },
         { id: 'hq-progress', label: 'Headquarters level progress', tier: 'canvas-hud', source: 'progress.next' },
         { id: 'pads-buildings-jobs', label: 'Pads, buildings, production jobs, outputs, timers', tier: 'world-object', source: 'pads + buildings + jobs' },
@@ -1547,9 +1568,15 @@
         { id: 'standing-order', label: 'Foreman standing order', tier: 'selected-object-detail', source: 'foreman.standingOrder' },
         { id: 'unlocks-blocked', label: 'Unlocks and blocked-state indicators', tier: 'selected-object-detail', source: 'unlocks + policy + currentGoal' },
         { id: 'selected-object', label: 'Selected object detail summary', tier: 'selected-object-detail', source: 'selected object + world object' }
-      ],
+      ];
+    const featureAllowed = (domainId = '') => roadmapFeatureEnabled(view, COVERAGE_FEATURES[String(domainId || '')]);
+    const filteredAnchors = anchors.filter((anchor) => featureAllowed(anchor.domainId));
+
+    return {
+      version: 'founders-plot-state-coverage-v1',
+      domains: domains.filter((domain) => featureAllowed(domain.id)),
       hud,
-      anchors,
+      anchors: filteredAnchors,
       selectedDetail: selectedObjectDetail(view, { objects, selectedObjectId, goalObjectId }),
       retainedDomControls: [
         'drawer bodies',
@@ -1564,7 +1591,7 @@
   function drawers(view, options) {
     const badges = drawerBadges(view);
     const activeDrawer = String(options?.activeDrawer || '');
-    return DRAWER_CONFIG.map((entry) => ({
+    return DRAWER_CONFIG.filter((entry) => roadmapFeatureEnabled(view, DRAWER_FEATURES[entry.key])).map((entry) => ({
       key: entry.key,
       label: entry.label,
       icon: entry.icon,
@@ -1617,6 +1644,13 @@
     const openExceptions = Array.isArray(view?.foreman?.governance?.openExceptions) ? view.foreman.governance.openExceptions : [];
     const pendingDecisions = pendingApprovals.length + openExceptions.length;
     const unseenRecap = number(view?.recap?.unseenCount || 0);
+    const scenariosEnabled = roadmapFeatureEnabled(view, 'FEATURE_FOUNDERS_V16_SCENARIOS');
+    const identityEnabled = roadmapFeatureEnabled(view, 'FEATURE_FOUNDERS_V17_TOWN_IDENTITY');
+    const settlementsEnabled = roadmapFeatureEnabled(view, 'FEATURE_FOUNDERS_V25_SECOND_SETTLEMENT');
+    const operatingEnabled = roadmapFeatureEnabled(view, 'FEATURE_FOUNDERS_V30_OPERATING_MODEL');
+    const regionalEnabled = roadmapFeatureEnabled(view, 'FEATURE_FOUNDERS_V35_REGIONAL_GOVERNANCE');
+    const creatorEnabled = roadmapFeatureEnabled(view, 'FEATURE_FOUNDERS_V45_CREATOR_BUILDINGS');
+    const settlementWorldEnabled = settlementsEnabled || regionalEnabled;
 
     const hqBuilding = Array.isArray(view?.buildings)
       ? view.buildings.find((entry) => upper(entry?.type) === 'HQ')
@@ -1766,9 +1800,9 @@
     });
 
     const publicSquareLevel = number(view?.landmarks?.publicSquare?.level || 0);
-    const publicSquareStyle = view?.landmarks?.publicSquare?.style || null;
-    const publicSquareStyleLabel = view?.landmarks?.publicSquare?.styleLabel || publicSquareStyle?.label || '';
-    const charterLabel = view?.operatingModel?.charter?.label || '';
+    const publicSquareStyle = identityEnabled ? view?.landmarks?.publicSquare?.style || null : null;
+    const publicSquareStyleLabel = identityEnabled ? view?.landmarks?.publicSquare?.styleLabel || publicSquareStyle?.label || '' : '';
+    const charterLabel = operatingEnabled ? view?.operatingModel?.charter?.label || '' : '';
     const townOpportunityActive = !!view?.townOpportunity?.active?.opportunityId;
     const publicSquareState = townOpportunityActive
       ? 'READY'
@@ -1802,9 +1836,9 @@
           ? { type: 'identity', label: charterLabel, displayLabel: 'Charter', tone: 'good', overlayRole: 'ambient', overlayWeight: 'quiet', showWhenSelected: true }
           : publicSquareStyleLabel
           ? { type: 'identity', label: publicSquareStyleLabel, displayLabel: publicSquareStyleLabel.replace(/\s+Square$/i, ''), tone: 'good', overlayRole: 'ambient', overlayWeight: 'quiet', showWhenSelected: true }
-          : publicSquareLevel > 0
+          : identityEnabled && publicSquareLevel > 0
           ? { type: 'charm', label: 'Choose town style', displayLabel: 'Style', tone: 'neutral', overlayRole: 'status', overlayWeight: 'medium', showWhenSelected: true }
-          : { type: 'civic', label: 'Civic project', displayLabel: 'Civic', tone: 'neutral', overlayRole: 'ambient', overlayWeight: 'quiet', showWhenSelected: true }
+          : { type: 'civic', label: publicSquareLevel > 0 ? 'Welcome Sign raised' : 'Civic project', displayLabel: publicSquareLevel > 0 ? 'Square' : 'Civic', tone: 'neutral', overlayRole: 'ambient', overlayWeight: 'quiet', showWhenSelected: true }
       ],
       timer: null,
       primaryAction: squareAction,
@@ -1813,45 +1847,47 @@
       testId: 'founders-stage-object-PUBLIC_SQUARE'
     });
 
-    const activeScenario = view?.scenarios?.active || null;
-    const scenarioOffers = Array.isArray(view?.scenarios?.offers) ? view.scenarios.offers : [];
-    const scenarioState = activeScenario
-      ? activeScenario.status === 'COMPLETED'
-        ? 'READY'
-        : 'PRODUCING'
-      : scenarioOffers.length > 0
-        ? 'BUILDABLE'
-        : 'IDLE';
-    const scenarioAction = objectPrimaryAction('SCENARIO_SITE', view, null);
-    objects.push({
-      id: 'SCENARIO_SITE',
-      kind: 'object',
-      worldObjectId: 'scenario_site',
-      label: activeScenario?.title || scenarioOffers[0]?.title || 'Civic Project Site',
-      state: scenarioState,
-      x: SPECIAL_OBJECT_LAYOUT.SCENARIO_SITE.x,
-      y: SPECIAL_OBJECT_LAYOUT.SCENARIO_SITE.y,
-      z: SPECIAL_OBJECT_LAYOUT.SCENARIO_SITE.z,
-      assetId: 'founders_plot_public_square_v1_4_2',
-      badges: [
-        activeScenario
-          ? { type: 'opportunity', label: `${number(activeScenario.completedTasks)} / ${number(activeScenario.minCompletedTasks)} prep`, displayLabel: 'Prep', tone: 'good', overlayRole: 'status', overlayWeight: 'strong', alwaysVisible: true }
-          : scenarioOffers.length > 0
-            ? { type: 'civic', label: 'Scenario available', displayLabel: 'Event', tone: 'neutral', overlayRole: 'status', overlayWeight: 'medium', alwaysVisible: true }
-            : { type: 'civic', label: 'Civic project site', displayLabel: 'Civic', tone: 'neutral', overlayRole: 'ambient', overlayWeight: 'quiet', showWhenSelected: true }
-      ],
-      timer: activeScenario?.dueAtMs ? {
-        startedAtMs: number(activeScenario.startedAtMs),
-        label: 'Scenario window',
-        endsAtMs: number(activeScenario.dueAtMs),
-        status: 'RUNNING',
-        progress: clamp((Date.now() - number(activeScenario.startedAtMs)) / Math.max(1, number(activeScenario.dueAtMs) - number(activeScenario.startedAtMs)), 0, 1)
-      } : null,
-      primaryAction: scenarioAction,
-      ariaLabel: `Civic project site, ${stateLabel(scenarioState)}, ${scenarioAction.label}.`,
-      drawerKey: 'signals',
-      testId: 'founders-stage-object-SCENARIO_SITE'
-    });
+    if (scenariosEnabled) {
+      const activeScenario = view?.scenarios?.active || null;
+      const scenarioOffers = Array.isArray(view?.scenarios?.offers) ? view.scenarios.offers : [];
+      const scenarioState = activeScenario
+        ? activeScenario.status === 'COMPLETED'
+          ? 'READY'
+          : 'PRODUCING'
+        : scenarioOffers.length > 0
+          ? 'BUILDABLE'
+          : 'IDLE';
+      const scenarioAction = objectPrimaryAction('SCENARIO_SITE', view, null);
+      objects.push({
+        id: 'SCENARIO_SITE',
+        kind: 'object',
+        worldObjectId: 'scenario_site',
+        label: activeScenario?.title || scenarioOffers[0]?.title || 'Civic Project Site',
+        state: scenarioState,
+        x: SPECIAL_OBJECT_LAYOUT.SCENARIO_SITE.x,
+        y: SPECIAL_OBJECT_LAYOUT.SCENARIO_SITE.y,
+        z: SPECIAL_OBJECT_LAYOUT.SCENARIO_SITE.z,
+        assetId: 'founders_plot_public_square_v1_4_2',
+        badges: [
+          activeScenario
+            ? { type: 'opportunity', label: `${number(activeScenario.completedTasks)} / ${number(activeScenario.minCompletedTasks)} prep`, displayLabel: 'Prep', tone: 'good', overlayRole: 'status', overlayWeight: 'strong', alwaysVisible: true }
+            : scenarioOffers.length > 0
+              ? { type: 'civic', label: 'Scenario available', displayLabel: 'Event', tone: 'neutral', overlayRole: 'status', overlayWeight: 'medium', alwaysVisible: true }
+              : { type: 'civic', label: 'Civic project site', displayLabel: 'Civic', tone: 'neutral', overlayRole: 'ambient', overlayWeight: 'quiet', showWhenSelected: true }
+        ],
+        timer: activeScenario?.dueAtMs ? {
+          startedAtMs: number(activeScenario.startedAtMs),
+          label: 'Scenario window',
+          endsAtMs: number(activeScenario.dueAtMs),
+          status: 'RUNNING',
+          progress: clamp((Date.now() - number(activeScenario.startedAtMs)) / Math.max(1, number(activeScenario.dueAtMs) - number(activeScenario.startedAtMs)), 0, 1)
+        } : null,
+        primaryAction: scenarioAction,
+        ariaLabel: `Civic project site, ${stateLabel(scenarioState)}, ${scenarioAction.label}.`,
+        drawerKey: 'signals',
+        testId: 'founders-stage-object-SCENARIO_SITE'
+      });
+    }
 
     const journalAction = objectPrimaryAction('JOURNAL', view, null);
     const journalState = unseenRecap > 0 ? 'READY' : 'IDLE';
@@ -1901,81 +1937,83 @@
       testId: 'founders-stage-object-APPROVAL_INBOX'
     });
 
-    const settlementLedger = view?.settlements || {};
-    const settlementCount = Array.isArray(settlementLedger.settlements) ? settlementLedger.settlements.length : 1;
-    const expeditionStatus = upper(settlementLedger?.expedition?.status || '');
-    const regionalRoutes = Array.isArray(view?.regionalNetwork?.routes) ? view.regionalNetwork.routes : [];
-    const regionalIssues = number(view?.regionalNetwork?.pendingIssueCount || 0);
-    const regionalActive = regionalRoutes.some((route) => ['ACTIVE', 'SHORTAGE'].includes(upper(route?.status || '')));
-    const regionalReady = view?.regionalNetwork?.gate?.ready === true && regionalRoutes.some((route) => upper(route?.status || '') === 'READY');
-    const ledgerState = regionalIssues > 0
-      ? 'BLOCKED'
-      : expeditionStatus === 'READY'
-      ? 'READY'
-      : expeditionStatus === 'LAUNCHED' || regionalActive
-        ? 'PRODUCING'
-        : 'IDLE';
-    const ledgerAction = objectPrimaryAction('GOVERNOR_LEDGER', view, null);
-    objects.push({
-      id: 'GOVERNOR_LEDGER',
-      kind: 'object',
-      worldObjectId: 'governor_ledger',
-      label: 'Governor Ledger',
-      state: ledgerState,
-      x: SPECIAL_OBJECT_LAYOUT.GOVERNOR_LEDGER.x,
-      y: SPECIAL_OBJECT_LAYOUT.GOVERNOR_LEDGER.y,
-      z: SPECIAL_OBJECT_LAYOUT.GOVERNOR_LEDGER.z,
-      assetId: 'founders_plot_journal_trigger_v1_4_2',
-      badges: [
-        regionalIssues > 0
-          ? { type: 'approval', label: `${regionalIssues} regional issue${regionalIssues === 1 ? '' : 's'}`, displayLabel: `${regionalIssues}`, tone: 'warn', overlayRole: 'status', overlayWeight: 'strong', alwaysVisible: true }
-          : regionalReady
-            ? { type: 'opportunity', label: 'Regional route ready', displayLabel: 'Route', tone: 'good', overlayRole: 'status', overlayWeight: 'strong', alwaysVisible: true }
-            : expeditionStatus === 'READY'
-          ? { type: 'opportunity', label: 'Settler Expedition ready', displayLabel: 'Expedition', tone: 'good', overlayRole: 'status', overlayWeight: 'strong', alwaysVisible: true }
-          : expeditionStatus === 'LAUNCHED' || regionalActive
-            ? { type: 'civic', label: `${settlementCount} settlements`, displayLabel: `${settlementCount} towns`, tone: 'good', overlayRole: 'status', overlayWeight: 'medium', showWhenSelected: true }
-            : { type: 'civic', label: 'Governor Ledger', displayLabel: 'Ledger', tone: 'neutral', overlayRole: 'ambient', overlayWeight: 'quiet', showWhenSelected: true }
-      ],
-      timer: null,
-      primaryAction: ledgerAction,
-      ariaLabel: `Governor Ledger, ${stateLabel(ledgerState)}, ${ledgerAction.label}.`,
-      drawerKey: 'settlements',
-      testId: 'founders-stage-object-GOVERNOR_LEDGER'
-    });
+    if (settlementWorldEnabled) {
+      const settlementLedger = view?.settlements || {};
+      const settlementCount = Array.isArray(settlementLedger.settlements) ? settlementLedger.settlements.length : 1;
+      const expeditionStatus = upper(settlementLedger?.expedition?.status || '');
+      const regionalRoutes = regionalEnabled && Array.isArray(view?.regionalNetwork?.routes) ? view.regionalNetwork.routes : [];
+      const regionalIssues = regionalEnabled ? number(view?.regionalNetwork?.pendingIssueCount || 0) : 0;
+      const regionalActive = regionalRoutes.some((route) => ['ACTIVE', 'SHORTAGE'].includes(upper(route?.status || '')));
+      const regionalReady = view?.regionalNetwork?.gate?.ready === true && regionalRoutes.some((route) => upper(route?.status || '') === 'READY');
+      const ledgerState = regionalIssues > 0
+        ? 'BLOCKED'
+        : expeditionStatus === 'READY'
+        ? 'READY'
+        : expeditionStatus === 'LAUNCHED' || regionalActive
+          ? 'PRODUCING'
+          : 'IDLE';
+      const ledgerAction = objectPrimaryAction('GOVERNOR_LEDGER', view, null);
+      objects.push({
+        id: 'GOVERNOR_LEDGER',
+        kind: 'object',
+        worldObjectId: 'governor_ledger',
+        label: 'Governor Ledger',
+        state: ledgerState,
+        x: SPECIAL_OBJECT_LAYOUT.GOVERNOR_LEDGER.x,
+        y: SPECIAL_OBJECT_LAYOUT.GOVERNOR_LEDGER.y,
+        z: SPECIAL_OBJECT_LAYOUT.GOVERNOR_LEDGER.z,
+        assetId: 'founders_plot_journal_trigger_v1_4_2',
+        badges: [
+          regionalIssues > 0
+            ? { type: 'approval', label: `${regionalIssues} regional issue${regionalIssues === 1 ? '' : 's'}`, displayLabel: `${regionalIssues}`, tone: 'warn', overlayRole: 'status', overlayWeight: 'strong', alwaysVisible: true }
+            : regionalReady
+              ? { type: 'opportunity', label: 'Regional route ready', displayLabel: 'Route', tone: 'good', overlayRole: 'status', overlayWeight: 'strong', alwaysVisible: true }
+              : expeditionStatus === 'READY'
+            ? { type: 'opportunity', label: 'Settler Expedition ready', displayLabel: 'Expedition', tone: 'good', overlayRole: 'status', overlayWeight: 'strong', alwaysVisible: true }
+            : expeditionStatus === 'LAUNCHED' || regionalActive
+              ? { type: 'civic', label: `${settlementCount} settlements`, displayLabel: `${settlementCount} towns`, tone: 'good', overlayRole: 'status', overlayWeight: 'medium', showWhenSelected: true }
+              : { type: 'civic', label: 'Governor Ledger', displayLabel: 'Ledger', tone: 'neutral', overlayRole: 'ambient', overlayWeight: 'quiet', showWhenSelected: true }
+        ],
+        timer: null,
+        primaryAction: ledgerAction,
+        ariaLabel: `Governor Ledger, ${stateLabel(ledgerState)}, ${ledgerAction.label}.`,
+        drawerKey: 'settlements',
+        testId: 'founders-stage-object-GOVERNOR_LEDGER'
+      });
 
-    if (settlementCount > 1 || regionalRoutes.length > 0) {
-      const settlements = Array.isArray(settlementLedger.settlements) ? settlementLedger.settlements : [];
-      for (const settlement of settlements.slice(0, 2)) {
-        const settlementId = String(settlement?.settlementId || settlement?.id || '');
-        const nodeId = settlementId === 'town_2' ? 'SETTLEMENT_NODE_TOWN_2' : 'SETTLEMENT_NODE_TOWN_1';
-        const layout = SPECIAL_OBJECT_LAYOUT[nodeId] || SPECIAL_OBJECT_LAYOUT.SETTLEMENT_NODE_TOWN_1;
-        const active = String(settlementLedger.activeSettlementId || '') === settlementId;
-        const nodeAction = objectPrimaryAction(nodeId, view, null);
-        objects.push({
-          id: nodeId,
-          kind: 'object',
-          worldObjectId: `settlement_node_${settlementId || 'town'}`,
-          label: settlement?.name || (settlementId === 'town_2' ? 'Ridge Outpost' : 'Founders Plot'),
-          state: active ? 'READY' : 'IDLE',
-          x: layout.x,
-          y: layout.y,
-          z: layout.z,
-          scale: active ? 0.58 : 0.5,
-          assetId: settlementId === 'town_2' ? 'founders_plot_supply_crates_prop_v1_4_4' : 'founders_plot_journal_trigger_v1_4_2',
-          badges: [
-            active
-              ? { type: 'civic', label: 'Camera focus', displayLabel: 'Focus', tone: 'good', overlayRole: 'status', overlayWeight: 'medium', alwaysVisible: true }
-              : { type: 'civic', label: 'Settlement node', displayLabel: 'Town', tone: 'neutral', overlayRole: 'ambient', overlayWeight: 'quiet', showWhenSelected: true }
-          ],
-          attention: active ? 'recommended' : '',
-          timer: null,
-          primaryAction: nodeAction,
-          ariaLabel: `${settlement?.name || 'Settlement node'}, ${active ? 'camera focus' : 'regional map node'}, ${nodeAction.label}.`,
-          drawerKey: 'settlements',
-          selectionKey: `settlement:${settlementId}`,
-          testId: `founders-stage-object-${nodeId}`
-        });
+      if (settlementCount > 1 || regionalRoutes.length > 0) {
+        const settlements = Array.isArray(settlementLedger.settlements) ? settlementLedger.settlements : [];
+        for (const settlement of settlements.slice(0, 2)) {
+          const settlementId = String(settlement?.settlementId || settlement?.id || '');
+          const nodeId = settlementId === 'town_2' ? 'SETTLEMENT_NODE_TOWN_2' : 'SETTLEMENT_NODE_TOWN_1';
+          const layout = SPECIAL_OBJECT_LAYOUT[nodeId] || SPECIAL_OBJECT_LAYOUT.SETTLEMENT_NODE_TOWN_1;
+          const active = String(settlementLedger.activeSettlementId || '') === settlementId;
+          const nodeAction = objectPrimaryAction(nodeId, view, null);
+          objects.push({
+            id: nodeId,
+            kind: 'object',
+            worldObjectId: `settlement_node_${settlementId || 'town'}`,
+            label: settlement?.name || (settlementId === 'town_2' ? 'Ridge Outpost' : 'Founders Plot'),
+            state: active ? 'READY' : 'IDLE',
+            x: layout.x,
+            y: layout.y,
+            z: layout.z,
+            scale: active ? 0.58 : 0.5,
+            assetId: settlementId === 'town_2' ? 'founders_plot_supply_crates_prop_v1_4_4' : 'founders_plot_journal_trigger_v1_4_2',
+            badges: [
+              active
+                ? { type: 'civic', label: 'Camera focus', displayLabel: 'Focus', tone: 'good', overlayRole: 'status', overlayWeight: 'medium', alwaysVisible: true }
+                : { type: 'civic', label: 'Settlement node', displayLabel: 'Town', tone: 'neutral', overlayRole: 'ambient', overlayWeight: 'quiet', showWhenSelected: true }
+            ],
+            attention: active ? 'recommended' : '',
+            timer: null,
+            primaryAction: nodeAction,
+            ariaLabel: `${settlement?.name || 'Settlement node'}, ${active ? 'camera focus' : 'regional map node'}, ${nodeAction.label}.`,
+            drawerKey: 'settlements',
+            selectionKey: `settlement:${settlementId}`,
+            testId: `founders-stage-object-${nodeId}`
+          });
+        }
       }
     }
 
@@ -2012,7 +2050,7 @@
       testId: 'founders-stage-object-FOREMAN_HUT'
     });
 
-    const creatorInstalled = Array.isArray(view?.creatorExtensions?.installed) ? view.creatorExtensions.installed : [];
+    const creatorInstalled = creatorEnabled && Array.isArray(view?.creatorExtensions?.installed) ? view.creatorExtensions.installed : [];
     const creatorKiosk = creatorInstalled.find((entry) => entry?.active === true || upper(entry?.status) === 'ACTIVE') || creatorInstalled[0] || null;
     if (creatorKiosk) {
       const creatorActive = creatorKiosk.active === true || upper(creatorKiosk.status) === 'ACTIVE';
@@ -2104,6 +2142,7 @@
   }
 
   function regionalRouteVisuals(view, objects = []) {
+    if (!roadmapFeatureEnabled(view, 'FEATURE_FOUNDERS_V35_REGIONAL_GOVERNANCE')) return [];
     const homeNode = objectForId(objects, 'SETTLEMENT_NODE_TOWN_1') || objectForId(objects, 'HQ') || objectForId(objects, 'PUBLIC_SQUARE');
     const ridgeNode = objectForId(objects, 'SETTLEMENT_NODE_TOWN_2') || objectForId(objects, 'GOVERNOR_LEDGER');
     if (!homeNode || !ridgeNode) return [];
@@ -2125,15 +2164,30 @@
   }
 
   function regionalMapState(view, objects = []) {
+    const settlementsEnabled = roadmapFeatureEnabled(view, 'FEATURE_FOUNDERS_V25_SECOND_SETTLEMENT');
+    const regionalEnabled = roadmapFeatureEnabled(view, 'FEATURE_FOUNDERS_V35_REGIONAL_GOVERNANCE');
+    if (!settlementsEnabled && !regionalEnabled) {
+      return {
+        version: 'founders-plot-regional-map-disabled-v1',
+        enabled: false,
+        activeSettlementId: 'town_1',
+        cameraFocusObjectId: objectForId(objects, 'HQ') ? 'HQ' : 'PUBLIC_SQUARE',
+        settlementNodes: [],
+        routeCount: 0,
+        issueCount: 0,
+        transitionLabel: ''
+      };
+    }
     const settlementLedger = view?.settlements || {};
     const settlements = Array.isArray(settlementLedger.settlements) ? settlementLedger.settlements : [];
     const activeSettlementId = String(settlementLedger.activeSettlementId || 'town_1');
     const focusObjectId = activeSettlementId === 'town_2' ? 'SETTLEMENT_NODE_TOWN_2' : 'SETTLEMENT_NODE_TOWN_1';
-    const routes = Array.isArray(view?.regionalNetwork?.routes) ? view.regionalNetwork.routes : [];
+    const routes = regionalEnabled && Array.isArray(view?.regionalNetwork?.routes) ? view.regionalNetwork.routes : [];
     return {
       version: 'founders-plot-regional-map-v1',
+      enabled: true,
       activeSettlementId,
-      cameraFocusObjectId: objectForId(objects, focusObjectId) ? focusObjectId : 'GOVERNOR_LEDGER',
+      cameraFocusObjectId: objectForId(objects, focusObjectId) ? focusObjectId : objectForId(objects, 'GOVERNOR_LEDGER') ? 'GOVERNOR_LEDGER' : 'HQ',
       settlementNodes: settlements.map((settlement) => {
         const settlementId = String(settlement?.settlementId || '');
         return {

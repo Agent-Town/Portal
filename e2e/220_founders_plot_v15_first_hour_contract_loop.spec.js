@@ -81,14 +81,24 @@ async function buildFirstFarm(frame) {
   });
 }
 
+async function analyticsNames(frame) {
+  return await frame.evaluate(() => window.__foundersPlotTest.getAnalyticsEvents().map((event) => event.name));
+}
+
 test('V1.5 first-hour loop offers named contracts, Morning Brief, and lightweight Clover teaching in Three.js', async ({ page }) => {
   test.setTimeout(75_000);
   let frame = await openFoundersPlotFrame(page);
+  await expect.poll(async () => analyticsNames(frame)).toContain('founders.entered_play_first');
 
   await buildLumberAndReachHq2(frame);
   await buildFirstFarm(frame);
 
   let state = await getPlotState(frame);
+  await expect.poll(async () => analyticsNames(frame)).toEqual(expect.arrayContaining([
+    'founders.first_building_placed',
+    'founders.first_contract_viewed',
+    'founders.clover_advice_seen'
+  ]));
   expect(state?.currentGoal?.title).toMatch(/choose/i);
   expect(state?.contracts?.boardLocked).toBe(false);
   expect(state?.contracts?.offers?.length).toBeGreaterThanOrEqual(2);
@@ -120,6 +130,7 @@ test('V1.5 first-hour loop offers named contracts, Morning Brief, and lightweigh
     idempotencyKey: 'v15:supply:accept'
   }))?.ok).toBe(true);
   await frame.evaluate(async () => window.__foundersPlotTest.loadState());
+  await expect.poll(async () => analyticsNames(frame)).toContain('founders.contract_offer_chosen');
 
   state = await getPlotState(frame);
   expect(state?.contracts?.activeContract?.kind).toBe('SUPPLY');
@@ -146,6 +157,8 @@ test('V1.5 first-hour loop offers named contracts, Morning Brief, and lightweigh
   expect(completed?.ok).toBe(true);
   expect(completed?.contract?.status).toBe('COMPLETED');
   expect(completed?.contract?.requesterSnapshot?.displayName).toBe(supply.requesterSnapshot.displayName);
+  await frame.evaluate(async () => window.__foundersPlotTest.loadState());
+  await expect.poll(async () => analyticsNames(frame)).toContain('founders.contract_completed');
 
   const recap = await getJson(frame, '/api/founders-plot/recap');
   expect(recap?.ok).toBe(true);
@@ -166,11 +179,13 @@ test('V1.5 first-hour loop offers named contracts, Morning Brief, and lightweigh
   await frame.evaluate(() => window.__foundersPlotTest.openDrawer('recap'));
   await expect(frame.getByTestId('founders-morning-brief')).toBeVisible();
   await expect(frame.getByTestId('founders-morning-brief')).toContainText('Clover');
+  await expect.poll(async () => analyticsNames(frame)).toContain('founders.morning_brief_opened');
 
   const preference = await frame.evaluate(async () => window.__foundersPlotTest.recordForemanPreference('PREFER_RESERVES'));
   expect(preference?.ok).toBe(true);
   expect(preference?.state?.foreman?.teachingPreferences?.contractPreference).toBe('RESERVES');
   expect(preference?.state?.contracts?.recommendation?.reason).toContain('reserves');
+  await expect.poll(async () => analyticsNames(frame)).toContain('founders.clover_teaching_clicked');
 
   await frame.evaluate(() => window.__foundersPlotTest.openDrawer('foreman'));
   await expect(frame.getByTestId('founders-teaching-actions')).toBeVisible();
@@ -214,6 +229,7 @@ test('V1.5 first-hour loop offers named contracts, Morning Brief, and lightweigh
   });
   expect(acceptedSecond?.ok).toBe(true);
   await frame.evaluate(async () => window.__foundersPlotTest.loadState());
+  await expect.poll(async () => analyticsNames(frame)).toContain('founders.second_contract_chosen');
   state = await getPlotState(frame);
   expect(state?.contracts?.activeContract?.contractId).toBe(second.contractId);
   expect(state?.foreman?.companionAdvice?.recommendation).toContain(state.contracts.activeContract.requesterSnapshot.displayName);

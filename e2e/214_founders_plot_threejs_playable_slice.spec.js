@@ -445,3 +445,50 @@ test('Clover is represented in the Three.js scene without exposing worker or too
   expect(recommendationText).toMatch(/\b(Clover|Brain|Foreman|manual|guide|ready|connected)\b/i);
   expect(recommendationText).not.toMatch(/\b(worker|tool|provider|runtime|oauth|debug|schema)\b/i);
 });
+
+test('Three.js runtime exposes mobile FPS smoke, DOM fallback, and route-exit disposal evidence', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const frame = await openFoundersPlotFrame(page);
+
+  await frame.waitForTimeout(900);
+  const mobileInfo = await getThreeInfo(frame);
+  expect(mobileInfo.renderer).toBe('three.js');
+  expect(mobileInfo.performance.averageFps).toBeGreaterThan(20);
+  expect(mobileInfo.canvasWidth).toBeGreaterThan(300);
+  expect(mobileInfo.canvasHeight).toBeGreaterThan(400);
+
+  const fallback = await frame.evaluate(() => {
+    const scene = window.__foundersPlotTest.getScene();
+    const node = document.createElement('div');
+    node.setAttribute('data-testid', 'fallback-probe-stage');
+    document.body.appendChild(node);
+    const originalRenderer = window.FoundersPlotThreeRenderer;
+    window.FoundersPlotThreeRenderer = {
+      renderPlotScene() {
+        throw new Error('WEBGL_UNAVAILABLE');
+      }
+    };
+    window.FoundersPlotSceneRender.renderPlotStage(node, scene, { assetMap: {} });
+    const result = {
+      renderer: node.dataset.renderer || '',
+      reason: node.dataset.rendererFallbackReason || ''
+    };
+    window.FoundersPlotThreeRenderer = originalRenderer;
+    node.remove();
+    return result;
+  });
+  expect(fallback.renderer).toBe('dom-layered');
+  expect(fallback.reason).toContain('WEBGL_UNAVAILABLE');
+
+  const disposed = await frame.evaluate(() => {
+    const stage = document.getElementById('plotBoard');
+    const before = window.__foundersPlotTest.getThreeSceneInfo();
+    window.FoundersPlotThreeRenderer.disposeStage(stage);
+    return {
+      hadRenderer: !!before,
+      after: window.__foundersPlotTest.getThreeSceneInfo()
+    };
+  });
+  expect(disposed.hadRenderer).toBe(true);
+  expect(disposed.after).toBeNull();
+});

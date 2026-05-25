@@ -87,6 +87,13 @@ const {
 const { buildRecap } = require('./recap');
 const { replayFromEvents } = require('./replay');
 const { FOUNDERS_PLOT_TOOL_SPECS, getToolSpec } = require('./tools');
+const {
+  filterToolSpecs,
+  isFeatureEnabled,
+  isToolEnabled,
+  resolveFoundersPlotFeatureFlags,
+  stripDisabledFutureState
+} = require('./feature_flags');
 
 let persistentForemanSweepTimer = null;
 
@@ -290,6 +297,9 @@ function normalizeToolError(error) {
     if (code === 'BRAIN_REQUIRED') {
       return 'Connect a Brain to let Clover act as your Foreman.';
     }
+    if (code === 'FEATURE_DISABLED') {
+      return 'That roadmap prototype is hidden for this play session.';
+    }
     return code;
   })();
   return {
@@ -381,7 +391,17 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
     return result;
   }
 
-  function buildStatePayload(state) {
+  function featureDisabledError(featureFlags = {}, toolName = '') {
+    const error = new Error('FEATURE_DISABLED');
+    error.details = {
+      tool: String(toolName || ''),
+      featureFlags
+    };
+    return error;
+  }
+
+  function buildStatePayload(state, featureFlags = null) {
+    const resolvedFeatureFlags = featureFlags || resolveFoundersPlotFeatureFlags(null);
     const beforeSnapshot = hashJson({
       contracts: state.meta.contracts,
       contractDeck: state.meta.contractDeck,
@@ -403,7 +423,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       afterSeq: state.meta.recapSeenSeq,
       limit: 8
     });
-    const payload = {
+    const payload = stripDisabledFutureState({
       ...view,
       recap: {
         ...view.recap,
@@ -411,7 +431,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         lines: recap.lines,
         pendingApprovals: pendingApprovalsView(state)
       }
-    };
+    }, resolvedFeatureFlags);
     const afterSnapshot = hashJson({
       contracts: state.meta.contracts,
       contractDeck: state.meta.contractDeck,
@@ -551,15 +571,16 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
 
   function withState(req, res) {
     const identity = resolvePlotIdentity(req, res);
+    const featureFlags = resolveFoundersPlotFeatureFlags(req);
     const wallNowMs = Date.now();
     const state = createPlotIfMissing(identity, wallNowMs);
     const nowMs = Math.max(wallNowMs, safeFiniteNumber(state?.plot?.lastSimulatedAt, wallNowMs));
     const simulation = applySimulation(state, nowMs);
-    return { identity, nowMs, state, simulation };
+    return { identity, nowMs, state, simulation, featureFlags };
   }
 
   function mutationContext(req, res, toolName, rawArgs) {
-    const { state, nowMs } = withState(req, res);
+    const { state, nowMs, featureFlags } = withState(req, res);
     const args = rawArgs && typeof rawArgs === 'object' ? rawArgs : {};
     const idempotencyKey = typeof args.idempotencyKey === 'string' ? args.idempotencyKey.trim() : '';
     if (!idempotencyKey) {
@@ -578,12 +599,14 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       return {
         nowMs,
         state,
+        featureFlags,
         replayResponse: previous.response
       };
     }
     return {
       nowMs,
       state,
+      featureFlags,
       argsHash,
       idempotencyKey
     };
@@ -609,8 +632,8 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
   const WORKER_COMMAND_ID_RE = /^fpwcmd_\d+_[a-f0-9]+$/i;
   const WORKER_TRACE_ID_RE = /^fpwtrace_\d+_[a-f0-9]+$/i;
 
-  function readOnlyToolData(toolName, state) {
-    const payload = buildStatePayload(state);
+  function readOnlyToolData(toolName, state, featureFlags = null) {
+    const payload = buildStatePayload(state, featureFlags);
     if (toolName === 'et.plot.town.get_signals') {
       return {
         signals: payload.townSignals
@@ -750,6 +773,10 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
     }
 
     try {
+      const featureFlags = resolveFoundersPlotFeatureFlags(req);
+      if (!isToolEnabled(toolName, featureFlags)) {
+        throw featureDisabledError(featureFlags, toolName);
+      }
       const rawArgs = req.body && typeof req.body === 'object' ? req.body : {};
       if (String(rawArgs.actor || '').trim().toUpperCase() === 'AGENT') {
         return res.status(403).json(makeToolEnvelope({
@@ -764,23 +791,23 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         }));
       }
       if (toolName === 'et.plot.get_state') {
-        const { state } = withState(req, res);
+        const { state, featureFlags: requestFeatureFlags } = withState(req, res);
         return res.json(makeToolEnvelope({
           ok: true,
           data: {
-            state: buildStatePayload(state)
+            state: buildStatePayload(state, requestFeatureFlags)
           },
           worldDelta: null
         }));
       }
       const readOnlyState = READ_ONLY_TOOL_NAMES.has(toolName) ? withState(req, res) : null;
       if (readOnlyState) {
-        const { state } = readOnlyState;
+        const { state, featureFlags: requestFeatureFlags } = readOnlyState;
         return res.json(makeToolEnvelope({
           ok: true,
           data: {
-            ...readOnlyToolData(toolName, state),
-            state: buildStatePayload(state)
+            ...readOnlyToolData(toolName, state, requestFeatureFlags),
+            state: buildStatePayload(state, requestFeatureFlags)
           },
           worldDelta: null
         }));
@@ -846,7 +873,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         }, mutationHelpers);
       } else if (toolName === 'et.plot.town.get_signals') {
         data = {
-          signals: buildStatePayload(ctx.state).townSignals
+          signals: buildStatePayload(ctx.state, ctx.featureFlags).townSignals
         };
       } else if (toolName === 'et.plot.town.upgrade_landmark') {
         data = applyUpgradeLandmark(ctx.state, {
@@ -864,11 +891,11 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         }, mutationHelpers);
       } else if (toolName === 'et.plot.journal.get_entries') {
         data = {
-          entries: buildStatePayload(ctx.state).journal?.entries || []
+          entries: buildStatePayload(ctx.state, ctx.featureFlags).journal?.entries || []
         };
       } else if (toolName === 'et.plot.contracts.get_state') {
         data = {
-          contracts: buildStatePayload(ctx.state).contracts
+          contracts: buildStatePayload(ctx.state, ctx.featureFlags).contracts
         };
       } else if (toolName === 'et.plot.contracts.accept') {
         data = applyAcceptContract(ctx.state, {
@@ -880,7 +907,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         }, mutationHelpers);
       } else if (toolName === 'et.plot.scenarios.get_state') {
         data = {
-          scenarios: buildStatePayload(ctx.state).scenarios
+          scenarios: buildStatePayload(ctx.state, ctx.featureFlags).scenarios
         };
       } else if (toolName === 'et.plot.scenarios.start') {
         data = applyStartCivicScenario(ctx.state, {
@@ -893,7 +920,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         }, mutationHelpers);
       } else if (toolName === 'et.plot.settlements.get_ledger') {
         data = {
-          settlements: buildStatePayload(ctx.state).settlements
+          settlements: buildStatePayload(ctx.state, ctx.featureFlags).settlements
         };
       } else if (toolName === 'et.plot.settlements.launch_expedition') {
         data = {
@@ -914,7 +941,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         };
       } else if (toolName === 'et.plot.operating_model.get_state') {
         data = {
-          operatingModel: buildStatePayload(ctx.state).operatingModel
+          operatingModel: buildStatePayload(ctx.state, ctx.featureFlags).operatingModel
         };
       } else if (toolName === 'et.plot.operating_model.choose_charter') {
         data = applyChooseOperatingCharter(ctx.state, {
@@ -930,7 +957,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         data = applyRefreshOperatingContracts(ctx.state, {}, mutationHelpers);
       } else if (toolName === 'et.plot.regional.get_ledger') {
         data = {
-          regionalNetwork: buildStatePayload(ctx.state).regionalNetwork
+          regionalNetwork: buildStatePayload(ctx.state, ctx.featureFlags).regionalNetwork
         };
       } else if (toolName === 'et.plot.regional.open_supply_route') {
         data = applyOpenRegionalSupplyRoute(ctx.state, {
@@ -952,7 +979,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         }, mutationHelpers);
       } else if (toolName === 'et.plot.creator.get_catalog') {
         data = {
-          creatorExtensions: buildStatePayload(ctx.state).creatorExtensions
+          creatorExtensions: buildStatePayload(ctx.state, ctx.featureFlags).creatorExtensions
         };
       } else if (toolName === 'et.plot.creator.install_building') {
         data = applyInstallCreatorBuilding(ctx.state, {
@@ -972,7 +999,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         }, mutationHelpers);
       } else if (toolName === 'et.foreman.specialists.get_state') {
         data = {
-          specialists: buildStatePayload(ctx.state).foreman?.specialists
+          specialists: buildStatePayload(ctx.state, ctx.featureFlags).foreman?.specialists
         };
       } else if (toolName === 'et.foreman.specialists.assign') {
         data = applyAssignSpecialist(ctx.state, {
@@ -997,7 +1024,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         }, mutationHelpers);
       } else if (toolName === 'et.foreman.policy.get_standing_order') {
         data = {
-          standingOrder: buildStatePayload(ctx.state).foreman?.standingOrder
+          standingOrder: buildStatePayload(ctx.state, ctx.featureFlags).foreman?.standingOrder
         };
       } else if (toolName === 'et.foreman.policy.set_standing_order') {
         data = applySetStandingOrder(ctx.state, {
@@ -1005,7 +1032,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         }, mutationHelpers);
       } else if (toolName === 'et.foreman.doctrine.get_state') {
         data = {
-          doctrine: buildStatePayload(ctx.state).foreman?.doctrine
+          doctrine: buildStatePayload(ctx.state, ctx.featureFlags).foreman?.doctrine
         };
       } else if (toolName === 'et.foreman.doctrine.set_rule') {
         data = applySetForemanDoctrineRule(ctx.state, {
@@ -1088,7 +1115,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         ok: true,
         data: {
           ...data,
-          state: buildStatePayload(ctx.state)
+          state: buildStatePayload(ctx.state, ctx.featureFlags)
         },
         worldDelta: buildWorldDelta(ctx.state, eventBuffer.map((event) => event.type))
       });
@@ -1102,7 +1129,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
           ? 400
           : normalized.code === 'CREATOR_MANIFEST_NOT_FOUND'
             ? 404
-          : normalized.code === 'OUT_OF_RESOURCES' || normalized.code === 'FORBIDDEN_POLICY' || normalized.code === 'ACTOR_SPOOF_REJECTED' || normalized.code === 'FOREMAN_RUNTIME_REQUIRED' || normalized.code === 'STALE_RUNTIME' || normalized.code === 'SPECIALIST_GATE_REQUIRED' || normalized.code === 'SPECIALIST_DOMAIN_VIOLATION' || normalized.code === 'REGIONAL_GATE_REQUIRED' || normalized.code === 'REGIONAL_ROUTE_FORBIDDEN' || normalized.code === 'CREATOR_GATE_REQUIRED' || normalized.code === 'CREATOR_MANIFEST_REJECTED' || normalized.code === 'CREATOR_TOOL_MODERATION_FAILED'
+          : normalized.code === 'OUT_OF_RESOURCES' || normalized.code === 'FORBIDDEN_POLICY' || normalized.code === 'FEATURE_DISABLED' || normalized.code === 'ACTOR_SPOOF_REJECTED' || normalized.code === 'FOREMAN_RUNTIME_REQUIRED' || normalized.code === 'STALE_RUNTIME' || normalized.code === 'SPECIALIST_GATE_REQUIRED' || normalized.code === 'SPECIALIST_DOMAIN_VIOLATION' || normalized.code === 'REGIONAL_GATE_REQUIRED' || normalized.code === 'REGIONAL_ROUTE_FORBIDDEN' || normalized.code === 'CREATOR_GATE_REQUIRED' || normalized.code === 'CREATOR_MANIFEST_REJECTED' || normalized.code === 'CREATOR_TOOL_MODERATION_FAILED'
             ? 403
             : normalized.code === 'BUILD_SLOT_OCCUPIED' || normalized.code === 'JOB_ALREADY_RUNNING' || normalized.code === 'IDEMPOTENCY_CONFLICT' || normalized.code === 'CONTRACT_ACTIVE_EXISTS' || normalized.code === 'SPECIALIST_ASSIGNMENT_REQUIRED' || normalized.code === 'REGIONAL_ROUTE_REQUIRED' || normalized.code === 'REGIONAL_CONTRACT_ACTIVE_EXISTS' || normalized.code === 'CREATOR_INSTALLATION_REQUIRED'
               ? 409
@@ -1117,20 +1144,22 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
     }
   }
 
-  router.get('/api/founders-plot/tools', (_req, res) => {
+  router.get('/api/founders-plot/tools', (req, res) => {
+    const featureFlags = resolveFoundersPlotFeatureFlags(req);
     res.json({
       ok: true,
-      tools: FOUNDERS_PLOT_TOOL_SPECS
+      featureFlags,
+      tools: filterToolSpecs(FOUNDERS_PLOT_TOOL_SPECS, featureFlags)
     });
   });
 
   router.get('/api/founders-plot/state', (req, res) => {
     try {
-      const { state, simulation } = withState(req, res);
+      const { state, simulation, featureFlags } = withState(req, res);
       res.json({
         ok: true,
         simulation,
-        state: buildStatePayload(state)
+        state: buildStatePayload(state, featureFlags)
       });
     } catch (error) {
       const normalized = normalizeToolError(error);
@@ -1143,7 +1172,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
 
   router.get('/api/founders-plot/recap', (req, res) => {
     try {
-      const { state, nowMs } = withState(req, res);
+      const { state, nowMs, featureFlags } = withState(req, res);
       const events = listRecentEvents(state.plot.plotId, 120);
       const recap = buildRecap(events, {
         afterSeq: state.meta.recapSeenSeq,
@@ -1177,7 +1206,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         ok: true,
         recap: {
           ...recap,
-          morningBrief: buildStatePayload(state).recap?.morningBrief || null
+          morningBrief: buildStatePayload(state, featureFlags).recap?.morningBrief || null
         }
       });
     } catch (error) {
@@ -1191,7 +1220,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
 
   router.post('/api/founders-plot/recap/read', (req, res) => {
     try {
-      const { state } = withState(req, res);
+      const { state, featureFlags } = withState(req, res);
       const latest = listRecentEvents(state.plot.plotId, 1)[0] || null;
       state.meta.recapSeenSeq = latest ? latest.seq : state.meta.recapSeenSeq;
       state.plot.updatedAt = Date.now();
@@ -1220,7 +1249,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       res.json({
         ok: true,
         replay,
-        currentHash: buildStatePayload(state).stateHash
+        currentHash: buildStatePayload(state, featureFlags).stateHash
       });
     } catch (error) {
       const normalized = normalizeToolError(error);
@@ -1233,7 +1262,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
 
   router.post('/api/founders-plot/policy', (req, res) => {
     try {
-      const { state, nowMs } = withState(req, res);
+      const { state, nowMs, featureFlags } = withState(req, res);
       const key = String(req.body?.key || '').trim();
       const value = typeof req.body?.value === 'boolean' ? req.body.value : req.body?.value;
       const events = [];
@@ -1249,7 +1278,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       res.json({
         ok: true,
         data,
-        state: buildStatePayload(state)
+        state: buildStatePayload(state, featureFlags)
       });
     } catch (error) {
       const normalized = normalizeToolError(error);
@@ -1263,7 +1292,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
 
   router.post('/api/founders-plot/approvals/:approvalId/resolve', (req, res) => {
     try {
-      const { state, nowMs } = withState(req, res);
+      const { state, nowMs, featureFlags } = withState(req, res);
       const events = [];
       const data = applyResolveApproval(state, {
         approvalId: String(req.params.approvalId || '').trim(),
@@ -1281,7 +1310,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       res.json({
         ok: true,
         data,
-        state: buildStatePayload(state)
+        state: buildStatePayload(state, featureFlags)
       });
     } catch (error) {
       const normalized = normalizeToolError(error);
@@ -1295,10 +1324,10 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
 
   router.get('/api/founders-plot/contracts/state', (req, res) => {
     try {
-      const { state } = withState(req, res);
+      const { state, featureFlags } = withState(req, res);
       res.json({
         ok: true,
-        contracts: buildStatePayload(state).contracts
+        contracts: buildStatePayload(state, featureFlags).contracts
       });
     } catch (error) {
       const normalized = normalizeToolError(error);
@@ -1324,7 +1353,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       const payload = {
         ok: true,
         contract: result.contract,
-        state: buildStatePayload(ctx.state)
+        state: buildStatePayload(ctx.state, ctx.featureFlags)
       };
       persistMutation(ctx.state, 'et.plot.contracts.accept', ctx.idempotencyKey, ctx.argsHash, payload, events);
       res.json(payload);
@@ -1352,7 +1381,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       const payload = {
         ok: true,
         contract: result.contract,
-        state: buildStatePayload(ctx.state)
+        state: buildStatePayload(ctx.state, ctx.featureFlags)
       };
       persistMutation(ctx.state, 'et.plot.contracts.turn_in', ctx.idempotencyKey, ctx.argsHash, payload, events);
       res.json(payload);
@@ -1367,7 +1396,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
 
   router.post('/api/founders-plot/foreman/session/start', (req, res) => {
     try {
-      const { state, nowMs } = withState(req, res);
+      const { state, nowMs, featureFlags } = withState(req, res);
       const raw = req.body && typeof req.body === 'object' ? req.body : {};
       if (raw.brainReady !== true) {
         const error = new Error('BRAIN_REQUIRED');
@@ -1455,7 +1484,10 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
 
   router.post('/api/founders-plot/foreman/persistent/start', (req, res) => {
     try {
-      const { state, nowMs } = withState(req, res);
+      const { state, nowMs, featureFlags } = withState(req, res);
+      if (!isFeatureEnabled(featureFlags, 'FEATURE_FOUNDERS_V20_PERSISTENT_FOREMAN')) {
+        throw featureDisabledError(featureFlags, 'et.foreman.governance.start_persistent');
+      }
       const raw = req.body && typeof req.body === 'object' ? req.body : {};
       if (raw.brainReady !== true) {
         const error = new Error('BRAIN_REQUIRED');
@@ -1477,17 +1509,20 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       res.json({
         ok: true,
         governance,
-        state: buildStatePayload(state)
+        state: buildStatePayload(state, featureFlags)
       });
     } catch (error) {
       const normalized = normalizeToolError(error);
-      res.status(normalized.code === 'BRAIN_REQUIRED' ? 403 : 400).json({ ok: false, error: normalized });
+      res.status(normalized.code === 'BRAIN_REQUIRED' || normalized.code === 'FEATURE_DISABLED' ? 403 : 400).json({ ok: false, error: normalized });
     }
   });
 
   router.post('/api/founders-plot/foreman/persistent/pause', (req, res) => {
     try {
-      const { state, nowMs } = withState(req, res);
+      const { state, nowMs, featureFlags } = withState(req, res);
+      if (!isFeatureEnabled(featureFlags, 'FEATURE_FOUNDERS_V20_PERSISTENT_FOREMAN')) {
+        throw featureDisabledError(featureFlags, 'et.foreman.governance.pause_persistent');
+      }
       const raw = req.body && typeof req.body === 'object' ? req.body : {};
       const events = [];
       const governance = applyPausePersistentForeman(state, {
@@ -1503,11 +1538,11 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       res.json({
         ok: true,
         governance,
-        state: buildStatePayload(state)
+        state: buildStatePayload(state, featureFlags)
       });
     } catch (error) {
       const normalized = normalizeToolError(error);
-      res.status(400).json({ ok: false, error: normalized });
+      res.status(normalized.code === 'FEATURE_DISABLED' ? 403 : 400).json({ ok: false, error: normalized });
     }
   });
 
@@ -1621,9 +1656,13 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
     let toolName = '';
     let rawArgs = {};
     let decisionEventMeta = null;
+    let featureFlags = resolveFoundersPlotFeatureFlags(req);
     try {
       toolName = String(req.params.toolName || '').trim();
       rawArgs = req.body && typeof req.body === 'object' ? req.body : {};
+      if (!isToolEnabled(toolName, featureFlags)) {
+        throw featureDisabledError(featureFlags, toolName);
+      }
       ({ state, nowMs, runtime } = requireForemanRuntime(req, res));
       const idempotencyKey = typeof rawArgs.idempotencyKey === 'string' ? rawArgs.idempotencyKey.trim() : '';
       if (toolName !== 'et.plot.get_state' && !idempotencyKey) {
@@ -1633,7 +1672,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         return res.json({
           ok: true,
           data: {
-            state: buildStatePayload(state)
+            state: buildStatePayload(state, featureFlags)
           }
         });
       }
@@ -1753,7 +1792,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
           || 'Executed the safest useful action.'
         ),
         authorityUsed: 'Foreman runtime token (server-authenticated)',
-        standingOrderUsed: buildStatePayload(state).foreman?.standingOrder || '',
+        standingOrderUsed: buildStatePayload(state, featureFlags).foreman?.standingOrder || '',
         doctrineUsed: doctrineUsed.activeRules.length > 0
           ? {
             activeRules: doctrineUsed.activeRules,
@@ -1789,7 +1828,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
           mutationApplied: true
         },
         receipt,
-        state: buildStatePayload(state)
+        state: buildStatePayload(state, featureFlags)
       };
       saveIdempotency(state.plot.plotId, idempotencyKey, {
         tool: toolName,
@@ -1802,7 +1841,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       if (receiptEvent && state.meta.foremanReceipts[0]) {
         state.meta.foremanReceipts[0].eventId = receiptEvent.seq;
         payload.receipt.eventId = receiptEvent.seq;
-        payload.state = buildStatePayload(state);
+        payload.state = buildStatePayload(state, featureFlags);
         savePlotGraph(state);
       }
       res.json(payload);
@@ -1840,6 +1879,8 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         || normalized.code === 'FOREMAN_WORKER_ORIGIN_REQUIRED'
         || normalized.code === 'FOREMAN_WORKER_RUNTIME_MISMATCH'
         ? 403
+        : normalized.code === 'FEATURE_DISABLED'
+          ? 403
         : normalized.code === 'IDEMPOTENCY_CONFLICT'
           ? 409
           : 400;
@@ -1885,7 +1926,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       res.json({
         ok: true,
         result,
-        state: buildStatePayload(state)
+        state: buildStatePayload(state, featureFlags)
       });
     } catch (error) {
       const normalized = normalizeToolError(error);
@@ -1895,7 +1936,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
 
   router.post('/api/founders-plot/foreman/preference', (req, res) => {
     try {
-      const { state, nowMs } = withState(req, res);
+      const { state, nowMs, featureFlags } = withState(req, res);
       const raw = req.body && typeof req.body === 'object' ? req.body : {};
       const preferenceEvents = [];
       const result = applyForemanPreference(state, {
@@ -1926,7 +1967,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       res.json({
         ok: true,
         result,
-        state: buildStatePayload(state)
+        state: buildStatePayload(state, featureFlags)
       });
     } catch (error) {
       const normalized = normalizeToolError(error);
@@ -1936,7 +1977,10 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
 
   router.post('/api/founders-plot/foreman/doctrine', (req, res) => {
     try {
-      const { state, nowMs } = withState(req, res);
+      const { state, nowMs, featureFlags } = withState(req, res);
+      if (!isFeatureEnabled(featureFlags, 'FEATURE_FOUNDERS_V21_DOCTRINE_LITE')) {
+        throw featureDisabledError(featureFlags, 'et.foreman.doctrine.set_rule');
+      }
       const raw = req.body && typeof req.body === 'object' ? req.body : {};
       const events = [];
       const result = applySetForemanDoctrineRule(state, {
@@ -1954,11 +1998,11 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       res.json({
         ok: true,
         result,
-        state: buildStatePayload(state)
+        state: buildStatePayload(state, featureFlags)
       });
     } catch (error) {
       const normalized = normalizeToolError(error);
-      res.status(400).json({ ok: false, error: normalized });
+      res.status(normalized.code === 'FEATURE_DISABLED' ? 403 : 400).json({ ok: false, error: normalized });
     }
   });
 
@@ -1982,6 +2026,10 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
   });
 
   router.get('/api/founders-plot/public/operating-style-card/:plotId', (req, res) => {
+    const featureFlags = resolveFoundersPlotFeatureFlags(req);
+    if (!isFeatureEnabled(featureFlags, 'FEATURE_FOUNDERS_V40_OPERATING_STYLE_SHARING')) {
+      return res.status(403).json({ ok: false, error: { code: 'FEATURE_DISABLED', details: { featureFlags } } });
+    }
     const state = loadPlotGraphById(String(req.params.plotId || '').trim());
     if (!state) {
       return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
@@ -2014,14 +2062,17 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
 
   router.get('/api/founders-plot/plot-card', (req, res) => {
     try {
-      const { state, nowMs } = withState(req, res);
+      const { state, nowMs, featureFlags } = withState(req, res);
+      if (!isFeatureEnabled(featureFlags, 'FEATURE_FOUNDERS_V17_TOWN_IDENTITY')) {
+        throw featureDisabledError(featureFlags, 'plot-card');
+      }
       res.json({
         ok: true,
         card: buildPlotCard(state, { nowMs })
       });
     } catch (error) {
       const normalized = normalizeToolError(error);
-      res.status(normalized.code === 'UNAUTHORIZED' ? 401 : 500).json({
+      res.status(normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FEATURE_DISABLED' ? 403 : 500).json({
         ok: false,
         error: normalized.code
       });
@@ -2032,6 +2083,9 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
     try {
       const rawArgs = req.body && typeof req.body === 'object' ? req.body : {};
       const ctx = mutationContext(req, res, 'et.plot.town.capture_postcard', rawArgs);
+      if (!isFeatureEnabled(ctx.featureFlags, 'FEATURE_FOUNDERS_V17_TOWN_IDENTITY')) {
+        throw featureDisabledError(ctx.featureFlags, 'postcard');
+      }
       if (ctx.replayResponse) return res.json(ctx.replayResponse);
       const events = [];
       const result = applyCaptureTownPostcard(ctx.state, {
@@ -2044,7 +2098,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         ok: true,
         postcard: result.postcard,
         postcards: result.postcards,
-        state: buildStatePayload(ctx.state)
+        state: buildStatePayload(ctx.state, ctx.featureFlags)
       };
       persistMutation(ctx.state, 'et.plot.town.capture_postcard', ctx.idempotencyKey, ctx.argsHash, payload, events);
       res.json(payload);
@@ -2059,14 +2113,17 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
 
   router.get('/api/founders-plot/operating-style-card', (req, res) => {
     try {
-      const { state, nowMs } = withState(req, res);
+      const { state, nowMs, featureFlags } = withState(req, res);
+      if (!isFeatureEnabled(featureFlags, 'FEATURE_FOUNDERS_V40_OPERATING_STYLE_SHARING')) {
+        throw featureDisabledError(featureFlags, 'operating-style-card');
+      }
       res.json({
         ok: true,
         card: buildOperatingStyleCard(state, { nowMs })
       });
     } catch (error) {
       const normalized = normalizeToolError(error);
-      res.status(normalized.code === 'UNAUTHORIZED' ? 401 : 500).json({
+      res.status(normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FEATURE_DISABLED' ? 403 : 500).json({
         ok: false,
         error: normalized.code
       });
@@ -2075,7 +2132,10 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
 
   router.post('/api/founders-plot/operating-style/compare', (req, res) => {
     try {
-      const { state, nowMs } = withState(req, res);
+      const { state, nowMs, featureFlags } = withState(req, res);
+      if (!isFeatureEnabled(featureFlags, 'FEATURE_FOUNDERS_V40_OPERATING_STYLE_SHARING')) {
+        throw featureDisabledError(featureFlags, 'operating-style');
+      }
       const current = buildOperatingStyleCard(state, { nowMs });
       res.json({
         ok: true,
@@ -2084,7 +2144,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       });
     } catch (error) {
       const normalized = normalizeToolError(error);
-      res.status(normalized.code === 'UNAUTHORIZED' ? 401 : 500).json({
+      res.status(normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FEATURE_DISABLED' ? 403 : 500).json({
         ok: false,
         error: normalized.code
       });
@@ -2094,7 +2154,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
   if (process.env.NODE_ENV === 'test') {
     router.post('/__test__/founders-plot/advance', (req, res) => {
       try {
-        const { state } = withState(req, res);
+        const { state, featureFlags } = withState(req, res);
         const requestedMs = Number(req.body?.ms ?? (Number(req.body?.minutes || 0) * 60 * 1000) ?? 0);
         const advanceMs = Math.max(0, Math.min(MAX_OFFLINE_MS, Math.floor(requestedMs)));
         const targetMs = state.plot.lastSimulatedAt + advanceMs;
@@ -2123,7 +2183,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
           ok: true,
           advancedToMs: targetMs,
           persistent,
-          state: buildStatePayload(state)
+          state: buildStatePayload(state, featureFlags)
         });
       } catch (error) {
         const normalized = normalizeToolError(error);
@@ -2136,13 +2196,13 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
 
     router.post('/__test__/founders-plot/persistent-tick', (req, res) => {
       try {
-        const { state, nowMs } = withState(req, res);
+        const { state, nowMs, featureFlags } = withState(req, res);
         const { result, events } = runPersistentForemanAndPersist(state, nowMs);
         res.json({
           ok: true,
           persistent: result,
           eventCount: events.length,
-          state: buildStatePayload(state)
+          state: buildStatePayload(state, featureFlags)
         });
       } catch (error) {
         const normalized = normalizeToolError(error);

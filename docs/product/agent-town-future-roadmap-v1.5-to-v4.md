@@ -5,7 +5,7 @@ title: "Agent Town Future Roadmap: V1.5 to V4+"
 status: "current-branch-aligned roadmap"
 date: "2026-05-24"
 owner: "Agent Town product"
-sourceBranchReference: "codex/founders-plot-threejs-playable-slice"
+sourceBranchReference: "codex/founders-plot-roadmap-v15-v45-completion"
 lockedDecisions:
   - "Founders Plot V1.x uses Three.js as the forward human-facing renderer path."
   - "Three.js is a renderer boundary, not a simulation rewrite."
@@ -128,6 +128,30 @@ The long-term product sequence remains:
 5. **V5+** — grow toward agent civilization and multi-settlement society.
 
 Each version should add one new player decision layer.
+
+## Roadmap Branch Release Status Contract
+
+This branch contains V1.5 product work plus gated prototype baselines for future slices.
+The V1.6 through V4.5 slices are not player-visible by default and are not release
+candidate claims until their release gates are satisfied.
+
+| Slice | product_stage | player_visible_by_default | feature_flag | release_gate_required |
+| --- | --- | --- | --- | --- |
+| V1.6 Civic Projects and Short Scenarios | gated_experimental | false | `FEATURE_FOUNDERS_V16_SCENARIOS` | true |
+| V1.7 Town Identity, Pride, and Plot Cards | gated_experimental | false | `FEATURE_FOUNDERS_V17_TOWN_IDENTITY` | true |
+| V2.0 Persistent Foreman Governance | prototype | false | `FEATURE_FOUNDERS_V20_PERSISTENT_FOREMAN` | true |
+| V2.1 Doctrine Lite and Teaching UI | prototype | false | `FEATURE_FOUNDERS_V21_DOCTRINE_LITE` | true |
+| V2.5 Settler Expedition / Second Settlement | prototype | false | `FEATURE_FOUNDERS_V25_SECOND_SETTLEMENT` | true |
+| V3.0 Operating Model and Capability Web | prototype | false | `FEATURE_FOUNDERS_V30_OPERATING_MODEL` | true |
+| V3.1 Specialist Foremen | prototype | false | `FEATURE_FOUNDERS_V31_SPECIALISTS` | true |
+| V3.5 Settlement Network / Regional Governance | prototype | false | `FEATURE_FOUNDERS_V35_REGIONAL_GOVERNANCE` | true |
+| V4.0 Shareable Operating Styles | prototype | false | `FEATURE_FOUNDERS_V40_OPERATING_STYLE_SHARING` | true |
+| V4.5 Creator Buildings and District Experiences | prototype | false | `FEATURE_FOUNDERS_V45_CREATOR_BUILDINGS` | true |
+
+Feature flags must default off outside explicit test/prototype runs. With these
+flags off, normal V1.5 play must not expose future tools, future mutation
+endpoints, future Three.js objects, future state coverage domains, or future
+drawers/cards.
 
 ---
 
@@ -425,8 +449,15 @@ This is where Three.js becomes especially valuable:
 - Verify Three.js scene reflects selected style.
 - Generate plot card.
 - Verify plot card has no debug/provider/runtime jargon.
+- Capture postcard and verify public-safe Three.js camera/flyover state.
 
 ### API / Unit
+
+Prototype status in `codex/founders-plot-roadmap-v15-v45-completion`: covered
+by `tests/founders_plot_v17_town_identity.test.js` and
+`e2e/224_founders_plot_v17_town_identity_plot_card.spec.js`, including
+`meta.townPostcards`, `STATE:town_postcard`, a data-URL postcard preview, and
+public-safe redaction checks.
 
 - Cosmetic choice persists.
 - Cosmetic choice does not mutate economy fields.
@@ -486,11 +517,18 @@ Do not implement V2 until:
 
 - Start persistent Foreman.
 - Close/reopen simulated session.
+- Run the server background sweep while the page is closed.
 - Morning Brief shows Foreman actions.
 - Exception Inbox displays blocked actions.
 - Emergency pause stops future actions.
 
 ### API / Unit
+
+Prototype status in `codex/founders-plot-roadmap-v15-v45-completion`: covered
+by `tests/founders_plot_v20_persistent_foreman.test.js` and
+`e2e/228_founders_plot_v20_persistent_foreman.spec.js`, including a closed-page
+server sweep for the bounded collect-ready routine, receipt/Morning Brief proof,
+pause control, and policy-blocked Exception Inbox behavior.
 
 - Runtime leases prevent duplicate execution.
 - Task idempotency prevents double collection/queueing.
@@ -528,6 +566,12 @@ The player teaches Clover simple priorities.
 - Preferences remain reversible.
 
 ## Required Test Evidence
+
+Prototype status in `codex/founders-plot-roadmap-v15-v45-completion`: covered
+by `tests/founders_plot_v21_doctrine_lite.test.js` and
+`e2e/227_founders_plot_v21_doctrine_lite.spec.js`, including reversible
+preference rules, deterministic recommendation ranking, teaching UI receipts,
+Morning Brief copy, and conflict routing through the Exception Inbox.
 
 - Preference modifies deterministic Foreman candidate ranking.
 - Preference appears in receipt/recap.
@@ -773,6 +817,13 @@ Players choose which external experiences/buildings to attach to their town.
 - Uninstall/rollback test.
 - No unauthorized data access.
 
+Prototype status in `codex/founders-plot-roadmap-v15-v45-completion`: covered
+by `tests/founders_plot_v45_creator_buildings.test.js` and
+`e2e/234_founders_plot_v45_creator_buildings.spec.js`, including curated local
+import source, asset-governance provenance, credit-only creator model,
+moderation/no-network checks, typed state/tools, rollback, and no core-town
+truth mutation.
+
 ---
 
 # V5+ — Agent Civilization Layer
@@ -781,15 +832,20 @@ Players choose which external experiences/buildings to attach to their town.
 
 Grow Agent Town from one-player settlements into a broader world of agent-run civic systems.
 
-## Possible Directions
+## Staged World Ladder
 
-- Agent-managed districts.
-- Inter-agent economies.
-- Public works.
-- Reputation systems.
-- Agent services marketplace.
-- World events.
-- Cross-framework agent participation.
+V5+ should not jump directly to unrestricted free-play. The staged direction is:
+
+| Stage | Theme | Product stance |
+| --- | --- | --- |
+| V5.0 | World Layer / Civ Map | Show multiple governed towns as a readable world layer without adding public social pressure yet. |
+| V5.1 | Public Districts / Social Presence | Let towns appear near one another with safe public presence and strict redaction. |
+| V5.2 | Agent Services / Civic Marketplace | Allow opt-in agent services after identity, reputation, and permission boundaries are proven. |
+| V5.3 | World Events / Public Works | Add shared events where contributions are bounded, auditable, and reversible. |
+| V5.4 | Controlled Free-Play Sandbox Districts | Introduce free-play only inside constrained sandbox districts with moderation and rollback. |
+| V6+ | Agent Civilization | Consider broad agent society only after retention, governance, security, and social safety are proven. |
+
+Free-play is a late-stage sandbox, not the next production promise.
 
 ## Guardrails
 

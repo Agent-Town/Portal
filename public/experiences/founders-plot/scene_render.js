@@ -185,11 +185,17 @@
       node.dataset.renderer = 'dom-layered';
       return;
     }
-    const info = threeApi.renderPlotScene(node, viewport, scene, {
-      assetMap: options.assetMap || {}
-    });
-    node.dataset.renderer = 'three.js';
-    node.dataset.threeObjectCount = String(info?.objectCount || 0);
+    try {
+      const info = threeApi.renderPlotScene(node, viewport, scene, {
+        assetMap: options.assetMap || {}
+      });
+      node.dataset.renderer = 'three.js';
+      node.dataset.rendererFallbackReason = '';
+      node.dataset.threeObjectCount = String(info?.objectCount || 0);
+    } catch (error) {
+      node.dataset.renderer = 'dom-layered';
+      node.dataset.rendererFallbackReason = String(error?.message || 'THREE_RENDER_FAILED').slice(0, 80);
+    }
   }
 
   function renderPlotStage(node, scene, options = {}) {
