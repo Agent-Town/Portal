@@ -110,6 +110,21 @@ Agent Town uses a warm frontier storybook design system. The UI must feel like a
 
 This file now carries both machine-readable tokens in front matter and human-readable visual law in the markdown body.
 
+## Three.js visual system
+
+The Founders Plot world surface uses Three.js as the forward renderer path.
+
+Visual assets may be:
+
+- generated 2D billboard sprites;
+- textured planes;
+- ambient world props;
+- future GLB/glTF models.
+
+The current production path may use GPT Image 2 generated 2D assets normalized through the 2D asset pipeline. Future GLB/glTF assets must record source prompt, concept image, model file, texture files, size budgets, bounding box, pickable nodes, approval metadata, and screenshot proof.
+
+Do not bake stateful gameplay objects into backgrounds. Stateful objects must be live scene objects with server-state identity.
+
 ## 1.1 V1.4.2 overview
 
 The V1.4.2 art baseline is approved. The cleanup sprint is about route-level integration polish, not another broad asset rebuild.

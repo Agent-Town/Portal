@@ -203,6 +203,7 @@
   function defaultProviderApi(provider) {
     const normalized = String(provider || '').trim();
     if (normalized === 'openai' || normalized === 'ollama' || normalized === 'openrouter') return 'openai-completions';
+    if (normalized === 'openai-codex') return 'openai-codex-responses';
     return '';
   }
 

@@ -14,6 +14,7 @@ test('V1.4.2 design docs carry the required GPT Image 2 governance rules', () =>
 
   assert.match(brand, /hero cast is the platform ensemble/i);
   assert.match(brand, /Clover Kincaid.*gameplay partner/is);
+  assert.match(brand, /account\/wallet continuity/i);
 
   const frontMatter = parseFrontMatter(design);
   assert.ok(frontMatter, 'DESIGN.md is missing YAML front matter');
@@ -22,13 +23,16 @@ test('V1.4.2 design docs carry the required GPT Image 2 governance rules', () =>
   });
   assert.match(design, /^---\n[\s\S]*\n---\n/m);
   assert.match(design, /^## Asset Generation Law$/m);
+  assert.match(design, /Three\.js visual system/i);
 
   assert.match(gameUx, /Screenshot-first signoff/i);
   assert.match(gameUx, /full player route/i);
+  assert.match(gameUx, /Three\.js game surface law/i);
 
   assert.match(registry, /gpt-image-2-prompt-contract/i);
   assert.match(registry, /asset-manifest-entry/i);
   assert.match(registry, /hero-cast-reference-card/i);
+  assert.match(registry, /three-town-stage/i);
 });
 
 test('DESIGN.md front matter is structurally sound for local lint fallback', () => {

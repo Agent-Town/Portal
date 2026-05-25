@@ -1,6 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72" fill="none">
-
-      <path d="M12 54h48L46 20H26z" fill="#c79139" stroke="#5a3621" stroke-width="6" stroke-linejoin="round"/>
-      <path d="M22 54V20h18" stroke="#5a3621" stroke-width="6" stroke-linecap="round"/>
-    
+  <defs>
+    <linearGradient id="badge" x1="18" y1="12" x2="55" y2="61" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F7D889"/>
+      <stop offset="1" stop-color="#C98934"/>
+    </linearGradient>
+    <linearGradient id="wood" x1="24" y1="18" x2="51" y2="55" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8A542D"/>
+      <stop offset="1" stop-color="#56321E"/>
+    </linearGradient>
+    <filter id="shadow" x="5" y="6" width="62" height="62" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#3D200F" flood-opacity=".26"/>
+    </filter>
+  </defs>
+  <g filter="url(#shadow)">
+    <circle cx="36" cy="34" r="25" fill="url(#badge)" stroke="#5A3621" stroke-width="3"/>
+    <path d="M22 50 50 22" stroke="#56321E" stroke-width="7" stroke-linecap="round"/>
+    <path d="M43 16 58 31 51 38 36 23Z" fill="#F2B654" stroke="#56321E" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M18 34h26" stroke="url(#wood)" stroke-width="8" stroke-linecap="round"/>
+    <path d="M18 34h26" stroke="#F7D889" stroke-width="2" stroke-linecap="round" opacity=".55"/>
+    <circle cx="36" cy="34" r="3" fill="#FFF1C2" opacity=".9"/>
+  </g>
 </svg>

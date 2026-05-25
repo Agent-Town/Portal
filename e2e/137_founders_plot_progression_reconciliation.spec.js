@@ -42,6 +42,17 @@ async function runLumberCycle(frame, buildingId, keyPrefix) {
   }, { targetBuildingId: buildingId, prefix: keyPrefix });
 }
 
+async function resolveTownOpportunity(frame, opportunityId, optionId) {
+  const result = await frame.evaluate(async ({ targetOpportunityId, targetOptionId }) => {
+    return window.__foundersPlotTest.runTool('et.plot.town.resolve_opportunity', {
+      opportunityId: targetOpportunityId,
+      optionId: targetOptionId,
+      idempotencyKey: `progression:${targetOpportunityId}:${targetOptionId}`
+    });
+  }, { targetOpportunityId: opportunityId, targetOptionId: optionId });
+  expect(result?.ok).toBe(true);
+}
+
 test('later progression costs only require already-unlocked resources and HQ2 leads directly into the first Farm Plot', async ({ page }) => {
   const frame = await openFoundersPlotFrame(page);
 
@@ -103,12 +114,23 @@ test('later progression costs only require already-unlocked resources and HQ2 le
   });
   expect(afterHq2.questStep).toBe('place_farm_plot');
   expect(afterHq2.permissions).toContain('collectOutputs');
-  expect(afterHq2.nextCost.food || 0).toBe(0);
-  expect(afterHq2.nextCost.stone || 0).toBeGreaterThan(0);
+  expect(afterHq2.nextCost.food || 0).toBeGreaterThan(0);
+  expect(afterHq2.nextCost.stone || 0).toBe(0);
 
-  await runLumberCycle(frame, lumberBuildingId, 'hq2-farm-funding');
+  await resolveTownOpportunity(frame, 'first_campfire_choice', 'raise_waymarkers');
   await frame.waitForFunction(() => {
-    return (window.__foundersPlotTest.getState()?.state?.plot?.inventory?.wood || 0) >= 10;
+    return window.__foundersPlotTest.getState()?.state?.townOpportunity?.active?.opportunityId === 'first_supply_council_choice';
+  }, null, { timeout: 5000 });
+  await resolveTownOpportunity(frame, 'first_supply_council_choice', 'host_work_bee');
+  await frame.waitForFunction(() => {
+    return window.__foundersPlotTest.getState()?.state?.townOpportunity?.active?.opportunityId === 'level_two_charter_choice';
+  }, null, { timeout: 5000 });
+  await resolveTownOpportunity(frame, 'level_two_charter_choice', 'seed_farm_coop');
+  await frame.waitForFunction(() => {
+    const state = window.__foundersPlotTest.getState()?.state;
+    return !state?.townOpportunity?.active
+      && (state?.plot?.inventory?.wood || 0) >= 10
+      && state?.currentGoal?.primaryAction?.buildingType === 'FARM_PLOT';
   }, null, { timeout: 5000 });
 
   await frame.getByTestId('founders-quest-cta').click();

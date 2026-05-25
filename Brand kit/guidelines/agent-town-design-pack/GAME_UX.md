@@ -35,6 +35,22 @@ In five seconds, a player should understand:
 
 If the screen reads as a dashboard, asset browser, or AI demo, it fails.
 
+## 1.1.1 Three.js game surface law
+
+Founders Plot V1.x is moving to a Three.js world surface.
+
+The player-facing game surface should be a playable 2.5D/orthographic town scene, not a dashboard. Three.js owns the world surface and object picking; DOM owns HUD, drawers, and setup for now.
+
+Every new V1.5+ gameplay concept must answer:
+
+- where does it appear in the Three.js scene?
+- which world object/anchor owns it?
+- what is the DOM/accessibility mirror?
+- what Playwright screenshot proves it?
+- what API/unit tests prove the server state?
+
+Contracts, requesters, Morning Brief anchors, scenario projects, town identity, and Foreman actions must all have scene-state representation without moving game logic into the renderer.
+
 ## 1.2 V1.4.2 route-level acceptance cleanup
 
 The V1.4.2 GPT Image 2 art baseline is accepted. The next UX cleanup focuses on the live route, not a broad art rebuild.

@@ -1,0 +1,74 @@
+{
+  "schemaVersion": "founders-plot.creator-building.v1",
+  "id": "creator.notice-kiosk",
+  "buildingType": "CREATOR_NOTICE_KIOSK",
+  "label": "Creator Notice Kiosk",
+  "summary": "A curated town notice board that can publish short public-safe notices inside Founders Plot.",
+  "creator": {
+    "name": "Agent Town Labs",
+    "credit": "Agent Town Labs curated example pack"
+  },
+  "source": {
+    "importMode": "curated_local_pack",
+    "externalUpload": false,
+    "path": "public/experiences/founders-plot/creator-packs/notice-kiosk.manifest.json",
+    "assetOrigin": "repo_native_2d_billboard"
+  },
+  "assetGovernance": {
+    "status": "APPROVED",
+    "assetPipeline": "repo_native_or_gpt_image_2_manifested_2d_billboard",
+    "manifestPath": "public/experiences/founders-plot/assets/manifest.json",
+    "promptProvenanceRequired": true,
+    "humanSignoff": "Agent Town Labs"
+  },
+  "creatorEconomics": {
+    "creditModel": "credit_only_v1",
+    "revenueEnabled": false
+  },
+  "moderation": {
+    "status": "APPROVED",
+    "rating": "EVERYONE",
+    "networkAccess": false,
+    "dataAccess": ["plot_public_summary"],
+    "forbiddenData": ["brain", "wallet", "runtime", "worker", "token", "secret", "privateEvents"]
+  },
+  "install": {
+    "objectId": "CREATOR_NOTICE_KIOSK",
+    "requiresHqLevel": 2,
+    "slot": "public_square_edge"
+  },
+  "stateSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "noticeCount": { "type": "integer", "minimum": 0 },
+      "featuredNotice": { "type": "string", "maxLength": 80 },
+      "enabled": { "type": "boolean" }
+    },
+    "required": ["noticeCount", "featuredNotice", "enabled"]
+  },
+  "tools": [
+    {
+      "name": "et.creator.notice_kiosk.post_notice",
+      "description": "Publish one short public-safe notice on the curated Notice Kiosk.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "text": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "idempotencyKey": { "type": "string" }
+        },
+        "required": ["text", "idempotencyKey"]
+      },
+      "resultSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "noticeCount": { "type": "integer" },
+          "featuredNotice": { "type": "string" }
+        },
+        "required": ["noticeCount", "featuredNotice"]
+      }
+    }
+  ]
+}

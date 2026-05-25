@@ -14,7 +14,8 @@ const TABLES = [
   'anchors',
   'inbox',
   'erc8004OptOut',
-  'erc8004Registrations'
+  'erc8004Registrations',
+  'brainVaults'
 ];
 
 let db = null;
@@ -57,7 +58,8 @@ function ensureDb() {
       'CREATE TABLE IF NOT EXISTS anchors (pos INTEGER NOT NULL, data TEXT NOT NULL);',
       'CREATE TABLE IF NOT EXISTS inbox (pos INTEGER NOT NULL, data TEXT NOT NULL);',
       'CREATE TABLE IF NOT EXISTS erc8004OptOut (pos INTEGER NOT NULL, data TEXT NOT NULL);',
-      'CREATE TABLE IF NOT EXISTS erc8004Registrations (pos INTEGER NOT NULL, data TEXT NOT NULL);'
+      'CREATE TABLE IF NOT EXISTS erc8004Registrations (pos INTEGER NOT NULL, data TEXT NOT NULL);',
+      'CREATE TABLE IF NOT EXISTS brainVaults (pos INTEGER NOT NULL, data TEXT NOT NULL);'
     ].join('\n')
   );
   statements = buildStatements(db);
@@ -107,7 +109,8 @@ function normalizeStore(next) {
     anchors: Array.isArray(next?.anchors) ? next.anchors : [],
     inbox: Array.isArray(next?.inbox) ? next.inbox : [],
     erc8004OptOut: Array.isArray(next?.erc8004OptOut) ? next.erc8004OptOut : [],
-    erc8004Registrations: Array.isArray(next?.erc8004Registrations) ? next.erc8004Registrations : []
+    erc8004Registrations: Array.isArray(next?.erc8004Registrations) ? next.erc8004Registrations : [],
+    brainVaults: Array.isArray(next?.brainVaults) ? next.brainVaults : []
   };
 }
 
@@ -125,7 +128,8 @@ function readStore() {
     anchors: [],
     inbox: [],
     erc8004OptOut: [],
-    erc8004Registrations: []
+    erc8004Registrations: [],
+    brainVaults: []
   };
   for (const table of TABLES) {
     const rows = statements[table].all.all();

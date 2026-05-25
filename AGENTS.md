@@ -12,10 +12,10 @@ The project is no longer only a minimal landing page. It contains both:
 Before making product/UI changes, read the relevant docs in this order:
 
 1. `AGENTS.md` — repo workflow and non-negotiable coding rules.
-2. `BRAND.md` — product identity, tone, naming, copy, character, and asset law.
-3. `DESIGN.md` — visual law, tokens, layout, game-surface composition, accessibility, and asset-generation law.
-4. `GAME_UX.md` — UX flows, hierarchy, game-surface interaction rules, screenshot signoff rules, and measurable acceptance criteria.
-5. `REGISTRY.md` — approved `@agent-town` components/blocks, visual contracts, and asset-governance primitives.
+2. `BRAND.md` — root redirect to `Brand kit/guidelines/agent-town-design-pack/BRAND.md`; product identity, tone, naming, copy, character, and asset law.
+3. `DESIGN.md` — root redirect to `Brand kit/guidelines/agent-town-design-pack/DESIGN.md`; visual law, tokens, layout, game-surface composition, accessibility, and asset-generation law.
+4. `GAME_UX.md` — root redirect to `Brand kit/guidelines/agent-town-design-pack/GAME_UX.md`; UX flows, hierarchy, game-surface interaction rules, screenshot signoff rules, and measurable acceptance criteria.
+5. `REGISTRY.md` — root redirect to `Brand kit/guidelines/agent-town-design-pack/REGISTRY.md`; approved `@agent-town` components/blocks, visual contracts, and asset-governance primitives.
 6. The active sprint spec in `specs/`.
 
 Do not duplicate detailed style rules in `AGENTS.md`. Put durable design/UX rules in the design docs above and link to them here.
@@ -64,7 +64,7 @@ Read before implementation:
 3. **Human + agent co-op** — the player and agent/Foreman must operate through the same shared state machine.
 4. **Worker-first architecture** — OpenClaw Lite worker/runtime owns agent behavior; the server owns world truth.
 5. **Deterministic testability** — every milestone must be verifiable with Playwright and lower-level tests where appropriate.
-6. **Wallet/session continuity** — wallet/session continuity must not regress.
+6. **Account/wallet continuity** — account/wallet continuity must not regress.
 7. **Design-source discipline** — visual/game-surface changes must follow `BRAND.md`, `DESIGN.md`, `GAME_UX.md`, and `REGISTRY.md`.
 
 ## Non-goals / constraints
@@ -167,6 +167,18 @@ For Founders Plot and future Agent Town game surfaces:
 - Visual state must derive from real server/game state.
 - Respect reduced motion, keyboard access, touch targets, and accessible names.
 
+### Founders Plot Three.js renderer path
+
+Founders Plot V1.x uses Three.js as the forward human-facing renderer path.
+
+- Three.js is a renderer boundary, not a simulation rewrite.
+- `server/founders_plot/*` remains world truth.
+- `et.plot.*` remains the gameplay mutation path.
+- `public/experiences/founders-plot/scene_state.js` remains the state-to-scene adapter.
+- `public/experiences/founders-plot/three_scene_entry.js` renders the world surface.
+- Semantic DOM hooks remain for accessibility and Playwright.
+- Future gameplay specs must build on the Three.js scene/state contract.
+
 ## Skill Contract Convention (mandatory)
 
 To keep future skill and worker work safe, preserve this convention:
@@ -227,7 +239,9 @@ Debug tabs must remain hidden from the normal gameplay surface.
 
 ### 6) Session and identity guardrails
 
-- The user identity is the connected wallet/session identity, not a transient browser credential.
+- Production identity contract: account/wallet continuity.
+- Privy is the current provider, but normal gameplay copy should not rely on provider jargon.
+- The user identity is the connected account/wallet identity, not a transient browser credential.
 - Team Code is a session/routing token and should stay hidden from cluttered UX surfaces.
 - Session identity should be stable across polling/refresh for a live session.
 
@@ -319,7 +333,7 @@ Founders Plot is now the first gameplay chapter of Agent Town and must be playab
 
 Coding agents must preserve this ladder:
 
-1. **Play Now** — after Privy/test authentication, the user can enter Founders Plot and play manually.
+1. **Play Now** — after account/wallet authentication, the user can enter Founders Plot and play manually.
 2. **Connect Brain** — required only for real Clover Foreman behavior and LLM-mediated actions.
 3. **Visit Town Hall** — later optional path for public identity, ERC-8004/passport-style setup, and advanced onboarding.
 

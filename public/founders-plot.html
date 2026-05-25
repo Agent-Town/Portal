@@ -7,7 +7,7 @@
   <meta name="description" content="Founders Plot starter district" />
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="stylesheet" href="/styles.css?v=20260524a" />
-  <link rel="stylesheet" href="/experiences/founders-plot/styles.css?v=20260524a" />
+  <link rel="stylesheet" href="/experiences/founders-plot/styles.css?v=20260525b" />
 </head>
 <body class="founders-plot-page">
   <div class="foundersPlotRoot foundersGameShell" data-testid="founders-game-shell">
@@ -105,6 +105,7 @@
             <div class="foundersBadge" id="foremanStatusBadge" data-testid="founders-foreman-status">Foreman not started</div>
             <p id="foremanRecommendation" data-testid="founders-companion-advice">The foreman is reading the plot.</p>
             <div class="small" id="foremanToolsLine">Clover can help with routine work you trust it with.</div>
+            <div class="foundersTeachingActions" id="foremanTeachingActions" data-testid="founders-teaching-actions"></div>
             <div class="foundersInlineButtons foundersForemanControls">
               <button class="btn small" id="foremanStartBtn" type="button" data-testid="foreman-start-btn">Start Clover</button>
               <button class="btn small" id="foremanPauseBtn" type="button" data-testid="foreman-pause-btn">Pause Foreman</button>
@@ -113,14 +114,57 @@
           </div>
           <div class="foundersDrawerGrid">
             <div class="foundersSubpanel" id="standingOrderCard" data-testid="founders-standing-order"></div>
+            <div class="foundersSubpanel" id="doctrineCard" data-testid="foreman-doctrine-card"></div>
             <div class="foundersSubpanel" id="planCard" data-testid="founders-plan-card"></div>
+            <div class="foundersSubpanel" id="governanceCard" data-testid="foreman-governance-card"></div>
+            <div class="foundersSubpanel" id="specialistsCard" data-testid="foreman-specialists-card"></div>
             <div class="foundersSubpanel" id="schedulerCard"></div>
+            <div class="foundersSubpanel" id="exceptionCard" data-testid="foreman-exception-inbox"></div>
             <div class="foundersSubpanel" id="receiptCard" data-testid="founders-receipt"></div>
             <div class="foundersDrawerSection">
               <div class="foundersLabel">Delegation</div>
               <div id="permissionsList" data-testid="founders-permissions-panel"></div>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section class="foundersDrawer" id="foundersDrawer-settlements" hidden aria-labelledby="foundersDrawerTitle-settlements">
+        <header class="foundersDrawerHeader">
+          <div>
+            <div class="foundersLabel">Settlements</div>
+            <h2 id="foundersDrawerTitle-settlements">Governor Ledger</h2>
+          </div>
+          <button class="btn small foundersDrawerClose" type="button" data-close-drawer="settlements">Close</button>
+        </header>
+        <div class="foundersDrawerBody foundersDrawerBodyWide" id="governorLedger" data-testid="governor-ledger">
+          <div class="foundersEmptyState">Reading settlement ledger.</div>
+        </div>
+      </section>
+
+      <section class="foundersDrawer" id="foundersDrawer-operating" hidden aria-labelledby="foundersDrawerTitle-operating">
+        <header class="foundersDrawerHeader">
+          <div>
+            <div class="foundersLabel">Operating model</div>
+            <h2 id="foundersDrawerTitle-operating">Town Charter</h2>
+          </div>
+          <button class="btn small foundersDrawerClose" type="button" data-close-drawer="operating">Close</button>
+        </header>
+        <div class="foundersDrawerBody foundersDrawerBodyWide" id="operatingModelPanel" data-testid="operating-model-panel">
+          <div class="foundersEmptyState">Reading town charter.</div>
+        </div>
+      </section>
+
+      <section class="foundersDrawer" id="foundersDrawer-creator" hidden aria-labelledby="foundersDrawerTitle-creator">
+        <header class="foundersDrawerHeader">
+          <div>
+            <div class="foundersLabel">Curated extensions</div>
+            <h2 id="foundersDrawerTitle-creator">Creator Buildings</h2>
+          </div>
+          <button class="btn small foundersDrawerClose" type="button" data-close-drawer="creator">Close</button>
+        </header>
+        <div class="foundersDrawerBody foundersDrawerBodyWide" id="creatorExtensionsPanel" data-testid="creator-extensions-panel">
+          <div class="foundersEmptyState">Reading creator buildings.</div>
         </div>
       </section>
 
@@ -215,6 +259,6 @@
   <script src="/experiences/founders-plot/effects.js?v=20260421a" defer></script>
   <script src="/experiences/founders-plot/visual_metrics.js?v=20260421a" defer></script>
   <script src="/agent_town_access.js?v=20260424a" defer></script>
-  <script src="/experiences/founders-plot/app.js?v=20260524a" defer></script>
+  <script src="/experiences/founders-plot/app.js?v=20260525b" defer></script>
 </body>
 </html>

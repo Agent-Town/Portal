@@ -225,6 +225,7 @@ test('Three.js Founders Plot scene renders in the modal with inspectable canvas 
   expect(info.pickTargets.some((entry) => entry.objectId === 'PAD:0,0' && entry.validPlacement === true)).toBe(true);
   expect(info.parity.labels.some((entry) => entry.objectId === 'PAD:0,0')).toBe(true);
   expect(info.parity.badges.some((entry) => entry.objectId === 'PAD:0,0' && entry.type === 'build')).toBe(true);
+  expect(info.parity.badges.filter((entry) => entry.type === 'build')).toHaveLength(1);
   expect(info.parity.cloverBubbles.some((entry) => entry.objectId === 'CLOVER')).toBe(true);
   expect(info.parity.targetLinks.some((entry) => entry.objectId === 'CLOVER' && entry.targetObjectId === 'PAD:0,0')).toBe(true);
   expect(info.coverage.domainIds).toEqual(expect.arrayContaining(REQUIRED_COVERAGE_DOMAINS));

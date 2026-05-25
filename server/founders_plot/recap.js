@@ -36,6 +36,14 @@ function classifySection(event) {
   const type = String(event?.type || '').toUpperCase();
   if (
     type === 'FOREMAN_RECEIPT_CREATED'
+    || type === 'FOREMAN_LEASE_GRANTED'
+    || type === 'FOREMAN_LEASE_REVOKED'
+    || type === 'FOREMAN_PERSISTENT_STARTED'
+    || type === 'FOREMAN_PERSISTENT_PAUSED'
+    || type === 'FOREMAN_PERSISTENT_TICK'
+    || type === 'SPECIALIST_ASSIGNED'
+    || type === 'SPECIALIST_PAUSED'
+    || type === 'SPECIALIST_RECOMMENDATION_REVIEWED'
     || type === 'AGENT_ACTION_EXECUTED'
     || type.startsWith('FOREMAN_WORKER_COMMAND_')
     || type.startsWith('FOREMAN_LLM_')
@@ -48,10 +56,41 @@ function classifySection(event) {
   if (type === 'APPROVAL_REQUESTED' || type === 'APPROVAL_RESOLVED') {
     return 'What needs your decision now';
   }
+  if (type === 'FOREMAN_EXCEPTION_RAISED' || type === 'FOREMAN_EXCEPTION_RESOLVED') {
+    return 'What needs your decision now';
+  }
+  if (type === 'SPECIALIST_CONFLICT_RAISED') {
+    return 'What needs your decision now';
+  }
   if (type === 'CONTRACT_ACCEPTED' || type === 'CONTRACT_COMPLETED' || type === 'CONTRACT_MISSED') {
     return 'Who asked for help';
   }
-  if (type === 'TOWN_SIGNAL_CHANGED' || type === 'LANDMARK_UPGRADED') {
+  if (
+    type === 'CIVIC_SCENARIO_STARTED'
+    || type === 'CIVIC_SCENARIO_PROGRESS'
+    || type === 'CIVIC_SCENARIO_COMPLETED'
+    || type === 'CIVIC_SCENARIO_SOFT_MISSED'
+    || type === 'SETTLER_EXPEDITION_LAUNCHED'
+    || type === 'SETTLEMENT_FOCUSED'
+    || type === 'SETTLEMENT_FOUNDING_TASK_COMPLETED'
+    || type === 'OPERATING_CHARTER_CHOSEN'
+    || type === 'OPERATING_CAPABILITY_UNLOCKED'
+    || type === 'OPERATING_CONTRACTS_REFRESHED'
+    || type === 'REGIONAL_SUPPLY_ROUTE_OPENED'
+    || type === 'REGIONAL_SUPPLY_TRANSFERRED'
+    || type === 'REGIONAL_CONTRACT_ACCEPTED'
+    || type === 'REGIONAL_CONTRACT_COMPLETED'
+    || type === 'CREATOR_BUILDING_INSTALLED'
+    || type === 'CREATOR_BUILDING_DISABLED'
+    || type === 'CREATOR_BUILDING_REMOVED'
+    || type === 'CREATOR_TOOL_RAN'
+  ) {
+    return 'What changed in town';
+  }
+  if (type === 'REGIONAL_ROUTE_SHORTAGE') {
+    return 'What needs your decision now';
+  }
+  if (type === 'TOWN_SIGNAL_CHANGED' || type === 'LANDMARK_UPGRADED' || type === 'TOWN_IDENTITY_SET') {
     return 'What changed in town';
   }
   if (type === 'JOB_COMPLETED' || type === 'OUTPUT_COLLECTED') {

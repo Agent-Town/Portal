@@ -307,20 +307,76 @@ After the house/founders opening sequence, the next district is **Founders Plot*
   - Reads the four visible town signals that tell you how the town is feeling.
 - `et.plot.town.upgrade_landmark`
   - Raises the Public Square Welcome Sign when the plot can afford it.
+- `et.plot.town.set_identity`
+  - Sets a cosmetic Public Square style after the Welcome Sign is raised.
 - `et.plot.town.resolve_opportunity`
   - Resolves the active Public Square town opportunity after the human chooses one option.
 - `et.plot.journal.get_entries`
   - Reads the compact Town Journal derived from contract, signal, landmark, and Clover events.
 - `et.plot.contracts.get_state`
-  - Reads the living Contract Board with current offers, active contract, and completed requests.
+  - Reads the living Contract Board with current offers, Clover's current recommendation, active contract, and completed requests.
 - `et.plot.contracts.accept`
   - Accepts one `SUPPLY`, `BUILD`, or `PREPARATION` contract. Only one contract may be active.
 - `et.plot.contracts.turn_in`
   - Turns in the active contract once it is ready.
+- `et.plot.settlements.get_ledger`
+  - Reads the Governor Ledger with settlement summaries and the expedition gate.
+- `et.plot.settlements.launch_expedition`
+  - Launches the first second-settlement shard only after first-town stability criteria pass.
+- `et.plot.settlements.focus`
+  - Switches Governor Ledger focus between settlements without mutating their inventories.
+- `et.plot.settlements.complete_founding_task`
+  - Completes one second-settlement founding task using only second-settlement inventory.
+- `et.plot.operating_model.get_state`
+  - Reads the Town Charter and Capability Web state.
+- `et.plot.operating_model.choose_charter`
+  - Chooses one founding operating charter after Ridge Outpost is active.
+- `et.plot.operating_model.unlock_capability`
+  - Unlocks one small operating-model capability after a charter is chosen.
+- `et.plot.operating_model.refresh_contracts`
+  - Refreshes the Contract Board through the chosen charter after `CHARTER_CONTRACTS` is unlocked.
+- `et.plot.regional.get_ledger`
+  - Reads regional routes, shared reserves, regional contracts, and pending route issues.
+- `et.plot.regional.open_supply_route`
+  - Opens the bounded Ridge Supply Route after regional governance is ready.
+- `et.plot.regional.transfer_supply_route`
+  - Moves one deterministic shipment from Founders Plot to Ridge Outpost without creating or destroying resources.
+- `et.plot.regional.accept_contract`
+  - Accepts one regional contract that references both towns.
+- `et.plot.regional.turn_in_contract`
+  - Turns in a regional contract after its required cross-town shipment is complete.
+- `et.plot.creator.get_catalog`
+  - Reads approved creator-building manifests, install gates, current installation state, and allowed actions.
+- `et.plot.creator.install_building`
+  - Installs or re-enables one approved creator building after its gate is ready.
+- `et.plot.creator.disable_building`
+  - Disables one installed creator building while preserving its safe state.
+- `et.plot.creator.remove_building`
+  - Removes one installed creator building without changing core town inventory, buildings, permissions, or progress.
+- `et.creator.notice_kiosk.post_notice`
+  - Posts one public-safe notice through the installed Notice Kiosk creator building.
+- `GET /api/founders-plot/operating-style-card`
+  - Generates the current player's public-safe operating-style card.
+- `GET /api/founders-plot/public/operating-style-card/:plotId`
+  - Loads a shared operating-style card without entering the private town.
+- `POST /api/founders-plot/operating-style/compare`
+  - Compares an imported style card as inspiration only; it must not mutate state.
+- `et.foreman.specialists.get_state`
+  - Reads specialist Foreman staffing lanes, bounded domains, and open conflicts.
+- `et.foreman.specialists.assign`
+  - Assigns or reassigns one specialist to one eligible bounded domain.
+- `et.foreman.specialists.pause`
+  - Pauses one specialist lane without pausing the general Foreman.
+- `et.foreman.specialists.review_recommendation`
+  - Records one specialist recommendation and escalates conflicts to the Exception Inbox.
 - `et.foreman.policy.get_standing_order`
   - Reads Clover's current Standing Order.
 - `et.foreman.policy.set_standing_order`
   - Sets Clover to `CAREFUL_STEWARD` or `BOLD_FOUNDER`.
+- `et.foreman.doctrine.get_state`
+  - Reads Clover's lightweight preference rules.
+- `et.foreman.doctrine.set_rule`
+  - Enables or disables one reversible Clover preference: `PREFER_RESERVES`, `PREFER_SPEED`, `ASK_BEFORE_SPENDING`, or `FINISH_ACTIVE_CONTRACTS_FIRST`.
 - `et.foreman.scheduler.get_status`
   - Reads the Collect ready outputs preset state.
 - `et.foreman.scheduler.enable_collect_ready_outputs`
@@ -329,6 +385,10 @@ After the house/founders opening sequence, the next district is **Founders Plot*
   - Pauses the shipped Collect ready outputs routine.
 - `et.foreman.scheduler.resume`
   - Resumes the shipped Collect ready outputs routine.
+- `et.foreman.governance.start_persistent`
+  - Starts time-boxed while-away Clover help for the collect-ready routine after real Brain authorization.
+- `et.foreman.governance.pause_persistent`
+  - Pauses while-away Clover help immediately.
 
 ### Founders Plot behavior rules
 
@@ -336,21 +396,53 @@ After the house/founders opening sequence, the next district is **Founders Plot*
 - Respect the Current Goal and the Standing Order before choosing a mutation.
 - Use `foreman.companionAdvice` to explain the current bottleneck or town-choice tradeoff before suggesting an action.
 - Use the Contract Board as the first civic choice after HQ2.
+- Treat V1.5 Contract Board offers as the first contract-choice decision layer: compare named requester need, readiness, reward, and Clover's recommendation before choosing.
 - Treat requesters as recurring people and institutions, not disposable strings.
 - Watch for `PREPARATION` requests with a soft deadline and avoid promising them unless the town can finish them.
 - Use `et.plot.town.get_signals` and `et.plot.journal.get_entries` to explain how the town changed.
 - Town opportunities are human preference choices; explain the option costs and town-signal tradeoffs, and call `et.plot.town.resolve_opportunity` only after the human has selected an option.
 - Public Square opportunities can chain during the first session; after each resolution, observe state again before recommending the next build or upgrade.
 - The Welcome Sign is an optional coin sink; it should never be treated as tutorial-gating.
+- Public Square style is cosmetic player identity; do not imply it changes resources, Foreman authority, or hidden strategy.
+- Plot cards and postcards are public-safe exports. Postcards record camera flyover state, but they must not include Brain config, provider details, wallet/session data, runtime or worker traces, tokens, secrets, private logs, or private events.
 - If policy blocks the action, request approval instead of simulating success.
 - Mutation tools require `idempotencyKey`; provide one when you call them.
-- `COLLECT_READY_OUTPUTS` works only while this page stays open; do not promise off-session Clover behavior.
-- If the page reloads, restart Clover before claiming any routine can run again in that tab.
+- `COLLECT_READY_OUTPUTS` works only while this page stays open unless the human has explicitly started while-away Clover help.
+- While-away Clover help is limited to the collect-ready routine. Do not place buildings, upgrade, spend reserves, resolve contracts, resolve scenarios, or invent broader background autonomy.
+- Starting while-away Clover help requires a real connected Brain, a time-boxed Foreman lease, and the collect outputs permission. If any of those are missing, raise or surface an Exception Inbox decision instead of acting.
+- Closed-page while-away work must be proven by the server sweep path, not by claiming the foreground worker kept running.
+- If the page reloads and while-away help is not active, restart Clover before claiming any routine can run again in that tab.
 - Treat `FORBIDDEN_POLICY`, `OUT_OF_RESOURCES`, `BUILD_SLOT_OCCUPIED`, and `JOB_ALREADY_RUNNING` as real world-state blockers, not prompt wording.
 - Never try to spoof the Foreman by sending `actor: "AGENT"` on the human route.
 - Use the Foreman-authenticated route only when the runtime session actually exists, and only through the OpenClaw Lite worker-origin path.
 - When the UI offers a `Run now` Foreman action, the real observe -> decide -> tool-call loop must come through the OpenClaw Lite worker command path.
 - Use recap lines and the current quest to explain why you acted.
+- Use Morning Brief as a return-loop summary. It may summarize real event history, active contracts, blockers, Clover advice, and the next player action, but it must not invent off-session Clover work.
+- Doctrine Lite preferences can tune Clover's recommendations and safe-candidate ranking. They are not permissions, leases, or proof that Real Clover is unlocked.
+- `PREFER_RESERVES` and `PREFER_SPEED` conflict. Raise or respect an Exception Inbox decision instead of silently switching between them.
+- Foreman receipts and Morning Briefs should mention an active preference when it influenced Clover's action.
+- Second settlement actions must go through the Governor Ledger tools. Do not mutate Town 1 inventory/buildings when completing Ridge Outpost founding tasks.
+- Settler Expedition must stay locked until the first town has HQ2, active while-away Clover help, and at least one completed while-away routine action.
+- Operating charter choices must use `et.plot.operating_model.choose_charter` only after Ridge Outpost is active.
+- Charter choice may weight contracts, Clover suggestions, and signage; it must not grant broad autonomy or bypass Foreman permissions.
+- Capability Web unlocks stay small. `CHARTER_CONTRACTS` is required before `et.plot.operating_model.refresh_contracts` appears in allowed tools/actions.
+- Specialist Foremen are staffing lanes under Clover, not separate hidden Brains. Use `et.foreman.specialists.assign` only after the specialist gate is ready.
+- A specialist may recommend only tools in its assigned domain. If a proposed tool is outside the role's domain, treat `SPECIALIST_DOMAIN_VIOLATION` as a hard blocker.
+- Conflicting specialist recommendations must route to the Exception Inbox through `et.foreman.specialists.review_recommendation`; never silently pick one specialist over another.
+- The human can pause or reassign a specialist lane. Pausing a specialist does not pause the general Foreman runtime.
+- Regional governance starts only after Ridge Outpost is active, a charter is chosen, and at least one specialist lane is staffed.
+- Regional route transfers must use `et.plot.regional.transfer_supply_route` with the route's exact from/to towns. Wrong-town transfers are hard blockers.
+- A route shortage is visible in the Governor Ledger and can be recovered by producing the missing resource before retrying the same route.
+- Regional contracts must reference both towns and must not bypass cross-town resource conservation.
+- The regional map is a read model with settlement nodes, route links, and camera focus. Focusing a settlement must not transfer resources or mutate either town.
+- Operating-style cards are public-safe social summaries. They may include charter, doctrine, specialist lanes, regional route counts, Capability Web labels, and cosmetic town identity only.
+- Operating-style cards must exclude Brain config, provider details, wallet/session data, runtime or worker traces, tokens, secrets, private logs, and private events.
+- Imported or inspired operating styles are comparison only. They must never grant resources, buildings, permissions, Foreman authority, or Capability Web nodes.
+- Creator buildings are curated extensions only. Install, disable, remove, and creator-tool actions must go through `et.plot.creator.*` or `et.creator.*` tools and remain bound to server truth.
+- Creator manifests must be approved, typed, no-network, and limited to public town summary data.
+- Creator manifests must also declare curated local import source, approved asset-governance provenance, and a credit-only creator model until a separate marketplace/revenue spec exists.
+- Creator tools must never access or expose Brain config, provider details, wallet/session data, runtime or worker traces, tokens, secrets, private logs, or private events.
+- The Notice Kiosk creator tool may mutate only creator-extension state; it must not grant resources, buildings, permissions, Foreman authority, settlements, routes, or Capability Web nodes.
 
 ### UI intent policy
 

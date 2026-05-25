@@ -16,18 +16,52 @@ const {
   applyResumeScheduler,
   applyPauseScheduler,
   applyEnableCollectReadyOutputs,
+  applyGrantForemanLease,
+  applyPausePersistentForeman,
+  applyPersistentForemanTick,
   applyUpgradeLandmark,
+  applyStartCivicScenario,
+  applyContributeCivicScenario,
+  applyCompleteSettlementFoundingTask,
+  applyChooseOperatingCharter,
+  applyFocusSettlement,
+  applyLaunchSettlerExpedition,
+  applyRefreshOperatingContracts,
+  applySetTownIdentity,
+  applySetForemanDoctrineRule,
+  applyAssignSpecialist,
+  applyPauseSpecialist,
+  applyReviewSpecialistRecommendation,
+  applyAcceptRegionalContract,
+  applyCaptureTownPostcard,
+  applyCreatorNoticeKioskPostNotice,
+  applyDisableCreatorBuilding,
+  applyInstallCreatorBuilding,
+  applyOpenRegionalSupplyRoute,
+  applyRemoveCreatorBuilding,
+  applyTransferRegionalSupplyRoute,
+  applyTurnInRegionalContract,
+  applyStartPersistentForeman,
+  applyUnlockOperatingCapability,
   applyReceiptCorrection,
+  applyForemanPreference,
+  applyRaiseForemanException,
+  applyResolveForemanException,
+  applyRevokeForemanLease,
   applySetStandingOrder,
   applySetPriority,
   applyTurnInContract,
   applyUpgradeBuilding,
   buildForemanObservation,
   buildForemanDecision,
+  buildOperatingStyleCard,
+  buildPlotCard,
+  compareOperatingStyleCards,
   buildSafeForemanCandidates,
   buildWorldDelta,
   chooseForemanCandidateWithTestBrain,
   createInitialPlot,
+  foremanDoctrineView,
   foremanRuntimeStatus,
   pendingApprovalsView,
   resolvePrimaryGoal,
@@ -53,6 +87,8 @@ const {
 const { buildRecap } = require('./recap');
 const { replayFromEvents } = require('./replay');
 const { FOUNDERS_PLOT_TOOL_SPECS, getToolSpec } = require('./tools');
+
+let persistentForemanSweepTimer = null;
 
 function hashJson(value) {
   return crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -350,6 +386,13 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       contracts: state.meta.contracts,
       contractDeck: state.meta.contractDeck,
       townOpportunities: state.meta.townOpportunities,
+      scenarios: state.meta.scenarios,
+      operatingModel: state.meta.operatingModel,
+      specialists: state.meta.specialists,
+      regionalNetwork: state.meta.regionalNetwork,
+      creatorExtensions: state.meta.creatorExtensions,
+      governance: state.meta.governance,
+      doctrine: state.meta.doctrine,
       requesters: state.meta.requesters,
       foremanLastDecision: state.meta.foremanLastDecision,
       publicHeadline: state.meta.publicHeadline
@@ -373,6 +416,13 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       contracts: state.meta.contracts,
       contractDeck: state.meta.contractDeck,
       townOpportunities: state.meta.townOpportunities,
+      scenarios: state.meta.scenarios,
+      operatingModel: state.meta.operatingModel,
+      specialists: state.meta.specialists,
+      regionalNetwork: state.meta.regionalNetwork,
+      creatorExtensions: state.meta.creatorExtensions,
+      governance: state.meta.governance,
+      doctrine: state.meta.doctrine,
       requesters: state.meta.requesters,
       foremanLastDecision: state.meta.foremanLastDecision,
       publicHeadline: state.meta.publicHeadline
@@ -389,6 +439,79 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       return appendEvents(state.plot.plotId, events);
     }
     return [];
+  }
+
+  function runPersistentForemanAndPersist(state, nowMs = Date.now()) {
+    const events = [];
+    const recentEvents = listRecentEvents(state.plot.plotId, 48);
+    const result = applyPersistentForemanTick(state, {
+      nowMs,
+      recentEvents
+    }, {
+      nowMs,
+      appendEvent: (event) => events.push({
+        ...event,
+        createdAt: event.createdAt || nowMs
+      })
+    });
+    savePlotGraph(state);
+    if (events.length > 0) {
+      appendEvents(state.plot.plotId, events);
+    }
+    return {
+      result,
+      events
+    };
+  }
+
+  function runPersistentForemanSweep(nowMs = Date.now()) {
+    const results = [];
+    for (const state of listPlots(100)) {
+      if (!state?.plot?.plotId) continue;
+      const persistent = state?.meta?.governance?.persistent;
+      if (!persistent || String(persistent.status || '').toUpperCase() !== 'ACTIVE') continue;
+      const events = [];
+      simulatePlot(state, nowMs, (event) => {
+        events.push({
+          ...event,
+          createdAt: event.createdAt || nowMs
+        });
+      });
+      const result = applyPersistentForemanTick(state, {
+        nowMs,
+        recentEvents: listRecentEvents(state.plot.plotId, 48)
+      }, {
+        nowMs,
+        appendEvent: (event) => events.push({
+          ...event,
+          createdAt: event.createdAt || nowMs
+        })
+      });
+      savePlotGraph(state);
+      if (events.length > 0) {
+        appendEvents(state.plot.plotId, events);
+      }
+      results.push({
+        plotId: state.plot.plotId,
+        result
+      });
+    }
+    return results;
+  }
+
+  if (
+    !persistentForemanSweepTimer
+    && process.env.NODE_ENV !== 'test'
+    && process.env.FOUNDERS_PLOT_BACKGROUND_FOREMAN_DISABLED !== '1'
+  ) {
+    persistentForemanSweepTimer = setInterval(() => {
+      try {
+        runPersistentForemanSweep(Date.now());
+      } catch {
+        // Keep the app server alive if one background sweep fails.
+      }
+    }, 15_000);
+    if (typeof persistentForemanSweepTimer.unref === 'function') persistentForemanSweepTimer.unref();
   }
 
   function readForemanBearer(req) {
@@ -428,8 +551,9 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
 
   function withState(req, res) {
     const identity = resolvePlotIdentity(req, res);
-    const nowMs = Date.now();
-    const state = createPlotIfMissing(identity, nowMs);
+    const wallNowMs = Date.now();
+    const state = createPlotIfMissing(identity, wallNowMs);
+    const nowMs = Math.max(wallNowMs, safeFiniteNumber(state?.plot?.lastSimulatedAt, wallNowMs));
     const simulation = applySimulation(state, nowMs);
     return { identity, nowMs, state, simulation };
   }
@@ -469,6 +593,10 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
     'et.plot.town.get_signals',
     'et.plot.journal.get_entries',
     'et.plot.contracts.get_state',
+    'et.plot.scenarios.get_state',
+    'et.plot.regional.get_ledger',
+    'et.plot.creator.get_catalog',
+    'et.foreman.specialists.get_state',
     'et.foreman.policy.get_standing_order',
     'et.foreman.scheduler.get_status'
   ]);
@@ -496,6 +624,26 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
     if (toolName === 'et.plot.contracts.get_state') {
       return {
         contracts: payload.contracts
+      };
+    }
+    if (toolName === 'et.plot.scenarios.get_state') {
+      return {
+        scenarios: payload.scenarios
+      };
+    }
+    if (toolName === 'et.plot.regional.get_ledger') {
+      return {
+        regionalNetwork: payload.regionalNetwork
+      };
+    }
+    if (toolName === 'et.plot.creator.get_catalog') {
+      return {
+        creatorExtensions: payload.creatorExtensions
+      };
+    }
+    if (toolName === 'et.foreman.specialists.get_state') {
+      return {
+        specialists: payload.foreman?.specialists
       };
     }
     if (toolName === 'et.foreman.policy.get_standing_order') {
@@ -704,6 +852,11 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         data = applyUpgradeLandmark(ctx.state, {
           landmarkId: String(rawArgs.landmarkId || '').trim()
         }, mutationHelpers);
+      } else if (toolName === 'et.plot.town.set_identity') {
+        data = applySetTownIdentity(ctx.state, {
+          landmarkId: String(rawArgs.landmarkId || '').trim(),
+          styleId: String(rawArgs.styleId || '').trim()
+        }, mutationHelpers);
       } else if (toolName === 'et.plot.town.resolve_opportunity') {
         data = applyResolveTownOpportunity(ctx.state, {
           opportunityId: String(rawArgs.opportunityId || '').trim(),
@@ -725,6 +878,123 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         data = applyTurnInContract(ctx.state, {
           contractId: String(rawArgs.contractId || '').trim()
         }, mutationHelpers);
+      } else if (toolName === 'et.plot.scenarios.get_state') {
+        data = {
+          scenarios: buildStatePayload(ctx.state).scenarios
+        };
+      } else if (toolName === 'et.plot.scenarios.start') {
+        data = applyStartCivicScenario(ctx.state, {
+          scenarioId: String(rawArgs.scenarioId || '').trim()
+        }, mutationHelpers);
+      } else if (toolName === 'et.plot.scenarios.contribute') {
+        data = applyContributeCivicScenario(ctx.state, {
+          scenarioId: String(rawArgs.scenarioId || '').trim(),
+          taskId: String(rawArgs.taskId || '').trim()
+        }, mutationHelpers);
+      } else if (toolName === 'et.plot.settlements.get_ledger') {
+        data = {
+          settlements: buildStatePayload(ctx.state).settlements
+        };
+      } else if (toolName === 'et.plot.settlements.launch_expedition') {
+        data = {
+          settlements: applyLaunchSettlerExpedition(ctx.state, {}, mutationHelpers)
+        };
+      } else if (toolName === 'et.plot.settlements.focus') {
+        data = {
+          settlements: applyFocusSettlement(ctx.state, {
+            settlementId: String(rawArgs.settlementId || 'town_1').trim()
+          }, mutationHelpers)
+        };
+      } else if (toolName === 'et.plot.settlements.complete_founding_task') {
+        data = {
+          settlements: applyCompleteSettlementFoundingTask(ctx.state, {
+            settlementId: String(rawArgs.settlementId || 'town_2').trim(),
+            taskId: String(rawArgs.taskId || 'raise_outpost_camp').trim()
+          }, mutationHelpers)
+        };
+      } else if (toolName === 'et.plot.operating_model.get_state') {
+        data = {
+          operatingModel: buildStatePayload(ctx.state).operatingModel
+        };
+      } else if (toolName === 'et.plot.operating_model.choose_charter') {
+        data = applyChooseOperatingCharter(ctx.state, {
+          charterId: String(rawArgs.charterId || '').trim(),
+          source: 'tool'
+        }, mutationHelpers);
+      } else if (toolName === 'et.plot.operating_model.unlock_capability') {
+        data = applyUnlockOperatingCapability(ctx.state, {
+          capabilityId: String(rawArgs.capabilityId || '').trim(),
+          source: 'tool'
+        }, mutationHelpers);
+      } else if (toolName === 'et.plot.operating_model.refresh_contracts') {
+        data = applyRefreshOperatingContracts(ctx.state, {}, mutationHelpers);
+      } else if (toolName === 'et.plot.regional.get_ledger') {
+        data = {
+          regionalNetwork: buildStatePayload(ctx.state).regionalNetwork
+        };
+      } else if (toolName === 'et.plot.regional.open_supply_route') {
+        data = applyOpenRegionalSupplyRoute(ctx.state, {
+          routeId: String(rawArgs.routeId || 'founders_ridge_supply_route').trim()
+        }, mutationHelpers);
+      } else if (toolName === 'et.plot.regional.transfer_supply_route') {
+        data = applyTransferRegionalSupplyRoute(ctx.state, {
+          routeId: String(rawArgs.routeId || 'founders_ridge_supply_route').trim(),
+          fromSettlementId: String(rawArgs.fromSettlementId || 'town_1').trim(),
+          toSettlementId: String(rawArgs.toSettlementId || 'town_2').trim()
+        }, mutationHelpers);
+      } else if (toolName === 'et.plot.regional.accept_contract') {
+        data = applyAcceptRegionalContract(ctx.state, {
+          contractId: String(rawArgs.contractId || 'ridge_timber_bridge').trim()
+        }, mutationHelpers);
+      } else if (toolName === 'et.plot.regional.turn_in_contract') {
+        data = applyTurnInRegionalContract(ctx.state, {
+          contractId: String(rawArgs.contractId || 'ridge_timber_bridge').trim()
+        }, mutationHelpers);
+      } else if (toolName === 'et.plot.creator.get_catalog') {
+        data = {
+          creatorExtensions: buildStatePayload(ctx.state).creatorExtensions
+        };
+      } else if (toolName === 'et.plot.creator.install_building') {
+        data = applyInstallCreatorBuilding(ctx.state, {
+          extensionId: String(rawArgs.extensionId || 'creator.notice-kiosk').trim()
+        }, mutationHelpers);
+      } else if (toolName === 'et.plot.creator.disable_building') {
+        data = applyDisableCreatorBuilding(ctx.state, {
+          extensionId: String(rawArgs.extensionId || 'creator.notice-kiosk').trim()
+        }, mutationHelpers);
+      } else if (toolName === 'et.plot.creator.remove_building') {
+        data = applyRemoveCreatorBuilding(ctx.state, {
+          extensionId: String(rawArgs.extensionId || 'creator.notice-kiosk').trim()
+        }, mutationHelpers);
+      } else if (toolName === 'et.creator.notice_kiosk.post_notice') {
+        data = applyCreatorNoticeKioskPostNotice(ctx.state, {
+          text: String(rawArgs.text || '').trim()
+        }, mutationHelpers);
+      } else if (toolName === 'et.foreman.specialists.get_state') {
+        data = {
+          specialists: buildStatePayload(ctx.state).foreman?.specialists
+        };
+      } else if (toolName === 'et.foreman.specialists.assign') {
+        data = applyAssignSpecialist(ctx.state, {
+          roleId: String(rawArgs.roleId || '').trim(),
+          domainId: String(rawArgs.domainId || '').trim(),
+          source: 'tool'
+        }, mutationHelpers);
+      } else if (toolName === 'et.foreman.specialists.pause') {
+        data = applyPauseSpecialist(ctx.state, {
+          roleId: String(rawArgs.roleId || '').trim(),
+          reason: String(rawArgs.reason || 'Player paused specialist lane.').trim()
+        }, mutationHelpers);
+      } else if (toolName === 'et.foreman.specialists.review_recommendation') {
+        data = applyReviewSpecialistRecommendation(ctx.state, {
+          roleId: String(rawArgs.roleId || '').trim(),
+          domainId: String(rawArgs.domainId || '').trim(),
+          toolName: String(rawArgs.toolName || '').trim(),
+          targetObjectId: String(rawArgs.targetObjectId || '').trim(),
+          summary: String(rawArgs.summary || '').trim(),
+          recommendationId: String(rawArgs.recommendationId || '').trim(),
+          conflictsWith: Array.isArray(rawArgs.conflictsWith) ? rawArgs.conflictsWith : []
+        }, mutationHelpers);
       } else if (toolName === 'et.foreman.policy.get_standing_order') {
         data = {
           standingOrder: buildStatePayload(ctx.state).foreman?.standingOrder
@@ -732,6 +1002,16 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       } else if (toolName === 'et.foreman.policy.set_standing_order') {
         data = applySetStandingOrder(ctx.state, {
           standingOrder: String(rawArgs.standingOrder || '').trim()
+        }, mutationHelpers);
+      } else if (toolName === 'et.foreman.doctrine.get_state') {
+        data = {
+          doctrine: buildStatePayload(ctx.state).foreman?.doctrine
+        };
+      } else if (toolName === 'et.foreman.doctrine.set_rule') {
+        data = applySetForemanDoctrineRule(ctx.state, {
+          ruleId: String(rawArgs.ruleId || '').trim(),
+          enabled: rawArgs.enabled !== false,
+          source: 'tool'
         }, mutationHelpers);
       } else if (toolName === 'et.foreman.scheduler.get_status') {
         data = {
@@ -748,6 +1028,54 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       } else if (toolName === 'et.foreman.scheduler.resume') {
         data = {
           scheduler: applyResumeScheduler(ctx.state, mutationHelpers)
+        };
+      } else if (toolName === 'et.foreman.governance.grant_lease') {
+        data = {
+          governance: applyGrantForemanLease(ctx.state, {
+            durationMinutes: Number(rawArgs.durationMinutes || 15),
+            scope: String(rawArgs.scope || 'collect_ready_outputs').trim()
+          }, mutationHelpers)
+        };
+      } else if (toolName === 'et.foreman.governance.revoke_lease') {
+        data = {
+          governance: applyRevokeForemanLease(ctx.state, {
+            reason: String(rawArgs.reason || 'Player revoked Foreman lease.').trim()
+          }, mutationHelpers)
+        };
+      } else if (toolName === 'et.foreman.governance.raise_exception') {
+        data = {
+          governance: applyRaiseForemanException(ctx.state, {
+            title: String(rawArgs.title || '').trim(),
+            body: String(rawArgs.body || '').trim(),
+            requestedAction: String(rawArgs.requestedAction || '').trim(),
+            severity: String(rawArgs.severity || 'needs_review').trim(),
+            payload: rawArgs.payload && typeof rawArgs.payload === 'object' ? rawArgs.payload : {}
+          }, mutationHelpers)
+        };
+      } else if (toolName === 'et.foreman.governance.resolve_exception') {
+        data = {
+          governance: applyResolveForemanException(ctx.state, {
+            exceptionId: String(rawArgs.exceptionId || '').trim(),
+            resolution: String(rawArgs.resolution || 'RESOLVED').trim()
+          }, mutationHelpers)
+        };
+      } else if (toolName === 'et.foreman.governance.start_persistent') {
+        if (rawArgs.brainReady !== true) {
+          const error = new Error('BRAIN_REQUIRED');
+          error.details = { reason: 'BRAIN_NOT_READY' };
+          throw error;
+        }
+        data = {
+          governance: applyStartPersistentForeman(ctx.state, {
+            durationMinutes: Number(rawArgs.durationMinutes || 120),
+            scope: String(rawArgs.scope || 'collect_ready_outputs').trim()
+          }, mutationHelpers)
+        };
+      } else if (toolName === 'et.foreman.governance.pause_persistent') {
+        data = {
+          governance: applyPausePersistentForeman(ctx.state, {
+            reason: String(rawArgs.reason || 'Player paused while-away Clover help.').trim()
+          }, mutationHelpers)
         };
       } else {
         const error = new Error('INVALID_STATE');
@@ -772,9 +1100,11 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         ? 401
         : normalized.code === 'OUT_OF_BOUNDS' || normalized.code === 'INVALID_STATE'
           ? 400
-          : normalized.code === 'OUT_OF_RESOURCES' || normalized.code === 'FORBIDDEN_POLICY' || normalized.code === 'ACTOR_SPOOF_REJECTED' || normalized.code === 'FOREMAN_RUNTIME_REQUIRED' || normalized.code === 'STALE_RUNTIME'
+          : normalized.code === 'CREATOR_MANIFEST_NOT_FOUND'
+            ? 404
+          : normalized.code === 'OUT_OF_RESOURCES' || normalized.code === 'FORBIDDEN_POLICY' || normalized.code === 'ACTOR_SPOOF_REJECTED' || normalized.code === 'FOREMAN_RUNTIME_REQUIRED' || normalized.code === 'STALE_RUNTIME' || normalized.code === 'SPECIALIST_GATE_REQUIRED' || normalized.code === 'SPECIALIST_DOMAIN_VIOLATION' || normalized.code === 'REGIONAL_GATE_REQUIRED' || normalized.code === 'REGIONAL_ROUTE_FORBIDDEN' || normalized.code === 'CREATOR_GATE_REQUIRED' || normalized.code === 'CREATOR_MANIFEST_REJECTED' || normalized.code === 'CREATOR_TOOL_MODERATION_FAILED'
             ? 403
-            : normalized.code === 'BUILD_SLOT_OCCUPIED' || normalized.code === 'JOB_ALREADY_RUNNING' || normalized.code === 'IDEMPOTENCY_CONFLICT' || normalized.code === 'CONTRACT_ACTIVE_EXISTS'
+            : normalized.code === 'BUILD_SLOT_OCCUPIED' || normalized.code === 'JOB_ALREADY_RUNNING' || normalized.code === 'IDEMPOTENCY_CONFLICT' || normalized.code === 'CONTRACT_ACTIVE_EXISTS' || normalized.code === 'SPECIALIST_ASSIGNMENT_REQUIRED' || normalized.code === 'REGIONAL_ROUTE_REQUIRED' || normalized.code === 'REGIONAL_CONTRACT_ACTIVE_EXISTS' || normalized.code === 'CREATOR_INSTALLATION_REQUIRED'
               ? 409
               : normalized.code === 'RATE_LIMITED'
                 ? 429
@@ -845,7 +1175,10 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       }
       res.json({
         ok: true,
-        recap
+        recap: {
+          ...recap,
+          morningBrief: buildStatePayload(state).recap?.morningBrief || null
+        }
       });
     } catch (error) {
       const normalized = normalizeToolError(error);
@@ -1120,6 +1453,64 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
     }
   });
 
+  router.post('/api/founders-plot/foreman/persistent/start', (req, res) => {
+    try {
+      const { state, nowMs } = withState(req, res);
+      const raw = req.body && typeof req.body === 'object' ? req.body : {};
+      if (raw.brainReady !== true) {
+        const error = new Error('BRAIN_REQUIRED');
+        error.details = { reason: 'BRAIN_NOT_READY' };
+        throw error;
+      }
+      const events = [];
+      const governance = applyStartPersistentForeman(state, {
+        durationMinutes: Number(raw.durationMinutes || 120),
+        scope: String(raw.scope || 'collect_ready_outputs').trim()
+      }, {
+        nowMs,
+        appendEvent: (event) => events.push({
+          ...event,
+          createdAt: event.createdAt || nowMs
+        })
+      });
+      persistStateAndEvents(state, events);
+      res.json({
+        ok: true,
+        governance,
+        state: buildStatePayload(state)
+      });
+    } catch (error) {
+      const normalized = normalizeToolError(error);
+      res.status(normalized.code === 'BRAIN_REQUIRED' ? 403 : 400).json({ ok: false, error: normalized });
+    }
+  });
+
+  router.post('/api/founders-plot/foreman/persistent/pause', (req, res) => {
+    try {
+      const { state, nowMs } = withState(req, res);
+      const raw = req.body && typeof req.body === 'object' ? req.body : {};
+      const events = [];
+      const governance = applyPausePersistentForeman(state, {
+        reason: String(raw.reason || 'Player paused while-away Clover help.').trim()
+      }, {
+        nowMs,
+        appendEvent: (event) => events.push({
+          ...event,
+          createdAt: event.createdAt || nowMs
+        })
+      });
+      persistStateAndEvents(state, events);
+      res.json({
+        ok: true,
+        governance,
+        state: buildStatePayload(state)
+      });
+    } catch (error) {
+      const normalized = normalizeToolError(error);
+      res.status(400).json({ ok: false, error: normalized });
+    }
+  });
+
   router.get('/api/founders-plot/foreman/observation', (req, res) => {
     try {
       const { state, nowMs, runtime } = requireForemanRuntime(req, res);
@@ -1350,6 +1741,7 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
 
       const lastSeq = listRecentEvents(state.plot.plotId, 1)[0]?.seq || 0;
       const action = toolName === 'et.plot.collect_outputs' ? 'collect_ready_outputs' : toolName;
+      const doctrineUsed = foremanDoctrineView(state);
       const receipt = {
         receiptId: `rcpt_${crypto.randomBytes(6).toString('hex')}`,
         action,
@@ -1362,6 +1754,12 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         ),
         authorityUsed: 'Foreman runtime token (server-authenticated)',
         standingOrderUsed: buildStatePayload(state).foreman?.standingOrder || '',
+        doctrineUsed: doctrineUsed.activeRules.length > 0
+          ? {
+            activeRules: doctrineUsed.activeRules,
+            summary: doctrineUsed.summary
+          }
+          : null,
         correctionOptions: ['ASK_ME_NEXT_TIME', 'PAUSE_FOREMAN'],
         createdAt: nowMs,
         eventId: lastSeq + eventBuffer.length + 1
@@ -1495,6 +1893,75 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
     }
   });
 
+  router.post('/api/founders-plot/foreman/preference', (req, res) => {
+    try {
+      const { state, nowMs } = withState(req, res);
+      const raw = req.body && typeof req.body === 'object' ? req.body : {};
+      const preferenceEvents = [];
+      const result = applyForemanPreference(state, {
+        correction: String(raw.correction || '').trim(),
+        note: String(raw.note || '').trim()
+      }, {
+        nowMs,
+        appendEvent: (event) => preferenceEvents.push({
+          ...event,
+          createdAt: event.createdAt || nowMs
+        })
+      });
+      persistStateAndEvents(state, [
+        ...preferenceEvents,
+        {
+          type: EVENT_TYPES.FOREMAN_PREFERENCE_RECORDED,
+          actor: 'HUMAN',
+          explanation: `The player taught Clover: ${result.label}.`,
+          recapLine: `Clover learned: ${result.label}.`,
+          data: {
+            correction: result.correction,
+            teachingPreferences: result.teachingPreferences,
+            contractRecommendation: result.contractRecommendation
+          },
+          createdAt: nowMs
+        }
+      ]);
+      res.json({
+        ok: true,
+        result,
+        state: buildStatePayload(state)
+      });
+    } catch (error) {
+      const normalized = normalizeToolError(error);
+      res.status(400).json({ ok: false, error: normalized });
+    }
+  });
+
+  router.post('/api/founders-plot/foreman/doctrine', (req, res) => {
+    try {
+      const { state, nowMs } = withState(req, res);
+      const raw = req.body && typeof req.body === 'object' ? req.body : {};
+      const events = [];
+      const result = applySetForemanDoctrineRule(state, {
+        ruleId: String(raw.ruleId || '').trim(),
+        enabled: raw.enabled !== false,
+        source: 'player'
+      }, {
+        nowMs,
+        appendEvent: (event) => events.push({
+          ...event,
+          createdAt: event.createdAt || nowMs
+        })
+      });
+      persistStateAndEvents(state, events);
+      res.json({
+        ok: true,
+        result,
+        state: buildStatePayload(state)
+      });
+    } catch (error) {
+      const normalized = normalizeToolError(error);
+      res.status(400).json({ ok: false, error: normalized });
+    }
+  });
+
   router.get('/api/founders-plot/public', (_req, res) => {
     const summaries = listPlots(20).map((state) => summarizePublic(state));
     res.json({
@@ -1514,6 +1981,17 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
     });
   });
 
+  router.get('/api/founders-plot/public/operating-style-card/:plotId', (req, res) => {
+    const state = loadPlotGraphById(String(req.params.plotId || '').trim());
+    if (!state) {
+      return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    }
+    return res.json({
+      ok: true,
+      card: buildOperatingStyleCard(state, { nowMs: Date.now() })
+    });
+  });
+
   router.post('/api/founders-plot/tool/:toolName', (req, res) => {
     executeTool(String(req.params.toolName || '').trim(), req, res);
   });
@@ -1524,6 +2002,85 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
       res.json({
         ok: true,
         summary: summarizePublic(state)
+      });
+    } catch (error) {
+      const normalized = normalizeToolError(error);
+      res.status(normalized.code === 'UNAUTHORIZED' ? 401 : 500).json({
+        ok: false,
+        error: normalized.code
+      });
+    }
+  });
+
+  router.get('/api/founders-plot/plot-card', (req, res) => {
+    try {
+      const { state, nowMs } = withState(req, res);
+      res.json({
+        ok: true,
+        card: buildPlotCard(state, { nowMs })
+      });
+    } catch (error) {
+      const normalized = normalizeToolError(error);
+      res.status(normalized.code === 'UNAUTHORIZED' ? 401 : 500).json({
+        ok: false,
+        error: normalized.code
+      });
+    }
+  });
+
+  router.post('/api/founders-plot/postcard', (req, res) => {
+    try {
+      const rawArgs = req.body && typeof req.body === 'object' ? req.body : {};
+      const ctx = mutationContext(req, res, 'et.plot.town.capture_postcard', rawArgs);
+      if (ctx.replayResponse) return res.json(ctx.replayResponse);
+      const events = [];
+      const result = applyCaptureTownPostcard(ctx.state, {
+        focusObjectId: String(rawArgs.focusObjectId || 'PUBLIC_SQUARE').trim() || 'PUBLIC_SQUARE'
+      }, {
+        nowMs: ctx.nowMs,
+        appendEvent: (event) => events.push({ ...event, createdAt: event.createdAt || ctx.nowMs })
+      });
+      const payload = {
+        ok: true,
+        postcard: result.postcard,
+        postcards: result.postcards,
+        state: buildStatePayload(ctx.state)
+      };
+      persistMutation(ctx.state, 'et.plot.town.capture_postcard', ctx.idempotencyKey, ctx.argsHash, payload, events);
+      res.json(payload);
+    } catch (error) {
+      const normalized = normalizeToolError(error);
+      res.status(normalized.code === 'UNAUTHORIZED' ? 401 : 400).json({
+        ok: false,
+        error: normalized
+      });
+    }
+  });
+
+  router.get('/api/founders-plot/operating-style-card', (req, res) => {
+    try {
+      const { state, nowMs } = withState(req, res);
+      res.json({
+        ok: true,
+        card: buildOperatingStyleCard(state, { nowMs })
+      });
+    } catch (error) {
+      const normalized = normalizeToolError(error);
+      res.status(normalized.code === 'UNAUTHORIZED' ? 401 : 500).json({
+        ok: false,
+        error: normalized.code
+      });
+    }
+  });
+
+  router.post('/api/founders-plot/operating-style/compare', (req, res) => {
+    try {
+      const { state, nowMs } = withState(req, res);
+      const current = buildOperatingStyleCard(state, { nowMs });
+      res.json({
+        ok: true,
+        current,
+        comparison: compareOperatingStyleCards(current, req.body?.card || {})
       });
     } catch (error) {
       const normalized = normalizeToolError(error);
@@ -1548,6 +2105,16 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
             createdAt: event.createdAt || targetMs
           });
         });
+        const persistent = applyPersistentForemanTick(state, {
+          nowMs: targetMs,
+          recentEvents: listRecentEvents(state.plot.plotId, 48)
+        }, {
+          nowMs: targetMs,
+          appendEvent: (event) => events.push({
+            ...event,
+            createdAt: event.createdAt || targetMs
+          })
+        });
         savePlotGraph(state);
         if (events.length > 0) {
           appendEvents(state.plot.plotId, events);
@@ -1555,11 +2122,50 @@ function createFoundersPlotRouter({ resolveIdentity } = {}) {
         res.json({
           ok: true,
           advancedToMs: targetMs,
+          persistent,
           state: buildStatePayload(state)
         });
       } catch (error) {
         const normalized = normalizeToolError(error);
         res.status(normalized.code === 'UNAUTHORIZED' ? 401 : 500).json({
+          ok: false,
+          error: normalized.code
+        });
+      }
+    });
+
+    router.post('/__test__/founders-plot/persistent-tick', (req, res) => {
+      try {
+        const { state, nowMs } = withState(req, res);
+        const { result, events } = runPersistentForemanAndPersist(state, nowMs);
+        res.json({
+          ok: true,
+          persistent: result,
+          eventCount: events.length,
+          state: buildStatePayload(state)
+        });
+      } catch (error) {
+        const normalized = normalizeToolError(error);
+        res.status(normalized.code === 'UNAUTHORIZED' ? 401 : 500).json({
+          ok: false,
+          error: normalized.code
+        });
+      }
+    });
+
+    router.post('/__test__/founders-plot/persistent-sweep', (req, res) => {
+      try {
+        const requestedNowMs = Number(req.body?.nowMs || 0);
+        const nowMs = Number.isFinite(requestedNowMs) && requestedNowMs > 0 ? requestedNowMs : Date.now();
+        const results = runPersistentForemanSweep(nowMs);
+        res.json({
+          ok: true,
+          results,
+          ranCount: results.filter((entry) => entry?.result?.ran === true).length
+        });
+      } catch (error) {
+        const normalized = normalizeToolError(error);
+        res.status(500).json({
           ok: false,
           error: normalized.code
         });

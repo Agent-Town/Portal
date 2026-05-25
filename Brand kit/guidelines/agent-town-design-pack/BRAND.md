@@ -87,6 +87,16 @@ The player is **crossing the gate into town**.
 - **Founders Plot** is the launch chapter.
 - Use **Agent Town: Founders Plot** when continuity helps, but do not collapse the whole product into the Founders Plot name.
 
+## 4.1.1 Public roadmap language
+
+Use **account/wallet continuity** for player-facing identity and recovery language. Use **Privy** only where the user is configuring or troubleshooting the production login provider.
+
+Founders Plot is now represented as an immersive Three.js town scene in future-facing roadmap and marketing copy, but the core fantasy remains:
+
+> Build a town with Clover, then gradually learn to govern a growing civilization with AI partners.
+
+Do not market the roadmap as a generic 3D metaverse. The game remains a cozy frontier civic-builder with AI delegation as the differentiator.
+
 V1.4.2 keeps the recovered role hierarchy explicit:
 
 - **Clover Kincaid** is the gameplay partner and Foreman on the default Founders Plot route.

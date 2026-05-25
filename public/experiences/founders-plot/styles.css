@@ -334,6 +334,18 @@ html.founders-plot-embed body.founders-plot-page {
   background: linear-gradient(180deg, var(--fp-ochre), var(--fp-brass));
 }
 
+.foundersTrayIcon--ledger {
+  background: linear-gradient(180deg, var(--fp-teal), var(--fp-brass));
+}
+
+.foundersTrayIcon--creator {
+  background: linear-gradient(180deg, var(--fp-brass), var(--fp-teal));
+}
+
+.foundersTrayIcon--charter {
+  background: linear-gradient(180deg, var(--fp-ochre), var(--fp-teal));
+}
+
 .foundersTrayIcon--approval {
   background: linear-gradient(180deg, var(--fp-rust), var(--fp-ochre));
 }
@@ -519,11 +531,8 @@ html.founders-plot-embed body.founders-plot-page {
   opacity: 0 !important;
 }
 
-.at-fp-stage--threejs .at-fp-stage-object:focus .at-fp-objectLabel,
-.at-fp-stage--threejs .at-fp-stage-object:focus-visible .at-fp-objectLabel,
-.at-fp-stage--threejs .at-fp-clover:focus .at-fp-cloverBubble,
-.at-fp-stage--threejs .at-fp-clover:focus-visible .at-fp-cloverBubble {
-  opacity: 1 !important;
+.at-fp-stage--threejs .at-fp-stageObjects {
+  pointer-events: none;
 }
 
 .at-fp-stage::after {
@@ -600,7 +609,7 @@ html.founders-plot-embed body.founders-plot-page {
 }
 
 .at-fp-stageObjects {
-  z-index: 2;
+  z-index: 47;
 }
 
 .at-fp-stage-object,
@@ -635,7 +644,7 @@ html.founders-plot-embed body.founders-plot-page {
 
 .at-fp-cloverWrap,
 .at-fp-clover {
-  z-index: 44;
+  z-index: 48;
   transform: translate(-50%, -90%);
 }
 
@@ -699,6 +708,10 @@ html.founders-plot-embed body.founders-plot-page {
   overflow: hidden;
   text-overflow: ellipsis;
   box-shadow: 0 10px 24px rgba(61, 32, 15, 0.14);
+}
+
+.founders-plot-fullscreen .at-fp-stage--threejs .at-fp-sceneActionsKicker {
+  display: none;
 }
 
 .at-fp-sceneActionsRow {
@@ -901,10 +914,14 @@ html.founders-plot-embed body.founders-plot-page {
 .at-fp-stage-object--under-construction::after {
   content: "";
   position: absolute;
-  inset: 12% 16% auto;
-  aspect-ratio: 1;
-  background: url("/experiences/founders-plot/assets/overlays/construction.svg") center/contain no-repeat;
-  opacity: 0.92;
+  top: 8%;
+  right: 9%;
+  width: clamp(30px, 30%, 44px);
+  height: clamp(30px, 30%, 44px);
+  background: url("/experiences/founders-plot/assets/overlays/construction.svg?v=20260525a") center/contain no-repeat;
+  opacity: 0.94;
+  filter: drop-shadow(0 5px 10px rgba(61, 32, 15, 0.22));
+  pointer-events: none;
 }
 
 .at-fp-stage-object--blocked::after {
@@ -1381,6 +1398,35 @@ html.founders-plot-embed body.founders-plot-page {
     rgba(255, 248, 232, 0.62);
 }
 
+.foundersBrainLoginPath {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(76, 132, 99, 0.24);
+  background:
+    linear-gradient(135deg, rgba(76, 132, 99, 0.12), rgba(255, 255, 255, 0.52));
+}
+
+.foundersBrainQuickDivider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fp-ink-soft);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.foundersBrainQuickDivider::before,
+.foundersBrainQuickDivider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: rgba(46, 27, 14, 0.14);
+}
+
 .foundersBrainQuickFields {
   display: grid;
   grid-template-columns: minmax(72px, auto) minmax(0, 1fr);
@@ -1398,6 +1444,21 @@ html.founders-plot-embed body.founders-plot-page {
   color: var(--fp-ink);
   padding: 7px 10px;
   font: inherit;
+}
+
+.foundersBrainVaultRestore {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(76, 132, 99, 0.24);
+  background: rgba(255, 255, 255, 0.56);
+}
+
+.foundersBrainVaultRestore > div {
+  min-width: 0;
 }
 
 .foundersDataRow {
@@ -1463,6 +1524,162 @@ html.founders-plot-embed body.founders-plot-page {
   letter-spacing: 0;
 }
 
+.foundersScenarioBody {
+  border-color: rgba(95, 141, 142, 0.24);
+  background:
+    linear-gradient(135deg, rgba(95, 141, 142, 0.1), rgba(255, 255, 255, 0.42));
+}
+
+.foundersScenarioProgress {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(46, 27, 14, 0.1);
+}
+
+.foundersScenarioFill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(76, 132, 99, 0.9), rgba(246, 211, 145, 0.95));
+}
+
+.foundersScenarioTask[disabled] {
+  opacity: 0.74;
+}
+
+.foundersIdentityBody {
+  border-color: rgba(196, 136, 58, 0.24);
+  background:
+    linear-gradient(135deg, rgba(246, 211, 145, 0.18), rgba(255, 255, 255, 0.44));
+}
+
+.foundersStyleChoices {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.foundersStyleChoice {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 4px 8px;
+  align-items: center;
+  width: 100%;
+  min-height: 76px;
+  padding: 10px;
+  border-radius: 8px;
+  text-align: left;
+  white-space: normal;
+  letter-spacing: 0;
+}
+
+.foundersStyleChoice strong,
+.foundersStyleChoice span:not(.foundersStyleSwatch) {
+  grid-column: 2;
+}
+
+.foundersStyleChoice span:not(.foundersStyleSwatch) {
+  color: var(--fp-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.foundersStyleSwatch {
+  grid-row: 1 / span 2;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 2px solid var(--style-accent, #7a3f22);
+  background: var(--style-swatch, #d9b77a);
+  box-shadow: 0 2px 8px rgba(46, 27, 14, 0.16);
+}
+
+.foundersPlotCard {
+  border-color: rgba(47, 93, 80, 0.24);
+  background:
+    linear-gradient(135deg, rgba(47, 93, 80, 0.12), rgba(255, 243, 214, 0.72));
+}
+
+.foundersPostcard {
+  border-color: rgba(196, 136, 58, 0.3);
+  background:
+    linear-gradient(135deg, rgba(196, 136, 58, 0.13), rgba(255, 247, 230, 0.76));
+}
+
+.foundersPostcardImage {
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid rgba(46, 27, 14, 0.14);
+  background: rgba(255, 243, 214, 0.72);
+}
+
+.foundersPlotCardStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.foundersPlotCardStats span {
+  min-height: 24px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.56);
+  color: var(--fp-ink);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.foundersOperatingShare {
+  border-top: 1px solid rgba(122, 63, 34, 0.14);
+  padding-top: 12px;
+}
+
+.foundersOperatingStylePreview {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid rgba(47, 93, 80, 0.24);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(47, 93, 80, 0.12), rgba(255, 243, 214, 0.76));
+}
+
+.foundersStyleTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.foundersStyleTags span {
+  min-height: 24px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(47, 93, 80, 0.14);
+  color: var(--fp-ink);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.foundersCreatorNotice {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid rgba(47, 93, 80, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.foundersCreatorActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .foundersInlineButtons,
 .foundersReceiptActions,
 .foundersApprovalActions,
@@ -1477,12 +1694,168 @@ html.founders-plot-embed body.founders-plot-page {
   align-items: center;
 }
 
+.foundersBuildOptions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.foundersBuildTypeButton {
+  display: grid;
+  justify-items: start;
+  min-height: 62px;
+  text-align: left;
+}
+
+.foundersBuildTypeButton small {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: rgba(46, 27, 14, 0.72);
+}
+
 .foundersStandingOrderChoice {
   display: grid;
   gap: 4px;
   min-width: 148px;
   width: calc(50% - 4px);
   text-align: left;
+}
+
+.foundersDoctrineRules {
+  display: grid;
+  gap: 8px;
+}
+
+.foundersDoctrineRule {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  text-align: left;
+}
+
+.foundersDoctrineRule.is-active {
+  border-color: rgba(47, 93, 80, 0.44);
+  background: rgba(47, 93, 80, 0.12);
+}
+
+.foundersPersistentHelp {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(46, 27, 14, 0.1);
+}
+
+.foundersGovernorSummary,
+.foundersOperatingSummary {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(46, 27, 14, 0.1);
+}
+
+.foundersSettlementCriteria,
+.foundersSettlementList,
+.foundersSettlementTasks,
+.foundersRegionalPanel,
+.foundersRegionalGrid {
+  display: grid;
+  gap: 10px;
+}
+
+.foundersSettlementCriteria {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin: 12px 0;
+}
+
+.foundersSettlementList,
+.foundersOperatingGrid,
+.foundersRegionalGrid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.foundersOperatingGrid,
+.foundersRegionalGrid {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.foundersRegionalPanel {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(46, 27, 14, 0.1);
+}
+
+.foundersRegionalMap {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  align-items: stretch;
+  margin-top: 10px;
+}
+
+.foundersRegionalNode,
+.foundersRegionalMapRoute {
+  min-height: 52px;
+  border: 1px solid rgba(105, 73, 45, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 247, 230, 0.72);
+  color: var(--fp-ink);
+  padding: 10px;
+  text-align: left;
+}
+
+.foundersRegionalNode {
+  display: grid;
+  gap: 2px;
+  cursor: pointer;
+}
+
+.foundersRegionalNode.is-active {
+  border-color: rgba(95, 141, 142, 0.56);
+  background: rgba(223, 241, 239, 0.78);
+}
+
+.foundersRegionalNode:disabled {
+  cursor: default;
+}
+
+.foundersRegionalMapRoute {
+  grid-column: 1 / -1;
+  min-height: 38px;
+  border-style: dashed;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.foundersRegionalMapRoute.is-shortage {
+  border-color: rgba(166, 83, 28, 0.36);
+  background: rgba(255, 224, 184, 0.58);
+}
+
+.foundersSettlementCard {
+  border: 1px solid rgba(105, 73, 45, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 247, 230, 0.72);
+  padding: 12px;
+}
+
+.foundersSettlementCard.is-active {
+  border-color: rgba(95, 141, 142, 0.52);
+  box-shadow: 0 0 0 2px rgba(95, 141, 142, 0.1);
+}
+
+.foundersSettlementCard.is-paused {
+  border-style: dashed;
+  opacity: 0.82;
+}
+
+.foundersSpecialistGrid {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
 .foundersPermissionToggle,
@@ -1512,9 +1885,61 @@ html.founders-plot-embed body.founders-plot-page {
   background: rgba(95, 141, 142, 0.08);
 }
 
+.foundersContractItem.is-recommended {
+  border-color: rgba(76, 132, 99, 0.34);
+  background:
+    linear-gradient(135deg, rgba(76, 132, 99, 0.12), rgba(255, 255, 255, 0.44));
+}
+
+.foundersContractBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.foundersContractCloverReason {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(76, 132, 99, 0.1);
+  color: #2f654c;
+}
+
 .foundersContractKicker,
 .foundersEmptyState {
   color: var(--fp-ink-soft);
+}
+
+.foundersTeachingActions {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(255, 248, 232, 0.58);
+  border: 1px solid rgba(46, 27, 14, 0.08);
+}
+
+.foundersTeachingHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.foundersMorningBrief {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(196, 136, 58, 0.24);
+  background:
+    linear-gradient(135deg, rgba(246, 211, 145, 0.18), rgba(255, 255, 255, 0.4));
+}
+
+.foundersBriefGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
 }
 
 .foundersSignalBar {
@@ -2426,7 +2851,7 @@ html.founders-plot-fullscreen body.founders-plot-page {
 
   .founders-plot-fullscreen .foundersPrimaryCta {
     min-width: 0;
-    min-height: 42px;
+    min-height: 44px;
     padding: 10px 12px;
     font-size: 14px;
     white-space: nowrap;
@@ -2441,7 +2866,7 @@ html.founders-plot-fullscreen body.founders-plot-page {
   }
 
   .founders-plot-fullscreen .foundersTrayButton {
-    min-height: 42px;
+    min-height: 44px;
     padding: 8px 10px;
   }
 
@@ -2517,7 +2942,7 @@ html.founders-plot-fullscreen body.founders-plot-page {
   }
 
   .founders-plot-fullscreen .foundersPrimaryCta {
-    min-height: 42px;
+    min-height: 44px;
     padding: 10px 14px;
     font-size: 15px;
   }
@@ -2563,7 +2988,7 @@ html.founders-plot-fullscreen body.founders-plot-page {
   }
 
   .founders-plot-fullscreen .foundersPrimaryCta {
-    min-height: 40px;
+    min-height: 44px;
     padding: 8px 10px;
     font-size: 14px;
   }

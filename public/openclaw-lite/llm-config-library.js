@@ -33,6 +33,7 @@ function parseModelRef(modelRef, fallbackProvider = 'openai', fallbackModelId = 
 function defaultProviderApi(provider) {
   const p = String(provider || '').trim();
   if (p === 'openai' || p === 'ollama' || p === 'openrouter') return 'openai-completions';
+  if (p === 'openai-codex') return 'openai-codex-responses';
   return '';
 }
 

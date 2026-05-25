@@ -27,6 +27,7 @@ const { resetFoundersPlotStore } = require('./founders_plot/store');
 const { getAtlasSnapshot, searchAtlasAgents } = require('./atlas');
 const { createPonyTransportService } = require('./ponyTransport');
 const { createServerHouseVaultBackend } = require('./houseVaultBackend');
+const { createBrainVaultRouter } = require('./brain_vault');
 const { createPostageVerifier } = require('./postageVerifier');
 const { emitMilestone } = require('./milestones');
 const { computeRewardsSummary } = require('./rewards');
@@ -2060,6 +2061,40 @@ function resolveFoundersPlotIdentity(req, res) {
     houseId: null
   };
 }
+
+function resolveBrainVaultOwner(req, res) {
+  const session = ensureHumanSession(req, res);
+  const walletCandidate = collectWalletCandidatesFromHeaders(req)[0] || null;
+  if (walletCandidate) {
+    return {
+      key: `wallet:${walletCandidate.chain}:${walletCandidate.address}`,
+      kind: 'wallet',
+      localOnly: false,
+      session
+    };
+  }
+  const houseId = typeof session?.houseCeremony?.houseId === 'string' ? session.houseCeremony.houseId.trim() : '';
+  if (houseId) {
+    return {
+      key: `house:${houseId}`,
+      kind: 'house',
+      localOnly: false,
+      session
+    };
+  }
+  return {
+    key: `session:${session?.sessionId || session?.teamCode || 'anonymous'}`,
+    kind: 'session',
+    localOnly: true,
+    session
+  };
+}
+
+app.use(createBrainVaultRouter({
+  resolveOwner: resolveBrainVaultOwner,
+  readStore,
+  writeStore
+}));
 
 function collectTownhallWalletCandidatesFromPayload(walletPayload) {
   const wallet = walletPayload && typeof walletPayload === 'object' ? walletPayload : null;
@@ -8336,7 +8371,8 @@ if (process.env.NODE_ENV === 'test') {
       anchors: [],
       inbox: [],
       erc8004OptOut: [],
-      erc8004Registrations: []
+      erc8004Registrations: [],
+      brainVaults: []
     });
     invalidateAtlasStoreCaches();
     resetAllSessions();

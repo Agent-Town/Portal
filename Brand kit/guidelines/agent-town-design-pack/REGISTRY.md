@@ -124,6 +124,26 @@ npx shadcn@latest add @agent-town/townhall-onboarding
 - `platform-illustration-card`
 - `platform-empty-state`
 
+### Three.js scene primitives
+
+- `three-town-stage`
+- `three-world-object`
+- `three-state-anchor`
+- `three-clover`
+- `three-object-picker`
+- `three-accessibility-mirror`
+- `three-selected-detail`
+- `three-scene-hud-row`
+
+Each Three.js scene primitive must declare:
+
+- scene-state input;
+- stable object ID;
+- accessible DOM mirror;
+- Playwright selector/test hook;
+- performance expectations;
+- fallback behavior.
+
 ## 7. Governance rules
 
 ### 7.1 Base token changes

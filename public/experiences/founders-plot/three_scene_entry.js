@@ -14,6 +14,12 @@ function number(value, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function hexColorValue(value, fallback = null) {
+  const normalized = String(value || '').trim();
+  if (!/^#[0-9a-f]{6}$/i.test(normalized)) return fallback;
+  return Number.parseInt(normalized.slice(1), 16);
+}
+
 function worldX(x) {
   return (number(x, 0.5) - 0.5) * WORLD_WIDTH;
 }
@@ -282,7 +288,23 @@ function badgeToneStyle(badge = {}) {
   }
 }
 
-function badgeDisplayText(badge = {}) {
+function badgeDisplayText(badge = {}, textProfile = {}) {
+  if (textProfile.quietWorldText) {
+    switch (String(badge.type || '').trim()) {
+      case 'approval':
+      case 'restart':
+      case 'blocked':
+        return '!';
+      case 'ready':
+        return 'OK';
+      case 'build':
+        return '+';
+      case 'locked':
+        return 'X';
+      default:
+        return '';
+    }
+  }
   if (badge.iconOnly) {
     if (String(badge.type || '') === 'build') return '+';
     if (String(badge.type || '') === 'approval') return '!';
@@ -292,8 +314,10 @@ function badgeDisplayText(badge = {}) {
 
 function makeBadgeSprite(badge = {}, sprite, index = 0, textProfile = {}) {
   const tone = badgeToneStyle(badge);
-  const label = badgeDisplayText(badge);
+  const label = badgeDisplayText(badge, textProfile);
+  if (!label) return null;
   const badgeScale = number(textProfile.badgeScale, 1);
+  const iconOnly = badge.iconOnly || textProfile.quietWorldText;
   const position = new THREE.Vector3(
     sprite.position.x + sprite.scale.x * 0.34,
     sprite.position.y + sprite.scale.y * (0.16 + index * 0.22),
@@ -301,11 +325,11 @@ function makeBadgeSprite(badge = {}, sprite, index = 0, textProfile = {}) {
   );
   return makeTextSprite(label, {
     ...tone,
-    width: badge.iconOnly ? 112 : 290,
+    width: iconOnly ? 112 : 290,
     height: 82,
-    fontSize: Math.round((badge.iconOnly ? 40 : 28) * badgeScale),
-    maxChars: badge.iconOnly ? 2 : 14,
-    scaleX: (badge.iconOnly ? 0.45 : 1.24) * badgeScale,
+    fontSize: Math.round((iconOnly ? 40 : 28) * badgeScale),
+    maxChars: iconOnly ? 2 : 14,
+    scaleX: (iconOnly ? 0.45 : 1.24) * badgeScale,
     scaleY: 0.34 * badgeScale,
     position,
     userData: {
@@ -499,7 +523,9 @@ class FoundersPlotThreeStage {
       timers: [],
       highlights: [],
       cloverBubbles: [],
-      targetLinks: []
+      targetLinks: [],
+      routeLinks: [],
+      cameraFocus: null
     };
     this.renderCount = 0;
     this.running = true;
@@ -576,6 +602,7 @@ class FoundersPlotThreeStage {
       fullscreen,
       width,
       height,
+      quietWorldText: fullscreen,
       labelScale: baseScale,
       badgeScale: fullscreen ? Math.max(1.18, baseScale * 0.95) : 1,
       anchorScale: fullscreen ? Math.max(1.28, baseScale * 1.05) : 1,
@@ -685,7 +712,9 @@ class FoundersPlotThreeStage {
       timers: [],
       highlights: [],
       cloverBubbles: [],
-      targetLinks: []
+      targetLinks: [],
+      routeLinks: [],
+      cameraFocus: this.scenePayload?.cameraFocus || null
     };
     this.coverageInfo = {
       domainIds: [],
@@ -740,6 +769,8 @@ class FoundersPlotThreeStage {
         : fallbackTextureFor(object);
       const materialOptions = {};
       if (object.goalTarget) materialOptions.color = 0xfff2c2;
+      const tint = hexColorValue(object.tint);
+      if (tint != null) materialOptions.color = tint;
       if (String(object.state || '') === 'LOCKED') materialOptions.opacity = 0.74;
       const sprite = makeSprite({ texture: texture || fallbackTextureFor(object), object, materialOptions });
       this.objectsGroup.add(sprite);
@@ -776,7 +807,47 @@ class FoundersPlotThreeStage {
         });
       }
 
-      if (object.labelVisible === true || object.selected || object.goalTarget || object.cloverTarget || actionLinked) {
+      if (object.identityStyle && typeof object.identityStyle === 'object') {
+        const styleLabel = String(object.identityStyle.label || 'Town style');
+        const palette = object.identityStyle.palette || {};
+        const identity = makeTextSprite(styleLabel, {
+          fill: String(palette.tint || '#e6f3ca'),
+          ink: String(palette.accent || '#254526'),
+          stroke: 'rgba(59, 36, 21, 0.2)',
+          width: 300,
+          height: 74,
+          fontSize: Math.round(22 * textProfile.anchorScale),
+          maxChars: 14,
+          scaleX: Math.max(0.86, Math.min(1.38, styleLabel.length * 0.08)) * textProfile.anchorScale,
+          scaleY: 0.28 * textProfile.anchorScale,
+          position: new THREE.Vector3(sprite.position.x + sprite.scale.x * 0.22, sprite.position.y + sprite.scale.y * 0.44, sprite.position.z + 0.5),
+          userData: {
+            objectId: String(object.id || ''),
+            worldObjectId: 'town_identity_marker',
+            layer: 'three-state-anchor',
+            identityStyleId: String(object.identityStyle.styleId || '')
+          }
+        });
+        if (textProfile.quietWorldText && !object.selected && !object.goalTarget) identity.visible = false;
+        this.coverageGroup.add(identity);
+        this.parityInfo.labels.push({
+          objectId: String(object.id || ''),
+          text: styleLabel,
+          role: 'town-identity'
+        });
+      }
+
+      const wantsLabel = object.labelVisible === true || object.selected || object.goalTarget || object.cloverTarget || actionLinked;
+      const labelRole = String(object.labelRole || object.overlayRole || '');
+      const renderLabel = wantsLabel && !textProfile.quietWorldText;
+      if (wantsLabel) {
+        this.parityInfo.labels.push({
+          objectId: String(object.id || ''),
+          text: String(object.label || object.id || ''),
+          role: labelRole
+        });
+      }
+      if (renderLabel) {
         const labelText = String(object.label || object.id || '');
         const labelScale = textProfile.labelScale;
         const label = makeTextSprite(object.label || object.id, {
@@ -792,27 +863,26 @@ class FoundersPlotThreeStage {
           userData: {
             objectId: String(object.id || ''),
             labelSprite: true,
-            labelRole: String(object.labelRole || object.overlayRole || ''),
+            labelRole,
             layer: 'three-label'
           }
         });
         this.objectsGroup.add(label);
-        this.parityInfo.labels.push({
-          objectId: String(object.id || ''),
-          text: String(object.label || object.id || ''),
-          role: String(object.labelRole || object.overlayRole || '')
-        });
       }
 
       const badges = Array.isArray(object.badges) ? object.badges : [];
       badges.forEach((badge, index) => {
-        const badgeSprite = makeBadgeSprite(badge, sprite, index, textProfile);
-        this.objectsGroup.add(badgeSprite);
         this.parityInfo.badges.push({
           objectId: String(object.id || ''),
           type: String(badge.type || ''),
           label: String(badge.displayLabel || badge.label || badge.type || '')
         });
+        if (textProfile.quietWorldText && !['approval', 'restart', 'blocked', 'ready'].includes(String(badge.type || '').trim())) {
+          return;
+        }
+        const badgeSprite = makeBadgeSprite(badge, sprite, index, textProfile);
+        if (!badgeSprite) return;
+        this.objectsGroup.add(badgeSprite);
       });
 
       if (object.timer) {
@@ -822,6 +892,48 @@ class FoundersPlotThreeStage {
           progress: clamp(number(object.timer.progress, 0), 0, 1)
         });
       }
+    });
+
+    const regionalRoutes = Array.isArray(scenePayload.regionalRoutes) ? scenePayload.regionalRoutes : [];
+    regionalRoutes.forEach((route) => {
+      const status = String(route.status || 'LOCKED').toUpperCase();
+      if (status === 'LOCKED') return;
+      const fromSprite = objectSpritesById.get(String(route.fromObjectId || ''));
+      const toSprite = objectSpritesById.get(String(route.toObjectId || ''));
+      if (!fromSprite || !toSprite) return;
+      const points = [
+        fromSprite.position.x,
+        fromSprite.position.y - fromSprite.scale.y * 0.3,
+        fromSprite.position.z - 0.16,
+        toSprite.position.x,
+        toSprite.position.y - toSprite.scale.y * 0.32,
+        toSprite.position.z - 0.16
+      ];
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
+      const line = new THREE.LineSegments(
+        geometry,
+        new THREE.LineBasicMaterial({
+          color: route.issue ? 0xb66a3c : status === 'READY' ? 0xc4883a : 0x5f8d8e,
+          transparent: true,
+          opacity: route.issue ? 0.58 : 0.42,
+          depthWrite: false
+        })
+      );
+      line.userData = {
+        objectId: `REGIONAL_ROUTE:${String(route.routeId || '')}`,
+        fromObjectId: String(route.fromObjectId || ''),
+        toObjectId: String(route.toObjectId || ''),
+        regionalRouteSprite: true,
+        layer: 'three-regional-route'
+      };
+      this.objectsGroup.add(line);
+      this.parityInfo.routeLinks.push({
+        routeId: String(route.routeId || ''),
+        status,
+        fromObjectId: String(route.fromObjectId || ''),
+        toObjectId: String(route.toObjectId || '')
+      });
     });
 
     const clover = scenePayload.clover || {};
@@ -856,7 +968,16 @@ class FoundersPlotThreeStage {
       this.objectsGroup.add(hitTarget);
       this.pickables.push(hitTarget);
 
+      const cloverState = String(clover.state || '').toUpperCase();
+      const showCloverBubble = String(clover.bubbleText || '').trim()
+        && (!textProfile.quietWorldText || ['WAITING_FOR_PERMISSION', 'ERROR', 'RESTART_NEEDED'].includes(cloverState));
       if (String(clover.bubbleText || '').trim()) {
+        this.parityInfo.cloverBubbles.push({
+          objectId: 'CLOVER',
+          text: String(clover.bubbleText || '')
+        });
+      }
+      if (showCloverBubble) {
         const bubbleScale = textProfile.labelScale;
         const bubble = makeTextSprite(clover.bubbleText, {
           fill: '#f8ead0',
@@ -875,10 +996,6 @@ class FoundersPlotThreeStage {
           }
         });
         this.objectsGroup.add(bubble);
-        this.parityInfo.cloverBubbles.push({
-          objectId: 'CLOVER',
-          text: String(clover.bubbleText || '')
-        });
       }
 
       const targetSprite = objectSpritesById.get(String(clover.targetObjectId || ''));
@@ -1038,6 +1155,7 @@ class FoundersPlotThreeStage {
           layer: 'three-state-anchor'
         }
       });
+      if (textProfile.quietWorldText) sprite.visible = false;
       this.coverageGroup.add(sprite);
       const hitTarget = makeCoverageHitTarget(anchor, sprite);
       this.coverageGroup.add(hitTarget);
@@ -1052,7 +1170,8 @@ class FoundersPlotThreeStage {
         status: String(anchor.status || ''),
         count: number(anchor.count),
         text,
-        canvas: this.canvasPointFor(sprite)
+        canvas: this.canvasPointFor(sprite),
+        collapsed: textProfile.quietWorldText
       });
     });
 
@@ -1063,6 +1182,15 @@ class FoundersPlotThreeStage {
         String(detail.title || 'Object detail'),
         ...detailRows.slice(0, 3).map((row) => `${String(row.label || '').trim()}: ${String(row.value || '').trim()}`)
       ].filter(Boolean).join(' | ');
+      if (textProfile.quietWorldText) {
+        this.coverageInfo.selectedDetail = {
+          ...detail,
+          text,
+          canvas: this.canvasPointFor({ position: new THREE.Vector3(left + 2.05, bottom + 0.48, 8.15) }),
+          collapsed: true
+        };
+        return;
+      }
       const detailScale = textProfile.detailScale;
       const sprite = makeTextSprite(text, {
         fill: '#dff1ef',
@@ -1285,7 +1413,9 @@ class FoundersPlotThreeStage {
         timers: this.parityInfo.timers.slice(),
         highlights: this.parityInfo.highlights.slice(),
         cloverBubbles: this.parityInfo.cloverBubbles.slice(),
-        targetLinks: this.parityInfo.targetLinks.slice()
+        targetLinks: this.parityInfo.targetLinks.slice(),
+        routeLinks: this.parityInfo.routeLinks.slice(),
+        cameraFocus: this.parityInfo.cameraFocus
       },
       coverage: {
         domainIds: this.coverageInfo.domainIds.slice(),
