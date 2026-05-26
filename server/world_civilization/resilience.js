@@ -68,7 +68,7 @@ const V6_CIVIC_RESILIENCE_STORES = [
     label: 'Agent participation delegation store',
     modulePath: 'server/world_civilization/delegations.js',
     migrationVersion: 'v1',
-    restartCoverage: 'tests/world_civilization_delegations.test.js',
+    restartCoverage: 'tests/world_civilization_delegation_process_restart.test.js',
     requiredMethods: ['recordDelegation', 'revokeDelegation', 'getAgentParticipationPolicy', 'listDelegations', 'summarizePrincipalDelegations', 'count', 'close']
   },
   {

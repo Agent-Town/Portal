@@ -6,7 +6,10 @@ Milestone: `M12 Agent participation controls`
 
 Runtime module: `server/world_civilization/delegations.js`
 
-Contract tests: `tests/world_civilization_delegations.test.js`
+Contract tests:
+
+- `tests/world_civilization_delegations.test.js`
+- `tests/world_civilization_delegation_process_restart.test.js`
 
 Schema contract: `specs/55_agent_town_v6_civic_schema_contracts.md`
 
@@ -19,6 +22,11 @@ world state.
 The store records scoped delegation lifecycle evidence only. Later worker-first
 tools and civic effect handlers may consult a compatible delegation store, but
 this foundation does not connect delegation policy to runtime execution.
+
+The process-level restart proof currently covers creation of scoped advice and
+explicit civic-execution delegations plus principal-owned revocation. It proves
+policy summaries and audit replay survive separate Node process lifetimes, and
+exact retries do not append duplicate delegation or audit rows.
 
 ## Data Model
 
