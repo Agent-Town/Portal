@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Agent Town World Grid</title>
+    <link rel="stylesheet" href="./styles.css">
+    <script src="./scene_state.js"></script>
+    <script src="./three_scene_bundle.js"></script>
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <main class="world-grid-shell">
+      <header class="world-grid-topbar">
+        <div>
+          <h1>World Grid</h1>
+          <p data-world-grid-status>Loading territory survey</p>
+        </div>
+      </header>
+      <section class="world-grid-main" aria-label="World grid prototype">
+        <div class="world-grid-stage" data-world-grid-stage aria-label="Three.js territory grid">
+          <div class="world-grid-fallback" data-world-grid-fallback hidden>Territory survey fallback map</div>
+        </div>
+        <aside class="world-grid-panel" aria-label="Territory cell details">
+          <div class="world-grid-detail" data-world-grid-detail>No surveyed cell selected.</div>
+          <section class="world-grid-public" data-world-grid-public hidden>
+            <h2>Public Presence</h2>
+            <button type="button" class="world-grid-action" data-world-grid-public-opt-in>Opt in public town card</button>
+            <button type="button" class="world-grid-action world-grid-action--quiet" data-world-grid-public-opt-out>Opt out</button>
+            <div data-world-grid-public-list></div>
+          </section>
+          <section class="world-grid-services" data-world-grid-services hidden>
+            <h2>Civic Services</h2>
+            <div data-world-grid-services-list></div>
+            <div data-world-grid-service-result></div>
+          </section>
+          <section class="world-grid-events" data-world-grid-events hidden>
+            <h2>World Event</h2>
+            <div data-world-grid-events-list></div>
+            <div data-world-grid-event-result></div>
+          </section>
+          <section class="world-grid-sandbox" data-world-grid-sandbox hidden>
+            <h2>Sandbox District</h2>
+            <div data-world-grid-sandbox-state></div>
+            <div data-world-grid-sandbox-result></div>
+          </section>
+          <nav class="world-grid-mirror" data-world-grid-mirror aria-label="Selectable territory cells"></nav>
+        </aside>
+      </section>
+    </main>
+  </body>
+</html>

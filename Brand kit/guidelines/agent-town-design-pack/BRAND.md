@@ -97,6 +97,12 @@ Founders Plot is now represented as an immersive Three.js town scene in future-f
 
 Do not market the roadmap as a generic 3D metaverse. The game remains a cozy frontier civic-builder with AI delegation as the differentiator.
 
+V5+ world-grid language should keep the same civic frontier frame:
+
+- say "territory", "region", "routes", "neighbors", "public works", and "districts";
+- avoid "metaverse", "MMO", "land market", "PvP", and "open world" as early promises;
+- describe free play as a controlled sandbox district, not as unrestricted world ownership.
+
 V1.4.2 keeps the recovered role hierarchy explicit:
 
 - **Clover Kincaid** is the gameplay partner and Foreman on the default Founders Plot route.

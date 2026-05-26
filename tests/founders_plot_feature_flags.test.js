@@ -1,14 +1,19 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const http = require('node:http');
+const express = require('express');
 
 const {
   FUTURE_FEATURES,
   emptyFeatureFlags,
   filterToolSpecs,
+  isAuthorizedFeatureOverrideRequest,
   isToolEnabled,
   parseExplicitFeatureFlags,
+  resolveFoundersPlotFeatureFlags,
   stripDisabledFutureState
 } = require('../server/founders_plot/feature_flags');
+const { createFoundersPlotRouter } = require('../server/founders_plot/routes');
 const { FOUNDERS_PLOT_TOOL_SPECS } = require('../server/founders_plot/tools');
 const { createSceneState } = require('../public/experiences/founders-plot/scene_state.js');
 
@@ -93,6 +98,40 @@ function sceneView(flags = emptyFeatureFlags(false)) {
   };
 }
 
+async function withFoundersPlotFeatureFlagServer(envPatch, fn) {
+  const previous = {
+    NODE_ENV: process.env.NODE_ENV,
+    ADMIN_TOKEN: process.env.ADMIN_TOKEN,
+    FOUNDERS_PLOT_FEATURE_FLAGS: process.env.FOUNDERS_PLOT_FEATURE_FLAGS,
+    FOUNDERS_PLOT_FEATURE_FLAG_QA_TOKEN: process.env.FOUNDERS_PLOT_FEATURE_FLAG_QA_TOKEN,
+    FOUNDERS_PLOT_QA_TOKEN: process.env.FOUNDERS_PLOT_QA_TOKEN
+  };
+  for (const [key, value] of Object.entries(envPatch || {})) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+  const app = express();
+  app.use(express.json());
+  app.use(createFoundersPlotRouter({
+    resolveIdentity: () => ({
+      pairId: `pair-feature-flags-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      houseId: null
+    })
+  }));
+  const server = http.createServer(app);
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const port = server.address().port;
+  try {
+    return await fn(`http://127.0.0.1:${port}`);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+}
+
 test('explicit Founders Plot feature flag parser supports all and V1.5-only modes', () => {
   const all = parseExplicitFeatureFlags('all');
   assert.ok(FUTURE_FEATURES.every((feature) => all[feature.key] === true));
@@ -104,6 +143,98 @@ test('explicit Founders Plot feature flag parser supports all and V1.5-only mode
   assert.equal(partial.FEATURE_FOUNDERS_V16_SCENARIOS, true);
   assert.equal(partial.FEATURE_FOUNDERS_V45_CREATOR_BUILDINGS, true);
   assert.equal(partial.FEATURE_FOUNDERS_V35_REGIONAL_GOVERNANCE, false);
+});
+
+test('production feature flag overrides require an admin or QA authorization token', () => {
+  const productionEnv = {
+    NODE_ENV: 'production',
+    ADMIN_TOKEN: 'admin-secret',
+    FOUNDERS_PLOT_FEATURE_FLAG_QA_TOKEN: 'qa-secret'
+  };
+  const playerReq = {
+    headers: { 'x-founders-plot-feature-flags': 'all' },
+    query: { foundersFeatureFlags: 'all' }
+  };
+  const playerFlags = resolveFoundersPlotFeatureFlags(playerReq, productionEnv);
+  assert.ok(FUTURE_FEATURES.every((feature) => playerFlags[feature.key] === false));
+  assert.equal(isAuthorizedFeatureOverrideRequest(playerReq, productionEnv), false);
+
+  const serverConfigured = resolveFoundersPlotFeatureFlags(playerReq, {
+    ...productionEnv,
+    FOUNDERS_PLOT_FEATURE_FLAGS: 'v16'
+  });
+  assert.equal(serverConfigured.FEATURE_FOUNDERS_V16_SCENARIOS, true);
+  assert.equal(serverConfigured.FEATURE_FOUNDERS_V45_CREATOR_BUILDINGS, false);
+
+  const adminReq = {
+    headers: {
+      'x-admin-token': 'admin-secret',
+      'x-founders-plot-feature-flags': 'all'
+    },
+    query: {}
+  };
+  const adminFlags = resolveFoundersPlotFeatureFlags(adminReq, productionEnv);
+  assert.ok(FUTURE_FEATURES.every((feature) => adminFlags[feature.key] === true));
+
+  const qaReq = {
+    headers: {
+      'x-founders-plot-feature-qa-token': 'qa-secret',
+      'x-founders-plot-feature-flags': 'v45'
+    },
+    query: {}
+  };
+  const qaFlags = resolveFoundersPlotFeatureFlags(qaReq, productionEnv);
+  assert.equal(qaFlags.FEATURE_FOUNDERS_V45_CREATOR_BUILDINGS, true);
+  assert.equal(qaFlags.FEATURE_FOUNDERS_V16_SCENARIOS, false);
+
+  const devFlags = resolveFoundersPlotFeatureFlags(playerReq, { NODE_ENV: 'development' });
+  assert.ok(FUTURE_FEATURES.every((feature) => devFlags[feature.key] === true));
+});
+
+test('production routes ignore client feature flag overrides without admin authorization', async () => {
+  await withFoundersPlotFeatureFlagServer({
+    NODE_ENV: 'production',
+    ADMIN_TOKEN: 'admin-secret',
+    FOUNDERS_PLOT_FEATURE_FLAGS: undefined,
+    FOUNDERS_PLOT_FEATURE_FLAG_QA_TOKEN: 'qa-secret',
+    FOUNDERS_PLOT_QA_TOKEN: undefined
+  }, async (baseUrl) => {
+    const toolsResp = await fetch(`${baseUrl}/api/founders-plot/tools?foundersFeatureFlags=all`, {
+      headers: { 'x-founders-plot-feature-flags': 'all' }
+    });
+    const tools = await toolsResp.json();
+    assert.equal(toolsResp.status, 200, JSON.stringify(tools));
+    assert.equal(tools.featureFlags.FEATURE_FOUNDERS_V16_SCENARIOS, false);
+    assert.equal(tools.featureFlags.FEATURE_FOUNDERS_V45_CREATOR_BUILDINGS, false);
+    assert.equal(tools.tools.some((tool) => tool.name === 'et.plot.scenarios.start'), false);
+
+    const blockedResp = await fetch(`${baseUrl}/api/founders-plot/tool/et.plot.scenarios.start`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-founders-plot-feature-flags': 'all'
+      },
+      body: JSON.stringify({
+        actor: 'HUMAN',
+        scenarioId: 'storm_prep',
+        idempotencyKey: `prod-override-blocked:${Date.now()}`
+      })
+    });
+    const blocked = await blockedResp.json();
+    assert.equal(blockedResp.status, 403, JSON.stringify(blocked));
+    assert.equal(blocked.error.code, 'FEATURE_DISABLED');
+
+    const adminToolsResp = await fetch(`${baseUrl}/api/founders-plot/tools`, {
+      headers: {
+        'x-admin-token': 'admin-secret',
+        'x-founders-plot-feature-flags': 'all'
+      }
+    });
+    const adminTools = await adminToolsResp.json();
+    assert.equal(adminToolsResp.status, 200, JSON.stringify(adminTools));
+    assert.equal(adminTools.featureFlags.FEATURE_FOUNDERS_V16_SCENARIOS, true);
+    assert.equal(adminTools.tools.some((tool) => tool.name === 'et.plot.scenarios.start'), true);
+  });
 });
 
 test('disabled future flags strip future payloads and tool availability', () => {

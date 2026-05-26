@@ -188,14 +188,46 @@ function defaultFoundersPlotFeatureFlags(env = process.env) {
   return flags;
 }
 
+function readHeaderValue(headers = {}, name = '') {
+  const target = String(name || '').toLowerCase();
+  for (const [key, value] of Object.entries(headers || {})) {
+    if (String(key || '').toLowerCase() === target) return value;
+  }
+  return '';
+}
+
+function isProductionEnv(env = process.env) {
+  return env.NODE_ENV === 'production';
+}
+
+function isAuthorizedFeatureOverrideRequest(req = null, env = process.env) {
+  if (!req) return false;
+  if (!isProductionEnv(env)) return true;
+
+  const adminToken = String(env.ADMIN_TOKEN || '').trim();
+  const qaToken = String(env.FOUNDERS_PLOT_FEATURE_FLAG_QA_TOKEN || env.FOUNDERS_PLOT_QA_TOKEN || '').trim();
+  const adminHeader = String(readHeaderValue(req.headers, 'x-admin-token') || '').trim();
+  const qaHeader = String(readHeaderValue(req.headers, 'x-founders-plot-feature-qa-token') || '').trim();
+
+  return !!(
+    (adminToken && adminHeader && adminHeader === adminToken)
+    || (qaToken && qaHeader && qaHeader === qaToken)
+  );
+}
+
+function requestFeatureFlagOverride(req = null) {
+  if (!req) return '';
+  return String(
+    readHeaderValue(req.headers, 'x-founders-plot-feature-flags')
+    || req.query?.foundersFeatureFlags
+    || req.query?.founders_features
+    || ''
+  ).trim();
+}
+
 function resolveFoundersPlotFeatureFlags(req = null, env = process.env) {
-  const explicit = req
-    ? String(
-      req.headers?.['x-founders-plot-feature-flags']
-      || req.query?.foundersFeatureFlags
-      || req.query?.founders_features
-      || ''
-    )
+  const explicit = req && isAuthorizedFeatureOverrideRequest(req, env)
+    ? requestFeatureFlagOverride(req)
     : '';
   return parseExplicitFeatureFlags(explicit) || defaultFoundersPlotFeatureFlags(env);
 }
@@ -259,9 +291,12 @@ module.exports = {
   featureForPayloadKey,
   featureForTool,
   filterToolSpecs,
+  isAuthorizedFeatureOverrideRequest,
   isFeatureEnabled,
   isToolEnabled,
   parseExplicitFeatureFlags,
+  requestFeatureFlagOverride,
   resolveFoundersPlotFeatureFlags,
+  truthyEnv,
   stripDisabledFutureState
 };

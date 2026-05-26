@@ -18,21 +18,29 @@ approved. With flags off, future tools, future mutation endpoints, future
 Three.js objects, future state coverage domains, and future drawers/cards must
 not appear.
 
+Allowed release vocabulary:
+
+- `release_candidate`: intended for normal player release.
+- `prototype_gated`: implemented as a gated prototype; not normal release content.
+- `research_only`: documented or partially tested, not player-ready.
+- `blocked_on_security`: requires security review before release.
+- `blocked_on_retention`: requires prior gameplay-retention proof before release.
+
 ## Slice Order
 
-| Slice | Roadmap Layer | product_stage | player_visible_by_default | feature_flag | release_gate_required | Implementation Target |
+| Slice | Roadmap Layer | release_status | player_visible_by_default | feature_flag | release_gate_required | Implementation Target |
 | --- | --- | --- | --- | --- | --- | --- |
-| V1.4.5 Account Vault / Brain Restore | Return continuity and trust | gated_experimental | false | n/a, release-gated by Brain Vault security gate | true | Browser-encrypted Brain vault, explicit unlock restore, agent backup summary, wrong-wallet denial, and fresh-browser restore into Real Clover. |
-| V1.6 Civic Projects and Short Scenarios | Scenario preparation | gated_experimental | false | `FEATURE_FOUNDERS_V16_SCENARIOS` | true | Storm Prep at Public Square with progress, soft miss, recap, Three.js civic project anchor, and Clover pressure copy. |
-| V1.7 Town Identity, Pride, and Plot Cards | Aesthetic/civic identity | gated_experimental | false | `FEATURE_FOUNDERS_V17_TOWN_IDENTITY` | true | Public Square style choice, visible Three.js landmark variant, public-safe plot card export, postcard capture, camera flyover state, and cosmetic-only persistence. |
-| V2.0 Persistent Foreman Governance | Delegation governance | prototype | false | `FEATURE_FOUNDERS_V20_PERSISTENT_FOREMAN` | true | Time-boxed Foreman leases, revoke/pause, Exception Inbox, scene anchors, Morning Brief receipts, and bounded while-away collect-ready help proven through closed-page server sweep coverage. |
-| V2.1 Doctrine Lite and Teaching UI | Preference teaching | prototype | false | `FEATURE_FOUNDERS_V21_DOCTRINE_LITE` | true | 2-4 reversible Foreman preferences with deterministic suggestion ranking and recap receipts. |
-| V2.5 Settler Expedition / Second Settlement | Multi-settlement delegation | prototype | false | `FEATURE_FOUNDERS_V25_SECOND_SETTLEMENT` | true | Stability gate, second settlement shard, Governor Ledger, independent inventories/events. |
-| V3.0 Operating Model and Capability Web | Operating model | prototype | false | `FEATURE_FOUNDERS_V30_OPERATING_MODEL` | true | Charter choice, capability unlocks, contract deck weighting, visible banners/signage. |
-| V3.1 Specialist Foremen | Staffing | prototype | false | `FEATURE_FOUNDERS_V31_SPECIALISTS` | true | Two specialist roles, domain-scoped tools, conflict approvals, pause/reassign. |
-| V3.5 Settlement Network / Regional Governance | Regional allocation | prototype | false | `FEATURE_FOUNDERS_V35_REGIONAL_GOVERNANCE` | true | Supply routes, regional contracts, regional map nodes, route visuals, jump-to-town camera focus, regional ledger. |
-| V4.0 Shareable Operating Styles | Social operating identity | prototype | false | `FEATURE_FOUNDERS_V40_OPERATING_STYLE_SHARING` | true | Public-safe operating-style export, public lookup, and inspiration-only comparison. |
-| V4.5 Creator Buildings and District Experiences | Curated extension | prototype | false | `FEATURE_FOUNDERS_V45_CREATOR_BUILDINGS` | true | Creator building manifest validation, typed tools/state, curated local import governance, asset-governance provenance, credit-only creator model, uninstall/rollback. |
+| V1.4.5 Account Vault / Brain Restore | Return continuity and trust | `blocked_on_security` | false | n/a, release-gated by Brain Vault security gate | true | Browser-encrypted Brain vault, explicit unlock restore, agent backup summary, wrong-wallet denial, and fresh-browser restore into Real Clover. |
+| V1.6 Civic Projects and Short Scenarios | Scenario preparation | `prototype_gated` | false | `FEATURE_FOUNDERS_V16_SCENARIOS` | true | Storm Prep at Public Square with progress, soft miss, recap, Three.js civic project anchor, and Clover pressure copy. |
+| V1.7 Town Identity, Pride, and Plot Cards | Aesthetic/civic identity | `prototype_gated` | false | `FEATURE_FOUNDERS_V17_TOWN_IDENTITY` | true | Public Square style choice, visible Three.js landmark variant, public-safe plot card export, postcard capture, camera flyover state, and cosmetic-only persistence. |
+| V2.0 Persistent Foreman Governance | Delegation governance | `prototype_gated` | false | `FEATURE_FOUNDERS_V20_PERSISTENT_FOREMAN` | true | Time-boxed Foreman leases, revoke/pause, Exception Inbox, scene anchors, Morning Brief receipts, and bounded while-away collect-ready help proven through closed-page server sweep coverage. |
+| V2.1 Doctrine Lite and Teaching UI | Preference teaching | `prototype_gated` | false | `FEATURE_FOUNDERS_V21_DOCTRINE_LITE` | true | 2-4 reversible Foreman preferences with deterministic suggestion ranking and recap receipts. |
+| V2.5 Settler Expedition / Second Settlement | Multi-settlement delegation | `prototype_gated` | false | `FEATURE_FOUNDERS_V25_SECOND_SETTLEMENT` | true | Stability gate, second settlement shard, Governor Ledger, independent inventories/events. |
+| V3.0 Operating Model and Capability Web | Operating model | `prototype_gated` | false | `FEATURE_FOUNDERS_V30_OPERATING_MODEL` | true | Charter choice, capability unlocks, contract deck weighting, visible banners/signage. |
+| V3.1 Specialist Foremen | Staffing | `prototype_gated` | false | `FEATURE_FOUNDERS_V31_SPECIALISTS` | true | Two specialist roles, domain-scoped tools, conflict approvals, pause/reassign. |
+| V3.5 Settlement Network / Regional Governance | Regional allocation | `prototype_gated` | false | `FEATURE_FOUNDERS_V35_REGIONAL_GOVERNANCE` | true | Supply routes, regional contracts, regional map nodes, route visuals, jump-to-town camera focus, regional ledger. |
+| V4.0 Shareable Operating Styles | Social operating identity | `prototype_gated` | false | `FEATURE_FOUNDERS_V40_OPERATING_STYLE_SHARING` | true | Public-safe operating-style export, public lookup, and inspiration-only comparison. |
+| V4.5 Creator Buildings and District Experiences | Curated extension | `prototype_gated` | false | `FEATURE_FOUNDERS_V45_CREATOR_BUILDINGS` | true | Creator building manifest validation, typed tools/state, curated local import governance, asset-governance provenance, credit-only creator model, uninstall/rollback. |
 
 ## Current Next Hours Of Gameplay
 
@@ -56,6 +64,8 @@ feel like:
 - Unit/API tests cover persistence, conservation, and migration risk.
 - Normal gameplay contains no provider/runtime/debug jargon.
 - Any player-facing visual asset follows prompt/manifest provenance rules.
+- Any Three.js/world-renderer change satisfies
+  `specs/release-gates/threejs_runtime_gate.md`.
 
 ## Known Gates
 
@@ -293,18 +303,20 @@ feel like:
 
 ### V5+ Boundary
 
-- The roadmap's V5+ section is intentionally not an implementation slice. It
-  names a staged future ladder: V5.0 World Layer / Civ Map, V5.1 Public
-  Districts / Social Presence, V5.2 Agent Services / Civic Marketplace, V5.3
-  World Events / Public Works, V5.4 Controlled Free-Play Sandbox Districts,
-  and V6+ Agent Civilization.
-- Do not enter V5+ from this goal. The roadmap guardrails require stronger
-  evidence first: single-town retention, trusted persistent Foreman behavior,
-  understandable multi-town governance, safe public/shareable operating style,
-  and identity/reputation security review.
+- The roadmap's V5+ section is a staged future ladder: V5.0 Region Grid and
+  Multi-Zoom World Foundation, V5.1 Territory Claims, V5.2 Public Presence,
+  V5.3 Agent Services, V5.4 World Events, V5.5 Controlled Free-Play Sandbox
+  Districts, and V6+ Agent Civilization.
+- V5.0 may exist as a `prototype_gated` world-grid branch package because it is
+  read-only territory awareness and cannot affect the normal player route unless
+  explicitly enabled.
+- V5.1+ and public/free-play systems still require stronger evidence first:
+  single-town retention, trusted persistent Foreman behavior, understandable
+  multi-town governance, safe public/shareable operating style, and
+  identity/reputation security review.
 - Free-play is a late sandbox milestone, not the next production promise.
-- The next responsible V5+ action is a security/product discovery spec, not
-  gameplay implementation.
+- The next responsible V5+ implementation after V5.0 is still gated planning
+  plus security/product review before player-visible release work.
 
 ## V2 Boundary
 

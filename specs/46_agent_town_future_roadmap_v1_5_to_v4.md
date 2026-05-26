@@ -135,23 +135,38 @@ This branch contains V1.5 product work plus gated prototype baselines for future
 The V1.6 through V4.5 slices are not player-visible by default and are not release
 candidate claims until their release gates are satisfied.
 
-| Slice | product_stage | player_visible_by_default | feature_flag | release_gate_required |
+Use this release vocabulary only:
+
+| Status | Meaning |
+| --- | --- |
+| `release_candidate` | Intended for normal player release. |
+| `prototype_gated` | Implemented as a gated prototype; not normal release content. |
+| `research_only` | Documented or partially tested, not player-ready. |
+| `blocked_on_security` | Requires security review before release. |
+| `blocked_on_retention` | Requires prior gameplay-retention proof before release. |
+
+| Slice | release_status | player_visible_by_default | feature_flag | release_gate_required |
 | --- | --- | --- | --- | --- |
-| V1.6 Civic Projects and Short Scenarios | gated_experimental | false | `FEATURE_FOUNDERS_V16_SCENARIOS` | true |
-| V1.7 Town Identity, Pride, and Plot Cards | gated_experimental | false | `FEATURE_FOUNDERS_V17_TOWN_IDENTITY` | true |
-| V2.0 Persistent Foreman Governance | prototype | false | `FEATURE_FOUNDERS_V20_PERSISTENT_FOREMAN` | true |
-| V2.1 Doctrine Lite and Teaching UI | prototype | false | `FEATURE_FOUNDERS_V21_DOCTRINE_LITE` | true |
-| V2.5 Settler Expedition / Second Settlement | prototype | false | `FEATURE_FOUNDERS_V25_SECOND_SETTLEMENT` | true |
-| V3.0 Operating Model and Capability Web | prototype | false | `FEATURE_FOUNDERS_V30_OPERATING_MODEL` | true |
-| V3.1 Specialist Foremen | prototype | false | `FEATURE_FOUNDERS_V31_SPECIALISTS` | true |
-| V3.5 Settlement Network / Regional Governance | prototype | false | `FEATURE_FOUNDERS_V35_REGIONAL_GOVERNANCE` | true |
-| V4.0 Shareable Operating Styles | prototype | false | `FEATURE_FOUNDERS_V40_OPERATING_STYLE_SHARING` | true |
-| V4.5 Creator Buildings and District Experiences | prototype | false | `FEATURE_FOUNDERS_V45_CREATOR_BUILDINGS` | true |
+| V1.6 Civic Projects and Short Scenarios | `prototype_gated` | false | `FEATURE_FOUNDERS_V16_SCENARIOS` | true |
+| V1.7 Town Identity, Pride, and Plot Cards | `prototype_gated` | false | `FEATURE_FOUNDERS_V17_TOWN_IDENTITY` | true |
+| V2.0 Persistent Foreman Governance | `prototype_gated` | false | `FEATURE_FOUNDERS_V20_PERSISTENT_FOREMAN` | true |
+| V2.1 Doctrine Lite and Teaching UI | `prototype_gated` | false | `FEATURE_FOUNDERS_V21_DOCTRINE_LITE` | true |
+| V2.5 Settler Expedition / Second Settlement | `prototype_gated` | false | `FEATURE_FOUNDERS_V25_SECOND_SETTLEMENT` | true |
+| V3.0 Operating Model and Capability Web | `prototype_gated` | false | `FEATURE_FOUNDERS_V30_OPERATING_MODEL` | true |
+| V3.1 Specialist Foremen | `prototype_gated` | false | `FEATURE_FOUNDERS_V31_SPECIALISTS` | true |
+| V3.5 Settlement Network / Regional Governance | `prototype_gated` | false | `FEATURE_FOUNDERS_V35_REGIONAL_GOVERNANCE` | true |
+| V4.0 Shareable Operating Styles | `prototype_gated` | false | `FEATURE_FOUNDERS_V40_OPERATING_STYLE_SHARING` | true |
+| V4.5 Creator Buildings and District Experiences | `prototype_gated` | false | `FEATURE_FOUNDERS_V45_CREATOR_BUILDINGS` | true |
 
 Feature flags must default off outside explicit test/prototype runs. With these
 flags off, normal V1.5 play must not expose future tools, future mutation
 endpoints, future Three.js objects, future state coverage domains, or future
 drawers/cards.
+
+Production requests must ignore `foundersFeatureFlags`, `founders_features`,
+and `x-founders-plot-feature-flags` unless the request carries a trusted
+server-side admin/QA override token. Normal player URLs and headers cannot
+promote prototype content in production.
 
 ---
 
@@ -339,6 +354,7 @@ V1.5 content must render through the Three.js world surface:
 - Morning Brief appears after simulated return.
 - Teaching affordance records preference without unlocking full doctrine board.
 - Three.js scene reflects active contract, selected object, and requester markers.
+- Any renderer change satisfies `specs/release-gates/threejs_runtime_gate.md`.
 
 ### API / Unit
 

@@ -23,6 +23,7 @@ const { parseCookies, nowIso, randomHex } = require('./util');
 const { readStore, writeStore, getStorePath } = require('./store');
 const { createExperiencesRouter } = require('./experience_loader');
 const { createFoundersPlotRouter } = require('./founders_plot/routes');
+const { createWorldGridRouter } = require('./world_grid/routes');
 const { resetFoundersPlotStore } = require('./founders_plot/store');
 const { getAtlasSnapshot, searchAtlasAgents } = require('./atlas');
 const { createPonyTransportService } = require('./ponyTransport');
@@ -3795,6 +3796,9 @@ app.post('/api/experience/preference', (req, res) => {
 
 app.use('/api/experiences', createExperiencesRouter());
 app.use(createFoundersPlotRouter({
+  resolveIdentity: resolveFoundersPlotIdentity
+}));
+app.use(createWorldGridRouter({
   resolveIdentity: resolveFoundersPlotIdentity
 }));
 

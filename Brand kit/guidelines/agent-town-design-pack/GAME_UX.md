@@ -51,6 +51,23 @@ Every new V1.5+ gameplay concept must answer:
 
 Contracts, requesters, Morning Brief anchors, scenario projects, town identity, and Foreman actions must all have scene-state representation without moving game logic into the renderer.
 
+### V5+ world-grid UX law
+
+The world grid adds scale through governance, not chaos.
+
+Each zoom level must answer one player question:
+
+- Z0 object focus: "What is this thing and what can I do with it?"
+- Z1 settlement: "What does my town need now?"
+- Z2 territory grid: "Where can my town expand next?"
+- Z3 regional map: "How do my settlements connect?"
+- Z4 world layer: "Who and what is happening around me?"
+- Z5 sandbox district: "What can I safely create or try here?"
+
+Every selectable grid cell or public node must have a DOM/accessibility mirror.
+Canvas-only gameplay state is not allowed. Public/private boundaries must be
+obvious before a player opts into sharing or visiting.
+
 ## 1.2 V1.4.2 route-level acceptance cleanup
 
 The V1.4.2 GPT Image 2 art baseline is accepted. The next UX cleanup focuses on the live route, not a broad art rebuild.

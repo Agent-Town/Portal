@@ -125,6 +125,33 @@ The current production path may use GPT Image 2 generated 2D assets normalized t
 
 Do not bake stateful gameplay objects into backgrounds. Stateful objects must be live scene objects with server-state identity.
 
+## V5+ World Grid Visual Language
+
+The world grid extends the warm frontier storybook system. It should read as a
+surveyed territory around the player's town, not a strategy-war map.
+
+Grid cell state language:
+
+- `locked`: quiet, distant, low-contrast terrain.
+- `visible`: readable terrain with no strong action treatment.
+- `claimable`: clear but secondary action marker.
+- `claimed`: warm ownership tint tied to the home settlement.
+
+Public/private distinction:
+
+- private town and territory state uses warm parchment/sage/brass treatments;
+- public or neighbor state uses cooler civic blue/teal accents;
+- unsafe, moderated, or blocked public actions use explicit lock/moderation
+  iconography and never rely on color alone.
+
+World event visuals should look civic and cooperative: public works boards,
+route markers, bridges, gardens, telegraph lines, or festival preparations.
+Avoid battle-map, conquest, or speculative land-market motifs.
+
+Camera and zoom behavior should preserve orientation. Z1 settlement, Z2
+territory, and later Z3/Z4 views need visible home-town anchors, short camera
+transitions, and DOM accessibility mirrors for every selectable cell or node.
+
 ## 1.1 V1.4.2 overview
 
 The V1.4.2 art baseline is approved. The cleanup sprint is about route-level integration polish, not another broad asset rebuild.

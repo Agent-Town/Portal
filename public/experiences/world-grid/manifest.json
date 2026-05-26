@@ -1,0 +1,45 @@
+{
+  "id": "world-grid",
+  "label": "World Grid",
+  "status": "prototype_gated",
+  "featureFlag": "FEATURE_WORLD_GRID_V50_REGION",
+  "version": "0.1.0",
+  "description": "V5 region-grid prototype pack for territory awareness, bounded claims, public-safe presence, civic service advice, capped public works, and controlled sandbox play above Founders Plot.",
+  "route": "/experiences/world-grid/index.html",
+  "modalRoute": "/experiences/world-grid/index.html",
+  "entry": {
+    "skill": "skill.md",
+    "heartbeat": "heartbeat.md",
+    "tools": "tools.md",
+    "goals": "goals.md"
+  },
+  "tools": [
+    "et.world.region.get_state",
+    "et.world.region.explain_cell",
+    "et.world.territory.get_claim_options",
+    "et.world.territory.plan_claim",
+    "et.world.territory.complete_claim",
+    "et.world.territory.cancel_claim",
+    "et.world.public.list_neighbors",
+    "et.world.public.summarize_neighbor",
+    "et.world.services.list",
+    "et.world.services.request_advice",
+    "et.world.services.accept_result",
+    "et.world.services.report_issue",
+    "et.world.events.get_state",
+    "et.world.events.preview_contribution",
+    "et.world.events.contribute",
+    "et.world.events.claim_reward",
+    "et.world.sandbox.get_state",
+    "et.world.sandbox.enter",
+    "et.world.sandbox.place_prop",
+    "et.world.sandbox.agent_demo",
+    "et.world.sandbox.rollback_last",
+    "et.world.sandbox.leave"
+  ],
+  "privacy": {
+    "privateTownDetails": "redacted",
+    "brainSecrets": "never_shared",
+    "walletIdentifiers": "public_safe_alias_only"
+  }
+}

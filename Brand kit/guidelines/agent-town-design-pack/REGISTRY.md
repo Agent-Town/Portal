@@ -134,6 +134,12 @@ npx shadcn@latest add @agent-town/townhall-onboarding
 - `three-accessibility-mirror`
 - `three-selected-detail`
 - `three-scene-hud-row`
+- `three-region-grid`
+- `three-region-cell`
+- `three-settlement-node`
+- `three-route-edge`
+- `three-world-zoom-control`
+- `three-public-node`
 
 Each Three.js scene primitive must declare:
 
@@ -143,6 +149,14 @@ Each Three.js scene primitive must declare:
 - Playwright selector/test hook;
 - performance expectations;
 - fallback behavior.
+
+V5+ world-grid primitives must also declare:
+
+- zoom level ownership;
+- public/private state category;
+- keyboard navigation behavior;
+- redaction contract if the primitive can display public or neighbor data;
+- rollback/moderation indicator if the primitive can appear in public districts.
 
 ## 7. Governance rules
 

@@ -7,6 +7,7 @@
   "scripts": {
     "build:openclaw-lite": "node scripts/build_openclaw_lite_runtime.mjs",
     "build:founders-plot-threejs": "node scripts/build_founders_plot_threejs_bundle.mjs",
+    "build:world-grid-threejs": "node scripts/build_world_grid_threejs_bundle.mjs",
     "normalize:founders-plot-sprites": "node scripts/normalize_founders_plot_sprite_sheet.mjs",
     "build:agent0-sdk": "node scripts/build_agent0_sdk_bundle.mjs --install --build",
     "bundle:agent0-sdk": "node scripts/build_agent0_sdk_bundle.mjs",
@@ -14,8 +15,8 @@
     "research:portal:prepare": "node research/portal/prepare.mjs",
     "research:portal:eval": "node research/portal/evaluate.mjs",
     "research:portal:app": "bash scripts/run_portal_research_loop.sh",
-    "predev": "npm run build:openclaw-lite && npm run build:founders-plot-threejs",
-    "pretest": "npm run build:openclaw-lite && npm run build:founders-plot-threejs",
+    "predev": "npm run build:openclaw-lite && npm run build:founders-plot-threejs && npm run build:world-grid-threejs",
+    "pretest": "npm run build:openclaw-lite && npm run build:founders-plot-threejs && npm run build:world-grid-threejs",
     "dev": "node server/index.js",
     "setup:sepolia-wallet": "node scripts/setup_sepolia_wallet.js",
     "import:claimables": "node scripts/import-claimable-reservations.js",
