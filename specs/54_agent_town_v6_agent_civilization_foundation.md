@@ -31,6 +31,9 @@ Moderation privacy foundation:
 Civic effect rollback foundation:
 `specs/62_agent_town_v6_civic_effect_rollback_foundation.md`
 
+Agent participation delegation foundation:
+`specs/63_agent_town_v6_agent_participation_delegation_foundation.md`
+
 ## Implementation Boundary
 
 Do not add V6 civic mechanics to normal gameplay or the world-grid prototype

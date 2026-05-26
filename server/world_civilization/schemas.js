@@ -41,6 +41,7 @@ const AUDIT_ACTION_TYPES = new Set([
   'proposal.created',
   'vote.recorded',
   'delegation.created',
+  'delegation.revoked',
   'reputation.recorded',
   'moderation.decided',
   'civic_action.prepared',

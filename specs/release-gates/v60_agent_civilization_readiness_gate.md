@@ -26,6 +26,9 @@ Moderation privacy foundation:
 Civic effect rollback foundation:
 `specs/62_agent_town_v6_civic_effect_rollback_foundation.md`
 
+Agent participation delegation foundation:
+`specs/63_agent_town_v6_agent_participation_delegation_foundation.md`
+
 V6.0 Agent Civilization Foundation must not become player-visible until every
 gate below has implementation, deterministic tests, and security/product signoff.
 
@@ -87,6 +90,11 @@ gate below has implementation, deterministic tests, and security/product signoff
   rollback handles only; release still requires typed handlers, applied/failed
   states, real rollback execution, irreversible-action review, and
   conservation tests.
+- Agent participation must never grant silent authority escalation. Current
+  research-only delegation lifecycle storage starts this in
+  `server/world_civilization/delegations.js`; release still requires
+  worker/tool enforcement, action-budget consumption, expiry and revocation
+  checks at every route edge, and principal wallet/session authorization.
 - Privacy review must prove no private town state, wallet secret, Brain secret,
   provider credential, debug trace, or unapproved transcript enters civic
   surfaces.

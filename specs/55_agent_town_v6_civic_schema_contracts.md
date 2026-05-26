@@ -19,6 +19,9 @@ Moderation privacy foundation:
 Civic effect rollback foundation:
 `specs/62_agent_town_v6_civic_effect_rollback_foundation.md`
 
+Agent participation delegation foundation:
+`specs/63_agent_town_v6_agent_participation_delegation_foundation.md`
+
 ## Boundary
 
 These schemas do not make V6 player-visible. They define the fail-closed

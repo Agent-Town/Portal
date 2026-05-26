@@ -37,6 +37,11 @@ Prepared civic effects use `civic_action.prepared` audit entries. They are
 readiness evidence for rollback handles and must not be treated as
 `civic_action.applied` world-state mutations.
 
+Delegation lifecycle changes use `delegation.created` and
+`delegation.revoked` audit entries. They are participation-control evidence and
+must not be treated as agent execution authority unless later route/tool checks
+verify active scope, expiry, budget, and principal approval.
+
 ## Idempotency Rule
 
 Repeating the same `(actorAccountId, idempotencyKey)` with the same normalized

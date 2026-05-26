@@ -37,6 +37,10 @@ effect can apply.
 ## Delegation Boundary
 
 The vote schema accepts a `server_attested_delegation` authorization kind, but
-this foundation does not create or manage delegations yet. Delegation lifecycle,
-expiry, revocation, and scoped agent authority remain part of the next M8/M12
-substeps.
+vote recording still requires server verification before persistence.
+
+Delegation lifecycle storage starts in
+`server/world_civilization/delegations.js`, but vote routes/tools must not trust
+delegation references until M12 worker/tool enforcement, action-budget
+consumption, expiry checks, revocation checks, and route-edge authorization are
+implemented and tested.
