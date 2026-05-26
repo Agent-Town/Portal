@@ -72,6 +72,13 @@ Player prompt
 - Screenshot evidence is recorded as dimensions, byte length, source, and SHA-256 hash; the contract does not require storing production screenshot files yet.
 - Missing future production textures remain deterministic fallbacks. The harness records handled fallbacks as warnings while still requiring zero unhandled missing assets for a pass.
 
+## GU-9 Replayability Diversity Slice
+
+- `REPLAYABILITY_PROMPT_SUITE` is the fixed ten-prompt roadmap seed set for generated-pack diversity checks.
+- `analyzePackDiversity` now produces a pack pass/fail report with valid pack count, first-loop pass count, replayability signatures, pairwise palette distance, label/name distance, motif distance, screenshot-hash comparison, and forbidden-authority/raw-prompt leak counts.
+- Prompt-derived palette variants keep same-preset packs visually distinct while preserving readable text contrast and canonical gameplay mappings.
+- Browser coverage runs all ten prompts through the real world-grid first loop and reuses the same diversity analyzer on the returned packs and measured playtest reports.
+
 ## Machine Checks
 
 ```json
@@ -118,6 +125,14 @@ Player prompt
   "missingMappingPackRejected": true,
   "missingAssetFallbackWarningRecorded": true,
   "screenshotEvidenceRecorded": true,
-  "paletteContrastScoreMin": 0.85
+  "paletteContrastScoreMin": 0.85,
+  "replayabilityPromptCount": 10,
+  "replayabilityValidPackCount": 10,
+  "replayabilityFirstLoopPassCount": 10,
+  "replayabilityPairwiseComparisonCount": 45,
+  "uniqueReplayabilitySignatures": 10,
+  "uniqueScreenshotHashes": 10,
+  "meaningfulDifferenceScoreMin": 0.65,
+  "replayabilityForbiddenAuthorityCount": 0
 }
 ```

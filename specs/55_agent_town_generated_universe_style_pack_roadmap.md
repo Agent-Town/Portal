@@ -105,6 +105,12 @@ This is a separate prototype-gated track. It must not change normal gameplay vis
   "defaultScoresUsed": false,
   "screenshotEvidenceRecorded": true,
   "paletteContrastScoreMin": 0.85,
+  "replayabilityPromptCount": 10,
+  "replayabilityValidPackCount": 10,
+  "replayabilityFirstLoopPassCount": 10,
+  "meaningfulDifferenceScoreMin": 0.65,
+  "replayabilityScreenshotHashCount": 10,
+  "forbiddenAuthorityCount": 0,
   "replayabilityDistinctSignatureRatioMin": 1.0,
   "replayabilityDistinctThemeRatioMin": 0.75
 }
@@ -228,5 +234,25 @@ The first-loop playtest gate now requires measured browser evidence before a gen
   "uiReadabilityScoreMin": 0.85,
   "styleCoherenceScoreMin": 0.85,
   "promptAlignmentScoreMin": 0.85
+}
+```
+
+## GU-9 Replayability and Diversity Suite
+
+The replayability suite now uses the roadmap ten-prompt seed set as a deterministic contract. Each prompt must generate a schema-valid pack, pass the measured first-loop playtest report, keep raw prompt instructions and forbidden authority out of the generated pack, produce a distinct replayability signature, and contribute to pairwise diversity measurements across palette, label/name, motif, and screenshot hash evidence.
+
+```json
+{
+  "promptCount": 10,
+  "validPackCount": 10,
+  "firstLoopPassCount": 10,
+  "pairwiseComparisonCount": 45,
+  "uniqueReplayabilitySignatures": 10,
+  "uniqueScreenshotHashes": 10,
+  "minimumPaletteDistanceGreaterThan": 0,
+  "minimumLabelNameDistanceMin": 0.65,
+  "meaningfulDifferenceScoreMin": 0.65,
+  "forbiddenAuthorityCount": 0,
+  "rawPromptLeakCount": 0
 }
 ```

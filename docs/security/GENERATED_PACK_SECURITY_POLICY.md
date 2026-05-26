@@ -17,6 +17,7 @@ Status: prototype-gated
 - Postprocess plans and reports are standalone contracts; they may write postprocessed candidate artifacts and metadata, but must not write approved production assets or alter canonical gameplay mappings.
 - Browser runtime asset loading must use safe public generated-pack paths only; private candidate roots, path traversal, data URLs, provider URLs, and unapproved outputs must fall back without player exposure.
 - First-loop playtest pass status requires measured browser evidence, screenshot evidence, clean console state, canonical payload integrity, and generated-pack validation. Default or placeholder scores cannot pass release gates.
+- Replayability diversity pass status requires the ten-prompt seed suite, measured first-loop pass evidence, distinct replayability signatures, screenshot-hash comparison, and zero forbidden authority or raw prompt leaks.
 - Player-visible generated text must be escaped in DOM rendering.
 - Production image generation requires explicit consent and a documented cost/auth model before any user-facing release claim.
 
@@ -53,6 +54,11 @@ Status: prototype-gated
   "defaultScoresCannotPass": true,
   "badContrastPackRejected": true,
   "screenshotEvidenceRecorded": true,
+  "replayabilityPromptCount": 10,
+  "replayabilityValidPackCount": 10,
+  "replayabilityFirstLoopPassCount": 10,
+  "meaningfulDifferenceScoreMin": 0.65,
+  "replayabilityForbiddenAuthorityCount": 0,
   "approvedProductionAssetCount": 0,
   "generatedImageAssetsCanChangeServerRules": false,
   "productionImageAssetCount": 0,

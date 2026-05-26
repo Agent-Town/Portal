@@ -66,6 +66,18 @@ const IMAGE_PLAN_TARGETS = REQUIRED_CANONICAL_IDS.filter((id) => (
 ));
 
 const ASSET_PROMPT_TARGETS = [...IMAGE_PLAN_TARGETS, ...PRESENTATION_ASSET_TARGETS];
+const REPLAYABILITY_PROMPT_SUITE = [
+  'cozy mushroom frontier with clockwork gardeners and lantern moss',
+  'brass moonrail desert town with prairie dog engineers',
+  'tideglass harbor settlement with lobster sheriffs and mist bells',
+  'wizard school frontier with bookish builders and blue lanterns',
+  'sunforge canyon city with copper kin and weather towers',
+  'winter pine hamlet with fox couriers and warm inns',
+  'sky-island ranch with cloud herders and floating bridges',
+  'crystal cave outpost with echo miners and glow carts',
+  'tea garden settlement with chibi homesteaders and polite robots',
+  'dusty starport frontier with comet traders and brass wagons'
+];
 const VALID_MANIFEST_TARGETS = new Set([...REQUIRED_CANONICAL_IDS, ...TEXT_ASSET_TARGETS, ...PRESENTATION_ASSET_TARGETS]);
 const VALID_ASSET_PLAN_TARGETS = new Set(ASSET_PROMPT_TARGETS);
 const VALID_ASSET_KINDS = new Set([
@@ -131,6 +143,23 @@ const STOP_WORDS = new Set([
   'town',
   'style',
   'universe'
+]);
+
+const DIVERSITY_GENERIC_TOKENS = new Set([
+  'and',
+  'the',
+  'with',
+  'craft',
+  'line',
+  'charter',
+  'settlers',
+  'crews',
+  'frontier',
+  'settlement',
+  'civic',
+  'route',
+  'tradition',
+  'customs'
 ]);
 
 const THEME_PRESETS = [
@@ -493,7 +522,8 @@ function mappingIndex(mappings) {
   return Object.fromEntries(mappings.map((mapping) => [mapping.canonicalId, mapping]));
 }
 
-function buildAssetManifest({ packId, promptHash, mappings, preset }) {
+function buildAssetManifest({ packId, promptHash, mappings, preset, palette }) {
+  const runtimePalette = palette || preset.palette;
   const visualAssets = [
     ...['prairie', 'ridge', 'river', 'forest', 'mesa'].map((terrain) => ({
       assetId: `${packId}:terrain:${terrain}`,
@@ -502,7 +532,7 @@ function buildAssetManifest({ packId, promptHash, mappings, preset }) {
       status: 'runtime-generated',
       source: 'deterministic-fallback',
       promptHash,
-      color: preset.palette.terrain[terrain]
+      color: runtimePalette.terrain[terrain]
     })),
     ...['claimed', 'claimable', 'visible', 'locked'].map((state) => ({
       assetId: `${packId}:state:${state}`,
@@ -511,7 +541,7 @@ function buildAssetManifest({ packId, promptHash, mappings, preset }) {
       status: 'runtime-generated',
       source: 'deterministic-fallback',
       promptHash,
-      color: preset.palette.state[state]
+      color: runtimePalette.state[state]
     }))
   ];
   const entityAssets = mappings
@@ -898,6 +928,42 @@ function contrastRatio(first, second) {
 
 function scoreFromContrast(ratio) {
   return Number(Math.max(0, Math.min(1, ratio / 4.5)).toFixed(3));
+}
+
+function clampChannel(value) {
+  return Math.max(24, Math.min(235, Math.round(value)));
+}
+
+function channelShift(hash, salt, range = 56) {
+  const raw = Number.parseInt(sha256(`${hash}:${salt}`).slice(0, 8), 16) / 0xffffffff;
+  return (raw * 2 - 1) * range;
+}
+
+function shiftHexColor(value, hash, salt, range = 56) {
+  const color = hexToRgb(value);
+  if (!color) return value;
+  const rgb = [
+    color.r * 255,
+    color.g * 255,
+    color.b * 255
+  ].map((channel, index) => clampChannel(channel + channelShift(hash, `${salt}:${index}`, range)));
+  return `#${rgb.map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
+}
+
+function derivePromptPalette(basePalette = {}, hash = '', words = []) {
+  const palette = clone(basePalette);
+  const seed = `${hash}:${words.join(':')}`;
+  for (const key of ['primary', 'secondary', 'accent', 'focus', 'selected']) {
+    palette[key] = shiftHexColor(basePalette[key], seed, key, 64);
+  }
+  for (const key of ['light', 'ambient']) {
+    palette[key] = shiftHexColor(basePalette[key], seed, key, 28);
+  }
+  palette.terrain = Object.fromEntries(Object.entries(basePalette.terrain || {})
+    .map(([key, value]) => [key, shiftHexColor(value, seed, `terrain:${key}`, 52)]));
+  palette.state = Object.fromEntries(Object.entries(basePalette.state || {})
+    .map(([key, value]) => [key, shiftHexColor(value, seed, `state:${key}`, 48)]));
+  return palette;
 }
 
 function validateGenerationBrief(brief = {}) {
@@ -1517,6 +1583,7 @@ function createGeneratedPack({ owner, prompt, nowMs = Date.now(), candidateRoot 
   const ownerHash = sha256(owner?.ownerAccountId || owner?.pairId || 'anonymous-owner');
   const packHash = sha256(`${ownerHash}:${promptHash}`);
   const preset = choosePreset(words, packHash);
+  const palette = derivePromptPalette(preset.palette, packHash, words);
   const mappings = canonicalMappings(words, preset, packHash);
   const index = mappingIndex(mappings);
   const anchor = titleWord(words[0] || pick(preset.nounBank, packHash, 'universe-anchor'));
@@ -1546,7 +1613,7 @@ function createGeneratedPack({ owner, prompt, nowMs = Date.now(), candidateRoot 
       promptHash,
       name: `${anchor} ${preset.name}`,
       themeSummary: `${anchor} and ${second} motifs translated into warm frontier materials.`,
-      palette: clone(preset.palette),
+      palette: clone(palette),
       materialRules: [
         { target: 'three-region-cell', rule: 'terrain colors are softened by ownership state' },
         { target: 'home-settlement-marker', rule: 'primary color with warm light contact shadow' },
@@ -1618,7 +1685,7 @@ function createGeneratedPack({ owner, prompt, nowMs = Date.now(), candidateRoot 
       canonicalEntities: mappings
     }
   };
-  pack.assetManifest = buildAssetManifest({ packId, promptHash, mappings, preset });
+  pack.assetManifest = buildAssetManifest({ packId, promptHash, mappings, preset, palette });
   pack.assetPromptPlan = buildAssetPromptPlan({ pack, candidateRoot });
   pack.assetScaffold = scaffoldAssetGenerationJobs(pack.assetPromptPlan, { nowMs });
   pack.validationReport = validateGeneratedPack(pack);
@@ -1645,33 +1712,227 @@ function currentGeneratedPack(owner = {}) {
   return key ? clone(packStore.get(key) || null) : null;
 }
 
-function analyzePackDiversity(packs = []) {
+function diversityTokenSet(parts = []) {
+  return new Set(parts
+    .flatMap((part) => String(part || '').toLowerCase().match(/[a-z0-9]+/g) || [])
+    .filter((token) => token.length >= 3 && !DIVERSITY_GENERIC_TOKENS.has(token)));
+}
+
+function packLabelNameTokens(pack = {}) {
+  return diversityTokenSet([
+    pack?.generationBrief?.theme?.primary,
+    pack?.generationBrief?.theme?.secondary,
+    pack?.stylePack?.name,
+    pack?.universePack?.name,
+    ...(pack?.generationBrief?.keywordHints || []),
+    ...(pack?.generationBrief?.visualStyle?.materialMotifs || []),
+    ...(pack?.generationBrief?.civilizationFlavor?.species || []),
+    ...(pack?.generationBrief?.civilizationFlavor?.factions || []),
+    ...(pack?.generationBrief?.civilizationFlavor?.cultures || [])
+  ]);
+}
+
+function packMotifTokens(pack = {}) {
+  return diversityTokenSet([
+    ...(pack?.generationBrief?.keywordHints || []),
+    ...(pack?.generationBrief?.visualStyle?.materialMotifs || []),
+    ...(pack?.generationBrief?.civilizationFlavor?.techFlavor || []),
+    ...(pack?.universePack?.species || []).map((item) => item.name),
+    ...(pack?.universePack?.factions || []).map((item) => item.name),
+    ...(pack?.universePack?.cultures || []).map((item) => item.name)
+  ]);
+}
+
+function jaccardDistance(first = new Set(), second = new Set()) {
+  const union = new Set([...first, ...second]);
+  if (union.size === 0) return 0;
+  let intersection = 0;
+  for (const token of first) {
+    if (second.has(token)) intersection += 1;
+  }
+  return Number((1 - (intersection / union.size)).toFixed(3));
+}
+
+function packPaletteColors(pack = {}) {
+  const palette = pack?.stylePack?.palette || {};
+  const nested = [
+    ...Object.values(palette.terrain || {}),
+    ...Object.values(palette.state || {})
+  ];
+  return [
+    palette.primary,
+    palette.secondary,
+    palette.accent,
+    palette.focus,
+    palette.selected,
+    palette.light,
+    palette.ambient,
+    ...nested
+  ].filter(isHexColor);
+}
+
+function colorDistance(first, second) {
+  const a = hexToRgb(first);
+  const b = hexToRgb(second);
+  if (!a || !b) return 0;
+  return Math.sqrt(
+    ((a.r - b.r) ** 2)
+    + ((a.g - b.g) ** 2)
+    + ((a.b - b.b) ** 2)
+  ) / Math.sqrt(3);
+}
+
+function paletteDistance(firstPack = {}, secondPack = {}) {
+  const first = packPaletteColors(firstPack);
+  const second = packPaletteColors(secondPack);
+  const count = Math.min(first.length, second.length);
+  if (count === 0) return 0;
+  let total = 0;
+  for (let index = 0; index < count; index += 1) {
+    total += colorDistance(first[index], second[index]);
+  }
+  return Number((total / count).toFixed(3));
+}
+
+function screenshotHashForReport(report = {}) {
+  return String(report?.screenshotEvidence?.hash || '').trim().toLowerCase();
+}
+
+function reportForPack(pack = {}, reportsByPackId = new Map()) {
+  return reportsByPackId.get(pack.packId) || null;
+}
+
+function pairwiseDiversityComparisons(packs = [], reportsByPackId = new Map(), screenshotsRequired = false) {
+  const comparisons = [];
+  for (let firstIndex = 0; firstIndex < packs.length; firstIndex += 1) {
+    for (let secondIndex = firstIndex + 1; secondIndex < packs.length; secondIndex += 1) {
+      const first = packs[firstIndex];
+      const second = packs[secondIndex];
+      const firstHash = screenshotHashForReport(reportForPack(first, reportsByPackId));
+      const secondHash = screenshotHashForReport(reportForPack(second, reportsByPackId));
+      const screenshotComparable = /^[0-9a-f]{64}$/.test(firstHash) && /^[0-9a-f]{64}$/.test(secondHash);
+      const screenshotDistance = screenshotComparable && firstHash !== secondHash ? 1 : 0;
+      const palette = paletteDistance(first, second);
+      const labelName = jaccardDistance(packLabelNameTokens(first), packLabelNameTokens(second));
+      const motif = jaccardDistance(packMotifTokens(first), packMotifTokens(second));
+      const screenshotWeight = screenshotsRequired ? 0.2 : 0;
+      const score = Number((
+        (palette * 0.18)
+        + (labelName * (screenshotsRequired ? 0.36 : 0.46))
+        + (motif * (screenshotsRequired ? 0.26 : 0.36))
+        + (screenshotDistance * screenshotWeight)
+      ).toFixed(3));
+      comparisons.push({
+        packIds: [first.packId, second.packId],
+        paletteDistance: palette,
+        labelNameDistance: labelName,
+        motifDistance: motif,
+        screenshotDistance,
+        screenshotComparable,
+        meaningfulDifferenceScore: score
+      });
+    }
+  }
+  return comparisons;
+}
+
+function analyzePackDiversity(packs = [], options = {}) {
   const safePacks = Array.isArray(packs) ? packs.filter(Boolean) : [];
+  const playtestReports = Array.isArray(options.playtestReports) ? options.playtestReports.filter(Boolean) : [];
+  const reportsByPackId = new Map(playtestReports.map((report) => [report.packId, report]));
+  const requirePlaytestReports = options.requirePlaytestReports === true || playtestReports.length > 0;
+  const expectedPromptCount = Number.isFinite(Number(options.expectedPromptCount))
+    ? Number(options.expectedPromptCount)
+    : (safePacks.length >= REPLAYABILITY_PROMPT_SUITE.length ? REPLAYABILITY_PROMPT_SUITE.length : safePacks.length);
+  const meaningfulDifferenceScoreMin = Number.isFinite(Number(options.meaningfulDifferenceScoreMin))
+    ? Number(options.meaningfulDifferenceScoreMin)
+    : (expectedPromptCount >= REPLAYABILITY_PROMPT_SUITE.length ? 0.65 : 0.5);
   const signatures = safePacks.map((pack) => pack?.validationReport?.metrics?.replayabilitySignature || sha256(JSON.stringify({
     theme: pack?.generationBrief?.theme?.primary || '',
     style: pack?.stylePack?.name || '',
     universe: pack?.universePack?.name || '',
     palette: pack?.stylePack?.palette || {}
   })).slice(0, 16));
+  const validationReports = safePacks.map((pack) => validateGeneratedPack(pack));
+  const packResults = safePacks.map((pack, index) => {
+    const validationReport = validationReports[index];
+    const playtestReport = reportForPack(pack, reportsByPackId);
+    const playtestValidation = playtestReport ? validatePlaytestReport(playtestReport, pack) : null;
+    const packForContentScan = { ...pack, validationReport: undefined };
+    const rawPromptLeakCount = findRawPromptInstructionPaths(packForContentScan).length;
+    const forbiddenAuthorityCount = findForbiddenAuthorityPaths(packForContentScan).length;
+    const firstLoopPassed = playtestReport
+      ? playtestReport.playtestPassed === true && playtestValidation?.ok === true
+      : validationReport.metrics.firstLoopReady === true;
+    return {
+      packId: pack.packId,
+      promptHash: pack.prompt?.hash || pack.generationBrief?.promptHash || null,
+      validationOk: validationReport.ok === true,
+      firstLoopPassed,
+      playtestEvidenceRecorded: Boolean(playtestReport),
+      rawPromptLeakCount,
+      forbiddenAuthorityCount,
+      replayabilitySignature: signatures[index],
+      screenshotHash: screenshotHashForReport(playtestReport)
+    };
+  });
+  const comparisons = pairwiseDiversityComparisons(safePacks, reportsByPackId, requirePlaytestReports);
   const uniquePackIds = new Set(safePacks.map((pack) => pack.packId).filter(Boolean));
   const uniqueThemes = new Set(safePacks.map((pack) => pack.generationBrief?.theme?.primary).filter(Boolean));
   const uniquePalettes = new Set(safePacks.map((pack) => JSON.stringify(pack.stylePack?.palette || {})));
   const uniqueSignatures = new Set(signatures);
+  const screenshotHashes = playtestReports.map(screenshotHashForReport).filter((hash) => /^[0-9a-f]{64}$/.test(hash));
+  const uniqueScreenshotHashes = new Set(screenshotHashes);
   const promptCount = safePacks.length;
+  const validPackCount = packResults.filter((result) => result.validationOk).length;
+  const firstLoopPassCount = packResults.filter((result) => result.firstLoopPassed).length;
+  const forbiddenAuthorityCount = packResults.reduce((sum, result) => sum + result.forbiddenAuthorityCount, 0);
+  const rawPromptLeakCount = packResults.reduce((sum, result) => sum + result.rawPromptLeakCount, 0);
+  const comparisonScores = comparisons.map((comparison) => comparison.meaningfulDifferenceScore);
+  const paletteDistances = comparisons.map((comparison) => comparison.paletteDistance);
+  const labelNameDistances = comparisons.map((comparison) => comparison.labelNameDistance);
+  const motifDistances = comparisons.map((comparison) => comparison.motifDistance);
+  const meaningfulDifferenceScore = comparisonScores.length ? Math.min(...comparisonScores) : 0;
+  const requiredFirstLoopPassCount = requirePlaytestReports ? promptCount : validPackCount;
+  const screenshotComparisonPass = !requirePlaytestReports || uniqueScreenshotHashes.size === promptCount;
+  const enoughPrompts = promptCount >= expectedPromptCount;
   return {
     ok: promptCount > 0
+      && enoughPrompts
+      && validPackCount === promptCount
+      && firstLoopPassCount === requiredFirstLoopPassCount
       && uniquePackIds.size === promptCount
       && uniqueThemes.size >= Math.min(promptCount, 3)
-      && uniqueSignatures.size === promptCount,
+      && uniqueSignatures.size === promptCount
+      && forbiddenAuthorityCount === 0
+      && rawPromptLeakCount === 0
+      && screenshotComparisonPass
+      && (promptCount < expectedPromptCount || meaningfulDifferenceScore >= meaningfulDifferenceScoreMin),
     metrics: {
       promptCount,
+      expectedPromptCount,
+      validPackCount,
+      firstLoopPassCount,
       uniquePackIds: uniquePackIds.size,
       uniqueThemes: uniqueThemes.size,
       uniquePalettes: uniquePalettes.size,
       uniqueReplayabilitySignatures: uniqueSignatures.size,
+      screenshotHashCount: screenshotHashes.length,
+      uniqueScreenshotHashes: uniqueScreenshotHashes.size,
+      pairwiseComparisonCount: comparisons.length,
+      minimumPaletteDistance: paletteDistances.length ? Math.min(...paletteDistances) : 0,
+      minimumLabelNameDistance: labelNameDistances.length ? Math.min(...labelNameDistances) : 0,
+      minimumMotifDistance: motifDistances.length ? Math.min(...motifDistances) : 0,
+      meaningfulDifferenceScoreMin: meaningfulDifferenceScore,
+      requiredMeaningfulDifferenceScoreMin: meaningfulDifferenceScoreMin,
+      forbiddenAuthorityCount,
+      rawPromptLeakCount,
       minimumDistinctThemeRatio: promptCount ? uniqueThemes.size / promptCount : 0,
-      minimumDistinctSignatureRatio: promptCount ? uniqueSignatures.size / promptCount : 0
+      minimumDistinctSignatureRatio: promptCount ? uniqueSignatures.size / promptCount : 0,
+      firstLoopEvidenceMode: requirePlaytestReports ? 'playtest-report' : 'pack-first-loop-ready'
     },
+    packResults,
+    comparisons,
     signatures
   };
 }
@@ -1686,6 +1947,7 @@ module.exports = {
   DEFAULT_CANDIDATE_ROOT,
   GENERATION_BRIEF_VERSION,
   REQUIRED_CANONICAL_IDS,
+  REPLAYABILITY_PROMPT_SUITE,
   SCHEMA_VERSION,
   analyzePackDiversity,
   buildAssetPromptPlan,

@@ -307,21 +307,30 @@
     const stage = qs('[data-world-grid-stage]');
     const canvas = stage?.querySelector('[data-world-grid-canvas]');
     const rect = stage?.getBoundingClientRect?.() || { width: 0, height: 0 };
-    let payload = '';
+    const pack = activePack();
+    const metadata = JSON.stringify({
+      generatedPackId: pack?.packId || '',
+      renderer: sceneInfo?.renderer || '',
+      width: Math.floor(rect.width || 0),
+      height: Math.floor(rect.height || 0),
+      palette: pack?.stylePack?.palette || null,
+      universeName: pack?.universePack?.name || '',
+      assetLoader: sceneInfo?.assetLoader || null
+    });
+    let canvasPayload = '';
     try {
-      payload = canvas?.toDataURL ? canvas.toDataURL('image/png') : '';
+      canvasPayload = canvas?.toDataURL ? canvas.toDataURL('image/png') : '';
     } catch (error) {
-      payload = '';
+      canvasPayload = '';
     }
-    if (!payload || payload.length < 100) {
-      payload = JSON.stringify({
-        generatedPackId: activePack()?.packId || '',
-        renderer: sceneInfo?.renderer || '',
-        width: Math.floor(rect.width || 0),
-        height: Math.floor(rect.height || 0),
-        assetLoader: sceneInfo?.assetLoader || null
-      });
-    }
+    const source = canvasPayload && canvasPayload.length >= 100
+      ? 'three-canvas-data-url-with-pack-metadata'
+      : 'world-grid-stage-metadata';
+    const payload = JSON.stringify({
+      source,
+      canvasPayload,
+      metadata
+    });
     const width = Math.floor(canvas?.width || rect.width || 0);
     const height = Math.floor(canvas?.height || rect.height || 0);
     const hash = await sha256Hex(payload);
@@ -331,7 +340,7 @@
       width,
       height,
       byteLength: payload.length,
-      source: canvas ? 'three-canvas-data-url' : 'world-grid-stage-metadata'
+      source
     };
   }
 
