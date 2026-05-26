@@ -1,0 +1,262 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-town-requester-voice-pack-v1",
+  "title": "Agent Town Generated Requester Voice Pack",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "canonicalVersion",
+    "voicePackId",
+    "promptHash",
+    "requesterArchetypes",
+    "contractFlavorTemplates",
+    "townMurmurTemplates",
+    "cloverVoice",
+    "cachedRewritePolicy",
+    "safety",
+    "balanceSimulation"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "agent-town-requester-voice-pack-v1"
+    },
+    "canonicalVersion": {
+      "const": "agent-town-world-grid-v1"
+    },
+    "voicePackId": {
+      "type": "string",
+      "pattern": "^voice_pack_[a-f0-9]{12}$"
+    },
+    "promptHash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "requesterArchetypes": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requesterId",
+          "displayName",
+          "role",
+          "motivation",
+          "canonicalNeed",
+          "voiceLine"
+        ],
+        "properties": {
+          "requesterId": {
+            "type": "string",
+            "pattern": "^requester_[a-z0-9-]{3,48}$"
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 3
+          },
+          "role": {
+            "type": "string",
+            "minLength": 3
+          },
+          "motivation": {
+            "type": "string",
+            "minLength": 8
+          },
+          "canonicalNeed": {
+            "enum": ["resource.food", "resource.wood", "resource.stone", "resource.coin"]
+          },
+          "voiceLine": {
+            "type": "string",
+            "minLength": 8
+          }
+        }
+      }
+    },
+    "contractFlavorTemplates": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "canonicalContractId",
+          "canonicalActionId",
+          "requesterId",
+          "template",
+          "recapTemplate",
+          "canonicalRuleImpact",
+          "hiddenMechanic",
+          "rewardFormulaDelta"
+        ],
+        "properties": {
+          "canonicalContractId": {
+            "enum": [
+              "contract.world_grid.plan_claim",
+              "contract.world_grid.complete_claim",
+              "contract.world_grid.public_presence",
+              "contract.world_grid.civic_service"
+            ]
+          },
+          "canonicalActionId": {
+            "enum": [
+              "action.plan_claim",
+              "action.complete_claim",
+              "surface.public_presence",
+              "surface.agent_services"
+            ]
+          },
+          "requesterId": {
+            "type": "string",
+            "pattern": "^requester_[a-z0-9-]{3,48}$"
+          },
+          "template": {
+            "type": "string",
+            "minLength": 12
+          },
+          "recapTemplate": {
+            "type": "string",
+            "minLength": 12
+          },
+          "canonicalRuleImpact": {
+            "const": "none"
+          },
+          "hiddenMechanic": {
+            "const": false
+          },
+          "rewardFormulaDelta": {
+            "const": 0
+          }
+        }
+      }
+    },
+    "townMurmurTemplates": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["murmurId", "surface", "text"],
+        "properties": {
+          "murmurId": {
+            "type": "string",
+            "pattern": "^murmur_[a-z0-9-]{3,48}$"
+          },
+          "surface": {
+            "enum": ["world-grid-summary", "public-square", "contract-board"]
+          },
+          "text": {
+            "type": "string",
+            "minLength": 8
+          }
+        }
+      }
+    },
+    "cloverVoice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identityAnchor",
+        "styleAwareLine",
+        "stability",
+        "canonicalRolePreserved"
+      ],
+      "properties": {
+        "identityAnchor": {
+          "const": "Clover remains the trusted Foreman"
+        },
+        "styleAwareLine": {
+          "type": "string",
+          "minLength": 12
+        },
+        "stability": {
+          "const": "identity-stable"
+        },
+        "canonicalRolePreserved": {
+          "const": true
+        }
+      }
+    },
+    "cachedRewritePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "externalModelUsed",
+        "requiresConsent",
+        "requiresCostApproval",
+        "providerAuthStored"
+      ],
+      "properties": {
+        "status": {
+          "const": "future-hook-disabled"
+        },
+        "externalModelUsed": {
+          "const": false
+        },
+        "requiresConsent": {
+          "const": true
+        },
+        "requiresCostApproval": {
+          "const": true
+        },
+        "providerAuthStored": {
+          "const": false
+        }
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "providerDebugJargonCount",
+        "unsafeTextRejectCount",
+        "htmlEscapingRequired"
+      ],
+      "properties": {
+        "providerDebugJargonCount": {
+          "const": 0
+        },
+        "unsafeTextRejectCount": {
+          "const": 0
+        },
+        "htmlEscapingRequired": {
+          "const": true
+        }
+      }
+    },
+    "balanceSimulation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "simulationVersion",
+        "canonicalContractCoverage",
+        "canonicalContractRulesPreserved",
+        "hiddenContractMechanics",
+        "canonicalContractHash",
+        "firstLoopCompletable"
+      ],
+      "properties": {
+        "simulationVersion": {
+          "const": "agent-town-requester-voice-balance-v1"
+        },
+        "canonicalContractCoverage": {
+          "const": 1
+        },
+        "canonicalContractRulesPreserved": {
+          "const": true
+        },
+        "hiddenContractMechanics": {
+          "const": 0
+        },
+        "canonicalContractHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "firstLoopCompletable": {
+          "const": true
+        }
+      }
+    }
+  }
+}

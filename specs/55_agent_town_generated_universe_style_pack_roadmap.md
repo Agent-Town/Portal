@@ -357,3 +357,24 @@ Generated packs now include a strict `techFlavorTree` contract that renames and 
   "firstLoopStillCompletes": true
 }
 ```
+
+## GU-15 Generated Requesters, Contracts, and Voices Slice
+
+Generated packs now include a `requesterVoicePack` contract for presentation-only requester archetypes, canonical contract flavor templates, town murmurs, and Clover style-aware copy. Each contract template maps to one approved canonical contract/action pair and proves through balance simulation that no hidden mechanics, formulas, reward changes, or V6 civic authority were introduced. The cached LLM rewrite path remains a disabled future hook requiring explicit consent and cost approval before use.
+
+```json
+{
+  "requesterVoicePackSchemaExists": true,
+  "requesterArchetypesGenerated": true,
+  "contractFlavorGenerated": true,
+  "canonicalContractCoverage": 1.0,
+  "canonicalContractRulesPreserved": true,
+  "hiddenContractMechanics": 0,
+  "unsafeTextRejectCount": 0,
+  "townMurmurTemplateCountMin": 3,
+  "cloverIdentityStable": true,
+  "cachedRewriteDisabled": true,
+  "externalModelUsed": false,
+  "firstLoopStillCompletes": true
+}
+```

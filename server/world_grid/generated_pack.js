@@ -121,6 +121,32 @@ const CANONICAL_TECH_CAPABILITIES = [
 ];
 const CANONICAL_TECH_CAPABILITY_IDS = CANONICAL_TECH_CAPABILITIES.map((capability) => capability.canonicalCapabilityId);
 const CANONICAL_TECH_EFFECT_IDS = CANONICAL_TECH_CAPABILITIES.map((capability) => capability.canonicalEffectId);
+const REQUESTER_VOICE_PACK_VERSION = 'agent-town-requester-voice-pack-v1';
+const REQUESTER_VOICE_BALANCE_VERSION = 'agent-town-requester-voice-balance-v1';
+const CANONICAL_CONTRACTS = [
+  {
+    canonicalContractId: 'contract.world_grid.plan_claim',
+    canonicalActionId: 'action.plan_claim',
+    ruleSurface: 'claim-planning'
+  },
+  {
+    canonicalContractId: 'contract.world_grid.complete_claim',
+    canonicalActionId: 'action.complete_claim',
+    ruleSurface: 'claim-completion'
+  },
+  {
+    canonicalContractId: 'contract.world_grid.public_presence',
+    canonicalActionId: 'surface.public_presence',
+    ruleSurface: 'public-presence'
+  },
+  {
+    canonicalContractId: 'contract.world_grid.civic_service',
+    canonicalActionId: 'surface.agent_services',
+    ruleSurface: 'agent-services'
+  }
+];
+const CANONICAL_CONTRACT_IDS = CANONICAL_CONTRACTS.map((contract) => contract.canonicalContractId);
+const CANONICAL_CONTRACT_ACTION_IDS = CANONICAL_CONTRACTS.map((contract) => contract.canonicalActionId);
 const APPROVED_MODIFIERS_VERSION = 'agent-town-approved-modifiers-v1';
 const APPROVED_MODIFIER_BALANCE_VERSION = 'agent-town-approved-modifier-balance-v1';
 const APPROVED_MODIFIERS = [
@@ -430,6 +456,10 @@ function canonicalTechEffectHash() {
     canonicalEffectId: capability.canonicalEffectId,
     unlockRule: capability.unlockRule
   }))));
+}
+
+function canonicalContractHash() {
+  return sha256(JSON.stringify(CANONICAL_CONTRACTS));
 }
 
 function clone(value) {
@@ -1533,6 +1563,324 @@ function projectTechFlavorView(pack = {}) {
   };
 }
 
+function boundedLine(value = '', maxLength = 118) {
+  return String(value || '').replace(/\s+/g, ' ').trim().slice(0, maxLength);
+}
+
+function requesterIdFor(name = '') {
+  return `requester_${slugForTarget(name).slice(0, 38)}`;
+}
+
+function buildRequesterVoicePack({ packId = '', promptHash = '', packHash = '', anchor = 'Civic', second = 'Route', index = {} } = {}) {
+  const foodName = index?.['resource.food']?.generatedName || `${anchor} Supplies`;
+  const woodName = index?.['resource.wood']?.generatedName || `${anchor} Timber`;
+  const coinName = index?.['resource.coin']?.generatedName || `${second} Scrip`;
+  const requesterArchetypes = [
+    {
+      requesterId: requesterIdFor(`${anchor} Quartermaster`),
+      displayName: `${anchor} Quartermaster`,
+      role: 'route supplies steward',
+      motivation: `Keeps ${foodName.toLowerCase()} ready before the settlement opens a new route.`,
+      canonicalNeed: 'resource.food',
+      voiceLine: boundedLine(`Bring the ${foodName.toLowerCase()} into view, and I will keep the route calm.`)
+    },
+    {
+      requesterId: requesterIdFor(`${second} Wayfinder`),
+      displayName: `${second} Wayfinder`,
+      role: 'survey route caller',
+      motivation: `Watches the map edge and asks for a clear claim plan before work begins.`,
+      canonicalNeed: 'resource.coin',
+      voiceLine: boundedLine(`Mark the path first; ${coinName.toLowerCase()} should only move after the plan is clear.`)
+    },
+    {
+      requesterId: requesterIdFor(`${anchor} Craftkeeper`),
+      displayName: `${anchor} Craftkeeper`,
+      role: 'materials neighbor',
+      motivation: `Keeps ${woodName.toLowerCase()} stories grounded in visible town work.`,
+      canonicalNeed: 'resource.wood',
+      voiceLine: boundedLine(`I trust Clover's route board when the materials and cost stay visible.`)
+    }
+  ];
+  const byNeed = new Map(requesterArchetypes.map((requester) => [requester.canonicalNeed, requester]));
+  const routeRequester = byNeed.get('resource.coin') || requesterArchetypes[0];
+  const supplyRequester = byNeed.get('resource.food') || requesterArchetypes[0];
+  const craftRequester = byNeed.get('resource.wood') || requesterArchetypes[0];
+  const contractFlavorTemplates = [
+    {
+      canonicalContractId: 'contract.world_grid.plan_claim',
+      canonicalActionId: 'action.plan_claim',
+      requesterId: routeRequester.requesterId,
+      template: boundedLine(`${routeRequester.displayName}: Plan the ${second.toLowerCase()} route before any claim is completed.`),
+      recapTemplate: boundedLine(`${routeRequester.displayName} saw the route plan and kept the request bounded.`),
+      canonicalRuleImpact: 'none',
+      hiddenMechanic: false,
+      rewardFormulaDelta: 0
+    },
+    {
+      canonicalContractId: 'contract.world_grid.complete_claim',
+      canonicalActionId: 'action.complete_claim',
+      requesterId: supplyRequester.requesterId,
+      template: boundedLine(`${supplyRequester.displayName}: Complete the claim when Clover shows the same cost on the board.`),
+      recapTemplate: boundedLine(`${supplyRequester.displayName} logged the completed claim without changing rewards.`),
+      canonicalRuleImpact: 'none',
+      hiddenMechanic: false,
+      rewardFormulaDelta: 0
+    },
+    {
+      canonicalContractId: 'contract.world_grid.public_presence',
+      canonicalActionId: 'surface.public_presence',
+      requesterId: craftRequester.requesterId,
+      template: boundedLine(`${craftRequester.displayName}: Share only public-safe neighbor notes from the ${anchor.toLowerCase()} town.`),
+      recapTemplate: boundedLine(`${craftRequester.displayName} kept public presence to safe summary text.`),
+      canonicalRuleImpact: 'none',
+      hiddenMechanic: false,
+      rewardFormulaDelta: 0
+    },
+    {
+      canonicalContractId: 'contract.world_grid.civic_service',
+      canonicalActionId: 'surface.agent_services',
+      requesterId: routeRequester.requesterId,
+      template: boundedLine(`${routeRequester.displayName}: Ask civic services for advice, not authority over the claim.`),
+      recapTemplate: boundedLine(`${routeRequester.displayName} treated service output as advice only.`),
+      canonicalRuleImpact: 'none',
+      hiddenMechanic: false,
+      rewardFormulaDelta: 0
+    }
+  ];
+  const townMurmurTemplates = [
+    {
+      murmurId: `murmur_${slugForTarget(anchor)}-market-note`,
+      surface: 'world-grid-summary',
+      text: boundedLine(`${anchor} neighbors compare route notes while Clover keeps the claim steps simple.`)
+    },
+    {
+      murmurId: `murmur_${slugForTarget(second)}-square-note`,
+      surface: 'public-square',
+      text: boundedLine(`${second} crews trade small stories, but no one changes the town rules.`)
+    },
+    {
+      murmurId: `murmur_${slugForTarget(anchor)}-contract-note`,
+      surface: 'contract-board',
+      text: boundedLine(`Every ${anchor.toLowerCase()} request points back to the same canonical action board.`)
+    }
+  ];
+  return {
+    schemaVersion: REQUESTER_VOICE_PACK_VERSION,
+    canonicalVersion: 'agent-town-world-grid-v1',
+    voicePackId: `voice_pack_${String(packHash || sha256(promptHash || packId)).slice(0, 12)}`,
+    promptHash,
+    requesterArchetypes,
+    contractFlavorTemplates,
+    townMurmurTemplates,
+    cloverVoice: {
+      identityAnchor: 'Clover remains the trusted Foreman',
+      styleAwareLine: boundedLine(`Clover reads the ${anchor.toLowerCase()} flavor, then points back to the same bounded action.`),
+      stability: 'identity-stable',
+      canonicalRolePreserved: true
+    },
+    cachedRewritePolicy: {
+      status: 'future-hook-disabled',
+      externalModelUsed: false,
+      requiresConsent: true,
+      requiresCostApproval: true,
+      providerAuthStored: false
+    },
+    safety: {
+      providerDebugJargonCount: 0,
+      unsafeTextRejectCount: 0,
+      htmlEscapingRequired: true
+    },
+    balanceSimulation: {
+      simulationVersion: REQUESTER_VOICE_BALANCE_VERSION,
+      canonicalContractCoverage: 1,
+      canonicalContractRulesPreserved: true,
+      hiddenContractMechanics: 0,
+      canonicalContractHash: canonicalContractHash(),
+      firstLoopCompletable: true
+    }
+  };
+}
+
+function requesterVoiceTextValues(pack = {}) {
+  const requesterVoice = pack?.requesterVoicePack || pack;
+  return [
+    ...(requesterVoice.requesterArchetypes || []).flatMap((requester) => [
+      requester.displayName,
+      requester.role,
+      requester.motivation,
+      requester.voiceLine
+    ]),
+    ...(requesterVoice.contractFlavorTemplates || []).flatMap((template) => [
+      template.template,
+      template.recapTemplate
+    ]),
+    ...(requesterVoice.townMurmurTemplates || []).map((murmur) => murmur.text),
+    requesterVoice.cloverVoice?.styleAwareLine || ''
+  ].filter(Boolean);
+}
+
+function unsafeRequesterVoiceTextFindings(requesterVoice = {}) {
+  const findings = [];
+  for (const [index, text] of requesterVoiceTextValues(requesterVoice).entries()) {
+    const value = String(text || '');
+    const lower = value.toLowerCase();
+    const technicalTerms = TECHNICAL_NORMAL_GAMEPLAY_TERMS.filter((term) => lower.includes(term));
+    const publicForbiddenTerms = PUBLIC_CARD_FORBIDDEN_TERMS.filter((term) => lower.includes(term));
+    const rawPromptPatterns = blockedPatternIdsForText(value);
+    const tooLong = value.length > 140;
+    if (technicalTerms.length > 0 || publicForbiddenTerms.length > 0 || rawPromptPatterns.length > 0 || tooLong) {
+      findings.push({ index, technicalTerms, publicForbiddenTerms, rawPromptPatterns, tooLong });
+    }
+  }
+  return findings;
+}
+
+function validateRequesterVoicePack(requesterVoice = {}) {
+  const schemaReport = SCHEMA_REGISTRY?.requesterVoicePack
+    ? validateGeneratedSchema(requesterVoice, SCHEMA_REGISTRY.requesterVoicePack, '$.requesterVoicePack')
+    : { ok: true, errors: [] };
+  const requesters = Array.isArray(requesterVoice?.requesterArchetypes) ? requesterVoice.requesterArchetypes : [];
+  const templates = Array.isArray(requesterVoice?.contractFlavorTemplates) ? requesterVoice.contractFlavorTemplates : [];
+  const murmurs = Array.isArray(requesterVoice?.townMurmurTemplates) ? requesterVoice.townMurmurTemplates : [];
+  const requesterIds = new Set(requesters.map((requester) => requester.requesterId).filter(Boolean));
+  const templateContractIds = templates.map((template) => template.canonicalContractId).filter(Boolean);
+  const templateActionIds = templates.map((template) => template.canonicalActionId).filter(Boolean);
+  const missingContractIds = CANONICAL_CONTRACT_IDS.filter((id) => !templateContractIds.includes(id));
+  const unknownContractIds = templateContractIds.filter((id) => !CANONICAL_CONTRACT_IDS.includes(id));
+  const duplicateContractIds = templateContractIds.filter((id, index, all) => id && all.indexOf(id) !== index);
+  const unknownActionIds = templateActionIds.filter((id) => !CANONICAL_CONTRACT_ACTION_IDS.includes(id));
+  const requesterReferenceProblems = templates
+    .filter((template) => template.requesterId && !requesterIds.has(template.requesterId))
+    .map((template) => template.requesterId);
+  const hiddenMechanics = templates.filter((template) => (
+    template.canonicalRuleImpact !== 'none'
+    || template.hiddenMechanic !== false
+    || Number(template.rewardFormulaDelta || 0) !== 0
+  ));
+  const unsafeTextFindings = unsafeRequesterVoiceTextFindings(requesterVoice);
+  const forbiddenAuthorityPaths = findForbiddenAuthorityPaths(requesterVoice);
+  const secretLikePaths = findSecretLikePaths(requesterVoice);
+  const rawInstructionPaths = findRawPromptInstructionPaths(requesterVoice);
+  const balance = requesterVoice?.balanceSimulation || {};
+  const checks = [
+    {
+      id: 'REQUESTER_VOICE_SCHEMA_VALID',
+      passed: schemaReport.ok === true,
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
+    },
+    {
+      id: 'REQUESTER_ARCHETYPES_GENERATED',
+      passed: requesters.length >= 3
+        && requesters.every((requester) => requester.requesterId && requester.displayName && requester.voiceLine),
+      measured: { requesterCount: requesters.length }
+    },
+    {
+      id: 'CONTRACT_FLAVOR_CANONICAL_MAPPING',
+      passed: missingContractIds.length === 0
+        && unknownContractIds.length === 0
+        && duplicateContractIds.length === 0
+        && unknownActionIds.length === 0
+        && requesterReferenceProblems.length === 0,
+      measured: {
+        requiredContractCount: CANONICAL_CONTRACT_IDS.length,
+        coveredContractCount: new Set(templateContractIds).size,
+        missingContractIds,
+        unknownContractIds,
+        duplicateContractIds: [...new Set(duplicateContractIds)],
+        unknownActionIds,
+        requesterReferenceProblems
+      }
+    },
+    {
+      id: 'CONTRACT_FLAVOR_NO_HIDDEN_MECHANICS',
+      passed: hiddenMechanics.length === 0
+        && forbiddenAuthorityPaths.length === 0
+        && secretLikePaths.length === 0
+        && rawInstructionPaths.length === 0
+        && balance?.simulationVersion === REQUESTER_VOICE_BALANCE_VERSION
+        && Number(balance?.canonicalContractCoverage || 0) === 1
+        && balance?.canonicalContractRulesPreserved === true
+        && Number(balance?.hiddenContractMechanics || 0) === 0
+        && balance?.canonicalContractHash === canonicalContractHash()
+        && balance?.firstLoopCompletable === true,
+      measured: {
+        hiddenMechanicCount: hiddenMechanics.length,
+        forbiddenAuthorityPaths,
+        secretLikePaths,
+        rawInstructionPaths: rawInstructionPaths.slice(0, 5),
+        canonicalContractHash: balance?.canonicalContractHash || null
+      }
+    },
+    {
+      id: 'REQUESTER_VOICE_TEXT_SAFE_READABLE',
+      passed: unsafeTextFindings.length === 0
+        && murmurs.length >= 3
+        && requesterVoice?.safety?.providerDebugJargonCount === 0
+        && requesterVoice?.safety?.unsafeTextRejectCount === 0
+        && requesterVoice?.safety?.htmlEscapingRequired === true,
+      measured: {
+        murmurCount: murmurs.length,
+        unsafeTextRejectCount: unsafeTextFindings.length,
+        unsafeTextFindings: unsafeTextFindings.slice(0, 5)
+      }
+    },
+    {
+      id: 'CLOVER_VOICE_IDENTITY_STABLE',
+      passed: requesterVoice?.cloverVoice?.identityAnchor === 'Clover remains the trusted Foreman'
+        && requesterVoice?.cloverVoice?.canonicalRolePreserved === true
+        && requesterVoice?.cloverVoice?.stability === 'identity-stable',
+      measured: requesterVoice?.cloverVoice || {}
+    },
+    {
+      id: 'REQUESTER_REWRITE_HOOK_DISABLED',
+      passed: requesterVoice?.cachedRewritePolicy?.status === 'future-hook-disabled'
+        && requesterVoice?.cachedRewritePolicy?.externalModelUsed === false
+        && requesterVoice?.cachedRewritePolicy?.requiresConsent === true
+        && requesterVoice?.cachedRewritePolicy?.requiresCostApproval === true
+        && requesterVoice?.cachedRewritePolicy?.providerAuthStored === false,
+      measured: requesterVoice?.cachedRewritePolicy || {}
+    }
+  ];
+  return {
+    ok: checks.every((check) => check.passed === true),
+    checks,
+    metrics: {
+      requesterVoicePackSchemaExists: Boolean(SCHEMA_REGISTRY?.requesterVoicePack),
+      requesterArchetypesGenerated: checks.find((check) => check.id === 'REQUESTER_ARCHETYPES_GENERATED')?.passed === true,
+      contractFlavorGenerated: templates.length >= CANONICAL_CONTRACT_IDS.length,
+      canonicalContractRulesPreserved: checks.find((check) => check.id === 'CONTRACT_FLAVOR_NO_HIDDEN_MECHANICS')?.passed === true,
+      canonicalContractCoverage: CANONICAL_CONTRACT_IDS.length
+        ? (CANONICAL_CONTRACT_IDS.length - missingContractIds.length) / CANONICAL_CONTRACT_IDS.length
+        : 0,
+      unsafeTextRejectCount: unsafeTextFindings.length,
+      townMurmurTemplateCount: murmurs.length,
+      cloverIdentityStable: checks.find((check) => check.id === 'CLOVER_VOICE_IDENTITY_STABLE')?.passed === true,
+      cachedRewriteDisabled: checks.find((check) => check.id === 'REQUESTER_REWRITE_HOOK_DISABLED')?.passed === true
+    }
+  };
+}
+
+function projectRequesterVoiceView(pack = {}) {
+  const requesterVoice = pack?.requesterVoicePack || {};
+  const report = validateRequesterVoicePack(requesterVoice);
+  return {
+    schemaVersion: 'agent-town-requester-voice-view-v1',
+    packId: pack?.packId || '',
+    requesterArchetypes: clone(requesterVoice.requesterArchetypes || []),
+    contractFlavorTemplates: (requesterVoice.contractFlavorTemplates || []).map((template) => ({
+      canonicalContractId: template.canonicalContractId,
+      canonicalActionId: template.canonicalActionId,
+      requesterId: template.requesterId,
+      template: template.template,
+      recapTemplate: template.recapTemplate
+    })),
+    townMurmurTemplates: clone(requesterVoice.townMurmurTemplates || []),
+    cloverVoice: clone(requesterVoice.cloverVoice || {}),
+    balanceSimulation: clone(requesterVoice.balanceSimulation || {}),
+    validationReport: report
+  };
+}
+
 function modifierEffectFor(modifier = '') {
   const base = APPROVED_MODIFIER_EFFECTS[modifier] || APPROVED_MODIFIER_EFFECTS.visual_only;
   return {
@@ -1776,6 +2124,7 @@ function validateGeneratedPack(pack) {
     .filter((canonicalId, index, all) => canonicalId && all.indexOf(canonicalId) !== index);
   const generationBriefReport = validateGenerationBrief(pack?.generationBrief || {});
   const techFlavorTreeReport = validateTechFlavorTree(pack?.techFlavorTree || {});
+  const requesterVoiceReport = validateRequesterVoicePack(pack?.requesterVoicePack || {});
   const approvedModifiersReport = validateApprovedModifiers(pack?.approvedModifiers || {});
   const assetManifestReport = validateAssetManifest(pack?.assetManifest || {}, pack);
   const assetPromptPlanReport = validateAssetPromptPlan(pack?.assetPromptPlan || {}, pack);
@@ -1824,6 +2173,11 @@ function validateGeneratedPack(pack) {
       id: 'GENPACK_TECH_FLAVOR_TREE_VALID',
       passed: techFlavorTreeReport.ok === true,
       measured: techFlavorTreeReport.metrics
+    },
+    {
+      id: 'GENPACK_REQUESTER_VOICE_PACK_VALID',
+      passed: requesterVoiceReport.ok === true,
+      measured: requesterVoiceReport.metrics
     },
     {
       id: 'GENPACK_APPROVED_MODIFIERS_VALID',
@@ -1913,6 +2267,14 @@ function validateGeneratedPack(pack) {
       generatedTechNameCount: techFlavorTreeReport.metrics.generatedTechNameCount,
       generatedTechNamesVisible: techFlavorTreeReport.metrics.generatedTechNamesVisible,
       unlockRulesPreserved: techFlavorTreeReport.metrics.unlockRulesPreserved,
+      requesterVoicePackValid: requesterVoiceReport.ok === true,
+      requesterArchetypesGenerated: requesterVoiceReport.metrics.requesterArchetypesGenerated,
+      contractFlavorGenerated: requesterVoiceReport.metrics.contractFlavorGenerated,
+      canonicalContractRulesPreserved: requesterVoiceReport.metrics.canonicalContractRulesPreserved,
+      canonicalContractCoverage: requesterVoiceReport.metrics.canonicalContractCoverage,
+      unsafeTextRejectCount: requesterVoiceReport.metrics.unsafeTextRejectCount,
+      townMurmurTemplateCount: requesterVoiceReport.metrics.townMurmurTemplateCount,
+      cloverIdentityStable: requesterVoiceReport.metrics.cloverIdentityStable,
       enumOnlyModifiers: approvedModifiersReport.metrics.enumOnlyModifiers,
       formulaInjectionRejected: approvedModifiersReport.checks.find((check) => check.id === 'APPROVED_MODIFIERS_NO_FORMULA_OR_AUTHORITY')?.passed === true,
       balanceSimulationPassed: approvedModifiersReport.metrics.balanceSimulationPassed,
@@ -2284,6 +2646,7 @@ function createGeneratedPack({
       canonicalEntities: mappings
     },
     techFlavorTree: buildTechFlavorTree({ promptHash, packHash, anchor, second, index }),
+    requesterVoicePack: buildRequesterVoicePack({ packId, promptHash, packHash, anchor, second, index }),
     approvedModifiers: buildApprovedModifiers({ words, packHash })
   };
   pack.assetManifest = buildAssetManifest({ packId, promptHash, mappings, preset, palette });
@@ -2502,6 +2865,7 @@ function exportedPackHash(exportedPack = {}) {
     universePack: exportedPack.universePack,
     gameplayMapping: exportedPack.gameplayMapping,
     techFlavorTree: exportedPack.techFlavorTree,
+    requesterVoicePack: exportedPack.requesterVoicePack,
     approvedModifiers: exportedPack.approvedModifiers,
     assetManifest: exportedPack.assetManifest,
     assetPromptPlan: exportedPack.assetPromptPlan,
@@ -3412,6 +3776,7 @@ function clearGeneratedPacksForTests({ clearDisk = false } = {}) {
 module.exports = {
   APPROVED_MODIFIERS,
   ASSET_PROMPT_PLAN_VERSION,
+  CANONICAL_CONTRACTS,
   CANONICAL_TECH_CAPABILITIES,
   DEFAULT_CANDIDATE_ROOT,
   GENERATION_BRIEF_VERSION,
@@ -3433,6 +3798,7 @@ module.exports = {
   listPublicPackGallery,
   normalizePrompt,
   projectApprovedModifierView,
+  projectRequesterVoiceView,
   projectTechFlavorView,
   publishPublicPackCard,
   recordPlaytestReport,
@@ -3446,6 +3812,7 @@ module.exports = {
   validateAssetPromptPlan,
   validateApprovedModifiers,
   validateGenerationBrief,
+  validateRequesterVoicePack,
   validateTechFlavorTree,
   validatePublicPackGallery,
   validatePublicPackCard,

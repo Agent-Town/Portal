@@ -118,6 +118,14 @@ Player prompt
 - `projectTechFlavorView` exposes only public generated names/lore/effect metadata for generated-pack UI surfaces.
 - Balance simulation requires canonical effect coverage of 1.0, zero custom effects, unchanged unlock rules, no V6 civic mechanics touched, and first-loop playability.
 
+## GU-15 Generated Requester Voice Slice
+
+- `requester_voice_pack.schema.json` defines requester archetypes, canonical contract flavor templates, town murmur templates, Clover style-aware copy, a disabled cached rewrite policy, and a balance simulation record.
+- Every contract flavor template maps to one approved canonical contract/action pair: plan claim, complete claim, public presence, and civic service.
+- Requester voice packs can change presentation copy only; unknown contract IDs, unknown action IDs, formulas, hidden mechanics, reward deltas, mutation authority, secret-like fields, raw executable instructions, and provider/debug jargon fail validation.
+- `projectRequesterVoiceView` exposes generated requester copy and contract flavor metadata only when generated packs are enabled.
+- Balance simulation requires canonical contract coverage of 1.0, no hidden mechanics, canonical contract rules preserved, and first-loop playability.
+
 ## Machine Checks
 
 ```json
@@ -205,6 +213,14 @@ Player prompt
   "customEffectCount": 0,
   "generatedTechNamesVisible": true,
   "unlockRulesPreserved": true,
-  "v6CivicMechanicsTouched": false
+  "v6CivicMechanicsTouched": false,
+  "requesterVoicePackSchemaExists": true,
+  "requesterArchetypesGenerated": true,
+  "contractFlavorGenerated": true,
+  "canonicalContractCoverage": 1.0,
+  "canonicalContractRulesPreserved": true,
+  "unsafeTextRejectCount": 0,
+  "cloverIdentityStable": true,
+  "cachedRewriteDisabled": true
 }
 ```

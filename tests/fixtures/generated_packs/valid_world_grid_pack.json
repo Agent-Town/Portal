@@ -485,6 +485,123 @@
       "firstLoopCompletable": true
     }
   },
+  "requesterVoicePack": {
+    "schemaVersion": "agent-town-requester-voice-pack-v1",
+    "canonicalVersion": "agent-town-world-grid-v1",
+    "voicePackId": "voice_pack_1dc551d9ebea",
+    "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+    "requesterArchetypes": [
+      {
+        "requesterId": "requester_cozy-quartermaster",
+        "displayName": "Cozy Quartermaster",
+        "role": "route supplies steward",
+        "motivation": "Keeps cozy supplies ready before the settlement opens a new route.",
+        "canonicalNeed": "resource.food",
+        "voiceLine": "Bring the cozy supplies into view, and I will keep the route calm."
+      },
+      {
+        "requesterId": "requester_mushroom-wayfinder",
+        "displayName": "Mushroom Wayfinder",
+        "role": "survey route caller",
+        "motivation": "Watches the map edge and asks for a clear claim plan before work begins.",
+        "canonicalNeed": "resource.coin",
+        "voiceLine": "Mark the path first; mushroom scrip should only move after the plan is clear."
+      },
+      {
+        "requesterId": "requester_cozy-craftkeeper",
+        "displayName": "Cozy Craftkeeper",
+        "role": "materials neighbor",
+        "motivation": "Keeps cozy timber stories grounded in visible town work.",
+        "canonicalNeed": "resource.wood",
+        "voiceLine": "I trust Clover's route board when the materials and cost stay visible."
+      }
+    ],
+    "contractFlavorTemplates": [
+      {
+        "canonicalContractId": "contract.world_grid.plan_claim",
+        "canonicalActionId": "action.plan_claim",
+        "requesterId": "requester_mushroom-wayfinder",
+        "template": "Mushroom Wayfinder: Plan the mushroom route before any claim is completed.",
+        "recapTemplate": "Mushroom Wayfinder saw the route plan and kept the request bounded.",
+        "canonicalRuleImpact": "none",
+        "hiddenMechanic": false,
+        "rewardFormulaDelta": 0
+      },
+      {
+        "canonicalContractId": "contract.world_grid.complete_claim",
+        "canonicalActionId": "action.complete_claim",
+        "requesterId": "requester_cozy-quartermaster",
+        "template": "Cozy Quartermaster: Complete the claim when Clover shows the same cost on the board.",
+        "recapTemplate": "Cozy Quartermaster logged the completed claim without changing rewards.",
+        "canonicalRuleImpact": "none",
+        "hiddenMechanic": false,
+        "rewardFormulaDelta": 0
+      },
+      {
+        "canonicalContractId": "contract.world_grid.public_presence",
+        "canonicalActionId": "surface.public_presence",
+        "requesterId": "requester_cozy-craftkeeper",
+        "template": "Cozy Craftkeeper: Share only public-safe neighbor notes from the cozy town.",
+        "recapTemplate": "Cozy Craftkeeper kept public presence to safe summary text.",
+        "canonicalRuleImpact": "none",
+        "hiddenMechanic": false,
+        "rewardFormulaDelta": 0
+      },
+      {
+        "canonicalContractId": "contract.world_grid.civic_service",
+        "canonicalActionId": "surface.agent_services",
+        "requesterId": "requester_mushroom-wayfinder",
+        "template": "Mushroom Wayfinder: Ask civic services for advice, not authority over the claim.",
+        "recapTemplate": "Mushroom Wayfinder treated service output as advice only.",
+        "canonicalRuleImpact": "none",
+        "hiddenMechanic": false,
+        "rewardFormulaDelta": 0
+      }
+    ],
+    "townMurmurTemplates": [
+      {
+        "murmurId": "murmur_cozy-market-note",
+        "surface": "world-grid-summary",
+        "text": "Cozy neighbors compare route notes while Clover keeps the claim steps simple."
+      },
+      {
+        "murmurId": "murmur_mushroom-square-note",
+        "surface": "public-square",
+        "text": "Mushroom crews trade small stories, but no one changes the town rules."
+      },
+      {
+        "murmurId": "murmur_cozy-contract-note",
+        "surface": "contract-board",
+        "text": "Every cozy request points back to the same canonical action board."
+      }
+    ],
+    "cloverVoice": {
+      "identityAnchor": "Clover remains the trusted Foreman",
+      "styleAwareLine": "Clover reads the cozy flavor, then points back to the same bounded action.",
+      "stability": "identity-stable",
+      "canonicalRolePreserved": true
+    },
+    "cachedRewritePolicy": {
+      "status": "future-hook-disabled",
+      "externalModelUsed": false,
+      "requiresConsent": true,
+      "requiresCostApproval": true,
+      "providerAuthStored": false
+    },
+    "safety": {
+      "providerDebugJargonCount": 0,
+      "unsafeTextRejectCount": 0,
+      "htmlEscapingRequired": true
+    },
+    "balanceSimulation": {
+      "simulationVersion": "agent-town-requester-voice-balance-v1",
+      "canonicalContractCoverage": 1,
+      "canonicalContractRulesPreserved": true,
+      "hiddenContractMechanics": 0,
+      "canonicalContractHash": "6c7c8fd7edd323e6ea6c1a36b6c80e351180d74d8746aecc137473c59408e098",
+      "firstLoopCompletable": true
+    }
+  },
   "approvedModifiers": {
     "schemaVersion": "agent-town-approved-modifiers-v1",
     "canonicalVersion": "agent-town-world-grid-v1",

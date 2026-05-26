@@ -2705,6 +2705,14 @@ Tech-flavor invariants:
 - compatibility hooks for V3/V5 are metadata-only and `v6CivicMechanicsTouched=false`;
 - `/api/world/region` may include `generatedPackTechFlavorView` only when generated packs are enabled, and that view cannot change canonical unlock effects.
 
+Requester/voice invariants:
+- schema is `agent-town-requester-voice-pack-v1`;
+- requester archetypes, town murmurs, and Clover style-aware copy are presentation text only;
+- every contract flavor template maps to an approved canonical contract ID and canonical action ID;
+- missing canonical contracts, unknown contract/action IDs, hidden mechanics, reward deltas, formulas, mutation authority, secret-like fields, raw executable prompt instructions, and provider/debug jargon are rejected;
+- cached rewrite policy is `future-hook-disabled`, uses no external model, and requires consent plus cost approval before any future provider path;
+- `/api/world/region` may include `generatedPackRequesterVoiceView` only when generated packs are enabled, and that view cannot change canonical claim planning, claim completion, public presence, or civic-service rules.
+
 Approved-modifier invariants:
 - schema is `agent-town-approved-modifiers-v1`;
 - `selectedModifiers` must be drawn only from the approved enum: `visual_only`, `more_contract_flavor`, `requesters_prefer_food`, `extra_public_square_charm_text`, `ambient_weather_cosmetic`, `tutorial_copy_variant`;

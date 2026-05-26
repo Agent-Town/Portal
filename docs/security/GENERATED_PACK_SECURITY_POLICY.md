@@ -23,6 +23,7 @@ Status: prototype-gated
 - Curated public gallery entries must be approved-card derivatives with moderation metadata, reviewer signoff, tags, screenshot metadata, asset summary, and zero private-state fields; pending, rejected, and unpublished cards must not appear.
 - Approved generated-pack modifiers must be enum-only, presentation-scoped, and balance-simulated; unknown modifiers, formula strings, custom resource math, mutation tools, custom permissions, custom agent authority, and nonzero canonical rule impact are forbidden.
 - Generated tech flavor trees must map every node to an approved canonical capability/effect pair; missing effects, custom effects, custom mechanics, formulas, changed unlock rules, V6 civic changes, and hidden progression authority are forbidden.
+- Generated requester voice packs must map every contract flavor template to approved canonical contract/action pairs; missing mappings, unknown contracts/actions, hidden mechanics, reward deltas, formulas, mutation authority, secret-like fields, raw executable instructions, and provider/debug jargon are forbidden.
 - Player-visible generated text must be escaped in DOM rendering.
 - Production image generation requires explicit consent and a documented cost/auth model before any user-facing release claim.
 
@@ -89,6 +90,14 @@ Status: prototype-gated
   "customEffectCount": 0,
   "generatedTechNamesVisible": true,
   "unlockRulesPreserved": true,
+  "requesterVoicePackSchemaExists": true,
+  "requesterArchetypesGenerated": true,
+  "contractFlavorGenerated": true,
+  "canonicalContractCoverage": 1.0,
+  "canonicalContractRulesPreserved": true,
+  "unsafeTextRejectCount": 0,
+  "cloverIdentityStable": true,
+  "cachedRewriteDisabled": true,
   "approvedProductionAssetCount": 0,
   "generatedImageAssetsCanChangeServerRules": false,
   "productionImageAssetCount": 0,

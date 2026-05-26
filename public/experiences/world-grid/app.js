@@ -106,6 +106,10 @@
       .map((tech) => tech.generatedName || tech.name)
       .filter(Boolean)
       .slice(0, 3);
+    const voiceLines = [
+      ...(pack.requesterVoicePack?.requesterArchetypes || []).map((requester) => requester.voiceLine),
+      pack.requesterVoicePack?.cloverVoice?.styleAwareLine
+    ].filter(Boolean).slice(0, 2);
     const metrics = pack.validationReport?.metrics || {};
     status.textContent = validation;
     summary.innerHTML = `
@@ -114,6 +118,7 @@
       <p>${escapeHtml(pack.universePack?.firstLoop?.objective || '')}</p>
       ${factions.length ? `<p>${factions.map(escapeHtml).join(' · ')}</p>` : ''}
       ${techNames.length ? `<p>${techNames.map(escapeHtml).join(' · ')}</p>` : ''}
+      ${voiceLines.length ? `<p>${voiceLines.map(escapeHtml).join(' · ')}</p>` : ''}
       <dl>
         <div><dt>Mappings</dt><dd>${escapeHtml(`${metrics.canonicalMappingsCovered || 0}/${metrics.requiredCanonicalMappings || 0}`)}</dd></div>
         <div><dt>Assets</dt><dd>${escapeHtml(String(metrics.fallbackAssetCount || 0))}</dd></div>

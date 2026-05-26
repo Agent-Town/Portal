@@ -67,6 +67,7 @@ test('generated pack schema suite and fixtures exist', () => {
     'universe_bible.schema.json',
     'gameplay_mapping.schema.json',
     'tech_flavor_tree.schema.json',
+    'requester_voice_pack.schema.json',
     'approved_modifiers.schema.json',
     'asset_prompt_plan.schema.json',
     'asset_postprocess_plan.schema.json',
@@ -81,7 +82,7 @@ test('generated pack schema suite and fixtures exist', () => {
     const parsed = readJson(`schemas/generated-packs/${schema}`);
     assert.ok(parsed.$id, schema);
   }
-  assert.equal(requiredSchemas.length, 14);
+  assert.equal(requiredSchemas.length, 15);
 
   for (const fixture of [
     'valid_world_grid_pack.json',
@@ -154,6 +155,11 @@ test('generated pack validation accepts the valid fixture and covers canonical g
   assert.equal(report.metrics.canonicalEffectCoverage, 1);
   assert.equal(report.metrics.customEffectCount, 0);
   assert.equal(report.metrics.unlockRulesPreserved, true);
+  assert.equal(report.metrics.requesterVoicePackValid, true);
+  assert.equal(report.metrics.requesterArchetypesGenerated, true);
+  assert.equal(report.metrics.contractFlavorGenerated, true);
+  assert.equal(report.metrics.canonicalContractRulesPreserved, true);
+  assert.equal(report.metrics.unsafeTextRejectCount, 0);
   assert.equal(report.metrics.enumOnlyModifiers, true);
   assert.equal(report.metrics.balanceSimulationPassed, true);
   assert.equal(report.metrics.canonicalRulesPreserved, true);
@@ -322,6 +328,9 @@ test('generated pack API is gated and records first-loop playtest reports when e
     assert.equal(generateBody.generatedPack.generationBrief.safety.status, 'passed');
     assert.equal(generateBody.generatedPack.techFlavorTree.schemaVersion, 'agent-town-tech-flavor-tree-v1');
     assert.equal(generateBody.generatedPack.techFlavorTree.balanceSimulation.unlockRulesPreserved, true);
+    assert.equal(generateBody.generatedPack.requesterVoicePack.schemaVersion, 'agent-town-requester-voice-pack-v1');
+    assert.equal(generateBody.generatedPack.requesterVoicePack.balanceSimulation.canonicalContractRulesPreserved, true);
+    assert.equal(generateBody.generatedPack.requesterVoicePack.safety.unsafeTextRejectCount, 0);
     assert.equal(generateBody.generatedPack.approvedModifiers.schemaVersion, 'agent-town-approved-modifiers-v1');
     assert.equal(generateBody.generatedPack.approvedModifiers.balanceSimulation.canonicalRulesPreserved, true);
     assert.equal(generateBody.generatedPack.assetPromptPlan.targets.length, 23);
@@ -333,6 +342,8 @@ test('generated pack API is gated and records first-loop playtest reports when e
     assert.equal(regionBody.generatedPack.packId, generateBody.generatedPack.packId);
     assert.equal(regionBody.generatedPackTechFlavorView.validationReport.ok, true);
     assert.equal(regionBody.generatedPackTechFlavorView.balanceSimulation.unlockRulesPreserved, true);
+    assert.equal(regionBody.generatedPackRequesterVoiceView.validationReport.ok, true);
+    assert.equal(regionBody.generatedPackRequesterVoiceView.balanceSimulation.canonicalContractRulesPreserved, true);
     assert.equal(regionBody.generatedPackModifierView.validationReport.ok, true);
     assert.equal(regionBody.generatedPackModifierView.balanceSimulation.canonicalRulesPreserved, true);
     assert.equal(regionBody.generatedPackModifierView.balanceSimulation.resourceFormulaChanges, 0);

@@ -37,6 +37,11 @@ test('generated universe pack loads into Three.js and completes the first world-
   expect(generatedPack?.validationReport?.metrics?.canonicalEffectCoverage).toBe(1);
   expect(generatedPack?.validationReport?.metrics?.unlockRulesPreserved).toBe(true);
   await expect(page.locator('[data-world-grid-generated-summary]')).toContainText(generatedPack.techFlavorTree.nodes[0].generatedName);
+  expect(generatedPack?.requesterVoicePack?.requesterArchetypes?.length).toBeGreaterThan(0);
+  expect(generatedPack?.validationReport?.metrics?.requesterArchetypesGenerated).toBe(true);
+  expect(generatedPack?.validationReport?.metrics?.canonicalContractRulesPreserved).toBe(true);
+  expect(generatedPack?.validationReport?.metrics?.unsafeTextRejectCount).toBe(0);
+  await expect(page.locator('[data-world-grid-generated-summary]')).toContainText(generatedPack.requesterVoicePack.requesterArchetypes[0].voiceLine);
   expect(generatedPack?.approvedModifiers?.selectedModifiers?.length).toBeGreaterThan(0);
   expect(generatedPack?.validationReport?.metrics?.enumOnlyModifiers).toBe(true);
   expect(generatedPack?.validationReport?.metrics?.canonicalRulesPreserved).toBe(true);
@@ -47,6 +52,8 @@ test('generated universe pack loads into Three.js and completes the first world-
   });
   expect(modifierPayload?.generatedPackTechFlavorView?.validationReport?.ok).toBe(true);
   expect(modifierPayload?.generatedPackTechFlavorView?.balanceSimulation?.unlockRulesPreserved).toBe(true);
+  expect(modifierPayload?.generatedPackRequesterVoiceView?.validationReport?.ok).toBe(true);
+  expect(modifierPayload?.generatedPackRequesterVoiceView?.balanceSimulation?.canonicalContractRulesPreserved).toBe(true);
   expect(modifierPayload?.generatedPackModifierView?.validationReport?.ok).toBe(true);
   expect(modifierPayload?.generatedPackModifierView?.balanceSimulation?.resourceFormulaChanges).toBe(0);
 
