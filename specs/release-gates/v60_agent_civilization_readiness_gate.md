@@ -126,7 +126,11 @@ gate below has implementation, deterministic tests, and security/product signoff
   stale-session, full dispute workflow, retention, and final service privacy
   coverage in the V5 gate.
 - V5.4 World Events and Public Works proves contribution caps, idempotency,
-  conservation, reward safety, audit records, and rollback policy.
+  conservation, reward safety, audit records, and rollback policy. Current V5.4
+  storage evidence includes the `WORLD_GRID_EVENTS_SQLITE_PATH` foundation for
+  event contribution/reward restart proof, but release promotion still requires
+  rollback policy, multi-event migration, final public-ledger review, and larger
+  contribution-load coverage in the V5 gate.
 - V5.5 Controlled Free-Play Sandbox Districts proves typed action moderation,
   rollback, rate limits, privacy boundaries, and no private-town mutation.
 

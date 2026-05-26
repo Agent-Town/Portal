@@ -50,6 +50,11 @@ until the controls below are implemented and covered by deterministic tests.
   redacted advice requests, accepted/reported request state, reputation counter
   replay, and duplicate accept/report safety across separate Node process
   lifetimes without leaking forbidden service inputs.
+- When `WORLD_GRID_EVENTS_SQLITE_PATH` is configured, V5.4 world-event
+  contribution and reward state writes durable SQLite rows with owner, event,
+  day, settlement, schema, and migration metadata. Current restart coverage
+  proves contribution totals, reward claims, cap replay, and duplicate
+  contribution/reward safety across separate Node process lifetimes.
 - Mutating V5.1+ world-grid routes and tool routes use process-local rate
   buckets keyed by owner and mutation surface. This throttles prototype abuse
   paths but is not durable, distributed, or session-auth aware.
@@ -101,6 +106,9 @@ until the controls below are implemented and covered by deterministic tests.
 - Current `WORLD_GRID_SERVICES_SQLITE_PATH` coverage is a V5.3 storage
   foundation only; release promotion still needs stale-session, dispute workflow,
   retention, and final service privacy review coverage.
+- Current `WORLD_GRID_EVENTS_SQLITE_PATH` coverage is a V5.4 storage foundation
+  only; release promotion still needs rollback policy, multi-event migration,
+  final public-ledger review, and larger contribution-load coverage.
 
 ## Out Of Scope For This Hardening Pass
 

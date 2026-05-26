@@ -1,5 +1,10 @@
 const { savePlotGraph } = require('../founders_plot/store');
 const { loadWorldGridPlotPrerequisite } = require('./plot_prerequisite');
+const fs = require('fs');
+const path = require('path');
+
+const WORLD_GRID_EVENTS_SCHEMA_VERSION = 'agent-town.v5.world-grid.events.v1';
+const WORLD_GRID_EVENTS_MIGRATION_VERSION = 'world_grid_events_v1';
 
 const RESOURCE_KEYS = ['wood', 'stone', 'food', 'coin'];
 
@@ -29,6 +34,8 @@ const WORLD_EVENT_TEMPLATES = [
 // Prototype/ephemeral process-local stores; release storage is documented in docs/technical/WORLD_GRID_STATE_MODEL.md.
 const contributionsByEvent = new Map();
 const rewardsByEvent = new Map();
+let durableSingleton = null;
+let durableSingletonPath = '';
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -37,6 +44,221 @@ function clone(value) {
 function normalizeCount(value) {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? Math.floor(number) : 0;
+}
+
+function ensureDurableSchema(db) {
+  db.exec('PRAGMA journal_mode = WAL;');
+  db.exec('PRAGMA synchronous = NORMAL;');
+  db.exec('PRAGMA busy_timeout = 5000;');
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS world_grid_event_contributions (
+      event_id TEXT NOT NULL,
+      contribution_id TEXT NOT NULL,
+      owner_account_id TEXT NOT NULL,
+      settlement_id TEXT NOT NULL,
+      idempotency_key TEXT NOT NULL,
+      day_key TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      bundle_json TEXT NOT NULL,
+      contribution_json TEXT NOT NULL,
+      migration_version TEXT NOT NULL,
+      schema_version TEXT NOT NULL,
+      PRIMARY KEY (event_id, contribution_id),
+      UNIQUE(event_id, owner_account_id, idempotency_key)
+    );
+    CREATE INDEX IF NOT EXISTS idx_world_grid_event_contributions_owner_day
+      ON world_grid_event_contributions(owner_account_id, day_key);
+    CREATE INDEX IF NOT EXISTS idx_world_grid_event_contributions_event_day
+      ON world_grid_event_contributions(event_id, day_key);
+    CREATE INDEX IF NOT EXISTS idx_world_grid_event_contributions_settlement_day
+      ON world_grid_event_contributions(settlement_id, day_key);
+
+    CREATE TABLE IF NOT EXISTS world_grid_event_rewards (
+      event_id TEXT NOT NULL,
+      owner_account_id TEXT NOT NULL,
+      reward_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      claimed_at INTEGER NOT NULL,
+      reward_json TEXT NOT NULL,
+      migration_version TEXT NOT NULL,
+      schema_version TEXT NOT NULL,
+      PRIMARY KEY (event_id, owner_account_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_world_grid_event_rewards_reward
+      ON world_grid_event_rewards(reward_id);
+    CREATE INDEX IF NOT EXISTS idx_world_grid_event_rewards_status
+      ON world_grid_event_rewards(status);
+  `);
+}
+
+function parseDurableContribution(row) {
+  if (!row) return null;
+  return JSON.parse(row.contribution_json);
+}
+
+function parseDurableReward(row) {
+  if (!row) return null;
+  return JSON.parse(row.reward_json);
+}
+
+function createWorldGridEventStore({ sqlitePath } = {}) {
+  if (!sqlitePath || typeof sqlitePath !== 'string') {
+    throw new Error('WORLD_GRID_EVENTS_SQLITE_PATH_REQUIRED');
+  }
+  fs.mkdirSync(path.dirname(sqlitePath), { recursive: true });
+  const { DatabaseSync } = require('node:sqlite');
+  const db = new DatabaseSync(sqlitePath);
+  ensureDurableSchema(db);
+  const statements = {
+    contributionsByEvent: db.prepare(`
+      SELECT *
+      FROM world_grid_event_contributions
+      WHERE event_id = ?
+      ORDER BY created_at ASC, contribution_id ASC
+    `),
+    deleteContributionsByEvent: db.prepare('DELETE FROM world_grid_event_contributions WHERE event_id = ?'),
+    insertContribution: db.prepare(`
+      INSERT OR REPLACE INTO world_grid_event_contributions (
+        event_id, contribution_id, owner_account_id, settlement_id,
+        idempotency_key, day_key, created_at, bundle_json, contribution_json,
+        migration_version, schema_version
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `),
+    rewardByOwner: db.prepare(`
+      SELECT *
+      FROM world_grid_event_rewards
+      WHERE event_id = ? AND owner_account_id = ?
+      LIMIT 1
+    `),
+    upsertReward: db.prepare(`
+      INSERT INTO world_grid_event_rewards (
+        event_id, owner_account_id, reward_id, status, claimed_at, reward_json,
+        migration_version, schema_version
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(event_id, owner_account_id) DO UPDATE SET
+        reward_id=excluded.reward_id,
+        status=excluded.status,
+        claimed_at=excluded.claimed_at,
+        reward_json=excluded.reward_json,
+        migration_version=excluded.migration_version,
+        schema_version=excluded.schema_version
+    `),
+    contributionCount: db.prepare('SELECT COUNT(1) AS count FROM world_grid_event_contributions'),
+    rewardCount: db.prepare('SELECT COUNT(1) AS count FROM world_grid_event_rewards'),
+    metadata: db.prepare(`
+      SELECT migration_version, schema_version, COUNT(1) AS count
+      FROM (
+        SELECT migration_version, schema_version FROM world_grid_event_contributions
+        UNION ALL
+        SELECT migration_version, schema_version FROM world_grid_event_rewards
+      )
+      GROUP BY migration_version, schema_version
+      ORDER BY migration_version ASC, schema_version ASC
+    `)
+  };
+  let closed = false;
+
+  function contributionsForEvent(eventId = '') {
+    return statements.contributionsByEvent.all(String(eventId || '')).map(parseDurableContribution);
+  }
+
+  function saveContributionList(eventId = '', contributions = []) {
+    const normalizedEvent = String(eventId || '');
+    db.exec('BEGIN IMMEDIATE;');
+    try {
+      statements.deleteContributionsByEvent.run(normalizedEvent);
+      for (const contribution of contributions) {
+        statements.insertContribution.run(
+          normalizedEvent,
+          String(contribution.contributionId || ''),
+          String(contribution.ownerAccountId || ''),
+          String(contribution.settlementId || ''),
+          String(contribution.idempotencyKey || ''),
+          String(contribution.dayKey || ''),
+          Number(contribution.createdAtMs) || Date.now(),
+          JSON.stringify(normalizeBundle(contribution.bundle)),
+          JSON.stringify(clone(contribution)),
+          WORLD_GRID_EVENTS_MIGRATION_VERSION,
+          WORLD_GRID_EVENTS_SCHEMA_VERSION
+        );
+      }
+      db.exec('COMMIT;');
+    } catch (error) {
+      db.exec('ROLLBACK;');
+      throw error;
+    }
+  }
+
+  function getReward(eventId = '', ownerAccountId = '') {
+    return parseDurableReward(statements.rewardByOwner.get(String(eventId || ''), String(ownerAccountId || '')));
+  }
+
+  function saveReward(eventId = '', ownerAccountId = '', reward = {}) {
+    const next = clone(reward);
+    statements.upsertReward.run(
+      String(eventId || ''),
+      String(ownerAccountId || ''),
+      String(next.rewardId || ''),
+      String(next.status || ''),
+      Number(next.claimedAtMs) || Date.now(),
+      JSON.stringify(next),
+      WORLD_GRID_EVENTS_MIGRATION_VERSION,
+      WORLD_GRID_EVENTS_SCHEMA_VERSION
+    );
+  }
+
+  function counts() {
+    return {
+      contributions: Number(statements.contributionCount.get().count || 0),
+      rewards: Number(statements.rewardCount.get().count || 0)
+    };
+  }
+
+  function metadata() {
+    return statements.metadata.all().map((row) => ({
+      migrationVersion: row.migration_version,
+      schemaVersion: row.schema_version,
+      count: Number(row.count || 0)
+    }));
+  }
+
+  function close() {
+    if (closed) return;
+    closed = true;
+    db.close();
+  }
+
+  return {
+    close,
+    contributionsForEvent,
+    counts,
+    getReward,
+    metadata,
+    saveContributionList,
+    saveReward,
+    sqlitePath
+  };
+}
+
+function configuredWorldGridEventsPath(env = process.env) {
+  return String(env.WORLD_GRID_EVENTS_SQLITE_PATH || '').trim();
+}
+
+function getConfiguredWorldGridEventStore(env = process.env) {
+  const sqlitePath = configuredWorldGridEventsPath(env);
+  if (!sqlitePath) return null;
+  if (durableSingleton && durableSingletonPath === sqlitePath) return durableSingleton;
+  if (durableSingleton) durableSingleton.close();
+  durableSingleton = createWorldGridEventStore({ sqlitePath });
+  durableSingletonPath = sqlitePath;
+  return durableSingleton;
+}
+
+function closeWorldGridEventStore() {
+  if (!durableSingleton) return;
+  durableSingleton.close();
+  durableSingleton = null;
+  durableSingletonPath = '';
 }
 
 function normalizeBundle(bundle = {}) {
@@ -76,16 +298,38 @@ function eventTemplate(eventId = '') {
 }
 
 function contributionList(eventId = '') {
+  const durableStore = getConfiguredWorldGridEventStore();
+  if (durableStore) return durableStore.contributionsForEvent(eventId).map((contribution) => clone(contribution));
   return contributionsByEvent.get(eventId) || [];
 }
 
 function saveContributionList(eventId = '', contributions = []) {
+  const durableStore = getConfiguredWorldGridEventStore();
+  if (durableStore) {
+    durableStore.saveContributionList(eventId, contributions);
+    return;
+  }
   contributionsByEvent.set(eventId, contributions.map((contribution) => clone(contribution)));
 }
 
-function rewardMap(eventId = '') {
+function rewardForOwner(eventId = '', ownerAccountId = '') {
+  const durableStore = getConfiguredWorldGridEventStore();
+  if (durableStore) {
+    const reward = durableStore.getReward(eventId, ownerAccountId);
+    return reward ? clone(reward) : null;
+  }
   if (!rewardsByEvent.has(eventId)) rewardsByEvent.set(eventId, new Map());
-  return rewardsByEvent.get(eventId);
+  return rewardsByEvent.get(eventId).get(ownerAccountId) || null;
+}
+
+function saveReward(eventId = '', ownerAccountId = '', reward = {}) {
+  const durableStore = getConfiguredWorldGridEventStore();
+  if (durableStore) {
+    durableStore.saveReward(eventId, ownerAccountId, reward);
+    return;
+  }
+  if (!rewardsByEvent.has(eventId)) rewardsByEvent.set(eventId, new Map());
+  rewardsByEvent.get(eventId).set(ownerAccountId, clone(reward));
 }
 
 function totalContributions(eventId = '') {
@@ -133,7 +377,7 @@ function personalRecap(owner, eventId = '') {
   const contributions = contributionList(eventId)
     .filter((contribution) => contribution.ownerAccountId === owner.ownerAccountId)
     .map((contribution) => clone(contribution));
-  const reward = rewardMap(eventId).get(owner.ownerAccountId) || null;
+  const reward = rewardForOwner(eventId, owner.ownerAccountId);
   return {
     eventId,
     total: contributions.reduce((total, contribution) => addBundles(total, contribution.bundle), normalizeBundle()),
@@ -270,8 +514,7 @@ function claimEventReward(owner, eventId = '', rewardOwnerAccountId = '') {
     error.details = { reason: 'NO_CONTRIBUTION', eventId: event.eventId };
     throw error;
   }
-  const rewards = rewardMap(event.eventId);
-  const existing = rewards.get(owner.ownerAccountId);
+  const existing = rewardForOwner(event.eventId, owner.ownerAccountId);
   if (existing) return clone(existing);
   const rewardTemplate = event.rewards[0];
   const reward = {
@@ -282,13 +525,18 @@ function claimEventReward(owner, eventId = '', rewardOwnerAccountId = '') {
     mutationApplied: false,
     claimedAtMs: Date.now()
   };
-  rewards.set(owner.ownerAccountId, reward);
+  saveReward(event.eventId, owner.ownerAccountId, reward);
   return clone(reward);
 }
 
 module.exports = {
+  WORLD_GRID_EVENTS_MIGRATION_VERSION,
+  WORLD_GRID_EVENTS_SCHEMA_VERSION,
   claimEventReward,
+  closeWorldGridEventStore,
+  configuredWorldGridEventsPath,
   contributeToEvent,
+  createWorldGridEventStore,
   previewContribution,
   worldEventState
 };

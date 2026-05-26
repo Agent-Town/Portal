@@ -30,6 +30,7 @@ Status: `prototype_gated` for V5.0-V5.5 starter workflow
 | Durable claims foundation | `server/world_grid/claims.js` can write SQLite `world_grid_claims` rows when `WORLD_GRID_CLAIMS_SQLITE_PATH` is configured; `tests/world_grid_claims_persistence.test.js` proves planned claims reopen after restart, complete from durable claim state, and reopen again as claimed routes. |
 | Durable public presence foundation | `server/world_grid/public_presence.js` can write SQLite `world_grid_public_presence` and `world_grid_public_follows` rows when `WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH` is configured; `tests/world_grid_public_presence_persistence.test.js` proves opt-in/list/lookup/follow/summary/opt-out across restarts and clears inbound follows on opt-out. |
 | Durable services foundation | `server/world_grid/services.js` can write SQLite `world_grid_service_requests` and `world_grid_service_reputation` rows when `WORLD_GRID_SERVICES_SQLITE_PATH` is configured; `tests/world_grid_services_persistence.test.js` proves redacted request inputs, accepted/reported request state, reputation counters, and duplicate accept/report safety across restarts. |
+| Durable events foundation | `server/world_grid/events.js` can write SQLite `world_grid_event_contributions` and `world_grid_event_rewards` rows when `WORLD_GRID_EVENTS_SQLITE_PATH` is configured; `tests/world_grid_events_persistence.test.js` proves contribution totals, reward claims, cap replay, and duplicate contribution/reward safety across restarts. |
 | Screenshots | `artifacts/world-grid-v50-region-prototype.png`, `artifacts/world-grid-v51-territory-claim-prototype.png`, `artifacts/world-grid-v53-agent-services-prototype.png`, `artifacts/world-grid-v54-world-event-prototype.png`, and `artifacts/world-grid-v55-sandbox-prototype.png`. |
 | Live sanity | Local route reported `renderer: "three"`, `payloadCells: 19`, a claimed route after V5.1 completion, V5.2 opt-in/out, V5.3 civic service request/accept, V5.4 preview/contribute/reward, V5.5 enter/place/reject/agent-demo/rollback/leave, no horizontal overflow at 291px, and no console/page errors. |
 
@@ -48,7 +49,8 @@ bookkeeping, rewards, sandbox participants/actions/snapshots, CSRF mutation
 tokens, rate-limit buckets, and camera preferences. The optional SQLite audit log,
 optional SQLite idempotency rows, optional SQLite claim rows, and optional
 SQLite public presence/follow rows, and optional SQLite service request/reputation
-rows are durable foundations, but release
+rows, and optional SQLite event contribution/reward rows are durable foundations,
+but release
 promotion still requires durable owner indexes, migration versioning, full
 append-only audit/replay records with before-state snapshots, complete durable
 idempotency records and restart coverage for every route/tool surface,

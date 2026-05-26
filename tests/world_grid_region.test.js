@@ -21,6 +21,7 @@ const {
   normalizeOwnerIdentity
 } = require('../server/world_grid/region');
 const { closeWorldGridPublicPresenceStore } = require('../server/world_grid/public_presence');
+const { closeWorldGridEventStore } = require('../server/world_grid/events');
 const { createInitialPlot } = require('../server/founders_plot/engine');
 const { loadPlotByPairId, savePlotGraph } = require('../server/founders_plot/store');
 const {
@@ -39,6 +40,7 @@ async function withWorldGridServer({ identity, envPatch = {} }, fn) {
     WORLD_GRID_CSRF_TOKEN_TTL_MS: process.env.WORLD_GRID_CSRF_TOKEN_TTL_MS,
     WORLD_GRID_AUDIT_SQLITE_PATH: process.env.WORLD_GRID_AUDIT_SQLITE_PATH,
     WORLD_GRID_CLAIMS_SQLITE_PATH: process.env.WORLD_GRID_CLAIMS_SQLITE_PATH,
+    WORLD_GRID_EVENTS_SQLITE_PATH: process.env.WORLD_GRID_EVENTS_SQLITE_PATH,
     WORLD_GRID_IDEMPOTENCY_SQLITE_PATH: process.env.WORLD_GRID_IDEMPOTENCY_SQLITE_PATH,
     WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH: process.env.WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH,
     WORLD_GRID_SERVICES_SQLITE_PATH: process.env.WORLD_GRID_SERVICES_SQLITE_PATH,
@@ -63,6 +65,7 @@ async function withWorldGridServer({ identity, envPatch = {} }, fn) {
     await new Promise((resolve) => server.close(resolve));
     closeWorldGridAuditLog();
     closeWorldGridClaimStore();
+    closeWorldGridEventStore();
     closeWorldGridIdempotencyStore();
     closeWorldGridPublicPresenceStore();
     closeWorldGridServiceStore();

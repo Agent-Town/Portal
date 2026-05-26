@@ -2800,6 +2800,12 @@ V5.3 service request/reputation rows persist redacted advice requests,
 accepted/reported request state, and service reputation counters with
 owner/service/status indexes, schema versioning, and migration metadata; this is
 only a foundation until dispute workflow, stale-session, retention, and final
-service privacy coverage are complete. Mutating
+service privacy coverage are complete. When `WORLD_GRID_EVENTS_SQLITE_PATH` is
+configured, V5.4 event contribution/reward rows persist public-works
+contributions, cap accounting inputs, and cosmetic reward claims with
+owner/event/day/settlement indexes, schema versioning, and migration metadata;
+this is only a foundation until rollback policy, multi-event migration, final
+public-ledger review, and larger contribution-load coverage are complete.
+Mutating
 endpoint same-origin, CSRF, session-auth, rate-limit, and idempotency
 requirements are tracked in `docs/security/WORLD_GRID_MUTATION_SECURITY_PLAN.md`.
