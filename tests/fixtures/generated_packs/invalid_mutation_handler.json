@@ -1,0 +1,5 @@
+{
+  "schemaVersion": "agent-town-generated-pack-v1",
+  "packId": "invalid_mutation_handler",
+  "mutationHandler": "completeClaimWithoutCanonicalServer"
+}

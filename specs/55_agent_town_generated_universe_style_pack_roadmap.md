@@ -83,10 +83,10 @@ This is a separate prototype-gated track. It must not change normal gameplay vis
   "arbitraryToolMutationFormulaCount": 0,
   "invalidAssetManifestEntryCount": 0,
   "assetPromptPlanCoverage": 1.0,
-  "assetPromptPlanAssetCount": 20,
+  "assetPromptPlanAssetCount": 23,
   "candidateOutputPathCount": 40,
-  "candidateFolderCount": 20,
-  "generationJobLogCount": 20,
+  "candidateFolderCount": 23,
+  "generationJobLogCount": 23,
   "productionImageAssetCount": 0,
   "externalImageModelUsed": false,
   "explicitConsentRequiredForImageGeneration": true,
@@ -94,5 +94,42 @@ This is a separate prototype-gated track. It must not change normal gameplay vis
   "firstLoopCompleted": true,
   "replayabilityDistinctSignatureRatioMin": 1.0,
   "replayabilityDistinctThemeRatioMin": 0.75
+}
+```
+
+## GU-2 Schema Validation Engine Slice
+
+The first production-roadmap continuation adds a local JSON Schema registry and runner for generated-pack subdocuments. The runner validates the pack, brief, style bible, universe bible, gameplay mapping, asset prompt plan, and asset manifest independently before a generated pack can pass validation.
+
+```json
+{
+  "schemaRegistryExists": true,
+  "jsonSchemaRunnerExists": true,
+  "schemasValidatedIndependently": true,
+  "generationBriefMatchesRoadmapShape": true,
+  "styleBibleMatchesRoadmapShape": true,
+  "universeBibleMatchesRoadmapShape": true,
+  "gameplayMappingSchemaVersionRequired": true,
+  "assetPromptPlanMatchesRoadmapShape": true,
+  "dangerousFieldRejectCountMin": 20,
+  "runtimeRejectsInvalidPack": true
+}
+```
+
+## GU-4 Candidate Generation Job Scaffold Slice
+
+The candidate generation scaffold still does not call image models. Each planned target writes a JSONL job-log record with explicit no-generation provenance, consent/cost placeholders, retry metadata, and enough prompt-plan linkage to replay or resume later.
+
+```json
+{
+  "jobLogExists": true,
+  "jobLogCount": 23,
+  "externalImageGenerationUsed": false,
+  "authMode": "not_configured",
+  "costConsentStatus": "not_required_for_scaffold",
+  "approvedOutputsEmptyUntilSignoff": true,
+  "retryRecordsPresent": true,
+  "replayableFromPromptPlan": true,
+  "secretsRedacted": true
 }
 ```

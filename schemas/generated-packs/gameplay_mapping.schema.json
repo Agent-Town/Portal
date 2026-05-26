@@ -3,10 +3,11 @@
   "$id": "agent-town-gameplay-mapping-v1",
   "title": "Agent Town Gameplay Mapping",
   "type": "object",
-  "required": ["canonicalVersion", "canonicalEntities"],
+  "required": ["schemaVersion", "canonicalVersion", "serverRuleOverrides", "canonicalEntities"],
   "additionalProperties": false,
   "properties": {
-    "canonicalVersion": { "type": "string", "minLength": 3 },
+    "schemaVersion": { "const": "agent-town-gameplay-mapping-v1" },
+    "canonicalVersion": { "const": "agent-town-world-grid-v1" },
     "serverRuleOverrides": { "const": 0 },
     "canonicalEntities": {
       "type": "array",
@@ -14,11 +15,12 @@
       "items": {
         "type": "object",
         "required": ["canonicalId", "mechanicalKey", "generatedName"],
-        "additionalProperties": true,
+        "additionalProperties": false,
         "properties": {
           "canonicalId": { "type": "string", "minLength": 3 },
           "mechanicalKey": { "type": "string", "minLength": 1 },
-          "generatedName": { "type": "string", "minLength": 1 }
+          "generatedName": { "type": "string", "minLength": 1 },
+          "assetHint": { "type": "string", "minLength": 3 }
         }
       }
     }

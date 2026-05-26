@@ -31,6 +31,19 @@ Player prompt
 - Candidate folders and job logs are scaffolded under `data/generated-packs*`; no production image asset is required for runtime playability.
 - Deterministic fallback materials, shape tokens, sprites, and generated text remain the playable runtime source until an explicit auth, consent, cost, review, and promotion model exists for production image generation.
 
+## GU-2 Schema Validation Slice
+
+- `server/world_grid/generated_schema.js` is the local schema registry and minimal JSON Schema runner for generated-pack contracts.
+- Generated packs now validate `GenerationBrief`, `StyleBible`, `UniverseBible`, `GameplayMapping`, `AssetPromptPlan`, `GeneratedAssetManifest`, and the outer generated pack independently.
+- Runtime pack validation fails closed when schema validation finds missing required fields, unknown fields in strict subdocuments, wrong enum values, or raw-prompt forbidden fields.
+- The schema runner is intentionally local and deterministic; it does not call external validators or image/model services.
+
+## GU-4 Job Scaffold Slice
+
+- Each asset prompt target writes a scaffolded JSONL generation job record under the configured candidate root.
+- Job logs record `authMode=not_configured`, `costConsentStatus=not_required_for_scaffold`, `externalImageGenerationUsed=false`, zero outputs, and no production approval.
+- Job logs include prompt-plan hash, source provenance, retry metadata, and a resume pointer so a future approved image-generation runner can replay from the prompt plan without inventing state.
+
 ## Machine Checks
 
 ```json
@@ -44,10 +57,16 @@ Player prompt
   "canonicalPayloadIntegrity": true,
   "generationBriefStructured": true,
   "assetPromptPlanCoverage": 1.0,
-  "candidateFolderCount": 20,
-  "generationJobLogCount": 20,
+  "candidateFolderCount": 23,
+  "generationJobLogCount": 23,
   "productionImageAssetCount": 0,
   "externalImageModelUsed": false,
-  "replayabilityDistinctSignatureRatioMin": 1.0
+  "replayabilityDistinctSignatureRatioMin": 1.0,
+  "schemaRegistryExists": true,
+  "jsonSchemaRunnerExists": true,
+  "schemasValidatedIndependently": true,
+  "dangerousFieldRejectCountMin": 20,
+  "jobLogsReplayableFromPromptPlan": true,
+  "costConsentStatus": "not_required_for_scaffold"
 }
 ```

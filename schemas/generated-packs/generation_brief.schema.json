@@ -3,46 +3,69 @@
   "$id": "agent-town-generation-brief-v1",
   "title": "Agent Town Generation Brief",
   "type": "object",
-  "required": [
-    "schemaVersion",
-    "promptHash",
-    "theme",
-    "tone",
-    "visualStyle",
-    "species",
-    "factions",
-    "cultures",
-    "techFlavor",
-    "humorLevel",
-    "safetyStatus",
-    "keywordHints",
-    "metrics"
-  ],
+  "required": ["schemaVersion", "promptHash", "promptLength", "keywordHints", "theme", "tone", "visualStyle", "civilizationFlavor", "humorLevel", "safety"],
   "additionalProperties": false,
   "properties": {
     "schemaVersion": { "const": "agent-town-generation-brief-v1" },
     "promptHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-    "theme": { "type": "string", "minLength": 3 },
-    "tone": { "type": "string", "minLength": 3 },
-    "visualStyle": { "type": "string", "minLength": 3 },
-    "species": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 2 } },
-    "factions": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 2 } },
-    "cultures": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 2 } },
-    "techFlavor": { "type": "string", "minLength": 3 },
-    "humorLevel": { "enum": ["none", "low", "medium", "medium-high", "high"] },
-    "safetyStatus": {
+    "promptLength": { "type": "number", "minimum": 4 },
+    "keywordHints": { "type": "array", "items": { "type": "string", "minLength": 2 } },
+    "theme": {
       "type": "object",
-      "required": ["status", "safetyRewriteApplied", "blockedPatternIds", "sensitivePatternIds", "deterministicFallbackAllowed"],
+      "required": ["primary", "setting"],
       "additionalProperties": false,
       "properties": {
-        "status": { "enum": ["safe", "rewritten", "blocked"] },
-        "safetyRewriteApplied": { "type": "boolean" },
-        "blockedPatternIds": { "type": "array", "items": { "type": "string" } },
-        "sensitivePatternIds": { "type": "array", "items": { "type": "string" } },
-        "deterministicFallbackAllowed": { "type": "boolean" }
+        "primary": { "type": "string", "minLength": 3 },
+        "secondary": { "type": "string", "minLength": 3 },
+        "setting": { "type": "string", "minLength": 3 }
       }
     },
-    "keywordHints": { "type": "array", "items": { "type": "string" } },
-    "metrics": { "type": "object" }
+    "tone": {
+      "type": "object",
+      "required": ["cozy", "adventurous", "mystical", "humorous", "serious"],
+      "additionalProperties": false,
+      "properties": {
+        "cozy": { "type": "number", "minimum": 0, "maximum": 1 },
+        "adventurous": { "type": "number", "minimum": 0, "maximum": 1 },
+        "mystical": { "type": "number", "minimum": 0, "maximum": 1 },
+        "humorous": { "type": "number", "minimum": 0, "maximum": 1 },
+        "serious": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "visualStyle": {
+      "type": "object",
+      "required": ["styleFamily", "materialMotifs", "lighting", "colorMood", "forbiddenVisuals"],
+      "additionalProperties": false,
+      "properties": {
+        "styleFamily": { "type": "string", "minLength": 3 },
+        "materialMotifs": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 2 } },
+        "lighting": { "type": "string", "minLength": 3 },
+        "colorMood": { "type": "string", "minLength": 3 },
+        "forbiddenVisuals": { "type": "array", "items": { "type": "string", "minLength": 2 } }
+      }
+    },
+    "civilizationFlavor": {
+      "type": "object",
+      "required": ["species", "factions", "cultures", "techFlavor"],
+      "additionalProperties": false,
+      "properties": {
+        "species": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 2 } },
+        "factions": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 2 } },
+        "cultures": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 2 } },
+        "techFlavor": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 2 } }
+      }
+    },
+    "humorLevel": { "enum": ["none", "subtle", "playful", "absurd-but-safe"] },
+    "safety": {
+      "type": "object",
+      "required": ["status", "reasons", "normalizedForRuntime", "rawPromptExecutable"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "enum": ["passed", "needs_review", "rejected"] },
+        "reasons": { "type": "array", "items": { "type": "string" } },
+        "normalizedForRuntime": { "const": true },
+        "rawPromptExecutable": { "const": false }
+      }
+    }
   }
 }

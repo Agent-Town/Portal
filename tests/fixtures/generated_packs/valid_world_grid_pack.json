@@ -25,30 +25,7 @@
   "generationBrief": {
     "schemaVersion": "agent-town-generation-brief-v1",
     "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
-    "theme": "Cozy Moss Lantern Frontier",
-    "tone": "cozy and practical",
-    "visualStyle": "warm mechanical frontier miniatures",
-    "species": [
-      "Cozy settlers",
-      "Mushroom crews"
-    ],
-    "factions": [
-      "Cozy Settlers",
-      "Mushroom Crews"
-    ],
-    "cultures": [
-      "Moss Lantern Frontier craft tradition",
-      "Mushroom route customs"
-    ],
-    "techFlavor": "clockwork route markers and hand-built civic machines",
-    "humorLevel": "low",
-    "safetyStatus": {
-      "status": "safe",
-      "safetyRewriteApplied": false,
-      "blockedPatternIds": [],
-      "sensitivePatternIds": [],
-      "deterministicFallbackAllowed": true
-    },
+    "promptLength": 64,
     "keywordHints": [
       "cozy",
       "mushroom",
@@ -58,16 +35,66 @@
       "lantern",
       "moss"
     ],
-    "metrics": {
-      "promptLength": 64,
-      "keywordCount": 7,
-      "safetyRewriteApplied": false,
-      "deterministicFallbackPlayable": true
+    "theme": {
+      "primary": "Cozy Moss Lantern Frontier",
+      "secondary": "Mushroom craft line",
+      "setting": "Moss Lantern Frontier"
+    },
+    "tone": {
+      "cozy": 0.85,
+      "adventurous": 0.75,
+      "mystical": 0.3,
+      "humorous": 0.25,
+      "serious": 0.35
+    },
+    "visualStyle": {
+      "styleFamily": "warm mechanical frontier",
+      "materialMotifs": [
+        "grove",
+        "grove",
+        "moss lantern"
+      ],
+      "lighting": "warm daylight readability",
+      "colorMood": "moss lantern frontier palette with high-contrast readable accents",
+      "forbiddenVisuals": [
+        "text in image",
+        "logos",
+        "credentials",
+        "photoreal gore",
+        "copyrighted characters"
+      ]
+    },
+    "civilizationFlavor": {
+      "species": [
+        "Cozy settlers",
+        "Mushroom crews"
+      ],
+      "factions": [
+        "Cozy Settlers",
+        "Mushroom Crews"
+      ],
+      "cultures": [
+        "Moss Lantern Frontier craft tradition",
+        "Mushroom route customs"
+      ],
+      "techFlavor": [
+        "clockwork route markers",
+        "hand-built civic machines",
+        "copper repair tools"
+      ]
+    },
+    "humorLevel": "subtle",
+    "safety": {
+      "status": "passed",
+      "reasons": [],
+      "normalizedForRuntime": true,
+      "rawPromptExecutable": false
     }
   },
   "stylePack": {
     "schemaVersion": "agent-town-style-bible-v1",
     "stylePackId": "style_moss-lantern_1dc551d9",
+    "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
     "name": "Cozy Moss Lantern Frontier",
     "themeSummary": "Cozy and Mushroom motifs translated into warm frontier materials.",
     "palette": {
@@ -109,19 +136,42 @@
         "rule": "selected color with high contrast against terrain"
       }
     ],
+    "silhouetteRules": [
+      "buildings use one readable primary silhouette per canonical target",
+      "terrain textures must remain legible under ownership overlays",
+      "resource icons stay distinct at 32px"
+    ],
     "uiRules": {
       "minReadableTextPx": 16,
       "onePrimaryAction": true,
       "normalGameplayDebugJargon": false
-    }
+    },
+    "animationRules": [
+      "motion is cosmetic only",
+      "reduced-motion mode may disable all ambient animation",
+      "selection feedback must not obscure cell labels"
+    ]
   },
   "universePack": {
     "schemaVersion": "agent-town-universe-bible-v1",
     "universePackId": "universe_1dc551d9ebea",
+    "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
     "name": "Cozy Mushroom Charter",
     "pitch": "Cozy settlers and Mushroom crews build a civic frontier with Clover keeping the work bounded and legible.",
     "playerRole": "Cozy founder",
     "cloverRole": "Clover remains the trusted Foreman and explains each bounded action in-world.",
+    "species": [
+      {
+        "id": "species_settlers",
+        "name": "Cozy settlers",
+        "description": "Readable frontier citizens who keep the settlement grounded in canonical Agent Town work."
+      },
+      {
+        "id": "species_crews",
+        "name": "Mushroom crews",
+        "description": "Theme-flavored helpers who add presentation flavor without adding autonomous mechanics."
+      }
+    ],
     "factions": [
       {
         "factionId": "faction_settlers",
@@ -134,6 +184,18 @@
         "name": "Mushroom Crews",
         "role": "makers",
         "line": "They turn cozy timber and mushroom stone into practical town work."
+      }
+    ],
+    "cultures": [
+      {
+        "cultureId": "culture_craft",
+        "name": "Cozy craft habit",
+        "civicHabit": "plan one route, explain the cost, then complete the bounded claim."
+      },
+      {
+        "cultureId": "culture_route",
+        "name": "Mushroom route custom",
+        "civicHabit": "keep maps legible and make every generated label traceable to a canonical key."
       }
     ],
     "techs": [
@@ -168,7 +230,9 @@
     }
   },
   "gameplayMapping": {
+    "schemaVersion": "agent-town-gameplay-mapping-v1",
     "canonicalVersion": "agent-town-world-grid-v1",
+    "serverRuleOverrides": 0,
     "canonicalEntities": [
       {
         "canonicalId": "building.hq",
@@ -543,473 +607,479 @@
         "status": "runtime-generated",
         "source": "deterministic-fallback",
         "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e"
+      },
+      {
+        "assetId": "gen_pack_1dc551d9ebea7769:ui.topbar-frame",
+        "canonicalTarget": "ui.topbar-frame",
+        "kind": "ui-ornament-candidate",
+        "status": "fallback-ready",
+        "source": "deterministic-fallback",
+        "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+        "description": "small UI ornament candidate that preserves minimal world-grid UX"
+      },
+      {
+        "assetId": "gen_pack_1dc551d9ebea7769:ui.selection-ring",
+        "canonicalTarget": "ui.selection-ring",
+        "kind": "ui-ornament-candidate",
+        "status": "fallback-ready",
+        "source": "deterministic-fallback",
+        "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+        "description": "small UI ornament candidate that preserves minimal world-grid UX"
+      },
+      {
+        "assetId": "gen_pack_1dc551d9ebea7769:postcard.pack-preview",
+        "canonicalTarget": "postcard.pack-preview",
+        "kind": "postcard-candidate",
+        "status": "fallback-ready",
+        "source": "deterministic-fallback",
+        "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+        "description": "share-safe generated-pack preview postcard candidate"
       }
     ]
   },
   "assetPromptPlan": {
     "schemaVersion": "agent-town-asset-prompt-plan-v1",
     "packId": "gen_pack_1dc551d9ebea7769",
+    "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+    "modelFamily": "gpt-image-2-candidate",
+    "createdAtMs": 1779788033732,
     "promptRoot": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769",
     "candidateRoot": "data/generated-packs-test",
-    "generationModel": {
-      "targetModel": "gpt-image-2",
-      "externalModelUsed": false,
-      "explicitConsentRequired": true,
-      "productionImageAssetsRequired": false
+    "globalStyleLock": {
+      "summary": "Cozy Moss Lantern Frontier: Cozy and Mushroom motifs translated into warm frontier materials.",
+      "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
+      "aspectPolicy": "square assets unless a future signed manifest says otherwise",
+      "transparentBackgroundPolicy": "clean-background-plus-postprocess"
     },
-    "assets": [
+    "targets": [
       {
-        "assetPlanId": "gen_pack_1dc551d9ebea7769:building-hq:plan",
+        "promptId": "gen_pack_1dc551d9ebea7769:building-hq:prompt",
         "canonicalTarget": "building.hq",
-        "mechanicalKey": "hq",
-        "generatedName": "Cozy Hall",
-        "promptHash": "180236e2545eaa416a08402997f2f96c70260cbce7a077858f70268be5a43be0",
-        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/building-hq.prompt.md",
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/building-hq.webp",
+        "targetKind": "building-billboard",
         "targetSize": {
           "width": 1024,
           "height": 1024
         },
-        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/building-hq.webp",
+        "promptText": "Create one bounded Agent Town world-grid game asset candidate.\nCanonical target: building.hq.\nMechanical key: hq. Do not change gameplay rules or invent tools.\nGenerated label: Cozy Hall.\nUniverse: Cozy Mushroom Charter. Theme: Cozy Moss Lantern Frontier. Tone: cozy:0.85, adventurous:0.75, mystical:0.30, humorous:0.25, serious:0.35.\nVisual style: warm mechanical frontier. Tech flavor: clockwork route markers, hand-built civic machines, copper repair tools.\nAsset direction: tall civic lodge with one bright signal roof.\nTarget size: 1024x1024. Transparent or clean background where possible.\nNo text, no logos, no credentials, no UI chrome, no extra characters unless requested by the canonical target.",
         "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
-        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-hq",
-        "candidateOutputPaths": [
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-hq/building-hq.candidate-001.png",
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-hq/building-hq.candidate-002.png"
-        ],
+        "promptHash": "8d2019f8aa6adcac75b1891b457308dc7724429b7ba955d700ffe070fb1cd3c7",
+        "candidateOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-hq/building-hq.candidate-001.png",
+        "approvedOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/approved/building-hq.webp",
         "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/building-hq.jsonl",
         "fallbackAssetId": "gen_pack_1dc551d9ebea7769:building.hq",
         "status": "planned-not-generated"
       },
       {
-        "assetPlanId": "gen_pack_1dc551d9ebea7769:building-worker-camp:plan",
+        "promptId": "gen_pack_1dc551d9ebea7769:building-worker-camp:prompt",
         "canonicalTarget": "building.worker_camp",
-        "mechanicalKey": "worker_camp",
-        "generatedName": "Mushroom Crew Camp",
-        "promptHash": "87bba585949efa8315220b2e5eaab2797798c25bed894a44e47ac2f2ebb31334",
-        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/building-worker-camp.prompt.md",
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/building-worker-camp.webp",
+        "targetKind": "building-billboard",
         "targetSize": {
           "width": 1024,
           "height": 1024
         },
-        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/building-worker-camp.webp",
+        "promptText": "Create one bounded Agent Town world-grid game asset candidate.\nCanonical target: building.worker_camp.\nMechanical key: worker_camp. Do not change gameplay rules or invent tools.\nGenerated label: Mushroom Crew Camp.\nUniverse: Cozy Mushroom Charter. Theme: Cozy Moss Lantern Frontier. Tone: cozy:0.85, adventurous:0.75, mystical:0.30, humorous:0.25, serious:0.35.\nVisual style: warm mechanical frontier. Tech flavor: clockwork route markers, hand-built civic machines, copper repair tools.\nAsset direction: compact worker camp with theme props and clear doorway.\nTarget size: 1024x1024. Transparent or clean background where possible.\nNo text, no logos, no credentials, no UI chrome, no extra characters unless requested by the canonical target.",
         "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
-        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-worker-camp",
-        "candidateOutputPaths": [
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-worker-camp/building-worker-camp.candidate-001.png",
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-worker-camp/building-worker-camp.candidate-002.png"
-        ],
+        "promptHash": "c34cf3ce106078ff08c856b0a75e469bbc7b8405602aec7ceaae6e7158734cea",
+        "candidateOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-worker-camp/building-worker-camp.candidate-001.png",
+        "approvedOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/approved/building-worker-camp.webp",
         "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/building-worker-camp.jsonl",
         "fallbackAssetId": "gen_pack_1dc551d9ebea7769:building.worker_camp",
         "status": "planned-not-generated"
       },
       {
-        "assetPlanId": "gen_pack_1dc551d9ebea7769:building-lumber-camp:plan",
+        "promptId": "gen_pack_1dc551d9ebea7769:building-lumber-camp:prompt",
         "canonicalTarget": "building.lumber_camp",
-        "mechanicalKey": "lumber_camp",
-        "generatedName": "Cozy Timber Yard",
-        "promptHash": "cdd4d622ae08187468b659201729b572e90699786d933f9ba1e8693168f88fee",
-        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/building-lumber-camp.prompt.md",
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/building-lumber-camp.webp",
+        "targetKind": "building-billboard",
         "targetSize": {
           "width": 1024,
           "height": 1024
         },
-        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/building-lumber-camp.webp",
+        "promptText": "Create one bounded Agent Town world-grid game asset candidate.\nCanonical target: building.lumber_camp.\nMechanical key: lumber_camp. Do not change gameplay rules or invent tools.\nGenerated label: Cozy Timber Yard.\nUniverse: Cozy Mushroom Charter. Theme: Cozy Moss Lantern Frontier. Tone: cozy:0.85, adventurous:0.75, mystical:0.30, humorous:0.25, serious:0.35.\nVisual style: warm mechanical frontier. Tech flavor: clockwork route markers, hand-built civic machines, copper repair tools.\nAsset direction: wood-production building mapped to generated materials.\nTarget size: 1024x1024. Transparent or clean background where possible.\nNo text, no logos, no credentials, no UI chrome, no extra characters unless requested by the canonical target.",
         "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
-        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-lumber-camp",
-        "candidateOutputPaths": [
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-lumber-camp/building-lumber-camp.candidate-001.png",
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-lumber-camp/building-lumber-camp.candidate-002.png"
-        ],
+        "promptHash": "2dd5caf11482af37c01e92ef6d1701f71b7530ce53a11b0f1843494e47cbc316",
+        "candidateOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-lumber-camp/building-lumber-camp.candidate-001.png",
+        "approvedOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/approved/building-lumber-camp.webp",
         "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/building-lumber-camp.jsonl",
         "fallbackAssetId": "gen_pack_1dc551d9ebea7769:building.lumber_camp",
         "status": "planned-not-generated"
       },
       {
-        "assetPlanId": "gen_pack_1dc551d9ebea7769:building-farm:plan",
+        "promptId": "gen_pack_1dc551d9ebea7769:building-farm:prompt",
         "canonicalTarget": "building.farm",
-        "mechanicalKey": "farm",
-        "generatedName": "Cozy Garden Patch",
-        "promptHash": "17153393d743fa98c07c0bd8cf7bb1e9eefafd9f25b238e01754e90069cfcc2e",
-        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/building-farm.prompt.md",
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/building-farm.webp",
+        "targetKind": "building-billboard",
         "targetSize": {
           "width": 1024,
           "height": 1024
         },
-        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/building-farm.webp",
+        "promptText": "Create one bounded Agent Town world-grid game asset candidate.\nCanonical target: building.farm.\nMechanical key: farm. Do not change gameplay rules or invent tools.\nGenerated label: Cozy Garden Patch.\nUniverse: Cozy Mushroom Charter. Theme: Cozy Moss Lantern Frontier. Tone: cozy:0.85, adventurous:0.75, mystical:0.30, humorous:0.25, serious:0.35.\nVisual style: warm mechanical frontier. Tech flavor: clockwork route markers, hand-built civic machines, copper repair tools.\nAsset direction: food-production building with readable planted rows.\nTarget size: 1024x1024. Transparent or clean background where possible.\nNo text, no logos, no credentials, no UI chrome, no extra characters unless requested by the canonical target.",
         "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
-        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-farm",
-        "candidateOutputPaths": [
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-farm/building-farm.candidate-001.png",
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-farm/building-farm.candidate-002.png"
-        ],
+        "promptHash": "5e97f2b44b7fc2689cf398251ada2b825756e1dd1dc28d34905d6bf8c84ec1c7",
+        "candidateOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-farm/building-farm.candidate-001.png",
+        "approvedOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/approved/building-farm.webp",
         "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/building-farm.jsonl",
         "fallbackAssetId": "gen_pack_1dc551d9ebea7769:building.farm",
         "status": "planned-not-generated"
       },
       {
-        "assetPlanId": "gen_pack_1dc551d9ebea7769:building-quarry:plan",
+        "promptId": "gen_pack_1dc551d9ebea7769:building-quarry:prompt",
         "canonicalTarget": "building.quarry",
-        "mechanicalKey": "quarry",
-        "generatedName": "Mushroom Stone Cut",
-        "promptHash": "b84cc866a8e360a178f19c1324ad85908f1ff79d9a7e823a66d1631c5de7ad45",
-        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/building-quarry.prompt.md",
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/building-quarry.webp",
+        "targetKind": "building-billboard",
         "targetSize": {
           "width": 1024,
           "height": 1024
         },
-        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/building-quarry.webp",
+        "promptText": "Create one bounded Agent Town world-grid game asset candidate.\nCanonical target: building.quarry.\nMechanical key: quarry. Do not change gameplay rules or invent tools.\nGenerated label: Mushroom Stone Cut.\nUniverse: Cozy Mushroom Charter. Theme: Cozy Moss Lantern Frontier. Tone: cozy:0.85, adventurous:0.75, mystical:0.30, humorous:0.25, serious:0.35.\nVisual style: warm mechanical frontier. Tech flavor: clockwork route markers, hand-built civic machines, copper repair tools.\nAsset direction: stone-production building with stable rock silhouette.\nTarget size: 1024x1024. Transparent or clean background where possible.\nNo text, no logos, no credentials, no UI chrome, no extra characters unless requested by the canonical target.",
         "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
-        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-quarry",
-        "candidateOutputPaths": [
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-quarry/building-quarry.candidate-001.png",
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-quarry/building-quarry.candidate-002.png"
-        ],
+        "promptHash": "51409a568e976faef0ebc52116e671446eb3a6412c2b3c6d49e4d2da1e33e6a3",
+        "candidateOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-quarry/building-quarry.candidate-001.png",
+        "approvedOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/approved/building-quarry.webp",
         "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/building-quarry.jsonl",
         "fallbackAssetId": "gen_pack_1dc551d9ebea7769:building.quarry",
         "status": "planned-not-generated"
       },
       {
-        "assetPlanId": "gen_pack_1dc551d9ebea7769:building-market:plan",
+        "promptId": "gen_pack_1dc551d9ebea7769:building-market:prompt",
         "canonicalTarget": "building.market",
-        "mechanicalKey": "market",
-        "generatedName": "Mushroom Market Stand",
-        "promptHash": "bfef7907ec021608c7e8776e71eb2706311889f0ab60645d4387fb0a7a4d005d",
-        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/building-market.prompt.md",
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/building-market.webp",
+        "targetKind": "building-billboard",
         "targetSize": {
           "width": 1024,
           "height": 1024
         },
-        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/building-market.webp",
+        "promptText": "Create one bounded Agent Town world-grid game asset candidate.\nCanonical target: building.market.\nMechanical key: market. Do not change gameplay rules or invent tools.\nGenerated label: Mushroom Market Stand.\nUniverse: Cozy Mushroom Charter. Theme: Cozy Moss Lantern Frontier. Tone: cozy:0.85, adventurous:0.75, mystical:0.30, humorous:0.25, serious:0.35.\nVisual style: warm mechanical frontier. Tech flavor: clockwork route markers, hand-built civic machines, copper repair tools.\nAsset direction: exchange building with cloth awning and signpost.\nTarget size: 1024x1024. Transparent or clean background where possible.\nNo text, no logos, no credentials, no UI chrome, no extra characters unless requested by the canonical target.",
         "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
-        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-market",
-        "candidateOutputPaths": [
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-market/building-market.candidate-001.png",
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-market/building-market.candidate-002.png"
-        ],
+        "promptHash": "935b49edcc378af9a599fe74a68a2cf0ede1eae1323fce87883e519b068b8318",
+        "candidateOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-market/building-market.candidate-001.png",
+        "approvedOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/approved/building-market.webp",
         "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/building-market.jsonl",
         "fallbackAssetId": "gen_pack_1dc551d9ebea7769:building.market",
         "status": "planned-not-generated"
       },
       {
-        "assetPlanId": "gen_pack_1dc551d9ebea7769:resource-wood:plan",
+        "promptId": "gen_pack_1dc551d9ebea7769:resource-wood:prompt",
         "canonicalTarget": "resource.wood",
-        "mechanicalKey": "wood",
-        "generatedName": "Cozy Timber",
-        "promptHash": "21f2d5d752b3ea6632d54f6b518118419b141cc428ecc3d6892c4697f42e136b",
-        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/resource-wood.prompt.md",
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/resource-wood.webp",
+        "targetKind": "resource-icon",
         "targetSize": {
           "width": 512,
           "height": 512
         },
-        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/resource-wood.webp",
+        "promptText": "Create one bounded Agent Town world-grid game asset candidate.\nCanonical target: resource.wood.\nMechanical key: wood. Do not change gameplay rules or invent tools.\nGenerated label: Cozy Timber.\nUniverse: Cozy Mushroom Charter. Theme: Cozy Moss Lantern Frontier. Tone: cozy:0.85, adventurous:0.75, mystical:0.30, humorous:0.25, serious:0.35.\nVisual style: warm mechanical frontier. Tech flavor: clockwork route markers, hand-built civic machines, copper repair tools.\nAsset direction: small stack icon.\nTarget size: 512x512. Transparent or clean background where possible.\nNo text, no logos, no credentials, no UI chrome, no extra characters unless requested by the canonical target.",
         "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
-        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/resource-wood",
-        "candidateOutputPaths": [
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/resource-wood/resource-wood.candidate-001.png",
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/resource-wood/resource-wood.candidate-002.png"
-        ],
+        "promptHash": "6387a24e2be11011ea6f7591524aa6bdbcc45a55876547ddcc78638a6b5c4381",
+        "candidateOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/resource-wood/resource-wood.candidate-001.png",
+        "approvedOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/approved/resource-wood.webp",
         "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/resource-wood.jsonl",
         "fallbackAssetId": "gen_pack_1dc551d9ebea7769:resource.wood",
         "status": "planned-not-generated"
       },
       {
-        "assetPlanId": "gen_pack_1dc551d9ebea7769:resource-stone:plan",
+        "promptId": "gen_pack_1dc551d9ebea7769:resource-stone:prompt",
         "canonicalTarget": "resource.stone",
-        "mechanicalKey": "stone",
-        "generatedName": "Mushroom Stone",
-        "promptHash": "7ff48adf83ce0fee1f6bb1730ecc8873b30d8420d23de32001bb3729b079b22a",
-        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/resource-stone.prompt.md",
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/resource-stone.webp",
+        "targetKind": "resource-icon",
         "targetSize": {
           "width": 512,
           "height": 512
         },
-        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/resource-stone.webp",
+        "promptText": "Create one bounded Agent Town world-grid game asset candidate.\nCanonical target: resource.stone.\nMechanical key: stone. Do not change gameplay rules or invent tools.\nGenerated label: Mushroom Stone.\nUniverse: Cozy Mushroom Charter. Theme: Cozy Moss Lantern Frontier. Tone: cozy:0.85, adventurous:0.75, mystical:0.30, humorous:0.25, serious:0.35.\nVisual style: warm mechanical frontier. Tech flavor: clockwork route markers, hand-built civic machines, copper repair tools.\nAsset direction: small stone icon.\nTarget size: 512x512. Transparent or clean background where possible.\nNo text, no logos, no credentials, no UI chrome, no extra characters unless requested by the canonical target.",
         "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
-        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/resource-stone",
-        "candidateOutputPaths": [
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/resource-stone/resource-stone.candidate-001.png",
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/resource-stone/resource-stone.candidate-002.png"
-        ],
+        "promptHash": "63c5d6c668c28d4217f2aa4d4dec48208b73e5b8ba83ff0e250fa17813e27946",
+        "candidateOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/resource-stone/resource-stone.candidate-001.png",
+        "approvedOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/approved/resource-stone.webp",
         "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/resource-stone.jsonl",
         "fallbackAssetId": "gen_pack_1dc551d9ebea7769:resource.stone",
         "status": "planned-not-generated"
       },
       {
-        "assetPlanId": "gen_pack_1dc551d9ebea7769:resource-food:plan",
+        "promptId": "gen_pack_1dc551d9ebea7769:resource-food:prompt",
         "canonicalTarget": "resource.food",
-        "mechanicalKey": "food",
-        "generatedName": "Cozy Supplies",
-        "promptHash": "3bee58c013f06f37d9b4f76ed5247cc72c55294567cebed17ac1bf8199627645",
-        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/resource-food.prompt.md",
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/resource-food.webp",
+        "targetKind": "resource-icon",
         "targetSize": {
           "width": 512,
           "height": 512
         },
-        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/resource-food.webp",
+        "promptText": "Create one bounded Agent Town world-grid game asset candidate.\nCanonical target: resource.food.\nMechanical key: food. Do not change gameplay rules or invent tools.\nGenerated label: Cozy Supplies.\nUniverse: Cozy Mushroom Charter. Theme: Cozy Moss Lantern Frontier. Tone: cozy:0.85, adventurous:0.75, mystical:0.30, humorous:0.25, serious:0.35.\nVisual style: warm mechanical frontier. Tech flavor: clockwork route markers, hand-built civic machines, copper repair tools.\nAsset direction: small crate icon.\nTarget size: 512x512. Transparent or clean background where possible.\nNo text, no logos, no credentials, no UI chrome, no extra characters unless requested by the canonical target.",
         "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
-        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/resource-food",
-        "candidateOutputPaths": [
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/resource-food/resource-food.candidate-001.png",
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/resource-food/resource-food.candidate-002.png"
-        ],
+        "promptHash": "44ca63348bd73542610c5ecb19fb806b42bc5905a2c5a33ea87ce0b8a36febf4",
+        "candidateOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/resource-food/resource-food.candidate-001.png",
+        "approvedOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/approved/resource-food.webp",
         "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/resource-food.jsonl",
         "fallbackAssetId": "gen_pack_1dc551d9ebea7769:resource.food",
         "status": "planned-not-generated"
       },
       {
-        "assetPlanId": "gen_pack_1dc551d9ebea7769:resource-coin:plan",
+        "promptId": "gen_pack_1dc551d9ebea7769:resource-coin:prompt",
         "canonicalTarget": "resource.coin",
-        "mechanicalKey": "coin",
-        "generatedName": "Mushroom Scrip",
-        "promptHash": "f3bf7b537a4709cfd2f890dbfcbb3afb3285e55619a6d2e3a0986f4035cbea80",
-        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/resource-coin.prompt.md",
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/resource-coin.webp",
+        "targetKind": "resource-icon",
         "targetSize": {
           "width": 512,
           "height": 512
         },
-        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/resource-coin.webp",
+        "promptText": "Create one bounded Agent Town world-grid game asset candidate.\nCanonical target: resource.coin.\nMechanical key: coin. Do not change gameplay rules or invent tools.\nGenerated label: Mushroom Scrip.\nUniverse: Cozy Mushroom Charter. Theme: Cozy Moss Lantern Frontier. Tone: cozy:0.85, adventurous:0.75, mystical:0.30, humorous:0.25, serious:0.35.\nVisual style: warm mechanical frontier. Tech flavor: clockwork route markers, hand-built civic machines, copper repair tools.\nAsset direction: small brass coin icon.\nTarget size: 512x512. Transparent or clean background where possible.\nNo text, no logos, no credentials, no UI chrome, no extra characters unless requested by the canonical target.",
         "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
-        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/resource-coin",
-        "candidateOutputPaths": [
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/resource-coin/resource-coin.candidate-001.png",
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/resource-coin/resource-coin.candidate-002.png"
-        ],
+        "promptHash": "2eb618a80eac0bae10314634a9fb8e61d8f65e2562b8c7d1a23527108948e615",
+        "candidateOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/resource-coin/resource-coin.candidate-001.png",
+        "approvedOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/approved/resource-coin.webp",
         "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/resource-coin.jsonl",
         "fallbackAssetId": "gen_pack_1dc551d9ebea7769:resource.coin",
         "status": "planned-not-generated"
       },
       {
-        "assetPlanId": "gen_pack_1dc551d9ebea7769:character-clover:plan",
+        "promptId": "gen_pack_1dc551d9ebea7769:character-clover:prompt",
         "canonicalTarget": "character.clover",
-        "mechanicalKey": "clover",
-        "generatedName": "Clover Kincaid",
-        "promptHash": "807e82330548f10fe580ddd3eb5ff044efd17bd4a03efb6ce70ed518292b1a81",
-        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/character-clover.prompt.md",
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/character-clover.webp",
+        "targetKind": "character-sprite",
         "targetSize": {
           "width": 1024,
           "height": 1024
         },
-        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/character-clover.webp",
+        "promptText": "Create one bounded Agent Town world-grid game asset candidate.\nCanonical target: character.clover.\nMechanical key: clover. Do not change gameplay rules or invent tools.\nGenerated label: Clover Kincaid.\nUniverse: Cozy Mushroom Charter. Theme: Cozy Moss Lantern Frontier. Tone: cozy:0.85, adventurous:0.75, mystical:0.30, humorous:0.25, serious:0.35.\nVisual style: warm mechanical frontier. Tech flavor: clockwork route markers, hand-built civic machines, copper repair tools.\nAsset direction: Clover remains the trusted Foreman silhouette.\nTarget size: 1024x1024. Transparent or clean background where possible.\nNo text, no logos, no credentials, no UI chrome, no extra characters unless requested by the canonical target.",
         "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
-        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/character-clover",
-        "candidateOutputPaths": [
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/character-clover/character-clover.candidate-001.png",
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/character-clover/character-clover.candidate-002.png"
-        ],
+        "promptHash": "60ce5262aa128aeb5bb24d684229ea724c34d7a553fd22955de1beb07f938409",
+        "candidateOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/character-clover/character-clover.candidate-001.png",
+        "approvedOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/approved/character-clover.webp",
         "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/character-clover.jsonl",
         "fallbackAssetId": "gen_pack_1dc551d9ebea7769:character.clover",
         "status": "planned-not-generated"
       },
       {
-        "assetPlanId": "gen_pack_1dc551d9ebea7769:terrain-prairie:plan",
+        "promptId": "gen_pack_1dc551d9ebea7769:terrain-prairie:prompt",
         "canonicalTarget": "terrain.prairie",
-        "mechanicalKey": "prairie",
-        "generatedName": "Cozy Meadow",
-        "promptHash": "ee0d4587f5c2172c2fc85a8f2cbfa729e6d970329a9ca4adf5536f59c5c8e669",
-        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/terrain-prairie.prompt.md",
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/materials/terrain-prairie.json",
+        "targetKind": "terrain-texture",
         "targetSize": {
           "width": 1024,
           "height": 1024
         },
-        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/materials/terrain-prairie.json",
+        "promptText": "Create one bounded Agent Town world-grid game asset candidate.\nCanonical target: terrain.prairie.\nMechanical key: prairie. Do not change gameplay rules or invent tools.\nGenerated label: Cozy Meadow.\nUniverse: Cozy Mushroom Charter. Theme: Cozy Moss Lantern Frontier. Tone: cozy:0.85, adventurous:0.75, mystical:0.30, humorous:0.25, serious:0.35.\nVisual style: warm mechanical frontier. Tech flavor: clockwork route markers, hand-built civic machines, copper repair tools.\nAsset direction: open hex terrain material.\nTarget size: 1024x1024. Transparent or clean background where possible.\nNo text, no logos, no credentials, no UI chrome, no extra characters unless requested by the canonical target.",
         "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
-        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-prairie",
-        "candidateOutputPaths": [
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-prairie/terrain-prairie.candidate-001.png",
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-prairie/terrain-prairie.candidate-002.png"
-        ],
+        "promptHash": "c43977803cbcf962ad63d38ce9643d166dcf9724277c39ce0776e04471200831",
+        "candidateOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-prairie/terrain-prairie.candidate-001.png",
+        "approvedOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/approved/terrain-prairie.webp",
         "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/terrain-prairie.jsonl",
         "fallbackAssetId": "gen_pack_1dc551d9ebea7769:terrain.prairie",
         "status": "planned-not-generated"
       },
       {
-        "assetPlanId": "gen_pack_1dc551d9ebea7769:terrain-ridge:plan",
+        "promptId": "gen_pack_1dc551d9ebea7769:terrain-ridge:prompt",
         "canonicalTarget": "terrain.ridge",
-        "mechanicalKey": "ridge",
-        "generatedName": "Mushroom Ridge",
-        "promptHash": "cf3a2d553048841b881445f8ce9ee88eab44997be3d6a526bfeeabcec1a62dbf",
-        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/terrain-ridge.prompt.md",
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/materials/terrain-ridge.json",
+        "targetKind": "terrain-texture",
         "targetSize": {
           "width": 1024,
           "height": 1024
         },
-        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/materials/terrain-ridge.json",
+        "promptText": "Create one bounded Agent Town world-grid game asset candidate.\nCanonical target: terrain.ridge.\nMechanical key: ridge. Do not change gameplay rules or invent tools.\nGenerated label: Mushroom Ridge.\nUniverse: Cozy Mushroom Charter. Theme: Cozy Moss Lantern Frontier. Tone: cozy:0.85, adventurous:0.75, mystical:0.30, humorous:0.25, serious:0.35.\nVisual style: warm mechanical frontier. Tech flavor: clockwork route markers, hand-built civic machines, copper repair tools.\nAsset direction: raised hex terrain material.\nTarget size: 1024x1024. Transparent or clean background where possible.\nNo text, no logos, no credentials, no UI chrome, no extra characters unless requested by the canonical target.",
         "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
-        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-ridge",
-        "candidateOutputPaths": [
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-ridge/terrain-ridge.candidate-001.png",
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-ridge/terrain-ridge.candidate-002.png"
-        ],
+        "promptHash": "62ac07798aac074a6ec3736ec4feb00f53f5f792a29e806d93d79e4884d28317",
+        "candidateOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-ridge/terrain-ridge.candidate-001.png",
+        "approvedOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/approved/terrain-ridge.webp",
         "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/terrain-ridge.jsonl",
         "fallbackAssetId": "gen_pack_1dc551d9ebea7769:terrain.ridge",
         "status": "planned-not-generated"
       },
       {
-        "assetPlanId": "gen_pack_1dc551d9ebea7769:terrain-river:plan",
+        "promptId": "gen_pack_1dc551d9ebea7769:terrain-river:prompt",
         "canonicalTarget": "terrain.river",
-        "mechanicalKey": "river",
-        "generatedName": "Cozy Run",
-        "promptHash": "334c3e320fa4cebbe799b386671104e300c3183774cbd21bd5be48fa601f0d89",
-        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/terrain-river.prompt.md",
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/materials/terrain-river.json",
+        "targetKind": "terrain-texture",
         "targetSize": {
           "width": 1024,
           "height": 1024
         },
-        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/materials/terrain-river.json",
+        "promptText": "Create one bounded Agent Town world-grid game asset candidate.\nCanonical target: terrain.river.\nMechanical key: river. Do not change gameplay rules or invent tools.\nGenerated label: Cozy Run.\nUniverse: Cozy Mushroom Charter. Theme: Cozy Moss Lantern Frontier. Tone: cozy:0.85, adventurous:0.75, mystical:0.30, humorous:0.25, serious:0.35.\nVisual style: warm mechanical frontier. Tech flavor: clockwork route markers, hand-built civic machines, copper repair tools.\nAsset direction: river hex terrain material.\nTarget size: 1024x1024. Transparent or clean background where possible.\nNo text, no logos, no credentials, no UI chrome, no extra characters unless requested by the canonical target.",
         "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
-        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-river",
-        "candidateOutputPaths": [
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-river/terrain-river.candidate-001.png",
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-river/terrain-river.candidate-002.png"
-        ],
+        "promptHash": "a56f247c5e41ddb59ab18211dc6881a325dafc98468804d0784a7fb035b6f4ad",
+        "candidateOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-river/terrain-river.candidate-001.png",
+        "approvedOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/approved/terrain-river.webp",
         "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/terrain-river.jsonl",
         "fallbackAssetId": "gen_pack_1dc551d9ebea7769:terrain.river",
         "status": "planned-not-generated"
       },
       {
-        "assetPlanId": "gen_pack_1dc551d9ebea7769:terrain-forest:plan",
+        "promptId": "gen_pack_1dc551d9ebea7769:terrain-forest:prompt",
         "canonicalTarget": "terrain.forest",
-        "mechanicalKey": "forest",
-        "generatedName": "Mushroom Grove",
-        "promptHash": "83c5e7ba8734f932b9ee383b9183b059b7ebcbee0a20f0bf83c1f9999bc02a19",
-        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/terrain-forest.prompt.md",
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/materials/terrain-forest.json",
+        "targetKind": "terrain-texture",
         "targetSize": {
           "width": 1024,
           "height": 1024
         },
-        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/materials/terrain-forest.json",
+        "promptText": "Create one bounded Agent Town world-grid game asset candidate.\nCanonical target: terrain.forest.\nMechanical key: forest. Do not change gameplay rules or invent tools.\nGenerated label: Mushroom Grove.\nUniverse: Cozy Mushroom Charter. Theme: Cozy Moss Lantern Frontier. Tone: cozy:0.85, adventurous:0.75, mystical:0.30, humorous:0.25, serious:0.35.\nVisual style: warm mechanical frontier. Tech flavor: clockwork route markers, hand-built civic machines, copper repair tools.\nAsset direction: forest hex terrain material.\nTarget size: 1024x1024. Transparent or clean background where possible.\nNo text, no logos, no credentials, no UI chrome, no extra characters unless requested by the canonical target.",
         "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
-        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-forest",
-        "candidateOutputPaths": [
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-forest/terrain-forest.candidate-001.png",
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-forest/terrain-forest.candidate-002.png"
-        ],
+        "promptHash": "943b11cf2f3c12cf900cdb5b2f97e7215eab4557289a4a26d2f5a37b8dc6e0cf",
+        "candidateOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-forest/terrain-forest.candidate-001.png",
+        "approvedOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/approved/terrain-forest.webp",
         "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/terrain-forest.jsonl",
         "fallbackAssetId": "gen_pack_1dc551d9ebea7769:terrain.forest",
         "status": "planned-not-generated"
       },
       {
-        "assetPlanId": "gen_pack_1dc551d9ebea7769:terrain-mesa:plan",
+        "promptId": "gen_pack_1dc551d9ebea7769:terrain-mesa:prompt",
         "canonicalTarget": "terrain.mesa",
-        "mechanicalKey": "mesa",
-        "generatedName": "Cozy Mesa",
-        "promptHash": "5ee9a020929fdf9b45981aa0792660d49efd2b9dcb3dc9bfd3cfb0584ab72e86",
-        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/terrain-mesa.prompt.md",
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/materials/terrain-mesa.json",
+        "targetKind": "terrain-texture",
         "targetSize": {
           "width": 1024,
           "height": 1024
         },
-        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/materials/terrain-mesa.json",
+        "promptText": "Create one bounded Agent Town world-grid game asset candidate.\nCanonical target: terrain.mesa.\nMechanical key: mesa. Do not change gameplay rules or invent tools.\nGenerated label: Cozy Mesa.\nUniverse: Cozy Mushroom Charter. Theme: Cozy Moss Lantern Frontier. Tone: cozy:0.85, adventurous:0.75, mystical:0.30, humorous:0.25, serious:0.35.\nVisual style: warm mechanical frontier. Tech flavor: clockwork route markers, hand-built civic machines, copper repair tools.\nAsset direction: mesa hex terrain material.\nTarget size: 1024x1024. Transparent or clean background where possible.\nNo text, no logos, no credentials, no UI chrome, no extra characters unless requested by the canonical target.",
         "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
-        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-mesa",
-        "candidateOutputPaths": [
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-mesa/terrain-mesa.candidate-001.png",
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-mesa/terrain-mesa.candidate-002.png"
-        ],
+        "promptHash": "519293e7719b4a2c2f35a38107cb26bbe80e60eac27db3a8d76a074cfb446eb3",
+        "candidateOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-mesa/terrain-mesa.candidate-001.png",
+        "approvedOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/approved/terrain-mesa.webp",
         "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/terrain-mesa.jsonl",
         "fallbackAssetId": "gen_pack_1dc551d9ebea7769:terrain.mesa",
         "status": "planned-not-generated"
       },
       {
-        "assetPlanId": "gen_pack_1dc551d9ebea7769:state-claimed:plan",
+        "promptId": "gen_pack_1dc551d9ebea7769:state-claimed:prompt",
         "canonicalTarget": "state.claimed",
-        "mechanicalKey": "claimed",
-        "generatedName": "Held by your settlement",
-        "promptHash": "11f2f5926c36d3b89c8bb928e6e6732ddfe93d463ad89b83016f029d609f13f6",
-        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/state-claimed.prompt.md",
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/materials/state-claimed.json",
+        "targetKind": "terrain-texture",
         "targetSize": {
           "width": 1024,
           "height": 1024
         },
-        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/materials/state-claimed.json",
+        "promptText": "Create one bounded Agent Town world-grid game asset candidate.\nCanonical target: state.claimed.\nMechanical key: claimed. Do not change gameplay rules or invent tools.\nGenerated label: Held by your settlement.\nUniverse: Cozy Mushroom Charter. Theme: Cozy Moss Lantern Frontier. Tone: cozy:0.85, adventurous:0.75, mystical:0.30, humorous:0.25, serious:0.35.\nVisual style: warm mechanical frontier. Tech flavor: clockwork route markers, hand-built civic machines, copper repair tools.\nAsset direction: warm ownership state.\nTarget size: 1024x1024. Transparent or clean background where possible.\nNo text, no logos, no credentials, no UI chrome, no extra characters unless requested by the canonical target.",
         "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
-        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/state-claimed",
-        "candidateOutputPaths": [
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/state-claimed/state-claimed.candidate-001.png",
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/state-claimed/state-claimed.candidate-002.png"
-        ],
+        "promptHash": "ab6a0d87ccaee6bf8d698335ca336d7167a72dfa8b3d9c3d06034bc377d85186",
+        "candidateOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/state-claimed/state-claimed.candidate-001.png",
+        "approvedOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/approved/state-claimed.webp",
         "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/state-claimed.jsonl",
         "fallbackAssetId": "gen_pack_1dc551d9ebea7769:state.claimed",
         "status": "planned-not-generated"
       },
       {
-        "assetPlanId": "gen_pack_1dc551d9ebea7769:state-claimable:plan",
+        "promptId": "gen_pack_1dc551d9ebea7769:state-claimable:prompt",
         "canonicalTarget": "state.claimable",
-        "mechanicalKey": "claimable",
-        "generatedName": "Ready for a route plan",
-        "promptHash": "d552a5790fcb9ae36c276c15c2d0d68ce6c0f0c4b72afcce89be2bdc1a210815",
-        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/state-claimable.prompt.md",
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/materials/state-claimable.json",
+        "targetKind": "terrain-texture",
         "targetSize": {
           "width": 1024,
           "height": 1024
         },
-        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/materials/state-claimable.json",
+        "promptText": "Create one bounded Agent Town world-grid game asset candidate.\nCanonical target: state.claimable.\nMechanical key: claimable. Do not change gameplay rules or invent tools.\nGenerated label: Ready for a route plan.\nUniverse: Cozy Mushroom Charter. Theme: Cozy Moss Lantern Frontier. Tone: cozy:0.85, adventurous:0.75, mystical:0.30, humorous:0.25, serious:0.35.\nVisual style: warm mechanical frontier. Tech flavor: clockwork route markers, hand-built civic machines, copper repair tools.\nAsset direction: available claim state.\nTarget size: 1024x1024. Transparent or clean background where possible.\nNo text, no logos, no credentials, no UI chrome, no extra characters unless requested by the canonical target.",
         "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
-        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/state-claimable",
-        "candidateOutputPaths": [
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/state-claimable/state-claimable.candidate-001.png",
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/state-claimable/state-claimable.candidate-002.png"
-        ],
+        "promptHash": "4a66e38388d3a5b3bced6bfc38c5e97fad71a699a902c732d6a70639182d8932",
+        "candidateOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/state-claimable/state-claimable.candidate-001.png",
+        "approvedOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/approved/state-claimable.webp",
         "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/state-claimable.jsonl",
         "fallbackAssetId": "gen_pack_1dc551d9ebea7769:state.claimable",
         "status": "planned-not-generated"
       },
       {
-        "assetPlanId": "gen_pack_1dc551d9ebea7769:state-visible:plan",
+        "promptId": "gen_pack_1dc551d9ebea7769:state-visible:prompt",
         "canonicalTarget": "state.visible",
-        "mechanicalKey": "visible",
-        "generatedName": "Surveyed nearby ground",
-        "promptHash": "4f68fab329b64bea3b4027f6be9956ba504778925084873ad5611b12e66039d3",
-        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/state-visible.prompt.md",
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/materials/state-visible.json",
+        "targetKind": "terrain-texture",
         "targetSize": {
           "width": 1024,
           "height": 1024
         },
-        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/materials/state-visible.json",
+        "promptText": "Create one bounded Agent Town world-grid game asset candidate.\nCanonical target: state.visible.\nMechanical key: visible. Do not change gameplay rules or invent tools.\nGenerated label: Surveyed nearby ground.\nUniverse: Cozy Mushroom Charter. Theme: Cozy Moss Lantern Frontier. Tone: cozy:0.85, adventurous:0.75, mystical:0.30, humorous:0.25, serious:0.35.\nVisual style: warm mechanical frontier. Tech flavor: clockwork route markers, hand-built civic machines, copper repair tools.\nAsset direction: visible orientation state.\nTarget size: 1024x1024. Transparent or clean background where possible.\nNo text, no logos, no credentials, no UI chrome, no extra characters unless requested by the canonical target.",
         "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
-        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/state-visible",
-        "candidateOutputPaths": [
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/state-visible/state-visible.candidate-001.png",
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/state-visible/state-visible.candidate-002.png"
-        ],
+        "promptHash": "9a62b60aee75e8c3ac5affb641bd57fda54029698974b67f3b038f0ce322e51f",
+        "candidateOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/state-visible/state-visible.candidate-001.png",
+        "approvedOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/approved/state-visible.webp",
         "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/state-visible.jsonl",
         "fallbackAssetId": "gen_pack_1dc551d9ebea7769:state.visible",
         "status": "planned-not-generated"
       },
       {
-        "assetPlanId": "gen_pack_1dc551d9ebea7769:state-locked:plan",
+        "promptId": "gen_pack_1dc551d9ebea7769:state-locked:prompt",
         "canonicalTarget": "state.locked",
-        "mechanicalKey": "locked",
-        "generatedName": "Beyond today's survey",
-        "promptHash": "e0ae035b70c586f80e2dbb65a554a9b10c5b34812c5a4b40d72ae8798bdac666",
-        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/state-locked.prompt.md",
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/materials/state-locked.json",
+        "targetKind": "terrain-texture",
         "targetSize": {
           "width": 1024,
           "height": 1024
         },
-        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/materials/state-locked.json",
+        "promptText": "Create one bounded Agent Town world-grid game asset candidate.\nCanonical target: state.locked.\nMechanical key: locked. Do not change gameplay rules or invent tools.\nGenerated label: Beyond today's survey.\nUniverse: Cozy Mushroom Charter. Theme: Cozy Moss Lantern Frontier. Tone: cozy:0.85, adventurous:0.75, mystical:0.30, humorous:0.25, serious:0.35.\nVisual style: warm mechanical frontier. Tech flavor: clockwork route markers, hand-built civic machines, copper repair tools.\nAsset direction: quiet locked state.\nTarget size: 1024x1024. Transparent or clean background where possible.\nNo text, no logos, no credentials, no UI chrome, no extra characters unless requested by the canonical target.",
         "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
-        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/state-locked",
-        "candidateOutputPaths": [
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/state-locked/state-locked.candidate-001.png",
-          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/state-locked/state-locked.candidate-002.png"
-        ],
+        "promptHash": "6fadfe6db94d1da8403133bc8e6989c0c003b33b900c9e3e585768b74761f6db",
+        "candidateOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/state-locked/state-locked.candidate-001.png",
+        "approvedOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/approved/state-locked.webp",
         "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/state-locked.jsonl",
         "fallbackAssetId": "gen_pack_1dc551d9ebea7769:state.locked",
         "status": "planned-not-generated"
+      },
+      {
+        "promptId": "gen_pack_1dc551d9ebea7769:ui-topbar-frame:prompt",
+        "canonicalTarget": "ui.topbar-frame",
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/ui/ui-topbar-frame.webp",
+        "targetKind": "ui-ornament",
+        "targetSize": {
+          "width": 512,
+          "height": 256
+        },
+        "promptText": "Create one bounded Agent Town world-grid game asset candidate.\nCanonical target: ui.topbar-frame.\nMechanical key: ui_topbar_frame. Do not change gameplay rules or invent tools.\nGenerated label: Cozy Mushroom Charter topbar frame.\nUniverse: Cozy Mushroom Charter. Theme: Cozy Moss Lantern Frontier. Tone: cozy:0.85, adventurous:0.75, mystical:0.30, humorous:0.25, serious:0.35.\nVisual style: warm mechanical frontier. Tech flavor: clockwork route markers, hand-built civic machines, copper repair tools.\nAsset direction: minimal decorative topbar trim for the generated world-grid theme.\nTarget size: 512x256. Transparent or clean background where possible.\nNo text, no logos, no credentials, no UI chrome, no extra characters unless requested by the canonical target.",
+        "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
+        "promptHash": "0e815bd6c40c1b6ec9c4b0a93eac5453ba42035a3cb195632d9574ad75c4e951",
+        "candidateOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/ui-topbar-frame/ui-topbar-frame.candidate-001.png",
+        "approvedOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/approved/ui-topbar-frame.webp",
+        "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/ui-topbar-frame.jsonl",
+        "fallbackAssetId": "gen_pack_1dc551d9ebea7769:ui.topbar-frame",
+        "status": "planned-not-generated"
+      },
+      {
+        "promptId": "gen_pack_1dc551d9ebea7769:ui-selection-ring:prompt",
+        "canonicalTarget": "ui.selection-ring",
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/ui/ui-selection-ring.webp",
+        "targetKind": "ui-ornament",
+        "targetSize": {
+          "width": 512,
+          "height": 256
+        },
+        "promptText": "Create one bounded Agent Town world-grid game asset candidate.\nCanonical target: ui.selection-ring.\nMechanical key: ui_selection_ring. Do not change gameplay rules or invent tools.\nGenerated label: Cozy Moss Lantern Frontier selection ring.\nUniverse: Cozy Mushroom Charter. Theme: Cozy Moss Lantern Frontier. Tone: cozy:0.85, adventurous:0.75, mystical:0.30, humorous:0.25, serious:0.35.\nVisual style: warm mechanical frontier. Tech flavor: clockwork route markers, hand-built civic machines, copper repair tools.\nAsset direction: high-contrast selection ornament that preserves accessibility and does not cover labels.\nTarget size: 512x256. Transparent or clean background where possible.\nNo text, no logos, no credentials, no UI chrome, no extra characters unless requested by the canonical target.",
+        "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
+        "promptHash": "ade28393faa2ba5f04525c3f937bf4e3dc15e7dd309212793809362a0982272d",
+        "candidateOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/ui-selection-ring/ui-selection-ring.candidate-001.png",
+        "approvedOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/approved/ui-selection-ring.webp",
+        "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/ui-selection-ring.jsonl",
+        "fallbackAssetId": "gen_pack_1dc551d9ebea7769:ui.selection-ring",
+        "status": "planned-not-generated"
+      },
+      {
+        "promptId": "gen_pack_1dc551d9ebea7769:postcard-pack-preview:prompt",
+        "canonicalTarget": "postcard.pack-preview",
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/postcards/postcard-pack-preview.webp",
+        "targetKind": "postcard",
+        "targetSize": {
+          "width": 1200,
+          "height": 630
+        },
+        "promptText": "Create one bounded Agent Town world-grid game asset candidate.\nCanonical target: postcard.pack-preview.\nMechanical key: postcard_pack_preview. Do not change gameplay rules or invent tools.\nGenerated label: Cozy Mushroom Charter preview postcard.\nUniverse: Cozy Mushroom Charter. Theme: Cozy Moss Lantern Frontier. Tone: cozy:0.85, adventurous:0.75, mystical:0.30, humorous:0.25, serious:0.35.\nVisual style: warm mechanical frontier. Tech flavor: clockwork route markers, hand-built civic machines, copper repair tools.\nAsset direction: public-safe postcard layout with no account data, wallet data, raw prompt, or debug text.\nTarget size: 1200x630. Transparent or clean background where possible.\nNo text, no logos, no credentials, no UI chrome, no extra characters unless requested by the canonical target.",
+        "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
+        "promptHash": "173e57277d9a694de311822ad68e82108125e835ff8fc77f73ea987896ebdc76",
+        "candidateOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/postcard-pack-preview/postcard-pack-preview.candidate-001.png",
+        "approvedOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/approved/postcard-pack-preview.webp",
+        "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/postcard-pack-preview.jsonl",
+        "fallbackAssetId": "gen_pack_1dc551d9ebea7769:postcard.pack-preview",
+        "status": "planned-not-generated"
       }
     ],
-    "planHash": "14b8e421db9e351cd0ec2603de6237f7ee58207fa6c15b38195c41cc75a559b8"
+    "planHash": "89523e107008dd3efe1e4a7a78441cd81d7b7ecd920a112465f73d5d1916fc1c"
   },
   "assetScaffold": {
     "schemaVersion": "agent-town-asset-generation-scaffold-v1",
     "packId": "gen_pack_1dc551d9ebea7769",
     "candidateRoot": "data/generated-packs-test",
-    "candidateFolderCount": 20,
-    "jobLogCount": 20,
+    "candidateFolderCount": 23,
+    "jobLogCount": 23,
     "productionImageAssetCount": 0,
     "externalModelUsed": false,
-    "explicitConsentRequired": true
+    "explicitConsentRequired": true,
+    "costConsentStatus": "not_required_for_scaffold",
+    "replayableFromPromptPlan": true
   },
   "validationReport": {
     "ok": true,
@@ -1019,6 +1089,15 @@
         "passed": true,
         "measured": {
           "schemaVersion": "agent-town-generated-pack-v1"
+        }
+      },
+      {
+        "id": "GENPACK_JSON_SCHEMA_VALID",
+        "passed": true,
+        "measured": {
+          "schemaCount": 7,
+          "schemaErrorCount": 0,
+          "errors": []
         }
       },
       {
@@ -1073,10 +1152,10 @@
         "id": "GENPACK_GENERATION_BRIEF_VALID",
         "passed": true,
         "measured": {
-          "safetyRewriteApplied": false,
-          "blockedPatternCount": 0,
-          "sensitivePatternCount": 0,
-          "structuredDimensionCount": 9
+          "safetyNeedsReview": false,
+          "safetyReasonCount": 0,
+          "structuredDimensionCount": 9,
+          "schemaErrorCount": 0
         }
       },
       {
@@ -1092,9 +1171,9 @@
         "id": "GENPACK_ASSET_MANIFEST_READY",
         "passed": true,
         "measured": {
-          "assetCount": 26,
+          "assetCount": 29,
           "invalidAssetCount": 0,
-          "fallbackAssetCount": 26,
+          "fallbackAssetCount": 29,
           "productionImageAssetsRequired": false
         }
       },
@@ -1102,10 +1181,10 @@
         "id": "GENPACK_ASSET_PROMPT_PLAN_READY",
         "passed": true,
         "measured": {
-          "plannedAssetCount": 20,
+          "plannedAssetCount": 23,
           "invalidPlanAssetCount": 0,
-          "promptHashCount": 20,
-          "candidateOutputPathCount": 40,
+          "promptHashCount": 23,
+          "candidateOutputPathCount": 23,
           "productionImageAssetsRequired": false
         }
       },
@@ -1114,8 +1193,8 @@
         "passed": true,
         "measured": {
           "schemaVersion": "agent-town-asset-generation-scaffold-v1",
-          "candidateFolderCount": 20,
-          "jobLogCount": 20,
+          "candidateFolderCount": 23,
+          "jobLogCount": 23,
           "productionImageAssetCount": 0,
           "externalModelUsed": false
         }
@@ -1141,12 +1220,16 @@
       "canonicalMappingsCovered": 22,
       "threeJsTerrainMaterials": 5,
       "threeJsStateMaterials": 4,
-      "fallbackAssetCount": 26,
+      "fallbackAssetCount": 29,
       "generatedTextAssetCount": 6,
       "generationBriefValid": true,
-      "assetPromptPlanCount": 20,
-      "candidateOutputPathCount": 40,
-      "jobLogCount": 20,
+      "schemaRegistryExists": true,
+      "jsonSchemaRunnerExists": true,
+      "schemasValidatedIndependently": true,
+      "schemaValidationErrorCount": 0,
+      "assetPromptPlanCount": 23,
+      "candidateOutputPathCount": 23,
+      "jobLogCount": 23,
       "invalidAssetManifestEntries": 0,
       "firstLoopReady": true,
       "productionImageCandidatesRequired": true,

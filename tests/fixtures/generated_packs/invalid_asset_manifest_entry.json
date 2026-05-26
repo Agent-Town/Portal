@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "agent-town-generated-pack-v1",
+  "packId": "invalid_asset_manifest_entry",
+  "assetManifest": {
+    "schemaVersion": "agent-town-generated-asset-manifest-v1",
+    "assets": [
+      {
+        "assetId": "bad",
+        "canonicalTarget": "tool.spawn",
+        "kind": "remote-script",
+        "status": "production-ready",
+        "source": "external-url"
+      }
+    ]
+  }
+}

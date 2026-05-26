@@ -3,67 +3,55 @@
   "$id": "agent-town-asset-prompt-plan-v1",
   "title": "Agent Town Asset Prompt Plan",
   "type": "object",
-  "required": ["schemaVersion", "packId", "promptRoot", "candidateRoot", "generationModel", "assets", "planHash"],
+  "required": ["schemaVersion", "packId", "promptHash", "modelFamily", "createdAtMs", "promptRoot", "candidateRoot", "globalStyleLock", "targets", "planHash"],
   "additionalProperties": false,
   "properties": {
     "schemaVersion": { "const": "agent-town-asset-prompt-plan-v1" },
     "packId": { "type": "string", "minLength": 3 },
+    "promptHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "modelFamily": { "enum": ["gpt-image-2-candidate", "deterministic-fallback"] },
+    "createdAtMs": { "type": "number" },
     "promptRoot": { "type": "string", "minLength": 3 },
     "candidateRoot": { "type": "string", "minLength": 3 },
-    "generationModel": {
+    "globalStyleLock": {
       "type": "object",
-      "required": ["targetModel", "externalModelUsed", "explicitConsentRequired", "productionImageAssetsRequired"],
+      "required": ["summary", "negativePrompt", "aspectPolicy", "transparentBackgroundPolicy"],
       "additionalProperties": false,
       "properties": {
-        "targetModel": { "const": "gpt-image-2" },
-        "externalModelUsed": { "const": false },
-        "explicitConsentRequired": { "const": true },
-        "productionImageAssetsRequired": { "const": false }
+        "summary": { "type": "string", "minLength": 3 },
+        "negativePrompt": { "type": "string", "minLength": 12 },
+        "aspectPolicy": { "type": "string", "minLength": 3 },
+        "transparentBackgroundPolicy": { "const": "clean-background-plus-postprocess" }
       }
     },
-    "assets": {
+    "targets": {
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": [
-          "assetPlanId",
-          "canonicalTarget",
-          "mechanicalKey",
-          "generatedName",
-          "promptHash",
-          "promptFile",
-          "targetSize",
-          "usagePath",
-          "negativePrompt",
-          "candidateFolder",
-          "candidateOutputPaths",
-          "jobLogPath",
-          "fallbackAssetId",
-          "status"
-        ],
+        "required": ["promptId", "canonicalTarget", "usagePath", "targetKind", "targetSize", "promptText", "negativePrompt", "promptHash", "candidateOutputPath", "approvedOutputPath", "fallbackAssetId", "jobLogPath", "status"],
         "additionalProperties": false,
         "properties": {
-          "assetPlanId": { "type": "string", "minLength": 3 },
+          "promptId": { "type": "string", "minLength": 3 },
           "canonicalTarget": { "type": "string", "minLength": 3 },
-          "mechanicalKey": { "type": "string", "minLength": 1 },
-          "generatedName": { "type": "string", "minLength": 1 },
-          "promptHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-          "promptFile": { "type": "string", "minLength": 3 },
+          "usagePath": { "type": "string", "minLength": 3 },
+          "targetKind": { "enum": ["terrain-texture", "building-billboard", "resource-icon", "character-sprite", "ui-ornament", "postcard"] },
           "targetSize": {
             "type": "object",
             "required": ["width", "height"],
+            "additionalProperties": false,
             "properties": {
               "width": { "type": "integer", "minimum": 64 },
               "height": { "type": "integer", "minimum": 64 }
             }
           },
-          "usagePath": { "type": "string", "minLength": 3 },
+          "promptText": { "type": "string", "minLength": 80 },
           "negativePrompt": { "type": "string", "minLength": 12 },
-          "candidateFolder": { "type": "string", "minLength": 3 },
-          "candidateOutputPaths": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 3 } },
-          "jobLogPath": { "type": "string", "minLength": 3 },
+          "promptHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "candidateOutputPath": { "type": "string", "minLength": 3 },
+          "approvedOutputPath": { "type": "string", "minLength": 3 },
           "fallbackAssetId": { "type": "string", "minLength": 3 },
+          "jobLogPath": { "type": "string", "minLength": 3 },
           "status": { "const": "planned-not-generated" }
         }
       }

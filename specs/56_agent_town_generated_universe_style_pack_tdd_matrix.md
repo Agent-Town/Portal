@@ -24,7 +24,12 @@ owner: "Agent Town product"
 | GPACK-011 | Brief | Prompt normalization emits a structured `GenerationBrief` with safety status and no raw prompt | `tests/generated_pack_contract.test.js` |
 | GPACK-012 | Security | Raw executable prompt instructions fail generated-pack validation | `tests/generated_pack_contract.test.js` |
 | GPACK-013 | Assets | Invalid manifest entries fail validation before runtime load | `tests/generated_pack_contract.test.js` |
-| GPACK-014 | Assets | Asset prompt plan covers 20 canonical image targets with prompt hashes, target sizes, usage paths, negative prompts, and candidate paths | `tests/generated_pack_contract.test.js` |
+| GPACK-014 | Assets | Asset prompt plan covers 20 canonical image targets plus UI/postcard presentation targets with prompt hashes, target sizes, usage paths, negative prompts, and candidate paths | `tests/generated_pack_contract.test.js` |
 | GPACK-015 | Assets | Candidate folders and JSONL job logs are scaffolded with zero production image assets | `tests/generated_pack_contract.test.js` |
 | GPACK-016 | Replayability | Multiple prompts produce distinct deterministic pack signatures and themes | `tests/generated_pack_contract.test.js` |
 | GPACK-017 | Browser | First-loop Playwright regression asserts `GenerationBrief`, prompt-plan, scaffold, Three.js load, generated text, and playtest report | `e2e/237_world_grid_generated_pack_demo.spec.js` |
+| GPACK-018 | Brief | Roadmap-shaped `GenerationBrief` uses nested theme/tone/style/civilization/safety fields and no executable prompt text | `tests/generated_pack_generation_brief.test.js` |
+| GPACK-019 | Assets | Roadmap-shaped `AssetPromptPlan` uses global style lock, target prompts, candidate paths, approved paths, and stable hashes | `tests/generated_pack_asset_prompt_plan.test.js` |
+| GPACK-020 | Schema | Local schema registry validates generated-pack subdocuments independently | `tests/generated_pack_schema_validation.test.js` |
+| GPACK-021 | Schema | Dangerous unknown fields across generated-pack subdocuments produce at least 20 schema/content rejections | `tests/generated_pack_schema_validation.test.js` |
+| GPACK-022 | Jobs | Candidate generation job logs are written without image generation, include consent/cost/provenance/retry/resume metadata, and redact secrets | `tests/generated_pack_generation_job_scaffold.test.js` |

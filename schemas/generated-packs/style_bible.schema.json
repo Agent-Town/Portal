@@ -3,18 +3,57 @@
   "$id": "agent-town-style-bible-v1",
   "title": "Agent Town Style Bible",
   "type": "object",
-  "required": ["schemaVersion", "stylePackId", "name", "palette", "materialRules", "uiRules"],
-  "additionalProperties": true,
+  "required": ["schemaVersion", "stylePackId", "promptHash", "name", "themeSummary", "palette", "materialRules", "silhouetteRules", "uiRules", "animationRules"],
+  "additionalProperties": false,
   "properties": {
     "schemaVersion": { "const": "agent-town-style-bible-v1" },
     "stylePackId": { "type": "string", "minLength": 3 },
+    "promptHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "name": { "type": "string", "minLength": 3 },
+    "themeSummary": { "type": "string", "minLength": 3 },
     "palette": {
       "type": "object",
-      "required": ["background", "surface", "ink", "primary", "secondary", "accent", "focus", "selected", "terrain", "state"],
-      "additionalProperties": true
+      "required": ["background", "surface", "ink", "primary", "secondary", "accent", "focus", "selected", "light", "ambient", "terrain", "state"],
+      "additionalProperties": false,
+      "properties": {
+        "background": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "surface": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "ink": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "primary": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "secondary": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "accent": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "focus": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "selected": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "light": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "ambient": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "terrain": { "type": "object" },
+        "state": { "type": "object" }
+      }
     },
-    "materialRules": { "type": "array", "minItems": 3 },
-    "uiRules": { "type": "object" }
+    "materialRules": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "required": ["target", "rule"],
+        "additionalProperties": false,
+        "properties": {
+          "target": { "type": "string", "minLength": 3 },
+          "rule": { "type": "string", "minLength": 3 }
+        }
+      }
+    },
+    "silhouetteRules": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 3 } },
+    "uiRules": {
+      "type": "object",
+      "required": ["minReadableTextPx", "onePrimaryAction", "normalGameplayDebugJargon"],
+      "additionalProperties": false,
+      "properties": {
+        "minReadableTextPx": { "type": "number", "minimum": 12 },
+        "onePrimaryAction": { "type": "boolean" },
+        "normalGameplayDebugJargon": { "const": false }
+      }
+    },
+    "animationRules": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 3 } }
   }
 }

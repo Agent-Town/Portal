@@ -1,6 +1,11 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const {
+  loadGeneratedPackSchemaRegistry,
+  validateGeneratedPackSchemas,
+  validateGeneratedSchema
+} = require('./generated_schema');
 
 const SCHEMA_VERSION = 'agent-town-generated-pack-v1';
 const GENERATOR_ID = 'deterministic-world-grid-style-pack-v0.1';
@@ -10,6 +15,7 @@ const ASSET_SCAFFOLD_VERSION = 'agent-town-asset-generation-scaffold-v1';
 const GENERATED_ASSET_MANIFEST_VERSION = 'agent-town-generated-asset-manifest-v1';
 const DEFAULT_CANDIDATE_ROOT = 'data/generated-packs';
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
+const SCHEMA_REGISTRY = loadGeneratedPackSchemaRegistry();
 
 const REQUIRED_CANONICAL_IDS = [
   'building.hq',
@@ -45,6 +51,12 @@ const TEXT_ASSET_TARGETS = [
   'text.complete-claim-action'
 ];
 
+const PRESENTATION_ASSET_TARGETS = [
+  'ui.topbar-frame',
+  'ui.selection-ring',
+  'postcard.pack-preview'
+];
+
 const IMAGE_PLAN_TARGETS = REQUIRED_CANONICAL_IDS.filter((id) => (
   id.startsWith('building.')
   || id.startsWith('resource.')
@@ -53,12 +65,15 @@ const IMAGE_PLAN_TARGETS = REQUIRED_CANONICAL_IDS.filter((id) => (
   || id === 'character.clover'
 ));
 
-const VALID_MANIFEST_TARGETS = new Set([...REQUIRED_CANONICAL_IDS, ...TEXT_ASSET_TARGETS]);
-const VALID_ASSET_PLAN_TARGETS = new Set(IMAGE_PLAN_TARGETS);
+const ASSET_PROMPT_TARGETS = [...IMAGE_PLAN_TARGETS, ...PRESENTATION_ASSET_TARGETS];
+const VALID_MANIFEST_TARGETS = new Set([...REQUIRED_CANONICAL_IDS, ...TEXT_ASSET_TARGETS, ...PRESENTATION_ASSET_TARGETS]);
+const VALID_ASSET_PLAN_TARGETS = new Set(ASSET_PROMPT_TARGETS);
 const VALID_ASSET_KINDS = new Set([
   'three-material',
   'shape-token',
   'billboard-sprite-candidate',
+  'ui-ornament-candidate',
+  'postcard-candidate',
   'generated-text'
 ]);
 const VALID_ASSET_STATUSES = new Set([
@@ -349,37 +364,54 @@ function safePromptWords(words = []) {
 
 function inferTone(words = []) {
   const set = new Set(words);
-  if (['cozy', 'gentle', 'soft', 'calm', 'friendly'].some((word) => set.has(word))) return 'cozy and practical';
-  if (['mystery', 'mist', 'moon', 'shadow'].some((word) => set.has(word))) return 'quietly mysterious';
-  if (['festival', 'bright', 'comic', 'silly'].some((word) => set.has(word))) return 'bright and lightly humorous';
-  if (['forge', 'gear', 'clockwork', 'copper'].some((word) => set.has(word))) return 'craft-focused and orderly';
-  return 'clear frontier optimism';
+  return {
+    cozy: ['cozy', 'gentle', 'soft', 'calm', 'friendly', 'mushroom', 'lantern'].some((word) => set.has(word)) ? 0.85 : 0.45,
+    adventurous: ['frontier', 'route', 'rail', 'starport', 'sky', 'canyon'].some((word) => set.has(word)) ? 0.75 : 0.55,
+    mystical: ['mystery', 'mist', 'moon', 'shadow', 'crystal', 'wizard', 'glow'].some((word) => set.has(word)) ? 0.75 : 0.3,
+    humorous: ['silly', 'goofy', 'absurd', 'comic', 'whimsical', 'playful'].some((word) => set.has(word)) ? 0.7 : 0.25,
+    serious: ['serious', 'solemn', 'quiet'].some((word) => set.has(word)) ? 0.7 : 0.35
+  };
 }
 
 function inferVisualStyle(words = [], preset = THEME_PRESETS[0]) {
   const set = new Set(words);
-  if (['watercolor', 'painted', 'storybook'].some((word) => set.has(word))) return 'storybook watercolor game sprites';
-  if (['pixel', 'retro'].some((word) => set.has(word))) return 'chunky readable pixel-inspired sprites';
-  if (['clay', 'diorama', 'miniature'].some((word) => set.has(word))) return 'soft tabletop diorama shapes';
-  if (['clockwork', 'brass', 'gear', 'forge'].some((word) => set.has(word))) return 'warm mechanical frontier miniatures';
-  return `${preset.name.toLowerCase()} readable Three.js materials`;
+  const styleFamily = ['watercolor', 'painted', 'storybook'].some((word) => set.has(word))
+    ? 'storybook watercolor'
+    : ['pixel', 'retro'].some((word) => set.has(word))
+      ? 'readable pixel-inspired'
+      : ['clay', 'diorama', 'miniature'].some((word) => set.has(word))
+        ? 'soft tabletop diorama'
+        : ['clockwork', 'brass', 'gear', 'forge'].some((word) => set.has(word))
+          ? 'warm mechanical frontier'
+          : `${preset.name.toLowerCase()} game miniature`;
+  return {
+    styleFamily,
+    materialMotifs: [
+      pick(preset.nounBank, words.join(':') || preset.id, 'motif-a').toLowerCase(),
+      pick(preset.nounBank, words.join(':') || preset.id, 'motif-b').toLowerCase(),
+      preset.id.replace(/-/g, ' ')
+    ],
+    lighting: set.has('moon') || set.has('mist') ? 'soft twilight readability' : 'warm daylight readability',
+    colorMood: `${preset.name.toLowerCase()} palette with high-contrast readable accents`,
+    forbiddenVisuals: ['text in image', 'logos', 'credentials', 'photoreal gore', 'copyrighted characters']
+  };
 }
 
 function inferTechFlavor(words = [], preset = THEME_PRESETS[0]) {
   const set = new Set(words);
-  if (['space', 'star', 'orbit', 'comet', 'moon'].some((word) => set.has(word))) return 'signal lamps, orbital routes, and brass navigation tools';
-  if (['clockwork', 'gear', 'forge', 'copper'].some((word) => set.has(word))) return 'clockwork route markers and hand-built civic machines';
-  if (['water', 'tide', 'reef', 'harbor', 'glass'].some((word) => set.has(word))) return 'tide gauges, glass beacons, and harbor craft';
-  if (['forest', 'moss', 'mushroom', 'garden', 'lantern'].some((word) => set.has(word))) return 'lantern ecology, garden tools, and low-tech route craft';
-  return `${preset.name} practical frontier tools`;
+  if (['space', 'star', 'orbit', 'comet', 'moon'].some((word) => set.has(word))) return ['signal lamps', 'orbital routes', 'brass navigation tools'];
+  if (['clockwork', 'gear', 'forge', 'copper'].some((word) => set.has(word))) return ['clockwork route markers', 'hand-built civic machines', 'copper repair tools'];
+  if (['water', 'tide', 'reef', 'harbor', 'glass'].some((word) => set.has(word))) return ['tide gauges', 'glass beacons', 'harbor craft'];
+  if (['forest', 'moss', 'mushroom', 'garden', 'lantern'].some((word) => set.has(word))) return ['lantern ecology', 'garden tools', 'low-tech route craft'];
+  return [`${preset.name} practical tools`, 'route markers', 'settlement craft'];
 }
 
 function inferHumorLevel(words = []) {
   const set = new Set(words);
-  if (['silly', 'goofy', 'absurd', 'comic'].some((word) => set.has(word))) return 'medium-high';
-  if (['whimsical', 'playful', 'funny'].some((word) => set.has(word))) return 'medium';
-  if (['serious', 'solemn', 'quiet'].some((word) => set.has(word))) return 'low';
-  return 'low';
+  if (['absurd', 'goofy'].some((word) => set.has(word))) return 'absurd-but-safe';
+  if (['silly', 'comic', 'whimsical', 'playful', 'funny'].some((word) => set.has(word))) return 'playful';
+  if (['serious', 'solemn', 'quiet'].some((word) => set.has(word))) return 'none';
+  return 'subtle';
 }
 
 function createGenerationBrief({ prompt }) {
@@ -396,27 +428,27 @@ function createGenerationBrief({ prompt }) {
   return {
     schemaVersion: GENERATION_BRIEF_VERSION,
     promptHash,
-    theme: `${anchor} ${preset.name}`,
+    promptLength: normalizedPrompt.length,
+    keywordHints: words.slice(0, 10),
+    theme: {
+      primary: `${anchor} ${preset.name}`,
+      secondary: `${second} craft line`,
+      setting: preset.name
+    },
     tone: inferTone(words),
     visualStyle: inferVisualStyle(words, preset),
-    species: [`${anchor} settlers`, `${second} crews`],
-    factions: [`${anchor} Settlers`, `${second} Crews`],
-    cultures: [`${preset.name} craft tradition`, `${second} route customs`],
-    techFlavor: inferTechFlavor(words, preset),
-    humorLevel: inferHumorLevel(words),
-    safetyStatus: {
-      status: safetyRewriteApplied ? 'rewritten' : 'safe',
-      safetyRewriteApplied,
-      blockedPatternIds,
-      sensitivePatternIds,
-      deterministicFallbackAllowed: true
+    civilizationFlavor: {
+      species: [`${anchor} settlers`, `${second} crews`],
+      factions: [`${anchor} Settlers`, `${second} Crews`],
+      cultures: [`${preset.name} craft tradition`, `${second} route customs`],
+      techFlavor: inferTechFlavor(words, preset)
     },
-    keywordHints: words.slice(0, 10),
-    metrics: {
-      promptLength: normalizedPrompt.length,
-      keywordCount: words.length,
-      safetyRewriteApplied,
-      deterministicFallbackPlayable: true
+    humorLevel: inferHumorLevel(words),
+    safety: {
+      status: safetyRewriteApplied ? 'needs_review' : 'passed',
+      reasons: [...blockedPatternIds, ...sensitivePatternIds],
+      normalizedForRuntime: true,
+      rawPromptExecutable: false
     }
   };
 }
@@ -506,7 +538,18 @@ function buildAssetManifest({ packId, promptHash, mappings, preset }) {
     kind: 'generated-text',
     status: 'runtime-generated',
     source: 'deterministic-fallback',
-    promptHash
+      promptHash
+    }));
+  const presentationAssets = PRESENTATION_ASSET_TARGETS.map((target) => ({
+    assetId: `${packId}:${target}`,
+    canonicalTarget: target,
+    kind: target.startsWith('postcard.') ? 'postcard-candidate' : 'ui-ornament-candidate',
+    status: 'fallback-ready',
+    source: 'deterministic-fallback',
+    promptHash,
+    description: target.startsWith('postcard.')
+      ? 'share-safe generated-pack preview postcard candidate'
+      : 'small UI ornament candidate that preserves minimal world-grid UX'
   }));
   return {
     schemaVersion: GENERATED_ASSET_MANIFEST_VERSION,
@@ -519,7 +562,7 @@ function buildAssetManifest({ packId, promptHash, mappings, preset }) {
       requiresHumanSignoff: true,
       transparentBackgroundPolicy: 'clean-background-plus-postprocess'
     },
-    assets: [...visualAssets, ...entityAssets, ...textAssets]
+    assets: [...visualAssets, ...entityAssets, ...textAssets, ...presentationAssets]
   };
 }
 
@@ -549,6 +592,8 @@ function isSafeRelativePath(value = '') {
 
 function targetSizeForCanonicalTarget(canonicalTarget = '') {
   if (canonicalTarget.startsWith('resource.')) return { width: 512, height: 512 };
+  if (canonicalTarget.startsWith('ui.')) return { width: 512, height: 256 };
+  if (canonicalTarget.startsWith('postcard.')) return { width: 1200, height: 630 };
   if (canonicalTarget.startsWith('terrain.') || canonicalTarget.startsWith('state.')) return { width: 1024, height: 1024 };
   return { width: 1024, height: 1024 };
 }
@@ -557,6 +602,12 @@ function usagePathForCanonicalTarget(packId, canonicalTarget = '') {
   const slug = slugForTarget(canonicalTarget);
   if (canonicalTarget.startsWith('terrain.') || canonicalTarget.startsWith('state.')) {
     return relativePackPath('public/experiences/world-grid/generated', packId, 'materials', `${slug}.json`);
+  }
+  if (canonicalTarget.startsWith('ui.')) {
+    return relativePackPath('public/experiences/world-grid/generated', packId, 'ui', `${slug}.webp`);
+  }
+  if (canonicalTarget.startsWith('postcard.')) {
+    return relativePackPath('public/experiences/world-grid/generated', packId, 'postcards', `${slug}.webp`);
   }
   return relativePackPath('public/experiences/world-grid/generated', packId, 'sprites', `${slug}.webp`);
 }
@@ -568,6 +619,8 @@ function assetHintForMapping(mapping = {}) {
   if (String(mapping.canonicalId || '').startsWith('resource.')) return 'small readable resource token for UI and map overlays';
   if (String(mapping.canonicalId || '').startsWith('building.')) return 'transparent-background building sprite with a clear silhouette';
   if (mapping.canonicalId === 'character.clover') return 'trusted Foreman character sprite with friendly frontier posture';
+  if (String(mapping.canonicalId || '').startsWith('ui.')) return 'minimal UI ornament that does not add clutter or hide gameplay information';
+  if (String(mapping.canonicalId || '').startsWith('postcard.')) return 'public-safe preview postcard composition using only generated-pack presentation data';
   return 'readable Agent Town world-grid game asset';
 }
 
@@ -577,44 +630,58 @@ function buildControlledAssetPrompt({ pack, mapping }) {
   const style = pack.stylePack || {};
   const target = mapping.canonicalId;
   const size = targetSizeForCanonicalTarget(target);
+  const toneSummary = Object.entries(brief.tone || {})
+    .map(([key, value]) => `${key}:${Number(value || 0).toFixed(2)}`)
+    .join(', ');
   return [
     'Create one bounded Agent Town world-grid game asset candidate.',
     `Canonical target: ${target}.`,
     `Mechanical key: ${mapping.mechanicalKey}. Do not change gameplay rules or invent tools.`,
     `Generated label: ${mapping.generatedName}.`,
-    `Universe: ${universe.name}. Theme: ${brief.theme}. Tone: ${brief.tone}.`,
-    `Visual style: ${brief.visualStyle || style.name}. Tech flavor: ${brief.techFlavor}.`,
+    `Universe: ${universe.name}. Theme: ${brief.theme?.primary || style.name}. Tone: ${toneSummary}.`,
+    `Visual style: ${brief.visualStyle?.styleFamily || style.name}. Tech flavor: ${(brief.civilizationFlavor?.techFlavor || []).join(', ')}.`,
     `Asset direction: ${assetHintForMapping(mapping)}.`,
     `Target size: ${size.width}x${size.height}. Transparent or clean background where possible.`,
     'No text, no logos, no credentials, no UI chrome, no extra characters unless requested by the canonical target.'
   ].join('\n');
 }
 
-function buildAssetPromptPlan({ pack, candidateRoot = DEFAULT_CANDIDATE_ROOT }) {
+function targetKindForCanonicalTarget(canonicalTarget = '') {
+  if (canonicalTarget.startsWith('terrain.') || canonicalTarget.startsWith('state.')) return 'terrain-texture';
+  if (canonicalTarget.startsWith('building.')) return 'building-billboard';
+  if (canonicalTarget.startsWith('resource.')) return 'resource-icon';
+  if (canonicalTarget === 'character.clover') return 'character-sprite';
+  if (canonicalTarget.startsWith('postcard.')) return 'postcard';
+  return 'ui-ornament';
+}
+
+function buildAssetPromptPlan({ pack, candidateRoot = DEFAULT_CANDIDATE_ROOT, nowMs = Date.now() }) {
   const mappings = pack?.gameplayMapping?.canonicalEntities || [];
-  const visualMappings = mappings.filter((mapping) => VALID_ASSET_PLAN_TARGETS.has(mapping.canonicalId));
+  const presentationMappings = [
+    { canonicalId: 'ui.topbar-frame', mechanicalKey: 'ui_topbar_frame', generatedName: `${pack?.universePack?.name || 'Generated'} topbar frame`, assetHint: 'minimal decorative topbar trim for the generated world-grid theme' },
+    { canonicalId: 'ui.selection-ring', mechanicalKey: 'ui_selection_ring', generatedName: `${pack?.stylePack?.name || 'Generated'} selection ring`, assetHint: 'high-contrast selection ornament that preserves accessibility and does not cover labels' },
+    { canonicalId: 'postcard.pack-preview', mechanicalKey: 'postcard_pack_preview', generatedName: `${pack?.universePack?.name || 'Generated pack'} preview postcard`, assetHint: 'public-safe postcard layout with no account data, wallet data, raw prompt, or debug text' }
+  ];
+  const visualMappings = [...mappings, ...presentationMappings].filter((mapping) => VALID_ASSET_PLAN_TARGETS.has(mapping.canonicalId));
   const promptRoot = relativePackPath('specs/prompts/generated-universe-packs', pack.packId);
-  const assets = visualMappings.map((mapping) => {
+  const globalNegativePrompt = 'text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters';
+  const targets = visualMappings.map((mapping) => {
     const canonicalTarget = mapping.canonicalId;
     const slug = slugForTarget(canonicalTarget);
     const controlledPrompt = buildControlledAssetPrompt({ pack, mapping });
     const promptHash = sha256(controlledPrompt);
     const candidateFolder = relativePackPath(candidateRoot, pack.packId, 'candidates', slug);
     return {
-      assetPlanId: `${pack.packId}:${slug}:plan`,
+      promptId: `${pack.packId}:${slug}:prompt`,
       canonicalTarget,
-      mechanicalKey: mapping.mechanicalKey,
-      generatedName: mapping.generatedName,
-      promptHash,
-      promptFile: relativePackPath(promptRoot, `${slug}.prompt.md`),
-      targetSize: targetSizeForCanonicalTarget(canonicalTarget),
       usagePath: usagePathForCanonicalTarget(pack.packId, canonicalTarget),
-      negativePrompt: 'text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters',
-      candidateFolder,
-      candidateOutputPaths: [
-        relativePackPath(candidateFolder, `${slug}.candidate-001.png`),
-        relativePackPath(candidateFolder, `${slug}.candidate-002.png`)
-      ],
+      targetKind: targetKindForCanonicalTarget(canonicalTarget),
+      targetSize: targetSizeForCanonicalTarget(canonicalTarget),
+      promptText: controlledPrompt,
+      negativePrompt: globalNegativePrompt,
+      promptHash,
+      candidateOutputPath: relativePackPath(candidateFolder, `${slug}.candidate-001.png`),
+      approvedOutputPath: relativePackPath(candidateRoot, pack.packId, 'approved', `${slug}.webp`),
       jobLogPath: relativePackPath(candidateRoot, pack.packId, 'jobs', `${slug}.jsonl`),
       fallbackAssetId: `${pack.packId}:${canonicalTarget}`,
       status: 'planned-not-generated'
@@ -623,22 +690,25 @@ function buildAssetPromptPlan({ pack, candidateRoot = DEFAULT_CANDIDATE_ROOT }) 
   const plan = {
     schemaVersion: ASSET_PROMPT_PLAN_VERSION,
     packId: pack.packId,
+    promptHash: pack.prompt?.hash || pack.generationBrief?.promptHash || '',
+    modelFamily: 'gpt-image-2-candidate',
+    createdAtMs: nowMs,
     promptRoot,
     candidateRoot,
-    generationModel: {
-      targetModel: 'gpt-image-2',
-      externalModelUsed: false,
-      explicitConsentRequired: true,
-      productionImageAssetsRequired: false
+    globalStyleLock: {
+      summary: `${pack.stylePack?.name || 'Generated pack'}: ${pack.stylePack?.themeSummary || 'bounded Agent Town style'}`,
+      negativePrompt: globalNegativePrompt,
+      aspectPolicy: 'square assets unless a future signed manifest says otherwise',
+      transparentBackgroundPolicy: 'clean-background-plus-postprocess'
     },
-    assets
+    targets
   };
   plan.planHash = sha256(JSON.stringify({
     packId: plan.packId,
-    assets: plan.assets.map((asset) => ({
-      canonicalTarget: asset.canonicalTarget,
-      promptHash: asset.promptHash,
-      usagePath: asset.usagePath
+    targets: plan.targets.map((target) => ({
+      canonicalTarget: target.canonicalTarget,
+      promptHash: target.promptHash,
+      usagePath: target.usagePath
     }))
   }));
   return plan;
@@ -660,26 +730,60 @@ function repoPathForRelativePath(relativePath) {
 }
 
 function scaffoldAssetGenerationJobs(assetPromptPlan, { nowMs = Date.now() } = {}) {
-  const assets = assetPromptPlan?.assets || [];
+  const targets = assetPromptPlan?.targets || [];
   let candidateFolderCount = 0;
   let jobLogCount = 0;
-  for (const asset of assets) {
-    const candidateFolder = repoPathForRelativePath(asset.candidateFolder);
+  for (const target of targets) {
+    const candidateFolder = repoPathForRelativePath(path.dirname(target.candidateOutputPath));
     fs.mkdirSync(candidateFolder, { recursive: true });
     candidateFolderCount += 1;
-    const jobLogPath = repoPathForRelativePath(asset.jobLogPath);
+    const jobLogPath = repoPathForRelativePath(target.jobLogPath);
     fs.mkdirSync(path.dirname(jobLogPath), { recursive: true });
     const line = JSON.stringify({
       schemaVersion: 'agent-town-asset-generation-job-log-v1',
+      jobId: `${assetPromptPlan.packId}:${slugForTarget(target.canonicalTarget)}:planned`,
       packId: assetPromptPlan.packId,
-      assetPlanId: asset.assetPlanId,
-      canonicalTarget: asset.canonicalTarget,
-      promptHash: asset.promptHash,
-      status: 'planned-not-generated',
-      targetModel: assetPromptPlan.generationModel?.targetModel || 'gpt-image-2',
-      productionImageAssetCreated: false,
-      explicitConsentRequired: true,
-      createdAtMs: nowMs
+      promptId: target.promptId,
+      promptHash: target.promptHash,
+      promptPlanHash: assetPromptPlan.planHash,
+      status: 'planned',
+      modelFamily: assetPromptPlan.modelFamily || 'gpt-image-2-candidate',
+      authMode: 'not_configured',
+      costConsentStatus: 'not_required_for_scaffold',
+      consentModel: {
+        explicitConsentRequiredForGeneration: true,
+        status: 'not_required_for_scaffold'
+      },
+      costEstimate: {
+        status: 'not_required_for_scaffold',
+        currency: 'USD',
+        estimatedMin: 0,
+        estimatedMax: 0
+      },
+      sourceProvenance: {
+        generator: GENERATOR_ID,
+        promptPlanHash: assetPromptPlan.planHash,
+        externalModelUsed: false,
+        productionAssetApproval: 'not_requested'
+      },
+      retryPolicy: {
+        maxRetries: 0,
+        retryRecords: []
+      },
+      resume: {
+        replayableFromPromptPlan: true,
+        promptPlanPath: relativePackPath(assetPromptPlan.candidateRoot || DEFAULT_CANDIDATE_ROOT, assetPromptPlan.packId, 'prompt-plan.json'),
+        promptId: target.promptId
+      },
+      createdAtMs: nowMs,
+      promptCount: 1,
+      outputCount: 0,
+      errors: [],
+      externalImageGenerationUsed: false,
+      approvedProductionAssetsCreated: false,
+      canonicalTarget: target.canonicalTarget,
+      candidateOutputPath: target.candidateOutputPath,
+      approvedOutputPath: target.approvedOutputPath
     });
     fs.writeFileSync(jobLogPath, `${line}\n`, 'utf8');
     jobLogCount += 1;
@@ -692,7 +796,9 @@ function scaffoldAssetGenerationJobs(assetPromptPlan, { nowMs = Date.now() } = {
     jobLogCount,
     productionImageAssetCount: 0,
     externalModelUsed: false,
-    explicitConsentRequired: true
+    explicitConsentRequired: true,
+    costConsentStatus: 'not_required_for_scaffold',
+    replayableFromPromptPlan: true
   };
 }
 
@@ -716,7 +822,7 @@ function findForbiddenAuthorityPaths(value, path = '$', matches = []) {
   const forbiddenKey = /(toolhandler|toolhandlers|^tools?$|serverrule|mutationhandler|mutationhandlers|^mutations?$|^formulas?$|expression|^eval$|^script$)/i;
   for (const [key, child] of Object.entries(value)) {
     const childPath = `${path}.${key}`;
-    if (forbiddenKey.test(key)) {
+    if (forbiddenKey.test(key) && childPath !== '$.gameplayMapping.serverRuleOverrides') {
       matches.push(childPath);
     }
     findForbiddenAuthorityPaths(child, childPath, matches);
@@ -738,7 +844,7 @@ function findSecretLikePaths(value, path = '$', matches = []) {
 }
 
 function findRawPromptInstructionPaths(value, path = '$', matches = []) {
-  const rawPromptKey = /^(rawprompt|normalizedprompt|prompttext|systemprompt|developerprompt|promptinstructions)$/i;
+  const rawPromptKey = /^(rawprompt|normalizedprompt|systemprompt|developerprompt|promptinstructions)$/i;
   if (typeof value === 'string') {
     const blockedPatternIds = blockedPatternIdsForText(value);
     if (blockedPatternIds.length > 0) {
@@ -762,13 +868,22 @@ function isHexColor(value) {
 }
 
 function validateGenerationBrief(brief = {}) {
-  const requiredStringFields = ['theme', 'tone', 'visualStyle', 'techFlavor'];
-  const requiredArrayFields = ['species', 'factions', 'cultures'];
-  const missingStringFields = requiredStringFields.filter((key) => String(brief?.[key] || '').trim().length < 3);
-  const missingArrayFields = requiredArrayFields.filter((key) => !Array.isArray(brief?.[key]) || brief[key].length < 1 || brief[key].some((item) => String(item || '').trim().length < 2));
-  const status = brief?.safetyStatus?.status;
+  const missingFields = [];
+  if (String(brief?.theme?.primary || '').trim().length < 3) missingFields.push('theme.primary');
+  if (!brief?.tone || typeof brief.tone !== 'object') missingFields.push('tone');
+  if (String(brief?.visualStyle?.styleFamily || '').trim().length < 3) missingFields.push('visualStyle.styleFamily');
+  for (const key of ['species', 'factions', 'cultures', 'techFlavor']) {
+    const value = brief?.civilizationFlavor?.[key];
+    if (!Array.isArray(value) || value.length < 1 || value.some((item) => String(item || '').trim().length < 2)) {
+      missingFields.push(`civilizationFlavor.${key}`);
+    }
+  }
+  const status = brief?.safety?.status;
   const rawInstructionPaths = findRawPromptInstructionPaths(brief);
   const secretLikePaths = findSecretLikePaths(brief);
+  const schemaReport = SCHEMA_REGISTRY?.generationBrief
+    ? validateGeneratedSchema(brief, SCHEMA_REGISTRY.generationBrief, '$.generationBrief')
+    : { ok: true, errors: [] };
   const checks = [
     {
       id: 'GENBRIEF_SCHEMA_VERSION',
@@ -782,22 +897,29 @@ function validateGenerationBrief(brief = {}) {
     },
     {
       id: 'GENBRIEF_CORE_FIELDS',
-      passed: missingStringFields.length === 0 && missingArrayFields.length === 0,
-      measured: { missingStringFields, missingArrayFields }
+      passed: missingFields.length === 0,
+      measured: { missingFields }
     },
     {
       id: 'GENBRIEF_HUMOR_LEVEL_ENUM',
-      passed: ['none', 'low', 'medium', 'medium-high', 'high'].includes(String(brief?.humorLevel || '')),
+      passed: ['none', 'subtle', 'playful', 'absurd-but-safe'].includes(String(brief?.humorLevel || '')),
       measured: { humorLevel: brief?.humorLevel || null }
     },
     {
       id: 'GENBRIEF_SAFETY_STATUS_VALID',
-      passed: ['safe', 'rewritten', 'blocked'].includes(String(status || '')) && brief?.safetyStatus?.deterministicFallbackAllowed === true,
+      passed: ['passed', 'needs_review', 'rejected'].includes(String(status || ''))
+        && brief?.safety?.normalizedForRuntime === true
+        && brief?.safety?.rawPromptExecutable === false,
       measured: {
         status: status || null,
-        deterministicFallbackAllowed: brief?.safetyStatus?.deterministicFallbackAllowed === true,
-        safetyRewriteApplied: brief?.safetyStatus?.safetyRewriteApplied === true
+        normalizedForRuntime: brief?.safety?.normalizedForRuntime === true,
+        rawPromptExecutable: brief?.safety?.rawPromptExecutable === true
       }
+    },
+    {
+      id: 'GENBRIEF_JSON_SCHEMA_VALID',
+      passed: schemaReport.ok === true,
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
     },
     {
       id: 'GENBRIEF_NO_RAW_EXECUTABLE_INSTRUCTIONS',
@@ -814,10 +936,10 @@ function validateGenerationBrief(brief = {}) {
     ok: checks.every((check) => check.passed === true),
     checks,
     metrics: {
-      safetyRewriteApplied: brief?.safetyStatus?.safetyRewriteApplied === true,
-      blockedPatternCount: Array.isArray(brief?.safetyStatus?.blockedPatternIds) ? brief.safetyStatus.blockedPatternIds.length : 0,
-      sensitivePatternCount: Array.isArray(brief?.safetyStatus?.sensitivePatternIds) ? brief.safetyStatus.sensitivePatternIds.length : 0,
-      structuredDimensionCount: requiredStringFields.length + requiredArrayFields.length + 2
+      safetyNeedsReview: brief?.safety?.status === 'needs_review',
+      safetyReasonCount: Array.isArray(brief?.safety?.reasons) ? brief.safety.reasons.length : 0,
+      structuredDimensionCount: 9,
+      schemaErrorCount: schemaReport.errors.length
     }
   };
 }
@@ -887,35 +1009,41 @@ function validateAssetManifest(manifest = {}, pack = {}) {
 
 function assetPlanProblems(asset = {}, index = 0, packId = '') {
   const problems = [];
-  if (!String(asset.assetPlanId || '').startsWith(`${packId}:`)) problems.push('invalid-asset-plan-id');
+  if (!String(asset.promptId || '').startsWith(`${packId}:`)) problems.push('invalid-prompt-id');
   if (!VALID_ASSET_PLAN_TARGETS.has(String(asset.canonicalTarget || ''))) problems.push('invalid-canonical-target');
   if (!/^[0-9a-f]{64}$/.test(String(asset.promptHash || ''))) problems.push('invalid-prompt-hash');
   if (!asset.targetSize || !Number.isInteger(asset.targetSize.width) || !Number.isInteger(asset.targetSize.height)) problems.push('invalid-target-size');
-  if (!isSafeRelativePath(asset.promptFile) || !String(asset.promptFile || '').startsWith(`specs/prompts/generated-universe-packs/${packId}/`)) problems.push('invalid-prompt-file');
+  if (!['terrain-texture', 'building-billboard', 'resource-icon', 'character-sprite', 'ui-ornament', 'postcard'].includes(String(asset.targetKind || ''))) problems.push('invalid-target-kind');
+  if (String(asset.promptText || '').trim().length < 80) problems.push('missing-prompt-text');
   if (!isSafeRelativePath(asset.usagePath) || !String(asset.usagePath || '').startsWith(`public/experiences/world-grid/generated/${packId}/`)) problems.push('invalid-usage-path');
   if (String(asset.negativePrompt || '').trim().length < 12) problems.push('missing-negative-prompt');
-  if (!isSafeRelativePath(asset.candidateFolder)) problems.push('invalid-candidate-folder');
-  const outputPaths = Array.isArray(asset.candidateOutputPaths) ? asset.candidateOutputPaths : [];
-  if (outputPaths.length < 1 || outputPaths.some((item) => !isSafeRelativePath(item) || !String(item).startsWith(`${asset.candidateFolder}/`))) {
-    problems.push('invalid-candidate-output-paths');
-  }
+  if (!isSafeRelativePath(asset.candidateOutputPath) || !String(asset.candidateOutputPath || '').includes(`/${packId}/candidates/`)) problems.push('invalid-candidate-output-path');
+  if (!isSafeRelativePath(asset.approvedOutputPath) || !String(asset.approvedOutputPath || '').includes(`/${packId}/approved/`)) problems.push('invalid-approved-output-path');
   if (!isSafeRelativePath(asset.jobLogPath) || !String(asset.jobLogPath || '').endsWith('.jsonl')) problems.push('invalid-job-log-path');
-  return problems.length ? { index, assetPlanId: asset.assetPlanId || null, canonicalTarget: asset.canonicalTarget || null, problems } : null;
+  return problems.length ? { index, promptId: asset.promptId || null, canonicalTarget: asset.canonicalTarget || null, problems } : null;
 }
 
 function validateAssetPromptPlan(plan = {}, pack = {}) {
-  const assets = Array.isArray(plan?.assets) ? plan.assets : [];
-  const problems = assets
+  const targets = Array.isArray(plan?.targets) ? plan.targets : [];
+  const problems = targets
     .map((asset, index) => assetPlanProblems(asset, index, pack?.packId || plan?.packId || ''))
     .filter(Boolean);
-  const targets = assets.map((asset) => asset.canonicalTarget).filter(Boolean);
-  const missingTargets = IMAGE_PLAN_TARGETS.filter((target) => !targets.includes(target));
-  const duplicateTargets = targets.filter((target, index, all) => all.indexOf(target) !== index);
+  const targetIds = targets.map((asset) => asset.canonicalTarget).filter(Boolean);
+  const missingTargets = ASSET_PROMPT_TARGETS.filter((target) => !targetIds.includes(target));
+  const duplicateTargets = targetIds.filter((target, index, all) => all.indexOf(target) !== index);
+  const schemaReport = SCHEMA_REGISTRY?.assetPromptPlan
+    ? validateGeneratedSchema(plan, SCHEMA_REGISTRY.assetPromptPlan, '$.assetPromptPlan')
+    : { ok: true, errors: [] };
   const checks = [
     {
       id: 'ASSET_PROMPT_PLAN_SCHEMA_VERSION',
       passed: plan?.schemaVersion === ASSET_PROMPT_PLAN_VERSION,
       measured: { schemaVersion: plan?.schemaVersion || null }
+    },
+    {
+      id: 'ASSET_PROMPT_PLAN_JSON_SCHEMA_VALID',
+      passed: schemaReport.ok === true,
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
     },
     {
       id: 'ASSET_PROMPT_PLAN_PACK_MATCH',
@@ -925,20 +1053,21 @@ function validateAssetPromptPlan(plan = {}, pack = {}) {
     {
       id: 'ASSET_PROMPT_PLAN_TARGET_COVERAGE',
       passed: missingTargets.length === 0 && duplicateTargets.length === 0,
-      measured: { required: IMAGE_PLAN_TARGETS.length, covered: new Set(targets).size, missingTargets, duplicateTargets: [...new Set(duplicateTargets)] }
+      measured: { required: ASSET_PROMPT_TARGETS.length, covered: new Set(targetIds).size, missingTargets, duplicateTargets: [...new Set(duplicateTargets)] }
     },
     {
       id: 'ASSET_PROMPT_PLAN_ENTRIES_VALID',
-      passed: assets.length === IMAGE_PLAN_TARGETS.length && problems.length === 0,
-      measured: { assetCount: assets.length, problems }
+      passed: targets.length === ASSET_PROMPT_TARGETS.length && problems.length === 0,
+      measured: { targetCount: targets.length, problems }
     },
     {
       id: 'ASSET_PROMPT_PLAN_NO_PRODUCTION_DEPENDENCY',
-      passed: plan?.generationModel?.externalModelUsed === false && plan?.generationModel?.explicitConsentRequired === true && plan?.generationModel?.productionImageAssetsRequired === false,
+      passed: ['gpt-image-2-candidate', 'deterministic-fallback'].includes(String(plan?.modelFamily || ''))
+        && targets.every((target) => target.status === 'planned-not-generated')
+        && targets.every((target) => !String(target.approvedOutputPath || '').endsWith('.png')),
       measured: {
-        externalModelUsed: plan?.generationModel?.externalModelUsed === true,
-        explicitConsentRequired: plan?.generationModel?.explicitConsentRequired === true,
-        productionImageAssetsRequired: plan?.generationModel?.productionImageAssetsRequired === true
+        modelFamily: plan?.modelFamily || null,
+        approvedTargetCount: targets.filter((target) => target.status !== 'planned-not-generated').length
       }
     }
   ];
@@ -946,10 +1075,10 @@ function validateAssetPromptPlan(plan = {}, pack = {}) {
     ok: checks.every((check) => check.passed === true),
     checks,
     metrics: {
-      plannedAssetCount: assets.length,
+      plannedAssetCount: targets.length,
       invalidPlanAssetCount: problems.length,
-      promptHashCount: new Set(assets.map((asset) => asset.promptHash).filter(Boolean)).size,
-      candidateOutputPathCount: assets.reduce((sum, asset) => sum + (Array.isArray(asset.candidateOutputPaths) ? asset.candidateOutputPaths.length : 0), 0),
+      promptHashCount: new Set(targets.map((asset) => asset.promptHash).filter(Boolean)).size,
+      candidateOutputPathCount: targets.filter((asset) => asset.candidateOutputPath).length,
       productionImageAssetsRequired: false
     }
   };
@@ -990,12 +1119,25 @@ function validateGeneratedPack(pack) {
   const generationBriefReport = validateGenerationBrief(pack?.generationBrief || {});
   const assetManifestReport = validateAssetManifest(pack?.assetManifest || {}, pack);
   const assetPromptPlanReport = validateAssetPromptPlan(pack?.assetPromptPlan || {}, pack);
+  const schemaValidationReport = validateGeneratedPackSchemas(
+    pack?.validationReport ? pack : { ...pack, validationReport: { ok: true } },
+    SCHEMA_REGISTRY
+  );
   const scaffold = pack?.assetScaffold || {};
   const checks = [
     {
       id: 'GENPACK_SCHEMA_VERSION',
       passed: pack?.schemaVersion === SCHEMA_VERSION,
       measured: { schemaVersion: pack?.schemaVersion || null }
+    },
+    {
+      id: 'GENPACK_JSON_SCHEMA_VALID',
+      passed: schemaValidationReport.ok === true,
+      measured: {
+        schemaCount: schemaValidationReport.metrics.schemaCount,
+        schemaErrorCount: schemaValidationReport.metrics.schemaErrorCount,
+        errors: schemaValidationReport.errors.slice(0, 10)
+      }
     },
     {
       id: 'GENPACK_PROMPT_HASHED',
@@ -1057,8 +1199,8 @@ function validateGeneratedPack(pack) {
       id: 'GENPACK_ASSET_SCAFFOLD_READY',
       passed: scaffold?.schemaVersion === ASSET_SCAFFOLD_VERSION
         && scaffold?.packId === pack?.packId
-        && Number(scaffold?.candidateFolderCount || 0) === IMAGE_PLAN_TARGETS.length
-        && Number(scaffold?.jobLogCount || 0) === IMAGE_PLAN_TARGETS.length
+        && Number(scaffold?.candidateFolderCount || 0) === ASSET_PROMPT_TARGETS.length
+        && Number(scaffold?.jobLogCount || 0) === ASSET_PROMPT_TARGETS.length
         && Number(scaffold?.productionImageAssetCount || 0) === 0
         && scaffold?.externalModelUsed === false,
       measured: {
@@ -1095,7 +1237,11 @@ function validateGeneratedPack(pack) {
       fallbackAssetCount: manifestAssets.filter((asset) => asset.source === 'deterministic-fallback').length,
       generatedTextAssetCount: manifestAssets.filter((asset) => asset.kind === 'generated-text').length,
       generationBriefValid: generationBriefReport.ok === true,
-      assetPromptPlanCount: Array.isArray(pack?.assetPromptPlan?.assets) ? pack.assetPromptPlan.assets.length : 0,
+      schemaRegistryExists: true,
+      jsonSchemaRunnerExists: true,
+      schemasValidatedIndependently: schemaValidationReport.metrics.schemasValidatedIndependently,
+      schemaValidationErrorCount: schemaValidationReport.metrics.schemaErrorCount,
+      assetPromptPlanCount: Array.isArray(pack?.assetPromptPlan?.targets) ? pack.assetPromptPlan.targets.length : 0,
       candidateOutputPathCount: assetPromptPlanReport.metrics.candidateOutputPathCount,
       jobLogCount: Number(pack?.assetScaffold?.jobLogCount || 0),
       invalidAssetManifestEntries: assetManifestReport.metrics.invalidAssetCount,
@@ -1103,7 +1249,7 @@ function validateGeneratedPack(pack) {
       productionImageCandidatesRequired: true,
       productionImageAssetsRequired: false,
       replayabilitySignature: sha256(JSON.stringify({
-        theme: pack?.generationBrief?.theme || '',
+        theme: pack?.generationBrief?.theme?.primary || '',
         palette: pack?.stylePack?.palette || {},
         mappings: mappings.map((mapping) => [mapping.canonicalId, mapping.generatedName])
       })).slice(0, 16)
@@ -1200,13 +1346,14 @@ function createGeneratedPack({ owner, prompt, nowMs = Date.now(), candidateRoot 
     },
     prompt: {
       hash: promptHash,
-      length: generationBrief.metrics.promptLength,
+      length: generationBrief.promptLength,
       keywordHints: words.slice(0, 6)
     },
     generationBrief,
     stylePack: {
       schemaVersion: 'agent-town-style-bible-v1',
       stylePackId: `style_${preset.id}_${packHash.slice(0, 8)}`,
+      promptHash,
       name: `${anchor} ${preset.name}`,
       themeSummary: `${anchor} and ${second} motifs translated into warm frontier materials.`,
       palette: clone(preset.palette),
@@ -1215,22 +1362,41 @@ function createGeneratedPack({ owner, prompt, nowMs = Date.now(), candidateRoot 
         { target: 'home-settlement-marker', rule: 'primary color with warm light contact shadow' },
         { target: 'selection-ring', rule: 'selected color with high contrast against terrain' }
       ],
+      silhouetteRules: [
+        'buildings use one readable primary silhouette per canonical target',
+        'terrain textures must remain legible under ownership overlays',
+        'resource icons stay distinct at 32px'
+      ],
       uiRules: {
         minReadableTextPx: 16,
         onePrimaryAction: true,
         normalGameplayDebugJargon: false
-      }
+      },
+      animationRules: [
+        'motion is cosmetic only',
+        'reduced-motion mode may disable all ambient animation',
+        'selection feedback must not obscure cell labels'
+      ]
     },
     universePack: {
       schemaVersion: 'agent-town-universe-bible-v1',
       universePackId: `universe_${packHash.slice(0, 12)}`,
+      promptHash,
       name: `${anchor} ${second} Charter`,
       pitch: `${anchor} settlers and ${second} crews build a civic frontier with Clover keeping the work bounded and legible.`,
       playerRole: `${anchor} founder`,
       cloverRole: 'Clover remains the trusted Foreman and explains each bounded action in-world.',
+      species: [
+        { id: 'species_settlers', name: `${anchor} settlers`, description: 'Readable frontier citizens who keep the settlement grounded in canonical Agent Town work.' },
+        { id: 'species_crews', name: `${second} crews`, description: 'Theme-flavored helpers who add presentation flavor without adding autonomous mechanics.' }
+      ],
       factions: [
         { factionId: 'faction_settlers', name: `${anchor} Settlers`, role: 'home-builders', line: `They want ${index['resource.food'].generatedName.toLowerCase()} and a steady route outward.` },
         { factionId: 'faction_crews', name: `${second} Crews`, role: 'makers', line: `They turn ${index['resource.wood'].generatedName.toLowerCase()} and ${index['resource.stone'].generatedName.toLowerCase()} into practical town work.` }
+      ],
+      cultures: [
+        { cultureId: 'culture_craft', name: `${anchor} craft habit`, civicHabit: 'plan one route, explain the cost, then complete the bounded claim.' },
+        { cultureId: 'culture_route', name: `${second} route custom`, civicHabit: 'keep maps legible and make every generated label traceable to a canonical key.' }
       ],
       techs: [
         { techId: 'tech_route_signals', name: `${second} Route Signals`, unlockIntent: 'makes claim planning visually clearer' },
@@ -1256,7 +1422,9 @@ function createGeneratedPack({ owner, prompt, nowMs = Date.now(), candidateRoot 
       }
     },
     gameplayMapping: {
+      schemaVersion: 'agent-town-gameplay-mapping-v1',
       canonicalVersion: 'agent-town-world-grid-v1',
+      serverRuleOverrides: 0,
       canonicalEntities: mappings
     }
   };
@@ -1290,13 +1458,13 @@ function currentGeneratedPack(owner = {}) {
 function analyzePackDiversity(packs = []) {
   const safePacks = Array.isArray(packs) ? packs.filter(Boolean) : [];
   const signatures = safePacks.map((pack) => pack?.validationReport?.metrics?.replayabilitySignature || sha256(JSON.stringify({
-    theme: pack?.generationBrief?.theme || '',
+    theme: pack?.generationBrief?.theme?.primary || '',
     style: pack?.stylePack?.name || '',
     universe: pack?.universePack?.name || '',
     palette: pack?.stylePack?.palette || {}
   })).slice(0, 16));
   const uniquePackIds = new Set(safePacks.map((pack) => pack.packId).filter(Boolean));
-  const uniqueThemes = new Set(safePacks.map((pack) => pack.generationBrief?.theme).filter(Boolean));
+  const uniqueThemes = new Set(safePacks.map((pack) => pack.generationBrief?.theme?.primary).filter(Boolean));
   const uniquePalettes = new Set(safePacks.map((pack) => JSON.stringify(pack.stylePack?.palette || {})));
   const uniqueSignatures = new Set(signatures);
   const promptCount = safePacks.length;
@@ -1340,6 +1508,7 @@ module.exports = {
   normalizePrompt,
   recordPlaytestReport,
   scaffoldAssetGenerationJobs,
+  validateGeneratedPackSchemas,
   validateAssetManifest,
   validateAssetPromptPlan,
   validateGenerationBrief,

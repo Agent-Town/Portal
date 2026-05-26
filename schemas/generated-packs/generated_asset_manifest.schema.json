@@ -31,7 +31,7 @@
         "properties": {
           "assetId": { "type": "string", "minLength": 1 },
           "canonicalTarget": { "type": "string", "minLength": 3 },
-          "kind": { "enum": ["three-material", "shape-token", "billboard-sprite-candidate", "generated-text"] },
+          "kind": { "enum": ["three-material", "shape-token", "billboard-sprite-candidate", "ui-ornament-candidate", "postcard-candidate", "generated-text"] },
           "status": { "enum": ["runtime-generated", "fallback-ready", "candidate-planned", "planned-not-generated"] },
           "source": { "enum": ["deterministic-fallback", "candidate-scaffold"] },
           "promptHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }

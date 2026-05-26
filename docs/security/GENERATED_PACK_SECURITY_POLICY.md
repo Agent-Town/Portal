@@ -9,7 +9,9 @@ Status: prototype-gated
 - Generated packs cannot store raw prompts as executable instructions. Runtime packs store a prompt hash, safe keyword hints, and a structured `GenerationBrief`.
 - Generated packs cannot carry raw executable prompt instructions in generated copy, prompt metadata, asset manifests, or asset prompt-plan records.
 - Asset manifests and asset prompt plans are allowlisted by canonical target, relative path, prompt hash, size, status, source, and no-production-image policy.
+- Generated-pack subdocuments must pass the local schema registry independently before runtime validation can pass.
 - Generated packs cannot store provider credentials, API keys, access tokens, refresh tokens, wallet secrets, Brain vault data, private event logs, or account recovery material.
+- Scaffolded generation job logs must record `authMode=not_configured`, `externalImageGenerationUsed=false`, zero outputs, and no production approval until a separate consent/auth/cost model is approved.
 - Player-visible generated text must be escaped in DOM rendering.
 - Production image generation requires explicit consent and a documented cost/auth model before any user-facing release claim.
 
@@ -25,8 +27,12 @@ Status: prototype-gated
   "secretLeakCount": 0,
   "rawExecutablePromptInstructionCount": 0,
   "arbitraryToolMutationFormulaCount": 0,
-  "candidateFolderCount": 20,
-  "generationJobLogCount": 20,
+  "schemaRegistryExists": true,
+  "schemasValidatedIndependently": true,
+  "dangerousFieldRejectCountMin": 20,
+  "candidateFolderCount": 23,
+  "generationJobLogCount": 23,
+  "jobLogsReplayableFromPromptPlan": true,
   "productionImageAssetCount": 0,
   "externalImageModelUsed": false,
   "explicitConsentRequiredForImageGeneration": true,
