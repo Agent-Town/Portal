@@ -35,6 +35,9 @@ Civic institution charter foundation:
 Public works shared resources foundation:
 `specs/65_agent_town_v6_public_works_shared_resources_foundation.md`
 
+Modal lab surface foundation:
+`specs/66_agent_town_v6_modal_lab_surface_foundation.md`
+
 V6.0 Agent Civilization Foundation must not become player-visible until every
 gate below has implementation, deterministic tests, and security/product signoff.
 
@@ -52,6 +55,10 @@ gate below has implementation, deterministic tests, and security/product signoff
 - Research-only civic tool drafts may exist in
   `server/world_civilization/tools.js`, but they must be non-executing,
   hidden from runtime `/api/world/tools`, and covered by contract tests.
+- The research-only modal lab surface contract may exist in
+  `server/world_civilization/lab_surface.js`, but it must stay route-neutral,
+  modal-first, hidden from players, non-executing, and covered by contract
+  tests.
 
 ## Prerequisites
 
@@ -119,6 +126,13 @@ gate below has implementation, deterministic tests, and security/product signoff
   `server/world_civilization/public_works.js`; release still requires governed
   project creation, wallet/session route auth, explicit private-inventory spend,
   rollback execution, and reward conservation tests.
+- Any internal V6 lab UI must launch from the town hub modal flow, preserve
+  page-scoped OpenClaw Lite worker continuity, keep Worker Tools, Skill Context,
+  Worker Traffic, Brain, and Session Context observable, and prove with
+  Playwright visual coverage that it has no standalone route or normal gameplay
+  exposure. Current contract-only coverage starts in
+  `server/world_civilization/lab_surface.js`; release still requires real modal
+  UI checks before any player-visible V6 lab work.
 - Privacy review must prove no private town state, wallet secret, Brain secret,
   provider credential, debug trace, or unapproved transcript enters civic
   surfaces.

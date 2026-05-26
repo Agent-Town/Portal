@@ -40,6 +40,9 @@ Civic institution charter foundation:
 Public works shared resources foundation:
 `specs/65_agent_town_v6_public_works_shared_resources_foundation.md`
 
+Modal lab surface foundation:
+`specs/66_agent_town_v6_modal_lab_surface_foundation.md`
+
 ## Implementation Boundary
 
 Do not add V6 civic mechanics to normal gameplay or the world-grid prototype
@@ -54,6 +57,12 @@ research-only civic tool draft in `server/world_civilization/tools.js` is
 non-executing and hidden from runtime `/api/world/tools`; runtime V6 civic
 tools and routes remain absent or disabled until the worker-first V6 tool
 surface and readiness gate are implemented.
+
+The research-only modal lab surface contract in
+`server/world_civilization/lab_surface.js` is route-neutral and non-executing.
+It does not add a V6 route or normal gameplay surface; it only records the
+modal-first, debug-observable constraints that any later internal V6 lab UI must
+meet.
 
 ## Goal
 
