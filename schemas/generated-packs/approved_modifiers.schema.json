@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-town-approved-modifiers-v1",
+  "title": "Agent Town Approved Modifier Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "canonicalVersion",
+    "allowedModifiers",
+    "selectedModifiers",
+    "modifierEffects",
+    "balanceSimulation"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "agent-town-approved-modifiers-v1"
+    },
+    "canonicalVersion": {
+      "const": "agent-town-world-grid-v1"
+    },
+    "allowedModifiers": {
+      "type": "array",
+      "minItems": 6,
+      "items": {
+        "enum": [
+          "visual_only",
+          "more_contract_flavor",
+          "requesters_prefer_food",
+          "extra_public_square_charm_text",
+          "ambient_weather_cosmetic",
+          "tutorial_copy_variant"
+        ]
+      }
+    },
+    "selectedModifiers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "enum": [
+          "visual_only",
+          "more_contract_flavor",
+          "requesters_prefer_food",
+          "extra_public_square_charm_text",
+          "ambient_weather_cosmetic",
+          "tutorial_copy_variant"
+        ]
+      }
+    },
+    "modifierEffects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "modifier",
+          "scope",
+          "appliesTo",
+          "effect",
+          "canonicalRuleImpact",
+          "formulaAllowed",
+          "mutationAllowed",
+          "resourceMathDelta"
+        ],
+        "properties": {
+          "modifier": {
+            "enum": [
+              "visual_only",
+              "more_contract_flavor",
+              "requesters_prefer_food",
+              "extra_public_square_charm_text",
+              "ambient_weather_cosmetic",
+              "tutorial_copy_variant"
+            ]
+          },
+          "scope": {
+            "enum": ["visual", "copy", "requester-flavor", "cosmetic"]
+          },
+          "appliesTo": {
+            "enum": ["region-grid", "contract-copy", "public-square-copy", "weather-layer", "tutorial-copy"]
+          },
+          "effect": {
+            "type": "string",
+            "minLength": 8
+          },
+          "canonicalRuleImpact": {
+            "const": "none"
+          },
+          "formulaAllowed": {
+            "const": false
+          },
+          "mutationAllowed": {
+            "const": false
+          },
+          "resourceMathDelta": {
+            "const": 0
+          }
+        }
+      }
+    },
+    "balanceSimulation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "simulationVersion",
+        "canonicalRulesPreserved",
+        "resourceFormulaChanges",
+        "toolMutationChanges",
+        "customPermissionChanges",
+        "firstLoopCompletable",
+        "canonicalClaimCostHash"
+      ],
+      "properties": {
+        "simulationVersion": {
+          "const": "agent-town-approved-modifier-balance-v1"
+        },
+        "canonicalRulesPreserved": {
+          "const": true
+        },
+        "resourceFormulaChanges": {
+          "const": 0
+        },
+        "toolMutationChanges": {
+          "const": 0
+        },
+        "customPermissionChanges": {
+          "const": 0
+        },
+        "firstLoopCompletable": {
+          "const": true
+        },
+        "canonicalClaimCostHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    }
+  }
+}

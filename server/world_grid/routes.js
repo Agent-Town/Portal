@@ -49,6 +49,7 @@ const {
   getPublicPackCard,
   importGeneratedPack,
   listPublicPackGallery,
+  projectApprovedModifierView,
   publishPublicPackCard,
   recordPlaytestReport,
   reloadGeneratedPack,
@@ -351,23 +352,27 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     }
     const claims = claimsForRegion(baseRegion.regionId);
     const region = applyClaimsToRegion(baseRegion, claims);
+    const claimsEnabled = isWorldGridFeatureEnabled(featureFlags, 'FEATURE_WORLD_GRID_V51_CLAIMS');
+    const claimOptionList = claimsEnabled ? claimOptions(region, claims) : [];
     const preferences = cameraPreferences.get(owner.regionId) || {
       selectedCellId: region.cells.find((cell) => cell.state === 'claimed')?.cellId || '',
       camera: { zoom: 'settlement', q: 0, r: 0 }
     };
     const generatedPacksEnabled = isWorldGridFeatureEnabled(featureFlags, 'FEATURE_WORLD_GRID_GENERATED_PACKS');
+    const generatedPack = generatedPacksEnabled ? currentGeneratedPack(owner) : null;
     return {
       identity,
       owner,
       featureFlags,
       region,
-      generatedPack: generatedPacksEnabled ? currentGeneratedPack(owner) : null,
+      generatedPack,
       generatedPackPlaytestReport: generatedPacksEnabled ? currentPlaytestReport(owner) : null,
+      generatedPackModifierView: generatedPacksEnabled && generatedPack
+        ? projectApprovedModifierView(generatedPack, { claimOptions: claimOptionList })
+        : null,
       territory: {
-        claimsEnabled: isWorldGridFeatureEnabled(featureFlags, 'FEATURE_WORLD_GRID_V51_CLAIMS'),
-        claimOptions: isWorldGridFeatureEnabled(featureFlags, 'FEATURE_WORLD_GRID_V51_CLAIMS')
-          ? claimOptions(region, claims)
-          : [],
+        claimsEnabled,
+        claimOptions: claimOptionList,
         claims
       },
       preferences

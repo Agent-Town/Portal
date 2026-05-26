@@ -102,6 +102,14 @@ Player prompt
 - Gallery entries require approval status, moderation metadata, reviewer signoff hash, pack tags, screenshot metadata, and asset-manifest summary.
 - Pending and rejected cards are hidden from the gallery; unpublished cards are removed from direct public-card lookup and gallery results.
 
+## GU-13 Approved Modifier Slice
+
+- `approved_modifiers.schema.json` defines the enum-only modifier contract.
+- `createGeneratedPack` selects from the approved modifier enum deterministically; generated packs cannot provide unknown modifiers.
+- `projectApprovedModifierView` produces presentation-only flavor/tutorial/cosmetic hints and copies claim costs unchanged.
+- Modifier validation rejects formula fields, custom resource math, mutation/tool authority, custom permissions, custom agent authority, and nonzero canonical rule impact.
+- Balance simulation requires the canonical claim-cost hash to remain unchanged and first-loop playability to remain true.
+
 ## Machine Checks
 
 ```json
@@ -177,6 +185,12 @@ Player prompt
   "approvedOnlyGallery": true,
   "moderationMetadataRequired": true,
   "pendingRejectedHidden": true,
-  "unpublishWorks": true
+  "unpublishWorks": true,
+  "approvedModifierSchemaExists": true,
+  "enumOnlyModifiers": true,
+  "formulaInjectionRejected": true,
+  "balanceSimulationPassed": true,
+  "canonicalRulesPreserved": true,
+  "claimCostHashPreserved": true
 }
 ```

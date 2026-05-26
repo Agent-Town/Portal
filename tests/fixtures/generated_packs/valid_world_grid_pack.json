@@ -368,6 +368,64 @@
       }
     ]
   },
+  "approvedModifiers": {
+    "schemaVersion": "agent-town-approved-modifiers-v1",
+    "canonicalVersion": "agent-town-world-grid-v1",
+    "allowedModifiers": [
+      "visual_only",
+      "more_contract_flavor",
+      "requesters_prefer_food",
+      "extra_public_square_charm_text",
+      "ambient_weather_cosmetic",
+      "tutorial_copy_variant"
+    ],
+    "selectedModifiers": [
+      "visual_only",
+      "requesters_prefer_food",
+      "extra_public_square_charm_text"
+    ],
+    "modifierEffects": [
+      {
+        "modifier": "visual_only",
+        "scope": "visual",
+        "appliesTo": "region-grid",
+        "effect": "Uses generated palette, labels, and asset fallbacks without changing region rules.",
+        "canonicalRuleImpact": "none",
+        "formulaAllowed": false,
+        "mutationAllowed": false,
+        "resourceMathDelta": 0
+      },
+      {
+        "modifier": "requesters_prefer_food",
+        "scope": "requester-flavor",
+        "appliesTo": "contract-copy",
+        "effect": "Lets requester copy mention food preferences without changing resource math.",
+        "canonicalRuleImpact": "none",
+        "formulaAllowed": false,
+        "mutationAllowed": false,
+        "resourceMathDelta": 0
+      },
+      {
+        "modifier": "extra_public_square_charm_text",
+        "scope": "copy",
+        "appliesTo": "public-square-copy",
+        "effect": "Adds one public-square charm line in generated surfaces only.",
+        "canonicalRuleImpact": "none",
+        "formulaAllowed": false,
+        "mutationAllowed": false,
+        "resourceMathDelta": 0
+      }
+    ],
+    "balanceSimulation": {
+      "simulationVersion": "agent-town-approved-modifier-balance-v1",
+      "canonicalRulesPreserved": true,
+      "resourceFormulaChanges": 0,
+      "toolMutationChanges": 0,
+      "customPermissionChanges": 0,
+      "firstLoopCompletable": true,
+      "canonicalClaimCostHash": "3460ff09f5a3c60a51c9842c7ac192e09f3280603e5a202062534cb3f8f05ecc"
+    }
+  },
   "assetManifest": {
     "schemaVersion": "agent-town-generated-asset-manifest-v1",
     "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",

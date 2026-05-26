@@ -9,6 +9,7 @@ const GENERATED_PACK_SCHEMA_FILES = {
   stylePack: 'style_bible.schema.json',
   universePack: 'universe_bible.schema.json',
   gameplayMapping: 'gameplay_mapping.schema.json',
+  approvedModifiers: 'approved_modifiers.schema.json',
   assetPromptPlan: 'asset_prompt_plan.schema.json',
   assetManifest: 'generated_asset_manifest.schema.json',
   generatedPack: 'generated_pack.schema.json',
@@ -121,6 +122,7 @@ function validateGeneratedPackSchemas(pack, registry = loadGeneratedPackSchemaRe
     stylePack: pack?.stylePack,
     universePack: pack?.universePack,
     gameplayMapping: pack?.gameplayMapping,
+    approvedModifiers: pack?.approvedModifiers,
     assetPromptPlan: pack?.assetPromptPlan,
     assetManifest: pack?.assetManifest,
     generatedPack: pack

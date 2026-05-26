@@ -33,6 +33,16 @@ test('generated universe pack loads into Three.js and completes the first world-
   expect(generatedPack?.assetPromptPlan?.targets?.every((asset) => asset.promptHash && asset.candidateOutputPath && asset.approvedOutputPath && asset.jobLogPath)).toBe(true);
   expect(generatedPack?.assetScaffold?.productionImageAssetCount).toBe(0);
   expect(generatedPack?.gameplayMapping?.canonicalEntities?.some((item) => item.canonicalId === 'resource.wood' && item.mechanicalKey === 'wood')).toBe(true);
+  expect(generatedPack?.approvedModifiers?.selectedModifiers?.length).toBeGreaterThan(0);
+  expect(generatedPack?.validationReport?.metrics?.enumOnlyModifiers).toBe(true);
+  expect(generatedPack?.validationReport?.metrics?.canonicalRulesPreserved).toBe(true);
+
+  const modifierPayload = await page.evaluate(async () => {
+    const response = await fetch('/api/world/region?worldGridFeatureFlags=all');
+    return response.json();
+  });
+  expect(modifierPayload?.generatedPackModifierView?.validationReport?.ok).toBe(true);
+  expect(modifierPayload?.generatedPackModifierView?.balanceSimulation?.resourceFormulaChanges).toBe(0);
 
   const sceneInfo = await page.evaluate(() => window.__worldGridTest.getSceneInfo());
   expect(sceneInfo?.renderer).toBe('three');

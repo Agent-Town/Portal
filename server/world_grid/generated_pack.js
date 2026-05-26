@@ -73,6 +73,55 @@ const IMAGE_PLAN_TARGETS = REQUIRED_CANONICAL_IDS.filter((id) => (
 ));
 
 const ASSET_PROMPT_TARGETS = [...IMAGE_PLAN_TARGETS, ...PRESENTATION_ASSET_TARGETS];
+const APPROVED_MODIFIERS_VERSION = 'agent-town-approved-modifiers-v1';
+const APPROVED_MODIFIER_BALANCE_VERSION = 'agent-town-approved-modifier-balance-v1';
+const APPROVED_MODIFIERS = [
+  'visual_only',
+  'more_contract_flavor',
+  'requesters_prefer_food',
+  'extra_public_square_charm_text',
+  'ambient_weather_cosmetic',
+  'tutorial_copy_variant'
+];
+const APPROVED_MODIFIER_EFFECTS = {
+  visual_only: {
+    scope: 'visual',
+    appliesTo: 'region-grid',
+    effect: 'Uses generated palette, labels, and asset fallbacks without changing region rules.'
+  },
+  more_contract_flavor: {
+    scope: 'copy',
+    appliesTo: 'contract-copy',
+    effect: 'Adds themed contract wording while preserving canonical claim costs and states.'
+  },
+  requesters_prefer_food: {
+    scope: 'requester-flavor',
+    appliesTo: 'contract-copy',
+    effect: 'Lets requester copy mention food preferences without changing resource math.'
+  },
+  extra_public_square_charm_text: {
+    scope: 'copy',
+    appliesTo: 'public-square-copy',
+    effect: 'Adds one public-square charm line in generated surfaces only.'
+  },
+  ambient_weather_cosmetic: {
+    scope: 'cosmetic',
+    appliesTo: 'weather-layer',
+    effect: 'Allows ambient weather language and presentation tinting with no mechanical weather pressure.'
+  },
+  tutorial_copy_variant: {
+    scope: 'copy',
+    appliesTo: 'tutorial-copy',
+    effect: 'Uses a generated first-loop tutorial phrasing while keeping the same required action.'
+  }
+};
+const CANONICAL_CLAIM_COST_TABLE = {
+  prairie: { coin: 3 },
+  ridge: { coin: 4 },
+  river: { coin: 4 },
+  forest: { coin: 2 },
+  mesa: { coin: 3 }
+};
 const REPLAYABILITY_PROMPT_SUITE = [
   'cozy mushroom frontier with clockwork gardeners and lantern moss',
   'brass moonrail desert town with prairie dog engineers',
@@ -321,6 +370,10 @@ const publicCardStore = new Map();
 
 function sha256(value = '') {
   return crypto.createHash('sha256').update(String(value || '')).digest('hex');
+}
+
+function canonicalClaimCostHash() {
+  return sha256(JSON.stringify(CANONICAL_CLAIM_COST_TABLE));
 }
 
 function clone(value) {
@@ -1236,6 +1289,215 @@ function validateAssetPromptPlan(plan = {}, pack = {}) {
   };
 }
 
+function modifierEffectFor(modifier = '') {
+  const base = APPROVED_MODIFIER_EFFECTS[modifier] || APPROVED_MODIFIER_EFFECTS.visual_only;
+  return {
+    modifier,
+    scope: base.scope,
+    appliesTo: base.appliesTo,
+    effect: base.effect,
+    canonicalRuleImpact: 'none',
+    formulaAllowed: false,
+    mutationAllowed: false,
+    resourceMathDelta: 0
+  };
+}
+
+function selectApprovedModifiers(words = [], packHash = '') {
+  const lowerWords = new Set((Array.isArray(words) ? words : [])
+    .map((word) => String(word || '').toLowerCase())
+    .filter(Boolean));
+  const selected = ['visual_only'];
+  if (['contract', 'trade', 'worker', 'market', 'charter'].some((word) => lowerWords.has(word))) {
+    selected.push('more_contract_flavor');
+  }
+  if (['food', 'farm', 'garden', 'tea', 'harbor', 'mushroom'].some((word) => lowerWords.has(word))) {
+    selected.push('requesters_prefer_food');
+  }
+  if (['square', 'town', 'cozy', 'lantern', 'winter'].some((word) => lowerWords.has(word))) {
+    selected.push('extra_public_square_charm_text');
+  }
+  if (['weather', 'winter', 'mist', 'sky', 'cloud', 'rain'].some((word) => lowerWords.has(word))) {
+    selected.push('ambient_weather_cosmetic');
+  }
+  if (selected.length < 3 || Number.parseInt(String(packHash || '0').slice(0, 2), 16) % 2 === 0) {
+    selected.push('tutorial_copy_variant');
+  }
+  return [...new Set(selected)].filter((modifier) => APPROVED_MODIFIERS.includes(modifier)).slice(0, 4);
+}
+
+function buildApprovedModifiers({ words = [], packHash = '' } = {}) {
+  const selectedModifiers = selectApprovedModifiers(words, packHash);
+  return {
+    schemaVersion: APPROVED_MODIFIERS_VERSION,
+    canonicalVersion: 'agent-town-world-grid-v1',
+    allowedModifiers: [...APPROVED_MODIFIERS],
+    selectedModifiers,
+    modifierEffects: selectedModifiers.map(modifierEffectFor),
+    balanceSimulation: {
+      simulationVersion: APPROVED_MODIFIER_BALANCE_VERSION,
+      canonicalRulesPreserved: true,
+      resourceFormulaChanges: 0,
+      toolMutationChanges: 0,
+      customPermissionChanges: 0,
+      firstLoopCompletable: true,
+      canonicalClaimCostHash: canonicalClaimCostHash()
+    }
+  };
+}
+
+function validateApprovedModifiers(modifiers = {}) {
+  const schemaReport = SCHEMA_REGISTRY?.approvedModifiers
+    ? validateGeneratedSchema(modifiers, SCHEMA_REGISTRY.approvedModifiers, '$.approvedModifiers')
+    : { ok: true, errors: [] };
+  const allowed = Array.isArray(modifiers?.allowedModifiers) ? modifiers.allowedModifiers : [];
+  const selected = Array.isArray(modifiers?.selectedModifiers) ? modifiers.selectedModifiers : [];
+  const effects = Array.isArray(modifiers?.modifierEffects) ? modifiers.modifierEffects : [];
+  const unknownAllowed = allowed.filter((modifier) => !APPROVED_MODIFIERS.includes(modifier));
+  const unknownSelected = selected.filter((modifier) => !APPROVED_MODIFIERS.includes(modifier));
+  const duplicateSelected = selected.filter((modifier, index, all) => modifier && all.indexOf(modifier) !== index);
+  const missingAllowed = APPROVED_MODIFIERS.filter((modifier) => !allowed.includes(modifier));
+  const effectModifiers = effects.map((effect) => effect.modifier).filter(Boolean);
+  const missingEffects = selected.filter((modifier) => !effectModifiers.includes(modifier));
+  const unsafeEffects = effects.filter((effect) => (
+    effect.canonicalRuleImpact !== 'none'
+    || effect.formulaAllowed !== false
+    || effect.mutationAllowed !== false
+    || Number(effect.resourceMathDelta || 0) !== 0
+  ));
+  const forbiddenAuthorityPaths = findForbiddenAuthorityPaths(modifiers);
+  const rawInstructionPaths = findRawPromptInstructionPaths(modifiers);
+  const balance = modifiers?.balanceSimulation || {};
+  const checks = [
+    {
+      id: 'APPROVED_MODIFIERS_SCHEMA_VALID',
+      passed: schemaReport.ok === true,
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
+    },
+    {
+      id: 'APPROVED_MODIFIERS_ENUM_ONLY',
+      passed: modifiers?.schemaVersion === APPROVED_MODIFIERS_VERSION
+        && allowed.length === APPROVED_MODIFIERS.length
+        && new Set(allowed).size === APPROVED_MODIFIERS.length
+        && unknownAllowed.length === 0
+        && unknownSelected.length === 0
+        && missingAllowed.length === 0
+        && duplicateSelected.length === 0
+        && selected.length > 0,
+      measured: {
+        allowedCount: allowed.length,
+        selectedCount: selected.length,
+        unknownAllowed,
+        unknownSelected,
+        missingAllowed,
+        duplicateSelected: [...new Set(duplicateSelected)]
+      }
+    },
+    {
+      id: 'APPROVED_MODIFIERS_EFFECTS_BOUNDED',
+      passed: missingEffects.length === 0 && unsafeEffects.length === 0 && effects.length === selected.length,
+      measured: {
+        effectCount: effects.length,
+        missingEffects,
+        unsafeEffectCount: unsafeEffects.length
+      }
+    },
+    {
+      id: 'APPROVED_MODIFIERS_NO_FORMULA_OR_AUTHORITY',
+      passed: forbiddenAuthorityPaths.length === 0 && rawInstructionPaths.length === 0,
+      measured: {
+        forbiddenAuthorityPaths,
+        rawInstructionPaths: rawInstructionPaths.slice(0, 5)
+      }
+    },
+    {
+      id: 'APPROVED_MODIFIERS_BALANCE_SIMULATION_PASSED',
+      passed: balance?.simulationVersion === APPROVED_MODIFIER_BALANCE_VERSION
+        && balance?.canonicalRulesPreserved === true
+        && Number(balance?.resourceFormulaChanges || 0) === 0
+        && Number(balance?.toolMutationChanges || 0) === 0
+        && Number(balance?.customPermissionChanges || 0) === 0
+        && balance?.firstLoopCompletable === true
+        && balance?.canonicalClaimCostHash === canonicalClaimCostHash(),
+      measured: {
+        canonicalRulesPreserved: balance?.canonicalRulesPreserved === true,
+        resourceFormulaChanges: Number(balance?.resourceFormulaChanges || 0),
+        toolMutationChanges: Number(balance?.toolMutationChanges || 0),
+        customPermissionChanges: Number(balance?.customPermissionChanges || 0),
+        firstLoopCompletable: balance?.firstLoopCompletable === true,
+        canonicalClaimCostHash: balance?.canonicalClaimCostHash || null
+      }
+    }
+  ];
+  return {
+    ok: checks.every((check) => check.passed === true),
+    checks,
+    metrics: {
+      enumOnlyModifiers: checks.find((check) => check.id === 'APPROVED_MODIFIERS_ENUM_ONLY')?.passed === true,
+      formulaInjectionRejected: checks.find((check) => check.id === 'APPROVED_MODIFIERS_NO_FORMULA_OR_AUTHORITY')?.passed === true,
+      balanceSimulationPassed: checks.find((check) => check.id === 'APPROVED_MODIFIERS_BALANCE_SIMULATION_PASSED')?.passed === true,
+      canonicalRulesPreserved: balance?.canonicalRulesPreserved === true,
+      selectedModifierCount: selected.length,
+      unknownModifierCount: unknownAllowed.length + unknownSelected.length,
+      resourceFormulaChanges: Number(balance?.resourceFormulaChanges || 0)
+    }
+  };
+}
+
+function stableCostHash(costs = []) {
+  return sha256(JSON.stringify(costs.map((entry) => ({
+    optionId: entry.optionId || '',
+    cellId: entry.cellId || '',
+    cost: entry.cost || {}
+  })).sort((a, b) => a.optionId.localeCompare(b.optionId) || a.cellId.localeCompare(b.cellId))));
+}
+
+function projectApprovedModifierView(pack = {}, { claimOptions = [] } = {}) {
+  const modifierReport = validateApprovedModifiers(pack?.approvedModifiers || {});
+  const selectedModifiers = Array.isArray(pack?.approvedModifiers?.selectedModifiers)
+    ? pack.approvedModifiers.selectedModifiers.filter((modifier) => APPROVED_MODIFIERS.includes(modifier))
+    : [];
+  const beforeCostHash = stableCostHash(claimOptions);
+  const projectedClaimOptions = (Array.isArray(claimOptions) ? claimOptions : []).map((option) => ({
+    optionId: option.optionId,
+    cellId: option.cellId,
+    cost: clone(option.cost || {}),
+    flavorText: selectedModifiers.includes('more_contract_flavor')
+      ? `${pack?.universePack?.name || 'Generated pack'} frames this as a themed route contract.`
+      : '',
+    requesterHint: selectedModifiers.includes('requesters_prefer_food')
+      ? 'Requester copy may prefer food in flavor text only.'
+      : ''
+  }));
+  const afterCostHash = stableCostHash(projectedClaimOptions);
+  return {
+    schemaVersion: 'agent-town-approved-modifier-view-v1',
+    packId: pack?.packId || '',
+    selectedModifiers,
+    tutorialCopy: selectedModifiers.includes('tutorial_copy_variant')
+      ? String(pack?.universePack?.firstLoop?.objective || '')
+      : '',
+    publicSquareCharmText: selectedModifiers.includes('extra_public_square_charm_text')
+      ? String(pack?.universePack?.text?.publicPresenceTitle || pack?.universePack?.name || '')
+      : '',
+    ambientWeatherText: selectedModifiers.includes('ambient_weather_cosmetic')
+      ? `${pack?.generationBrief?.theme?.primary || 'Gentle'} ambient weather remains cosmetic.`
+      : '',
+    projectedClaimOptions,
+    balanceSimulation: {
+      simulationVersion: APPROVED_MODIFIER_BALANCE_VERSION,
+      canonicalRulesPreserved: beforeCostHash === afterCostHash && modifierReport.metrics.canonicalRulesPreserved === true,
+      resourceFormulaChanges: beforeCostHash === afterCostHash ? 0 : 1,
+      toolMutationChanges: 0,
+      customPermissionChanges: 0,
+      firstLoopCompletable: modifierReport.metrics.balanceSimulationPassed === true,
+      canonicalClaimCostHash: canonicalClaimCostHash(),
+      projectedClaimCostHash: afterCostHash
+    },
+    validationReport: modifierReport
+  };
+}
+
 function validateGeneratedPack(pack) {
   const mappings = pack?.gameplayMapping?.canonicalEntities || [];
   const mappingIds = new Set(mappings.map((mapping) => mapping.canonicalId));
@@ -1269,6 +1531,7 @@ function validateGeneratedPack(pack) {
     .map((mapping) => mapping.canonicalId)
     .filter((canonicalId, index, all) => canonicalId && all.indexOf(canonicalId) !== index);
   const generationBriefReport = validateGenerationBrief(pack?.generationBrief || {});
+  const approvedModifiersReport = validateApprovedModifiers(pack?.approvedModifiers || {});
   const assetManifestReport = validateAssetManifest(pack?.assetManifest || {}, pack);
   const assetPromptPlanReport = validateAssetPromptPlan(pack?.assetPromptPlan || {}, pack);
   const schemaValidationReport = validateGeneratedPackSchemas(
@@ -1311,6 +1574,11 @@ function validateGeneratedPack(pack) {
       id: 'GENPACK_CANONICAL_KEYS_PRESERVED',
       passed: mechanicalMissing.length === 0 && Number(pack?.gameplayMapping?.serverRuleOverrides || 0) === 0,
       measured: { missingMechanicalKeys: mechanicalMissing, serverRuleOverrides: pack?.gameplayMapping?.serverRuleOverrides || 0 }
+    },
+    {
+      id: 'GENPACK_APPROVED_MODIFIERS_VALID',
+      passed: approvedModifiersReport.ok === true,
+      measured: approvedModifiersReport.metrics
     },
     {
       id: 'GENPACK_NO_MUTATION_AUTHORITY',
@@ -1389,6 +1657,11 @@ function validateGeneratedPack(pack) {
       fallbackAssetCount: manifestAssets.filter((asset) => asset.source === 'deterministic-fallback').length,
       generatedTextAssetCount: manifestAssets.filter((asset) => asset.kind === 'generated-text').length,
       generationBriefValid: generationBriefReport.ok === true,
+      enumOnlyModifiers: approvedModifiersReport.metrics.enumOnlyModifiers,
+      formulaInjectionRejected: approvedModifiersReport.checks.find((check) => check.id === 'APPROVED_MODIFIERS_NO_FORMULA_OR_AUTHORITY')?.passed === true,
+      balanceSimulationPassed: approvedModifiersReport.metrics.balanceSimulationPassed,
+      canonicalRulesPreserved: approvedModifiersReport.metrics.canonicalRulesPreserved,
+      selectedModifierCount: approvedModifiersReport.metrics.selectedModifierCount,
       schemaRegistryExists: true,
       jsonSchemaRunnerExists: true,
       schemasValidatedIndependently: schemaValidationReport.metrics.schemasValidatedIndependently,
@@ -1753,7 +2026,8 @@ function createGeneratedPack({
       canonicalVersion: 'agent-town-world-grid-v1',
       serverRuleOverrides: 0,
       canonicalEntities: mappings
-    }
+    },
+    approvedModifiers: buildApprovedModifiers({ words, packHash })
   };
   pack.assetManifest = buildAssetManifest({ packId, promptHash, mappings, preset, palette });
   pack.assetPromptPlan = buildAssetPromptPlan({ pack, candidateRoot });
@@ -1970,6 +2244,7 @@ function exportedPackHash(exportedPack = {}) {
     stylePack: exportedPack.stylePack,
     universePack: exportedPack.universePack,
     gameplayMapping: exportedPack.gameplayMapping,
+    approvedModifiers: exportedPack.approvedModifiers,
     assetManifest: exportedPack.assetManifest,
     assetPromptPlan: exportedPack.assetPromptPlan,
     assetScaffold: exportedPack.assetScaffold,
@@ -2877,6 +3152,7 @@ function clearGeneratedPacksForTests({ clearDisk = false } = {}) {
 }
 
 module.exports = {
+  APPROVED_MODIFIERS,
   ASSET_PROMPT_PLAN_VERSION,
   DEFAULT_CANDIDATE_ROOT,
   GENERATION_BRIEF_VERSION,
@@ -2897,6 +3173,7 @@ module.exports = {
   importGeneratedPack,
   listPublicPackGallery,
   normalizePrompt,
+  projectApprovedModifierView,
   publishPublicPackCard,
   recordPlaytestReport,
   reloadGeneratedPack,
@@ -2907,6 +3184,7 @@ module.exports = {
   validateGeneratedPackSchemas,
   validateAssetManifest,
   validateAssetPromptPlan,
+  validateApprovedModifiers,
   validateGenerationBrief,
   validatePublicPackGallery,
   validatePublicPackCard,

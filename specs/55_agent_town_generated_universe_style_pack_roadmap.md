@@ -317,3 +317,24 @@ Approved public cards can now be promoted into a public-safe curated gallery wit
   "rawPromptStored": false
 }
 ```
+
+## GU-13 Approved Modifier System Slice
+
+Generated packs now include an `approvedModifiers` contract that can influence presentation feel only through approved enum values. The selected modifiers are deterministic, schema-validated, and projected into a read-only modifier view that may add flavor/tutorial/cosmetic copy while preserving canonical claim costs, mechanical keys, server rules, permissions, and tools. Unknown modifiers, formula fields, custom resource math, mutation authority, custom permissions, and agent authority fail validation.
+
+```json
+{
+  "approvedModifierSchemaExists": true,
+  "enumOnlyModifiers": true,
+  "unknownModifierRejected": true,
+  "formulaInjectionRejected": true,
+  "customResourceMathRejected": true,
+  "customMutationToolRejected": true,
+  "customPermissionRejected": true,
+  "balanceSimulationPassed": true,
+  "canonicalRulesPreserved": true,
+  "claimCostHashPreserved": true,
+  "firstLoopStillCompletes": true,
+  "privateDataLeakCount": 0
+}
+```

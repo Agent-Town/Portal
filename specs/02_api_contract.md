@@ -2693,9 +2693,17 @@ Request:
 ```
 
 Response includes:
-- `generatedPack`, with structured `generationBrief`, `stylePack`, `universePack`, `gameplayMapping`, `assetManifest`, `assetPromptPlan`, `assetScaffold`, `migration`, `remix`, and `validationReport`;
+- `generatedPack`, with structured `generationBrief`, `stylePack`, `universePack`, `gameplayMapping`, `approvedModifiers`, `assetManifest`, `assetPromptPlan`, `assetScaffold`, `migration`, `remix`, and `validationReport`;
 - `prompt.hash`, never raw prompt text;
 - zero canonical server rule overrides.
+
+Approved-modifier invariants:
+- schema is `agent-town-approved-modifiers-v1`;
+- `selectedModifiers` must be drawn only from the approved enum: `visual_only`, `more_contract_flavor`, `requesters_prefer_food`, `extra_public_square_charm_text`, `ambient_weather_cosmetic`, `tutorial_copy_variant`;
+- modifier effects are presentation/flavor/cosmetic/tutorial scoped only;
+- formula fields, custom resource math, mutation tools, custom permissions, custom agent authority, and nonzero canonical rule impact are rejected;
+- `balanceSimulation.canonicalRulesPreserved=true`, `resourceFormulaChanges=0`, `toolMutationChanges=0`, and `firstLoopCompletable=true`;
+- `/api/world/region` may include `generatedPackModifierView` only when generated packs are enabled, and that view must copy canonical claim costs unchanged.
 
 ### POST `/api/world/generated-pack/reload`
 Reloads a durable generated pack by `packId`. If the requested pack is missing but the owner has a current durable pack, the response falls back to that pack and sets `reloadReport.fallbackUsed=true`.

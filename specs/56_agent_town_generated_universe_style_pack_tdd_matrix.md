@@ -58,3 +58,6 @@ owner: "Agent Town product"
 | GPACK-045 | Gallery | Public gallery schema exists and gallery entries require approval status, moderation metadata, reviewer signoff, tags, screenshot, and asset summary | `tests/generated_pack_gallery.test.js`, `tests/generated_pack_contract.test.js` |
 | GPACK-046 | Gallery | Public gallery lists only approved cards; pending and rejected cards remain hidden while search/filter/sort/pagination stay public-safe | `tests/generated_pack_gallery.test.js` |
 | GPACK-047 | Gallery | Unpublish removes a public card from direct public lookup and curated gallery results without exposing private state | `tests/generated_pack_gallery.test.js` |
+| GPACK-048 | Modifiers | Generated packs include an approved-modifier schema with enum-only selected modifiers and no raw formulas | `tests/generated_pack_approved_modifiers.test.js`, `tests/generated_pack_contract.test.js` |
+| GPACK-049 | Modifiers | Unknown modifiers, formula fields, custom resource math, mutation authority, and custom rule impact fail validation | `tests/generated_pack_approved_modifiers.test.js` |
+| GPACK-050 | Modifiers | Modifier projection preserves canonical claim costs and first-loop viability while exposing only flavor/cosmetic copy | `tests/generated_pack_approved_modifiers.test.js`, `e2e/237_world_grid_generated_pack_demo.spec.js` |

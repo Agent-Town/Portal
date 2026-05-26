@@ -21,6 +21,7 @@ Status: prototype-gated
 - Generated-pack exports must redact owner/session/private identifiers, omit raw prompts, include a content hash, and reject import if the hash or generated-pack validation fails.
 - Public pack cards must be unlisted by ID, auth-free only for read, generated from validated packs, backed by screenshot evidence, and rejected if raw prompts, Brain/provider/debug/wallet terms, private identifiers, or executable instructions appear.
 - Curated public gallery entries must be approved-card derivatives with moderation metadata, reviewer signoff, tags, screenshot metadata, asset summary, and zero private-state fields; pending, rejected, and unpublished cards must not appear.
+- Approved generated-pack modifiers must be enum-only, presentation-scoped, and balance-simulated; unknown modifiers, formula strings, custom resource math, mutation tools, custom permissions, custom agent authority, and nonzero canonical rule impact are forbidden.
 - Player-visible generated text must be escaped in DOM rendering.
 - Production image generation requires explicit consent and a documented cost/auth model before any user-facing release claim.
 
@@ -77,6 +78,11 @@ Status: prototype-gated
   "approvedOnlyGallery": true,
   "moderationMetadataRequired": true,
   "unpublishWorks": true,
+  "approvedModifierSchemaExists": true,
+  "enumOnlyModifiers": true,
+  "formulaInjectionRejected": true,
+  "balanceSimulationPassed": true,
+  "canonicalRulesPreserved": true,
   "approvedProductionAssetCount": 0,
   "generatedImageAssetsCanChangeServerRules": false,
   "productionImageAssetCount": 0,
