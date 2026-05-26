@@ -41,6 +41,9 @@ Modal lab surface foundation:
 Persistence replay resilience foundation:
 `specs/67_agent_town_v6_persistence_replay_resilience_foundation.md`
 
+Security product release review foundation:
+`specs/68_agent_town_v6_security_product_release_review_foundation.md`
+
 V6.0 Agent Civilization Foundation must not become player-visible until every
 gate below has implementation, deterministic tests, and security/product signoff.
 
@@ -67,6 +70,11 @@ gate below has implementation, deterministic tests, and security/product signoff
   `releaseReady: false` until process restart, replay reconstruction,
   migration upgrade/downgrade, load/rate, and rollback recovery gates have
   deterministic evidence.
+- The research-only release review gate may exist in
+  `server/world_civilization/release_review.js`, but it must keep V6 hidden
+  from runtime/player surfaces until threat model, privacy review, abuse-case
+  review, data-retention policy, audit coverage, validation evidence, and
+  product signoff are complete.
 
 ## Prerequisites
 
@@ -148,6 +156,13 @@ gate below has implementation, deterministic tests, and security/product signoff
   tracking starts in `server/world_civilization/resilience.js`; release still
   requires process-level restart, replay reconstruction, migration, load/rate,
   and rollback recovery tests.
+- Security and product release review must be complete before normal gameplay
+  exposure. Current gate tracking starts in
+  `server/world_civilization/release_review.js` and
+  `docs/security/V6_AGENT_CIVILIZATION_RELEASE_REVIEW.md`; release still
+  requires approved threat model, privacy review, abuse-case review,
+  data-retention policy, audit coverage review, deterministic validation
+  evidence, and product signoff.
 - Privacy review must prove no private town state, wallet secret, Brain secret,
   provider credential, debug trace, or unapproved transcript enters civic
   surfaces.

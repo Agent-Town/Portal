@@ -46,6 +46,9 @@ Modal lab surface foundation:
 Persistence replay resilience foundation:
 `specs/67_agent_town_v6_persistence_replay_resilience_foundation.md`
 
+Security product release review foundation:
+`specs/68_agent_town_v6_security_product_release_review_foundation.md`
+
 ## Implementation Boundary
 
 Do not add V6 civic mechanics to normal gameplay or the world-grid prototype
@@ -71,6 +74,11 @@ The research-only resilience baseline in
 `server/world_civilization/resilience.js` inspects the current SQLite civic
 stores and keeps `releaseReady: false` until process restart, replay
 reconstruction, migration, load/rate, and rollback recovery gates are proven.
+
+The research-only release review gate in
+`server/world_civilization/release_review.js` names the threat model, privacy,
+abuse-case, data-retention, audit coverage, validation, and product signoff
+requirements that must be complete before normal gameplay exposure.
 
 ## Goal
 
