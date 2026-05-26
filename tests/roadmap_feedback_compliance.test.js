@@ -27,6 +27,7 @@ test('future roadmap uses approved release status vocabulary', () => {
 test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
   const required = [
     'specs/release-gates/threejs_runtime_gate.md',
+    'specs/release-gates/v60_agent_civilization_readiness_gate.md',
     'specs/47_agent_town_v5_0_region_grid_foundation.md',
     'specs/48_agent_town_v5_0_region_grid_tdd_matrix.md',
     'specs/49_agent_town_v5_1_territory_claims.md',
@@ -43,6 +44,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'docs/technical/WORLD_EVENT_CONSERVATION_MODEL.md',
     'docs/technical/PUBLIC_DISTRICT_MODERATION_AND_ROLLBACK.md',
     'docs/security/WORLD_LAYER_SECURITY_REVIEW_V5.md',
+    'docs/security/WORLD_GRID_MUTATION_SECURITY_PLAN.md',
     'docs/security/AGENT_SERVICES_DATA_ACCESS_POLICY.md',
     'docs/security/PUBLIC_PRESENCE_REDACTION_POLICY.md',
     'public/experiences/world-grid/manifest.json',

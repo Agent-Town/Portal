@@ -7,6 +7,8 @@ Feature flag: `FEATURE_WORLD_V60_AGENT_CIVILIZATION`
 V6.0 starts only after V5 proves world safety, public presence, rollback,
 redaction, and retention.
 
+Release gate: `specs/release-gates/v60_agent_civilization_readiness_gate.md`
+
 ## Implementation Boundary
 
 Do not add V6 civic mechanics to normal gameplay or the world-grid prototype
@@ -27,6 +29,23 @@ auditable institutions.
 - Reputation/attestation.
 - World history ledger.
 
+## Explicit Prerequisites
+
+- V5.0 Region Grid proves deterministic rendering without creating Founders Plot
+  state as a side effect.
+- V5.1 Territory Claims and Settler Routes prove existing-plot prerequisites,
+  owner checks, resource conservation, idempotency, and replayability.
+- V5.2 Public Presence and Safe Player Discovery proves opt-in boundaries,
+  XSS-safe rendering, privacy redaction, and reporting/moderation paths.
+- V5.3 Civic Service Advice Prototype proves redacted inputs, output schemas,
+  bounded reputation, and no hidden mutation.
+- V5.4 World Events and Public Works proves contribution caps, audit records,
+  reward safety, and rollback policy.
+- V5.5 Controlled Free-Play Sandbox Districts proves typed moderation,
+  rollback, rate limiting, privacy, and no private-town mutation.
+- Release-grade world-grid persistence exists with owner indexes, migration
+  versioning, audit/replay records, and restart persistence tests.
+
 ## Principles
 
 - Agents may propose.
@@ -43,3 +62,5 @@ auditable institutions.
 - Proposal effect preview cannot mutate state until accepted and applied through
   explicit rules.
 - No private data leaks into public civic surfaces.
+- The V6 readiness gate has signed-off coverage for proposal schemas, vote auth,
+  reputation, moderation, rollback, privacy, and audit ledger behavior.

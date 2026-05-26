@@ -2717,3 +2717,59 @@ Contract notes:
   - `futureUse`
 - `model: "gpt-image-2"` entries must have prompt provenance;
 - the V1.4.3 platform pack refreshes Start Gate, town shell, Town Hall, Brain, House, Pony, Saloon, Sigil, Atlas, Leaderboard, and generic empty-state ornamentation without reopening accepted Founders Plot gameplay art.
+
+---
+
+## World Grid Prototype APIs
+
+Status: `prototype_gated`; not a public release surface.
+
+Feature flags:
+- `FEATURE_WORLD_GRID_V50_REGION`: V5.0 Region Grid
+- `FEATURE_WORLD_GRID_V51_CLAIMS`: V5.1 Territory Claims and Settler Routes
+- `FEATURE_WORLD_GRID_V52_PUBLIC_PRESENCE`: V5.2 Public Presence and Safe Player Discovery
+- `FEATURE_WORLD_GRID_V53_AGENT_SERVICES`: V5.3 Civic Service Advice Prototype
+- `FEATURE_WORLD_GRID_V54_WORLD_EVENTS`: V5.4 World Events and Public Works
+- `FEATURE_WORLD_GRID_V55_SANDBOX_DISTRICTS`: V5.5 Controlled Free-Play Sandbox Districts
+
+### GET `/api/world/tools`
+Returns `{ ok, featureFlags, tools }`, where `tools` is the runtime source of
+truth for world-grid tool contracts. Every tool entry includes `name`,
+`description`, and `featureFlag`; the world-grid pack manifest mirrors this in
+`toolMetadata`.
+
+### GET `/api/world/region`
+Returns a deterministic V5.0 region payload for the current owner identity when
+`FEATURE_WORLD_GRID_V50_REGION` is enabled. This read path may render without an
+existing Founders Plot and must not create one.
+
+### POST `/api/world/territory/*`
+V5.1 territory mutation routes (`plan-claim`, `complete-claim`, `cancel-claim`)
+require an existing valid Founders Plot prerequisite. Missing prerequisite
+returns `409` with `error.code === "WORLD_GRID_PLOT_REQUIRED"`. Claim options
+are read-only and do not create Founders Plot state.
+
+### POST `/api/world/public-presence/*`, `/api/world/follow-town`
+V5.2 public presence mutations require the Founders Plot prerequisite. Public
+strings are public-safe data and must be escaped or DOM-rendered by clients.
+
+### POST `/api/world/services/*`
+V5.3 civic service advice mutations require the Founders Plot prerequisite.
+Accepted service results are advice-only and return `mutationApplied: false`
+where exposed by the route.
+
+### POST `/api/world/events/*`
+V5.4 contribution and reward mutations require the Founders Plot prerequisite.
+Contributions require an idempotency key; duplicate keys return the original
+contribution.
+
+### POST `/api/world/sandbox/*`
+V5.5 sandbox mutations require the Founders Plot prerequisite. Sandbox state is
+typed, moderated, rollback-capable, and separate from private town state.
+
+### Persistence And Security
+World-grid V5 prototype stores are process-local and ephemeral. Release-grade
+storage requires durable owner indexes, migration versioning, audit/replay
+records, and restart persistence tests before public enablement. Mutating
+endpoint same-origin, CSRF, session-auth, rate-limit, and idempotency
+requirements are tracked in `docs/security/WORLD_GRID_MUTATION_SECURITY_PLAN.md`.

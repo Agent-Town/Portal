@@ -1,11 +1,11 @@
-# Agent Services Data Access Policy
+# Civic Service Advice Data Access Policy
 
 Status: implementation planning
 
-Agent services may read only explicitly shared public-safe or user-approved
-inputs. Services may not receive Brain secrets, wallet secrets, provider
-secrets, private event logs, worker traffic, debug payloads, or another
-player's private town state.
+V5.3 Civic Service Advice Prototype services may read only explicitly shared
+public-safe or user-approved inputs. Services may not receive Brain secrets,
+wallet secrets, provider secrets, private event logs, worker traffic, debug
+payloads, or another player's private town state.
 
 ## Required Controls
 

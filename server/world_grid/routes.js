@@ -41,119 +41,142 @@ const {
   isWorldGridFeatureEnabled,
   resolveWorldGridFeatureFlags
 } = require('./feature_flags');
+const { loadWorldGridPlotPrerequisite } = require('./plot_prerequisite');
 
 const WORLD_GRID_TOOLS = [
   {
     name: 'et.world.region.get_state',
+    featureFlag: 'FEATURE_WORLD_GRID_V50_REGION',
     description: 'Read the V5.0 region-grid state without mutating town or world state.'
   },
   {
     name: 'et.world.region.explain_cell',
+    featureFlag: 'FEATURE_WORLD_GRID_V50_REGION',
     description: 'Explain one region cell terrain/state tradeoff without claiming it.'
   },
   {
     name: 'et.world.territory.get_claim_options',
+    featureFlag: 'FEATURE_WORLD_GRID_V51_CLAIMS',
     description: 'List adjacent V5.1 territory claim options with cost, benefit, drawback, and route preview.'
   },
   {
     name: 'et.world.territory.plan_claim',
+    featureFlag: 'FEATURE_WORLD_GRID_V51_CLAIMS',
     description: 'Plan one adjacent territory claim without spending resources.'
   },
   {
     name: 'et.world.territory.complete_claim',
+    featureFlag: 'FEATURE_WORLD_GRID_V51_CLAIMS',
     description: 'Complete a planned territory claim with exact resource spend.'
   },
   {
     name: 'et.world.territory.cancel_claim',
+    featureFlag: 'FEATURE_WORLD_GRID_V51_CLAIMS',
     description: 'Cancel a planned territory claim before resources are spent.'
   },
   {
     name: 'et.world.public.list_neighbors',
+    featureFlag: 'FEATURE_WORLD_GRID_V52_PUBLIC_PRESENCE',
     description: 'List opt-in public towns using public-safe redacted fields only.'
   },
   {
     name: 'et.world.public.summarize_neighbor',
+    featureFlag: 'FEATURE_WORLD_GRID_V52_PUBLIC_PRESENCE',
     description: 'Summarize one public town without private state or mutation.'
   },
   {
     name: 'et.world.services.list',
-    description: 'List bounded civic agent services with input scopes and reputation.'
+    featureFlag: 'FEATURE_WORLD_GRID_V53_AGENT_SERVICES',
+    description: 'List bounded V5.3 civic service advice prototypes with input scopes and reputation.'
   },
   {
     name: 'et.world.services.request_advice',
+    featureFlag: 'FEATURE_WORLD_GRID_V53_AGENT_SERVICES',
     description: 'Request a structured recommendation from one service using redacted approved inputs.'
   },
   {
     name: 'et.world.services.accept_result',
+    featureFlag: 'FEATURE_WORLD_GRID_V53_AGENT_SERVICES',
     description: 'Accept a service recommendation without mutating town or world state.'
   },
   {
     name: 'et.world.services.report_issue',
+    featureFlag: 'FEATURE_WORLD_GRID_V53_AGENT_SERVICES',
     description: 'Report a service issue and update service reliability bookkeeping.'
   },
   {
     name: 'et.world.events.get_state',
+    featureFlag: 'FEATURE_WORLD_GRID_V54_WORLD_EVENTS',
     description: 'Read active public works events, public progress, and this town’s personal recap.'
   },
   {
     name: 'et.world.events.preview_contribution',
+    featureFlag: 'FEATURE_WORLD_GRID_V54_WORLD_EVENTS',
     description: 'Preview a capped world-event contribution before resources are spent.'
   },
   {
     name: 'et.world.events.contribute',
+    featureFlag: 'FEATURE_WORLD_GRID_V54_WORLD_EVENTS',
     description: 'Contribute allowed resources to a world event with idempotent accounting.'
   },
   {
     name: 'et.world.events.claim_reward',
+    featureFlag: 'FEATURE_WORLD_GRID_V54_WORLD_EVENTS',
     description: 'Claim a cosmetic/status-safe world-event reward for this account.'
   },
   {
     name: 'et.world.sandbox.get_state',
+    featureFlag: 'FEATURE_WORLD_GRID_V55_SANDBOX_DISTRICTS',
     description: 'Read the controlled sandbox district with redacted public presence.'
   },
   {
     name: 'et.world.sandbox.enter',
+    featureFlag: 'FEATURE_WORLD_GRID_V55_SANDBOX_DISTRICTS',
     description: 'Enter the sandbox as a redacted public participant.'
   },
   {
     name: 'et.world.sandbox.place_prop',
+    featureFlag: 'FEATURE_WORLD_GRID_V55_SANDBOX_DISTRICTS',
     description: 'Place one approved typed prop through sandbox moderation.'
   },
   {
     name: 'et.world.sandbox.agent_demo',
+    featureFlag: 'FEATURE_WORLD_GRID_V55_SANDBOX_DISTRICTS',
     description: 'Run one typed agent demo action in the sandbox, with moderation and rollback.'
   },
   {
     name: 'et.world.sandbox.rollback_last',
+    featureFlag: 'FEATURE_WORLD_GRID_V55_SANDBOX_DISTRICTS',
     description: 'Rollback this participant’s last approved sandbox action.'
   },
   {
     name: 'et.world.sandbox.leave',
+    featureFlag: 'FEATURE_WORLD_GRID_V55_SANDBOX_DISTRICTS',
     description: 'Leave the sandbox without mutating private town state.'
   }
 ];
 
+const MUTATING_WORLD_GRID_TOOL_NAMES = new Set([
+  'et.world.territory.plan_claim',
+  'et.world.territory.complete_claim',
+  'et.world.territory.cancel_claim',
+  'et.world.services.request_advice',
+  'et.world.services.accept_result',
+  'et.world.services.report_issue',
+  'et.world.events.contribute',
+  'et.world.events.claim_reward',
+  'et.world.sandbox.enter',
+  'et.world.sandbox.place_prop',
+  'et.world.sandbox.agent_demo',
+  'et.world.sandbox.rollback_last',
+  'et.world.sandbox.leave'
+]);
+
+// Prototype/ephemeral process-local store; release storage is documented in docs/technical/WORLD_GRID_STATE_MODEL.md.
 const cameraPreferences = new Map();
 
 function toolsForFlags(featureFlags = {}) {
-  return WORLD_GRID_TOOLS.filter((tool) => {
-    if (tool.name.startsWith('et.world.territory.')) {
-      return isWorldGridFeatureEnabled(featureFlags, 'FEATURE_WORLD_GRID_V51_CLAIMS');
-    }
-    if (tool.name.startsWith('et.world.public.')) {
-      return isWorldGridFeatureEnabled(featureFlags, 'FEATURE_WORLD_GRID_V52_PUBLIC_PRESENCE');
-    }
-    if (tool.name.startsWith('et.world.services.')) {
-      return isWorldGridFeatureEnabled(featureFlags, 'FEATURE_WORLD_GRID_V53_AGENT_SERVICES');
-    }
-    if (tool.name.startsWith('et.world.events.')) {
-      return isWorldGridFeatureEnabled(featureFlags, 'FEATURE_WORLD_GRID_V54_WORLD_EVENTS');
-    }
-    if (tool.name.startsWith('et.world.sandbox.')) {
-      return isWorldGridFeatureEnabled(featureFlags, 'FEATURE_WORLD_GRID_V55_SANDBOX_DISTRICTS');
-    }
-    return true;
-  });
+  return WORLD_GRID_TOOLS.filter((tool) => isWorldGridFeatureEnabled(featureFlags, tool.featureFlag));
 }
 
 function normalizeError(error) {
@@ -164,9 +187,33 @@ function normalizeError(error) {
       ? 'The world grid prototype is hidden for this play session.'
       : code === 'UNAUTHORIZED'
         ? 'Sign in to view your territory survey.'
+        : code === 'WORLD_GRID_PLOT_REQUIRED'
+          ? 'Open Founders Plot before using mutating world-grid prototype tools.'
         : code,
     details: error?.details && typeof error.details === 'object' ? error.details : {}
   };
+}
+
+function statusForWorldGridError(normalized = {}) {
+  const code = String(normalized?.code || '');
+  if (code === 'UNAUTHORIZED') return 401;
+  if (code === 'NOT_FOUND') return 404;
+  if (code === 'INVALID_PUBLIC_TOWN' || code === 'INVALID_IDEMPOTENCY_KEY' || code === 'INVALID_EVENT_STATE') return 400;
+  if (code === 'INVALID_SERVICE_OUTPUT') return 422;
+  if ([
+    'WORLD_GRID_PLOT_REQUIRED',
+    'INVALID_SERVICE_REQUEST_STATE',
+    'OUT_OF_RESOURCES',
+    'CONTRIBUTION_CAP_EXCEEDED',
+    'INVALID_REWARD_STATE'
+  ].includes(code)) return 409;
+  if ([
+    'FORBIDDEN',
+    'FEATURE_DISABLED',
+    'INVALID_CLAIM_TARGET',
+    'INVALID_CLAIM_STATE'
+  ].includes(code)) return 403;
+  return 500;
 }
 
 function createWorldGridRouter({ resolveIdentity } = {}) {
@@ -266,13 +313,21 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     };
   }
 
+  function requirePlotPrerequisite(payload) {
+    return loadWorldGridPlotPrerequisite(payload.identity);
+  }
+
+  function requirePlotPrerequisiteForTool(toolName, payload) {
+    if (MUTATING_WORLD_GRID_TOOL_NAMES.has(toolName)) requirePlotPrerequisite(payload);
+  }
+
   router.get('/api/world/tools', (req, res) => {
     try {
       const featureFlags = requireEnabled(req);
       res.json({ ok: true, featureFlags, tools: toolsForFlags(featureFlags) });
     } catch (error) {
       const normalized = normalizeError(error);
-      res.status(normalized.code === 'FEATURE_DISABLED' ? 403 : 500).json({ ok: false, error: normalized });
+      res.status(statusForWorldGridError(normalized)).json({ ok: false, error: normalized });
     }
   });
 
@@ -282,7 +337,7 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       res.json({ ok: true, ...payload });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = statusForWorldGridError(normalized);
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -307,7 +362,7 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       res.json({ ok: true, featureFlags: payload.featureFlags, region: payload.region, preferences: nextPreferences, selectedCell: cell });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'NOT_FOUND' ? 404 : normalized.code === 'INVALID_SERVICE_REQUEST_STATE' ? 409 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = statusForWorldGridError(normalized);
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -329,7 +384,7 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       res.json({ ok: true, featureFlags: payload.featureFlags, region: payload.region, preferences: nextPreferences });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = statusForWorldGridError(normalized);
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -359,16 +414,19 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       }
       if (toolName === 'et.world.territory.plan_claim') {
         requireClaimsEnabled(payload.featureFlags);
+        requirePlotPrerequisiteForTool(toolName, payload);
         const claim = planClaim(payload.region, req.body?.cellId, payload.owner, Date.now());
         return res.json({ ok: true, data: { claim } });
       }
       if (toolName === 'et.world.territory.complete_claim') {
         requireClaimsEnabled(payload.featureFlags);
+        requirePlotPrerequisiteForTool(toolName, payload);
         const claim = completeClaim(payload.region, payload.identity, payload.owner, req.body?.claimId, Date.now());
         return res.json({ ok: true, data: { claim } });
       }
       if (toolName === 'et.world.territory.cancel_claim') {
         requireClaimsEnabled(payload.featureFlags);
+        requirePlotPrerequisiteForTool(toolName, payload);
         const result = cancelClaim(payload.region.regionId, payload.owner, req.body?.claimId);
         return res.json({ ok: true, data: result });
       }
@@ -386,6 +444,7 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       }
       if (toolName === 'et.world.services.request_advice') {
         requireServicesEnabled(payload.featureFlags);
+        requirePlotPrerequisiteForTool(toolName, payload);
         return res.json({
           ok: true,
           data: {
@@ -395,10 +454,12 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       }
       if (toolName === 'et.world.services.accept_result') {
         requireServicesEnabled(payload.featureFlags);
+        requirePlotPrerequisiteForTool(toolName, payload);
         return res.json({ ok: true, data: { request: acceptServiceResult(payload.owner, req.body?.requestId) } });
       }
       if (toolName === 'et.world.services.report_issue') {
         requireServicesEnabled(payload.featureFlags);
+        requirePlotPrerequisiteForTool(toolName, payload);
         return res.json({ ok: true, data: { request: reportServiceIssue(payload.owner, req.body?.requestId, req.body?.reason) } });
       }
       if (toolName === 'et.world.events.get_state') {
@@ -416,6 +477,7 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       }
       if (toolName === 'et.world.events.contribute') {
         requireEventsEnabled(payload.featureFlags);
+        requirePlotPrerequisiteForTool(toolName, payload);
         return res.json({
           ok: true,
           data: contributeToEvent(payload.identity, payload.owner, req.body?.eventId, req.body?.bundle, req.body?.idempotencyKey, Date.now())
@@ -423,6 +485,7 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       }
       if (toolName === 'et.world.events.claim_reward') {
         requireEventsEnabled(payload.featureFlags);
+        requirePlotPrerequisiteForTool(toolName, payload);
         return res.json({
           ok: true,
           data: {
@@ -436,28 +499,33 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       }
       if (toolName === 'et.world.sandbox.enter') {
         requireSandboxEnabled(payload.featureFlags);
+        requirePlotPrerequisiteForTool(toolName, payload);
         return res.json({ ok: true, data: { participant: enterSandbox(payload.owner), sandbox: sandboxStateFor(payload.owner) } });
       }
       if (toolName === 'et.world.sandbox.place_prop') {
         requireSandboxEnabled(payload.featureFlags);
+        requirePlotPrerequisiteForTool(toolName, payload);
         return res.json({ ok: true, data: { action: placeSandboxProp(payload.owner, req.body?.payload), sandbox: sandboxStateFor(payload.owner) } });
       }
       if (toolName === 'et.world.sandbox.agent_demo') {
         requireSandboxEnabled(payload.featureFlags);
+        requirePlotPrerequisiteForTool(toolName, payload);
         return res.json({ ok: true, data: { action: sandboxAgentDemo(payload.owner, req.body?.payload), sandbox: sandboxStateFor(payload.owner) } });
       }
       if (toolName === 'et.world.sandbox.rollback_last') {
         requireSandboxEnabled(payload.featureFlags);
+        requirePlotPrerequisiteForTool(toolName, payload);
         return res.json({ ok: true, data: rollbackSandboxLastAction(payload.owner) });
       }
       if (toolName === 'et.world.sandbox.leave') {
         requireSandboxEnabled(payload.featureFlags);
+        requirePlotPrerequisiteForTool(toolName, payload);
         return res.json({ ok: true, data: leaveSandbox(payload.owner) });
       }
       res.status(404).json({ ok: false, error: { code: 'TOOL_NOT_FOUND' } });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'NOT_FOUND' ? 404 : normalized.code === 'INVALID_SERVICE_REQUEST_STATE' || normalized.code === 'OUT_OF_RESOURCES' || normalized.code === 'CONTRIBUTION_CAP_EXCEEDED' || normalized.code === 'INVALID_REWARD_STATE' ? 409 : normalized.code === 'INVALID_IDEMPOTENCY_KEY' || normalized.code === 'INVALID_EVENT_STATE' ? 400 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = statusForWorldGridError(normalized);
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -474,7 +542,7 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = statusForWorldGridError(normalized);
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -483,11 +551,12 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requireClaimsEnabled(payload.featureFlags);
+      requirePlotPrerequisite(payload);
       const claim = planClaim(payload.region, req.body?.cellId, payload.owner, Date.now());
       res.json({ ok: true, featureFlags: payload.featureFlags, claim });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'NOT_FOUND' ? 404 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' || normalized.code === 'INVALID_CLAIM_TARGET' ? 403 : 500;
+      const status = statusForWorldGridError(normalized);
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -496,12 +565,13 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requireClaimsEnabled(payload.featureFlags);
+      requirePlotPrerequisite(payload);
       const claim = completeClaim(payload.region, payload.identity, payload.owner, req.body?.claimId, Date.now());
       const refreshed = buildRegionPayload(req, res);
       res.json({ ok: true, featureFlags: payload.featureFlags, claim, region: refreshed.region, territory: refreshed.territory });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'NOT_FOUND' ? 404 : normalized.code === 'OUT_OF_RESOURCES' ? 409 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' || normalized.code === 'INVALID_CLAIM_STATE' ? 403 : 500;
+      const status = statusForWorldGridError(normalized);
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -510,11 +580,12 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requireClaimsEnabled(payload.featureFlags);
+      requirePlotPrerequisite(payload);
       const result = cancelClaim(payload.region.regionId, payload.owner, req.body?.claimId);
       res.json({ ok: true, featureFlags: payload.featureFlags, ...result });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'NOT_FOUND' ? 404 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' || normalized.code === 'INVALID_CLAIM_STATE' ? 403 : 500;
+      const status = statusForWorldGridError(normalized);
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -526,7 +597,7 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       res.json({ ok: true, featureFlags, towns: listPublicTowns() });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = statusForWorldGridError(normalized);
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -544,7 +615,7 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       res.json({ ok: true, featureFlags, town });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'NOT_FOUND' ? 404 : normalized.code === 'INVALID_SERVICE_REQUEST_STATE' ? 409 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = statusForWorldGridError(normalized);
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -553,6 +624,7 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requirePublicEnabled(payload.featureFlags);
+      requirePlotPrerequisite(payload);
       const town = optInPublicPresence({
         owner: payload.owner,
         region: payload.region,
@@ -563,7 +635,7 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       res.json({ ok: true, featureFlags: payload.featureFlags, town });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = statusForWorldGridError(normalized);
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -572,11 +644,12 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requirePublicEnabled(payload.featureFlags);
+      requirePlotPrerequisite(payload);
       const result = optOutPublicPresence(payload.owner);
       res.json({ ok: true, featureFlags: payload.featureFlags, ...result });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = statusForWorldGridError(normalized);
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -585,11 +658,12 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requirePublicEnabled(payload.featureFlags);
+      requirePlotPrerequisite(payload);
       const result = followTown(payload.owner, req.body?.publicTownId);
       res.json({ ok: true, featureFlags: payload.featureFlags, ...result });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'NOT_FOUND' ? 404 : normalized.code === 'INVALID_PUBLIC_TOWN' ? 400 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = statusForWorldGridError(normalized);
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -606,7 +680,7 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = statusForWorldGridError(normalized);
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -615,11 +689,12 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requireServicesEnabled(payload.featureFlags);
+      requirePlotPrerequisite(payload);
       const request = requestServiceAdvice(payload.owner, req.body?.serviceId, req.body?.input);
       res.json({ ok: true, featureFlags: payload.featureFlags, request });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'NOT_FOUND' ? 404 : normalized.code === 'INVALID_SERVICE_OUTPUT' ? 422 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = statusForWorldGridError(normalized);
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -628,11 +703,12 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requireServicesEnabled(payload.featureFlags);
+      requirePlotPrerequisite(payload);
       const request = acceptServiceResult(payload.owner, req.body?.requestId);
       res.json({ ok: true, featureFlags: payload.featureFlags, request, mutationApplied: false });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'NOT_FOUND' ? 404 : normalized.code === 'INVALID_SERVICE_REQUEST_STATE' ? 409 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = statusForWorldGridError(normalized);
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -641,11 +717,12 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requireServicesEnabled(payload.featureFlags);
+      requirePlotPrerequisite(payload);
       const request = reportServiceIssue(payload.owner, req.body?.requestId, req.body?.reason);
       res.json({ ok: true, featureFlags: payload.featureFlags, request });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'NOT_FOUND' ? 404 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = statusForWorldGridError(normalized);
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -661,7 +738,7 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = statusForWorldGridError(normalized);
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -674,7 +751,7 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       res.json({ ok: true, featureFlags: payload.featureFlags, preview });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'NOT_FOUND' ? 404 : normalized.code === 'INVALID_EVENT_STATE' ? 400 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = statusForWorldGridError(normalized);
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -683,12 +760,13 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requireEventsEnabled(payload.featureFlags);
+      requirePlotPrerequisite(payload);
       const result = contributeToEvent(payload.identity, payload.owner, req.body?.eventId, req.body?.bundle, req.body?.idempotencyKey, Date.now());
       const events = worldEventState(payload.owner);
       res.json({ ok: true, featureFlags: payload.featureFlags, ...result, events });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'NOT_FOUND' ? 404 : normalized.code === 'OUT_OF_RESOURCES' || normalized.code === 'CONTRIBUTION_CAP_EXCEEDED' ? 409 : normalized.code === 'INVALID_IDEMPOTENCY_KEY' || normalized.code === 'INVALID_EVENT_STATE' ? 400 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = statusForWorldGridError(normalized);
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -697,11 +775,12 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requireEventsEnabled(payload.featureFlags);
+      requirePlotPrerequisite(payload);
       const reward = claimEventReward(payload.owner, req.body?.eventId, req.body?.ownerAccountId);
       res.json({ ok: true, featureFlags: payload.featureFlags, reward, mutationApplied: false });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'NOT_FOUND' ? 404 : normalized.code === 'INVALID_REWARD_STATE' ? 409 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = statusForWorldGridError(normalized);
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -713,7 +792,7 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       res.json({ ok: true, featureFlags: payload.featureFlags, ...sandboxStateFor(payload.owner) });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = statusForWorldGridError(normalized);
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -722,11 +801,12 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requireSandboxEnabled(payload.featureFlags);
+      requirePlotPrerequisite(payload);
       const participant = enterSandbox(payload.owner);
       res.json({ ok: true, featureFlags: payload.featureFlags, participant, sandbox: sandboxStateFor(payload.owner) });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = statusForWorldGridError(normalized);
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -735,11 +815,12 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requireSandboxEnabled(payload.featureFlags);
+      requirePlotPrerequisite(payload);
       const action = placeSandboxProp(payload.owner, req.body?.payload);
       res.json({ ok: true, featureFlags: payload.featureFlags, action, sandbox: sandboxStateFor(payload.owner) });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = statusForWorldGridError(normalized);
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -748,11 +829,12 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requireSandboxEnabled(payload.featureFlags);
+      requirePlotPrerequisite(payload);
       const action = sandboxAgentDemo(payload.owner, req.body?.payload);
       res.json({ ok: true, featureFlags: payload.featureFlags, action, sandbox: sandboxStateFor(payload.owner) });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = statusForWorldGridError(normalized);
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -761,10 +843,11 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requireSandboxEnabled(payload.featureFlags);
+      requirePlotPrerequisite(payload);
       res.json({ ok: true, featureFlags: payload.featureFlags, ...rollbackSandboxLastAction(payload.owner) });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'NOT_FOUND' ? 404 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = statusForWorldGridError(normalized);
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -773,10 +856,11 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requireSandboxEnabled(payload.featureFlags);
+      requirePlotPrerequisite(payload);
       res.json({ ok: true, featureFlags: payload.featureFlags, ...leaveSandbox(payload.owner) });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = statusForWorldGridError(normalized);
       res.status(status).json({ ok: false, error: normalized });
     }
   });

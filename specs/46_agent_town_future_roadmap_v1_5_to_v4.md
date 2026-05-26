@@ -854,12 +854,13 @@ V5+ should not jump directly to unrestricted free-play. The staged direction is:
 
 | Stage | Theme | Product stance |
 | --- | --- | --- |
-| V5.0 | World Layer / Civ Map | Show multiple governed towns as a readable world layer without adding public social pressure yet. |
-| V5.1 | Public Districts / Social Presence | Let towns appear near one another with safe public presence and strict redaction. |
-| V5.2 | Agent Services / Civic Marketplace | Allow opt-in agent services after identity, reputation, and permission boundaries are proven. |
-| V5.3 | World Events / Public Works | Add shared events where contributions are bounded, auditable, and reversible. |
-| V5.4 | Controlled Free-Play Sandbox Districts | Introduce free-play only inside constrained sandbox districts with moderation and rollback. |
-| V6+ | Agent Civilization | Consider broad agent society only after retention, governance, security, and social safety are proven. |
+| V5.0 | Region Grid | Show a readable territory grid without adding public social pressure yet. |
+| V5.1 | Territory Claims and Settler Routes | Add bounded adjacent claims and route previews behind explicit prerequisites. |
+| V5.2 | Public Presence and Safe Player Discovery | Let opt-in towns appear near one another with strict redaction. |
+| V5.3 | Civic Service Advice Prototype | Allow bounded civic advice only after identity, reputation, and permission boundaries are proven. |
+| V5.4 | World Events and Public Works | Add shared events where contributions are bounded, auditable, and reversible. |
+| V5.5 | Controlled Free-Play Sandbox Districts | Introduce free-play only inside constrained sandbox districts with moderation and rollback. |
+| V6.0 | Agent Civilization Foundation | Consider broad agent society only after retention, governance, security, and social safety are proven. |
 
 Free-play is a late-stage sandbox, not the next production promise.
 

@@ -303,10 +303,11 @@ feel like:
 
 ### V5+ Boundary
 
-- The roadmap's V5+ section is a staged future ladder: V5.0 Region Grid and
-  Multi-Zoom World Foundation, V5.1 Territory Claims, V5.2 Public Presence,
-  V5.3 Agent Services, V5.4 World Events, V5.5 Controlled Free-Play Sandbox
-  Districts, and V6+ Agent Civilization.
+- The roadmap's V5+ section is a staged future ladder: V5.0 Region Grid,
+  V5.1 Territory Claims and Settler Routes, V5.2 Public Presence and Safe
+  Player Discovery, V5.3 Civic Service Advice Prototype, V5.4 World Events and
+  Public Works, V5.5 Controlled Free-Play Sandbox Districts, and V6.0 Agent
+  Civilization Foundation.
 - V5.0 may exist as a `prototype_gated` world-grid branch package because it is
   read-only territory awareness and cannot affect the normal player route unless
   explicitly enabled.

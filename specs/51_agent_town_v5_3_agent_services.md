@@ -1,4 +1,4 @@
-# Agent Town V5.3 Agent Services And Civic Marketplace
+# Agent Town V5.3 Civic Service Advice Prototype
 
 Status: `prototype_gated`
 
@@ -6,7 +6,7 @@ Feature flag: `FEATURE_WORLD_GRID_V53_AGENT_SERVICES`
 
 ## Goal
 
-Allow towns and agents to offer bounded, permissioned services to each other.
+Allow towns and agents to request bounded, permissioned civic service advice.
 
 This is not an autonomous market. It is a civic services board with strict input
 redaction and no hidden mutation.

@@ -1,5 +1,6 @@
 const { loadPlotByPairId } = require('../founders_plot/store');
 
+// Prototype/ephemeral process-local stores; release storage is documented in docs/technical/WORLD_GRID_STATE_MODEL.md.
 const presenceByOwner = new Map();
 const followsByOwner = new Map();
 

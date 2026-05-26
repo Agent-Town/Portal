@@ -6,7 +6,7 @@ const {
 const WORLD_GRID_FEATURES = [
   {
     key: 'FEATURE_WORLD_GRID_V50_REGION',
-    label: 'V5.0 Region Grid Foundation',
+    label: 'V5.0 Region Grid',
     shortName: 'v50'
   },
   {
@@ -21,7 +21,7 @@ const WORLD_GRID_FEATURES = [
   },
   {
     key: 'FEATURE_WORLD_GRID_V53_AGENT_SERVICES',
-    label: 'V5.3 Agent Services and Civic Marketplace',
+    label: 'V5.3 Civic Service Advice Prototype',
     shortName: 'v53'
   },
   {

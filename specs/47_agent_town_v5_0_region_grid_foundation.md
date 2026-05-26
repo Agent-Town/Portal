@@ -1,7 +1,7 @@
 ---
 schemaVersion: "agent-town-spec-v1"
 documentId: "specs/47_agent_town_v5_0_region_grid_foundation"
-title: "Agent Town V5.0 Region Grid Foundation"
+title: "Agent Town V5.0 Region Grid"
 status: "prototype_gated"
 date: "2026-05-26"
 owner: "Agent Town product"
@@ -10,7 +10,7 @@ releaseGate:
   - "specs/release-gates/threejs_runtime_gate.md"
 ---
 
-# Agent Town V5.0 Region Grid Foundation
+# Agent Town V5.0 Region Grid
 
 V5.0 creates a gated prototype region grid above the Founders Plot settlement
 view. It must not affect the normal V1.5 player route unless explicitly enabled

@@ -1,6 +1,7 @@
-const { loadPlotByPairId, savePlotGraph } = require('../founders_plot/store');
-const { createInitialPlot } = require('../founders_plot/engine');
+const { savePlotGraph } = require('../founders_plot/store');
+const { loadWorldGridPlotPrerequisite } = require('./plot_prerequisite');
 
+// Prototype/ephemeral process-local store; release storage is documented in docs/technical/WORLD_GRID_STATE_MODEL.md.
 const claimStore = new Map();
 
 const RESOURCE_KEYS = ['wood', 'stone', 'food', 'coin'];
@@ -93,17 +94,8 @@ function claimByCell(regionId = '', cellId = '') {
   return claimList(regionId).find((claim) => claim.cellId === cellId && claim.status !== 'cancelled') || null;
 }
 
-function ensurePlotState(identity, nowMs) {
-  let state = loadPlotByPairId(identity.pairId);
-  if (!state) {
-    state = createInitialPlot({
-      pairId: identity.pairId,
-      houseId: identity.houseId || null,
-      nowMs
-    });
-    savePlotGraph(state);
-  }
-  return state;
+function ensurePlotState(identity) {
+  return loadWorldGridPlotPrerequisite(identity);
 }
 
 function canAfford(plot, cost = {}) {

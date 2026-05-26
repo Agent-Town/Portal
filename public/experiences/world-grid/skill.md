@@ -10,7 +10,8 @@ account data or imply that public world features are live unless the server
 state says they are enabled.
 
 Claims may only be planned, completed, or cancelled through the explicit
-territory tools. Service recommendations are advice only. Accepting a service
+territory tools, and mutating V5.1+ tools require the player to have an existing
+Founders Plot. Service recommendations are advice only. Accepting a service
 result must not spend resources, build objects, claim territory, or mutate
 Founders Plot.
 

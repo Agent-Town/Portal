@@ -13,11 +13,12 @@ The ladder is:
 2. Governed town.
 3. Multiple towns.
 4. Regional grid.
-5. Public presence.
-6. Agent services.
-7. World events.
-8. Controlled free-play districts.
-9. Agent civilization.
+5. Territory claims and settler routes.
+6. Public presence and safe player discovery.
+7. Civic service advice prototype.
+8. World events and public works.
+9. Controlled free-play sandbox districts.
+10. Agent civilization foundation.
 
 ## Zoom Model
 
@@ -40,10 +41,10 @@ gate, safety review, and retention dependency pass.
 
 | Slice | release_status | Player-visible by default | Evidence |
 | --- | --- | --- | --- |
-| V5.0 Region grid | `prototype_gated` | No | `docs/release-evidence/WORLD_GRID_V50_REGION_PROTOTYPE_EVIDENCE_2026-05-26.md` |
-| V5.1 Territory claims | `prototype_gated` | No | API, UI, and Playwright coverage in the world-grid prototype. |
-| V5.2 Public presence | `prototype_gated` | No | Redaction, opt-in/out, follow, and public summary coverage. |
-| V5.3 Agent services | `prototype_gated` | No | Redacted inputs, schema-shaped output, accept/report coverage. |
-| V5.4 World events | `prototype_gated` | No | Preview, cap, idempotency, conservation, and cosmetic reward coverage. |
-| V5.5 Sandbox districts | `prototype_gated` | No | Typed props, moderation rejection, agent demo, rollback, and private-town isolation coverage. |
-| V6.0 Agent civilization | `research_only` | No | Blocked until V5 safety, rollback, redaction, retention, and civic-governance gates are proven. |
+| V5.0 Region Grid | `prototype_gated` | No | `docs/release-evidence/WORLD_GRID_V50_REGION_PROTOTYPE_EVIDENCE_2026-05-26.md` |
+| V5.1 Territory Claims and Settler Routes | `prototype_gated` | No | API, UI, and Playwright coverage in the world-grid prototype. |
+| V5.2 Public Presence and Safe Player Discovery | `prototype_gated` | No | Redaction, opt-in/out, follow, and public summary coverage. |
+| V5.3 Civic Service Advice Prototype | `prototype_gated` | No | Redacted inputs, schema-shaped output, accept/report coverage. |
+| V5.4 World Events and Public Works | `prototype_gated` | No | Preview, cap, idempotency, conservation, and cosmetic reward coverage. |
+| V5.5 Controlled Free-Play Sandbox Districts | `prototype_gated` | No | Typed props, moderation rejection, agent demo, rollback, and private-town isolation coverage. |
+| V6.0 Agent Civilization Foundation | `research_only` | No | Blocked until V5 safety, rollback, redaction, retention, and civic-governance gates are proven. |

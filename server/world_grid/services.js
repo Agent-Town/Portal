@@ -58,6 +58,7 @@ const SERVICE_LISTINGS = [
   }
 ];
 
+// Prototype/ephemeral process-local stores; release storage is documented in docs/technical/WORLD_GRID_STATE_MODEL.md.
 const serviceRequestsByOwner = new Map();
 const reputationByService = new Map();
 

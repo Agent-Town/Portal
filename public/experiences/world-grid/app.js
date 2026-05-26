@@ -35,6 +35,26 @@
     return body;
   }
 
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    }[char]));
+  }
+
+  function escapeAttr(value) {
+    return escapeHtml(value).replace(/`/g, '&#96;');
+  }
+
+  function percentValue(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return 0;
+    return Math.max(0, Math.min(100, Math.round(number)));
+  }
+
   function cellButton(cell) {
     const button = document.createElement('button');
     button.type = 'button';
@@ -65,23 +85,23 @@
     const option = (state.payload?.territory?.claimOptions || []).find((item) => item.cellId === cell.cellId) || null;
     const claim = (state.payload?.territory?.claims || []).find((item) => item.cellId === cell.cellId) || null;
     const claimAction = claimsEnabled && option
-      ? `<button type="button" class="world-grid-action" data-world-grid-plan-claim="${cell.cellId}">Plan claim</button>`
+      ? `<button type="button" class="world-grid-action" data-world-grid-plan-claim="${escapeAttr(cell.cellId)}">Plan claim</button>`
       : claimsEnabled && claim?.status === 'planned'
-        ? `<button type="button" class="world-grid-action" data-world-grid-complete-claim="${claim.claimId}">Complete claim</button>
-           <button type="button" class="world-grid-action world-grid-action--quiet" data-world-grid-cancel-claim="${claim.claimId}">Cancel</button>`
+        ? `<button type="button" class="world-grid-action" data-world-grid-complete-claim="${escapeAttr(claim.claimId)}">Complete claim</button>
+           <button type="button" class="world-grid-action world-grid-action--quiet" data-world-grid-cancel-claim="${escapeAttr(claim.claimId)}">Cancel</button>`
         : '';
     detail.innerHTML = `
-      <h2>${cell.label}</h2>
-      <p>${explanation?.summary || cell.accessibleName}</p>
+      <h2>${escapeHtml(cell.label)}</h2>
+      <p>${escapeHtml(explanation?.summary || cell.accessibleName)}</p>
       <dl>
-        <div><dt>State</dt><dd>${cell.state}</dd></div>
-        <div><dt>Terrain</dt><dd>${cell.terrain}</dd></div>
-        <div><dt>Feature</dt><dd>${cell.feature || 'none'}</dd></div>
-        <div><dt>Risk</dt><dd>${cell.risk || 'none'}</dd></div>
+        <div><dt>State</dt><dd>${escapeHtml(cell.state)}</dd></div>
+        <div><dt>Terrain</dt><dd>${escapeHtml(cell.terrain)}</dd></div>
+        <div><dt>Feature</dt><dd>${escapeHtml(cell.feature || 'none')}</dd></div>
+        <div><dt>Risk</dt><dd>${escapeHtml(cell.risk || 'none')}</dd></div>
       </dl>
-      <p>${explanation?.futureUse || 'V5.0 is a read-only territory survey.'}</p>
-      ${option ? `<p>${option.cloverAdvice}</p><p>Cost: ${formatCost(option.cost)}. Benefit: ${option.benefit.label}.</p>` : ''}
-      ${claim ? `<p>Claim status: ${claim.status}. ${claim.cloverAdvice || ''}</p>` : ''}
+      <p>${escapeHtml(explanation?.futureUse || 'V5.0 is a read-only territory survey.')}</p>
+      ${option ? `<p>${escapeHtml(option.cloverAdvice)}</p><p>Cost: ${escapeHtml(formatCost(option.cost))}. Benefit: ${escapeHtml(option.benefit.label)}.</p>` : ''}
+      ${claim ? `<p>Claim status: ${escapeHtml(claim.status)}. ${escapeHtml(claim.cloverAdvice || '')}</p>` : ''}
       ${claimAction}
     `;
     const plan = detail.querySelector('[data-world-grid-plan-claim]');
@@ -200,7 +220,7 @@
       const payload = await api('/api/world/public-towns');
       const towns = payload.towns || [];
       list.innerHTML = towns.length
-        ? towns.map((town) => `<p><strong>${town.townName}</strong><br>${town.publicSummary.charmBand} in ${town.regionHint}</p>`).join('')
+        ? towns.map((town) => `<p><strong>${escapeHtml(town.townName)}</strong><br><span>${escapeHtml(town.displayName)}</span><br>${escapeHtml(town.publicSummary.charmBand)} in ${escapeHtml(town.regionHint)}</p>`).join('')
         : '<p>No public neighbors yet.</p>';
     } catch (error) {
       list.textContent = error?.body?.error?.message || 'Public presence is not available.';
@@ -244,10 +264,10 @@
       const services = payload.services || [];
       list.innerHTML = services.map((service) => `
         <article class="world-grid-service-card">
-          <strong>${service.title}</strong>
-          <p>${service.description}</p>
-          <p>${service.serviceKind} · ${service.reputation.reliabilityBand}</p>
-          <button type="button" class="world-grid-action" data-world-grid-request-service="${service.serviceId}">Request advice</button>
+          <strong>${escapeHtml(service.title)}</strong>
+          <p>${escapeHtml(service.description)}</p>
+          <p>${escapeHtml(service.serviceKind)} · ${escapeHtml(service.reputation.reliabilityBand)}</p>
+          <button type="button" class="world-grid-action" data-world-grid-request-service="${escapeAttr(service.serviceId)}">Request advice</button>
         </article>
       `).join('');
       for (const button of list.querySelectorAll('[data-world-grid-request-service]')) {
@@ -287,11 +307,11 @@
     }
     result.innerHTML = `
       <div class="world-grid-service-result">
-        <strong>${request.output.recommendation}</strong>
-        <p>${request.output.rationale}</p>
-        <p>${request.output.nextStep}</p>
-        <button type="button" class="world-grid-action" data-world-grid-accept-service="${request.requestId}">Accept result</button>
-        <button type="button" class="world-grid-action world-grid-action--quiet" data-world-grid-report-service="${request.requestId}">Report issue</button>
+        <strong>${escapeHtml(request.output.recommendation)}</strong>
+        <p>${escapeHtml(request.output.rationale)}</p>
+        <p>${escapeHtml(request.output.nextStep)}</p>
+        <button type="button" class="world-grid-action" data-world-grid-accept-service="${escapeAttr(request.requestId)}">Accept result</button>
+        <button type="button" class="world-grid-action world-grid-action--quiet" data-world-grid-report-service="${escapeAttr(request.requestId)}">Report issue</button>
       </div>
     `;
     const accept = result.querySelector('[data-world-grid-accept-service]');
@@ -331,19 +351,22 @@
     try {
       const payload = await api('/api/world/events');
       const items = payload.events || [];
-      list.innerHTML = items.map(({ event, personal }) => `
-        <article class="world-grid-event-card" data-world-grid-event-card="${event.eventId}">
-          <strong>${event.title}</strong>
-          <p>${event.status} · ${event.progress.percent}% complete · ${event.participantCount} towns</p>
-          <div class="world-grid-event-meter" aria-label="${event.title} progress">
-            <span style="--world-grid-event-progress: ${event.progress.percent}%"></span>
-          </div>
-          <p>Goal: ${formatBundle(event.publicGoal)}. Your contribution: ${formatBundle(personal.total)}.</p>
-          <button type="button" class="world-grid-action" data-world-grid-preview-event="${event.eventId}">Preview contribution</button>
-          <button type="button" class="world-grid-action" data-world-grid-contribute-event="${event.eventId}">Contribute 1 coin</button>
-          ${personal.contributionCount > 0 ? `<button type="button" class="world-grid-action world-grid-action--quiet" data-world-grid-claim-event-reward="${event.eventId}">Claim badge</button>` : ''}
-        </article>
-      `).join('');
+      list.innerHTML = items.map(({ event, personal }) => {
+        const progress = percentValue(event.progress.percent);
+        return `
+          <article class="world-grid-event-card" data-world-grid-event-card="${escapeAttr(event.eventId)}">
+            <strong>${escapeHtml(event.title)}</strong>
+            <p>${escapeHtml(event.status)} · ${progress}% complete · ${escapeHtml(event.participantCount)} towns</p>
+            <div class="world-grid-event-meter" aria-label="${escapeAttr(`${event.title} progress`)}">
+              <span style="--world-grid-event-progress: ${progress}%"></span>
+            </div>
+            <p>Goal: ${escapeHtml(formatBundle(event.publicGoal))}. Your contribution: ${escapeHtml(formatBundle(personal.total))}.</p>
+            <button type="button" class="world-grid-action" data-world-grid-preview-event="${escapeAttr(event.eventId)}">Preview contribution</button>
+            <button type="button" class="world-grid-action" data-world-grid-contribute-event="${escapeAttr(event.eventId)}">Contribute 1 coin</button>
+            ${personal.contributionCount > 0 ? `<button type="button" class="world-grid-action world-grid-action--quiet" data-world-grid-claim-event-reward="${escapeAttr(event.eventId)}">Claim badge</button>` : ''}
+          </article>
+        `;
+      }).join('');
     } catch (error) {
       list.textContent = error?.body?.error?.message || 'World events are not available.';
     }
@@ -372,7 +395,7 @@
 
   function renderEventResult(message) {
     const result = qs('[data-world-grid-event-result]');
-    result.innerHTML = `<div class="world-grid-event-result"><p>${message}</p></div>`;
+    result.innerHTML = `<div class="world-grid-event-result"><p>${escapeHtml(message)}</p></div>`;
   }
 
   async function previewWorldEventContribution(eventId) {
@@ -420,9 +443,9 @@
       const propCount = (district.cells || []).reduce((sum, cell) => sum + (cell.props || []).length, 0);
       container.innerHTML = `
         <article class="world-grid-sandbox-card">
-          <strong>${district.title}</strong>
-          <p>${district.status} · ${district.participants.length} visitors · ${propCount} props</p>
-          <p>${participant ? `You are ${participant.displayName}.` : 'Enter with redacted public presence.'}</p>
+          <strong>${escapeHtml(district.title)}</strong>
+          <p>${escapeHtml(district.status)} · ${escapeHtml(district.participants.length)} visitors · ${escapeHtml(propCount)} props</p>
+          <p>${escapeHtml(participant ? `You are ${participant.displayName}.` : 'Enter with redacted public presence.')}</p>
           <button type="button" class="world-grid-action" data-world-grid-sandbox-enter>Enter sandbox</button>
           <button type="button" class="world-grid-action" data-world-grid-sandbox-place>Place lantern</button>
           <button type="button" class="world-grid-action world-grid-action--quiet" data-world-grid-sandbox-forbidden>Place forbidden prop</button>
@@ -438,7 +461,7 @@
 
   function renderSandboxResult(message) {
     const result = qs('[data-world-grid-sandbox-result]');
-    result.innerHTML = `<div class="world-grid-sandbox-result"><p>${message}</p></div>`;
+    result.innerHTML = `<div class="world-grid-sandbox-result"><p>${escapeHtml(message)}</p></div>`;
   }
 
   function bindSandboxPanel() {

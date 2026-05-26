@@ -11,6 +11,7 @@ const ALLOWED_AGENT_DEMOS = new Map([
   ['route-signpost', { propId: 'notice-board', label: 'Route Signpost Demo' }]
 ]);
 
+// Prototype/ephemeral process-local district state; release storage is documented in docs/technical/WORLD_GRID_STATE_MODEL.md.
 const district = {
   districtId: 'sandbox_public_commons',
   title: 'Public Commons Sandbox',
@@ -29,6 +30,7 @@ const district = {
   }
 };
 
+// Prototype/ephemeral process-local stores; release storage is documented in docs/technical/WORLD_GRID_STATE_MODEL.md.
 const participantsByOwner = new Map();
 const actions = [];
 const snapshots = new Map();

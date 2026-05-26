@@ -1,5 +1,5 @@
-const { loadPlotByPairId, savePlotGraph } = require('../founders_plot/store');
-const { createInitialPlot } = require('../founders_plot/engine');
+const { savePlotGraph } = require('../founders_plot/store');
+const { loadWorldGridPlotPrerequisite } = require('./plot_prerequisite');
 
 const RESOURCE_KEYS = ['wood', 'stone', 'food', 'coin'];
 
@@ -26,6 +26,7 @@ const WORLD_EVENT_TEMPLATES = [
   }
 ];
 
+// Prototype/ephemeral process-local stores; release storage is documented in docs/technical/WORLD_GRID_STATE_MODEL.md.
 const contributionsByEvent = new Map();
 const rewardsByEvent = new Map();
 
@@ -179,17 +180,8 @@ function previewContribution(owner, eventId = '', requestedBundle = {}, nowMs = 
   };
 }
 
-function ensurePlotState(identity, nowMs) {
-  let state = loadPlotByPairId(identity.pairId);
-  if (!state) {
-    state = createInitialPlot({
-      pairId: identity.pairId,
-      houseId: identity.houseId || null,
-      nowMs
-    });
-    savePlotGraph(state);
-  }
-  return state;
+function ensurePlotState(identity) {
+  return loadWorldGridPlotPrerequisite(identity);
 }
 
 function canAfford(plot, bundle = {}) {

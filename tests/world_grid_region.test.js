@@ -1,6 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const http = require('node:http');
+const path = require('node:path');
 const express = require('express');
 
 const { createWorldGridRouter } = require('../server/world_grid/routes');
@@ -8,7 +10,8 @@ const {
   generateRegion,
   normalizeOwnerIdentity
 } = require('../server/world_grid/region');
-const { loadPlotByPairId } = require('../server/founders_plot/store');
+const { createInitialPlot } = require('../server/founders_plot/engine');
+const { loadPlotByPairId, savePlotGraph } = require('../server/founders_plot/store');
 
 async function withWorldGridServer({ identity, envPatch = {} }, fn) {
   const previous = {
@@ -50,6 +53,16 @@ async function withDynamicWorldGridServer(envPatch, fn) {
   }, async (baseUrl) => {
     return await fn(baseUrl, (pairId) => ({ 'x-test-pair-id': pairId }));
   });
+}
+
+function seedFoundersPlot(pairId, options = {}) {
+  const state = createInitialPlot({
+    pairId,
+    houseId: options.houseId || null,
+    nowMs: options.nowMs || Date.now()
+  });
+  savePlotGraph(state);
+  return state;
 }
 
 test('V5.0 region generation is deterministic with stable cells and home settlement', () => {
@@ -111,6 +124,26 @@ test('production world grid query overrides are ignored unless admin authorized'
     assert.equal(playerResponse.status, 403, JSON.stringify(playerBody));
     assert.equal(playerBody.error.code, 'FEATURE_DISABLED');
 
+    const playerToolsResponse = await fetch(`${baseUrl}/api/world/tools?worldGridFeatureFlags=all`, {
+      headers: { 'x-world-grid-feature-flags': 'all' }
+    });
+    const playerToolsBody = await playerToolsResponse.json();
+    assert.equal(playerToolsResponse.status, 403, JSON.stringify(playerToolsBody));
+    assert.equal(playerToolsBody.error.code, 'FEATURE_DISABLED');
+
+    const playerMutationResponse = await fetch(`${baseUrl}/api/world/territory/plan-claim?worldGridFeatureFlags=all`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-world-grid-feature-flags': 'all'
+      },
+      body: JSON.stringify({ cellId: 'region_fake:0,1' })
+    });
+    const playerMutationBody = await playerMutationResponse.json();
+    assert.equal(playerMutationResponse.status, 403, JSON.stringify(playerMutationBody));
+    assert.equal(playerMutationBody.error.code, 'FEATURE_DISABLED');
+    assert.equal(loadPlotByPairId('session:world-grid-production-query'), null);
+
     const adminResponse = await fetch(`${baseUrl}/api/world/region`, {
       headers: {
         'x-admin-token': 'admin-secret',
@@ -120,6 +153,16 @@ test('production world grid query overrides are ignored unless admin authorized'
     const adminBody = await adminResponse.json();
     assert.equal(adminResponse.status, 200, JSON.stringify(adminBody));
     assert.equal(adminBody.region.cells.length, 19);
+
+    const adminToolsResponse = await fetch(`${baseUrl}/api/world/tools`, {
+      headers: {
+        'x-admin-token': 'admin-secret',
+        'x-world-grid-feature-flags': 'all'
+      }
+    });
+    const adminToolsBody = await adminToolsResponse.json();
+    assert.equal(adminToolsResponse.status, 200, JSON.stringify(adminToolsBody));
+    assert.equal(adminToolsBody.tools.every((tool) => typeof tool.featureFlag === 'string'), true);
   });
 });
 
@@ -161,6 +204,85 @@ test('world grid focus and read-only tools do not mutate Founders Plot state', a
     const wrongOwnerBody = await wrongOwnerResponse.json();
     assert.equal(wrongOwnerResponse.status, 403, JSON.stringify(wrongOwnerBody));
     assert.equal(wrongOwnerBody.error.code, 'FORBIDDEN');
+    assert.equal(loadPlotByPairId(identity.pairId), null);
+  });
+});
+
+test('V5.1+ mutating world-grid routes require an existing Founders Plot without side effects', async () => {
+  const identity = { pairId: `session:world-grid-missing-plot-${Date.now()}-${Math.random().toString(16).slice(2)}` };
+  await withWorldGridServer({
+    identity,
+    envPatch: { NODE_ENV: 'test', WORLD_GRID_FEATURE_FLAGS: 'all' }
+  }, async (baseUrl) => {
+    assert.equal(loadPlotByPairId(identity.pairId), null);
+
+    const stateResponse = await fetch(`${baseUrl}/api/world/region`);
+    const stateBody = await stateResponse.json();
+    assert.equal(stateResponse.status, 200, JSON.stringify(stateBody));
+    const target = stateBody.region.cells.find((cell) => cell.state === 'claimable');
+    assert.ok(target);
+
+    const focusResponse = await fetch(`${baseUrl}/api/world/region/focus-cell`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ cellId: target.cellId })
+    });
+    assert.equal(focusResponse.status, 200, await focusResponse.text());
+    assert.equal(loadPlotByPairId(identity.pairId), null);
+
+    const planResponse = await fetch(`${baseUrl}/api/world/territory/plan-claim`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ cellId: target.cellId })
+    });
+    const planBody = await planResponse.json();
+    assert.equal(planResponse.status, 409, JSON.stringify(planBody));
+    assert.equal(planBody.error.code, 'WORLD_GRID_PLOT_REQUIRED');
+    assert.equal(loadPlotByPairId(identity.pairId), null);
+
+    const eventResponse = await fetch(`${baseUrl}/api/world/events/contribute`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ eventId: 'event_great_ridge_bridge', bundle: { coin: 1 }, idempotencyKey: 'missing-plot' })
+    });
+    const eventBody = await eventResponse.json();
+    assert.equal(eventResponse.status, 409, JSON.stringify(eventBody));
+    assert.equal(eventBody.error.code, 'WORLD_GRID_PLOT_REQUIRED');
+    assert.equal(loadPlotByPairId(identity.pairId), null);
+
+    const sandboxResponse = await fetch(`${baseUrl}/api/world/sandbox/enter`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({})
+    });
+    const sandboxBody = await sandboxResponse.json();
+    assert.equal(sandboxResponse.status, 409, JSON.stringify(sandboxBody));
+    assert.equal(sandboxBody.error.code, 'WORLD_GRID_PLOT_REQUIRED');
+    assert.equal(loadPlotByPairId(identity.pairId), null);
+  });
+});
+
+test('runtime world-grid tools are feature-gated and match the pack manifest metadata', async () => {
+  const manifestPath = path.join(__dirname, '..', 'public', 'experiences', 'world-grid', 'manifest.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  const manifestTools = Array.isArray(manifest.toolMetadata) ? manifest.toolMetadata : [];
+
+  await withWorldGridServer({
+    identity: { pairId: 'session:world-grid-tool-parity' },
+    envPatch: { NODE_ENV: 'test', WORLD_GRID_FEATURE_FLAGS: 'all' }
+  }, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/world/tools`);
+    const body = await response.json();
+    assert.equal(response.status, 200, JSON.stringify(body));
+    assert.equal(body.tools.every((tool) => typeof tool.featureFlag === 'string' && tool.featureFlag.startsWith('FEATURE_WORLD_GRID_')), true);
+
+    const runtimePairs = body.tools
+      .map((tool) => [tool.name, tool.featureFlag])
+      .sort((a, b) => a[0].localeCompare(b[0]));
+    const manifestPairs = manifestTools
+      .map((tool) => [tool.name, tool.featureFlag])
+      .sort((a, b) => a[0].localeCompare(b[0]));
+    assert.deepEqual(manifestPairs, runtimePairs);
   });
 });
 
@@ -170,6 +292,8 @@ test('V5.1 territory claim tools plan and complete one adjacent claim with exact
     identity,
     envPatch: { NODE_ENV: 'test', WORLD_GRID_FEATURE_FLAGS: 'all' }
   }, async (baseUrl) => {
+    seedFoundersPlot(identity.pairId);
+
     const toolsResponse = await fetch(`${baseUrl}/api/world/tools`);
     const toolsBody = await toolsResponse.json();
     assert.equal(toolsResponse.status, 200, JSON.stringify(toolsBody));
@@ -230,6 +354,8 @@ test('V5.2 public presence is opt-in, redacted, followable, and removable', asyn
   }, async (baseUrl, headersFor) => {
     const ownerA = `session:world-grid-public-a-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const ownerB = `session:world-grid-public-b-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    seedFoundersPlot(ownerA);
+    seedFoundersPlot(ownerB);
 
     const optInA = await fetch(`${baseUrl}/api/world/public-presence/opt-in`, {
       method: 'POST',
@@ -297,6 +423,7 @@ test('V5.3 agent services redact inputs and never mutate world state on accept',
     const owner = `session:world-grid-services-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const headers = headersFor(owner);
     const ownerIdentity = normalizeOwnerIdentity({ pairId: owner });
+    seedFoundersPlot(owner);
 
     const beforeRegionResponse = await fetch(`${baseUrl}/api/world/region`, { headers });
     const beforeRegion = await beforeRegionResponse.json();
@@ -415,6 +542,8 @@ test('V5.4 world events enforce caps, idempotency, conservation, and cosmetic re
     const headersA = headersFor(ownerA);
     const headersB = headersFor(ownerB);
     const ownerAIdentity = normalizeOwnerIdentity({ pairId: ownerA });
+    seedFoundersPlot(ownerA);
+    seedFoundersPlot(ownerB);
 
     const toolsResponse = await fetch(`${baseUrl}/api/world/tools`, { headers: headersA });
     const toolsBody = await toolsResponse.json();
@@ -523,7 +652,8 @@ test('V5.5 sandbox districts moderate typed actions, rollback, and keep private 
   }, async (baseUrl, headersFor) => {
     const owner = `session:world-grid-sandbox-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const headers = headersFor(owner);
-    assert.equal(loadPlotByPairId(owner), null);
+    seedFoundersPlot(owner);
+    const initialPlotInventory = { ...loadPlotByPairId(owner).plot.inventory };
 
     const toolsResponse = await fetch(`${baseUrl}/api/world/tools`, { headers });
     const toolsBody = await toolsResponse.json();
@@ -610,6 +740,6 @@ test('V5.5 sandbox districts moderate typed actions, rollback, and keep private 
     const leaveBody = await leaveResponse.json();
     assert.equal(leaveResponse.status, 200, JSON.stringify(leaveBody));
     assert.equal(leaveBody.removed, true);
-    assert.equal(loadPlotByPairId(owner), null);
+    assert.deepEqual(loadPlotByPairId(owner).plot.inventory, initialPlotInventory);
   });
 });
