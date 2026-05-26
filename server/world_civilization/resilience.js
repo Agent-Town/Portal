@@ -5,7 +5,7 @@ const { V6_WORLD_FEATURE_FLAG, isWorldGridFeatureEnabled } = require('../world_g
 const V6_RESILIENCE_BASELINE_VERSION = 'agent-town.v6.resilience.v1';
 
 const REQUIRED_RELEASE_GAPS = [
-  'M16_PROCESS_RESTART_TESTS_REQUIRED',
+  'M16_PROCESS_RESTART_RELEASE_COVERAGE_REQUIRED',
   'M16_REPLAY_RECONSTRUCTION_RELEASE_COVERAGE_REQUIRED',
   'M16_MIGRATION_UPGRADE_DOWNGRADE_TESTS_REQUIRED',
   'M16_LOAD_AND_RATE_TESTS_REQUIRED',
@@ -18,7 +18,7 @@ const V6_CIVIC_RESILIENCE_STORES = [
     label: 'Civic audit ledger',
     modulePath: 'server/world_civilization/audit_ledger.js',
     migrationVersion: 'v1',
-    restartCoverage: 'tests/world_civilization_audit_ledger.test.js',
+    restartCoverage: 'tests/world_civilization_process_restart.test.js',
     requiredMethods: ['append', 'replay', 'getByEntryId', 'getByIdempotency', 'count', 'close']
   },
   {

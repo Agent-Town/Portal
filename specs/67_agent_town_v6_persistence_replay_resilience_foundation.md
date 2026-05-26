@@ -13,6 +13,7 @@ Test coverage:
 
 - `tests/world_civilization_resilience.test.js`
 - `tests/world_civilization_replay_reconstruction.test.js`
+- `tests/world_civilization_process_restart.test.js`
 
 ## Boundary
 
@@ -56,11 +57,17 @@ verifies sequence order, hash-chain continuity, redacted privacy envelopes,
 action counts, migration-version counts, rollback handle counts, and paginated
 ledger replay without applying world state or exposing actor account ids.
 
+`tests/world_civilization_process_restart.test.js` adds process-level restart
+evidence for the civic audit ledger by seeding, closing, reopening, replaying,
+and retrying exact idempotent writes across separate Node process lifetimes
+against the same SQLite file.
+
 ## Open Release Gaps
 
 M16 remains incomplete until all of these gates close:
 
-- Process restart tests, not only same-process close/reopen tests.
+- Process restart tests for every civic store, not only the current audit-ledger
+  restart replay probe.
 - Release-grade replay reconstruction across process restart, larger datasets,
   and every civic summary surface.
 - Migration upgrade and downgrade tests for every civic table.
