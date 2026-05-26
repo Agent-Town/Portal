@@ -43,6 +43,9 @@ Public works shared resources foundation:
 Modal lab surface foundation:
 `specs/66_agent_town_v6_modal_lab_surface_foundation.md`
 
+Persistence replay resilience foundation:
+`specs/67_agent_town_v6_persistence_replay_resilience_foundation.md`
+
 ## Implementation Boundary
 
 Do not add V6 civic mechanics to normal gameplay or the world-grid prototype
@@ -63,6 +66,11 @@ The research-only modal lab surface contract in
 It does not add a V6 route or normal gameplay surface; it only records the
 modal-first, debug-observable constraints that any later internal V6 lab UI must
 meet.
+
+The research-only resilience baseline in
+`server/world_civilization/resilience.js` inspects the current SQLite civic
+stores and keeps `releaseReady: false` until process restart, replay
+reconstruction, migration, load/rate, and rollback recovery gates are proven.
 
 ## Goal
 

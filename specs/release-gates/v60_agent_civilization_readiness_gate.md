@@ -38,6 +38,9 @@ Public works shared resources foundation:
 Modal lab surface foundation:
 `specs/66_agent_town_v6_modal_lab_surface_foundation.md`
 
+Persistence replay resilience foundation:
+`specs/67_agent_town_v6_persistence_replay_resilience_foundation.md`
+
 V6.0 Agent Civilization Foundation must not become player-visible until every
 gate below has implementation, deterministic tests, and security/product signoff.
 
@@ -59,6 +62,11 @@ gate below has implementation, deterministic tests, and security/product signoff
   `server/world_civilization/lab_surface.js`, but it must stay route-neutral,
   modal-first, hidden from players, non-executing, and covered by contract
   tests.
+- The research-only resilience baseline may exist in
+  `server/world_civilization/resilience.js`, but it must keep
+  `releaseReady: false` until process restart, replay reconstruction,
+  migration upgrade/downgrade, load/rate, and rollback recovery gates have
+  deterministic evidence.
 
 ## Prerequisites
 
@@ -133,6 +141,13 @@ gate below has implementation, deterministic tests, and security/product signoff
   exposure. Current contract-only coverage starts in
   `server/world_civilization/lab_surface.js`; release still requires real modal
   UI checks before any player-visible V6 lab work.
+- Persistence and replay resilience must prove every V6 civic store survives
+  process restarts, reconstructs summaries from audit replay, rejects duplicate
+  retries under load, migrates forward and backward through schema versions, and
+  recovers rollback handles after failures. Current research-only baseline
+  tracking starts in `server/world_civilization/resilience.js`; release still
+  requires process-level restart, replay reconstruction, migration, load/rate,
+  and rollback recovery tests.
 - Privacy review must prove no private town state, wallet secret, Brain secret,
   provider credential, debug trace, or unapproved transcript enters civic
   surfaces.
