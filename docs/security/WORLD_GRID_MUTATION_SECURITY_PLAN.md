@@ -26,7 +26,9 @@ until the controls below are implemented and covered by deterministic tests.
   `idempotencyKey` shape at the router boundary and record a process-local
   request hash/success response. Exact retries replay the stored response;
   changed payload reuse returns `IDEMPOTENCY_CONFLICT`. This remains a
-  prototype guard, not durable replay-safe persistence.
+  prototype guard, not durable replay-safe persistence. Current Node coverage
+  proves exact replay and changed-payload rejection across every externally
+  visible V5.1-V5.5 mutating route surface.
 - Mutating V5.1+ world-grid routes and tool routes use process-local rate
   buckets keyed by owner and mutation surface. This throttles prototype abuse
   paths but is not durable, distributed, or session-auth aware.

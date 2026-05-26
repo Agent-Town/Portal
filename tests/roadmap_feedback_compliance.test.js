@@ -286,12 +286,15 @@ test('world-grid idempotency policy rejects changed retry payloads before releas
   const evidence = read('docs/release-evidence/WORLD_GRID_V50_REGION_PROTOTYPE_EVIDENCE_2026-05-26.md');
 
   assert.match(plan, /reject changed key reuse/);
+  assert.match(plan, /all externally visible mutating prototype routes/);
   assert.match(security, /IDEMPOTENCY_CONFLICT/);
   assert.match(security, /process-local\s+request hash\/success response/);
+  assert.match(security, /every externally\s+visible V5\.1-V5\.5 mutating route surface/);
   assert.match(security, /reject conflicting retries after restart/);
   assert.match(stateModel, /server\/world_grid\/idempotency\.js/);
   assert.match(stateModel, /Durable idempotency rows/);
   assert.match(evidence, /Idempotency replay guard/);
+  assert.match(evidence, /every externally visible V5\.1-V5\.5 mutating route surface/);
   assert.match(evidence, /durable\s+idempotency records/);
 });
 

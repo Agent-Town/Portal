@@ -100,6 +100,31 @@ async function fetchWorldGridCsrfToken(baseUrl, headers = {}) {
   return body.csrfToken;
 }
 
+async function postWorldGridJson(baseUrl, route, body = {}, headers = {}) {
+  const response = await fetch(`${baseUrl}${route}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...headers },
+    body: JSON.stringify(body)
+  });
+  const payload = await response.json();
+  return { response, payload };
+}
+
+async function assertWorldGridRouteIdempotency({ baseUrl, headers = {}, route, body, conflictBody }) {
+  const first = await postWorldGridJson(baseUrl, route, body, headers);
+  assert.equal(first.response.status, 200, `${route} first: ${JSON.stringify(first.payload)}`);
+
+  const replay = await postWorldGridJson(baseUrl, route, body, headers);
+  assert.equal(replay.response.status, 200, `${route} replay: ${JSON.stringify(replay.payload)}`);
+  assert.equal(replay.response.headers.get('x-world-grid-idempotency-replay'), '1', route);
+  assert.deepEqual(replay.payload, first.payload, route);
+
+  const conflict = await postWorldGridJson(baseUrl, route, conflictBody, headers);
+  assert.equal(conflict.response.status, 409, `${route} conflict: ${JSON.stringify(conflict.payload)}`);
+  assert.equal(conflict.payload.error.code, 'IDEMPOTENCY_CONFLICT', route);
+  return first.payload;
+}
+
 test('V5.0 region generation is deterministic with stable cells and home settlement', () => {
   const identity = { pairId: 'wallet:solana:WorldGridOwner111', houseId: null };
   const one = generateRegion(identity, { nowMs: 1_000, hqLevel: 2 });
@@ -446,6 +471,181 @@ test('mutating world-grid idempotency replays exact responses and rejects confli
     assert.equal(sandboxCleanup.restored, true);
 
     assert.equal(worldGridIdempotencyRecordCount(), beforeRecordCount + 4);
+  });
+});
+
+test('all externally visible mutating world-grid routes replay exact idempotent successes and reject conflicts', async () => {
+  await withDynamicWorldGridServer({
+    NODE_ENV: 'test',
+    WORLD_GRID_FEATURE_FLAGS: 'all'
+  }, async (baseUrl, headersFor) => {
+    const ownerA = `session:world-grid-idempotency-matrix-a-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const ownerB = `session:world-grid-idempotency-matrix-b-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    seedFoundersPlot(ownerA);
+    seedFoundersPlot(ownerB);
+    const headersA = headersFor(ownerA);
+    const headersB = headersFor(ownerB);
+
+    const optionsResponse = await fetch(`${baseUrl}/api/world/territory/claim-options`, { headers: headersA });
+    const optionsBody = await optionsResponse.json();
+    assert.equal(optionsResponse.status, 200, JSON.stringify(optionsBody));
+    assert.ok(optionsBody.options.length >= 5);
+    const [planOption, cancelOption, completeOption, conflictOption] = optionsBody.options;
+
+    await assertWorldGridRouteIdempotency({
+      baseUrl,
+      headers: headersA,
+      route: '/api/world/territory/plan-claim',
+      body: { cellId: planOption.cellId, idempotencyKey: 'matrix_plan_claim_001' },
+      conflictBody: { cellId: conflictOption.cellId, idempotencyKey: 'matrix_plan_claim_001' }
+    });
+
+    const cancelPrep = await postWorldGridJson(baseUrl, '/api/world/territory/plan-claim', {
+      cellId: cancelOption.cellId,
+      idempotencyKey: 'matrix_cancel_prep_001'
+    }, headersA);
+    assert.equal(cancelPrep.response.status, 200, JSON.stringify(cancelPrep.payload));
+    await assertWorldGridRouteIdempotency({
+      baseUrl,
+      headers: headersA,
+      route: '/api/world/territory/cancel-claim',
+      body: { claimId: cancelPrep.payload.claim.claimId, idempotencyKey: 'matrix_cancel_claim_001' },
+      conflictBody: { claimId: 'claim_matrix_missing', idempotencyKey: 'matrix_cancel_claim_001' }
+    });
+
+    const completePrep = await postWorldGridJson(baseUrl, '/api/world/territory/plan-claim', {
+      cellId: completeOption.cellId,
+      idempotencyKey: 'matrix_complete_prep_001'
+    }, headersA);
+    assert.equal(completePrep.response.status, 200, JSON.stringify(completePrep.payload));
+    await assertWorldGridRouteIdempotency({
+      baseUrl,
+      headers: headersA,
+      route: '/api/world/territory/complete-claim',
+      body: { claimId: completePrep.payload.claim.claimId, idempotencyKey: 'matrix_complete_claim_001' },
+      conflictBody: { claimId: 'claim_matrix_missing', idempotencyKey: 'matrix_complete_claim_001' }
+    });
+
+    const publicOwnerB = await assertWorldGridRouteIdempotency({
+      baseUrl,
+      headers: headersB,
+      route: '/api/world/public-presence/opt-in',
+      body: { townName: 'Matrix Neighbor', displayName: 'Neighbor', idempotencyKey: 'matrix_public_optin_b_001' },
+      conflictBody: { townName: 'Matrix Neighbor Changed', displayName: 'Neighbor', idempotencyKey: 'matrix_public_optin_b_001' }
+    });
+    const publicOwnerA = await assertWorldGridRouteIdempotency({
+      baseUrl,
+      headers: headersA,
+      route: '/api/world/public-presence/opt-in',
+      body: { townName: 'Matrix Home', displayName: 'Founder', idempotencyKey: 'matrix_public_optin_a_001' },
+      conflictBody: { townName: 'Matrix Home Changed', displayName: 'Founder', idempotencyKey: 'matrix_public_optin_a_001' }
+    });
+    await assertWorldGridRouteIdempotency({
+      baseUrl,
+      headers: headersA,
+      route: '/api/world/follow-town',
+      body: { publicTownId: publicOwnerB.town.publicTownId, idempotencyKey: 'matrix_follow_town_001' },
+      conflictBody: { publicTownId: publicOwnerA.town.publicTownId, idempotencyKey: 'matrix_follow_town_001' }
+    });
+    await assertWorldGridRouteIdempotency({
+      baseUrl,
+      headers: headersA,
+      route: '/api/world/public-presence/opt-out',
+      body: { idempotencyKey: 'matrix_public_optout_001' },
+      conflictBody: { reason: 'changed', idempotencyKey: 'matrix_public_optout_001' }
+    });
+
+    const serviceRequest = await assertWorldGridRouteIdempotency({
+      baseUrl,
+      headers: headersA,
+      route: '/api/world/services/request-advice',
+      body: {
+        serviceId: 'service_route_advisor',
+        input: { selectedCell: planOption, brainSecrets: 'redact-me' },
+        idempotencyKey: 'matrix_service_request_001'
+      },
+      conflictBody: {
+        serviceId: 'service_route_advisor',
+        input: { selectedCell: conflictOption },
+        idempotencyKey: 'matrix_service_request_001'
+      }
+    });
+    await assertWorldGridRouteIdempotency({
+      baseUrl,
+      headers: headersA,
+      route: '/api/world/services/accept-result',
+      body: { requestId: serviceRequest.request.requestId, idempotencyKey: 'matrix_service_accept_001' },
+      conflictBody: { requestId: 'svc_req_matrix_missing', idempotencyKey: 'matrix_service_accept_001' }
+    });
+    const reportPrep = await postWorldGridJson(baseUrl, '/api/world/services/request-advice', {
+      serviceId: 'service_public_works_planner',
+      input: { claimSummary: cancelOption },
+      idempotencyKey: 'matrix_service_report_prep_001'
+    }, headersA);
+    assert.equal(reportPrep.response.status, 200, JSON.stringify(reportPrep.payload));
+    await assertWorldGridRouteIdempotency({
+      baseUrl,
+      headers: headersA,
+      route: '/api/world/services/report-issue',
+      body: { requestId: reportPrep.payload.request.requestId, reason: 'bad advice', idempotencyKey: 'matrix_service_report_001' },
+      conflictBody: { requestId: reportPrep.payload.request.requestId, reason: 'changed reason', idempotencyKey: 'matrix_service_report_001' }
+    });
+
+    await assertWorldGridRouteIdempotency({
+      baseUrl,
+      headers: headersA,
+      route: '/api/world/events/contribute',
+      body: { eventId: 'event_great_ridge_bridge', bundle: { coin: 1 }, idempotencyKey: 'matrix_event_contribute_001' },
+      conflictBody: { eventId: 'event_great_ridge_bridge', bundle: { coin: 2 }, idempotencyKey: 'matrix_event_contribute_001' }
+    });
+    await assertWorldGridRouteIdempotency({
+      baseUrl,
+      headers: headersA,
+      route: '/api/world/events/claim-reward',
+      body: { eventId: 'event_great_ridge_bridge', idempotencyKey: 'matrix_event_reward_001' },
+      conflictBody: { eventId: 'event_great_ridge_bridge', ownerAccountId: 'owner_mismatch', idempotencyKey: 'matrix_event_reward_001' }
+    });
+
+    await assertWorldGridRouteIdempotency({
+      baseUrl,
+      headers: headersA,
+      route: '/api/world/sandbox/enter',
+      body: { idempotencyKey: 'matrix_sandbox_enter_001' },
+      conflictBody: { note: 'changed', idempotencyKey: 'matrix_sandbox_enter_001' }
+    });
+    await assertWorldGridRouteIdempotency({
+      baseUrl,
+      headers: headersA,
+      route: '/api/world/sandbox/place-prop',
+      body: { payload: { cellId: 'sandbox_cell_0', propId: 'lantern' }, idempotencyKey: 'matrix_sandbox_place_001' },
+      conflictBody: { payload: { cellId: 'sandbox_cell_0', propId: 'bench' }, idempotencyKey: 'matrix_sandbox_place_001' }
+    });
+    await assertWorldGridRouteIdempotency({
+      baseUrl,
+      headers: headersA,
+      route: '/api/world/sandbox/agent-demo',
+      body: { payload: { cellId: 'sandbox_cell_1', demoKind: 'route-signpost' }, idempotencyKey: 'matrix_sandbox_agent_001' },
+      conflictBody: { payload: { cellId: 'sandbox_cell_2', demoKind: 'route-signpost' }, idempotencyKey: 'matrix_sandbox_agent_001' }
+    });
+    await assertWorldGridRouteIdempotency({
+      baseUrl,
+      headers: headersA,
+      route: '/api/world/sandbox/rollback-last',
+      body: { idempotencyKey: 'matrix_sandbox_rollback_001' },
+      conflictBody: { note: 'changed', idempotencyKey: 'matrix_sandbox_rollback_001' }
+    });
+    const sandboxCleanup = await postWorldGridJson(baseUrl, '/api/world/sandbox/rollback-last', {
+      idempotencyKey: 'matrix_sandbox_cleanup_001'
+    }, headersA);
+    assert.equal(sandboxCleanup.response.status, 200, JSON.stringify(sandboxCleanup.payload));
+    assert.equal(sandboxCleanup.payload.restored, true);
+    await assertWorldGridRouteIdempotency({
+      baseUrl,
+      headers: headersA,
+      route: '/api/world/sandbox/leave',
+      body: { idempotencyKey: 'matrix_sandbox_leave_001' },
+      conflictBody: { note: 'changed', idempotencyKey: 'matrix_sandbox_leave_001' }
+    });
   });
 });
 
