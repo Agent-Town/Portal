@@ -25,6 +25,13 @@ Do not add V6 civic mechanics to normal gameplay or the world-grid prototype
 until V5 prototype evidence has been promoted through security, moderation,
 retention, reputation, and governance release gates.
 
+The V6 feature flag is explicit and research-only. Broad V5 prototype overrides
+such as `WORLD_GRID_FEATURE_FLAGS=all`, `world`, or `prototype` enable V5.0-V5.5
+only; they must not enable `FEATURE_WORLD_V60_AGENT_CIVILIZATION` by accident.
+Internal V6 research may opt in with `v60` or the full flag name, but runtime
+V6 civic tools and routes remain absent or disabled until the worker-first V6
+tool surface and readiness gate are implemented.
+
 ## Goal
 
 Move from many towns to civic systems where humans and agents participate in

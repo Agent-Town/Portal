@@ -11,7 +11,7 @@ Status: `prototype_gated` for V5.0-V5.5 starter workflow
 | Area | Evidence |
 | --- | --- |
 | Feature gate | `FEATURE_WORLD_GRID_V50_REGION` defaults off; `/api/world/region` returns `FEATURE_DISABLED` unless server/dev/QA enables it. |
-| Production override safety | `server/world_grid/feature_flags.js` reuses the production admin/QA override guard before honoring `worldGridFeatureFlags` or `x-world-grid-feature-flags`. |
+| Production override safety | `server/world_grid/feature_flags.js` reuses the production admin/QA override guard before honoring `worldGridFeatureFlags` or `x-world-grid-feature-flags`; broad `all` V5 prototype overrides do not enable the V6.0 research flag. |
 | Mutation origin guard | `server/world_grid/mutation_origin.js` rejects explicit cross-origin mutation metadata and requires positive same-origin context for mutating world-grid routes/tools in production. |
 | Mutation CSRF guard | `server/world_grid/csrf.js` issues owner-bound process-local tokens through `/api/world/mutation-token`; production mutating routes/tools reject missing, invalid, or cross-owner tokens. |
 | Mutation rate-limit guard | `server/world_grid/rate_limit.js` applies process-local owner/surface buckets to mutating world-grid routes/tools and returns `RATE_LIMITED` with retry headers when exceeded. |

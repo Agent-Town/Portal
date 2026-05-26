@@ -2731,12 +2731,21 @@ Feature flags:
 - `FEATURE_WORLD_GRID_V53_AGENT_SERVICES`: V5.3 Civic Service Advice Prototype
 - `FEATURE_WORLD_GRID_V54_WORLD_EVENTS`: V5.4 World Events and Public Works
 - `FEATURE_WORLD_GRID_V55_SANDBOX_DISTRICTS`: V5.5 Controlled Free-Play Sandbox Districts
+- `FEATURE_WORLD_V60_AGENT_CIVILIZATION`: V6.0 Agent Civilization Foundation
+  research flag.
+
+Broad V5 prototype overrides such as `worldGridFeatureFlags=all`,
+`WORLD_GRID_FEATURE_FLAGS=all`, `world`, or `prototype` enable V5.0-V5.5 only.
+V6.0 requires an explicit `v60` or
+`FEATURE_WORLD_V60_AGENT_CIVILIZATION` opt-in, and production player
+query/header overrides cannot enable it.
 
 ### GET `/api/world/tools`
 Returns `{ ok, featureFlags, tools }`, where `tools` is the runtime source of
 truth for world-grid tool contracts. Every tool entry includes `name`,
 `description`, and `featureFlag`; the world-grid pack manifest mirrors this in
-`toolMetadata`.
+`toolMetadata`. No `et.world.civic.*` V6 tool may appear here until the V6
+worker-first tool surface is implemented and release-gated.
 
 ### GET `/api/world/region`
 Returns a deterministic V5.0 region payload for the current owner identity when

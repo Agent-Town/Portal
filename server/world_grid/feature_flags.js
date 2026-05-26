@@ -41,6 +41,9 @@ const WORLD_GRID_FEATURES = [
   }
 ];
 
+const V5_WORLD_GRID_OVERRIDE_TOKENS = new Set(['all', 'world', 'world_grid', 'prototype', 'prototypes']);
+const V6_WORLD_FEATURE_FLAG = 'FEATURE_WORLD_V60_AGENT_CIVILIZATION';
+
 function normalizeToken(value = '') {
   return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 }
@@ -49,19 +52,27 @@ function emptyWorldGridFeatureFlags(enabled = false) {
   return Object.fromEntries(WORLD_GRID_FEATURES.map((feature) => [feature.key, enabled === true]));
 }
 
+function enableV5WorldGridFeatures(flags) {
+  for (const feature of WORLD_GRID_FEATURES) {
+    if (feature.key !== V6_WORLD_FEATURE_FLAG) flags[feature.key] = true;
+  }
+  return flags;
+}
+
 function parseWorldGridFeatureFlags(raw = '') {
   const value = String(raw || '').trim();
   if (!value) return null;
   const normalized = normalizeToken(value);
-  if (['all', 'world', 'world_grid', 'prototype', 'prototypes'].includes(normalized)) {
-    return emptyWorldGridFeatureFlags(true);
-  }
   if (['none', 'off', 'disabled', 'v15', 'first_hour'].includes(normalized)) {
     return emptyWorldGridFeatureFlags(false);
   }
   const flags = emptyWorldGridFeatureFlags(false);
   const tokens = value.split(',').map((part) => normalizeToken(part)).filter(Boolean);
   for (const token of tokens) {
+    if (V5_WORLD_GRID_OVERRIDE_TOKENS.has(token)) {
+      enableV5WorldGridFeatures(flags);
+      continue;
+    }
     for (const feature of WORLD_GRID_FEATURES) {
       if (token === normalizeToken(feature.key) || token === feature.shortName) {
         flags[feature.key] = true;
@@ -113,6 +124,7 @@ function isWorldGridFeatureEnabled(flags = {}, featureKey = '') {
 
 module.exports = {
   WORLD_GRID_FEATURES,
+  V6_WORLD_FEATURE_FLAG,
   defaultWorldGridFeatureFlags,
   emptyWorldGridFeatureFlags,
   isWorldGridFeatureEnabled,

@@ -17,6 +17,18 @@ Vote authorization foundation: `specs/58_agent_town_v6_vote_authorization_founda
 V6.0 Agent Civilization Foundation must not become player-visible until every
 gate below has implementation, deterministic tests, and security/product signoff.
 
+## Runtime Feature Flag Gate
+
+- `FEATURE_WORLD_V60_AGENT_CIVILIZATION` defaults off.
+- Broad V5 prototype overrides such as `all`, `world`, `world_grid`,
+  `prototype`, or `prototypes` enable V5.0-V5.5 only and must not enable V6.0.
+- Internal V6 research requires an explicit `v60` or
+  `FEATURE_WORLD_V60_AGENT_CIVILIZATION` opt-in.
+- Production player query/header overrides must not enable V6.0.
+- Runtime V6 civic routes and tools must be absent or return
+  `FEATURE_DISABLED` until the M6 worker-first tool surface is intentionally
+  implemented and tested.
+
 ## Prerequisites
 
 - V5.0 Region Grid remains gated and deterministic without hidden state creation.

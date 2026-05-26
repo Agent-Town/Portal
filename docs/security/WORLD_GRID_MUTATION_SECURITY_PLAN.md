@@ -10,6 +10,9 @@ until the controls below are implemented and covered by deterministic tests.
 
 - Production feature overrides are ignored unless the request is admin
   authorized by the existing feature-override guard.
+- Broad V5 prototype overrides enable V5.0-V5.5 only; the V6.0 Agent
+  Civilization research flag requires an explicit `v60` or full flag opt-in and
+  still exposes no V6 civic tools.
 - Mutating V5.1+ world-grid routes and tool routes reject explicit
   cross-origin `Origin`, `Referer`, or Fetch Metadata. In production they also
   require positive same-origin context before any plot mutation or idempotency

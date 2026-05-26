@@ -108,6 +108,11 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(spec, /docs\/product\/V6_AGENT_CIVILIZATION_MILESTONE_PLAN\.md/);
   assert.match(gate, /docs\/product\/V6_AGENT_CIVILIZATION_MILESTONE_PLAN\.md/);
   assert.match(plan, /Source branch: `codex\/v6-agent-civilization-milestones`/);
+  assert.match(plan, /broad V5 prototype overrides do not enable V6/);
+  assert.match(spec, /FEATURE_WORLD_V60_AGENT_CIVILIZATION/);
+  assert.match(spec, /WORLD_GRID_FEATURE_FLAGS=all/);
+  assert.match(gate, /Broad V5 prototype overrides/);
+  assert.match(gate, /Production player query\/header overrides must not enable V6\.0/);
 });
 
 test('V5 world-grid release promotion gate blocks V6 on prototype-only evidence', () => {

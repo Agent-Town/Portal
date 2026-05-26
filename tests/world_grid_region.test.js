@@ -113,7 +113,10 @@ test('V5.0 region generation is deterministic with stable cells and home settlem
 
 test('world grid API is gated off by default and can be enabled by server config', async () => {
   assert.equal(defaultWorldGridFeatureFlags({}).FEATURE_WORLD_V60_AGENT_CIVILIZATION, false);
+  assert.equal(parseWorldGridFeatureFlags('all').FEATURE_WORLD_GRID_V55_SANDBOX_DISTRICTS, true);
+  assert.equal(parseWorldGridFeatureFlags('all').FEATURE_WORLD_V60_AGENT_CIVILIZATION, false);
   assert.equal(parseWorldGridFeatureFlags('v60').FEATURE_WORLD_V60_AGENT_CIVILIZATION, true);
+  assert.equal(parseWorldGridFeatureFlags('all,v60').FEATURE_WORLD_V60_AGENT_CIVILIZATION, true);
 
   await withWorldGridServer({
     identity: { pairId: 'session:world-grid-default-off' },
@@ -184,6 +187,7 @@ test('production world grid query overrides are ignored unless admin authorized'
     const adminBody = await adminResponse.json();
     assert.equal(adminResponse.status, 200, JSON.stringify(adminBody));
     assert.equal(adminBody.region.cells.length, 19);
+    assert.equal(adminBody.featureFlags.FEATURE_WORLD_V60_AGENT_CIVILIZATION, false);
 
     const adminToolsResponse = await fetch(`${baseUrl}/api/world/tools`, {
       headers: {
@@ -194,8 +198,21 @@ test('production world grid query overrides are ignored unless admin authorized'
     const adminToolsBody = await adminToolsResponse.json();
     assert.equal(adminToolsResponse.status, 200, JSON.stringify(adminToolsBody));
     assert.equal(adminToolsBody.tools.every((tool) => typeof tool.featureFlag === 'string'), true);
-    assert.equal(adminToolsBody.featureFlags.FEATURE_WORLD_V60_AGENT_CIVILIZATION, true);
+    assert.equal(adminToolsBody.featureFlags.FEATURE_WORLD_V60_AGENT_CIVILIZATION, false);
     assert.equal(adminToolsBody.tools.some((tool) => tool.featureFlag === 'FEATURE_WORLD_V60_AGENT_CIVILIZATION'), false);
+
+    const adminExplicitV6ToolsResponse = await fetch(`${baseUrl}/api/world/tools`, {
+      headers: {
+        'x-admin-token': 'admin-secret',
+        'x-world-grid-feature-flags': 'all,v60'
+      }
+    });
+    const adminExplicitV6ToolsBody = await adminExplicitV6ToolsResponse.json();
+    assert.equal(adminExplicitV6ToolsResponse.status, 200, JSON.stringify(adminExplicitV6ToolsBody));
+    assert.equal(adminExplicitV6ToolsBody.featureFlags.FEATURE_WORLD_V60_AGENT_CIVILIZATION, true);
+    assert.equal(adminExplicitV6ToolsBody.tools.some((tool) => tool.featureFlag === 'FEATURE_WORLD_V60_AGENT_CIVILIZATION'), false);
+    assert.equal(adminExplicitV6ToolsBody.tools.some((tool) => tool.name.startsWith('et.world.civic.')), false);
+    assert.equal(adminExplicitV6ToolsBody.tools.some((tool) => /civic\./.test(tool.name)), false);
   });
 });
 
@@ -683,6 +700,7 @@ test('runtime world-grid tools are feature-gated and match the pack manifest met
     const response = await fetch(`${baseUrl}/api/world/tools`);
     const body = await response.json();
     assert.equal(response.status, 200, JSON.stringify(body));
+    assert.equal(body.featureFlags.FEATURE_WORLD_V60_AGENT_CIVILIZATION, false);
     assert.equal(body.tools.every((tool) => typeof tool.featureFlag === 'string' && tool.featureFlag.startsWith('FEATURE_WORLD_GRID_')), true);
 
     const runtimePairs = body.tools
