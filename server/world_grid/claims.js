@@ -1,8 +1,15 @@
 const { savePlotGraph } = require('../founders_plot/store');
 const { loadWorldGridPlotPrerequisite } = require('./plot_prerequisite');
+const fs = require('fs');
+const path = require('path');
+
+const WORLD_GRID_CLAIMS_SCHEMA_VERSION = 'agent-town.v5.world-grid.claims.v1';
+const WORLD_GRID_CLAIMS_MIGRATION_VERSION = 'world_grid_claims_v1';
 
 // Prototype/ephemeral process-local store; release storage is documented in docs/technical/WORLD_GRID_STATE_MODEL.md.
 const claimStore = new Map();
+let durableSingleton = null;
+let durableSingletonPath = '';
 
 const RESOURCE_KEYS = ['wood', 'stone', 'food', 'coin'];
 
@@ -43,11 +50,159 @@ function normalizeCount(value) {
   return Number.isFinite(number) && number > 0 ? Math.floor(number) : 0;
 }
 
+function ensureDurableSchema(db) {
+  db.exec('PRAGMA journal_mode = WAL;');
+  db.exec('PRAGMA synchronous = NORMAL;');
+  db.exec('PRAGMA busy_timeout = 5000;');
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS world_grid_claims (
+      region_id TEXT NOT NULL,
+      claim_id TEXT NOT NULL,
+      cell_id TEXT NOT NULL,
+      account_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      completed_at INTEGER,
+      claim_json TEXT NOT NULL,
+      migration_version TEXT NOT NULL,
+      schema_version TEXT NOT NULL,
+      PRIMARY KEY (region_id, claim_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_world_grid_claims_owner_status
+      ON world_grid_claims(account_id, status);
+    CREATE INDEX IF NOT EXISTS idx_world_grid_claims_region_cell
+      ON world_grid_claims(region_id, cell_id);
+  `);
+}
+
+function parseDurableClaim(row) {
+  if (!row) return null;
+  return JSON.parse(row.claim_json);
+}
+
+function createWorldGridClaimStore({ sqlitePath } = {}) {
+  if (!sqlitePath || typeof sqlitePath !== 'string') {
+    throw new Error('WORLD_GRID_CLAIMS_SQLITE_PATH_REQUIRED');
+  }
+  fs.mkdirSync(path.dirname(sqlitePath), { recursive: true });
+  const { DatabaseSync } = require('node:sqlite');
+  const db = new DatabaseSync(sqlitePath);
+  ensureDurableSchema(db);
+  const statements = {
+    byRegion: db.prepare(`
+      SELECT *
+      FROM world_grid_claims
+      WHERE region_id = ?
+      ORDER BY created_at ASC, claim_id ASC
+    `),
+    deleteRegion: db.prepare('DELETE FROM world_grid_claims WHERE region_id = ?'),
+    insert: db.prepare(`
+      INSERT OR REPLACE INTO world_grid_claims (
+        region_id, claim_id, cell_id, account_id, status, created_at,
+        completed_at, claim_json, migration_version, schema_version
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `),
+    count: db.prepare('SELECT COUNT(1) AS count FROM world_grid_claims'),
+    metadata: db.prepare(`
+      SELECT migration_version, schema_version, COUNT(1) AS count
+      FROM world_grid_claims
+      GROUP BY migration_version, schema_version
+      ORDER BY migration_version ASC, schema_version ASC
+    `)
+  };
+  let closed = false;
+
+  function claimsForRegion(regionId = '') {
+    return statements.byRegion.all(String(regionId || '')).map(parseDurableClaim);
+  }
+
+  function saveClaimList(regionId = '', claims = []) {
+    const normalizedRegionId = String(regionId || '');
+    db.exec('BEGIN IMMEDIATE;');
+    try {
+      statements.deleteRegion.run(normalizedRegionId);
+      for (const claim of claims) {
+        statements.insert.run(
+          normalizedRegionId,
+          String(claim.claimId || ''),
+          String(claim.cellId || ''),
+          String(claim.accountId || ''),
+          String(claim.status || ''),
+          Number(claim.createdAtMs) || Date.now(),
+          claim.completedAtMs ? Number(claim.completedAtMs) : null,
+          JSON.stringify(clone(claim)),
+          WORLD_GRID_CLAIMS_MIGRATION_VERSION,
+          WORLD_GRID_CLAIMS_SCHEMA_VERSION
+        );
+      }
+      db.exec('COMMIT;');
+    } catch (error) {
+      db.exec('ROLLBACK;');
+      throw error;
+    }
+  }
+
+  function count() {
+    return Number(statements.count.get().count || 0);
+  }
+
+  function metadata() {
+    return statements.metadata.all().map((row) => ({
+      migrationVersion: row.migration_version,
+      schemaVersion: row.schema_version,
+      count: Number(row.count || 0)
+    }));
+  }
+
+  function close() {
+    if (closed) return;
+    closed = true;
+    db.close();
+  }
+
+  return {
+    claimsForRegion,
+    close,
+    count,
+    metadata,
+    saveClaimList,
+    sqlitePath
+  };
+}
+
+function configuredWorldGridClaimsPath(env = process.env) {
+  return String(env.WORLD_GRID_CLAIMS_SQLITE_PATH || '').trim();
+}
+
+function getConfiguredWorldGridClaimStore(env = process.env) {
+  const sqlitePath = configuredWorldGridClaimsPath(env);
+  if (!sqlitePath) return null;
+  if (durableSingleton && durableSingletonPath === sqlitePath) return durableSingleton;
+  if (durableSingleton) durableSingleton.close();
+  durableSingleton = createWorldGridClaimStore({ sqlitePath });
+  durableSingletonPath = sqlitePath;
+  return durableSingleton;
+}
+
+function closeWorldGridClaimStore() {
+  if (!durableSingleton) return;
+  durableSingleton.close();
+  durableSingleton = null;
+  durableSingletonPath = '';
+}
+
 function claimList(regionId = '') {
+  const durableStore = getConfiguredWorldGridClaimStore();
+  if (durableStore) return durableStore.claimsForRegion(regionId).map((claim) => clone(claim));
   return claimStore.get(String(regionId || '')) || [];
 }
 
 function saveClaimList(regionId = '', claims = []) {
+  const durableStore = getConfiguredWorldGridClaimStore();
+  if (durableStore) {
+    durableStore.saveClaimList(regionId, claims);
+    return;
+  }
   claimStore.set(String(regionId || ''), claims.map((claim) => clone(claim)));
 }
 
@@ -238,10 +393,15 @@ function applyClaimsToRegion(region, claims = claimsForRegion(region.regionId)) 
 }
 
 module.exports = {
+  WORLD_GRID_CLAIMS_MIGRATION_VERSION,
+  WORLD_GRID_CLAIMS_SCHEMA_VERSION,
   applyClaimsToRegion,
   cancelClaim,
   claimOptions,
   claimsForRegion,
+  closeWorldGridClaimStore,
   completeClaim,
+  configuredWorldGridClaimsPath,
+  createWorldGridClaimStore,
   planClaim
 };

@@ -27,6 +27,7 @@ Status: `prototype_gated` for V5.0-V5.5 starter workflow
 | V5.5 Controlled Free-Play Sandbox Districts | `server/world_grid/sandbox.js` adds one typed sandbox district with redacted public presence, allowed prop placement, rejected forbidden props, typed agent demo, and rollback snapshots. |
 | Idempotency replay guard | `server/world_grid/idempotency.js` records process-local request hashes and success responses for mutating V5.1+ routes/tools, replays exact retries, and rejects changed payload reuse with `IDEMPOTENCY_CONFLICT`; `tests/world_grid_region.test.js` now proves exact replay and conflict rejection across every externally visible V5.1-V5.5 mutating route surface. |
 | Durable idempotency foundation | `server/world_grid/idempotency.js` can write SQLite `world_grid_idempotency_records` rows when `WORLD_GRID_IDEMPOTENCY_SQLITE_PATH` is configured; `tests/world_grid_idempotency_persistence.test.js` proves planned-claim replay and conflict detection after separate Node process restarts without recreating process-local claim state. |
+| Durable claims foundation | `server/world_grid/claims.js` can write SQLite `world_grid_claims` rows when `WORLD_GRID_CLAIMS_SQLITE_PATH` is configured; `tests/world_grid_claims_persistence.test.js` proves planned claims reopen after restart, complete from durable claim state, and reopen again as claimed routes. |
 | Screenshots | `artifacts/world-grid-v50-region-prototype.png`, `artifacts/world-grid-v51-territory-claim-prototype.png`, `artifacts/world-grid-v53-agent-services-prototype.png`, `artifacts/world-grid-v54-world-event-prototype.png`, and `artifacts/world-grid-v55-sandbox-prototype.png`. |
 | Live sanity | Local route reported `renderer: "three"`, `payloadCells: 19`, a claimed route after V5.1 completion, V5.2 opt-in/out, V5.3 civic service request/accept, V5.4 preview/contribute/reward, V5.5 enter/place/reject/agent-demo/rollback/leave, no horizontal overflow at 291px, and no console/page errors. |
 
@@ -42,8 +43,9 @@ All V5.0-V5.5 world-grid stores remain prototype/ephemeral unless explicitly
 replaced by durable release-grade storage. Process-local state includes claims,
 public presence, follows, service requests/reputation, event contribution
 bookkeeping, rewards, sandbox participants/actions/snapshots, CSRF mutation
-tokens, rate-limit buckets, and camera preferences. The optional SQLite audit log
-and optional SQLite idempotency rows are durable foundations, but release
+tokens, rate-limit buckets, and camera preferences. The optional SQLite audit log,
+optional SQLite idempotency rows, and optional SQLite claim rows are durable
+foundations, but release
 promotion still requires durable owner indexes, migration versioning, full
 append-only audit/replay records with before-state snapshots, complete durable
 idempotency records and restart coverage for every route/tool surface,

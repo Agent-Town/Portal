@@ -34,6 +34,11 @@ until the controls below are implemented and covered by deterministic tests.
   success responses, schema/migration versions, and conflict detection. Current
   restart coverage proves a planned-claim retry replays after a separate Node
   process restart without recreating process-local claim state.
+- When `WORLD_GRID_CLAIMS_SQLITE_PATH` is configured, V5.1 claim state writes
+  durable SQLite `world_grid_claims` rows with owner, status, cell, schema, and
+  migration metadata. Current restart coverage proves a planned claim reopens
+  after a separate Node process restart, completes from durable claim state, and
+  reopens again as a claimed route.
 - Mutating V5.1+ world-grid routes and tool routes use process-local rate
   buckets keyed by owner and mutation surface. This throttles prototype abuse
   paths but is not durable, distributed, or session-auth aware.
@@ -76,6 +81,9 @@ until the controls below are implemented and covered by deterministic tests.
   world-grid store.
 - Restart persistence tests and replay tests before any public release flag is
   enabled.
+- Current `WORLD_GRID_CLAIMS_SQLITE_PATH` coverage is a V5.1 storage foundation
+  only; release promotion still needs cancel/replay, cross-owner, and
+  public-surface store persistence coverage.
 
 ## Out Of Scope For This Hardening Pass
 

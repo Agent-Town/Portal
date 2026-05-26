@@ -47,7 +47,7 @@ V6 milestone plan.
 | Slice | release_status | Player-visible by default | Evidence |
 | --- | --- | --- | --- |
 | V5.0 Region Grid | `prototype_gated` | No | `docs/release-evidence/WORLD_GRID_V50_REGION_PROTOTYPE_EVIDENCE_2026-05-26.md` |
-| V5.1 Territory Claims and Settler Routes | `prototype_gated` | No | API, UI, and Playwright coverage in the world-grid prototype. |
+| V5.1 Territory Claims and Settler Routes | `prototype_gated` | No | API, UI, Playwright coverage, and optional `WORLD_GRID_CLAIMS_SQLITE_PATH` restart proof for planned/claimed claim state. |
 | V5.2 Public Presence and Safe Player Discovery | `prototype_gated` | No | Redaction, opt-in/out, follow, and public summary coverage. |
 | V5.3 Civic Service Advice Prototype | `prototype_gated` | No | Redacted inputs, schema-shaped output, accept/report coverage. |
 | V5.4 World Events and Public Works | `prototype_gated` | No | Preview, cap, idempotency, conservation, and cosmetic reward coverage. |

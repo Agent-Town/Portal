@@ -46,7 +46,7 @@ release-grade store is explicitly implemented and tested. Current stores are:
 | --- | --- | --- |
 | Region generation | Deterministic synthesis from owner identity in `server/world_grid/region.js` | Prototype, recomputed on demand |
 | Camera/focus preferences | Process-local `Map` in `server/world_grid/routes.js` | Prototype/ephemeral |
-| Territory claims | Process-local `Map` in `server/world_grid/claims.js` | Prototype/ephemeral |
+| Territory claims | Process-local `Map` in `server/world_grid/claims.js`; optional SQLite `world_grid_claims` table when `WORLD_GRID_CLAIMS_SQLITE_PATH` is configured | Durable foundation for planned/claimed V5.1 claim state, owner/status/cell indexes, schema/migration versions, and restart proof; release promotion still needs cancel/replay, cross-owner, and every V5.1-V5.5 store covered |
 | Public presence/follows | Process-local `Map` values in `server/world_grid/public_presence.js` | Prototype/ephemeral |
 | Civic service requests/reputation | Process-local `Map` values in `server/world_grid/services.js` | Prototype/ephemeral |
 | World event contributions/rewards | Process-local `Map` values in `server/world_grid/events.js` | Prototype/ephemeral |
@@ -56,9 +56,10 @@ release-grade store is explicitly implemented and tested. Current stores are:
 | Mutation rate-limit buckets | Process-local `Map` in `server/world_grid/rate_limit.js` | Prototype/ephemeral; per-owner and per-surface only for the process lifetime |
 | Mutation audit records | Optional SQLite `world_grid_audit_log` table in `server/world_grid/audit_log.js` when `WORLD_GRID_AUDIT_SQLITE_PATH` is configured | Durable foundation for append-only audit/replay; not yet complete release storage because before-state snapshots and store reconstruction are still release gates |
 
-The only durable dependency used by mutating V5.1+ routes is the existing
-Founders Plot prerequisite check. World-grid routes must not create Founders Plot
-state as a side effect.
+The mandatory durable dependency used by mutating V5.1+ routes is the existing
+Founders Plot prerequisite check. Optional SQLite claim and idempotency stores
+are release-storage foundations only. World-grid routes must not create Founders
+Plot state as a side effect.
 
 ## Release-Grade Storage Requirements
 
@@ -76,6 +77,10 @@ Before any V5 world-grid slice can claim release-grade persistence, it needs:
   coverage after restart. Current SQLite idempotency coverage starts this for
   route-level planned claims only; every remaining V5.1-V5.5 route/tool surface
   still needs restart replay proof before release promotion.
+- Durable claim rows with owner/status/cell indexes and restart persistence for
+  the full V5.1 lifecycle. Current SQLite claim coverage proves planned and
+  claimed state reopens across separate Node lifetimes; cancel replay,
+  cross-owner ownership, and release replay reconstruction remain gates.
 - Restart persistence tests proving state survives server restart and cannot be
   silently recreated, lost, or reassigned across owners.
 - Cross-owner and stale-session tests for every owner index.
