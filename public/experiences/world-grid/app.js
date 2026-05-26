@@ -35,6 +35,10 @@
     return body;
   }
 
+  function nextIdempotencyKey(prefix) {
+    return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+  }
+
   function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>"']/g, (char) => ({
       '&': '&amp;',
@@ -181,7 +185,7 @@
   async function planClaim(cellId) {
     const payload = await api('/api/world/territory/plan-claim', {
       method: 'POST',
-      body: JSON.stringify({ cellId })
+      body: JSON.stringify({ cellId, idempotencyKey: nextIdempotencyKey('world_plan_claim') })
     });
     state.payload.territory.claims = [...(state.payload.territory.claims || []), payload.claim];
     state.payload.territory.claimOptions = (state.payload.territory.claimOptions || []).filter((option) => option.cellId !== cellId);
@@ -191,7 +195,7 @@
   async function completeClaim(claimId) {
     const payload = await api('/api/world/territory/complete-claim', {
       method: 'POST',
-      body: JSON.stringify({ claimId })
+      body: JSON.stringify({ claimId, idempotencyKey: nextIdempotencyKey('world_complete_claim') })
     });
     await refreshAfterTerritoryMutation(payload, payload.claim.cellId);
   }
@@ -199,7 +203,7 @@
   async function cancelClaim(claimId) {
     const payload = await api('/api/world/territory/cancel-claim', {
       method: 'POST',
-      body: JSON.stringify({ claimId })
+      body: JSON.stringify({ claimId, idempotencyKey: nextIdempotencyKey('world_cancel_claim') })
     });
     const claims = state.payload?.territory?.claims || [];
     const cancelled = claims.find((claim) => claim.claimId === claimId);
@@ -233,6 +237,7 @@
       body: JSON.stringify({
         displayName: 'A Founder',
         townName: 'Founders Plot',
+        idempotencyKey: nextIdempotencyKey('world_public_opt_in'),
         privacy: {
           showOperatingStyle: false,
           showRegion: true,
@@ -246,7 +251,7 @@
   async function optOutPublicPresence() {
     await api('/api/world/public-presence/opt-out', {
       method: 'POST',
-      body: JSON.stringify({})
+      body: JSON.stringify({ idempotencyKey: nextIdempotencyKey('world_public_opt_out') })
     });
     await refreshPublicPresence();
   }
@@ -284,6 +289,7 @@
       method: 'POST',
       body: JSON.stringify({
         serviceId,
+        idempotencyKey: nextIdempotencyKey('world_service_request'),
         input: {
           selectedCell: selected,
           regionSummary: {
@@ -323,7 +329,7 @@
   async function acceptServiceResult(requestId) {
     const payload = await api('/api/world/services/accept-result', {
       method: 'POST',
-      body: JSON.stringify({ requestId })
+      body: JSON.stringify({ requestId, idempotencyKey: nextIdempotencyKey('world_service_accept') })
     });
     renderServiceResult(payload.request);
     const result = qs('[data-world-grid-service-result]');
@@ -333,7 +339,11 @@
   async function reportServiceIssue(requestId) {
     const payload = await api('/api/world/services/report-issue', {
       method: 'POST',
-      body: JSON.stringify({ requestId, reason: 'Player reported a service issue from the prototype board.' })
+      body: JSON.stringify({
+        requestId,
+        reason: 'Player reported a service issue from the prototype board.',
+        idempotencyKey: nextIdempotencyKey('world_service_report')
+      })
     });
     renderServiceResult(payload.request);
     const result = qs('[data-world-grid-service-result]');
@@ -422,7 +432,7 @@
   async function claimWorldEventReward(eventId) {
     const payload = await api('/api/world/events/claim-reward', {
       method: 'POST',
-      body: JSON.stringify({ eventId })
+      body: JSON.stringify({ eventId, idempotencyKey: nextIdempotencyKey('world_event_reward') })
     });
     renderEventResult(`Claimed ${payload.reward.title}. Cosmetic status only; no resource mutation was applied.`);
     await refreshEvents();
@@ -473,36 +483,54 @@
       if (!target) return;
       try {
         if (target.dataset.worldGridSandboxEnter !== undefined) {
-          const payload = await api('/api/world/sandbox/enter', { method: 'POST', body: JSON.stringify({}) });
+          const payload = await api('/api/world/sandbox/enter', {
+            method: 'POST',
+            body: JSON.stringify({ idempotencyKey: nextIdempotencyKey('world_sandbox_enter') })
+          });
           renderSandboxResult(`Entered as ${payload.participant.displayName}.`);
           await refreshSandbox();
         } else if (target.dataset.worldGridSandboxPlace !== undefined) {
           const payload = await api('/api/world/sandbox/place-prop', {
             method: 'POST',
-            body: JSON.stringify({ payload: { cellId: 'sandbox_cell_0', propId: 'lantern' } })
+            body: JSON.stringify({
+              payload: { cellId: 'sandbox_cell_0', propId: 'lantern' },
+              idempotencyKey: nextIdempotencyKey('world_sandbox_place')
+            })
           });
           renderSandboxResult(payload.action.moderationStatus === 'auto-approved' ? 'Lantern placed with rollback snapshot.' : 'Lantern was not approved.');
           await refreshSandbox();
         } else if (target.dataset.worldGridSandboxForbidden !== undefined) {
           const payload = await api('/api/world/sandbox/place-prop', {
             method: 'POST',
-            body: JSON.stringify({ payload: { cellId: 'sandbox_cell_0', propId: 'uploaded-dragon' } })
+            body: JSON.stringify({
+              payload: { cellId: 'sandbox_cell_0', propId: 'uploaded-dragon' },
+              idempotencyKey: nextIdempotencyKey('world_sandbox_reject')
+            })
           });
           renderSandboxResult(payload.action.moderationStatus === 'rejected' ? 'Moderation rejected that sandbox action.' : 'Unexpected sandbox approval.');
           await refreshSandbox();
         } else if (target.dataset.worldGridSandboxAgentDemo !== undefined) {
           const payload = await api('/api/world/sandbox/agent-demo', {
             method: 'POST',
-            body: JSON.stringify({ payload: { cellId: 'sandbox_cell_1', demoKind: 'route-signpost' } })
+            body: JSON.stringify({
+              payload: { cellId: 'sandbox_cell_1', demoKind: 'route-signpost' },
+              idempotencyKey: nextIdempotencyKey('world_sandbox_demo')
+            })
           });
           renderSandboxResult(payload.action.moderationStatus === 'auto-approved' ? 'Agent demo used a typed sandbox action.' : 'Agent demo was rejected.');
           await refreshSandbox();
         } else if (target.dataset.worldGridSandboxRollback !== undefined) {
-          const payload = await api('/api/world/sandbox/rollback-last', { method: 'POST', body: JSON.stringify({}) });
+          const payload = await api('/api/world/sandbox/rollback-last', {
+            method: 'POST',
+            body: JSON.stringify({ idempotencyKey: nextIdempotencyKey('world_sandbox_rollback') })
+          });
           renderSandboxResult(payload.restored ? 'Rollback restored the sandbox district.' : 'Rollback was not available.');
           await refreshSandbox();
         } else if (target.dataset.worldGridSandboxLeave !== undefined) {
-          const payload = await api('/api/world/sandbox/leave', { method: 'POST', body: JSON.stringify({}) });
+          const payload = await api('/api/world/sandbox/leave', {
+            method: 'POST',
+            body: JSON.stringify({ idempotencyKey: nextIdempotencyKey('world_sandbox_leave') })
+          });
           renderSandboxResult(payload.removed ? 'Left the sandbox without private town mutation.' : 'No sandbox presence was active.');
           await refreshSandbox();
         }

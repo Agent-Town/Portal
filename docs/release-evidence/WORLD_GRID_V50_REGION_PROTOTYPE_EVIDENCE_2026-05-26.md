@@ -1,6 +1,8 @@
 # World Grid V5.0 Region Prototype Evidence - 2026-05-26
 
-Branch: `codex/v5-v6-world-grid-feedback`
+Original branch: `codex/v5-v6-world-grid-feedback`
+
+Current hardening branch: `codex/v6-agent-civilization-milestones`
 
 Status: `prototype_gated` for V5.0-V5.5 starter workflow
 
@@ -14,7 +16,7 @@ Status: `prototype_gated` for V5.0-V5.5 starter workflow
 | Read-only V5.0 APIs | `server/world_grid/routes.js` exposes region, focus, camera, and read-only tool endpoints without claim/build/resource mutation. |
 | V5.1 Territory Claims and Settler Routes | `server/world_grid/claims.js` adds gated adjacent claim options, plan/complete/cancel tools, exact resource spend, route preview, and terrain tradeoff copy. |
 | Browser prototype | `public/experiences/world-grid/` renders a Three.js territory grid and DOM cell mirror when the prototype flag is enabled. |
-| Tests | `tests/world_grid_region.test.js` and `e2e/236_world_grid_v50_region_prototype.spec.js`. |
+| Tests | `tests/world_grid_region.test.js`; split Playwright coverage in `e2e/236_world_grid_v50_region_prototype.spec.js`, `e2e/237_world_grid_v51_claims_prototype.spec.js`, `e2e/238_world_grid_v52_public_presence_prototype.spec.js`, `e2e/239_world_grid_v53_service_redaction_prototype.spec.js`, `e2e/240_world_grid_v54_event_accounting_prototype.spec.js`, `e2e/241_world_grid_v55_sandbox_prototype.spec.js`; and all-features regression `e2e/242_world_grid_all_features_demo_regression.spec.js`. |
 | V5.2 Public Presence and Safe Player Discovery | `server/world_grid/public_presence.js` adds opt-in public cards, redacted list/lookup, follow-town, summarize-neighbor, and opt-out removal. |
 | V5.3 Civic Service Advice Prototype | `server/world_grid/services.js` adds bounded service listings, redacted service requests, schema-shaped recommendations, accept-as-advice only, report flow, and reputation bookkeeping. |
 | V5.4 World Events and Public Works | `server/world_grid/events.js` adds one capped public-works event, preview-before-contribute, idempotent contribution accounting, exact resource spend, public progress, personal recap, and cosmetic reward claim. |
@@ -27,3 +29,12 @@ Status: `prototype_gated` for V5.0-V5.5 starter workflow
 This is not a public release claim. V5.0 remains hidden from the normal player
 route and requires the recurring Three.js runtime gate before promotion beyond
 prototype review.
+
+## Prototype Persistence Warning
+
+All V5.0-V5.5 world-grid stores remain prototype/ephemeral unless explicitly
+replaced by durable release-grade storage. Process-local state includes claims,
+public presence, follows, service requests/reputation, event contribution
+bookkeeping, rewards, sandbox participants/actions/snapshots, and camera
+preferences. Release promotion still requires durable owner indexes, migration
+versioning, append-only audit/replay records, and restart persistence tests.

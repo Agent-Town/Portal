@@ -33,6 +33,11 @@ const WORLD_GRID_FEATURES = [
     key: 'FEATURE_WORLD_GRID_V55_SANDBOX_DISTRICTS',
     label: 'V5.5 Controlled Free-Play Sandbox Districts',
     shortName: 'v55'
+  },
+  {
+    key: 'FEATURE_WORLD_V60_AGENT_CIVILIZATION',
+    label: 'V6.0 Agent Civilization Foundation',
+    shortName: 'v60'
   }
 ];
 

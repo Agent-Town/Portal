@@ -7,6 +7,10 @@ const express = require('express');
 
 const { createWorldGridRouter } = require('../server/world_grid/routes');
 const {
+  defaultWorldGridFeatureFlags,
+  parseWorldGridFeatureFlags
+} = require('../server/world_grid/feature_flags');
+const {
   generateRegion,
   normalizeOwnerIdentity
 } = require('../server/world_grid/region');
@@ -84,6 +88,9 @@ test('V5.0 region generation is deterministic with stable cells and home settlem
 });
 
 test('world grid API is gated off by default and can be enabled by server config', async () => {
+  assert.equal(defaultWorldGridFeatureFlags({}).FEATURE_WORLD_V60_AGENT_CIVILIZATION, false);
+  assert.equal(parseWorldGridFeatureFlags('v60').FEATURE_WORLD_V60_AGENT_CIVILIZATION, true);
+
   await withWorldGridServer({
     identity: { pairId: 'session:world-grid-default-off' },
     envPatch: { NODE_ENV: 'production', FEATURE_WORLD_GRID_V50_REGION: undefined }
@@ -163,6 +170,8 @@ test('production world grid query overrides are ignored unless admin authorized'
     const adminToolsBody = await adminToolsResponse.json();
     assert.equal(adminToolsResponse.status, 200, JSON.stringify(adminToolsBody));
     assert.equal(adminToolsBody.tools.every((tool) => typeof tool.featureFlag === 'string'), true);
+    assert.equal(adminToolsBody.featureFlags.FEATURE_WORLD_V60_AGENT_CIVILIZATION, true);
+    assert.equal(adminToolsBody.tools.some((tool) => tool.featureFlag === 'FEATURE_WORLD_V60_AGENT_CIVILIZATION'), false);
   });
 });
 
@@ -205,6 +214,59 @@ test('world grid focus and read-only tools do not mutate Founders Plot state', a
     assert.equal(wrongOwnerResponse.status, 403, JSON.stringify(wrongOwnerBody));
     assert.equal(wrongOwnerBody.error.code, 'FORBIDDEN');
     assert.equal(loadPlotByPairId(identity.pairId), null);
+  });
+});
+
+test('mutating world-grid prototype routes require idempotency keys after plot prerequisite', async () => {
+  const identity = { pairId: `session:world-grid-idempotency-${Date.now()}-${Math.random().toString(16).slice(2)}` };
+  await withWorldGridServer({
+    identity,
+    envPatch: { NODE_ENV: 'test', WORLD_GRID_FEATURE_FLAGS: 'all' }
+  }, async (baseUrl) => {
+    seedFoundersPlot(identity.pairId);
+
+    const stateResponse = await fetch(`${baseUrl}/api/world/region`);
+    const stateBody = await stateResponse.json();
+    assert.equal(stateResponse.status, 200, JSON.stringify(stateBody));
+    const target = stateBody.region.cells.find((cell) => cell.state === 'claimable');
+    assert.ok(target);
+
+    const missingKeyRoutes = [
+      ['/api/world/territory/plan-claim', { cellId: target.cellId }],
+      ['/api/world/public-presence/opt-in', { townName: 'Idempotency Town', displayName: 'Founder' }],
+      ['/api/world/public-presence/opt-out', {}],
+      ['/api/world/follow-town', { publicTownId: 'public_missing' }],
+      ['/api/world/services/request-advice', { serviceId: 'service_route_advisor', input: {} }],
+      ['/api/world/services/accept-result', { requestId: 'request_missing' }],
+      ['/api/world/services/report-issue', { requestId: 'request_missing', reason: 'test' }],
+      ['/api/world/events/contribute', { eventId: 'event_great_ridge_bridge', bundle: { coin: 1 } }],
+      ['/api/world/events/claim-reward', { eventId: 'event_great_ridge_bridge' }],
+      ['/api/world/sandbox/enter', {}],
+      ['/api/world/sandbox/place-prop', { payload: { cellId: 'sandbox_cell_0', propId: 'lantern' } }],
+      ['/api/world/sandbox/agent-demo', { payload: { cellId: 'sandbox_cell_1', demoKind: 'route-signpost' } }],
+      ['/api/world/sandbox/rollback-last', {}],
+      ['/api/world/sandbox/leave', {}]
+    ];
+
+    for (const [route, body] of missingKeyRoutes) {
+      const response = await fetch(`${baseUrl}${route}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const payload = await response.json();
+      assert.equal(response.status, 400, `${route}: ${JSON.stringify(payload)}`);
+      assert.equal(payload.error.code, 'INVALID_IDEMPOTENCY_KEY', route);
+    }
+
+    const invalidToolResponse = await fetch(`${baseUrl}/api/world/tool/et.world.territory.plan_claim`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ cellId: target.cellId, idempotencyKey: 'bad' })
+    });
+    const invalidToolBody = await invalidToolResponse.json();
+    assert.equal(invalidToolResponse.status, 400, JSON.stringify(invalidToolBody));
+    assert.equal(invalidToolBody.error.code, 'INVALID_IDEMPOTENCY_KEY');
   });
 });
 
@@ -309,7 +371,7 @@ test('V5.1 territory claim tools plan and complete one adjacent claim with exact
     const planResponse = await fetch(`${baseUrl}/api/world/territory/plan-claim`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ cellId: option.cellId })
+      body: JSON.stringify({ cellId: option.cellId, idempotencyKey: 'v51_plan_claim_001' })
     });
     const planBody = await planResponse.json();
     assert.equal(planResponse.status, 200, JSON.stringify(planBody));
@@ -320,7 +382,7 @@ test('V5.1 territory claim tools plan and complete one adjacent claim with exact
     const completeResponse = await fetch(`${baseUrl}/api/world/territory/complete-claim`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ claimId: planBody.claim.claimId })
+      body: JSON.stringify({ claimId: planBody.claim.claimId, idempotencyKey: 'v51_complete_claim_001' })
     });
     const completeBody = await completeResponse.json();
     assert.equal(completeResponse.status, 200, JSON.stringify(completeBody));
@@ -338,7 +400,7 @@ test('V5.1 territory claim tools plan and complete one adjacent claim with exact
     const replayCompleteResponse = await fetch(`${baseUrl}/api/world/territory/complete-claim`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ claimId: planBody.claim.claimId })
+      body: JSON.stringify({ claimId: planBody.claim.claimId, idempotencyKey: 'v51_complete_claim_002' })
     });
     const replayCompleteBody = await replayCompleteResponse.json();
     assert.equal(replayCompleteResponse.status, 200, JSON.stringify(replayCompleteBody));
@@ -363,6 +425,7 @@ test('V5.2 public presence is opt-in, redacted, followable, and removable', asyn
       body: JSON.stringify({
         displayName: 'Founder A',
         townName: 'Copper Lantern',
+        idempotencyKey: 'v52_opt_in_owner_a',
         privacy: { showOperatingStyle: true, showRegion: true, allowVisits: true }
       })
     });
@@ -383,7 +446,7 @@ test('V5.2 public presence is opt-in, redacted, followable, and removable', asyn
     const follow = await fetch(`${baseUrl}/api/world/follow-town`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...headersFor(ownerB) },
-      body: JSON.stringify({ publicTownId: optInABody.town.publicTownId })
+      body: JSON.stringify({ publicTownId: optInABody.town.publicTownId, idempotencyKey: 'v52_follow_owner_b' })
     });
     const followBody = await follow.json();
     assert.equal(follow.status, 200, JSON.stringify(followBody));
@@ -401,7 +464,7 @@ test('V5.2 public presence is opt-in, redacted, followable, and removable', asyn
     const optOutA = await fetch(`${baseUrl}/api/world/public-presence/opt-out`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...headersFor(ownerA) },
-      body: JSON.stringify({})
+      body: JSON.stringify({ idempotencyKey: 'v52_opt_out_owner_a' })
     });
     const optOutABody = await optOutA.json();
     assert.equal(optOutA.status, 200, JSON.stringify(optOutABody));
@@ -450,6 +513,7 @@ test('V5.3 agent services redact inputs and never mutate world state on accept',
       headers: { 'content-type': 'application/json', ...headers },
       body: JSON.stringify({
         serviceId: 'service_route_advisor',
+        idempotencyKey: 'v53_request_advice_001',
         input: {
           selectedCell: beforeRegion.region.cells.find((cell) => cell.state === 'claimable'),
           regionSummary: { cellCount: beforeRegion.region.cells.length },
@@ -478,7 +542,7 @@ test('V5.3 agent services redact inputs and never mutate world state on accept',
     const acceptResponse = await fetch(`${baseUrl}/api/world/services/accept-result`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...headers },
-      body: JSON.stringify({ requestId: requestBody.request.requestId })
+      body: JSON.stringify({ requestId: requestBody.request.requestId, idempotencyKey: 'v53_accept_result_001' })
     });
     const acceptBody = await acceptResponse.json();
     assert.equal(acceptResponse.status, 200, JSON.stringify(acceptBody));
@@ -497,7 +561,11 @@ test('V5.3 agent services redact inputs and never mutate world state on accept',
     const reportResponse = await fetch(`${baseUrl}/api/world/services/report-issue`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...headers },
-      body: JSON.stringify({ requestId: requestBody.request.requestId, reason: 'Advice was not relevant.' })
+      body: JSON.stringify({
+        requestId: requestBody.request.requestId,
+        reason: 'Advice was not relevant.',
+        idempotencyKey: 'v53_report_issue_001'
+      })
     });
     const reportBody = await reportResponse.json();
     assert.equal(reportResponse.status, 200, JSON.stringify(reportBody));
@@ -511,7 +579,11 @@ test('V5.3 agent services redact inputs and never mutate world state on accept',
     const duplicateReportResponse = await fetch(`${baseUrl}/api/world/services/report-issue`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...headers },
-      body: JSON.stringify({ requestId: requestBody.request.requestId, reason: 'Duplicate report.' })
+      body: JSON.stringify({
+        requestId: requestBody.request.requestId,
+        reason: 'Duplicate report.',
+        idempotencyKey: 'v53_report_issue_002'
+      })
     });
     const duplicateReportBody = await duplicateReportResponse.json();
     assert.equal(duplicateReportResponse.status, 200, JSON.stringify(duplicateReportBody));
@@ -524,7 +596,7 @@ test('V5.3 agent services redact inputs and never mutate world state on accept',
     const acceptAfterReportResponse = await fetch(`${baseUrl}/api/world/services/accept-result`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...headers },
-      body: JSON.stringify({ requestId: requestBody.request.requestId })
+      body: JSON.stringify({ requestId: requestBody.request.requestId, idempotencyKey: 'v53_accept_result_002' })
     });
     const acceptAfterReportBody = await acceptAfterReportResponse.json();
     assert.equal(acceptAfterReportResponse.status, 409, JSON.stringify(acceptAfterReportBody));
@@ -616,7 +688,7 @@ test('V5.4 world events enforce caps, idempotency, conservation, and cosmetic re
     const wrongOwnerReward = await fetch(`${baseUrl}/api/world/events/claim-reward`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...headersB },
-      body: JSON.stringify({ eventId, ownerAccountId: ownerAIdentity.ownerAccountId })
+      body: JSON.stringify({ eventId, ownerAccountId: ownerAIdentity.ownerAccountId, idempotencyKey: 'v54_wrong_reward_001' })
     });
     const wrongOwnerRewardBody = await wrongOwnerReward.json();
     assert.equal(wrongOwnerReward.status, 403, JSON.stringify(wrongOwnerRewardBody));
@@ -626,7 +698,7 @@ test('V5.4 world events enforce caps, idempotency, conservation, and cosmetic re
     const rewardResponse = await fetch(`${baseUrl}/api/world/events/claim-reward`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...headersA },
-      body: JSON.stringify({ eventId })
+      body: JSON.stringify({ eventId, idempotencyKey: 'v54_reward_001' })
     });
     const rewardBody = await rewardResponse.json();
     assert.equal(rewardResponse.status, 200, JSON.stringify(rewardBody));
@@ -637,7 +709,7 @@ test('V5.4 world events enforce caps, idempotency, conservation, and cosmetic re
     const rewardReplay = await fetch(`${baseUrl}/api/world/events/claim-reward`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...headersA },
-      body: JSON.stringify({ eventId })
+      body: JSON.stringify({ eventId, idempotencyKey: 'v54_reward_002' })
     });
     const rewardReplayBody = await rewardReplay.json();
     assert.equal(rewardReplay.status, 200, JSON.stringify(rewardReplayBody));
@@ -663,7 +735,7 @@ test('V5.5 sandbox districts moderate typed actions, rollback, and keep private 
     const enterResponse = await fetch(`${baseUrl}/api/world/sandbox/enter`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...headers },
-      body: JSON.stringify({})
+      body: JSON.stringify({ idempotencyKey: 'v55_enter_001' })
     });
     const enterBody = await enterResponse.json();
     assert.equal(enterResponse.status, 200, JSON.stringify(enterBody));
@@ -675,7 +747,10 @@ test('V5.5 sandbox districts moderate typed actions, rollback, and keep private 
     const placeResponse = await fetch(`${baseUrl}/api/world/sandbox/place-prop`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...headers },
-      body: JSON.stringify({ payload: { cellId: 'sandbox_cell_0', propId: 'lantern' } })
+      body: JSON.stringify({
+        payload: { cellId: 'sandbox_cell_0', propId: 'lantern' },
+        idempotencyKey: 'v55_place_001'
+      })
     });
     const placeBody = await placeResponse.json();
     assert.equal(placeResponse.status, 200, JSON.stringify(placeBody));
@@ -686,7 +761,10 @@ test('V5.5 sandbox districts moderate typed actions, rollback, and keep private 
     const rejectedResponse = await fetch(`${baseUrl}/api/world/sandbox/place-prop`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...headers },
-      body: JSON.stringify({ payload: { cellId: 'sandbox_cell_0', propId: 'uploaded-dragon' } })
+      body: JSON.stringify({
+        payload: { cellId: 'sandbox_cell_0', propId: 'uploaded-dragon' },
+        idempotencyKey: 'v55_place_002'
+      })
     });
     const rejectedBody = await rejectedResponse.json();
     assert.equal(rejectedResponse.status, 200, JSON.stringify(rejectedBody));
@@ -696,7 +774,10 @@ test('V5.5 sandbox districts moderate typed actions, rollback, and keep private 
     const demoResponse = await fetch(`${baseUrl}/api/world/sandbox/agent-demo`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...headers },
-      body: JSON.stringify({ payload: { cellId: 'sandbox_cell_1', demoKind: 'route-signpost' } })
+      body: JSON.stringify({
+        payload: { cellId: 'sandbox_cell_1', demoKind: 'route-signpost' },
+        idempotencyKey: 'v55_demo_001'
+      })
     });
     const demoBody = await demoResponse.json();
     assert.equal(demoResponse.status, 200, JSON.stringify(demoBody));
@@ -707,7 +788,10 @@ test('V5.5 sandbox districts moderate typed actions, rollback, and keep private 
     const rejectedDemoResponse = await fetch(`${baseUrl}/api/world/sandbox/agent-demo`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...headers },
-      body: JSON.stringify({ payload: { cellId: 'sandbox_cell_1', demoKind: 'freeform-chat' } })
+      body: JSON.stringify({
+        payload: { cellId: 'sandbox_cell_1', demoKind: 'freeform-chat' },
+        idempotencyKey: 'v55_demo_002'
+      })
     });
     const rejectedDemoBody = await rejectedDemoResponse.json();
     assert.equal(rejectedDemoResponse.status, 200, JSON.stringify(rejectedDemoBody));
@@ -716,7 +800,7 @@ test('V5.5 sandbox districts moderate typed actions, rollback, and keep private 
     const rollbackDemoResponse = await fetch(`${baseUrl}/api/world/sandbox/rollback-last`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...headers },
-      body: JSON.stringify({})
+      body: JSON.stringify({ idempotencyKey: 'v55_rollback_001' })
     });
     const rollbackDemoBody = await rollbackDemoResponse.json();
     assert.equal(rollbackDemoResponse.status, 200, JSON.stringify(rollbackDemoBody));
@@ -726,7 +810,7 @@ test('V5.5 sandbox districts moderate typed actions, rollback, and keep private 
     const rollbackLanternResponse = await fetch(`${baseUrl}/api/world/sandbox/rollback-last`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...headers },
-      body: JSON.stringify({})
+      body: JSON.stringify({ idempotencyKey: 'v55_rollback_002' })
     });
     const rollbackLanternBody = await rollbackLanternResponse.json();
     assert.equal(rollbackLanternResponse.status, 200, JSON.stringify(rollbackLanternBody));
@@ -735,7 +819,7 @@ test('V5.5 sandbox districts moderate typed actions, rollback, and keep private 
     const leaveResponse = await fetch(`${baseUrl}/api/world/sandbox/leave`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...headers },
-      body: JSON.stringify({})
+      body: JSON.stringify({ idempotencyKey: 'v55_leave_001' })
     });
     const leaveBody = await leaveResponse.json();
     assert.equal(leaveResponse.status, 200, JSON.stringify(leaveBody));

@@ -52,6 +52,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'docs/security/WORLD_LAYER_SECURITY_REVIEW_V5.md',
     'docs/security/WORLD_GRID_MUTATION_SECURITY_PLAN.md',
     'docs/security/AGENT_SERVICES_DATA_ACCESS_POLICY.md',
+    'docs/security/PUBLIC_TEXT_RENDERING_POLICY.md',
     'docs/security/PUBLIC_PRESENCE_REDACTION_POLICY.md',
     'server/world_civilization/audit_ledger.js',
     'server/world_civilization/proposals.js',
@@ -102,6 +103,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /Human approval or explicit delegation is required/);
   assert.match(spec, /docs\/product\/V6_AGENT_CIVILIZATION_MILESTONE_PLAN\.md/);
   assert.match(gate, /docs\/product\/V6_AGENT_CIVILIZATION_MILESTONE_PLAN\.md/);
+  assert.match(plan, /Source branch: `codex\/v6-agent-civilization-milestones`/);
 });
 
 test('V5 world-grid release promotion gate blocks V6 on prototype-only evidence', () => {
@@ -137,4 +139,18 @@ test('V5 world-grid release promotion gate blocks V6 on prototype-only evidence'
   assert.match(gate, /V6 civic institutions may not become player-visible/);
   assert.match(v6Gate, /specs\/release-gates\/v5_world_grid_release_promotion_gate\.md/);
   assert.match(ladder, /specs\/release-gates\/v5_world_grid_release_promotion_gate\.md/);
+});
+
+test('public text rendering policy covers future V6 civic public surfaces', () => {
+  const policy = read('docs/security/PUBLIC_TEXT_RENDERING_POLICY.md');
+  const presence = read('docs/security/PUBLIC_PRESENCE_REDACTION_POLICY.md');
+  const evidence = read('docs/release-evidence/WORLD_GRID_V50_REGION_PROTOTYPE_EVIDENCE_2026-05-26.md');
+
+  assert.match(policy, /textContent/);
+  assert.match(policy, /explicit escaping/);
+  assert.match(policy, /agent-authored text as untrusted/);
+  assert.match(policy, /future V6 civic proposals/);
+  assert.match(presence, /PUBLIC_TEXT_RENDERING_POLICY\.md/);
+  assert.match(evidence, /Prototype Persistence Warning/);
+  assert.match(evidence, /e2e\/242_world_grid_all_features_demo_regression\.spec\.js/);
 });

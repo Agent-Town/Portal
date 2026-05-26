@@ -20,6 +20,7 @@ test('V5.2 Public Presence and Safe Player Discovery smoke escapes malicious pub
     body: {
       displayName,
       townName,
+      idempotencyKey: 'e2e_v52_public_presence_xss',
       privacy: { showOperatingStyle: true, showRegion: true, allowVisits: true }
     }
   });

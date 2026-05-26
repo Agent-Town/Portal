@@ -12,6 +12,9 @@ until the controls below are implemented and covered by deterministic tests.
   authorized by the existing feature-override guard.
 - V5.1+ mutating world-grid routes require an existing Founders Plot
   prerequisite and return `WORLD_GRID_PLOT_REQUIRED` when missing.
+- V5.1+ externally visible mutating prototype routes now require an
+  `idempotencyKey` shape at the router boundary. This is a prototype guard, not
+  full replay-safe idempotent persistence.
 - V5.0 region rendering and read-only tools may run without creating Founders
   Plot state.
 - World-grid prototype stores are process-local and ephemeral; they are not
@@ -27,7 +30,8 @@ until the controls below are implemented and covered by deterministic tests.
 - Rate limits keyed by session and owner for public presence, claim planning,
   service requests, event contributions, and sandbox actions.
 - Idempotency requirements for every resource-spending or externally visible
-  mutation, not only world-event contribution.
+  mutation, not only world-event contribution. Release-grade idempotency must
+  persist request hashes/responses and reject conflicting retries.
 - Durable audit records with actor, route/tool name, idempotency key, before and
   after summaries, and rollback handle when one exists.
 - Restart persistence tests and replay tests before any public release flag is

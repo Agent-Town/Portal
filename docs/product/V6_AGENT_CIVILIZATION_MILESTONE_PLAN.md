@@ -2,7 +2,7 @@
 
 Status: `living_goal`
 
-Source branch: `codex/v6-world-grid-hardening-readiness`
+Source branch: `codex/v6-agent-civilization-milestones`
 
 This document is the working ladder from the hardened V5 world-grid prototype
 to V6.0 Agent Civilization completion. Keep it current as implementation lands:
@@ -58,9 +58,11 @@ Until every prerequisite below is met:
 
 1. Keep M0/M1 green while the hardening branch is reviewed.
 2. Close M2 by promoting V5 prototype evidence into release-grade gates.
-3. Build M3/M4 before adding any player-visible V6 behavior.
-4. Add M5/M6 controls before any mutating V6 tool or route exists.
-5. Implement M7-M12 behind research/internal flags only.
+3. Close M3-M6 before expanding V6 civic mechanics beyond research-only
+   contracts/foundations.
+4. Add M5/M6 controls before any mutating V6 route, tool, or UI exists.
+5. Keep M7-M12 behind research/internal flags only until V5 hardening gates are
+   closed.
 6. Add M13-M15 once schemas, auth, moderation, privacy, and rollback are proven.
 7. Treat M16-M18 as release hardening, not prototype discovery.
 
