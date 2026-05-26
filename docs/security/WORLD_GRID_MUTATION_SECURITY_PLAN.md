@@ -73,6 +73,11 @@ until the controls below are implemented and covered by deterministic tests.
   redacted summaries, rollback handles when present, and replay indexes.
 - V5.0 region rendering and read-only tools may run without creating Founders
   Plot state.
+- When `WORLD_GRID_REGION_PREFS_SQLITE_PATH` is configured, V5.0 camera/focus
+  preferences write durable SQLite `world_grid_region_preferences` rows with
+  owner, region, selected-cell, camera, schema, and migration metadata. Current
+  restart coverage proves selected-cell and camera preferences reopen across
+  separate Node process lifetimes and do not leak to another owner.
 - World-grid prototype stores are process-local and ephemeral unless an
   explicit optional SQLite foundation path is configured; none are release-grade
   persistence yet.
@@ -106,6 +111,9 @@ until the controls below are implemented and covered by deterministic tests.
   world-grid store.
 - Restart persistence tests and replay tests before any public release flag is
   enabled.
+- Current `WORLD_GRID_REGION_PREFS_SQLITE_PATH` coverage is a V5.0 storage
+  foundation only; release promotion still needs final browser-session
+  continuity, stale-session coverage, and production replay coverage.
 - Current `WORLD_GRID_CLAIMS_SQLITE_PATH` coverage is a V5.1 storage foundation
   only; release promotion still needs cancel/replay, cross-owner, and
   public-surface store persistence coverage.

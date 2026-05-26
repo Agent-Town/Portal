@@ -49,6 +49,10 @@ const {
 const { runIdempotentWorldGridMutation } = require('./idempotency');
 const { recordWorldGridMutationAudit } = require('./audit_log');
 const { requireWorldGridMutationOrigin } = require('./mutation_origin');
+const {
+  preferencesForOwner,
+  savePreferencesForOwner
+} = require('./preferences');
 const { loadWorldGridPlotPrerequisite } = require('./plot_prerequisite');
 const { consumeWorldGridMutationRateLimit } = require('./rate_limit');
 
@@ -182,9 +186,6 @@ const MUTATING_WORLD_GRID_TOOL_NAMES = new Set([
   'et.world.sandbox.rollback_last',
   'et.world.sandbox.leave'
 ]);
-
-// Prototype/ephemeral process-local store; release storage is documented in docs/technical/WORLD_GRID_STATE_MODEL.md.
-const cameraPreferences = new Map();
 
 function toolsForFlags(featureFlags = {}) {
   return WORLD_GRID_TOOLS.filter((tool) => isWorldGridFeatureEnabled(featureFlags, tool.featureFlag));
@@ -326,10 +327,10 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     }
     const claims = claimsForRegion(baseRegion.regionId);
     const region = applyClaimsToRegion(baseRegion, claims);
-    const preferences = cameraPreferences.get(owner.regionId) || {
+    const preferences = preferencesForOwner(owner, {
       selectedCellId: region.cells.find((cell) => cell.state === 'claimed')?.cellId || '',
       camera: { zoom: 'settlement', q: 0, r: 0 }
-    };
+    });
     return {
       identity,
       owner,
@@ -453,12 +454,16 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
         error.details = { cellId };
         throw error;
       }
+      const currentPreferences = preferencesForOwner(owner, {
+        selectedCellId: payload.region.cells.find((candidate) => candidate.state === 'claimed')?.cellId || '',
+        camera: { zoom: 'settlement', q: 0, r: 0 }
+      });
       const nextPreferences = {
-        ...(cameraPreferences.get(owner.regionId) || {}),
+        ...currentPreferences,
         selectedCellId: cell.cellId,
         camera: { zoom: 'region', q: cell.q, r: cell.r }
       };
-      cameraPreferences.set(owner.regionId, nextPreferences);
+      savePreferencesForOwner(owner, nextPreferences);
       res.json({ ok: true, featureFlags: payload.featureFlags, region: payload.region, preferences: nextPreferences, selectedCell: cell });
     } catch (error) {
       const normalized = normalizeError(error);
@@ -476,11 +481,15 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
         q: Number.isFinite(Number(req.body?.q)) ? Number(req.body.q) : 0,
         r: Number.isFinite(Number(req.body?.r)) ? Number(req.body.r) : 0
       };
+      const currentPreferences = preferencesForOwner(owner, {
+        selectedCellId: payload.region.cells.find((cell) => cell.state === 'claimed')?.cellId || '',
+        camera: { zoom: 'settlement', q: 0, r: 0 }
+      });
       const nextPreferences = {
-        ...(cameraPreferences.get(owner.regionId) || {}),
+        ...currentPreferences,
         camera
       };
-      cameraPreferences.set(owner.regionId, nextPreferences);
+      savePreferencesForOwner(owner, nextPreferences);
       res.json({ ok: true, featureFlags: payload.featureFlags, region: payload.region, preferences: nextPreferences });
     } catch (error) {
       const normalized = normalizeError(error);

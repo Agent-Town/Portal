@@ -56,12 +56,19 @@ Renderer state must derive from:
 - `POST /api/world/region/focus-cell`
 - `POST /api/world/region/set-camera`
 
+Focus/camera preferences are prototype-ephemeral by default. When
+`WORLD_GRID_REGION_PREFS_SQLITE_PATH` is configured, they are written to
+owner-indexed SQLite rows so restart persistence can be proven before V6
+depends on V5.0 region state.
+
 Prototype implementation evidence:
 
 - `server/world_grid/region.js`
+- `server/world_grid/preferences.js`
 - `server/world_grid/routes.js`
 - `public/experiences/world-grid/`
 - `tests/world_grid_region.test.js`
+- `tests/world_grid_region_preferences_persistence.test.js`
 - `e2e/236_world_grid_v50_region_prototype.spec.js`
 
 The renderer may never mutate town inventory, building state, contracts,
@@ -100,6 +107,8 @@ type WorldCell = {
 - Same account/wallet restores the same region.
 - Wrong account cannot read another private region.
 - Region view does not mutate Founders Plot state.
+- Mutable focus/camera preferences survive restart when release-storage
+  foundation mode is configured.
 - Home settlement node is visible in the Three.js region scene.
 - Selecting a cell opens a state-backed detail sheet.
 - Keyboard navigation can select cells through the DOM/accessibility mirror.

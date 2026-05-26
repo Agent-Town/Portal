@@ -2753,6 +2753,13 @@ Returns a deterministic V5.0 region payload for the current owner identity when
 `FEATURE_WORLD_GRID_V50_REGION` is enabled. This read path may render without an
 existing Founders Plot and must not create one.
 
+### POST `/api/world/region/focus-cell`, `/api/world/region/set-camera`
+V5.0 focus/camera preference routes update only region-view preferences. They
+must not create Founders Plot state, spend resources, or claim territory. When
+`WORLD_GRID_REGION_PREFS_SQLITE_PATH` is configured, selected-cell and camera
+preferences persist in owner-indexed SQLite rows with schema/migration metadata
+and restart proof.
+
 ### POST `/api/world/territory/*`
 V5.1 territory mutation routes (`plan-claim`, `complete-claim`, `cancel-claim`)
 require an existing valid Founders Plot prerequisite. Missing prerequisite
@@ -2785,9 +2792,14 @@ records, and restart persistence tests before public enablement. When
 mutations write durable audit/replay rows, but this is only a foundation until
 before-state snapshots and per-store restart replay are complete. When
 `WORLD_GRID_IDEMPOTENCY_SQLITE_PATH` is configured, mutating routes/tools write
-durable idempotency rows with request hashes and stored success responses; this is only a
-foundation until final session-auth production replay is also covered. When
-`WORLD_GRID_CLAIMS_SQLITE_PATH` is configured, V5.1 claim rows persist planned
+durable idempotency rows with request hashes and stored success responses; this
+is only a foundation until final session-auth production replay is also covered.
+When
+`WORLD_GRID_REGION_PREFS_SQLITE_PATH` is configured, V5.0 selected-cell and
+camera preference rows persist with owner/region indexes, schema versioning, and
+migration metadata; this is only a foundation until browser-session preference
+continuity, stale-session coverage, and production replay coverage are complete.
+When `WORLD_GRID_CLAIMS_SQLITE_PATH` is configured, V5.1 claim rows persist planned
 and claimed territory state with owner/status/cell indexes, schema versioning,
 and migration metadata; this is only a foundation until the full V5.1-V5.5 store
 set has restart and replay coverage. When

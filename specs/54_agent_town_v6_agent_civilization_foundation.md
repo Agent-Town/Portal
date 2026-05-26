@@ -109,7 +109,8 @@ auditable institutions.
 ## Explicit Prerequisites
 
 - V5.0 Region Grid proves deterministic rendering without creating Founders Plot
-  state as a side effect.
+  state as a side effect, with optional `WORLD_GRID_REGION_PREFS_SQLITE_PATH`
+  restart proof for owner-indexed camera/focus preferences.
 - V5.1 Territory Claims and Settler Routes prove existing-plot prerequisites,
   owner checks, resource conservation, idempotency, and replayability.
 - V5.2 Public Presence and Safe Player Discovery proves opt-in boundaries,

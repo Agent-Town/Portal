@@ -18,6 +18,7 @@ owner: "Agent Town engineering"
 | Same account restore | Same owner account resolves the same `regionId` and seed. |
 | Wrong account denial | Private region lookup for another owner returns 403/404 without metadata leakage. |
 | Renderer cannot mutate town | Region focus/camera APIs do not change Founders Plot inventory, buildings, jobs, contracts, or events. |
+| Restart-safe preferences | `tests/world_grid_region_preferences_persistence.test.js` proves selected-cell and camera preferences reopen across separate Node lifetimes when `WORLD_GRID_REGION_PREFS_SQLITE_PATH` is configured and do not leak to another owner. |
 | Read-only agent tools | `et.world.region.get_state` and `et.world.region.explain_cell` return redacted observations only. |
 | Accessibility mirror data | Every selectable cell has a label containing terrain and state. |
 
@@ -42,3 +43,4 @@ owner: "Agent Town engineering"
 - Settlement-to-region zoom screenshot.
 - Runtime evidence document under `docs/release-evidence/`.
 - API/unit and Playwright summaries.
+- Region preference restart proof summary.

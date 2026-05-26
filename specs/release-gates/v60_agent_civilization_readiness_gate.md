@@ -107,7 +107,12 @@ gate below has implementation, deterministic tests, and security/product signoff
 
 ## Prerequisites
 
-- V5.0 Region Grid remains gated and deterministic without hidden state creation.
+- V5.0 Region Grid remains gated and deterministic without hidden state
+  creation. Current V5.0 storage evidence includes the
+  `WORLD_GRID_REGION_PREFS_SQLITE_PATH` foundation for owner-indexed camera/focus
+  preference restart proof, but release promotion still requires final
+  browser-session preference continuity and production replay coverage in the
+  V5 gate.
 - V5.1 Territory Claims and Settler Routes require existing settlement state,
   owner checks, resource conservation, idempotency, and replay evidence. Current
   V5.1 storage evidence includes the `WORLD_GRID_CLAIMS_SQLITE_PATH` foundation

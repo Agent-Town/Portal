@@ -71,6 +71,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'server/world_grid/audit_log.js',
     'server/world_grid/idempotency.js',
     'server/world_grid/mutation_origin.js',
+    'server/world_grid/preferences.js',
     'server/world_grid/rate_limit.js',
     'server/world_civilization/audit_ledger.js',
     'server/world_civilization/controlled_release.js',
@@ -102,6 +103,8 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'tests/world_civilization_migration_rehearsal.test.js',
     'tests/world_civilization_load_rate.test.js',
     'tests/world_civilization_rollback_recovery.test.js',
+    'tests/world_grid_region_preferences_persistence.test.js',
+    'tests/world_grid_region_preferences_restart_probe_child.js',
     'tests/world_grid_idempotency_persistence.test.js',
     'tests/world_grid_idempotency_restart_probe_child.js',
     'tests/world_grid_claims_persistence.test.js',
@@ -367,6 +370,7 @@ test('world-grid audit replay policy is tracked as an M3 release storage control
   const evidence = read('docs/release-evidence/WORLD_GRID_V50_REGION_PROTOTYPE_EVIDENCE_2026-05-26.md');
 
   assert.match(plan, /durable world-grid audit log foundation/);
+  assert.match(plan, /WORLD_GRID_REGION_PREFS_SQLITE_PATH/);
   assert.match(plan, /WORLD_GRID_IDEMPOTENCY_SQLITE_PATH/);
   assert.match(plan, /WORLD_GRID_CLAIMS_SQLITE_PATH/);
   assert.match(plan, /WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH/);
@@ -374,6 +378,7 @@ test('world-grid audit replay policy is tracked as an M3 release storage control
   assert.match(plan, /WORLD_GRID_EVENTS_SQLITE_PATH/);
   assert.match(plan, /WORLD_GRID_SANDBOX_SQLITE_PATH/);
   assert.match(security, /WORLD_GRID_AUDIT_SQLITE_PATH/);
+  assert.match(security, /WORLD_GRID_REGION_PREFS_SQLITE_PATH/);
   assert.match(security, /WORLD_GRID_IDEMPOTENCY_SQLITE_PATH/);
   assert.match(security, /WORLD_GRID_CLAIMS_SQLITE_PATH/);
   assert.match(security, /WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH/);
@@ -381,6 +386,7 @@ test('world-grid audit replay policy is tracked as an M3 release storage control
   assert.match(security, /WORLD_GRID_EVENTS_SQLITE_PATH/);
   assert.match(security, /WORLD_GRID_SANDBOX_SQLITE_PATH/);
   assert.match(security, /planned-claim retry replays after a separate Node\s+process restart/);
+  assert.match(security, /selected-cell and camera preferences reopen across\s+separate Node process lifetimes/);
   assert.match(security, /every externally\s+visible V5\.1-V5\.5 mutating route and tool surface after separate Node process\s+restarts/);
   assert.match(security, /completes from durable claim state/);
   assert.match(security, /inbound follow cleanup/);
@@ -389,6 +395,8 @@ test('world-grid audit replay policy is tracked as an M3 release storage control
   assert.match(security, /rollback\s+snapshots, cell props, leave state/);
   assert.match(security, /append-only SQLite audit records/);
   assert.match(stateModel, /server\/world_grid\/audit_log\.js/);
+  assert.match(stateModel, /server\/world_grid\/preferences\.js/);
+  assert.match(stateModel, /world_grid_region_preferences/);
   assert.match(stateModel, /world_grid_idempotency_records/);
   assert.match(stateModel, /world_grid_claims/);
   assert.match(stateModel, /world_grid_public_presence/);
@@ -401,6 +409,7 @@ test('world-grid audit replay policy is tracked as an M3 release storage control
   assert.match(stateModel, /world_grid_sandbox_actions/);
   assert.match(stateModel, /world_grid_sandbox_snapshots/);
   assert.match(stateModel, /world_grid_sandbox_cells/);
+  assert.match(stateModel, /selected-cell and camera state reopens across separate Node lifetimes/);
   assert.match(stateModel, /planned and\s+claimed state reopens across separate Node lifetimes/);
   assert.match(stateModel, /opt-in\/list\/lookup\/follow\/opt-out across separate\s+Node lifetimes/);
   assert.match(stateModel, /redacted request inputs, accepted\/reported request state,\s+reputation counters/);
@@ -410,6 +419,8 @@ test('world-grid audit replay policy is tracked as an M3 release storage control
   assert.match(stateModel, /final session-auth integration and production\s+replay coverage remain release gates/);
   assert.match(stateModel, /world_grid_audit_log/);
   assert.match(evidence, /Mutation audit log/);
+  assert.match(evidence, /Durable V5\.0 preferences foundation/);
+  assert.match(evidence, /tests\/world_grid_region_preferences_persistence\.test\.js/);
   assert.match(evidence, /Durable idempotency foundation/);
   assert.match(evidence, /tests\/world_grid_idempotency_persistence\.test\.js/);
   assert.match(evidence, /V5\.1-V5\.5 mutating route and tool surfaces after separate Node process restarts/);

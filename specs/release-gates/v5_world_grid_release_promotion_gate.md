@@ -33,7 +33,7 @@ from `prototype_gated` to `release_ready`:
 
 | Slice | Promotion Evidence Required |
 | --- | --- |
-| V5.0 Region Grid | Deterministic region generation, read-only route coverage, no Founders Plot side-effect creation, restart-safe camera/focus preferences if preferences remain mutable, and renderer smoke tests for desktop/mobile framing. |
+| V5.0 Region Grid | Deterministic region generation, read-only route coverage, no Founders Plot side-effect creation, restart-safe camera/focus preferences through `WORLD_GRID_REGION_PREFS_SQLITE_PATH` or equivalent release storage if preferences remain mutable, and renderer smoke tests for desktop/mobile framing. |
 | V5.1 Territory Claims and Settler Routes | Existing valid plot prerequisite, owner/adjacency checks, resource conservation, idempotent claim/complete/cancel flows, route replay records, and restart-safe claim state. |
 | V5.2 Public Presence and Safe Player Discovery | Explicit opt-in/out, public-safe profile schema, malicious name rendering tests, follow/unfollow owner checks, abuse report hooks, and redaction/privacy review. |
 | V5.3 Civic Service Advice Prototype | Redacted request inputs, typed advice output schema, no private-state mutation, bounded reputation updates, dispute/report flow, and audit records for accept/report actions. |

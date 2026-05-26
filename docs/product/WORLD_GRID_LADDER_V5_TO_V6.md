@@ -46,7 +46,7 @@ V6 milestone plan.
 
 | Slice | release_status | Player-visible by default | Evidence |
 | --- | --- | --- | --- |
-| V5.0 Region Grid | `prototype_gated` | No | `docs/release-evidence/WORLD_GRID_V50_REGION_PROTOTYPE_EVIDENCE_2026-05-26.md` |
+| V5.0 Region Grid | `prototype_gated` | No | Deterministic region, read-only focus/camera coverage, no Founders Plot side effects, split Playwright smoke, and optional `WORLD_GRID_REGION_PREFS_SQLITE_PATH` restart proof for owner-indexed camera/focus preferences. |
 | V5.1 Territory Claims and Settler Routes | `prototype_gated` | No | API, UI, Playwright coverage, and optional `WORLD_GRID_CLAIMS_SQLITE_PATH` restart proof for planned/claimed claim state. |
 | V5.2 Public Presence and Safe Player Discovery | `prototype_gated` | No | Redaction, opt-in/out, follow, public summary coverage, and optional `WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH` restart proof for public presence/follow state. |
 | V5.3 Civic Service Advice Prototype | `prototype_gated` | No | Redacted inputs, schema-shaped output, accept/report coverage, and optional `WORLD_GRID_SERVICES_SQLITE_PATH` restart proof for service request/reputation state. |

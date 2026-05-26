@@ -18,6 +18,7 @@ Status: `prototype_gated` for V5.0-V5.5 starter workflow
 | Mutation audit log | `server/world_grid/audit_log.js` writes hash-chained SQLite audit/replay rows for successful mutating V5.1+ routes/tools when `WORLD_GRID_AUDIT_SQLITE_PATH` is configured; release promotion still needs full before-state snapshots and per-store restart replay coverage. |
 | Server-authoritative region | `server/world_grid/region.js` deterministically generates `WorldRegion`, `WorldCell`, `SettlementNode`, and `RouteEdge` data from owner identity. |
 | Read-only V5.0 APIs | `server/world_grid/routes.js` exposes region, focus, camera, and read-only tool endpoints without claim/build/resource mutation. |
+| Durable V5.0 preferences foundation | `server/world_grid/preferences.js` can write SQLite `world_grid_region_preferences` rows when `WORLD_GRID_REGION_PREFS_SQLITE_PATH` is configured; `tests/world_grid_region_preferences_persistence.test.js` proves selected-cell and camera preferences reopen across restarts and stay isolated by owner/region. |
 | V5.1 Territory Claims and Settler Routes | `server/world_grid/claims.js` adds gated adjacent claim options, plan/complete/cancel tools, exact resource spend, route preview, and terrain tradeoff copy. |
 | Browser prototype | `public/experiences/world-grid/` renders a Three.js territory grid and DOM cell mirror when the prototype flag is enabled. |
 | Tests | `tests/world_grid_region.test.js`; split Playwright coverage in `e2e/236_world_grid_v50_region_prototype.spec.js`, `e2e/237_world_grid_v51_claims_prototype.spec.js`, `e2e/238_world_grid_v52_public_presence_prototype.spec.js`, `e2e/239_world_grid_v53_service_redaction_prototype.spec.js`, `e2e/240_world_grid_v54_event_accounting_prototype.spec.js`, `e2e/241_world_grid_v55_sandbox_prototype.spec.js`; and all-features regression `e2e/242_world_grid_all_features_demo_regression.spec.js`. |
@@ -48,12 +49,12 @@ replaced by durable release-grade storage. Process-local state includes claims,
 public presence, follows, service requests/reputation, event contribution
 bookkeeping, rewards, sandbox participants/actions/snapshots/cells, CSRF mutation
 tokens, rate-limit buckets, and camera preferences. The optional SQLite audit log,
-optional SQLite idempotency rows, optional SQLite claim rows, optional SQLite
-public presence/follow rows, optional SQLite service request/reputation rows,
-optional SQLite event contribution/reward rows, and optional SQLite sandbox
-participant/action/snapshot/cell rows are durable foundations, but release
-promotion still requires durable owner indexes, migration versioning, full
-append-only audit/replay records with before-state snapshots, durable
-idempotency integration with final session-auth production replay,
-CSRF-token/session-auth integration, durable/shared rate limits, and restart
-replay coverage for every world-grid store.
+optional SQLite region preference rows, optional SQLite idempotency rows, optional
+SQLite claim rows, optional SQLite public presence/follow rows, optional SQLite
+service request/reputation rows, optional SQLite event contribution/reward rows,
+and optional SQLite sandbox participant/action/snapshot/cell rows are durable
+foundations, but release promotion still requires durable owner indexes,
+migration versioning, full append-only audit/replay records with before-state
+snapshots, durable idempotency integration with final session-auth production
+replay, CSRF-token/session-auth integration, durable/shared rate limits, and
+restart replay coverage for every world-grid store.
