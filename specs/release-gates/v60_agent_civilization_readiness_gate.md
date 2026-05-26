@@ -120,7 +120,11 @@ gate below has implementation, deterministic tests, and security/product signoff
   still requires abuse-report, retention, stale-session, and final privacy
   coverage in the V5 gate.
 - V5.3 Civic Service Advice Prototype proves input redaction, output schemas,
-  reputation bounds, dispute handling, and no hidden mutation.
+  reputation bounds, dispute handling, and no hidden mutation. Current V5.3
+  storage evidence includes the `WORLD_GRID_SERVICES_SQLITE_PATH` foundation for
+  service request/reputation restart proof, but release promotion still requires
+  stale-session, full dispute workflow, retention, and final service privacy
+  coverage in the V5 gate.
 - V5.4 World Events and Public Works proves contribution caps, idempotency,
   conservation, reward safety, audit records, and rollback policy.
 - V5.5 Controlled Free-Play Sandbox Districts proves typed action moderation,

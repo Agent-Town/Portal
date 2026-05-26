@@ -27,6 +27,7 @@ const {
   closeWorldGridAuditLog,
   createWorldGridAuditLog
 } = require('../server/world_grid/audit_log');
+const { closeWorldGridServiceStore } = require('../server/world_grid/services');
 
 async function withWorldGridServer({ identity, envPatch = {} }, fn) {
   const previous = {
@@ -40,6 +41,7 @@ async function withWorldGridServer({ identity, envPatch = {} }, fn) {
     WORLD_GRID_CLAIMS_SQLITE_PATH: process.env.WORLD_GRID_CLAIMS_SQLITE_PATH,
     WORLD_GRID_IDEMPOTENCY_SQLITE_PATH: process.env.WORLD_GRID_IDEMPOTENCY_SQLITE_PATH,
     WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH: process.env.WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH,
+    WORLD_GRID_SERVICES_SQLITE_PATH: process.env.WORLD_GRID_SERVICES_SQLITE_PATH,
     WORLD_GRID_MUTATION_RATE_LIMIT_MAX: process.env.WORLD_GRID_MUTATION_RATE_LIMIT_MAX,
     WORLD_GRID_MUTATION_RATE_LIMIT_WINDOW_MS: process.env.WORLD_GRID_MUTATION_RATE_LIMIT_WINDOW_MS
   };
@@ -63,6 +65,7 @@ async function withWorldGridServer({ identity, envPatch = {} }, fn) {
     closeWorldGridClaimStore();
     closeWorldGridIdempotencyStore();
     closeWorldGridPublicPresenceStore();
+    closeWorldGridServiceStore();
     for (const [key, value] of Object.entries(previous)) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;

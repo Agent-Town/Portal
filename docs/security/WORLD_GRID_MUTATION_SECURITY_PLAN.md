@@ -44,6 +44,12 @@ until the controls below are implemented and covered by deterministic tests.
   schema, and migration metadata. Current restart coverage proves opt-in,
   listing, lookup, follow, summary, and opt-out behavior across separate Node
   process lifetimes, including inbound follow cleanup when a town opts out.
+- When `WORLD_GRID_SERVICES_SQLITE_PATH` is configured, V5.3 civic service
+  request and reputation state writes durable SQLite rows with owner, service,
+  status, schema, and migration metadata. Current restart coverage proves
+  redacted advice requests, accepted/reported request state, reputation counter
+  replay, and duplicate accept/report safety across separate Node process
+  lifetimes without leaking forbidden service inputs.
 - Mutating V5.1+ world-grid routes and tool routes use process-local rate
   buckets keyed by owner and mutation surface. This throttles prototype abuse
   paths but is not durable, distributed, or session-auth aware.
@@ -92,6 +98,9 @@ until the controls below are implemented and covered by deterministic tests.
 - Current `WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH` coverage is a V5.2 storage
   foundation only; release promotion still needs stale-session, abuse-report,
   retention, and final public-privacy review coverage.
+- Current `WORLD_GRID_SERVICES_SQLITE_PATH` coverage is a V5.3 storage
+  foundation only; release promotion still needs stale-session, dispute workflow,
+  retention, and final service privacy review coverage.
 
 ## Out Of Scope For This Hardening Pass
 

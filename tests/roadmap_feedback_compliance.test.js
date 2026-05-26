@@ -108,6 +108,8 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'tests/world_grid_claims_restart_probe_child.js',
     'tests/world_grid_public_presence_persistence.test.js',
     'tests/world_grid_public_presence_restart_probe_child.js',
+    'tests/world_grid_services_persistence.test.js',
+    'tests/world_grid_services_restart_probe_child.js',
     'public/experiences/world-grid/manifest.json',
     'public/experiences/world-grid/skill.md',
     'public/experiences/world-grid/tools.md',
@@ -364,21 +366,27 @@ test('world-grid audit replay policy is tracked as an M3 release storage control
   assert.match(plan, /WORLD_GRID_IDEMPOTENCY_SQLITE_PATH/);
   assert.match(plan, /WORLD_GRID_CLAIMS_SQLITE_PATH/);
   assert.match(plan, /WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH/);
+  assert.match(plan, /WORLD_GRID_SERVICES_SQLITE_PATH/);
   assert.match(security, /WORLD_GRID_AUDIT_SQLITE_PATH/);
   assert.match(security, /WORLD_GRID_IDEMPOTENCY_SQLITE_PATH/);
   assert.match(security, /WORLD_GRID_CLAIMS_SQLITE_PATH/);
   assert.match(security, /WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH/);
+  assert.match(security, /WORLD_GRID_SERVICES_SQLITE_PATH/);
   assert.match(security, /planned-claim retry replays after a separate Node\s+process restart/);
   assert.match(security, /completes from durable claim state/);
   assert.match(security, /inbound follow cleanup/);
+  assert.match(security, /duplicate accept\/report safety/);
   assert.match(security, /append-only SQLite audit records/);
   assert.match(stateModel, /server\/world_grid\/audit_log\.js/);
   assert.match(stateModel, /world_grid_idempotency_records/);
   assert.match(stateModel, /world_grid_claims/);
   assert.match(stateModel, /world_grid_public_presence/);
   assert.match(stateModel, /world_grid_public_follows/);
+  assert.match(stateModel, /world_grid_service_requests/);
+  assert.match(stateModel, /world_grid_service_reputation/);
   assert.match(stateModel, /planned and\s+claimed state reopens across separate Node lifetimes/);
   assert.match(stateModel, /opt-in\/list\/lookup\/follow\/opt-out across separate\s+Node lifetimes/);
+  assert.match(stateModel, /redacted request inputs, accepted\/reported request state,\s+reputation counters/);
   assert.match(stateModel, /route-level planned claims only/);
   assert.match(stateModel, /world_grid_audit_log/);
   assert.match(evidence, /Mutation audit log/);
@@ -388,5 +396,7 @@ test('world-grid audit replay policy is tracked as an M3 release storage control
   assert.match(evidence, /tests\/world_grid_claims_persistence\.test\.js/);
   assert.match(evidence, /Durable public presence foundation/);
   assert.match(evidence, /tests\/world_grid_public_presence_persistence\.test\.js/);
+  assert.match(evidence, /Durable services foundation/);
+  assert.match(evidence, /tests\/world_grid_services_persistence\.test\.js/);
   assert.match(evidence, /restart replay coverage/);
 });

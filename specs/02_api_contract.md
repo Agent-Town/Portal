@@ -2795,6 +2795,11 @@ set has restart and replay coverage. When
 presence/follow rows persist opt-in public town cards and follow edges with
 owner/town indexes, schema versioning, and migration metadata; this is only a
 foundation until stale-session, abuse-report, retention, and final privacy
-coverage are complete. Mutating
+coverage are complete. When `WORLD_GRID_SERVICES_SQLITE_PATH` is configured,
+V5.3 service request/reputation rows persist redacted advice requests,
+accepted/reported request state, and service reputation counters with
+owner/service/status indexes, schema versioning, and migration metadata; this is
+only a foundation until dispute workflow, stale-session, retention, and final
+service privacy coverage are complete. Mutating
 endpoint same-origin, CSRF, session-auth, rate-limit, and idempotency
 requirements are tracked in `docs/security/WORLD_GRID_MUTATION_SECURITY_PLAN.md`.
