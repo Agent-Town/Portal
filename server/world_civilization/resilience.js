@@ -43,7 +43,7 @@ const V6_CIVIC_RESILIENCE_STORES = [
     label: 'Reputation accountability store',
     modulePath: 'server/world_civilization/reputation.js',
     migrationVersion: 'v1',
-    restartCoverage: 'tests/world_civilization_reputation.test.js',
+    restartCoverage: 'tests/world_civilization_reputation_moderation_process_restart.test.js',
     requiredMethods: ['recordReputation', 'getRecord', 'listRecords', 'summarizeSubjectReputation', 'count', 'close']
   },
   {
@@ -51,7 +51,7 @@ const V6_CIVIC_RESILIENCE_STORES = [
     label: 'Moderation privacy store',
     modulePath: 'server/world_civilization/moderation.js',
     migrationVersion: 'v1',
-    restartCoverage: 'tests/world_civilization_moderation.test.js',
+    restartCoverage: 'tests/world_civilization_reputation_moderation_process_restart.test.js',
     requiredMethods: ['recordDecision', 'getDecision', 'listDecisions', 'summarizeSubjectModeration', 'count', 'close']
   },
   {
