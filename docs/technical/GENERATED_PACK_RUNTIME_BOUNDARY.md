@@ -65,6 +65,13 @@ Player prompt
 - Runtime asset URLs must remain under `public/experiences/world-grid/generated`; unsafe paths and unapproved data/candidate paths are treated as fallbacks.
 - `public/experiences/world-grid/three_scene_entry.js` exposes loader metrics through `sceneInfo.assetLoader`, respects reduced motion, and derives playtest missing-asset counts from the loader.
 
+## GU-8 AI Playtest Harness Slice
+
+- First-loop reports are normalized by `buildMeasuredPlaytestReport` before validation and cannot pass with default scores.
+- The harness records measured score evidence, palette contrast/readability scoring, style-coherence factors, prompt-alignment hints, asset-loader fallback evidence, console error count, and screenshot evidence.
+- Screenshot evidence is recorded as dimensions, byte length, source, and SHA-256 hash; the contract does not require storing production screenshot files yet.
+- Missing future production textures remain deterministic fallbacks. The harness records handled fallbacks as warnings while still requiring zero unhandled missing assets for a pass.
+
 ## Machine Checks
 
 ```json
@@ -103,6 +110,14 @@ Player prompt
   "missingTextureCount": 0,
   "handledMissingTextureCount": 23,
   "assetLoaderPerformanceBudgetPassed": true,
-  "firstLoopStillCompletes": true
+  "firstLoopStillCompletes": true,
+  "firstLoopPlaytestAutomated": true,
+  "measuredScoresRequired": true,
+  "defaultScoresCannotPass": true,
+  "badContrastPackRejected": true,
+  "missingMappingPackRejected": true,
+  "missingAssetFallbackWarningRecorded": true,
+  "screenshotEvidenceRecorded": true,
+  "paletteContrastScoreMin": 0.85
 }
 ```

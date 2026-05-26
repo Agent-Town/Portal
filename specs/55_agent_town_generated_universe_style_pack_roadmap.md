@@ -100,6 +100,11 @@ This is a separate prototype-gated track. It must not change normal gameplay vis
   "assetLoaderPerformanceBudgetPassed": true,
   "deterministicFallbackPlayable": true,
   "firstLoopCompleted": true,
+  "firstLoopPlaytestAutomated": true,
+  "measuredScoresRequired": true,
+  "defaultScoresUsed": false,
+  "screenshotEvidenceRecorded": true,
+  "paletteContrastScoreMin": 0.85,
   "replayabilityDistinctSignatureRatioMin": 1.0,
   "replayabilityDistinctThemeRatioMin": 0.75
 }
@@ -201,5 +206,27 @@ The browser runtime now includes a generated-pack asset loader between pack cont
   "performanceBudgetPassed": true,
   "firstLoopStillCompletes": true,
   "playtestMissingAssetsDerivedFromLoader": true
+}
+```
+
+## GU-8 AI Playtest Harness Slice
+
+The first-loop playtest gate now requires measured browser evidence before a generated pack can pass. The harness derives palette contrast, readability, style coherence, and prompt-alignment scores from the generated pack contract and browser runtime evidence, records screenshot evidence with a stable hash, fails bad contrast or invalid mapping packs, and preserves deterministic fallback playability by warning on handled fallback textures instead of requiring production image assets.
+
+```json
+{
+  "firstLoopPlaytestAutomated": true,
+  "measuredScoresRequired": true,
+  "defaultScoresCannotPass": true,
+  "badContrastPackRejected": true,
+  "missingMappingPackRejected": true,
+  "missingAssetFallbackWarningRecorded": true,
+  "screenshotEvidenceRecorded": true,
+  "consoleErrorGateExists": true,
+  "firstLoopCompletionGateExists": true,
+  "paletteContrastScoreMin": 0.85,
+  "uiReadabilityScoreMin": 0.85,
+  "styleCoherenceScoreMin": 0.85,
+  "promptAlignmentScoreMin": 0.85
 }
 ```

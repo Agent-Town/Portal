@@ -43,3 +43,6 @@ owner: "Agent Town product"
 | GPACK-030 | Asset loader | Browser asset loader v2 converts generated manifest and prompt-plan targets into fallback-safe runtime metadata | `tests/generated_pack_asset_loader.test.js` |
 | GPACK-031 | Asset loader | Runtime asset paths must stay under `public/experiences/world-grid/generated` and path traversal stays fallback-only | `tests/generated_pack_asset_loader.test.js` |
 | GPACK-032 | Three.js | Scene info exposes asset-loader target counts, zero unhandled missing textures, performance budget pass, and first-loop safety | `e2e/237_world_grid_generated_pack_demo.spec.js` |
+| GPACK-033 | Playtest | First-loop reports require measured scores, screenshot evidence, and console/asset/loop gates before passing | `tests/generated_pack_playtest_harness.test.js`, `e2e/237_world_grid_generated_pack_demo.spec.js` |
+| GPACK-034 | Playtest | Bad contrast packs, missing mapping packs, default scores, and incomplete first loops are rejected | `tests/generated_pack_playtest_harness.test.js` |
+| GPACK-035 | Playtest | Missing production texture assets remain deterministic fallbacks and are recorded as warnings, not silent passes | `tests/generated_pack_playtest_harness.test.js`, `e2e/237_world_grid_generated_pack_demo.spec.js` |

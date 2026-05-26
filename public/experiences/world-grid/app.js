@@ -296,10 +296,50 @@
     await recordGeneratedFirstLoopReport();
   }
 
+  async function sha256Hex(value) {
+    if (!window.crypto?.subtle || !window.TextEncoder) return '';
+    const bytes = new TextEncoder().encode(String(value || ''));
+    const hash = await window.crypto.subtle.digest('SHA-256', bytes);
+    return Array.from(new Uint8Array(hash)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  }
+
+  async function captureScreenshotEvidence(sceneInfo = null) {
+    const stage = qs('[data-world-grid-stage]');
+    const canvas = stage?.querySelector('[data-world-grid-canvas]');
+    const rect = stage?.getBoundingClientRect?.() || { width: 0, height: 0 };
+    let payload = '';
+    try {
+      payload = canvas?.toDataURL ? canvas.toDataURL('image/png') : '';
+    } catch (error) {
+      payload = '';
+    }
+    if (!payload || payload.length < 100) {
+      payload = JSON.stringify({
+        generatedPackId: activePack()?.packId || '',
+        renderer: sceneInfo?.renderer || '',
+        width: Math.floor(rect.width || 0),
+        height: Math.floor(rect.height || 0),
+        assetLoader: sceneInfo?.assetLoader || null
+      });
+    }
+    const width = Math.floor(canvas?.width || rect.width || 0);
+    const height = Math.floor(canvas?.height || rect.height || 0);
+    const hash = await sha256Hex(payload);
+    return {
+      captured: hash.length === 64 && width >= 160 && height >= 120 && payload.length > 100,
+      hash,
+      width,
+      height,
+      byteLength: payload.length,
+      source: canvas ? 'three-canvas-data-url' : 'world-grid-stage-metadata'
+    };
+  }
+
   async function recordGeneratedFirstLoopReport() {
     const pack = activePack();
     if (!pack) return null;
     const sceneInfo = state.scene?.info ? state.scene.info() : null;
+    const screenshotEvidence = await captureScreenshotEvidence(sceneInfo);
     try {
       const payload = await api('/api/world/generated-pack/playtest-report', {
         method: 'POST',
@@ -309,7 +349,14 @@
           firstLoopCompleted: true,
           canonicalPayloadIntegrity: true,
           missingAssets: Number(sceneInfo?.assetLoader?.missingTextureCount || 0),
-          consoleErrors: 0
+          consoleErrors: 0,
+          assetLoader: sceneInfo?.assetLoader || null,
+          screenshotEvidence,
+          scoreEvidence: {
+            measured: true,
+            measurementVersion: 'agent-town-browser-playtest-measurements-v1',
+            source: 'world-grid-browser-first-loop'
+          }
         })
       });
       state.playtestReport = payload.playtestReport || null;

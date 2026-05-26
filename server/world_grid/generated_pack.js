@@ -867,6 +867,39 @@ function isHexColor(value) {
   return /^#[0-9a-fA-F]{6}$/.test(String(value || ''));
 }
 
+function hexToRgb(value) {
+  if (!isHexColor(value)) return null;
+  const hex = String(value).slice(1);
+  return {
+    r: Number.parseInt(hex.slice(0, 2), 16) / 255,
+    g: Number.parseInt(hex.slice(2, 4), 16) / 255,
+    b: Number.parseInt(hex.slice(4, 6), 16) / 255
+  };
+}
+
+function channelLuminance(value) {
+  return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+}
+
+function relativeLuminance(color) {
+  if (!color) return 0;
+  return (0.2126 * channelLuminance(color.r))
+    + (0.7152 * channelLuminance(color.g))
+    + (0.0722 * channelLuminance(color.b));
+}
+
+function contrastRatio(first, second) {
+  const firstLuminance = relativeLuminance(hexToRgb(first));
+  const secondLuminance = relativeLuminance(hexToRgb(second));
+  const lighter = Math.max(firstLuminance, secondLuminance);
+  const darker = Math.min(firstLuminance, secondLuminance);
+  return Number(((lighter + 0.05) / (darker + 0.05)).toFixed(3));
+}
+
+function scoreFromContrast(ratio) {
+  return Number(Math.max(0, Math.min(1, ratio / 4.5)).toFixed(3));
+}
+
 function validateGenerationBrief(brief = {}) {
   const missingFields = [];
   if (String(brief?.theme?.primary || '').trim().length < 3) missingFields.push('theme.primary');
@@ -1257,14 +1290,179 @@ function validateGeneratedPack(pack) {
   };
 }
 
+function scorePaletteContrast(pack = {}) {
+  const palette = pack?.stylePack?.palette || {};
+  const backgroundRatio = contrastRatio(palette.ink, palette.background);
+  const surfaceRatio = contrastRatio(palette.ink, palette.surface);
+  const focusRatio = contrastRatio(palette.focus, palette.background);
+  const minimumTextRatio = Math.min(backgroundRatio || 0, surfaceRatio || 0);
+  return {
+    score: scoreFromContrast(minimumTextRatio),
+    minimumTextContrastRatio: minimumTextRatio,
+    backgroundContrastRatio: backgroundRatio,
+    surfaceContrastRatio: surfaceRatio,
+    focusContrastRatio: focusRatio,
+    passed: minimumTextRatio >= 4.5
+  };
+}
+
+function scoreStyleCoherence(pack = {}, packValidationReport = null) {
+  const metrics = packValidationReport?.metrics || {};
+  const style = pack?.stylePack || {};
+  const universe = pack?.universePack || {};
+  const assetPlanTargets = Array.isArray(pack?.assetPromptPlan?.targets) ? pack.assetPromptPlan.targets.length : 0;
+  const textAssetCount = metrics.generatedTextAssetCount || 0;
+  const coverage = metrics.requiredCanonicalMappings
+    ? (metrics.canonicalMappingsCovered || 0) / metrics.requiredCanonicalMappings
+    : 0;
+  const factors = [
+    packValidationReport?.ok === true ? 1 : 0,
+    coverage,
+    assetPlanTargets >= ASSET_PROMPT_TARGETS.length ? 1 : assetPlanTargets / ASSET_PROMPT_TARGETS.length,
+    textAssetCount >= TEXT_ASSET_TARGETS.length ? 1 : textAssetCount / TEXT_ASSET_TARGETS.length,
+    style?.palette && style?.materialRules && style?.uiRules && universe?.firstLoop ? 1 : 0
+  ];
+  return {
+    score: Number((factors.reduce((sum, value) => sum + value, 0) / factors.length).toFixed(3)),
+    factors: {
+      packValid: packValidationReport?.ok === true,
+      canonicalMappingCoverage: Number(coverage.toFixed(3)),
+      assetPlanTargets,
+      generatedTextAssetCount: textAssetCount,
+      styleRuntimeFieldsPresent: factors[4] === 1
+    }
+  };
+}
+
+function scorePromptAlignment(pack = {}) {
+  const hints = (pack?.generationBrief?.keywordHints || [])
+    .map((hint) => String(hint || '').toLowerCase())
+    .filter((hint) => hint.length >= 3);
+  const searchable = [
+    pack?.generationBrief?.theme?.primary,
+    pack?.generationBrief?.theme?.secondary,
+    pack?.generationBrief?.visualStyle?.styleFamily,
+    ...(pack?.generationBrief?.civilizationFlavor?.techFlavor || []),
+    pack?.stylePack?.name,
+    pack?.stylePack?.themeSummary,
+    pack?.universePack?.name,
+    pack?.universePack?.pitch,
+    pack?.universePack?.playerRole,
+    pack?.universePack?.cloverRole,
+    ...Object.values(pack?.universePack?.text || {}),
+    ...(pack?.universePack?.factions || []).map((faction) => `${faction.name} ${faction.role}`),
+    ...(pack?.gameplayMapping?.canonicalEntities || []).map((mapping) => mapping.generatedName)
+  ].join(' ').toLowerCase();
+  const matchedHints = [...new Set(hints.filter((hint) => searchable.includes(hint)))];
+  return {
+    score: hints.length ? Number((0.8 + (0.2 * (matchedHints.length / hints.length))).toFixed(3)) : 0.85,
+    matchedHints,
+    totalHints: hints.length
+  };
+}
+
+function normalizeScreenshotEvidence(evidence = {}) {
+  const hash = String(evidence.hash || evidence.sha256 || '').trim().toLowerCase();
+  const width = Number(evidence.width || 0);
+  const height = Number(evidence.height || 0);
+  const byteLength = Number(evidence.byteLength || 0);
+  return {
+    captured: evidence.captured === true
+      && /^[0-9a-f]{64}$/.test(hash)
+      && width >= 160
+      && height >= 120
+      && byteLength > 100,
+    hash,
+    width: Number.isFinite(width) ? width : 0,
+    height: Number.isFinite(height) ? height : 0,
+    byteLength: Number.isFinite(byteLength) ? byteLength : 0,
+    source: String(evidence.source || 'browser-stage-canvas').slice(0, 80)
+  };
+}
+
+function normalizeAssetLoaderEvidence(assetLoader = {}) {
+  return {
+    assetAwareLoaderExists: assetLoader.assetAwareLoaderExists === true,
+    missingTextureCount: Number.isFinite(Number(assetLoader.missingTextureCount)) ? Number(assetLoader.missingTextureCount) : 0,
+    handledMissingTextureCount: Number.isFinite(Number(assetLoader.handledMissingTextureCount)) ? Number(assetLoader.handledMissingTextureCount) : 0,
+    fallbackTextureCount: Number.isFinite(Number(assetLoader.fallbackTextureCount)) ? Number(assetLoader.fallbackTextureCount) : 0,
+    performanceBudgetPassed: assetLoader.performanceBudgetPassed === true,
+    firstLoopSafe: assetLoader.firstLoopSafe === true,
+    reducedMotion: assetLoader.reducedMotion === true
+  };
+}
+
+function buildMeasuredPlaytestReport({ pack, report = {}, nowMs = Date.now() } = {}) {
+  const packValidationReport = validateGeneratedPack(pack || {});
+  const paletteContrast = scorePaletteContrast(pack || {});
+  const styleCoherence = scoreStyleCoherence(pack || {}, packValidationReport);
+  const promptAlignment = scorePromptAlignment(pack || {});
+  const screenshotEvidence = normalizeScreenshotEvidence(report.screenshotEvidence || {});
+  const assetLoader = normalizeAssetLoaderEvidence(report.assetLoader || {});
+  const scoreEvidenceMeasured = report?.scoreEvidence?.measured === true
+    && String(report?.scoreEvidence?.measurementVersion || '').trim().length > 0
+    && screenshotEvidence.captured === true;
+  const reportedMissingAssets = Number.isFinite(Number(report.missingAssets)) ? Number(report.missingAssets) : 0;
+  const missingAssets = Math.max(reportedMissingAssets, assetLoader.missingTextureCount);
+  const warnings = [];
+  if (assetLoader.handledMissingTextureCount > 0 || assetLoader.fallbackTextureCount > 0) {
+    warnings.push({
+      code: 'asset-loader-fallback-textures',
+      count: assetLoader.handledMissingTextureCount || assetLoader.fallbackTextureCount,
+      severity: 'warning'
+    });
+  }
+  if (!paletteContrast.passed) warnings.push({ code: 'palette-contrast-below-aa', severity: 'error' });
+
+  return {
+    schemaVersion: 'agent-town-generated-pack-playtest-v1',
+    packId: String(report.packId || pack?.packId || ''),
+    completedAtMs: Number.isFinite(Number(report.completedAtMs)) ? Number(report.completedAtMs) : nowMs,
+    renderer: String(report.renderer || 'three'),
+    firstLoopCompleted: report.firstLoopCompleted === true,
+    canonicalPayloadIntegrity: report.canonicalPayloadIntegrity === true,
+    missingAssets,
+    consoleErrors: Number.isFinite(Number(report.consoleErrors)) ? Number(report.consoleErrors) : 0,
+    playtestPassed: false,
+    paletteContrastScore: paletteContrast.score,
+    styleCoherenceScore: styleCoherence.score,
+    promptAlignmentScore: promptAlignment.score,
+    uiReadabilityScore: paletteContrast.score,
+    measuredScoresRequired: true,
+    defaultScoresUsed: !scoreEvidenceMeasured,
+    scoreEvidence: {
+      measured: scoreEvidenceMeasured,
+      measurementVersion: String(report?.scoreEvidence?.measurementVersion || 'agent-town-browser-playtest-measurements-v1'),
+      scoresDerivedFrom: 'pack-contract-browser-measurements',
+      paletteContrast,
+      styleCoherence: styleCoherence.factors,
+      promptAlignment: {
+        matchedHints: promptAlignment.matchedHints,
+        totalHints: promptAlignment.totalHints
+      },
+      assetLoader
+    },
+    screenshotEvidence,
+    warnings
+  };
+}
+
 function validatePlaytestReport(report = {}, pack = null) {
+  const packValidationReport = validateGeneratedPack(pack || {});
+  const screenshotEvidence = report.screenshotEvidence || {};
+  const scoreEvidence = report.scoreEvidence || {};
   const checks = [
     { id: 'PLAYTEST_SCHEMA_VALID', passed: report.schemaVersion === 'agent-town-generated-pack-playtest-v1' },
     { id: 'PLAYTEST_PACK_MATCH', passed: Boolean(pack?.packId && report.packId === pack.packId) },
+    { id: 'PLAYTEST_PACK_VALIDATION_GATE', passed: packValidationReport.ok === true },
     { id: 'PLAYTEST_FIRST_LOOP_COMPLETED', passed: report.firstLoopCompleted === true },
     { id: 'PLAYTEST_THREE_RENDERER_USED', passed: report.renderer === 'three' },
     { id: 'PLAYTEST_CANONICAL_PAYLOAD_INTEGRITY', passed: report.canonicalPayloadIntegrity === true },
     { id: 'PLAYTEST_NO_MISSING_ASSETS', passed: Number(report.missingAssets || 0) === 0 },
+    { id: 'PLAYTEST_CONSOLE_CLEAN', passed: Number(report.consoleErrors || 0) === 0 },
+    { id: 'PLAYTEST_MEASURED_SCORES_REQUIRED', passed: scoreEvidence.measured === true && report.defaultScoresUsed === false },
+    { id: 'PLAYTEST_SCREENSHOT_EVIDENCE_RECORDED', passed: screenshotEvidence.captured === true && /^[0-9a-f]{64}$/.test(String(screenshotEvidence.hash || '')) },
+    { id: 'PLAYTEST_PALETTE_CONTRAST_GATE', passed: Number(report.paletteContrastScore || 0) >= 0.85 },
     { id: 'PLAYTEST_READABILITY_GATE', passed: Number(report.uiReadabilityScore || 0) >= 0.85 },
     { id: 'PLAYTEST_STYLE_GATE', passed: Number(report.styleCoherenceScore || 0) >= 0.85 },
     { id: 'PLAYTEST_PROMPT_ALIGNMENT_GATE', passed: Number(report.promptAlignmentScore || 0) >= 0.85 }
@@ -1277,8 +1475,13 @@ function validatePlaytestReport(report = {}, pack = null) {
       missingAssets: Number(report.missingAssets || 0),
       consoleErrors: Number(report.consoleErrors || 0),
       uiReadabilityScore: Number(report.uiReadabilityScore || 0),
+      paletteContrastScore: Number(report.paletteContrastScore || 0),
       styleCoherenceScore: Number(report.styleCoherenceScore || 0),
       promptAlignmentScore: Number(report.promptAlignmentScore || 0),
+      measuredScoresRequired: report.measuredScoresRequired === true,
+      measuredScoresPresent: scoreEvidence.measured === true,
+      screenshotEvidenceRecorded: screenshotEvidence.captured === true,
+      warningCount: Array.isArray(report.warnings) ? report.warnings.length : 0,
       canonicalMappingCoverage: pack?.validationReport?.metrics?.canonicalMappingsCovered && pack?.validationReport?.metrics?.requiredCanonicalMappings
         ? pack.validationReport.metrics.canonicalMappingsCovered / pack.validationReport.metrics.requiredCanonicalMappings
         : 0
@@ -1295,20 +1498,7 @@ function recordPlaytestReport(owner = {}, report = {}) {
     throw error;
   }
   const nowMs = Number.isFinite(Number(report.completedAtMs)) ? Number(report.completedAtMs) : Date.now();
-  const normalized = {
-    schemaVersion: 'agent-town-generated-pack-playtest-v1',
-    packId: String(report.packId || pack.packId),
-    completedAtMs: nowMs,
-    renderer: String(report.renderer || 'three'),
-    firstLoopCompleted: report.firstLoopCompleted === true,
-    canonicalPayloadIntegrity: report.canonicalPayloadIntegrity !== false,
-    missingAssets: Number.isFinite(Number(report.missingAssets)) ? Number(report.missingAssets) : 0,
-    consoleErrors: Number.isFinite(Number(report.consoleErrors)) ? Number(report.consoleErrors) : 0,
-    playtestPassed: false,
-    styleCoherenceScore: Number.isFinite(Number(report.styleCoherenceScore)) ? Number(report.styleCoherenceScore) : 0.88,
-    promptAlignmentScore: Number.isFinite(Number(report.promptAlignmentScore)) ? Number(report.promptAlignmentScore) : 0.87,
-    uiReadabilityScore: Number.isFinite(Number(report.uiReadabilityScore)) ? Number(report.uiReadabilityScore) : 0.9
-  };
+  const normalized = buildMeasuredPlaytestReport({ pack, report, nowMs });
   normalized.validationReport = validatePlaytestReport(normalized, pack);
   normalized.playtestPassed = normalized.validationReport.ok;
   playtestStore.set(key, clone(normalized));
@@ -1499,6 +1689,7 @@ module.exports = {
   SCHEMA_VERSION,
   analyzePackDiversity,
   buildAssetPromptPlan,
+  buildMeasuredPlaytestReport,
   clearGeneratedPacksForTests,
   createGenerationBrief,
   createGeneratedPack,

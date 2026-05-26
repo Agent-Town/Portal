@@ -61,6 +61,17 @@ test('generated universe pack loads into Three.js and completes the first world-
 
   const report = await page.evaluate(() => window.__worldGridTest.getPlaytestReport());
   expect(report?.playtestPassed).toBe(true);
+  expect(report?.measuredScoresRequired).toBe(true);
+  expect(report?.defaultScoresUsed).toBe(false);
+  expect(report?.scoreEvidence?.measured).toBe(true);
+  expect(report?.screenshotEvidence?.captured).toBe(true);
+  expect(report?.paletteContrastScore).toBeGreaterThanOrEqual(0.85);
+  expect(report?.uiReadabilityScore).toBeGreaterThanOrEqual(0.85);
+  expect(report?.styleCoherenceScore).toBeGreaterThanOrEqual(0.85);
+  expect(report?.promptAlignmentScore).toBeGreaterThanOrEqual(0.85);
   expect(report?.validationReport?.metrics?.canonicalMappingCoverage).toBe(1);
+  expect(report?.validationReport?.metrics?.measuredScoresPresent).toBe(true);
+  expect(report?.validationReport?.metrics?.screenshotEvidenceRecorded).toBe(true);
+  expect(report?.warnings?.some((warning) => warning.code === 'asset-loader-fallback-textures')).toBe(true);
   expect(consoleErrors).toEqual([]);
 });

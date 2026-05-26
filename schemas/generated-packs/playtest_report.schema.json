@@ -3,7 +3,7 @@
   "$id": "agent-town-generated-pack-playtest-v1",
   "title": "Agent Town Generated Pack Playtest Report",
   "type": "object",
-  "required": ["schemaVersion", "packId", "completedAtMs", "renderer", "firstLoopCompleted", "canonicalPayloadIntegrity", "missingAssets", "consoleErrors", "playtestPassed", "styleCoherenceScore", "promptAlignmentScore", "uiReadabilityScore", "validationReport"],
+  "required": ["schemaVersion", "packId", "completedAtMs", "renderer", "firstLoopCompleted", "canonicalPayloadIntegrity", "missingAssets", "consoleErrors", "playtestPassed", "paletteContrastScore", "styleCoherenceScore", "promptAlignmentScore", "uiReadabilityScore", "measuredScoresRequired", "defaultScoresUsed", "scoreEvidence", "screenshotEvidence", "warnings", "validationReport"],
   "additionalProperties": false,
   "properties": {
     "schemaVersion": { "const": "agent-town-generated-pack-playtest-v1" },
@@ -15,9 +15,15 @@
     "missingAssets": { "type": "number", "minimum": 0 },
     "consoleErrors": { "type": "number", "minimum": 0 },
     "playtestPassed": { "type": "boolean" },
+    "paletteContrastScore": { "type": "number", "minimum": 0, "maximum": 1 },
     "styleCoherenceScore": { "type": "number", "minimum": 0, "maximum": 1 },
     "promptAlignmentScore": { "type": "number", "minimum": 0, "maximum": 1 },
     "uiReadabilityScore": { "type": "number", "minimum": 0, "maximum": 1 },
+    "measuredScoresRequired": { "type": "boolean" },
+    "defaultScoresUsed": { "type": "boolean" },
+    "scoreEvidence": { "type": "object" },
+    "screenshotEvidence": { "type": "object" },
+    "warnings": { "type": "array" },
     "validationReport": { "type": "object" }
   }
 }

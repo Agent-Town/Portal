@@ -313,12 +313,42 @@ test('generated pack API is gated and records first-loop playtest reports when e
         firstLoopCompleted: true,
         canonicalPayloadIntegrity: true,
         missingAssets: 0,
-        consoleErrors: 0
+        consoleErrors: 0,
+        assetLoader: {
+          assetAwareLoaderExists: true,
+          missingTextureCount: 0,
+          handledMissingTextureCount: 23,
+          fallbackTextureCount: 23,
+          performanceBudgetPassed: true,
+          firstLoopSafe: true
+        },
+        screenshotEvidence: {
+          captured: true,
+          hash: 'b'.repeat(64),
+          width: 1280,
+          height: 720,
+          byteLength: 2400,
+          source: 'unit-test-screenshot'
+        },
+        scoreEvidence: {
+          measured: true,
+          measurementVersion: 'agent-town-browser-playtest-measurements-v1'
+        }
       })
     });
     const reportBody = await reportResponse.json();
     assert.equal(reportResponse.status, 200, JSON.stringify(reportBody));
     assert.equal(reportBody.playtestReport.playtestPassed, true);
+    assert.equal(reportBody.playtestReport.defaultScoresUsed, false);
+    assert.equal(reportBody.playtestReport.measuredScoresRequired, true);
+    assert.equal(reportBody.playtestReport.scoreEvidence.measured, true);
+    assert.equal(reportBody.playtestReport.screenshotEvidence.captured, true);
+    assert.equal(reportBody.playtestReport.validationReport.metrics.measuredScoresPresent, true);
+    assert.equal(reportBody.playtestReport.validationReport.metrics.screenshotEvidenceRecorded, true);
+    assert.equal(
+      reportBody.playtestReport.warnings.some((warning) => warning.code === 'asset-loader-fallback-textures'),
+      true
+    );
 
     const currentResponse = await fetch(`${baseUrl}/api/world/generated-pack/current`);
     const currentBody = await currentResponse.json();
