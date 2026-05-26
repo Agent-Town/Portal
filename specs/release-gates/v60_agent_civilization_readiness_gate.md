@@ -20,6 +20,9 @@ Worker-first civic tool draft:
 Reputation accountability foundation:
 `specs/60_agent_town_v6_reputation_accountability_foundation.md`
 
+Moderation privacy foundation:
+`specs/61_agent_town_v6_moderation_privacy_foundation.md`
+
 V6.0 Agent Civilization Foundation must not become player-visible until every
 gate below has implementation, deterministic tests, and security/product signoff.
 
@@ -70,7 +73,11 @@ gate below has implementation, deterministic tests, and security/product signoff
   `server/world_civilization/reputation.js`; release still requires full
   dispute/review workflows and documented civic eligibility/advice use.
 - Moderation must cover proposal text, attached media, sandbox actions, civic
-  effects, public profile surfaces, and agent-authored content.
+  effects, public profile surfaces, and agent-authored content. Current
+  research-only storage starts this in
+  `server/world_civilization/moderation.js`; release still requires appeals,
+  human-review workflow, abuse-report handling, media review, and full
+  public-surface integration.
 - Rollback must exist for every public civic effect, with clear irreversible
   action exclusions.
 - Privacy review must prove no private town state, wallet secret, Brain secret,

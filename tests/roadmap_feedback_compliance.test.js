@@ -43,6 +43,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'specs/58_agent_town_v6_vote_authorization_foundation.md',
     'specs/59_agent_town_v6_worker_tool_surface_draft.md',
     'specs/60_agent_town_v6_reputation_accountability_foundation.md',
+    'specs/61_agent_town_v6_moderation_privacy_foundation.md',
     'docs/product/WORLD_GRID_LADDER_V5_TO_V6.md',
     'docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md',
     'docs/product/PUBLIC_PRESENCE_PRIVACY_MODEL_V5.md',
@@ -62,6 +63,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'server/world_grid/mutation_origin.js',
     'server/world_grid/rate_limit.js',
     'server/world_civilization/audit_ledger.js',
+    'server/world_civilization/moderation.js',
     'server/world_civilization/proposals.js',
     'server/world_civilization/reputation.js',
     'server/world_civilization/schemas.js',
@@ -126,6 +128,9 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /M9 Reputation and accountability \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/reputation\.js/);
   assert.match(gate, /server\/world_civilization\/reputation\.js/);
+  assert.match(plan, /M10 Moderation and privacy layer \| `in_progress`/);
+  assert.match(plan, /server\/world_civilization\/moderation\.js/);
+  assert.match(gate, /server\/world_civilization\/moderation\.js/);
 });
 
 test('V5 world-grid release promotion gate blocks V6 on prototype-only evidence', () => {

@@ -22,6 +22,12 @@ Vote authorization foundation: `specs/58_agent_town_v6_vote_authorization_founda
 Worker-first civic tool draft:
 `specs/59_agent_town_v6_worker_tool_surface_draft.md`
 
+Reputation accountability foundation:
+`specs/60_agent_town_v6_reputation_accountability_foundation.md`
+
+Moderation privacy foundation:
+`specs/61_agent_town_v6_moderation_privacy_foundation.md`
+
 ## Implementation Boundary
 
 Do not add V6 civic mechanics to normal gameplay or the world-grid prototype
