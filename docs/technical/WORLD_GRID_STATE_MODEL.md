@@ -47,7 +47,7 @@ release-grade store is explicitly implemented and tested. Current stores are:
 | Region generation | Deterministic synthesis from owner identity in `server/world_grid/region.js` | Prototype, recomputed on demand |
 | Camera/focus preferences | Process-local `Map` in `server/world_grid/routes.js` | Prototype/ephemeral |
 | Territory claims | Process-local `Map` in `server/world_grid/claims.js`; optional SQLite `world_grid_claims` table when `WORLD_GRID_CLAIMS_SQLITE_PATH` is configured | Durable foundation for planned/claimed V5.1 claim state, owner/status/cell indexes, schema/migration versions, and restart proof; release promotion still needs cancel/replay, cross-owner, and every V5.1-V5.5 store covered |
-| Public presence/follows | Process-local `Map` values in `server/world_grid/public_presence.js` | Prototype/ephemeral |
+| Public presence/follows | Process-local `Map` values in `server/world_grid/public_presence.js`; optional SQLite `world_grid_public_presence` and `world_grid_public_follows` tables when `WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH` is configured | Durable foundation for V5.2 opt-in/list/lookup/follow/opt-out state, owner/town indexes, schema/migration versions, restart proof, and inbound follow cleanup on opt-out; release promotion still needs abuse reports, stale-session coverage, and public privacy review |
 | Civic service requests/reputation | Process-local `Map` values in `server/world_grid/services.js` | Prototype/ephemeral |
 | World event contributions/rewards | Process-local `Map` values in `server/world_grid/events.js` | Prototype/ephemeral |
 | Sandbox participants/actions/snapshots/cells | Process-local arrays/maps and mutable in-memory district cells in `server/world_grid/sandbox.js` | Prototype/ephemeral |
@@ -81,6 +81,11 @@ Before any V5 world-grid slice can claim release-grade persistence, it needs:
   the full V5.1 lifecycle. Current SQLite claim coverage proves planned and
   claimed state reopens across separate Node lifetimes; cancel replay,
   cross-owner ownership, and release replay reconstruction remain gates.
+- Durable public presence and follow rows with owner/town indexes and restart
+  persistence for the V5.2 public discovery lifecycle. Current SQLite public
+  presence coverage proves opt-in/list/lookup/follow/opt-out across separate
+  Node lifetimes and clears inbound follows on opt-out; stale-session,
+  abuse-report, and final privacy-review coverage remain gates.
 - Restart persistence tests proving state survives server restart and cannot be
   silently recreated, lost, or reassigned across owners.
 - Cross-owner and stale-session tests for every owner index.

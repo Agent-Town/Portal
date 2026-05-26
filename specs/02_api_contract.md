@@ -2790,6 +2790,11 @@ foundation until restart replay covers every route and tool surface. When
 `WORLD_GRID_CLAIMS_SQLITE_PATH` is configured, V5.1 claim rows persist planned
 and claimed territory state with owner/status/cell indexes, schema versioning,
 and migration metadata; this is only a foundation until the full V5.1-V5.5 store
-set has restart and replay coverage. Mutating
+set has restart and replay coverage. When
+`WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH` is configured, V5.2 public
+presence/follow rows persist opt-in public town cards and follow edges with
+owner/town indexes, schema versioning, and migration metadata; this is only a
+foundation until stale-session, abuse-report, retention, and final privacy
+coverage are complete. Mutating
 endpoint same-origin, CSRF, session-auth, rate-limit, and idempotency
 requirements are tracked in `docs/security/WORLD_GRID_MUTATION_SECURITY_PLAN.md`.

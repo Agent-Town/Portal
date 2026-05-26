@@ -39,6 +39,11 @@ until the controls below are implemented and covered by deterministic tests.
   migration metadata. Current restart coverage proves a planned claim reopens
   after a separate Node process restart, completes from durable claim state, and
   reopens again as a claimed route.
+- When `WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH` is configured, V5.2 public
+  presence and follow state writes durable SQLite rows with owner, public-town,
+  schema, and migration metadata. Current restart coverage proves opt-in,
+  listing, lookup, follow, summary, and opt-out behavior across separate Node
+  process lifetimes, including inbound follow cleanup when a town opts out.
 - Mutating V5.1+ world-grid routes and tool routes use process-local rate
   buckets keyed by owner and mutation surface. This throttles prototype abuse
   paths but is not durable, distributed, or session-auth aware.
@@ -84,6 +89,9 @@ until the controls below are implemented and covered by deterministic tests.
 - Current `WORLD_GRID_CLAIMS_SQLITE_PATH` coverage is a V5.1 storage foundation
   only; release promotion still needs cancel/replay, cross-owner, and
   public-surface store persistence coverage.
+- Current `WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH` coverage is a V5.2 storage
+  foundation only; release promotion still needs stale-session, abuse-report,
+  retention, and final public-privacy review coverage.
 
 ## Out Of Scope For This Hardening Pass
 

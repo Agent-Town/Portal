@@ -20,6 +20,7 @@ const {
   generateRegion,
   normalizeOwnerIdentity
 } = require('../server/world_grid/region');
+const { closeWorldGridPublicPresenceStore } = require('../server/world_grid/public_presence');
 const { createInitialPlot } = require('../server/founders_plot/engine');
 const { loadPlotByPairId, savePlotGraph } = require('../server/founders_plot/store');
 const {
@@ -38,6 +39,7 @@ async function withWorldGridServer({ identity, envPatch = {} }, fn) {
     WORLD_GRID_AUDIT_SQLITE_PATH: process.env.WORLD_GRID_AUDIT_SQLITE_PATH,
     WORLD_GRID_CLAIMS_SQLITE_PATH: process.env.WORLD_GRID_CLAIMS_SQLITE_PATH,
     WORLD_GRID_IDEMPOTENCY_SQLITE_PATH: process.env.WORLD_GRID_IDEMPOTENCY_SQLITE_PATH,
+    WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH: process.env.WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH,
     WORLD_GRID_MUTATION_RATE_LIMIT_MAX: process.env.WORLD_GRID_MUTATION_RATE_LIMIT_MAX,
     WORLD_GRID_MUTATION_RATE_LIMIT_WINDOW_MS: process.env.WORLD_GRID_MUTATION_RATE_LIMIT_WINDOW_MS
   };
@@ -60,6 +62,7 @@ async function withWorldGridServer({ identity, envPatch = {} }, fn) {
     closeWorldGridAuditLog();
     closeWorldGridClaimStore();
     closeWorldGridIdempotencyStore();
+    closeWorldGridPublicPresenceStore();
     for (const [key, value] of Object.entries(previous)) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
