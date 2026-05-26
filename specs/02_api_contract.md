@@ -2783,6 +2783,9 @@ storage requires durable owner indexes, migration versioning, audit/replay
 records, and restart persistence tests before public enablement. When
 `WORLD_GRID_AUDIT_SQLITE_PATH` is configured, successful V5.1+ world-grid
 mutations write durable audit/replay rows, but this is only a foundation until
-before-state snapshots and per-store restart replay are complete. Mutating
+before-state snapshots and per-store restart replay are complete. When
+`WORLD_GRID_IDEMPOTENCY_SQLITE_PATH` is configured, mutating routes write durable
+idempotency rows with request hashes and stored success responses; this is only a
+foundation until restart replay covers every route and tool surface. Mutating
 endpoint same-origin, CSRF, session-auth, rate-limit, and idempotency
 requirements are tracked in `docs/security/WORLD_GRID_MUTATION_SECURITY_PLAN.md`.

@@ -51,7 +51,7 @@ release-grade store is explicitly implemented and tested. Current stores are:
 | Civic service requests/reputation | Process-local `Map` values in `server/world_grid/services.js` | Prototype/ephemeral |
 | World event contributions/rewards | Process-local `Map` values in `server/world_grid/events.js` | Prototype/ephemeral |
 | Sandbox participants/actions/snapshots/cells | Process-local arrays/maps and mutable in-memory district cells in `server/world_grid/sandbox.js` | Prototype/ephemeral |
-| Idempotency replay records | Process-local `Map` in `server/world_grid/idempotency.js` | Prototype/ephemeral; replays exact retries and rejects changed payload reuse only for the process lifetime |
+| Idempotency replay records | Process-local `Map` in `server/world_grid/idempotency.js`; optional SQLite `world_grid_idempotency_records` table when `WORLD_GRID_IDEMPOTENCY_SQLITE_PATH` is configured | Durable foundation for exact retry replay, changed payload rejection, schema/migration versions, and planned-claim restart proof; release promotion still needs every route/tool surface covered by restart replay |
 | CSRF mutation tokens | Process-local `Map` in `server/world_grid/csrf.js` | Prototype/ephemeral; owner-bound only for the process lifetime |
 | Mutation rate-limit buckets | Process-local `Map` in `server/world_grid/rate_limit.js` | Prototype/ephemeral; per-owner and per-surface only for the process lifetime |
 | Mutation audit records | Optional SQLite `world_grid_audit_log` table in `server/world_grid/audit_log.js` when `WORLD_GRID_AUDIT_SQLITE_PATH` is configured | Durable foundation for append-only audit/replay; not yet complete release storage because before-state snapshots and store reconstruction are still release gates |
@@ -73,7 +73,9 @@ Before any V5 world-grid slice can claim release-grade persistence, it needs:
   where applicable.
 - Durable idempotency rows for every externally visible mutating route/tool,
   with request hashes, stored success responses, conflict detection, and replay
-  coverage after restart.
+  coverage after restart. Current SQLite idempotency coverage starts this for
+  route-level planned claims only; every remaining V5.1-V5.5 route/tool surface
+  still needs restart replay proof before release promotion.
 - Restart persistence tests proving state survives server restart and cannot be
   silently recreated, lost, or reassigned across owners.
 - Cross-owner and stale-session tests for every owner index.

@@ -102,6 +102,8 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'tests/world_civilization_migration_rehearsal.test.js',
     'tests/world_civilization_load_rate.test.js',
     'tests/world_civilization_rollback_recovery.test.js',
+    'tests/world_grid_idempotency_persistence.test.js',
+    'tests/world_grid_idempotency_restart_probe_child.js',
     'public/experiences/world-grid/manifest.json',
     'public/experiences/world-grid/skill.md',
     'public/experiences/world-grid/tools.md',
@@ -290,7 +292,7 @@ test('world-grid idempotency policy rejects changed retry payloads before releas
   assert.match(security, /IDEMPOTENCY_CONFLICT/);
   assert.match(security, /process-local\s+request hash\/success response/);
   assert.match(security, /every externally\s+visible V5\.1-V5\.5 mutating route surface/);
-  assert.match(security, /reject conflicting retries after restart/);
+  assert.match(security, /reject\s+conflicting retries after restart/);
   assert.match(stateModel, /server\/world_grid\/idempotency\.js/);
   assert.match(stateModel, /Durable idempotency rows/);
   assert.match(evidence, /Idempotency replay guard/);
@@ -355,10 +357,17 @@ test('world-grid audit replay policy is tracked as an M3 release storage control
   const evidence = read('docs/release-evidence/WORLD_GRID_V50_REGION_PROTOTYPE_EVIDENCE_2026-05-26.md');
 
   assert.match(plan, /durable world-grid audit log foundation/);
+  assert.match(plan, /WORLD_GRID_IDEMPOTENCY_SQLITE_PATH/);
   assert.match(security, /WORLD_GRID_AUDIT_SQLITE_PATH/);
+  assert.match(security, /WORLD_GRID_IDEMPOTENCY_SQLITE_PATH/);
+  assert.match(security, /planned-claim retry replays after a separate Node\s+process restart/);
   assert.match(security, /append-only SQLite audit records/);
   assert.match(stateModel, /server\/world_grid\/audit_log\.js/);
+  assert.match(stateModel, /world_grid_idempotency_records/);
+  assert.match(stateModel, /route-level planned claims only/);
   assert.match(stateModel, /world_grid_audit_log/);
   assert.match(evidence, /Mutation audit log/);
+  assert.match(evidence, /Durable idempotency foundation/);
+  assert.match(evidence, /tests\/world_grid_idempotency_persistence\.test\.js/);
   assert.match(evidence, /restart replay coverage/);
 });

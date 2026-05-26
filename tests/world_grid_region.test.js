@@ -11,7 +11,10 @@ const {
   defaultWorldGridFeatureFlags,
   parseWorldGridFeatureFlags
 } = require('../server/world_grid/feature_flags');
-const { worldGridIdempotencyRecordCount } = require('../server/world_grid/idempotency');
+const {
+  closeWorldGridIdempotencyStore,
+  worldGridIdempotencyRecordCount
+} = require('../server/world_grid/idempotency');
 const {
   generateRegion,
   normalizeOwnerIdentity
@@ -32,6 +35,7 @@ async function withWorldGridServer({ identity, envPatch = {} }, fn) {
     WORLD_GRID_CSRF_REQUIRED: process.env.WORLD_GRID_CSRF_REQUIRED,
     WORLD_GRID_CSRF_TOKEN_TTL_MS: process.env.WORLD_GRID_CSRF_TOKEN_TTL_MS,
     WORLD_GRID_AUDIT_SQLITE_PATH: process.env.WORLD_GRID_AUDIT_SQLITE_PATH,
+    WORLD_GRID_IDEMPOTENCY_SQLITE_PATH: process.env.WORLD_GRID_IDEMPOTENCY_SQLITE_PATH,
     WORLD_GRID_MUTATION_RATE_LIMIT_MAX: process.env.WORLD_GRID_MUTATION_RATE_LIMIT_MAX,
     WORLD_GRID_MUTATION_RATE_LIMIT_WINDOW_MS: process.env.WORLD_GRID_MUTATION_RATE_LIMIT_WINDOW_MS
   };
@@ -52,6 +56,7 @@ async function withWorldGridServer({ identity, envPatch = {} }, fn) {
   } finally {
     await new Promise((resolve) => server.close(resolve));
     closeWorldGridAuditLog();
+    closeWorldGridIdempotencyStore();
     for (const [key, value] of Object.entries(previous)) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
