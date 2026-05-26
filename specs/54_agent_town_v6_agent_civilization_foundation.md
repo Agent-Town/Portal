@@ -77,6 +77,9 @@ The research-only resilience baseline in
 `server/world_civilization/resilience.js` inspects the current SQLite civic
 stores and keeps `releaseReady: false` until process restart, replay
 reconstruction, migration, load/rate, and rollback recovery gates are proven.
+The companion reconstruction helper in
+`server/world_civilization/replay_reconstruction.js` rebuilds privacy-safe audit
+summaries from replay rows without applying world state.
 
 The research-only release review gate in
 `server/world_civilization/release_review.js` names the threat model, privacy,

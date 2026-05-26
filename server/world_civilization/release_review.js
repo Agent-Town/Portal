@@ -44,6 +44,7 @@ const REQUIRED_REVIEW_GATES = [
     requiredArtifacts: [
       RELEASE_REVIEW_ARTIFACT,
       'server/world_civilization/audit_ledger.js',
+      'server/world_civilization/replay_reconstruction.js',
       'server/world_civilization/resilience.js'
     ],
     requiredChecks: ['append_only_ledger', 'owner_indexes', 'migration_versions', 'replay_reconstruction', 'rollback_handles'],

@@ -82,6 +82,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'server/world_civilization/proposals.js',
     'server/world_civilization/public_works.js',
     'server/world_civilization/reputation.js',
+    'server/world_civilization/replay_reconstruction.js',
     'server/world_civilization/resilience.js',
     'server/world_civilization/release_review.js',
     'server/world_civilization/schemas.js',
@@ -167,8 +168,10 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(gate, /town hub modal flow/);
   assert.match(plan, /M16 Persistence, replay, and resilience hardening \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/resilience\.js/);
+  assert.match(plan, /server\/world_civilization\/replay_reconstruction\.js/);
   assert.match(gate, /server\/world_civilization\/resilience\.js/);
-  assert.match(gate, /process restart, replay reconstruction/);
+  assert.match(gate, /server\/world_civilization\/replay_reconstruction\.js/);
+  assert.match(gate, /process restart, release-grade replay/);
   assert.match(plan, /M17 Security and product release review \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/release_review\.js/);
   assert.match(gate, /server\/world_civilization\/release_review\.js/);

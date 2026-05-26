@@ -70,9 +70,11 @@ gate below has implementation, deterministic tests, and security/product signoff
   tests.
 - The research-only resilience baseline may exist in
   `server/world_civilization/resilience.js`, but it must keep
-  `releaseReady: false` until process restart, replay reconstruction,
-  migration upgrade/downgrade, load/rate, and rollback recovery gates have
-  deterministic evidence.
+  `releaseReady: false` until process restart, release-grade replay
+  reconstruction, migration upgrade/downgrade, load/rate, and rollback recovery
+  gates have deterministic evidence. Current audit replay reconstruction starts
+  in `server/world_civilization/replay_reconstruction.js` and must remain
+  privacy-safe and non-executing.
 - The research-only release review gate may exist in
   `server/world_civilization/release_review.js`, but it must keep V6 hidden
   from runtime/player surfaces until threat model, privacy review, abuse-case
@@ -162,9 +164,11 @@ gate below has implementation, deterministic tests, and security/product signoff
   process restarts, reconstructs summaries from audit replay, rejects duplicate
   retries under load, migrates forward and backward through schema versions, and
   recovers rollback handles after failures. Current research-only baseline
-  tracking starts in `server/world_civilization/resilience.js`; release still
-  requires process-level restart, replay reconstruction, migration, load/rate,
-  and rollback recovery tests.
+  tracking starts in `server/world_civilization/resilience.js`, and privacy-safe
+  audit replay reconstruction starts in
+  `server/world_civilization/replay_reconstruction.js`; release still requires
+  process-level restart, larger replay reconstruction, migration, load/rate, and
+  rollback recovery tests.
 - Security and product release review must be complete before normal gameplay
   exposure. Current gate tracking starts in
   `server/world_civilization/release_review.js` and

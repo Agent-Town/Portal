@@ -4,9 +4,15 @@ Status: `research_only`
 
 Milestone: M16 Persistence, replay, and resilience hardening
 
-Runtime contract: `server/world_civilization/resilience.js`
+Runtime contracts:
 
-Test coverage: `tests/world_civilization_resilience.test.js`
+- `server/world_civilization/resilience.js`
+- `server/world_civilization/replay_reconstruction.js`
+
+Test coverage:
+
+- `tests/world_civilization_resilience.test.js`
+- `tests/world_civilization_replay_reconstruction.test.js`
 
 ## Boundary
 
@@ -44,12 +50,19 @@ the required replay/list/count methods are present. It also rejects forbidden
 execution methods such as direct proposal/effect execution or private inventory
 spend.
 
+`server/world_civilization/replay_reconstruction.js` reconstructs a
+privacy-safe summary from civic audit ledger replay rows. The reconstruction
+verifies sequence order, hash-chain continuity, redacted privacy envelopes,
+action counts, migration-version counts, rollback handle counts, and paginated
+ledger replay without applying world state or exposing actor account ids.
+
 ## Open Release Gaps
 
 M16 remains incomplete until all of these gates close:
 
 - Process restart tests, not only same-process close/reopen tests.
-- Replay reconstruction tests that rebuild civic summaries from audit records.
+- Release-grade replay reconstruction across process restart, larger datasets,
+  and every civic summary surface.
 - Migration upgrade and downgrade tests for every civic table.
 - Load/rate tests for duplicate suppression, idempotent retries, and replay
   pagination.
