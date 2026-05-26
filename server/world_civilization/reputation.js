@@ -4,8 +4,13 @@ const { DatabaseSync } = require('node:sqlite');
 
 const { createCivicAuditLedger, sha256, stableJson } = require('./audit_ledger');
 const { validateReputationRecord } = require('./schemas');
+const {
+  ensureCivicSqliteSchemaMetadata,
+  readCivicSqliteSchemaMetadata
+} = require('./sqlite_schema');
 
 const MIGRATION_VERSION = 'v1';
+const STORE_KEY = 'reputation';
 
 function parseReputationRow(row) {
   if (!row) return null;
@@ -50,6 +55,11 @@ function ensureSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_world_civic_reputation_dispute
       ON world_civic_reputation_records(dispute_status, created_at);
   `);
+  return ensureCivicSqliteSchemaMetadata(db, {
+    storeKey: STORE_KEY,
+    migrationVersion: MIGRATION_VERSION,
+    modulePath: 'server/world_civilization/reputation.js'
+  });
 }
 
 function buildStatements(db) {
@@ -130,7 +140,13 @@ function createCivicReputationStore({ sqlitePath, auditLedger = null, auditSqlit
   }
   fs.mkdirSync(path.dirname(sqlitePath), { recursive: true });
   const db = new DatabaseSync(sqlitePath);
-  ensureSchema(db);
+  let schemaMetadata;
+  try {
+    schemaMetadata = ensureSchema(db);
+  } catch (err) {
+    db.close();
+    throw err;
+  }
   const statements = buildStatements(db);
   const ownsLedger = !auditLedger;
   const ledger = auditLedger || createCivicAuditLedger({ sqlitePath: auditSqlitePath || sqlitePath });
@@ -242,6 +258,10 @@ function createCivicReputationStore({ sqlitePath, auditLedger = null, auditSqlit
     return Number(statements.count.get().count || 0);
   }
 
+  function getSchemaMetadata() {
+    return readCivicSqliteSchemaMetadata(db, STORE_KEY);
+  }
+
   function close() {
     if (closed) return;
     closed = true;
@@ -253,7 +273,9 @@ function createCivicReputationStore({ sqlitePath, auditLedger = null, auditSqlit
     close,
     count,
     getRecord,
+    getSchemaMetadata,
     listRecords,
+    migrationVersion: schemaMetadata.migrationVersion,
     recordReputation,
     sqlitePath,
     summarizeSubjectReputation

@@ -30,8 +30,8 @@ are present.
   and moderation escalation.
 - Data-retention policy: audit retention, deletion policy, debug log retention,
   and export policy.
-- Audit coverage: append-only ledger, owner indexes, migration versions, replay
-  reconstruction, and rollback handles.
+- Audit coverage: append-only ledger, owner indexes, migration versions,
+  schema metadata drift checks, replay reconstruction, and rollback handles.
 - Validation evidence: targeted Node suite, split Playwright smokes,
   all-features regression, and feature override safety.
 - Product release signoff: player-visible scope, rollback plan, support runbook,

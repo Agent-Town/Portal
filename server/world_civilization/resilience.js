@@ -19,7 +19,7 @@ const V6_CIVIC_RESILIENCE_STORES = [
     modulePath: 'server/world_civilization/audit_ledger.js',
     migrationVersion: 'v1',
     restartCoverage: 'tests/world_civilization_process_restart.test.js',
-    requiredMethods: ['append', 'replay', 'getByEntryId', 'getByIdempotency', 'count', 'close']
+    requiredMethods: ['append', 'replay', 'getByEntryId', 'getByIdempotency', 'getSchemaMetadata', 'count', 'close']
   },
   {
     key: 'proposals',
@@ -27,7 +27,7 @@ const V6_CIVIC_RESILIENCE_STORES = [
     modulePath: 'server/world_civilization/proposals.js',
     migrationVersion: 'v1',
     restartCoverage: 'tests/world_civilization_proposal_vote_process_restart.test.js',
-    requiredMethods: ['draftProposal', 'getProposal', 'listProposals', 'previewProposalEffect', 'count', 'close'],
+    requiredMethods: ['draftProposal', 'getProposal', 'getSchemaMetadata', 'listProposals', 'previewProposalEffect', 'count', 'close'],
     forbiddenMethods: ['applyProposal', 'executeProposal']
   },
   {
@@ -36,7 +36,7 @@ const V6_CIVIC_RESILIENCE_STORES = [
     modulePath: 'server/world_civilization/votes.js',
     migrationVersion: 'v1',
     restartCoverage: 'tests/world_civilization_proposal_vote_process_restart.test.js',
-    requiredMethods: ['recordVote', 'getVote', 'listVotes', 'summarizeProposalVotes', 'count', 'close']
+    requiredMethods: ['recordVote', 'getVote', 'getSchemaMetadata', 'listVotes', 'summarizeProposalVotes', 'count', 'close']
   },
   {
     key: 'reputation',
@@ -44,7 +44,7 @@ const V6_CIVIC_RESILIENCE_STORES = [
     modulePath: 'server/world_civilization/reputation.js',
     migrationVersion: 'v1',
     restartCoverage: 'tests/world_civilization_reputation_moderation_process_restart.test.js',
-    requiredMethods: ['recordReputation', 'getRecord', 'listRecords', 'summarizeSubjectReputation', 'count', 'close']
+    requiredMethods: ['recordReputation', 'getRecord', 'getSchemaMetadata', 'listRecords', 'summarizeSubjectReputation', 'count', 'close']
   },
   {
     key: 'moderation',
@@ -52,7 +52,7 @@ const V6_CIVIC_RESILIENCE_STORES = [
     modulePath: 'server/world_civilization/moderation.js',
     migrationVersion: 'v1',
     restartCoverage: 'tests/world_civilization_reputation_moderation_process_restart.test.js',
-    requiredMethods: ['recordDecision', 'getDecision', 'listDecisions', 'summarizeSubjectModeration', 'count', 'close']
+    requiredMethods: ['recordDecision', 'getDecision', 'getSchemaMetadata', 'listDecisions', 'summarizeSubjectModeration', 'count', 'close']
   },
   {
     key: 'effects',
@@ -60,7 +60,7 @@ const V6_CIVIC_RESILIENCE_STORES = [
     modulePath: 'server/world_civilization/effects.js',
     migrationVersion: 'v1',
     restartCoverage: 'tests/world_civilization_effect_process_restart.test.js',
-    requiredMethods: ['prepareEffect', 'getAction', 'getRollback', 'listActions', 'listRollbacks', 'summarizeProposalEffects', 'count', 'close'],
+    requiredMethods: ['prepareEffect', 'getAction', 'getRollback', 'getSchemaMetadata', 'listActions', 'listRollbacks', 'summarizeProposalEffects', 'count', 'close'],
     forbiddenMethods: ['applyEffect', 'executeEffect']
   },
   {
@@ -69,7 +69,7 @@ const V6_CIVIC_RESILIENCE_STORES = [
     modulePath: 'server/world_civilization/delegations.js',
     migrationVersion: 'v1',
     restartCoverage: 'tests/world_civilization_delegation_process_restart.test.js',
-    requiredMethods: ['recordDelegation', 'revokeDelegation', 'getAgentParticipationPolicy', 'listDelegations', 'summarizePrincipalDelegations', 'count', 'close']
+    requiredMethods: ['recordDelegation', 'revokeDelegation', 'getAgentParticipationPolicy', 'getSchemaMetadata', 'listDelegations', 'summarizePrincipalDelegations', 'count', 'close']
   },
   {
     key: 'institutions',
@@ -77,7 +77,7 @@ const V6_CIVIC_RESILIENCE_STORES = [
     modulePath: 'server/world_civilization/institutions.js',
     migrationVersion: 'v1',
     restartCoverage: 'tests/world_civilization_institution_process_restart.test.js',
-    requiredMethods: ['charterInstitution', 'getInstitution', 'listInstitutions', 'summarizeScopeInstitutions', 'count', 'close']
+    requiredMethods: ['charterInstitution', 'getInstitution', 'getSchemaMetadata', 'listInstitutions', 'summarizeScopeInstitutions', 'count', 'close']
   },
   {
     key: 'public_works',
@@ -85,7 +85,7 @@ const V6_CIVIC_RESILIENCE_STORES = [
     modulePath: 'server/world_civilization/public_works.js',
     migrationVersion: 'v1',
     restartCoverage: 'tests/world_civilization_public_works_process_restart.test.js',
-    requiredMethods: ['recordContribution', 'getContribution', 'listContributions', 'summarizeProject', 'count', 'close'],
+    requiredMethods: ['recordContribution', 'getContribution', 'getSchemaMetadata', 'listContributions', 'summarizeProject', 'count', 'close'],
     forbiddenMethods: ['spendPrivateInventory', 'grantReward']
   }
 ];
@@ -118,12 +118,22 @@ function inspectStore(requirement, store) {
   const forbiddenPresent = forbiddenMethods.filter((method) => typeof store?.[method] === 'function');
   const sqlitePath = typeof store?.sqlitePath === 'string' ? store.sqlitePath : '';
   const sqliteFileExists = sqlitePath ? fs.existsSync(sqlitePath) : false;
+  const migrationVersion = typeof store?.migrationVersion === 'string' ? store.migrationVersion : '';
+  const schemaMetadata = typeof store?.getSchemaMetadata === 'function' ? store.getSchemaMetadata() : null;
+  const schemaMetadataOk = Boolean(schemaMetadata)
+    && schemaMetadata.storeKey === requirement.key
+    && schemaMetadata.migrationVersion === requirement.migrationVersion
+    && schemaMetadata.schemaUserVersion === 1
+    && schemaMetadata.releaseStatus === 'research_only';
 
   return {
     key: requirement.key,
     label: requirement.label,
     modulePath: requirement.modulePath,
-    migrationVersion: requirement.migrationVersion,
+    migrationVersion,
+    expectedMigrationVersion: requirement.migrationVersion,
+    schemaMetadata,
+    schemaMetadataOk,
     restartCoverage: requirement.restartCoverage,
     sqliteBacked: Boolean(sqlitePath),
     sqliteFileExists,
@@ -131,7 +141,12 @@ function inspectStore(requirement, store) {
     missingMethods,
     forbiddenMethods: [...forbiddenMethods],
     forbiddenPresent,
-    ok: Boolean(sqlitePath) && sqliteFileExists && missingMethods.length === 0 && forbiddenPresent.length === 0
+    ok: Boolean(sqlitePath)
+      && sqliteFileExists
+      && migrationVersion === requirement.migrationVersion
+      && schemaMetadataOk
+      && missingMethods.length === 0
+      && forbiddenPresent.length === 0
   };
 }
 

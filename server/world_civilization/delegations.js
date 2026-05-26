@@ -4,10 +4,15 @@ const { DatabaseSync } = require('node:sqlite');
 
 const { createCivicAuditLedger, sha256, stableJson } = require('./audit_ledger');
 const { validateCivicDelegation } = require('./schemas');
+const {
+  ensureCivicSqliteSchemaMetadata,
+  readCivicSqliteSchemaMetadata
+} = require('./sqlite_schema');
 
 const DELEGATION_STATUS_ACTIVE = 'active';
 const DELEGATION_STATUS_REVOKED = 'revoked';
 const MIGRATION_VERSION = 'v1';
+const STORE_KEY = 'delegations';
 
 function parseDelegationRow(row) {
   if (!row) return null;
@@ -56,6 +61,11 @@ function ensureSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_world_civic_delegations_expiry
       ON world_civic_delegations(expires_at, status);
   `);
+  return ensureCivicSqliteSchemaMetadata(db, {
+    storeKey: STORE_KEY,
+    migrationVersion: MIGRATION_VERSION,
+    modulePath: 'server/world_civilization/delegations.js'
+  });
 }
 
 function buildStatements(db) {
@@ -195,7 +205,13 @@ function createCivicDelegationStore({ sqlitePath, auditLedger = null, auditSqlit
   }
   fs.mkdirSync(path.dirname(sqlitePath), { recursive: true });
   const db = new DatabaseSync(sqlitePath);
-  ensureSchema(db);
+  let schemaMetadata;
+  try {
+    schemaMetadata = ensureSchema(db);
+  } catch (err) {
+    db.close();
+    throw err;
+  }
   const statements = buildStatements(db);
   const ownsLedger = !auditLedger;
   const ledger = auditLedger || createCivicAuditLedger({ sqlitePath: auditSqlitePath || sqlitePath });
@@ -385,6 +401,10 @@ function createCivicDelegationStore({ sqlitePath, auditLedger = null, auditSqlit
     return Number(statements.count.get().count || 0);
   }
 
+  function getSchemaMetadata() {
+    return readCivicSqliteSchemaMetadata(db, STORE_KEY);
+  }
+
   function close() {
     if (closed) return;
     closed = true;
@@ -397,7 +417,9 @@ function createCivicDelegationStore({ sqlitePath, auditLedger = null, auditSqlit
     count,
     getAgentParticipationPolicy,
     getDelegation,
+    getSchemaMetadata,
     listDelegations,
+    migrationVersion: schemaMetadata.migrationVersion,
     recordDelegation,
     revokeDelegation,
     sqlitePath,

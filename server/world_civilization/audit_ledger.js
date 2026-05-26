@@ -4,6 +4,13 @@ const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
 
 const { validateAuditLedgerEntry } = require('./schemas');
+const {
+  ensureCivicSqliteSchemaMetadata,
+  readCivicSqliteSchemaMetadata
+} = require('./sqlite_schema');
+
+const MIGRATION_VERSION = 'v1';
+const STORE_KEY = 'audit_ledger';
 
 function stableValue(value) {
   if (Array.isArray(value)) return value.map(stableValue);
@@ -72,6 +79,11 @@ function ensureSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_world_civic_audit_action_seq
       ON world_civic_audit_ledger(action_type, seq);
   `);
+  return ensureCivicSqliteSchemaMetadata(db, {
+    storeKey: STORE_KEY,
+    migrationVersion: MIGRATION_VERSION,
+    modulePath: 'server/world_civilization/audit_ledger.js'
+  });
 }
 
 function buildStatements(db) {
@@ -144,7 +156,13 @@ function createCivicAuditLedger({ sqlitePath }) {
   }
   fs.mkdirSync(path.dirname(sqlitePath), { recursive: true });
   const db = new DatabaseSync(sqlitePath);
-  ensureSchema(db);
+  let schemaMetadata;
+  try {
+    schemaMetadata = ensureSchema(db);
+  } catch (err) {
+    db.close();
+    throw err;
+  }
   const statements = buildStatements(db);
   let closed = false;
 
@@ -226,6 +244,10 @@ function createCivicAuditLedger({ sqlitePath }) {
     return Number(statements.count.get().count || 0);
   }
 
+  function getSchemaMetadata() {
+    return readCivicSqliteSchemaMetadata(db, STORE_KEY);
+  }
+
   function close() {
     if (closed) return;
     closed = true;
@@ -238,6 +260,8 @@ function createCivicAuditLedger({ sqlitePath }) {
     count,
     getByEntryId,
     getByIdempotency,
+    getSchemaMetadata,
+    migrationVersion: schemaMetadata.migrationVersion,
     replay,
     sqlitePath
   };

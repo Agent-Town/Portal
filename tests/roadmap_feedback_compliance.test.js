@@ -86,6 +86,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'server/world_civilization/resilience.js',
     'server/world_civilization/release_review.js',
     'server/world_civilization/schemas.js',
+    'server/world_civilization/sqlite_schema.js',
     'server/world_civilization/tools.js',
     'server/world_civilization/votes.js',
     'tests/world_civilization_process_restart.test.js',
@@ -95,6 +96,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'tests/world_civilization_delegation_process_restart.test.js',
     'tests/world_civilization_institution_process_restart.test.js',
     'tests/world_civilization_public_works_process_restart.test.js',
+    'tests/world_civilization_schema_metadata.test.js',
     'public/experiences/world-grid/manifest.json',
     'public/experiences/world-grid/skill.md',
     'public/experiences/world-grid/tools.md',
@@ -175,9 +177,13 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(gate, /town hub modal flow/);
   assert.match(plan, /M16 Persistence, replay, and resilience hardening \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/resilience\.js/);
+  assert.match(plan, /server\/world_civilization\/sqlite_schema\.js/);
+  assert.match(plan, /v1 on-disk schema metadata/);
   assert.match(plan, /server\/world_civilization\/replay_reconstruction\.js/);
   assert.match(plan, /process restart probes now cover audit-ledger, proposal\/vote, reputation\/moderation, effect\/rollback, delegation, institution, and public-works/);
   assert.match(gate, /server\/world_civilization\/resilience\.js/);
+  assert.match(gate, /tests\/world_civilization_schema_metadata\.test\.js/);
+  assert.match(gate, /unsupported SQLite `user_version`/);
   assert.match(gate, /server\/world_civilization\/replay_reconstruction\.js/);
   assert.match(gate, /tests\/world_civilization_process_restart\.test\.js/);
   assert.match(gate, /tests\/world_civilization_proposal_vote_process_restart\.test\.js/);

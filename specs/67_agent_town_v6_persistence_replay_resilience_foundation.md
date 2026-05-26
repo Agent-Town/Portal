@@ -20,6 +20,7 @@ Test coverage:
 - `tests/world_civilization_delegation_process_restart.test.js`
 - `tests/world_civilization_institution_process_restart.test.js`
 - `tests/world_civilization_public_works_process_restart.test.js`
+- `tests/world_civilization_schema_metadata.test.js`
 
 ## Boundary
 
@@ -52,10 +53,17 @@ research stores:
 - Public works shared-resource accounting.
 
 For each store, the baseline verifies that a SQLite path exists, the expected
-v1 migration marker is documented, restart-style test coverage is named, and
-the required replay/list/count methods are present. It also rejects forbidden
-execution methods such as direct proposal/effect execution or private inventory
-spend.
+v1 migration marker is stamped into on-disk schema metadata, restart-style test
+coverage is named, and the required replay/list/count/schema metadata methods
+are present. It also rejects forbidden execution methods such as direct
+proposal/effect execution or private inventory spend.
+
+`server/world_civilization/sqlite_schema.js` centralizes the current
+research-only SQLite schema metadata contract. Every current V6 civic store
+records a `world_civic_schema_metadata` row with `migrationVersion: v1`,
+`schemaUserVersion: 1`, the module path, and `releaseStatus: research_only`.
+The metadata layer fails closed when a database advertises an unsupported
+SQLite `user_version` or a mismatched store migration marker.
 
 `server/world_civilization/replay_reconstruction.js` reconstructs a
 privacy-safe summary from civic audit ledger replay rows. The reconstruction
@@ -106,6 +114,10 @@ reopen the required institution and public-works stores, record capped
 contributions, reconstruct privacy-safe audit replay, and prove exact retries
 do not append duplicate contribution or audit rows after restart.
 
+`tests/world_civilization_schema_metadata.test.js` proves every current civic
+store exposes v1 schema metadata to the resilience report and rejects version
+drift before the store can be used.
+
 ## Open Release Gaps
 
 M16 remains incomplete until all of these gates close:
@@ -116,7 +128,8 @@ M16 remains incomplete until all of these gates close:
   probes.
 - Release-grade replay reconstruction across process restart, larger datasets,
   and every civic summary surface.
-- Migration upgrade and downgrade tests for every civic table.
+- Release-grade migration upgrade and downgrade scripts/tests for every civic
+  table beyond the current v1 metadata and fail-closed drift checks.
 - Load/rate tests for duplicate suppression, idempotent retries, and replay
   pagination.
 - Rollback recovery tests that prove prepared rollback handles can survive

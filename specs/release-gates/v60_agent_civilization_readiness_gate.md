@@ -194,9 +194,14 @@ gate below has implementation, deterministic tests, and security/product signoff
   `tests/world_civilization_institution_process_restart.test.js`.
   Public-works process restart coverage starts in
   `tests/world_civilization_public_works_process_restart.test.js`.
+  Schema metadata coverage starts in
+  `tests/world_civilization_schema_metadata.test.js`; current stores stamp
+  v1 on-disk metadata and fail closed on unsupported SQLite `user_version` or
+  mismatched migration markers.
   These current probes cover every current civic store at research scale.
   Release still requires release-grade process restart coverage, larger replay
-  reconstruction, migration, load/rate, and rollback recovery tests.
+  reconstruction, migration scripts with upgrade/downgrade proofs, load/rate,
+  and rollback recovery tests.
 - Security and product release review must be complete before normal gameplay
   exposure. Current gate tracking starts in
   `server/world_civilization/release_review.js` and

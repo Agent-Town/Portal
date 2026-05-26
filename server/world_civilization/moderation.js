@@ -4,8 +4,13 @@ const { DatabaseSync } = require('node:sqlite');
 
 const { createCivicAuditLedger, sha256, stableJson } = require('./audit_ledger');
 const { validateModerationDecision } = require('./schemas');
+const {
+  ensureCivicSqliteSchemaMetadata,
+  readCivicSqliteSchemaMetadata
+} = require('./sqlite_schema');
 
 const MIGRATION_VERSION = 'v1';
+const STORE_KEY = 'moderation';
 
 function parseModerationRow(row) {
   if (!row) return null;
@@ -48,6 +53,11 @@ function ensureSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_world_civic_moderation_reviewer
       ON world_civic_moderation_decisions(reviewer_kind, created_at);
   `);
+  return ensureCivicSqliteSchemaMetadata(db, {
+    storeKey: STORE_KEY,
+    migrationVersion: MIGRATION_VERSION,
+    modulePath: 'server/world_civilization/moderation.js'
+  });
 }
 
 function buildStatements(db) {
@@ -142,7 +152,13 @@ function createCivicModerationStore({ sqlitePath, auditLedger = null, auditSqlit
   }
   fs.mkdirSync(path.dirname(sqlitePath), { recursive: true });
   const db = new DatabaseSync(sqlitePath);
-  ensureSchema(db);
+  let schemaMetadata;
+  try {
+    schemaMetadata = ensureSchema(db);
+  } catch (err) {
+    db.close();
+    throw err;
+  }
   const statements = buildStatements(db);
   const ownsLedger = !auditLedger;
   const ledger = auditLedger || createCivicAuditLedger({ sqlitePath: auditSqlitePath || sqlitePath });
@@ -256,6 +272,10 @@ function createCivicModerationStore({ sqlitePath, auditLedger = null, auditSqlit
     return Number(statements.count.get().count || 0);
   }
 
+  function getSchemaMetadata() {
+    return readCivicSqliteSchemaMetadata(db, STORE_KEY);
+  }
+
   function close() {
     if (closed) return;
     closed = true;
@@ -267,7 +287,9 @@ function createCivicModerationStore({ sqlitePath, auditLedger = null, auditSqlit
     close,
     count,
     getDecision,
+    getSchemaMetadata,
     listDecisions,
+    migrationVersion: schemaMetadata.migrationVersion,
     recordDecision,
     sqlitePath,
     summarizeSubjectModeration

@@ -4,9 +4,14 @@ const { DatabaseSync } = require('node:sqlite');
 
 const { createCivicAuditLedger, sha256, stableJson } = require('./audit_ledger');
 const { validateCivicInstitution } = require('./schemas');
+const {
+  ensureCivicSqliteSchemaMetadata,
+  readCivicSqliteSchemaMetadata
+} = require('./sqlite_schema');
 
 const INSTITUTION_STATUS_CHARTERED = 'chartered';
 const MIGRATION_VERSION = 'v1';
+const STORE_KEY = 'institutions';
 
 function parseInstitutionRow(row) {
   if (!row) return null;
@@ -61,6 +66,11 @@ function ensureSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_world_civic_institutions_chartered_by
       ON world_civic_institutions(chartered_by_account_id, created_at);
   `);
+  return ensureCivicSqliteSchemaMetadata(db, {
+    storeKey: STORE_KEY,
+    migrationVersion: MIGRATION_VERSION,
+    modulePath: 'server/world_civilization/institutions.js'
+  });
 }
 
 function buildStatements(db) {
@@ -133,7 +143,13 @@ function createCivicInstitutionStore({ sqlitePath, auditLedger = null, auditSqli
   }
   fs.mkdirSync(path.dirname(sqlitePath), { recursive: true });
   const db = new DatabaseSync(sqlitePath);
-  ensureSchema(db);
+  let schemaMetadata;
+  try {
+    schemaMetadata = ensureSchema(db);
+  } catch (err) {
+    db.close();
+    throw err;
+  }
   const statements = buildStatements(db);
   const ownsLedger = !auditLedger;
   const ledger = auditLedger || createCivicAuditLedger({ sqlitePath: auditSqlitePath || sqlitePath });
@@ -247,6 +263,10 @@ function createCivicInstitutionStore({ sqlitePath, auditLedger = null, auditSqli
     return Number(statements.count.get().count || 0);
   }
 
+  function getSchemaMetadata() {
+    return readCivicSqliteSchemaMetadata(db, STORE_KEY);
+  }
+
   function close() {
     if (closed) return;
     closed = true;
@@ -259,7 +279,9 @@ function createCivicInstitutionStore({ sqlitePath, auditLedger = null, auditSqli
     close,
     count,
     getInstitution,
+    getSchemaMetadata,
     listInstitutions,
+    migrationVersion: schemaMetadata.migrationVersion,
     sqlitePath,
     summarizeScopeInstitutions
   };

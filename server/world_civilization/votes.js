@@ -4,8 +4,13 @@ const { DatabaseSync } = require('node:sqlite');
 
 const { createCivicAuditLedger, sha256, stableJson } = require('./audit_ledger');
 const { validateCivicVote } = require('./schemas');
+const {
+  ensureCivicSqliteSchemaMetadata,
+  readCivicSqliteSchemaMetadata
+} = require('./sqlite_schema');
 
 const MIGRATION_VERSION = 'v1';
+const STORE_KEY = 'votes';
 
 function parseVoteRow(row) {
   if (!row) return null;
@@ -49,6 +54,11 @@ function ensureSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_world_civic_votes_voter_created
       ON world_civic_votes(voter_account_id, created_at);
   `);
+  return ensureCivicSqliteSchemaMetadata(db, {
+    storeKey: STORE_KEY,
+    migrationVersion: MIGRATION_VERSION,
+    modulePath: 'server/world_civilization/votes.js'
+  });
 }
 
 function buildStatements(db) {
@@ -127,7 +137,13 @@ function createCivicVoteStore({ sqlitePath, proposalStore, auditLedger = null, a
   }
   fs.mkdirSync(path.dirname(sqlitePath), { recursive: true });
   const db = new DatabaseSync(sqlitePath);
-  ensureSchema(db);
+  let schemaMetadata;
+  try {
+    schemaMetadata = ensureSchema(db);
+  } catch (err) {
+    db.close();
+    throw err;
+  }
   const statements = buildStatements(db);
   const ownsLedger = !auditLedger;
   const ledger = auditLedger || createCivicAuditLedger({ sqlitePath: auditSqlitePath || sqlitePath });
@@ -238,6 +254,10 @@ function createCivicVoteStore({ sqlitePath, proposalStore, auditLedger = null, a
     return Number(statements.count.get().count || 0);
   }
 
+  function getSchemaMetadata() {
+    return readCivicSqliteSchemaMetadata(db, STORE_KEY);
+  }
+
   function close() {
     if (closed) return;
     closed = true;
@@ -248,8 +268,10 @@ function createCivicVoteStore({ sqlitePath, proposalStore, auditLedger = null, a
   return {
     close,
     count,
+    getSchemaMetadata,
     getVote,
     listVotes,
+    migrationVersion: schemaMetadata.migrationVersion,
     recordVote,
     sqlitePath,
     summarizeProposalVotes

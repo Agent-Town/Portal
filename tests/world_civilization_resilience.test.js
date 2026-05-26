@@ -111,6 +111,11 @@ test('V6 resilience baseline verifies current SQLite stores and keeps release ga
     assert.equal(storeReport.sqliteBacked, true, storeReport.key);
     assert.equal(storeReport.sqliteFileExists, true, storeReport.key);
     assert.equal(storeReport.migrationVersion, 'v1', storeReport.key);
+    assert.equal(storeReport.expectedMigrationVersion, 'v1', storeReport.key);
+    assert.equal(storeReport.schemaMetadataOk, true, storeReport.key);
+    assert.equal(storeReport.schemaMetadata.storeKey, storeReport.key);
+    assert.equal(storeReport.schemaMetadata.migrationVersion, 'v1', storeReport.key);
+    assert.equal(storeReport.schemaMetadata.releaseStatus, 'research_only', storeReport.key);
     assert.deepEqual(storeReport.missingMethods, [], storeReport.key);
     assert.deepEqual(storeReport.forbiddenPresent, [], storeReport.key);
     assert.match(storeReport.restartCoverage, /^tests\/world_civilization_.*\.test\.js$/);

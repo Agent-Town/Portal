@@ -4,10 +4,15 @@ const { DatabaseSync } = require('node:sqlite');
 
 const { createCivicAuditLedger, sha256, stableJson } = require('./audit_ledger');
 const { validatePublicWorksContribution } = require('./schemas');
+const {
+  ensureCivicSqliteSchemaMetadata,
+  readCivicSqliteSchemaMetadata
+} = require('./sqlite_schema');
 
 const RESOURCE_KEYS = ['wood', 'stone', 'food', 'coin'];
 const CONTRIBUTION_STATUS_RECORDED = 'recorded';
 const MIGRATION_VERSION = 'v1';
+const STORE_KEY = 'public_works';
 
 const DEFAULT_PUBLIC_WORKS_PROJECTS = [
   {
@@ -107,6 +112,11 @@ function ensureSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_world_civic_public_works_contributor
       ON world_civic_public_work_contributions(contributor_account_id, created_at);
   `);
+  return ensureCivicSqliteSchemaMetadata(db, {
+    storeKey: STORE_KEY,
+    migrationVersion: MIGRATION_VERSION,
+    modulePath: 'server/world_civilization/public_works.js'
+  });
 }
 
 function buildStatements(db) {
@@ -225,7 +235,13 @@ function createCivicPublicWorksStore({
   }
   fs.mkdirSync(path.dirname(sqlitePath), { recursive: true });
   const db = new DatabaseSync(sqlitePath);
-  ensureSchema(db);
+  let schemaMetadata;
+  try {
+    schemaMetadata = ensureSchema(db);
+  } catch (err) {
+    db.close();
+    throw err;
+  }
   const statements = buildStatements(db);
   const projectMap = normalizedProjects(projects);
   const ownsLedger = !auditLedger;
@@ -412,6 +428,10 @@ function createCivicPublicWorksStore({
     return Number(statements.count.get().count || 0);
   }
 
+  function getSchemaMetadata() {
+    return readCivicSqliteSchemaMetadata(db, STORE_KEY);
+  }
+
   function close() {
     if (closed) return;
     closed = true;
@@ -423,7 +443,9 @@ function createCivicPublicWorksStore({
     close,
     count,
     getContribution,
+    getSchemaMetadata,
     listContributions,
+    migrationVersion: schemaMetadata.migrationVersion,
     recordContribution,
     sqlitePath,
     summarizeProject
