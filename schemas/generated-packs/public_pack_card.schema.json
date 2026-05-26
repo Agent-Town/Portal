@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-town-generated-pack-public-card-v1",
+  "title": "Agent Town Generated Pack Public Card",
+  "type": "object",
+  "required": ["schemaVersion", "cardId", "packId", "packHash", "createdAtMs", "visibility", "title", "styleSummary", "promptKeywordHints", "screenshot", "assetManifestSummary", "moderation"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": "agent-town-generated-pack-public-card-v1" },
+    "cardId": { "type": "string", "pattern": "^gen_card_[0-9a-f]{16}$" },
+    "packId": { "type": "string", "minLength": 3 },
+    "packHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "createdAtMs": { "type": "number" },
+    "visibility": { "enum": ["public-unlisted"] },
+    "title": { "type": "string", "minLength": 3 },
+    "styleSummary": { "type": "string", "minLength": 3 },
+    "promptKeywordHints": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 2 }
+    },
+    "screenshot": {
+      "type": "object",
+      "required": ["present", "source", "hash", "width", "height"],
+      "additionalProperties": false,
+      "properties": {
+        "present": { "type": "boolean" },
+        "source": { "type": "string", "minLength": 3 },
+        "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "width": { "type": "number", "minimum": 1 },
+        "height": { "type": "number", "minimum": 1 }
+      }
+    },
+    "assetManifestSummary": {
+      "type": "object",
+      "required": ["assetCount", "materialCount", "generatedTextCount", "plannedCandidateCount", "productionImageAssetCount", "canonicalTargets"],
+      "additionalProperties": false,
+      "properties": {
+        "assetCount": { "type": "number", "minimum": 0 },
+        "materialCount": { "type": "number", "minimum": 0 },
+        "generatedTextCount": { "type": "number", "minimum": 0 },
+        "plannedCandidateCount": { "type": "number", "minimum": 0 },
+        "productionImageAssetCount": { "type": "number", "minimum": 0 },
+        "canonicalTargets": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 3 }
+        }
+      }
+    },
+    "moderation": {
+      "type": "object",
+      "required": ["status", "rawPromptIncluded", "privateDataLeakCount", "blockedFieldCount"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "enum": ["passed"] },
+        "rawPromptIncluded": { "type": "boolean" },
+        "privateDataLeakCount": { "type": "number", "minimum": 0 },
+        "blockedFieldCount": { "type": "number", "minimum": 0 }
+      }
+    }
+  }
+}

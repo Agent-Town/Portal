@@ -12,7 +12,8 @@ const GENERATED_PACK_SCHEMA_FILES = {
   assetPromptPlan: 'asset_prompt_plan.schema.json',
   assetManifest: 'generated_asset_manifest.schema.json',
   generatedPack: 'generated_pack.schema.json',
-  playtestReport: 'playtest_report.schema.json'
+  playtestReport: 'playtest_report.schema.json',
+  publicPackCard: 'public_pack_card.schema.json'
 };
 
 function clone(value) {

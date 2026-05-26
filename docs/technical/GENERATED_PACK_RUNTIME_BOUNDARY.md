@@ -87,6 +87,13 @@ Player prompt
 - `importGeneratedPack` accepts only hash-valid generated-pack exports, rejects tampering or private owner fields, migrates the pack to the current owner, and validates before saving.
 - `remixGeneratedPack` creates a child pack with parent/root/generation lineage while preserving canonical mappings and zero server-rule overrides.
 
+## GU-11 Public-Safe Pack Card Slice
+
+- `public_pack_card.schema.json` defines the unlisted public-card contract.
+- `publishPublicPackCard` is authenticated and generated-pack feature-gated; `GET /api/world/generated-pack/public-card/:cardId` is auth-free and returns only the already-published card.
+- Public cards include generated title, style summary, prompt keyword hints only, screenshot metadata, and asset-manifest summary.
+- Public-card moderation rejects raw prompt fields, Brain/provider/debug/wallet terms, executable prompt text, private owner/session data, missing screenshots, and invalid asset summaries.
+
 ## Machine Checks
 
 ```json
@@ -149,6 +156,12 @@ Player prompt
   "remixLineageRecorded": true,
   "missingPackFallback": true,
   "privateDataLeakCount": 0,
-  "migrationVersion": 1
+  "migrationVersion": 1,
+  "publicCardSchemaExists": true,
+  "authNotRequiredForPublicCard": true,
+  "publicCardPublishFeatureGated": true,
+  "promptKeywordHintsOnly": true,
+  "publicCardScreenshotPresent": true,
+  "unsafePackCardRejected": true
 }
 ```

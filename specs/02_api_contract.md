@@ -2716,6 +2716,20 @@ Imports a generated-pack export into the current owner session. The server rejec
 ### POST `/api/world/generated-pack/remix`
 Creates a child generated pack from a parent durable pack and a new prompt. The child records `remix.parentPackId`, `remix.rootPackId`, `remix.generation`, and lineage entries. Remixing does not add tools, mutations, formulas, or server-rule overrides.
 
+### POST `/api/world/generated-pack/public-card`
+Publishes an unlisted public-safe card for a validated generated pack. This endpoint requires the generated-pack feature flag and the current wallet/session owner.
+
+Public-card invariants:
+- schema is `agent-town-generated-pack-public-card-v1`;
+- card includes generated `title`, `styleSummary`, `promptKeywordHints`, `screenshot`, and `assetManifestSummary`;
+- prompt content is limited to keyword hints;
+- Brain, wallet, provider, OAuth, debug, worker traffic, session context, raw prompt, secret, token, and credential fields are absent;
+- screenshot evidence must be present;
+- unsafe card moderation returns `PUBLIC_PACK_CARD_REJECTED`.
+
+### GET `/api/world/generated-pack/public-card/:cardId`
+Loads a published unlisted public card by ID without auth. This endpoint does not list cards, does not expose full generated-pack records, and does not expose owner/session identifiers.
+
 ### POST `/api/world/generated-pack/playtest-report`
 Records the measured generated-pack first-loop report. Passing reports require measured scores, screenshot evidence, clean console state, zero unhandled missing assets, canonical payload integrity, and generated-pack validation.
 

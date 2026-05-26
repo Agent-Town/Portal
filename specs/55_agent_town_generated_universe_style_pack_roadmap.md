@@ -275,3 +275,23 @@ Generated packs now have a durable ignored-data contract for prototype reload, e
   "rawPromptStored": false
 }
 ```
+
+## GU-11 Public-Safe Pack Cards Slice
+
+Generated packs can now publish an unlisted public card after a measured playtest screenshot exists. Publishing remains authenticated and feature-gated, but the card read endpoint is auth-free by card ID. Cards include generated title, style summary, prompt keyword hints only, screenshot metadata, asset-manifest summary, and moderation metrics. Raw prompts, Brain/provider/debug/wallet fields, account/session identifiers, and unsafe card content fail moderation.
+
+```json
+{
+  "publicCardSchemaExists": true,
+  "authNotRequiredForPublicCard": true,
+  "publicCardPublishFeatureGated": true,
+  "generatedTitlePresent": true,
+  "styleSummaryPresent": true,
+  "promptKeywordHintsOnly": true,
+  "assetManifestSummaryPresent": true,
+  "screenshotPresent": true,
+  "unsafePackCardRejected": true,
+  "privateDataLeakCount": 0,
+  "rawPromptStored": false
+}
+```

@@ -52,3 +52,6 @@ owner: "Agent Town product"
 | GPACK-039 | Persistence | Same prompt and same owner generate a stable pack ID, and the current pack reloads from durable storage after memory reset | `tests/generated_pack_persistence.test.js` |
 | GPACK-040 | Persistence | Generated-pack export/import round trip is hash-valid, validation-safe, and excludes owner/session/private data | `tests/generated_pack_persistence.test.js`, `tests/generated_pack_contract.test.js` |
 | GPACK-041 | Persistence | Invalid imports are rejected, remix lineage records parent/root/generation, and missing pack reload falls back to the current durable pack | `tests/generated_pack_persistence.test.js`, `tests/generated_pack_contract.test.js` |
+| GPACK-042 | Public card | Public pack-card schema exists and published cards include generated title, style summary, prompt keyword hints only, screenshot metadata, and asset summary | `tests/generated_pack_public_card.test.js`, `tests/generated_pack_contract.test.js` |
+| GPACK-043 | Public card | Public card fetch by card ID requires no auth while publish remains generated-pack feature-gated | `tests/generated_pack_public_card.test.js` |
+| GPACK-044 | Public card | Unsafe card content, raw prompt fields, Brain/provider/debug/wallet fields, and private owner/session data fail moderation or stay absent | `tests/generated_pack_public_card.test.js` |

@@ -71,13 +71,14 @@ test('generated pack schema suite and fixtures exist', () => {
     'asset_postprocess_report.schema.json',
     'generated_asset_manifest.schema.json',
     'generated_pack.schema.json',
-    'playtest_report.schema.json'
+    'playtest_report.schema.json',
+    'public_pack_card.schema.json'
   ];
   for (const schema of requiredSchemas) {
     const parsed = readJson(`schemas/generated-packs/${schema}`);
     assert.ok(parsed.$id, schema);
   }
-  assert.equal(requiredSchemas.length, 10);
+  assert.equal(requiredSchemas.length, 11);
 
   for (const fixture of [
     'valid_world_grid_pack.json',
@@ -295,6 +296,7 @@ test('generated pack API is gated and records first-loop playtest reports when e
     assert.equal(toolsBody.tools.some((tool) => tool.name === 'et.world.generated_pack.export'), true);
     assert.equal(toolsBody.tools.some((tool) => tool.name === 'et.world.generated_pack.import'), true);
     assert.equal(toolsBody.tools.some((tool) => tool.name === 'et.world.generated_pack.remix'), true);
+    assert.equal(toolsBody.tools.some((tool) => tool.name === 'et.world.generated_pack.public_card'), true);
 
     const generateResponse = await fetch(`${baseUrl}/api/world/generated-pack/generate`, {
       method: 'POST',

@@ -15,6 +15,7 @@ const ASSET_SCAFFOLD_VERSION = 'agent-town-asset-generation-scaffold-v1';
 const GENERATED_ASSET_MANIFEST_VERSION = 'agent-town-generated-asset-manifest-v1';
 const GENERATED_PACK_EXPORT_VERSION = 'agent-town-generated-pack-export-v1';
 const GENERATED_PACK_MIGRATION_VERSION = 1;
+const PUBLIC_PACK_CARD_VERSION = 'agent-town-generated-pack-public-card-v1';
 const DEFAULT_CANDIDATE_ROOT = 'data/generated-packs';
 const DEFAULT_DURABLE_ROOT = 'data/generated-packs-durable';
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
@@ -126,6 +127,25 @@ const TECHNICAL_NORMAL_GAMEPLAY_TERMS = [
   'worker traffic',
   'session context',
   'model id'
+];
+
+const PUBLIC_CARD_FORBIDDEN_TERMS = [
+  'brain',
+  'wallet',
+  'provider',
+  'oauth',
+  'debug',
+  'worker traffic',
+  'session context',
+  'api key',
+  'secret',
+  'private key',
+  'access token',
+  'refresh token',
+  'password',
+  'credential',
+  'raw prompt',
+  'normalized prompt'
 ];
 
 const STOP_WORDS = new Set([
@@ -294,6 +314,7 @@ const THEME_PRESETS = [
 
 const packStore = new Map();
 const playtestStore = new Map();
+const publicCardStore = new Map();
 
 function sha256(value = '') {
   return crypto.createHash('sha256').update(String(value || '')).digest('hex');
@@ -1764,6 +1785,10 @@ function ownerPackIndexPath(owner = {}) {
   return relativePackPath('owners', ownerStoreId(owner), 'packs.json');
 }
 
+function publicCardPath(cardId = '') {
+  return relativePackPath('public-cards', `${slugForTarget(cardId)}.json`);
+}
+
 function validateStoredPack(pack = {}) {
   const validationReport = validateGeneratedPack(pack);
   if (!validationReport.ok) {
@@ -2057,6 +2082,195 @@ function remixGeneratedPack({ owner, parentPackId = '', prompt, nowMs = Date.now
   };
 }
 
+function cardPrivateLeakCount(value = {}, owner = {}) {
+  const text = JSON.stringify(value).toLowerCase();
+  return [storeKey(owner), owner?.ownerAccountId, owner?.pairId, owner?.houseId]
+    .filter((item) => String(item || '').trim().length > 0)
+    .filter((item, index, all) => all.indexOf(item) === index)
+    .filter((item) => text.includes(String(item).toLowerCase())).length;
+}
+
+function publicCardBlockedPaths(value, pathLabel = '$', matches = []) {
+  if (typeof value === 'string') {
+    const lower = value.toLowerCase();
+    const blockedTerms = PUBLIC_CARD_FORBIDDEN_TERMS.filter((term) => lower.includes(term));
+    const blockedPromptPatterns = blockedPatternIdsForText(value);
+    if (blockedTerms.length > 0 || blockedPromptPatterns.length > 0) {
+      matches.push({ path: pathLabel, blockedTerms, blockedPromptPatterns });
+    }
+    return matches;
+  }
+  if (!value || typeof value !== 'object') return matches;
+  for (const [key, child] of Object.entries(value)) {
+    const childPath = `${pathLabel}.${key}`;
+    const allowedModerationKeys = new Set(['$.moderation.rawPromptIncluded', '$.moderation.privateDataLeakCount', '$.moderation.blockedFieldCount']);
+    if (!allowedModerationKeys.has(childPath) && /rawprompt|normalizedprompt|systemprompt|developerprompt|brain|wallet|provider|oauth|debug|secret|credential|token/i.test(key)) {
+      matches.push({ path: childPath, blockedTerms: [key], blockedPromptPatterns: [] });
+    }
+    publicCardBlockedPaths(child, childPath, matches);
+  }
+  return matches;
+}
+
+function assetManifestSummaryForCard(pack = {}) {
+  const assets = Array.isArray(pack?.assetManifest?.assets) ? pack.assetManifest.assets : [];
+  return {
+    assetCount: assets.length,
+    materialCount: assets.filter((asset) => asset.kind === 'three-material').length,
+    generatedTextCount: assets.filter((asset) => asset.kind === 'generated-text').length,
+    plannedCandidateCount: Array.isArray(pack?.assetPromptPlan?.targets) ? pack.assetPromptPlan.targets.length : 0,
+    productionImageAssetCount: Number(pack?.assetScaffold?.productionImageAssetCount || 0),
+    canonicalTargets: [...new Set(assets.map((asset) => asset.canonicalTarget).filter(Boolean))].slice(0, 32)
+  };
+}
+
+function screenshotForPublicCard(playtestReport = {}) {
+  const evidence = normalizeScreenshotEvidence(playtestReport?.screenshotEvidence || {});
+  return {
+    present: evidence.captured === true,
+    source: evidence.source || 'missing-screenshot',
+    hash: evidence.hash || sha256('missing-generated-pack-screenshot'),
+    width: evidence.width || 1,
+    height: evidence.height || 1
+  };
+}
+
+function buildPublicPackCard({ pack, playtestReport = null, owner = {}, nowMs = Date.now() } = {}) {
+  const screenshot = screenshotForPublicCard(playtestReport);
+  const promptHints = (pack?.prompt?.keywordHints || pack?.generationBrief?.keywordHints || [])
+    .map((hint) => String(hint || '').trim().toLowerCase())
+    .filter((hint) => hint.length >= 2 && !PUBLIC_CARD_FORBIDDEN_TERMS.includes(hint))
+    .slice(0, 10);
+  const packHash = exportedPackHash(redactPackForExport(pack || {}));
+  const cardId = `gen_card_${sha256(`${pack?.packId || ''}:${screenshot.hash}:${packHash}`).slice(0, 16)}`;
+  const card = {
+    schemaVersion: PUBLIC_PACK_CARD_VERSION,
+    cardId,
+    packId: String(pack?.packId || ''),
+    packHash,
+    createdAtMs: nowMs,
+    visibility: 'public-unlisted',
+    title: String(pack?.universePack?.name || pack?.stylePack?.name || 'Generated Pack').slice(0, 120),
+    styleSummary: String(pack?.stylePack?.themeSummary || pack?.universePack?.pitch || 'Generated Agent Town style pack.').slice(0, 240),
+    promptKeywordHints: promptHints,
+    screenshot,
+    assetManifestSummary: assetManifestSummaryForCard(pack),
+    moderation: {
+      status: 'passed',
+      rawPromptIncluded: false,
+      privateDataLeakCount: 0,
+      blockedFieldCount: 0
+    }
+  };
+  const blocked = publicCardBlockedPaths(card);
+  card.moderation.privateDataLeakCount = cardPrivateLeakCount(card, owner);
+  card.moderation.blockedFieldCount = blocked.length;
+  return card;
+}
+
+function validatePublicPackCard(card = {}, owner = {}) {
+  const schemaReport = SCHEMA_REGISTRY?.publicPackCard
+    ? validateGeneratedSchema(card, SCHEMA_REGISTRY.publicPackCard, '$.publicPackCard')
+    : { ok: true, errors: [] };
+  const blockedFields = publicCardBlockedPaths(card);
+  const privateDataLeakCount = cardPrivateLeakCount(card, owner);
+  const checks = [
+    {
+      id: 'PUBLIC_CARD_SCHEMA_VALID',
+      passed: schemaReport.ok === true,
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
+    },
+    {
+      id: 'PUBLIC_CARD_SCREENSHOT_PRESENT',
+      passed: card?.screenshot?.present === true && /^[0-9a-f]{64}$/.test(String(card?.screenshot?.hash || '')),
+      measured: { screenshotPresent: card?.screenshot?.present === true }
+    },
+    {
+      id: 'PUBLIC_CARD_PROMPT_HINTS_ONLY',
+      passed: Array.isArray(card?.promptKeywordHints)
+        && !Object.prototype.hasOwnProperty.call(card, 'prompt')
+        && !Object.prototype.hasOwnProperty.call(card, 'rawPrompt')
+        && !Object.prototype.hasOwnProperty.call(card, 'normalizedPrompt'),
+      measured: { keywordHintCount: Array.isArray(card?.promptKeywordHints) ? card.promptKeywordHints.length : 0 }
+    },
+    {
+      id: 'PUBLIC_CARD_NO_PRIVATE_DATA',
+      passed: privateDataLeakCount === 0,
+      measured: { privateDataLeakCount }
+    },
+    {
+      id: 'PUBLIC_CARD_BLOCKED_FIELDS_ABSENT',
+      passed: blockedFields.length === 0,
+      measured: { blockedFieldCount: blockedFields.length, blockedFields: blockedFields.slice(0, 5) }
+    },
+    {
+      id: 'PUBLIC_CARD_ASSET_SUMMARY_PRESENT',
+      passed: Number(card?.assetManifestSummary?.assetCount || 0) > 0
+        && Number(card?.assetManifestSummary?.plannedCandidateCount || 0) >= ASSET_PROMPT_TARGETS.length,
+      measured: card?.assetManifestSummary || {}
+    }
+  ];
+  return {
+    ok: checks.every((check) => check.passed === true),
+    checks,
+    metrics: {
+      publicCardSchemaExists: Boolean(SCHEMA_REGISTRY?.publicPackCard),
+      authNotRequiredForPublicCard: true,
+      screenshotPresent: card?.screenshot?.present === true,
+      privateDataLeakCount,
+      rawPromptIncluded: Object.prototype.hasOwnProperty.call(card, 'rawPrompt') || Object.prototype.hasOwnProperty.call(card, 'normalizedPrompt'),
+      blockedFieldCount: blockedFields.length
+    }
+  };
+}
+
+function persistPublicPackCard(card = {}, validationReport = null) {
+  const record = {
+    schemaVersion: 'agent-town-generated-pack-public-card-record-v1',
+    cardId: card.cardId,
+    savedAtMs: Date.now(),
+    publicCard: clone(card),
+    validationReport: validationReport ? clone(validationReport) : validatePublicPackCard(card)
+  };
+  safeWriteJson(publicCardPath(card.cardId), record);
+  publicCardStore.set(card.cardId, clone(record));
+  return clone(record);
+}
+
+function publishPublicPackCard(owner = {}, packId = '', { nowMs = Date.now() } = {}) {
+  const loaded = reloadGeneratedPack(owner, packId);
+  const card = buildPublicPackCard({
+    pack: loaded.generatedPack,
+    playtestReport: loaded.playtestReport || currentPlaytestReport(owner),
+    owner,
+    nowMs
+  });
+  const validationReport = validatePublicPackCard(card, owner);
+  if (!validationReport.ok) {
+    const error = new Error('PUBLIC_PACK_CARD_REJECTED');
+    error.details = { validationReport };
+    throw error;
+  }
+  const record = persistPublicPackCard(card, validationReport);
+  return {
+    publicCard: record.publicCard,
+    validationReport: record.validationReport
+  };
+}
+
+function getPublicPackCard(cardId = '') {
+  const key = String(cardId || '').trim();
+  if (!key) return null;
+  const cached = publicCardStore.get(key);
+  if (cached?.publicCard && cached?.validationReport?.ok === true) return clone(cached.publicCard);
+  const record = safeReadJson(publicCardPath(key));
+  if (!record?.publicCard) return null;
+  const validationReport = validatePublicPackCard(record.publicCard);
+  if (!validationReport.ok) return null;
+  publicCardStore.set(key, clone({ ...record, validationReport }));
+  return clone(record.publicCard);
+}
+
 function diversityTokenSet(parts = []) {
   return new Set(parts
     .flatMap((part) => String(part || '').toLowerCase().match(/[a-z0-9]+/g) || [])
@@ -2285,6 +2499,7 @@ function analyzePackDiversity(packs = [], options = {}) {
 function clearGeneratedPacksForTests({ clearDisk = false } = {}) {
   packStore.clear();
   playtestStore.clear();
+  publicCardStore.clear();
   if (clearDisk) {
     fs.rmSync(durableRoot(), { recursive: true, force: true });
   }
@@ -2307,8 +2522,10 @@ module.exports = {
   currentPlaytestReport,
   exportGeneratedPack,
   generateAndStorePack,
+  getPublicPackCard,
   importGeneratedPack,
   normalizePrompt,
+  publishPublicPackCard,
   recordPlaytestReport,
   reloadGeneratedPack,
   remixGeneratedPack,
@@ -2317,6 +2534,7 @@ module.exports = {
   validateAssetManifest,
   validateAssetPromptPlan,
   validateGenerationBrief,
+  validatePublicPackCard,
   validatePlaytestReport,
   validateGeneratedPack
 };

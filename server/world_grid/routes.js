@@ -46,7 +46,9 @@ const {
   currentPlaytestReport,
   exportGeneratedPack,
   generateAndStorePack,
+  getPublicPackCard,
   importGeneratedPack,
+  publishPublicPackCard,
   recordPlaytestReport,
   reloadGeneratedPack,
   remixGeneratedPack
@@ -168,6 +170,10 @@ const WORLD_GRID_TOOLS = [
   {
     name: 'et.world.generated_pack.remix',
     description: 'Create a remix child pack with parent lineage recorded and canonical rules preserved.'
+  },
+  {
+    name: 'et.world.generated_pack.public_card',
+    description: 'Publish an unlisted public-safe generated-pack card with no owner, wallet, provider, Brain, debug, or raw prompt fields.'
   }
 ];
 
@@ -281,6 +287,23 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       throw error;
     }
   }
+
+  router.get('/api/world/generated-pack/public-card/:cardId', (req, res) => {
+    try {
+      const publicCard = getPublicPackCard(req.params.cardId);
+      if (!publicCard) {
+        return res.status(404).json({ ok: false, error: { code: 'PUBLIC_CARD_NOT_FOUND' } });
+      }
+      return res.json({
+        ok: true,
+        authRequired: false,
+        publicCard
+      });
+    } catch (error) {
+      const normalized = normalizeError(error);
+      return res.status(500).json({ ok: false, error: normalized });
+    }
+  });
 
   function buildRegionPayload(req, res) {
     const featureFlags = requireEnabled(req);
@@ -573,10 +596,17 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
           })
         });
       }
+      if (toolName === 'et.world.generated_pack.public_card') {
+        requireGeneratedPacksEnabled(payload.featureFlags);
+        return res.json({
+          ok: true,
+          data: publishPublicPackCard(payload.owner, req.body?.packId, { nowMs: Date.now() })
+        });
+      }
       res.status(404).json({ ok: false, error: { code: 'TOOL_NOT_FOUND' } });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'NOT_FOUND' || normalized.code === 'NO_GENERATED_PACK' || normalized.code === 'PACK_NOT_FOUND' ? 404 : normalized.code === 'INVALID_SERVICE_REQUEST_STATE' || normalized.code === 'OUT_OF_RESOURCES' || normalized.code === 'CONTRIBUTION_CAP_EXCEEDED' || normalized.code === 'INVALID_REWARD_STATE' ? 409 : normalized.code === 'INVALID_IDEMPOTENCY_KEY' || normalized.code === 'INVALID_EVENT_STATE' || normalized.code === 'INVALID_PROMPT' || normalized.code === 'INVALID_GENERATED_PACK_EXPORT' ? 400 : normalized.code === 'GENPACK_VALIDATION_FAILED' ? 422 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = normalized.code === 'NOT_FOUND' || normalized.code === 'NO_GENERATED_PACK' || normalized.code === 'PACK_NOT_FOUND' ? 404 : normalized.code === 'INVALID_SERVICE_REQUEST_STATE' || normalized.code === 'OUT_OF_RESOURCES' || normalized.code === 'CONTRIBUTION_CAP_EXCEEDED' || normalized.code === 'INVALID_REWARD_STATE' ? 409 : normalized.code === 'INVALID_IDEMPOTENCY_KEY' || normalized.code === 'INVALID_EVENT_STATE' || normalized.code === 'INVALID_PROMPT' || normalized.code === 'INVALID_GENERATED_PACK_EXPORT' ? 400 : normalized.code === 'GENPACK_VALIDATION_FAILED' || normalized.code === 'PUBLIC_PACK_CARD_REJECTED' ? 422 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -705,6 +735,23 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     } catch (error) {
       const normalized = normalizeError(error);
       const status = normalized.code === 'INVALID_PROMPT' ? 400 : normalized.code === 'PACK_NOT_FOUND' ? 404 : normalized.code === 'GENPACK_VALIDATION_FAILED' ? 422 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      res.status(status).json({ ok: false, error: normalized });
+    }
+  });
+
+  router.post('/api/world/generated-pack/public-card', (req, res) => {
+    try {
+      const payload = buildRegionPayload(req, res);
+      requireGeneratedPacksEnabled(payload.featureFlags);
+      const result = publishPublicPackCard(payload.owner, req.body?.packId, { nowMs: Date.now() });
+      res.json({
+        ok: true,
+        featureFlags: payload.featureFlags,
+        ...result
+      });
+    } catch (error) {
+      const normalized = normalizeError(error);
+      const status = normalized.code === 'PUBLIC_PACK_CARD_REJECTED' ? 422 : normalized.code === 'PACK_NOT_FOUND' ? 404 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
       res.status(status).json({ ok: false, error: normalized });
     }
   });
