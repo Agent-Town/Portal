@@ -30,6 +30,25 @@ const V6_CIVIC_LOAD_RATE_COVERAGE = {
   ]
 };
 
+const V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE = {
+  modulePath: 'server/world_civilization/rollback_recovery.js',
+  artifact: 'tests/world_civilization_rollback_recovery.test.js',
+  status: 'research_only',
+  releaseReady: false,
+  coveredChecks: [
+    'prepared_rollback_handle_reconstruction',
+    'audit_linked_recovery_handles',
+    'restart_safe_recovery_report',
+    'non_executing_recovery_boundary'
+  ],
+  remainingReleaseGaps: [
+    'typed_rollback_handlers',
+    'applied_failed_and_rolled_back_states',
+    'real_state_recovery_execution',
+    'irreversible_action_review'
+  ]
+};
+
 const V6_CIVIC_RESILIENCE_STORES = [
   {
     key: 'audit_ledger',
@@ -125,6 +144,7 @@ function disabledReport(source) {
     executionStatus: 'not_executable',
     storeReports: [],
     loadRateCoverage: null,
+    rollbackRecoveryCoverage: null,
     releaseGaps: [...REQUIRED_RELEASE_GAPS],
     disabledReason: 'V6 resilience evidence requires explicit research opt-in and V6 feature flag'
   };
@@ -191,6 +211,7 @@ function buildV6ResilienceBaselineReport({
     executionStatus: 'not_executable',
     storeReports: V6_CIVIC_RESILIENCE_STORES.map((requirement) => inspectStore(requirement, stores[requirement.key])),
     loadRateCoverage: clone(V6_CIVIC_LOAD_RATE_COVERAGE),
+    rollbackRecoveryCoverage: clone(V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE),
     releaseGaps: [...REQUIRED_RELEASE_GAPS]
   };
 }
@@ -240,6 +261,17 @@ function assertV6ResilienceBaseline(report = {}) {
     ) {
       errors.push('V6_RESILIENCE_LOAD_RATE_COVERAGE_REQUIRED');
     }
+    const rollbackRecoveryCoverage = report.rollbackRecoveryCoverage || {};
+    if (
+      rollbackRecoveryCoverage.modulePath !== V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE.modulePath
+      || rollbackRecoveryCoverage.artifact !== V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE.artifact
+      || rollbackRecoveryCoverage.status !== 'research_only'
+      || rollbackRecoveryCoverage.releaseReady !== false
+      || !Array.isArray(rollbackRecoveryCoverage.coveredChecks)
+      || !rollbackRecoveryCoverage.coveredChecks.includes('prepared_rollback_handle_reconstruction')
+    ) {
+      errors.push('V6_RESILIENCE_ROLLBACK_RECOVERY_COVERAGE_REQUIRED');
+    }
   }
   return {
     ok: errors.length === 0,
@@ -250,6 +282,7 @@ function assertV6ResilienceBaseline(report = {}) {
 module.exports = {
   REQUIRED_RELEASE_GAPS,
   V6_CIVIC_LOAD_RATE_COVERAGE: clone(V6_CIVIC_LOAD_RATE_COVERAGE),
+  V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE: clone(V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE),
   V6_CIVIC_RESILIENCE_STORES: clone(V6_CIVIC_RESILIENCE_STORES),
   V6_RESILIENCE_BASELINE_VERSION,
   assertV6ResilienceBaseline,

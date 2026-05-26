@@ -147,9 +147,11 @@ gate below has implementation, deterministic tests, and security/product signoff
 - Rollback must exist for every public civic effect, with clear irreversible
   action exclusions. Current research-only storage starts this in
   `server/world_civilization/effects.js` with prepared-effect records and
-  rollback handles only; release still requires typed handlers, applied/failed
-  states, real rollback execution, irreversible-action review, and
-  conservation tests.
+  rollback handles only; research-only handle reconstruction starts in
+  `server/world_civilization/rollback_recovery.js` and
+  `tests/world_civilization_rollback_recovery.test.js`. Release still requires
+  typed handlers, applied/failed states, real rollback execution,
+  irreversible-action review, and conservation tests.
 - Agent participation must never grant silent authority escalation. Current
   research-only delegation lifecycle storage starts this in
   `server/world_civilization/delegations.js`; release still requires
@@ -201,6 +203,10 @@ gate below has implementation, deterministic tests, and security/product signoff
   Load/rate research coverage starts in
   `tests/world_civilization_load_rate.test.js`; the audit ledger now has a
   deterministic larger replay pagination and duplicate retry burst check.
+  Rollback recovery research coverage starts in
+  `tests/world_civilization_rollback_recovery.test.js`; prepared rollback
+  handles can be reconstructed from reopened effect/audit stores without
+  executing state.
   These current probes cover every current civic store at research scale.
   Release still requires release-grade process restart coverage, larger replay
   reconstruction, migration scripts with upgrade/downgrade proofs, load/rate,

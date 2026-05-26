@@ -6,10 +6,13 @@ Milestone: `M11 Civic effect execution and rollback`
 
 Runtime module: `server/world_civilization/effects.js`
 
+Recovery report: `server/world_civilization/rollback_recovery.js`
+
 Contract tests:
 
 - `tests/world_civilization_effects.test.js`
 - `tests/world_civilization_effect_process_restart.test.js`
+- `tests/world_civilization_rollback_recovery.test.js`
 
 Schema contract: `specs/55_agent_town_v6_civic_schema_contracts.md`
 
@@ -30,6 +33,12 @@ handle persistence only. It proves a prepared action can be created after
 proposal, approved moderation, and approval-vote prerequisites are reopened in
 a later Node process, and that exact retries do not append duplicate effect,
 rollback, or audit rows.
+
+The rollback recovery report is also research-only. It reconstructs prepared
+rollback handles from the effect store and audit ledger after restart, verifies
+that the handle is still linked to a redacted `civic_action.prepared` audit
+entry, and returns `executionStatus: "not_executable"` with
+`releaseReady: false`. It does not apply or roll back world state.
 
 ## Data Model
 
@@ -83,6 +92,8 @@ proposal/status replay.
   "not_executable"`.
 - Prepared effects write `civic_action.prepared` audit ledger entries, not
   `civic_action.applied`.
+- Rollback recovery reports may validate handle availability and audit linkage,
+  but must not call an apply or rollback handler until typed execution exists.
 
 ## Release Gate
 

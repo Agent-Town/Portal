@@ -8,6 +8,7 @@ Runtime contracts:
 
 - `server/world_civilization/resilience.js`
 - `server/world_civilization/replay_reconstruction.js`
+- `server/world_civilization/rollback_recovery.js`
 
 Test coverage:
 
@@ -22,6 +23,7 @@ Test coverage:
 - `tests/world_civilization_public_works_process_restart.test.js`
 - `tests/world_civilization_schema_metadata.test.js`
 - `tests/world_civilization_load_rate.test.js`
+- `tests/world_civilization_rollback_recovery.test.js`
 
 ## Boundary
 
@@ -125,6 +127,12 @@ bounded pages, exact duplicate retries do not create new rows, changed
 idempotency-key reuse fails closed, and replay reconstruction remains
 privacy-safe and non-executing.
 
+`tests/world_civilization_rollback_recovery.test.js` adds research-scale
+rollback recovery evidence for prepared civic effects: after reopening the
+effect store and audit ledger, the recovery report can reconstruct the
+available rollback handle, confirm the matching redacted prepared-action audit
+row, reject expired handles, and remain non-executing.
+
 ## Open Release Gaps
 
 M16 remains incomplete until all of these gates close:
@@ -140,8 +148,9 @@ M16 remains incomplete until all of these gates close:
 - Release-grade load/rate tests for production route limits, store-specific
   throughput targets, multi-process write contention, and replay pagination
   beyond the current research-scale duplicate/replay probe.
-- Rollback recovery tests that prove prepared rollback handles can survive
-  failure and drive real recovery once effect execution exists.
+- Release-grade rollback recovery tests that drive real recovery once effect
+  execution exists, beyond the current non-executing handle reconstruction
+  report.
 
 ## Definition Of Done
 

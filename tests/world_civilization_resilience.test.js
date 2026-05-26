@@ -17,6 +17,7 @@ const { createCivicVoteStore } = require('../server/world_civilization/votes');
 const {
   REQUIRED_RELEASE_GAPS,
   V6_CIVIC_LOAD_RATE_COVERAGE,
+  V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE,
   V6_CIVIC_RESILIENCE_STORES,
   assertV6ResilienceBaseline,
   buildV6ResilienceBaselineReport
@@ -90,6 +91,7 @@ test('V6 resilience report is hidden without explicit research opt-in and V6 fla
     assert.equal(report.releaseReady, false);
     assert.deepEqual(report.storeReports, []);
     assert.equal(report.loadRateCoverage, null);
+    assert.equal(report.rollbackRecoveryCoverage, null);
     assert.deepEqual(report.releaseGaps, REQUIRED_RELEASE_GAPS);
     assert.deepEqual(assertV6ResilienceBaseline(report), { ok: true, errors: [] });
   }
@@ -110,6 +112,10 @@ test('V6 resilience baseline verifies current SQLite stores and keeps release ga
   assert.equal(report.loadRateCoverage.releaseReady, false);
   assert.ok(report.loadRateCoverage.coveredChecks.includes('idempotent_duplicate_retry_suppression'));
   assert.ok(report.loadRateCoverage.remainingReleaseGaps.includes('production_route_rate_limits'));
+  assert.deepEqual(report.rollbackRecoveryCoverage, V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE);
+  assert.equal(report.rollbackRecoveryCoverage.releaseReady, false);
+  assert.ok(report.rollbackRecoveryCoverage.coveredChecks.includes('prepared_rollback_handle_reconstruction'));
+  assert.ok(report.rollbackRecoveryCoverage.remainingReleaseGaps.includes('typed_rollback_handlers'));
   assert.deepEqual(report.releaseGaps, REQUIRED_RELEASE_GAPS);
   assert.deepEqual(report.storeReports.map((entry) => entry.key), V6_CIVIC_RESILIENCE_STORES.map((entry) => entry.key));
   for (const storeReport of report.storeReports) {

@@ -83,6 +83,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'server/world_civilization/public_works.js',
     'server/world_civilization/reputation.js',
     'server/world_civilization/replay_reconstruction.js',
+    'server/world_civilization/rollback_recovery.js',
     'server/world_civilization/resilience.js',
     'server/world_civilization/release_review.js',
     'server/world_civilization/schemas.js',
@@ -98,6 +99,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'tests/world_civilization_public_works_process_restart.test.js',
     'tests/world_civilization_schema_metadata.test.js',
     'tests/world_civilization_load_rate.test.js',
+    'tests/world_civilization_rollback_recovery.test.js',
     'public/experiences/world-grid/manifest.json',
     'public/experiences/world-grid/skill.md',
     'public/experiences/world-grid/tools.md',
@@ -162,7 +164,11 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(gate, /server\/world_civilization\/moderation\.js/);
   assert.match(plan, /M11 Civic effect execution and rollback \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/effects\.js/);
+  assert.match(plan, /server\/world_civilization\/rollback_recovery\.js/);
+  assert.match(plan, /without executing state/);
   assert.match(gate, /server\/world_civilization\/effects\.js/);
+  assert.match(gate, /server\/world_civilization\/rollback_recovery\.js/);
+  assert.match(gate, /tests\/world_civilization_rollback_recovery\.test\.js/);
   assert.match(plan, /M12 Agent participation controls \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/delegations\.js/);
   assert.match(gate, /server\/world_civilization\/delegations\.js/);
@@ -183,12 +189,15 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /server\/world_civilization\/replay_reconstruction\.js/);
   assert.match(plan, /tests\/world_civilization_load_rate\.test\.js/);
   assert.match(plan, /research-scale replay pagination plus duplicate retry bursts/);
+  assert.match(plan, /tests\/world_civilization_rollback_recovery\.test\.js/);
+  assert.match(plan, /prepared rollback-handle reconstruction after reopen/);
   assert.match(plan, /process restart probes now cover audit-ledger, proposal\/vote, reputation\/moderation, effect\/rollback, delegation, institution, and public-works/);
   assert.match(gate, /server\/world_civilization\/resilience\.js/);
   assert.match(gate, /tests\/world_civilization_schema_metadata\.test\.js/);
   assert.match(gate, /unsupported SQLite `user_version`/);
   assert.match(gate, /tests\/world_civilization_load_rate\.test\.js/);
   assert.match(gate, /larger replay pagination and duplicate retry burst/);
+  assert.match(gate, /prepared rollback\s+handles can be reconstructed/);
   assert.match(gate, /server\/world_civilization\/replay_reconstruction\.js/);
   assert.match(gate, /tests\/world_civilization_process_restart\.test\.js/);
   assert.match(gate, /tests\/world_civilization_proposal_vote_process_restart\.test\.js/);
