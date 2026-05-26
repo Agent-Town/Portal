@@ -37,6 +37,11 @@ Each step must prove one new decision layer. A feature can be implemented as
 `prototype_gated`, but it cannot be player-visible by default until its release
 gate, safety review, and retention dependency pass.
 
+V5.0-V5.5 promotion is tracked in
+`specs/release-gates/v5_world_grid_release_promotion_gate.md`. V6 cannot depend
+on prototype-only V5 evidence unless the dependency is explicitly excluded in the
+V6 milestone plan.
+
 ## Current Prototype Status
 
 | Slice | release_status | Player-visible by default | Evidence |

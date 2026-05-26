@@ -27,6 +27,7 @@ test('future roadmap uses approved release status vocabulary', () => {
 test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
   const required = [
     'specs/release-gates/threejs_runtime_gate.md',
+    'specs/release-gates/v5_world_grid_release_promotion_gate.md',
     'specs/release-gates/v60_agent_civilization_readiness_gate.md',
     'specs/47_agent_town_v5_0_region_grid_foundation.md',
     'specs/48_agent_town_v5_0_region_grid_tdd_matrix.md',
@@ -93,4 +94,39 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /Human approval or explicit delegation is required/);
   assert.match(spec, /docs\/product\/V6_AGENT_CIVILIZATION_MILESTONE_PLAN\.md/);
   assert.match(gate, /docs\/product\/V6_AGENT_CIVILIZATION_MILESTONE_PLAN\.md/);
+});
+
+test('V5 world-grid release promotion gate blocks V6 on prototype-only evidence', () => {
+  const gate = read('specs/release-gates/v5_world_grid_release_promotion_gate.md');
+  const v6Gate = read('specs/release-gates/v60_agent_civilization_readiness_gate.md');
+  const ladder = read('docs/product/WORLD_GRID_LADDER_V5_TO_V6.md');
+  const requiredSlices = [
+    'V5.0 Region Grid',
+    'V5.1 Territory Claims and Settler Routes',
+    'V5.2 Public Presence and Safe Player Discovery',
+    'V5.3 Civic Service Advice Prototype',
+    'V5.4 World Events and Public Works',
+    'V5.5 Controlled Free-Play Sandbox Districts'
+  ];
+  const requiredControls = [
+    /Durable persistence/,
+    /Owner indexes/,
+    /Schema migration versions/,
+    /Restart persistence tests/,
+    /same-origin\s+or\s+CSRF protection/,
+    /rate limits/,
+    /idempotency keys/,
+    /append-only audit\/replay records/,
+    /Production feature override tests/
+  ];
+
+  for (const slice of requiredSlices) {
+    assert.match(gate, new RegExp(slice.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), slice);
+  }
+  for (const control of requiredControls) {
+    assert.match(gate, control);
+  }
+  assert.match(gate, /V6 civic institutions may not become player-visible/);
+  assert.match(v6Gate, /specs\/release-gates\/v5_world_grid_release_promotion_gate\.md/);
+  assert.match(ladder, /specs\/release-gates\/v5_world_grid_release_promotion_gate\.md/);
 });
