@@ -33,6 +33,10 @@ test('generated universe pack loads into Three.js and completes the first world-
   expect(generatedPack?.assetPromptPlan?.targets?.every((asset) => asset.promptHash && asset.candidateOutputPath && asset.approvedOutputPath && asset.jobLogPath)).toBe(true);
   expect(generatedPack?.assetScaffold?.productionImageAssetCount).toBe(0);
   expect(generatedPack?.gameplayMapping?.canonicalEntities?.some((item) => item.canonicalId === 'resource.wood' && item.mechanicalKey === 'wood')).toBe(true);
+  expect(generatedPack?.techFlavorTree?.nodes?.length).toBeGreaterThan(0);
+  expect(generatedPack?.validationReport?.metrics?.canonicalEffectCoverage).toBe(1);
+  expect(generatedPack?.validationReport?.metrics?.unlockRulesPreserved).toBe(true);
+  await expect(page.locator('[data-world-grid-generated-summary]')).toContainText(generatedPack.techFlavorTree.nodes[0].generatedName);
   expect(generatedPack?.approvedModifiers?.selectedModifiers?.length).toBeGreaterThan(0);
   expect(generatedPack?.validationReport?.metrics?.enumOnlyModifiers).toBe(true);
   expect(generatedPack?.validationReport?.metrics?.canonicalRulesPreserved).toBe(true);
@@ -41,6 +45,8 @@ test('generated universe pack loads into Three.js and completes the first world-
     const response = await fetch('/api/world/region?worldGridFeatureFlags=all');
     return response.json();
   });
+  expect(modifierPayload?.generatedPackTechFlavorView?.validationReport?.ok).toBe(true);
+  expect(modifierPayload?.generatedPackTechFlavorView?.balanceSimulation?.unlockRulesPreserved).toBe(true);
   expect(modifierPayload?.generatedPackModifierView?.validationReport?.ok).toBe(true);
   expect(modifierPayload?.generatedPackModifierView?.balanceSimulation?.resourceFormulaChanges).toBe(0);
 

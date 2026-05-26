@@ -368,6 +368,123 @@
       }
     ]
   },
+  "techFlavorTree": {
+    "schemaVersion": "agent-town-tech-flavor-tree-v1",
+    "canonicalVersion": "agent-town-world-grid-v1",
+    "treeId": "tech_tree_1dc551d9ebea",
+    "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+    "nodes": [
+      {
+        "nodeId": "tech_node_world-grid-survey-readiness",
+        "canonicalCapabilityId": "capability.world_grid.survey_readiness",
+        "canonicalEffectId": "text.status-ready",
+        "generatedTechId": "tech_cozy-survey-signals",
+        "generatedName": "Cozy Survey Signals",
+        "loreText": "Cozy Survey Signals reframes text.status-ready for this universe without changing unlock rules.",
+        "unlockRule": "available-at-region-load",
+        "effectKind": "copy-only",
+        "canonicalRuleImpact": "none",
+        "mechanicDelta": 0,
+        "futureHook": {
+          "targetLane": "v5-world-grid",
+          "status": "metadata-only"
+        }
+      },
+      {
+        "nodeId": "tech_node_world-grid-claim-planning",
+        "canonicalCapabilityId": "capability.world_grid.claim_planning",
+        "canonicalEffectId": "action.plan_claim",
+        "generatedTechId": "tech_mushroom-plan-cozy-route",
+        "generatedName": "Mushroom Plan Cozy Route",
+        "loreText": "Mushroom Plan Cozy Route reframes action.plan_claim for this universe without changing unlock rules.",
+        "unlockRule": "canonical-action-available",
+        "effectKind": "copy-only",
+        "canonicalRuleImpact": "none",
+        "mechanicDelta": 0,
+        "futureHook": {
+          "targetLane": "v5-world-grid",
+          "status": "metadata-only"
+        }
+      },
+      {
+        "nodeId": "tech_node_world-grid-claim-completion",
+        "canonicalCapabilityId": "capability.world_grid.claim_completion",
+        "canonicalEffectId": "action.complete_claim",
+        "generatedTechId": "tech_cozy-complete-mushroom-claim",
+        "generatedName": "Cozy Complete Mushroom Claim",
+        "loreText": "Cozy Complete Mushroom Claim reframes action.complete_claim for this universe without changing unlock rules.",
+        "unlockRule": "canonical-action-available",
+        "effectKind": "copy-only",
+        "canonicalRuleImpact": "none",
+        "mechanicDelta": 0,
+        "futureHook": {
+          "targetLane": "v5-world-grid",
+          "status": "metadata-only"
+        }
+      },
+      {
+        "nodeId": "tech_node_world-grid-public-presence",
+        "canonicalCapabilityId": "capability.world_grid.public_presence",
+        "canonicalEffectId": "surface.public_presence",
+        "generatedTechId": "tech_mushroom-neighbor-lamps",
+        "generatedName": "Mushroom Neighbor Lamps",
+        "loreText": "Mushroom Neighbor Lamps reframes surface.public_presence for this universe without changing unlock rules.",
+        "unlockRule": "canonical-feature-flag-gated",
+        "effectKind": "flavor-only",
+        "canonicalRuleImpact": "none",
+        "mechanicDelta": 0,
+        "futureHook": {
+          "targetLane": "v5-world-grid",
+          "status": "metadata-only"
+        }
+      },
+      {
+        "nodeId": "tech_node_world-grid-civic-services",
+        "canonicalCapabilityId": "capability.world_grid.civic_services",
+        "canonicalEffectId": "surface.agent_services",
+        "generatedTechId": "tech_cozy-service-loom",
+        "generatedName": "Cozy Service Loom",
+        "loreText": "Cozy Service Loom reframes surface.agent_services for this universe without changing unlock rules.",
+        "unlockRule": "canonical-feature-flag-gated",
+        "effectKind": "metadata-only",
+        "canonicalRuleImpact": "none",
+        "mechanicDelta": 0,
+        "futureHook": {
+          "targetLane": "v3-compatible-metadata",
+          "status": "metadata-only"
+        }
+      },
+      {
+        "nodeId": "tech_node_world-grid-public-works",
+        "canonicalCapabilityId": "capability.world_grid.public_works",
+        "canonicalEffectId": "surface.world_events",
+        "generatedTechId": "tech_mushroom-works-bell",
+        "generatedName": "Mushroom Works Bell",
+        "loreText": "Mushroom Works Bell reframes surface.world_events for this universe without changing unlock rules.",
+        "unlockRule": "canonical-feature-flag-gated",
+        "effectKind": "flavor-only",
+        "canonicalRuleImpact": "none",
+        "mechanicDelta": 0,
+        "futureHook": {
+          "targetLane": "v5-world-grid",
+          "status": "metadata-only"
+        }
+      }
+    ],
+    "compatibility": {
+      "v3HookStatus": "metadata-only",
+      "v5WorldGridCompatible": true,
+      "v6CivicMechanicsTouched": false
+    },
+    "balanceSimulation": {
+      "simulationVersion": "agent-town-tech-flavor-balance-v1",
+      "canonicalEffectCoverage": 1,
+      "customEffectCount": 0,
+      "unlockRulesPreserved": true,
+      "canonicalEffectHash": "8186653c8ac92dce07d6e8f4313466e17bfac4a3ba99ed9afdac93d995c17336",
+      "firstLoopCompletable": true
+    }
+  },
   "approvedModifiers": {
     "schemaVersion": "agent-town-approved-modifiers-v1",
     "canonicalVersion": "agent-town-world-grid-v1",

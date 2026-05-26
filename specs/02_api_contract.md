@@ -2693,9 +2693,17 @@ Request:
 ```
 
 Response includes:
-- `generatedPack`, with structured `generationBrief`, `stylePack`, `universePack`, `gameplayMapping`, `approvedModifiers`, `assetManifest`, `assetPromptPlan`, `assetScaffold`, `migration`, `remix`, and `validationReport`;
+- `generatedPack`, with structured `generationBrief`, `stylePack`, `universePack`, `gameplayMapping`, `techFlavorTree`, `approvedModifiers`, `assetManifest`, `assetPromptPlan`, `assetScaffold`, `migration`, `remix`, and `validationReport`;
 - `prompt.hash`, never raw prompt text;
 - zero canonical server rule overrides.
+
+Tech-flavor invariants:
+- schema is `agent-town-tech-flavor-tree-v1`;
+- every node maps to an approved canonical capability ID and canonical effect ID;
+- generated names and lore may appear in generated-pack UI surfaces;
+- missing canonical effects, custom effects, formulas, custom mechanics, changed unlock rules, and hidden progression authority are rejected;
+- compatibility hooks for V3/V5 are metadata-only and `v6CivicMechanicsTouched=false`;
+- `/api/world/region` may include `generatedPackTechFlavorView` only when generated packs are enabled, and that view cannot change canonical unlock effects.
 
 Approved-modifier invariants:
 - schema is `agent-town-approved-modifiers-v1`;

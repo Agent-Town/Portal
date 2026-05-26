@@ -50,6 +50,7 @@ const {
   importGeneratedPack,
   listPublicPackGallery,
   projectApprovedModifierView,
+  projectTechFlavorView,
   publishPublicPackCard,
   recordPlaytestReport,
   reloadGeneratedPack,
@@ -367,6 +368,9 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       region,
       generatedPack,
       generatedPackPlaytestReport: generatedPacksEnabled ? currentPlaytestReport(owner) : null,
+      generatedPackTechFlavorView: generatedPacksEnabled && generatedPack
+        ? projectTechFlavorView(generatedPack)
+        : null,
       generatedPackModifierView: generatedPacksEnabled && generatedPack
         ? projectApprovedModifierView(generatedPack, { claimOptions: claimOptionList })
         : null,

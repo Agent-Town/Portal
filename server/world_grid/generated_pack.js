@@ -73,6 +73,54 @@ const IMAGE_PLAN_TARGETS = REQUIRED_CANONICAL_IDS.filter((id) => (
 ));
 
 const ASSET_PROMPT_TARGETS = [...IMAGE_PLAN_TARGETS, ...PRESENTATION_ASSET_TARGETS];
+const TECH_FLAVOR_TREE_VERSION = 'agent-town-tech-flavor-tree-v1';
+const TECH_FLAVOR_BALANCE_VERSION = 'agent-town-tech-flavor-balance-v1';
+const CANONICAL_TECH_CAPABILITIES = [
+  {
+    canonicalCapabilityId: 'capability.world_grid.survey_readiness',
+    canonicalEffectId: 'text.status-ready',
+    unlockRule: 'available-at-region-load',
+    effectKind: 'copy-only',
+    futureHook: { targetLane: 'v5-world-grid', status: 'metadata-only' }
+  },
+  {
+    canonicalCapabilityId: 'capability.world_grid.claim_planning',
+    canonicalEffectId: 'action.plan_claim',
+    unlockRule: 'canonical-action-available',
+    effectKind: 'copy-only',
+    futureHook: { targetLane: 'v5-world-grid', status: 'metadata-only' }
+  },
+  {
+    canonicalCapabilityId: 'capability.world_grid.claim_completion',
+    canonicalEffectId: 'action.complete_claim',
+    unlockRule: 'canonical-action-available',
+    effectKind: 'copy-only',
+    futureHook: { targetLane: 'v5-world-grid', status: 'metadata-only' }
+  },
+  {
+    canonicalCapabilityId: 'capability.world_grid.public_presence',
+    canonicalEffectId: 'surface.public_presence',
+    unlockRule: 'canonical-feature-flag-gated',
+    effectKind: 'flavor-only',
+    futureHook: { targetLane: 'v5-world-grid', status: 'metadata-only' }
+  },
+  {
+    canonicalCapabilityId: 'capability.world_grid.civic_services',
+    canonicalEffectId: 'surface.agent_services',
+    unlockRule: 'canonical-feature-flag-gated',
+    effectKind: 'metadata-only',
+    futureHook: { targetLane: 'v3-compatible-metadata', status: 'metadata-only' }
+  },
+  {
+    canonicalCapabilityId: 'capability.world_grid.public_works',
+    canonicalEffectId: 'surface.world_events',
+    unlockRule: 'canonical-feature-flag-gated',
+    effectKind: 'flavor-only',
+    futureHook: { targetLane: 'v5-world-grid', status: 'metadata-only' }
+  }
+];
+const CANONICAL_TECH_CAPABILITY_IDS = CANONICAL_TECH_CAPABILITIES.map((capability) => capability.canonicalCapabilityId);
+const CANONICAL_TECH_EFFECT_IDS = CANONICAL_TECH_CAPABILITIES.map((capability) => capability.canonicalEffectId);
 const APPROVED_MODIFIERS_VERSION = 'agent-town-approved-modifiers-v1';
 const APPROVED_MODIFIER_BALANCE_VERSION = 'agent-town-approved-modifier-balance-v1';
 const APPROVED_MODIFIERS = [
@@ -376,6 +424,14 @@ function canonicalClaimCostHash() {
   return sha256(JSON.stringify(CANONICAL_CLAIM_COST_TABLE));
 }
 
+function canonicalTechEffectHash() {
+  return sha256(JSON.stringify(CANONICAL_TECH_CAPABILITIES.map((capability) => ({
+    canonicalCapabilityId: capability.canonicalCapabilityId,
+    canonicalEffectId: capability.canonicalEffectId,
+    unlockRule: capability.unlockRule
+  }))));
+}
+
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -431,6 +487,13 @@ function titleWord(word = '') {
   const cleaned = String(word || '').replace(/[^a-zA-Z0-9]/g, '');
   if (!cleaned) return '';
   return `${cleaned.slice(0, 1).toUpperCase()}${cleaned.slice(1).toLowerCase()}`;
+}
+
+function titlePhrase(value = '') {
+  return (String(value || '').match(/[a-zA-Z0-9]+/g) || [])
+    .map(titleWord)
+    .filter(Boolean)
+    .join(' ');
 }
 
 function pick(array, hash, salt) {
@@ -1289,6 +1352,187 @@ function validateAssetPromptPlan(plan = {}, pack = {}) {
   };
 }
 
+function generatedTechNameForCapability(capabilityId = '', anchor = 'Civic', second = 'Route', index = {}) {
+  if (capabilityId === 'capability.world_grid.survey_readiness') return `${anchor} Survey Signals`;
+  if (capabilityId === 'capability.world_grid.claim_planning') {
+    return `${second} ${titlePhrase(index?.['action.plan_claim']?.generatedName || 'Route Plan')}`;
+  }
+  if (capabilityId === 'capability.world_grid.claim_completion') {
+    return `${anchor} ${titlePhrase(index?.['action.complete_claim']?.generatedName || 'Claim Rite')}`;
+  }
+  if (capabilityId === 'capability.world_grid.public_presence') return `${second} Neighbor Lamps`;
+  if (capabilityId === 'capability.world_grid.civic_services') return `${anchor} Service Loom`;
+  if (capabilityId === 'capability.world_grid.public_works') return `${second} Works Bell`;
+  return `${anchor} Civic Signal`;
+}
+
+function buildTechFlavorTree({ promptHash = '', packHash = '', anchor = 'Civic', second = 'Route', index = {} } = {}) {
+  const nodes = CANONICAL_TECH_CAPABILITIES.map((capability) => {
+    const generatedName = generatedTechNameForCapability(capability.canonicalCapabilityId, anchor, second, index);
+    const generatedTechId = `tech_${slugForTarget(generatedName).slice(0, 43)}`;
+    return {
+      nodeId: `tech_node_${slugForTarget(capability.canonicalCapabilityId.replace(/^capability\./, ''))}`,
+      canonicalCapabilityId: capability.canonicalCapabilityId,
+      canonicalEffectId: capability.canonicalEffectId,
+      generatedTechId,
+      generatedName,
+      loreText: `${generatedName} reframes ${capability.canonicalEffectId} for this universe without changing unlock rules.`,
+      unlockRule: capability.unlockRule,
+      effectKind: capability.effectKind,
+      canonicalRuleImpact: 'none',
+      mechanicDelta: 0,
+      futureHook: clone(capability.futureHook)
+    };
+  });
+  return {
+    schemaVersion: TECH_FLAVOR_TREE_VERSION,
+    canonicalVersion: 'agent-town-world-grid-v1',
+    treeId: `tech_tree_${String(packHash || sha256(promptHash)).slice(0, 12)}`,
+    promptHash,
+    nodes,
+    compatibility: {
+      v3HookStatus: 'metadata-only',
+      v5WorldGridCompatible: true,
+      v6CivicMechanicsTouched: false
+    },
+    balanceSimulation: {
+      simulationVersion: TECH_FLAVOR_BALANCE_VERSION,
+      canonicalEffectCoverage: 1,
+      customEffectCount: 0,
+      unlockRulesPreserved: true,
+      canonicalEffectHash: canonicalTechEffectHash(),
+      firstLoopCompletable: true
+    }
+  };
+}
+
+function validateTechFlavorTree(tree = {}) {
+  const schemaReport = SCHEMA_REGISTRY?.techFlavorTree
+    ? validateGeneratedSchema(tree, SCHEMA_REGISTRY.techFlavorTree, '$.techFlavorTree')
+    : { ok: true, errors: [] };
+  const nodes = Array.isArray(tree?.nodes) ? tree.nodes : [];
+  const capabilityIds = nodes.map((node) => node.canonicalCapabilityId).filter(Boolean);
+  const effectIds = nodes.map((node) => node.canonicalEffectId).filter(Boolean);
+  const missingCapabilities = CANONICAL_TECH_CAPABILITY_IDS.filter((id) => !capabilityIds.includes(id));
+  const unknownCapabilities = capabilityIds.filter((id) => !CANONICAL_TECH_CAPABILITY_IDS.includes(id));
+  const duplicateCapabilities = capabilityIds.filter((id, index, all) => id && all.indexOf(id) !== index);
+  const missingEffects = CANONICAL_TECH_EFFECT_IDS.filter((id) => !effectIds.includes(id));
+  const unknownEffects = effectIds.filter((id) => !CANONICAL_TECH_EFFECT_IDS.includes(id));
+  const customMechanicNodes = nodes.filter((node) => (
+    node.canonicalRuleImpact !== 'none'
+    || Number(node.mechanicDelta || 0) !== 0
+  ));
+  const unlockRuleChanges = nodes.filter((node) => {
+    const canonical = CANONICAL_TECH_CAPABILITIES.find((capability) => capability.canonicalCapabilityId === node.canonicalCapabilityId);
+    return canonical && node.unlockRule !== canonical.unlockRule;
+  });
+  const generatedNameCount = nodes.filter((node) => String(node.generatedName || '').trim().length >= 3).length;
+  const forbiddenAuthorityPaths = findForbiddenAuthorityPaths(tree);
+  const secretLikePaths = findSecretLikePaths(tree);
+  const rawInstructionPaths = findRawPromptInstructionPaths(tree);
+  const canonicalEffectCoverage = CANONICAL_TECH_CAPABILITY_IDS.length
+    ? (CANONICAL_TECH_CAPABILITY_IDS.length - missingCapabilities.length) / CANONICAL_TECH_CAPABILITY_IDS.length
+    : 0;
+  const customEffectCount = unknownCapabilities.length + unknownEffects.length + customMechanicNodes.length;
+  const balance = tree?.balanceSimulation || {};
+  const checks = [
+    {
+      id: 'TECH_FLAVOR_SCHEMA_VALID',
+      passed: schemaReport.ok === true,
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
+    },
+    {
+      id: 'TECH_FLAVOR_CANONICAL_EFFECT_COVERAGE',
+      passed: missingCapabilities.length === 0
+        && unknownCapabilities.length === 0
+        && duplicateCapabilities.length === 0
+        && missingEffects.length === 0
+        && unknownEffects.length === 0,
+      measured: {
+        requiredCapabilityCount: CANONICAL_TECH_CAPABILITY_IDS.length,
+        coveredCapabilityCount: new Set(capabilityIds).size,
+        canonicalEffectCoverage,
+        missingCapabilities,
+        unknownCapabilities,
+        duplicateCapabilities: [...new Set(duplicateCapabilities)],
+        missingEffects,
+        unknownEffects
+      }
+    },
+    {
+      id: 'TECH_FLAVOR_NO_CUSTOM_MECHANICS',
+      passed: customEffectCount === 0
+        && forbiddenAuthorityPaths.length === 0
+        && secretLikePaths.length === 0
+        && rawInstructionPaths.length === 0,
+      measured: {
+        customEffectCount,
+        customMechanicNodeCount: customMechanicNodes.length,
+        forbiddenAuthorityPaths,
+        secretLikePaths,
+        rawInstructionPaths: rawInstructionPaths.slice(0, 5)
+      }
+    },
+    {
+      id: 'TECH_FLAVOR_GENERATED_NAMES_READY',
+      passed: generatedNameCount === CANONICAL_TECH_CAPABILITY_IDS.length,
+      measured: { generatedNameCount }
+    },
+    {
+      id: 'TECH_FLAVOR_UNLOCK_RULES_PRESERVED',
+      passed: unlockRuleChanges.length === 0
+        && balance?.simulationVersion === TECH_FLAVOR_BALANCE_VERSION
+        && Number(balance?.canonicalEffectCoverage || 0) === 1
+        && Number(balance?.customEffectCount || 0) === 0
+        && balance?.unlockRulesPreserved === true
+        && balance?.canonicalEffectHash === canonicalTechEffectHash()
+        && balance?.firstLoopCompletable === true
+        && tree?.compatibility?.v5WorldGridCompatible === true
+        && tree?.compatibility?.v6CivicMechanicsTouched === false,
+      measured: {
+        unlockRuleChanges: unlockRuleChanges.map((node) => node.canonicalCapabilityId),
+        canonicalEffectHash: balance?.canonicalEffectHash || null,
+        v6CivicMechanicsTouched: tree?.compatibility?.v6CivicMechanicsTouched === true
+      }
+    }
+  ];
+  return {
+    ok: checks.every((check) => check.passed === true),
+    checks,
+    metrics: {
+      techFlavorTreeSchemaExists: Boolean(SCHEMA_REGISTRY?.techFlavorTree),
+      canonicalEffectCoverage,
+      customEffectCount,
+      generatedTechNameCount: generatedNameCount,
+      generatedTechNamesVisible: generatedNameCount === CANONICAL_TECH_CAPABILITY_IDS.length,
+      unlockRulesPreserved: checks.find((check) => check.id === 'TECH_FLAVOR_UNLOCK_RULES_PRESERVED')?.passed === true,
+      v5WorldGridCompatible: tree?.compatibility?.v5WorldGridCompatible === true,
+      v6CivicMechanicsTouched: tree?.compatibility?.v6CivicMechanicsTouched === true
+    }
+  };
+}
+
+function projectTechFlavorView(pack = {}) {
+  const report = validateTechFlavorTree(pack?.techFlavorTree || {});
+  const nodes = Array.isArray(pack?.techFlavorTree?.nodes) ? pack.techFlavorTree.nodes : [];
+  return {
+    schemaVersion: 'agent-town-tech-flavor-view-v1',
+    packId: pack?.packId || '',
+    nodes: nodes.map((node) => ({
+      canonicalCapabilityId: node.canonicalCapabilityId,
+      canonicalEffectId: node.canonicalEffectId,
+      generatedTechId: node.generatedTechId,
+      generatedName: node.generatedName,
+      loreText: node.loreText,
+      unlockRule: node.unlockRule,
+      effectKind: node.effectKind,
+      futureHook: clone(node.futureHook || {})
+    })),
+    balanceSimulation: clone(pack?.techFlavorTree?.balanceSimulation || {}),
+    validationReport: report
+  };
+}
+
 function modifierEffectFor(modifier = '') {
   const base = APPROVED_MODIFIER_EFFECTS[modifier] || APPROVED_MODIFIER_EFFECTS.visual_only;
   return {
@@ -1531,6 +1775,7 @@ function validateGeneratedPack(pack) {
     .map((mapping) => mapping.canonicalId)
     .filter((canonicalId, index, all) => canonicalId && all.indexOf(canonicalId) !== index);
   const generationBriefReport = validateGenerationBrief(pack?.generationBrief || {});
+  const techFlavorTreeReport = validateTechFlavorTree(pack?.techFlavorTree || {});
   const approvedModifiersReport = validateApprovedModifiers(pack?.approvedModifiers || {});
   const assetManifestReport = validateAssetManifest(pack?.assetManifest || {}, pack);
   const assetPromptPlanReport = validateAssetPromptPlan(pack?.assetPromptPlan || {}, pack);
@@ -1574,6 +1819,11 @@ function validateGeneratedPack(pack) {
       id: 'GENPACK_CANONICAL_KEYS_PRESERVED',
       passed: mechanicalMissing.length === 0 && Number(pack?.gameplayMapping?.serverRuleOverrides || 0) === 0,
       measured: { missingMechanicalKeys: mechanicalMissing, serverRuleOverrides: pack?.gameplayMapping?.serverRuleOverrides || 0 }
+    },
+    {
+      id: 'GENPACK_TECH_FLAVOR_TREE_VALID',
+      passed: techFlavorTreeReport.ok === true,
+      measured: techFlavorTreeReport.metrics
     },
     {
       id: 'GENPACK_APPROVED_MODIFIERS_VALID',
@@ -1657,6 +1907,12 @@ function validateGeneratedPack(pack) {
       fallbackAssetCount: manifestAssets.filter((asset) => asset.source === 'deterministic-fallback').length,
       generatedTextAssetCount: manifestAssets.filter((asset) => asset.kind === 'generated-text').length,
       generationBriefValid: generationBriefReport.ok === true,
+      techFlavorTreeValid: techFlavorTreeReport.ok === true,
+      canonicalEffectCoverage: techFlavorTreeReport.metrics.canonicalEffectCoverage,
+      customEffectCount: techFlavorTreeReport.metrics.customEffectCount,
+      generatedTechNameCount: techFlavorTreeReport.metrics.generatedTechNameCount,
+      generatedTechNamesVisible: techFlavorTreeReport.metrics.generatedTechNamesVisible,
+      unlockRulesPreserved: techFlavorTreeReport.metrics.unlockRulesPreserved,
       enumOnlyModifiers: approvedModifiersReport.metrics.enumOnlyModifiers,
       formulaInjectionRejected: approvedModifiersReport.checks.find((check) => check.id === 'APPROVED_MODIFIERS_NO_FORMULA_OR_AUTHORITY')?.passed === true,
       balanceSimulationPassed: approvedModifiersReport.metrics.balanceSimulationPassed,
@@ -2027,6 +2283,7 @@ function createGeneratedPack({
       serverRuleOverrides: 0,
       canonicalEntities: mappings
     },
+    techFlavorTree: buildTechFlavorTree({ promptHash, packHash, anchor, second, index }),
     approvedModifiers: buildApprovedModifiers({ words, packHash })
   };
   pack.assetManifest = buildAssetManifest({ packId, promptHash, mappings, preset, palette });
@@ -2244,6 +2501,7 @@ function exportedPackHash(exportedPack = {}) {
     stylePack: exportedPack.stylePack,
     universePack: exportedPack.universePack,
     gameplayMapping: exportedPack.gameplayMapping,
+    techFlavorTree: exportedPack.techFlavorTree,
     approvedModifiers: exportedPack.approvedModifiers,
     assetManifest: exportedPack.assetManifest,
     assetPromptPlan: exportedPack.assetPromptPlan,
@@ -3154,6 +3412,7 @@ function clearGeneratedPacksForTests({ clearDisk = false } = {}) {
 module.exports = {
   APPROVED_MODIFIERS,
   ASSET_PROMPT_PLAN_VERSION,
+  CANONICAL_TECH_CAPABILITIES,
   DEFAULT_CANDIDATE_ROOT,
   GENERATION_BRIEF_VERSION,
   REQUIRED_CANONICAL_IDS,
@@ -3174,6 +3433,7 @@ module.exports = {
   listPublicPackGallery,
   normalizePrompt,
   projectApprovedModifierView,
+  projectTechFlavorView,
   publishPublicPackCard,
   recordPlaytestReport,
   reloadGeneratedPack,
@@ -3186,6 +3446,7 @@ module.exports = {
   validateAssetPromptPlan,
   validateApprovedModifiers,
   validateGenerationBrief,
+  validateTechFlavorTree,
   validatePublicPackGallery,
   validatePublicPackCard,
   validatePlaytestReport,

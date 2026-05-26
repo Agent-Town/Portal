@@ -338,3 +338,22 @@ Generated packs now include an `approvedModifiers` contract that can influence p
   "privateDataLeakCount": 0
 }
 ```
+
+## GU-14 Generated Tech Flavor Tree Slice
+
+Generated packs now include a strict `techFlavorTree` contract that renames and reframes canonical progression without adding unlock rules or custom effects. Every generated tech node maps to an approved canonical capability/effect pair, carries generated name and lore text, records metadata-only V3/V5 compatibility hooks, and proves through balance simulation that canonical unlock effects, first-loop viability, and V6 civic mechanics remain unchanged.
+
+```json
+{
+  "techFlavorTreeSchemaExists": true,
+  "canonicalEffectCoverage": 1.0,
+  "missingCanonicalEffectsRejected": true,
+  "customEffectCount": 0,
+  "customMechanicsRejected": true,
+  "generatedTechNamesVisible": true,
+  "unlockRulesPreserved": true,
+  "v5WorldGridCompatible": true,
+  "v6CivicMechanicsTouched": false,
+  "firstLoopStillCompletes": true
+}
+```

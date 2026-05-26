@@ -22,6 +22,7 @@ Status: prototype-gated
 - Public pack cards must be unlisted by ID, auth-free only for read, generated from validated packs, backed by screenshot evidence, and rejected if raw prompts, Brain/provider/debug/wallet terms, private identifiers, or executable instructions appear.
 - Curated public gallery entries must be approved-card derivatives with moderation metadata, reviewer signoff, tags, screenshot metadata, asset summary, and zero private-state fields; pending, rejected, and unpublished cards must not appear.
 - Approved generated-pack modifiers must be enum-only, presentation-scoped, and balance-simulated; unknown modifiers, formula strings, custom resource math, mutation tools, custom permissions, custom agent authority, and nonzero canonical rule impact are forbidden.
+- Generated tech flavor trees must map every node to an approved canonical capability/effect pair; missing effects, custom effects, custom mechanics, formulas, changed unlock rules, V6 civic changes, and hidden progression authority are forbidden.
 - Player-visible generated text must be escaped in DOM rendering.
 - Production image generation requires explicit consent and a documented cost/auth model before any user-facing release claim.
 
@@ -83,6 +84,11 @@ Status: prototype-gated
   "formulaInjectionRejected": true,
   "balanceSimulationPassed": true,
   "canonicalRulesPreserved": true,
+  "techFlavorTreeSchemaExists": true,
+  "canonicalEffectCoverage": 1.0,
+  "customEffectCount": 0,
+  "generatedTechNamesVisible": true,
+  "unlockRulesPreserved": true,
   "approvedProductionAssetCount": 0,
   "generatedImageAssetsCanChangeServerRules": false,
   "productionImageAssetCount": 0,

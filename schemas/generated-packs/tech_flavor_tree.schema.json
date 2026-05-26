@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-town-tech-flavor-tree-v1",
+  "title": "Agent Town Generated Tech Flavor Tree",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "canonicalVersion",
+    "treeId",
+    "promptHash",
+    "nodes",
+    "compatibility",
+    "balanceSimulation"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "agent-town-tech-flavor-tree-v1"
+    },
+    "canonicalVersion": {
+      "const": "agent-town-world-grid-v1"
+    },
+    "treeId": {
+      "type": "string",
+      "pattern": "^tech_tree_[a-f0-9]{12}$"
+    },
+    "promptHash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "nodeId",
+          "canonicalCapabilityId",
+          "canonicalEffectId",
+          "generatedTechId",
+          "generatedName",
+          "loreText",
+          "unlockRule",
+          "effectKind",
+          "canonicalRuleImpact",
+          "mechanicDelta",
+          "futureHook"
+        ],
+        "properties": {
+          "nodeId": {
+            "type": "string",
+            "pattern": "^tech_node_[a-z0-9-]+$"
+          },
+          "canonicalCapabilityId": {
+            "enum": [
+              "capability.world_grid.survey_readiness",
+              "capability.world_grid.claim_planning",
+              "capability.world_grid.claim_completion",
+              "capability.world_grid.public_presence",
+              "capability.world_grid.civic_services",
+              "capability.world_grid.public_works"
+            ]
+          },
+          "canonicalEffectId": {
+            "enum": [
+              "text.status-ready",
+              "action.plan_claim",
+              "action.complete_claim",
+              "surface.public_presence",
+              "surface.agent_services",
+              "surface.world_events"
+            ]
+          },
+          "generatedTechId": {
+            "type": "string",
+            "pattern": "^tech_[a-z0-9-]{3,48}$"
+          },
+          "generatedName": {
+            "type": "string",
+            "minLength": 3
+          },
+          "loreText": {
+            "type": "string",
+            "minLength": 12
+          },
+          "unlockRule": {
+            "enum": [
+              "available-at-region-load",
+              "canonical-action-available",
+              "canonical-feature-flag-gated"
+            ]
+          },
+          "effectKind": {
+            "enum": ["copy-only", "visual-only", "flavor-only", "metadata-only"]
+          },
+          "canonicalRuleImpact": {
+            "const": "none"
+          },
+          "mechanicDelta": {
+            "const": 0
+          },
+          "futureHook": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["targetLane", "status"],
+            "properties": {
+              "targetLane": {
+                "enum": ["v3-compatible-metadata", "v5-world-grid", "none"]
+              },
+              "status": {
+                "const": "metadata-only"
+              }
+            }
+          }
+        }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "v3HookStatus",
+        "v5WorldGridCompatible",
+        "v6CivicMechanicsTouched"
+      ],
+      "properties": {
+        "v3HookStatus": {
+          "enum": ["metadata-only", "not-integrated"]
+        },
+        "v5WorldGridCompatible": {
+          "const": true
+        },
+        "v6CivicMechanicsTouched": {
+          "const": false
+        }
+      }
+    },
+    "balanceSimulation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "simulationVersion",
+        "canonicalEffectCoverage",
+        "customEffectCount",
+        "unlockRulesPreserved",
+        "canonicalEffectHash",
+        "firstLoopCompletable"
+      ],
+      "properties": {
+        "simulationVersion": {
+          "const": "agent-town-tech-flavor-balance-v1"
+        },
+        "canonicalEffectCoverage": {
+          "const": 1
+        },
+        "customEffectCount": {
+          "const": 0
+        },
+        "unlockRulesPreserved": {
+          "const": true
+        },
+        "canonicalEffectHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "firstLoopCompletable": {
+          "const": true
+        }
+      }
+    }
+  }
+}

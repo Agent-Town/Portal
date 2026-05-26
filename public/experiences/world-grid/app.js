@@ -102,6 +102,10 @@
     }
     const validation = pack.validationReport?.ok === true ? packText('packValidated', 'Pack validated') : 'Pack needs review';
     const factions = (pack.universePack?.factions || []).map((faction) => faction.name).filter(Boolean).slice(0, 3);
+    const techNames = (pack.techFlavorTree?.nodes || pack.universePack?.techs || [])
+      .map((tech) => tech.generatedName || tech.name)
+      .filter(Boolean)
+      .slice(0, 3);
     const metrics = pack.validationReport?.metrics || {};
     status.textContent = validation;
     summary.innerHTML = `
@@ -109,6 +113,7 @@
       <p>${escapeHtml(pack.universePack?.pitch || '')}</p>
       <p>${escapeHtml(pack.universePack?.firstLoop?.objective || '')}</p>
       ${factions.length ? `<p>${factions.map(escapeHtml).join(' · ')}</p>` : ''}
+      ${techNames.length ? `<p>${techNames.map(escapeHtml).join(' · ')}</p>` : ''}
       <dl>
         <div><dt>Mappings</dt><dd>${escapeHtml(`${metrics.canonicalMappingsCovered || 0}/${metrics.requiredCanonicalMappings || 0}`)}</dd></div>
         <div><dt>Assets</dt><dd>${escapeHtml(String(metrics.fallbackAssetCount || 0))}</dd></div>

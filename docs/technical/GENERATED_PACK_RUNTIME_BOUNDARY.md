@@ -110,6 +110,14 @@ Player prompt
 - Modifier validation rejects formula fields, custom resource math, mutation/tool authority, custom permissions, custom agent authority, and nonzero canonical rule impact.
 - Balance simulation requires the canonical claim-cost hash to remain unchanged and first-loop playability to remain true.
 
+## GU-14 Generated Tech Flavor Tree Slice
+
+- `tech_flavor_tree.schema.json` defines generated tech names, lore, canonical capability IDs, canonical effect IDs, unlock rules, and metadata-only compatibility hooks.
+- Each generated tech node maps to one approved canonical capability/effect pair; missing or unknown effects fail validation.
+- Tech flavor trees can rename and explain progression, but cannot add formulas, custom mechanics, permissions, tools, or altered unlock rules.
+- `projectTechFlavorView` exposes only public generated names/lore/effect metadata for generated-pack UI surfaces.
+- Balance simulation requires canonical effect coverage of 1.0, zero custom effects, unchanged unlock rules, no V6 civic mechanics touched, and first-loop playability.
+
 ## Machine Checks
 
 ```json
@@ -191,6 +199,12 @@ Player prompt
   "formulaInjectionRejected": true,
   "balanceSimulationPassed": true,
   "canonicalRulesPreserved": true,
-  "claimCostHashPreserved": true
+  "claimCostHashPreserved": true,
+  "techFlavorTreeSchemaExists": true,
+  "canonicalEffectCoverage": 1.0,
+  "customEffectCount": 0,
+  "generatedTechNamesVisible": true,
+  "unlockRulesPreserved": true,
+  "v6CivicMechanicsTouched": false
 }
 ```
