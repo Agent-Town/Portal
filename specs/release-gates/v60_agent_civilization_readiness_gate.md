@@ -12,6 +12,8 @@ Civic audit ledger foundation: `specs/56_agent_town_v6_audit_ledger_foundation.m
 
 Internal proposal lifecycle: `specs/57_agent_town_v6_internal_proposal_lifecycle.md`
 
+Vote authorization foundation: `specs/58_agent_town_v6_vote_authorization_foundation.md`
+
 V6.0 Agent Civilization Foundation must not become player-visible until every
 gate below has implementation, deterministic tests, and security/product signoff.
 

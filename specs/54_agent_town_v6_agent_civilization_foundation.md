@@ -17,6 +17,8 @@ Civic audit ledger foundation: `specs/56_agent_town_v6_audit_ledger_foundation.m
 
 Internal proposal lifecycle: `specs/57_agent_town_v6_internal_proposal_lifecycle.md`
 
+Vote authorization foundation: `specs/58_agent_town_v6_vote_authorization_foundation.md`
+
 ## Implementation Boundary
 
 Do not add V6 civic mechanics to normal gameplay or the world-grid prototype
