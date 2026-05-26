@@ -32,6 +32,8 @@ not leak private owner identifiers.
   server tools.
 - Mutating routes/tools require same-origin mutation context in production and
   reject explicit cross-origin metadata before plot or world state changes.
+- Mutating routes/tools consume prototype rate-limit buckets keyed by owner and
+  mutation surface.
 
 ## Prototype Persistence Boundary
 
@@ -48,6 +50,7 @@ release-grade store is explicitly implemented and tested. Current stores are:
 | World event contributions/rewards | Process-local `Map` values in `server/world_grid/events.js` | Prototype/ephemeral |
 | Sandbox participants/actions/snapshots/cells | Process-local arrays/maps and mutable in-memory district cells in `server/world_grid/sandbox.js` | Prototype/ephemeral |
 | Idempotency replay records | Process-local `Map` in `server/world_grid/idempotency.js` | Prototype/ephemeral; replays exact retries and rejects changed payload reuse only for the process lifetime |
+| Mutation rate-limit buckets | Process-local `Map` in `server/world_grid/rate_limit.js` | Prototype/ephemeral; per-owner and per-surface only for the process lifetime |
 
 The only durable dependency used by mutating V5.1+ routes is the existing
 Founders Plot prerequisite check. World-grid routes must not create Founders Plot
@@ -72,5 +75,8 @@ Before any V5 world-grid slice can claim release-grade persistence, it needs:
 - Cross-owner and stale-session tests for every owner index.
 - CSRF-token and same-origin integration tests bound to the final
   browser-authenticated session model.
+- Durable/shared rate-limit counters keyed by final session, wallet/owner, IP
+  risk signal, and mutation surface, with replay-safe behavior for legitimate
+  retries.
 - Backfill and migration tests for older prototype rows before enabling a public
   release flag.

@@ -56,6 +56,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'docs/security/PUBLIC_PRESENCE_REDACTION_POLICY.md',
     'server/world_grid/idempotency.js',
     'server/world_grid/mutation_origin.js',
+    'server/world_grid/rate_limit.js',
     'server/world_civilization/audit_ledger.js',
     'server/world_civilization/proposals.js',
     'server/world_civilization/schemas.js',
@@ -187,4 +188,22 @@ test('world-grid mutation origin policy is tracked as an M5 release security con
   assert.match(stateModel, /same-origin mutation context in production/);
   assert.match(evidence, /Mutation origin guard/);
   assert.match(evidence, /server\/world_grid\/mutation_origin\.js/);
+});
+
+test('world-grid mutation rate-limit policy is tracked as prototype-only M5 coverage', () => {
+  const plan = read('docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md');
+  const security = read('docs/security/WORLD_GRID_MUTATION_SECURITY_PLAN.md');
+  const stateModel = read('docs/technical/WORLD_GRID_STATE_MODEL.md');
+  const evidence = read('docs/release-evidence/WORLD_GRID_V50_REGION_PROTOTYPE_EVIDENCE_2026-05-26.md');
+  const rateLimits = read('docs/rate-limits.md');
+
+  assert.match(plan, /owner\/surface prototype rate limits are enforced/);
+  assert.match(security, /process-local rate\s+buckets keyed by owner and mutation surface/);
+  assert.match(security, /durable or shared\s+counters/);
+  assert.match(stateModel, /server\/world_grid\/rate_limit\.js/);
+  assert.match(stateModel, /Durable\/shared rate-limit counters/);
+  assert.match(evidence, /Mutation rate-limit guard/);
+  assert.match(evidence, /durable\/shared rate limits/);
+  assert.match(rateLimits, /World-grid prototype mutation limit/);
+  assert.match(rateLimits, /WORLD_GRID_MUTATION_RATE_LIMIT_MAX/);
 });

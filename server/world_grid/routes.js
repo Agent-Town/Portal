@@ -44,6 +44,7 @@ const {
 const { runIdempotentWorldGridMutation } = require('./idempotency');
 const { requireWorldGridMutationOrigin } = require('./mutation_origin');
 const { loadWorldGridPlotPrerequisite } = require('./plot_prerequisite');
+const { consumeWorldGridMutationRateLimit } = require('./rate_limit');
 
 const WORLD_GRID_IDEMPOTENCY_KEY_RE = /^[a-z0-9][a-z0-9:_-]{5,119}$/i;
 
@@ -219,6 +220,7 @@ function statusForWorldGridError(normalized = {}) {
     'INVALID_CLAIM_TARGET',
     'INVALID_CLAIM_STATE'
   ].includes(code)) return 403;
+  if (code === 'RATE_LIMITED') return 429;
   return 500;
 }
 
@@ -346,8 +348,29 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     return requireWorldGridIdempotencyKey(req, surface);
   }
 
+  function requireMutationRateLimit(res, payload, surface) {
+    const rateLimit = consumeWorldGridMutationRateLimit({
+      owner: payload.owner,
+      surface
+    });
+    if (!rateLimit) return;
+    res.set('X-RateLimit-Limit', String(rateLimit.limit));
+    res.set('X-RateLimit-Remaining', String(rateLimit.remaining));
+    res.set('X-RateLimit-Reset', String(Math.ceil(rateLimit.resetAtMs / 1000)));
+    if (!rateLimit.allowed) {
+      res.set('Retry-After', String(rateLimit.retryAfterSeconds));
+      const error = new Error('RATE_LIMITED');
+      error.details = {
+        surface,
+        retryAfterSeconds: rateLimit.retryAfterSeconds
+      };
+      throw error;
+    }
+  }
+
   function sendIdempotentMutation(req, res, payload, surface, mutate) {
     const idempotencyKey = requireMutationPrerequisites(req, payload, surface);
+    requireMutationRateLimit(res, payload, surface);
     const outcome = runIdempotentWorldGridMutation({
       owner: payload.owner,
       surface,

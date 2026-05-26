@@ -23,7 +23,9 @@ async function withWorldGridServer({ identity, envPatch = {} }, fn) {
     NODE_ENV: process.env.NODE_ENV,
     ADMIN_TOKEN: process.env.ADMIN_TOKEN,
     FEATURE_WORLD_GRID_V50_REGION: process.env.FEATURE_WORLD_GRID_V50_REGION,
-    WORLD_GRID_FEATURE_FLAGS: process.env.WORLD_GRID_FEATURE_FLAGS
+    WORLD_GRID_FEATURE_FLAGS: process.env.WORLD_GRID_FEATURE_FLAGS,
+    WORLD_GRID_MUTATION_RATE_LIMIT_MAX: process.env.WORLD_GRID_MUTATION_RATE_LIMIT_MAX,
+    WORLD_GRID_MUTATION_RATE_LIMIT_WINDOW_MS: process.env.WORLD_GRID_MUTATION_RATE_LIMIT_WINDOW_MS
   };
   for (const [key, value] of Object.entries(envPatch)) {
     if (value === undefined) delete process.env[key];
@@ -476,6 +478,71 @@ test('mutating world-grid routes reject cross-origin metadata and require same-o
 
     const regionAfterOriginChecks = await (await fetch(`${baseUrl}/api/world/region`)).json();
     assert.equal(regionAfterOriginChecks.territory.claims.length, 1);
+  });
+});
+
+test('mutating world-grid routes enforce prototype owner and surface rate limits', async () => {
+  const identity = { pairId: `session:world-grid-rate-${Date.now()}-${Math.random().toString(16).slice(2)}` };
+  await withWorldGridServer({
+    identity,
+    envPatch: {
+      NODE_ENV: 'test',
+      WORLD_GRID_FEATURE_FLAGS: 'all',
+      WORLD_GRID_MUTATION_RATE_LIMIT_MAX: '2',
+      WORLD_GRID_MUTATION_RATE_LIMIT_WINDOW_MS: '60000'
+    }
+  }, async (baseUrl) => {
+    seedFoundersPlot(identity.pairId);
+
+    const optionsResponse = await fetch(`${baseUrl}/api/world/territory/claim-options`);
+    const optionsBody = await optionsResponse.json();
+    assert.equal(optionsResponse.status, 200, JSON.stringify(optionsBody));
+    const option = optionsBody.options[0];
+    assert.ok(option);
+
+    const planBody = { cellId: option.cellId, idempotencyKey: 'rate_limit_plan_001' };
+    const firstPlanResponse = await fetch(`${baseUrl}/api/world/territory/plan-claim`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(planBody)
+    });
+    const firstPlan = await firstPlanResponse.json();
+    assert.equal(firstPlanResponse.status, 200, JSON.stringify(firstPlan));
+    assert.equal(firstPlanResponse.headers.get('x-ratelimit-limit'), '2');
+    assert.equal(firstPlanResponse.headers.get('x-ratelimit-remaining'), '1');
+
+    const secondPlanResponse = await fetch(`${baseUrl}/api/world/territory/plan-claim`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(planBody)
+    });
+    const secondPlan = await secondPlanResponse.json();
+    assert.equal(secondPlanResponse.status, 200, JSON.stringify(secondPlan));
+    assert.equal(secondPlanResponse.headers.get('x-world-grid-idempotency-replay'), '1');
+    assert.equal(secondPlanResponse.headers.get('x-ratelimit-remaining'), '0');
+
+    const thirdPlanResponse = await fetch(`${baseUrl}/api/world/territory/plan-claim`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(planBody)
+    });
+    const thirdPlan = await thirdPlanResponse.json();
+    assert.equal(thirdPlanResponse.status, 429, JSON.stringify(thirdPlan));
+    assert.equal(thirdPlan.error.code, 'RATE_LIMITED');
+    assert.ok(Number(thirdPlanResponse.headers.get('retry-after')) >= 1);
+
+    const serviceResponse = await fetch(`${baseUrl}/api/world/services/request-advice`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        serviceId: 'service_route_advisor',
+        input: { selectedCell: option },
+        idempotencyKey: 'rate_limit_service_001'
+      })
+    });
+    const service = await serviceResponse.json();
+    assert.equal(serviceResponse.status, 200, JSON.stringify(service));
+    assert.equal(serviceResponse.headers.get('x-ratelimit-remaining'), '1');
   });
 });
 

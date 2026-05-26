@@ -45,6 +45,29 @@ Configured middleware limits:
 | `/api/wallet` | 60s | 30 | `wallet:${req.ip}` |
 | `/api/house/init` | 60s | 20 | `house-init:${req.ip}` |
 
+## World-grid prototype mutation limit
+
+Implementation:
+- `/Users/robin/.codex/worktrees/657c/Portal/server/world_grid/rate_limit.js`
+
+Scope:
+- Mutating V5.1+ `/api/world/*` routes and mutating
+  `/api/world/tool/:toolName` calls.
+
+Behavior:
+- Default process-local window: 60 seconds.
+- Default max: 30 requests per owner and mutation surface.
+- Environment overrides:
+  - `WORLD_GRID_MUTATION_RATE_LIMIT_WINDOW_MS`
+  - `WORLD_GRID_MUTATION_RATE_LIMIT_MAX`
+- On reject: `Retry-After`, response `429 { ok: false, error: { code:
+  'RATE_LIMITED' } }`.
+
+Release note:
+- This is prototype abuse resistance only. V5/V6 release promotion still needs
+  durable/shared counters bound to the final browser session and wallet/owner
+  identity.
+
 ## Pony message rate limit
 
 Implementation:

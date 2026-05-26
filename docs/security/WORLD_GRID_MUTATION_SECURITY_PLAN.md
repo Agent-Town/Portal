@@ -21,6 +21,9 @@ until the controls below are implemented and covered by deterministic tests.
   request hash/success response. Exact retries replay the stored response;
   changed payload reuse returns `IDEMPOTENCY_CONFLICT`. This remains a
   prototype guard, not durable replay-safe persistence.
+- Mutating V5.1+ world-grid routes and tool routes use process-local rate
+  buckets keyed by owner and mutation surface. This throttles prototype abuse
+  paths but is not durable, distributed, or session-auth aware.
 - V5.0 region rendering and read-only tools may run without creating Founders
   Plot state.
 - World-grid prototype stores are process-local and ephemeral; they are not
@@ -37,7 +40,9 @@ until the controls below are implemented and covered by deterministic tests.
 - Session-auth and wallet-continuity checks that bind mutations to the current
   owner, not just to a public id or request body field.
 - Rate limits keyed by session and owner for public presence, claim planning,
-  service requests, event contributions, and sandbox actions.
+  service requests, event contributions, and sandbox actions. Current coverage
+  is owner/surface process-local only; release promotion needs durable or shared
+  counters and final session binding.
 - Idempotency requirements for every resource-spending or externally visible
   mutation, not only world-event contribution. Release-grade idempotency must
   persist request hashes/responses, reject conflicting retries after restart,
@@ -50,6 +55,6 @@ until the controls below are implemented and covered by deterministic tests.
 
 ## Out Of Scope For This Hardening Pass
 
-This pass does not add a broad CSRF token/session-auth middleware, durable rate
-limits, or a public free-play security surface. Those controls remain release
-gates because the V5 world-grid branch is still prototype-gated.
+This pass does not add a broad CSRF token/session-auth middleware, durable or
+distributed rate limits, or a public free-play security surface. Those controls
+remain release gates because the V5 world-grid branch is still prototype-gated.
