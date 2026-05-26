@@ -119,7 +119,9 @@ auditable institutions.
 - V5.4 World Events and Public Works proves contribution caps, audit records,
   reward safety, and rollback policy.
 - V5.5 Controlled Free-Play Sandbox Districts proves typed moderation,
-  rollback, rate limiting, privacy, and no private-town mutation.
+  rollback, rate limiting, privacy, no private-town mutation, and optional
+  `WORLD_GRID_SANDBOX_SQLITE_PATH` restart proof for sandbox
+  participant/action/snapshot/cell state.
 - Release-grade world-grid persistence exists with owner indexes, migration
   versioning, audit/replay records, and restart persistence tests.
 

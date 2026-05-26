@@ -38,7 +38,7 @@ from `prototype_gated` to `release_ready`:
 | V5.2 Public Presence and Safe Player Discovery | Explicit opt-in/out, public-safe profile schema, malicious name rendering tests, follow/unfollow owner checks, abuse report hooks, and redaction/privacy review. |
 | V5.3 Civic Service Advice Prototype | Redacted request inputs, typed advice output schema, no private-state mutation, bounded reputation updates, dispute/report flow, and audit records for accept/report actions. |
 | V5.4 World Events and Public Works | Contribution caps, reward conservation, idempotent contribution/reward claim, public ledger entries, rollback policy for event accounting mistakes, and restart-safe contribution records. |
-| V5.5 Controlled Free-Play Sandbox Districts | Typed action schemas, moderation before public placement, rollback snapshots, private-town isolation, rate limits, abuse reporting, and restart-safe participant/action/snapshot records. |
+| V5.5 Controlled Free-Play Sandbox Districts | Typed action schemas, moderation before public placement, rollback snapshots, private-town isolation, rate limits, abuse reporting, and restart-safe participant/action/snapshot/cell records. |
 
 ## V6 Dependency Rule
 

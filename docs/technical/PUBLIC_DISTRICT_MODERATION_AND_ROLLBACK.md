@@ -25,7 +25,12 @@ settlement state.
 ## Prototype Baseline
 
 - `server/world_grid/sandbox.js` stores typed sandbox actions, redacted
-  participants, and rollback snapshots.
+  participants, rollback snapshots, and district cells in process-local
+  prototype state by default.
+- When `WORLD_GRID_SANDBOX_SQLITE_PATH` is configured, the same prototype
+  surface persists participants, actions, rollback snapshots, and cells as a
+  durable foundation with restart proof; it is not yet release-grade sandbox
+  persistence.
 - Unsupported props and unsupported agent demos are recorded as `rejected`
   actions and do not change sandbox cells.
 - Approved actions record rollback snapshots before public sandbox mutation.

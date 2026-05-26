@@ -26,6 +26,9 @@ Introduce free play as a controlled public sandbox, not as the whole world.
 - Sandbox actions cannot mutate private settlement state.
 - Public participant data is redacted.
 - Agents use typed tools only.
+- Optional `WORLD_GRID_SANDBOX_SQLITE_PATH` storage proves participant, action,
+  rollback snapshot, and cell state survives process restarts before any release
+  promotion claim.
 
 ## Prototype Implementation Evidence
 
@@ -34,4 +37,5 @@ Introduce free play as a controlled public sandbox, not as the whole world.
 - `public/experiences/world-grid/app.js`
 - `public/experiences/world-grid/tools.md`
 - `tests/world_grid_region.test.js`
-- `e2e/236_world_grid_v50_region_prototype.spec.js`
+- `tests/world_grid_sandbox_persistence.test.js`
+- `e2e/241_world_grid_v55_sandbox_prototype.spec.js`

@@ -55,6 +55,12 @@ until the controls below are implemented and covered by deterministic tests.
   day, settlement, schema, and migration metadata. Current restart coverage
   proves contribution totals, reward claims, cap replay, and duplicate
   contribution/reward safety across separate Node process lifetimes.
+- When `WORLD_GRID_SANDBOX_SQLITE_PATH` is configured, V5.5 controlled sandbox
+  state writes durable SQLite rows with participant, action, rollback snapshot,
+  cell, schema, and migration metadata. Current restart coverage proves
+  redacted participants, moderated actions, rejected actions, rollback
+  snapshots, cell props, leave state, and private-town isolation across separate
+  Node process lifetimes.
 - Mutating V5.1+ world-grid routes and tool routes use process-local rate
   buckets keyed by owner and mutation surface. This throttles prototype abuse
   paths but is not durable, distributed, or session-auth aware.
@@ -64,8 +70,9 @@ until the controls below are implemented and covered by deterministic tests.
   redacted summaries, rollback handles when present, and replay indexes.
 - V5.0 region rendering and read-only tools may run without creating Founders
   Plot state.
-- World-grid prototype stores are process-local and ephemeral; they are not
-  release-grade persistence.
+- World-grid prototype stores are process-local and ephemeral unless an
+  explicit optional SQLite foundation path is configured; none are release-grade
+  persistence yet.
 
 ## Required Release Controls
 
@@ -109,6 +116,9 @@ until the controls below are implemented and covered by deterministic tests.
 - Current `WORLD_GRID_EVENTS_SQLITE_PATH` coverage is a V5.4 storage foundation
   only; release promotion still needs rollback policy, multi-event migration,
   final public-ledger review, and larger contribution-load coverage.
+- Current `WORLD_GRID_SANDBOX_SQLITE_PATH` coverage is a V5.5 storage
+  foundation only; release promotion still needs abuse reports, stale-session
+  cleanup, cross-owner moderation review, and final sandbox privacy coverage.
 
 ## Out Of Scope For This Hardening Pass
 

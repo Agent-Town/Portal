@@ -133,6 +133,11 @@ gate below has implementation, deterministic tests, and security/product signoff
   contribution-load coverage in the V5 gate.
 - V5.5 Controlled Free-Play Sandbox Districts proves typed action moderation,
   rollback, rate limits, privacy boundaries, and no private-town mutation.
+  Current V5.5 storage evidence includes the `WORLD_GRID_SANDBOX_SQLITE_PATH`
+  foundation for sandbox participant/action/snapshot/cell restart proof, but
+  release promotion still requires abuse reports, stale-session cleanup,
+  cross-owner moderation review, and final sandbox privacy coverage in the V5
+  gate.
 
 ## Required V6 Schemas
 

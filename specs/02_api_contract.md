@@ -2806,6 +2806,12 @@ contributions, cap accounting inputs, and cosmetic reward claims with
 owner/event/day/settlement indexes, schema versioning, and migration metadata;
 this is only a foundation until rollback policy, multi-event migration, final
 public-ledger review, and larger contribution-load coverage are complete.
-Mutating
-endpoint same-origin, CSRF, session-auth, rate-limit, and idempotency
+When `WORLD_GRID_SANDBOX_SQLITE_PATH` is configured, V5.5 sandbox
+participant/action/snapshot/cell rows persist redacted participant state,
+moderated action records, rejected action records, rollback snapshots, and
+district cell props with a participant owner key plus action/cell indexes,
+schema versioning, and migration metadata; this is only a foundation until abuse-report,
+stale-session, cross-owner moderation-review, and final sandbox privacy coverage
+are complete.
+Mutating endpoint same-origin, CSRF, session-auth, rate-limit, and idempotency
 requirements are tracked in `docs/security/WORLD_GRID_MUTATION_SECURITY_PLAN.md`.

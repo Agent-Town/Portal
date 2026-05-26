@@ -20,6 +20,7 @@ default world mode and it does not grant permanent private-town mutation.
 ## Release Gate
 
 V5.5 cannot ship until moderation, rollback, identity, reputation, permissions,
+restart-safe participant/action/snapshot/cell storage, abuse-report handling,
 and shard performance have dedicated evidence.
 
 ## Prototype Evidence
@@ -27,5 +28,6 @@ and shard performance have dedicated evidence.
 - `server/world_grid/sandbox.js`
 - `public/experiences/world-grid/app.js`
 - `tests/world_grid_region.test.js`
-- `e2e/236_world_grid_v50_region_prototype.spec.js`
+- `tests/world_grid_sandbox_persistence.test.js`
+- `e2e/241_world_grid_v55_sandbox_prototype.spec.js`
 - `artifacts/world-grid-v55-sandbox-prototype.png`
