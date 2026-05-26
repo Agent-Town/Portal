@@ -21,6 +21,7 @@ Status: `prototype_gated` for V5.0-V5.5 starter workflow
 | V5.3 Civic Service Advice Prototype | `server/world_grid/services.js` adds bounded service listings, redacted service requests, schema-shaped recommendations, accept-as-advice only, report flow, and reputation bookkeeping. |
 | V5.4 World Events and Public Works | `server/world_grid/events.js` adds one capped public-works event, preview-before-contribute, idempotent contribution accounting, exact resource spend, public progress, personal recap, and cosmetic reward claim. |
 | V5.5 Controlled Free-Play Sandbox Districts | `server/world_grid/sandbox.js` adds one typed sandbox district with redacted public presence, allowed prop placement, rejected forbidden props, typed agent demo, and rollback snapshots. |
+| Idempotency replay guard | `server/world_grid/idempotency.js` records process-local request hashes and success responses for mutating V5.1+ routes/tools, replays exact retries, and rejects changed payload reuse with `IDEMPOTENCY_CONFLICT`. |
 | Screenshots | `artifacts/world-grid-v50-region-prototype.png`, `artifacts/world-grid-v51-territory-claim-prototype.png`, `artifacts/world-grid-v53-agent-services-prototype.png`, `artifacts/world-grid-v54-world-event-prototype.png`, and `artifacts/world-grid-v55-sandbox-prototype.png`. |
 | Live sanity | Local route reported `renderer: "three"`, `payloadCells: 19`, a claimed route after V5.1 completion, V5.2 opt-in/out, V5.3 civic service request/accept, V5.4 preview/contribute/reward, V5.5 enter/place/reject/agent-demo/rollback/leave, no horizontal overflow at 291px, and no console/page errors. |
 
@@ -35,6 +36,7 @@ prototype review.
 All V5.0-V5.5 world-grid stores remain prototype/ephemeral unless explicitly
 replaced by durable release-grade storage. Process-local state includes claims,
 public presence, follows, service requests/reputation, event contribution
-bookkeeping, rewards, sandbox participants/actions/snapshots, and camera
-preferences. Release promotion still requires durable owner indexes, migration
-versioning, append-only audit/replay records, and restart persistence tests.
+bookkeeping, rewards, sandbox participants/actions/snapshots, idempotency replay
+records, and camera preferences. Release promotion still requires durable owner
+indexes, migration versioning, append-only audit/replay records, durable
+idempotency records, and restart persistence tests.

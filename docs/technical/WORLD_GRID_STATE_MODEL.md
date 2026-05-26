@@ -45,6 +45,7 @@ release-grade store is explicitly implemented and tested. Current stores are:
 | Civic service requests/reputation | Process-local `Map` values in `server/world_grid/services.js` | Prototype/ephemeral |
 | World event contributions/rewards | Process-local `Map` values in `server/world_grid/events.js` | Prototype/ephemeral |
 | Sandbox participants/actions/snapshots/cells | Process-local arrays/maps and mutable in-memory district cells in `server/world_grid/sandbox.js` | Prototype/ephemeral |
+| Idempotency replay records | Process-local `Map` in `server/world_grid/idempotency.js` | Prototype/ephemeral; replays exact retries and rejects changed payload reuse only for the process lifetime |
 
 The only durable dependency used by mutating V5.1+ routes is the existing
 Founders Plot prerequisite check. World-grid routes must not create Founders Plot
@@ -61,6 +62,9 @@ Before any V5 world-grid slice can claim release-grade persistence, it needs:
 - Append-only audit/replay records for every mutating route and tool, including
   actor identity, idempotency key, before/after summary, and rollback handle
   where applicable.
+- Durable idempotency rows for every externally visible mutating route/tool,
+  with request hashes, stored success responses, conflict detection, and replay
+  coverage after restart.
 - Restart persistence tests proving state survives server restart and cannot be
   silently recreated, lost, or reassigned across owners.
 - Cross-owner and stale-session tests for every owner index.

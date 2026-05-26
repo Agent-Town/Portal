@@ -10,6 +10,7 @@ const {
   defaultWorldGridFeatureFlags,
   parseWorldGridFeatureFlags
 } = require('../server/world_grid/feature_flags');
+const { worldGridIdempotencyRecordCount } = require('../server/world_grid/idempotency');
 const {
   generateRegion,
   normalizeOwnerIdentity
@@ -267,6 +268,137 @@ test('mutating world-grid prototype routes require idempotency keys after plot p
     const invalidToolBody = await invalidToolResponse.json();
     assert.equal(invalidToolResponse.status, 400, JSON.stringify(invalidToolBody));
     assert.equal(invalidToolBody.error.code, 'INVALID_IDEMPOTENCY_KEY');
+  });
+});
+
+test('mutating world-grid idempotency replays exact responses and rejects conflicting retries', async () => {
+  const identity = { pairId: `session:world-grid-idempotency-replay-${Date.now()}-${Math.random().toString(16).slice(2)}` };
+  await withWorldGridServer({
+    identity,
+    envPatch: { NODE_ENV: 'test', WORLD_GRID_FEATURE_FLAGS: 'all' }
+  }, async (baseUrl) => {
+    seedFoundersPlot(identity.pairId);
+    const beforeRecordCount = worldGridIdempotencyRecordCount();
+
+    const optionsResponse = await fetch(`${baseUrl}/api/world/territory/claim-options`);
+    const optionsBody = await optionsResponse.json();
+    assert.equal(optionsResponse.status, 200, JSON.stringify(optionsBody));
+    assert.ok(optionsBody.options.length >= 2);
+    const [firstOption, secondOption] = optionsBody.options;
+
+    const planBody = { cellId: firstOption.cellId, idempotencyKey: 'idempotency_replay_plan_001' };
+    const planResponse = await fetch(`${baseUrl}/api/world/territory/plan-claim`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(planBody)
+    });
+    const plan = await planResponse.json();
+    assert.equal(planResponse.status, 200, JSON.stringify(plan));
+
+    const planReplayResponse = await fetch(`${baseUrl}/api/world/territory/plan-claim`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(planBody)
+    });
+    const planReplay = await planReplayResponse.json();
+    assert.equal(planReplayResponse.status, 200, JSON.stringify(planReplay));
+    assert.equal(planReplayResponse.headers.get('x-world-grid-idempotency-replay'), '1');
+    assert.deepEqual(planReplay, plan);
+
+    const planConflictResponse = await fetch(`${baseUrl}/api/world/territory/plan-claim`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ cellId: secondOption.cellId, idempotencyKey: planBody.idempotencyKey })
+    });
+    const planConflict = await planConflictResponse.json();
+    assert.equal(planConflictResponse.status, 409, JSON.stringify(planConflict));
+    assert.equal(planConflict.error.code, 'IDEMPOTENCY_CONFLICT');
+
+    const regionAfterPlan = await (await fetch(`${baseUrl}/api/world/region`)).json();
+    assert.equal(regionAfterPlan.territory.claims.length, 1);
+
+    const serviceBody = {
+      serviceId: 'service_route_advisor',
+      input: { selectedCell: firstOption, brainSecrets: 'must-not-persist' },
+      idempotencyKey: 'idempotency_replay_service_001'
+    };
+    const serviceResponse = await fetch(`${baseUrl}/api/world/services/request-advice`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(serviceBody)
+    });
+    const service = await serviceResponse.json();
+    assert.equal(serviceResponse.status, 200, JSON.stringify(service));
+
+    const serviceReplayResponse = await fetch(`${baseUrl}/api/world/services/request-advice`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(serviceBody)
+    });
+    const serviceReplay = await serviceReplayResponse.json();
+    assert.equal(serviceReplayResponse.status, 200, JSON.stringify(serviceReplay));
+    assert.equal(serviceReplayResponse.headers.get('x-world-grid-idempotency-replay'), '1');
+    assert.equal(serviceReplay.request.requestId, service.request.requestId);
+
+    const serviceConflictResponse = await fetch(`${baseUrl}/api/world/services/request-advice`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        ...serviceBody,
+        input: { selectedCell: secondOption }
+      })
+    });
+    const serviceConflict = await serviceConflictResponse.json();
+    assert.equal(serviceConflictResponse.status, 409, JSON.stringify(serviceConflict));
+    assert.equal(serviceConflict.error.code, 'IDEMPOTENCY_CONFLICT');
+
+    const servicesState = await (await fetch(`${baseUrl}/api/world/services`)).json();
+    assert.equal(servicesState.requests.length, 1);
+
+    const sandboxBody = {
+      payload: { cellId: 'sandbox_cell_0', propId: 'lantern' },
+      idempotencyKey: 'idempotency_replay_sandbox_001'
+    };
+    const sandboxResponse = await fetch(`${baseUrl}/api/world/sandbox/place-prop`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(sandboxBody)
+    });
+    const sandbox = await sandboxResponse.json();
+    assert.equal(sandboxResponse.status, 200, JSON.stringify(sandbox));
+
+    const sandboxReplayResponse = await fetch(`${baseUrl}/api/world/sandbox/place-prop`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(sandboxBody)
+    });
+    const sandboxReplay = await sandboxReplayResponse.json();
+    assert.equal(sandboxReplayResponse.status, 200, JSON.stringify(sandboxReplay));
+    assert.equal(sandboxReplayResponse.headers.get('x-world-grid-idempotency-replay'), '1');
+    assert.equal(sandboxReplay.action.actionId, sandbox.action.actionId);
+
+    const sandboxConflictResponse = await fetch(`${baseUrl}/api/world/sandbox/place-prop`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        payload: { cellId: 'sandbox_cell_0', propId: 'bench' },
+        idempotencyKey: sandboxBody.idempotencyKey
+      })
+    });
+    const sandboxConflict = await sandboxConflictResponse.json();
+    assert.equal(sandboxConflictResponse.status, 409, JSON.stringify(sandboxConflict));
+    assert.equal(sandboxConflict.error.code, 'IDEMPOTENCY_CONFLICT');
+
+    const sandboxCleanupResponse = await fetch(`${baseUrl}/api/world/sandbox/rollback-last`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ idempotencyKey: 'idempotency_replay_sandbox_cleanup' })
+    });
+    const sandboxCleanup = await sandboxCleanupResponse.json();
+    assert.equal(sandboxCleanupResponse.status, 200, JSON.stringify(sandboxCleanup));
+    assert.equal(sandboxCleanup.restored, true);
+
+    assert.equal(worldGridIdempotencyRecordCount(), beforeRecordCount + 4);
   });
 });
 
@@ -659,12 +791,23 @@ test('V5.4 world events enforce caps, idempotency, conservation, and cosmetic re
     const duplicateResponse = await fetch(`${baseUrl}/api/world/events/contribute`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...headersA },
-      body: JSON.stringify({ eventId, bundle: { coin: 5 }, idempotencyKey: 'bridge-day-1' })
+      body: JSON.stringify({ eventId, bundle: { coin: 2 }, idempotencyKey: 'bridge-day-1' })
     });
     const duplicateBody = await duplicateResponse.json();
     assert.equal(duplicateResponse.status, 200, JSON.stringify(duplicateBody));
-    assert.equal(duplicateBody.duplicate, true);
+    assert.equal(duplicateResponse.headers.get('x-world-grid-idempotency-replay'), '1');
+    assert.equal(duplicateBody.duplicate, false);
     assert.equal(duplicateBody.contribution.contributionId, contributeBody.contribution.contributionId);
+    assert.deepEqual(loadPlotByPairId(ownerA).plot.inventory, plotAfterContribution.plot.inventory);
+
+    const conflictResponse = await fetch(`${baseUrl}/api/world/events/contribute`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...headersA },
+      body: JSON.stringify({ eventId, bundle: { coin: 5 }, idempotencyKey: 'bridge-day-1' })
+    });
+    const conflictBody = await conflictResponse.json();
+    assert.equal(conflictResponse.status, 409, JSON.stringify(conflictBody));
+    assert.equal(conflictBody.error.code, 'IDEMPOTENCY_CONFLICT');
     assert.deepEqual(loadPlotByPairId(ownerA).plot.inventory, plotAfterContribution.plot.inventory);
 
     const capFillResponse = await fetch(`${baseUrl}/api/world/events/contribute`, {

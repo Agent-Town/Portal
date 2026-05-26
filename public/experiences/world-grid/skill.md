@@ -11,9 +11,10 @@ state says they are enabled.
 
 Claims may only be planned, completed, or cancelled through the explicit
 territory tools, and mutating V5.1+ tools require the player to have an existing
-Founders Plot. Service recommendations are advice only. Accepting a service
-result must not spend resources, build objects, claim territory, or mutate
-Founders Plot.
+Founders Plot plus an idempotency key. Exact retry responses may be replayed by
+the server; changed payload reuse is a conflict. Service recommendations are
+advice only. Accepting a service result must not spend resources, build objects,
+claim territory, or mutate Founders Plot.
 
 World event contributions must always be previewed first, capped by the server,
 and submitted with an idempotency key. Event rewards are cosmetic/status-only.

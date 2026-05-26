@@ -2,6 +2,11 @@
 
 Prototype-gated world tools:
 
+All mutating V5.1+ tools require an existing Founders Plot prerequisite and an
+`idempotencyKey`. Exact successful retries replay the original response during
+the current prototype process lifetime; changed payload reuse is rejected as
+`IDEMPOTENCY_CONFLICT`. This is not release-grade durable persistence.
+
 ## et.world.region.get_state
 
 Feature flag: `FEATURE_WORLD_GRID_V50_REGION`
@@ -102,9 +107,9 @@ goal remaining, and requested resources are applied. This tool spends nothing.
 
 Feature flag: `FEATURE_WORLD_GRID_V54_WORLD_EVENTS`
 
-Contributes the accepted resource bundle with an idempotency key. Duplicate
-requests return the original contribution. Requires an existing Founders Plot
-prerequisite.
+Contributes the accepted resource bundle with an idempotency key. Exact
+successful retries return the original response. Requires an existing Founders
+Plot prerequisite.
 
 ## et.world.events.claim_reward
 

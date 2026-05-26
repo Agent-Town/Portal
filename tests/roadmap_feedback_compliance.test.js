@@ -54,6 +54,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'docs/security/AGENT_SERVICES_DATA_ACCESS_POLICY.md',
     'docs/security/PUBLIC_TEXT_RENDERING_POLICY.md',
     'docs/security/PUBLIC_PRESENCE_REDACTION_POLICY.md',
+    'server/world_grid/idempotency.js',
     'server/world_civilization/audit_ledger.js',
     'server/world_civilization/proposals.js',
     'server/world_civilization/schemas.js',
@@ -153,4 +154,20 @@ test('public text rendering policy covers future V6 civic public surfaces', () =
   assert.match(presence, /PUBLIC_TEXT_RENDERING_POLICY\.md/);
   assert.match(evidence, /Prototype Persistence Warning/);
   assert.match(evidence, /e2e\/242_world_grid_all_features_demo_regression\.spec\.js/);
+});
+
+test('world-grid idempotency policy rejects changed retry payloads before release promotion', () => {
+  const plan = read('docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md');
+  const security = read('docs/security/WORLD_GRID_MUTATION_SECURITY_PLAN.md');
+  const stateModel = read('docs/technical/WORLD_GRID_STATE_MODEL.md');
+  const evidence = read('docs/release-evidence/WORLD_GRID_V50_REGION_PROTOTYPE_EVIDENCE_2026-05-26.md');
+
+  assert.match(plan, /reject changed key reuse/);
+  assert.match(security, /IDEMPOTENCY_CONFLICT/);
+  assert.match(security, /process-local\s+request hash\/success response/);
+  assert.match(security, /reject conflicting retries after restart/);
+  assert.match(stateModel, /server\/world_grid\/idempotency\.js/);
+  assert.match(stateModel, /Durable idempotency rows/);
+  assert.match(evidence, /Idempotency replay guard/);
+  assert.match(evidence, /durable\s+idempotency records/);
 });

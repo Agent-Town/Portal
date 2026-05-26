@@ -41,6 +41,7 @@ const {
   isWorldGridFeatureEnabled,
   resolveWorldGridFeatureFlags
 } = require('./feature_flags');
+const { runIdempotentWorldGridMutation } = require('./idempotency');
 const { loadWorldGridPlotPrerequisite } = require('./plot_prerequisite');
 
 const WORLD_GRID_IDEMPOTENCY_KEY_RE = /^[a-z0-9][a-z0-9:_-]{5,119}$/i;
@@ -204,6 +205,7 @@ function statusForWorldGridError(normalized = {}) {
   if (code === 'INVALID_SERVICE_OUTPUT') return 422;
   if ([
     'WORLD_GRID_PLOT_REQUIRED',
+    'IDEMPOTENCY_CONFLICT',
     'INVALID_SERVICE_REQUEST_STATE',
     'OUT_OF_RESOURCES',
     'CONTRIBUTION_CAP_EXCEEDED',
@@ -341,9 +343,21 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     return requireWorldGridIdempotencyKey(req, surface);
   }
 
-  function requireMutationPrerequisitesForTool(req, toolName, payload) {
-    if (!MUTATING_WORLD_GRID_TOOL_NAMES.has(toolName)) return '';
-    return requireMutationPrerequisites(req, payload, toolName);
+  function sendIdempotentMutation(req, res, payload, surface, mutate) {
+    const idempotencyKey = requireMutationPrerequisites(req, payload, surface);
+    const outcome = runIdempotentWorldGridMutation({
+      owner: payload.owner,
+      surface,
+      idempotencyKey,
+      body: req.body
+    }, () => mutate(idempotencyKey));
+    if (outcome.duplicate) res.set('x-world-grid-idempotency-replay', '1');
+    return res.json(outcome.response);
+  }
+
+  function sendIdempotentToolMutation(req, res, payload, toolName, mutate) {
+    if (!MUTATING_WORLD_GRID_TOOL_NAMES.has(toolName)) return res.json(mutate(''));
+    return sendIdempotentMutation(req, res, payload, toolName, mutate);
   }
 
   router.get('/api/world/tools', (req, res) => {
@@ -439,21 +453,24 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       }
       if (toolName === 'et.world.territory.plan_claim') {
         requireClaimsEnabled(payload.featureFlags);
-        requireMutationPrerequisitesForTool(req, toolName, payload);
-        const claim = planClaim(payload.region, req.body?.cellId, payload.owner, Date.now());
-        return res.json({ ok: true, data: { claim } });
+        return sendIdempotentToolMutation(req, res, payload, toolName, () => {
+          const claim = planClaim(payload.region, req.body?.cellId, payload.owner, Date.now());
+          return { ok: true, data: { claim } };
+        });
       }
       if (toolName === 'et.world.territory.complete_claim') {
         requireClaimsEnabled(payload.featureFlags);
-        requireMutationPrerequisitesForTool(req, toolName, payload);
-        const claim = completeClaim(payload.region, payload.identity, payload.owner, req.body?.claimId, Date.now());
-        return res.json({ ok: true, data: { claim } });
+        return sendIdempotentToolMutation(req, res, payload, toolName, () => {
+          const claim = completeClaim(payload.region, payload.identity, payload.owner, req.body?.claimId, Date.now());
+          return { ok: true, data: { claim } };
+        });
       }
       if (toolName === 'et.world.territory.cancel_claim') {
         requireClaimsEnabled(payload.featureFlags);
-        requireMutationPrerequisitesForTool(req, toolName, payload);
-        const result = cancelClaim(payload.region.regionId, payload.owner, req.body?.claimId);
-        return res.json({ ok: true, data: result });
+        return sendIdempotentToolMutation(req, res, payload, toolName, () => {
+          const result = cancelClaim(payload.region.regionId, payload.owner, req.body?.claimId);
+          return { ok: true, data: result };
+        });
       }
       if (toolName === 'et.world.public.list_neighbors') {
         requirePublicEnabled(payload.featureFlags);
@@ -469,23 +486,26 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       }
       if (toolName === 'et.world.services.request_advice') {
         requireServicesEnabled(payload.featureFlags);
-        requireMutationPrerequisitesForTool(req, toolName, payload);
-        return res.json({
-          ok: true,
-          data: {
-            request: requestServiceAdvice(payload.owner, req.body?.serviceId, req.body?.input)
-          }
+        return sendIdempotentToolMutation(req, res, payload, toolName, () => {
+          return {
+            ok: true,
+            data: {
+              request: requestServiceAdvice(payload.owner, req.body?.serviceId, req.body?.input)
+            }
+          };
         });
       }
       if (toolName === 'et.world.services.accept_result') {
         requireServicesEnabled(payload.featureFlags);
-        requireMutationPrerequisitesForTool(req, toolName, payload);
-        return res.json({ ok: true, data: { request: acceptServiceResult(payload.owner, req.body?.requestId) } });
+        return sendIdempotentToolMutation(req, res, payload, toolName, () => {
+          return { ok: true, data: { request: acceptServiceResult(payload.owner, req.body?.requestId) } };
+        });
       }
       if (toolName === 'et.world.services.report_issue') {
         requireServicesEnabled(payload.featureFlags);
-        requireMutationPrerequisitesForTool(req, toolName, payload);
-        return res.json({ ok: true, data: { request: reportServiceIssue(payload.owner, req.body?.requestId, req.body?.reason) } });
+        return sendIdempotentToolMutation(req, res, payload, toolName, () => {
+          return { ok: true, data: { request: reportServiceIssue(payload.owner, req.body?.requestId, req.body?.reason) } };
+        });
       }
       if (toolName === 'et.world.events.get_state') {
         requireEventsEnabled(payload.featureFlags);
@@ -502,20 +522,22 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       }
       if (toolName === 'et.world.events.contribute') {
         requireEventsEnabled(payload.featureFlags);
-        const idempotencyKey = requireMutationPrerequisitesForTool(req, toolName, payload);
-        return res.json({
-          ok: true,
-          data: contributeToEvent(payload.identity, payload.owner, req.body?.eventId, req.body?.bundle, idempotencyKey, Date.now())
+        return sendIdempotentToolMutation(req, res, payload, toolName, (idempotencyKey) => {
+          return {
+            ok: true,
+            data: contributeToEvent(payload.identity, payload.owner, req.body?.eventId, req.body?.bundle, idempotencyKey, Date.now())
+          };
         });
       }
       if (toolName === 'et.world.events.claim_reward') {
         requireEventsEnabled(payload.featureFlags);
-        requireMutationPrerequisitesForTool(req, toolName, payload);
-        return res.json({
-          ok: true,
-          data: {
-            reward: claimEventReward(payload.owner, req.body?.eventId, req.body?.ownerAccountId)
-          }
+        return sendIdempotentToolMutation(req, res, payload, toolName, () => {
+          return {
+            ok: true,
+            data: {
+              reward: claimEventReward(payload.owner, req.body?.eventId, req.body?.ownerAccountId)
+            }
+          };
         });
       }
       if (toolName === 'et.world.sandbox.get_state') {
@@ -524,28 +546,33 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       }
       if (toolName === 'et.world.sandbox.enter') {
         requireSandboxEnabled(payload.featureFlags);
-        requireMutationPrerequisitesForTool(req, toolName, payload);
-        return res.json({ ok: true, data: { participant: enterSandbox(payload.owner), sandbox: sandboxStateFor(payload.owner) } });
+        return sendIdempotentToolMutation(req, res, payload, toolName, () => {
+          return { ok: true, data: { participant: enterSandbox(payload.owner), sandbox: sandboxStateFor(payload.owner) } };
+        });
       }
       if (toolName === 'et.world.sandbox.place_prop') {
         requireSandboxEnabled(payload.featureFlags);
-        requireMutationPrerequisitesForTool(req, toolName, payload);
-        return res.json({ ok: true, data: { action: placeSandboxProp(payload.owner, req.body?.payload), sandbox: sandboxStateFor(payload.owner) } });
+        return sendIdempotentToolMutation(req, res, payload, toolName, () => {
+          return { ok: true, data: { action: placeSandboxProp(payload.owner, req.body?.payload), sandbox: sandboxStateFor(payload.owner) } };
+        });
       }
       if (toolName === 'et.world.sandbox.agent_demo') {
         requireSandboxEnabled(payload.featureFlags);
-        requireMutationPrerequisitesForTool(req, toolName, payload);
-        return res.json({ ok: true, data: { action: sandboxAgentDemo(payload.owner, req.body?.payload), sandbox: sandboxStateFor(payload.owner) } });
+        return sendIdempotentToolMutation(req, res, payload, toolName, () => {
+          return { ok: true, data: { action: sandboxAgentDemo(payload.owner, req.body?.payload), sandbox: sandboxStateFor(payload.owner) } };
+        });
       }
       if (toolName === 'et.world.sandbox.rollback_last') {
         requireSandboxEnabled(payload.featureFlags);
-        requireMutationPrerequisitesForTool(req, toolName, payload);
-        return res.json({ ok: true, data: rollbackSandboxLastAction(payload.owner) });
+        return sendIdempotentToolMutation(req, res, payload, toolName, () => {
+          return { ok: true, data: rollbackSandboxLastAction(payload.owner) };
+        });
       }
       if (toolName === 'et.world.sandbox.leave') {
         requireSandboxEnabled(payload.featureFlags);
-        requireMutationPrerequisitesForTool(req, toolName, payload);
-        return res.json({ ok: true, data: leaveSandbox(payload.owner) });
+        return sendIdempotentToolMutation(req, res, payload, toolName, () => {
+          return { ok: true, data: leaveSandbox(payload.owner) };
+        });
       }
       res.status(404).json({ ok: false, error: { code: 'TOOL_NOT_FOUND' } });
     } catch (error) {
@@ -576,9 +603,10 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requireClaimsEnabled(payload.featureFlags);
-      requireMutationPrerequisites(req, payload, '/api/world/territory/plan-claim');
-      const claim = planClaim(payload.region, req.body?.cellId, payload.owner, Date.now());
-      res.json({ ok: true, featureFlags: payload.featureFlags, claim });
+      sendIdempotentMutation(req, res, payload, '/api/world/territory/plan-claim', () => {
+        const claim = planClaim(payload.region, req.body?.cellId, payload.owner, Date.now());
+        return { ok: true, featureFlags: payload.featureFlags, claim };
+      });
     } catch (error) {
       const normalized = normalizeError(error);
       const status = statusForWorldGridError(normalized);
@@ -590,10 +618,11 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requireClaimsEnabled(payload.featureFlags);
-      requireMutationPrerequisites(req, payload, '/api/world/territory/complete-claim');
-      const claim = completeClaim(payload.region, payload.identity, payload.owner, req.body?.claimId, Date.now());
-      const refreshed = buildRegionPayload(req, res);
-      res.json({ ok: true, featureFlags: payload.featureFlags, claim, region: refreshed.region, territory: refreshed.territory });
+      sendIdempotentMutation(req, res, payload, '/api/world/territory/complete-claim', () => {
+        const claim = completeClaim(payload.region, payload.identity, payload.owner, req.body?.claimId, Date.now());
+        const refreshed = buildRegionPayload(req, res);
+        return { ok: true, featureFlags: payload.featureFlags, claim, region: refreshed.region, territory: refreshed.territory };
+      });
     } catch (error) {
       const normalized = normalizeError(error);
       const status = statusForWorldGridError(normalized);
@@ -605,9 +634,10 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requireClaimsEnabled(payload.featureFlags);
-      requireMutationPrerequisites(req, payload, '/api/world/territory/cancel-claim');
-      const result = cancelClaim(payload.region.regionId, payload.owner, req.body?.claimId);
-      res.json({ ok: true, featureFlags: payload.featureFlags, ...result });
+      sendIdempotentMutation(req, res, payload, '/api/world/territory/cancel-claim', () => {
+        const result = cancelClaim(payload.region.regionId, payload.owner, req.body?.claimId);
+        return { ok: true, featureFlags: payload.featureFlags, ...result };
+      });
     } catch (error) {
       const normalized = normalizeError(error);
       const status = statusForWorldGridError(normalized);
@@ -649,15 +679,16 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requirePublicEnabled(payload.featureFlags);
-      requireMutationPrerequisites(req, payload, '/api/world/public-presence/opt-in');
-      const town = optInPublicPresence({
-        owner: payload.owner,
-        region: payload.region,
-        displayName: req.body?.displayName,
-        townName: req.body?.townName,
-        privacy: req.body?.privacy
+      sendIdempotentMutation(req, res, payload, '/api/world/public-presence/opt-in', () => {
+        const town = optInPublicPresence({
+          owner: payload.owner,
+          region: payload.region,
+          displayName: req.body?.displayName,
+          townName: req.body?.townName,
+          privacy: req.body?.privacy
+        });
+        return { ok: true, featureFlags: payload.featureFlags, town };
       });
-      res.json({ ok: true, featureFlags: payload.featureFlags, town });
     } catch (error) {
       const normalized = normalizeError(error);
       const status = statusForWorldGridError(normalized);
@@ -669,9 +700,10 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requirePublicEnabled(payload.featureFlags);
-      requireMutationPrerequisites(req, payload, '/api/world/public-presence/opt-out');
-      const result = optOutPublicPresence(payload.owner);
-      res.json({ ok: true, featureFlags: payload.featureFlags, ...result });
+      sendIdempotentMutation(req, res, payload, '/api/world/public-presence/opt-out', () => {
+        const result = optOutPublicPresence(payload.owner);
+        return { ok: true, featureFlags: payload.featureFlags, ...result };
+      });
     } catch (error) {
       const normalized = normalizeError(error);
       const status = statusForWorldGridError(normalized);
@@ -683,9 +715,10 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requirePublicEnabled(payload.featureFlags);
-      requireMutationPrerequisites(req, payload, '/api/world/follow-town');
-      const result = followTown(payload.owner, req.body?.publicTownId);
-      res.json({ ok: true, featureFlags: payload.featureFlags, ...result });
+      sendIdempotentMutation(req, res, payload, '/api/world/follow-town', () => {
+        const result = followTown(payload.owner, req.body?.publicTownId);
+        return { ok: true, featureFlags: payload.featureFlags, ...result };
+      });
     } catch (error) {
       const normalized = normalizeError(error);
       const status = statusForWorldGridError(normalized);
@@ -714,9 +747,10 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requireServicesEnabled(payload.featureFlags);
-      requireMutationPrerequisites(req, payload, '/api/world/services/request-advice');
-      const request = requestServiceAdvice(payload.owner, req.body?.serviceId, req.body?.input);
-      res.json({ ok: true, featureFlags: payload.featureFlags, request });
+      sendIdempotentMutation(req, res, payload, '/api/world/services/request-advice', () => {
+        const request = requestServiceAdvice(payload.owner, req.body?.serviceId, req.body?.input);
+        return { ok: true, featureFlags: payload.featureFlags, request };
+      });
     } catch (error) {
       const normalized = normalizeError(error);
       const status = statusForWorldGridError(normalized);
@@ -728,9 +762,10 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requireServicesEnabled(payload.featureFlags);
-      requireMutationPrerequisites(req, payload, '/api/world/services/accept-result');
-      const request = acceptServiceResult(payload.owner, req.body?.requestId);
-      res.json({ ok: true, featureFlags: payload.featureFlags, request, mutationApplied: false });
+      sendIdempotentMutation(req, res, payload, '/api/world/services/accept-result', () => {
+        const request = acceptServiceResult(payload.owner, req.body?.requestId);
+        return { ok: true, featureFlags: payload.featureFlags, request, mutationApplied: false };
+      });
     } catch (error) {
       const normalized = normalizeError(error);
       const status = statusForWorldGridError(normalized);
@@ -742,9 +777,10 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requireServicesEnabled(payload.featureFlags);
-      requireMutationPrerequisites(req, payload, '/api/world/services/report-issue');
-      const request = reportServiceIssue(payload.owner, req.body?.requestId, req.body?.reason);
-      res.json({ ok: true, featureFlags: payload.featureFlags, request });
+      sendIdempotentMutation(req, res, payload, '/api/world/services/report-issue', () => {
+        const request = reportServiceIssue(payload.owner, req.body?.requestId, req.body?.reason);
+        return { ok: true, featureFlags: payload.featureFlags, request };
+      });
     } catch (error) {
       const normalized = normalizeError(error);
       const status = statusForWorldGridError(normalized);
@@ -785,10 +821,11 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requireEventsEnabled(payload.featureFlags);
-      const idempotencyKey = requireMutationPrerequisites(req, payload, '/api/world/events/contribute');
-      const result = contributeToEvent(payload.identity, payload.owner, req.body?.eventId, req.body?.bundle, idempotencyKey, Date.now());
-      const events = worldEventState(payload.owner);
-      res.json({ ok: true, featureFlags: payload.featureFlags, ...result, events });
+      sendIdempotentMutation(req, res, payload, '/api/world/events/contribute', (idempotencyKey) => {
+        const result = contributeToEvent(payload.identity, payload.owner, req.body?.eventId, req.body?.bundle, idempotencyKey, Date.now());
+        const events = worldEventState(payload.owner);
+        return { ok: true, featureFlags: payload.featureFlags, ...result, events };
+      });
     } catch (error) {
       const normalized = normalizeError(error);
       const status = statusForWorldGridError(normalized);
@@ -800,9 +837,10 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requireEventsEnabled(payload.featureFlags);
-      requireMutationPrerequisites(req, payload, '/api/world/events/claim-reward');
-      const reward = claimEventReward(payload.owner, req.body?.eventId, req.body?.ownerAccountId);
-      res.json({ ok: true, featureFlags: payload.featureFlags, reward, mutationApplied: false });
+      sendIdempotentMutation(req, res, payload, '/api/world/events/claim-reward', () => {
+        const reward = claimEventReward(payload.owner, req.body?.eventId, req.body?.ownerAccountId);
+        return { ok: true, featureFlags: payload.featureFlags, reward, mutationApplied: false };
+      });
     } catch (error) {
       const normalized = normalizeError(error);
       const status = statusForWorldGridError(normalized);
@@ -826,9 +864,10 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requireSandboxEnabled(payload.featureFlags);
-      requireMutationPrerequisites(req, payload, '/api/world/sandbox/enter');
-      const participant = enterSandbox(payload.owner);
-      res.json({ ok: true, featureFlags: payload.featureFlags, participant, sandbox: sandboxStateFor(payload.owner) });
+      sendIdempotentMutation(req, res, payload, '/api/world/sandbox/enter', () => {
+        const participant = enterSandbox(payload.owner);
+        return { ok: true, featureFlags: payload.featureFlags, participant, sandbox: sandboxStateFor(payload.owner) };
+      });
     } catch (error) {
       const normalized = normalizeError(error);
       const status = statusForWorldGridError(normalized);
@@ -840,9 +879,10 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requireSandboxEnabled(payload.featureFlags);
-      requireMutationPrerequisites(req, payload, '/api/world/sandbox/place-prop');
-      const action = placeSandboxProp(payload.owner, req.body?.payload);
-      res.json({ ok: true, featureFlags: payload.featureFlags, action, sandbox: sandboxStateFor(payload.owner) });
+      sendIdempotentMutation(req, res, payload, '/api/world/sandbox/place-prop', () => {
+        const action = placeSandboxProp(payload.owner, req.body?.payload);
+        return { ok: true, featureFlags: payload.featureFlags, action, sandbox: sandboxStateFor(payload.owner) };
+      });
     } catch (error) {
       const normalized = normalizeError(error);
       const status = statusForWorldGridError(normalized);
@@ -854,9 +894,10 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requireSandboxEnabled(payload.featureFlags);
-      requireMutationPrerequisites(req, payload, '/api/world/sandbox/agent-demo');
-      const action = sandboxAgentDemo(payload.owner, req.body?.payload);
-      res.json({ ok: true, featureFlags: payload.featureFlags, action, sandbox: sandboxStateFor(payload.owner) });
+      sendIdempotentMutation(req, res, payload, '/api/world/sandbox/agent-demo', () => {
+        const action = sandboxAgentDemo(payload.owner, req.body?.payload);
+        return { ok: true, featureFlags: payload.featureFlags, action, sandbox: sandboxStateFor(payload.owner) };
+      });
     } catch (error) {
       const normalized = normalizeError(error);
       const status = statusForWorldGridError(normalized);
@@ -868,8 +909,9 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requireSandboxEnabled(payload.featureFlags);
-      requireMutationPrerequisites(req, payload, '/api/world/sandbox/rollback-last');
-      res.json({ ok: true, featureFlags: payload.featureFlags, ...rollbackSandboxLastAction(payload.owner) });
+      sendIdempotentMutation(req, res, payload, '/api/world/sandbox/rollback-last', () => {
+        return { ok: true, featureFlags: payload.featureFlags, ...rollbackSandboxLastAction(payload.owner) };
+      });
     } catch (error) {
       const normalized = normalizeError(error);
       const status = statusForWorldGridError(normalized);
@@ -881,8 +923,9 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     try {
       const payload = buildRegionPayload(req, res);
       requireSandboxEnabled(payload.featureFlags);
-      requireMutationPrerequisites(req, payload, '/api/world/sandbox/leave');
-      res.json({ ok: true, featureFlags: payload.featureFlags, ...leaveSandbox(payload.owner) });
+      sendIdempotentMutation(req, res, payload, '/api/world/sandbox/leave', () => {
+        return { ok: true, featureFlags: payload.featureFlags, ...leaveSandbox(payload.owner) };
+      });
     } catch (error) {
       const normalized = normalizeError(error);
       const status = statusForWorldGridError(normalized);

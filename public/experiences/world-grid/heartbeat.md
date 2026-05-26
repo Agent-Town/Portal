@@ -9,8 +9,9 @@ On each turn:
 5. Treat public presence as opt-in and public-safe only.
 6. Treat civic services as advice/template output only; never accept service
    advice as a hidden mutation.
-7. Preview public works contributions before contributing, and rely on server
-   caps/idempotency for accepted amounts.
+7. Use idempotency keys for every mutating V5.1+ tool. Preview public works
+   contributions before contributing, and rely on server caps/idempotency for
+   accepted amounts.
 8. In sandbox districts, use only typed prop/demo tools and rely on moderation
    plus rollback for public changes.
 9. Keep advice focused on orientation, tradeoffs, and bounded next actions.
