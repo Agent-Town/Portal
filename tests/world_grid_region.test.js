@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const http = require('node:http');
+const os = require('node:os');
 const path = require('node:path');
 const express = require('express');
 
@@ -17,6 +18,10 @@ const {
 } = require('../server/world_grid/region');
 const { createInitialPlot } = require('../server/founders_plot/engine');
 const { loadPlotByPairId, savePlotGraph } = require('../server/founders_plot/store');
+const {
+  closeWorldGridAuditLog,
+  createWorldGridAuditLog
+} = require('../server/world_grid/audit_log');
 
 async function withWorldGridServer({ identity, envPatch = {} }, fn) {
   const previous = {
@@ -26,6 +31,7 @@ async function withWorldGridServer({ identity, envPatch = {} }, fn) {
     WORLD_GRID_FEATURE_FLAGS: process.env.WORLD_GRID_FEATURE_FLAGS,
     WORLD_GRID_CSRF_REQUIRED: process.env.WORLD_GRID_CSRF_REQUIRED,
     WORLD_GRID_CSRF_TOKEN_TTL_MS: process.env.WORLD_GRID_CSRF_TOKEN_TTL_MS,
+    WORLD_GRID_AUDIT_SQLITE_PATH: process.env.WORLD_GRID_AUDIT_SQLITE_PATH,
     WORLD_GRID_MUTATION_RATE_LIMIT_MAX: process.env.WORLD_GRID_MUTATION_RATE_LIMIT_MAX,
     WORLD_GRID_MUTATION_RATE_LIMIT_WINDOW_MS: process.env.WORLD_GRID_MUTATION_RATE_LIMIT_WINDOW_MS
   };
@@ -45,6 +51,7 @@ async function withWorldGridServer({ identity, envPatch = {} }, fn) {
     return await fn(baseUrl);
   } finally {
     await new Promise((resolve) => server.close(resolve));
+    closeWorldGridAuditLog();
     for (const [key, value] of Object.entries(previous)) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
@@ -440,6 +447,93 @@ test('mutating world-grid idempotency replays exact responses and rejects confli
 
     assert.equal(worldGridIdempotencyRecordCount(), beforeRecordCount + 4);
   });
+});
+
+test('mutating world-grid routes write durable audit replay records when configured', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-world-grid-audit-'));
+  const sqlitePath = path.join(dir, 'world-grid-audit.sqlite');
+  const identity = { pairId: `session:world-grid-audit-${Date.now()}-${Math.random().toString(16).slice(2)}` };
+  try {
+    await withWorldGridServer({
+      identity,
+      envPatch: {
+        NODE_ENV: 'test',
+        WORLD_GRID_FEATURE_FLAGS: 'all',
+        WORLD_GRID_AUDIT_SQLITE_PATH: sqlitePath
+      }
+    }, async (baseUrl) => {
+      seedFoundersPlot(identity.pairId);
+
+      const optionsResponse = await fetch(`${baseUrl}/api/world/territory/claim-options`);
+      const optionsBody = await optionsResponse.json();
+      assert.equal(optionsResponse.status, 200, JSON.stringify(optionsBody));
+      const option = optionsBody.options[0];
+      assert.ok(option);
+
+      const planBody = {
+        cellId: option.cellId,
+        idempotencyKey: 'audit_plan_claim_001'
+      };
+      const planResponse = await fetch(`${baseUrl}/api/world/territory/plan-claim`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(planBody)
+      });
+      const plan = await planResponse.json();
+      assert.equal(planResponse.status, 200, JSON.stringify(plan));
+
+      const replayResponse = await fetch(`${baseUrl}/api/world/territory/plan-claim`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(planBody)
+      });
+      const replay = await replayResponse.json();
+      assert.equal(replayResponse.status, 200, JSON.stringify(replay));
+      assert.equal(replayResponse.headers.get('x-world-grid-idempotency-replay'), '1');
+
+      const serviceResponse = await fetch(`${baseUrl}/api/world/services/request-advice`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          serviceId: 'service_route_advisor',
+          input: {
+            selectedCell: option,
+            brainSecrets: 'must-not-persist-in-audit'
+          },
+          idempotencyKey: 'audit_service_request_001'
+        })
+      });
+      const service = await serviceResponse.json();
+      assert.equal(serviceResponse.status, 200, JSON.stringify(service));
+    });
+
+    const owner = normalizeOwnerIdentity(identity);
+    const ledger = createWorldGridAuditLog({ sqlitePath });
+    assert.equal(ledger.count(), 2);
+    const entries = ledger.replay({ actorAccountId: owner.ownerAccountId });
+    assert.equal(entries.length, 2);
+    assert.equal(entries[0].actorAccountId, owner.ownerAccountId);
+    assert.equal(entries[0].regionId, owner.regionId);
+    assert.equal(entries[0].surface, '/api/world/territory/plan-claim');
+    assert.equal(entries[0].idempotencyKey, 'audit_plan_claim_001');
+    assert.equal(entries[0].entry.objectRef, entries[0].entry.afterSummary.objectRef);
+    assert.match(entries[0].entry.objectRef, /^claim_/);
+    assert.equal(entries[0].entry.privacy.privateDataIncluded, false);
+    assert.equal(entries[0].entry.beforeSummary.state, 'unrecorded-prototype-before-state');
+    const serviceEntry = entries.find((entry) => entry.surface === '/api/world/services/request-advice');
+    assert.ok(serviceEntry);
+    assert.equal(JSON.stringify(serviceEntry.entry).includes('must-not-persist-in-audit'), false);
+    assert.equal(serviceEntry.entry.privacy.privateDataIncluded, false);
+    ledger.close();
+
+    const reopened = createWorldGridAuditLog({ sqlitePath });
+    assert.equal(reopened.count(), 2);
+    assert.equal(reopened.replay({ surface: '/api/world/territory/plan-claim' }).length, 1);
+    assert.equal(reopened.replay({ surface: '/api/world/services/request-advice' }).length, 1);
+    reopened.close();
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('mutating world-grid routes reject cross-origin metadata and require same-origin context in production', async () => {

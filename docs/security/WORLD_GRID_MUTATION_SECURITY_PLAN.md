@@ -30,6 +30,10 @@ until the controls below are implemented and covered by deterministic tests.
 - Mutating V5.1+ world-grid routes and tool routes use process-local rate
   buckets keyed by owner and mutation surface. This throttles prototype abuse
   paths but is not durable, distributed, or session-auth aware.
+- When `WORLD_GRID_AUDIT_SQLITE_PATH` is configured, successful mutating V5.1+
+  world-grid routes and tool routes append durable, hash-chained SQLite audit
+  records with actor, surface, idempotency key, request/response hashes,
+  redacted summaries, rollback handles when present, and replay indexes.
 - V5.0 region rendering and read-only tools may run without creating Founders
   Plot state.
 - World-grid prototype stores are process-local and ephemeral; they are not
@@ -57,7 +61,10 @@ until the controls below are implemented and covered by deterministic tests.
   and prove replay does not create duplicate claims, service requests,
   presence records, rewards, sandbox actions, or resource spends.
 - Durable audit records with actor, route/tool name, idempotency key, before and
-  after summaries, and rollback handle when one exists.
+  after summaries, and rollback handle when one exists. Current coverage starts
+  this with append-only SQLite audit records; release promotion still needs
+  complete before-state snapshots and full restart replay coverage for each
+  world-grid store.
 - Restart persistence tests and replay tests before any public release flag is
   enabled.
 

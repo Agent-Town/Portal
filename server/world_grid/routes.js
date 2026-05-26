@@ -47,6 +47,7 @@ const {
   worldGridCsrfRequired
 } = require('./csrf');
 const { runIdempotentWorldGridMutation } = require('./idempotency');
+const { recordWorldGridMutationAudit } = require('./audit_log');
 const { requireWorldGridMutationOrigin } = require('./mutation_origin');
 const { loadWorldGridPlotPrerequisite } = require('./plot_prerequisite');
 const { consumeWorldGridMutationRateLimit } = require('./rate_limit');
@@ -385,6 +386,14 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       idempotencyKey,
       body: req.body
     }, () => mutate(idempotencyKey));
+    recordWorldGridMutationAudit({
+      owner: payload.owner,
+      surface,
+      idempotencyKey,
+      body: req.body,
+      response: outcome.response,
+      createdAtMs: outcome.record?.createdAtMs
+    });
     if (outcome.duplicate) res.set('x-world-grid-idempotency-replay', '1');
     return res.json(outcome.response);
   }

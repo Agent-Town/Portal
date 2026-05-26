@@ -2779,6 +2779,9 @@ typed, moderated, rollback-capable, and separate from private town state.
 ### Persistence And Security
 World-grid V5 prototype stores are process-local and ephemeral. Release-grade
 storage requires durable owner indexes, migration versioning, audit/replay
-records, and restart persistence tests before public enablement. Mutating
+records, and restart persistence tests before public enablement. When
+`WORLD_GRID_AUDIT_SQLITE_PATH` is configured, successful V5.1+ world-grid
+mutations write durable audit/replay rows, but this is only a foundation until
+before-state snapshots and per-store restart replay are complete. Mutating
 endpoint same-origin, CSRF, session-auth, rate-limit, and idempotency
 requirements are tracked in `docs/security/WORLD_GRID_MUTATION_SECURITY_PLAN.md`.

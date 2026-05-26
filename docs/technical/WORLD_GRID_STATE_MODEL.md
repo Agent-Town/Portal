@@ -54,6 +54,7 @@ release-grade store is explicitly implemented and tested. Current stores are:
 | Idempotency replay records | Process-local `Map` in `server/world_grid/idempotency.js` | Prototype/ephemeral; replays exact retries and rejects changed payload reuse only for the process lifetime |
 | CSRF mutation tokens | Process-local `Map` in `server/world_grid/csrf.js` | Prototype/ephemeral; owner-bound only for the process lifetime |
 | Mutation rate-limit buckets | Process-local `Map` in `server/world_grid/rate_limit.js` | Prototype/ephemeral; per-owner and per-surface only for the process lifetime |
+| Mutation audit records | Optional SQLite `world_grid_audit_log` table in `server/world_grid/audit_log.js` when `WORLD_GRID_AUDIT_SQLITE_PATH` is configured | Durable foundation for append-only audit/replay; not yet complete release storage because before-state snapshots and store reconstruction are still release gates |
 
 The only durable dependency used by mutating V5.1+ routes is the existing
 Founders Plot prerequisite check. World-grid routes must not create Founders Plot

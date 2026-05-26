@@ -15,6 +15,7 @@ Status: `prototype_gated` for V5.0-V5.5 starter workflow
 | Mutation origin guard | `server/world_grid/mutation_origin.js` rejects explicit cross-origin mutation metadata and requires positive same-origin context for mutating world-grid routes/tools in production. |
 | Mutation CSRF guard | `server/world_grid/csrf.js` issues owner-bound process-local tokens through `/api/world/mutation-token`; production mutating routes/tools reject missing, invalid, or cross-owner tokens. |
 | Mutation rate-limit guard | `server/world_grid/rate_limit.js` applies process-local owner/surface buckets to mutating world-grid routes/tools and returns `RATE_LIMITED` with retry headers when exceeded. |
+| Mutation audit log | `server/world_grid/audit_log.js` writes hash-chained SQLite audit/replay rows for successful mutating V5.1+ routes/tools when `WORLD_GRID_AUDIT_SQLITE_PATH` is configured; release promotion still needs full before-state snapshots and per-store restart replay coverage. |
 | Server-authoritative region | `server/world_grid/region.js` deterministically generates `WorldRegion`, `WorldCell`, `SettlementNode`, and `RouteEdge` data from owner identity. |
 | Read-only V5.0 APIs | `server/world_grid/routes.js` exposes region, focus, camera, and read-only tool endpoints without claim/build/resource mutation. |
 | V5.1 Territory Claims and Settler Routes | `server/world_grid/claims.js` adds gated adjacent claim options, plan/complete/cancel tools, exact resource spend, route preview, and terrain tradeoff copy. |
@@ -40,7 +41,9 @@ All V5.0-V5.5 world-grid stores remain prototype/ephemeral unless explicitly
 replaced by durable release-grade storage. Process-local state includes claims,
 public presence, follows, service requests/reputation, event contribution
 bookkeeping, rewards, sandbox participants/actions/snapshots, idempotency replay
-records, CSRF mutation tokens, rate-limit buckets, and camera preferences. Release promotion still
-requires durable owner indexes, migration versioning, append-only audit/replay
-records, durable idempotency records, CSRF-token/session-auth integration,
-durable/shared rate limits, and restart persistence tests.
+records, CSRF mutation tokens, rate-limit buckets, and camera preferences. The
+optional SQLite audit log is a durable audit foundation, but release promotion
+still requires durable owner indexes, migration versioning, full append-only
+audit/replay records with before-state snapshots, durable idempotency records,
+CSRF-token/session-auth integration, durable/shared rate limits, and restart
+replay coverage for every world-grid store.

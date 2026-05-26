@@ -55,6 +55,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'docs/security/PUBLIC_TEXT_RENDERING_POLICY.md',
     'docs/security/PUBLIC_PRESENCE_REDACTION_POLICY.md',
     'server/world_grid/csrf.js',
+    'server/world_grid/audit_log.js',
     'server/world_grid/idempotency.js',
     'server/world_grid/mutation_origin.js',
     'server/world_grid/rate_limit.js',
@@ -228,4 +229,19 @@ test('world-grid mutation rate-limit policy is tracked as prototype-only M5 cove
   assert.match(evidence, /durable\/shared rate limits/);
   assert.match(rateLimits, /World-grid prototype mutation limit/);
   assert.match(rateLimits, /WORLD_GRID_MUTATION_RATE_LIMIT_MAX/);
+});
+
+test('world-grid audit replay policy is tracked as an M3 release storage control', () => {
+  const plan = read('docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md');
+  const security = read('docs/security/WORLD_GRID_MUTATION_SECURITY_PLAN.md');
+  const stateModel = read('docs/technical/WORLD_GRID_STATE_MODEL.md');
+  const evidence = read('docs/release-evidence/WORLD_GRID_V50_REGION_PROTOTYPE_EVIDENCE_2026-05-26.md');
+
+  assert.match(plan, /durable world-grid audit log foundation/);
+  assert.match(security, /WORLD_GRID_AUDIT_SQLITE_PATH/);
+  assert.match(security, /append-only SQLite audit records/);
+  assert.match(stateModel, /server\/world_grid\/audit_log\.js/);
+  assert.match(stateModel, /world_grid_audit_log/);
+  assert.match(evidence, /Mutation audit log/);
+  assert.match(evidence, /restart replay coverage/);
 });
