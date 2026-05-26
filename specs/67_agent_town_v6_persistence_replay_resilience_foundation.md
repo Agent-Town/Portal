@@ -16,6 +16,7 @@ Test coverage:
 - `tests/world_civilization_process_restart.test.js`
 - `tests/world_civilization_proposal_vote_process_restart.test.js`
 - `tests/world_civilization_reputation_moderation_process_restart.test.js`
+- `tests/world_civilization_effect_process_restart.test.js`
 
 ## Boundary
 
@@ -76,12 +77,20 @@ separate processes record a bounded reputation entry and a redacted moderation
 decision, reconstruct the privacy-safe audit replay, and prove exact retries do
 not add duplicate store rows or audit entries after restart.
 
+`tests/world_civilization_effect_process_restart.test.js` extends the
+process-level evidence to civic effect rollback preparation: one process seeds
+the proposal, approved moderation decision, and approval vote prerequisites, a
+later process prepares the non-executing civic action and rollback handle, a
+third process reconstructs replay, and exact retries do not append duplicate
+effect, rollback, or audit rows after restart.
+
 ## Open Release Gaps
 
 M16 remains incomplete until all of these gates close:
 
 - Process restart tests for every civic store, not only the current
-  audit-ledger, proposal/vote, and reputation/moderation restart replay probes.
+  audit-ledger, proposal/vote, reputation/moderation, and effect/rollback
+  restart replay probes.
 - Release-grade replay reconstruction across process restart, larger datasets,
   and every civic summary surface.
 - Migration upgrade and downgrade tests for every civic table.

@@ -6,7 +6,10 @@ Milestone: `M11 Civic effect execution and rollback`
 
 Runtime module: `server/world_civilization/effects.js`
 
-Contract tests: `tests/world_civilization_effects.test.js`
+Contract tests:
+
+- `tests/world_civilization_effects.test.js`
+- `tests/world_civilization_effect_process_restart.test.js`
 
 Schema contract: `specs/55_agent_town_v6_civic_schema_contracts.md`
 
@@ -21,6 +24,12 @@ proposal, vote, and moderation foundations can prove the action has a valid
 public proposal, an approved moderation decision, and a human approval receipt.
 It is readiness evidence for later typed execution handlers, not an execution
 engine.
+
+The process-level restart proof currently covers prepared-effect and rollback
+handle persistence only. It proves a prepared action can be created after
+proposal, approved moderation, and approval-vote prerequisites are reopened in
+a later Node process, and that exact retries do not append duplicate effect,
+rollback, or audit rows.
 
 ## Data Model
 

@@ -59,7 +59,7 @@ const V6_CIVIC_RESILIENCE_STORES = [
     label: 'Civic effect rollback store',
     modulePath: 'server/world_civilization/effects.js',
     migrationVersion: 'v1',
-    restartCoverage: 'tests/world_civilization_effects.test.js',
+    restartCoverage: 'tests/world_civilization_effect_process_restart.test.js',
     requiredMethods: ['prepareEffect', 'getAction', 'getRollback', 'listActions', 'listRollbacks', 'summarizeProposalEffects', 'count', 'close'],
     forbiddenMethods: ['applyEffect', 'executeEffect']
   },
