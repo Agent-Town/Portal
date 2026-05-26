@@ -42,6 +42,7 @@ const {
   resolveWorldGridFeatureFlags
 } = require('./feature_flags');
 const {
+  buildProductionReleaseGate,
   currentGeneratedPack,
   currentPlaytestReport,
   exportGeneratedPack,
@@ -59,7 +60,8 @@ const {
   reloadGeneratedPack,
   reviewPublicPackCard,
   remixGeneratedPack,
-  unpublishPublicPackCard
+  unpublishPublicPackCard,
+  validateProductionReleaseGate
 } = require('./generated_pack');
 
 const WORLD_GRID_TOOLS = [
@@ -190,6 +192,10 @@ const WORLD_GRID_TOOLS = [
   {
     name: 'et.world.generated_pack.gallery_unpublish',
     description: 'Unpublish a generated-pack public card and remove it from public card lookup and gallery results.'
+  },
+  {
+    name: 'et.world.generated_pack.release_gate',
+    description: 'Evaluate the generated-pack production release gate from explicit evidence and approvals without changing gameplay.'
   }
 ];
 
@@ -392,6 +398,29 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
         claims
       },
       preferences
+    };
+  }
+
+  function buildGeneratedPackReleaseGatePayload(owner, body = {}) {
+    const generatedPack = currentGeneratedPack(owner);
+    if (!generatedPack) {
+      const error = new Error('NO_GENERATED_PACK');
+      error.details = { reason: 'GENERATE_PACK_FIRST' };
+      throw error;
+    }
+    const publicCard = body?.publicCard || (body?.cardId ? getPublicPackCard(body.cardId) : null);
+    const releaseGate = buildProductionReleaseGate({
+      pack: generatedPack,
+      playtestReport: currentPlaytestReport(owner),
+      diversityReport: body?.diversityReport || null,
+      publicCard,
+      persistenceReport: body?.persistenceReport || {},
+      approvalInputs: body?.approvalInputs || {},
+      nowMs: Date.now()
+    });
+    return {
+      releaseGate,
+      validationReport: validateProductionReleaseGate(releaseGate)
     };
   }
 
@@ -680,6 +709,13 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
           }, { nowMs: Date.now() })
         });
       }
+      if (toolName === 'et.world.generated_pack.release_gate') {
+        requireGeneratedPacksEnabled(payload.featureFlags);
+        return res.json({
+          ok: true,
+          data: buildGeneratedPackReleaseGatePayload(payload.owner, req.body || {})
+        });
+      }
       res.status(404).json({ ok: false, error: { code: 'TOOL_NOT_FOUND' } });
     } catch (error) {
       const normalized = normalizeError(error);
@@ -736,6 +772,23 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
         ok: true,
         featureFlags: payload.featureFlags,
         playtestReport
+      });
+    } catch (error) {
+      const normalized = normalizeError(error);
+      const status = normalized.code === 'NO_GENERATED_PACK' ? 404 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      res.status(status).json({ ok: false, error: normalized });
+    }
+  });
+
+  router.post('/api/world/generated-pack/release-gate', (req, res) => {
+    try {
+      const payload = buildRegionPayload(req, res);
+      requireGeneratedPacksEnabled(payload.featureFlags);
+      const result = buildGeneratedPackReleaseGatePayload(payload.owner, req.body || {});
+      res.json({
+        ok: true,
+        featureFlags: payload.featureFlags,
+        ...result
       });
     } catch (error) {
       const normalized = normalizeError(error);

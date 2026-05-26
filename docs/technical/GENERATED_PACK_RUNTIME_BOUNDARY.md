@@ -142,6 +142,14 @@ Player prompt
 - `projectMultiSurfaceCompatibilityView` exposes generated surface names and naming conventions only when generated packs are enabled.
 - Public cards may use the generated public-card title/style summary from the compatibility profile, but still pass raw-prompt, private-data, screenshot, and blocked-field gates.
 
+## Production Release Gate Boundary
+
+- `buildProductionReleaseGate` creates a standalone readiness report and does not embed release approval state inside generated packs or default gameplay payloads.
+- `validateProductionReleaseGate` checks schema validity, prerequisite coherence, fail-closed behavior, explicit approvals, and zero public/private asset leaks.
+- The gate can be valid while `publicReleaseEligible=false`; that is the expected result when playtest evidence, diversity evidence, persistence evidence, public-card privacy evidence, candidate review, consent/cost/auth approval, or human signoff is absent.
+- `publicReleaseEligible=true` requires every prerequisite to be true and `blockingReasons=[]`; forged eligibility or missing blocking reasons fail validation.
+- `POST /api/world/generated-pack/release-gate` remains behind `FEATURE_WORLD_GRID_GENERATED_PACKS` and does not change canonical world-grid rules, V6 civic systems, pack visibility, or production image policy.
+
 ## Machine Checks
 
 ```json
@@ -255,6 +263,14 @@ Player prompt
   "publicCardSafe": true,
   "sandboxSkinSafe": true,
   "v5ToolsUnaffected": true,
-  "serverRuleChangeCount": 0
+  "serverRuleChangeCount": 0,
+  "productionReleaseGateSchemaExists": true,
+  "releaseGateFeatureGated": true,
+  "releaseGateFailsClosedWithoutApprovals": true,
+  "blockingReasonsMatchFailedPrerequisites": true,
+  "costConsentModelApproved": true,
+  "candidateAssetsReviewed": true,
+  "humanReviewComplete": true,
+  "publicReleaseEligibleRequiresAllPrerequisites": true
 }
 ```

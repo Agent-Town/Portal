@@ -19,6 +19,7 @@ const PUBLIC_PACK_CARD_VERSION = 'agent-town-generated-pack-public-card-v1';
 const PUBLIC_PACK_GALLERY_VERSION = 'agent-town-generated-pack-gallery-v1';
 const PUBLIC_PACK_GALLERY_ENTRY_VERSION = 'agent-town-generated-pack-gallery-entry-v1';
 const PUBLIC_PACK_GALLERY_CURATION_VERSION = 'agent-town-generated-pack-gallery-curation-v1';
+const PRODUCTION_RELEASE_GATE_VERSION = 'agent-town-generated-pack-production-release-gate-v1';
 const DEFAULT_CANDIDATE_ROOT = 'data/generated-packs';
 const DEFAULT_DURABLE_ROOT = 'data/generated-packs-durable';
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
@@ -3838,6 +3839,205 @@ function validatePublicPackCard(card = {}, owner = {}) {
   };
 }
 
+function normalizeReleaseApprovalInputs(approvalInputs = {}) {
+  const source = approvalInputs || {};
+  return {
+    authModelDocumented: source.authModelDocumented === true,
+    costEstimateAccepted: source.costEstimateAccepted === true,
+    explicitConsentRecorded: source.explicitConsentRecorded === true,
+    candidateAssetsReviewed: source.candidateAssetsReviewed === true,
+    humanReviewSignoffHash: String(source.humanReviewSignoffHash || '').trim()
+  };
+}
+
+function releaseDiversityPassed(diversityReport = {}) {
+  const metrics = diversityReport?.metrics || {};
+  return diversityReport?.ok === true
+    && Number(metrics.promptCount || metrics.validPackCount || 0) >= 10
+    && Number(metrics.uniqueReplayabilitySignatures || 0) >= 10
+    && Number(metrics.forbiddenAuthorityCount || metrics.replayabilityForbiddenAuthorityCount || 0) === 0
+    && Number(metrics.rawPromptLeakCount || 0) === 0;
+}
+
+function releasePersistencePassed(persistenceReport = {}) {
+  return persistenceReport?.durablePackStorage === true
+    && persistenceReport?.restartReloadPass === true
+    && persistenceReport?.exportImportRoundTrip === true
+    && persistenceReport?.invalidImportRejected === true
+    && Number(persistenceReport?.privateDataLeakCount || 0) === 0;
+}
+
+function buildProductionReleaseGate({
+  pack = {},
+  playtestReport = null,
+  diversityReport = null,
+  publicCard = null,
+  persistenceReport = {},
+  approvalInputs = {},
+  nowMs = Date.now()
+} = {}) {
+  const schemaReport = validateGeneratedPackSchemas(
+    pack?.validationReport ? pack : { ...pack, validationReport: { ok: true } },
+    SCHEMA_REGISTRY
+  );
+  const packReport = validateGeneratedPack(pack || {});
+  const assetManifestReport = validateAssetManifest(pack?.assetManifest || {}, pack);
+  const assetPromptPlanReport = validateAssetPromptPlan(pack?.assetPromptPlan || {}, pack);
+  const playtestValidation = playtestReport
+    ? validatePlaytestReport(playtestReport, pack)
+    : { ok: false, metrics: {} };
+  const publicCardReport = publicCard
+    ? validatePublicPackCard(publicCard, {})
+    : { ok: false, metrics: { privateDataLeakCount: 0, blockedFieldCount: 0 } };
+  const approvals = normalizeReleaseApprovalInputs(approvalInputs);
+  const costConsentModelApproved = approvals.authModelDocumented === true
+    && approvals.costEstimateAccepted === true
+    && approvals.explicitConsentRecorded === true;
+  const humanReviewComplete = /^[0-9a-f]{64}$/.test(approvals.humanReviewSignoffHash);
+  const publicCardPrivateDataLeakCount = Number(
+    publicCard?.moderation?.privateDataLeakCount
+    || publicCardReport.metrics?.privateDataLeakCount
+    || 0
+  );
+  const publicCardBlockedFieldCount = Number(
+    publicCard?.moderation?.blockedFieldCount
+    || publicCardReport.metrics?.blockedFieldCount
+    || 0
+  );
+  const assetLoaderEvidence = playtestReport?.assetLoader || playtestReport?.scoreEvidence?.assetLoader || {};
+  const missingAssetCount = Number(playtestReport?.missingAssets || 0)
+    + Number(assetLoaderEvidence?.missingTextureCount || 0);
+  const fallbackVerified = playtestValidation.ok === true
+    && Number(pack?.assetScaffold?.productionImageAssetCount || 0) === 0
+    && missingAssetCount === 0
+    && assetLoaderEvidence?.firstLoopSafe === true;
+  const releasePrerequisites = {
+    schemaValid: schemaReport.ok === true && packReport.ok === true,
+    moderationPassed: packReport.ok === true
+      && Number(packReport.metrics?.schemaValidationErrorCount || 0) === 0
+      && Number(packReport.metrics?.invalidAssetManifestEntries || 0) === 0,
+    playtestPassed: playtestValidation.ok === true && playtestReport?.playtestPassed !== false,
+    assetManifestValid: assetManifestReport.ok === true && assetPromptPlanReport.ok === true,
+    fallbackVerified,
+    diversitySuitePassed: releaseDiversityPassed(diversityReport || {}),
+    packSaveReloadPassed: releasePersistencePassed(persistenceReport || {}),
+    publicCardPrivacyPassed: publicCardReport.ok === true
+      && publicCardPrivateDataLeakCount === 0
+      && publicCardBlockedFieldCount === 0,
+    costConsentModelApproved,
+    candidateAssetsReviewed: approvals.candidateAssetsReviewed === true,
+    humanReviewComplete
+  };
+  const blockingReasons = Object.entries(releasePrerequisites)
+    .filter(([, passed]) => passed !== true)
+    .map(([key]) => key);
+  const publicReleaseEligible = blockingReasons.length === 0;
+  const gate = {
+    schemaVersion: PRODUCTION_RELEASE_GATE_VERSION,
+    packId: String(pack?.packId || ''),
+    evaluatedAtMs: nowMs,
+    releaseMode: publicReleaseEligible ? 'ready-for-controlled-release' : 'prototype-gated',
+    releasePrerequisites,
+    approvalInputs: approvals,
+    metrics: {
+      schemaErrorCount: Number(schemaReport.metrics?.schemaErrorCount || 0),
+      privateDataLeakCount: publicCardPrivateDataLeakCount,
+      blockedFieldCount: publicCardBlockedFieldCount,
+      missingAssetCount,
+      productionImageAssetCount: Number(pack?.assetScaffold?.productionImageAssetCount || 0),
+      replayabilityPromptCount: Number(diversityReport?.metrics?.promptCount || diversityReport?.metrics?.validPackCount || 0),
+      eligiblePrerequisiteCount: Object.values(releasePrerequisites).filter((passed) => passed === true).length,
+      requiredPrerequisiteCount: Object.keys(releasePrerequisites).length
+    },
+    publicReleaseEligible,
+    blockingReasons
+  };
+  return gate;
+}
+
+function validateProductionReleaseGate(gate = {}) {
+  const schemaReport = SCHEMA_REGISTRY?.productionReleaseGate
+    ? validateGeneratedSchema(gate, SCHEMA_REGISTRY.productionReleaseGate, '$.productionReleaseGate')
+    : { ok: true, errors: [] };
+  const prerequisites = gate?.releasePrerequisites || {};
+  const prerequisiteEntries = Object.entries(prerequisites);
+  const failedPrerequisites = prerequisiteEntries
+    .filter(([, passed]) => passed !== true)
+    .map(([key]) => key);
+  const allPrerequisitesPassed = prerequisiteEntries.length > 0
+    && failedPrerequisites.length === 0;
+  const blockingReasons = Array.isArray(gate?.blockingReasons) ? gate.blockingReasons : [];
+  const blockingReasonSet = new Set(blockingReasons);
+  const failedPrerequisiteSet = new Set(failedPrerequisites);
+  const blockingReasonsMatchFailures = blockingReasons.length === failedPrerequisites.length
+    && blockingReasons.every((reason) => failedPrerequisiteSet.has(reason))
+    && failedPrerequisites.every((reason) => blockingReasonSet.has(reason));
+  const approvals = gate?.approvalInputs || {};
+  const checks = [
+    {
+      id: 'PRODUCTION_RELEASE_GATE_SCHEMA_VALID',
+      passed: schemaReport.ok === true,
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
+    },
+    {
+      id: 'PRODUCTION_RELEASE_GATE_PREREQUISITES_COHERENT',
+      passed: gate?.publicReleaseEligible === allPrerequisitesPassed
+        && blockingReasonsMatchFailures
+        && Number(gate?.metrics?.eligiblePrerequisiteCount || 0) === prerequisiteEntries.filter(([, passed]) => passed === true).length
+        && Number(gate?.metrics?.requiredPrerequisiteCount || 0) === prerequisiteEntries.length,
+      measured: {
+        allPrerequisitesPassed,
+        publicReleaseEligible: gate?.publicReleaseEligible === true,
+        failedPrerequisites,
+        blockingReasonsMatchFailures
+      }
+    },
+    {
+      id: 'PRODUCTION_RELEASE_GATE_FAILS_CLOSED',
+      passed: gate?.publicReleaseEligible === true
+        ? gate?.releaseMode === 'ready-for-controlled-release' && blockingReasons.length === 0
+        : gate?.releaseMode === 'prototype-gated' && blockingReasons.length > 0,
+      measured: { releaseMode: gate?.releaseMode || null, blockingReasons }
+    },
+    {
+      id: 'PRODUCTION_RELEASE_GATE_APPROVALS_EXPLICIT',
+      passed: gate?.publicReleaseEligible !== true
+        || (
+          approvals.authModelDocumented === true
+          && approvals.costEstimateAccepted === true
+          && approvals.explicitConsentRecorded === true
+          && approvals.candidateAssetsReviewed === true
+          && /^[0-9a-f]{64}$/.test(String(approvals.humanReviewSignoffHash || ''))
+        ),
+      measured: approvals
+    },
+    {
+      id: 'PRODUCTION_RELEASE_GATE_NO_PRIVATE_OR_ASSET_LEAKS',
+      passed: Number(gate?.metrics?.privateDataLeakCount || 0) === 0
+        && Number(gate?.metrics?.blockedFieldCount || 0) === 0
+        && Number(gate?.metrics?.productionImageAssetCount || 0) === 0
+        && (
+          Number(gate?.metrics?.missingAssetCount || 0) === 0
+          || (gate?.publicReleaseEligible !== true && failedPrerequisiteSet.has('fallbackVerified'))
+        ),
+      measured: gate?.metrics || {}
+    }
+  ];
+  return {
+    ok: checks.every((check) => check.passed === true),
+    checks,
+    metrics: {
+      productionReleaseGateSchemaExists: Boolean(SCHEMA_REGISTRY?.productionReleaseGate),
+      publicReleaseEligible: gate?.publicReleaseEligible === true,
+      releaseMode: gate?.releaseMode || null,
+      blockingReasonCount: blockingReasons.length,
+      costConsentModelApproved: prerequisites.costConsentModelApproved === true,
+      humanReviewComplete: prerequisites.humanReviewComplete === true,
+      privateDataLeakCount: Number(gate?.metrics?.privateDataLeakCount || 0)
+    }
+  };
+}
+
 function normalizeGalleryTag(value = '') {
   const tag = slugForTarget(value).slice(0, 32);
   if (tag.length < 2) return '';
@@ -4475,6 +4675,7 @@ module.exports = {
   analyzePackDiversity,
   buildAssetPromptPlan,
   buildMeasuredPlaytestReport,
+  buildProductionReleaseGate,
   clearGeneratedPacksForTests,
   createGenerationBrief,
   createGeneratedPack,
@@ -4510,5 +4711,6 @@ module.exports = {
   validatePublicPackGallery,
   validatePublicPackCard,
   validatePlaytestReport,
+  validateProductionReleaseGate,
   validateGeneratedPack
 };

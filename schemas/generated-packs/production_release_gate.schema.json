@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-town-generated-pack-production-release-gate-v1",
+  "title": "Agent Town Generated Pack Production Release Gate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "packId",
+    "evaluatedAtMs",
+    "releaseMode",
+    "releasePrerequisites",
+    "approvalInputs",
+    "metrics",
+    "publicReleaseEligible",
+    "blockingReasons"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "agent-town-generated-pack-production-release-gate-v1" },
+    "packId": { "type": "string", "minLength": 3 },
+    "evaluatedAtMs": { "type": "number" },
+    "releaseMode": { "enum": ["prototype-gated", "ready-for-controlled-release"] },
+    "releasePrerequisites": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaValid",
+        "moderationPassed",
+        "playtestPassed",
+        "assetManifestValid",
+        "fallbackVerified",
+        "diversitySuitePassed",
+        "packSaveReloadPassed",
+        "publicCardPrivacyPassed",
+        "costConsentModelApproved",
+        "candidateAssetsReviewed",
+        "humanReviewComplete"
+      ],
+      "properties": {
+        "schemaValid": { "type": "boolean" },
+        "moderationPassed": { "type": "boolean" },
+        "playtestPassed": { "type": "boolean" },
+        "assetManifestValid": { "type": "boolean" },
+        "fallbackVerified": { "type": "boolean" },
+        "diversitySuitePassed": { "type": "boolean" },
+        "packSaveReloadPassed": { "type": "boolean" },
+        "publicCardPrivacyPassed": { "type": "boolean" },
+        "costConsentModelApproved": { "type": "boolean" },
+        "candidateAssetsReviewed": { "type": "boolean" },
+        "humanReviewComplete": { "type": "boolean" }
+      }
+    },
+    "approvalInputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authModelDocumented",
+        "costEstimateAccepted",
+        "explicitConsentRecorded",
+        "candidateAssetsReviewed",
+        "humanReviewSignoffHash"
+      ],
+      "properties": {
+        "authModelDocumented": { "type": "boolean" },
+        "costEstimateAccepted": { "type": "boolean" },
+        "explicitConsentRecorded": { "type": "boolean" },
+        "candidateAssetsReviewed": { "type": "boolean" },
+        "humanReviewSignoffHash": { "type": "string", "pattern": "^$|^[0-9a-f]{64}$" }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaErrorCount",
+        "privateDataLeakCount",
+        "blockedFieldCount",
+        "missingAssetCount",
+        "productionImageAssetCount",
+        "replayabilityPromptCount",
+        "eligiblePrerequisiteCount",
+        "requiredPrerequisiteCount"
+      ],
+      "properties": {
+        "schemaErrorCount": { "type": "number", "minimum": 0 },
+        "privateDataLeakCount": { "type": "number", "minimum": 0 },
+        "blockedFieldCount": { "type": "number", "minimum": 0 },
+        "missingAssetCount": { "type": "number", "minimum": 0 },
+        "productionImageAssetCount": { "type": "number", "minimum": 0 },
+        "replayabilityPromptCount": { "type": "number", "minimum": 0 },
+        "eligiblePrerequisiteCount": { "type": "number", "minimum": 0 },
+        "requiredPrerequisiteCount": { "type": "number", "minimum": 0 }
+      }
+    },
+    "publicReleaseEligible": { "type": "boolean" },
+    "blockingReasons": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "schemaValid",
+          "moderationPassed",
+          "playtestPassed",
+          "assetManifestValid",
+          "fallbackVerified",
+          "diversitySuitePassed",
+          "packSaveReloadPassed",
+          "publicCardPrivacyPassed",
+          "costConsentModelApproved",
+          "candidateAssetsReviewed",
+          "humanReviewComplete"
+        ]
+      }
+    }
+  }
+}

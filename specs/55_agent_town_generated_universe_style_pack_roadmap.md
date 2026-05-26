@@ -417,3 +417,29 @@ Generated packs now include a `multiSurfaceCompatibility` contract that maps one
   "firstLoopStillCompletes": true
 }
 ```
+
+## GU-18 Production Release Gate Slice
+
+Generated packs now have a standalone `productionReleaseGate` contract for controlled player-facing readiness. The gate is a report, not a generated-pack subdocument and not default gameplay visibility. It evaluates strict schemas, safety/moderation, measured first-loop evidence, asset manifest and prompt-plan validity, deterministic fallback safety, ten-prompt diversity, durable save/reload/import evidence, public-card privacy, candidate asset review, explicit auth/cost/consent approval, and human review signoff. It fails closed by default: missing approval evidence produces a valid `prototype-gated` report with blocking reasons, not a public release claim.
+
+```json
+{
+  "productionReleaseGateSchemaExists": true,
+  "releaseGateFeatureGated": true,
+  "schemaValid": true,
+  "moderationPassed": true,
+  "playtestPassed": true,
+  "assetManifestValid": true,
+  "fallbackVerified": true,
+  "diversitySuitePassed": true,
+  "packSaveReloadPassed": true,
+  "publicCardPrivacyPassed": true,
+  "costConsentModelApproved": true,
+  "candidateAssetsReviewed": true,
+  "privateDataLeakCount": 0,
+  "humanReviewComplete": true,
+  "blockingReasonsMatchFailedPrerequisites": true,
+  "failClosedWithoutApprovals": true,
+  "publicReleaseEligible": true
+}
+```

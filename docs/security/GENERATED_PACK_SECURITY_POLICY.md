@@ -28,6 +28,7 @@ Status: prototype-gated
 - Generated multi-surface compatibility profiles must remain visual-only across Z1 settlement, Z2 region, route, public-card, and sandbox surfaces; private public-card data, unsafe sandbox labels, V5 tool changes, server-rule changes, unknown surfaces, formulas, and tool authority are forbidden.
 - Player-visible generated text must be escaped in DOM rendering.
 - Production image generation requires explicit consent and a documented cost/auth model before any user-facing release claim.
+- Public release eligibility must come from the standalone `productionReleaseGate` report, which fails closed unless every prerequisite, explicit approval, candidate review, and human signoff is present.
 
 ## Release Gate
 
@@ -43,6 +44,11 @@ Status: prototype-gated
   "arbitraryToolMutationFormulaCount": 0,
   "schemaRegistryExists": true,
   "schemasValidatedIndependently": true,
+  "productionReleaseGateSchemaExists": true,
+  "releaseGateFeatureGated": true,
+  "releaseModeWhenIncomplete": "prototype-gated",
+  "failClosedWithoutApprovals": true,
+  "blockingReasonsMatchFailedPrerequisites": true,
   "dangerousFieldRejectCountMin": 20,
   "candidateFolderCount": 23,
   "generationJobLogCount": 23,
@@ -119,6 +125,8 @@ Status: prototype-gated
   "productionImageAssetCount": 0,
   "externalImageModelUsed": false,
   "explicitConsentRequiredForImageGeneration": true,
+  "costConsentModelApproved": true,
+  "candidateAssetsReviewed": true,
   "fallbackVerified": true,
   "humanReviewComplete": true,
   "publicReleaseEligible": true

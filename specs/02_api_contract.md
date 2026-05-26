@@ -2756,6 +2756,45 @@ Imports a generated-pack export into the current owner session. The server rejec
 ### POST `/api/world/generated-pack/remix`
 Creates a child generated pack from a parent durable pack and a new prompt. The child records `remix.parentPackId`, `remix.rootPackId`, `remix.generation`, and lineage entries. Remixing does not add tools, mutations, formulas, or server-rule overrides.
 
+### POST `/api/world/generated-pack/release-gate`
+Evaluates the standalone production readiness report for the current generated pack. This endpoint requires the generated-pack feature flag and the current wallet/session owner. It does not generate assets, does not approve production image usage, does not alter generated-pack records, and does not change canonical world-grid simulation rules.
+
+Request may include:
+```json
+{
+  "diversityReport": { "ok": true, "metrics": { "promptCount": 10 } },
+  "publicCard": { "schemaVersion": "agent-town-generated-pack-public-card-v1" },
+  "cardId": "gen_card_...",
+  "persistenceReport": {
+    "durablePackStorage": true,
+    "restartReloadPass": true,
+    "exportImportRoundTrip": true,
+    "invalidImportRejected": true,
+    "privateDataLeakCount": 0
+  },
+  "approvalInputs": {
+    "authModelDocumented": true,
+    "costEstimateAccepted": true,
+    "explicitConsentRecorded": true,
+    "candidateAssetsReviewed": true,
+    "humanReviewSignoffHash": "64 hex chars"
+  }
+}
+```
+
+Response includes:
+- `releaseGate.schemaVersion="agent-town-generated-pack-production-release-gate-v1"`;
+- `releaseGate.releaseMode`, either `prototype-gated` or `ready-for-controlled-release`;
+- `releaseGate.releasePrerequisites` for schema, moderation, playtest, asset manifest, fallback, diversity, persistence, public-card privacy, consent/cost/auth approval, candidate review, and human review;
+- `releaseGate.blockingReasons`, which must exactly match failed prerequisites;
+- `validationReport`, which can be valid even when `publicReleaseEligible=false`.
+
+Release-gate invariants:
+- missing approval or evidence returns a valid fail-closed `prototype-gated` report;
+- `publicReleaseEligible=true` requires all prerequisites to be true, `blockingReasons=[]`, zero private-data leaks, zero missing assets, zero production image assets, explicit consent/cost/auth approval, candidate asset review, and a 64-hex human review signoff hash;
+- forged eligibility, mismatched blocking reasons, secret-like fields, raw prompt instructions, production asset leaks, and private-card data fail validation;
+- the route remains hidden in default gameplay unless `FEATURE_WORLD_GRID_GENERATED_PACKS` is enabled.
+
 ### POST `/api/world/generated-pack/public-card`
 Publishes an unlisted public-safe card for a validated generated pack. This endpoint requires the generated-pack feature flag and the current wallet/session owner.
 
