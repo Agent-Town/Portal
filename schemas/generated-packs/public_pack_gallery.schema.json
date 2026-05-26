@@ -1,0 +1,285 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-town-generated-pack-public-gallery-v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "generatedAtMs",
+    "query",
+    "page",
+    "metrics",
+    "entries"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "agent-town-generated-pack-gallery-v1"
+    },
+    "generatedAtMs": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["search", "tags", "sort"],
+      "properties": {
+        "search": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]{2,32}$"
+          }
+        },
+        "sort": {
+          "enum": ["newest", "oldest", "title"]
+        }
+      }
+    },
+    "page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cursor", "nextCursor", "limit", "returnedCount", "totalApprovedCount"],
+      "properties": {
+        "cursor": {
+          "type": "string",
+          "pattern": "^[0-9]*$"
+        },
+        "nextCursor": {
+          "type": "string",
+          "pattern": "^[0-9]*$"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "returnedCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "totalApprovedCount": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "approvedOnlyGallery",
+        "moderationMetadataRequired",
+        "privateDataLeakCount",
+        "hiddenPendingOrRejectedCount"
+      ],
+      "properties": {
+        "approvedOnlyGallery": {
+          "type": "boolean"
+        },
+        "moderationMetadataRequired": {
+          "type": "boolean"
+        },
+        "privateDataLeakCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hiddenPendingOrRejectedCount": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schemaVersion",
+          "cardId",
+          "packId",
+          "packHash",
+          "title",
+          "styleSummary",
+          "promptKeywordHints",
+          "screenshot",
+          "assetManifestSummary",
+          "tags",
+          "approvalStatus",
+          "approvedAtMs",
+          "moderation",
+          "reviewerSignoff"
+        ],
+        "properties": {
+          "schemaVersion": {
+            "const": "agent-town-generated-pack-gallery-entry-v1"
+          },
+          "cardId": {
+            "type": "string",
+            "pattern": "^gen_card_[a-f0-9]{16}$"
+          },
+          "packId": {
+            "type": "string",
+            "pattern": "^gen_pack_[a-f0-9]{16}$"
+          },
+          "packHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 3
+          },
+          "styleSummary": {
+            "type": "string",
+            "minLength": 12
+          },
+          "promptKeywordHints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "screenshot": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["present", "source", "hash", "width", "height"],
+            "properties": {
+              "present": {
+                "const": true
+              },
+              "source": {
+                "type": "string",
+                "minLength": 1
+              },
+              "hash": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "width": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          },
+          "assetManifestSummary": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "assetCount",
+              "materialCount",
+              "generatedTextCount",
+              "plannedCandidateCount",
+              "productionImageAssetCount",
+              "canonicalTargets"
+            ],
+            "properties": {
+              "assetCount": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "materialCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "generatedTextCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "plannedCandidateCount": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "productionImageAssetCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "canonicalTargets": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]{2,32}$"
+            }
+          },
+          "approvalStatus": {
+            "const": "approved"
+          },
+          "approvedAtMs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "moderation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status",
+              "rawPromptIncluded",
+              "privateDataLeakCount",
+              "blockedFieldCount",
+              "reviewedAtMs"
+            ],
+            "properties": {
+              "status": {
+                "const": "passed"
+              },
+              "rawPromptIncluded": {
+                "const": false
+              },
+              "privateDataLeakCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "blockedFieldCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "reviewedAtMs": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "reviewerSignoff": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "reviewerId",
+              "signedOffAtMs",
+              "signoffHash"
+            ],
+            "properties": {
+              "reviewerId": {
+                "type": "string",
+                "pattern": "^[a-z0-9-]{3,48}$"
+              },
+              "signedOffAtMs": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "signoffHash": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

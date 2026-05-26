@@ -16,6 +16,9 @@ const GENERATED_ASSET_MANIFEST_VERSION = 'agent-town-generated-asset-manifest-v1
 const GENERATED_PACK_EXPORT_VERSION = 'agent-town-generated-pack-export-v1';
 const GENERATED_PACK_MIGRATION_VERSION = 1;
 const PUBLIC_PACK_CARD_VERSION = 'agent-town-generated-pack-public-card-v1';
+const PUBLIC_PACK_GALLERY_VERSION = 'agent-town-generated-pack-gallery-v1';
+const PUBLIC_PACK_GALLERY_ENTRY_VERSION = 'agent-town-generated-pack-gallery-entry-v1';
+const PUBLIC_PACK_GALLERY_CURATION_VERSION = 'agent-town-generated-pack-gallery-curation-v1';
 const DEFAULT_CANDIDATE_ROOT = 'data/generated-packs';
 const DEFAULT_DURABLE_ROOT = 'data/generated-packs-durable';
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
@@ -1789,6 +1792,33 @@ function publicCardPath(cardId = '') {
   return relativePackPath('public-cards', `${slugForTarget(cardId)}.json`);
 }
 
+function publicCardDirectory() {
+  return path.resolve(durableRoot(), 'public-cards');
+}
+
+function readPublicCardRecord(cardId = '') {
+  const key = String(cardId || '').trim();
+  if (!key) return null;
+  const cached = publicCardStore.get(key);
+  if (cached) return clone(cached);
+  const record = safeReadJson(publicCardPath(key));
+  if (!record?.cardId) return null;
+  publicCardStore.set(key, clone(record));
+  return clone(record);
+}
+
+function listPublicCardRecords() {
+  const dir = publicCardDirectory();
+  if (!fs.existsSync(dir)) return [];
+  const root = durableRoot();
+  if (!ensureInsideRoot(root, dir)) return [];
+  return fs.readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
+    .map((entry) => safeReadJson(relativePackPath('public-cards', entry.name)))
+    .filter((record) => record?.schemaVersion === 'agent-town-generated-pack-public-card-record-v1')
+    .sort((a, b) => String(a.cardId || '').localeCompare(String(b.cardId || '')));
+}
+
 function validateStoredPack(pack = {}) {
   const validationReport = validateGeneratedPack(pack);
   if (!validationReport.ok) {
@@ -2103,8 +2133,8 @@ function publicCardBlockedPaths(value, pathLabel = '$', matches = []) {
   if (!value || typeof value !== 'object') return matches;
   for (const [key, child] of Object.entries(value)) {
     const childPath = `${pathLabel}.${key}`;
-    const allowedModerationKeys = new Set(['$.moderation.rawPromptIncluded', '$.moderation.privateDataLeakCount', '$.moderation.blockedFieldCount']);
-    if (!allowedModerationKeys.has(childPath) && /rawprompt|normalizedprompt|systemprompt|developerprompt|brain|wallet|provider|oauth|debug|secret|credential|token/i.test(key)) {
+    const allowedModerationKey = /\.moderation\.(rawPromptIncluded|privateDataLeakCount|blockedFieldCount)$/.test(childPath);
+    if (!allowedModerationKey && /rawprompt|normalizedprompt|systemprompt|developerprompt|brain|wallet|provider|oauth|debug|secret|credential|token/i.test(key)) {
       matches.push({ path: childPath, blockedTerms: [key], blockedPromptPatterns: [] });
     }
     publicCardBlockedPaths(child, childPath, matches);
@@ -2224,17 +2254,100 @@ function validatePublicPackCard(card = {}, owner = {}) {
   };
 }
 
+function normalizeGalleryTag(value = '') {
+  const tag = slugForTarget(value).slice(0, 32);
+  if (tag.length < 2) return '';
+  if (PUBLIC_CARD_FORBIDDEN_TERMS.some((term) => tag.includes(slugForTarget(term)))) return '';
+  return tag;
+}
+
+function normalizeReviewerId(value = '') {
+  const reviewerId = slugForTarget(value || 'generated-pack-review').slice(0, 48);
+  if (reviewerId.length < 3) return 'generated-pack-review';
+  if (PUBLIC_CARD_FORBIDDEN_TERMS.some((term) => reviewerId.includes(slugForTarget(term)))) {
+    return 'generated-pack-review';
+  }
+  return reviewerId;
+}
+
+function normalizeGalleryTags(tags = [], card = {}) {
+  const rawTags = Array.isArray(tags)
+    ? tags
+    : String(tags || '').split(',');
+  const fallbackTags = [
+    ...(Array.isArray(card?.promptKeywordHints) ? card.promptKeywordHints : []),
+    String(card?.title || '').split(/\s+/)[0]
+  ];
+  return [...new Set([...rawTags, ...fallbackTags]
+    .map(normalizeGalleryTag)
+    .filter(Boolean))]
+    .slice(0, 8);
+}
+
+function normalizeGallerySearch(value = '') {
+  const forbiddenTokens = new Set(PUBLIC_CARD_FORBIDDEN_TERMS
+    .flatMap((term) => slugForTarget(term).split('-'))
+    .filter(Boolean));
+  const tokens = String(value || '')
+    .toLowerCase()
+    .match(/[a-z0-9]+/g) || [];
+  return tokens
+    .filter((token) => token.length >= 2)
+    .filter((token) => !forbiddenTokens.has(token))
+    .slice(0, 8)
+    .join(' ');
+}
+
+function publicCardReviewModeration(card = {}, validationReport = null, nowMs = Date.now()) {
+  const report = validationReport || validatePublicPackCard(card);
+  return {
+    status: report.ok === true ? 'passed' : 'failed',
+    rawPromptIncluded: report.metrics?.rawPromptIncluded === true,
+    privateDataLeakCount: Number(report.metrics?.privateDataLeakCount || 0),
+    blockedFieldCount: Number(report.metrics?.blockedFieldCount || 0),
+    reviewedAtMs: nowMs
+  };
+}
+
+function defaultPublicCardCuration(card = {}, validationReport = null, nowMs = Date.now()) {
+  return {
+    schemaVersion: PUBLIC_PACK_GALLERY_CURATION_VERSION,
+    approvalStatus: 'pending',
+    tags: normalizeGalleryTags([], card),
+    moderation: publicCardReviewModeration(card, validationReport, nowMs),
+    reviewerSignoff: null
+  };
+}
+
+function signoffHashForReview({ cardId = '', decision = '', reviewerId = '', tags = [], signoffNote = '', nowMs = 0 } = {}) {
+  return sha256(JSON.stringify({
+    cardId,
+    decision,
+    reviewerId,
+    tags,
+    signoffNote: String(signoffNote || '').slice(0, 240),
+    nowMs
+  }));
+}
+
+function persistPublicCardRecord(record = {}) {
+  safeWriteJson(publicCardPath(record.cardId), record);
+  publicCardStore.set(record.cardId, clone(record));
+  return clone(record);
+}
+
 function persistPublicPackCard(card = {}, validationReport = null) {
+  const report = validationReport ? clone(validationReport) : validatePublicPackCard(card);
+  const savedAtMs = Date.now();
   const record = {
     schemaVersion: 'agent-town-generated-pack-public-card-record-v1',
     cardId: card.cardId,
-    savedAtMs: Date.now(),
+    savedAtMs,
     publicCard: clone(card),
-    validationReport: validationReport ? clone(validationReport) : validatePublicPackCard(card)
+    validationReport: report,
+    curation: defaultPublicCardCuration(card, report, savedAtMs)
   };
-  safeWriteJson(publicCardPath(card.cardId), record);
-  publicCardStore.set(card.cardId, clone(record));
-  return clone(record);
+  return persistPublicCardRecord(record);
 }
 
 function publishPublicPackCard(owner = {}, packId = '', { nowMs = Date.now() } = {}) {
@@ -2261,14 +2374,272 @@ function publishPublicPackCard(owner = {}, packId = '', { nowMs = Date.now() } =
 function getPublicPackCard(cardId = '') {
   const key = String(cardId || '').trim();
   if (!key) return null;
-  const cached = publicCardStore.get(key);
-  if (cached?.publicCard && cached?.validationReport?.ok === true) return clone(cached.publicCard);
-  const record = safeReadJson(publicCardPath(key));
+  const record = readPublicCardRecord(key);
   if (!record?.publicCard) return null;
   const validationReport = validatePublicPackCard(record.publicCard);
   if (!validationReport.ok) return null;
   publicCardStore.set(key, clone({ ...record, validationReport }));
   return clone(record.publicCard);
+}
+
+function reviewPublicPackCard(cardId = '', review = {}, { nowMs = Date.now() } = {}) {
+  const record = readPublicCardRecord(cardId);
+  if (!record?.publicCard) {
+    const error = new Error('PUBLIC_CARD_NOT_FOUND');
+    error.details = { cardId };
+    throw error;
+  }
+  const decision = String(review?.decision || 'approve').trim().toLowerCase();
+  if (!['approve', 'reject'].includes(decision)) {
+    const error = new Error('PUBLIC_GALLERY_REVIEW_REJECTED');
+    error.details = { reason: 'INVALID_REVIEW_DECISION', decision };
+    throw error;
+  }
+  const validationReport = validatePublicPackCard(record.publicCard);
+  if (!validationReport.ok && decision === 'approve') {
+    const error = new Error('PUBLIC_PACK_CARD_REJECTED');
+    error.details = { validationReport };
+    throw error;
+  }
+  const reviewerId = normalizeReviewerId(review?.reviewerId);
+  const tags = normalizeGalleryTags(review?.tags, record.publicCard);
+  const moderation = publicCardReviewModeration(record.publicCard, validationReport, nowMs);
+  const approvalStatus = decision === 'approve' ? 'approved' : 'rejected';
+  const reviewerSignoff = {
+    reviewerId,
+    signedOffAtMs: nowMs,
+    signoffHash: signoffHashForReview({
+      cardId: record.cardId,
+      decision,
+      reviewerId,
+      tags,
+      signoffNote: review?.signoffNote,
+      nowMs
+    })
+  };
+  const curation = {
+    schemaVersion: PUBLIC_PACK_GALLERY_CURATION_VERSION,
+    approvalStatus,
+    tags,
+    moderation,
+    reviewerSignoff
+  };
+  const updated = persistPublicCardRecord({
+    ...record,
+    savedAtMs: nowMs,
+    validationReport,
+    curation
+  });
+  return {
+    publicCard: clone(updated.publicCard),
+    curation: clone(updated.curation),
+    validationReport
+  };
+}
+
+function unpublishPublicPackCard(cardId = '', review = {}, { nowMs = Date.now() } = {}) {
+  const record = readPublicCardRecord(cardId);
+  if (!record?.cardId) {
+    const error = new Error('PUBLIC_CARD_NOT_FOUND');
+    error.details = { cardId };
+    throw error;
+  }
+  const reviewerId = normalizeReviewerId(review?.reviewerId);
+  const tags = normalizeGalleryTags(review?.tags, record.publicCard || {});
+  const validationReport = record.publicCard ? validatePublicPackCard(record.publicCard) : record.validationReport || null;
+  const curation = {
+    schemaVersion: PUBLIC_PACK_GALLERY_CURATION_VERSION,
+    approvalStatus: 'unpublished',
+    tags,
+    moderation: record.publicCard
+      ? publicCardReviewModeration(record.publicCard, validationReport, nowMs)
+      : {
+          status: 'passed',
+          rawPromptIncluded: false,
+          privateDataLeakCount: 0,
+          blockedFieldCount: 0,
+          reviewedAtMs: nowMs
+        },
+    reviewerSignoff: {
+      reviewerId,
+      signedOffAtMs: nowMs,
+      signoffHash: signoffHashForReview({
+        cardId: record.cardId,
+        decision: 'unpublish',
+        reviewerId,
+        tags,
+        signoffNote: review?.signoffNote,
+        nowMs
+      })
+    }
+  };
+  persistPublicCardRecord({
+    ...record,
+    savedAtMs: nowMs,
+    publicCard: null,
+    curation,
+    unpublishedAtMs: nowMs
+  });
+  return {
+    unpublishReport: {
+      schemaVersion: 'agent-town-generated-pack-unpublish-report-v1',
+      cardId: record.cardId,
+      unpublishedAtMs: nowMs,
+      publicCardRemoved: true,
+      galleryVisible: false
+    }
+  };
+}
+
+function galleryEntryFromRecord(record = {}) {
+  const card = record.publicCard;
+  const curation = record.curation || defaultPublicCardCuration(card, record.validationReport, record.savedAtMs || Date.now());
+  if (!card || curation.approvalStatus !== 'approved') return null;
+  const validationReport = validatePublicPackCard(card);
+  if (!validationReport.ok) return null;
+  const moderation = curation.moderation || publicCardReviewModeration(card, validationReport, record.savedAtMs || Date.now());
+  const reviewerSignoff = curation.reviewerSignoff || null;
+  if (moderation.status !== 'passed' || !reviewerSignoff?.reviewerId || !reviewerSignoff?.signoffHash) return null;
+  return {
+    schemaVersion: PUBLIC_PACK_GALLERY_ENTRY_VERSION,
+    cardId: card.cardId,
+    packId: card.packId,
+    packHash: card.packHash,
+    title: card.title,
+    styleSummary: card.styleSummary,
+    promptKeywordHints: clone(card.promptKeywordHints || []),
+    screenshot: clone(card.screenshot || {}),
+    assetManifestSummary: clone(card.assetManifestSummary || {}),
+    tags: normalizeGalleryTags(curation.tags, card),
+    approvalStatus: 'approved',
+    approvedAtMs: Number(reviewerSignoff.signedOffAtMs || record.savedAtMs || 0),
+    moderation: {
+      status: 'passed',
+      rawPromptIncluded: moderation.rawPromptIncluded === true,
+      privateDataLeakCount: Number(moderation.privateDataLeakCount || 0),
+      blockedFieldCount: Number(moderation.blockedFieldCount || 0),
+      reviewedAtMs: Number(moderation.reviewedAtMs || reviewerSignoff.signedOffAtMs || record.savedAtMs || 0)
+    },
+    reviewerSignoff: {
+      reviewerId: normalizeReviewerId(reviewerSignoff.reviewerId),
+      signedOffAtMs: Number(reviewerSignoff.signedOffAtMs || record.savedAtMs || 0),
+      signoffHash: String(reviewerSignoff.signoffHash || '')
+    }
+  };
+}
+
+function galleryEntrySearchText(entry = {}) {
+  return [
+    entry.title,
+    entry.styleSummary,
+    ...(Array.isArray(entry.promptKeywordHints) ? entry.promptKeywordHints : []),
+    ...(Array.isArray(entry.tags) ? entry.tags : [])
+  ].join(' ').toLowerCase();
+}
+
+function validatePublicPackGallery(gallery = {}) {
+  const schemaReport = SCHEMA_REGISTRY?.publicPackGallery
+    ? validateGeneratedSchema(gallery, SCHEMA_REGISTRY.publicPackGallery, '$.publicPackGallery')
+    : { ok: true, errors: [] };
+  const entries = Array.isArray(gallery?.entries) ? gallery.entries : [];
+  const blockedFields = publicCardBlockedPaths({ entries });
+  const privateDataLeakCount = Math.max(Number(gallery?.metrics?.privateDataLeakCount || 0), blockedFields.length);
+  const checks = [
+    {
+      id: 'PUBLIC_GALLERY_SCHEMA_VALID',
+      passed: schemaReport.ok === true,
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
+    },
+    {
+      id: 'PUBLIC_GALLERY_APPROVED_ONLY',
+      passed: entries.every((entry) => entry?.approvalStatus === 'approved'),
+      measured: { entryCount: entries.length }
+    },
+    {
+      id: 'PUBLIC_GALLERY_MODERATION_METADATA_REQUIRED',
+      passed: entries.every((entry) => entry?.moderation?.status === 'passed'
+        && entry?.moderation?.rawPromptIncluded === false
+        && Number(entry?.moderation?.privateDataLeakCount || 0) === 0
+        && Number(entry?.moderation?.blockedFieldCount || 0) === 0
+        && Boolean(entry?.reviewerSignoff?.reviewerId)
+        && /^[a-f0-9]{64}$/.test(String(entry?.reviewerSignoff?.signoffHash || ''))),
+      measured: {
+        missingModerationCount: entries.filter((entry) => !entry?.moderation || !entry?.reviewerSignoff).length
+      }
+    },
+    {
+      id: 'PUBLIC_GALLERY_NO_PRIVATE_STATE',
+      passed: privateDataLeakCount === 0,
+      measured: {
+        privateDataLeakCount,
+        blockedFields: blockedFields.slice(0, 5)
+      }
+    }
+  ];
+  return {
+    ok: checks.every((check) => check.passed === true),
+    checks,
+    metrics: {
+      publicGallerySchemaExists: Boolean(SCHEMA_REGISTRY?.publicPackGallery),
+      approvedOnlyGallery: checks.find((check) => check.id === 'PUBLIC_GALLERY_APPROVED_ONLY')?.passed === true,
+      moderationMetadataRequired: checks.find((check) => check.id === 'PUBLIC_GALLERY_MODERATION_METADATA_REQUIRED')?.passed === true,
+      privateDataLeakCount
+    }
+  };
+}
+
+function listPublicPackGallery({ search = '', tags = [], sort = 'newest', cursor = '0', limit = 24, nowMs = Date.now() } = {}) {
+  const normalizedSearch = normalizeGallerySearch(search);
+  const requiredTags = (Array.isArray(tags) ? tags : String(tags || '').split(','))
+    .map(normalizeGalleryTag)
+    .filter(Boolean);
+  const sortMode = ['newest', 'oldest', 'title'].includes(String(sort || '').trim()) ? String(sort || '').trim() : 'newest';
+  const pageLimit = Math.max(1, Math.min(50, Number.parseInt(limit, 10) || 24));
+  const offset = Math.max(0, Number.parseInt(cursor, 10) || 0);
+  const records = listPublicCardRecords();
+  const hiddenPendingOrRejectedCount = records.filter((record) => record?.publicCard && record?.curation?.approvalStatus !== 'approved').length;
+  const approvedEntries = records
+    .map(galleryEntryFromRecord)
+    .filter(Boolean)
+    .filter((entry) => {
+      if (requiredTags.length > 0 && !requiredTags.every((tag) => entry.tags.includes(tag))) return false;
+      if (!normalizedSearch) return true;
+      return normalizedSearch.split(/\s+/).every((term) => galleryEntrySearchText(entry).includes(term));
+    })
+    .sort((a, b) => {
+      if (sortMode === 'oldest') return a.approvedAtMs - b.approvedAtMs || a.cardId.localeCompare(b.cardId);
+      if (sortMode === 'title') return a.title.localeCompare(b.title) || b.approvedAtMs - a.approvedAtMs;
+      return b.approvedAtMs - a.approvedAtMs || a.cardId.localeCompare(b.cardId);
+    });
+  const entries = approvedEntries.slice(offset, offset + pageLimit);
+  const nextOffset = offset + entries.length;
+  const gallery = {
+    schemaVersion: PUBLIC_PACK_GALLERY_VERSION,
+    generatedAtMs: nowMs,
+    query: {
+      search: normalizedSearch,
+      tags: requiredTags,
+      sort: sortMode
+    },
+    page: {
+      cursor: String(offset),
+      nextCursor: nextOffset < approvedEntries.length ? String(nextOffset) : '',
+      limit: pageLimit,
+      returnedCount: entries.length,
+      totalApprovedCount: approvedEntries.length
+    },
+    metrics: {
+      approvedOnlyGallery: entries.every((entry) => entry.approvalStatus === 'approved'),
+      moderationMetadataRequired: entries.every((entry) => entry.moderation?.status === 'passed' && Boolean(entry.reviewerSignoff?.signoffHash)),
+      privateDataLeakCount: publicCardBlockedPaths({ entries }).length,
+      hiddenPendingOrRejectedCount
+    },
+    entries
+  };
+  return {
+    gallery,
+    validationReport: validatePublicPackGallery(gallery)
+  };
 }
 
 function diversityTokenSet(parts = []) {
@@ -2524,16 +2895,20 @@ module.exports = {
   generateAndStorePack,
   getPublicPackCard,
   importGeneratedPack,
+  listPublicPackGallery,
   normalizePrompt,
   publishPublicPackCard,
   recordPlaytestReport,
   reloadGeneratedPack,
+  reviewPublicPackCard,
   remixGeneratedPack,
   scaffoldAssetGenerationJobs,
+  unpublishPublicPackCard,
   validateGeneratedPackSchemas,
   validateAssetManifest,
   validateAssetPromptPlan,
   validateGenerationBrief,
+  validatePublicPackGallery,
   validatePublicPackCard,
   validatePlaytestReport,
   validateGeneratedPack

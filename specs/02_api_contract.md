@@ -2730,6 +2730,54 @@ Public-card invariants:
 ### GET `/api/world/generated-pack/public-card/:cardId`
 Loads a published unlisted public card by ID without auth. This endpoint does not list cards, does not expose full generated-pack records, and does not expose owner/session identifiers.
 
+### GET `/api/world/generated-pack/gallery`
+Loads the curated public generated-pack gallery without auth.
+
+Query:
+- `q` or `query`: optional public-safe search terms;
+- `tags` or `tag`: optional comma-separated tag filter;
+- `sort`: `newest`, `oldest`, or `title`;
+- `cursor`: numeric offset cursor;
+- `limit`: 1 to 50.
+
+Gallery invariants:
+- schema is `agent-town-generated-pack-gallery-v1`;
+- entries are `agent-town-generated-pack-gallery-entry-v1`;
+- only `approvalStatus="approved"` entries are returned;
+- pending, rejected, and unpublished cards are hidden;
+- entries include moderation metadata, reviewer signoff hash, tags, screenshot metadata, and asset-manifest summary;
+- raw prompt fields, owner/session identifiers, Brain/provider/debug/wallet fields, private reviewer notes, secrets, tokens, and credentials are absent.
+
+### POST `/api/world/generated-pack/gallery/review`
+Approves or rejects a generated-pack public card for the curated gallery. This endpoint requires the generated-pack feature flag and the current wallet/session owner.
+
+Body:
+```json
+{
+  "cardId": "gen_card_...",
+  "decision": "approve",
+  "reviewerId": "qa-style-reviewer",
+  "tags": ["cozy", "frontier"],
+  "signoffNote": "stored only as a public-safe signoff hash"
+}
+```
+
+Review invariants:
+- approving requires a valid public card and writes `approvalStatus="approved"`;
+- rejecting writes `approvalStatus="rejected"` and keeps the card out of gallery results;
+- reviewer notes are not exposed in the public gallery;
+- invalid cards return `PUBLIC_PACK_CARD_REJECTED`;
+- missing cards return `PUBLIC_CARD_NOT_FOUND`.
+
+### POST `/api/world/generated-pack/gallery/unpublish`
+Rolls back a public card publication. This endpoint requires the generated-pack feature flag and the current wallet/session owner.
+
+Unpublish invariants:
+- writes an unpublish report with `publicCardRemoved=true`;
+- direct `GET /api/world/generated-pack/public-card/:cardId` returns `PUBLIC_CARD_NOT_FOUND` after unpublish;
+- the card is absent from curated gallery results;
+- generated-pack records and canonical server simulation rules are not changed.
+
 ### POST `/api/world/generated-pack/playtest-report`
 Records the measured generated-pack first-loop report. Passing reports require measured scores, screenshot evidence, clean console state, zero unhandled missing assets, canonical payload integrity, and generated-pack validation.
 

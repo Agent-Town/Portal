@@ -295,3 +295,25 @@ Generated packs can now publish an unlisted public card after a measured playtes
   "rawPromptStored": false
 }
 ```
+
+## GU-12 Curated Pack Gallery Slice
+
+Approved public cards can now be promoted into a public-safe curated gallery without exposing generated-pack records, owner/session identifiers, raw prompts, Brain/provider/debug fields, or private review notes. Gallery review and unpublish controls remain authenticated and generated-pack feature-gated. The gallery read route is auth-free, returns only approved entries, supports search/filter/sort/pagination, requires moderation metadata plus reviewer signoff, and removes unpublished cards from public lookup and gallery results.
+
+```json
+{
+  "publicGallerySchemaExists": true,
+  "approvedOnlyGallery": true,
+  "pendingRejectedHidden": true,
+  "authNotRequiredForPublicGallery": true,
+  "galleryReviewFeatureGated": true,
+  "moderationMetadataRequired": true,
+  "reviewerSignoffRequired": true,
+  "packTagsPresent": true,
+  "searchFilterSortPagination": true,
+  "unpublishWorks": true,
+  "publicCardRemovedOnUnpublish": true,
+  "privateDataLeakCount": 0,
+  "rawPromptStored": false
+}
+```

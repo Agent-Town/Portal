@@ -48,10 +48,13 @@ const {
   generateAndStorePack,
   getPublicPackCard,
   importGeneratedPack,
+  listPublicPackGallery,
   publishPublicPackCard,
   recordPlaytestReport,
   reloadGeneratedPack,
-  remixGeneratedPack
+  reviewPublicPackCard,
+  remixGeneratedPack,
+  unpublishPublicPackCard
 } = require('./generated_pack');
 
 const WORLD_GRID_TOOLS = [
@@ -174,6 +177,14 @@ const WORLD_GRID_TOOLS = [
   {
     name: 'et.world.generated_pack.public_card',
     description: 'Publish an unlisted public-safe generated-pack card with no owner, wallet, provider, Brain, debug, or raw prompt fields.'
+  },
+  {
+    name: 'et.world.generated_pack.gallery_review',
+    description: 'Approve or reject a generated-pack public card for the curated gallery with public-safe signoff metadata.'
+  },
+  {
+    name: 'et.world.generated_pack.gallery_unpublish',
+    description: 'Unpublish a generated-pack public card and remove it from public card lookup and gallery results.'
   }
 ];
 
@@ -287,6 +298,28 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       throw error;
     }
   }
+
+  router.get('/api/world/generated-pack/gallery', (req, res) => {
+    try {
+      const tags = req.query?.tags || req.query?.tag || '';
+      const result = listPublicPackGallery({
+        search: req.query?.q || req.query?.query || '',
+        tags: Array.isArray(tags) ? tags : String(tags || '').split(','),
+        sort: req.query?.sort,
+        cursor: req.query?.cursor,
+        limit: req.query?.limit,
+        nowMs: Date.now()
+      });
+      return res.json({
+        ok: true,
+        authRequired: false,
+        ...result
+      });
+    } catch (error) {
+      const normalized = normalizeError(error);
+      return res.status(500).json({ ok: false, error: normalized });
+    }
+  });
 
   router.get('/api/world/generated-pack/public-card/:cardId', (req, res) => {
     try {
@@ -603,10 +636,33 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
           data: publishPublicPackCard(payload.owner, req.body?.packId, { nowMs: Date.now() })
         });
       }
+      if (toolName === 'et.world.generated_pack.gallery_review') {
+        requireGeneratedPacksEnabled(payload.featureFlags);
+        return res.json({
+          ok: true,
+          data: reviewPublicPackCard(req.body?.cardId, {
+            decision: req.body?.decision,
+            reviewerId: req.body?.reviewerId,
+            tags: req.body?.tags,
+            signoffNote: req.body?.signoffNote
+          }, { nowMs: Date.now() })
+        });
+      }
+      if (toolName === 'et.world.generated_pack.gallery_unpublish') {
+        requireGeneratedPacksEnabled(payload.featureFlags);
+        return res.json({
+          ok: true,
+          data: unpublishPublicPackCard(req.body?.cardId, {
+            reviewerId: req.body?.reviewerId,
+            tags: req.body?.tags,
+            signoffNote: req.body?.signoffNote
+          }, { nowMs: Date.now() })
+        });
+      }
       res.status(404).json({ ok: false, error: { code: 'TOOL_NOT_FOUND' } });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'NOT_FOUND' || normalized.code === 'NO_GENERATED_PACK' || normalized.code === 'PACK_NOT_FOUND' ? 404 : normalized.code === 'INVALID_SERVICE_REQUEST_STATE' || normalized.code === 'OUT_OF_RESOURCES' || normalized.code === 'CONTRIBUTION_CAP_EXCEEDED' || normalized.code === 'INVALID_REWARD_STATE' ? 409 : normalized.code === 'INVALID_IDEMPOTENCY_KEY' || normalized.code === 'INVALID_EVENT_STATE' || normalized.code === 'INVALID_PROMPT' || normalized.code === 'INVALID_GENERATED_PACK_EXPORT' ? 400 : normalized.code === 'GENPACK_VALIDATION_FAILED' || normalized.code === 'PUBLIC_PACK_CARD_REJECTED' ? 422 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = normalized.code === 'NOT_FOUND' || normalized.code === 'NO_GENERATED_PACK' || normalized.code === 'PACK_NOT_FOUND' || normalized.code === 'PUBLIC_CARD_NOT_FOUND' ? 404 : normalized.code === 'INVALID_SERVICE_REQUEST_STATE' || normalized.code === 'OUT_OF_RESOURCES' || normalized.code === 'CONTRIBUTION_CAP_EXCEEDED' || normalized.code === 'INVALID_REWARD_STATE' ? 409 : normalized.code === 'INVALID_IDEMPOTENCY_KEY' || normalized.code === 'INVALID_EVENT_STATE' || normalized.code === 'INVALID_PROMPT' || normalized.code === 'INVALID_GENERATED_PACK_EXPORT' ? 400 : normalized.code === 'GENPACK_VALIDATION_FAILED' || normalized.code === 'PUBLIC_PACK_CARD_REJECTED' || normalized.code === 'PUBLIC_GALLERY_REVIEW_REJECTED' ? 422 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -752,6 +808,49 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     } catch (error) {
       const normalized = normalizeError(error);
       const status = normalized.code === 'PUBLIC_PACK_CARD_REJECTED' ? 422 : normalized.code === 'PACK_NOT_FOUND' ? 404 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      res.status(status).json({ ok: false, error: normalized });
+    }
+  });
+
+  router.post('/api/world/generated-pack/gallery/review', (req, res) => {
+    try {
+      const payload = buildRegionPayload(req, res);
+      requireGeneratedPacksEnabled(payload.featureFlags);
+      const result = reviewPublicPackCard(req.body?.cardId, {
+        decision: req.body?.decision,
+        reviewerId: req.body?.reviewerId,
+        tags: req.body?.tags,
+        signoffNote: req.body?.signoffNote
+      }, { nowMs: Date.now() });
+      res.json({
+        ok: true,
+        featureFlags: payload.featureFlags,
+        ...result
+      });
+    } catch (error) {
+      const normalized = normalizeError(error);
+      const status = normalized.code === 'PUBLIC_CARD_NOT_FOUND' ? 404 : normalized.code === 'PUBLIC_PACK_CARD_REJECTED' || normalized.code === 'PUBLIC_GALLERY_REVIEW_REJECTED' ? 422 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      res.status(status).json({ ok: false, error: normalized });
+    }
+  });
+
+  router.post('/api/world/generated-pack/gallery/unpublish', (req, res) => {
+    try {
+      const payload = buildRegionPayload(req, res);
+      requireGeneratedPacksEnabled(payload.featureFlags);
+      const result = unpublishPublicPackCard(req.body?.cardId, {
+        reviewerId: req.body?.reviewerId,
+        tags: req.body?.tags,
+        signoffNote: req.body?.signoffNote
+      }, { nowMs: Date.now() });
+      res.json({
+        ok: true,
+        featureFlags: payload.featureFlags,
+        ...result
+      });
+    } catch (error) {
+      const normalized = normalizeError(error);
+      const status = normalized.code === 'PUBLIC_CARD_NOT_FOUND' ? 404 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
       res.status(status).json({ ok: false, error: normalized });
     }
   });

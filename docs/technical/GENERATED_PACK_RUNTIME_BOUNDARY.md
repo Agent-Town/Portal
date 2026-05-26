@@ -94,6 +94,14 @@ Player prompt
 - Public cards include generated title, style summary, prompt keyword hints only, screenshot metadata, and asset-manifest summary.
 - Public-card moderation rejects raw prompt fields, Brain/provider/debug/wallet terms, executable prompt text, private owner/session data, missing screenshots, and invalid asset summaries.
 
+## GU-12 Curated Pack Gallery Slice
+
+- `public_pack_gallery.schema.json` defines the public gallery response contract.
+- `GET /api/world/generated-pack/gallery` is auth-free and returns only approved public-card derivatives, never full generated-pack records.
+- `POST /api/world/generated-pack/gallery/review` and `/gallery/unpublish` remain authenticated and generated-pack feature-gated.
+- Gallery entries require approval status, moderation metadata, reviewer signoff hash, pack tags, screenshot metadata, and asset-manifest summary.
+- Pending and rejected cards are hidden from the gallery; unpublished cards are removed from direct public-card lookup and gallery results.
+
 ## Machine Checks
 
 ```json
@@ -162,6 +170,13 @@ Player prompt
   "publicCardPublishFeatureGated": true,
   "promptKeywordHintsOnly": true,
   "publicCardScreenshotPresent": true,
-  "unsafePackCardRejected": true
+  "unsafePackCardRejected": true,
+  "publicGallerySchemaExists": true,
+  "authNotRequiredForPublicGallery": true,
+  "galleryReviewFeatureGated": true,
+  "approvedOnlyGallery": true,
+  "moderationMetadataRequired": true,
+  "pendingRejectedHidden": true,
+  "unpublishWorks": true
 }
 ```

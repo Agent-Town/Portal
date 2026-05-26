@@ -55,3 +55,6 @@ owner: "Agent Town product"
 | GPACK-042 | Public card | Public pack-card schema exists and published cards include generated title, style summary, prompt keyword hints only, screenshot metadata, and asset summary | `tests/generated_pack_public_card.test.js`, `tests/generated_pack_contract.test.js` |
 | GPACK-043 | Public card | Public card fetch by card ID requires no auth while publish remains generated-pack feature-gated | `tests/generated_pack_public_card.test.js` |
 | GPACK-044 | Public card | Unsafe card content, raw prompt fields, Brain/provider/debug/wallet fields, and private owner/session data fail moderation or stay absent | `tests/generated_pack_public_card.test.js` |
+| GPACK-045 | Gallery | Public gallery schema exists and gallery entries require approval status, moderation metadata, reviewer signoff, tags, screenshot, and asset summary | `tests/generated_pack_gallery.test.js`, `tests/generated_pack_contract.test.js` |
+| GPACK-046 | Gallery | Public gallery lists only approved cards; pending and rejected cards remain hidden while search/filter/sort/pagination stay public-safe | `tests/generated_pack_gallery.test.js` |
+| GPACK-047 | Gallery | Unpublish removes a public card from direct public lookup and curated gallery results without exposing private state | `tests/generated_pack_gallery.test.js` |
