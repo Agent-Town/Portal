@@ -24,6 +24,7 @@ Status: prototype-gated
 - Approved generated-pack modifiers must be enum-only, presentation-scoped, and balance-simulated; unknown modifiers, formula strings, custom resource math, mutation tools, custom permissions, custom agent authority, and nonzero canonical rule impact are forbidden.
 - Generated tech flavor trees must map every node to an approved canonical capability/effect pair; missing effects, custom effects, custom mechanics, formulas, changed unlock rules, V6 civic changes, and hidden progression authority are forbidden.
 - Generated requester voice packs must map every contract flavor template to approved canonical contract/action pairs; missing mappings, unknown contracts/actions, hidden mechanics, reward deltas, formulas, mutation authority, secret-like fields, raw executable instructions, and provider/debug jargon are forbidden.
+- Generated inhabitant style overlays must remain passive visual actors only; unknown roles, autonomous-agent claims, hidden simulation, resource mutation, tool authority, unsafe text, per-inhabitant external model use, and actor counts above budget are forbidden.
 - Player-visible generated text must be escaped in DOM rendering.
 - Production image generation requires explicit consent and a documented cost/auth model before any user-facing release claim.
 
@@ -98,6 +99,14 @@ Status: prototype-gated
   "unsafeTextRejectCount": 0,
   "cloverIdentityStable": true,
   "cachedRewriteDisabled": true,
+  "inhabitantOverlaySchemaExists": true,
+  "inhabitantsAreVisualActorsOnly": true,
+  "serverStateAuthorityPreserved": true,
+  "actorBudgetPassed": true,
+  "generatedStyleApplied": true,
+  "inhabitantSpritePromptCount": 4,
+  "externalModelPerInhabitant": false,
+  "inhabitantResourceMutationCount": 0,
   "approvedProductionAssetCount": 0,
   "generatedImageAssetsCanChangeServerRules": false,
   "productionImageAssetCount": 0,

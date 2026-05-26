@@ -602,6 +602,203 @@
       "firstLoopCompletable": true
     }
   },
+  "inhabitantStyleOverlay": {
+    "schemaVersion": "agent-town-inhabitant-style-overlay-v1",
+    "canonicalVersion": "agent-town-world-grid-v1",
+    "overlayId": "inhabitant_overlay_1dc551d9ebea",
+    "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+    "inhabitantRoles": [
+      {
+        "canonicalRoleId": "inhabitant.worker",
+        "displayName": "Cozy Worker",
+        "roleKind": "worker",
+        "visualDescription": "Cozy Worker wears cozy colors and mushroom props while keeps the claimed home cell readable.",
+        "serverStateSource": "region.cells.claimed",
+        "stateReadPath": "region.cells[state=claimed]",
+        "visualOnly": true,
+        "mutatesResources": false,
+        "autonomousAgent": false,
+        "styleTags": [
+          "cozy",
+          "mushroom",
+          "worker",
+          "visual-only"
+        ]
+      },
+      {
+        "canonicalRoleId": "inhabitant.hauler",
+        "displayName": "Mushroom Hauler",
+        "roleKind": "hauler",
+        "visualDescription": "Mushroom Hauler wears cozy colors and mushroom props while points toward the next available claim option.",
+        "serverStateSource": "territory.claimOptions",
+        "stateReadPath": "territory.claimOptions[0]",
+        "visualOnly": true,
+        "mutatesResources": false,
+        "autonomousAgent": false,
+        "styleTags": [
+          "cozy",
+          "mushroom",
+          "hauler",
+          "visual-only"
+        ]
+      },
+      {
+        "canonicalRoleId": "inhabitant.messenger",
+        "displayName": "Mushroom Messenger",
+        "roleKind": "messenger",
+        "visualDescription": "Mushroom Messenger wears cozy colors and mushroom props while stands near visible route information.",
+        "serverStateSource": "region.routes",
+        "stateReadPath": "region.routes[status=open]",
+        "visualOnly": true,
+        "mutatesResources": false,
+        "autonomousAgent": false,
+        "styleTags": [
+          "cozy",
+          "mushroom",
+          "messenger",
+          "visual-only"
+        ]
+      },
+      {
+        "canonicalRoleId": "inhabitant.farmer",
+        "displayName": "Cozy Farmer",
+        "roleKind": "farmer",
+        "visualDescription": "Cozy Farmer wears cozy colors and mushroom props while adds food-town flavor near settlement state.",
+        "serverStateSource": "region.settlements",
+        "stateReadPath": "region.settlements[0]",
+        "visualOnly": true,
+        "mutatesResources": false,
+        "autonomousAgent": false,
+        "styleTags": [
+          "cozy",
+          "mushroom",
+          "farmer",
+          "visual-only"
+        ]
+      }
+    ],
+    "spritePromptPlan": {
+      "schemaVersion": "agent-town-inhabitant-sprite-prompt-plan-v1",
+      "modelFamily": "gpt-image-2-candidate",
+      "externalModelUsed": false,
+      "productionImageAssetsRequired": false,
+      "targets": [
+        {
+          "promptId": "gen_pack_1dc551d9ebea7769:inhabitant-worker:inhabitant-prompt",
+          "canonicalRoleId": "inhabitant.worker",
+          "canonicalTarget": "inhabitant.worker",
+          "targetKind": "character-sprite",
+          "targetSize": {
+            "width": 512,
+            "height": 512
+          },
+          "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/inhabitants/inhabitant-worker.webp",
+          "promptText": "Create one passive Agent Town world-grid inhabitant sprite candidate.\nCanonical role: inhabitant.worker. Role kind: worker.\nDisplay name: Cozy Worker.\nTheme words: Cozy, Mushroom.\nVisual direction: Cozy Worker wears cozy colors and mushroom props while keeps the claimed home cell readable..\nThe character is a visual marker only and must not imply resource control or independent decisions.\nTransparent background, readable full-body silhouette, no text, no logos, no UI frame.",
+          "negativePrompt": "text, logos, interface chrome, extra characters, weapons focus, copyrighted characters",
+          "promptHash": "c1fc8307ddf65e176c47d6571ec608d02a95a43ed656b991201cfb850f8dec3f",
+          "candidateOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/inhabitants/inhabitant-worker/inhabitant-worker.candidate-001.png",
+          "approvedOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/approved-inhabitants/inhabitant-worker.webp",
+          "status": "planned-not-generated"
+        },
+        {
+          "promptId": "gen_pack_1dc551d9ebea7769:inhabitant-hauler:inhabitant-prompt",
+          "canonicalRoleId": "inhabitant.hauler",
+          "canonicalTarget": "inhabitant.hauler",
+          "targetKind": "character-sprite",
+          "targetSize": {
+            "width": 512,
+            "height": 512
+          },
+          "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/inhabitants/inhabitant-hauler.webp",
+          "promptText": "Create one passive Agent Town world-grid inhabitant sprite candidate.\nCanonical role: inhabitant.hauler. Role kind: hauler.\nDisplay name: Mushroom Hauler.\nTheme words: Cozy, Mushroom.\nVisual direction: Mushroom Hauler wears cozy colors and mushroom props while points toward the next available claim option..\nThe character is a visual marker only and must not imply resource control or independent decisions.\nTransparent background, readable full-body silhouette, no text, no logos, no UI frame.",
+          "negativePrompt": "text, logos, interface chrome, extra characters, weapons focus, copyrighted characters",
+          "promptHash": "bfdaddda3b87f23b22f23fff3781111a928aea6a04f29510c7f598854ae2bcaf",
+          "candidateOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/inhabitants/inhabitant-hauler/inhabitant-hauler.candidate-001.png",
+          "approvedOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/approved-inhabitants/inhabitant-hauler.webp",
+          "status": "planned-not-generated"
+        },
+        {
+          "promptId": "gen_pack_1dc551d9ebea7769:inhabitant-messenger:inhabitant-prompt",
+          "canonicalRoleId": "inhabitant.messenger",
+          "canonicalTarget": "inhabitant.messenger",
+          "targetKind": "character-sprite",
+          "targetSize": {
+            "width": 512,
+            "height": 512
+          },
+          "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/inhabitants/inhabitant-messenger.webp",
+          "promptText": "Create one passive Agent Town world-grid inhabitant sprite candidate.\nCanonical role: inhabitant.messenger. Role kind: messenger.\nDisplay name: Mushroom Messenger.\nTheme words: Cozy, Mushroom.\nVisual direction: Mushroom Messenger wears cozy colors and mushroom props while stands near visible route information..\nThe character is a visual marker only and must not imply resource control or independent decisions.\nTransparent background, readable full-body silhouette, no text, no logos, no UI frame.",
+          "negativePrompt": "text, logos, interface chrome, extra characters, weapons focus, copyrighted characters",
+          "promptHash": "7803b4ab0231cd655436d89db73f4dad69f2c5c626167b505a73f31d3704de8b",
+          "candidateOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/inhabitants/inhabitant-messenger/inhabitant-messenger.candidate-001.png",
+          "approvedOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/approved-inhabitants/inhabitant-messenger.webp",
+          "status": "planned-not-generated"
+        },
+        {
+          "promptId": "gen_pack_1dc551d9ebea7769:inhabitant-farmer:inhabitant-prompt",
+          "canonicalRoleId": "inhabitant.farmer",
+          "canonicalTarget": "inhabitant.farmer",
+          "targetKind": "character-sprite",
+          "targetSize": {
+            "width": 512,
+            "height": 512
+          },
+          "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/inhabitants/inhabitant-farmer.webp",
+          "promptText": "Create one passive Agent Town world-grid inhabitant sprite candidate.\nCanonical role: inhabitant.farmer. Role kind: farmer.\nDisplay name: Cozy Farmer.\nTheme words: Cozy, Mushroom.\nVisual direction: Cozy Farmer wears cozy colors and mushroom props while adds food-town flavor near settlement state..\nThe character is a visual marker only and must not imply resource control or independent decisions.\nTransparent background, readable full-body silhouette, no text, no logos, no UI frame.",
+          "negativePrompt": "text, logos, interface chrome, extra characters, weapons focus, copyrighted characters",
+          "promptHash": "a3b2013f0e025d7058917c057ff85e64174156ac6b69b98d15121e6402a353cd",
+          "candidateOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/inhabitants/inhabitant-farmer/inhabitant-farmer.candidate-001.png",
+          "approvedOutputPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/approved-inhabitants/inhabitant-farmer.webp",
+          "status": "planned-not-generated"
+        }
+      ]
+    },
+    "voiceTemplateMapping": [
+      {
+        "canonicalRoleId": "inhabitant.worker",
+        "template": "Cozy Worker: I show the cozy supplies style and leave the plan cozy route rules to Clover.",
+        "maxLength": 96
+      },
+      {
+        "canonicalRoleId": "inhabitant.hauler",
+        "template": "Mushroom Hauler: I show the cozy supplies style and leave the plan cozy route rules to Clover.",
+        "maxLength": 96
+      },
+      {
+        "canonicalRoleId": "inhabitant.messenger",
+        "template": "Mushroom Messenger: I show the cozy supplies style and leave the plan cozy route rules to Clover",
+        "maxLength": 96
+      },
+      {
+        "canonicalRoleId": "inhabitant.farmer",
+        "template": "Cozy Farmer: I show the cozy supplies style and leave the plan cozy route rules to Clover.",
+        "maxLength": 96
+      }
+    ],
+    "animationPolicy": {
+      "actorBudgetMax": 4,
+      "generatedActorCount": 4,
+      "motionKind": "ambient-cosmetic",
+      "reducedMotionFallback": "static-markers",
+      "hiddenSimulation": false
+    },
+    "safety": {
+      "externalModelPerInhabitant": false,
+      "serverStateAuthority": "server-owned-state-only",
+      "resourceMutationCount": 0,
+      "unsafeTextRejectCount": 0
+    },
+    "balanceSimulation": {
+      "simulationVersion": "agent-town-inhabitant-style-balance-v1",
+      "inhabitantsAreVisualActorsOnly": true,
+      "serverStateAuthorityPreserved": true,
+      "actorBudgetPassed": true,
+      "generatedStyleApplied": true,
+      "resourceMutationCount": 0,
+      "autonomousAgentCount": 0,
+      "firstLoopCompletable": true
+    }
+  },
   "approvedModifiers": {
     "schemaVersion": "agent-town-approved-modifiers-v1",
     "canonicalVersion": "agent-town-world-grid-v1",

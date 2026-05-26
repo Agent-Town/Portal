@@ -110,6 +110,10 @@
       ...(pack.requesterVoicePack?.requesterArchetypes || []).map((requester) => requester.voiceLine),
       pack.requesterVoicePack?.cloverVoice?.styleAwareLine
     ].filter(Boolean).slice(0, 2);
+    const inhabitantNames = (pack.inhabitantStyleOverlay?.inhabitantRoles || [])
+      .map((role) => role.displayName)
+      .filter(Boolean)
+      .slice(0, 4);
     const metrics = pack.validationReport?.metrics || {};
     status.textContent = validation;
     summary.innerHTML = `
@@ -119,6 +123,7 @@
       ${factions.length ? `<p>${factions.map(escapeHtml).join(' · ')}</p>` : ''}
       ${techNames.length ? `<p>${techNames.map(escapeHtml).join(' · ')}</p>` : ''}
       ${voiceLines.length ? `<p>${voiceLines.map(escapeHtml).join(' · ')}</p>` : ''}
+      ${inhabitantNames.length ? `<p>${inhabitantNames.map(escapeHtml).join(' · ')}</p>` : ''}
       <dl>
         <div><dt>Mappings</dt><dd>${escapeHtml(`${metrics.canonicalMappingsCovered || 0}/${metrics.requiredCanonicalMappings || 0}`)}</dd></div>
         <div><dt>Assets</dt><dd>${escapeHtml(String(metrics.fallbackAssetCount || 0))}</dd></div>
@@ -229,6 +234,65 @@
     return formatCost(bundle);
   }
 
+  function clampPercent(value) {
+    return Math.max(10, Math.min(90, value));
+  }
+
+  function cellForInhabitant(role, cells = [], index = 0) {
+    if (role.serverStateSource === 'region.cells.claimed') {
+      return cells.find((cell) => cell.state === 'claimed') || cells[index % Math.max(1, cells.length)];
+    }
+    if (role.serverStateSource === 'territory.claimOptions') {
+      return cells.find((cell) => cell.state === 'claimable') || cells[(index + 1) % Math.max(1, cells.length)];
+    }
+    if (role.serverStateSource === 'region.routes') {
+      return cells.find((cell) => cell.state === 'visible') || cells[(index + 2) % Math.max(1, cells.length)];
+    }
+    return cells.find((cell) => cell.feature === 'settlement' || cell.state === 'claimed') || cells[(index + 3) % Math.max(1, cells.length)];
+  }
+
+  function renderTownLifeOverlay(sceneState) {
+    const stage = qs('[data-world-grid-stage]');
+    if (!stage) return null;
+    const existing = stage.querySelector('[data-world-grid-inhabitants]');
+    if (existing) existing.remove();
+    const overlay = activePack()?.inhabitantStyleOverlay || null;
+    const roles = overlay?.inhabitantRoles || [];
+    if (!overlay || roles.length === 0) return null;
+    const reducedMotion = typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const budgetMax = Number(overlay.animationPolicy?.actorBudgetMax || 0);
+    const actors = roles.slice(0, budgetMax || roles.length);
+    const cells = sceneState?.cells || [];
+    const layer = document.createElement('div');
+    layer.className = 'world-grid-inhabitants';
+    layer.dataset.worldGridInhabitants = '';
+    layer.dataset.actorCount = String(actors.length);
+    layer.dataset.actorBudgetPassed = String(actors.length <= budgetMax && overlay.balanceSimulation?.actorBudgetPassed === true);
+    layer.dataset.motionMode = reducedMotion ? 'static' : 'ambient';
+    actors.forEach((role, index) => {
+      const cell = cellForInhabitant(role, cells, index) || { x: index - 1.5, y: 0 };
+      const marker = document.createElement('div');
+      marker.className = 'world-grid-inhabitant';
+      marker.dataset.worldGridInhabitant = role.canonicalRoleId;
+      marker.dataset.serverStateSource = role.serverStateSource;
+      marker.dataset.mutatesResources = String(role.mutatesResources === true);
+      marker.style.left = `${clampPercent(50 + (Number(cell.x || 0) * 8))}%`;
+      marker.style.top = `${clampPercent(50 - (Number(cell.y || 0) * 10))}%`;
+      marker.innerHTML = `
+        <span aria-hidden="true"></span>
+        <strong>${escapeHtml(role.displayName)}</strong>
+      `;
+      layer.appendChild(marker);
+    });
+    stage.appendChild(layer);
+    return {
+      actorCount: actors.length,
+      actorBudgetPassed: layer.dataset.actorBudgetPassed === 'true',
+      motionMode: layer.dataset.motionMode
+    };
+  }
+
   function renderScene(sceneState) {
     const stage = qs('[data-world-grid-stage]');
     let fallback = qs('[data-world-grid-fallback]');
@@ -257,6 +321,7 @@
       fallback.hidden = false;
       state.scene = null;
     }
+    renderTownLifeOverlay(sceneState);
   }
 
   async function selectCell(cellId) {
@@ -743,6 +808,20 @@
     getGeneratedPack: () => activePack(),
     getPlaytestReport: () => state.playtestReport,
     getSceneInfo: () => state.scene?.info ? state.scene.info() : null,
+    getTownLifeOverlayInfo: () => {
+      const layer = qs('[data-world-grid-inhabitants]');
+      return layer ? {
+        actorCount: Number(layer.dataset.actorCount || 0),
+        actorBudgetPassed: layer.dataset.actorBudgetPassed === 'true',
+        motionMode: layer.dataset.motionMode || '',
+        roles: Array.from(layer.querySelectorAll('[data-world-grid-inhabitant]')).map((node) => ({
+          roleId: node.dataset.worldGridInhabitant,
+          serverStateSource: node.dataset.serverStateSource,
+          mutatesResources: node.dataset.mutatesResources === 'true',
+          text: node.textContent.trim()
+        }))
+      } : null;
+    },
     generatePackFromPrompt: (prompt) => {
       const promptNode = qs('[data-world-grid-prompt]');
       if (promptNode) promptNode.value = prompt;

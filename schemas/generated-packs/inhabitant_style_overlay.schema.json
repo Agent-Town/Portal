@@ -1,0 +1,335 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-town-inhabitant-style-overlay-v1",
+  "title": "Agent Town Generated Inhabitant Style Overlay",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "canonicalVersion",
+    "overlayId",
+    "promptHash",
+    "inhabitantRoles",
+    "spritePromptPlan",
+    "voiceTemplateMapping",
+    "animationPolicy",
+    "safety",
+    "balanceSimulation"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "agent-town-inhabitant-style-overlay-v1"
+    },
+    "canonicalVersion": {
+      "const": "agent-town-world-grid-v1"
+    },
+    "overlayId": {
+      "type": "string",
+      "pattern": "^inhabitant_overlay_[a-f0-9]{12}$"
+    },
+    "promptHash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "inhabitantRoles": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "canonicalRoleId",
+          "displayName",
+          "roleKind",
+          "visualDescription",
+          "serverStateSource",
+          "stateReadPath",
+          "visualOnly",
+          "mutatesResources",
+          "autonomousAgent",
+          "styleTags"
+        ],
+        "properties": {
+          "canonicalRoleId": {
+            "enum": [
+              "inhabitant.worker",
+              "inhabitant.hauler",
+              "inhabitant.messenger",
+              "inhabitant.farmer"
+            ]
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 3
+          },
+          "roleKind": {
+            "enum": ["worker", "hauler", "messenger", "farmer"]
+          },
+          "visualDescription": {
+            "type": "string",
+            "minLength": 12
+          },
+          "serverStateSource": {
+            "enum": [
+              "region.cells.claimed",
+              "territory.claimOptions",
+              "region.routes",
+              "region.settlements"
+            ]
+          },
+          "stateReadPath": {
+            "type": "string",
+            "minLength": 8
+          },
+          "visualOnly": {
+            "const": true
+          },
+          "mutatesResources": {
+            "const": false
+          },
+          "autonomousAgent": {
+            "const": false
+          },
+          "styleTags": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 5,
+            "items": {
+              "type": "string",
+              "minLength": 2
+            }
+          }
+        }
+      }
+    },
+    "spritePromptPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "modelFamily",
+        "externalModelUsed",
+        "productionImageAssetsRequired",
+        "targets"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "agent-town-inhabitant-sprite-prompt-plan-v1"
+        },
+        "modelFamily": {
+          "const": "gpt-image-2-candidate"
+        },
+        "externalModelUsed": {
+          "const": false
+        },
+        "productionImageAssetsRequired": {
+          "const": false
+        },
+        "targets": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "promptId",
+              "canonicalRoleId",
+              "canonicalTarget",
+              "targetKind",
+              "targetSize",
+              "usagePath",
+              "promptText",
+              "negativePrompt",
+              "promptHash",
+              "candidateOutputPath",
+              "approvedOutputPath",
+              "status"
+            ],
+            "properties": {
+              "promptId": {
+                "type": "string",
+                "minLength": 8
+              },
+              "canonicalRoleId": {
+                "enum": [
+                  "inhabitant.worker",
+                  "inhabitant.hauler",
+                  "inhabitant.messenger",
+                  "inhabitant.farmer"
+                ]
+              },
+              "canonicalTarget": {
+                "enum": [
+                  "inhabitant.worker",
+                  "inhabitant.hauler",
+                  "inhabitant.messenger",
+                  "inhabitant.farmer"
+                ]
+              },
+              "targetKind": {
+                "const": "character-sprite"
+              },
+              "targetSize": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["width", "height"],
+                "properties": {
+                  "width": { "const": 512 },
+                  "height": { "const": 512 }
+                }
+              },
+              "usagePath": {
+                "type": "string",
+                "pattern": "^public/experiences/world-grid/generated/[a-z0-9_-]+/inhabitants/[a-z0-9-]+\\.webp$"
+              },
+              "promptText": {
+                "type": "string",
+                "minLength": 40
+              },
+              "negativePrompt": {
+                "type": "string",
+                "minLength": 10
+              },
+              "promptHash": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "candidateOutputPath": {
+                "type": "string",
+                "minLength": 12
+              },
+              "approvedOutputPath": {
+                "type": "string",
+                "minLength": 12
+              },
+              "status": {
+                "const": "planned-not-generated"
+              }
+            }
+          }
+        }
+      }
+    },
+    "voiceTemplateMapping": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["canonicalRoleId", "template", "maxLength"],
+        "properties": {
+          "canonicalRoleId": {
+            "enum": [
+              "inhabitant.worker",
+              "inhabitant.hauler",
+              "inhabitant.messenger",
+              "inhabitant.farmer"
+            ]
+          },
+          "template": {
+            "type": "string",
+            "minLength": 8
+          },
+          "maxLength": {
+            "const": 96
+          }
+        }
+      }
+    },
+    "animationPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actorBudgetMax",
+        "generatedActorCount",
+        "motionKind",
+        "reducedMotionFallback",
+        "hiddenSimulation"
+      ],
+      "properties": {
+        "actorBudgetMax": {
+          "const": 4
+        },
+        "generatedActorCount": {
+          "const": 4
+        },
+        "motionKind": {
+          "const": "ambient-cosmetic"
+        },
+        "reducedMotionFallback": {
+          "const": "static-markers"
+        },
+        "hiddenSimulation": {
+          "const": false
+        }
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "externalModelPerInhabitant",
+        "serverStateAuthority",
+        "resourceMutationCount",
+        "unsafeTextRejectCount"
+      ],
+      "properties": {
+        "externalModelPerInhabitant": {
+          "const": false
+        },
+        "serverStateAuthority": {
+          "const": "server-owned-state-only"
+        },
+        "resourceMutationCount": {
+          "const": 0
+        },
+        "unsafeTextRejectCount": {
+          "const": 0
+        }
+      }
+    },
+    "balanceSimulation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "simulationVersion",
+        "inhabitantsAreVisualActorsOnly",
+        "serverStateAuthorityPreserved",
+        "actorBudgetPassed",
+        "generatedStyleApplied",
+        "resourceMutationCount",
+        "autonomousAgentCount",
+        "firstLoopCompletable"
+      ],
+      "properties": {
+        "simulationVersion": {
+          "const": "agent-town-inhabitant-style-balance-v1"
+        },
+        "inhabitantsAreVisualActorsOnly": {
+          "const": true
+        },
+        "serverStateAuthorityPreserved": {
+          "const": true
+        },
+        "actorBudgetPassed": {
+          "const": true
+        },
+        "generatedStyleApplied": {
+          "const": true
+        },
+        "resourceMutationCount": {
+          "const": 0
+        },
+        "autonomousAgentCount": {
+          "const": 0
+        },
+        "firstLoopCompletable": {
+          "const": true
+        }
+      }
+    }
+  }
+}

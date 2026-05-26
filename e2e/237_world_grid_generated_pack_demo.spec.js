@@ -7,6 +7,7 @@ test.beforeEach(async ({ request }) => {
 });
 
 test('generated universe pack loads into Three.js and completes the first world-grid loop', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   const consoleErrors = [];
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text());
@@ -42,6 +43,16 @@ test('generated universe pack loads into Three.js and completes the first world-
   expect(generatedPack?.validationReport?.metrics?.canonicalContractRulesPreserved).toBe(true);
   expect(generatedPack?.validationReport?.metrics?.unsafeTextRejectCount).toBe(0);
   await expect(page.locator('[data-world-grid-generated-summary]')).toContainText(generatedPack.requesterVoicePack.requesterArchetypes[0].voiceLine);
+  expect(generatedPack?.inhabitantStyleOverlay?.inhabitantRoles?.length).toBe(4);
+  expect(generatedPack?.validationReport?.metrics?.inhabitantsAreVisualActorsOnly).toBe(true);
+  expect(generatedPack?.validationReport?.metrics?.serverStateAuthorityPreserved).toBe(true);
+  expect(generatedPack?.validationReport?.metrics?.actorBudgetPassed).toBe(true);
+  await expect(page.locator('[data-world-grid-generated-summary]')).toContainText(generatedPack.inhabitantStyleOverlay.inhabitantRoles[0].displayName);
+  const townLifeOverlay = await page.evaluate(() => window.__worldGridTest.getTownLifeOverlayInfo());
+  expect(townLifeOverlay?.actorCount).toBe(4);
+  expect(townLifeOverlay?.actorBudgetPassed).toBe(true);
+  expect(townLifeOverlay?.motionMode).toBe('static');
+  expect(townLifeOverlay?.roles?.every((role) => role.mutatesResources === false)).toBe(true);
   expect(generatedPack?.approvedModifiers?.selectedModifiers?.length).toBeGreaterThan(0);
   expect(generatedPack?.validationReport?.metrics?.enumOnlyModifiers).toBe(true);
   expect(generatedPack?.validationReport?.metrics?.canonicalRulesPreserved).toBe(true);
@@ -54,6 +65,8 @@ test('generated universe pack loads into Three.js and completes the first world-
   expect(modifierPayload?.generatedPackTechFlavorView?.balanceSimulation?.unlockRulesPreserved).toBe(true);
   expect(modifierPayload?.generatedPackRequesterVoiceView?.validationReport?.ok).toBe(true);
   expect(modifierPayload?.generatedPackRequesterVoiceView?.balanceSimulation?.canonicalContractRulesPreserved).toBe(true);
+  expect(modifierPayload?.generatedPackInhabitantOverlayView?.validationReport?.ok).toBe(true);
+  expect(modifierPayload?.generatedPackInhabitantOverlayView?.balanceSimulation?.serverStateAuthorityPreserved).toBe(true);
   expect(modifierPayload?.generatedPackModifierView?.validationReport?.ok).toBe(true);
   expect(modifierPayload?.generatedPackModifierView?.balanceSimulation?.resourceFormulaChanges).toBe(0);
 

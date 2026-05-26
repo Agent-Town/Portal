@@ -2713,6 +2713,14 @@ Requester/voice invariants:
 - cached rewrite policy is `future-hook-disabled`, uses no external model, and requires consent plus cost approval before any future provider path;
 - `/api/world/region` may include `generatedPackRequesterVoiceView` only when generated packs are enabled, and that view cannot change canonical claim planning, claim completion, public presence, or civic-service rules.
 
+Inhabitant overlay invariants:
+- schema is `agent-town-inhabitant-style-overlay-v1`;
+- generated worker, hauler, messenger, and farmer roles are visual actors only and read server-owned region/territory state;
+- sprite prompt targets are candidate-only `character-sprite` scaffolds with prompt hashes, usage paths, candidate paths, and no production image requirement;
+- unknown roles, autonomous-agent flags, resource mutation, hidden simulation, tool authority, unsafe text, and actor counts above budget are rejected;
+- reduced-motion rendering must fall back to static markers;
+- `/api/world/region` may include `generatedPackInhabitantOverlayView` only when generated packs are enabled, and that view cannot change resources, route state, claim state, public presence, or civic-service rules.
+
 Approved-modifier invariants:
 - schema is `agent-town-approved-modifiers-v1`;
 - `selectedModifiers` must be drawn only from the approved enum: `visual_only`, `more_contract_flavor`, `requesters_prefer_food`, `extra_public_square_charm_text`, `ambient_weather_cosmetic`, `tutorial_copy_variant`;

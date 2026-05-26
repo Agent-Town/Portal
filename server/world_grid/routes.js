@@ -50,6 +50,7 @@ const {
   importGeneratedPack,
   listPublicPackGallery,
   projectApprovedModifierView,
+  projectInhabitantStyleOverlayView,
   projectRequesterVoiceView,
   projectTechFlavorView,
   publishPublicPackCard,
@@ -374,6 +375,9 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
         : null,
       generatedPackRequesterVoiceView: generatedPacksEnabled && generatedPack
         ? projectRequesterVoiceView(generatedPack)
+        : null,
+      generatedPackInhabitantOverlayView: generatedPacksEnabled && generatedPack
+        ? projectInhabitantStyleOverlayView(generatedPack)
         : null,
       generatedPackModifierView: generatedPacksEnabled && generatedPack
         ? projectApprovedModifierView(generatedPack, { claimOptions: claimOptionList })

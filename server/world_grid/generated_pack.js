@@ -147,6 +147,44 @@ const CANONICAL_CONTRACTS = [
 ];
 const CANONICAL_CONTRACT_IDS = CANONICAL_CONTRACTS.map((contract) => contract.canonicalContractId);
 const CANONICAL_CONTRACT_ACTION_IDS = CANONICAL_CONTRACTS.map((contract) => contract.canonicalActionId);
+const INHABITANT_STYLE_OVERLAY_VERSION = 'agent-town-inhabitant-style-overlay-v1';
+const INHABITANT_STYLE_BALANCE_VERSION = 'agent-town-inhabitant-style-balance-v1';
+const INHABITANT_SPRITE_PROMPT_PLAN_VERSION = 'agent-town-inhabitant-sprite-prompt-plan-v1';
+const INHABITANT_ROLE_DEFINITIONS = [
+  {
+    canonicalRoleId: 'inhabitant.worker',
+    roleKind: 'worker',
+    baseTitle: 'Worker',
+    serverStateSource: 'region.cells.claimed',
+    stateReadPath: 'region.cells[state=claimed]',
+    copyFocus: 'keeps the claimed home cell readable'
+  },
+  {
+    canonicalRoleId: 'inhabitant.hauler',
+    roleKind: 'hauler',
+    baseTitle: 'Hauler',
+    serverStateSource: 'territory.claimOptions',
+    stateReadPath: 'territory.claimOptions[0]',
+    copyFocus: 'points toward the next available claim option'
+  },
+  {
+    canonicalRoleId: 'inhabitant.messenger',
+    roleKind: 'messenger',
+    baseTitle: 'Messenger',
+    serverStateSource: 'region.routes',
+    stateReadPath: 'region.routes[status=open]',
+    copyFocus: 'stands near visible route information'
+  },
+  {
+    canonicalRoleId: 'inhabitant.farmer',
+    roleKind: 'farmer',
+    baseTitle: 'Farmer',
+    serverStateSource: 'region.settlements',
+    stateReadPath: 'region.settlements[0]',
+    copyFocus: 'adds food-town flavor near settlement state'
+  }
+];
+const INHABITANT_ROLE_IDS = INHABITANT_ROLE_DEFINITIONS.map((role) => role.canonicalRoleId);
 const APPROVED_MODIFIERS_VERSION = 'agent-town-approved-modifiers-v1';
 const APPROVED_MODIFIER_BALANCE_VERSION = 'agent-town-approved-modifier-balance-v1';
 const APPROVED_MODIFIERS = [
@@ -1881,6 +1919,335 @@ function projectRequesterVoiceView(pack = {}) {
   };
 }
 
+function inhabitantDisplayName(anchor = 'Civic', second = 'Route', role = {}) {
+  if (role.roleKind === 'worker') return `${anchor} Worker`;
+  if (role.roleKind === 'hauler') return `${second} Hauler`;
+  if (role.roleKind === 'messenger') return `${second} Messenger`;
+  if (role.roleKind === 'farmer') return `${anchor} Farmer`;
+  return `${anchor} ${role.baseTitle || 'Neighbor'}`;
+}
+
+function inhabitantStyleTags(anchor = 'Civic', second = 'Route', role = {}) {
+  return [
+    slugForTarget(anchor),
+    slugForTarget(second),
+    role.roleKind,
+    'visual-only'
+  ].filter(Boolean).slice(0, 5);
+}
+
+function buildInhabitantSpritePrompt({ packId = '', promptHash = '', candidateRoot = DEFAULT_CANDIDATE_ROOT, anchor = 'Civic', second = 'Route', role = {}, displayName = '', visualDescription = '' } = {}) {
+  const slug = slugForTarget(role.canonicalRoleId || displayName);
+  const usagePath = relativePackPath('public/experiences/world-grid/generated', packId, 'inhabitants', `${slug}.webp`);
+  const promptText = [
+    'Create one passive Agent Town world-grid inhabitant sprite candidate.',
+    `Canonical role: ${role.canonicalRoleId}. Role kind: ${role.roleKind}.`,
+    `Display name: ${displayName}.`,
+    `Theme words: ${anchor}, ${second}.`,
+    `Visual direction: ${visualDescription}.`,
+    'The character is a visual marker only and must not imply resource control or independent decisions.',
+    'Transparent background, readable full-body silhouette, no text, no logos, no UI frame.'
+  ].join('\n');
+  return {
+    promptId: `${packId}:${slug}:inhabitant-prompt`,
+    canonicalRoleId: role.canonicalRoleId,
+    canonicalTarget: role.canonicalRoleId,
+    targetKind: 'character-sprite',
+    targetSize: { width: 512, height: 512 },
+    usagePath,
+    promptText,
+    negativePrompt: 'text, logos, interface chrome, extra characters, weapons focus, copyrighted characters',
+    promptHash: sha256(promptText),
+    candidateOutputPath: relativePackPath(candidateRoot, packId, 'inhabitants', slug, `${slug}.candidate-001.png`),
+    approvedOutputPath: relativePackPath(candidateRoot, packId, 'approved-inhabitants', `${slug}.webp`),
+    status: 'planned-not-generated'
+  };
+}
+
+function buildInhabitantStyleOverlay({ packId = '', promptHash = '', packHash = '', candidateRoot = DEFAULT_CANDIDATE_ROOT, anchor = 'Civic', second = 'Route', index = {} } = {}) {
+  const foodName = index?.['resource.food']?.generatedName || `${anchor} Supplies`;
+  const routeName = index?.['action.plan_claim']?.generatedName || `${anchor} route`;
+  const inhabitantRoles = INHABITANT_ROLE_DEFINITIONS.map((role) => {
+    const displayName = inhabitantDisplayName(anchor, second, role);
+    const visualDescription = boundedLine(`${displayName} wears ${anchor.toLowerCase()} colors and ${second.toLowerCase()} props while ${role.copyFocus}.`, 132);
+    return {
+      canonicalRoleId: role.canonicalRoleId,
+      displayName,
+      roleKind: role.roleKind,
+      visualDescription,
+      serverStateSource: role.serverStateSource,
+      stateReadPath: role.stateReadPath,
+      visualOnly: true,
+      mutatesResources: false,
+      autonomousAgent: false,
+      styleTags: inhabitantStyleTags(anchor, second, role)
+    };
+  });
+  const spriteTargets = inhabitantRoles.map((inhabitant) => {
+    const role = INHABITANT_ROLE_DEFINITIONS.find((item) => item.canonicalRoleId === inhabitant.canonicalRoleId) || {};
+    return buildInhabitantSpritePrompt({
+      packId,
+      promptHash,
+      candidateRoot,
+      anchor,
+      second,
+      role,
+      displayName: inhabitant.displayName,
+      visualDescription: inhabitant.visualDescription
+    });
+  });
+  const voiceTemplateMapping = inhabitantRoles.map((inhabitant) => ({
+    canonicalRoleId: inhabitant.canonicalRoleId,
+    template: boundedLine(`${inhabitant.displayName}: I show the ${foodName.toLowerCase()} style and leave the ${routeName.toLowerCase()} rules to Clover.`, 96),
+    maxLength: 96
+  }));
+  return {
+    schemaVersion: INHABITANT_STYLE_OVERLAY_VERSION,
+    canonicalVersion: 'agent-town-world-grid-v1',
+    overlayId: `inhabitant_overlay_${String(packHash || sha256(promptHash || packId)).slice(0, 12)}`,
+    promptHash,
+    inhabitantRoles,
+    spritePromptPlan: {
+      schemaVersion: INHABITANT_SPRITE_PROMPT_PLAN_VERSION,
+      modelFamily: 'gpt-image-2-candidate',
+      externalModelUsed: false,
+      productionImageAssetsRequired: false,
+      targets: spriteTargets
+    },
+    voiceTemplateMapping,
+    animationPolicy: {
+      actorBudgetMax: INHABITANT_ROLE_IDS.length,
+      generatedActorCount: inhabitantRoles.length,
+      motionKind: 'ambient-cosmetic',
+      reducedMotionFallback: 'static-markers',
+      hiddenSimulation: false
+    },
+    safety: {
+      externalModelPerInhabitant: false,
+      serverStateAuthority: 'server-owned-state-only',
+      resourceMutationCount: 0,
+      unsafeTextRejectCount: 0
+    },
+    balanceSimulation: {
+      simulationVersion: INHABITANT_STYLE_BALANCE_VERSION,
+      inhabitantsAreVisualActorsOnly: true,
+      serverStateAuthorityPreserved: true,
+      actorBudgetPassed: true,
+      generatedStyleApplied: true,
+      resourceMutationCount: 0,
+      autonomousAgentCount: 0,
+      firstLoopCompletable: true
+    }
+  };
+}
+
+function inhabitantOverlayTextValues(overlay = {}) {
+  const inhabitantOverlay = overlay?.inhabitantStyleOverlay || overlay;
+  return [
+    ...(inhabitantOverlay.inhabitantRoles || []).flatMap((role) => [
+      role.displayName,
+      role.roleKind,
+      role.visualDescription
+    ]),
+    ...(inhabitantOverlay.voiceTemplateMapping || []).map((voice) => voice.template)
+  ].filter(Boolean);
+}
+
+function unsafeInhabitantOverlayTextFindings(overlay = {}) {
+  const findings = [];
+  for (const [index, text] of inhabitantOverlayTextValues(overlay).entries()) {
+    const value = String(text || '');
+    const lower = value.toLowerCase();
+    const technicalTerms = TECHNICAL_NORMAL_GAMEPLAY_TERMS.filter((term) => lower.includes(term));
+    const publicForbiddenTerms = PUBLIC_CARD_FORBIDDEN_TERMS.filter((term) => lower.includes(term));
+    const rawPromptPatterns = blockedPatternIdsForText(value);
+    const tooLong = value.length > 140;
+    if (technicalTerms.length > 0 || publicForbiddenTerms.length > 0 || rawPromptPatterns.length > 0 || tooLong) {
+      findings.push({ index, technicalTerms, publicForbiddenTerms, rawPromptPatterns, tooLong });
+    }
+  }
+  return findings;
+}
+
+function validateInhabitantStyleOverlay(overlay = {}) {
+  const schemaReport = SCHEMA_REGISTRY?.inhabitantStyleOverlay
+    ? validateGeneratedSchema(overlay, SCHEMA_REGISTRY.inhabitantStyleOverlay, '$.inhabitantStyleOverlay')
+    : { ok: true, errors: [] };
+  const roles = Array.isArray(overlay?.inhabitantRoles) ? overlay.inhabitantRoles : [];
+  const roleIds = roles.map((role) => role.canonicalRoleId).filter(Boolean);
+  const missingRoleIds = INHABITANT_ROLE_IDS.filter((roleId) => !roleIds.includes(roleId));
+  const unknownRoleIds = roleIds.filter((roleId) => !INHABITANT_ROLE_IDS.includes(roleId));
+  const duplicateRoleIds = roleIds.filter((roleId, index, all) => roleId && all.indexOf(roleId) !== index);
+  const nonVisualRoles = roles.filter((role) => (
+    role.visualOnly !== true
+    || role.mutatesResources !== false
+    || role.autonomousAgent !== false
+    || !['region.cells.claimed', 'territory.claimOptions', 'region.routes', 'region.settlements'].includes(role.serverStateSource)
+  ));
+  const spriteTargets = Array.isArray(overlay?.spritePromptPlan?.targets) ? overlay.spritePromptPlan.targets : [];
+  const spriteRoleIds = spriteTargets.map((target) => target.canonicalRoleId).filter(Boolean);
+  const missingSpriteRoleIds = INHABITANT_ROLE_IDS.filter((roleId) => !spriteRoleIds.includes(roleId));
+  const invalidSpriteTargets = spriteTargets.filter((target) => (
+    target.canonicalRoleId !== target.canonicalTarget
+    || !INHABITANT_ROLE_IDS.includes(target.canonicalRoleId)
+    || target.targetKind !== 'character-sprite'
+    || target.targetSize?.width !== 512
+    || target.targetSize?.height !== 512
+    || !String(target.usagePath || '').startsWith(`public/experiences/world-grid/generated/`)
+    || !String(target.usagePath || '').includes('/inhabitants/')
+    || !/^[0-9a-f]{64}$/.test(String(target.promptHash || ''))
+    || !target.candidateOutputPath
+    || !target.approvedOutputPath
+    || target.status !== 'planned-not-generated'
+  ));
+  const voiceTemplates = Array.isArray(overlay?.voiceTemplateMapping) ? overlay.voiceTemplateMapping : [];
+  const voiceRoleIds = voiceTemplates.map((voice) => voice.canonicalRoleId).filter(Boolean);
+  const missingVoiceRoleIds = INHABITANT_ROLE_IDS.filter((roleId) => !voiceRoleIds.includes(roleId));
+  const longVoiceTemplates = voiceTemplates.filter((voice) => String(voice.template || '').length > Number(voice.maxLength || 0));
+  const unsafeTextFindings = unsafeInhabitantOverlayTextFindings(overlay);
+  const forbiddenAuthorityPaths = findForbiddenAuthorityPaths(overlay);
+  const secretLikePaths = findSecretLikePaths(overlay);
+  const rawInstructionPaths = findRawPromptInstructionPaths(overlay);
+  const policy = overlay?.animationPolicy || {};
+  const safety = overlay?.safety || {};
+  const balance = overlay?.balanceSimulation || {};
+  const checks = [
+    {
+      id: 'INHABITANT_OVERLAY_SCHEMA_VALID',
+      passed: schemaReport.ok === true,
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
+    },
+    {
+      id: 'INHABITANT_ROLES_VISUAL_ONLY',
+      passed: missingRoleIds.length === 0
+        && unknownRoleIds.length === 0
+        && duplicateRoleIds.length === 0
+        && nonVisualRoles.length === 0,
+      measured: {
+        requiredRoleCount: INHABITANT_ROLE_IDS.length,
+        roleCount: roles.length,
+        missingRoleIds,
+        unknownRoleIds,
+        duplicateRoleIds: [...new Set(duplicateRoleIds)],
+        nonVisualRoleCount: nonVisualRoles.length
+      }
+    },
+    {
+      id: 'INHABITANT_SPRITE_PROMPT_PLAN_READY',
+      passed: overlay?.spritePromptPlan?.schemaVersion === INHABITANT_SPRITE_PROMPT_PLAN_VERSION
+        && overlay?.spritePromptPlan?.externalModelUsed === false
+        && overlay?.spritePromptPlan?.productionImageAssetsRequired === false
+        && spriteTargets.length === INHABITANT_ROLE_IDS.length
+        && missingSpriteRoleIds.length === 0
+        && invalidSpriteTargets.length === 0,
+      measured: {
+        spriteTargetCount: spriteTargets.length,
+        missingSpriteRoleIds,
+        invalidSpriteTargetCount: invalidSpriteTargets.length
+      }
+    },
+    {
+      id: 'INHABITANT_VOICE_TEMPLATES_SAFE',
+      passed: voiceTemplates.length === INHABITANT_ROLE_IDS.length
+        && missingVoiceRoleIds.length === 0
+        && longVoiceTemplates.length === 0
+        && unsafeTextFindings.length === 0
+        && safety?.unsafeTextRejectCount === 0,
+      measured: {
+        voiceTemplateCount: voiceTemplates.length,
+        missingVoiceRoleIds,
+        longVoiceTemplateCount: longVoiceTemplates.length,
+        unsafeTextRejectCount: unsafeTextFindings.length,
+        unsafeTextFindings: unsafeTextFindings.slice(0, 5)
+      }
+    },
+    {
+      id: 'INHABITANT_NO_HIDDEN_SIMULATION',
+      passed: forbiddenAuthorityPaths.length === 0
+        && secretLikePaths.length === 0
+        && rawInstructionPaths.length === 0
+        && policy?.hiddenSimulation === false
+        && safety?.externalModelPerInhabitant === false
+        && safety?.serverStateAuthority === 'server-owned-state-only'
+        && Number(safety?.resourceMutationCount || 0) === 0,
+      measured: {
+        forbiddenAuthorityPaths,
+        secretLikePaths,
+        rawInstructionPaths: rawInstructionPaths.slice(0, 5),
+        externalModelPerInhabitant: safety?.externalModelPerInhabitant === true,
+        resourceMutationCount: Number(safety?.resourceMutationCount || 0)
+      }
+    },
+    {
+      id: 'INHABITANT_ACTOR_BUDGET_PASSED',
+      passed: Number(policy?.actorBudgetMax || 0) === INHABITANT_ROLE_IDS.length
+        && Number(policy?.generatedActorCount || 0) === roles.length
+        && Number(policy?.generatedActorCount || 0) <= Number(policy?.actorBudgetMax || 0)
+        && policy?.motionKind === 'ambient-cosmetic'
+        && policy?.reducedMotionFallback === 'static-markers',
+      measured: {
+        actorBudgetMax: Number(policy?.actorBudgetMax || 0),
+        generatedActorCount: Number(policy?.generatedActorCount || 0),
+        reducedMotionFallback: policy?.reducedMotionFallback || null
+      }
+    },
+    {
+      id: 'INHABITANT_BALANCE_SIMULATION_PASSED',
+      passed: balance?.simulationVersion === INHABITANT_STYLE_BALANCE_VERSION
+        && balance?.inhabitantsAreVisualActorsOnly === true
+        && balance?.serverStateAuthorityPreserved === true
+        && balance?.actorBudgetPassed === true
+        && balance?.generatedStyleApplied === true
+        && Number(balance?.resourceMutationCount || 0) === 0
+        && Number(balance?.autonomousAgentCount || 0) === 0
+        && balance?.firstLoopCompletable === true,
+      measured: balance
+    }
+  ];
+  return {
+    ok: checks.every((check) => check.passed === true),
+    checks,
+    metrics: {
+      inhabitantOverlaySchemaExists: Boolean(SCHEMA_REGISTRY?.inhabitantStyleOverlay),
+      inhabitantsAreVisualActorsOnly: checks.find((check) => check.id === 'INHABITANT_ROLES_VISUAL_ONLY')?.passed === true,
+      serverStateAuthorityPreserved: checks.find((check) => check.id === 'INHABITANT_NO_HIDDEN_SIMULATION')?.passed === true
+        && balance?.serverStateAuthorityPreserved === true,
+      actorBudgetPassed: checks.find((check) => check.id === 'INHABITANT_ACTOR_BUDGET_PASSED')?.passed === true
+        && balance?.actorBudgetPassed === true,
+      generatedStyleApplied: balance?.generatedStyleApplied === true,
+      inhabitantRoleCount: roles.length,
+      inhabitantSpritePromptCount: spriteTargets.length,
+      externalModelPerInhabitant: safety?.externalModelPerInhabitant === true,
+      resourceMutationCount: Number(safety?.resourceMutationCount || 0),
+      unsafeTextRejectCount: unsafeTextFindings.length,
+      reducedMotionFallback: policy?.reducedMotionFallback || null
+    }
+  };
+}
+
+function projectInhabitantStyleOverlayView(pack = {}) {
+  const overlay = pack?.inhabitantStyleOverlay || {};
+  const report = validateInhabitantStyleOverlay(overlay);
+  return {
+    schemaVersion: 'agent-town-inhabitant-style-overlay-view-v1',
+    packId: pack?.packId || '',
+    inhabitantRoles: clone(overlay.inhabitantRoles || []),
+    voiceTemplateMapping: clone(overlay.voiceTemplateMapping || []),
+    spritePromptTargets: (overlay.spritePromptPlan?.targets || []).map((target) => ({
+      canonicalRoleId: target.canonicalRoleId,
+      canonicalTarget: target.canonicalTarget,
+      targetKind: target.targetKind,
+      targetSize: clone(target.targetSize || {}),
+      usagePath: target.usagePath,
+      candidateOutputPath: target.candidateOutputPath,
+      status: target.status
+    })),
+    animationPolicy: clone(overlay.animationPolicy || {}),
+    balanceSimulation: clone(overlay.balanceSimulation || {}),
+    validationReport: report
+  };
+}
+
 function modifierEffectFor(modifier = '') {
   const base = APPROVED_MODIFIER_EFFECTS[modifier] || APPROVED_MODIFIER_EFFECTS.visual_only;
   return {
@@ -2125,6 +2492,7 @@ function validateGeneratedPack(pack) {
   const generationBriefReport = validateGenerationBrief(pack?.generationBrief || {});
   const techFlavorTreeReport = validateTechFlavorTree(pack?.techFlavorTree || {});
   const requesterVoiceReport = validateRequesterVoicePack(pack?.requesterVoicePack || {});
+  const inhabitantOverlayReport = validateInhabitantStyleOverlay(pack?.inhabitantStyleOverlay || {});
   const approvedModifiersReport = validateApprovedModifiers(pack?.approvedModifiers || {});
   const assetManifestReport = validateAssetManifest(pack?.assetManifest || {}, pack);
   const assetPromptPlanReport = validateAssetPromptPlan(pack?.assetPromptPlan || {}, pack);
@@ -2178,6 +2546,11 @@ function validateGeneratedPack(pack) {
       id: 'GENPACK_REQUESTER_VOICE_PACK_VALID',
       passed: requesterVoiceReport.ok === true,
       measured: requesterVoiceReport.metrics
+    },
+    {
+      id: 'GENPACK_INHABITANT_STYLE_OVERLAY_VALID',
+      passed: inhabitantOverlayReport.ok === true,
+      measured: inhabitantOverlayReport.metrics
     },
     {
       id: 'GENPACK_APPROVED_MODIFIERS_VALID',
@@ -2275,6 +2648,16 @@ function validateGeneratedPack(pack) {
       unsafeTextRejectCount: requesterVoiceReport.metrics.unsafeTextRejectCount,
       townMurmurTemplateCount: requesterVoiceReport.metrics.townMurmurTemplateCount,
       cloverIdentityStable: requesterVoiceReport.metrics.cloverIdentityStable,
+      inhabitantOverlayValid: inhabitantOverlayReport.ok === true,
+      inhabitantsAreVisualActorsOnly: inhabitantOverlayReport.metrics.inhabitantsAreVisualActorsOnly,
+      serverStateAuthorityPreserved: inhabitantOverlayReport.metrics.serverStateAuthorityPreserved,
+      actorBudgetPassed: inhabitantOverlayReport.metrics.actorBudgetPassed,
+      generatedStyleApplied: inhabitantOverlayReport.metrics.generatedStyleApplied,
+      inhabitantRoleCount: inhabitantOverlayReport.metrics.inhabitantRoleCount,
+      inhabitantSpritePromptCount: inhabitantOverlayReport.metrics.inhabitantSpritePromptCount,
+      externalModelPerInhabitant: inhabitantOverlayReport.metrics.externalModelPerInhabitant,
+      inhabitantResourceMutationCount: inhabitantOverlayReport.metrics.resourceMutationCount,
+      inhabitantUnsafeTextRejectCount: inhabitantOverlayReport.metrics.unsafeTextRejectCount,
       enumOnlyModifiers: approvedModifiersReport.metrics.enumOnlyModifiers,
       formulaInjectionRejected: approvedModifiersReport.checks.find((check) => check.id === 'APPROVED_MODIFIERS_NO_FORMULA_OR_AUTHORITY')?.passed === true,
       balanceSimulationPassed: approvedModifiersReport.metrics.balanceSimulationPassed,
@@ -2647,6 +3030,7 @@ function createGeneratedPack({
     },
     techFlavorTree: buildTechFlavorTree({ promptHash, packHash, anchor, second, index }),
     requesterVoicePack: buildRequesterVoicePack({ packId, promptHash, packHash, anchor, second, index }),
+    inhabitantStyleOverlay: buildInhabitantStyleOverlay({ packId, promptHash, packHash, candidateRoot, anchor, second, index }),
     approvedModifiers: buildApprovedModifiers({ words, packHash })
   };
   pack.assetManifest = buildAssetManifest({ packId, promptHash, mappings, preset, palette });
@@ -2866,6 +3250,7 @@ function exportedPackHash(exportedPack = {}) {
     gameplayMapping: exportedPack.gameplayMapping,
     techFlavorTree: exportedPack.techFlavorTree,
     requesterVoicePack: exportedPack.requesterVoicePack,
+    inhabitantStyleOverlay: exportedPack.inhabitantStyleOverlay,
     approvedModifiers: exportedPack.approvedModifiers,
     assetManifest: exportedPack.assetManifest,
     assetPromptPlan: exportedPack.assetPromptPlan,
@@ -3780,6 +4165,7 @@ module.exports = {
   CANONICAL_TECH_CAPABILITIES,
   DEFAULT_CANDIDATE_ROOT,
   GENERATION_BRIEF_VERSION,
+  INHABITANT_ROLE_DEFINITIONS,
   REQUIRED_CANONICAL_IDS,
   REPLAYABILITY_PROMPT_SUITE,
   SCHEMA_VERSION,
@@ -3798,6 +4184,7 @@ module.exports = {
   listPublicPackGallery,
   normalizePrompt,
   projectApprovedModifierView,
+  projectInhabitantStyleOverlayView,
   projectRequesterVoiceView,
   projectTechFlavorView,
   publishPublicPackCard,
@@ -3812,6 +4199,7 @@ module.exports = {
   validateAssetPromptPlan,
   validateApprovedModifiers,
   validateGenerationBrief,
+  validateInhabitantStyleOverlay,
   validateRequesterVoicePack,
   validateTechFlavorTree,
   validatePublicPackGallery,

@@ -126,6 +126,14 @@ Player prompt
 - `projectRequesterVoiceView` exposes generated requester copy and contract flavor metadata only when generated packs are enabled.
 - Balance simulation requires canonical contract coverage of 1.0, no hidden mechanics, canonical contract rules preserved, and first-loop playability.
 
+## GU-16 Town Life + Inhabitant Overlay Slice
+
+- `inhabitant_style_overlay.schema.json` defines passive worker, hauler, messenger, and farmer roles, sprite prompt scaffolding, voice templates, animation policy, safety policy, and balance simulation.
+- Inhabitants are visual actors only. They read from server-owned region/territory state sources and cannot mutate resources, own tools, change contracts, or act as autonomous agents.
+- Sprite prompt targets are role-scoped `character-sprite` candidates with prompt hashes, usage paths, candidate paths, and no production image requirement.
+- `projectInhabitantStyleOverlayView` exposes only generated role/voice/sprite-plan metadata when generated packs are enabled.
+- Browser rendering uses a generated-pack-only stage overlay; reduced-motion mode switches the overlay to static markers.
+
 ## Machine Checks
 
 ```json
@@ -221,6 +229,16 @@ Player prompt
   "canonicalContractRulesPreserved": true,
   "unsafeTextRejectCount": 0,
   "cloverIdentityStable": true,
-  "cachedRewriteDisabled": true
+  "cachedRewriteDisabled": true,
+  "inhabitantOverlaySchemaExists": true,
+  "inhabitantsAreVisualActorsOnly": true,
+  "serverStateAuthorityPreserved": true,
+  "actorBudgetPassed": true,
+  "generatedStyleApplied": true,
+  "inhabitantRoleCount": 4,
+  "inhabitantSpritePromptCount": 4,
+  "externalModelPerInhabitant": false,
+  "inhabitantResourceMutationCount": 0,
+  "reducedMotionFallback": "static-markers"
 }
 ```

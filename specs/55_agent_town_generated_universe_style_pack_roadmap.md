@@ -378,3 +378,23 @@ Generated packs now include a `requesterVoicePack` contract for presentation-onl
   "firstLoopStillCompletes": true
 }
 ```
+
+## GU-16 Town Life + Inhabitant Style Overlay Slice
+
+Generated packs now include an `inhabitantStyleOverlay` contract for passive town-life visual actors. The overlay can name and style workers, haulers, messengers, and farmers, scaffold future sprite prompts, and add short voice templates, but every role is visual-only, reads server-owned state, has no resource mutation authority, and cannot become an autonomous agent. Browser rendering uses a small generated-pack-only stage overlay with reduced-motion static markers.
+
+```json
+{
+  "inhabitantOverlaySchemaExists": true,
+  "inhabitantsAreVisualActorsOnly": true,
+  "serverStateAuthorityPreserved": true,
+  "actorBudgetPassed": true,
+  "generatedStyleApplied": true,
+  "inhabitantRoleCount": 4,
+  "inhabitantSpritePromptCount": 4,
+  "externalModelPerInhabitant": false,
+  "resourceMutationCount": 0,
+  "reducedMotionFallback": "static-markers",
+  "firstLoopStillCompletes": true
+}
+```
