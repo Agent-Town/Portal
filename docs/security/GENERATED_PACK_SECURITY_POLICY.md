@@ -12,6 +12,8 @@ Status: prototype-gated
 - Generated-pack subdocuments must pass the local schema registry independently before runtime validation can pass.
 - Generated packs cannot store provider credentials, API keys, access tokens, refresh tokens, wallet secrets, Brain vault data, private event logs, or account recovery material.
 - Scaffolded generation job logs must record `authMode=not_configured`, `externalImageGenerationUsed=false`, zero outputs, and no production approval until a separate consent/auth/cost model is approved.
+- Optional candidate-generation preflights must fail closed unless product/security approval, documented auth model, documented cost model, accepted cost estimate, and user/team consent are all present.
+- Candidate-generation preflight records must never persist raw provider credentials, and failure records must keep `fallbackStillPlayable=true` for valid deterministic packs.
 - Player-visible generated text must be escaped in DOM rendering.
 - Production image generation requires explicit consent and a documented cost/auth model before any user-facing release claim.
 
@@ -33,6 +35,10 @@ Status: prototype-gated
   "candidateFolderCount": 23,
   "generationJobLogCount": 23,
   "jobLogsReplayableFromPromptPlan": true,
+  "candidateGenerationPreflightExists": true,
+  "generationDisabledWithoutConsentAuthCost": true,
+  "productSecurityApprovalRequired": true,
+  "generatedImageAssetsCanChangeServerRules": false,
   "productionImageAssetCount": 0,
   "externalImageModelUsed": false,
   "explicitConsentRequiredForImageGeneration": true,

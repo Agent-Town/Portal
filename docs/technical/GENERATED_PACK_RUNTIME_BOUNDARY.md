@@ -44,6 +44,13 @@ Player prompt
 - Job logs record `authMode=not_configured`, `costConsentStatus=not_required_for_scaffold`, `externalImageGenerationUsed=false`, zero outputs, and no production approval.
 - Job logs include prompt-plan hash, source provenance, retry metadata, and a resume pointer so a future approved image-generation runner can replay from the prompt plan without inventing state.
 
+## GU-5 Candidate Generation Guard Slice
+
+- `server/world_grid/generated_asset_generation.js` provides the preflight boundary for future candidate image generation.
+- `scripts/generated_pack_candidate_generation_spike.js` is the optional command surface; by default it only reports blocked preflight state and can append candidate-generation evidence to JSONL job logs.
+- The guard requires product/security approval, documented auth, documented cost, accepted cost estimate, and user/team consent before any adapter can run.
+- No adapter is wired by default. Failed or blocked attempts keep deterministic fallback packs playable, write zero production outputs, and preserve canonical gameplay mappings.
+
 ## Machine Checks
 
 ```json
@@ -67,6 +74,10 @@ Player prompt
   "schemasValidatedIndependently": true,
   "dangerousFieldRejectCountMin": 20,
   "jobLogsReplayableFromPromptPlan": true,
-  "costConsentStatus": "not_required_for_scaffold"
+  "costConsentStatus": "not_required_for_scaffold",
+  "candidateGenerationPreflightExists": true,
+  "generationDisabledWithoutConsentAuthCost": true,
+  "approvedAssetsRequireHumanSignoff": true,
+  "generatedImageAssetsCanChangeServerRules": false
 }
 ```

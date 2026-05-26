@@ -33,3 +33,6 @@ owner: "Agent Town product"
 | GPACK-020 | Schema | Local schema registry validates generated-pack subdocuments independently | `tests/generated_pack_schema_validation.test.js` |
 | GPACK-021 | Schema | Dangerous unknown fields across generated-pack subdocuments produce at least 20 schema/content rejections | `tests/generated_pack_schema_validation.test.js` |
 | GPACK-022 | Jobs | Candidate generation job logs are written without image generation, include consent/cost/provenance/retry/resume metadata, and redact secrets | `tests/generated_pack_generation_job_scaffold.test.js` |
+| GPACK-023 | Generation guard | Optional candidate-generation command exists, but generation is blocked without product approval, auth model, cost acceptance, and user/team consent | `tests/generated_pack_candidate_generation_guard.test.js` |
+| GPACK-024 | Generation guard | Job-log preflight records never store raw provider secrets and failed attempts preserve deterministic fallback playability | `tests/generated_pack_candidate_generation_guard.test.js` |
+| GPACK-025 | Generation guard | Candidate image attempts cannot create approved production assets or mutate canonical server gameplay mappings | `tests/generated_pack_candidate_generation_guard.test.js` |

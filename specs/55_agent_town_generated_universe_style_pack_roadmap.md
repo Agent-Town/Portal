@@ -84,12 +84,14 @@ This is a separate prototype-gated track. It must not change normal gameplay vis
   "invalidAssetManifestEntryCount": 0,
   "assetPromptPlanCoverage": 1.0,
   "assetPromptPlanAssetCount": 23,
-  "candidateOutputPathCount": 40,
+  "candidateOutputPathCount": 23,
   "candidateFolderCount": 23,
   "generationJobLogCount": 23,
   "productionImageAssetCount": 0,
   "externalImageModelUsed": false,
   "explicitConsentRequiredForImageGeneration": true,
+  "candidateGenerationPreflightExists": true,
+  "candidateGenerationBlockedWithoutConsentAuthCost": true,
   "deterministicFallbackPlayable": true,
   "firstLoopCompleted": true,
   "replayabilityDistinctSignatureRatioMin": 1.0,
@@ -131,5 +133,24 @@ The candidate generation scaffold still does not call image models. Each planned
   "retryRecordsPresent": true,
   "replayableFromPromptPlan": true,
   "secretsRedacted": true
+}
+```
+
+## GU-5 Candidate Image Generation Guard Slice
+
+The real image-generation spike remains blocked until product/security approval, an explicit auth model, an explicit cost model, and explicit user/team consent exist. This slice adds only the optional command and runtime guard for that future work. The guard writes candidate-generation preflight records to the same job logs, never reads provider credentials, never calls an image model by default, never creates approved production assets, and fails back to the deterministic generated pack.
+
+```json
+{
+  "optionalGenerationCommandExists": true,
+  "generationDisabledWithoutConsentAuthCost": true,
+  "productSecurityApprovalRequired": true,
+  "authModelDocumentedRequired": true,
+  "costConsentRequired": true,
+  "jobLogsNeverStoreProviderSecrets": true,
+  "failedJobsFallbackToDeterministicPack": true,
+  "generatedImageAssetsCanChangeServerRules": false,
+  "approvedAssetsRequireHumanSignoff": true,
+  "candidateImagesGenerated": false
 }
 ```

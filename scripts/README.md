@@ -37,6 +37,20 @@ Notes:
 
 ## Scripts
 
+### `generated_pack_candidate_generation_spike.js`
+
+Runs the Generated Universe GU-5 candidate image-generation preflight for a saved generated-pack JSON file.
+This is a guard and evidence command only: it does not call an image model, read provider secrets, or mark production assets approved.
+
+```bash
+node scripts/generated_pack_candidate_generation_spike.js \
+  --pack tests/fixtures/generated_packs/valid_world_grid_pack.json \
+  --target-limit 1 \
+  --no-write
+```
+
+The command reports blocked state unless explicit product/security approval, documented auth, documented cost, accepted cost estimate, and user/team consent are all present in environment variables listed by `--help`.
+
 ### `pull-colosseum-agent-hackathon-projects.ts`
 
 Pulls all entries from Colosseum hackathon projects API and optionally enriches each project with
