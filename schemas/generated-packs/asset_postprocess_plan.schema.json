@@ -1,0 +1,88 @@
+{
+  "$id": "agent-town://schemas/generated-packs/asset_postprocess_plan.schema.json",
+  "type": "object",
+  "required": ["schemaVersion", "packId", "promptHash", "promptPlanHash", "createdAtMs", "candidateRoot", "postprocessRoot", "textureAtlasPath", "textureAtlasImagePath", "visualManifestPath", "budget", "pipeline", "targets", "planHash"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": "agent-town-asset-postprocess-plan-v1" },
+    "packId": { "type": "string", "minLength": 8 },
+    "promptHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "promptPlanHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "createdAtMs": { "type": "number", "minimum": 0 },
+    "candidateRoot": { "type": "string", "minLength": 3 },
+    "postprocessRoot": { "type": "string", "minLength": 3 },
+    "textureAtlasPath": { "type": "string", "minLength": 3 },
+    "textureAtlasImagePath": { "type": "string", "minLength": 3 },
+    "visualManifestPath": { "type": "string", "minLength": 3 },
+    "budget": {
+      "type": "object",
+      "required": ["maxAtlasWidth", "totalBudgetBytes"],
+      "additionalProperties": false,
+      "properties": {
+        "maxAtlasWidth": { "type": "number", "minimum": 512 },
+        "totalBudgetBytes": { "type": "number", "minimum": 1 }
+      }
+    },
+    "pipeline": {
+      "type": "object",
+      "required": ["crop", "resize", "alpha", "conversion", "packing"],
+      "additionalProperties": false,
+      "properties": {
+        "crop": { "const": "contain-center-no-upscale" },
+        "resize": { "const": "fit-within-target-size-preserve-aspect" },
+        "alpha": { "const": "preserve-alpha-or-clean-background-postprocess" },
+        "conversion": { "const": "webp-primary-png-fallback" },
+        "packing": { "const": "deterministic-shelf-atlas-metadata" }
+      }
+    },
+    "targets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["canonicalTarget", "promptId", "promptHash", "promptPlanHash", "targetKind", "targetSize", "candidateInputPath", "processedOutputPath", "pngFallbackOutputPath", "promotionOutputPath", "usagePath", "fallbackAssetId", "visualManifestSidecarPath", "atlasFrame", "maxBytes", "outputFormat", "cropPolicy", "resizePolicy", "alphaPolicy"],
+        "additionalProperties": false,
+        "properties": {
+          "canonicalTarget": { "type": "string", "minLength": 3 },
+          "promptId": { "type": "string", "minLength": 8 },
+          "promptHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "promptPlanHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "targetKind": { "enum": ["terrain-texture", "building-billboard", "resource-icon", "character-sprite", "ui-ornament", "postcard"] },
+          "targetSize": {
+            "type": "object",
+            "required": ["width", "height"],
+            "additionalProperties": false,
+            "properties": {
+              "width": { "type": "number", "minimum": 1 },
+              "height": { "type": "number", "minimum": 1 }
+            }
+          },
+          "candidateInputPath": { "type": "string", "minLength": 3 },
+          "processedOutputPath": { "type": "string", "minLength": 3 },
+          "pngFallbackOutputPath": { "type": "string", "minLength": 3 },
+          "promotionOutputPath": { "type": "string", "minLength": 3 },
+          "usagePath": { "type": "string", "minLength": 3 },
+          "fallbackAssetId": { "type": "string", "minLength": 3 },
+          "visualManifestSidecarPath": { "type": "string", "minLength": 3 },
+          "atlasFrame": {
+            "type": "object",
+            "required": ["x", "y", "width", "height"],
+            "additionalProperties": false,
+            "properties": {
+              "x": { "type": "number", "minimum": 0 },
+              "y": { "type": "number", "minimum": 0 },
+              "width": { "type": "number", "minimum": 1 },
+              "height": { "type": "number", "minimum": 1 }
+            }
+          },
+          "maxBytes": { "type": "number", "minimum": 1 },
+          "outputFormat": { "const": "webp" },
+          "cropPolicy": { "const": "contain-center-no-upscale" },
+          "resizePolicy": { "const": "fit-within-target-size-preserve-aspect" },
+          "alphaPolicy": { "const": "preserve-alpha-or-clean-background-postprocess" }
+        }
+      }
+    },
+    "planHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

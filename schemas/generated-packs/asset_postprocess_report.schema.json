@@ -1,0 +1,96 @@
+{
+  "$id": "agent-town://schemas/generated-packs/asset_postprocess_report.schema.json",
+  "type": "object",
+  "required": ["schemaVersion", "packId", "postprocessPlanHash", "createdAtMs", "status", "targetCount", "processedCandidateOutputCount", "fallbackCount", "missingCandidateCount", "failedOutputCount", "assetBudgetPassed", "budgetExceededCount", "spriteAtlasMetadataExists", "visualManifestSidecarExists", "transparentBackgroundPolicyHandled", "fallbackOnAssetFailure", "approvedProductionAssetCount", "approvedProductionAssetsCreated", "generatedImageAssetsCanChangeServerRules", "packValidationPassed", "assetPromptPlanValidationPassed", "textureAtlasPath", "visualManifestPath", "targetResults"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": "agent-town-asset-postprocess-report-v1" },
+    "packId": { "type": "string", "minLength": 8 },
+    "postprocessPlanHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "createdAtMs": { "type": "number", "minimum": 0 },
+    "status": { "enum": ["postprocessed-candidates-ready", "fallback-ready"] },
+    "targetCount": { "type": "number", "minimum": 0 },
+    "processedCandidateOutputCount": { "type": "number", "minimum": 0 },
+    "fallbackCount": { "type": "number", "minimum": 0 },
+    "missingCandidateCount": { "type": "number", "minimum": 0 },
+    "failedOutputCount": { "type": "number", "minimum": 0 },
+    "assetBudgetPassed": { "type": "boolean" },
+    "budgetExceededCount": { "type": "number", "minimum": 0 },
+    "spriteAtlasMetadataExists": { "type": "boolean" },
+    "visualManifestSidecarExists": { "type": "boolean" },
+    "transparentBackgroundPolicyHandled": { "type": "boolean" },
+    "fallbackOnAssetFailure": { "type": "boolean" },
+    "approvedProductionAssetCount": { "type": "number", "minimum": 0 },
+    "approvedProductionAssetsCreated": { "type": "boolean" },
+    "generatedImageAssetsCanChangeServerRules": { "type": "boolean" },
+    "packValidationPassed": { "type": "boolean" },
+    "assetPromptPlanValidationPassed": { "type": "boolean" },
+    "textureAtlasPath": { "type": "string", "minLength": 3 },
+    "visualManifestPath": { "type": "string", "minLength": 3 },
+    "targetResults": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["schemaVersion", "packId", "canonicalTarget", "promptHash", "promptPlanHash", "postprocessPlanHash", "status", "reason", "fallbackUsed", "fallbackAssetId", "candidateInputPath", "processedOutputPath", "promotionOutputPath", "approvedProductionAssetCreated", "outputByteSize", "outputSize", "targetSize", "atlasFrame", "transparentBackgroundPolicy", "createdAtMs", "sidecarPath"],
+        "additionalProperties": false,
+        "properties": {
+          "schemaVersion": { "const": "agent-town-asset-postprocess-sidecar-v1" },
+          "packId": { "type": "string", "minLength": 8 },
+          "canonicalTarget": { "type": "string", "minLength": 3 },
+          "promptHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "promptPlanHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "postprocessPlanHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "status": { "enum": ["postprocessed-candidate", "fallback-ready"] },
+          "reason": { "type": "string", "minLength": 3 },
+          "fallbackUsed": { "type": "boolean" },
+          "fallbackAssetId": { "type": "string", "minLength": 3 },
+          "candidateInputPath": { "type": "string", "minLength": 3 },
+          "processedOutputPath": { "type": "string" },
+          "promotionOutputPath": { "type": "string", "minLength": 3 },
+          "approvedProductionAssetCreated": { "type": "boolean" },
+          "outputByteSize": { "type": "number", "minimum": 0 },
+          "outputSize": {
+            "type": "object",
+            "required": ["width", "height"],
+            "additionalProperties": false,
+            "properties": {
+              "width": { "type": "number", "minimum": 0 },
+              "height": { "type": "number", "minimum": 0 }
+            }
+          },
+          "targetSize": {
+            "type": "object",
+            "required": ["width", "height"],
+            "additionalProperties": false,
+            "properties": {
+              "width": { "type": "number", "minimum": 1 },
+              "height": { "type": "number", "minimum": 1 }
+            }
+          },
+          "atlasFrame": {
+            "type": "object",
+            "required": ["x", "y", "width", "height"],
+            "additionalProperties": false,
+            "properties": {
+              "x": { "type": "number", "minimum": 0 },
+              "y": { "type": "number", "minimum": 0 },
+              "width": { "type": "number", "minimum": 1 },
+              "height": { "type": "number", "minimum": 1 }
+            }
+          },
+          "transparentBackgroundPolicy": {
+            "type": "object",
+            "required": ["status", "handledBy"],
+            "additionalProperties": false,
+            "properties": {
+              "status": { "enum": ["not_required", "preserved_alpha", "clean_background_postprocess_required"] },
+              "handledBy": { "type": "string", "minLength": 3 }
+            }
+          },
+          "createdAtMs": { "type": "number", "minimum": 0 },
+          "sidecarPath": { "type": "string", "minLength": 3 }
+        }
+      }
+    }
+  }
+}

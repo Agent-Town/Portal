@@ -51,6 +51,13 @@ Player prompt
 - The guard requires product/security approval, documented auth, documented cost, accepted cost estimate, and user/team consent before any adapter can run.
 - No adapter is wired by default. Failed or blocked attempts keep deterministic fallback packs playable, write zero production outputs, and preserve canonical gameplay mappings.
 
+## GU-6 Post-Processing Contract Slice
+
+- `server/world_grid/generated_asset_postprocess.js` builds standalone postprocess plans and reports from an `AssetPromptPlan`.
+- Postprocess plans record crop, resize, alpha, WebP/PNG fallback, shelf-atlas metadata, per-target byte budgets, candidate input paths, postprocessed candidate output paths, and human-promotion paths.
+- The runner writes texture-atlas metadata, visual manifest sidecars, and per-target sidecars even when candidate files are absent, so missing assets fall back deterministically instead of blocking the first loop.
+- Postprocessed outputs remain candidate artifacts under `data/generated-packs*/<packId>/postprocessed`; production promotion paths under `approved` are not written without later human signoff.
+
 ## Machine Checks
 
 ```json
@@ -78,6 +85,12 @@ Player prompt
   "candidateGenerationPreflightExists": true,
   "generationDisabledWithoutConsentAuthCost": true,
   "approvedAssetsRequireHumanSignoff": true,
-  "generatedImageAssetsCanChangeServerRules": false
+  "generatedImageAssetsCanChangeServerRules": false,
+  "assetPostprocessPlanExists": true,
+  "assetPostprocessReportExists": true,
+  "spriteAtlasMetadataExists": true,
+  "visualManifestSidecarsExist": true,
+  "postprocessedOutputsStayCandidateOnly": true,
+  "threejsPackedAssetLoadDeferredToGU7": true
 }
 ```

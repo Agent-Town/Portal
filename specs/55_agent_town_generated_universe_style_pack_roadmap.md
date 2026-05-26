@@ -21,7 +21,7 @@ This is a separate prototype-gated track. It must not change normal gameplay vis
 | Goal | Milestone | AI-measurable done |
 | --- | --- | --- |
 | G0 | Pack charter, security policy, runtime boundary | `canonicalServerTruthPreserved=true`, `generatedPackMutationAuthority=false`, rollback documented |
-| G1 | Schema suite and fixtures | 8 schemas exist, valid fixture passes, invalid fixtures fail |
+| G1 | Schema suite and fixtures | 10 contract schemas exist, valid fixture passes, invalid fixtures fail |
 | G2 | Prompt intake and safety normalization | Prompt becomes safe `GenerationBrief`; raw prompt is not executable |
 | G3 | Style bible generator | Palette, material rules, silhouette rules, UI rules, animation rules present |
 | G4 | Universe bible generator | Factions/species/cultures, requester archetypes, hooks, humor, tech flavor present |
@@ -92,6 +92,8 @@ This is a separate prototype-gated track. It must not change normal gameplay vis
   "explicitConsentRequiredForImageGeneration": true,
   "candidateGenerationPreflightExists": true,
   "candidateGenerationBlockedWithoutConsentAuthCost": true,
+  "assetPostprocessPlanExists": true,
+  "assetPostprocessReportExists": true,
   "deterministicFallbackPlayable": true,
   "firstLoopCompleted": true,
   "replayabilityDistinctSignatureRatioMin": 1.0,
@@ -152,5 +154,27 @@ The real image-generation spike remains blocked until product/security approval,
   "generatedImageAssetsCanChangeServerRules": false,
   "approvedAssetsRequireHumanSignoff": true,
   "candidateImagesGenerated": false
+}
+```
+
+## GU-6 Post-Processing Contract Slice
+
+The post-processing lane now has a deterministic contract layer for future approved image candidates. It builds a postprocess plan from the `AssetPromptPlan`, validates standalone plan/report schemas, records crop/resize/alpha/conversion policy, writes per-target visual sidecars, writes texture-atlas metadata, enforces per-target byte budgets, and falls back to deterministic runtime assets when candidate files or conversion are absent. The runner writes postprocessed candidate outputs only; it does not promote production assets or change server gameplay rules.
+
+```json
+{
+  "assetPostprocessPlanSchemaExists": true,
+  "assetPostprocessReportSchemaExists": true,
+  "postprocessPipelineExists": true,
+  "cropResizeAlphaPolicyRecorded": true,
+  "webpPrimaryPngFallbackPolicyRecorded": true,
+  "spriteAtlasMetadataExists": true,
+  "visualManifestSidecarsExist": true,
+  "assetBudgetPassedWhenOutputsUnderBudget": true,
+  "oversizedOutputsFallback": true,
+  "fallbackOnAssetFailure": true,
+  "approvedProductionAssetCount": 0,
+  "generatedImageAssetsCanChangeServerRules": false,
+  "threejsPackedAssetLoadDeferredToGU7": true
 }
 ```

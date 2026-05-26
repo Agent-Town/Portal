@@ -36,3 +36,7 @@ owner: "Agent Town product"
 | GPACK-023 | Generation guard | Optional candidate-generation command exists, but generation is blocked without product approval, auth model, cost acceptance, and user/team consent | `tests/generated_pack_candidate_generation_guard.test.js` |
 | GPACK-024 | Generation guard | Job-log preflight records never store raw provider secrets and failed attempts preserve deterministic fallback playability | `tests/generated_pack_candidate_generation_guard.test.js` |
 | GPACK-025 | Generation guard | Candidate image attempts cannot create approved production assets or mutate canonical server gameplay mappings | `tests/generated_pack_candidate_generation_guard.test.js` |
+| GPACK-026 | Postprocess | Asset postprocess plan/report schemas exist and reject arbitrary executable fields | `tests/generated_pack_contract.test.js`, `tests/generated_pack_asset_postprocess.test.js` |
+| GPACK-027 | Postprocess | Missing candidate images write atlas metadata and visual sidecars while falling back to deterministic assets | `tests/generated_pack_asset_postprocess.test.js` |
+| GPACK-028 | Postprocess | Adapter-produced candidate outputs stay in postprocessed candidate paths, never approved production paths | `tests/generated_pack_asset_postprocess.test.js` |
+| GPACK-029 | Postprocess | Oversized processed outputs fail the byte budget and fall back instead of promoting | `tests/generated_pack_asset_postprocess.test.js` |

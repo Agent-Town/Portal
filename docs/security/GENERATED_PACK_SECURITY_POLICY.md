@@ -14,6 +14,7 @@ Status: prototype-gated
 - Scaffolded generation job logs must record `authMode=not_configured`, `externalImageGenerationUsed=false`, zero outputs, and no production approval until a separate consent/auth/cost model is approved.
 - Optional candidate-generation preflights must fail closed unless product/security approval, documented auth model, documented cost model, accepted cost estimate, and user/team consent are all present.
 - Candidate-generation preflight records must never persist raw provider credentials, and failure records must keep `fallbackStillPlayable=true` for valid deterministic packs.
+- Postprocess plans and reports are standalone contracts; they may write postprocessed candidate artifacts and metadata, but must not write approved production assets or alter canonical gameplay mappings.
 - Player-visible generated text must be escaped in DOM rendering.
 - Production image generation requires explicit consent and a documented cost/auth model before any user-facing release claim.
 
@@ -38,6 +39,10 @@ Status: prototype-gated
   "candidateGenerationPreflightExists": true,
   "generationDisabledWithoutConsentAuthCost": true,
   "productSecurityApprovalRequired": true,
+  "assetPostprocessPlanExists": true,
+  "assetPostprocessReportExists": true,
+  "postprocessedOutputsStayCandidateOnly": true,
+  "approvedProductionAssetCount": 0,
   "generatedImageAssetsCanChangeServerRules": false,
   "productionImageAssetCount": 0,
   "externalImageModelUsed": false,
