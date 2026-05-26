@@ -45,7 +45,9 @@ const REQUIRED_REVIEW_GATES = [
       RELEASE_REVIEW_ARTIFACT,
       'server/world_civilization/audit_ledger.js',
       'server/world_civilization/replay_reconstruction.js',
-      'server/world_civilization/resilience.js'
+      'server/world_civilization/resilience.js',
+      'tests/world_civilization_process_restart.test.js',
+      'tests/world_civilization_proposal_vote_process_restart.test.js'
     ],
     requiredChecks: ['append_only_ledger', 'owner_indexes', 'migration_versions', 'replay_reconstruction', 'rollback_handles'],
     signoffRequired: true

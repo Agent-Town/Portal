@@ -75,8 +75,10 @@ gate below has implementation, deterministic tests, and security/product signoff
   and rollback recovery gates have deterministic evidence. Current audit replay
   reconstruction starts in `server/world_civilization/replay_reconstruction.js`,
   and the current audit-ledger process restart probe starts in
-  `tests/world_civilization_process_restart.test.js`; both must remain
-  privacy-safe and non-executing.
+  `tests/world_civilization_process_restart.test.js`. Proposal/vote process
+  restart coverage starts in
+  `tests/world_civilization_proposal_vote_process_restart.test.js`; all replay
+  probes must remain privacy-safe and non-executing.
 - The research-only release review gate may exist in
   `server/world_civilization/release_review.js`, but it must keep V6 hidden
   from runtime/player surfaces until threat model, privacy review, abuse-case
@@ -170,9 +172,10 @@ gate below has implementation, deterministic tests, and security/product signoff
   audit replay reconstruction starts in
   `server/world_civilization/replay_reconstruction.js`; audit-ledger process
   restart coverage starts in `tests/world_civilization_process_restart.test.js`.
-  Release still requires process-level restart coverage for every civic store,
-  larger replay reconstruction, migration, load/rate, and rollback recovery
-  tests.
+  Proposal/vote process restart coverage starts in
+  `tests/world_civilization_proposal_vote_process_restart.test.js`. Release
+  still requires process-level restart coverage for every civic store, larger
+  replay reconstruction, migration, load/rate, and rollback recovery tests.
 - Security and product release review must be complete before normal gameplay
   exposure. Current gate tracking starts in
   `server/world_civilization/release_review.js` and

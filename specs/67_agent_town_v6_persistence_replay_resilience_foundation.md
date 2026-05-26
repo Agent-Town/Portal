@@ -14,6 +14,7 @@ Test coverage:
 - `tests/world_civilization_resilience.test.js`
 - `tests/world_civilization_replay_reconstruction.test.js`
 - `tests/world_civilization_process_restart.test.js`
+- `tests/world_civilization_proposal_vote_process_restart.test.js`
 
 ## Boundary
 
@@ -62,12 +63,18 @@ evidence for the civic audit ledger by seeding, closing, reopening, replaying,
 and retrying exact idempotent writes across separate Node process lifetimes
 against the same SQLite file.
 
+`tests/world_civilization_proposal_vote_process_restart.test.js` extends the
+same process-level evidence to dependent proposal and vote stores: one process
+drafts a proposal, a later process records a vote against the reopened proposal
+store, a third process reconstructs the audit replay, and exact retries remain
+idempotent after restart.
+
 ## Open Release Gaps
 
 M16 remains incomplete until all of these gates close:
 
 - Process restart tests for every civic store, not only the current audit-ledger
-  restart replay probe.
+  and proposal/vote restart replay probes.
 - Release-grade replay reconstruction across process restart, larger datasets,
   and every civic summary surface.
 - Migration upgrade and downgrade tests for every civic table.
