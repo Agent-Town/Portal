@@ -53,6 +53,22 @@ const EXPECTED_ROUTE_SURFACES = [
   '/api/world/sandbox/leave'
 ];
 
+const EXPECTED_TOOL_SURFACES = [
+  'et.world.territory.plan_claim',
+  'et.world.territory.complete_claim',
+  'et.world.territory.cancel_claim',
+  'et.world.services.request_advice',
+  'et.world.services.accept_result',
+  'et.world.services.report_issue',
+  'et.world.events.contribute',
+  'et.world.events.claim_reward',
+  'et.world.sandbox.enter',
+  'et.world.sandbox.place_prop',
+  'et.world.sandbox.agent_demo',
+  'et.world.sandbox.rollback_last',
+  'et.world.sandbox.leave'
+];
+
 test('world-grid durable idempotency rows replay after separate Node process restart without remutating prototype state', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-world-grid-idempotency-'));
   const sqlitePath = path.join(dir, 'world-grid-idempotency.sqlite');
@@ -128,6 +144,54 @@ test('world-grid durable idempotency rows replay every V5.1-V5.5 mutating route 
       assert.equal(result.status, 409, result.route);
       assert.equal(result.errorCode, 'IDEMPOTENCY_CONFLICT', result.route);
       assert.equal(result.replayHeader, '', result.route);
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('world-grid durable idempotency rows replay every V5.1-V5.5 mutating tool surface after restart', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-world-grid-idempotency-tools-'));
+  const sqlitePath = path.join(dir, 'world-grid-idempotency.sqlite');
+  const storePath = path.join(dir, 'portal-store.sqlite');
+  const scenarioPath = path.join(dir, 'tool-matrix.json');
+  try {
+    const seeded = runProbe('tool-matrix-seed', sqlitePath, storePath);
+    fs.writeFileSync(scenarioPath, JSON.stringify(seeded.cases, null, 2));
+    const replayed = runProbe('tool-matrix-replay', sqlitePath, storePath, scenarioPath);
+    const conflicted = runProbe('tool-matrix-conflict', sqlitePath, storePath, scenarioPath);
+
+    assert.equal(seeded.ok, true);
+    assert.equal(seeded.caseCount, 14);
+    assert.equal(seeded.durableCount, seeded.caseCount);
+    for (const surface of EXPECTED_TOOL_SURFACES) {
+      assert.equal(seeded.surfaces.includes(surface), true, surface);
+    }
+    assert.equal(
+      seeded.durableRecords.every((record) => record.migrationVersion === 'world_grid_idempotency_v1'),
+      true
+    );
+    assert.equal(
+      seeded.durableRecords.every((record) => record.schemaVersion === 'agent-town.v5.world-grid.idempotency.v1'),
+      true
+    );
+
+    assert.equal(replayed.ok, true);
+    assert.equal(replayed.durableCount, seeded.durableCount);
+    assert.equal(replayed.results.length, seeded.caseCount);
+    for (const result of replayed.results) {
+      assert.equal(result.status, 200, result.toolName);
+      assert.equal(result.replayHeader, '1', result.toolName);
+      assert.equal(result.matchesSeededResponse, true, result.toolName);
+    }
+
+    assert.equal(conflicted.ok, true);
+    assert.equal(conflicted.durableCount, seeded.durableCount);
+    assert.equal(conflicted.results.length, seeded.caseCount);
+    for (const result of conflicted.results) {
+      assert.equal(result.status, 409, result.toolName);
+      assert.equal(result.errorCode, 'IDEMPOTENCY_CONFLICT', result.toolName);
+      assert.equal(result.replayHeader, '', result.toolName);
     }
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });

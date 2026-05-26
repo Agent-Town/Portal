@@ -13,6 +13,7 @@ const { createWorldGridRouter } = require('../server/world_grid/routes');
 const PAIR_ID = 'session:world-grid-durable-idempotency-restart';
 const ROUTE_OWNER_A = 'session:world-grid-durable-idempotency-route-a';
 const ROUTE_OWNER_B = 'session:world-grid-durable-idempotency-route-b';
+const TOOL_OWNER = 'session:world-grid-durable-idempotency-tool';
 const IDEMPOTENCY_KEY = 'restart_plan_claim_001';
 
 function writeJson(value) {
@@ -86,6 +87,10 @@ async function postJson(baseUrl, route, body, pairId = PAIR_ID) {
   };
 }
 
+async function postTool(baseUrl, toolName, body, pairId = TOOL_OWNER) {
+  return postJson(baseUrl, `/api/world/tool/${toolName}`, body, pairId);
+}
+
 async function regionClaimCount(baseUrl) {
   const response = await fetch(`${baseUrl}/api/world/region`);
   const body = await response.json();
@@ -125,6 +130,18 @@ function durableCount(sqlitePath) {
 function caseRecord({ route, owner = ROUTE_OWNER_A, body, conflictBody, result }) {
   return {
     route,
+    owner,
+    body,
+    conflictBody,
+    expectedStatus: result.status,
+    expectedBody: result.body
+  };
+}
+
+function toolCaseRecord({ toolName, owner = TOOL_OWNER, body, conflictBody, result }) {
+  return {
+    toolName,
+    route: `/api/world/tool/${toolName}`,
     owner,
     body,
     conflictBody,
@@ -381,6 +398,193 @@ async function seedRouteMatrix(baseUrl) {
   return cases;
 }
 
+async function seedToolMatrix(baseUrl) {
+  seedPlotFor(TOOL_OWNER);
+  const cases = [];
+  const options = await getClaimOptionsFor(baseUrl, TOOL_OWNER);
+  const completeOption = options[0];
+  const cancelOption = options[1];
+
+  const planBody = {
+    cellId: completeOption.cellId,
+    idempotencyKey: 'tool_matrix_plan_claim_001'
+  };
+  const planned = await postTool(baseUrl, 'et.world.territory.plan_claim', planBody);
+  assertOk(planned, 'TOOL_PLAN_CLAIM');
+  cases.push(toolCaseRecord({
+    toolName: 'et.world.territory.plan_claim',
+    body: planBody,
+    conflictBody: { ...planBody, cellId: cancelOption.cellId },
+    result: planned
+  }));
+
+  const cancelPrepBody = {
+    cellId: cancelOption.cellId,
+    idempotencyKey: 'tool_matrix_plan_cancel_prep_001'
+  };
+  const cancelPrepared = await postTool(baseUrl, 'et.world.territory.plan_claim', cancelPrepBody);
+  assertOk(cancelPrepared, 'TOOL_PLAN_CANCEL_PREP');
+  cases.push(toolCaseRecord({
+    toolName: 'et.world.territory.plan_claim',
+    body: cancelPrepBody,
+    conflictBody: { ...cancelPrepBody, cellId: completeOption.cellId },
+    result: cancelPrepared
+  }));
+
+  const completeBody = {
+    claimId: planned.body.data.claim.claimId,
+    idempotencyKey: 'tool_matrix_complete_claim_001'
+  };
+  const completed = await postTool(baseUrl, 'et.world.territory.complete_claim', completeBody);
+  assertOk(completed, 'TOOL_COMPLETE_CLAIM');
+  cases.push(toolCaseRecord({
+    toolName: 'et.world.territory.complete_claim',
+    body: completeBody,
+    conflictBody: { ...completeBody, claimId: `${completeBody.claimId}_changed` },
+    result: completed
+  }));
+
+  const cancelBody = {
+    claimId: cancelPrepared.body.data.claim.claimId,
+    idempotencyKey: 'tool_matrix_cancel_claim_001'
+  };
+  const cancelled = await postTool(baseUrl, 'et.world.territory.cancel_claim', cancelBody);
+  assertOk(cancelled, 'TOOL_CANCEL_CLAIM');
+  cases.push(toolCaseRecord({
+    toolName: 'et.world.territory.cancel_claim',
+    body: cancelBody,
+    conflictBody: { ...cancelBody, claimId: `${cancelBody.claimId}_changed` },
+    result: cancelled
+  }));
+
+  const requestBody = {
+    serviceId: 'service_route_advisor',
+    input: { regionSummary: { cellCount: 19 }, brainSecrets: 'sk-tool-matrix-secret' },
+    idempotencyKey: 'tool_matrix_service_request_001'
+  };
+  const requested = await postTool(baseUrl, 'et.world.services.request_advice', requestBody);
+  assertOk(requested, 'TOOL_SERVICE_REQUEST');
+  cases.push(toolCaseRecord({
+    toolName: 'et.world.services.request_advice',
+    body: requestBody,
+    conflictBody: { ...requestBody, serviceId: 'service_public_works_planner' },
+    result: requested
+  }));
+
+  const acceptBody = {
+    requestId: requested.body.data.request.requestId,
+    idempotencyKey: 'tool_matrix_service_accept_001'
+  };
+  const accepted = await postTool(baseUrl, 'et.world.services.accept_result', acceptBody);
+  assertOk(accepted, 'TOOL_SERVICE_ACCEPT');
+  cases.push(toolCaseRecord({
+    toolName: 'et.world.services.accept_result',
+    body: acceptBody,
+    conflictBody: { ...acceptBody, requestId: `${acceptBody.requestId}_changed` },
+    result: accepted
+  }));
+
+  const reportBody = {
+    requestId: requested.body.data.request.requestId,
+    reason: 'Tool matrix dispute.',
+    idempotencyKey: 'tool_matrix_service_report_001'
+  };
+  const reported = await postTool(baseUrl, 'et.world.services.report_issue', reportBody);
+  assertOk(reported, 'TOOL_SERVICE_REPORT');
+  cases.push(toolCaseRecord({
+    toolName: 'et.world.services.report_issue',
+    body: reportBody,
+    conflictBody: { ...reportBody, reason: 'Changed tool dispute.' },
+    result: reported
+  }));
+
+  const eventId = 'event_great_ridge_bridge';
+  const contributeBody = {
+    eventId,
+    bundle: { coin: 1 },
+    idempotencyKey: 'tool_matrix_event_contribute_001'
+  };
+  const contributed = await postTool(baseUrl, 'et.world.events.contribute', contributeBody);
+  assertOk(contributed, 'TOOL_EVENT_CONTRIBUTE');
+  cases.push(toolCaseRecord({
+    toolName: 'et.world.events.contribute',
+    body: contributeBody,
+    conflictBody: { ...contributeBody, bundle: { coin: 2 } },
+    result: contributed
+  }));
+
+  const rewardBody = {
+    eventId,
+    idempotencyKey: 'tool_matrix_event_reward_001'
+  };
+  const rewarded = await postTool(baseUrl, 'et.world.events.claim_reward', rewardBody);
+  assertOk(rewarded, 'TOOL_EVENT_REWARD');
+  cases.push(toolCaseRecord({
+    toolName: 'et.world.events.claim_reward',
+    body: rewardBody,
+    conflictBody: { ...rewardBody, ownerAccountId: 'owner_mismatch' },
+    result: rewarded
+  }));
+
+  const sandboxEnterBody = { idempotencyKey: 'tool_matrix_sandbox_enter_001' };
+  const sandboxEntered = await postTool(baseUrl, 'et.world.sandbox.enter', sandboxEnterBody);
+  assertOk(sandboxEntered, 'TOOL_SANDBOX_ENTER');
+  cases.push(toolCaseRecord({
+    toolName: 'et.world.sandbox.enter',
+    body: sandboxEnterBody,
+    conflictBody: { ...sandboxEnterBody, note: 'changed' },
+    result: sandboxEntered
+  }));
+
+  const sandboxPlaceBody = {
+    payload: { cellId: 'sandbox_cell_0', propId: 'lantern' },
+    idempotencyKey: 'tool_matrix_sandbox_place_001'
+  };
+  const sandboxPlaced = await postTool(baseUrl, 'et.world.sandbox.place_prop', sandboxPlaceBody);
+  assertOk(sandboxPlaced, 'TOOL_SANDBOX_PLACE');
+  cases.push(toolCaseRecord({
+    toolName: 'et.world.sandbox.place_prop',
+    body: sandboxPlaceBody,
+    conflictBody: { ...sandboxPlaceBody, payload: { cellId: 'sandbox_cell_0', propId: 'bench' } },
+    result: sandboxPlaced
+  }));
+
+  const sandboxAgentBody = {
+    payload: { cellId: 'sandbox_cell_1', demoKind: 'route-signpost' },
+    idempotencyKey: 'tool_matrix_sandbox_agent_001'
+  };
+  const sandboxAgent = await postTool(baseUrl, 'et.world.sandbox.agent_demo', sandboxAgentBody);
+  assertOk(sandboxAgent, 'TOOL_SANDBOX_AGENT');
+  cases.push(toolCaseRecord({
+    toolName: 'et.world.sandbox.agent_demo',
+    body: sandboxAgentBody,
+    conflictBody: { ...sandboxAgentBody, payload: { cellId: 'sandbox_cell_2', demoKind: 'route-signpost' } },
+    result: sandboxAgent
+  }));
+
+  const sandboxRollbackBody = { idempotencyKey: 'tool_matrix_sandbox_rollback_001' };
+  const sandboxRollback = await postTool(baseUrl, 'et.world.sandbox.rollback_last', sandboxRollbackBody);
+  assertOk(sandboxRollback, 'TOOL_SANDBOX_ROLLBACK');
+  cases.push(toolCaseRecord({
+    toolName: 'et.world.sandbox.rollback_last',
+    body: sandboxRollbackBody,
+    conflictBody: { ...sandboxRollbackBody, note: 'changed' },
+    result: sandboxRollback
+  }));
+
+  const sandboxLeaveBody = { idempotencyKey: 'tool_matrix_sandbox_leave_001' };
+  const sandboxLeave = await postTool(baseUrl, 'et.world.sandbox.leave', sandboxLeaveBody);
+  assertOk(sandboxLeave, 'TOOL_SANDBOX_LEAVE');
+  cases.push(toolCaseRecord({
+    toolName: 'et.world.sandbox.leave',
+    body: sandboxLeaveBody,
+    conflictBody: { ...sandboxLeaveBody, note: 'changed' },
+    result: sandboxLeave
+  }));
+
+  return cases;
+}
+
 function readScenario(scenarioPath = '') {
   if (!scenarioPath) throw new Error('WORLD_GRID_IDEMPOTENCY_SCENARIO_REQUIRED');
   return JSON.parse(require('node:fs').readFileSync(scenarioPath, 'utf8'));
@@ -411,6 +615,41 @@ async function conflictRouteMatrix(baseUrl, scenarioPath) {
     const conflict = await postJson(baseUrl, entry.route, entry.conflictBody, entry.owner);
     results.push({
       route: entry.route,
+      owner: entry.owner,
+      idempotencyKey: entry.conflictBody.idempotencyKey,
+      status: conflict.status,
+      replayHeader: conflict.replayHeader,
+      errorCode: conflict.body.error?.code || ''
+    });
+  }
+  return results;
+}
+
+async function replayToolMatrix(baseUrl, scenarioPath) {
+  const cases = readScenario(scenarioPath);
+  const results = [];
+  for (const entry of cases) {
+    const replay = await postTool(baseUrl, entry.toolName, entry.body, entry.owner);
+    results.push({
+      toolName: entry.toolName,
+      owner: entry.owner,
+      idempotencyKey: entry.body.idempotencyKey,
+      status: replay.status,
+      replayHeader: replay.replayHeader,
+      body: replay.body,
+      matchesSeededResponse: isDeepStrictEqual(replay.body, entry.expectedBody)
+    });
+  }
+  return results;
+}
+
+async function conflictToolMatrix(baseUrl, scenarioPath) {
+  const cases = readScenario(scenarioPath);
+  const results = [];
+  for (const entry of cases) {
+    const conflict = await postTool(baseUrl, entry.toolName, entry.conflictBody, entry.owner);
+    results.push({
+      toolName: entry.toolName,
       owner: entry.owner,
       idempotencyKey: entry.conflictBody.idempotencyKey,
       status: conflict.status,
@@ -460,6 +699,38 @@ async function main() {
     }
     if (mode === 'route-matrix-conflict') {
       const results = await conflictRouteMatrix(baseUrl, scenarioPath);
+      writeJson({
+        ok: results.every((entry) => entry.status === 409 && entry.errorCode === 'IDEMPOTENCY_CONFLICT'),
+        mode,
+        results,
+        ...durableSnapshot(sqlitePath)
+      });
+      return;
+    }
+    if (mode === 'tool-matrix-seed') {
+      const cases = await seedToolMatrix(baseUrl);
+      const snapshot = durableSnapshot(sqlitePath);
+      writeJson({
+        ok: cases.every((entry) => entry.expectedStatus === 200),
+        mode,
+        caseCount: cases.length,
+        cases,
+        ...snapshot
+      });
+      return;
+    }
+    if (mode === 'tool-matrix-replay') {
+      const results = await replayToolMatrix(baseUrl, scenarioPath);
+      writeJson({
+        ok: results.every((entry) => entry.status === 200 && entry.replayHeader === '1' && entry.matchesSeededResponse),
+        mode,
+        results,
+        ...durableSnapshot(sqlitePath)
+      });
+      return;
+    }
+    if (mode === 'tool-matrix-conflict') {
+      const results = await conflictToolMatrix(baseUrl, scenarioPath);
       writeJson({
         ok: results.every((entry) => entry.status === 409 && entry.errorCode === 'IDEMPOTENCY_CONFLICT'),
         mode,
