@@ -116,8 +116,10 @@ gate below has implementation, deterministic tests, and security/product signoff
 - V5.1 Territory Claims and Settler Routes require existing settlement state,
   owner checks, resource conservation, idempotency, and replay evidence. Current
   V5.1 storage evidence includes the `WORLD_GRID_CLAIMS_SQLITE_PATH` foundation
-  for planned/claimed claim restart proof, but release promotion still requires
-  the full lifecycle and cross-owner coverage in the V5 gate.
+  for planned/claimed/cancel restart proof and cross-owner route-mutation
+  denial, but release promotion still requires stale-session handling, final
+  production session-auth coverage, and release replay reconstruction in the V5
+  gate.
 - V5.2 Public Presence and Safe Player Discovery has XSS-safe rendering,
   opt-in/out, redaction, abuse reporting, and privacy review. Current V5.2
   storage evidence includes the `WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH`

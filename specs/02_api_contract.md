@@ -2799,10 +2799,12 @@ When
 camera preference rows persist with owner/region indexes, schema versioning, and
 migration metadata; this is only a foundation until browser-session preference
 continuity, stale-session coverage, and production replay coverage are complete.
-When `WORLD_GRID_CLAIMS_SQLITE_PATH` is configured, V5.1 claim rows persist planned
-and claimed territory state with owner/status/cell indexes, schema versioning,
-and migration metadata; this is only a foundation until the full V5.1-V5.5 store
-set has restart and replay coverage. When
+When `WORLD_GRID_CLAIMS_SQLITE_PATH` is configured, V5.1 claim rows persist
+planned and claimed territory state with owner/status/cell indexes, schema
+versioning, migration metadata, restart proof, cancel cleanup, and cross-owner
+route-mutation denial; this is only a foundation until stale-session handling,
+final production session-auth coverage, and release replay reconstruction are
+complete. When
 `WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH` is configured, V5.2 public
 presence/follow rows persist opt-in public town cards and follow edges with
 owner/town indexes, schema versioning, and migration metadata; this is only a

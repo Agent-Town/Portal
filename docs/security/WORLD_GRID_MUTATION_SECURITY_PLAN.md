@@ -40,8 +40,9 @@ until the controls below are implemented and covered by deterministic tests.
 - When `WORLD_GRID_CLAIMS_SQLITE_PATH` is configured, V5.1 claim state writes
   durable SQLite `world_grid_claims` rows with owner, status, cell, schema, and
   migration metadata. Current restart coverage proves a planned claim reopens
-  after a separate Node process restart, completes from durable claim state, and
-  reopens again as a claimed route.
+  after a separate Node process restart, completes from durable claim state,
+  reopens again as a claimed route, rejects a different owner mutating the
+  persisted claim region, and removes durable rows on cancel after restart.
 - When `WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH` is configured, V5.2 public
   presence and follow state writes durable SQLite rows with owner, public-town,
   schema, and migration metadata. Current restart coverage proves opt-in,
@@ -115,8 +116,9 @@ until the controls below are implemented and covered by deterministic tests.
   foundation only; release promotion still needs final browser-session
   continuity, stale-session coverage, and production replay coverage.
 - Current `WORLD_GRID_CLAIMS_SQLITE_PATH` coverage is a V5.1 storage foundation
-  only; release promotion still needs cancel/replay, cross-owner, and
-  public-surface store persistence coverage.
+  only; release promotion still needs stale-session handling, final production
+  session-auth coverage, release replay reconstruction, and public-surface store
+  persistence coverage.
 - Current `WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH` coverage is a V5.2 storage
   foundation only; release promotion still needs stale-session, abuse-report,
   retention, and final public-privacy review coverage.

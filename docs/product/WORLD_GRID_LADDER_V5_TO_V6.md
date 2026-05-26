@@ -47,7 +47,7 @@ V6 milestone plan.
 | Slice | release_status | Player-visible by default | Evidence |
 | --- | --- | --- | --- |
 | V5.0 Region Grid | `prototype_gated` | No | Deterministic region, read-only focus/camera coverage, no Founders Plot side effects, split Playwright smoke, and optional `WORLD_GRID_REGION_PREFS_SQLITE_PATH` restart proof for owner-indexed camera/focus preferences. |
-| V5.1 Territory Claims and Settler Routes | `prototype_gated` | No | API, UI, Playwright coverage, and optional `WORLD_GRID_CLAIMS_SQLITE_PATH` restart proof for planned/claimed claim state. |
+| V5.1 Territory Claims and Settler Routes | `prototype_gated` | No | API, UI, Playwright coverage, and optional `WORLD_GRID_CLAIMS_SQLITE_PATH` restart proof for planned/claimed/cancel claim state plus cross-owner route-mutation denial. |
 | V5.2 Public Presence and Safe Player Discovery | `prototype_gated` | No | Redaction, opt-in/out, follow, public summary coverage, and optional `WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH` restart proof for public presence/follow state. |
 | V5.3 Civic Service Advice Prototype | `prototype_gated` | No | Redacted inputs, schema-shaped output, accept/report coverage, and optional `WORLD_GRID_SERVICES_SQLITE_PATH` restart proof for service request/reputation state. |
 | V5.4 World Events and Public Works | `prototype_gated` | No | Preview, cap, idempotency, conservation, cosmetic reward coverage, and optional `WORLD_GRID_EVENTS_SQLITE_PATH` restart proof for contribution/reward state. |

@@ -389,6 +389,8 @@ test('world-grid audit replay policy is tracked as an M3 release storage control
   assert.match(security, /selected-cell and camera preferences reopen across\s+separate Node process lifetimes/);
   assert.match(security, /every externally\s+visible V5\.1-V5\.5 mutating route and tool surface after separate Node process\s+restarts/);
   assert.match(security, /completes from durable claim state/);
+  assert.match(security, /rejects a different owner mutating the\s+persisted claim region/);
+  assert.match(security, /removes durable rows on cancel after restart/);
   assert.match(security, /inbound follow cleanup/);
   assert.match(security, /duplicate accept\/report safety/);
   assert.match(security, /duplicate\s+contribution\/reward safety/);
@@ -411,6 +413,8 @@ test('world-grid audit replay policy is tracked as an M3 release storage control
   assert.match(stateModel, /world_grid_sandbox_cells/);
   assert.match(stateModel, /selected-cell and camera state reopens across separate Node lifetimes/);
   assert.match(stateModel, /planned and\s+claimed state reopens across separate Node lifetimes/);
+  assert.match(stateModel, /cancel removes durable\s+rows after restart/);
+  assert.match(stateModel, /different owner cannot mutate a persisted claim\s+region through route parameters/);
   assert.match(stateModel, /opt-in\/list\/lookup\/follow\/opt-out across separate\s+Node lifetimes/);
   assert.match(stateModel, /redacted request inputs, accepted\/reported request state,\s+reputation counters/);
   assert.match(stateModel, /contribution totals, reward state, duplicate\s+contribution\/reward safety/);
@@ -426,6 +430,8 @@ test('world-grid audit replay policy is tracked as an M3 release storage control
   assert.match(evidence, /V5\.1-V5\.5 mutating route and tool surfaces after separate Node process restarts/);
   assert.match(evidence, /Durable claims foundation/);
   assert.match(evidence, /tests\/world_grid_claims_persistence\.test\.js/);
+  assert.match(evidence, /reject a different owner mutating the persisted claim region/);
+  assert.match(evidence, /remove durable rows on cancel after restart/);
   assert.match(evidence, /Durable public presence foundation/);
   assert.match(evidence, /tests\/world_grid_public_presence_persistence\.test\.js/);
   assert.match(evidence, /Durable services foundation/);

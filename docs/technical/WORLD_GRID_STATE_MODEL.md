@@ -46,7 +46,7 @@ release-grade store is explicitly implemented and tested. Current stores are:
 | --- | --- | --- |
 | Region generation | Deterministic synthesis from owner identity in `server/world_grid/region.js` | Prototype, recomputed on demand |
 | Camera/focus preferences | Process-local `Map` in `server/world_grid/preferences.js`; optional SQLite `world_grid_region_preferences` table when `WORLD_GRID_REGION_PREFS_SQLITE_PATH` is configured | Durable foundation for V5.0 camera/focus state, owner/region indexes, schema/migration versions, and restart proof; release promotion still needs final browser-session preference continuity and production replay coverage |
-| Territory claims | Process-local `Map` in `server/world_grid/claims.js`; optional SQLite `world_grid_claims` table when `WORLD_GRID_CLAIMS_SQLITE_PATH` is configured | Durable foundation for planned/claimed V5.1 claim state, owner/status/cell indexes, schema/migration versions, and restart proof; release promotion still needs cancel/replay, cross-owner, and final replay reconstruction |
+| Territory claims | Process-local `Map` in `server/world_grid/claims.js`; optional SQLite `world_grid_claims` table when `WORLD_GRID_CLAIMS_SQLITE_PATH` is configured | Durable foundation for planned/claimed V5.1 claim state, cancel cleanup, owner/status/cell indexes, schema/migration versions, restart proof, and cross-owner route-mutation denial; release promotion still needs final replay reconstruction, stale-session coverage, and production session-auth coverage |
 | Public presence/follows | Process-local `Map` values in `server/world_grid/public_presence.js`; optional SQLite `world_grid_public_presence` and `world_grid_public_follows` tables when `WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH` is configured | Durable foundation for V5.2 opt-in/list/lookup/follow/opt-out state, owner/town indexes, schema/migration versions, restart proof, and inbound follow cleanup on opt-out; release promotion still needs abuse reports, stale-session coverage, and public privacy review |
 | Civic service requests/reputation | Process-local `Map` values in `server/world_grid/services.js`; optional SQLite `world_grid_service_requests` and `world_grid_service_reputation` tables when `WORLD_GRID_SERVICES_SQLITE_PATH` is configured | Durable foundation for V5.3 request/accept/report state, owner/service/status indexes, service reputation counters, schema/migration versions, restart proof, and duplicate accept/report safety after reopen; release promotion still needs dispute workflow, stale-session coverage, and final privacy review |
 | World event contributions/rewards | Process-local `Map` values in `server/world_grid/events.js`; optional SQLite `world_grid_event_contributions` and `world_grid_event_rewards` tables when `WORLD_GRID_EVENTS_SQLITE_PATH` is configured | Durable foundation for V5.4 contribution/reward state, owner/event/day/settlement indexes, cap replay, schema/migration versions, restart proof, and duplicate contribution/reward safety after reopen; release promotion still needs rollback policy, multi-event migration coverage, and final public ledger review |
@@ -86,8 +86,10 @@ Before any V5 world-grid slice can claim release-grade persistence, it needs:
   replay coverage remain release gates.
 - Durable claim rows with owner/status/cell indexes and restart persistence for
   the full V5.1 lifecycle. Current SQLite claim coverage proves planned and
-  claimed state reopens across separate Node lifetimes; cancel replay,
-  cross-owner ownership, and release replay reconstruction remain gates.
+  claimed state reopens across separate Node lifetimes, cancel removes durable
+  rows after restart, and a different owner cannot mutate a persisted claim
+  region through route parameters; stale-session handling, final production
+  session-auth coverage, and release replay reconstruction remain gates.
 - Durable public presence and follow rows with owner/town indexes and restart
   persistence for the V5.2 public discovery lifecycle. Current SQLite public
   presence coverage proves opt-in/list/lookup/follow/opt-out across separate

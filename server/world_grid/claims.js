@@ -185,10 +185,10 @@ function getConfiguredWorldGridClaimStore(env = process.env) {
 }
 
 function closeWorldGridClaimStore() {
-  if (!durableSingleton) return;
-  durableSingleton.close();
+  if (durableSingleton) durableSingleton.close();
   durableSingleton = null;
   durableSingletonPath = '';
+  claimStore.clear();
 }
 
 function claimList(regionId = '') {

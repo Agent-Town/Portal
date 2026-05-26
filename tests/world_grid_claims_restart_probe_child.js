@@ -16,15 +16,15 @@ function writeJson(value) {
   process.stdout.write(`${JSON.stringify(value)}\n`);
 }
 
-function seedFoundersPlot() {
-  savePlotGraph(createInitialPlot({ pairId: PAIR_ID, nowMs: 1_779_984_000_000 }));
+function seedFoundersPlot(pairId = PAIR_ID) {
+  savePlotGraph(createInitialPlot({ pairId, nowMs: 1_779_984_000_000 }));
 }
 
-async function withServer(fn) {
+async function withServer(pairId, fn) {
   const app = express();
   app.use(express.json());
   app.use(createWorldGridRouter({
-    resolveIdentity: () => ({ pairId: PAIR_ID, houseId: null })
+    resolveIdentity: () => ({ pairId, houseId: null })
   }));
   const server = http.createServer(app);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -75,6 +75,8 @@ async function main() {
   const claimsPath = process.argv[3];
   const storePath = process.argv[4];
   const claimIdArg = process.argv[5] || '';
+  const pairId = process.argv[6] || PAIR_ID;
+  const targetRegionId = process.argv[7] || '';
   if (!mode || !claimsPath || !storePath) throw new Error('WORLD_GRID_CLAIMS_RESTART_ARGS_REQUIRED');
 
   process.env.NODE_ENV = 'test';
@@ -82,9 +84,9 @@ async function main() {
   process.env.WORLD_GRID_FEATURE_FLAGS = 'all';
   process.env.WORLD_GRID_CLAIMS_SQLITE_PATH = claimsPath;
 
-  if (mode === 'plan') seedFoundersPlot();
+  if (mode === 'plan') seedFoundersPlot(pairId);
 
-  await withServer(async (baseUrl) => {
+  await withServer(pairId, async (baseUrl) => {
     const regionBefore = await getJson(baseUrl, '/api/world/region');
     const options = await getJson(baseUrl, '/api/world/territory/claim-options');
     let mutation = { status: 0, body: {} };
@@ -94,13 +96,26 @@ async function main() {
         idempotencyKey: 'durable_claim_plan_001'
       });
     } else if (mode === 'complete') {
-      mutation = await postJson(baseUrl, '/api/world/territory/complete-claim', {
+      const route = targetRegionId
+        ? `/api/world/territory/complete-claim?regionId=${encodeURIComponent(targetRegionId)}`
+        : '/api/world/territory/complete-claim';
+      mutation = await postJson(baseUrl, route, {
         claimId: claimIdArg,
         idempotencyKey: 'durable_claim_complete_001'
       });
+    } else if (mode === 'cancel') {
+      const route = targetRegionId
+        ? `/api/world/territory/cancel-claim?regionId=${encodeURIComponent(targetRegionId)}`
+        : '/api/world/territory/cancel-claim';
+      mutation = await postJson(baseUrl, route, {
+        claimId: claimIdArg,
+        idempotencyKey: 'durable_claim_cancel_001'
+      });
     }
     const regionAfter = await getJson(baseUrl, '/api/world/region');
-    const claims = regionAfter.territory.claims;
+    const snapshotRegionId = targetRegionId || regionAfter.region.regionId;
+    const snapshot = durableSnapshot(claimsPath, snapshotRegionId);
+    const claims = targetRegionId ? snapshot.durableClaims : regionAfter.territory.claims;
     const claim = claims.find((candidate) => candidate.claimId === (mutation.body.claim?.claimId || claimIdArg)) || claims[0] || null;
     const claimedCell = claim
       ? regionAfter.region.cells.find((cell) => cell.cellId === claim.cellId)
@@ -109,17 +124,20 @@ async function main() {
       ? regionAfter.region.routes.find((candidate) => candidate.routeId === claim.routePreview?.routeId)
       : null;
     writeJson({
-      ok: mutation.status === 0 || mutation.status === 200,
+      ok: [0, 200, 403].includes(mutation.status),
       mode,
       mutationStatus: mutation.status,
+      mutationErrorCode: mutation.body?.error?.code || '',
+      pairId,
       regionId: regionAfter.region.regionId,
+      snapshotRegionId,
       initialClaimCount: regionBefore.territory.claims.length,
       claimCount: claims.length,
-      claimId: claim?.claimId || mutation.body.claim?.claimId || '',
+      claimId: claim?.claimId || mutation.body.claim?.claimId || mutation.body.claimId || claimIdArg || '',
       claimStatus: claim?.status || mutation.body.claim?.status || '',
       claimedCellState: claimedCell?.state || '',
       routeStatus: route?.status || '',
-      ...durableSnapshot(claimsPath, regionAfter.region.regionId)
+      ...snapshot
     });
   });
 }

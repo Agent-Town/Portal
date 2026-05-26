@@ -42,4 +42,13 @@ Let players choose where the town expands next.
 - `server/world_grid/routes.js`
 - `public/experiences/world-grid/app.js`
 - `tests/world_grid_region.test.js`
+- `tests/world_grid_claims_persistence.test.js`
 - `e2e/236_world_grid_v50_region_prototype.spec.js`
+
+`tests/world_grid_claims_persistence.test.js` currently proves optional
+`WORLD_GRID_CLAIMS_SQLITE_PATH` storage reopens planned claims, completes a
+durable claim after restart, removes durable rows on cancel after restart, and
+rejects a different owner mutating the persisted claim region through route
+parameters. This remains a storage foundation until stale-session handling,
+final production session-auth coverage, and release replay reconstruction are
+complete.
