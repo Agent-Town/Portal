@@ -26,7 +26,7 @@ Status: `prototype_gated` for V5.0-V5.5 starter workflow
 | V5.4 World Events and Public Works | `server/world_grid/events.js` adds one capped public-works event, preview-before-contribute, idempotent contribution accounting, exact resource spend, public progress, personal recap, and cosmetic reward claim. |
 | V5.5 Controlled Free-Play Sandbox Districts | `server/world_grid/sandbox.js` adds one typed sandbox district with redacted public presence, allowed prop placement, rejected forbidden props, typed agent demo, and rollback snapshots. |
 | Idempotency replay guard | `server/world_grid/idempotency.js` records process-local request hashes and success responses for mutating V5.1+ routes/tools, replays exact retries, and rejects changed payload reuse with `IDEMPOTENCY_CONFLICT`; `tests/world_grid_region.test.js` now proves exact replay and conflict rejection across every externally visible V5.1-V5.5 mutating route surface. |
-| Durable idempotency foundation | `server/world_grid/idempotency.js` can write SQLite `world_grid_idempotency_records` rows when `WORLD_GRID_IDEMPOTENCY_SQLITE_PATH` is configured; `tests/world_grid_idempotency_persistence.test.js` proves planned-claim replay and conflict detection after separate Node process restarts without recreating process-local claim state. |
+| Durable idempotency foundation | `server/world_grid/idempotency.js` can write SQLite `world_grid_idempotency_records` rows when `WORLD_GRID_IDEMPOTENCY_SQLITE_PATH` is configured; `tests/world_grid_idempotency_persistence.test.js` proves planned-claim replay and conflict detection after separate Node process restarts without recreating process-local claim state, then proves exact replay and changed-payload conflict rejection across V5.1-V5.5 mutating route surfaces after separate Node process restarts. |
 | Durable claims foundation | `server/world_grid/claims.js` can write SQLite `world_grid_claims` rows when `WORLD_GRID_CLAIMS_SQLITE_PATH` is configured; `tests/world_grid_claims_persistence.test.js` proves planned claims reopen after restart, complete from durable claim state, and reopen again as claimed routes. |
 | Durable public presence foundation | `server/world_grid/public_presence.js` can write SQLite `world_grid_public_presence` and `world_grid_public_follows` rows when `WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH` is configured; `tests/world_grid_public_presence_persistence.test.js` proves opt-in/list/lookup/follow/summary/opt-out across restarts and clears inbound follows on opt-out. |
 | Durable services foundation | `server/world_grid/services.js` can write SQLite `world_grid_service_requests` and `world_grid_service_reputation` rows when `WORLD_GRID_SERVICES_SQLITE_PATH` is configured; `tests/world_grid_services_persistence.test.js` proves redacted request inputs, accepted/reported request state, reputation counters, and duplicate accept/report safety across restarts. |
@@ -53,7 +53,7 @@ public presence/follow rows, optional SQLite service request/reputation rows,
 optional SQLite event contribution/reward rows, and optional SQLite sandbox
 participant/action/snapshot/cell rows are durable foundations, but release
 promotion still requires durable owner indexes, migration versioning, full
-append-only audit/replay records with before-state snapshots, complete durable
-idempotency records and restart coverage for every route/tool surface,
+append-only audit/replay records with before-state snapshots, durable
+idempotency restart coverage for mutating tool routes,
 CSRF-token/session-auth integration, durable/shared rate limits, and restart
 replay coverage for every world-grid store.

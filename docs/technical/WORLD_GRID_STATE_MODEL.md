@@ -51,7 +51,7 @@ release-grade store is explicitly implemented and tested. Current stores are:
 | Civic service requests/reputation | Process-local `Map` values in `server/world_grid/services.js`; optional SQLite `world_grid_service_requests` and `world_grid_service_reputation` tables when `WORLD_GRID_SERVICES_SQLITE_PATH` is configured | Durable foundation for V5.3 request/accept/report state, owner/service/status indexes, service reputation counters, schema/migration versions, restart proof, and duplicate accept/report safety after reopen; release promotion still needs dispute workflow, stale-session coverage, and final privacy review |
 | World event contributions/rewards | Process-local `Map` values in `server/world_grid/events.js`; optional SQLite `world_grid_event_contributions` and `world_grid_event_rewards` tables when `WORLD_GRID_EVENTS_SQLITE_PATH` is configured | Durable foundation for V5.4 contribution/reward state, owner/event/day/settlement indexes, cap replay, schema/migration versions, restart proof, and duplicate contribution/reward safety after reopen; release promotion still needs rollback policy, multi-event migration coverage, and final public ledger review |
 | Sandbox participants/actions/snapshots/cells | Process-local arrays/maps and mutable in-memory district cells in `server/world_grid/sandbox.js`; optional SQLite `world_grid_sandbox_participants`, `world_grid_sandbox_actions`, `world_grid_sandbox_snapshots`, and `world_grid_sandbox_cells` tables when `WORLD_GRID_SANDBOX_SQLITE_PATH` is configured | Durable foundation for V5.5 participant/action/snapshot/cell state, participant owner key plus action/cell indexes, schema/migration versions, restart proof, moderation rejection replay, rollback replay, and private-town isolation; release promotion still needs abuse reports, cross-owner moderation review, stale-session cleanup, and final sandbox privacy review |
-| Idempotency replay records | Process-local `Map` in `server/world_grid/idempotency.js`; optional SQLite `world_grid_idempotency_records` table when `WORLD_GRID_IDEMPOTENCY_SQLITE_PATH` is configured | Durable foundation for exact retry replay, changed payload rejection, schema/migration versions, and planned-claim restart proof; release promotion still needs every route/tool surface covered by restart replay |
+| Idempotency replay records | Process-local `Map` in `server/world_grid/idempotency.js`; optional SQLite `world_grid_idempotency_records` table when `WORLD_GRID_IDEMPOTENCY_SQLITE_PATH` is configured | Durable foundation for exact retry replay, changed payload rejection, schema/migration versions, planned-claim restart proof, and V5.1-V5.5 mutating route-surface restart proof; release promotion still needs mutating tool-route restart replay coverage |
 | CSRF mutation tokens | Process-local `Map` in `server/world_grid/csrf.js` | Prototype/ephemeral; owner-bound only for the process lifetime |
 | Mutation rate-limit buckets | Process-local `Map` in `server/world_grid/rate_limit.js` | Prototype/ephemeral; per-owner and per-surface only for the process lifetime |
 | Mutation audit records | Optional SQLite `world_grid_audit_log` table in `server/world_grid/audit_log.js` when `WORLD_GRID_AUDIT_SQLITE_PATH` is configured | Durable foundation for append-only audit/replay; not yet complete release storage because before-state snapshots and store reconstruction are still release gates |
@@ -74,9 +74,11 @@ Before any V5 world-grid slice can claim release-grade persistence, it needs:
   where applicable.
 - Durable idempotency rows for every externally visible mutating route/tool,
   with request hashes, stored success responses, conflict detection, and replay
-  coverage after restart. Current SQLite idempotency coverage starts this for
-  route-level planned claims only; every remaining V5.1-V5.5 route/tool surface
-  still needs restart replay proof before release promotion.
+  coverage after restart. Current SQLite idempotency coverage proves planned
+  claim replay plus exact replay and changed-payload conflict rejection across
+  the externally visible V5.1-V5.5 mutating route surfaces after separate Node
+  process restarts; mutating tool-route restart replay proof still remains a
+  release gate.
 - Durable claim rows with owner/status/cell indexes and restart persistence for
   the full V5.1 lifecycle. Current SQLite claim coverage proves planned and
   claimed state reopens across separate Node lifetimes; cancel replay,

@@ -8,8 +8,10 @@ const path = require('node:path');
 const repoRoot = path.join(__dirname, '..');
 const probePath = path.join(__dirname, 'world_grid_idempotency_restart_probe_child.js');
 
-function runProbe(mode, sqlitePath, storePath) {
-  const result = spawnSync(process.execPath, [probePath, mode, sqlitePath, storePath], {
+function runProbe(mode, sqlitePath, storePath, scenarioPath = '') {
+  const args = [probePath, mode, sqlitePath, storePath];
+  if (scenarioPath) args.push(scenarioPath);
+  const result = spawnSync(process.execPath, args, {
     cwd: repoRoot,
     encoding: 'utf8',
     env: {
@@ -31,6 +33,25 @@ function runProbe(mode, sqlitePath, storePath) {
   }
   return parsed;
 }
+
+const EXPECTED_ROUTE_SURFACES = [
+  '/api/world/territory/plan-claim',
+  '/api/world/territory/complete-claim',
+  '/api/world/territory/cancel-claim',
+  '/api/world/public-presence/opt-in',
+  '/api/world/public-presence/opt-out',
+  '/api/world/follow-town',
+  '/api/world/services/request-advice',
+  '/api/world/services/accept-result',
+  '/api/world/services/report-issue',
+  '/api/world/events/contribute',
+  '/api/world/events/claim-reward',
+  '/api/world/sandbox/enter',
+  '/api/world/sandbox/place-prop',
+  '/api/world/sandbox/agent-demo',
+  '/api/world/sandbox/rollback-last',
+  '/api/world/sandbox/leave'
+];
 
 test('world-grid durable idempotency rows replay after separate Node process restart without remutating prototype state', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-world-grid-idempotency-'));
@@ -60,6 +81,54 @@ test('world-grid durable idempotency rows replay after separate Node process res
     assert.equal(conflicted.errorCode, 'IDEMPOTENCY_CONFLICT');
     assert.equal(conflicted.claimCount, 0);
     assert.equal(conflicted.durableCount, 1);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('world-grid durable idempotency rows replay every V5.1-V5.5 mutating route surface after restart', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-world-grid-idempotency-routes-'));
+  const sqlitePath = path.join(dir, 'world-grid-idempotency.sqlite');
+  const storePath = path.join(dir, 'portal-store.sqlite');
+  const scenarioPath = path.join(dir, 'route-matrix.json');
+  try {
+    const seeded = runProbe('route-matrix-seed', sqlitePath, storePath);
+    fs.writeFileSync(scenarioPath, JSON.stringify(seeded.cases, null, 2));
+    const replayed = runProbe('route-matrix-replay', sqlitePath, storePath, scenarioPath);
+    const conflicted = runProbe('route-matrix-conflict', sqlitePath, storePath, scenarioPath);
+
+    assert.equal(seeded.ok, true);
+    assert.equal(seeded.caseCount, 18);
+    assert.equal(seeded.durableCount, seeded.caseCount);
+    for (const surface of EXPECTED_ROUTE_SURFACES) {
+      assert.equal(seeded.surfaces.includes(surface), true, surface);
+    }
+    assert.equal(
+      seeded.durableRecords.every((record) => record.migrationVersion === 'world_grid_idempotency_v1'),
+      true
+    );
+    assert.equal(
+      seeded.durableRecords.every((record) => record.schemaVersion === 'agent-town.v5.world-grid.idempotency.v1'),
+      true
+    );
+
+    assert.equal(replayed.ok, true);
+    assert.equal(replayed.durableCount, seeded.durableCount);
+    assert.equal(replayed.results.length, seeded.caseCount);
+    for (const result of replayed.results) {
+      assert.equal(result.status, 200, result.route);
+      assert.equal(result.replayHeader, '1', result.route);
+      assert.equal(result.matchesSeededResponse, true, result.route);
+    }
+
+    assert.equal(conflicted.ok, true);
+    assert.equal(conflicted.durableCount, seeded.durableCount);
+    assert.equal(conflicted.results.length, seeded.caseCount);
+    for (const result of conflicted.results) {
+      assert.equal(result.status, 409, result.route);
+      assert.equal(result.errorCode, 'IDEMPOTENCY_CONFLICT', result.route);
+      assert.equal(result.replayHeader, '', result.route);
+    }
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

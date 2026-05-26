@@ -122,6 +122,11 @@ function createWorldGridIdempotencyStore({ sqlitePath } = {}) {
       WHERE owner_account_id = ? AND idempotency_key = ?
       LIMIT 1
     `),
+    listRecords: db.prepare(`
+      SELECT *
+      FROM world_grid_idempotency_records
+      ORDER BY created_at ASC, owner_account_id ASC, idempotency_key ASC
+    `),
     insert: db.prepare(`
       INSERT INTO world_grid_idempotency_records (
         owner_account_id, idempotency_key, surface, args_sha, response_json,
@@ -176,6 +181,10 @@ function createWorldGridIdempotencyStore({ sqlitePath } = {}) {
     return Number(statements.count.get().count || 0);
   }
 
+  function listRecords() {
+    return statements.listRecords.all().map(parseDurableRecord);
+  }
+
   function close() {
     if (closed) return;
     closed = true;
@@ -186,6 +195,7 @@ function createWorldGridIdempotencyStore({ sqlitePath } = {}) {
     close,
     count,
     get,
+    listRecords,
     record,
     sqlitePath
   };

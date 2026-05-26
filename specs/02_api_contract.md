@@ -2786,7 +2786,7 @@ mutations write durable audit/replay rows, but this is only a foundation until
 before-state snapshots and per-store restart replay are complete. When
 `WORLD_GRID_IDEMPOTENCY_SQLITE_PATH` is configured, mutating routes write durable
 idempotency rows with request hashes and stored success responses; this is only a
-foundation until restart replay covers every route and tool surface. When
+foundation until mutating tool-route restart replay is also covered. When
 `WORLD_GRID_CLAIMS_SQLITE_PATH` is configured, V5.1 claim rows persist planned
 and claimed territory state with owner/status/cell indexes, schema versioning,
 and migration metadata; this is only a foundation until the full V5.1-V5.5 store

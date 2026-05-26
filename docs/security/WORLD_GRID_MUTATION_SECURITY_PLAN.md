@@ -33,7 +33,10 @@ until the controls below are implemented and covered by deterministic tests.
   guard writes durable SQLite idempotency rows with request hashes, stored
   success responses, schema/migration versions, and conflict detection. Current
   restart coverage proves a planned-claim retry replays after a separate Node
-  process restart without recreating process-local claim state.
+  process restart without recreating process-local claim state, then proves
+  exact replay and changed-payload conflict rejection across every externally
+  visible V5.1-V5.5 mutating route surface after separate Node process
+  restarts.
 - When `WORLD_GRID_CLAIMS_SQLITE_PATH` is configured, V5.1 claim state writes
   durable SQLite `world_grid_claims` rows with owner, status, cell, schema, and
   migration metadata. Current restart coverage proves a planned claim reopens
@@ -92,11 +95,11 @@ until the controls below are implemented and covered by deterministic tests.
   counters and final session binding.
 - Idempotency requirements for every resource-spending or externally visible
   mutation, not only world-event contribution. Current durable idempotency
-  coverage starts this with SQLite-backed planned-claim replay after restart.
-  Release-grade idempotency must persist request hashes/responses, reject
-  conflicting retries after restart, and prove replay does not create duplicate
-  claims, service requests, presence records, rewards, sandbox actions, or
-  resource spends across every route/tool surface.
+  coverage starts this with SQLite-backed planned-claim replay after restart and
+  now covers every externally visible V5.1-V5.5 mutating route surface after
+  restart. Release-grade idempotency must also prove mutating tool-route replay
+  does not create duplicate claims, service requests, presence records, rewards,
+  sandbox actions, or resource spends.
 - Durable audit records with actor, route/tool name, idempotency key, before and
   after summaries, and rollback handle when one exists. Current coverage starts
   this with append-only SQLite audit records; release promotion still needs

@@ -302,12 +302,12 @@ test('world-grid idempotency policy rejects changed retry payloads before releas
   assert.match(security, /IDEMPOTENCY_CONFLICT/);
   assert.match(security, /process-local\s+request hash\/success response/);
   assert.match(security, /every externally\s+visible V5\.1-V5\.5 mutating route surface/);
-  assert.match(security, /reject\s+conflicting retries after restart/);
+  assert.match(security, /changed-payload conflict rejection across every externally\s+visible V5\.1-V5\.5 mutating route surface after separate Node process\s+restarts/);
   assert.match(stateModel, /server\/world_grid\/idempotency\.js/);
   assert.match(stateModel, /Durable idempotency rows/);
   assert.match(evidence, /Idempotency replay guard/);
   assert.match(evidence, /every externally visible V5\.1-V5\.5 mutating route surface/);
-  assert.match(evidence, /durable\s+idempotency records/);
+  assert.match(evidence, /Durable idempotency foundation/);
 });
 
 test('world-grid mutation origin policy is tracked as an M5 release security control', () => {
@@ -381,6 +381,7 @@ test('world-grid audit replay policy is tracked as an M3 release storage control
   assert.match(security, /WORLD_GRID_EVENTS_SQLITE_PATH/);
   assert.match(security, /WORLD_GRID_SANDBOX_SQLITE_PATH/);
   assert.match(security, /planned-claim retry replays after a separate Node\s+process restart/);
+  assert.match(security, /every externally\s+visible V5\.1-V5\.5 mutating route surface after separate Node process\s+restarts/);
   assert.match(security, /completes from durable claim state/);
   assert.match(security, /inbound follow cleanup/);
   assert.match(security, /duplicate accept\/report safety/);
@@ -405,11 +406,13 @@ test('world-grid audit replay policy is tracked as an M3 release storage control
   assert.match(stateModel, /redacted request inputs, accepted\/reported request state,\s+reputation counters/);
   assert.match(stateModel, /contribution totals, reward state, duplicate\s+contribution\/reward safety/);
   assert.match(stateModel, /participants,\s+moderated action records, rejected action records,\s+rollback snapshots/);
-  assert.match(stateModel, /route-level planned claims only/);
+  assert.match(stateModel, /V5\.1-V5\.5 mutating route surfaces after separate Node\s+process restarts/);
+  assert.match(stateModel, /mutating tool-route restart replay proof still remains a\s+release gate/);
   assert.match(stateModel, /world_grid_audit_log/);
   assert.match(evidence, /Mutation audit log/);
   assert.match(evidence, /Durable idempotency foundation/);
   assert.match(evidence, /tests\/world_grid_idempotency_persistence\.test\.js/);
+  assert.match(evidence, /V5\.1-V5\.5 mutating route surfaces after separate Node process restarts/);
   assert.match(evidence, /Durable claims foundation/);
   assert.match(evidence, /tests\/world_grid_claims_persistence\.test\.js/);
   assert.match(evidence, /Durable public presence foundation/);
