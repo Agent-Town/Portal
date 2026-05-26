@@ -42,6 +42,7 @@ const {
   resolveWorldGridFeatureFlags
 } = require('./feature_flags');
 const { runIdempotentWorldGridMutation } = require('./idempotency');
+const { requireWorldGridMutationOrigin } = require('./mutation_origin');
 const { loadWorldGridPlotPrerequisite } = require('./plot_prerequisite');
 
 const WORLD_GRID_IDEMPOTENCY_KEY_RE = /^[a-z0-9][a-z0-9:_-]{5,119}$/i;
@@ -213,6 +214,7 @@ function statusForWorldGridError(normalized = {}) {
   ].includes(code)) return 409;
   if ([
     'FORBIDDEN',
+    'FORBIDDEN_ORIGIN',
     'FEATURE_DISABLED',
     'INVALID_CLAIM_TARGET',
     'INVALID_CLAIM_STATE'
@@ -339,6 +341,7 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
   }
 
   function requireMutationPrerequisites(req, payload, surface) {
+    requireWorldGridMutationOrigin(req);
     requirePlotPrerequisite(payload);
     return requireWorldGridIdempotencyKey(req, surface);
   }

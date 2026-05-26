@@ -70,6 +70,17 @@ function seedFoundersPlot(pairId, options = {}) {
   return state;
 }
 
+function sameOriginMutationHeaders(baseUrl, extra = {}) {
+  return {
+    'content-type': 'application/json',
+    origin: baseUrl,
+    'sec-fetch-site': 'same-origin',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-dest': 'empty',
+    ...extra
+  };
+}
+
 test('V5.0 region generation is deterministic with stable cells and home settlement', () => {
   const identity = { pairId: 'wallet:solana:WorldGridOwner111', houseId: null };
   const one = generateRegion(identity, { nowMs: 1_000, hqLevel: 2 });
@@ -399,6 +410,72 @@ test('mutating world-grid idempotency replays exact responses and rejects confli
     assert.equal(sandboxCleanup.restored, true);
 
     assert.equal(worldGridIdempotencyRecordCount(), beforeRecordCount + 4);
+  });
+});
+
+test('mutating world-grid routes reject cross-origin metadata and require same-origin context in production', async () => {
+  const identity = { pairId: `session:world-grid-origin-${Date.now()}-${Math.random().toString(16).slice(2)}` };
+  await withWorldGridServer({
+    identity,
+    envPatch: { NODE_ENV: 'production', WORLD_GRID_FEATURE_FLAGS: 'all' }
+  }, async (baseUrl) => {
+    seedFoundersPlot(identity.pairId);
+
+    const optionsResponse = await fetch(`${baseUrl}/api/world/territory/claim-options`);
+    const optionsBody = await optionsResponse.json();
+    assert.equal(optionsResponse.status, 200, JSON.stringify(optionsBody));
+    assert.ok(optionsBody.options.length >= 2);
+    const [firstOption, secondOption] = optionsBody.options;
+
+    const missingContextResponse = await fetch(`${baseUrl}/api/world/territory/plan-claim`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ cellId: firstOption.cellId, idempotencyKey: 'origin_missing_context_001' })
+    });
+    const missingContext = await missingContextResponse.json();
+    assert.equal(missingContextResponse.status, 403, JSON.stringify(missingContext));
+    assert.equal(missingContext.error.code, 'FORBIDDEN_ORIGIN');
+
+    const crossOriginResponse = await fetch(`${baseUrl}/api/world/territory/plan-claim`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: 'https://evil.example',
+        'sec-fetch-site': 'same-origin',
+        'sec-fetch-mode': 'cors',
+        'sec-fetch-dest': 'empty'
+      },
+      body: JSON.stringify({ cellId: firstOption.cellId, idempotencyKey: 'origin_cross_site_001' })
+    });
+    const crossOrigin = await crossOriginResponse.json();
+    assert.equal(crossOriginResponse.status, 403, JSON.stringify(crossOrigin));
+    assert.equal(crossOrigin.error.code, 'FORBIDDEN_ORIGIN');
+
+    const crossFetchResponse = await fetch(`${baseUrl}/api/world/tool/et.world.territory.plan_claim`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'sec-fetch-site': 'cross-site',
+        'sec-fetch-mode': 'cors',
+        'sec-fetch-dest': 'empty'
+      },
+      body: JSON.stringify({ cellId: secondOption.cellId, idempotencyKey: 'origin_cross_fetch_001' })
+    });
+    const crossFetch = await crossFetchResponse.json();
+    assert.equal(crossFetchResponse.status, 403, JSON.stringify(crossFetch));
+    assert.equal(crossFetch.error.code, 'FORBIDDEN_ORIGIN');
+
+    const sameOriginResponse = await fetch(`${baseUrl}/api/world/territory/plan-claim`, {
+      method: 'POST',
+      headers: sameOriginMutationHeaders(baseUrl),
+      body: JSON.stringify({ cellId: firstOption.cellId, idempotencyKey: 'origin_same_origin_001' })
+    });
+    const sameOrigin = await sameOriginResponse.json();
+    assert.equal(sameOriginResponse.status, 200, JSON.stringify(sameOrigin));
+    assert.equal(sameOrigin.claim.cellId, firstOption.cellId);
+
+    const regionAfterOriginChecks = await (await fetch(`${baseUrl}/api/world/region`)).json();
+    assert.equal(regionAfterOriginChecks.territory.claims.length, 1);
   });
 });
 

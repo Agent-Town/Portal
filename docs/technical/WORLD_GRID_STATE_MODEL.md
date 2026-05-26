@@ -30,6 +30,8 @@ not leak private owner identifiers.
 - Public presence and world events are separate from private town simulation.
 - Renderer actions must be idempotent or read-only unless routed through typed
   server tools.
+- Mutating routes/tools require same-origin mutation context in production and
+  reject explicit cross-origin metadata before plot or world state changes.
 
 ## Prototype Persistence Boundary
 
@@ -68,5 +70,7 @@ Before any V5 world-grid slice can claim release-grade persistence, it needs:
 - Restart persistence tests proving state survives server restart and cannot be
   silently recreated, lost, or reassigned across owners.
 - Cross-owner and stale-session tests for every owner index.
+- CSRF-token and same-origin integration tests bound to the final
+  browser-authenticated session model.
 - Backfill and migration tests for older prototype rows before enabling a public
   release flag.

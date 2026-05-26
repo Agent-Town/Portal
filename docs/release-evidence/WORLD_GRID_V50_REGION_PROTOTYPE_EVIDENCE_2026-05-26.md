@@ -12,6 +12,7 @@ Status: `prototype_gated` for V5.0-V5.5 starter workflow
 | --- | --- |
 | Feature gate | `FEATURE_WORLD_GRID_V50_REGION` defaults off; `/api/world/region` returns `FEATURE_DISABLED` unless server/dev/QA enables it. |
 | Production override safety | `server/world_grid/feature_flags.js` reuses the production admin/QA override guard before honoring `worldGridFeatureFlags` or `x-world-grid-feature-flags`. |
+| Mutation origin guard | `server/world_grid/mutation_origin.js` rejects explicit cross-origin mutation metadata and requires positive same-origin context for mutating world-grid routes/tools in production. |
 | Server-authoritative region | `server/world_grid/region.js` deterministically generates `WorldRegion`, `WorldCell`, `SettlementNode`, and `RouteEdge` data from owner identity. |
 | Read-only V5.0 APIs | `server/world_grid/routes.js` exposes region, focus, camera, and read-only tool endpoints without claim/build/resource mutation. |
 | V5.1 Territory Claims and Settler Routes | `server/world_grid/claims.js` adds gated adjacent claim options, plan/complete/cancel tools, exact resource spend, route preview, and terrain tradeoff copy. |
@@ -39,4 +40,5 @@ public presence, follows, service requests/reputation, event contribution
 bookkeeping, rewards, sandbox participants/actions/snapshots, idempotency replay
 records, and camera preferences. Release promotion still requires durable owner
 indexes, migration versioning, append-only audit/replay records, durable
-idempotency records, and restart persistence tests.
+idempotency records, CSRF-token/session-auth integration, and restart
+persistence tests.
