@@ -21,6 +21,7 @@ Test coverage:
 - `tests/world_civilization_institution_process_restart.test.js`
 - `tests/world_civilization_public_works_process_restart.test.js`
 - `tests/world_civilization_schema_metadata.test.js`
+- `tests/world_civilization_load_rate.test.js`
 
 ## Boundary
 
@@ -118,6 +119,12 @@ do not append duplicate contribution or audit rows after restart.
 store exposes v1 schema metadata to the resilience report and rejects version
 drift before the store can be used.
 
+`tests/world_civilization_load_rate.test.js` adds research-scale load/rate
+evidence for the civic audit ledger: a larger append burst is replayed through
+bounded pages, exact duplicate retries do not create new rows, changed
+idempotency-key reuse fails closed, and replay reconstruction remains
+privacy-safe and non-executing.
+
 ## Open Release Gaps
 
 M16 remains incomplete until all of these gates close:
@@ -130,8 +137,9 @@ M16 remains incomplete until all of these gates close:
   and every civic summary surface.
 - Release-grade migration upgrade and downgrade scripts/tests for every civic
   table beyond the current v1 metadata and fail-closed drift checks.
-- Load/rate tests for duplicate suppression, idempotent retries, and replay
-  pagination.
+- Release-grade load/rate tests for production route limits, store-specific
+  throughput targets, multi-process write contention, and replay pagination
+  beyond the current research-scale duplicate/replay probe.
 - Rollback recovery tests that prove prepared rollback handles can survive
   failure and drive real recovery once effect execution exists.
 

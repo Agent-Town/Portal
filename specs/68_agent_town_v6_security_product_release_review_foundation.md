@@ -33,7 +33,8 @@ are present.
 - Audit coverage: append-only ledger, owner indexes, migration versions,
   schema metadata drift checks, replay reconstruction, and rollback handles.
 - Validation evidence: targeted Node suite, split Playwright smokes,
-  all-features regression, and feature override safety.
+  all-features regression, feature override safety, and load/rate replay
+  evidence.
 - Product release signoff: player-visible scope, rollback plan, support runbook,
   and disable plan.
 

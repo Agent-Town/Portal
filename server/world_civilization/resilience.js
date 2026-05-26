@@ -12,6 +12,24 @@ const REQUIRED_RELEASE_GAPS = [
   'M16_ROLLBACK_RECOVERY_EXECUTION_REQUIRED'
 ];
 
+const V6_CIVIC_LOAD_RATE_COVERAGE = {
+  artifact: 'tests/world_civilization_load_rate.test.js',
+  status: 'research_only',
+  releaseReady: false,
+  coveredChecks: [
+    'audit_ledger_replay_pagination',
+    'idempotent_duplicate_retry_suppression',
+    'idempotency_conflict_rejection',
+    'privacy_safe_replay_reconstruction'
+  ],
+  remainingReleaseGaps: [
+    'production_route_rate_limits',
+    'store_specific_load_targets',
+    'multi_process_write_contention',
+    'release_slo_thresholds'
+  ]
+};
+
 const V6_CIVIC_RESILIENCE_STORES = [
   {
     key: 'audit_ledger',
@@ -106,6 +124,7 @@ function disabledReport(source) {
     releaseReady: false,
     executionStatus: 'not_executable',
     storeReports: [],
+    loadRateCoverage: null,
     releaseGaps: [...REQUIRED_RELEASE_GAPS],
     disabledReason: 'V6 resilience evidence requires explicit research opt-in and V6 feature flag'
   };
@@ -171,6 +190,7 @@ function buildV6ResilienceBaselineReport({
     releaseReady: false,
     executionStatus: 'not_executable',
     storeReports: V6_CIVIC_RESILIENCE_STORES.map((requirement) => inspectStore(requirement, stores[requirement.key])),
+    loadRateCoverage: clone(V6_CIVIC_LOAD_RATE_COVERAGE),
     releaseGaps: [...REQUIRED_RELEASE_GAPS]
   };
 }
@@ -210,6 +230,16 @@ function assertV6ResilienceBaseline(report = {}) {
     for (const storeReport of reports) {
       if (storeReport.ok !== true) errors.push(`V6_RESILIENCE_STORE_EVIDENCE_INVALID:${storeReport.key}`);
     }
+    const loadRateCoverage = report.loadRateCoverage || {};
+    if (
+      loadRateCoverage.artifact !== V6_CIVIC_LOAD_RATE_COVERAGE.artifact
+      || loadRateCoverage.status !== 'research_only'
+      || loadRateCoverage.releaseReady !== false
+      || !Array.isArray(loadRateCoverage.coveredChecks)
+      || !loadRateCoverage.coveredChecks.includes('idempotent_duplicate_retry_suppression')
+    ) {
+      errors.push('V6_RESILIENCE_LOAD_RATE_COVERAGE_REQUIRED');
+    }
   }
   return {
     ok: errors.length === 0,
@@ -219,6 +249,7 @@ function assertV6ResilienceBaseline(report = {}) {
 
 module.exports = {
   REQUIRED_RELEASE_GAPS,
+  V6_CIVIC_LOAD_RATE_COVERAGE: clone(V6_CIVIC_LOAD_RATE_COVERAGE),
   V6_CIVIC_RESILIENCE_STORES: clone(V6_CIVIC_RESILIENCE_STORES),
   V6_RESILIENCE_BASELINE_VERSION,
   assertV6ResilienceBaseline,

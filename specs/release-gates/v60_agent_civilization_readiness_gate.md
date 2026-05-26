@@ -198,6 +198,9 @@ gate below has implementation, deterministic tests, and security/product signoff
   `tests/world_civilization_schema_metadata.test.js`; current stores stamp
   v1 on-disk metadata and fail closed on unsupported SQLite `user_version` or
   mismatched migration markers.
+  Load/rate research coverage starts in
+  `tests/world_civilization_load_rate.test.js`; the audit ledger now has a
+  deterministic larger replay pagination and duplicate retry burst check.
   These current probes cover every current civic store at research scale.
   Release still requires release-grade process restart coverage, larger replay
   reconstruction, migration scripts with upgrade/downgrade proofs, load/rate,
