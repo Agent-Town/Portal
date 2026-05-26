@@ -18,6 +18,7 @@ Test coverage:
 - `tests/world_civilization_reputation_moderation_process_restart.test.js`
 - `tests/world_civilization_effect_process_restart.test.js`
 - `tests/world_civilization_delegation_process_restart.test.js`
+- `tests/world_civilization_institution_process_restart.test.js`
 
 ## Boundary
 
@@ -92,13 +93,19 @@ advice delegation through the principal account, reconstruct privacy-safe audit
 replay, and prove exact retries do not append duplicate delegation or audit
 rows after restart.
 
+`tests/world_civilization_institution_process_restart.test.js` extends the
+process-level evidence to civic institution charters: separate processes record
+public-works and sandbox-policy charters, reconstruct privacy-safe audit replay,
+and prove exact retries do not append duplicate institution or audit rows after
+restart.
+
 ## Open Release Gaps
 
 M16 remains incomplete until all of these gates close:
 
 - Process restart tests for every civic store, not only the current
   audit-ledger, proposal/vote, reputation/moderation, effect/rollback, and
-  delegation restart replay probes.
+  delegation/institution restart replay probes.
 - Release-grade replay reconstruction across process restart, larger datasets,
   and every civic summary surface.
 - Migration upgrade and downgrade tests for every civic table.

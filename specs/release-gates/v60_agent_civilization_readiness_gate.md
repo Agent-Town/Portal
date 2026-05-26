@@ -84,6 +84,8 @@ gate below has implementation, deterministic tests, and security/product signoff
   `tests/world_civilization_effect_process_restart.test.js`;
   delegation process restart coverage starts in
   `tests/world_civilization_delegation_process_restart.test.js`;
+  institution process restart coverage starts in
+  `tests/world_civilization_institution_process_restart.test.js`;
   all replay probes must remain privacy-safe and non-executing.
 - The research-only release review gate may exist in
   `server/world_civilization/release_review.js`, but it must keep V6 hidden
@@ -186,6 +188,8 @@ gate below has implementation, deterministic tests, and security/product signoff
   `tests/world_civilization_effect_process_restart.test.js`.
   Delegation process restart coverage starts in
   `tests/world_civilization_delegation_process_restart.test.js`.
+  Institution process restart coverage starts in
+  `tests/world_civilization_institution_process_restart.test.js`.
   Release still requires process-level restart coverage for every civic store,
   larger replay reconstruction, migration, load/rate, and rollback recovery
   tests.

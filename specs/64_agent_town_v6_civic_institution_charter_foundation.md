@@ -6,7 +6,10 @@ Milestone: `M13 Civic institutions and charters`
 
 Runtime module: `server/world_civilization/institutions.js`
 
-Contract tests: `tests/world_civilization_institutions.test.js`
+Contract tests:
+
+- `tests/world_civilization_institutions.test.js`
+- `tests/world_civilization_institution_process_restart.test.js`
 
 Schema contract: `specs/55_agent_town_v6_civic_schema_contracts.md`
 
@@ -18,6 +21,11 @@ routes or tools, and does not create civic mechanics in normal gameplay.
 The store records public-safe institution charters as durable civic evidence so
 later proposal, voting, moderation, and effect handlers can attach to explicit
 institution boundaries instead of implicit text labels.
+
+The process-level restart proof currently covers separate public-works and
+sandbox-policy charters, privacy-safe audit replay reconstruction, and exact
+retry idempotency across separate Node process lifetimes without exposing
+player-visible institution surfaces.
 
 ## Data Model
 

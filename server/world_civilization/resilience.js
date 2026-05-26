@@ -76,7 +76,7 @@ const V6_CIVIC_RESILIENCE_STORES = [
     label: 'Civic institution charter store',
     modulePath: 'server/world_civilization/institutions.js',
     migrationVersion: 'v1',
-    restartCoverage: 'tests/world_civilization_institutions.test.js',
+    restartCoverage: 'tests/world_civilization_institution_process_restart.test.js',
     requiredMethods: ['charterInstitution', 'getInstitution', 'listInstitutions', 'summarizeScopeInstitutions', 'count', 'close']
   },
   {

@@ -93,6 +93,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'tests/world_civilization_reputation_moderation_process_restart.test.js',
     'tests/world_civilization_effect_process_restart.test.js',
     'tests/world_civilization_delegation_process_restart.test.js',
+    'tests/world_civilization_institution_process_restart.test.js',
     'public/experiences/world-grid/manifest.json',
     'public/experiences/world-grid/skill.md',
     'public/experiences/world-grid/tools.md',
@@ -174,7 +175,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /M16 Persistence, replay, and resilience hardening \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/resilience\.js/);
   assert.match(plan, /server\/world_civilization\/replay_reconstruction\.js/);
-  assert.match(plan, /process restart probes now cover audit-ledger, proposal\/vote, reputation\/moderation, effect\/rollback, and delegation/);
+  assert.match(plan, /process restart probes now cover audit-ledger, proposal\/vote, reputation\/moderation, effect\/rollback, delegation, and institution/);
   assert.match(gate, /server\/world_civilization\/resilience\.js/);
   assert.match(gate, /server\/world_civilization\/replay_reconstruction\.js/);
   assert.match(gate, /tests\/world_civilization_process_restart\.test\.js/);
@@ -182,6 +183,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(gate, /tests\/world_civilization_reputation_moderation_process_restart\.test\.js/);
   assert.match(gate, /tests\/world_civilization_effect_process_restart\.test\.js/);
   assert.match(gate, /tests\/world_civilization_delegation_process_restart\.test\.js/);
+  assert.match(gate, /tests\/world_civilization_institution_process_restart\.test\.js/);
   assert.match(gate, /process restart coverage spans every civic store/);
   assert.match(plan, /M17 Security and product release review \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/release_review\.js/);
