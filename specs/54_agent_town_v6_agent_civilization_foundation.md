@@ -9,6 +9,8 @@ redaction, and retention.
 
 Release gate: `specs/release-gates/v60_agent_civilization_readiness_gate.md`
 
+Milestone plan: `docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md`
+
 ## Implementation Boundary
 
 Do not add V6 civic mechanics to normal gameplay or the world-grid prototype

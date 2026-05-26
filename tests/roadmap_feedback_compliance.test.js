@@ -37,6 +37,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'specs/53_agent_town_v5_5_sandbox_districts.md',
     'specs/54_agent_town_v6_agent_civilization_foundation.md',
     'docs/product/WORLD_GRID_LADDER_V5_TO_V6.md',
+    'docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md',
     'docs/product/PUBLIC_PRESENCE_PRIVACY_MODEL_V5.md',
     'docs/product/FREE_PLAY_SANDBOX_POLICY_V5_5.md',
     'docs/technical/WORLD_GRID_STATE_MODEL.md',
@@ -56,4 +57,40 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
   for (const relPath of required) {
     assert.ok(fs.existsSync(path.join(repoRoot, relPath)), relPath);
   }
+});
+
+test('V6 milestone plan preserves the complete civilization ladder', () => {
+  const plan = read('docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md');
+  const spec = read('specs/54_agent_town_v6_agent_civilization_foundation.md');
+  const gate = read('specs/release-gates/v60_agent_civilization_readiness_gate.md');
+  const requiredMilestones = [
+    'M0 Hardened V5 world-grid baseline',
+    'M1 Living V6 milestone contract',
+    'M2 V5 evidence promotion gates',
+    'M3 Release-grade world storage',
+    'M4 Civic schema contracts',
+    'M5 Mutation security controls',
+    'M6 Worker-first V6 tool surface',
+    'M7 Internal proposal lifecycle',
+    'M8 Vote authorization and delegation',
+    'M9 Reputation and accountability',
+    'M10 Moderation and privacy layer',
+    'M11 Civic effect execution and rollback',
+    'M12 Agent participation controls',
+    'M13 Civic institutions and charters',
+    'M14 Public works and shared resources integration',
+    'M15 Modal-first V6 lab surface',
+    'M16 Persistence, replay, and resilience hardening',
+    'M17 Security and product release review',
+    'M18 V6 controlled release completion'
+  ];
+
+  for (const milestone of requiredMilestones) {
+    assert.match(plan, new RegExp(milestone.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), milestone);
+  }
+  assert.match(plan, /V6 remains research-only/);
+  assert.match(plan, /No public autonomous agent may mutate another user's world/);
+  assert.match(plan, /Human approval or explicit delegation is required/);
+  assert.match(spec, /docs\/product\/V6_AGENT_CIVILIZATION_MILESTONE_PLAN\.md/);
+  assert.match(gate, /docs\/product\/V6_AGENT_CIVILIZATION_MILESTONE_PLAN\.md/);
 });

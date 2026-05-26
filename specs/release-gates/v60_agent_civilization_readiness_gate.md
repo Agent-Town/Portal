@@ -2,6 +2,8 @@
 
 Status: `research_only`
 
+Milestone plan: `docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md`
+
 V6.0 Agent Civilization Foundation must not become player-visible until every
 gate below has implementation, deterministic tests, and security/product signoff.
 
