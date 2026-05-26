@@ -11,6 +11,8 @@ Release gate: `specs/release-gates/v60_agent_civilization_readiness_gate.md`
 
 Milestone plan: `docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md`
 
+Civic schema contracts: `specs/55_agent_town_v6_civic_schema_contracts.md`
+
 ## Implementation Boundary
 
 Do not add V6 civic mechanics to normal gameplay or the world-grid prototype

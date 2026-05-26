@@ -1,0 +1,270 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+
+const {
+  CIVIC_SCHEMA_VERSION,
+  validateAuditLedgerEntry,
+  validateCivicAction,
+  validateCivicDelegation,
+  validateCivicProposal,
+  validateCivicVote,
+  validateModerationDecision,
+  validateReputationRecord,
+  validateRollbackPlan,
+  validateV6CivicSchema
+} = require('../server/world_civilization/schemas');
+
+const HASH_A = `sha256:${'a'.repeat(64)}`;
+const HASH_B = `sha256:${'b'.repeat(64)}`;
+
+function actor(overrides = {}) {
+  return {
+    kind: 'human',
+    accountId: 'acct_v6_human_001',
+    ...overrides
+  };
+}
+
+function privacy(overrides = {}) {
+  return {
+    redacted: true,
+    privateDataIncluded: false,
+    dataClasses: ['public_profile', 'public_world_state'],
+    ...overrides
+  };
+}
+
+function rollbackPlan(overrides = {}) {
+  return {
+    planId: 'rollbackplan_public_works_001',
+    strategy: 'Restore previous public works accounting snapshot.',
+    canRollback: true,
+    irreversibleEffects: [],
+    maxRollbackMs: 86_400_000,
+    ...overrides
+  };
+}
+
+function proposal(overrides = {}) {
+  return {
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    proposalId: 'proposal_public_works_bridge_001',
+    proposer: actor(),
+    scope: {
+      kind: 'public_works',
+      targetId: 'district_great_ridge'
+    },
+    affectedPublicState: ['public_works:gorge_bridge'],
+    effectPreview: {
+      effectType: 'public_works_accounting',
+      mutationMode: 'preview_only',
+      summary: 'Preview bridge accounting without applying it.'
+    },
+    moderationClass: 'public_works',
+    expiresAtMs: 4_102_444_800_000,
+    rollbackPlan: rollbackPlan(),
+    privacy: privacy(),
+    ...overrides
+  };
+}
+
+function vote(overrides = {}) {
+  return {
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    voteId: 'vote_bridge_approval_001',
+    proposalId: 'proposal_public_works_bridge_001',
+    voter: actor(),
+    choice: 'approve',
+    authorization: {
+      kind: 'wallet_session',
+      subjectAccountId: 'acct_v6_human_001',
+      serverVerified: true
+    },
+    eligibilityProof: {
+      eligible: true,
+      ruleId: 'rule_public_works_voter_001'
+    },
+    receiptId: 'receipt_vote_bridge_001',
+    idempotencyKey: 'idem_vote_bridge_001',
+    ...overrides
+  };
+}
+
+test('V6 proposal schema accepts bounded preview-only public civic proposals', () => {
+  const result = validateCivicProposal(proposal());
+
+  assert.equal(result.ok, true, result.errors.join('\n'));
+  assert.equal(result.value.effectPreview.mutationMode, 'preview_only');
+  assert.equal(result.value.privacy.privateDataIncluded, false);
+  assert.equal(result.value.rollbackPlan.canRollback, true);
+});
+
+test('V6 proposal schema rejects hidden mutation and private-data leaks', () => {
+  const result = validateCivicProposal(proposal({
+    effectPreview: {
+      effectType: 'public_works_accounting',
+      mutationMode: 'apply_now',
+      summary: 'Apply immediately.'
+    },
+    privacy: privacy({
+      privateDataIncluded: true,
+      dataClasses: ['public_profile', 'brain_transcript']
+    }),
+    debugTrace: {
+      token: 'sk-test-secret-value'
+    }
+  }));
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join('\n'), /preview_only/);
+  assert.match(result.errors.join('\n'), /privateDataIncluded/);
+  assert.match(result.errors.join('\n'), /private data forbidden/);
+});
+
+test('V6 vote schema requires verified voter authorization and one receipt path', () => {
+  const valid = validateCivicVote(vote());
+  assert.equal(valid.ok, true, valid.errors.join('\n'));
+
+  const forged = validateCivicVote(vote({
+    authorization: {
+      kind: 'wallet_session',
+      subjectAccountId: 'acct_attacker_001',
+      serverVerified: true
+    }
+  }));
+  assert.equal(forged.ok, false);
+  assert.match(forged.errors.join('\n'), /must match voter/);
+
+  const unverified = validateCivicVote(vote({
+    authorization: {
+      kind: 'wallet_session',
+      subjectAccountId: 'acct_v6_human_001',
+      serverVerified: false
+    }
+  }));
+  assert.equal(unverified.ok, false);
+  assert.match(unverified.errors.join('\n'), /serverVerified/);
+});
+
+test('V6 delegation schema stays scoped, expiring, revocable, and explicit', () => {
+  const valid = validateCivicDelegation({
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    delegationId: 'delegation_vote_advice_001',
+    principalAccountId: 'acct_v6_human_001',
+    delegateAgentId: 'agent_civic_clover_001',
+    scope: 'vote_advice',
+    expiresAtMs: 4_102_444_800_000,
+    maxActions: 3,
+    approvalReceiptId: 'receipt_delegate_vote_advice_001',
+    revocable: true,
+    canExecuteCivicEffects: false
+  });
+  assert.equal(valid.ok, true, valid.errors.join('\n'));
+
+  const unsafe = validateCivicDelegation({
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    delegationId: 'delegation_vote_advice_002',
+    principalAccountId: 'acct_v6_human_001',
+    delegateAgentId: 'agent_civic_clover_001',
+    scope: 'vote_advice',
+    expiresAtMs: 4_102_444_800_000,
+    maxActions: 3,
+    approvalReceiptId: 'receipt_delegate_vote_advice_002',
+    revocable: false,
+    canExecuteCivicEffects: true
+  });
+  assert.equal(unsafe.ok, false);
+  assert.match(unsafe.errors.join('\n'), /revocable/);
+  assert.match(unsafe.errors.join('\n'), /civic_execution/);
+});
+
+test('V6 reputation schema blocks self-awards and currency-like transfers', () => {
+  const valid = validateReputationRecord({
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    recordId: 'reputation_service_quality_001',
+    subjectAccountId: 'acct_service_provider_001',
+    awardedByAccountId: 'acct_v6_human_001',
+    kind: 'service_reliability',
+    delta: 2,
+    sourceRef: 'proposal_public_works_bridge_001',
+    disputeStatus: 'none',
+    auditLedgerEntryId: 'audit_reputation_001'
+  });
+  assert.equal(valid.ok, true, valid.errors.join('\n'));
+
+  const selfAward = validateReputationRecord({
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    recordId: 'reputation_self_001',
+    subjectAccountId: 'acct_service_provider_001',
+    awardedByAccountId: 'acct_service_provider_001',
+    kind: 'service_reliability',
+    delta: 25,
+    sourceRef: 'proposal_public_works_bridge_001',
+    disputeStatus: 'none',
+    auditLedgerEntryId: 'audit_reputation_002'
+  });
+  assert.equal(selfAward.ok, false);
+  assert.match(selfAward.errors.join('\n'), /self-awarded/);
+  assert.match(selfAward.errors.join('\n'), /delta invalid/);
+});
+
+test('V6 moderation, action, rollback, and audit schemas require traceable safety handles', () => {
+  const moderation = validateModerationDecision({
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    decisionId: 'moderation_bridge_text_001',
+    subjectRef: 'proposal_public_works_bridge_001',
+    surface: 'public_works',
+    status: 'approved',
+    policyVersion: 'policy_v6_public_001',
+    reviewerKind: 'system',
+    reasons: ['No private state or unsafe public text detected.'],
+    redactedFields: []
+  });
+  assert.equal(moderation.ok, true, moderation.errors.join('\n'));
+
+  const rollback = validateRollbackPlan(rollbackPlan());
+  assert.equal(rollback.ok, true, rollback.errors.join('\n'));
+  assert.deepEqual(rollback.value.irreversibleEffects, []);
+
+  const action = validateCivicAction({
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    actionId: 'action_apply_bridge_001',
+    proposalId: 'proposal_public_works_bridge_001',
+    effectType: 'public_works_accounting',
+    executionAuthority: {
+      kind: 'human_approved',
+      receiptId: 'receipt_vote_bridge_001'
+    },
+    handlerName: 'et.civic.public_works.apply',
+    beforeSummary: 'Bridge contribution total is 20 wood.',
+    afterSummary: 'Bridge contribution total is 30 wood.',
+    auditLedgerEntryId: 'audit_action_bridge_001',
+    rollbackId: 'rollback_bridge_001',
+    idempotencyKey: 'idem_action_bridge_001'
+  });
+  assert.equal(action.ok, true, action.errors.join('\n'));
+
+  const audit = validateAuditLedgerEntry({
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    entryId: 'audit_action_bridge_001',
+    actor: actor(),
+    actionType: 'civic_action.applied',
+    objectRef: 'action_apply_bridge_001',
+    idempotencyKey: 'idem_action_bridge_001',
+    beforeHash: HASH_A,
+    afterHash: HASH_B,
+    createdAtMs: 1_779_784_000_000,
+    migrationVersion: 'v1',
+    replayable: true,
+    rollbackId: 'rollback_bridge_001',
+    privacy: privacy({ dataClasses: ['public_audit_summary'] })
+  });
+  assert.equal(audit.ok, true, audit.errors.join('\n'));
+});
+
+test('V6 civic schema dispatcher fails closed for unknown schemas', () => {
+  assert.equal(validateV6CivicSchema('proposal', proposal()).ok, true);
+  const unknown = validateV6CivicSchema('institution', {});
+  assert.equal(unknown.ok, false);
+  assert.match(unknown.errors.join('\n'), /unknown civic schema kind/);
+});

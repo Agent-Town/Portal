@@ -6,6 +6,8 @@ Milestone plan: `docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md`
 
 V5 promotion gate: `specs/release-gates/v5_world_grid_release_promotion_gate.md`
 
+Civic schema contracts: `specs/55_agent_town_v6_civic_schema_contracts.md`
+
 V6.0 Agent Civilization Foundation must not become player-visible until every
 gate below has implementation, deterministic tests, and security/product signoff.
 
