@@ -25,6 +25,10 @@ function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(root, relativePath), 'utf8'));
 }
 
+function readText(relativePath) {
+  return fs.readFileSync(path.join(root, relativePath), 'utf8');
+}
+
 async function withWorldGridServer({ identity, envPatch = {} }, fn) {
   const previous = {
     NODE_ENV: process.env.NODE_ENV,
@@ -98,6 +102,29 @@ test('generated pack schema suite and fixtures exist', () => {
     'invalid_asset_manifest_entry.json'
   ]) {
     assert.ok(readJson(`tests/fixtures/generated_packs/${fixture}`).packId, fixture);
+  }
+});
+
+test('generated pack production readiness evidence documents roadmap coverage and fail-closed release stance', () => {
+  const evidence = readText('docs/release-evidence/GENERATED_PACK_PRODUCTION_READINESS_EVIDENCE_2026-05-26.md');
+  for (let index = 0; index <= 18; index += 1) {
+    assert.match(evidence, new RegExp(`GU-${index}\\b`), `GU-${index}`);
+  }
+  for (const required of [
+    '"normalGameplayVisibilityChanged": false',
+    '"canonicalServerRulesChanged": false',
+    '"v6CivicMechanicsTouched": false',
+    '"newExternalImageGenerationUsed": false',
+    '"publicReleaseApproved": false',
+    '"releaseMode": "prototype-gated"',
+    '"publicReleaseEligible": false',
+    'Auth model approved',
+    'Cost model accepted',
+    'User/team consent recorded',
+    'Candidate assets reviewed',
+    'Human release signoff'
+  ]) {
+    assert.equal(evidence.includes(required), true, required);
   }
 });
 

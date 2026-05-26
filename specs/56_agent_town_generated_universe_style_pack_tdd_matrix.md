@@ -77,3 +77,4 @@ owner: "Agent Town product"
 | GPACK-064 | Release gate | Full machine evidence plus explicit auth/cost/consent, candidate review, and human signoff can produce `publicReleaseEligible=true` | `tests/generated_pack_production_release_gate.test.js` |
 | GPACK-065 | Release gate | Tampered eligibility or blocking reasons fail release-gate validation before public release | `tests/generated_pack_production_release_gate.test.js` |
 | GPACK-066 | API | `POST /api/world/generated-pack/release-gate` is hidden without generated-pack feature flags and returns a valid fail-closed report when enabled | `tests/generated_pack_production_release_gate.test.js` |
+| GPACK-067 | Evidence | Production-readiness evidence covers GU-0 through GU-18, hard boundaries, fail-closed stance, and remaining non-code approvals | `docs/release-evidence/GENERATED_PACK_PRODUCTION_READINESS_EVIDENCE_2026-05-26.md`, `tests/generated_pack_contract.test.js` |
