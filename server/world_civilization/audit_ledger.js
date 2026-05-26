@@ -146,6 +146,7 @@ function createCivicAuditLedger({ sqlitePath }) {
   const db = new DatabaseSync(sqlitePath);
   ensureSchema(db);
   const statements = buildStatements(db);
+  let closed = false;
 
   function append(rawEntry = {}) {
     const validation = validateAuditLedgerEntry(rawEntry);
@@ -226,6 +227,8 @@ function createCivicAuditLedger({ sqlitePath }) {
   }
 
   function close() {
+    if (closed) return;
+    closed = true;
     db.close();
   }
 

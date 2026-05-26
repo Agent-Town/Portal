@@ -62,6 +62,7 @@ function proposal(overrides = {}) {
     },
     moderationClass: 'public_works',
     expiresAtMs: 4_102_444_800_000,
+    idempotencyKey: 'idem_proposal_bridge_001',
     rollbackPlan: rollbackPlan(),
     privacy: privacy(),
     ...overrides

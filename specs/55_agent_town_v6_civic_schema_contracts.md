@@ -32,7 +32,7 @@ unversioned payloads are invalid for V6 civic state.
 
 | Contract | Required Safety Properties |
 | --- | --- |
-| Proposal | Proposer identity, public scope, affected public state, preview-only effect, moderation class, expiry, rollback plan, and redacted privacy envelope. |
+| Proposal | Proposer identity, public scope, affected public state, preview-only effect, moderation class, expiry, idempotency key, rollback plan, and redacted privacy envelope. |
 | Vote | Human voter identity, server-verified authorization, eligibility proof, explicit choice, receipt id, and idempotency key. |
 | Delegation | Principal account, delegate agent, scoped authority, expiry, action cap, approval receipt, revocability, and explicit civic-effect execution permission. |
 | Reputation | Subject, awarding account, bounded non-zero delta, source reference, dispute status, and audit entry reference. Self-awards are invalid. |

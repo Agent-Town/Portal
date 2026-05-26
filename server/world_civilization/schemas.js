@@ -127,7 +127,7 @@ function validateActor(errors, raw, path, { allowAgent = true } = {}) {
   const accountId = validateString(errors, raw.accountId, `${path}.accountId`, { pattern: CIVIC_ID_RE, max: 96 });
   const agentId = raw.agentId === undefined ? '' : validateString(errors, raw.agentId, `${path}.agentId`, { pattern: CIVIC_ID_RE, max: 96 });
   if (kind === 'agent' && !agentId) errors.push(`${path}.agentId required for agent actor`);
-  return { kind, accountId, agentId };
+  return agentId ? { kind, accountId, agentId } : { kind, accountId };
 }
 
 function validatePrivacy(errors, raw, path) {
@@ -185,6 +185,7 @@ function validateCivicProposal(raw = {}) {
   const summary = validateString(errors, effectPreview.summary, 'effectPreview.summary', { max: 400 });
   const moderationClass = validateEnum(errors, raw.moderationClass, MODERATION_CLASSES, 'moderationClass');
   const expiresAtMs = validateNumber(errors, raw.expiresAtMs, 'expiresAtMs', { min: 1 });
+  const idempotencyKey = validateString(errors, raw.idempotencyKey, 'idempotencyKey', { pattern: CIVIC_ID_RE, max: 96 });
   const rollbackPlan = normalizeRollbackPlan(errors, raw.rollbackPlan);
   const privacy = validatePrivacy(errors, raw.privacy, 'privacy');
   const privatePaths = findPrivateData(raw);
@@ -201,6 +202,7 @@ function validateCivicProposal(raw = {}) {
       effectPreview: { effectType, mutationMode, summary },
       moderationClass,
       expiresAtMs,
+      idempotencyKey,
       rollbackPlan,
       privacy
     }

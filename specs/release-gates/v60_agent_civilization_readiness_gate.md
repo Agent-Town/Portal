@@ -10,6 +10,8 @@ Civic schema contracts: `specs/55_agent_town_v6_civic_schema_contracts.md`
 
 Civic audit ledger foundation: `specs/56_agent_town_v6_audit_ledger_foundation.md`
 
+Internal proposal lifecycle: `specs/57_agent_town_v6_internal_proposal_lifecycle.md`
+
 V6.0 Agent Civilization Foundation must not become player-visible until every
 gate below has implementation, deterministic tests, and security/product signoff.
 
@@ -30,7 +32,7 @@ gate below has implementation, deterministic tests, and security/product signoff
 ## Required V6 Schemas
 
 - Proposal schema with proposer identity, scope, affected public state, effect
-  preview, moderation class, expiry, and rollback plan.
+  preview, moderation class, expiry, idempotency key, and rollback plan.
 - Vote schema with voter authorization, delegation status, eligibility proof,
   one-vote accounting, and receipt id.
 - Civic action schema with proposal reference, execution authority, before/after

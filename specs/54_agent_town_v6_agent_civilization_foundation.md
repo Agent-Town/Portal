@@ -15,6 +15,8 @@ Civic schema contracts: `specs/55_agent_town_v6_civic_schema_contracts.md`
 
 Civic audit ledger foundation: `specs/56_agent_town_v6_audit_ledger_foundation.md`
 
+Internal proposal lifecycle: `specs/57_agent_town_v6_internal_proposal_lifecycle.md`
+
 ## Implementation Boundary
 
 Do not add V6 civic mechanics to normal gameplay or the world-grid prototype
