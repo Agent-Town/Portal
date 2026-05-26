@@ -1,10 +1,10 @@
 {
   "schemaVersion": "agent-town-generated-pack-v1",
-  "packId": "gen_pack_fixture_valid",
+  "packId": "gen_pack_1dc551d9ebea7769",
   "ownerAccountId": "owner_fixture",
   "createdAtMs": 1770000000000,
   "generator": {
-    "id": "deterministic-world-grid-style-pack-v0",
+    "id": "deterministic-world-grid-style-pack-v0.1",
     "source": "deterministic-fallback",
     "codexBridgeReady": true,
     "externalModelUsed": false,
@@ -13,12 +13,63 @@
   "prompt": {
     "hash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
     "length": 64,
-    "keywordHints": ["cozy", "mushroom", "frontier", "clockwork", "gardeners", "lantern"]
+    "keywordHints": [
+      "cozy",
+      "mushroom",
+      "frontier",
+      "clockwork",
+      "gardeners",
+      "lantern"
+    ]
+  },
+  "generationBrief": {
+    "schemaVersion": "agent-town-generation-brief-v1",
+    "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+    "theme": "Cozy Moss Lantern Frontier",
+    "tone": "cozy and practical",
+    "visualStyle": "warm mechanical frontier miniatures",
+    "species": [
+      "Cozy settlers",
+      "Mushroom crews"
+    ],
+    "factions": [
+      "Cozy Settlers",
+      "Mushroom Crews"
+    ],
+    "cultures": [
+      "Moss Lantern Frontier craft tradition",
+      "Mushroom route customs"
+    ],
+    "techFlavor": "clockwork route markers and hand-built civic machines",
+    "humorLevel": "low",
+    "safetyStatus": {
+      "status": "safe",
+      "safetyRewriteApplied": false,
+      "blockedPatternIds": [],
+      "sensitivePatternIds": [],
+      "deterministicFallbackAllowed": true
+    },
+    "keywordHints": [
+      "cozy",
+      "mushroom",
+      "frontier",
+      "clockwork",
+      "gardeners",
+      "lantern",
+      "moss"
+    ],
+    "metrics": {
+      "promptLength": 64,
+      "keywordCount": 7,
+      "safetyRewriteApplied": false,
+      "deterministicFallbackPlayable": true
+    }
   },
   "stylePack": {
-    "stylePackId": "style_fixture",
+    "schemaVersion": "agent-town-style-bible-v1",
+    "stylePackId": "style_moss-lantern_1dc551d9",
     "name": "Cozy Moss Lantern Frontier",
-    "themeSummary": "Cozy and mushroom motifs translated into warm frontier materials.",
+    "themeSummary": "Cozy and Mushroom motifs translated into warm frontier materials.",
     "palette": {
       "background": "#e8eed0",
       "surface": "#fff6d8",
@@ -28,6 +79,8 @@
       "accent": "#d39a37",
       "focus": "#2f78ad",
       "selected": "#f1c75b",
+      "light": "#fff4c9",
+      "ambient": "#d7f0cf",
       "terrain": {
         "prairie": "#cfdc8c",
         "ridge": "#9f9271",
@@ -43,9 +96,18 @@
       }
     },
     "materialRules": [
-      { "target": "three-region-cell", "rule": "terrain colors are softened by ownership state" },
-      { "target": "home-settlement-marker", "rule": "primary color with warm light contact shadow" },
-      { "target": "selection-ring", "rule": "selected color with high contrast against terrain" }
+      {
+        "target": "three-region-cell",
+        "rule": "terrain colors are softened by ownership state"
+      },
+      {
+        "target": "home-settlement-marker",
+        "rule": "primary color with warm light contact shadow"
+      },
+      {
+        "target": "selection-ring",
+        "rule": "selected color with high contrast against terrain"
+      }
     ],
     "uiRules": {
       "minReadableTextPx": 16,
@@ -54,89 +116,1042 @@
     }
   },
   "universePack": {
-    "universePackId": "universe_fixture",
+    "schemaVersion": "agent-town-universe-bible-v1",
+    "universePackId": "universe_1dc551d9ebea",
     "name": "Cozy Mushroom Charter",
-    "pitch": "Cozy settlers and mushroom crews build a civic frontier with Clover keeping the work bounded and legible.",
+    "pitch": "Cozy settlers and Mushroom crews build a civic frontier with Clover keeping the work bounded and legible.",
     "playerRole": "Cozy founder",
     "cloverRole": "Clover remains the trusted Foreman and explains each bounded action in-world.",
     "factions": [
-      { "factionId": "faction_settlers", "name": "Cozy Settlers", "role": "home-builders" },
-      { "factionId": "faction_crews", "name": "Mushroom Crews", "role": "makers" }
+      {
+        "factionId": "faction_settlers",
+        "name": "Cozy Settlers",
+        "role": "home-builders",
+        "line": "They want cozy supplies and a steady route outward."
+      },
+      {
+        "factionId": "faction_crews",
+        "name": "Mushroom Crews",
+        "role": "makers",
+        "line": "They turn cozy timber and mushroom stone into practical town work."
+      }
+    ],
+    "techs": [
+      {
+        "techId": "tech_route_signals",
+        "name": "Mushroom Route Signals",
+        "unlockIntent": "makes claim planning visually clearer"
+      },
+      {
+        "techId": "tech_civic_lamps",
+        "name": "Cozy Civic Lamps",
+        "unlockIntent": "makes public works and night scenes readable"
+      }
     ],
     "firstLoop": {
       "title": "Cozy first route",
       "objective": "Choose a nearby cell, plan the cozy route, and complete the first claim.",
-      "successReceipt": "Cozy route complete. Cozy Hall now has a visible path into the wider territory."
+      "successReceipt": "Cozy route complete. Cozy Hall now has a visible path into the wider territory.",
+      "recovery": "If resources are short, pick another adjacent cell or keep the claim planned."
     },
     "text": {
       "topbarTitle": "Cozy World Grid",
       "statusReady": "Cozy survey ready",
       "packValidated": "Cozy pack validated",
       "planClaimAction": "Plan Cozy route",
-      "completeClaimAction": "Complete Mushroom claim"
+      "completeClaimAction": "Complete Mushroom claim",
+      "selectedSummaryPrefix": "Cozy survey note",
+      "publicPresenceTitle": "Cozy Neighbors",
+      "servicesTitle": "Mushroom Civic Services",
+      "eventsTitle": "Cozy Public Works",
+      "sandboxTitle": "Mushroom Sandbox District"
     }
   },
   "gameplayMapping": {
     "canonicalVersion": "agent-town-world-grid-v1",
-    "serverRuleOverrides": 0,
     "canonicalEntities": [
-      { "canonicalId": "building.hq", "mechanicalKey": "hq", "generatedName": "Cozy Hall" },
-      { "canonicalId": "building.worker_camp", "mechanicalKey": "worker_camp", "generatedName": "Mushroom Crew Camp" },
-      { "canonicalId": "building.lumber_camp", "mechanicalKey": "lumber_camp", "generatedName": "Cozy Timber Yard" },
-      { "canonicalId": "building.farm", "mechanicalKey": "farm", "generatedName": "Cozy Garden Patch" },
-      { "canonicalId": "building.quarry", "mechanicalKey": "quarry", "generatedName": "Mushroom Stone Cut" },
-      { "canonicalId": "building.market", "mechanicalKey": "market", "generatedName": "Mushroom Market Stand" },
-      { "canonicalId": "resource.wood", "mechanicalKey": "wood", "generatedName": "Cozy Timber" },
-      { "canonicalId": "resource.stone", "mechanicalKey": "stone", "generatedName": "Mushroom Stone" },
-      { "canonicalId": "resource.food", "mechanicalKey": "food", "generatedName": "Cozy Supplies" },
-      { "canonicalId": "resource.coin", "mechanicalKey": "coin", "generatedName": "Mushroom Scrip" },
-      { "canonicalId": "character.clover", "mechanicalKey": "clover", "generatedName": "Clover Kincaid" },
-      { "canonicalId": "action.plan_claim", "mechanicalKey": "plan_claim", "generatedName": "Plan Cozy route" },
-      { "canonicalId": "action.complete_claim", "mechanicalKey": "complete_claim", "generatedName": "Complete Mushroom claim" },
-      { "canonicalId": "terrain.prairie", "mechanicalKey": "prairie", "generatedName": "Cozy Meadow" },
-      { "canonicalId": "terrain.ridge", "mechanicalKey": "ridge", "generatedName": "Mushroom Ridge" },
-      { "canonicalId": "terrain.river", "mechanicalKey": "river", "generatedName": "Cozy Run" },
-      { "canonicalId": "terrain.forest", "mechanicalKey": "forest", "generatedName": "Mushroom Grove" },
-      { "canonicalId": "terrain.mesa", "mechanicalKey": "mesa", "generatedName": "Cozy Mesa" },
-      { "canonicalId": "state.claimed", "mechanicalKey": "claimed", "generatedName": "Held by your settlement" },
-      { "canonicalId": "state.claimable", "mechanicalKey": "claimable", "generatedName": "Ready for a route plan" },
-      { "canonicalId": "state.visible", "mechanicalKey": "visible", "generatedName": "Surveyed nearby ground" },
-      { "canonicalId": "state.locked", "mechanicalKey": "locked", "generatedName": "Beyond today's survey" }
+      {
+        "canonicalId": "building.hq",
+        "mechanicalKey": "hq",
+        "generatedName": "Cozy Hall",
+        "assetHint": "tall civic lodge with one bright signal roof"
+      },
+      {
+        "canonicalId": "building.worker_camp",
+        "mechanicalKey": "worker_camp",
+        "generatedName": "Mushroom Crew Camp",
+        "assetHint": "compact worker camp with theme props and clear doorway"
+      },
+      {
+        "canonicalId": "building.lumber_camp",
+        "mechanicalKey": "lumber_camp",
+        "generatedName": "Cozy Timber Yard",
+        "assetHint": "wood-production building mapped to generated materials"
+      },
+      {
+        "canonicalId": "building.farm",
+        "mechanicalKey": "farm",
+        "generatedName": "Cozy Garden Patch",
+        "assetHint": "food-production building with readable planted rows"
+      },
+      {
+        "canonicalId": "building.quarry",
+        "mechanicalKey": "quarry",
+        "generatedName": "Mushroom Stone Cut",
+        "assetHint": "stone-production building with stable rock silhouette"
+      },
+      {
+        "canonicalId": "building.market",
+        "mechanicalKey": "market",
+        "generatedName": "Mushroom Market Stand",
+        "assetHint": "exchange building with cloth awning and signpost"
+      },
+      {
+        "canonicalId": "resource.wood",
+        "mechanicalKey": "wood",
+        "generatedName": "Cozy Timber",
+        "assetHint": "small stack icon"
+      },
+      {
+        "canonicalId": "resource.stone",
+        "mechanicalKey": "stone",
+        "generatedName": "Mushroom Stone",
+        "assetHint": "small stone icon"
+      },
+      {
+        "canonicalId": "resource.food",
+        "mechanicalKey": "food",
+        "generatedName": "Cozy Supplies",
+        "assetHint": "small crate icon"
+      },
+      {
+        "canonicalId": "resource.coin",
+        "mechanicalKey": "coin",
+        "generatedName": "Mushroom Scrip",
+        "assetHint": "small brass coin icon"
+      },
+      {
+        "canonicalId": "character.clover",
+        "mechanicalKey": "clover",
+        "generatedName": "Clover Kincaid",
+        "assetHint": "Clover remains the trusted Foreman silhouette"
+      },
+      {
+        "canonicalId": "action.plan_claim",
+        "mechanicalKey": "plan_claim",
+        "generatedName": "Plan Cozy route",
+        "assetHint": "primary claim planning action"
+      },
+      {
+        "canonicalId": "action.complete_claim",
+        "mechanicalKey": "complete_claim",
+        "generatedName": "Complete Mushroom claim",
+        "assetHint": "primary claim completion action"
+      },
+      {
+        "canonicalId": "terrain.prairie",
+        "mechanicalKey": "prairie",
+        "generatedName": "Cozy Meadow",
+        "assetHint": "open hex terrain material"
+      },
+      {
+        "canonicalId": "terrain.ridge",
+        "mechanicalKey": "ridge",
+        "generatedName": "Mushroom Ridge",
+        "assetHint": "raised hex terrain material"
+      },
+      {
+        "canonicalId": "terrain.river",
+        "mechanicalKey": "river",
+        "generatedName": "Cozy Run",
+        "assetHint": "river hex terrain material"
+      },
+      {
+        "canonicalId": "terrain.forest",
+        "mechanicalKey": "forest",
+        "generatedName": "Mushroom Grove",
+        "assetHint": "forest hex terrain material"
+      },
+      {
+        "canonicalId": "terrain.mesa",
+        "mechanicalKey": "mesa",
+        "generatedName": "Cozy Mesa",
+        "assetHint": "mesa hex terrain material"
+      },
+      {
+        "canonicalId": "state.claimed",
+        "mechanicalKey": "claimed",
+        "generatedName": "Held by your settlement",
+        "assetHint": "warm ownership state"
+      },
+      {
+        "canonicalId": "state.claimable",
+        "mechanicalKey": "claimable",
+        "generatedName": "Ready for a route plan",
+        "assetHint": "available claim state"
+      },
+      {
+        "canonicalId": "state.visible",
+        "mechanicalKey": "visible",
+        "generatedName": "Surveyed nearby ground",
+        "assetHint": "visible orientation state"
+      },
+      {
+        "canonicalId": "state.locked",
+        "mechanicalKey": "locked",
+        "generatedName": "Beyond today's survey",
+        "assetHint": "quiet locked state"
+      }
     ]
   },
   "assetManifest": {
     "schemaVersion": "agent-town-generated-asset-manifest-v1",
     "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
-    "generator": "deterministic-world-grid-style-pack-v0",
+    "generator": "deterministic-world-grid-style-pack-v0.1",
     "productionImagePolicy": {
       "model": "gpt-image-2",
       "status": "candidate_required_before_production",
-      "requiresHumanSignoff": true
+      "promptRoot": "specs/prompts/generated-universe-packs",
+      "requiresHumanSignoff": true,
+      "transparentBackgroundPolicy": "clean-background-plus-postprocess"
     },
     "assets": [
-      { "assetId": "a1", "canonicalTarget": "terrain.prairie", "kind": "three-material", "status": "runtime-generated", "source": "deterministic-fallback" },
-      { "assetId": "a2", "canonicalTarget": "terrain.ridge", "kind": "three-material", "status": "runtime-generated", "source": "deterministic-fallback" },
-      { "assetId": "a3", "canonicalTarget": "terrain.river", "kind": "three-material", "status": "runtime-generated", "source": "deterministic-fallback" },
-      { "assetId": "a4", "canonicalTarget": "terrain.forest", "kind": "three-material", "status": "runtime-generated", "source": "deterministic-fallback" },
-      { "assetId": "a5", "canonicalTarget": "terrain.mesa", "kind": "three-material", "status": "runtime-generated", "source": "deterministic-fallback" },
-      { "assetId": "a6", "canonicalTarget": "state.claimed", "kind": "three-material", "status": "runtime-generated", "source": "deterministic-fallback" },
-      { "assetId": "a7", "canonicalTarget": "state.claimable", "kind": "three-material", "status": "runtime-generated", "source": "deterministic-fallback" },
-      { "assetId": "a8", "canonicalTarget": "state.visible", "kind": "three-material", "status": "runtime-generated", "source": "deterministic-fallback" },
-      { "assetId": "a9", "canonicalTarget": "state.locked", "kind": "three-material", "status": "runtime-generated", "source": "deterministic-fallback" },
-      { "assetId": "a10", "canonicalTarget": "building.hq", "kind": "billboard-sprite-candidate", "status": "fallback-ready", "source": "deterministic-fallback" },
-      { "assetId": "a11", "canonicalTarget": "building.worker_camp", "kind": "billboard-sprite-candidate", "status": "fallback-ready", "source": "deterministic-fallback" },
-      { "assetId": "a12", "canonicalTarget": "building.lumber_camp", "kind": "billboard-sprite-candidate", "status": "fallback-ready", "source": "deterministic-fallback" },
-      { "assetId": "a13", "canonicalTarget": "building.farm", "kind": "billboard-sprite-candidate", "status": "fallback-ready", "source": "deterministic-fallback" },
-      { "assetId": "a14", "canonicalTarget": "building.quarry", "kind": "billboard-sprite-candidate", "status": "fallback-ready", "source": "deterministic-fallback" },
-      { "assetId": "a15", "canonicalTarget": "building.market", "kind": "billboard-sprite-candidate", "status": "fallback-ready", "source": "deterministic-fallback" },
-      { "assetId": "a16", "canonicalTarget": "resource.wood", "kind": "shape-token", "status": "fallback-ready", "source": "deterministic-fallback" },
-      { "assetId": "a17", "canonicalTarget": "resource.stone", "kind": "shape-token", "status": "fallback-ready", "source": "deterministic-fallback" },
-      { "assetId": "a18", "canonicalTarget": "resource.food", "kind": "shape-token", "status": "fallback-ready", "source": "deterministic-fallback" },
-      { "assetId": "a19", "canonicalTarget": "resource.coin", "kind": "shape-token", "status": "fallback-ready", "source": "deterministic-fallback" },
-      { "assetId": "a20", "canonicalTarget": "character.clover", "kind": "billboard-sprite-candidate", "status": "fallback-ready", "source": "deterministic-fallback" }
+      {
+        "assetId": "gen_pack_1dc551d9ebea7769:terrain:prairie",
+        "canonicalTarget": "terrain.prairie",
+        "kind": "three-material",
+        "status": "runtime-generated",
+        "source": "deterministic-fallback",
+        "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+        "color": "#cfdc8c"
+      },
+      {
+        "assetId": "gen_pack_1dc551d9ebea7769:terrain:ridge",
+        "canonicalTarget": "terrain.ridge",
+        "kind": "three-material",
+        "status": "runtime-generated",
+        "source": "deterministic-fallback",
+        "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+        "color": "#9f9271"
+      },
+      {
+        "assetId": "gen_pack_1dc551d9ebea7769:terrain:river",
+        "canonicalTarget": "terrain.river",
+        "kind": "three-material",
+        "status": "runtime-generated",
+        "source": "deterministic-fallback",
+        "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+        "color": "#71a9b2"
+      },
+      {
+        "assetId": "gen_pack_1dc551d9ebea7769:terrain:forest",
+        "canonicalTarget": "terrain.forest",
+        "kind": "three-material",
+        "status": "runtime-generated",
+        "source": "deterministic-fallback",
+        "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+        "color": "#5f8d58"
+      },
+      {
+        "assetId": "gen_pack_1dc551d9ebea7769:terrain:mesa",
+        "canonicalTarget": "terrain.mesa",
+        "kind": "three-material",
+        "status": "runtime-generated",
+        "source": "deterministic-fallback",
+        "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+        "color": "#c98252"
+      },
+      {
+        "assetId": "gen_pack_1dc551d9ebea7769:state:claimed",
+        "canonicalTarget": "state.claimed",
+        "kind": "three-material",
+        "status": "runtime-generated",
+        "source": "deterministic-fallback",
+        "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+        "color": "#d39a37"
+      },
+      {
+        "assetId": "gen_pack_1dc551d9ebea7769:state:claimable",
+        "canonicalTarget": "state.claimable",
+        "kind": "three-material",
+        "status": "runtime-generated",
+        "source": "deterministic-fallback",
+        "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+        "color": "#5f8d58"
+      },
+      {
+        "assetId": "gen_pack_1dc551d9ebea7769:state:visible",
+        "canonicalTarget": "state.visible",
+        "kind": "three-material",
+        "status": "runtime-generated",
+        "source": "deterministic-fallback",
+        "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+        "color": "#cfdc8c"
+      },
+      {
+        "assetId": "gen_pack_1dc551d9ebea7769:state:locked",
+        "canonicalTarget": "state.locked",
+        "kind": "three-material",
+        "status": "runtime-generated",
+        "source": "deterministic-fallback",
+        "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+        "color": "#817b68"
+      },
+      {
+        "assetId": "gen_pack_1dc551d9ebea7769:building.hq",
+        "canonicalTarget": "building.hq",
+        "kind": "billboard-sprite-candidate",
+        "status": "fallback-ready",
+        "source": "deterministic-fallback",
+        "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+        "description": "tall civic lodge with one bright signal roof"
+      },
+      {
+        "assetId": "gen_pack_1dc551d9ebea7769:building.worker_camp",
+        "canonicalTarget": "building.worker_camp",
+        "kind": "billboard-sprite-candidate",
+        "status": "fallback-ready",
+        "source": "deterministic-fallback",
+        "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+        "description": "compact worker camp with theme props and clear doorway"
+      },
+      {
+        "assetId": "gen_pack_1dc551d9ebea7769:building.lumber_camp",
+        "canonicalTarget": "building.lumber_camp",
+        "kind": "billboard-sprite-candidate",
+        "status": "fallback-ready",
+        "source": "deterministic-fallback",
+        "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+        "description": "wood-production building mapped to generated materials"
+      },
+      {
+        "assetId": "gen_pack_1dc551d9ebea7769:building.farm",
+        "canonicalTarget": "building.farm",
+        "kind": "billboard-sprite-candidate",
+        "status": "fallback-ready",
+        "source": "deterministic-fallback",
+        "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+        "description": "food-production building with readable planted rows"
+      },
+      {
+        "assetId": "gen_pack_1dc551d9ebea7769:building.quarry",
+        "canonicalTarget": "building.quarry",
+        "kind": "billboard-sprite-candidate",
+        "status": "fallback-ready",
+        "source": "deterministic-fallback",
+        "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+        "description": "stone-production building with stable rock silhouette"
+      },
+      {
+        "assetId": "gen_pack_1dc551d9ebea7769:building.market",
+        "canonicalTarget": "building.market",
+        "kind": "billboard-sprite-candidate",
+        "status": "fallback-ready",
+        "source": "deterministic-fallback",
+        "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+        "description": "exchange building with cloth awning and signpost"
+      },
+      {
+        "assetId": "gen_pack_1dc551d9ebea7769:resource.wood",
+        "canonicalTarget": "resource.wood",
+        "kind": "shape-token",
+        "status": "fallback-ready",
+        "source": "deterministic-fallback",
+        "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+        "description": "small stack icon"
+      },
+      {
+        "assetId": "gen_pack_1dc551d9ebea7769:resource.stone",
+        "canonicalTarget": "resource.stone",
+        "kind": "shape-token",
+        "status": "fallback-ready",
+        "source": "deterministic-fallback",
+        "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+        "description": "small stone icon"
+      },
+      {
+        "assetId": "gen_pack_1dc551d9ebea7769:resource.food",
+        "canonicalTarget": "resource.food",
+        "kind": "shape-token",
+        "status": "fallback-ready",
+        "source": "deterministic-fallback",
+        "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+        "description": "small crate icon"
+      },
+      {
+        "assetId": "gen_pack_1dc551d9ebea7769:resource.coin",
+        "canonicalTarget": "resource.coin",
+        "kind": "shape-token",
+        "status": "fallback-ready",
+        "source": "deterministic-fallback",
+        "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+        "description": "small brass coin icon"
+      },
+      {
+        "assetId": "gen_pack_1dc551d9ebea7769:character.clover",
+        "canonicalTarget": "character.clover",
+        "kind": "billboard-sprite-candidate",
+        "status": "fallback-ready",
+        "source": "deterministic-fallback",
+        "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+        "description": "Clover remains the trusted Foreman silhouette"
+      },
+      {
+        "assetId": "gen_pack_1dc551d9ebea7769:text:topbar-title",
+        "canonicalTarget": "text.topbar-title",
+        "kind": "generated-text",
+        "status": "runtime-generated",
+        "source": "deterministic-fallback",
+        "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e"
+      },
+      {
+        "assetId": "gen_pack_1dc551d9ebea7769:text:status-ready",
+        "canonicalTarget": "text.status-ready",
+        "kind": "generated-text",
+        "status": "runtime-generated",
+        "source": "deterministic-fallback",
+        "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e"
+      },
+      {
+        "assetId": "gen_pack_1dc551d9ebea7769:text:first-loop-objective",
+        "canonicalTarget": "text.first-loop-objective",
+        "kind": "generated-text",
+        "status": "runtime-generated",
+        "source": "deterministic-fallback",
+        "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e"
+      },
+      {
+        "assetId": "gen_pack_1dc551d9ebea7769:text:first-loop-receipt",
+        "canonicalTarget": "text.first-loop-receipt",
+        "kind": "generated-text",
+        "status": "runtime-generated",
+        "source": "deterministic-fallback",
+        "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e"
+      },
+      {
+        "assetId": "gen_pack_1dc551d9ebea7769:text:plan-claim-action",
+        "canonicalTarget": "text.plan-claim-action",
+        "kind": "generated-text",
+        "status": "runtime-generated",
+        "source": "deterministic-fallback",
+        "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e"
+      },
+      {
+        "assetId": "gen_pack_1dc551d9ebea7769:text:complete-claim-action",
+        "canonicalTarget": "text.complete-claim-action",
+        "kind": "generated-text",
+        "status": "runtime-generated",
+        "source": "deterministic-fallback",
+        "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e"
+      }
     ]
   },
+  "assetPromptPlan": {
+    "schemaVersion": "agent-town-asset-prompt-plan-v1",
+    "packId": "gen_pack_1dc551d9ebea7769",
+    "promptRoot": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769",
+    "candidateRoot": "data/generated-packs-test",
+    "generationModel": {
+      "targetModel": "gpt-image-2",
+      "externalModelUsed": false,
+      "explicitConsentRequired": true,
+      "productionImageAssetsRequired": false
+    },
+    "assets": [
+      {
+        "assetPlanId": "gen_pack_1dc551d9ebea7769:building-hq:plan",
+        "canonicalTarget": "building.hq",
+        "mechanicalKey": "hq",
+        "generatedName": "Cozy Hall",
+        "promptHash": "180236e2545eaa416a08402997f2f96c70260cbce7a077858f70268be5a43be0",
+        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/building-hq.prompt.md",
+        "targetSize": {
+          "width": 1024,
+          "height": 1024
+        },
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/building-hq.webp",
+        "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
+        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-hq",
+        "candidateOutputPaths": [
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-hq/building-hq.candidate-001.png",
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-hq/building-hq.candidate-002.png"
+        ],
+        "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/building-hq.jsonl",
+        "fallbackAssetId": "gen_pack_1dc551d9ebea7769:building.hq",
+        "status": "planned-not-generated"
+      },
+      {
+        "assetPlanId": "gen_pack_1dc551d9ebea7769:building-worker-camp:plan",
+        "canonicalTarget": "building.worker_camp",
+        "mechanicalKey": "worker_camp",
+        "generatedName": "Mushroom Crew Camp",
+        "promptHash": "87bba585949efa8315220b2e5eaab2797798c25bed894a44e47ac2f2ebb31334",
+        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/building-worker-camp.prompt.md",
+        "targetSize": {
+          "width": 1024,
+          "height": 1024
+        },
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/building-worker-camp.webp",
+        "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
+        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-worker-camp",
+        "candidateOutputPaths": [
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-worker-camp/building-worker-camp.candidate-001.png",
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-worker-camp/building-worker-camp.candidate-002.png"
+        ],
+        "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/building-worker-camp.jsonl",
+        "fallbackAssetId": "gen_pack_1dc551d9ebea7769:building.worker_camp",
+        "status": "planned-not-generated"
+      },
+      {
+        "assetPlanId": "gen_pack_1dc551d9ebea7769:building-lumber-camp:plan",
+        "canonicalTarget": "building.lumber_camp",
+        "mechanicalKey": "lumber_camp",
+        "generatedName": "Cozy Timber Yard",
+        "promptHash": "cdd4d622ae08187468b659201729b572e90699786d933f9ba1e8693168f88fee",
+        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/building-lumber-camp.prompt.md",
+        "targetSize": {
+          "width": 1024,
+          "height": 1024
+        },
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/building-lumber-camp.webp",
+        "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
+        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-lumber-camp",
+        "candidateOutputPaths": [
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-lumber-camp/building-lumber-camp.candidate-001.png",
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-lumber-camp/building-lumber-camp.candidate-002.png"
+        ],
+        "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/building-lumber-camp.jsonl",
+        "fallbackAssetId": "gen_pack_1dc551d9ebea7769:building.lumber_camp",
+        "status": "planned-not-generated"
+      },
+      {
+        "assetPlanId": "gen_pack_1dc551d9ebea7769:building-farm:plan",
+        "canonicalTarget": "building.farm",
+        "mechanicalKey": "farm",
+        "generatedName": "Cozy Garden Patch",
+        "promptHash": "17153393d743fa98c07c0bd8cf7bb1e9eefafd9f25b238e01754e90069cfcc2e",
+        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/building-farm.prompt.md",
+        "targetSize": {
+          "width": 1024,
+          "height": 1024
+        },
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/building-farm.webp",
+        "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
+        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-farm",
+        "candidateOutputPaths": [
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-farm/building-farm.candidate-001.png",
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-farm/building-farm.candidate-002.png"
+        ],
+        "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/building-farm.jsonl",
+        "fallbackAssetId": "gen_pack_1dc551d9ebea7769:building.farm",
+        "status": "planned-not-generated"
+      },
+      {
+        "assetPlanId": "gen_pack_1dc551d9ebea7769:building-quarry:plan",
+        "canonicalTarget": "building.quarry",
+        "mechanicalKey": "quarry",
+        "generatedName": "Mushroom Stone Cut",
+        "promptHash": "b84cc866a8e360a178f19c1324ad85908f1ff79d9a7e823a66d1631c5de7ad45",
+        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/building-quarry.prompt.md",
+        "targetSize": {
+          "width": 1024,
+          "height": 1024
+        },
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/building-quarry.webp",
+        "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
+        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-quarry",
+        "candidateOutputPaths": [
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-quarry/building-quarry.candidate-001.png",
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-quarry/building-quarry.candidate-002.png"
+        ],
+        "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/building-quarry.jsonl",
+        "fallbackAssetId": "gen_pack_1dc551d9ebea7769:building.quarry",
+        "status": "planned-not-generated"
+      },
+      {
+        "assetPlanId": "gen_pack_1dc551d9ebea7769:building-market:plan",
+        "canonicalTarget": "building.market",
+        "mechanicalKey": "market",
+        "generatedName": "Mushroom Market Stand",
+        "promptHash": "bfef7907ec021608c7e8776e71eb2706311889f0ab60645d4387fb0a7a4d005d",
+        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/building-market.prompt.md",
+        "targetSize": {
+          "width": 1024,
+          "height": 1024
+        },
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/building-market.webp",
+        "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
+        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-market",
+        "candidateOutputPaths": [
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-market/building-market.candidate-001.png",
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/building-market/building-market.candidate-002.png"
+        ],
+        "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/building-market.jsonl",
+        "fallbackAssetId": "gen_pack_1dc551d9ebea7769:building.market",
+        "status": "planned-not-generated"
+      },
+      {
+        "assetPlanId": "gen_pack_1dc551d9ebea7769:resource-wood:plan",
+        "canonicalTarget": "resource.wood",
+        "mechanicalKey": "wood",
+        "generatedName": "Cozy Timber",
+        "promptHash": "21f2d5d752b3ea6632d54f6b518118419b141cc428ecc3d6892c4697f42e136b",
+        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/resource-wood.prompt.md",
+        "targetSize": {
+          "width": 512,
+          "height": 512
+        },
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/resource-wood.webp",
+        "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
+        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/resource-wood",
+        "candidateOutputPaths": [
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/resource-wood/resource-wood.candidate-001.png",
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/resource-wood/resource-wood.candidate-002.png"
+        ],
+        "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/resource-wood.jsonl",
+        "fallbackAssetId": "gen_pack_1dc551d9ebea7769:resource.wood",
+        "status": "planned-not-generated"
+      },
+      {
+        "assetPlanId": "gen_pack_1dc551d9ebea7769:resource-stone:plan",
+        "canonicalTarget": "resource.stone",
+        "mechanicalKey": "stone",
+        "generatedName": "Mushroom Stone",
+        "promptHash": "7ff48adf83ce0fee1f6bb1730ecc8873b30d8420d23de32001bb3729b079b22a",
+        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/resource-stone.prompt.md",
+        "targetSize": {
+          "width": 512,
+          "height": 512
+        },
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/resource-stone.webp",
+        "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
+        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/resource-stone",
+        "candidateOutputPaths": [
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/resource-stone/resource-stone.candidate-001.png",
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/resource-stone/resource-stone.candidate-002.png"
+        ],
+        "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/resource-stone.jsonl",
+        "fallbackAssetId": "gen_pack_1dc551d9ebea7769:resource.stone",
+        "status": "planned-not-generated"
+      },
+      {
+        "assetPlanId": "gen_pack_1dc551d9ebea7769:resource-food:plan",
+        "canonicalTarget": "resource.food",
+        "mechanicalKey": "food",
+        "generatedName": "Cozy Supplies",
+        "promptHash": "3bee58c013f06f37d9b4f76ed5247cc72c55294567cebed17ac1bf8199627645",
+        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/resource-food.prompt.md",
+        "targetSize": {
+          "width": 512,
+          "height": 512
+        },
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/resource-food.webp",
+        "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
+        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/resource-food",
+        "candidateOutputPaths": [
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/resource-food/resource-food.candidate-001.png",
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/resource-food/resource-food.candidate-002.png"
+        ],
+        "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/resource-food.jsonl",
+        "fallbackAssetId": "gen_pack_1dc551d9ebea7769:resource.food",
+        "status": "planned-not-generated"
+      },
+      {
+        "assetPlanId": "gen_pack_1dc551d9ebea7769:resource-coin:plan",
+        "canonicalTarget": "resource.coin",
+        "mechanicalKey": "coin",
+        "generatedName": "Mushroom Scrip",
+        "promptHash": "f3bf7b537a4709cfd2f890dbfcbb3afb3285e55619a6d2e3a0986f4035cbea80",
+        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/resource-coin.prompt.md",
+        "targetSize": {
+          "width": 512,
+          "height": 512
+        },
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/resource-coin.webp",
+        "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
+        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/resource-coin",
+        "candidateOutputPaths": [
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/resource-coin/resource-coin.candidate-001.png",
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/resource-coin/resource-coin.candidate-002.png"
+        ],
+        "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/resource-coin.jsonl",
+        "fallbackAssetId": "gen_pack_1dc551d9ebea7769:resource.coin",
+        "status": "planned-not-generated"
+      },
+      {
+        "assetPlanId": "gen_pack_1dc551d9ebea7769:character-clover:plan",
+        "canonicalTarget": "character.clover",
+        "mechanicalKey": "clover",
+        "generatedName": "Clover Kincaid",
+        "promptHash": "807e82330548f10fe580ddd3eb5ff044efd17bd4a03efb6ce70ed518292b1a81",
+        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/character-clover.prompt.md",
+        "targetSize": {
+          "width": 1024,
+          "height": 1024
+        },
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/sprites/character-clover.webp",
+        "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
+        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/character-clover",
+        "candidateOutputPaths": [
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/character-clover/character-clover.candidate-001.png",
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/character-clover/character-clover.candidate-002.png"
+        ],
+        "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/character-clover.jsonl",
+        "fallbackAssetId": "gen_pack_1dc551d9ebea7769:character.clover",
+        "status": "planned-not-generated"
+      },
+      {
+        "assetPlanId": "gen_pack_1dc551d9ebea7769:terrain-prairie:plan",
+        "canonicalTarget": "terrain.prairie",
+        "mechanicalKey": "prairie",
+        "generatedName": "Cozy Meadow",
+        "promptHash": "ee0d4587f5c2172c2fc85a8f2cbfa729e6d970329a9ca4adf5536f59c5c8e669",
+        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/terrain-prairie.prompt.md",
+        "targetSize": {
+          "width": 1024,
+          "height": 1024
+        },
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/materials/terrain-prairie.json",
+        "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
+        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-prairie",
+        "candidateOutputPaths": [
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-prairie/terrain-prairie.candidate-001.png",
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-prairie/terrain-prairie.candidate-002.png"
+        ],
+        "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/terrain-prairie.jsonl",
+        "fallbackAssetId": "gen_pack_1dc551d9ebea7769:terrain.prairie",
+        "status": "planned-not-generated"
+      },
+      {
+        "assetPlanId": "gen_pack_1dc551d9ebea7769:terrain-ridge:plan",
+        "canonicalTarget": "terrain.ridge",
+        "mechanicalKey": "ridge",
+        "generatedName": "Mushroom Ridge",
+        "promptHash": "cf3a2d553048841b881445f8ce9ee88eab44997be3d6a526bfeeabcec1a62dbf",
+        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/terrain-ridge.prompt.md",
+        "targetSize": {
+          "width": 1024,
+          "height": 1024
+        },
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/materials/terrain-ridge.json",
+        "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
+        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-ridge",
+        "candidateOutputPaths": [
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-ridge/terrain-ridge.candidate-001.png",
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-ridge/terrain-ridge.candidate-002.png"
+        ],
+        "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/terrain-ridge.jsonl",
+        "fallbackAssetId": "gen_pack_1dc551d9ebea7769:terrain.ridge",
+        "status": "planned-not-generated"
+      },
+      {
+        "assetPlanId": "gen_pack_1dc551d9ebea7769:terrain-river:plan",
+        "canonicalTarget": "terrain.river",
+        "mechanicalKey": "river",
+        "generatedName": "Cozy Run",
+        "promptHash": "334c3e320fa4cebbe799b386671104e300c3183774cbd21bd5be48fa601f0d89",
+        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/terrain-river.prompt.md",
+        "targetSize": {
+          "width": 1024,
+          "height": 1024
+        },
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/materials/terrain-river.json",
+        "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
+        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-river",
+        "candidateOutputPaths": [
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-river/terrain-river.candidate-001.png",
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-river/terrain-river.candidate-002.png"
+        ],
+        "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/terrain-river.jsonl",
+        "fallbackAssetId": "gen_pack_1dc551d9ebea7769:terrain.river",
+        "status": "planned-not-generated"
+      },
+      {
+        "assetPlanId": "gen_pack_1dc551d9ebea7769:terrain-forest:plan",
+        "canonicalTarget": "terrain.forest",
+        "mechanicalKey": "forest",
+        "generatedName": "Mushroom Grove",
+        "promptHash": "83c5e7ba8734f932b9ee383b9183b059b7ebcbee0a20f0bf83c1f9999bc02a19",
+        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/terrain-forest.prompt.md",
+        "targetSize": {
+          "width": 1024,
+          "height": 1024
+        },
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/materials/terrain-forest.json",
+        "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
+        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-forest",
+        "candidateOutputPaths": [
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-forest/terrain-forest.candidate-001.png",
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-forest/terrain-forest.candidate-002.png"
+        ],
+        "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/terrain-forest.jsonl",
+        "fallbackAssetId": "gen_pack_1dc551d9ebea7769:terrain.forest",
+        "status": "planned-not-generated"
+      },
+      {
+        "assetPlanId": "gen_pack_1dc551d9ebea7769:terrain-mesa:plan",
+        "canonicalTarget": "terrain.mesa",
+        "mechanicalKey": "mesa",
+        "generatedName": "Cozy Mesa",
+        "promptHash": "5ee9a020929fdf9b45981aa0792660d49efd2b9dcb3dc9bfd3cfb0584ab72e86",
+        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/terrain-mesa.prompt.md",
+        "targetSize": {
+          "width": 1024,
+          "height": 1024
+        },
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/materials/terrain-mesa.json",
+        "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
+        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-mesa",
+        "candidateOutputPaths": [
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-mesa/terrain-mesa.candidate-001.png",
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/terrain-mesa/terrain-mesa.candidate-002.png"
+        ],
+        "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/terrain-mesa.jsonl",
+        "fallbackAssetId": "gen_pack_1dc551d9ebea7769:terrain.mesa",
+        "status": "planned-not-generated"
+      },
+      {
+        "assetPlanId": "gen_pack_1dc551d9ebea7769:state-claimed:plan",
+        "canonicalTarget": "state.claimed",
+        "mechanicalKey": "claimed",
+        "generatedName": "Held by your settlement",
+        "promptHash": "11f2f5926c36d3b89c8bb928e6e6732ddfe93d463ad89b83016f029d609f13f6",
+        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/state-claimed.prompt.md",
+        "targetSize": {
+          "width": 1024,
+          "height": 1024
+        },
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/materials/state-claimed.json",
+        "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
+        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/state-claimed",
+        "candidateOutputPaths": [
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/state-claimed/state-claimed.candidate-001.png",
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/state-claimed/state-claimed.candidate-002.png"
+        ],
+        "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/state-claimed.jsonl",
+        "fallbackAssetId": "gen_pack_1dc551d9ebea7769:state.claimed",
+        "status": "planned-not-generated"
+      },
+      {
+        "assetPlanId": "gen_pack_1dc551d9ebea7769:state-claimable:plan",
+        "canonicalTarget": "state.claimable",
+        "mechanicalKey": "claimable",
+        "generatedName": "Ready for a route plan",
+        "promptHash": "d552a5790fcb9ae36c276c15c2d0d68ce6c0f0c4b72afcce89be2bdc1a210815",
+        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/state-claimable.prompt.md",
+        "targetSize": {
+          "width": 1024,
+          "height": 1024
+        },
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/materials/state-claimable.json",
+        "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
+        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/state-claimable",
+        "candidateOutputPaths": [
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/state-claimable/state-claimable.candidate-001.png",
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/state-claimable/state-claimable.candidate-002.png"
+        ],
+        "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/state-claimable.jsonl",
+        "fallbackAssetId": "gen_pack_1dc551d9ebea7769:state.claimable",
+        "status": "planned-not-generated"
+      },
+      {
+        "assetPlanId": "gen_pack_1dc551d9ebea7769:state-visible:plan",
+        "canonicalTarget": "state.visible",
+        "mechanicalKey": "visible",
+        "generatedName": "Surveyed nearby ground",
+        "promptHash": "4f68fab329b64bea3b4027f6be9956ba504778925084873ad5611b12e66039d3",
+        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/state-visible.prompt.md",
+        "targetSize": {
+          "width": 1024,
+          "height": 1024
+        },
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/materials/state-visible.json",
+        "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
+        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/state-visible",
+        "candidateOutputPaths": [
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/state-visible/state-visible.candidate-001.png",
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/state-visible/state-visible.candidate-002.png"
+        ],
+        "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/state-visible.jsonl",
+        "fallbackAssetId": "gen_pack_1dc551d9ebea7769:state.visible",
+        "status": "planned-not-generated"
+      },
+      {
+        "assetPlanId": "gen_pack_1dc551d9ebea7769:state-locked:plan",
+        "canonicalTarget": "state.locked",
+        "mechanicalKey": "locked",
+        "generatedName": "Beyond today's survey",
+        "promptHash": "e0ae035b70c586f80e2dbb65a554a9b10c5b34812c5a4b40d72ae8798bdac666",
+        "promptFile": "specs/prompts/generated-universe-packs/gen_pack_1dc551d9ebea7769/state-locked.prompt.md",
+        "targetSize": {
+          "width": 1024,
+          "height": 1024
+        },
+        "usagePath": "public/experiences/world-grid/generated/gen_pack_1dc551d9ebea7769/materials/state-locked.json",
+        "negativePrompt": "text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters",
+        "candidateFolder": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/state-locked",
+        "candidateOutputPaths": [
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/state-locked/state-locked.candidate-001.png",
+          "data/generated-packs-test/gen_pack_1dc551d9ebea7769/candidates/state-locked/state-locked.candidate-002.png"
+        ],
+        "jobLogPath": "data/generated-packs-test/gen_pack_1dc551d9ebea7769/jobs/state-locked.jsonl",
+        "fallbackAssetId": "gen_pack_1dc551d9ebea7769:state.locked",
+        "status": "planned-not-generated"
+      }
+    ],
+    "planHash": "14b8e421db9e351cd0ec2603de6237f7ee58207fa6c15b38195c41cc75a559b8"
+  },
+  "assetScaffold": {
+    "schemaVersion": "agent-town-asset-generation-scaffold-v1",
+    "packId": "gen_pack_1dc551d9ebea7769",
+    "candidateRoot": "data/generated-packs-test",
+    "candidateFolderCount": 20,
+    "jobLogCount": 20,
+    "productionImageAssetCount": 0,
+    "externalModelUsed": false,
+    "explicitConsentRequired": true
+  },
   "validationReport": {
-    "ok": true
+    "ok": true,
+    "checks": [
+      {
+        "id": "GENPACK_SCHEMA_VERSION",
+        "passed": true,
+        "measured": {
+          "schemaVersion": "agent-town-generated-pack-v1"
+        }
+      },
+      {
+        "id": "GENPACK_PROMPT_HASHED",
+        "passed": true,
+        "measured": {
+          "hasPromptHash": true,
+          "promptStoredRaw": false
+        }
+      },
+      {
+        "id": "GENPACK_CANONICAL_MAPPING_COVERAGE",
+        "passed": true,
+        "measured": {
+          "required": 22,
+          "covered": 22,
+          "missing": [],
+          "unknownMappings": [],
+          "duplicateMappings": []
+        }
+      },
+      {
+        "id": "GENPACK_CANONICAL_KEYS_PRESERVED",
+        "passed": true,
+        "measured": {
+          "missingMechanicalKeys": [],
+          "serverRuleOverrides": 0
+        }
+      },
+      {
+        "id": "GENPACK_NO_MUTATION_AUTHORITY",
+        "passed": true,
+        "measured": {
+          "forbiddenAuthorityPaths": []
+        }
+      },
+      {
+        "id": "GENPACK_NO_SECRET_FIELDS",
+        "passed": true,
+        "measured": {
+          "secretLikePaths": []
+        }
+      },
+      {
+        "id": "GENPACK_NO_RAW_EXECUTABLE_PROMPT_INSTRUCTIONS",
+        "passed": true,
+        "measured": {
+          "rawInstructionPaths": []
+        }
+      },
+      {
+        "id": "GENPACK_GENERATION_BRIEF_VALID",
+        "passed": true,
+        "measured": {
+          "safetyRewriteApplied": false,
+          "blockedPatternCount": 0,
+          "sensitivePatternCount": 0,
+          "structuredDimensionCount": 9
+        }
+      },
+      {
+        "id": "GENPACK_THREEJS_PALETTE_READY",
+        "passed": true,
+        "measured": {
+          "terrainColors": 5,
+          "stateColors": 4,
+          "invalidColors": []
+        }
+      },
+      {
+        "id": "GENPACK_ASSET_MANIFEST_READY",
+        "passed": true,
+        "measured": {
+          "assetCount": 26,
+          "invalidAssetCount": 0,
+          "fallbackAssetCount": 26,
+          "productionImageAssetsRequired": false
+        }
+      },
+      {
+        "id": "GENPACK_ASSET_PROMPT_PLAN_READY",
+        "passed": true,
+        "measured": {
+          "plannedAssetCount": 20,
+          "invalidPlanAssetCount": 0,
+          "promptHashCount": 20,
+          "candidateOutputPathCount": 40,
+          "productionImageAssetsRequired": false
+        }
+      },
+      {
+        "id": "GENPACK_ASSET_SCAFFOLD_READY",
+        "passed": true,
+        "measured": {
+          "schemaVersion": "agent-town-asset-generation-scaffold-v1",
+          "candidateFolderCount": 20,
+          "jobLogCount": 20,
+          "productionImageAssetCount": 0,
+          "externalModelUsed": false
+        }
+      },
+      {
+        "id": "GENPACK_PLAYER_COPY_SAFE",
+        "passed": true,
+        "measured": {
+          "forbiddenTerms": []
+        }
+      },
+      {
+        "id": "GENPACK_FIRST_LOOP_READY",
+        "passed": true,
+        "measured": {
+          "hasObjective": true,
+          "hasSuccessReceipt": true
+        }
+      }
+    ],
+    "metrics": {
+      "requiredCanonicalMappings": 22,
+      "canonicalMappingsCovered": 22,
+      "threeJsTerrainMaterials": 5,
+      "threeJsStateMaterials": 4,
+      "fallbackAssetCount": 26,
+      "generatedTextAssetCount": 6,
+      "generationBriefValid": true,
+      "assetPromptPlanCount": 20,
+      "candidateOutputPathCount": 40,
+      "jobLogCount": 20,
+      "invalidAssetManifestEntries": 0,
+      "firstLoopReady": true,
+      "productionImageCandidatesRequired": true,
+      "productionImageAssetsRequired": false,
+      "replayabilitySignature": "b0283720e4f703ae"
+    }
   }
 }

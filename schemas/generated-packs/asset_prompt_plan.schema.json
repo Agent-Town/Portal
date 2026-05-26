@@ -3,20 +3,71 @@
   "$id": "agent-town-asset-prompt-plan-v1",
   "title": "Agent Town Asset Prompt Plan",
   "type": "object",
-  "required": ["schemaVersion", "packId", "promptRoot", "assets"],
+  "required": ["schemaVersion", "packId", "promptRoot", "candidateRoot", "generationModel", "assets", "planHash"],
   "additionalProperties": false,
   "properties": {
     "schemaVersion": { "const": "agent-town-asset-prompt-plan-v1" },
     "packId": { "type": "string", "minLength": 3 },
     "promptRoot": { "type": "string", "minLength": 3 },
+    "candidateRoot": { "type": "string", "minLength": 3 },
+    "generationModel": {
+      "type": "object",
+      "required": ["targetModel", "externalModelUsed", "explicitConsentRequired", "productionImageAssetsRequired"],
+      "additionalProperties": false,
+      "properties": {
+        "targetModel": { "const": "gpt-image-2" },
+        "externalModelUsed": { "const": false },
+        "explicitConsentRequired": { "const": true },
+        "productionImageAssetsRequired": { "const": false }
+      }
+    },
     "assets": {
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["assetId", "canonicalTarget", "promptFile", "promptHash", "targetSize", "usagePath", "negativePrompt"],
-        "additionalProperties": true
+        "required": [
+          "assetPlanId",
+          "canonicalTarget",
+          "mechanicalKey",
+          "generatedName",
+          "promptHash",
+          "promptFile",
+          "targetSize",
+          "usagePath",
+          "negativePrompt",
+          "candidateFolder",
+          "candidateOutputPaths",
+          "jobLogPath",
+          "fallbackAssetId",
+          "status"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "assetPlanId": { "type": "string", "minLength": 3 },
+          "canonicalTarget": { "type": "string", "minLength": 3 },
+          "mechanicalKey": { "type": "string", "minLength": 1 },
+          "generatedName": { "type": "string", "minLength": 1 },
+          "promptHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "promptFile": { "type": "string", "minLength": 3 },
+          "targetSize": {
+            "type": "object",
+            "required": ["width", "height"],
+            "properties": {
+              "width": { "type": "integer", "minimum": 64 },
+              "height": { "type": "integer", "minimum": 64 }
+            }
+          },
+          "usagePath": { "type": "string", "minLength": 3 },
+          "negativePrompt": { "type": "string", "minLength": 12 },
+          "candidateFolder": { "type": "string", "minLength": 3 },
+          "candidateOutputPaths": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 3 } },
+          "jobLogPath": { "type": "string", "minLength": 3 },
+          "fallbackAssetId": { "type": "string", "minLength": 3 },
+          "status": { "const": "planned-not-generated" }
+        }
       }
-    }
+    },
+    "planHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
   }
 }

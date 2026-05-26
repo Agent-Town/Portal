@@ -21,4 +21,10 @@ owner: "Agent Town product"
 | GPACK-008 | Runtime | Generated text appears in the playable route | `e2e/237_world_grid_generated_pack_demo.spec.js` |
 | GPACK-009 | Gameplay | First claim loop completes with canonical server mutation | `e2e/237_world_grid_generated_pack_demo.spec.js` |
 | GPACK-010 | Playtest | First-loop playtest report is recorded and passes | `e2e/237_world_grid_generated_pack_demo.spec.js` |
-
+| GPACK-011 | Brief | Prompt normalization emits a structured `GenerationBrief` with safety status and no raw prompt | `tests/generated_pack_contract.test.js` |
+| GPACK-012 | Security | Raw executable prompt instructions fail generated-pack validation | `tests/generated_pack_contract.test.js` |
+| GPACK-013 | Assets | Invalid manifest entries fail validation before runtime load | `tests/generated_pack_contract.test.js` |
+| GPACK-014 | Assets | Asset prompt plan covers 20 canonical image targets with prompt hashes, target sizes, usage paths, negative prompts, and candidate paths | `tests/generated_pack_contract.test.js` |
+| GPACK-015 | Assets | Candidate folders and JSONL job logs are scaffolded with zero production image assets | `tests/generated_pack_contract.test.js` |
+| GPACK-016 | Replayability | Multiple prompts produce distinct deterministic pack signatures and themes | `tests/generated_pack_contract.test.js` |
+| GPACK-017 | Browser | First-loop Playwright regression asserts `GenerationBrief`, prompt-plan, scaffold, Three.js load, generated text, and playtest report | `e2e/237_world_grid_generated_pack_demo.spec.js` |

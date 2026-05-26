@@ -60,3 +60,39 @@ This is a separate prototype-gated track. It must not change normal gameplay vis
 }
 ```
 
+## V0.1 Contract-First Pipeline Acceptance
+
+```json
+{
+  "generationBriefStructured": true,
+  "generationBriefDimensions": [
+    "theme",
+    "tone",
+    "visualStyle",
+    "species",
+    "factions",
+    "cultures",
+    "techFlavor",
+    "humorLevel",
+    "safetyStatus"
+  ],
+  "rawPromptStored": false,
+  "rawExecutablePromptInstructionCount": 0,
+  "secretLikeFieldCount": 0,
+  "canonicalMappingCoverage": 1.0,
+  "arbitraryToolMutationFormulaCount": 0,
+  "invalidAssetManifestEntryCount": 0,
+  "assetPromptPlanCoverage": 1.0,
+  "assetPromptPlanAssetCount": 20,
+  "candidateOutputPathCount": 40,
+  "candidateFolderCount": 20,
+  "generationJobLogCount": 20,
+  "productionImageAssetCount": 0,
+  "externalImageModelUsed": false,
+  "explicitConsentRequiredForImageGeneration": true,
+  "deterministicFallbackPlayable": true,
+  "firstLoopCompleted": true,
+  "replayabilityDistinctSignatureRatioMin": 1.0,
+  "replayabilityDistinctThemeRatioMin": 0.75
+}
+```

@@ -1,7 +1,15 @@
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 
 const SCHEMA_VERSION = 'agent-town-generated-pack-v1';
-const GENERATOR_ID = 'deterministic-world-grid-style-pack-v0';
+const GENERATOR_ID = 'deterministic-world-grid-style-pack-v0.1';
+const GENERATION_BRIEF_VERSION = 'agent-town-generation-brief-v1';
+const ASSET_PROMPT_PLAN_VERSION = 'agent-town-asset-prompt-plan-v1';
+const ASSET_SCAFFOLD_VERSION = 'agent-town-asset-generation-scaffold-v1';
+const GENERATED_ASSET_MANIFEST_VERSION = 'agent-town-generated-asset-manifest-v1';
+const DEFAULT_CANDIDATE_ROOT = 'data/generated-packs';
+const REPO_ROOT = path.resolve(__dirname, '..', '..');
 
 const REQUIRED_CANONICAL_IDS = [
   'building.hq',
@@ -26,6 +34,57 @@ const REQUIRED_CANONICAL_IDS = [
   'state.claimable',
   'state.visible',
   'state.locked'
+];
+
+const TEXT_ASSET_TARGETS = [
+  'text.topbar-title',
+  'text.status-ready',
+  'text.first-loop-objective',
+  'text.first-loop-receipt',
+  'text.plan-claim-action',
+  'text.complete-claim-action'
+];
+
+const IMAGE_PLAN_TARGETS = REQUIRED_CANONICAL_IDS.filter((id) => (
+  id.startsWith('building.')
+  || id.startsWith('resource.')
+  || id.startsWith('terrain.')
+  || id.startsWith('state.')
+  || id === 'character.clover'
+));
+
+const VALID_MANIFEST_TARGETS = new Set([...REQUIRED_CANONICAL_IDS, ...TEXT_ASSET_TARGETS]);
+const VALID_ASSET_PLAN_TARGETS = new Set(IMAGE_PLAN_TARGETS);
+const VALID_ASSET_KINDS = new Set([
+  'three-material',
+  'shape-token',
+  'billboard-sprite-candidate',
+  'generated-text'
+]);
+const VALID_ASSET_STATUSES = new Set([
+  'runtime-generated',
+  'fallback-ready',
+  'candidate-planned',
+  'planned-not-generated'
+]);
+const VALID_ASSET_SOURCES = new Set([
+  'deterministic-fallback',
+  'candidate-scaffold'
+]);
+
+const RAW_EXECUTABLE_PROMPT_PATTERNS = [
+  { id: 'ignore-prior-instructions', pattern: /\bignore\s+(all\s+)?(previous|prior|above)\s+instructions\b/i },
+  { id: 'system-prompt-request', pattern: /\b(system|developer)\s+(prompt|message|instructions)\b/i },
+  { id: 'tool-call-request', pattern: /\b(tool|function)\s+call\b/i },
+  { id: 'shell-execution', pattern: /\b(execute|run)\s+(shell|bash|terminal|command|javascript|python)\b/i },
+  { id: 'inline-script', pattern: /<\s*script\b|javascript\s*:|\beval\s*\(|\bFunction\s*\(/i },
+  { id: 'network-exfiltration', pattern: /\b(curl|wget)\s+https?:|\bpost\s+to\s+https?:/i }
+];
+
+const SENSITIVE_TEXT_PATTERNS = [
+  { id: 'api-key-reference', pattern: /\b(api[_ -]?key|access[_ -]?token|refresh[_ -]?token)\b/i },
+  { id: 'private-key-reference', pattern: /\b(private[_ -]?key|seed[_ -]?phrase|wallet[_ -]?secret)\b/i },
+  { id: 'password-reference', pattern: /\b(password|credential)\b/i }
 ];
 
 const TECHNICAL_NORMAL_GAMEPLAY_TERMS = [
@@ -240,6 +299,128 @@ function choosePreset(words, hash) {
   return THEME_PRESETS[Number.parseInt(hash.slice(0, 8), 16) % THEME_PRESETS.length];
 }
 
+function blockedPatternIdsForText(value = '') {
+  const text = String(value || '');
+  return RAW_EXECUTABLE_PROMPT_PATTERNS
+    .filter(({ pattern }) => pattern.test(text))
+    .map(({ id }) => id);
+}
+
+function sensitivePatternIdsForText(value = '') {
+  const text = String(value || '');
+  return SENSITIVE_TEXT_PATTERNS
+    .filter(({ pattern }) => pattern.test(text))
+    .map(({ id }) => id);
+}
+
+function safePromptWords(words = []) {
+  const blocked = new Set([
+    'ignore',
+    'previous',
+    'prior',
+    'instructions',
+    'system',
+    'developer',
+    'prompt',
+    'message',
+    'tool',
+    'function',
+    'execute',
+    'shell',
+    'bash',
+    'terminal',
+    'command',
+    'javascript',
+    'python',
+    'eval',
+    'curl',
+    'wget',
+    'api',
+    'key',
+    'token',
+    'secret',
+    'password',
+    'credential',
+    'private',
+    'wallet'
+  ]);
+  return words.filter((word) => !blocked.has(word));
+}
+
+function inferTone(words = []) {
+  const set = new Set(words);
+  if (['cozy', 'gentle', 'soft', 'calm', 'friendly'].some((word) => set.has(word))) return 'cozy and practical';
+  if (['mystery', 'mist', 'moon', 'shadow'].some((word) => set.has(word))) return 'quietly mysterious';
+  if (['festival', 'bright', 'comic', 'silly'].some((word) => set.has(word))) return 'bright and lightly humorous';
+  if (['forge', 'gear', 'clockwork', 'copper'].some((word) => set.has(word))) return 'craft-focused and orderly';
+  return 'clear frontier optimism';
+}
+
+function inferVisualStyle(words = [], preset = THEME_PRESETS[0]) {
+  const set = new Set(words);
+  if (['watercolor', 'painted', 'storybook'].some((word) => set.has(word))) return 'storybook watercolor game sprites';
+  if (['pixel', 'retro'].some((word) => set.has(word))) return 'chunky readable pixel-inspired sprites';
+  if (['clay', 'diorama', 'miniature'].some((word) => set.has(word))) return 'soft tabletop diorama shapes';
+  if (['clockwork', 'brass', 'gear', 'forge'].some((word) => set.has(word))) return 'warm mechanical frontier miniatures';
+  return `${preset.name.toLowerCase()} readable Three.js materials`;
+}
+
+function inferTechFlavor(words = [], preset = THEME_PRESETS[0]) {
+  const set = new Set(words);
+  if (['space', 'star', 'orbit', 'comet', 'moon'].some((word) => set.has(word))) return 'signal lamps, orbital routes, and brass navigation tools';
+  if (['clockwork', 'gear', 'forge', 'copper'].some((word) => set.has(word))) return 'clockwork route markers and hand-built civic machines';
+  if (['water', 'tide', 'reef', 'harbor', 'glass'].some((word) => set.has(word))) return 'tide gauges, glass beacons, and harbor craft';
+  if (['forest', 'moss', 'mushroom', 'garden', 'lantern'].some((word) => set.has(word))) return 'lantern ecology, garden tools, and low-tech route craft';
+  return `${preset.name} practical frontier tools`;
+}
+
+function inferHumorLevel(words = []) {
+  const set = new Set(words);
+  if (['silly', 'goofy', 'absurd', 'comic'].some((word) => set.has(word))) return 'medium-high';
+  if (['whimsical', 'playful', 'funny'].some((word) => set.has(word))) return 'medium';
+  if (['serious', 'solemn', 'quiet'].some((word) => set.has(word))) return 'low';
+  return 'low';
+}
+
+function createGenerationBrief({ prompt }) {
+  const normalizedPrompt = normalizePrompt(prompt);
+  const promptHash = sha256(normalizedPrompt);
+  const promptWords = wordsForPrompt(normalizedPrompt);
+  const blockedPatternIds = blockedPatternIdsForText(normalizedPrompt);
+  const sensitivePatternIds = sensitivePatternIdsForText(normalizedPrompt);
+  const words = safePromptWords(promptWords);
+  const preset = choosePreset(words, promptHash);
+  const anchor = titleWord(words[0] || pick(preset.nounBank, promptHash, 'brief-anchor'));
+  const second = titleWord(words[1] || pick(preset.nounBank, promptHash, 'brief-second'));
+  const safetyRewriteApplied = blockedPatternIds.length > 0 || sensitivePatternIds.length > 0;
+  return {
+    schemaVersion: GENERATION_BRIEF_VERSION,
+    promptHash,
+    theme: `${anchor} ${preset.name}`,
+    tone: inferTone(words),
+    visualStyle: inferVisualStyle(words, preset),
+    species: [`${anchor} settlers`, `${second} crews`],
+    factions: [`${anchor} Settlers`, `${second} Crews`],
+    cultures: [`${preset.name} craft tradition`, `${second} route customs`],
+    techFlavor: inferTechFlavor(words, preset),
+    humorLevel: inferHumorLevel(words),
+    safetyStatus: {
+      status: safetyRewriteApplied ? 'rewritten' : 'safe',
+      safetyRewriteApplied,
+      blockedPatternIds,
+      sensitivePatternIds,
+      deterministicFallbackAllowed: true
+    },
+    keywordHints: words.slice(0, 10),
+    metrics: {
+      promptLength: normalizedPrompt.length,
+      keywordCount: words.length,
+      safetyRewriteApplied,
+      deterministicFallbackPlayable: true
+    }
+  };
+}
+
 function generatedName(prefix, fallback, nounBank, hash, salt) {
   const noun = pick(nounBank, hash, salt);
   const head = titleWord(prefix) || noun;
@@ -288,6 +469,7 @@ function buildAssetManifest({ packId, promptHash, mappings, preset }) {
       kind: 'three-material',
       status: 'runtime-generated',
       source: 'deterministic-fallback',
+      promptHash,
       color: preset.palette.terrain[terrain]
     })),
     ...['claimed', 'claimable', 'visible', 'locked'].map((state) => ({
@@ -296,6 +478,7 @@ function buildAssetManifest({ packId, promptHash, mappings, preset }) {
       kind: 'three-material',
       status: 'runtime-generated',
       source: 'deterministic-fallback',
+      promptHash,
       color: preset.palette.state[state]
     }))
   ];
@@ -326,7 +509,7 @@ function buildAssetManifest({ packId, promptHash, mappings, preset }) {
     promptHash
   }));
   return {
-    schemaVersion: 'agent-town-generated-asset-manifest-v1',
+    schemaVersion: GENERATED_ASSET_MANIFEST_VERSION,
     promptHash,
     generator: GENERATOR_ID,
     productionImagePolicy: {
@@ -337,6 +520,179 @@ function buildAssetManifest({ packId, promptHash, mappings, preset }) {
       transparentBackgroundPolicy: 'clean-background-plus-postprocess'
     },
     assets: [...visualAssets, ...entityAssets, ...textAssets]
+  };
+}
+
+function slugForTarget(value = '') {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'asset';
+}
+
+function relativePackPath(...parts) {
+  return parts
+    .map((part) => String(part || '').replace(/^\/+|\/+$/g, ''))
+    .filter(Boolean)
+    .join('/');
+}
+
+function isSafeRelativePath(value = '') {
+  const text = String(value || '').trim();
+  return Boolean(text)
+    && !path.isAbsolute(text)
+    && !/^https?:\/\//i.test(text)
+    && !/^data:/i.test(text)
+    && !text.split(/[\\/]+/).some((part) => part === '..');
+}
+
+function targetSizeForCanonicalTarget(canonicalTarget = '') {
+  if (canonicalTarget.startsWith('resource.')) return { width: 512, height: 512 };
+  if (canonicalTarget.startsWith('terrain.') || canonicalTarget.startsWith('state.')) return { width: 1024, height: 1024 };
+  return { width: 1024, height: 1024 };
+}
+
+function usagePathForCanonicalTarget(packId, canonicalTarget = '') {
+  const slug = slugForTarget(canonicalTarget);
+  if (canonicalTarget.startsWith('terrain.') || canonicalTarget.startsWith('state.')) {
+    return relativePackPath('public/experiences/world-grid/generated', packId, 'materials', `${slug}.json`);
+  }
+  return relativePackPath('public/experiences/world-grid/generated', packId, 'sprites', `${slug}.webp`);
+}
+
+function assetHintForMapping(mapping = {}) {
+  if (mapping.assetHint) return mapping.assetHint;
+  if (String(mapping.canonicalId || '').startsWith('terrain.')) return 'readable terrain tile material for a Three.js world grid';
+  if (String(mapping.canonicalId || '').startsWith('state.')) return 'clear cell-state visual treatment with accessible contrast';
+  if (String(mapping.canonicalId || '').startsWith('resource.')) return 'small readable resource token for UI and map overlays';
+  if (String(mapping.canonicalId || '').startsWith('building.')) return 'transparent-background building sprite with a clear silhouette';
+  if (mapping.canonicalId === 'character.clover') return 'trusted Foreman character sprite with friendly frontier posture';
+  return 'readable Agent Town world-grid game asset';
+}
+
+function buildControlledAssetPrompt({ pack, mapping }) {
+  const brief = pack.generationBrief || {};
+  const universe = pack.universePack || {};
+  const style = pack.stylePack || {};
+  const target = mapping.canonicalId;
+  const size = targetSizeForCanonicalTarget(target);
+  return [
+    'Create one bounded Agent Town world-grid game asset candidate.',
+    `Canonical target: ${target}.`,
+    `Mechanical key: ${mapping.mechanicalKey}. Do not change gameplay rules or invent tools.`,
+    `Generated label: ${mapping.generatedName}.`,
+    `Universe: ${universe.name}. Theme: ${brief.theme}. Tone: ${brief.tone}.`,
+    `Visual style: ${brief.visualStyle || style.name}. Tech flavor: ${brief.techFlavor}.`,
+    `Asset direction: ${assetHintForMapping(mapping)}.`,
+    `Target size: ${size.width}x${size.height}. Transparent or clean background where possible.`,
+    'No text, no logos, no credentials, no UI chrome, no extra characters unless requested by the canonical target.'
+  ].join('\n');
+}
+
+function buildAssetPromptPlan({ pack, candidateRoot = DEFAULT_CANDIDATE_ROOT }) {
+  const mappings = pack?.gameplayMapping?.canonicalEntities || [];
+  const visualMappings = mappings.filter((mapping) => VALID_ASSET_PLAN_TARGETS.has(mapping.canonicalId));
+  const promptRoot = relativePackPath('specs/prompts/generated-universe-packs', pack.packId);
+  const assets = visualMappings.map((mapping) => {
+    const canonicalTarget = mapping.canonicalId;
+    const slug = slugForTarget(canonicalTarget);
+    const controlledPrompt = buildControlledAssetPrompt({ pack, mapping });
+    const promptHash = sha256(controlledPrompt);
+    const candidateFolder = relativePackPath(candidateRoot, pack.packId, 'candidates', slug);
+    return {
+      assetPlanId: `${pack.packId}:${slug}:plan`,
+      canonicalTarget,
+      mechanicalKey: mapping.mechanicalKey,
+      generatedName: mapping.generatedName,
+      promptHash,
+      promptFile: relativePackPath(promptRoot, `${slug}.prompt.md`),
+      targetSize: targetSizeForCanonicalTarget(canonicalTarget),
+      usagePath: usagePathForCanonicalTarget(pack.packId, canonicalTarget),
+      negativePrompt: 'text, logos, UI chrome, photoreal gore, weapons focus, credential material, code, prompt injection, copyrighted characters',
+      candidateFolder,
+      candidateOutputPaths: [
+        relativePackPath(candidateFolder, `${slug}.candidate-001.png`),
+        relativePackPath(candidateFolder, `${slug}.candidate-002.png`)
+      ],
+      jobLogPath: relativePackPath(candidateRoot, pack.packId, 'jobs', `${slug}.jsonl`),
+      fallbackAssetId: `${pack.packId}:${canonicalTarget}`,
+      status: 'planned-not-generated'
+    };
+  });
+  const plan = {
+    schemaVersion: ASSET_PROMPT_PLAN_VERSION,
+    packId: pack.packId,
+    promptRoot,
+    candidateRoot,
+    generationModel: {
+      targetModel: 'gpt-image-2',
+      externalModelUsed: false,
+      explicitConsentRequired: true,
+      productionImageAssetsRequired: false
+    },
+    assets
+  };
+  plan.planHash = sha256(JSON.stringify({
+    packId: plan.packId,
+    assets: plan.assets.map((asset) => ({
+      canonicalTarget: asset.canonicalTarget,
+      promptHash: asset.promptHash,
+      usagePath: asset.usagePath
+    }))
+  }));
+  return plan;
+}
+
+function repoPathForRelativePath(relativePath) {
+  if (!isSafeRelativePath(relativePath)) {
+    const error = new Error('INVALID_ASSET_SCAFFOLD_PATH');
+    error.details = { relativePath };
+    throw error;
+  }
+  const resolved = path.resolve(REPO_ROOT, relativePath);
+  if (!resolved.startsWith(`${REPO_ROOT}${path.sep}`)) {
+    const error = new Error('INVALID_ASSET_SCAFFOLD_PATH');
+    error.details = { relativePath };
+    throw error;
+  }
+  return resolved;
+}
+
+function scaffoldAssetGenerationJobs(assetPromptPlan, { nowMs = Date.now() } = {}) {
+  const assets = assetPromptPlan?.assets || [];
+  let candidateFolderCount = 0;
+  let jobLogCount = 0;
+  for (const asset of assets) {
+    const candidateFolder = repoPathForRelativePath(asset.candidateFolder);
+    fs.mkdirSync(candidateFolder, { recursive: true });
+    candidateFolderCount += 1;
+    const jobLogPath = repoPathForRelativePath(asset.jobLogPath);
+    fs.mkdirSync(path.dirname(jobLogPath), { recursive: true });
+    const line = JSON.stringify({
+      schemaVersion: 'agent-town-asset-generation-job-log-v1',
+      packId: assetPromptPlan.packId,
+      assetPlanId: asset.assetPlanId,
+      canonicalTarget: asset.canonicalTarget,
+      promptHash: asset.promptHash,
+      status: 'planned-not-generated',
+      targetModel: assetPromptPlan.generationModel?.targetModel || 'gpt-image-2',
+      productionImageAssetCreated: false,
+      explicitConsentRequired: true,
+      createdAtMs: nowMs
+    });
+    fs.writeFileSync(jobLogPath, `${line}\n`, 'utf8');
+    jobLogCount += 1;
+  }
+  return {
+    schemaVersion: ASSET_SCAFFOLD_VERSION,
+    packId: assetPromptPlan?.packId || '',
+    candidateRoot: assetPromptPlan?.candidateRoot || DEFAULT_CANDIDATE_ROOT,
+    candidateFolderCount,
+    jobLogCount,
+    productionImageAssetCount: 0,
+    externalModelUsed: false,
+    explicitConsentRequired: true
   };
 }
 
@@ -357,14 +713,46 @@ function hasForbiddenGeneratedCopy(pack) {
 
 function findForbiddenAuthorityPaths(value, path = '$', matches = []) {
   if (!value || typeof value !== 'object') return matches;
-  const forbiddenKey = /^(tool|tools|toolhandler|toolhandlers|serverrule|serverrules|mutation|mutations|mutationhandler|mutationhandlers|formula|formulas|expression|expressions|eval|script)$/i;
-  const secretKey = /(api[_-]?key|secret|private[_-]?key|credential|oauth|access[_-]?token|refresh[_-]?token|wallet[_-]?secret)/i;
+  const forbiddenKey = /(toolhandler|toolhandlers|^tools?$|serverrule|mutationhandler|mutationhandlers|^mutations?$|^formulas?$|expression|^eval$|^script$)/i;
   for (const [key, child] of Object.entries(value)) {
     const childPath = `${path}.${key}`;
-    if (forbiddenKey.test(key) || secretKey.test(key)) {
+    if (forbiddenKey.test(key)) {
       matches.push(childPath);
     }
     findForbiddenAuthorityPaths(child, childPath, matches);
+  }
+  return matches;
+}
+
+function findSecretLikePaths(value, path = '$', matches = []) {
+  if (!value || typeof value !== 'object') return matches;
+  const secretKey = /(api[_-]?key|secret|private[_-]?key|credential|oauth|access[_-]?token|refresh[_-]?token|wallet[_-]?secret|seed[_-]?phrase|password)/i;
+  for (const [key, child] of Object.entries(value)) {
+    const childPath = `${path}.${key}`;
+    if (secretKey.test(key)) {
+      matches.push(childPath);
+    }
+    findSecretLikePaths(child, childPath, matches);
+  }
+  return matches;
+}
+
+function findRawPromptInstructionPaths(value, path = '$', matches = []) {
+  const rawPromptKey = /^(rawprompt|normalizedprompt|prompttext|systemprompt|developerprompt|promptinstructions)$/i;
+  if (typeof value === 'string') {
+    const blockedPatternIds = blockedPatternIdsForText(value);
+    if (blockedPatternIds.length > 0) {
+      matches.push({ path, blockedPatternIds });
+    }
+    return matches;
+  }
+  if (!value || typeof value !== 'object') return matches;
+  for (const [key, child] of Object.entries(value)) {
+    const childPath = `${path}.${key}`;
+    if (rawPromptKey.test(key)) {
+      matches.push({ path: childPath, blockedPatternIds: ['raw-prompt-field'] });
+    }
+    findRawPromptInstructionPaths(child, childPath, matches);
   }
   return matches;
 }
@@ -373,10 +761,207 @@ function isHexColor(value) {
   return /^#[0-9a-fA-F]{6}$/.test(String(value || ''));
 }
 
+function validateGenerationBrief(brief = {}) {
+  const requiredStringFields = ['theme', 'tone', 'visualStyle', 'techFlavor'];
+  const requiredArrayFields = ['species', 'factions', 'cultures'];
+  const missingStringFields = requiredStringFields.filter((key) => String(brief?.[key] || '').trim().length < 3);
+  const missingArrayFields = requiredArrayFields.filter((key) => !Array.isArray(brief?.[key]) || brief[key].length < 1 || brief[key].some((item) => String(item || '').trim().length < 2));
+  const status = brief?.safetyStatus?.status;
+  const rawInstructionPaths = findRawPromptInstructionPaths(brief);
+  const secretLikePaths = findSecretLikePaths(brief);
+  const checks = [
+    {
+      id: 'GENBRIEF_SCHEMA_VERSION',
+      passed: brief?.schemaVersion === GENERATION_BRIEF_VERSION,
+      measured: { schemaVersion: brief?.schemaVersion || null }
+    },
+    {
+      id: 'GENBRIEF_PROMPT_HASHED',
+      passed: /^[0-9a-f]{64}$/.test(String(brief?.promptHash || '')),
+      measured: { hasPromptHash: Boolean(brief?.promptHash) }
+    },
+    {
+      id: 'GENBRIEF_CORE_FIELDS',
+      passed: missingStringFields.length === 0 && missingArrayFields.length === 0,
+      measured: { missingStringFields, missingArrayFields }
+    },
+    {
+      id: 'GENBRIEF_HUMOR_LEVEL_ENUM',
+      passed: ['none', 'low', 'medium', 'medium-high', 'high'].includes(String(brief?.humorLevel || '')),
+      measured: { humorLevel: brief?.humorLevel || null }
+    },
+    {
+      id: 'GENBRIEF_SAFETY_STATUS_VALID',
+      passed: ['safe', 'rewritten', 'blocked'].includes(String(status || '')) && brief?.safetyStatus?.deterministicFallbackAllowed === true,
+      measured: {
+        status: status || null,
+        deterministicFallbackAllowed: brief?.safetyStatus?.deterministicFallbackAllowed === true,
+        safetyRewriteApplied: brief?.safetyStatus?.safetyRewriteApplied === true
+      }
+    },
+    {
+      id: 'GENBRIEF_NO_RAW_EXECUTABLE_INSTRUCTIONS',
+      passed: rawInstructionPaths.length === 0,
+      measured: { rawInstructionPaths }
+    },
+    {
+      id: 'GENBRIEF_NO_SECRET_FIELDS',
+      passed: secretLikePaths.length === 0,
+      measured: { secretLikePaths }
+    }
+  ];
+  return {
+    ok: checks.every((check) => check.passed === true),
+    checks,
+    metrics: {
+      safetyRewriteApplied: brief?.safetyStatus?.safetyRewriteApplied === true,
+      blockedPatternCount: Array.isArray(brief?.safetyStatus?.blockedPatternIds) ? brief.safetyStatus.blockedPatternIds.length : 0,
+      sensitivePatternCount: Array.isArray(brief?.safetyStatus?.sensitivePatternIds) ? brief.safetyStatus.sensitivePatternIds.length : 0,
+      structuredDimensionCount: requiredStringFields.length + requiredArrayFields.length + 2
+    }
+  };
+}
+
+function manifestAssetProblems(asset = {}, index = 0, packPromptHash = '') {
+  const problems = [];
+  if (!String(asset.assetId || '').trim()) problems.push('missing-asset-id');
+  if (!VALID_MANIFEST_TARGETS.has(String(asset.canonicalTarget || ''))) problems.push('invalid-canonical-target');
+  if (!VALID_ASSET_KINDS.has(String(asset.kind || ''))) problems.push('invalid-kind');
+  if (!VALID_ASSET_STATUSES.has(String(asset.status || ''))) problems.push('invalid-status');
+  if (!VALID_ASSET_SOURCES.has(String(asset.source || ''))) problems.push('invalid-source');
+  if (asset.promptHash && !/^[0-9a-f]{64}$/.test(String(asset.promptHash))) problems.push('invalid-prompt-hash');
+  if (asset.promptHash && packPromptHash && asset.source === 'deterministic-fallback' && asset.promptHash !== packPromptHash) problems.push('prompt-hash-mismatch');
+  if (asset.kind === 'three-material' && !isHexColor(asset.color)) problems.push('invalid-material-color');
+  return problems.length ? { index, assetId: asset.assetId || null, canonicalTarget: asset.canonicalTarget || null, problems } : null;
+}
+
+function validateAssetManifest(manifest = {}, pack = {}) {
+  const assets = Array.isArray(manifest?.assets) ? manifest.assets : [];
+  const problems = assets
+    .map((asset, index) => manifestAssetProblems(asset, index, manifest.promptHash || pack?.prompt?.hash || ''))
+    .filter(Boolean);
+  const duplicateTargets = assets
+    .map((asset) => asset.canonicalTarget)
+    .filter((target, index, all) => target && all.indexOf(target) !== index);
+  const checks = [
+    {
+      id: 'ASSET_MANIFEST_SCHEMA_VERSION',
+      passed: manifest?.schemaVersion === GENERATED_ASSET_MANIFEST_VERSION,
+      measured: { schemaVersion: manifest?.schemaVersion || null }
+    },
+    {
+      id: 'ASSET_MANIFEST_PROMPT_HASH_MATCH',
+      passed: /^[0-9a-f]{64}$/.test(String(manifest?.promptHash || '')) && (!pack?.prompt?.hash || manifest.promptHash === pack.prompt.hash),
+      measured: { manifestPromptHash: manifest?.promptHash || null, packPromptHash: pack?.prompt?.hash || null }
+    },
+    {
+      id: 'ASSET_MANIFEST_ENTRIES_VALID',
+      passed: assets.length >= 20 && problems.length === 0,
+      measured: { assetCount: assets.length, problems }
+    },
+    {
+      id: 'ASSET_MANIFEST_TARGETS_UNIQUE',
+      passed: duplicateTargets.length === 0,
+      measured: { duplicateTargets: [...new Set(duplicateTargets)] }
+    },
+    {
+      id: 'ASSET_MANIFEST_NO_PRODUCTION_IMAGE_REQUIREMENT',
+      passed: manifest?.productionImagePolicy?.status === 'candidate_required_before_production' && manifest?.productionImagePolicy?.requiresHumanSignoff === true,
+      measured: {
+        status: manifest?.productionImagePolicy?.status || null,
+        requiresHumanSignoff: manifest?.productionImagePolicy?.requiresHumanSignoff === true
+      }
+    }
+  ];
+  return {
+    ok: checks.every((check) => check.passed === true),
+    checks,
+    metrics: {
+      assetCount: assets.length,
+      invalidAssetCount: problems.length,
+      fallbackAssetCount: assets.filter((asset) => asset.source === 'deterministic-fallback').length,
+      productionImageAssetsRequired: false
+    }
+  };
+}
+
+function assetPlanProblems(asset = {}, index = 0, packId = '') {
+  const problems = [];
+  if (!String(asset.assetPlanId || '').startsWith(`${packId}:`)) problems.push('invalid-asset-plan-id');
+  if (!VALID_ASSET_PLAN_TARGETS.has(String(asset.canonicalTarget || ''))) problems.push('invalid-canonical-target');
+  if (!/^[0-9a-f]{64}$/.test(String(asset.promptHash || ''))) problems.push('invalid-prompt-hash');
+  if (!asset.targetSize || !Number.isInteger(asset.targetSize.width) || !Number.isInteger(asset.targetSize.height)) problems.push('invalid-target-size');
+  if (!isSafeRelativePath(asset.promptFile) || !String(asset.promptFile || '').startsWith(`specs/prompts/generated-universe-packs/${packId}/`)) problems.push('invalid-prompt-file');
+  if (!isSafeRelativePath(asset.usagePath) || !String(asset.usagePath || '').startsWith(`public/experiences/world-grid/generated/${packId}/`)) problems.push('invalid-usage-path');
+  if (String(asset.negativePrompt || '').trim().length < 12) problems.push('missing-negative-prompt');
+  if (!isSafeRelativePath(asset.candidateFolder)) problems.push('invalid-candidate-folder');
+  const outputPaths = Array.isArray(asset.candidateOutputPaths) ? asset.candidateOutputPaths : [];
+  if (outputPaths.length < 1 || outputPaths.some((item) => !isSafeRelativePath(item) || !String(item).startsWith(`${asset.candidateFolder}/`))) {
+    problems.push('invalid-candidate-output-paths');
+  }
+  if (!isSafeRelativePath(asset.jobLogPath) || !String(asset.jobLogPath || '').endsWith('.jsonl')) problems.push('invalid-job-log-path');
+  return problems.length ? { index, assetPlanId: asset.assetPlanId || null, canonicalTarget: asset.canonicalTarget || null, problems } : null;
+}
+
+function validateAssetPromptPlan(plan = {}, pack = {}) {
+  const assets = Array.isArray(plan?.assets) ? plan.assets : [];
+  const problems = assets
+    .map((asset, index) => assetPlanProblems(asset, index, pack?.packId || plan?.packId || ''))
+    .filter(Boolean);
+  const targets = assets.map((asset) => asset.canonicalTarget).filter(Boolean);
+  const missingTargets = IMAGE_PLAN_TARGETS.filter((target) => !targets.includes(target));
+  const duplicateTargets = targets.filter((target, index, all) => all.indexOf(target) !== index);
+  const checks = [
+    {
+      id: 'ASSET_PROMPT_PLAN_SCHEMA_VERSION',
+      passed: plan?.schemaVersion === ASSET_PROMPT_PLAN_VERSION,
+      measured: { schemaVersion: plan?.schemaVersion || null }
+    },
+    {
+      id: 'ASSET_PROMPT_PLAN_PACK_MATCH',
+      passed: Boolean(pack?.packId && plan?.packId === pack.packId),
+      measured: { planPackId: plan?.packId || null, packId: pack?.packId || null }
+    },
+    {
+      id: 'ASSET_PROMPT_PLAN_TARGET_COVERAGE',
+      passed: missingTargets.length === 0 && duplicateTargets.length === 0,
+      measured: { required: IMAGE_PLAN_TARGETS.length, covered: new Set(targets).size, missingTargets, duplicateTargets: [...new Set(duplicateTargets)] }
+    },
+    {
+      id: 'ASSET_PROMPT_PLAN_ENTRIES_VALID',
+      passed: assets.length === IMAGE_PLAN_TARGETS.length && problems.length === 0,
+      measured: { assetCount: assets.length, problems }
+    },
+    {
+      id: 'ASSET_PROMPT_PLAN_NO_PRODUCTION_DEPENDENCY',
+      passed: plan?.generationModel?.externalModelUsed === false && plan?.generationModel?.explicitConsentRequired === true && plan?.generationModel?.productionImageAssetsRequired === false,
+      measured: {
+        externalModelUsed: plan?.generationModel?.externalModelUsed === true,
+        explicitConsentRequired: plan?.generationModel?.explicitConsentRequired === true,
+        productionImageAssetsRequired: plan?.generationModel?.productionImageAssetsRequired === true
+      }
+    }
+  ];
+  return {
+    ok: checks.every((check) => check.passed === true),
+    checks,
+    metrics: {
+      plannedAssetCount: assets.length,
+      invalidPlanAssetCount: problems.length,
+      promptHashCount: new Set(assets.map((asset) => asset.promptHash).filter(Boolean)).size,
+      candidateOutputPathCount: assets.reduce((sum, asset) => sum + (Array.isArray(asset.candidateOutputPaths) ? asset.candidateOutputPaths.length : 0), 0),
+      productionImageAssetsRequired: false
+    }
+  };
+}
+
 function validateGeneratedPack(pack) {
   const mappings = pack?.gameplayMapping?.canonicalEntities || [];
   const mappingIds = new Set(mappings.map((mapping) => mapping.canonicalId));
   const missingMappings = REQUIRED_CANONICAL_IDS.filter((id) => !mappingIds.has(id));
+  const unknownMappings = mappings
+    .filter((mapping) => !REQUIRED_CANONICAL_IDS.includes(mapping.canonicalId))
+    .map((mapping) => mapping.canonicalId);
   const palette = pack?.stylePack?.palette || {};
   const terrainColors = Object.values(palette.terrain || {});
   const stateColors = Object.values(palette.state || {});
@@ -394,8 +979,18 @@ function validateGeneratedPack(pack) {
   ].filter((color) => !isHexColor(color));
   const manifestAssets = pack?.assetManifest?.assets || [];
   const forbiddenTerms = hasForbiddenGeneratedCopy(pack);
-  const forbiddenAuthorityPaths = findForbiddenAuthorityPaths(pack);
+  const packForContentScan = { ...pack, validationReport: undefined };
+  const forbiddenAuthorityPaths = findForbiddenAuthorityPaths(packForContentScan);
+  const secretLikePaths = findSecretLikePaths(packForContentScan);
+  const rawInstructionPaths = findRawPromptInstructionPaths(packForContentScan);
   const mechanicalMissing = mappings.filter((mapping) => !mapping.mechanicalKey).map((mapping) => mapping.canonicalId);
+  const duplicateMappings = mappings
+    .map((mapping) => mapping.canonicalId)
+    .filter((canonicalId, index, all) => canonicalId && all.indexOf(canonicalId) !== index);
+  const generationBriefReport = validateGenerationBrief(pack?.generationBrief || {});
+  const assetManifestReport = validateAssetManifest(pack?.assetManifest || {}, pack);
+  const assetPromptPlanReport = validateAssetPromptPlan(pack?.assetPromptPlan || {}, pack);
+  const scaffold = pack?.assetScaffold || {};
   const checks = [
     {
       id: 'GENPACK_SCHEMA_VERSION',
@@ -409,8 +1004,14 @@ function validateGeneratedPack(pack) {
     },
     {
       id: 'GENPACK_CANONICAL_MAPPING_COVERAGE',
-      passed: missingMappings.length === 0,
-      measured: { required: REQUIRED_CANONICAL_IDS.length, covered: mappingIds.size, missing: missingMappings }
+      passed: missingMappings.length === 0 && unknownMappings.length === 0 && duplicateMappings.length === 0,
+      measured: {
+        required: REQUIRED_CANONICAL_IDS.length,
+        covered: mappingIds.size,
+        missing: missingMappings,
+        unknownMappings,
+        duplicateMappings: [...new Set(duplicateMappings)]
+      }
     },
     {
       id: 'GENPACK_CANONICAL_KEYS_PRESERVED',
@@ -423,14 +1024,50 @@ function validateGeneratedPack(pack) {
       measured: { forbiddenAuthorityPaths }
     },
     {
+      id: 'GENPACK_NO_SECRET_FIELDS',
+      passed: secretLikePaths.length === 0,
+      measured: { secretLikePaths }
+    },
+    {
+      id: 'GENPACK_NO_RAW_EXECUTABLE_PROMPT_INSTRUCTIONS',
+      passed: rawInstructionPaths.length === 0,
+      measured: { rawInstructionPaths }
+    },
+    {
+      id: 'GENPACK_GENERATION_BRIEF_VALID',
+      passed: generationBriefReport.ok === true,
+      measured: generationBriefReport.metrics
+    },
+    {
       id: 'GENPACK_THREEJS_PALETTE_READY',
       passed: missingColors.length === 0 && terrainColors.length === 5 && stateColors.length === 4,
       measured: { terrainColors: terrainColors.length, stateColors: stateColors.length, invalidColors: missingColors }
     },
     {
       id: 'GENPACK_ASSET_MANIFEST_READY',
-      passed: manifestAssets.length >= 20 && manifestAssets.every((asset) => asset.canonicalTarget && asset.source),
-      measured: { assetCount: manifestAssets.length }
+      passed: assetManifestReport.ok === true,
+      measured: assetManifestReport.metrics
+    },
+    {
+      id: 'GENPACK_ASSET_PROMPT_PLAN_READY',
+      passed: assetPromptPlanReport.ok === true,
+      measured: assetPromptPlanReport.metrics
+    },
+    {
+      id: 'GENPACK_ASSET_SCAFFOLD_READY',
+      passed: scaffold?.schemaVersion === ASSET_SCAFFOLD_VERSION
+        && scaffold?.packId === pack?.packId
+        && Number(scaffold?.candidateFolderCount || 0) === IMAGE_PLAN_TARGETS.length
+        && Number(scaffold?.jobLogCount || 0) === IMAGE_PLAN_TARGETS.length
+        && Number(scaffold?.productionImageAssetCount || 0) === 0
+        && scaffold?.externalModelUsed === false,
+      measured: {
+        schemaVersion: scaffold?.schemaVersion || null,
+        candidateFolderCount: Number(scaffold?.candidateFolderCount || 0),
+        jobLogCount: Number(scaffold?.jobLogCount || 0),
+        productionImageAssetCount: Number(scaffold?.productionImageAssetCount || 0),
+        externalModelUsed: scaffold?.externalModelUsed === true
+      }
     },
     {
       id: 'GENPACK_PLAYER_COPY_SAFE',
@@ -457,8 +1094,19 @@ function validateGeneratedPack(pack) {
       threeJsStateMaterials: stateColors.length,
       fallbackAssetCount: manifestAssets.filter((asset) => asset.source === 'deterministic-fallback').length,
       generatedTextAssetCount: manifestAssets.filter((asset) => asset.kind === 'generated-text').length,
+      generationBriefValid: generationBriefReport.ok === true,
+      assetPromptPlanCount: Array.isArray(pack?.assetPromptPlan?.assets) ? pack.assetPromptPlan.assets.length : 0,
+      candidateOutputPathCount: assetPromptPlanReport.metrics.candidateOutputPathCount,
+      jobLogCount: Number(pack?.assetScaffold?.jobLogCount || 0),
+      invalidAssetManifestEntries: assetManifestReport.metrics.invalidAssetCount,
       firstLoopReady: Boolean(pack?.universePack?.firstLoop?.objective && pack?.universePack?.firstLoop?.successReceipt),
-      productionImageCandidatesRequired: true
+      productionImageCandidatesRequired: true,
+      productionImageAssetsRequired: false,
+      replayabilitySignature: sha256(JSON.stringify({
+        theme: pack?.generationBrief?.theme || '',
+        palette: pack?.stylePack?.palette || {},
+        mappings: mappings.map((mapping) => [mapping.canonicalId, mapping.generatedName])
+      })).slice(0, 16)
     }
   };
 }
@@ -526,10 +1174,10 @@ function currentPlaytestReport(owner = {}) {
   return key ? clone(playtestStore.get(key) || null) : null;
 }
 
-function createGeneratedPack({ owner, prompt, nowMs = Date.now() }) {
-  const normalizedPrompt = normalizePrompt(prompt);
-  const words = wordsForPrompt(normalizedPrompt);
-  const promptHash = sha256(normalizedPrompt);
+function createGeneratedPack({ owner, prompt, nowMs = Date.now(), candidateRoot = DEFAULT_CANDIDATE_ROOT } = {}) {
+  const generationBrief = createGenerationBrief({ prompt });
+  const promptHash = generationBrief.promptHash;
+  const words = Array.isArray(generationBrief.keywordHints) ? generationBrief.keywordHints : [];
   const ownerHash = sha256(owner?.ownerAccountId || owner?.pairId || 'anonymous-owner');
   const packHash = sha256(`${ownerHash}:${promptHash}`);
   const preset = choosePreset(words, packHash);
@@ -552,10 +1200,12 @@ function createGeneratedPack({ owner, prompt, nowMs = Date.now() }) {
     },
     prompt: {
       hash: promptHash,
-      length: normalizedPrompt.length,
+      length: generationBrief.metrics.promptLength,
       keywordHints: words.slice(0, 6)
     },
+    generationBrief,
     stylePack: {
+      schemaVersion: 'agent-town-style-bible-v1',
       stylePackId: `style_${preset.id}_${packHash.slice(0, 8)}`,
       name: `${anchor} ${preset.name}`,
       themeSummary: `${anchor} and ${second} motifs translated into warm frontier materials.`,
@@ -572,6 +1222,7 @@ function createGeneratedPack({ owner, prompt, nowMs = Date.now() }) {
       }
     },
     universePack: {
+      schemaVersion: 'agent-town-universe-bible-v1',
       universePackId: `universe_${packHash.slice(0, 12)}`,
       name: `${anchor} ${second} Charter`,
       pitch: `${anchor} settlers and ${second} crews build a civic frontier with Clover keeping the work bounded and legible.`,
@@ -610,6 +1261,8 @@ function createGeneratedPack({ owner, prompt, nowMs = Date.now() }) {
     }
   };
   pack.assetManifest = buildAssetManifest({ packId, promptHash, mappings, preset });
+  pack.assetPromptPlan = buildAssetPromptPlan({ pack, candidateRoot });
+  pack.assetScaffold = scaffoldAssetGenerationJobs(pack.assetPromptPlan, { nowMs });
   pack.validationReport = validateGeneratedPack(pack);
   if (!pack.validationReport.ok) {
     const error = new Error('GENPACK_VALIDATION_FAILED');
@@ -634,21 +1287,62 @@ function currentGeneratedPack(owner = {}) {
   return key ? clone(packStore.get(key) || null) : null;
 }
 
+function analyzePackDiversity(packs = []) {
+  const safePacks = Array.isArray(packs) ? packs.filter(Boolean) : [];
+  const signatures = safePacks.map((pack) => pack?.validationReport?.metrics?.replayabilitySignature || sha256(JSON.stringify({
+    theme: pack?.generationBrief?.theme || '',
+    style: pack?.stylePack?.name || '',
+    universe: pack?.universePack?.name || '',
+    palette: pack?.stylePack?.palette || {}
+  })).slice(0, 16));
+  const uniquePackIds = new Set(safePacks.map((pack) => pack.packId).filter(Boolean));
+  const uniqueThemes = new Set(safePacks.map((pack) => pack.generationBrief?.theme).filter(Boolean));
+  const uniquePalettes = new Set(safePacks.map((pack) => JSON.stringify(pack.stylePack?.palette || {})));
+  const uniqueSignatures = new Set(signatures);
+  const promptCount = safePacks.length;
+  return {
+    ok: promptCount > 0
+      && uniquePackIds.size === promptCount
+      && uniqueThemes.size >= Math.min(promptCount, 3)
+      && uniqueSignatures.size === promptCount,
+    metrics: {
+      promptCount,
+      uniquePackIds: uniquePackIds.size,
+      uniqueThemes: uniqueThemes.size,
+      uniquePalettes: uniquePalettes.size,
+      uniqueReplayabilitySignatures: uniqueSignatures.size,
+      minimumDistinctThemeRatio: promptCount ? uniqueThemes.size / promptCount : 0,
+      minimumDistinctSignatureRatio: promptCount ? uniqueSignatures.size / promptCount : 0
+    },
+    signatures
+  };
+}
+
 function clearGeneratedPacksForTests() {
   packStore.clear();
   playtestStore.clear();
 }
 
 module.exports = {
+  ASSET_PROMPT_PLAN_VERSION,
+  DEFAULT_CANDIDATE_ROOT,
+  GENERATION_BRIEF_VERSION,
   REQUIRED_CANONICAL_IDS,
   SCHEMA_VERSION,
+  analyzePackDiversity,
+  buildAssetPromptPlan,
   clearGeneratedPacksForTests,
+  createGenerationBrief,
   createGeneratedPack,
   currentGeneratedPack,
   currentPlaytestReport,
   generateAndStorePack,
   normalizePrompt,
   recordPlaytestReport,
+  scaffoldAssetGenerationJobs,
+  validateAssetManifest,
+  validateAssetPromptPlan,
+  validateGenerationBrief,
   validatePlaytestReport,
   validateGeneratedPack
 };

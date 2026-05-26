@@ -27,6 +27,11 @@ test('generated universe pack loads into Three.js and completes the first world-
   const generatedPack = await page.evaluate(() => window.__worldGridTest.getGeneratedPack());
   expect(generatedPack?.validationReport?.ok).toBe(true);
   expect(generatedPack?.prompt?.normalizedPrompt).toBeUndefined();
+  expect(generatedPack?.generationBrief?.schemaVersion).toBe('agent-town-generation-brief-v1');
+  expect(generatedPack?.generationBrief?.safetyStatus?.status).toBe('safe');
+  expect(generatedPack?.assetPromptPlan?.assets?.length).toBe(20);
+  expect(generatedPack?.assetPromptPlan?.assets?.every((asset) => asset.promptHash && asset.candidateOutputPaths?.length === 2 && asset.jobLogPath)).toBe(true);
+  expect(generatedPack?.assetScaffold?.productionImageAssetCount).toBe(0);
   expect(generatedPack?.gameplayMapping?.canonicalEntities?.some((item) => item.canonicalId === 'resource.wood' && item.mechanicalKey === 'wood')).toBe(true);
 
   const sceneInfo = await page.evaluate(() => window.__worldGridTest.getSceneInfo());
@@ -52,4 +57,3 @@ test('generated universe pack loads into Three.js and completes the first world-
   expect(report?.validationReport?.metrics?.canonicalMappingCoverage).toBe(1);
   expect(consoleErrors).toEqual([]);
 });
-

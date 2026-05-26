@@ -3,7 +3,22 @@
   "$id": "agent-town-generated-pack-v1",
   "title": "Agent Town Generated Pack",
   "type": "object",
-  "required": ["schemaVersion", "packId", "ownerAccountId", "createdAtMs", "generator", "prompt", "stylePack", "universePack", "gameplayMapping", "assetManifest", "validationReport"],
+  "required": [
+    "schemaVersion",
+    "packId",
+    "ownerAccountId",
+    "createdAtMs",
+    "generator",
+    "prompt",
+    "generationBrief",
+    "stylePack",
+    "universePack",
+    "gameplayMapping",
+    "assetManifest",
+    "assetPromptPlan",
+    "assetScaffold",
+    "validationReport"
+  ],
   "additionalProperties": false,
   "properties": {
     "schemaVersion": { "const": "agent-town-generated-pack-v1" },
@@ -14,12 +29,15 @@
     "prompt": {
       "type": "object",
       "required": ["hash", "length", "keywordHints"],
-      "not": { "required": ["normalizedPrompt"] }
+      "not": { "anyOf": [{ "required": ["normalizedPrompt"] }, { "required": ["rawPrompt"] }, { "required": ["promptText"] }] }
     },
+    "generationBrief": { "type": "object" },
     "stylePack": { "type": "object" },
     "universePack": { "type": "object" },
     "gameplayMapping": { "type": "object" },
     "assetManifest": { "type": "object" },
+    "assetPromptPlan": { "type": "object" },
+    "assetScaffold": { "type": "object" },
     "validationReport": { "type": "object" }
   }
 }

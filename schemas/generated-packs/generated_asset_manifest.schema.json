@@ -9,14 +9,33 @@
     "schemaVersion": { "const": "agent-town-generated-asset-manifest-v1" },
     "promptHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "generator": { "type": "string", "minLength": 3 },
-    "productionImagePolicy": { "type": "object" },
+    "productionImagePolicy": {
+      "type": "object",
+      "required": ["model", "status", "promptRoot", "requiresHumanSignoff", "transparentBackgroundPolicy"],
+      "additionalProperties": false,
+      "properties": {
+        "model": { "const": "gpt-image-2" },
+        "status": { "const": "candidate_required_before_production" },
+        "promptRoot": { "type": "string", "minLength": 3 },
+        "requiresHumanSignoff": { "const": true },
+        "transparentBackgroundPolicy": { "type": "string", "minLength": 3 }
+      }
+    },
     "assets": {
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["assetId", "canonicalTarget", "kind", "status", "source"],
-        "additionalProperties": true
+        "required": ["assetId", "canonicalTarget", "kind", "status", "source", "promptHash"],
+        "additionalProperties": true,
+        "properties": {
+          "assetId": { "type": "string", "minLength": 1 },
+          "canonicalTarget": { "type": "string", "minLength": 3 },
+          "kind": { "enum": ["three-material", "shape-token", "billboard-sprite-candidate", "generated-text"] },
+          "status": { "enum": ["runtime-generated", "fallback-ready", "candidate-planned", "planned-not-generated"] },
+          "source": { "enum": ["deterministic-fallback", "candidate-scaffold"] },
+          "promptHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
       }
     }
   }
