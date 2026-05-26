@@ -134,6 +134,14 @@ Player prompt
 - `projectInhabitantStyleOverlayView` exposes only generated role/voice/sprite-plan metadata when generated packs are enabled.
 - Browser rendering uses a generated-pack-only stage overlay; reduced-motion mode switches the overlay to static markers.
 
+## GU-17 Multi-Surface Compatibility Slice
+
+- `multi_surface_compatibility.schema.json` defines visual skins for Z1 settlement node, Z2 region grid, route network, public pack card, and sandbox commons.
+- Surface skins are presentation contracts only: they read `region.settlements`, `region.cells`, `region.routes`, redacted public-card pack data, or typed sandbox state.
+- Surface skins cannot mutate server state, include private data, alter V5 tool catalogs, add formulas, or change canonical server rules.
+- `projectMultiSurfaceCompatibilityView` exposes generated surface names and naming conventions only when generated packs are enabled.
+- Public cards may use the generated public-card title/style summary from the compatibility profile, but still pass raw-prompt, private-data, screenshot, and blocked-field gates.
+
 ## Machine Checks
 
 ```json
@@ -239,6 +247,14 @@ Player prompt
   "inhabitantSpritePromptCount": 4,
   "externalModelPerInhabitant": false,
   "inhabitantResourceMutationCount": 0,
-  "reducedMotionFallback": "static-markers"
+  "reducedMotionFallback": "static-markers",
+  "multiSurfaceCompatibilitySchemaExists": true,
+  "z1Z2Compatibility": true,
+  "surfaceSkinCount": 5,
+  "multiTownNamesGenerated": 6,
+  "publicCardSafe": true,
+  "sandboxSkinSafe": true,
+  "v5ToolsUnaffected": true,
+  "serverRuleChangeCount": 0
 }
 ```

@@ -2721,6 +2721,14 @@ Inhabitant overlay invariants:
 - reduced-motion rendering must fall back to static markers;
 - `/api/world/region` may include `generatedPackInhabitantOverlayView` only when generated packs are enabled, and that view cannot change resources, route state, claim state, public presence, or civic-service rules.
 
+Multi-surface compatibility invariants:
+- schema is `agent-town-multi-surface-compatibility-v1`;
+- surface skins cover Z1 settlement node, Z2 region grid, route network, public pack card, and sandbox commons;
+- all surface skins are visual-only, use existing server-owned state sources, include no private data, and have `v5ToolImpact="none"`;
+- unknown surfaces, unsafe labels, private public-card data, sandbox unsafe labels, server-rule changes, V5 tool changes, formulas, mutation authority, and secret-like fields are rejected;
+- public cards may use the generated public-card title/style summary only after the normal screenshot, prompt-hint, private-data, and blocked-field gates pass;
+- `/api/world/region` may include `generatedPackMultiSurfaceCompatibilityView` only when generated packs are enabled, and the V5 tool list must remain unchanged after pack generation.
+
 Approved-modifier invariants:
 - schema is `agent-town-approved-modifiers-v1`;
 - `selectedModifiers` must be drawn only from the approved enum: `visual_only`, `more_contract_flavor`, `requesters_prefer_food`, `extra_public_square_charm_text`, `ambient_weather_cosmetic`, `tutorial_copy_variant`;

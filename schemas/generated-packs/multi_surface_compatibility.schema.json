@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-town-multi-surface-compatibility-v1",
+  "title": "Agent Town Generated Multi-Surface Compatibility",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "canonicalVersion",
+    "compatibilityId",
+    "promptHash",
+    "surfaceSkins",
+    "multiTownNaming",
+    "safety",
+    "balanceSimulation"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "agent-town-multi-surface-compatibility-v1" },
+    "canonicalVersion": { "const": "agent-town-world-grid-v1" },
+    "compatibilityId": {
+      "type": "string",
+      "pattern": "^multi_surface_[a-f0-9]{12}$"
+    },
+    "promptHash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "surfaceSkins": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "surfaceId",
+          "canonicalSurface",
+          "generatedName",
+          "visualStyle",
+          "serverStateSource",
+          "usagePath",
+          "visualOnly",
+          "mutatesServerState",
+          "privateDataIncluded",
+          "v5ToolImpact"
+        ],
+        "properties": {
+          "surfaceId": {
+            "enum": [
+              "surface.z1.settlement",
+              "surface.z2.region",
+              "surface.route.network",
+              "surface.public.card",
+              "surface.sandbox.commons"
+            ]
+          },
+          "canonicalSurface": {
+            "enum": [
+              "z1-settlement-node",
+              "z2-region-grid",
+              "region-route-edge",
+              "public-pack-card",
+              "sandbox-district"
+            ]
+          },
+          "generatedName": {
+            "type": "string",
+            "minLength": 3
+          },
+          "visualStyle": {
+            "type": "string",
+            "minLength": 8
+          },
+          "serverStateSource": {
+            "enum": [
+              "region.settlements",
+              "region.cells",
+              "region.routes",
+              "public-card.redacted-pack",
+              "sandbox.typed-state"
+            ]
+          },
+          "usagePath": {
+            "type": "string",
+            "minLength": 4
+          },
+          "visualOnly": { "const": true },
+          "mutatesServerState": { "const": false },
+          "privateDataIncluded": { "const": false },
+          "v5ToolImpact": { "const": "none" }
+        }
+      }
+    },
+    "multiTownNaming": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "homeSettlementName",
+        "secondSettlementName",
+        "regionName",
+        "routeName",
+        "publicCardTitle",
+        "sandboxTitle",
+        "namingConvention",
+        "privateDataIncluded"
+      ],
+      "properties": {
+        "homeSettlementName": { "type": "string", "minLength": 3 },
+        "secondSettlementName": { "type": "string", "minLength": 3 },
+        "regionName": { "type": "string", "minLength": 3 },
+        "routeName": { "type": "string", "minLength": 3 },
+        "publicCardTitle": { "type": "string", "minLength": 3 },
+        "sandboxTitle": { "type": "string", "minLength": 3 },
+        "namingConvention": { "type": "string", "minLength": 8 },
+        "privateDataIncluded": { "const": false }
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "publicCardPrivateDataIncluded",
+        "sandboxUnsafeLabelCount",
+        "v5ToolMutationCount",
+        "unsafeTextRejectCount"
+      ],
+      "properties": {
+        "publicCardPrivateDataIncluded": { "const": false },
+        "sandboxUnsafeLabelCount": { "const": 0 },
+        "v5ToolMutationCount": { "const": 0 },
+        "unsafeTextRejectCount": { "const": 0 }
+      }
+    },
+    "balanceSimulation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "simulationVersion",
+        "z1Z2Compatibility",
+        "publicCardSafe",
+        "sandboxSkinSafe",
+        "v5ToolsUnaffected",
+        "canonicalRuleChangeCount",
+        "firstLoopCompletable"
+      ],
+      "properties": {
+        "simulationVersion": { "const": "agent-town-multi-surface-balance-v1" },
+        "z1Z2Compatibility": { "const": true },
+        "publicCardSafe": { "const": true },
+        "sandboxSkinSafe": { "const": true },
+        "v5ToolsUnaffected": { "const": true },
+        "canonicalRuleChangeCount": { "const": 0 },
+        "firstLoopCompletable": { "const": true }
+      }
+    }
+  }
+}

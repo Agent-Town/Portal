@@ -799,6 +799,99 @@
       "firstLoopCompletable": true
     }
   },
+  "multiSurfaceCompatibility": {
+    "schemaVersion": "agent-town-multi-surface-compatibility-v1",
+    "canonicalVersion": "agent-town-world-grid-v1",
+    "compatibilityId": "multi_surface_1dc551d9ebea",
+    "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+    "surfaceSkins": [
+      {
+        "surfaceId": "surface.z1.settlement",
+        "canonicalSurface": "z1-settlement-node",
+        "generatedName": "Cozy Home",
+        "visualStyle": "Cozy Mushroom styling for z1-settlement-node using cozy timber.",
+        "serverStateSource": "region.settlements",
+        "usagePath": "world-grid.z1.settlement-node",
+        "visualOnly": true,
+        "mutatesServerState": false,
+        "privateDataIncluded": false,
+        "v5ToolImpact": "none"
+      },
+      {
+        "surfaceId": "surface.z2.region",
+        "canonicalSurface": "z2-region-grid",
+        "generatedName": "Cozy Mushroom Region",
+        "visualStyle": "Cozy Mushroom styling for z2-region-grid using cozy timber.",
+        "serverStateSource": "region.cells",
+        "usagePath": "world-grid.z2.region-grid",
+        "visualOnly": true,
+        "mutatesServerState": false,
+        "privateDataIncluded": false,
+        "v5ToolImpact": "none"
+      },
+      {
+        "surfaceId": "surface.route.network",
+        "canonicalSurface": "region-route-edge",
+        "generatedName": "Mushroom Route",
+        "visualStyle": "Cozy Mushroom styling for region-route-edge using cozy timber.",
+        "serverStateSource": "region.routes",
+        "usagePath": "world-grid.routes",
+        "visualOnly": true,
+        "mutatesServerState": false,
+        "privateDataIncluded": false,
+        "v5ToolImpact": "none"
+      },
+      {
+        "surfaceId": "surface.public.card",
+        "canonicalSurface": "public-pack-card",
+        "generatedName": "Cozy Mushroom Charter Card",
+        "visualStyle": "Cozy Mushroom styling for public-pack-card using cozy timber.",
+        "serverStateSource": "public-card.redacted-pack",
+        "usagePath": "generated-pack.public-card",
+        "visualOnly": true,
+        "mutatesServerState": false,
+        "privateDataIncluded": false,
+        "v5ToolImpact": "none"
+      },
+      {
+        "surfaceId": "surface.sandbox.commons",
+        "canonicalSurface": "sandbox-district",
+        "generatedName": "Mushroom Commons",
+        "visualStyle": "Cozy Mushroom styling for sandbox-district using cozy timber.",
+        "serverStateSource": "sandbox.typed-state",
+        "usagePath": "world-grid.sandbox",
+        "visualOnly": true,
+        "mutatesServerState": false,
+        "privateDataIncluded": false,
+        "v5ToolImpact": "none"
+      }
+    ],
+    "multiTownNaming": {
+      "homeSettlementName": "Cozy Home",
+      "secondSettlementName": "Mushroom Outpost",
+      "regionName": "Cozy Mushroom Region",
+      "routeName": "Mushroom Route",
+      "publicCardTitle": "Cozy Mushroom Charter Card",
+      "sandboxTitle": "Mushroom Commons",
+      "namingConvention": "theme-prefix plus canonical surface suffix",
+      "privateDataIncluded": false
+    },
+    "safety": {
+      "publicCardPrivateDataIncluded": false,
+      "sandboxUnsafeLabelCount": 0,
+      "v5ToolMutationCount": 0,
+      "unsafeTextRejectCount": 0
+    },
+    "balanceSimulation": {
+      "simulationVersion": "agent-town-multi-surface-balance-v1",
+      "z1Z2Compatibility": true,
+      "publicCardSafe": true,
+      "sandboxSkinSafe": true,
+      "v5ToolsUnaffected": true,
+      "canonicalRuleChangeCount": 0,
+      "firstLoopCompletable": true
+    }
+  },
   "approvedModifiers": {
     "schemaVersion": "agent-town-approved-modifiers-v1",
     "canonicalVersion": "agent-town-world-grid-v1",

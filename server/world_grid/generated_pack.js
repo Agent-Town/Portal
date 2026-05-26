@@ -185,6 +185,46 @@ const INHABITANT_ROLE_DEFINITIONS = [
   }
 ];
 const INHABITANT_ROLE_IDS = INHABITANT_ROLE_DEFINITIONS.map((role) => role.canonicalRoleId);
+const MULTI_SURFACE_COMPATIBILITY_VERSION = 'agent-town-multi-surface-compatibility-v1';
+const MULTI_SURFACE_BALANCE_VERSION = 'agent-town-multi-surface-balance-v1';
+const MULTI_SURFACE_DEFINITIONS = [
+  {
+    surfaceId: 'surface.z1.settlement',
+    canonicalSurface: 'z1-settlement-node',
+    serverStateSource: 'region.settlements',
+    usagePath: 'world-grid.z1.settlement-node',
+    titleSuffix: 'Home'
+  },
+  {
+    surfaceId: 'surface.z2.region',
+    canonicalSurface: 'z2-region-grid',
+    serverStateSource: 'region.cells',
+    usagePath: 'world-grid.z2.region-grid',
+    titleSuffix: 'Region'
+  },
+  {
+    surfaceId: 'surface.route.network',
+    canonicalSurface: 'region-route-edge',
+    serverStateSource: 'region.routes',
+    usagePath: 'world-grid.routes',
+    titleSuffix: 'Route'
+  },
+  {
+    surfaceId: 'surface.public.card',
+    canonicalSurface: 'public-pack-card',
+    serverStateSource: 'public-card.redacted-pack',
+    usagePath: 'generated-pack.public-card',
+    titleSuffix: 'Card'
+  },
+  {
+    surfaceId: 'surface.sandbox.commons',
+    canonicalSurface: 'sandbox-district',
+    serverStateSource: 'sandbox.typed-state',
+    usagePath: 'world-grid.sandbox',
+    titleSuffix: 'Commons'
+  }
+];
+const MULTI_SURFACE_IDS = MULTI_SURFACE_DEFINITIONS.map((surface) => surface.surfaceId);
 const APPROVED_MODIFIERS_VERSION = 'agent-town-approved-modifiers-v1';
 const APPROVED_MODIFIER_BALANCE_VERSION = 'agent-town-approved-modifier-balance-v1';
 const APPROVED_MODIFIERS = [
@@ -2248,6 +2288,250 @@ function projectInhabitantStyleOverlayView(pack = {}) {
   };
 }
 
+function multiSurfaceGeneratedName(anchor = 'Civic', second = 'Route', surface = {}) {
+  if (surface.surfaceId === 'surface.z1.settlement') return `${anchor} Home`;
+  if (surface.surfaceId === 'surface.z2.region') return `${anchor} ${second} Region`;
+  if (surface.surfaceId === 'surface.route.network') return `${second} Route`;
+  if (surface.surfaceId === 'surface.public.card') return `${anchor} ${second} Charter Card`;
+  if (surface.surfaceId === 'surface.sandbox.commons') return `${second} Commons`;
+  return `${anchor} ${surface.titleSuffix || 'Surface'}`;
+}
+
+function buildMultiSurfaceCompatibility({ promptHash = '', packHash = '', anchor = 'Civic', second = 'Route', index = {} } = {}) {
+  const regionName = `${anchor} ${second} Region`;
+  const homeSettlementName = `${anchor} Home`;
+  const secondSettlementName = `${second} Outpost`;
+  const routeName = `${second} Route`;
+  const sandboxTitle = `${second} Commons`;
+  const publicCardTitle = `${anchor} ${second} Charter Card`;
+  const surfaceSkins = MULTI_SURFACE_DEFINITIONS.map((surface) => ({
+    surfaceId: surface.surfaceId,
+    canonicalSurface: surface.canonicalSurface,
+    generatedName: multiSurfaceGeneratedName(anchor, second, surface),
+    visualStyle: boundedLine(`${anchor} ${second} styling for ${surface.canonicalSurface} using ${index?.['resource.wood']?.generatedName || 'generated materials'}.`, 132),
+    serverStateSource: surface.serverStateSource,
+    usagePath: surface.usagePath,
+    visualOnly: true,
+    mutatesServerState: false,
+    privateDataIncluded: false,
+    v5ToolImpact: 'none'
+  }));
+  return {
+    schemaVersion: MULTI_SURFACE_COMPATIBILITY_VERSION,
+    canonicalVersion: 'agent-town-world-grid-v1',
+    compatibilityId: `multi_surface_${String(packHash || sha256(promptHash)).slice(0, 12)}`,
+    promptHash,
+    surfaceSkins,
+    multiTownNaming: {
+      homeSettlementName,
+      secondSettlementName,
+      regionName,
+      routeName,
+      publicCardTitle,
+      sandboxTitle,
+      namingConvention: 'theme-prefix plus canonical surface suffix',
+      privateDataIncluded: false
+    },
+    safety: {
+      publicCardPrivateDataIncluded: false,
+      sandboxUnsafeLabelCount: 0,
+      v5ToolMutationCount: 0,
+      unsafeTextRejectCount: 0
+    },
+    balanceSimulation: {
+      simulationVersion: MULTI_SURFACE_BALANCE_VERSION,
+      z1Z2Compatibility: true,
+      publicCardSafe: true,
+      sandboxSkinSafe: true,
+      v5ToolsUnaffected: true,
+      canonicalRuleChangeCount: 0,
+      firstLoopCompletable: true
+    }
+  };
+}
+
+function multiSurfaceTextValues(compatibility = {}) {
+  const profile = compatibility?.multiSurfaceCompatibility || compatibility;
+  return [
+    ...(profile.surfaceSkins || []).flatMap((surface) => [
+      surface.generatedName,
+      surface.visualStyle,
+      surface.usagePath
+    ]),
+    ...Object.values(profile.multiTownNaming || {})
+  ].filter((value) => typeof value === 'string' && value.trim());
+}
+
+function unsafeMultiSurfaceTextFindings(compatibility = {}) {
+  const findings = [];
+  for (const [index, text] of multiSurfaceTextValues(compatibility).entries()) {
+    const value = String(text || '');
+    const lower = value.toLowerCase();
+    const technicalTerms = TECHNICAL_NORMAL_GAMEPLAY_TERMS.filter((term) => lower.includes(term));
+    const publicForbiddenTerms = PUBLIC_CARD_FORBIDDEN_TERMS.filter((term) => lower.includes(term));
+    const rawPromptPatterns = blockedPatternIdsForText(value);
+    const tooLong = value.length > 160;
+    if (technicalTerms.length > 0 || publicForbiddenTerms.length > 0 || rawPromptPatterns.length > 0 || tooLong) {
+      findings.push({ index, technicalTerms, publicForbiddenTerms, rawPromptPatterns, tooLong });
+    }
+  }
+  return findings;
+}
+
+function validateMultiSurfaceCompatibility(compatibility = {}) {
+  const schemaReport = SCHEMA_REGISTRY?.multiSurfaceCompatibility
+    ? validateGeneratedSchema(compatibility, SCHEMA_REGISTRY.multiSurfaceCompatibility, '$.multiSurfaceCompatibility')
+    : { ok: true, errors: [] };
+  const surfaceSkins = Array.isArray(compatibility?.surfaceSkins) ? compatibility.surfaceSkins : [];
+  const surfaceIds = surfaceSkins.map((surface) => surface.surfaceId).filter(Boolean);
+  const missingSurfaceIds = MULTI_SURFACE_IDS.filter((surfaceId) => !surfaceIds.includes(surfaceId));
+  const unknownSurfaceIds = surfaceIds.filter((surfaceId) => !MULTI_SURFACE_IDS.includes(surfaceId));
+  const duplicateSurfaceIds = surfaceIds.filter((surfaceId, index, all) => surfaceId && all.indexOf(surfaceId) !== index);
+  const nonVisualSurfaces = surfaceSkins.filter((surface) => (
+    surface.visualOnly !== true
+    || surface.mutatesServerState !== false
+    || surface.privateDataIncluded !== false
+    || surface.v5ToolImpact !== 'none'
+  ));
+  const bySurfaceId = new Map(surfaceSkins.map((surface) => [surface.surfaceId, surface]));
+  const z1 = bySurfaceId.get('surface.z1.settlement');
+  const z2 = bySurfaceId.get('surface.z2.region');
+  const publicCard = bySurfaceId.get('surface.public.card');
+  const sandbox = bySurfaceId.get('surface.sandbox.commons');
+  const naming = compatibility?.multiTownNaming || {};
+  const unsafeTextFindings = unsafeMultiSurfaceTextFindings(compatibility);
+  const forbiddenAuthorityPaths = findForbiddenAuthorityPaths(compatibility);
+  const secretLikePaths = findSecretLikePaths(compatibility);
+  const rawInstructionPaths = findRawPromptInstructionPaths(compatibility);
+  const safety = compatibility?.safety || {};
+  const balance = compatibility?.balanceSimulation || {};
+  const checks = [
+    {
+      id: 'MULTI_SURFACE_SCHEMA_VALID',
+      passed: schemaReport.ok === true,
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
+    },
+    {
+      id: 'MULTI_SURFACE_REQUIRED_SURFACES',
+      passed: missingSurfaceIds.length === 0
+        && unknownSurfaceIds.length === 0
+        && duplicateSurfaceIds.length === 0
+        && nonVisualSurfaces.length === 0,
+      measured: {
+        requiredSurfaceCount: MULTI_SURFACE_IDS.length,
+        surfaceCount: surfaceSkins.length,
+        missingSurfaceIds,
+        unknownSurfaceIds,
+        duplicateSurfaceIds: [...new Set(duplicateSurfaceIds)],
+        nonVisualSurfaceCount: nonVisualSurfaces.length
+      }
+    },
+    {
+      id: 'MULTI_SURFACE_Z1_Z2_COMPATIBILITY',
+      passed: Boolean(z1 && z2)
+        && z1?.serverStateSource === 'region.settlements'
+        && z2?.serverStateSource === 'region.cells'
+        && String(naming.homeSettlementName || '').length >= 3
+        && String(naming.secondSettlementName || '').length >= 3
+        && String(naming.regionName || '').length >= 3
+        && balance?.z1Z2Compatibility === true,
+      measured: {
+        z1SurfacePresent: Boolean(z1),
+        z2SurfacePresent: Boolean(z2),
+        homeSettlementName: naming.homeSettlementName || null,
+        secondSettlementName: naming.secondSettlementName || null,
+        regionName: naming.regionName || null
+      }
+    },
+    {
+      id: 'MULTI_SURFACE_PUBLIC_CARD_SAFE',
+      passed: Boolean(publicCard)
+        && publicCard?.serverStateSource === 'public-card.redacted-pack'
+        && publicCard?.privateDataIncluded === false
+        && safety?.publicCardPrivateDataIncluded === false
+        && balance?.publicCardSafe === true,
+      measured: {
+        publicCardSurfacePresent: Boolean(publicCard),
+        publicCardPrivateDataIncluded: safety?.publicCardPrivateDataIncluded === true
+      }
+    },
+    {
+      id: 'MULTI_SURFACE_SANDBOX_SKIN_SAFE',
+      passed: Boolean(sandbox)
+        && sandbox?.serverStateSource === 'sandbox.typed-state'
+        && Number(safety?.sandboxUnsafeLabelCount || 0) === 0
+        && balance?.sandboxSkinSafe === true,
+      measured: {
+        sandboxSurfacePresent: Boolean(sandbox),
+        sandboxUnsafeLabelCount: Number(safety?.sandboxUnsafeLabelCount || 0)
+      }
+    },
+    {
+      id: 'MULTI_SURFACE_V5_TOOLS_UNAFFECTED',
+      passed: forbiddenAuthorityPaths.length === 0
+        && secretLikePaths.length === 0
+        && rawInstructionPaths.length === 0
+        && Number(safety?.v5ToolMutationCount || 0) === 0
+        && Number(balance?.canonicalRuleChangeCount || 0) === 0
+        && balance?.v5ToolsUnaffected === true,
+      measured: {
+        forbiddenAuthorityPaths,
+        secretLikePaths,
+        rawInstructionPaths: rawInstructionPaths.slice(0, 5),
+        v5ToolMutationCount: Number(safety?.v5ToolMutationCount || 0),
+        canonicalRuleChangeCount: Number(balance?.canonicalRuleChangeCount || 0)
+      }
+    },
+    {
+      id: 'MULTI_SURFACE_TEXT_SAFE',
+      passed: unsafeTextFindings.length === 0
+        && Number(safety?.unsafeTextRejectCount || 0) === 0
+        && naming.privateDataIncluded === false,
+      measured: {
+        unsafeTextRejectCount: unsafeTextFindings.length,
+        unsafeTextFindings: unsafeTextFindings.slice(0, 5),
+        namingPrivateDataIncluded: naming.privateDataIncluded === true
+      }
+    }
+  ];
+  return {
+    ok: checks.every((check) => check.passed === true),
+    checks,
+    metrics: {
+      multiSurfaceCompatibilitySchemaExists: Boolean(SCHEMA_REGISTRY?.multiSurfaceCompatibility),
+      z1Z2Compatibility: checks.find((check) => check.id === 'MULTI_SURFACE_Z1_Z2_COMPATIBILITY')?.passed === true,
+      publicCardSafe: checks.find((check) => check.id === 'MULTI_SURFACE_PUBLIC_CARD_SAFE')?.passed === true,
+      sandboxSkinSafe: checks.find((check) => check.id === 'MULTI_SURFACE_SANDBOX_SKIN_SAFE')?.passed === true,
+      v5ToolsUnaffected: checks.find((check) => check.id === 'MULTI_SURFACE_V5_TOOLS_UNAFFECTED')?.passed === true,
+      surfaceSkinCount: surfaceSkins.length,
+      multiTownNamesGenerated: [
+        naming.homeSettlementName,
+        naming.secondSettlementName,
+        naming.regionName,
+        naming.routeName,
+        naming.publicCardTitle,
+        naming.sandboxTitle
+      ].filter(Boolean).length,
+      unsafeTextRejectCount: unsafeTextFindings.length,
+      canonicalRuleChangeCount: Number(balance?.canonicalRuleChangeCount || 0)
+    }
+  };
+}
+
+function projectMultiSurfaceCompatibilityView(pack = {}) {
+  const compatibility = pack?.multiSurfaceCompatibility || {};
+  const report = validateMultiSurfaceCompatibility(compatibility);
+  return {
+    schemaVersion: 'agent-town-multi-surface-compatibility-view-v1',
+    packId: pack?.packId || '',
+    surfaceSkins: clone(compatibility.surfaceSkins || []),
+    multiTownNaming: clone(compatibility.multiTownNaming || {}),
+    safety: clone(compatibility.safety || {}),
+    balanceSimulation: clone(compatibility.balanceSimulation || {}),
+    validationReport: report
+  };
+}
+
 function modifierEffectFor(modifier = '') {
   const base = APPROVED_MODIFIER_EFFECTS[modifier] || APPROVED_MODIFIER_EFFECTS.visual_only;
   return {
@@ -2493,6 +2777,7 @@ function validateGeneratedPack(pack) {
   const techFlavorTreeReport = validateTechFlavorTree(pack?.techFlavorTree || {});
   const requesterVoiceReport = validateRequesterVoicePack(pack?.requesterVoicePack || {});
   const inhabitantOverlayReport = validateInhabitantStyleOverlay(pack?.inhabitantStyleOverlay || {});
+  const multiSurfaceReport = validateMultiSurfaceCompatibility(pack?.multiSurfaceCompatibility || {});
   const approvedModifiersReport = validateApprovedModifiers(pack?.approvedModifiers || {});
   const assetManifestReport = validateAssetManifest(pack?.assetManifest || {}, pack);
   const assetPromptPlanReport = validateAssetPromptPlan(pack?.assetPromptPlan || {}, pack);
@@ -2551,6 +2836,11 @@ function validateGeneratedPack(pack) {
       id: 'GENPACK_INHABITANT_STYLE_OVERLAY_VALID',
       passed: inhabitantOverlayReport.ok === true,
       measured: inhabitantOverlayReport.metrics
+    },
+    {
+      id: 'GENPACK_MULTI_SURFACE_COMPATIBILITY_VALID',
+      passed: multiSurfaceReport.ok === true,
+      measured: multiSurfaceReport.metrics
     },
     {
       id: 'GENPACK_APPROVED_MODIFIERS_VALID',
@@ -2658,6 +2948,14 @@ function validateGeneratedPack(pack) {
       externalModelPerInhabitant: inhabitantOverlayReport.metrics.externalModelPerInhabitant,
       inhabitantResourceMutationCount: inhabitantOverlayReport.metrics.resourceMutationCount,
       inhabitantUnsafeTextRejectCount: inhabitantOverlayReport.metrics.unsafeTextRejectCount,
+      multiSurfaceCompatibilityValid: multiSurfaceReport.ok === true,
+      z1Z2Compatibility: multiSurfaceReport.metrics.z1Z2Compatibility,
+      publicCardSafe: multiSurfaceReport.metrics.publicCardSafe,
+      sandboxSkinSafe: multiSurfaceReport.metrics.sandboxSkinSafe,
+      v5ToolsUnaffected: multiSurfaceReport.metrics.v5ToolsUnaffected,
+      surfaceSkinCount: multiSurfaceReport.metrics.surfaceSkinCount,
+      multiTownNamesGenerated: multiSurfaceReport.metrics.multiTownNamesGenerated,
+      multiSurfaceUnsafeTextRejectCount: multiSurfaceReport.metrics.unsafeTextRejectCount,
       enumOnlyModifiers: approvedModifiersReport.metrics.enumOnlyModifiers,
       formulaInjectionRejected: approvedModifiersReport.checks.find((check) => check.id === 'APPROVED_MODIFIERS_NO_FORMULA_OR_AUTHORITY')?.passed === true,
       balanceSimulationPassed: approvedModifiersReport.metrics.balanceSimulationPassed,
@@ -3031,6 +3329,7 @@ function createGeneratedPack({
     techFlavorTree: buildTechFlavorTree({ promptHash, packHash, anchor, second, index }),
     requesterVoicePack: buildRequesterVoicePack({ packId, promptHash, packHash, anchor, second, index }),
     inhabitantStyleOverlay: buildInhabitantStyleOverlay({ packId, promptHash, packHash, candidateRoot, anchor, second, index }),
+    multiSurfaceCompatibility: buildMultiSurfaceCompatibility({ promptHash, packHash, anchor, second, index }),
     approvedModifiers: buildApprovedModifiers({ words, packHash })
   };
   pack.assetManifest = buildAssetManifest({ packId, promptHash, mappings, preset, palette });
@@ -3251,6 +3550,7 @@ function exportedPackHash(exportedPack = {}) {
     techFlavorTree: exportedPack.techFlavorTree,
     requesterVoicePack: exportedPack.requesterVoicePack,
     inhabitantStyleOverlay: exportedPack.inhabitantStyleOverlay,
+    multiSurfaceCompatibility: exportedPack.multiSurfaceCompatibility,
     approvedModifiers: exportedPack.approvedModifiers,
     assetManifest: exportedPack.assetManifest,
     assetPromptPlan: exportedPack.assetPromptPlan,
@@ -3449,6 +3749,8 @@ function screenshotForPublicCard(playtestReport = {}) {
 
 function buildPublicPackCard({ pack, playtestReport = null, owner = {}, nowMs = Date.now() } = {}) {
   const screenshot = screenshotForPublicCard(playtestReport);
+  const compatibility = pack?.multiSurfaceCompatibility || {};
+  const publicSkin = (compatibility.surfaceSkins || []).find((skin) => skin.surfaceId === 'surface.public.card') || null;
   const promptHints = (pack?.prompt?.keywordHints || pack?.generationBrief?.keywordHints || [])
     .map((hint) => String(hint || '').trim().toLowerCase())
     .filter((hint) => hint.length >= 2 && !PUBLIC_CARD_FORBIDDEN_TERMS.includes(hint))
@@ -3462,8 +3764,8 @@ function buildPublicPackCard({ pack, playtestReport = null, owner = {}, nowMs = 
     packHash,
     createdAtMs: nowMs,
     visibility: 'public-unlisted',
-    title: String(pack?.universePack?.name || pack?.stylePack?.name || 'Generated Pack').slice(0, 120),
-    styleSummary: String(pack?.stylePack?.themeSummary || pack?.universePack?.pitch || 'Generated Agent Town style pack.').slice(0, 240),
+    title: String(compatibility.multiTownNaming?.publicCardTitle || pack?.universePack?.name || pack?.stylePack?.name || 'Generated Pack').slice(0, 120),
+    styleSummary: String(publicSkin?.visualStyle || pack?.stylePack?.themeSummary || pack?.universePack?.pitch || 'Generated Agent Town style pack.').slice(0, 240),
     promptKeywordHints: promptHints,
     screenshot,
     assetManifestSummary: assetManifestSummaryForCard(pack),
@@ -4166,6 +4468,7 @@ module.exports = {
   DEFAULT_CANDIDATE_ROOT,
   GENERATION_BRIEF_VERSION,
   INHABITANT_ROLE_DEFINITIONS,
+  MULTI_SURFACE_DEFINITIONS,
   REQUIRED_CANONICAL_IDS,
   REPLAYABILITY_PROMPT_SUITE,
   SCHEMA_VERSION,
@@ -4185,6 +4488,7 @@ module.exports = {
   normalizePrompt,
   projectApprovedModifierView,
   projectInhabitantStyleOverlayView,
+  projectMultiSurfaceCompatibilityView,
   projectRequesterVoiceView,
   projectTechFlavorView,
   publishPublicPackCard,
@@ -4200,6 +4504,7 @@ module.exports = {
   validateApprovedModifiers,
   validateGenerationBrief,
   validateInhabitantStyleOverlay,
+  validateMultiSurfaceCompatibility,
   validateRequesterVoicePack,
   validateTechFlavorTree,
   validatePublicPackGallery,

@@ -62,7 +62,7 @@
     const eventsTitle = qs('[data-world-grid-events-title]');
     if (eventsTitle) eventsTitle.textContent = packText('eventsTitle', 'World Event');
     const sandboxTitle = qs('[data-world-grid-sandbox-title]');
-    if (sandboxTitle) sandboxTitle.textContent = packText('sandboxTitle', 'Sandbox District');
+    if (sandboxTitle) sandboxTitle.textContent = activePack()?.multiSurfaceCompatibility?.multiTownNaming?.sandboxTitle || packText('sandboxTitle', 'Sandbox District');
   }
 
   function apiHeaders() {
@@ -114,6 +114,11 @@
       .map((role) => role.displayName)
       .filter(Boolean)
       .slice(0, 4);
+    const surfaceNames = [
+      pack.multiSurfaceCompatibility?.multiTownNaming?.homeSettlementName,
+      pack.multiSurfaceCompatibility?.multiTownNaming?.regionName,
+      pack.multiSurfaceCompatibility?.multiTownNaming?.sandboxTitle
+    ].filter(Boolean);
     const metrics = pack.validationReport?.metrics || {};
     status.textContent = validation;
     summary.innerHTML = `
@@ -124,6 +129,7 @@
       ${techNames.length ? `<p>${techNames.map(escapeHtml).join(' · ')}</p>` : ''}
       ${voiceLines.length ? `<p>${voiceLines.map(escapeHtml).join(' · ')}</p>` : ''}
       ${inhabitantNames.length ? `<p>${inhabitantNames.map(escapeHtml).join(' · ')}</p>` : ''}
+      ${surfaceNames.length ? `<p>${surfaceNames.map(escapeHtml).join(' · ')}</p>` : ''}
       <dl>
         <div><dt>Mappings</dt><dd>${escapeHtml(`${metrics.canonicalMappingsCovered || 0}/${metrics.requiredCanonicalMappings || 0}`)}</dd></div>
         <div><dt>Assets</dt><dd>${escapeHtml(String(metrics.fallbackAssetCount || 0))}</dd></div>
@@ -699,10 +705,11 @@
       const payload = await api('/api/world/sandbox');
       const district = payload.district;
       const participant = payload.participant;
+      const sandboxTitle = activePack()?.multiSurfaceCompatibility?.multiTownNaming?.sandboxTitle || district.title;
       const propCount = (district.cells || []).reduce((sum, cell) => sum + (cell.props || []).length, 0);
       container.innerHTML = `
         <article class="world-grid-sandbox-card">
-          <strong>${district.title}</strong>
+          <strong>${escapeHtml(sandboxTitle)}</strong>
           <p>${district.status} · ${district.participants.length} visitors · ${propCount} props</p>
           <p>${participant ? `You are ${participant.displayName}.` : 'Enter with redacted public presence.'}</p>
           <button type="button" class="world-grid-action" data-world-grid-sandbox-enter>Enter sandbox</button>

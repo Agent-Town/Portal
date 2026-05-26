@@ -398,3 +398,22 @@ Generated packs now include an `inhabitantStyleOverlay` contract for passive tow
   "firstLoopStillCompletes": true
 }
 ```
+
+## GU-17 World Grid and Multi-Settlement Compatibility Slice
+
+Generated packs now include a `multiSurfaceCompatibility` contract that maps one universe across Z1 settlement nodes, Z2 region grids, route edges, public pack cards, and sandbox districts. Each surface skin is visual-only, reads existing server-owned state, carries public-safe generated names, and records no V5 tool or server-rule impact. Public card copy can use the generated card skin while preserving screenshot, prompt-hint, and private-data redaction gates.
+
+```json
+{
+  "multiSurfaceCompatibilitySchemaExists": true,
+  "z1Z2Compatibility": true,
+  "surfaceSkinCount": 5,
+  "multiTownNamesGenerated": 6,
+  "publicCardSafe": true,
+  "sandboxSkinSafe": true,
+  "v5ToolsUnaffected": true,
+  "serverRuleChangeCount": 0,
+  "unsafeTextRejectCount": 0,
+  "firstLoopStillCompletes": true
+}
+```

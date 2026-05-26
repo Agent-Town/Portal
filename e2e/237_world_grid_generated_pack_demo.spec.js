@@ -53,6 +53,12 @@ test('generated universe pack loads into Three.js and completes the first world-
   expect(townLifeOverlay?.actorBudgetPassed).toBe(true);
   expect(townLifeOverlay?.motionMode).toBe('static');
   expect(townLifeOverlay?.roles?.every((role) => role.mutatesResources === false)).toBe(true);
+  expect(generatedPack?.multiSurfaceCompatibility?.surfaceSkins?.length).toBe(5);
+  expect(generatedPack?.validationReport?.metrics?.z1Z2Compatibility).toBe(true);
+  expect(generatedPack?.validationReport?.metrics?.publicCardSafe).toBe(true);
+  expect(generatedPack?.validationReport?.metrics?.sandboxSkinSafe).toBe(true);
+  expect(generatedPack?.validationReport?.metrics?.v5ToolsUnaffected).toBe(true);
+  await expect(page.locator('[data-world-grid-generated-summary]')).toContainText(generatedPack.multiSurfaceCompatibility.multiTownNaming.regionName);
   expect(generatedPack?.approvedModifiers?.selectedModifiers?.length).toBeGreaterThan(0);
   expect(generatedPack?.validationReport?.metrics?.enumOnlyModifiers).toBe(true);
   expect(generatedPack?.validationReport?.metrics?.canonicalRulesPreserved).toBe(true);
@@ -67,6 +73,9 @@ test('generated universe pack loads into Three.js and completes the first world-
   expect(modifierPayload?.generatedPackRequesterVoiceView?.balanceSimulation?.canonicalContractRulesPreserved).toBe(true);
   expect(modifierPayload?.generatedPackInhabitantOverlayView?.validationReport?.ok).toBe(true);
   expect(modifierPayload?.generatedPackInhabitantOverlayView?.balanceSimulation?.serverStateAuthorityPreserved).toBe(true);
+  expect(modifierPayload?.generatedPackMultiSurfaceCompatibilityView?.validationReport?.ok).toBe(true);
+  expect(modifierPayload?.generatedPackMultiSurfaceCompatibilityView?.balanceSimulation?.v5ToolsUnaffected).toBe(true);
+  expect(modifierPayload?.generatedPackMultiSurfaceCompatibilityView?.multiTownNaming?.sandboxTitle).toBe(generatedPack.multiSurfaceCompatibility.multiTownNaming.sandboxTitle);
   expect(modifierPayload?.generatedPackModifierView?.validationReport?.ok).toBe(true);
   expect(modifierPayload?.generatedPackModifierView?.balanceSimulation?.resourceFormulaChanges).toBe(0);
 

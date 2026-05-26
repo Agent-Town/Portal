@@ -51,6 +51,7 @@ const {
   listPublicPackGallery,
   projectApprovedModifierView,
   projectInhabitantStyleOverlayView,
+  projectMultiSurfaceCompatibilityView,
   projectRequesterVoiceView,
   projectTechFlavorView,
   publishPublicPackCard,
@@ -378,6 +379,9 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
         : null,
       generatedPackInhabitantOverlayView: generatedPacksEnabled && generatedPack
         ? projectInhabitantStyleOverlayView(generatedPack)
+        : null,
+      generatedPackMultiSurfaceCompatibilityView: generatedPacksEnabled && generatedPack
+        ? projectMultiSurfaceCompatibilityView(generatedPack)
         : null,
       generatedPackModifierView: generatedPacksEnabled && generatedPack
         ? projectApprovedModifierView(generatedPack, { claimOptions: claimOptionList })

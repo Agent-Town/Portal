@@ -69,6 +69,7 @@ test('generated pack schema suite and fixtures exist', () => {
     'tech_flavor_tree.schema.json',
     'requester_voice_pack.schema.json',
     'inhabitant_style_overlay.schema.json',
+    'multi_surface_compatibility.schema.json',
     'approved_modifiers.schema.json',
     'asset_prompt_plan.schema.json',
     'asset_postprocess_plan.schema.json',
@@ -83,7 +84,7 @@ test('generated pack schema suite and fixtures exist', () => {
     const parsed = readJson(`schemas/generated-packs/${schema}`);
     assert.ok(parsed.$id, schema);
   }
-  assert.equal(requiredSchemas.length, 16);
+  assert.equal(requiredSchemas.length, 17);
 
   for (const fixture of [
     'valid_world_grid_pack.json',
@@ -166,6 +167,11 @@ test('generated pack validation accepts the valid fixture and covers canonical g
   assert.equal(report.metrics.serverStateAuthorityPreserved, true);
   assert.equal(report.metrics.actorBudgetPassed, true);
   assert.equal(report.metrics.generatedStyleApplied, true);
+  assert.equal(report.metrics.multiSurfaceCompatibilityValid, true);
+  assert.equal(report.metrics.z1Z2Compatibility, true);
+  assert.equal(report.metrics.publicCardSafe, true);
+  assert.equal(report.metrics.sandboxSkinSafe, true);
+  assert.equal(report.metrics.v5ToolsUnaffected, true);
   assert.equal(report.metrics.enumOnlyModifiers, true);
   assert.equal(report.metrics.balanceSimulationPassed, true);
   assert.equal(report.metrics.canonicalRulesPreserved, true);
@@ -340,6 +346,9 @@ test('generated pack API is gated and records first-loop playtest reports when e
     assert.equal(generateBody.generatedPack.inhabitantStyleOverlay.schemaVersion, 'agent-town-inhabitant-style-overlay-v1');
     assert.equal(generateBody.generatedPack.inhabitantStyleOverlay.balanceSimulation.serverStateAuthorityPreserved, true);
     assert.equal(generateBody.generatedPack.inhabitantStyleOverlay.safety.resourceMutationCount, 0);
+    assert.equal(generateBody.generatedPack.multiSurfaceCompatibility.schemaVersion, 'agent-town-multi-surface-compatibility-v1');
+    assert.equal(generateBody.generatedPack.multiSurfaceCompatibility.balanceSimulation.v5ToolsUnaffected, true);
+    assert.equal(generateBody.generatedPack.multiSurfaceCompatibility.safety.sandboxUnsafeLabelCount, 0);
     assert.equal(generateBody.generatedPack.approvedModifiers.schemaVersion, 'agent-town-approved-modifiers-v1');
     assert.equal(generateBody.generatedPack.approvedModifiers.balanceSimulation.canonicalRulesPreserved, true);
     assert.equal(generateBody.generatedPack.assetPromptPlan.targets.length, 23);
@@ -355,6 +364,8 @@ test('generated pack API is gated and records first-loop playtest reports when e
     assert.equal(regionBody.generatedPackRequesterVoiceView.balanceSimulation.canonicalContractRulesPreserved, true);
     assert.equal(regionBody.generatedPackInhabitantOverlayView.validationReport.ok, true);
     assert.equal(regionBody.generatedPackInhabitantOverlayView.balanceSimulation.serverStateAuthorityPreserved, true);
+    assert.equal(regionBody.generatedPackMultiSurfaceCompatibilityView.validationReport.ok, true);
+    assert.equal(regionBody.generatedPackMultiSurfaceCompatibilityView.balanceSimulation.v5ToolsUnaffected, true);
     assert.equal(regionBody.generatedPackModifierView.validationReport.ok, true);
     assert.equal(regionBody.generatedPackModifierView.balanceSimulation.canonicalRulesPreserved, true);
     assert.equal(regionBody.generatedPackModifierView.balanceSimulation.resourceFormulaChanges, 0);
