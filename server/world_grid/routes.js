@@ -44,8 +44,12 @@ const {
 const {
   currentGeneratedPack,
   currentPlaytestReport,
+  exportGeneratedPack,
   generateAndStorePack,
-  recordPlaytestReport
+  importGeneratedPack,
+  recordPlaytestReport,
+  reloadGeneratedPack,
+  remixGeneratedPack
 } = require('./generated_pack');
 
 const WORLD_GRID_TOOLS = [
@@ -148,6 +152,22 @@ const WORLD_GRID_TOOLS = [
   {
     name: 'et.world.generated_pack.record_playtest',
     description: 'Record a first-loop generated-pack playtest report with machine-readable metrics.'
+  },
+  {
+    name: 'et.world.generated_pack.reload',
+    description: 'Reload a durable generated pack by hash or fall back to the current saved pack.'
+  },
+  {
+    name: 'et.world.generated_pack.export',
+    description: 'Export the current generated pack without raw prompts, owner identifiers, or secrets.'
+  },
+  {
+    name: 'et.world.generated_pack.import',
+    description: 'Import a validated generated-pack export into the current wallet session.'
+  },
+  {
+    name: 'et.world.generated_pack.remix',
+    description: 'Create a remix child pack with parent lineage recorded and canonical rules preserved.'
   }
 ];
 
@@ -518,10 +538,45 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
           }
         });
       }
+      if (toolName === 'et.world.generated_pack.reload') {
+        requireGeneratedPacksEnabled(payload.featureFlags);
+        return res.json({
+          ok: true,
+          data: reloadGeneratedPack(payload.owner, req.body?.packId)
+        });
+      }
+      if (toolName === 'et.world.generated_pack.export') {
+        requireGeneratedPacksEnabled(payload.featureFlags);
+        return res.json({
+          ok: true,
+          data: {
+            exportEnvelope: exportGeneratedPack(payload.owner, req.body?.packId)
+          }
+        });
+      }
+      if (toolName === 'et.world.generated_pack.import') {
+        requireGeneratedPacksEnabled(payload.featureFlags);
+        return res.json({
+          ok: true,
+          data: importGeneratedPack(payload.owner, req.body?.exportEnvelope || req.body)
+        });
+      }
+      if (toolName === 'et.world.generated_pack.remix') {
+        requireGeneratedPacksEnabled(payload.featureFlags);
+        return res.json({
+          ok: true,
+          data: remixGeneratedPack({
+            owner: payload.owner,
+            parentPackId: req.body?.parentPackId,
+            prompt: req.body?.prompt,
+            nowMs: Date.now()
+          })
+        });
+      }
       res.status(404).json({ ok: false, error: { code: 'TOOL_NOT_FOUND' } });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'NOT_FOUND' || normalized.code === 'NO_GENERATED_PACK' ? 404 : normalized.code === 'INVALID_SERVICE_REQUEST_STATE' || normalized.code === 'OUT_OF_RESOURCES' || normalized.code === 'CONTRIBUTION_CAP_EXCEEDED' || normalized.code === 'INVALID_REWARD_STATE' ? 409 : normalized.code === 'INVALID_IDEMPOTENCY_KEY' || normalized.code === 'INVALID_EVENT_STATE' || normalized.code === 'INVALID_PROMPT' ? 400 : normalized.code === 'GENPACK_VALIDATION_FAILED' ? 422 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = normalized.code === 'NOT_FOUND' || normalized.code === 'NO_GENERATED_PACK' || normalized.code === 'PACK_NOT_FOUND' ? 404 : normalized.code === 'INVALID_SERVICE_REQUEST_STATE' || normalized.code === 'OUT_OF_RESOURCES' || normalized.code === 'CONTRIBUTION_CAP_EXCEEDED' || normalized.code === 'INVALID_REWARD_STATE' ? 409 : normalized.code === 'INVALID_IDEMPOTENCY_KEY' || normalized.code === 'INVALID_EVENT_STATE' || normalized.code === 'INVALID_PROMPT' || normalized.code === 'INVALID_GENERATED_PACK_EXPORT' ? 400 : normalized.code === 'GENPACK_VALIDATION_FAILED' ? 422 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -578,6 +633,78 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     } catch (error) {
       const normalized = normalizeError(error);
       const status = normalized.code === 'NO_GENERATED_PACK' ? 404 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      res.status(status).json({ ok: false, error: normalized });
+    }
+  });
+
+  router.post('/api/world/generated-pack/reload', (req, res) => {
+    try {
+      const payload = buildRegionPayload(req, res);
+      requireGeneratedPacksEnabled(payload.featureFlags);
+      const result = reloadGeneratedPack(payload.owner, req.body?.packId);
+      res.json({
+        ok: true,
+        featureFlags: payload.featureFlags,
+        ...result
+      });
+    } catch (error) {
+      const normalized = normalizeError(error);
+      const status = normalized.code === 'PACK_NOT_FOUND' ? 404 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      res.status(status).json({ ok: false, error: normalized });
+    }
+  });
+
+  router.get('/api/world/generated-pack/export', (req, res) => {
+    try {
+      const payload = buildRegionPayload(req, res);
+      requireGeneratedPacksEnabled(payload.featureFlags);
+      res.json({
+        ok: true,
+        featureFlags: payload.featureFlags,
+        exportEnvelope: exportGeneratedPack(payload.owner, req.query?.packId)
+      });
+    } catch (error) {
+      const normalized = normalizeError(error);
+      const status = normalized.code === 'PACK_NOT_FOUND' ? 404 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      res.status(status).json({ ok: false, error: normalized });
+    }
+  });
+
+  router.post('/api/world/generated-pack/import', (req, res) => {
+    try {
+      const payload = buildRegionPayload(req, res);
+      requireGeneratedPacksEnabled(payload.featureFlags);
+      const result = importGeneratedPack(payload.owner, req.body?.exportEnvelope || req.body, { nowMs: Date.now() });
+      res.json({
+        ok: true,
+        featureFlags: payload.featureFlags,
+        ...result
+      });
+    } catch (error) {
+      const normalized = normalizeError(error);
+      const status = normalized.code === 'INVALID_GENERATED_PACK_EXPORT' ? 400 : normalized.code === 'GENPACK_VALIDATION_FAILED' ? 422 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      res.status(status).json({ ok: false, error: normalized });
+    }
+  });
+
+  router.post('/api/world/generated-pack/remix', (req, res) => {
+    try {
+      const payload = buildRegionPayload(req, res);
+      requireGeneratedPacksEnabled(payload.featureFlags);
+      const result = remixGeneratedPack({
+        owner: payload.owner,
+        parentPackId: req.body?.parentPackId,
+        prompt: req.body?.prompt,
+        nowMs: Date.now()
+      });
+      res.json({
+        ok: true,
+        featureFlags: payload.featureFlags,
+        ...result
+      });
+    } catch (error) {
+      const normalized = normalizeError(error);
+      const status = normalized.code === 'INVALID_PROMPT' ? 400 : normalized.code === 'PACK_NOT_FOUND' ? 404 : normalized.code === 'GENPACK_VALIDATION_FAILED' ? 422 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
       res.status(status).json({ ok: false, error: normalized });
     }
   });

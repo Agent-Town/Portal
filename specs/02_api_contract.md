@@ -2680,6 +2680,47 @@ Contract notes:
 
 ---
 
+## World Grid Generated Packs
+
+All generated-pack endpoints are hidden unless `FEATURE_WORLD_GRID_GENERATED_PACKS` is enabled. Generated packs are presentation contracts only: they do not change canonical world-grid server rules, mechanical keys, V6 civic systems, auth, wallet identity, or production image-generation policy.
+
+### POST `/api/world/generated-pack/generate`
+Creates and stores a deterministic generated universe/style pack for the current wallet/session owner.
+
+Request:
+```json
+{ "prompt": "cozy mushroom frontier with clockwork gardeners and lantern moss" }
+```
+
+Response includes:
+- `generatedPack`, with structured `generationBrief`, `stylePack`, `universePack`, `gameplayMapping`, `assetManifest`, `assetPromptPlan`, `assetScaffold`, `migration`, `remix`, and `validationReport`;
+- `prompt.hash`, never raw prompt text;
+- zero canonical server rule overrides.
+
+### POST `/api/world/generated-pack/reload`
+Reloads a durable generated pack by `packId`. If the requested pack is missing but the owner has a current durable pack, the response falls back to that pack and sets `reloadReport.fallbackUsed=true`.
+
+### GET `/api/world/generated-pack/export`
+Exports the current or requested pack as `agent-town-generated-pack-export-v1`.
+
+Export invariants:
+- `privateDataExcluded=true`;
+- `privateDataLeakCount=0`;
+- `pack.ownerAccountId="exported_owner_redacted"`;
+- raw prompts, wallet identifiers, session identifiers, secrets, and provider credentials are absent;
+- `packHash` must match the redacted generated-pack content.
+
+### POST `/api/world/generated-pack/import`
+Imports a generated-pack export into the current owner session. The server rejects tampered hashes, invalid generated-pack content, private owner fields, raw prompt fields, secret-like fields, and forbidden authority fields before saving.
+
+### POST `/api/world/generated-pack/remix`
+Creates a child generated pack from a parent durable pack and a new prompt. The child records `remix.parentPackId`, `remix.rootPackId`, `remix.generation`, and lineage entries. Remixing does not add tools, mutations, formulas, or server-rule overrides.
+
+### POST `/api/world/generated-pack/playtest-report`
+Records the measured generated-pack first-loop report. Passing reports require measured scores, screenshot evidence, clean console state, zero unhandled missing assets, canonical payload integrity, and generated-pack validation.
+
+---
+
 ## App-Wide Platform Asset Manifest
 
 ### GET `/assets/platform/asset-manifest.json`

@@ -256,3 +256,22 @@ The replayability suite now uses the roadmap ten-prompt seed set as a determinis
   "rawPromptLeakCount": 0
 }
 ```
+
+## GU-10 Pack Save, Reload, and Remix Slice
+
+Generated packs now have a durable ignored-data contract for prototype reload, export/import, and remix lineage. The store writes validated pack records under the generated-pack durable root, reloads the current pack after memory reset, falls back to the current durable pack when a requested pack is missing, exports a redacted owner-safe envelope, imports only hash-valid exports, and records remix parent/root/generation metadata without changing canonical world rules.
+
+```json
+{
+  "durablePackStorage": true,
+  "samePromptSameOwnerStablePack": true,
+  "restartReloadPass": true,
+  "exportImportRoundTrip": true,
+  "invalidImportRejected": true,
+  "remixLineageRecorded": true,
+  "migrationVersion": 1,
+  "missingPackFallback": true,
+  "privateDataLeakCount": 0,
+  "rawPromptStored": false
+}
+```

@@ -18,6 +18,7 @@ Status: prototype-gated
 - Browser runtime asset loading must use safe public generated-pack paths only; private candidate roots, path traversal, data URLs, provider URLs, and unapproved outputs must fall back without player exposure.
 - First-loop playtest pass status requires measured browser evidence, screenshot evidence, clean console state, canonical payload integrity, and generated-pack validation. Default or placeholder scores cannot pass release gates.
 - Replayability diversity pass status requires the ten-prompt seed suite, measured first-loop pass evidence, distinct replayability signatures, screenshot-hash comparison, and zero forbidden authority or raw prompt leaks.
+- Generated-pack exports must redact owner/session/private identifiers, omit raw prompts, include a content hash, and reject import if the hash or generated-pack validation fails.
 - Player-visible generated text must be escaped in DOM rendering.
 - Production image generation requires explicit consent and a documented cost/auth model before any user-facing release claim.
 
@@ -59,6 +60,11 @@ Status: prototype-gated
   "replayabilityFirstLoopPassCount": 10,
   "meaningfulDifferenceScoreMin": 0.65,
   "replayabilityForbiddenAuthorityCount": 0,
+  "durablePackStorage": true,
+  "exportImportRoundTrip": true,
+  "invalidImportRejected": true,
+  "remixLineageRecorded": true,
+  "privateDataLeakCount": 0,
   "approvedProductionAssetCount": 0,
   "generatedImageAssetsCanChangeServerRules": false,
   "productionImageAssetCount": 0,

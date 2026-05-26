@@ -13,7 +13,10 @@ const GENERATION_BRIEF_VERSION = 'agent-town-generation-brief-v1';
 const ASSET_PROMPT_PLAN_VERSION = 'agent-town-asset-prompt-plan-v1';
 const ASSET_SCAFFOLD_VERSION = 'agent-town-asset-generation-scaffold-v1';
 const GENERATED_ASSET_MANIFEST_VERSION = 'agent-town-generated-asset-manifest-v1';
+const GENERATED_PACK_EXPORT_VERSION = 'agent-town-generated-pack-export-v1';
+const GENERATED_PACK_MIGRATION_VERSION = 1;
 const DEFAULT_CANDIDATE_ROOT = 'data/generated-packs';
+const DEFAULT_DURABLE_ROOT = 'data/generated-packs-durable';
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const SCHEMA_REGISTRY = loadGeneratedPackSchemaRegistry();
 
@@ -298,6 +301,32 @@ function sha256(value = '') {
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function durableRoot() {
+  return path.resolve(REPO_ROOT, process.env.GENERATED_PACK_STORE_ROOT || DEFAULT_DURABLE_ROOT);
+}
+
+function ensureInsideRoot(root, target) {
+  const relative = path.relative(root, target);
+  return Boolean(relative && !relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
+function safeWriteJson(relativePath, value, root = durableRoot()) {
+  const fullPath = path.resolve(root, relativePath);
+  if (!ensureInsideRoot(root, fullPath)) {
+    const error = new Error('INVALID_STORAGE_PATH');
+    error.details = { relativePath };
+    throw error;
+  }
+  fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+  fs.writeFileSync(fullPath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+}
+
+function safeReadJson(relativePath, root = durableRoot()) {
+  const fullPath = path.resolve(root, relativePath);
+  if (!ensureInsideRoot(root, fullPath) || !fs.existsSync(fullPath)) return null;
+  return JSON.parse(fs.readFileSync(fullPath, 'utf8'));
 }
 
 function normalizePrompt(rawPrompt = '') {
@@ -1568,20 +1597,24 @@ function recordPlaytestReport(owner = {}, report = {}) {
   normalized.validationReport = validatePlaytestReport(normalized, pack);
   normalized.playtestPassed = normalized.validationReport.ok;
   playtestStore.set(key, clone(normalized));
+  persistGeneratedPack(owner, pack, { playtestReport: normalized });
   return clone(normalized);
 }
 
-function currentPlaytestReport(owner = {}) {
-  const key = storeKey(owner);
-  return key ? clone(playtestStore.get(key) || null) : null;
-}
-
-function createGeneratedPack({ owner, prompt, nowMs = Date.now(), candidateRoot = DEFAULT_CANDIDATE_ROOT } = {}) {
+function createGeneratedPack({
+  owner,
+  prompt,
+  nowMs = Date.now(),
+  candidateRoot = DEFAULT_CANDIDATE_ROOT,
+  packSalt = '',
+  remix = null,
+  migration = null
+} = {}) {
   const generationBrief = createGenerationBrief({ prompt });
   const promptHash = generationBrief.promptHash;
   const words = Array.isArray(generationBrief.keywordHints) ? generationBrief.keywordHints : [];
   const ownerHash = sha256(owner?.ownerAccountId || owner?.pairId || 'anonymous-owner');
-  const packHash = sha256(`${ownerHash}:${promptHash}`);
+  const packHash = sha256(`${ownerHash}:${promptHash}:${packSalt || 'base'}`);
   const preset = choosePreset(words, packHash);
   const palette = derivePromptPalette(preset.palette, packHash, words);
   const mappings = canonicalMappings(words, preset, packHash);
@@ -1594,6 +1627,19 @@ function createGeneratedPack({ owner, prompt, nowMs = Date.now(), candidateRoot 
     packId,
     ownerAccountId: owner?.ownerAccountId || 'owner_unknown',
     createdAtMs: nowMs,
+    migration: {
+      schemaVersion: 'agent-town-generated-pack-migration-v1',
+      migrationVersion: GENERATED_PACK_MIGRATION_VERSION,
+      importedFromExport: migration?.importedFromExport === true,
+      sourceExportHash: migration?.sourceExportHash || null
+    },
+    remix: remix || {
+      parentPackId: null,
+      rootPackId: packId,
+      generation: 0,
+      remixPromptHash: null,
+      lineage: []
+    },
     generator: {
       id: GENERATOR_ID,
       source: 'deterministic-fallback',
@@ -1701,15 +1747,314 @@ function storeKey(owner = {}) {
   return String(owner.ownerAccountId || owner.pairId || '').trim();
 }
 
+function ownerStoreId(owner = {}) {
+  const key = storeKey(owner);
+  return key ? sha256(key).slice(0, 32) : '';
+}
+
+function packPath(packId = '') {
+  return relativePackPath('packs', `${slugForTarget(packId)}.json`);
+}
+
+function ownerCurrentPath(owner = {}) {
+  return relativePackPath('owners', ownerStoreId(owner), 'current.json');
+}
+
+function ownerPackIndexPath(owner = {}) {
+  return relativePackPath('owners', ownerStoreId(owner), 'packs.json');
+}
+
+function validateStoredPack(pack = {}) {
+  const validationReport = validateGeneratedPack(pack);
+  if (!validationReport.ok) {
+    const error = new Error('GENPACK_VALIDATION_FAILED');
+    error.details = { validationReport };
+    throw error;
+  }
+  return validationReport;
+}
+
+function persistGeneratedPack(owner = {}, pack = {}, { playtestReport = null } = {}) {
+  const ownerId = ownerStoreId(owner);
+  if (!ownerId) {
+    const error = new Error('UNAUTHORIZED');
+    error.details = { reason: 'GENERATED_PACK_OWNER_UNAVAILABLE' };
+    throw error;
+  }
+  const storedPack = clone(pack);
+  storedPack.validationReport = validateStoredPack(storedPack);
+  const packRecord = {
+    schemaVersion: 'agent-town-generated-pack-record-v1',
+    packId: storedPack.packId,
+    ownerStoreId: ownerId,
+    savedAtMs: Date.now(),
+    migrationVersion: GENERATED_PACK_MIGRATION_VERSION,
+    pack: storedPack,
+    playtestReport: playtestReport ? clone(playtestReport) : currentPlaytestReport(owner)
+  };
+  safeWriteJson(packPath(storedPack.packId), packRecord);
+  safeWriteJson(ownerCurrentPath(owner), {
+    schemaVersion: 'agent-town-generated-pack-current-v1',
+    ownerStoreId: ownerId,
+    packId: storedPack.packId,
+    updatedAtMs: packRecord.savedAtMs
+  });
+  const index = safeReadJson(ownerPackIndexPath(owner)) || {
+    schemaVersion: 'agent-town-generated-pack-owner-index-v1',
+    ownerStoreId: ownerId,
+    packIds: []
+  };
+  index.packIds = [...new Set([storedPack.packId, ...(Array.isArray(index.packIds) ? index.packIds : [])])];
+  index.updatedAtMs = packRecord.savedAtMs;
+  safeWriteJson(ownerPackIndexPath(owner), index);
+  packStore.set(storeKey(owner), clone(storedPack));
+  if (packRecord.playtestReport) playtestStore.set(storeKey(owner), clone(packRecord.playtestReport));
+  return clone(packRecord);
+}
+
+function loadPackRecord(packId = '') {
+  const record = safeReadJson(packPath(packId));
+  return record?.schemaVersion === 'agent-town-generated-pack-record-v1' ? record : null;
+}
+
+function loadCurrentPackRecord(owner = {}) {
+  const pointer = safeReadJson(ownerCurrentPath(owner));
+  return pointer?.packId ? loadPackRecord(pointer.packId) : null;
+}
+
+function loadGeneratedPack(owner = {}, packId = '') {
+  const record = packId ? loadPackRecord(packId) : loadCurrentPackRecord(owner);
+  if (!record?.pack) return null;
+  const validationReport = validateGeneratedPack(record.pack);
+  if (!validationReport.ok) return null;
+  if (record.ownerStoreId !== ownerStoreId(owner)) return null;
+  return clone({
+    generatedPack: { ...record.pack, validationReport },
+    playtestReport: record.playtestReport || null
+  });
+}
+
 function generateAndStorePack({ owner, prompt, nowMs = Date.now() }) {
   const pack = createGeneratedPack({ owner, prompt, nowMs });
-  packStore.set(storeKey(owner), clone(pack));
+  persistGeneratedPack(owner, pack);
   return clone(pack);
 }
 
 function currentGeneratedPack(owner = {}) {
   const key = storeKey(owner);
-  return key ? clone(packStore.get(key) || null) : null;
+  if (!key) return null;
+  if (packStore.has(key)) return clone(packStore.get(key));
+  const loaded = loadGeneratedPack(owner);
+  return loaded?.generatedPack || null;
+}
+
+function currentPlaytestReport(owner = {}) {
+  const key = storeKey(owner);
+  if (!key) return null;
+  if (playtestStore.has(key)) return clone(playtestStore.get(key));
+  const loaded = loadGeneratedPack(owner);
+  return loaded?.playtestReport || null;
+}
+
+function reloadGeneratedPack(owner = {}, packId = '') {
+  const requestedPackId = String(packId || '').trim();
+  const loaded = requestedPackId ? loadGeneratedPack(owner, requestedPackId) : loadGeneratedPack(owner);
+  if (loaded?.generatedPack) {
+    packStore.set(storeKey(owner), clone(loaded.generatedPack));
+    if (loaded.playtestReport) playtestStore.set(storeKey(owner), clone(loaded.playtestReport));
+    return {
+      generatedPack: loaded.generatedPack,
+      playtestReport: loaded.playtestReport,
+      reloadReport: {
+        schemaVersion: 'agent-town-generated-pack-reload-report-v1',
+        requestedPackId: requestedPackId || loaded.generatedPack.packId,
+        loadedPackId: loaded.generatedPack.packId,
+        durablePackStorage: true,
+        fallbackUsed: false,
+        migrationVersion: loaded.generatedPack.migration?.migrationVersion || GENERATED_PACK_MIGRATION_VERSION
+      }
+    };
+  }
+  const fallback = loadGeneratedPack(owner);
+  if (fallback?.generatedPack) {
+    packStore.set(storeKey(owner), clone(fallback.generatedPack));
+    if (fallback.playtestReport) playtestStore.set(storeKey(owner), clone(fallback.playtestReport));
+    return {
+      generatedPack: fallback.generatedPack,
+      playtestReport: fallback.playtestReport,
+      reloadReport: {
+        schemaVersion: 'agent-town-generated-pack-reload-report-v1',
+        requestedPackId: requestedPackId || null,
+        loadedPackId: fallback.generatedPack.packId,
+        durablePackStorage: true,
+        fallbackUsed: true,
+        fallbackReason: 'PACK_NOT_FOUND',
+        migrationVersion: fallback.generatedPack.migration?.migrationVersion || GENERATED_PACK_MIGRATION_VERSION
+      }
+    };
+  }
+  const error = new Error('PACK_NOT_FOUND');
+  error.details = { packId: requestedPackId || null };
+  throw error;
+}
+
+function redactPackForExport(pack = {}) {
+  const exported = clone(pack);
+  exported.ownerAccountId = 'exported_owner_redacted';
+  exported.validationReport = validateGeneratedPack(exported);
+  return exported;
+}
+
+function exportedPackHash(exportedPack = {}) {
+  return sha256(JSON.stringify({
+    schemaVersion: exportedPack.schemaVersion,
+    packId: exportedPack.packId,
+    ownerAccountId: 'exported_owner_redacted',
+    prompt: exportedPack.prompt,
+    generationBrief: exportedPack.generationBrief,
+    stylePack: exportedPack.stylePack,
+    universePack: exportedPack.universePack,
+    gameplayMapping: exportedPack.gameplayMapping,
+    assetManifest: exportedPack.assetManifest,
+    assetPromptPlan: exportedPack.assetPromptPlan,
+    assetScaffold: exportedPack.assetScaffold,
+    migrationVersion: exportedPack.migration?.migrationVersion || GENERATED_PACK_MIGRATION_VERSION,
+    remix: exportedPack.remix || null
+  }));
+}
+
+function privateLeakCountForExport(exportEnvelope = {}, owner = {}) {
+  const text = JSON.stringify(exportEnvelope);
+  return [storeKey(owner), owner?.ownerAccountId, owner?.pairId, owner?.houseId]
+    .filter((value) => String(value || '').trim().length > 0)
+    .filter((value, index, all) => all.indexOf(value) === index)
+    .filter((value) => text.includes(String(value))).length;
+}
+
+function exportGeneratedPack(owner = {}, packId = '') {
+  const loaded = reloadGeneratedPack(owner, packId);
+  const exportedPack = redactPackForExport(loaded.generatedPack);
+  const packHash = exportedPackHash(exportedPack);
+  const envelope = {
+    schemaVersion: GENERATED_PACK_EXPORT_VERSION,
+    exportedAtMs: Date.now(),
+    exportId: `gen_export_${packHash.slice(0, 16)}`,
+    packHash,
+    migrationVersion: GENERATED_PACK_MIGRATION_VERSION,
+    privateDataExcluded: true,
+    vaultCompatibility: {
+      compatible: true,
+      privateOwnerFields: ['ownerAccountId'],
+      secretFieldCount: 0
+    },
+    redactionReport: {
+      ownerAccountIdRedacted: true,
+      rawPromptStored: false,
+      playtestReportIncluded: false
+    },
+    pack: exportedPack
+  };
+  envelope.privateDataLeakCount = privateLeakCountForExport(envelope, owner);
+  return envelope;
+}
+
+function normalizeExportEnvelope(envelope = {}) {
+  const wrapped = envelope?.schemaVersion === GENERATED_PACK_EXPORT_VERSION ? envelope : envelope?.exportEnvelope;
+  if (!wrapped || typeof wrapped !== 'object') {
+    const error = new Error('INVALID_GENERATED_PACK_EXPORT');
+    error.details = { reason: 'MISSING_EXPORT_ENVELOPE' };
+    throw error;
+  }
+  const pack = wrapped.pack;
+  const exportedPack = redactPackForExport(pack || {});
+  const expectedHash = exportedPackHash(exportedPack);
+  if (wrapped.schemaVersion !== GENERATED_PACK_EXPORT_VERSION || wrapped.packHash !== expectedHash) {
+    const error = new Error('INVALID_GENERATED_PACK_EXPORT');
+    error.details = { reason: 'EXPORT_HASH_MISMATCH' };
+    throw error;
+  }
+  const validationReport = validateGeneratedPack(exportedPack);
+  if (!validationReport.ok) {
+    const error = new Error('INVALID_GENERATED_PACK_EXPORT');
+    error.details = { reason: 'PACK_VALIDATION_FAILED', validationReport };
+    throw error;
+  }
+  if (privateLeakCountForExport(wrapped, { ownerAccountId: pack?.ownerAccountId }) > 0 && pack?.ownerAccountId !== 'exported_owner_redacted') {
+    const error = new Error('INVALID_GENERATED_PACK_EXPORT');
+    error.details = { reason: 'PRIVATE_OWNER_FIELD_NOT_REDACTED' };
+    throw error;
+  }
+  return { envelope: wrapped, exportedPack, packHash: expectedHash };
+}
+
+function importGeneratedPack(owner = {}, envelope = {}, { nowMs = Date.now() } = {}) {
+  const normalized = normalizeExportEnvelope(envelope);
+  const importedPack = clone(normalized.exportedPack);
+  importedPack.ownerAccountId = owner?.ownerAccountId || 'owner_unknown';
+  importedPack.migration = {
+    schemaVersion: 'agent-town-generated-pack-migration-v1',
+    migrationVersion: GENERATED_PACK_MIGRATION_VERSION,
+    importedFromExport: true,
+    sourceExportHash: normalized.packHash,
+    importedAtMs: nowMs
+  };
+  importedPack.validationReport = validateStoredPack(importedPack);
+  persistGeneratedPack(owner, importedPack);
+  return {
+    generatedPack: clone(importedPack),
+    importReport: {
+      schemaVersion: 'agent-town-generated-pack-import-report-v1',
+      importedPackId: importedPack.packId,
+      sourceExportHash: normalized.packHash,
+      migrationVersion: GENERATED_PACK_MIGRATION_VERSION,
+      exportImportRoundTrip: exportGeneratedPack(owner, importedPack.packId).packHash === normalized.packHash,
+      privateDataLeakCount: privateLeakCountForExport(normalized.envelope, owner)
+    }
+  };
+}
+
+function remixGeneratedPack({ owner, parentPackId = '', prompt, nowMs = Date.now() } = {}) {
+  const parent = reloadGeneratedPack(owner, parentPackId).generatedPack;
+  const parentLineage = Array.isArray(parent?.remix?.lineage) ? parent.remix.lineage : [];
+  const remixPrompt = createGenerationBrief({ prompt });
+  const rootPackId = parent?.remix?.rootPackId || parent.packId;
+  const generation = Number(parent?.remix?.generation || 0) + 1;
+  const remix = {
+    parentPackId: parent.packId,
+    rootPackId,
+    generation,
+    remixPromptHash: remixPrompt.promptHash,
+    lineage: [
+      ...parentLineage,
+      {
+        parentPackId: parent.packId,
+        parentPromptHash: parent.prompt?.hash || parent.generationBrief?.promptHash || null
+      }
+    ]
+  };
+  const generatedPack = createGeneratedPack({
+    owner,
+    prompt,
+    nowMs,
+    packSalt: `${parent.packId}:${generation}`,
+    remix,
+    migration: {
+      importedFromExport: false,
+      sourceExportHash: null
+    }
+  });
+  persistGeneratedPack(owner, generatedPack);
+  return {
+    generatedPack,
+    remixReport: {
+      schemaVersion: 'agent-town-generated-pack-remix-report-v1',
+      parentPackId: parent.packId,
+      childPackId: generatedPack.packId,
+      rootPackId,
+      generation,
+      remixLineageRecorded: true
+    }
+  };
 }
 
 function diversityTokenSet(parts = []) {
@@ -1937,9 +2282,12 @@ function analyzePackDiversity(packs = [], options = {}) {
   };
 }
 
-function clearGeneratedPacksForTests() {
+function clearGeneratedPacksForTests({ clearDisk = false } = {}) {
   packStore.clear();
   playtestStore.clear();
+  if (clearDisk) {
+    fs.rmSync(durableRoot(), { recursive: true, force: true });
+  }
 }
 
 module.exports = {
@@ -1957,9 +2305,13 @@ module.exports = {
   createGeneratedPack,
   currentGeneratedPack,
   currentPlaytestReport,
+  exportGeneratedPack,
   generateAndStorePack,
+  importGeneratedPack,
   normalizePrompt,
   recordPlaytestReport,
+  reloadGeneratedPack,
+  remixGeneratedPack,
   scaffoldAssetGenerationJobs,
   validateGeneratedPackSchemas,
   validateAssetManifest,

@@ -25,6 +25,8 @@
     "packId": { "type": "string", "minLength": 3 },
     "ownerAccountId": { "type": "string", "minLength": 3 },
     "createdAtMs": { "type": "number" },
+    "migration": { "type": "object" },
+    "remix": { "type": "object" },
     "generator": { "type": "object" },
     "prompt": {
       "type": "object",

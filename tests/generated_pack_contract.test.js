@@ -31,13 +31,15 @@ async function withWorldGridServer({ identity, envPatch = {} }, fn) {
     ADMIN_TOKEN: process.env.ADMIN_TOKEN,
     FEATURE_WORLD_GRID_V50_REGION: process.env.FEATURE_WORLD_GRID_V50_REGION,
     FEATURE_WORLD_GRID_GENERATED_PACKS: process.env.FEATURE_WORLD_GRID_GENERATED_PACKS,
-    WORLD_GRID_FEATURE_FLAGS: process.env.WORLD_GRID_FEATURE_FLAGS
+    WORLD_GRID_FEATURE_FLAGS: process.env.WORLD_GRID_FEATURE_FLAGS,
+    GENERATED_PACK_STORE_ROOT: process.env.GENERATED_PACK_STORE_ROOT
   };
+  const clearDisk = Object.prototype.hasOwnProperty.call(envPatch, 'GENERATED_PACK_STORE_ROOT');
   for (const [key, value] of Object.entries(envPatch)) {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
   }
-  clearGeneratedPacksForTests();
+  clearGeneratedPacksForTests({ clearDisk });
   const app = express();
   app.use(express.json());
   app.use(createWorldGridRouter({
@@ -50,7 +52,7 @@ async function withWorldGridServer({ identity, envPatch = {} }, fn) {
     return await fn(baseUrl);
   } finally {
     await new Promise((resolve) => server.close(resolve));
-    clearGeneratedPacksForTests();
+    clearGeneratedPacksForTests({ clearDisk });
     for (const [key, value] of Object.entries(previous)) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
@@ -279,12 +281,20 @@ test('generated pack API is gated and records first-loop playtest reports when e
 
   await withWorldGridServer({
     identity,
-    envPatch: { NODE_ENV: 'test', WORLD_GRID_FEATURE_FLAGS: 'all' }
+    envPatch: {
+      NODE_ENV: 'test',
+      WORLD_GRID_FEATURE_FLAGS: 'all',
+      GENERATED_PACK_STORE_ROOT: 'data/generated-packs-contract-test'
+    }
   }, async (baseUrl) => {
     const toolsResponse = await fetch(`${baseUrl}/api/world/tools`);
     const toolsBody = await toolsResponse.json();
     assert.equal(toolsResponse.status, 200, JSON.stringify(toolsBody));
     assert.equal(toolsBody.tools.some((tool) => tool.name === 'et.world.generated_pack.generate'), true);
+    assert.equal(toolsBody.tools.some((tool) => tool.name === 'et.world.generated_pack.reload'), true);
+    assert.equal(toolsBody.tools.some((tool) => tool.name === 'et.world.generated_pack.export'), true);
+    assert.equal(toolsBody.tools.some((tool) => tool.name === 'et.world.generated_pack.import'), true);
+    assert.equal(toolsBody.tools.some((tool) => tool.name === 'et.world.generated_pack.remix'), true);
 
     const generateResponse = await fetch(`${baseUrl}/api/world/generated-pack/generate`, {
       method: 'POST',
@@ -354,5 +364,45 @@ test('generated pack API is gated and records first-loop playtest reports when e
     const currentBody = await currentResponse.json();
     assert.equal(currentResponse.status, 200, JSON.stringify(currentBody));
     assert.equal(currentBody.playtestReport.packId, generateBody.generatedPack.packId);
+
+    clearGeneratedPacksForTests();
+    const reloadResponse = await fetch(`${baseUrl}/api/world/generated-pack/reload`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ packId: generateBody.generatedPack.packId })
+    });
+    const reloadBody = await reloadResponse.json();
+    assert.equal(reloadResponse.status, 200, JSON.stringify(reloadBody));
+    assert.equal(reloadBody.generatedPack.packId, generateBody.generatedPack.packId);
+    assert.equal(reloadBody.reloadReport.durablePackStorage, true);
+
+    const exportResponse = await fetch(`${baseUrl}/api/world/generated-pack/export`);
+    const exportBody = await exportResponse.json();
+    assert.equal(exportResponse.status, 200, JSON.stringify(exportBody));
+    assert.equal(exportBody.exportEnvelope.privateDataExcluded, true);
+    assert.equal(exportBody.exportEnvelope.privateDataLeakCount, 0);
+    assert.equal(JSON.stringify(exportBody.exportEnvelope).includes(identity.pairId), false);
+
+    const importResponse = await fetch(`${baseUrl}/api/world/generated-pack/import`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ exportEnvelope: exportBody.exportEnvelope })
+    });
+    const importBody = await importResponse.json();
+    assert.equal(importResponse.status, 200, JSON.stringify(importBody));
+    assert.equal(importBody.importReport.exportImportRoundTrip, true);
+
+    const remixResponse = await fetch(`${baseUrl}/api/world/generated-pack/remix`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        parentPackId: generateBody.generatedPack.packId,
+        prompt: 'cozy mushroom frontier remixed with crystal cave lantern rail'
+      })
+    });
+    const remixBody = await remixResponse.json();
+    assert.equal(remixResponse.status, 200, JSON.stringify(remixBody));
+    assert.equal(remixBody.remixReport.parentPackId, generateBody.generatedPack.packId);
+    assert.equal(remixBody.remixReport.remixLineageRecorded, true);
   });
 });

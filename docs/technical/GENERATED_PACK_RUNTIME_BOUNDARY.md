@@ -79,6 +79,14 @@ Player prompt
 - Prompt-derived palette variants keep same-preset packs visually distinct while preserving readable text contrast and canonical gameplay mappings.
 - Browser coverage runs all ten prompts through the real world-grid first loop and reuses the same diversity analyzer on the returned packs and measured playtest reports.
 
+## GU-10 Pack Save, Reload, and Remix Slice
+
+- Generated-pack records are persisted under an ignored durable root, defaulting to `data/generated-packs-durable`.
+- `reloadGeneratedPack` reloads a saved pack by ID, reloads the current pack after memory reset, and falls back to the current durable pack when a requested pack is missing.
+- `exportGeneratedPack` writes an owner-redacted export envelope with a stable content hash, migration version, vault compatibility metadata, and no raw prompt text.
+- `importGeneratedPack` accepts only hash-valid generated-pack exports, rejects tampering or private owner fields, migrates the pack to the current owner, and validates before saving.
+- `remixGeneratedPack` creates a child pack with parent/root/generation lineage while preserving canonical mappings and zero server-rule overrides.
+
 ## Machine Checks
 
 ```json
@@ -133,6 +141,14 @@ Player prompt
   "uniqueReplayabilitySignatures": 10,
   "uniqueScreenshotHashes": 10,
   "meaningfulDifferenceScoreMin": 0.65,
-  "replayabilityForbiddenAuthorityCount": 0
+  "replayabilityForbiddenAuthorityCount": 0,
+  "durablePackStorage": true,
+  "restartReloadPass": true,
+  "exportImportRoundTrip": true,
+  "invalidImportRejected": true,
+  "remixLineageRecorded": true,
+  "missingPackFallback": true,
+  "privateDataLeakCount": 0,
+  "migrationVersion": 1
 }
 ```
