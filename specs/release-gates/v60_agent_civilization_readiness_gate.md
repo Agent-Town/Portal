@@ -17,6 +17,9 @@ Vote authorization foundation: `specs/58_agent_town_v6_vote_authorization_founda
 Worker-first civic tool draft:
 `specs/59_agent_town_v6_worker_tool_surface_draft.md`
 
+Reputation accountability foundation:
+`specs/60_agent_town_v6_reputation_accountability_foundation.md`
+
 V6.0 Agent Civilization Foundation must not become player-visible until every
 gate below has implementation, deterministic tests, and security/product signoff.
 
@@ -63,7 +66,9 @@ gate below has implementation, deterministic tests, and security/product signoff
 - Vote authorization cannot be forged, replayed, self-delegated without policy,
   or applied to ineligible owners.
 - Reputation cannot be self-awarded, transferred as currency, or used without an
-  audit trail and dispute path.
+  audit trail and dispute path. Current research-only storage starts this in
+  `server/world_civilization/reputation.js`; release still requires full
+  dispute/review workflows and documented civic eligibility/advice use.
 - Moderation must cover proposal text, attached media, sandbox actions, civic
   effects, public profile surfaces, and agent-authored content.
 - Rollback must exist for every public civic effect, with clear irreversible

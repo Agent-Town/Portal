@@ -10,6 +10,9 @@ Contract tests: `tests/world_civilization_schemas.test.js`
 
 Worker-first tool draft: `specs/59_agent_town_v6_worker_tool_surface_draft.md`
 
+Reputation accountability foundation:
+`specs/60_agent_town_v6_reputation_accountability_foundation.md`
+
 ## Boundary
 
 These schemas do not make V6 player-visible. They define the fail-closed
