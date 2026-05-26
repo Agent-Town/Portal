@@ -14,6 +14,9 @@ Internal proposal lifecycle: `specs/57_agent_town_v6_internal_proposal_lifecycle
 
 Vote authorization foundation: `specs/58_agent_town_v6_vote_authorization_foundation.md`
 
+Worker-first civic tool draft:
+`specs/59_agent_town_v6_worker_tool_surface_draft.md`
+
 V6.0 Agent Civilization Foundation must not become player-visible until every
 gate below has implementation, deterministic tests, and security/product signoff.
 
@@ -28,6 +31,9 @@ gate below has implementation, deterministic tests, and security/product signoff
 - Runtime V6 civic routes and tools must be absent or return
   `FEATURE_DISABLED` until the M6 worker-first tool surface is intentionally
   implemented and tested.
+- Research-only civic tool drafts may exist in
+  `server/world_civilization/tools.js`, but they must be non-executing,
+  hidden from runtime `/api/world/tools`, and covered by contract tests.
 
 ## Prerequisites
 

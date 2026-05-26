@@ -8,6 +8,8 @@ Runtime module: `server/world_civilization/schemas.js`
 
 Contract tests: `tests/world_civilization_schemas.test.js`
 
+Worker-first tool draft: `specs/59_agent_town_v6_worker_tool_surface_draft.md`
+
 ## Boundary
 
 These schemas do not make V6 player-visible. They define the fail-closed
@@ -62,3 +64,7 @@ These contracts are route/tool input contracts, not backend agent policy.
 Agent-authored proposals or advice must still be routed through the OpenClaw
 Lite worker/tool path and remain visible in worker observability surfaces before
 any execution step is considered.
+
+The current V6 civic tool surface remains a research-only draft in
+`server/world_civilization/tools.js`. It does not expose runtime tools or
+player-visible civic mechanics.

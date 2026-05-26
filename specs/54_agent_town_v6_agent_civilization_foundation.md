@@ -19,6 +19,9 @@ Internal proposal lifecycle: `specs/57_agent_town_v6_internal_proposal_lifecycle
 
 Vote authorization foundation: `specs/58_agent_town_v6_vote_authorization_foundation.md`
 
+Worker-first civic tool draft:
+`specs/59_agent_town_v6_worker_tool_surface_draft.md`
+
 ## Implementation Boundary
 
 Do not add V6 civic mechanics to normal gameplay or the world-grid prototype
@@ -28,9 +31,11 @@ retention, reputation, and governance release gates.
 The V6 feature flag is explicit and research-only. Broad V5 prototype overrides
 such as `WORLD_GRID_FEATURE_FLAGS=all`, `world`, or `prototype` enable V5.0-V5.5
 only; they must not enable `FEATURE_WORLD_V60_AGENT_CIVILIZATION` by accident.
-Internal V6 research may opt in with `v60` or the full flag name, but runtime
-V6 civic tools and routes remain absent or disabled until the worker-first V6
-tool surface and readiness gate are implemented.
+Internal V6 research may opt in with `v60` or the full flag name. The
+research-only civic tool draft in `server/world_civilization/tools.js` is
+non-executing and hidden from runtime `/api/world/tools`; runtime V6 civic
+tools and routes remain absent or disabled until the worker-first V6 tool
+surface and readiness gate are implemented.
 
 ## Goal
 

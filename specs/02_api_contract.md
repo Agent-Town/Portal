@@ -2745,7 +2745,8 @@ Returns `{ ok, featureFlags, tools }`, where `tools` is the runtime source of
 truth for world-grid tool contracts. Every tool entry includes `name`,
 `description`, and `featureFlag`; the world-grid pack manifest mirrors this in
 `toolMetadata`. No `et.world.civic.*` V6 tool may appear here until the V6
-worker-first tool surface is implemented and release-gated.
+worker-first tool surface is implemented and release-gated. The research-only
+draft in `server/world_civilization/tools.js` is not runtime exposure.
 
 ### GET `/api/world/region`
 Returns a deterministic V5.0 region payload for the current owner identity when

@@ -41,6 +41,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'specs/56_agent_town_v6_audit_ledger_foundation.md',
     'specs/57_agent_town_v6_internal_proposal_lifecycle.md',
     'specs/58_agent_town_v6_vote_authorization_foundation.md',
+    'specs/59_agent_town_v6_worker_tool_surface_draft.md',
     'docs/product/WORLD_GRID_LADDER_V5_TO_V6.md',
     'docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md',
     'docs/product/PUBLIC_PRESENCE_PRIVACY_MODEL_V5.md',
@@ -62,6 +63,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'server/world_civilization/audit_ledger.js',
     'server/world_civilization/proposals.js',
     'server/world_civilization/schemas.js',
+    'server/world_civilization/tools.js',
     'server/world_civilization/votes.js',
     'public/experiences/world-grid/manifest.json',
     'public/experiences/world-grid/skill.md',
@@ -114,6 +116,11 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(spec, /WORLD_GRID_FEATURE_FLAGS=all/);
   assert.match(gate, /Broad V5 prototype overrides/);
   assert.match(gate, /Production player query\/header overrides must not enable V6\.0/);
+  assert.match(plan, /M6 Worker-first V6 tool surface \| `in_progress`/);
+  assert.match(plan, /server\/world_civilization\/tools\.js/);
+  assert.match(spec, /research-only civic tool draft/);
+  assert.match(gate, /server\/world_civilization\/tools\.js/);
+  assert.match(gate, /hidden from runtime `\/api\/world\/tools`/);
 });
 
 test('V5 world-grid release promotion gate blocks V6 on prototype-only evidence', () => {

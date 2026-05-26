@@ -40,7 +40,7 @@ Until every prerequisite below is met:
 | M3 Release-grade world storage | `in_progress` | Replace process-local world-grid stores before public civic systems depend on them. | Durable owner indexes, migration versioning, idempotency records, audit/replay rows, restart persistence tests, rollback handles, the durable world-grid audit log foundation, and the `server/world_civilization/audit_ledger.js` foundation exist for every mutating world endpoint. |
 | M4 Civic schema contracts | `done` | Define the stable data contracts for V6 institutions. | Proposal, vote, delegation, civic action, reputation, moderation decision, rollback, and audit ledger schemas are documented in `specs/55_agent_town_v6_civic_schema_contracts.md` and validated by `tests/world_civilization_schemas.test.js`. |
 | M5 Mutation security controls | `in_progress` | Make civic mutations safe against cross-origin, replay, and abuse paths. | Same-origin/CSRF checks, session/wallet auth, rate limits, idempotency keys, ownership checks, and production feature override safety tests are enforced for mutating civic routes. |
-| M6 Worker-first V6 tool surface | `planned` | Preserve the OpenClaw Lite worker as the authority for agent behavior. | `FEATURE_WORLD_V60_AGENT_CIVILIZATION` defaults off, broad V5 prototype overrides do not enable V6, V6 tools are feature-gated, visible in the runtime tool manifest, traceable in Worker Traffic, and exercised through worker/tool flows rather than backend shortcuts. |
+| M6 Worker-first V6 tool surface | `in_progress` | Preserve the OpenClaw Lite worker as the authority for agent behavior. | `FEATURE_WORLD_V60_AGENT_CIVILIZATION` defaults off, broad V5 prototype overrides do not enable V6, `server/world_civilization/tools.js` defines a research-only non-executing civic tool draft, V6 tools are feature-gated, visible in the runtime tool manifest only when intentionally implemented, traceable in Worker Traffic, and exercised through worker/tool flows rather than backend shortcuts. |
 | M7 Internal proposal lifecycle | `in_progress` | Let humans or agents draft bounded civic proposals without executing them. | Proposals have scope, proposer identity, effect preview, moderation class, expiry, idempotency, private-data redaction, audit records, and no state mutation until approved. |
 | M8 Vote authorization and delegation | `in_progress` | Add explicit consent mechanics for civic decisions. | Vote auth prevents forgery/replay, enforces eligibility, records receipts, handles abstain/revoke/delegation policy, proves one-vote accounting, and starts with `server/world_civilization/votes.js`. |
 | M9 Reputation and accountability | `planned` | Add bounded trust signals without turning reputation into farmable currency. | Reputation cannot be self-awarded or transferred, has dispute/review paths, is privacy-bounded, and affects only documented civic eligibility or advice surfaces. |
@@ -60,7 +60,8 @@ Until every prerequisite below is met:
 2. Close M2 by promoting V5 prototype evidence into release-grade gates.
 3. Close M3-M6 before expanding V6 civic mechanics beyond research-only
    contracts/foundations.
-4. Add M5/M6 controls before any mutating V6 route, tool, or UI exists.
+4. Keep the M6 civic tool draft non-executing and hidden until worker/runtime
+   exposure, observability, and mutating-route security controls are complete.
 5. Keep M7-M12 behind research/internal flags only until V5 hardening gates are
    closed.
 6. Add M13-M15 once schemas, auth, moderation, privacy, and rollback are proven.
