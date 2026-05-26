@@ -4,7 +4,8 @@
   const state = {
     payload: null,
     scene: null,
-    selectedCellId: ''
+    selectedCellId: '',
+    csrfToken: ''
   };
 
   function qs(selector) {
@@ -17,14 +18,34 @@
     return headers;
   }
 
+  async function worldGridCsrfToken() {
+    if (state.csrfToken) return state.csrfToken;
+    const headers = flagOverride ? { 'x-world-grid-feature-flags': flagOverride } : {};
+    const response = await fetch('/api/world/mutation-token', {
+      credentials: 'include',
+      headers
+    });
+    if (!response.ok) return '';
+    const body = await response.json().catch(() => null);
+    state.csrfToken = typeof body?.csrfToken === 'string' ? body.csrfToken : '';
+    return state.csrfToken;
+  }
+
   async function api(path, options = {}) {
+    const method = String(options.method || 'GET').toUpperCase();
+    const mutating = method !== 'GET' && method !== 'HEAD';
+    const headers = {
+      ...(options.headers || {}),
+      ...(options.method ? apiHeaders() : (flagOverride ? { 'x-world-grid-feature-flags': flagOverride } : {}))
+    };
+    if (mutating) {
+      const csrfToken = await worldGridCsrfToken();
+      if (csrfToken) headers['x-world-grid-csrf'] = csrfToken;
+    }
     const response = await fetch(path, {
       credentials: 'include',
       ...options,
-      headers: {
-        ...(options.headers || {}),
-        ...(options.method ? apiHeaders() : (flagOverride ? { 'x-world-grid-feature-flags': flagOverride } : {}))
-      }
+      headers
     });
     const body = await response.json();
     if (!response.ok || body.ok === false) {

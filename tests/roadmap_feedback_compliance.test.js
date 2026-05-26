@@ -54,6 +54,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'docs/security/AGENT_SERVICES_DATA_ACCESS_POLICY.md',
     'docs/security/PUBLIC_TEXT_RENDERING_POLICY.md',
     'docs/security/PUBLIC_PRESENCE_REDACTION_POLICY.md',
+    'server/world_grid/csrf.js',
     'server/world_grid/idempotency.js',
     'server/world_grid/mutation_origin.js',
     'server/world_grid/rate_limit.js',
@@ -188,6 +189,22 @@ test('world-grid mutation origin policy is tracked as an M5 release security con
   assert.match(stateModel, /same-origin mutation context in production/);
   assert.match(evidence, /Mutation origin guard/);
   assert.match(evidence, /server\/world_grid\/mutation_origin\.js/);
+});
+
+test('world-grid CSRF policy is tracked as prototype-only M5 coverage', () => {
+  const plan = read('docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md');
+  const security = read('docs/security/WORLD_GRID_MUTATION_SECURITY_PLAN.md');
+  const stateModel = read('docs/technical/WORLD_GRID_STATE_MODEL.md');
+  const evidence = read('docs/release-evidence/WORLD_GRID_V50_REGION_PROTOTYPE_EVIDENCE_2026-05-26.md');
+
+  assert.match(plan, /owner-bound CSRF tokens/);
+  assert.match(security, /\/api\/world\/mutation-token/);
+  assert.match(security, /missing, invalid, and cross-owner tokens/);
+  assert.match(security, /durable CSRF token storage/);
+  assert.match(stateModel, /server\/world_grid\/csrf\.js/);
+  assert.match(stateModel, /Durable\/session-bound CSRF token issuance/);
+  assert.match(evidence, /Mutation CSRF guard/);
+  assert.match(evidence, /cross-owner tokens/);
 });
 
 test('world-grid mutation rate-limit policy is tracked as prototype-only M5 coverage', () => {

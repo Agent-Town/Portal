@@ -41,6 +41,11 @@ const {
   isWorldGridFeatureEnabled,
   resolveWorldGridFeatureFlags
 } = require('./feature_flags');
+const {
+  issueWorldGridCsrfToken,
+  requireWorldGridCsrfToken,
+  worldGridCsrfRequired
+} = require('./csrf');
 const { runIdempotentWorldGridMutation } = require('./idempotency');
 const { requireWorldGridMutationOrigin } = require('./mutation_origin');
 const { loadWorldGridPlotPrerequisite } = require('./plot_prerequisite');
@@ -216,6 +221,8 @@ function statusForWorldGridError(normalized = {}) {
   if ([
     'FORBIDDEN',
     'FORBIDDEN_ORIGIN',
+    'CSRF_REQUIRED',
+    'CSRF_INVALID',
     'FEATURE_DISABLED',
     'INVALID_CLAIM_TARGET',
     'INVALID_CLAIM_STATE'
@@ -345,6 +352,7 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
   function requireMutationPrerequisites(req, payload, surface) {
     requireWorldGridMutationOrigin(req);
     requirePlotPrerequisite(payload);
+    requireWorldGridCsrfToken(req, payload.owner);
     return requireWorldGridIdempotencyKey(req, surface);
   }
 
@@ -393,6 +401,24 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     } catch (error) {
       const normalized = normalizeError(error);
       res.status(statusForWorldGridError(normalized)).json({ ok: false, error: normalized });
+    }
+  });
+
+  router.get('/api/world/mutation-token', (req, res) => {
+    try {
+      if (worldGridCsrfRequired()) requireWorldGridMutationOrigin(req);
+      const payload = buildRegionPayload(req, res);
+      const issued = issueWorldGridCsrfToken(payload.owner);
+      res.json({
+        ok: true,
+        featureFlags: payload.featureFlags,
+        csrfToken: issued.token,
+        expiresAtMs: issued.expiresAtMs
+      });
+    } catch (error) {
+      const normalized = normalizeError(error);
+      const status = statusForWorldGridError(normalized);
+      res.status(status).json({ ok: false, error: normalized });
     }
   });
 

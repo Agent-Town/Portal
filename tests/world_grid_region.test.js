@@ -24,6 +24,8 @@ async function withWorldGridServer({ identity, envPatch = {} }, fn) {
     ADMIN_TOKEN: process.env.ADMIN_TOKEN,
     FEATURE_WORLD_GRID_V50_REGION: process.env.FEATURE_WORLD_GRID_V50_REGION,
     WORLD_GRID_FEATURE_FLAGS: process.env.WORLD_GRID_FEATURE_FLAGS,
+    WORLD_GRID_CSRF_REQUIRED: process.env.WORLD_GRID_CSRF_REQUIRED,
+    WORLD_GRID_CSRF_TOKEN_TTL_MS: process.env.WORLD_GRID_CSRF_TOKEN_TTL_MS,
     WORLD_GRID_MUTATION_RATE_LIMIT_MAX: process.env.WORLD_GRID_MUTATION_RATE_LIMIT_MAX,
     WORLD_GRID_MUTATION_RATE_LIMIT_WINDOW_MS: process.env.WORLD_GRID_MUTATION_RATE_LIMIT_WINDOW_MS
   };
@@ -81,6 +83,14 @@ function sameOriginMutationHeaders(baseUrl, extra = {}) {
     'sec-fetch-dest': 'empty',
     ...extra
   };
+}
+
+async function fetchWorldGridCsrfToken(baseUrl, headers = {}) {
+  const response = await fetch(`${baseUrl}/api/world/mutation-token`, { headers });
+  const body = await response.json();
+  assert.equal(response.status, 200, JSON.stringify(body));
+  assert.match(body.csrfToken, /^wgcsrf_[a-f0-9]{48}$/);
+  return body.csrfToken;
 }
 
 test('V5.0 region generation is deterministic with stable cells and home settlement', () => {
@@ -467,9 +477,10 @@ test('mutating world-grid routes reject cross-origin metadata and require same-o
     assert.equal(crossFetchResponse.status, 403, JSON.stringify(crossFetch));
     assert.equal(crossFetch.error.code, 'FORBIDDEN_ORIGIN');
 
+    const csrfToken = await fetchWorldGridCsrfToken(baseUrl, sameOriginMutationHeaders(baseUrl));
     const sameOriginResponse = await fetch(`${baseUrl}/api/world/territory/plan-claim`, {
       method: 'POST',
-      headers: sameOriginMutationHeaders(baseUrl),
+      headers: sameOriginMutationHeaders(baseUrl, { 'x-world-grid-csrf': csrfToken }),
       body: JSON.stringify({ cellId: firstOption.cellId, idempotencyKey: 'origin_same_origin_001' })
     });
     const sameOrigin = await sameOriginResponse.json();
@@ -478,6 +489,66 @@ test('mutating world-grid routes reject cross-origin metadata and require same-o
 
     const regionAfterOriginChecks = await (await fetch(`${baseUrl}/api/world/region`)).json();
     assert.equal(regionAfterOriginChecks.territory.claims.length, 1);
+  });
+});
+
+test('mutating world-grid routes require owner-bound CSRF tokens in production', async () => {
+  await withDynamicWorldGridServer({
+    NODE_ENV: 'production',
+    WORLD_GRID_FEATURE_FLAGS: 'all'
+  }, async (baseUrl, headersFor) => {
+    const ownerA = `session:world-grid-csrf-a-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const ownerB = `session:world-grid-csrf-b-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    seedFoundersPlot(ownerA);
+    seedFoundersPlot(ownerB);
+    const headersA = headersFor(ownerA);
+    const headersB = headersFor(ownerB);
+
+    const optionsResponse = await fetch(`${baseUrl}/api/world/territory/claim-options`, { headers: headersA });
+    const optionsBody = await optionsResponse.json();
+    assert.equal(optionsResponse.status, 200, JSON.stringify(optionsBody));
+    const option = optionsBody.options[0];
+    assert.ok(option);
+
+    const missingTokenResponse = await fetch(`${baseUrl}/api/world/territory/plan-claim`, {
+      method: 'POST',
+      headers: sameOriginMutationHeaders(baseUrl, headersA),
+      body: JSON.stringify({ cellId: option.cellId, idempotencyKey: 'csrf_missing_001' })
+    });
+    const missingToken = await missingTokenResponse.json();
+    assert.equal(missingTokenResponse.status, 403, JSON.stringify(missingToken));
+    assert.equal(missingToken.error.code, 'CSRF_REQUIRED');
+
+    const invalidTokenResponse = await fetch(`${baseUrl}/api/world/territory/plan-claim`, {
+      method: 'POST',
+      headers: sameOriginMutationHeaders(baseUrl, { ...headersA, 'x-world-grid-csrf': 'wgcsrf_invalid' }),
+      body: JSON.stringify({ cellId: option.cellId, idempotencyKey: 'csrf_invalid_001' })
+    });
+    const invalidToken = await invalidTokenResponse.json();
+    assert.equal(invalidTokenResponse.status, 403, JSON.stringify(invalidToken));
+    assert.equal(invalidToken.error.code, 'CSRF_INVALID');
+
+    const csrfTokenA = await fetchWorldGridCsrfToken(baseUrl, sameOriginMutationHeaders(baseUrl, headersA));
+    const wrongOwnerResponse = await fetch(`${baseUrl}/api/world/territory/plan-claim`, {
+      method: 'POST',
+      headers: sameOriginMutationHeaders(baseUrl, { ...headersB, 'x-world-grid-csrf': csrfTokenA }),
+      body: JSON.stringify({ cellId: option.cellId, idempotencyKey: 'csrf_wrong_owner_001' })
+    });
+    const wrongOwner = await wrongOwnerResponse.json();
+    assert.equal(wrongOwnerResponse.status, 403, JSON.stringify(wrongOwner));
+    assert.equal(wrongOwner.error.code, 'CSRF_INVALID');
+
+    const validResponse = await fetch(`${baseUrl}/api/world/territory/plan-claim`, {
+      method: 'POST',
+      headers: sameOriginMutationHeaders(baseUrl, { ...headersA, 'x-world-grid-csrf': csrfTokenA }),
+      body: JSON.stringify({ cellId: option.cellId, idempotencyKey: 'csrf_valid_001' })
+    });
+    const valid = await validResponse.json();
+    assert.equal(validResponse.status, 200, JSON.stringify(valid));
+    assert.equal(valid.claim.cellId, option.cellId);
+
+    const regionAfterCsrf = await (await fetch(`${baseUrl}/api/world/region`, { headers: headersA })).json();
+    assert.equal(regionAfterCsrf.territory.claims.length, 1);
   });
 });
 

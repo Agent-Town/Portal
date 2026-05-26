@@ -34,6 +34,7 @@ function requestBodyWithoutIdempotency(body = {}) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return {};
   const next = clone(body);
   delete next.idempotencyKey;
+  delete next.csrfToken;
   return next;
 }
 

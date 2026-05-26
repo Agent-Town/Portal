@@ -14,6 +14,9 @@ until the controls below are implemented and covered by deterministic tests.
   cross-origin `Origin`, `Referer`, or Fetch Metadata. In production they also
   require positive same-origin context before any plot mutation or idempotency
   replay is allowed.
+- Mutating V5.1+ world-grid routes and tool routes require an owner-bound
+  world-grid CSRF token in production, issued by `/api/world/mutation-token`.
+  The token store is process-local and prototype-only.
 - V5.1+ mutating world-grid routes require an existing Founders Plot
   prerequisite and return `WORLD_GRID_PLOT_REQUIRED` when missing.
 - V5.1+ externally visible mutating prototype routes now require an
@@ -35,8 +38,10 @@ until the controls below are implemented and covered by deterministic tests.
   Current coverage rejects cross-origin metadata and requires same-origin
   context in production; release promotion still needs integration with the
   final session-auth surface.
-- CSRF token protection for browser-authenticated mutations, with tests for
-  missing, stale, and cross-session tokens.
+- CSRF token protection for browser-authenticated mutations. Current coverage
+  verifies missing, invalid, and cross-owner tokens; release promotion still
+  needs final session-bound token issuance, expiry/restart behavior, and
+  cross-session browser coverage.
 - Session-auth and wallet-continuity checks that bind mutations to the current
   owner, not just to a public id or request body field.
 - Rate limits keyed by session and owner for public presence, claim planning,
@@ -55,6 +60,7 @@ until the controls below are implemented and covered by deterministic tests.
 
 ## Out Of Scope For This Hardening Pass
 
-This pass does not add a broad CSRF token/session-auth middleware, durable or
-distributed rate limits, or a public free-play security surface. Those controls
-remain release gates because the V5 world-grid branch is still prototype-gated.
+This pass does not add final session-auth middleware, durable or distributed
+rate limits, durable CSRF token storage, or a public free-play security surface.
+Those controls remain release gates because the V5 world-grid branch is still
+prototype-gated.
