@@ -42,6 +42,7 @@ const AUDIT_ACTION_TYPES = new Set([
   'vote.recorded',
   'delegation.created',
   'delegation.revoked',
+  'institution.chartered',
   'reputation.recorded',
   'moderation.decided',
   'civic_action.prepared',
@@ -292,6 +293,55 @@ function validateCivicDelegation(raw = {}) {
   };
 }
 
+function validateCivicInstitution(raw = {}) {
+  const errors = [];
+  if (!isPlainObject(raw)) return { ok: false, errors: ['institution must be object'] };
+  validateSchemaVersion(errors, raw);
+  const institutionId = validateString(errors, raw.institutionId, 'institutionId', { pattern: /^institution_[a-z0-9_:-]{4,88}$/ });
+  const charterId = validateString(errors, raw.charterId, 'charterId', { pattern: /^charter_[a-z0-9_:-]{4,88}$/ });
+  const charteredBy = validateActor(errors, raw.charteredBy, 'charteredBy', { allowAgent: false });
+  const displayName = validateString(errors, raw.displayName, 'displayName', { max: 80 });
+  const purpose = validateString(errors, raw.purpose, 'purpose', { max: 300 });
+  const scope = isPlainObject(raw.scope) ? raw.scope : {};
+  if (!isPlainObject(raw.scope)) errors.push('scope required');
+  const scopeKind = validateEnum(errors, scope.kind, PROPOSAL_SCOPES, 'scope.kind');
+  const scopeTargetId = validateString(errors, scope.targetId, 'scope.targetId', { pattern: CIVIC_ID_RE, max: 96 });
+  const proposalTypes = validateStringArray(errors, raw.proposalTypes, 'proposalTypes', { maxItems: 8, maxLen: 64 });
+  for (const proposalType of proposalTypes) {
+    if (!PROPOSAL_SCOPES.has(proposalType)) errors.push(`proposalTypes unsupported: ${proposalType}`);
+  }
+  const membershipRuleId = validateString(errors, raw.membershipRuleId, 'membershipRuleId', { pattern: /^rule_[a-z0-9_:-]{4,88}$/ });
+  const eligibilityRuleId = validateString(errors, raw.eligibilityRuleId, 'eligibilityRuleId', { pattern: /^rule_[a-z0-9_:-]{4,88}$/ });
+  const moderationPolicyId = validateString(errors, raw.moderationPolicyId, 'moderationPolicyId', { pattern: /^policy_[a-z0-9_:-]{4,88}$/ });
+  const votingRuleId = validateString(errors, raw.votingRuleId, 'votingRuleId', { pattern: /^rule_[a-z0-9_:-]{4,88}$/ });
+  const publicAuditSummary = validateString(errors, raw.publicAuditSummary, 'publicAuditSummary', { max: 480 });
+  const effectiveAtMs = validateNumber(errors, raw.effectiveAtMs, 'effectiveAtMs', { min: 1 });
+  const privacy = validatePrivacy(errors, raw.privacy, 'privacy');
+  const privatePaths = findPrivateData(raw);
+  if (privatePaths.length) errors.push(`private data forbidden: ${privatePaths.join(', ')}`);
+  return {
+    ok: errors.length === 0,
+    errors,
+    value: errors.length ? null : {
+      schemaVersion: CIVIC_SCHEMA_VERSION,
+      institutionId,
+      charterId,
+      charteredBy,
+      displayName,
+      purpose,
+      scope: { kind: scopeKind, targetId: scopeTargetId },
+      proposalTypes,
+      membershipRuleId,
+      eligibilityRuleId,
+      moderationPolicyId,
+      votingRuleId,
+      publicAuditSummary,
+      effectiveAtMs,
+      privacy
+    }
+  };
+}
+
 function validateReputationRecord(raw = {}) {
   const errors = [];
   if (!isPlainObject(raw)) return { ok: false, errors: ['reputation record must be object'] };
@@ -455,6 +505,7 @@ function validateV6CivicSchema(kind, raw = {}) {
     proposal: validateCivicProposal,
     vote: validateCivicVote,
     delegation: validateCivicDelegation,
+    institution: validateCivicInstitution,
     reputation: validateReputationRecord,
     moderation: validateModerationDecision,
     action: validateCivicAction,
@@ -474,6 +525,7 @@ module.exports = {
   validateAuditLedgerEntry,
   validateCivicAction,
   validateCivicDelegation,
+  validateCivicInstitution,
   validateCivicProposal,
   validateCivicVote,
   validateModerationDecision,

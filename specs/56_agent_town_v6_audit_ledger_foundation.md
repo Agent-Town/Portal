@@ -42,6 +42,10 @@ Delegation lifecycle changes use `delegation.created` and
 must not be treated as agent execution authority unless later route/tool checks
 verify active scope, expiry, budget, and principal approval.
 
+Research-only institution charters use `institution.chartered` audit entries.
+They are charter evidence and must not be treated as player-visible civic
+institutions until the M13 release gate closes.
+
 ## Idempotency Rule
 
 Repeating the same `(actorAccountId, idempotencyKey)` with the same normalized

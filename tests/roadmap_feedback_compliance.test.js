@@ -46,6 +46,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'specs/61_agent_town_v6_moderation_privacy_foundation.md',
     'specs/62_agent_town_v6_civic_effect_rollback_foundation.md',
     'specs/63_agent_town_v6_agent_participation_delegation_foundation.md',
+    'specs/64_agent_town_v6_civic_institution_charter_foundation.md',
     'docs/product/WORLD_GRID_LADDER_V5_TO_V6.md',
     'docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md',
     'docs/product/PUBLIC_PRESENCE_PRIVACY_MODEL_V5.md',
@@ -67,6 +68,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'server/world_civilization/audit_ledger.js',
     'server/world_civilization/delegations.js',
     'server/world_civilization/effects.js',
+    'server/world_civilization/institutions.js',
     'server/world_civilization/moderation.js',
     'server/world_civilization/proposals.js',
     'server/world_civilization/reputation.js',
@@ -141,6 +143,9 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /M12 Agent participation controls \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/delegations\.js/);
   assert.match(gate, /server\/world_civilization\/delegations\.js/);
+  assert.match(plan, /M13 Civic institutions and charters \| `in_progress`/);
+  assert.match(plan, /server\/world_civilization\/institutions\.js/);
+  assert.match(gate, /server\/world_civilization\/institutions\.js/);
 });
 
 test('V5 world-grid release promotion gate blocks V6 on prototype-only evidence', () => {

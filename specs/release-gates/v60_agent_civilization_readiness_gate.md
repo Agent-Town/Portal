@@ -29,6 +29,9 @@ Civic effect rollback foundation:
 Agent participation delegation foundation:
 `specs/63_agent_town_v6_agent_participation_delegation_foundation.md`
 
+Civic institution charter foundation:
+`specs/64_agent_town_v6_civic_institution_charter_foundation.md`
+
 V6.0 Agent Civilization Foundation must not become player-visible until every
 gate below has implementation, deterministic tests, and security/product signoff.
 
@@ -69,6 +72,9 @@ gate below has implementation, deterministic tests, and security/product signoff
   one-vote accounting, and receipt id.
 - Civic action schema with proposal reference, execution authority, before/after
   summary, audit ledger entry, and rollback id.
+- Institution charter schema with human chartering actor, public scope,
+  proposal types, membership and eligibility rules, moderation policy, voting
+  rule, and redacted public audit summary.
 
 ## Release Gates
 
@@ -95,6 +101,12 @@ gate below has implementation, deterministic tests, and security/product signoff
   `server/world_civilization/delegations.js`; release still requires
   worker/tool enforcement, action-budget consumption, expiry and revocation
   checks at every route edge, and principal wallet/session authorization.
+- Civic institutions must have explicit charters, scopes, eligibility rules,
+  voting rules, moderation policies, and public audit summaries before any
+  player-visible institution appears. Current research-only storage starts this
+  in `server/world_civilization/institutions.js`; release still requires
+  proposal/vote-governed charter changes, worker/tool integration, and public
+  text rendering review.
 - Privacy review must prove no private town state, wallet secret, Brain secret,
   provider credential, debug trace, or unapproved transcript enters civic
   surfaces.

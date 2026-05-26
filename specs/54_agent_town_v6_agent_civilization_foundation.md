@@ -34,6 +34,9 @@ Civic effect rollback foundation:
 Agent participation delegation foundation:
 `specs/63_agent_town_v6_agent_participation_delegation_foundation.md`
 
+Civic institution charter foundation:
+`specs/64_agent_town_v6_civic_institution_charter_foundation.md`
+
 ## Implementation Boundary
 
 Do not add V6 civic mechanics to normal gameplay or the world-grid prototype

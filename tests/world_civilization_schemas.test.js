@@ -6,6 +6,7 @@ const {
   validateAuditLedgerEntry,
   validateCivicAction,
   validateCivicDelegation,
+  validateCivicInstitution,
   validateCivicProposal,
   validateCivicVote,
   validateModerationDecision,
@@ -179,6 +180,64 @@ test('V6 delegation schema stays scoped, expiring, revocable, and explicit', () 
   assert.match(unsafe.errors.join('\n'), /civic_execution/);
 });
 
+test('V6 institution schema requires human-chartered public governance boundaries', () => {
+  const valid = validateCivicInstitution({
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    institutionId: 'institution_bridge_council_001',
+    charterId: 'charter_bridge_council_001',
+    charteredBy: actor(),
+    displayName: 'Bridge Council',
+    purpose: 'Coordinate public works proposals for the Great Ridge district.',
+    scope: {
+      kind: 'public_works',
+      targetId: 'district_great_ridge'
+    },
+    proposalTypes: ['public_works', 'public_world'],
+    membershipRuleId: 'rule_bridge_members_001',
+    eligibilityRuleId: 'rule_bridge_voters_001',
+    moderationPolicyId: 'policy_v6_public_001',
+    votingRuleId: 'rule_bridge_majority_001',
+    publicAuditSummary: 'Bridge Council charter for public works coordination.',
+    effectiveAtMs: 1_779_784_000_000,
+    privacy: privacy({
+      dataClasses: ['public_audit_summary', 'public_world_state']
+    })
+  });
+  assert.equal(valid.ok, true, valid.errors.join('\n'));
+
+  const unsafe = validateCivicInstitution({
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    institutionId: 'institution_agent_secret_001',
+    charterId: 'charter_agent_secret_001',
+    charteredBy: {
+      kind: 'agent',
+      accountId: 'acct_v6_human_001',
+      agentId: 'agent_civic_clover_001'
+    },
+    displayName: 'Secret Council',
+    purpose: 'Unsafe private charter.',
+    scope: {
+      kind: 'public_works',
+      targetId: 'district_great_ridge'
+    },
+    proposalTypes: ['private_town'],
+    membershipRuleId: 'rule_bridge_members_001',
+    eligibilityRuleId: 'rule_bridge_voters_001',
+    moderationPolicyId: 'policy_v6_public_001',
+    votingRuleId: 'rule_bridge_majority_001',
+    publicAuditSummary: 'Unsafe charter.',
+    effectiveAtMs: 1_779_784_000_000,
+    privacy: privacy(),
+    debugTrace: {
+      token: 'sk-test-secret-value'
+    }
+  });
+  assert.equal(unsafe.ok, false);
+  assert.match(unsafe.errors.join('\n'), /charteredBy.kind unsupported/);
+  assert.match(unsafe.errors.join('\n'), /proposalTypes unsupported/);
+  assert.match(unsafe.errors.join('\n'), /private data forbidden/);
+});
+
 test('V6 reputation schema blocks self-awards and currency-like transfers', () => {
   const valid = validateReputationRecord({
     schemaVersion: CIVIC_SCHEMA_VERSION,
@@ -265,7 +324,27 @@ test('V6 moderation, action, rollback, and audit schemas require traceable safet
 
 test('V6 civic schema dispatcher fails closed for unknown schemas', () => {
   assert.equal(validateV6CivicSchema('proposal', proposal()).ok, true);
-  const unknown = validateV6CivicSchema('institution', {});
+  assert.equal(validateV6CivicSchema('institution', {
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    institutionId: 'institution_bridge_council_001',
+    charterId: 'charter_bridge_council_001',
+    charteredBy: actor(),
+    displayName: 'Bridge Council',
+    purpose: 'Coordinate public works proposals for the Great Ridge district.',
+    scope: {
+      kind: 'public_works',
+      targetId: 'district_great_ridge'
+    },
+    proposalTypes: ['public_works'],
+    membershipRuleId: 'rule_bridge_members_001',
+    eligibilityRuleId: 'rule_bridge_voters_001',
+    moderationPolicyId: 'policy_v6_public_001',
+    votingRuleId: 'rule_bridge_majority_001',
+    publicAuditSummary: 'Bridge Council charter for public works coordination.',
+    effectiveAtMs: 1_779_784_000_000,
+    privacy: privacy({ dataClasses: ['public_audit_summary'] })
+  }).ok, true);
+  const unknown = validateV6CivicSchema('treasury', {});
   assert.equal(unknown.ok, false);
   assert.match(unknown.errors.join('\n'), /unknown civic schema kind/);
 });
