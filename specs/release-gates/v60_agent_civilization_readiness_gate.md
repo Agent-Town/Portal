@@ -32,6 +32,9 @@ Agent participation delegation foundation:
 Civic institution charter foundation:
 `specs/64_agent_town_v6_civic_institution_charter_foundation.md`
 
+Public works shared resources foundation:
+`specs/65_agent_town_v6_public_works_shared_resources_foundation.md`
+
 V6.0 Agent Civilization Foundation must not become player-visible until every
 gate below has implementation, deterministic tests, and security/product signoff.
 
@@ -75,6 +78,9 @@ gate below has implementation, deterministic tests, and security/product signoff
 - Institution charter schema with human chartering actor, public scope,
   proposal types, membership and eligibility rules, moderation policy, voting
   rule, and redacted public audit summary.
+- Public works contribution schema with institution, project, contributor,
+  source reference, requested public resource bundle, idempotency key, and
+  redacted public audit summary.
 
 ## Release Gates
 
@@ -107,6 +113,12 @@ gate below has implementation, deterministic tests, and security/product signoff
   in `server/world_civilization/institutions.js`; release still requires
   proposal/vote-governed charter changes, worker/tool integration, and public
   text rendering review.
+- Public works and shared resources must conserve accepted inputs, public
+  progress, caps, rewards, and rollbacks across retries and restarts. Current
+  research-only accounting starts this in
+  `server/world_civilization/public_works.js`; release still requires governed
+  project creation, wallet/session route auth, explicit private-inventory spend,
+  rollback execution, and reward conservation tests.
 - Privacy review must prove no private town state, wallet secret, Brain secret,
   provider credential, debug trace, or unapproved transcript enters civic
   surfaces.

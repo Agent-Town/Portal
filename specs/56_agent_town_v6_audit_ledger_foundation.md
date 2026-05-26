@@ -46,6 +46,11 @@ Research-only institution charters use `institution.chartered` audit entries.
 They are charter evidence and must not be treated as player-visible civic
 institutions until the M13 release gate closes.
 
+Research-only shared public works contributions use
+`public_works.contribution.recorded` audit entries. They are capped accounting
+evidence and must not be treated as private inventory spend or reward grants
+until the M14 release gate closes.
+
 ## Idempotency Rule
 
 Repeating the same `(actorAccountId, idempotencyKey)` with the same normalized

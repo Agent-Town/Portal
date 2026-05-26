@@ -37,12 +37,14 @@ const DELEGATION_SCOPES = new Set(['proposal_drafting', 'vote_advice', 'civic_ex
 const CIVIC_ACTION_EFFECTS = new Set(['public_summary', 'public_works_accounting', 'sandbox_policy', 'charter_update']);
 const MODERATION_STATUSES = new Set(['approved', 'rejected', 'needs_review']);
 const REPUTATION_KINDS = new Set(['service_reliability', 'proposal_quality', 'moderation_trust']);
+const RESOURCE_BUNDLE_KEYS = ['wood', 'stone', 'food', 'coin'];
 const AUDIT_ACTION_TYPES = new Set([
   'proposal.created',
   'vote.recorded',
   'delegation.created',
   'delegation.revoked',
   'institution.chartered',
+  'public_works.contribution.recorded',
   'reputation.recorded',
   'moderation.decided',
   'civic_action.prepared',
@@ -342,6 +344,52 @@ function validateCivicInstitution(raw = {}) {
   };
 }
 
+function normalizeResourceBundle(errors, raw, path) {
+  if (!isPlainObject(raw)) {
+    errors.push(`${path} required`);
+    return Object.fromEntries(RESOURCE_BUNDLE_KEYS.map((key) => [key, 0]));
+  }
+  const bundle = {};
+  for (const key of RESOURCE_BUNDLE_KEYS) {
+    bundle[key] = validateNumber(errors, raw[key] || 0, `${path}.${key}`, { min: 0, max: 1_000, integer: true });
+  }
+  return bundle;
+}
+
+function validatePublicWorksContribution(raw = {}) {
+  const errors = [];
+  if (!isPlainObject(raw)) return { ok: false, errors: ['public works contribution must be object'] };
+  validateSchemaVersion(errors, raw);
+  const contributionId = validateString(errors, raw.contributionId, 'contributionId', { pattern: /^contribution_[a-z0-9_:-]{4,88}$/ });
+  const institutionId = validateString(errors, raw.institutionId, 'institutionId', { pattern: /^institution_[a-z0-9_:-]{4,88}$/ });
+  const projectId = validateString(errors, raw.projectId, 'projectId', { pattern: /^publicworks_[a-z0-9_:-]{4,88}$/ });
+  const contributorAccountId = validateString(errors, raw.contributorAccountId, 'contributorAccountId', { pattern: CIVIC_ID_RE, max: 96 });
+  const sourceRef = validateString(errors, raw.sourceRef, 'sourceRef', { pattern: CIVIC_ID_RE, max: 96 });
+  const requestedBundle = normalizeResourceBundle(errors, raw.requestedBundle, 'requestedBundle');
+  if (!RESOURCE_BUNDLE_KEYS.some((key) => requestedBundle[key] > 0)) errors.push('requestedBundle must include at least one resource');
+  const idempotencyKey = validateString(errors, raw.idempotencyKey, 'idempotencyKey', { pattern: CIVIC_ID_RE, max: 96 });
+  const publicSummary = validateString(errors, raw.publicSummary, 'publicSummary', { max: 360 });
+  const privacy = validatePrivacy(errors, raw.privacy, 'privacy');
+  const privatePaths = findPrivateData(raw);
+  if (privatePaths.length) errors.push(`private data forbidden: ${privatePaths.join(', ')}`);
+  return {
+    ok: errors.length === 0,
+    errors,
+    value: errors.length ? null : {
+      schemaVersion: CIVIC_SCHEMA_VERSION,
+      contributionId,
+      institutionId,
+      projectId,
+      contributorAccountId,
+      sourceRef,
+      requestedBundle,
+      idempotencyKey,
+      publicSummary,
+      privacy
+    }
+  };
+}
+
 function validateReputationRecord(raw = {}) {
   const errors = [];
   if (!isPlainObject(raw)) return { ok: false, errors: ['reputation record must be object'] };
@@ -506,6 +554,7 @@ function validateV6CivicSchema(kind, raw = {}) {
     vote: validateCivicVote,
     delegation: validateCivicDelegation,
     institution: validateCivicInstitution,
+    publicWorksContribution: validatePublicWorksContribution,
     reputation: validateReputationRecord,
     moderation: validateModerationDecision,
     action: validateCivicAction,
@@ -529,6 +578,7 @@ module.exports = {
   validateCivicProposal,
   validateCivicVote,
   validateModerationDecision,
+  validatePublicWorksContribution,
   validateReputationRecord,
   validateRollbackPlan,
   validateV6CivicSchema

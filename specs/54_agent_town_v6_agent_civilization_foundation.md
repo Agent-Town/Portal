@@ -37,6 +37,9 @@ Agent participation delegation foundation:
 Civic institution charter foundation:
 `specs/64_agent_town_v6_civic_institution_charter_foundation.md`
 
+Public works shared resources foundation:
+`specs/65_agent_town_v6_public_works_shared_resources_foundation.md`
+
 ## Implementation Boundary
 
 Do not add V6 civic mechanics to normal gameplay or the world-grid prototype

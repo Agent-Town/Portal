@@ -10,6 +10,7 @@ const {
   validateCivicProposal,
   validateCivicVote,
   validateModerationDecision,
+  validatePublicWorksContribution,
   validateReputationRecord,
   validateRollbackPlan,
   validateV6CivicSchema
@@ -238,6 +239,43 @@ test('V6 institution schema requires human-chartered public governance boundarie
   assert.match(unsafe.errors.join('\n'), /private data forbidden/);
 });
 
+test('V6 public works contribution schema requires public bundles and redacted audit data', () => {
+  const valid = validatePublicWorksContribution({
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    contributionId: 'contribution_bridge_001',
+    institutionId: 'institution_bridge_council_001',
+    projectId: 'publicworks_great_ridge_bridge_001',
+    contributorAccountId: 'acct_v6_contributor_001',
+    sourceRef: 'action_prepare_bridge_001',
+    requestedBundle: { wood: 2, stone: 1, food: 0, coin: 5 },
+    idempotencyKey: 'idem_public_works_bridge_001',
+    publicSummary: 'Public works contribution toward the Great Ridge bridge.',
+    privacy: privacy({
+      dataClasses: ['public_audit_summary', 'public_world_state']
+    })
+  });
+  assert.equal(valid.ok, true, valid.errors.join('\n'));
+
+  const unsafe = validatePublicWorksContribution({
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    contributionId: 'contribution_bridge_private_001',
+    institutionId: 'institution_bridge_council_001',
+    projectId: 'publicworks_great_ridge_bridge_001',
+    contributorAccountId: 'acct_v6_contributor_001',
+    sourceRef: 'action_prepare_bridge_001',
+    requestedBundle: { wood: 0, stone: 0, food: 0, coin: 0 },
+    idempotencyKey: 'idem_public_works_bridge_private_001',
+    publicSummary: 'Unsafe contribution.',
+    privacy: privacy(),
+    debugTrace: {
+      token: 'sk-test-secret-value'
+    }
+  });
+  assert.equal(unsafe.ok, false);
+  assert.match(unsafe.errors.join('\n'), /requestedBundle/);
+  assert.match(unsafe.errors.join('\n'), /private data forbidden/);
+});
+
 test('V6 reputation schema blocks self-awards and currency-like transfers', () => {
   const valid = validateReputationRecord({
     schemaVersion: CIVIC_SCHEMA_VERSION,
@@ -342,6 +380,18 @@ test('V6 civic schema dispatcher fails closed for unknown schemas', () => {
     votingRuleId: 'rule_bridge_majority_001',
     publicAuditSummary: 'Bridge Council charter for public works coordination.',
     effectiveAtMs: 1_779_784_000_000,
+    privacy: privacy({ dataClasses: ['public_audit_summary'] })
+  }).ok, true);
+  assert.equal(validateV6CivicSchema('publicWorksContribution', {
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    contributionId: 'contribution_bridge_001',
+    institutionId: 'institution_bridge_council_001',
+    projectId: 'publicworks_great_ridge_bridge_001',
+    contributorAccountId: 'acct_v6_contributor_001',
+    sourceRef: 'action_prepare_bridge_001',
+    requestedBundle: { wood: 1, stone: 0, food: 0, coin: 0 },
+    idempotencyKey: 'idem_public_works_bridge_001',
+    publicSummary: 'Public works contribution.',
     privacy: privacy({ dataClasses: ['public_audit_summary'] })
   }).ok, true);
   const unknown = validateV6CivicSchema('treasury', {});
