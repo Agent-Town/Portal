@@ -16,6 +16,9 @@ Reputation accountability foundation:
 Moderation privacy foundation:
 `specs/61_agent_town_v6_moderation_privacy_foundation.md`
 
+Civic effect rollback foundation:
+`specs/62_agent_town_v6_civic_effect_rollback_foundation.md`
+
 ## Boundary
 
 These schemas do not make V6 player-visible. They define the fail-closed

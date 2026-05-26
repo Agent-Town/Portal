@@ -23,6 +23,9 @@ Reputation accountability foundation:
 Moderation privacy foundation:
 `specs/61_agent_town_v6_moderation_privacy_foundation.md`
 
+Civic effect rollback foundation:
+`specs/62_agent_town_v6_civic_effect_rollback_foundation.md`
+
 V6.0 Agent Civilization Foundation must not become player-visible until every
 gate below has implementation, deterministic tests, and security/product signoff.
 
@@ -79,7 +82,11 @@ gate below has implementation, deterministic tests, and security/product signoff
   human-review workflow, abuse-report handling, media review, and full
   public-surface integration.
 - Rollback must exist for every public civic effect, with clear irreversible
-  action exclusions.
+  action exclusions. Current research-only storage starts this in
+  `server/world_civilization/effects.js` with prepared-effect records and
+  rollback handles only; release still requires typed handlers, applied/failed
+  states, real rollback execution, irreversible-action review, and
+  conservation tests.
 - Privacy review must prove no private town state, wallet secret, Brain secret,
   provider credential, debug trace, or unapproved transcript enters civic
   surfaces.

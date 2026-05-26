@@ -43,6 +43,7 @@ const AUDIT_ACTION_TYPES = new Set([
   'delegation.created',
   'reputation.recorded',
   'moderation.decided',
+  'civic_action.prepared',
   'civic_action.applied',
   'rollback.applied'
 ]);

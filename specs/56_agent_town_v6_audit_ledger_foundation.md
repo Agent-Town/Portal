@@ -33,6 +33,10 @@ Replay returns entries in ascending sequence order. Consumers can replay all
 entries, replay by actor account, replay by object reference, or continue after a
 known sequence number.
 
+Prepared civic effects use `civic_action.prepared` audit entries. They are
+readiness evidence for rollback handles and must not be treated as
+`civic_action.applied` world-state mutations.
+
 ## Idempotency Rule
 
 Repeating the same `(actorAccountId, idempotencyKey)` with the same normalized

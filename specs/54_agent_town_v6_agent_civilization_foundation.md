@@ -28,6 +28,9 @@ Reputation accountability foundation:
 Moderation privacy foundation:
 `specs/61_agent_town_v6_moderation_privacy_foundation.md`
 
+Civic effect rollback foundation:
+`specs/62_agent_town_v6_civic_effect_rollback_foundation.md`
+
 ## Implementation Boundary
 
 Do not add V6 civic mechanics to normal gameplay or the world-grid prototype
