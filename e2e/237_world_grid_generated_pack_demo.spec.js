@@ -38,7 +38,14 @@ test('generated universe pack loads into Three.js and completes the first world-
   expect(sceneInfo?.renderer).toBe('three');
   expect(sceneInfo?.generatedPackId).toBe(generatedPack.packId);
   expect(sceneInfo?.palette?.background).toBe(generatedPack.stylePack.palette.background);
+  expect(sceneInfo?.assetLoader?.assetAwareLoaderExists).toBe(true);
+  expect(sceneInfo?.assetLoader?.plannedTextureTargetCount).toBe(23);
+  expect(sceneInfo?.assetLoader?.missingTextureCount).toBe(0);
+  expect(sceneInfo?.assetLoader?.handledMissingTextureCount).toBe(23);
+  expect(sceneInfo?.assetLoader?.performanceBudgetPassed).toBe(true);
+  expect(sceneInfo?.assetLoader?.firstLoopSafe).toBe(true);
   await expect(page.locator('[data-world-grid-stage]')).toHaveAttribute('data-generated-pack-id', generatedPack.packId);
+  await expect(page.locator('[data-world-grid-stage]')).toHaveAttribute('data-asset-loader', 'v2');
 
   await page.locator('.world-grid-cell--claimable').first().click();
   await expect(page.locator('[data-world-grid-detail]')).toContainText(/Cost:/);

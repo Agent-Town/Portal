@@ -94,6 +94,10 @@ This is a separate prototype-gated track. It must not change normal gameplay vis
   "candidateGenerationBlockedWithoutConsentAuthCost": true,
   "assetPostprocessPlanExists": true,
   "assetPostprocessReportExists": true,
+  "assetAwareLoaderExists": true,
+  "missingTextureCount": 0,
+  "handledMissingTextureCount": 23,
+  "assetLoaderPerformanceBudgetPassed": true,
   "deterministicFallbackPlayable": true,
   "firstLoopCompleted": true,
   "replayabilityDistinctSignatureRatioMin": 1.0,
@@ -176,5 +180,26 @@ The post-processing lane now has a deterministic contract layer for future appro
   "approvedProductionAssetCount": 0,
   "generatedImageAssetsCanChangeServerRules": false,
   "threejsPackedAssetLoadDeferredToGU7": true
+}
+```
+
+## GU-7 Three.js Generated Pack Loader v2 Slice
+
+The browser runtime now includes a generated-pack asset loader between pack contracts and Three.js rendering. The loader reads material fallback assets from `GeneratedAssetManifest`, reads planned texture targets from `AssetPromptPlan`, accepts only safe future public runtime asset paths, and reports texture load/fallback metrics through `sceneInfo.assetLoader`. When no approved public runtime assets exist, all planned texture targets are explicitly handled as deterministic fallbacks, so missing texture count remains zero and the first loop can still pass.
+
+```json
+{
+  "assetAwareLoaderExists": true,
+  "materialLoaderUsesGeneratedManifest": true,
+  "plannedTextureTargetCount": 23,
+  "safePublicRuntimeAssetPathsOnly": true,
+  "runtimeAssetPathTraversalRejected": true,
+  "missingTextureCount": 0,
+  "handledMissingTextureCount": 23,
+  "fallbackTextureCount": 23,
+  "reducedMotionSupported": true,
+  "performanceBudgetPassed": true,
+  "firstLoopStillCompletes": true,
+  "playtestMissingAssetsDerivedFromLoader": true
 }
 ```

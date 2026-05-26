@@ -15,6 +15,7 @@ Status: prototype-gated
 - Optional candidate-generation preflights must fail closed unless product/security approval, documented auth model, documented cost model, accepted cost estimate, and user/team consent are all present.
 - Candidate-generation preflight records must never persist raw provider credentials, and failure records must keep `fallbackStillPlayable=true` for valid deterministic packs.
 - Postprocess plans and reports are standalone contracts; they may write postprocessed candidate artifacts and metadata, but must not write approved production assets or alter canonical gameplay mappings.
+- Browser runtime asset loading must use safe public generated-pack paths only; private candidate roots, path traversal, data URLs, provider URLs, and unapproved outputs must fall back without player exposure.
 - Player-visible generated text must be escaped in DOM rendering.
 - Production image generation requires explicit consent and a documented cost/auth model before any user-facing release claim.
 
@@ -42,6 +43,10 @@ Status: prototype-gated
   "assetPostprocessPlanExists": true,
   "assetPostprocessReportExists": true,
   "postprocessedOutputsStayCandidateOnly": true,
+  "assetAwareLoaderExists": true,
+  "runtimeAssetPathTraversalRejected": true,
+  "missingTextureCount": 0,
+  "handledMissingTextureCount": 23,
   "approvedProductionAssetCount": 0,
   "generatedImageAssetsCanChangeServerRules": false,
   "productionImageAssetCount": 0,

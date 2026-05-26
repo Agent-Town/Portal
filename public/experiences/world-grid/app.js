@@ -238,6 +238,7 @@
       });
       stage.dataset.renderer = 'three';
       stage.dataset.generatedPackId = activePack()?.packId || '';
+      stage.dataset.assetLoader = state.scene?.info?.().assetLoader?.assetAwareLoaderExists ? 'v2' : 'fallback';
     } catch (error) {
       stage.dataset.renderer = 'dom-fallback';
       stage.dataset.rendererFallbackReason = error?.message || 'WORLD_GRID_RENDER_FAILED';
@@ -307,7 +308,7 @@
           renderer: sceneInfo?.renderer || 'three',
           firstLoopCompleted: true,
           canonicalPayloadIntegrity: true,
-          missingAssets: 0,
+          missingAssets: Number(sceneInfo?.assetLoader?.missingTextureCount || 0),
           consoleErrors: 0
         })
       });

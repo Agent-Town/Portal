@@ -58,6 +58,13 @@ Player prompt
 - The runner writes texture-atlas metadata, visual manifest sidecars, and per-target sidecars even when candidate files are absent, so missing assets fall back deterministically instead of blocking the first loop.
 - Postprocessed outputs remain candidate artifacts under `data/generated-packs*/<packId>/postprocessed`; production promotion paths under `approved` are not written without later human signoff.
 
+## GU-7 Three.js Asset Loader Slice
+
+- `public/experiences/world-grid/asset_loader.js` is the browser-side asset-aware loader contract for generated packs.
+- The loader reads material colors from `GeneratedAssetManifest`, planned texture targets from `AssetPromptPlan`, and optional future public runtime assets from `runtimeAssetManifest`.
+- Runtime asset URLs must remain under `public/experiences/world-grid/generated`; unsafe paths and unapproved data/candidate paths are treated as fallbacks.
+- `public/experiences/world-grid/three_scene_entry.js` exposes loader metrics through `sceneInfo.assetLoader`, respects reduced motion, and derives playtest missing-asset counts from the loader.
+
 ## Machine Checks
 
 ```json
@@ -91,6 +98,11 @@ Player prompt
   "spriteAtlasMetadataExists": true,
   "visualManifestSidecarsExist": true,
   "postprocessedOutputsStayCandidateOnly": true,
-  "threejsPackedAssetLoadDeferredToGU7": true
+  "assetAwareLoaderExists": true,
+  "plannedTextureTargetCount": 23,
+  "missingTextureCount": 0,
+  "handledMissingTextureCount": 23,
+  "assetLoaderPerformanceBudgetPassed": true,
+  "firstLoopStillCompletes": true
 }
 ```

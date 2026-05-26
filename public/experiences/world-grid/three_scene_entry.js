@@ -30,8 +30,13 @@ function rendererSize(container) {
 }
 
 function makeMaterial(cell, palette = null) {
+  const assetLoader = window.WorldGridAssetLoader || null;
+  const materialColor = assetLoader?.materialColorFor
+    ? assetLoader.materialColorFor(null, palette?.generatedPack || null, `state.${cell.state}`, null)
+      || assetLoader.materialColorFor(null, palette?.generatedPack || null, `terrain.${cell.terrain}`, null)
+    : null;
   const color = hexToNumber(
-    palette?.state?.[cell.state] || palette?.terrain?.[cell.terrain],
+    materialColor || palette?.state?.[cell.state] || palette?.terrain?.[cell.terrain],
     stateColors[cell.state] || 0xd7b66f
   );
   return new THREE.MeshStandardMaterial({
@@ -58,6 +63,23 @@ function renderWorldGridScene(container, sceneState, options = {}) {
   container.innerHTML = '';
   const generatedPack = options.generatedPack || null;
   const palette = generatedPack?.stylePack?.palette || null;
+  const reducedMotion = Boolean(
+    options.reducedMotion
+    || (typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+  );
+  const assetLoader = window.WorldGridAssetLoader || null;
+  const assetLoadReport = assetLoader?.buildAssetLoadReport
+    ? assetLoader.buildAssetLoadReport(generatedPack, {
+      reducedMotion,
+      runtimeAssets: options.runtimeAssets || []
+    })
+    : {
+      assetAwareLoaderExists: false,
+      missingTextureCount: 0,
+      performanceBudgetPassed: true,
+      reducedMotion
+    };
+  const materialPalette = palette ? { ...palette, generatedPack } : { generatedPack };
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -81,7 +103,7 @@ function renderWorldGridScene(container, sceneState, options = {}) {
   scene.add(group);
   const meshes = [];
   for (const cell of sceneState.cells || []) {
-    const mesh = createCellMesh(cell, palette);
+    const mesh = createCellMesh(cell, materialPalette);
     meshes.push(mesh);
     group.add(mesh);
   }
@@ -131,7 +153,7 @@ function renderWorldGridScene(container, sceneState, options = {}) {
   function animate() {
     if (disposed) return;
     frameCount += 1;
-    group.rotation.z = Math.sin(performance.now() / 3200) * 0.006;
+    if (!reducedMotion) group.rotation.z = Math.sin(performance.now() / 3200) * 0.006;
     renderer.render(scene, camera);
     requestAnimationFrame(animate);
   }
@@ -150,6 +172,11 @@ function renderWorldGridScene(container, sceneState, options = {}) {
         primary: palette.primary,
         claimable: palette.state?.claimable
       } : null,
+      assetLoader: {
+        ...assetLoadReport,
+        averageFps: Math.round((frameCount / uptimeMs) * 1000),
+        firstLoopSafe: assetLoadReport.missingTextureCount === 0 && assetLoadReport.performanceBudgetPassed === true
+      },
       performance: {
         uptimeMs,
         averageFps: Math.round((frameCount / uptimeMs) * 1000)

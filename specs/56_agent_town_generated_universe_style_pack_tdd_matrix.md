@@ -40,3 +40,6 @@ owner: "Agent Town product"
 | GPACK-027 | Postprocess | Missing candidate images write atlas metadata and visual sidecars while falling back to deterministic assets | `tests/generated_pack_asset_postprocess.test.js` |
 | GPACK-028 | Postprocess | Adapter-produced candidate outputs stay in postprocessed candidate paths, never approved production paths | `tests/generated_pack_asset_postprocess.test.js` |
 | GPACK-029 | Postprocess | Oversized processed outputs fail the byte budget and fall back instead of promoting | `tests/generated_pack_asset_postprocess.test.js` |
+| GPACK-030 | Asset loader | Browser asset loader v2 converts generated manifest and prompt-plan targets into fallback-safe runtime metadata | `tests/generated_pack_asset_loader.test.js` |
+| GPACK-031 | Asset loader | Runtime asset paths must stay under `public/experiences/world-grid/generated` and path traversal stays fallback-only | `tests/generated_pack_asset_loader.test.js` |
+| GPACK-032 | Three.js | Scene info exposes asset-loader target counts, zero unhandled missing textures, performance budget pass, and first-loop safety | `e2e/237_world_grid_generated_pack_demo.spec.js` |
