@@ -31,8 +31,9 @@ are present.
 - Data-retention policy: audit retention, deletion policy, debug log retention,
   and export policy.
 - Audit coverage: append-only ledger, owner indexes, migration versions,
-  schema metadata drift checks, replay reconstruction, rollback handles, and
-  non-executing rollback recovery evidence.
+  schema metadata drift checks, migration rehearsal with unsupported
+  upgrade/downgrade targets failing closed, replay reconstruction, rollback
+  handles, and non-executing rollback recovery evidence.
 - Validation evidence: targeted Node suite, split Playwright smokes,
   all-features regression, feature override safety, and load/rate replay
   evidence.

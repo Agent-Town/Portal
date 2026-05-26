@@ -61,6 +61,14 @@ test('V6 release review baseline names every security and product gate but remai
   assert.deepEqual(assertV6ReleaseReviewSafe(report), { ok: true, errors: [] });
 });
 
+test('V6 release review audit coverage requires migration rehearsal evidence', () => {
+  const auditGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'audit_coverage');
+
+  assert.ok(auditGate.requiredArtifacts.includes('server/world_civilization/migration_rehearsal.js'));
+  assert.ok(auditGate.requiredArtifacts.includes('tests/world_civilization_migration_rehearsal.test.js'));
+  assert.ok(auditGate.requiredChecks.includes('migration_rehearsal'));
+});
+
 test('V6 release review report can only become ready with complete evidence and signoff', () => {
   const evidence = Object.fromEntries(REQUIRED_REVIEW_GATES.map((gate) => [gate.key, completeEvidenceFor(gate)]));
   const report = buildV6ReleaseReviewReport({

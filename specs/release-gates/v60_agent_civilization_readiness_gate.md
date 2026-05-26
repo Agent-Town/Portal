@@ -74,9 +74,13 @@ gate below has implementation, deterministic tests, and security/product signoff
   replay reconstruction, migration upgrade/downgrade, load/rate, and rollback
   recovery gates have deterministic evidence. Current audit replay
   reconstruction starts in `server/world_civilization/replay_reconstruction.js`,
-  and the current audit-ledger process restart probe starts in
-  `tests/world_civilization_process_restart.test.js`. Proposal/vote process
-  restart coverage starts in
+  migration rehearsal starts in
+  `server/world_civilization/migration_rehearsal.js`, and unsupported
+  upgrade/downgrade targets fail closed in
+  `tests/world_civilization_migration_rehearsal.test.js`. Real migration scripts
+  remain a release requirement. Current audit-ledger process restart probe
+  starts in `tests/world_civilization_process_restart.test.js`. Proposal/vote
+  process restart coverage starts in
   `tests/world_civilization_proposal_vote_process_restart.test.js`.
   Reputation/moderation process restart coverage starts in
   `tests/world_civilization_reputation_moderation_process_restart.test.js`;
@@ -207,6 +211,11 @@ gate below has implementation, deterministic tests, and security/product signoff
   `tests/world_civilization_rollback_recovery.test.js`; prepared rollback
   handles can be reconstructed from reopened effect/audit stores without
   executing state.
+  Migration rehearsal coverage starts in
+  `server/world_civilization/migration_rehearsal.js` and
+  `tests/world_civilization_migration_rehearsal.test.js`; current v1 metadata can
+  be inventoried and unsupported upgrade/downgrade targets fail closed without
+  executing migration scripts.
   These current probes cover every current civic store at research scale.
   Release still requires release-grade process restart coverage, larger replay
   reconstruction, migration scripts with upgrade/downgrade proofs, load/rate,

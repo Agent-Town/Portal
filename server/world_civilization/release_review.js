@@ -46,6 +46,7 @@ const REQUIRED_REVIEW_GATES = [
       'server/world_civilization/audit_ledger.js',
       'server/world_civilization/replay_reconstruction.js',
       'server/world_civilization/resilience.js',
+      'server/world_civilization/migration_rehearsal.js',
       'tests/world_civilization_process_restart.test.js',
       'tests/world_civilization_proposal_vote_process_restart.test.js',
       'tests/world_civilization_reputation_moderation_process_restart.test.js',
@@ -54,10 +55,18 @@ const REQUIRED_REVIEW_GATES = [
       'tests/world_civilization_institution_process_restart.test.js',
       'tests/world_civilization_public_works_process_restart.test.js',
       'tests/world_civilization_schema_metadata.test.js',
+      'tests/world_civilization_migration_rehearsal.test.js',
       'tests/world_civilization_load_rate.test.js',
       'tests/world_civilization_rollback_recovery.test.js'
     ],
-    requiredChecks: ['append_only_ledger', 'owner_indexes', 'migration_versions', 'replay_reconstruction', 'rollback_handles'],
+    requiredChecks: [
+      'append_only_ledger',
+      'owner_indexes',
+      'migration_versions',
+      'migration_rehearsal',
+      'replay_reconstruction',
+      'rollback_handles'
+    ],
     signoffRequired: true
   },
   {

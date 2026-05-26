@@ -17,6 +17,7 @@ const { createCivicVoteStore } = require('../server/world_civilization/votes');
 const {
   REQUIRED_RELEASE_GAPS,
   V6_CIVIC_LOAD_RATE_COVERAGE,
+  V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE,
   V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE,
   V6_CIVIC_RESILIENCE_STORES,
   assertV6ResilienceBaseline,
@@ -92,6 +93,7 @@ test('V6 resilience report is hidden without explicit research opt-in and V6 fla
     assert.deepEqual(report.storeReports, []);
     assert.equal(report.loadRateCoverage, null);
     assert.equal(report.rollbackRecoveryCoverage, null);
+    assert.equal(report.migrationRehearsalCoverage, null);
     assert.deepEqual(report.releaseGaps, REQUIRED_RELEASE_GAPS);
     assert.deepEqual(assertV6ResilienceBaseline(report), { ok: true, errors: [] });
   }
@@ -116,6 +118,10 @@ test('V6 resilience baseline verifies current SQLite stores and keeps release ga
   assert.equal(report.rollbackRecoveryCoverage.releaseReady, false);
   assert.ok(report.rollbackRecoveryCoverage.coveredChecks.includes('prepared_rollback_handle_reconstruction'));
   assert.ok(report.rollbackRecoveryCoverage.remainingReleaseGaps.includes('typed_rollback_handlers'));
+  assert.deepEqual(report.migrationRehearsalCoverage, V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE);
+  assert.equal(report.migrationRehearsalCoverage.releaseReady, false);
+  assert.ok(report.migrationRehearsalCoverage.coveredChecks.includes('unsupported_upgrade_fails_closed'));
+  assert.ok(report.migrationRehearsalCoverage.remainingReleaseGaps.includes('release_grade_upgrade_scripts'));
   assert.deepEqual(report.releaseGaps, REQUIRED_RELEASE_GAPS);
   assert.deepEqual(report.storeReports.map((entry) => entry.key), V6_CIVIC_RESILIENCE_STORES.map((entry) => entry.key));
   for (const storeReport of report.storeReports) {

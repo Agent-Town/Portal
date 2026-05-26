@@ -49,6 +49,25 @@ const V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE = {
   ]
 };
 
+const V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE = {
+  modulePath: 'server/world_civilization/migration_rehearsal.js',
+  artifact: 'tests/world_civilization_migration_rehearsal.test.js',
+  status: 'research_only',
+  releaseReady: false,
+  coveredChecks: [
+    'current_v1_store_inventory',
+    'schema_metadata_inventory',
+    'unsupported_upgrade_fails_closed',
+    'unsupported_downgrade_fails_closed'
+  ],
+  remainingReleaseGaps: [
+    'release_grade_upgrade_scripts',
+    'release_grade_downgrade_scripts',
+    'backup_restore_rehearsal',
+    'migration_load_replay_rehearsal'
+  ]
+};
+
 const V6_CIVIC_RESILIENCE_STORES = [
   {
     key: 'audit_ledger',
@@ -145,6 +164,7 @@ function disabledReport(source) {
     storeReports: [],
     loadRateCoverage: null,
     rollbackRecoveryCoverage: null,
+    migrationRehearsalCoverage: null,
     releaseGaps: [...REQUIRED_RELEASE_GAPS],
     disabledReason: 'V6 resilience evidence requires explicit research opt-in and V6 feature flag'
   };
@@ -212,6 +232,7 @@ function buildV6ResilienceBaselineReport({
     storeReports: V6_CIVIC_RESILIENCE_STORES.map((requirement) => inspectStore(requirement, stores[requirement.key])),
     loadRateCoverage: clone(V6_CIVIC_LOAD_RATE_COVERAGE),
     rollbackRecoveryCoverage: clone(V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE),
+    migrationRehearsalCoverage: clone(V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE),
     releaseGaps: [...REQUIRED_RELEASE_GAPS]
   };
 }
@@ -272,6 +293,18 @@ function assertV6ResilienceBaseline(report = {}) {
     ) {
       errors.push('V6_RESILIENCE_ROLLBACK_RECOVERY_COVERAGE_REQUIRED');
     }
+    const migrationRehearsalCoverage = report.migrationRehearsalCoverage || {};
+    if (
+      migrationRehearsalCoverage.modulePath !== V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE.modulePath
+      || migrationRehearsalCoverage.artifact !== V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE.artifact
+      || migrationRehearsalCoverage.status !== 'research_only'
+      || migrationRehearsalCoverage.releaseReady !== false
+      || !Array.isArray(migrationRehearsalCoverage.coveredChecks)
+      || !migrationRehearsalCoverage.coveredChecks.includes('unsupported_upgrade_fails_closed')
+      || !migrationRehearsalCoverage.coveredChecks.includes('unsupported_downgrade_fails_closed')
+    ) {
+      errors.push('V6_RESILIENCE_MIGRATION_REHEARSAL_COVERAGE_REQUIRED');
+    }
   }
   return {
     ok: errors.length === 0,
@@ -282,6 +315,7 @@ function assertV6ResilienceBaseline(report = {}) {
 module.exports = {
   REQUIRED_RELEASE_GAPS,
   V6_CIVIC_LOAD_RATE_COVERAGE: clone(V6_CIVIC_LOAD_RATE_COVERAGE),
+  V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE: clone(V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE),
   V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE: clone(V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE),
   V6_CIVIC_RESILIENCE_STORES: clone(V6_CIVIC_RESILIENCE_STORES),
   V6_RESILIENCE_BASELINE_VERSION,

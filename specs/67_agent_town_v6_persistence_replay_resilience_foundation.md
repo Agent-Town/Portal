@@ -8,6 +8,7 @@ Runtime contracts:
 
 - `server/world_civilization/resilience.js`
 - `server/world_civilization/replay_reconstruction.js`
+- `server/world_civilization/migration_rehearsal.js`
 - `server/world_civilization/rollback_recovery.js`
 
 Test coverage:
@@ -22,6 +23,7 @@ Test coverage:
 - `tests/world_civilization_institution_process_restart.test.js`
 - `tests/world_civilization_public_works_process_restart.test.js`
 - `tests/world_civilization_schema_metadata.test.js`
+- `tests/world_civilization_migration_rehearsal.test.js`
 - `tests/world_civilization_load_rate.test.js`
 - `tests/world_civilization_rollback_recovery.test.js`
 
@@ -67,6 +69,11 @@ records a `world_civic_schema_metadata` row with `migrationVersion: v1`,
 `schemaUserVersion: 1`, the module path, and `releaseStatus: research_only`.
 The metadata layer fails closed when a database advertises an unsupported
 SQLite `user_version` or a mismatched store migration marker.
+
+`server/world_civilization/migration_rehearsal.js` inventories the current v1
+store metadata without applying migrations or claiming executable migration
+scripts. Unsupported upgrade/downgrade targets fail closed until release-grade
+scripts, backup/restore rehearsal, and migration load replay evidence exist.
 
 `server/world_civilization/replay_reconstruction.js` reconstructs a
 privacy-safe summary from civic audit ledger replay rows. The reconstruction
@@ -121,6 +128,11 @@ do not append duplicate contribution or audit rows after restart.
 store exposes v1 schema metadata to the resilience report and rejects version
 drift before the store can be used.
 
+`tests/world_civilization_migration_rehearsal.test.js` adds research-scale
+migration readiness evidence: every current store can be inventoried at v1
+from schema metadata, while unsupported v2 upgrades and v0 downgrades fail
+closed until real migration scripts exist.
+
 `tests/world_civilization_load_rate.test.js` adds research-scale load/rate
 evidence for the civic audit ledger: a larger append burst is replayed through
 bounded pages, exact duplicate retries do not create new rows, changed
@@ -144,7 +156,8 @@ M16 remains incomplete until all of these gates close:
 - Release-grade replay reconstruction across process restart, larger datasets,
   and every civic summary surface.
 - Release-grade migration upgrade and downgrade scripts/tests for every civic
-  table beyond the current v1 metadata and fail-closed drift checks.
+  table beyond the current v1 metadata, migration inventory, and fail-closed
+  unsupported transition checks.
 - Release-grade load/rate tests for production route limits, store-specific
   throughput targets, multi-process write contention, and replay pagination
   beyond the current research-scale duplicate/replay probe.
