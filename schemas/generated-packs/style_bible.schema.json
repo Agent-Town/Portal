@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-town-style-bible-v1",
+  "title": "Agent Town Style Bible",
+  "type": "object",
+  "required": ["schemaVersion", "stylePackId", "name", "palette", "materialRules", "uiRules"],
+  "additionalProperties": true,
+  "properties": {
+    "schemaVersion": { "const": "agent-town-style-bible-v1" },
+    "stylePackId": { "type": "string", "minLength": 3 },
+    "name": { "type": "string", "minLength": 3 },
+    "palette": {
+      "type": "object",
+      "required": ["background", "surface", "ink", "primary", "secondary", "accent", "focus", "selected", "terrain", "state"],
+      "additionalProperties": true
+    },
+    "materialRules": { "type": "array", "minItems": 3 },
+    "uiRules": { "type": "object" }
+  }
+}

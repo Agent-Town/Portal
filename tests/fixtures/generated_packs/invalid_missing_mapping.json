@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "agent-town-generated-pack-v1",
+  "packId": "gen_pack_invalid_missing_mapping",
+  "prompt": { "hash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e" },
+  "stylePack": { "palette": {} },
+  "universePack": { "firstLoop": {} },
+  "gameplayMapping": { "canonicalEntities": [] },
+  "assetManifest": { "assets": [] }
+}

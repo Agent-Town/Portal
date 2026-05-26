@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "agent-town-generated-pack-v1",
+  "packId": "gen_pack_invalid_formula",
+  "formula": "wood * 2",
+  "gameplayMapping": {
+    "canonicalEntities": [],
+    "serverRuleOverrides": 1
+  }
+}

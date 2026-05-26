@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-town-generated-pack-playtest-v1",
+  "title": "Agent Town Generated Pack Playtest Report",
+  "type": "object",
+  "required": ["schemaVersion", "packId", "completedAtMs", "renderer", "firstLoopCompleted", "canonicalPayloadIntegrity", "missingAssets", "consoleErrors", "playtestPassed", "styleCoherenceScore", "promptAlignmentScore", "uiReadabilityScore", "validationReport"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": "agent-town-generated-pack-playtest-v1" },
+    "packId": { "type": "string", "minLength": 3 },
+    "completedAtMs": { "type": "number" },
+    "renderer": { "enum": ["three", "dom-fallback"] },
+    "firstLoopCompleted": { "type": "boolean" },
+    "canonicalPayloadIntegrity": { "type": "boolean" },
+    "missingAssets": { "type": "number", "minimum": 0 },
+    "consoleErrors": { "type": "number", "minimum": 0 },
+    "playtestPassed": { "type": "boolean" },
+    "styleCoherenceScore": { "type": "number", "minimum": 0, "maximum": 1 },
+    "promptAlignmentScore": { "type": "number", "minimum": 0, "maximum": 1 },
+    "uiReadabilityScore": { "type": "number", "minimum": 0, "maximum": 1 },
+    "validationReport": { "type": "object" }
+  }
+}

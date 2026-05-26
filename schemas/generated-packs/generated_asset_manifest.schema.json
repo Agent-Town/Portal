@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-town-generated-asset-manifest-v1",
+  "title": "Agent Town Generated Asset Manifest",
+  "type": "object",
+  "required": ["schemaVersion", "promptHash", "generator", "productionImagePolicy", "assets"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": "agent-town-generated-asset-manifest-v1" },
+    "promptHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "generator": { "type": "string", "minLength": 3 },
+    "productionImagePolicy": { "type": "object" },
+    "assets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["assetId", "canonicalTarget", "kind", "status", "source"],
+        "additionalProperties": true
+      }
+    }
+  }
+}

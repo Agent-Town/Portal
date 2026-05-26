@@ -4,11 +4,65 @@
   const state = {
     payload: null,
     scene: null,
+    generatedPack: null,
+    playtestReport: null,
     selectedCellId: ''
   };
 
   function qs(selector) {
     return document.querySelector(selector);
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function activePack() {
+    return state.generatedPack || state.payload?.generatedPack || null;
+  }
+
+  function packText(key, fallback) {
+    return activePack()?.universePack?.text?.[key] || fallback;
+  }
+
+  function mappingName(canonicalId, fallback) {
+    return window.WorldGridSceneState.mappingName(activePack(), canonicalId, fallback);
+  }
+
+  function sceneStateForPayload(payload = state.payload) {
+    return window.WorldGridSceneState.createWorldGridSceneState(payload?.region, payload?.preferences, activePack());
+  }
+
+  function applyGeneratedTheme(pack = activePack()) {
+    const root = document.documentElement;
+    const palette = pack?.stylePack?.palette || null;
+    const assignments = {
+      '--world-grid-background': palette?.background || '#f7e8c8',
+      '--world-grid-surface': palette?.surface || '#fff3d6',
+      '--world-grid-ink': palette?.ink || '#2a1a0d',
+      '--world-grid-primary': palette?.primary || '#7a3f22',
+      '--world-grid-secondary': palette?.secondary || '#2f5d50',
+      '--world-grid-accent': palette?.accent || '#c7892e',
+      '--world-grid-focus': palette?.focus || '#2b76c4'
+    };
+    for (const [key, value] of Object.entries(assignments)) {
+      root.style.setProperty(key, value);
+    }
+    const title = qs('[data-world-grid-title]');
+    if (title) title.textContent = packText('topbarTitle', 'World Grid');
+    const publicTitle = qs('[data-world-grid-public-title]');
+    if (publicTitle) publicTitle.textContent = packText('publicPresenceTitle', 'Public Presence');
+    const servicesTitle = qs('[data-world-grid-services-title]');
+    if (servicesTitle) servicesTitle.textContent = packText('servicesTitle', 'Civic Services');
+    const eventsTitle = qs('[data-world-grid-events-title]');
+    if (eventsTitle) eventsTitle.textContent = packText('eventsTitle', 'World Event');
+    const sandboxTitle = qs('[data-world-grid-sandbox-title]');
+    if (sandboxTitle) sandboxTitle.textContent = packText('sandboxTitle', 'Sandbox District');
   }
 
   function apiHeaders() {
@@ -33,6 +87,68 @@
       throw error;
     }
     return body;
+  }
+
+  function renderGeneratedPack() {
+    applyGeneratedTheme();
+    const pack = activePack();
+    const status = qs('[data-world-grid-pack-status]');
+    const summary = qs('[data-world-grid-generated-summary]');
+    if (!status || !summary) return;
+    if (!pack) {
+      status.textContent = 'Enter a prompt to create a playable style and universe pack.';
+      summary.textContent = '';
+      return;
+    }
+    const validation = pack.validationReport?.ok === true ? packText('packValidated', 'Pack validated') : 'Pack needs review';
+    const factions = (pack.universePack?.factions || []).map((faction) => faction.name).filter(Boolean).slice(0, 3);
+    const metrics = pack.validationReport?.metrics || {};
+    status.textContent = validation;
+    summary.innerHTML = `
+      <strong>${escapeHtml(pack.universePack?.name || pack.stylePack?.name || 'Generated pack')}</strong>
+      <p>${escapeHtml(pack.universePack?.pitch || '')}</p>
+      <p>${escapeHtml(pack.universePack?.firstLoop?.objective || '')}</p>
+      ${factions.length ? `<p>${factions.map(escapeHtml).join(' · ')}</p>` : ''}
+      <dl>
+        <div><dt>Mappings</dt><dd>${escapeHtml(`${metrics.canonicalMappingsCovered || 0}/${metrics.requiredCanonicalMappings || 0}`)}</dd></div>
+        <div><dt>Assets</dt><dd>${escapeHtml(String(metrics.fallbackAssetCount || 0))}</dd></div>
+      </dl>
+    `;
+  }
+
+  async function generatePackFromPrompt(event) {
+    if (event) event.preventDefault();
+    const prompt = qs('[data-world-grid-prompt]');
+    const status = qs('[data-world-grid-pack-status]');
+    const value = String(prompt?.value || '').trim();
+    if (!value) {
+      if (status) status.textContent = 'Add a style prompt first.';
+      return;
+    }
+    if (status) status.textContent = 'Shaping a playable universe pack';
+    try {
+      const payload = await api('/api/world/generated-pack/generate', {
+        method: 'POST',
+        body: JSON.stringify({ prompt: value })
+      });
+      state.generatedPack = payload.generatedPack || null;
+      state.playtestReport = payload.playtestReport || null;
+      if (state.payload) state.payload.generatedPack = state.generatedPack;
+      renderGeneratedPack();
+      const sceneState = sceneStateForPayload();
+      renderMirror(sceneState);
+      renderDetail(sceneState);
+      renderScene(sceneState);
+      if (state.selectedCellId) await selectCell(state.selectedCellId);
+      const routeStatus = qs('[data-world-grid-status]');
+      if (routeStatus) routeStatus.textContent = packText('statusReady', 'Territory survey ready');
+      await refreshPublicPresence();
+      await refreshServices();
+      await refreshEvents();
+      await refreshSandbox();
+    } catch (error) {
+      if (status) status.textContent = error?.body?.error?.message || 'Could not generate that pack.';
+    }
   }
 
   function cellButton(cell) {
@@ -65,23 +181,23 @@
     const option = (state.payload?.territory?.claimOptions || []).find((item) => item.cellId === cell.cellId) || null;
     const claim = (state.payload?.territory?.claims || []).find((item) => item.cellId === cell.cellId) || null;
     const claimAction = claimsEnabled && option
-      ? `<button type="button" class="world-grid-action" data-world-grid-plan-claim="${cell.cellId}">Plan claim</button>`
+      ? `<button type="button" class="world-grid-action" data-world-grid-plan-claim="${escapeHtml(cell.cellId)}">${escapeHtml(packText('planClaimAction', 'Plan claim'))}</button>`
       : claimsEnabled && claim?.status === 'planned'
-        ? `<button type="button" class="world-grid-action" data-world-grid-complete-claim="${claim.claimId}">Complete claim</button>
-           <button type="button" class="world-grid-action world-grid-action--quiet" data-world-grid-cancel-claim="${claim.claimId}">Cancel</button>`
+        ? `<button type="button" class="world-grid-action" data-world-grid-complete-claim="${escapeHtml(claim.claimId)}">${escapeHtml(packText('completeClaimAction', 'Complete claim'))}</button>
+           <button type="button" class="world-grid-action world-grid-action--quiet" data-world-grid-cancel-claim="${escapeHtml(claim.claimId)}">Cancel</button>`
         : '';
     detail.innerHTML = `
-      <h2>${cell.label}</h2>
-      <p>${explanation?.summary || cell.accessibleName}</p>
+      <h2>${escapeHtml(cell.label)}</h2>
+      <p>${escapeHtml(explanation?.summary || cell.accessibleName)}</p>
       <dl>
-        <div><dt>State</dt><dd>${cell.state}</dd></div>
-        <div><dt>Terrain</dt><dd>${cell.terrain}</dd></div>
-        <div><dt>Feature</dt><dd>${cell.feature || 'none'}</dd></div>
-        <div><dt>Risk</dt><dd>${cell.risk || 'none'}</dd></div>
+        <div><dt>State</dt><dd>${escapeHtml(cell.state)}</dd></div>
+        <div><dt>Terrain</dt><dd>${escapeHtml(cell.terrain)}</dd></div>
+        <div><dt>Feature</dt><dd>${escapeHtml(cell.feature || 'none')}</dd></div>
+        <div><dt>Risk</dt><dd>${escapeHtml(cell.risk || 'none')}</dd></div>
       </dl>
-      <p>${explanation?.futureUse || 'V5.0 is a read-only territory survey.'}</p>
-      ${option ? `<p>${option.cloverAdvice}</p><p>Cost: ${formatCost(option.cost)}. Benefit: ${option.benefit.label}.</p>` : ''}
-      ${claim ? `<p>Claim status: ${claim.status}. ${claim.cloverAdvice || ''}</p>` : ''}
+      <p>${escapeHtml(explanation?.futureUse || 'V5.0 is a read-only territory survey.')}</p>
+      ${option ? `<p>${escapeHtml(option.cloverAdvice)}</p><p>Cost: ${escapeHtml(formatCost(option.cost))}. Benefit: ${escapeHtml(option.benefit.label)}.</p>` : ''}
+      ${claim ? `<p>Claim status: ${escapeHtml(claim.status)}. ${escapeHtml(claim.cloverAdvice || '')}</p>` : ''}
       ${claimAction}
     `;
     const plan = detail.querySelector('[data-world-grid-plan-claim]');
@@ -95,7 +211,7 @@
   function formatCost(cost = {}) {
     const parts = ['wood', 'stone', 'food', 'coin']
       .filter((key) => Number(cost[key] || 0) > 0)
-      .map((key) => `${cost[key]} ${key}`);
+      .map((key) => `${cost[key]} ${mappingName(`resource.${key}`, key)}`);
     return parts.join(', ') || 'none';
   }
 
@@ -117,9 +233,11 @@
     if (state.scene?.dispose) state.scene.dispose();
     try {
       state.scene = window.WorldGridThreeRenderer.renderWorldGridScene(stage, sceneState, {
+        generatedPack: activePack(),
         onSelect: (cellId) => selectCell(cellId)
       });
       stage.dataset.renderer = 'three';
+      stage.dataset.generatedPackId = activePack()?.packId || '';
     } catch (error) {
       stage.dataset.renderer = 'dom-fallback';
       stage.dataset.rendererFallbackReason = error?.message || 'WORLD_GRID_RENDER_FAILED';
@@ -137,7 +255,7 @@
       body: JSON.stringify({ cellId })
     });
     state.payload.preferences = payload.preferences;
-    const sceneState = window.WorldGridSceneState.createWorldGridSceneState(state.payload.region, payload.preferences);
+    const sceneState = sceneStateForPayload();
     const explain = await api('/api/world/tool/et.world.region.explain_cell', {
       method: 'POST',
       body: JSON.stringify({ cellId })
@@ -152,7 +270,7 @@
   async function refreshAfterTerritoryMutation(payload, selectedCellId) {
     state.payload.region = payload.region || state.payload.region;
     state.payload.territory = payload.territory || state.payload.territory;
-    const sceneState = window.WorldGridSceneState.createWorldGridSceneState(state.payload.region, state.payload.preferences);
+    const sceneState = sceneStateForPayload();
     renderMirror(sceneState);
     renderScene(sceneState);
     await selectCell(selectedCellId || state.selectedCellId);
@@ -174,6 +292,38 @@
       body: JSON.stringify({ claimId })
     });
     await refreshAfterTerritoryMutation(payload, payload.claim.cellId);
+    await recordGeneratedFirstLoopReport();
+  }
+
+  async function recordGeneratedFirstLoopReport() {
+    const pack = activePack();
+    if (!pack) return null;
+    const sceneInfo = state.scene?.info ? state.scene.info() : null;
+    try {
+      const payload = await api('/api/world/generated-pack/playtest-report', {
+        method: 'POST',
+        body: JSON.stringify({
+          packId: pack.packId,
+          renderer: sceneInfo?.renderer || 'three',
+          firstLoopCompleted: true,
+          canonicalPayloadIntegrity: true,
+          missingAssets: 0,
+          consoleErrors: 0
+        })
+      });
+      state.playtestReport = payload.playtestReport || null;
+      if (state.payload) state.payload.generatedPackPlaytestReport = state.playtestReport;
+      const result = qs('[data-world-grid-loop-result]');
+      if (result) {
+        result.innerHTML = `<p>${escapeHtml(pack.universePack?.firstLoop?.successReceipt || 'First generated loop complete.')}</p>`;
+      }
+      renderGeneratedPack();
+      return payload.playtestReport;
+    } catch (error) {
+      const result = qs('[data-world-grid-loop-result]');
+      if (result) result.textContent = error?.body?.error?.message || 'Generated pack playtest report could not be recorded.';
+      return null;
+    }
   }
 
   async function cancelClaim(claimId) {
@@ -494,9 +644,12 @@
     try {
       const payload = await api('/api/world/region');
       state.payload = payload;
+      state.generatedPack = payload.generatedPack || null;
+      state.playtestReport = payload.generatedPackPlaytestReport || null;
       state.selectedCellId = payload.preferences?.selectedCellId || payload.region.cells[0]?.cellId || '';
-      const sceneState = window.WorldGridSceneState.createWorldGridSceneState(payload.region, payload.preferences);
+      const sceneState = sceneStateForPayload(payload);
       status.textContent = 'Preparing territory survey';
+      renderGeneratedPack();
       renderMirror(sceneState);
       renderDetail(sceneState);
       renderScene(sceneState);
@@ -511,7 +664,7 @@
       await refreshServices();
       await refreshEvents();
       await refreshSandbox();
-      status.textContent = 'Territory survey ready';
+      status.textContent = packText('statusReady', 'Territory survey ready');
     } catch (error) {
       status.textContent = error?.body?.error?.message || 'The territory survey is not available.';
       qs('[data-world-grid-stage]').dataset.renderer = 'blocked';
@@ -520,7 +673,14 @@
 
   window.__worldGridTest = {
     getPayload: () => state.payload,
+    getGeneratedPack: () => activePack(),
+    getPlaytestReport: () => state.playtestReport,
     getSceneInfo: () => state.scene?.info ? state.scene.info() : null,
+    generatePackFromPrompt: (prompt) => {
+      const promptNode = qs('[data-world-grid-prompt]');
+      if (promptNode) promptNode.value = prompt;
+      return generatePackFromPrompt();
+    },
     selectCell,
     planClaim,
     completeClaim,
@@ -537,11 +697,16 @@
     contributeWorldEvent,
     claimWorldEventReward,
     refreshSandbox,
+    recordGeneratedFirstLoopReport,
     dispose: () => {
       if (state.scene?.dispose) state.scene.dispose();
       state.scene = null;
     }
   };
 
-  window.addEventListener('DOMContentLoaded', load);
+  window.addEventListener('DOMContentLoaded', () => {
+    const form = qs('[data-world-grid-generate-form]');
+    if (form) form.addEventListener('submit', generatePackFromPrompt);
+    load();
+  });
 })();

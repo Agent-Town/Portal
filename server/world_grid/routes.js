@@ -41,6 +41,12 @@ const {
   isWorldGridFeatureEnabled,
   resolveWorldGridFeatureFlags
 } = require('./feature_flags');
+const {
+  currentGeneratedPack,
+  currentPlaytestReport,
+  generateAndStorePack,
+  recordPlaytestReport
+} = require('./generated_pack');
 
 const WORLD_GRID_TOOLS = [
   {
@@ -130,6 +136,18 @@ const WORLD_GRID_TOOLS = [
   {
     name: 'et.world.sandbox.leave',
     description: 'Leave the sandbox without mutating private town state.'
+  },
+  {
+    name: 'et.world.generated_pack.current',
+    description: 'Read the current generated universe and style pack without exposing raw prompts or secrets.'
+  },
+  {
+    name: 'et.world.generated_pack.generate',
+    description: 'Create a validated generated universe and style pack from a player prompt while preserving canonical world rules.'
+  },
+  {
+    name: 'et.world.generated_pack.record_playtest',
+    description: 'Record a first-loop generated-pack playtest report with machine-readable metrics.'
   }
 ];
 
@@ -151,6 +169,9 @@ function toolsForFlags(featureFlags = {}) {
     }
     if (tool.name.startsWith('et.world.sandbox.')) {
       return isWorldGridFeatureEnabled(featureFlags, 'FEATURE_WORLD_GRID_V55_SANDBOX_DISTRICTS');
+    }
+    if (tool.name.startsWith('et.world.generated_pack.')) {
+      return isWorldGridFeatureEnabled(featureFlags, 'FEATURE_WORLD_GRID_GENERATED_PACKS');
     }
     return true;
   });
@@ -233,6 +254,14 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     }
   }
 
+  function requireGeneratedPacksEnabled(featureFlags) {
+    if (!isWorldGridFeatureEnabled(featureFlags, 'FEATURE_WORLD_GRID_GENERATED_PACKS')) {
+      const error = new Error('FEATURE_DISABLED');
+      error.details = { featureFlags, feature: 'FEATURE_WORLD_GRID_GENERATED_PACKS' };
+      throw error;
+    }
+  }
+
   function buildRegionPayload(req, res) {
     const featureFlags = requireEnabled(req);
     const identity = resolveWorldIdentity(req, res);
@@ -250,11 +279,14 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       selectedCellId: region.cells.find((cell) => cell.state === 'claimed')?.cellId || '',
       camera: { zoom: 'settlement', q: 0, r: 0 }
     };
+    const generatedPacksEnabled = isWorldGridFeatureEnabled(featureFlags, 'FEATURE_WORLD_GRID_GENERATED_PACKS');
     return {
       identity,
       owner,
       featureFlags,
       region,
+      generatedPack: generatedPacksEnabled ? currentGeneratedPack(owner) : null,
+      generatedPackPlaytestReport: generatedPacksEnabled ? currentPlaytestReport(owner) : null,
       territory: {
         claimsEnabled: isWorldGridFeatureEnabled(featureFlags, 'FEATURE_WORLD_GRID_V51_CLAIMS'),
         claimOptions: isWorldGridFeatureEnabled(featureFlags, 'FEATURE_WORLD_GRID_V51_CLAIMS')
@@ -454,10 +486,98 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
         requireSandboxEnabled(payload.featureFlags);
         return res.json({ ok: true, data: leaveSandbox(payload.owner) });
       }
+      if (toolName === 'et.world.generated_pack.current') {
+        requireGeneratedPacksEnabled(payload.featureFlags);
+        return res.json({
+          ok: true,
+          data: {
+            generatedPack: currentGeneratedPack(payload.owner),
+            playtestReport: currentPlaytestReport(payload.owner)
+          }
+        });
+      }
+      if (toolName === 'et.world.generated_pack.generate') {
+        requireGeneratedPacksEnabled(payload.featureFlags);
+        return res.json({
+          ok: true,
+          data: {
+            generatedPack: generateAndStorePack({
+              owner: payload.owner,
+              prompt: req.body?.prompt,
+              nowMs: Date.now()
+            })
+          }
+        });
+      }
+      if (toolName === 'et.world.generated_pack.record_playtest') {
+        requireGeneratedPacksEnabled(payload.featureFlags);
+        return res.json({
+          ok: true,
+          data: {
+            playtestReport: recordPlaytestReport(payload.owner, req.body?.report || req.body || {})
+          }
+        });
+      }
       res.status(404).json({ ok: false, error: { code: 'TOOL_NOT_FOUND' } });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'NOT_FOUND' ? 404 : normalized.code === 'INVALID_SERVICE_REQUEST_STATE' || normalized.code === 'OUT_OF_RESOURCES' || normalized.code === 'CONTRIBUTION_CAP_EXCEEDED' || normalized.code === 'INVALID_REWARD_STATE' ? 409 : normalized.code === 'INVALID_IDEMPOTENCY_KEY' || normalized.code === 'INVALID_EVENT_STATE' ? 400 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = normalized.code === 'NOT_FOUND' || normalized.code === 'NO_GENERATED_PACK' ? 404 : normalized.code === 'INVALID_SERVICE_REQUEST_STATE' || normalized.code === 'OUT_OF_RESOURCES' || normalized.code === 'CONTRIBUTION_CAP_EXCEEDED' || normalized.code === 'INVALID_REWARD_STATE' ? 409 : normalized.code === 'INVALID_IDEMPOTENCY_KEY' || normalized.code === 'INVALID_EVENT_STATE' || normalized.code === 'INVALID_PROMPT' ? 400 : normalized.code === 'GENPACK_VALIDATION_FAILED' ? 422 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      res.status(status).json({ ok: false, error: normalized });
+    }
+  });
+
+  router.get('/api/world/generated-pack/current', (req, res) => {
+    try {
+      const payload = buildRegionPayload(req, res);
+      requireGeneratedPacksEnabled(payload.featureFlags);
+      res.json({
+        ok: true,
+        featureFlags: payload.featureFlags,
+        generatedPack: currentGeneratedPack(payload.owner),
+        playtestReport: currentPlaytestReport(payload.owner)
+      });
+    } catch (error) {
+      const normalized = normalizeError(error);
+      const status = normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      res.status(status).json({ ok: false, error: normalized });
+    }
+  });
+
+  router.post('/api/world/generated-pack/generate', (req, res) => {
+    try {
+      const payload = buildRegionPayload(req, res);
+      requireGeneratedPacksEnabled(payload.featureFlags);
+      const generatedPack = generateAndStorePack({
+        owner: payload.owner,
+        prompt: req.body?.prompt,
+        nowMs: Date.now()
+      });
+      res.json({
+        ok: true,
+        featureFlags: payload.featureFlags,
+        generatedPack,
+        playtestReport: currentPlaytestReport(payload.owner)
+      });
+    } catch (error) {
+      const normalized = normalizeError(error);
+      const status = normalized.code === 'INVALID_PROMPT' ? 400 : normalized.code === 'GENPACK_VALIDATION_FAILED' ? 422 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      res.status(status).json({ ok: false, error: normalized });
+    }
+  });
+
+  router.post('/api/world/generated-pack/playtest-report', (req, res) => {
+    try {
+      const payload = buildRegionPayload(req, res);
+      requireGeneratedPacksEnabled(payload.featureFlags);
+      const playtestReport = recordPlaytestReport(payload.owner, req.body || {});
+      res.json({
+        ok: true,
+        featureFlags: payload.featureFlags,
+        playtestReport
+      });
+    } catch (error) {
+      const normalized = normalizeError(error);
+      const status = normalized.code === 'NO_GENERATED_PACK' ? 404 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
       res.status(status).json({ ok: false, error: normalized });
     }
   });

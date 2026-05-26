@@ -1,0 +1,142 @@
+{
+  "schemaVersion": "agent-town-generated-pack-v1",
+  "packId": "gen_pack_fixture_valid",
+  "ownerAccountId": "owner_fixture",
+  "createdAtMs": 1770000000000,
+  "generator": {
+    "id": "deterministic-world-grid-style-pack-v0",
+    "source": "deterministic-fallback",
+    "codexBridgeReady": true,
+    "externalModelUsed": false,
+    "futureModel": "gpt-image-2"
+  },
+  "prompt": {
+    "hash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+    "length": 64,
+    "keywordHints": ["cozy", "mushroom", "frontier", "clockwork", "gardeners", "lantern"]
+  },
+  "stylePack": {
+    "stylePackId": "style_fixture",
+    "name": "Cozy Moss Lantern Frontier",
+    "themeSummary": "Cozy and mushroom motifs translated into warm frontier materials.",
+    "palette": {
+      "background": "#e8eed0",
+      "surface": "#fff6d8",
+      "ink": "#25301f",
+      "primary": "#446f45",
+      "secondary": "#6f4260",
+      "accent": "#d39a37",
+      "focus": "#2f78ad",
+      "selected": "#f1c75b",
+      "terrain": {
+        "prairie": "#cfdc8c",
+        "ridge": "#9f9271",
+        "river": "#71a9b2",
+        "forest": "#5f8d58",
+        "mesa": "#c98252"
+      },
+      "state": {
+        "claimed": "#d39a37",
+        "claimable": "#5f8d58",
+        "visible": "#cfdc8c",
+        "locked": "#817b68"
+      }
+    },
+    "materialRules": [
+      { "target": "three-region-cell", "rule": "terrain colors are softened by ownership state" },
+      { "target": "home-settlement-marker", "rule": "primary color with warm light contact shadow" },
+      { "target": "selection-ring", "rule": "selected color with high contrast against terrain" }
+    ],
+    "uiRules": {
+      "minReadableTextPx": 16,
+      "onePrimaryAction": true,
+      "normalGameplayDebugJargon": false
+    }
+  },
+  "universePack": {
+    "universePackId": "universe_fixture",
+    "name": "Cozy Mushroom Charter",
+    "pitch": "Cozy settlers and mushroom crews build a civic frontier with Clover keeping the work bounded and legible.",
+    "playerRole": "Cozy founder",
+    "cloverRole": "Clover remains the trusted Foreman and explains each bounded action in-world.",
+    "factions": [
+      { "factionId": "faction_settlers", "name": "Cozy Settlers", "role": "home-builders" },
+      { "factionId": "faction_crews", "name": "Mushroom Crews", "role": "makers" }
+    ],
+    "firstLoop": {
+      "title": "Cozy first route",
+      "objective": "Choose a nearby cell, plan the cozy route, and complete the first claim.",
+      "successReceipt": "Cozy route complete. Cozy Hall now has a visible path into the wider territory."
+    },
+    "text": {
+      "topbarTitle": "Cozy World Grid",
+      "statusReady": "Cozy survey ready",
+      "packValidated": "Cozy pack validated",
+      "planClaimAction": "Plan Cozy route",
+      "completeClaimAction": "Complete Mushroom claim"
+    }
+  },
+  "gameplayMapping": {
+    "canonicalVersion": "agent-town-world-grid-v1",
+    "serverRuleOverrides": 0,
+    "canonicalEntities": [
+      { "canonicalId": "building.hq", "mechanicalKey": "hq", "generatedName": "Cozy Hall" },
+      { "canonicalId": "building.worker_camp", "mechanicalKey": "worker_camp", "generatedName": "Mushroom Crew Camp" },
+      { "canonicalId": "building.lumber_camp", "mechanicalKey": "lumber_camp", "generatedName": "Cozy Timber Yard" },
+      { "canonicalId": "building.farm", "mechanicalKey": "farm", "generatedName": "Cozy Garden Patch" },
+      { "canonicalId": "building.quarry", "mechanicalKey": "quarry", "generatedName": "Mushroom Stone Cut" },
+      { "canonicalId": "building.market", "mechanicalKey": "market", "generatedName": "Mushroom Market Stand" },
+      { "canonicalId": "resource.wood", "mechanicalKey": "wood", "generatedName": "Cozy Timber" },
+      { "canonicalId": "resource.stone", "mechanicalKey": "stone", "generatedName": "Mushroom Stone" },
+      { "canonicalId": "resource.food", "mechanicalKey": "food", "generatedName": "Cozy Supplies" },
+      { "canonicalId": "resource.coin", "mechanicalKey": "coin", "generatedName": "Mushroom Scrip" },
+      { "canonicalId": "character.clover", "mechanicalKey": "clover", "generatedName": "Clover Kincaid" },
+      { "canonicalId": "action.plan_claim", "mechanicalKey": "plan_claim", "generatedName": "Plan Cozy route" },
+      { "canonicalId": "action.complete_claim", "mechanicalKey": "complete_claim", "generatedName": "Complete Mushroom claim" },
+      { "canonicalId": "terrain.prairie", "mechanicalKey": "prairie", "generatedName": "Cozy Meadow" },
+      { "canonicalId": "terrain.ridge", "mechanicalKey": "ridge", "generatedName": "Mushroom Ridge" },
+      { "canonicalId": "terrain.river", "mechanicalKey": "river", "generatedName": "Cozy Run" },
+      { "canonicalId": "terrain.forest", "mechanicalKey": "forest", "generatedName": "Mushroom Grove" },
+      { "canonicalId": "terrain.mesa", "mechanicalKey": "mesa", "generatedName": "Cozy Mesa" },
+      { "canonicalId": "state.claimed", "mechanicalKey": "claimed", "generatedName": "Held by your settlement" },
+      { "canonicalId": "state.claimable", "mechanicalKey": "claimable", "generatedName": "Ready for a route plan" },
+      { "canonicalId": "state.visible", "mechanicalKey": "visible", "generatedName": "Surveyed nearby ground" },
+      { "canonicalId": "state.locked", "mechanicalKey": "locked", "generatedName": "Beyond today's survey" }
+    ]
+  },
+  "assetManifest": {
+    "schemaVersion": "agent-town-generated-asset-manifest-v1",
+    "promptHash": "fc691f03e258d9045748cde44e7177531cb5606bab85ac16752491867dc5ce4e",
+    "generator": "deterministic-world-grid-style-pack-v0",
+    "productionImagePolicy": {
+      "model": "gpt-image-2",
+      "status": "candidate_required_before_production",
+      "requiresHumanSignoff": true
+    },
+    "assets": [
+      { "assetId": "a1", "canonicalTarget": "terrain.prairie", "kind": "three-material", "status": "runtime-generated", "source": "deterministic-fallback" },
+      { "assetId": "a2", "canonicalTarget": "terrain.ridge", "kind": "three-material", "status": "runtime-generated", "source": "deterministic-fallback" },
+      { "assetId": "a3", "canonicalTarget": "terrain.river", "kind": "three-material", "status": "runtime-generated", "source": "deterministic-fallback" },
+      { "assetId": "a4", "canonicalTarget": "terrain.forest", "kind": "three-material", "status": "runtime-generated", "source": "deterministic-fallback" },
+      { "assetId": "a5", "canonicalTarget": "terrain.mesa", "kind": "three-material", "status": "runtime-generated", "source": "deterministic-fallback" },
+      { "assetId": "a6", "canonicalTarget": "state.claimed", "kind": "three-material", "status": "runtime-generated", "source": "deterministic-fallback" },
+      { "assetId": "a7", "canonicalTarget": "state.claimable", "kind": "three-material", "status": "runtime-generated", "source": "deterministic-fallback" },
+      { "assetId": "a8", "canonicalTarget": "state.visible", "kind": "three-material", "status": "runtime-generated", "source": "deterministic-fallback" },
+      { "assetId": "a9", "canonicalTarget": "state.locked", "kind": "three-material", "status": "runtime-generated", "source": "deterministic-fallback" },
+      { "assetId": "a10", "canonicalTarget": "building.hq", "kind": "billboard-sprite-candidate", "status": "fallback-ready", "source": "deterministic-fallback" },
+      { "assetId": "a11", "canonicalTarget": "building.worker_camp", "kind": "billboard-sprite-candidate", "status": "fallback-ready", "source": "deterministic-fallback" },
+      { "assetId": "a12", "canonicalTarget": "building.lumber_camp", "kind": "billboard-sprite-candidate", "status": "fallback-ready", "source": "deterministic-fallback" },
+      { "assetId": "a13", "canonicalTarget": "building.farm", "kind": "billboard-sprite-candidate", "status": "fallback-ready", "source": "deterministic-fallback" },
+      { "assetId": "a14", "canonicalTarget": "building.quarry", "kind": "billboard-sprite-candidate", "status": "fallback-ready", "source": "deterministic-fallback" },
+      { "assetId": "a15", "canonicalTarget": "building.market", "kind": "billboard-sprite-candidate", "status": "fallback-ready", "source": "deterministic-fallback" },
+      { "assetId": "a16", "canonicalTarget": "resource.wood", "kind": "shape-token", "status": "fallback-ready", "source": "deterministic-fallback" },
+      { "assetId": "a17", "canonicalTarget": "resource.stone", "kind": "shape-token", "status": "fallback-ready", "source": "deterministic-fallback" },
+      { "assetId": "a18", "canonicalTarget": "resource.food", "kind": "shape-token", "status": "fallback-ready", "source": "deterministic-fallback" },
+      { "assetId": "a19", "canonicalTarget": "resource.coin", "kind": "shape-token", "status": "fallback-ready", "source": "deterministic-fallback" },
+      { "assetId": "a20", "canonicalTarget": "character.clover", "kind": "billboard-sprite-candidate", "status": "fallback-ready", "source": "deterministic-fallback" }
+    ]
+  },
+  "validationReport": {
+    "ok": true
+  }
+}

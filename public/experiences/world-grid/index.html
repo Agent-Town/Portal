@@ -13,7 +13,7 @@
     <main class="world-grid-shell">
       <header class="world-grid-topbar">
         <div>
-          <h1>World Grid</h1>
+          <h1 data-world-grid-title>World Grid</h1>
           <p data-world-grid-status>Loading territory survey</p>
         </div>
       </header>
@@ -22,25 +22,36 @@
           <div class="world-grid-fallback" data-world-grid-fallback hidden>Territory survey fallback map</div>
         </div>
         <aside class="world-grid-panel" aria-label="Territory cell details">
+          <section class="world-grid-generator" data-world-grid-generated-panel>
+            <h2>Generate Universe</h2>
+            <form data-world-grid-generate-form>
+              <label for="world-grid-prompt">Style prompt</label>
+              <textarea id="world-grid-prompt" data-world-grid-prompt rows="3" placeholder="cozy mushroom frontier with clockwork gardeners"></textarea>
+              <button type="submit" class="world-grid-action">Generate pack</button>
+            </form>
+            <p data-world-grid-pack-status>Enter a prompt to create a playable style and universe pack.</p>
+            <div class="world-grid-generated-summary" data-world-grid-generated-summary></div>
+            <div class="world-grid-loop-result" data-world-grid-loop-result></div>
+          </section>
           <div class="world-grid-detail" data-world-grid-detail>No surveyed cell selected.</div>
           <section class="world-grid-public" data-world-grid-public hidden>
-            <h2>Public Presence</h2>
+            <h2 data-world-grid-public-title>Public Presence</h2>
             <button type="button" class="world-grid-action" data-world-grid-public-opt-in>Opt in public town card</button>
             <button type="button" class="world-grid-action world-grid-action--quiet" data-world-grid-public-opt-out>Opt out</button>
             <div data-world-grid-public-list></div>
           </section>
           <section class="world-grid-services" data-world-grid-services hidden>
-            <h2>Civic Services</h2>
+            <h2 data-world-grid-services-title>Civic Services</h2>
             <div data-world-grid-services-list></div>
             <div data-world-grid-service-result></div>
           </section>
           <section class="world-grid-events" data-world-grid-events hidden>
-            <h2>World Event</h2>
+            <h2 data-world-grid-events-title>World Event</h2>
             <div data-world-grid-events-list></div>
             <div data-world-grid-event-result></div>
           </section>
           <section class="world-grid-sandbox" data-world-grid-sandbox hidden>
-            <h2>Sandbox District</h2>
+            <h2 data-world-grid-sandbox-title>Sandbox District</h2>
             <div data-world-grid-sandbox-state></div>
             <div data-world-grid-sandbox-result></div>
           </section>

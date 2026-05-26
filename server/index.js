@@ -24,6 +24,7 @@ const { readStore, writeStore, getStorePath } = require('./store');
 const { createExperiencesRouter } = require('./experience_loader');
 const { createFoundersPlotRouter } = require('./founders_plot/routes');
 const { createWorldGridRouter } = require('./world_grid/routes');
+const { clearGeneratedPacksForTests } = require('./world_grid/generated_pack');
 const { resetFoundersPlotStore } = require('./founders_plot/store');
 const { getAtlasSnapshot, searchAtlasAgents } = require('./atlas');
 const { createPonyTransportService } = require('./ponyTransport');
@@ -8381,6 +8382,7 @@ if (process.env.NODE_ENV === 'test') {
     invalidateAtlasStoreCaches();
     resetAllSessions();
     resetFoundersPlotStore();
+    clearGeneratedPacksForTests();
     rateBuckets.clear();
     ponyRateBuckets.clear();
     erc8004OptOutNonces.clear();

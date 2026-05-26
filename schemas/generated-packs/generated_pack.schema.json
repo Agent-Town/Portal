@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-town-generated-pack-v1",
+  "title": "Agent Town Generated Pack",
+  "type": "object",
+  "required": ["schemaVersion", "packId", "ownerAccountId", "createdAtMs", "generator", "prompt", "stylePack", "universePack", "gameplayMapping", "assetManifest", "validationReport"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": "agent-town-generated-pack-v1" },
+    "packId": { "type": "string", "minLength": 3 },
+    "ownerAccountId": { "type": "string", "minLength": 3 },
+    "createdAtMs": { "type": "number" },
+    "generator": { "type": "object" },
+    "prompt": {
+      "type": "object",
+      "required": ["hash", "length", "keywordHints"],
+      "not": { "required": ["normalizedPrompt"] }
+    },
+    "stylePack": { "type": "object" },
+    "universePack": { "type": "object" },
+    "gameplayMapping": { "type": "object" },
+    "assetManifest": { "type": "object" },
+    "validationReport": { "type": "object" }
+  }
+}

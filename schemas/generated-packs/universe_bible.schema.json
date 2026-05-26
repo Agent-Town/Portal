@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-town-universe-bible-v1",
+  "title": "Agent Town Universe Bible",
+  "type": "object",
+  "required": ["schemaVersion", "universePackId", "name", "pitch", "factions", "firstLoop", "text"],
+  "additionalProperties": true,
+  "properties": {
+    "schemaVersion": { "const": "agent-town-universe-bible-v1" },
+    "universePackId": { "type": "string", "minLength": 3 },
+    "name": { "type": "string", "minLength": 3 },
+    "pitch": { "type": "string", "minLength": 12 },
+    "factions": { "type": "array", "minItems": 2 },
+    "firstLoop": {
+      "type": "object",
+      "required": ["title", "objective", "successReceipt"]
+    },
+    "text": { "type": "object" }
+  }
+}
