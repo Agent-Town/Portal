@@ -5,7 +5,7 @@ const { V6_WORLD_FEATURE_FLAG, isWorldGridFeatureEnabled } = require('../world_g
 const V6_RESILIENCE_BASELINE_VERSION = 'agent-town.v6.resilience.v1';
 
 const REQUIRED_RELEASE_GAPS = [
-  'M16_REMAINING_STORE_PROCESS_RESTART_COVERAGE_REQUIRED',
+  'M16_RELEASE_GRADE_PROCESS_RESTART_COVERAGE_REQUIRED',
   'M16_REPLAY_RECONSTRUCTION_RELEASE_COVERAGE_REQUIRED',
   'M16_MIGRATION_UPGRADE_DOWNGRADE_TESTS_REQUIRED',
   'M16_LOAD_AND_RATE_TESTS_REQUIRED',
@@ -84,7 +84,7 @@ const V6_CIVIC_RESILIENCE_STORES = [
     label: 'Public works shared-resource store',
     modulePath: 'server/world_civilization/public_works.js',
     migrationVersion: 'v1',
-    restartCoverage: 'tests/world_civilization_public_works.test.js',
+    restartCoverage: 'tests/world_civilization_public_works_process_restart.test.js',
     requiredMethods: ['recordContribution', 'getContribution', 'listContributions', 'summarizeProject', 'count', 'close'],
     forbiddenMethods: ['spendPrivateInventory', 'grantReward']
   }

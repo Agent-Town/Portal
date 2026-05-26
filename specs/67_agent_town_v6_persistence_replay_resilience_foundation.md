@@ -19,6 +19,7 @@ Test coverage:
 - `tests/world_civilization_effect_process_restart.test.js`
 - `tests/world_civilization_delegation_process_restart.test.js`
 - `tests/world_civilization_institution_process_restart.test.js`
+- `tests/world_civilization_public_works_process_restart.test.js`
 
 ## Boundary
 
@@ -99,13 +100,20 @@ public-works and sandbox-policy charters, reconstruct privacy-safe audit replay,
 and prove exact retries do not append duplicate institution or audit rows after
 restart.
 
+`tests/world_civilization_public_works_process_restart.test.js` extends the
+process-level evidence to shared public-works accounting: separate processes
+reopen the required institution and public-works stores, record capped
+contributions, reconstruct privacy-safe audit replay, and prove exact retries
+do not append duplicate contribution or audit rows after restart.
+
 ## Open Release Gaps
 
 M16 remains incomplete until all of these gates close:
 
-- Process restart tests for every civic store, not only the current
-  audit-ledger, proposal/vote, reputation/moderation, effect/rollback, and
-  delegation/institution restart replay probes.
+- Release-grade process restart tests for every civic store beyond the current
+  research-only audit-ledger, proposal/vote, reputation/moderation,
+  effect/rollback, delegation, institution, and public-works restart replay
+  probes.
 - Release-grade replay reconstruction across process restart, larger datasets,
   and every civic summary surface.
 - Migration upgrade and downgrade tests for every civic table.

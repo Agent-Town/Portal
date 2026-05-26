@@ -6,7 +6,10 @@ Milestone: `M14 Public works and shared resources integration`
 
 Runtime module: `server/world_civilization/public_works.js`
 
-Contract tests: `tests/world_civilization_public_works.test.js`
+Contract tests:
+
+- `tests/world_civilization_public_works.test.js`
+- `tests/world_civilization_public_works_process_restart.test.js`
 
 Schema contract: `specs/55_agent_town_v6_civic_schema_contracts.md`
 
@@ -19,6 +22,11 @@ grant rewards.
 The store records shared public-works contribution accounting against a
 research-only V6 institution charter. It is readiness evidence for later M14
 integration with V5.4-style public works, not a public contribution endpoint.
+
+The process-level restart proof currently covers reopening the institution and
+public-works stores across separate Node process lifetimes, recording capped
+contributions, reconstructing privacy-safe audit replay, and proving exact
+retries do not append duplicate contribution or audit rows.
 
 ## Data Model
 

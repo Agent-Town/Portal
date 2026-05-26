@@ -51,7 +51,8 @@ const REQUIRED_REVIEW_GATES = [
       'tests/world_civilization_reputation_moderation_process_restart.test.js',
       'tests/world_civilization_effect_process_restart.test.js',
       'tests/world_civilization_delegation_process_restart.test.js',
-      'tests/world_civilization_institution_process_restart.test.js'
+      'tests/world_civilization_institution_process_restart.test.js',
+      'tests/world_civilization_public_works_process_restart.test.js'
     ],
     requiredChecks: ['append_only_ledger', 'owner_indexes', 'migration_versions', 'replay_reconstruction', 'rollback_handles'],
     signoffRequired: true

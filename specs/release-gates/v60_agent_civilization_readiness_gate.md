@@ -70,9 +70,9 @@ gate below has implementation, deterministic tests, and security/product signoff
   tests.
 - The research-only resilience baseline may exist in
   `server/world_civilization/resilience.js`, but it must keep
-  `releaseReady: false` until process restart coverage spans every civic store,
-  release-grade replay reconstruction, migration upgrade/downgrade, load/rate,
-  and rollback recovery gates have deterministic evidence. Current audit replay
+  `releaseReady: false` until release-grade process restart coverage,
+  replay reconstruction, migration upgrade/downgrade, load/rate, and rollback
+  recovery gates have deterministic evidence. Current audit replay
   reconstruction starts in `server/world_civilization/replay_reconstruction.js`,
   and the current audit-ledger process restart probe starts in
   `tests/world_civilization_process_restart.test.js`. Proposal/vote process
@@ -86,6 +86,8 @@ gate below has implementation, deterministic tests, and security/product signoff
   `tests/world_civilization_delegation_process_restart.test.js`;
   institution process restart coverage starts in
   `tests/world_civilization_institution_process_restart.test.js`;
+  public-works process restart coverage starts in
+  `tests/world_civilization_public_works_process_restart.test.js`;
   all replay probes must remain privacy-safe and non-executing.
 - The research-only release review gate may exist in
   `server/world_civilization/release_review.js`, but it must keep V6 hidden
@@ -190,9 +192,11 @@ gate below has implementation, deterministic tests, and security/product signoff
   `tests/world_civilization_delegation_process_restart.test.js`.
   Institution process restart coverage starts in
   `tests/world_civilization_institution_process_restart.test.js`.
-  Release still requires process-level restart coverage for every civic store,
-  larger replay reconstruction, migration, load/rate, and rollback recovery
-  tests.
+  Public-works process restart coverage starts in
+  `tests/world_civilization_public_works_process_restart.test.js`.
+  These current probes cover every current civic store at research scale.
+  Release still requires release-grade process restart coverage, larger replay
+  reconstruction, migration, load/rate, and rollback recovery tests.
 - Security and product release review must be complete before normal gameplay
   exposure. Current gate tracking starts in
   `server/world_civilization/release_review.js` and
