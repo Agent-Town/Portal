@@ -49,6 +49,9 @@ Persistence replay resilience foundation:
 Security product release review foundation:
 `specs/68_agent_town_v6_security_product_release_review_foundation.md`
 
+Controlled release completion foundation:
+`specs/69_agent_town_v6_controlled_release_completion_foundation.md`
+
 ## Implementation Boundary
 
 Do not add V6 civic mechanics to normal gameplay or the world-grid prototype
@@ -79,6 +82,12 @@ The research-only release review gate in
 `server/world_civilization/release_review.js` names the threat model, privacy,
 abuse-case, data-retention, audit coverage, validation, and product signoff
 requirements that must be complete before normal gameplay exposure.
+
+The research-only controlled release gate in
+`server/world_civilization/controlled_release.js` requires M0-M17 completion,
+release-review readiness, production feature flag safety, rollback/disable
+controls, observability, support runbooks, blocker clearance, and a controlled
+release window before explicit production enablement.
 
 ## Goal
 

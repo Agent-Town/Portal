@@ -44,6 +44,9 @@ Persistence replay resilience foundation:
 Security product release review foundation:
 `specs/68_agent_town_v6_security_product_release_review_foundation.md`
 
+Controlled release completion foundation:
+`specs/69_agent_town_v6_controlled_release_completion_foundation.md`
+
 V6.0 Agent Civilization Foundation must not become player-visible until every
 gate below has implementation, deterministic tests, and security/product signoff.
 
@@ -75,6 +78,12 @@ gate below has implementation, deterministic tests, and security/product signoff
   from runtime/player surfaces until threat model, privacy review, abuse-case
   review, data-retention policy, audit coverage, validation evidence, and
   product signoff are complete.
+- The research-only controlled release gate may exist in
+  `server/world_civilization/controlled_release.js`, but it must keep
+  `productionEnabled: false` until M0-M17 are done, the release-review report is
+  ready, production-safe flags, rollback/disable controls, observability,
+  support runbooks, blocker clearance, and a controlled release window have
+  approved evidence.
 
 ## Prerequisites
 
@@ -163,6 +172,13 @@ gate below has implementation, deterministic tests, and security/product signoff
   requires approved threat model, privacy review, abuse-case review,
   data-retention policy, audit coverage review, deterministic validation
   evidence, and product signoff.
+- Controlled release completion must remain a final go/no-go gate, not an
+  automatic enablement path. Current gate tracking starts in
+  `server/world_civilization/controlled_release.js` and
+  `docs/ops/V6_AGENT_CIVILIZATION_CONTROLLED_RELEASE_RUNBOOK.md`; release still
+  requires closed M0-M17 milestones, a closed V6 readiness gate, production
+  feature flag safety, rollback/disable rehearsals, privacy-safe observability,
+  support readiness, blocker clearance, and an explicit release window.
 - Privacy review must prove no private town state, wallet secret, Brain secret,
   provider credential, debug trace, or unapproved transcript enters civic
   surfaces.

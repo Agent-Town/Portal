@@ -51,6 +51,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'specs/66_agent_town_v6_modal_lab_surface_foundation.md',
     'specs/67_agent_town_v6_persistence_replay_resilience_foundation.md',
     'specs/68_agent_town_v6_security_product_release_review_foundation.md',
+    'specs/69_agent_town_v6_controlled_release_completion_foundation.md',
     'docs/product/WORLD_GRID_LADDER_V5_TO_V6.md',
     'docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md',
     'docs/product/PUBLIC_PRESENCE_PRIVACY_MODEL_V5.md',
@@ -59,6 +60,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'docs/technical/THREEJS_WORLD_ZOOM_RENDERER.md',
     'docs/technical/WORLD_EVENT_CONSERVATION_MODEL.md',
     'docs/technical/PUBLIC_DISTRICT_MODERATION_AND_ROLLBACK.md',
+    'docs/ops/V6_AGENT_CIVILIZATION_CONTROLLED_RELEASE_RUNBOOK.md',
     'docs/security/V6_AGENT_CIVILIZATION_RELEASE_REVIEW.md',
     'docs/security/WORLD_LAYER_SECURITY_REVIEW_V5.md',
     'docs/security/WORLD_GRID_MUTATION_SECURITY_PLAN.md',
@@ -71,6 +73,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'server/world_grid/mutation_origin.js',
     'server/world_grid/rate_limit.js',
     'server/world_civilization/audit_ledger.js',
+    'server/world_civilization/controlled_release.js',
     'server/world_civilization/delegations.js',
     'server/world_civilization/effects.js',
     'server/world_civilization/institutions.js',
@@ -170,6 +173,10 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /server\/world_civilization\/release_review\.js/);
   assert.match(gate, /server\/world_civilization\/release_review\.js/);
   assert.match(gate, /threat model, privacy review, abuse-case review/);
+  assert.match(plan, /M18 V6 controlled release completion \| `in_progress`/);
+  assert.match(plan, /server\/world_civilization\/controlled_release\.js/);
+  assert.match(gate, /server\/world_civilization\/controlled_release\.js/);
+  assert.match(gate, /production\s+feature flag safety, rollback\/disable rehearsals/);
 });
 
 test('V5 world-grid release promotion gate blocks V6 on prototype-only evidence', () => {
