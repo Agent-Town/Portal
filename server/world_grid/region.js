@@ -16,12 +16,14 @@ function hashNumber(seed = '', modulo = 1) {
 function normalizeOwnerIdentity(identity = {}) {
   const pairId = typeof identity.pairId === 'string' ? identity.pairId.trim() : '';
   if (!pairId) return null;
+  const sessionId = typeof identity.sessionId === 'string' ? identity.sessionId.trim() : '';
   const ownerHash = sha256(pairId);
   return {
     pairId,
     ownerAccountId: `owner_${ownerHash.slice(0, 16)}`,
     regionId: `region_${ownerHash.slice(0, 16)}`,
-    seed: `world-grid-v50:${ownerHash.slice(0, 32)}`
+    seed: `world-grid-v50:${ownerHash.slice(0, 32)}`,
+    sessionBindingKey: sessionId
   };
 }
 

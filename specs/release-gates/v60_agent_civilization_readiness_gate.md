@@ -214,7 +214,8 @@ persistence resilience, and security/product release review.
 - Mutating V6 civic routes and worker tools must use a fail-closed security
   envelope before touching civic stores. Current research-only coverage starts
   this in `server/world_civilization/mutation_security.js`; release still
-  requires durable/session-bound CSRF, durable/shared rate limits, final
+  requires applying the durable/session-bound CSRF foundation to final
+  browser-authenticated sessions, durable/shared rate limits, final
   session/wallet middleware, production browser coverage, audit integration,
   and security/product signoff.
 - Worker-first V6 civic tools must pass the exposure gate before becoming

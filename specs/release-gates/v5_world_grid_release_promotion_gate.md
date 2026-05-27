@@ -20,7 +20,8 @@ from `prototype_gated` to `release_ready`:
 - Restart persistence tests prove state survives server restarts without silent
   recreation, reassignment, or loss.
 - Every mutating route and tool requires session/wallet ownership, same-origin
-  or CSRF protection, rate limits, and idempotency keys.
+  context, session-bound CSRF protection when a browser session is available,
+  rate limits, and idempotency keys.
 - Every mutating route and tool writes append-only audit/replay records with
   actor, route/tool name, idempotency key, before/after summary, and rollback
   handle when applicable.

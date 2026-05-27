@@ -28,11 +28,11 @@ function sameOriginHeaders(baseUrl, extra = {}) {
   };
 }
 
-async function withServer(fn) {
+async function withServer(sessionId, fn) {
   const app = express();
   app.use(express.json());
   app.use(createWorldGridRouter({
-    resolveIdentity: () => ({ pairId: PAIR_ID, houseId: null })
+    resolveIdentity: () => ({ pairId: PAIR_ID, houseId: null, sessionId })
   }));
   const server = http.createServer(app);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -80,6 +80,7 @@ async function main() {
   const sqlitePath = process.argv[3];
   const storePath = process.argv[4];
   const token = process.argv[5] || '';
+  const sessionId = process.argv[6] || 'session_alpha';
   if (!mode || !sqlitePath || !storePath) throw new Error('WORLD_GRID_CSRF_RESTART_ARGS_REQUIRED');
 
   process.env.NODE_ENV = 'production';
@@ -89,13 +90,14 @@ async function main() {
 
   seedFoundersPlot();
 
-  await withServer(async (baseUrl) => {
+  await withServer(sessionId, async (baseUrl) => {
     if (mode === 'issue') {
       const issued = await issueToken(baseUrl);
       writeJson({
         ok: issued.status === 200,
         mode,
         status: issued.status,
+        sessionId,
         csrfToken: issued.body.csrfToken || '',
         expiresAtMs: issued.body.expiresAtMs || 0
       });
@@ -108,6 +110,7 @@ async function main() {
         ok: used.status === 200,
         mode,
         status: used.status,
+        sessionId,
         errorCode: used.body.error?.code || '',
         claimId: used.body.claim?.claimId || ''
       });

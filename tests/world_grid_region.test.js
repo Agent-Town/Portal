@@ -156,12 +156,17 @@ async function assertWorldGridRouteIdempotency({ baseUrl, headers = {}, route, b
 
 test('V5.0 region generation is deterministic with stable cells and home settlement', () => {
   const identity = { pairId: 'wallet:solana:WorldGridOwner111', houseId: null };
+  const sessionA = normalizeOwnerIdentity({ ...identity, sessionId: 'session_alpha' });
+  const sessionB = normalizeOwnerIdentity({ ...identity, sessionId: 'session_beta' });
   const one = generateRegion(identity, { nowMs: 1_000, hqLevel: 2 });
   const two = generateRegion(identity, { nowMs: 2_000, hqLevel: 2 });
 
   assert.equal(one.regionId, two.regionId);
   assert.equal(one.ownerAccountId, two.ownerAccountId);
   assert.equal(one.seed, two.seed);
+  assert.equal(sessionA.regionId, sessionB.regionId);
+  assert.equal(sessionA.ownerAccountId, sessionB.ownerAccountId);
+  assert.notEqual(sessionA.sessionBindingKey, sessionB.sessionBindingKey);
   assert.equal(one.cells.length, 19);
   assert.deepEqual(
     one.cells.map((cell) => [cell.cellId, cell.q, cell.r, cell.terrain, cell.state, cell.feature, cell.risk]),

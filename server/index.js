@@ -2047,19 +2047,22 @@ function resolveFoundersPlotIdentity(req, res) {
   if (houseId) {
     return {
       pairId: `house:${houseId}`,
-      houseId
+      houseId,
+      sessionId: session?.sessionId || ''
     };
   }
   const walletCandidate = collectWalletCandidatesFromHeaders(req)[0] || null;
   if (walletCandidate) {
     return {
       pairId: `wallet:${walletCandidate.chain}:${walletCandidate.address}`,
-      houseId: null
+      houseId: null,
+      sessionId: session?.sessionId || ''
     };
   }
   return {
     pairId: `session:${session?.teamCode || session?.sessionId || 'anonymous'}`,
-    houseId: null
+    houseId: null,
+    sessionId: session?.sessionId || ''
   };
 }
 

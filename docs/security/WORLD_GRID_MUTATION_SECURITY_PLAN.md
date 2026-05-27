@@ -21,12 +21,14 @@ until the controls below are implemented and covered by deterministic tests.
   world-grid CSRF token in production, issued by `/api/world/mutation-token`.
   By default the token store is process-local. When
   `WORLD_GRID_CSRF_SQLITE_PATH` is configured, the guard writes durable SQLite
-  `world_grid_csrf_tokens` rows with owner-bound token hashes, expiry,
-  schema/migration metadata, and restart replay. Current coverage proves hashed
-  token rows survive reopen, cross-owner and expired tokens fail closed, and a
-  production mutating route accepts a valid token after a separate Node process
-  restart. Release promotion still needs final browser-session binding and
-  cross-session browser coverage.
+  `world_grid_csrf_tokens` rows with owner-bound token hashes, hashed
+  `session_binding_hash` metadata when the runtime identity includes a session
+  id, expiry, schema/migration metadata, and restart replay. Current coverage
+  proves hashed token rows survive reopen, cross-owner, cross-session, and
+  expired tokens fail closed, and a production mutating route accepts a valid
+  token after a separate Node process restart. Release promotion still needs
+  final browser-authenticated cross-session coverage, operational token
+  invalidation, and wallet/session continuity review.
 - V5.1+ mutating world-grid routes require an existing Founders Plot
   prerequisite and return `WORLD_GRID_PLOT_REQUIRED` when missing.
 - V5.1+ externally visible mutating prototype routes now require an
@@ -109,9 +111,9 @@ until the controls below are implemented and covered by deterministic tests.
   context in production; release promotion still needs integration with the
   final session-auth surface.
 - CSRF token protection for browser-authenticated mutations. Current coverage
-  verifies missing, invalid, cross-owner, expired, and durable restart tokens;
-  release promotion still needs final session-bound token issuance and
-  cross-session browser coverage.
+  verifies missing, invalid, cross-owner, cross-session, expired, and durable
+  restart tokens; release promotion still needs final browser-authenticated
+  token issuance/invalidation and cross-session Playwright coverage.
 - Session-auth and wallet-continuity checks that bind mutations to the current
   owner, not just to a public id or request body field.
 - Rate limits keyed by session and owner for public presence, claim planning,
@@ -149,8 +151,8 @@ until the controls below are implemented and covered by deterministic tests.
   only; release promotion still needs rollback policy, multi-event migration,
   final public-ledger review, and larger contribution-load coverage.
 - Current `WORLD_GRID_CSRF_SQLITE_PATH` coverage is a mutation security
-  foundation only; release promotion still needs final browser-session binding,
-  cross-session browser coverage, operational rotation/invalidation policy, and
+  foundation only; release promotion still needs final browser-authenticated
+  cross-session coverage, operational rotation/invalidation policy, and
   wallet/session continuity review.
 - Current `WORLD_GRID_RATE_LIMIT_SQLITE_PATH` coverage is a mutation security
   foundation only; release promotion still needs final browser-session binding,
@@ -163,6 +165,6 @@ until the controls below are implemented and covered by deterministic tests.
 ## Out Of Scope For This Hardening Pass
 
 This pass does not add final session-auth middleware, IP/risk-aware distributed
-rate limits, final browser-session-bound CSRF, or a public free-play security
-surface. Those controls remain release gates because the V5 world-grid branch is
-still prototype-gated.
+rate limits, browser-authenticated CSRF invalidation/rotation coverage, or a
+public free-play security surface. Those controls remain release gates because
+the V5 world-grid branch is still prototype-gated.

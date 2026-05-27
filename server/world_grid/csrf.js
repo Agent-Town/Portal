@@ -7,8 +7,8 @@ const tokensByOwner = new Map();
 let durableSingleton = null;
 let durableSingletonPath = '';
 
-const WORLD_GRID_CSRF_SCHEMA_VERSION = 'agent-town.v5.world-grid.csrf.v1';
-const WORLD_GRID_CSRF_MIGRATION_VERSION = 'world_grid_csrf_v1';
+const WORLD_GRID_CSRF_SCHEMA_VERSION = 'agent-town.v5.world-grid.csrf.v2';
+const WORLD_GRID_CSRF_MIGRATION_VERSION = 'world_grid_csrf_v2';
 
 const DEFAULT_TOKEN_TTL_MS = 60 * 60 * 1000;
 const MAX_TOKENS_PER_OWNER = 10;
@@ -37,12 +37,21 @@ function ownerKey(owner = {}) {
   return String(owner.ownerAccountId || owner.regionId || owner.pairId || '').trim();
 }
 
+function sessionBindingKey(owner = {}) {
+  return String(owner.sessionBindingKey || owner.sessionId || owner.session?.sessionId || '').trim();
+}
+
 function tokenTtlMs(env = process.env) {
   return readPositiveInteger(env.WORLD_GRID_CSRF_TOKEN_TTL_MS, DEFAULT_TOKEN_TTL_MS);
 }
 
 function tokenHash(token = '') {
   return `sha256:${crypto.createHash('sha256').update(String(token || ''), 'utf8').digest('hex')}`;
+}
+
+function sessionBindingHash(value = '') {
+  const key = String(value || '').trim();
+  return key ? tokenHash(`world-grid-csrf-session:${key}`) : '';
 }
 
 function ensureDurableSchema(db) {
@@ -53,6 +62,7 @@ function ensureDurableSchema(db) {
     CREATE TABLE IF NOT EXISTS world_grid_csrf_tokens (
       owner_account_id TEXT NOT NULL,
       token_hash TEXT NOT NULL,
+      session_binding_hash TEXT NOT NULL DEFAULT '',
       expires_at INTEGER NOT NULL,
       created_at INTEGER NOT NULL,
       migration_version TEXT NOT NULL,
@@ -64,6 +74,14 @@ function ensureDurableSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_world_grid_csrf_expires
       ON world_grid_csrf_tokens(expires_at);
   `);
+  const columns = new Set(db.prepare('PRAGMA table_info(world_grid_csrf_tokens)').all().map((row) => row.name));
+  if (!columns.has('session_binding_hash')) {
+    db.exec("ALTER TABLE world_grid_csrf_tokens ADD COLUMN session_binding_hash TEXT NOT NULL DEFAULT '';");
+  }
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_world_grid_csrf_owner_session
+      ON world_grid_csrf_tokens(owner_account_id, session_binding_hash, created_at);
+  `);
 }
 
 function parseTokenRow(row) {
@@ -71,6 +89,7 @@ function parseTokenRow(row) {
   return {
     ownerAccountId: row.owner_account_id,
     tokenHash: row.token_hash,
+    sessionBindingHash: row.session_binding_hash || '',
     expiresAtMs: Number(row.expires_at),
     createdAtMs: Number(row.created_at),
     migrationVersion: row.migration_version,
@@ -90,14 +109,14 @@ function createWorldGridCsrfStore({ sqlitePath } = {}) {
     byOwnerHash: db.prepare(`
       SELECT *
       FROM world_grid_csrf_tokens
-      WHERE owner_account_id = ? AND token_hash = ?
+      WHERE owner_account_id = ? AND token_hash = ? AND session_binding_hash = ?
       LIMIT 1
     `),
     insert: db.prepare(`
       INSERT OR REPLACE INTO world_grid_csrf_tokens (
-        owner_account_id, token_hash, expires_at, created_at,
+        owner_account_id, token_hash, session_binding_hash, expires_at, created_at,
         migration_version, schema_version
-      ) VALUES (?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
     `),
     listOwner: db.prepare(`
       SELECT *
@@ -133,30 +152,32 @@ function createWorldGridCsrfStore({ sqlitePath } = {}) {
     return rows.slice(0, MAX_TOKENS_PER_OWNER);
   }
 
-  function issue({ ownerAccountId = '', token = '', nowMs = Date.now(), env = process.env } = {}) {
+  function issue({ ownerAccountId = '', token = '', sessionBindingKey = '', nowMs = Date.now(), env = process.env } = {}) {
     const key = String(ownerAccountId || '').trim();
     if (!key || !token) return null;
     const createdAtMs = Number(nowMs) || Date.now();
     const expiresAtMs = createdAtMs + tokenTtlMs(env);
     const hash = tokenHash(token);
+    const sessionHash = sessionBindingHash(sessionBindingKey);
     pruneOwner(key, createdAtMs);
     statements.insert.run(
       key,
       hash,
+      sessionHash,
       expiresAtMs,
       createdAtMs,
       WORLD_GRID_CSRF_MIGRATION_VERSION,
       WORLD_GRID_CSRF_SCHEMA_VERSION
     );
     pruneOwner(key, createdAtMs);
-    return { tokenHash: hash, expiresAtMs, createdAtMs };
+    return { tokenHash: hash, sessionBindingHash: sessionHash, expiresAtMs, createdAtMs };
   }
 
-  function hasValidToken({ ownerAccountId = '', token = '', nowMs = Date.now() } = {}) {
+  function hasValidToken({ ownerAccountId = '', token = '', sessionBindingKey = '', nowMs = Date.now() } = {}) {
     const key = String(ownerAccountId || '').trim();
     if (!key || !token) return false;
     pruneOwner(key, nowMs);
-    const row = parseTokenRow(statements.byOwnerHash.get(key, tokenHash(token)));
+    const row = parseTokenRow(statements.byOwnerHash.get(key, tokenHash(token), sessionBindingHash(sessionBindingKey)));
     return Boolean(row && row.expiresAtMs > nowMs);
   }
 
@@ -223,11 +244,11 @@ function issueWorldGridCsrfToken(owner, { nowMs = Date.now(), env = process.env 
   const expiresAtMs = nowMs + tokenTtlMs(env);
   const durableStore = getConfiguredWorldGridCsrfStore(env);
   if (durableStore) {
-    durableStore.issue({ ownerAccountId: key, token, nowMs, env });
+    durableStore.issue({ ownerAccountId: key, token, sessionBindingKey: sessionBindingKey(owner), nowMs, env });
     return { token, expiresAtMs };
   }
   const records = pruneOwnerTokens(owner, nowMs, env);
-  records.push({ token, expiresAtMs, createdAtMs: nowMs });
+  records.push({ token, sessionBindingHash: sessionBindingHash(sessionBindingKey(owner)), expiresAtMs, createdAtMs: nowMs });
   tokensByOwner.set(key, records.slice(-MAX_TOKENS_PER_OWNER));
   return { token, expiresAtMs };
 }
@@ -245,10 +266,11 @@ function requireWorldGridCsrfToken(req = null, owner = {}, { env = process.env, 
     throw error;
   }
   const key = ownerKey(owner);
+  const sessionHash = sessionBindingHash(sessionBindingKey(owner));
   const durableStore = getConfiguredWorldGridCsrfStore(env);
   const found = durableStore
-    ? durableStore.hasValidToken({ ownerAccountId: key, token, nowMs })
-    : pruneOwnerTokens(owner, nowMs, env).some((record) => record.token === token);
+    ? durableStore.hasValidToken({ ownerAccountId: key, token, sessionBindingKey: sessionBindingKey(owner), nowMs })
+    : pruneOwnerTokens(owner, nowMs, env).some((record) => record.token === token && String(record.sessionBindingHash || '') === sessionHash);
   if (!found) {
     const error = new Error('CSRF_INVALID');
     error.details = { reason: 'WORLD_GRID_CSRF_TOKEN_INVALID_OR_EXPIRED' };
@@ -278,6 +300,7 @@ module.exports = {
   createWorldGridCsrfStore,
   issueWorldGridCsrfToken,
   requireWorldGridCsrfToken,
+  sessionBindingHash,
   tokenHash,
   worldGridCsrfRequired,
   worldGridCsrfTokenCount

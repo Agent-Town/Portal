@@ -33,7 +33,8 @@ not leak private owner identifiers.
 - Mutating routes/tools require same-origin mutation context in production and
   reject explicit cross-origin metadata before plot or world state changes.
 - Mutating routes/tools require an owner-bound world-grid CSRF token in
-  production.
+  production. When the resolved runtime identity includes a session id, the
+  CSRF token is also bound to a hashed session binding.
 - Mutating routes/tools consume prototype rate-limit buckets keyed by owner and
   mutation surface.
 
@@ -52,7 +53,7 @@ release-grade store is explicitly implemented and tested. Current stores are:
 | World event contributions/rewards | Process-local `Map` values in `server/world_grid/events.js`; optional SQLite `world_grid_event_contributions` and `world_grid_event_rewards` tables when `WORLD_GRID_EVENTS_SQLITE_PATH` is configured | Durable foundation for V5.4 contribution/reward state, owner/event/day/settlement indexes, cap replay, schema/migration versions, restart proof, and duplicate contribution/reward safety after reopen; release promotion still needs rollback policy, multi-event migration coverage, and final public ledger review |
 | Sandbox participants/actions/snapshots/cells | Process-local arrays/maps and mutable in-memory district cells in `server/world_grid/sandbox.js`; optional SQLite `world_grid_sandbox_participants`, `world_grid_sandbox_actions`, `world_grid_sandbox_snapshots`, and `world_grid_sandbox_cells` tables when `WORLD_GRID_SANDBOX_SQLITE_PATH` is configured | Durable foundation for V5.5 participant/action/snapshot/cell state, participant owner key plus action/cell indexes, schema/migration versions, restart proof, moderation rejection replay, rollback replay, and private-town isolation; release promotion still needs abuse reports, cross-owner moderation review, stale-session cleanup, and final sandbox privacy review |
 | Idempotency replay records | Process-local `Map` in `server/world_grid/idempotency.js`; optional SQLite `world_grid_idempotency_records` table when `WORLD_GRID_IDEMPOTENCY_SQLITE_PATH` is configured | Durable foundation for exact retry replay, changed payload rejection, schema/migration versions, planned-claim restart proof, and V5.1-V5.5 mutating route/tool-surface restart proof; release promotion still needs final session-auth integration and production replay coverage |
-| CSRF mutation tokens | Process-local `Map` in `server/world_grid/csrf.js`; optional SQLite `world_grid_csrf_tokens` table when `WORLD_GRID_CSRF_SQLITE_PATH` is configured | Durable foundation for owner-bound hashed tokens, expiry pruning, schema/migration versions, and production route restart proof; release promotion still needs final browser-session binding and cross-session coverage |
+| CSRF mutation tokens | Process-local `Map` in `server/world_grid/csrf.js`; optional SQLite `world_grid_csrf_tokens` table with `session_binding_hash` when `WORLD_GRID_CSRF_SQLITE_PATH` is configured | Durable foundation for owner-bound hashed tokens, hashed session binding when identity supplies a session id, expiry pruning, schema/migration versions, and production route restart proof; release promotion still needs final browser-authenticated cross-session coverage and token invalidation policy |
 | Mutation rate-limit buckets | Process-local `Map` in `server/world_grid/rate_limit.js`; optional SQLite `world_grid_rate_limit_buckets` table when `WORLD_GRID_RATE_LIMIT_SQLITE_PATH` is configured | Durable foundation for owner/surface mutation counters, schema/migration versions, window reset metadata, and restart proof; release promotion still needs final session binding plus IP/risk-aware shared production enforcement |
 | Mutation audit records | Optional SQLite `world_grid_audit_log` table in `server/world_grid/audit_log.js` when `WORLD_GRID_AUDIT_SQLITE_PATH` is configured | Durable foundation for append-only audit/replay, route/tool-surface restart matrix coverage, and duplicate-replay suppression; not yet complete release storage because complete before-state snapshots and store reconstruction are still release gates |
 
@@ -128,10 +129,11 @@ Before any V5 world-grid slice can claim release-grade persistence, it needs:
 - Cross-owner and stale-session tests for every owner index.
 - CSRF-token and same-origin integration tests bound to the final
   browser-authenticated session model. Current `WORLD_GRID_CSRF_SQLITE_PATH`
-  coverage proves owner-bound hashed token rows, expiry fail-closed behavior,
-  cross-owner denial, and production mutating-route authorization across
-  separate Node process restarts; final browser-session binding and
-  cross-session browser coverage remain gates.
+  coverage proves owner-bound hashed token rows, hashed session-binding rows,
+  expiry fail-closed behavior, cross-owner denial, cross-session denial, and
+  production mutating-route authorization across separate Node process
+  restarts; final browser-authenticated cross-session coverage and token
+  invalidation policy remain gates.
 - Durable/shared rate-limit counters keyed by final session, wallet/owner, IP
   risk signal, and mutation surface, with replay-safe behavior for legitimate
   retries. Current `WORLD_GRID_RATE_LIMIT_SQLITE_PATH` coverage proves
