@@ -4476,6 +4476,15 @@ function releaseDiversityMetricsCoherent(diversityReport = {}) {
     && signaturesMatchRows;
 }
 
+function releaseDiversityIncludesPack(diversityReport = {}, packId = '') {
+  const targetPackId = String(packId || '');
+  if (!targetPackId || !Array.isArray(diversityReport?.packResults)) return false;
+  return diversityReport.packResults.some((result) => result?.packId === targetPackId
+    && result?.validationOk === true
+    && result?.firstLoopPassed === true
+    && result?.playtestEvidenceRecorded === true);
+}
+
 function releasePersistencePassed(persistenceReport = {}) {
   return persistenceReport?.durablePackStorage === true
     && persistenceReport?.restartReloadPass === true
@@ -4940,12 +4949,17 @@ function buildReleaseEvidenceBundle({
   const blockingReasonsMatchGate = stableEvidenceHash(blockingReasons) === stableEvidenceHash(gate?.blockingReasons || []);
   const bundleCreatedAtMs = positiveNumberOrZero(nowMs);
   const gateEvaluatedAtMs = positiveNumberOrZero(gate?.evaluatedAtMs);
+  const diversitySourceIncludesGatePack = releaseDiversityIncludesPack(diversityReport || {}, bundlePackId);
+  const diversitySourceMetricsCoherent = releaseDiversityPassed(diversityReport || {})
+    && releaseDiversityMetricsCoherent(diversityReport || {});
   const bundleCreatedAtOrAfterGate = gateEvaluatedAtMs > 0
     && bundleCreatedAtMs >= gateEvaluatedAtMs;
   const bundleCreatedAtNotFuture = bundleCreatedAtMs > 0;
   const readyEvidenceSourcesMatchGate = gate?.publicReleaseEligible !== true
     || (
       prerequisiteSnapshotMatchesGate
+      && diversitySourceIncludesGatePack
+      && diversitySourceMetricsCoherent
       && approvalEvidenceHashMatchesGate
       && candidateReviewManifestHashMatchesEvidence
       && candidateReviewManifestTimeMatchesEvidence
@@ -4984,6 +4998,8 @@ function buildReleaseEvidenceBundle({
       blockingReasonsMatchGate,
       prerequisiteSnapshotMatchesGate,
       readyEvidenceSourcesMatchGate,
+      diversitySourceIncludesGatePack,
+      diversitySourceMetricsCoherent,
       approvalEvidenceHashMatchesGate,
       candidateReviewManifestHashMatchesEvidence,
       candidateReviewManifestTimeMatchesEvidence,
@@ -5074,6 +5090,12 @@ function validateReleaseEvidenceBundle(bundle = {}, {
   const prerequisiteSnapshotMatchesGate = releaseGate
     ? stableEvidenceHash(bundle?.prerequisiteSnapshot || {}) === stableEvidenceHash(releaseGate?.releasePrerequisites || {})
     : bundle?.publicReleaseEligible !== true;
+  const diversitySourceIncludesGatePack = diversityReport
+    ? releaseDiversityIncludesPack(diversityReport, bundle?.packId || releaseGate?.packId || pack?.packId || '')
+    : false;
+  const diversitySourceMetricsCoherent = diversityReport
+    ? releaseDiversityPassed(diversityReport) && releaseDiversityMetricsCoherent(diversityReport)
+    : false;
   const presentSourceCount = RELEASE_EVIDENCE_SOURCE_KEYS
     .filter((key) => Boolean(bundle?.sourceHashes?.[key]))
     .length;
@@ -5101,6 +5123,8 @@ function validateReleaseEvidenceBundle(bundle = {}, {
   const readyEvidenceSourcesMatchGate = bundle?.publicReleaseEligible !== true
     || (
       prerequisiteSnapshotMatchesGate
+      && diversitySourceIncludesGatePack
+      && diversitySourceMetricsCoherent
       && approvalEvidenceHashMatchesGate
       && candidateReviewManifestHashMatchesEvidence
       && candidateReviewManifestTimeMatchesEvidence
@@ -5128,6 +5152,8 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     && bundle?.metrics?.blockingReasonsMatchGate === blockingReasonsMatchGate
     && blockingReasonsMatchGate === true
     && bundle?.metrics?.prerequisiteSnapshotMatchesGate === prerequisiteSnapshotMatchesGate
+    && bundle?.metrics?.diversitySourceIncludesGatePack === diversitySourceIncludesGatePack
+    && bundle?.metrics?.diversitySourceMetricsCoherent === diversitySourceMetricsCoherent
     && bundle?.metrics?.readyEvidenceSourcesMatchGate === readyEvidenceSourcesMatchGate
     && readyEvidenceSourcesMatchGate === true
     && bundle?.metrics?.approvalEvidenceHashMatchesGate === approvalEvidenceHashMatchesGate
@@ -5189,6 +5215,8 @@ function validateReleaseEvidenceBundle(bundle = {}, {
         bundleCreatedAtNotFuture,
         blockingReasonsMatchGate,
         prerequisiteSnapshotMatchesGate,
+        diversitySourceIncludesGatePack,
+        diversitySourceMetricsCoherent,
         readyEvidenceSourcesMatchGate,
         approvalEvidenceHashMatchesGate,
         candidateReviewManifestHashMatchesEvidence,

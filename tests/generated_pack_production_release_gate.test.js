@@ -482,6 +482,8 @@ test('GU-19 release evidence bundle binds a ready gate to source evidence hashes
   assert.equal(bundle.metrics.blockingReasonsMatchGate, true);
   assert.equal(bundle.metrics.prerequisiteSnapshotMatchesGate, true);
   assert.equal(bundle.metrics.readyEvidenceSourcesMatchGate, true);
+  assert.equal(bundle.metrics.diversitySourceIncludesGatePack, true);
+  assert.equal(bundle.metrics.diversitySourceMetricsCoherent, true);
   assert.equal(bundle.metrics.approvalEvidenceHashMatchesGate, true);
   assert.equal(bundle.metrics.candidateReviewManifestHashMatchesEvidence, true);
   assert.equal(bundle.metrics.candidateReviewManifestTimeMatchesEvidence, true);
@@ -730,6 +732,42 @@ test('GU-19 release evidence bundle rejects mixed-pack source evidence even when
   assert.equal(invalidSourceIdReport.ok, false);
   assert.equal(
     invalidSourceIdReport.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_SCHEMA_VALID').passed,
+    false
+  );
+}));
+
+test('GU-19 release evidence bundle rejects diversity source evidence copied from another suite', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_evidence_bundle_mixed_diversity',
+    prompt: 'plum harbor library with warm signal masons',
+    nowMs: 157_850
+  });
+  const otherFixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_evidence_bundle_mixed_diversity_other',
+    prompt: 'mist orchard station with copper bridge scouts',
+    nowMs: 157_875
+  });
+  const mixedBundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    diversityReport: otherFixture.diversityReport,
+    nowMs: 158_600
+  });
+  const mixedReport = validateReleaseEvidenceBundle(mixedBundle, {
+    ...fixture,
+    diversityReport: otherFixture.diversityReport
+  });
+
+  assert.equal(otherFixture.diversityReport.packResults.some((result) => result.packId === fixture.pack.packId), false);
+  assert.equal(mixedBundle.metrics.sourceHashMismatchCount, 0);
+  assert.equal(mixedBundle.metrics.diversitySourceIncludesGatePack, false);
+  assert.equal(mixedBundle.metrics.readyEvidenceSourcesMatchGate, false);
+  assert.equal(mixedReport.ok, false);
+  assert.equal(
+    mixedReport.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_SOURCE_HASHES_MATCH').passed,
+    true
+  );
+  assert.equal(
+    mixedReport.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,
     false
   );
 }));
