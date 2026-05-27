@@ -209,9 +209,11 @@ gate below has implementation, deterministic tests, and security/product signoff
 - Public works and shared resources must conserve accepted inputs, public
   progress, caps, rewards, and rollbacks across retries and restarts. Current
   research-only accounting starts this in
-  `server/world_civilization/public_works.js`; release still requires governed
-  project creation, wallet/session route auth, explicit private-inventory spend,
-  rollback execution, and reward conservation tests.
+  `server/world_civilization/public_works.js` with proposal/vote/moderation-gated
+  project records plus capped contributions; release still requires
+  worker/tool enforcement, wallet/session route auth, explicit
+  private-inventory spend, rollback execution, public surfaces, and reward
+  conservation tests.
 - Any internal V6 lab UI must launch from the town hub modal flow, preserve
   page-scoped OpenClaw Lite worker continuity, keep Worker Tools, Skill Context,
   Worker Traffic, Brain, and Session Context observable, and prove with

@@ -14,7 +14,10 @@ function runProbe(mode, paths) {
     mode,
     paths.auditPath,
     paths.institutionPath,
-    paths.publicWorksPath
+    paths.publicWorksPath,
+    paths.proposalPath,
+    paths.votePath,
+    paths.moderationPath
   ], {
     cwd: repoRoot,
     encoding: 'utf8',
@@ -43,13 +46,18 @@ test('V6 public works store survives separate Node process restarts with conserv
   const paths = {
     auditPath: path.join(dir, 'audit.sqlite'),
     institutionPath: path.join(dir, 'institutions.sqlite'),
-    publicWorksPath: path.join(dir, 'public_works.sqlite')
+    moderationPath: path.join(dir, 'moderation.sqlite'),
+    proposalPath: path.join(dir, 'proposals.sqlite'),
+    publicWorksPath: path.join(dir, 'public_works.sqlite'),
+    votePath: path.join(dir, 'votes.sqlite')
   };
   try {
     const institutionSeed = runProbe('seed-institution', paths);
+    const projectSeed = runProbe('seed-project', paths);
     const firstRecord = runProbe('record-first', paths);
     const secondRecord = runProbe('record-second', paths);
     const snapshot = runProbe('snapshot', paths);
+    const projectRetry = runProbe('seed-project', paths);
     const firstRetry = runProbe('record-first', paths);
     const secondRetry = runProbe('record-second', paths);
     const finalSnapshot = runProbe('snapshot', paths);
@@ -58,6 +66,7 @@ test('V6 public works store survives separate Node process restarts with conserv
     assert.equal(institutionSeed.duplicate, false);
     assert.equal(institutionSeed.institutionId, 'institution_restart_public_works_council_001');
     assert.equal(institutionSeed.institutionCount, 1);
+    assert.equal(institutionSeed.projectCount, 0);
     assert.equal(institutionSeed.contributionCount, 0);
     assert.equal(institutionSeed.auditCount, 1);
     assert.equal(institutionSeed.summary.contributionCount, 0);
@@ -65,13 +74,25 @@ test('V6 public works store survives separate Node process restarts with conserv
     assert.equal(institutionSeed.summary.cosmeticRewardsOnly, true);
     assert.equal(institutionSeed.summary.executionStatus, 'not_executable');
 
+    assert.equal(projectSeed.ok, true);
+    assert.equal(projectSeed.duplicate, false);
+    assert.equal(projectSeed.projectId, 'publicworks_restart_bridge_001');
+    assert.equal(projectSeed.projectCount, 1);
+    assert.equal(projectSeed.proposalCount, 1);
+    assert.equal(projectSeed.voteCount, 1);
+    assert.equal(projectSeed.moderationCount, 1);
+    assert.equal(projectSeed.auditCount, 5);
+    assert.deepEqual(projectSeed.projectIds, ['publicworks_restart_bridge_001']);
+    assert.equal(projectSeed.summary.projectSource, 'recorded');
+    assert.equal(projectSeed.summary.projectStatus, 'recorded');
+
     assert.equal(firstRecord.ok, true);
     assert.equal(firstRecord.duplicate, false);
     assert.equal(firstRecord.contributionId, 'contribution_restart_bridge_001');
     assert.deepEqual(firstRecord.acceptedBundle, { wood: 2, stone: 1, food: 0, coin: 5 });
     assert.deepEqual(firstRecord.cappedBundle, { wood: 8, stone: 1, food: 0, coin: 3 });
     assert.equal(firstRecord.contributionCount, 1);
-    assert.equal(firstRecord.auditCount, 2);
+    assert.equal(firstRecord.auditCount, 6);
 
     assert.equal(secondRecord.ok, true);
     assert.equal(secondRecord.duplicate, false);
@@ -79,7 +100,7 @@ test('V6 public works store survives separate Node process restarts with conserv
     assert.deepEqual(secondRecord.acceptedBundle, { wood: 1, stone: 1, food: 0, coin: 1 });
     assert.deepEqual(secondRecord.cappedBundle, { wood: 0, stone: 0, food: 0, coin: 0 });
     assert.equal(secondRecord.contributionCount, 2);
-    assert.equal(secondRecord.auditCount, 3);
+    assert.equal(secondRecord.auditCount, 7);
     assert.deepEqual(secondRecord.contributionIds, [
       'contribution_restart_bridge_001',
       'contribution_restart_bridge_002'
@@ -87,7 +108,7 @@ test('V6 public works store survives separate Node process restarts with conserv
 
     assert.equal(snapshot.ok, true);
     assert.equal(snapshot.replayOk, true);
-    assert.equal(snapshot.replayReport.entryCount, 3);
+    assert.equal(snapshot.replayReport.entryCount, 7);
     assert.equal(snapshot.replayReport.chainValid, true);
     assert.equal(snapshot.replayReport.privacySafe, true);
     assert.equal(snapshot.replayReport.appliesWorldState, false);
@@ -99,20 +120,28 @@ test('V6 public works store survives separate Node process restarts with conserv
     assert.equal(snapshot.summary.executionStatus, 'not_executable');
     assert.deepEqual(snapshot.replayReport.byActionType, {
       'institution.chartered': 1,
+      'moderation.decided': 1,
+      'proposal.created': 1,
+      'public_works.project.recorded': 1,
+      'vote.recorded': 1,
       'public_works.contribution.recorded': 2
     });
-    assert.deepEqual(snapshot.replayReport.byMigrationVersion, { v1: 3 });
+    assert.deepEqual(snapshot.replayReport.byMigrationVersion, { v1: 7 });
 
+    assert.equal(projectRetry.ok, true);
+    assert.equal(projectRetry.duplicate, true);
+    assert.equal(projectRetry.projectCount, 1);
+    assert.equal(projectRetry.auditCount, 7);
     assert.equal(firstRetry.ok, true);
     assert.equal(firstRetry.duplicate, true);
     assert.equal(firstRetry.contributionCount, 2);
-    assert.equal(firstRetry.auditCount, 3);
+    assert.equal(firstRetry.auditCount, 7);
     assert.equal(secondRetry.ok, true);
     assert.equal(secondRetry.duplicate, true);
     assert.equal(secondRetry.contributionCount, 2);
-    assert.equal(secondRetry.auditCount, 3);
+    assert.equal(secondRetry.auditCount, 7);
     assert.equal(finalSnapshot.replayOk, true);
-    assert.equal(finalSnapshot.replayReport.entryCount, 3);
+    assert.equal(finalSnapshot.replayReport.entryCount, 7);
     assert.equal(finalSnapshot.replayReport.latestEntryHash, snapshot.replayReport.latestEntryHash);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });

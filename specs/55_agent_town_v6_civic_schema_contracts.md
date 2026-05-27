@@ -59,6 +59,7 @@ unversioned payloads are invalid for V6 civic state.
 | Delegation | Principal account, delegate agent, scoped authority, expiry, action cap, approval receipt, revocability, and explicit civic-effect execution permission. |
 | Institution | Human chartering actor, public scope, proposal types, membership and eligibility rules, moderation policy, voting rule, public audit summary, effective timestamp, and redacted privacy envelope. |
 | Institution Charter Amendment | Institution reference, proposal reference, human requester, approval receipt, replacement charter id, public summary, effective timestamp, idempotency key, and redacted privacy envelope. |
+| Public Works Project | Institution reference, proposal reference, human requester, approval receipt, display name, public summary, goal bundle, per-contribution cap, per-contributor cap, cosmetic-only reward marker, idempotency key, and redacted privacy envelope. |
 | Public Works Contribution | Institution, project, contributor, source reference, requested public resource bundle, idempotency key, public summary, and redacted privacy envelope. |
 | Reputation | Subject, awarding account, bounded non-zero delta, source reference, dispute status, and audit entry reference. Self-awards are invalid. |
 | Reputation Dispute/Review | Reputation record reference, subject account, human requester, queue/outcome status, reviewer kind, optional moderation decision reference, public source references, reasons, and redacted privacy envelope. |

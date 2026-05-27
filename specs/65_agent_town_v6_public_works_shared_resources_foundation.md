@@ -19,16 +19,38 @@ This foundation does not make V6 player-visible, does not expose public works
 routes or tools, does not spend private Founders Plot inventory, and does not
 grant rewards.
 
-The store records shared public-works contribution accounting against a
-research-only V6 institution charter. It is readiness evidence for later M14
-integration with V5.4-style public works, not a public contribution endpoint.
+The store records governed public-works project evidence and shared
+contribution accounting against a research-only V6 institution charter. It is
+readiness evidence for later M14 integration with V5.4-style public works, not
+a public contribution endpoint.
 
 The process-level restart proof currently covers reopening the institution and
-public-works stores across separate Node process lifetimes, recording capped
-contributions, reconstructing privacy-safe audit replay, and proving exact
-retries do not append duplicate contribution or audit rows.
+public-works stores across separate Node process lifetimes, recording a
+proposal/vote/moderation-gated project, recording capped contributions,
+reconstructing privacy-safe audit replay, and proving exact retries do not
+append duplicate project, contribution, or audit rows.
 
 ## Data Model
+
+The SQLite table `world_civic_public_work_projects` stores validated
+`publicWorksProject` schema records with:
+
+- project id;
+- institution id;
+- institution scope target id;
+- proposal id;
+- human requester account id;
+- approval receipt id;
+- idempotency key;
+- lifecycle status;
+- cosmetic-rewards-only marker;
+- audit ledger entry id;
+- creation timestamp;
+- goal, per-contribution cap, and per-contributor cap bundles;
+- normalized project JSON.
+
+Indexes cover institution/status replay, institution-scope/status replay, and
+proposal replay.
 
 The SQLite table `world_civic_public_work_contributions` stores validated
 `publicWorksContribution` schema records with:
@@ -50,11 +72,21 @@ Indexes cover project/status replay, institution replay, and contributor replay.
 
 ## Safety Rules
 
-- Contributions must pass `validatePublicWorksContribution` before persistence.
+- Projects must pass `validatePublicWorksProject` before persistence.
+- Project creation records require an existing `public_works` institution, a
+  non-expired `public_works` proposal scoped to that institution target, an
+  approved moderation decision, more approval than rejection votes, a matching
+  approval receipt, `public_works_accounting` preview effect, and affected
+  public state for the project.
+- Project idempotency is scoped to the institution and key, and exact retries
+  must not append duplicate project or audit rows.
+- Contributions must pass `validatePublicWorksContribution` before
+  persistence.
 - Private data, Brain/debug traces, wallet secrets, provider credentials, and
   token-like fields are rejected by the shared schema validator.
 - The referenced institution must exist and must be scoped to `public_works`.
-- The public works project must be known and must match the institution scope.
+- The public works project must be known and must match the institution and
+  institution scope.
 - Accepted bundles are capped by per-contribution, per-contributor, and project
   goal limits.
 - Idempotency reuse is accepted only when the validated contribution payload is
@@ -62,14 +94,16 @@ Indexes cover project/status replay, institution replay, and contributor replay.
 - Summaries report `resourceConservationStatus:
   "accepted_inputs_equal_public_progress"`, `mutatesPrivateTown: false`,
   `cosmeticRewardsOnly: true`, and `executionStatus: "not_executable"`.
-- Contributions write `public_works.contribution.recorded` audit ledger entries.
+- Projects write `public_works.project.recorded` audit ledger entries;
+  contributions write `public_works.contribution.recorded` audit ledger entries.
 
 ## Release Gate
 
 M14 cannot move to `done` until:
 
-- public works projects are created and governed by proposal, vote, moderation,
-  institution, and rollback flows;
+- public works project creation is connected to worker/tool enforcement,
+  release-reviewed templates, explicit route authorization, and rollback
+  execution;
 - contribution routes verify wallet/session ownership and durable idempotency;
 - private inventory spending is explicit, authorized, replayable, and covered by
   restart persistence tests;

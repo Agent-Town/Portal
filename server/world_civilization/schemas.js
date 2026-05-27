@@ -55,6 +55,7 @@ const AUDIT_ACTION_TYPES = new Set([
   'delegation.revoked',
   'institution.chartered',
   'institution.charter_amendment.recorded',
+  'public_works.project.recorded',
   'public_works.contribution.recorded',
   'reputation.recorded',
   'reputation.disputed',
@@ -440,6 +441,51 @@ function validatePublicWorksContribution(raw = {}) {
   };
 }
 
+function validatePublicWorksProject(raw = {}) {
+  const errors = [];
+  if (!isPlainObject(raw)) return { ok: false, errors: ['public works project must be object'] };
+  validateSchemaVersion(errors, raw);
+  const projectId = validateString(errors, raw.projectId, 'projectId', { pattern: /^publicworks_[a-z0-9_:-]{4,88}$/ });
+  const institutionId = validateString(errors, raw.institutionId, 'institutionId', { pattern: /^institution_[a-z0-9_:-]{4,88}$/ });
+  const proposalId = validateString(errors, raw.proposalId, 'proposalId', { pattern: /^proposal_[a-z0-9_:-]{4,88}$/ });
+  const requestedBy = validateActor(errors, raw.requestedBy, 'requestedBy', { allowAgent: false });
+  const approvalReceiptId = validateString(errors, raw.approvalReceiptId, 'approvalReceiptId', { pattern: /^receipt_[a-z0-9_:-]{4,88}$/ });
+  const displayName = validateString(errors, raw.displayName, 'displayName', { max: 80 });
+  const publicSummary = validateString(errors, raw.publicSummary, 'publicSummary', { max: 480 });
+  const goalBundle = normalizeResourceBundle(errors, raw.goalBundle, 'goalBundle');
+  const perContributionCap = normalizeResourceBundle(errors, raw.perContributionCap, 'perContributionCap');
+  const perContributorCap = normalizeResourceBundle(errors, raw.perContributorCap, 'perContributorCap');
+  if (!RESOURCE_BUNDLE_KEYS.some((key) => goalBundle[key] > 0)) errors.push('goalBundle must include at least one resource');
+  if (!RESOURCE_BUNDLE_KEYS.some((key) => perContributionCap[key] > 0)) errors.push('perContributionCap must include at least one resource');
+  if (!RESOURCE_BUNDLE_KEYS.some((key) => perContributorCap[key] > 0)) errors.push('perContributorCap must include at least one resource');
+  const cosmeticRewardsOnly = raw.cosmeticRewardsOnly === true;
+  if (!cosmeticRewardsOnly) errors.push('cosmeticRewardsOnly must be true');
+  const idempotencyKey = validateString(errors, raw.idempotencyKey, 'idempotencyKey', { pattern: CIVIC_ID_RE, max: 96 });
+  const privacy = validatePrivacy(errors, raw.privacy, 'privacy');
+  const privatePaths = findPrivateData(raw);
+  if (privatePaths.length) errors.push(`private data forbidden: ${privatePaths.join(', ')}`);
+  return {
+    ok: errors.length === 0,
+    errors,
+    value: errors.length ? null : {
+      schemaVersion: CIVIC_SCHEMA_VERSION,
+      projectId,
+      institutionId,
+      proposalId,
+      requestedBy,
+      approvalReceiptId,
+      displayName,
+      publicSummary,
+      goalBundle,
+      perContributionCap,
+      perContributorCap,
+      cosmeticRewardsOnly,
+      idempotencyKey,
+      privacy
+    }
+  };
+}
+
 function validateReputationRecord(raw = {}) {
   const errors = [];
   if (!isPlainObject(raw)) return { ok: false, errors: ['reputation record must be object'] };
@@ -686,6 +732,7 @@ function validateV6CivicSchema(kind, raw = {}) {
     delegation: validateCivicDelegation,
     institution: validateCivicInstitution,
     institutionAmendment: validateCivicInstitutionAmendment,
+    publicWorksProject: validatePublicWorksProject,
     publicWorksContribution: validatePublicWorksContribution,
     reputation: validateReputationRecord,
     reputationDispute: validateReputationDispute,
@@ -716,6 +763,7 @@ module.exports = {
   validateModerationDecision,
   validateModerationReview,
   validatePublicWorksContribution,
+  validatePublicWorksProject,
   validateReputationDispute,
   validateReputationRecord,
   validateRollbackPlan,

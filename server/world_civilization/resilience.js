@@ -141,7 +141,7 @@ const V6_CIVIC_RESILIENCE_STORES = [
     modulePath: 'server/world_civilization/public_works.js',
     migrationVersion: 'v1',
     restartCoverage: 'tests/world_civilization_public_works_process_restart.test.js',
-    requiredMethods: ['recordContribution', 'getContribution', 'getSchemaMetadata', 'listContributions', 'summarizeProject', 'count', 'close'],
+    requiredMethods: ['recordProject', 'recordContribution', 'getProject', 'getContribution', 'getSchemaMetadata', 'listProjects', 'listContributions', 'summarizeProject', 'projectCount', 'count', 'close'],
     forbiddenMethods: ['spendPrivateInventory', 'grantReward']
   }
 ];

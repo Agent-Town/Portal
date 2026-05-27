@@ -14,6 +14,7 @@ const {
   validateModerationDecision,
   validateModerationReview,
   validatePublicWorksContribution,
+  validatePublicWorksProject,
   validateReputationDispute,
   validateReputationRecord,
   validateRollbackPlan,
@@ -282,6 +283,57 @@ test('V6 institution amendment schema requires human requester and redacted char
   assert.match(unsafe.errors.join('\n'), /private data forbidden/);
 });
 
+test('V6 public works project schema requires governed caps and cosmetic-only rewards', () => {
+  const valid = validatePublicWorksProject({
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    projectId: 'publicworks_great_ridge_bridge_001',
+    institutionId: 'institution_bridge_council_001',
+    proposalId: 'proposal_public_works_project_001',
+    requestedBy: actor(),
+    approvalReceiptId: 'receipt_public_works_project_001',
+    displayName: 'Great Ridge Bridge',
+    publicSummary: 'Governed public works project for later release review.',
+    goalBundle: { wood: 10, stone: 5, food: 0, coin: 20 },
+    perContributionCap: { wood: 2, stone: 1, food: 0, coin: 5 },
+    perContributorCap: { wood: 4, stone: 2, food: 0, coin: 10 },
+    cosmeticRewardsOnly: true,
+    idempotencyKey: 'idem_public_works_project_001',
+    privacy: privacy({
+      dataClasses: ['public_audit_summary', 'public_world_state']
+    })
+  });
+  assert.equal(valid.ok, true, valid.errors.join('\n'));
+
+  const unsafe = validatePublicWorksProject({
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    projectId: 'publicworks_great_ridge_private_001',
+    institutionId: 'institution_bridge_council_001',
+    proposalId: 'proposal_public_works_project_001',
+    requestedBy: {
+      kind: 'agent',
+      accountId: 'acct_v6_agent_001',
+      agentId: 'agent_v6_builder_001'
+    },
+    approvalReceiptId: 'receipt_public_works_project_001',
+    displayName: 'Unsafe Bridge',
+    publicSummary: 'Unsafe public works project.',
+    goalBundle: { wood: 0, stone: 0, food: 0, coin: 0 },
+    perContributionCap: { wood: 0, stone: 0, food: 0, coin: 0 },
+    perContributorCap: { wood: 0, stone: 0, food: 0, coin: 0 },
+    cosmeticRewardsOnly: false,
+    idempotencyKey: 'idem_public_works_project_private_001',
+    privacy: privacy(),
+    debugTrace: {
+      token: 'sk-test-secret-value'
+    }
+  });
+  assert.equal(unsafe.ok, false);
+  assert.match(unsafe.errors.join('\n'), /requestedBy.kind unsupported/);
+  assert.match(unsafe.errors.join('\n'), /goalBundle/);
+  assert.match(unsafe.errors.join('\n'), /cosmeticRewardsOnly/);
+  assert.match(unsafe.errors.join('\n'), /private data forbidden/);
+});
+
 test('V6 public works contribution schema requires public bundles and redacted audit data', () => {
   const valid = validatePublicWorksContribution({
     schemaVersion: CIVIC_SCHEMA_VERSION,
@@ -521,6 +573,23 @@ test('V6 moderation, action, rollback, and audit schemas require traceable safet
     privacy: privacy({ dataClasses: ['public_audit_summary'] })
   });
   assert.equal(institutionAmendmentAudit.ok, true, institutionAmendmentAudit.errors.join('\n'));
+
+  const publicWorksProjectAudit = validateAuditLedgerEntry({
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    entryId: 'audit_publicworks_great_ridge_bridge_001',
+    actor: actor(),
+    actionType: 'public_works.project.recorded',
+    objectRef: 'publicworks_great_ridge_bridge_001',
+    idempotencyKey: 'idem_public_works_project_001',
+    beforeHash: HASH_A,
+    afterHash: HASH_B,
+    createdAtMs: 1_779_784_000_000,
+    migrationVersion: 'v1',
+    replayable: true,
+    rollbackId: '',
+    privacy: privacy({ dataClasses: ['public_audit_summary'] })
+  });
+  assert.equal(publicWorksProjectAudit.ok, true, publicWorksProjectAudit.errors.join('\n'));
 });
 
 test('V6 civic action schema enforces typed effect handler registry', () => {
@@ -598,6 +667,22 @@ test('V6 civic schema dispatcher fails closed for unknown schemas', () => {
     publicSummary: 'Record a Bridge Council charter update.',
     effectiveAtMs: 1_779_784_000_000,
     idempotencyKey: 'idem_bridge_charter_amendment_001',
+    privacy: privacy({ dataClasses: ['public_audit_summary'] })
+  }).ok, true);
+  assert.equal(validateV6CivicSchema('publicWorksProject', {
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    projectId: 'publicworks_great_ridge_bridge_001',
+    institutionId: 'institution_bridge_council_001',
+    proposalId: 'proposal_public_works_project_001',
+    requestedBy: actor(),
+    approvalReceiptId: 'receipt_public_works_project_001',
+    displayName: 'Great Ridge Bridge',
+    publicSummary: 'Public works project.',
+    goalBundle: { wood: 1, stone: 0, food: 0, coin: 0 },
+    perContributionCap: { wood: 1, stone: 0, food: 0, coin: 0 },
+    perContributorCap: { wood: 1, stone: 0, food: 0, coin: 0 },
+    cosmeticRewardsOnly: true,
+    idempotencyKey: 'idem_public_works_project_001',
     privacy: privacy({ dataClasses: ['public_audit_summary'] })
   }).ok, true);
   assert.equal(validateV6CivicSchema('publicWorksContribution', {

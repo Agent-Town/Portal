@@ -48,10 +48,12 @@ Research-only institution charters and charter amendments use
 entries. They are charter evidence and must not be treated as player-visible
 civic institutions or applied charter changes until the M13 release gate closes.
 
-Research-only shared public works contributions use
-`public_works.contribution.recorded` audit entries. They are capped accounting
-evidence and must not be treated as private inventory spend or reward grants
-until the M14 release gate closes.
+Research-only governed public works projects and shared public works
+contributions use `public_works.project.recorded` and
+`public_works.contribution.recorded` audit entries. They are project-governance
+and capped accounting evidence and must not be treated as private inventory
+spend, reward grants, or public contribution routes until the M14 release gate
+closes.
 
 ## Idempotency Rule
 
