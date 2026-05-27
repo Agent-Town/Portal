@@ -111,6 +111,7 @@ This is a separate prototype-gated track. It must not change normal gameplay vis
   "candidateGenerationBlockedWithoutConsentAuthCost": true,
   "assetPostprocessPlanExists": true,
   "assetPostprocessReportExists": true,
+  "assetPostprocessUnsafeSchemaErrorsRedacted": true,
   "assetAwareLoaderExists": true,
   "missingTextureCount": 0,
   "handledMissingTextureCount": 23,
@@ -206,12 +207,13 @@ Candidate-generation run reports and asset-generation job logs now have strict s
 
 ## GU-6 Post-Processing Contract Slice
 
-The post-processing lane now has a deterministic contract layer for future approved image candidates. It builds a postprocess plan from the `AssetPromptPlan`, validates standalone plan/report schemas, records crop/resize/alpha/conversion policy, writes per-target visual sidecars, writes texture-atlas metadata, enforces per-target byte budgets, and falls back to deterministic runtime assets when candidate files or conversion are absent. The runner writes postprocessed candidate outputs only; it does not promote production assets or change server gameplay rules.
+The post-processing lane now has a deterministic contract layer for future approved image candidates. It builds a postprocess plan from the `AssetPromptPlan`, validates standalone plan/report schemas, redacts unsafe submitted schema-error paths and actual values from plan/report diagnostics, records crop/resize/alpha/conversion policy, writes per-target visual sidecars, writes texture-atlas metadata, enforces per-target byte budgets, and falls back to deterministic runtime assets when candidate files or conversion are absent. The runner writes postprocessed candidate outputs only; it does not promote production assets or change server gameplay rules.
 
 ```json
 {
   "assetPostprocessPlanSchemaExists": true,
   "assetPostprocessReportSchemaExists": true,
+  "assetPostprocessUnsafeSchemaErrorsRedacted": true,
   "postprocessPipelineExists": true,
   "cropResizeAlphaPolicyRecorded": true,
   "webpPrimaryPngFallbackPolicyRecorded": true,

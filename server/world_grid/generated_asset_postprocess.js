@@ -4,6 +4,7 @@ const path = require('path');
 
 const {
   DEFAULT_CANDIDATE_ROOT,
+  SECRET_LIKE_VALUE_PATTERN,
   validateAssetPromptPlan,
   validateGeneratedPack
 } = require('./generated_pack');
@@ -24,6 +25,9 @@ const TARGET_BUDGET_BYTES = {
   'ui-ornament': 80_000,
   postcard: 480_000
 };
+const SECRET_LIKE_KEY_PATTERN = /(api[_-]?key|secret|private[_-]?key|credential|oauth|access[_-]?token|refresh[_-]?token|auth[_-]?token|bearer[_-]?token|id[_-]?token|session[_-]?token|provider[_-]?token|wallet[_-]?secret|seed[_-]?phrase|password|^token$)/i;
+const RAW_PROMPT_KEY_PATTERN = /^(rawprompt|normalizedprompt|systemprompt|developerprompt|promptinstructions)$/i;
+const RAW_TEXT_PATTERN = /\bignore\s+(all\s+)?(previous|prior|above)\s+instructions\b|\b(system|developer)\s+(prompt|message|instructions)\b|\b(tool|function)\s+call\b|\bexecute\s+(shell|bash|terminal|command|javascript|python)\b|\b(curl|wget)\s+https?:|<\s*script\b|javascript\s*:|\beval\s*\(|\bFunction\s*\(/i;
 
 function sha256(value) {
   return crypto.createHash('sha256').update(String(value)).digest('hex');
@@ -74,6 +78,29 @@ function replaceExtension(relativePath, extension) {
 
 function budgetForTarget(target = {}) {
   return TARGET_BUDGET_BYTES[target.targetKind] || 180_000;
+}
+
+function redactedPathSegment(value = '') {
+  const segment = String(value || '');
+  if (SECRET_LIKE_KEY_PATTERN.test(segment) || SECRET_LIKE_VALUE_PATTERN.test(segment)) return '<secret-like-key>';
+  if (RAW_PROMPT_KEY_PATTERN.test(segment) || RAW_TEXT_PATTERN.test(segment)) return '<raw-instruction-key>';
+  return segment;
+}
+
+function redactValidationPath(pathLabel = '$') {
+  return String(pathLabel || '$')
+    .replace(SECRET_LIKE_VALUE_PATTERN, '<secret-like-key>')
+    .split('.')
+    .map((segment, index) => index === 0 ? segment : redactedPathSegment(segment))
+    .join('.');
+}
+
+function redactSchemaError(error = {}) {
+  const redacted = { ...error, path: redactValidationPath(error.path) };
+  if (typeof redacted.actual === 'string' && (SECRET_LIKE_VALUE_PATTERN.test(redacted.actual) || RAW_TEXT_PATTERN.test(redacted.actual))) {
+    redacted.actual = '<redacted-value>';
+  }
+  return redacted;
 }
 
 function packAtlasFrames(targets = []) {
@@ -446,12 +473,12 @@ function schema(filename) {
 
 function validateAssetPostprocessPlan(plan = {}) {
   const result = validateGeneratedSchema(plan, schema('asset_postprocess_plan.schema.json'), '$.assetPostprocessPlan');
-  return { ok: result.ok, errors: result.errors };
+  return { ok: result.ok, errors: result.errors.map(redactSchemaError) };
 }
 
 function validateAssetPostprocessReport(report = {}) {
   const result = validateGeneratedSchema(report, schema('asset_postprocess_report.schema.json'), '$.assetPostprocessReport');
-  return { ok: result.ok, errors: result.errors };
+  return { ok: result.ok, errors: result.errors.map(redactSchemaError) };
 }
 
 module.exports = {
