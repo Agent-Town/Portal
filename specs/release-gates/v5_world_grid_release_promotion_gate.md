@@ -25,8 +25,9 @@ from `prototype_gated` to `release_ready`:
 - Current V5 CSRF evidence includes `e2e/243_world_grid_csrf_session_binding.spec.js`,
   which proves a token issued in one same-wallet browser session cannot mutate
   from another same-wallet browser session while a same-session token succeeds;
-  release promotion still requires final token invalidation/rotation and
-  session-auth integration.
+  current store coverage proves same-session token rotation plus explicit
+  invalidation; release promotion still requires logout/session-reset
+  invalidation wiring and session-auth integration.
 - Every mutating route and tool writes append-only audit/replay records with
   actor, route/tool name, idempotency key, before/after summary, and rollback
   handle when applicable.

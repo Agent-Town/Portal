@@ -137,6 +137,14 @@ function createWorldGridCsrfStore({ sqlitePath } = {}) {
       DELETE FROM world_grid_csrf_tokens
       WHERE owner_account_id = ? AND token_hash = ?
     `),
+    deleteOwnerSession: db.prepare(`
+      DELETE FROM world_grid_csrf_tokens
+      WHERE owner_account_id = ? AND session_binding_hash = ?
+    `),
+    deleteOwner: db.prepare(`
+      DELETE FROM world_grid_csrf_tokens
+      WHERE owner_account_id = ?
+    `),
     count: db.prepare('SELECT COUNT(1) AS count FROM world_grid_csrf_tokens')
   };
   let closed = false;
@@ -160,6 +168,7 @@ function createWorldGridCsrfStore({ sqlitePath } = {}) {
     const hash = tokenHash(token);
     const sessionHash = sessionBindingHash(sessionBindingKey);
     pruneOwner(key, createdAtMs);
+    statements.deleteOwnerSession.run(key, sessionHash);
     statements.insert.run(
       key,
       hash,
@@ -181,6 +190,19 @@ function createWorldGridCsrfStore({ sqlitePath } = {}) {
     return Boolean(row && row.expiresAtMs > nowMs);
   }
 
+  function invalidate({ ownerAccountId = '', sessionBindingKey = '', sessionOnly = true } = {}) {
+    const key = String(ownerAccountId || '').trim();
+    if (!key) return 0;
+    const before = statements.listOwner.all(key).length;
+    if (sessionOnly) {
+      statements.deleteOwnerSession.run(key, sessionBindingHash(sessionBindingKey));
+    } else {
+      statements.deleteOwner.run(key);
+    }
+    const after = statements.listOwner.all(key).length;
+    return Math.max(0, before - after);
+  }
+
   function count() {
     return Number(statements.count.get().count || 0);
   }
@@ -199,6 +221,7 @@ function createWorldGridCsrfStore({ sqlitePath } = {}) {
     close,
     count,
     hasValidToken,
+    invalidate,
     issue,
     listTokens,
     pruneOwner,
@@ -247,10 +270,35 @@ function issueWorldGridCsrfToken(owner, { nowMs = Date.now(), env = process.env 
     durableStore.issue({ ownerAccountId: key, token, sessionBindingKey: sessionBindingKey(owner), nowMs, env });
     return { token, expiresAtMs };
   }
-  const records = pruneOwnerTokens(owner, nowMs, env);
-  records.push({ token, sessionBindingHash: sessionBindingHash(sessionBindingKey(owner)), expiresAtMs, createdAtMs: nowMs });
+  const sessionHash = sessionBindingHash(sessionBindingKey(owner));
+  const records = pruneOwnerTokens(owner, nowMs, env).filter((record) => String(record.sessionBindingHash || '') !== sessionHash);
+  records.push({ token, sessionBindingHash: sessionHash, expiresAtMs, createdAtMs: nowMs });
   tokensByOwner.set(key, records.slice(-MAX_TOKENS_PER_OWNER));
   return { token, expiresAtMs };
+}
+
+function invalidateWorldGridCsrfTokens(owner, { env = process.env, sessionOnly = true } = {}) {
+  const key = ownerKey(owner);
+  if (!key) return 0;
+  const durableStore = getConfiguredWorldGridCsrfStore(env);
+  if (durableStore) {
+    return durableStore.invalidate({
+      ownerAccountId: key,
+      sessionBindingKey: sessionBindingKey(owner),
+      sessionOnly
+    });
+  }
+  const records = tokensByOwner.get(key) || [];
+  const before = records.length;
+  if (!sessionOnly) {
+    tokensByOwner.delete(key);
+    return before;
+  }
+  const sessionHash = sessionBindingHash(sessionBindingKey(owner));
+  const kept = records.filter((record) => String(record.sessionBindingHash || '') !== sessionHash);
+  if (kept.length) tokensByOwner.set(key, kept);
+  else tokensByOwner.delete(key);
+  return before - kept.length;
 }
 
 function readWorldGridCsrfToken(req = null) {
@@ -299,6 +347,7 @@ module.exports = {
   configuredWorldGridCsrfPath,
   createWorldGridCsrfStore,
   issueWorldGridCsrfToken,
+  invalidateWorldGridCsrfTokens,
   requireWorldGridCsrfToken,
   sessionBindingHash,
   tokenHash,

@@ -13,7 +13,7 @@ Status: `prototype_gated` for V5.0-V5.5 starter workflow
 | Feature gate | `FEATURE_WORLD_GRID_V50_REGION` defaults off; `/api/world/region` returns `FEATURE_DISABLED` unless server/dev/QA enables it. |
 | Production override safety | `server/world_grid/feature_flags.js` reuses the production admin/QA override guard before honoring `worldGridFeatureFlags` or `x-world-grid-feature-flags`; broad `all` V5 prototype overrides do not enable the V6.0 research flag. |
 | Mutation origin guard | `server/world_grid/mutation_origin.js` rejects explicit cross-origin mutation metadata and requires positive same-origin context for mutating world-grid routes/tools in production. |
-| Mutation CSRF guard | `server/world_grid/csrf.js` issues owner-bound tokens through `/api/world/mutation-token`; when the resolved runtime identity includes a session id, tokens are also bound to a hashed session binding; production mutating routes/tools reject missing, invalid, cross-owner, cross-session, and expired tokens; `tests/world_grid_csrf_persistence.test.js` proves optional SQLite `WORLD_GRID_CSRF_SQLITE_PATH` token/session hashes survive reopen, reject cross-session reuse, and authorize production mutating routes across separate Node process restarts; `e2e/243_world_grid_csrf_session_binding.spec.js` proves browser same-wallet cross-session token reuse is denied while a same-session token succeeds under `WORLD_GRID_CSRF_REQUIRED=1`. |
+| Mutation CSRF guard | `server/world_grid/csrf.js` issues owner-bound tokens through `/api/world/mutation-token`; when the resolved runtime identity includes a session id, tokens are also bound to a hashed session binding; issuing a new token rotates old tokens for the same owner/session binding; `invalidateWorldGridCsrfTokens()` supports explicit session-token invalidation; production mutating routes/tools reject missing, invalid, cross-owner, cross-session, and expired tokens; `tests/world_grid_csrf_persistence.test.js` proves optional SQLite `WORLD_GRID_CSRF_SQLITE_PATH` token/session hashes survive reopen, reject cross-session reuse, rotate and invalidate old same-session tokens, and authorize production mutating routes across separate Node process restarts; `e2e/243_world_grid_csrf_session_binding.spec.js` proves browser same-session token rotation and same-wallet cross-session token reuse denial while a same-session token succeeds under `WORLD_GRID_CSRF_REQUIRED=1`. |
 | Mutation rate-limit guard | `server/world_grid/rate_limit.js` applies owner/surface buckets to mutating world-grid routes/tools and returns `RATE_LIMITED` with retry headers when exceeded; `tests/world_grid_rate_limit_persistence.test.js` proves optional SQLite `WORLD_GRID_RATE_LIMIT_SQLITE_PATH` counters survive separate Node process restarts and block mutating routes after restart. |
 | Mutation audit log | `server/world_grid/audit_log.js` writes hash-chained SQLite audit/replay rows for successful mutating V5.1+ routes/tools when `WORLD_GRID_AUDIT_SQLITE_PATH` is configured; `tests/world_grid_audit_persistence.test.js` proves every V5.1-V5.5 mutating route/tool surface writes durable audit rows across separate Node process restarts, exact idempotent replay does not duplicate audit rows, changed-payload conflicts add no audit rows, and private-looking service secrets stay out of entries. Release promotion still needs full before-state snapshots and release replay reconstruction. |
 | Server-authoritative region | `server/world_grid/region.js` deterministically generates `WorldRegion`, `WorldCell`, `SettlementNode`, and `RouteEdge` data from owner identity. |
@@ -56,9 +56,11 @@ rows, and optional SQLite sandbox participant/action/snapshot/cell rows are dura
 foundations. Optional SQLite audit rows now have route/tool-surface restart
 matrix coverage, optional SQLite CSRF rows now have owner-bound hashed-token and
 hashed session-binding route restart coverage, browser coverage now proves
-same-wallet cross-session CSRF denial, and optional SQLite rate-limit rows now
-have owner/surface route restart coverage, but release promotion still requires
-durable owner indexes, migration versioning, complete before-state snapshots,
-durable idempotency integration with final session-auth production replay,
-CSRF invalidation/rotation coverage, IP/risk-aware production rate limits, and
-release replay reconstruction for every world-grid store.
+same-wallet cross-session CSRF denial, CSRF storage coverage now proves
+same-session token rotation and explicit invalidation, and optional SQLite
+rate-limit rows now have owner/surface route restart coverage, but release
+promotion still requires durable owner indexes, migration versioning, complete
+before-state snapshots, durable idempotency integration with final session-auth
+production replay, logout/session-reset CSRF invalidation wiring, IP/risk-aware
+production rate limits, and release replay reconstruction for every world-grid
+store.

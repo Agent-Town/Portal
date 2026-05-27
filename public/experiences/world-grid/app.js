@@ -31,7 +31,7 @@
     return state.csrfToken;
   }
 
-  async function api(path, options = {}) {
+  async function api(path, options = {}, attempt = 0) {
     const method = String(options.method || 'GET').toUpperCase();
     const mutating = method !== 'GET' && method !== 'HEAD';
     const headers = {
@@ -49,6 +49,11 @@
     });
     const body = await response.json();
     if (!response.ok || body.ok === false) {
+      const code = body?.error?.code || '';
+      if (mutating && attempt === 0 && (code === 'CSRF_INVALID' || code === 'CSRF_REQUIRED')) {
+        state.csrfToken = '';
+        return api(path, options, attempt + 1);
+      }
       const error = new Error(body?.error?.code || 'WORLD_GRID_API_FAILED');
       error.body = body;
       throw error;

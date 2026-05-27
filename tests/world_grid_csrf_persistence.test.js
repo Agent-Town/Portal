@@ -9,6 +9,7 @@ const {
   closeWorldGridCsrfStore,
   createWorldGridCsrfStore,
   issueWorldGridCsrfToken,
+  invalidateWorldGridCsrfTokens,
   requireWorldGridCsrfToken,
   sessionBindingHash,
   tokenHash
@@ -94,6 +95,85 @@ test('world-grid durable CSRF tokens persist hashed owner/session-bound rows and
     );
     assert.throws(
       () => requireWorldGridCsrfToken(requestForToken(issued.token), ownerA, { env, nowMs: 1_779_984_002_000 }),
+      /CSRF_INVALID/
+    );
+  } finally {
+    closeWorldGridCsrfStore();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('world-grid CSRF issuance rotates old same-session tokens and supports explicit invalidation', () => {
+  const owner = {
+    ownerAccountId: `acct_csrf_rotation_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    sessionBindingKey: 'session_rotation'
+  };
+  const env = {
+    NODE_ENV: 'production',
+    WORLD_GRID_CSRF_REQUIRED: '1',
+    WORLD_GRID_CSRF_TOKEN_TTL_MS: '10000'
+  };
+
+  const first = issueWorldGridCsrfToken(owner, { nowMs: 1_779_985_000_000, env });
+  const second = issueWorldGridCsrfToken(owner, { nowMs: 1_779_985_000_100, env });
+
+  assert.notEqual(first.token, second.token);
+  assert.throws(
+    () => requireWorldGridCsrfToken(requestForToken(first.token), owner, { env, nowMs: 1_779_985_000_200 }),
+    /CSRF_INVALID/
+  );
+  assert.equal(
+    requireWorldGridCsrfToken(requestForToken(second.token), owner, { env, nowMs: 1_779_985_000_200 }),
+    true
+  );
+  assert.equal(invalidateWorldGridCsrfTokens(owner, { env }), 1);
+  assert.throws(
+    () => requireWorldGridCsrfToken(requestForToken(second.token), owner, { env, nowMs: 1_779_985_000_300 }),
+    /CSRF_INVALID/
+  );
+});
+
+test('world-grid durable CSRF issuance rotates old same-session token rows and supports explicit invalidation', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-world-grid-csrf-rotation-'));
+  const sqlitePath = path.join(dir, 'world-grid-csrf.sqlite');
+  const owner = { ownerAccountId: 'acct_csrf_durable_rotation', sessionBindingKey: 'session_rotation' };
+  const env = {
+    NODE_ENV: 'production',
+    WORLD_GRID_CSRF_REQUIRED: '1',
+    WORLD_GRID_CSRF_SQLITE_PATH: sqlitePath,
+    WORLD_GRID_CSRF_TOKEN_TTL_MS: '10000'
+  };
+  try {
+    const first = issueWorldGridCsrfToken(owner, { nowMs: 1_779_986_000_000, env });
+    const second = issueWorldGridCsrfToken(owner, { nowMs: 1_779_986_000_100, env });
+    closeWorldGridCsrfStore();
+
+    let store = createWorldGridCsrfStore({ sqlitePath });
+    let rows = store.listTokens();
+    store.close();
+
+    assert.notEqual(first.token, second.token);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].tokenHash, tokenHash(second.token));
+    assert.notEqual(rows[0].tokenHash, tokenHash(first.token));
+    assert.equal(rows[0].sessionBindingHash, sessionBindingHash(owner.sessionBindingKey));
+    assert.throws(
+      () => requireWorldGridCsrfToken(requestForToken(first.token), owner, { env, nowMs: 1_779_986_000_200 }),
+      /CSRF_INVALID/
+    );
+    assert.equal(
+      requireWorldGridCsrfToken(requestForToken(second.token), owner, { env, nowMs: 1_779_986_000_200 }),
+      true
+    );
+    assert.equal(invalidateWorldGridCsrfTokens(owner, { env }), 1);
+    closeWorldGridCsrfStore();
+
+    store = createWorldGridCsrfStore({ sqlitePath });
+    rows = store.listTokens();
+    store.close();
+    assert.equal(rows.length, 0);
+    assert.throws(
+      () => requireWorldGridCsrfToken(requestForToken(second.token), owner, { env, nowMs: 1_779_986_000_300 }),
       /CSRF_INVALID/
     );
   } finally {

@@ -61,6 +61,41 @@ test.beforeEach(async ({ request }) => {
   await resetWorldGrid(request);
 });
 
+test('V5 world-grid CSRF issuing a new token invalidates the older same-session token', async ({ page }) => {
+  await seedFoundersPlot(page);
+  await openWorldGrid(page, 'v50,v51');
+
+  const firstToken = await fetchCsrfToken(page);
+  expect(firstToken.status).toBe(200);
+  expect(firstToken.csrfToken).toMatch(/^wgcsrf_[a-f0-9]{48}$/);
+
+  const secondToken = await fetchCsrfToken(page);
+  expect(secondToken.status).toBe(200);
+  expect(secondToken.csrfToken).toMatch(/^wgcsrf_[a-f0-9]{48}$/);
+  expect(secondToken.csrfToken).not.toBe(firstToken.csrfToken);
+
+  const options = await claimOptions(page);
+  expect(options.status).toBe(200);
+  expect(options.options.length).toBeGreaterThan(0);
+  const cellId = options.options[0].cellId;
+
+  const staleToken = await planClaimWithToken(page, {
+    cellId,
+    csrfToken: firstToken.csrfToken,
+    idempotencyKey: 'e2e_csrf_rotated_token_denied'
+  });
+  expect(staleToken.status).toBe(403);
+  expect(staleToken.errorCode).toBe('CSRF_INVALID');
+
+  const currentToken = await planClaimWithToken(page, {
+    cellId,
+    csrfToken: secondToken.csrfToken,
+    idempotencyKey: 'e2e_csrf_rotated_token_allowed'
+  });
+  expect(currentToken.status).toBe(200);
+  expect(currentToken.claimId).toMatch(/^claim_/);
+});
+
 test('V5 world-grid CSRF token from one browser session cannot mutate the same wallet region in another session', async ({ browser }) => {
   const contextA = await browser.newContext({ extraHTTPHeaders: sharedWalletHeaders });
   const contextB = await browser.newContext({ extraHTTPHeaders: sharedWalletHeaders });
