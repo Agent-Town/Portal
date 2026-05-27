@@ -1235,6 +1235,62 @@ test('GPACK-147 release evidence bundle rejects production boundary metric tampe
   }
 }));
 
+test('GPACK-152 release evidence bundle report mirrors production boundary indicators', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_evidence_bundle_boundary_report_metrics',
+    prompt: 'jade signal orchard with careful harbor cartographers',
+    nowMs: 155_170
+  });
+  const validationNowMs = fixture.releaseGate.evaluatedAtMs + 100;
+  const bundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    nowMs: fixture.releaseGate.evaluatedAtMs + 50
+  });
+  const productionMetricBundle = rehashReleaseEvidenceBundle({
+    ...bundle,
+    metrics: {
+      ...bundle.metrics,
+      productionImageAssetCount: 1,
+      privateDataLeakCount: 2
+    }
+  });
+  const boundaryConstraintBundle = rehashReleaseEvidenceBundle({
+    ...bundle,
+    constraints: {
+      ...bundle.constraints,
+      productionImageAssetsCreated: true,
+      externalProviderPrivateDataStored: true,
+      canonicalServerRulesChanged: true,
+      v6CivicMechanicsTouched: true,
+      normalGameplayVisibilityChanged: true,
+      generatedPackDefaultExposure: true
+    }
+  });
+  const productionMetricReport = validateReleaseEvidenceBundle(productionMetricBundle, {
+    ...fixture,
+    nowMs: validationNowMs
+  });
+  const boundaryConstraintReport = validateReleaseEvidenceBundle(boundaryConstraintBundle, {
+    ...fixture,
+    nowMs: validationNowMs
+  });
+
+  assert.equal(bundle.metrics.productionImageAssetCount, 0);
+  assert.equal(bundle.metrics.privateDataLeakCount, 0);
+  assert.equal(productionMetricReport.metrics.productionImageAssetCount, 1);
+  assert.equal(productionMetricReport.metrics.privateDataLeakCount, 2);
+  assert.equal(productionMetricReport.metrics.boundaryPreserved, false);
+  assert.equal(productionMetricReport.ok, false);
+  assert.equal(boundaryConstraintReport.metrics.productionImageAssetsCreated, true);
+  assert.equal(boundaryConstraintReport.metrics.externalProviderPrivateDataStored, true);
+  assert.equal(boundaryConstraintReport.metrics.canonicalServerRulesChanged, true);
+  assert.equal(boundaryConstraintReport.metrics.v6CivicMechanicsTouched, true);
+  assert.equal(boundaryConstraintReport.metrics.normalGameplayVisibilityChanged, true);
+  assert.equal(boundaryConstraintReport.metrics.generatedPackDefaultExposure, true);
+  assert.equal(boundaryConstraintReport.metrics.boundaryPreserved, false);
+  assert.equal(boundaryConstraintReport.ok, false);
+}));
+
 test('GPACK-148 release evidence bundle rejects source-count metric tampering', () => withTempGeneratedPackStore(() => {
   const fixture = readyReleaseGateFixture({
     ownerAccountId: 'owner_release_evidence_bundle_source_count_metrics',

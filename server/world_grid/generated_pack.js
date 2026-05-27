@@ -5604,6 +5604,14 @@ function validateReleaseEvidenceBundle(bundle = {}, {
       candidateReviewManifestTimeMatchesEvidence,
       candidateReviewManifestCountsMatchEvidence,
       readyEvidenceSourcesMatchGate,
+      productionImageAssetCount: Number(bundle?.metrics?.productionImageAssetCount || 0),
+      privateDataLeakCount: Number(bundle?.metrics?.privateDataLeakCount || 0),
+      productionImageAssetsCreated: constraints.productionImageAssetsCreated === true,
+      externalProviderPrivateDataStored: constraints.externalProviderPrivateDataStored === true,
+      canonicalServerRulesChanged: constraints.canonicalServerRulesChanged === true,
+      v6CivicMechanicsTouched: constraints.v6CivicMechanicsTouched === true,
+      normalGameplayVisibilityChanged: constraints.normalGameplayVisibilityChanged === true,
+      generatedPackDefaultExposure: constraints.generatedPackDefaultExposure === true,
       boundaryPreserved
     }
   };
