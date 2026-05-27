@@ -24,6 +24,7 @@ const { readStore, writeStore, getStorePath } = require('./store');
 const { createExperiencesRouter } = require('./experience_loader');
 const { createFoundersPlotRouter } = require('./founders_plot/routes');
 const { createWorldGridRouter } = require('./world_grid/routes');
+const { createWorldCivilizationRouter } = require('./world_civilization/routes');
 const {
   invalidateWorldGridCsrfTokens,
   worldGridCsrfRequired
@@ -2073,6 +2074,16 @@ function resolveFoundersPlotIdentity(req, res) {
   };
 }
 
+function resolveWorldCivilizationIdentity(req, res) {
+  const owner = normalizeWorldGridOwnerIdentity(resolveFoundersPlotIdentity(req, res));
+  if (!owner) return null;
+  return {
+    accountId: owner.ownerAccountId,
+    walletAddress: owner.ownerAccountId,
+    actorKind: 'human'
+  };
+}
+
 function resolveBrainVaultOwner(req, res) {
   const session = ensureHumanSession(req, res);
   const walletCandidate = collectWalletCandidatesFromHeaders(req)[0] || null;
@@ -3836,6 +3847,9 @@ app.use(createFoundersPlotRouter({
 }));
 app.use(createWorldGridRouter({
   resolveIdentity: resolveFoundersPlotIdentity
+}));
+app.use(createWorldCivilizationRouter({
+  resolveCivicIdentity: resolveWorldCivilizationIdentity
 }));
 
 app.post('/api/hatch/complete', (req, res) => {

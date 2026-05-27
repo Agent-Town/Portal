@@ -86,6 +86,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'server/world_civilization/moderation.js',
     'server/world_civilization/mutation_security.js',
     'server/world_civilization/proposals.js',
+    'server/world_civilization/routes.js',
     'server/world_civilization/public_works.js',
     'server/world_civilization/reputation.js',
     'server/world_civilization/replay_reconstruction.js',
@@ -112,6 +113,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'tests/world_civilization_rollback_recovery.test.js',
     'tests/world_civilization_readiness_gate.test.js',
     'tests/world_civilization_mutation_security.test.js',
+    'tests/world_civilization_routes.test.js',
     'tests/world_civilization_tool_exposure_gate.test.js',
     'tests/world_civilization_governance_preflight.test.js',
     'tests/world_grid_region_preferences_persistence.test.js',
@@ -178,6 +180,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   const releaseReviewSource = read('server/world_civilization/release_review.js');
   const controlledSource = read('server/world_civilization/controlled_release.js');
   const proposalSource = read('server/world_civilization/proposals.js');
+  const proposalRouteSource = read('server/world_civilization/routes.js');
   const voteSource = read('server/world_civilization/votes.js');
   const votingTemplateSource = read('server/world_civilization/voting_templates.js');
   const reputationSource = read('server/world_civilization/reputation.js');
@@ -245,6 +248,9 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /proposal draft\/review audit entries now include privacy-safe before\/after summaries/);
   assert.match(plan, /buildV6ProposalSubmissionEnvelope\(\)/);
   assert.match(plan, /submitProposalForReview\(\)/);
+  assert.match(plan, /server\/world_civilization\/routes\.js/);
+  assert.match(plan, /V6_CIVIC_PROPOSAL_SUBMISSION_ROUTE_ENABLED/);
+  assert.match(plan, /OpenClaw Lite tool wiring/);
   assert.match(plan, /getProposalReviewQueueSnapshot\(\)/);
   assert.match(plan, /buildV6ProposalIntakeReadinessGate\(\)/);
   assert.match(plan, /human route submission, worker tool submission/);
@@ -258,6 +264,8 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(proposalSpec, /proposal\.reviewed`\s+audit ledger entry with privacy-safe before\/after status summaries/);
   assert.match(proposalSpec, /Submission Envelope/);
   assert.match(proposalSpec, /buildV6ProposalSubmissionEnvelope\(\)/);
+  assert.match(proposalSpec, /POST \/api\/world\/civilization\/proposals\/submit/);
+  assert.match(proposalSpec, /V6_CIVIC_PROPOSAL_SUBMISSION_ROUTE_ENABLED/);
   assert.match(proposalSpec, /CIVIC_PROPOSAL_SUBMISSION_DENIED/);
   assert.match(proposalSpec, /Review Queue Snapshot/);
   assert.match(proposalSpec, /V6_PROPOSAL_REVIEW_QUEUE_VERSION/);
@@ -272,10 +280,22 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(proposalSource, /V6_PROPOSAL_REVIEW_QUEUE_VERSION/);
   assert.match(proposalSource, /buildV6ProposalIntakeReadinessGate/);
   assert.match(proposalSource, /REQUIRED_PROPOSAL_SUBMISSION_SURFACES/);
+  assert.match(proposalRouteSource, /PROPOSAL_SUBMISSION_ROUTE/);
+  assert.match(proposalRouteSource, /createWorldCivilizationRouter/);
+  assert.match(proposalRouteSource, /V6_CIVIC_PROPOSAL_SUBMISSION_ROUTE_ENABLED/);
+  assert.match(proposalRouteSource, /buildV6CivicMutationSecurityEnvelope/);
+  assert.match(proposalRouteSource, /submitProposalForReview/);
+  assert.match(gate, /POST \/api\/world\/civilization\/proposals\/submit/);
+  assert.match(gate, /V6_CIVIC_PROPOSAL_SUBMISSION_ROUTE_ENABLED/);
+  assert.match(gate, /fail closed when the default app mount lacks\s+release-grade store wiring/);
+  assert.match(serverIndex, /createWorldCivilizationRouter/);
+  assert.match(serverIndex, /resolveWorldCivilizationIdentity/);
   assert.match(readinessSource, /proposal_intake_readiness_gate/);
   assert.match(readinessSource, /submission_envelope/);
   assert.match(readinessSource, /proposal_submission_mutation_security/);
   assert.match(readinessSource, /review_queue_snapshot/);
+  assert.match(readinessSource, /server\/world_civilization\/routes\.js/);
+  assert.match(readinessSource, /tests\/world_civilization_routes\.test\.js/);
   assert.match(plan, /M8 Vote authorization and delegation \| `in_progress`/);
   assert.match(plan, /evaluateVoteApprovalPolicy\(\)/);
   assert.match(plan, /buildV6VoteRouteAuthorizationEnvelope\(\)/);
@@ -575,6 +595,12 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(releaseReview, /worker-tool origin enforcement/);
   assert.match(releaseReview, /review queue snapshots/);
   assert.match(releaseReview, /reviewed\/expired proposal queue exclusion/);
+  assert.match(releaseReview, /research-only Express proposal submission route/);
+  assert.match(releaseReview, /fail-closed route tests/);
+  assert.match(releaseReview, /missing route flag, missing release store wiring, and denied same-origin\/CSRF evidence/);
+  assert.match(releaseReview, /release-grade store wiring, OpenClaw Lite tool wiring/);
+  assert.match(releaseReviewSource, /server\/world_civilization\/routes\.js/);
+  assert.match(releaseReviewSource, /tests\/world_civilization_routes\.test\.js/);
   assert.match(releaseReview, /reputation eligibility advice gate/);
   assert.match(releaseReview, /Reputation eligibility and advice review/);
   assert.match(releaseReview, /moderation privacy readiness gate/);

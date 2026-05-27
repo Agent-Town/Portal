@@ -50,7 +50,9 @@ are present.
   submission envelope, approval receipt binding, proposal-submission mutation
   security, OpenClaw Lite worker origin, worker-tool origin enforcement, Skill
   Context and Worker Traffic observability, same-origin/CSRF/session auth,
-  idempotent submission replay, review queue indexes, review queue snapshots,
+  disabled-by-default research-only Express route coverage with fail-closed
+  missing-flag, missing-store, and denied same-origin/CSRF behavior, idempotent
+  submission replay, review queue indexes, review queue snapshots,
   reviewed/expired proposal queue exclusion, moderation decision links, proposal
   audit rows, public text rendering review, private-data exclusion, no backend
   shortcuts, no civic tool exposure, and no effect execution before any proposal

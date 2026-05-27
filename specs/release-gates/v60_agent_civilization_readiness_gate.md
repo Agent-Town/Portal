@@ -100,6 +100,14 @@ persistence resilience, and security/product release review.
   delegated-agent proof with required scope and remaining budget evidence, CSRF
   verification, idempotency, and owner/surface rate limiting before any future
   civic store write.
+- The research-only proposal submission route may exist in
+  `server/world_civilization/routes.js`, but
+  `POST /api/world/civilization/proposals/submit` must stay disabled by default
+  behind `V6_CIVIC_PROPOSAL_SUBMISSION_ROUTE_ENABLED`, require an injected
+  proposal store, require explicit V6 feature opt-in, require same-origin and
+  CSRF-reviewed M5 mutation-security evidence, persist nothing on denial, expose
+  no runtime civic tools, and fail closed when the default app mount lacks
+  release-grade store wiring.
 - The research-only modal lab surface contract may exist in
   `server/world_civilization/lab_surface.js`, but it must stay route-neutral,
   modal-first, hidden from players, non-executing, fail closed for standalone

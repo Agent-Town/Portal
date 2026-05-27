@@ -329,9 +329,11 @@ test('V6 release review requires proposal intake route tool and review queue evi
   assert.equal(proposalGate.owner, 'engineering_security_product');
   assert.ok(proposalGate.requiredArtifacts.includes('specs/57_agent_town_v6_internal_proposal_lifecycle.md'));
   assert.ok(proposalGate.requiredArtifacts.includes('server/world_civilization/proposals.js'));
+  assert.ok(proposalGate.requiredArtifacts.includes('server/world_civilization/routes.js'));
   assert.ok(proposalGate.requiredArtifacts.includes('server/world_civilization/mutation_security.js'));
   assert.ok(proposalGate.requiredArtifacts.includes('server/world_civilization/tool_exposure_gate.js'));
   assert.ok(proposalGate.requiredArtifacts.includes('tests/world_civilization_proposals.test.js'));
+  assert.ok(proposalGate.requiredArtifacts.includes('tests/world_civilization_routes.test.js'));
   assert.ok(proposalGate.requiredChecks.includes('human_submission_envelope'));
   assert.ok(proposalGate.requiredChecks.includes('worker_tool_submission_envelope'));
   assert.ok(proposalGate.requiredChecks.includes('openclaw_lite_worker_origin'));
