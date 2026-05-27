@@ -497,6 +497,7 @@ test('GU-19 release evidence bundle binds a ready gate to source evidence hashes
   assert.equal(bundle.metrics.candidateReviewManifestSourcePassed, true);
   assert.equal(bundle.metrics.candidateReviewManifestHashMatchesEvidence, true);
   assert.equal(bundle.metrics.candidateReviewManifestTimeMatchesEvidence, true);
+  assert.equal(bundle.metrics.candidateReviewManifestCountsMatchEvidence, true);
   assert.equal(report.metrics.generatedPackSourcePassed, true);
   assert.equal(report.metrics.playtestSourcePassed, true);
   assert.equal(report.metrics.persistenceSourcePassed, true);
@@ -712,6 +713,35 @@ test('GU-19 release evidence bundle rejects candidate-review time-order metric t
 
   assert.equal(bundle.metrics.candidateReviewManifestHashMatchesEvidence, true);
   assert.equal(bundle.metrics.candidateReviewManifestTimeMatchesEvidence, true);
+  assert.equal(report.ok, false);
+  assert.equal(
+    report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,
+    false
+  );
+}));
+
+test('GPACK-135 release evidence bundle rejects candidate-review count-match metric tampering', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_evidence_bundle_candidate_counts',
+    prompt: 'silver orchard station with kite signal couriers',
+    nowMs: 154_925
+  });
+  const bundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    nowMs: 154_975
+  });
+  const tamperedBundle = {
+    ...bundle,
+    metrics: {
+      ...bundle.metrics,
+      candidateReviewManifestCountsMatchEvidence: false
+    }
+  };
+  const report = validateReleaseEvidenceBundle(tamperedBundle, fixture);
+
+  assert.equal(bundle.metrics.candidateReviewManifestHashMatchesEvidence, true);
+  assert.equal(bundle.metrics.candidateReviewManifestTimeMatchesEvidence, true);
+  assert.equal(bundle.metrics.candidateReviewManifestCountsMatchEvidence, true);
   assert.equal(report.ok, false);
   assert.equal(
     report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,

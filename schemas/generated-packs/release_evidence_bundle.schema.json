@@ -191,6 +191,7 @@
         "candidateReviewManifestSourcePassed",
         "candidateReviewManifestHashMatchesEvidence",
         "candidateReviewManifestTimeMatchesEvidence",
+        "candidateReviewManifestCountsMatchEvidence",
         "productionImageAssetCount",
         "privateDataLeakCount"
       ],
@@ -218,6 +219,7 @@
         "candidateReviewManifestSourcePassed": { "type": "boolean" },
         "candidateReviewManifestHashMatchesEvidence": { "type": "boolean" },
         "candidateReviewManifestTimeMatchesEvidence": { "type": "boolean" },
+        "candidateReviewManifestCountsMatchEvidence": { "type": "boolean" },
         "productionImageAssetCount": { "type": "integer", "minimum": 0 },
         "privateDataLeakCount": { "type": "integer", "minimum": 0 }
       }
