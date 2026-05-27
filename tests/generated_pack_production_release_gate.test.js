@@ -2975,6 +2975,11 @@ test('GU-18/GU-19 release gate and evidence bundle APIs are generated-pack-gated
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.prerequisiteSnapshotMatchesGate, true);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.readyEvidenceSourcesMatchGate, true);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.presentSourceCount < bundleBody.releaseEvidenceBundle.metrics.requiredSourceCount, true);
+      assert.equal(bundleBody.releaseEvidenceBundle.metrics.missingSourceCount > 0, true);
+      assert.equal(bundleBody.validationReport.metrics.presentSourceCount, bundleBody.releaseEvidenceBundle.metrics.presentSourceCount);
+      assert.equal(bundleBody.validationReport.metrics.missingSourceCount, bundleBody.releaseEvidenceBundle.metrics.missingSourceCount);
+      assert.equal(bundleBody.validationReport.metrics.requiredSourceCount, bundleBody.releaseEvidenceBundle.metrics.requiredSourceCount);
+      assert.equal(bundleBody.validationReport.metrics.suppliedSourceCount, bundleBody.releaseEvidenceBundle.metrics.presentSourceCount);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.sourceHashMismatchCount, 0);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.sourcePresenceMatchesHashes, true);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.sourceCoverageOk, true);
@@ -2989,6 +2994,14 @@ test('GU-18/GU-19 release gate and evidence bundle APIs are generated-pack-gated
       assert.equal(toolBundleResponse.status, 200, JSON.stringify(toolBundleBody));
       assert.equal(toolBundleBody.data.validationReport.ok, true, JSON.stringify(toolBundleBody.data.validationReport.checks));
       assert.equal(toolBundleBody.data.releaseEvidenceBundle.publicReleaseEligible, false);
+      assert.equal(
+        toolBundleBody.data.validationReport.metrics.missingSourceCount,
+        toolBundleBody.data.releaseEvidenceBundle.metrics.missingSourceCount
+      );
+      assert.equal(
+        toolBundleBody.data.validationReport.metrics.suppliedSourceCount,
+        toolBundleBody.data.releaseEvidenceBundle.metrics.presentSourceCount
+      );
 
       const unsafeToolBundleResponse = await fetch(`${baseUrl}/api/world/tool/et.world.generated_pack.release_evidence_bundle`, {
         method: 'POST',

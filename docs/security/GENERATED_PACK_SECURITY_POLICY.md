@@ -139,6 +139,7 @@ Status: prototype-gated
   "productionBoundaryMetricTamperRejected": true,
   "validationReportSourceMetricsMirrored": true,
   "validationReportSourceCountsMirrored": true,
+  "releaseEvidenceBundleApiSourceCountsMirrored": true,
   "mixedDiversitySourceRejected": true,
   "dangerousFieldRejectCountMin": 20,
   "candidateFolderCount": 23,

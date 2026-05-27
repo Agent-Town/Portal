@@ -2846,7 +2846,7 @@ Response includes:
 
 Release-evidence-bundle invariants:
 - request bodies share the release-gate ingress guard for secret-like fields, semantic token fields, secret-looking keys or values, raw prompt-instruction keys, executable instruction values, request depth, node count, array size, object key count, object key length, and string length;
-- the generic tool dispatcher path `et.world.generated_pack.release_evidence_bundle` uses the same guard and returns the same fail-closed rejection code;
+- the generic tool dispatcher path `et.world.generated_pack.release_evidence_bundle` uses the same guard, returns the same fail-closed rejection code, and exposes the same validation-report source-count metrics as the HTTP endpoint;
 - bundle validation reports redact unsafe submitted bundle hashes and source pack ids from measured evidence;
 - rejection responses must not echo raw submitted secrets, semantic token field names or values, secret-looking keys or values, raw prompt-instruction keys, executable instruction values, oversized object keys, or oversized evidence values.
 
