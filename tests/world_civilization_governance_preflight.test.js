@@ -152,7 +152,8 @@ function civicAction(overrides = {}) {
 
 function seedApproved({ moderationStore, proposalStore, voteStore }) {
   proposalStore.draftProposal(proposal(), { nowMs: 1_779_784_000_000 });
-  moderationStore.recordDecision(moderationDecision(), { nowMs: 1_779_784_100_000 });
+  const decision = moderationStore.recordDecision(moderationDecision(), { nowMs: 1_779_784_100_000 });
+  proposalStore.recordProposalReview(decision, { nowMs: 1_779_784_150_000 });
   voteStore.recordVote(vote(), { nowMs: 1_779_784_200_000 });
 }
 
@@ -200,6 +201,11 @@ test('V6 governance preflight fails closed for missing moderation vote and appro
   assert.throws(() => throwV6CivicGovernancePreflightError(report), /CIVIC_EFFECT_MODERATION_REQUIRED/);
 
   stores.moderationStore.recordDecision(moderationDecision(), { nowMs: 1_779_784_100_000 });
+  report = preflight(stores);
+  assert.match(report.errors.join(','), /CIVIC_EFFECT_PROPOSAL_REVIEW_REQUIRED/);
+  assert.throws(() => throwV6CivicGovernancePreflightError(report), /CIVIC_EFFECT_PROPOSAL_REVIEW_REQUIRED/);
+
+  stores.proposalStore.recordProposalReview(moderationDecision(), { nowMs: 1_779_784_150_000 });
   report = preflight(stores);
   assert.match(report.errors.join(','), /CIVIC_EFFECT_APPROVAL_REQUIRED/);
   assert.throws(() => throwV6CivicGovernancePreflightError(report), /CIVIC_EFFECT_APPROVAL_REQUIRED/);
@@ -266,7 +272,8 @@ test('V6 effect preparation uses governance preflight before writing prepared ac
     }
   );
 
-  stores.moderationStore.recordDecision(moderationDecision(), { nowMs: 1_779_784_100_000 });
+  const decision = stores.moderationStore.recordDecision(moderationDecision(), { nowMs: 1_779_784_100_000 });
+  stores.proposalStore.recordProposalReview(decision, { nowMs: 1_779_784_150_000 });
   stores.voteStore.recordVote(vote(), { nowMs: 1_779_784_200_000 });
   const prepared = stores.effectStore.prepareEffect(civicAction(), rollbackPlan(), { nowMs: 1_779_784_300_000 });
 

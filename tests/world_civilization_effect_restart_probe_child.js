@@ -179,7 +179,8 @@ function main() {
   try {
     if (mode === 'seed-prerequisites') {
       stores.proposalStore.draftProposal(proposal(), { nowMs: 1_779_786_000_000 });
-      stores.moderationStore.recordDecision(moderationDecision(), { nowMs: 1_779_786_100_000 });
+      const decision = stores.moderationStore.recordDecision(moderationDecision(), { nowMs: 1_779_786_100_000 });
+      stores.proposalStore.recordProposalReview(decision, { nowMs: 1_779_786_150_000 });
       stores.voteStore.recordVote(vote(), { nowMs: 1_779_786_200_000 });
       writeJson({
         ok: true,

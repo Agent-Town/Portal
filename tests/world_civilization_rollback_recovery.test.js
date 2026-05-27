@@ -158,7 +158,8 @@ function civicAction(overrides = {}) {
 
 function seedPreparedEffect(stores) {
   stores.proposalStore.draftProposal(proposal(), { nowMs: 1_779_784_000_000 });
-  stores.moderationStore.recordDecision(moderationDecision(), { nowMs: 1_779_784_100_000 });
+  const decision = stores.moderationStore.recordDecision(moderationDecision(), { nowMs: 1_779_784_100_000 });
+  stores.proposalStore.recordProposalReview(decision, { nowMs: 1_779_784_150_000 });
   stores.voteStore.recordVote(vote(), { nowMs: 1_779_784_200_000 });
   stores.effectStore.prepareEffect(civicAction(), rollbackPlan(), { nowMs: 1_779_784_300_000 });
 }

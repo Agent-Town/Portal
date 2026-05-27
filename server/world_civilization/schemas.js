@@ -60,6 +60,7 @@ const AUDIT_ACTION_TYPES = new Set([
   'reputation.recorded',
   'reputation.disputed',
   'reputation.reviewed',
+  'proposal.reviewed',
   'moderation.decided',
   'moderation.reviewed',
   'moderation.appealed',

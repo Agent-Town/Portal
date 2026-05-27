@@ -3,14 +3,18 @@ const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
 
 const { createCivicAuditLedger, sha256, stableJson } = require('./audit_ledger');
-const { validateCivicProposal } = require('./schemas');
+const { validateCivicProposal, validateModerationDecision } = require('./schemas');
 const {
   ensureCivicSqliteSchemaMetadata,
   readCivicSqliteSchemaMetadata
 } = require('./sqlite_schema');
 
 const PROPOSAL_STATUS_DRAFTED = 'drafted';
+const PROPOSAL_STATUS_READY_FOR_VOTE = 'ready_for_vote';
+const PROPOSAL_STATUS_REJECTED = 'rejected';
 const MODERATION_STATUS_NEEDS_REVIEW = 'needs_review';
+const MODERATION_STATUS_APPROVED = 'approved';
+const MODERATION_STATUS_REJECTED = 'rejected';
 const MIGRATION_VERSION = 'v1';
 const STORE_KEY = 'proposals';
 
@@ -92,6 +96,11 @@ function buildStatements(db) {
         audit_entry_id, proposal_json
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `),
+    updateReview: db.prepare(`
+      UPDATE world_civic_proposals
+      SET status = ?, moderation_status = ?, updated_at = ?
+      WHERE proposal_id = ?
+    `),
     list: db.prepare(`
       SELECT *
       FROM world_civic_proposals
@@ -120,6 +129,91 @@ function createProposalAuditEntry(proposal, nowMs) {
     replayable: true,
     rollbackId: '',
     privacy: proposal.privacy
+  };
+}
+
+function normalizeModerationDecision(rawDecision = {}) {
+  const decision = rawDecision.decision && typeof rawDecision.decision === 'object'
+    ? rawDecision.decision
+    : rawDecision;
+  const validation = validateModerationDecision(decision);
+  if (!validation.ok) {
+    const err = new Error('CIVIC_PROPOSAL_REVIEW_MODERATION_DECISION_INVALID');
+    err.details = { errors: validation.errors };
+    throw err;
+  }
+  const normalized = validation.value;
+  return {
+    decisionId: normalized.decisionId,
+    subjectRef: normalized.subjectRef,
+    surface: normalized.surface,
+    status: normalized.status,
+    policyVersion: normalized.policyVersion,
+    reviewerKind: normalized.reviewerKind,
+    decision: normalized
+  };
+}
+
+function reviewTransitionFor(decisionStatus = '') {
+  if (decisionStatus === MODERATION_STATUS_APPROVED) {
+    return {
+      proposalStatus: PROPOSAL_STATUS_READY_FOR_VOTE,
+      moderationStatus: MODERATION_STATUS_APPROVED
+    };
+  }
+  if (decisionStatus === MODERATION_STATUS_REJECTED) {
+    return {
+      proposalStatus: PROPOSAL_STATUS_REJECTED,
+      moderationStatus: MODERATION_STATUS_REJECTED
+    };
+  }
+  return null;
+}
+
+function auditActorForReview(decision = {}) {
+  if (decision.reviewerKind === 'system') {
+    return {
+      kind: 'agent',
+      accountId: 'acct_system_moderation',
+      agentId: 'agent_system_moderation'
+    };
+  }
+  return {
+    kind: 'human',
+    accountId: 'acct_human_moderator'
+  };
+}
+
+function createProposalReviewAuditEntry({ before, after, decision, nowMs }) {
+  return {
+    schemaVersion: before.proposal.schemaVersion,
+    entryId: `audit_proprev_${decision.decisionId}`.slice(0, 94),
+    actor: auditActorForReview(decision),
+    actionType: 'proposal.reviewed',
+    objectRef: before.proposalId,
+    idempotencyKey: `idem_proposal_review_${decision.decisionId}`.slice(0, 96),
+    beforeHash: sha256(stableJson({
+      proposalId: before.proposalId,
+      status: before.status,
+      moderationStatus: before.moderationStatus,
+      updatedAtMs: before.updatedAtMs
+    })),
+    afterHash: sha256(stableJson({
+      proposalId: before.proposalId,
+      status: after.proposalStatus,
+      moderationStatus: after.moderationStatus,
+      decisionId: decision.decisionId,
+      policyVersion: decision.policyVersion
+    })),
+    createdAtMs: nowMs,
+    migrationVersion: MIGRATION_VERSION,
+    replayable: true,
+    rollbackId: '',
+    privacy: {
+      redacted: true,
+      privateDataIncluded: false,
+      dataClasses: ['public_audit_summary']
+    }
   };
 }
 
@@ -203,6 +297,73 @@ function createCivicProposalStore({ sqlitePath, auditLedger = null, auditSqliteP
     return parseProposalRow(statements.byProposalId.get(String(proposalId || '')));
   }
 
+  function recordProposalReview(rawDecision = {}, { nowMs = Date.now() } = {}) {
+    const decision = normalizeModerationDecision(rawDecision);
+    const transition = reviewTransitionFor(decision.status);
+    if (!transition) {
+      const err = new Error('CIVIC_PROPOSAL_REVIEW_STATUS_UNSUPPORTED');
+      err.details = { decisionId: decision.decisionId, status: decision.status };
+      throw err;
+    }
+    const proposal = getProposal(decision.subjectRef);
+    if (!proposal) {
+      const err = new Error('CIVIC_PROPOSAL_REVIEW_PROPOSAL_REQUIRED');
+      err.details = { proposalId: decision.subjectRef, decisionId: decision.decisionId };
+      throw err;
+    }
+    if (proposal.expiresAtMs <= nowMs) {
+      const err = new Error('CIVIC_PROPOSAL_REVIEW_EXPIRED');
+      err.details = { proposalId: proposal.proposalId, expiresAtMs: proposal.expiresAtMs, nowMs };
+      throw err;
+    }
+    if (decision.surface !== proposal.proposal.moderationClass) {
+      const err = new Error('CIVIC_PROPOSAL_REVIEW_SURFACE_MISMATCH');
+      err.details = {
+        proposalId: proposal.proposalId,
+        expected: proposal.proposal.moderationClass,
+        received: decision.surface
+      };
+      throw err;
+    }
+    const auditEntry = createProposalReviewAuditEntry({
+      before: proposal,
+      after: transition,
+      decision,
+      nowMs
+    });
+    const existingAudit = ledger.getByEntryId(auditEntry.entryId);
+    if (existingAudit) {
+      return { ...getProposal(proposal.proposalId), duplicate: true };
+    }
+    if (proposal.status !== PROPOSAL_STATUS_DRAFTED) {
+      if (
+        proposal.status === transition.proposalStatus
+        && proposal.moderationStatus === transition.moderationStatus
+      ) {
+        return { ...proposal, duplicate: true };
+      }
+      const err = new Error('CIVIC_PROPOSAL_REVIEW_STATE_CONFLICT');
+      err.details = {
+        proposalId: proposal.proposalId,
+        status: proposal.status,
+        moderationStatus: proposal.moderationStatus
+      };
+      throw err;
+    }
+
+    const auditRow = ledger.append(auditEntry);
+    statements.updateReview.run(
+      transition.proposalStatus,
+      transition.moderationStatus,
+      nowMs,
+      proposal.proposalId
+    );
+    return {
+      ...getProposal(proposal.proposalId),
+      reviewAuditEntryId: auditRow.entry.entryId
+    };
+  }
+
   function listProposals({ proposerAccountId = '', status = '', moderationStatus = '', limit = 100 } = {}) {
     const safeLimit = Number.isInteger(Number(limit)) ? Math.max(1, Math.min(250, Number(limit))) : 100;
     return statements.list.all(
@@ -252,12 +413,17 @@ function createCivicProposalStore({ sqlitePath, auditLedger = null, auditSqliteP
     listProposals,
     migrationVersion: schemaMetadata.migrationVersion,
     previewProposalEffect,
+    recordProposalReview,
     sqlitePath
   };
 }
 
 module.exports = {
+  MODERATION_STATUS_APPROVED,
   MODERATION_STATUS_NEEDS_REVIEW,
+  MODERATION_STATUS_REJECTED,
   PROPOSAL_STATUS_DRAFTED,
+  PROPOSAL_STATUS_READY_FOR_VOTE,
+  PROPOSAL_STATUS_REJECTED,
   createCivicProposalStore
 };

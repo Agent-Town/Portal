@@ -35,6 +35,26 @@ proposal returns the existing draft and does not append another audit record.
 Changing content with the same proposer/idempotency pair fails with
 `CIVIC_PROPOSAL_IDEMPOTENCY_CONFLICT`.
 
+## Review Transition Rules
+
+`recordProposalReview()` consumes a validated V6 moderation decision contract.
+Malformed decisions fail with
+`CIVIC_PROPOSAL_REVIEW_MODERATION_DECISION_INVALID` before proposal rows or audit
+rows are touched.
+
+Allowed research-only transitions:
+
+- `approved` moderation decisions move a `drafted` proposal to
+  `ready_for_vote` with moderation status `approved`.
+- `rejected` moderation decisions move a `drafted` proposal to `rejected` with
+  moderation status `rejected`.
+
+The review decision must reference the proposal id as `subjectRef`, and its
+surface must match the proposal moderation class. Missing proposals, expired
+proposals, unsupported review statuses, and surface mismatches fail before
+persistence. Successful transitions append a replayable `proposal.reviewed`
+audit ledger entry and do not execute proposal effects.
+
 ## Non-Execution Rule
 
 The proposal store intentionally has no apply or execute method. Later V6
@@ -43,7 +63,8 @@ authority, rollback, and audit checks before any civic effect can be applied.
 
 The current research-only governance preflight consumes proposal records before
 prepared effect persistence. It requires an existing, non-expired proposal whose
-effect preview and rollback plan match the proposed civic action.
+review transition has reached `ready_for_vote` with approved moderation status
+and whose effect preview and rollback plan match the proposed civic action.
 
 ## Worker-First Rule
 

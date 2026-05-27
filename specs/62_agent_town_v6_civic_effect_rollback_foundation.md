@@ -27,9 +27,9 @@ normal gameplay state.
 
 The store records a prepared civic effect and rollback handle only after the
 proposal, vote, and moderation foundations can prove the action has a valid
-public proposal, an approved moderation decision, and a human approval receipt.
-It is readiness evidence for later typed execution handlers, not an execution
-engine.
+public proposal, a completed approved proposal review transition, an approved
+moderation decision, and a human approval receipt. It is readiness evidence for
+later typed execution handlers, not an execution engine.
 
 Those prerequisites are centralized in
 `server/world_civilization/governance_preflight.js`. `effects.js` calls the
@@ -93,6 +93,8 @@ proposal/status replay.
   persistence.
 - Rollback plans must pass `validateRollbackPlan` before persistence.
 - The referenced proposal must exist and must not be expired.
+- The referenced proposal must be review-ready: status `ready_for_vote` and
+  moderation status `approved`.
 - The action effect type must match the proposal preview effect type.
 - The rollback plan id must match the proposal rollback plan id.
 - The proposal must have an approved moderation decision for its moderation

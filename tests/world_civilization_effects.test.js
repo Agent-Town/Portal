@@ -157,7 +157,8 @@ function civicAction(overrides = {}) {
 
 function seedApprovedProposal({ moderationStore, proposalStore, voteStore }) {
   proposalStore.draftProposal(proposal(), { nowMs: 1_779_784_000_000 });
-  moderationStore.recordDecision(moderationDecision(), { nowMs: 1_779_784_100_000 });
+  const decision = moderationStore.recordDecision(moderationDecision(), { nowMs: 1_779_784_100_000 });
+  proposalStore.recordProposalReview(decision, { nowMs: 1_779_784_150_000 });
   voteStore.recordVote(vote(), { nowMs: 1_779_784_200_000 });
 }
 
@@ -192,7 +193,7 @@ test('V6 civic effect store prepares approved actions with rollback handles but 
   assert.equal(audit.entry.rollbackId, 'rollback_bridge_001');
   assert.deepEqual(
     auditLedger.replay().map((row) => row.entry.actionType),
-    ['proposal.created', 'moderation.decided', 'vote.recorded', 'civic_action.prepared']
+    ['proposal.created', 'moderation.decided', 'proposal.reviewed', 'vote.recorded', 'civic_action.prepared']
   );
 }));
 
@@ -246,6 +247,12 @@ test('V6 civic effect store rejects missing prerequisites and unsupported delega
   );
 
   moderationStore.recordDecision(moderationDecision(), { nowMs: 1_779_784_100_000 });
+  assert.throws(
+    () => effectStore.prepareEffect(civicAction(), rollbackPlan(), { nowMs: 1_779_784_300_000 }),
+    /CIVIC_EFFECT_PROPOSAL_REVIEW_REQUIRED/
+  );
+
+  proposalStore.recordProposalReview(moderationDecision(), { nowMs: 1_779_784_150_000 });
   assert.throws(
     () => effectStore.prepareEffect(civicAction(), rollbackPlan(), { nowMs: 1_779_784_300_000 }),
     /CIVIC_EFFECT_APPROVAL_REQUIRED/

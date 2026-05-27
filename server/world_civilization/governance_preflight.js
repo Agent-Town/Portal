@@ -10,6 +10,7 @@ const REQUIRED_GOVERNANCE_PREFLIGHT_CHECKS = [
   'proposal_active',
   'effect_type_matches',
   'moderation_approved',
+  'proposal_review_ready',
   'vote_approval',
   'delegation_policy',
   'approval_receipt',
@@ -20,6 +21,7 @@ const CHECK_ERROR = {
   action_schema: 'CIVIC_EFFECT_ACTION_INVALID',
   rollback_schema: 'CIVIC_EFFECT_ROLLBACK_INVALID',
   proposal_exists: 'CIVIC_EFFECT_PROPOSAL_REQUIRED',
+  proposal_review_ready: 'CIVIC_EFFECT_PROPOSAL_REVIEW_REQUIRED',
   rollback_plan_matches: 'CIVIC_EFFECT_ROLLBACK_PLAN_MISMATCH',
   proposal_active: 'CIVIC_EFFECT_PROPOSAL_EXPIRED',
   effect_type_matches: 'CIVIC_EFFECT_TYPE_MISMATCH',
@@ -92,6 +94,11 @@ function buildV6CivicGovernancePreflight({
       && rollbackPlan
       && rollbackPlan.planId === proposal.proposal.rollbackPlan.planId
   );
+  const proposalReviewReady = Boolean(
+    proposal
+      && proposal.status === 'ready_for_vote'
+      && proposal.moderationStatus === 'approved'
+  );
   const proposalActive = Boolean(proposal && proposal.expiresAtMs > nowMs);
   const effectTypeMatches = Boolean(
     proposal
@@ -130,6 +137,11 @@ function buildV6CivicGovernancePreflight({
     check('moderation_approved', Boolean(moderationDecision), {
       proposalId: action?.proposalId || '',
       moderationClass: proposal?.proposal?.moderationClass || ''
+    }),
+    check('proposal_review_ready', proposalReviewReady, {
+      proposalId: action?.proposalId || '',
+      status: proposal?.status || '',
+      moderationStatus: proposal?.moderationStatus || ''
     }),
     check('vote_approval', voteApproved, {
       proposalId: action?.proposalId || '',

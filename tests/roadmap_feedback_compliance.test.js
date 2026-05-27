@@ -203,7 +203,10 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /M11 Civic effect execution and rollback \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/effects\.js/);
   assert.match(plan, /server\/world_civilization\/governance_preflight\.js/);
-  assert.match(plan, /proposal, approved moderation, vote approval, human approval receipt/);
+  assert.match(plan, /recordProposalReview\(\)/);
+  assert.match(plan, /ready_for_vote/);
+  assert.match(plan, /proposal\.reviewed/);
+  assert.match(plan, /proposal review-ready state, approved moderation, vote approval, human approval receipt/);
   assert.match(plan, /schema-level typed effect handler registry/);
   assert.match(plan, /executable apply\/rollback handlers/);
   assert.match(plan, /server\/world_civilization\/rollback_recovery\.js/);
@@ -409,6 +412,7 @@ test('V6 worker-first civic tool exposure gate is tracked as an M6 release contr
 test('V6 governance preflight is tracked as an M7-M11 prerequisite control', () => {
   const plan = read('docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md');
   const foundation = read('specs/54_agent_town_v6_agent_civilization_foundation.md');
+  const proposalSpec = read('specs/57_agent_town_v6_internal_proposal_lifecycle.md');
   const effectSpec = read('specs/62_agent_town_v6_civic_effect_rollback_foundation.md');
   const preflightSpec = read('specs/71_agent_town_v6_governance_preflight_foundation.md');
   const gate = read('specs/release-gates/v60_agent_civilization_readiness_gate.md');
@@ -417,13 +421,23 @@ test('V6 governance preflight is tracked as an M7-M11 prerequisite control', () 
 
   assert.match(plan, /server\/world_civilization\/governance_preflight\.js/);
   assert.match(plan, /vote approval, human approval receipt/);
+  assert.match(plan, /review-ready proposal/);
   assert.match(foundation, /governance_preflight\.js/);
+  assert.match(proposalSpec, /recordProposalReview\(\)/);
+  assert.match(proposalSpec, /CIVIC_PROPOSAL_REVIEW_MODERATION_DECISION_INVALID/);
+  assert.match(proposalSpec, /`ready_for_vote`/);
+  assert.match(proposalSpec, /`proposal\.reviewed`/);
   assert.match(effectSpec, /failed preflights preserve the existing `CIVIC_EFFECT_\*` error surface/);
+  assert.match(effectSpec, /review-ready/);
   assert.match(preflightSpec, /Existing proposal record/);
+  assert.match(preflightSpec, /Proposal review-ready state/);
   assert.match(preflightSpec, /Vote approval with at least one approving vote/);
   assert.match(preflightSpec, /Delegated execution remains rejected/);
-  assert.match(gate, /proposal, vote, moderation, approval receipt/);
+  assert.match(gate, /proposal review-ready state/);
+  assert.match(gate, /`proposal\.reviewed`/);
+  assert.match(releaseReview, /proposal `ready_for_vote`\/`rejected` transitions/);
   assert.match(releaseReview, /governance preflight coverage/);
+  assert.match(skillLine, /V6 internal proposal lifecycle foundation/);
   assert.match(skillLine, /tests\/world_civilization_governance_preflight\.test\.js/);
 });
 

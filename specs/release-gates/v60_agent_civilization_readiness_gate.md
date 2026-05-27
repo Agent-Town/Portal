@@ -172,6 +172,9 @@ gate below has implementation, deterministic tests, and security/product signoff
 
 - Proposal schema with proposer identity, scope, affected public state, effect
   preview, moderation class, expiry, idempotency key, and rollback plan.
+- Proposal lifecycle storage with validated moderation-review transitions,
+  `ready_for_vote` and `rejected` terminal readiness states, and replayable
+  `proposal.reviewed` audit entries before vote/effect preparation.
 - Vote schema with voter authorization, delegation status, eligibility proof,
   one-vote accounting, and receipt id.
 - Civic action schema with proposal reference, execution authority, before/after
@@ -221,8 +224,9 @@ gate below has implementation, deterministic tests, and security/product signoff
   mismatches before persistence. Research-only governance preflight starts in
   `server/world_civilization/governance_preflight.js` and is called by
   `effects.js` before any prepared effect, rollback record, or audit row is
-  written; it requires proposal, vote, moderation, approval receipt, effect
-  preview, rollback-plan, and delegation-policy prerequisites to pass.
+  written; it requires proposal, proposal review-ready state, vote,
+  moderation, approval receipt, effect preview, rollback-plan, and
+  delegation-policy prerequisites to pass.
   Research-only handle reconstruction starts in
   `server/world_civilization/rollback_recovery.js` and
   `tests/world_civilization_rollback_recovery.test.js`. Release still requires

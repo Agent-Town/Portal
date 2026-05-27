@@ -31,6 +31,8 @@ errors before persistence, rollback handles, or audit rows are written.
 - Non-expired proposal.
 - Action effect type matches the proposal preview effect type.
 - Approved moderation decision for the proposal moderation class.
+- Proposal review-ready state: proposal status `ready_for_vote` and moderation
+  status `approved`.
 - Vote approval with at least one approving vote and more approvals than
   rejections.
 - Delegated execution remains rejected until M12 worker/tool enforcement and
@@ -42,7 +44,8 @@ errors before persistence, rollback handles, or audit rows are written.
 
 This foundation is not execution readiness. M7-M11 cannot move to `done` until:
 
-- proposal state transitions are explicit and durable beyond `drafted`;
+- proposal state transitions remain explicit, durable, audited, and connected to
+  moderation review outcomes before vote/effect preparation;
 - vote quorum and threshold rules are release-reviewed;
 - moderation review and appeal outcomes are connected to proposal state;
 - delegated execution is authorized through M12 route/tool enforcement or

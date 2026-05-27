@@ -62,10 +62,11 @@ test('V6 civic effect store survives separate Node process restarts with rollbac
     assert.equal(seed.voteCount, 1);
     assert.equal(seed.effectCount, 0);
     assert.equal(seed.rollbackCount, 0);
-    assert.equal(seed.auditCount, 3);
+    assert.equal(seed.auditCount, 4);
     assert.deepEqual(seed.replayReport.byActionType, {
       'moderation.decided': 1,
       'proposal.created': 1,
+      'proposal.reviewed': 1,
       'vote.recorded': 1
     });
 
@@ -75,7 +76,7 @@ test('V6 civic effect store survives separate Node process restarts with rollbac
     assert.equal(prepared.rollbackId, 'rollback_restart_effect_bridge_001');
     assert.equal(prepared.effectCount, 1);
     assert.equal(prepared.rollbackCount, 1);
-    assert.equal(prepared.auditCount, 4);
+    assert.equal(prepared.auditCount, 5);
     assert.equal(prepared.actionStatus, 'prepared');
     assert.equal(prepared.rollbackStatus, 'available');
     assert.equal(prepared.effectSummary.actionCount, 1);
@@ -87,7 +88,7 @@ test('V6 civic effect store survives separate Node process restarts with rollbac
 
     assert.equal(snapshot.ok, true);
     assert.equal(snapshot.replayOk, true);
-    assert.equal(snapshot.replayReport.entryCount, 4);
+    assert.equal(snapshot.replayReport.entryCount, 5);
     assert.equal(snapshot.replayReport.chainValid, true);
     assert.equal(snapshot.replayReport.privacySafe, true);
     assert.equal(snapshot.replayReport.appliesWorldState, false);
@@ -96,17 +97,18 @@ test('V6 civic effect store survives separate Node process restarts with rollbac
       'civic_action.prepared': 1,
       'moderation.decided': 1,
       'proposal.created': 1,
+      'proposal.reviewed': 1,
       'vote.recorded': 1
     });
-    assert.deepEqual(snapshot.replayReport.byMigrationVersion, { v1: 4 });
+    assert.deepEqual(snapshot.replayReport.byMigrationVersion, { v1: 5 });
 
     assert.equal(retry.ok, true);
     assert.equal(retry.duplicate, true);
     assert.equal(retry.effectCount, 1);
     assert.equal(retry.rollbackCount, 1);
-    assert.equal(retry.auditCount, 4);
+    assert.equal(retry.auditCount, 5);
     assert.equal(finalSnapshot.replayOk, true);
-    assert.equal(finalSnapshot.replayReport.entryCount, 4);
+    assert.equal(finalSnapshot.replayReport.entryCount, 5);
     assert.equal(finalSnapshot.replayReport.latestEntryHash, snapshot.replayReport.latestEntryHash);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
