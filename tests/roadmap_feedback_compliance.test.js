@@ -93,6 +93,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'server/world_civilization/reputation.js',
     'server/world_civilization/replay_reconstruction.js',
     'server/world_civilization/migration_rehearsal.js',
+    'server/world_civilization/migration_load_replay.js',
     'server/world_civilization/rollback_recovery.js',
     'server/world_civilization/write_contention.js',
     'server/world_civilization/readiness_gate.js',
@@ -114,6 +115,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'tests/world_civilization_public_works_process_restart.test.js',
     'tests/world_civilization_schema_metadata.test.js',
     'tests/world_civilization_migration_rehearsal.test.js',
+    'tests/world_civilization_migration_load_replay.test.js',
     'tests/world_civilization_load_rate.test.js',
     'tests/world_civilization_write_contention.test.js',
     'tests/world_civilization_rollback_recovery.test.js',
@@ -630,7 +632,12 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /server\/world_civilization\/migration_rehearsal\.js/);
   assert.match(plan, /tests\/world_civilization_migration_rehearsal\.test\.js/);
   assert.match(plan, /unsupported upgrade\/downgrade targets fail closed/);
+  assert.match(plan, /server\/world_civilization\/migration_load_replay\.js/);
+  assert.match(plan, /tests\/world_civilization_migration_load_replay\.test\.js/);
+  assert.match(plan, /migration-load replay/);
   assert.match(persistenceSpec, /server\/world_civilization\/migration_rehearsal\.js/);
+  assert.match(persistenceSpec, /server\/world_civilization\/migration_load_replay\.js/);
+  assert.match(persistenceSpec, /tests\/world_civilization_migration_load_replay\.test\.js/);
   assert.match(persistenceSpec, /V6_CIVIC_AUDIT_SUMMARY_COVERAGE/);
   assert.match(persistenceSpec, /Manual audit-ledger rows without store-provided summaries/);
   assert.match(persistenceSpec, /tests\/world_civilization_migration_rehearsal\.test\.js/);
@@ -668,6 +675,9 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(gate, /server\/world_civilization\/migration_rehearsal\.js/);
   assert.match(gate, /tests\/world_civilization_migration_rehearsal\.test\.js/);
   assert.match(gate, /unsupported upgrade\/downgrade targets fail closed/);
+  assert.match(gate, /server\/world_civilization\/migration_load_replay\.js/);
+  assert.match(gate, /tests\/world_civilization_migration_load_replay\.test\.js/);
+  assert.match(gate, /migration-load replay/);
   assert.match(gate, /server\/world_civilization\/backup_restore\.js/);
   assert.match(gate, /tests\/world_civilization_backup_restore\.test\.js/);
   assert.match(gate, /source\/restored hashes/);
@@ -694,6 +704,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(persistenceSpec, /server\/world_civilization\/backup_restore\.js/);
   assert.match(persistenceSpec, /tests\/world_civilization_backup_restore\.test\.js/);
   assert.match(persistenceSpec, /report exposes no row\s+payloads/);
+  assert.match(persistenceSpec, /no\s+migration scripts are executed/);
   assert.match(persistenceSpec, /server\/world_civilization\/write_contention\.js/);
   assert.match(persistenceSpec, /tests\/world_civilization_write_contention\.test\.js/);
   assert.match(persistenceSpec, /multi-process write contention/);
@@ -704,6 +715,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(resilienceSource, /REQUIRED_RESILIENCE_EVIDENCE_CHECKS/);
   assert.match(resilienceSource, /V6_CIVIC_AUDIT_SUMMARY_COVERAGE/);
   assert.match(resilienceSource, /V6_CIVIC_BACKUP_RESTORE_COVERAGE/);
+  assert.match(resilienceSource, /V6_CIVIC_MIGRATION_LOAD_REPLAY_COVERAGE/);
   assert.match(resilienceSource, /V6_CIVIC_WRITE_CONTENTION_COVERAGE/);
   assert.match(resilienceSource, /store_specific_zero_hash_only_fallbacks/);
   assert.match(resilienceSource, /typed_rollback_execution_recovery/);

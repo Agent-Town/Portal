@@ -509,6 +509,11 @@ persistence resilience, and security/product release review.
   `tests/world_civilization_migration_rehearsal.test.js`; current v1 metadata can
   be inventoried and unsupported upgrade/downgrade targets fail closed without
   executing migration scripts.
+  Migration-load replay coverage starts in
+  `server/world_civilization/migration_load_replay.js` and
+  `tests/world_civilization_migration_load_replay.test.js`; current v1 schema
+  inventory is paired with bounded privacy-safe audit replay, row payloads stay
+  excluded, no migration scripts execute, and no world state is applied.
   Backup/restore research coverage starts in
   `server/world_civilization/backup_restore.js` and
   `tests/world_civilization_backup_restore.test.js`; closed SQLite civic store
@@ -526,7 +531,7 @@ persistence resilience, and security/product release review.
   restart probes, audit replay reconstruction, privacy-safe replay summaries,
   store-specific zero hash-only fallback proof, hash-chain integrity,
   migration upgrade/downgrade scripts, unsupported
-  transition denial, backup/restore rehearsal, migration load replay rehearsal,
+  transition denial, backup/restore rehearsal, migration-load replay rehearsal,
   production load/rate targets, multi-process write contention, duplicate retry
   bursts, rollback handle reconstruction, typed rollback execution recovery,
   private-data exclusion, and no effect application during replay while keeping

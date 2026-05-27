@@ -253,10 +253,12 @@ test('V6 release review requires persistence replay resilience readiness evidenc
   assert.ok(resilienceGate.requiredArtifacts.includes('server/world_civilization/resilience.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('server/world_civilization/replay_reconstruction.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('server/world_civilization/migration_rehearsal.js'));
+  assert.ok(resilienceGate.requiredArtifacts.includes('server/world_civilization/migration_load_replay.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('server/world_civilization/backup_restore.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('server/world_civilization/write_contention.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('server/world_civilization/rollback_recovery.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('tests/world_civilization_resilience.test.js'));
+  assert.ok(resilienceGate.requiredArtifacts.includes('tests/world_civilization_migration_load_replay.test.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('tests/world_civilization_backup_restore.test.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('tests/world_civilization_write_contention.test.js'));
   assert.ok(resilienceGate.requiredChecks.includes('all_civic_store_restart_probes'));
@@ -283,6 +285,7 @@ test('V6 release review blocks signoff without migration load rollback and backu
     checks: evidence.resilience_readiness_review.checks.filter((check) => (
       check !== 'migration_upgrade_scripts'
       && check !== 'store_specific_zero_hash_only_fallbacks'
+      && check !== 'migration_load_replay_rehearsal'
       && check !== 'production_load_rate_targets'
       && check !== 'multi_process_write_contention'
       && check !== 'typed_rollback_execution_recovery'
@@ -302,6 +305,7 @@ test('V6 release review blocks signoff without migration load rollback and backu
     'store_specific_zero_hash_only_fallbacks',
     'migration_upgrade_scripts',
     'backup_restore_rehearsal',
+    'migration_load_replay_rehearsal',
     'production_load_rate_targets',
     'multi_process_write_contention',
     'typed_rollback_execution_recovery'

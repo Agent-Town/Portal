@@ -6,6 +6,10 @@ const {
   V6_BACKUP_RESTORE_REHEARSAL_VERSION
 } = require('./backup_restore');
 const {
+  REQUIRED_MIGRATION_LOAD_REPLAY_RELEASE_GAPS,
+  V6_MIGRATION_LOAD_REPLAY_REHEARSAL_VERSION
+} = require('./migration_load_replay');
+const {
   REQUIRED_WRITE_CONTENTION_RELEASE_GAPS,
   V6_WRITE_CONTENTION_REHEARSAL_VERSION
 } = require('./write_contention');
@@ -90,9 +94,26 @@ const V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE = {
   remainingReleaseGaps: [
     'release_grade_upgrade_scripts',
     'release_grade_downgrade_scripts',
-    'release_grade_backup_restore_drill',
-    'migration_load_replay_rehearsal'
+    'release_grade_backup_restore_drill'
   ]
+};
+
+const V6_CIVIC_MIGRATION_LOAD_REPLAY_COVERAGE = {
+  modulePath: 'server/world_civilization/migration_load_replay.js',
+  artifact: 'tests/world_civilization_migration_load_replay.test.js',
+  version: V6_MIGRATION_LOAD_REPLAY_REHEARSAL_VERSION,
+  status: 'research_only',
+  releaseReady: false,
+  coveredChecks: [
+    'current_schema_inventory_before_replay',
+    'bounded_audit_replay_after_inventory',
+    'hash_chain_integrity_after_inventory',
+    'privacy_safe_replay_summaries',
+    'private_row_payload_exclusion',
+    'no_migration_application',
+    'no_world_state_application'
+  ],
+  remainingReleaseGaps: [...REQUIRED_MIGRATION_LOAD_REPLAY_RELEASE_GAPS]
 };
 
 const V6_CIVIC_BACKUP_RESTORE_COVERAGE = {
@@ -582,6 +603,7 @@ function disabledReport(source) {
     loadRateCoverage: null,
     rollbackRecoveryCoverage: null,
     migrationRehearsalCoverage: null,
+    migrationLoadReplayCoverage: null,
     backupRestoreCoverage: null,
     writeContentionCoverage: null,
     releaseGaps: [...REQUIRED_RELEASE_GAPS],
@@ -653,6 +675,7 @@ function buildV6ResilienceBaselineReport({
     loadRateCoverage: clone(V6_CIVIC_LOAD_RATE_COVERAGE),
     rollbackRecoveryCoverage: clone(V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE),
     migrationRehearsalCoverage: clone(V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE),
+    migrationLoadReplayCoverage: clone(V6_CIVIC_MIGRATION_LOAD_REPLAY_COVERAGE),
     backupRestoreCoverage: clone(V6_CIVIC_BACKUP_RESTORE_COVERAGE),
     writeContentionCoverage: clone(V6_CIVIC_WRITE_CONTENTION_COVERAGE),
     releaseGaps: [...REQUIRED_RELEASE_GAPS]
@@ -738,6 +761,19 @@ function assertV6ResilienceBaseline(report = {}) {
     ) {
       errors.push('V6_RESILIENCE_MIGRATION_REHEARSAL_COVERAGE_REQUIRED');
     }
+    const migrationLoadReplayCoverage = report.migrationLoadReplayCoverage || {};
+    if (
+      migrationLoadReplayCoverage.modulePath !== V6_CIVIC_MIGRATION_LOAD_REPLAY_COVERAGE.modulePath
+      || migrationLoadReplayCoverage.artifact !== V6_CIVIC_MIGRATION_LOAD_REPLAY_COVERAGE.artifact
+      || migrationLoadReplayCoverage.version !== V6_MIGRATION_LOAD_REPLAY_REHEARSAL_VERSION
+      || migrationLoadReplayCoverage.status !== 'research_only'
+      || migrationLoadReplayCoverage.releaseReady !== false
+      || !Array.isArray(migrationLoadReplayCoverage.coveredChecks)
+      || !migrationLoadReplayCoverage.coveredChecks.includes('current_schema_inventory_before_replay')
+      || !migrationLoadReplayCoverage.coveredChecks.includes('no_migration_application')
+    ) {
+      errors.push('V6_RESILIENCE_MIGRATION_LOAD_REPLAY_COVERAGE_REQUIRED');
+    }
     const backupRestoreCoverage = report.backupRestoreCoverage || {};
     if (
       backupRestoreCoverage.modulePath !== V6_CIVIC_BACKUP_RESTORE_COVERAGE.modulePath
@@ -779,6 +815,7 @@ module.exports = {
   V6_CIVIC_AUDIT_SUMMARY_COVERAGE: clone(V6_CIVIC_AUDIT_SUMMARY_COVERAGE),
   V6_CIVIC_BACKUP_RESTORE_COVERAGE: clone(V6_CIVIC_BACKUP_RESTORE_COVERAGE),
   V6_CIVIC_LOAD_RATE_COVERAGE: clone(V6_CIVIC_LOAD_RATE_COVERAGE),
+  V6_CIVIC_MIGRATION_LOAD_REPLAY_COVERAGE: clone(V6_CIVIC_MIGRATION_LOAD_REPLAY_COVERAGE),
   V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE: clone(V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE),
   V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE: clone(V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE),
   V6_CIVIC_RESILIENCE_STORES: clone(V6_CIVIC_RESILIENCE_STORES),

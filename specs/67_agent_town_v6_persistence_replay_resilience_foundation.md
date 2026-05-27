@@ -9,6 +9,7 @@ Runtime contracts:
 - `server/world_civilization/resilience.js`
 - `server/world_civilization/replay_reconstruction.js`
 - `server/world_civilization/migration_rehearsal.js`
+- `server/world_civilization/migration_load_replay.js`
 - `server/world_civilization/backup_restore.js`
 - `server/world_civilization/write_contention.js`
 - `server/world_civilization/rollback_recovery.js`
@@ -26,6 +27,7 @@ Test coverage:
 - `tests/world_civilization_public_works_process_restart.test.js`
 - `tests/world_civilization_schema_metadata.test.js`
 - `tests/world_civilization_migration_rehearsal.test.js`
+- `tests/world_civilization_migration_load_replay.test.js`
 - `tests/world_civilization_backup_restore.test.js`
 - `tests/world_civilization_load_rate.test.js`
 - `tests/world_civilization_write_contention.test.js`
@@ -78,6 +80,14 @@ SQLite `user_version` or a mismatched store migration marker.
 store metadata without applying migrations or claiming executable migration
 scripts. Unsupported upgrade/downgrade targets fail closed until release-grade
 scripts, backup/restore drills, and migration load replay evidence exist.
+
+`server/world_civilization/migration_load_replay.js` adds a research-only
+migration-load replay rehearsal. It pairs the current v1 schema inventory with
+bounded audit-ledger replay evidence, verifies replay hash-chain and privacy
+status, excludes row payloads from the report, and keeps `appliesMigration:
+false` and `appliesWorldState: false`. It is not a migration script, no
+migration scripts are executed, and it does not claim post-migration replay
+diff coverage.
 
 `server/world_civilization/backup_restore.js` adds a research-only backup and
 restore rehearsal for closed SQLite civic stores. It copies every current store
@@ -177,6 +187,12 @@ migration readiness evidence: every current store can be inventoried at v1
 from schema metadata, while unsupported v2 upgrades and v0 downgrades fail
 closed until real migration scripts exist.
 
+`tests/world_civilization_migration_load_replay.test.js` adds research-scale
+migration-load replay evidence: every current store is inventoried at v1, a
+bounded audit load is replayed with privacy-safe summaries and a valid hash
+chain, unsupported migration targets fail closed, row payloads remain excluded,
+and no migration or world-state application is allowed.
+
 `tests/world_civilization_backup_restore.test.js` adds research-scale
 backup/restore evidence: closed SQLite stores are copied into a restore
 directory, restored files match source hashes and v1 schema metadata, the
@@ -218,7 +234,7 @@ The readiness gate requires evidence for:
 - Store-specific zero hash-only fallback proof across the current civic store
   restart probes.
 - Migration upgrade/downgrade scripts and unsupported transition denial.
-- Backup/restore and migration load replay rehearsal.
+- Migration-load replay, backup/restore, and migration rehearsal.
 - Research-scale multi-process write contention, production load/rate targets,
   duplicate retry bursts, and idempotency conflict rejection.
 - Rollback handle reconstruction and typed rollback execution recovery review.

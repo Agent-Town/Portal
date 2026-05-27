@@ -39,9 +39,9 @@ are present.
   store-specific audit-summary coverage, rollback handles, governance preflight
   evidence, and non-executing rollback recovery evidence.
 - Validation evidence: targeted Node suite, split Playwright smokes,
-  all-features regression, feature override safety, load/rate replay evidence,
-  and multi-process write-contention evidence, including civic mutation
-  security, proposal intake readiness, vote
+  all-features regression, feature override safety, migration-load replay
+  evidence, load/rate replay evidence, and multi-process write-contention
+  evidence, including civic mutation security, proposal intake readiness, vote
   authorization readiness, worker vote adapter gate, reputation eligibility
   advice readiness, moderation privacy readiness, delegated-agent proof, and
   governance preflight, effect execution gate, agent participation enforcement
@@ -124,16 +124,18 @@ are present.
   probes, audit replay reconstruction, privacy-safe replay summaries,
   store-specific zero hash-only fallback proof, hash-chain integrity, migration
   upgrade/downgrade scripts, unsupported transition denial, backup/restore
-  rehearsal, migration load replay rehearsal, production load/rate targets,
+  rehearsal, migration-load replay rehearsal, production load/rate targets,
   multi-process write contention, duplicate retry bursts, rollback handle
   reconstruction, typed rollback execution recovery, private-data exclusion, and
   no effect application during replay before M16 can claim release-grade
-  resilience. Current backup/restore evidence is research-only closed-store
+  resilience. Current migration-load replay evidence is research-only v1 schema
+  inventory plus bounded privacy-safe audit replay with no migration execution;
+  current backup/restore evidence is research-only closed-store
   file-copy/hash/schema-metadata rehearsal; current write-contention evidence is
   research-only audit-ledger SQLite contention rehearsal with no row-payload
   reports. Release still requires encrypted storage, point-in-time recovery,
-  live WAL checkpointing, restore SLO signoff, and route/store contention SLO
-  evidence.
+  live WAL checkpointing, restore SLO signoff, migration replay diffs, and
+  route/store contention SLO evidence.
 - Product release signoff: player-visible scope, rollback plan, support runbook,
   and disable plan.
 
