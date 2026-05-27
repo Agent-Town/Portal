@@ -2763,7 +2763,7 @@ test('GU-18 production release gate validation rejects future-dated gate reports
   );
 }));
 
-test('GU-18/GU-19/GPACK-157/159/160 release gate and evidence bundle APIs are generated-pack-gated and fail closed', async () => {
+test('GU-18/GU-19/GPACK-157/159/160/161 release gate and evidence bundle APIs are generated-pack-gated and fail closed', async () => {
   const identity = { pairId: 'session:release-gate-api', houseId: null };
   await withWorldGridServer({
     identity,
@@ -3019,6 +3019,14 @@ test('GU-18/GU-19/GPACK-157/159/160 release gate and evidence bundle APIs are ge
       assert.equal(releaseBody.validationReport.metrics.persistencePackIdMatches, releaseBody.releaseGate.metrics.persistencePackIdMatches);
       assert.equal(releaseBody.validationReport.metrics.missingAssetCount, releaseBody.releaseGate.metrics.missingAssetCount);
       assert.equal(releaseBody.validationReport.metrics.replayabilityPromptCount, releaseBody.releaseGate.metrics.replayabilityPromptCount);
+      assert.equal(releaseBody.validationReport.metrics.approvalEvidenceSchemaErrorCount, releaseBody.releaseGate.metrics.approvalEvidenceSchemaErrorCount);
+      assert.equal(releaseBody.validationReport.metrics.approvalEvidenceSecretLikeCount, releaseBody.releaseGate.metrics.approvalEvidenceSecretLikeCount);
+      assert.equal(releaseBody.validationReport.metrics.approvalEvidenceRawInstructionCount, releaseBody.releaseGate.metrics.approvalEvidenceRawInstructionCount);
+      assert.equal(releaseBody.validationReport.metrics.candidateReviewManifestSchemaErrorCount, releaseBody.releaseGate.metrics.candidateReviewManifestSchemaErrorCount);
+      assert.equal(releaseBody.validationReport.metrics.candidateReviewManifestSecretLikeCount, releaseBody.releaseGate.metrics.candidateReviewManifestSecretLikeCount);
+      assert.equal(releaseBody.validationReport.metrics.candidateReviewManifestRawInstructionCount, releaseBody.releaseGate.metrics.candidateReviewManifestRawInstructionCount);
+      assert.equal(releaseBody.validationReport.metrics.candidateReviewExpectedTargetCount, releaseBody.releaseGate.metrics.candidateReviewExpectedTargetCount);
+      assert.equal(releaseBody.validationReport.metrics.candidateReviewCoverageCount, releaseBody.releaseGate.metrics.candidateReviewCoverageCount);
       assert.equal(releaseBody.validationReport.metrics.privateDataLeakCount, releaseBody.releaseGate.metrics.privateDataLeakCount);
       assert.equal(releaseBody.validationReport.metrics.productionImageAssetCount, releaseBody.releaseGate.metrics.productionImageAssetCount);
       assert.equal(releaseBody.validationReport.metrics.productionImageAssetsCreated, false);
@@ -3201,7 +3209,7 @@ test('GU-18/GU-19/GPACK-157/159/160 release gate and evidence bundle APIs are ge
   });
 });
 
-test('GPACK-154/155/156/158/159/160 release APIs can return ready evidence and ignore loose approvals', async () => {
+test('GPACK-154/155/156/158/159/160/161 release APIs can return ready evidence and ignore loose approvals', async () => {
   const identity = { pairId: 'session:release-evidence-ready-api', houseId: null };
 
   await withTempGeneratedPackStore(async (root) => {
@@ -3308,6 +3316,14 @@ test('GPACK-154/155/156/158/159/160 release APIs can return ready evidence and i
       assert.equal(releaseGateBody.validationReport.metrics.persistencePackIdMatches, true);
       assert.equal(releaseGateBody.validationReport.metrics.missingAssetCount, 0);
       assert.equal(releaseGateBody.validationReport.metrics.replayabilityPromptCount, releaseGateBody.releaseGate.metrics.replayabilityPromptCount);
+      assert.equal(releaseGateBody.validationReport.metrics.approvalEvidenceSchemaErrorCount, 0);
+      assert.equal(releaseGateBody.validationReport.metrics.approvalEvidenceSecretLikeCount, 0);
+      assert.equal(releaseGateBody.validationReport.metrics.approvalEvidenceRawInstructionCount, 0);
+      assert.equal(releaseGateBody.validationReport.metrics.candidateReviewManifestSchemaErrorCount, 0);
+      assert.equal(releaseGateBody.validationReport.metrics.candidateReviewManifestSecretLikeCount, 0);
+      assert.equal(releaseGateBody.validationReport.metrics.candidateReviewManifestRawInstructionCount, 0);
+      assert.equal(releaseGateBody.validationReport.metrics.candidateReviewExpectedTargetCount, releaseGateBody.releaseGate.metrics.candidateReviewExpectedTargetCount);
+      assert.equal(releaseGateBody.validationReport.metrics.candidateReviewCoverageCount, releaseGateBody.releaseGate.metrics.candidateReviewCoverageCount);
       assert.equal(releaseGateBody.validationReport.metrics.authModelDocumented, true);
       assert.equal(releaseGateBody.validationReport.metrics.costEstimateAccepted, true);
       assert.equal(releaseGateBody.validationReport.metrics.explicitConsentRecorded, true);
@@ -3343,6 +3359,14 @@ test('GPACK-154/155/156/158/159/160 release APIs can return ready evidence and i
       assert.equal(toolReleaseGateBody.data.validationReport.metrics.persistencePackIdMatches, true);
       assert.equal(toolReleaseGateBody.data.validationReport.metrics.missingAssetCount, 0);
       assert.equal(toolReleaseGateBody.data.validationReport.metrics.replayabilityPromptCount, toolReleaseGateBody.data.releaseGate.metrics.replayabilityPromptCount);
+      assert.equal(toolReleaseGateBody.data.validationReport.metrics.approvalEvidenceSchemaErrorCount, 0);
+      assert.equal(toolReleaseGateBody.data.validationReport.metrics.approvalEvidenceSecretLikeCount, 0);
+      assert.equal(toolReleaseGateBody.data.validationReport.metrics.approvalEvidenceRawInstructionCount, 0);
+      assert.equal(toolReleaseGateBody.data.validationReport.metrics.candidateReviewManifestSchemaErrorCount, 0);
+      assert.equal(toolReleaseGateBody.data.validationReport.metrics.candidateReviewManifestSecretLikeCount, 0);
+      assert.equal(toolReleaseGateBody.data.validationReport.metrics.candidateReviewManifestRawInstructionCount, 0);
+      assert.equal(toolReleaseGateBody.data.validationReport.metrics.candidateReviewExpectedTargetCount, toolReleaseGateBody.data.releaseGate.metrics.candidateReviewExpectedTargetCount);
+      assert.equal(toolReleaseGateBody.data.validationReport.metrics.candidateReviewCoverageCount, toolReleaseGateBody.data.releaseGate.metrics.candidateReviewCoverageCount);
       assert.equal(toolReleaseGateBody.data.validationReport.metrics.authModelDocumented, true);
       assert.equal(toolReleaseGateBody.data.validationReport.metrics.costEstimateAccepted, true);
       assert.equal(toolReleaseGateBody.data.validationReport.metrics.explicitConsentRecorded, true);
@@ -3431,6 +3455,14 @@ test('GPACK-154/155/156/158/159/160 release APIs can return ready evidence and i
       assert.equal(looseReleaseGateBody.validationReport.metrics.persistencePackIdMatches, true);
       assert.equal(looseReleaseGateBody.validationReport.metrics.missingAssetCount, 0);
       assert.equal(looseReleaseGateBody.validationReport.metrics.replayabilityPromptCount, looseReleaseGateBody.releaseGate.metrics.replayabilityPromptCount);
+      assert.equal(looseReleaseGateBody.validationReport.metrics.approvalEvidenceSchemaErrorCount, looseReleaseGateBody.releaseGate.metrics.approvalEvidenceSchemaErrorCount);
+      assert.equal(looseReleaseGateBody.validationReport.metrics.approvalEvidenceSecretLikeCount, looseReleaseGateBody.releaseGate.metrics.approvalEvidenceSecretLikeCount);
+      assert.equal(looseReleaseGateBody.validationReport.metrics.approvalEvidenceRawInstructionCount, looseReleaseGateBody.releaseGate.metrics.approvalEvidenceRawInstructionCount);
+      assert.equal(looseReleaseGateBody.validationReport.metrics.candidateReviewManifestSchemaErrorCount, looseReleaseGateBody.releaseGate.metrics.candidateReviewManifestSchemaErrorCount);
+      assert.equal(looseReleaseGateBody.validationReport.metrics.candidateReviewManifestSecretLikeCount, looseReleaseGateBody.releaseGate.metrics.candidateReviewManifestSecretLikeCount);
+      assert.equal(looseReleaseGateBody.validationReport.metrics.candidateReviewManifestRawInstructionCount, looseReleaseGateBody.releaseGate.metrics.candidateReviewManifestRawInstructionCount);
+      assert.equal(looseReleaseGateBody.validationReport.metrics.candidateReviewExpectedTargetCount, looseReleaseGateBody.releaseGate.metrics.candidateReviewExpectedTargetCount);
+      assert.equal(looseReleaseGateBody.validationReport.metrics.candidateReviewCoverageCount, looseReleaseGateBody.releaseGate.metrics.candidateReviewCoverageCount);
       assert.equal(looseReleaseGateBody.validationReport.metrics.authModelDocumented, false);
       assert.equal(looseReleaseGateBody.validationReport.metrics.costEstimateAccepted, false);
       assert.equal(looseReleaseGateBody.validationReport.metrics.explicitConsentRecorded, false);
@@ -3459,6 +3491,14 @@ test('GPACK-154/155/156/158/159/160 release APIs can return ready evidence and i
       assert.equal(looseToolReleaseGateBody.data.validationReport.metrics.persistencePackIdMatches, true);
       assert.equal(looseToolReleaseGateBody.data.validationReport.metrics.missingAssetCount, 0);
       assert.equal(looseToolReleaseGateBody.data.validationReport.metrics.replayabilityPromptCount, looseToolReleaseGateBody.data.releaseGate.metrics.replayabilityPromptCount);
+      assert.equal(looseToolReleaseGateBody.data.validationReport.metrics.approvalEvidenceSchemaErrorCount, looseToolReleaseGateBody.data.releaseGate.metrics.approvalEvidenceSchemaErrorCount);
+      assert.equal(looseToolReleaseGateBody.data.validationReport.metrics.approvalEvidenceSecretLikeCount, looseToolReleaseGateBody.data.releaseGate.metrics.approvalEvidenceSecretLikeCount);
+      assert.equal(looseToolReleaseGateBody.data.validationReport.metrics.approvalEvidenceRawInstructionCount, looseToolReleaseGateBody.data.releaseGate.metrics.approvalEvidenceRawInstructionCount);
+      assert.equal(looseToolReleaseGateBody.data.validationReport.metrics.candidateReviewManifestSchemaErrorCount, looseToolReleaseGateBody.data.releaseGate.metrics.candidateReviewManifestSchemaErrorCount);
+      assert.equal(looseToolReleaseGateBody.data.validationReport.metrics.candidateReviewManifestSecretLikeCount, looseToolReleaseGateBody.data.releaseGate.metrics.candidateReviewManifestSecretLikeCount);
+      assert.equal(looseToolReleaseGateBody.data.validationReport.metrics.candidateReviewManifestRawInstructionCount, looseToolReleaseGateBody.data.releaseGate.metrics.candidateReviewManifestRawInstructionCount);
+      assert.equal(looseToolReleaseGateBody.data.validationReport.metrics.candidateReviewExpectedTargetCount, looseToolReleaseGateBody.data.releaseGate.metrics.candidateReviewExpectedTargetCount);
+      assert.equal(looseToolReleaseGateBody.data.validationReport.metrics.candidateReviewCoverageCount, looseToolReleaseGateBody.data.releaseGate.metrics.candidateReviewCoverageCount);
       assert.equal(looseToolReleaseGateBody.data.validationReport.metrics.authModelDocumented, false);
       assert.equal(looseToolReleaseGateBody.data.validationReport.metrics.costEstimateAccepted, false);
       assert.equal(looseToolReleaseGateBody.data.validationReport.metrics.explicitConsentRecorded, false);

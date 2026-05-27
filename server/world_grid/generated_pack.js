@@ -5073,6 +5073,14 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
       persistencePackIdMatches: gate?.metrics?.persistencePackIdMatches === true,
       missingAssetCount: Number(gate?.metrics?.missingAssetCount || 0),
       replayabilityPromptCount: Number(gate?.metrics?.replayabilityPromptCount || 0),
+      approvalEvidenceSchemaErrorCount: Number(approvalEvidenceReport.metrics.schemaErrorCount || 0),
+      approvalEvidenceSecretLikeCount: Number(approvalEvidenceReport.metrics.secretLikePathCount || 0),
+      approvalEvidenceRawInstructionCount: Number(approvalEvidenceReport.metrics.rawInstructionPathCount || 0),
+      candidateReviewManifestSchemaErrorCount: Number(gate?.metrics?.candidateReviewManifestSchemaErrorCount || 0),
+      candidateReviewManifestSecretLikeCount: Number(gate?.metrics?.candidateReviewManifestSecretLikeCount || 0),
+      candidateReviewManifestRawInstructionCount: Number(gate?.metrics?.candidateReviewManifestRawInstructionCount || 0),
+      candidateReviewExpectedTargetCount: Number(gate?.metrics?.candidateReviewExpectedTargetCount || 0),
+      candidateReviewCoverageCount: Number(gate?.metrics?.candidateReviewCoverageCount || 0),
       authModelDocumented: approvals.authModelDocumented === true,
       costEstimateAccepted: approvals.costEstimateAccepted === true,
       explicitConsentRecorded: approvals.explicitConsentRecorded === true,
@@ -5096,8 +5104,7 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
       normalGameplayVisibilityChanged,
       generatedPackDefaultExposure,
       boundaryPreserved,
-      approvalEvidenceOk: approvalEvidenceReport.ok === true,
-      approvalEvidenceSecretLikeCount: Number(approvalEvidenceReport.metrics.secretLikePathCount || 0)
+      approvalEvidenceOk: approvalEvidenceReport.ok === true
     }
   };
 }
