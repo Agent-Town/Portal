@@ -9,6 +9,7 @@ Runtime contracts:
 - `server/world_civilization/readiness_gate.js`
 - `server/world_civilization/blocker_exception_register.js`
 - `server/world_civilization/release_observability.js`
+- `server/world_civilization/release_support.js`
 - `server/world_civilization/controlled_release.js`
 - `server/world_civilization/controlled_release_targets.js`
 
@@ -47,7 +48,10 @@ release or enabling production.
   privacy-safe audit metrics, redacted Worker Traffic traces, error alert
   owners, feature flag dashboard ownership, runtime tool absence monitoring,
   support escalation links, and post-release review.
-- Support runbook.
+- Support runbook through the release support runbook, including known issues,
+  support triage, incident response, approved user comms, rollback contact,
+  support on-call, escalation owners, privacy-safe support views, blocker
+  register links, and observability links.
 - Release blocker clearance through the blocker/exception register, including
   P0/P1 clearance, no expired exceptions, owner/expiry/mitigation records,
   security dependency review, QA signoff, product signoff, and private-data

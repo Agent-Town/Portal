@@ -166,6 +166,13 @@ are present.
   observability handoff, release observability handoff, blocker/exception
   register, go/no-go record, post-release monitoring, and product signoff
   target gate.
+- Release support runbook: `server/world_civilization/release_support.js` and
+  `tests/world_civilization_release_support.test.js` record the research-only
+  support handoff for known issues, triage, incident response, approved user
+  comms, rollback contact, support on-call, escalation owners, privacy-safe
+  support views, blocker register links, and observability links while opening
+  no support queue, publishing no comms, triggering no rollback, exposing no
+  runtime civic tools, and applying no world mutation.
 - Release observability handoff: `server/world_civilization/release_observability.js`
   and `tests/world_civilization_release_observability.test.js` record the
   research-only target for privacy-safe audit metrics, redacted Worker Traffic

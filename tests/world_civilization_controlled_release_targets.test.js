@@ -52,6 +52,10 @@ test('V6 controlled release targets name every launch control surface', () => {
     'server/world_civilization/release_observability.js'
   );
   assert.ok(matrix.targetKeys.includes('support_runbook'));
+  assert.equal(
+    V6_CONTROLLED_RELEASE_TARGETS.find((target) => target.key === 'support_runbook').currentEvidence,
+    'server/world_civilization/release_support.js'
+  );
   assert.ok(matrix.targetKeys.includes('blocker_clearance'));
   assert.ok(matrix.targetKeys.includes('controlled_release_window'));
   assert.ok(matrix.targetKeys.includes('emergency_disable'));

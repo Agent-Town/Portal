@@ -79,14 +79,14 @@ const V6_PRODUCT_SIGNOFF_TARGETS = [
     key: 'support_runbook',
     surface: 'support_and_incident_response',
     requiredEvidence: 'Support must have triage, known issues, incident response, escalation owners, and rollback contact paths.',
-    currentEvidence: 'docs/ops/V6_AGENT_CIVILIZATION_CONTROLLED_RELEASE_RUNBOOK.md',
+    currentEvidence: 'server/world_civilization/release_support.js',
     releaseEvidenceRequired: 'support_oncall_signoff'
   },
   {
     key: 'user_comms_plan',
     surface: 'release_communications',
     requiredEvidence: 'User communication plan must be approved without exposing debug, provider, private-town, or internal research details.',
-    currentEvidence: 'docs/security/PUBLIC_TEXT_RENDERING_POLICY.md',
+    currentEvidence: 'server/world_civilization/release_support.js',
     releaseEvidenceRequired: 'approved_user_comms_plan'
   },
   {

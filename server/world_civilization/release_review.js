@@ -645,9 +645,11 @@ const REQUIRED_REVIEW_GATES = [
       'server/world_civilization/blocker_exception_register.js',
       'server/world_civilization/product_signoff_targets.js',
       'server/world_civilization/release_observability.js',
+      'server/world_civilization/release_support.js',
       'tests/world_civilization_blocker_exception_register.test.js',
       'tests/world_civilization_product_signoff_targets.test.js',
-      'tests/world_civilization_release_observability.test.js'
+      'tests/world_civilization_release_observability.test.js',
+      'tests/world_civilization_release_support.test.js'
     ],
     requiredChecks: [
       'player_visible_scope',
@@ -658,6 +660,7 @@ const REQUIRED_REVIEW_GATES = [
       'rollback_plan',
       'disable_plan',
       'support_runbook',
+      'release_support_runbook',
       'user_comms_plan',
       'observability_handoff',
       'release_observability_handoff',

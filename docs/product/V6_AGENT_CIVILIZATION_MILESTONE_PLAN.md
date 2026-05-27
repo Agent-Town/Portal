@@ -61,6 +61,11 @@ Until every prerequisite below is met:
 - `server/world_civilization/release_observability.js` is the research-only
   release observability handoff target for privacy-safe audit metrics, redacted
   Worker Traffic traces, feature flag dashboard ownership, runtime tool absence monitoring, support escalation links, and post-release review.
+- `server/world_civilization/release_support.js` is the research-only release
+  support runbook target for known issues, support triage, incident response,
+  support on-call, rollback contacts, privacy-safe support views, blocker
+  register links, observability links, and approved user comms while opening no
+  support queue and publishing no communications.
 
 ## Immediate Working Order
 

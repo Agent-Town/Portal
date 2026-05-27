@@ -133,9 +133,11 @@ test('V6 release review requires product signoff target gate evidence', () => {
   assert.ok(productGate.requiredArtifacts.includes('server/world_civilization/blocker_exception_register.js'));
   assert.ok(productGate.requiredArtifacts.includes('server/world_civilization/product_signoff_targets.js'));
   assert.ok(productGate.requiredArtifacts.includes('server/world_civilization/release_observability.js'));
+  assert.ok(productGate.requiredArtifacts.includes('server/world_civilization/release_support.js'));
   assert.ok(productGate.requiredArtifacts.includes('tests/world_civilization_blocker_exception_register.test.js'));
   assert.ok(productGate.requiredArtifacts.includes('tests/world_civilization_product_signoff_targets.test.js'));
   assert.ok(productGate.requiredArtifacts.includes('tests/world_civilization_release_observability.test.js'));
+  assert.ok(productGate.requiredArtifacts.includes('tests/world_civilization_release_support.test.js'));
   assert.ok(productGate.requiredChecks.includes('player_visible_scope'));
   assert.ok(productGate.requiredChecks.includes('normal_gameplay_exposure_denial'));
   assert.ok(productGate.requiredChecks.includes('product_owner_approval'));
@@ -144,6 +146,7 @@ test('V6 release review requires product signoff target gate evidence', () => {
   assert.ok(productGate.requiredChecks.includes('rollback_plan'));
   assert.ok(productGate.requiredChecks.includes('disable_plan'));
   assert.ok(productGate.requiredChecks.includes('support_runbook'));
+  assert.ok(productGate.requiredChecks.includes('release_support_runbook'));
   assert.ok(productGate.requiredChecks.includes('user_comms_plan'));
   assert.ok(productGate.requiredChecks.includes('observability_handoff'));
   assert.ok(productGate.requiredChecks.includes('release_observability_handoff'));

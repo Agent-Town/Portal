@@ -9,6 +9,8 @@ const BLOCKER_EXCEPTION_REGISTER_ARTIFACT = 'server/world_civilization/blocker_e
 const BLOCKER_EXCEPTION_REGISTER_TEST = 'tests/world_civilization_blocker_exception_register.test.js';
 const RELEASE_OBSERVABILITY_ARTIFACT = 'server/world_civilization/release_observability.js';
 const RELEASE_OBSERVABILITY_TEST = 'tests/world_civilization_release_observability.test.js';
+const RELEASE_SUPPORT_ARTIFACT = 'server/world_civilization/release_support.js';
+const RELEASE_SUPPORT_TEST = 'tests/world_civilization_release_support.test.js';
 const CONTROLLED_RELEASE_TARGET_ARTIFACT = 'server/world_civilization/controlled_release_targets.js';
 const CONTROLLED_RELEASE_TARGET_TEST = 'tests/world_civilization_controlled_release_targets.test.js';
 
@@ -43,6 +45,8 @@ const REQUIRED_CONTROLLED_RELEASE_GATES = [
       BLOCKER_EXCEPTION_REGISTER_TEST,
       RELEASE_OBSERVABILITY_ARTIFACT,
       RELEASE_OBSERVABILITY_TEST,
+      RELEASE_SUPPORT_ARTIFACT,
+      RELEASE_SUPPORT_TEST,
       CONTROLLED_RELEASE_TARGET_ARTIFACT,
       CONTROLLED_RELEASE_TARGET_TEST
     ],
@@ -102,8 +106,20 @@ const REQUIRED_CONTROLLED_RELEASE_GATES = [
   {
     key: 'support_runbook',
     label: 'Support runbook',
-    requiredArtifacts: [CONTROLLED_RELEASE_RUNBOOK],
-    requiredChecks: ['known_issues', 'support_triage', 'incident_response', 'user_comms', 'rollback_contact']
+    requiredArtifacts: [CONTROLLED_RELEASE_RUNBOOK, RELEASE_SUPPORT_ARTIFACT, RELEASE_SUPPORT_TEST],
+    requiredChecks: [
+      'release_support_runbook',
+      'known_issues',
+      'support_triage',
+      'incident_response',
+      'user_comms',
+      'rollback_contact',
+      'support_oncall',
+      'escalation_owners',
+      'privacy_safe_support_view',
+      'blocker_register_link',
+      'observability_link'
+    ]
   },
   {
     key: 'blocker_clearance',
@@ -338,6 +354,8 @@ module.exports = {
   BLOCKER_EXCEPTION_REGISTER_TEST,
   RELEASE_OBSERVABILITY_ARTIFACT,
   RELEASE_OBSERVABILITY_TEST,
+  RELEASE_SUPPORT_ARTIFACT,
+  RELEASE_SUPPORT_TEST,
   CONTROLLED_RELEASE_TARGET_ARTIFACT,
   CONTROLLED_RELEASE_TARGET_TEST,
   CONTROLLED_RELEASE_RUNBOOK,

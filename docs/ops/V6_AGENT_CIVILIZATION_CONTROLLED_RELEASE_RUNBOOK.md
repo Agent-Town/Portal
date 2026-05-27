@@ -10,6 +10,8 @@ Blocker register: `server/world_civilization/blocker_exception_register.js`
 
 Observability handoff: `server/world_civilization/release_observability.js`
 
+Support runbook handoff: `server/world_civilization/release_support.js`
+
 Readiness gate source: `server/world_civilization/readiness_gate.js`
 
 Milestone: M18 V6 controlled release completion
@@ -21,12 +23,12 @@ production enablement switch and does not approve player-visible V6.
 
 | Gate | Required Checks | Current Status |
 | --- | --- | --- |
-| Controlled release target gate | Readiness gate closed target, production flag safety target, rollback/disable target, observability target, release observability handoff, support runbook target, blocker clearance target, blocker/exception register, controlled release window target, canary exit target, emergency disable target, post-release verification target | Pending |
+| Controlled release target gate | Readiness gate closed target, production flag safety target, rollback/disable target, observability target, release observability handoff, support runbook target, release support runbook, blocker clearance target, blocker/exception register, controlled release window target, canary exit target, emergency disable target, post-release verification target | Pending |
 | V6 readiness gate closed | M0-M17 done, explicit closed V6.0 readiness-gate report from `buildV6ReadinessGateReport()`, readiness report hidden until controlled release, readiness audit-summary proof, release review ready | Pending |
 | Production feature flag safety | Default off, admin-only enablement, broad override exclusion, canary cohort, emergency disable | Pending |
 | Rollback and disable controls | Disable plan, rollback owner, rollback rehearsal, data preservation, post-disable verification | Pending |
 | Release observability | Audit metrics, Worker Traffic trace, error alerts, privacy-safe logs, feature flag dashboard, monitoring owner, runtime tool absence monitor, support escalation link | Pending |
-| Support runbook | Known issues, support triage, incident response, user communications, rollback contact | Pending |
+| Support runbook | Known issues, support triage, incident response, user communications, rollback contact, support on-call, escalation owners, privacy-safe support view, blocker register link, observability link | Pending |
 | Release blocker clearance | Blocker/exception register, no P0 blockers, no P1 blockers, no expired exceptions, exception owner/expiry/mitigation, security dependency review, QA signoff, product signoff | Pending |
 | Controlled release window | Release window, canary exit criteria, rollback window, monitoring owner, go/no-go record | Pending |
 

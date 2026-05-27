@@ -56,7 +56,7 @@ const V6_CONTROLLED_RELEASE_TARGETS = [
     key: 'support_runbook',
     surface: 'support_and_incident_response',
     requiredEvidence: 'Support needs known issues, triage path, incident response, user comms, and rollback contact coverage.',
-    currentEvidence: 'docs/ops/V6_AGENT_CIVILIZATION_CONTROLLED_RELEASE_RUNBOOK.md',
+    currentEvidence: 'server/world_civilization/release_support.js',
     releaseEvidenceRequired: 'support_runbook_signoff'
   },
   {
