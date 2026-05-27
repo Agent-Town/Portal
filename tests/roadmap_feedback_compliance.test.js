@@ -248,6 +248,9 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(proposalSource, /afterSummary/);
   assert.match(plan, /M8 Vote authorization and delegation \| `in_progress`/);
   assert.match(plan, /evaluateVoteApprovalPolicy\(\)/);
+  assert.match(plan, /buildV6VoteRouteAuthorizationEnvelope\(\)/);
+  assert.match(plan, /non-recording route-edge guard/);
+  assert.match(plan, /M5 mutation-security envelope/);
   assert.match(plan, /vote\.recorded` audit rows with privacy-safe before\/after summaries/);
   assert.match(plan, /buildV6VoteAuthorizationReadinessGate\(\)/);
   assert.match(plan, /route-edge vote auth/);
@@ -260,6 +263,10 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(gate, /appliesVoteOutcome: false/);
   assert.match(gate, /per-institution voting templates/);
   assert.match(voteSpec, /privacy-safe before\/after summary/);
+  assert.match(voteSpec, /Route-Edge Authorization Envelope/);
+  assert.match(voteSpec, /buildV6VoteRouteAuthorizationEnvelope\(\)/);
+  assert.match(voteSpec, /assertV6VoteRouteAuthorizationEnvelopeSafe\(\)/);
+  assert.match(voteSpec, /store-backed `vote_advice` delegation proof/);
   assert.match(releaseReview, /Vote authorization readiness review/);
   assert.match(releaseReview, /vote authorization readiness gate/);
   assert.match(readinessSource, /vote_authorization_readiness_gate/);
@@ -728,7 +735,9 @@ test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () 
   assert.match(proposalSpec, /`ready_for_vote`/);
   assert.match(proposalSpec, /`proposal\.reviewed`/);
   assert.match(voteSpec, /Approval Policy Rules/);
+  assert.match(voteSpec, /Route-Edge Authorization Envelope/);
   assert.match(voteSpec, /buildV6VoteAuthorizationReadinessGate\(\)/);
+  assert.match(voteSpec, /ready_for_vote/);
   assert.match(voteSpec, /delegated_agent_vote_route/);
   assert.match(voteSpec, /quorumMinVotes/);
   assert.match(voteSpec, /approvalThresholdBps/);
@@ -765,6 +774,7 @@ test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () 
   assert.match(releaseReview, /governance preflight coverage/);
   assert.match(releaseReview, /Vote authorization readiness review/);
   assert.match(releaseReview, /route-edge vote auth/);
+  assert.match(releaseReview, /route-edge authorization envelope/);
   assert.match(releaseReview, /Effect execution and rollback review/);
   assert.match(releaseReview, /effect execution gate/);
   assert.match(releaseReview, /Agent participation enforcement review/);
@@ -772,6 +782,9 @@ test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () 
   assert.match(skillLine, /V6 internal proposal lifecycle foundation/);
   assert.match(skillLine, /V6 vote authorization foundation/);
   assert.match(skillLine, /M8 readiness gate/);
+  assert.match(skillLine, /buildV6VoteRouteAuthorizationEnvelope\(\)/);
+  assert.match(skillLine, /non-recording route-edge guard/);
+  assert.match(skillLine, /store-backed `vote_advice` delegation proof/);
   assert.match(skillLine, /M11 effect execution gate/);
   assert.match(skillLine, /applied\/rollback audit evidence/);
   assert.match(skillLine, /M12 enforcement gate/);
@@ -780,7 +793,12 @@ test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () 
   assert.match(skillLine, /tests\/world_civilization_votes\.test\.js/);
   assert.match(skillLine, /tests\/world_civilization_governance_preflight\.test\.js/);
   assert.match(voteSource, /REQUIRED_VOTE_ROUTE_SURFACES/);
+  assert.match(voteSource, /REQUIRED_VOTE_ROUTE_AUTHORIZATION_CHECKS/);
+  assert.match(voteSource, /V6_VOTE_ROUTE_AUTHORIZATION_VERSION/);
+  assert.match(voteSource, /buildV6VoteRouteAuthorizationEnvelope/);
+  assert.match(voteSource, /assertV6VoteRouteAuthorizationEnvelopeSafe/);
   assert.match(voteSource, /human_vote_route/);
+  assert.match(voteSource, /worker_tool_vote_surface/);
   assert.match(voteSource, /V6_VOTE_AUTHORIZATION_READINESS_OUTCOME_APPLICATION_FORBIDDEN/);
   assert.match(effectSource, /REQUIRED_EFFECT_EXECUTION_EVIDENCE_CHECKS/);
   assert.match(effectSource, /irreversible_action_review/);

@@ -61,6 +61,33 @@ vote, more approvals than rejections, an explicit vote approval policy that
 passes quorum/threshold checks, and an execution-authority receipt that matches
 an approving vote.
 
+## Route-Edge Authorization Envelope
+
+`buildV6VoteRouteAuthorizationEnvelope()` is the current non-executing route-edge
+guard for future V6 vote routes and worker tool surfaces. It does not record a
+vote, publish a route, expose runtime tools, apply vote outcomes, or mutate world
+state.
+
+The envelope is available only with explicit V6 research opt-in plus
+`FEATURE_WORLD_V60_AGENT_CIVILIZATION`. It composes:
+
+- the M5 civic mutation-security envelope;
+- supported route surfaces: `human_vote_route`, `delegated_agent_vote_route`,
+  and `worker_tool_vote_surface`;
+- `validateCivicVote`;
+- an existing proposal that has reached `ready_for_vote`;
+- proposal expiry denial;
+- route-specific authorization kind checks;
+- human actor binding for human vote routes;
+- store-backed `vote_advice` delegation proof for delegated agent and worker
+  tool vote surfaces;
+- eligibility proof; and
+- a hard non-recording, no-effect-application boundary.
+
+`assertV6VoteRouteAuthorizationEnvelopeSafe()` fails closed if the envelope ever
+claims runtime exposure, player visibility, vote recording, world mutation,
+private-data exposure, outcome application, or executable behavior.
+
 ## M8 Readiness Gate
 
 `buildV6VoteAuthorizationReadinessGate()` records the non-executing M8 vote

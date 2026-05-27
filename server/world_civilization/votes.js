@@ -4,6 +4,11 @@ const { DatabaseSync } = require('node:sqlite');
 
 const { V6_WORLD_FEATURE_FLAG, isWorldGridFeatureEnabled } = require('../world_grid/feature_flags');
 const { createCivicAuditLedger, sha256, stableJson } = require('./audit_ledger');
+const {
+  V6_CIVIC_MUTATION_SECURITY_VERSION,
+  assertV6CivicMutationSecuritySafe
+} = require('./mutation_security');
+const { PROPOSAL_STATUS_READY_FOR_VOTE } = require('./proposals');
 const { validateCivicVote } = require('./schemas');
 const {
   ensureCivicSqliteSchemaMetadata,
@@ -13,6 +18,7 @@ const {
 const MIGRATION_VERSION = 'v1';
 const STORE_KEY = 'votes';
 const V6_VOTE_AUTHORIZATION_READINESS_GATE_VERSION = 'agent-town.v6.vote_authorization_readiness.v1';
+const V6_VOTE_ROUTE_AUTHORIZATION_VERSION = 'agent-town.v6.vote_route_authorization.v1';
 const DEFAULT_VOTE_APPROVAL_POLICY = Object.freeze({
   policyId: 'policy_v6_simple_majority_v1',
   quorumMinVotes: 1,
@@ -52,6 +58,40 @@ const REQUIRED_VOTE_ROUTE_SURFACES = [
   'delegated_agent_vote_route',
   'worker_tool_vote_surface'
 ];
+const REQUIRED_VOTE_ROUTE_AUTHORIZATION_CHECKS = [
+  'feature_flag',
+  'research_opt_in',
+  'route_surface',
+  'vote_payload',
+  'mutation_security',
+  'proposal_exists',
+  'proposal_ready_for_vote',
+  'voter_authorization',
+  'eligibility',
+  'route_actor_binding',
+  'no_runtime_exposure',
+  'no_effect_application'
+];
+const VOTE_ROUTE_SURFACE_RULES = Object.freeze({
+  human_vote_route: Object.freeze({
+    routeSurface: 'human_vote_route',
+    actorKind: 'human',
+    authorizationKind: 'wallet_session',
+    requiredDelegationScope: ''
+  }),
+  delegated_agent_vote_route: Object.freeze({
+    routeSurface: 'delegated_agent_vote_route',
+    actorKind: 'agent',
+    authorizationKind: 'server_attested_delegation',
+    requiredDelegationScope: 'vote_advice'
+  }),
+  worker_tool_vote_surface: Object.freeze({
+    routeSurface: 'worker_tool_vote_surface',
+    actorKind: 'agent',
+    authorizationKind: 'server_attested_delegation',
+    requiredDelegationScope: 'vote_advice'
+  })
+});
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -63,6 +103,227 @@ function normalizeList(value) {
 
 function check(key, ok, error = '') {
   return { key, ok: ok === true, error: ok === true ? '' : error };
+}
+
+function disabledVoteRouteAuthorizationEnvelope({ source, routeSurface, reason }) {
+  return {
+    version: V6_VOTE_ROUTE_AUTHORIZATION_VERSION,
+    status: 'research_only',
+    source,
+    featureFlag: V6_WORLD_FEATURE_FLAG,
+    available: false,
+    authorized: false,
+    failClosed: true,
+    runtimeExposed: false,
+    playerVisible: false,
+    normalGameplayExposure: false,
+    recordsVote: false,
+    appliesVoteOutcome: false,
+    mutatesWorldState: false,
+    exposesPrivateData: false,
+    executionStatus: 'not_executable',
+    routeSurface: String(routeSurface || ''),
+    voteId: '',
+    proposalId: '',
+    voterAccountId: '',
+    proposalStatus: '',
+    mutationSecurity: null,
+    checks: [],
+    errors: [reason],
+    disabledReason: reason
+  };
+}
+
+function mutationSecurityEnvelopeOk(mutationSecurityEnvelope = null, vote = null, routeSurface = '') {
+  if (!mutationSecurityEnvelope || typeof mutationSecurityEnvelope !== 'object') {
+    return { ok: false, errors: ['MUTATION_SECURITY_ENVELOPE_REQUIRED'] };
+  }
+  const safety = assertV6CivicMutationSecuritySafe(mutationSecurityEnvelope);
+  const errors = [...(safety.errors || [])];
+  if (safety.ok !== true) errors.push('MUTATION_SECURITY_ENVELOPE_UNSAFE');
+  if (mutationSecurityEnvelope.version !== V6_CIVIC_MUTATION_SECURITY_VERSION) {
+    errors.push('MUTATION_SECURITY_VERSION_REQUIRED');
+  }
+  if (mutationSecurityEnvelope.allowed !== true) errors.push('MUTATION_SECURITY_ALLOWED_REQUIRED');
+  if (mutationSecurityEnvelope.available !== true) errors.push('MUTATION_SECURITY_AVAILABLE_REQUIRED');
+  if (mutationSecurityEnvelope.mutationApplied !== false) errors.push('MUTATION_SECURITY_NON_MUTATING_REQUIRED');
+  if (mutationSecurityEnvelope.executionStatus !== 'not_executable') errors.push('MUTATION_SECURITY_NON_EXECUTING_REQUIRED');
+  if (String(mutationSecurityEnvelope.surface || '') !== String(routeSurface || '')) {
+    errors.push('MUTATION_SECURITY_SURFACE_MISMATCH');
+  }
+  if (vote) {
+    if (String(mutationSecurityEnvelope.idempotencyKey || '') !== String(vote.idempotencyKey || '')) {
+      errors.push('MUTATION_SECURITY_IDEMPOTENCY_MISMATCH');
+    }
+    if (String(mutationSecurityEnvelope.ownerAccountId || '') !== String(vote.voter?.accountId || '')) {
+      errors.push('MUTATION_SECURITY_OWNER_MISMATCH');
+    }
+    if (String(mutationSecurityEnvelope.sessionAccountId || '') !== String(vote.voter?.accountId || '')) {
+      errors.push('MUTATION_SECURITY_SESSION_MISMATCH');
+    }
+  }
+  return {
+    ok: errors.length === 0,
+    errors
+  };
+}
+
+function routeActorBindingOk({ mutationSecurityEnvelope = null, vote = null, routeRule = null } = {}) {
+  if (!mutationSecurityEnvelope || !vote || !routeRule) return false;
+  const actor = mutationSecurityEnvelope.actor || {};
+  if (routeRule.actorKind === 'human') {
+    return actor.kind === 'human'
+      && String(actor.accountId || '') === String(vote.voter?.accountId || '');
+  }
+  if (routeRule.actorKind === 'agent') {
+    const proof = mutationSecurityEnvelope.delegationProof || {};
+    return actor.kind === 'agent'
+      && proof.proofStatus === 'valid'
+      && proof.requiredScope === routeRule.requiredDelegationScope
+      && String(proof.principalAccountId || '') === String(vote.voter?.accountId || '');
+  }
+  return false;
+}
+
+function buildV6VoteRouteAuthorizationEnvelope({
+  featureFlags = {},
+  includeResearchVoteRouteAuth = false,
+  source = 'runtime',
+  routeSurface = '',
+  rawVote = {},
+  proposalStore = null,
+  mutationSecurityEnvelope = null,
+  nowMs = Date.now()
+} = {}) {
+  const featureEnabled = isWorldGridFeatureEnabled(featureFlags, V6_WORLD_FEATURE_FLAG);
+  const normalizedRouteSurface = String(routeSurface || '').trim();
+  if (!featureEnabled || includeResearchVoteRouteAuth !== true) {
+    return disabledVoteRouteAuthorizationEnvelope({
+      source,
+      routeSurface: normalizedRouteSurface,
+      reason: 'V6 vote route authorization requires explicit research opt-in and V6 feature flag'
+    });
+  }
+
+  const validation = validateCivicVote(rawVote);
+  const vote = validation.value;
+  const routeRule = VOTE_ROUTE_SURFACE_RULES[normalizedRouteSurface] || null;
+  const proposal = vote && proposalStore && typeof proposalStore.getProposal === 'function'
+    ? proposalStore.getProposal(vote.proposalId)
+    : null;
+  const proposalReadyForVote = proposal?.status === PROPOSAL_STATUS_READY_FOR_VOTE;
+  const proposalActive = proposal && proposal.expiresAtMs > nowMs;
+  const mutationSecurity = mutationSecurityEnvelopeOk(mutationSecurityEnvelope, vote, normalizedRouteSurface);
+  const voterAuthorizationOk = Boolean(vote)
+    && vote.authorization?.serverVerified === true
+    && vote.authorization?.kind === routeRule?.authorizationKind
+    && vote.authorization?.subjectAccountId === vote.voter?.accountId;
+  const eligibilityOk = Boolean(vote?.eligibilityProof?.eligible === true && vote.eligibilityProof.ruleId);
+  const routeActorOk = routeActorBindingOk({ mutationSecurityEnvelope, vote, routeRule });
+  const checks = [
+    check('feature_flag', featureEnabled, 'FEATURE_DISABLED'),
+    check('research_opt_in', includeResearchVoteRouteAuth === true, 'RESEARCH_OPT_IN_REQUIRED'),
+    check('route_surface', Boolean(routeRule), 'VOTE_ROUTE_SURFACE_UNSUPPORTED'),
+    check('vote_payload', validation.ok, 'CIVIC_VOTE_INVALID'),
+    check('mutation_security', mutationSecurity.ok, mutationSecurity.errors[0] || 'MUTATION_SECURITY_REQUIRED'),
+    check('proposal_exists', Boolean(proposal), 'CIVIC_VOTE_PROPOSAL_REQUIRED'),
+    check('proposal_ready_for_vote', proposalReadyForVote && proposalActive, 'CIVIC_VOTE_PROPOSAL_NOT_READY'),
+    check('voter_authorization', voterAuthorizationOk, 'VOTE_AUTHORIZATION_ROUTE_MISMATCH'),
+    check('eligibility', eligibilityOk, 'VOTE_ELIGIBILITY_REQUIRED'),
+    check('route_actor_binding', routeActorOk, 'VOTE_ROUTE_ACTOR_BINDING_REQUIRED'),
+    check('no_runtime_exposure', true, ''),
+    check('no_effect_application', true, '')
+  ];
+  const authorized = checks.every((entry) => entry.ok);
+  return {
+    version: V6_VOTE_ROUTE_AUTHORIZATION_VERSION,
+    status: 'research_only',
+    source,
+    featureFlag: V6_WORLD_FEATURE_FLAG,
+    available: true,
+    authorized,
+    failClosed: authorized !== true,
+    runtimeExposed: false,
+    playerVisible: false,
+    normalGameplayExposure: false,
+    recordsVote: false,
+    appliesVoteOutcome: false,
+    mutatesWorldState: false,
+    exposesPrivateData: false,
+    executionStatus: 'not_executable',
+    routeSurface: normalizedRouteSurface,
+    routeRule: routeRule ? clone(routeRule) : null,
+    voteId: String(vote?.voteId || ''),
+    proposalId: String(vote?.proposalId || ''),
+    voterAccountId: String(vote?.voter?.accountId || ''),
+    proposalStatus: String(proposal?.status || ''),
+    proposalExpiresAtMs: proposal ? Number(proposal.expiresAtMs || 0) : 0,
+    mutationSecurity: {
+      ok: mutationSecurity.ok,
+      errors: mutationSecurity.errors,
+      surface: String(mutationSecurityEnvelope?.surface || ''),
+      actorKind: String(mutationSecurityEnvelope?.actor?.kind || ''),
+      delegationProofStatus: String(mutationSecurityEnvelope?.delegationProof?.proofStatus || '')
+    },
+    checks,
+    errors: checks.filter((entry) => !entry.ok).map((entry) => entry.error)
+  };
+}
+
+function assertV6VoteRouteAuthorizationEnvelopeSafe(report = {}) {
+  const errors = [];
+  if (report.version !== V6_VOTE_ROUTE_AUTHORIZATION_VERSION) {
+    errors.push('V6_VOTE_ROUTE_AUTHORIZATION_VERSION_REQUIRED');
+  }
+  if (report.featureFlag !== V6_WORLD_FEATURE_FLAG) {
+    errors.push('V6_VOTE_ROUTE_AUTHORIZATION_FEATURE_FLAG_REQUIRED');
+  }
+  if (report.status !== 'research_only') {
+    errors.push('V6_VOTE_ROUTE_AUTHORIZATION_RESEARCH_ONLY_REQUIRED');
+  }
+  if (report.runtimeExposed !== false) {
+    errors.push('V6_VOTE_ROUTE_AUTHORIZATION_RUNTIME_HIDDEN_REQUIRED');
+  }
+  if (report.playerVisible !== false) {
+    errors.push('V6_VOTE_ROUTE_AUTHORIZATION_PLAYER_HIDDEN_REQUIRED');
+  }
+  if (report.normalGameplayExposure !== false) {
+    errors.push('V6_VOTE_ROUTE_AUTHORIZATION_NORMAL_GAMEPLAY_FORBIDDEN');
+  }
+  if (report.recordsVote !== false) {
+    errors.push('V6_VOTE_ROUTE_AUTHORIZATION_RECORDING_FORBIDDEN');
+  }
+  if (report.appliesVoteOutcome !== false) {
+    errors.push('V6_VOTE_ROUTE_AUTHORIZATION_OUTCOME_APPLICATION_FORBIDDEN');
+  }
+  if (report.mutatesWorldState !== false) {
+    errors.push('V6_VOTE_ROUTE_AUTHORIZATION_WORLD_MUTATION_FORBIDDEN');
+  }
+  if (report.exposesPrivateData !== false) {
+    errors.push('V6_VOTE_ROUTE_AUTHORIZATION_PRIVATE_DATA_FORBIDDEN');
+  }
+  if (report.executionStatus !== 'not_executable') {
+    errors.push('V6_VOTE_ROUTE_AUTHORIZATION_NON_EXECUTING_REQUIRED');
+  }
+  if (report.available === true) {
+    const checkKeys = new Set((report.checks || []).map((entry) => entry.key));
+    for (const key of REQUIRED_VOTE_ROUTE_AUTHORIZATION_CHECKS) {
+      if (!checkKeys.has(key)) errors.push(`V6_VOTE_ROUTE_AUTHORIZATION_CHECK_REQUIRED:${key}`);
+    }
+    const failedChecks = (report.checks || []).filter((entry) => entry.ok !== true);
+    if (report.authorized === true && failedChecks.length > 0) {
+      errors.push('V6_VOTE_ROUTE_AUTHORIZATION_ALLOWED_WITH_FAILED_CHECKS');
+    }
+    if (report.authorized !== true && report.failClosed !== true) {
+      errors.push('V6_VOTE_ROUTE_AUTHORIZATION_DENIAL_FAIL_CLOSED_REQUIRED');
+    }
+  } else if (report.failClosed !== true) {
+    errors.push('V6_VOTE_ROUTE_AUTHORIZATION_DISABLED_FAIL_CLOSED_REQUIRED');
+  }
+  return {
+    ok: errors.length === 0,
+    errors
+  };
 }
 
 function inspectVoteAuthorizationReadinessEvidence(evidence = {}) {
@@ -645,9 +906,13 @@ module.exports = {
   DEFAULT_VOTE_APPROVAL_POLICY,
   REQUIRED_VOTE_AUTHORIZATION_EVIDENCE_CHECKS: clone(REQUIRED_VOTE_AUTHORIZATION_EVIDENCE_CHECKS),
   REQUIRED_VOTE_AUTHORIZATION_READINESS_CHECKS: clone(REQUIRED_VOTE_AUTHORIZATION_READINESS_CHECKS),
+  REQUIRED_VOTE_ROUTE_AUTHORIZATION_CHECKS: clone(REQUIRED_VOTE_ROUTE_AUTHORIZATION_CHECKS),
   REQUIRED_VOTE_ROUTE_SURFACES: clone(REQUIRED_VOTE_ROUTE_SURFACES),
   V6_VOTE_AUTHORIZATION_READINESS_GATE_VERSION,
+  V6_VOTE_ROUTE_AUTHORIZATION_VERSION,
+  assertV6VoteRouteAuthorizationEnvelopeSafe,
   assertV6VoteAuthorizationReadinessGateSafe,
+  buildV6VoteRouteAuthorizationEnvelope,
   buildV6VoteAuthorizationReadinessGate,
   createCivicVoteStore,
   evaluateVoteApprovalPolicy,

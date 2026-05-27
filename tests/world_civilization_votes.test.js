@@ -7,13 +7,19 @@ const path = require('node:path');
 const { V6_WORLD_FEATURE_FLAG, parseWorldGridFeatureFlags } = require('../server/world_grid/feature_flags');
 const { CIVIC_SCHEMA_VERSION } = require('../server/world_civilization/schemas');
 const { createCivicAuditLedger } = require('../server/world_civilization/audit_ledger');
+const { createCivicDelegationStore } = require('../server/world_civilization/delegations');
+const { buildV6CivicMutationSecurityEnvelope } = require('../server/world_civilization/mutation_security');
 const { createCivicProposalStore } = require('../server/world_civilization/proposals');
 const {
   DEFAULT_VOTE_APPROVAL_POLICY,
   REQUIRED_VOTE_AUTHORIZATION_EVIDENCE_CHECKS,
   REQUIRED_VOTE_AUTHORIZATION_READINESS_CHECKS,
+  REQUIRED_VOTE_ROUTE_AUTHORIZATION_CHECKS,
   REQUIRED_VOTE_ROUTE_SURFACES,
+  V6_VOTE_ROUTE_AUTHORIZATION_VERSION,
+  assertV6VoteRouteAuthorizationEnvelopeSafe,
   assertV6VoteAuthorizationReadinessGateSafe,
+  buildV6VoteRouteAuthorizationEnvelope,
   buildV6VoteAuthorizationReadinessGate,
   createCivicVoteStore
 } = require('../server/world_civilization/votes');
@@ -21,16 +27,28 @@ const {
 function withTempCivicStores(fn) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-v6-votes-'));
   const auditPath = path.join(dir, 'audit.sqlite');
+  const delegationPath = path.join(dir, 'delegations.sqlite');
   const proposalPath = path.join(dir, 'proposals.sqlite');
   const votePath = path.join(dir, 'votes.sqlite');
   const auditLedger = createCivicAuditLedger({ sqlitePath: auditPath });
+  const delegationStore = createCivicDelegationStore({ sqlitePath: delegationPath, auditLedger });
   const proposalStore = createCivicProposalStore({ sqlitePath: proposalPath, auditLedger });
   const voteStore = createCivicVoteStore({ sqlitePath: votePath, proposalStore, auditLedger });
   try {
-    return fn({ auditLedger, auditPath, proposalPath, proposalStore, votePath, voteStore });
+    return fn({
+      auditLedger,
+      auditPath,
+      delegationPath,
+      delegationStore,
+      proposalPath,
+      proposalStore,
+      votePath,
+      voteStore
+    });
   } finally {
     voteStore.close();
     proposalStore.close();
+    delegationStore.close();
     auditLedger.close();
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -98,6 +116,84 @@ function vote(overrides = {}) {
   };
 }
 
+function moderationDecision(overrides = {}) {
+  return {
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    decisionId: 'moderation_proposal_bridge_001',
+    subjectRef: 'proposal_public_works_bridge_001',
+    surface: 'public_works',
+    status: 'approved',
+    policyVersion: 'policy_v6_public_001',
+    reviewerKind: 'system',
+    reasons: ['Public-safe proposal text.'],
+    redactedFields: [],
+    ...overrides
+  };
+}
+
+function delegation(overrides = {}) {
+  return {
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    delegationId: 'delegation_vote_route_auth_001',
+    principalAccountId: 'acct_v6_voter_001',
+    delegateAgentId: 'agent_civic_clover_001',
+    scope: 'vote_advice',
+    expiresAtMs: 4_102_444_800_000,
+    maxActions: 2,
+    approvalReceiptId: 'receipt_delegate_vote_route_auth_001',
+    revocable: true,
+    canExecuteCivicEffects: false,
+    ...overrides
+  };
+}
+
+function headers(overrides = {}) {
+  return {
+    host: 'portal.local',
+    origin: 'https://portal.local',
+    'sec-fetch-site': 'same-origin',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-dest': 'empty',
+    ...overrides
+  };
+}
+
+function voteMutationSecurityEnvelope(overrides = {}) {
+  const voterAccountId = overrides.voterAccountId || 'acct_v6_voter_001';
+  return buildV6CivicMutationSecurityEnvelope({
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    includeResearchMutation: true,
+    source: 'node_test',
+    headers: headers(),
+    env: {
+      NODE_ENV: 'production',
+      WORLD_GRID_MUTATION_RATE_LIMIT_MAX: '30',
+      WORLD_GRID_MUTATION_RATE_LIMIT_WINDOW_MS: '60000'
+    },
+    session: {
+      authenticated: true,
+      accountId: voterAccountId
+    },
+    wallet: {
+      serverVerified: true,
+      subjectAccountId: voterAccountId,
+      walletAddress: '0x0000000000000000000000000000000000000002'
+    },
+    actor: {
+      kind: 'human',
+      accountId: voterAccountId
+    },
+    owner: {
+      ownerAccountId: voterAccountId
+    },
+    surface: 'human_vote_route',
+    idempotencyKey: 'idem_vote_bridge_001',
+    csrfVerified: true,
+    nowMs: 1_779_784_500_000,
+    ...overrides
+  });
+}
+
 function voteReadinessEvidence(overrides = {}) {
   return {
     status: 'complete',
@@ -117,6 +213,204 @@ function voteReadinessEvidence(overrides = {}) {
     ...overrides
   };
 }
+
+test('V6 vote route authorization envelope is hidden without explicit research opt-in and V6 flag', () => withTempCivicStores(({ proposalStore }) => {
+  proposalStore.draftProposal(proposal(), { nowMs: 1_779_784_000_000 });
+  proposalStore.recordProposalReview(moderationDecision(), { nowMs: 1_779_784_100_000 });
+  const noResearchOptIn = buildV6VoteRouteAuthorizationEnvelope({
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    routeSurface: 'human_vote_route',
+    rawVote: vote(),
+    proposalStore,
+    mutationSecurityEnvelope: voteMutationSecurityEnvelope()
+  });
+  const broadV5Override = buildV6VoteRouteAuthorizationEnvelope({
+    includeResearchVoteRouteAuth: true,
+    featureFlags: parseWorldGridFeatureFlags('all'),
+    routeSurface: 'human_vote_route',
+    rawVote: vote(),
+    proposalStore,
+    mutationSecurityEnvelope: voteMutationSecurityEnvelope()
+  });
+
+  for (const report of [noResearchOptIn, broadV5Override]) {
+    assert.equal(report.version, V6_VOTE_ROUTE_AUTHORIZATION_VERSION);
+    assert.equal(report.available, false);
+    assert.equal(report.authorized, false);
+    assert.equal(report.failClosed, true);
+    assert.equal(report.runtimeExposed, false);
+    assert.equal(report.playerVisible, false);
+    assert.equal(report.normalGameplayExposure, false);
+    assert.equal(report.recordsVote, false);
+    assert.equal(report.appliesVoteOutcome, false);
+    assert.equal(report.mutatesWorldState, false);
+    assert.deepEqual(report.checks, []);
+    assert.deepEqual(assertV6VoteRouteAuthorizationEnvelopeSafe(report), { ok: true, errors: [] });
+  }
+}));
+
+test('V6 vote route authorization envelope authorizes a reviewed human vote without recording it', () => withTempCivicStores(({
+  auditLedger,
+  proposalStore,
+  voteStore
+}) => {
+  proposalStore.draftProposal(proposal(), { nowMs: 1_779_784_000_000 });
+  proposalStore.recordProposalReview(moderationDecision(), { nowMs: 1_779_784_100_000 });
+  const report = buildV6VoteRouteAuthorizationEnvelope({
+    includeResearchVoteRouteAuth: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    source: 'node_test',
+    routeSurface: 'human_vote_route',
+    rawVote: vote(),
+    proposalStore,
+    mutationSecurityEnvelope: voteMutationSecurityEnvelope()
+  });
+
+  assert.equal(report.available, true);
+  assert.equal(report.authorized, true);
+  assert.equal(report.failClosed, false);
+  assert.equal(report.routeSurface, 'human_vote_route');
+  assert.equal(report.proposalStatus, 'ready_for_vote');
+  assert.equal(report.recordsVote, false);
+  assert.equal(report.appliesVoteOutcome, false);
+  assert.equal(report.mutatesWorldState, false);
+  assert.equal(report.executionStatus, 'not_executable');
+  assert.deepEqual(report.checks.map((entry) => entry.key), REQUIRED_VOTE_ROUTE_AUTHORIZATION_CHECKS);
+  assert.ok(report.checks.every((entry) => entry.ok === true));
+  assert.equal(voteStore.count(), 0);
+  assert.equal(auditLedger.replay().filter((row) => row.entry.actionType === 'vote.recorded').length, 0);
+  assert.deepEqual(assertV6VoteRouteAuthorizationEnvelopeSafe(report), { ok: true, errors: [] });
+}));
+
+test('V6 vote route authorization envelope requires reviewed proposals and bound mutation security', () => withTempCivicStores(({
+  proposalStore
+}) => {
+  proposalStore.draftProposal(proposal(), { nowMs: 1_779_784_000_000 });
+  const unreviewed = buildV6VoteRouteAuthorizationEnvelope({
+    includeResearchVoteRouteAuth: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    routeSurface: 'human_vote_route',
+    rawVote: vote(),
+    proposalStore,
+    mutationSecurityEnvelope: voteMutationSecurityEnvelope()
+  });
+  proposalStore.recordProposalReview(moderationDecision(), { nowMs: 1_779_784_100_000 });
+  const mismatchedSecurity = buildV6VoteRouteAuthorizationEnvelope({
+    includeResearchVoteRouteAuth: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    routeSurface: 'human_vote_route',
+    rawVote: vote(),
+    proposalStore,
+    mutationSecurityEnvelope: voteMutationSecurityEnvelope({
+      surface: 'wrong_vote_route_surface',
+      idempotencyKey: 'idem_vote_bridge_001_wrong'
+    })
+  });
+  const delegatedWithoutDelegationAuth = buildV6VoteRouteAuthorizationEnvelope({
+    includeResearchVoteRouteAuth: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    routeSurface: 'delegated_agent_vote_route',
+    rawVote: vote(),
+    proposalStore,
+    mutationSecurityEnvelope: voteMutationSecurityEnvelope({
+      surface: 'delegated_agent_vote_route'
+    })
+  });
+
+  assert.equal(unreviewed.authorized, false);
+  assert.equal(unreviewed.failClosed, true);
+  assert.match(unreviewed.errors.join(','), /CIVIC_VOTE_PROPOSAL_NOT_READY/);
+  assert.equal(mismatchedSecurity.authorized, false);
+  assert.match(mismatchedSecurity.errors.join(','), /MUTATION_SECURITY_SURFACE_MISMATCH|MUTATION_SECURITY_IDEMPOTENCY_MISMATCH/);
+  assert.equal(delegatedWithoutDelegationAuth.authorized, false);
+  assert.match(delegatedWithoutDelegationAuth.errors.join(','), /VOTE_AUTHORIZATION_ROUTE_MISMATCH/);
+  assert.match(delegatedWithoutDelegationAuth.errors.join(','), /VOTE_ROUTE_ACTOR_BINDING_REQUIRED/);
+  for (const report of [unreviewed, mismatchedSecurity, delegatedWithoutDelegationAuth]) {
+    assert.deepEqual(assertV6VoteRouteAuthorizationEnvelopeSafe(report), { ok: true, errors: [] });
+  }
+}));
+
+test('V6 vote route authorization envelope accepts delegated agent vote advice only with store-backed proof', () => withTempCivicStores(({
+  delegationStore,
+  proposalStore
+}) => {
+  proposalStore.draftProposal(proposal(), { nowMs: 1_779_784_000_000 });
+  proposalStore.recordProposalReview(moderationDecision(), { nowMs: 1_779_784_100_000 });
+  delegationStore.recordDelegation(delegation(), { nowMs: 1_779_784_200_000 });
+  const delegatedVote = vote({
+    voteId: 'vote_bridge_delegated_001',
+    authorization: {
+      kind: 'server_attested_delegation',
+      subjectAccountId: 'acct_v6_voter_001',
+      serverVerified: true
+    },
+    receiptId: 'receipt_vote_bridge_delegated_001',
+    idempotencyKey: 'idem_vote_bridge_delegated_001'
+  });
+  const report = buildV6VoteRouteAuthorizationEnvelope({
+    includeResearchVoteRouteAuth: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    routeSurface: 'delegated_agent_vote_route',
+    rawVote: delegatedVote,
+    proposalStore,
+    mutationSecurityEnvelope: voteMutationSecurityEnvelope({
+      actor: {
+        kind: 'agent',
+        accountId: 'acct_v6_voter_001',
+        agentId: 'agent_civic_clover_001'
+      },
+      delegation: {
+        delegationId: 'delegation_vote_route_auth_001',
+        principalAccountId: 'acct_v6_voter_001',
+        delegateAgentId: 'agent_civic_clover_001',
+        approvalReceiptId: 'receipt_delegate_vote_route_auth_001'
+      },
+      delegationStore,
+      requiredDelegationScope: 'vote_advice',
+      surface: 'delegated_agent_vote_route',
+      idempotencyKey: 'idem_vote_bridge_delegated_001'
+    })
+  });
+
+  assert.equal(report.authorized, true);
+  assert.equal(report.routeRule.actorKind, 'agent');
+  assert.equal(report.routeRule.requiredDelegationScope, 'vote_advice');
+  assert.equal(report.mutationSecurity.delegationProofStatus, 'valid');
+  assert.equal(report.recordsVote, false);
+  assert.equal(report.appliesVoteOutcome, false);
+  assert.deepEqual(assertV6VoteRouteAuthorizationEnvelopeSafe(report), { ok: true, errors: [] });
+}));
+
+test('V6 vote route authorization assertion rejects visible recording or outcome-applying drift', () => {
+  const unsafe = {
+    version: V6_VOTE_ROUTE_AUTHORIZATION_VERSION,
+    status: 'research_only',
+    featureFlag: V6_WORLD_FEATURE_FLAG,
+    available: true,
+    authorized: true,
+    failClosed: false,
+    runtimeExposed: true,
+    playerVisible: true,
+    normalGameplayExposure: true,
+    recordsVote: true,
+    appliesVoteOutcome: true,
+    mutatesWorldState: true,
+    exposesPrivateData: true,
+    executionStatus: 'executes',
+    checks: REQUIRED_VOTE_ROUTE_AUTHORIZATION_CHECKS.map((key) => ({ key, ok: true, error: '' }))
+  };
+  const result = assertV6VoteRouteAuthorizationEnvelopeSafe(unsafe);
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(','), /V6_VOTE_ROUTE_AUTHORIZATION_RUNTIME_HIDDEN_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_VOTE_ROUTE_AUTHORIZATION_PLAYER_HIDDEN_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_VOTE_ROUTE_AUTHORIZATION_NORMAL_GAMEPLAY_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_VOTE_ROUTE_AUTHORIZATION_RECORDING_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_VOTE_ROUTE_AUTHORIZATION_OUTCOME_APPLICATION_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_VOTE_ROUTE_AUTHORIZATION_WORLD_MUTATION_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_VOTE_ROUTE_AUTHORIZATION_PRIVATE_DATA_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_VOTE_ROUTE_AUTHORIZATION_NON_EXECUTING_REQUIRED/);
+});
 
 test('V6 vote authorization readiness gate is hidden without explicit research opt-in and V6 flag', () => {
   const withoutResearchOptIn = buildV6VoteAuthorizationReadinessGate({
