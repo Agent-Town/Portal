@@ -63,6 +63,7 @@ test('V6 readiness gate baseline names every prerequisite domain but remains ope
   assert.ok(report.gateReports.some((gate) => gate.requiredArtifacts.includes(V6_READINESS_GATE_ARTIFACT)));
   assert.ok(report.gateReports.some((gate) => gate.requiredArtifacts.includes(V6_MILESTONE_PLAN_ARTIFACT)));
   const persistenceGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'persistence_resilience');
+  const effectGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'effect_rollback');
   const proposalGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'proposal_vote_governance');
   const reputationGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'reputation_moderation_privacy');
   const releaseReviewGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'security_product_release_review');
@@ -97,21 +98,27 @@ test('V6 readiness gate baseline names every prerequisite domain but remains ope
   assert.ok(reputationGate.requiredChecks.includes('appeal_operations_review'));
   assert.ok(reputationGate.requiredChecks.includes('eligibility_advice_policy'));
   assert.ok(reputationGate.requiredChecks.includes('no_score_mutation'));
+  assert.ok(effectGate.requiredArtifacts.includes('server/world_civilization/rollback_execution_targets.js'));
+  assert.ok(effectGate.requiredArtifacts.includes('tests/world_civilization_rollback_execution_targets.test.js'));
+  assert.ok(effectGate.requiredChecks.includes('typed_rollback_execution_targets'));
   assert.ok(persistenceGate.requiredArtifacts.includes('server/world_civilization/replay_reconstruction.js'));
   assert.ok(persistenceGate.requiredArtifacts.includes('server/world_civilization/load_rate_targets.js'));
   assert.ok(persistenceGate.requiredArtifacts.includes('server/world_civilization/backup_restore.js'));
   assert.ok(persistenceGate.requiredArtifacts.includes('server/world_civilization/migration_load_replay.js'));
   assert.ok(persistenceGate.requiredArtifacts.includes('server/world_civilization/write_contention.js'));
+  assert.ok(persistenceGate.requiredArtifacts.includes('server/world_civilization/rollback_execution_targets.js'));
   assert.ok(persistenceGate.requiredArtifacts.includes('tests/world_civilization_replay_reconstruction.test.js'));
   assert.ok(persistenceGate.requiredArtifacts.includes('tests/world_civilization_load_rate_targets.test.js'));
   assert.ok(persistenceGate.requiredArtifacts.includes('tests/world_civilization_backup_restore.test.js'));
   assert.ok(persistenceGate.requiredArtifacts.includes('tests/world_civilization_migration_load_replay.test.js'));
   assert.ok(persistenceGate.requiredArtifacts.includes('tests/world_civilization_write_contention.test.js'));
+  assert.ok(persistenceGate.requiredArtifacts.includes('tests/world_civilization_rollback_execution_targets.test.js'));
   assert.ok(persistenceGate.requiredArtifacts.includes('tests/world_civilization_process_restart.test.js'));
   assert.ok(persistenceGate.requiredChecks.includes('store_specific_zero_hash_only_fallbacks'));
   assert.ok(persistenceGate.requiredChecks.includes('backup_restore'));
   assert.ok(persistenceGate.requiredChecks.includes('migration_load_replay'));
   assert.ok(persistenceGate.requiredChecks.includes('multi_process_write_contention'));
+  assert.ok(persistenceGate.requiredChecks.includes('typed_rollback_execution_recovery'));
   assert.ok(persistenceGate.requiredChecks.includes('privacy_safe_replay_summaries'));
   assert.ok(persistenceGate.requiredChecks.includes('no_effect_application_during_replay'));
   assert.ok(releaseReviewGate.requiredChecks.includes('audit_coverage'));
@@ -162,6 +169,7 @@ test('V6 readiness gate fails closed without proposal vote privacy and resilienc
       && check !== 'migration_load_replay'
       && check !== 'multi_process_write_contention'
       && check !== 'store_specific_zero_hash_only_fallbacks'
+      && check !== 'typed_rollback_execution_recovery'
     ))
   };
   evidence.security_product_release_review = {
@@ -185,7 +193,8 @@ test('V6 readiness gate fails closed without proposal vote privacy and resilienc
     'store_specific_zero_hash_only_fallbacks',
     'migration_load_replay',
     'production_load_rate',
-    'multi_process_write_contention'
+    'multi_process_write_contention',
+    'typed_rollback_execution_recovery'
   ]);
   assert.deepEqual(report.gateReports.find((gate) => gate.key === 'security_product_release_review').missingChecks, [
     'audit_coverage',

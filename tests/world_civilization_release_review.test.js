@@ -257,12 +257,14 @@ test('V6 release review requires persistence replay resilience readiness evidenc
   assert.ok(resilienceGate.requiredArtifacts.includes('server/world_civilization/migration_load_replay.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('server/world_civilization/backup_restore.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('server/world_civilization/write_contention.js'));
+  assert.ok(resilienceGate.requiredArtifacts.includes('server/world_civilization/rollback_execution_targets.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('server/world_civilization/rollback_recovery.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('tests/world_civilization_resilience.test.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('tests/world_civilization_load_rate_targets.test.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('tests/world_civilization_migration_load_replay.test.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('tests/world_civilization_backup_restore.test.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('tests/world_civilization_write_contention.test.js'));
+  assert.ok(resilienceGate.requiredArtifacts.includes('tests/world_civilization_rollback_execution_targets.test.js'));
   assert.ok(resilienceGate.requiredChecks.includes('all_civic_store_restart_probes'));
   assert.ok(resilienceGate.requiredChecks.includes('audit_replay_reconstruction'));
   assert.ok(resilienceGate.requiredChecks.includes('privacy_safe_replay_summaries'));
@@ -384,11 +386,14 @@ test('V6 release review requires effect execution and rollback gate evidence', (
   assert.equal(effectGate.owner, 'engineering_security');
   assert.ok(effectGate.requiredArtifacts.includes('specs/62_agent_town_v6_civic_effect_rollback_foundation.md'));
   assert.ok(effectGate.requiredArtifacts.includes('server/world_civilization/effects.js'));
+  assert.ok(effectGate.requiredArtifacts.includes('server/world_civilization/rollback_execution_targets.js'));
   assert.ok(effectGate.requiredArtifacts.includes('server/world_civilization/rollback_recovery.js'));
   assert.ok(effectGate.requiredArtifacts.includes('tests/world_civilization_effects.test.js'));
+  assert.ok(effectGate.requiredArtifacts.includes('tests/world_civilization_rollback_execution_targets.test.js'));
   assert.ok(effectGate.requiredArtifacts.includes('tests/world_civilization_rollback_recovery.test.js'));
   assert.ok(effectGate.requiredChecks.includes('typed_apply_handlers'));
   assert.ok(effectGate.requiredChecks.includes('typed_rollback_handlers'));
+  assert.ok(effectGate.requiredChecks.includes('typed_rollback_execution_targets'));
   assert.ok(effectGate.requiredChecks.includes('real_before_after_state'));
   assert.ok(effectGate.requiredChecks.includes('irreversible_action_review'));
   assert.ok(effectGate.requiredChecks.includes('conservation_tests'));
@@ -466,6 +471,7 @@ test('V6 release review blocks signoff without effect execution rollback evidenc
     ...evidence.effect_execution_review,
     checks: evidence.effect_execution_review.checks.filter((check) => (
       check !== 'typed_rollback_handlers'
+      && check !== 'typed_rollback_execution_targets'
       && check !== 'irreversible_action_review'
       && check !== 'conservation_tests'
     ))
@@ -481,6 +487,7 @@ test('V6 release review blocks signoff without effect execution rollback evidenc
   assert.equal(effectGate.ok, false);
   assert.deepEqual(effectGate.missingChecks, [
     'typed_rollback_handlers',
+    'typed_rollback_execution_targets',
     'irreversible_action_review',
     'conservation_tests'
   ]);

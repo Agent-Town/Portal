@@ -14,6 +14,10 @@ const {
   V6_MIGRATION_LOAD_REPLAY_REHEARSAL_VERSION
 } = require('./migration_load_replay');
 const {
+  REQUIRED_ROLLBACK_EXECUTION_TARGET_RELEASE_GAPS,
+  V6_ROLLBACK_EXECUTION_TARGETS_VERSION
+} = require('./rollback_execution_targets');
+const {
   REQUIRED_WRITE_CONTENTION_RELEASE_GAPS,
   V6_WRITE_CONTENTION_REHEARSAL_VERSION
 } = require('./write_contention');
@@ -101,6 +105,26 @@ const V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE = {
     'real_state_recovery_execution',
     'irreversible_action_review'
   ]
+};
+
+const V6_CIVIC_ROLLBACK_EXECUTION_TARGET_COVERAGE = {
+  modulePath: 'server/world_civilization/rollback_execution_targets.js',
+  artifact: 'tests/world_civilization_rollback_execution_targets.test.js',
+  version: V6_ROLLBACK_EXECUTION_TARGETS_VERSION,
+  status: 'research_only',
+  releaseReady: false,
+  coveredChecks: [
+    'typed_apply_handler_targets',
+    'typed_rollback_handler_targets',
+    'real_before_after_state_target',
+    'idempotent_apply_rollback_target',
+    'conservation_test_target',
+    'applied_and_rollback_audit_target',
+    'rollback_recovery_execution_drill_target',
+    'private_row_payload_exclusion',
+    'no_world_state_application'
+  ],
+  remainingReleaseGaps: [...REQUIRED_ROLLBACK_EXECUTION_TARGET_RELEASE_GAPS]
 };
 
 const V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE = {
@@ -626,6 +650,7 @@ function disabledReport(source) {
     loadRateCoverage: null,
     loadRateTargetCoverage: null,
     rollbackRecoveryCoverage: null,
+    rollbackExecutionTargetCoverage: null,
     migrationRehearsalCoverage: null,
     migrationLoadReplayCoverage: null,
     backupRestoreCoverage: null,
@@ -699,6 +724,7 @@ function buildV6ResilienceBaselineReport({
     loadRateCoverage: clone(V6_CIVIC_LOAD_RATE_COVERAGE),
     loadRateTargetCoverage: clone(V6_CIVIC_LOAD_RATE_TARGET_COVERAGE),
     rollbackRecoveryCoverage: clone(V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE),
+    rollbackExecutionTargetCoverage: clone(V6_CIVIC_ROLLBACK_EXECUTION_TARGET_COVERAGE),
     migrationRehearsalCoverage: clone(V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE),
     migrationLoadReplayCoverage: clone(V6_CIVIC_MIGRATION_LOAD_REPLAY_COVERAGE),
     backupRestoreCoverage: clone(V6_CIVIC_BACKUP_RESTORE_COVERAGE),
@@ -787,6 +813,19 @@ function assertV6ResilienceBaseline(report = {}) {
     ) {
       errors.push('V6_RESILIENCE_ROLLBACK_RECOVERY_COVERAGE_REQUIRED');
     }
+    const rollbackExecutionTargetCoverage = report.rollbackExecutionTargetCoverage || {};
+    if (
+      rollbackExecutionTargetCoverage.modulePath !== V6_CIVIC_ROLLBACK_EXECUTION_TARGET_COVERAGE.modulePath
+      || rollbackExecutionTargetCoverage.artifact !== V6_CIVIC_ROLLBACK_EXECUTION_TARGET_COVERAGE.artifact
+      || rollbackExecutionTargetCoverage.version !== V6_ROLLBACK_EXECUTION_TARGETS_VERSION
+      || rollbackExecutionTargetCoverage.status !== 'research_only'
+      || rollbackExecutionTargetCoverage.releaseReady !== false
+      || !Array.isArray(rollbackExecutionTargetCoverage.coveredChecks)
+      || !rollbackExecutionTargetCoverage.coveredChecks.includes('typed_rollback_handler_targets')
+      || !rollbackExecutionTargetCoverage.coveredChecks.includes('no_world_state_application')
+    ) {
+      errors.push('V6_RESILIENCE_ROLLBACK_EXECUTION_TARGET_COVERAGE_REQUIRED');
+    }
     const migrationRehearsalCoverage = report.migrationRehearsalCoverage || {};
     if (
       migrationRehearsalCoverage.modulePath !== V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE.modulePath
@@ -856,6 +895,7 @@ module.exports = {
   V6_CIVIC_LOAD_RATE_TARGET_COVERAGE: clone(V6_CIVIC_LOAD_RATE_TARGET_COVERAGE),
   V6_CIVIC_MIGRATION_LOAD_REPLAY_COVERAGE: clone(V6_CIVIC_MIGRATION_LOAD_REPLAY_COVERAGE),
   V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE: clone(V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE),
+  V6_CIVIC_ROLLBACK_EXECUTION_TARGET_COVERAGE: clone(V6_CIVIC_ROLLBACK_EXECUTION_TARGET_COVERAGE),
   V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE: clone(V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE),
   V6_CIVIC_RESILIENCE_STORES: clone(V6_CIVIC_RESILIENCE_STORES),
   V6_CIVIC_WRITE_CONTENTION_COVERAGE: clone(V6_CIVIC_WRITE_CONTENTION_COVERAGE),

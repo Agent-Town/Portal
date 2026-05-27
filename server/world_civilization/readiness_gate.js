@@ -216,13 +216,16 @@ const REQUIRED_V6_READINESS_GATES = [
     requiredArtifacts: [
       'specs/62_agent_town_v6_civic_effect_rollback_foundation.md',
       'server/world_civilization/effects.js',
+      'server/world_civilization/rollback_execution_targets.js',
       'server/world_civilization/rollback_recovery.js',
       'tests/world_civilization_effects.test.js',
+      'tests/world_civilization_rollback_execution_targets.test.js',
       'tests/world_civilization_rollback_recovery.test.js'
     ],
     requiredChecks: [
       'typed_apply_handlers',
       'typed_rollback_handlers',
+      'typed_rollback_execution_targets',
       'governance_preflight',
       'rollback_handles',
       'conservation_tests',
@@ -304,6 +307,7 @@ const REQUIRED_V6_READINESS_GATES = [
       'server/world_civilization/backup_restore.js',
       'server/world_civilization/write_contention.js',
       'server/world_civilization/rollback_recovery.js',
+      'server/world_civilization/rollback_execution_targets.js',
       'tests/world_civilization_resilience.test.js',
       'tests/world_civilization_replay_reconstruction.test.js',
       'tests/world_civilization_load_rate_targets.test.js',
@@ -313,7 +317,8 @@ const REQUIRED_V6_READINESS_GATES = [
       'tests/world_civilization_backup_restore.test.js',
       'tests/world_civilization_write_contention.test.js',
       'tests/world_civilization_load_rate.test.js',
-      'tests/world_civilization_rollback_recovery.test.js'
+      'tests/world_civilization_rollback_recovery.test.js',
+      'tests/world_civilization_rollback_execution_targets.test.js'
     ],
     requiredChecks: [
       'all_civic_store_restart_probes',
@@ -327,6 +332,7 @@ const REQUIRED_V6_READINESS_GATES = [
       'production_load_rate',
       'multi_process_write_contention',
       'rollback_recovery',
+      'typed_rollback_execution_recovery',
       'private_data_exclusion',
       'no_effect_application_during_replay'
     ]

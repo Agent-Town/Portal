@@ -14,6 +14,7 @@ Runtime contracts:
 - `server/world_civilization/backup_restore.js`
 - `server/world_civilization/write_contention.js`
 - `server/world_civilization/rollback_recovery.js`
+- `server/world_civilization/rollback_execution_targets.js`
 
 Test coverage:
 
@@ -34,6 +35,7 @@ Test coverage:
 - `tests/world_civilization_load_rate.test.js`
 - `tests/world_civilization_write_contention.test.js`
 - `tests/world_civilization_rollback_recovery.test.js`
+- `tests/world_civilization_rollback_execution_targets.test.js`
 
 ## Boundary
 
@@ -232,6 +234,14 @@ effect store and audit ledger, the recovery report can reconstruct the
 available rollback handle, confirm the matching redacted prepared-action audit
 row, reject expired handles, and remain non-executing.
 
+`tests/world_civilization_rollback_execution_targets.test.js` adds
+research-scale typed rollback execution target evidence: every current civic
+effect type is mapped to its future apply handler and required rollback
+handler, the target matrix requires recovery-drill, conservation, audit,
+authorization, idempotency, and worker/route security evidence, and the report
+rejects executable handlers, execution drills, private row payloads, fake
+release readiness, and world-state application.
+
 ## M16 Readiness Gate
 
 `buildV6ResilienceReadinessGate()` records the non-executing M16 resilience
@@ -251,7 +261,8 @@ The readiness gate requires evidence for:
 - Migration-load replay, backup/restore, and migration rehearsal.
 - Research-scale multi-process write contention, production load/rate target
   surfaces, duplicate retry bursts, and idempotency conflict rejection.
-- Rollback handle reconstruction and typed rollback execution recovery review.
+- Rollback handle reconstruction, typed rollback execution target coverage, and
+  typed rollback execution recovery review.
 - No effect application during replay.
 
 The gate is intentionally stricter than the current baseline report. It can

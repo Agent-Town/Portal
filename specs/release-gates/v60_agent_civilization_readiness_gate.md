@@ -387,6 +387,12 @@ persistence resilience, and security/product release review.
   `civic_action.applied`/`rollback.applied` audit evidence, and worker/route
   security while keeping `releaseReady: false`, `appliesWorldState: false`, and
   `executionStatus: "not_executable"`.
+  Typed rollback execution target coverage starts in
+  `server/world_civilization/rollback_execution_targets.js` and
+  `tests/world_civilization_rollback_execution_targets.test.js`; every current
+  effect type maps to a future apply handler and required rollback handler, and
+  the report rejects executable handlers, execution drills, private row
+  payloads, fake release readiness, and world-state application.
   Research-only handle reconstruction starts in
   `server/world_civilization/rollback_recovery.js` and
   `tests/world_civilization_rollback_recovery.test.js`. Release still requires
@@ -510,6 +516,11 @@ persistence resilience, and security/product release review.
   `tests/world_civilization_rollback_recovery.test.js`; prepared rollback
   handles can be reconstructed from reopened effect/audit stores without
   executing state.
+  Rollback execution target coverage starts in
+  `server/world_civilization/rollback_execution_targets.js` and
+  `tests/world_civilization_rollback_execution_targets.test.js`; the typed
+  target matrix is explicit, non-executing, private-row-free, and
+  `releaseReady: false`.
   Migration rehearsal coverage starts in
   `server/world_civilization/migration_rehearsal.js` and
   `tests/world_civilization_migration_rehearsal.test.js`; current v1 metadata can
@@ -539,7 +550,8 @@ persistence resilience, and security/product release review.
   migration upgrade/downgrade scripts, unsupported
   transition denial, backup/restore rehearsal, migration-load replay rehearsal,
   production load-rate target surfaces, multi-process write contention, duplicate retry
-  bursts, rollback handle reconstruction, typed rollback execution recovery,
+  bursts, rollback handle reconstruction, typed rollback execution target
+  coverage, typed rollback execution recovery,
   private-data exclusion, and no effect application during replay while keeping
   `releaseReady: false`, `appliesMigration: false`,
   `appliesRollback: false`, `mutatesWorldState: false`, and

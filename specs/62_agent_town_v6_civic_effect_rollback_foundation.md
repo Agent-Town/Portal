@@ -10,12 +10,16 @@ Governance preflight: `server/world_civilization/governance_preflight.js`
 
 Recovery report: `server/world_civilization/rollback_recovery.js`
 
+Rollback execution target report:
+`server/world_civilization/rollback_execution_targets.js`
+
 Contract tests:
 
 - `tests/world_civilization_effects.test.js`
 - `tests/world_civilization_governance_preflight.test.js`
 - `tests/world_civilization_effect_process_restart.test.js`
 - `tests/world_civilization_rollback_recovery.test.js`
+- `tests/world_civilization_rollback_execution_targets.test.js`
 
 Schema contract: `specs/55_agent_town_v6_civic_schema_contracts.md`
 
@@ -53,6 +57,15 @@ rollback handles from the effect store and audit ledger after restart, verifies
 that the handle is still linked to a redacted `civic_action.prepared` audit
 entry, and returns `executionStatus: "not_executable"` with
 `releaseReady: false`. It does not apply or roll back world state.
+
+`server/world_civilization/rollback_execution_targets.js` adds the M11 typed
+rollback execution target matrix. It maps every current civic effect type to
+its future apply handler and required rollback handler, requires real
+before/after state capture, authorization, idempotent apply/rollback,
+irreversible-action review, conservation tests, applied/rollback audit rows,
+worker/route security, and rollback recovery execution drill evidence, and
+keeps the report `research_only`, `executionEnabled: false`,
+`executionStatus: "not_executable"`, and `releaseReady: false`.
 
 The M11 effect execution gate is research-only and non-executing. It is exposed
 by `buildV6CivicEffectExecutionGate()` in

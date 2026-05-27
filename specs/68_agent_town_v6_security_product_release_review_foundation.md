@@ -37,7 +37,8 @@ are present.
   schema metadata drift checks, migration rehearsal with unsupported
   upgrade/downgrade targets failing closed, replay reconstruction,
   store-specific audit-summary coverage, rollback handles, governance preflight
-  evidence, and non-executing rollback recovery evidence.
+  evidence, non-executing rollback recovery evidence, and typed rollback
+  execution target coverage.
 - Validation evidence: targeted Node suite, split Playwright smokes,
   all-features regression, feature override safety, load-rate target coverage,
   migration-load replay evidence, load/rate replay evidence, and multi-process
@@ -86,10 +87,11 @@ are present.
   rows; no player-visible moderation; no moderation effect application; and no
   world mutation before moderation can cover production public surfaces.
 - Effect execution and rollback review: typed apply handlers, typed rollback
-  handlers, real before/after state, authorization enforcement, idempotent
-  apply/rollback behavior, irreversible-action review, conservation tests,
-  applied/rollback audit evidence, and worker/route security before any
-  executable civic effect can exist.
+  handlers, typed rollback execution targets, real before/after state,
+  authorization enforcement, idempotent apply/rollback behavior,
+  irreversible-action review, conservation tests, applied/rollback audit
+  evidence, and worker/route security before any executable civic effect can
+  exist.
 - Agent participation enforcement review: worker-tool scope enforcement,
   route-edge scope checks, route-edge expiry checks, route-edge budget checks,
   route-edge revocation checks, principal wallet/session binding, idempotent
@@ -126,16 +128,17 @@ are present.
   upgrade/downgrade scripts, unsupported transition denial, backup/restore
   rehearsal, migration-load replay rehearsal, production load/rate targets,
   multi-process write contention, duplicate retry bursts, rollback handle
-  reconstruction, typed rollback execution recovery, private-data exclusion, and
-  no effect application during replay before M16 can claim release-grade
-  resilience. Current load-rate target coverage is research-only release SLO
+  reconstruction, typed rollback execution target coverage, typed rollback
+  execution recovery, private-data exclusion, and no effect application during
+  replay before M16 can claim release-grade resilience. Current load-rate target coverage is research-only release SLO
   surface definition plus calibration counts, not production signoff. Current
   migration-load replay evidence is research-only v1 schema inventory plus
   bounded privacy-safe audit replay with no migration execution;
   current backup/restore evidence is research-only closed-store
   file-copy/hash/schema-metadata rehearsal; current write-contention evidence is
   research-only audit-ledger SQLite contention rehearsal with no row-payload
-  reports. Release still requires encrypted storage, point-in-time recovery,
+  reports; current typed rollback execution target coverage is research-only
+  target mapping with no executable handlers. Release still requires encrypted storage, point-in-time recovery,
   live WAL checkpointing, restore SLO signoff, migration replay diffs, and
   route/store contention SLO evidence.
 - Product release signoff: player-visible scope, rollback plan, support runbook,

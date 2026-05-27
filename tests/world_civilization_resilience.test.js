@@ -25,6 +25,7 @@ const {
   V6_CIVIC_LOAD_RATE_TARGET_COVERAGE,
   V6_CIVIC_MIGRATION_LOAD_REPLAY_COVERAGE,
   V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE,
+  V6_CIVIC_ROLLBACK_EXECUTION_TARGET_COVERAGE,
   V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE,
   V6_CIVIC_RESILIENCE_STORES,
   V6_CIVIC_WRITE_CONTENTION_COVERAGE,
@@ -129,6 +130,7 @@ test('V6 resilience report is hidden without explicit research opt-in and V6 fla
     assert.equal(report.loadRateCoverage, null);
     assert.equal(report.loadRateTargetCoverage, null);
     assert.equal(report.rollbackRecoveryCoverage, null);
+    assert.equal(report.rollbackExecutionTargetCoverage, null);
     assert.equal(report.migrationRehearsalCoverage, null);
     assert.equal(report.migrationLoadReplayCoverage, null);
     assert.equal(report.backupRestoreCoverage, null);
@@ -162,6 +164,12 @@ test('V6 resilience baseline verifies current SQLite stores and keeps release ga
   assert.equal(report.rollbackRecoveryCoverage.releaseReady, false);
   assert.ok(report.rollbackRecoveryCoverage.coveredChecks.includes('prepared_rollback_handle_reconstruction'));
   assert.ok(report.rollbackRecoveryCoverage.remainingReleaseGaps.includes('typed_rollback_handlers'));
+  assert.deepEqual(report.rollbackExecutionTargetCoverage, V6_CIVIC_ROLLBACK_EXECUTION_TARGET_COVERAGE);
+  assert.equal(report.rollbackExecutionTargetCoverage.releaseReady, false);
+  assert.ok(report.rollbackExecutionTargetCoverage.coveredChecks.includes('typed_rollback_handler_targets'));
+  assert.ok(report.rollbackExecutionTargetCoverage.coveredChecks.includes('rollback_recovery_execution_drill_target'));
+  assert.ok(report.rollbackExecutionTargetCoverage.coveredChecks.includes('no_world_state_application'));
+  assert.ok(report.rollbackExecutionTargetCoverage.remainingReleaseGaps.includes('rollback_recovery_execution_drill_required'));
   assert.deepEqual(report.migrationRehearsalCoverage, V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE);
   assert.equal(report.migrationRehearsalCoverage.releaseReady, false);
   assert.ok(report.migrationRehearsalCoverage.coveredChecks.includes('unsupported_upgrade_fails_closed'));
@@ -260,6 +268,10 @@ test('V6 resilience assertion fails closed for missing store evidence and releas
       ...report.writeContentionCoverage,
       artifact: 'tests/fake_write_contention.test.js'
     },
+    rollbackExecutionTargetCoverage: {
+      ...report.rollbackExecutionTargetCoverage,
+      artifact: 'tests/fake_rollback_execution_targets.test.js'
+    },
     releaseGaps: []
   };
   const result = assertV6ResilienceBaseline(unsafe);
@@ -275,6 +287,7 @@ test('V6 resilience assertion fails closed for missing store evidence and releas
   assert.match(result.errors.join(','), /V6_RESILIENCE_MIGRATION_LOAD_REPLAY_COVERAGE_REQUIRED/);
   assert.match(result.errors.join(','), /V6_RESILIENCE_BACKUP_RESTORE_COVERAGE_REQUIRED/);
   assert.match(result.errors.join(','), /V6_RESILIENCE_WRITE_CONTENTION_COVERAGE_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_RESILIENCE_ROLLBACK_EXECUTION_TARGET_COVERAGE_REQUIRED/);
   assert.match(result.errors.join(','), /V6_RESILIENCE_STORE_EVIDENCE_INVALID:audit_ledger/);
   assert.match(result.errors.join(','), /V6_RESILIENCE_STORE_EVIDENCE_INVALID:proposals/);
   assert.match(result.errors.join(','), /V6_RESILIENCE_STORE_EVIDENCE_INVALID:public_works/);

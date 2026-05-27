@@ -96,6 +96,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'server/world_civilization/migration_rehearsal.js',
     'server/world_civilization/migration_load_replay.js',
     'server/world_civilization/rollback_recovery.js',
+    'server/world_civilization/rollback_execution_targets.js',
     'server/world_civilization/write_contention.js',
     'server/world_civilization/readiness_gate.js',
     'server/world_civilization/resilience.js',
@@ -121,6 +122,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'tests/world_civilization_load_rate.test.js',
     'tests/world_civilization_write_contention.test.js',
     'tests/world_civilization_rollback_recovery.test.js',
+    'tests/world_civilization_rollback_execution_targets.test.js',
     'tests/world_civilization_readiness_gate.test.js',
     'tests/world_civilization_mutation_security.test.js',
     'tests/world_civilization_routes.test.js',
@@ -190,6 +192,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   const schemaSource = read('server/world_civilization/schemas.js');
   const replaySource = read('server/world_civilization/replay_reconstruction.js');
   const resilienceSource = read('server/world_civilization/resilience.js');
+  const rollbackExecutionTargetSource = read('server/world_civilization/rollback_execution_targets.js');
   const readinessSource = read('server/world_civilization/readiness_gate.js');
   const releaseReviewSource = read('server/world_civilization/release_review.js');
   const controlledSource = read('server/world_civilization/controlled_release.js');
@@ -530,6 +533,9 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /typed apply handlers, typed rollback handlers/);
   assert.match(plan, /release-signed conservation\/rollback execution/);
   assert.match(plan, /server\/world_civilization\/rollback_recovery\.js/);
+  assert.match(plan, /server\/world_civilization\/rollback_execution_targets\.js/);
+  assert.match(plan, /tests\/world_civilization_rollback_execution_targets\.test\.js/);
+  assert.match(plan, /typed rollback execution target matrix/);
   assert.match(plan, /without executing state/);
   assert.match(gate, /server\/world_civilization\/effects\.js/);
   assert.match(gate, /server\/world_civilization\/governance_preflight\.js/);
@@ -539,6 +545,16 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(gate, /executable typed handlers/);
   assert.match(gate, /server\/world_civilization\/rollback_recovery\.js/);
   assert.match(gate, /tests\/world_civilization_rollback_recovery\.test\.js/);
+  assert.match(gate, /server\/world_civilization\/rollback_execution_targets\.js/);
+  assert.match(gate, /tests\/world_civilization_rollback_execution_targets\.test\.js/);
+  assert.match(gate, /[Tt]yped rollback execution target coverage/);
+  assert.match(effectSpec, /Rollback execution target report/);
+  assert.match(effectSpec, /server\/world_civilization\/rollback_execution_targets\.js/);
+  assert.match(effectSpec, /rollback recovery execution drill/);
+  assert.match(rollbackExecutionTargetSource, /REQUIRED_ROLLBACK_EXECUTION_TARGET_CHECKS/);
+  assert.match(rollbackExecutionTargetSource, /rollback_recovery_execution_drill/);
+  assert.match(rollbackExecutionTargetSource, /V6_ROLLBACK_EXECUTION_TARGETS_VERSION/);
+  assert.match(rollbackExecutionTargetSource, /executionEnabled: false/);
   assert.match(plan, /M12 Agent participation controls \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/delegations\.js/);
   assert.match(plan, /idempotent action-budget consumption/);
@@ -668,6 +684,8 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /multi-process write-contention/);
   assert.match(plan, /tests\/world_civilization_rollback_recovery\.test\.js/);
   assert.match(plan, /prepared rollback-handle reconstruction after reopen/);
+  assert.match(plan, /tests\/world_civilization_rollback_execution_targets\.test\.js/);
+  assert.match(plan, /typed rollback execution target mapping/);
   assert.match(plan, /buildV6ResilienceReadinessGate\(\)/);
   assert.match(plan, /migration upgrade\/downgrade scripts/);
   assert.match(plan, /process restart probes now cover audit-ledger, proposal\/vote, reputation record\/dispute, moderation decision\/review, effect\/rollback, delegation, institution, and public-works/);
@@ -695,6 +713,8 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(gate, /tests\/world_civilization_load_rate\.test\.js/);
   assert.match(gate, /larger replay pagination and duplicate retry burst/);
   assert.match(gate, /prepared rollback\s+handles can be reconstructed/);
+  assert.match(gate, /rollback execution target coverage/);
+  assert.match(gate, /typed\s+target matrix is explicit/);
   assert.match(gate, /server\/world_civilization\/replay_reconstruction\.js/);
   assert.match(gate, /tests\/world_civilization_process_restart\.test\.js/);
   assert.match(gate, /tests\/world_civilization_proposal_vote_process_restart\.test\.js/);
@@ -719,6 +739,9 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(persistenceSpec, /server\/world_civilization\/write_contention\.js/);
   assert.match(persistenceSpec, /tests\/world_civilization_write_contention\.test\.js/);
   assert.match(persistenceSpec, /multi-process write contention/);
+  assert.match(persistenceSpec, /server\/world_civilization\/rollback_execution_targets\.js/);
+  assert.match(persistenceSpec, /tests\/world_civilization_rollback_execution_targets\.test\.js/);
+  assert.match(persistenceSpec, /typed rollback execution target evidence/);
   assert.match(schemaSource, /AUDIT_HASH_ONLY_BEFORE_SUMMARY/);
   assert.match(schemaSource, /beforeSummary/);
   assert.match(replaySource, /CIVIC_REPLAY_AUDIT_SUMMARY_REQUIRED/);
@@ -729,6 +752,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(resilienceSource, /V6_CIVIC_LOAD_RATE_TARGET_COVERAGE/);
   assert.match(resilienceSource, /V6_CIVIC_MIGRATION_LOAD_REPLAY_COVERAGE/);
   assert.match(resilienceSource, /V6_CIVIC_WRITE_CONTENTION_COVERAGE/);
+  assert.match(resilienceSource, /V6_CIVIC_ROLLBACK_EXECUTION_TARGET_COVERAGE/);
   assert.match(resilienceSource, /store_specific_zero_hash_only_fallbacks/);
   assert.match(resilienceSource, /typed_rollback_execution_recovery/);
   assert.match(resilienceSource, /V6_RESILIENCE_READINESS_RELEASE_READY_FORBIDDEN/);
@@ -776,6 +800,9 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(releaseReviewSource, /server\/world_civilization\/routes\.js/);
   assert.match(releaseReviewSource, /server\/world_civilization\/store_wiring\.js/);
   assert.match(releaseReviewSource, /tests\/world_civilization_routes\.test\.js/);
+  assert.match(releaseReviewSource, /server\/world_civilization\/rollback_execution_targets\.js/);
+  assert.match(releaseReviewSource, /tests\/world_civilization_rollback_execution_targets\.test\.js/);
+  assert.match(releaseReviewSource, /typed_rollback_execution_targets/);
   assert.match(releaseReview, /reputation eligibility advice gate/);
   assert.match(releaseReview, /Reputation eligibility and advice review/);
   assert.match(releaseReview, /moderation privacy readiness gate/);
@@ -790,6 +817,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(releaseReview, /Public works readiness review/);
   assert.match(releaseReview, /public works readiness gate/);
   assert.match(releaseReview, /Persistence replay resilience readiness review/);
+  assert.match(releaseReview, /typed rollback execution target coverage/);
   assert.match(skillLine, /M13 readiness gate/);
   assert.match(skillLine, /civic institution readiness review/);
   assert.match(skillLine, /M14 readiness gate/);
@@ -800,6 +828,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(skillLine, /store-specific audit-summary coverage/);
   assert.match(skillLine, /store_specific_zero_hash_only_fallbacks/);
   assert.match(skillLine, /resilience readiness review/);
+  assert.match(skillLine, /typed rollback execution target coverage/);
   assert.match(plan, /M18 V6 controlled release completion \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/controlled_release\.js/);
   assert.match(plan, /buildV6ReadinessGateReport\(\)/);
