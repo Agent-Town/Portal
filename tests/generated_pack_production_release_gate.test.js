@@ -1231,6 +1231,56 @@ test('GPACK-147 release evidence bundle rejects production boundary metric tampe
   }
 }));
 
+test('GPACK-148 release evidence bundle rejects source-count metric tampering', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_evidence_bundle_source_count_metrics',
+    prompt: 'indigo harbor orchard with careful bell archivists',
+    nowMs: 155_180
+  });
+  const validationNowMs = fixture.releaseGate.evaluatedAtMs + 100;
+  const bundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    nowMs: fixture.releaseGate.evaluatedAtMs + 50
+  });
+  const sourceCountMetricUpdates = [
+    { presentSourceCount: bundle.metrics.presentSourceCount - 1 },
+    { missingSourceCount: bundle.metrics.missingSourceCount + 1 },
+    { requiredSourceCount: bundle.metrics.requiredSourceCount - 1 }
+  ];
+
+  assert.equal(bundle.metrics.presentSourceCount, bundle.metrics.requiredSourceCount);
+  assert.equal(bundle.metrics.missingSourceCount, 0);
+  assert.equal(bundle.metrics.requiredSourceCount > 0, true);
+
+  for (const metricPatch of sourceCountMetricUpdates) {
+    const tamperedBundle = rehashReleaseEvidenceBundle({
+      ...bundle,
+      metrics: {
+        ...bundle.metrics,
+        ...metricPatch
+      }
+    });
+    const report = validateReleaseEvidenceBundle(tamperedBundle, {
+      ...fixture,
+      nowMs: validationNowMs
+    });
+
+    assert.equal(
+      report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_HASH_STABLE').passed,
+      true,
+      JSON.stringify(metricPatch)
+    );
+    assert.equal(report.metrics.presentSourceCount, bundle.metrics.presentSourceCount, JSON.stringify(metricPatch));
+    assert.equal(report.metrics.requiredSourceCount, bundle.metrics.requiredSourceCount, JSON.stringify(metricPatch));
+    assert.equal(report.ok, false, JSON.stringify(metricPatch));
+    assert.equal(
+      report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,
+      false,
+      JSON.stringify(metricPatch)
+    );
+  }
+}));
+
 test('GU-19 release evidence bundle rejects source drift and missing ready-gate evidence', () => withTempGeneratedPackStore(() => {
   const fixture = readyReleaseGateFixture({
     ownerAccountId: 'owner_release_evidence_bundle_tamper',
