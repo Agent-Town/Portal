@@ -12,6 +12,9 @@ Worker proposal adapter: `server/world_civilization/worker_tool_adapter.js`
 
 Worker vote adapter: `server/world_civilization/worker_vote_adapter.js`
 
+Worker runtime registration target:
+`server/world_civilization/worker_runtime_registration.js`
+
 Contract tests: `tests/world_civilization_tools.test.js`
 
 Exposure gate tests: `tests/world_civilization_tool_exposure_gate.test.js`
@@ -19,6 +22,9 @@ Exposure gate tests: `tests/world_civilization_tool_exposure_gate.test.js`
 Worker adapter tests: `tests/world_civilization_worker_tool_adapter.test.js`
 
 Worker vote adapter tests: `tests/world_civilization_worker_vote_adapter.test.js`
+
+Worker runtime registration target tests:
+`tests/world_civilization_worker_runtime_registration.test.js`
 
 Production override tests: `tests/world_grid_region.test.js`
 
@@ -161,6 +167,29 @@ The current gate requires:
 - Non-executing draft metadata and approval/idempotency binding for future
   review, vote receipt, and delegation-policy mutations.
 
+## Worker Runtime Registration Target
+
+`server/world_civilization/worker_runtime_registration.js` is the
+research-only target matrix for the browser worker registration gap. It does
+not register `et.world.civic.*` tools and does not claim browser release
+coverage. It records the evidence required before civic tools can become
+callable through the OpenClaw Lite worker runtime:
+
+- browser OpenClaw Lite worker boot evidence;
+- runtime `/api/world/tools` manifest sync;
+- civic tool absence before release;
+- Worker Tools, Skill Context, Worker Traffic, Brain, and Session Context
+  observability;
+- skill context import and worker traffic traces;
+- session/wallet context linkage;
+- modal lifetime continuity for the page-scoped worker;
+- shared-state route adapter evidence;
+- production player override denial.
+
+The report remains `research_only`, `releaseReady: false`, does not register
+runtime civic tools, forbids backend shortcuts, and treats browser worker
+registration plus production browser coverage as release gaps.
+
 ## Release Gate
 
 M6 can move to `done` only after:
@@ -169,6 +198,9 @@ M6 can move to `done` only after:
 - production player overrides cannot expose the tools;
 - `server/world_civilization/tool_exposure_gate.js` passes with real worker
   origin and observability evidence;
+- `server/world_civilization/worker_runtime_registration.js` is backed by real
+  browser worker boot, manifest parity, shared-state route, modal-continuity,
+  and production override traces;
 - worker-origin and worker-traffic coverage proves the worker path is used;
 - every mutating civic route has same-origin, CSRF, session/wallet auth, rate
   limits, idempotency, audit, moderation, rollback, and privacy coverage;

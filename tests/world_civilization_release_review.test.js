@@ -325,9 +325,11 @@ test('V6 release review requires worker tool exposure evidence', () => {
   assert.ok(workerGate.requiredArtifacts.includes('specs/59_agent_town_v6_worker_tool_surface_draft.md'));
   assert.ok(workerGate.requiredArtifacts.includes('server/world_civilization/tools.js'));
   assert.ok(workerGate.requiredArtifacts.includes('server/world_civilization/tool_exposure_gate.js'));
+  assert.ok(workerGate.requiredArtifacts.includes('server/world_civilization/worker_runtime_registration.js'));
   assert.ok(workerGate.requiredArtifacts.includes('server/world_civilization/worker_tool_adapter.js'));
   assert.ok(workerGate.requiredArtifacts.includes('server/world_civilization/worker_vote_adapter.js'));
   assert.ok(workerGate.requiredArtifacts.includes('tests/world_civilization_tool_exposure_gate.test.js'));
+  assert.ok(workerGate.requiredArtifacts.includes('tests/world_civilization_worker_runtime_registration.test.js'));
   assert.ok(workerGate.requiredArtifacts.includes('tests/world_civilization_worker_tool_adapter.test.js'));
   assert.ok(workerGate.requiredArtifacts.includes('tests/world_civilization_worker_vote_adapter.test.js'));
   assert.ok(workerGate.requiredArtifacts.includes('docs/internal-skill-testline.md'));
@@ -335,12 +337,16 @@ test('V6 release review requires worker tool exposure evidence', () => {
   assert.ok(workerGate.requiredChecks.includes('openclaw_lite_worker_origin'));
   assert.ok(workerGate.requiredChecks.includes('worker_traffic_observability'));
   assert.ok(workerGate.requiredChecks.includes('skill_context_observability'));
+  assert.ok(workerGate.requiredChecks.includes('browser_worker_runtime_registration_target'));
+  assert.ok(workerGate.requiredChecks.includes('production_browser_worker_coverage_target'));
   assert.ok(workerGate.requiredChecks.includes('mutation_security_envelope'));
   assert.ok(workerGate.requiredChecks.includes('worker_vote_receipt_adapter'));
   assert.ok(workerGate.requiredChecks.includes('no_backend_shortcuts'));
   assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_worker_vote_adapter.test.js'));
+  assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_worker_runtime_registration.test.js'));
   assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_mutation_security.test.js'));
   assert.ok(validationGate.requiredChecks.includes('worker_vote_adapter_gate'));
+  assert.ok(validationGate.requiredChecks.includes('worker_runtime_registration_target'));
 });
 
 test('V6 release review requires proposal intake route tool and review queue evidence', () => {

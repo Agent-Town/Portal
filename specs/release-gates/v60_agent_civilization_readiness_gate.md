@@ -93,6 +93,13 @@ persistence resilience, and security/product release review.
   coverage, and read-only delegation budget handling, and fail closed if any
   `et.world.civic.*` tool appears in the runtime manifest before M6/M17/M18
   close.
+- The research-only worker runtime registration target may exist in
+  `server/world_civilization/worker_runtime_registration.js`, but it must keep
+  `releaseReady: false`, register no runtime civic tools, forbid backend
+  shortcuts, and require release evidence for browser OpenClaw Lite worker boot,
+  runtime manifest sync, civic-tool absence, debug observability, skill context,
+  worker traffic, session context, modal lifetime continuity, shared-state route
+  adapter traces, and production override denial before M6 can close.
 - The research-only worker proposal adapter may exist in
   `server/world_civilization/worker_tool_adapter.js`, but it must stay disabled
   by default behind `V6_CIVIC_WORKER_TOOL_ADAPTER_ENABLED`, require OpenClaw
@@ -282,9 +289,12 @@ persistence resilience, and security/product release review.
 - Worker-first V6 civic tools must pass the exposure gate before becoming
   runtime-callable. Current research-only coverage starts in
   `server/world_civilization/tool_exposure_gate.js`, with route-level production
-  override safety in `tests/world_grid_region.test.js`; release still requires
+  override safety in `tests/world_grid_region.test.js`. Worker runtime
+  registration target coverage starts in
+  `server/world_civilization/worker_runtime_registration.js` and
+  `tests/world_civilization_worker_runtime_registration.test.js`; release still requires
   real OpenClaw Lite worker routing, Worker Traffic evidence, production browser
-  coverage, store-backed delegation proof evidence, delegation scope-mismatch
+  coverage, shared-state route traces, store-backed delegation proof evidence, delegation scope-mismatch
   coverage, read-only delegation budget handling, and release review signoff
   before any `et.world.civic.*` tool appears in `/api/world/tools`.
 - Vote authorization cannot be forged, replayed, self-delegated without policy,

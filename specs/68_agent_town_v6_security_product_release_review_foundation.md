@@ -115,8 +115,10 @@ are present.
   in normal gameplay.
 - Worker tool surface review: runtime manifest source-of-truth evidence,
   OpenClaw Lite worker origin, Worker Traffic and Skill Context observability,
-  mutation security envelope coverage, worker vote receipt adapter coverage,
-  and no backend shortcuts before any civic tool exposure.
+  browser worker runtime registration target evidence, production browser worker
+  coverage target evidence, mutation security envelope coverage, worker vote
+  receipt adapter coverage, and no backend shortcuts before any civic tool
+  exposure.
 - Modal lab surface review: town hub modal launch, standalone route denial,
   worker continuity, debug observability, non-executing panels, browser visual
   coverage at 390/768/1280 widths, keyboard accessibility, focus trap review,

@@ -70,10 +70,14 @@ test('V6 readiness gate baseline names every prerequisite domain but remains ope
   const workerToolGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'worker_tool_surface');
   assert.ok(workerToolGate.requiredArtifacts.includes('server/world_civilization/worker_tool_adapter.js'));
   assert.ok(workerToolGate.requiredArtifacts.includes('server/world_civilization/worker_vote_adapter.js'));
+  assert.ok(workerToolGate.requiredArtifacts.includes('server/world_civilization/worker_runtime_registration.js'));
   assert.ok(workerToolGate.requiredArtifacts.includes('tests/world_civilization_worker_tool_adapter.test.js'));
   assert.ok(workerToolGate.requiredArtifacts.includes('tests/world_civilization_worker_vote_adapter.test.js'));
+  assert.ok(workerToolGate.requiredArtifacts.includes('tests/world_civilization_worker_runtime_registration.test.js'));
   assert.ok(workerToolGate.requiredChecks.includes('worker_vote_receipt_adapter'));
   assert.ok(workerToolGate.requiredChecks.includes('worker_vote_route_edge_authorization'));
+  assert.ok(workerToolGate.requiredChecks.includes('browser_worker_runtime_registration_target'));
+  assert.ok(workerToolGate.requiredChecks.includes('production_browser_worker_coverage_target'));
   assert.ok(proposalGate.requiredChecks.includes('proposal_intake_readiness_gate'));
   assert.ok(proposalGate.requiredArtifacts.includes('server/world_civilization/routes.js'));
   assert.ok(proposalGate.requiredArtifacts.includes('server/world_civilization/store_wiring.js'));
