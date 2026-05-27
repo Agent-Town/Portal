@@ -42,7 +42,7 @@ are present.
   all-features regression, feature override safety, and load/rate replay
   evidence, including civic mutation security, delegated-agent proof, and
   governance preflight, effect execution gate, and agent participation
-  enforcement gate contract coverage.
+  enforcement gate, and institution readiness gate contract coverage.
 - Effect execution and rollback review: typed apply handlers, typed rollback
   handlers, real before/after state, authorization enforcement, idempotent
   apply/rollback behavior, irreversible-action review, conservation tests,
@@ -54,6 +54,13 @@ are present.
   budget consumption, store-backed delegation proof, delegation audit rows, no
   backend shortcuts, and no public autonomous mutation before delegated
   authority can affect any civic route or tool.
+- Civic institution readiness review: release-reviewed charter templates,
+  membership rules, eligibility rules, voting rules, moderation policies,
+  proposal-type rules, public audit summaries, public text rendering, M12
+  delegation policy linkage, charter-change execution/rollback review,
+  private-data exclusion, institution audit rows, no player-visible
+  institutions, and no world mutation before any institution can appear in
+  normal gameplay.
 - Worker tool surface review: runtime manifest source-of-truth evidence,
   OpenClaw Lite worker origin, Worker Traffic and Skill Context observability,
   mutation security envelope coverage, and no backend shortcuts before any

@@ -263,6 +263,64 @@ test('V6 release review blocks signoff without agent participation route-edge co
   assert.deepEqual(assertV6ReleaseReviewSafe(report), { ok: true, errors: [] });
 });
 
+test('V6 release review requires civic institution readiness evidence', () => {
+  const institutionGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'institution_readiness_review');
+  const validationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'validation_evidence');
+
+  assert.equal(institutionGate.owner, 'engineering_security_product');
+  assert.ok(institutionGate.requiredArtifacts.includes('specs/64_agent_town_v6_civic_institution_charter_foundation.md'));
+  assert.ok(institutionGate.requiredArtifacts.includes('server/world_civilization/institutions.js'));
+  assert.ok(institutionGate.requiredArtifacts.includes('server/world_civilization/delegations.js'));
+  assert.ok(institutionGate.requiredArtifacts.includes('server/world_civilization/effects.js'));
+  assert.ok(institutionGate.requiredArtifacts.includes('docs/security/PUBLIC_TEXT_RENDERING_POLICY.md'));
+  assert.ok(institutionGate.requiredArtifacts.includes('tests/world_civilization_institutions.test.js'));
+  assert.ok(institutionGate.requiredChecks.includes('charter_template_review'));
+  assert.ok(institutionGate.requiredChecks.includes('membership_rule_review'));
+  assert.ok(institutionGate.requiredChecks.includes('eligibility_rule_review'));
+  assert.ok(institutionGate.requiredChecks.includes('voting_rule_review'));
+  assert.ok(institutionGate.requiredChecks.includes('moderation_policy_review'));
+  assert.ok(institutionGate.requiredChecks.includes('proposal_type_review'));
+  assert.ok(institutionGate.requiredChecks.includes('public_text_rendering_review'));
+  assert.ok(institutionGate.requiredChecks.includes('delegation_policy_link'));
+  assert.ok(institutionGate.requiredChecks.includes('charter_change_execution_review'));
+  assert.ok(institutionGate.requiredChecks.includes('charter_change_rollback_review'));
+  assert.ok(institutionGate.requiredChecks.includes('private_data_exclusion'));
+  assert.ok(institutionGate.requiredChecks.includes('institution_audit_rows'));
+  assert.ok(institutionGate.requiredChecks.includes('no_player_visible_institutions'));
+  assert.ok(institutionGate.requiredChecks.includes('no_world_mutation'));
+  assert.ok(validationGate.requiredChecks.includes('institution_readiness_gate'));
+  assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_institutions.test.js'));
+});
+
+test('V6 release review blocks signoff without institution templates public text and rollback evidence', () => {
+  const evidence = Object.fromEntries(REQUIRED_REVIEW_GATES.map((gate) => [gate.key, completeEvidenceFor(gate)]));
+  evidence.institution_readiness_review = {
+    ...evidence.institution_readiness_review,
+    checks: evidence.institution_readiness_review.checks.filter((check) => (
+      check !== 'charter_template_review'
+      && check !== 'public_text_rendering_review'
+      && check !== 'delegation_policy_link'
+      && check !== 'charter_change_rollback_review'
+    ))
+  };
+  const report = buildV6ReleaseReviewReport({
+    includeResearchReview: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence
+  });
+  const institutionGate = report.gateReports.find((gate) => gate.key === 'institution_readiness_review');
+
+  assert.equal(report.releaseReady, false);
+  assert.equal(institutionGate.ok, false);
+  assert.deepEqual(institutionGate.missingChecks, [
+    'charter_template_review',
+    'public_text_rendering_review',
+    'delegation_policy_link',
+    'charter_change_rollback_review'
+  ]);
+  assert.deepEqual(assertV6ReleaseReviewSafe(report), { ok: true, errors: [] });
+});
+
 test('V6 release review report can only become ready with complete evidence and signoff', () => {
   const evidence = Object.fromEntries(REQUIRED_REVIEW_GATES.map((gate) => [gate.key, completeEvidenceFor(gate)]));
   const report = buildV6ReleaseReviewReport({

@@ -279,7 +279,14 @@ gate below has implementation, deterministic tests, and security/product signoff
   proposal/vote/moderation-gated charter amendment records and
   `institution.charter_amendment.recorded` audit rows; release still requires
   worker/tool integration, applied charter-change execution/rollback,
-  release-reviewed templates, and public text rendering review.
+  release-reviewed templates, and public text rendering review. The M13
+  research-only institution readiness gate in
+  `server/world_civilization/institutions.js` must require release-reviewed
+  charter, membership, eligibility, voting, moderation, proposal-type, public
+  audit, public-text, delegation-policy, charter-change execution/rollback,
+  private-data exclusion, and institution-audit evidence across all civic
+  institution template scopes while keeping `appliesCharterChange: false`,
+  `mutatesWorldState: false`, and `executionStatus: "not_executable"`.
 - Public works and shared resources must conserve accepted inputs, public
   progress, caps, rewards, and rollbacks across retries and restarts. Current
   research-only accounting starts this in
@@ -343,8 +350,8 @@ gate below has implementation, deterministic tests, and security/product signoff
   requires approved threat model, privacy review, abuse-case review,
   store-backed delegation proof and scope-mismatch evidence, data-retention
   policy, audit coverage review, deterministic validation evidence, effect
-  execution and rollback review, agent participation enforcement review, modal
-  lab surface review, and product signoff.
+  execution and rollback review, agent participation enforcement review, civic
+  institution readiness review, modal lab surface review, and product signoff.
 - Controlled release completion must remain a final go/no-go gate, not an
   automatic enablement path. Current gate tracking starts in
   `server/world_civilization/controlled_release.js` and

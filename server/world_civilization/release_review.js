@@ -103,6 +103,7 @@ const REQUIRED_REVIEW_GATES = [
       'tests/world_civilization_effects.test.js',
       'tests/world_civilization_rollback_recovery.test.js',
       'tests/world_civilization_delegations.test.js',
+      'tests/world_civilization_institutions.test.js',
       'tests/world_civilization_reputation.test.js',
       'tests/world_civilization_moderation.test.js',
       'tests/world_civilization_resilience.test.js',
@@ -115,7 +116,8 @@ const REQUIRED_REVIEW_GATES = [
       'feature_override_safety',
       'store_backed_delegation_proof',
       'effect_execution_gate',
-      'agent_participation_enforcement_gate'
+      'agent_participation_enforcement_gate',
+      'institution_readiness_gate'
     ],
     signoffRequired: true
   },
@@ -173,6 +175,41 @@ const REQUIRED_REVIEW_GATES = [
       'delegation_audit_rows',
       'no_backend_shortcuts',
       'no_public_autonomous_mutation'
+    ],
+    signoffRequired: true
+  },
+  {
+    key: 'institution_readiness_review',
+    label: 'Civic institution readiness review',
+    owner: 'engineering_security_product',
+    requiredArtifacts: [
+      RELEASE_REVIEW_ARTIFACT,
+      'specs/64_agent_town_v6_civic_institution_charter_foundation.md',
+      'server/world_civilization/institutions.js',
+      'server/world_civilization/delegations.js',
+      'server/world_civilization/effects.js',
+      'docs/security/PUBLIC_TEXT_RENDERING_POLICY.md',
+      'tests/world_civilization_institutions.test.js',
+      'tests/world_civilization_institution_process_restart.test.js',
+      'tests/world_civilization_delegations.test.js',
+      'tests/world_civilization_effects.test.js'
+    ],
+    requiredChecks: [
+      'charter_template_review',
+      'membership_rule_review',
+      'eligibility_rule_review',
+      'voting_rule_review',
+      'moderation_policy_review',
+      'proposal_type_review',
+      'public_audit_summary_review',
+      'public_text_rendering_review',
+      'delegation_policy_link',
+      'charter_change_execution_review',
+      'charter_change_rollback_review',
+      'private_data_exclusion',
+      'institution_audit_rows',
+      'no_player_visible_institutions',
+      'no_world_mutation'
     ],
     signoffRequired: true
   },

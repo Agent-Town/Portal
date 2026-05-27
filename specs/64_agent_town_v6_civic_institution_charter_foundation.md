@@ -93,6 +93,27 @@ Indexes cover institution/status replay, proposal replay, and requester replay.
   charter amendments write `institution.charter_amendment.recorded` audit rows
   without applying the replacement charter.
 
+## M13 Readiness Gate
+
+`buildV6CivicInstitutionReadinessGate()` records non-executing readiness
+evidence for the eventual release institution surface. It requires explicit
+research opt-in and `FEATURE_WORLD_V60_AGENT_CIVILIZATION`; broad V5 prototype
+overrides must not enable it.
+
+The gate remains `research_only`, `releaseReady: false`, `playerVisible: false`,
+`mutatesWorldState: false`, `appliesCharterChange: false`, and
+`executionStatus: "not_executable"`. It only passes research readiness when
+evidence covers release-reviewed charter templates, membership rules,
+eligibility rules, voting rules, moderation policies, proposal type rules,
+public audit summaries, public text rendering, M12 delegation policy linkage,
+charter-change execution review, charter-change rollback review, private-data
+exclusion, and `institution.*` audit rows across public-world, public-works,
+sandbox-policy, institution-charter, and service-policy templates.
+
+The corresponding assertion rejects fake readiness that exposes runtime/player
+surfaces, marks the gate release-ready, mutates world state, or applies a
+charter change.
+
 ## Release Gate
 
 M13 cannot move to `done` until:

@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
+const { V6_WORLD_FEATURE_FLAG, parseWorldGridFeatureFlags } = require('../server/world_grid/feature_flags');
 const { CIVIC_SCHEMA_VERSION } = require('../server/world_civilization/schemas');
 const { createCivicAuditLedger } = require('../server/world_civilization/audit_ledger');
 const { createCivicModerationStore } = require('../server/world_civilization/moderation');
@@ -12,6 +13,11 @@ const { createCivicVoteStore } = require('../server/world_civilization/votes');
 const {
   INSTITUTION_AMENDMENT_STATUS_RECORDED,
   INSTITUTION_STATUS_CHARTERED,
+  REQUIRED_INSTITUTION_READINESS_CHECKS,
+  REQUIRED_INSTITUTION_TEMPLATE_EVIDENCE_CHECKS,
+  REQUIRED_INSTITUTION_TEMPLATE_SCOPES,
+  assertV6CivicInstitutionReadinessGateSafe,
+  buildV6CivicInstitutionReadinessGate,
   createCivicInstitutionStore
 } = require('../server/world_civilization/institutions');
 
@@ -169,6 +175,26 @@ function vote(overrides = {}) {
     },
     receiptId: 'receipt_bridge_charter_update_001',
     idempotencyKey: 'idem_bridge_charter_update_vote_001',
+    ...overrides
+  };
+}
+
+function institutionReadinessEvidence(overrides = {}) {
+  return {
+    status: 'complete',
+    executionStatus: 'not_executable',
+    runtimeExposed: false,
+    playerVisible: false,
+    normalGameplayExposure: false,
+    mutatesWorldState: false,
+    appliesCharterChange: false,
+    workerToolIntegrated: true,
+    delegationPolicyLinked: true,
+    charterChangeExecutionReviewed: true,
+    charterChangeRollbackReviewed: true,
+    publicTextRenderingReviewed: true,
+    checks: [...REQUIRED_INSTITUTION_TEMPLATE_EVIDENCE_CHECKS],
+    templateScopes: [...REQUIRED_INSTITUTION_TEMPLATE_SCOPES],
     ...overrides
   };
 }
@@ -505,3 +531,131 @@ test('V6 institution charter amendments reject wrong proposal scope effect state
   );
   assert.equal(store.listCharterAmendments({ institutionId: 'institution_bridge_council_001' }).length, 0);
 }));
+
+test('V6 institution readiness gate is hidden without explicit research opt-in and V6 flag', () => {
+  const withoutResearchOptIn = buildV6CivicInstitutionReadinessGate({
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: institutionReadinessEvidence()
+  });
+  const broadV5Override = buildV6CivicInstitutionReadinessGate({
+    includeResearchInstitutionReadiness: true,
+    featureFlags: parseWorldGridFeatureFlags('all'),
+    evidence: institutionReadinessEvidence()
+  });
+
+  for (const report of [withoutResearchOptIn, broadV5Override]) {
+    assert.equal(report.available, false);
+    assert.equal(report.researchReady, false);
+    assert.equal(report.releaseReady, false);
+    assert.equal(report.failClosed, true);
+    assert.equal(report.runtimeExposed, false);
+    assert.equal(report.playerVisible, false);
+    assert.equal(report.normalGameplayExposure, false);
+    assert.equal(report.mutatesWorldState, false);
+    assert.equal(report.appliesCharterChange, false);
+    assert.deepEqual(report.checks, []);
+    assert.deepEqual(assertV6CivicInstitutionReadinessGateSafe(report), { ok: true, errors: [] });
+  }
+});
+
+test('V6 institution readiness gate records template worker delegation and public-text evidence without execution', () => {
+  const report = buildV6CivicInstitutionReadinessGate({
+    includeResearchInstitutionReadiness: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    source: 'node_test',
+    evidence: institutionReadinessEvidence()
+  });
+
+  assert.equal(report.available, true);
+  assert.equal(report.source, 'node_test');
+  assert.equal(report.researchReady, true);
+  assert.equal(report.releaseReady, false);
+  assert.equal(report.failClosed, false);
+  assert.equal(report.runtimeExposed, false);
+  assert.equal(report.playerVisible, false);
+  assert.equal(report.normalGameplayExposure, false);
+  assert.equal(report.mutatesWorldState, false);
+  assert.equal(report.appliesCharterChange, false);
+  assert.equal(report.executionStatus, 'not_executable');
+  assert.deepEqual(report.checks.map((entry) => entry.key), REQUIRED_INSTITUTION_READINESS_CHECKS);
+  assert.equal(report.evidence.ok, true);
+  assert.deepEqual(report.evidence.missingChecks, []);
+  assert.deepEqual(report.evidence.missingTemplateScopes, []);
+  assert.deepEqual(report.evidence.requiredTemplateScopes, REQUIRED_INSTITUTION_TEMPLATE_SCOPES);
+  assert.deepEqual(assertV6CivicInstitutionReadinessGateSafe(report), { ok: true, errors: [] });
+});
+
+test('V6 institution readiness gate fails closed without reviewed templates delegation public text and rollback evidence', () => {
+  const report = buildV6CivicInstitutionReadinessGate({
+    includeResearchInstitutionReadiness: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: institutionReadinessEvidence({
+      checks: REQUIRED_INSTITUTION_TEMPLATE_EVIDENCE_CHECKS.filter((check) => (
+        check !== 'charter_template_review'
+        && check !== 'public_text_rendering_review'
+        && check !== 'delegation_policy_review'
+        && check !== 'charter_change_rollback_review'
+      )),
+      templateScopes: REQUIRED_INSTITUTION_TEMPLATE_SCOPES.filter((scope) => scope !== 'service_policy'),
+      delegationPolicyLinked: false,
+      charterChangeRollbackReviewed: false,
+      publicTextRenderingReviewed: false
+    })
+  });
+
+  assert.equal(report.available, true);
+  assert.equal(report.researchReady, false);
+  assert.equal(report.failClosed, true);
+  assert.deepEqual(report.evidence.missingChecks, [
+    'charter_template_review',
+    'public_text_rendering_review',
+    'delegation_policy_review',
+    'charter_change_rollback_review'
+  ]);
+  assert.deepEqual(report.evidence.missingTemplateScopes, ['service_policy']);
+  assert.deepEqual(report.errors, [
+    'INSTITUTION_TEMPLATE_EVIDENCE_REQUIRED',
+    'INSTITUTION_DELEGATION_POLICY_LINK_REQUIRED',
+    'INSTITUTION_CHARTER_CHANGE_EXECUTION_REVIEW_REQUIRED',
+    'INSTITUTION_PUBLIC_TEXT_RENDERING_REQUIRED'
+  ]);
+  assert.deepEqual(assertV6CivicInstitutionReadinessGateSafe(report), { ok: true, errors: [] });
+});
+
+test('V6 institution readiness assertion rejects fake player-visible or applying charter readiness', () => {
+  const report = buildV6CivicInstitutionReadinessGate({
+    includeResearchInstitutionReadiness: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: institutionReadinessEvidence()
+  });
+  const unsafe = {
+    ...report,
+    runtimeExposed: true,
+    playerVisible: true,
+    normalGameplayExposure: true,
+    mutatesWorldState: true,
+    appliesCharterChange: true,
+    releaseReady: true,
+    executionStatus: 'executes',
+    evidence: {
+      ...report.evidence,
+      runtimeExposed: true,
+      playerVisible: true,
+      normalGameplayExposure: true,
+      mutatesWorldState: true,
+      appliesCharterChange: true
+    }
+  };
+  const result = assertV6CivicInstitutionReadinessGateSafe(unsafe);
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(','), /V6_CIVIC_INSTITUTION_READINESS_RUNTIME_HIDDEN_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_CIVIC_INSTITUTION_READINESS_PLAYER_HIDDEN_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_CIVIC_INSTITUTION_READINESS_NORMAL_GAMEPLAY_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_CIVIC_INSTITUTION_READINESS_WORLD_MUTATION_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_CIVIC_INSTITUTION_READINESS_CHARTER_CHANGE_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_CIVIC_INSTITUTION_READINESS_NON_EXECUTING_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_CIVIC_INSTITUTION_READINESS_RELEASE_READY_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_CIVIC_INSTITUTION_READINESS_EVIDENCE_PLAYER_HIDDEN_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_CIVIC_INSTITUTION_READINESS_EVIDENCE_CHARTER_CHANGE_FORBIDDEN/);
+});

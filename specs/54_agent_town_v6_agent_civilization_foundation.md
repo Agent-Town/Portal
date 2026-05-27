@@ -124,6 +124,16 @@ no public autonomous mutation. It remains non-executing with
 `releaseReady: false`, `delegatedExecutionEnabled: false`,
 `mutatesWorldState: false`, and `executionStatus: "not_executable"`.
 
+The research-only M13 civic institution readiness gate in
+`server/world_civilization/institutions.js` records release evidence required
+before any institution can appear in normal gameplay: release-reviewed charter,
+membership, eligibility, voting, moderation, proposal-type, public-audit,
+public-text, delegation-policy, charter-change execution/rollback,
+private-data exclusion, and institution-audit evidence across every civic
+template scope. It remains non-executing with `releaseReady: false`,
+`appliesCharterChange: false`, `mutatesWorldState: false`, and
+`executionStatus: "not_executable"`.
+
 The research-only modal lab surface contract in
 `server/world_civilization/lab_surface.js` is route-neutral and non-executing.
 It does not add a V6 route or normal gameplay surface; it only records the
@@ -143,9 +153,10 @@ summaries from replay rows without applying world state.
 The research-only release review gate in
 `server/world_civilization/release_review.js` names the threat model, privacy,
 abuse-case, data-retention, audit coverage, validation, effect execution and
-rollback review, agent participation enforcement review, modal lab surface
-review, and product signoff requirements that must be complete before normal
-gameplay exposure.
+rollback review, agent participation enforcement review, civic institution
+readiness review, worker tool surface review, modal lab surface review, and
+product signoff requirements that must be complete before normal gameplay
+exposure.
 
 The research-only controlled release gate in
 `server/world_civilization/controlled_release.js` requires M0-M17 completion,
