@@ -130,7 +130,9 @@ test('V6 release review requires product signoff target gate evidence', () => {
 
   assert.equal(productGate.owner, 'product');
   assert.ok(productGate.requiredArtifacts.includes('docs/ops/V6_AGENT_CIVILIZATION_CONTROLLED_RELEASE_RUNBOOK.md'));
+  assert.ok(productGate.requiredArtifacts.includes('server/world_civilization/blocker_exception_register.js'));
   assert.ok(productGate.requiredArtifacts.includes('server/world_civilization/product_signoff_targets.js'));
+  assert.ok(productGate.requiredArtifacts.includes('tests/world_civilization_blocker_exception_register.test.js'));
   assert.ok(productGate.requiredArtifacts.includes('tests/world_civilization_product_signoff_targets.test.js'));
   assert.ok(productGate.requiredChecks.includes('player_visible_scope'));
   assert.ok(productGate.requiredChecks.includes('normal_gameplay_exposure_denial'));
@@ -142,10 +144,13 @@ test('V6 release review requires product signoff target gate evidence', () => {
   assert.ok(productGate.requiredChecks.includes('support_runbook'));
   assert.ok(productGate.requiredChecks.includes('user_comms_plan'));
   assert.ok(productGate.requiredChecks.includes('observability_handoff'));
+  assert.ok(productGate.requiredChecks.includes('blocker_exception_register'));
   assert.ok(productGate.requiredChecks.includes('go_no_go_record'));
   assert.ok(productGate.requiredChecks.includes('post_release_monitoring'));
   assert.ok(productGate.requiredChecks.includes('product_signoff_target_gate'));
   assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_product_signoff_targets.test.js'));
+  assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_blocker_exception_register.test.js'));
+  assert.ok(validationGate.requiredChecks.includes('blocker_exception_register'));
   assert.ok(validationGate.requiredChecks.includes('product_signoff_target_gate'));
 });
 
@@ -159,6 +164,9 @@ test('V6 release review requires validation target gate evidence', () => {
   assert.ok(validationGate.requiredChecks.includes('split_playwright_smokes'));
   assert.ok(validationGate.requiredChecks.includes('all_features_regression'));
   assert.ok(validationGate.requiredChecks.includes('feature_override_safety'));
+  assert.ok(validationGate.requiredArtifacts.includes('server/world_civilization/blocker_exception_register.js'));
+  assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_blocker_exception_register.test.js'));
+  assert.ok(validationGate.requiredChecks.includes('blocker_exception_register'));
   assert.ok(validationGate.requiredChecks.includes('validation_target_gate'));
   assert.ok(validationGate.requiredChecks.includes('abuse_case_target_gate'));
   assert.ok(validationGate.requiredChecks.includes('product_signoff_target_gate'));

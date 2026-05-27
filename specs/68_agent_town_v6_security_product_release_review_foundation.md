@@ -163,8 +163,16 @@ are present.
 - Product release signoff: player-visible scope, normal gameplay exposure
   denial, product owner approval, QA release evidence, security release
   evidence, rollback plan, disable plan, support runbook, user comms plan,
-  observability handoff, go/no-go record, post-release monitoring, and product
-  signoff target gate.
+  observability handoff, blocker/exception register, go/no-go record,
+  post-release monitoring, and product signoff target gate.
+- Blocker/exception register: `server/world_civilization/blocker_exception_register.js`
+  and `tests/world_civilization_blocker_exception_register.test.js` record the
+  research-only target for register rows, blocker owners, P0/P1 clearance,
+  exception owner/expiry/mitigation, release decisions, security dependency
+  review, QA/product/security signoff, controlled-release handoff, and
+  private-data exclusion. The report must reject fake release readiness,
+  production enablement, runtime exposure, world mutation, expired exceptions,
+  unlinked exceptions, and open P0/P1 blockers.
 
 ## Release Rule
 

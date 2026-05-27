@@ -12,6 +12,8 @@ const {
   buildV6ReadinessGateReport
 } = require('../server/world_civilization/readiness_gate');
 const {
+  BLOCKER_EXCEPTION_REGISTER_ARTIFACT,
+  BLOCKER_EXCEPTION_REGISTER_TEST,
   CONTROLLED_RELEASE_TARGET_ARTIFACT,
   CONTROLLED_RELEASE_TARGET_TEST,
   CONTROLLED_RELEASE_RUNBOOK,
@@ -133,6 +135,8 @@ test('V6 controlled release requires target gate evidence for launch controls', 
   const targetGate = REQUIRED_CONTROLLED_RELEASE_GATES.find((gate) => gate.key === 'controlled_release_target_gate');
 
   assert.ok(targetGate.requiredArtifacts.includes(CONTROLLED_RELEASE_RUNBOOK));
+  assert.ok(targetGate.requiredArtifacts.includes(BLOCKER_EXCEPTION_REGISTER_ARTIFACT));
+  assert.ok(targetGate.requiredArtifacts.includes(BLOCKER_EXCEPTION_REGISTER_TEST));
   assert.ok(targetGate.requiredArtifacts.includes(CONTROLLED_RELEASE_TARGET_ARTIFACT));
   assert.ok(targetGate.requiredArtifacts.includes(CONTROLLED_RELEASE_TARGET_TEST));
   assert.ok(targetGate.requiredChecks.includes('readiness_gate_closed_target'));
@@ -145,6 +149,15 @@ test('V6 controlled release requires target gate evidence for launch controls', 
   assert.ok(targetGate.requiredChecks.includes('canary_exit_target'));
   assert.ok(targetGate.requiredChecks.includes('emergency_disable_target'));
   assert.ok(targetGate.requiredChecks.includes('post_release_verification_target'));
+
+  const blockerGate = REQUIRED_CONTROLLED_RELEASE_GATES.find((gate) => gate.key === 'blocker_clearance');
+  assert.ok(blockerGate.requiredArtifacts.includes(BLOCKER_EXCEPTION_REGISTER_ARTIFACT));
+  assert.ok(blockerGate.requiredArtifacts.includes(BLOCKER_EXCEPTION_REGISTER_TEST));
+  assert.ok(blockerGate.requiredChecks.includes('blocker_exception_register'));
+  assert.ok(blockerGate.requiredChecks.includes('no_p0_blockers'));
+  assert.ok(blockerGate.requiredChecks.includes('no_p1_blockers'));
+  assert.ok(blockerGate.requiredChecks.includes('no_expired_exceptions'));
+  assert.ok(blockerGate.requiredChecks.includes('exception_owner_expiry_mitigation'));
 });
 
 test('V6 controlled release can only become ready after prior milestones, release review, and controls close', () => {

@@ -165,9 +165,11 @@ const REQUIRED_REVIEW_GATES = [
     owner: 'qa_engineering',
     requiredArtifacts: [
       RELEASE_REVIEW_ARTIFACT,
+      'server/world_civilization/blocker_exception_register.js',
       'server/world_civilization/ci_validation_matrix_targets.js',
       'server/world_civilization/release_candidate_targets.js',
       'server/world_civilization/validation_targets.js',
+      'tests/world_civilization_blocker_exception_register.test.js',
       'tests/world_civilization_ci_validation_matrix_targets.test.js',
       'tests/world_civilization_release_candidate_targets.test.js',
       'tests/world_civilization_validation_targets.test.js',
@@ -203,6 +205,7 @@ const REQUIRED_REVIEW_GATES = [
       'split_playwright_smokes',
       'all_features_regression',
       'feature_override_safety',
+      'blocker_exception_register',
       'ci_validation_matrix_gate',
       'release_candidate_target_gate',
       'validation_target_gate',
@@ -639,7 +642,9 @@ const REQUIRED_REVIEW_GATES = [
     requiredArtifacts: [
       RELEASE_REVIEW_ARTIFACT,
       'docs/ops/V6_AGENT_CIVILIZATION_CONTROLLED_RELEASE_RUNBOOK.md',
+      'server/world_civilization/blocker_exception_register.js',
       'server/world_civilization/product_signoff_targets.js',
+      'tests/world_civilization_blocker_exception_register.test.js',
       'tests/world_civilization_product_signoff_targets.test.js'
     ],
     requiredChecks: [
@@ -653,6 +658,7 @@ const REQUIRED_REVIEW_GATES = [
       'support_runbook',
       'user_comms_plan',
       'observability_handoff',
+      'blocker_exception_register',
       'go_no_go_record',
       'post_release_monitoring',
       'product_signoff_target_gate'

@@ -51,6 +51,10 @@ test('V6 controlled release targets name every launch control surface', () => {
   assert.ok(matrix.targetKeys.includes('blocker_clearance'));
   assert.ok(matrix.targetKeys.includes('controlled_release_window'));
   assert.ok(matrix.targetKeys.includes('emergency_disable'));
+  assert.equal(
+    V6_CONTROLLED_RELEASE_TARGETS.find((target) => target.key === 'blocker_clearance').currentEvidence,
+    'server/world_civilization/blocker_exception_register.js'
+  );
   assert.match(matrix.digest, /^sha256:[a-f0-9]{64}$/);
 });
 

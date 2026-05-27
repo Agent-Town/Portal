@@ -21,6 +21,7 @@ const REQUIRED_RELEASE_CANDIDATE_GAPS = [
   'command_transcript_required',
   'browser_console_budget_signoff_required',
   'playwright_trace_archive_required',
+  'blocker_exception_register_required',
   'qa_owner_signoff_required',
   'security_product_signoff_required',
   'controlled_release_handoff_required'
@@ -108,7 +109,7 @@ const V6_RELEASE_CANDIDATE_TARGETS = [
     key: 'blocker_exception_register',
     owner: 'release_manager',
     requiredEvidence: 'Every blocker, exception, owner, expiry, mitigation, and release decision must be recorded before controlled release.',
-    currentEvidence: 'server/world_civilization/controlled_release_targets.js',
+    currentEvidence: 'server/world_civilization/blocker_exception_register.js',
     releaseEvidenceRequired: 'blocker_exception_register'
   },
   {

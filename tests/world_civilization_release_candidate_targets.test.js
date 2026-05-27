@@ -51,8 +51,13 @@ test('V6 release-candidate targets name every evidence packet surface', () => {
   assert.ok(matrix.targetKeys.includes('browser_console_error_budget'));
   assert.ok(matrix.targetKeys.includes('playwright_trace_archive'));
   assert.ok(matrix.targetKeys.includes('production_override_recheck'));
+  assert.ok(matrix.targetKeys.includes('blocker_exception_register'));
   assert.ok(matrix.targetKeys.includes('qa_owner_signoff'));
   assert.ok(matrix.targetKeys.includes('controlled_release_handoff'));
+  assert.equal(
+    V6_RELEASE_CANDIDATE_TARGETS.find((target) => target.key === 'blocker_exception_register').currentEvidence,
+    'server/world_civilization/blocker_exception_register.js'
+  );
   assert.match(matrix.digest, /^sha256:[a-f0-9]{64}$/);
 });
 
@@ -80,6 +85,7 @@ test('V6 release-candidate report records evidence without enabling release', ()
   assert.equal(report.targetMatrix.ok, true);
   assert.equal(report.observedEvidence.releaseCandidateEnvironmentCount, 1);
   assert.equal(report.observedEvidence.runtimeCivicToolExposureCount, 0);
+  assert.ok(report.releaseGaps.includes('blocker_exception_register_required'));
   assert.deepEqual(report.releaseGaps, REQUIRED_RELEASE_CANDIDATE_GAPS);
   assert.deepEqual(assertV6ReleaseCandidateTargetReportSafe(report), { ok: true, errors: [] });
 });
@@ -99,6 +105,7 @@ test('V6 release-candidate report fails closed for incomplete targets or missing
   assert.match(missingEvidence.errors.join(','), /V6_RELEASE_CANDIDATE_COMMAND_TRANSCRIPT_REQUIRED/);
   assert.match(missingEvidence.errors.join(','), /V6_RELEASE_CANDIDATE_CONSOLE_BUDGET_REQUIRED/);
   assert.match(missingEvidence.errors.join(','), /V6_RELEASE_CANDIDATE_TRACE_ARCHIVE_REQUIRED/);
+  assert.match(missingEvidence.errors.join(','), /V6_RELEASE_CANDIDATE_BLOCKER_REGISTER_REQUIRED/);
   assert.match(missingEvidence.errors.join(','), /V6_RELEASE_CANDIDATE_QA_SIGNOFF_REQUIRED/);
   assert.match(missingEvidence.errors.join(','), /V6_RELEASE_CANDIDATE_CONTROLLED_RELEASE_HANDOFF_REQUIRED/);
 });

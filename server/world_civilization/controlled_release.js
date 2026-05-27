@@ -5,6 +5,8 @@ const V6_CONTROLLED_RELEASE_VERSION = 'agent-town.v6.controlled_release.v1';
 const CONTROLLED_RELEASE_RUNBOOK = 'docs/ops/V6_AGENT_CIVILIZATION_CONTROLLED_RELEASE_RUNBOOK.md';
 const V6_READINESS_GATE_ARTIFACT = 'specs/release-gates/v60_agent_civilization_readiness_gate.md';
 const V6_MILESTONE_PLAN_ARTIFACT = 'docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md';
+const BLOCKER_EXCEPTION_REGISTER_ARTIFACT = 'server/world_civilization/blocker_exception_register.js';
+const BLOCKER_EXCEPTION_REGISTER_TEST = 'tests/world_civilization_blocker_exception_register.test.js';
 const CONTROLLED_RELEASE_TARGET_ARTIFACT = 'server/world_civilization/controlled_release_targets.js';
 const CONTROLLED_RELEASE_TARGET_TEST = 'tests/world_civilization_controlled_release_targets.test.js';
 
@@ -33,7 +35,13 @@ const REQUIRED_CONTROLLED_RELEASE_GATES = [
   {
     key: 'controlled_release_target_gate',
     label: 'Controlled release target gate',
-    requiredArtifacts: [CONTROLLED_RELEASE_RUNBOOK, CONTROLLED_RELEASE_TARGET_ARTIFACT, CONTROLLED_RELEASE_TARGET_TEST],
+    requiredArtifacts: [
+      CONTROLLED_RELEASE_RUNBOOK,
+      BLOCKER_EXCEPTION_REGISTER_ARTIFACT,
+      BLOCKER_EXCEPTION_REGISTER_TEST,
+      CONTROLLED_RELEASE_TARGET_ARTIFACT,
+      CONTROLLED_RELEASE_TARGET_TEST
+    ],
     requiredChecks: [
       'readiness_gate_closed_target',
       'production_flag_safety_target',
@@ -86,8 +94,17 @@ const REQUIRED_CONTROLLED_RELEASE_GATES = [
   {
     key: 'blocker_clearance',
     label: 'Release blocker clearance',
-    requiredArtifacts: [CONTROLLED_RELEASE_RUNBOOK],
-    requiredChecks: ['no_p0_blockers', 'no_p1_blockers', 'security_dependency_review', 'qa_signoff', 'product_signoff']
+    requiredArtifacts: [CONTROLLED_RELEASE_RUNBOOK, BLOCKER_EXCEPTION_REGISTER_ARTIFACT, BLOCKER_EXCEPTION_REGISTER_TEST],
+    requiredChecks: [
+      'blocker_exception_register',
+      'no_p0_blockers',
+      'no_p1_blockers',
+      'no_expired_exceptions',
+      'exception_owner_expiry_mitigation',
+      'security_dependency_review',
+      'qa_signoff',
+      'product_signoff'
+    ]
   },
   {
     key: 'controlled_release_window',
@@ -303,6 +320,8 @@ function assertV6ControlledReleaseSafe(report = {}) {
 }
 
 module.exports = {
+  BLOCKER_EXCEPTION_REGISTER_ARTIFACT,
+  BLOCKER_EXCEPTION_REGISTER_TEST,
   CONTROLLED_RELEASE_TARGET_ARTIFACT,
   CONTROLLED_RELEASE_TARGET_TEST,
   CONTROLLED_RELEASE_RUNBOOK,

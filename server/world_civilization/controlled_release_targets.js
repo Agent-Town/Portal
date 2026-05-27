@@ -63,7 +63,7 @@ const V6_CONTROLLED_RELEASE_TARGETS = [
     key: 'blocker_clearance',
     surface: 'release_blockers',
     requiredEvidence: 'No P0/P1 blockers may remain, and security dependency review, QA signoff, and product signoff must be approved.',
-    currentEvidence: 'docs/security/V6_AGENT_CIVILIZATION_RELEASE_REVIEW.md',
+    currentEvidence: 'server/world_civilization/blocker_exception_register.js',
     releaseEvidenceRequired: 'blocker_clearance_record'
   },
   {

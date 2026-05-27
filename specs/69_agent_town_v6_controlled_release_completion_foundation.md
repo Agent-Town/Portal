@@ -7,6 +7,7 @@ Milestone: M18 V6 controlled release completion
 Runtime contracts:
 
 - `server/world_civilization/readiness_gate.js`
+- `server/world_civilization/blocker_exception_register.js`
 - `server/world_civilization/controlled_release.js`
 - `server/world_civilization/controlled_release_targets.js`
 
@@ -43,7 +44,10 @@ release or enabling production.
 - Rollback and disable controls.
 - Release observability.
 - Support runbook.
-- Release blocker clearance.
+- Release blocker clearance through the blocker/exception register, including
+  P0/P1 clearance, no expired exceptions, owner/expiry/mitigation records,
+  security dependency review, QA signoff, product signoff, and private-data
+  exclusion.
 - Controlled release window.
 
 ## Release Rule
