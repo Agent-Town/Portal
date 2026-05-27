@@ -117,6 +117,8 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'tests/world_grid_region_preferences_persistence.test.js',
     'tests/world_grid_region_preferences_restart_probe_child.js',
     'tests/world_grid_audit_persistence.test.js',
+    'tests/world_grid_csrf_persistence.test.js',
+    'tests/world_grid_csrf_restart_probe_child.js',
     'tests/world_grid_rate_limit_persistence.test.js',
     'tests/world_grid_rate_limit_restart_probe_child.js',
     'tests/world_grid_idempotency_persistence.test.js',
@@ -669,20 +671,30 @@ test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () 
   assert.match(delegationSource, /V6_AGENT_PARTICIPATION_ENFORCEMENT_RELEASE_READY_FORBIDDEN/);
 });
 
-test('world-grid CSRF policy is tracked as prototype-only M5 coverage', () => {
+test('world-grid CSRF policy is tracked as an M5 durable foundation', () => {
   const plan = read('docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md');
   const security = read('docs/security/WORLD_GRID_MUTATION_SECURITY_PLAN.md');
   const stateModel = read('docs/technical/WORLD_GRID_STATE_MODEL.md');
   const evidence = read('docs/release-evidence/WORLD_GRID_V50_REGION_PROTOTYPE_EVIDENCE_2026-05-26.md');
 
-  assert.match(plan, /owner-bound CSRF tokens/);
+  assert.match(plan, /optional durable hashed-token SQLite foundation/);
+  assert.match(plan, /WORLD_GRID_CSRF_SQLITE_PATH/);
   assert.match(security, /\/api\/world\/mutation-token/);
-  assert.match(security, /missing, invalid, and cross-owner tokens/);
-  assert.match(security, /durable CSRF token storage/);
+  assert.match(security, /WORLD_GRID_CSRF_SQLITE_PATH/);
+  assert.match(security, /world_grid_csrf_tokens/);
+  assert.match(security, /owner-bound token hashes/);
+  assert.match(security, /cross-owner and expired tokens fail closed/);
+  assert.match(security, /separate Node process\s+restart/);
+  assert.match(security, /final browser-session-bound CSRF/);
   assert.match(stateModel, /server\/world_grid\/csrf\.js/);
-  assert.match(stateModel, /Durable\/session-bound CSRF token issuance/);
+  assert.match(stateModel, /world_grid_csrf_tokens/);
+  assert.match(stateModel, /WORLD_GRID_CSRF_SQLITE_PATH/);
+  assert.match(stateModel, /owner-bound hashed token rows/);
   assert.match(evidence, /Mutation CSRF guard/);
-  assert.match(evidence, /cross-owner tokens/);
+  assert.match(evidence, /tests\/world_grid_csrf_persistence\.test\.js/);
+  assert.match(evidence, /token hashes survive reopen/);
+  assert.match(evidence, /separate Node process restarts/);
+  assert.match(evidence, /browser-session-bound CSRF integration/);
 });
 
 test('world-grid mutation rate-limit policy is tracked as an M5 durable foundation', () => {

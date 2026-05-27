@@ -28,6 +28,7 @@ const {
   closeWorldGridAuditLog,
   createWorldGridAuditLog
 } = require('../server/world_grid/audit_log');
+const { closeWorldGridCsrfStore } = require('../server/world_grid/csrf');
 const { closeWorldGridRateLimitStore } = require('../server/world_grid/rate_limit');
 const { closeWorldGridRegionPreferenceStore } = require('../server/world_grid/preferences');
 const { closeWorldGridServiceStore } = require('../server/world_grid/services');
@@ -40,6 +41,7 @@ async function withWorldGridServer({ identity, envPatch = {} }, fn) {
     FEATURE_WORLD_GRID_V50_REGION: process.env.FEATURE_WORLD_GRID_V50_REGION,
     WORLD_GRID_FEATURE_FLAGS: process.env.WORLD_GRID_FEATURE_FLAGS,
     WORLD_GRID_CSRF_REQUIRED: process.env.WORLD_GRID_CSRF_REQUIRED,
+    WORLD_GRID_CSRF_SQLITE_PATH: process.env.WORLD_GRID_CSRF_SQLITE_PATH,
     WORLD_GRID_CSRF_TOKEN_TTL_MS: process.env.WORLD_GRID_CSRF_TOKEN_TTL_MS,
     WORLD_GRID_AUDIT_SQLITE_PATH: process.env.WORLD_GRID_AUDIT_SQLITE_PATH,
     WORLD_GRID_CLAIMS_SQLITE_PATH: process.env.WORLD_GRID_CLAIMS_SQLITE_PATH,
@@ -71,6 +73,7 @@ async function withWorldGridServer({ identity, envPatch = {} }, fn) {
     await new Promise((resolve) => server.close(resolve));
     closeWorldGridAuditLog();
     closeWorldGridClaimStore();
+    closeWorldGridCsrfStore();
     closeWorldGridEventStore();
     closeWorldGridIdempotencyStore();
     closeWorldGridPublicPresenceStore();
