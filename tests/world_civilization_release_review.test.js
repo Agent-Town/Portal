@@ -312,16 +312,21 @@ test('V6 release review requires worker tool exposure evidence', () => {
   assert.ok(workerGate.requiredArtifacts.includes('server/world_civilization/tools.js'));
   assert.ok(workerGate.requiredArtifacts.includes('server/world_civilization/tool_exposure_gate.js'));
   assert.ok(workerGate.requiredArtifacts.includes('server/world_civilization/worker_tool_adapter.js'));
+  assert.ok(workerGate.requiredArtifacts.includes('server/world_civilization/worker_vote_adapter.js'));
   assert.ok(workerGate.requiredArtifacts.includes('tests/world_civilization_tool_exposure_gate.test.js'));
   assert.ok(workerGate.requiredArtifacts.includes('tests/world_civilization_worker_tool_adapter.test.js'));
+  assert.ok(workerGate.requiredArtifacts.includes('tests/world_civilization_worker_vote_adapter.test.js'));
   assert.ok(workerGate.requiredArtifacts.includes('docs/internal-skill-testline.md'));
   assert.ok(workerGate.requiredChecks.includes('runtime_manifest_source_of_truth'));
   assert.ok(workerGate.requiredChecks.includes('openclaw_lite_worker_origin'));
   assert.ok(workerGate.requiredChecks.includes('worker_traffic_observability'));
   assert.ok(workerGate.requiredChecks.includes('skill_context_observability'));
   assert.ok(workerGate.requiredChecks.includes('mutation_security_envelope'));
+  assert.ok(workerGate.requiredChecks.includes('worker_vote_receipt_adapter'));
   assert.ok(workerGate.requiredChecks.includes('no_backend_shortcuts'));
+  assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_worker_vote_adapter.test.js'));
   assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_mutation_security.test.js'));
+  assert.ok(validationGate.requiredChecks.includes('worker_vote_adapter_gate'));
 });
 
 test('V6 release review requires proposal intake route tool and review queue evidence', () => {
@@ -389,9 +394,11 @@ test('V6 release review requires vote authorization readiness evidence', () => {
   assert.ok(voteGate.requiredArtifacts.includes('server/world_civilization/routes.js'));
   assert.ok(voteGate.requiredArtifacts.includes('server/world_civilization/store_wiring.js'));
   assert.ok(voteGate.requiredArtifacts.includes('server/world_civilization/votes.js'));
+  assert.ok(voteGate.requiredArtifacts.includes('server/world_civilization/worker_vote_adapter.js'));
   assert.ok(voteGate.requiredArtifacts.includes('server/world_civilization/governance_preflight.js'));
   assert.ok(voteGate.requiredArtifacts.includes('tests/world_civilization_routes.test.js'));
   assert.ok(voteGate.requiredArtifacts.includes('tests/world_civilization_votes.test.js'));
+  assert.ok(voteGate.requiredArtifacts.includes('tests/world_civilization_worker_vote_adapter.test.js'));
   assert.ok(voteGate.requiredChecks.includes('server_verified_voter_authorization'));
   assert.ok(voteGate.requiredChecks.includes('eligibility_rule_verification'));
   assert.ok(voteGate.requiredChecks.includes('one_vote_accounting'));
@@ -401,6 +408,7 @@ test('V6 release review requires vote authorization readiness evidence', () => {
   assert.ok(voteGate.requiredChecks.includes('delegation_policy_review'));
   assert.ok(voteGate.requiredChecks.includes('per_institution_voting_templates'));
   assert.ok(voteGate.requiredChecks.includes('route_edge_vote_auth'));
+  assert.ok(voteGate.requiredChecks.includes('worker_tool_vote_registration'));
   assert.ok(voteGate.requiredChecks.includes('hidden_vote_route_store_wiring'));
   assert.ok(voteGate.requiredChecks.includes('quorum_threshold_policy'));
   assert.ok(voteGate.requiredChecks.includes('governance_preflight_integration'));

@@ -182,6 +182,10 @@ function mutationSecurityEnvelopeOk(mutationSecurityEnvelope = null, vote = null
   }
   const safety = assertV6CivicMutationSecuritySafe(mutationSecurityEnvelope);
   const errors = [...(safety.errors || [])];
+  const envelopeErrors = Array.isArray(mutationSecurityEnvelope.errors) ? mutationSecurityEnvelope.errors : [];
+  for (const error of envelopeErrors) {
+    if (error && !errors.includes(error)) errors.push(error);
+  }
   if (safety.ok !== true) errors.push('MUTATION_SECURITY_ENVELOPE_UNSAFE');
   if (mutationSecurityEnvelope.version !== V6_CIVIC_MUTATION_SECURITY_VERSION) {
     errors.push('MUTATION_SECURITY_VERSION_REQUIRED');

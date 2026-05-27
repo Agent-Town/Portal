@@ -104,10 +104,39 @@ flag is enabled, and explicit vote stores are provided directly or through
 The route builds the M5 civic mutation-security envelope, passes the vote
 through `buildV6VoteRouteAuthorizationEnvelope()`, and records a vote receipt
 only after the route-edge envelope authorizes the request. It supports the
-hidden human and delegated-agent vote route surfaces, fails closed without
+hidden human and delegated-agent vote route surfaces. The
+`worker_tool_vote_surface` remains reserved for the OpenClaw Lite worker adapter
+and is not HTTP-route callable. The route fails closed without
 same-origin/CSRF-reviewed session and wallet evidence, and does not publish
 runtime tools, apply vote outcomes, expose player-visible UI, mutate private
 town state, or execute proposal effects.
+
+## Worker Vote Adapter
+
+`server/world_civilization/worker_vote_adapter.js` is the internal
+research-only worker adapter for `et.world.civic.votes.cast`. It is disabled by
+default behind `V6_CIVIC_WORKER_VOTE_ADAPTER_ENABLED=1` plus explicit V6
+research opt-in and is not registered in runtime `/api/world/tools`.
+
+`castVoteFromWorkerTool()` requires:
+
+- OpenClaw Lite worker origin and no backend shortcut.
+- Worker Tools, Skill Context, Worker Traffic, Brain, and Session Context
+  observability.
+- Same-origin/CSRF-reviewed M5 mutation-security evidence.
+- Store-backed `vote_advice` delegation bound to the session owner and worker
+  agent.
+- A `ready_for_vote` proposal.
+- Server-attested delegation vote authorization, eligibility proof, and
+  idempotency key.
+- `buildV6VoteRouteAuthorizationEnvelope()` authorization for
+  `worker_tool_vote_surface`.
+
+The worker adapter records only a vote receipt. It does not apply vote outcomes,
+execute proposal effects, publish V6 civic tools, expose player-visible UI,
+mutate private towns, or mutate another user's world. Denied envelopes preserve
+the underlying mutation-security reason, such as `CSRF_REQUIRED`, for internal
+debugging without exposing the tool to normal gameplay.
 
 ## Voting Template Review
 
@@ -162,5 +191,6 @@ Delegation lifecycle storage starts in
 delegation references until M12 worker/tool enforcement, action-budget
 consumption, expiry checks, revocation checks, and route-edge authorization are
 implemented and tested. The current research vote route uses store-backed
-`vote_advice` proof for delegated-agent vote receipts; worker-tool vote
-registration remains pending.
+`vote_advice` proof for delegated-agent vote receipts, and the internal worker
+vote adapter uses the same store-backed `vote_advice` proof plus the
+`worker_tool_vote_surface` route-edge envelope before recording any receipt.

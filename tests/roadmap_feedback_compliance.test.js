@@ -103,6 +103,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'server/world_civilization/tools.js',
     'server/world_civilization/votes.js',
     'server/world_civilization/worker_tool_adapter.js',
+    'server/world_civilization/worker_vote_adapter.js',
     'tests/world_civilization_process_restart.test.js',
     'tests/world_civilization_proposal_vote_process_restart.test.js',
     'tests/world_civilization_reputation_moderation_process_restart.test.js',
@@ -119,6 +120,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'tests/world_civilization_routes.test.js',
     'tests/world_civilization_tool_exposure_gate.test.js',
     'tests/world_civilization_worker_tool_adapter.test.js',
+    'tests/world_civilization_worker_vote_adapter.test.js',
     'tests/world_civilization_governance_preflight.test.js',
     'tests/world_grid_region_preferences_persistence.test.js',
     'tests/world_grid_region_preferences_restart_probe_child.js',
@@ -189,6 +191,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   const proposalRouteSource = read('server/world_civilization/routes.js');
   const proposalStoreWiringSource = read('server/world_civilization/store_wiring.js');
   const workerToolAdapterSource = read('server/world_civilization/worker_tool_adapter.js');
+  const workerVoteAdapterSource = read('server/world_civilization/worker_vote_adapter.js');
   const voteSource = read('server/world_civilization/votes.js');
   const votingTemplateSource = read('server/world_civilization/voting_templates.js');
   const reputationSource = read('server/world_civilization/reputation.js');
@@ -249,16 +252,23 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /server\/world_civilization\/tools\.js/);
   assert.match(plan, /server\/world_civilization\/tool_exposure_gate\.js/);
   assert.match(plan, /server\/world_civilization\/worker_tool_adapter\.js/);
+  assert.match(plan, /server\/world_civilization\/worker_vote_adapter\.js/);
   assert.match(plan, /V6_CIVIC_WORKER_TOOL_ADAPTER_ENABLED/);
+  assert.match(plan, /V6_CIVIC_WORKER_VOTE_ADAPTER_ENABLED/);
   assert.match(plan, /et\.world\.civic\.proposals\.submit_for_review/);
+  assert.match(plan, /et\.world\.civic\.votes\.cast/);
   assert.match(plan, /store-backed `proposal_drafting` delegation/);
   assert.match(plan, /OpenClaw Lite worker origin/);
   assert.match(spec, /research-only civic tool draft/);
   assert.match(spec, /tool exposure gate/);
   assert.match(toolSpec, /Worker Tool Adapter/);
   assert.match(toolSpec, /server\/world_civilization\/worker_tool_adapter\.js/);
+  assert.match(toolSpec, /Worker Vote Adapter/);
+  assert.match(toolSpec, /server\/world_civilization\/worker_vote_adapter\.js/);
   assert.match(toolSpec, /V6_CIVIC_WORKER_TOOL_ADAPTER_ENABLED/);
+  assert.match(toolSpec, /V6_CIVIC_WORKER_VOTE_ADAPTER_ENABLED/);
   assert.match(toolSpec, /et\.world\.civic\.proposals\.submit_for_review/);
+  assert.match(toolSpec, /et\.world\.civic\.votes\.cast/);
   assert.match(toolSpec, /runtime `\/api\/world\/tools`/);
   assert.match(gate, /server\/world_civilization\/tools\.js/);
   assert.match(gate, /server\/world_civilization\/tool_exposure_gate\.js/);
@@ -326,6 +336,16 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(workerToolAdapterSource, /sameOriginCsrfReviewed/);
   assert.match(workerToolAdapterSource, /runtimeExposed: false/);
   assert.match(workerToolAdapterSource, /executesProposalEffects: false/);
+  assert.match(workerVoteAdapterSource, /V6_CIVIC_WORKER_VOTE_ADAPTER_VERSION/);
+  assert.match(workerVoteAdapterSource, /WORKER_VOTE_CAST_TOOL_NAME/);
+  assert.match(workerVoteAdapterSource, /V6_CIVIC_WORKER_VOTE_ADAPTER_ENABLED/);
+  assert.match(workerVoteAdapterSource, /castVoteFromWorkerTool/);
+  assert.match(workerVoteAdapterSource, /buildV6CivicMutationSecurityEnvelope/);
+  assert.match(workerVoteAdapterSource, /buildV6VoteRouteAuthorizationEnvelope/);
+  assert.match(workerVoteAdapterSource, /vote_advice/);
+  assert.match(workerVoteAdapterSource, /sameOriginCsrfReviewed/);
+  assert.match(workerVoteAdapterSource, /recordsVote: true/);
+  assert.match(workerVoteAdapterSource, /appliesVoteOutcome: false/);
   assert.match(gate, /POST \/api\/world\/civilization\/proposals\/submit/);
   assert.match(gate, /V6_CIVIC_PROPOSAL_SUBMISSION_ROUTE_ENABLED/);
   assert.match(gate, /V6_CIVIC_PROPOSAL_STORE_WIRING_ENABLED/);
@@ -342,14 +362,19 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(readinessSource, /server\/world_civilization\/routes\.js/);
   assert.match(readinessSource, /server\/world_civilization\/store_wiring\.js/);
   assert.match(readinessSource, /server\/world_civilization\/worker_tool_adapter\.js/);
+  assert.match(readinessSource, /server\/world_civilization\/worker_vote_adapter\.js/);
   assert.match(readinessSource, /tests\/world_civilization_routes\.test\.js/);
   assert.match(readinessSource, /tests\/world_civilization_worker_tool_adapter\.test\.js/);
+  assert.match(readinessSource, /tests\/world_civilization_worker_vote_adapter\.test\.js/);
   assert.match(releaseReview, /worker-origin proposal tool adapter/);
+  assert.match(releaseReview, /worker-origin vote tool adapter/);
   assert.match(releaseReview, /missing worker observability/);
   assert.match(releaseReview, /missing delegation/);
   assert.match(releaseReview, /browser worker registration/);
   assert.match(releaseReviewSource, /server\/world_civilization\/worker_tool_adapter\.js/);
+  assert.match(releaseReviewSource, /server\/world_civilization\/worker_vote_adapter\.js/);
   assert.match(releaseReviewSource, /tests\/world_civilization_worker_tool_adapter\.test\.js/);
+  assert.match(releaseReviewSource, /tests\/world_civilization_worker_vote_adapter\.test\.js/);
   assert.match(plan, /M8 Vote authorization and delegation \| `in_progress`/);
   assert.match(plan, /evaluateVoteApprovalPolicy\(\)/);
   assert.match(plan, /buildV6VoteRouteAuthorizationEnvelope\(\)/);
@@ -360,6 +385,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /V6_CIVIC_VOTE_STORE_WIRING_ENABLED/);
   assert.match(plan, /V6_CIVIC_VOTE_SQLITE_PATH/);
   assert.match(plan, /worker-tool vote registration/);
+  assert.match(plan, /castVoteFromWorkerTool\(\)/);
   assert.match(plan, /server\/world_civilization\/voting_templates\.js/);
   assert.match(plan, /buildV6VotingTemplateReviewReport\(\)/);
   assert.match(plan, /public-world, public-works, sandbox-policy, institution-charter, and service-policy/);
@@ -383,6 +409,10 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(voteSpec, /buildV6VoteRouteAuthorizationEnvelope\(\)/);
   assert.match(voteSpec, /assertV6VoteRouteAuthorizationEnvelopeSafe\(\)/);
   assert.match(voteSpec, /store-backed `vote_advice` delegation proof/);
+  assert.match(voteSpec, /Worker Vote Adapter/);
+  assert.match(voteSpec, /server\/world_civilization\/worker_vote_adapter\.js/);
+  assert.match(voteSpec, /V6_CIVIC_WORKER_VOTE_ADAPTER_ENABLED/);
+  assert.match(voteSpec, /castVoteFromWorkerTool\(\)/);
   assert.match(voteSpec, /Voting Template Review/);
   assert.match(voteSpec, /server\/world_civilization\/voting_templates\.js/);
   assert.match(voteSpec, /buildV6VotingTemplateReviewReport\(\)/);
@@ -392,10 +422,13 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(releaseReview, /V6_CIVIC_VOTE_ROUTE_ENABLED/);
   assert.match(releaseReview, /V6_CIVIC_VOTE_STORE_WIRING_ENABLED/);
   assert.match(releaseReview, /worker-tool vote registration/);
+  assert.match(releaseReview, /V6_CIVIC_WORKER_VOTE_ADAPTER_ENABLED/);
   assert.match(releaseReview, /vote authorization readiness gate/);
   assert.match(readinessSource, /vote_authorization_readiness_gate/);
+  assert.match(readinessSource, /worker_tool_vote_registration/);
   assert.match(readinessSource, /vote_route_store_wiring/);
   assert.match(releaseReviewSource, /hidden_vote_route_store_wiring/);
+  assert.match(releaseReviewSource, /worker_tool_vote_registration/);
   assert.match(voteSource, /REQUIRED_VOTE_AUTHORIZATION_EVIDENCE_CHECKS/);
   assert.match(voteSource, /beforeSummary/);
   assert.match(voteSource, /afterSummary/);

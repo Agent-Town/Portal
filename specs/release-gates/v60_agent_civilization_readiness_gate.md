@@ -100,6 +100,14 @@ persistence resilience, and security/product release review.
   Context observability, require store-backed `proposal_drafting` delegation and
   M5 mutation security, write only to the internal proposal review queue, expose
   no runtime civic tools, and execute no civic effects.
+- The research-only worker vote adapter may exist in
+  `server/world_civilization/worker_vote_adapter.js`, but it must stay disabled
+  by default behind `V6_CIVIC_WORKER_VOTE_ADAPTER_ENABLED`, require OpenClaw
+  Lite origin and Worker Tools/Skill Context/Worker Traffic/Brain/Session
+  Context observability, require store-backed `vote_advice` delegation, M5
+  mutation security, `worker_tool_vote_surface` route-edge authorization,
+  server-attested vote authorization, and idempotency, record only vote
+  receipts, expose no runtime civic tools, and apply no vote outcomes.
 - The research-only civic mutation security envelope may exist in
   `server/world_civilization/mutation_security.js`, but it must stay
   fail-closed, route/tool-hidden, non-executing, and require explicit V6 opt-in,
@@ -306,8 +314,12 @@ persistence resilience, and security/product release review.
   application while keeping `releaseReady: false`,
   `appliesVoteOutcome: false`, `mutatesWorldState: false`, and
   `executionStatus: "not_executable"`;
-  release still requires worker-tool vote registration through the route-edge
-  authorization envelope, release signoff for voting templates, and
+  `server/world_civilization/worker_vote_adapter.js` now provides worker-tool
+  vote registration through the route-edge authorization envelope for
+  `worker_tool_vote_surface` while staying disabled by default, hidden from
+  runtime tools, same-origin/CSRF guarded, store-backed-delegation guarded, and
+  receipt-only; release still requires browser worker/runtime registration,
+  production browser coverage, release signoff for voting templates, and
   product/security review of quorum and threshold choices.
 - Reputation cannot be self-awarded, transferred as currency, or used without an
   audit trail and dispute path. Current research-only storage starts this in

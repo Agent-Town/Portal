@@ -122,8 +122,10 @@ const REQUIRED_V6_READINESS_GATES = [
       'server/world_civilization/tools.js',
       'server/world_civilization/tool_exposure_gate.js',
       'server/world_civilization/worker_tool_adapter.js',
+      'server/world_civilization/worker_vote_adapter.js',
       'tests/world_civilization_tools.test.js',
       'tests/world_civilization_worker_tool_adapter.test.js',
+      'tests/world_civilization_worker_vote_adapter.test.js',
       'tests/world_civilization_tool_exposure_gate.test.js'
     ],
     requiredChecks: [
@@ -131,6 +133,8 @@ const REQUIRED_V6_READINESS_GATES = [
       'openclaw_lite_worker_origin',
       'worker_observability',
       'skill_context_observability',
+      'worker_vote_receipt_adapter',
+      'worker_vote_route_edge_authorization',
       'hidden_v6_tools',
       'no_backend_shortcuts'
     ]
@@ -147,11 +151,13 @@ const REQUIRED_V6_READINESS_GATES = [
       'server/world_civilization/routes.js',
       'server/world_civilization/store_wiring.js',
       'server/world_civilization/worker_tool_adapter.js',
+      'server/world_civilization/worker_vote_adapter.js',
       'server/world_civilization/votes.js',
       'server/world_civilization/governance_preflight.js',
       'tests/world_civilization_proposals.test.js',
       'tests/world_civilization_routes.test.js',
       'tests/world_civilization_worker_tool_adapter.test.js',
+      'tests/world_civilization_worker_vote_adapter.test.js',
       'tests/world_civilization_votes.test.js',
       'tests/world_civilization_governance_preflight.test.js'
     ],
@@ -167,6 +173,7 @@ const REQUIRED_V6_READINESS_GATES = [
       'review_queue_snapshot',
       'expired_review_queue_exclusion',
       'vote_authorization',
+      'worker_tool_vote_registration',
       'vote_authorization_readiness_gate',
       'vote_route_store_wiring',
       'quorum_policy',

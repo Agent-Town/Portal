@@ -41,9 +41,10 @@ are present.
 - Validation evidence: targeted Node suite, split Playwright smokes,
   all-features regression, feature override safety, and load/rate replay
   evidence, including civic mutation security, proposal intake readiness, vote
-  authorization readiness, reputation eligibility advice readiness, moderation
-  privacy readiness, delegated-agent proof, and governance preflight, effect
-  execution gate, agent participation enforcement gate, institution readiness
+  authorization readiness, worker vote adapter gate, reputation eligibility
+  advice readiness, moderation privacy readiness, delegated-agent proof, and
+  governance preflight, effect execution gate, agent participation enforcement
+  gate, institution readiness
   gate, public works readiness gate, lab readiness gate, and resilience
   readiness gate contract coverage.
 - Proposal intake readiness review: human submission envelope, worker-tool
@@ -63,8 +64,9 @@ are present.
 - Vote authorization readiness review: server-verified voter authorization,
   eligibility rule verification, one-vote accounting, idempotent receipt replay,
   changed-vote replay rejection, proposal expiry denial, delegation policy
-  review, per-institution voting templates, route-edge vote auth, hidden vote
-  route/store wiring, quorum/threshold policy, governance-preflight integration,
+  review, per-institution voting templates, route-edge vote auth, worker-tool
+  vote registration, hidden vote route/store wiring, quorum/threshold policy,
+  governance-preflight integration,
   vote audit rows, private-data exclusion, and no effect application before any
   vote route or worker tool can influence civic outcomes.
 - Reputation eligibility and advice review: eligibility policy review, advice
@@ -110,8 +112,8 @@ are present.
   in normal gameplay.
 - Worker tool surface review: runtime manifest source-of-truth evidence,
   OpenClaw Lite worker origin, Worker Traffic and Skill Context observability,
-  mutation security envelope coverage, and no backend shortcuts before any
-  civic tool exposure.
+  mutation security envelope coverage, worker vote receipt adapter coverage,
+  and no backend shortcuts before any civic tool exposure.
 - Modal lab surface review: town hub modal launch, standalone route denial,
   worker continuity, debug observability, non-executing panels, browser visual
   coverage at 390/768/1280 widths, keyboard accessibility, focus trap review,
