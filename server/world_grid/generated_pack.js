@@ -5177,6 +5177,9 @@ function buildReleaseEvidenceBundle({
   const sourcePresence = sourcePresenceForHashes(sourceHashes);
   const sourcePresenceMatchesHashes = true;
   const presentSourceCount = Object.values(sourcePresence).filter(Boolean).length;
+  const sourceCoverageOk = gate?.publicReleaseEligible === true
+    ? presentSourceCount === RELEASE_EVIDENCE_SOURCE_KEYS.length
+    : presentSourceCount >= 1;
   const approvalEvidenceHashMatchesGate = Boolean(gate?.approvalEvidence)
     && stableEvidenceHash(gate.approvalEvidence) === sourceHashes.approvalEvidence;
   const candidateReviewManifestHashMatchesEvidence = Boolean(candidateReviewManifest?.manifestHash)
@@ -5251,6 +5254,7 @@ function buildReleaseEvidenceBundle({
       sourceHashMismatchCount: 0,
       sourcePresenceMatchesHashes,
       sourcePackIdMismatchCount: sourcePackIdProblems.length,
+      sourceCoverageOk,
       releaseGateHashMatches,
       releaseGateValid: validateProductionReleaseGate(gate, { nowMs: bundleCreatedAtMs }).ok === true,
       releaseGatePublicEligible: gate?.publicReleaseEligible === true,
@@ -5446,6 +5450,8 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     && bundle?.metrics?.sourcePresenceMatchesHashes === sourcePresenceMatchesHashes
     && sourcePresenceMatchesHashes === true
     && Number(bundle?.metrics?.sourcePackIdMismatchCount || 0) === sourcePackIdProblems.length
+    && bundle?.metrics?.sourceCoverageOk === sourceCoverageOk
+    && sourceCoverageOk === true
     && bundle?.metrics?.releaseGateHashMatches === releaseGateHashMatches
     && releaseGateHashMatches === true
     && bundle?.metrics?.releaseGateValid === (gateReport.ok === true)
@@ -5528,6 +5534,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
         sourcePresenceProblemCount: sourcePresenceProblems.length,
         sourcePresenceMatchesHashes,
         sourcePackIdProblemCount: sourcePackIdProblems.length,
+        sourceCoverageOk,
         releaseGateHashMatches,
         bundleCreatedAtOrAfterGate,
         bundleCreatedAtNotFuture,

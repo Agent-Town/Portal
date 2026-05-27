@@ -2819,6 +2819,7 @@ Response includes:
 - `releaseEvidenceBundle.sourceHashes` for generated pack, playtest, diversity, public card, persistence, approval evidence, and candidate review;
 - `releaseEvidenceBundle.sourcePackIds` for single-pack evidence coherence;
 - `releaseEvidenceBundle.metrics.sourcePresenceMatchesHashes`;
+- `releaseEvidenceBundle.metrics.sourceCoverageOk`;
 - `releaseEvidenceBundle.metrics.releaseGateHashMatches`;
 - `releaseEvidenceBundle.metrics.bundleCreatedAtOrAfterGate`;
 - `releaseEvidenceBundle.metrics.bundleCreatedAtNotFuture`;
@@ -2835,7 +2836,7 @@ Response includes:
 - `releaseEvidenceBundle.metrics.candidateReviewManifestSourcePassed`;
 - `releaseEvidenceBundle.metrics.candidateReviewManifestHashMatchesEvidence`, `candidateReviewManifestTimeMatchesEvidence`, and `candidateReviewManifestCountsMatchEvidence`;
 - `validationReport.metrics` mirrors the source-pass booleans above so QA can classify generated-pack, playtest, persistence, public-card, diversity, approval-evidence, and candidate-review manifest source failures without inspecting internal checks;
-- `validationReport`, which rejects missing release-gate context, source drift, claimed hashes or pack ids for unsupplied sources, mixed pack ids, failing generated-pack sources, failing playtest sources, failing persistence sources, failing public-card sources, failing approval-evidence sources, failing candidate-review manifest sources, copied diversity reports that exclude the release pack, invalid source pack-id shapes, bundles created before their bound gate, future-dated bundles, forged blocking reasons, forged prerequisite snapshots, approval evidence drift from the bound gate, missing ready-gate evidence, source-presence metric tampering, release-gate hash metric tampering, candidate-review time/count metric tampering, unsafe request content, and boundary violations.
+- `validationReport`, which rejects missing release-gate context, source drift, claimed hashes or pack ids for unsupplied sources, mixed pack ids, failing generated-pack sources, failing playtest sources, failing persistence sources, failing public-card sources, failing approval-evidence sources, failing candidate-review manifest sources, copied diversity reports that exclude the release pack, invalid source pack-id shapes, bundles created before their bound gate, future-dated bundles, forged blocking reasons, forged prerequisite snapshots, approval evidence drift from the bound gate, missing ready-gate evidence, source-coverage metric tampering, source-presence metric tampering, release-gate hash metric tampering, candidate-review time/count metric tampering, unsafe request content, and boundary violations.
 
 Release-evidence-bundle invariants:
 - request bodies share the release-gate ingress guard for secret-like fields, semantic token fields, secret-looking keys or values, raw prompt-instruction keys, executable instruction values, request depth, node count, array size, object key count, object key length, and string length;
