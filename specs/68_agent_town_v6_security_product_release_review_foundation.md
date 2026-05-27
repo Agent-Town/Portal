@@ -52,11 +52,12 @@ are present.
 - Validation evidence: targeted Node suite, split Playwright smokes,
   all-features regression, feature override safety, load-rate target coverage,
   migration-load replay evidence, load/rate replay evidence, and multi-process
-  write-contention evidence, validation target gate, including civic mutation
-  security, runtime tool absence, modal lab browser coverage, release-candidate
-  run, artifact traceability, abuse-case target coverage, product signoff target
-  coverage, threat model target coverage, privacy review target coverage,
-  data-retention target
+  write-contention evidence, validation target gate, CI validation matrix target
+  gate, including civic mutation security, runtime tool absence, modal lab
+  browser coverage, release-candidate run, console error budget, Playwright
+  trace retention, artifact traceability, abuse-case target coverage, product
+  signoff target coverage, threat model target coverage, privacy review target
+  coverage, data-retention target
   coverage, session-auth target coverage, proposal intake readiness, vote
   authorization readiness, worker vote adapter gate, reputation eligibility
   advice readiness, moderation privacy readiness, delegated-agent proof, and
