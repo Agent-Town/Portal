@@ -4,6 +4,7 @@ const path = require('path');
 
 const {
   DEFAULT_CANDIDATE_ROOT,
+  SECRET_LIKE_VALUE_PATTERN,
   validateAssetPromptPlan,
   validateGeneratedPack
 } = require('./generated_pack');
@@ -30,7 +31,6 @@ const HUMAN_REVIEW_CHECKLIST = [
   'human_signoff_required_before_production'
 ];
 const SECRET_LIKE_KEY_PATTERN = /(api[_-]?key|secret|private[_-]?key|credential|oauth|access[_-]?token|refresh[_-]?token|auth[_-]?token|bearer[_-]?token|id[_-]?token|session[_-]?token|provider[_-]?token|wallet[_-]?secret|seed[_-]?phrase|password|^token$)/i;
-const SECRET_LIKE_VALUE_PATTERN = /\b(?:sk-[a-z0-9_-]{8,}|xox[baprs]-[a-z0-9-]{8,}|ghp_[a-z0-9_]{8,}|github_pat_[a-z0-9_]{8,}|ya29\.[a-z0-9_-]{8,}|bearer\s+[a-z0-9._-]{12,})\b/i;
 const RAW_PROMPT_KEY_PATTERN = /^(rawprompt|normalizedprompt|systemprompt|developerprompt|promptinstructions)$/i;
 const RAW_TEXT_PATTERN = /\bignore\s+(all\s+)?(previous|prior|above)\s+instructions\b|\b(system|developer)\s+(prompt|message|instructions)\b|\b(tool|function)\s+call\b|\bexecute\s+(shell|bash|terminal|command|javascript|python)\b|\b(curl|wget)\s+https?:|<\s*script\b|javascript\s*:|\beval\s*\(|\bFunction\s*\(/i;
 

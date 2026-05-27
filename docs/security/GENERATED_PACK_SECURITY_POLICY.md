@@ -15,7 +15,7 @@ Status: prototype-gated
 - Scaffolded generation job logs must record `authMode=not_configured`, `externalImageGenerationUsed=false`, zero outputs, and no production approval until a separate consent/auth/cost model is approved.
 - Optional candidate-generation preflights must fail closed unless product/security approval, documented auth model, documented cost model, accepted cost estimate, and user/team consent are all present.
 - Candidate-generation preflight records must never persist raw provider credentials, and failure records must keep `fallbackStillPlayable=true` for valid deterministic packs.
-- Candidate-generation run and job-log validation reports must reject and redact submitted secret-looking keys, secret-looking values, raw-instruction keys, and executable instruction values from both content checks and schema-error paths.
+- Candidate-generation run and job-log validation reports must reject and redact submitted secret-looking keys, secret-looking values, expanded credential-token-family values, raw-instruction keys, and executable instruction values from both content checks and schema-error paths.
 - Asset prompt-plan, candidate-review, and candidate-generation validation reports must redact unsafe submitted canonical target labels from measured problem lists.
 - Candidate-review, release-approval, and release-evidence-bundle validation reports must redact unsafe submitted manifest hashes, evidence hashes, bundle hashes, and pack ids from measured problem lists.
 - Public-card, approved-modifier, requester-voice, and multi-surface validation reports must redact unsafe submitted measured values before returning evidence to callers.
@@ -58,6 +58,7 @@ Status: prototype-gated
   "secretLikeValueRejected": true,
   "rawInstructionKeyRedacted": true,
   "candidateGenerationUnsafeKeyValueRedacted": true,
+  "candidateGenerationExpandedCredentialFamiliesRejected": true,
   "releaseEvidenceUnsafeKeyValueRedacted": true,
   "unsafeTargetLabelRedacted": true,
   "unsafeHashAndPackIdRedacted": true,

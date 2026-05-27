@@ -83,6 +83,7 @@ This is a separate prototype-gated track. It must not change normal gameplay vis
   "secretLikeKeyRedacted": true,
   "secretLikeValueRejected": true,
   "candidateGenerationUnsafeKeyValueRedacted": true,
+  "candidateGenerationExpandedCredentialFamiliesRejected": true,
   "releaseEvidenceUnsafeKeyValueRedacted": true,
   "unsafeTargetLabelRedacted": true,
   "unsafeHashAndPackIdRedacted": true,
@@ -175,7 +176,7 @@ The candidate generation scaffold still does not call image models. Each planned
 
 The real image-generation spike remains blocked until product/security approval, an explicit auth model, an explicit cost model, and explicit user/team consent exist. This slice adds only the optional command and runtime guard for that future work. The guard writes candidate-generation preflight records to the same job logs, never reads provider credentials, never calls an image model by default, never creates approved production assets, and fails back to the deterministic generated pack.
 
-Candidate-generation run reports and asset-generation job logs now have strict schemas. The run report carries a stable hash, bounded integer rate/retry/count policy, redacted consent/cost/auth evidence, canonical mapping fingerprints, prompt-plan target checks, and zero production-promotion claims. Job-log validation enforces safe candidate/approved paths, known canonical prompt-plan targets, candidate-only output status, no raw prompt instructions, no secret-like fields or values, no production assets, and status/output-count coherence. Validation reports must redact submitted secret-looking keys, secret-looking values, raw-instruction keys, executable instruction values, unsafe canonical target labels, and unsafe measured metadata values from content, schema-error, and measured-problem evidence.
+Candidate-generation run reports and asset-generation job logs now have strict schemas. The run report carries a stable hash, bounded integer rate/retry/count policy, redacted consent/cost/auth evidence, canonical mapping fingerprints, prompt-plan target checks, and zero production-promotion claims. Job-log validation enforces safe candidate/approved paths, known canonical prompt-plan targets, candidate-only output status, no raw prompt instructions, no secret-like fields or values, expanded credential-token-family rejection, no production assets, and status/output-count coherence. Validation reports must redact submitted secret-looking keys, secret-looking values, expanded credential-token-family values, raw-instruction keys, executable instruction values, unsafe canonical target labels, and unsafe measured metadata values from content, schema-error, and measured-problem evidence.
 
 ```json
 {
@@ -196,6 +197,7 @@ Candidate-generation run reports and asset-generation job logs now have strict s
   "generatedImageAssetsCanChangeServerRules": false,
   "approvedAssetsRequireHumanSignoff": true,
   "assetGenerationJobLogSecretLikeCount": 0,
+  "candidateGenerationExpandedCredentialFamiliesRejected": true,
   "assetGenerationJobLogRawInstructionCount": 0,
   "candidateGenerationUnsafeReportEchoCount": 0,
   "candidateImagesGenerated": false

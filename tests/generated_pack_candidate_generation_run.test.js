@@ -210,6 +210,68 @@ test('GU-5 candidate generation validators redact unsafe keys and values from re
   assert.equal(serializedRunReport.includes(secretLookingTarget), false);
 });
 
+test('GPACK-126 candidate generation validators reject expanded credential-token families', async () => {
+  const pack = createRunPack('owner_candidate_generation_run_expanded_credential');
+  const target = pack.assetPromptPlan.targets[0];
+  const run = await runCandidateImageGenerationSpike({
+    pack,
+    targetLimit: 1,
+    nowMs: 180_275,
+    config: approvedConfig(),
+    generatorAdapter: async ({ target: plannedTarget }) => ({
+      candidateOutputPath: plannedTarget.candidateOutputPath
+    })
+  });
+  const jobRecord = readLastJobLog(target.jobLogPath);
+  const marker = 'candidatetokshouldnotappear';
+  const expandedSecretValues = [
+    ['gho', marker].join('_'),
+    ['glpat', marker].join('-'),
+    ['xoxc', marker].join('-'),
+    ['rk', 'live', marker].join('_')
+  ];
+
+  for (const expandedSecretValue of expandedSecretValues) {
+    const unsafeJobRecord = {
+      ...jobRecord,
+      errors: [{ code: expandedSecretValue }]
+    };
+    const unsafeRun = {
+      ...run,
+      targetCount: run.targetCount + 1,
+      jobStatuses: [
+        ...run.jobStatuses,
+        { canonicalTarget: expandedSecretValue, status: 'blocked', errors: [] }
+      ]
+    };
+    const jobReport = validateAssetGenerationJobLogRecord(unsafeJobRecord, {
+      assetPromptPlan: pack.assetPromptPlan
+    });
+    const runReport = validateCandidateGenerationRun(unsafeRun, { pack });
+    const serializedJobReport = JSON.stringify(jobReport);
+    const serializedRunReport = JSON.stringify(runReport);
+
+    assert.equal(jobReport.ok, false, expandedSecretValue);
+    assert.equal(runReport.ok, false, expandedSecretValue);
+    assert.equal(
+      jobReport.checks.find((check) => check.id === 'ASSET_GENERATION_JOB_LOG_CONTENT_SAFE').passed,
+      false,
+      expandedSecretValue
+    );
+    assert.equal(
+      runReport.checks.find((check) => check.id === 'CANDIDATE_GENERATION_RUN_CONTENT_SAFE').passed,
+      false,
+      expandedSecretValue
+    );
+    assert.equal(jobReport.metrics.secretLikePathCount > 0, true, expandedSecretValue);
+    assert.equal(runReport.metrics.secretLikePathCount > 0, true, expandedSecretValue);
+    assert.equal(serializedJobReport.includes(expandedSecretValue), false, expandedSecretValue);
+    assert.equal(serializedRunReport.includes(expandedSecretValue), false, expandedSecretValue);
+    assert.equal(serializedJobReport.includes(marker), false, expandedSecretValue);
+    assert.equal(serializedRunReport.includes(marker), false, expandedSecretValue);
+  }
+});
+
 test('GU-5 candidate generation validators reject fractional counters and target drift', async () => {
   const pack = createRunPack('owner_candidate_generation_run_limit_edges');
   const target = pack.assetPromptPlan.targets[0];
