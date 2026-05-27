@@ -442,6 +442,7 @@ test('GU-18 production release gate can pass only with explicit machine evidence
   assert.equal(gate.metrics.replayabilityPromptCount, 10);
   assert.equal(gate.metrics.privateDataLeakCount, 0);
   assert.equal(gate.metrics.productionImageAssetCount, 0);
+  assert.equal(gate.metrics.publicCardPackIdMatches, true);
   assert.equal(gate.metrics.eligiblePrerequisiteCount, gate.metrics.requiredPrerequisiteCount);
 }));
 
@@ -1066,6 +1067,32 @@ test('GU-18 production release gate validation rejects tampered eligibility and 
     false
   );
 });
+
+test('GU-18 production release gate rejects public-card evidence copied from another pack', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_gate_mixed_public_card',
+    prompt: 'lapis garden station with careful moss couriers',
+    nowMs: 153_575
+  });
+  const otherFixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_gate_mixed_public_card_other',
+    prompt: 'pearl harbor library with kite-signal artisans',
+    nowMs: 153_600
+  });
+  const gate = buildProductionReleaseGate({
+    ...fixture,
+    publicCard: otherFixture.publicCard,
+    nowMs: 155_200
+  });
+  const report = validateProductionReleaseGate(gate);
+
+  assert.notEqual(otherFixture.publicCard.packId, fixture.pack.packId);
+  assert.equal(gate.publicReleaseEligible, false);
+  assert.equal(gate.releasePrerequisites.publicCardPrivacyPassed, false);
+  assert.equal(gate.metrics.publicCardPackIdMatches, false);
+  assert.equal(gate.blockingReasons.includes('publicCardPrivacyPassed'), true);
+  assert.equal(report.ok, true, JSON.stringify(report.checks));
+}));
 
 test('GU-18 production release gate schema rejects invalid pack id shapes', () => withTempGeneratedPackStore(() => {
   const fixture = readyReleaseGateFixture({

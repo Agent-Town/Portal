@@ -4486,6 +4486,8 @@ function buildProductionReleaseGate({
     || publicCardReport.metrics?.blockedFieldCount
     || 0
   );
+  const publicCardPackIdMatches = Boolean(pack?.packId)
+    && publicCard?.packId === pack.packId;
   const assetLoaderEvidence = playtestReport?.assetLoader || playtestReport?.scoreEvidence?.assetLoader || {};
   const missingAssetCount = Number(playtestReport?.missingAssets || 0)
     + Number(assetLoaderEvidence?.missingTextureCount || 0);
@@ -4504,6 +4506,7 @@ function buildProductionReleaseGate({
     diversitySuitePassed: releaseDiversityPassed(diversityReport || {}),
     packSaveReloadPassed: releasePersistencePassed(persistenceReport || {}),
     publicCardPrivacyPassed: publicCardReport.ok === true
+      && publicCardPackIdMatches
       && publicCardPrivateDataLeakCount === 0
       && publicCardBlockedFieldCount === 0,
     costConsentModelApproved,
@@ -4530,6 +4533,7 @@ function buildProductionReleaseGate({
       schemaErrorCount: Number(schemaReport.metrics?.schemaErrorCount || 0),
       privateDataLeakCount: publicCardPrivateDataLeakCount,
       blockedFieldCount: publicCardBlockedFieldCount,
+      publicCardPackIdMatches,
       missingAssetCount,
       productionImageAssetCount: Number(pack?.assetScaffold?.productionImageAssetCount || 0),
       replayabilityPromptCount: Number(diversityReport?.metrics?.promptCount || diversityReport?.metrics?.validPackCount || 0),
@@ -4613,13 +4617,15 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
       id: 'PRODUCTION_RELEASE_GATE_PREREQUISITES_COHERENT',
       passed: gate?.publicReleaseEligible === allPrerequisitesPassed
         && blockingReasonsMatchFailures
+        && (prerequisites.publicCardPrivacyPassed !== true || gate?.metrics?.publicCardPackIdMatches === true)
         && Number(gate?.metrics?.eligiblePrerequisiteCount || 0) === prerequisiteEntries.filter(([, passed]) => passed === true).length
         && Number(gate?.metrics?.requiredPrerequisiteCount || 0) === prerequisiteEntries.length,
       measured: {
         allPrerequisitesPassed,
         publicReleaseEligible: gate?.publicReleaseEligible === true,
         failedPrerequisites,
-        blockingReasonsMatchFailures
+        blockingReasonsMatchFailures,
+        publicCardPackIdMatches: gate?.metrics?.publicCardPackIdMatches === true
       }
     },
     {
