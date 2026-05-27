@@ -28,49 +28,49 @@ const V6_WORKER_RUNTIME_REGISTRATION_TARGETS = [
     key: 'openclaw_worker_boot',
     surface: 'browser_openclaw_lite_worker',
     requiredEvidence: 'Worker startup is owned by the browser OpenClaw Lite runtime.',
-    currentEvidence: 'server/world_civilization/worker_tool_adapter.js',
+    currentEvidence: 'server/world_civilization/worker_tool_adapter.js, e2e/246_v6_worker_runtime_registration_smoke.spec.js',
     releaseEvidenceRequired: 'browser_worker_boot_trace'
   },
   {
     key: 'runtime_tool_manifest_sync',
     surface: '/api/world/tools',
     requiredEvidence: 'Runtime tool manifest remains the source of truth.',
-    currentEvidence: 'tests/world_civilization_tool_exposure_gate.test.js',
+    currentEvidence: 'tests/world_civilization_tool_exposure_gate.test.js, e2e/246_v6_worker_runtime_registration_smoke.spec.js',
     releaseEvidenceRequired: 'browser_manifest_parity_trace'
   },
   {
     key: 'civic_tool_absence_before_release',
     surface: '/api/world/tools',
     requiredEvidence: 'No et.world.civic.* tool is runtime-callable before release gates close.',
-    currentEvidence: 'tests/world_grid_region.test.js',
+    currentEvidence: 'tests/world_grid_region.test.js, e2e/246_v6_worker_runtime_registration_smoke.spec.js',
     releaseEvidenceRequired: 'production_runtime_absence_smoke'
   },
   {
     key: 'debug_observability_tabs',
     surface: 'Worker Tools / Skill Context / Worker Traffic / Brain / Session Context',
     requiredEvidence: 'Worker debug tabs are present before civic tool registration can be trusted.',
-    currentEvidence: 'tests/world_civilization_tool_exposure_gate.test.js',
+    currentEvidence: 'tests/world_civilization_tool_exposure_gate.test.js, e2e/246_v6_worker_runtime_registration_smoke.spec.js',
     releaseEvidenceRequired: 'browser_debug_tabs_trace'
   },
   {
     key: 'skill_context_import',
     surface: 'OpenClaw Lite skill context',
     requiredEvidence: 'Worker-imported skill context is observable and loaded before civic tools run.',
-    currentEvidence: 'tests/world_civilization_worker_tool_adapter.test.js',
+    currentEvidence: 'tests/world_civilization_worker_tool_adapter.test.js, e2e/246_v6_worker_runtime_registration_smoke.spec.js',
     releaseEvidenceRequired: 'browser_skill_context_trace'
   },
   {
     key: 'worker_traffic_trace',
     surface: 'Worker Traffic',
     requiredEvidence: 'Outbound and inbound worker tool traffic is traceable.',
-    currentEvidence: 'tests/world_civilization_worker_vote_adapter.test.js',
+    currentEvidence: 'tests/world_civilization_worker_vote_adapter.test.js, e2e/246_v6_worker_runtime_registration_smoke.spec.js',
     releaseEvidenceRequired: 'browser_worker_traffic_trace'
   },
   {
     key: 'session_context_link',
     surface: 'Session Context',
     requiredEvidence: 'Worker requests are linked to the current session and wallet context.',
-    currentEvidence: 'server/world_civilization/mutation_security.js',
+    currentEvidence: 'server/world_civilization/mutation_security.js, e2e/246_v6_worker_runtime_registration_smoke.spec.js',
     releaseEvidenceRequired: 'browser_session_wallet_trace'
   },
   {
@@ -91,7 +91,7 @@ const V6_WORKER_RUNTIME_REGISTRATION_TARGETS = [
     key: 'production_override_denial',
     surface: 'production_feature_flags',
     requiredEvidence: 'Player-supplied production overrides cannot expose V6 civic tools.',
-    currentEvidence: 'tests/world_grid_region.test.js',
+    currentEvidence: 'tests/world_grid_region.test.js, e2e/246_v6_worker_runtime_registration_smoke.spec.js',
     releaseEvidenceRequired: 'production_browser_override_smoke'
   }
 ];

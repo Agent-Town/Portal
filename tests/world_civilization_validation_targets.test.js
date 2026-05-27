@@ -49,8 +49,11 @@ test('V6 validation targets name every Node and Playwright release evidence surf
   assert.ok(matrix.targetKeys.includes('all_features_regression'));
   assert.ok(matrix.targetKeys.includes('feature_override_safety'));
   assert.ok(matrix.targetKeys.includes('runtime_tool_absence'));
+  assert.ok(matrix.targetKeys.includes('worker_observability_smoke'));
   assert.ok(matrix.targetKeys.includes('release_candidate_run'));
   assert.ok(matrix.targetKeys.includes('artifact_traceability'));
+  assert.ok(V6_VALIDATION_TARGETS.find((target) => target.key === 'worker_observability_smoke')
+    .currentEvidence.includes('e2e/246_v6_worker_runtime_registration_smoke.spec.js'));
   assert.match(matrix.digest, /^sha256:[a-f0-9]{64}$/);
 });
 

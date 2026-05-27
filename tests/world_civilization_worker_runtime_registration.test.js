@@ -31,6 +31,9 @@ function observedEvidence(overrides = {}) {
 
 test('V6 worker runtime registration targets name every browser worker release surface', () => {
   const matrix = inspectWorkerRuntimeRegistrationTargets();
+  const browserSmokeTargets = V6_WORKER_RUNTIME_REGISTRATION_TARGETS.filter((target) => (
+    String(target.currentEvidence || '').includes('e2e/246_v6_worker_runtime_registration_smoke.spec.js')
+  )).map((target) => target.key);
 
   assert.equal(matrix.ok, true);
   assert.deepEqual(matrix.requiredKeys, REQUIRED_WORKER_RUNTIME_REGISTRATION_TARGET_KEYS);
@@ -39,6 +42,14 @@ test('V6 worker runtime registration targets name every browser worker release s
   assert.ok(matrix.targetKeys.includes('openclaw_worker_boot'));
   assert.ok(matrix.targetKeys.includes('runtime_tool_manifest_sync'));
   assert.ok(matrix.targetKeys.includes('production_override_denial'));
+  assert.ok(browserSmokeTargets.includes('openclaw_worker_boot'));
+  assert.ok(browserSmokeTargets.includes('runtime_tool_manifest_sync'));
+  assert.ok(browserSmokeTargets.includes('civic_tool_absence_before_release'));
+  assert.ok(browserSmokeTargets.includes('debug_observability_tabs'));
+  assert.ok(browserSmokeTargets.includes('skill_context_import'));
+  assert.ok(browserSmokeTargets.includes('worker_traffic_trace'));
+  assert.ok(browserSmokeTargets.includes('session_context_link'));
+  assert.ok(browserSmokeTargets.includes('production_override_denial'));
   assert.match(matrix.digest, /^sha256:[a-f0-9]{64}$/);
 });
 
@@ -67,6 +78,21 @@ test('V6 worker runtime registration report captures current contract probes wit
   assert.equal(report.observedEvidence.workerAdapterContractProbeCount, 2);
   assert.equal(report.observedEvidence.browserWorkerRegistrationCovered, false);
   assert.deepEqual(report.releaseGaps, REQUIRED_WORKER_RUNTIME_REGISTRATION_RELEASE_GAPS);
+  assert.deepEqual(assertV6WorkerRuntimeRegistrationReportSafe(report), { ok: true, errors: [] });
+});
+
+test('V6 worker runtime registration report can record browser smoke without closing release gaps', () => {
+  const report = buildV6WorkerRuntimeRegistrationReport({
+    observed: observedEvidence({ browserWorkerRegistrationProbeCount: 1 }),
+    source: 'browser_smoke'
+  });
+
+  assert.equal(report.ok, true);
+  assert.equal(report.source, 'browser_smoke');
+  assert.equal(report.observedEvidence.browserWorkerRegistrationProbeCount, 1);
+  assert.equal(report.observedEvidence.browserWorkerRegistrationCovered, true);
+  assert.equal(report.releaseReady, false);
+  assert.ok(report.releaseGaps.includes('production_browser_coverage_required'));
   assert.deepEqual(assertV6WorkerRuntimeRegistrationReportSafe(report), { ok: true, errors: [] });
 });
 

@@ -104,6 +104,10 @@ persistence resilience, and security/product release review.
   runtime manifest sync, civic-tool absence, debug observability, skill context,
   worker traffic, session context, modal lifetime continuity, shared-state route
   adapter traces, and production override denial before M6 can close.
+  `e2e/246_v6_worker_runtime_registration_smoke.spec.js` records the current
+  browser smoke for normal `/app` worker observability plus runtime civic-tool
+  absence under broad `all,v60` style overrides; production browser worker
+  coverage and release signoff remain open.
 - The research-only worker proposal adapter may exist in
   `server/world_civilization/worker_tool_adapter.js`, but it must stay disabled
   by default behind `V6_CIVIC_WORKER_TOOL_ADAPTER_ENABLED`, require OpenClaw

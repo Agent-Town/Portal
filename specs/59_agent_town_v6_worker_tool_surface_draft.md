@@ -26,6 +26,9 @@ Worker vote adapter tests: `tests/world_civilization_worker_vote_adapter.test.js
 Worker runtime registration target tests:
 `tests/world_civilization_worker_runtime_registration.test.js`
 
+Worker runtime browser smoke:
+`e2e/246_v6_worker_runtime_registration_smoke.spec.js`
+
 Production override tests: `tests/world_grid_region.test.js`
 
 Feature flag: `FEATURE_WORLD_V60_AGENT_CIVILIZATION`
@@ -185,6 +188,11 @@ callable through the OpenClaw Lite worker runtime:
 - modal lifetime continuity for the page-scoped worker;
 - shared-state route adapter evidence;
 - production player override denial.
+
+`e2e/246_v6_worker_runtime_registration_smoke.spec.js` adds current browser
+smoke evidence that normal `/app` with broad `all,v60` style overrides keeps
+runtime civic tools absent while Worker Tools, Skill Context, Worker Traffic,
+Brain, and Session Context remain observable.
 
 The report remains `research_only`, `releaseReady: false`, does not register
 runtime civic tools, forbids backend shortcuts, and treats browser worker

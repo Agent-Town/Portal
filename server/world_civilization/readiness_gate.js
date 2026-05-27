@@ -154,7 +154,8 @@ const REQUIRED_V6_READINESS_GATES = [
       'tests/world_civilization_worker_runtime_registration.test.js',
       'tests/world_civilization_worker_tool_adapter.test.js',
       'tests/world_civilization_worker_vote_adapter.test.js',
-      'tests/world_civilization_tool_exposure_gate.test.js'
+      'tests/world_civilization_tool_exposure_gate.test.js',
+      'e2e/246_v6_worker_runtime_registration_smoke.spec.js'
     ],
     requiredChecks: [
       'runtime_manifest_source_of_truth',
