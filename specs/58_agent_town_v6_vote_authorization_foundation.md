@@ -26,7 +26,10 @@ effects, or grant agents public mutation authority.
 - A voter can record only one vote per proposal.
 - The same voter/idempotency pair can be retried only with identical normalized
   vote content.
-- Recording a vote appends exactly one `vote.recorded` audit ledger entry.
+- Recording a vote appends exactly one `vote.recorded` audit ledger entry with
+  a privacy-safe before/after summary that names the proposal, vote choice,
+  receipt, and non-executing outcome boundary without exposing private wallet or
+  session material.
 
 ## Approval Policy Rules
 

@@ -472,6 +472,8 @@ function createVoteAuditEntry(vote, nowMs) {
     idempotencyKey: vote.idempotencyKey,
     beforeHash: sha256(`agent-town.v6.civic.vote.absent:${vote.proposalId}:${vote.voter.accountId}`),
     afterHash: sha256(stableJson(vote)),
+    beforeSummary: `No recorded civic vote existed for ${vote.proposalId} from this voter before ${vote.receiptId}.`,
+    afterSummary: `Recorded ${vote.choice} vote ${vote.voteId} for ${vote.proposalId}; vote outcome remains non-executing.`,
     createdAtMs: nowMs,
     migrationVersion: MIGRATION_VERSION,
     replayable: true,

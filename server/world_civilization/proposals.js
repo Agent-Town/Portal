@@ -115,6 +115,7 @@ function buildStatements(db) {
 }
 
 function createProposalAuditEntry(proposal, nowMs) {
+  const scopeRef = `${proposal.scope.kind}:${proposal.scope.targetId}`;
   return {
     schemaVersion: proposal.schemaVersion,
     entryId: `audit_${proposal.proposalId.replace(/^proposal_/, 'proposal_')}`,
@@ -124,6 +125,8 @@ function createProposalAuditEntry(proposal, nowMs) {
     idempotencyKey: proposal.idempotencyKey,
     beforeHash: sha256('agent-town.v6.civic.proposal.absent'),
     afterHash: sha256(stableJson(proposal)),
+    beforeSummary: `No civic proposal existed for ${proposal.proposalId} in ${scopeRef}.`,
+    afterSummary: `Drafted ${proposal.proposalId} for ${scopeRef} with preview-only ${proposal.effectPreview.effectType}; moderation status is needs_review.`,
     createdAtMs: nowMs,
     migrationVersion: MIGRATION_VERSION,
     replayable: true,
@@ -185,6 +188,7 @@ function auditActorForReview(decision = {}) {
 }
 
 function createProposalReviewAuditEntry({ before, after, decision, nowMs }) {
+  const scopeRef = `${before.scopeKind}:${before.scopeTargetId}`;
   return {
     schemaVersion: before.proposal.schemaVersion,
     entryId: `audit_proprev_${decision.decisionId}`.slice(0, 94),
@@ -205,6 +209,8 @@ function createProposalReviewAuditEntry({ before, after, decision, nowMs }) {
       decisionId: decision.decisionId,
       policyVersion: decision.policyVersion
     })),
+    beforeSummary: `Proposal ${before.proposalId} in ${scopeRef} was ${before.status}/${before.moderationStatus} before moderation decision ${decision.decisionId}.`,
+    afterSummary: `Proposal ${before.proposalId} moved to ${after.proposalStatus}/${after.moderationStatus} under ${decision.policyVersion}; no civic effect was applied.`,
     createdAtMs: nowMs,
     migrationVersion: MIGRATION_VERSION,
     replayable: true,

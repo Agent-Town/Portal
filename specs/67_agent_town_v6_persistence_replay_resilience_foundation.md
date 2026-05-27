@@ -92,7 +92,9 @@ against the same SQLite file.
 same process-level evidence to dependent proposal and vote stores: one process
 drafts a proposal, a later process records a vote against the reopened proposal
 store, a third process reconstructs the audit replay, and exact retries remain
-idempotent after restart.
+idempotent after restart. The proposal/vote replay chain now carries
+store-specific privacy-safe before/after audit summaries and proves zero
+hash-only summary fallbacks for those governance records.
 
 `tests/world_civilization_reputation_moderation_process_restart.test.js`
 extends the same process-level evidence to reputation and moderation stores:

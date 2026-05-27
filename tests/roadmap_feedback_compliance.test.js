@@ -153,6 +153,8 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   const moderationSpec = read('specs/61_agent_town_v6_moderation_privacy_foundation.md');
   const schemaSpec = read('specs/55_agent_town_v6_civic_schema_contracts.md');
   const auditSpec = read('specs/56_agent_town_v6_audit_ledger_foundation.md');
+  const proposalSpec = read('specs/57_agent_town_v6_internal_proposal_lifecycle.md');
+  const voteSpec = read('specs/58_agent_town_v6_vote_authorization_foundation.md');
   const institutionSpec = read('specs/64_agent_town_v6_civic_institution_charter_foundation.md');
   const publicWorksSpec = read('specs/65_agent_town_v6_public_works_shared_resources_foundation.md');
   const labSpec = read('specs/66_agent_town_v6_modal_lab_surface_foundation.md');
@@ -168,6 +170,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   const resilienceSource = read('server/world_civilization/resilience.js');
   const readinessSource = read('server/world_civilization/readiness_gate.js');
   const controlledSource = read('server/world_civilization/controlled_release.js');
+  const proposalSource = read('server/world_civilization/proposals.js');
   const voteSource = read('server/world_civilization/votes.js');
   const requiredMilestones = [
     'M0 Hardened V5 world-grid baseline',
@@ -224,8 +227,15 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(gate, /server\/world_civilization\/tools\.js/);
   assert.match(gate, /server\/world_civilization\/tool_exposure_gate\.js/);
   assert.match(gate, /hidden from runtime `\/api\/world\/tools`/);
+  assert.match(plan, /M7 Internal proposal lifecycle \| `in_progress`/);
+  assert.match(plan, /proposal draft\/review audit entries now include privacy-safe before\/after summaries/);
+  assert.match(proposalSpec, /privacy-safe before\/after summary/);
+  assert.match(proposalSpec, /proposal\.reviewed`\s+audit ledger entry with privacy-safe before\/after status summaries/);
+  assert.match(proposalSource, /beforeSummary/);
+  assert.match(proposalSource, /afterSummary/);
   assert.match(plan, /M8 Vote authorization and delegation \| `in_progress`/);
   assert.match(plan, /evaluateVoteApprovalPolicy\(\)/);
+  assert.match(plan, /vote\.recorded` audit rows with privacy-safe before\/after summaries/);
   assert.match(plan, /buildV6VoteAuthorizationReadinessGate\(\)/);
   assert.match(plan, /route-edge vote auth/);
   assert.match(plan, /per-institution voting templates/);
@@ -233,12 +243,16 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /approvalThresholdBps/);
   assert.match(gate, /evaluateVoteApprovalPolicy\(\)/);
   assert.match(gate, /M8 research-only vote authorization readiness gate/);
+  assert.match(gate, /store-specific privacy-safe audit summaries for proposal\/vote records/);
   assert.match(gate, /appliesVoteOutcome: false/);
   assert.match(gate, /per-institution voting templates/);
+  assert.match(voteSpec, /privacy-safe before\/after summary/);
   assert.match(releaseReview, /Vote authorization readiness review/);
   assert.match(releaseReview, /vote authorization readiness gate/);
   assert.match(readinessSource, /vote_authorization_readiness_gate/);
   assert.match(voteSource, /REQUIRED_VOTE_AUTHORIZATION_EVIDENCE_CHECKS/);
+  assert.match(voteSource, /beforeSummary/);
+  assert.match(voteSource, /afterSummary/);
   assert.match(voteSource, /route_edge_vote_auth/);
   assert.match(voteSource, /V6_VOTE_AUTHORIZATION_READINESS_RELEASE_READY_FORBIDDEN/);
   assert.match(plan, /M9 Reputation and accountability \| `in_progress`/);
@@ -357,6 +371,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(persistenceSpec, /tests\/world_civilization_migration_rehearsal\.test\.js/);
   assert.match(persistenceSpec, /Unsupported upgrade\/downgrade targets fail closed/);
   assert.match(persistenceSpec, /before\/after audit summary presence/);
+  assert.match(persistenceSpec, /zero\s+hash-only summary fallbacks for those governance records/);
   assert.match(persistenceSpec, /missing-summary denial/);
   assert.match(auditSpec, /beforeSummary/);
   assert.match(auditSpec, /hash-only fallbacks/);

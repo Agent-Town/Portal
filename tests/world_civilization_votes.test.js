@@ -254,6 +254,11 @@ test('V6 vote store records authorized votes for existing proposals without exec
   assert.equal(voteStore.count(), 1);
   assert.equal(auditLedger.count(), 2);
   assert.deepEqual(auditLedger.replay().map((row) => row.entry.actionType), ['proposal.created', 'vote.recorded']);
+  const audit = auditLedger.getByEntryId('audit_vote_bridge_approval_001').entry;
+  assert.match(audit.beforeSummary, /No recorded civic vote existed/);
+  assert.match(audit.afterSummary, /Recorded approve vote/);
+  assert.equal(audit.beforeSummary.includes('Hash-only'), false);
+  assert.equal(audit.afterSummary.includes('Hash-only'), false);
   assert.deepEqual(voteStore.summarizeProposalVotes('proposal_public_works_bridge_001'), {
     proposalId: 'proposal_public_works_bridge_001',
     counts: { approve: 1, reject: 0, abstain: 0 },

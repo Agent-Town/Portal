@@ -241,7 +241,8 @@ persistence resilience, and security/product release review.
   or applied to ineligible owners. Current research-only coverage starts this
   in `server/world_civilization/votes.js` with non-executing
   `evaluateVoteApprovalPolicy()` checks for quorum, minimum approvals, approval
-  threshold, abstain quorum handling, and governance-preflight integration;
+  threshold, abstain quorum handling, governance-preflight integration, and
+  store-specific privacy-safe audit summaries for proposal/vote records;
   the M8 research-only vote authorization readiness gate in
   `server/world_civilization/votes.js` must require server-verified voter
   authorization, eligibility rule verification, one-vote accounting,

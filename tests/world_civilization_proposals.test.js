@@ -93,6 +93,11 @@ test('V6 proposal lifecycle drafts bounded proposals without executing effects',
   assert.equal(store.count(), 1);
   assert.equal(auditLedger.count(), 1);
   assert.deepEqual(auditLedger.replay().map((row) => row.entry.actionType), ['proposal.created']);
+  const audit = auditLedger.getByEntryId('audit_proposal_public_works_bridge_001').entry;
+  assert.match(audit.beforeSummary, /No civic proposal existed/);
+  assert.match(audit.afterSummary, /preview-only public_works_accounting/);
+  assert.equal(audit.beforeSummary.includes('Hash-only'), false);
+  assert.equal(audit.afterSummary.includes('Hash-only'), false);
   assert.equal(typeof store.applyProposal, 'undefined');
   assert.equal(typeof store.executeProposal, 'undefined');
 
@@ -165,6 +170,9 @@ test('V6 proposal lifecycle records moderation review transitions without execut
     ['proposal.created', 'proposal.reviewed']
   );
   assert.equal(auditLedger.getByEntryId(reviewed.reviewAuditEntryId).entry.actor.agentId, 'agent_system_moderation');
+  assert.match(auditLedger.getByEntryId(reviewed.reviewAuditEntryId).entry.beforeSummary, /drafted\/needs_review/);
+  assert.match(auditLedger.getByEntryId(reviewed.reviewAuditEntryId).entry.afterSummary, /ready_for_vote\/approved/);
+  assert.equal(auditLedger.getByEntryId(reviewed.reviewAuditEntryId).entry.afterSummary.includes('Hash-only'), false);
   assert.equal(store.previewProposalEffect('proposal_public_works_bridge_001').status, PROPOSAL_STATUS_READY_FOR_VOTE);
   assert.equal(typeof store.applyProposal, 'undefined');
   assert.equal(typeof store.executeProposal, 'undefined');

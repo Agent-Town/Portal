@@ -26,7 +26,9 @@ effects, count votes, or authorize autonomous public agent action.
   secret-like text are rejected before persistence.
 - Drafted proposals start with status `drafted`.
 - Drafted proposals start with moderation status `needs_review`.
-- Drafting appends exactly one `proposal.created` audit ledger entry.
+- Drafting appends exactly one `proposal.created` audit ledger entry with a
+  privacy-safe before/after summary of the proposal scope, preview effect type,
+  and moderation state.
 
 ## Idempotency Rule
 
@@ -53,7 +55,8 @@ The review decision must reference the proposal id as `subjectRef`, and its
 surface must match the proposal moderation class. Missing proposals, expired
 proposals, unsupported review statuses, and surface mismatches fail before
 persistence. Successful transitions append a replayable `proposal.reviewed`
-audit ledger entry and do not execute proposal effects.
+audit ledger entry with privacy-safe before/after status summaries and do not
+execute proposal effects.
 
 ## Non-Execution Rule
 
