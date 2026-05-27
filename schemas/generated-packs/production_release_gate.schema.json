@@ -10,6 +10,7 @@
     "evaluatedAtMs",
     "releaseMode",
     "releasePrerequisites",
+    "approvalEvidence",
     "approvalInputs",
     "metrics",
     "publicReleaseEligible",
@@ -50,6 +51,11 @@
         "humanReviewComplete": { "type": "boolean" }
       }
     },
+    "approvalEvidence": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["schemaVersion"]
+    },
     "approvalInputs": {
       "type": "object",
       "additionalProperties": false,
@@ -78,8 +84,14 @@
         "missingAssetCount",
         "productionImageAssetCount",
         "replayabilityPromptCount",
+        "approvalEvidenceSchemaErrorCount",
+        "approvalEvidenceSecretLikeCount",
+        "approvalEvidenceRawInstructionCount",
+        "candidateReviewExpectedTargetCount",
+        "candidateReviewCoverageCount",
         "eligiblePrerequisiteCount",
-        "requiredPrerequisiteCount"
+        "requiredPrerequisiteCount",
+        "looseApprovalInputCount"
       ],
       "properties": {
         "schemaErrorCount": { "type": "number", "minimum": 0 },
@@ -88,8 +100,14 @@
         "missingAssetCount": { "type": "number", "minimum": 0 },
         "productionImageAssetCount": { "type": "number", "minimum": 0 },
         "replayabilityPromptCount": { "type": "number", "minimum": 0 },
+        "approvalEvidenceSchemaErrorCount": { "type": "number", "minimum": 0 },
+        "approvalEvidenceSecretLikeCount": { "type": "number", "minimum": 0 },
+        "approvalEvidenceRawInstructionCount": { "type": "number", "minimum": 0 },
+        "candidateReviewExpectedTargetCount": { "type": "number", "minimum": 0 },
+        "candidateReviewCoverageCount": { "type": "number", "minimum": 0 },
         "eligiblePrerequisiteCount": { "type": "number", "minimum": 0 },
-        "requiredPrerequisiteCount": { "type": "number", "minimum": 0 }
+        "requiredPrerequisiteCount": { "type": "number", "minimum": 0 },
+        "looseApprovalInputCount": { "type": "number", "minimum": 0 }
       }
     },
     "publicReleaseEligible": { "type": "boolean" },

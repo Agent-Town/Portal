@@ -18,6 +18,7 @@ const GENERATED_PACK_SCHEMA_FILES = {
   assetManifest: 'generated_asset_manifest.schema.json',
   generatedPack: 'generated_pack.schema.json',
   playtestReport: 'playtest_report.schema.json',
+  releaseApprovalEvidence: 'release_approval_evidence.schema.json',
   productionReleaseGate: 'production_release_gate.schema.json',
   publicPackCard: 'public_pack_card.schema.json',
   publicPackGallery: 'public_pack_gallery.schema.json'

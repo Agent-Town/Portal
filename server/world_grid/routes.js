@@ -415,6 +415,7 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       diversityReport: body?.diversityReport || null,
       publicCard,
       persistenceReport: body?.persistenceReport || {},
+      approvalEvidence: body?.approvalEvidence || null,
       approvalInputs: body?.approvalInputs || {},
       nowMs: Date.now()
     });

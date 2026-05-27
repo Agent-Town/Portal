@@ -19,6 +19,7 @@ const PUBLIC_PACK_CARD_VERSION = 'agent-town-generated-pack-public-card-v1';
 const PUBLIC_PACK_GALLERY_VERSION = 'agent-town-generated-pack-gallery-v1';
 const PUBLIC_PACK_GALLERY_ENTRY_VERSION = 'agent-town-generated-pack-gallery-entry-v1';
 const PUBLIC_PACK_GALLERY_CURATION_VERSION = 'agent-town-generated-pack-gallery-curation-v1';
+const RELEASE_APPROVAL_EVIDENCE_VERSION = 'agent-town-generated-pack-release-approval-evidence-v1';
 const PRODUCTION_RELEASE_GATE_VERSION = 'agent-town-generated-pack-production-release-gate-v1';
 const DEFAULT_CANDIDATE_ROOT = 'data/generated-packs';
 const DEFAULT_DURABLE_ROOT = 'data/generated-packs-durable';
@@ -3850,6 +3851,238 @@ function normalizeReleaseApprovalInputs(approvalInputs = {}) {
   };
 }
 
+function isSha256Hex(value = '') {
+  return /^[0-9a-f]{64}$/.test(String(value || ''));
+}
+
+function normalizeApprovalStatus(value = '', allowed = []) {
+  const status = String(value || '').trim().toLowerCase();
+  return allowed.includes(status) ? status : allowed[0];
+}
+
+function normalizeAuthModeForEvidence(value = '') {
+  const authMode = String(value || '').trim().toLowerCase();
+  return ['not_configured', 'operator_managed', 'oauth_user_delegated'].includes(authMode)
+    ? authMode
+    : 'not_configured';
+}
+
+function positiveNumberOrZero(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric >= 0 ? numeric : 0;
+}
+
+function releaseApprovalEvidenceDefault(pack = {}, nowMs = Date.now()) {
+  const packId = String(pack?.packId || '');
+  return buildReleaseApprovalEvidence({ pack: { packId }, nowMs });
+}
+
+function buildReleaseApprovalEvidence({
+  pack = {},
+  nowMs = Date.now(),
+  authModel = {},
+  costModel = {},
+  consentModel = {},
+  candidateReview = {},
+  humanReview = {},
+  constraints = {}
+} = {}) {
+  const packId = String(pack?.packId || '');
+  const expectedTargetCount = Number.isFinite(Number(candidateReview.expectedTargetCount))
+    ? positiveNumberOrZero(candidateReview.expectedTargetCount)
+    : (Array.isArray(pack?.assetPromptPlan?.targets) ? pack.assetPromptPlan.targets.length : 0);
+  const authStatus = normalizeApprovalStatus(authModel.status, ['missing', 'approved', 'rejected']);
+  const costStatus = normalizeApprovalStatus(costModel.status, ['missing', 'accepted', 'rejected']);
+  const consentStatusValue = normalizeApprovalStatus(consentModel.status, ['missing', 'recorded', 'revoked']);
+  const candidateStatus = normalizeApprovalStatus(candidateReview.status, ['missing', 'reviewed', 'rejected']);
+  const humanStatus = normalizeApprovalStatus(humanReview.status, ['missing', 'complete', 'rejected']);
+  const evidenceCore = {
+    packId,
+    nowMs,
+    authStatus,
+    costStatus,
+    consentStatus: consentStatusValue,
+    candidateStatus,
+    humanStatus,
+    expectedTargetCount
+  };
+  return {
+    schemaVersion: RELEASE_APPROVAL_EVIDENCE_VERSION,
+    evidenceId: String(candidateReview.evidenceId || sha256(JSON.stringify(evidenceCore)).slice(0, 32)),
+    packId,
+    createdAtMs: positiveNumberOrZero(nowMs),
+    authModel: {
+      status: authStatus,
+      authMode: normalizeAuthModeForEvidence(authModel.authMode),
+      approvalDocHash: isSha256Hex(authModel.approvalDocHash) ? authModel.approvalDocHash : '',
+      approvedByHash: isSha256Hex(authModel.approvedByHash) ? authModel.approvedByHash : '',
+      approvedAtMs: positiveNumberOrZero(authModel.approvedAtMs),
+      providerAccessPolicy: authModel.providerAccessPolicy === 'out_of_band_only_no_pack_storage'
+        ? 'out_of_band_only_no_pack_storage'
+        : 'not_applicable'
+    },
+    costModel: {
+      status: costStatus,
+      currency: 'USD',
+      estimatedMin: positiveNumberOrZero(costModel.estimatedMin),
+      estimatedMax: Math.max(positiveNumberOrZero(costModel.estimatedMin), positiveNumberOrZero(costModel.estimatedMax)),
+      costEstimateHash: isSha256Hex(costModel.costEstimateHash) ? costModel.costEstimateHash : '',
+      acceptedByHash: isSha256Hex(costModel.acceptedByHash) ? costModel.acceptedByHash : '',
+      acceptedAtMs: positiveNumberOrZero(costModel.acceptedAtMs)
+    },
+    consentModel: {
+      status: consentStatusValue,
+      scope: ['single-pack-candidate-run', 'generated-pack-lane-validation'].includes(String(consentModel.scope || ''))
+        ? String(consentModel.scope)
+        : 'not_applicable',
+      userConsentHash: isSha256Hex(consentModel.userConsentHash) ? consentModel.userConsentHash : '',
+      teamConsentHash: isSha256Hex(consentModel.teamConsentHash) ? consentModel.teamConsentHash : '',
+      consentRecordHash: isSha256Hex(consentModel.consentRecordHash) ? consentModel.consentRecordHash : '',
+      recordedAtMs: positiveNumberOrZero(consentModel.recordedAtMs)
+    },
+    candidateReview: {
+      status: candidateStatus,
+      expectedTargetCount,
+      reviewedCandidateCount: positiveNumberOrZero(candidateReview.reviewedCandidateCount),
+      approvedCandidateCount: positiveNumberOrZero(candidateReview.approvedCandidateCount),
+      rejectedCandidateCount: positiveNumberOrZero(candidateReview.rejectedCandidateCount),
+      candidateManifestHash: isSha256Hex(candidateReview.candidateManifestHash) ? candidateReview.candidateManifestHash : '',
+      reviewerSignoffHash: isSha256Hex(candidateReview.reviewerSignoffHash) ? candidateReview.reviewerSignoffHash : '',
+      reviewedAtMs: positiveNumberOrZero(candidateReview.reviewedAtMs),
+      productionPromotionApproved: candidateReview.productionPromotionApproved === true
+    },
+    humanReview: {
+      status: humanStatus,
+      releaseSignoffHash: isSha256Hex(humanReview.releaseSignoffHash) ? humanReview.releaseSignoffHash : '',
+      checklistHash: isSha256Hex(humanReview.checklistHash) ? humanReview.checklistHash : '',
+      reviewedAtMs: positiveNumberOrZero(humanReview.reviewedAtMs)
+    },
+    constraints: {
+      externalProviderPrivateDataStored: constraints.externalProviderPrivateDataStored === true,
+      productionImageAssetsCreated: constraints.productionImageAssetsCreated === true,
+      canonicalServerRulesChanged: constraints.canonicalServerRulesChanged === true,
+      v6CivicMechanicsTouched: constraints.v6CivicMechanicsTouched === true,
+      normalGameplayVisibilityChanged: constraints.normalGameplayVisibilityChanged === true,
+      generatedPackDefaultExposure: constraints.generatedPackDefaultExposure === true
+    }
+  };
+}
+
+function validateReleaseApprovalEvidence(evidence = {}, pack = {}) {
+  const schemaReport = SCHEMA_REGISTRY?.releaseApprovalEvidence
+    ? validateGeneratedSchema(evidence, SCHEMA_REGISTRY.releaseApprovalEvidence, '$.releaseApprovalEvidence')
+    : { ok: true, errors: [] };
+  const secretLikePaths = findSecretLikePaths(evidence);
+  const rawInstructionPaths = findRawPromptInstructionPaths(evidence);
+  const requiredTargetCount = Math.max(
+    ASSET_PROMPT_TARGETS.length,
+    Array.isArray(pack?.assetPromptPlan?.targets) ? pack.assetPromptPlan.targets.length : 0
+  );
+  const candidate = evidence?.candidateReview || {};
+  const reviewedCandidateCount = positiveNumberOrZero(candidate.reviewedCandidateCount);
+  const expectedTargetCount = positiveNumberOrZero(candidate.expectedTargetCount);
+  const reviewedDispositionCount = positiveNumberOrZero(candidate.approvedCandidateCount)
+    + positiveNumberOrZero(candidate.rejectedCandidateCount);
+  const constraints = evidence?.constraints || {};
+  const boundaryPreserved = constraints.externalProviderPrivateDataStored === false
+    && constraints.productionImageAssetsCreated === false
+    && constraints.canonicalServerRulesChanged === false
+    && constraints.v6CivicMechanicsTouched === false
+    && constraints.normalGameplayVisibilityChanged === false
+    && constraints.generatedPackDefaultExposure === false;
+  const authModelApproved = evidence?.authModel?.status === 'approved'
+    && evidence?.authModel?.authMode !== 'not_configured'
+    && evidence?.authModel?.providerAccessPolicy === 'out_of_band_only_no_pack_storage'
+    && isSha256Hex(evidence?.authModel?.approvalDocHash)
+    && isSha256Hex(evidence?.authModel?.approvedByHash);
+  const costEstimateAccepted = evidence?.costModel?.status === 'accepted'
+    && evidence?.costModel?.currency === 'USD'
+    && positiveNumberOrZero(evidence?.costModel?.estimatedMax) >= positiveNumberOrZero(evidence?.costModel?.estimatedMin)
+    && isSha256Hex(evidence?.costModel?.costEstimateHash)
+    && isSha256Hex(evidence?.costModel?.acceptedByHash);
+  const explicitConsentRecorded = evidence?.consentModel?.status === 'recorded'
+    && evidence?.consentModel?.scope !== 'not_applicable'
+    && isSha256Hex(evidence?.consentModel?.userConsentHash)
+    && isSha256Hex(evidence?.consentModel?.teamConsentHash)
+    && isSha256Hex(evidence?.consentModel?.consentRecordHash);
+  const candidateAssetsReviewed = candidate.status === 'reviewed'
+    && expectedTargetCount >= requiredTargetCount
+    && reviewedCandidateCount >= expectedTargetCount
+    && reviewedDispositionCount >= reviewedCandidateCount
+    && isSha256Hex(candidate.candidateManifestHash)
+    && isSha256Hex(candidate.reviewerSignoffHash)
+    && candidate.productionPromotionApproved === false;
+  const humanReviewComplete = evidence?.humanReview?.status === 'complete'
+    && isSha256Hex(evidence?.humanReview?.releaseSignoffHash)
+    && isSha256Hex(evidence?.humanReview?.checklistHash);
+  const contentSafe = secretLikePaths.length === 0 && rawInstructionPaths.length === 0;
+  const checks = [
+    {
+      id: 'RELEASE_APPROVAL_EVIDENCE_SCHEMA_VALID',
+      passed: schemaReport.ok === true,
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
+    },
+    {
+      id: 'RELEASE_APPROVAL_EVIDENCE_CONTENT_SAFE',
+      passed: contentSafe,
+      measured: { secretLikePaths, rawInstructionPaths }
+    },
+    {
+      id: 'RELEASE_APPROVAL_EVIDENCE_AUTH_COST_CONSENT',
+      passed: authModelApproved && costEstimateAccepted && explicitConsentRecorded,
+      measured: { authModelApproved, costEstimateAccepted, explicitConsentRecorded }
+    },
+    {
+      id: 'RELEASE_APPROVAL_EVIDENCE_CANDIDATE_REVIEW_COVERAGE',
+      passed: candidateAssetsReviewed,
+      measured: { requiredTargetCount, expectedTargetCount, reviewedCandidateCount, reviewedDispositionCount }
+    },
+    {
+      id: 'RELEASE_APPROVAL_EVIDENCE_HUMAN_REVIEW',
+      passed: humanReviewComplete,
+      measured: { humanReviewStatus: evidence?.humanReview?.status || null }
+    },
+    {
+      id: 'RELEASE_APPROVAL_EVIDENCE_BOUNDARY_PRESERVED',
+      passed: boundaryPreserved,
+      measured: constraints
+    }
+  ];
+  return {
+    ok: checks.every((check) => check.passed === true),
+    checks,
+    metrics: {
+      releaseApprovalEvidenceSchemaExists: Boolean(SCHEMA_REGISTRY?.releaseApprovalEvidence),
+      schemaErrorCount: schemaReport.errors.length,
+      secretLikePathCount: secretLikePaths.length,
+      rawInstructionPathCount: rawInstructionPaths.length,
+      authModelApproved,
+      costEstimateAccepted,
+      explicitConsentRecorded,
+      costConsentModelApproved: authModelApproved && costEstimateAccepted && explicitConsentRecorded,
+      candidateAssetsReviewed,
+      humanReviewComplete,
+      boundaryPreserved,
+      requiredTargetCount,
+      expectedTargetCount,
+      reviewedCandidateCount
+    }
+  };
+}
+
+function approvalInputsFromEvidence(evidence = {}, evidenceReport = validateReleaseApprovalEvidence(evidence)) {
+  const metrics = evidenceReport.metrics || {};
+  return {
+    authModelDocumented: metrics.authModelApproved === true,
+    costEstimateAccepted: metrics.costEstimateAccepted === true,
+    explicitConsentRecorded: metrics.explicitConsentRecorded === true,
+    candidateAssetsReviewed: metrics.candidateAssetsReviewed === true,
+    humanReviewSignoffHash: metrics.humanReviewComplete === true
+      ? String(evidence?.humanReview?.releaseSignoffHash || '').trim()
+      : ''
+  };
+}
+
 function releaseDiversityPassed(diversityReport = {}) {
   const metrics = diversityReport?.metrics || {};
   return diversityReport?.ok === true
@@ -3873,6 +4106,7 @@ function buildProductionReleaseGate({
   diversityReport = null,
   publicCard = null,
   persistenceReport = {},
+  approvalEvidence = null,
   approvalInputs = {},
   nowMs = Date.now()
 } = {}) {
@@ -3889,11 +4123,15 @@ function buildProductionReleaseGate({
   const publicCardReport = publicCard
     ? validatePublicPackCard(publicCard, {})
     : { ok: false, metrics: { privateDataLeakCount: 0, blockedFieldCount: 0 } };
-  const approvals = normalizeReleaseApprovalInputs(approvalInputs);
-  const costConsentModelApproved = approvals.authModelDocumented === true
-    && approvals.costEstimateAccepted === true
-    && approvals.explicitConsentRecorded === true;
-  const humanReviewComplete = /^[0-9a-f]{64}$/.test(approvals.humanReviewSignoffHash);
+  const normalizedLooseApprovals = normalizeReleaseApprovalInputs(approvalInputs);
+  const evidence = approvalEvidence && typeof approvalEvidence === 'object'
+    ? clone(approvalEvidence)
+    : releaseApprovalEvidenceDefault(pack, nowMs);
+  const approvalEvidenceReport = validateReleaseApprovalEvidence(evidence, pack);
+  const approvals = approvalInputsFromEvidence(evidence, approvalEvidenceReport);
+  const approvalEvidenceOk = approvalEvidenceReport.ok === true;
+  const costConsentModelApproved = approvalEvidenceOk && approvalEvidenceReport.metrics.costConsentModelApproved === true;
+  const humanReviewComplete = approvalEvidenceOk && approvalEvidenceReport.metrics.humanReviewComplete === true;
   const publicCardPrivateDataLeakCount = Number(
     publicCard?.moderation?.privateDataLeakCount
     || publicCardReport.metrics?.privateDataLeakCount
@@ -3925,7 +4163,7 @@ function buildProductionReleaseGate({
       && publicCardPrivateDataLeakCount === 0
       && publicCardBlockedFieldCount === 0,
     costConsentModelApproved,
-    candidateAssetsReviewed: approvals.candidateAssetsReviewed === true,
+    candidateAssetsReviewed: approvalEvidenceOk && approvalEvidenceReport.metrics.candidateAssetsReviewed === true,
     humanReviewComplete
   };
   const blockingReasons = Object.entries(releasePrerequisites)
@@ -3938,6 +4176,7 @@ function buildProductionReleaseGate({
     evaluatedAtMs: nowMs,
     releaseMode: publicReleaseEligible ? 'ready-for-controlled-release' : 'prototype-gated',
     releasePrerequisites,
+    approvalEvidence: evidence,
     approvalInputs: approvals,
     metrics: {
       schemaErrorCount: Number(schemaReport.metrics?.schemaErrorCount || 0),
@@ -3946,8 +4185,14 @@ function buildProductionReleaseGate({
       missingAssetCount,
       productionImageAssetCount: Number(pack?.assetScaffold?.productionImageAssetCount || 0),
       replayabilityPromptCount: Number(diversityReport?.metrics?.promptCount || diversityReport?.metrics?.validPackCount || 0),
+      approvalEvidenceSchemaErrorCount: Number(approvalEvidenceReport.metrics.schemaErrorCount || 0),
+      approvalEvidenceSecretLikeCount: Number(approvalEvidenceReport.metrics.secretLikePathCount || 0),
+      approvalEvidenceRawInstructionCount: Number(approvalEvidenceReport.metrics.rawInstructionPathCount || 0),
+      candidateReviewExpectedTargetCount: Number(approvalEvidenceReport.metrics.expectedTargetCount || 0),
+      candidateReviewCoverageCount: Number(approvalEvidenceReport.metrics.reviewedCandidateCount || 0),
       eligiblePrerequisiteCount: Object.values(releasePrerequisites).filter((passed) => passed === true).length,
-      requiredPrerequisiteCount: Object.keys(releasePrerequisites).length
+      requiredPrerequisiteCount: Object.keys(releasePrerequisites).length,
+      looseApprovalInputCount: Object.values(normalizedLooseApprovals).filter(Boolean).length
     },
     publicReleaseEligible,
     blockingReasons
@@ -3973,6 +4218,20 @@ function validateProductionReleaseGate(gate = {}) {
     && blockingReasons.every((reason) => failedPrerequisiteSet.has(reason))
     && failedPrerequisites.every((reason) => blockingReasonSet.has(reason));
   const approvals = gate?.approvalInputs || {};
+  const approvalEvidenceReport = validateReleaseApprovalEvidence(gate?.approvalEvidence || {});
+  const approvalEvidenceContractOk = approvalEvidenceReport.checks
+    .filter((check) => [
+      'RELEASE_APPROVAL_EVIDENCE_SCHEMA_VALID',
+      'RELEASE_APPROVAL_EVIDENCE_CONTENT_SAFE',
+      'RELEASE_APPROVAL_EVIDENCE_BOUNDARY_PRESERVED'
+    ].includes(check.id))
+    .every((check) => check.passed === true);
+  const expectedApprovals = approvalInputsFromEvidence(gate?.approvalEvidence || {}, approvalEvidenceReport);
+  const approvalInputsMatchEvidence = approvals.authModelDocumented === expectedApprovals.authModelDocumented
+    && approvals.costEstimateAccepted === expectedApprovals.costEstimateAccepted
+    && approvals.explicitConsentRecorded === expectedApprovals.explicitConsentRecorded
+    && approvals.candidateAssetsReviewed === expectedApprovals.candidateAssetsReviewed
+    && String(approvals.humanReviewSignoffHash || '') === String(expectedApprovals.humanReviewSignoffHash || '');
   const checks = [
     {
       id: 'PRODUCTION_RELEASE_GATE_SCHEMA_VALID',
@@ -4003,18 +4262,39 @@ function validateProductionReleaseGate(gate = {}) {
       id: 'PRODUCTION_RELEASE_GATE_APPROVALS_EXPLICIT',
       passed: gate?.publicReleaseEligible !== true
         || (
-          approvals.authModelDocumented === true
+          approvalEvidenceReport.ok === true
+          && approvalInputsMatchEvidence
+          && approvals.authModelDocumented === true
           && approvals.costEstimateAccepted === true
           && approvals.explicitConsentRecorded === true
           && approvals.candidateAssetsReviewed === true
           && /^[0-9a-f]{64}$/.test(String(approvals.humanReviewSignoffHash || ''))
         ),
-      measured: approvals
+      measured: { approvals, approvalEvidenceOk: approvalEvidenceReport.ok === true, approvalInputsMatchEvidence }
+    },
+    {
+      id: 'PRODUCTION_RELEASE_GATE_APPROVAL_EVIDENCE_VALID',
+      passed: approvalEvidenceContractOk
+        && approvalInputsMatchEvidence
+        && Number(gate?.metrics?.approvalEvidenceSchemaErrorCount || 0) === Number(approvalEvidenceReport.metrics.schemaErrorCount || 0)
+        && Number(gate?.metrics?.approvalEvidenceSecretLikeCount || 0) === Number(approvalEvidenceReport.metrics.secretLikePathCount || 0)
+        && Number(gate?.metrics?.approvalEvidenceRawInstructionCount || 0) === Number(approvalEvidenceReport.metrics.rawInstructionPathCount || 0)
+        && Number(gate?.metrics?.candidateReviewExpectedTargetCount || 0) === Number(approvalEvidenceReport.metrics.expectedTargetCount || 0)
+        && Number(gate?.metrics?.candidateReviewCoverageCount || 0) === Number(approvalEvidenceReport.metrics.reviewedCandidateCount || 0),
+      measured: {
+        approvalEvidenceContractOk,
+        approvalEvidenceComplete: approvalEvidenceReport.ok === true,
+        approvalInputsMatchEvidence,
+        approvalEvidenceMetrics: approvalEvidenceReport.metrics,
+        gateMetrics: gate?.metrics || {}
+      }
     },
     {
       id: 'PRODUCTION_RELEASE_GATE_NO_PRIVATE_OR_ASSET_LEAKS',
       passed: Number(gate?.metrics?.privateDataLeakCount || 0) === 0
         && Number(gate?.metrics?.blockedFieldCount || 0) === 0
+        && Number(gate?.metrics?.approvalEvidenceSecretLikeCount || 0) === 0
+        && Number(gate?.metrics?.approvalEvidenceRawInstructionCount || 0) === 0
         && Number(gate?.metrics?.productionImageAssetCount || 0) === 0
         && (
           Number(gate?.metrics?.missingAssetCount || 0) === 0
@@ -4033,7 +4313,9 @@ function validateProductionReleaseGate(gate = {}) {
       blockingReasonCount: blockingReasons.length,
       costConsentModelApproved: prerequisites.costConsentModelApproved === true,
       humanReviewComplete: prerequisites.humanReviewComplete === true,
-      privateDataLeakCount: Number(gate?.metrics?.privateDataLeakCount || 0)
+      privateDataLeakCount: Number(gate?.metrics?.privateDataLeakCount || 0),
+      approvalEvidenceOk: approvalEvidenceReport.ok === true,
+      approvalEvidenceSecretLikeCount: Number(approvalEvidenceReport.metrics.secretLikePathCount || 0)
     }
   };
 }
@@ -4670,11 +4952,13 @@ module.exports = {
   INHABITANT_ROLE_DEFINITIONS,
   MULTI_SURFACE_DEFINITIONS,
   REQUIRED_CANONICAL_IDS,
+  RELEASE_APPROVAL_EVIDENCE_VERSION,
   REPLAYABILITY_PROMPT_SUITE,
   SCHEMA_VERSION,
   analyzePackDiversity,
   buildAssetPromptPlan,
   buildMeasuredPlaytestReport,
+  buildReleaseApprovalEvidence,
   buildProductionReleaseGate,
   clearGeneratedPacksForTests,
   createGenerationBrief,
@@ -4711,6 +4995,7 @@ module.exports = {
   validatePublicPackGallery,
   validatePublicPackCard,
   validatePlaytestReport,
+  validateReleaseApprovalEvidence,
   validateProductionReleaseGate,
   validateGeneratedPack
 };

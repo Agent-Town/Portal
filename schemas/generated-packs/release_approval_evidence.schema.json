@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-town-generated-pack-release-approval-evidence-v1",
+  "title": "Agent Town Generated Pack Release Approval Evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "evidenceId",
+    "packId",
+    "createdAtMs",
+    "authModel",
+    "costModel",
+    "consentModel",
+    "candidateReview",
+    "humanReview",
+    "constraints"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "agent-town-generated-pack-release-approval-evidence-v1" },
+    "evidenceId": { "type": "string", "minLength": 12 },
+    "packId": { "type": "string", "minLength": 3 },
+    "createdAtMs": { "type": "number" },
+    "authModel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "authMode", "approvalDocHash", "approvedByHash", "approvedAtMs", "providerAccessPolicy"],
+      "properties": {
+        "status": { "enum": ["missing", "approved", "rejected"] },
+        "authMode": { "enum": ["not_configured", "operator_managed", "oauth_user_delegated"] },
+        "approvalDocHash": { "type": "string", "pattern": "^$|^[0-9a-f]{64}$" },
+        "approvedByHash": { "type": "string", "pattern": "^$|^[0-9a-f]{64}$" },
+        "approvedAtMs": { "type": "number", "minimum": 0 },
+        "providerAccessPolicy": { "enum": ["not_applicable", "out_of_band_only_no_pack_storage"] }
+      }
+    },
+    "costModel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "currency", "estimatedMin", "estimatedMax", "costEstimateHash", "acceptedByHash", "acceptedAtMs"],
+      "properties": {
+        "status": { "enum": ["missing", "accepted", "rejected"] },
+        "currency": { "const": "USD" },
+        "estimatedMin": { "type": "number", "minimum": 0 },
+        "estimatedMax": { "type": "number", "minimum": 0 },
+        "costEstimateHash": { "type": "string", "pattern": "^$|^[0-9a-f]{64}$" },
+        "acceptedByHash": { "type": "string", "pattern": "^$|^[0-9a-f]{64}$" },
+        "acceptedAtMs": { "type": "number", "minimum": 0 }
+      }
+    },
+    "consentModel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "scope", "userConsentHash", "teamConsentHash", "consentRecordHash", "recordedAtMs"],
+      "properties": {
+        "status": { "enum": ["missing", "recorded", "revoked"] },
+        "scope": { "enum": ["not_applicable", "single-pack-candidate-run", "generated-pack-lane-validation"] },
+        "userConsentHash": { "type": "string", "pattern": "^$|^[0-9a-f]{64}$" },
+        "teamConsentHash": { "type": "string", "pattern": "^$|^[0-9a-f]{64}$" },
+        "consentRecordHash": { "type": "string", "pattern": "^$|^[0-9a-f]{64}$" },
+        "recordedAtMs": { "type": "number", "minimum": 0 }
+      }
+    },
+    "candidateReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "expectedTargetCount",
+        "reviewedCandidateCount",
+        "approvedCandidateCount",
+        "rejectedCandidateCount",
+        "candidateManifestHash",
+        "reviewerSignoffHash",
+        "reviewedAtMs",
+        "productionPromotionApproved"
+      ],
+      "properties": {
+        "status": { "enum": ["missing", "reviewed", "rejected"] },
+        "expectedTargetCount": { "type": "number", "minimum": 0 },
+        "reviewedCandidateCount": { "type": "number", "minimum": 0 },
+        "approvedCandidateCount": { "type": "number", "minimum": 0 },
+        "rejectedCandidateCount": { "type": "number", "minimum": 0 },
+        "candidateManifestHash": { "type": "string", "pattern": "^$|^[0-9a-f]{64}$" },
+        "reviewerSignoffHash": { "type": "string", "pattern": "^$|^[0-9a-f]{64}$" },
+        "reviewedAtMs": { "type": "number", "minimum": 0 },
+        "productionPromotionApproved": { "const": false }
+      }
+    },
+    "humanReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "releaseSignoffHash", "checklistHash", "reviewedAtMs"],
+      "properties": {
+        "status": { "enum": ["missing", "complete", "rejected"] },
+        "releaseSignoffHash": { "type": "string", "pattern": "^$|^[0-9a-f]{64}$" },
+        "checklistHash": { "type": "string", "pattern": "^$|^[0-9a-f]{64}$" },
+        "reviewedAtMs": { "type": "number", "minimum": 0 }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "externalProviderPrivateDataStored",
+        "productionImageAssetsCreated",
+        "canonicalServerRulesChanged",
+        "v6CivicMechanicsTouched",
+        "normalGameplayVisibilityChanged",
+        "generatedPackDefaultExposure"
+      ],
+      "properties": {
+        "externalProviderPrivateDataStored": { "const": false },
+        "productionImageAssetsCreated": { "const": false },
+        "canonicalServerRulesChanged": { "const": false },
+        "v6CivicMechanicsTouched": { "const": false },
+        "normalGameplayVisibilityChanged": { "const": false },
+        "generatedPackDefaultExposure": { "const": false }
+      }
+    }
+  }
+}

@@ -145,9 +145,11 @@ Player prompt
 ## Production Release Gate Boundary
 
 - `buildProductionReleaseGate` creates a standalone readiness report and does not embed release approval state inside generated packs or default gameplay payloads.
-- `validateProductionReleaseGate` checks schema validity, prerequisite coherence, fail-closed behavior, explicit approvals, and zero public/private asset leaks.
+- `release_approval_evidence.schema.json` is the auditable auth/cost/consent/candidate-review/human-review contract used by the release gate. Loose approval booleans are ignored for eligibility unless they are derived from matching versioned evidence.
+- `validateProductionReleaseGate` checks schema validity, prerequisite coherence, fail-closed behavior, explicit approval evidence, and zero public/private asset leaks.
 - The gate can be valid while `publicReleaseEligible=false`; that is the expected result when playtest evidence, diversity evidence, persistence evidence, public-card privacy evidence, candidate review, consent/cost/auth approval, or human signoff is absent.
 - `publicReleaseEligible=true` requires every prerequisite to be true and `blockingReasons=[]`; forged eligibility or missing blocking reasons fail validation.
+- Approval evidence with secret-like fields, raw prompt instructions, short candidate-review coverage, production image promotion, canonical rule changes, V6 civic changes, or default gameplay exposure fails closed.
 - `POST /api/world/generated-pack/release-gate` remains behind `FEATURE_WORLD_GRID_GENERATED_PACKS` and does not change canonical world-grid rules, V6 civic systems, pack visibility, or production image policy.
 
 ## Machine Checks
@@ -265,9 +267,15 @@ Player prompt
   "v5ToolsUnaffected": true,
   "serverRuleChangeCount": 0,
   "productionReleaseGateSchemaExists": true,
+  "releaseApprovalEvidenceSchemaExists": true,
   "releaseGateFeatureGated": true,
   "releaseGateFailsClosedWithoutApprovals": true,
   "blockingReasonsMatchFailedPrerequisites": true,
+  "looseApprovalBooleansIgnored": true,
+  "approvalInputsDerivedFromEvidence": true,
+  "approvalEvidenceSecretLikeCount": 0,
+  "approvalEvidenceRawInstructionCount": 0,
+  "candidateReviewCoverageCountMin": 23,
   "costConsentModelApproved": true,
   "candidateAssetsReviewed": true,
   "humanReviewComplete": true,
