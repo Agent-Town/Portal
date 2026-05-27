@@ -5155,26 +5155,27 @@ function validateReleaseEvidenceBundle(bundle = {}, {
   if (pack?.packId && bundle?.packId !== pack.packId) {
     sourcePackIdProblems.push(`generatedPack:bundle:${pack.packId}`);
   }
-  const releaseGateHashExpected = releaseGate ? stableEvidenceHash(releaseGate) : '';
-  const releaseGateHashMatches = !releaseGate || bundle?.releaseGateHash === releaseGateHashExpected;
+  const releaseGateProvided = Boolean(releaseGate);
+  const releaseGateHashExpected = releaseGateProvided ? stableEvidenceHash(releaseGate) : '';
+  const releaseGateHashMatches = releaseGateProvided && bundle?.releaseGateHash === releaseGateHashExpected;
   const gateReport = releaseGate
     ? validateProductionReleaseGate(releaseGate, { nowMs })
-    : { ok: bundle?.metrics?.releaseGateValid === true };
+    : { ok: false };
   const bundleCreatedAtMs = positiveNumberOrZero(bundle?.createdAtMs);
   const validationNowMs = positiveNumberOrZero(nowMs);
   const bundleCreatedAtOrAfterGate = releaseGate
     ? positiveNumberOrZero(releaseGate?.evaluatedAtMs) > 0
       && bundleCreatedAtMs >= positiveNumberOrZero(releaseGate.evaluatedAtMs)
-    : bundle?.publicReleaseEligible !== true;
+    : false;
   const bundleCreatedAtNotFuture = validationNowMs > 0
     && bundleCreatedAtMs > 0
     && bundleCreatedAtMs <= validationNowMs;
   const blockingReasonsMatchGate = releaseGate
     ? stableEvidenceHash(bundle?.blockingReasons || []) === stableEvidenceHash(releaseGate?.blockingReasons || [])
-    : bundle?.publicReleaseEligible !== true;
+    : false;
   const prerequisiteSnapshotMatchesGate = releaseGate
     ? stableEvidenceHash(bundle?.prerequisiteSnapshot || {}) === stableEvidenceHash(releaseGate?.releasePrerequisites || {})
-    : bundle?.publicReleaseEligible !== true;
+    : false;
   const generatedPackSourcePassed = releaseGeneratedPackSourcePassed(pack);
   const playtestSourcePassed = releasePlaytestSourcePassed(playtestReport, pack || {});
   const persistenceSourcePassed = releasePersistenceSourcePassed(persistenceReport || {}, bundle?.packId || releaseGate?.packId || pack?.packId || '');
@@ -5197,11 +5198,11 @@ function validateReleaseEvidenceBundle(bundle = {}, {
   const sourceCoverageOk = bundle?.publicReleaseEligible === true
     ? presentSourceCount === RELEASE_EVIDENCE_SOURCE_KEYS.length
       && suppliedSourceCount === RELEASE_EVIDENCE_SOURCE_KEYS.length
-      && Boolean(releaseGate)
-    : presentSourceCount >= 1;
+      && releaseGateProvided
+    : presentSourceCount >= 1 && releaseGateProvided;
   const approvalEvidenceHashMatchesGate = releaseGate?.approvalEvidence
     ? bundle?.sourceHashes?.approvalEvidence === stableEvidenceHash(releaseGate.approvalEvidence)
-    : bundle?.metrics?.approvalEvidenceHashMatchesGate === true || bundle?.publicReleaseEligible !== true;
+    : false;
   const candidateReviewManifestHashMatchesEvidence = candidateReviewManifest?.manifestHash
     ? candidateReviewManifest.manifestHash === (approvalEvidence || releaseGate?.approvalEvidence || {})?.candidateReview?.candidateManifestHash
       && bundle?.sourceHashes?.candidateReviewManifest === stableEvidenceHash(candidateReviewManifest)
@@ -5302,11 +5303,11 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     },
     {
       id: 'RELEASE_EVIDENCE_BUNDLE_RELEASE_GATE_VALID',
-      passed: gateReport.ok === true
-        && (bundle?.publicReleaseEligible !== true || Boolean(releaseGate))
+      passed: releaseGateProvided
+        && gateReport.ok === true
         && (!releaseGate || bundle?.publicReleaseEligible === (releaseGate.publicReleaseEligible === true))
         && (!releaseGate || bundle?.releaseGateMode === releaseGate.releaseMode),
-      measured: { releaseGateProvided: Boolean(releaseGate), releaseGateValid: gateReport.ok === true }
+      measured: { releaseGateProvided, releaseGateValid: gateReport.ok === true }
     },
     {
       id: 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT',

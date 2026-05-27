@@ -829,6 +829,30 @@ test('GU-19 release evidence bundle rejects unsupplied source pack ids even when
   );
 }));
 
+test('GU-19 release evidence bundle validation requires the bound release gate even when fail closed', () => withTempGeneratedPackStore(() => {
+  const owner = { ownerAccountId: 'owner_release_evidence_bundle_missing_gate_context' };
+  const pack = generateAndStorePack({
+    owner,
+    prompt: 'rain-glass depot with careful moss signalers',
+    nowMs: 157_300
+  });
+  const releaseGate = buildProductionReleaseGate({ pack, nowMs: 157_350 });
+  const bundle = buildReleaseEvidenceBundle({
+    pack,
+    releaseGate,
+    nowMs: 157_400
+  });
+  const report = validateReleaseEvidenceBundle(bundle, { pack, nowMs: 157_450 });
+
+  assert.equal(releaseGate.publicReleaseEligible, false);
+  assert.equal(bundle.publicReleaseEligible, false);
+  assert.equal(report.ok, false);
+  assert.equal(
+    report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_RELEASE_GATE_VALID').passed,
+    false
+  );
+}));
+
 test('GU-19 release evidence bundle rejects mixed-pack source evidence even when hashes match supplied sources', () => withTempGeneratedPackStore(() => {
   const fixture = readyReleaseGateFixture({
     ownerAccountId: 'owner_release_evidence_bundle_mixed_pack',
