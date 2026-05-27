@@ -4836,6 +4836,13 @@ function buildReleaseEvidenceBundle({
     && Number(gate?.metrics?.candidateReviewManifestTimeMatchesEvidence || 0) === 1;
   const prerequisiteSnapshot = clone(gate?.releasePrerequisites || {});
   const prerequisiteSnapshotMatchesGate = stableEvidenceHash(prerequisiteSnapshot) === stableEvidenceHash(gate?.releasePrerequisites || {});
+  const readyEvidenceSourcesMatchGate = gate?.publicReleaseEligible !== true
+    || (
+      prerequisiteSnapshotMatchesGate
+      && approvalEvidenceHashMatchesGate
+      && candidateReviewManifestHashMatchesEvidence
+      && candidateReviewManifestTimeMatchesEvidence
+    );
   const bundle = {
     schemaVersion: RELEASE_EVIDENCE_BUNDLE_VERSION,
     bundleHash: '',
@@ -4866,6 +4873,7 @@ function buildReleaseEvidenceBundle({
       releaseGateValid: validateProductionReleaseGate(gate).ok === true,
       releaseGatePublicEligible: gate?.publicReleaseEligible === true,
       prerequisiteSnapshotMatchesGate,
+      readyEvidenceSourcesMatchGate,
       approvalEvidenceHashMatchesGate,
       candidateReviewManifestHashMatchesEvidence,
       candidateReviewManifestTimeMatchesEvidence,
@@ -4967,6 +4975,13 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     && positiveNumberOrZero(reviewEvidence?.candidateReview?.reviewedAtMs) >= positiveNumberOrZero(candidateReviewManifest.createdAtMs)
     && positiveNumberOrZero(reviewEvidence?.candidateReview?.reviewedAtMs) <= positiveNumberOrZero(reviewEvidence?.createdAtMs)
     && (!releaseGate || Number(releaseGate?.metrics?.candidateReviewManifestTimeMatchesEvidence || 0) === 1);
+  const readyEvidenceSourcesMatchGate = bundle?.publicReleaseEligible !== true
+    || (
+      prerequisiteSnapshotMatchesGate
+      && approvalEvidenceHashMatchesGate
+      && candidateReviewManifestHashMatchesEvidence
+      && candidateReviewManifestTimeMatchesEvidence
+    );
   const constraints = bundle?.constraints || {};
   const boundaryPreserved = constraints.productionImageAssetsCreated === false
     && constraints.externalProviderPrivateDataStored === false
@@ -4984,6 +4999,8 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     && bundle?.metrics?.releaseGateValid === (gateReport.ok === true)
     && bundle?.metrics?.releaseGatePublicEligible === (bundle?.publicReleaseEligible === true)
     && bundle?.metrics?.prerequisiteSnapshotMatchesGate === prerequisiteSnapshotMatchesGate
+    && bundle?.metrics?.readyEvidenceSourcesMatchGate === readyEvidenceSourcesMatchGate
+    && readyEvidenceSourcesMatchGate === true
     && bundle?.metrics?.approvalEvidenceHashMatchesGate === approvalEvidenceHashMatchesGate
     && bundle?.metrics?.candidateReviewManifestHashMatchesEvidence === candidateReviewManifestHashMatchesEvidence
     && bundle?.metrics?.candidateReviewManifestTimeMatchesEvidence === candidateReviewManifestTimeMatchesEvidence;
@@ -5040,6 +5057,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
         sourceHashProblemCount: sourceHashProblems.length,
         sourcePackIdProblemCount: sourcePackIdProblems.length,
         prerequisiteSnapshotMatchesGate,
+        readyEvidenceSourcesMatchGate,
         approvalEvidenceHashMatchesGate,
         candidateReviewManifestHashMatchesEvidence,
         candidateReviewManifestTimeMatchesEvidence
@@ -5068,6 +5086,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
       sourceCoverageOk,
       releaseGateValid: gateReport.ok === true,
       prerequisiteSnapshotMatchesGate,
+      readyEvidenceSourcesMatchGate,
       boundaryPreserved
     }
   };

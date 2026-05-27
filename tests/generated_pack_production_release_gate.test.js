@@ -222,6 +222,56 @@ function approvedReleaseEvidence(pack) {
   });
 }
 
+function alternateApprovedReleaseEvidence(pack) {
+  const candidateReviewManifest = reviewedCandidateManifest(pack);
+  const targetCount = pack.assetPromptPlan.targets.length;
+  return buildReleaseApprovalEvidence({
+    pack,
+    nowMs: 152_450,
+    authModel: {
+      status: 'approved',
+      authMode: 'operator_managed',
+      approvalDocHash: hashLabel('generated-pack-auth-policy-alternate'),
+      approvedByHash: hashLabel('product-security-reviewer-alternate'),
+      approvedAtMs: 152_110,
+      providerAccessPolicy: 'out_of_band_only_no_pack_storage'
+    },
+    costModel: {
+      status: 'accepted',
+      estimatedMin: 0.45,
+      estimatedMax: 1.85,
+      costEstimateHash: hashLabel('generated-pack-candidate-cost-estimate-alternate'),
+      acceptedByHash: hashLabel('cost-owner-alternate'),
+      acceptedAtMs: 152_220
+    },
+    consentModel: {
+      status: 'recorded',
+      scope: 'single-pack-candidate-run',
+      userConsentHash: hashLabel('user-consent-record-alternate'),
+      teamConsentHash: hashLabel('team-consent-record-alternate'),
+      consentRecordHash: hashLabel('combined-consent-record-alternate'),
+      recordedAtMs: 152_260
+    },
+    candidateReview: {
+      status: 'reviewed',
+      expectedTargetCount: targetCount,
+      reviewedCandidateCount: targetCount,
+      approvedCandidateCount: targetCount,
+      rejectedCandidateCount: 0,
+      candidateManifestHash: candidateReviewManifest.manifestHash,
+      reviewerSignoffHash: hashLabel('candidate-reviewer-alternate'),
+      reviewedAtMs: 152_395,
+      productionPromotionApproved: false
+    },
+    humanReview: {
+      status: 'complete',
+      releaseSignoffHash: hashLabel('human-release-signoff-alternate'),
+      checklistHash: hashLabel('release-checklist-alternate'),
+      reviewedAtMs: 152_360
+    }
+  });
+}
+
 function reviewedCandidateManifest(pack) {
   const reviewDecisions = Object.fromEntries(pack.assetPromptPlan.targets.map((target) => [
     target.canonicalTarget,
@@ -420,10 +470,40 @@ test('GU-19 release evidence bundle binds a ready gate to source evidence hashes
   assert.equal(bundle.metrics.releaseGateValid, true);
   assert.equal(bundle.metrics.releaseGatePublicEligible, true);
   assert.equal(bundle.metrics.prerequisiteSnapshotMatchesGate, true);
+  assert.equal(bundle.metrics.readyEvidenceSourcesMatchGate, true);
   assert.equal(bundle.metrics.approvalEvidenceHashMatchesGate, true);
   assert.equal(bundle.metrics.candidateReviewManifestHashMatchesEvidence, true);
   assert.equal(bundle.metrics.candidateReviewManifestTimeMatchesEvidence, true);
   assert.equal(bundle.constraints.productionImageAssetsCreated, false);
+}));
+
+test('GU-19 release evidence bundle rejects approval evidence that drifts from the bound gate', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_evidence_bundle_approval_drift',
+    prompt: 'opal rail garden with lantern switchwrights',
+    nowMs: 154_750
+  });
+  const alternateApprovalEvidence = alternateApprovedReleaseEvidence(fixture.pack);
+  const bundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    approvalEvidence: alternateApprovalEvidence,
+    nowMs: 154_780
+  });
+  const report = validateReleaseEvidenceBundle(bundle, {
+    ...fixture,
+    approvalEvidence: alternateApprovalEvidence
+  });
+
+  assert.equal(validateReleaseApprovalEvidence(alternateApprovalEvidence, fixture.pack).ok, true);
+  assert.equal(bundle.sourcePackIds.approvalEvidence, fixture.pack.packId);
+  assert.equal(bundle.publicReleaseEligible, true);
+  assert.equal(bundle.metrics.approvalEvidenceHashMatchesGate, false);
+  assert.equal(bundle.metrics.readyEvidenceSourcesMatchGate, false);
+  assert.equal(report.ok, false);
+  assert.equal(
+    report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,
+    false
+  );
 }));
 
 test('GU-19 release evidence bundle rejects forged prerequisite snapshots', () => withTempGeneratedPackStore(() => {
@@ -1035,6 +1115,7 @@ test('GU-18/GU-19 release gate and evidence bundle APIs are generated-pack-gated
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.releaseGateValid, true);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.releaseGatePublicEligible, false);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.prerequisiteSnapshotMatchesGate, true);
+      assert.equal(bundleBody.releaseEvidenceBundle.metrics.readyEvidenceSourcesMatchGate, true);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.presentSourceCount < bundleBody.releaseEvidenceBundle.metrics.requiredSourceCount, true);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.sourceHashMismatchCount, 0);
       assert.equal(bundleBody.releaseEvidenceBundle.constraints.productionImageAssetsCreated, false);
