@@ -5022,6 +5022,24 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
       measured: redactGeneratedPackReportObject(gate?.metrics || {})
     }
   ];
+  const constraints = gate?.approvalEvidence?.constraints || {};
+  const privateDataLeakCount = Number(gate?.metrics?.privateDataLeakCount || 0);
+  const blockedFieldCount = Number(gate?.metrics?.blockedFieldCount || 0);
+  const productionImageAssetCount = Number(gate?.metrics?.productionImageAssetCount || 0);
+  const productionImageAssetsCreated = productionImageAssetCount > 0 || constraints.productionImageAssetsCreated === true;
+  const externalProviderPrivateDataStored = constraints.externalProviderPrivateDataStored === true;
+  const canonicalServerRulesChanged = constraints.canonicalServerRulesChanged === true;
+  const v6CivicMechanicsTouched = constraints.v6CivicMechanicsTouched === true;
+  const normalGameplayVisibilityChanged = constraints.normalGameplayVisibilityChanged === true;
+  const generatedPackDefaultExposure = constraints.generatedPackDefaultExposure === true;
+  const boundaryPreserved = privateDataLeakCount === 0
+    && blockedFieldCount === 0
+    && productionImageAssetsCreated === false
+    && externalProviderPrivateDataStored === false
+    && canonicalServerRulesChanged === false
+    && v6CivicMechanicsTouched === false
+    && normalGameplayVisibilityChanged === false
+    && generatedPackDefaultExposure === false;
   return {
     ok: checks.every((check) => check.passed === true),
     checks,
@@ -5033,7 +5051,16 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
       costConsentModelApproved: prerequisites.costConsentModelApproved === true,
       humanReviewComplete: prerequisites.humanReviewComplete === true,
       releaseGateEvaluatedAtNotFuture,
-      privateDataLeakCount: Number(gate?.metrics?.privateDataLeakCount || 0),
+      privateDataLeakCount,
+      blockedFieldCount,
+      productionImageAssetCount,
+      productionImageAssetsCreated,
+      externalProviderPrivateDataStored,
+      canonicalServerRulesChanged,
+      v6CivicMechanicsTouched,
+      normalGameplayVisibilityChanged,
+      generatedPackDefaultExposure,
+      boundaryPreserved,
       approvalEvidenceOk: approvalEvidenceReport.ok === true,
       approvalEvidenceSecretLikeCount: Number(approvalEvidenceReport.metrics.secretLikePathCount || 0)
     }

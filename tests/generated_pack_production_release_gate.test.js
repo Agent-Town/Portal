@@ -2763,7 +2763,7 @@ test('GU-18 production release gate validation rejects future-dated gate reports
   );
 }));
 
-test('GU-18/GU-19 release gate and evidence bundle APIs are generated-pack-gated and fail closed', async () => {
+test('GU-18/GU-19/GPACK-157 release gate and evidence bundle APIs are generated-pack-gated and fail closed', async () => {
   const identity = { pairId: 'session:release-gate-api', houseId: null };
   await withWorldGridServer({
     identity,
@@ -3008,6 +3008,15 @@ test('GU-18/GU-19 release gate and evidence bundle APIs are generated-pack-gated
       assert.equal(releaseBody.releaseGate.publicReleaseEligible, false);
       assert.equal(releaseBody.releaseGate.metrics.releaseGateEvaluatedAtNotFuture, true);
       assert.equal(releaseBody.releaseGate.blockingReasons.includes('costConsentModelApproved'), true);
+      assert.equal(releaseBody.validationReport.metrics.privateDataLeakCount, releaseBody.releaseGate.metrics.privateDataLeakCount);
+      assert.equal(releaseBody.validationReport.metrics.productionImageAssetCount, releaseBody.releaseGate.metrics.productionImageAssetCount);
+      assert.equal(releaseBody.validationReport.metrics.productionImageAssetsCreated, false);
+      assert.equal(releaseBody.validationReport.metrics.externalProviderPrivateDataStored, false);
+      assert.equal(releaseBody.validationReport.metrics.canonicalServerRulesChanged, false);
+      assert.equal(releaseBody.validationReport.metrics.v6CivicMechanicsTouched, false);
+      assert.equal(releaseBody.validationReport.metrics.normalGameplayVisibilityChanged, false);
+      assert.equal(releaseBody.validationReport.metrics.generatedPackDefaultExposure, false);
+      assert.equal(releaseBody.validationReport.metrics.boundaryPreserved, true);
 
       const bundleResponse = await fetch(`${baseUrl}/api/world/generated-pack/release-evidence-bundle`, {
         method: 'POST',
@@ -3061,6 +3070,19 @@ test('GU-18/GU-19 release gate and evidence bundle APIs are generated-pack-gated
           }
         }
       };
+      const boundaryReleaseResponse = await fetch(`${baseUrl}/api/world/generated-pack/release-gate`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(boundaryFailureBody)
+      });
+      const boundaryReleaseBody = await boundaryReleaseResponse.json();
+      assert.equal(boundaryReleaseResponse.status, 200, JSON.stringify(boundaryReleaseBody));
+      assert.equal(boundaryReleaseBody.releaseGate.metrics.privateDataLeakCount, 2);
+      assert.equal(boundaryReleaseBody.validationReport.metrics.privateDataLeakCount, 2);
+      assert.equal(boundaryReleaseBody.validationReport.metrics.productionImageAssetCount, 0);
+      assert.equal(boundaryReleaseBody.validationReport.metrics.boundaryPreserved, false);
+      assert.equal(boundaryReleaseBody.validationReport.ok, false);
+
       const boundaryBundleResponse = await fetch(`${baseUrl}/api/world/generated-pack/release-evidence-bundle`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -3106,6 +3128,19 @@ test('GU-18/GU-19 release gate and evidence bundle APIs are generated-pack-gated
       assert.equal(toolBundleBody.data.validationReport.metrics.normalGameplayVisibilityChanged, false);
       assert.equal(toolBundleBody.data.validationReport.metrics.generatedPackDefaultExposure, false);
       assert.equal(toolBundleBody.data.validationReport.metrics.boundaryPreserved, true);
+
+      const toolBoundaryReleaseResponse = await fetch(`${baseUrl}/api/world/tool/et.world.generated_pack.release_gate`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(boundaryFailureBody)
+      });
+      const toolBoundaryReleaseBody = await toolBoundaryReleaseResponse.json();
+      assert.equal(toolBoundaryReleaseResponse.status, 200, JSON.stringify(toolBoundaryReleaseBody));
+      assert.equal(toolBoundaryReleaseBody.data.releaseGate.metrics.privateDataLeakCount, 2);
+      assert.equal(toolBoundaryReleaseBody.data.validationReport.metrics.privateDataLeakCount, 2);
+      assert.equal(toolBoundaryReleaseBody.data.validationReport.metrics.productionImageAssetCount, 0);
+      assert.equal(toolBoundaryReleaseBody.data.validationReport.metrics.boundaryPreserved, false);
+      assert.equal(toolBoundaryReleaseBody.data.validationReport.ok, false);
 
       const toolBoundaryBundleResponse = await fetch(`${baseUrl}/api/world/tool/et.world.generated_pack.release_evidence_bundle`, {
         method: 'POST',
