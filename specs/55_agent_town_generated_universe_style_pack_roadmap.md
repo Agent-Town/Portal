@@ -88,6 +88,7 @@ This is a separate prototype-gated track. It must not change normal gameplay vis
   "unsafeHashAndPackIdRedacted": true,
   "presentationReportUnsafeValueRedacted": true,
   "coreContractReportUnsafeValueRedacted": true,
+  "aggregateReportUnsafeValueRedacted": true,
   "canonicalMappingCoverage": 1.0,
   "arbitraryToolMutationFormulaCount": 0,
   "invalidAssetManifestEntryCount": 0,
@@ -127,7 +128,7 @@ This is a separate prototype-gated track. It must not change normal gameplay vis
 
 ## GU-2 Schema Validation Engine Slice
 
-The first production-roadmap continuation adds a local JSON Schema registry and runner for generated-pack subdocuments. The runner validates the pack, brief, style bible, universe bible, gameplay mapping, asset prompt plan, and asset manifest independently before a generated pack can pass validation. Core contract validation reports redact unsafe submitted generation-brief, asset-manifest, and asset-prompt-plan measured metadata values.
+The first production-roadmap continuation adds a local JSON Schema registry and runner for generated-pack subdocuments. The runner validates the pack, brief, style bible, universe bible, gameplay mapping, asset prompt plan, and asset manifest independently before a generated pack can pass validation. Core contract validation reports redact unsafe submitted generation-brief, asset-manifest, and asset-prompt-plan measured metadata values. Aggregate generated-pack validation reports also redact unsafe submitted schema-version, mapping-id, palette, and scaffold metadata values.
 
 ```json
 {
@@ -260,7 +261,7 @@ The first-loop playtest gate now requires measured browser evidence before a gen
 
 ## GU-9 Replayability and Diversity Suite
 
-The replayability suite now uses the roadmap ten-prompt seed set as a deterministic contract. Each prompt must generate a schema-valid pack, pass the measured first-loop playtest report, keep raw prompt instructions and forbidden authority out of the generated pack, produce a distinct replayability signature, and contribute to pairwise diversity measurements across palette, label/name, motif, and screenshot hash evidence.
+The replayability suite now uses the roadmap ten-prompt seed set as a deterministic contract. Each prompt must generate a schema-valid pack, pass the measured first-loop playtest report, keep raw prompt instructions and forbidden authority out of the generated pack, produce a distinct replayability signature, and contribute to pairwise diversity measurements across palette, label/name, motif, and screenshot hash evidence. Diversity reports redact unsafe submitted pack ids, prompt hashes, and replayability signatures from pack-level and pairwise evidence.
 
 ```json
 {
@@ -274,7 +275,8 @@ The replayability suite now uses the roadmap ten-prompt seed set as a determinis
   "minimumLabelNameDistanceMin": 0.65,
   "meaningfulDifferenceScoreMin": 0.65,
   "forbiddenAuthorityCount": 0,
-  "rawPromptLeakCount": 0
+  "rawPromptLeakCount": 0,
+  "unsafeDiversityReportValueRedacted": true
 }
 ```
 

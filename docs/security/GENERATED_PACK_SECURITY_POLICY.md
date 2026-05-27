@@ -19,6 +19,7 @@ Status: prototype-gated
 - Candidate-review, release-approval, and release-evidence-bundle validation reports must redact unsafe submitted manifest hashes, evidence hashes, bundle hashes, and pack ids from measured problem lists.
 - Public-card, approved-modifier, requester-voice, and multi-surface validation reports must redact unsafe submitted measured values before returning evidence to callers.
 - Generation-brief, asset-manifest, asset-prompt-plan, tech-flavor, and inhabitant-overlay validation reports must redact unsafe submitted measured metadata values before returning evidence to callers.
+- Generated-pack aggregate validation and replayability diversity reports must redact unsafe submitted pack ids, prompt hashes, schema versions, mapping ids, palette values, scaffold metadata, and replayability signatures before returning evidence to callers.
 - Postprocess plans and reports are standalone contracts; they may write postprocessed candidate artifacts and metadata, but must not write approved production assets or alter canonical gameplay mappings.
 - Browser runtime asset loading must use safe public generated-pack paths only; private candidate roots, path traversal, data URLs, provider URLs, and unapproved outputs must fall back without player exposure.
 - First-loop playtest pass status requires measured browser evidence, screenshot evidence, clean console state, canonical payload integrity, and generated-pack validation. Default or placeholder scores cannot pass release gates.
@@ -59,6 +60,7 @@ Status: prototype-gated
   "unsafeHashAndPackIdRedacted": true,
   "presentationReportUnsafeValueRedacted": true,
   "coreContractReportUnsafeValueRedacted": true,
+  "aggregateReportUnsafeValueRedacted": true,
   "rawExecutablePromptInstructionCount": 0,
   "arbitraryToolMutationFormulaCount": 0,
   "schemaRegistryExists": true,

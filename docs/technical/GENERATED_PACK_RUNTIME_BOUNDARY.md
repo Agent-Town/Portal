@@ -37,6 +37,7 @@ Player prompt
 - Generated packs now validate `GenerationBrief`, `StyleBible`, `UniverseBible`, `GameplayMapping`, `AssetPromptPlan`, `GeneratedAssetManifest`, and the outer generated pack independently.
 - Runtime pack validation fails closed when schema validation finds missing required fields, unknown fields in strict subdocuments, wrong enum values, raw-prompt forbidden fields, raw-instruction object keys, semantic token fields such as `sessionToken`, secret-looking object keys, or secret-looking values under harmless generated-copy keys. Final generated-pack validation reports redact secret-looking and raw-instruction object keys from content and schema-error paths.
 - Generation-brief, asset-manifest, and asset-prompt-plan validation reports redact unsafe submitted measured metadata values.
+- Aggregate generated-pack validation reports redact unsafe submitted schema versions, mapping ids, palette values, and scaffold metadata from measured evidence.
 - The schema runner is intentionally local and deterministic; it does not call external validators or image/model services.
 
 ## GU-4 Job Scaffold Slice
@@ -81,6 +82,7 @@ Player prompt
 
 - `REPLAYABILITY_PROMPT_SUITE` is the fixed ten-prompt roadmap seed set for generated-pack diversity checks.
 - `analyzePackDiversity` now produces a pack pass/fail report with valid pack count, first-loop pass count, replayability signatures, pairwise palette distance, label/name distance, motif distance, screenshot-hash comparison, and forbidden-authority/raw-prompt leak counts.
+- Replayability diversity reports redact unsafe submitted pack ids, prompt hashes, and replayability signatures from pack-level and pairwise evidence.
 - Prompt-derived palette variants keep same-preset packs visually distinct while preserving readable text contrast and canonical gameplay mappings.
 - Browser coverage runs all ten prompts through the real world-grid first loop and reuses the same diversity analyzer on the returned packs and measured playtest reports.
 

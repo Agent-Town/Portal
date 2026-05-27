@@ -2894,7 +2894,7 @@ function validateGeneratedPack(pack) {
     {
       id: 'GENPACK_SCHEMA_VERSION',
       passed: pack?.schemaVersion === SCHEMA_VERSION,
-      measured: { schemaVersion: pack?.schemaVersion || null }
+      measured: { schemaVersion: redactGeneratedPackReportValue(pack?.schemaVersion || null) }
     },
     {
       id: 'GENPACK_JSON_SCHEMA_VALID',
@@ -2917,14 +2917,17 @@ function validateGeneratedPack(pack) {
         required: REQUIRED_CANONICAL_IDS.length,
         covered: mappingIds.size,
         missing: missingMappings,
-        unknownMappings,
-        duplicateMappings: [...new Set(duplicateMappings)]
+        unknownMappings: unknownMappings.map(redactGeneratedPackReportValue),
+        duplicateMappings: [...new Set(duplicateMappings)].map(redactGeneratedPackReportValue)
       }
     },
     {
       id: 'GENPACK_CANONICAL_KEYS_PRESERVED',
       passed: mechanicalMissing.length === 0 && Number(pack?.gameplayMapping?.serverRuleOverrides || 0) === 0,
-      measured: { missingMechanicalKeys: mechanicalMissing, serverRuleOverrides: pack?.gameplayMapping?.serverRuleOverrides || 0 }
+      measured: {
+        missingMechanicalKeys: mechanicalMissing.map(redactGeneratedPackReportValue),
+        serverRuleOverrides: pack?.gameplayMapping?.serverRuleOverrides || 0
+      }
     },
     {
       id: 'GENPACK_TECH_FLAVOR_TREE_VALID',
@@ -2974,7 +2977,11 @@ function validateGeneratedPack(pack) {
     {
       id: 'GENPACK_THREEJS_PALETTE_READY',
       passed: missingColors.length === 0 && terrainColors.length === 5 && stateColors.length === 4,
-      measured: { terrainColors: terrainColors.length, stateColors: stateColors.length, invalidColors: missingColors }
+      measured: {
+        terrainColors: terrainColors.length,
+        stateColors: stateColors.length,
+        invalidColors: missingColors.map(redactGeneratedPackReportValue)
+      }
     },
     {
       id: 'GENPACK_ASSET_MANIFEST_READY',
@@ -2995,7 +3002,7 @@ function validateGeneratedPack(pack) {
         && Number(scaffold?.productionImageAssetCount || 0) === 0
         && scaffold?.externalModelUsed === false,
       measured: {
-        schemaVersion: scaffold?.schemaVersion || null,
+        schemaVersion: redactGeneratedPackReportValue(scaffold?.schemaVersion || null),
         candidateFolderCount: Number(scaffold?.candidateFolderCount || 0),
         jobLogCount: Number(scaffold?.jobLogCount || 0),
         productionImageAssetCount: Number(scaffold?.productionImageAssetCount || 0),
@@ -5965,7 +5972,7 @@ function pairwiseDiversityComparisons(packs = [], reportsByPackId = new Map(), s
         + (screenshotDistance * screenshotWeight)
       ).toFixed(3));
       comparisons.push({
-        packIds: [first.packId, second.packId],
+        packIds: [redactGeneratedPackReportValue(first.packId), redactGeneratedPackReportValue(second.packId)],
         paletteDistance: palette,
         labelNameDistance: labelName,
         motifDistance: motif,
@@ -6007,15 +6014,15 @@ function analyzePackDiversity(packs = [], options = {}) {
       ? playtestReport.playtestPassed === true && playtestValidation?.ok === true
       : validationReport.metrics.firstLoopReady === true;
     return {
-      packId: pack.packId,
-      promptHash: pack.prompt?.hash || pack.generationBrief?.promptHash || null,
+      packId: redactGeneratedPackReportValue(pack.packId),
+      promptHash: redactGeneratedPackReportValue(pack.prompt?.hash || pack.generationBrief?.promptHash || null),
       validationOk: validationReport.ok === true,
       firstLoopPassed,
       playtestEvidenceRecorded: Boolean(playtestReport),
       rawPromptLeakCount,
       forbiddenAuthorityCount,
-      replayabilitySignature: signatures[index],
-      screenshotHash: screenshotHashForReport(playtestReport)
+      replayabilitySignature: redactGeneratedPackReportValue(signatures[index]),
+      screenshotHash: redactGeneratedPackReportValue(screenshotHashForReport(playtestReport))
     };
   });
   const comparisons = pairwiseDiversityComparisons(safePacks, reportsByPackId, requirePlaytestReports);
@@ -6075,7 +6082,7 @@ function analyzePackDiversity(packs = [], options = {}) {
     },
     packResults,
     comparisons,
-    signatures
+    signatures: signatures.map(redactGeneratedPackReportValue)
   };
 }
 
