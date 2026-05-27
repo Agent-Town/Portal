@@ -36,9 +36,10 @@ from `prototype_gated` to `release_ready`:
 - Every mutating route and tool writes append-only audit/replay records with
   actor, route/tool name, idempotency key, before/after summary, and rollback
   handle when applicable. Current V5 audit evidence proves privacy-safe
-  before/after route snapshots across the V5.1-V5.5 mutating route/tool matrix;
-  promotion still requires complete store-specific before-state snapshots and
-  release replay reconstruction.
+  before/after route snapshots with public presence, services, events, and
+  sandbox aggregate summaries across the V5.1-V5.5 mutating route/tool matrix;
+  promotion still requires complete exact per-record before-state reconstruction
+  and release replay reconstruction.
 - Production feature override tests prove prototype flags cannot be forced on in
   production mode without the intended release controls.
 - Public surfaces prove XSS-safe rendering, redaction, and no private Founders

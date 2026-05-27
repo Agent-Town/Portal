@@ -200,9 +200,10 @@ persistence resilience, and security/product release review.
   gate.
 - Shared V5 audit evidence includes `WORLD_GRID_AUDIT_SQLITE_PATH`
   route/tool-surface restart proof and privacy-safe before/after route
-  snapshots. V6 readiness still requires store-specific before-state snapshots
-  and release replay reconstruction before public civic effects can depend on
-  V5 world state.
+  snapshots with public presence, services, events, and sandbox aggregate
+  summaries. V6 readiness still requires complete exact per-record before-state
+  reconstruction and release replay reconstruction before public civic effects
+  can depend on V5 world state.
 
 ## Required V6 Schemas
 

@@ -358,6 +358,7 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
 
   function buildWorldGridAuditSnapshot(payload = null, phase = 'before') {
     const region = payload?.region || {};
+    const owner = payload?.owner || {};
     const cells = Array.isArray(region.cells) ? region.cells : [];
     const settlements = Array.isArray(region.settlements) ? region.settlements : [];
     const routes = Array.isArray(region.routes) ? region.routes : [];
@@ -366,6 +367,21 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     const preferences = payload?.preferences && typeof payload.preferences === 'object' ? payload.preferences : {};
     const selectedCellId = String(preferences.selectedCellId || '');
     const camera = preferences.camera && typeof preferences.camera === 'object' ? preferences.camera : {};
+    const publicTowns = listPublicTowns();
+    const ownPublicTowns = publicTowns
+      .filter((town) => town.accountPublicId === owner.ownerAccountId)
+      .map((town) => ({
+        publicTownId: String(town.publicTownId || ''),
+        charmBand: String(town.publicSummary?.charmBand || ''),
+        regionHint: String(town.regionHint || '')
+      }))
+      .sort((a, b) => a.publicTownId.localeCompare(b.publicTownId));
+    const serviceRequests = listServiceRequests(owner);
+    const serviceReputationBands = serviceListings().map((service) => service.reputation?.reliabilityBand);
+    const eventStates = worldEventState(owner);
+    const sandbox = sandboxStateFor(owner);
+    const sandboxDistrict = sandbox?.district || {};
+    const sandboxActions = Array.isArray(sandboxDistrict.recentActions) ? sandboxDistrict.recentActions : [];
     return {
       snapshotVersion: 'agent-town.v5.world-grid.audit-snapshot.v1',
       phase: phase === 'after' ? 'after' : 'before',
@@ -396,6 +412,34 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
           q: Number.isFinite(Number(camera.q)) ? Number(camera.q) : 0,
           r: Number.isFinite(Number(camera.r)) ? Number(camera.r) : 0
         }
+      },
+      publicPresence: {
+        optedIn: ownPublicTowns.length > 0,
+        publicTownCount: ownPublicTowns.length,
+        totalPublicTownCount: publicTowns.length,
+        publicTownIds: ownPublicTowns.map((town) => town.publicTownId)
+      },
+      services: {
+        requestCount: serviceRequests.length,
+        requestStatusCounts: countByString(serviceRequests.map((request) => request.status)),
+        requestServiceIds: Array.from(new Set(serviceRequests.map((request) => String(request.serviceId || '')))).sort(),
+        reputationBandCounts: countByString(serviceReputationBands)
+      },
+      events: {
+        eventCount: eventStates.length,
+        personalContributionCount: eventStates.reduce((sum, state) => sum + Number(state.personal?.contributionCount || 0), 0),
+        rewardCount: eventStates.filter((state) => state.personal?.reward).length,
+        eventIds: eventStates.map((state) => String(state.event?.eventId || state.personal?.eventId || '')).filter(Boolean).sort()
+      },
+      sandbox: {
+        participantActive: !!sandbox?.participant,
+        participantStatus: String(sandbox?.participant?.status || ''),
+        participantCount: Array.isArray(sandboxDistrict.participants) ? sandboxDistrict.participants.length : 0,
+        cellCount: Array.isArray(sandboxDistrict.cells) ? sandboxDistrict.cells.length : 0,
+        snapshotCount: Array.isArray(sandboxDistrict.snapshots) ? sandboxDistrict.snapshots.length : 0,
+        recentActionCount: sandboxActions.length,
+        actionKindCounts: countByString(sandboxActions.map((action) => action.kind)),
+        moderationStatusCounts: countByString(sandboxActions.map((action) => action.moderationStatus))
       }
     };
   }

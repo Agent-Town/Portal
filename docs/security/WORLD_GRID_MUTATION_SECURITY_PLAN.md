@@ -112,7 +112,8 @@ until the controls below are implemented and covered by deterministic tests.
   separate Node process restarts, exact idempotent replays do not add duplicate
   audit rows, changed-payload conflicts add no audit rows, privacy-safe
   `agent-town.v5.world-grid.audit-snapshot.v1` before/after snapshots are
-  stored, and private-looking service secrets stay out of audit entries.
+  stored with public presence, services, events, and sandbox aggregate summaries,
+  and private-looking service secrets stay out of audit entries.
 - V5.0 region rendering and read-only tools may run without creating Founders
   Plot state.
 - When `WORLD_GRID_REGION_PREFS_SQLITE_PATH` is configured, V5.0 camera/focus
@@ -153,9 +154,10 @@ until the controls below are implemented and covered by deterministic tests.
 - Durable audit records with actor, route/tool name, idempotency key, before and
   after summaries, and rollback handle when one exists. Current coverage starts
   this with append-only SQLite audit records and route/tool-surface restart
-  matrix proof plus route-level before/after snapshot summaries; release
-  promotion still needs complete store-specific before-state snapshots and
-  release replay reconstruction for each world-grid store.
+  matrix proof plus route-level before/after snapshot summaries with
+  store-specific public presence, services, events, and sandbox aggregate
+  summaries; release promotion still needs complete exact per-record before-state
+  reconstruction and release replay reconstruction for each world-grid store.
 - Restart persistence tests and replay tests before any public release flag is
   enabled.
 - Current `WORLD_GRID_REGION_PREFS_SQLITE_PATH` coverage is a V5.0 storage

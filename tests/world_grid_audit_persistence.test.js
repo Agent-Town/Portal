@@ -46,6 +46,13 @@ const EXPECTED_TOOL_SURFACES = [
   'et.world.sandbox.leave'
 ];
 
+const AUDIT_STORE_SUMMARIES = {
+  publicPresence: ['publicTownCount', 'totalPublicTownCount'],
+  services: ['requestCount'],
+  events: ['eventCount', 'personalContributionCount', 'rewardCount'],
+  sandbox: ['participantCount', 'cellCount', 'snapshotCount', 'recentActionCount']
+};
+
 function runProbe(mode, idempotencyPath, storePath, auditPath, scenarioPath = '') {
   const args = [probePath, mode, idempotencyPath, storePath];
   if (scenarioPath) args.push(scenarioPath);
@@ -88,6 +95,54 @@ function auditSnapshot(auditPath) {
   }
 }
 
+function snapshotFor(row, phase) {
+  return phase === 'after' ? row.entry.afterSummary.snapshot : row.entry.beforeSummary;
+}
+
+function assertStoreAuditSummaries(snapshot) {
+  for (const row of snapshot.entries) {
+    for (const [section, numericFields] of Object.entries(AUDIT_STORE_SUMMARIES)) {
+      const before = snapshotFor(row, 'before')?.[section];
+      const after = snapshotFor(row, 'after')?.[section];
+      assert.equal(before && typeof before === 'object' && !Array.isArray(before), true, `${row.surface} before ${section}`);
+      assert.equal(after && typeof after === 'object' && !Array.isArray(after), true, `${row.surface} after ${section}`);
+      for (const field of numericFields) {
+        assert.equal(Number.isFinite(before[field]), true, `${row.surface} before ${section}.${field}`);
+        assert.equal(Number.isFinite(after[field]), true, `${row.surface} after ${section}.${field}`);
+      }
+    }
+  }
+}
+
+function entryForKey(snapshot, idempotencyKey) {
+  const row = snapshot.entries.find((entry) => entry.idempotencyKey === idempotencyKey);
+  assert.ok(row, idempotencyKey);
+  return row;
+}
+
+function assertSnapshotIncrease(snapshot, idempotencyKey, section, field) {
+  const row = entryForKey(snapshot, idempotencyKey);
+  const before = snapshotFor(row, 'before')?.[section]?.[field];
+  const after = snapshotFor(row, 'after')?.[section]?.[field];
+  assert.equal(Number.isFinite(before), true, `${idempotencyKey} before ${section}.${field}`);
+  assert.equal(Number.isFinite(after), true, `${idempotencyKey} after ${section}.${field}`);
+  assert.equal(after > before, true, `${idempotencyKey} expected ${section}.${field} to increase (${before} -> ${after})`);
+}
+
+function assertSnapshotDecrease(snapshot, idempotencyKey, section, field) {
+  const row = entryForKey(snapshot, idempotencyKey);
+  const before = snapshotFor(row, 'before')?.[section]?.[field];
+  const after = snapshotFor(row, 'after')?.[section]?.[field];
+  assert.equal(Number.isFinite(before), true, `${idempotencyKey} before ${section}.${field}`);
+  assert.equal(Number.isFinite(after), true, `${idempotencyKey} after ${section}.${field}`);
+  assert.equal(after < before, true, `${idempotencyKey} expected ${section}.${field} to decrease (${before} -> ${after})`);
+}
+
+function assertSnapshotAfterValue(snapshot, idempotencyKey, section, field, expected) {
+  const row = entryForKey(snapshot, idempotencyKey);
+  assert.deepEqual(snapshotFor(row, 'after')?.[section]?.[field], expected, `${idempotencyKey} after ${section}.${field}`);
+}
+
 function assertAuditSnapshot(snapshot, {
   expectedCount,
   expectedSurfaces,
@@ -111,6 +166,7 @@ function assertAuditSnapshot(snapshot, {
   assert.equal(snapshot.entries.every((row) => row.entry.beforeSummary.region?.regionId), true);
   assert.equal(snapshot.entries.every((row) => row.entry.afterSummary.snapshot?.region?.regionId), true);
   assert.equal(snapshot.entries.some((row) => row.entry.beforeSummary.territory?.claimOptionCount > 0), true);
+  assertStoreAuditSummaries(snapshot);
 }
 
 test('world-grid durable audit rows replay every V5.1-V5.5 mutating route surface after restart without duplicate audit writes', () => {
@@ -137,6 +193,16 @@ test('world-grid durable audit rows replay every V5.1-V5.5 mutating route surfac
       expectedSurfaces: EXPECTED_ROUTE_SURFACES,
       expectedCaseKeys: seeded.cases.map((entry) => entry.body.idempotencyKey)
     });
+    assertSnapshotIncrease(seededAudit, 'route_matrix_public_opt_in_b_001', 'publicPresence', 'publicTownCount');
+    assertSnapshotIncrease(seededAudit, 'route_matrix_public_opt_in_a_001', 'publicPresence', 'publicTownCount');
+    assertSnapshotDecrease(seededAudit, 'route_matrix_public_opt_out_001', 'publicPresence', 'publicTownCount');
+    assertSnapshotIncrease(seededAudit, 'route_matrix_service_request_001', 'services', 'requestCount');
+    assertSnapshotIncrease(seededAudit, 'route_matrix_event_contribute_001', 'events', 'personalContributionCount');
+    assertSnapshotIncrease(seededAudit, 'route_matrix_event_reward_001', 'events', 'rewardCount');
+    assertSnapshotAfterValue(seededAudit, 'route_matrix_sandbox_enter_001', 'sandbox', 'participantActive', true);
+    assertSnapshotIncrease(seededAudit, 'route_matrix_sandbox_place_001', 'sandbox', 'recentActionCount');
+    assertSnapshotIncrease(seededAudit, 'route_matrix_sandbox_agent_001', 'sandbox', 'recentActionCount');
+    assertSnapshotAfterValue(seededAudit, 'route_matrix_sandbox_leave_001', 'sandbox', 'participantActive', false);
     assert.deepEqual(replayAudit.idempotencyKeys, seededAudit.idempotencyKeys);
     assert.deepEqual(conflictAudit.idempotencyKeys, seededAudit.idempotencyKeys);
     assert.equal(JSON.stringify(seededAudit.entries).includes('sk-route-matrix-secret'), false);
@@ -169,6 +235,13 @@ test('world-grid durable audit rows replay every V5.1-V5.5 mutating tool surface
       expectedSurfaces: EXPECTED_TOOL_SURFACES,
       expectedCaseKeys: seeded.cases.map((entry) => entry.body.idempotencyKey)
     });
+    assertSnapshotIncrease(seededAudit, 'tool_matrix_service_request_001', 'services', 'requestCount');
+    assertSnapshotIncrease(seededAudit, 'tool_matrix_event_contribute_001', 'events', 'personalContributionCount');
+    assertSnapshotIncrease(seededAudit, 'tool_matrix_event_reward_001', 'events', 'rewardCount');
+    assertSnapshotAfterValue(seededAudit, 'tool_matrix_sandbox_enter_001', 'sandbox', 'participantActive', true);
+    assertSnapshotIncrease(seededAudit, 'tool_matrix_sandbox_place_001', 'sandbox', 'recentActionCount');
+    assertSnapshotIncrease(seededAudit, 'tool_matrix_sandbox_agent_001', 'sandbox', 'recentActionCount');
+    assertSnapshotAfterValue(seededAudit, 'tool_matrix_sandbox_leave_001', 'sandbox', 'participantActive', false);
     assert.deepEqual(replayAudit.idempotencyKeys, seededAudit.idempotencyKeys);
     assert.deepEqual(conflictAudit.idempotencyKeys, seededAudit.idempotencyKeys);
     assert.equal(JSON.stringify(seededAudit.entries).includes('sk-tool-matrix-secret'), false);
