@@ -4693,6 +4693,13 @@ body.town-hub-page .districtModal[data-theme="atlas"] {
   --modal-rivet-edge: #2a4a4a;
 }
 
+body.town-hub-page .districtModal[data-theme="lab"] {
+  border-color: #5f7251;
+  --modal-rivet-core: #d5c179;
+  --modal-rivet-mid: #7d8b62;
+  --modal-rivet-edge: #2f3828;
+}
+
 body.town-hub-page .districtModalBody {
   color: #4f3a28;
 }
@@ -4838,6 +4845,241 @@ body.town-hub-page .districtModal.is-district .districtModalBody {
 body.town-hub-page .districtModal.is-district .districtModalBody > * {
   width: 100%;
   max-width: 100%;
+}
+
+body.town-hub-page .districtModal.is-v6-lab {
+  width: min(1040px, calc(100vw - 24px));
+  min-width: 0;
+  height: auto;
+  max-height: min(calc(94vh - var(--agent-panel-page-inset, 0px)), 880px);
+  overflow: hidden;
+}
+
+body.town-hub-page .districtModal.is-v6-lab .districtModalHeader {
+  justify-content: space-between;
+  padding: 12px 18px;
+  border-bottom: 4px solid var(--v0-wood);
+  background:
+    linear-gradient(180deg, rgba(37, 52, 37, 0.62), rgba(46, 27, 14, 0.22)),
+    url("/images/wood-header.jpg") center/cover no-repeat;
+}
+
+body.town-hub-page .districtModal.is-v6-lab .districtModalHeader h2 {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+body.town-hub-page .districtModal.is-v6-lab .districtModalBody {
+  display: block;
+  overflow: auto;
+}
+
+body.town-hub-page .districtModal.is-v6-lab .districtModalBody > * {
+  width: auto;
+  max-width: none;
+}
+
+.v6LabSurface {
+  width: 100%;
+  max-width: 100%;
+  padding: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 249, 234, 0.96), rgba(236, 226, 198, 0.96)),
+    url("/images/parchment-bg.jpg") center/cover no-repeat;
+  color: #2f2417;
+}
+
+.v6LabSurface:focus {
+  outline: 3px solid rgba(111, 130, 86, 0.54);
+  outline-offset: -6px;
+}
+
+.v6LabHero {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid rgba(95, 114, 81, 0.32);
+}
+
+.v6LabHero h2 {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.05;
+}
+
+.v6LabHero p {
+  margin: 0;
+  max-width: 760px;
+  color: #5c4732;
+}
+
+.v6LabEyebrow {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  color: #5f7251;
+}
+
+.v6LabStatusGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.v6LabStatusItem,
+.v6LabPanelDetail,
+.v6LabCheckList li {
+  border: 2px solid rgba(70, 55, 36, 0.38);
+  border-radius: 8px;
+  background: rgba(255, 250, 238, 0.74);
+  box-shadow: 0 2px 0 rgba(70, 55, 36, 0.14);
+}
+
+.v6LabStatusItem {
+  display: grid;
+  gap: 4px;
+  min-height: 72px;
+  padding: 10px;
+}
+
+.v6LabStatusLabel {
+  font-size: 12px;
+  font-weight: 800;
+  color: #746149;
+}
+
+.v6LabStatusItem strong {
+  font-size: 15px;
+  line-height: 1.2;
+  color: #263821;
+}
+
+.v6LabSection {
+  margin-top: 14px;
+}
+
+.v6LabSection h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.v6LabCheckList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.v6LabCheckList li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px 10px;
+}
+
+.v6LabCheckList li strong {
+  color: #385b31;
+}
+
+.v6LabCheckList li[data-ready="false"] strong {
+  color: #8b3c24;
+}
+
+.v6LabPanelTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.v6LabPanelTab {
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 2px solid rgba(82, 101, 62, 0.44);
+  border-radius: 8px;
+  background: #f1e5c3;
+  color: #2f2417;
+  font-family: var(--font-ui);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.v6LabPanelTab:hover,
+.v6LabPanelTab:focus-visible,
+.v6LabPanelTab.is-active {
+  border-color: #4f6742;
+  background: #dfe7c8;
+  outline: none;
+}
+
+.v6LabPanelDetail {
+  margin-top: 10px;
+  padding: 12px;
+}
+
+.v6LabPanelDetail h4 {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
+
+.v6LabPanelDetail p {
+  margin: 0 0 10px;
+  color: #5c4732;
+}
+
+.v6LabExecutionBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 2px solid rgba(95, 114, 81, 0.4);
+  border-radius: 8px;
+  background: #efe7ca;
+  color: #32442b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.v6LabFooter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 2px solid rgba(95, 114, 81, 0.3);
+  color: #5c4732;
+}
+
+.v6LabFooter strong {
+  color: #2f2417;
+}
+
+@media (max-width: 640px) {
+  .v6LabSurface {
+    padding: 14px;
+  }
+
+  .v6LabHero h2 {
+    font-size: 24px;
+  }
+
+  .v6LabStatusGrid,
+  .v6LabCheckList {
+    grid-template-columns: 1fr;
+  }
+
+  .v6LabPanelTabs {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
 }
 
 body.town-hub-page .districtBackdrop.is-fullscreen-frame {

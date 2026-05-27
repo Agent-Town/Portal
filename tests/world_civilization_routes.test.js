@@ -12,6 +12,7 @@ const { createCivicProposalStore } = require('../server/world_civilization/propo
 const { createCivicVoteStore } = require('../server/world_civilization/votes');
 const {
   PROPOSAL_SUBMISSION_ROUTE,
+  V6_LAB_LAUNCH_PLAN_ROUTE,
   VOTE_CAST_ROUTE,
   createWorldCivilizationRouter
 } = require('../server/world_civilization/routes');
@@ -147,6 +148,17 @@ async function postJson(baseUrl, route, body, headers = {}) {
   };
 }
 
+async function getJson(baseUrl, route, headers = {}) {
+  const response = await fetch(`${baseUrl}${route}`, {
+    method: 'GET',
+    headers
+  });
+  return {
+    status: response.status,
+    body: await response.json()
+  };
+}
+
 async function withCivilizationServer({
   env = {},
   proposalStore = null,
@@ -211,6 +223,105 @@ function routeEnv(overrides = {}) {
     ...overrides
   };
 }
+
+test('V6 lab launch-plan route is hidden unless explicitly enabled and opted in', async () => {
+  await withCivilizationServer({
+    env: {
+      NODE_ENV: 'test'
+    }
+  }, async (baseUrl) => {
+    const response = await getJson(
+      baseUrl,
+      `${V6_LAB_LAUNCH_PLAN_ROUTE}?v6Lab=1&worldGridFeatureFlags=v60&requestPath=%2Fapp`
+    );
+
+    assert.equal(response.status, 404);
+    assert.equal(response.body.ok, false);
+    assert.equal(response.body.error.code, 'V6_CIVIC_LAB_MODAL_DISABLED');
+  });
+});
+
+test('V6 lab launch-plan route returns only a non-executing modal plan when gated on', async () => {
+  await withCivilizationServer({
+    env: {
+      NODE_ENV: 'test',
+      V6_CIVIC_LAB_MODAL_ENABLED: '1'
+    }
+  }, async (baseUrl) => {
+    const response = await getJson(
+      baseUrl,
+      `${V6_LAB_LAUNCH_PLAN_ROUTE}?v6Lab=1&worldGridFeatureFlags=v60&requestPath=%2Fapp&debugTabs=Worker%20Tools,Skill%20Context,Worker%20Traffic,Brain,Session%20Context`
+    );
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.ok, true);
+    assert.equal(response.body.status, 'research_only');
+    assert.equal(response.body.runtimeExposed, false);
+    assert.equal(response.body.playerVisible, false);
+    assert.equal(response.body.normalGameplayExposure, false);
+    assert.equal(response.body.exposesCivicTools, false);
+    assert.equal(response.body.executionStatus, 'not_executable');
+    assert.equal(response.body.launchPlan.allowed, true);
+    assert.equal(response.body.launchPlan.routeAction, 'open_modal');
+    assert.equal(response.body.launchPlan.requestPath, '/app');
+    assert.equal(response.body.launchPlan.modalId, 'v6-research-lab');
+    assert.equal(response.body.launchPlan.preservesWorkerContinuity, true);
+    assert.equal(response.body.launchPlan.executionStatus, 'not_executable');
+    assert.equal(response.body.launchPlan.effects.executesCivicEffect, false);
+    assert.ok(response.body.panels.length > 0);
+    assert.equal(response.body.panels.every((panel) => panel.executionStatus === 'not_executable'), true);
+  });
+});
+
+test('V6 lab launch-plan production requests require authorized override context', async () => {
+  await withCivilizationServer({
+    env: routeEnv({
+      V6_CIVIC_LAB_MODAL_ENABLED: '1',
+      ADMIN_TOKEN: 'test-admin'
+    })
+  }, async (baseUrl) => {
+    const route = `${V6_LAB_LAUNCH_PLAN_ROUTE}?v6Lab=1&worldGridFeatureFlags=v60&requestPath=%2Fapp`;
+    const denied = await getJson(baseUrl, route);
+    assert.equal(denied.status, 403);
+    assert.equal(denied.body.ok, false);
+    assert.equal(denied.body.error.code, 'V6_CIVIC_LAB_MODAL_DENIED');
+
+    const allowed = await getJson(baseUrl, route, { 'x-admin-token': 'test-admin' });
+    assert.equal(allowed.status, 200);
+    assert.equal(allowed.body.ok, true);
+    assert.equal(allowed.body.launchPlan.allowed, true);
+    assert.equal(allowed.body.launchPlan.executionStatus, 'not_executable');
+  });
+});
+
+test('V6 lab launch-plan denies non-town-hub or incomplete debug observability requests', async () => {
+  await withCivilizationServer({
+    env: {
+      NODE_ENV: 'test',
+      V6_CIVIC_LAB_MODAL_ENABLED: '1'
+    }
+  }, async (baseUrl) => {
+    const nonTownHub = await getJson(
+      baseUrl,
+      `${V6_LAB_LAUNCH_PLAN_ROUTE}?v6Lab=1&worldGridFeatureFlags=v60&requestPath=%2Ftrainer`
+    );
+    assert.equal(nonTownHub.status, 403);
+    assert.equal(nonTownHub.body.error.code, 'V6_CIVIC_LAB_MODAL_DENIED');
+    assert.match(nonTownHub.body.error.details.launchPlan.reason, /town hub route/);
+
+    const missingDebug = await getJson(
+      baseUrl,
+      `${V6_LAB_LAUNCH_PLAN_ROUTE}?v6Lab=1&worldGridFeatureFlags=v60&requestPath=%2Fapp&debugTabs=Worker%20Tools,Brain`
+    );
+    assert.equal(missingDebug.status, 403);
+    assert.equal(missingDebug.body.error.code, 'V6_CIVIC_LAB_MODAL_DENIED');
+    assert.deepEqual(missingDebug.body.error.details.launchPlan.missingDebugTabs, [
+      'Skill Context',
+      'Worker Traffic',
+      'Session Context'
+    ]);
+  });
+});
 
 test('V6 proposal submission route is hidden unless the research route flag is enabled', async () => {
   await withCivilizationServer({}, async (baseUrl) => {

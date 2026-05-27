@@ -5,6 +5,12 @@ const {
   isWorldGridFeatureEnabled,
   resolveWorldGridFeatureFlags
 } = require('../world_grid/feature_flags');
+const { isAuthorizedFeatureOverrideRequest } = require('../founders_plot/feature_flags');
+const {
+  REQUIRED_DEBUG_TABS,
+  assertV6LabLaunchPlanSafe,
+  buildV6LabModalLaunchPlan
+} = require('./lab_surface');
 const { buildV6CivicMutationSecurityEnvelope } = require('./mutation_security');
 const { buildV6ProposalSubmissionEnvelope } = require('./proposals');
 const { buildV6VoteRouteAuthorizationEnvelope } = require('./votes');
@@ -17,6 +23,7 @@ const PROPOSAL_SUBMISSION_ROUTE = '/api/world/civilization/proposals/submit';
 const PROPOSAL_SUBMISSION_MUTATION_SURFACE = 'proposal.submit_for_review';
 const VOTE_CAST_ROUTE = '/api/world/civilization/votes/cast';
 const HUMAN_VOTE_ROUTE_SURFACE = 'human_vote_route';
+const V6_LAB_LAUNCH_PLAN_ROUTE = '/api/world/civilization/lab/launch-plan';
 
 function truthy(value) {
   return ['1', 'true', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
@@ -30,12 +37,19 @@ function voteRouteEnabled(env = process.env) {
   return truthy(env.V6_CIVIC_VOTE_ROUTE_ENABLED);
 }
 
+function labRouteEnabled(env = process.env) {
+  return truthy(env.V6_CIVIC_LAB_MODAL_ENABLED);
+}
+
 function csrfReviewed(req) {
   return String(req.header('x-v6-civic-csrf-reviewed') || '').trim() === '1';
 }
 
 function statusForError(error = null) {
   if (!error) return 500;
+  if (error.message === 'V6_CIVIC_LAB_MODAL_DISABLED') return 404;
+  if (error.message === 'V6_CIVIC_LAB_MODAL_DENIED') return 403;
+  if (error.message === 'V6_CIVIC_LAB_MODAL_UNSAFE') return 500;
   if (error.message === 'V6_CIVIC_PROPOSAL_ROUTE_DISABLED') return 404;
   if (error.message === 'V6_CIVIC_VOTE_ROUTE_DISABLED') return 404;
   if (error.message === 'V6_CIVIC_PROPOSAL_STORE_REQUIRED') return 503;
@@ -80,6 +94,54 @@ function normalizeCivicIdentity(identity = {}) {
     actorKind,
     agentId,
     walletAddress: String(identity.walletAddress || identity.address || accountId).trim()
+  };
+}
+
+function firstQueryValue(value) {
+  if (Array.isArray(value)) return firstQueryValue(value[0]);
+  return String(value || '').trim();
+}
+
+function labResearchOptedIn(req) {
+  return truthy(firstQueryValue(req?.query?.v6Lab || req?.query?.v6ResearchLab));
+}
+
+function labDebugTabsAvailable(req) {
+  const raw = firstQueryValue(req?.query?.debugTabs || req?.header?.('x-v6-lab-debug-tabs'));
+  if (!raw) return [...REQUIRED_DEBUG_TABS];
+  return raw.split(',').map((entry) => entry.trim()).filter(Boolean);
+}
+
+function labRequestPath(req) {
+  return firstQueryValue(req?.query?.requestPath || req?.header?.('x-v6-lab-request-path')) || '/app';
+}
+
+function labLaunchSurface(req) {
+  return firstQueryValue(req?.query?.launchSurface || req?.header?.('x-v6-lab-launch-surface')) || 'town_hub_modal';
+}
+
+function assertLabRequestAllowed(req, env) {
+  if (!labRouteEnabled(env) || !labResearchOptedIn(req)) {
+    throw new Error('V6_CIVIC_LAB_MODAL_DISABLED');
+  }
+  if (env.NODE_ENV === 'production' && !isAuthorizedFeatureOverrideRequest(req, env)) {
+    throw new Error('V6_CIVIC_LAB_MODAL_DENIED');
+  }
+}
+
+function labLaunchPlanPayload(launchPlan = {}) {
+  return {
+    ok: true,
+    status: 'research_only',
+    runtimeExposed: false,
+    playerVisible: false,
+    normalGameplayExposure: false,
+    mutatesWorldState: false,
+    exposesCivicTools: false,
+    exposesPrivateData: false,
+    executionStatus: 'not_executable',
+    launchPlan,
+    panels: Array.isArray(launchPlan.panels) ? launchPlan.panels : []
   };
 }
 
@@ -261,6 +323,39 @@ function createWorldCivilizationRouter({
   env = process.env
 } = {}) {
   const router = express.Router();
+
+  router.get(V6_LAB_LAUNCH_PLAN_ROUTE, (req, res) => {
+    try {
+      assertLabRequestAllowed(req, env);
+      const featureFlags = resolveWorldGridFeatureFlags(req, env);
+      const launchPlan = buildV6LabModalLaunchPlan({
+        featureFlags,
+        includeResearchLab: true,
+        source: 'world_civilization_route',
+        requestPath: labRequestPath(req),
+        launchSurface: labLaunchSurface(req),
+        debugTabsAvailable: labDebugTabsAvailable(req)
+      });
+      const safety = assertV6LabLaunchPlanSafe(launchPlan);
+      if (!safety.ok) {
+        const error = new Error('V6_CIVIC_LAB_MODAL_UNSAFE');
+        error.details = { safety, launchPlan };
+        throw error;
+      }
+      if (launchPlan.allowed !== true) {
+        const error = new Error('V6_CIVIC_LAB_MODAL_DENIED');
+        error.details = { launchPlan };
+        throw error;
+      }
+      return res.json(labLaunchPlanPayload(launchPlan));
+    } catch (error) {
+      const status = statusForError(error);
+      return res.status(status).json({
+        ok: false,
+        error: normalizeError(error)
+      });
+    }
+  });
 
   router.post(PROPOSAL_SUBMISSION_ROUTE, (req, res) => {
     try {
@@ -471,6 +566,7 @@ function createWorldCivilizationRouter({
 
 module.exports = {
   PROPOSAL_SUBMISSION_ROUTE,
+  V6_LAB_LAUNCH_PLAN_ROUTE,
   VOTE_CAST_ROUTE,
   createWorldCivilizationRouter
 };

@@ -147,6 +147,33 @@ test('V6 lab modal launch plan fails closed for standalone routes and missing de
   assert.deepEqual(assertV6LabLaunchPlanSafe(missingTabs), { ok: true, errors: [] });
 });
 
+test('V6 lab modal launch plan fails closed outside the town hub route', () => {
+  const denied = buildV6LabModalLaunchPlan({
+    includeResearchLab: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    requestPath: '/trainer?embedded=0'
+  });
+
+  assert.equal(denied.allowed, false);
+  assert.equal(denied.failClosed, true);
+  assert.equal(denied.routeAction, 'deny');
+  assert.equal(denied.requestPath, '/trainer');
+  assert.match(denied.reason, /town hub route/);
+  assert.deepEqual(assertV6LabLaunchPlanSafe(denied), { ok: true, errors: [] });
+
+  const unsafe = {
+    ...buildV6LabModalLaunchPlan({
+      includeResearchLab: true,
+      featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+      requestPath: '/app'
+    }),
+    requestPath: '/trainer'
+  };
+  const result = assertV6LabLaunchPlanSafe(unsafe);
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(','), /V6_LAB_LAUNCH_TOWN_HUB_ROUTE_REQUIRED/);
+});
+
 test('V6 lab safety assertion fails closed for route, visibility, debug, and mutation drift', () => {
   const unsafe = {
     ...buildV6LabSurfaceContract({

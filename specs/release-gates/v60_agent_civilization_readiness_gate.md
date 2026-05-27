@@ -449,12 +449,17 @@ persistence resilience, and security/product release review.
   page-scoped OpenClaw Lite worker continuity, keep Worker Tools, Skill Context,
   Worker Traffic, Brain, and Session Context observable, and prove with
   Playwright visual coverage that it has no standalone route or normal gameplay
-  exposure. Current contract-only coverage in
-  `server/world_civilization/lab_surface.js` includes a fail-closed modal launch
-  plan for `/v6`, `/v6-lab`, and `/civilization`; current route coverage in
-  `e2e/244_v6_lab_modal_boundary.spec.js` proves those paths redirect to `/app`
-  without rendering V6 lab content and that normal `/app` exposes no
-  `et.world.civic.*` tools by default. The M15 research-only lab
+  exposure. Current coverage in `server/world_civilization/lab_surface.js`,
+  `server/world_civilization/routes.js`, and `public/app.js` includes a
+  fail-closed modal launch plan, a disabled-by-default launch-plan API that
+  requires explicit `v6Lab=1`, V6 flag enablement, `/app` route context, debug
+  observability, and production admin/QA override authorization, plus a
+  DOM-rendered non-executing modal. Current route coverage in
+  `e2e/244_v6_lab_modal_boundary.spec.js` proves `/v6`, `/v6-lab`, and
+  `/civilization` redirect to `/app` without rendering V6 lab content, normal
+  `/app` exposes no `et.world.civic.*` tools by default, and the internal modal
+  renders with keyboard containment and screenshots at 390/768/1280 widths. The
+  M15 research-only lab
   readiness gate in `server/world_civilization/lab_surface.js` must require
   town-hub modal launch, standalone route denial, worker continuity, debug
   observability, non-executing panels, browser visual coverage at
@@ -462,8 +467,8 @@ persistence resilience, and security/product release review.
   screen-reader names, runtime tool absence, private debug-data exclusion, and
   normal gameplay exposure denial while keeping `standaloneRouteAllowed: false`,
   `civicEffectsEnabled: false`, and `executionStatus: "not_executable"`.
-  Release still requires real modal UI checks before any player-visible V6 lab
-  work.
+  Release still requires product/security signoff before any player-visible V6
+  lab work.
 - Persistence and replay resilience must prove every V6 civic store survives
   process restarts, reconstructs summaries from audit replay, rejects duplicate
   retries under load, migrates forward and backward through schema versions, and

@@ -6,14 +6,18 @@ Milestone: M15 Modal-first V6 lab surface
 
 Runtime contract: `server/world_civilization/lab_surface.js`
 
+Launch-plan route: `GET /api/world/civilization/lab/launch-plan`
+
 Test coverage: `tests/world_civilization_lab_surface.test.js`,
 `e2e/244_v6_lab_modal_boundary.spec.js`
 
 ## Boundary
 
 This foundation describes the internal V6 lab surface and modal launch plan as
-contracts only. It does not add routes, page navigation, player-visible UI,
-autonomous civic agents, or executable civic mechanics.
+research-only infrastructure. It includes a disabled-by-default launch-plan API
+and a hidden town-hub modal renderer, but it does not add page navigation,
+normal player-visible UI, autonomous civic agents, runtime civic tools, or
+executable civic mechanics.
 
 The lab surface remains route-neutral so later UI work must mount from the town
 hub modal flow instead of a standalone V6 page. Standalone routes such as `/v6`,
@@ -22,6 +26,12 @@ to the town hub path instead of rendering V6 content directly.
 The current Express route layer explicitly redirects those standalone paths to
 `/app`; Playwright coverage proves the redirect does not render V6 lab content
 or civic runtime details.
+
+The launch-plan API is available only when `V6_CIVIC_LAB_MODAL_ENABLED` is set,
+the request explicitly opts in with `v6Lab=1`, the V6 feature flag is enabled,
+the requested launch path is `/app`, all required debug tabs are present, and
+production requests carry authorized admin/QA override context. The client may
+render the lab only after that launch plan returns `allowed: true`.
 
 ## Contract Rules
 
@@ -42,6 +52,10 @@ or civic runtime details.
 - `buildV6LabModalLaunchPlan` may allow launch only from `/app` through
   `town_hub_modal` when the V6 feature flag, research opt-in, and required
   debug tabs are present.
+- The client modal must be DOM-rendered from the launch-plan response; it must
+  not inject launch-plan strings as HTML.
+- The modal may expose readiness and release-gate status only in this internal
+  research flow, and it must avoid runtime civic tool names in visible text.
 - Missing debug tabs, broad V5 feature overrides, direct standalone paths, or
   non-modal launch surfaces must return a fail-closed non-executing plan.
 
@@ -70,17 +84,21 @@ release-ready.
 
 ## Release Gate
 
-Before any real V6 lab UI is added, the release branch must prove:
+Before any V6 lab UI can be released beyond the internal research flow, the
+release branch must prove:
 
 - The UI launches only through the town hub modal flow.
+- The launch-plan route is disabled by default and production requests require
+  authorized override context.
 - Direct standalone hits redirect or fail closed.
 - `e2e/244_v6_lab_modal_boundary.spec.js` proves `/v6`, `/v6-lab`, and
   `/civilization` redirect to `/app` and that normal `/app` gameplay does not
   expose V6 lab markers or `et.world.civic.*` tools by default.
 - Browser/Playwright visual coverage proves the modal renders without
-  overlapping normal gameplay controls.
+  overlapping normal gameplay controls at 390/768/1280 widths.
 - Worker Tools, Skill Context, Worker Traffic, Brain, and Session Context remain
   visible and current while the modal is open.
+- Keyboard focus stays contained in the modal until the modal closes.
 - V6 routes and worker tools are still absent or disabled unless separately
   released through the V6 readiness gate.
 - No V6 panel can apply civic effects, mutate private towns, mutate another

@@ -529,6 +529,14 @@ function buildV6LabModalLaunchPlan({
       reason: 'V6 lab standalone route is forbidden; launch from the town hub modal'
     });
   }
+  if (normalizedRequestPath !== '/app') {
+    return buildDisabledLaunchPlan({
+      contract,
+      requestPath: normalizedRequestPath,
+      source,
+      reason: 'V6 lab launch must start from the town hub route'
+    });
+  }
   const missingTabs = missingDebugTabs(debugTabsAvailable);
   if (launchSurface !== 'town_hub_modal' || missingTabs.length > 0) {
     return {
@@ -591,6 +599,9 @@ function assertV6LabLaunchPlanSafe(plan = {}) {
   }
   if (isStandaloneV6LabPath(plan.requestPath) && plan.allowed === true) {
     errors.push('V6_LAB_LAUNCH_STANDALONE_ALLOWED');
+  }
+  if (plan.allowed === true && normalizePath(plan.requestPath) !== '/app') {
+    errors.push('V6_LAB_LAUNCH_TOWN_HUB_ROUTE_REQUIRED');
   }
   if (plan.allowed === true) {
     if (plan.routeAction !== 'open_modal') errors.push('V6_LAB_LAUNCH_OPEN_MODAL_REQUIRED');

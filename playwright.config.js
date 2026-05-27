@@ -57,6 +57,8 @@ module.exports = defineConfig({
       PRIVY_PUBLIC_CONFIG_JSON: '{}',
       START_PAGE_ENABLED: '0',
       WORLD_GRID_CSRF_REQUIRED: process.env.WORLD_GRID_CSRF_REQUIRED || '1',
+      V6_CIVIC_LAB_MODAL_ENABLED: process.env.V6_CIVIC_LAB_MODAL_ENABLED || '1',
+      FEATURE_WORLD_V60_AGENT_CIVILIZATION: process.env.FEATURE_WORLD_V60_AGENT_CIVILIZATION || '',
       // Avoid modifying tracked data/store.json during e2e runs.
       STORE_PATH: require('path').join(process.cwd(), 'data', 'store.e2e.sqlite')
     }

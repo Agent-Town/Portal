@@ -4506,6 +4506,7 @@ function setDistrictModalMode(mode) {
   const modal = document.querySelector('#districtModalBackdrop .districtModal');
   const backdrop = el('districtModalBackdrop');
   if (!modal) return;
+  modal.classList.remove('is-v6-lab');
   modal.classList.toggle('is-district', mode === 'district');
   modal.classList.toggle('is-frame', mode === 'frame' || mode === 'fullscreen-frame');
   modal.classList.toggle('is-fullscreen-frame', mode === 'fullscreen-frame');
@@ -4553,6 +4554,269 @@ function inferDistrictModalThemeFromUrl(url) {
   if (path === '/townhall') return 'townhall';
   if (path.startsWith('/s/')) return 'share';
   return 'house';
+}
+
+let v6LabFocusTrapHandler = null;
+
+function shouldOpenV6ResearchLabFromRoute() {
+  if (!isTownHub || window.location.pathname !== '/app') return false;
+  const params = new URLSearchParams(window.location.search || '');
+  return params.get('v6Lab') === '1' || params.get('v6ResearchLab') === '1';
+}
+
+function collectV6LabDebugTabs() {
+  return [
+    'agentDebugTabTools',
+    'agentDebugTabSkill',
+    'agentDebugTabTraffic',
+    'agentDebugTabBrain',
+    'agentDebugTabSession'
+  ].map((id) => {
+    const node = el(id);
+    return node ? String(node.textContent || '').trim() : '';
+  }).filter(Boolean);
+}
+
+function clearV6LabFocusTrap() {
+  if (v6LabFocusTrapHandler) {
+    document.removeEventListener('keydown', v6LabFocusTrapHandler);
+    v6LabFocusTrapHandler = null;
+  }
+}
+
+function visibleFocusableNodes(nodes) {
+  return nodes.filter((node) => {
+    if (!node || typeof node.focus !== 'function') return false;
+    if (node.disabled || node.getAttribute('aria-hidden') === 'true') return false;
+    const box = node.getBoundingClientRect();
+    return box.width > 0 && box.height > 0;
+  });
+}
+
+function bindV6LabFocusTrap(root) {
+  clearV6LabFocusTrap();
+  const closeBtn = el('districtModalClose');
+  v6LabFocusTrapHandler = (event) => {
+    if (event.key !== 'Tab') return;
+    const backdrop = el('districtModalBackdrop');
+    if (!backdrop || backdrop.classList.contains('is-hidden')) return;
+    if (!root || !root.isConnected) return;
+    const focusables = visibleFocusableNodes([
+      closeBtn,
+      ...root.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
+    ]);
+    if (!focusables.length) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+      return;
+    }
+    if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+  document.addEventListener('keydown', v6LabFocusTrapHandler);
+}
+
+function appendV6LabText(parent, tag, text, className = '') {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  node.textContent = String(text || '');
+  parent.appendChild(node);
+  return node;
+}
+
+function v6LabPanelTitle(id) {
+  const labels = {
+    readiness: 'Readiness',
+    schemas: 'Proposal Schemas',
+    proposals: 'Proposal Intake',
+    votes: 'Vote Receipts',
+    moderation: 'Moderation',
+    reputation: 'Reputation',
+    effects: 'Effects and Rollback',
+    delegations: 'Delegations',
+    institutions: 'Institutions',
+    public_works: 'Public Works',
+    audit: 'Audit Ledger'
+  };
+  return labels[id] || String(id || 'Panel').replace(/_/g, ' ');
+}
+
+function renderV6LabStatusList(parent, launchPlan) {
+  const grid = document.createElement('div');
+  grid.className = 'v6LabStatusGrid';
+  parent.appendChild(grid);
+
+  const statuses = [
+    ['Mode', 'Research-only'],
+    ['Execution', launchPlan.executionStatus === 'not_executable' ? 'Non-executing' : 'Blocked'],
+    ['Launch', launchPlan.routeAction === 'open_modal' ? 'Town hub modal' : 'Denied'],
+    ['Worker', launchPlan.preservesWorkerContinuity ? 'Continuity kept' : 'Continuity missing'],
+    ['Runtime tools', launchPlan.runtimeExposed === true ? 'Blocked' : 'Hidden'],
+    ['World effects', launchPlan.effects?.executesCivicEffect === false ? 'None' : 'Blocked']
+  ];
+
+  for (const [label, value] of statuses) {
+    const item = document.createElement('div');
+    item.className = 'v6LabStatusItem';
+    appendV6LabText(item, 'span', label, 'v6LabStatusLabel');
+    appendV6LabText(item, 'strong', value);
+    grid.appendChild(item);
+  }
+}
+
+function renderV6LabDebugList(parent, launchPlan) {
+  const section = document.createElement('section');
+  section.className = 'v6LabSection';
+  appendV6LabText(section, 'h3', 'Debug Observability');
+  const list = document.createElement('ul');
+  list.className = 'v6LabCheckList';
+  const available = new Set(Array.isArray(launchPlan.debugTabsAvailable) ? launchPlan.debugTabsAvailable : []);
+  const required = Array.isArray(launchPlan.requiredDebugTabs) ? launchPlan.requiredDebugTabs : [];
+  for (const tab of required) {
+    const item = document.createElement('li');
+    item.dataset.ready = available.has(tab) ? 'true' : 'false';
+    appendV6LabText(item, 'span', tab);
+    appendV6LabText(item, 'strong', available.has(tab) ? 'Ready' : 'Missing');
+    list.appendChild(item);
+  }
+  section.appendChild(list);
+  parent.appendChild(section);
+}
+
+function renderV6LabPanels(parent, launchPlan) {
+  const section = document.createElement('section');
+  section.className = 'v6LabSection';
+  appendV6LabText(section, 'h3', 'Milestone Panels');
+  const tabs = document.createElement('div');
+  tabs.className = 'v6LabPanelTabs';
+  tabs.setAttribute('role', 'tablist');
+  tabs.setAttribute('aria-label', 'V6 research lab panels');
+  const detail = document.createElement('div');
+  detail.className = 'v6LabPanelDetail';
+  detail.setAttribute('role', 'tabpanel');
+  detail.id = 'v6LabPanelDetail';
+
+  const panels = Array.isArray(launchPlan.panels) ? launchPlan.panels : [];
+  const buttons = [];
+  const selectPanel = (panel, button) => {
+    for (const entry of buttons) {
+      entry.classList.toggle('is-active', entry === button);
+      entry.setAttribute('aria-selected', entry === button ? 'true' : 'false');
+      entry.tabIndex = entry === button ? 0 : -1;
+    }
+    detail.replaceChildren();
+    appendV6LabText(detail, 'h4', v6LabPanelTitle(panel.id));
+    appendV6LabText(detail, 'p', 'This panel is staged for internal review only. It cannot execute civic effects, mutate a town, or publish runtime civic tools.');
+    appendV6LabText(detail, 'span', panel.executionStatus || 'not_executable', 'v6LabExecutionBadge');
+  };
+
+  panels.forEach((panel, index) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'v6LabPanelTab';
+    button.dataset.panelId = String(panel.id || '');
+    button.dataset.executionStatus = String(panel.executionStatus || 'not_executable');
+    button.setAttribute('role', 'tab');
+    button.setAttribute('aria-controls', detail.id);
+    button.textContent = v6LabPanelTitle(panel.id);
+    button.addEventListener('click', () => selectPanel(panel, button));
+    button.addEventListener('keydown', (event) => {
+      if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+      event.preventDefault();
+      const delta = event.key === 'ArrowRight' ? 1 : -1;
+      const next = buttons[(buttons.indexOf(button) + delta + buttons.length) % buttons.length];
+      next.focus();
+      next.click();
+    });
+    buttons.push(button);
+    tabs.appendChild(button);
+    if (index === 0) selectPanel(panel, button);
+  });
+
+  section.appendChild(tabs);
+  section.appendChild(detail);
+  parent.appendChild(section);
+}
+
+function renderV6ResearchLabModal(payload) {
+  if (!isTownHub || !payload?.launchPlan?.allowed) return false;
+  const launchPlan = payload.launchPlan;
+  const backdrop = el('districtModalBackdrop');
+  const modal = document.querySelector('#districtModalBackdrop .districtModal');
+  const title = el('districtModalTitle');
+  const body = el('districtModalBody');
+  if (!backdrop || !modal || !title || !body) return false;
+
+  currentDistrict = null;
+  clearTownBoardPoll();
+  clearV6LabFocusTrap();
+  setDistrictModalMode('district');
+  setDistrictModalTheme('lab');
+  modal.classList.add('is-v6-lab');
+  title.textContent = 'V6 Research Lab';
+  body.replaceChildren();
+  body.classList.remove('is-loading');
+
+  const root = document.createElement('section');
+  root.id = 'v6-research-lab';
+  root.className = 'v6LabSurface';
+  root.dataset.v6Lab = 'true';
+  root.dataset.modalId = 'v6-research-lab';
+  root.dataset.executionStatus = launchPlan.executionStatus || 'not_executable';
+  root.tabIndex = -1;
+  root.setAttribute('role', 'document');
+  root.setAttribute('aria-label', 'V6 research lab readiness surface');
+
+  const header = document.createElement('header');
+  header.className = 'v6LabHero';
+  appendV6LabText(header, 'p', 'Internal readiness surface', 'v6LabEyebrow');
+  appendV6LabText(header, 'h2', 'Agent Civilization Foundation');
+  appendV6LabText(header, 'p', 'A gated, non-executing view for reviewing civic readiness evidence before any player-visible release.');
+  root.appendChild(header);
+
+  renderV6LabStatusList(root, launchPlan);
+  renderV6LabDebugList(root, launchPlan);
+  renderV6LabPanels(root, launchPlan);
+
+  const footer = document.createElement('footer');
+  footer.className = 'v6LabFooter';
+  appendV6LabText(footer, 'strong', 'No civic effects are available here.');
+  appendV6LabText(footer, 'span', 'Normal gameplay, public tools, and private world state remain outside this surface.');
+  root.appendChild(footer);
+
+  body.appendChild(root);
+  backdrop.classList.remove('is-closing');
+  backdrop.classList.remove('is-hidden');
+  backdrop.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('district-modal-open');
+  bindV6LabFocusTrap(root);
+  requestAnimationFrame(() => root.focus({ preventScroll: true }));
+  return true;
+}
+
+async function maybeOpenV6ResearchLabFromRoute() {
+  if (!shouldOpenV6ResearchLabFromRoute()) return false;
+  const params = new URLSearchParams();
+  params.set('v6Lab', '1');
+  params.set('requestPath', window.location.pathname || '/app');
+  params.set('launchSurface', 'town_hub_modal');
+  params.set('debugTabs', collectV6LabDebugTabs().join(','));
+  const routeParams = new URLSearchParams(window.location.search || '');
+  const featureFlags = routeParams.get('worldGridFeatureFlags');
+  if (featureFlags) params.set('worldGridFeatureFlags', featureFlags);
+
+  try {
+    const payload = await api(`/api/world/civilization/lab/launch-plan?${params.toString()}`);
+    return renderV6ResearchLabModal(payload);
+  } catch (error) {
+    console.warn('V6 research lab launch denied', error?.data?.error?.code || error?.message || error);
+    return false;
+  }
 }
 
 function isPlainRecord(value) {
@@ -5135,6 +5399,7 @@ function hideDistrictImmediate() {
   currentDistrict = null;
   lastDistrictLoad += 1;
   clearTouchDistrictPrime();
+  clearV6LabFocusTrap();
   setDistrictModalMode('district');
   setDistrictModalTheme(null);
   if (modal) modal.classList.add('is-hidden');
@@ -9687,6 +9952,7 @@ async function init() {
     console.warn('local LLM preload failed', e);
   }
   updateUI(initial);
+  await maybeOpenV6ResearchLabFromRoute();
   if (isVendorLite(initial)) {
     bootstrapVendorRuntime()
       .then(() => restoreLiteLlmConfigFromLocalIfNeeded(initial))

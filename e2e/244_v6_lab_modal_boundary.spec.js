@@ -43,3 +43,54 @@ test('M15 normal gameplay keeps V6 lab and civic runtime details hidden by defau
   const toolNames = Array.isArray(toolsBody.tools) ? toolsBody.tools.map((tool) => tool.name) : [];
   expect(toolNames.some((name) => String(name || '').startsWith('et.world.civic.'))).toBe(false);
 });
+
+test('M15 internal V6 lab opens only as a non-executing town hub modal', async ({ page, request }, testInfo) => {
+  const widths = [390, 768, 1280];
+
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+    await page.goto('/app?v6Lab=1&worldGridFeatureFlags=v60');
+
+    const lab = page.locator('#v6-research-lab');
+    await expect(page.locator('#districtModalBackdrop:not(.is-hidden)')).toBeVisible();
+    await expect(page.locator('[data-modal-id="v6-research-lab"]')).toHaveCount(1);
+    await expect(lab).toBeVisible();
+    await expect(lab).toHaveAttribute('data-execution-status', 'not_executable');
+    await expect(lab.getByText('Research-only')).toBeVisible();
+    await expect(lab.getByText('Non-executing', { exact: true })).toBeVisible();
+    await expect(lab.getByRole('tab', { name: 'Readiness' })).toBeVisible();
+    await expect(lab.getByRole('tab', { name: 'Audit Ledger' })).toBeVisible();
+    await expect(lab).not.toContainText(/et\.world\.civic/i);
+
+    const box = await lab.boundingBox();
+    expect(box, `lab bounds at ${width}px`).toBeTruthy();
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.width).toBeLessThanOrEqual(width);
+
+    await page.keyboard.press('Tab');
+    const focusInsideModal = await page.evaluate(() => {
+      const active = document.activeElement;
+      return !!active && !!active.closest('#districtModalBackdrop');
+    });
+    expect(focusInsideModal).toBe(true);
+
+    await page.screenshot({
+      path: testInfo.outputPath(`v6-lab-modal-${width}.png`),
+      fullPage: true
+    });
+  }
+
+  const planResponse = await request.get('/api/world/civilization/lab/launch-plan?v6Lab=1&worldGridFeatureFlags=v60&requestPath=%2Fapp');
+  expect(planResponse.status()).toBe(200);
+  const planBody = await planResponse.json();
+  expect(planBody.ok).toBe(true);
+  expect(planBody.launchPlan.allowed).toBe(true);
+  expect(planBody.launchPlan.executionStatus).toBe('not_executable');
+  expect(planBody.launchPlan.effects.executesCivicEffect).toBe(false);
+
+  const toolsResponse = await request.get('/api/world/tools?worldGridFeatureFlags=all,v60');
+  expect(toolsResponse.status()).toBe(200);
+  const toolsBody = await toolsResponse.json();
+  const toolNames = Array.isArray(toolsBody.tools) ? toolsBody.tools.map((tool) => tool.name) : [];
+  expect(toolNames.some((name) => String(name || '').startsWith('et.world.civic.'))).toBe(false);
+});
