@@ -1218,8 +1218,11 @@ function findRawPromptInstructionPaths(value, path = '$', matches = []) {
   if (!value || typeof value !== 'object') return matches;
   for (const [key, child] of Object.entries(value)) {
     const childPath = generatedPackChildPath(path, key);
+    const keyBlockedPatternIds = blockedPatternIdsForText(key);
     if (rawPromptKey.test(key)) {
       matches.push({ path: childPath, blockedPatternIds: ['raw-prompt-field'] });
+    } else if (keyBlockedPatternIds.length > 0) {
+      matches.push({ path: childPath, blockedPatternIds: keyBlockedPatternIds });
     }
     findRawPromptInstructionPaths(child, childPath, matches);
   }

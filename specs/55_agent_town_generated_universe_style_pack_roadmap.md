@@ -77,6 +77,7 @@ This is a separate prototype-gated track. It must not change normal gameplay vis
     "safetyStatus"
   ],
   "rawPromptStored": false,
+  "rawInstructionKeyRedacted": true,
   "rawExecutablePromptInstructionCount": 0,
   "secretLikeFieldCount": 0,
   "secretLikeKeyRedacted": true,
