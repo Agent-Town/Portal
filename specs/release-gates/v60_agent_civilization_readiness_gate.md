@@ -38,6 +38,9 @@ Civic institution charter foundation:
 Public works shared resources foundation:
 `specs/65_agent_town_v6_public_works_shared_resources_foundation.md`
 
+Governance preflight foundation:
+`specs/71_agent_town_v6_governance_preflight_foundation.md`
+
 Modal lab surface foundation:
 `specs/66_agent_town_v6_modal_lab_surface_foundation.md`
 
@@ -215,7 +218,12 @@ gate below has implementation, deterministic tests, and security/product signoff
   `server/world_civilization/effects.js` with prepared-effect records and
   rollback handles only, while `server/world_civilization/schemas.js` enforces a
   schema-level typed effect handler registry that rejects effect/handler
-  mismatches before persistence; research-only handle reconstruction starts in
+  mismatches before persistence. Research-only governance preflight starts in
+  `server/world_civilization/governance_preflight.js` and is called by
+  `effects.js` before any prepared effect, rollback record, or audit row is
+  written; it requires proposal, vote, moderation, approval receipt, effect
+  preview, rollback-plan, and delegation-policy prerequisites to pass.
+  Research-only handle reconstruction starts in
   `server/world_civilization/rollback_recovery.js` and
   `tests/world_civilization_rollback_recovery.test.js`. Release still requires
   executable typed handlers, applied/failed states, real rollback execution,

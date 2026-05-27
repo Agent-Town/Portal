@@ -33,10 +33,12 @@ are present.
 - Audit coverage: append-only ledger, owner indexes, migration versions,
   schema metadata drift checks, migration rehearsal with unsupported
   upgrade/downgrade targets failing closed, replay reconstruction, rollback
-  handles, and non-executing rollback recovery evidence.
+  handles, governance preflight evidence, and non-executing rollback recovery
+  evidence.
 - Validation evidence: targeted Node suite, split Playwright smokes,
   all-features regression, feature override safety, and load/rate replay
-  evidence, including civic mutation security contract coverage.
+  evidence, including civic mutation security and governance preflight contract
+  coverage.
 - Worker tool surface review: runtime manifest source-of-truth evidence,
   OpenClaw Lite worker origin, Worker Traffic and Skill Context observability,
   mutation security envelope coverage, and no backend shortcuts before any

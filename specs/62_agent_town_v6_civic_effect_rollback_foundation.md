@@ -6,11 +6,14 @@ Milestone: `M11 Civic effect execution and rollback`
 
 Runtime module: `server/world_civilization/effects.js`
 
+Governance preflight: `server/world_civilization/governance_preflight.js`
+
 Recovery report: `server/world_civilization/rollback_recovery.js`
 
 Contract tests:
 
 - `tests/world_civilization_effects.test.js`
+- `tests/world_civilization_governance_preflight.test.js`
 - `tests/world_civilization_effect_process_restart.test.js`
 - `tests/world_civilization_rollback_recovery.test.js`
 
@@ -27,6 +30,11 @@ proposal, vote, and moderation foundations can prove the action has a valid
 public proposal, an approved moderation decision, and a human approval receipt.
 It is readiness evidence for later typed execution handlers, not an execution
 engine.
+
+Those prerequisites are centralized in
+`server/world_civilization/governance_preflight.js`. `effects.js` calls the
+preflight before any prepared action, rollback record, or audit row is written,
+and failed preflights preserve the existing `CIVIC_EFFECT_*` error surface.
 
 The schema layer now has a typed effect handler registry for
 `public_summary`, `public_works_accounting`, `sandbox_policy`, and
@@ -94,6 +102,8 @@ proposal/status replay.
 - Human-approved actions must reference an approving vote receipt.
 - Delegated execution is rejected until M12 defines scoped delegation storage
   and enforcement.
+- `server/world_civilization/governance_preflight.js` must pass before
+  prepared effect persistence.
 - Idempotency reuse is accepted only when the validated action and rollback
   plan are identical.
 - Summaries return `appliesWorldState: false` and `executionStatus:

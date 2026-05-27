@@ -3,7 +3,10 @@ const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
 
 const { createCivicAuditLedger, sha256, stableJson } = require('./audit_ledger');
-const { validateCivicAction, validateRollbackPlan } = require('./schemas');
+const {
+  buildV6CivicGovernancePreflight,
+  throwV6CivicGovernancePreflightError
+} = require('./governance_preflight');
 const {
   ensureCivicSqliteSchemaMetadata,
   readCivicSqliteSchemaMetadata
@@ -164,72 +167,6 @@ function buildStatements(db) {
   };
 }
 
-function matchingVoteForReceipt(voteStore, proposalId, receiptId) {
-  if (!voteStore || typeof voteStore.listVotes !== 'function') return null;
-  return voteStore
-    .listVotes({ proposalId, limit: 500 })
-    .find((vote) => vote.receiptId === receiptId && vote.choice === 'approve') || null;
-}
-
-function approvedModerationForProposal(moderationStore, proposal) {
-  if (!moderationStore || typeof moderationStore.listDecisions !== 'function') return null;
-  return moderationStore
-    .listDecisions({
-      subjectRef: proposal.proposalId,
-      surface: proposal.proposal.moderationClass,
-      status: 'approved',
-      limit: 1
-    })[0] || null;
-}
-
-function validateEffectPrerequisites({ action, proposal, voteStore, moderationStore, nowMs }) {
-  if (!proposal) {
-    const err = new Error('CIVIC_EFFECT_PROPOSAL_REQUIRED');
-    err.details = { proposalId: action.proposalId };
-    throw err;
-  }
-  if (proposal.expiresAtMs <= nowMs) {
-    const err = new Error('CIVIC_EFFECT_PROPOSAL_EXPIRED');
-    err.details = { proposalId: action.proposalId, expiresAtMs: proposal.expiresAtMs, nowMs };
-    throw err;
-  }
-  if (proposal.proposal.effectPreview.effectType !== action.effectType) {
-    const err = new Error('CIVIC_EFFECT_TYPE_MISMATCH');
-    err.details = {
-      proposalId: action.proposalId,
-      expected: proposal.proposal.effectPreview.effectType,
-      received: action.effectType
-    };
-    throw err;
-  }
-
-  const moderation = approvedModerationForProposal(moderationStore, proposal);
-  if (!moderation) {
-    const err = new Error('CIVIC_EFFECT_MODERATION_REQUIRED');
-    err.details = { proposalId: action.proposalId };
-    throw err;
-  }
-
-  const voteSummary = voteStore?.summarizeProposalVotes?.(action.proposalId);
-  if (!voteSummary || voteSummary.counts.approve <= voteSummary.counts.reject || voteSummary.counts.approve < 1) {
-    const err = new Error('CIVIC_EFFECT_APPROVAL_REQUIRED');
-    err.details = { proposalId: action.proposalId, counts: voteSummary?.counts || null };
-    throw err;
-  }
-  if (action.executionAuthority.kind === 'delegated') {
-    const err = new Error('CIVIC_EFFECT_DELEGATION_UNSUPPORTED');
-    err.details = { proposalId: action.proposalId };
-    throw err;
-  }
-  const approvingVote = matchingVoteForReceipt(voteStore, action.proposalId, action.executionAuthority.receiptId);
-  if (!approvingVote) {
-    const err = new Error('CIVIC_EFFECT_APPROVAL_RECEIPT_REQUIRED');
-    err.details = { proposalId: action.proposalId, receiptId: action.executionAuthority.receiptId };
-    throw err;
-  }
-  return { approvingVote, moderation };
-}
-
 function createPreparedEffectAuditEntry({ action, rollbackPlan, actor, nowMs }) {
   return {
     schemaVersion: action.schemaVersion,
@@ -288,39 +225,19 @@ function createCivicEffectStore({
   let closed = false;
 
   function prepareEffect(rawAction = {}, rawRollbackPlan = {}, { nowMs = Date.now() } = {}) {
-    const actionValidation = validateCivicAction(rawAction);
-    if (!actionValidation.ok) {
-      const err = new Error('CIVIC_EFFECT_ACTION_INVALID');
-      err.details = { errors: actionValidation.errors };
-      throw err;
-    }
-    const rollbackValidation = validateRollbackPlan(rawRollbackPlan);
-    if (!rollbackValidation.ok) {
-      const err = new Error('CIVIC_EFFECT_ROLLBACK_INVALID');
-      err.details = { errors: rollbackValidation.errors };
-      throw err;
-    }
-
-    const action = actionValidation.value;
-    const rollbackPlan = rollbackValidation.value;
-    const normalizedRecord = stableJson({ action, rollbackPlan });
-    const proposal = proposalStore.getProposal(action.proposalId);
-    if (proposal && rollbackPlan.planId !== proposal.proposal.rollbackPlan.planId) {
-      const err = new Error('CIVIC_EFFECT_ROLLBACK_PLAN_MISMATCH');
-      err.details = {
-        proposalId: action.proposalId,
-        expected: proposal.proposal.rollbackPlan.planId,
-        received: rollbackPlan.planId
-      };
-      throw err;
-    }
-    const { approvingVote } = validateEffectPrerequisites({
-      action,
-      proposal,
+    const preflight = buildV6CivicGovernancePreflight({
+      rawAction,
+      rawRollbackPlan,
+      proposalStore,
       voteStore,
       moderationStore,
       nowMs
     });
+    throwV6CivicGovernancePreflightError(preflight);
+    const action = preflight.action;
+    const rollbackPlan = preflight.rollbackPlan;
+    const approvingVote = preflight.approvingVote;
+    const normalizedRecord = stableJson({ action, rollbackPlan });
 
     const existingByIdempotency = parseEffectRow(
       statements.byProposalIdempotency.get(action.proposalId, action.idempotencyKey)

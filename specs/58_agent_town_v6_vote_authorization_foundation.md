@@ -6,6 +6,8 @@ Milestone: `M8 Vote authorization and delegation`
 
 Runtime module: `server/world_civilization/votes.js`
 
+Governance preflight: `server/world_civilization/governance_preflight.js`
+
 Contract tests: `tests/world_civilization_votes.test.js`
 
 ## Boundary
@@ -33,6 +35,11 @@ they always report `executionStatus: not_executable`. Later milestones must add
 moderation, proposal state transitions, quorum/threshold rules, execution
 authority, rollback checks, and release-security controls before any civic
 effect can apply.
+
+The current research-only governance preflight consumes vote summaries and vote
+receipts before prepared effect persistence. It requires at least one approving
+vote, more approvals than rejections, and an execution-authority receipt that
+matches an approving vote.
 
 ## Delegation Boundary
 

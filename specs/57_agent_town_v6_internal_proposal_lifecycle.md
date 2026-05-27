@@ -6,6 +6,8 @@ Milestone: `M7 Internal proposal lifecycle`
 
 Runtime module: `server/world_civilization/proposals.js`
 
+Governance preflight: `server/world_civilization/governance_preflight.js`
+
 Contract tests: `tests/world_civilization_proposals.test.js`
 
 ## Boundary
@@ -38,6 +40,10 @@ Changing content with the same proposer/idempotency pair fails with
 The proposal store intentionally has no apply or execute method. Later V6
 milestones must add vote authorization, moderation decisions, execution
 authority, rollback, and audit checks before any civic effect can be applied.
+
+The current research-only governance preflight consumes proposal records before
+prepared effect persistence. It requires an existing, non-expired proposal whose
+effect preview and rollback plan match the proposed civic action.
 
 ## Worker-First Rule
 

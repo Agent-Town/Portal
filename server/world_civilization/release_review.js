@@ -49,6 +49,7 @@ const REQUIRED_REVIEW_GATES = [
     requiredArtifacts: [
       RELEASE_REVIEW_ARTIFACT,
       'server/world_civilization/audit_ledger.js',
+      'server/world_civilization/governance_preflight.js',
       'server/world_civilization/replay_reconstruction.js',
       'server/world_civilization/resilience.js',
       'server/world_civilization/migration_rehearsal.js',
@@ -59,6 +60,7 @@ const REQUIRED_REVIEW_GATES = [
       'tests/world_civilization_delegation_process_restart.test.js',
       'tests/world_civilization_institution_process_restart.test.js',
       'tests/world_civilization_public_works_process_restart.test.js',
+      'tests/world_civilization_governance_preflight.test.js',
       'tests/world_civilization_schema_metadata.test.js',
       'tests/world_civilization_migration_rehearsal.test.js',
       'tests/world_civilization_load_rate.test.js',
@@ -70,6 +72,7 @@ const REQUIRED_REVIEW_GATES = [
       'migration_versions',
       'migration_rehearsal',
       'replay_reconstruction',
+      'governance_preflight',
       'rollback_handles'
     ],
     signoffRequired: true
@@ -82,6 +85,7 @@ const REQUIRED_REVIEW_GATES = [
       RELEASE_REVIEW_ARTIFACT,
       'tests/world_civilization_schemas.test.js',
       'tests/world_civilization_mutation_security.test.js',
+      'tests/world_civilization_governance_preflight.test.js',
       'tests/world_civilization_resilience.test.js',
       'e2e/242_world_grid_all_features_demo_regression.spec.js'
     ],

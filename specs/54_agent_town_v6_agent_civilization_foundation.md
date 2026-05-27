@@ -46,6 +46,9 @@ Public works shared resources foundation:
 Modal lab surface foundation:
 `specs/66_agent_town_v6_modal_lab_surface_foundation.md`
 
+Governance preflight foundation:
+`specs/71_agent_town_v6_governance_preflight_foundation.md`
+
 Persistence replay resilience foundation:
 `specs/67_agent_town_v6_persistence_replay_resilience_foundation.md`
 
@@ -85,6 +88,14 @@ session/wallet auth, actor and owner binding, delegated-agent proof when an
 agent actor is used, CSRF verification in production/security-required mode,
 idempotency, and owner/surface rate limiting before future routes/tools may
 touch civic stores.
+
+The research-only governance preflight in
+`server/world_civilization/governance_preflight.js` is called by
+`server/world_civilization/effects.js` before prepared effect persistence. It
+keeps the M7-M11 chain explicit by requiring an existing active proposal,
+matching rollback plan, matching effect preview, approved moderation decision,
+approval vote majority, non-delegated execution policy, and an approving vote
+receipt before any `civic_action.prepared` row can be written.
 
 The research-only modal lab surface contract in
 `server/world_civilization/lab_surface.js` is route-neutral and non-executing.

@@ -53,6 +53,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'specs/68_agent_town_v6_security_product_release_review_foundation.md',
     'specs/69_agent_town_v6_controlled_release_completion_foundation.md',
     'specs/70_agent_town_v6_civic_mutation_security_foundation.md',
+    'specs/71_agent_town_v6_governance_preflight_foundation.md',
     'docs/product/WORLD_GRID_LADDER_V5_TO_V6.md',
     'docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md',
     'docs/product/PUBLIC_PRESENCE_PRIVACY_MODEL_V5.md',
@@ -79,6 +80,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'server/world_civilization/controlled_release.js',
     'server/world_civilization/delegations.js',
     'server/world_civilization/effects.js',
+    'server/world_civilization/governance_preflight.js',
     'server/world_civilization/institutions.js',
     'server/world_civilization/lab_surface.js',
     'server/world_civilization/moderation.js',
@@ -109,6 +111,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'tests/world_civilization_rollback_recovery.test.js',
     'tests/world_civilization_mutation_security.test.js',
     'tests/world_civilization_tool_exposure_gate.test.js',
+    'tests/world_civilization_governance_preflight.test.js',
     'tests/world_grid_region_preferences_persistence.test.js',
     'tests/world_grid_region_preferences_restart_probe_child.js',
     'tests/world_grid_idempotency_persistence.test.js',
@@ -199,11 +202,14 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(gate, /moderation\.appealed/);
   assert.match(plan, /M11 Civic effect execution and rollback \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/effects\.js/);
+  assert.match(plan, /server\/world_civilization\/governance_preflight\.js/);
+  assert.match(plan, /proposal, approved moderation, vote approval, human approval receipt/);
   assert.match(plan, /schema-level typed effect handler registry/);
   assert.match(plan, /executable apply\/rollback handlers/);
   assert.match(plan, /server\/world_civilization\/rollback_recovery\.js/);
   assert.match(plan, /without executing state/);
   assert.match(gate, /server\/world_civilization\/effects\.js/);
+  assert.match(gate, /server\/world_civilization\/governance_preflight\.js/);
   assert.match(gate, /schema-level typed effect handler registry/);
   assert.match(gate, /executable typed handlers/);
   assert.match(gate, /server\/world_civilization\/rollback_recovery\.js/);
@@ -398,6 +404,27 @@ test('V6 worker-first civic tool exposure gate is tracked as an M6 release contr
   assert.match(releaseReview, /Worker tool surface review/);
   assert.match(releaseReview, /no backend shortcuts/);
   assert.match(skillLine, /tests\/world_civilization_tool_exposure_gate\.test\.js/);
+});
+
+test('V6 governance preflight is tracked as an M7-M11 prerequisite control', () => {
+  const plan = read('docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md');
+  const foundation = read('specs/54_agent_town_v6_agent_civilization_foundation.md');
+  const effectSpec = read('specs/62_agent_town_v6_civic_effect_rollback_foundation.md');
+  const preflightSpec = read('specs/71_agent_town_v6_governance_preflight_foundation.md');
+  const gate = read('specs/release-gates/v60_agent_civilization_readiness_gate.md');
+  const releaseReview = read('docs/security/V6_AGENT_CIVILIZATION_RELEASE_REVIEW.md');
+  const skillLine = read('docs/internal-skill-testline.md');
+
+  assert.match(plan, /server\/world_civilization\/governance_preflight\.js/);
+  assert.match(plan, /vote approval, human approval receipt/);
+  assert.match(foundation, /governance_preflight\.js/);
+  assert.match(effectSpec, /failed preflights preserve the existing `CIVIC_EFFECT_\*` error surface/);
+  assert.match(preflightSpec, /Existing proposal record/);
+  assert.match(preflightSpec, /Vote approval with at least one approving vote/);
+  assert.match(preflightSpec, /Delegated execution remains rejected/);
+  assert.match(gate, /proposal, vote, moderation, approval receipt/);
+  assert.match(releaseReview, /governance preflight coverage/);
+  assert.match(skillLine, /tests\/world_civilization_governance_preflight\.test\.js/);
 });
 
 test('world-grid CSRF policy is tracked as prototype-only M5 coverage', () => {

@@ -69,6 +69,16 @@ test('V6 release review audit coverage requires migration rehearsal evidence', (
   assert.ok(auditGate.requiredChecks.includes('migration_rehearsal'));
 });
 
+test('V6 release review audit coverage requires governance preflight evidence', () => {
+  const auditGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'audit_coverage');
+  const validationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'validation_evidence');
+
+  assert.ok(auditGate.requiredArtifacts.includes('server/world_civilization/governance_preflight.js'));
+  assert.ok(auditGate.requiredArtifacts.includes('tests/world_civilization_governance_preflight.test.js'));
+  assert.ok(auditGate.requiredChecks.includes('governance_preflight'));
+  assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_governance_preflight.test.js'));
+});
+
 test('V6 release review requires civic mutation security evidence for abuse review', () => {
   const abuseGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'abuse_case_review');
   const validationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'validation_evidence');
