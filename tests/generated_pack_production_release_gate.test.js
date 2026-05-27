@@ -1185,6 +1185,52 @@ test('GPACK-146 release evidence bundle rejects candidate-review hash metric tam
   );
 }));
 
+test('GPACK-147 release evidence bundle rejects production boundary metric tampering', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_evidence_bundle_boundary_metrics',
+    prompt: 'violet signal archive with careful moss couriers',
+    nowMs: 155_160
+  });
+  const validationNowMs = fixture.releaseGate.evaluatedAtMs + 100;
+  const bundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    nowMs: fixture.releaseGate.evaluatedAtMs + 50
+  });
+  const boundaryMetricUpdates = [
+    { productionImageAssetCount: 1 },
+    { privateDataLeakCount: 1 }
+  ];
+
+  for (const metricPatch of boundaryMetricUpdates) {
+    const tamperedBundle = rehashReleaseEvidenceBundle({
+      ...bundle,
+      metrics: {
+        ...bundle.metrics,
+        ...metricPatch
+      }
+    });
+    const report = validateReleaseEvidenceBundle(tamperedBundle, {
+      ...fixture,
+      nowMs: validationNowMs
+    });
+
+    assert.equal(bundle.metrics.productionImageAssetCount, 0);
+    assert.equal(bundle.metrics.privateDataLeakCount, 0);
+    assert.equal(
+      report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_HASH_STABLE').passed,
+      true,
+      JSON.stringify(metricPatch)
+    );
+    assert.equal(report.metrics.boundaryPreserved, false, JSON.stringify(metricPatch));
+    assert.equal(report.ok, false, JSON.stringify(metricPatch));
+    assert.equal(
+      report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_BOUNDARY_PRESERVED').passed,
+      false,
+      JSON.stringify(metricPatch)
+    );
+  }
+}));
+
 test('GU-19 release evidence bundle rejects source drift and missing ready-gate evidence', () => withTempGeneratedPackStore(() => {
   const fixture = readyReleaseGateFixture({
     ownerAccountId: 'owner_release_evidence_bundle_tamper',
