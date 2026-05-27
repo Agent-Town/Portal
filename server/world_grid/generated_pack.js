@@ -4144,7 +4144,7 @@ function validateCandidateReviewManifest(manifest = {}, pack = {}) {
     {
       id: 'CANDIDATE_REVIEW_MANIFEST_HASH_STABLE',
       passed: hashMatches,
-      measured: { expectedHash, actualHash: manifest?.manifestHash || '' }
+      measured: { expectedHash, actualHash: redactGeneratedPackReportValue(manifest?.manifestHash || '') }
     },
     {
       id: 'CANDIDATE_REVIEW_MANIFEST_BOUNDARY_PRESERVED',
@@ -4411,12 +4411,15 @@ function validateReleaseApprovalEvidence(evidence = {}, pack = {}) {
     {
       id: 'RELEASE_APPROVAL_EVIDENCE_HASH_STABLE',
       passed: evidenceHashMatches,
-      measured: { expectedEvidenceHash, actualEvidenceHash: evidence?.evidenceHash || '' }
+      measured: { expectedEvidenceHash, actualEvidenceHash: redactGeneratedPackReportValue(evidence?.evidenceHash || '') }
     },
     {
       id: 'RELEASE_APPROVAL_EVIDENCE_PACK_ID_MATCH',
       passed: packIdMatches,
-      measured: { expectedPackId: pack?.packId || '', actualPackId: evidence?.packId || '' }
+      measured: {
+        expectedPackId: redactGeneratedPackReportValue(pack?.packId || ''),
+        actualPackId: redactGeneratedPackReportValue(evidence?.packId || '')
+      }
     },
     {
       id: 'RELEASE_APPROVAL_EVIDENCE_TIMESTAMPS_COHERENT',
@@ -5006,7 +5009,7 @@ function sourcePackIdsForReleaseEvidence({
 function releaseEvidencePackIdProblems(sourcePackIds = {}, expectedPackId = '') {
   const problems = [];
   for (const [source, packId] of Object.entries(sourcePackIds || {})) {
-    if (packId && packId !== expectedPackId) problems.push(`${source}:${packId}`);
+    if (packId && packId !== expectedPackId) problems.push(`${source}:${redactGeneratedPackReportValue(packId)}`);
   }
   return problems;
 }
@@ -5208,20 +5211,20 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     ...releaseEvidencePackIdProblems(bundle?.sourcePackIds || {}, bundle?.packId || ''),
     ...Object.entries(suppliedPackIds)
       .filter(([source, packId]) => packId && bundle?.sourcePackIds?.[source] !== packId)
-      .map(([source, packId]) => `${source}:supplied:${packId}`)
+      .map(([source, packId]) => `${source}:supplied:${redactGeneratedPackReportValue(packId)}`)
   ];
   for (const key of RELEASE_EVIDENCE_SOURCE_KEYS) {
     const bundleSourcePackId = String(bundle?.sourcePackIds?.[key] || '');
     const suppliedSourcePackId = String(suppliedPackIds[key] || '');
     if (!suppliedSourcePackId && bundleSourcePackId) {
-      sourcePackIdProblems.push(`${key}:unsupplied:${bundleSourcePackId}`);
+      sourcePackIdProblems.push(`${key}:unsupplied:${redactGeneratedPackReportValue(bundleSourcePackId)}`);
     }
   }
   if (releaseGate?.packId && bundle?.packId !== releaseGate.packId) {
-    sourcePackIdProblems.push(`releaseGate:bundle:${releaseGate.packId}`);
+    sourcePackIdProblems.push(`releaseGate:bundle:${redactGeneratedPackReportValue(releaseGate.packId)}`);
   }
   if (pack?.packId && bundle?.packId !== pack.packId) {
-    sourcePackIdProblems.push(`generatedPack:bundle:${pack.packId}`);
+    sourcePackIdProblems.push(`generatedPack:bundle:${redactGeneratedPackReportValue(pack.packId)}`);
   }
   const releaseGateProvided = Boolean(releaseGate);
   const releaseGateHashExpected = releaseGateProvided ? stableEvidenceHash(releaseGate) : '';
@@ -5346,7 +5349,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     {
       id: 'RELEASE_EVIDENCE_BUNDLE_HASH_STABLE',
       passed: bundleHashMatches,
-      measured: { expectedBundleHash, actualBundleHash: bundle?.bundleHash || '' }
+      measured: { expectedBundleHash, actualBundleHash: redactGeneratedPackReportValue(bundle?.bundleHash || '') }
     },
     {
       id: 'RELEASE_EVIDENCE_BUNDLE_SOURCE_HASHES_MATCH',
@@ -5356,7 +5359,10 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     {
       id: 'RELEASE_EVIDENCE_BUNDLE_PACK_IDS_MATCH',
       passed: sourcePackIdProblems.length === 0,
-      measured: { packId: bundle?.packId || '', sourcePackIdProblems }
+      measured: {
+        packId: redactGeneratedPackReportValue(bundle?.packId || ''),
+        sourcePackIdProblems
+      }
     },
     {
       id: 'RELEASE_EVIDENCE_BUNDLE_SOURCE_COVERAGE',

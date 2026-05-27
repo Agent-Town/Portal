@@ -16,6 +16,7 @@ Status: prototype-gated
 - Candidate-generation preflight records must never persist raw provider credentials, and failure records must keep `fallbackStillPlayable=true` for valid deterministic packs.
 - Candidate-generation run and job-log validation reports must reject and redact submitted secret-looking keys, secret-looking values, raw-instruction keys, and executable instruction values from both content checks and schema-error paths.
 - Asset prompt-plan, candidate-review, and candidate-generation validation reports must redact unsafe submitted canonical target labels from measured problem lists.
+- Candidate-review, release-approval, and release-evidence-bundle validation reports must redact unsafe submitted manifest hashes, evidence hashes, bundle hashes, and pack ids from measured problem lists.
 - Postprocess plans and reports are standalone contracts; they may write postprocessed candidate artifacts and metadata, but must not write approved production assets or alter canonical gameplay mappings.
 - Browser runtime asset loading must use safe public generated-pack paths only; private candidate roots, path traversal, data URLs, provider URLs, and unapproved outputs must fall back without player exposure.
 - First-loop playtest pass status requires measured browser evidence, screenshot evidence, clean console state, canonical payload integrity, and generated-pack validation. Default or placeholder scores cannot pass release gates.
@@ -34,6 +35,7 @@ Status: prototype-gated
 - Release approval evidence must be hash-bound, match the current generated pack id, contain timestamp-coherent approval events, and remain candidate-only; stale hashes, future-dated approvals, candidate reviews that predate their manifest, planned-only candidate approvals, or evidence copied from another pack cannot unlock production readiness.
 - Candidate-review and release-approval evidence validation reports must redact submitted secret-looking keys, secret-looking values, raw-instruction keys, and executable instruction values from content and schema-error evidence.
 - Release evidence bundles must be created at or after the bound release gate evaluation time, must not be future-dated relative to validation time, and must bind ready evidence sources, generated-pack-source validation, playtest-source validation, persistence-source validation, public-card-source validation, approval-evidence-source validation, candidate-review manifest source validation, diversity-source pack inclusion/coherence, blocking reasons, and prerequisite snapshots back to the release gate; missing release-gate context, claimed hashes or pack ids for unsupplied sources, failing generated-pack sources, failing playtest sources, failing persistence sources, failing public-card sources, failing approval-evidence sources, failing candidate-review manifest sources, approval evidence drift, or copied diversity reports from another suite fail validation even when supplied source hashes are stable.
+- Release evidence report measured fields must redact unsafe submitted manifest hashes, evidence hashes, bundle hashes, and pack ids before returning validation reports to callers.
 - Release-gate and release-evidence-bundle API requests must reject secret-like fields, semantic token fields, secret-looking keys or values, raw prompt-instruction keys, executable instruction values, oversized object keys, and oversized/noisy evidence bodies before report construction; rejection responses may include counts, redacted paths, and limits, but not submitted evidence values, token field names, executable instruction text, or oversized key text.
 
 ## Release Gate
@@ -52,6 +54,7 @@ Status: prototype-gated
   "candidateGenerationUnsafeKeyValueRedacted": true,
   "releaseEvidenceUnsafeKeyValueRedacted": true,
   "unsafeTargetLabelRedacted": true,
+  "unsafeHashAndPackIdRedacted": true,
   "rawExecutablePromptInstructionCount": 0,
   "arbitraryToolMutationFormulaCount": 0,
   "schemaRegistryExists": true,

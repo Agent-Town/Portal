@@ -2805,7 +2805,7 @@ Release-gate invariants:
 - `evaluatedAtMs` must not be future-dated relative to validation time;
 - `publicReleaseEligible=true` requires all prerequisites to be true, `blockingReasons=[]`, diversity evidence including the release pack, diversity aggregate metrics that match per-pack rows/signatures/screenshots/comparisons, same-pack persistence evidence, same-pack public-card evidence, zero private-data leaks, zero missing assets, zero production image assets, explicit consent/cost/auth approval, candidate asset review, and a 64-hex human review signoff hash;
 - forged eligibility, mismatched blocking reasons, invalid gate pack ids, diversity evidence that excludes the release pack, metric-only diversity claims, mixed persistence evidence, mixed public-card evidence, approval evidence hash drift, future-dated approval evidence, future-dated gate reports, candidate-review approval evidence that predates its manifest, planned-only candidate-review approvals, approval evidence copied from another pack, secret-like fields including semantic token fields, raw prompt instructions, production asset leaks, and private-card data fail validation;
-- candidate-review and release-approval evidence validation reports redact submitted secret-looking keys, secret-looking values, raw-instruction keys, and executable instruction values from content and schema-error evidence;
+- candidate-review and release-approval evidence validation reports redact submitted secret-looking keys, secret-looking values, raw-instruction keys, executable instruction values, manifest hashes, evidence hashes, and pack ids from content, schema-error, and measured evidence;
 - oversized or noisy release-evidence request bodies and oversized evidence object keys fail before report construction and rejection responses return counts/redacted paths/limits, not submitted evidence values or oversized key text;
 - the route remains hidden in default gameplay unless `FEATURE_WORLD_GRID_GENERATED_PACKS` is enabled.
 
@@ -2837,6 +2837,7 @@ Response includes:
 Release-evidence-bundle invariants:
 - request bodies share the release-gate ingress guard for secret-like fields, semantic token fields, secret-looking keys or values, raw prompt-instruction keys, executable instruction values, request depth, node count, array size, object key count, object key length, and string length;
 - the generic tool dispatcher path `et.world.generated_pack.release_evidence_bundle` uses the same guard and returns the same fail-closed rejection code;
+- bundle validation reports redact unsafe submitted bundle hashes and source pack ids from measured evidence;
 - rejection responses must not echo raw submitted secrets, semantic token field names or values, secret-looking keys or values, raw prompt-instruction keys, executable instruction values, oversized object keys, or oversized evidence values.
 
 ### POST `/api/world/generated-pack/public-card`
