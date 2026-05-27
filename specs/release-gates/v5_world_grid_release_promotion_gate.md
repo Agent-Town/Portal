@@ -4,6 +4,10 @@ Status: `release_gate`
 
 Blocks: `V6.0 Agent Civilization Foundation`
 
+Runtime target report: `server/world_grid/release_promotion.js`
+
+Target coverage: `tests/world_grid_release_promotion.test.js`
+
 This gate promotes V5.0-V5.5 world-grid slices from prototype evidence to
 release-grade prerequisites. Passing Playwright demos is not enough: each slice
 must prove durable state, owner safety, auditability, rollback policy, and
@@ -50,6 +54,15 @@ from `prototype_gated` to `release_ready`:
   that entry. Current test-mode coverage is
   `e2e/245_world_grid_player_route_prerequisite.spec.js`; release promotion
   still requires live account/wallet provider signoff.
+- `server/world_grid/release_promotion.js` keeps the promotion matrix
+  code-auditable by naming every V5.0-V5.5 slice plus durable storage,
+  owner-index, migration-version, restart-persistence, route/tool mutation
+  security, session-bound CSRF, rate-limit, idempotency, audit/replay,
+  production override, public-text privacy, player-route prerequisite,
+  release replay reconstruction, live provider logout signoff, and
+  risk-rate-limit identity targets. The report is non-executing and may not mark
+  V5 `releaseReady`, may not enable V6, may not expose player-visible defaults,
+  and may not mutate world state.
 
 ## Slice Gates
 

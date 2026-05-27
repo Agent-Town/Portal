@@ -5,6 +5,8 @@ const V6_READINESS_GATE_VERSION = 'agent-town.v6.readiness_gate.v1';
 const V6_READINESS_GATE_ARTIFACT = 'specs/release-gates/v60_agent_civilization_readiness_gate.md';
 const V6_MILESTONE_PLAN_ARTIFACT = 'docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md';
 const V5_PROMOTION_GATE_ARTIFACT = 'specs/release-gates/v5_world_grid_release_promotion_gate.md';
+const V5_PROMOTION_TARGET_ARTIFACT = 'server/world_grid/release_promotion.js';
+const V5_PROMOTION_TARGET_TEST = 'tests/world_grid_release_promotion.test.js';
 
 const REQUIRED_V6_READINESS_GATES = [
   {
@@ -13,6 +15,8 @@ const REQUIRED_V6_READINESS_GATES = [
     owner: 'qa_security_engineering',
     requiredArtifacts: [
       V5_PROMOTION_GATE_ARTIFACT,
+      V5_PROMOTION_TARGET_ARTIFACT,
+      V5_PROMOTION_TARGET_TEST,
       V6_MILESTONE_PLAN_ARTIFACT,
       'docs/product/WORLD_GRID_LADDER_V5_TO_V6.md',
       'tests/world_grid_region.test.js',
@@ -32,7 +36,12 @@ const REQUIRED_V6_READINESS_GATES = [
       'v54_event_accounting',
       'v55_sandbox_moderation_rollback',
       'durable_storage_evidence',
-      'mutation_security_controls'
+      'mutation_security_controls',
+      'v5_release_promotion_target',
+      'exact_before_state_reconstruction_target',
+      'production_replay_coverage_target',
+      'live_provider_logout_signoff_target',
+      'risk_rate_limit_identity_target'
     ]
   },
   {
@@ -560,6 +569,8 @@ function assertV6ReadinessGateSafe(report = {}) {
 module.exports = {
   REQUIRED_V6_READINESS_GATES: clone(REQUIRED_V6_READINESS_GATES),
   V5_PROMOTION_GATE_ARTIFACT,
+  V5_PROMOTION_TARGET_ARTIFACT,
+  V5_PROMOTION_TARGET_TEST,
   V6_MILESTONE_PLAN_ARTIFACT,
   V6_READINESS_GATE_ARTIFACT,
   V6_READINESS_GATE_VERSION,

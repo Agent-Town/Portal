@@ -38,9 +38,10 @@ Each step must prove one new decision layer. A feature can be implemented as
 gate, safety review, and retention dependency pass.
 
 V5.0-V5.5 promotion is tracked in
-`specs/release-gates/v5_world_grid_release_promotion_gate.md`. V6 cannot depend
-on prototype-only V5 evidence unless the dependency is explicitly excluded in the
-V6 milestone plan.
+`specs/release-gates/v5_world_grid_release_promotion_gate.md` and the
+code-auditable target report in `server/world_grid/release_promotion.js`. V6
+cannot depend on prototype-only V5 evidence unless the dependency is explicitly
+excluded in the V6 milestone plan.
 
 ## Current Prototype Status
 
@@ -70,3 +71,12 @@ explicit invalidation endpoint plus client hook and mocked provider disconnect
 callback proof. Optional
 `WORLD_GRID_RATE_LIMIT_SQLITE_PATH` coverage now proves owner/surface mutation
 buckets persist across route restarts.
+
+`server/world_grid/release_promotion.js` now names the V5.0-V5.5 release
+promotion target matrix and keeps the report non-executing: it may record
+evidence for durable storage, owner indexes, migration versions, restart
+persistence, mutation security, CSRF, rate limits, idempotency, audit/replay,
+public text privacy, player-route prerequisites, release replay reconstruction,
+provider logout signoff, and risk-rate-limit identity, but it may not mark V5
+release-ready, enable V6, expose prototype features by default, or mutate world
+state.

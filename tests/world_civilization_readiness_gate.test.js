@@ -5,6 +5,8 @@ const { V6_WORLD_FEATURE_FLAG, parseWorldGridFeatureFlags } = require('../server
 const {
   REQUIRED_V6_READINESS_GATES,
   V5_PROMOTION_GATE_ARTIFACT,
+  V5_PROMOTION_TARGET_ARTIFACT,
+  V5_PROMOTION_TARGET_TEST,
   V6_MILESTONE_PLAN_ARTIFACT,
   V6_READINESS_GATE_ARTIFACT,
   assertV6ReadinessGateSafe,
@@ -62,6 +64,7 @@ test('V6 readiness gate baseline names every prerequisite domain but remains ope
   assert.ok(report.gateReports.some((gate) => gate.requiredArtifacts.includes(V5_PROMOTION_GATE_ARTIFACT)));
   assert.ok(report.gateReports.some((gate) => gate.requiredArtifacts.includes(V6_READINESS_GATE_ARTIFACT)));
   assert.ok(report.gateReports.some((gate) => gate.requiredArtifacts.includes(V6_MILESTONE_PLAN_ARTIFACT)));
+  const v5PromotionGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'v5_world_grid_promotion');
   const persistenceGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'persistence_resilience');
   const effectGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'effect_rollback');
   const mutationSecurityGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'mutation_security');
@@ -69,6 +72,13 @@ test('V6 readiness gate baseline names every prerequisite domain but remains ope
   const reputationGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'reputation_moderation_privacy');
   const releaseReviewGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'security_product_release_review');
   const workerToolGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'worker_tool_surface');
+  assert.ok(v5PromotionGate.requiredArtifacts.includes(V5_PROMOTION_TARGET_ARTIFACT));
+  assert.ok(v5PromotionGate.requiredArtifacts.includes(V5_PROMOTION_TARGET_TEST));
+  assert.ok(v5PromotionGate.requiredChecks.includes('v5_release_promotion_target'));
+  assert.ok(v5PromotionGate.requiredChecks.includes('exact_before_state_reconstruction_target'));
+  assert.ok(v5PromotionGate.requiredChecks.includes('production_replay_coverage_target'));
+  assert.ok(v5PromotionGate.requiredChecks.includes('live_provider_logout_signoff_target'));
+  assert.ok(v5PromotionGate.requiredChecks.includes('risk_rate_limit_identity_target'));
   assert.ok(workerToolGate.requiredArtifacts.includes('server/world_civilization/worker_tool_adapter.js'));
   assert.ok(workerToolGate.requiredArtifacts.includes('server/world_civilization/worker_vote_adapter.js'));
   assert.ok(workerToolGate.requiredArtifacts.includes('server/world_civilization/worker_runtime_registration.js'));

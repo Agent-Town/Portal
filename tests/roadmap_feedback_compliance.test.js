@@ -1223,6 +1223,8 @@ test('V5 world-grid release promotion gate blocks V6 on prototype-only evidence'
   const gate = read('specs/release-gates/v5_world_grid_release_promotion_gate.md');
   const v6Gate = read('specs/release-gates/v60_agent_civilization_readiness_gate.md');
   const ladder = read('docs/product/WORLD_GRID_LADDER_V5_TO_V6.md');
+  const promotionTarget = read('server/world_grid/release_promotion.js');
+  const promotionTargetTest = read('tests/world_grid_release_promotion.test.js');
   const requiredSlices = [
     'V5.0 Region Grid',
     'V5.1 Territory Claims and Settler Routes',
@@ -1253,8 +1255,17 @@ test('V5 world-grid release promotion gate blocks V6 on prototype-only evidence'
   }
   assert.match(gate, /V6 civic institutions may not become player-visible/);
   assert.match(gate, /e2e\/245_world_grid_player_route_prerequisite\.spec\.js/);
+  assert.match(gate, /server\/world_grid\/release_promotion\.js/);
+  assert.match(promotionTarget, /V5_WORLD_GRID_RELEASE_PROMOTION_VERSION/);
+  assert.match(promotionTarget, /release_replay_reconstruction/);
+  assert.match(promotionTarget, /provider_logout_signoff/);
+  assert.match(promotionTarget, /risk_rate_limit_identity/);
+  assert.match(promotionTarget, /V5_WORLD_GRID_PROMOTION_V6_EXPOSURE_FORBIDDEN/);
+  assert.match(promotionTargetTest, /V5 world-grid promotion report records evidence without completing release or enabling V6/);
   assert.match(v6Gate, /specs\/release-gates\/v5_world_grid_release_promotion_gate\.md/);
+  assert.match(v6Gate, /server\/world_grid\/release_promotion\.js/);
   assert.match(ladder, /specs\/release-gates\/v5_world_grid_release_promotion_gate\.md/);
+  assert.match(ladder, /server\/world_grid\/release_promotion\.js/);
 });
 
 test('public text rendering policy covers future V6 civic public surfaces', () => {
