@@ -30,7 +30,7 @@ Status: prototype-gated
 - Production image generation requires explicit consent and a documented cost/auth model before any user-facing release claim.
 - Public release eligibility must come from the standalone `productionReleaseGate` report, which fails closed unless every prerequisite, explicit approval, candidate review, and human signoff is present.
 - Release approval evidence must be hash-bound, match the current generated pack id, contain timestamp-coherent approval events, and remain candidate-only; stale hashes, future-dated approvals, candidate reviews that predate their manifest, planned-only candidate approvals, or evidence copied from another pack cannot unlock production readiness.
-- Release evidence bundles must bind ready evidence sources back to the release gate; approval evidence drift from the bound gate fails validation even when replacement evidence is valid for the same pack.
+- Release evidence bundles must bind ready evidence sources, blocking reasons, and prerequisite snapshots back to the release gate; approval evidence drift from the bound gate fails validation even when replacement evidence is valid for the same pack.
 - Release-gate and release-evidence-bundle API requests must reject secret-like fields, raw prompt instructions, and oversized/noisy evidence bodies before report construction; rejection responses may include counts, paths, and limits, but not submitted evidence values.
 
 ## Release Gate

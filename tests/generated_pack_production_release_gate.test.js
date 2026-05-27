@@ -469,6 +469,7 @@ test('GU-19 release evidence bundle binds a ready gate to source evidence hashes
   assert.equal(bundle.sourcePackIds.releaseGate, fixture.pack.packId);
   assert.equal(bundle.metrics.releaseGateValid, true);
   assert.equal(bundle.metrics.releaseGatePublicEligible, true);
+  assert.equal(bundle.metrics.blockingReasonsMatchGate, true);
   assert.equal(bundle.metrics.prerequisiteSnapshotMatchesGate, true);
   assert.equal(bundle.metrics.readyEvidenceSourcesMatchGate, true);
   assert.equal(bundle.metrics.approvalEvidenceHashMatchesGate, true);
@@ -527,6 +528,32 @@ test('GU-19 release evidence bundle rejects forged prerequisite snapshots', () =
 
   assert.equal(bundle.prerequisiteSnapshot.publicCardPrivacyPassed, true);
   assert.equal(bundle.metrics.prerequisiteSnapshotMatchesGate, true);
+  assert.equal(report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_HASH_STABLE').passed, true);
+  assert.equal(report.ok, false);
+  assert.equal(
+    report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,
+    false
+  );
+}));
+
+test('GU-19 release evidence bundle rejects forged blocking reasons', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_evidence_bundle_blocking_reasons',
+    prompt: 'silver ridge station with moss courier lamps',
+    nowMs: 154_875
+  });
+  const bundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    nowMs: 154_895
+  });
+  const forgedBundle = rehashReleaseEvidenceBundle({
+    ...bundle,
+    blockingReasons: ['playtestPassed']
+  });
+  const report = validateReleaseEvidenceBundle(forgedBundle, fixture);
+
+  assert.deepEqual(bundle.blockingReasons, []);
+  assert.equal(bundle.metrics.blockingReasonsMatchGate, true);
   assert.equal(report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_HASH_STABLE').passed, true);
   assert.equal(report.ok, false);
   assert.equal(
@@ -1114,6 +1141,7 @@ test('GU-18/GU-19 release gate and evidence bundle APIs are generated-pack-gated
       assert.equal(bundleBody.releaseEvidenceBundle.publicReleaseEligible, false);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.releaseGateValid, true);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.releaseGatePublicEligible, false);
+      assert.equal(bundleBody.releaseEvidenceBundle.metrics.blockingReasonsMatchGate, true);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.prerequisiteSnapshotMatchesGate, true);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.readyEvidenceSourcesMatchGate, true);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.presentSourceCount < bundleBody.releaseEvidenceBundle.metrics.requiredSourceCount, true);

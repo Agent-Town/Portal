@@ -4836,6 +4836,8 @@ function buildReleaseEvidenceBundle({
     && Number(gate?.metrics?.candidateReviewManifestTimeMatchesEvidence || 0) === 1;
   const prerequisiteSnapshot = clone(gate?.releasePrerequisites || {});
   const prerequisiteSnapshotMatchesGate = stableEvidenceHash(prerequisiteSnapshot) === stableEvidenceHash(gate?.releasePrerequisites || {});
+  const blockingReasons = Array.isArray(gate?.blockingReasons) ? clone(gate.blockingReasons) : [];
+  const blockingReasonsMatchGate = stableEvidenceHash(blockingReasons) === stableEvidenceHash(gate?.blockingReasons || []);
   const readyEvidenceSourcesMatchGate = gate?.publicReleaseEligible !== true
     || (
       prerequisiteSnapshotMatchesGate
@@ -4851,7 +4853,7 @@ function buildReleaseEvidenceBundle({
     releaseGateHash: stableEvidenceHash(gate),
     releaseGateMode: gate?.releaseMode || 'prototype-gated',
     publicReleaseEligible: gate?.publicReleaseEligible === true,
-    blockingReasons: Array.isArray(gate?.blockingReasons) ? clone(gate.blockingReasons) : [],
+    blockingReasons,
     sourceHashes,
     sourcePackIds,
     sourcePresence,
@@ -4872,6 +4874,7 @@ function buildReleaseEvidenceBundle({
       sourcePackIdMismatchCount: sourcePackIdProblems.length,
       releaseGateValid: validateProductionReleaseGate(gate).ok === true,
       releaseGatePublicEligible: gate?.publicReleaseEligible === true,
+      blockingReasonsMatchGate,
       prerequisiteSnapshotMatchesGate,
       readyEvidenceSourcesMatchGate,
       approvalEvidenceHashMatchesGate,
@@ -4948,6 +4951,9 @@ function validateReleaseEvidenceBundle(bundle = {}, {
   const gateReport = releaseGate
     ? validateProductionReleaseGate(releaseGate)
     : { ok: bundle?.metrics?.releaseGateValid === true };
+  const blockingReasonsMatchGate = releaseGate
+    ? stableEvidenceHash(bundle?.blockingReasons || []) === stableEvidenceHash(releaseGate?.blockingReasons || [])
+    : bundle?.publicReleaseEligible !== true;
   const prerequisiteSnapshotMatchesGate = releaseGate
     ? stableEvidenceHash(bundle?.prerequisiteSnapshot || {}) === stableEvidenceHash(releaseGate?.releasePrerequisites || {})
     : bundle?.publicReleaseEligible !== true;
@@ -4998,6 +5004,8 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     && Number(bundle?.metrics?.sourcePackIdMismatchCount || 0) === sourcePackIdProblems.length
     && bundle?.metrics?.releaseGateValid === (gateReport.ok === true)
     && bundle?.metrics?.releaseGatePublicEligible === (bundle?.publicReleaseEligible === true)
+    && bundle?.metrics?.blockingReasonsMatchGate === blockingReasonsMatchGate
+    && blockingReasonsMatchGate === true
     && bundle?.metrics?.prerequisiteSnapshotMatchesGate === prerequisiteSnapshotMatchesGate
     && bundle?.metrics?.readyEvidenceSourcesMatchGate === readyEvidenceSourcesMatchGate
     && readyEvidenceSourcesMatchGate === true
@@ -5056,6 +5064,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
         presentSourceCount,
         sourceHashProblemCount: sourceHashProblems.length,
         sourcePackIdProblemCount: sourcePackIdProblems.length,
+        blockingReasonsMatchGate,
         prerequisiteSnapshotMatchesGate,
         readyEvidenceSourcesMatchGate,
         approvalEvidenceHashMatchesGate,
@@ -5085,6 +5094,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
       requiredSourceCount: RELEASE_EVIDENCE_SOURCE_KEYS.length,
       sourceCoverageOk,
       releaseGateValid: gateReport.ok === true,
+      blockingReasonsMatchGate,
       prerequisiteSnapshotMatchesGate,
       readyEvidenceSourcesMatchGate,
       boundaryPreserved
