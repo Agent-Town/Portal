@@ -2763,7 +2763,7 @@ test('GU-18 production release gate validation rejects future-dated gate reports
   );
 }));
 
-test('GU-18/GU-19/GPACK-157 release gate and evidence bundle APIs are generated-pack-gated and fail closed', async () => {
+test('GU-18/GU-19/GPACK-157/159 release gate and evidence bundle APIs are generated-pack-gated and fail closed', async () => {
   const identity = { pairId: 'session:release-gate-api', houseId: null };
   await withWorldGridServer({
     identity,
@@ -3008,6 +3008,11 @@ test('GU-18/GU-19/GPACK-157 release gate and evidence bundle APIs are generated-
       assert.equal(releaseBody.releaseGate.publicReleaseEligible, false);
       assert.equal(releaseBody.releaseGate.metrics.releaseGateEvaluatedAtNotFuture, true);
       assert.equal(releaseBody.releaseGate.blockingReasons.includes('costConsentModelApproved'), true);
+      for (const [key, value] of Object.entries(releaseBody.releaseGate.releasePrerequisites)) {
+        assert.equal(releaseBody.validationReport.metrics[key], value, key);
+      }
+      assert.equal(releaseBody.validationReport.metrics.eligiblePrerequisiteCount, releaseBody.releaseGate.metrics.eligiblePrerequisiteCount);
+      assert.equal(releaseBody.validationReport.metrics.requiredPrerequisiteCount, releaseBody.releaseGate.metrics.requiredPrerequisiteCount);
       assert.equal(releaseBody.validationReport.metrics.privateDataLeakCount, releaseBody.releaseGate.metrics.privateDataLeakCount);
       assert.equal(releaseBody.validationReport.metrics.productionImageAssetCount, releaseBody.releaseGate.metrics.productionImageAssetCount);
       assert.equal(releaseBody.validationReport.metrics.productionImageAssetsCreated, false);
@@ -3190,7 +3195,7 @@ test('GU-18/GU-19/GPACK-157 release gate and evidence bundle APIs are generated-
   });
 });
 
-test('GPACK-154/155/156/158 release APIs can return ready evidence and ignore loose approvals', async () => {
+test('GPACK-154/155/156/158/159 release APIs can return ready evidence and ignore loose approvals', async () => {
   const identity = { pairId: 'session:release-evidence-ready-api', houseId: null };
 
   await withTempGeneratedPackStore(async (root) => {
@@ -3286,6 +3291,11 @@ test('GPACK-154/155/156/158 release APIs can return ready evidence and ignore lo
       assert.equal(releaseGateBody.releaseGate.metrics.looseApprovalInputCount, 0);
       assert.equal(releaseGateBody.validationReport.ok, true, JSON.stringify(releaseGateBody.validationReport.checks));
       assert.equal(releaseGateBody.validationReport.metrics.publicReleaseEligible, true);
+      for (const [key, value] of Object.entries(releaseGateBody.releaseGate.releasePrerequisites)) {
+        assert.equal(releaseGateBody.validationReport.metrics[key], value, key);
+      }
+      assert.equal(releaseGateBody.validationReport.metrics.eligiblePrerequisiteCount, releaseGateBody.releaseGate.metrics.eligiblePrerequisiteCount);
+      assert.equal(releaseGateBody.validationReport.metrics.requiredPrerequisiteCount, releaseGateBody.releaseGate.metrics.requiredPrerequisiteCount);
       assert.equal(releaseGateBody.validationReport.metrics.authModelDocumented, true);
       assert.equal(releaseGateBody.validationReport.metrics.costEstimateAccepted, true);
       assert.equal(releaseGateBody.validationReport.metrics.explicitConsentRecorded, true);
@@ -3310,6 +3320,11 @@ test('GPACK-154/155/156/158 release APIs can return ready evidence and ignore lo
       assert.equal(toolReleaseGateBody.data.releaseGate.metrics.productionImageAssetCount, 0);
       assert.equal(toolReleaseGateBody.data.validationReport.ok, true, JSON.stringify(toolReleaseGateBody.data.validationReport.checks));
       assert.equal(toolReleaseGateBody.data.validationReport.metrics.publicReleaseEligible, true);
+      for (const [key, value] of Object.entries(toolReleaseGateBody.data.releaseGate.releasePrerequisites)) {
+        assert.equal(toolReleaseGateBody.data.validationReport.metrics[key], value, key);
+      }
+      assert.equal(toolReleaseGateBody.data.validationReport.metrics.eligiblePrerequisiteCount, toolReleaseGateBody.data.releaseGate.metrics.eligiblePrerequisiteCount);
+      assert.equal(toolReleaseGateBody.data.validationReport.metrics.requiredPrerequisiteCount, toolReleaseGateBody.data.releaseGate.metrics.requiredPrerequisiteCount);
       assert.equal(toolReleaseGateBody.data.validationReport.metrics.authModelDocumented, true);
       assert.equal(toolReleaseGateBody.data.validationReport.metrics.costEstimateAccepted, true);
       assert.equal(toolReleaseGateBody.data.validationReport.metrics.explicitConsentRecorded, true);
@@ -3387,6 +3402,11 @@ test('GPACK-154/155/156/158 release APIs can return ready evidence and ignore lo
       assert.equal(looseReleaseGateBody.releaseGate.approvalInputs.explicitConsentRecorded, false);
       assert.equal(looseReleaseGateBody.releaseGate.approvalInputs.candidateAssetsReviewed, false);
       assert.equal(looseReleaseGateBody.validationReport.ok, true, JSON.stringify(looseReleaseGateBody.validationReport.checks));
+      for (const [key, value] of Object.entries(looseReleaseGateBody.releaseGate.releasePrerequisites)) {
+        assert.equal(looseReleaseGateBody.validationReport.metrics[key], value, key);
+      }
+      assert.equal(looseReleaseGateBody.validationReport.metrics.eligiblePrerequisiteCount, looseReleaseGateBody.releaseGate.metrics.eligiblePrerequisiteCount);
+      assert.equal(looseReleaseGateBody.validationReport.metrics.requiredPrerequisiteCount, looseReleaseGateBody.releaseGate.metrics.requiredPrerequisiteCount);
       assert.equal(looseReleaseGateBody.validationReport.metrics.authModelDocumented, false);
       assert.equal(looseReleaseGateBody.validationReport.metrics.costEstimateAccepted, false);
       assert.equal(looseReleaseGateBody.validationReport.metrics.explicitConsentRecorded, false);
@@ -3404,6 +3424,11 @@ test('GPACK-154/155/156/158 release APIs can return ready evidence and ignore lo
       assert.equal(looseToolReleaseGateBody.data.releaseGate.publicReleaseEligible, false);
       assert.equal(looseToolReleaseGateBody.data.releaseGate.metrics.looseApprovalInputCount > 0, true);
       assert.equal(looseToolReleaseGateBody.data.validationReport.ok, true, JSON.stringify(looseToolReleaseGateBody.data.validationReport.checks));
+      for (const [key, value] of Object.entries(looseToolReleaseGateBody.data.releaseGate.releasePrerequisites)) {
+        assert.equal(looseToolReleaseGateBody.data.validationReport.metrics[key], value, key);
+      }
+      assert.equal(looseToolReleaseGateBody.data.validationReport.metrics.eligiblePrerequisiteCount, looseToolReleaseGateBody.data.releaseGate.metrics.eligiblePrerequisiteCount);
+      assert.equal(looseToolReleaseGateBody.data.validationReport.metrics.requiredPrerequisiteCount, looseToolReleaseGateBody.data.releaseGate.metrics.requiredPrerequisiteCount);
       assert.equal(looseToolReleaseGateBody.data.validationReport.metrics.authModelDocumented, false);
       assert.equal(looseToolReleaseGateBody.data.validationReport.metrics.costEstimateAccepted, false);
       assert.equal(looseToolReleaseGateBody.data.validationReport.metrics.explicitConsentRecorded, false);

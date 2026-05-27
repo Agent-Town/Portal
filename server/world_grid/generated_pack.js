@@ -4870,6 +4870,22 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
     && gateEvaluatedAtMs <= validationNowMs;
   const prerequisites = gate?.releasePrerequisites || {};
   const prerequisiteEntries = Object.entries(prerequisites);
+  const releasePrerequisiteMetricKeys = [
+    'schemaValid',
+    'moderationPassed',
+    'playtestPassed',
+    'assetManifestValid',
+    'fallbackVerified',
+    'diversitySuitePassed',
+    'packSaveReloadPassed',
+    'publicCardPrivacyPassed',
+    'costConsentModelApproved',
+    'candidateAssetsReviewed',
+    'humanReviewComplete'
+  ];
+  const releasePrerequisiteMetrics = Object.fromEntries(
+    releasePrerequisiteMetricKeys.map((key) => [key, prerequisites[key] === true])
+  );
   const failedPrerequisites = prerequisiteEntries
     .filter(([, passed]) => passed !== true)
     .map(([key]) => key);
@@ -5048,6 +5064,9 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
       publicReleaseEligible: gate?.publicReleaseEligible === true,
       releaseMode: redactGeneratedPackReportValue(gate?.releaseMode || null),
       blockingReasonCount: blockingReasons.length,
+      ...releasePrerequisiteMetrics,
+      eligiblePrerequisiteCount: prerequisiteEntries.filter(([, passed]) => passed === true).length,
+      requiredPrerequisiteCount: prerequisiteEntries.length,
       authModelDocumented: approvals.authModelDocumented === true,
       costEstimateAccepted: approvals.costEstimateAccepted === true,
       explicitConsentRecorded: approvals.explicitConsentRecorded === true,
