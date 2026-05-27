@@ -4965,6 +4965,12 @@ function validateProductionReleaseGate(gate = {}, {
       && sourceCandidateReviewManifestCountsMatchEvidence
     );
   const prerequisiteEvidenceBound = (
+    prerequisites.schemaValid !== true || sourceGeneratedPackPassed
+  ) && (
+    prerequisites.moderationPassed !== true || sourceGeneratedPackPassed
+  ) && (
+    prerequisites.assetManifestValid !== true || sourceGeneratedPackPassed
+  ) && (
     prerequisites.playtestPassed !== true || sourcePlaytestPassed
   ) && (
     prerequisites.fallbackVerified !== true || (
@@ -5144,6 +5150,10 @@ function validateProductionReleaseGate(gate = {}, {
         costConsentModelApprovedClaimed: prerequisites.costConsentModelApproved === true,
         candidateAssetsReviewedClaimed: prerequisites.candidateAssetsReviewed === true,
         humanReviewCompleteClaimed: prerequisites.humanReviewComplete === true,
+        schemaValidClaimed: prerequisites.schemaValid === true,
+        moderationPassedClaimed: prerequisites.moderationPassed === true,
+        assetManifestValidClaimed: prerequisites.assetManifestValid === true,
+        sourceGeneratedPackPassed,
         sourcePlaytestPassed,
         sourcePersistencePassed,
         sourcePublicCardPassed,

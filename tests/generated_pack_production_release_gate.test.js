@@ -386,7 +386,7 @@ test('GU-18 production release gate fails closed without playtest, approvals, di
     nowMs: 150_000
   });
   const gate = buildProductionReleaseGate({ pack, nowMs: 150_500 });
-  const validationReport = validateProductionReleaseGate(gate);
+  const validationReport = validateProductionReleaseGate(gate, { pack, nowMs: 150_600 });
 
   assert.equal(validationReport.ok, true, JSON.stringify(validationReport.checks));
   assert.equal(gate.schemaVersion, 'agent-town-generated-pack-production-release-gate-v1');
@@ -2475,6 +2475,32 @@ test('GPACK-166 release gate rejects metric-only prerequisite evidence claims', 
     false
   );
   assert.equal(report.metrics.prerequisiteEvidenceBound, false);
+});
+
+test('GPACK-167 release gate binds generated-pack prerequisites to source context', () => {
+  const pack = createGeneratedPack({
+    owner: { ownerAccountId: 'owner_release_gate_pack_prerequisite_source_context' },
+    prompt: 'silver commons relay with careful lantern mechanics',
+    nowMs: 153_190,
+    candidateRoot: 'data/generated-packs-test'
+  });
+  const gate = buildProductionReleaseGate({ pack, nowMs: 153_200 });
+  const missingSourceReport = validateProductionReleaseGate(gate, { nowMs: 153_210 });
+  const sourceBoundReport = validateProductionReleaseGate(gate, { pack, nowMs: 153_210 });
+
+  assert.equal(gate.publicReleaseEligible, false);
+  assert.equal(gate.releasePrerequisites.schemaValid, true);
+  assert.equal(gate.releasePrerequisites.moderationPassed, true);
+  assert.equal(gate.releasePrerequisites.assetManifestValid, true);
+  assert.equal(gate.releasePrerequisites.playtestPassed, false);
+  assert.equal(missingSourceReport.ok, false);
+  assert.equal(
+    missingSourceReport.checks.find((check) => check.id === 'PRODUCTION_RELEASE_GATE_PREREQUISITE_EVIDENCE_BOUND').passed,
+    false
+  );
+  assert.equal(missingSourceReport.metrics.prerequisiteEvidenceBound, false);
+  assert.equal(sourceBoundReport.ok, true, JSON.stringify(sourceBoundReport.checks));
+  assert.equal(sourceBoundReport.metrics.prerequisiteEvidenceBound, true);
 });
 
 test('GU-18 release approval evidence reports redact unsafe submitted keys and values', () => {
