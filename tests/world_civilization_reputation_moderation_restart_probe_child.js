@@ -96,8 +96,13 @@ function writeJson(value) {
 
 function openStores({ auditPath, reputationPath, moderationPath }) {
   const auditLedger = createCivicAuditLedger({ sqlitePath: auditPath });
-  const reputationStore = createCivicReputationStore({ sqlitePath: reputationPath, auditLedger });
   const moderationStore = createCivicModerationStore({ sqlitePath: moderationPath, auditLedger });
+  const reputationStore = createCivicReputationStore({
+    sqlitePath: reputationPath,
+    auditLedger,
+    moderationStore,
+    requireModerationDecisionForDisputes: true
+  });
   return { auditLedger, reputationStore, moderationStore };
 }
 

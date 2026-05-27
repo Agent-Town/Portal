@@ -6,6 +6,7 @@ const path = require('node:path');
 
 const { CIVIC_SCHEMA_VERSION } = require('../server/world_civilization/schemas');
 const { createCivicAuditLedger } = require('../server/world_civilization/audit_ledger');
+const { createCivicModerationStore } = require('../server/world_civilization/moderation');
 const { createCivicReputationStore } = require('../server/world_civilization/reputation');
 
 function withTempReputationStore(fn) {
@@ -18,6 +19,29 @@ function withTempReputationStore(fn) {
     return fn({ auditLedger, store, sqlitePath });
   } finally {
     store.close();
+    auditLedger.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function withTempReputationModerationStores(fn) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-v6-reputation-moderation-'));
+  const reputationPath = path.join(dir, 'reputation.sqlite');
+  const moderationPath = path.join(dir, 'moderation.sqlite');
+  const auditSqlitePath = path.join(dir, 'audit.sqlite');
+  const auditLedger = createCivicAuditLedger({ sqlitePath: auditSqlitePath });
+  const moderationStore = createCivicModerationStore({ sqlitePath: moderationPath, auditLedger });
+  const reputationStore = createCivicReputationStore({
+    sqlitePath: reputationPath,
+    auditLedger,
+    moderationStore,
+    requireModerationDecisionForDisputes: true
+  });
+  try {
+    return fn({ auditLedger, moderationStore, reputationStore });
+  } finally {
+    reputationStore.close();
+    moderationStore.close();
     auditLedger.close();
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -58,6 +82,21 @@ function reputationDispute(overrides = {}) {
       privateDataIncluded: false,
       dataClasses: ['public_audit_summary']
     },
+    ...overrides
+  };
+}
+
+function moderationDecision(overrides = {}) {
+  return {
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    decisionId: 'moderation_bridge_text_001',
+    subjectRef: 'proposal_public_works_bridge_001',
+    surface: 'public_works',
+    status: 'needs_review',
+    policyVersion: 'policy_v6_public_001',
+    reviewerKind: 'human',
+    reasons: ['Public source requires moderation-linked reputation dispute review.'],
+    redactedFields: [],
     ...overrides
   };
 }
@@ -117,6 +156,55 @@ test('V6 reputation store records dispute review workflow without score mutation
   assert.equal(audit.entry.actor.accountId, 'acct_v6_human_002');
   assert.equal(audit.entry.objectRef, 'repdispute_service_quality_001');
   assert.equal(audit.entry.privacy.privateDataIncluded, false);
+}));
+
+test('V6 reputation disputes can require linked moderation decisions before persistence', () => withTempReputationModerationStores(({
+  auditLedger,
+  moderationStore,
+  reputationStore
+}) => {
+  reputationStore.recordReputation(reputationRecord(), { nowMs: 1_779_784_000_000 });
+
+  assert.throws(
+    () => reputationStore.recordDispute(reputationDispute({
+      moderationDecisionId: '',
+      sourceRefs: []
+    }), { nowMs: 1_779_784_001_000 }),
+    /CIVIC_REPUTATION_DISPUTE_MODERATION_DECISION_REQUIRED/
+  );
+  assert.throws(
+    () => reputationStore.recordDispute(reputationDispute(), { nowMs: 1_779_784_001_000 }),
+    /CIVIC_REPUTATION_DISPUTE_MODERATION_DECISION_REQUIRED/
+  );
+
+  moderationStore.recordDecision(moderationDecision({
+    decisionId: 'moderation_bridge_mismatch_001',
+    subjectRef: 'proposal_wrong_source_001'
+  }), { nowMs: 1_779_784_001_500 });
+  assert.throws(
+    () => reputationStore.recordDispute(reputationDispute({
+      disputeId: 'repdispute_service_quality_mismatch_001',
+      moderationDecisionId: 'moderation_bridge_mismatch_001',
+      sourceRefs: ['moderation_bridge_mismatch_001']
+    }), { nowMs: 1_779_784_002_000 }),
+    /CIVIC_REPUTATION_DISPUTE_MODERATION_DECISION_MISMATCH/
+  );
+
+  moderationStore.recordDecision(moderationDecision(), { nowMs: 1_779_784_002_500 });
+  const linked = reputationStore.recordDispute(reputationDispute(), { nowMs: 1_779_784_003_000 });
+  const summary = reputationStore.summarizeSubjectReputation('acct_service_provider_001');
+
+  assert.equal(linked.disputeId, 'repdispute_service_quality_001');
+  assert.equal(linked.moderationDecisionId, 'moderation_bridge_text_001');
+  assert.equal(summary.totalScore, 2);
+  assert.equal(summary.disputeReviewCount, 1);
+  assert.equal(summary.openDisputeReviewCount, 1);
+  assert.equal(summary.transferable, false);
+  assert.equal(summary.executionStatus, 'not_executable');
+  assert.deepEqual(
+    auditLedger.replay().map((row) => row.entry.actionType),
+    ['reputation.recorded', 'moderation.decided', 'moderation.decided', 'reputation.disputed']
+  );
 }));
 
 test('V6 reputation store is idempotent by record and rejects duplicate source awards', () => withTempReputationStore(({ store }) => {

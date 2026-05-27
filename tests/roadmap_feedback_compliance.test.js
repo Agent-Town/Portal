@@ -141,6 +141,8 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   const plan = read('docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md');
   const spec = read('specs/54_agent_town_v6_agent_civilization_foundation.md');
   const gate = read('specs/release-gates/v60_agent_civilization_readiness_gate.md');
+  const reputationSpec = read('specs/60_agent_town_v6_reputation_accountability_foundation.md');
+  const moderationSpec = read('specs/61_agent_town_v6_moderation_privacy_foundation.md');
   const persistenceSpec = read('specs/67_agent_town_v6_persistence_replay_resilience_foundation.md');
   const requiredMilestones = [
     'M0 Hardened V5 world-grid baseline',
@@ -197,13 +199,20 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /server\/world_civilization\/reputation\.js/);
   assert.match(plan, /reputation dispute\/review/);
   assert.match(plan, /human dispute requesters/);
+  assert.match(plan, /require an existing moderation decision linked to the reputation record source/);
+  assert.match(reputationSpec, /requireModerationDecisionForDisputes/);
+  assert.match(reputationSpec, /CIVIC_REPUTATION_DISPUTE_MODERATION_DECISION_REQUIRED/);
+  assert.match(reputationSpec, /CIVIC_REPUTATION_DISPUTE_MODERATION_DECISION_MISMATCH/);
   assert.match(gate, /server\/world_civilization\/reputation\.js/);
+  assert.match(gate, /moderation-decision links that must match the reputation record source/);
   assert.match(gate, /reputation\.disputed/);
   assert.match(plan, /M10 Moderation and privacy layer \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/moderation\.js/);
   assert.match(plan, /moderation review\/appeal/);
   assert.match(plan, /abuse-report source references/);
+  assert.match(moderationSpec, /reputation disputes may optionally require a moderation-store link/);
   assert.match(gate, /server\/world_civilization\/moderation\.js/);
+  assert.match(gate, /required public-source review link for reputation disputes/);
   assert.match(gate, /moderation\.reviewed/);
   assert.match(gate, /moderation\.appealed/);
   assert.match(plan, /M11 Civic effect execution and rollback \| `in_progress`/);

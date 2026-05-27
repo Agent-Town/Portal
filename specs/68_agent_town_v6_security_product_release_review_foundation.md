@@ -31,10 +31,11 @@ are present.
 - Data-retention policy: audit retention, deletion policy, debug log retention,
   and export policy.
 - Audit coverage: append-only ledger, owner indexes, migration versions,
-  proposal review transition audit rows, schema metadata drift checks,
-  migration rehearsal with unsupported upgrade/downgrade targets failing
-  closed, replay reconstruction, rollback handles, governance preflight
-  evidence, and non-executing rollback recovery evidence.
+  proposal review transition audit rows, reputation/moderation link evidence,
+  schema metadata drift checks, migration rehearsal with unsupported
+  upgrade/downgrade targets failing closed, replay reconstruction, rollback
+  handles, governance preflight evidence, and non-executing rollback recovery
+  evidence.
 - Validation evidence: targeted Node suite, split Playwright smokes,
   all-features regression, feature override safety, and load/rate replay
   evidence, including civic mutation security and governance preflight contract

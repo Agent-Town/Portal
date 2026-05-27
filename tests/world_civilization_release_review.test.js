@@ -79,6 +79,20 @@ test('V6 release review audit coverage requires governance preflight evidence', 
   assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_governance_preflight.test.js'));
 });
 
+test('V6 release review audit coverage requires reputation moderation link evidence', () => {
+  const auditGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'audit_coverage');
+  const validationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'validation_evidence');
+
+  assert.ok(auditGate.requiredArtifacts.includes('server/world_civilization/reputation.js'));
+  assert.ok(auditGate.requiredArtifacts.includes('server/world_civilization/moderation.js'));
+  assert.ok(auditGate.requiredArtifacts.includes('tests/world_civilization_reputation.test.js'));
+  assert.ok(auditGate.requiredArtifacts.includes('tests/world_civilization_moderation.test.js'));
+  assert.ok(auditGate.requiredArtifacts.includes('tests/world_civilization_reputation_moderation_process_restart.test.js'));
+  assert.ok(auditGate.requiredChecks.includes('reputation_moderation_links'));
+  assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_reputation.test.js'));
+  assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_moderation.test.js'));
+});
+
 test('V6 release review requires civic mutation security evidence for abuse review', () => {
   const abuseGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'abuse_case_review');
   const validationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'validation_evidence');

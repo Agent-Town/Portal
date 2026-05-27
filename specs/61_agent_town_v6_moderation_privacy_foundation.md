@@ -21,6 +21,12 @@ No V6 route, worker tool, or normal gameplay surface consumes these decisions
 yet. The store exists so later V6 work can depend on validated, replayable,
 privacy-reviewed moderation records instead of ad hoc public text flags.
 
+M9 reputation disputes may optionally require a moderation-store link before
+persistence. In that mode, the referenced moderation decision must exist and its
+subject must match the reputation record source. This keeps reputation impact
+review tied to the same public-safe moderation evidence without importing
+private town state.
+
 ## Data Model
 
 The SQLite table `world_civic_moderation_decisions` stores validated

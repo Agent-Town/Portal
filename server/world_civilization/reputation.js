@@ -231,7 +231,48 @@ function createReputationDisputeAuditEntry(dispute, nowMs) {
   };
 }
 
-function createCivicReputationStore({ sqlitePath, auditLedger = null, auditSqlitePath = '' }) {
+function verifyDisputeModerationDecision({ dispute, record, moderationStore, requireModerationDecision }) {
+  if (!moderationStore || typeof moderationStore.getDecision !== 'function') {
+    return;
+  }
+  if (!dispute.moderationDecisionId) {
+    if (requireModerationDecision === true) {
+      const err = new Error('CIVIC_REPUTATION_DISPUTE_MODERATION_DECISION_REQUIRED');
+      err.details = { disputeId: dispute.disputeId, recordId: dispute.recordId };
+      throw err;
+    }
+    return;
+  }
+  const decision = moderationStore.getDecision(dispute.moderationDecisionId);
+  if (!decision) {
+    const err = new Error('CIVIC_REPUTATION_DISPUTE_MODERATION_DECISION_REQUIRED');
+    err.details = {
+      disputeId: dispute.disputeId,
+      recordId: dispute.recordId,
+      moderationDecisionId: dispute.moderationDecisionId
+    };
+    throw err;
+  }
+  if (decision.subjectRef !== record.sourceRef) {
+    const err = new Error('CIVIC_REPUTATION_DISPUTE_MODERATION_DECISION_MISMATCH');
+    err.details = {
+      disputeId: dispute.disputeId,
+      recordId: dispute.recordId,
+      moderationDecisionId: dispute.moderationDecisionId,
+      expectedSubjectRef: record.sourceRef,
+      receivedSubjectRef: decision.subjectRef
+    };
+    throw err;
+  }
+}
+
+function createCivicReputationStore({
+  sqlitePath,
+  auditLedger = null,
+  auditSqlitePath = '',
+  moderationStore = null,
+  requireModerationDecisionForDisputes = false
+}) {
   if (!sqlitePath || typeof sqlitePath !== 'string') {
     throw new Error('CIVIC_REPUTATION_SQLITE_PATH_REQUIRED');
   }
@@ -341,6 +382,12 @@ function createCivicReputationStore({ sqlitePath, auditLedger = null, auditSqlit
       };
       throw err;
     }
+    verifyDisputeModerationDecision({
+      dispute,
+      record,
+      moderationStore,
+      requireModerationDecision: requireModerationDecisionForDisputes
+    });
 
     const existingByRecordDisputer = parseDisputeRow(statements.byRecordDisputer.get(
       dispute.recordId,

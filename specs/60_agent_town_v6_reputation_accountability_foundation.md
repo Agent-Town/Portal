@@ -51,6 +51,13 @@ Indexes cover record replay, subject replay, dispute status queues, and
 requester replay. Dispute records may reference public moderation decision ids,
 but they do not mutate reputation scores or create eligibility authority.
 
+When `server/world_civilization/reputation.js` is constructed with a moderation
+store and `requireModerationDecisionForDisputes`, dispute records must reference
+an existing moderation decision whose subject matches the reputation record
+source before persistence. This is the research-only bridge between M9
+accountability and M10 privacy review; it does not make reputation visible or
+executable.
+
 ## Safety Rules
 
 - Self-awards are invalid.
@@ -61,6 +68,10 @@ but they do not mutate reputation scores or create eligibility authority.
 - A requester can open only one dispute per reputation record.
 - Dispute and review records must reference an existing reputation record and
   match its subject account.
+- Moderation-linked dispute mode rejects missing moderation decisions and
+  source mismatches before persistence with
+  `CIVIC_REPUTATION_DISPUTE_MODERATION_DECISION_REQUIRED` and
+  `CIVIC_REPUTATION_DISPUTE_MODERATION_DECISION_MISMATCH`.
 - Dispute requesters must be human actors; reviewed dispute outcomes require a
   human reviewer kind.
 - Private data, Brain/debug traces, wallet secrets, provider credentials, and
