@@ -1347,7 +1347,7 @@ function validateGenerationBrief(brief = {}) {
     {
       id: 'GENBRIEF_SCHEMA_VERSION',
       passed: brief?.schemaVersion === GENERATION_BRIEF_VERSION,
-      measured: { schemaVersion: brief?.schemaVersion || null }
+      measured: { schemaVersion: redactGeneratedPackReportValue(brief?.schemaVersion || null) }
     },
     {
       id: 'GENBRIEF_PROMPT_HASHED',
@@ -1362,7 +1362,7 @@ function validateGenerationBrief(brief = {}) {
     {
       id: 'GENBRIEF_HUMOR_LEVEL_ENUM',
       passed: ['none', 'subtle', 'playful', 'absurd-but-safe'].includes(String(brief?.humorLevel || '')),
-      measured: { humorLevel: brief?.humorLevel || null }
+      measured: { humorLevel: redactGeneratedPackReportValue(brief?.humorLevel || null) }
     },
     {
       id: 'GENBRIEF_SAFETY_STATUS_VALID',
@@ -1370,7 +1370,7 @@ function validateGenerationBrief(brief = {}) {
         && brief?.safety?.normalizedForRuntime === true
         && brief?.safety?.rawPromptExecutable === false,
       measured: {
-        status: status || null,
+        status: redactGeneratedPackReportValue(status || null),
         normalizedForRuntime: brief?.safety?.normalizedForRuntime === true,
         rawPromptExecutable: brief?.safety?.rawPromptExecutable === true
       }
@@ -1433,12 +1433,15 @@ function validateAssetManifest(manifest = {}, pack = {}) {
     {
       id: 'ASSET_MANIFEST_SCHEMA_VERSION',
       passed: manifest?.schemaVersion === GENERATED_ASSET_MANIFEST_VERSION,
-      measured: { schemaVersion: manifest?.schemaVersion || null }
+      measured: { schemaVersion: redactGeneratedPackReportValue(manifest?.schemaVersion || null) }
     },
     {
       id: 'ASSET_MANIFEST_PROMPT_HASH_MATCH',
       passed: /^[0-9a-f]{64}$/.test(String(manifest?.promptHash || '')) && (!pack?.prompt?.hash || manifest.promptHash === pack.prompt.hash),
-      measured: { manifestPromptHash: manifest?.promptHash || null, packPromptHash: pack?.prompt?.hash || null }
+      measured: {
+        manifestPromptHash: redactGeneratedPackReportValue(manifest?.promptHash || null),
+        packPromptHash: redactGeneratedPackReportValue(pack?.prompt?.hash || null)
+      }
     },
     {
       id: 'ASSET_MANIFEST_ENTRIES_VALID',
@@ -1454,7 +1457,7 @@ function validateAssetManifest(manifest = {}, pack = {}) {
       id: 'ASSET_MANIFEST_NO_PRODUCTION_IMAGE_REQUIREMENT',
       passed: manifest?.productionImagePolicy?.status === 'candidate_required_before_production' && manifest?.productionImagePolicy?.requiresHumanSignoff === true,
       measured: {
-        status: manifest?.productionImagePolicy?.status || null,
+        status: redactGeneratedPackReportValue(manifest?.productionImagePolicy?.status || null),
         requiresHumanSignoff: manifest?.productionImagePolicy?.requiresHumanSignoff === true
       }
     }
@@ -1507,7 +1510,7 @@ function validateAssetPromptPlan(plan = {}, pack = {}) {
     {
       id: 'ASSET_PROMPT_PLAN_SCHEMA_VERSION',
       passed: plan?.schemaVersion === ASSET_PROMPT_PLAN_VERSION,
-      measured: { schemaVersion: plan?.schemaVersion || null }
+      measured: { schemaVersion: redactGeneratedPackReportValue(plan?.schemaVersion || null) }
     },
     {
       id: 'ASSET_PROMPT_PLAN_JSON_SCHEMA_VALID',
@@ -1517,7 +1520,10 @@ function validateAssetPromptPlan(plan = {}, pack = {}) {
     {
       id: 'ASSET_PROMPT_PLAN_PACK_MATCH',
       passed: Boolean(pack?.packId && plan?.packId === pack.packId),
-      measured: { planPackId: plan?.packId || null, packId: pack?.packId || null }
+      measured: {
+        planPackId: redactGeneratedPackReportValue(plan?.packId || null),
+        packId: redactGeneratedPackReportValue(pack?.packId || null)
+      }
     },
     {
       id: 'ASSET_PROMPT_PLAN_TARGET_COVERAGE',
@@ -1540,7 +1546,7 @@ function validateAssetPromptPlan(plan = {}, pack = {}) {
         && targets.every((target) => target.status === 'planned-not-generated')
         && targets.every((target) => !String(target.approvedOutputPath || '').endsWith('.png')),
       measured: {
-        modelFamily: plan?.modelFamily || null,
+        modelFamily: redactGeneratedPackReportValue(plan?.modelFamily || null),
         approvedTargetCount: targets.filter((target) => target.status !== 'planned-not-generated').length
       }
     }
@@ -1658,11 +1664,11 @@ function validateTechFlavorTree(tree = {}) {
         requiredCapabilityCount: CANONICAL_TECH_CAPABILITY_IDS.length,
         coveredCapabilityCount: new Set(capabilityIds).size,
         canonicalEffectCoverage,
-        missingCapabilities,
-        unknownCapabilities,
-        duplicateCapabilities: [...new Set(duplicateCapabilities)],
-        missingEffects,
-        unknownEffects
+        missingCapabilities: missingCapabilities.map(redactGeneratedPackReportValue),
+        unknownCapabilities: unknownCapabilities.map(redactGeneratedPackReportValue),
+        duplicateCapabilities: [...new Set(duplicateCapabilities)].map(redactGeneratedPackReportValue),
+        missingEffects: missingEffects.map(redactGeneratedPackReportValue),
+        unknownEffects: unknownEffects.map(redactGeneratedPackReportValue)
       }
     },
     {
@@ -1696,8 +1702,8 @@ function validateTechFlavorTree(tree = {}) {
         && tree?.compatibility?.v5WorldGridCompatible === true
         && tree?.compatibility?.v6CivicMechanicsTouched === false,
       measured: {
-        unlockRuleChanges: unlockRuleChanges.map((node) => node.canonicalCapabilityId),
-        canonicalEffectHash: balance?.canonicalEffectHash || null,
+        unlockRuleChanges: unlockRuleChanges.map((node) => redactGeneratedPackReportValue(node.canonicalCapabilityId)),
+        canonicalEffectHash: redactGeneratedPackReportValue(balance?.canonicalEffectHash || null),
         v6CivicMechanicsTouched: tree?.compatibility?.v6CivicMechanicsTouched === true
       }
     }
@@ -2326,7 +2332,7 @@ function validateInhabitantStyleOverlay(overlay = {}) {
       measured: {
         actorBudgetMax: Number(policy?.actorBudgetMax || 0),
         generatedActorCount: Number(policy?.generatedActorCount || 0),
-        reducedMotionFallback: policy?.reducedMotionFallback || null
+        reducedMotionFallback: redactGeneratedPackReportValue(policy?.reducedMotionFallback || null)
       }
     },
     {
@@ -2339,7 +2345,7 @@ function validateInhabitantStyleOverlay(overlay = {}) {
         && Number(balance?.resourceMutationCount || 0) === 0
         && Number(balance?.autonomousAgentCount || 0) === 0
         && balance?.firstLoopCompletable === true,
-      measured: balance
+      measured: redactGeneratedPackReportObject(balance)
     }
   ];
   return {
@@ -2358,7 +2364,7 @@ function validateInhabitantStyleOverlay(overlay = {}) {
       externalModelPerInhabitant: safety?.externalModelPerInhabitant === true,
       resourceMutationCount: Number(safety?.resourceMutationCount || 0),
       unsafeTextRejectCount: unsafeTextFindings.length,
-      reducedMotionFallback: policy?.reducedMotionFallback || null
+      reducedMotionFallback: redactGeneratedPackReportValue(policy?.reducedMotionFallback || null)
     }
   };
 }

@@ -18,6 +18,7 @@ Status: prototype-gated
 - Asset prompt-plan, candidate-review, and candidate-generation validation reports must redact unsafe submitted canonical target labels from measured problem lists.
 - Candidate-review, release-approval, and release-evidence-bundle validation reports must redact unsafe submitted manifest hashes, evidence hashes, bundle hashes, and pack ids from measured problem lists.
 - Public-card, approved-modifier, requester-voice, and multi-surface validation reports must redact unsafe submitted measured values before returning evidence to callers.
+- Generation-brief, asset-manifest, asset-prompt-plan, tech-flavor, and inhabitant-overlay validation reports must redact unsafe submitted measured metadata values before returning evidence to callers.
 - Postprocess plans and reports are standalone contracts; they may write postprocessed candidate artifacts and metadata, but must not write approved production assets or alter canonical gameplay mappings.
 - Browser runtime asset loading must use safe public generated-pack paths only; private candidate roots, path traversal, data URLs, provider URLs, and unapproved outputs must fall back without player exposure.
 - First-loop playtest pass status requires measured browser evidence, screenshot evidence, clean console state, canonical payload integrity, and generated-pack validation. Default or placeholder scores cannot pass release gates.
@@ -57,6 +58,7 @@ Status: prototype-gated
   "unsafeTargetLabelRedacted": true,
   "unsafeHashAndPackIdRedacted": true,
   "presentationReportUnsafeValueRedacted": true,
+  "coreContractReportUnsafeValueRedacted": true,
   "rawExecutablePromptInstructionCount": 0,
   "arbitraryToolMutationFormulaCount": 0,
   "schemaRegistryExists": true,
@@ -159,6 +161,7 @@ Status: prototype-gated
   "customEffectCount": 0,
   "generatedTechNamesVisible": true,
   "unlockRulesPreserved": true,
+  "unsafeTechFlavorReportValueRedacted": true,
   "requesterVoicePackSchemaExists": true,
   "requesterArchetypesGenerated": true,
   "contractFlavorGenerated": true,
@@ -175,6 +178,7 @@ Status: prototype-gated
   "inhabitantSpritePromptCount": 4,
   "externalModelPerInhabitant": false,
   "inhabitantResourceMutationCount": 0,
+  "unsafeInhabitantReportValueRedacted": true,
   "multiSurfaceCompatibilitySchemaExists": true,
   "z1Z2Compatibility": true,
   "publicCardSafe": true,

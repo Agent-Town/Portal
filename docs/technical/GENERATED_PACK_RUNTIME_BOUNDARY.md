@@ -36,6 +36,7 @@ Player prompt
 - `server/world_grid/generated_schema.js` is the local schema registry and minimal JSON Schema runner for generated-pack contracts.
 - Generated packs now validate `GenerationBrief`, `StyleBible`, `UniverseBible`, `GameplayMapping`, `AssetPromptPlan`, `GeneratedAssetManifest`, and the outer generated pack independently.
 - Runtime pack validation fails closed when schema validation finds missing required fields, unknown fields in strict subdocuments, wrong enum values, raw-prompt forbidden fields, raw-instruction object keys, semantic token fields such as `sessionToken`, secret-looking object keys, or secret-looking values under harmless generated-copy keys. Final generated-pack validation reports redact secret-looking and raw-instruction object keys from content and schema-error paths.
+- Generation-brief, asset-manifest, and asset-prompt-plan validation reports redact unsafe submitted measured metadata values.
 - The schema runner is intentionally local and deterministic; it does not call external validators or image/model services.
 
 ## GU-4 Job Scaffold Slice
@@ -53,6 +54,7 @@ Player prompt
 - No adapter is wired by default. Failed or blocked attempts keep deterministic fallback packs playable, write zero production outputs, preserve canonical gameplay mappings, and reject secret-like fields and values, raw prompt instructions, unsafe paths, unknown/duplicate prompt-plan targets, fractional counters, unstable run hashes, or production-promotion claims.
 - Candidate-generation run and job-log validation reports redact submitted secret-looking keys, secret-looking values, raw-instruction keys, and executable instruction values from content and schema-error evidence before callers can inspect the report.
 - Asset prompt-plan, candidate-review manifest, and candidate-generation run reports redact unsafe submitted canonical target labels from measured problem lists while preserving approved canonical target names for QA diagnostics.
+- Core generated-pack contract reports also redact unsafe submitted measured metadata values before returning diagnostics to callers.
 
 ## GU-6 Post-Processing Contract Slice
 
@@ -122,6 +124,7 @@ Player prompt
 - Tech flavor trees can rename and explain progression, but cannot add formulas, custom mechanics, permissions, tools, or altered unlock rules.
 - `projectTechFlavorView` exposes only public generated names/lore/effect metadata for generated-pack UI surfaces.
 - Balance simulation requires canonical effect coverage of 1.0, zero custom effects, unchanged unlock rules, no V6 civic mechanics touched, and first-loop playability.
+- Tech-flavor validation reports redact unsafe submitted effect IDs and balance hashes from measured evidence.
 
 ## GU-15 Generated Requester Voice Slice
 
@@ -139,6 +142,7 @@ Player prompt
 - Sprite prompt targets are role-scoped `character-sprite` candidates with prompt hashes, usage paths, candidate paths, and no production image requirement.
 - `projectInhabitantStyleOverlayView` exposes only generated role/voice/sprite-plan metadata when generated packs are enabled.
 - Browser rendering uses a generated-pack-only stage overlay; reduced-motion mode switches the overlay to static markers.
+- Inhabitant-overlay validation reports redact unsafe submitted policy and balance values from measured evidence.
 
 ## GU-17 Multi-Surface Compatibility Slice
 

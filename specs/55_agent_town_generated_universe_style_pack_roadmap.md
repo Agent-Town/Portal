@@ -87,6 +87,7 @@ This is a separate prototype-gated track. It must not change normal gameplay vis
   "unsafeTargetLabelRedacted": true,
   "unsafeHashAndPackIdRedacted": true,
   "presentationReportUnsafeValueRedacted": true,
+  "coreContractReportUnsafeValueRedacted": true,
   "canonicalMappingCoverage": 1.0,
   "arbitraryToolMutationFormulaCount": 0,
   "invalidAssetManifestEntryCount": 0,
@@ -126,7 +127,7 @@ This is a separate prototype-gated track. It must not change normal gameplay vis
 
 ## GU-2 Schema Validation Engine Slice
 
-The first production-roadmap continuation adds a local JSON Schema registry and runner for generated-pack subdocuments. The runner validates the pack, brief, style bible, universe bible, gameplay mapping, asset prompt plan, and asset manifest independently before a generated pack can pass validation.
+The first production-roadmap continuation adds a local JSON Schema registry and runner for generated-pack subdocuments. The runner validates the pack, brief, style bible, universe bible, gameplay mapping, asset prompt plan, and asset manifest independently before a generated pack can pass validation. Core contract validation reports redact unsafe submitted generation-brief, asset-manifest, and asset-prompt-plan measured metadata values.
 
 ```json
 {
@@ -165,7 +166,7 @@ The candidate generation scaffold still does not call image models. Each planned
 
 The real image-generation spike remains blocked until product/security approval, an explicit auth model, an explicit cost model, and explicit user/team consent exist. This slice adds only the optional command and runtime guard for that future work. The guard writes candidate-generation preflight records to the same job logs, never reads provider credentials, never calls an image model by default, never creates approved production assets, and fails back to the deterministic generated pack.
 
-Candidate-generation run reports and asset-generation job logs now have strict schemas. The run report carries a stable hash, bounded integer rate/retry/count policy, redacted consent/cost/auth evidence, canonical mapping fingerprints, prompt-plan target checks, and zero production-promotion claims. Job-log validation enforces safe candidate/approved paths, known canonical prompt-plan targets, candidate-only output status, no raw prompt instructions, no secret-like fields or values, no production assets, and status/output-count coherence. Validation reports must redact submitted secret-looking keys, secret-looking values, raw-instruction keys, executable instruction values, and unsafe canonical target labels from content, schema-error, and measured-problem evidence.
+Candidate-generation run reports and asset-generation job logs now have strict schemas. The run report carries a stable hash, bounded integer rate/retry/count policy, redacted consent/cost/auth evidence, canonical mapping fingerprints, prompt-plan target checks, and zero production-promotion claims. Job-log validation enforces safe candidate/approved paths, known canonical prompt-plan targets, candidate-only output status, no raw prompt instructions, no secret-like fields or values, no production assets, and status/output-count coherence. Validation reports must redact submitted secret-looking keys, secret-looking values, raw-instruction keys, executable instruction values, unsafe canonical target labels, and unsafe measured metadata values from content, schema-error, and measured-problem evidence.
 
 ```json
 {
@@ -363,7 +364,7 @@ Generated packs now include an `approvedModifiers` contract that can influence p
 
 ## GU-14 Generated Tech Flavor Tree Slice
 
-Generated packs now include a strict `techFlavorTree` contract that renames and reframes canonical progression without adding unlock rules or custom effects. Every generated tech node maps to an approved canonical capability/effect pair, carries generated name and lore text, records metadata-only V3/V5 compatibility hooks, and proves through balance simulation that canonical unlock effects, first-loop viability, and V6 civic mechanics remain unchanged.
+Generated packs now include a strict `techFlavorTree` contract that renames and reframes canonical progression without adding unlock rules or custom effects. Every generated tech node maps to an approved canonical capability/effect pair, carries generated name and lore text, records metadata-only V3/V5 compatibility hooks, and proves through balance simulation that canonical unlock effects, first-loop viability, and V6 civic mechanics remain unchanged. Validation reports redact unsafe submitted effect IDs and balance hashes from measured evidence.
 
 ```json
 {
@@ -376,6 +377,7 @@ Generated packs now include a strict `techFlavorTree` contract that renames and 
   "unlockRulesPreserved": true,
   "v5WorldGridCompatible": true,
   "v6CivicMechanicsTouched": false,
+  "unsafeTechFlavorReportValueRedacted": true,
   "firstLoopStillCompletes": true
 }
 ```
@@ -404,7 +406,7 @@ Generated packs now include a `requesterVoicePack` contract for presentation-onl
 
 ## GU-16 Town Life + Inhabitant Style Overlay Slice
 
-Generated packs now include an `inhabitantStyleOverlay` contract for passive town-life visual actors. The overlay can name and style workers, haulers, messengers, and farmers, scaffold future sprite prompts, and add short voice templates, but every role is visual-only, reads server-owned state, has no resource mutation authority, and cannot become an autonomous agent. Browser rendering uses a small generated-pack-only stage overlay with reduced-motion static markers.
+Generated packs now include an `inhabitantStyleOverlay` contract for passive town-life visual actors. The overlay can name and style workers, haulers, messengers, and farmers, scaffold future sprite prompts, and add short voice templates, but every role is visual-only, reads server-owned state, has no resource mutation authority, and cannot become an autonomous agent. Browser rendering uses a small generated-pack-only stage overlay with reduced-motion static markers. Validation reports redact unsafe submitted policy and balance values from measured evidence.
 
 ```json
 {
@@ -418,6 +420,7 @@ Generated packs now include an `inhabitantStyleOverlay` contract for passive tow
   "externalModelPerInhabitant": false,
   "resourceMutationCount": 0,
   "reducedMotionFallback": "static-markers",
+  "unsafeInhabitantReportValueRedacted": true,
   "firstLoopStillCompletes": true
 }
 ```
