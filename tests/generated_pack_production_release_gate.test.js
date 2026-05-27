@@ -1067,6 +1067,25 @@ test('GU-18 production release gate validation rejects tampered eligibility and 
   );
 });
 
+test('GU-18 production release gate schema rejects invalid pack id shapes', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_gate_invalid_pack_id',
+    prompt: 'blue relay harbor with glass tide librarians',
+    nowMs: 153_625
+  });
+  const forgedGate = {
+    ...fixture.releaseGate,
+    packId: '../not-a-generated-pack-id'
+  };
+  const report = validateProductionReleaseGate(forgedGate);
+
+  assert.equal(report.ok, false);
+  assert.equal(
+    report.checks.find((check) => check.id === 'PRODUCTION_RELEASE_GATE_SCHEMA_VALID').passed,
+    false
+  );
+}));
+
 test('GU-18 production release gate validation rejects future-dated gate reports', () => withTempGeneratedPackStore(() => {
   const fixture = readyReleaseGateFixture({
     ownerAccountId: 'owner_release_gate_future_report',

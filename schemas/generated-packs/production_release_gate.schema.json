@@ -18,7 +18,7 @@
   ],
   "properties": {
     "schemaVersion": { "const": "agent-town-generated-pack-production-release-gate-v1" },
-    "packId": { "type": "string", "minLength": 3 },
+    "packId": { "type": "string", "pattern": "^gen_pack_[0-9a-f]{16}$" },
     "evaluatedAtMs": { "type": "number" },
     "releaseMode": { "enum": ["prototype-gated", "ready-for-controlled-release"] },
     "releasePrerequisites": {
