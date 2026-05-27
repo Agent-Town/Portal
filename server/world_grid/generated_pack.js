@@ -4905,6 +4905,11 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
   const candidateReviewManifestHashMatchesEvidence = Number(gate?.metrics?.candidateReviewManifestHashMatchesEvidence || 0) === 1;
   const candidateReviewManifestTimeMatchesEvidence = Number(gate?.metrics?.candidateReviewManifestTimeMatchesEvidence || 0) === 1;
   const candidateReviewManifestCountsMatchEvidence = Number(gate?.metrics?.candidateReviewManifestCountsMatchEvidence || 0) === 1;
+  const candidateReviewCoverageCount = Number(gate?.metrics?.candidateReviewCoverageCount || 0);
+  const approvalEvidenceReviewedCandidateCount = Number(approvalEvidenceReport.metrics.reviewedCandidateCount || 0);
+  const candidateReviewCoverageCountMatchesEvidence = candidateReviewManifestHashMatchesEvidence
+    ? candidateReviewCoverageCount === approvalEvidenceReviewedCandidateCount
+    : candidateReviewCoverageCount === 0;
   const approvalEvidenceContractOk = approvalEvidenceReport.checks
     .filter((check) => [
       'RELEASE_APPROVAL_EVIDENCE_SCHEMA_VALID',
@@ -5008,7 +5013,7 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
           && candidateReviewManifestCountsMatchEvidence
         ))
         && Number(gate?.metrics?.candidateReviewExpectedTargetCount || 0) === Number(approvalEvidenceReport.metrics.expectedTargetCount || 0)
-        && Number(gate?.metrics?.candidateReviewCoverageCount || 0) <= Number(approvalEvidenceReport.metrics.reviewedCandidateCount || 0),
+        && candidateReviewCoverageCountMatchesEvidence,
       measured: {
         approvalEvidenceContractOk,
         approvalEvidenceHashStable,
@@ -5016,6 +5021,7 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
         candidateReviewManifestHashMatchesEvidence,
         candidateReviewManifestTimeMatchesEvidence,
         candidateReviewManifestCountsMatchEvidence,
+        candidateReviewCoverageCountMatchesEvidence,
         approvalEvidenceComplete: approvalEvidenceReport.ok === true,
         approvalInputsMatchEvidence,
         approvalEvidenceMetrics: approvalEvidenceReport.metrics,

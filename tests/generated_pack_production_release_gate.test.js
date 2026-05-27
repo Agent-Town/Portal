@@ -2341,6 +2341,41 @@ test('GPACK-134 release gate rejects candidate review count drift between approv
   );
 });
 
+test('GPACK-164 release gate rejects candidate-review diagnostic metric tampering', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_gate_candidate_review_diagnostic_tamper',
+    prompt: 'amber relay orchard with patient slate navigators',
+    nowMs: 153_105
+  });
+  const gate = fixture.releaseGate;
+  const diagnosticMetricUpdates = [
+    { candidateReviewExpectedTargetCount: gate.metrics.candidateReviewExpectedTargetCount + 1 },
+    { candidateReviewCoverageCount: gate.metrics.candidateReviewCoverageCount - 1 }
+  ];
+
+  assert.equal(validateProductionReleaseGate(gate).ok, true);
+  assert.equal(gate.metrics.candidateReviewExpectedTargetCount, fixture.pack.assetPromptPlan.targets.length);
+  assert.equal(gate.metrics.candidateReviewCoverageCount, fixture.pack.assetPromptPlan.targets.length);
+
+  for (const metricPatch of diagnosticMetricUpdates) {
+    const tamperedGate = {
+      ...gate,
+      metrics: {
+        ...gate.metrics,
+        ...metricPatch
+      }
+    };
+    const report = validateProductionReleaseGate(tamperedGate);
+
+    assert.equal(report.ok, false, JSON.stringify(metricPatch));
+    assert.equal(
+      report.checks.find((check) => check.id === 'PRODUCTION_RELEASE_GATE_APPROVAL_EVIDENCE_VALID').passed,
+      false,
+      JSON.stringify(metricPatch)
+    );
+  }
+}));
+
 test('GU-18 release approval evidence reports redact unsafe submitted keys and values', () => {
   const pack = createGeneratedPack({
     owner: { ownerAccountId: 'owner_release_gate_evidence_redaction' },
