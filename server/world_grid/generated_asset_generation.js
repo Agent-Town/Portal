@@ -69,6 +69,12 @@ function redactSchemaError(error = {}) {
   return redacted;
 }
 
+function redactedReportValue(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'string') return value;
+  return redactedPathSegment(value);
+}
+
 function findSecretLikePaths(value, pathLabel = '$', matches = []) {
   if (typeof value === 'string') {
     if (SECRET_LIKE_VALUE_PATTERN.test(value)) matches.push(pathLabel);
@@ -402,10 +408,10 @@ function validateCandidateGenerationRun(run = {}, { pack = {}, assetPromptPlan =
   for (const statusEntry of jobStatuses) {
     const canonicalTarget = statusEntry?.canonicalTarget || '';
     if (allowedCanonicalTargets.size > 0 && !allowedCanonicalTargets.has(canonicalTarget)) {
-      canonicalTargetProblems.push(`unknown:${canonicalTarget}`);
+      canonicalTargetProblems.push(`unknown:${redactedReportValue(canonicalTarget)}`);
     }
     if (seenCanonicalTargets.has(canonicalTarget)) {
-      canonicalTargetProblems.push(`duplicate:${canonicalTarget}`);
+      canonicalTargetProblems.push(`duplicate:${redactedReportValue(canonicalTarget)}`);
     }
     seenCanonicalTargets.add(canonicalTarget);
   }

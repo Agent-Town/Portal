@@ -2759,7 +2759,7 @@ Creates a child generated pack from a parent durable pack and a new prompt. The 
 Candidate-generation evidence invariants:
 - candidate-generation run reports and asset-generation job logs are strict validation evidence only; they do not approve release, promote assets, call image models by default, or change canonical world-grid simulation rules;
 - validation rejects unsafe paths, unknown targets, production-promotion claims, secret-like fields or values, raw executable instruction text, and raw-instruction object keys;
-- validation reports may include counts and redacted paths, but must not echo submitted secret-looking keys, secret-looking values, raw-instruction keys, or executable instruction values.
+- validation reports may include counts and redacted paths, but must not echo submitted secret-looking keys, secret-looking values, raw-instruction keys, executable instruction values, or unsafe canonical target labels.
 
 ### POST `/api/world/generated-pack/release-gate`
 Evaluates the standalone production readiness report for the current generated pack. This endpoint requires the generated-pack feature flag and the current wallet/session owner. It does not generate assets, does not approve production image usage, does not alter generated-pack records, and does not change canonical world-grid simulation rules.

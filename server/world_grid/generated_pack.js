@@ -685,6 +685,21 @@ function redactGeneratedPackSchemaError(error = {}) {
   return redacted;
 }
 
+function redactGeneratedPackReportValue(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'string') return value;
+  return generatedPackPathSegment(value);
+}
+
+function redactGeneratedPackTargetProblem(value = '') {
+  const text = String(value || '');
+  const separatorIndex = text.indexOf(':');
+  if (separatorIndex === -1) return redactGeneratedPackReportValue(text);
+  const target = text.slice(0, separatorIndex);
+  const suffix = text.slice(separatorIndex + 1);
+  return `${redactGeneratedPackReportValue(target)}:${suffix}`;
+}
+
 function safePromptWords(words = []) {
   const blocked = new Set([
     'ignore',
@@ -1389,7 +1404,12 @@ function manifestAssetProblems(asset = {}, index = 0, packPromptHash = '') {
   if (asset.promptHash && !/^[0-9a-f]{64}$/.test(String(asset.promptHash))) problems.push('invalid-prompt-hash');
   if (asset.promptHash && packPromptHash && asset.source === 'deterministic-fallback' && asset.promptHash !== packPromptHash) problems.push('prompt-hash-mismatch');
   if (asset.kind === 'three-material' && !isHexColor(asset.color)) problems.push('invalid-material-color');
-  return problems.length ? { index, assetId: asset.assetId || null, canonicalTarget: asset.canonicalTarget || null, problems } : null;
+  return problems.length ? {
+    index,
+    assetId: redactGeneratedPackReportValue(asset.assetId || null),
+    canonicalTarget: redactGeneratedPackReportValue(asset.canonicalTarget || null),
+    problems
+  } : null;
 }
 
 function validateAssetManifest(manifest = {}, pack = {}) {
@@ -1419,7 +1439,7 @@ function validateAssetManifest(manifest = {}, pack = {}) {
     {
       id: 'ASSET_MANIFEST_TARGETS_UNIQUE',
       passed: duplicateTargets.length === 0,
-      measured: { duplicateTargets: [...new Set(duplicateTargets)] }
+      measured: { duplicateTargets: [...new Set(duplicateTargets)].map(redactGeneratedPackReportValue) }
     },
     {
       id: 'ASSET_MANIFEST_NO_PRODUCTION_IMAGE_REQUIREMENT',
@@ -1455,7 +1475,12 @@ function assetPlanProblems(asset = {}, index = 0, packId = '') {
   if (!isSafeRelativePath(asset.candidateOutputPath) || !String(asset.candidateOutputPath || '').includes(`/${packId}/candidates/`)) problems.push('invalid-candidate-output-path');
   if (!isSafeRelativePath(asset.approvedOutputPath) || !String(asset.approvedOutputPath || '').includes(`/${packId}/approved/`)) problems.push('invalid-approved-output-path');
   if (!isSafeRelativePath(asset.jobLogPath) || !String(asset.jobLogPath || '').endsWith('.jsonl')) problems.push('invalid-job-log-path');
-  return problems.length ? { index, promptId: asset.promptId || null, canonicalTarget: asset.canonicalTarget || null, problems } : null;
+  return problems.length ? {
+    index,
+    promptId: redactGeneratedPackReportValue(asset.promptId || null),
+    canonicalTarget: redactGeneratedPackReportValue(asset.canonicalTarget || null),
+    problems
+  } : null;
 }
 
 function validateAssetPromptPlan(plan = {}, pack = {}) {
@@ -1488,7 +1513,12 @@ function validateAssetPromptPlan(plan = {}, pack = {}) {
     {
       id: 'ASSET_PROMPT_PLAN_TARGET_COVERAGE',
       passed: missingTargets.length === 0 && duplicateTargets.length === 0,
-      measured: { required: ASSET_PROMPT_TARGETS.length, covered: new Set(targetIds).size, missingTargets, duplicateTargets: [...new Set(duplicateTargets)] }
+      measured: {
+        required: ASSET_PROMPT_TARGETS.length,
+        covered: new Set(targetIds).size,
+        missingTargets,
+        duplicateTargets: [...new Set(duplicateTargets)].map(redactGeneratedPackReportValue)
+      }
     },
     {
       id: 'ASSET_PROMPT_PLAN_ENTRIES_VALID',
@@ -4092,9 +4122,9 @@ function validateCandidateReviewManifest(manifest = {}, pack = {}) {
         expectedTargetCount: targets.length,
         candidateCount: candidates.length,
         missingTargets,
-        duplicateTargets: [...new Set(duplicateTargets)],
-        unknownTargets,
-        pathProblems
+        duplicateTargets: [...new Set(duplicateTargets)].map(redactGeneratedPackReportValue),
+        unknownTargets: unknownTargets.map(redactGeneratedPackReportValue),
+        pathProblems: pathProblems.map(redactGeneratedPackTargetProblem)
       }
     },
     {
@@ -4107,8 +4137,8 @@ function validateCandidateReviewManifest(manifest = {}, pack = {}) {
       id: 'CANDIDATE_REVIEW_MANIFEST_REVIEWED_CANDIDATES_HAVE_CONTENT',
       passed: reviewedCandidatesWithoutContent.length === 0,
       measured: {
-        plannedOnlyReviewedCandidates,
-        reviewedCandidatesMissingContent
+        plannedOnlyReviewedCandidates: plannedOnlyReviewedCandidates.map(redactGeneratedPackReportValue),
+        reviewedCandidatesMissingContent: reviewedCandidatesMissingContent.map(redactGeneratedPackReportValue)
       }
     },
     {

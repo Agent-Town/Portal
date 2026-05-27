@@ -15,6 +15,7 @@ Status: prototype-gated
 - Optional candidate-generation preflights must fail closed unless product/security approval, documented auth model, documented cost model, accepted cost estimate, and user/team consent are all present.
 - Candidate-generation preflight records must never persist raw provider credentials, and failure records must keep `fallbackStillPlayable=true` for valid deterministic packs.
 - Candidate-generation run and job-log validation reports must reject and redact submitted secret-looking keys, secret-looking values, raw-instruction keys, and executable instruction values from both content checks and schema-error paths.
+- Asset prompt-plan, candidate-review, and candidate-generation validation reports must redact unsafe submitted canonical target labels from measured problem lists.
 - Postprocess plans and reports are standalone contracts; they may write postprocessed candidate artifacts and metadata, but must not write approved production assets or alter canonical gameplay mappings.
 - Browser runtime asset loading must use safe public generated-pack paths only; private candidate roots, path traversal, data URLs, provider URLs, and unapproved outputs must fall back without player exposure.
 - First-loop playtest pass status requires measured browser evidence, screenshot evidence, clean console state, canonical payload integrity, and generated-pack validation. Default or placeholder scores cannot pass release gates.
@@ -50,6 +51,7 @@ Status: prototype-gated
   "rawInstructionKeyRedacted": true,
   "candidateGenerationUnsafeKeyValueRedacted": true,
   "releaseEvidenceUnsafeKeyValueRedacted": true,
+  "unsafeTargetLabelRedacted": true,
   "rawExecutablePromptInstructionCount": 0,
   "arbitraryToolMutationFormulaCount": 0,
   "schemaRegistryExists": true,
