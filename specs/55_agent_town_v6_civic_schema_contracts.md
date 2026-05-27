@@ -34,9 +34,9 @@ These schemas do not make V6 player-visible. They define the fail-closed
 contracts that later V6 routes, worker tools, and audit stores must use.
 
 No V6 proposal, vote, delegation, institution charter, public works
-contribution, reputation update, moderation decision, moderation review/appeal,
-civic effect, rollback, or audit ledger row may be accepted without passing the
-matching schema validator.
+contribution, reputation update, reputation dispute/review, moderation decision,
+moderation review/appeal, civic effect, rollback, or audit ledger row may be
+accepted without passing the matching schema validator.
 
 ## Schema Version
 
@@ -59,6 +59,7 @@ unversioned payloads are invalid for V6 civic state.
 | Institution | Human chartering actor, public scope, proposal types, membership and eligibility rules, moderation policy, voting rule, public audit summary, effective timestamp, and redacted privacy envelope. |
 | Public Works Contribution | Institution, project, contributor, source reference, requested public resource bundle, idempotency key, public summary, and redacted privacy envelope. |
 | Reputation | Subject, awarding account, bounded non-zero delta, source reference, dispute status, and audit entry reference. Self-awards are invalid. |
+| Reputation Dispute/Review | Reputation record reference, subject account, human requester, queue/outcome status, reviewer kind, optional moderation decision reference, public source references, reasons, and redacted privacy envelope. |
 | Moderation Decision | Subject reference, public surface, approved/rejected/review status, policy version, reviewer kind, reasons, and redacted fields. |
 | Moderation Review/Appeal | Decision reference, human requester, review type, queue/outcome status, policy version, reviewer kind, public source references such as abuse reports, reasons, and redacted privacy envelope. |
 | Civic Action | Proposal reference, typed public effect, execution authority, handler name, before/after summaries, audit entry, rollback id, and idempotency key. |

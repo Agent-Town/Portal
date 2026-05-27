@@ -12,6 +12,7 @@ const {
   validateModerationDecision,
   validateModerationReview,
   validatePublicWorksContribution,
+  validateReputationDispute,
   validateReputationRecord,
   validateRollbackPlan,
   validateV6CivicSchema
@@ -305,6 +306,46 @@ test('V6 reputation schema blocks self-awards and currency-like transfers', () =
   assert.equal(selfAward.ok, false);
   assert.match(selfAward.errors.join('\n'), /self-awarded/);
   assert.match(selfAward.errors.join('\n'), /delta invalid/);
+});
+
+test('V6 reputation dispute schema requires human review and public-safe evidence', () => {
+  const valid = validateReputationDispute({
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    disputeId: 'repdispute_service_quality_001',
+    recordId: 'reputation_service_quality_001',
+    subjectAccountId: 'acct_service_provider_001',
+    disputedBy: actor({ accountId: 'acct_v6_reviewer_001' }),
+    status: 'opened',
+    reviewerKind: 'system',
+    moderationDecisionId: 'moderation_bridge_text_001',
+    sourceRefs: ['moderation_bridge_text_001'],
+    reasons: ['Open a bounded dispute lane before reputation affects civic advice.'],
+    privacy: privacy({ dataClasses: ['public_audit_summary'] })
+  });
+  assert.equal(valid.ok, true, valid.errors.join('\n'));
+
+  const unsafe = validateReputationDispute({
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    disputeId: 'repdispute_service_quality_002',
+    recordId: 'reputation_service_quality_001',
+    subjectAccountId: 'acct_service_provider_001',
+    disputedBy: {
+      kind: 'agent',
+      accountId: 'acct_v6_reviewer_001',
+      agentId: 'agent_civic_clover_001'
+    },
+    status: 'upheld',
+    reviewerKind: 'system',
+    moderationDecisionId: 'moderation_bridge_text_001',
+    sourceRefs: ['moderation_bridge_text_001'],
+    reasons: ['Contains oauth token for debugging.'],
+    privacy: privacy({ privateDataIncluded: true })
+  });
+  assert.equal(unsafe.ok, false);
+  assert.match(unsafe.errors.join('\n'), /disputedBy.kind unsupported/);
+  assert.match(unsafe.errors.join('\n'), /reviewerKind must be human/);
+  assert.match(unsafe.errors.join('\n'), /privateDataIncluded/);
+  assert.match(unsafe.errors.join('\n'), /private data forbidden/);
 });
 
 test('V6 moderation, action, rollback, and audit schemas require traceable safety handles', () => {

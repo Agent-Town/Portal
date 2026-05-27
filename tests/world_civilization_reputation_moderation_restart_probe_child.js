@@ -25,6 +25,30 @@ function reputationRecord(overrides = {}) {
   };
 }
 
+function reputationDispute(overrides = {}) {
+  return {
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    disputeId: 'repdispute_restart_service_001',
+    recordId: 'reputation_restart_service_001',
+    subjectAccountId: REPUTATION_SUBJECT,
+    disputedBy: {
+      kind: 'human',
+      accountId: 'acct_v6_restart_reviewer_001'
+    },
+    status: 'opened',
+    reviewerKind: 'system',
+    moderationDecisionId: 'moderation_restart_civic_notice_001',
+    sourceRefs: ['moderation_restart_civic_notice_001'],
+    reasons: ['Restart probe opens a review lane for the reputation record without mutating score.'],
+    privacy: {
+      redacted: true,
+      privateDataIncluded: false,
+      dataClasses: ['public_audit_summary']
+    },
+    ...overrides
+  };
+}
+
 function moderationDecision(overrides = {}) {
   return {
     schemaVersion: CIVIC_SCHEMA_VERSION,
@@ -91,6 +115,7 @@ function snapshot({ auditLedger, reputationStore, moderationStore }) {
   return {
     auditCount: auditLedger.count(),
     reputationCount: reputationStore.count(),
+    reputationDisputeCount: reputationStore.disputeCount(),
     moderationCount: moderationStore.count(),
     moderationReviewCount: moderationStore.reviewCount(),
     reputationSummary,
@@ -117,6 +142,16 @@ function main() {
         ok: true,
         duplicate: row.duplicate === true,
         recordId: row.recordId,
+        ...snapshot(stores)
+      });
+      return;
+    }
+    if (mode === 'seed-reputation-dispute') {
+      const row = stores.reputationStore.recordDispute(reputationDispute(), { nowMs: 1_779_785_200_000 });
+      writeJson({
+        ok: true,
+        duplicate: row.duplicate === true,
+        disputeId: row.disputeId,
         ...snapshot(stores)
       });
       return;

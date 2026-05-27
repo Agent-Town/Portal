@@ -169,8 +169,10 @@ gate below has implementation, deterministic tests, and security/product signoff
   or applied to ineligible owners.
 - Reputation cannot be self-awarded, transferred as currency, or used without an
   audit trail and dispute path. Current research-only storage starts this in
-  `server/world_civilization/reputation.js`; release still requires full
-  dispute/review workflows and documented civic eligibility/advice use.
+  `server/world_civilization/reputation.js` with durable reputation records,
+  dispute/review records, human dispute requesters, moderation-decision source
+  references, and `reputation.disputed` audit rows; release still requires
+  production eligibility/advice integration and privacy/product review.
 - Moderation must cover proposal text, attached media, sandbox actions, civic
   effects, public profile surfaces, and agent-authored content. Current
   research-only storage starts this in

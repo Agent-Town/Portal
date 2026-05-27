@@ -39,6 +39,7 @@ const MODERATION_STATUSES = new Set(['approved', 'rejected', 'needs_review']);
 const MODERATION_REVIEW_TYPES = new Set(['human_review', 'appeal']);
 const MODERATION_REVIEW_STATUSES = new Set(['queued', 'upheld', 'overturned', 'escalated']);
 const REPUTATION_KINDS = new Set(['service_reliability', 'proposal_quality', 'moderation_trust']);
+const REPUTATION_DISPUTE_STATUSES = new Set(['opened', 'under_review', 'upheld', 'overturned', 'dismissed']);
 const RESOURCE_BUNDLE_KEYS = ['wood', 'stone', 'food', 'coin'];
 const AUDIT_ACTION_TYPES = new Set([
   'proposal.created',
@@ -48,6 +49,8 @@ const AUDIT_ACTION_TYPES = new Set([
   'institution.chartered',
   'public_works.contribution.recorded',
   'reputation.recorded',
+  'reputation.disputed',
+  'reputation.reviewed',
   'moderation.decided',
   'moderation.reviewed',
   'moderation.appealed',
@@ -427,6 +430,44 @@ function validateReputationRecord(raw = {}) {
   };
 }
 
+function validateReputationDispute(raw = {}) {
+  const errors = [];
+  if (!isPlainObject(raw)) return { ok: false, errors: ['reputation dispute must be object'] };
+  validateSchemaVersion(errors, raw);
+  const disputeId = validateString(errors, raw.disputeId, 'disputeId', { pattern: /^repdispute_[a-z0-9_:-]{4,88}$/ });
+  const recordId = validateString(errors, raw.recordId, 'recordId', { pattern: /^reputation_[a-z0-9_:-]{4,88}$/ });
+  const subjectAccountId = validateString(errors, raw.subjectAccountId, 'subjectAccountId', { pattern: CIVIC_ID_RE, max: 96 });
+  const disputedBy = validateActor(errors, raw.disputedBy, 'disputedBy', { allowAgent: false });
+  const status = validateEnum(errors, raw.status, REPUTATION_DISPUTE_STATUSES, 'status');
+  const reviewerKind = validateEnum(errors, raw.reviewerKind, new Set(['system', 'human']), 'reviewerKind');
+  if (status !== 'opened' && reviewerKind !== 'human') errors.push('reviewerKind must be human for reviewed disputes');
+  const moderationDecisionId = raw.moderationDecisionId === undefined || raw.moderationDecisionId === ''
+    ? ''
+    : validateString(errors, raw.moderationDecisionId, 'moderationDecisionId', { pattern: /^moderation_[a-z0-9_:-]{4,88}$/ });
+  const sourceRefs = validateStringArray(errors, raw.sourceRefs || [], 'sourceRefs', { maxItems: 8, maxLen: 96, required: false });
+  const reasons = validateStringArray(errors, raw.reasons, 'reasons', { maxItems: 8, maxLen: 120 });
+  const privacy = validatePrivacy(errors, raw.privacy, 'privacy');
+  const privatePaths = findPrivateData(raw);
+  if (privatePaths.length) errors.push(`private data forbidden: ${privatePaths.join(', ')}`);
+  return {
+    ok: errors.length === 0,
+    errors,
+    value: errors.length ? null : {
+      schemaVersion: CIVIC_SCHEMA_VERSION,
+      disputeId,
+      recordId,
+      subjectAccountId,
+      disputedBy,
+      status,
+      reviewerKind,
+      moderationDecisionId,
+      sourceRefs,
+      reasons,
+      privacy
+    }
+  };
+}
+
 function validateModerationDecision(raw = {}) {
   const errors = [];
   if (!isPlainObject(raw)) return { ok: false, errors: ['moderation decision must be object'] };
@@ -600,6 +641,7 @@ function validateV6CivicSchema(kind, raw = {}) {
     institution: validateCivicInstitution,
     publicWorksContribution: validatePublicWorksContribution,
     reputation: validateReputationRecord,
+    reputationDispute: validateReputationDispute,
     moderation: validateModerationDecision,
     moderationReview: validateModerationReview,
     action: validateCivicAction,
@@ -625,6 +667,7 @@ module.exports = {
   validateModerationDecision,
   validateModerationReview,
   validatePublicWorksContribution,
+  validateReputationDispute,
   validateReputationRecord,
   validateRollbackPlan,
   validateV6CivicSchema

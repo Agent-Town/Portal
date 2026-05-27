@@ -176,7 +176,10 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(gate, /hidden from runtime `\/api\/world\/tools`/);
   assert.match(plan, /M9 Reputation and accountability \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/reputation\.js/);
+  assert.match(plan, /reputation dispute\/review/);
+  assert.match(plan, /human dispute requesters/);
   assert.match(gate, /server\/world_civilization\/reputation\.js/);
+  assert.match(gate, /reputation\.disputed/);
   assert.match(plan, /M10 Moderation and privacy layer \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/moderation\.js/);
   assert.match(plan, /moderation review\/appeal/);
@@ -219,7 +222,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /research-scale replay pagination plus duplicate retry bursts/);
   assert.match(plan, /tests\/world_civilization_rollback_recovery\.test\.js/);
   assert.match(plan, /prepared rollback-handle reconstruction after reopen/);
-  assert.match(plan, /process restart probes now cover audit-ledger, proposal\/vote, reputation\/moderation decision\/review, effect\/rollback, delegation, institution, and public-works/);
+  assert.match(plan, /process restart probes now cover audit-ledger, proposal\/vote, reputation record\/dispute, moderation decision\/review, effect\/rollback, delegation, institution, and public-works/);
   assert.match(gate, /server\/world_civilization\/resilience\.js/);
   assert.match(gate, /tests\/world_civilization_schema_metadata\.test\.js/);
   assert.match(gate, /unsupported SQLite `user_version`/);

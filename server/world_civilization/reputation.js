@@ -3,7 +3,7 @@ const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
 
 const { createCivicAuditLedger, sha256, stableJson } = require('./audit_ledger');
-const { validateReputationRecord } = require('./schemas');
+const { validateReputationDispute, validateReputationRecord } = require('./schemas');
 const {
   ensureCivicSqliteSchemaMetadata,
   readCivicSqliteSchemaMetadata
@@ -25,6 +25,22 @@ function parseReputationRow(row) {
     auditEntryId: row.audit_entry_id,
     createdAtMs: Number(row.created_at),
     record: JSON.parse(row.reputation_json)
+  };
+}
+
+function parseDisputeRow(row) {
+  if (!row) return null;
+  return {
+    disputeId: row.dispute_id,
+    recordId: row.record_id,
+    subjectAccountId: row.subject_account_id,
+    disputedByAccountId: row.disputed_by_account_id,
+    status: row.status,
+    reviewerKind: row.reviewer_kind,
+    moderationDecisionId: row.moderation_decision_id || '',
+    auditEntryId: row.audit_entry_id,
+    createdAtMs: Number(row.created_at),
+    dispute: JSON.parse(row.dispute_json)
   };
 }
 
@@ -54,6 +70,28 @@ function ensureSchema(db) {
       ON world_civic_reputation_records(source_ref, created_at);
     CREATE INDEX IF NOT EXISTS idx_world_civic_reputation_dispute
       ON world_civic_reputation_records(dispute_status, created_at);
+
+    CREATE TABLE IF NOT EXISTS world_civic_reputation_disputes (
+      dispute_id TEXT PRIMARY KEY,
+      record_id TEXT NOT NULL,
+      subject_account_id TEXT NOT NULL,
+      disputed_by_account_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      reviewer_kind TEXT NOT NULL,
+      moderation_decision_id TEXT NOT NULL,
+      audit_entry_id TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      dispute_json TEXT NOT NULL,
+      UNIQUE(record_id, disputed_by_account_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_world_civic_reputation_disputes_record
+      ON world_civic_reputation_disputes(record_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_world_civic_reputation_disputes_subject
+      ON world_civic_reputation_disputes(subject_account_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_world_civic_reputation_disputes_status
+      ON world_civic_reputation_disputes(status, created_at);
+    CREATE INDEX IF NOT EXISTS idx_world_civic_reputation_disputes_requester
+      ON world_civic_reputation_disputes(disputed_by_account_id, created_at);
   `);
   return ensureCivicSqliteSchemaMetadata(db, {
     storeKey: STORE_KEY,
@@ -95,13 +133,43 @@ function buildStatements(db) {
       ORDER BY created_at ASC, record_id ASC
       LIMIT ?
     `),
+    byDisputeId: db.prepare(`
+      SELECT *
+      FROM world_civic_reputation_disputes
+      WHERE dispute_id = ?
+      LIMIT 1
+    `),
+    byRecordDisputer: db.prepare(`
+      SELECT *
+      FROM world_civic_reputation_disputes
+      WHERE record_id = ? AND disputed_by_account_id = ?
+      LIMIT 1
+    `),
+    insertDispute: db.prepare(`
+      INSERT INTO world_civic_reputation_disputes (
+        dispute_id, record_id, subject_account_id, disputed_by_account_id,
+        status, reviewer_kind, moderation_decision_id, audit_entry_id,
+        created_at, dispute_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `),
+    listDisputes: db.prepare(`
+      SELECT *
+      FROM world_civic_reputation_disputes
+      WHERE (? = '' OR record_id = ?)
+        AND (? = '' OR subject_account_id = ?)
+        AND (? = '' OR status = ?)
+        AND (? = '' OR disputed_by_account_id = ?)
+      ORDER BY created_at ASC, dispute_id ASC
+      LIMIT ?
+    `),
     summary: db.prepare(`
       SELECT kind, dispute_status, SUM(delta) AS total_delta, COUNT(1) AS count
       FROM world_civic_reputation_records
       WHERE subject_account_id = ?
       GROUP BY kind, dispute_status
     `),
-    count: db.prepare('SELECT COUNT(1) AS count FROM world_civic_reputation_records')
+    count: db.prepare('SELECT COUNT(1) AS count FROM world_civic_reputation_records'),
+    disputeCount: db.prepare('SELECT COUNT(1) AS count FROM world_civic_reputation_disputes')
   };
 }
 
@@ -122,6 +190,35 @@ function createReputationAuditEntry(record, nowMs) {
     idempotencyKey: auditIdempotencyKey(record),
     beforeHash: sha256(`agent-town.v6.civic.reputation.absent:${record.recordId}`),
     afterHash: sha256(stableJson(record)),
+    createdAtMs: nowMs,
+    migrationVersion: MIGRATION_VERSION,
+    replayable: true,
+    rollbackId: '',
+    privacy: {
+      redacted: true,
+      privateDataIncluded: false,
+      dataClasses: ['public_audit_summary']
+    }
+  };
+}
+
+function disputeAuditIdempotencyKey(dispute) {
+  return `idem_${dispute.disputeId.replace(/^repdispute_/, 'repdispute_').slice(0, 80)}`;
+}
+
+function createReputationDisputeAuditEntry(dispute, nowMs) {
+  return {
+    schemaVersion: dispute.schemaVersion,
+    entryId: `audit_${dispute.disputeId.replace(/^repdispute_/, 'repdispute_')}`,
+    actor: {
+      kind: 'human',
+      accountId: dispute.disputedBy.accountId
+    },
+    actionType: dispute.status === 'opened' ? 'reputation.disputed' : 'reputation.reviewed',
+    objectRef: dispute.disputeId,
+    idempotencyKey: disputeAuditIdempotencyKey(dispute),
+    beforeHash: sha256(`agent-town.v6.civic.reputation.dispute.absent:${dispute.disputeId}`),
+    afterHash: sha256(stableJson(dispute)),
     createdAtMs: nowMs,
     migrationVersion: MIGRATION_VERSION,
     replayable: true,
@@ -210,6 +307,75 @@ function createCivicReputationStore({ sqlitePath, auditLedger = null, auditSqlit
     return parseReputationRow(statements.byRecordId.get(String(recordId || '')));
   }
 
+  function recordDispute(rawDispute = {}, { nowMs = Date.now() } = {}) {
+    const validation = validateReputationDispute(rawDispute);
+    if (!validation.ok) {
+      const err = new Error('CIVIC_REPUTATION_DISPUTE_INVALID');
+      err.details = { errors: validation.errors };
+      throw err;
+    }
+    const dispute = validation.value;
+    const normalizedJson = stableJson(dispute);
+
+    const existingById = parseDisputeRow(statements.byDisputeId.get(dispute.disputeId));
+    if (existingById) {
+      if (stableJson(existingById.dispute) !== normalizedJson) {
+        const err = new Error('CIVIC_REPUTATION_DISPUTE_ID_CONFLICT');
+        err.details = { disputeId: dispute.disputeId };
+        throw err;
+      }
+      return { ...existingById, duplicate: true };
+    }
+
+    const record = getRecord(dispute.recordId);
+    if (!record) {
+      const err = new Error('CIVIC_REPUTATION_DISPUTE_RECORD_REQUIRED');
+      err.details = { recordId: dispute.recordId };
+      throw err;
+    }
+    if (record.subjectAccountId !== dispute.subjectAccountId) {
+      const err = new Error('CIVIC_REPUTATION_DISPUTE_RECORD_MISMATCH');
+      err.details = {
+        recordId: dispute.recordId,
+        subjectAccountId: dispute.subjectAccountId
+      };
+      throw err;
+    }
+
+    const existingByRecordDisputer = parseDisputeRow(statements.byRecordDisputer.get(
+      dispute.recordId,
+      dispute.disputedBy.accountId
+    ));
+    if (existingByRecordDisputer) {
+      const err = new Error('CIVIC_REPUTATION_DISPUTE_SOURCE_CONFLICT');
+      err.details = {
+        recordId: dispute.recordId,
+        disputedByAccountId: dispute.disputedBy.accountId,
+        existingDisputeId: existingByRecordDisputer.disputeId
+      };
+      throw err;
+    }
+
+    const auditRow = ledger.append(createReputationDisputeAuditEntry(dispute, nowMs));
+    statements.insertDispute.run(
+      dispute.disputeId,
+      dispute.recordId,
+      dispute.subjectAccountId,
+      dispute.disputedBy.accountId,
+      dispute.status,
+      dispute.reviewerKind,
+      dispute.moderationDecisionId,
+      auditRow.entry.entryId,
+      nowMs,
+      normalizedJson
+    );
+    return parseDisputeRow(statements.byDisputeId.get(dispute.disputeId));
+  }
+
+  function getDispute(disputeId = '') {
+    return parseDisputeRow(statements.byDisputeId.get(String(disputeId || '')));
+  }
+
   function listRecords({ subjectAccountId = '', kind = '', disputeStatus = '', limit = 100 } = {}) {
     const safeLimit = Number.isInteger(Number(limit)) ? Math.max(1, Math.min(500, Number(limit))) : 100;
     return statements.list.all(
@@ -223,12 +389,30 @@ function createCivicReputationStore({ sqlitePath, auditLedger = null, auditSqlit
     ).map(parseReputationRow);
   }
 
+  function listDisputes({ recordId = '', subjectAccountId = '', status = '', disputedByAccountId = '', limit = 100 } = {}) {
+    const safeLimit = Number.isInteger(Number(limit)) ? Math.max(1, Math.min(500, Number(limit))) : 100;
+    return statements.listDisputes.all(
+      String(recordId || ''),
+      String(recordId || ''),
+      String(subjectAccountId || ''),
+      String(subjectAccountId || ''),
+      String(status || ''),
+      String(status || ''),
+      String(disputedByAccountId || ''),
+      String(disputedByAccountId || ''),
+      safeLimit
+    ).map(parseDisputeRow);
+  }
+
   function summarizeSubjectReputation(subjectAccountId = '') {
     const rows = statements.summary.all(String(subjectAccountId || ''));
+    const disputes = listDisputes({ subjectAccountId, limit: 500 });
     const byKind = {};
     let totalScore = 0;
     let openDisputeCount = 0;
     let recordCount = 0;
+    let disputeReviewCount = disputes.length;
+    let openDisputeReviewCount = 0;
     for (const row of rows) {
       const kind = String(row.kind || '');
       const totalDelta = Number(row.total_delta || 0);
@@ -243,11 +427,17 @@ function createCivicReputationStore({ sqlitePath, auditLedger = null, auditSqlit
         openDisputeCount += count;
       }
     }
+    for (const dispute of disputes) {
+      if (dispute.status === 'opened' || dispute.status === 'under_review') openDisputeReviewCount += 1;
+    }
     return {
       subjectAccountId: String(subjectAccountId || ''),
       totalScore,
       recordCount,
       openDisputeCount,
+      disputeReviewCount,
+      openDisputeReviewCount,
+      latestDisputeId: disputes[disputes.length - 1]?.disputeId || '',
       byKind,
       transferable: false,
       executionStatus: 'not_executable'
@@ -256,6 +446,10 @@ function createCivicReputationStore({ sqlitePath, auditLedger = null, auditSqlit
 
   function count() {
     return Number(statements.count.get().count || 0);
+  }
+
+  function disputeCount() {
+    return Number(statements.disputeCount.get().count || 0);
   }
 
   function getSchemaMetadata() {
@@ -272,11 +466,15 @@ function createCivicReputationStore({ sqlitePath, auditLedger = null, auditSqlit
   return {
     close,
     count,
+    disputeCount,
+    getDispute,
     getRecord,
     getSchemaMetadata,
+    listDisputes,
     listRecords,
     migrationVersion: schemaMetadata.migrationVersion,
     recordReputation,
+    recordDispute,
     sqlitePath,
     summarizeSubjectReputation
   };

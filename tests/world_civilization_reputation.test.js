@@ -38,6 +38,30 @@ function reputationRecord(overrides = {}) {
   };
 }
 
+function reputationDispute(overrides = {}) {
+  return {
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    disputeId: 'repdispute_service_quality_001',
+    recordId: 'reputation_service_quality_001',
+    subjectAccountId: 'acct_service_provider_001',
+    disputedBy: {
+      kind: 'human',
+      accountId: 'acct_v6_human_002'
+    },
+    status: 'opened',
+    reviewerKind: 'system',
+    moderationDecisionId: 'moderation_bridge_text_001',
+    sourceRefs: ['moderation_bridge_text_001'],
+    reasons: ['Human reviewer should inspect the service quality award before release use.'],
+    privacy: {
+      redacted: true,
+      privateDataIncluded: false,
+      dataClasses: ['public_audit_summary']
+    },
+    ...overrides
+  };
+}
+
 test('V6 reputation store records bounded accountability entries without execution', () => withTempReputationStore(({ auditLedger, store }) => {
   const row = store.recordReputation(reputationRecord(), { nowMs: 1_779_784_000_000 });
   const summary = store.summarizeSubjectReputation('acct_service_provider_001');
@@ -56,6 +80,43 @@ test('V6 reputation store records bounded accountability entries without executi
   assert.equal(audit.entry.actionType, 'reputation.recorded');
   assert.equal(audit.entry.actor.accountId, 'acct_v6_human_001');
   assert.equal(audit.entry.objectRef, 'reputation_service_quality_001');
+}));
+
+test('V6 reputation store records dispute review workflow without score mutation', () => withTempReputationStore(({ auditLedger, store }) => {
+  store.recordReputation(reputationRecord(), { nowMs: 1_779_784_000_000 });
+  const row = store.recordDispute(reputationDispute(), { nowMs: 1_779_784_001_000 });
+  const duplicate = store.recordDispute(reputationDispute(), { nowMs: 1_779_784_002_000 });
+  const summary = store.summarizeSubjectReputation('acct_service_provider_001');
+
+  assert.equal(row.disputeId, 'repdispute_service_quality_001');
+  assert.equal(row.recordId, 'reputation_service_quality_001');
+  assert.equal(row.status, 'opened');
+  assert.equal(row.moderationDecisionId, 'moderation_bridge_text_001');
+  assert.equal(row.dispute.sourceRefs[0], 'moderation_bridge_text_001');
+  assert.equal(duplicate.duplicate, true);
+  assert.throws(
+    () => store.recordDispute(reputationDispute({ status: 'upheld', reviewerKind: 'human' })),
+    /CIVIC_REPUTATION_DISPUTE_ID_CONFLICT/
+  );
+  assert.throws(
+    () => store.recordDispute(reputationDispute({ disputeId: 'repdispute_service_quality_002' })),
+    /CIVIC_REPUTATION_DISPUTE_SOURCE_CONFLICT/
+  );
+  assert.equal(store.disputeCount(), 1);
+  assert.equal(summary.totalScore, 2);
+  assert.equal(summary.recordCount, 1);
+  assert.equal(summary.disputeReviewCount, 1);
+  assert.equal(summary.openDisputeReviewCount, 1);
+  assert.equal(summary.latestDisputeId, 'repdispute_service_quality_001');
+  assert.equal(summary.transferable, false);
+  assert.equal(summary.executionStatus, 'not_executable');
+
+  const audit = auditLedger.getByEntryId('audit_repdispute_service_quality_001');
+  assert.equal(audit.entry.actionType, 'reputation.disputed');
+  assert.equal(audit.entry.actor.kind, 'human');
+  assert.equal(audit.entry.actor.accountId, 'acct_v6_human_002');
+  assert.equal(audit.entry.objectRef, 'repdispute_service_quality_001');
+  assert.equal(audit.entry.privacy.privateDataIncluded, false);
 }));
 
 test('V6 reputation store is idempotent by record and rejects duplicate source awards', () => withTempReputationStore(({ store }) => {
@@ -77,6 +138,53 @@ test('V6 reputation store is idempotent by record and rejects duplicate source a
     /CIVIC_REPUTATION_SOURCE_CONFLICT/
   );
   assert.equal(store.count(), 1);
+}));
+
+test('V6 reputation store rejects unsafe dispute reviews before persistence', () => withTempReputationStore(({ auditLedger, store }) => {
+  store.recordReputation(reputationRecord(), { nowMs: 1_779_784_000_000 });
+
+  assert.throws(
+    () => store.recordDispute(reputationDispute({
+      disputeId: 'repdispute_missing_record_001',
+      recordId: 'reputation_missing_001'
+    })),
+    /CIVIC_REPUTATION_DISPUTE_RECORD_REQUIRED/
+  );
+  assert.throws(
+    () => store.recordDispute(reputationDispute({
+      disputeId: 'repdispute_mismatch_001',
+      subjectAccountId: 'acct_wrong_subject_001'
+    })),
+    /CIVIC_REPUTATION_DISPUTE_RECORD_MISMATCH/
+  );
+  assert.throws(
+    () => store.recordDispute(reputationDispute({
+      disputeId: 'repdispute_agent_request_001',
+      disputedBy: {
+        kind: 'agent',
+        accountId: 'acct_v6_human_002',
+        agentId: 'agent_civic_clover_001'
+      }
+    })),
+    /CIVIC_REPUTATION_DISPUTE_INVALID/
+  );
+  assert.throws(
+    () => store.recordDispute(reputationDispute({
+      disputeId: 'repdispute_review_system_001',
+      status: 'upheld',
+      reviewerKind: 'system'
+    })),
+    /CIVIC_REPUTATION_DISPUTE_INVALID/
+  );
+  assert.throws(
+    () => store.recordDispute(reputationDispute({
+      disputeId: 'repdispute_private_trace_001',
+      reasons: ['Contains bearer secret-token-value']
+    })),
+    /CIVIC_REPUTATION_DISPUTE_INVALID/
+  );
+  assert.equal(store.disputeCount(), 0);
+  assert.equal(auditLedger.count(), 1);
 }));
 
 test('V6 reputation store rejects self-awards, currency-like deltas, and private data', () => withTempReputationStore(({ store }) => {
@@ -118,6 +226,7 @@ test('V6 reputation store persists records and supports dispute replay indexes',
     const auditLedger = createCivicAuditLedger({ sqlitePath: auditSqlitePath });
     const store = createCivicReputationStore({ sqlitePath, auditLedger });
     store.recordReputation(reputationRecord(), { nowMs: 1_779_784_000_000 });
+    store.recordDispute(reputationDispute(), { nowMs: 1_779_784_000_500 });
     store.recordReputation(reputationRecord({
       recordId: 'reputation_quality_dispute_001',
       awardedByAccountId: 'acct_v6_human_002',
@@ -132,7 +241,17 @@ test('V6 reputation store persists records and supports dispute replay indexes',
     const reopenedAudit = createCivicAuditLedger({ sqlitePath: auditSqlitePath });
     const reopened = createCivicReputationStore({ sqlitePath, auditLedger: reopenedAudit });
     assert.equal(reopened.count(), 2);
+    assert.equal(reopened.disputeCount(), 1);
     assert.equal(reopened.getRecord('reputation_service_quality_001').delta, 2);
+    assert.equal(reopened.getDispute('repdispute_service_quality_001').status, 'opened');
+    assert.deepEqual(
+      reopened.listDisputes({ recordId: 'reputation_service_quality_001' }).map((row) => row.disputeId),
+      ['repdispute_service_quality_001']
+    );
+    assert.deepEqual(
+      reopened.listDisputes({ status: 'opened' }).map((row) => row.disputeId),
+      ['repdispute_service_quality_001']
+    );
     assert.deepEqual(
       reopened.listRecords({ subjectAccountId: 'acct_service_provider_001' }).map((row) => row.recordId),
       ['reputation_service_quality_001', 'reputation_quality_dispute_001']
@@ -144,7 +263,14 @@ test('V6 reputation store persists records and supports dispute replay indexes',
     const summary = reopened.summarizeSubjectReputation('acct_service_provider_001');
     assert.equal(summary.totalScore, 1);
     assert.equal(summary.openDisputeCount, 1);
-    assert.equal(reopenedAudit.replay({ actorAccountId: 'acct_v6_human_002' })[0].entry.objectRef, 'reputation_quality_dispute_001');
+    assert.equal(summary.disputeReviewCount, 1);
+    assert.equal(summary.openDisputeReviewCount, 1);
+    assert.equal(summary.latestDisputeId, 'repdispute_service_quality_001');
+    assert.deepEqual(
+      reopenedAudit.replay({ actorAccountId: 'acct_v6_human_002' }).map((row) => row.entry.objectRef),
+      ['repdispute_service_quality_001', 'reputation_quality_dispute_001']
+    );
+    assert.equal(reopenedAudit.replay({ actorAccountId: 'acct_v6_human_002' })[0].entry.actionType, 'reputation.disputed');
     reopened.close();
     reopenedAudit.close();
   } finally {
