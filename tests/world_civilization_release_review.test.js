@@ -124,6 +124,31 @@ test('V6 release review requires data-retention target gate evidence', () => {
   assert.ok(validationGate.requiredChecks.includes('data_retention_target_gate'));
 });
 
+test('V6 release review requires product signoff target gate evidence', () => {
+  const productGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'product_signoff');
+  const validationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'validation_evidence');
+
+  assert.equal(productGate.owner, 'product');
+  assert.ok(productGate.requiredArtifacts.includes('docs/ops/V6_AGENT_CIVILIZATION_CONTROLLED_RELEASE_RUNBOOK.md'));
+  assert.ok(productGate.requiredArtifacts.includes('server/world_civilization/product_signoff_targets.js'));
+  assert.ok(productGate.requiredArtifacts.includes('tests/world_civilization_product_signoff_targets.test.js'));
+  assert.ok(productGate.requiredChecks.includes('player_visible_scope'));
+  assert.ok(productGate.requiredChecks.includes('normal_gameplay_exposure_denial'));
+  assert.ok(productGate.requiredChecks.includes('product_owner_approval'));
+  assert.ok(productGate.requiredChecks.includes('qa_release_evidence'));
+  assert.ok(productGate.requiredChecks.includes('security_release_evidence'));
+  assert.ok(productGate.requiredChecks.includes('rollback_plan'));
+  assert.ok(productGate.requiredChecks.includes('disable_plan'));
+  assert.ok(productGate.requiredChecks.includes('support_runbook'));
+  assert.ok(productGate.requiredChecks.includes('user_comms_plan'));
+  assert.ok(productGate.requiredChecks.includes('observability_handoff'));
+  assert.ok(productGate.requiredChecks.includes('go_no_go_record'));
+  assert.ok(productGate.requiredChecks.includes('post_release_monitoring'));
+  assert.ok(productGate.requiredChecks.includes('product_signoff_target_gate'));
+  assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_product_signoff_targets.test.js'));
+  assert.ok(validationGate.requiredChecks.includes('product_signoff_target_gate'));
+});
+
 test('V6 release review audit coverage requires governance preflight evidence', () => {
   const auditGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'audit_coverage');
   const validationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'validation_evidence');

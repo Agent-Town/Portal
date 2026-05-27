@@ -167,6 +167,7 @@ const REQUIRED_REVIEW_GATES = [
       RELEASE_REVIEW_ARTIFACT,
       'tests/world_civilization_schemas.test.js',
       'tests/world_civilization_abuse_case_targets.test.js',
+      'tests/world_civilization_product_signoff_targets.test.js',
       'tests/world_civilization_threat_model_targets.test.js',
       'tests/world_civilization_data_retention_targets.test.js',
       'tests/world_civilization_privacy_review_targets.test.js',
@@ -197,6 +198,7 @@ const REQUIRED_REVIEW_GATES = [
       'all_features_regression',
       'feature_override_safety',
       'abuse_case_target_gate',
+      'product_signoff_target_gate',
       'threat_model_target_gate',
       'privacy_review_target_gate',
       'data_retention_target_gate',
@@ -625,8 +627,27 @@ const REQUIRED_REVIEW_GATES = [
     key: 'product_signoff',
     label: 'Product release signoff',
     owner: 'product',
-    requiredArtifacts: [RELEASE_REVIEW_ARTIFACT],
-    requiredChecks: ['player_visible_scope', 'rollback_plan', 'support_runbook', 'disable_plan'],
+    requiredArtifacts: [
+      RELEASE_REVIEW_ARTIFACT,
+      'docs/ops/V6_AGENT_CIVILIZATION_CONTROLLED_RELEASE_RUNBOOK.md',
+      'server/world_civilization/product_signoff_targets.js',
+      'tests/world_civilization_product_signoff_targets.test.js'
+    ],
+    requiredChecks: [
+      'player_visible_scope',
+      'normal_gameplay_exposure_denial',
+      'product_owner_approval',
+      'qa_release_evidence',
+      'security_release_evidence',
+      'rollback_plan',
+      'disable_plan',
+      'support_runbook',
+      'user_comms_plan',
+      'observability_handoff',
+      'go_no_go_record',
+      'post_release_monitoring',
+      'product_signoff_target_gate'
+    ],
     signoffRequired: true
   }
 ];

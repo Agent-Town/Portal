@@ -53,8 +53,8 @@ are present.
   all-features regression, feature override safety, load-rate target coverage,
   migration-load replay evidence, load/rate replay evidence, and multi-process
   write-contention evidence, including civic mutation security, abuse-case
-  target coverage, threat model target coverage, privacy review target coverage,
-  data-retention target
+  target coverage, product signoff target coverage, threat model target
+  coverage, privacy review target coverage, data-retention target
   coverage, session-auth target coverage, proposal intake readiness, vote
   authorization readiness, worker vote adapter gate, reputation eligibility
   advice readiness, moderation privacy readiness, delegated-agent proof, and
@@ -156,8 +156,11 @@ are present.
   target mapping with no executable handlers. Release still requires encrypted storage, point-in-time recovery,
   live WAL checkpointing, restore SLO signoff, migration replay diffs, and
   route/store contention SLO evidence.
-- Product release signoff: player-visible scope, rollback plan, support runbook,
-  and disable plan.
+- Product release signoff: player-visible scope, normal gameplay exposure
+  denial, product owner approval, QA release evidence, security release
+  evidence, rollback plan, disable plan, support runbook, user comms plan,
+  observability handoff, go/no-go record, post-release monitoring, and product
+  signoff target gate.
 
 ## Release Rule
 

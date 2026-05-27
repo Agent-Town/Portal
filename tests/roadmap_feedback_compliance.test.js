@@ -89,6 +89,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'server/world_civilization/moderation.js',
     'server/world_civilization/mutation_security.js',
     'server/world_civilization/privacy_review_targets.js',
+    'server/world_civilization/product_signoff_targets.js',
     'server/world_civilization/proposals.js',
     'server/world_civilization/routes.js',
     'server/world_civilization/store_wiring.js',
@@ -119,6 +120,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'tests/world_civilization_abuse_case_targets.test.js',
     'tests/world_civilization_data_retention_targets.test.js',
     'tests/world_civilization_privacy_review_targets.test.js',
+    'tests/world_civilization_product_signoff_targets.test.js',
     'tests/world_civilization_reputation_moderation_process_restart.test.js',
     'tests/world_civilization_effect_process_restart.test.js',
     'tests/world_civilization_delegation_process_restart.test.js',
@@ -225,6 +227,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   const privacyReviewTargetSource = read('server/world_civilization/privacy_review_targets.js');
   const threatModelTargetSource = read('server/world_civilization/threat_model_targets.js');
   const abuseCaseTargetSource = read('server/world_civilization/abuse_case_targets.js');
+  const productSignoffTargetSource = read('server/world_civilization/product_signoff_targets.js');
   const requiredMilestones = [
     'M0 Hardened V5 world-grid baseline',
     'M1 Living V6 milestone contract',
@@ -270,6 +273,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(readinessSource, /V6_READINESS_GATE_PRODUCTION_ENABLEMENT_FORBIDDEN/);
   assert.match(readinessSource, /threat_model_target_gate/);
   assert.match(readinessSource, /abuse_case_target_gate/);
+  assert.match(readinessSource, /product_signoff_target_gate/);
   assert.match(readinessSource, /privacy_review_target_gate/);
   assert.match(readinessSource, /data_retention_target_gate/);
   assert.match(releaseReviewSource, /session_auth_target_gate/);
@@ -277,6 +281,8 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(releaseReviewSource, /server\/world_civilization\/threat_model_targets\.js/);
   assert.match(releaseReviewSource, /abuse_case_target_gate/);
   assert.match(releaseReviewSource, /server\/world_civilization\/abuse_case_targets\.js/);
+  assert.match(releaseReviewSource, /product_signoff_target_gate/);
+  assert.match(releaseReviewSource, /server\/world_civilization\/product_signoff_targets\.js/);
   assert.match(releaseReviewSource, /privacy_review_target_gate/);
   assert.match(releaseReviewSource, /server\/world_civilization\/privacy_review_targets\.js/);
   assert.match(releaseReviewSource, /data_retention_target_gate/);
@@ -296,6 +302,11 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(abuseCaseTargetSource, /delegation_budget_abuse/);
   assert.match(abuseCaseTargetSource, /vote_reputation_farming/);
   assert.match(abuseCaseTargetSource, /public_autonomous_agent_mutation/);
+  assert.match(productSignoffTargetSource, /V6_PRODUCT_SIGNOFF_TARGETS_VERSION/);
+  assert.match(productSignoffTargetSource, /player_visible_scope/);
+  assert.match(productSignoffTargetSource, /normal_gameplay_exposure_denial/);
+  assert.match(productSignoffTargetSource, /go_no_go_record/);
+  assert.match(productSignoffTargetSource, /post_release_monitoring/);
   assert.match(skillLine, /V6 aggregate readiness gate/);
   assert.match(plan, /Source branch: `codex\/v6-agent-civilization-milestones`/);
   assert.match(plan, /broad V5 prototype overrides do not enable V6/);
@@ -826,6 +837,9 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /server\/world_civilization\/abuse_case_targets\.js/);
   assert.match(plan, /abuse-case target matrix/);
   assert.match(plan, /public autonomous agent mutation denial/);
+  assert.match(plan, /server\/world_civilization\/product_signoff_targets\.js/);
+  assert.match(plan, /product signoff target matrix/);
+  assert.match(plan, /go\/no-go records/);
   assert.match(plan, /server\/world_civilization\/privacy_review_targets\.js/);
   assert.match(plan, /privacy review target matrix/);
   assert.match(plan, /public surface minimization/);
@@ -837,6 +851,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /store-specific audit-summary coverage/);
   assert.match(gate, /server\/world_civilization\/release_review\.js/);
   assert.match(gate, /abuse-case target gate evidence/);
+  assert.match(gate, /product signoff target gate evidence/);
   assert.match(gate, /threat model target gate evidence/);
   assert.match(gate, /privacy review target gate evidence/);
   assert.match(gate, /data-retention target gate evidence/);
@@ -903,6 +918,9 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(releaseReview, /Abuse-case review/);
   assert.match(releaseReview, /abuse-case target gate/);
   assert.match(releaseReview, /public autonomous agent mutation denial/);
+  assert.match(releaseReview, /Product signoff/);
+  assert.match(releaseReview, /product signoff target gate/);
+  assert.match(releaseReview, /go\/no-go record/);
   assert.match(releaseReview, /Privacy review/);
   assert.match(releaseReview, /privacy review target gate/);
   assert.match(releaseReview, /public text rendering\/XSS/);
@@ -929,6 +947,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(skillLine, /M16 readiness gate/);
   assert.match(skillLine, /V6 threat-model target gate/);
   assert.match(skillLine, /V6 abuse-case target gate/);
+  assert.match(skillLine, /V6 product signoff target gate/);
   assert.match(skillLine, /V6 privacy review target gate/);
   assert.match(skillLine, /V6 data-retention target gate/);
   assert.match(skillLine, /store-specific audit-summary coverage/);

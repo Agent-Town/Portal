@@ -196,8 +196,8 @@ persistence resilience, and security/product release review.
   privacy review target gate evidence, M5 session-auth target evidence,
   store-backed delegated-agent proof evidence, data-retention policy with
   data-retention target gate evidence,
-  audit coverage, validation evidence, modal lab surface launch review, and
-  product signoff are complete.
+  audit coverage, validation evidence, modal lab surface launch review, product
+  signoff target gate evidence, and product signoff are complete.
 - The research-only controlled release gate may exist in
   `server/world_civilization/controlled_release.js`, but it must keep
   `productionEnabled: false` until M0-M17 are done, the release-review report is
@@ -596,7 +596,7 @@ persistence resilience, and security/product release review.
   execution and rollback review, agent participation enforcement review, civic
   institution readiness review, public works readiness review, modal lab surface
   review, resilience readiness review with store-specific zero hash-only
-  fallback proof, and product signoff.
+  fallback proof, product signoff target gate evidence, and product signoff.
 - Controlled release completion must remain a final go/no-go gate, not an
   automatic enablement path. Current gate tracking starts in
   `server/world_civilization/controlled_release.js` and
