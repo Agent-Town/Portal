@@ -121,3 +121,4 @@ owner: "Agent Town product"
 | GPACK-107 | API security | Release-gate API ingress rejects raw-instruction evidence object keys and redacts those key names from rejection paths | `tests/generated_pack_production_release_gate.test.js` |
 | GPACK-108 | API security | Release-gate API ingress rejects oversized evidence object keys and redacts those key names from rejection paths | `tests/generated_pack_production_release_gate.test.js` |
 | GPACK-109 | Security | Generated-pack validation and release-gate API ingress reject semantic token fields such as `sessionToken` without echoing submitted token names or values | `tests/generated_pack_contract.test.js`, `tests/generated_pack_production_release_gate.test.js` |
+| GPACK-110 | API security | Release-gate API ingress rejects executable instruction text under harmless evidence keys before constructing or echoing release reports | `tests/generated_pack_production_release_gate.test.js` |
