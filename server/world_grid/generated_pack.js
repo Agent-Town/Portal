@@ -4136,6 +4136,14 @@ function validateCandidateReviewManifest(manifest = {}, pack = {}) {
   const rejectedCandidateCount = Number(manifest?.metrics?.rejectedCandidateCount || 0);
   const pendingCandidateCount = Number(manifest?.metrics?.pendingCandidateCount || 0);
   const countedCandidates = approvedCandidateCount + rejectedCandidateCount + pendingCandidateCount;
+  const actualApprovedCandidateCount = candidates.filter((candidate) => candidate.reviewStatus === 'approved-candidate').length;
+  const actualRejectedCandidateCount = candidates.filter((candidate) => candidate.reviewStatus === 'rejected-candidate').length;
+  const actualPendingCandidateCount = candidates.filter((candidate) => candidate.reviewStatus === 'pending').length;
+  const actualReviewedCandidateCount = actualApprovedCandidateCount + actualRejectedCandidateCount;
+  const candidateReviewRowStatusCountsMatch = reviewedCandidateCount === actualReviewedCandidateCount
+    && approvedCandidateCount === actualApprovedCandidateCount
+    && rejectedCandidateCount === actualRejectedCandidateCount
+    && pendingCandidateCount === actualPendingCandidateCount;
   const reviewedCandidates = candidates.filter((candidate) => candidate.reviewStatus !== 'pending');
   const reviewedCandidatesWithoutContent = reviewedCandidates.filter((candidate) => (
     candidate.sourceStatus === 'planned-only'
@@ -4180,8 +4188,20 @@ function validateCandidateReviewManifest(manifest = {}, pack = {}) {
     {
       id: 'CANDIDATE_REVIEW_MANIFEST_REVIEW_COUNTS',
       passed: reviewedCandidateCount === approvedCandidateCount + rejectedCandidateCount
-        && countedCandidates === candidates.length,
-      measured: { reviewedCandidateCount, approvedCandidateCount, rejectedCandidateCount, pendingCandidateCount, candidateCount: candidates.length }
+        && countedCandidates === candidates.length
+        && candidateReviewRowStatusCountsMatch,
+      measured: {
+        reviewedCandidateCount,
+        approvedCandidateCount,
+        rejectedCandidateCount,
+        pendingCandidateCount,
+        actualReviewedCandidateCount,
+        actualApprovedCandidateCount,
+        actualRejectedCandidateCount,
+        actualPendingCandidateCount,
+        candidateReviewRowStatusCountsMatch,
+        candidateCount: candidates.length
+      }
     },
     {
       id: 'CANDIDATE_REVIEW_MANIFEST_REVIEWED_CANDIDATES_HAVE_CONTENT',
@@ -4216,6 +4236,11 @@ function validateCandidateReviewManifest(manifest = {}, pack = {}) {
       approvedCandidateCount,
       rejectedCandidateCount,
       pendingCandidateCount,
+      actualReviewedCandidateCount,
+      actualApprovedCandidateCount,
+      actualRejectedCandidateCount,
+      actualPendingCandidateCount,
+      candidateReviewRowStatusCountsMatch,
       reviewedCandidateContentCount: Math.max(0, reviewedCandidateCount - reviewedCandidatesWithoutContent.length),
       plannedOnlyReviewedCandidateCount: plannedOnlyReviewedCandidates.length,
       reviewedCandidateMissingContentCount: reviewedCandidatesWithoutContent.length,
