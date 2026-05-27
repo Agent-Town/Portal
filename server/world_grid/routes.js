@@ -271,7 +271,67 @@ function findReleaseEvidenceRawInstructionPaths(value, pathLabel = '$', matches 
   return matches;
 }
 
+const RELEASE_EVIDENCE_REQUEST_LIMITS = {
+  maxDepth: 12,
+  maxNodeCount: 2500,
+  maxObjectKeyCount: 128,
+  maxArrayItemCount: 256,
+  maxStringLength: 8192,
+  maxProblems: 12
+};
+
+function findReleaseEvidenceRequestBoundProblems(value, pathLabel = '$', state = { nodeCount: 0, problems: [] }, depth = 0) {
+  if (state.problems.length >= RELEASE_EVIDENCE_REQUEST_LIMITS.maxProblems) return state;
+  state.nodeCount += 1;
+  if (state.nodeCount > RELEASE_EVIDENCE_REQUEST_LIMITS.maxNodeCount) {
+    state.problems.push(`${pathLabel}:node_count:${state.nodeCount}`);
+    return state;
+  }
+  if (depth > RELEASE_EVIDENCE_REQUEST_LIMITS.maxDepth) {
+    state.problems.push(`${pathLabel}:depth:${depth}`);
+    return state;
+  }
+  if (typeof value === 'string') {
+    if (value.length > RELEASE_EVIDENCE_REQUEST_LIMITS.maxStringLength) {
+      state.problems.push(`${pathLabel}:string_length:${value.length}`);
+    }
+    return state;
+  }
+  if (!value || typeof value !== 'object') return state;
+  if (Array.isArray(value)) {
+    if (value.length > RELEASE_EVIDENCE_REQUEST_LIMITS.maxArrayItemCount) {
+      state.problems.push(`${pathLabel}:array_length:${value.length}`);
+    }
+    const scanLimit = Math.min(value.length, RELEASE_EVIDENCE_REQUEST_LIMITS.maxArrayItemCount);
+    for (let index = 0; index < scanLimit; index += 1) {
+      findReleaseEvidenceRequestBoundProblems(value[index], `${pathLabel}[${index}]`, state, depth + 1);
+      if (state.problems.length >= RELEASE_EVIDENCE_REQUEST_LIMITS.maxProblems) break;
+    }
+    return state;
+  }
+  const entries = Object.entries(value);
+  if (entries.length > RELEASE_EVIDENCE_REQUEST_LIMITS.maxObjectKeyCount) {
+    state.problems.push(`${pathLabel}:object_key_count:${entries.length}`);
+  }
+  for (const [key, child] of entries.slice(0, RELEASE_EVIDENCE_REQUEST_LIMITS.maxObjectKeyCount)) {
+    findReleaseEvidenceRequestBoundProblems(child, `${pathLabel}.${key}`, state, depth + 1);
+    if (state.problems.length >= RELEASE_EVIDENCE_REQUEST_LIMITS.maxProblems) break;
+  }
+  return state;
+}
+
 function assertReleaseEvidenceRequestSafe(body = {}) {
+  const boundReport = findReleaseEvidenceRequestBoundProblems(body);
+  if (boundReport.problems.length) {
+    const error = new Error('GENPACK_RELEASE_EVIDENCE_REJECTED');
+    error.details = {
+      requestBoundProblemCount: boundReport.problems.length,
+      requestNodeCount: boundReport.nodeCount,
+      requestBoundProblems: boundReport.problems.slice(0, RELEASE_EVIDENCE_REQUEST_LIMITS.maxProblems),
+      requestLimits: RELEASE_EVIDENCE_REQUEST_LIMITS
+    };
+    throw error;
+  }
   const secretLikePaths = findReleaseEvidenceSecretLikePaths(body);
   const rawInstructionPaths = findReleaseEvidenceRawInstructionPaths(body);
   if (secretLikePaths.length || rawInstructionPaths.length) {

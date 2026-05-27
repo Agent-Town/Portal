@@ -2793,7 +2793,23 @@ Release-gate invariants:
 - missing approval or evidence returns a valid fail-closed `prototype-gated` report;
 - `publicReleaseEligible=true` requires all prerequisites to be true, `blockingReasons=[]`, zero private-data leaks, zero missing assets, zero production image assets, explicit consent/cost/auth approval, candidate asset review, and a 64-hex human review signoff hash;
 - forged eligibility, mismatched blocking reasons, secret-like fields, raw prompt instructions, production asset leaks, and private-card data fail validation;
+- oversized or noisy release-evidence request bodies fail before report construction and rejection responses return counts/paths/limits, not submitted evidence values;
 - the route remains hidden in default gameplay unless `FEATURE_WORLD_GRID_GENERATED_PACKS` is enabled.
+
+### POST `/api/world/generated-pack/release-evidence-bundle`
+Builds a hash-bound QA evidence envelope for the current generated pack and release-gate inputs. This endpoint requires the generated-pack feature flag and current wallet/session owner. It does not approve release, promote assets, change default gameplay visibility, or mutate canonical world-grid simulation rules.
+
+Response includes:
+- `releaseGate` and `releaseGateValidationReport`;
+- `releaseEvidenceBundle.schemaVersion="agent-town-generated-pack-release-evidence-bundle-v1"`;
+- `releaseEvidenceBundle.sourceHashes` for generated pack, playtest, diversity, public card, persistence, approval evidence, and candidate review;
+- `releaseEvidenceBundle.sourcePackIds` for single-pack evidence coherence;
+- `validationReport`, which rejects source drift, mixed pack ids, invalid source pack-id shapes, missing ready-gate evidence, unsafe request content, and boundary violations.
+
+Release-evidence-bundle invariants:
+- request bodies share the release-gate ingress guard for secret-like fields, raw prompt instructions, request depth, node count, array size, object key count, and string length;
+- the generic tool dispatcher path `et.world.generated_pack.release_evidence_bundle` uses the same guard and returns the same fail-closed rejection code;
+- rejection responses must not echo raw submitted secrets, prompt instructions, or oversized evidence values.
 
 ### POST `/api/world/generated-pack/public-card`
 Publishes an unlisted public-safe card for a validated generated pack. This endpoint requires the generated-pack feature flag and the current wallet/session owner.

@@ -693,6 +693,25 @@ test('GU-18/GU-19 release gate and evidence bundle APIs are generated-pack-gated
       assert.equal(unsafeBundleBody.error.code, 'GENPACK_RELEASE_EVIDENCE_REJECTED');
       assert.equal(JSON.stringify(unsafeBundleBody).includes('ignore all previous instructions'), false);
 
+      const noisyEvidenceValue = 'oversized-evidence-value-should-not-echo';
+      const noisyReleaseResponse = await fetch(`${baseUrl}/api/world/generated-pack/release-gate`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          approvalInputs: {
+            noise: Array.from({ length: 300 }, (_, index) => ({
+              index,
+              value: noisyEvidenceValue
+            }))
+          }
+        })
+      });
+      const noisyReleaseBody = await noisyReleaseResponse.json();
+      assert.equal(noisyReleaseResponse.status, 422, JSON.stringify(noisyReleaseBody));
+      assert.equal(noisyReleaseBody.error.code, 'GENPACK_RELEASE_EVIDENCE_REJECTED');
+      assert.equal(noisyReleaseBody.error.details.requestBoundProblemCount > 0, true);
+      assert.equal(JSON.stringify(noisyReleaseBody).includes(noisyEvidenceValue), false);
+
       const releaseResponse = await fetch(`${baseUrl}/api/world/generated-pack/release-gate`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -747,6 +766,24 @@ test('GU-18/GU-19 release gate and evidence bundle APIs are generated-pack-gated
       assert.equal(unsafeToolBundleResponse.status, 422, JSON.stringify(unsafeToolBundleBody));
       assert.equal(unsafeToolBundleBody.error.code, 'GENPACK_RELEASE_EVIDENCE_REJECTED');
       assert.equal(JSON.stringify(unsafeToolBundleBody).includes('token-should-not-echo'), false);
+
+      const noisyToolBundleResponse = await fetch(`${baseUrl}/api/world/tool/et.world.generated_pack.release_evidence_bundle`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          approvalInputs: {
+            noise: Array.from({ length: 300 }, (_, index) => ({
+              index,
+              value: noisyEvidenceValue
+            }))
+          }
+        })
+      });
+      const noisyToolBundleBody = await noisyToolBundleResponse.json();
+      assert.equal(noisyToolBundleResponse.status, 422, JSON.stringify(noisyToolBundleBody));
+      assert.equal(noisyToolBundleBody.error.code, 'GENPACK_RELEASE_EVIDENCE_REJECTED');
+      assert.equal(noisyToolBundleBody.error.details.requestBoundProblemCount > 0, true);
+      assert.equal(JSON.stringify(noisyToolBundleBody).includes(noisyEvidenceValue), false);
     });
   });
 });
