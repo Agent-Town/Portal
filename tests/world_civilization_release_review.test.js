@@ -69,6 +69,20 @@ test('V6 release review audit coverage requires migration rehearsal evidence', (
   assert.ok(auditGate.requiredChecks.includes('migration_rehearsal'));
 });
 
+test('V6 release review requires modal lab launch-surface evidence', () => {
+  const labGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'modal_lab_surface_review');
+
+  assert.equal(labGate.owner, 'product_engineering');
+  assert.ok(labGate.requiredArtifacts.includes('specs/66_agent_town_v6_modal_lab_surface_foundation.md'));
+  assert.ok(labGate.requiredArtifacts.includes('server/world_civilization/lab_surface.js'));
+  assert.ok(labGate.requiredArtifacts.includes('tests/world_civilization_lab_surface.test.js'));
+  assert.ok(labGate.requiredChecks.includes('town_hub_modal_launch'));
+  assert.ok(labGate.requiredChecks.includes('standalone_route_denial'));
+  assert.ok(labGate.requiredChecks.includes('worker_continuity'));
+  assert.ok(labGate.requiredChecks.includes('debug_observability'));
+  assert.ok(labGate.requiredChecks.includes('non_executing_panels'));
+});
+
 test('V6 release review report can only become ready with complete evidence and signoff', () => {
   const evidence = Object.fromEntries(REQUIRED_REVIEW_GATES.map((gate) => [gate.key, completeEvidenceFor(gate)]));
   const report = buildV6ReleaseReviewReport({

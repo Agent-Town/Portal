@@ -259,6 +259,8 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /server\/world_civilization\/release_review\.js/);
   assert.match(gate, /server\/world_civilization\/release_review\.js/);
   assert.match(gate, /threat model, privacy review, abuse-case review/);
+  assert.match(plan, /modal lab surface review/);
+  assert.match(gate, /modal lab surface (launch )?review/);
   assert.match(plan, /M18 V6 controlled release completion \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/controlled_release\.js/);
   assert.match(gate, /server\/world_civilization\/controlled_release\.js/);

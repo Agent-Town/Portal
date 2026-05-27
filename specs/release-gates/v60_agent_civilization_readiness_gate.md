@@ -97,8 +97,8 @@ gate below has implementation, deterministic tests, and security/product signoff
 - The research-only release review gate may exist in
   `server/world_civilization/release_review.js`, but it must keep V6 hidden
   from runtime/player surfaces until threat model, privacy review, abuse-case
-  review, data-retention policy, audit coverage, validation evidence, and
-  product signoff are complete.
+  review, data-retention policy, audit coverage, validation evidence, modal lab
+  surface launch review, and product signoff are complete.
 - The research-only controlled release gate may exist in
   `server/world_civilization/controlled_release.js`, but it must keep
   `productionEnabled: false` until M0-M17 are done, the release-review report is
@@ -269,7 +269,7 @@ gate below has implementation, deterministic tests, and security/product signoff
   `docs/security/V6_AGENT_CIVILIZATION_RELEASE_REVIEW.md`; release still
   requires approved threat model, privacy review, abuse-case review,
   data-retention policy, audit coverage review, deterministic validation
-  evidence, and product signoff.
+  evidence, modal lab surface review, and product signoff.
 - Controlled release completion must remain a final go/no-go gate, not an
   automatic enablement path. Current gate tracking starts in
   `server/world_civilization/controlled_release.js` and

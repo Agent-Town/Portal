@@ -85,8 +85,9 @@ summaries from replay rows without applying world state.
 
 The research-only release review gate in
 `server/world_civilization/release_review.js` names the threat model, privacy,
-abuse-case, data-retention, audit coverage, validation, and product signoff
-requirements that must be complete before normal gameplay exposure.
+abuse-case, data-retention, audit coverage, validation, modal lab surface
+review, and product signoff requirements that must be complete before normal
+gameplay exposure.
 
 The research-only controlled release gate in
 `server/world_civilization/controlled_release.js` requires M0-M17 completion,

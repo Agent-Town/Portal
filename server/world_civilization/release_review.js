@@ -83,6 +83,25 @@ const REQUIRED_REVIEW_GATES = [
     signoffRequired: true
   },
   {
+    key: 'modal_lab_surface_review',
+    label: 'Modal lab surface review',
+    owner: 'product_engineering',
+    requiredArtifacts: [
+      RELEASE_REVIEW_ARTIFACT,
+      'specs/66_agent_town_v6_modal_lab_surface_foundation.md',
+      'server/world_civilization/lab_surface.js',
+      'tests/world_civilization_lab_surface.test.js'
+    ],
+    requiredChecks: [
+      'town_hub_modal_launch',
+      'standalone_route_denial',
+      'worker_continuity',
+      'debug_observability',
+      'non_executing_panels'
+    ],
+    signoffRequired: true
+  },
+  {
     key: 'product_signoff',
     label: 'Product release signoff',
     owner: 'product',

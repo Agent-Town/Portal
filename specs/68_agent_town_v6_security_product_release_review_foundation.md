@@ -37,6 +37,8 @@ are present.
 - Validation evidence: targeted Node suite, split Playwright smokes,
   all-features regression, feature override safety, and load/rate replay
   evidence.
+- Modal lab surface review: town hub modal launch, standalone route denial,
+  worker continuity, debug observability, and non-executing panels.
 - Product release signoff: player-visible scope, rollback plan, support runbook,
   and disable plan.
 
