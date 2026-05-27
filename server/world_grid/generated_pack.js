@@ -6147,6 +6147,7 @@ module.exports = {
   RELEASE_APPROVAL_EVIDENCE_VERSION,
   REPLAYABILITY_PROMPT_SUITE,
   SCHEMA_VERSION,
+  SECRET_LIKE_VALUE_PATTERN,
   analyzePackDiversity,
   buildAssetPromptPlan,
   buildCandidateReviewManifest,

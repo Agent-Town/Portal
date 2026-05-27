@@ -177,7 +177,7 @@ Player prompt
 - `validateReleaseEvidenceBundle` rejects missing release-gate context, drifted source evidence, unsupplied claimed source hashes, unsupplied claimed source pack ids, mixed-pack source evidence, failing generated-pack sources, failing playtest sources, failing persistence sources, failing public-card sources, failing approval-evidence sources, failing candidate-review manifest sources, copied diversity reports that exclude the release pack, invalid source pack-id shapes, missing source hashes for ready gates, bundles created before their bound release gate, future-dated bundles, forged blocking reasons, forged prerequisite snapshots, approval evidence drift from the bound release gate, candidate-review time-order metric tampering, secret-like fields, raw prompt instructions, production image assets, private-data leaks, default generated-pack exposure, V6 civic changes, or canonical server-rule changes.
 - `validateReleaseEvidenceBundle` redacts unsafe submitted bundle hashes, source pack ids, release modes, prerequisite keys, blocking reasons, boundary values, and metric values from measured validation-report fields.
 - `POST /api/world/generated-pack/release-evidence-bundle` is feature-gated by `FEATURE_WORLD_GRID_GENERATED_PACKS` and returns only evidence reports; it does not approve release or change gameplay.
-- Release-gate and release-evidence-bundle API ingress, including the generic tool dispatcher, rejects secret-like fields, semantic token fields, secret-looking keys or values, raw executable prompt-instruction keys, executable instruction values, oversized object keys, or oversized/noisy evidence bodies before constructing reports, so unsafe submitted values, token field names, executable instruction text, and oversized key text are not echoed back to callers.
+- Release-gate and release-evidence-bundle API ingress, including the generic tool dispatcher, rejects secret-like fields, semantic token fields, secret-looking keys or values, expanded credential-token-family values, raw executable prompt-instruction keys, executable instruction values, oversized object keys, or oversized/noisy evidence bodies before constructing reports, so unsafe submitted values, token field names, executable instruction text, and oversized key text are not echoed back to callers.
 - Generated-pack API and tool error responses redact unsafe submitted pack ids, public-card ids, and detail values before returning diagnostics, including missing-pack and missing-card errors.
 - The bundle is not a release approval surface. It only makes the release-gate evidence replayable and hash-bound for review.
 
@@ -370,6 +370,7 @@ Player prompt
   "releaseApiSemanticSecretKeyRedacted": true,
   "releaseApiSecretValueRejected": true,
   "releaseApiSecretKeyRedacted": true,
+  "releaseApiExpandedCredentialFamiliesRejected": true,
   "releaseApiSecretEchoCount": 0,
   "releaseApiRawInstructionKeyRedacted": true,
   "releaseApiExecutableInstructionValueRejected": true,

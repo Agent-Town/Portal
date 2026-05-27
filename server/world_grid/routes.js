@@ -61,6 +61,7 @@ const {
   reloadGeneratedPack,
   reviewPublicPackCard,
   remixGeneratedPack,
+  SECRET_LIKE_VALUE_PATTERN,
   unpublishPublicPackCard,
   validateProductionReleaseGate,
   validateReleaseEvidenceBundle
@@ -244,7 +245,7 @@ function normalizeError(error) {
   };
 }
 
-const RELEASE_EVIDENCE_SECRET_VALUE_PATTERN = /\b(?:sk-[a-z0-9_-]{8,}|xox[baprs]-[a-z0-9-]{8,}|ghp_[a-z0-9_]{8,}|github_pat_[a-z0-9_]{8,}|ya29\.[a-z0-9_-]{8,}|bearer\s+[a-z0-9._-]{12,})\b/i;
+const RELEASE_EVIDENCE_SECRET_VALUE_PATTERN = SECRET_LIKE_VALUE_PATTERN;
 const RELEASE_EVIDENCE_SECRET_KEY_PATTERN = /(api[_-]?key|secret|private[_-]?key|credential|oauth|access[_-]?token|refresh[_-]?token|auth[_-]?token|bearer[_-]?token|id[_-]?token|session[_-]?token|provider[_-]?token|wallet[_-]?secret|seed[_-]?phrase|password|^token$)/i;
 const RELEASE_EVIDENCE_RAW_INSTRUCTION_PATTERN = /\bignore\s+(all\s+)?(previous|prior|above)\s+instructions\b|\b(system|developer)\s+(prompt|message|instructions)\b|\b(tool|function)\s+call\b|\b(execute|run)\s+(shell|bash|terminal|command|javascript|python)\b|<\s*script\b|javascript\s*:|\beval\s*\(|\bFunction\s*\(|\b(curl|wget)\s+https?:|\bpost\s+to\s+https?:/i;
 const RELEASE_EVIDENCE_MAX_OBJECT_KEY_LENGTH = 256;

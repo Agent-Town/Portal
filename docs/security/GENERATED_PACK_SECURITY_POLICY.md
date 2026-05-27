@@ -42,7 +42,7 @@ Status: prototype-gated
 - Candidate-review and release-approval evidence validation reports must redact submitted secret-looking keys, secret-looking values, raw-instruction keys, and executable instruction values from content and schema-error evidence.
 - Release evidence bundles must be created at or after the bound release gate evaluation time, must not be future-dated relative to validation time, and must bind ready evidence sources, generated-pack-source validation, playtest-source validation, persistence-source validation, public-card-source validation, approval-evidence-source validation, candidate-review manifest source validation, diversity-source pack inclusion/coherence, blocking reasons, and prerequisite snapshots back to the release gate; missing release-gate context, claimed hashes or pack ids for unsupplied sources, failing generated-pack sources, failing playtest sources, failing persistence sources, failing public-card sources, failing approval-evidence sources, failing candidate-review manifest sources, approval evidence drift, or copied diversity reports from another suite fail validation even when supplied source hashes are stable.
 - Release evidence report measured fields must redact unsafe submitted manifest hashes, evidence hashes, bundle hashes, and pack ids before returning validation reports to callers.
-- Release-gate and release-evidence-bundle API requests must reject secret-like fields, semantic token fields, secret-looking keys or values, raw prompt-instruction keys, executable instruction values, oversized object keys, and oversized/noisy evidence bodies before report construction; rejection responses may include counts, redacted paths, and limits, but not submitted evidence values, token field names, executable instruction text, or oversized key text.
+- Release-gate and release-evidence-bundle API requests must reject secret-like fields, semantic token fields, secret-looking keys or values, expanded credential-token-family values, raw prompt-instruction keys, executable instruction values, oversized object keys, and oversized/noisy evidence bodies before report construction; rejection responses may include counts, redacted paths, and limits, but not submitted evidence values, token field names, executable instruction text, or oversized key text.
 
 ## Release Gate
 
@@ -90,6 +90,7 @@ Status: prototype-gated
   "releaseApiSemanticSecretKeyRedacted": true,
   "releaseApiSecretValueRejected": true,
   "releaseApiSecretKeyRedacted": true,
+  "releaseApiExpandedCredentialFamiliesRejected": true,
   "releaseModeWhenIncomplete": "prototype-gated",
   "releaseApiRawInstructionKeyRedacted": true,
   "releaseApiExecutableInstructionValueRejected": true,

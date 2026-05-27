@@ -1876,6 +1876,32 @@ test('GU-18/GU-19 release gate and evidence bundle APIs are generated-pack-gated
       const generateBody = await generateResponse.json();
       assert.equal(generateResponse.status, 200, JSON.stringify(generateBody));
 
+      const expandedSecretValues = [
+        ['gho', 'releaseexpandedsecretshouldnotecho'].join('_'),
+        ['glpat', 'releaseexpandedsecretshouldnotecho'].join('-'),
+        ['xoxc', 'releaseexpandedsecretshouldnotecho'].join('-'),
+        ['rk', 'live', 'releaseexpandedsecretshouldnotecho'].join('_')
+      ];
+      for (const expandedSecretValue of expandedSecretValues) {
+        const expandedSecretResponse = await fetch(`${baseUrl}/api/world/generated-pack/release-gate`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            approvalEvidence: {
+              schemaVersion: 'agent-town-generated-pack-release-approval-evidence-v1',
+              reviewNote: expandedSecretValue
+            }
+          })
+        });
+        const expandedSecretBody = await expandedSecretResponse.json();
+        const expandedSecretSerialized = JSON.stringify(expandedSecretBody).toLowerCase();
+        assert.equal(expandedSecretResponse.status, 422, JSON.stringify(expandedSecretBody));
+        assert.equal(expandedSecretBody.error.code, 'GENPACK_RELEASE_EVIDENCE_REJECTED');
+        assert.equal(expandedSecretBody.error.details.secretLikePathCount > 0, true);
+        assert.equal(expandedSecretSerialized.includes(expandedSecretValue.toLowerCase()), false);
+        assert.equal(expandedSecretSerialized.includes('releaseexpandedsecretshouldnotecho'), false);
+      }
+
       const unsafeReleaseResponse = await fetch(`${baseUrl}/api/world/generated-pack/release-gate`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
