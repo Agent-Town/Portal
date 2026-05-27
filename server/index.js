@@ -24,7 +24,11 @@ const { readStore, writeStore, getStorePath } = require('./store');
 const { createExperiencesRouter } = require('./experience_loader');
 const { createFoundersPlotRouter } = require('./founders_plot/routes');
 const { createWorldGridRouter } = require('./world_grid/routes');
-const { invalidateWorldGridCsrfTokens } = require('./world_grid/csrf');
+const {
+  invalidateWorldGridCsrfTokens,
+  worldGridCsrfRequired
+} = require('./world_grid/csrf');
+const { requireWorldGridMutationOrigin } = require('./world_grid/mutation_origin');
 const { normalizeOwnerIdentity: normalizeWorldGridOwnerIdentity } = require('./world_grid/region');
 const { resetFoundersPlotStore } = require('./founders_plot/store');
 const { getAtlasSnapshot, searchAtlasAgents } = require('./atlas');
@@ -3717,6 +3721,25 @@ app.post('/api/session/reset', (req, res) => {
       publicTeams: store.publicTeams.length
     }
   });
+});
+
+app.post('/api/session/world-grid-csrf/invalidate', (req, res) => {
+  try {
+    requireWorldGridMutationOrigin(req, { productionRequired: worldGridCsrfRequired() });
+    const owner = normalizeWorldGridOwnerIdentity(resolveFoundersPlotIdentity(req, res));
+    const invalidatedCount = owner ? invalidateWorldGridCsrfTokens(owner) : 0;
+    res.json({ ok: true, invalidatedCount });
+  } catch (error) {
+    const code = String(error?.message || error?.code || 'WORLD_GRID_CSRF_INVALIDATE_FAILED');
+    const status = code === 'FORBIDDEN_ORIGIN' ? 403 : 500;
+    res.status(status).json({
+      ok: false,
+      error: {
+        code,
+        details: error?.details && typeof error.details === 'object' ? error.details : {}
+      }
+    });
+  }
 });
 
 app.get('/api/state', (req, res) => {

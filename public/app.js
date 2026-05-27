@@ -5301,6 +5301,7 @@ async function connectWallet({ silent = false } = {}) {
 }
 
 async function disconnectWallet({ fromProvider = false } = {}) {
+  await invalidateWorldGridCsrfForWalletDisconnect();
   if (!fromProvider && appWalletClient) {
     try {
       await appWalletClient.disconnect({ chain: 'solana' });
@@ -5319,6 +5320,14 @@ async function disconnectWallet({ fromProvider = false } = {}) {
   if (lastState) updateUI(lastState);
   if (fromProvider) {
     return;
+  }
+}
+
+async function invalidateWorldGridCsrfForWalletDisconnect() {
+  try {
+    await api('/api/session/world-grid-csrf/invalidate', { method: 'POST', body: JSON.stringify({}) });
+  } catch (e) {
+    console.warn('world-grid CSRF invalidation failed', e);
   }
 }
 

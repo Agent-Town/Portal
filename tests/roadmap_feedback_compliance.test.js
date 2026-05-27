@@ -677,6 +677,8 @@ test('world-grid CSRF policy is tracked as an M5 durable foundation', () => {
   const security = read('docs/security/WORLD_GRID_MUTATION_SECURITY_PLAN.md');
   const stateModel = read('docs/technical/WORLD_GRID_STATE_MODEL.md');
   const evidence = read('docs/release-evidence/WORLD_GRID_V50_REGION_PROTOTYPE_EVIDENCE_2026-05-26.md');
+  const serverSource = read('server/index.js');
+  const appSource = read('public/app.js');
 
   assert.match(plan, /optional durable hashed-token and session-binding SQLite foundation/);
   assert.match(plan, /WORLD_GRID_CSRF_SQLITE_PATH/);
@@ -696,8 +698,10 @@ test('world-grid CSRF policy is tracked as an M5 durable foundation', () => {
   assert.match(security, /same-session token rotation/);
   assert.match(security, /explicit invalidation/);
   assert.match(security, /\/api\/session\/reset/);
-  assert.match(security, /pre-reset same-wallet\s+token is rejected after session reset/);
-  assert.match(security, /provider\s+logout\/disconnect invalidation wiring/);
+  assert.match(security, /pre-reset\s+same-wallet\s+token\s+is rejected after session reset/);
+  assert.match(security, /\/api\/session\/world-grid-csrf\/invalidate/);
+  assert.match(security, /wallet\/provider disconnect cleanup/);
+  assert.match(security, /provider-specific logout callback signoff/);
   assert.match(stateModel, /server\/world_grid\/csrf\.js/);
   assert.match(stateModel, /world_grid_csrf_tokens/);
   assert.match(stateModel, /WORLD_GRID_CSRF_SQLITE_PATH/);
@@ -707,6 +711,7 @@ test('world-grid CSRF policy is tracked as an M5 durable foundation', () => {
   assert.match(stateModel, /browser same-wallet cross-session denial proof/);
   assert.match(stateModel, /same-session token rotation/);
   assert.match(stateModel, /pre-reset tokens fail after `\/api\/session\/reset`/);
+  assert.match(stateModel, /\/api\/session\/world-grid-csrf\/invalidate/);
   assert.match(evidence, /Mutation CSRF guard/);
   assert.match(evidence, /tests\/world_grid_csrf_persistence\.test\.js/);
   assert.match(evidence, /e2e\/243_world_grid_csrf_session_binding\.spec\.js/);
@@ -718,7 +723,12 @@ test('world-grid CSRF policy is tracked as an M5 durable foundation', () => {
   assert.match(evidence, /pre-reset token rejection after session reset/);
   assert.match(evidence, /WORLD_GRID_CSRF_REQUIRED=1/);
   assert.match(evidence, /separate Node process restarts/);
-  assert.match(evidence, /provider logout\/disconnect CSRF invalidation wiring/);
+  assert.match(evidence, /old-token rejection after wallet\/provider disconnect invalidation/);
+  assert.match(evidence, /provider-specific logout callback signoff/);
+  assert.match(serverSource, /app\.post\('\/api\/session\/world-grid-csrf\/invalidate'/);
+  assert.match(serverSource, /invalidateWorldGridCsrfTokens\(owner\)/);
+  assert.match(appSource, /invalidateWorldGridCsrfForWalletDisconnect/);
+  assert.match(appSource, /\/api\/session\/world-grid-csrf\/invalidate/);
 });
 
 test('world-grid mutation rate-limit policy is tracked as an M5 durable foundation', () => {

@@ -27,8 +27,11 @@ from `prototype_gated` to `release_ready`:
   from another same-wallet browser session while a same-session token succeeds;
   current store coverage proves same-session token rotation plus explicit
   invalidation; current browser coverage proves pre-reset tokens fail after
-  `/api/session/reset`; release promotion still requires provider
-  logout/disconnect invalidation wiring and session-auth integration.
+  `/api/session/reset` and proves old-token rejection after
+  `/api/session/world-grid-csrf/invalidate`; wallet/provider disconnect cleanup
+  calls that endpoint before local wallet identity is cleared; release
+  promotion still requires provider-specific logout callback signoff and
+  session-auth integration.
 - Every mutating route and tool writes append-only audit/replay records with
   actor, route/tool name, idempotency key, before/after summary, and rollback
   handle when applicable.

@@ -74,6 +74,24 @@ async function resetSession(page) {
   });
 }
 
+async function invalidateWorldGridCsrfForSession(page) {
+  return await page.evaluate(async () => {
+    const response = await fetch('/api/session/world-grid-csrf/invalidate', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({})
+    });
+    const body = await response.json().catch(() => null);
+    return {
+      status: response.status,
+      ok: body?.ok === true,
+      invalidatedCount: Number(body?.invalidatedCount || 0),
+      errorCode: body?.error?.code || ''
+    };
+  });
+}
+
 test.beforeEach(async ({ request }) => {
   await resetWorldGrid(request);
 });
@@ -152,6 +170,52 @@ test('V5 world-grid CSRF token from a prior browser session is invalid after ses
       cellId,
       csrfToken: tokenAfterReset.csrfToken,
       idempotencyKey: 'e2e_csrf_session_reset_allowed'
+    });
+    expect(currentToken.status).toBe(200);
+    expect(currentToken.claimId).toMatch(/^claim_/);
+  } finally {
+    await context.close();
+  }
+});
+
+test('V5 world-grid CSRF token is invalid after wallet/provider disconnect invalidation', async ({ browser }) => {
+  const context = await browser.newContext({ extraHTTPHeaders: sharedWalletHeaders });
+  try {
+    const page = await context.newPage();
+    await seedFoundersPlot(page);
+    await openWorldGrid(page, 'v50,v51');
+
+    const tokenBeforeDisconnect = await fetchCsrfToken(page);
+    expect(tokenBeforeDisconnect.status).toBe(200);
+    expect(tokenBeforeDisconnect.csrfToken).toMatch(/^wgcsrf_[a-f0-9]{48}$/);
+
+    const invalidated = await invalidateWorldGridCsrfForSession(page);
+    expect(invalidated.status).toBe(200);
+    expect(invalidated.ok).toBe(true);
+    expect(invalidated.invalidatedCount).toBeGreaterThanOrEqual(1);
+
+    const options = await claimOptions(page);
+    expect(options.status).toBe(200);
+    expect(options.options.length).toBeGreaterThan(0);
+    const cellId = options.options[0].cellId;
+
+    const staleToken = await planClaimWithToken(page, {
+      cellId,
+      csrfToken: tokenBeforeDisconnect.csrfToken,
+      idempotencyKey: 'e2e_csrf_disconnect_denied'
+    });
+    expect(staleToken.status).toBe(403);
+    expect(staleToken.errorCode).toBe('CSRF_INVALID');
+
+    const tokenAfterDisconnect = await fetchCsrfToken(page);
+    expect(tokenAfterDisconnect.status).toBe(200);
+    expect(tokenAfterDisconnect.csrfToken).toMatch(/^wgcsrf_[a-f0-9]{48}$/);
+    expect(tokenAfterDisconnect.csrfToken).not.toBe(tokenBeforeDisconnect.csrfToken);
+
+    const currentToken = await planClaimWithToken(page, {
+      cellId,
+      csrfToken: tokenAfterDisconnect.csrfToken,
+      idempotencyKey: 'e2e_csrf_disconnect_allowed'
     });
     expect(currentToken.status).toBe(200);
     expect(currentToken.claimId).toMatch(/^claim_/);
