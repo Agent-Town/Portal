@@ -348,6 +348,25 @@ test('prompt-to-pack generation is deterministic, hashed, and does not store raw
   assert.match(first.universePack.firstLoop.objective, /complete the first claim/i);
 });
 
+test('GPACK-123 prompt-to-pack generation does not echo credential-like prompt fragments', () => {
+  const secretLikeValue = 'github_pat_generatedsecretshouldnotecho';
+  const pack = createGeneratedPack({
+    owner: { ownerAccountId: 'owner_generation_secret_prompt' },
+    prompt: `${secretLikeValue} cozy lantern town with patient gardeners`,
+    nowMs: 3_500,
+    candidateRoot: 'data/generated-packs-test'
+  });
+  const serialized = JSON.stringify(pack);
+
+  assert.equal(pack.validationReport.ok, true);
+  assert.equal(pack.generationBrief.safety.status, 'needs_review');
+  assert.equal(pack.generationBrief.safety.reasons.includes('secret-like-value'), true);
+  assert.equal(pack.prompt.keywordHints.includes('generatedsecretshouldnotecho'), false);
+  assert.equal(pack.generationBrief.keywordHints.includes('generatedsecretshouldnotecho'), false);
+  assert.equal(serialized.includes(secretLikeValue), false);
+  assert.equal(serialized.includes('generatedsecretshouldnotecho'), false);
+});
+
 test('asset prompt-plan creation covers canonical image targets and scaffolds future image jobs only', () => {
   const owner = { ownerAccountId: 'owner_asset_plan_contract' };
   const pack = createGeneratedPack({

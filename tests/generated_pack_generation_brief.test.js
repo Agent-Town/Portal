@@ -51,6 +51,23 @@ test('GenerationBrief marks executable or secret-like prompts for review without
   assert.equal(brief.keywordHints.includes('api'), false);
 });
 
+test('GPACK-123 GenerationBrief strips credential-like prompt spans from runtime keyword hints', () => {
+  const secretLikeValue = 'github_pat_generatedsecretshouldnotecho';
+  const brief = createGenerationBrief({
+    prompt: `${secretLikeValue} cozy lantern town with patient gardeners`
+  });
+  const serialized = JSON.stringify(brief);
+
+  assert.equal(brief.safety.status, 'needs_review');
+  assert.equal(brief.safety.reasons.includes('secret-like-value'), true);
+  assert.equal(brief.safety.rawPromptExecutable, false);
+  assert.equal(brief.keywordHints.includes('github'), false);
+  assert.equal(brief.keywordHints.includes('pat'), false);
+  assert.equal(brief.keywordHints.includes('generatedsecretshouldnotecho'), false);
+  assert.equal(serialized.includes(secretLikeValue), false);
+  assert.equal(serialized.includes('generatedsecretshouldnotecho'), false);
+});
+
 test('GPACK-119 GenerationBrief reports redact unsafe measured metadata values', () => {
   const brief = createGenerationBrief({
     prompt: 'cozy mushroom frontier with clockwork gardeners and lantern moss'

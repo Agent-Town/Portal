@@ -324,6 +324,7 @@ const SECRET_LIKE_KEY_PATTERN = /(api[_-]?key|secret|private[_-]?key|credential|
 const SECRET_LIKE_VALUE_PATTERN = /\b(?:sk-[a-z0-9_-]{8,}|xox[baprs]-[a-z0-9-]{8,}|ghp_[a-z0-9_]{8,}|github_pat_[a-z0-9_]{8,}|ya29\.[a-z0-9_-]{8,}|bearer\s+[a-z0-9._-]{12,})\b/i;
 
 const SENSITIVE_TEXT_PATTERNS = [
+  { id: 'secret-like-value', pattern: SECRET_LIKE_VALUE_PATTERN },
   { id: 'api-key-reference', pattern: /\b(api[_ -]?key|access[_ -]?token|refresh[_ -]?token|auth[_ -]?token|bearer[_ -]?token|id[_ -]?token|session[_ -]?token|provider[_ -]?token)\b/i },
   { id: 'private-key-reference', pattern: /\b(private[_ -]?key|seed[_ -]?phrase|wallet[_ -]?secret)\b/i },
   { id: 'password-reference', pattern: /\b(password|credential)\b/i }
@@ -608,8 +609,13 @@ function normalizePrompt(rawPrompt = '') {
   return normalized;
 }
 
+function promptTextForKeywordExtraction(prompt = '') {
+  return RAW_EXECUTABLE_PROMPT_PATTERNS
+    .reduce((text, { pattern }) => text.replace(globalPattern(pattern), ' '), String(prompt || '').replace(globalPattern(SECRET_LIKE_VALUE_PATTERN), ' '));
+}
+
 function wordsForPrompt(prompt = '') {
-  const words = String(prompt || '')
+  const words = promptTextForKeywordExtraction(prompt)
     .toLowerCase()
     .match(/[a-z0-9]+/g) || [];
   return words.filter((word) => word.length > 2 && !STOP_WORDS.has(word)).slice(0, 10);
@@ -626,6 +632,12 @@ function titlePhrase(value = '') {
     .map(titleWord)
     .filter(Boolean)
     .join(' ');
+}
+
+function globalPattern(pattern) {
+  const flags = new Set(pattern.flags.split(''));
+  flags.add('g');
+  return new RegExp(pattern.source, [...flags].join(''));
 }
 
 function pick(array, hash, salt) {
@@ -732,7 +744,11 @@ function safePromptWords(words = []) {
     'curl',
     'wget',
     'api',
+    'bearer',
+    'github',
+    'ghp',
     'key',
+    'pat',
     'token',
     'secret',
     'password',

@@ -11,6 +11,7 @@ Status: prototype-gated
 - Asset manifests and asset prompt plans are allowlisted by canonical target, relative path, prompt hash, size, status, source, and no-production-image policy.
 - Generated-pack subdocuments must pass the local schema registry independently before runtime validation can pass.
 - Generated packs cannot store provider credentials, API keys, access tokens, refresh tokens, session/auth/id/bearer/provider tokens, wallet secrets, Brain vault data, private event logs, account recovery material, or secret-looking credential strings under harmless generated-copy keys.
+- Credential-like prompt spans must be marked for review and stripped before runtime keyword extraction so secret fragments cannot become generated labels, names, titles, or hints.
 - Scaffolded generation job logs must record `authMode=not_configured`, `externalImageGenerationUsed=false`, zero outputs, and no production approval until a separate consent/auth/cost model is approved.
 - Optional candidate-generation preflights must fail closed unless product/security approval, documented auth model, documented cost model, accepted cost estimate, and user/team consent are all present.
 - Candidate-generation preflight records must never persist raw provider credentials, and failure records must keep `fallbackStillPlayable=true` for valid deterministic packs.
@@ -66,6 +67,7 @@ Status: prototype-gated
   "releaseGateReportUnsafeValueRedacted": true,
   "releaseEvidenceBundleReportUnsafeValueRedacted": true,
   "generatedPackApiErrorDetailsRedacted": true,
+  "credentialPromptFragmentsRedacted": true,
   "rawExecutablePromptInstructionCount": 0,
   "arbitraryToolMutationFormulaCount": 0,
   "schemaRegistryExists": true,
