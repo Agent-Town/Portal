@@ -193,8 +193,9 @@ persistence resilience, and security/product release review.
   `server/world_civilization/release_review.js`, but it must keep V6 hidden
   from runtime/player surfaces until threat model, privacy review, abuse-case
   review, M5 session-auth target evidence, store-backed delegated-agent proof
-  evidence, data-retention policy, audit coverage, validation evidence, modal lab
-  surface launch review, and product signoff are complete.
+  evidence, data-retention policy with data-retention target gate evidence,
+  audit coverage, validation evidence, modal lab surface launch review, and
+  product signoff are complete.
 - The research-only controlled release gate may exist in
   `server/world_civilization/controlled_release.js`, but it must keep
   `productionEnabled: false` until M0-M17 are done, the release-review report is

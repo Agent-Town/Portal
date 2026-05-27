@@ -134,6 +134,10 @@ test('V6 readiness gate baseline names every prerequisite domain but remains ope
   assert.ok(persistenceGate.requiredChecks.includes('privacy_safe_replay_summaries'));
   assert.ok(persistenceGate.requiredChecks.includes('no_effect_application_during_replay'));
   assert.ok(releaseReviewGate.requiredChecks.includes('audit_coverage'));
+  assert.ok(releaseReviewGate.requiredArtifacts.includes('server/world_civilization/data_retention_targets.js'));
+  assert.ok(releaseReviewGate.requiredArtifacts.includes('tests/world_civilization_data_retention_targets.test.js'));
+  assert.ok(releaseReviewGate.requiredChecks.includes('data_retention_policy'));
+  assert.ok(releaseReviewGate.requiredChecks.includes('data_retention_target_gate'));
   assert.ok(releaseReviewGate.requiredChecks.includes('store_specific_audit_summary_coverage'));
   for (const gate of report.gateReports) {
     assert.equal(gate.ok, false, gate.key);

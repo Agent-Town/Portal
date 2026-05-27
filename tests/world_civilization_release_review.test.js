@@ -69,6 +69,21 @@ test('V6 release review audit coverage requires migration rehearsal evidence', (
   assert.ok(auditGate.requiredChecks.includes('migration_rehearsal'));
 });
 
+test('V6 release review requires data-retention target gate evidence', () => {
+  const retentionGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'data_retention_policy');
+  const validationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'validation_evidence');
+
+  assert.equal(retentionGate.owner, 'security_product');
+  assert.ok(retentionGate.requiredArtifacts.includes('server/world_civilization/data_retention_targets.js'));
+  assert.ok(retentionGate.requiredArtifacts.includes('tests/world_civilization_data_retention_targets.test.js'));
+  assert.ok(retentionGate.requiredChecks.includes('data_retention_target_gate'));
+  assert.ok(retentionGate.requiredChecks.includes('private_credential_exclusion'));
+  assert.ok(retentionGate.requiredChecks.includes('backup_retention_expiry_target'));
+  assert.ok(retentionGate.requiredChecks.includes('retention_aware_replay_target'));
+  assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_data_retention_targets.test.js'));
+  assert.ok(validationGate.requiredChecks.includes('data_retention_target_gate'));
+});
+
 test('V6 release review audit coverage requires governance preflight evidence', () => {
   const auditGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'audit_coverage');
   const validationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'validation_evidence');

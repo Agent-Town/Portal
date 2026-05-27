@@ -33,7 +33,8 @@ are present.
   coverage target evidence, moderation escalation, and civic mutation security
   envelope evidence.
 - Data-retention policy: audit retention, deletion policy, debug log retention,
-  and export policy.
+  export policy, data-retention target gate, private credential exclusion,
+  backup retention expiry target, and retention-aware replay target.
 - Audit coverage: append-only ledger, owner indexes, migration versions,
   proposal review transition audit rows, reputation/moderation link evidence,
   schema metadata drift checks, migration rehearsal with unsupported
@@ -44,10 +45,10 @@ are present.
 - Validation evidence: targeted Node suite, split Playwright smokes,
   all-features regression, feature override safety, load-rate target coverage,
   migration-load replay evidence, load/rate replay evidence, and multi-process
-  write-contention evidence, including civic mutation security, session-auth
-  target coverage, proposal intake readiness, vote authorization readiness,
-  worker vote adapter gate, reputation eligibility advice readiness, moderation
-  privacy readiness, delegated-agent proof, and
+  write-contention evidence, including civic mutation security, data-retention
+  target coverage, session-auth target coverage, proposal intake readiness,
+  vote authorization readiness, worker vote adapter gate, reputation eligibility
+  advice readiness, moderation privacy readiness, delegated-agent proof, and
   governance preflight, effect execution gate, agent participation enforcement
   gate, institution readiness
   gate, public works readiness gate, lab readiness gate, and resilience

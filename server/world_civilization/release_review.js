@@ -52,8 +52,21 @@ const REQUIRED_REVIEW_GATES = [
     key: 'data_retention_policy',
     label: 'Data-retention policy',
     owner: 'security_product',
-    requiredArtifacts: [RELEASE_REVIEW_ARTIFACT],
-    requiredChecks: ['audit_retention', 'deletion_policy', 'debug_log_retention', 'export_policy'],
+    requiredArtifacts: [
+      RELEASE_REVIEW_ARTIFACT,
+      'server/world_civilization/data_retention_targets.js',
+      'tests/world_civilization_data_retention_targets.test.js'
+    ],
+    requiredChecks: [
+      'audit_retention',
+      'deletion_policy',
+      'debug_log_retention',
+      'export_policy',
+      'data_retention_target_gate',
+      'private_credential_exclusion',
+      'backup_retention_expiry_target',
+      'retention_aware_replay_target'
+    ],
     signoffRequired: true
   },
   {
@@ -112,6 +125,7 @@ const REQUIRED_REVIEW_GATES = [
     requiredArtifacts: [
       RELEASE_REVIEW_ARTIFACT,
       'tests/world_civilization_schemas.test.js',
+      'tests/world_civilization_data_retention_targets.test.js',
       'tests/world_civilization_mutation_security.test.js',
       'tests/world_civilization_session_auth_targets.test.js',
       'tests/world_civilization_governance_preflight.test.js',
@@ -138,6 +152,7 @@ const REQUIRED_REVIEW_GATES = [
       'split_playwright_smokes',
       'all_features_regression',
       'feature_override_safety',
+      'data_retention_target_gate',
       'session_auth_target_gate',
       'proposal_intake_readiness_gate',
       'vote_authorization_readiness_gate',
