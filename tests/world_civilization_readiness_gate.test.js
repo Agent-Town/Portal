@@ -1,0 +1,151 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+
+const { V6_WORLD_FEATURE_FLAG, parseWorldGridFeatureFlags } = require('../server/world_grid/feature_flags');
+const {
+  REQUIRED_V6_READINESS_GATES,
+  V5_PROMOTION_GATE_ARTIFACT,
+  V6_MILESTONE_PLAN_ARTIFACT,
+  V6_READINESS_GATE_ARTIFACT,
+  assertV6ReadinessGateSafe,
+  buildV6ReadinessGateReport
+} = require('../server/world_civilization/readiness_gate');
+
+function completeEvidenceFor(gate) {
+  return {
+    status: 'complete',
+    signoff: 'approved',
+    artifacts: [...gate.requiredArtifacts],
+    checks: [...gate.requiredChecks]
+  };
+}
+
+function completeReadinessEvidence() {
+  return Object.fromEntries(REQUIRED_V6_READINESS_GATES.map((gate) => [gate.key, completeEvidenceFor(gate)]));
+}
+
+test('V6 readiness gate report is hidden without explicit research opt-in and V6 flag', () => {
+  const withoutResearchOptIn = buildV6ReadinessGateReport({
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true }
+  });
+  const broadV5Override = buildV6ReadinessGateReport({
+    includeResearchReadiness: true,
+    featureFlags: parseWorldGridFeatureFlags('all')
+  });
+
+  for (const report of [withoutResearchOptIn, broadV5Override]) {
+    assert.equal(report.available, false);
+    assert.equal(report.closed, false);
+    assert.equal(report.releaseReady, false);
+    assert.equal(report.runtimeExposed, false);
+    assert.equal(report.playerVisible, false);
+    assert.equal(report.normalGameplayExposure, false);
+    assert.equal(report.mutatesWorldState, false);
+    assert.equal(report.productionEnabled, false);
+    assert.deepEqual(report.gateReports, []);
+    assert.deepEqual(assertV6ReadinessGateSafe(report), { ok: true, errors: [] });
+  }
+});
+
+test('V6 readiness gate baseline names every prerequisite domain but remains open', () => {
+  const report = buildV6ReadinessGateReport({
+    includeResearchReadiness: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    source: 'node_test'
+  });
+
+  assert.equal(report.available, true);
+  assert.equal(report.source, 'node_test');
+  assert.equal(report.closed, false);
+  assert.equal(report.releaseReady, false);
+  assert.deepEqual(report.gateReports.map((gate) => gate.key), REQUIRED_V6_READINESS_GATES.map((gate) => gate.key));
+  assert.ok(report.gateReports.some((gate) => gate.requiredArtifacts.includes(V5_PROMOTION_GATE_ARTIFACT)));
+  assert.ok(report.gateReports.some((gate) => gate.requiredArtifacts.includes(V6_READINESS_GATE_ARTIFACT)));
+  assert.ok(report.gateReports.some((gate) => gate.requiredArtifacts.includes(V6_MILESTONE_PLAN_ARTIFACT)));
+  for (const gate of report.gateReports) {
+    assert.equal(gate.ok, false, gate.key);
+    assert.equal(gate.status, 'missing', gate.key);
+    assert.equal(gate.signoff, 'missing', gate.key);
+    assert.ok(gate.missingArtifacts.length > 0, gate.key);
+    assert.ok(gate.missingChecks.length > 0, gate.key);
+  }
+  assert.deepEqual(assertV6ReadinessGateSafe(report), { ok: true, errors: [] });
+});
+
+test('V6 readiness gate closes only with complete signed evidence and stays hidden', () => {
+  const report = buildV6ReadinessGateReport({
+    includeResearchReadiness: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: completeReadinessEvidence()
+  });
+
+  assert.equal(report.closed, true);
+  assert.equal(report.releaseReady, true);
+  assert.equal(report.runtimeExposed, false);
+  assert.equal(report.playerVisible, false);
+  assert.equal(report.normalGameplayExposure, false);
+  assert.equal(report.mutatesWorldState, false);
+  assert.equal(report.productionEnabled, false);
+  assert.equal(report.executionStatus, 'not_executable');
+  assert.deepEqual(report.gateReports.map((gate) => gate.ok), REQUIRED_V6_READINESS_GATES.map(() => true));
+  assert.deepEqual(assertV6ReadinessGateSafe(report), { ok: true, errors: [] });
+});
+
+test('V6 readiness gate fails closed without proposal vote privacy and resilience evidence', () => {
+  const evidence = completeReadinessEvidence();
+  evidence.proposal_vote_governance = {
+    ...evidence.proposal_vote_governance,
+    checks: evidence.proposal_vote_governance.checks.filter((check) => check !== 'vote_authorization')
+  };
+  evidence.reputation_moderation_privacy = {
+    ...evidence.reputation_moderation_privacy,
+    checks: evidence.reputation_moderation_privacy.checks.filter((check) => check !== 'private_data_redaction')
+  };
+  evidence.persistence_resilience = {
+    ...evidence.persistence_resilience,
+    checks: evidence.persistence_resilience.checks.filter((check) => check !== 'production_load_rate')
+  };
+  const report = buildV6ReadinessGateReport({
+    includeResearchReadiness: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence
+  });
+
+  assert.equal(report.closed, false);
+  assert.equal(report.releaseReady, false);
+  assert.deepEqual(report.gateReports.find((gate) => gate.key === 'proposal_vote_governance').missingChecks, ['vote_authorization']);
+  assert.deepEqual(report.gateReports.find((gate) => gate.key === 'reputation_moderation_privacy').missingChecks, ['private_data_redaction']);
+  assert.deepEqual(report.gateReports.find((gate) => gate.key === 'persistence_resilience').missingChecks, ['production_load_rate']);
+  assert.deepEqual(assertV6ReadinessGateSafe(report), { ok: true, errors: [] });
+});
+
+test('V6 readiness gate assertion rejects fake closure or exposure drift', () => {
+  const report = buildV6ReadinessGateReport({
+    includeResearchReadiness: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: {
+      civic_schema_contracts: completeEvidenceFor(REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'civic_schema_contracts'))
+    }
+  });
+  const unsafe = {
+    ...report,
+    closed: true,
+    releaseReady: true,
+    runtimeExposed: true,
+    playerVisible: true,
+    normalGameplayExposure: true,
+    mutatesWorldState: true,
+    productionEnabled: true,
+    executionStatus: 'executes'
+  };
+  const result = assertV6ReadinessGateSafe(unsafe);
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(','), /V6_READINESS_GATE_RUNTIME_HIDDEN_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_READINESS_GATE_PLAYER_HIDDEN_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_READINESS_GATE_NORMAL_GAMEPLAY_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_READINESS_GATE_WORLD_MUTATION_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_READINESS_GATE_PRODUCTION_ENABLEMENT_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_READINESS_GATE_NON_EXECUTING_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_READINESS_GATE_CLOSED_WITH_FAILED_GATES/);
+});

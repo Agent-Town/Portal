@@ -91,6 +91,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'server/world_civilization/replay_reconstruction.js',
     'server/world_civilization/migration_rehearsal.js',
     'server/world_civilization/rollback_recovery.js',
+    'server/world_civilization/readiness_gate.js',
     'server/world_civilization/resilience.js',
     'server/world_civilization/release_review.js',
     'server/world_civilization/schemas.js',
@@ -109,6 +110,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'tests/world_civilization_migration_rehearsal.test.js',
     'tests/world_civilization_load_rate.test.js',
     'tests/world_civilization_rollback_recovery.test.js',
+    'tests/world_civilization_readiness_gate.test.js',
     'tests/world_civilization_mutation_security.test.js',
     'tests/world_civilization_tool_exposure_gate.test.js',
     'tests/world_civilization_governance_preflight.test.js',
@@ -154,6 +156,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   const publicWorksSource = read('server/world_civilization/public_works.js');
   const labSource = read('server/world_civilization/lab_surface.js');
   const resilienceSource = read('server/world_civilization/resilience.js');
+  const readinessSource = read('server/world_civilization/readiness_gate.js');
   const controlledSource = read('server/world_civilization/controlled_release.js');
   const requiredMilestones = [
     'M0 Hardened V5 world-grid baseline',
@@ -185,6 +188,16 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /Human approval or explicit delegation is required/);
   assert.match(spec, /docs\/product\/V6_AGENT_CIVILIZATION_MILESTONE_PLAN\.md/);
   assert.match(gate, /docs\/product\/V6_AGENT_CIVILIZATION_MILESTONE_PLAN\.md/);
+  assert.match(plan, /server\/world_civilization\/readiness_gate\.js/);
+  assert.match(gate, /server\/world_civilization\/readiness_gate\.js/);
+  assert.match(readinessSource, /buildV6ReadinessGateReport/);
+  assert.match(readinessSource, /REQUIRED_V6_READINESS_GATES/);
+  assert.match(readinessSource, /proposal_vote_governance/);
+  assert.match(readinessSource, /reputation_moderation_privacy/);
+  assert.match(readinessSource, /persistence_resilience/);
+  assert.match(readinessSource, /security_product_release_review/);
+  assert.match(readinessSource, /V6_READINESS_GATE_PRODUCTION_ENABLEMENT_FORBIDDEN/);
+  assert.match(skillLine, /V6 aggregate readiness gate/);
   assert.match(plan, /Source branch: `codex\/v6-agent-civilization-milestones`/);
   assert.match(plan, /broad V5 prototype overrides do not enable V6/);
   assert.match(spec, /FEATURE_WORLD_V60_AGENT_CIVILIZATION/);
@@ -392,6 +405,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(skillLine, /resilience readiness review/);
   assert.match(plan, /M18 V6 controlled release completion \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/controlled_release\.js/);
+  assert.match(plan, /buildV6ReadinessGateReport\(\)/);
   assert.match(plan, /explicit closed V6 readiness-gate report/);
   assert.match(gate, /server\/world_civilization\/controlled_release\.js/);
   assert.match(gate, /closed readiness-gate report/);

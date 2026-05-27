@@ -6,6 +6,8 @@ Milestone plan: `docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md`
 
 V5 promotion gate: `specs/release-gates/v5_world_grid_release_promotion_gate.md`
 
+Runtime readiness gate: `server/world_civilization/readiness_gate.js`
+
 Civic schema contracts: `specs/55_agent_town_v6_civic_schema_contracts.md`
 
 Civic mutation security foundation:
@@ -55,6 +57,14 @@ Controlled release completion foundation:
 
 V6.0 Agent Civilization Foundation must not become player-visible until every
 gate below has implementation, deterministic tests, and security/product signoff.
+
+`buildV6ReadinessGateReport()` is the research-only aggregate readiness report
+for this document. It remains hidden, non-executing, non-mutating, and
+`productionEnabled: false`; it can close only with complete approved evidence
+for V5 promotion, feature flag safety, civic schemas, audit replay, mutation
+security, worker tools, proposal/vote governance, reputation/moderation privacy,
+rollback, agent participation, institutions/public works, modal lab,
+persistence resilience, and security/product release review.
 
 ## Runtime Feature Flag Gate
 

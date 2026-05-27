@@ -4,7 +4,10 @@ Status: `research_only`
 
 Milestone: M18 V6 controlled release completion
 
-Runtime contract: `server/world_civilization/controlled_release.js`
+Runtime contracts:
+
+- `server/world_civilization/readiness_gate.js`
+- `server/world_civilization/controlled_release.js`
 
 Runbook: `docs/ops/V6_AGENT_CIVILIZATION_CONTROLLED_RELEASE_RUNBOOK.md`
 
@@ -19,8 +22,8 @@ create public autonomous agents, or bypass any M0-M17 gate.
 The report remains hidden from runtime/player surfaces and keeps
 `productionEnabled: false`. It can report release readiness only when all prior
 milestones are `done`, the M17 release-review report is ready, an explicit V6
-readiness-gate report is closed, and every controlled-release gate has complete
-evidence and approved signoff.
+readiness-gate report from `buildV6ReadinessGateReport()` is closed, and every
+controlled-release gate has complete evidence and approved signoff.
 
 ## Required Controlled-Release Gates
 

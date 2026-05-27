@@ -194,6 +194,16 @@ modal lab surface review, resilience readiness review, and product signoff
 requirements that must be
 complete before normal gameplay exposure.
 
+The research-only aggregate readiness gate in
+`server/world_civilization/readiness_gate.js` records the final V6 readiness
+evidence before M18: V5 world-grid promotion, feature flag safety, civic schema
+contracts, audit replay, mutation security, worker tool surface,
+proposal/vote governance, reputation/moderation privacy, effect rollback,
+agent participation, institutions/public works, modal lab, persistence
+resilience, and security/product release review. It remains hidden,
+non-executing, non-mutating, and production-disabled until all evidence is
+complete and approved.
+
 The research-only controlled release gate in
 `server/world_civilization/controlled_release.js` requires M0-M17 completion,
 release-review readiness, an explicit closed V6 readiness-gate report that

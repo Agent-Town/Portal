@@ -4,6 +4,8 @@ Status: `research_only`
 
 Runtime gate: `server/world_civilization/controlled_release.js`
 
+Readiness gate source: `server/world_civilization/readiness_gate.js`
+
 Milestone: M18 V6 controlled release completion
 
 This runbook records the required controlled-release evidence. It is not a
@@ -13,7 +15,7 @@ production enablement switch and does not approve player-visible V6.
 
 | Gate | Required Checks | Current Status |
 | --- | --- | --- |
-| V6 readiness gate closed | M0-M17 done, explicit closed V6.0 readiness-gate report, readiness report hidden until controlled release, release review ready | Pending |
+| V6 readiness gate closed | M0-M17 done, explicit closed V6.0 readiness-gate report from `buildV6ReadinessGateReport()`, readiness report hidden until controlled release, release review ready | Pending |
 | Production feature flag safety | Default off, admin-only enablement, broad override exclusion, canary cohort, emergency disable | Pending |
 | Rollback and disable controls | Disable plan, rollback owner, rollback rehearsal, data preservation, post-disable verification | Pending |
 | Release observability | Audit metrics, Worker Traffic trace, error alerts, privacy-safe logs, feature flag dashboard | Pending |

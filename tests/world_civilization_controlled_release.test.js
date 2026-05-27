@@ -8,6 +8,10 @@ const {
   buildV6ReleaseReviewReport
 } = require('../server/world_civilization/release_review');
 const {
+  REQUIRED_V6_READINESS_GATES,
+  buildV6ReadinessGateReport
+} = require('../server/world_civilization/readiness_gate');
+const {
   CONTROLLED_RELEASE_RUNBOOK,
   PRIOR_MILESTONE_KEYS,
   REQUIRED_CONTROLLED_RELEASE_GATES,
@@ -35,6 +39,15 @@ function completeReleaseEvidence() {
   }]));
 }
 
+function completeReadinessEvidence() {
+  return Object.fromEntries(REQUIRED_V6_READINESS_GATES.map((gate) => [gate.key, {
+    status: 'complete',
+    signoff: 'approved',
+    artifacts: [...gate.requiredArtifacts],
+    checks: [...gate.requiredChecks]
+  }]));
+}
+
 function allPriorMilestonesDone(overrides = {}) {
   return {
     ...Object.fromEntries(PRIOR_MILESTONE_KEYS.map((key) => [key, 'done'])),
@@ -50,17 +63,12 @@ function readyReleaseReviewReport() {
   });
 }
 
-function readyV6ReadinessGateReport(overrides = {}) {
-  return {
-    status: 'closed',
-    featureFlag: V6_WORLD_FEATURE_FLAG,
-    closed: true,
-    releaseReady: true,
-    runtimeExposed: false,
-    playerVisible: false,
-    normalGameplayExposure: false,
-    ...overrides
-  };
+function readyV6ReadinessGateReport() {
+  return buildV6ReadinessGateReport({
+    includeResearchReadiness: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: completeReadinessEvidence()
+  });
 }
 
 test('V6 controlled release report is hidden without explicit research opt-in and V6 flag', () => {
@@ -171,11 +179,12 @@ test('V6 controlled release rejects visible or mismatched readiness gate reports
     featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
     milestoneStatuses: allPriorMilestonesDone(),
     releaseReviewReport: readyReleaseReviewReport(),
-    v6ReadinessGateReport: readyV6ReadinessGateReport({
+    v6ReadinessGateReport: {
+      ...readyV6ReadinessGateReport(),
       featureFlag: 'FEATURE_WRONG',
       playerVisible: true,
       normalGameplayExposure: true
-    }),
+    },
     evidence: completeReleaseEvidence()
   });
 
