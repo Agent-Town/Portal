@@ -225,6 +225,7 @@ Status: prototype-gated
   "productionImageAssetCount": 0,
   "validationReportBoundaryMetricsMirrored": true,
   "validationReportBoundaryMetricsApiMirrored": true,
+  "releaseEvidenceBundleReadyApiPathVerified": true,
   "externalImageModelUsed": false,
   "explicitConsentRequiredForImageGeneration": true,
   "costConsentModelApproved": true,

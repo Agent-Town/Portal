@@ -3154,3 +3154,128 @@ test('GU-18/GU-19 release gate and evidence bundle APIs are generated-pack-gated
     });
   });
 });
+
+test('GPACK-154 release evidence bundle APIs can return ready controlled-release evidence', async () => {
+  const identity = { pairId: 'session:release-evidence-ready-api', houseId: null };
+
+  await withTempGeneratedPackStore(async (root) => {
+    await withWorldGridServer({
+      identity,
+      envPatch: {
+        NODE_ENV: 'test',
+        WORLD_GRID_FEATURE_FLAGS: 'all',
+        GENERATED_PACK_STORE_ROOT: root
+      }
+    }, async (baseUrl) => {
+      const postJson = async (url, body = {}) => {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        return { response, body: await response.json() };
+      };
+      const { response: generateResponse, body: generateBody } = await postJson(
+        `${baseUrl}/api/world/generated-pack/generate`,
+        { prompt: 'brass orbit rail town with moon garden markets' }
+      );
+      assert.equal(generateResponse.status, 200, JSON.stringify(generateBody));
+      const pack = generateBody.generatedPack;
+
+      const exportResponse = await fetch(`${baseUrl}/api/world/generated-pack/export?packId=${encodeURIComponent(pack.packId)}`);
+      const exportBody = await exportResponse.json();
+      assert.equal(exportResponse.status, 200, JSON.stringify(exportBody));
+
+      const { response: reloadResponse, body: reloadBody } = await postJson(
+        `${baseUrl}/api/world/generated-pack/reload`,
+        { packId: pack.packId }
+      );
+      assert.equal(reloadResponse.status, 200, JSON.stringify(reloadBody));
+
+      const { response: importResponse, body: importBody } = await postJson(
+        `${baseUrl}/api/world/generated-pack/import`,
+        { exportEnvelope: exportBody.exportEnvelope }
+      );
+      assert.equal(importResponse.status, 200, JSON.stringify(importBody));
+
+      const { response: invalidImportResponse } = await postJson(
+        `${baseUrl}/api/world/generated-pack/import`,
+        { exportEnvelope: { ...exportBody.exportEnvelope, packHash: '0'.repeat(64) } }
+      );
+      assert.equal(invalidImportResponse.status, 400);
+
+      const { response: playtestResponse, body: playtestBody } = await postJson(
+        `${baseUrl}/api/world/generated-pack/playtest-report`,
+        passingPlaytestInput(pack)
+      );
+      assert.equal(playtestResponse.status, 200, JSON.stringify(playtestBody));
+      assert.equal(playtestBody.playtestReport.playtestPassed, true);
+
+      const { response: publicCardResponse, body: publicCardBody } = await postJson(
+        `${baseUrl}/api/world/generated-pack/public-card`,
+        { packId: pack.packId }
+      );
+      assert.equal(publicCardResponse.status, 200, JSON.stringify(publicCardBody));
+      assert.equal(publicCardBody.validationReport.ok, true, JSON.stringify(publicCardBody.validationReport.checks));
+
+      const candidateReviewManifest = reviewedCandidateManifest(pack);
+      const readyRequestBody = {
+        diversityReport: suiteDiversityReport({ includePack: pack }),
+        publicCard: publicCardBody.publicCard,
+        persistenceReport: {
+          packId: pack.packId,
+          durablePackStorage: reloadBody.reloadReport.durablePackStorage === true,
+          restartReloadPass: reloadBody.generatedPack.packId === pack.packId && reloadBody.reloadReport.fallbackUsed === false,
+          exportImportRoundTrip: importBody.importReport.exportImportRoundTrip === true,
+          invalidImportRejected: invalidImportResponse.status === 400,
+          privateDataLeakCount: Math.max(
+            Number(exportBody.exportEnvelope.privateDataLeakCount || 0),
+            Number(importBody.importReport.privateDataLeakCount || 0)
+          )
+        },
+        candidateReviewManifest,
+        approvalEvidence: approvedReleaseEvidence(pack)
+      };
+
+      const { response: bundleResponse, body: bundleBody } = await postJson(
+        `${baseUrl}/api/world/generated-pack/release-evidence-bundle`,
+        readyRequestBody
+      );
+      assert.equal(bundleResponse.status, 200, JSON.stringify(bundleBody));
+      assert.equal(bundleBody.releaseGate.releaseMode, 'ready-for-controlled-release');
+      assert.equal(bundleBody.releaseGate.publicReleaseEligible, true);
+      assert.equal(bundleBody.releaseGateValidationReport.ok, true, JSON.stringify(bundleBody.releaseGateValidationReport.checks));
+      assert.equal(bundleBody.releaseEvidenceBundle.publicReleaseEligible, true);
+      assert.equal(bundleBody.releaseEvidenceBundle.metrics.presentSourceCount, bundleBody.releaseEvidenceBundle.metrics.requiredSourceCount);
+      assert.equal(bundleBody.releaseEvidenceBundle.metrics.missingSourceCount, 0);
+      assert.equal(bundleBody.releaseEvidenceBundle.metrics.readyEvidenceSourcesMatchGate, true);
+      assert.equal(bundleBody.releaseEvidenceBundle.metrics.privateDataLeakCount, 0);
+      assert.equal(bundleBody.releaseEvidenceBundle.metrics.productionImageAssetCount, 0);
+      assert.equal(bundleBody.releaseEvidenceBundle.constraints.productionImageAssetsCreated, false);
+      assert.equal(bundleBody.releaseEvidenceBundle.constraints.externalProviderPrivateDataStored, false);
+      assert.equal(bundleBody.releaseEvidenceBundle.constraints.canonicalServerRulesChanged, false);
+      assert.equal(bundleBody.releaseEvidenceBundle.constraints.v6CivicMechanicsTouched, false);
+      assert.equal(bundleBody.releaseEvidenceBundle.constraints.normalGameplayVisibilityChanged, false);
+      assert.equal(bundleBody.releaseEvidenceBundle.constraints.generatedPackDefaultExposure, false);
+      assert.equal(bundleBody.validationReport.ok, true, JSON.stringify(bundleBody.validationReport.checks));
+      assert.equal(bundleBody.validationReport.metrics.releaseGatePublicEligible, true);
+      assert.equal(bundleBody.validationReport.metrics.presentSourceCount, bundleBody.releaseEvidenceBundle.metrics.requiredSourceCount);
+      assert.equal(bundleBody.validationReport.metrics.missingSourceCount, 0);
+      assert.equal(bundleBody.validationReport.metrics.readyEvidenceSourcesMatchGate, true);
+      assert.equal(bundleBody.validationReport.metrics.boundaryPreserved, true);
+
+      const { response: toolBundleResponse, body: toolBundleBody } = await postJson(
+        `${baseUrl}/api/world/tool/et.world.generated_pack.release_evidence_bundle`,
+        readyRequestBody
+      );
+      assert.equal(toolBundleResponse.status, 200, JSON.stringify(toolBundleBody));
+      assert.equal(toolBundleBody.data.releaseGate.releaseMode, 'ready-for-controlled-release');
+      assert.equal(toolBundleBody.data.releaseEvidenceBundle.publicReleaseEligible, true);
+      assert.equal(toolBundleBody.data.releaseEvidenceBundle.metrics.missingSourceCount, 0);
+      assert.equal(toolBundleBody.data.releaseEvidenceBundle.metrics.readyEvidenceSourcesMatchGate, true);
+      assert.equal(toolBundleBody.data.validationReport.ok, true, JSON.stringify(toolBundleBody.data.validationReport.checks));
+      assert.equal(toolBundleBody.data.validationReport.metrics.releaseGatePublicEligible, true);
+      assert.equal(toolBundleBody.data.validationReport.metrics.boundaryPreserved, true);
+    });
+  });
+});
