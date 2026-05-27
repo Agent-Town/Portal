@@ -1018,6 +1018,42 @@ test('GPACK-142 release evidence bundle rejects gate-context metric tampering', 
   );
 }));
 
+test('GPACK-143 release evidence bundle rejects ready-evidence aggregate metric tampering', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_evidence_bundle_ready_sources_metric',
+    prompt: 'silver relay garden with careful harbor builders',
+    nowMs: 155_080
+  });
+  const validationNowMs = fixture.releaseGate.evaluatedAtMs + 100;
+  const bundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    nowMs: fixture.releaseGate.evaluatedAtMs + 50
+  });
+  const tamperedBundle = rehashReleaseEvidenceBundle({
+    ...bundle,
+    metrics: {
+      ...bundle.metrics,
+      readyEvidenceSourcesMatchGate: false
+    }
+  });
+  const report = validateReleaseEvidenceBundle(tamperedBundle, {
+    ...fixture,
+    nowMs: validationNowMs
+  });
+
+  assert.equal(bundle.metrics.readyEvidenceSourcesMatchGate, true);
+  assert.equal(report.metrics.readyEvidenceSourcesMatchGate, true);
+  assert.equal(
+    report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_HASH_STABLE').passed,
+    true
+  );
+  assert.equal(report.ok, false);
+  assert.equal(
+    report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,
+    false
+  );
+}));
+
 test('GU-19 release evidence bundle rejects source drift and missing ready-gate evidence', () => withTempGeneratedPackStore(() => {
   const fixture = readyReleaseGateFixture({
     ownerAccountId: 'owner_release_evidence_bundle_tamper',
