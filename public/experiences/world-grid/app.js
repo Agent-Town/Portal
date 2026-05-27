@@ -79,6 +79,18 @@
     return escapeHtml(value).replace(/`/g, '&#96;');
   }
 
+  function appendPublicText(parent, tagName, value, className = '') {
+    const node = document.createElement(tagName);
+    if (className) node.className = className;
+    node.textContent = String(value ?? '');
+    parent.appendChild(node);
+    return node;
+  }
+
+  function appendBreak(parent) {
+    parent.appendChild(document.createElement('br'));
+  }
+
   function percentValue(value) {
     const number = Number(value);
     if (!Number.isFinite(number)) return 0;
@@ -249,9 +261,20 @@
     try {
       const payload = await api('/api/world/public-towns');
       const towns = payload.towns || [];
-      list.innerHTML = towns.length
-        ? towns.map((town) => `<p><strong>${escapeHtml(town.townName)}</strong><br><span>${escapeHtml(town.displayName)}</span><br>${escapeHtml(town.publicSummary.charmBand)} in ${escapeHtml(town.regionHint)}</p>`).join('')
-        : '<p>No public neighbors yet.</p>';
+      list.innerHTML = '';
+      if (!towns.length) {
+        appendPublicText(list, 'p', 'No public neighbors yet.');
+        return;
+      }
+      for (const town of towns) {
+        const row = document.createElement('p');
+        appendPublicText(row, 'strong', town.townName);
+        appendBreak(row);
+        appendPublicText(row, 'span', town.displayName);
+        appendBreak(row);
+        appendPublicText(row, 'span', `${town.publicSummary?.charmBand || 'Public-safe town'} in ${town.regionHint || 'the world grid'}`);
+        list.appendChild(row);
+      }
     } catch (error) {
       list.textContent = error?.body?.error?.message || 'Public presence is not available.';
     }

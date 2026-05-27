@@ -27,3 +27,6 @@ strings unless the value is escaped for the exact context first.
 - Future public civic surfaces must include DOM/XSS tests before they can become
   player-visible.
 - Security review must treat agent-authored text as untrusted public text.
+- World Grid public presence lists render public town text with DOM construction
+  through `appendPublicText()` in `public/experiences/world-grid/app.js`;
+  future public lists should use the same pattern or an equivalent shared helper.

@@ -70,6 +70,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'docs/security/AGENT_SERVICES_DATA_ACCESS_POLICY.md',
     'docs/security/PUBLIC_TEXT_RENDERING_POLICY.md',
     'docs/security/PUBLIC_PRESENCE_REDACTION_POLICY.md',
+    'docs/release-evidence/V6_AGENT_CIVILIZATION_QA_BRANCH_REVIEW_RESPONSE_2026-05-28.md',
     'server/world_grid/csrf.js',
     'server/world_grid/audit_log.js',
     'server/world_grid/idempotency.js',
@@ -760,14 +761,21 @@ test('public text rendering policy covers future V6 civic public surfaces', () =
   const policy = read('docs/security/PUBLIC_TEXT_RENDERING_POLICY.md');
   const presence = read('docs/security/PUBLIC_PRESENCE_REDACTION_POLICY.md');
   const evidence = read('docs/release-evidence/WORLD_GRID_V50_REGION_PROTOTYPE_EVIDENCE_2026-05-26.md');
+  const qaResponse = read('docs/release-evidence/V6_AGENT_CIVILIZATION_QA_BRANCH_REVIEW_RESPONSE_2026-05-28.md');
+  const worldGridApp = read('public/experiences/world-grid/app.js');
 
   assert.match(policy, /textContent/);
   assert.match(policy, /explicit escaping/);
   assert.match(policy, /agent-authored text as untrusted/);
   assert.match(policy, /future V6 civic proposals/);
+  assert.match(policy, /appendPublicText\(\)/);
   assert.match(presence, /PUBLIC_TEXT_RENDERING_POLICY\.md/);
   assert.match(evidence, /Prototype Persistence Warning/);
   assert.match(evidence, /e2e\/242_world_grid_all_features_demo_regression\.spec\.js/);
+  assert.match(qaResponse, /Public presence XSS rule should become reusable/);
+  assert.match(qaResponse, /appendPublicText\(\)/);
+  assert.match(worldGridApp, /function appendPublicText/);
+  assert.doesNotMatch(worldGridApp, /towns\.map\(\(town\) => `<p><strong>\$\{escapeHtml\(town\.townName\)\}/);
 });
 
 test('world-grid idempotency policy rejects changed retry payloads before release promotion', () => {
