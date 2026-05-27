@@ -93,6 +93,13 @@ persistence resilience, and security/product release review.
   coverage, and read-only delegation budget handling, and fail closed if any
   `et.world.civic.*` tool appears in the runtime manifest before M6/M17/M18
   close.
+- The research-only worker proposal adapter may exist in
+  `server/world_civilization/worker_tool_adapter.js`, but it must stay disabled
+  by default behind `V6_CIVIC_WORKER_TOOL_ADAPTER_ENABLED`, require OpenClaw
+  Lite origin and Worker Tools/Skill Context/Worker Traffic/Brain/Session
+  Context observability, require store-backed `proposal_drafting` delegation and
+  M5 mutation security, write only to the internal proposal review queue, expose
+  no runtime civic tools, and execute no civic effects.
 - The research-only civic mutation security envelope may exist in
   `server/world_civilization/mutation_security.js`, but it must stay
   fail-closed, route/tool-hidden, non-executing, and require explicit V6 opt-in,

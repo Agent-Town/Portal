@@ -311,7 +311,9 @@ test('V6 release review requires worker tool exposure evidence', () => {
   assert.ok(workerGate.requiredArtifacts.includes('specs/59_agent_town_v6_worker_tool_surface_draft.md'));
   assert.ok(workerGate.requiredArtifacts.includes('server/world_civilization/tools.js'));
   assert.ok(workerGate.requiredArtifacts.includes('server/world_civilization/tool_exposure_gate.js'));
+  assert.ok(workerGate.requiredArtifacts.includes('server/world_civilization/worker_tool_adapter.js'));
   assert.ok(workerGate.requiredArtifacts.includes('tests/world_civilization_tool_exposure_gate.test.js'));
+  assert.ok(workerGate.requiredArtifacts.includes('tests/world_civilization_worker_tool_adapter.test.js'));
   assert.ok(workerGate.requiredArtifacts.includes('docs/internal-skill-testline.md'));
   assert.ok(workerGate.requiredChecks.includes('runtime_manifest_source_of_truth'));
   assert.ok(workerGate.requiredChecks.includes('openclaw_lite_worker_origin'));
@@ -331,10 +333,12 @@ test('V6 release review requires proposal intake route tool and review queue evi
   assert.ok(proposalGate.requiredArtifacts.includes('server/world_civilization/proposals.js'));
   assert.ok(proposalGate.requiredArtifacts.includes('server/world_civilization/routes.js'));
   assert.ok(proposalGate.requiredArtifacts.includes('server/world_civilization/store_wiring.js'));
+  assert.ok(proposalGate.requiredArtifacts.includes('server/world_civilization/worker_tool_adapter.js'));
   assert.ok(proposalGate.requiredArtifacts.includes('server/world_civilization/mutation_security.js'));
   assert.ok(proposalGate.requiredArtifacts.includes('server/world_civilization/tool_exposure_gate.js'));
   assert.ok(proposalGate.requiredArtifacts.includes('tests/world_civilization_proposals.test.js'));
   assert.ok(proposalGate.requiredArtifacts.includes('tests/world_civilization_routes.test.js'));
+  assert.ok(proposalGate.requiredArtifacts.includes('tests/world_civilization_worker_tool_adapter.test.js'));
   assert.ok(proposalGate.requiredChecks.includes('human_submission_envelope'));
   assert.ok(proposalGate.requiredChecks.includes('worker_tool_submission_envelope'));
   assert.ok(proposalGate.requiredChecks.includes('openclaw_lite_worker_origin'));

@@ -169,11 +169,13 @@ const REQUIRED_REVIEW_GATES = [
       'server/world_civilization/proposals.js',
       'server/world_civilization/routes.js',
       'server/world_civilization/store_wiring.js',
+      'server/world_civilization/worker_tool_adapter.js',
       'server/world_civilization/mutation_security.js',
       'server/world_civilization/tool_exposure_gate.js',
       'docs/security/PUBLIC_TEXT_RENDERING_POLICY.md',
       'tests/world_civilization_proposals.test.js',
       'tests/world_civilization_routes.test.js',
+      'tests/world_civilization_worker_tool_adapter.test.js',
       'tests/world_civilization_governance_preflight.test.js',
       'tests/world_civilization_mutation_security.test.js',
       'tests/world_civilization_tool_exposure_gate.test.js'
@@ -420,7 +422,9 @@ const REQUIRED_REVIEW_GATES = [
       'specs/59_agent_town_v6_worker_tool_surface_draft.md',
       'server/world_civilization/tools.js',
       'server/world_civilization/tool_exposure_gate.js',
+      'server/world_civilization/worker_tool_adapter.js',
       'tests/world_civilization_tools.test.js',
+      'tests/world_civilization_worker_tool_adapter.test.js',
       'tests/world_civilization_tool_exposure_gate.test.js',
       'docs/internal-skill-testline.md'
     ],

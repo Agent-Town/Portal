@@ -8,9 +8,13 @@ Runtime module: `server/world_civilization/tools.js`
 
 Exposure gate: `server/world_civilization/tool_exposure_gate.js`
 
+Worker proposal adapter: `server/world_civilization/worker_tool_adapter.js`
+
 Contract tests: `tests/world_civilization_tools.test.js`
 
 Exposure gate tests: `tests/world_civilization_tool_exposure_gate.test.js`
+
+Worker adapter tests: `tests/world_civilization_worker_tool_adapter.test.js`
 
 Production override tests: `tests/world_grid_region.test.js`
 
@@ -60,6 +64,30 @@ delegation policy preparation:
   until moderation, rollback, audit, and release gates are closed.
 - Agent-authored proposal drafts remain draft/review inputs. Agents may not
   silently apply civic effects.
+
+## Worker Tool Adapter
+
+`server/world_civilization/worker_tool_adapter.js` is the current internal
+worker-first wiring foundation for `et.world.civic.proposals.submit_for_review`.
+It is not registered in runtime `/api/world/tools`, does not add player-visible
+UI, and is disabled unless `V6_CIVIC_WORKER_TOOL_ADAPTER_ENABLED=1`,
+`FEATURE_WORLD_V60_AGENT_CIVILIZATION`, and explicit research opt-in are all
+present.
+
+The adapter requires:
+
+- OpenClaw Lite worker origin.
+- No backend shortcut.
+- Worker Tools, Skill Context, Worker Traffic, Brain, and Session Context
+  observability.
+- Same-origin/CSRF-reviewed M5 civic mutation security.
+- Store-backed `proposal_drafting` delegation for the agent proposer.
+- Explicit approval receipt and idempotency key.
+- No proposal effect execution and no runtime civic tool exposure.
+
+The adapter may persist a proposal only into the internal M7 review queue. It
+must never apply a civic effect, mutate private town state, mutate another
+user's world, or publish `et.world.civic.*` through runtime tool manifests.
 
 ## Worker-First Requirement
 

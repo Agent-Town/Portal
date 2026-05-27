@@ -121,7 +121,9 @@ const REQUIRED_V6_READINESS_GATES = [
       'specs/59_agent_town_v6_worker_tool_surface_draft.md',
       'server/world_civilization/tools.js',
       'server/world_civilization/tool_exposure_gate.js',
+      'server/world_civilization/worker_tool_adapter.js',
       'tests/world_civilization_tools.test.js',
+      'tests/world_civilization_worker_tool_adapter.test.js',
       'tests/world_civilization_tool_exposure_gate.test.js'
     ],
     requiredChecks: [
@@ -144,10 +146,12 @@ const REQUIRED_V6_READINESS_GATES = [
       'server/world_civilization/proposals.js',
       'server/world_civilization/routes.js',
       'server/world_civilization/store_wiring.js',
+      'server/world_civilization/worker_tool_adapter.js',
       'server/world_civilization/votes.js',
       'server/world_civilization/governance_preflight.js',
       'tests/world_civilization_proposals.test.js',
       'tests/world_civilization_routes.test.js',
+      'tests/world_civilization_worker_tool_adapter.test.js',
       'tests/world_civilization_votes.test.js',
       'tests/world_civilization_governance_preflight.test.js'
     ],

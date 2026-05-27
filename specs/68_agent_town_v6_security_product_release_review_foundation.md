@@ -53,11 +53,13 @@ are present.
   disabled-by-default research-only Express route coverage with fail-closed
   missing-flag, missing-store, denied same-origin/CSRF behavior, and env-gated
   SQLite proposal/audit/delegation store wiring that remains releaseReady false;
-  idempotent submission replay; review queue indexes, review queue
-  snapshots, reviewed/expired proposal queue exclusion, moderation decision
-  links, proposal audit rows, public text rendering review, private-data
-  exclusion, no backend shortcuts, no civic tool exposure, and no effect
-  execution before any proposal route or worker tool can accept civic proposals.
+  worker proposal-tool adapter evidence for OpenClaw Lite origin, observability,
+  store-backed delegation, and no backend shortcut; idempotent submission replay;
+  review queue indexes, review queue snapshots, reviewed/expired proposal queue
+  exclusion, moderation decision links, proposal audit rows, public text
+  rendering review, private-data exclusion, no backend shortcuts, no civic tool
+  exposure, and no effect execution before any proposal route or worker tool can
+  accept civic proposals.
 - Vote authorization readiness review: server-verified voter authorization,
   eligibility rule verification, one-vote accounting, idempotent receipt replay,
   changed-vote replay rejection, proposal expiry denial, delegation policy

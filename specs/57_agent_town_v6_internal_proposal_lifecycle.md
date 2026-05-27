@@ -153,6 +153,12 @@ path.
 
 ## Worker-First Rule
 
-Agent-authored proposals may be stored only after a later worker/tool integration
-routes them through OpenClaw Lite and preserves Worker Tools, Skill Context,
-Worker Traffic, Brain, and Session Context observability.
+Agent-authored proposals may be stored through
+`server/world_civilization/worker_tool_adapter.js` only when the
+`et.world.civic.proposals.submit_for_review` adapter receives OpenClaw Lite
+worker-origin evidence, Worker Tools, Skill Context, Worker Traffic, Brain, and
+Session Context observability, store-backed `proposal_drafting` delegation,
+same-origin/CSRF-reviewed M5 mutation security, explicit approval, and
+idempotency. This adapter is still research-only and does not register a runtime
+civic tool, proposal UI, review queue UI, effect execution path, or public
+autonomous-agent mutation.
