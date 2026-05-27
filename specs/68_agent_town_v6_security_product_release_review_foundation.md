@@ -37,6 +37,10 @@ are present.
 - Validation evidence: targeted Node suite, split Playwright smokes,
   all-features regression, feature override safety, and load/rate replay
   evidence, including civic mutation security contract coverage.
+- Worker tool surface review: runtime manifest source-of-truth evidence,
+  OpenClaw Lite worker origin, Worker Traffic and Skill Context observability,
+  mutation security envelope coverage, and no backend shortcuts before any
+  civic tool exposure.
 - Modal lab surface review: town hub modal launch, standalone route denial,
   worker continuity, debug observability, and non-executing panels.
 - Product release signoff: player-visible scope, rollback plan, support runbook,

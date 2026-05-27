@@ -70,6 +70,14 @@ non-executing and hidden from runtime `/api/world/tools`; runtime V6 civic
 tools and routes remain absent or disabled until the worker-first V6 tool
 surface and readiness gate are implemented.
 
+The research-only civic tool exposure gate in
+`server/world_civilization/tool_exposure_gate.js` keeps M6 fail-closed. It
+requires `/api/world/tools` as the runtime source of truth, OpenClaw Lite worker
+origin, Worker Tools/Skill Context/Worker Traffic/Brain/Session Context
+observability, the civic mutation security envelope, non-executing draft
+metadata, approval/idempotency-bound future mutations, and no public runtime
+`et.world.civic.*` tools before any future exposure can proceed.
+
 The research-only civic mutation security envelope in
 `server/world_civilization/mutation_security.js` is fail-closed and
 non-executing. It requires explicit V6 research opt-in, same-origin checks,

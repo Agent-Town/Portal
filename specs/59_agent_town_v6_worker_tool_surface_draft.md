@@ -6,7 +6,11 @@ Milestone: `M6 Worker-first V6 tool surface`
 
 Runtime module: `server/world_civilization/tools.js`
 
+Exposure gate: `server/world_civilization/tool_exposure_gate.js`
+
 Contract tests: `tests/world_civilization_tools.test.js`
+
+Exposure gate tests: `tests/world_civilization_tool_exposure_gate.test.js`
 
 Feature flag: `FEATURE_WORLD_V60_AGENT_CIVILIZATION`
 
@@ -62,12 +66,32 @@ OpenClaw Lite worker/tool path and appear in worker observability surfaces:
 Backend handlers may validate, persist, and audit tool requests, but they must
 not contain agent decision policy or bypass shared-state human approval.
 
+## Exposure Gate
+
+`server/world_civilization/tool_exposure_gate.js` is the research-only contract
+that future work must satisfy before any `et.world.civic.*` draft can become a
+runtime-callable tool. The gate remains non-executing and keeps
+`releaseReady: false`; it only records readiness evidence.
+
+The current gate requires:
+
+- `/api/world/tools` to remain the runtime source of truth.
+- No `et.world.civic.*` entry in the runtime tool manifest.
+- OpenClaw Lite worker origin and no backend shortcut.
+- Worker Tools, Skill Context, Worker Traffic, Brain, and Session Context
+  observability.
+- V6 civic mutation security envelope evidence.
+- Non-executing draft metadata and approval/idempotency binding for future
+  review, vote receipt, and delegation-policy mutations.
+
 ## Release Gate
 
 M6 can move to `done` only after:
 
 - runtime tool manifest exposure is intentionally implemented behind V6 flags;
 - production player overrides cannot expose the tools;
+- `server/world_civilization/tool_exposure_gate.js` passes with real worker
+  origin and observability evidence;
 - worker-origin and worker-traffic coverage proves the worker path is used;
 - every mutating civic route has same-origin, CSRF, session/wallet auth, rate
   limits, idempotency, audit, moderation, rollback, and privacy coverage;

@@ -67,6 +67,13 @@ gate below has implementation, deterministic tests, and security/product signoff
 - Research-only civic tool drafts may exist in
   `server/world_civilization/tools.js`, but they must be non-executing,
   hidden from runtime `/api/world/tools`, and covered by contract tests.
+- The research-only civic tool exposure gate may exist in
+  `server/world_civilization/tool_exposure_gate.js`, but it must keep
+  `releaseReady: false`, require `/api/world/tools` as runtime source of truth,
+  require OpenClaw Lite worker origin and Worker Tools, Skill Context, Worker
+  Traffic, Brain, and Session Context observability, require the civic mutation
+  security envelope, and fail closed if any `et.world.civic.*` tool appears in
+  the runtime manifest before M6/M17/M18 close.
 - The research-only civic mutation security envelope may exist in
   `server/world_civilization/mutation_security.js`, but it must stay
   fail-closed, route/tool-hidden, non-executing, and require explicit V6 opt-in,
@@ -181,6 +188,12 @@ gate below has implementation, deterministic tests, and security/product signoff
   requires durable/session-bound CSRF, durable/shared rate limits, final
   session/wallet middleware, production browser coverage, audit integration,
   and security/product signoff.
+- Worker-first V6 civic tools must pass the exposure gate before becoming
+  runtime-callable. Current research-only coverage starts in
+  `server/world_civilization/tool_exposure_gate.js`; release still requires
+  real OpenClaw Lite worker routing, Worker Traffic evidence, production
+  override safety, browser coverage, and release review signoff before any
+  `et.world.civic.*` tool appears in `/api/world/tools`.
 - Vote authorization cannot be forged, replayed, self-delegated without policy,
   or applied to ineligible owners.
 - Reputation cannot be self-awarded, transferred as currency, or used without an

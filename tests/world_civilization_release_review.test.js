@@ -94,6 +94,25 @@ test('V6 release review requires modal lab launch-surface evidence', () => {
   assert.ok(labGate.requiredChecks.includes('non_executing_panels'));
 });
 
+test('V6 release review requires worker tool exposure evidence', () => {
+  const workerGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'worker_tool_surface_review');
+  const validationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'validation_evidence');
+
+  assert.equal(workerGate.owner, 'product_engineering');
+  assert.ok(workerGate.requiredArtifacts.includes('specs/59_agent_town_v6_worker_tool_surface_draft.md'));
+  assert.ok(workerGate.requiredArtifacts.includes('server/world_civilization/tools.js'));
+  assert.ok(workerGate.requiredArtifacts.includes('server/world_civilization/tool_exposure_gate.js'));
+  assert.ok(workerGate.requiredArtifacts.includes('tests/world_civilization_tool_exposure_gate.test.js'));
+  assert.ok(workerGate.requiredArtifacts.includes('docs/internal-skill-testline.md'));
+  assert.ok(workerGate.requiredChecks.includes('runtime_manifest_source_of_truth'));
+  assert.ok(workerGate.requiredChecks.includes('openclaw_lite_worker_origin'));
+  assert.ok(workerGate.requiredChecks.includes('worker_traffic_observability'));
+  assert.ok(workerGate.requiredChecks.includes('skill_context_observability'));
+  assert.ok(workerGate.requiredChecks.includes('mutation_security_envelope'));
+  assert.ok(workerGate.requiredChecks.includes('no_backend_shortcuts'));
+  assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_mutation_security.test.js'));
+});
+
 test('V6 release review report can only become ready with complete evidence and signoff', () => {
   const evidence = Object.fromEntries(REQUIRED_REVIEW_GATES.map((gate) => [gate.key, completeEvidenceFor(gate)]));
   const report = buildV6ReleaseReviewReport({

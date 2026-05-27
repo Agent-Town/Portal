@@ -89,6 +89,29 @@ const REQUIRED_REVIEW_GATES = [
     signoffRequired: true
   },
   {
+    key: 'worker_tool_surface_review',
+    label: 'Worker tool surface review',
+    owner: 'product_engineering',
+    requiredArtifacts: [
+      RELEASE_REVIEW_ARTIFACT,
+      'specs/59_agent_town_v6_worker_tool_surface_draft.md',
+      'server/world_civilization/tools.js',
+      'server/world_civilization/tool_exposure_gate.js',
+      'tests/world_civilization_tools.test.js',
+      'tests/world_civilization_tool_exposure_gate.test.js',
+      'docs/internal-skill-testline.md'
+    ],
+    requiredChecks: [
+      'runtime_manifest_source_of_truth',
+      'openclaw_lite_worker_origin',
+      'worker_traffic_observability',
+      'skill_context_observability',
+      'mutation_security_envelope',
+      'no_backend_shortcuts'
+    ],
+    signoffRequired: true
+  },
+  {
     key: 'modal_lab_surface_review',
     label: 'Modal lab surface review',
     owner: 'product_engineering',

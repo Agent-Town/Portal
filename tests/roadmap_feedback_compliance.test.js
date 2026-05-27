@@ -93,6 +93,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'server/world_civilization/release_review.js',
     'server/world_civilization/schemas.js',
     'server/world_civilization/sqlite_schema.js',
+    'server/world_civilization/tool_exposure_gate.js',
     'server/world_civilization/tools.js',
     'server/world_civilization/votes.js',
     'tests/world_civilization_process_restart.test.js',
@@ -107,6 +108,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'tests/world_civilization_load_rate.test.js',
     'tests/world_civilization_rollback_recovery.test.js',
     'tests/world_civilization_mutation_security.test.js',
+    'tests/world_civilization_tool_exposure_gate.test.js',
     'tests/world_grid_region_preferences_persistence.test.js',
     'tests/world_grid_region_preferences_restart_probe_child.js',
     'tests/world_grid_idempotency_persistence.test.js',
@@ -175,8 +177,12 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(gate, /Production player query\/header overrides must not enable V6\.0/);
   assert.match(plan, /M6 Worker-first V6 tool surface \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/tools\.js/);
+  assert.match(plan, /server\/world_civilization\/tool_exposure_gate\.js/);
+  assert.match(plan, /OpenClaw Lite worker origin/);
   assert.match(spec, /research-only civic tool draft/);
+  assert.match(spec, /tool exposure gate/);
   assert.match(gate, /server\/world_civilization\/tools\.js/);
+  assert.match(gate, /server\/world_civilization\/tool_exposure_gate\.js/);
   assert.match(gate, /hidden from runtime `\/api\/world\/tools`/);
   assert.match(plan, /M9 Reputation and accountability \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/reputation\.js/);
@@ -264,7 +270,9 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(gate, /server\/world_civilization\/release_review\.js/);
   assert.match(gate, /threat model, privacy review, abuse-case review/);
   assert.match(plan, /modal lab surface review/);
+  assert.match(plan, /worker tool surface review/);
   assert.match(gate, /modal lab surface (launch )?review/);
+  assert.match(gate, /Worker-first V6 civic tools must pass the exposure gate/);
   assert.match(plan, /M18 V6 controlled release completion \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/controlled_release\.js/);
   assert.match(gate, /server\/world_civilization\/controlled_release\.js/);
@@ -371,6 +379,25 @@ test('V6 civic mutation security envelope is tracked as an M5 release control', 
   assert.match(gate, /future civic store write/);
   assert.match(security, /mutationApplied: false/);
   assert.match(security, /durable\/session-bound CSRF/);
+});
+
+test('V6 worker-first civic tool exposure gate is tracked as an M6 release control', () => {
+  const plan = read('docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md');
+  const spec = read('specs/59_agent_town_v6_worker_tool_surface_draft.md');
+  const gate = read('specs/release-gates/v60_agent_civilization_readiness_gate.md');
+  const releaseReview = read('docs/security/V6_AGENT_CIVILIZATION_RELEASE_REVIEW.md');
+  const skillLine = read('docs/internal-skill-testline.md');
+
+  assert.match(plan, /server\/world_civilization\/tool_exposure_gate\.js/);
+  assert.match(plan, /Worker Tools\/Skill Context\/Worker Traffic\/Brain\/Session Context/);
+  assert.match(spec, /Exposure gate: `server\/world_civilization\/tool_exposure_gate\.js`/);
+  assert.match(spec, /OpenClaw Lite worker origin/);
+  assert.match(spec, /No `et\.world\.civic\.\*` entry in the runtime tool manifest/);
+  assert.match(gate, /releaseReady: false/);
+  assert.match(gate, /Worker-first V6 civic tools must pass the exposure gate/);
+  assert.match(releaseReview, /Worker tool surface review/);
+  assert.match(releaseReview, /no backend shortcuts/);
+  assert.match(skillLine, /tests\/world_civilization_tool_exposure_gate\.test\.js/);
 });
 
 test('world-grid CSRF policy is tracked as prototype-only M5 coverage', () => {
