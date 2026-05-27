@@ -34,7 +34,13 @@ const MODERATION_CLASSES = new Set([
 ]);
 const VOTE_CHOICES = new Set(['approve', 'reject', 'abstain']);
 const DELEGATION_SCOPES = new Set(['proposal_drafting', 'vote_advice', 'civic_execution']);
-const CIVIC_ACTION_EFFECTS = new Set(['public_summary', 'public_works_accounting', 'sandbox_policy', 'charter_update']);
+const CIVIC_ACTION_EFFECT_HANDLERS = Object.freeze({
+  public_summary: 'et.civic.public_summary.apply',
+  public_works_accounting: 'et.civic.public_works.apply',
+  sandbox_policy: 'et.civic.sandbox_policy.apply',
+  charter_update: 'et.civic.charter.apply'
+});
+const CIVIC_ACTION_EFFECTS = new Set(Object.keys(CIVIC_ACTION_EFFECT_HANDLERS));
 const MODERATION_STATUSES = new Set(['approved', 'rejected', 'needs_review']);
 const MODERATION_REVIEW_TYPES = new Set(['human_review', 'appeal']);
 const MODERATION_REVIEW_STATUSES = new Set(['queued', 'upheld', 'overturned', 'escalated']);
@@ -551,6 +557,9 @@ function validateCivicAction(raw = {}) {
   const authorityKind = validateEnum(errors, executionAuthority.kind, new Set(['human_approved', 'delegated']), 'executionAuthority.kind');
   const authorityReceiptId = validateString(errors, executionAuthority.receiptId, 'executionAuthority.receiptId', { pattern: /^receipt_[a-z0-9_:-]{4,88}$/ });
   const handlerName = validateString(errors, raw.handlerName, 'handlerName', { pattern: TOOL_NAME_RE, max: 96 });
+  if (effectType && handlerName && handlerName !== CIVIC_ACTION_EFFECT_HANDLERS[effectType]) {
+    errors.push(`handlerName must match effectType ${effectType}`);
+  }
   const beforeSummary = validateString(errors, raw.beforeSummary, 'beforeSummary', { max: 480 });
   const afterSummary = validateString(errors, raw.afterSummary, 'afterSummary', { max: 480 });
   const auditLedgerEntryId = validateString(errors, raw.auditLedgerEntryId, 'auditLedgerEntryId', { pattern: /^audit_[a-z0-9_:-]{4,88}$/ });
@@ -655,6 +664,7 @@ function validateV6CivicSchema(kind, raw = {}) {
 
 module.exports = {
   AUDIT_ACTION_TYPES,
+  CIVIC_ACTION_EFFECT_HANDLERS,
   CIVIC_SCHEMA_VERSION,
   MODERATION_CLASSES,
   PROPOSAL_SCOPES,

@@ -292,6 +292,16 @@ test('V6 civic effect store rejects invalid actions, rollback gaps, and private 
   );
   assert.throws(
     () => effectStore.prepareEffect(civicAction({
+      actionId: 'action_handler_mismatch_001',
+      handlerName: 'et.civic.public_summary.apply',
+      auditLedgerEntryId: 'audit_action_handler_mismatch_001',
+      idempotencyKey: 'idem_action_handler_mismatch_001',
+      rollbackId: 'rollback_handler_mismatch_001'
+    }), rollbackPlan(), { nowMs: 1_779_784_300_000 }),
+    /CIVIC_EFFECT_ACTION_INVALID/
+  );
+  assert.throws(
+    () => effectStore.prepareEffect(civicAction({
       actionId: 'action_bad_rollback_001',
       auditLedgerEntryId: 'audit_action_bad_rollback_001',
       idempotencyKey: 'idem_action_bad_rollback_001',

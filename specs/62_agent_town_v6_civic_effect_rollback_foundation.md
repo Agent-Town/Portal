@@ -28,6 +28,12 @@ public proposal, an approved moderation decision, and a human approval receipt.
 It is readiness evidence for later typed execution handlers, not an execution
 engine.
 
+The schema layer now has a typed effect handler registry for
+`public_summary`, `public_works_accounting`, `sandbox_policy`, and
+`charter_update`. The registry only validates that a prepared action references
+the correct future handler name for its effect type. It does not expose apply or
+rollback functions.
+
 The process-level restart proof currently covers prepared-effect and rollback
 handle persistence only. It proves a prepared action can be created after
 proposal, approved moderation, and approval-vote prerequisites are reopened in
@@ -75,6 +81,8 @@ proposal/status replay.
 ## Safety Rules
 
 - Actions must pass `validateCivicAction` before persistence.
+- Action handler names must match the typed effect handler registry before
+  persistence.
 - Rollback plans must pass `validateRollbackPlan` before persistence.
 - The referenced proposal must exist and must not be expired.
 - The action effect type must match the proposal preview effect type.
@@ -99,7 +107,8 @@ proposal/status replay.
 
 M11 cannot move to `done` until:
 
-- typed effect handlers exist for every supported public civic effect;
+- executable apply and rollback handlers exist for every supported public civic
+  effect;
 - execution is authorized by human approval or a valid M12 delegation;
 - before/after summaries are generated from real pre/post state;
 - rollback handlers are implemented, tested, and linked to each applied effect;

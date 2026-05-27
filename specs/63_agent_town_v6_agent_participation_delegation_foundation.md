@@ -73,8 +73,8 @@ M12 cannot move to `done` until:
 - worker-first V6 tools consult delegation policy instead of backend shortcuts;
 - action budgets are consumed atomically and replayably;
 - delegated vote/advice/proposal scopes are enforced at every route/tool edge;
-- delegated civic execution can only be used after M11 typed handlers and
-  rollback gates are release-ready;
+- delegated civic execution can only be used after M11 executable effect
+  handlers and rollback gates are release-ready;
 - delegation revocation takes effect before any later delegated action can run;
 - session/wallet continuity proves the principal authorized the delegation;
 - deterministic expiry, revocation, replay, duplicate receipt, self-delegation,

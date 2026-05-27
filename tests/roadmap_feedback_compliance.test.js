@@ -189,9 +189,13 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(gate, /moderation\.appealed/);
   assert.match(plan, /M11 Civic effect execution and rollback \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/effects\.js/);
+  assert.match(plan, /schema-level typed effect handler registry/);
+  assert.match(plan, /executable apply\/rollback handlers/);
   assert.match(plan, /server\/world_civilization\/rollback_recovery\.js/);
   assert.match(plan, /without executing state/);
   assert.match(gate, /server\/world_civilization\/effects\.js/);
+  assert.match(gate, /schema-level typed effect handler registry/);
+  assert.match(gate, /executable typed handlers/);
   assert.match(gate, /server\/world_civilization\/rollback_recovery\.js/);
   assert.match(gate, /tests\/world_civilization_rollback_recovery\.test\.js/);
   assert.match(plan, /M12 Agent participation controls \| `in_progress`/);

@@ -62,7 +62,7 @@ unversioned payloads are invalid for V6 civic state.
 | Reputation Dispute/Review | Reputation record reference, subject account, human requester, queue/outcome status, reviewer kind, optional moderation decision reference, public source references, reasons, and redacted privacy envelope. |
 | Moderation Decision | Subject reference, public surface, approved/rejected/review status, policy version, reviewer kind, reasons, and redacted fields. |
 | Moderation Review/Appeal | Decision reference, human requester, review type, queue/outcome status, policy version, reviewer kind, public source references such as abuse reports, reasons, and redacted privacy envelope. |
-| Civic Action | Proposal reference, typed public effect, execution authority, handler name, before/after summaries, audit entry, rollback id, and idempotency key. |
+| Civic Action | Proposal reference, typed public effect, execution authority, handler name from the typed effect registry, before/after summaries, audit entry, rollback id, and idempotency key. |
 | Rollback Plan | Plan id, strategy, explicit rollback support, irreversible-effect list, and maximum rollback window. |
 | Audit Ledger Entry | Actor, action type, object reference, idempotency key, before/after hashes, migration version, replayability, rollback handle, and redacted privacy envelope. |
 
@@ -80,6 +80,21 @@ routes must still verify wallet/session continuity, eligibility, same-origin or
 CSRF requirements, rate limits, idempotency, and proposal state. The schema
 contract ensures those routes cannot accept a vote without an authorization
 object marked as server-verified.
+
+## Effect Handler Registry
+
+The civic action schema includes a non-executing effect-to-handler registry:
+
+```text
+public_summary -> et.civic.public_summary.apply
+public_works_accounting -> et.civic.public_works.apply
+sandbox_policy -> et.civic.sandbox_policy.apply
+charter_update -> et.civic.charter.apply
+```
+
+This registry is a fail-closed contract for future M11 execution handlers. It
+does not apply or roll back world state. A civic action whose `handlerName` does
+not match its `effectType` is invalid before persistence.
 
 ## Worker-First Rule
 

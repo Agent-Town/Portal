@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
   CIVIC_SCHEMA_VERSION,
+  CIVIC_ACTION_EFFECT_HANDLERS,
   validateAuditLedgerEntry,
   validateCivicAction,
   validateCivicDelegation,
@@ -442,6 +443,48 @@ test('V6 moderation, action, rollback, and audit schemas require traceable safet
     privacy: privacy({ dataClasses: ['public_audit_summary'] })
   });
   assert.equal(audit.ok, true, audit.errors.join('\n'));
+});
+
+test('V6 civic action schema enforces typed effect handler registry', () => {
+  for (const [effectType, handlerName] of Object.entries(CIVIC_ACTION_EFFECT_HANDLERS)) {
+    const action = validateCivicAction({
+      schemaVersion: CIVIC_SCHEMA_VERSION,
+      actionId: `action_${effectType}_typed_001`,
+      proposalId: 'proposal_public_works_bridge_001',
+      effectType,
+      executionAuthority: {
+        kind: 'human_approved',
+        receiptId: 'receipt_vote_bridge_001'
+      },
+      handlerName,
+      beforeSummary: 'Prepared effect has not changed public state.',
+      afterSummary: 'Prepared effect remains non-executing until release gates close.',
+      auditLedgerEntryId: `audit_${effectType}_typed_001`,
+      rollbackId: `rollback_${effectType}_typed_001`,
+      idempotencyKey: `idem_${effectType}_typed_001`
+    });
+    assert.equal(action.ok, true, action.errors.join('\n'));
+    assert.equal(action.value.handlerName, handlerName);
+  }
+
+  const mismatch = validateCivicAction({
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    actionId: 'action_public_works_mismatch_001',
+    proposalId: 'proposal_public_works_bridge_001',
+    effectType: 'public_works_accounting',
+    executionAuthority: {
+      kind: 'human_approved',
+      receiptId: 'receipt_vote_bridge_001'
+    },
+    handlerName: CIVIC_ACTION_EFFECT_HANDLERS.public_summary,
+    beforeSummary: 'Bridge contribution total is 20 wood.',
+    afterSummary: 'Prepared bridge accounting would set the total to 30 wood.',
+    auditLedgerEntryId: 'audit_public_works_mismatch_001',
+    rollbackId: 'rollback_public_works_mismatch_001',
+    idempotencyKey: 'idem_public_works_mismatch_001'
+  });
+  assert.equal(mismatch.ok, false);
+  assert.match(mismatch.errors.join('\n'), /handlerName must match effectType public_works_accounting/);
 });
 
 test('V6 civic schema dispatcher fails closed for unknown schemas', () => {
