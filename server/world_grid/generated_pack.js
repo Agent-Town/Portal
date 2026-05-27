@@ -4610,14 +4610,20 @@ function sourceHashesForReleaseEvidence({
   approvalEvidence = null,
   candidateReviewManifest = null
 } = {}) {
+  function hashIfPresent(value) {
+    if (value === null || value === undefined) return '';
+    if (Array.isArray(value) && value.length === 0) return '';
+    if (value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0) return '';
+    return stableEvidenceHash(value);
+  }
   return {
-    generatedPack: stableEvidenceHash(pack),
-    playtestReport: stableEvidenceHash(playtestReport),
-    diversityReport: stableEvidenceHash(diversityReport),
-    publicCard: stableEvidenceHash(publicCard),
-    persistenceReport: stableEvidenceHash(persistenceReport),
-    approvalEvidence: stableEvidenceHash(approvalEvidence),
-    candidateReviewManifest: stableEvidenceHash(candidateReviewManifest)
+    generatedPack: hashIfPresent(pack),
+    playtestReport: hashIfPresent(playtestReport),
+    diversityReport: hashIfPresent(diversityReport),
+    publicCard: hashIfPresent(publicCard),
+    persistenceReport: hashIfPresent(persistenceReport),
+    approvalEvidence: hashIfPresent(approvalEvidence),
+    candidateReviewManifest: hashIfPresent(candidateReviewManifest)
   };
 }
 
@@ -4761,7 +4767,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
   const candidateReviewManifestHashMatchesEvidence = candidateReviewManifest?.manifestHash
     ? candidateReviewManifest.manifestHash === (approvalEvidence || releaseGate?.approvalEvidence || {})?.candidateReview?.candidateManifestHash
       && bundle?.sourceHashes?.candidateReviewManifest === stableEvidenceHash(candidateReviewManifest)
-    : bundle?.metrics?.candidateReviewManifestHashMatchesEvidence === true || bundle?.publicReleaseEligible !== true;
+    : false;
   const constraints = bundle?.constraints || {};
   const boundaryPreserved = constraints.productionImageAssetsCreated === false
     && constraints.externalProviderPrivateDataStored === false

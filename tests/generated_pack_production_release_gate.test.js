@@ -553,7 +553,7 @@ test('GU-18 production release gate validation rejects tampered eligibility and 
   );
 });
 
-test('GU-18 production release gate API is generated-pack-gated and returns a valid fail-closed report', async () => {
+test('GU-18/GU-19 release gate and evidence bundle APIs are generated-pack-gated and fail closed', async () => {
   const identity = { pairId: 'session:release-gate-api', houseId: null };
   await withWorldGridServer({
     identity,
@@ -571,6 +571,15 @@ test('GU-18 production release gate API is generated-pack-gated and returns a va
     const body = await response.json();
     assert.equal(response.status, 403, JSON.stringify(body));
     assert.equal(body.error.code, 'FEATURE_DISABLED');
+
+    const bundleResponse = await fetch(`${baseUrl}/api/world/generated-pack/release-evidence-bundle`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({})
+    });
+    const bundleBody = await bundleResponse.json();
+    assert.equal(bundleResponse.status, 403, JSON.stringify(bundleBody));
+    assert.equal(bundleBody.error.code, 'FEATURE_DISABLED');
   });
 
   await withTempGeneratedPackStore(async (root) => {
@@ -586,6 +595,7 @@ test('GU-18 production release gate API is generated-pack-gated and returns a va
       const toolsBody = await toolsResponse.json();
       assert.equal(toolsResponse.status, 200, JSON.stringify(toolsBody));
       assert.equal(toolsBody.tools.some((tool) => tool.name === 'et.world.generated_pack.release_gate'), true);
+      assert.equal(toolsBody.tools.some((tool) => tool.name === 'et.world.generated_pack.release_evidence_bundle'), true);
 
       const generateResponse = await fetch(`${baseUrl}/api/world/generated-pack/generate`, {
         method: 'POST',
@@ -607,6 +617,24 @@ test('GU-18 production release gate API is generated-pack-gated and returns a va
       assert.equal(releaseBody.releaseGate.releaseMode, 'prototype-gated');
       assert.equal(releaseBody.releaseGate.publicReleaseEligible, false);
       assert.equal(releaseBody.releaseGate.blockingReasons.includes('costConsentModelApproved'), true);
+
+      const bundleResponse = await fetch(`${baseUrl}/api/world/generated-pack/release-evidence-bundle`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      const bundleBody = await bundleResponse.json();
+      assert.equal(bundleResponse.status, 200, JSON.stringify(bundleBody));
+      assert.equal(bundleBody.releaseGateValidationReport.ok, true, JSON.stringify(bundleBody.releaseGateValidationReport.checks));
+      assert.equal(bundleBody.validationReport.ok, true, JSON.stringify(bundleBody.validationReport.checks));
+      assert.equal(bundleBody.releaseEvidenceBundle.packId, generateBody.generatedPack.packId);
+      assert.equal(bundleBody.releaseEvidenceBundle.releaseGateMode, 'prototype-gated');
+      assert.equal(bundleBody.releaseEvidenceBundle.publicReleaseEligible, false);
+      assert.equal(bundleBody.releaseEvidenceBundle.metrics.releaseGateValid, true);
+      assert.equal(bundleBody.releaseEvidenceBundle.metrics.releaseGatePublicEligible, false);
+      assert.equal(bundleBody.releaseEvidenceBundle.metrics.presentSourceCount < bundleBody.releaseEvidenceBundle.metrics.requiredSourceCount, true);
+      assert.equal(bundleBody.releaseEvidenceBundle.metrics.sourceHashMismatchCount, 0);
+      assert.equal(bundleBody.releaseEvidenceBundle.constraints.productionImageAssetsCreated, false);
     });
   });
 });

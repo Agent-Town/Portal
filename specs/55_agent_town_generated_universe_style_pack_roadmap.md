@@ -470,6 +470,8 @@ Release approval is now a versioned evidence object, not a loose set of booleans
 
 Release gates now have a companion `releaseEvidenceBundle` contract. The bundle is evidence-only: it does not approve production release, promote assets, expose generated packs in default gameplay, or alter server rules. It records stable hashes for the generated pack, measured playtest report, replayability diversity report, public card, persistence report, release approval evidence, candidate-review manifest, and release gate. A ready gate requires every source hash to be present and to match the supplied source evidence; missing sources or drifted evidence fail validation.
 
+The evidence bundle has a generated-pack feature-gated API endpoint for QA review: `POST /api/world/generated-pack/release-evidence-bundle`. The endpoint returns the release gate, release-gate validation, hash-bound bundle, and bundle validation report. It remains hidden unless `FEATURE_WORLD_GRID_GENERATED_PACKS` is enabled and does not approve public release by itself.
+
 ```json
 {
   "releaseEvidenceBundleSchemaExists": true,
@@ -478,6 +480,8 @@ Release gates now have a companion `releaseEvidenceBundle` contract. The bundle 
   "sourceHashMismatchCount": 0,
   "readyGateRequiresAllSourceEvidence": true,
   "sourceDriftRejected": true,
+  "releaseEvidenceBundleApiFeatureGated": true,
+  "failClosedBundleApiValid": true,
   "productionImageAssetCount": 0,
   "privateDataLeakCount": 0,
   "canonicalServerRulesChanged": false,

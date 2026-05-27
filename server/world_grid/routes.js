@@ -42,6 +42,7 @@ const {
   resolveWorldGridFeatureFlags
 } = require('./feature_flags');
 const {
+  buildReleaseEvidenceBundle,
   buildProductionReleaseGate,
   currentGeneratedPack,
   currentPlaytestReport,
@@ -61,7 +62,8 @@ const {
   reviewPublicPackCard,
   remixGeneratedPack,
   unpublishPublicPackCard,
-  validateProductionReleaseGate
+  validateProductionReleaseGate,
+  validateReleaseEvidenceBundle
 } = require('./generated_pack');
 
 const WORLD_GRID_TOOLS = [
@@ -196,6 +198,10 @@ const WORLD_GRID_TOOLS = [
   {
     name: 'et.world.generated_pack.release_gate',
     description: 'Evaluate the generated-pack production release gate from explicit evidence and approvals without changing gameplay.'
+  },
+  {
+    name: 'et.world.generated_pack.release_evidence_bundle',
+    description: 'Build a hash-bound generated-pack release evidence bundle for QA review without approving release or changing gameplay.'
   }
 ];
 
@@ -401,7 +407,7 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     };
   }
 
-  function buildGeneratedPackReleaseGatePayload(owner, body = {}) {
+  function buildGeneratedPackReleaseInputs(owner, body = {}) {
     const generatedPack = currentGeneratedPack(owner);
     if (!generatedPack) {
       const error = new Error('NO_GENERATED_PACK');
@@ -409,20 +415,75 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       throw error;
     }
     const publicCard = body?.publicCard || (body?.cardId ? getPublicPackCard(body.cardId) : null);
-    const releaseGate = buildProductionReleaseGate({
-      pack: generatedPack,
+    return {
+      generatedPack,
       playtestReport: currentPlaytestReport(owner),
       diversityReport: body?.diversityReport || null,
       publicCard,
       persistenceReport: body?.persistenceReport || {},
       candidateReviewManifest: body?.candidateReviewManifest || null,
       approvalEvidence: body?.approvalEvidence || null,
-      approvalInputs: body?.approvalInputs || {},
+      approvalInputs: body?.approvalInputs || {}
+    };
+  }
+
+  function buildGeneratedPackReleaseGatePayload(owner, body = {}) {
+    const inputs = buildGeneratedPackReleaseInputs(owner, body);
+    const releaseGate = buildProductionReleaseGate({
+      pack: inputs.generatedPack,
+      playtestReport: inputs.playtestReport,
+      diversityReport: inputs.diversityReport,
+      publicCard: inputs.publicCard,
+      persistenceReport: inputs.persistenceReport,
+      candidateReviewManifest: inputs.candidateReviewManifest,
+      approvalEvidence: inputs.approvalEvidence,
+      approvalInputs: inputs.approvalInputs,
       nowMs: Date.now()
     });
     return {
       releaseGate,
       validationReport: validateProductionReleaseGate(releaseGate)
+    };
+  }
+
+  function buildGeneratedPackReleaseEvidenceBundlePayload(owner, body = {}) {
+    const inputs = buildGeneratedPackReleaseInputs(owner, body);
+    const releaseGate = buildProductionReleaseGate({
+      pack: inputs.generatedPack,
+      playtestReport: inputs.playtestReport,
+      diversityReport: inputs.diversityReport,
+      publicCard: inputs.publicCard,
+      persistenceReport: inputs.persistenceReport,
+      candidateReviewManifest: inputs.candidateReviewManifest,
+      approvalEvidence: inputs.approvalEvidence,
+      approvalInputs: inputs.approvalInputs,
+      nowMs: Date.now()
+    });
+    const releaseEvidenceBundle = buildReleaseEvidenceBundle({
+      pack: inputs.generatedPack,
+      releaseGate,
+      playtestReport: inputs.playtestReport,
+      diversityReport: inputs.diversityReport,
+      publicCard: inputs.publicCard,
+      persistenceReport: inputs.persistenceReport,
+      approvalEvidence: inputs.approvalEvidence || releaseGate.approvalEvidence,
+      candidateReviewManifest: inputs.candidateReviewManifest,
+      nowMs: Date.now()
+    });
+    return {
+      releaseGate,
+      releaseGateValidationReport: validateProductionReleaseGate(releaseGate),
+      releaseEvidenceBundle,
+      validationReport: validateReleaseEvidenceBundle(releaseEvidenceBundle, {
+        pack: inputs.generatedPack,
+        releaseGate,
+        playtestReport: inputs.playtestReport,
+        diversityReport: inputs.diversityReport,
+        publicCard: inputs.publicCard,
+        persistenceReport: inputs.persistenceReport,
+        approvalEvidence: inputs.approvalEvidence || releaseGate.approvalEvidence,
+        candidateReviewManifest: inputs.candidateReviewManifest
+      })
     };
   }
 
@@ -787,6 +848,23 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       const payload = buildRegionPayload(req, res);
       requireGeneratedPacksEnabled(payload.featureFlags);
       const result = buildGeneratedPackReleaseGatePayload(payload.owner, req.body || {});
+      res.json({
+        ok: true,
+        featureFlags: payload.featureFlags,
+        ...result
+      });
+    } catch (error) {
+      const normalized = normalizeError(error);
+      const status = normalized.code === 'NO_GENERATED_PACK' ? 404 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      res.status(status).json({ ok: false, error: normalized });
+    }
+  });
+
+  router.post('/api/world/generated-pack/release-evidence-bundle', (req, res) => {
+    try {
+      const payload = buildRegionPayload(req, res);
+      requireGeneratedPacksEnabled(payload.featureFlags);
+      const result = buildGeneratedPackReleaseEvidenceBundlePayload(payload.owner, req.body || {});
       res.json({
         ok: true,
         featureFlags: payload.featureFlags,
