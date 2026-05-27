@@ -60,6 +60,8 @@ test('V6 validation targets name every Node and Playwright release evidence surf
     .currentEvidence.includes('e2e/247_v6_production_override_browser_smoke.spec.js'));
   assert.ok(V6_VALIDATION_TARGETS.find((target) => target.key === 'worker_observability_smoke')
     .currentEvidence.includes('e2e/246_v6_worker_runtime_registration_smoke.spec.js'));
+  assert.ok(V6_VALIDATION_TARGETS.find((target) => target.key === 'worker_observability_smoke')
+    .currentEvidence.includes('e2e/248_v6_production_worker_runtime_smoke.spec.js'));
   assert.match(matrix.digest, /^sha256:[a-f0-9]{64}$/);
 });
 

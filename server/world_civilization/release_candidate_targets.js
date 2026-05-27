@@ -88,7 +88,7 @@ const V6_RELEASE_CANDIDATE_TARGETS = [
     key: 'runtime_tool_absence_recheck',
     owner: 'security_engineering',
     requiredEvidence: 'Runtime `/api/world/tools` must be captured during release-candidate validation and prove no `et.world.civic.*` tools are published.',
-    currentEvidence: 'tests/world_civilization_tool_exposure_gate.test.js, e2e/247_v6_production_override_browser_smoke.spec.js',
+    currentEvidence: 'tests/world_civilization_tool_exposure_gate.test.js, e2e/247_v6_production_override_browser_smoke.spec.js, e2e/248_v6_production_worker_runtime_smoke.spec.js',
     releaseEvidenceRequired: 'runtime_tool_absence_recheck_pass'
   },
   {

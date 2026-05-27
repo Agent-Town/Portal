@@ -198,9 +198,14 @@ Brain, and Session Context remain observable.
 browser evidence that player `all,v60` query/header overrides cannot enable
 V6, publish civic tools, or open the V6 lab while V5 is server-enabled.
 
+`e2e/248_v6_production_worker_runtime_smoke.spec.js` adds production-mode
+browser evidence that Worker Tools, Skill Context, Worker Traffic, Brain, and
+Session Context stay observable while player `all,v60` overrides are ignored
+for V6 and runtime civic tools remain absent.
+
 The report remains `research_only`, `releaseReady: false`, does not register
 runtime civic tools, forbids backend shortcuts, and treats browser worker
-registration plus production browser coverage as release gaps.
+registration plus full production browser coverage as release gaps.
 
 ## Release Gate
 

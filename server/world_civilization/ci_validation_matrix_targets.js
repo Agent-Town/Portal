@@ -77,9 +77,9 @@ const V6_CI_VALIDATION_MATRIX_TARGETS = [
   {
     key: 'worker_observability_browser_smoke',
     lane: 'worker_observability',
-    command: 'npx playwright test e2e/53_agent_panel_global_presence.spec.js e2e/244_v6_lab_modal_boundary.spec.js',
-    requiredEvidence: 'Worker Tools, Skill Context, Worker Traffic, Brain, and Session Context must remain observable for internal validation without leaking private data.',
-    currentEvidence: 'tests/world_civilization_worker_runtime_registration.test.js',
+    command: 'npx playwright test e2e/53_agent_panel_global_presence.spec.js e2e/244_v6_lab_modal_boundary.spec.js e2e/246_v6_worker_runtime_registration_smoke.spec.js && PW_NODE_ENV=production FEATURE_WORLD_GRID_V50_REGION=1 npx playwright test e2e/248_v6_production_worker_runtime_smoke.spec.js',
+    requiredEvidence: 'Worker Tools, Skill Context, Worker Traffic, Brain, and Session Context must remain observable in test and production-mode browser validation without leaking private data.',
+    currentEvidence: 'tests/world_civilization_worker_runtime_registration.test.js, e2e/246_v6_worker_runtime_registration_smoke.spec.js, e2e/248_v6_production_worker_runtime_smoke.spec.js',
     releaseEvidenceRequired: 'worker_observability_browser_ci_pass'
   },
   {

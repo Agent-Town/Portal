@@ -71,7 +71,7 @@ const V6_VALIDATION_TARGETS = [
     key: 'worker_observability_smoke',
     surface: 'openclaw_worker_observability',
     requiredEvidence: 'Worker Tools, Skill Context, Worker Traffic, Brain, and Session Context observability must be present for internal V6 validation without leaking private data.',
-    currentEvidence: 'server/world_civilization/worker_runtime_registration.js, e2e/246_v6_worker_runtime_registration_smoke.spec.js',
+    currentEvidence: 'server/world_civilization/worker_runtime_registration.js, e2e/246_v6_worker_runtime_registration_smoke.spec.js, e2e/248_v6_production_worker_runtime_smoke.spec.js',
     releaseEvidenceRequired: 'worker_observability_browser_smoke'
   },
   {

@@ -80,7 +80,7 @@ const V6_RELEASE_EVIDENCE_MANIFEST_REQUIREMENTS = [
   {
     key: 'runtime_tool_absence_recheck',
     owner: 'security_engineering',
-    requiredEvidence: 'Evidence manifest must link runtime `/api/world/tools` capture proving no `et.world.civic.*` tools are published before release, including the production-mode browser override smoke.',
+    requiredEvidence: 'Evidence manifest must link runtime `/api/world/tools` capture proving no `et.world.civic.*` tools are published before release, including the production-mode browser override and worker-runtime smokes.',
     releaseEvidenceRequired: 'runtime_tool_absence_manifest_entry'
   },
   {

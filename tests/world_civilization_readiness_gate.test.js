@@ -98,6 +98,7 @@ test('V6 readiness gate baseline names every prerequisite domain but remains ope
   assert.ok(workerToolGate.requiredArtifacts.includes('tests/world_civilization_worker_runtime_registration.test.js'));
   assert.ok(workerToolGate.requiredArtifacts.includes('e2e/246_v6_worker_runtime_registration_smoke.spec.js'));
   assert.ok(workerToolGate.requiredArtifacts.includes('e2e/247_v6_production_override_browser_smoke.spec.js'));
+  assert.ok(workerToolGate.requiredArtifacts.includes('e2e/248_v6_production_worker_runtime_smoke.spec.js'));
   assert.ok(workerToolGate.requiredChecks.includes('worker_vote_receipt_adapter'));
   assert.ok(workerToolGate.requiredChecks.includes('worker_vote_route_edge_authorization'));
   assert.ok(workerToolGate.requiredChecks.includes('browser_worker_runtime_registration_target'));

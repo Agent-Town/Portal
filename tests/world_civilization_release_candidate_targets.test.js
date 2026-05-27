@@ -57,6 +57,8 @@ test('V6 release-candidate targets name every evidence packet surface', () => {
     .currentEvidence.includes('e2e/247_v6_production_override_browser_smoke.spec.js'));
   assert.ok(V6_RELEASE_CANDIDATE_TARGETS.find((target) => target.key === 'runtime_tool_absence_recheck')
     .currentEvidence.includes('e2e/247_v6_production_override_browser_smoke.spec.js'));
+  assert.ok(V6_RELEASE_CANDIDATE_TARGETS.find((target) => target.key === 'runtime_tool_absence_recheck')
+    .currentEvidence.includes('e2e/248_v6_production_worker_runtime_smoke.spec.js'));
   assert.equal(
     V6_RELEASE_CANDIDATE_TARGETS.find((target) => target.key === 'qa_owner_signoff').currentEvidence,
     'server/world_civilization/release_signoff_packet.js'

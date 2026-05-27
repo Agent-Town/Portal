@@ -18,6 +18,7 @@ function observedEvidence(overrides = {}) {
     observabilityContractProbeCount: 1,
     productionOverrideProbeCount: 2,
     browserWorkerRegistrationProbeCount: 0,
+    productionBrowserWorkerProbeCount: 0,
     civicRuntimeToolCount: 0,
     registeredRuntimeCivicToolCount: 0,
     playerVisibleCivicToolCount: 0,
@@ -33,6 +34,9 @@ test('V6 worker runtime registration targets name every browser worker release s
   const matrix = inspectWorkerRuntimeRegistrationTargets();
   const browserSmokeTargets = V6_WORKER_RUNTIME_REGISTRATION_TARGETS.filter((target) => (
     String(target.currentEvidence || '').includes('e2e/246_v6_worker_runtime_registration_smoke.spec.js')
+  )).map((target) => target.key);
+  const productionBrowserSmokeTargets = V6_WORKER_RUNTIME_REGISTRATION_TARGETS.filter((target) => (
+    String(target.currentEvidence || '').includes('e2e/248_v6_production_worker_runtime_smoke.spec.js')
   )).map((target) => target.key);
 
   assert.equal(matrix.ok, true);
@@ -50,6 +54,14 @@ test('V6 worker runtime registration targets name every browser worker release s
   assert.ok(browserSmokeTargets.includes('worker_traffic_trace'));
   assert.ok(browserSmokeTargets.includes('session_context_link'));
   assert.ok(browserSmokeTargets.includes('production_override_denial'));
+  assert.ok(productionBrowserSmokeTargets.includes('openclaw_worker_boot'));
+  assert.ok(productionBrowserSmokeTargets.includes('runtime_tool_manifest_sync'));
+  assert.ok(productionBrowserSmokeTargets.includes('civic_tool_absence_before_release'));
+  assert.ok(productionBrowserSmokeTargets.includes('debug_observability_tabs'));
+  assert.ok(productionBrowserSmokeTargets.includes('skill_context_import'));
+  assert.ok(productionBrowserSmokeTargets.includes('worker_traffic_trace'));
+  assert.ok(productionBrowserSmokeTargets.includes('session_context_link'));
+  assert.ok(productionBrowserSmokeTargets.includes('production_override_denial'));
   assert.match(matrix.digest, /^sha256:[a-f0-9]{64}$/);
 });
 
@@ -77,13 +89,17 @@ test('V6 worker runtime registration report captures current contract probes wit
   assert.equal(report.observedEvidence.runtimeManifestProbeCount, 2);
   assert.equal(report.observedEvidence.workerAdapterContractProbeCount, 2);
   assert.equal(report.observedEvidence.browserWorkerRegistrationCovered, false);
+  assert.equal(report.observedEvidence.productionBrowserWorkerCovered, false);
   assert.deepEqual(report.releaseGaps, REQUIRED_WORKER_RUNTIME_REGISTRATION_RELEASE_GAPS);
   assert.deepEqual(assertV6WorkerRuntimeRegistrationReportSafe(report), { ok: true, errors: [] });
 });
 
 test('V6 worker runtime registration report can record browser smoke without closing release gaps', () => {
   const report = buildV6WorkerRuntimeRegistrationReport({
-    observed: observedEvidence({ browserWorkerRegistrationProbeCount: 1 }),
+    observed: observedEvidence({
+      browserWorkerRegistrationProbeCount: 1,
+      productionBrowserWorkerProbeCount: 1
+    }),
     source: 'browser_smoke'
   });
 
@@ -91,8 +107,10 @@ test('V6 worker runtime registration report can record browser smoke without clo
   assert.equal(report.source, 'browser_smoke');
   assert.equal(report.observedEvidence.browserWorkerRegistrationProbeCount, 1);
   assert.equal(report.observedEvidence.browserWorkerRegistrationCovered, true);
+  assert.equal(report.observedEvidence.productionBrowserWorkerProbeCount, 1);
+  assert.equal(report.observedEvidence.productionBrowserWorkerCovered, true);
   assert.equal(report.releaseReady, false);
-  assert.ok(report.releaseGaps.includes('production_browser_coverage_required'));
+  assert.ok(report.releaseGaps.includes('full_production_browser_coverage_required'));
   assert.deepEqual(assertV6WorkerRuntimeRegistrationReportSafe(report), { ok: true, errors: [] });
 });
 

@@ -70,7 +70,7 @@ test('V6 release evidence manifest requirements name every archive input', () =>
   );
   assert.match(
     V6_RELEASE_EVIDENCE_MANIFEST_REQUIREMENTS.find((requirement) => requirement.key === 'runtime_tool_absence_recheck').requiredEvidence,
-    /production-mode browser override smoke/
+    /production-mode browser override and worker-runtime smokes/
   );
   assert.ok(matrix.requirementKeys.includes('browser_console_error_budget'));
   assert.ok(matrix.requirementKeys.includes('playwright_trace_archive'));

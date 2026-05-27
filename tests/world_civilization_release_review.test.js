@@ -538,6 +538,7 @@ test('V6 release review requires worker tool exposure evidence', () => {
   assert.ok(workerGate.requiredArtifacts.includes('tests/world_civilization_worker_vote_adapter.test.js'));
   assert.ok(workerGate.requiredArtifacts.includes('e2e/246_v6_worker_runtime_registration_smoke.spec.js'));
   assert.ok(workerGate.requiredArtifacts.includes('e2e/247_v6_production_override_browser_smoke.spec.js'));
+  assert.ok(workerGate.requiredArtifacts.includes('e2e/248_v6_production_worker_runtime_smoke.spec.js'));
   assert.ok(workerGate.requiredArtifacts.includes('docs/internal-skill-testline.md'));
   assert.ok(workerGate.requiredChecks.includes('runtime_manifest_source_of_truth'));
   assert.ok(workerGate.requiredChecks.includes('openclaw_lite_worker_origin'));
@@ -552,6 +553,7 @@ test('V6 release review requires worker tool exposure evidence', () => {
   assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_worker_runtime_registration.test.js'));
   assert.ok(validationGate.requiredArtifacts.includes('e2e/246_v6_worker_runtime_registration_smoke.spec.js'));
   assert.ok(validationGate.requiredArtifacts.includes('e2e/247_v6_production_override_browser_smoke.spec.js'));
+  assert.ok(validationGate.requiredArtifacts.includes('e2e/248_v6_production_worker_runtime_smoke.spec.js'));
   assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_mutation_security.test.js'));
   assert.ok(validationGate.requiredChecks.includes('worker_vote_adapter_gate'));
   assert.ok(validationGate.requiredChecks.includes('worker_runtime_registration_target'));

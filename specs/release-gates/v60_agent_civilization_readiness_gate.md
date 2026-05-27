@@ -112,6 +112,11 @@ persistence resilience, and security/product release review.
   production-mode browser smoke for player `all,v60` query/header override
   denial, runtime civic-tool absence, and V6 lab non-exposure while V5 is
   server-enabled.
+- `e2e/248_v6_production_worker_runtime_smoke.spec.js` records the current
+  production-mode browser smoke for worker observability tabs plus runtime
+  civic-tool absence while V5 is server-enabled and player V6 overrides are
+  ignored. Full production worker coverage, modal lifetime continuity, manifest
+  parity signoff, shared-state route traces, and release signoff remain open.
 - The research-only worker proposal adapter may exist in
   `server/world_civilization/worker_tool_adapter.js`, but it must stay disabled
   by default behind `V6_CIVIC_WORKER_TOOL_ADAPTER_ENABLED`, require OpenClaw
