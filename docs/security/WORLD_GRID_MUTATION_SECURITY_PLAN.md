@@ -103,12 +103,13 @@ until the controls below are implemented and covered by deterministic tests.
 - When `WORLD_GRID_AUDIT_SQLITE_PATH` is configured, successful mutating V5.1+
   world-grid routes and tool routes append durable, hash-chained SQLite audit
   records with actor, surface, idempotency key, request/response hashes,
-  redacted summaries, rollback handles when present, and replay indexes. Current
-  restart coverage proves every externally visible V5.1-V5.5 mutating route and
-  tool surface writes a durable audit row after separate Node process restarts,
-  exact idempotent replays do not add duplicate audit rows, changed-payload
-  conflicts add no audit rows, and private-looking service secrets stay out of
-  audit entries.
+  redacted before/after route snapshots, rollback handles when present, and
+  replay indexes. Current restart coverage proves every externally visible
+  V5.1-V5.5 mutating route and tool surface writes a durable audit row after
+  separate Node process restarts, exact idempotent replays do not add duplicate
+  audit rows, changed-payload conflicts add no audit rows, privacy-safe
+  `agent-town.v5.world-grid.audit-snapshot.v1` before/after snapshots are
+  stored, and private-looking service secrets stay out of audit entries.
 - V5.0 region rendering and read-only tools may run without creating Founders
   Plot state.
 - When `WORLD_GRID_REGION_PREFS_SQLITE_PATH` is configured, V5.0 camera/focus
@@ -149,8 +150,9 @@ until the controls below are implemented and covered by deterministic tests.
 - Durable audit records with actor, route/tool name, idempotency key, before and
   after summaries, and rollback handle when one exists. Current coverage starts
   this with append-only SQLite audit records and route/tool-surface restart
-  matrix proof; release promotion still needs complete before-state snapshots
-  and release replay reconstruction for each world-grid store.
+  matrix proof plus route-level before/after snapshot summaries; release
+  promotion still needs complete store-specific before-state snapshots and
+  release replay reconstruction for each world-grid store.
 - Restart persistence tests and replay tests before any public release flag is
   enabled.
 - Current `WORLD_GRID_REGION_PREFS_SQLITE_PATH` coverage is a V5.0 storage

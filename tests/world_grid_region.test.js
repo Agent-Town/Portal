@@ -771,7 +771,13 @@ test('mutating world-grid routes write durable audit replay records when configu
     assert.equal(entries[0].entry.objectRef, entries[0].entry.afterSummary.objectRef);
     assert.match(entries[0].entry.objectRef, /^claim_/);
     assert.equal(entries[0].entry.privacy.privateDataIncluded, false);
-    assert.equal(entries[0].entry.beforeSummary.state, 'unrecorded-prototype-before-state');
+    assert.equal(entries[0].entry.beforeSummary.snapshotVersion, 'agent-town.v5.world-grid.audit-snapshot.v1');
+    assert.equal(entries[0].entry.beforeSummary.phase, 'before');
+    assert.equal(entries[0].entry.afterSummary.snapshot.snapshotVersion, 'agent-town.v5.world-grid.audit-snapshot.v1');
+    assert.equal(entries[0].entry.afterSummary.snapshot.phase, 'after');
+    assert.equal(entries[0].entry.beforeSummary.region.regionId, owner.regionId);
+    assert.equal(entries[0].entry.afterSummary.snapshot.region.regionId, owner.regionId);
+    assert.equal(entries[0].entry.beforeSummary.territory.claimOptionCount > 0, true);
     const serviceEntry = entries.find((entry) => entry.surface === '/api/world/services/request-advice');
     assert.ok(serviceEntry);
     assert.equal(JSON.stringify(serviceEntry.entry).includes('must-not-persist-in-audit'), false);

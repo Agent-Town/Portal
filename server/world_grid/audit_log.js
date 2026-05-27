@@ -230,12 +230,19 @@ function responseSummary(response = {}) {
   };
 }
 
+function auditSummaryOrFallback(value, fallback) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return fallback;
+  return redactForAudit(value);
+}
+
 function normalizeAuditEntry({
   owner,
   surface = '',
   idempotencyKey = '',
   body = {},
   response = {},
+  beforeSummary = null,
+  afterSummary = null,
   createdAtMs = Date.now()
 } = {}) {
   const actorAccountId = String(owner?.ownerAccountId || '').trim();
@@ -250,17 +257,20 @@ function normalizeAuditEntry({
     body: bodyForAuditHash(body)
   }));
   const summary = responseSummary(response);
-  const afterSummary = {
+  const suppliedBeforeSummary = auditSummaryOrFallback(beforeSummary, null);
+  const suppliedAfterSummary = auditSummaryOrFallback(afterSummary, null);
+  const normalizedAfterSummary = {
     surface: normalizedSurface,
     objectRef: summary.objectRef || normalizedSurface,
-    response: summary
+    response: summary,
+    ...(suppliedAfterSummary ? { snapshot: suppliedAfterSummary } : {})
   };
-  const beforeSummary = {
+  const normalizedBeforeSummary = suppliedBeforeSummary || {
     surface: normalizedSurface,
     state: 'unrecorded-prototype-before-state',
     note: 'Durable before-state snapshots are a release-gate requirement.'
   };
-  const responseHash = sha256(stableJson(afterSummary));
+  const responseHash = sha256(stableJson(normalizedAfterSummary));
   return {
     schemaVersion: WORLD_GRID_AUDIT_SCHEMA_VERSION,
     entryId: `world_grid_audit_${shortHash(`${actorAccountId}\n${key}`)}`,
@@ -270,14 +280,14 @@ function normalizeAuditEntry({
       regionId
     },
     surface: normalizedSurface,
-    objectRef: afterSummary.objectRef,
+    objectRef: normalizedAfterSummary.objectRef,
     idempotencyKey: key,
     requestHash,
     responseHash,
-    beforeHash: sha256(stableJson(beforeSummary)),
-    afterHash: sha256(stableJson(afterSummary)),
-    beforeSummary,
-    afterSummary,
+    beforeHash: sha256(stableJson(normalizedBeforeSummary)),
+    afterHash: sha256(stableJson(normalizedAfterSummary)),
+    beforeSummary: normalizedBeforeSummary,
+    afterSummary: normalizedAfterSummary,
     createdAtMs: Number(createdAtMs) || Date.now(),
     migrationVersion: WORLD_GRID_AUDIT_MIGRATION_VERSION,
     rollbackId: inferRollbackId(response),

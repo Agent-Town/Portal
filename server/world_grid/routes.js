@@ -348,6 +348,58 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     };
   }
 
+  function countByString(values = []) {
+    return values.reduce((out, value) => {
+      const key = String(value || 'unknown');
+      out[key] = (out[key] || 0) + 1;
+      return out;
+    }, {});
+  }
+
+  function buildWorldGridAuditSnapshot(payload = null, phase = 'before') {
+    const region = payload?.region || {};
+    const cells = Array.isArray(region.cells) ? region.cells : [];
+    const settlements = Array.isArray(region.settlements) ? region.settlements : [];
+    const routes = Array.isArray(region.routes) ? region.routes : [];
+    const claims = Array.isArray(payload?.territory?.claims) ? payload.territory.claims : [];
+    const claimOptionsList = Array.isArray(payload?.territory?.claimOptions) ? payload.territory.claimOptions : [];
+    const preferences = payload?.preferences && typeof payload.preferences === 'object' ? payload.preferences : {};
+    const selectedCellId = String(preferences.selectedCellId || '');
+    const camera = preferences.camera && typeof preferences.camera === 'object' ? preferences.camera : {};
+    return {
+      snapshotVersion: 'agent-town.v5.world-grid.audit-snapshot.v1',
+      phase: phase === 'after' ? 'after' : 'before',
+      region: {
+        regionId: String(region.regionId || ''),
+        cellCount: cells.length,
+        cellStateCounts: countByString(cells.map((cell) => cell.state)),
+        terrainCounts: countByString(cells.map((cell) => cell.terrain)),
+        settlementCount: settlements.length,
+        routeCount: routes.length
+      },
+      territory: {
+        claimsEnabled: payload?.territory?.claimsEnabled === true,
+        claimCount: claims.length,
+        claimStatusCounts: countByString(claims.map((claim) => claim.status)),
+        claimOptionCount: claimOptionsList.length,
+        claims: claims.map((claim) => ({
+          claimId: String(claim.claimId || ''),
+          cellId: String(claim.cellId || ''),
+          status: String(claim.status || ''),
+          routeId: String(claim.routePreview?.routeId || claim.routeId || '')
+        })).sort((a, b) => a.claimId.localeCompare(b.claimId))
+      },
+      preferences: {
+        selectedCellId,
+        camera: {
+          zoom: String(camera.zoom || ''),
+          q: Number.isFinite(Number(camera.q)) ? Number(camera.q) : 0,
+          r: Number.isFinite(Number(camera.r)) ? Number(camera.r) : 0
+        }
+      }
+    };
+  }
+
   function requirePlotPrerequisite(payload) {
     return loadWorldGridPlotPrerequisite(payload.identity);
   }
@@ -382,20 +434,26 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
   function sendIdempotentMutation(req, res, payload, surface, mutate) {
     const idempotencyKey = requireMutationPrerequisites(req, payload, surface);
     requireMutationRateLimit(res, payload, surface);
+    const beforeSummary = buildWorldGridAuditSnapshot(payload, 'before');
     const outcome = runIdempotentWorldGridMutation({
       owner: payload.owner,
       surface,
       idempotencyKey,
       body: req.body
     }, () => mutate(idempotencyKey));
-    recordWorldGridMutationAudit({
-      owner: payload.owner,
-      surface,
-      idempotencyKey,
-      body: req.body,
-      response: outcome.response,
-      createdAtMs: outcome.record?.createdAtMs
-    });
+    if (!outcome.duplicate) {
+      const afterSummary = buildWorldGridAuditSnapshot(buildRegionPayload(req, res), 'after');
+      recordWorldGridMutationAudit({
+        owner: payload.owner,
+        surface,
+        idempotencyKey,
+        body: req.body,
+        response: outcome.response,
+        beforeSummary,
+        afterSummary,
+        createdAtMs: outcome.record?.createdAtMs
+      });
+    }
     if (outcome.duplicate) res.set('x-world-grid-idempotency-replay', '1');
     return res.json(outcome.response);
   }

@@ -189,6 +189,11 @@ persistence resilience, and security/product release review.
   release promotion still requires abuse reports, stale-session cleanup,
   cross-owner moderation review, and final sandbox privacy coverage in the V5
   gate.
+- Shared V5 audit evidence includes `WORLD_GRID_AUDIT_SQLITE_PATH`
+  route/tool-surface restart proof and privacy-safe before/after route
+  snapshots. V6 readiness still requires store-specific before-state snapshots
+  and release replay reconstruction before public civic effects can depend on
+  V5 world state.
 
 ## Required V6 Schemas
 

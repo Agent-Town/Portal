@@ -104,7 +104,13 @@ function assertAuditSnapshot(snapshot, {
   assert.equal(snapshot.entries.every((row) => row.entry.privacy.privateDataIncluded === false), true);
   assert.equal(snapshot.entries.every((row) => row.entry.migrationVersion === 'world_grid_audit_v1'), true);
   assert.equal(snapshot.entries.every((row) => row.entry.schemaVersion === 'agent-town.v5.world-grid.audit.v1'), true);
-  assert.equal(snapshot.entries.every((row) => row.entry.beforeSummary.state === 'unrecorded-prototype-before-state'), true);
+  assert.equal(snapshot.entries.every((row) => row.entry.beforeSummary.snapshotVersion === 'agent-town.v5.world-grid.audit-snapshot.v1'), true);
+  assert.equal(snapshot.entries.every((row) => row.entry.beforeSummary.phase === 'before'), true);
+  assert.equal(snapshot.entries.every((row) => row.entry.afterSummary.snapshot?.snapshotVersion === 'agent-town.v5.world-grid.audit-snapshot.v1'), true);
+  assert.equal(snapshot.entries.every((row) => row.entry.afterSummary.snapshot?.phase === 'after'), true);
+  assert.equal(snapshot.entries.every((row) => row.entry.beforeSummary.region?.regionId), true);
+  assert.equal(snapshot.entries.every((row) => row.entry.afterSummary.snapshot?.region?.regionId), true);
+  assert.equal(snapshot.entries.some((row) => row.entry.beforeSummary.territory?.claimOptionCount > 0), true);
 }
 
 test('world-grid durable audit rows replay every V5.1-V5.5 mutating route surface after restart without duplicate audit writes', () => {

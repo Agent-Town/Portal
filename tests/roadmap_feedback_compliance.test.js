@@ -770,11 +770,14 @@ test('world-grid audit replay policy is tracked as an M3 release storage control
   const security = read('docs/security/WORLD_GRID_MUTATION_SECURITY_PLAN.md');
   const stateModel = read('docs/technical/WORLD_GRID_STATE_MODEL.md');
   const evidence = read('docs/release-evidence/WORLD_GRID_V50_REGION_PROTOTYPE_EVIDENCE_2026-05-26.md');
+  const auditSource = read('server/world_grid/audit_log.js');
+  const routeSource = read('server/world_grid/routes.js');
 
   assert.match(plan, /durable world-grid audit log foundation/);
   assert.match(plan, /WORLD_GRID_AUDIT_SQLITE_PATH/);
   assert.match(plan, /mutating route\/tool-surface restart matrix proof/);
   assert.match(plan, /duplicate-replay suppression/);
+  assert.match(plan, /before\/after route snapshot proof/);
   assert.match(plan, /WORLD_GRID_REGION_PREFS_SQLITE_PATH/);
   assert.match(plan, /WORLD_GRID_IDEMPOTENCY_SQLITE_PATH/);
   assert.match(plan, /WORLD_GRID_CLAIMS_SQLITE_PATH/);
@@ -790,9 +793,12 @@ test('world-grid audit replay policy is tracked as an M3 release storage control
   assert.match(security, /WORLD_GRID_SERVICES_SQLITE_PATH/);
   assert.match(security, /WORLD_GRID_EVENTS_SQLITE_PATH/);
   assert.match(security, /WORLD_GRID_SANDBOX_SQLITE_PATH/);
-  assert.match(security, /every externally visible V5\.1-V5\.5 mutating route and\s+tool surface writes a durable audit row after separate Node process restarts/);
-  assert.match(security, /exact idempotent replays do not add duplicate audit rows/);
+  assert.match(security, /every externally visible\s+V5\.1-V5\.5 mutating route and\s+tool surface writes a durable audit row after\s+separate Node process restarts/);
+  assert.match(security, /exact idempotent replays do not add duplicate\s+audit rows/);
   assert.match(security, /changed-payload\s+conflicts add no audit rows/);
+  assert.match(security, /agent-town\.v5\.world-grid\.audit-snapshot\.v1/);
+  assert.match(security, /before\/after snapshots are\s+stored/);
+  assert.match(security, /complete store-specific before-state snapshots/);
   assert.match(security, /planned-claim retry replays after a separate Node\s+process restart/);
   assert.match(security, /selected-cell and camera preferences reopen across\s+separate Node process lifetimes/);
   assert.match(security, /every externally\s+visible V5\.1-V5\.5 mutating route and tool surface after separate Node process\s+restarts/);
@@ -809,6 +815,9 @@ test('world-grid audit replay policy is tracked as an M3 release storage control
   assert.match(stateModel, /server\/world_grid\/audit_log\.js/);
   assert.match(stateModel, /route\/tool-surface restart matrix coverage/);
   assert.match(stateModel, /duplicate-replay suppression/);
+  assert.match(stateModel, /agent-town\.v5\.world-grid\.audit-snapshot\.v1/);
+  assert.match(stateModel, /before\/after region, territory, and preference summaries/);
+  assert.match(stateModel, /Complete store-specific before-state snapshots/);
   assert.match(stateModel, /server\/world_grid\/preferences\.js/);
   assert.match(stateModel, /world_grid_region_preferences/);
   assert.match(stateModel, /world_grid_idempotency_records/);
@@ -842,6 +851,8 @@ test('world-grid audit replay policy is tracked as an M3 release storage control
   assert.match(evidence, /tests\/world_grid_audit_persistence\.test\.js/);
   assert.match(evidence, /every V5\.1-V5\.5 mutating route\/tool surface writes durable audit rows/);
   assert.match(evidence, /changed-payload conflicts add no audit rows/);
+  assert.match(evidence, /before\/after snapshots are present/);
+  assert.match(evidence, /complete store-specific before-state snapshots/);
   assert.match(evidence, /private-looking service secrets stay out of entries/);
   assert.match(evidence, /Durable V5\.0 preferences foundation/);
   assert.match(evidence, /tests\/world_grid_region_preferences_persistence\.test\.js/);
@@ -865,4 +876,9 @@ test('world-grid audit replay policy is tracked as an M3 release storage control
   assert.match(evidence, /tests\/world_grid_sandbox_persistence\.test\.js/);
   assert.match(evidence, /route\/tool-surface restart\s+matrix coverage/);
   assert.match(evidence, /release replay reconstruction/);
+  assert.match(auditSource, /beforeSummary = null/);
+  assert.match(auditSource, /afterSummary = null/);
+  assert.match(auditSource, /normalizedBeforeSummary/);
+  assert.match(routeSource, /buildWorldGridAuditSnapshot/);
+  assert.match(routeSource, /agent-town\.v5\.world-grid\.audit-snapshot\.v1/);
 });
