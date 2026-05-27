@@ -199,10 +199,12 @@ persistence resilience, and security/product release review.
   audit coverage, validation evidence, modal lab surface launch review, product
   signoff target gate evidence, and product signoff are complete.
 - The research-only controlled release gate may exist in
-  `server/world_civilization/controlled_release.js`, but it must keep
+  `server/world_civilization/controlled_release.js` with
+  `server/world_civilization/controlled_release_targets.js`, but it must keep
   `productionEnabled: false` until M0-M17 are done, the release-review report is
   ready, an explicit V6 readiness-gate report is closed and hidden until
-  controlled release, readiness audit-summary proof, production-safe flags,
+  controlled release, controlled release target gate evidence,
+  readiness audit-summary proof, production-safe flags,
   rollback/disable controls, observability, support runbooks, blocker clearance,
   and a controlled release window have approved evidence.
 
@@ -601,8 +603,9 @@ persistence resilience, and security/product release review.
   automatic enablement path. Current gate tracking starts in
   `server/world_civilization/controlled_release.js` and
   `docs/ops/V6_AGENT_CIVILIZATION_CONTROLLED_RELEASE_RUNBOOK.md`; release still
-  requires closed M0-M17 milestones, a closed V6 readiness gate, an explicit
-  closed readiness-gate report that stays hidden until controlled release,
+  requires closed M0-M17 milestones, a closed V6 readiness gate, a controlled
+  release target gate, an explicit closed readiness-gate report that stays
+  hidden until controlled release,
   readiness audit-summary proof, production feature flag safety,
   rollback/disable rehearsals, privacy-safe observability, support readiness,
   blocker clearance, and an explicit release window.

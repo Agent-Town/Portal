@@ -5,6 +5,8 @@ const V6_CONTROLLED_RELEASE_VERSION = 'agent-town.v6.controlled_release.v1';
 const CONTROLLED_RELEASE_RUNBOOK = 'docs/ops/V6_AGENT_CIVILIZATION_CONTROLLED_RELEASE_RUNBOOK.md';
 const V6_READINESS_GATE_ARTIFACT = 'specs/release-gates/v60_agent_civilization_readiness_gate.md';
 const V6_MILESTONE_PLAN_ARTIFACT = 'docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md';
+const CONTROLLED_RELEASE_TARGET_ARTIFACT = 'server/world_civilization/controlled_release_targets.js';
+const CONTROLLED_RELEASE_TARGET_TEST = 'tests/world_civilization_controlled_release_targets.test.js';
 
 const PRIOR_MILESTONE_KEYS = [
   'M0',
@@ -28,6 +30,23 @@ const PRIOR_MILESTONE_KEYS = [
 ];
 
 const REQUIRED_CONTROLLED_RELEASE_GATES = [
+  {
+    key: 'controlled_release_target_gate',
+    label: 'Controlled release target gate',
+    requiredArtifacts: [CONTROLLED_RELEASE_RUNBOOK, CONTROLLED_RELEASE_TARGET_ARTIFACT, CONTROLLED_RELEASE_TARGET_TEST],
+    requiredChecks: [
+      'readiness_gate_closed_target',
+      'production_flag_safety_target',
+      'rollback_disable_target',
+      'observability_target',
+      'support_runbook_target',
+      'blocker_clearance_target',
+      'controlled_release_window_target',
+      'canary_exit_target',
+      'emergency_disable_target',
+      'post_release_verification_target'
+    ]
+  },
   {
     key: 'readiness_gate_closed',
     label: 'V6 readiness gate closed',
@@ -284,6 +303,8 @@ function assertV6ControlledReleaseSafe(report = {}) {
 }
 
 module.exports = {
+  CONTROLLED_RELEASE_TARGET_ARTIFACT,
+  CONTROLLED_RELEASE_TARGET_TEST,
   CONTROLLED_RELEASE_RUNBOOK,
   PRIOR_MILESTONE_KEYS: [...PRIOR_MILESTONE_KEYS],
   REQUIRED_CONTROLLED_RELEASE_GATES: clone(REQUIRED_CONTROLLED_RELEASE_GATES),

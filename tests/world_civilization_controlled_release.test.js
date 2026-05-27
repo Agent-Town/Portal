@@ -12,6 +12,8 @@ const {
   buildV6ReadinessGateReport
 } = require('../server/world_civilization/readiness_gate');
 const {
+  CONTROLLED_RELEASE_TARGET_ARTIFACT,
+  CONTROLLED_RELEASE_TARGET_TEST,
   CONTROLLED_RELEASE_RUNBOOK,
   PRIOR_MILESTONE_KEYS,
   REQUIRED_CONTROLLED_RELEASE_GATES,
@@ -125,6 +127,24 @@ test('V6 controlled release baseline names all launch controls but remains block
     assert.ok(gate.missingChecks.length > 0, gate.key);
   }
   assert.deepEqual(assertV6ControlledReleaseSafe(report), { ok: true, errors: [] });
+});
+
+test('V6 controlled release requires target gate evidence for launch controls', () => {
+  const targetGate = REQUIRED_CONTROLLED_RELEASE_GATES.find((gate) => gate.key === 'controlled_release_target_gate');
+
+  assert.ok(targetGate.requiredArtifacts.includes(CONTROLLED_RELEASE_RUNBOOK));
+  assert.ok(targetGate.requiredArtifacts.includes(CONTROLLED_RELEASE_TARGET_ARTIFACT));
+  assert.ok(targetGate.requiredArtifacts.includes(CONTROLLED_RELEASE_TARGET_TEST));
+  assert.ok(targetGate.requiredChecks.includes('readiness_gate_closed_target'));
+  assert.ok(targetGate.requiredChecks.includes('production_flag_safety_target'));
+  assert.ok(targetGate.requiredChecks.includes('rollback_disable_target'));
+  assert.ok(targetGate.requiredChecks.includes('observability_target'));
+  assert.ok(targetGate.requiredChecks.includes('support_runbook_target'));
+  assert.ok(targetGate.requiredChecks.includes('blocker_clearance_target'));
+  assert.ok(targetGate.requiredChecks.includes('controlled_release_window_target'));
+  assert.ok(targetGate.requiredChecks.includes('canary_exit_target'));
+  assert.ok(targetGate.requiredChecks.includes('emergency_disable_target'));
+  assert.ok(targetGate.requiredChecks.includes('post_release_verification_target'));
 });
 
 test('V6 controlled release can only become ready after prior milestones, release review, and controls close', () => {

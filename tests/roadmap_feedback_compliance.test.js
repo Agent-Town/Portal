@@ -80,6 +80,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'server/world_civilization/audit_ledger.js',
     'server/world_civilization/abuse_case_targets.js',
     'server/world_civilization/controlled_release.js',
+    'server/world_civilization/controlled_release_targets.js',
     'server/world_civilization/data_retention_targets.js',
     'server/world_civilization/delegations.js',
     'server/world_civilization/effects.js',
@@ -140,6 +141,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'tests/world_civilization_threat_model_targets.test.js',
     'tests/world_civilization_routes.test.js',
     'tests/world_civilization_tool_exposure_gate.test.js',
+    'tests/world_civilization_controlled_release_targets.test.js',
     'tests/world_civilization_worker_runtime_registration.test.js',
     'tests/world_civilization_worker_tool_adapter.test.js',
     'tests/world_civilization_worker_vote_adapter.test.js',
@@ -211,6 +213,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   const releaseReviewSource = read('server/world_civilization/release_review.js');
   const sessionAuthTargetSource = read('server/world_civilization/session_auth_targets.js');
   const controlledSource = read('server/world_civilization/controlled_release.js');
+  const controlledTargetSource = read('server/world_civilization/controlled_release_targets.js');
   const proposalSource = read('server/world_civilization/proposals.js');
   const proposalRouteSource = read('server/world_civilization/routes.js');
   const proposalStoreWiringSource = read('server/world_civilization/store_wiring.js');
@@ -956,22 +959,34 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(skillLine, /typed rollback execution target coverage/);
   assert.match(plan, /M18 V6 controlled release completion \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/controlled_release\.js/);
+  assert.match(plan, /server\/world_civilization\/controlled_release_targets\.js/);
+  assert.match(plan, /controlled release target matrix/);
   assert.match(plan, /buildV6ReadinessGateReport\(\)/);
   assert.match(plan, /explicit closed V6 readiness-gate report/);
   assert.match(plan, /readiness audit-summary proof/);
   assert.match(gate, /server\/world_civilization\/controlled_release\.js/);
+  assert.match(gate, /server\/world_civilization\/controlled_release_targets\.js/);
+  assert.match(gate, /controlled release target gate evidence/);
   assert.match(gate, /closed readiness-gate report/);
   assert.match(gate, /readiness audit-summary proof/);
   assert.match(gate, /production feature flag safety/);
   assert.match(gate, /rollback\/disable rehearsals/);
+  assert.match(controlledRunbook, /Controlled release target gate/);
   assert.match(controlledRunbook, /explicit closed V6\.0 readiness-gate report/);
   assert.match(controlledRunbook, /readiness report hidden until controlled release/);
   assert.match(controlledRunbook, /readiness audit-summary proof/);
+  assert.match(controlledSpec, /controlled release target gate/);
   assert.match(controlledSpec, /M16\/M17 audit-summary proof checks/);
+  assert.match(controlledSource, /CONTROLLED_RELEASE_TARGET_ARTIFACT/);
   assert.match(controlledSource, /v6ReadinessGateReport/);
   assert.match(controlledSource, /readiness_audit_summary_proof/);
   assert.match(controlledSource, /V6_CONTROLLED_RELEASE_READY_WITHOUT_V6_READINESS_GATE/);
   assert.match(controlledSource, /V6_READINESS_GATE_PRE_RELEASE_HIDDEN_REQUIRED/);
+  assert.match(controlledTargetSource, /V6_CONTROLLED_RELEASE_TARGETS_VERSION/);
+  assert.match(controlledTargetSource, /production_flag_safety/);
+  assert.match(controlledTargetSource, /emergency_disable/);
+  assert.match(controlledTargetSource, /post_release_verification/);
+  assert.match(skillLine, /V6 controlled release target gate/);
   assert.match(skillLine, /explicit closed V6 readiness-gate report/);
   assert.match(skillLine, /readiness audit-summary proof/);
 });
