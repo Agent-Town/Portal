@@ -361,6 +361,7 @@ const REQUIRED_V6_READINESS_GATES = [
       'server/world_civilization/privacy_review_targets.js',
       'server/world_civilization/product_signoff_targets.js',
       'server/world_civilization/release_review.js',
+      'server/world_civilization/release_candidate_targets.js',
       'server/world_civilization/threat_model_targets.js',
       'server/world_civilization/validation_targets.js',
       'tests/world_civilization_abuse_case_targets.test.js',
@@ -369,6 +370,7 @@ const REQUIRED_V6_READINESS_GATES = [
       'tests/world_civilization_privacy_review_targets.test.js',
       'tests/world_civilization_product_signoff_targets.test.js',
       'tests/world_civilization_release_review.test.js',
+      'tests/world_civilization_release_candidate_targets.test.js',
       'tests/world_civilization_threat_model_targets.test.js',
       'tests/world_civilization_validation_targets.test.js'
     ],
@@ -385,6 +387,7 @@ const REQUIRED_V6_READINESS_GATES = [
       'store_specific_audit_summary_coverage',
       'validation_evidence',
       'ci_validation_matrix_gate',
+      'release_candidate_target_gate',
       'validation_target_gate',
       'vote_authorization_readiness_review',
       'resilience_readiness_review',

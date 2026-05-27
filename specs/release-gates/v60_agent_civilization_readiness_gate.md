@@ -196,9 +196,10 @@ persistence resilience, and security/product release review.
   privacy review target gate evidence, M5 session-auth target evidence,
   store-backed delegated-agent proof evidence, data-retention policy with
   data-retention target gate evidence,
-  audit coverage, CI validation matrix target gate evidence, validation target
-  gate evidence, validation evidence, modal lab surface launch review, product
-  signoff target gate evidence, and product signoff are complete.
+  audit coverage, CI validation matrix target gate evidence,
+  release-candidate target gate evidence, validation target gate evidence,
+  validation evidence, modal lab surface launch review, product signoff target
+  gate evidence, and product signoff are complete.
 - The research-only controlled release gate may exist in
   `server/world_civilization/controlled_release.js` with
   `server/world_civilization/controlled_release_targets.js`, but it must keep
@@ -596,8 +597,8 @@ persistence resilience, and security/product release review.
   abuse-case target gate evidence, store-backed delegation proof and scope-mismatch evidence,
   data-retention policy, audit coverage review,
   deterministic validation evidence with CI validation matrix target gate
-  evidence and validation target gate evidence, effect execution and rollback review,
-  agent participation enforcement review,
+  evidence, release-candidate target gate evidence, and validation target gate
+  evidence, effect execution and rollback review, agent participation enforcement review,
   civic institution readiness review, public works readiness review,
   modal lab surface review, resilience readiness review with store-specific zero hash-only
   fallback proof, product signoff target gate evidence, and product signoff.

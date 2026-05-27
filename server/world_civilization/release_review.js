@@ -166,8 +166,10 @@ const REQUIRED_REVIEW_GATES = [
     requiredArtifacts: [
       RELEASE_REVIEW_ARTIFACT,
       'server/world_civilization/ci_validation_matrix_targets.js',
+      'server/world_civilization/release_candidate_targets.js',
       'server/world_civilization/validation_targets.js',
       'tests/world_civilization_ci_validation_matrix_targets.test.js',
+      'tests/world_civilization_release_candidate_targets.test.js',
       'tests/world_civilization_validation_targets.test.js',
       'tests/world_civilization_schemas.test.js',
       'tests/world_civilization_abuse_case_targets.test.js',
@@ -202,6 +204,7 @@ const REQUIRED_REVIEW_GATES = [
       'all_features_regression',
       'feature_override_safety',
       'ci_validation_matrix_gate',
+      'release_candidate_target_gate',
       'validation_target_gate',
       'abuse_case_target_gate',
       'product_signoff_target_gate',

@@ -98,6 +98,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'server/world_civilization/public_works.js',
     'server/world_civilization/reputation.js',
     'server/world_civilization/replay_reconstruction.js',
+    'server/world_civilization/release_candidate_targets.js',
     'server/world_civilization/load_rate_targets.js',
     'server/world_civilization/migration_rehearsal.js',
     'server/world_civilization/migration_load_replay.js',
@@ -139,6 +140,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'tests/world_civilization_rollback_recovery.test.js',
     'tests/world_civilization_rollback_execution_targets.test.js',
     'tests/world_civilization_readiness_gate.test.js',
+    'tests/world_civilization_release_candidate_targets.test.js',
     'tests/world_civilization_mutation_security.test.js',
     'tests/world_civilization_session_auth_targets.test.js',
     'tests/world_civilization_threat_model_targets.test.js',
@@ -236,6 +238,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   const abuseCaseTargetSource = read('server/world_civilization/abuse_case_targets.js');
   const productSignoffTargetSource = read('server/world_civilization/product_signoff_targets.js');
   const ciValidationMatrixTargetSource = read('server/world_civilization/ci_validation_matrix_targets.js');
+  const releaseCandidateTargetSource = read('server/world_civilization/release_candidate_targets.js');
   const validationTargetSource = read('server/world_civilization/validation_targets.js');
   const requiredMilestones = [
     'M0 Hardened V5 world-grid baseline',
@@ -286,6 +289,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(readinessSource, /privacy_review_target_gate/);
   assert.match(readinessSource, /data_retention_target_gate/);
   assert.match(readinessSource, /ci_validation_matrix_gate/);
+  assert.match(readinessSource, /release_candidate_target_gate/);
   assert.match(readinessSource, /validation_target_gate/);
   assert.match(releaseReviewSource, /session_auth_target_gate/);
   assert.match(releaseReviewSource, /threat_model_target_gate/);
@@ -301,6 +305,8 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(releaseReviewSource, /server\/world_civilization\/session_auth_targets\.js/);
   assert.match(releaseReviewSource, /ci_validation_matrix_gate/);
   assert.match(releaseReviewSource, /server\/world_civilization\/ci_validation_matrix_targets\.js/);
+  assert.match(releaseReviewSource, /release_candidate_target_gate/);
+  assert.match(releaseReviewSource, /server\/world_civilization\/release_candidate_targets\.js/);
   assert.match(releaseReviewSource, /validation_target_gate/);
   assert.match(releaseReviewSource, /server\/world_civilization\/validation_targets\.js/);
   assert.match(sessionAuthTargetSource, /V6_SESSION_AUTH_TARGETS_VERSION/);
@@ -327,6 +333,12 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(ciValidationMatrixTargetSource, /console_error_budget/);
   assert.match(ciValidationMatrixTargetSource, /trace_artifact_retention/);
   assert.match(ciValidationMatrixTargetSource, /qa_release_packet/);
+  assert.match(releaseCandidateTargetSource, /V6_RELEASE_CANDIDATE_TARGETS_VERSION/);
+  assert.match(releaseCandidateTargetSource, /release_candidate_environment/);
+  assert.match(releaseCandidateTargetSource, /browser_console_error_budget/);
+  assert.match(releaseCandidateTargetSource, /playwright_trace_archive/);
+  assert.match(releaseCandidateTargetSource, /production_override_recheck/);
+  assert.match(releaseCandidateTargetSource, /controlled_release_handoff/);
   assert.match(validationTargetSource, /V6_VALIDATION_TARGETS_VERSION/);
   assert.match(validationTargetSource, /split_playwright_smokes/);
   assert.match(validationTargetSource, /runtime_tool_absence/);
@@ -875,6 +887,9 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /server\/world_civilization\/ci_validation_matrix_targets\.js/);
   assert.match(plan, /CI validation matrix target/);
   assert.match(plan, /trace retention/);
+  assert.match(plan, /server\/world_civilization\/release_candidate_targets\.js/);
+  assert.match(plan, /release-candidate target matrix/);
+  assert.match(plan, /controlled release handoff/);
   assert.match(plan, /server\/world_civilization\/validation_targets\.js/);
   assert.match(plan, /validation target matrix/);
   assert.match(plan, /runtime tool absence/);
@@ -887,6 +902,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(gate, /privacy review target gate evidence/);
   assert.match(gate, /data-retention target gate evidence/);
   assert.match(gate, /CI validation matrix target gate evidence/);
+  assert.match(gate, /release-candidate target gate evidence/);
   assert.match(gate, /validation target gate evidence/);
   assert.match(gate, /threat model, privacy review, abuse-case review/);
   assert.match(gate, /store-backed delegation proof and scope-mismatch evidence/);
@@ -962,6 +978,8 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(releaseReview, /backup retention expiry target/);
   assert.match(releaseReview, /CI validation matrix target gate/);
   assert.match(releaseReview, /Playwright trace retention/);
+  assert.match(releaseReview, /release-candidate target gate/);
+  assert.match(releaseReview, /controlled release handoff/);
   assert.match(releaseReview, /validation target gate/);
   assert.match(releaseReview, /release-candidate run/);
   assert.match(releaseReview, /store-specific audit-summary coverage/);
@@ -988,6 +1006,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(skillLine, /V6 privacy review target gate/);
   assert.match(skillLine, /V6 data-retention target gate/);
   assert.match(skillLine, /V6 CI validation matrix target gate/);
+  assert.match(skillLine, /V6 release-candidate target gate/);
   assert.match(skillLine, /V6 validation target gate/);
   assert.match(skillLine, /store-specific audit-summary coverage/);
   assert.match(skillLine, /store_specific_zero_hash_only_fallbacks/);
