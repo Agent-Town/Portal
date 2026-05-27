@@ -7,6 +7,8 @@ const {
   V5_PROMOTION_GATE_ARTIFACT,
   V5_PROMOTION_TARGET_ARTIFACT,
   V5_PROMOTION_TARGET_TEST,
+  V5_REPLAY_RECONSTRUCTION_ARTIFACT,
+  V5_REPLAY_RECONSTRUCTION_TEST,
   V6_MILESTONE_PLAN_ARTIFACT,
   V6_READINESS_GATE_ARTIFACT,
   assertV6ReadinessGateSafe,
@@ -74,7 +76,10 @@ test('V6 readiness gate baseline names every prerequisite domain but remains ope
   const workerToolGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'worker_tool_surface');
   assert.ok(v5PromotionGate.requiredArtifacts.includes(V5_PROMOTION_TARGET_ARTIFACT));
   assert.ok(v5PromotionGate.requiredArtifacts.includes(V5_PROMOTION_TARGET_TEST));
+  assert.ok(v5PromotionGate.requiredArtifacts.includes(V5_REPLAY_RECONSTRUCTION_ARTIFACT));
+  assert.ok(v5PromotionGate.requiredArtifacts.includes(V5_REPLAY_RECONSTRUCTION_TEST));
   assert.ok(v5PromotionGate.requiredChecks.includes('v5_release_promotion_target'));
+  assert.ok(v5PromotionGate.requiredChecks.includes('v5_replay_reconstruction_target'));
   assert.ok(v5PromotionGate.requiredChecks.includes('exact_before_state_reconstruction_target'));
   assert.ok(v5PromotionGate.requiredChecks.includes('production_replay_coverage_target'));
   assert.ok(v5PromotionGate.requiredChecks.includes('live_provider_logout_signoff_target'));

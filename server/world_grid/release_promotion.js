@@ -167,8 +167,8 @@ const V5_WORLD_GRID_RELEASE_PROMOTION_TARGETS = [
   {
     key: 'release_replay_reconstruction',
     slice: 'V5 release replay',
-    requiredEvidence: 'Release promotion must prove complete exact per-record before-state reconstruction and release replay reconstruction, not only privacy-safe aggregate before/after summaries.',
-    currentEvidence: 'docs/technical/WORLD_GRID_STATE_MODEL.md',
+    requiredEvidence: 'Release promotion must prove hash-chain replay reconstruction, privacy-safe before/after aggregate snapshots, and complete exact per-record before-state reconstruction before release.',
+    currentEvidence: 'server/world_grid/replay_reconstruction.js, tests/world_grid_replay_reconstruction.test.js, docs/technical/WORLD_GRID_STATE_MODEL.md',
     releaseEvidenceRequired: 'release_replay_reconstruction_packet'
   },
   {

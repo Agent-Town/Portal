@@ -55,7 +55,7 @@ release-grade store is explicitly implemented and tested. Current stores are:
 | Idempotency replay records | Process-local `Map` in `server/world_grid/idempotency.js`; optional SQLite `world_grid_idempotency_records` table when `WORLD_GRID_IDEMPOTENCY_SQLITE_PATH` is configured | Durable foundation for exact retry replay, changed payload rejection, schema/migration versions, planned-claim restart proof, and V5.1-V5.5 mutating route/tool-surface restart proof; release promotion still needs final session-auth integration and production replay coverage |
 | CSRF mutation tokens | Process-local `Map` in `server/world_grid/csrf.js`; optional SQLite `world_grid_csrf_tokens` table with `session_binding_hash` when `WORLD_GRID_CSRF_SQLITE_PATH` is configured | Durable foundation for owner-bound hashed tokens, hashed session binding when identity supplies a session id, expiry pruning, schema/migration versions, production route restart proof, browser same-wallet cross-session denial proof, same-session rotation, explicit invalidation, session-reset invalidation wiring, wallet/provider disconnect invalidation endpoint plus client hook, and mocked provider disconnect callback proof; release promotion still needs live Privy/provider logout signoff and session-auth integration |
 | Mutation rate-limit buckets | Process-local `Map` in `server/world_grid/rate_limit.js`; optional SQLite `world_grid_rate_limit_buckets` table when `WORLD_GRID_RATE_LIMIT_SQLITE_PATH` is configured | Durable foundation for owner/surface mutation counters, schema/migration versions, window reset metadata, and restart proof; release promotion still needs final session binding plus IP/risk-aware shared production enforcement |
-| Mutation audit records | Optional SQLite `world_grid_audit_log` table in `server/world_grid/audit_log.js` when `WORLD_GRID_AUDIT_SQLITE_PATH` is configured | Durable foundation for append-only audit/replay, route/tool-surface restart matrix coverage, duplicate-replay suppression, and privacy-safe `agent-town.v5.world-grid.audit-snapshot.v1` before/after route snapshots with store-specific public presence, services, events, and sandbox aggregate summaries; not yet complete release storage because complete exact per-record before-state reconstruction and store reconstruction are still release gates |
+| Mutation audit records | Optional SQLite `world_grid_audit_log` table in `server/world_grid/audit_log.js` when `WORLD_GRID_AUDIT_SQLITE_PATH` is configured; replay target in `server/world_grid/replay_reconstruction.js` | Durable foundation for append-only audit/replay, route/tool-surface restart matrix coverage, duplicate-replay suppression, privacy-safe `agent-town.v5.world-grid.audit-snapshot.v1` before/after route snapshots with store-specific public presence, services, events, and sandbox aggregate summaries, and non-executing replay reconstruction over hash-chain, privacy, snapshot, and migration metadata; not yet complete release storage because complete exact per-record before-state reconstruction and store reconstruction are still release gates |
 
 The mandatory durable dependency used by mutating V5.1+ routes is the existing
 Founders Plot prerequisite check. Optional SQLite world-grid stores are
@@ -80,9 +80,13 @@ Before any V5 world-grid slice can claim release-grade persistence, it needs:
   after separate Node process restarts and exact idempotent replays do not add
   duplicate audit rows; current route-level audit snapshots capture privacy-safe
   before/after region, territory, preference, public presence, services, events,
-  and sandbox aggregate summaries for every mutating route/tool surface. Complete
-  exact per-record before-state reconstruction and release replay reconstruction
-  remain gates.
+  and sandbox aggregate summaries for every mutating route/tool surface.
+  `server/world_grid/replay_reconstruction.js` now reconstructs the audit replay
+  stream without applying world state, verifies hash-chain continuity,
+  privacy-safe summaries, snapshot presence, migration metadata, and rollback
+  counts, and reports `releaseReplayReady: false` until exact per-record
+  before-state reconstruction exists. Complete exact per-record before-state
+  reconstruction and release-grade store reconstruction remain gates.
 - Durable camera/focus preference rows with owner/region indexes and restart
   persistence for the V5.0 region lifecycle. Current SQLite preference coverage
   proves selected-cell and camera state reopens across separate Node lifetimes

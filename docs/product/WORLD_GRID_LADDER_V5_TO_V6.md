@@ -58,9 +58,12 @@ excluded in the V6 milestone plan.
 Shared V5 storage evidence now includes optional `WORLD_GRID_AUDIT_SQLITE_PATH`
 restart matrix coverage for all V5.1-V5.5 mutating route and tool surfaces,
 including duplicate-replay suppression and private service-secret exclusion.
-Complete before-state snapshots, release replay reconstruction, final session
-auth, live Privy/provider logout signoff, and IP/risk-aware production rate
-limits remain promotion gates. Optional
+`server/world_grid/replay_reconstruction.js` now reconstructs current audit
+rows without applying world state and checks hash-chain continuity,
+privacy-safe snapshots, migration metadata, rollback counts, and aggregate
+summary coverage. Complete exact per-record before-state reconstruction, final
+session auth, production replay coverage, live Privy/provider logout signoff,
+and IP/risk-aware production rate limits remain promotion gates. Optional
 `WORLD_GRID_CSRF_SQLITE_PATH` coverage now proves owner-bound hashed CSRF tokens
 and hashed session-binding metadata persist across route restarts, Playwright
 coverage now proves browser same-wallet cross-session CSRF token reuse is

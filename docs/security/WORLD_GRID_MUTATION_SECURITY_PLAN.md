@@ -114,6 +114,11 @@ until the controls below are implemented and covered by deterministic tests.
   `agent-town.v5.world-grid.audit-snapshot.v1` before/after snapshots are
   stored with public presence, services, events, and sandbox aggregate summaries,
   and private-looking service secrets stay out of audit entries.
+  `server/world_grid/replay_reconstruction.js` reconstructs the current audit
+  stream without applying world state and verifies hash-chain continuity,
+  privacy-safe snapshots, migration metadata, rollback counts, and aggregate
+  summary coverage while keeping `releaseReplayReady: false` until exact
+  per-record before-state reconstruction exists.
 - V5.0 region rendering and read-only tools may run without creating Founders
   Plot state.
 - When `WORLD_GRID_REGION_PREFS_SQLITE_PATH` is configured, V5.0 camera/focus

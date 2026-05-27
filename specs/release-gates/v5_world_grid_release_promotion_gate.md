@@ -6,7 +6,10 @@ Blocks: `V6.0 Agent Civilization Foundation`
 
 Runtime target report: `server/world_grid/release_promotion.js`
 
-Target coverage: `tests/world_grid_release_promotion.test.js`
+Replay reconstruction target: `server/world_grid/replay_reconstruction.js`
+
+Target coverage: `tests/world_grid_release_promotion.test.js`,
+`tests/world_grid_replay_reconstruction.test.js`
 
 This gate promotes V5.0-V5.5 world-grid slices from prototype evidence to
 release-grade prerequisites. Passing Playwright demos is not enough: each slice
@@ -63,6 +66,12 @@ from `prototype_gated` to `release_ready`:
   risk-rate-limit identity targets. The report is non-executing and may not mark
   V5 `releaseReady`, may not enable V6, may not expose player-visible defaults,
   and may not mutate world state.
+- `server/world_grid/replay_reconstruction.js` verifies the current
+  `WORLD_GRID_AUDIT_SQLITE_PATH` replay stream without applying world state:
+  hash-chain continuity, privacy-safe before/after snapshots, migration
+  metadata, rollback counts, and aggregate store summaries are checked. The
+  report keeps `releaseReplayReady: false` until complete exact per-record
+  before-state reconstruction and release-grade store reconstruction are proven.
 
 ## Slice Gates
 

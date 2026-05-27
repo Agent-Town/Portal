@@ -8,6 +8,8 @@ V5 promotion gate: `specs/release-gates/v5_world_grid_release_promotion_gate.md`
 
 V5 promotion target: `server/world_grid/release_promotion.js`
 
+V5 replay reconstruction target: `server/world_grid/replay_reconstruction.js`
+
 Runtime readiness gate: `server/world_civilization/readiness_gate.js`
 
 Civic schema contracts: `specs/55_agent_town_v6_civic_schema_contracts.md`
