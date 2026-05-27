@@ -141,6 +141,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'tests/world_grid_sandbox_restart_probe_child.js',
     'e2e/243_world_grid_csrf_session_binding.spec.js',
     'e2e/244_v6_lab_modal_boundary.spec.js',
+    'e2e/245_world_grid_player_route_prerequisite.spec.js',
     'public/experiences/world-grid/manifest.json',
     'public/experiences/world-grid/skill.md',
     'public/experiences/world-grid/tools.md',
@@ -238,6 +239,8 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(skillLine, /V6 aggregate readiness gate/);
   assert.match(plan, /Source branch: `codex\/v6-agent-civilization-milestones`/);
   assert.match(plan, /broad V5 prototype overrides do not enable V6/);
+  assert.match(plan, /same-session player-route prerequisite proof/);
+  assert.match(plan, /e2e\/245_world_grid_player_route_prerequisite\.spec\.js/);
   assert.match(spec, /FEATURE_WORLD_V60_AGENT_CIVILIZATION/);
   assert.match(spec, /WORLD_GRID_FEATURE_FLAGS=all/);
   assert.match(gate, /Broad V5 prototype overrides/);
@@ -743,7 +746,9 @@ test('V5 world-grid release promotion gate blocks V6 on prototype-only evidence'
     /rate limits/,
     /idempotency keys/,
     /append-only audit\/replay records/,
-    /Production feature override tests/
+    /Production feature override tests/,
+    /same-session `\/app` Founders Plot\s+entry creates the prerequisite before V5\.1\+ World Grid mutation/,
+    /WORLD_GRID_PLOT_REQUIRED/
   ];
 
   for (const slice of requiredSlices) {
@@ -753,6 +758,7 @@ test('V5 world-grid release promotion gate blocks V6 on prototype-only evidence'
     assert.match(gate, control);
   }
   assert.match(gate, /V6 civic institutions may not become player-visible/);
+  assert.match(gate, /e2e\/245_world_grid_player_route_prerequisite\.spec\.js/);
   assert.match(v6Gate, /specs\/release-gates\/v5_world_grid_release_promotion_gate\.md/);
   assert.match(ladder, /specs\/release-gates\/v5_world_grid_release_promotion_gate\.md/);
 });

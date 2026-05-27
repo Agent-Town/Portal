@@ -44,6 +44,12 @@ from `prototype_gated` to `release_ready`:
   production mode without the intended release controls.
 - Public surfaces prove XSS-safe rendering, redaction, and no private Founders
   Plot data leakage.
+- Browser player-route coverage proves a same-session `/app` Founders Plot
+  entry creates the prerequisite before V5.1+ World Grid mutation, and that the
+  same mutation returns `WORLD_GRID_PLOT_REQUIRED` without creating a plot before
+  that entry. Current test-mode coverage is
+  `e2e/245_world_grid_player_route_prerequisite.spec.js`; release promotion
+  still requires live account/wallet provider signoff.
 
 ## Slice Gates
 
