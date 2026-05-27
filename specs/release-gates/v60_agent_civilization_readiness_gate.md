@@ -132,9 +132,10 @@ gate below has implementation, deterministic tests, and security/product signoff
 - The research-only controlled release gate may exist in
   `server/world_civilization/controlled_release.js`, but it must keep
   `productionEnabled: false` until M0-M17 are done, the release-review report is
-  ready, production-safe flags, rollback/disable controls, observability,
-  support runbooks, blocker clearance, and a controlled release window have
-  approved evidence.
+  ready, an explicit V6 readiness-gate report is closed and hidden until
+  controlled release, production-safe flags, rollback/disable controls,
+  observability, support runbooks, blocker clearance, and a controlled release
+  window have approved evidence.
 
 ## Prerequisites
 
@@ -392,9 +393,11 @@ gate below has implementation, deterministic tests, and security/product signoff
   automatic enablement path. Current gate tracking starts in
   `server/world_civilization/controlled_release.js` and
   `docs/ops/V6_AGENT_CIVILIZATION_CONTROLLED_RELEASE_RUNBOOK.md`; release still
-  requires closed M0-M17 milestones, a closed V6 readiness gate, production
-  feature flag safety, rollback/disable rehearsals, privacy-safe observability,
-  support readiness, blocker clearance, and an explicit release window.
+  requires closed M0-M17 milestones, a closed V6 readiness gate, an explicit
+  closed readiness-gate report that stays hidden until controlled release,
+  production feature flag safety, rollback/disable rehearsals, privacy-safe
+  observability, support readiness, blocker clearance, and an explicit release
+  window.
 - Privacy review must prove no private town state, wallet secret, Brain secret,
   provider credential, debug trace, or unapproved transcript enters civic
   surfaces.

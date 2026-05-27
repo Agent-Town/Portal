@@ -50,6 +50,19 @@ function readyReleaseReviewReport() {
   });
 }
 
+function readyV6ReadinessGateReport(overrides = {}) {
+  return {
+    status: 'closed',
+    featureFlag: V6_WORLD_FEATURE_FLAG,
+    closed: true,
+    releaseReady: true,
+    runtimeExposed: false,
+    playerVisible: false,
+    normalGameplayExposure: false,
+    ...overrides
+  };
+}
+
 test('V6 controlled release report is hidden without explicit research opt-in and V6 flag', () => {
   const withoutResearchOptIn = buildV6ControlledReleaseReport({
     featureFlags: { [V6_WORLD_FEATURE_FLAG]: true }
@@ -66,6 +79,8 @@ test('V6 controlled release report is hidden without explicit research opt-in an
     assert.equal(report.normalGameplayExposure, false);
     assert.equal(report.productionEnabled, false);
     assert.equal(report.releaseReady, false);
+    assert.equal(report.v6ReadinessGateClosed, false);
+    assert.equal(report.v6ReadinessGate, null);
     assert.deepEqual(report.priorMilestones, []);
     assert.deepEqual(report.gateReports, []);
     assert.deepEqual(assertV6ControlledReleaseSafe(report), { ok: true, errors: [] });
@@ -83,6 +98,8 @@ test('V6 controlled release baseline names all launch controls but remains block
   assert.equal(report.source, 'node_test');
   assert.equal(report.releaseReady, false);
   assert.equal(report.releaseReviewReady, false);
+  assert.equal(report.v6ReadinessGateClosed, false);
+  assert.match(report.v6ReadinessGate.errors.join(','), /V6_READINESS_GATE_REPORT_REQUIRED/);
   assert.deepEqual(report.priorMilestones.map((entry) => entry.key), PRIOR_MILESTONE_KEYS);
   assert.deepEqual(report.gateReports.map((entry) => entry.key), REQUIRED_CONTROLLED_RELEASE_GATES.map((gate) => gate.key));
   assert.ok(report.priorMilestones.every((entry) => entry.ok === false));
@@ -98,16 +115,20 @@ test('V6 controlled release baseline names all launch controls but remains block
 
 test('V6 controlled release can only become ready after prior milestones, release review, and controls close', () => {
   const review = readyReleaseReviewReport();
+  const readinessGate = readyV6ReadinessGateReport();
   const report = buildV6ControlledReleaseReport({
     includeResearchRelease: true,
     featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
     milestoneStatuses: allPriorMilestonesDone(),
     releaseReviewReport: review,
+    v6ReadinessGateReport: readinessGate,
     evidence: completeReleaseEvidence()
   });
 
   assert.equal(review.releaseReady, true);
   assert.equal(report.releaseReady, true);
+  assert.equal(report.v6ReadinessGateClosed, true);
+  assert.equal(report.v6ReadinessGate.ok, true);
   assert.equal(report.runtimeExposed, false);
   assert.equal(report.playerVisible, false);
   assert.equal(report.normalGameplayExposure, false);
@@ -119,6 +140,53 @@ test('V6 controlled release can only become ready after prior milestones, releas
   assert.ok(report.gateReports.some((gate) => gate.requiredArtifacts.includes(V6_MILESTONE_PLAN_ARTIFACT)));
   assert.ok(REQUIRED_REVIEW_GATES.every((gate) => gate.requiredArtifacts.includes(RELEASE_REVIEW_ARTIFACT)));
   assert.deepEqual(assertV6ControlledReleaseSafe(report), { ok: true, errors: [] });
+});
+
+test('V6 controlled release blocks readiness without a closed V6 readiness gate report', () => {
+  const review = readyReleaseReviewReport();
+  const report = buildV6ControlledReleaseReport({
+    includeResearchRelease: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    milestoneStatuses: allPriorMilestonesDone(),
+    releaseReviewReport: review,
+    evidence: completeReleaseEvidence()
+  });
+
+  assert.equal(review.releaseReady, true);
+  assert.equal(report.releaseReady, false);
+  assert.equal(report.releaseReviewReady, true);
+  assert.equal(report.v6ReadinessGateClosed, false);
+  assert.deepEqual(report.v6ReadinessGate.errors, [
+    'V6_READINESS_GATE_REPORT_REQUIRED',
+    'V6_READINESS_GATE_CLOSED_REQUIRED',
+    'V6_READINESS_GATE_RELEASE_READY_REQUIRED',
+    'V6_READINESS_GATE_FEATURE_FLAG_REQUIRED'
+  ]);
+  assert.deepEqual(assertV6ControlledReleaseSafe(report), { ok: true, errors: [] });
+});
+
+test('V6 controlled release rejects visible or mismatched readiness gate reports before launch', () => {
+  const report = buildV6ControlledReleaseReport({
+    includeResearchRelease: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    milestoneStatuses: allPriorMilestonesDone(),
+    releaseReviewReport: readyReleaseReviewReport(),
+    v6ReadinessGateReport: readyV6ReadinessGateReport({
+      featureFlag: 'FEATURE_WRONG',
+      playerVisible: true,
+      normalGameplayExposure: true
+    }),
+    evidence: completeReleaseEvidence()
+  });
+
+  assert.equal(report.releaseReady, false);
+  assert.equal(report.v6ReadinessGateClosed, false);
+  assert.match(report.v6ReadinessGate.errors.join(','), /V6_READINESS_GATE_FEATURE_FLAG_REQUIRED/);
+  assert.match(report.v6ReadinessGate.errors.join(','), /V6_READINESS_GATE_PRE_RELEASE_HIDDEN_REQUIRED/);
+  assert.deepEqual(assertV6ControlledReleaseSafe(report), {
+    ok: false,
+    errors: ['V6_CONTROLLED_RELEASE_READINESS_GATE_PRE_RELEASE_HIDDEN_REQUIRED']
+  });
 });
 
 test('V6 controlled release assertion fails closed for fake readiness, exposure, or incomplete gates', () => {
@@ -155,5 +223,6 @@ test('V6 controlled release assertion fails closed for fake readiness, exposure,
   assert.match(result.errors.join(','), /V6_CONTROLLED_RELEASE_NON_EXECUTING_REQUIRED/);
   assert.match(result.errors.join(','), /V6_CONTROLLED_RELEASE_READY_WITH_INCOMPLETE_MILESTONES/);
   assert.match(result.errors.join(','), /V6_CONTROLLED_RELEASE_READY_WITHOUT_RELEASE_REVIEW/);
+  assert.match(result.errors.join(','), /V6_CONTROLLED_RELEASE_READY_WITHOUT_V6_READINESS_GATE/);
   assert.match(result.errors.join(','), /V6_CONTROLLED_RELEASE_READY_WITH_FAILED_GATES/);
 });

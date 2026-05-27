@@ -13,7 +13,7 @@ production enablement switch and does not approve player-visible V6.
 
 | Gate | Required Checks | Current Status |
 | --- | --- | --- |
-| V6 readiness gate closed | M0-M17 done, V6.0 readiness gate closed, release review ready | Pending |
+| V6 readiness gate closed | M0-M17 done, explicit closed V6.0 readiness-gate report, readiness report hidden until controlled release, release review ready | Pending |
 | Production feature flag safety | Default off, admin-only enablement, broad override exclusion, canary cohort, emergency disable | Pending |
 | Rollback and disable controls | Disable plan, rollback owner, rollback rehearsal, data preservation, post-disable verification | Pending |
 | Release observability | Audit metrics, Worker Traffic trace, error alerts, privacy-safe logs, feature flag dashboard | Pending |

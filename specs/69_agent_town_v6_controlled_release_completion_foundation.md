@@ -18,12 +18,14 @@ create public autonomous agents, or bypass any M0-M17 gate.
 
 The report remains hidden from runtime/player surfaces and keeps
 `productionEnabled: false`. It can report release readiness only when all prior
-milestones are `done`, the M17 release-review report is ready, and every
-controlled-release gate has complete evidence and approved signoff.
+milestones are `done`, the M17 release-review report is ready, an explicit V6
+readiness-gate report is closed, and every controlled-release gate has complete
+evidence and approved signoff.
 
 ## Required Controlled-Release Gates
 
-- V6 readiness gate closed.
+- V6 readiness gate closed, including an explicit closed readiness-gate report
+  that remains hidden from runtime/player surfaces until controlled release.
 - Production feature flag safety.
 - Rollback and disable controls.
 - Release observability.
@@ -34,9 +36,10 @@ controlled-release gate has complete evidence and approved signoff.
 ## Release Rule
 
 M18 may move to `done` only when the controlled-release report has complete
-evidence for every gate and the deployment path still requires an explicit
-production action outside this research-only contract. A green report is a
-go/no-go artifact, not an automatic player-visible enablement mechanism.
+evidence for every gate, the V6 readiness-gate report is closed, and the
+deployment path still requires an explicit production action outside this
+research-only contract. A green report is a go/no-go artifact, not an automatic
+player-visible enablement mechanism.
 
 ## Non-Goals
 

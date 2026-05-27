@@ -32,7 +32,7 @@ const REQUIRED_CONTROLLED_RELEASE_GATES = [
     key: 'readiness_gate_closed',
     label: 'V6 readiness gate closed',
     requiredArtifacts: [V6_READINESS_GATE_ARTIFACT, V6_MILESTONE_PLAN_ARTIFACT],
-    requiredChecks: ['m0_m17_done', 'v60_gate_closed', 'release_review_ready']
+    requiredChecks: ['m0_m17_done', 'v60_gate_closed', 'v60_gate_report_closed', 'release_review_ready']
   },
   {
     key: 'production_flag_safety',
@@ -95,6 +95,8 @@ function disabledReport(source) {
     executionStatus: 'not_executable',
     priorMilestones: [],
     releaseReviewReady: false,
+    v6ReadinessGateClosed: false,
+    v6ReadinessGate: null,
     gateReports: [],
     disabledReason: 'V6 controlled release requires explicit research opt-in and V6 feature flag'
   };
@@ -135,12 +137,46 @@ function inspectGate(requirement, evidence = {}) {
   };
 }
 
+function inspectV6ReadinessGate(report = null) {
+  const present = report && typeof report === 'object';
+  const status = String(report?.status || 'missing');
+  const featureFlag = String(report?.featureFlag || 'missing');
+  const gateClosed = report?.closed === true;
+  const releaseReady = report?.releaseReady === true;
+  const runtimeExposed = report?.runtimeExposed === true;
+  const playerVisible = report?.playerVisible === true;
+  const normalGameplayExposure = report?.normalGameplayExposure === true;
+  const featureFlagOk = featureFlag === V6_WORLD_FEATURE_FLAG;
+  const hiddenUntilControlledRelease = runtimeExposed === false
+    && playerVisible === false
+    && normalGameplayExposure === false;
+  const errors = [];
+  if (!present) errors.push('V6_READINESS_GATE_REPORT_REQUIRED');
+  if (!gateClosed) errors.push('V6_READINESS_GATE_CLOSED_REQUIRED');
+  if (!releaseReady) errors.push('V6_READINESS_GATE_RELEASE_READY_REQUIRED');
+  if (!featureFlagOk) errors.push('V6_READINESS_GATE_FEATURE_FLAG_REQUIRED');
+  if (!hiddenUntilControlledRelease) errors.push('V6_READINESS_GATE_PRE_RELEASE_HIDDEN_REQUIRED');
+
+  return {
+    status,
+    featureFlag,
+    gateClosed,
+    releaseReady,
+    runtimeExposed,
+    playerVisible,
+    normalGameplayExposure,
+    ok: errors.length === 0,
+    errors
+  };
+}
+
 function buildV6ControlledReleaseReport({
   featureFlags = {},
   includeResearchRelease = false,
   source = 'runtime',
   milestoneStatuses = {},
   releaseReviewReport = null,
+  v6ReadinessGateReport = null,
   evidence = {}
 } = {}) {
   const enabled = includeResearchRelease === true
@@ -149,6 +185,7 @@ function buildV6ControlledReleaseReport({
 
   const priorMilestones = inspectPriorMilestones(milestoneStatuses);
   const releaseReviewReady = releaseReviewReport?.releaseReady === true;
+  const v6ReadinessGate = inspectV6ReadinessGate(v6ReadinessGateReport);
   const gateReports = REQUIRED_CONTROLLED_RELEASE_GATES.map((gate) => inspectGate(gate, evidence[gate.key] || {}));
   return {
     version: V6_CONTROLLED_RELEASE_VERSION,
@@ -162,10 +199,13 @@ function buildV6ControlledReleaseReport({
     productionEnabled: false,
     releaseReady: priorMilestones.every((milestone) => milestone.ok)
       && releaseReviewReady
+      && v6ReadinessGate.ok
       && gateReports.every((gate) => gate.ok),
     executionStatus: 'not_executable',
     priorMilestones,
     releaseReviewReady,
+    v6ReadinessGateClosed: v6ReadinessGate.ok,
+    v6ReadinessGate,
     gateReports
   };
 }
@@ -209,6 +249,13 @@ function assertV6ControlledReleaseSafe(report = {}) {
     }
     if (report.releaseReady === true && report.releaseReviewReady !== true) {
       errors.push('V6_CONTROLLED_RELEASE_READY_WITHOUT_RELEASE_REVIEW');
+    }
+    if (report.releaseReady === true && report.v6ReadinessGateClosed !== true) {
+      errors.push('V6_CONTROLLED_RELEASE_READY_WITHOUT_V6_READINESS_GATE');
+    }
+    const readinessGate = report.v6ReadinessGate || {};
+    if (readinessGate.runtimeExposed === true || readinessGate.playerVisible === true || readinessGate.normalGameplayExposure === true) {
+      errors.push('V6_CONTROLLED_RELEASE_READINESS_GATE_PRE_RELEASE_HIDDEN_REQUIRED');
     }
 
     const gates = Array.isArray(report.gateReports) ? report.gateReports : [];

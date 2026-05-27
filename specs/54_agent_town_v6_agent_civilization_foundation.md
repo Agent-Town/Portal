@@ -196,9 +196,10 @@ complete before normal gameplay exposure.
 
 The research-only controlled release gate in
 `server/world_civilization/controlled_release.js` requires M0-M17 completion,
-release-review readiness, production feature flag safety, rollback/disable
-controls, observability, support runbooks, blocker clearance, and a controlled
-release window before explicit production enablement.
+release-review readiness, an explicit closed V6 readiness-gate report that
+remains hidden until controlled release, production feature flag safety,
+rollback/disable controls, observability, support runbooks, blocker clearance,
+and a controlled release window before explicit production enablement.
 
 ## Goal
 

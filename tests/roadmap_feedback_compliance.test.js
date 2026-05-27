@@ -148,11 +148,13 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   const labSpec = read('specs/66_agent_town_v6_modal_lab_surface_foundation.md');
   const persistenceSpec = read('specs/67_agent_town_v6_persistence_replay_resilience_foundation.md');
   const releaseReview = read('docs/security/V6_AGENT_CIVILIZATION_RELEASE_REVIEW.md');
+  const controlledRunbook = read('docs/ops/V6_AGENT_CIVILIZATION_CONTROLLED_RELEASE_RUNBOOK.md');
   const skillLine = read('docs/internal-skill-testline.md');
   const institutionSource = read('server/world_civilization/institutions.js');
   const publicWorksSource = read('server/world_civilization/public_works.js');
   const labSource = read('server/world_civilization/lab_surface.js');
   const resilienceSource = read('server/world_civilization/resilience.js');
+  const controlledSource = read('server/world_civilization/controlled_release.js');
   const requiredMilestones = [
     'M0 Hardened V5 world-grid baseline',
     'M1 Living V6 milestone contract',
@@ -390,8 +392,16 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(skillLine, /resilience readiness review/);
   assert.match(plan, /M18 V6 controlled release completion \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/controlled_release\.js/);
+  assert.match(plan, /explicit closed V6 readiness-gate report/);
   assert.match(gate, /server\/world_civilization\/controlled_release\.js/);
+  assert.match(gate, /closed readiness-gate report/);
   assert.match(gate, /production\s+feature flag safety, rollback\/disable rehearsals/);
+  assert.match(controlledRunbook, /explicit closed V6\.0 readiness-gate report/);
+  assert.match(controlledRunbook, /readiness report hidden until controlled release/);
+  assert.match(controlledSource, /v6ReadinessGateReport/);
+  assert.match(controlledSource, /V6_CONTROLLED_RELEASE_READY_WITHOUT_V6_READINESS_GATE/);
+  assert.match(controlledSource, /V6_READINESS_GATE_PRE_RELEASE_HIDDEN_REQUIRED/);
+  assert.match(skillLine, /explicit closed V6 readiness-gate report/);
 });
 
 test('V5 world-grid release promotion gate blocks V6 on prototype-only evidence', () => {
