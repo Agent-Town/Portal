@@ -3155,7 +3155,7 @@ test('GU-18/GU-19 release gate and evidence bundle APIs are generated-pack-gated
   });
 });
 
-test('GPACK-154 release evidence bundle APIs can return ready controlled-release evidence', async () => {
+test('GPACK-154/155 release evidence bundle APIs can return ready evidence and ignore loose approvals', async () => {
   const identity = { pairId: 'session:release-evidence-ready-api', houseId: null };
 
   await withTempGeneratedPackStore(async (root) => {
@@ -3276,6 +3276,69 @@ test('GPACK-154 release evidence bundle APIs can return ready controlled-release
       assert.equal(toolBundleBody.data.validationReport.ok, true, JSON.stringify(toolBundleBody.data.validationReport.checks));
       assert.equal(toolBundleBody.data.validationReport.metrics.releaseGatePublicEligible, true);
       assert.equal(toolBundleBody.data.validationReport.metrics.boundaryPreserved, true);
+
+      const looseApprovalBody = {
+        ...readyRequestBody,
+        approvalInputs: {
+          authModelDocumented: true,
+          costEstimateAccepted: true,
+          explicitConsentRecorded: true,
+          candidateAssetsReviewed: true,
+          humanReviewSignoffHash: 'b'.repeat(64)
+        }
+      };
+      delete looseApprovalBody.approvalEvidence;
+
+      const { response: looseReleaseGateResponse, body: looseReleaseGateBody } = await postJson(
+        `${baseUrl}/api/world/generated-pack/release-gate`,
+        looseApprovalBody
+      );
+      assert.equal(looseReleaseGateResponse.status, 200, JSON.stringify(looseReleaseGateBody));
+      assert.equal(looseReleaseGateBody.releaseGate.releaseMode, 'prototype-gated');
+      assert.equal(looseReleaseGateBody.releaseGate.publicReleaseEligible, false);
+      assert.equal(looseReleaseGateBody.releaseGate.metrics.looseApprovalInputCount > 0, true);
+      assert.equal(looseReleaseGateBody.releaseGate.releasePrerequisites.costConsentModelApproved, false);
+      assert.equal(looseReleaseGateBody.releaseGate.releasePrerequisites.candidateAssetsReviewed, false);
+      assert.equal(looseReleaseGateBody.releaseGate.releasePrerequisites.humanReviewComplete, false);
+      assert.equal(looseReleaseGateBody.releaseGate.approvalInputs.authModelDocumented, false);
+      assert.equal(looseReleaseGateBody.releaseGate.approvalInputs.costEstimateAccepted, false);
+      assert.equal(looseReleaseGateBody.releaseGate.approvalInputs.explicitConsentRecorded, false);
+      assert.equal(looseReleaseGateBody.releaseGate.approvalInputs.candidateAssetsReviewed, false);
+      assert.equal(looseReleaseGateBody.validationReport.ok, true, JSON.stringify(looseReleaseGateBody.validationReport.checks));
+
+      const { response: looseBundleResponse, body: looseBundleBody } = await postJson(
+        `${baseUrl}/api/world/generated-pack/release-evidence-bundle`,
+        looseApprovalBody
+      );
+      assert.equal(looseBundleResponse.status, 200, JSON.stringify(looseBundleBody));
+      assert.equal(looseBundleBody.releaseGate.releaseMode, 'prototype-gated');
+      assert.equal(looseBundleBody.releaseGate.publicReleaseEligible, false);
+      assert.equal(looseBundleBody.releaseEvidenceBundle.publicReleaseEligible, false);
+      assert.equal(looseBundleBody.releaseEvidenceBundle.metrics.releaseGatePublicEligible, false);
+      assert.equal(looseBundleBody.releaseEvidenceBundle.metrics.presentSourceCount, looseBundleBody.releaseEvidenceBundle.metrics.requiredSourceCount);
+      assert.equal(looseBundleBody.releaseEvidenceBundle.metrics.privateDataLeakCount, 0);
+      assert.equal(looseBundleBody.releaseEvidenceBundle.metrics.productionImageAssetCount, 0);
+      assert.equal(looseBundleBody.releaseEvidenceBundle.constraints.productionImageAssetsCreated, false);
+      assert.equal(looseBundleBody.releaseEvidenceBundle.constraints.externalProviderPrivateDataStored, false);
+      assert.equal(looseBundleBody.releaseEvidenceBundle.constraints.canonicalServerRulesChanged, false);
+      assert.equal(looseBundleBody.releaseEvidenceBundle.constraints.v6CivicMechanicsTouched, false);
+      assert.equal(looseBundleBody.releaseEvidenceBundle.constraints.normalGameplayVisibilityChanged, false);
+      assert.equal(looseBundleBody.releaseEvidenceBundle.constraints.generatedPackDefaultExposure, false);
+      assert.equal(looseBundleBody.validationReport.ok, true, JSON.stringify(looseBundleBody.validationReport.checks));
+      assert.equal(looseBundleBody.validationReport.metrics.releaseGatePublicEligible, false);
+      assert.equal(looseBundleBody.validationReport.metrics.boundaryPreserved, true);
+
+      const { response: looseToolBundleResponse, body: looseToolBundleBody } = await postJson(
+        `${baseUrl}/api/world/tool/et.world.generated_pack.release_evidence_bundle`,
+        looseApprovalBody
+      );
+      assert.equal(looseToolBundleResponse.status, 200, JSON.stringify(looseToolBundleBody));
+      assert.equal(looseToolBundleBody.data.releaseGate.releaseMode, 'prototype-gated');
+      assert.equal(looseToolBundleBody.data.releaseEvidenceBundle.publicReleaseEligible, false);
+      assert.equal(looseToolBundleBody.data.releaseEvidenceBundle.metrics.releaseGatePublicEligible, false);
+      assert.equal(looseToolBundleBody.data.validationReport.ok, true, JSON.stringify(looseToolBundleBody.data.validationReport.checks));
+      assert.equal(looseToolBundleBody.data.validationReport.metrics.releaseGatePublicEligible, false);
+      assert.equal(looseToolBundleBody.data.validationReport.metrics.boundaryPreserved, true);
     });
   });
 });

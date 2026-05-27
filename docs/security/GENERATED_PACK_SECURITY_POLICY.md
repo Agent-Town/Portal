@@ -226,6 +226,7 @@ Status: prototype-gated
   "validationReportBoundaryMetricsMirrored": true,
   "validationReportBoundaryMetricsApiMirrored": true,
   "releaseEvidenceBundleReadyApiPathVerified": true,
+  "releaseEvidenceBundleLooseApprovalsIgnored": true,
   "externalImageModelUsed": false,
   "explicitConsentRequiredForImageGeneration": true,
   "costConsentModelApproved": true,

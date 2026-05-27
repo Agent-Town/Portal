@@ -2846,6 +2846,7 @@ Response includes:
 
 Release-evidence-bundle invariants:
 - complete machine, persistence, approval, and candidate-review evidence can produce `ready-for-controlled-release` HTTP/tool responses while production image creation, default generated-pack exposure, canonical server-rule changes, V6 civic changes, and private-data storage remain false/zero;
+- loose approval inputs cannot satisfy consent/cost/auth, candidate-review, or human-review release prerequisites; versioned `approvalEvidence` is required even when all other machine evidence is complete;
 - request bodies share the release-gate ingress guard for secret-like fields, semantic token fields, secret-looking keys or values, raw prompt-instruction keys, executable instruction values, request depth, node count, array size, object key count, object key length, and string length;
 - the generic tool dispatcher path `et.world.generated_pack.release_evidence_bundle` uses the same guard, returns the same fail-closed rejection code, and exposes the same validation-report source-count metrics and production/private/default/V6 boundary indicators as the HTTP endpoint;
 - bundle validation reports redact unsafe submitted bundle hashes and source pack ids from measured evidence;
