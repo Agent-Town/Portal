@@ -158,6 +158,68 @@ test('FP-UT-008 state hash is deterministic across serializations', () => {
   assert.match(h1, /^[0-9a-f]{64}$/);
 });
 
+test('FP-UT-009 visual actors are deterministic projections, not simulation actors', () => {
+  const env = fresh();
+  const placed = engine.placeBuilding({
+    pairId: env.state.plot.pairId, plotId: env.plotId,
+    type: 'LUMBER_CAMP', x: 0, y: 1, actor: 'HUMAN',
+    idempotencyKey: 'ut-9-place', nowMs: 1700_000_000_000,
+  });
+  assert.equal(placed.ok, true);
+
+  const s1 = engine.getFoundersPlotState({ pairId: env.state.plot.pairId, nowMs: 1700_000_010_000 });
+  const s2 = engine.getFoundersPlotState({ pairId: env.state.plot.pairId, nowMs: 1700_000_010_000 });
+  assert.deepEqual(s1.state.visualActors, s2.state.visualActors);
+
+  const actors = s1.state.visualActors;
+  assert.ok(Array.isArray(actors));
+  assert.ok(actors.some((actor) => actor.canonicalRoleId === 'clover'));
+  const builder = actors.find((actor) => actor.canonicalRoleId === 'builder');
+  assert.ok(builder, 'active construction should project a builder');
+  assert.equal(builder.generatedOverlayRoleId, 'inhabitant.worker');
+  assert.equal(builder.sourceDomain, 'job');
+  assert.equal(builder.sourceStateHash, s1.state.audit.stateHash);
+  assert.equal(builder.visualOnly, true);
+  for (const actor of actors) {
+    assert.equal('toolName' in actor, false);
+    assert.equal('resourceDelta' in actor, false);
+    assert.equal('mutatesResources' in actor, false);
+    assert.equal('autonomousAgent' in actor, false);
+  }
+});
+
+test('FP-UT-010 visual actors expose haulers for ready outputs', () => {
+  const env = fresh();
+  engine.placeBuilding({
+    pairId: env.state.plot.pairId, plotId: env.plotId,
+    type: 'LUMBER_CAMP', x: 0, y: 1, actor: 'HUMAN',
+    idempotencyKey: 'ut-10-place', nowMs: 1700_000_000_000,
+  });
+  engine.advancePlotTimeForTests({
+    pairId: env.state.plot.pairId, plotId: env.plotId,
+    advanceMs: 2 * 60 * 1000, nowMs: 1700_000_000_000,
+  });
+  const ready = engine.getFoundersPlotState({ pairId: env.state.plot.pairId, nowMs: 1700_000_200_000 });
+  const camp = ready.state.buildings.find((building) => building.type === 'LUMBER_CAMP');
+  assert.equal(camp.state, 'READY');
+  const queued = engine.queueJob({
+    pairId: env.state.plot.pairId, plotId: env.plotId,
+    buildingId: camp.buildingId, kind: 'PRODUCE', actor: 'HUMAN',
+    idempotencyKey: 'ut-10-queue', nowMs: 1700_000_200_000,
+  });
+  assert.equal(queued.ok, true);
+  engine.advancePlotTimeForTests({
+    pairId: env.state.plot.pairId, plotId: env.plotId,
+    advanceMs: 2 * 60 * 1000, nowMs: 1700_000_200_000,
+  });
+  const outputReady = engine.getFoundersPlotState({ pairId: env.state.plot.pairId, nowMs: 1700_000_400_000 });
+  const hauler = outputReady.state.visualActors.find((actor) => actor.canonicalRoleId === 'hauler');
+  assert.ok(hauler, 'ready output should project a hauler');
+  assert.equal(hauler.generatedOverlayRoleId, 'inhabitant.hauler');
+  assert.equal(hauler.visualState, 'ready_to_collect');
+  assert.equal(hauler.target.id, camp.buildingId);
+});
+
 test('FP-IT-001 full loop: place → construct → produce → collect → inventory gained', () => {
   const env = fresh();
   engine.placeBuilding({

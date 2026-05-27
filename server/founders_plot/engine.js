@@ -193,6 +193,15 @@ function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
 }
 
+function publicBuildingDefs() {
+  return Object.fromEntries(Object.entries(BUILDING_DEFS).map(([type, def]) => [type, {
+    unlockHqLevel: def.unlockHqLevel,
+    construction: clone(def.construction),
+    upgrade: clone(def.upgrade),
+    canProduce: typeof def.produces === 'function'
+  }]));
+}
+
 function nowDayKey(ms) {
   return new Date(Number(ms || 0)).toISOString().slice(0, 10);
 }
@@ -684,6 +693,140 @@ function buildingUiState(bundle, building) {
   };
 }
 
+function actorTargetForBuilding(building) {
+  if (!building) return null;
+  return {
+    kind: 'building',
+    id: building.buildingId,
+    type: building.type,
+    label: BUILDING_LABELS[building.type] || building.type,
+    x: building.x,
+    y: building.y
+  };
+}
+
+function visualActorProgress(job, nowMs) {
+  if (!job || !Number.isFinite(Number(job.startedAt)) || !Number.isFinite(Number(job.endsAt))) {
+    return 0;
+  }
+  const startedAt = Number(job.startedAt);
+  const endsAt = Number(job.endsAt);
+  const duration = Math.max(1, endsAt - startedAt);
+  const elapsed = Math.max(0, Math.min(duration, Number(nowMs || 0) - startedAt));
+  return Number((elapsed / duration).toFixed(4));
+}
+
+function makeVisualActor({
+  role,
+  generatedOverlayRoleId,
+  sourceDomain,
+  sourceObjectId,
+  sourceStateHash,
+  visualState,
+  progress = 0,
+  target = null
+}) {
+  const safeRole = String(role || 'worker');
+  const safeDomain = String(sourceDomain || 'plot');
+  const safeSourceId = String(sourceObjectId || 'plot');
+  return {
+    actorId: `actor:${safeRole}:${safeDomain}:${safeSourceId}`,
+    canonicalRoleId: safeRole,
+    generatedOverlayRoleId: generatedOverlayRoleId || null,
+    sourceDomain: safeDomain,
+    sourceObjectId: safeSourceId,
+    sourceStateHash,
+    visualState: String(visualState || 'idle'),
+    progress: Math.max(0, Math.min(1, Number(progress || 0))),
+    target,
+    selectionKey: target?.kind && target?.id ? `${target.kind}:${target.id}` : `${safeDomain}:${safeSourceId}`,
+    drawerKey: target?.kind && target?.id ? `${target.kind}:${target.id}` : `${safeDomain}:${safeSourceId}`,
+    visualOnly: true
+  };
+}
+
+function visualActorProjections(bundle, { stateHash }) {
+  const nowMs = Number(bundle.plot.lastSimulatedAt || bundle.plot.updatedAt || 0);
+  const actors = [];
+  const sourceStateHash = String(stateHash || '');
+  const quest = currentQuest(bundle);
+  const hq = bundle.buildings.find((building) => building.type === 'HQ') || bundle.buildings[0] || null;
+
+  actors.push(makeVisualActor({
+    role: 'clover',
+    generatedOverlayRoleId: 'inhabitant.messenger',
+    sourceDomain: 'foreman',
+    sourceObjectId: bundle.plot.plotId,
+    sourceStateHash,
+    visualState: bundle.policy.emergencyPause ? 'paused' : 'observing',
+    progress: 0,
+    target: actorTargetForBuilding(hq)
+  }));
+
+  for (const job of [...bundle.jobs].sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0))) {
+    if (!['QUEUED', 'RUNNING', 'COMPLETED'].includes(job.status)) continue;
+    const building = findBuilding(bundle, job.buildingId);
+    const target = actorTargetForBuilding(building);
+    if (job.kind === 'CONSTRUCT' || job.kind === 'UPGRADE') {
+      actors.push(makeVisualActor({
+        role: 'builder',
+        generatedOverlayRoleId: 'inhabitant.worker',
+        sourceDomain: 'job',
+        sourceObjectId: job.jobId,
+        sourceStateHash,
+        visualState: job.status === 'QUEUED' ? 'waiting_to_build' : 'building',
+        progress: visualActorProgress(job, nowMs),
+        target
+      }));
+      continue;
+    }
+    if (job.kind === 'PRODUCE' || job.kind === 'SELL') {
+      actors.push(makeVisualActor({
+        role: 'worker',
+        generatedOverlayRoleId: 'inhabitant.worker',
+        sourceDomain: 'job',
+        sourceObjectId: job.jobId,
+        sourceStateHash,
+        visualState: job.status === 'QUEUED' ? 'waiting_to_work' : 'working',
+        progress: visualActorProgress(job, nowMs),
+        target
+      }));
+    }
+  }
+
+  for (const building of [...bundle.buildings].sort((a, b) => String(a.buildingId).localeCompare(String(b.buildingId)))) {
+    if (building.state !== 'OUTPUT_READY') continue;
+    actors.push(makeVisualActor({
+      role: 'hauler',
+      generatedOverlayRoleId: 'inhabitant.hauler',
+      sourceDomain: 'building',
+      sourceObjectId: building.buildingId,
+      sourceStateHash,
+      visualState: 'ready_to_collect',
+      progress: 1,
+      target: actorTargetForBuilding(building)
+    }));
+  }
+
+  const messengerSource = (bundle.approvals || []).find((approval) => approval.status === 'PENDING')
+    || availableRewards(bundle)[0]
+    || quest;
+  if (messengerSource) {
+    actors.push(makeVisualActor({
+      role: 'messenger',
+      generatedOverlayRoleId: 'inhabitant.messenger',
+      sourceDomain: messengerSource.approvalId ? 'approval' : messengerSource.rewardId ? 'reward' : 'quest',
+      sourceObjectId: messengerSource.approvalId || messengerSource.rewardId || messengerSource.id || 'current',
+      sourceStateHash,
+      visualState: messengerSource.approvalId ? 'needs_approval' : 'notifying',
+      progress: 0,
+      target: actorTargetForBuilding(hq)
+    }));
+  }
+
+  return actors.slice(0, 16);
+}
+
 function publicSummary(bundle) {
   const plot = bundle.plot;
   const buildings = bundle.buildings.map((building) => ({
@@ -717,6 +860,7 @@ function buildState(bundle, { includeReplay = false, includePublicSummary = true
 
   const snapshot = bundleSnapshot(bundle);
   const stateHash = computeStateHash(snapshot);
+  const visualActors = visualActorProjections(bundle, { stateHash });
   const permissions = unlockedPermissionRows(bundle);
   const approvals = (bundle.approvals || [])
     .filter((approval) => approval.status !== 'USED')
@@ -739,7 +883,12 @@ function buildState(bundle, { includeReplay = false, includePublicSummary = true
       ...pad,
       occupiedBy: bundle.buildings.find((building) => building.x === pad.x && building.y === pad.y)?.buildingId || null
     })),
+    unlocks: {
+      buildings: unlockedBuildings.filter((type) => type !== 'HQ')
+    },
     unlockedBuildings,
+    buildingDefs: publicBuildingDefs(),
+    visualActors,
     publicSummary: includePublicSummary ? publicSummary(bundle) : null,
     audit: includeReplay
       ? {

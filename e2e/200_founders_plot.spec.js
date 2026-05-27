@@ -155,3 +155,58 @@ test('FP-E2E-008 full loop: construct → produce → collect adds wood to inven
   const wood = sFinal.state.plot.inventory?.wood ?? sFinal.state.plot.resources?.wood ?? 0;
   expect(wood).toBeGreaterThan(0);
 });
+
+test('FP-E2E-009 UI loop: player can queue production and collect through the page', async ({ page }) => {
+  await page.goto('/founders-plot');
+  await expect(page.getByTestId('fp-root')).toBeVisible();
+
+  await page.getByTestId('fp-tile-0-1').click();
+  await expect(page.getByTestId('fp-palette-LUMBER_CAMP')).toContainText('8');
+  await page.getByTestId('fp-palette-LUMBER_CAMP').click();
+  await expect(page.getByTestId('fp-tile-0-1')).toContainText('Building');
+  await expect(page.getByTestId('fp-close-palette')).toBeHidden();
+
+  const ids = await page.evaluate(async () => {
+    const resp = await fetch('/api/founders-plot/state');
+    const body = await resp.json();
+    return {
+      pairId: body.state.plot.pairId,
+      plotId: body.state.plot.plotId,
+    };
+  });
+
+  await page.evaluate(async ({ pairId, plotId }) => {
+    await fetch('/__test__/founders-plot/advance', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-test-reset': 'test-reset' },
+      body: JSON.stringify({ pairId, plotId, advanceMs: 5 * 60_000 }),
+    });
+  }, ids);
+
+  await page.reload();
+  await expect(page.getByTestId('fp-tile-0-1')).toContainText('Idle');
+  await page.getByTestId('fp-tile-0-1').click();
+  await expect(page.getByTestId('fp-btn-queue')).toBeVisible();
+  await page.getByTestId('fp-btn-queue').click();
+  await expect(page.getByTestId('fp-tile-0-1')).toContainText(/Producing|Ready to collect/);
+
+  if (!(await page.getByTestId('fp-tile-0-1').textContent()).includes('Ready to collect')) {
+    await page.evaluate(async ({ pairId, plotId }) => {
+      await fetch('/__test__/founders-plot/advance', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-test-reset': 'test-reset' },
+        body: JSON.stringify({ pairId, plotId, advanceMs: 10 * 60_000 }),
+      });
+    }, ids);
+
+    await page.reload();
+  }
+  await expect(page.getByTestId('fp-tile-0-1')).toContainText('Ready to collect');
+  await page.getByTestId('fp-tile-0-1').click();
+  await expect(page.getByTestId('fp-btn-collect')).toBeVisible();
+  await page.getByTestId('fp-btn-collect').click();
+  await expect(page.getByTestId('fp-res-wood')).not.toHaveText('0');
+  await expect(page.getByTestId('fp-tile-0-1')).toContainText('Idle');
+  await expect(page.getByTestId('fp-btn-collect')).toHaveCount(0);
+  await expect(page.getByTestId('fp-close-palette')).toBeHidden();
+});

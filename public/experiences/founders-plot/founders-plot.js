@@ -71,6 +71,7 @@
   const state = {
     plotId: null,
     snapshot: null,
+    bundle: null,
     selected: null,
     paletteOpenForTile: null,
     pollTimer: null,
@@ -232,7 +233,7 @@
       collectBtn.dataset.testid = 'fp-btn-collect';
       actions.appendChild(collectBtn);
     }
-    if (b.state === 'READY' && def.produces) {
+    if (b.state === 'READY' && b.canQueue) {
       const produceBtn = brassBtn('Queue production', 'fp-btn-queue', () => doQueueJob(b.buildingId, 'PRODUCE'));
       produceBtn.dataset.testid = 'fp-btn-queue';
       actions.appendChild(produceBtn);
@@ -362,7 +363,7 @@
     } else {
       state.selected = { kind: 'empty', x, y };
     }
-    renderBuildingPanel(state.snapshot || {});
+    renderBuildingPanel(state.bundle || state.snapshot || {});
   }
 
   function openPalette(x, y, bundle) {
@@ -406,6 +407,7 @@
     state.plotId = data.plotId;
     state.snapshot = data.state || {};
     const bundle = normalizeBundle(data);
+    state.bundle = bundle;
     state.unlocks = bundle.unlocks?.buildings || state.unlocks;
     renderAll(bundle);
   }
@@ -423,7 +425,7 @@
       permissions: s.permissions || {},
       pendingApprovals: s.approvals || s.pendingApprovals || plot.pendingApprovals || [],
       quest: s.quest || plot.quest || null,
-      unlocks: s.unlocks || {},
+      unlocks: s.unlocks || { buildings: s.unlockedBuildings || [] },
       buildingDefs: s.buildingDefs || {},
       pads: s.pads || plot.pads || defaultPads(),
       hqLevel: plot.hqLevel || 1,
@@ -433,6 +435,7 @@
   }
 
   function renderAll(bundle) {
+    refreshSelectedFromBundle(bundle);
     renderResources(bundle.plot || {});
     renderQuest(bundle);
     renderGrid(bundle);
@@ -440,6 +443,26 @@
     renderBuildingPanel(bundle);
     renderForeman(bundle);
     renderRecap(bundle);
+  }
+
+  function refreshSelectedFromBundle(bundle) {
+    if (!state.selected || !bundle) return;
+    const buildings = Array.isArray(bundle.buildings) ? bundle.buildings : [];
+    const current = state.selected.kind === 'building'
+      ? buildings.find((b) => b.buildingId === state.selected.building?.buildingId)
+      : buildings.find((b) => b.x === state.selected.x && b.y === state.selected.y);
+    if (current) {
+      state.selected = {
+        kind: 'building',
+        building: current,
+        x: current.x,
+        y: current.y,
+      };
+      return;
+    }
+    if (state.selected.kind === 'building') {
+      state.selected = null;
+    }
   }
 
   function renderRecap(bundle) {

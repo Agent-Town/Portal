@@ -117,10 +117,10 @@ html, body {
 
 .fp-plot__grid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  grid-template-rows: repeat(4, 1fr);
+  grid-template-columns: repeat(var(--fp-grid-cols, 3), 1fr);
+  grid-template-rows: repeat(var(--fp-grid-rows, 3), 1fr);
   gap: 10px;
-  aspect-ratio: 6 / 4;
+  aspect-ratio: var(--fp-grid-cols, 3) / var(--fp-grid-rows, 3);
 }
 
 .fp-tile {
@@ -210,6 +210,7 @@ html, body {
 .fp-brass-btn {
   background: var(--at-sand-100); color: var(--at-wood-950);
 }
+.fp-brass-btn[hidden], .fp-teal-btn[hidden], .fp-rust-btn[hidden] { display: none; }
 .fp-brass-btn:hover { background: var(--at-cream-50); transform: translateY(-1px); }
 .fp-brass-btn--small { padding: 6px 10px; font-size: 13px; }
 
