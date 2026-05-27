@@ -116,6 +116,40 @@ test('asset postprocess validators redact unsafe schema-error paths and actual v
   assert.equal(reportErrors.includes(secretValue), false);
 });
 
+test('asset postprocess runner rejects tampered writable paths before writing sidecars', async () => {
+  const pack = createPostprocessPack('owner_asset_postprocess_path_guard');
+  const plan = buildGeneratedAssetPostprocessPlan({ pack, nowMs: 51_900 });
+  const unsafeSidecarPath = plan.targets[0].promotionOutputPath.replace(/\.webp$/i, '.sidecar.json');
+  const unsafeProcessedPath = plan.targets[0].promotionOutputPath;
+  const badPlan = {
+    ...plan,
+    targets: [
+      {
+        ...plan.targets[0],
+        processedOutputPath: unsafeProcessedPath,
+        pngFallbackOutputPath: unsafeProcessedPath.replace(/\.webp$/i, '.png'),
+        visualManifestSidecarPath: unsafeSidecarPath
+      },
+      ...plan.targets.slice(1)
+    ]
+  };
+  let caught;
+  let sidecarWritten = false;
+  try {
+    await runGeneratedAssetPostprocessPlan(badPlan, { pack, nowMs: 51_950 });
+  } catch (error) {
+    caught = error;
+  } finally {
+    sidecarWritten = fs.existsSync(repoPath(unsafeSidecarPath));
+    if (sidecarWritten) fs.rmSync(repoPath(unsafeSidecarPath), { force: true });
+  }
+
+  assert.equal(caught?.message, 'INVALID_ASSET_POSTPROCESS_PLAN_PATH');
+  assert.equal(caught?.details?.reason, 'POSTPROCESS_PATH_OUTSIDE_ROOT');
+  assert.equal(caught?.details?.field, '$.assetPostprocessPlan.targets[0].processedOutputPath');
+  assert.equal(sidecarWritten, false);
+});
+
 test('asset postprocess fallback writes atlas metadata and sidecars when candidates are absent', async () => {
   const pack = createPostprocessPack('owner_asset_postprocess_fallback');
   const plan = buildGeneratedAssetPostprocessPlan({ pack, nowMs: 52_000 });

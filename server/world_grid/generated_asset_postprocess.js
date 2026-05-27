@@ -57,6 +57,12 @@ function isSafeRelativePath(value = '') {
     && !text.split(/[\\/]+/).some((part) => part === '..');
 }
 
+function normalizedRelativePath(value = '') {
+  const normalized = path.posix.normalize(String(value || '').trim().replace(/\\/g, '/'));
+  if (!normalized || normalized === '.') return '';
+  return normalized.replace(/^\/+|\/+$/g, '');
+}
+
 function repoPathForRelativePath(relativePath) {
   if (!isSafeRelativePath(relativePath)) {
     const error = new Error('INVALID_ASSET_POSTPROCESS_PATH');
@@ -101,6 +107,72 @@ function redactSchemaError(error = {}) {
     redacted.actual = '<redacted-value>';
   }
   return redacted;
+}
+
+function invalidPostprocessPlanPath(reason, field, value) {
+  const error = new Error('INVALID_ASSET_POSTPROCESS_PLAN_PATH');
+  error.details = { reason, field, value: redactedPathSegment(value) };
+  throw error;
+}
+
+function isPathInside(root, target) {
+  const base = normalizedRelativePath(root);
+  const child = normalizedRelativePath(target);
+  return Boolean(base && child && (child === base || child.startsWith(`${base}/`)));
+}
+
+function requireSafePlanPath(field, value) {
+  if (!isSafeRelativePath(value)) {
+    invalidPostprocessPlanPath('UNSAFE_RELATIVE_PATH', field, value);
+  }
+}
+
+function requirePlanPathInside(field, value, root, reason = 'POSTPROCESS_PATH_OUTSIDE_ROOT') {
+  requireSafePlanPath(field, value);
+  if (!isPathInside(root, value)) {
+    invalidPostprocessPlanPath(reason, field, value);
+  }
+}
+
+function validatePostprocessPlanPaths(plan = {}) {
+  requireSafePlanPath('$.assetPostprocessPlan.candidateRoot', plan.candidateRoot);
+  const packRoot = relativePackPath(plan.candidateRoot, plan.packId);
+  const expectedPostprocessRoot = relativePackPath(packRoot, 'postprocessed');
+  requireSafePlanPath('$.assetPostprocessPlan.postprocessRoot', plan.postprocessRoot);
+  if (normalizedRelativePath(plan.postprocessRoot) !== normalizedRelativePath(expectedPostprocessRoot)) {
+    invalidPostprocessPlanPath('POSTPROCESS_ROOT_MISMATCH', '$.assetPostprocessPlan.postprocessRoot', plan.postprocessRoot);
+  }
+
+  const atlasRoot = relativePackPath(expectedPostprocessRoot, 'atlas');
+  const candidatesRoot = relativePackPath(expectedPostprocessRoot, 'candidates');
+  const sidecarsRoot = relativePackPath(expectedPostprocessRoot, 'sidecars');
+  const candidateInputRoot = relativePackPath(packRoot, 'candidates');
+  const approvedRoot = relativePackPath(packRoot, 'approved');
+  requirePlanPathInside('$.assetPostprocessPlan.textureAtlasPath', plan.textureAtlasPath, atlasRoot);
+  requirePlanPathInside('$.assetPostprocessPlan.textureAtlasImagePath', plan.textureAtlasImagePath, atlasRoot);
+  requirePlanPathInside('$.assetPostprocessPlan.visualManifestPath', plan.visualManifestPath, expectedPostprocessRoot);
+
+  (plan.targets || []).forEach((target, index) => {
+    const targetPath = `$.assetPostprocessPlan.targets[${index}]`;
+    requirePlanPathInside(`${targetPath}.candidateInputPath`, target.candidateInputPath, candidateInputRoot, 'CANDIDATE_INPUT_PATH_OUTSIDE_ROOT');
+    requirePlanPathInside(`${targetPath}.processedOutputPath`, target.processedOutputPath, candidatesRoot);
+    requirePlanPathInside(`${targetPath}.pngFallbackOutputPath`, target.pngFallbackOutputPath, candidatesRoot);
+    requirePlanPathInside(`${targetPath}.visualManifestSidecarPath`, target.visualManifestSidecarPath, sidecarsRoot);
+    requirePlanPathInside(`${targetPath}.promotionOutputPath`, target.promotionOutputPath, approvedRoot, 'PROMOTION_PATH_OUTSIDE_APPROVED_ROOT');
+    if (normalizedRelativePath(target.processedOutputPath) === normalizedRelativePath(target.promotionOutputPath)) {
+      invalidPostprocessPlanPath('POSTPROCESS_PATH_MATCHES_PROMOTION_PATH', `${targetPath}.processedOutputPath`, target.processedOutputPath);
+    }
+  });
+}
+
+function validatePostprocessPlanForRun(plan = {}) {
+  const schemaReport = validateAssetPostprocessPlan(plan);
+  if (!schemaReport.ok) {
+    const error = new Error('INVALID_ASSET_POSTPROCESS_PLAN');
+    error.details = { reason: 'SCHEMA_INVALID', validationReport: schemaReport };
+    throw error;
+  }
+  validatePostprocessPlanPaths(plan);
 }
 
 function packAtlasFrames(targets = []) {
@@ -372,6 +444,7 @@ async function runGeneratedAssetPostprocessPlan(plan, {
   nowMs = Date.now(),
   pack
 } = {}) {
+  validatePostprocessPlanForRun(plan);
   const packValidation = validateGeneratedPack(pack || {});
   const promptPlanValidation = validateAssetPromptPlan(pack?.assetPromptPlan || {}, pack || {});
   const targetResults = [];
