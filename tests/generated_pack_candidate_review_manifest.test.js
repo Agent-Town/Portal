@@ -104,6 +104,30 @@ test('GU-19 candidate review manifest rejects missing targets, unsafe fields, ba
   );
 });
 
+test('GU-19 candidate review manifest rejects approved planned-only placeholders', () => {
+  const pack = createReviewPack('owner_candidate_review_manifest_planned_only');
+  const manifest = buildCandidateReviewManifest({
+    pack,
+    nowMs: 170_150,
+    reviewDecisions: Object.fromEntries(pack.assetPromptPlan.targets.map((target) => [
+      target.canonicalTarget,
+      {
+        reviewStatus: 'approved-candidate',
+        reviewerNoteHash: hashLabel(`planned-only-review:${target.canonicalTarget}`)
+      }
+    ]))
+  });
+  const report = validateCandidateReviewManifest(manifest, pack);
+
+  assert.equal(report.ok, false);
+  assert.equal(report.metrics.releaseReady, false);
+  assert.equal(report.metrics.plannedOnlyReviewedCandidateCount, pack.assetPromptPlan.targets.length);
+  assert.equal(
+    report.checks.find((check) => check.id === 'CANDIDATE_REVIEW_MANIFEST_REVIEWED_CANDIDATES_HAVE_CONTENT').passed,
+    false
+  );
+});
+
 test('GU-19 release gate requires approval evidence to match a reviewed candidate manifest', () => {
   const pack = createReviewPack('owner_candidate_review_manifest_release_gate');
   const manifest = reviewedManifest(pack);

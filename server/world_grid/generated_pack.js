@@ -4018,6 +4018,18 @@ function validateCandidateReviewManifest(manifest = {}, pack = {}) {
   const rejectedCandidateCount = Number(manifest?.metrics?.rejectedCandidateCount || 0);
   const pendingCandidateCount = Number(manifest?.metrics?.pendingCandidateCount || 0);
   const countedCandidates = approvedCandidateCount + rejectedCandidateCount + pendingCandidateCount;
+  const reviewedCandidates = candidates.filter((candidate) => candidate.reviewStatus !== 'pending');
+  const reviewedCandidatesWithoutContent = reviewedCandidates.filter((candidate) => (
+    candidate.sourceStatus === 'planned-only'
+    || positiveNumberOrZero(candidate.byteLength) <= 0
+    || !isSha256Hex(candidate.contentHash)
+    || !isSha256Hex(candidate.reviewerNoteHash)
+  ));
+  const plannedOnlyReviewedCandidates = reviewedCandidatesWithoutContent
+    .filter((candidate) => candidate.sourceStatus === 'planned-only')
+    .map((candidate) => candidate.canonicalTarget);
+  const reviewedCandidatesMissingContent = reviewedCandidatesWithoutContent
+    .map((candidate) => candidate.canonicalTarget);
   const checks = [
     {
       id: 'CANDIDATE_REVIEW_MANIFEST_SCHEMA_VALID',
@@ -4054,6 +4066,14 @@ function validateCandidateReviewManifest(manifest = {}, pack = {}) {
       measured: { reviewedCandidateCount, approvedCandidateCount, rejectedCandidateCount, pendingCandidateCount, candidateCount: candidates.length }
     },
     {
+      id: 'CANDIDATE_REVIEW_MANIFEST_REVIEWED_CANDIDATES_HAVE_CONTENT',
+      passed: reviewedCandidatesWithoutContent.length === 0,
+      measured: {
+        plannedOnlyReviewedCandidates,
+        reviewedCandidatesMissingContent
+      }
+    },
+    {
       id: 'CANDIDATE_REVIEW_MANIFEST_HASH_STABLE',
       passed: hashMatches,
       measured: { expectedHash, actualHash: manifest?.manifestHash || '' }
@@ -4078,6 +4098,9 @@ function validateCandidateReviewManifest(manifest = {}, pack = {}) {
       approvedCandidateCount,
       rejectedCandidateCount,
       pendingCandidateCount,
+      reviewedCandidateContentCount: Math.max(0, reviewedCandidateCount - reviewedCandidatesWithoutContent.length),
+      plannedOnlyReviewedCandidateCount: plannedOnlyReviewedCandidates.length,
+      reviewedCandidateMissingContentCount: reviewedCandidatesWithoutContent.length,
       missingTargetCount: missingTargets.length,
       duplicateTargetCount: new Set(duplicateTargets).size,
       unknownTargetCount: unknownTargets.length,
