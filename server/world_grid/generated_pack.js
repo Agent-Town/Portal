@@ -658,6 +658,33 @@ function sensitivePatternIdsForText(value = '') {
     .map(({ id }) => id);
 }
 
+function generatedPackPathSegment(key = '') {
+  const segment = String(key || '');
+  if (SECRET_LIKE_KEY_PATTERN.test(segment) || SECRET_LIKE_VALUE_PATTERN.test(segment)) return '<secret-like-key>';
+  if (blockedPatternIdsForText(segment).length > 0) return '<raw-instruction-key>';
+  return segment;
+}
+
+function generatedPackChildPath(path = '$', key = '') {
+  return `${path}.${generatedPackPathSegment(key)}`;
+}
+
+function redactGeneratedPackPath(path = '$') {
+  return String(path || '$')
+    .replace(SECRET_LIKE_VALUE_PATTERN, '<secret-like-key>')
+    .split('.')
+    .map((segment, index) => index === 0 ? segment : generatedPackPathSegment(segment))
+    .join('.');
+}
+
+function redactGeneratedPackSchemaError(error = {}) {
+  const redacted = { ...error, path: redactGeneratedPackPath(error.path) };
+  if (typeof redacted.actual === 'string' && (SECRET_LIKE_VALUE_PATTERN.test(redacted.actual) || blockedPatternIdsForText(redacted.actual).length > 0)) {
+    redacted.actual = '<redacted-value>';
+  }
+  return redacted;
+}
+
 function safePromptWords(words = []) {
   const blocked = new Set([
     'ignore',
@@ -1152,7 +1179,7 @@ function findForbiddenAuthorityPaths(value, path = '$', matches = []) {
   if (!value || typeof value !== 'object') return matches;
   const forbiddenKey = /(toolhandler|toolhandlers|^tools?$|serverrule|mutationhandler|mutationhandlers|^mutations?$|^formulas?$|expression|^eval$|^script$)/i;
   for (const [key, child] of Object.entries(value)) {
-    const childPath = `${path}.${key}`;
+    const childPath = generatedPackChildPath(path, key);
     if (forbiddenKey.test(key) && childPath !== '$.gameplayMapping.serverRuleOverrides') {
       matches.push(childPath);
     }
@@ -1170,8 +1197,8 @@ function findSecretLikePaths(value, path = '$', matches = []) {
   }
   if (!value || typeof value !== 'object') return matches;
   for (const [key, child] of Object.entries(value)) {
-    const childPath = `${path}.${key}`;
-    if (SECRET_LIKE_KEY_PATTERN.test(key)) {
+    const childPath = generatedPackChildPath(path, key);
+    if (SECRET_LIKE_KEY_PATTERN.test(key) || SECRET_LIKE_VALUE_PATTERN.test(key)) {
       matches.push(childPath);
     }
     findSecretLikePaths(child, childPath, matches);
@@ -1190,7 +1217,7 @@ function findRawPromptInstructionPaths(value, path = '$', matches = []) {
   }
   if (!value || typeof value !== 'object') return matches;
   for (const [key, child] of Object.entries(value)) {
-    const childPath = `${path}.${key}`;
+    const childPath = generatedPackChildPath(path, key);
     if (rawPromptKey.test(key)) {
       matches.push({ path: childPath, blockedPatternIds: ['raw-prompt-field'] });
     }
@@ -2827,7 +2854,7 @@ function validateGeneratedPack(pack) {
       measured: {
         schemaCount: schemaValidationReport.metrics.schemaCount,
         schemaErrorCount: schemaValidationReport.metrics.schemaErrorCount,
-        errors: schemaValidationReport.errors.slice(0, 10)
+        errors: schemaValidationReport.errors.slice(0, 10).map(redactGeneratedPackSchemaError)
       }
     },
     {

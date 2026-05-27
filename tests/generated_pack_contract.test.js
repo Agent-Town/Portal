@@ -251,6 +251,15 @@ test('generated pack validation rejects missing mappings, arbitrary formulas, se
   assert.equal(secretValueReport.ok, false);
   assert.equal(secretValueReport.checks.find((check) => check.id === 'GENPACK_NO_SECRET_FIELDS').passed, false);
   assert.equal(JSON.stringify(secretValueReport).includes('sk-generated-secret-value-should-not-ship'), false);
+  const secretKeyValue = 'sk-generated-secret-key-should-not-ship';
+  const secretValueKeyPack = {
+    ...valid,
+    [secretKeyValue]: 'metadata'
+  };
+  const secretValueKeyReport = validateGeneratedPack(secretValueKeyPack);
+  assert.equal(secretValueKeyReport.ok, false);
+  assert.equal(secretValueKeyReport.checks.find((check) => check.id === 'GENPACK_NO_SECRET_FIELDS').passed, false);
+  assert.equal(JSON.stringify(secretValueKeyReport).includes(secretKeyValue), false);
 
   const rawInstructionPack = {
     ...valid,
