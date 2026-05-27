@@ -8,6 +8,7 @@ Runtime contracts:
 
 - `server/world_civilization/readiness_gate.js`
 - `server/world_civilization/blocker_exception_register.js`
+- `server/world_civilization/release_observability.js`
 - `server/world_civilization/controlled_release.js`
 - `server/world_civilization/controlled_release_targets.js`
 
@@ -42,7 +43,10 @@ release or enabling production.
   carries the M16/M17 audit-summary proof checks.
 - Production feature flag safety.
 - Rollback and disable controls.
-- Release observability.
+- Release observability through the release observability handoff, including
+  privacy-safe audit metrics, redacted Worker Traffic traces, error alert
+  owners, feature flag dashboard ownership, runtime tool absence monitoring,
+  support escalation links, and post-release review.
 - Support runbook.
 - Release blocker clearance through the blocker/exception register, including
   P0/P1 clearance, no expired exceptions, owner/expiry/mitigation records,

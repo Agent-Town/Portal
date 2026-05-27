@@ -52,7 +52,16 @@ test('V6 product signoff targets name every release decision surface', () => {
   assert.ok(matrix.targetKeys.includes('rollback_plan'));
   assert.ok(matrix.targetKeys.includes('disable_plan'));
   assert.ok(matrix.targetKeys.includes('support_runbook'));
+  assert.ok(matrix.targetKeys.includes('observability_handoff'));
+  assert.equal(
+    V6_PRODUCT_SIGNOFF_TARGETS.find((target) => target.key === 'observability_handoff').currentEvidence,
+    'server/world_civilization/release_observability.js'
+  );
   assert.ok(matrix.targetKeys.includes('go_no_go_record'));
+  assert.equal(
+    V6_PRODUCT_SIGNOFF_TARGETS.find((target) => target.key === 'post_release_monitoring').currentEvidence,
+    'server/world_civilization/release_observability.js'
+  );
   assert.match(matrix.digest, /^sha256:[a-f0-9]{64}$/);
 });
 
@@ -99,6 +108,7 @@ test('V6 product signoff report fails closed for incomplete targets or missing c
   assert.match(missingProbes.errors.join(','), /V6_PRODUCT_SIGNOFF_QA_EVIDENCE_PROBE_REQUIRED/);
   assert.match(missingProbes.errors.join(','), /V6_PRODUCT_SIGNOFF_SECURITY_EVIDENCE_PROBE_REQUIRED/);
   assert.match(missingProbes.errors.join(','), /V6_PRODUCT_SIGNOFF_ROLLBACK_PLAN_PROBE_REQUIRED/);
+  assert.match(missingProbes.errors.join(','), /V6_PRODUCT_SIGNOFF_OBSERVABILITY_PROBE_REQUIRED/);
   assert.match(missingProbes.errors.join(','), /V6_PRODUCT_SIGNOFF_GO_NO_GO_PROBE_REQUIRED/);
 });
 

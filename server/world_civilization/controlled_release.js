@@ -7,6 +7,8 @@ const V6_READINESS_GATE_ARTIFACT = 'specs/release-gates/v60_agent_civilization_r
 const V6_MILESTONE_PLAN_ARTIFACT = 'docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md';
 const BLOCKER_EXCEPTION_REGISTER_ARTIFACT = 'server/world_civilization/blocker_exception_register.js';
 const BLOCKER_EXCEPTION_REGISTER_TEST = 'tests/world_civilization_blocker_exception_register.test.js';
+const RELEASE_OBSERVABILITY_ARTIFACT = 'server/world_civilization/release_observability.js';
+const RELEASE_OBSERVABILITY_TEST = 'tests/world_civilization_release_observability.test.js';
 const CONTROLLED_RELEASE_TARGET_ARTIFACT = 'server/world_civilization/controlled_release_targets.js';
 const CONTROLLED_RELEASE_TARGET_TEST = 'tests/world_civilization_controlled_release_targets.test.js';
 
@@ -39,6 +41,8 @@ const REQUIRED_CONTROLLED_RELEASE_GATES = [
       CONTROLLED_RELEASE_RUNBOOK,
       BLOCKER_EXCEPTION_REGISTER_ARTIFACT,
       BLOCKER_EXCEPTION_REGISTER_TEST,
+      RELEASE_OBSERVABILITY_ARTIFACT,
+      RELEASE_OBSERVABILITY_TEST,
       CONTROLLED_RELEASE_TARGET_ARTIFACT,
       CONTROLLED_RELEASE_TARGET_TEST
     ],
@@ -82,8 +86,18 @@ const REQUIRED_CONTROLLED_RELEASE_GATES = [
   {
     key: 'observability',
     label: 'Release observability',
-    requiredArtifacts: [CONTROLLED_RELEASE_RUNBOOK],
-    requiredChecks: ['audit_metrics', 'worker_traffic_trace', 'error_alerts', 'privacy_safe_logs', 'feature_flag_dashboard']
+    requiredArtifacts: [CONTROLLED_RELEASE_RUNBOOK, RELEASE_OBSERVABILITY_ARTIFACT, RELEASE_OBSERVABILITY_TEST],
+    requiredChecks: [
+      'release_observability_handoff',
+      'audit_metrics',
+      'worker_traffic_trace',
+      'error_alerts',
+      'privacy_safe_logs',
+      'feature_flag_dashboard',
+      'monitoring_owner',
+      'runtime_tool_absence_monitor',
+      'support_escalation_link'
+    ]
   },
   {
     key: 'support_runbook',
@@ -322,6 +336,8 @@ function assertV6ControlledReleaseSafe(report = {}) {
 module.exports = {
   BLOCKER_EXCEPTION_REGISTER_ARTIFACT,
   BLOCKER_EXCEPTION_REGISTER_TEST,
+  RELEASE_OBSERVABILITY_ARTIFACT,
+  RELEASE_OBSERVABILITY_TEST,
   CONTROLLED_RELEASE_TARGET_ARTIFACT,
   CONTROLLED_RELEASE_TARGET_TEST,
   CONTROLLED_RELEASE_RUNBOOK,

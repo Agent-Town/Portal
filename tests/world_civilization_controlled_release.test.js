@@ -17,6 +17,8 @@ const {
   CONTROLLED_RELEASE_TARGET_ARTIFACT,
   CONTROLLED_RELEASE_TARGET_TEST,
   CONTROLLED_RELEASE_RUNBOOK,
+  RELEASE_OBSERVABILITY_ARTIFACT,
+  RELEASE_OBSERVABILITY_TEST,
   PRIOR_MILESTONE_KEYS,
   REQUIRED_CONTROLLED_RELEASE_GATES,
   V6_MILESTONE_PLAN_ARTIFACT,
@@ -137,6 +139,8 @@ test('V6 controlled release requires target gate evidence for launch controls', 
   assert.ok(targetGate.requiredArtifacts.includes(CONTROLLED_RELEASE_RUNBOOK));
   assert.ok(targetGate.requiredArtifacts.includes(BLOCKER_EXCEPTION_REGISTER_ARTIFACT));
   assert.ok(targetGate.requiredArtifacts.includes(BLOCKER_EXCEPTION_REGISTER_TEST));
+  assert.ok(targetGate.requiredArtifacts.includes(RELEASE_OBSERVABILITY_ARTIFACT));
+  assert.ok(targetGate.requiredArtifacts.includes(RELEASE_OBSERVABILITY_TEST));
   assert.ok(targetGate.requiredArtifacts.includes(CONTROLLED_RELEASE_TARGET_ARTIFACT));
   assert.ok(targetGate.requiredArtifacts.includes(CONTROLLED_RELEASE_TARGET_TEST));
   assert.ok(targetGate.requiredChecks.includes('readiness_gate_closed_target'));
@@ -158,6 +162,18 @@ test('V6 controlled release requires target gate evidence for launch controls', 
   assert.ok(blockerGate.requiredChecks.includes('no_p1_blockers'));
   assert.ok(blockerGate.requiredChecks.includes('no_expired_exceptions'));
   assert.ok(blockerGate.requiredChecks.includes('exception_owner_expiry_mitigation'));
+
+  const observabilityGate = REQUIRED_CONTROLLED_RELEASE_GATES.find((gate) => gate.key === 'observability');
+  assert.ok(observabilityGate.requiredArtifacts.includes(RELEASE_OBSERVABILITY_ARTIFACT));
+  assert.ok(observabilityGate.requiredArtifacts.includes(RELEASE_OBSERVABILITY_TEST));
+  assert.ok(observabilityGate.requiredChecks.includes('release_observability_handoff'));
+  assert.ok(observabilityGate.requiredChecks.includes('audit_metrics'));
+  assert.ok(observabilityGate.requiredChecks.includes('worker_traffic_trace'));
+  assert.ok(observabilityGate.requiredChecks.includes('privacy_safe_logs'));
+  assert.ok(observabilityGate.requiredChecks.includes('feature_flag_dashboard'));
+  assert.ok(observabilityGate.requiredChecks.includes('monitoring_owner'));
+  assert.ok(observabilityGate.requiredChecks.includes('runtime_tool_absence_monitor'));
+  assert.ok(observabilityGate.requiredChecks.includes('support_escalation_link'));
 });
 
 test('V6 controlled release can only become ready after prior milestones, release review, and controls close', () => {

@@ -163,8 +163,18 @@ are present.
 - Product release signoff: player-visible scope, normal gameplay exposure
   denial, product owner approval, QA release evidence, security release
   evidence, rollback plan, disable plan, support runbook, user comms plan,
-  observability handoff, blocker/exception register, go/no-go record,
-  post-release monitoring, and product signoff target gate.
+  observability handoff, release observability handoff, blocker/exception
+  register, go/no-go record, post-release monitoring, and product signoff
+  target gate.
+- Release observability handoff: `server/world_civilization/release_observability.js`
+  and `tests/world_civilization_release_observability.test.js` record the
+  research-only target for privacy-safe audit metrics, redacted Worker Traffic
+  traces, error alert owners, privacy-safe logs, feature flag dashboard
+  ownership, monitoring owner handoff, canary health probes, runtime tool
+  absence monitoring, support escalation links, and post-release review. The
+  report must reject private trace data, runtime civic tool exposure, alert
+  activation, runtime monitoring startup, production enablement, and world
+  mutation.
 - Blocker/exception register: `server/world_civilization/blocker_exception_register.js`
   and `tests/world_civilization_blocker_exception_register.test.js` record the
   research-only target for register rows, blocker owners, P0/P1 clearance,

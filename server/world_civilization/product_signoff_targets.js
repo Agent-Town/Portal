@@ -93,7 +93,7 @@ const V6_PRODUCT_SIGNOFF_TARGETS = [
     key: 'observability_handoff',
     surface: 'privacy_safe_release_observability',
     requiredEvidence: 'Release observability must include privacy-safe audit metrics, worker traces, error alerts, and feature flag monitoring owners.',
-    currentEvidence: 'server/world_civilization/controlled_release.js',
+    currentEvidence: 'server/world_civilization/release_observability.js',
     releaseEvidenceRequired: 'observability_owner_handoff'
   },
   {
@@ -107,7 +107,7 @@ const V6_PRODUCT_SIGNOFF_TARGETS = [
     key: 'post_release_monitoring',
     surface: 'canary_and_post_release_monitoring',
     requiredEvidence: 'Post-release monitoring must define canary exit criteria, rollback window, monitoring owner, and blocker response path.',
-    currentEvidence: 'docs/ops/V6_AGENT_CIVILIZATION_CONTROLLED_RELEASE_RUNBOOK.md',
+    currentEvidence: 'server/world_civilization/release_observability.js',
     releaseEvidenceRequired: 'post_release_monitoring_plan'
   }
 ];

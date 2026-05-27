@@ -644,8 +644,10 @@ const REQUIRED_REVIEW_GATES = [
       'docs/ops/V6_AGENT_CIVILIZATION_CONTROLLED_RELEASE_RUNBOOK.md',
       'server/world_civilization/blocker_exception_register.js',
       'server/world_civilization/product_signoff_targets.js',
+      'server/world_civilization/release_observability.js',
       'tests/world_civilization_blocker_exception_register.test.js',
-      'tests/world_civilization_product_signoff_targets.test.js'
+      'tests/world_civilization_product_signoff_targets.test.js',
+      'tests/world_civilization_release_observability.test.js'
     ],
     requiredChecks: [
       'player_visible_scope',
@@ -658,6 +660,7 @@ const REQUIRED_REVIEW_GATES = [
       'support_runbook',
       'user_comms_plan',
       'observability_handoff',
+      'release_observability_handoff',
       'blocker_exception_register',
       'go_no_go_record',
       'post_release_monitoring',

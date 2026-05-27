@@ -49,7 +49,7 @@ const V6_CONTROLLED_RELEASE_TARGETS = [
     key: 'observability',
     surface: 'privacy_safe_release_observability',
     requiredEvidence: 'Release observability must include privacy-safe audit metrics, worker traffic traces, error alerts, and feature flag dashboard ownership.',
-    currentEvidence: 'server/world_civilization/product_signoff_targets.js',
+    currentEvidence: 'server/world_civilization/release_observability.js',
     releaseEvidenceRequired: 'observability_handoff_record'
   },
   {
@@ -91,7 +91,7 @@ const V6_CONTROLLED_RELEASE_TARGETS = [
     key: 'post_release_verification',
     surface: 'post_release_monitoring_and_verification',
     requiredEvidence: 'Post-release verification must confirm visibility, audit/replay health, support routing, and rollback readiness after launch.',
-    currentEvidence: 'server/world_civilization/product_signoff_targets.js',
+    currentEvidence: 'server/world_civilization/release_observability.js',
     releaseEvidenceRequired: 'post_release_verification_record'
   }
 ];

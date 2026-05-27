@@ -47,10 +47,18 @@ test('V6 controlled release targets name every launch control surface', () => {
   assert.ok(matrix.targetKeys.includes('production_flag_safety'));
   assert.ok(matrix.targetKeys.includes('rollback_disable_controls'));
   assert.ok(matrix.targetKeys.includes('observability'));
+  assert.equal(
+    V6_CONTROLLED_RELEASE_TARGETS.find((target) => target.key === 'observability').currentEvidence,
+    'server/world_civilization/release_observability.js'
+  );
   assert.ok(matrix.targetKeys.includes('support_runbook'));
   assert.ok(matrix.targetKeys.includes('blocker_clearance'));
   assert.ok(matrix.targetKeys.includes('controlled_release_window'));
   assert.ok(matrix.targetKeys.includes('emergency_disable'));
+  assert.equal(
+    V6_CONTROLLED_RELEASE_TARGETS.find((target) => target.key === 'post_release_verification').currentEvidence,
+    'server/world_civilization/release_observability.js'
+  );
   assert.equal(
     V6_CONTROLLED_RELEASE_TARGETS.find((target) => target.key === 'blocker_clearance').currentEvidence,
     'server/world_civilization/blocker_exception_register.js'

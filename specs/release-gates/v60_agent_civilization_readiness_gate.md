@@ -197,6 +197,7 @@ persistence resilience, and security/product release review.
   store-backed delegated-agent proof evidence, data-retention policy with
   data-retention target gate evidence,
   blocker/exception register evidence,
+  release observability handoff,
   audit coverage, CI validation matrix target gate evidence,
   release-candidate target gate evidence, validation target gate evidence,
   validation evidence, modal lab surface launch review, product signoff target
@@ -208,7 +209,8 @@ persistence resilience, and security/product release review.
   ready, an explicit V6 readiness-gate report is closed and hidden until
   controlled release, controlled release target gate evidence,
   readiness audit-summary proof, production-safe flags,
-  rollback/disable controls, observability, support runbooks,
+  rollback/disable controls, observability, release observability handoff,
+  support runbooks,
   blocker/exception register clearance with no open P0/P1 blockers or expired
   exceptions, blocker clearance, and a controlled release window have approved
   evidence.
@@ -600,7 +602,7 @@ persistence resilience, and security/product release review.
   abuse-case target gate evidence, store-backed delegation proof and scope-mismatch evidence,
   data-retention policy, audit coverage review,
   deterministic validation evidence with blocker/exception register evidence,
-  CI validation matrix target gate evidence, release-candidate target gate
+  release observability handoff, CI validation matrix target gate evidence, release-candidate target gate
   evidence, and validation target gate evidence, effect execution and rollback review, agent participation enforcement review,
   civic institution readiness review, public works readiness review,
   modal lab surface review, resilience readiness review with store-specific zero hash-only
@@ -613,7 +615,8 @@ persistence resilience, and security/product release review.
   release target gate, an explicit closed readiness-gate report that stays
   hidden until controlled release,
   readiness audit-summary proof, production feature flag safety,
-  rollback/disable rehearsals, privacy-safe observability, support readiness,
+  rollback/disable rehearsals, privacy-safe observability, release observability
+  handoff, support readiness,
   blocker/exception register clearance with no open P0/P1 blockers or expired
   exceptions, blocker clearance, and an explicit release window.
 - Privacy review must prove no private town state, wallet secret, Brain secret,
