@@ -514,6 +514,10 @@ test('GU-19 release evidence bundle binds a ready gate to source evidence hashes
   assert.equal(report.metrics.releaseGatePublicEligible, true);
   assert.equal(report.metrics.sourcePresenceMatchesHashes, true);
   assert.equal(report.metrics.sourceCoverageOk, true);
+  assert.equal(report.metrics.presentSourceCount, bundle.metrics.presentSourceCount);
+  assert.equal(report.metrics.missingSourceCount, 0);
+  assert.equal(report.metrics.requiredSourceCount, bundle.metrics.requiredSourceCount);
+  assert.equal(report.metrics.suppliedSourceCount, bundle.metrics.requiredSourceCount);
   assert.equal(bundle.constraints.productionImageAssetsCreated, false);
 }));
 
@@ -1327,6 +1331,45 @@ test('GPACK-149 release evidence bundle rejects source-problem count metric tamp
       JSON.stringify(metricPatch)
     );
   }
+}));
+
+test('GPACK-150 release evidence bundle report mirrors source-count metrics', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_evidence_bundle_report_source_counts',
+    prompt: 'topaz canal station with careful orchard surveyors',
+    nowMs: 155_220
+  });
+  const validationNowMs = fixture.releaseGate.evaluatedAtMs + 100;
+  const readyBundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    nowMs: fixture.releaseGate.evaluatedAtMs + 50
+  });
+  const missingSourceBundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    candidateReviewManifest: null,
+    nowMs: fixture.releaseGate.evaluatedAtMs + 50
+  });
+  const readyReport = validateReleaseEvidenceBundle(readyBundle, {
+    ...fixture,
+    nowMs: validationNowMs
+  });
+  const missingReport = validateReleaseEvidenceBundle(missingSourceBundle, {
+    ...fixture,
+    nowMs: validationNowMs
+  });
+
+  assert.equal(readyReport.ok, true, JSON.stringify(readyReport.checks));
+  assert.equal(readyReport.metrics.presentSourceCount, readyBundle.metrics.presentSourceCount);
+  assert.equal(readyReport.metrics.missingSourceCount, readyBundle.metrics.missingSourceCount);
+  assert.equal(readyReport.metrics.requiredSourceCount, readyBundle.metrics.requiredSourceCount);
+  assert.equal(readyReport.metrics.suppliedSourceCount, readyBundle.metrics.requiredSourceCount);
+  assert.equal(missingSourceBundle.metrics.missingSourceCount, 1);
+  assert.equal(missingReport.ok, false);
+  assert.equal(missingReport.metrics.presentSourceCount, missingSourceBundle.metrics.presentSourceCount);
+  assert.equal(missingReport.metrics.missingSourceCount, missingSourceBundle.metrics.missingSourceCount);
+  assert.equal(missingReport.metrics.requiredSourceCount, missingSourceBundle.metrics.requiredSourceCount);
+  assert.equal(missingReport.metrics.suppliedSourceCount, readyBundle.metrics.requiredSourceCount);
+  assert.equal(missingReport.metrics.sourceCoverageOk, false);
 }));
 
 test('GU-19 release evidence bundle rejects source drift and missing ready-gate evidence', () => withTempGeneratedPackStore(() => {
