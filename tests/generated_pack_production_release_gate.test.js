@@ -366,6 +366,19 @@ function readyReleaseGateFixture({
   };
 }
 
+function releaseGateValidationContext(fixture, overrides = {}) {
+  return {
+    pack: fixture.pack,
+    playtestReport: fixture.playtestReport,
+    diversityReport: fixture.diversityReport,
+    publicCard: fixture.publicCard,
+    persistenceReport: fixture.persistenceReport,
+    candidateReviewManifest: fixture.candidateReviewManifest,
+    approvalEvidence: fixture.approvalEvidence,
+    ...overrides
+  };
+}
+
 test('GU-18 production release gate fails closed without playtest, approvals, diversity, persistence, or public-card evidence', () => {
   const pack = createGeneratedPack({
     owner: { ownerAccountId: 'owner_release_gate_closed' },
@@ -425,6 +438,7 @@ test('GU-18 production release gate can pass only with explicit machine evidence
       Number(importResult.importReport.privateDataLeakCount || 0)
     )
   };
+  const approvalEvidence = approvedReleaseEvidence(pack);
   const gate = buildProductionReleaseGate({
     pack,
     playtestReport,
@@ -432,10 +446,18 @@ test('GU-18 production release gate can pass only with explicit machine evidence
     publicCard,
     persistenceReport,
     candidateReviewManifest,
-    approvalEvidence: approvedReleaseEvidence(pack),
+    approvalEvidence,
     nowMs: 152_500
   });
-  const validationReport = validateProductionReleaseGate(gate);
+  const validationReport = validateProductionReleaseGate(gate, {
+    pack,
+    playtestReport,
+    diversityReport,
+    publicCard,
+    persistenceReport,
+    candidateReviewManifest,
+    approvalEvidence
+  });
 
   assert.equal(playtestReport.playtestPassed, true);
   assert.equal(cardValidationReport.ok, true);
@@ -475,7 +497,7 @@ test('GU-19/GPACK-162 release evidence bundle binds a ready gate to source evide
   });
   const report = validateReleaseEvidenceBundle(bundle, fixture);
 
-  assert.equal(validateProductionReleaseGate(fixture.releaseGate).ok, true);
+  assert.equal(validateProductionReleaseGate(fixture.releaseGate, releaseGateValidationContext(fixture)).ok, true);
   assert.equal(fixture.releaseGate.publicReleaseEligible, true);
   assert.equal(report.ok, true, JSON.stringify(report.checks));
   assert.equal(bundle.schemaVersion, 'agent-town-generated-pack-release-evidence-bundle-v1');
@@ -2353,7 +2375,7 @@ test('GPACK-164 release gate rejects candidate-review diagnostic metric tamperin
     { candidateReviewCoverageCount: gate.metrics.candidateReviewCoverageCount - 1 }
   ];
 
-  assert.equal(validateProductionReleaseGate(gate).ok, true);
+  assert.equal(validateProductionReleaseGate(gate, releaseGateValidationContext(fixture)).ok, true);
   assert.equal(gate.metrics.candidateReviewExpectedTargetCount, fixture.pack.assetPromptPlan.targets.length);
   assert.equal(gate.metrics.candidateReviewCoverageCount, fixture.pack.assetPromptPlan.targets.length);
 
@@ -2365,7 +2387,7 @@ test('GPACK-164 release gate rejects candidate-review diagnostic metric tamperin
         ...metricPatch
       }
     };
-    const report = validateProductionReleaseGate(tamperedGate);
+    const report = validateProductionReleaseGate(tamperedGate, releaseGateValidationContext(fixture));
 
     assert.equal(report.ok, false, JSON.stringify(metricPatch));
     assert.equal(
@@ -2374,6 +2396,28 @@ test('GPACK-164 release gate rejects candidate-review diagnostic metric tamperin
       JSON.stringify(metricPatch)
     );
   }
+}));
+
+test('GPACK-165 release gate rejects metric-only ready gates without source evidence context', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_gate_ready_source_context',
+    prompt: 'cedar canal works with measured lantern scouts',
+    nowMs: 153_140
+  });
+  const missingSourceReport = validateProductionReleaseGate(fixture.releaseGate);
+  const sourceBoundReport = validateProductionReleaseGate(
+    fixture.releaseGate,
+    releaseGateValidationContext(fixture)
+  );
+
+  assert.equal(fixture.releaseGate.publicReleaseEligible, true);
+  assert.equal(missingSourceReport.ok, false);
+  assert.equal(
+    missingSourceReport.checks.find((check) => check.id === 'PRODUCTION_RELEASE_GATE_READY_SOURCE_EVIDENCE_BOUND').passed,
+    false
+  );
+  assert.equal(sourceBoundReport.ok, true, JSON.stringify(sourceBoundReport.checks));
+  assert.equal(sourceBoundReport.metrics.readySourceEvidenceBound, true);
 }));
 
 test('GU-18 release approval evidence reports redact unsafe submitted keys and values', () => {
@@ -2842,9 +2886,12 @@ test('GU-18 production release gate validation rejects future-dated gate reports
     nowMs: 153_700
   });
   const validationNowMs = fixture.releaseGate.evaluatedAtMs - 1;
-  const report = validateProductionReleaseGate(fixture.releaseGate, { nowMs: validationNowMs });
+  const report = validateProductionReleaseGate(
+    fixture.releaseGate,
+    releaseGateValidationContext(fixture, { nowMs: validationNowMs })
+  );
 
-  assert.equal(validateProductionReleaseGate(fixture.releaseGate).ok, true);
+  assert.equal(validateProductionReleaseGate(fixture.releaseGate, releaseGateValidationContext(fixture)).ok, true);
   assert.equal(fixture.releaseGate.evaluatedAtMs > validationNowMs, true);
   assert.equal(fixture.releaseGate.metrics.releaseGateEvaluatedAtNotFuture, true);
   assert.equal(report.ok, false);

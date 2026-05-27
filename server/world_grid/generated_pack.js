@@ -4859,7 +4859,16 @@ function buildProductionReleaseGate({
   return gate;
 }
 
-function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
+function validateProductionReleaseGate(gate = {}, {
+  nowMs = Date.now(),
+  pack = null,
+  playtestReport = null,
+  diversityReport = null,
+  publicCard = null,
+  persistenceReport = null,
+  candidateReviewManifest = null,
+  approvalEvidence = null
+} = {}) {
   const schemaReport = SCHEMA_REGISTRY?.productionReleaseGate
     ? validateGeneratedSchema(gate, SCHEMA_REGISTRY.productionReleaseGate, '$.productionReleaseGate')
     : { ok: true, errors: [] };
@@ -4910,6 +4919,45 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
   const candidateReviewCoverageCountMatchesEvidence = candidateReviewManifestHashMatchesEvidence
     ? candidateReviewCoverageCount === approvalEvidenceReviewedCandidateCount
     : candidateReviewCoverageCount === 0;
+  const sourceApprovalEvidence = approvalEvidence || gate?.approvalEvidence || null;
+  const sourcePackIdMatchesGate = Boolean(pack?.packId)
+    && String(pack.packId) === String(gate?.packId || '');
+  const sourceGeneratedPackPassed = sourcePackIdMatchesGate && releaseGeneratedPackSourcePassed(pack);
+  const sourcePlaytestPassed = sourcePackIdMatchesGate && releasePlaytestSourcePassed(playtestReport, pack || {});
+  const sourcePersistencePassed = sourcePackIdMatchesGate && releasePersistenceSourcePassed(persistenceReport || {}, gate?.packId);
+  const sourcePublicCardPassed = sourcePackIdMatchesGate && releasePublicCardSourcePassed(publicCard || {}, gate?.packId);
+  const sourceDiversityIncludesGatePack = releaseDiversityIncludesPack(diversityReport || {}, gate?.packId);
+  const sourceDiversityMetricsCoherent = releaseDiversityPassed(diversityReport || {})
+    && releaseDiversityMetricsCoherent(diversityReport || {});
+  const sourceApprovalEvidenceHashMatchesGate = Boolean(sourceApprovalEvidence && gate?.approvalEvidence)
+    && stableEvidenceHash(sourceApprovalEvidence) === stableEvidenceHash(gate.approvalEvidence);
+  const sourceApprovalEvidencePassed = sourceGeneratedPackPassed
+    && sourceApprovalEvidenceHashMatchesGate
+    && releaseApprovalEvidenceSourcePassed(sourceApprovalEvidence, pack || {});
+  const sourceCandidateReviewManifestPassed = sourceGeneratedPackPassed
+    && releaseCandidateReviewManifestSourcePassed(candidateReviewManifest, pack || {});
+  const sourceCandidateReviewManifestHashMatchesEvidence = Boolean(candidateReviewManifest?.manifestHash)
+    && candidateReviewManifest.manifestHash === gate?.approvalEvidence?.candidateReview?.candidateManifestHash;
+  const sourceCandidateReviewManifestTimeMatchesEvidence = sourceCandidateReviewManifestHashMatchesEvidence
+    && positiveNumberOrZero(candidateReviewManifest?.createdAtMs) > 0
+    && positiveNumberOrZero(gate?.approvalEvidence?.candidateReview?.reviewedAtMs) >= positiveNumberOrZero(candidateReviewManifest.createdAtMs)
+    && positiveNumberOrZero(gate?.approvalEvidence?.candidateReview?.reviewedAtMs) <= positiveNumberOrZero(gate?.approvalEvidence?.createdAtMs);
+  const sourceCandidateReviewManifestCountsMatchEvidence = sourceCandidateReviewManifestHashMatchesEvidence
+    && candidateReviewManifestCountsMatchApprovalEvidence(candidateReviewManifest, gate?.approvalEvidence || {});
+  const readySourceEvidenceBound = gate?.publicReleaseEligible !== true
+    || (
+      sourceGeneratedPackPassed
+      && sourcePlaytestPassed
+      && sourcePersistencePassed
+      && sourcePublicCardPassed
+      && sourceDiversityIncludesGatePack
+      && sourceDiversityMetricsCoherent
+      && sourceApprovalEvidencePassed
+      && sourceCandidateReviewManifestPassed
+      && sourceCandidateReviewManifestHashMatchesEvidence
+      && sourceCandidateReviewManifestTimeMatchesEvidence
+      && sourceCandidateReviewManifestCountsMatchEvidence
+    );
   const approvalEvidenceContractOk = approvalEvidenceReport.checks
     .filter((check) => [
       'RELEASE_APPROVAL_EVIDENCE_SCHEMA_VALID',
@@ -5029,6 +5077,26 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
       }
     },
     {
+      id: 'PRODUCTION_RELEASE_GATE_READY_SOURCE_EVIDENCE_BOUND',
+      passed: readySourceEvidenceBound,
+      measured: {
+        readyGate: gate?.publicReleaseEligible === true,
+        sourcePackIdMatchesGate,
+        sourceGeneratedPackPassed,
+        sourcePlaytestPassed,
+        sourcePersistencePassed,
+        sourcePublicCardPassed,
+        sourceDiversityIncludesGatePack,
+        sourceDiversityMetricsCoherent,
+        sourceApprovalEvidenceHashMatchesGate,
+        sourceApprovalEvidencePassed,
+        sourceCandidateReviewManifestPassed,
+        sourceCandidateReviewManifestHashMatchesEvidence,
+        sourceCandidateReviewManifestTimeMatchesEvidence,
+        sourceCandidateReviewManifestCountsMatchEvidence
+      }
+    },
+    {
       id: 'PRODUCTION_RELEASE_GATE_NO_PRIVATE_OR_ASSET_LEAKS',
       passed: Number(gate?.metrics?.privateDataLeakCount || 0) === 0
         && Number(gate?.metrics?.blockedFieldCount || 0) === 0
@@ -5099,6 +5167,7 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
       candidateReviewManifestHashMatchesEvidence,
       candidateReviewManifestTimeMatchesEvidence,
       candidateReviewManifestCountsMatchEvidence,
+      readySourceEvidenceBound,
       releaseGateEvaluatedAtNotFuture,
       privateDataLeakCount,
       blockedFieldCount,
@@ -5285,7 +5354,16 @@ function buildReleaseEvidenceBundle({
   const bundleCreatedAtOrAfterGate = gateEvaluatedAtMs > 0
     && bundleCreatedAtMs >= gateEvaluatedAtMs;
   const bundleCreatedAtNotFuture = bundleCreatedAtMs > 0;
-  const releaseGateValidationReport = validateProductionReleaseGate(gate, { nowMs: bundleCreatedAtMs });
+  const releaseGateValidationReport = validateProductionReleaseGate(gate, {
+    nowMs: bundleCreatedAtMs,
+    pack,
+    playtestReport,
+    diversityReport,
+    publicCard,
+    persistenceReport,
+    approvalEvidence: gateApprovalEvidence,
+    candidateReviewManifest
+  });
   const releaseGateValidationMetrics = releaseGateValidationReport.metrics || {};
   const readyEvidenceSourcesMatchGate = gate?.publicReleaseEligible !== true
     || (
@@ -5386,13 +5464,14 @@ function validateReleaseEvidenceBundle(bundle = {}, {
   const rawInstructionPaths = findRawPromptInstructionPaths(bundle);
   const expectedBundleHash = schemaReport.ok ? releaseEvidenceBundleHash(bundle) : '';
   const bundleHashMatches = Boolean(expectedBundleHash) && bundle?.bundleHash === expectedBundleHash;
+  const gateApprovalEvidence = approvalEvidence || releaseGate?.approvalEvidence || null;
   const suppliedHashes = sourceHashesForReleaseEvidence({
     pack,
     playtestReport,
     diversityReport,
     publicCard,
     persistenceReport,
-    approvalEvidence: approvalEvidence || releaseGate?.approvalEvidence || null,
+    approvalEvidence: gateApprovalEvidence,
     candidateReviewManifest
   });
   const suppliedPackIds = sourcePackIdsForReleaseEvidence({
@@ -5401,7 +5480,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     diversityReport,
     publicCard,
     persistenceReport,
-    approvalEvidence: approvalEvidence || releaseGate?.approvalEvidence || null,
+    approvalEvidence: gateApprovalEvidence,
     candidateReviewManifest,
     releaseGate
   });
@@ -5447,7 +5526,16 @@ function validateReleaseEvidenceBundle(bundle = {}, {
   const releaseGateHashMatches = releaseGateProvided && bundle?.releaseGateHash === releaseGateHashExpected;
   const releaseGatePublicEligible = releaseGate?.publicReleaseEligible === true;
   const gateReport = releaseGate
-    ? validateProductionReleaseGate(releaseGate, { nowMs })
+    ? validateProductionReleaseGate(releaseGate, {
+        nowMs,
+        pack,
+        playtestReport,
+        diversityReport,
+        publicCard,
+        persistenceReport,
+        approvalEvidence: gateApprovalEvidence,
+        candidateReviewManifest
+      })
     : { ok: false, metrics: {} };
   const gateMetrics = gateReport.metrics || {};
   const approvalEvidenceSchemaErrorCount = Number(gateMetrics.approvalEvidenceSchemaErrorCount || 0);

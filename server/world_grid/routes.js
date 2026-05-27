@@ -591,7 +591,16 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     });
     return {
       releaseGate,
-      validationReport: validateProductionReleaseGate(releaseGate, { nowMs })
+      validationReport: validateProductionReleaseGate(releaseGate, {
+        nowMs,
+        pack: inputs.generatedPack,
+        playtestReport: inputs.playtestReport,
+        diversityReport: inputs.diversityReport,
+        publicCard: inputs.publicCard,
+        persistenceReport: inputs.persistenceReport,
+        candidateReviewManifest: inputs.candidateReviewManifest,
+        approvalEvidence: inputs.approvalEvidence || releaseGate.approvalEvidence
+      })
     };
   }
 
@@ -622,7 +631,16 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     });
     return {
       releaseGate,
-      releaseGateValidationReport: validateProductionReleaseGate(releaseGate, { nowMs }),
+      releaseGateValidationReport: validateProductionReleaseGate(releaseGate, {
+        nowMs,
+        pack: inputs.generatedPack,
+        playtestReport: inputs.playtestReport,
+        diversityReport: inputs.diversityReport,
+        publicCard: inputs.publicCard,
+        persistenceReport: inputs.persistenceReport,
+        candidateReviewManifest: inputs.candidateReviewManifest,
+        approvalEvidence: inputs.approvalEvidence || releaseGate.approvalEvidence
+      }),
       releaseEvidenceBundle,
       validationReport: validateReleaseEvidenceBundle(releaseEvidenceBundle, {
         pack: inputs.generatedPack,
