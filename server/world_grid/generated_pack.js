@@ -5142,6 +5142,13 @@ function validateReleaseEvidenceBundle(bundle = {}, {
       .filter(([source, packId]) => packId && bundle?.sourcePackIds?.[source] !== packId)
       .map(([source, packId]) => `${source}:supplied:${packId}`)
   ];
+  for (const key of RELEASE_EVIDENCE_SOURCE_KEYS) {
+    const bundleSourcePackId = String(bundle?.sourcePackIds?.[key] || '');
+    const suppliedSourcePackId = String(suppliedPackIds[key] || '');
+    if (!suppliedSourcePackId && bundleSourcePackId) {
+      sourcePackIdProblems.push(`${key}:unsupplied:${bundleSourcePackId}`);
+    }
+  }
   if (releaseGate?.packId && bundle?.packId !== releaseGate.packId) {
     sourcePackIdProblems.push(`releaseGate:bundle:${releaseGate.packId}`);
   }
