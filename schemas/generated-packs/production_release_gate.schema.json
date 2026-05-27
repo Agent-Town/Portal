@@ -96,6 +96,7 @@
         "candidateReviewManifestTimeMatchesEvidence",
         "candidateReviewExpectedTargetCount",
         "candidateReviewCoverageCount",
+        "releaseGateEvaluatedAtNotFuture",
         "eligiblePrerequisiteCount",
         "requiredPrerequisiteCount",
         "looseApprovalInputCount"
@@ -119,6 +120,7 @@
         "candidateReviewManifestTimeMatchesEvidence": { "type": "number", "minimum": 0 },
         "candidateReviewExpectedTargetCount": { "type": "number", "minimum": 0 },
         "candidateReviewCoverageCount": { "type": "number", "minimum": 0 },
+        "releaseGateEvaluatedAtNotFuture": { "type": "boolean" },
         "eligiblePrerequisiteCount": { "type": "number", "minimum": 0 },
         "requiredPrerequisiteCount": { "type": "number", "minimum": 0 },
         "looseApprovalInputCount": { "type": "number", "minimum": 0 }

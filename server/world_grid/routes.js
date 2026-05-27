@@ -532,6 +532,7 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
 
   function buildGeneratedPackReleaseGatePayload(owner, body = {}) {
     const inputs = buildGeneratedPackReleaseInputs(owner, body);
+    const nowMs = Date.now();
     const releaseGate = buildProductionReleaseGate({
       pack: inputs.generatedPack,
       playtestReport: inputs.playtestReport,
@@ -541,16 +542,17 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       candidateReviewManifest: inputs.candidateReviewManifest,
       approvalEvidence: inputs.approvalEvidence,
       approvalInputs: inputs.approvalInputs,
-      nowMs: Date.now()
+      nowMs
     });
     return {
       releaseGate,
-      validationReport: validateProductionReleaseGate(releaseGate)
+      validationReport: validateProductionReleaseGate(releaseGate, { nowMs })
     };
   }
 
   function buildGeneratedPackReleaseEvidenceBundlePayload(owner, body = {}) {
     const inputs = buildGeneratedPackReleaseInputs(owner, body);
+    const nowMs = Date.now();
     const releaseGate = buildProductionReleaseGate({
       pack: inputs.generatedPack,
       playtestReport: inputs.playtestReport,
@@ -560,7 +562,7 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       candidateReviewManifest: inputs.candidateReviewManifest,
       approvalEvidence: inputs.approvalEvidence,
       approvalInputs: inputs.approvalInputs,
-      nowMs: Date.now()
+      nowMs
     });
     const releaseEvidenceBundle = buildReleaseEvidenceBundle({
       pack: inputs.generatedPack,
@@ -571,11 +573,11 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       persistenceReport: inputs.persistenceReport,
       approvalEvidence: inputs.approvalEvidence || releaseGate.approvalEvidence,
       candidateReviewManifest: inputs.candidateReviewManifest,
-      nowMs: Date.now()
+      nowMs
     });
     return {
       releaseGate,
-      releaseGateValidationReport: validateProductionReleaseGate(releaseGate),
+      releaseGateValidationReport: validateProductionReleaseGate(releaseGate, { nowMs }),
       releaseEvidenceBundle,
       validationReport: validateReleaseEvidenceBundle(releaseEvidenceBundle, {
         pack: inputs.generatedPack,
@@ -585,7 +587,8 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
         publicCard: inputs.publicCard,
         persistenceReport: inputs.persistenceReport,
         approvalEvidence: inputs.approvalEvidence || releaseGate.approvalEvidence,
-        candidateReviewManifest: inputs.candidateReviewManifest
+        candidateReviewManifest: inputs.candidateReviewManifest,
+        nowMs
       })
     };
   }

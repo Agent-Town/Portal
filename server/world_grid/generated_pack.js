@@ -4548,6 +4548,7 @@ function buildProductionReleaseGate({
         Number(approvalEvidenceReport.metrics.reviewedCandidateCount || 0),
         Number(candidateReviewManifestReport.metrics.reviewedCandidateCount || 0)
       ),
+      releaseGateEvaluatedAtNotFuture: positiveNumberOrZero(nowMs) > 0,
       eligiblePrerequisiteCount: Object.values(releasePrerequisites).filter((passed) => passed === true).length,
       requiredPrerequisiteCount: Object.keys(releasePrerequisites).length,
       looseApprovalInputCount: Object.values(normalizedLooseApprovals).filter(Boolean).length
@@ -4558,10 +4559,15 @@ function buildProductionReleaseGate({
   return gate;
 }
 
-function validateProductionReleaseGate(gate = {}) {
+function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
   const schemaReport = SCHEMA_REGISTRY?.productionReleaseGate
     ? validateGeneratedSchema(gate, SCHEMA_REGISTRY.productionReleaseGate, '$.productionReleaseGate')
     : { ok: true, errors: [] };
+  const gateEvaluatedAtMs = positiveNumberOrZero(gate?.evaluatedAtMs);
+  const validationNowMs = positiveNumberOrZero(nowMs);
+  const releaseGateEvaluatedAtNotFuture = validationNowMs > 0
+    && gateEvaluatedAtMs > 0
+    && gateEvaluatedAtMs <= validationNowMs;
   const prerequisites = gate?.releasePrerequisites || {};
   const prerequisiteEntries = Object.entries(prerequisites);
   const failedPrerequisites = prerequisiteEntries
@@ -4614,6 +4620,16 @@ function validateProductionReleaseGate(gate = {}) {
         publicReleaseEligible: gate?.publicReleaseEligible === true,
         failedPrerequisites,
         blockingReasonsMatchFailures
+      }
+    },
+    {
+      id: 'PRODUCTION_RELEASE_GATE_TIMESTAMP_COHERENT',
+      passed: gate?.metrics?.releaseGateEvaluatedAtNotFuture === releaseGateEvaluatedAtNotFuture
+        && releaseGateEvaluatedAtNotFuture === true,
+      measured: {
+        evaluatedAtMs: gateEvaluatedAtMs,
+        validationNowMs,
+        releaseGateEvaluatedAtNotFuture
       }
     },
     {
@@ -4693,6 +4709,7 @@ function validateProductionReleaseGate(gate = {}) {
       blockingReasonCount: blockingReasons.length,
       costConsentModelApproved: prerequisites.costConsentModelApproved === true,
       humanReviewComplete: prerequisites.humanReviewComplete === true,
+      releaseGateEvaluatedAtNotFuture,
       privateDataLeakCount: Number(gate?.metrics?.privateDataLeakCount || 0),
       approvalEvidenceOk: approvalEvidenceReport.ok === true,
       approvalEvidenceSecretLikeCount: Number(approvalEvidenceReport.metrics.secretLikePathCount || 0)
@@ -4877,7 +4894,7 @@ function buildReleaseEvidenceBundle({
       missingSourceCount: RELEASE_EVIDENCE_SOURCE_KEYS.length - presentSourceCount,
       sourceHashMismatchCount: 0,
       sourcePackIdMismatchCount: sourcePackIdProblems.length,
-      releaseGateValid: validateProductionReleaseGate(gate).ok === true,
+      releaseGateValid: validateProductionReleaseGate(gate, { nowMs: bundleCreatedAtMs }).ok === true,
       releaseGatePublicEligible: gate?.publicReleaseEligible === true,
       bundleCreatedAtOrAfterGate,
       bundleCreatedAtNotFuture,
@@ -4957,7 +4974,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
   const releaseGateHashExpected = releaseGate ? stableEvidenceHash(releaseGate) : '';
   const releaseGateHashMatches = !releaseGate || bundle?.releaseGateHash === releaseGateHashExpected;
   const gateReport = releaseGate
-    ? validateProductionReleaseGate(releaseGate)
+    ? validateProductionReleaseGate(releaseGate, { nowMs })
     : { ok: bundle?.metrics?.releaseGateValid === true };
   const bundleCreatedAtMs = positiveNumberOrZero(bundle?.createdAtMs);
   const validationNowMs = positiveNumberOrZero(nowMs);

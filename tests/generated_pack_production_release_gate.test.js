@@ -438,6 +438,7 @@ test('GU-18 production release gate can pass only with explicit machine evidence
   assert.equal(gate.metrics.candidateReviewManifestHashMatchesEvidence, 1);
   assert.equal(gate.metrics.candidateReviewManifestTimeMatchesEvidence, 1);
   assert.equal(gate.metrics.candidateReviewCoverageCount, pack.assetPromptPlan.targets.length);
+  assert.equal(gate.metrics.releaseGateEvaluatedAtNotFuture, true);
   assert.equal(gate.metrics.replayabilityPromptCount, 10);
   assert.equal(gate.metrics.privateDataLeakCount, 0);
   assert.equal(gate.metrics.productionImageAssetCount, 0);
@@ -1066,6 +1067,30 @@ test('GU-18 production release gate validation rejects tampered eligibility and 
   );
 });
 
+test('GU-18 production release gate validation rejects future-dated gate reports', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_gate_future_report',
+    prompt: 'crimson pier observatory with rain-clock archivists',
+    nowMs: 153_700
+  });
+  const validationNowMs = fixture.releaseGate.evaluatedAtMs - 1;
+  const report = validateProductionReleaseGate(fixture.releaseGate, { nowMs: validationNowMs });
+
+  assert.equal(validateProductionReleaseGate(fixture.releaseGate).ok, true);
+  assert.equal(fixture.releaseGate.evaluatedAtMs > validationNowMs, true);
+  assert.equal(fixture.releaseGate.metrics.releaseGateEvaluatedAtNotFuture, true);
+  assert.equal(report.ok, false);
+  assert.equal(
+    report.checks.find((check) => check.id === 'PRODUCTION_RELEASE_GATE_TIMESTAMP_COHERENT')
+      .measured.releaseGateEvaluatedAtNotFuture,
+    false
+  );
+  assert.equal(
+    report.checks.find((check) => check.id === 'PRODUCTION_RELEASE_GATE_TIMESTAMP_COHERENT').passed,
+    false
+  );
+}));
+
 test('GU-18/GU-19 release gate and evidence bundle APIs are generated-pack-gated and fail closed', async () => {
   const identity = { pairId: 'session:release-gate-api', houseId: null };
   await withWorldGridServer({
@@ -1178,6 +1203,7 @@ test('GU-18/GU-19 release gate and evidence bundle APIs are generated-pack-gated
       assert.equal(releaseBody.releaseGate.packId, generateBody.generatedPack.packId);
       assert.equal(releaseBody.releaseGate.releaseMode, 'prototype-gated');
       assert.equal(releaseBody.releaseGate.publicReleaseEligible, false);
+      assert.equal(releaseBody.releaseGate.metrics.releaseGateEvaluatedAtNotFuture, true);
       assert.equal(releaseBody.releaseGate.blockingReasons.includes('costConsentModelApproved'), true);
 
       const bundleResponse = await fetch(`${baseUrl}/api/world/generated-pack/release-evidence-bundle`, {
