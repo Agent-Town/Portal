@@ -24,13 +24,30 @@ async function openSeededWorldGrid(page, flags = 'all') {
 
 async function worldGridApi(page, path, { method = 'GET', body = null, flags = 'all' } = {}) {
   return await page.evaluate(async ({ path, method, body, flags }) => {
+    const normalizedMethod = String(method || 'GET').toUpperCase();
+    const mutating = normalizedMethod !== 'GET' && normalizedMethod !== 'HEAD';
+    const headers = {
+      'content-type': 'application/json',
+      'x-world-grid-feature-flags': flags
+    };
+    if (mutating) {
+      const tokenResponse = await fetch('/api/world/mutation-token', {
+        credentials: 'include',
+        headers: {
+          'x-world-grid-feature-flags': flags
+        }
+      });
+      if (tokenResponse.ok) {
+        const tokenBody = await tokenResponse.json().catch(() => null);
+        if (typeof tokenBody?.csrfToken === 'string' && tokenBody.csrfToken) {
+          headers['x-world-grid-csrf'] = tokenBody.csrfToken;
+        }
+      }
+    }
     const response = await fetch(path, {
-      method,
+      method: normalizedMethod,
       credentials: 'include',
-      headers: {
-        'content-type': 'application/json',
-        'x-world-grid-feature-flags': flags
-      },
+      headers,
       body: body == null ? undefined : JSON.stringify(body)
     });
     const text = await response.text();

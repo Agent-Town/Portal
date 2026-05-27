@@ -38,8 +38,10 @@ approval and does not expose V6 in normal gameplay.
 ## Required Release Controls
 
 - durable/session-bound CSRF token issuance and verification; the V5
-  world-grid foundation now stores owner/session-bound token hashes, but V6
-  still needs route/tool integration and browser-authenticated coverage.
+  world-grid foundation now stores owner/session-bound token hashes and proves
+  browser same-wallet cross-session denial, but V6 still needs route/tool
+  integration, token invalidation/rotation coverage, and final browser
+  coverage.
 - Durable or shared rate-limit counters across production instances.
 - Final session/wallet ownership middleware connected to every mutating V6
   route and worker tool.

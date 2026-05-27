@@ -58,9 +58,10 @@ Shared V5 storage evidence now includes optional `WORLD_GRID_AUDIT_SQLITE_PATH`
 restart matrix coverage for all V5.1-V5.5 mutating route and tool surfaces,
 including duplicate-replay suppression and private service-secret exclusion.
 Complete before-state snapshots, release replay reconstruction, final session
-auth, browser-authenticated CSRF invalidation/rotation coverage, and
-IP/risk-aware production rate limits remain promotion gates. Optional
-`WORLD_GRID_CSRF_SQLITE_PATH` coverage now proves owner-bound hashed CSRF tokens
-and hashed session-binding metadata persist across route restarts, and optional
+auth, CSRF invalidation/rotation coverage, and IP/risk-aware production rate
+limits remain promotion gates. Optional `WORLD_GRID_CSRF_SQLITE_PATH` coverage
+now proves owner-bound hashed CSRF tokens and hashed session-binding metadata
+persist across route restarts, and Playwright coverage now proves browser
+same-wallet cross-session CSRF token reuse is denied. Optional
 `WORLD_GRID_RATE_LIMIT_SQLITE_PATH` coverage now proves owner/surface mutation
 buckets persist across route restarts.

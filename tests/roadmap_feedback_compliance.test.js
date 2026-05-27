@@ -133,6 +133,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'tests/world_grid_events_restart_probe_child.js',
     'tests/world_grid_sandbox_persistence.test.js',
     'tests/world_grid_sandbox_restart_probe_child.js',
+    'e2e/243_world_grid_csrf_session_binding.spec.js',
     'public/experiences/world-grid/manifest.json',
     'public/experiences/world-grid/skill.md',
     'public/experiences/world-grid/tools.md',
@@ -679,6 +680,7 @@ test('world-grid CSRF policy is tracked as an M5 durable foundation', () => {
 
   assert.match(plan, /optional durable hashed-token and session-binding SQLite foundation/);
   assert.match(plan, /WORLD_GRID_CSRF_SQLITE_PATH/);
+  assert.match(plan, /browser same-wallet cross-session CSRF denial coverage/);
   assert.match(security, /\/api\/world\/mutation-token/);
   assert.match(security, /WORLD_GRID_CSRF_SQLITE_PATH/);
   assert.match(security, /world_grid_csrf_tokens/);
@@ -686,19 +688,26 @@ test('world-grid CSRF policy is tracked as an M5 durable foundation', () => {
   assert.match(security, /session_binding_hash/);
   assert.match(security, /cross-owner, cross-session, and\s+expired tokens fail closed/);
   assert.match(security, /separate Node process\s+restart/);
-  assert.match(security, /browser-authenticated cross-session coverage/);
+  assert.match(security, /e2e\/243_world_grid_csrf_session_binding\.spec\.js/);
+  assert.match(security, /WORLD_GRID_CSRF_REQUIRED=1/);
+  assert.match(security, /browser same-wallet cross-session denial/);
+  assert.match(security, /token invalidation\/rotation/);
   assert.match(stateModel, /server\/world_grid\/csrf\.js/);
   assert.match(stateModel, /world_grid_csrf_tokens/);
   assert.match(stateModel, /WORLD_GRID_CSRF_SQLITE_PATH/);
   assert.match(stateModel, /session_binding_hash/);
   assert.match(stateModel, /owner-bound hashed token rows/);
   assert.match(stateModel, /hashed session-binding rows/);
+  assert.match(stateModel, /browser same-wallet cross-session denial proof/);
   assert.match(evidence, /Mutation CSRF guard/);
   assert.match(evidence, /tests\/world_grid_csrf_persistence\.test\.js/);
+  assert.match(evidence, /e2e\/243_world_grid_csrf_session_binding\.spec\.js/);
   assert.match(evidence, /token\/session hashes survive reopen/);
   assert.match(evidence, /reject cross-session reuse/);
+  assert.match(evidence, /same-wallet cross-session CSRF denial/);
+  assert.match(evidence, /WORLD_GRID_CSRF_REQUIRED=1/);
   assert.match(evidence, /separate Node process restarts/);
-  assert.match(evidence, /browser-authenticated CSRF invalidation\/rotation coverage/);
+  assert.match(evidence, /CSRF invalidation\/rotation coverage/);
 });
 
 test('world-grid mutation rate-limit policy is tracked as an M5 durable foundation', () => {
