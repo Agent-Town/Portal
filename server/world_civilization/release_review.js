@@ -165,6 +165,8 @@ const REQUIRED_REVIEW_GATES = [
     owner: 'qa_engineering',
     requiredArtifacts: [
       RELEASE_REVIEW_ARTIFACT,
+      'server/world_civilization/validation_targets.js',
+      'tests/world_civilization_validation_targets.test.js',
       'tests/world_civilization_schemas.test.js',
       'tests/world_civilization_abuse_case_targets.test.js',
       'tests/world_civilization_product_signoff_targets.test.js',
@@ -197,6 +199,7 @@ const REQUIRED_REVIEW_GATES = [
       'split_playwright_smokes',
       'all_features_regression',
       'feature_override_safety',
+      'validation_target_gate',
       'abuse_case_target_gate',
       'product_signoff_target_gate',
       'threat_model_target_gate',

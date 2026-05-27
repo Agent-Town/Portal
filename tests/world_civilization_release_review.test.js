@@ -149,6 +149,28 @@ test('V6 release review requires product signoff target gate evidence', () => {
   assert.ok(validationGate.requiredChecks.includes('product_signoff_target_gate'));
 });
 
+test('V6 release review requires validation target gate evidence', () => {
+  const validationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'validation_evidence');
+
+  assert.equal(validationGate.owner, 'qa_engineering');
+  assert.ok(validationGate.requiredArtifacts.includes('server/world_civilization/validation_targets.js'));
+  assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_validation_targets.test.js'));
+  assert.ok(validationGate.requiredChecks.includes('targeted_node_suite'));
+  assert.ok(validationGate.requiredChecks.includes('split_playwright_smokes'));
+  assert.ok(validationGate.requiredChecks.includes('all_features_regression'));
+  assert.ok(validationGate.requiredChecks.includes('feature_override_safety'));
+  assert.ok(validationGate.requiredChecks.includes('validation_target_gate'));
+  assert.ok(validationGate.requiredChecks.includes('abuse_case_target_gate'));
+  assert.ok(validationGate.requiredChecks.includes('product_signoff_target_gate'));
+  assert.ok(validationGate.requiredChecks.includes('threat_model_target_gate'));
+  assert.ok(validationGate.requiredChecks.includes('privacy_review_target_gate'));
+  assert.ok(validationGate.requiredChecks.includes('data_retention_target_gate'));
+  assert.ok(validationGate.requiredChecks.includes('session_auth_target_gate'));
+  assert.ok(validationGate.requiredChecks.includes('worker_runtime_registration_target'));
+  assert.ok(validationGate.requiredChecks.includes('lab_readiness_gate'));
+  assert.ok(validationGate.requiredChecks.includes('resilience_readiness_gate'));
+});
+
 test('V6 release review audit coverage requires governance preflight evidence', () => {
   const auditGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'audit_coverage');
   const validationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'validation_evidence');

@@ -112,6 +112,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'server/world_civilization/tool_exposure_gate.js',
     'server/world_civilization/threat_model_targets.js',
     'server/world_civilization/tools.js',
+    'server/world_civilization/validation_targets.js',
     'server/world_civilization/votes.js',
     'server/world_civilization/worker_runtime_registration.js',
     'server/world_civilization/worker_tool_adapter.js',
@@ -139,6 +140,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'tests/world_civilization_mutation_security.test.js',
     'tests/world_civilization_session_auth_targets.test.js',
     'tests/world_civilization_threat_model_targets.test.js',
+    'tests/world_civilization_validation_targets.test.js',
     'tests/world_civilization_routes.test.js',
     'tests/world_civilization_tool_exposure_gate.test.js',
     'tests/world_civilization_controlled_release_targets.test.js',
@@ -231,6 +233,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   const threatModelTargetSource = read('server/world_civilization/threat_model_targets.js');
   const abuseCaseTargetSource = read('server/world_civilization/abuse_case_targets.js');
   const productSignoffTargetSource = read('server/world_civilization/product_signoff_targets.js');
+  const validationTargetSource = read('server/world_civilization/validation_targets.js');
   const requiredMilestones = [
     'M0 Hardened V5 world-grid baseline',
     'M1 Living V6 milestone contract',
@@ -279,6 +282,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(readinessSource, /product_signoff_target_gate/);
   assert.match(readinessSource, /privacy_review_target_gate/);
   assert.match(readinessSource, /data_retention_target_gate/);
+  assert.match(readinessSource, /validation_target_gate/);
   assert.match(releaseReviewSource, /session_auth_target_gate/);
   assert.match(releaseReviewSource, /threat_model_target_gate/);
   assert.match(releaseReviewSource, /server\/world_civilization\/threat_model_targets\.js/);
@@ -291,6 +295,8 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(releaseReviewSource, /data_retention_target_gate/);
   assert.match(releaseReviewSource, /server\/world_civilization\/data_retention_targets\.js/);
   assert.match(releaseReviewSource, /server\/world_civilization\/session_auth_targets\.js/);
+  assert.match(releaseReviewSource, /validation_target_gate/);
+  assert.match(releaseReviewSource, /server\/world_civilization\/validation_targets\.js/);
   assert.match(sessionAuthTargetSource, /V6_SESSION_AUTH_TARGETS_VERSION/);
   assert.match(sessionAuthTargetSource, /session_wallet_binding/);
   assert.match(sessionAuthTargetSource, /provider_disconnect_invalidation/);
@@ -310,6 +316,11 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(productSignoffTargetSource, /normal_gameplay_exposure_denial/);
   assert.match(productSignoffTargetSource, /go_no_go_record/);
   assert.match(productSignoffTargetSource, /post_release_monitoring/);
+  assert.match(validationTargetSource, /V6_VALIDATION_TARGETS_VERSION/);
+  assert.match(validationTargetSource, /split_playwright_smokes/);
+  assert.match(validationTargetSource, /runtime_tool_absence/);
+  assert.match(validationTargetSource, /release_candidate_run/);
+  assert.match(validationTargetSource, /artifact_traceability/);
   assert.match(skillLine, /V6 aggregate readiness gate/);
   assert.match(plan, /Source branch: `codex\/v6-agent-civilization-milestones`/);
   assert.match(plan, /broad V5 prototype overrides do not enable V6/);
@@ -850,6 +861,9 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /server\/world_civilization\/data_retention_targets\.js/);
   assert.match(plan, /data-retention target matrix/);
   assert.match(plan, /subject export\/deletion boundaries/);
+  assert.match(plan, /server\/world_civilization\/validation_targets\.js/);
+  assert.match(plan, /validation target matrix/);
+  assert.match(plan, /runtime tool absence/);
   assert.match(plan, /store-backed delegation proof and scope-mismatch evidence/);
   assert.match(plan, /store-specific audit-summary coverage/);
   assert.match(gate, /server\/world_civilization\/release_review\.js/);
@@ -858,6 +872,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(gate, /threat model target gate evidence/);
   assert.match(gate, /privacy review target gate evidence/);
   assert.match(gate, /data-retention target gate evidence/);
+  assert.match(gate, /validation target gate evidence/);
   assert.match(gate, /threat model, privacy review, abuse-case review/);
   assert.match(gate, /store-backed delegation proof and scope-mismatch evidence/);
   assert.match(privacyReviewTargetSource, /V6_PRIVACY_REVIEW_TARGETS_VERSION/);
@@ -930,6 +945,8 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(releaseReview, /Data-retention policy/);
   assert.match(releaseReview, /data-retention target gate/);
   assert.match(releaseReview, /backup retention expiry target/);
+  assert.match(releaseReview, /validation target gate/);
+  assert.match(releaseReview, /release-candidate run/);
   assert.match(releaseReview, /store-specific audit-summary coverage/);
   assert.match(releaseReview, /store-specific zero hash-only fallback proof/);
   assert.match(releaseReview, /browser visual 390\/768\/1280 coverage/);
@@ -953,6 +970,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(skillLine, /V6 product signoff target gate/);
   assert.match(skillLine, /V6 privacy review target gate/);
   assert.match(skillLine, /V6 data-retention target gate/);
+  assert.match(skillLine, /V6 validation target gate/);
   assert.match(skillLine, /store-specific audit-summary coverage/);
   assert.match(skillLine, /store_specific_zero_hash_only_fallbacks/);
   assert.match(skillLine, /resilience readiness review/);
