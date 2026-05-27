@@ -4819,6 +4819,36 @@ async function maybeOpenV6ResearchLabFromRoute() {
   }
 }
 
+function installV6LabTestHarness() {
+  const params = new URLSearchParams(window.location.search || '');
+  if (params.get('__v6LabTest') !== '1') return;
+  window.__agentTownV6LabTest = {
+    openFromRoute: () => maybeOpenV6ResearchLabFromRoute(),
+    pinWorkerRef: () => {
+      window.__agentTownV6LabPinnedWorker = window.__openclawLiteTest || null;
+      return !!window.__agentTownV6LabPinnedWorker;
+    },
+    snapshot: () => {
+      const backdrop = el('districtModalBackdrop');
+      const title = el('districtModalTitle');
+      const lab = document.getElementById('v6-research-lab');
+      return {
+        path: window.location.pathname,
+        search: window.location.search,
+        modalOpen: !!backdrop && !backdrop.classList.contains('is-hidden') && backdrop.getAttribute('aria-hidden') !== 'true',
+        modalTitle: title ? String(title.textContent || '').trim() : '',
+        labVisible: !!lab,
+        debugTabs: collectV6LabDebugTabs(),
+        districtFrameCount: document.querySelectorAll('#districtModalBody iframe').length,
+        hasWorkerTestApi: !!window.__openclawLiteTest,
+        workerRefStable: window.__agentTownV6LabPinnedWorker
+          ? window.__agentTownV6LabPinnedWorker === window.__openclawLiteTest
+          : null
+      };
+    }
+  };
+}
+
 function isPlainRecord(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
@@ -9952,6 +9982,7 @@ async function init() {
     console.warn('local LLM preload failed', e);
   }
   updateUI(initial);
+  installV6LabTestHarness();
   await maybeOpenV6ResearchLabFromRoute();
   if (isVendorLite(initial)) {
     bootstrapVendorRuntime()

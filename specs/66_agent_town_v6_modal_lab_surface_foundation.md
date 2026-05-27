@@ -9,7 +9,8 @@ Runtime contract: `server/world_civilization/lab_surface.js`
 Launch-plan route: `GET /api/world/civilization/lab/launch-plan`
 
 Test coverage: `tests/world_civilization_lab_surface.test.js`,
-`e2e/244_v6_lab_modal_boundary.spec.js`
+`e2e/244_v6_lab_modal_boundary.spec.js`,
+`e2e/249_v6_lab_modal_worker_lifetime_smoke.spec.js`
 
 ## Boundary
 
@@ -26,6 +27,10 @@ to the town hub path instead of rendering V6 content directly.
 The current Express route layer explicitly redirects those standalone paths to
 `/app`; Playwright coverage proves the redirect does not render V6 lab content
 or civic runtime details.
+`e2e/249_v6_lab_modal_worker_lifetime_smoke.spec.js` adds same-page modal
+evidence that an already-running `/app` page can open the internal V6 lab
+without navigation, iframe replacement, worker API replacement, or runtime
+civic-tool exposure.
 
 The launch-plan API is available only when `V6_CIVIC_LAB_MODAL_ENABLED` is set,
 the request explicitly opts in with `v6Lab=1`, the V6 feature flag is enabled,
@@ -94,6 +99,10 @@ release branch must prove:
 - `e2e/244_v6_lab_modal_boundary.spec.js` proves `/v6`, `/v6-lab`, and
   `/civilization` redirect to `/app` and that normal `/app` gameplay does not
   expose V6 lab markers or `et.world.civic.*` tools by default.
+- `e2e/249_v6_lab_modal_worker_lifetime_smoke.spec.js` proves the internal lab
+  opens as a town-hub modal on an already-running `/app` route without
+  full-page navigation, iframe replacement, worker API replacement, or runtime
+  civic-tool exposure.
 - Browser/Playwright visual coverage proves the modal renders without
   overlapping normal gameplay controls at 390/768/1280 widths.
 - Worker Tools, Skill Context, Worker Traffic, Brain, and Session Context remain

@@ -38,6 +38,9 @@ test('V6 worker runtime registration targets name every browser worker release s
   const productionBrowserSmokeTargets = V6_WORKER_RUNTIME_REGISTRATION_TARGETS.filter((target) => (
     String(target.currentEvidence || '').includes('e2e/248_v6_production_worker_runtime_smoke.spec.js')
   )).map((target) => target.key);
+  const modalLifetimeTarget = V6_WORKER_RUNTIME_REGISTRATION_TARGETS.find((target) => (
+    target.key === 'modal_lifetime_continuity'
+  ));
 
   assert.equal(matrix.ok, true);
   assert.deepEqual(matrix.requiredKeys, REQUIRED_WORKER_RUNTIME_REGISTRATION_TARGET_KEYS);
@@ -62,6 +65,7 @@ test('V6 worker runtime registration targets name every browser worker release s
   assert.ok(productionBrowserSmokeTargets.includes('worker_traffic_trace'));
   assert.ok(productionBrowserSmokeTargets.includes('session_context_link'));
   assert.ok(productionBrowserSmokeTargets.includes('production_override_denial'));
+  assert.ok(String(modalLifetimeTarget.currentEvidence || '').includes('e2e/249_v6_lab_modal_worker_lifetime_smoke.spec.js'));
   assert.match(matrix.digest, /^sha256:[a-f0-9]{64}$/);
 });
 

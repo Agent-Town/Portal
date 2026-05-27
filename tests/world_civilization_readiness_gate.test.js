@@ -75,6 +75,7 @@ test('V6 readiness gate baseline names every prerequisite domain but remains ope
   const reputationGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'reputation_moderation_privacy');
   const releaseReviewGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'security_product_release_review');
   const workerToolGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'worker_tool_surface');
+  const labGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'modal_lab_surface');
   assert.ok(v5PromotionGate.requiredArtifacts.includes(V5_PROMOTION_TARGET_ARTIFACT));
   assert.ok(v5PromotionGate.requiredArtifacts.includes(V5_PROMOTION_TARGET_TEST));
   assert.ok(v5PromotionGate.requiredArtifacts.includes(V5_REPLAY_RECONSTRUCTION_ARTIFACT));
@@ -99,6 +100,10 @@ test('V6 readiness gate baseline names every prerequisite domain but remains ope
   assert.ok(workerToolGate.requiredArtifacts.includes('e2e/246_v6_worker_runtime_registration_smoke.spec.js'));
   assert.ok(workerToolGate.requiredArtifacts.includes('e2e/247_v6_production_override_browser_smoke.spec.js'));
   assert.ok(workerToolGate.requiredArtifacts.includes('e2e/248_v6_production_worker_runtime_smoke.spec.js'));
+  assert.ok(workerToolGate.requiredArtifacts.includes('e2e/249_v6_lab_modal_worker_lifetime_smoke.spec.js'));
+  assert.ok(labGate.requiredArtifacts.includes('e2e/244_v6_lab_modal_boundary.spec.js'));
+  assert.ok(labGate.requiredArtifacts.includes('e2e/249_v6_lab_modal_worker_lifetime_smoke.spec.js'));
+  assert.ok(labGate.requiredChecks.includes('worker_continuity'));
   assert.ok(workerToolGate.requiredChecks.includes('worker_vote_receipt_adapter'));
   assert.ok(workerToolGate.requiredChecks.includes('worker_vote_route_edge_authorization'));
   assert.ok(workerToolGate.requiredChecks.includes('browser_worker_runtime_registration_target'));

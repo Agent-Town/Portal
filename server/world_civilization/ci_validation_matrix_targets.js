@@ -53,9 +53,9 @@ const V6_CI_VALIDATION_MATRIX_TARGETS = [
   {
     key: 'v6_modal_lab_browser_smoke',
     lane: 'internal_v6_browser_smoke',
-    command: 'npx playwright test e2e/244_v6_lab_modal_boundary.spec.js && PW_NODE_ENV=production FEATURE_WORLD_GRID_V50_REGION=1 npx playwright test e2e/247_v6_production_override_browser_smoke.spec.js',
-    requiredEvidence: 'Internal V6 lab validation must prove modal-only launch, standalone denial, focus containment, screenshots, production player override denial, and runtime civic-tool absence.',
-    currentEvidence: 'e2e/244_v6_lab_modal_boundary.spec.js, e2e/247_v6_production_override_browser_smoke.spec.js',
+    command: 'npx playwright test e2e/244_v6_lab_modal_boundary.spec.js e2e/249_v6_lab_modal_worker_lifetime_smoke.spec.js && PW_NODE_ENV=production FEATURE_WORLD_GRID_V50_REGION=1 npx playwright test e2e/247_v6_production_override_browser_smoke.spec.js',
+    requiredEvidence: 'Internal V6 lab validation must prove modal-only launch, standalone denial, focus containment, screenshots, worker lifetime continuity, production player override denial, and runtime civic-tool absence.',
+    currentEvidence: 'e2e/244_v6_lab_modal_boundary.spec.js, e2e/247_v6_production_override_browser_smoke.spec.js, e2e/249_v6_lab_modal_worker_lifetime_smoke.spec.js',
     releaseEvidenceRequired: 'v6_modal_lab_browser_ci_pass'
   },
   {

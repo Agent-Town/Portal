@@ -63,8 +63,8 @@ const V6_VALIDATION_TARGETS = [
   {
     key: 'modal_lab_browser_coverage',
     surface: 'internal_v6_lab_modal',
-    requiredEvidence: 'Internal lab coverage must prove standalone route denial, normal gameplay absence, modal launch, 390/768/1280 screenshots, and keyboard focus containment.',
-    currentEvidence: 'e2e/244_v6_lab_modal_boundary.spec.js, e2e/247_v6_production_override_browser_smoke.spec.js',
+    requiredEvidence: 'Internal lab coverage must prove standalone route denial, normal gameplay absence, modal launch, 390/768/1280 screenshots, keyboard focus containment, and same-page worker continuity.',
+    currentEvidence: 'e2e/244_v6_lab_modal_boundary.spec.js, e2e/247_v6_production_override_browser_smoke.spec.js, e2e/249_v6_lab_modal_worker_lifetime_smoke.spec.js',
     releaseEvidenceRequired: 'modal_lab_browser_coverage_pass'
   },
   {

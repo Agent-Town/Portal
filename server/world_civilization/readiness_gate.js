@@ -158,7 +158,8 @@ const REQUIRED_V6_READINESS_GATES = [
       'tests/world_civilization_tool_exposure_gate.test.js',
       'e2e/246_v6_worker_runtime_registration_smoke.spec.js',
       'e2e/247_v6_production_override_browser_smoke.spec.js',
-      'e2e/248_v6_production_worker_runtime_smoke.spec.js'
+      'e2e/248_v6_production_worker_runtime_smoke.spec.js',
+      'e2e/249_v6_lab_modal_worker_lifetime_smoke.spec.js'
     ],
     requiredChecks: [
       'runtime_manifest_source_of_truth',
@@ -315,7 +316,9 @@ const REQUIRED_V6_READINESS_GATES = [
     requiredArtifacts: [
       'specs/66_agent_town_v6_modal_lab_surface_foundation.md',
       'server/world_civilization/lab_surface.js',
-      'tests/world_civilization_lab_surface.test.js'
+      'tests/world_civilization_lab_surface.test.js',
+      'e2e/244_v6_lab_modal_boundary.spec.js',
+      'e2e/249_v6_lab_modal_worker_lifetime_smoke.spec.js'
     ],
     requiredChecks: [
       'town_hub_modal_launch',

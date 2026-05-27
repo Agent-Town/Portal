@@ -203,9 +203,15 @@ browser evidence that Worker Tools, Skill Context, Worker Traffic, Brain, and
 Session Context stay observable while player `all,v60` overrides are ignored
 for V6 and runtime civic tools remain absent.
 
+`e2e/249_v6_lab_modal_worker_lifetime_smoke.spec.js` adds modal lifetime
+evidence that the internal V6 lab can open on an already-running `/app` page
+without replacing the page-scoped worker test API, navigating away from `/app`,
+mounting an iframe, or exposing runtime civic tools.
+
 The report remains `research_only`, `releaseReady: false`, does not register
 runtime civic tools, forbids backend shortcuts, and treats browser worker
-registration plus full production browser coverage as release gaps.
+registration, full production browser coverage, and shared-state route traces
+as release gaps.
 
 ## Release Gate
 

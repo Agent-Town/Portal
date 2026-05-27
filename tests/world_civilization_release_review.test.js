@@ -401,7 +401,9 @@ test('V6 release review requires modal lab launch-surface evidence', () => {
   assert.ok(labGate.requiredArtifacts.includes('specs/66_agent_town_v6_modal_lab_surface_foundation.md'));
   assert.ok(labGate.requiredArtifacts.includes('server/world_civilization/lab_surface.js'));
   assert.ok(labGate.requiredArtifacts.includes('tests/world_civilization_lab_surface.test.js'));
+  assert.ok(labGate.requiredArtifacts.includes('e2e/244_v6_lab_modal_boundary.spec.js'));
   assert.ok(labGate.requiredArtifacts.includes('e2e/247_v6_production_override_browser_smoke.spec.js'));
+  assert.ok(labGate.requiredArtifacts.includes('e2e/249_v6_lab_modal_worker_lifetime_smoke.spec.js'));
   assert.ok(labGate.requiredChecks.includes('town_hub_modal_launch'));
   assert.ok(labGate.requiredChecks.includes('standalone_route_denial'));
   assert.ok(labGate.requiredChecks.includes('worker_continuity'));
@@ -539,6 +541,7 @@ test('V6 release review requires worker tool exposure evidence', () => {
   assert.ok(workerGate.requiredArtifacts.includes('e2e/246_v6_worker_runtime_registration_smoke.spec.js'));
   assert.ok(workerGate.requiredArtifacts.includes('e2e/247_v6_production_override_browser_smoke.spec.js'));
   assert.ok(workerGate.requiredArtifacts.includes('e2e/248_v6_production_worker_runtime_smoke.spec.js'));
+  assert.ok(workerGate.requiredArtifacts.includes('e2e/249_v6_lab_modal_worker_lifetime_smoke.spec.js'));
   assert.ok(workerGate.requiredArtifacts.includes('docs/internal-skill-testline.md'));
   assert.ok(workerGate.requiredChecks.includes('runtime_manifest_source_of_truth'));
   assert.ok(workerGate.requiredChecks.includes('openclaw_lite_worker_origin'));
@@ -554,6 +557,7 @@ test('V6 release review requires worker tool exposure evidence', () => {
   assert.ok(validationGate.requiredArtifacts.includes('e2e/246_v6_worker_runtime_registration_smoke.spec.js'));
   assert.ok(validationGate.requiredArtifacts.includes('e2e/247_v6_production_override_browser_smoke.spec.js'));
   assert.ok(validationGate.requiredArtifacts.includes('e2e/248_v6_production_worker_runtime_smoke.spec.js'));
+  assert.ok(validationGate.requiredArtifacts.includes('e2e/249_v6_lab_modal_worker_lifetime_smoke.spec.js'));
   assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_mutation_security.test.js'));
   assert.ok(validationGate.requiredChecks.includes('worker_vote_adapter_gate'));
   assert.ok(validationGate.requiredChecks.includes('worker_runtime_registration_target'));

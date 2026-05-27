@@ -77,7 +77,7 @@ const V6_WORKER_RUNTIME_REGISTRATION_TARGETS = [
     key: 'modal_lifetime_continuity',
     surface: 'town_hub_modal',
     requiredEvidence: 'Modal launch preserves page-scoped worker lifetime.',
-    currentEvidence: 'e2e/244_v6_lab_modal_boundary.spec.js',
+    currentEvidence: 'e2e/244_v6_lab_modal_boundary.spec.js, e2e/249_v6_lab_modal_worker_lifetime_smoke.spec.js',
     releaseEvidenceRequired: 'browser_worker_lifetime_trace'
   },
   {

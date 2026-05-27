@@ -186,6 +186,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'e2e/243_world_grid_csrf_session_binding.spec.js',
     'e2e/244_v6_lab_modal_boundary.spec.js',
     'e2e/245_world_grid_player_route_prerequisite.spec.js',
+    'e2e/249_v6_lab_modal_worker_lifetime_smoke.spec.js',
     'public/experiences/world-grid/manifest.json',
     'public/experiences/world-grid/skill.md',
     'public/experiences/world-grid/tools.md',
@@ -260,6 +261,8 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   const validationTargetSource = read('server/world_civilization/validation_targets.js');
   const productionOverrideBrowserSmoke = read('e2e/247_v6_production_override_browser_smoke.spec.js');
   const productionWorkerRuntimeSmoke = read('e2e/248_v6_production_worker_runtime_smoke.spec.js');
+  const modalWorkerLifetimeSmoke = read('e2e/249_v6_lab_modal_worker_lifetime_smoke.spec.js');
+  const publicAppSource = read('public/app.js');
   const playwrightConfig = read('playwright.config.js');
   const serverIndexSource = read('server/index.js');
   const requiredMilestones = [
@@ -450,6 +453,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(ciValidationMatrixTargetSource, /qa_release_packet/);
   assert.match(ciValidationMatrixTargetSource, /e2e\/247_v6_production_override_browser_smoke\.spec\.js/);
   assert.match(ciValidationMatrixTargetSource, /e2e\/248_v6_production_worker_runtime_smoke\.spec\.js/);
+  assert.match(ciValidationMatrixTargetSource, /e2e\/249_v6_lab_modal_worker_lifetime_smoke\.spec\.js/);
   assert.match(ciValidationMatrixTargetSource, /PW_NODE_ENV=production FEATURE_WORLD_GRID_V50_REGION=1/);
   assert.match(releaseCandidateTargetSource, /V6_RELEASE_CANDIDATE_TARGETS_VERSION/);
   assert.match(releaseCandidateTargetSource, /release_candidate_environment/);
@@ -465,6 +469,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(validationTargetSource, /e2e\/246_v6_worker_runtime_registration_smoke\.spec\.js/);
   assert.match(validationTargetSource, /e2e\/247_v6_production_override_browser_smoke\.spec\.js/);
   assert.match(validationTargetSource, /e2e\/248_v6_production_worker_runtime_smoke\.spec\.js/);
+  assert.match(validationTargetSource, /e2e\/249_v6_lab_modal_worker_lifetime_smoke\.spec\.js/);
   assert.match(validationTargetSource, /release_candidate_run/);
   assert.match(validationTargetSource, /artifact_traceability/);
   assert.match(playwrightConfig, /NODE_ENV: process\.env\.PW_NODE_ENV \|\| 'test'/);
@@ -479,6 +484,18 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(productionWorkerRuntimeSmoke, /production worker runtime keeps observability available without civic tools/);
   assert.match(productionWorkerRuntimeSmoke, /agent-debug-tab-traffic/);
   assert.match(productionWorkerRuntimeSmoke, /FEATURE_WORLD_V60_AGENT_CIVILIZATION\)\.toBe\(false\)/);
+  assert.match(modalWorkerLifetimeSmoke, /__v6LabTest/);
+  assert.match(modalWorkerLifetimeSmoke, /openFromRoute/);
+  assert.match(modalWorkerLifetimeSmoke, /pinWorkerRef/);
+  assert.match(modalWorkerLifetimeSmoke, /districtFrameCount/);
+  assert.match(modalWorkerLifetimeSmoke, /workerRefStable/);
+  assert.match(modalWorkerLifetimeSmoke, /history\.replaceState/);
+  assert.match(modalWorkerLifetimeSmoke, /\/api\/world\/tools\?worldGridFeatureFlags=all,v60/);
+  assert.match(publicAppSource, /installV6LabTestHarness/);
+  assert.match(publicAppSource, /__agentTownV6LabTest/);
+  assert.match(publicAppSource, /__v6LabTest/);
+  assert.match(publicAppSource, /__agentTownV6LabPinnedWorker/);
+  assert.match(publicAppSource, /districtFrameCount/);
   assert.match(skillLine, /V6 aggregate readiness gate/);
   assert.match(plan, /Source branch: `codex\/v6-agent-civilization-milestones`/);
   assert.match(plan, /broad V5 prototype overrides do not enable V6/);
@@ -505,6 +522,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /e2e\/246_v6_worker_runtime_registration_smoke\.spec\.js/);
   assert.match(plan, /e2e\/247_v6_production_override_browser_smoke\.spec\.js/);
   assert.match(plan, /e2e\/248_v6_production_worker_runtime_smoke\.spec\.js/);
+  assert.match(plan, /e2e\/249_v6_lab_modal_worker_lifetime_smoke\.spec\.js/);
   assert.match(plan, /shared-state route adapters/);
   assert.match(spec, /research-only civic tool draft/);
   assert.match(spec, /tool exposure gate/);
@@ -514,6 +532,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(toolSpec, /e2e\/246_v6_worker_runtime_registration_smoke\.spec\.js/);
   assert.match(toolSpec, /e2e\/247_v6_production_override_browser_smoke\.spec\.js/);
   assert.match(toolSpec, /e2e\/248_v6_production_worker_runtime_smoke\.spec\.js/);
+  assert.match(toolSpec, /e2e\/249_v6_lab_modal_worker_lifetime_smoke\.spec\.js/);
   assert.match(toolSpec, /browser OpenClaw Lite worker boot evidence/);
   assert.match(toolSpec, /Worker Tool Adapter/);
   assert.match(toolSpec, /server\/world_civilization\/worker_tool_adapter\.js/);
@@ -529,6 +548,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(workerRuntimeRegistrationSource, /openclaw_worker_boot/);
   assert.match(workerRuntimeRegistrationSource, /e2e\/246_v6_worker_runtime_registration_smoke\.spec\.js/);
   assert.match(workerRuntimeRegistrationSource, /e2e\/248_v6_production_worker_runtime_smoke\.spec\.js/);
+  assert.match(workerRuntimeRegistrationSource, /e2e\/249_v6_lab_modal_worker_lifetime_smoke\.spec\.js/);
   assert.match(workerRuntimeRegistrationSource, /productionBrowserWorkerProbeCount/);
   assert.match(workerRuntimeRegistrationSource, /full_production_browser_coverage_required/);
   assert.match(workerRuntimeRegistrationSource, /shared_state_route_adapter/);
@@ -539,6 +559,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(gate, /e2e\/246_v6_worker_runtime_registration_smoke\.spec\.js/);
   assert.match(gate, /e2e\/247_v6_production_override_browser_smoke\.spec\.js/);
   assert.match(gate, /e2e\/248_v6_production_worker_runtime_smoke\.spec\.js/);
+  assert.match(gate, /e2e\/249_v6_lab_modal_worker_lifetime_smoke\.spec\.js/);
   assert.match(gate, /browser OpenClaw Lite worker boot/);
   assert.match(gate, /hidden from runtime `\/api\/world\/tools`/);
   assert.match(plan, /M7 Internal proposal lifecycle \| `in_progress`/);
@@ -875,17 +896,21 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /browser visual coverage at 390\/768\/1280 widths/);
   assert.match(plan, /runtime tool absence/);
   assert.match(plan, /e2e\/244_v6_lab_modal_boundary\.spec\.js/);
+  assert.match(plan, /e2e\/249_v6_lab_modal_worker_lifetime_smoke\.spec\.js/);
   assert.match(plan, /normal `\/app` gameplay exposes no V6 lab markers or `et\.world\.civic\.\*` tools by default/);
   assert.match(plan, /\/v6.*\/v6-lab.*\/civilization/);
   assert.match(gate, /server\/world_civilization\/lab_surface\.js/);
   assert.match(gate, /e2e\/244_v6_lab_modal_boundary\.spec\.js/);
+  assert.match(gate, /e2e\/249_v6_lab_modal_worker_lifetime_smoke\.spec\.js/);
   assert.match(gate, /town hub modal flow/);
   assert.match(gate, /fail-closed modal launch\s+plan|fail closed for standalone\s+V6 paths/);
   assert.match(gate, /M15\s+research-only lab\s+readiness gate/);
   assert.match(gate, /standaloneRouteAllowed: false/);
   assert.match(labSpec, /buildV6LabReadinessGate\(\)/);
   assert.match(labSpec, /e2e\/244_v6_lab_modal_boundary\.spec\.js/);
+  assert.match(labSpec, /e2e\/249_v6_lab_modal_worker_lifetime_smoke\.spec\.js/);
   assert.match(labSpec, /redirects those standalone paths to\s+`\/app`/);
+  assert.match(labSpec, /without navigation, iframe replacement, worker API replacement, or runtime\s+civic-tool exposure/);
   assert.match(labSpec, /390\/768\/1280 widths/);
   assert.match(labSource, /REQUIRED_LAB_EVIDENCE_CHECKS/);
   assert.match(labSource, /runtime_tool_absence/);
@@ -895,6 +920,8 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(labE2e, /V6_LAB_STANDALONE_PATHS/);
   assert.match(labE2e, /toBe\('\/app'\)/);
   assert.match(labE2e, /et\.world\.civic/);
+  assert.match(modalWorkerLifetimeSmoke, /workerRefStable/);
+  assert.match(modalWorkerLifetimeSmoke, /districtFrameCount/);
   assert.match(plan, /M16 Persistence, replay, and resilience hardening \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/resilience\.js/);
   assert.match(plan, /server\/world_civilization\/sqlite_schema\.js/);
@@ -1447,6 +1474,8 @@ test('V6 worker-first civic tool exposure gate is tracked as an M6 release contr
   const workerRuntimeSmoke = read('e2e/246_v6_worker_runtime_registration_smoke.spec.js');
   const productionOverrideBrowserSmoke = read('e2e/247_v6_production_override_browser_smoke.spec.js');
   const productionWorkerRuntimeSmoke = read('e2e/248_v6_production_worker_runtime_smoke.spec.js');
+  const modalWorkerLifetimeSmoke = read('e2e/249_v6_lab_modal_worker_lifetime_smoke.spec.js');
+  const publicAppSource = read('public/app.js');
   const playwrightConfig = read('playwright.config.js');
   const serverIndexSource = read('server/index.js');
 
@@ -1466,8 +1495,10 @@ test('V6 worker-first civic tool exposure gate is tracked as an M6 release contr
   assert.match(plan, /Worker Tools, Skill Context, Worker Traffic, Brain, and Session Context remain observable/);
   assert.match(plan, /e2e\/247_v6_production_override_browser_smoke\.spec\.js/);
   assert.match(plan, /e2e\/248_v6_production_worker_runtime_smoke\.spec\.js/);
+  assert.match(plan, /e2e\/249_v6_lab_modal_worker_lifetime_smoke\.spec\.js/);
   assert.match(plan, /production-mode browser evidence/);
   assert.match(plan, /production-mode worker observability evidence/);
+  assert.match(plan, /modal lifetime evidence/);
   assert.match(plan, /shared-state route adapters/);
   assert.match(spec, /Exposure gate: `server\/world_civilization\/tool_exposure_gate\.js`/);
   assert.match(spec, /Worker runtime registration target/);
@@ -1476,6 +1507,7 @@ test('V6 worker-first civic tool exposure gate is tracked as an M6 release contr
   assert.match(spec, /e2e\/246_v6_worker_runtime_registration_smoke\.spec\.js/);
   assert.match(spec, /e2e\/247_v6_production_override_browser_smoke\.spec\.js/);
   assert.match(spec, /e2e\/248_v6_production_worker_runtime_smoke\.spec\.js/);
+  assert.match(spec, /e2e\/249_v6_lab_modal_worker_lifetime_smoke\.spec\.js/);
   assert.match(spec, /Worker proposal adapter: `server\/world_civilization\/worker_tool_adapter\.js`/);
   assert.match(spec, /Worker Tool Adapter/);
   assert.match(spec, /V6_CIVIC_WORKER_TOOL_ADAPTER_ENABLED/);
@@ -1494,6 +1526,7 @@ test('V6 worker-first civic tool exposure gate is tracked as an M6 release contr
   assert.match(gate, /e2e\/246_v6_worker_runtime_registration_smoke\.spec\.js/);
   assert.match(gate, /e2e\/247_v6_production_override_browser_smoke\.spec\.js/);
   assert.match(gate, /e2e\/248_v6_production_worker_runtime_smoke\.spec\.js/);
+  assert.match(gate, /e2e\/249_v6_lab_modal_worker_lifetime_smoke\.spec\.js/);
   assert.match(gate, /shared-state route traces/);
   assert.match(gate, /store-backed delegated-agent proof/);
   assert.match(gate, /consume delegated action budget idempotently/);
@@ -1505,8 +1538,10 @@ test('V6 worker-first civic tool exposure gate is tracked as an M6 release contr
   assert.match(releaseReview, /e2e\/246_v6_worker_runtime_registration_smoke\.spec\.js/);
   assert.match(releaseReview, /e2e\/247_v6_production_override_browser_smoke\.spec\.js/);
   assert.match(releaseReview, /e2e\/248_v6_production_worker_runtime_smoke\.spec\.js/);
+  assert.match(releaseReview, /e2e\/249_v6_lab_modal_worker_lifetime_smoke\.spec\.js/);
   assert.match(releaseReview, /worker-origin proposal tool adapter/);
   assert.match(releaseReview, /pending complete production worker coverage/);
+  assert.match(releaseReview, /shared-state route traces/);
   assert.match(releaseReview, /idempotent delegated action-budget consumption/);
   assert.match(releaseReview, /no backend shortcuts/);
   assert.match(releaseReview, /route-level production override coverage proves player `all,v60` overrides cannot enable V6/);
@@ -1518,6 +1553,8 @@ test('V6 worker-first civic tool exposure gate is tracked as an M6 release contr
   assert.match(skillLine, /e2e\/247_v6_production_override_browser_smoke\.spec\.js/);
   assert.match(skillLine, /V6 production worker runtime browser smoke/);
   assert.match(skillLine, /e2e\/248_v6_production_worker_runtime_smoke\.spec\.js/);
+  assert.match(skillLine, /V6 modal worker lifetime smoke/);
+  assert.match(skillLine, /e2e\/249_v6_lab_modal_worker_lifetime_smoke\.spec\.js/);
   assert.match(skillLine, /tests\/world_civilization_worker_runtime_registration\.test\.js/);
   assert.match(skillLine, /tests\/world_civilization_worker_tool_adapter\.test\.js/);
   assert.match(skillLine, /idempotent delegated action-budget consumption/);
@@ -1541,6 +1578,13 @@ test('V6 worker-first civic tool exposure gate is tracked as an M6 release contr
   assert.match(productionWorkerRuntimeSmoke, /agent-debug-tab-brain/);
   assert.match(productionWorkerRuntimeSmoke, /FEATURE_WORLD_GRID_V50_REGION\)\.toBe\(true\)/);
   assert.match(productionWorkerRuntimeSmoke, /FEATURE_WORLD_V60_AGENT_CIVILIZATION\)\.toBe\(false\)/);
+  assert.match(modalWorkerLifetimeSmoke, /__v6LabTest/);
+  assert.match(modalWorkerLifetimeSmoke, /openFromRoute/);
+  assert.match(modalWorkerLifetimeSmoke, /pinWorkerRef/);
+  assert.match(modalWorkerLifetimeSmoke, /districtFrameCount/);
+  assert.match(modalWorkerLifetimeSmoke, /workerRefStable/);
+  assert.match(modalWorkerLifetimeSmoke, /history\.replaceState/);
+  assert.match(modalWorkerLifetimeSmoke, /\/api\/world\/tools\?worldGridFeatureFlags=all,v60/);
   assert.match(workerRuntimeSmoke, /agent-debug-tab-traffic/);
   assert.match(workerRuntimeSmoke, /agent-debug-tab-brain/);
   assert.match(workerRuntimeSmoke, /agent-debug-tab-session/);
@@ -1554,6 +1598,7 @@ test('V6 worker-first civic tool exposure gate is tracked as an M6 release contr
   assert.match(toolGate, /MUTATION_SECURITY_EVIDENCE_REQUIRED/);
   assert.match(workerRuntimeRegistration, /V6_WORKER_RUNTIME_REGISTRATION_VERSION/);
   assert.match(workerRuntimeRegistration, /openclaw_worker_boot/);
+  assert.match(workerRuntimeRegistration, /e2e\/249_v6_lab_modal_worker_lifetime_smoke\.spec\.js/);
   assert.match(workerRuntimeRegistration, /runtime_tool_manifest_sync/);
   assert.match(workerRuntimeRegistration, /shared_state_route_adapter/);
   assert.match(workerRuntimeRegistration, /registersRuntimeCivicTools: false/);
@@ -1563,6 +1608,11 @@ test('V6 worker-first civic tool exposure gate is tracked as an M6 release contr
   assert.match(workerToolAdapter, /proposal_drafting/);
   assert.match(workerToolAdapter, /buildDelegatedActionUsage/);
   assert.match(workerToolAdapter, /consumeDelegatedAction/);
+  assert.match(publicAppSource, /installV6LabTestHarness/);
+  assert.match(publicAppSource, /__agentTownV6LabTest/);
+  assert.match(publicAppSource, /__v6LabTest/);
+  assert.match(publicAppSource, /__agentTownV6LabPinnedWorker/);
+  assert.match(publicAppSource, /districtFrameCount/);
   assert.match(workerToolAdapter, /runtimeExposed: false/);
   assert.match(workerToolAdapter, /executesProposalEffects: false/);
   assert.match(worldGridRegionTest, /production player overrides cannot enable V6 when V5 is server enabled/);

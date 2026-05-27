@@ -115,8 +115,12 @@ persistence resilience, and security/product release review.
 - `e2e/248_v6_production_worker_runtime_smoke.spec.js` records the current
   production-mode browser smoke for worker observability tabs plus runtime
   civic-tool absence while V5 is server-enabled and player V6 overrides are
-  ignored. Full production worker coverage, modal lifetime continuity, manifest
-  parity signoff, shared-state route traces, and release signoff remain open.
+  ignored. Full production worker coverage, manifest parity signoff,
+  shared-state route traces, and release signoff remain open.
+- `e2e/249_v6_lab_modal_worker_lifetime_smoke.spec.js` records the current
+  modal lifetime trace: an already-running `/app` page opens the internal V6
+  lab as a modal without navigation, iframe replacement, worker API replacement,
+  or runtime civic-tool exposure.
 - The research-only worker proposal adapter may exist in
   `server/world_civilization/worker_tool_adapter.js`, but it must stay disabled
   by default behind `V6_CIVIC_WORKER_TOOL_ADAPTER_ENABLED`, require OpenClaw

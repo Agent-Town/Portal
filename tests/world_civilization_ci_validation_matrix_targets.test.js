@@ -59,6 +59,8 @@ test('V6 CI validation matrix targets name every release validation lane', () =>
     .currentEvidence.includes('e2e/247_v6_production_override_browser_smoke.spec.js'));
   assert.ok(V6_CI_VALIDATION_MATRIX_TARGETS.find((target) => target.key === 'v6_modal_lab_browser_smoke')
     .command.includes('PW_NODE_ENV=production FEATURE_WORLD_GRID_V50_REGION=1 npx playwright test e2e/247_v6_production_override_browser_smoke.spec.js'));
+  assert.ok(V6_CI_VALIDATION_MATRIX_TARGETS.find((target) => target.key === 'v6_modal_lab_browser_smoke')
+    .currentEvidence.includes('e2e/249_v6_lab_modal_worker_lifetime_smoke.spec.js'));
   assert.ok(V6_CI_VALIDATION_MATRIX_TARGETS.find((target) => target.key === 'worker_observability_browser_smoke')
     .currentEvidence.includes('e2e/248_v6_production_worker_runtime_smoke.spec.js'));
   assert.ok(V6_CI_VALIDATION_MATRIX_TARGETS.find((target) => target.key === 'worker_observability_browser_smoke')
