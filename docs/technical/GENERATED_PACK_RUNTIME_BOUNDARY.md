@@ -96,6 +96,7 @@ Player prompt
 - `publishPublicPackCard` is authenticated and generated-pack feature-gated; `GET /api/world/generated-pack/public-card/:cardId` is auth-free and returns only the already-published card.
 - Public cards include generated title, style summary, prompt keyword hints only, screenshot metadata, and asset-manifest summary.
 - Public-card moderation rejects raw prompt fields, Brain/provider/debug/wallet terms, executable prompt text, private owner/session data, missing screenshots, and invalid asset summaries.
+- Public-card validation reports redact unsafe submitted asset-summary values from measured evidence.
 
 ## GU-12 Curated Pack Gallery Slice
 
@@ -111,6 +112,7 @@ Player prompt
 - `createGeneratedPack` selects from the approved modifier enum deterministically; generated packs cannot provide unknown modifiers.
 - `projectApprovedModifierView` produces presentation-only flavor/tutorial/cosmetic hints and copies claim costs unchanged.
 - Modifier validation rejects formula fields, custom resource math, mutation/tool authority, custom permissions, custom agent authority, and nonzero canonical rule impact.
+- Modifier validation reports redact unsafe submitted unknown enum values from measured evidence.
 - Balance simulation requires the canonical claim-cost hash to remain unchanged and first-loop playability to remain true.
 
 ## GU-14 Generated Tech Flavor Tree Slice
@@ -127,6 +129,7 @@ Player prompt
 - Every contract flavor template maps to one approved canonical contract/action pair: plan claim, complete claim, public presence, and civic service.
 - Requester voice packs can change presentation copy only; unknown contract IDs, unknown action IDs, formulas, hidden mechanics, reward deltas, mutation authority, secret-like fields, raw executable instructions, and provider/debug jargon fail validation.
 - `projectRequesterVoiceView` exposes generated requester copy and contract flavor metadata only when generated packs are enabled.
+- Requester voice validation reports redact unsafe submitted Clover voice and rewrite-policy values from measured evidence.
 - Balance simulation requires canonical contract coverage of 1.0, no hidden mechanics, canonical contract rules preserved, and first-loop playability.
 
 ## GU-16 Town Life + Inhabitant Overlay Slice
@@ -144,6 +147,7 @@ Player prompt
 - Surface skins cannot mutate server state, include private data, alter V5 tool catalogs, add formulas, or change canonical server rules.
 - `projectMultiSurfaceCompatibilityView` exposes generated surface names and naming conventions only when generated packs are enabled.
 - Public cards may use the generated public-card title/style summary from the compatibility profile, but still pass raw-prompt, private-data, screenshot, and blocked-field gates.
+- Multi-surface validation reports redact unsafe submitted naming values from measured evidence.
 
 ## Production Release Gate Boundary
 

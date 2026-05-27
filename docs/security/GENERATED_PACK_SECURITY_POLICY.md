@@ -17,6 +17,7 @@ Status: prototype-gated
 - Candidate-generation run and job-log validation reports must reject and redact submitted secret-looking keys, secret-looking values, raw-instruction keys, and executable instruction values from both content checks and schema-error paths.
 - Asset prompt-plan, candidate-review, and candidate-generation validation reports must redact unsafe submitted canonical target labels from measured problem lists.
 - Candidate-review, release-approval, and release-evidence-bundle validation reports must redact unsafe submitted manifest hashes, evidence hashes, bundle hashes, and pack ids from measured problem lists.
+- Public-card, approved-modifier, requester-voice, and multi-surface validation reports must redact unsafe submitted measured values before returning evidence to callers.
 - Postprocess plans and reports are standalone contracts; they may write postprocessed candidate artifacts and metadata, but must not write approved production assets or alter canonical gameplay mappings.
 - Browser runtime asset loading must use safe public generated-pack paths only; private candidate roots, path traversal, data URLs, provider URLs, and unapproved outputs must fall back without player exposure.
 - First-loop playtest pass status requires measured browser evidence, screenshot evidence, clean console state, canonical payload integrity, and generated-pack validation. Default or placeholder scores cannot pass release gates.
@@ -55,6 +56,7 @@ Status: prototype-gated
   "releaseEvidenceUnsafeKeyValueRedacted": true,
   "unsafeTargetLabelRedacted": true,
   "unsafeHashAndPackIdRedacted": true,
+  "presentationReportUnsafeValueRedacted": true,
   "rawExecutablePromptInstructionCount": 0,
   "arbitraryToolMutationFormulaCount": 0,
   "schemaRegistryExists": true,
@@ -140,6 +142,7 @@ Status: prototype-gated
   "promptKeywordHintsOnly": true,
   "publicCardScreenshotPresent": true,
   "unsafePackCardRejected": true,
+  "unsafeAssetSummaryValueRedacted": true,
   "publicGallerySchemaExists": true,
   "authNotRequiredForPublicGallery": true,
   "approvedOnlyGallery": true,
@@ -147,6 +150,7 @@ Status: prototype-gated
   "unpublishWorks": true,
   "approvedModifierSchemaExists": true,
   "enumOnlyModifiers": true,
+  "unsafeUnknownModifierValueRedacted": true,
   "formulaInjectionRejected": true,
   "balanceSimulationPassed": true,
   "canonicalRulesPreserved": true,

@@ -86,6 +86,7 @@ This is a separate prototype-gated track. It must not change normal gameplay vis
   "releaseEvidenceUnsafeKeyValueRedacted": true,
   "unsafeTargetLabelRedacted": true,
   "unsafeHashAndPackIdRedacted": true,
+  "presentationReportUnsafeValueRedacted": true,
   "canonicalMappingCoverage": 1.0,
   "arbitraryToolMutationFormulaCount": 0,
   "invalidAssetManifestEntryCount": 0,
@@ -297,7 +298,7 @@ Generated packs now have a durable ignored-data contract for prototype reload, e
 
 ## GU-11 Public-Safe Pack Cards Slice
 
-Generated packs can now publish an unlisted public card after a measured playtest screenshot exists. Publishing remains authenticated and feature-gated, but the card read endpoint is auth-free by card ID. Cards include generated title, style summary, prompt keyword hints only, screenshot metadata, asset-manifest summary, and moderation metrics. Raw prompts, Brain/provider/debug/wallet fields, account/session identifiers, and unsafe card content fail moderation.
+Generated packs can now publish an unlisted public card after a measured playtest screenshot exists. Publishing remains authenticated and feature-gated, but the card read endpoint is auth-free by card ID. Cards include generated title, style summary, prompt keyword hints only, screenshot metadata, asset-manifest summary, and moderation metrics. Raw prompts, Brain/provider/debug/wallet fields, account/session identifiers, and unsafe card content fail moderation, and validation reports redact unsafe submitted asset-summary values from measured evidence.
 
 ```json
 {
@@ -310,6 +311,7 @@ Generated packs can now publish an unlisted public card after a measured playtes
   "assetManifestSummaryPresent": true,
   "screenshotPresent": true,
   "unsafePackCardRejected": true,
+  "unsafeAssetSummaryValueRedacted": true,
   "privateDataLeakCount": 0,
   "rawPromptStored": false
 }
@@ -339,7 +341,7 @@ Approved public cards can now be promoted into a public-safe curated gallery wit
 
 ## GU-13 Approved Modifier System Slice
 
-Generated packs now include an `approvedModifiers` contract that can influence presentation feel only through approved enum values. The selected modifiers are deterministic, schema-validated, and projected into a read-only modifier view that may add flavor/tutorial/cosmetic copy while preserving canonical claim costs, mechanical keys, server rules, permissions, and tools. Unknown modifiers, formula fields, custom resource math, mutation authority, custom permissions, and agent authority fail validation.
+Generated packs now include an `approvedModifiers` contract that can influence presentation feel only through approved enum values. The selected modifiers are deterministic, schema-validated, and projected into a read-only modifier view that may add flavor/tutorial/cosmetic copy while preserving canonical claim costs, mechanical keys, server rules, permissions, and tools. Unknown modifiers, formula fields, custom resource math, mutation authority, custom permissions, and agent authority fail validation, and validation reports redact unsafe submitted unknown enum values.
 
 ```json
 {
@@ -354,7 +356,8 @@ Generated packs now include an `approvedModifiers` contract that can influence p
   "canonicalRulesPreserved": true,
   "claimCostHashPreserved": true,
   "firstLoopStillCompletes": true,
-  "privateDataLeakCount": 0
+  "privateDataLeakCount": 0,
+  "unsafeUnknownModifierValueRedacted": true
 }
 ```
 
@@ -379,7 +382,7 @@ Generated packs now include a strict `techFlavorTree` contract that renames and 
 
 ## GU-15 Generated Requesters, Contracts, and Voices Slice
 
-Generated packs now include a `requesterVoicePack` contract for presentation-only requester archetypes, canonical contract flavor templates, town murmurs, and Clover style-aware copy. Each contract template maps to one approved canonical contract/action pair and proves through balance simulation that no hidden mechanics, formulas, reward changes, or V6 civic authority were introduced. The cached LLM rewrite path remains a disabled future hook requiring explicit consent and cost approval before use.
+Generated packs now include a `requesterVoicePack` contract for presentation-only requester archetypes, canonical contract flavor templates, town murmurs, and Clover style-aware copy. Each contract template maps to one approved canonical contract/action pair and proves through balance simulation that no hidden mechanics, formulas, reward changes, or V6 civic authority were introduced. The cached LLM rewrite path remains a disabled future hook requiring explicit consent and cost approval before use. Validation reports redact unsafe submitted Clover voice and rewrite-policy values from measured evidence.
 
 ```json
 {
@@ -394,6 +397,7 @@ Generated packs now include a `requesterVoicePack` contract for presentation-onl
   "cloverIdentityStable": true,
   "cachedRewriteDisabled": true,
   "externalModelUsed": false,
+  "unsafeVoiceReportValueRedacted": true,
   "firstLoopStillCompletes": true
 }
 ```
@@ -420,7 +424,7 @@ Generated packs now include an `inhabitantStyleOverlay` contract for passive tow
 
 ## GU-17 World Grid and Multi-Settlement Compatibility Slice
 
-Generated packs now include a `multiSurfaceCompatibility` contract that maps one universe across Z1 settlement nodes, Z2 region grids, route edges, public pack cards, and sandbox districts. Each surface skin is visual-only, reads existing server-owned state, carries public-safe generated names, and records no V5 tool or server-rule impact. Public card copy can use the generated card skin while preserving screenshot, prompt-hint, and private-data redaction gates.
+Generated packs now include a `multiSurfaceCompatibility` contract that maps one universe across Z1 settlement nodes, Z2 region grids, route edges, public pack cards, and sandbox districts. Each surface skin is visual-only, reads existing server-owned state, carries public-safe generated names, and records no V5 tool or server-rule impact. Public card copy can use the generated card skin while preserving screenshot, prompt-hint, and private-data redaction gates. Validation reports redact unsafe submitted multi-town naming values from measured evidence.
 
 ```json
 {
@@ -433,6 +437,7 @@ Generated packs now include a `multiSurfaceCompatibility` contract that maps one
   "v5ToolsUnaffected": true,
   "serverRuleChangeCount": 0,
   "unsafeTextRejectCount": 0,
+  "unsafeNamingValueRedacted": true,
   "firstLoopStillCompletes": true
 }
 ```

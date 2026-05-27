@@ -691,6 +691,15 @@ function redactGeneratedPackReportValue(value) {
   return generatedPackPathSegment(value);
 }
 
+function redactGeneratedPackReportObject(value) {
+  if (Array.isArray(value)) return value.map((entry) => redactGeneratedPackReportObject(entry));
+  if (!value || typeof value !== 'object') return redactGeneratedPackReportValue(value);
+  return Object.fromEntries(Object.entries(value).map(([key, entry]) => [
+    generatedPackPathSegment(key),
+    redactGeneratedPackReportObject(entry)
+  ]));
+}
+
 function redactGeneratedPackTargetProblem(value = '') {
   const text = String(value || '');
   const separatorIndex = text.indexOf(':');
@@ -1996,7 +2005,7 @@ function validateRequesterVoicePack(requesterVoice = {}) {
       passed: requesterVoice?.cloverVoice?.identityAnchor === 'Clover remains the trusted Foreman'
         && requesterVoice?.cloverVoice?.canonicalRolePreserved === true
         && requesterVoice?.cloverVoice?.stability === 'identity-stable',
-      measured: requesterVoice?.cloverVoice || {}
+      measured: redactGeneratedPackReportObject(requesterVoice?.cloverVoice || {})
     },
     {
       id: 'REQUESTER_REWRITE_HOOK_DISABLED',
@@ -2005,7 +2014,7 @@ function validateRequesterVoicePack(requesterVoice = {}) {
         && requesterVoice?.cachedRewritePolicy?.requiresConsent === true
         && requesterVoice?.cachedRewritePolicy?.requiresCostApproval === true
         && requesterVoice?.cachedRewritePolicy?.providerAuthStored === false,
-      measured: requesterVoice?.cachedRewritePolicy || {}
+      measured: redactGeneratedPackReportObject(requesterVoice?.cachedRewritePolicy || {})
     }
   ];
   return {
@@ -2527,9 +2536,9 @@ function validateMultiSurfaceCompatibility(compatibility = {}) {
       measured: {
         z1SurfacePresent: Boolean(z1),
         z2SurfacePresent: Boolean(z2),
-        homeSettlementName: naming.homeSettlementName || null,
-        secondSettlementName: naming.secondSettlementName || null,
-        regionName: naming.regionName || null
+        homeSettlementName: redactGeneratedPackReportValue(naming.homeSettlementName || null),
+        secondSettlementName: redactGeneratedPackReportValue(naming.secondSettlementName || null),
+        regionName: redactGeneratedPackReportValue(naming.regionName || null)
       }
     },
     {
@@ -2719,10 +2728,10 @@ function validateApprovedModifiers(modifiers = {}) {
       measured: {
         allowedCount: allowed.length,
         selectedCount: selected.length,
-        unknownAllowed,
-        unknownSelected,
-        missingAllowed,
-        duplicateSelected: [...new Set(duplicateSelected)]
+        unknownAllowed: unknownAllowed.map(redactGeneratedPackReportValue),
+        unknownSelected: unknownSelected.map(redactGeneratedPackReportValue),
+        missingAllowed: missingAllowed.map(redactGeneratedPackReportValue),
+        duplicateSelected: [...new Set(duplicateSelected)].map(redactGeneratedPackReportValue)
       }
     },
     {
@@ -2730,7 +2739,7 @@ function validateApprovedModifiers(modifiers = {}) {
       passed: missingEffects.length === 0 && unsafeEffects.length === 0 && effects.length === selected.length,
       measured: {
         effectCount: effects.length,
-        missingEffects,
+        missingEffects: missingEffects.map(redactGeneratedPackReportValue),
         unsafeEffectCount: unsafeEffects.length
       }
     },
@@ -3910,7 +3919,7 @@ function validatePublicPackCard(card = {}, owner = {}) {
       id: 'PUBLIC_CARD_ASSET_SUMMARY_PRESENT',
       passed: Number(card?.assetManifestSummary?.assetCount || 0) > 0
         && Number(card?.assetManifestSummary?.plannedCandidateCount || 0) >= ASSET_PROMPT_TARGETS.length,
-      measured: card?.assetManifestSummary || {}
+      measured: redactGeneratedPackReportObject(card?.assetManifestSummary || {})
     }
   ];
   return {
