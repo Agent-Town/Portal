@@ -1,4 +1,5 @@
 const { validateCivicAction, validateRollbackPlan } = require('./schemas');
+const { DEFAULT_VOTE_APPROVAL_POLICY, evaluateVoteApprovalPolicy } = require('./votes');
 
 const V6_CIVIC_GOVERNANCE_PREFLIGHT_VERSION = 'agent-town.v6.civic.governance_preflight.v1';
 
@@ -12,6 +13,7 @@ const REQUIRED_GOVERNANCE_PREFLIGHT_CHECKS = [
   'moderation_approved',
   'proposal_review_ready',
   'vote_approval',
+  'vote_policy',
   'delegation_policy',
   'approval_receipt',
   'non_executing'
@@ -27,6 +29,7 @@ const CHECK_ERROR = {
   effect_type_matches: 'CIVIC_EFFECT_TYPE_MISMATCH',
   moderation_approved: 'CIVIC_EFFECT_MODERATION_REQUIRED',
   vote_approval: 'CIVIC_EFFECT_APPROVAL_REQUIRED',
+  vote_policy: 'CIVIC_EFFECT_VOTE_POLICY_REQUIRED',
   delegation_policy: 'CIVIC_EFFECT_DELEGATION_UNSUPPORTED',
   approval_receipt: 'CIVIC_EFFECT_APPROVAL_RECEIPT_REQUIRED',
   non_executing: 'CIVIC_GOVERNANCE_PREFLIGHT_NON_EXECUTING_REQUIRED'
@@ -75,7 +78,8 @@ function buildV6CivicGovernancePreflight({
   voteStore,
   moderationStore,
   nowMs = Date.now(),
-  allowDelegatedExecution = false
+  allowDelegatedExecution = false,
+  voteApprovalPolicy = DEFAULT_VOTE_APPROVAL_POLICY
 } = {}) {
   const actionValidation = validateCivicAction(rawAction);
   const rollbackValidation = validateRollbackPlan(rawRollbackPlan);
@@ -110,6 +114,7 @@ function buildV6CivicGovernancePreflight({
       && voteSummary.counts.approve > voteSummary.counts.reject
       && voteSummary.counts.approve >= 1
   );
+  const votePolicy = evaluateVoteApprovalPolicy(voteSummary, voteApprovalPolicy);
   const delegationAllowed = Boolean(
     action
       && (action.executionAuthority.kind !== 'delegated' || allowDelegatedExecution === true)
@@ -147,6 +152,16 @@ function buildV6CivicGovernancePreflight({
       proposalId: action?.proposalId || '',
       counts: voteSummary?.counts || null
     }),
+    check('vote_policy', votePolicy.ok, {
+      proposalId: action?.proposalId || '',
+      policy: votePolicy.policy,
+      counts: votePolicy.counts,
+      quorumVotes: votePolicy.quorumVotes,
+      decisiveVotes: votePolicy.decisiveVotes,
+      approvalBps: votePolicy.approvalBps,
+      failures: votePolicy.failures,
+      policyErrors: votePolicy.policyErrors
+    }),
     check('delegation_policy', delegationAllowed, {
       proposalId: action?.proposalId || '',
       authorityKind: action?.executionAuthority?.kind || '',
@@ -177,6 +192,7 @@ function buildV6CivicGovernancePreflight({
     rollbackPlan,
     proposal,
     voteSummary,
+    votePolicy,
     approvingVote,
     moderationDecision,
     checks,

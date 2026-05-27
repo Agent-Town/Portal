@@ -224,6 +224,54 @@ test('V6 governance preflight fails closed for missing moderation vote and appro
   assert.deepEqual(assertV6CivicGovernancePreflightSafe(report), { ok: true, errors: [] });
 }));
 
+test('V6 governance preflight enforces explicit vote quorum and threshold policy', () => withStores((stores) => {
+  stores.proposalStore.draftProposal(proposal(), { nowMs: 1_779_784_000_000 });
+  const decision = stores.moderationStore.recordDecision(moderationDecision(), { nowMs: 1_779_784_100_000 });
+  stores.proposalStore.recordProposalReview(decision, { nowMs: 1_779_784_150_000 });
+  stores.voteStore.recordVote(vote(), { nowMs: 1_779_784_200_000 });
+
+  let report = preflight(stores, {
+    voteApprovalPolicy: {
+      policyId: 'policy_v6_preflight_two_vote_001',
+      quorumMinVotes: 2,
+      minApproveVotes: 2,
+      approvalThresholdBps: 6600
+    }
+  });
+  assert.equal(report.canPrepare, false);
+  assert.match(report.errors.join(','), /CIVIC_EFFECT_VOTE_POLICY_REQUIRED/);
+  assert.deepEqual(report.votePolicy.failures, ['quorum', 'min_approve']);
+  assert.throws(() => throwV6CivicGovernancePreflightError(report), /CIVIC_EFFECT_VOTE_POLICY_REQUIRED/);
+
+  stores.voteStore.recordVote(vote({
+    voteId: 'vote_governance_preflight_002',
+    voter: {
+      kind: 'human',
+      accountId: 'acct_v6_voter_002'
+    },
+    authorization: {
+      kind: 'wallet_session',
+      subjectAccountId: 'acct_v6_voter_002',
+      serverVerified: true
+    },
+    receiptId: 'receipt_vote_preflight_002',
+    idempotencyKey: 'idem_vote_preflight_002'
+  }), { nowMs: 1_779_784_250_000 });
+
+  report = preflight(stores, {
+    voteApprovalPolicy: {
+      policyId: 'policy_v6_preflight_two_vote_001',
+      quorumMinVotes: 2,
+      minApproveVotes: 2,
+      approvalThresholdBps: 6600
+    }
+  });
+  assert.equal(report.canPrepare, true);
+  assert.equal(report.votePolicy.ok, true);
+  assert.equal(report.votePolicy.approvalBps, 10_000);
+  assert.deepEqual(assertV6CivicGovernancePreflightSafe(report), { ok: true, errors: [] });
+}));
+
 test('V6 governance preflight rejects delegated execution and stale or mismatched effect inputs', () => withStores((stores) => {
   seedApproved(stores);
   const delegated = preflight(stores, {

@@ -176,7 +176,8 @@ gate below has implementation, deterministic tests, and security/product signoff
   `ready_for_vote` and `rejected` terminal readiness states, and replayable
   `proposal.reviewed` audit entries before vote/effect preparation.
 - Vote schema with voter authorization, delegation status, eligibility proof,
-  one-vote accounting, and receipt id.
+  one-vote accounting, receipt id, and explicit quorum/approval-threshold policy
+  evaluation before effect preparation.
 - Civic action schema with proposal reference, execution authority, before/after
   summary, audit ledger entry, and rollback id.
 - Institution charter schema with human chartering actor, public scope,
@@ -201,7 +202,12 @@ gate below has implementation, deterministic tests, and security/product signoff
   override safety, browser coverage, and release review signoff before any
   `et.world.civic.*` tool appears in `/api/world/tools`.
 - Vote authorization cannot be forged, replayed, self-delegated without policy,
-  or applied to ineligible owners.
+  or applied to ineligible owners. Current research-only coverage starts this
+  in `server/world_civilization/votes.js` with non-executing
+  `evaluateVoteApprovalPolicy()` checks for quorum, minimum approvals, approval
+  threshold, abstain quorum handling, and governance-preflight integration;
+  release still requires per-institution voting templates, route-edge vote
+  authorization, and product/security review of quorum and threshold choices.
 - Reputation cannot be self-awarded, transferred as currency, or used without an
   audit trail and dispute path. Current research-only storage starts this in
   `server/world_civilization/reputation.js` with durable reputation records,
@@ -224,8 +230,8 @@ gate below has implementation, deterministic tests, and security/product signoff
   mismatches before persistence. Research-only governance preflight starts in
   `server/world_civilization/governance_preflight.js` and is called by
   `effects.js` before any prepared effect, rollback record, or audit row is
-  written; it requires proposal, proposal review-ready state, vote,
-  moderation, approval receipt, effect preview, rollback-plan, and
+  written; it requires proposal, proposal review-ready state, vote approval
+  policy, moderation, approval receipt, effect preview, rollback-plan, and
   delegation-policy prerequisites to pass.
   Research-only handle reconstruction starts in
   `server/world_civilization/rollback_recovery.js` and

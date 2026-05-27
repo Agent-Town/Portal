@@ -28,18 +28,35 @@ effects, or grant agents public mutation authority.
   vote content.
 - Recording a vote appends exactly one `vote.recorded` audit ledger entry.
 
+## Approval Policy Rules
+
+`server/world_civilization/votes.js` defines a non-executing vote approval
+policy evaluator. The default research policy is
+`policy_v6_simple_majority_v1`:
+
+- `quorumMinVotes: 1`
+- `minApproveVotes: 1`
+- `approvalThresholdBps: 5001`
+- `countAbstainForQuorum: true`
+
+Internal callers can pass stricter policies with explicit quorum and approval
+thresholds. Evaluation returns counts, quorum votes, decisive votes,
+approval-basis-points, failure reasons, and `executionStatus:
+not_executable`. It does not decide or apply proposal effects.
+
 ## Non-Execution Rule
 
 Vote summaries may count approve/reject/abstain choices for auditability, but
 they always report `executionStatus: not_executable`. Later milestones must add
-moderation, proposal state transitions, quorum/threshold rules, execution
-authority, rollback checks, and release-security controls before any civic
-effect can apply.
+moderation, proposal state transitions, release-reviewed voting templates,
+execution authority, rollback checks, and release-security controls before any
+civic effect can apply.
 
 The current research-only governance preflight consumes vote summaries and vote
 receipts before prepared effect persistence. It requires at least one approving
-vote, more approvals than rejections, and an execution-authority receipt that
-matches an approving vote.
+vote, more approvals than rejections, an explicit vote approval policy that
+passes quorum/threshold checks, and an execution-authority receipt that matches
+an approving vote.
 
 ## Delegation Boundary
 

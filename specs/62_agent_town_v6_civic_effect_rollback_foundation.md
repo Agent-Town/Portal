@@ -99,8 +99,9 @@ proposal/status replay.
 - The rollback plan id must match the proposal rollback plan id.
 - The proposal must have an approved moderation decision for its moderation
   class.
-- The proposal must have at least one approving vote and more approvals than
-  rejections.
+- The proposal must have at least one approving vote, more approvals than
+  rejections, and a passing vote approval policy with explicit quorum and
+  approval-threshold checks.
 - Human-approved actions must reference an approving vote receipt.
 - Delegated execution is rejected until M12 defines scoped delegation storage
   and enforcement.

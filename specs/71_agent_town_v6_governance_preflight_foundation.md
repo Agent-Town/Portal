@@ -35,6 +35,7 @@ errors before persistence, rollback handles, or audit rows are written.
   status `approved`.
 - Vote approval with at least one approving vote and more approvals than
   rejections.
+- Vote approval policy passes explicit quorum and approval-threshold checks.
 - Delegated execution remains rejected until M12 worker/tool enforcement and
   route-edge authorization are release-ready.
 - Human-approved execution authority must reference an approving vote receipt.
@@ -46,7 +47,8 @@ This foundation is not execution readiness. M7-M11 cannot move to `done` until:
 
 - proposal state transitions remain explicit, durable, audited, and connected to
   moderation review outcomes before vote/effect preparation;
-- vote quorum and threshold rules are release-reviewed;
+- vote quorum and threshold rules are connected to release-reviewed
+  per-institution voting templates;
 - moderation review and appeal outcomes are connected to proposal state;
 - delegated execution is authorized through M12 route/tool enforcement or
   remains disabled;

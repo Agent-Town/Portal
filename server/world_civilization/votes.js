@@ -11,6 +11,99 @@ const {
 
 const MIGRATION_VERSION = 'v1';
 const STORE_KEY = 'votes';
+const DEFAULT_VOTE_APPROVAL_POLICY = Object.freeze({
+  policyId: 'policy_v6_simple_majority_v1',
+  quorumMinVotes: 1,
+  minApproveVotes: 1,
+  approvalThresholdBps: 5001,
+  countAbstainForQuorum: true
+});
+
+function normalizePolicyInteger(errors, rawValue, key, fallback, { min, max }) {
+  const value = rawValue === undefined ? fallback : rawValue;
+  if (!Number.isInteger(value) || value < min || value > max) {
+    errors.push(`${key} must be integer ${min}-${max}`);
+    return fallback;
+  }
+  return value;
+}
+
+function normalizeVoteApprovalPolicy(rawPolicy = {}) {
+  const policy = rawPolicy && typeof rawPolicy === 'object' ? rawPolicy : {};
+  const errors = [];
+  const normalized = {
+    policyId: String(policy.policyId || DEFAULT_VOTE_APPROVAL_POLICY.policyId),
+    quorumMinVotes: normalizePolicyInteger(
+      errors,
+      policy.quorumMinVotes,
+      'quorumMinVotes',
+      DEFAULT_VOTE_APPROVAL_POLICY.quorumMinVotes,
+      { min: 1, max: 10_000 }
+    ),
+    minApproveVotes: normalizePolicyInteger(
+      errors,
+      policy.minApproveVotes,
+      'minApproveVotes',
+      DEFAULT_VOTE_APPROVAL_POLICY.minApproveVotes,
+      { min: 1, max: 10_000 }
+    ),
+    approvalThresholdBps: normalizePolicyInteger(
+      errors,
+      policy.approvalThresholdBps,
+      'approvalThresholdBps',
+      DEFAULT_VOTE_APPROVAL_POLICY.approvalThresholdBps,
+      { min: 1, max: 10_000 }
+    ),
+    countAbstainForQuorum: policy.countAbstainForQuorum === undefined
+      ? DEFAULT_VOTE_APPROVAL_POLICY.countAbstainForQuorum
+      : policy.countAbstainForQuorum === true
+  };
+  if (!/^policy_[a-z0-9_:-]{4,88}$/.test(normalized.policyId)) {
+    errors.push('policyId must match policy id format');
+  }
+  return {
+    ok: errors.length === 0,
+    errors,
+    policy: normalized
+  };
+}
+
+function evaluateVoteApprovalPolicy(summary = null, rawPolicy = {}) {
+  const normalized = normalizeVoteApprovalPolicy(rawPolicy);
+  const counts = summary?.counts || { approve: 0, reject: 0, abstain: 0 };
+  const approve = Number(counts.approve || 0);
+  const reject = Number(counts.reject || 0);
+  const abstain = Number(counts.abstain || 0);
+  const decisiveVotes = approve + reject;
+  const quorumVotes = normalized.policy.countAbstainForQuorum
+    ? approve + reject + abstain
+    : decisiveVotes;
+  const approvalBps = decisiveVotes > 0 ? Math.floor((approve * 10_000) / decisiveVotes) : 0;
+  const failures = [];
+
+  if (!normalized.ok) failures.push('policy_invalid');
+  if (quorumVotes < normalized.policy.quorumMinVotes) failures.push('quorum');
+  if (approve < normalized.policy.minApproveVotes) failures.push('min_approve');
+  if (approvalBps < normalized.policy.approvalThresholdBps) failures.push('approval_threshold');
+
+  return {
+    ok: failures.length === 0,
+    policy: normalized.policy,
+    policyErrors: normalized.errors,
+    proposalId: String(summary?.proposalId || ''),
+    counts: {
+      approve,
+      reject,
+      abstain
+    },
+    total: approve + reject + abstain,
+    quorumVotes,
+    decisiveVotes,
+    approvalBps,
+    failures,
+    executionStatus: 'not_executable'
+  };
+}
 
 function parseVoteRow(row) {
   if (!row) return null;
@@ -250,6 +343,10 @@ function createCivicVoteStore({ sqlitePath, proposalStore, auditLedger = null, a
     };
   }
 
+  function evaluateProposalApproval(proposalId = '', policy = {}) {
+    return evaluateVoteApprovalPolicy(summarizeProposalVotes(proposalId), policy);
+  }
+
   function count() {
     return Number(statements.count.get().count || 0);
   }
@@ -270,6 +367,7 @@ function createCivicVoteStore({ sqlitePath, proposalStore, auditLedger = null, a
     count,
     getSchemaMetadata,
     getVote,
+    evaluateProposalApproval,
     listVotes,
     migrationVersion: schemaMetadata.migrationVersion,
     recordVote,
@@ -279,5 +377,8 @@ function createCivicVoteStore({ sqlitePath, proposalStore, auditLedger = null, a
 }
 
 module.exports = {
-  createCivicVoteStore
+  DEFAULT_VOTE_APPROVAL_POLICY,
+  createCivicVoteStore,
+  evaluateVoteApprovalPolicy,
+  normalizeVoteApprovalPolicy
 };
