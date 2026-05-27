@@ -215,6 +215,54 @@ test('V6 release review blocks signoff without effect execution rollback evidenc
   assert.deepEqual(assertV6ReleaseReviewSafe(report), { ok: true, errors: [] });
 });
 
+test('V6 release review requires agent participation route-edge enforcement evidence', () => {
+  const agentGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'agent_participation_review');
+  const validationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'validation_evidence');
+
+  assert.equal(agentGate.owner, 'engineering_security');
+  assert.ok(agentGate.requiredArtifacts.includes('specs/63_agent_town_v6_agent_participation_delegation_foundation.md'));
+  assert.ok(agentGate.requiredArtifacts.includes('server/world_civilization/delegations.js'));
+  assert.ok(agentGate.requiredArtifacts.includes('server/world_civilization/governance_preflight.js'));
+  assert.ok(agentGate.requiredArtifacts.includes('server/world_civilization/mutation_security.js'));
+  assert.ok(agentGate.requiredArtifacts.includes('tests/world_civilization_delegations.test.js'));
+  assert.ok(agentGate.requiredChecks.includes('worker_tool_scope_enforcement'));
+  assert.ok(agentGate.requiredChecks.includes('route_edge_expiry_check'));
+  assert.ok(agentGate.requiredChecks.includes('route_edge_budget_check'));
+  assert.ok(agentGate.requiredChecks.includes('route_edge_revocation_check'));
+  assert.ok(agentGate.requiredChecks.includes('principal_wallet_session_binding'));
+  assert.ok(agentGate.requiredChecks.includes('no_public_autonomous_mutation'));
+  assert.ok(validationGate.requiredChecks.includes('agent_participation_enforcement_gate'));
+  assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_delegations.test.js'));
+  assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_mutation_security.test.js'));
+});
+
+test('V6 release review blocks signoff without agent participation route-edge controls', () => {
+  const evidence = Object.fromEntries(REQUIRED_REVIEW_GATES.map((gate) => [gate.key, completeEvidenceFor(gate)]));
+  evidence.agent_participation_review = {
+    ...evidence.agent_participation_review,
+    checks: evidence.agent_participation_review.checks.filter((check) => (
+      check !== 'route_edge_budget_check'
+      && check !== 'route_edge_revocation_check'
+      && check !== 'principal_wallet_session_binding'
+    ))
+  };
+  const report = buildV6ReleaseReviewReport({
+    includeResearchReview: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence
+  });
+  const agentGate = report.gateReports.find((gate) => gate.key === 'agent_participation_review');
+
+  assert.equal(report.releaseReady, false);
+  assert.equal(agentGate.ok, false);
+  assert.deepEqual(agentGate.missingChecks, [
+    'route_edge_budget_check',
+    'route_edge_revocation_check',
+    'principal_wallet_session_binding'
+  ]);
+  assert.deepEqual(assertV6ReleaseReviewSafe(report), { ok: true, errors: [] });
+});
+
 test('V6 release review report can only become ready with complete evidence and signoff', () => {
   const evidence = Object.fromEntries(REQUIRED_REVIEW_GATES.map((gate) => [gate.key, completeEvidenceFor(gate)]));
   const report = buildV6ReleaseReviewReport({

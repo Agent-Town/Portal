@@ -114,6 +114,16 @@ applied/rollback audit evidence, and worker/route security. It remains
 non-executing with `releaseReady: false`, `appliesWorldState: false`, and
 `executionStatus: "not_executable"`.
 
+The research-only M12 agent participation enforcement gate in
+`server/world_civilization/delegations.js` records the release evidence
+required before any delegated authority can reach a worker tool or route edge:
+worker-tool scope enforcement, route-edge scope/expiry/budget/revocation
+checks, principal wallet/session binding, idempotent budget consumption,
+store-backed delegation proof, delegation audit rows, no backend shortcuts, and
+no public autonomous mutation. It remains non-executing with
+`releaseReady: false`, `delegatedExecutionEnabled: false`,
+`mutatesWorldState: false`, and `executionStatus: "not_executable"`.
+
 The research-only modal lab surface contract in
 `server/world_civilization/lab_surface.js` is route-neutral and non-executing.
 It does not add a V6 route or normal gameplay surface; it only records the
@@ -133,8 +143,9 @@ summaries from replay rows without applying world state.
 The research-only release review gate in
 `server/world_civilization/release_review.js` names the threat model, privacy,
 abuse-case, data-retention, audit coverage, validation, effect execution and
-rollback review, modal lab surface review, and product signoff requirements
-that must be complete before normal gameplay exposure.
+rollback review, agent participation enforcement review, modal lab surface
+review, and product signoff requirements that must be complete before normal
+gameplay exposure.
 
 The research-only controlled release gate in
 `server/world_civilization/controlled_release.js` requires M0-M17 completion,

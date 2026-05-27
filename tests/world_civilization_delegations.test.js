@@ -4,11 +4,18 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
+const { V6_WORLD_FEATURE_FLAG, parseWorldGridFeatureFlags } = require('../server/world_grid/feature_flags');
 const { CIVIC_SCHEMA_VERSION } = require('../server/world_civilization/schemas');
 const { createCivicAuditLedger } = require('../server/world_civilization/audit_ledger');
 const {
   DELEGATION_STATUS_ACTIVE,
   DELEGATION_STATUS_REVOKED,
+  REQUIRED_AGENT_PARTICIPATION_ENFORCEMENT_CHECKS,
+  REQUIRED_AGENT_PARTICIPATION_EVIDENCE_CHECKS,
+  REQUIRED_DELEGATION_ROUTE_SURFACES,
+  V6_AGENT_PARTICIPATION_ENFORCEMENT_GATE_VERSION,
+  assertV6AgentParticipationEnforcementGateSafe,
+  buildV6AgentParticipationEnforcementGate,
   createCivicDelegationStore
 } = require('../server/world_civilization/delegations');
 
@@ -55,6 +62,148 @@ function delegatedActionUse(overrides = {}) {
     ...overrides
   };
 }
+
+function agentParticipationEnforcementEvidence(overrides = {}) {
+  return {
+    status: 'complete',
+    executionStatus: 'not_executable',
+    runtimeExposed: false,
+    playerVisible: false,
+    mutatesWorldState: false,
+    delegatedExecutionEnabled: false,
+    workerToolEnforced: true,
+    routeEdgeEnforced: true,
+    lifecycleControlsEnforced: true,
+    routeSurfaces: [...REQUIRED_DELEGATION_ROUTE_SURFACES],
+    checks: [...REQUIRED_AGENT_PARTICIPATION_EVIDENCE_CHECKS],
+    ...overrides
+  };
+}
+
+test('V6 agent participation enforcement gate is hidden without explicit research opt-in and V6 flag', () => {
+  const noResearchOptIn = buildV6AgentParticipationEnforcementGate({
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: agentParticipationEnforcementEvidence()
+  });
+  const broadV5Override = buildV6AgentParticipationEnforcementGate({
+    includeResearchDelegationEnforcement: true,
+    featureFlags: parseWorldGridFeatureFlags('all'),
+    evidence: agentParticipationEnforcementEvidence()
+  });
+
+  for (const report of [noResearchOptIn, broadV5Override]) {
+    assert.equal(report.version, V6_AGENT_PARTICIPATION_ENFORCEMENT_GATE_VERSION);
+    assert.equal(report.available, false);
+    assert.equal(report.researchReady, false);
+    assert.equal(report.releaseReady, false);
+    assert.equal(report.failClosed, true);
+    assert.equal(report.runtimeExposed, false);
+    assert.equal(report.playerVisible, false);
+    assert.equal(report.mutatesWorldState, false);
+    assert.equal(report.delegatedExecutionEnabled, false);
+    assert.equal(report.executionStatus, 'not_executable');
+    assert.deepEqual(assertV6AgentParticipationEnforcementGateSafe(report), { ok: true, errors: [] });
+  }
+});
+
+test('V6 agent participation enforcement gate records route-edge lifecycle evidence without execution', () => {
+  const report = buildV6AgentParticipationEnforcementGate({
+    includeResearchDelegationEnforcement: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    source: 'node_test',
+    evidence: agentParticipationEnforcementEvidence()
+  });
+
+  assert.equal(report.available, true);
+  assert.equal(report.researchReady, true);
+  assert.equal(report.releaseReady, false);
+  assert.equal(report.failClosed, false);
+  assert.equal(report.runtimeExposed, false);
+  assert.equal(report.playerVisible, false);
+  assert.equal(report.mutatesWorldState, false);
+  assert.equal(report.delegatedExecutionEnabled, false);
+  assert.equal(report.executionStatus, 'not_executable');
+  assert.deepEqual(report.checks.map((entry) => entry.key), REQUIRED_AGENT_PARTICIPATION_ENFORCEMENT_CHECKS);
+  assert.deepEqual(report.evidence.requiredChecks, REQUIRED_AGENT_PARTICIPATION_EVIDENCE_CHECKS);
+  assert.deepEqual(report.evidence.missingChecks, []);
+  assert.deepEqual(report.evidence.requiredRouteSurfaces, REQUIRED_DELEGATION_ROUTE_SURFACES);
+  assert.deepEqual(report.evidence.missingRouteSurfaces, []);
+  assert.deepEqual(assertV6AgentParticipationEnforcementGateSafe(report), { ok: true, errors: [] });
+});
+
+test('V6 agent participation enforcement gate fails closed without route-edge budget and revocation evidence', () => {
+  const report = buildV6AgentParticipationEnforcementGate({
+    includeResearchDelegationEnforcement: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: agentParticipationEnforcementEvidence({
+      checks: [
+        'worker_tool_scope_enforcement',
+        'route_edge_scope_check',
+        'store_backed_delegation_proof',
+        'no_backend_shortcuts',
+        'no_public_autonomous_mutation'
+      ],
+      routeSurfaces: ['proposal_drafting'],
+      routeEdgeEnforced: false,
+      lifecycleControlsEnforced: false
+    })
+  });
+
+  assert.equal(report.researchReady, false);
+  assert.equal(report.releaseReady, false);
+  assert.equal(report.failClosed, true);
+  assert.deepEqual(report.evidence.missingChecks, [
+    'route_edge_expiry_check',
+    'route_edge_budget_check',
+    'route_edge_revocation_check',
+    'principal_wallet_session_binding',
+    'idempotent_budget_consumption',
+    'delegation_audit_rows'
+  ]);
+  assert.deepEqual(report.evidence.missingRouteSurfaces, ['vote_advice', 'civic_execution']);
+  assert.match(report.errors.join(','), /AGENT_PARTICIPATION_ENFORCEMENT_EVIDENCE_REQUIRED/);
+  assert.match(report.errors.join(','), /AGENT_PARTICIPATION_ROUTE_EDGE_AUTHORIZATION_REQUIRED/);
+  assert.match(report.errors.join(','), /AGENT_PARTICIPATION_LIFECYCLE_CONTROLS_REQUIRED/);
+  assert.deepEqual(assertV6AgentParticipationEnforcementGateSafe(report), { ok: true, errors: [] });
+});
+
+test('V6 agent participation enforcement gate assertion rejects public delegated execution drift', () => {
+  const report = buildV6AgentParticipationEnforcementGate({
+    includeResearchDelegationEnforcement: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: agentParticipationEnforcementEvidence()
+  });
+  const unsafe = {
+    ...report,
+    releaseReady: true,
+    runtimeExposed: true,
+    playerVisible: true,
+    normalGameplayExposure: true,
+    mutatesWorldState: true,
+    delegatedExecutionEnabled: true,
+    executionStatus: 'executes',
+    evidence: {
+      ...report.evidence,
+      ok: false,
+      runtimeExposed: true,
+      playerVisible: true,
+      mutatesWorldState: true,
+      delegatedExecutionEnabled: true
+    }
+  };
+  const result = assertV6AgentParticipationEnforcementGateSafe(unsafe);
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(','), /V6_AGENT_PARTICIPATION_ENFORCEMENT_RUNTIME_HIDDEN_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_AGENT_PARTICIPATION_ENFORCEMENT_PLAYER_HIDDEN_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_AGENT_PARTICIPATION_ENFORCEMENT_NORMAL_GAMEPLAY_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_AGENT_PARTICIPATION_ENFORCEMENT_WORLD_MUTATION_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_AGENT_PARTICIPATION_ENFORCEMENT_DELEGATED_EXECUTION_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_AGENT_PARTICIPATION_ENFORCEMENT_NON_EXECUTING_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_AGENT_PARTICIPATION_ENFORCEMENT_RELEASE_READY_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_AGENT_PARTICIPATION_ENFORCEMENT_EVIDENCE_WORLD_MUTATION_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_AGENT_PARTICIPATION_ENFORCEMENT_READY_WITHOUT_EVIDENCE/);
+});
 
 test('V6 delegation store records scoped agent participation without execution authority', () => withTempDelegationStore(({ auditLedger, store }) => {
   const row = store.recordDelegation(delegation(), { nowMs: 1_779_784_000_000 });

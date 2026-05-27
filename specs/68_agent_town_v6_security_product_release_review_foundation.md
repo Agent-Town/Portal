@@ -41,12 +41,19 @@ are present.
 - Validation evidence: targeted Node suite, split Playwright smokes,
   all-features regression, feature override safety, and load/rate replay
   evidence, including civic mutation security, delegated-agent proof, and
-  governance preflight contract coverage.
+  governance preflight, effect execution gate, and agent participation
+  enforcement gate contract coverage.
 - Effect execution and rollback review: typed apply handlers, typed rollback
   handlers, real before/after state, authorization enforcement, idempotent
   apply/rollback behavior, irreversible-action review, conservation tests,
   applied/rollback audit evidence, and worker/route security before any
   executable civic effect can exist.
+- Agent participation enforcement review: worker-tool scope enforcement,
+  route-edge scope checks, route-edge expiry checks, route-edge budget checks,
+  route-edge revocation checks, principal wallet/session binding, idempotent
+  budget consumption, store-backed delegation proof, delegation audit rows, no
+  backend shortcuts, and no public autonomous mutation before delegated
+  authority can affect any civic route or tool.
 - Worker tool surface review: runtime manifest source-of-truth evidence,
   OpenClaw Lite worker origin, Worker Traffic and Skill Context observability,
   mutation security envelope coverage, and no backend shortcuts before any

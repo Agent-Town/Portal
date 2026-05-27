@@ -241,9 +241,15 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /idempotent action-budget consumption/);
   assert.match(plan, /allowDelegatedExecution/);
   assert.match(plan, /read-only active `civic_execution` delegation proof/);
+  assert.match(plan, /buildV6AgentParticipationEnforcementGate\(\)/);
+  assert.match(plan, /route-edge scope\/expiry\/budget\/revocation checks/);
+  assert.match(plan, /no public autonomous mutation/);
   assert.match(gate, /server\/world_civilization\/delegations\.js/);
   assert.match(gate, /loose boolean flag/);
   assert.match(gate, /delegation\.action_consumed/);
+  assert.match(gate, /M12\s+research-only enforcement gate/);
+  assert.match(gate, /principal wallet\/session binding/);
+  assert.match(gate, /delegatedExecutionEnabled: false/);
   assert.match(plan, /M13 Civic institutions and charters \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/institutions\.js/);
   assert.match(plan, /proposal\/vote\/moderation-gated charter amendment/);
@@ -305,8 +311,10 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /modal lab surface review/);
   assert.match(plan, /worker tool surface review/);
   assert.match(plan, /effect execution and rollback review/);
+  assert.match(plan, /agent participation enforcement review/);
   assert.match(gate, /modal lab\s+surface (launch )?review/);
   assert.match(gate, /effect\s+execution and rollback review/);
+  assert.match(gate, /agent participation enforcement review/);
   assert.match(gate, /Worker-first V6 civic tools must pass the exposure gate/);
   assert.match(plan, /M18 V6 controlled release completion \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/controlled_release\.js/);
@@ -466,11 +474,13 @@ test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () 
   const proposalSpec = read('specs/57_agent_town_v6_internal_proposal_lifecycle.md');
   const voteSpec = read('specs/58_agent_town_v6_vote_authorization_foundation.md');
   const effectSpec = read('specs/62_agent_town_v6_civic_effect_rollback_foundation.md');
+  const delegationSpec = read('specs/63_agent_town_v6_agent_participation_delegation_foundation.md');
   const preflightSpec = read('specs/71_agent_town_v6_governance_preflight_foundation.md');
   const gate = read('specs/release-gates/v60_agent_civilization_readiness_gate.md');
   const releaseReview = read('docs/security/V6_AGENT_CIVILIZATION_RELEASE_REVIEW.md');
   const skillLine = read('docs/internal-skill-testline.md');
   const effectSource = read('server/world_civilization/effects.js');
+  const delegationSource = read('server/world_civilization/delegations.js');
 
   assert.match(plan, /server\/world_civilization\/governance_preflight\.js/);
   assert.match(plan, /vote approval policy, human approval receipt/);
@@ -493,6 +503,10 @@ test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () 
   assert.match(effectSpec, /typed apply handler coverage/);
   assert.match(effectSpec, /irreversible-action review/);
   assert.match(effectSpec, /conservation tests/);
+  assert.match(delegationSpec, /buildV6AgentParticipationEnforcementGate\(\)/);
+  assert.match(delegationSpec, /route-edge expiry checks/);
+  assert.match(delegationSpec, /principal wallet\/session binding/);
+  assert.match(delegationSpec, /no public autonomous mutation/);
   assert.match(preflightSpec, /Existing proposal record/);
   assert.match(preflightSpec, /Proposal review-ready state/);
   assert.match(preflightSpec, /Vote approval with at least one approving vote/);
@@ -506,15 +520,22 @@ test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () 
   assert.match(gate, /M11 research-only execution gate/);
   assert.match(gate, /typed rollback handler evidence/);
   assert.match(gate, /appliesWorldState: false/);
+  assert.match(gate, /M12\s+research-only enforcement gate/);
+  assert.match(gate, /route-edge scope\/expiry\/budget\/\s+revocation checks/);
+  assert.match(gate, /mutatesWorldState: false/);
   assert.match(gate, /`proposal\.reviewed`/);
   assert.match(releaseReview, /proposal `ready_for_vote`\/`rejected` transitions/);
   assert.match(releaseReview, /governance preflight coverage/);
   assert.match(releaseReview, /Effect execution and rollback review/);
   assert.match(releaseReview, /effect execution gate/);
+  assert.match(releaseReview, /Agent participation enforcement review/);
+  assert.match(releaseReview, /agent participation enforcement gate/);
   assert.match(skillLine, /V6 internal proposal lifecycle foundation/);
   assert.match(skillLine, /V6 vote authorization foundation/);
   assert.match(skillLine, /M11 effect execution gate/);
   assert.match(skillLine, /applied\/rollback audit evidence/);
+  assert.match(skillLine, /M12 enforcement gate/);
+  assert.match(skillLine, /no public autonomous mutation/);
   assert.match(skillLine, /loose `allowDelegatedExecution` bypasses/);
   assert.match(skillLine, /tests\/world_civilization_votes\.test\.js/);
   assert.match(skillLine, /tests\/world_civilization_governance_preflight\.test\.js/);
@@ -522,6 +543,10 @@ test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () 
   assert.match(effectSource, /irreversible_action_review/);
   assert.match(effectSource, /conservation_tests/);
   assert.match(effectSource, /V6_CIVIC_EFFECT_EXECUTION_RELEASE_READY_FORBIDDEN/);
+  assert.match(delegationSource, /REQUIRED_AGENT_PARTICIPATION_EVIDENCE_CHECKS/);
+  assert.match(delegationSource, /route_edge_budget_check/);
+  assert.match(delegationSource, /no_public_autonomous_mutation/);
+  assert.match(delegationSource, /V6_AGENT_PARTICIPATION_ENFORCEMENT_RELEASE_READY_FORBIDDEN/);
 });
 
 test('world-grid CSRF policy is tracked as prototype-only M5 coverage', () => {

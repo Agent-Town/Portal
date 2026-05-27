@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
 
+const { V6_WORLD_FEATURE_FLAG, isWorldGridFeatureEnabled } = require('../world_grid/feature_flags');
 const { createCivicAuditLedger, sha256, stableJson } = require('./audit_ledger');
 const { validateCivicDelegation } = require('./schemas');
 const {
@@ -13,8 +14,38 @@ const DELEGATION_STATUS_ACTIVE = 'active';
 const DELEGATION_STATUS_REVOKED = 'revoked';
 const MIGRATION_VERSION = 'v1';
 const STORE_KEY = 'delegations';
+const V6_AGENT_PARTICIPATION_ENFORCEMENT_GATE_VERSION = 'agent-town.v6.agent_participation_enforcement.v1';
 const CIVIC_ID_RE = /^[a-z][a-z0-9_:-]{5,96}$/;
 const DELEGATION_SCOPES = new Set(['proposal_drafting', 'vote_advice', 'civic_execution']);
+const REQUIRED_AGENT_PARTICIPATION_ENFORCEMENT_CHECKS = [
+  'feature_flag',
+  'research_opt_in',
+  'enforcement_evidence',
+  'worker_tool_enforcement',
+  'route_edge_authorization',
+  'delegation_lifecycle_controls',
+  'no_runtime_execution',
+  'no_player_visible_execution',
+  'no_world_mutation'
+];
+const REQUIRED_AGENT_PARTICIPATION_EVIDENCE_CHECKS = [
+  'worker_tool_scope_enforcement',
+  'route_edge_scope_check',
+  'route_edge_expiry_check',
+  'route_edge_budget_check',
+  'route_edge_revocation_check',
+  'principal_wallet_session_binding',
+  'idempotent_budget_consumption',
+  'store_backed_delegation_proof',
+  'delegation_audit_rows',
+  'no_backend_shortcuts',
+  'no_public_autonomous_mutation'
+];
+const REQUIRED_DELEGATION_ROUTE_SURFACES = [
+  'proposal_drafting',
+  'vote_advice',
+  'civic_execution'
+];
 const SECRET_TEXT_RE = /\b(?:sk-[a-z0-9_-]{8,}|bearer\s+[a-z0-9._-]{8,}|oauth[-_ ]?token|api[-_ ]?key|private[-_ ]?key|secret)\b/i;
 const FORBIDDEN_USAGE_KEYS = new Set([
   'brain',
@@ -30,6 +61,199 @@ const FORBIDDEN_USAGE_KEYS = new Set([
   'transcript',
   'walletsecret'
 ]);
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function normalizeList(value) {
+  return Array.isArray(value) ? value.map((entry) => String(entry || '')).filter(Boolean) : [];
+}
+
+function check(key, ok, error = '') {
+  return { key, ok: ok === true, error: ok === true ? '' : error };
+}
+
+function inspectAgentParticipationEnforcementEvidence(evidence = {}) {
+  const checks = normalizeList(evidence.checks);
+  const routeSurfaces = normalizeList(evidence.routeSurfaces);
+  const missingChecks = REQUIRED_AGENT_PARTICIPATION_EVIDENCE_CHECKS.filter((entry) => !checks.includes(entry));
+  const missingRouteSurfaces = REQUIRED_DELEGATION_ROUTE_SURFACES.filter((entry) => !routeSurfaces.includes(entry));
+  const workerToolEnforced = evidence.workerToolEnforced === true;
+  const routeEdgeEnforced = evidence.routeEdgeEnforced === true;
+  const lifecycleControlsEnforced = evidence.lifecycleControlsEnforced === true;
+  const ok = evidence.status === 'complete'
+    && evidence.executionStatus === 'not_executable'
+    && evidence.runtimeExposed === false
+    && evidence.playerVisible === false
+    && evidence.mutatesWorldState === false
+    && evidence.delegatedExecutionEnabled === false
+    && workerToolEnforced
+    && routeEdgeEnforced
+    && lifecycleControlsEnforced
+    && missingChecks.length === 0
+    && missingRouteSurfaces.length === 0;
+  return {
+    ok,
+    status: String(evidence.status || 'missing'),
+    executionStatus: String(evidence.executionStatus || 'missing'),
+    runtimeExposed: evidence.runtimeExposed === true,
+    playerVisible: evidence.playerVisible === true,
+    mutatesWorldState: evidence.mutatesWorldState === true,
+    delegatedExecutionEnabled: evidence.delegatedExecutionEnabled === true,
+    workerToolEnforced,
+    routeEdgeEnforced,
+    lifecycleControlsEnforced,
+    requiredChecks: [...REQUIRED_AGENT_PARTICIPATION_EVIDENCE_CHECKS],
+    checks,
+    missingChecks,
+    requiredRouteSurfaces: [...REQUIRED_DELEGATION_ROUTE_SURFACES],
+    routeSurfaces,
+    missingRouteSurfaces
+  };
+}
+
+function disabledAgentParticipationEnforcementReport({ source, reason }) {
+  return {
+    version: V6_AGENT_PARTICIPATION_ENFORCEMENT_GATE_VERSION,
+    status: 'research_only',
+    source,
+    featureFlag: V6_WORLD_FEATURE_FLAG,
+    available: false,
+    researchReady: false,
+    releaseReady: false,
+    failClosed: true,
+    runtimeExposed: false,
+    playerVisible: false,
+    normalGameplayExposure: false,
+    mutatesWorldState: false,
+    delegatedExecutionEnabled: false,
+    executionStatus: 'not_executable',
+    evidence: inspectAgentParticipationEnforcementEvidence({}),
+    checks: [],
+    errors: [reason],
+    disabledReason: reason
+  };
+}
+
+function buildV6AgentParticipationEnforcementGate({
+  featureFlags = {},
+  includeResearchDelegationEnforcement = false,
+  source = 'runtime',
+  evidence = {}
+} = {}) {
+  const enabled = includeResearchDelegationEnforcement === true
+    && isWorldGridFeatureEnabled(featureFlags, V6_WORLD_FEATURE_FLAG);
+  if (!enabled) {
+    return disabledAgentParticipationEnforcementReport({
+      source,
+      reason: 'V6 agent participation enforcement requires explicit research opt-in and V6 feature flag'
+    });
+  }
+
+  const evidenceReport = inspectAgentParticipationEnforcementEvidence(evidence);
+  const checks = [
+    check('feature_flag', isWorldGridFeatureEnabled(featureFlags, V6_WORLD_FEATURE_FLAG), 'FEATURE_DISABLED'),
+    check('research_opt_in', includeResearchDelegationEnforcement === true, 'RESEARCH_OPT_IN_REQUIRED'),
+    check('enforcement_evidence', evidenceReport.status === 'complete' && evidenceReport.missingChecks.length === 0, 'AGENT_PARTICIPATION_ENFORCEMENT_EVIDENCE_REQUIRED'),
+    check('worker_tool_enforcement', evidenceReport.workerToolEnforced, 'AGENT_PARTICIPATION_WORKER_TOOL_ENFORCEMENT_REQUIRED'),
+    check('route_edge_authorization', evidenceReport.routeEdgeEnforced && evidenceReport.missingRouteSurfaces.length === 0, 'AGENT_PARTICIPATION_ROUTE_EDGE_AUTHORIZATION_REQUIRED'),
+    check('delegation_lifecycle_controls', evidenceReport.lifecycleControlsEnforced, 'AGENT_PARTICIPATION_LIFECYCLE_CONTROLS_REQUIRED'),
+    check('no_runtime_execution', evidenceReport.executionStatus === 'not_executable' && evidenceReport.runtimeExposed === false, 'AGENT_PARTICIPATION_RUNTIME_EXECUTION_FORBIDDEN'),
+    check('no_player_visible_execution', evidenceReport.playerVisible === false, 'AGENT_PARTICIPATION_PLAYER_VISIBLE_EXECUTION_FORBIDDEN'),
+    check('no_world_mutation', evidenceReport.mutatesWorldState === false && evidenceReport.delegatedExecutionEnabled === false, 'AGENT_PARTICIPATION_WORLD_MUTATION_FORBIDDEN')
+  ];
+  const researchReady = checks.every((entry) => entry.ok);
+
+  return {
+    version: V6_AGENT_PARTICIPATION_ENFORCEMENT_GATE_VERSION,
+    status: 'research_only',
+    source,
+    featureFlag: V6_WORLD_FEATURE_FLAG,
+    available: true,
+    researchReady,
+    releaseReady: false,
+    failClosed: researchReady !== true,
+    runtimeExposed: false,
+    playerVisible: false,
+    normalGameplayExposure: false,
+    mutatesWorldState: false,
+    delegatedExecutionEnabled: false,
+    executionStatus: 'not_executable',
+    evidence: evidenceReport,
+    checks,
+    errors: checks.filter((entry) => !entry.ok).map((entry) => entry.error)
+  };
+}
+
+function assertV6AgentParticipationEnforcementGateSafe(report = {}) {
+  const errors = [];
+  if (report.version !== V6_AGENT_PARTICIPATION_ENFORCEMENT_GATE_VERSION) {
+    errors.push('V6_AGENT_PARTICIPATION_ENFORCEMENT_VERSION_REQUIRED');
+  }
+  if (report.featureFlag !== V6_WORLD_FEATURE_FLAG) {
+    errors.push('V6_AGENT_PARTICIPATION_ENFORCEMENT_FEATURE_FLAG_REQUIRED');
+  }
+  if (report.status !== 'research_only') {
+    errors.push('V6_AGENT_PARTICIPATION_ENFORCEMENT_RESEARCH_ONLY_REQUIRED');
+  }
+  if (report.runtimeExposed !== false) {
+    errors.push('V6_AGENT_PARTICIPATION_ENFORCEMENT_RUNTIME_HIDDEN_REQUIRED');
+  }
+  if (report.playerVisible !== false) {
+    errors.push('V6_AGENT_PARTICIPATION_ENFORCEMENT_PLAYER_HIDDEN_REQUIRED');
+  }
+  if (report.normalGameplayExposure !== false) {
+    errors.push('V6_AGENT_PARTICIPATION_ENFORCEMENT_NORMAL_GAMEPLAY_FORBIDDEN');
+  }
+  if (report.mutatesWorldState !== false) {
+    errors.push('V6_AGENT_PARTICIPATION_ENFORCEMENT_WORLD_MUTATION_FORBIDDEN');
+  }
+  if (report.delegatedExecutionEnabled !== false) {
+    errors.push('V6_AGENT_PARTICIPATION_ENFORCEMENT_DELEGATED_EXECUTION_FORBIDDEN');
+  }
+  if (report.executionStatus !== 'not_executable') {
+    errors.push('V6_AGENT_PARTICIPATION_ENFORCEMENT_NON_EXECUTING_REQUIRED');
+  }
+  if (report.releaseReady !== false) {
+    errors.push('V6_AGENT_PARTICIPATION_ENFORCEMENT_RELEASE_READY_FORBIDDEN');
+  }
+  if (report.available === true) {
+    const checkKeys = new Set((report.checks || []).map((entry) => entry.key));
+    for (const key of REQUIRED_AGENT_PARTICIPATION_ENFORCEMENT_CHECKS) {
+      if (!checkKeys.has(key)) errors.push(`V6_AGENT_PARTICIPATION_ENFORCEMENT_CHECK_REQUIRED:${key}`);
+    }
+    const failedChecks = (report.checks || []).filter((entry) => entry.ok !== true);
+    if (report.researchReady === true && failedChecks.length > 0) {
+      errors.push('V6_AGENT_PARTICIPATION_ENFORCEMENT_READY_WITH_FAILED_CHECKS');
+    }
+    if (report.researchReady !== true && report.failClosed !== true) {
+      errors.push('V6_AGENT_PARTICIPATION_ENFORCEMENT_DENIAL_FAIL_CLOSED_REQUIRED');
+    }
+    const evidence = report.evidence || {};
+    if (evidence.runtimeExposed === true) {
+      errors.push('V6_AGENT_PARTICIPATION_ENFORCEMENT_EVIDENCE_RUNTIME_HIDDEN_REQUIRED');
+    }
+    if (evidence.playerVisible === true) {
+      errors.push('V6_AGENT_PARTICIPATION_ENFORCEMENT_EVIDENCE_PLAYER_HIDDEN_REQUIRED');
+    }
+    if (evidence.mutatesWorldState === true) {
+      errors.push('V6_AGENT_PARTICIPATION_ENFORCEMENT_EVIDENCE_WORLD_MUTATION_FORBIDDEN');
+    }
+    if (evidence.delegatedExecutionEnabled === true) {
+      errors.push('V6_AGENT_PARTICIPATION_ENFORCEMENT_EVIDENCE_DELEGATED_EXECUTION_FORBIDDEN');
+    }
+    if (report.researchReady === true && evidence.ok !== true) {
+      errors.push('V6_AGENT_PARTICIPATION_ENFORCEMENT_READY_WITHOUT_EVIDENCE');
+    }
+  } else if (report.failClosed !== true) {
+    errors.push('V6_AGENT_PARTICIPATION_ENFORCEMENT_DISABLED_FAIL_CLOSED_REQUIRED');
+  }
+  return {
+    ok: errors.length === 0,
+    errors
+  };
+}
 
 function parseDelegationRow(row) {
   if (!row) return null;
@@ -738,5 +962,11 @@ function createCivicDelegationStore({ sqlitePath, auditLedger = null, auditSqlit
 module.exports = {
   DELEGATION_STATUS_ACTIVE,
   DELEGATION_STATUS_REVOKED,
+  REQUIRED_AGENT_PARTICIPATION_ENFORCEMENT_CHECKS: clone(REQUIRED_AGENT_PARTICIPATION_ENFORCEMENT_CHECKS),
+  REQUIRED_AGENT_PARTICIPATION_EVIDENCE_CHECKS: clone(REQUIRED_AGENT_PARTICIPATION_EVIDENCE_CHECKS),
+  REQUIRED_DELEGATION_ROUTE_SURFACES: clone(REQUIRED_DELEGATION_ROUTE_SURFACES),
+  V6_AGENT_PARTICIPATION_ENFORCEMENT_GATE_VERSION,
+  assertV6AgentParticipationEnforcementGateSafe,
+  buildV6AgentParticipationEnforcementGate,
   createCivicDelegationStore
 };

@@ -102,6 +102,7 @@ const REQUIRED_REVIEW_GATES = [
       'tests/world_civilization_governance_preflight.test.js',
       'tests/world_civilization_effects.test.js',
       'tests/world_civilization_rollback_recovery.test.js',
+      'tests/world_civilization_delegations.test.js',
       'tests/world_civilization_reputation.test.js',
       'tests/world_civilization_moderation.test.js',
       'tests/world_civilization_resilience.test.js',
@@ -113,7 +114,8 @@ const REQUIRED_REVIEW_GATES = [
       'all_features_regression',
       'feature_override_safety',
       'store_backed_delegation_proof',
-      'effect_execution_gate'
+      'effect_execution_gate',
+      'agent_participation_enforcement_gate'
     ],
     signoffRequired: true
   },
@@ -141,6 +143,36 @@ const REQUIRED_REVIEW_GATES = [
       'conservation_tests',
       'applied_and_rollback_audit',
       'worker_route_security'
+    ],
+    signoffRequired: true
+  },
+  {
+    key: 'agent_participation_review',
+    label: 'Agent participation enforcement review',
+    owner: 'engineering_security',
+    requiredArtifacts: [
+      RELEASE_REVIEW_ARTIFACT,
+      'specs/63_agent_town_v6_agent_participation_delegation_foundation.md',
+      'server/world_civilization/delegations.js',
+      'server/world_civilization/governance_preflight.js',
+      'server/world_civilization/mutation_security.js',
+      'tests/world_civilization_delegations.test.js',
+      'tests/world_civilization_delegation_process_restart.test.js',
+      'tests/world_civilization_governance_preflight.test.js',
+      'tests/world_civilization_mutation_security.test.js'
+    ],
+    requiredChecks: [
+      'worker_tool_scope_enforcement',
+      'route_edge_scope_check',
+      'route_edge_expiry_check',
+      'route_edge_budget_check',
+      'route_edge_revocation_check',
+      'principal_wallet_session_binding',
+      'idempotent_budget_consumption',
+      'store_backed_delegation_proof',
+      'delegation_audit_rows',
+      'no_backend_shortcuts',
+      'no_public_autonomous_mutation'
     ],
     signoffRequired: true
   },

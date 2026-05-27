@@ -264,7 +264,14 @@ gate below has implementation, deterministic tests, and security/product signoff
   audit rows; governance preflight now validates delegation proof read-only
   while leaving budget unconsumed and delegated preparation blocked. Release
   still requires worker/tool enforcement, expiry, budget, and revocation checks
-  at every route edge, and principal wallet/session authorization.
+  at every route edge, and principal wallet/session authorization. The M12
+  research-only enforcement gate in `server/world_civilization/delegations.js`
+  must require worker-tool scope enforcement, route-edge scope/expiry/budget/
+  revocation checks, principal wallet/session binding, idempotent budget
+  consumption, store-backed delegation proof, delegation audit rows, no backend
+  shortcuts, and no public autonomous mutation while keeping
+  `delegatedExecutionEnabled: false`, `mutatesWorldState: false`, and
+  `executionStatus: "not_executable"`.
 - Civic institutions must have explicit charters, scopes, eligibility rules,
   voting rules, moderation policies, and public audit summaries before any
   player-visible institution appears. Current research-only storage starts this
@@ -336,7 +343,8 @@ gate below has implementation, deterministic tests, and security/product signoff
   requires approved threat model, privacy review, abuse-case review,
   store-backed delegation proof and scope-mismatch evidence, data-retention
   policy, audit coverage review, deterministic validation evidence, effect
-  execution and rollback review, modal lab surface review, and product signoff.
+  execution and rollback review, agent participation enforcement review, modal
+  lab surface review, and product signoff.
 - Controlled release completion must remain a final go/no-go gate, not an
   automatic enablement path. Current gate tracking starts in
   `server/world_civilization/controlled_release.js` and

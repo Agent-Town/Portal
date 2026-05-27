@@ -43,6 +43,19 @@ principal-owned revocation. It proves policy summaries and audit replay survive
 separate Node process lifetimes, and exact retries do not append duplicate
 delegation, usage, or audit rows.
 
+The M12 agent participation enforcement gate is research-only and
+non-executing. It is exposed by `buildV6AgentParticipationEnforcementGate()` in
+`server/world_civilization/delegations.js`, keeps `releaseReady: false`, and
+records the evidence required before any later worker/tool or route edge can
+honor delegated authority: worker-tool scope enforcement, route-edge scope
+checks, route-edge expiry checks, route-edge budget checks, route-edge
+revocation checks, principal wallet/session binding, idempotent budget
+consumption, store-backed delegation proof, delegation audit rows, no backend
+shortcuts, and no public autonomous mutation. The gate must continue to report
+`delegatedExecutionEnabled: false`, `mutatesWorldState: false`, and
+`executionStatus: "not_executable"` until a future release sprint implements
+actual worker and route-edge enforcement.
+
 ## Data Model
 
 The SQLite table `world_civic_delegations` stores validated `delegation` schema
@@ -106,6 +119,11 @@ Indexes cover delegation replay, principal/scope replay, and agent/scope replay.
 - Delegation creation writes `delegation.created` audit entries; action-budget
   usage writes `delegation.action_consumed` audit entries; revocation writes
   `delegation.revoked` audit entries.
+- `buildV6AgentParticipationEnforcementGate()` may record M12 enforcement
+  readiness evidence, but it must stay hidden, non-executing, and fail closed
+  when worker-tool scope checks, route-edge scope/expiry/budget/revocation
+  checks, principal wallet/session binding, store-backed delegation proof,
+  audit rows, or no-public-autonomous-mutation evidence is missing.
 
 ## Release Gate
 
