@@ -223,12 +223,16 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /proposal\.reviewed/);
   assert.match(plan, /proposal review-ready state, approved moderation, vote approval policy, human approval receipt/);
   assert.match(plan, /schema-level typed effect handler registry/);
-  assert.match(plan, /executable apply\/rollback handlers/);
+  assert.match(plan, /buildV6CivicEffectExecutionGate\(\)/);
+  assert.match(plan, /typed apply handlers, typed rollback handlers/);
+  assert.match(plan, /release-signed conservation\/rollback execution/);
   assert.match(plan, /server\/world_civilization\/rollback_recovery\.js/);
   assert.match(plan, /without executing state/);
   assert.match(gate, /server\/world_civilization\/effects\.js/);
   assert.match(gate, /server\/world_civilization\/governance_preflight\.js/);
   assert.match(gate, /schema-level typed effect handler registry/);
+  assert.match(gate, /typed apply handler\s+evidence/);
+  assert.match(gate, /irreversible-action review/);
   assert.match(gate, /executable typed handlers/);
   assert.match(gate, /server\/world_civilization\/rollback_recovery\.js/);
   assert.match(gate, /tests\/world_civilization_rollback_recovery\.test\.js/);
@@ -300,7 +304,9 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(gate, /store-backed delegation proof and scope-mismatch evidence/);
   assert.match(plan, /modal lab surface review/);
   assert.match(plan, /worker tool surface review/);
+  assert.match(plan, /effect execution and rollback review/);
   assert.match(gate, /modal lab\s+surface (launch )?review/);
+  assert.match(gate, /effect\s+execution and rollback review/);
   assert.match(gate, /Worker-first V6 civic tools must pass the exposure gate/);
   assert.match(plan, /M18 V6 controlled release completion \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/controlled_release\.js/);
@@ -464,6 +470,7 @@ test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () 
   const gate = read('specs/release-gates/v60_agent_civilization_readiness_gate.md');
   const releaseReview = read('docs/security/V6_AGENT_CIVILIZATION_RELEASE_REVIEW.md');
   const skillLine = read('docs/internal-skill-testline.md');
+  const effectSource = read('server/world_civilization/effects.js');
 
   assert.match(plan, /server\/world_civilization\/governance_preflight\.js/);
   assert.match(plan, /vote approval policy, human approval receipt/);
@@ -482,6 +489,10 @@ test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () 
   assert.match(effectSpec, /review-ready/);
   assert.match(effectSpec, /vote approval policy/);
   assert.match(effectSpec, /active `civic_execution` delegation\s+proof/);
+  assert.match(effectSpec, /buildV6CivicEffectExecutionGate\(\)/);
+  assert.match(effectSpec, /typed apply handler coverage/);
+  assert.match(effectSpec, /irreversible-action review/);
+  assert.match(effectSpec, /conservation tests/);
   assert.match(preflightSpec, /Existing proposal record/);
   assert.match(preflightSpec, /Proposal review-ready state/);
   assert.match(preflightSpec, /Vote approval with at least one approving vote/);
@@ -492,14 +503,25 @@ test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () 
   assert.match(gate, /proposal review-ready state/);
   assert.match(gate, /vote approval\s+policy/);
   assert.match(gate, /delegation proof/);
+  assert.match(gate, /M11 research-only execution gate/);
+  assert.match(gate, /typed rollback handler evidence/);
+  assert.match(gate, /appliesWorldState: false/);
   assert.match(gate, /`proposal\.reviewed`/);
   assert.match(releaseReview, /proposal `ready_for_vote`\/`rejected` transitions/);
   assert.match(releaseReview, /governance preflight coverage/);
+  assert.match(releaseReview, /Effect execution and rollback review/);
+  assert.match(releaseReview, /effect execution gate/);
   assert.match(skillLine, /V6 internal proposal lifecycle foundation/);
   assert.match(skillLine, /V6 vote authorization foundation/);
+  assert.match(skillLine, /M11 effect execution gate/);
+  assert.match(skillLine, /applied\/rollback audit evidence/);
   assert.match(skillLine, /loose `allowDelegatedExecution` bypasses/);
   assert.match(skillLine, /tests\/world_civilization_votes\.test\.js/);
   assert.match(skillLine, /tests\/world_civilization_governance_preflight\.test\.js/);
+  assert.match(effectSource, /REQUIRED_EFFECT_EXECUTION_EVIDENCE_CHECKS/);
+  assert.match(effectSource, /irreversible_action_review/);
+  assert.match(effectSource, /conservation_tests/);
+  assert.match(effectSource, /V6_CIVIC_EFFECT_EXECUTION_RELEASE_READY_FORBIDDEN/);
 });
 
 test('world-grid CSRF policy is tracked as prototype-only M5 coverage', () => {

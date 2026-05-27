@@ -105,6 +105,15 @@ Delegated authority remains blocked even with valid proof until M12 worker/tool
 enforcement and route-edge authorization are release-ready; the legacy
 `allowDelegatedExecution` flag is not sufficient.
 
+The research-only M11 effect execution gate in
+`server/world_civilization/effects.js` records the release evidence required
+before any typed effect can execute: typed apply handlers, typed rollback
+handlers, real before/after state, authorization enforcement, idempotent
+apply/rollback behavior, irreversible-action review, conservation tests,
+applied/rollback audit evidence, and worker/route security. It remains
+non-executing with `releaseReady: false`, `appliesWorldState: false`, and
+`executionStatus: "not_executable"`.
+
 The research-only modal lab surface contract in
 `server/world_civilization/lab_surface.js` is route-neutral and non-executing.
 It does not add a V6 route or normal gameplay surface; it only records the
@@ -123,9 +132,9 @@ summaries from replay rows without applying world state.
 
 The research-only release review gate in
 `server/world_civilization/release_review.js` names the threat model, privacy,
-abuse-case, data-retention, audit coverage, validation, modal lab surface
-review, and product signoff requirements that must be complete before normal
-gameplay exposure.
+abuse-case, data-retention, audit coverage, validation, effect execution and
+rollback review, modal lab surface review, and product signoff requirements
+that must be complete before normal gameplay exposure.
 
 The research-only controlled release gate in
 `server/world_civilization/controlled_release.js` requires M0-M17 completion,

@@ -168,6 +168,53 @@ test('V6 release review requires worker tool exposure evidence', () => {
   assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_mutation_security.test.js'));
 });
 
+test('V6 release review requires effect execution and rollback gate evidence', () => {
+  const effectGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'effect_execution_review');
+  const validationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'validation_evidence');
+
+  assert.equal(effectGate.owner, 'engineering_security');
+  assert.ok(effectGate.requiredArtifacts.includes('specs/62_agent_town_v6_civic_effect_rollback_foundation.md'));
+  assert.ok(effectGate.requiredArtifacts.includes('server/world_civilization/effects.js'));
+  assert.ok(effectGate.requiredArtifacts.includes('server/world_civilization/rollback_recovery.js'));
+  assert.ok(effectGate.requiredArtifacts.includes('tests/world_civilization_effects.test.js'));
+  assert.ok(effectGate.requiredArtifacts.includes('tests/world_civilization_rollback_recovery.test.js'));
+  assert.ok(effectGate.requiredChecks.includes('typed_apply_handlers'));
+  assert.ok(effectGate.requiredChecks.includes('typed_rollback_handlers'));
+  assert.ok(effectGate.requiredChecks.includes('real_before_after_state'));
+  assert.ok(effectGate.requiredChecks.includes('irreversible_action_review'));
+  assert.ok(effectGate.requiredChecks.includes('conservation_tests'));
+  assert.ok(effectGate.requiredChecks.includes('applied_and_rollback_audit'));
+  assert.ok(validationGate.requiredChecks.includes('effect_execution_gate'));
+  assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_effects.test.js'));
+});
+
+test('V6 release review blocks signoff without effect execution rollback evidence', () => {
+  const evidence = Object.fromEntries(REQUIRED_REVIEW_GATES.map((gate) => [gate.key, completeEvidenceFor(gate)]));
+  evidence.effect_execution_review = {
+    ...evidence.effect_execution_review,
+    checks: evidence.effect_execution_review.checks.filter((check) => (
+      check !== 'typed_rollback_handlers'
+      && check !== 'irreversible_action_review'
+      && check !== 'conservation_tests'
+    ))
+  };
+  const report = buildV6ReleaseReviewReport({
+    includeResearchReview: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence
+  });
+  const effectGate = report.gateReports.find((gate) => gate.key === 'effect_execution_review');
+
+  assert.equal(report.releaseReady, false);
+  assert.equal(effectGate.ok, false);
+  assert.deepEqual(effectGate.missingChecks, [
+    'typed_rollback_handlers',
+    'irreversible_action_review',
+    'conservation_tests'
+  ]);
+  assert.deepEqual(assertV6ReleaseReviewSafe(report), { ok: true, errors: [] });
+});
+
 test('V6 release review report can only become ready with complete evidence and signoff', () => {
   const evidence = Object.fromEntries(REQUIRED_REVIEW_GATES.map((gate) => [gate.key, completeEvidenceFor(gate)]));
   const report = buildV6ReleaseReviewReport({

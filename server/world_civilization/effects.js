@@ -2,20 +2,233 @@ const fs = require('fs');
 const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
 
+const { V6_WORLD_FEATURE_FLAG, isWorldGridFeatureEnabled } = require('../world_grid/feature_flags');
 const { createCivicAuditLedger, sha256, stableJson } = require('./audit_ledger');
 const {
   buildV6CivicGovernancePreflight,
   throwV6CivicGovernancePreflightError
 } = require('./governance_preflight');
+const { CIVIC_ACTION_EFFECT_HANDLERS } = require('./schemas');
 const {
   ensureCivicSqliteSchemaMetadata,
   readCivicSqliteSchemaMetadata
 } = require('./sqlite_schema');
 
+const V6_CIVIC_EFFECT_EXECUTION_GATE_VERSION = 'agent-town.v6.civic.effect_execution_gate.v1';
 const EFFECT_STATUS_PREPARED = 'prepared';
 const ROLLBACK_STATUS_AVAILABLE = 'available';
 const MIGRATION_VERSION = 'v1';
 const STORE_KEY = 'effects';
+const REQUIRED_EFFECT_EXECUTION_CHECKS = [
+  'feature_flag',
+  'research_opt_in',
+  'execution_evidence',
+  'typed_apply_handlers',
+  'typed_rollback_handlers',
+  'no_runtime_execution',
+  'no_player_visible_execution',
+  'no_world_mutation'
+];
+const REQUIRED_EFFECT_EXECUTION_EVIDENCE_CHECKS = [
+  'real_before_after_state',
+  'authorization_enforced',
+  'idempotent_apply_rollback',
+  'irreversible_action_review',
+  'conservation_tests',
+  'applied_and_rollback_audit',
+  'worker_route_security'
+];
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function normalizeList(value) {
+  return Array.isArray(value) ? value.map((entry) => String(entry || '')).filter(Boolean) : [];
+}
+
+function check(key, ok, error = '') {
+  return { key, ok: ok === true, error: ok === true ? '' : error };
+}
+
+function requiredApplyHandlers() {
+  return Object.values(CIVIC_ACTION_EFFECT_HANDLERS);
+}
+
+function requiredRollbackHandlers() {
+  return requiredApplyHandlers().map((handlerName) => (
+    handlerName.endsWith('.apply')
+      ? handlerName.replace(/\.apply$/, '.rollback')
+      : `${handlerName}.rollback`
+  ));
+}
+
+function inspectEffectExecutionEvidence(evidence = {}) {
+  const checks = normalizeList(evidence.checks);
+  const applyHandlers = normalizeList(evidence.applyHandlers);
+  const rollbackHandlers = normalizeList(evidence.rollbackHandlers);
+  const missingChecks = REQUIRED_EFFECT_EXECUTION_EVIDENCE_CHECKS.filter((entry) => !checks.includes(entry));
+  const missingApplyHandlers = requiredApplyHandlers().filter((entry) => !applyHandlers.includes(entry));
+  const missingRollbackHandlers = requiredRollbackHandlers().filter((entry) => !rollbackHandlers.includes(entry));
+  const ok = evidence.status === 'complete'
+    && evidence.executionStatus === 'not_executable'
+    && evidence.runtimeExposed === false
+    && evidence.playerVisible === false
+    && evidence.appliesWorldState === false
+    && missingChecks.length === 0
+    && missingApplyHandlers.length === 0
+    && missingRollbackHandlers.length === 0;
+  return {
+    ok,
+    status: String(evidence.status || 'missing'),
+    executionStatus: String(evidence.executionStatus || 'missing'),
+    runtimeExposed: evidence.runtimeExposed === true,
+    playerVisible: evidence.playerVisible === true,
+    appliesWorldState: evidence.appliesWorldState === true,
+    requiredChecks: [...REQUIRED_EFFECT_EXECUTION_EVIDENCE_CHECKS],
+    checks,
+    missingChecks,
+    requiredApplyHandlers: requiredApplyHandlers(),
+    applyHandlers,
+    missingApplyHandlers,
+    requiredRollbackHandlers: requiredRollbackHandlers(),
+    rollbackHandlers,
+    missingRollbackHandlers
+  };
+}
+
+function disabledExecutionGateReport({ source, reason }) {
+  return {
+    version: V6_CIVIC_EFFECT_EXECUTION_GATE_VERSION,
+    status: 'research_only',
+    source,
+    featureFlag: V6_WORLD_FEATURE_FLAG,
+    available: false,
+    researchReady: false,
+    releaseReady: false,
+    failClosed: true,
+    runtimeExposed: false,
+    playerVisible: false,
+    normalGameplayExposure: false,
+    appliesWorldState: false,
+    executionStatus: 'not_executable',
+    evidence: inspectEffectExecutionEvidence({}),
+    checks: [],
+    errors: [reason],
+    disabledReason: reason
+  };
+}
+
+function buildV6CivicEffectExecutionGate({
+  featureFlags = {},
+  includeResearchExecutionGate = false,
+  source = 'runtime',
+  evidence = {}
+} = {}) {
+  const enabled = includeResearchExecutionGate === true
+    && isWorldGridFeatureEnabled(featureFlags, V6_WORLD_FEATURE_FLAG);
+  if (!enabled) {
+    return disabledExecutionGateReport({
+      source,
+      reason: 'V6 civic effect execution gate requires explicit research opt-in and V6 feature flag'
+    });
+  }
+
+  const evidenceReport = inspectEffectExecutionEvidence(evidence);
+  const checks = [
+    check('feature_flag', isWorldGridFeatureEnabled(featureFlags, V6_WORLD_FEATURE_FLAG), 'FEATURE_DISABLED'),
+    check('research_opt_in', includeResearchExecutionGate === true, 'RESEARCH_OPT_IN_REQUIRED'),
+    check('execution_evidence', evidenceReport.status === 'complete' && evidenceReport.missingChecks.length === 0, 'EFFECT_EXECUTION_EVIDENCE_REQUIRED'),
+    check('typed_apply_handlers', evidenceReport.missingApplyHandlers.length === 0, 'EFFECT_APPLY_HANDLER_EVIDENCE_REQUIRED'),
+    check('typed_rollback_handlers', evidenceReport.missingRollbackHandlers.length === 0, 'EFFECT_ROLLBACK_HANDLER_EVIDENCE_REQUIRED'),
+    check('no_runtime_execution', evidenceReport.executionStatus === 'not_executable' && evidenceReport.runtimeExposed === false, 'EFFECT_RUNTIME_EXECUTION_FORBIDDEN'),
+    check('no_player_visible_execution', evidenceReport.playerVisible === false, 'EFFECT_PLAYER_VISIBLE_EXECUTION_FORBIDDEN'),
+    check('no_world_mutation', evidenceReport.appliesWorldState === false, 'EFFECT_WORLD_MUTATION_FORBIDDEN')
+  ];
+  const researchReady = checks.every((entry) => entry.ok);
+
+  return {
+    version: V6_CIVIC_EFFECT_EXECUTION_GATE_VERSION,
+    status: 'research_only',
+    source,
+    featureFlag: V6_WORLD_FEATURE_FLAG,
+    available: true,
+    researchReady,
+    releaseReady: false,
+    failClosed: researchReady !== true,
+    runtimeExposed: false,
+    playerVisible: false,
+    normalGameplayExposure: false,
+    appliesWorldState: false,
+    executionStatus: 'not_executable',
+    evidence: evidenceReport,
+    checks,
+    errors: checks.filter((entry) => !entry.ok).map((entry) => entry.error)
+  };
+}
+
+function assertV6CivicEffectExecutionGateSafe(report = {}) {
+  const errors = [];
+  if (report.version !== V6_CIVIC_EFFECT_EXECUTION_GATE_VERSION) {
+    errors.push('V6_CIVIC_EFFECT_EXECUTION_GATE_VERSION_REQUIRED');
+  }
+  if (report.featureFlag !== V6_WORLD_FEATURE_FLAG) {
+    errors.push('V6_CIVIC_EFFECT_EXECUTION_GATE_FEATURE_FLAG_REQUIRED');
+  }
+  if (report.status !== 'research_only') {
+    errors.push('V6_CIVIC_EFFECT_EXECUTION_RESEARCH_ONLY_REQUIRED');
+  }
+  if (report.runtimeExposed !== false) {
+    errors.push('V6_CIVIC_EFFECT_EXECUTION_RUNTIME_HIDDEN_REQUIRED');
+  }
+  if (report.playerVisible !== false) {
+    errors.push('V6_CIVIC_EFFECT_EXECUTION_PLAYER_HIDDEN_REQUIRED');
+  }
+  if (report.normalGameplayExposure !== false) {
+    errors.push('V6_CIVIC_EFFECT_EXECUTION_NORMAL_GAMEPLAY_FORBIDDEN');
+  }
+  if (report.appliesWorldState !== false) {
+    errors.push('V6_CIVIC_EFFECT_EXECUTION_WORLD_MUTATION_FORBIDDEN');
+  }
+  if (report.executionStatus !== 'not_executable') {
+    errors.push('V6_CIVIC_EFFECT_EXECUTION_NON_EXECUTING_REQUIRED');
+  }
+  if (report.releaseReady !== false) {
+    errors.push('V6_CIVIC_EFFECT_EXECUTION_RELEASE_READY_FORBIDDEN');
+  }
+  if (report.available === true) {
+    const checkKeys = new Set((report.checks || []).map((entry) => entry.key));
+    for (const key of REQUIRED_EFFECT_EXECUTION_CHECKS) {
+      if (!checkKeys.has(key)) errors.push(`V6_CIVIC_EFFECT_EXECUTION_CHECK_REQUIRED:${key}`);
+    }
+    const failedChecks = (report.checks || []).filter((entry) => entry.ok !== true);
+    if (report.researchReady === true && failedChecks.length > 0) {
+      errors.push('V6_CIVIC_EFFECT_EXECUTION_READY_WITH_FAILED_CHECKS');
+    }
+    if (report.researchReady !== true && report.failClosed !== true) {
+      errors.push('V6_CIVIC_EFFECT_EXECUTION_DENIAL_FAIL_CLOSED_REQUIRED');
+    }
+    const evidence = report.evidence || {};
+    if (evidence.runtimeExposed === true) {
+      errors.push('V6_CIVIC_EFFECT_EXECUTION_EVIDENCE_RUNTIME_HIDDEN_REQUIRED');
+    }
+    if (evidence.playerVisible === true) {
+      errors.push('V6_CIVIC_EFFECT_EXECUTION_EVIDENCE_PLAYER_HIDDEN_REQUIRED');
+    }
+    if (evidence.appliesWorldState === true) {
+      errors.push('V6_CIVIC_EFFECT_EXECUTION_EVIDENCE_WORLD_MUTATION_FORBIDDEN');
+    }
+    if (report.researchReady === true && evidence.ok !== true) {
+      errors.push('V6_CIVIC_EFFECT_EXECUTION_READY_WITHOUT_EVIDENCE');
+    }
+  } else if (report.failClosed !== true) {
+    errors.push('V6_CIVIC_EFFECT_EXECUTION_DISABLED_FAIL_CLOSED_REQUIRED');
+  }
+  return {
+    ok: errors.length === 0,
+    errors
+  };
+}
 
 function parseEffectRow(row) {
   if (!row) return null;
@@ -387,6 +600,11 @@ function createCivicEffectStore({
 
 module.exports = {
   EFFECT_STATUS_PREPARED,
+  REQUIRED_EFFECT_EXECUTION_CHECKS: [...REQUIRED_EFFECT_EXECUTION_CHECKS],
+  REQUIRED_EFFECT_EXECUTION_EVIDENCE_CHECKS: [...REQUIRED_EFFECT_EXECUTION_EVIDENCE_CHECKS],
   ROLLBACK_STATUS_AVAILABLE,
+  V6_CIVIC_EFFECT_EXECUTION_GATE_VERSION,
+  assertV6CivicEffectExecutionGateSafe,
+  buildV6CivicEffectExecutionGate,
   createCivicEffectStore
 };

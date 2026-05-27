@@ -54,6 +54,18 @@ that the handle is still linked to a redacted `civic_action.prepared` audit
 entry, and returns `executionStatus: "not_executable"` with
 `releaseReady: false`. It does not apply or roll back world state.
 
+The M11 effect execution gate is research-only and non-executing. It is exposed
+by `buildV6CivicEffectExecutionGate()` in
+`server/world_civilization/effects.js`, keeps `releaseReady: false`, and records
+the evidence required before any later executable handler can exist:
+typed apply handler coverage, typed rollback handler coverage, real
+before/after state, human or valid delegated authorization, idempotent
+apply/rollback behavior, irreversible-action review, conservation tests,
+`civic_action.applied`/`rollback.applied` audit evidence, and worker/route
+security. The gate must continue to report `appliesWorldState: false` and
+`executionStatus: "not_executable"` until a future release sprint implements
+actual typed execution.
+
 ## Data Model
 
 The SQLite table `world_civic_effect_actions` stores validated `action` schema
@@ -116,6 +128,10 @@ proposal/status replay.
   `civic_action.applied`.
 - Rollback recovery reports may validate handle availability and audit linkage,
   but must not call an apply or rollback handler until typed execution exists.
+- `buildV6CivicEffectExecutionGate()` may record M11 execution readiness
+  evidence, but it must stay hidden, non-executing, and fail closed when typed
+  rollback handler, irreversible-action review, conservation, audit, or route
+  security evidence is missing.
 
 ## Release Gate
 

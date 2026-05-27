@@ -4,9 +4,19 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { CIVIC_SCHEMA_VERSION } = require('../server/world_civilization/schemas');
+const { V6_WORLD_FEATURE_FLAG, parseWorldGridFeatureFlags } = require('../server/world_grid/feature_flags');
+const { CIVIC_ACTION_EFFECT_HANDLERS, CIVIC_SCHEMA_VERSION } = require('../server/world_civilization/schemas');
 const { createCivicAuditLedger } = require('../server/world_civilization/audit_ledger');
-const { createCivicEffectStore, EFFECT_STATUS_PREPARED, ROLLBACK_STATUS_AVAILABLE } = require('../server/world_civilization/effects');
+const {
+  EFFECT_STATUS_PREPARED,
+  REQUIRED_EFFECT_EXECUTION_CHECKS,
+  REQUIRED_EFFECT_EXECUTION_EVIDENCE_CHECKS,
+  ROLLBACK_STATUS_AVAILABLE,
+  V6_CIVIC_EFFECT_EXECUTION_GATE_VERSION,
+  assertV6CivicEffectExecutionGateSafe,
+  buildV6CivicEffectExecutionGate,
+  createCivicEffectStore
+} = require('../server/world_civilization/effects');
 const { createCivicModerationStore } = require('../server/world_civilization/moderation');
 const { createCivicProposalStore } = require('../server/world_civilization/proposals');
 const { createCivicVoteStore } = require('../server/world_civilization/votes');
@@ -155,12 +165,139 @@ function civicAction(overrides = {}) {
   };
 }
 
+function effectExecutionEvidence(overrides = {}) {
+  return {
+    status: 'complete',
+    executionStatus: 'not_executable',
+    runtimeExposed: false,
+    playerVisible: false,
+    appliesWorldState: false,
+    checks: [...REQUIRED_EFFECT_EXECUTION_EVIDENCE_CHECKS],
+    applyHandlers: Object.values(CIVIC_ACTION_EFFECT_HANDLERS),
+    rollbackHandlers: Object.values(CIVIC_ACTION_EFFECT_HANDLERS).map((handlerName) => handlerName.replace(/\.apply$/, '.rollback')),
+    ...overrides
+  };
+}
+
 function seedApprovedProposal({ moderationStore, proposalStore, voteStore }) {
   proposalStore.draftProposal(proposal(), { nowMs: 1_779_784_000_000 });
   const decision = moderationStore.recordDecision(moderationDecision(), { nowMs: 1_779_784_100_000 });
   proposalStore.recordProposalReview(decision, { nowMs: 1_779_784_150_000 });
   voteStore.recordVote(vote(), { nowMs: 1_779_784_200_000 });
 }
+
+test('V6 civic effect execution gate is hidden without explicit research opt-in and V6 flag', () => {
+  const noResearchOptIn = buildV6CivicEffectExecutionGate({
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: effectExecutionEvidence()
+  });
+  const broadV5Override = buildV6CivicEffectExecutionGate({
+    includeResearchExecutionGate: true,
+    featureFlags: parseWorldGridFeatureFlags('all'),
+    evidence: effectExecutionEvidence()
+  });
+
+  for (const report of [noResearchOptIn, broadV5Override]) {
+    assert.equal(report.version, V6_CIVIC_EFFECT_EXECUTION_GATE_VERSION);
+    assert.equal(report.available, false);
+    assert.equal(report.researchReady, false);
+    assert.equal(report.releaseReady, false);
+    assert.equal(report.failClosed, true);
+    assert.equal(report.runtimeExposed, false);
+    assert.equal(report.playerVisible, false);
+    assert.equal(report.appliesWorldState, false);
+    assert.equal(report.executionStatus, 'not_executable');
+    assert.deepEqual(assertV6CivicEffectExecutionGateSafe(report), { ok: true, errors: [] });
+  }
+});
+
+test('V6 civic effect execution gate records typed handler rollback and conservation evidence without execution', () => {
+  const report = buildV6CivicEffectExecutionGate({
+    includeResearchExecutionGate: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    source: 'node_test',
+    evidence: effectExecutionEvidence()
+  });
+
+  assert.equal(report.available, true);
+  assert.equal(report.researchReady, true);
+  assert.equal(report.releaseReady, false);
+  assert.equal(report.failClosed, false);
+  assert.equal(report.runtimeExposed, false);
+  assert.equal(report.playerVisible, false);
+  assert.equal(report.appliesWorldState, false);
+  assert.equal(report.executionStatus, 'not_executable');
+  assert.deepEqual(report.checks.map((entry) => entry.key), REQUIRED_EFFECT_EXECUTION_CHECKS);
+  assert.deepEqual(report.evidence.requiredChecks, REQUIRED_EFFECT_EXECUTION_EVIDENCE_CHECKS);
+  assert.deepEqual(report.evidence.missingChecks, []);
+  assert.deepEqual(report.evidence.requiredApplyHandlers, Object.values(CIVIC_ACTION_EFFECT_HANDLERS));
+  assert.deepEqual(report.evidence.missingApplyHandlers, []);
+  assert.deepEqual(report.evidence.missingRollbackHandlers, []);
+  assert.deepEqual(assertV6CivicEffectExecutionGateSafe(report), { ok: true, errors: [] });
+});
+
+test('V6 civic effect execution gate fails closed without rollback handler and conservation evidence', () => {
+  const report = buildV6CivicEffectExecutionGate({
+    includeResearchExecutionGate: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: effectExecutionEvidence({
+      checks: ['real_before_after_state', 'authorization_enforced'],
+      rollbackHandlers: []
+    })
+  });
+
+  assert.equal(report.researchReady, false);
+  assert.equal(report.releaseReady, false);
+  assert.equal(report.failClosed, true);
+  assert.deepEqual(report.evidence.missingChecks, [
+    'idempotent_apply_rollback',
+    'irreversible_action_review',
+    'conservation_tests',
+    'applied_and_rollback_audit',
+    'worker_route_security'
+  ]);
+  assert.deepEqual(report.evidence.missingRollbackHandlers, Object.values(CIVIC_ACTION_EFFECT_HANDLERS).map((handlerName) => handlerName.replace(/\.apply$/, '.rollback')));
+  assert.match(report.errors.join(','), /EFFECT_EXECUTION_EVIDENCE_REQUIRED/);
+  assert.match(report.errors.join(','), /EFFECT_ROLLBACK_HANDLER_EVIDENCE_REQUIRED/);
+  assert.deepEqual(assertV6CivicEffectExecutionGateSafe(report), { ok: true, errors: [] });
+});
+
+test('V6 civic effect execution gate assertion rejects fake executable release readiness', () => {
+  const report = buildV6CivicEffectExecutionGate({
+    includeResearchExecutionGate: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: effectExecutionEvidence()
+  });
+  const unsafe = {
+    ...report,
+    releaseReady: true,
+    runtimeExposed: true,
+    playerVisible: true,
+    normalGameplayExposure: true,
+    appliesWorldState: true,
+    executionStatus: 'executes',
+    evidence: {
+      ...report.evidence,
+      ok: false,
+      runtimeExposed: true,
+      playerVisible: true,
+      appliesWorldState: true
+    }
+  };
+  const result = assertV6CivicEffectExecutionGateSafe(unsafe);
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(','), /V6_CIVIC_EFFECT_EXECUTION_RUNTIME_HIDDEN_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_CIVIC_EFFECT_EXECUTION_PLAYER_HIDDEN_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_CIVIC_EFFECT_EXECUTION_NORMAL_GAMEPLAY_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_CIVIC_EFFECT_EXECUTION_WORLD_MUTATION_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_CIVIC_EFFECT_EXECUTION_NON_EXECUTING_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_CIVIC_EFFECT_EXECUTION_RELEASE_READY_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_CIVIC_EFFECT_EXECUTION_EVIDENCE_RUNTIME_HIDDEN_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_CIVIC_EFFECT_EXECUTION_EVIDENCE_PLAYER_HIDDEN_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_CIVIC_EFFECT_EXECUTION_EVIDENCE_WORLD_MUTATION_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_CIVIC_EFFECT_EXECUTION_READY_WITHOUT_EVIDENCE/);
+});
 
 test('V6 civic effect store prepares approved actions with rollback handles but no execution', () => withTempEffectStores(({
   auditLedger,

@@ -100,6 +100,8 @@ const REQUIRED_REVIEW_GATES = [
       'tests/world_civilization_schemas.test.js',
       'tests/world_civilization_mutation_security.test.js',
       'tests/world_civilization_governance_preflight.test.js',
+      'tests/world_civilization_effects.test.js',
+      'tests/world_civilization_rollback_recovery.test.js',
       'tests/world_civilization_reputation.test.js',
       'tests/world_civilization_moderation.test.js',
       'tests/world_civilization_resilience.test.js',
@@ -110,7 +112,35 @@ const REQUIRED_REVIEW_GATES = [
       'split_playwright_smokes',
       'all_features_regression',
       'feature_override_safety',
-      'store_backed_delegation_proof'
+      'store_backed_delegation_proof',
+      'effect_execution_gate'
+    ],
+    signoffRequired: true
+  },
+  {
+    key: 'effect_execution_review',
+    label: 'Effect execution and rollback review',
+    owner: 'engineering_security',
+    requiredArtifacts: [
+      RELEASE_REVIEW_ARTIFACT,
+      'specs/62_agent_town_v6_civic_effect_rollback_foundation.md',
+      'server/world_civilization/effects.js',
+      'server/world_civilization/rollback_recovery.js',
+      'server/world_civilization/schemas.js',
+      'tests/world_civilization_effects.test.js',
+      'tests/world_civilization_rollback_recovery.test.js',
+      'tests/world_civilization_effect_process_restart.test.js'
+    ],
+    requiredChecks: [
+      'typed_apply_handlers',
+      'typed_rollback_handlers',
+      'real_before_after_state',
+      'authorization_enforced',
+      'idempotent_apply_rollback',
+      'irreversible_action_review',
+      'conservation_tests',
+      'applied_and_rollback_audit',
+      'worker_route_security'
     ],
     signoffRequired: true
   },

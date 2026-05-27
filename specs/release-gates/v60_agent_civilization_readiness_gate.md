@@ -244,6 +244,14 @@ gate below has implementation, deterministic tests, and security/product signoff
   execution cannot be enabled by a loose boolean flag; it must carry matching
   active `civic_execution` delegation proof and still remains blocked until M12
   route/tool enforcement is release-ready.
+  The M11 research-only execution gate in
+  `server/world_civilization/effects.js` must also require typed apply handler
+  evidence, typed rollback handler evidence, real before/after state,
+  authorization enforcement, idempotent apply/rollback behavior,
+  irreversible-action review, conservation tests,
+  `civic_action.applied`/`rollback.applied` audit evidence, and worker/route
+  security while keeping `releaseReady: false`, `appliesWorldState: false`, and
+  `executionStatus: "not_executable"`.
   Research-only handle reconstruction starts in
   `server/world_civilization/rollback_recovery.js` and
   `tests/world_civilization_rollback_recovery.test.js`. Release still requires
@@ -327,8 +335,8 @@ gate below has implementation, deterministic tests, and security/product signoff
   `docs/security/V6_AGENT_CIVILIZATION_RELEASE_REVIEW.md`; release still
   requires approved threat model, privacy review, abuse-case review,
   store-backed delegation proof and scope-mismatch evidence, data-retention
-  policy, audit coverage review, deterministic validation evidence, modal lab
-  surface review, and product signoff.
+  policy, audit coverage review, deterministic validation evidence, effect
+  execution and rollback review, modal lab surface review, and product signoff.
 - Controlled release completion must remain a final go/no-go gate, not an
   automatic enablement path. Current gate tracking starts in
   `server/world_civilization/controlled_release.js` and
