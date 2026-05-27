@@ -69,6 +69,28 @@ test('V6 release review audit coverage requires migration rehearsal evidence', (
   assert.ok(auditGate.requiredChecks.includes('migration_rehearsal'));
 });
 
+test('V6 release review requires threat-model target gate evidence', () => {
+  const threatModelGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'threat_model');
+  const validationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'validation_evidence');
+
+  assert.equal(threatModelGate.owner, 'security');
+  assert.ok(threatModelGate.requiredArtifacts.includes('server/world_civilization/threat_model_targets.js'));
+  assert.ok(threatModelGate.requiredArtifacts.includes('tests/world_civilization_threat_model_targets.test.js'));
+  assert.ok(threatModelGate.requiredChecks.includes('trust_boundaries'));
+  assert.ok(threatModelGate.requiredChecks.includes('assets'));
+  assert.ok(threatModelGate.requiredChecks.includes('attacker_capabilities'));
+  assert.ok(threatModelGate.requiredChecks.includes('abuse_paths'));
+  assert.ok(threatModelGate.requiredChecks.includes('mitigations'));
+  assert.ok(threatModelGate.requiredChecks.includes('residual_risk_owners'));
+  assert.ok(threatModelGate.requiredChecks.includes('worker_route_boundary'));
+  assert.ok(threatModelGate.requiredChecks.includes('public_private_boundary'));
+  assert.ok(threatModelGate.requiredChecks.includes('rollback_failure_modes'));
+  assert.ok(threatModelGate.requiredChecks.includes('release_signoff_inputs'));
+  assert.ok(threatModelGate.requiredChecks.includes('threat_model_target_gate'));
+  assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_threat_model_targets.test.js'));
+  assert.ok(validationGate.requiredChecks.includes('threat_model_target_gate'));
+});
+
 test('V6 release review requires privacy review target gate evidence', () => {
   const privacyGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'privacy_review');
   const validationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'validation_evidence');

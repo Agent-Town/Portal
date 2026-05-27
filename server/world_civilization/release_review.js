@@ -9,8 +9,24 @@ const REQUIRED_REVIEW_GATES = [
     key: 'threat_model',
     label: 'Threat model',
     owner: 'security',
-    requiredArtifacts: [RELEASE_REVIEW_ARTIFACT],
-    requiredChecks: ['trust_boundaries', 'assets', 'attacker_capabilities', 'abuse_paths', 'mitigations'],
+    requiredArtifacts: [
+      RELEASE_REVIEW_ARTIFACT,
+      'server/world_civilization/threat_model_targets.js',
+      'tests/world_civilization_threat_model_targets.test.js'
+    ],
+    requiredChecks: [
+      'trust_boundaries',
+      'assets',
+      'attacker_capabilities',
+      'abuse_paths',
+      'mitigations',
+      'residual_risk_owners',
+      'worker_route_boundary',
+      'public_private_boundary',
+      'rollback_failure_modes',
+      'release_signoff_inputs',
+      'threat_model_target_gate'
+    ],
     signoffRequired: true
   },
   {
@@ -141,6 +157,7 @@ const REQUIRED_REVIEW_GATES = [
     requiredArtifacts: [
       RELEASE_REVIEW_ARTIFACT,
       'tests/world_civilization_schemas.test.js',
+      'tests/world_civilization_threat_model_targets.test.js',
       'tests/world_civilization_data_retention_targets.test.js',
       'tests/world_civilization_privacy_review_targets.test.js',
       'tests/world_civilization_mutation_security.test.js',
@@ -169,6 +186,7 @@ const REQUIRED_REVIEW_GATES = [
       'split_playwright_smokes',
       'all_features_regression',
       'feature_override_safety',
+      'threat_model_target_gate',
       'privacy_review_target_gate',
       'data_retention_target_gate',
       'session_auth_target_gate',

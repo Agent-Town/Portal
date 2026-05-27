@@ -358,12 +358,15 @@ const REQUIRED_V6_READINESS_GATES = [
       'server/world_civilization/data_retention_targets.js',
       'server/world_civilization/privacy_review_targets.js',
       'server/world_civilization/release_review.js',
+      'server/world_civilization/threat_model_targets.js',
       'tests/world_civilization_data_retention_targets.test.js',
       'tests/world_civilization_privacy_review_targets.test.js',
-      'tests/world_civilization_release_review.test.js'
+      'tests/world_civilization_release_review.test.js',
+      'tests/world_civilization_threat_model_targets.test.js'
     ],
     requiredChecks: [
       'threat_model',
+      'threat_model_target_gate',
       'privacy_review',
       'privacy_review_target_gate',
       'abuse_case_review',

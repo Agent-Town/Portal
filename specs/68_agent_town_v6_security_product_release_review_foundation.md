@@ -23,7 +23,9 @@ are present.
 ## Required Review Gates
 
 - Threat model: trust boundaries, assets, attacker capabilities, abuse paths,
-  and mitigations.
+  mitigations, residual risk owners, worker/route boundary, public/private
+  boundary, rollback failure modes, release signoff inputs, and threat model
+  target gate.
 - Privacy review: private town isolation, public surface data minimization,
   wallet and Brain secret exclusion, provider credential exclusion, debug trace
   redaction, worker observability redaction, public text rendering/XSS, modal
@@ -48,11 +50,11 @@ are present.
 - Validation evidence: targeted Node suite, split Playwright smokes,
   all-features regression, feature override safety, load-rate target coverage,
   migration-load replay evidence, load/rate replay evidence, and multi-process
-  write-contention evidence, including civic mutation security, privacy review
-  target coverage, data-retention target coverage, session-auth target
-  coverage, proposal intake readiness, vote authorization readiness, worker vote
-  adapter gate, reputation eligibility advice readiness, moderation privacy
-  readiness, delegated-agent proof, and
+  write-contention evidence, including civic mutation security, threat model
+  target coverage, privacy review target coverage, data-retention target
+  coverage, session-auth target coverage, proposal intake readiness, vote
+  authorization readiness, worker vote adapter gate, reputation eligibility
+  advice readiness, moderation privacy readiness, delegated-agent proof, and
   governance preflight, effect execution gate, agent participation enforcement
   gate, institution readiness
   gate, public works readiness gate, lab readiness gate, and resilience
