@@ -27,7 +27,7 @@ Player prompt
 ## V0.1 Contract-First Pipeline
 
 - Player prompts are reduced to a structured `GenerationBrief` with theme, tone, visual style, species, factions, cultures, tech flavor, humor level, and safety status.
-- Credential-like prompt spans are marked for review and removed before runtime keyword extraction, so secret fragments cannot become generated labels, names, titles, or hints.
+- Credential-like prompt spans, including expanded GitHub, GitLab, Google, AWS, Slack, Stripe, and JWT-shaped token families, are marked for review and removed before runtime keyword extraction, so secret fragments cannot become generated labels, names, titles, or hints.
 - Generated packs include an `AssetPromptPlan` for canonical image targets only; plan entries carry prompt hashes, target sizes, usage paths, negative prompts, candidate output paths, and JSONL job-log paths.
 - Candidate folders and job logs are scaffolded under `data/generated-packs*`; no production image asset is required for runtime playability.
 - Deterministic fallback materials, shape tokens, sprites, and generated text remain the playable runtime source until an explicit auth, consent, cost, review, and promotion model exists for production image generation.
@@ -203,6 +203,7 @@ Player prompt
   "jsonSchemaRunnerExists": true,
   "schemasValidatedIndependently": true,
   "credentialPromptFragmentsRedacted": true,
+  "expandedCredentialPromptFamiliesRedacted": true,
   "dangerousFieldRejectCountMin": 20,
   "jobLogsReplayableFromPromptPlan": true,
   "costConsentStatus": "not_required_for_scaffold",

@@ -93,6 +93,7 @@ This is a separate prototype-gated track. It must not change normal gameplay vis
   "releaseEvidenceBundleReportUnsafeValueRedacted": true,
   "generatedPackApiErrorDetailsRedacted": true,
   "credentialPromptFragmentsRedacted": true,
+  "expandedCredentialPromptFamiliesRedacted": true,
   "canonicalMappingCoverage": 1.0,
   "arbitraryToolMutationFormulaCount": 0,
   "invalidAssetManifestEntryCount": 0,
@@ -132,7 +133,7 @@ This is a separate prototype-gated track. It must not change normal gameplay vis
 
 ## GU-2 Schema Validation Engine Slice
 
-The first production-roadmap continuation adds a local JSON Schema registry and runner for generated-pack subdocuments. The runner validates the pack, brief, style bible, universe bible, gameplay mapping, asset prompt plan, and asset manifest independently before a generated pack can pass validation. Core contract validation reports redact unsafe submitted generation-brief, asset-manifest, and asset-prompt-plan measured metadata values. Aggregate generated-pack validation reports also redact unsafe submitted schema-version, mapping-id, palette, and scaffold metadata values. Credential-like prompt spans are marked for review and removed before runtime keyword extraction so secret fragments cannot become generated runtime labels.
+The first production-roadmap continuation adds a local JSON Schema registry and runner for generated-pack subdocuments. The runner validates the pack, brief, style bible, universe bible, gameplay mapping, asset prompt plan, and asset manifest independently before a generated pack can pass validation. Core contract validation reports redact unsafe submitted generation-brief, asset-manifest, and asset-prompt-plan measured metadata values. Aggregate generated-pack validation reports also redact unsafe submitted schema-version, mapping-id, palette, and scaffold metadata values. Credential-like prompt spans are marked for review and removed before runtime keyword extraction so secret fragments cannot become generated runtime labels. Expanded credential-token families, including GitHub OAuth/app tokens, GitLab PATs, Google API keys, AWS access-key IDs, Slack token prefixes, Stripe key prefixes, and JWT-shaped values, are stripped through the same shared matcher before API generation builds pack copy.
 
 ```json
 {
@@ -146,7 +147,8 @@ The first production-roadmap continuation adds a local JSON Schema registry and 
   "assetPromptPlanMatchesRoadmapShape": true,
   "dangerousFieldRejectCountMin": 20,
   "runtimeRejectsInvalidPack": true,
-  "credentialPromptFragmentsRedacted": true
+  "credentialPromptFragmentsRedacted": true,
+  "expandedCredentialPromptFamiliesRedacted": true
 }
 ```
 

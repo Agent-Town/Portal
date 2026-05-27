@@ -68,6 +68,35 @@ test('GPACK-123 GenerationBrief strips credential-like prompt spans from runtime
   assert.equal(serialized.includes('generatedsecretshouldnotecho'), false);
 });
 
+test('GPACK-124 GenerationBrief strips expanded credential-token families from runtime keyword hints', () => {
+  const secretLikeValues = [
+    'gho_generatedsecretshouldnotecho',
+    'ghu_generatedsecretshouldnotecho',
+    'ghs_generatedsecretshouldnotecho',
+    'glpat-generatedsecretshouldnotecho',
+    'AIzaGeneratedSecretShouldNotEcho1234567890',
+    'AKIAGENERATEDSECRET0',
+    ['rk', 'live', 'generatedsecretshouldnotecho'].join('_'),
+    ['pk', 'live', 'generatedsecretshouldnotecho'].join('_'),
+    'xoxc-generatedsecretshouldnotecho',
+    'eyJgeneratedsecret0.generatedsecret1.generatedsecret2'
+  ];
+
+  for (const secretLikeValue of secretLikeValues) {
+    const brief = createGenerationBrief({
+      prompt: `${secretLikeValue} cozy lantern town with patient gardeners`
+    });
+    const serialized = JSON.stringify(brief).toLowerCase();
+
+    assert.equal(brief.safety.status, 'needs_review', secretLikeValue);
+    assert.equal(brief.safety.reasons.includes('secret-like-value'), true, secretLikeValue);
+    assert.equal(brief.safety.rawPromptExecutable, false, secretLikeValue);
+    assert.equal(brief.keywordHints.includes('generatedsecretshouldnotecho'), false, secretLikeValue);
+    assert.equal(serialized.includes(secretLikeValue.toLowerCase()), false, secretLikeValue);
+    assert.equal(serialized.includes('generatedsecret'), false, secretLikeValue);
+  }
+});
+
 test('GPACK-119 GenerationBrief reports redact unsafe measured metadata values', () => {
   const brief = createGenerationBrief({
     prompt: 'cozy mushroom frontier with clockwork gardeners and lantern moss'

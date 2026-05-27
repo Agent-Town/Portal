@@ -321,7 +321,19 @@ const RAW_EXECUTABLE_PROMPT_PATTERNS = [
 ];
 
 const SECRET_LIKE_KEY_PATTERN = /(api[_-]?key|secret|private[_-]?key|credential|oauth|access[_-]?token|refresh[_-]?token|auth[_-]?token|bearer[_-]?token|id[_-]?token|session[_-]?token|provider[_-]?token|wallet[_-]?secret|seed[_-]?phrase|password|^token$)/i;
-const SECRET_LIKE_VALUE_PATTERN = /\b(?:sk-[a-z0-9_-]{8,}|xox[baprs]-[a-z0-9-]{8,}|ghp_[a-z0-9_]{8,}|github_pat_[a-z0-9_]{8,}|ya29\.[a-z0-9_-]{8,}|bearer\s+[a-z0-9._-]{12,})\b/i;
+const SECRET_LIKE_VALUE_PATTERN = new RegExp([
+  '\\bsk-[a-z0-9_-]{8,}\\b',
+  '\\bxox[a-z]-[a-z0-9-]{8,}\\b',
+  '\\bgh[opusr]_[a-z0-9_]{8,}\\b',
+  '\\bgithub_pat_[a-z0-9_]{8,}\\b',
+  '\\bglpat-[a-z0-9_-]{8,}\\b',
+  '\\bya29\\.[a-z0-9_-]{8,}\\b',
+  '\\bAIza[a-z0-9_-]{16,}\\b',
+  '\\b(?:AKIA|ASIA)[a-z0-9]{16}\\b',
+  '\\b[rsp]k_(?:live|test)_[a-z0-9]{8,}\\b',
+  '\\beyJ[a-z0-9_-]{8,}\\.[a-z0-9_-]{8,}\\.[a-z0-9_-]{8,}\\b',
+  '\\bbearer\\s+[a-z0-9._-]{12,}\\b'
+].join('|'), 'i');
 
 const SENSITIVE_TEXT_PATTERNS = [
   { id: 'secret-like-value', pattern: SECRET_LIKE_VALUE_PATTERN },

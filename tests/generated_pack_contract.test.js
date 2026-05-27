@@ -367,6 +367,41 @@ test('GPACK-123 prompt-to-pack generation does not echo credential-like prompt f
   assert.equal(serialized.includes('generatedsecretshouldnotecho'), false);
 });
 
+test('GPACK-124 generated-pack API strips expanded credential-like prompt spans before generating packs', async () => {
+  const identity = { pairId: 'session:generated-pack-api-expanded-token-redaction', houseId: null };
+  const secretLikePrompts = [
+    'gho_generatedsecretshouldnotecho cozy lantern town with patient gardeners',
+    'glpat-generatedsecretshouldnotecho cozy lantern town with patient gardeners',
+    'xoxc-generatedsecretshouldnotecho cozy lantern town with patient gardeners'
+  ];
+
+  await withWorldGridServer({
+    identity,
+    envPatch: {
+      NODE_ENV: 'test',
+      WORLD_GRID_FEATURE_FLAGS: 'all',
+      GENERATED_PACK_STORE_ROOT: 'data/generated-packs-expanded-token-redaction-test'
+    }
+  }, async (baseUrl) => {
+    for (const prompt of secretLikePrompts) {
+      const response = await fetch(`${baseUrl}/api/world/generated-pack/generate`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ prompt })
+      });
+      const body = await response.json();
+      const serialized = JSON.stringify(body).toLowerCase();
+
+      assert.equal(response.status, 200, JSON.stringify(body));
+      assert.equal(body.generatedPack.validationReport.ok, true);
+      assert.equal(body.generatedPack.generationBrief.safety.status, 'needs_review');
+      assert.equal(body.generatedPack.generationBrief.safety.reasons.includes('secret-like-value'), true);
+      assert.equal(serialized.includes('generatedsecretshouldnotecho'), false);
+      assert.equal(serialized.includes(prompt.split(' ')[0].toLowerCase()), false);
+    }
+  });
+});
+
 test('asset prompt-plan creation covers canonical image targets and scaffolds future image jobs only', () => {
   const owner = { ownerAccountId: 'owner_asset_plan_contract' };
   const pack = createGeneratedPack({
