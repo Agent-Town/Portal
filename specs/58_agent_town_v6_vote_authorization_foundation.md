@@ -6,6 +6,8 @@ Milestone: `M8 Vote authorization and delegation`
 
 Runtime module: `server/world_civilization/votes.js`
 
+Voting templates: `server/world_civilization/voting_templates.js`
+
 Governance preflight: `server/world_civilization/governance_preflight.js`
 
 Contract tests: `tests/world_civilization_votes.test.js`
@@ -87,6 +89,29 @@ The envelope is available only with explicit V6 research opt-in plus
 `assertV6VoteRouteAuthorizationEnvelopeSafe()` fails closed if the envelope ever
 claims runtime exposure, player visibility, vote recording, world mutation,
 private-data exposure, outcome application, or executable behavior.
+
+## Voting Template Review
+
+`server/world_civilization/voting_templates.js` defines research-only
+per-institution voting templates for:
+
+- `public_world`
+- `public_works`
+- `sandbox_policy`
+- `institution_charter`
+- `service_policy`
+
+Each template names proposal types, voting rule id, eligibility rule id,
+moderation policy id, `vote_advice` delegation scope, supported vote route
+surfaces, supported authorization kinds, and an explicit approval policy. The
+templates remain `not_executable`, not player-visible, not runtime-exposed, and
+marked `pending_release_review`.
+
+`buildV6VotingTemplateReviewReport()` verifies scope coverage, template
+contracts, route-surface coverage, public-audit text safety, no runtime
+exposure, no effect application, and release-review-pending status. The M8 vote
+authorization readiness gate consumes this report before it can consider
+`votingTemplatesReviewed` true.
 
 ## M8 Readiness Gate
 

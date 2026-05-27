@@ -11,6 +11,10 @@ const {
 const { PROPOSAL_STATUS_READY_FOR_VOTE } = require('./proposals');
 const { validateCivicVote } = require('./schemas');
 const {
+  V6_VOTING_TEMPLATE_REVIEW_VERSION,
+  assertV6VotingTemplateReviewReportSafe
+} = require('./voting_templates');
+const {
   ensureCivicSqliteSchemaMetadata,
   readCivicSqliteSchemaMetadata
 } = require('./sqlite_schema');
@@ -103,6 +107,44 @@ function normalizeList(value) {
 
 function check(key, ok, error = '') {
   return { key, ok: ok === true, error: ok === true ? '' : error };
+}
+
+function inspectVotingTemplateReviewReport(report = null) {
+  if (!report || typeof report !== 'object') {
+    return {
+      ok: false,
+      version: '',
+      researchReady: false,
+      releaseReady: false,
+      missingScopes: [],
+      errors: ['VOTING_TEMPLATE_REVIEW_REPORT_REQUIRED']
+    };
+  }
+  const safety = assertV6VotingTemplateReviewReportSafe(report);
+  const ok = safety.ok === true
+    && report.version === V6_VOTING_TEMPLATE_REVIEW_VERSION
+    && report.researchReady === true
+    && report.releaseReady === false
+    && report.runtimeExposed === false
+    && report.playerVisible === false
+    && report.normalGameplayExposure === false
+    && report.mutatesWorldState === false
+    && report.appliesVoteOutcome === false
+    && report.executionStatus === 'not_executable'
+    && Array.isArray(report.missingScopes)
+    && report.missingScopes.length === 0;
+  return {
+    ok,
+    version: String(report.version || ''),
+    researchReady: report.researchReady === true,
+    releaseReady: report.releaseReady === true,
+    templateScopes: Array.isArray(report.templateScopes) ? report.templateScopes : [],
+    missingScopes: Array.isArray(report.missingScopes) ? report.missingScopes : [],
+    errors: [
+      ...(safety.errors || []),
+      ...(Array.isArray(report.errors) ? report.errors : [])
+    ]
+  };
 }
 
 function disabledVoteRouteAuthorizationEnvelope({ source, routeSurface, reason }) {
@@ -329,10 +371,11 @@ function assertV6VoteRouteAuthorizationEnvelopeSafe(report = {}) {
 function inspectVoteAuthorizationReadinessEvidence(evidence = {}) {
   const checks = normalizeList(evidence.checks);
   const routeSurfaces = normalizeList(evidence.routeSurfaces);
+  const votingTemplateReview = inspectVotingTemplateReviewReport(evidence.votingTemplateReviewReport);
   const missingChecks = REQUIRED_VOTE_AUTHORIZATION_EVIDENCE_CHECKS.filter((entry) => !checks.includes(entry));
   const missingRouteSurfaces = REQUIRED_VOTE_ROUTE_SURFACES.filter((entry) => !routeSurfaces.includes(entry));
   const routeEdgeAuthReviewed = evidence.routeEdgeAuthReviewed === true;
-  const votingTemplatesReviewed = evidence.votingTemplatesReviewed === true;
+  const votingTemplatesReviewed = evidence.votingTemplatesReviewed === true && votingTemplateReview.ok === true;
   const replayIdempotencyReviewed = evidence.replayIdempotencyReviewed === true;
   const governancePreflightReviewed = evidence.governancePreflightReviewed === true;
   const ok = evidence.status === 'complete'
@@ -361,6 +404,7 @@ function inspectVoteAuthorizationReadinessEvidence(evidence = {}) {
     exposesPrivateData: evidence.exposesPrivateData === true,
     routeEdgeAuthReviewed,
     votingTemplatesReviewed,
+    votingTemplateReview,
     replayIdempotencyReviewed,
     governancePreflightReviewed,
     requiredChecks: [...REQUIRED_VOTE_AUTHORIZATION_EVIDENCE_CHECKS],
@@ -533,6 +577,9 @@ function assertV6VoteAuthorizationReadinessGateSafe(report = {}) {
     }
     if (report.researchReady === true && evidence.ok !== true) {
       errors.push('V6_VOTE_AUTHORIZATION_READINESS_READY_WITHOUT_EVIDENCE');
+    }
+    if (report.researchReady === true && evidence.votingTemplateReview?.ok !== true) {
+      errors.push('V6_VOTE_AUTHORIZATION_READINESS_TEMPLATE_REVIEW_REQUIRED');
     }
   } else if (report.failClosed !== true) {
     errors.push('V6_VOTE_AUTHORIZATION_READINESS_DISABLED_FAIL_CLOSED_REQUIRED');

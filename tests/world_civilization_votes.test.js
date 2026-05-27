@@ -10,6 +10,7 @@ const { createCivicAuditLedger } = require('../server/world_civilization/audit_l
 const { createCivicDelegationStore } = require('../server/world_civilization/delegations');
 const { buildV6CivicMutationSecurityEnvelope } = require('../server/world_civilization/mutation_security');
 const { createCivicProposalStore } = require('../server/world_civilization/proposals');
+const { buildV6VotingTemplateReviewReport } = require('../server/world_civilization/voting_templates');
 const {
   DEFAULT_VOTE_APPROVAL_POLICY,
   REQUIRED_VOTE_AUTHORIZATION_EVIDENCE_CHECKS,
@@ -208,6 +209,10 @@ function voteReadinessEvidence(overrides = {}) {
     votingTemplatesReviewed: true,
     replayIdempotencyReviewed: true,
     governancePreflightReviewed: true,
+    votingTemplateReviewReport: buildV6VotingTemplateReviewReport({
+      includeResearchVotingTemplates: true,
+      featureFlags: { [V6_WORLD_FEATURE_FLAG]: true }
+    }),
     checks: [...REQUIRED_VOTE_AUTHORIZATION_EVIDENCE_CHECKS],
     routeSurfaces: [...REQUIRED_VOTE_ROUTE_SURFACES],
     ...overrides

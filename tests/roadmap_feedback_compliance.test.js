@@ -179,6 +179,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   const controlledSource = read('server/world_civilization/controlled_release.js');
   const proposalSource = read('server/world_civilization/proposals.js');
   const voteSource = read('server/world_civilization/votes.js');
+  const votingTemplateSource = read('server/world_civilization/voting_templates.js');
   const reputationSource = read('server/world_civilization/reputation.js');
   const moderationSource = read('server/world_civilization/moderation.js');
   const effectSource = read('server/world_civilization/effects.js');
@@ -251,6 +252,9 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /buildV6VoteRouteAuthorizationEnvelope\(\)/);
   assert.match(plan, /non-recording route-edge guard/);
   assert.match(plan, /M5 mutation-security envelope/);
+  assert.match(plan, /server\/world_civilization\/voting_templates\.js/);
+  assert.match(plan, /buildV6VotingTemplateReviewReport\(\)/);
+  assert.match(plan, /public-world, public-works, sandbox-policy, institution-charter, and service-policy/);
   assert.match(plan, /vote\.recorded` audit rows with privacy-safe before\/after summaries/);
   assert.match(plan, /buildV6VoteAuthorizationReadinessGate\(\)/);
   assert.match(plan, /route-edge vote auth/);
@@ -267,6 +271,10 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(voteSpec, /buildV6VoteRouteAuthorizationEnvelope\(\)/);
   assert.match(voteSpec, /assertV6VoteRouteAuthorizationEnvelopeSafe\(\)/);
   assert.match(voteSpec, /store-backed `vote_advice` delegation proof/);
+  assert.match(voteSpec, /Voting Template Review/);
+  assert.match(voteSpec, /server\/world_civilization\/voting_templates\.js/);
+  assert.match(voteSpec, /buildV6VotingTemplateReviewReport\(\)/);
+  assert.match(voteSpec, /pending_release_review/);
   assert.match(releaseReview, /Vote authorization readiness review/);
   assert.match(releaseReview, /vote authorization readiness gate/);
   assert.match(readinessSource, /vote_authorization_readiness_gate/);
@@ -721,6 +729,7 @@ test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () 
   const releaseReview = read('docs/security/V6_AGENT_CIVILIZATION_RELEASE_REVIEW.md');
   const skillLine = read('docs/internal-skill-testline.md');
   const voteSource = read('server/world_civilization/votes.js');
+  const votingTemplateSource = read('server/world_civilization/voting_templates.js');
   const effectSource = read('server/world_civilization/effects.js');
   const delegationSource = read('server/world_civilization/delegations.js');
 
@@ -736,7 +745,9 @@ test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () 
   assert.match(proposalSpec, /`proposal\.reviewed`/);
   assert.match(voteSpec, /Approval Policy Rules/);
   assert.match(voteSpec, /Route-Edge Authorization Envelope/);
+  assert.match(voteSpec, /Voting Template Review/);
   assert.match(voteSpec, /buildV6VoteAuthorizationReadinessGate\(\)/);
+  assert.match(voteSpec, /buildV6VotingTemplateReviewReport\(\)/);
   assert.match(voteSpec, /ready_for_vote/);
   assert.match(voteSpec, /delegated_agent_vote_route/);
   assert.match(voteSpec, /quorumMinVotes/);
@@ -775,6 +786,7 @@ test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () 
   assert.match(releaseReview, /Vote authorization readiness review/);
   assert.match(releaseReview, /route-edge vote auth/);
   assert.match(releaseReview, /route-edge authorization envelope/);
+  assert.match(releaseReview, /per-institution voting template report/);
   assert.match(releaseReview, /Effect execution and rollback review/);
   assert.match(releaseReview, /effect execution gate/);
   assert.match(releaseReview, /Agent participation enforcement review/);
@@ -785,6 +797,8 @@ test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () 
   assert.match(skillLine, /buildV6VoteRouteAuthorizationEnvelope\(\)/);
   assert.match(skillLine, /non-recording route-edge guard/);
   assert.match(skillLine, /store-backed `vote_advice` delegation proof/);
+  assert.match(skillLine, /buildV6VotingTemplateReviewReport\(\)/);
+  assert.match(skillLine, /tests\/world_civilization_voting_templates\.test\.js/);
   assert.match(skillLine, /M11 effect execution gate/);
   assert.match(skillLine, /applied\/rollback audit evidence/);
   assert.match(skillLine, /M12 enforcement gate/);
@@ -797,9 +811,15 @@ test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () 
   assert.match(voteSource, /V6_VOTE_ROUTE_AUTHORIZATION_VERSION/);
   assert.match(voteSource, /buildV6VoteRouteAuthorizationEnvelope/);
   assert.match(voteSource, /assertV6VoteRouteAuthorizationEnvelopeSafe/);
+  assert.match(voteSource, /votingTemplateReviewReport/);
   assert.match(voteSource, /human_vote_route/);
   assert.match(voteSource, /worker_tool_vote_surface/);
   assert.match(voteSource, /V6_VOTE_AUTHORIZATION_READINESS_OUTCOME_APPLICATION_FORBIDDEN/);
+  assert.match(votingTemplateSource, /V6_VOTING_TEMPLATE_SCOPES/);
+  assert.match(votingTemplateSource, /buildV6VotingTemplateReviewReport/);
+  assert.match(votingTemplateSource, /pending_release_review/);
+  assert.match(votingTemplateSource, /public_works/);
+  assert.match(votingTemplateSource, /institution_charter/);
   assert.match(effectSource, /REQUIRED_EFFECT_EXECUTION_EVIDENCE_CHECKS/);
   assert.match(effectSource, /irreversible_action_review/);
   assert.match(effectSource, /conservation_tests/);

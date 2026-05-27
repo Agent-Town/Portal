@@ -252,7 +252,12 @@ persistence resilience, and security/product release review.
   includes a non-recording `buildV6VoteRouteAuthorizationEnvelope()` route-edge
   guard that composes the V6 feature gate, explicit research opt-in, M5 mutation
   security, `ready_for_vote` proposal state, human/delegated surface binding,
-  eligibility, and no effect application;
+  eligibility, and no effect application; `server/world_civilization/voting_templates.js`
+  adds research-only per-institution voting templates plus a
+  `buildV6VotingTemplateReviewReport()` that verifies scope coverage,
+  route-surface coverage, public-audit text safety, no runtime exposure, no
+  effect application, and pending release review before the M8 readiness gate can
+  consider template evidence complete;
   the M8 research-only vote authorization readiness gate in
   `server/world_civilization/votes.js` must require server-verified voter
   authorization, eligibility rule verification, one-vote accounting,
@@ -263,8 +268,8 @@ persistence resilience, and security/product release review.
   application while keeping `releaseReady: false`,
   `appliesVoteOutcome: false`, `mutatesWorldState: false`, and
   `executionStatus: "not_executable"`;
-  release still requires per-institution voting templates, route/tool wiring
-  through the route-edge authorization envelope, and product/security review of
+  release still requires route/tool wiring through the route-edge authorization
+  envelope, release signoff for voting templates, and product/security review of
   quorum and threshold choices.
 - Reputation cannot be self-awarded, transferred as currency, or used without an
   audit trail and dispute path. Current research-only storage starts this in
