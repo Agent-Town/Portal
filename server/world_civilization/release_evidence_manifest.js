@@ -74,13 +74,13 @@ const V6_RELEASE_EVIDENCE_MANIFEST_REQUIREMENTS = [
   {
     key: 'production_override_recheck',
     owner: 'security_engineering',
-    requiredEvidence: 'Evidence manifest must link the production query/header override recheck proving broad player overrides cannot enable V6 or publish runtime civic tools.',
+    requiredEvidence: 'Evidence manifest must link the production query/header override recheck, including production-mode browser evidence, proving broad player overrides cannot enable V6, publish runtime civic tools, or open the V6 lab.',
     releaseEvidenceRequired: 'production_override_recheck_manifest_entry'
   },
   {
     key: 'runtime_tool_absence_recheck',
     owner: 'security_engineering',
-    requiredEvidence: 'Evidence manifest must link runtime `/api/world/tools` capture proving no `et.world.civic.*` tools are published before release.',
+    requiredEvidence: 'Evidence manifest must link runtime `/api/world/tools` capture proving no `et.world.civic.*` tools are published before release, including the production-mode browser override smoke.',
     releaseEvidenceRequired: 'runtime_tool_absence_manifest_entry'
   },
   {

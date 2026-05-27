@@ -64,6 +64,14 @@ test('V6 release evidence manifest requirements name every archive input', () =>
   assert.ok(matrix.requirementKeys.includes('all_features_regression_results'));
   assert.ok(matrix.requirementKeys.includes('production_override_recheck'));
   assert.ok(matrix.requirementKeys.includes('runtime_tool_absence_recheck'));
+  assert.match(
+    V6_RELEASE_EVIDENCE_MANIFEST_REQUIREMENTS.find((requirement) => requirement.key === 'production_override_recheck').requiredEvidence,
+    /production-mode browser evidence/
+  );
+  assert.match(
+    V6_RELEASE_EVIDENCE_MANIFEST_REQUIREMENTS.find((requirement) => requirement.key === 'runtime_tool_absence_recheck').requiredEvidence,
+    /production-mode browser override smoke/
+  );
   assert.ok(matrix.requirementKeys.includes('browser_console_error_budget'));
   assert.ok(matrix.requirementKeys.includes('playwright_trace_archive'));
   assert.ok(matrix.requirementKeys.includes('blocker_exception_register'));

@@ -61,7 +61,8 @@ const REQUIRED_V6_READINESS_GATES = [
     requiredArtifacts: [
       V6_READINESS_GATE_ARTIFACT,
       'server/world_grid/feature_flags.js',
-      'tests/world_grid_region.test.js'
+      'tests/world_grid_region.test.js',
+      'e2e/247_v6_production_override_browser_smoke.spec.js'
     ],
     requiredChecks: [
       'explicit_v60_flag_required',
@@ -155,7 +156,8 @@ const REQUIRED_V6_READINESS_GATES = [
       'tests/world_civilization_worker_tool_adapter.test.js',
       'tests/world_civilization_worker_vote_adapter.test.js',
       'tests/world_civilization_tool_exposure_gate.test.js',
-      'e2e/246_v6_worker_runtime_registration_smoke.spec.js'
+      'e2e/246_v6_worker_runtime_registration_smoke.spec.js',
+      'e2e/247_v6_production_override_browser_smoke.spec.js'
     ],
     requiredChecks: [
       'runtime_manifest_source_of_truth',

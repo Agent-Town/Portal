@@ -194,6 +194,10 @@ smoke evidence that normal `/app` with broad `all,v60` style overrides keeps
 runtime civic tools absent while Worker Tools, Skill Context, Worker Traffic,
 Brain, and Session Context remain observable.
 
+`e2e/247_v6_production_override_browser_smoke.spec.js` adds production-mode
+browser evidence that player `all,v60` query/header overrides cannot enable
+V6, publish civic tools, or open the V6 lab while V5 is server-enabled.
+
 The report remains `research_only`, `releaseReady: false`, does not register
 runtime civic tools, forbids backend shortcuts, and treats browser worker
 registration plus production browser coverage as release gaps.

@@ -81,14 +81,14 @@ const V6_RELEASE_CANDIDATE_TARGETS = [
     key: 'production_override_recheck',
     owner: 'security_engineering',
     requiredEvidence: 'Release-candidate validation must recheck that production player query/header overrides cannot enable V6 or publish runtime civic tools.',
-    currentEvidence: 'tests/world_grid_region.test.js',
+    currentEvidence: 'tests/world_grid_region.test.js, e2e/247_v6_production_override_browser_smoke.spec.js',
     releaseEvidenceRequired: 'production_override_recheck_pass'
   },
   {
     key: 'runtime_tool_absence_recheck',
     owner: 'security_engineering',
     requiredEvidence: 'Runtime `/api/world/tools` must be captured during release-candidate validation and prove no `et.world.civic.*` tools are published.',
-    currentEvidence: 'tests/world_civilization_tool_exposure_gate.test.js',
+    currentEvidence: 'tests/world_civilization_tool_exposure_gate.test.js, e2e/247_v6_production_override_browser_smoke.spec.js',
     releaseEvidenceRequired: 'runtime_tool_absence_recheck_pass'
   },
   {

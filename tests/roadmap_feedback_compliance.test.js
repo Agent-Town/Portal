@@ -258,6 +258,9 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   const releaseSignoffPacketSource = read('server/world_civilization/release_signoff_packet.js');
   const releaseSupportSource = read('server/world_civilization/release_support.js');
   const validationTargetSource = read('server/world_civilization/validation_targets.js');
+  const productionOverrideBrowserSmoke = read('e2e/247_v6_production_override_browser_smoke.spec.js');
+  const playwrightConfig = read('playwright.config.js');
+  const serverIndexSource = read('server/index.js');
   const requiredMilestones = [
     'M0 Hardened V5 world-grid baseline',
     'M1 Living V6 milestone contract',
@@ -379,6 +382,8 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(releaseEvidenceManifestSource, /all_features_regression_results/);
   assert.match(releaseEvidenceManifestSource, /production_override_recheck/);
   assert.match(releaseEvidenceManifestSource, /runtime_tool_absence_recheck/);
+  assert.match(releaseEvidenceManifestSource, /production-mode browser evidence/);
+  assert.match(releaseEvidenceManifestSource, /production-mode browser override smoke/);
   assert.match(releaseEvidenceManifestSource, /browser_console_error_budget/);
   assert.match(releaseEvidenceManifestSource, /playwright_trace_archive/);
   assert.match(releaseEvidenceManifestSource, /release_signoff_packet/);
@@ -442,18 +447,31 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(ciValidationMatrixTargetSource, /console_error_budget/);
   assert.match(ciValidationMatrixTargetSource, /trace_artifact_retention/);
   assert.match(ciValidationMatrixTargetSource, /qa_release_packet/);
+  assert.match(ciValidationMatrixTargetSource, /e2e\/247_v6_production_override_browser_smoke\.spec\.js/);
+  assert.match(ciValidationMatrixTargetSource, /PW_NODE_ENV=production FEATURE_WORLD_GRID_V50_REGION=1/);
   assert.match(releaseCandidateTargetSource, /V6_RELEASE_CANDIDATE_TARGETS_VERSION/);
   assert.match(releaseCandidateTargetSource, /release_candidate_environment/);
   assert.match(releaseCandidateTargetSource, /browser_console_error_budget/);
   assert.match(releaseCandidateTargetSource, /playwright_trace_archive/);
   assert.match(releaseCandidateTargetSource, /production_override_recheck/);
+  assert.match(releaseCandidateTargetSource, /e2e\/247_v6_production_override_browser_smoke\.spec\.js/);
   assert.match(releaseCandidateTargetSource, /controlled_release_handoff/);
   assert.match(validationTargetSource, /V6_VALIDATION_TARGETS_VERSION/);
   assert.match(validationTargetSource, /split_playwright_smokes/);
   assert.match(validationTargetSource, /runtime_tool_absence/);
   assert.match(validationTargetSource, /e2e\/246_v6_worker_runtime_registration_smoke\.spec\.js/);
+  assert.match(validationTargetSource, /e2e\/247_v6_production_override_browser_smoke\.spec\.js/);
   assert.match(validationTargetSource, /release_candidate_run/);
   assert.match(validationTargetSource, /artifact_traceability/);
+  assert.match(playwrightConfig, /NODE_ENV: process\.env\.PW_NODE_ENV \|\| 'test'/);
+  assert.match(playwrightConfig, /FEATURE_WORLD_GRID_V50_REGION: process\.env\.FEATURE_WORLD_GRID_V50_REGION \|\| ''/);
+  assert.match(playwrightConfig, /ALLOW_INSECURE_LOCALHOST_PRODUCTION_HTTP/);
+  assert.match(serverIndexSource, /ALLOW_INSECURE_LOCALHOST_PRODUCTION_HTTP/);
+  assert.match(serverIndexSource, /isLocalhostHostHeader/);
+  assert.match(productionOverrideBrowserSmoke, /\/api\/world\/tools\?worldGridFeatureFlags=all,v60/);
+  assert.match(productionOverrideBrowserSmoke, /FEATURE_WORLD_V60_AGENT_CIVILIZATION\)\.toBe\(false\)/);
+  assert.match(productionOverrideBrowserSmoke, /v6Lab=1/);
+  assert.match(productionOverrideBrowserSmoke, /forbiddenSurfaceSelectors/);
   assert.match(skillLine, /V6 aggregate readiness gate/);
   assert.match(plan, /Source branch: `codex\/v6-agent-civilization-milestones`/);
   assert.match(plan, /broad V5 prototype overrides do not enable V6/);
@@ -478,6 +496,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /OpenClaw Lite worker origin/);
   assert.match(plan, /browser worker runtime registration target matrix/);
   assert.match(plan, /e2e\/246_v6_worker_runtime_registration_smoke\.spec\.js/);
+  assert.match(plan, /e2e\/247_v6_production_override_browser_smoke\.spec\.js/);
   assert.match(plan, /shared-state route adapters/);
   assert.match(spec, /research-only civic tool draft/);
   assert.match(spec, /tool exposure gate/);
@@ -485,6 +504,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(toolSpec, /server\/world_civilization\/worker_runtime_registration\.js/);
   assert.match(toolSpec, /tests\/world_civilization_worker_runtime_registration\.test\.js/);
   assert.match(toolSpec, /e2e\/246_v6_worker_runtime_registration_smoke\.spec\.js/);
+  assert.match(toolSpec, /e2e\/247_v6_production_override_browser_smoke\.spec\.js/);
   assert.match(toolSpec, /browser OpenClaw Lite worker boot evidence/);
   assert.match(toolSpec, /Worker Tool Adapter/);
   assert.match(toolSpec, /server\/world_civilization\/worker_tool_adapter\.js/);
@@ -505,6 +525,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(gate, /server\/world_civilization\/tool_exposure_gate\.js/);
   assert.match(gate, /server\/world_civilization\/worker_runtime_registration\.js/);
   assert.match(gate, /e2e\/246_v6_worker_runtime_registration_smoke\.spec\.js/);
+  assert.match(gate, /e2e\/247_v6_production_override_browser_smoke\.spec\.js/);
   assert.match(gate, /browser OpenClaw Lite worker boot/);
   assert.match(gate, /hidden from runtime `\/api\/world\/tools`/);
   assert.match(plan, /M7 Internal proposal lifecycle \| `in_progress`/);
@@ -1411,6 +1432,9 @@ test('V6 worker-first civic tool exposure gate is tracked as an M6 release contr
   const workerToolAdapter = read('server/world_civilization/worker_tool_adapter.js');
   const worldGridRegionTest = read('tests/world_grid_region.test.js');
   const workerRuntimeSmoke = read('e2e/246_v6_worker_runtime_registration_smoke.spec.js');
+  const productionOverrideBrowserSmoke = read('e2e/247_v6_production_override_browser_smoke.spec.js');
+  const playwrightConfig = read('playwright.config.js');
+  const serverIndexSource = read('server/index.js');
 
   assert.match(plan, /server\/world_civilization\/tool_exposure_gate\.js/);
   assert.match(plan, /server\/world_civilization\/worker_runtime_registration\.js/);
@@ -1426,12 +1450,15 @@ test('V6 worker-first civic tool exposure gate is tracked as an M6 release contr
   assert.match(plan, /server-side V6 flag still does not publish `et\.world\.civic\.\*` tools/);
   assert.match(plan, /browser worker runtime registration target matrix/);
   assert.match(plan, /Worker Tools, Skill Context, Worker Traffic, Brain, and Session Context remain observable/);
+  assert.match(plan, /e2e\/247_v6_production_override_browser_smoke\.spec\.js/);
+  assert.match(plan, /production-mode browser evidence/);
   assert.match(plan, /shared-state route adapters/);
   assert.match(spec, /Exposure gate: `server\/world_civilization\/tool_exposure_gate\.js`/);
   assert.match(spec, /Worker runtime registration target/);
   assert.match(spec, /server\/world_civilization\/worker_runtime_registration\.js/);
   assert.match(spec, /tests\/world_civilization_worker_runtime_registration\.test\.js/);
   assert.match(spec, /e2e\/246_v6_worker_runtime_registration_smoke\.spec\.js/);
+  assert.match(spec, /e2e\/247_v6_production_override_browser_smoke\.spec\.js/);
   assert.match(spec, /Worker proposal adapter: `server\/world_civilization\/worker_tool_adapter\.js`/);
   assert.match(spec, /Worker Tool Adapter/);
   assert.match(spec, /V6_CIVIC_WORKER_TOOL_ADAPTER_ENABLED/);
@@ -1448,6 +1475,7 @@ test('V6 worker-first civic tool exposure gate is tracked as an M6 release contr
   assert.match(gate, /Worker-first V6 civic tools must pass the exposure gate/);
   assert.match(gate, /Worker runtime\s+registration target coverage starts/);
   assert.match(gate, /e2e\/246_v6_worker_runtime_registration_smoke\.spec\.js/);
+  assert.match(gate, /e2e\/247_v6_production_override_browser_smoke\.spec\.js/);
   assert.match(gate, /shared-state route traces/);
   assert.match(gate, /store-backed delegated-agent proof/);
   assert.match(gate, /consume delegated action budget idempotently/);
@@ -1457,8 +1485,9 @@ test('V6 worker-first civic tool exposure gate is tracked as an M6 release contr
   assert.match(releaseReview, /browser worker runtime registration target/);
   assert.match(releaseReview, /server\/world_civilization\/worker_runtime_registration\.js/);
   assert.match(releaseReview, /e2e\/246_v6_worker_runtime_registration_smoke\.spec\.js/);
+  assert.match(releaseReview, /e2e\/247_v6_production_override_browser_smoke\.spec\.js/);
   assert.match(releaseReview, /worker-origin proposal tool adapter/);
-  assert.match(releaseReview, /pending production browser worker coverage/);
+  assert.match(releaseReview, /pending full production browser worker coverage/);
   assert.match(releaseReview, /idempotent delegated action-budget consumption/);
   assert.match(releaseReview, /no backend shortcuts/);
   assert.match(releaseReview, /route-level production override coverage proves player `all,v60` overrides cannot enable V6/);
@@ -1466,6 +1495,8 @@ test('V6 worker-first civic tool exposure gate is tracked as an M6 release contr
   assert.match(skillLine, /worker_runtime_registration\.js/);
   assert.match(skillLine, /V6 worker runtime browser smoke/);
   assert.match(skillLine, /e2e\/246_v6_worker_runtime_registration_smoke\.spec\.js/);
+  assert.match(skillLine, /V6 production override browser smoke/);
+  assert.match(skillLine, /e2e\/247_v6_production_override_browser_smoke\.spec\.js/);
   assert.match(skillLine, /tests\/world_civilization_worker_runtime_registration\.test\.js/);
   assert.match(skillLine, /tests\/world_civilization_worker_tool_adapter\.test\.js/);
   assert.match(skillLine, /idempotent delegated action-budget consumption/);
@@ -1474,6 +1505,16 @@ test('V6 worker-first civic tool exposure gate is tracked as an M6 release contr
   assert.match(skillLine, /tests\/world_civilization_tool_exposure_gate\.test\.js/);
   assert.match(workerRuntimeSmoke, /agent-debug-tools/);
   assert.match(workerRuntimeSmoke, /agent-debug-tab-skill/);
+  assert.match(playwrightConfig, /NODE_ENV: process\.env\.PW_NODE_ENV \|\| 'test'/);
+  assert.match(playwrightConfig, /FEATURE_WORLD_GRID_V50_REGION: process\.env\.FEATURE_WORLD_GRID_V50_REGION \|\| ''/);
+  assert.match(playwrightConfig, /ALLOW_INSECURE_LOCALHOST_PRODUCTION_HTTP/);
+  assert.match(serverIndexSource, /ALLOW_INSECURE_LOCALHOST_PRODUCTION_HTTP/);
+  assert.match(serverIndexSource, /LOCALHOST_HOSTNAMES/);
+  assert.match(productionOverrideBrowserSmoke, /\/api\/world\/tools\?worldGridFeatureFlags=all,v60/);
+  assert.match(productionOverrideBrowserSmoke, /FEATURE_WORLD_GRID_V50_REGION\)\.toBe\(true\)/);
+  assert.match(productionOverrideBrowserSmoke, /FEATURE_WORLD_V60_AGENT_CIVILIZATION\)\.toBe\(false\)/);
+  assert.match(productionOverrideBrowserSmoke, /v6Lab=1/);
+  assert.match(productionOverrideBrowserSmoke, /forbiddenSurfaceSelectors/);
   assert.match(workerRuntimeSmoke, /agent-debug-tab-traffic/);
   assert.match(workerRuntimeSmoke, /agent-debug-tab-brain/);
   assert.match(workerRuntimeSmoke, /agent-debug-tab-session/);

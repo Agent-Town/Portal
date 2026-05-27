@@ -53,25 +53,25 @@ const V6_CI_VALIDATION_MATRIX_TARGETS = [
   {
     key: 'v6_modal_lab_browser_smoke',
     lane: 'internal_v6_browser_smoke',
-    command: 'npx playwright test e2e/244_v6_lab_modal_boundary.spec.js',
-    requiredEvidence: 'Internal V6 lab validation must prove modal-only launch, standalone denial, focus containment, screenshots, and runtime civic-tool absence.',
-    currentEvidence: 'e2e/244_v6_lab_modal_boundary.spec.js',
+    command: 'npx playwright test e2e/244_v6_lab_modal_boundary.spec.js && PW_NODE_ENV=production FEATURE_WORLD_GRID_V50_REGION=1 npx playwright test e2e/247_v6_production_override_browser_smoke.spec.js',
+    requiredEvidence: 'Internal V6 lab validation must prove modal-only launch, standalone denial, focus containment, screenshots, production player override denial, and runtime civic-tool absence.',
+    currentEvidence: 'e2e/244_v6_lab_modal_boundary.spec.js, e2e/247_v6_production_override_browser_smoke.spec.js',
     releaseEvidenceRequired: 'v6_modal_lab_browser_ci_pass'
   },
   {
     key: 'feature_override_production_safety',
     lane: 'feature_flag_security',
-    command: 'node --test tests/world_grid_region.test.js tests/world_civilization_tool_exposure_gate.test.js',
-    requiredEvidence: 'Production query/header overrides must not enable V6 or publish runtime civic tools.',
-    currentEvidence: 'tests/world_grid_region.test.js',
+    command: 'node --test tests/world_grid_region.test.js tests/world_civilization_tool_exposure_gate.test.js && PW_NODE_ENV=production FEATURE_WORLD_GRID_V50_REGION=1 npx playwright test e2e/247_v6_production_override_browser_smoke.spec.js',
+    requiredEvidence: 'Production query/header overrides must not enable V6, publish runtime civic tools, or expose the V6 lab in a production browser server.',
+    currentEvidence: 'tests/world_grid_region.test.js, e2e/247_v6_production_override_browser_smoke.spec.js',
     releaseEvidenceRequired: 'production_override_safety_ci_pass'
   },
   {
     key: 'runtime_tool_absence',
     lane: 'runtime_manifest_security',
-    command: 'node --test tests/world_civilization_tool_exposure_gate.test.js tests/world_civilization_worker_runtime_registration.test.js',
+    command: 'node --test tests/world_civilization_tool_exposure_gate.test.js tests/world_civilization_worker_runtime_registration.test.js && PW_NODE_ENV=production FEATURE_WORLD_GRID_V50_REGION=1 npx playwright test e2e/247_v6_production_override_browser_smoke.spec.js',
     requiredEvidence: 'Runtime `/api/world/tools` must remain the source of truth and omit `et.world.civic.*` tools until release gates close.',
-    currentEvidence: 'tests/world_civilization_tool_exposure_gate.test.js',
+    currentEvidence: 'tests/world_civilization_tool_exposure_gate.test.js, e2e/247_v6_production_override_browser_smoke.spec.js',
     releaseEvidenceRequired: 'runtime_tool_absence_ci_pass'
   },
   {

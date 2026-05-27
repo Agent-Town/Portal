@@ -50,21 +50,21 @@ const V6_VALIDATION_TARGETS = [
     key: 'feature_override_safety',
     surface: 'production_feature_override_denial',
     requiredEvidence: 'Production browser query/header overrides must not enable V6 or publish `et.world.civic.*` tools before controlled release.',
-    currentEvidence: 'tests/world_grid_region.test.js',
+    currentEvidence: 'tests/world_grid_region.test.js, e2e/247_v6_production_override_browser_smoke.spec.js',
     releaseEvidenceRequired: 'production_override_safety_pass'
   },
   {
     key: 'runtime_tool_absence',
     surface: 'api_world_tools_runtime_manifest',
     requiredEvidence: 'Runtime `/api/world/tools` must remain the source of truth and omit V6 civic tools until M6/M17/M18 close.',
-    currentEvidence: 'server/world_civilization/tool_exposure_gate.js',
+    currentEvidence: 'server/world_civilization/tool_exposure_gate.js, e2e/247_v6_production_override_browser_smoke.spec.js',
     releaseEvidenceRequired: 'runtime_tool_absence_browser_smoke'
   },
   {
     key: 'modal_lab_browser_coverage',
     surface: 'internal_v6_lab_modal',
     requiredEvidence: 'Internal lab coverage must prove standalone route denial, normal gameplay absence, modal launch, 390/768/1280 screenshots, and keyboard focus containment.',
-    currentEvidence: 'e2e/244_v6_lab_modal_boundary.spec.js',
+    currentEvidence: 'e2e/244_v6_lab_modal_boundary.spec.js, e2e/247_v6_production_override_browser_smoke.spec.js',
     releaseEvidenceRequired: 'modal_lab_browser_coverage_pass'
   },
   {

@@ -45,7 +45,7 @@ module.exports = defineConfig({
     // Always start/stop the server for deterministic local + CI runs.
     reuseExistingServer: false,
     env: {
-      NODE_ENV: 'test',
+      NODE_ENV: process.env.PW_NODE_ENV || 'test',
       PORT: String(PORT),
       TEST_RESET_TOKEN: 'test-reset',
       ADMIN_TOKEN: 'test-admin',
@@ -57,6 +57,9 @@ module.exports = defineConfig({
       PRIVY_PUBLIC_CONFIG_JSON: '{}',
       START_PAGE_ENABLED: '0',
       WORLD_GRID_CSRF_REQUIRED: process.env.WORLD_GRID_CSRF_REQUIRED || '1',
+      WORLD_GRID_FEATURE_FLAGS: process.env.WORLD_GRID_FEATURE_FLAGS || '',
+      FEATURE_WORLD_GRID_V50_REGION: process.env.FEATURE_WORLD_GRID_V50_REGION || '',
+      ALLOW_INSECURE_LOCALHOST_PRODUCTION_HTTP: process.env.ALLOW_INSECURE_LOCALHOST_PRODUCTION_HTTP || (process.env.PW_NODE_ENV === 'production' ? '1' : ''),
       V6_CIVIC_LAB_MODAL_ENABLED: process.env.V6_CIVIC_LAB_MODAL_ENABLED || '1',
       FEATURE_WORLD_V60_AGENT_CIVILIZATION: process.env.FEATURE_WORLD_V60_AGENT_CIVILIZATION || '',
       // Avoid modifying tracked data/store.json during e2e runs.

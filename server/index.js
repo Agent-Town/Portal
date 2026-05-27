@@ -742,6 +742,7 @@ app.use((err, req, res, next) => {
 const PUBLIC_DIR = path.join(process.cwd(), 'public');
 const ASSETS_DIR = path.join(process.cwd(), 'assets');
 const isProd = process.env.NODE_ENV === 'production';
+const LOCALHOST_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1']);
 const ELIZATOWN_MINT = 'CZRsbB6BrHsAmGKeoxyfwzCyhttXvhfEukXCWnseBAGS';
 const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
 const SOLANA_RPC_FALLBACKS = (process.env.SOLANA_RPC_FALLBACKS || '')
@@ -1740,8 +1741,20 @@ function setSecurityHeaders(req, res, next) {
   return next();
 }
 
+function isLocalhostHostHeader(host = '') {
+  const value = String(host || '').trim().toLowerCase();
+  if (!value) return false;
+  const bracketed = value.match(/^\[([^\]]+)\](?::\d+)?$/);
+  if (bracketed) return LOCALHOST_HOSTNAMES.has(bracketed[1]);
+  const withoutPort = value.replace(/:\d+$/, '');
+  return LOCALHOST_HOSTNAMES.has(withoutPort);
+}
+
 app.use((req, res, next) => {
   if (isProd && !req.secure) {
+    if (process.env.ALLOW_INSECURE_LOCALHOST_PRODUCTION_HTTP === '1' && isLocalhostHostHeader(req.get('host'))) {
+      return next();
+    }
     const host = req.get('host');
     if (host) {
       return res.redirect(301, `https://${host}${req.originalUrl}`);

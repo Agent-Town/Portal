@@ -53,6 +53,12 @@ test('V6 CI validation matrix targets name every release validation lane', () =>
   assert.ok(matrix.targetKeys.includes('console_error_budget'));
   assert.ok(matrix.targetKeys.includes('trace_artifact_retention'));
   assert.ok(matrix.targetKeys.includes('qa_release_packet'));
+  assert.ok(V6_CI_VALIDATION_MATRIX_TARGETS.find((target) => target.key === 'feature_override_production_safety')
+    .currentEvidence.includes('e2e/247_v6_production_override_browser_smoke.spec.js'));
+  assert.ok(V6_CI_VALIDATION_MATRIX_TARGETS.find((target) => target.key === 'runtime_tool_absence')
+    .currentEvidence.includes('e2e/247_v6_production_override_browser_smoke.spec.js'));
+  assert.ok(V6_CI_VALIDATION_MATRIX_TARGETS.find((target) => target.key === 'v6_modal_lab_browser_smoke')
+    .command.includes('PW_NODE_ENV=production FEATURE_WORLD_GRID_V50_REGION=1 npx playwright test e2e/247_v6_production_override_browser_smoke.spec.js'));
   assert.match(matrix.digest, /^sha256:[a-f0-9]{64}$/);
 });
 

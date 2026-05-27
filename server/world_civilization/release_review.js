@@ -194,6 +194,7 @@ const REQUIRED_REVIEW_GATES = [
       'tests/world_civilization_worker_vote_adapter.test.js',
       'tests/world_civilization_worker_runtime_registration.test.js',
       'e2e/246_v6_worker_runtime_registration_smoke.spec.js',
+      'e2e/247_v6_production_override_browser_smoke.spec.js',
       'tests/world_civilization_effects.test.js',
       'tests/world_civilization_rollback_execution_targets.test.js',
       'tests/world_civilization_rollback_recovery.test.js',
@@ -558,6 +559,7 @@ const REQUIRED_REVIEW_GATES = [
       'tests/world_civilization_worker_vote_adapter.test.js',
       'tests/world_civilization_tool_exposure_gate.test.js',
       'e2e/246_v6_worker_runtime_registration_smoke.spec.js',
+      'e2e/247_v6_production_override_browser_smoke.spec.js',
       'docs/internal-skill-testline.md'
     ],
     requiredChecks: [
@@ -581,7 +583,8 @@ const REQUIRED_REVIEW_GATES = [
       RELEASE_REVIEW_ARTIFACT,
       'specs/66_agent_town_v6_modal_lab_surface_foundation.md',
       'server/world_civilization/lab_surface.js',
-      'tests/world_civilization_lab_surface.test.js'
+      'tests/world_civilization_lab_surface.test.js',
+      'e2e/247_v6_production_override_browser_smoke.spec.js'
     ],
     requiredChecks: [
       'town_hub_modal_launch',

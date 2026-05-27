@@ -70,6 +70,7 @@ test('V6 readiness gate baseline names every prerequisite domain but remains ope
   const persistenceGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'persistence_resilience');
   const effectGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'effect_rollback');
   const mutationSecurityGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'mutation_security');
+  const featureFlagGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'feature_flag_override_safety');
   const proposalGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'proposal_vote_governance');
   const reputationGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'reputation_moderation_privacy');
   const releaseReviewGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'security_product_release_review');
@@ -87,6 +88,8 @@ test('V6 readiness gate baseline names every prerequisite domain but remains ope
   assert.ok(v5PromotionGate.requiredChecks.includes('live_provider_logout_signoff_target'));
   assert.ok(v5PromotionGate.requiredChecks.includes('risk_rate_limit_identity_target'));
   assert.ok(v5PromotionGate.requiredChecks.includes('trusted_proxy_risk_signal_rollout_target'));
+  assert.ok(featureFlagGate.requiredArtifacts.includes('e2e/247_v6_production_override_browser_smoke.spec.js'));
+  assert.ok(featureFlagGate.requiredChecks.includes('production_override_denial'));
   assert.ok(workerToolGate.requiredArtifacts.includes('server/world_civilization/worker_tool_adapter.js'));
   assert.ok(workerToolGate.requiredArtifacts.includes('server/world_civilization/worker_vote_adapter.js'));
   assert.ok(workerToolGate.requiredArtifacts.includes('server/world_civilization/worker_runtime_registration.js'));
@@ -94,6 +97,7 @@ test('V6 readiness gate baseline names every prerequisite domain but remains ope
   assert.ok(workerToolGate.requiredArtifacts.includes('tests/world_civilization_worker_vote_adapter.test.js'));
   assert.ok(workerToolGate.requiredArtifacts.includes('tests/world_civilization_worker_runtime_registration.test.js'));
   assert.ok(workerToolGate.requiredArtifacts.includes('e2e/246_v6_worker_runtime_registration_smoke.spec.js'));
+  assert.ok(workerToolGate.requiredArtifacts.includes('e2e/247_v6_production_override_browser_smoke.spec.js'));
   assert.ok(workerToolGate.requiredChecks.includes('worker_vote_receipt_adapter'));
   assert.ok(workerToolGate.requiredChecks.includes('worker_vote_route_edge_authorization'));
   assert.ok(workerToolGate.requiredChecks.includes('browser_worker_runtime_registration_target'));
