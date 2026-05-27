@@ -708,7 +708,7 @@ test('GU-19 release evidence bundle rejects candidate-review time-order metric t
   });
   const bundle = buildReleaseEvidenceBundle({
     ...fixture,
-    nowMs: 154_950
+    nowMs: fixture.releaseGate.evaluatedAtMs + 50
   });
   const tamperedBundle = {
     ...bundle,
@@ -736,7 +736,7 @@ test('GPACK-135 release evidence bundle rejects candidate-review count-match met
   });
   const bundle = buildReleaseEvidenceBundle({
     ...fixture,
-    nowMs: 154_975
+    nowMs: fixture.releaseGate.evaluatedAtMs + 50
   });
   const tamperedBundle = {
     ...bundle,
@@ -765,7 +765,7 @@ test('GPACK-136 release evidence bundle rejects release-gate hash-match metric t
   });
   const bundle = buildReleaseEvidenceBundle({
     ...fixture,
-    nowMs: 154_990
+    nowMs: fixture.releaseGate.evaluatedAtMs + 50
   });
   const tamperedBundle = rehashReleaseEvidenceBundle({
     ...bundle,
@@ -794,7 +794,7 @@ test('GPACK-137 release evidence bundle rejects source-presence match metric tam
   });
   const bundle = buildReleaseEvidenceBundle({
     ...fixture,
-    nowMs: 155_010
+    nowMs: fixture.releaseGate.evaluatedAtMs + 50
   });
   const tamperedBundle = rehashReleaseEvidenceBundle({
     ...bundle,
@@ -823,7 +823,7 @@ test('GPACK-138 release evidence bundle rejects source-coverage metric tampering
   });
   const bundle = buildReleaseEvidenceBundle({
     ...fixture,
-    nowMs: 155_030
+    nowMs: fixture.releaseGate.evaluatedAtMs + 50
   });
   const tamperedBundle = rehashReleaseEvidenceBundle({
     ...bundle,
@@ -852,7 +852,7 @@ test('GPACK-139 release evidence bundle rejects release-gate eligibility metric 
   });
   const bundle = buildReleaseEvidenceBundle({
     ...fixture,
-    nowMs: 155_050
+    nowMs: fixture.releaseGate.evaluatedAtMs + 50
   });
   const tamperedBundle = rehashReleaseEvidenceBundle({
     ...bundle,
@@ -898,6 +898,64 @@ test('GPACK-140 release evidence bundle rejects release-gate validity metric tam
   assert.equal(report.ok, false);
   assert.equal(
     report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,
+    false
+  );
+}));
+
+test('GPACK-141 release evidence bundle rejects bundle timing metric tampering', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_evidence_bundle_timing_metric',
+    prompt: 'amber signal foundry with careful orchard archivists',
+    nowMs: 155_040
+  });
+  const validationNowMs = fixture.releaseGate.evaluatedAtMs + 100;
+  const bundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    nowMs: fixture.releaseGate.evaluatedAtMs + 50
+  });
+  const tamperedOrderBundle = rehashReleaseEvidenceBundle({
+    ...bundle,
+    metrics: {
+      ...bundle.metrics,
+      bundleCreatedAtOrAfterGate: false
+    }
+  });
+  const tamperedFutureBundle = rehashReleaseEvidenceBundle({
+    ...bundle,
+    metrics: {
+      ...bundle.metrics,
+      bundleCreatedAtNotFuture: false
+    }
+  });
+  const orderReport = validateReleaseEvidenceBundle(tamperedOrderBundle, {
+    ...fixture,
+    nowMs: validationNowMs
+  });
+  const futureReport = validateReleaseEvidenceBundle(tamperedFutureBundle, {
+    ...fixture,
+    nowMs: validationNowMs
+  });
+
+  assert.equal(bundle.metrics.bundleCreatedAtOrAfterGate, true);
+  assert.equal(bundle.metrics.bundleCreatedAtNotFuture, true);
+  assert.equal(orderReport.metrics.bundleCreatedAtOrAfterGate, true);
+  assert.equal(futureReport.metrics.bundleCreatedAtNotFuture, true);
+  assert.equal(
+    orderReport.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_HASH_STABLE').passed,
+    true
+  );
+  assert.equal(
+    futureReport.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_HASH_STABLE').passed,
+    true
+  );
+  assert.equal(orderReport.ok, false);
+  assert.equal(futureReport.ok, false);
+  assert.equal(
+    orderReport.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,
+    false
+  );
+  assert.equal(
+    futureReport.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,
     false
   );
 }));
