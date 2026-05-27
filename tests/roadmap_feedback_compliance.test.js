@@ -200,7 +200,9 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(gate, /tests\/world_civilization_rollback_recovery\.test\.js/);
   assert.match(plan, /M12 Agent participation controls \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/delegations\.js/);
+  assert.match(plan, /idempotent action-budget consumption/);
   assert.match(gate, /server\/world_civilization\/delegations\.js/);
+  assert.match(gate, /delegation\.action_consumed/);
   assert.match(plan, /M13 Civic institutions and charters \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/institutions\.js/);
   assert.match(gate, /server\/world_civilization\/institutions\.js/);

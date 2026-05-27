@@ -443,6 +443,27 @@ test('V6 moderation, action, rollback, and audit schemas require traceable safet
     privacy: privacy({ dataClasses: ['public_audit_summary'] })
   });
   assert.equal(audit.ok, true, audit.errors.join('\n'));
+
+  const delegationUsageAudit = validateAuditLedgerEntry({
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    entryId: 'audit_delegationuse_vote_advice_001',
+    actor: {
+      kind: 'agent',
+      accountId: 'acct_v6_human_001',
+      agentId: 'agent_civic_clover_001'
+    },
+    actionType: 'delegation.action_consumed',
+    objectRef: 'delegationuse_vote_advice_001',
+    idempotencyKey: 'idem_vote_advice_use_001',
+    beforeHash: HASH_A,
+    afterHash: HASH_B,
+    createdAtMs: 1_779_784_000_000,
+    migrationVersion: 'v1',
+    replayable: true,
+    rollbackId: '',
+    privacy: privacy({ dataClasses: ['public_audit_summary'] })
+  });
+  assert.equal(delegationUsageAudit.ok, true, delegationUsageAudit.errors.join('\n'));
 });
 
 test('V6 civic action schema enforces typed effect handler registry', () => {

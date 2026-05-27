@@ -10,6 +10,7 @@ const PRINCIPAL_ACCOUNT_ID = 'acct_v6_restart_delegate_principal_001';
 const DELEGATE_AGENT_ID = 'agent_v6_restart_civic_clover_001';
 const ADVICE_DELEGATION_ID = 'delegation_restart_vote_advice_001';
 const EXECUTION_DELEGATION_ID = 'delegation_restart_civic_execution_001';
+const EXECUTION_USAGE_ID = 'delegationuse_restart_execution_001';
 
 function adviceDelegation(overrides = {}) {
   return {
@@ -36,6 +37,19 @@ function executionDelegation(overrides = {}) {
     canExecuteCivicEffects: true,
     ...overrides
   });
+}
+
+function executionUsage(overrides = {}) {
+  return {
+    usageId: EXECUTION_USAGE_ID,
+    delegationId: EXECUTION_DELEGATION_ID,
+    principalAccountId: PRINCIPAL_ACCOUNT_ID,
+    delegateAgentId: DELEGATE_AGENT_ID,
+    scope: 'civic_execution',
+    actionRef: 'action_restart_delegate_execution_001',
+    idempotencyKey: 'idem_restart_delegate_execution_001',
+    ...overrides
+  };
 }
 
 function writeJson(value) {
@@ -67,6 +81,7 @@ function snapshot({ auditLedger, delegationStore }) {
   return {
     auditCount: auditLedger.count(),
     delegationCount: delegationStore.count(),
+    usageCount: delegationStore.listDelegatedActionUses({ principalAccountId: PRINCIPAL_ACCOUNT_ID }).length,
     adviceStatus: delegationStore.getDelegation(ADVICE_DELEGATION_ID)?.status || '',
     executionStatus: delegationStore.getDelegation(EXECUTION_DELEGATION_ID)?.status || '',
     policy,
@@ -92,6 +107,16 @@ function main() {
         ok: true,
         duplicate: row.duplicate === true,
         delegationId: row.delegationId,
+        ...snapshot(stores)
+      });
+      return;
+    }
+    if (mode === 'consume-execution') {
+      const row = stores.delegationStore.consumeDelegatedAction(executionUsage(), { nowMs: 1_779_787_150_000 });
+      writeJson({
+        ok: true,
+        duplicate: row.duplicate === true,
+        usageId: row.usageId,
         ...snapshot(stores)
       });
       return;

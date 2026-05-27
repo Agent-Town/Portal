@@ -13,6 +13,23 @@ const DELEGATION_STATUS_ACTIVE = 'active';
 const DELEGATION_STATUS_REVOKED = 'revoked';
 const MIGRATION_VERSION = 'v1';
 const STORE_KEY = 'delegations';
+const CIVIC_ID_RE = /^[a-z][a-z0-9_:-]{5,96}$/;
+const DELEGATION_SCOPES = new Set(['proposal_drafting', 'vote_advice', 'civic_execution']);
+const SECRET_TEXT_RE = /\b(?:sk-[a-z0-9_-]{8,}|bearer\s+[a-z0-9._-]{8,}|oauth[-_ ]?token|api[-_ ]?key|private[-_ ]?key|secret)\b/i;
+const FORBIDDEN_USAGE_KEYS = new Set([
+  'brain',
+  'credential',
+  'debugtrace',
+  'idtoken',
+  'oauth',
+  'password',
+  'privatekey',
+  'providercredential',
+  'secret',
+  'token',
+  'transcript',
+  'walletsecret'
+]);
 
 function parseDelegationRow(row) {
   if (!row) return null;
@@ -30,6 +47,22 @@ function parseDelegationRow(row) {
     createdAtMs: Number(row.created_at),
     updatedAtMs: Number(row.updated_at),
     delegation: JSON.parse(row.delegation_json)
+  };
+}
+
+function parseUsageRow(row) {
+  if (!row) return null;
+  return {
+    usageId: row.usage_id,
+    delegationId: row.delegation_id,
+    principalAccountId: row.principal_account_id,
+    delegateAgentId: row.delegate_agent_id,
+    scope: row.scope,
+    actionRef: row.action_ref,
+    idempotencyKey: row.idempotency_key,
+    auditEntryId: row.audit_entry_id,
+    createdAtMs: Number(row.created_at),
+    usage: JSON.parse(row.usage_json)
   };
 }
 
@@ -60,6 +93,25 @@ function ensureSchema(db) {
       ON world_civic_delegations(delegate_agent_id, scope, status);
     CREATE INDEX IF NOT EXISTS idx_world_civic_delegations_expiry
       ON world_civic_delegations(expires_at, status);
+    CREATE TABLE IF NOT EXISTS world_civic_delegation_action_uses (
+      usage_id TEXT PRIMARY KEY,
+      delegation_id TEXT NOT NULL,
+      principal_account_id TEXT NOT NULL,
+      delegate_agent_id TEXT NOT NULL,
+      scope TEXT NOT NULL,
+      action_ref TEXT NOT NULL,
+      idempotency_key TEXT NOT NULL,
+      audit_entry_id TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      usage_json TEXT NOT NULL,
+      UNIQUE(delegation_id, idempotency_key)
+    );
+    CREATE INDEX IF NOT EXISTS idx_world_civic_delegation_uses_delegation
+      ON world_civic_delegation_action_uses(delegation_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_world_civic_delegation_uses_principal
+      ON world_civic_delegation_action_uses(principal_account_id, scope, created_at);
+    CREATE INDEX IF NOT EXISTS idx_world_civic_delegation_uses_agent
+      ON world_civic_delegation_action_uses(delegate_agent_id, scope, created_at);
   `);
   return ensureCivicSqliteSchemaMetadata(db, {
     storeKey: STORE_KEY,
@@ -95,6 +147,40 @@ function buildStatements(db) {
       SET status = ?, updated_at = ?
       WHERE delegation_id = ?
     `),
+    byUsageId: db.prepare(`
+      SELECT *
+      FROM world_civic_delegation_action_uses
+      WHERE usage_id = ?
+      LIMIT 1
+    `),
+    byDelegationIdempotency: db.prepare(`
+      SELECT *
+      FROM world_civic_delegation_action_uses
+      WHERE delegation_id = ? AND idempotency_key = ?
+      LIMIT 1
+    `),
+    insertUsage: db.prepare(`
+      INSERT INTO world_civic_delegation_action_uses (
+        usage_id, delegation_id, principal_account_id, delegate_agent_id,
+        scope, action_ref, idempotency_key, audit_entry_id, created_at,
+        usage_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `),
+    listUsages: db.prepare(`
+      SELECT *
+      FROM world_civic_delegation_action_uses
+      WHERE (? = '' OR delegation_id = ?)
+        AND (? = '' OR principal_account_id = ?)
+        AND (? = '' OR delegate_agent_id = ?)
+        AND (? = '' OR scope = ?)
+      ORDER BY created_at ASC, usage_id ASC
+      LIMIT ?
+    `),
+    countUsageByDelegation: db.prepare(`
+      SELECT COUNT(1) AS count
+      FROM world_civic_delegation_action_uses
+      WHERE delegation_id = ?
+    `),
     list: db.prepare(`
       SELECT *
       FROM world_civic_delegations
@@ -125,6 +211,70 @@ function delegationAuditIdempotencyKey(delegation) {
 
 function revokeAuditIdempotencyKey(delegationId) {
   return `idem_${`${delegationId}_revoke`.slice(0, 80)}`;
+}
+
+function normalizedKey(key = '') {
+  return String(key || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function findPrivateUsageData(value, path = 'usage', found = []) {
+  if (value === null || value === undefined) return found;
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => findPrivateUsageData(entry, `${path}[${index}]`, found));
+    return found;
+  }
+  if (typeof value === 'object') {
+    for (const [key, child] of Object.entries(value)) {
+      const normalized = normalizedKey(key);
+      if (FORBIDDEN_USAGE_KEYS.has(normalized) || normalized.endsWith('token') || normalized.endsWith('secret')) {
+        found.push(`${path}.${key}`);
+      }
+      findPrivateUsageData(child, `${path}.${key}`, found);
+    }
+    return found;
+  }
+  if (typeof value === 'string' && SECRET_TEXT_RE.test(value)) found.push(path);
+  return found;
+}
+
+function validateUsageString(errors, raw, key, { pattern = CIVIC_ID_RE } = {}) {
+  const text = typeof raw?.[key] === 'string' ? raw[key].trim().slice(0, 96) : '';
+  if (!text) {
+    errors.push(`${key} required`);
+    return '';
+  }
+  if (pattern && !pattern.test(text)) errors.push(`${key} invalid`);
+  return text;
+}
+
+function normalizeDelegatedActionUsage(raw = {}) {
+  const errors = [];
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ok: false, errors: ['delegated action usage must be object'], value: null };
+  }
+  const usageId = validateUsageString(errors, raw, 'usageId', { pattern: /^delegationuse_[a-z0-9_:-]{4,80}$/ });
+  const delegationId = validateUsageString(errors, raw, 'delegationId', { pattern: /^delegation_[a-z0-9_:-]{4,88}$/ });
+  const principalAccountId = validateUsageString(errors, raw, 'principalAccountId');
+  const delegateAgentId = validateUsageString(errors, raw, 'delegateAgentId');
+  const scope = typeof raw.scope === 'string' ? raw.scope.trim().slice(0, 80) : '';
+  if (!DELEGATION_SCOPES.has(scope)) errors.push('scope unsupported');
+  const actionRef = validateUsageString(errors, raw, 'actionRef');
+  const idempotencyKey = validateUsageString(errors, raw, 'idempotencyKey');
+  const privatePaths = findPrivateUsageData(raw);
+  if (privatePaths.length) errors.push(`private data forbidden: ${privatePaths.join(', ')}`);
+  return {
+    ok: errors.length === 0,
+    errors,
+    value: errors.length ? null : {
+      usageId,
+      delegationId,
+      principalAccountId,
+      delegateAgentId,
+      scope,
+      actionRef,
+      idempotencyKey
+    }
+  };
 }
 
 function createDelegationAuditEntry(delegation, nowMs) {
@@ -165,6 +315,36 @@ function createDelegationRevokedAuditEntry(row, nowMs) {
     idempotencyKey: revokeAuditIdempotencyKey(row.delegationId),
     beforeHash: sha256(stableJson({ delegation: row.delegation, status: row.status })),
     afterHash: sha256(stableJson({ delegation: row.delegation, status: DELEGATION_STATUS_REVOKED })),
+    createdAtMs: nowMs,
+    migrationVersion: MIGRATION_VERSION,
+    replayable: true,
+    rollbackId: '',
+    privacy: {
+      redacted: true,
+      privateDataIncluded: false,
+      dataClasses: ['public_audit_summary']
+    }
+  };
+}
+
+function createDelegationActionConsumedAuditEntry({ usage, delegation, consumedBefore, consumedAfter, nowMs }) {
+  return {
+    schemaVersion: delegation.delegation.schemaVersion,
+    entryId: safeAuditId(usage.usageId),
+    actor: {
+      kind: 'agent',
+      accountId: usage.principalAccountId,
+      agentId: usage.delegateAgentId
+    },
+    actionType: 'delegation.action_consumed',
+    objectRef: usage.usageId,
+    idempotencyKey: usage.idempotencyKey,
+    beforeHash: sha256(stableJson({
+      delegationId: usage.delegationId,
+      consumedActionCount: consumedBefore,
+      maxActions: delegation.maxActions
+    })),
+    afterHash: sha256(stableJson({ usage, consumedActionCount: consumedAfter, maxActions: delegation.maxActions })),
     createdAtMs: nowMs,
     migrationVersion: MIGRATION_VERSION,
     replayable: true,
@@ -318,6 +498,123 @@ function createCivicDelegationStore({ sqlitePath, auditLedger = null, auditSqlit
     };
   }
 
+  function getUsageCountForDelegation(delegationId = '') {
+    return Number(statements.countUsageByDelegation.get(String(delegationId || '')).count || 0);
+  }
+
+  function consumeDelegatedAction(rawUsage = {}, { nowMs = Date.now() } = {}) {
+    const validation = normalizeDelegatedActionUsage(rawUsage);
+    if (!validation.ok) {
+      const err = new Error('CIVIC_DELEGATION_USAGE_INVALID');
+      err.details = { errors: validation.errors };
+      throw err;
+    }
+    const usage = validation.value;
+    const normalizedJson = stableJson(usage);
+    const existingByKey = parseUsageRow(
+      statements.byDelegationIdempotency.get(usage.delegationId, usage.idempotencyKey)
+    );
+    if (existingByKey) {
+      if (stableJson(existingByKey.usage) !== normalizedJson) {
+        const err = new Error('CIVIC_DELEGATION_USAGE_IDEMPOTENCY_CONFLICT');
+        err.details = {
+          delegationId: usage.delegationId,
+          idempotencyKey: usage.idempotencyKey,
+          existingUsageId: existingByKey.usageId
+        };
+        throw err;
+      }
+      return { ...existingByKey, duplicate: true };
+    }
+
+    const existingById = parseUsageRow(statements.byUsageId.get(usage.usageId));
+    if (existingById) {
+      const err = new Error('CIVIC_DELEGATION_USAGE_ID_CONFLICT');
+      err.details = { usageId: usage.usageId };
+      throw err;
+    }
+
+    const delegation = getDelegation(usage.delegationId);
+    if (!delegation) {
+      const err = new Error('CIVIC_DELEGATION_USAGE_DELEGATION_REQUIRED');
+      err.details = { delegationId: usage.delegationId };
+      throw err;
+    }
+    if (delegation.principalAccountId !== usage.principalAccountId) {
+      const err = new Error('CIVIC_DELEGATION_USAGE_PRINCIPAL_MISMATCH');
+      err.details = { delegationId: usage.delegationId, principalAccountId: usage.principalAccountId };
+      throw err;
+    }
+    if (delegation.delegateAgentId !== usage.delegateAgentId) {
+      const err = new Error('CIVIC_DELEGATION_USAGE_AGENT_MISMATCH');
+      err.details = { delegationId: usage.delegationId, delegateAgentId: usage.delegateAgentId };
+      throw err;
+    }
+    if (delegation.scope !== usage.scope) {
+      const err = new Error('CIVIC_DELEGATION_USAGE_SCOPE_MISMATCH');
+      err.details = { delegationId: usage.delegationId, expected: delegation.scope, received: usage.scope };
+      throw err;
+    }
+    if (delegation.status !== DELEGATION_STATUS_ACTIVE) {
+      const err = new Error('CIVIC_DELEGATION_USAGE_INACTIVE');
+      err.details = { delegationId: usage.delegationId, status: delegation.status };
+      throw err;
+    }
+    if (delegation.expiresAtMs <= nowMs) {
+      const err = new Error('CIVIC_DELEGATION_USAGE_EXPIRED');
+      err.details = { delegationId: usage.delegationId, expiresAtMs: delegation.expiresAtMs, nowMs };
+      throw err;
+    }
+    const consumedBefore = getUsageCountForDelegation(usage.delegationId);
+    if (consumedBefore >= delegation.maxActions) {
+      const err = new Error('CIVIC_DELEGATION_ACTION_BUDGET_EXHAUSTED');
+      err.details = { delegationId: usage.delegationId, maxActions: delegation.maxActions, consumedActionCount: consumedBefore };
+      throw err;
+    }
+    const consumedAfter = consumedBefore + 1;
+    const auditRow = ledger.append(createDelegationActionConsumedAuditEntry({
+      usage,
+      delegation,
+      consumedBefore,
+      consumedAfter,
+      nowMs
+    }));
+    statements.insertUsage.run(
+      usage.usageId,
+      usage.delegationId,
+      usage.principalAccountId,
+      usage.delegateAgentId,
+      usage.scope,
+      usage.actionRef,
+      usage.idempotencyKey,
+      auditRow.entry.entryId,
+      nowMs,
+      normalizedJson
+    );
+    return parseUsageRow(statements.byUsageId.get(usage.usageId));
+  }
+
+  function listDelegatedActionUses({
+    delegationId = '',
+    principalAccountId = '',
+    delegateAgentId = '',
+    scope = '',
+    limit = 100
+  } = {}) {
+    const safeLimit = Number.isInteger(Number(limit)) ? Math.max(1, Math.min(500, Number(limit))) : 100;
+    return statements.listUsages.all(
+      String(delegationId || ''),
+      String(delegationId || ''),
+      String(principalAccountId || ''),
+      String(principalAccountId || ''),
+      String(delegateAgentId || ''),
+      String(delegateAgentId || ''),
+      String(scope || ''),
+      String(scope || ''),
+      safeLimit
+    ).map(parseUsageRow);
+  }
+
   function getAgentParticipationPolicy({
     principalAccountId = '',
     delegateAgentId = '',
@@ -333,13 +630,14 @@ function createCivicDelegationStore({ sqlitePath, auditLedger = null, auditSqlit
 
     for (const row of rows) {
       if (isActiveAt(row, atMs)) {
-        allowedScopes.push(row.scope);
+        const consumedActionCount = getUsageCountForDelegation(row.delegationId);
+        const remainingActions = Math.max(0, row.maxActions - consumedActionCount);
         activeDelegationIds.push(row.delegationId);
-        remainingActionBudgetByScope[row.scope] = Math.max(
-          remainingActionBudgetByScope[row.scope] || 0,
-          row.maxActions
-        );
-        if (row.scope === 'civic_execution' && row.canExecuteCivicEffects) {
+        if (remainingActions > 0) {
+          allowedScopes.push(row.scope);
+          remainingActionBudgetByScope[row.scope] = (remainingActionBudgetByScope[row.scope] || 0) + remainingActions;
+        }
+        if (remainingActions > 0 && row.scope === 'civic_execution' && row.canExecuteCivicEffects) {
           civicExecutionAllowed = true;
         }
       } else if (row.status === DELEGATION_STATUS_REVOKED) {
@@ -369,7 +667,11 @@ function createCivicDelegationStore({ sqlitePath, auditLedger = null, auditSqlit
     let expiredCount = 0;
     let revokedCount = 0;
     let civicExecutionDelegationCount = 0;
+    let consumedActionCount = 0;
+    const remainingActionBudgetByScope = {};
     for (const row of rows) {
+      const rowConsumedActionCount = getUsageCountForDelegation(row.delegationId);
+      consumedActionCount += rowConsumedActionCount;
       if (!byScope[row.scope]) byScope[row.scope] = { active: 0, expired: 0, revoked: 0 };
       if (row.status === DELEGATION_STATUS_REVOKED) {
         revokedCount += 1;
@@ -380,6 +682,8 @@ function createCivicDelegationStore({ sqlitePath, auditLedger = null, auditSqlit
       } else {
         activeCount += 1;
         byScope[row.scope].active += 1;
+        remainingActionBudgetByScope[row.scope] = (remainingActionBudgetByScope[row.scope] || 0)
+          + Math.max(0, row.maxActions - rowConsumedActionCount);
       }
       if (row.scope === 'civic_execution' && row.canExecuteCivicEffects) {
         civicExecutionDelegationCount += 1;
@@ -392,6 +696,8 @@ function createCivicDelegationStore({ sqlitePath, auditLedger = null, auditSqlit
       expiredCount,
       revokedCount,
       civicExecutionDelegationCount,
+      consumedActionCount,
+      remainingActionBudgetByScope,
       byScope,
       executionStatus: 'not_executable'
     };
@@ -415,9 +721,11 @@ function createCivicDelegationStore({ sqlitePath, auditLedger = null, auditSqlit
   return {
     close,
     count,
+    consumeDelegatedAction,
     getAgentParticipationPolicy,
     getDelegation,
     getSchemaMetadata,
+    listDelegatedActionUses,
     listDelegations,
     migrationVersion: schemaMetadata.migrationVersion,
     recordDelegation,

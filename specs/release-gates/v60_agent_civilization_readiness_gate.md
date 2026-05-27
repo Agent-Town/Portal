@@ -193,9 +193,11 @@ gate below has implementation, deterministic tests, and security/product signoff
   irreversible-action review, and conservation tests.
 - Agent participation must never grant silent authority escalation. Current
   research-only delegation lifecycle storage starts this in
-  `server/world_civilization/delegations.js`; release still requires
-  worker/tool enforcement, action-budget consumption, expiry and revocation
-  checks at every route edge, and principal wallet/session authorization.
+  `server/world_civilization/delegations.js` with scoped delegations,
+  idempotent action-budget usage records, and `delegation.action_consumed`
+  audit rows; release still requires worker/tool enforcement, expiry,
+  budget, and revocation checks at every route edge, and principal
+  wallet/session authorization.
 - Civic institutions must have explicit charters, scopes, eligibility rules,
   voting rules, moderation policies, and public audit summaries before any
   player-visible institution appears. Current research-only storage starts this

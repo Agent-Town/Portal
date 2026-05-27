@@ -43,6 +43,19 @@ function delegation(overrides = {}) {
   };
 }
 
+function delegatedActionUse(overrides = {}) {
+  return {
+    usageId: 'delegationuse_vote_advice_001',
+    delegationId: 'delegation_vote_advice_001',
+    principalAccountId: 'acct_v6_human_001',
+    delegateAgentId: 'agent_civic_clover_001',
+    scope: 'vote_advice',
+    actionRef: 'action_vote_advice_001',
+    idempotencyKey: 'idem_vote_advice_use_001',
+    ...overrides
+  };
+}
+
 test('V6 delegation store records scoped agent participation without execution authority', () => withTempDelegationStore(({ auditLedger, store }) => {
   const row = store.recordDelegation(delegation(), { nowMs: 1_779_784_000_000 });
   const policy = store.getAgentParticipationPolicy({
@@ -70,6 +83,141 @@ test('V6 delegation store records scoped agent participation without execution a
   assert.equal(audit.entry.actionType, 'delegation.created');
   assert.equal(audit.entry.actor.accountId, 'acct_v6_human_001');
   assert.equal(audit.entry.objectRef, 'delegation_vote_advice_001');
+}));
+
+test('V6 delegation store consumes action budgets idempotently without execution', () => withTempDelegationStore(({
+  auditLedger,
+  store
+}) => {
+  store.recordDelegation(delegation(), { nowMs: 1_779_784_000_000 });
+  const first = store.consumeDelegatedAction(delegatedActionUse(), { nowMs: 1_779_784_010_000 });
+  const duplicate = store.consumeDelegatedAction(delegatedActionUse(), { nowMs: 1_779_784_011_000 });
+  const second = store.consumeDelegatedAction(delegatedActionUse({
+    usageId: 'delegationuse_vote_advice_002',
+    actionRef: 'action_vote_advice_002',
+    idempotencyKey: 'idem_vote_advice_use_002'
+  }), { nowMs: 1_779_784_012_000 });
+  const third = store.consumeDelegatedAction(delegatedActionUse({
+    usageId: 'delegationuse_vote_advice_003',
+    actionRef: 'action_vote_advice_003',
+    idempotencyKey: 'idem_vote_advice_use_003'
+  }), { nowMs: 1_779_784_013_000 });
+  const policy = store.getAgentParticipationPolicy({
+    principalAccountId: 'acct_v6_human_001',
+    delegateAgentId: 'agent_civic_clover_001',
+    atMs: 1_779_784_014_000
+  });
+  const summary = store.summarizePrincipalDelegations('acct_v6_human_001', { atMs: 1_779_784_014_000 });
+
+  assert.equal(first.usageId, 'delegationuse_vote_advice_001');
+  assert.equal(first.auditEntryId, 'audit_delegationuse_vote_advice_001');
+  assert.equal(duplicate.duplicate, true);
+  assert.equal(second.usageId, 'delegationuse_vote_advice_002');
+  assert.equal(third.usageId, 'delegationuse_vote_advice_003');
+  assert.equal(store.listDelegatedActionUses({ delegationId: 'delegation_vote_advice_001' }).length, 3);
+  assert.deepEqual(policy.allowedScopes, []);
+  assert.deepEqual(policy.activeDelegationIds, ['delegation_vote_advice_001']);
+  assert.equal(policy.remainingActionBudgetByScope.vote_advice, undefined);
+  assert.equal(policy.executionStatus, 'not_executable');
+  assert.equal(summary.consumedActionCount, 3);
+  assert.equal(summary.remainingActionBudgetByScope.vote_advice, 0);
+  assert.equal(summary.executionStatus, 'not_executable');
+  assert.equal(typeof store.executeDelegatedAction, 'undefined');
+  assert.equal(typeof store.applyDelegation, 'undefined');
+  assert.deepEqual(
+    auditLedger.replay().map((row) => row.entry.actionType),
+    [
+      'delegation.created',
+      'delegation.action_consumed',
+      'delegation.action_consumed',
+      'delegation.action_consumed'
+    ]
+  );
+  assert.throws(
+    () => store.consumeDelegatedAction(delegatedActionUse({
+      usageId: 'delegationuse_vote_advice_004',
+      actionRef: 'action_vote_advice_004',
+      idempotencyKey: 'idem_vote_advice_use_004'
+    }), { nowMs: 1_779_784_015_000 }),
+    /CIVIC_DELEGATION_ACTION_BUDGET_EXHAUSTED/
+  );
+  assert.throws(
+    () => store.consumeDelegatedAction(delegatedActionUse({
+      usageId: 'delegationuse_vote_advice_private_001',
+      idempotencyKey: 'idem_vote_advice_private_001',
+      debugTrace: {
+        token: 'sk-test-secret-value'
+      }
+    }), { nowMs: 1_779_784_016_000 }),
+    /CIVIC_DELEGATION_USAGE_INVALID/
+  );
+  assert.throws(
+    () => store.consumeDelegatedAction(delegatedActionUse({
+      usageId: 'delegationuse_vote_advice_conflict_001',
+      actionRef: 'action_vote_advice_conflict_001'
+    }), { nowMs: 1_779_784_017_000 }),
+    /CIVIC_DELEGATION_USAGE_IDEMPOTENCY_CONFLICT/
+  );
+}));
+
+test('V6 delegation usage rejects inactive, mismatched, expired, and missing delegations', () => withTempDelegationStore(({
+  store
+}) => {
+  assert.throws(
+    () => store.consumeDelegatedAction(delegatedActionUse(), { nowMs: 1_779_784_010_000 }),
+    /CIVIC_DELEGATION_USAGE_DELEGATION_REQUIRED/
+  );
+
+  store.recordDelegation(delegation(), { nowMs: 1_779_784_000_000 });
+  assert.throws(
+    () => store.consumeDelegatedAction(delegatedActionUse({
+      usageId: 'delegationuse_wrong_principal_001',
+      principalAccountId: 'acct_attacker_001',
+      idempotencyKey: 'idem_wrong_principal_001'
+    }), { nowMs: 1_779_784_010_000 }),
+    /CIVIC_DELEGATION_USAGE_PRINCIPAL_MISMATCH/
+  );
+  assert.throws(
+    () => store.consumeDelegatedAction(delegatedActionUse({
+      usageId: 'delegationuse_wrong_agent_001',
+      delegateAgentId: 'agent_attacker_001',
+      idempotencyKey: 'idem_wrong_agent_001'
+    }), { nowMs: 1_779_784_010_000 }),
+    /CIVIC_DELEGATION_USAGE_AGENT_MISMATCH/
+  );
+  assert.throws(
+    () => store.consumeDelegatedAction(delegatedActionUse({
+      usageId: 'delegationuse_wrong_scope_001',
+      scope: 'proposal_drafting',
+      idempotencyKey: 'idem_wrong_scope_001'
+    }), { nowMs: 1_779_784_010_000 }),
+    /CIVIC_DELEGATION_USAGE_SCOPE_MISMATCH/
+  );
+  store.revokeDelegation('delegation_vote_advice_001', {
+    principalAccountId: 'acct_v6_human_001',
+    nowMs: 1_779_784_020_000
+  });
+  assert.throws(
+    () => store.consumeDelegatedAction(delegatedActionUse({
+      usageId: 'delegationuse_revoked_001',
+      idempotencyKey: 'idem_revoked_001'
+    }), { nowMs: 1_779_784_030_000 }),
+    /CIVIC_DELEGATION_USAGE_INACTIVE/
+  );
+
+  store.recordDelegation(delegation({
+    delegationId: 'delegation_short_001',
+    approvalReceiptId: 'receipt_delegate_short_001',
+    expiresAtMs: 1_779_784_050_000
+  }), { nowMs: 1_779_784_040_000 });
+  assert.throws(
+    () => store.consumeDelegatedAction(delegatedActionUse({
+      usageId: 'delegationuse_expired_001',
+      delegationId: 'delegation_short_001',
+      idempotencyKey: 'idem_expired_001'
+    }), { nowMs: 1_779_784_060_000 }),
+    /CIVIC_DELEGATION_USAGE_EXPIRED/
+  );
 }));
 
 test('V6 delegation store enforces receipt idempotency and scoped execution permission', () => withTempDelegationStore(({ auditLedger, store }) => {

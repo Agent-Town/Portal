@@ -125,7 +125,7 @@ const V6_CIVIC_RESILIENCE_STORES = [
     modulePath: 'server/world_civilization/delegations.js',
     migrationVersion: 'v1',
     restartCoverage: 'tests/world_civilization_delegation_process_restart.test.js',
-    requiredMethods: ['recordDelegation', 'revokeDelegation', 'getAgentParticipationPolicy', 'getSchemaMetadata', 'listDelegations', 'summarizePrincipalDelegations', 'count', 'close']
+    requiredMethods: ['recordDelegation', 'consumeDelegatedAction', 'revokeDelegation', 'getAgentParticipationPolicy', 'getSchemaMetadata', 'listDelegatedActionUses', 'listDelegations', 'summarizePrincipalDelegations', 'count', 'close']
   },
   {
     key: 'institutions',
