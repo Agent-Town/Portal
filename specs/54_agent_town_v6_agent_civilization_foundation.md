@@ -94,8 +94,11 @@ The research-only governance preflight in
 `server/world_civilization/effects.js` before prepared effect persistence. It
 keeps the M7-M11 chain explicit by requiring an existing active proposal,
 matching rollback plan, matching effect preview, approved moderation decision,
-approval vote majority, non-delegated execution policy, and an approving vote
-receipt before any `civic_action.prepared` row can be written.
+approval vote majority, execution authority receipt, and delegation proof for
+delegated authority before any `civic_action.prepared` row can be written.
+Delegated authority remains blocked even with valid proof until M12 worker/tool
+enforcement and route-edge authorization are release-ready; the legacy
+`allowDelegatedExecution` flag is not sufficient.
 
 The research-only modal lab surface contract in
 `server/world_civilization/lab_surface.js` is route-neutral and non-executing.

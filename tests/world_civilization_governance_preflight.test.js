@@ -12,6 +12,7 @@ const {
   buildV6CivicGovernancePreflight,
   throwV6CivicGovernancePreflightError
 } = require('../server/world_civilization/governance_preflight');
+const { createCivicDelegationStore } = require('../server/world_civilization/delegations');
 const { createCivicEffectStore } = require('../server/world_civilization/effects');
 const { createCivicModerationStore } = require('../server/world_civilization/moderation');
 const { createCivicProposalStore } = require('../server/world_civilization/proposals');
@@ -24,11 +25,13 @@ function withStores(fn) {
   const proposalPath = path.join(dir, 'proposals.sqlite');
   const votePath = path.join(dir, 'votes.sqlite');
   const moderationPath = path.join(dir, 'moderation.sqlite');
+  const delegationPath = path.join(dir, 'delegations.sqlite');
   const effectPath = path.join(dir, 'effects.sqlite');
   const auditLedger = createCivicAuditLedger({ sqlitePath: auditPath });
   const proposalStore = createCivicProposalStore({ sqlitePath: proposalPath, auditLedger });
   const voteStore = createCivicVoteStore({ sqlitePath: votePath, proposalStore, auditLedger });
   const moderationStore = createCivicModerationStore({ sqlitePath: moderationPath, auditLedger });
+  const delegationStore = createCivicDelegationStore({ sqlitePath: delegationPath, auditLedger });
   const effectStore = createCivicEffectStore({
     sqlitePath: effectPath,
     proposalStore,
@@ -37,9 +40,10 @@ function withStores(fn) {
     auditLedger
   });
   try {
-    return fn({ auditLedger, effectStore, moderationStore, proposalStore, voteStore });
+    return fn({ auditLedger, delegationStore, effectStore, moderationStore, proposalStore, voteStore });
   } finally {
     effectStore.close();
+    delegationStore.close();
     moderationStore.close();
     voteStore.close();
     proposalStore.close();
@@ -126,6 +130,22 @@ function moderationDecision(overrides = {}) {
     reviewerKind: 'system',
     reasons: ['Public-safe proposal text.'],
     redactedFields: [],
+    ...overrides
+  };
+}
+
+function delegation(overrides = {}) {
+  return {
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    delegationId: 'delegation_governance_preflight_001',
+    principalAccountId: 'acct_v6_human_001',
+    delegateAgentId: 'agent_civic_clover_001',
+    scope: 'civic_execution',
+    expiresAtMs: 4_102_444_800_000,
+    maxActions: 1,
+    approvalReceiptId: 'receipt_delegate_preflight_001',
+    revocable: true,
+    canExecuteCivicEffects: true,
     ...overrides
   };
 }
@@ -272,7 +292,7 @@ test('V6 governance preflight enforces explicit vote quorum and threshold policy
   assert.deepEqual(assertV6CivicGovernancePreflightSafe(report), { ok: true, errors: [] });
 }));
 
-test('V6 governance preflight rejects delegated execution and stale or mismatched effect inputs', () => withStores((stores) => {
+test('V6 governance preflight rejects delegated execution without proof and stale or mismatched effect inputs', () => withStores((stores) => {
   seedApproved(stores);
   const delegated = preflight(stores, {
     rawAction: civicAction({
@@ -297,14 +317,76 @@ test('V6 governance preflight rejects delegated execution and stale or mismatche
     nowMs: 4_102_444_800_001
   });
 
-  assert.match(delegated.errors.join(','), /CIVIC_EFFECT_DELEGATION_UNSUPPORTED/);
-  assert.throws(() => throwV6CivicGovernancePreflightError(delegated), /CIVIC_EFFECT_DELEGATION_UNSUPPORTED/);
+  assert.match(delegated.errors.join(','), /CIVIC_EFFECT_DELEGATION_PROOF_REQUIRED/);
+  assert.throws(() => throwV6CivicGovernancePreflightError(delegated), /CIVIC_EFFECT_DELEGATION_PROOF_REQUIRED/);
   assert.match(wrongEffect.errors.join(','), /CIVIC_EFFECT_TYPE_MISMATCH/);
   assert.throws(() => throwV6CivicGovernancePreflightError(wrongEffect), /CIVIC_EFFECT_TYPE_MISMATCH/);
   assert.match(wrongRollback.errors.join(','), /CIVIC_EFFECT_ROLLBACK_PLAN_MISMATCH/);
   assert.throws(() => throwV6CivicGovernancePreflightError(wrongRollback), /CIVIC_EFFECT_ROLLBACK_PLAN_MISMATCH/);
   assert.match(expired.errors.join(','), /CIVIC_EFFECT_PROPOSAL_EXPIRED/);
   assert.throws(() => throwV6CivicGovernancePreflightError(expired), /CIVIC_EFFECT_PROPOSAL_EXPIRED/);
+}));
+
+test('V6 governance preflight requires delegation proof and ignores the legacy allow flag', () => withStores((stores) => {
+  seedApproved(stores);
+  const delegated = preflight(stores, {
+    allowDelegatedExecution: true,
+    rawAction: civicAction({
+      executionAuthority: {
+        kind: 'delegated',
+        receiptId: 'receipt_delegate_preflight_001'
+      }
+    })
+  });
+  const proofCheck = delegated.checks.find((entry) => entry.key === 'delegation_proof');
+  const policyCheck = delegated.checks.find((entry) => entry.key === 'delegation_policy');
+
+  assert.equal(delegated.canPrepare, false);
+  assert.equal(delegated.failClosed, true);
+  assert.equal(proofCheck.ok, false);
+  assert.equal(policyCheck.ok, false);
+  assert.equal(proofCheck.details.allowDelegatedExecution, true);
+  assert.match(delegated.errors.join(','), /CIVIC_EFFECT_DELEGATION_PROOF_REQUIRED/);
+  assert.throws(() => throwV6CivicGovernancePreflightError(delegated), /CIVIC_EFFECT_DELEGATION_PROOF_REQUIRED/);
+  assert.equal(stores.effectStore.count(), 0);
+}));
+
+test('V6 governance preflight validates delegation proof read-only but keeps delegated preparation blocked', () => withStores((stores) => {
+  seedApproved(stores);
+  stores.delegationStore.recordDelegation(delegation(), { nowMs: 1_779_784_250_000 });
+  const delegated = preflight(stores, {
+    delegationStore: stores.delegationStore,
+    delegatedExecutionProof: {
+      delegationId: 'delegation_governance_preflight_001',
+      principalAccountId: 'acct_v6_human_001',
+      delegateAgentId: 'agent_civic_clover_001'
+    },
+    rawAction: civicAction({
+      executionAuthority: {
+        kind: 'delegated',
+        receiptId: 'receipt_delegate_preflight_001'
+      }
+    })
+  });
+  const proofCheck = delegated.checks.find((entry) => entry.key === 'delegation_proof');
+  const policyCheck = delegated.checks.find((entry) => entry.key === 'delegation_policy');
+  const receiptCheck = delegated.checks.find((entry) => entry.key === 'approval_receipt');
+
+  assert.equal(delegated.canPrepare, false);
+  assert.equal(delegated.failClosed, true);
+  assert.equal(proofCheck.ok, true);
+  assert.equal(proofCheck.details.proofStatus, 'valid');
+  assert.equal(proofCheck.details.remainingActionBudget, 1);
+  assert.equal(proofCheck.details.budgetConsumptionStatus, 'not_consumed_by_preflight');
+  assert.equal(policyCheck.ok, false);
+  assert.equal(policyCheck.details.releaseGateReady, false);
+  assert.equal(receiptCheck.ok, true);
+  assert.equal(receiptCheck.details.receiptKind, 'delegation_approval');
+  assert.match(delegated.errors.join(','), /CIVIC_EFFECT_DELEGATION_UNSUPPORTED/);
+  assert.throws(() => throwV6CivicGovernancePreflightError(delegated), /CIVIC_EFFECT_DELEGATION_UNSUPPORTED/);
+  assert.equal(stores.delegationStore.listDelegatedActionUses({ delegationId: 'delegation_governance_preflight_001' }).length, 0);
+  assert.equal(stores.effectStore.count(), 0);
+  assert.deepEqual(assertV6CivicGovernancePreflightSafe(delegated), { ok: true, errors: [] });
 }));
 
 test('V6 effect preparation uses governance preflight before writing prepared actions', () => withStores((stores) => {

@@ -24,6 +24,13 @@ Later worker-first tools and civic effect handlers may consult a compatible
 delegation store, but this foundation does not connect delegation policy to
 runtime execution.
 
+`server/world_civilization/governance_preflight.js` may validate delegation
+proof read-only for a delegated civic action. That proof requires an active
+`civic_execution` delegation whose principal, delegate, approval receipt,
+permission flag, expiry, and remaining action budget match the action context.
+The preflight does not consume delegation budget and does not make delegated
+effect preparation available.
+
 The process-level restart proof currently covers creation of scoped advice and
 explicit civic-execution delegations, idempotent budget consumption, and
 principal-owned revocation. It proves policy summaries and audit replay survive
@@ -83,6 +90,10 @@ Indexes cover delegation replay, principal/scope replay, and agent/scope replay.
 - Delegated action budget usage is idempotent by delegation/idempotency key,
   audited, and rejected when the delegation is missing, mismatched, expired,
   revoked, or budget-exhausted.
+- Governance preflight delegation proof is read-only; the legacy
+  `allowDelegatedExecution` boolean cannot grant authority without a matching
+  active delegation proof, and delegated preparation remains blocked while M12
+  route/tool enforcement is incomplete.
 - Participation policy summaries return `executionStatus: "not_executable"`.
 - Delegation creation writes `delegation.created` audit entries; action-budget
   usage writes `delegation.action_consumed` audit entries; revocation writes

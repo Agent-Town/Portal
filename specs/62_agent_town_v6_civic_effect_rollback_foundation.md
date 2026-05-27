@@ -103,8 +103,9 @@ proposal/status replay.
   rejections, and a passing vote approval policy with explicit quorum and
   approval-threshold checks.
 - Human-approved actions must reference an approving vote receipt.
-- Delegated execution is rejected until M12 defines scoped delegation storage
-  and enforcement.
+- Delegated execution requires read-only active `civic_execution` delegation
+  proof in governance preflight, but remains rejected until M12 worker/tool
+  enforcement and route-edge authorization are release-ready.
 - `server/world_civilization/governance_preflight.js` must pass before
   prepared effect persistence.
 - Idempotency reuse is accepted only when the validated action and rollback

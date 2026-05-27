@@ -229,7 +229,7 @@ test('V6 civic effect store enforces idempotency and rollback id uniqueness', ()
   assert.equal(effectStore.count(), 1);
 }));
 
-test('V6 civic effect store rejects missing prerequisites and unsupported delegation', () => withTempEffectStores(({
+test('V6 civic effect store rejects missing prerequisites and delegated execution without proof', () => withTempEffectStores(({
   effectStore,
   moderationStore,
   proposalStore,
@@ -266,7 +266,7 @@ test('V6 civic effect store rejects missing prerequisites and unsupported delega
         receiptId: 'receipt_vote_bridge_001'
       }
     }), rollbackPlan(), { nowMs: 1_779_784_300_000 }),
-    /CIVIC_EFFECT_DELEGATION_UNSUPPORTED/
+    /CIVIC_EFFECT_DELEGATION_PROOF_REQUIRED/
   );
   assert.throws(
     () => effectStore.prepareEffect(civicAction({

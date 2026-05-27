@@ -24,6 +24,10 @@ approval and does not expose V6 in normal gameplay.
 - Human actors must match the authenticated session account.
 - Agent actors require verified, unexpired delegation from the authenticated
   principal and a human approval receipt.
+- Delegated civic-effect authority cannot be enabled by a loose feature or
+  test flag; governance preflight requires matching active `civic_execution`
+  delegation proof and still keeps delegated preparation non-executable until
+  M12 route/tool enforcement is release-ready.
 - Mutations require an idempotency key before any future store call.
 - Owner/surface rate limiting uses the current prototype bucket shape.
 - The report remains `research_only`, `runtimeExposed: false`,

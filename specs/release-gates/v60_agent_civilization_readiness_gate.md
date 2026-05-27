@@ -233,8 +233,11 @@ gate below has implementation, deterministic tests, and security/product signoff
   `server/world_civilization/governance_preflight.js` and is called by
   `effects.js` before any prepared effect, rollback record, or audit row is
   written; it requires proposal, proposal review-ready state, vote approval
-  policy, moderation, approval receipt, effect preview, rollback-plan, and
-  delegation-policy prerequisites to pass.
+  policy, moderation, approval receipt, effect preview, rollback-plan,
+  delegation proof, and delegation-policy prerequisites to pass. Delegated
+  execution cannot be enabled by a loose boolean flag; it must carry matching
+  active `civic_execution` delegation proof and still remains blocked until M12
+  route/tool enforcement is release-ready.
   Research-only handle reconstruction starts in
   `server/world_civilization/rollback_recovery.js` and
   `tests/world_civilization_rollback_recovery.test.js`. Release still requires
@@ -244,9 +247,10 @@ gate below has implementation, deterministic tests, and security/product signoff
   research-only delegation lifecycle storage starts this in
   `server/world_civilization/delegations.js` with scoped delegations,
   idempotent action-budget usage records, and `delegation.action_consumed`
-  audit rows; release still requires worker/tool enforcement, expiry,
-  budget, and revocation checks at every route edge, and principal
-  wallet/session authorization.
+  audit rows; governance preflight now validates delegation proof read-only
+  while leaving budget unconsumed and delegated preparation blocked. Release
+  still requires worker/tool enforcement, expiry, budget, and revocation checks
+  at every route edge, and principal wallet/session authorization.
 - Civic institutions must have explicit charters, scopes, eligibility rules,
   voting rules, moderation policies, and public audit summaries before any
   player-visible institution appears. Current research-only storage starts this

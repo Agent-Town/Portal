@@ -235,7 +235,10 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /M12 Agent participation controls \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/delegations\.js/);
   assert.match(plan, /idempotent action-budget consumption/);
+  assert.match(plan, /allowDelegatedExecution/);
+  assert.match(plan, /read-only active `civic_execution` delegation proof/);
   assert.match(gate, /server\/world_civilization\/delegations\.js/);
+  assert.match(gate, /loose boolean flag/);
   assert.match(gate, /delegation\.action_consumed/);
   assert.match(plan, /M13 Civic institutions and charters \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/institutions\.js/);
@@ -395,6 +398,7 @@ test('V6 civic mutation security envelope is tracked as an M5 release control', 
 
   assert.match(plan, /server\/world_civilization\/mutation_security\.js/);
   assert.match(plan, /delegated-agent proof/);
+  assert.match(plan, /read-only active `civic_execution` delegation proof/);
   assert.match(spec, /same-origin checks/);
   assert.match(spec, /session\/wallet auth/);
   assert.match(spec, /CSRF verification/);
@@ -424,7 +428,7 @@ test('V6 worker-first civic tool exposure gate is tracked as an M6 release contr
   assert.match(skillLine, /tests\/world_civilization_tool_exposure_gate\.test\.js/);
 });
 
-test('V6 governance preflight is tracked as an M7-M11 prerequisite control', () => {
+test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () => {
   const plan = read('docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md');
   const foundation = read('specs/54_agent_town_v6_agent_civilization_foundation.md');
   const proposalSpec = read('specs/57_agent_town_v6_internal_proposal_lifecycle.md');
@@ -438,6 +442,8 @@ test('V6 governance preflight is tracked as an M7-M11 prerequisite control', () 
   assert.match(plan, /server\/world_civilization\/governance_preflight\.js/);
   assert.match(plan, /vote approval policy, human approval receipt/);
   assert.match(plan, /review-ready proposal/);
+  assert.match(plan, /allowDelegatedExecution/);
+  assert.match(foundation, /Delegated authority remains blocked/);
   assert.match(foundation, /governance_preflight\.js/);
   assert.match(proposalSpec, /recordProposalReview\(\)/);
   assert.match(proposalSpec, /CIVIC_PROPOSAL_REVIEW_MODERATION_DECISION_INVALID/);
@@ -449,18 +455,23 @@ test('V6 governance preflight is tracked as an M7-M11 prerequisite control', () 
   assert.match(effectSpec, /failed preflights preserve the existing `CIVIC_EFFECT_\*` error surface/);
   assert.match(effectSpec, /review-ready/);
   assert.match(effectSpec, /vote approval policy/);
+  assert.match(effectSpec, /active `civic_execution` delegation\s+proof/);
   assert.match(preflightSpec, /Existing proposal record/);
   assert.match(preflightSpec, /Proposal review-ready state/);
   assert.match(preflightSpec, /Vote approval with at least one approving vote/);
   assert.match(preflightSpec, /Vote approval policy passes explicit quorum/);
+  assert.match(preflightSpec, /Delegated execution proof requires a matching active `civic_execution`/);
+  assert.match(preflightSpec, /legacy `allowDelegatedExecution` flag cannot bypass proof/);
   assert.match(preflightSpec, /Delegated execution remains rejected/);
   assert.match(gate, /proposal review-ready state/);
   assert.match(gate, /vote approval\s+policy/);
+  assert.match(gate, /delegation proof/);
   assert.match(gate, /`proposal\.reviewed`/);
   assert.match(releaseReview, /proposal `ready_for_vote`\/`rejected` transitions/);
   assert.match(releaseReview, /governance preflight coverage/);
   assert.match(skillLine, /V6 internal proposal lifecycle foundation/);
   assert.match(skillLine, /V6 vote authorization foundation/);
+  assert.match(skillLine, /loose `allowDelegatedExecution` bypasses/);
   assert.match(skillLine, /tests\/world_civilization_votes\.test\.js/);
   assert.match(skillLine, /tests\/world_civilization_governance_preflight\.test\.js/);
 });
