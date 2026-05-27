@@ -443,6 +443,7 @@ test('GU-18 production release gate can pass only with explicit machine evidence
   assert.equal(gate.metrics.approvalEvidencePackIdMatches, 1);
   assert.equal(gate.metrics.candidateReviewManifestHashMatchesEvidence, 1);
   assert.equal(gate.metrics.candidateReviewManifestTimeMatchesEvidence, 1);
+  assert.equal(gate.metrics.candidateReviewManifestCountsMatchEvidence, 1);
   assert.equal(gate.metrics.candidateReviewCoverageCount, pack.assetPromptPlan.targets.length);
   assert.equal(gate.metrics.releaseGateEvaluatedAtNotFuture, true);
   assert.equal(gate.metrics.replayabilityPromptCount, 10);
@@ -1488,6 +1489,86 @@ test('GPACK-132 release approval evidence rejects incoherent candidate review di
   );
   assert.equal(gate.releasePrerequisites.candidateAssetsReviewed, false);
   assert.equal(gate.blockingReasons.includes('candidateAssetsReviewed'), true);
+});
+
+test('GPACK-134 release gate rejects candidate review count drift between approval evidence and manifest', () => {
+  const pack = createGeneratedPack({
+    owner: { ownerAccountId: 'owner_release_gate_candidate_manifest_count_drift' },
+    prompt: 'glass orchard docks with signal kites',
+    nowMs: 153_080,
+    candidateRoot: 'data/generated-packs-test'
+  });
+  const candidateReviewManifest = reviewedCandidateManifest(pack);
+  const targetCount = pack.assetPromptPlan.targets.length;
+  const driftedApprovalEvidence = buildReleaseApprovalEvidence({
+    pack,
+    nowMs: 153_100,
+    authModel: {
+      status: 'approved',
+      authMode: 'operator_managed',
+      approvalDocHash: hashLabel('manifest-count-auth-policy'),
+      approvedByHash: hashLabel('manifest-count-security-reviewer'),
+      approvedAtMs: 153_081,
+      providerAccessPolicy: 'out_of_band_only_no_pack_storage'
+    },
+    costModel: {
+      status: 'accepted',
+      estimatedMin: 0.25,
+      estimatedMax: 1.25,
+      costEstimateHash: hashLabel('manifest-count-cost-estimate'),
+      acceptedByHash: hashLabel('manifest-count-cost-owner'),
+      acceptedAtMs: 153_082
+    },
+    consentModel: {
+      status: 'recorded',
+      scope: 'single-pack-candidate-run',
+      userConsentHash: hashLabel('manifest-count-user-consent'),
+      teamConsentHash: hashLabel('manifest-count-team-consent'),
+      consentRecordHash: hashLabel('manifest-count-consent-record'),
+      recordedAtMs: 153_083
+    },
+    candidateReview: {
+      status: 'reviewed',
+      expectedTargetCount: targetCount,
+      reviewedCandidateCount: targetCount,
+      approvedCandidateCount: 0,
+      rejectedCandidateCount: targetCount,
+      candidateManifestHash: candidateReviewManifest.manifestHash,
+      reviewerSignoffHash: hashLabel('manifest-count-candidate-reviewer'),
+      reviewedAtMs: 153_084,
+      productionPromotionApproved: false
+    },
+    humanReview: {
+      status: 'complete',
+      releaseSignoffHash: hashLabel('manifest-count-human-reviewer'),
+      checklistHash: hashLabel('manifest-count-checklist'),
+      reviewedAtMs: 153_085
+    }
+  });
+  const evidenceReport = validateReleaseApprovalEvidence(driftedApprovalEvidence, pack);
+  const manifestReport = validateCandidateReviewManifest(candidateReviewManifest, pack);
+  const gate = buildProductionReleaseGate({
+    pack,
+    approvalEvidence: driftedApprovalEvidence,
+    candidateReviewManifest,
+    nowMs: 153_110
+  });
+  const gateReport = validateProductionReleaseGate(gate, { nowMs: 153_120 });
+
+  assert.equal(evidenceReport.ok, true, JSON.stringify(evidenceReport.checks));
+  assert.equal(manifestReport.ok, true, JSON.stringify(manifestReport.checks));
+  assert.equal(gate.metrics.candidateReviewManifestHashMatchesEvidence, 1);
+  assert.equal(gate.metrics.candidateReviewManifestTimeMatchesEvidence, 1);
+  assert.equal(gate.metrics.candidateReviewManifestCountsMatchEvidence, 0);
+  assert.equal(gate.releasePrerequisites.costConsentModelApproved, true);
+  assert.equal(gate.releasePrerequisites.humanReviewComplete, true);
+  assert.equal(gate.releasePrerequisites.candidateAssetsReviewed, false);
+  assert.equal(gate.blockingReasons.includes('candidateAssetsReviewed'), true);
+  assert.equal(gateReport.ok, false);
+  assert.equal(
+    gateReport.checks.find((check) => check.id === 'PRODUCTION_RELEASE_GATE_APPROVAL_EVIDENCE_VALID').passed,
+    false
+  );
 });
 
 test('GU-18 release approval evidence reports redact unsafe submitted keys and values', () => {

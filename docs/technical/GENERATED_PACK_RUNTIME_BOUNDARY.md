@@ -164,11 +164,11 @@ Player prompt
 
 - `buildProductionReleaseGate` creates a standalone readiness report and does not embed release approval state inside generated packs or default gameplay payloads.
 - `release_approval_evidence.schema.json` is the auditable auth/cost/consent/candidate-review/human-review contract used by the release gate. It carries a stable `evidenceHash`, requires timestamp-coherent approval events, a nonzero accepted cost estimate, and coherent candidate-review disposition counts, and must match the generated pack id before it can unlock release prerequisites.
-- `candidate_review_manifest.schema.json` records every asset prompt-plan target's candidate review status, content hash, note hash, candidate path, postprocess path, and approved-output placeholder. It must remain candidate-only, its `manifestHash` must match the candidate-manifest hash recorded inside approval evidence, its metrics must match actual row review statuses, the approval evidence review timestamp must not predate the manifest, and reviewed rows must have candidate content metadata before candidate assets can count as reviewed.
+- `candidate_review_manifest.schema.json` records every asset prompt-plan target's candidate review status, content hash, note hash, candidate path, postprocess path, and approved-output placeholder. It must remain candidate-only, its `manifestHash` must match the candidate-manifest hash recorded inside approval evidence, its metrics must match actual row review statuses, the approval evidence review timestamp must not predate the manifest, approval-evidence candidate-review counts must match the manifest metrics, and reviewed rows must have candidate content metadata before candidate assets can count as reviewed.
 - `validateProductionReleaseGate` checks schema validity, generated-pack id shape, diversity-suite release-pack inclusion, diversity metric-to-row coherence, same-pack persistence binding, same-pack public-card binding, prerequisite coherence, fail-closed behavior, release-gate timestamp coherence, explicit approval evidence, and zero public/private asset leaks.
 - The gate can be valid while `publicReleaseEligible=false`; that is the expected result when playtest evidence, diversity evidence, persistence evidence, public-card privacy evidence, candidate review, consent/cost/auth approval, or human signoff is absent.
 - `publicReleaseEligible=true` requires every prerequisite to be true and `blockingReasons=[]`; forged eligibility or missing blocking reasons fail validation.
-- Approval evidence, candidate-review manifests, diversity reports, persistence reports, public cards, or release gates with secret-like fields, raw prompt instructions, hash drift, invalid pack ids, diversity evidence that excludes the release pack, metric-only diversity claims, mixed persistence evidence, mixed public-card evidence, future-dated approvals, future-dated gate evaluations, mixed pack ids, zero-cost approval evidence, stale candidate-review timing, planned-only reviewed candidates, short candidate-review coverage, candidate-review metric/row-status drift, incoherent candidate-review disposition counts, production image promotion, canonical rule changes, V6 civic changes, or default gameplay exposure fail closed.
+- Approval evidence, candidate-review manifests, diversity reports, persistence reports, public cards, or release gates with secret-like fields, raw prompt instructions, hash drift, invalid pack ids, diversity evidence that excludes the release pack, metric-only diversity claims, mixed persistence evidence, mixed public-card evidence, future-dated approvals, future-dated gate evaluations, mixed pack ids, zero-cost approval evidence, stale candidate-review timing, planned-only reviewed candidates, short candidate-review coverage, candidate-review metric/row-status drift, approval-evidence/manifest candidate-count drift, incoherent candidate-review disposition counts, production image promotion, canonical rule changes, V6 civic changes, or default gameplay exposure fail closed.
 - Candidate-review and release-approval evidence validation reports redact submitted secret-looking keys, secret-looking values, raw-instruction keys, executable instruction values, manifest hashes, evidence hashes, and pack ids from content checks, schema-error paths, and measured evidence.
 - Production release-gate validation reports redact unsafe submitted release modes, prerequisite keys, blocking reasons, approval fields, and metric values from measured evidence.
 - `POST /api/world/generated-pack/release-gate` remains behind `FEATURE_WORLD_GRID_GENERATED_PACKS` and does not change canonical world-grid rules, V6 civic systems, pack visibility, or production image policy.
@@ -341,6 +341,7 @@ Player prompt
   "mixedPackApprovalEvidenceRejected": true,
   "candidateReviewManifestHashMatchesEvidence": true,
   "candidateReviewManifestTimeMatchesEvidence": true,
+  "candidateReviewManifestCountsMatchEvidence": true,
   "staleCandidateReviewEvidenceRejected": true,
   "releaseGateHashStable": true,
   "releaseEvidenceSourceHashCount": 7,
@@ -392,6 +393,7 @@ Player prompt
   "candidateAssetsReviewed": true,
   "candidateReviewDispositionCountsCoherent": true,
   "candidateReviewRowStatusCountsMatch": true,
+  "candidateReviewManifestCountsMatchEvidence": true,
   "humanReviewComplete": true,
   "publicReleaseEligibleRequiresAllPrerequisites": true
 }

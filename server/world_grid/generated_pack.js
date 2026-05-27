@@ -4745,6 +4745,11 @@ function buildProductionReleaseGate({
     && positiveNumberOrZero(candidateManifest?.createdAtMs) > 0
     && positiveNumberOrZero(evidence?.candidateReview?.reviewedAtMs) >= positiveNumberOrZero(candidateManifest.createdAtMs)
     && positiveNumberOrZero(evidence?.candidateReview?.reviewedAtMs) <= positiveNumberOrZero(evidence?.createdAtMs);
+  const candidateReviewManifestCountsMatchEvidence = candidateReviewManifestHashMatchesEvidence
+    && Number(candidateReviewManifestReport.metrics.expectedTargetCount || 0) === Number(approvalEvidenceReport.metrics.expectedTargetCount || 0)
+    && Number(candidateReviewManifestReport.metrics.reviewedCandidateCount || 0) === Number(approvalEvidenceReport.metrics.reviewedCandidateCount || 0)
+    && Number(candidateReviewManifestReport.metrics.approvedCandidateCount || 0) === positiveNumberOrZero(evidence?.candidateReview?.approvedCandidateCount)
+    && Number(candidateReviewManifestReport.metrics.rejectedCandidateCount || 0) === positiveNumberOrZero(evidence?.candidateReview?.rejectedCandidateCount);
   const approvals = approvalInputsFromEvidence(evidence, approvalEvidenceReport);
   const approvalEvidenceOk = approvalEvidenceReport.ok === true;
   const costConsentModelApproved = approvalEvidenceOk && approvalEvidenceReport.metrics.costConsentModelApproved === true;
@@ -4800,7 +4805,8 @@ function buildProductionReleaseGate({
       && approvalEvidenceReport.metrics.candidateAssetsReviewed === true
       && candidateReviewManifestReport.metrics.releaseReady === true
       && candidateReviewManifestHashMatchesEvidence
-      && candidateReviewManifestTimeMatchesEvidence,
+      && candidateReviewManifestTimeMatchesEvidence
+      && candidateReviewManifestCountsMatchEvidence,
     humanReviewComplete
   };
   const blockingReasons = Object.entries(releasePrerequisites)
@@ -4836,6 +4842,7 @@ function buildProductionReleaseGate({
       candidateReviewManifestRawInstructionCount: Number(candidateReviewManifestReport.metrics.rawInstructionPathCount || 0),
       candidateReviewManifestHashMatchesEvidence: candidateReviewManifestHashMatchesEvidence ? 1 : 0,
       candidateReviewManifestTimeMatchesEvidence: candidateReviewManifestTimeMatchesEvidence ? 1 : 0,
+      candidateReviewManifestCountsMatchEvidence: candidateReviewManifestCountsMatchEvidence ? 1 : 0,
       candidateReviewExpectedTargetCount: Number(approvalEvidenceReport.metrics.expectedTargetCount || 0),
       candidateReviewCoverageCount: Math.min(
         Number(approvalEvidenceReport.metrics.reviewedCandidateCount || 0),
@@ -4881,6 +4888,7 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
     && gate?.approvalEvidence?.packId === gate.packId;
   const candidateReviewManifestHashMatchesEvidence = Number(gate?.metrics?.candidateReviewManifestHashMatchesEvidence || 0) === 1;
   const candidateReviewManifestTimeMatchesEvidence = Number(gate?.metrics?.candidateReviewManifestTimeMatchesEvidence || 0) === 1;
+  const candidateReviewManifestCountsMatchEvidence = Number(gate?.metrics?.candidateReviewManifestCountsMatchEvidence || 0) === 1;
   const approvalEvidenceContractOk = approvalEvidenceReport.checks
     .filter((check) => [
       'RELEASE_APPROVAL_EVIDENCE_SCHEMA_VALID',
@@ -4958,6 +4966,7 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
           && approvals.candidateAssetsReviewed === true
           && Number(gate?.metrics?.candidateReviewManifestHashMatchesEvidence || 0) === 1
           && Number(gate?.metrics?.candidateReviewManifestTimeMatchesEvidence || 0) === 1
+          && Number(gate?.metrics?.candidateReviewManifestCountsMatchEvidence || 0) === 1
           && Number(gate?.metrics?.candidateReviewManifestSchemaErrorCount || 0) === 0
           && /^[0-9a-f]{64}$/.test(String(approvals.humanReviewSignoffHash || ''))
         ),
@@ -4978,7 +4987,10 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
         && Number(gate?.metrics?.approvalEvidenceRawInstructionCount || 0) === Number(approvalEvidenceReport.metrics.rawInstructionPathCount || 0)
         && Number(gate?.metrics?.approvalEvidenceHashMatches || 0) === (approvalEvidenceHashStable ? 1 : 0)
         && Number(gate?.metrics?.approvalEvidencePackIdMatches || 0) === (approvalEvidencePackIdMatchesGate ? 1 : 0)
-        && (!candidateReviewManifestHashMatchesEvidence || candidateReviewManifestTimeMatchesEvidence)
+        && (!candidateReviewManifestHashMatchesEvidence || (
+          candidateReviewManifestTimeMatchesEvidence
+          && candidateReviewManifestCountsMatchEvidence
+        ))
         && Number(gate?.metrics?.candidateReviewExpectedTargetCount || 0) === Number(approvalEvidenceReport.metrics.expectedTargetCount || 0)
         && Number(gate?.metrics?.candidateReviewCoverageCount || 0) <= Number(approvalEvidenceReport.metrics.reviewedCandidateCount || 0),
       measured: {
@@ -4987,6 +4999,7 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
         approvalEvidencePackIdMatchesGate,
         candidateReviewManifestHashMatchesEvidence,
         candidateReviewManifestTimeMatchesEvidence,
+        candidateReviewManifestCountsMatchEvidence,
         approvalEvidenceComplete: approvalEvidenceReport.ok === true,
         approvalInputsMatchEvidence,
         approvalEvidenceMetrics: approvalEvidenceReport.metrics,
