@@ -111,6 +111,9 @@ test('V6 public works store survives separate Node process restarts with conserv
     assert.equal(snapshot.replayReport.entryCount, 7);
     assert.equal(snapshot.replayReport.chainValid, true);
     assert.equal(snapshot.replayReport.privacySafe, true);
+    assert.equal(snapshot.replayReport.summaryComplete, true);
+    assert.equal(snapshot.replayReport.summaryCoverage.beforeAfterSummaryCount, 7);
+    assert.equal(snapshot.replayReport.summaryCoverage.hashOnlyFallbackCount, 0);
     assert.equal(snapshot.replayReport.appliesWorldState, false);
     assert.deepEqual(snapshot.summary.totalAccepted, { wood: 3, stone: 2, food: 0, coin: 6 });
     assert.deepEqual(snapshot.summary.cappedLoss, { wood: 8, stone: 1, food: 0, coin: 3 });
@@ -142,6 +145,7 @@ test('V6 public works store survives separate Node process restarts with conserv
     assert.equal(secondRetry.auditCount, 7);
     assert.equal(finalSnapshot.replayOk, true);
     assert.equal(finalSnapshot.replayReport.entryCount, 7);
+    assert.equal(finalSnapshot.replayReport.summaryCoverage.hashOnlyFallbackCount, 0);
     assert.equal(finalSnapshot.replayReport.latestEntryHash, snapshot.replayReport.latestEntryHash);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });

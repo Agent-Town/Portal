@@ -323,7 +323,8 @@ persistence resilience, and security/product release review.
   player-visible institution appears. Current research-only storage starts this
   in `server/world_civilization/institutions.js` with public-safe charters plus
   proposal/vote/moderation-gated charter amendment records and
-  `institution.charter_amendment.recorded` audit rows; release still requires
+  `institution.charter_amendment.recorded` audit rows carrying privacy-safe
+  before/after charter summaries; release still requires
   worker/tool integration, applied charter-change execution/rollback,
   release-reviewed templates, and public text rendering review. The M13
   research-only institution readiness gate in
@@ -337,7 +338,8 @@ persistence resilience, and security/product release review.
   progress, caps, rewards, and rollbacks across retries and restarts. Current
   research-only accounting starts this in
   `server/world_civilization/public_works.js` with proposal/vote/moderation-gated
-  project records plus capped contributions; release still requires
+  project records plus capped contributions and privacy-safe before/after
+  bundle summaries with no private-inventory/reward execution evidence; release still requires
   worker/tool enforcement, wallet/session route auth, explicit
   private-inventory spend, rollback execution, public surfaces, and reward
   conservation tests. The M14 research-only public works readiness gate in
@@ -385,9 +387,11 @@ persistence resilience, and security/product release review.
   `tests/world_civilization_delegation_process_restart.test.js` and now proves
   zero hash-only summary fallbacks for delegation lifecycle replay.
   Institution process restart coverage starts in
-  `tests/world_civilization_institution_process_restart.test.js`.
+  `tests/world_civilization_institution_process_restart.test.js` and now proves
+  zero hash-only summary fallbacks for institution replay.
   Public-works process restart coverage starts in
-  `tests/world_civilization_public_works_process_restart.test.js`.
+  `tests/world_civilization_public_works_process_restart.test.js` and now proves
+  zero hash-only summary fallbacks for shared-resource replay.
   Schema metadata coverage starts in
   `tests/world_civilization_schema_metadata.test.js`; current stores stamp
   v1 on-disk metadata and fail closed on unsupported SQLite `user_version` or

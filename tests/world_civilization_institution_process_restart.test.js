@@ -98,6 +98,9 @@ test('V6 institution store survives separate Node process restarts with charter 
     assert.equal(snapshot.replayReport.entryCount, 6);
     assert.equal(snapshot.replayReport.chainValid, true);
     assert.equal(snapshot.replayReport.privacySafe, true);
+    assert.equal(snapshot.replayReport.summaryComplete, true);
+    assert.equal(snapshot.replayReport.summaryCoverage.beforeAfterSummaryCount, 6);
+    assert.equal(snapshot.replayReport.summaryCoverage.hashOnlyFallbackCount, 0);
     assert.equal(snapshot.replayReport.appliesWorldState, false);
     assert.deepEqual(snapshot.replayReport.byActionType, {
       'institution.chartered': 2,
@@ -122,6 +125,7 @@ test('V6 institution store survives separate Node process restarts with charter 
     assert.equal(sandboxRetry.auditCount, 6);
     assert.equal(finalSnapshot.replayOk, true);
     assert.equal(finalSnapshot.replayReport.entryCount, 6);
+    assert.equal(finalSnapshot.replayReport.summaryCoverage.hashOnlyFallbackCount, 0);
     assert.equal(finalSnapshot.replayReport.latestEntryHash, snapshot.replayReport.latestEntryHash);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });

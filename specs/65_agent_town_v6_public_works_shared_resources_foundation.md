@@ -28,7 +28,9 @@ The process-level restart proof currently covers reopening the institution and
 public-works stores across separate Node process lifetimes, recording a
 proposal/vote/moderation-gated project, recording capped contributions,
 reconstructing privacy-safe audit replay, and proving exact retries do not
-append duplicate project, contribution, or audit rows.
+append duplicate project, contribution, or audit rows. The replay chain now
+carries store-specific privacy-safe before/after audit summaries and proves
+zero hash-only summary fallbacks for those public-works records.
 
 ## Data Model
 
@@ -96,6 +98,10 @@ Indexes cover project/status replay, institution replay, and contributor replay.
   `cosmeticRewardsOnly: true`, and `executionStatus: "not_executable"`.
 - Projects write `public_works.project.recorded` audit ledger entries;
   contributions write `public_works.contribution.recorded` audit ledger entries.
+- Project and contribution audit rows include privacy-safe before/after
+  summaries covering public project ids, goal/cap bundles, accepted/capped
+  bundles, project totals, route-closed status, and absence of private inventory
+  spend or reward execution.
 
 ## M14 Readiness Gate
 

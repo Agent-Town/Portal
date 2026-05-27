@@ -459,6 +459,7 @@ function buildStatements(db) {
 }
 
 function createInstitutionAuditEntry(institution, nowMs) {
+  const scopeRef = `${institution.scope.kind}:${institution.scope.targetId}`;
   return {
     schemaVersion: institution.schemaVersion,
     entryId: `audit_${institution.institutionId.replace(/^institution_/, 'institution_')}`,
@@ -468,6 +469,8 @@ function createInstitutionAuditEntry(institution, nowMs) {
     idempotencyKey: `idem_${institution.institutionId.replace(/^institution_/, 'inst_').slice(0, 80)}`,
     beforeHash: sha256(`agent-town.v6.civic.institution.absent:${institution.institutionId}`),
     afterHash: sha256(stableJson(institution)),
+    beforeSummary: `No civic institution existed for ${institution.institutionId} in ${scopeRef}.`,
+    afterSummary: `Chartered institution ${institution.institutionId} for ${scopeRef} with ${institution.proposalTypes.length} proposal types, voting rule ${institution.votingRuleId}, and no player-visible mechanics.`,
     createdAtMs: nowMs,
     migrationVersion: MIGRATION_VERSION,
     replayable: true,
@@ -515,6 +518,8 @@ function createCharterAmendmentAuditEntry({ amendment, institution, actor, nowMs
       amendment,
       status: INSTITUTION_AMENDMENT_STATUS_RECORDED
     })),
+    beforeSummary: `Institution ${institution.institutionId} retained active charter ${institution.charterId} with status ${institution.status}.`,
+    afterSummary: `Recorded charter amendment ${amendment.amendmentId} toward ${amendment.newCharterId} from proposal ${amendment.proposalId}; active charter was not applied.`,
     createdAtMs: nowMs,
     migrationVersion: MIGRATION_VERSION,
     replayable: true,

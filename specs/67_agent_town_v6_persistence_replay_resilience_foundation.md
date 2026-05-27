@@ -127,13 +127,18 @@ fallbacks for those participation records.
 process-level evidence to civic institution charters: separate processes record
 public-works and sandbox-policy charters, reconstruct privacy-safe audit replay,
 and prove exact retries do not append duplicate institution or audit rows after
-restart.
+restart. The institution replay chain now carries store-specific privacy-safe
+before/after audit summaries and proves zero hash-only summary fallbacks for
+those institution records.
 
 `tests/world_civilization_public_works_process_restart.test.js` extends the
 process-level evidence to shared public-works accounting: separate processes
 reopen the required institution and public-works stores, record capped
 contributions, reconstruct privacy-safe audit replay, and prove exact retries
-do not append duplicate contribution or audit rows after restart.
+do not append duplicate contribution or audit rows after restart. The
+public-works replay chain now carries store-specific privacy-safe before/after
+audit summaries and proves zero hash-only summary fallbacks for those
+shared-resource records.
 
 `tests/world_civilization_schema_metadata.test.js` proves every current civic
 store exposes v1 schema metadata to the resilience report and rejects version

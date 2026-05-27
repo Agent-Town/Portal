@@ -27,7 +27,9 @@ The process-level restart proof currently covers separate public-works and
 sandbox-policy charters, a proposal/vote/moderation-gated charter amendment,
 privacy-safe audit replay reconstruction, and exact retry idempotency across
 separate Node process lifetimes without exposing player-visible institution
-surfaces.
+surfaces. The replay chain now carries store-specific privacy-safe before/after
+audit summaries and proves zero hash-only summary fallbacks for those
+institution records.
 
 ## Data Model
 
@@ -92,6 +94,9 @@ Indexes cover institution/status replay, proposal replay, and requester replay.
 - Institution charters write `institution.chartered` audit ledger entries;
   charter amendments write `institution.charter_amendment.recorded` audit rows
   without applying the replacement charter.
+- Institution audit rows include privacy-safe before/after summaries covering
+  public scope, proposal-type counts, voting rule, active charter, amendment
+  target, and non-application of player-visible mechanics or charter changes.
 
 ## M13 Readiness Gate
 

@@ -249,6 +249,11 @@ test('V6 institution store records chartered institutions without player-visible
   assert.equal(audit.entry.actionType, 'institution.chartered');
   assert.equal(audit.entry.actor.accountId, 'acct_v6_human_001');
   assert.equal(audit.entry.objectRef, 'institution_bridge_council_001');
+  assert.match(audit.entry.beforeSummary, /No civic institution existed/);
+  assert.match(audit.entry.afterSummary, /2 proposal types/);
+  assert.match(audit.entry.afterSummary, /no player-visible mechanics/);
+  assert.equal(audit.entry.beforeSummary.includes('Hash-only'), false);
+  assert.equal(audit.entry.afterSummary.includes('Hash-only'), false);
 }));
 
 test('V6 institution store is idempotent by institution and rejects duplicate scope charters', () => withTempInstitutionStore(({ auditLedger, store }) => {
@@ -387,6 +392,11 @@ test('V6 institution charter amendments require proposal vote and moderation evi
   const audit = auditLedger.getByEntryId('audit_charteramend_bridge_council_001');
   assert.equal(audit.entry.actionType, 'institution.charter_amendment.recorded');
   assert.equal(audit.entry.actor.accountId, 'acct_v6_voter_001');
+  assert.match(audit.entry.beforeSummary, /retained active charter charter_bridge_council_001/);
+  assert.match(audit.entry.afterSummary, /toward charter_bridge_council_002/);
+  assert.match(audit.entry.afterSummary, /active charter was not applied/);
+  assert.equal(audit.entry.beforeSummary.includes('Hash-only'), false);
+  assert.equal(audit.entry.afterSummary.includes('Hash-only'), false);
   assert.deepEqual(
     auditLedger.replay().map((entry) => entry.entry.actionType),
     [

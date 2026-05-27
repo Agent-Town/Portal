@@ -560,6 +560,11 @@ function bundleFromTotals(row) {
   });
 }
 
+function formatBundleForAudit(bundle = {}) {
+  const normalized = normalizeBundle(bundle);
+  return RESOURCE_KEYS.map((key) => `${key}:${normalized[key]}`).join(' ');
+}
+
 function createContributionAuditEntry({ contribution, acceptedBundle, cappedBundle, projectTotalBefore, projectTotalAfter, nowMs }) {
   return {
     schemaVersion: contribution.schemaVersion,
@@ -573,6 +578,8 @@ function createContributionAuditEntry({ contribution, acceptedBundle, cappedBund
     idempotencyKey: contribution.idempotencyKey,
     beforeHash: sha256(stableJson({ projectId: contribution.projectId, total: projectTotalBefore })),
     afterHash: sha256(stableJson({ contribution, acceptedBundle, cappedBundle, projectTotalAfter })),
+    beforeSummary: `Public works project ${contribution.projectId} totals before ${contribution.contributionId}: ${formatBundleForAudit(projectTotalBefore)}.`,
+    afterSummary: `Recorded contribution ${contribution.contributionId}; accepted ${formatBundleForAudit(acceptedBundle)}, capped ${formatBundleForAudit(cappedBundle)}, total ${formatBundleForAudit(projectTotalAfter)}; no private inventory spend or reward was executed.`,
     createdAtMs: nowMs,
     migrationVersion: MIGRATION_VERSION,
     replayable: true,
@@ -621,6 +628,8 @@ function createProjectAuditEntry({ project, institution, actor, nowMs }) {
       status: PROJECT_STATUS_RECORDED,
       institutionScopeTargetId: institution.scopeTargetId
     })),
+    beforeSummary: `No public works project ${project.projectId} existed for institution ${project.institutionId}.`,
+    afterSummary: `Recorded public works project ${project.projectId} for ${institution.scopeTargetId} with goal ${formatBundleForAudit(project.goalBundle)} and per-contribution cap ${formatBundleForAudit(project.perContributionCap)}; public contribution routes remain closed.`,
     createdAtMs: nowMs,
     migrationVersion: MIGRATION_VERSION,
     replayable: true,

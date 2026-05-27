@@ -336,6 +336,10 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /M13 Civic institutions and charters \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/institutions\.js/);
   assert.match(plan, /proposal\/vote\/moderation-gated charter amendment/);
+  assert.match(plan, /privacy-safe before\/after charter summaries/);
+  assert.match(institutionSpec, /privacy-safe before\/after summaries/);
+  assert.match(institutionSource, /beforeSummary/);
+  assert.match(institutionSource, /afterSummary/);
   assert.match(plan, /buildV6CivicInstitutionReadinessGate\(\)/);
   assert.match(plan, /charter-change execution\/rollback/);
   assert.match(plan, /public-world, public-works, sandbox-policy, institution-charter, and service-policy templates/);
@@ -351,6 +355,10 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /M14 Public works and shared resources integration \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/public_works\.js/);
   assert.match(plan, /proposal\/vote\/moderation-gated public works project/);
+  assert.match(plan, /privacy-safe before\/after bundle summaries/);
+  assert.match(publicWorksSpec, /privacy-safe before\/after audit summaries/);
+  assert.match(publicWorksSource, /beforeSummary/);
+  assert.match(publicWorksSource, /afterSummary/);
   assert.match(plan, /buildV6PublicWorksReadinessGate\(\)/);
   assert.match(plan, /explicit inventory-spend authorization/);
   assert.match(plan, /no public free play/);
@@ -398,6 +406,8 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(persistenceSpec, /zero hash-only summary fallbacks for\s+those privacy records/);
   assert.match(persistenceSpec, /zero hash-only summary fallbacks for those rollback records/);
   assert.match(persistenceSpec, /zero hash-only summary\s+fallbacks for those participation records/);
+  assert.match(persistenceSpec, /zero\s+hash-only summary fallbacks for\s+those institution records/);
+  assert.match(persistenceSpec, /zero\s+hash-only summary fallbacks for those\s+shared-resource records/);
   assert.match(persistenceSpec, /missing-summary denial/);
   assert.match(auditSpec, /beforeSummary/);
   assert.match(auditSpec, /hash-only fallbacks/);

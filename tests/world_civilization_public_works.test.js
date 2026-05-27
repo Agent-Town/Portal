@@ -323,7 +323,13 @@ test('V6 public works projects require proposal vote and moderation evidence bef
       'public_works.contribution.recorded'
     ]
   );
-  assert.equal(auditLedger.getByEntryId('audit_publicworks_governed_bridge_001').entry.actor.accountId, 'acct_v6_voter_001');
+  const projectAudit = auditLedger.getByEntryId('audit_publicworks_governed_bridge_001').entry;
+  assert.equal(projectAudit.actor.accountId, 'acct_v6_voter_001');
+  assert.match(projectAudit.beforeSummary, /No public works project/);
+  assert.match(projectAudit.afterSummary, /goal wood:10 stone:5 food:0 coin:20/);
+  assert.match(projectAudit.afterSummary, /public contribution routes remain closed/);
+  assert.equal(projectAudit.beforeSummary.includes('Hash-only'), false);
+  assert.equal(projectAudit.afterSummary.includes('Hash-only'), false);
 }));
 
 test('V6 public works project records enforce idempotency and governance prerequisites', () => withTempGovernedPublicWorksStore(({
@@ -489,6 +495,12 @@ test('V6 public works store records capped shared contributions without private 
   assert.equal(audit.entry.actionType, 'public_works.contribution.recorded');
   assert.equal(audit.entry.actor.accountId, 'acct_v6_contributor_001');
   assert.equal(audit.entry.objectRef, 'contribution_bridge_001');
+  assert.match(audit.entry.beforeSummary, /totals before contribution_bridge_001: wood:0 stone:0 food:0 coin:0/);
+  assert.match(audit.entry.afterSummary, /accepted wood:2 stone:1 food:0 coin:5/);
+  assert.match(audit.entry.afterSummary, /capped wood:8 stone:1 food:0 coin:3/);
+  assert.match(audit.entry.afterSummary, /no private inventory spend or reward was executed/);
+  assert.equal(audit.entry.beforeSummary.includes('Hash-only'), false);
+  assert.equal(audit.entry.afterSummary.includes('Hash-only'), false);
 }));
 
 test('V6 public works store enforces idempotency and contributor caps', () => withTempPublicWorksStore(({
