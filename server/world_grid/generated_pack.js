@@ -4829,6 +4829,11 @@ function buildReleaseEvidenceBundle({
     && stableEvidenceHash(gate.approvalEvidence) === sourceHashes.approvalEvidence;
   const candidateReviewManifestHashMatchesEvidence = Boolean(candidateReviewManifest?.manifestHash)
     && candidateReviewManifest.manifestHash === gateApprovalEvidence?.candidateReview?.candidateManifestHash;
+  const candidateReviewManifestTimeMatchesEvidence = candidateReviewManifestHashMatchesEvidence
+    && positiveNumberOrZero(candidateReviewManifest?.createdAtMs) > 0
+    && positiveNumberOrZero(gateApprovalEvidence?.candidateReview?.reviewedAtMs) >= positiveNumberOrZero(candidateReviewManifest.createdAtMs)
+    && positiveNumberOrZero(gateApprovalEvidence?.candidateReview?.reviewedAtMs) <= positiveNumberOrZero(gateApprovalEvidence?.createdAtMs)
+    && Number(gate?.metrics?.candidateReviewManifestTimeMatchesEvidence || 0) === 1;
   const bundle = {
     schemaVersion: RELEASE_EVIDENCE_BUNDLE_VERSION,
     bundleHash: '',
@@ -4860,6 +4865,7 @@ function buildReleaseEvidenceBundle({
       releaseGatePublicEligible: gate?.publicReleaseEligible === true,
       approvalEvidenceHashMatchesGate,
       candidateReviewManifestHashMatchesEvidence,
+      candidateReviewManifestTimeMatchesEvidence,
       productionImageAssetCount: Number(gate?.metrics?.productionImageAssetCount || 0),
       privateDataLeakCount: Number(gate?.metrics?.privateDataLeakCount || 0)
     }
@@ -4949,6 +4955,12 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     ? candidateReviewManifest.manifestHash === (approvalEvidence || releaseGate?.approvalEvidence || {})?.candidateReview?.candidateManifestHash
       && bundle?.sourceHashes?.candidateReviewManifest === stableEvidenceHash(candidateReviewManifest)
     : false;
+  const reviewEvidence = approvalEvidence || releaseGate?.approvalEvidence || {};
+  const candidateReviewManifestTimeMatchesEvidence = candidateReviewManifestHashMatchesEvidence
+    && positiveNumberOrZero(candidateReviewManifest?.createdAtMs) > 0
+    && positiveNumberOrZero(reviewEvidence?.candidateReview?.reviewedAtMs) >= positiveNumberOrZero(candidateReviewManifest.createdAtMs)
+    && positiveNumberOrZero(reviewEvidence?.candidateReview?.reviewedAtMs) <= positiveNumberOrZero(reviewEvidence?.createdAtMs)
+    && (!releaseGate || Number(releaseGate?.metrics?.candidateReviewManifestTimeMatchesEvidence || 0) === 1);
   const constraints = bundle?.constraints || {};
   const boundaryPreserved = constraints.productionImageAssetsCreated === false
     && constraints.externalProviderPrivateDataStored === false
@@ -4966,7 +4978,8 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     && bundle?.metrics?.releaseGateValid === (gateReport.ok === true)
     && bundle?.metrics?.releaseGatePublicEligible === (bundle?.publicReleaseEligible === true)
     && bundle?.metrics?.approvalEvidenceHashMatchesGate === approvalEvidenceHashMatchesGate
-    && bundle?.metrics?.candidateReviewManifestHashMatchesEvidence === candidateReviewManifestHashMatchesEvidence;
+    && bundle?.metrics?.candidateReviewManifestHashMatchesEvidence === candidateReviewManifestHashMatchesEvidence
+    && bundle?.metrics?.candidateReviewManifestTimeMatchesEvidence === candidateReviewManifestTimeMatchesEvidence;
   const checks = [
     {
       id: 'RELEASE_EVIDENCE_BUNDLE_SCHEMA_VALID',
@@ -5020,7 +5033,8 @@ function validateReleaseEvidenceBundle(bundle = {}, {
         sourceHashProblemCount: sourceHashProblems.length,
         sourcePackIdProblemCount: sourcePackIdProblems.length,
         approvalEvidenceHashMatchesGate,
-        candidateReviewManifestHashMatchesEvidence
+        candidateReviewManifestHashMatchesEvidence,
+        candidateReviewManifestTimeMatchesEvidence
       }
     },
     {

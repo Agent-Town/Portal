@@ -177,6 +177,7 @@
         "releaseGatePublicEligible",
         "approvalEvidenceHashMatchesGate",
         "candidateReviewManifestHashMatchesEvidence",
+        "candidateReviewManifestTimeMatchesEvidence",
         "productionImageAssetCount",
         "privateDataLeakCount"
       ],
@@ -190,6 +191,7 @@
         "releaseGatePublicEligible": { "type": "boolean" },
         "approvalEvidenceHashMatchesGate": { "type": "boolean" },
         "candidateReviewManifestHashMatchesEvidence": { "type": "boolean" },
+        "candidateReviewManifestTimeMatchesEvidence": { "type": "boolean" },
         "productionImageAssetCount": { "type": "integer", "minimum": 0 },
         "privateDataLeakCount": { "type": "integer", "minimum": 0 }
       }

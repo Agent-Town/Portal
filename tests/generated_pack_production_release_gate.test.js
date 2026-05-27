@@ -394,7 +394,36 @@ test('GU-19 release evidence bundle binds a ready gate to source evidence hashes
   assert.equal(bundle.metrics.releaseGatePublicEligible, true);
   assert.equal(bundle.metrics.approvalEvidenceHashMatchesGate, true);
   assert.equal(bundle.metrics.candidateReviewManifestHashMatchesEvidence, true);
+  assert.equal(bundle.metrics.candidateReviewManifestTimeMatchesEvidence, true);
   assert.equal(bundle.constraints.productionImageAssetsCreated, false);
+}));
+
+test('GU-19 release evidence bundle rejects candidate-review time-order metric tampering', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_evidence_bundle_candidate_time',
+    prompt: 'mirror orchard station with canal lantern couriers',
+    nowMs: 154_900
+  });
+  const bundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    nowMs: 154_950
+  });
+  const tamperedBundle = {
+    ...bundle,
+    metrics: {
+      ...bundle.metrics,
+      candidateReviewManifestTimeMatchesEvidence: false
+    }
+  };
+  const report = validateReleaseEvidenceBundle(tamperedBundle, fixture);
+
+  assert.equal(bundle.metrics.candidateReviewManifestHashMatchesEvidence, true);
+  assert.equal(bundle.metrics.candidateReviewManifestTimeMatchesEvidence, true);
+  assert.equal(report.ok, false);
+  assert.equal(
+    report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,
+    false
+  );
 }));
 
 test('GU-19 release evidence bundle rejects source drift and missing ready-gate evidence', () => withTempGeneratedPackStore(() => {
