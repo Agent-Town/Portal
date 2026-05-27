@@ -16,12 +16,17 @@ const { createCivicReputationStore } = require('../server/world_civilization/rep
 const { createCivicVoteStore } = require('../server/world_civilization/votes');
 const {
   REQUIRED_RELEASE_GAPS,
+  REQUIRED_RESILIENCE_EVIDENCE_CHECKS,
+  REQUIRED_RESILIENCE_READINESS_CHECKS,
+  REQUIRED_RESILIENCE_STORE_KEYS,
   V6_CIVIC_LOAD_RATE_COVERAGE,
   V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE,
   V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE,
   V6_CIVIC_RESILIENCE_STORES,
   assertV6ResilienceBaseline,
-  buildV6ResilienceBaselineReport
+  assertV6ResilienceReadinessGateSafe,
+  buildV6ResilienceBaselineReport,
+  buildV6ResilienceReadinessGate
 } = require('../server/world_civilization/resilience');
 
 function withTempCivicStores(fn) {
@@ -74,6 +79,30 @@ function withTempCivicStores(fn) {
     auditLedger.close();
     fs.rmSync(dir, { recursive: true, force: true });
   }
+}
+
+function resilienceReadinessEvidence(overrides = {}) {
+  return {
+    status: 'complete',
+    executionStatus: 'not_executable',
+    runtimeExposed: false,
+    playerVisible: false,
+    normalGameplayExposure: false,
+    mutatesWorldState: false,
+    appliesRollback: false,
+    appliesMigration: false,
+    exposesPrivateData: false,
+    processRestartCoverageComplete: true,
+    replayReconstructionReleaseReady: true,
+    migrationUpgradeDowngradeReviewed: true,
+    loadRateReviewed: true,
+    rollbackRecoveryReviewed: true,
+    backupRestoreReviewed: true,
+    privacySafeReplayReviewed: true,
+    checks: [...REQUIRED_RESILIENCE_EVIDENCE_CHECKS],
+    storeKeys: [...REQUIRED_RESILIENCE_STORE_KEYS],
+    ...overrides
+  };
 }
 
 test('V6 resilience report is hidden without explicit research opt-in and V6 flag', () => {
@@ -173,4 +202,144 @@ test('V6 resilience assertion fails closed for missing store evidence and releas
   assert.match(result.errors.join(','), /V6_RESILIENCE_STORE_EVIDENCE_INVALID:audit_ledger/);
   assert.match(result.errors.join(','), /V6_RESILIENCE_STORE_EVIDENCE_INVALID:proposals/);
   assert.match(result.errors.join(','), /V6_RESILIENCE_STORE_EVIDENCE_INVALID:public_works/);
+});
+
+test('V6 resilience readiness gate is hidden without explicit research opt-in and V6 flag', () => {
+  const withoutResearchOptIn = buildV6ResilienceReadinessGate({
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: resilienceReadinessEvidence()
+  });
+  const broadV5Override = buildV6ResilienceReadinessGate({
+    includeResearchResilienceReadiness: true,
+    featureFlags: parseWorldGridFeatureFlags('all'),
+    evidence: resilienceReadinessEvidence()
+  });
+
+  for (const report of [withoutResearchOptIn, broadV5Override]) {
+    assert.equal(report.available, false);
+    assert.equal(report.researchReady, false);
+    assert.equal(report.releaseReady, false);
+    assert.equal(report.failClosed, true);
+    assert.equal(report.runtimeExposed, false);
+    assert.equal(report.playerVisible, false);
+    assert.equal(report.normalGameplayExposure, false);
+    assert.equal(report.mutatesWorldState, false);
+    assert.equal(report.appliesRollback, false);
+    assert.equal(report.appliesMigration, false);
+    assert.equal(report.exposesPrivateData, false);
+    assert.deepEqual(report.checks, []);
+    assert.deepEqual(assertV6ResilienceReadinessGateSafe(report), { ok: true, errors: [] });
+  }
+});
+
+test('V6 resilience readiness gate records restart replay migration load and rollback evidence without execution', () => {
+  const report = buildV6ResilienceReadinessGate({
+    includeResearchResilienceReadiness: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    source: 'node_test',
+    evidence: resilienceReadinessEvidence()
+  });
+
+  assert.equal(report.available, true);
+  assert.equal(report.source, 'node_test');
+  assert.equal(report.researchReady, true);
+  assert.equal(report.releaseReady, false);
+  assert.equal(report.failClosed, false);
+  assert.equal(report.runtimeExposed, false);
+  assert.equal(report.playerVisible, false);
+  assert.equal(report.normalGameplayExposure, false);
+  assert.equal(report.mutatesWorldState, false);
+  assert.equal(report.appliesRollback, false);
+  assert.equal(report.appliesMigration, false);
+  assert.equal(report.exposesPrivateData, false);
+  assert.equal(report.executionStatus, 'not_executable');
+  assert.deepEqual(report.checks.map((entry) => entry.key), REQUIRED_RESILIENCE_READINESS_CHECKS);
+  assert.equal(report.evidence.ok, true);
+  assert.deepEqual(report.evidence.missingChecks, []);
+  assert.deepEqual(report.evidence.missingStoreKeys, []);
+  assert.deepEqual(report.evidence.requiredStoreKeys, REQUIRED_RESILIENCE_STORE_KEYS);
+  assert.deepEqual(assertV6ResilienceReadinessGateSafe(report), { ok: true, errors: [] });
+});
+
+test('V6 resilience readiness gate fails closed without migration load rollback and store evidence', () => {
+  const report = buildV6ResilienceReadinessGate({
+    includeResearchResilienceReadiness: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: resilienceReadinessEvidence({
+      checks: REQUIRED_RESILIENCE_EVIDENCE_CHECKS.filter((check) => (
+        check !== 'migration_upgrade_scripts'
+        && check !== 'production_load_rate_targets'
+        && check !== 'typed_rollback_execution_recovery'
+        && check !== 'backup_restore_rehearsal'
+      )),
+      storeKeys: REQUIRED_RESILIENCE_STORE_KEYS.filter((key) => key !== 'public_works'),
+      migrationUpgradeDowngradeReviewed: false,
+      loadRateReviewed: false,
+      rollbackRecoveryReviewed: false,
+      backupRestoreReviewed: false
+    })
+  });
+
+  assert.equal(report.available, true);
+  assert.equal(report.researchReady, false);
+  assert.equal(report.failClosed, true);
+  assert.deepEqual(report.evidence.missingChecks, [
+    'migration_upgrade_scripts',
+    'backup_restore_rehearsal',
+    'production_load_rate_targets',
+    'typed_rollback_execution_recovery'
+  ]);
+  assert.deepEqual(report.evidence.missingStoreKeys, ['public_works']);
+  assert.deepEqual(report.errors, [
+    'RESILIENCE_EVIDENCE_REQUIRED',
+    'RESILIENCE_MIGRATION_UPGRADE_DOWNGRADE_REQUIRED',
+    'RESILIENCE_LOAD_RATE_REQUIRED',
+    'RESILIENCE_ROLLBACK_RECOVERY_REQUIRED',
+    'RESILIENCE_BACKUP_RESTORE_REQUIRED'
+  ]);
+  assert.deepEqual(assertV6ResilienceReadinessGateSafe(report), { ok: true, errors: [] });
+});
+
+test('V6 resilience readiness assertion rejects fake executable migration rollback or private-data readiness', () => {
+  const report = buildV6ResilienceReadinessGate({
+    includeResearchResilienceReadiness: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: resilienceReadinessEvidence()
+  });
+  const unsafe = {
+    ...report,
+    runtimeExposed: true,
+    playerVisible: true,
+    normalGameplayExposure: true,
+    mutatesWorldState: true,
+    appliesRollback: true,
+    appliesMigration: true,
+    exposesPrivateData: true,
+    releaseReady: true,
+    executionStatus: 'executes',
+    evidence: {
+      ...report.evidence,
+      runtimeExposed: true,
+      playerVisible: true,
+      normalGameplayExposure: true,
+      mutatesWorldState: true,
+      appliesRollback: true,
+      appliesMigration: true,
+      exposesPrivateData: true
+    }
+  };
+  const result = assertV6ResilienceReadinessGateSafe(unsafe);
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(','), /V6_RESILIENCE_READINESS_RUNTIME_HIDDEN_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_RESILIENCE_READINESS_PLAYER_HIDDEN_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_RESILIENCE_READINESS_NORMAL_GAMEPLAY_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_RESILIENCE_READINESS_WORLD_MUTATION_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_RESILIENCE_READINESS_ROLLBACK_APPLICATION_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_RESILIENCE_READINESS_MIGRATION_APPLICATION_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_RESILIENCE_READINESS_PRIVATE_DATA_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_RESILIENCE_READINESS_NON_EXECUTING_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_RESILIENCE_READINESS_RELEASE_READY_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_RESILIENCE_READINESS_EVIDENCE_MIGRATION_APPLICATION_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_RESILIENCE_READINESS_EVIDENCE_PRIVATE_DATA_FORBIDDEN/);
 });

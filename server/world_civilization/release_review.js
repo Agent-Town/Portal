@@ -121,7 +121,8 @@ const REQUIRED_REVIEW_GATES = [
       'agent_participation_enforcement_gate',
       'institution_readiness_gate',
       'public_works_readiness_gate',
-      'lab_readiness_gate'
+      'lab_readiness_gate',
+      'resilience_readiness_gate'
     ],
     signoffRequired: true
   },
@@ -302,6 +303,43 @@ const REQUIRED_REVIEW_GATES = [
       'runtime_tool_absence',
       'normal_gameplay_exposure_denial',
       'private_debug_data_exclusion'
+    ],
+    signoffRequired: true
+  },
+  {
+    key: 'resilience_readiness_review',
+    label: 'Persistence replay resilience readiness review',
+    owner: 'engineering_security',
+    requiredArtifacts: [
+      RELEASE_REVIEW_ARTIFACT,
+      'specs/67_agent_town_v6_persistence_replay_resilience_foundation.md',
+      'server/world_civilization/resilience.js',
+      'server/world_civilization/replay_reconstruction.js',
+      'server/world_civilization/migration_rehearsal.js',
+      'server/world_civilization/rollback_recovery.js',
+      'tests/world_civilization_resilience.test.js',
+      'tests/world_civilization_replay_reconstruction.test.js',
+      'tests/world_civilization_migration_rehearsal.test.js',
+      'tests/world_civilization_load_rate.test.js',
+      'tests/world_civilization_rollback_recovery.test.js'
+    ],
+    requiredChecks: [
+      'all_civic_store_restart_probes',
+      'audit_replay_reconstruction',
+      'privacy_safe_replay_summaries',
+      'hash_chain_integrity',
+      'migration_upgrade_scripts',
+      'migration_downgrade_scripts',
+      'unsupported_upgrade_downgrade_fail_closed',
+      'backup_restore_rehearsal',
+      'migration_load_replay_rehearsal',
+      'production_load_rate_targets',
+      'multi_process_write_contention',
+      'idempotency_duplicate_retry_bursts',
+      'rollback_handle_reconstruction',
+      'typed_rollback_execution_recovery',
+      'private_data_exclusion',
+      'no_effect_application_during_replay'
     ],
     signoffRequired: true
   },

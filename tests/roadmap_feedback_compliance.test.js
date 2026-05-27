@@ -152,6 +152,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   const institutionSource = read('server/world_civilization/institutions.js');
   const publicWorksSource = read('server/world_civilization/public_works.js');
   const labSource = read('server/world_civilization/lab_surface.js');
+  const resilienceSource = read('server/world_civilization/resilience.js');
   const requiredMilestones = [
     'M0 Hardened V5 world-grid baseline',
     'M1 Living V6 milestone contract',
@@ -320,8 +321,13 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /research-scale replay pagination plus duplicate retry bursts/);
   assert.match(plan, /tests\/world_civilization_rollback_recovery\.test\.js/);
   assert.match(plan, /prepared rollback-handle reconstruction after reopen/);
+  assert.match(plan, /buildV6ResilienceReadinessGate\(\)/);
+  assert.match(plan, /migration upgrade\/downgrade scripts/);
   assert.match(plan, /process restart probes now cover audit-ledger, proposal\/vote, reputation record\/dispute, moderation decision\/review, effect\/rollback, delegation, institution, and public-works/);
   assert.match(gate, /server\/world_civilization\/resilience\.js/);
+  assert.match(gate, /M16 research-only resilience readiness gate/);
+  assert.match(gate, /appliesMigration: false/);
+  assert.match(gate, /appliesRollback: false/);
   assert.match(gate, /tests\/world_civilization_schema_metadata\.test\.js/);
   assert.match(gate, /unsupported SQLite `user_version`/);
   assert.match(gate, /server\/world_civilization\/migration_rehearsal\.js/);
@@ -340,6 +346,10 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(gate, /tests\/world_civilization_public_works_process_restart\.test\.js/);
   assert.match(gate, /These current probes cover every current civic store at research scale/);
   assert.match(gate, /Release still requires release-grade process restart coverage/);
+  assert.match(persistenceSpec, /buildV6ResilienceReadinessGate\(\)/);
+  assert.match(resilienceSource, /REQUIRED_RESILIENCE_EVIDENCE_CHECKS/);
+  assert.match(resilienceSource, /typed_rollback_execution_recovery/);
+  assert.match(resilienceSource, /V6_RESILIENCE_READINESS_RELEASE_READY_FORBIDDEN/);
   assert.match(plan, /M17 Security and product release review \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/release_review\.js/);
   assert.match(plan, /store-backed delegation proof and scope-mismatch evidence/);
@@ -353,24 +363,31 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /civic institution readiness review/);
   assert.match(plan, /public works readiness review/);
   assert.match(plan, /lab readiness gate/);
+  assert.match(plan, /resilience readiness review/);
+  assert.match(plan, /resilience readiness gate/);
   assert.match(gate, /modal lab\s+surface (launch )?review/);
   assert.match(gate, /effect\s+execution and rollback review/);
   assert.match(gate, /agent participation enforcement review/);
   assert.match(gate, /civic\s+institution readiness review/);
   assert.match(gate, /public works readiness review/);
+  assert.match(gate, /resilience readiness review/);
   assert.match(gate, /Worker-first V6 civic tools must pass the exposure gate/);
   assert.match(releaseReview, /lab readiness gate/);
+  assert.match(releaseReview, /resilience readiness gate/);
   assert.match(releaseReview, /browser visual 390\/768\/1280 coverage/);
   assert.match(releaseReview, /Civic institution readiness review/);
   assert.match(releaseReview, /institution readiness gate/);
   assert.match(releaseReview, /Public works readiness review/);
   assert.match(releaseReview, /public works readiness gate/);
+  assert.match(releaseReview, /Persistence replay resilience readiness review/);
   assert.match(skillLine, /M13 readiness gate/);
   assert.match(skillLine, /civic institution readiness review/);
   assert.match(skillLine, /M14 readiness gate/);
   assert.match(skillLine, /public works readiness review/);
   assert.match(skillLine, /M15 readiness gate/);
   assert.match(skillLine, /normal gameplay exposure denial/);
+  assert.match(skillLine, /M16 readiness gate/);
+  assert.match(skillLine, /resilience readiness review/);
   assert.match(plan, /M18 V6 controlled release completion \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/controlled_release\.js/);
   assert.match(gate, /server\/world_civilization\/controlled_release\.js/);

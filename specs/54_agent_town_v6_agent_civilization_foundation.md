@@ -173,12 +173,25 @@ The companion reconstruction helper in
 `server/world_civilization/replay_reconstruction.js` rebuilds privacy-safe audit
 summaries from replay rows without applying world state.
 
+The research-only M16 resilience readiness gate in
+`server/world_civilization/resilience.js` records release evidence required
+before persistence/replay/resilience can be promoted: all civic store restart
+probes, audit replay reconstruction, privacy-safe summaries, hash-chain
+integrity, migration upgrade/downgrade scripts, unsupported transition denial,
+backup/restore rehearsal, production load/rate targets, multi-process write
+contention, duplicate retry bursts, rollback handle reconstruction, typed
+rollback execution recovery, private-data exclusion, and no effect application
+during replay. It remains hidden and non-executing with `releaseReady: false`,
+`appliesMigration: false`, `appliesRollback: false`,
+`mutatesWorldState: false`, and `executionStatus: "not_executable"`.
+
 The research-only release review gate in
 `server/world_civilization/release_review.js` names the threat model, privacy,
 abuse-case, data-retention, audit coverage, validation, effect execution and
 rollback review, agent participation enforcement review, civic institution
 readiness review, public works readiness review, worker tool surface review,
-modal lab surface review, and product signoff requirements that must be
+modal lab surface review, resilience readiness review, and product signoff
+requirements that must be
 complete before normal gameplay exposure.
 
 The research-only controlled release gate in

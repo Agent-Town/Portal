@@ -115,7 +115,14 @@ gate below has implementation, deterministic tests, and security/product signoff
   `tests/world_civilization_institution_process_restart.test.js`;
   public-works process restart coverage starts in
   `tests/world_civilization_public_works_process_restart.test.js`;
-  all replay probes must remain privacy-safe and non-executing.
+  all replay probes must remain privacy-safe and non-executing. The M16
+  research-only resilience readiness gate may also exist in
+  `server/world_civilization/resilience.js`, but it must stay hidden,
+  non-executing, fail closed, and require explicit restart/replay,
+  hash-chain, migration upgrade/downgrade, backup/restore, load/rate,
+  rollback, privacy, and no-effect-application evidence while keeping
+  `appliesMigration: false`, `appliesRollback: false`,
+  `mutatesWorldState: false`, and `executionStatus: "not_executable"`.
 - The research-only release review gate may exist in
   `server/world_civilization/release_review.js`, but it must keep V6 hidden
   from runtime/player surfaces until threat model, privacy review, abuse-case
@@ -356,6 +363,17 @@ gate below has implementation, deterministic tests, and security/product signoff
   `tests/world_civilization_migration_rehearsal.test.js`; current v1 metadata can
   be inventoried and unsupported upgrade/downgrade targets fail closed without
   executing migration scripts.
+  The M16 research-only resilience readiness gate in
+  `server/world_civilization/resilience.js` must require all civic store
+  restart probes, audit replay reconstruction, privacy-safe replay summaries,
+  hash-chain integrity, migration upgrade/downgrade scripts, unsupported
+  transition denial, backup/restore rehearsal, migration load replay rehearsal,
+  production load/rate targets, multi-process write contention, duplicate retry
+  bursts, rollback handle reconstruction, typed rollback execution recovery,
+  private-data exclusion, and no effect application during replay while keeping
+  `releaseReady: false`, `appliesMigration: false`,
+  `appliesRollback: false`, `mutatesWorldState: false`, and
+  `executionStatus: "not_executable"`.
   These current probes cover every current civic store at research scale.
   Release still requires release-grade process restart coverage, larger replay
   reconstruction, migration scripts with upgrade/downgrade proofs, load/rate,
@@ -369,7 +387,7 @@ gate below has implementation, deterministic tests, and security/product signoff
   policy, audit coverage review, deterministic validation evidence, effect
   execution and rollback review, agent participation enforcement review, civic
   institution readiness review, public works readiness review, modal lab surface
-  review, and product signoff.
+  review, resilience readiness review, and product signoff.
 - Controlled release completion must remain a final go/no-go gate, not an
   automatic enablement path. Current gate tracking starts in
   `server/world_civilization/controlled_release.js` and

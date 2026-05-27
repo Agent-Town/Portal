@@ -189,6 +189,62 @@ test('V6 release review blocks signoff without lab visual accessibility and runt
   assert.deepEqual(assertV6ReleaseReviewSafe(report), { ok: true, errors: [] });
 });
 
+test('V6 release review requires persistence replay resilience readiness evidence', () => {
+  const resilienceGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'resilience_readiness_review');
+  const validationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'validation_evidence');
+
+  assert.equal(resilienceGate.owner, 'engineering_security');
+  assert.ok(resilienceGate.requiredArtifacts.includes('specs/67_agent_town_v6_persistence_replay_resilience_foundation.md'));
+  assert.ok(resilienceGate.requiredArtifacts.includes('server/world_civilization/resilience.js'));
+  assert.ok(resilienceGate.requiredArtifacts.includes('server/world_civilization/replay_reconstruction.js'));
+  assert.ok(resilienceGate.requiredArtifacts.includes('server/world_civilization/migration_rehearsal.js'));
+  assert.ok(resilienceGate.requiredArtifacts.includes('server/world_civilization/rollback_recovery.js'));
+  assert.ok(resilienceGate.requiredArtifacts.includes('tests/world_civilization_resilience.test.js'));
+  assert.ok(resilienceGate.requiredChecks.includes('all_civic_store_restart_probes'));
+  assert.ok(resilienceGate.requiredChecks.includes('audit_replay_reconstruction'));
+  assert.ok(resilienceGate.requiredChecks.includes('privacy_safe_replay_summaries'));
+  assert.ok(resilienceGate.requiredChecks.includes('hash_chain_integrity'));
+  assert.ok(resilienceGate.requiredChecks.includes('migration_upgrade_scripts'));
+  assert.ok(resilienceGate.requiredChecks.includes('migration_downgrade_scripts'));
+  assert.ok(resilienceGate.requiredChecks.includes('backup_restore_rehearsal'));
+  assert.ok(resilienceGate.requiredChecks.includes('production_load_rate_targets'));
+  assert.ok(resilienceGate.requiredChecks.includes('multi_process_write_contention'));
+  assert.ok(resilienceGate.requiredChecks.includes('typed_rollback_execution_recovery'));
+  assert.ok(resilienceGate.requiredChecks.includes('private_data_exclusion'));
+  assert.ok(resilienceGate.requiredChecks.includes('no_effect_application_during_replay'));
+  assert.ok(validationGate.requiredChecks.includes('resilience_readiness_gate'));
+  assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_resilience.test.js'));
+});
+
+test('V6 release review blocks signoff without migration load rollback and backup evidence', () => {
+  const evidence = Object.fromEntries(REQUIRED_REVIEW_GATES.map((gate) => [gate.key, completeEvidenceFor(gate)]));
+  evidence.resilience_readiness_review = {
+    ...evidence.resilience_readiness_review,
+    checks: evidence.resilience_readiness_review.checks.filter((check) => (
+      check !== 'migration_upgrade_scripts'
+      && check !== 'production_load_rate_targets'
+      && check !== 'typed_rollback_execution_recovery'
+      && check !== 'backup_restore_rehearsal'
+    ))
+  };
+  const report = buildV6ReleaseReviewReport({
+    includeResearchReview: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence
+  });
+  const resilienceGate = report.gateReports.find((gate) => gate.key === 'resilience_readiness_review');
+
+  assert.equal(report.releaseReady, false);
+  assert.equal(resilienceGate.ok, false);
+  assert.deepEqual(resilienceGate.missingChecks, [
+    'migration_upgrade_scripts',
+    'backup_restore_rehearsal',
+    'production_load_rate_targets',
+    'typed_rollback_execution_recovery'
+  ]);
+  assert.deepEqual(assertV6ReleaseReviewSafe(report), { ok: true, errors: [] });
+});
+
 test('V6 release review requires worker tool exposure evidence', () => {
   const workerGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'worker_tool_surface_review');
   const validationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'validation_evidence');

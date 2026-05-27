@@ -43,7 +43,7 @@ are present.
   evidence, including civic mutation security, delegated-agent proof, and
   governance preflight, effect execution gate, and agent participation
   enforcement gate, institution readiness gate, and public works readiness gate
-  and lab readiness gate contract coverage.
+  and lab readiness gate and resilience readiness gate contract coverage.
 - Effect execution and rollback review: typed apply handlers, typed rollback
   handlers, real before/after state, authorization enforcement, idempotent
   apply/rollback behavior, irreversible-action review, conservation tests,
@@ -79,6 +79,14 @@ are present.
   coverage at 390/768/1280 widths, keyboard accessibility, focus trap review,
   runtime tool absence, normal gameplay exposure denial, and private debug-data
   exclusion before any internal V6 lab surface can become visible.
+- Persistence replay resilience readiness review: all civic store restart
+  probes, audit replay reconstruction, privacy-safe replay summaries,
+  hash-chain integrity, migration upgrade/downgrade scripts, unsupported
+  transition denial, backup/restore rehearsal, migration load replay rehearsal,
+  production load/rate targets, multi-process write contention, duplicate retry
+  bursts, rollback handle reconstruction, typed rollback execution recovery,
+  private-data exclusion, and no effect application during replay before M16
+  can claim release-grade resilience.
 - Product release signoff: player-visible scope, rollback plan, support runbook,
   and disable plan.
 

@@ -145,6 +145,32 @@ effect store and audit ledger, the recovery report can reconstruct the
 available rollback handle, confirm the matching redacted prepared-action audit
 row, reject expired handles, and remain non-executing.
 
+## M16 Readiness Gate
+
+`buildV6ResilienceReadinessGate()` records the non-executing M16 resilience
+readiness gate. It is available only with explicit V6 research opt-in and it
+does not apply migrations, execute rollback, mutate world state, expose private
+data, expose runtime tools, or create a player-visible V6 surface.
+
+The readiness gate requires evidence for:
+
+- All current civic store restart probes.
+- Audit replay reconstruction with hash-chain continuity.
+- Privacy-safe replay summaries and private-data exclusion.
+- Migration upgrade/downgrade scripts and unsupported transition denial.
+- Backup/restore and migration load replay rehearsal.
+- Production load/rate targets, multi-process write contention, duplicate
+  retry bursts, and idempotency conflict rejection.
+- Rollback handle reconstruction and typed rollback execution recovery review.
+- No effect application during replay.
+
+The gate is intentionally stricter than the current baseline report. It can
+be `researchReady: true` only when all evidence is supplied, but it always keeps
+`releaseReady: false`, `executionStatus: "not_executable"`,
+`appliesMigration: false`, `appliesRollback: false`, and
+`mutatesWorldState: false` until release-grade storage, migration, replay,
+backup/restore, load/rate, and rollback execution are implemented and tested.
+
 ## Open Release Gaps
 
 M16 remains incomplete until all of these gates close:
