@@ -4508,6 +4508,18 @@ function releasePersistenceSourcePassed(persistenceReport = null, packId = '') {
     && releasePersistencePassed(persistenceReport);
 }
 
+function releasePublicCardSourcePassed(publicCard = null, packId = '') {
+  const targetPackId = String(packId || '');
+  if (!targetPackId || !publicCard || typeof publicCard !== 'object') return false;
+  const report = validatePublicPackCard(publicCard, {});
+  return report.ok === true
+    && publicCard.packId === targetPackId
+    && publicCard?.moderation?.status === 'passed'
+    && publicCard?.moderation?.rawPromptIncluded === false
+    && Number(publicCard?.moderation?.privateDataLeakCount || 0) === 0
+    && Number(publicCard?.moderation?.blockedFieldCount || 0) === 0;
+}
+
 function buildProductionReleaseGate({
   pack = {},
   playtestReport = null,
@@ -4966,6 +4978,7 @@ function buildReleaseEvidenceBundle({
   const gateEvaluatedAtMs = positiveNumberOrZero(gate?.evaluatedAtMs);
   const playtestSourcePassed = releasePlaytestSourcePassed(playtestReport, pack || {});
   const persistenceSourcePassed = releasePersistenceSourcePassed(persistenceReport || {}, bundlePackId);
+  const publicCardSourcePassed = releasePublicCardSourcePassed(publicCard || {}, bundlePackId);
   const diversitySourceIncludesGatePack = releaseDiversityIncludesPack(diversityReport || {}, bundlePackId);
   const diversitySourceMetricsCoherent = releaseDiversityPassed(diversityReport || {})
     && releaseDiversityMetricsCoherent(diversityReport || {});
@@ -4977,6 +4990,7 @@ function buildReleaseEvidenceBundle({
       prerequisiteSnapshotMatchesGate
       && playtestSourcePassed
       && persistenceSourcePassed
+      && publicCardSourcePassed
       && diversitySourceIncludesGatePack
       && diversitySourceMetricsCoherent
       && approvalEvidenceHashMatchesGate
@@ -5019,6 +5033,7 @@ function buildReleaseEvidenceBundle({
       readyEvidenceSourcesMatchGate,
       playtestSourcePassed,
       persistenceSourcePassed,
+      publicCardSourcePassed,
       diversitySourceIncludesGatePack,
       diversitySourceMetricsCoherent,
       approvalEvidenceHashMatchesGate,
@@ -5113,6 +5128,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     : bundle?.publicReleaseEligible !== true;
   const playtestSourcePassed = releasePlaytestSourcePassed(playtestReport, pack || {});
   const persistenceSourcePassed = releasePersistenceSourcePassed(persistenceReport || {}, bundle?.packId || releaseGate?.packId || pack?.packId || '');
+  const publicCardSourcePassed = releasePublicCardSourcePassed(publicCard || {}, bundle?.packId || releaseGate?.packId || pack?.packId || '');
   const diversitySourceIncludesGatePack = diversityReport
     ? releaseDiversityIncludesPack(diversityReport, bundle?.packId || releaseGate?.packId || pack?.packId || '')
     : false;
@@ -5148,6 +5164,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
       prerequisiteSnapshotMatchesGate
       && playtestSourcePassed
       && persistenceSourcePassed
+      && publicCardSourcePassed
       && diversitySourceIncludesGatePack
       && diversitySourceMetricsCoherent
       && approvalEvidenceHashMatchesGate
@@ -5179,6 +5196,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     && bundle?.metrics?.prerequisiteSnapshotMatchesGate === prerequisiteSnapshotMatchesGate
     && bundle?.metrics?.playtestSourcePassed === playtestSourcePassed
     && bundle?.metrics?.persistenceSourcePassed === persistenceSourcePassed
+    && bundle?.metrics?.publicCardSourcePassed === publicCardSourcePassed
     && bundle?.metrics?.diversitySourceIncludesGatePack === diversitySourceIncludesGatePack
     && bundle?.metrics?.diversitySourceMetricsCoherent === diversitySourceMetricsCoherent
     && bundle?.metrics?.readyEvidenceSourcesMatchGate === readyEvidenceSourcesMatchGate
@@ -5244,6 +5262,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
         prerequisiteSnapshotMatchesGate,
         playtestSourcePassed,
         persistenceSourcePassed,
+        publicCardSourcePassed,
         diversitySourceIncludesGatePack,
         diversitySourceMetricsCoherent,
         readyEvidenceSourcesMatchGate,

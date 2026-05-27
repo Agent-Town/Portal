@@ -25,6 +25,7 @@ const {
   recordPlaytestReport,
   reloadGeneratedPack,
   validatePlaytestReport,
+  validatePublicPackCard,
   validateReleaseApprovalEvidence,
   validateReleaseEvidenceBundle,
   validateProductionReleaseGate
@@ -484,6 +485,7 @@ test('GU-19 release evidence bundle binds a ready gate to source evidence hashes
   assert.equal(bundle.metrics.readyEvidenceSourcesMatchGate, true);
   assert.equal(bundle.metrics.playtestSourcePassed, true);
   assert.equal(bundle.metrics.persistenceSourcePassed, true);
+  assert.equal(bundle.metrics.publicCardSourcePassed, true);
   assert.equal(bundle.metrics.diversitySourceIncludesGatePack, true);
   assert.equal(bundle.metrics.diversitySourceMetricsCoherent, true);
   assert.equal(bundle.metrics.approvalEvidenceHashMatchesGate, true);
@@ -836,6 +838,46 @@ test('GU-19 release evidence bundle rejects persistence source evidence that doe
   assert.equal(failingPersistenceReport.packId, fixture.pack.packId);
   assert.equal(bundle.metrics.sourceHashMismatchCount, 0);
   assert.equal(bundle.metrics.persistenceSourcePassed, false);
+  assert.equal(bundle.metrics.readyEvidenceSourcesMatchGate, false);
+  assert.equal(report.ok, false);
+  assert.equal(
+    report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_SOURCE_HASHES_MATCH').passed,
+    true
+  );
+  assert.equal(
+    report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,
+    false
+  );
+}));
+
+test('GU-19 release evidence bundle rejects public-card source evidence that does not support the ready gate', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_evidence_bundle_bad_public_card_source',
+    prompt: 'green pier archive with careful kite lanterns',
+    nowMs: 160_250
+  });
+  const failingPublicCard = {
+    ...fixture.publicCard,
+    screenshot: {
+      ...fixture.publicCard.screenshot,
+      present: false
+    }
+  };
+  const bundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    publicCard: failingPublicCard,
+    nowMs: 161_000
+  });
+  const report = validateReleaseEvidenceBundle(bundle, {
+    ...fixture,
+    publicCard: failingPublicCard
+  });
+
+  assert.equal(validatePublicPackCard(failingPublicCard, {}).ok, false);
+  assert.equal(failingPublicCard.packId, fixture.pack.packId);
+  assert.equal(fixture.releaseGate.publicReleaseEligible, true);
+  assert.equal(bundle.metrics.sourceHashMismatchCount, 0);
+  assert.equal(bundle.metrics.publicCardSourcePassed, false);
   assert.equal(bundle.metrics.readyEvidenceSourcesMatchGate, false);
   assert.equal(report.ok, false);
   assert.equal(
