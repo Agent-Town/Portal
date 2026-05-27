@@ -4520,6 +4520,16 @@ function releasePublicCardSourcePassed(publicCard = null, packId = '') {
     && Number(publicCard?.moderation?.blockedFieldCount || 0) === 0;
 }
 
+function releaseCandidateReviewManifestSourcePassed(candidateReviewManifest = null, pack = {}) {
+  if (!candidateReviewManifest || typeof candidateReviewManifest !== 'object') return false;
+  const targetPackId = String(pack?.packId || '');
+  if (!targetPackId || candidateReviewManifest.packId !== targetPackId) return false;
+  const report = validateCandidateReviewManifest(candidateReviewManifest, pack || {});
+  return report.ok === true
+    && report.metrics?.releaseReady === true
+    && Number(report.metrics?.productionImageAssetCount || 0) === 0;
+}
+
 function buildProductionReleaseGate({
   pack = {},
   playtestReport = null,
@@ -4979,6 +4989,7 @@ function buildReleaseEvidenceBundle({
   const playtestSourcePassed = releasePlaytestSourcePassed(playtestReport, pack || {});
   const persistenceSourcePassed = releasePersistenceSourcePassed(persistenceReport || {}, bundlePackId);
   const publicCardSourcePassed = releasePublicCardSourcePassed(publicCard || {}, bundlePackId);
+  const candidateReviewManifestSourcePassed = releaseCandidateReviewManifestSourcePassed(candidateReviewManifest, pack || {});
   const diversitySourceIncludesGatePack = releaseDiversityIncludesPack(diversityReport || {}, bundlePackId);
   const diversitySourceMetricsCoherent = releaseDiversityPassed(diversityReport || {})
     && releaseDiversityMetricsCoherent(diversityReport || {});
@@ -4994,6 +5005,7 @@ function buildReleaseEvidenceBundle({
       && diversitySourceIncludesGatePack
       && diversitySourceMetricsCoherent
       && approvalEvidenceHashMatchesGate
+      && candidateReviewManifestSourcePassed
       && candidateReviewManifestHashMatchesEvidence
       && candidateReviewManifestTimeMatchesEvidence
     );
@@ -5037,6 +5049,7 @@ function buildReleaseEvidenceBundle({
       diversitySourceIncludesGatePack,
       diversitySourceMetricsCoherent,
       approvalEvidenceHashMatchesGate,
+      candidateReviewManifestSourcePassed,
       candidateReviewManifestHashMatchesEvidence,
       candidateReviewManifestTimeMatchesEvidence,
       productionImageAssetCount: Number(gate?.metrics?.productionImageAssetCount || 0),
@@ -5129,6 +5142,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
   const playtestSourcePassed = releasePlaytestSourcePassed(playtestReport, pack || {});
   const persistenceSourcePassed = releasePersistenceSourcePassed(persistenceReport || {}, bundle?.packId || releaseGate?.packId || pack?.packId || '');
   const publicCardSourcePassed = releasePublicCardSourcePassed(publicCard || {}, bundle?.packId || releaseGate?.packId || pack?.packId || '');
+  const candidateReviewManifestSourcePassed = releaseCandidateReviewManifestSourcePassed(candidateReviewManifest, pack || {});
   const diversitySourceIncludesGatePack = diversityReport
     ? releaseDiversityIncludesPack(diversityReport, bundle?.packId || releaseGate?.packId || pack?.packId || '')
     : false;
@@ -5168,6 +5182,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
       && diversitySourceIncludesGatePack
       && diversitySourceMetricsCoherent
       && approvalEvidenceHashMatchesGate
+      && candidateReviewManifestSourcePassed
       && candidateReviewManifestHashMatchesEvidence
       && candidateReviewManifestTimeMatchesEvidence
     );
@@ -5202,6 +5217,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     && bundle?.metrics?.readyEvidenceSourcesMatchGate === readyEvidenceSourcesMatchGate
     && readyEvidenceSourcesMatchGate === true
     && bundle?.metrics?.approvalEvidenceHashMatchesGate === approvalEvidenceHashMatchesGate
+    && bundle?.metrics?.candidateReviewManifestSourcePassed === candidateReviewManifestSourcePassed
     && bundle?.metrics?.candidateReviewManifestHashMatchesEvidence === candidateReviewManifestHashMatchesEvidence
     && bundle?.metrics?.candidateReviewManifestTimeMatchesEvidence === candidateReviewManifestTimeMatchesEvidence;
   const checks = [
@@ -5263,6 +5279,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
         playtestSourcePassed,
         persistenceSourcePassed,
         publicCardSourcePassed,
+        candidateReviewManifestSourcePassed,
         diversitySourceIncludesGatePack,
         diversitySourceMetricsCoherent,
         readyEvidenceSourcesMatchGate,

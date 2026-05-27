@@ -30,7 +30,7 @@ Status: prototype-gated
 - Production image generation requires explicit consent and a documented cost/auth model before any user-facing release claim.
 - Public release eligibility must come from the standalone `productionReleaseGate` report, which fails closed unless the gate uses a valid generated-pack id and every prerequisite, diversity evidence including the release pack, diversity metrics coherent with per-pack rows/signatures/screenshots/comparisons, same-pack persistence proof, same-pack public-card proof, explicit approval, candidate review, human signoff, and non-future gate evaluation timestamp is present.
 - Release approval evidence must be hash-bound, match the current generated pack id, contain timestamp-coherent approval events, and remain candidate-only; stale hashes, future-dated approvals, candidate reviews that predate their manifest, planned-only candidate approvals, or evidence copied from another pack cannot unlock production readiness.
-- Release evidence bundles must be created at or after the bound release gate evaluation time, must not be future-dated relative to validation time, and must bind ready evidence sources, playtest-source validation, persistence-source validation, public-card-source validation, diversity-source pack inclusion/coherence, blocking reasons, and prerequisite snapshots back to the release gate; failing playtest sources, failing persistence sources, failing public-card sources, approval evidence drift, or copied diversity reports from another suite fail validation even when supplied source hashes are stable.
+- Release evidence bundles must be created at or after the bound release gate evaluation time, must not be future-dated relative to validation time, and must bind ready evidence sources, playtest-source validation, persistence-source validation, public-card-source validation, candidate-review manifest source validation, diversity-source pack inclusion/coherence, blocking reasons, and prerequisite snapshots back to the release gate; failing playtest sources, failing persistence sources, failing public-card sources, failing candidate-review manifest sources, approval evidence drift, or copied diversity reports from another suite fail validation even when supplied source hashes are stable.
 - Release-gate and release-evidence-bundle API requests must reject secret-like fields, raw prompt instructions, and oversized/noisy evidence bodies before report construction; rejection responses may include counts, paths, and limits, but not submitted evidence values.
 
 ## Release Gate
@@ -164,6 +164,8 @@ Status: prototype-gated
   "fallbackVerified": true,
   "releaseEvidencePublicCardSourcePassed": true,
   "releaseEvidenceFailingPublicCardSourceRejected": true,
+  "releaseEvidenceCandidateReviewManifestSourcePassed": true,
+  "releaseEvidenceFailingCandidateReviewManifestSourceRejected": true,
   "humanReviewComplete": true,
   "publicReleaseEligible": true
 }

@@ -25,6 +25,7 @@ const {
   recordPlaytestReport,
   reloadGeneratedPack,
   validatePlaytestReport,
+  validateCandidateReviewManifest,
   validatePublicPackCard,
   validateReleaseApprovalEvidence,
   validateReleaseEvidenceBundle,
@@ -489,6 +490,7 @@ test('GU-19 release evidence bundle binds a ready gate to source evidence hashes
   assert.equal(bundle.metrics.diversitySourceIncludesGatePack, true);
   assert.equal(bundle.metrics.diversitySourceMetricsCoherent, true);
   assert.equal(bundle.metrics.approvalEvidenceHashMatchesGate, true);
+  assert.equal(bundle.metrics.candidateReviewManifestSourcePassed, true);
   assert.equal(bundle.metrics.candidateReviewManifestHashMatchesEvidence, true);
   assert.equal(bundle.metrics.candidateReviewManifestTimeMatchesEvidence, true);
   assert.equal(bundle.constraints.productionImageAssetsCreated, false);
@@ -878,6 +880,53 @@ test('GU-19 release evidence bundle rejects public-card source evidence that doe
   assert.equal(fixture.releaseGate.publicReleaseEligible, true);
   assert.equal(bundle.metrics.sourceHashMismatchCount, 0);
   assert.equal(bundle.metrics.publicCardSourcePassed, false);
+  assert.equal(bundle.metrics.readyEvidenceSourcesMatchGate, false);
+  assert.equal(report.ok, false);
+  assert.equal(
+    report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_SOURCE_HASHES_MATCH').passed,
+    true
+  );
+  assert.equal(
+    report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,
+    false
+  );
+}));
+
+test('GU-19 release evidence bundle rejects candidate-review manifest source evidence that does not support the ready gate', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_evidence_bundle_bad_candidate_review_source',
+    prompt: 'cobalt station garden with careful rail archivists',
+    nowMs: 161_050
+  });
+  const failingCandidateReviewManifest = {
+    ...fixture.candidateReviewManifest,
+    candidates: fixture.candidateReviewManifest.candidates.map((candidate, index) => (
+      index === 0
+        ? {
+            ...candidate,
+            byteLength: 0
+          }
+        : candidate
+    ))
+  };
+  const bundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    candidateReviewManifest: failingCandidateReviewManifest,
+    nowMs: 161_800
+  });
+  const report = validateReleaseEvidenceBundle(bundle, {
+    ...fixture,
+    candidateReviewManifest: failingCandidateReviewManifest
+  });
+
+  assert.equal(validateCandidateReviewManifest(failingCandidateReviewManifest, fixture.pack).ok, false);
+  assert.equal(failingCandidateReviewManifest.packId, fixture.pack.packId);
+  assert.equal(failingCandidateReviewManifest.manifestHash, fixture.releaseGate.approvalEvidence.candidateReview.candidateManifestHash);
+  assert.equal(fixture.releaseGate.publicReleaseEligible, true);
+  assert.equal(bundle.metrics.sourceHashMismatchCount, 0);
+  assert.equal(bundle.metrics.candidateReviewManifestHashMatchesEvidence, true);
+  assert.equal(bundle.metrics.candidateReviewManifestTimeMatchesEvidence, true);
+  assert.equal(bundle.metrics.candidateReviewManifestSourcePassed, false);
   assert.equal(bundle.metrics.readyEvidenceSourcesMatchGate, false);
   assert.equal(report.ok, false);
   assert.equal(
