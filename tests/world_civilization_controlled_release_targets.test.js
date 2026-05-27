@@ -45,7 +45,15 @@ test('V6 controlled release targets name every launch control surface', () => {
   assert.equal(matrix.targetCount, V6_CONTROLLED_RELEASE_TARGETS.length);
   assert.ok(matrix.targetKeys.includes('readiness_gate_closed'));
   assert.ok(matrix.targetKeys.includes('production_flag_safety'));
+  assert.equal(
+    V6_CONTROLLED_RELEASE_TARGETS.find((target) => target.key === 'production_flag_safety').currentEvidence,
+    'server/world_civilization/release_operations.js'
+  );
   assert.ok(matrix.targetKeys.includes('rollback_disable_controls'));
+  assert.equal(
+    V6_CONTROLLED_RELEASE_TARGETS.find((target) => target.key === 'rollback_disable_controls').currentEvidence,
+    'server/world_civilization/release_operations.js'
+  );
   assert.ok(matrix.targetKeys.includes('observability'));
   assert.equal(
     V6_CONTROLLED_RELEASE_TARGETS.find((target) => target.key === 'observability').currentEvidence,
@@ -58,10 +66,23 @@ test('V6 controlled release targets name every launch control surface', () => {
   );
   assert.ok(matrix.targetKeys.includes('blocker_clearance'));
   assert.ok(matrix.targetKeys.includes('controlled_release_window'));
+  assert.equal(
+    V6_CONTROLLED_RELEASE_TARGETS.find((target) => target.key === 'controlled_release_window').currentEvidence,
+    'server/world_civilization/release_operations.js'
+  );
+  assert.ok(matrix.targetKeys.includes('canary_exit'));
+  assert.equal(
+    V6_CONTROLLED_RELEASE_TARGETS.find((target) => target.key === 'canary_exit').currentEvidence,
+    'server/world_civilization/release_operations.js'
+  );
   assert.ok(matrix.targetKeys.includes('emergency_disable'));
   assert.equal(
+    V6_CONTROLLED_RELEASE_TARGETS.find((target) => target.key === 'emergency_disable').currentEvidence,
+    'server/world_civilization/release_operations.js'
+  );
+  assert.equal(
     V6_CONTROLLED_RELEASE_TARGETS.find((target) => target.key === 'post_release_verification').currentEvidence,
-    'server/world_civilization/release_observability.js'
+    'server/world_civilization/release_operations.js'
   );
   assert.equal(
     V6_CONTROLLED_RELEASE_TARGETS.find((target) => target.key === 'blocker_clearance').currentEvidence,

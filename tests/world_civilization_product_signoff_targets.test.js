@@ -50,7 +50,15 @@ test('V6 product signoff targets name every release decision surface', () => {
   assert.ok(matrix.targetKeys.includes('qa_release_evidence'));
   assert.ok(matrix.targetKeys.includes('security_release_evidence'));
   assert.ok(matrix.targetKeys.includes('rollback_plan'));
+  assert.equal(
+    V6_PRODUCT_SIGNOFF_TARGETS.find((target) => target.key === 'rollback_plan').currentEvidence,
+    'server/world_civilization/release_operations.js'
+  );
   assert.ok(matrix.targetKeys.includes('disable_plan'));
+  assert.equal(
+    V6_PRODUCT_SIGNOFF_TARGETS.find((target) => target.key === 'disable_plan').currentEvidence,
+    'server/world_civilization/release_operations.js'
+  );
   assert.ok(matrix.targetKeys.includes('support_runbook'));
   assert.equal(
     V6_PRODUCT_SIGNOFF_TARGETS.find((target) => target.key === 'support_runbook').currentEvidence,
@@ -68,8 +76,12 @@ test('V6 product signoff targets name every release decision surface', () => {
   );
   assert.ok(matrix.targetKeys.includes('go_no_go_record'));
   assert.equal(
+    V6_PRODUCT_SIGNOFF_TARGETS.find((target) => target.key === 'go_no_go_record').currentEvidence,
+    'server/world_civilization/release_operations.js'
+  );
+  assert.equal(
     V6_PRODUCT_SIGNOFF_TARGETS.find((target) => target.key === 'post_release_monitoring').currentEvidence,
-    'server/world_civilization/release_observability.js'
+    'server/world_civilization/release_operations.js'
   );
   assert.match(matrix.digest, /^sha256:[a-f0-9]{64}$/);
 });

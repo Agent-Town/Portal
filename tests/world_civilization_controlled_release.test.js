@@ -19,6 +19,8 @@ const {
   CONTROLLED_RELEASE_RUNBOOK,
   RELEASE_OBSERVABILITY_ARTIFACT,
   RELEASE_OBSERVABILITY_TEST,
+  RELEASE_OPERATIONS_ARTIFACT,
+  RELEASE_OPERATIONS_TEST,
   RELEASE_SUPPORT_ARTIFACT,
   RELEASE_SUPPORT_TEST,
   PRIOR_MILESTONE_KEYS,
@@ -143,6 +145,8 @@ test('V6 controlled release requires target gate evidence for launch controls', 
   assert.ok(targetGate.requiredArtifacts.includes(BLOCKER_EXCEPTION_REGISTER_TEST));
   assert.ok(targetGate.requiredArtifacts.includes(RELEASE_OBSERVABILITY_ARTIFACT));
   assert.ok(targetGate.requiredArtifacts.includes(RELEASE_OBSERVABILITY_TEST));
+  assert.ok(targetGate.requiredArtifacts.includes(RELEASE_OPERATIONS_ARTIFACT));
+  assert.ok(targetGate.requiredArtifacts.includes(RELEASE_OPERATIONS_TEST));
   assert.ok(targetGate.requiredArtifacts.includes(RELEASE_SUPPORT_ARTIFACT));
   assert.ok(targetGate.requiredArtifacts.includes(RELEASE_SUPPORT_TEST));
   assert.ok(targetGate.requiredArtifacts.includes(CONTROLLED_RELEASE_TARGET_ARTIFACT));
@@ -151,6 +155,7 @@ test('V6 controlled release requires target gate evidence for launch controls', 
   assert.ok(targetGate.requiredChecks.includes('production_flag_safety_target'));
   assert.ok(targetGate.requiredChecks.includes('rollback_disable_target'));
   assert.ok(targetGate.requiredChecks.includes('observability_target'));
+  assert.ok(targetGate.requiredChecks.includes('release_operations_target'));
   assert.ok(targetGate.requiredChecks.includes('support_runbook_target'));
   assert.ok(targetGate.requiredChecks.includes('blocker_clearance_target'));
   assert.ok(targetGate.requiredChecks.includes('controlled_release_window_target'));
@@ -193,6 +198,22 @@ test('V6 controlled release requires target gate evidence for launch controls', 
   assert.ok(supportGate.requiredChecks.includes('privacy_safe_support_view'));
   assert.ok(supportGate.requiredChecks.includes('blocker_register_link'));
   assert.ok(supportGate.requiredChecks.includes('observability_link'));
+
+  const operationsGate = REQUIRED_CONTROLLED_RELEASE_GATES.find((gate) => gate.key === 'release_operations');
+  assert.ok(operationsGate.requiredArtifacts.includes(RELEASE_OPERATIONS_ARTIFACT));
+  assert.ok(operationsGate.requiredArtifacts.includes(RELEASE_OPERATIONS_TEST));
+  assert.ok(operationsGate.requiredChecks.includes('release_operations_gate'));
+  assert.ok(operationsGate.requiredChecks.includes('production_flag_control'));
+  assert.ok(operationsGate.requiredChecks.includes('release_window'));
+  assert.ok(operationsGate.requiredChecks.includes('go_no_go_record'));
+  assert.ok(operationsGate.requiredChecks.includes('canary_scope'));
+  assert.ok(operationsGate.requiredChecks.includes('canary_exit'));
+  assert.ok(operationsGate.requiredChecks.includes('emergency_disable'));
+  assert.ok(operationsGate.requiredChecks.includes('rollback_disable_drill'));
+  assert.ok(operationsGate.requiredChecks.includes('post_release_verification'));
+  assert.ok(operationsGate.requiredChecks.includes('normal_gameplay_baseline'));
+  assert.ok(operationsGate.requiredChecks.includes('audit_replay_health_check'));
+  assert.ok(operationsGate.requiredChecks.includes('evidence_archive'));
 });
 
 test('V6 controlled release can only become ready after prior milestones, release review, and controls close', () => {

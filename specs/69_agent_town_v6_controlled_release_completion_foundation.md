@@ -9,6 +9,7 @@ Runtime contracts:
 - `server/world_civilization/readiness_gate.js`
 - `server/world_civilization/blocker_exception_register.js`
 - `server/world_civilization/release_observability.js`
+- `server/world_civilization/release_operations.js`
 - `server/world_civilization/release_support.js`
 - `server/world_civilization/controlled_release.js`
 - `server/world_civilization/controlled_release_targets.js`
@@ -44,6 +45,11 @@ release or enabling production.
   carries the M16/M17 audit-summary proof checks.
 - Production feature flag safety.
 - Rollback and disable controls.
+- Release operations gate covering production flag control, release window,
+  go/no-go record, canary scope, canary exit, emergency disable, rollback
+  window, rollback/disable drill, post-release verification, normal gameplay
+  baseline, audit/replay health check, and evidence archive while remaining
+  non-executing and production-disabled.
 - Release observability through the release observability handoff, including
   privacy-safe audit metrics, redacted Worker Traffic traces, error alert
   owners, feature flag dashboard ownership, runtime tool absence monitoring,
@@ -56,7 +62,9 @@ release or enabling production.
   P0/P1 clearance, no expired exceptions, owner/expiry/mitigation records,
   security dependency review, QA signoff, product signoff, and private-data
   exclusion.
-- Controlled release window.
+- Controlled release window, canary exit, emergency disable, post-release
+  verification, normal gameplay baseline, audit/replay health, and evidence
+  archive.
 
 ## Release Rule
 

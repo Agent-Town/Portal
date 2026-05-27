@@ -18,6 +18,7 @@ const REQUIRED_CONTROLLED_RELEASE_TARGET_GAPS = [
   'admin_enablement_signoff_required',
   'rollback_disable_rehearsal_required',
   'privacy_safe_observability_owner_required',
+  'controlled_release_operations_required',
   'support_oncall_signoff_required',
   'blocker_clearance_required',
   'controlled_release_go_no_go_required'
@@ -35,14 +36,14 @@ const V6_CONTROLLED_RELEASE_TARGETS = [
     key: 'production_flag_safety',
     surface: 'production_v6_feature_flag',
     requiredEvidence: 'Production enablement must stay default-off, admin-only, canary-scoped, broad-override-proof, and emergency-disableable.',
-    currentEvidence: 'server/world_civilization/controlled_release.js',
+    currentEvidence: 'server/world_civilization/release_operations.js',
     releaseEvidenceRequired: 'production_flag_safety_signoff'
   },
   {
     key: 'rollback_disable_controls',
     surface: 'release_rollback_and_disable',
     requiredEvidence: 'Release must have named rollback owner, rehearsed disable and rollback steps, data-preservation behavior, and post-disable verification.',
-    currentEvidence: 'docs/ops/V6_AGENT_CIVILIZATION_CONTROLLED_RELEASE_RUNBOOK.md',
+    currentEvidence: 'server/world_civilization/release_operations.js',
     releaseEvidenceRequired: 'rollback_disable_rehearsal_record'
   },
   {
@@ -70,28 +71,28 @@ const V6_CONTROLLED_RELEASE_TARGETS = [
     key: 'controlled_release_window',
     surface: 'release_window',
     requiredEvidence: 'Release must have approved window, rollback window, monitoring owner, and go/no-go record.',
-    currentEvidence: 'specs/69_agent_town_v6_controlled_release_completion_foundation.md',
+    currentEvidence: 'server/world_civilization/release_operations.js',
     releaseEvidenceRequired: 'controlled_release_window_record'
   },
   {
     key: 'canary_exit',
     surface: 'canary_cohort_exit_criteria',
     requiredEvidence: 'Canary exit criteria must prove V6 stays inside the approved cohort and normal gameplay remains stable before expansion.',
-    currentEvidence: 'docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md',
+    currentEvidence: 'server/world_civilization/release_operations.js',
     releaseEvidenceRequired: 'canary_exit_criteria_record'
   },
   {
     key: 'emergency_disable',
     surface: 'emergency_disable_path',
     requiredEvidence: 'Emergency disable must stop new public civic writes, hide runtime V6 tools/surfaces, and preserve replayable audit records.',
-    currentEvidence: 'docs/ops/V6_AGENT_CIVILIZATION_CONTROLLED_RELEASE_RUNBOOK.md',
+    currentEvidence: 'server/world_civilization/release_operations.js',
     releaseEvidenceRequired: 'emergency_disable_drill_record'
   },
   {
     key: 'post_release_verification',
     surface: 'post_release_monitoring_and_verification',
     requiredEvidence: 'Post-release verification must confirm visibility, audit/replay health, support routing, and rollback readiness after launch.',
-    currentEvidence: 'server/world_civilization/release_observability.js',
+    currentEvidence: 'server/world_civilization/release_operations.js',
     releaseEvidenceRequired: 'post_release_verification_record'
   }
 ];

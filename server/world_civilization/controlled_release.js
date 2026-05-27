@@ -11,6 +11,8 @@ const RELEASE_OBSERVABILITY_ARTIFACT = 'server/world_civilization/release_observ
 const RELEASE_OBSERVABILITY_TEST = 'tests/world_civilization_release_observability.test.js';
 const RELEASE_SUPPORT_ARTIFACT = 'server/world_civilization/release_support.js';
 const RELEASE_SUPPORT_TEST = 'tests/world_civilization_release_support.test.js';
+const RELEASE_OPERATIONS_ARTIFACT = 'server/world_civilization/release_operations.js';
+const RELEASE_OPERATIONS_TEST = 'tests/world_civilization_release_operations.test.js';
 const CONTROLLED_RELEASE_TARGET_ARTIFACT = 'server/world_civilization/controlled_release_targets.js';
 const CONTROLLED_RELEASE_TARGET_TEST = 'tests/world_civilization_controlled_release_targets.test.js';
 
@@ -47,6 +49,8 @@ const REQUIRED_CONTROLLED_RELEASE_GATES = [
       RELEASE_OBSERVABILITY_TEST,
       RELEASE_SUPPORT_ARTIFACT,
       RELEASE_SUPPORT_TEST,
+      RELEASE_OPERATIONS_ARTIFACT,
+      RELEASE_OPERATIONS_TEST,
       CONTROLLED_RELEASE_TARGET_ARTIFACT,
       CONTROLLED_RELEASE_TARGET_TEST
     ],
@@ -55,6 +59,7 @@ const REQUIRED_CONTROLLED_RELEASE_GATES = [
       'production_flag_safety_target',
       'rollback_disable_target',
       'observability_target',
+      'release_operations_target',
       'support_runbook_target',
       'blocker_clearance_target',
       'controlled_release_window_target',
@@ -78,14 +83,14 @@ const REQUIRED_CONTROLLED_RELEASE_GATES = [
   {
     key: 'production_flag_safety',
     label: 'Production feature flag safety',
-    requiredArtifacts: [CONTROLLED_RELEASE_RUNBOOK],
-    requiredChecks: ['default_off', 'admin_only_enablement', 'broad_override_exclusion', 'canary_cohort', 'emergency_disable']
+    requiredArtifacts: [CONTROLLED_RELEASE_RUNBOOK, RELEASE_OPERATIONS_ARTIFACT, RELEASE_OPERATIONS_TEST],
+    requiredChecks: ['release_operations_gate', 'production_flag_control', 'default_off', 'admin_only_enablement', 'broad_override_exclusion', 'canary_cohort', 'emergency_disable']
   },
   {
     key: 'rollback_disable_controls',
     label: 'Rollback and disable controls',
-    requiredArtifacts: [CONTROLLED_RELEASE_RUNBOOK],
-    requiredChecks: ['disable_plan', 'rollback_owner', 'rollback_rehearsal', 'data_preservation', 'post_disable_verification']
+    requiredArtifacts: [CONTROLLED_RELEASE_RUNBOOK, RELEASE_OPERATIONS_ARTIFACT, RELEASE_OPERATIONS_TEST],
+    requiredChecks: ['release_operations_gate', 'disable_plan', 'rollback_owner', 'rollback_window', 'rollback_rehearsal', 'rollback_disable_drill', 'data_preservation', 'post_disable_verification']
   },
   {
     key: 'observability',
@@ -139,8 +144,41 @@ const REQUIRED_CONTROLLED_RELEASE_GATES = [
   {
     key: 'controlled_release_window',
     label: 'Controlled release window',
-    requiredArtifacts: [CONTROLLED_RELEASE_RUNBOOK],
-    requiredChecks: ['release_window', 'canary_exit_criteria', 'rollback_window', 'monitoring_owner', 'go_no_go_record']
+    requiredArtifacts: [CONTROLLED_RELEASE_RUNBOOK, RELEASE_OPERATIONS_ARTIFACT, RELEASE_OPERATIONS_TEST],
+    requiredChecks: [
+      'release_operations_gate',
+      'release_window',
+      'canary_scope',
+      'canary_exit_criteria',
+      'emergency_disable',
+      'rollback_window',
+      'monitoring_owner',
+      'go_no_go_record',
+      'post_release_verification',
+      'normal_gameplay_baseline',
+      'audit_replay_health_check',
+      'evidence_archive'
+    ]
+  },
+  {
+    key: 'release_operations',
+    label: 'Controlled release operations',
+    requiredArtifacts: [CONTROLLED_RELEASE_RUNBOOK, RELEASE_OPERATIONS_ARTIFACT, RELEASE_OPERATIONS_TEST],
+    requiredChecks: [
+      'release_operations_gate',
+      'production_flag_control',
+      'release_window',
+      'go_no_go_record',
+      'canary_scope',
+      'canary_exit',
+      'emergency_disable',
+      'rollback_window',
+      'rollback_disable_drill',
+      'post_release_verification',
+      'normal_gameplay_baseline',
+      'audit_replay_health_check',
+      'evidence_archive'
+    ]
   }
 ];
 
@@ -356,6 +394,8 @@ module.exports = {
   RELEASE_OBSERVABILITY_TEST,
   RELEASE_SUPPORT_ARTIFACT,
   RELEASE_SUPPORT_TEST,
+  RELEASE_OPERATIONS_ARTIFACT,
+  RELEASE_OPERATIONS_TEST,
   CONTROLLED_RELEASE_TARGET_ARTIFACT,
   CONTROLLED_RELEASE_TARGET_TEST,
   CONTROLLED_RELEASE_RUNBOOK,

@@ -182,6 +182,14 @@ are present.
   report must reject private trace data, runtime civic tool exposure, alert
   activation, runtime monitoring startup, production enablement, and world
   mutation.
+- Controlled release operations: `server/world_civilization/release_operations.js`
+  and `tests/world_civilization_release_operations.test.js` record the
+  research-only operations gate for production flag control, release windows,
+  go/no-go records, canary scope and exit criteria, emergency disable drills,
+  rollback windows and drills, post-release verification, normal gameplay
+  baseline, audit/replay health checks, and evidence archives while opening no
+  canary, approving no release, enabling no production, publishing no runtime
+  civic tools, and executing no rollback or emergency disable.
 - Blocker/exception register: `server/world_civilization/blocker_exception_register.js`
   and `tests/world_civilization_blocker_exception_register.test.js` record the
   research-only target for register rows, blocker owners, P0/P1 clearance,

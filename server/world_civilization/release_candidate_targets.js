@@ -116,7 +116,7 @@ const V6_RELEASE_CANDIDATE_TARGETS = [
     key: 'controlled_release_handoff',
     owner: 'release_manager',
     requiredEvidence: 'Release-candidate output must feed M18 controlled release with rollback/disable instructions, observability links, support owner, and go/no-go record.',
-    currentEvidence: 'docs/ops/V6_AGENT_CIVILIZATION_CONTROLLED_RELEASE_RUNBOOK.md',
+    currentEvidence: 'server/world_civilization/release_operations.js',
     releaseEvidenceRequired: 'controlled_release_handoff_packet'
   }
 ];

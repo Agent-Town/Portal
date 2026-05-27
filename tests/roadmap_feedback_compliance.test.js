@@ -101,6 +101,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'server/world_civilization/replay_reconstruction.js',
     'server/world_civilization/release_candidate_targets.js',
     'server/world_civilization/release_observability.js',
+    'server/world_civilization/release_operations.js',
     'server/world_civilization/release_support.js',
     'server/world_civilization/load_rate_targets.js',
     'server/world_civilization/migration_rehearsal.js',
@@ -146,6 +147,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'tests/world_civilization_readiness_gate.test.js',
     'tests/world_civilization_release_candidate_targets.test.js',
     'tests/world_civilization_release_observability.test.js',
+    'tests/world_civilization_release_operations.test.js',
     'tests/world_civilization_release_support.test.js',
     'tests/world_civilization_mutation_security.test.js',
     'tests/world_civilization_session_auth_targets.test.js',
@@ -247,6 +249,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   const ciValidationMatrixTargetSource = read('server/world_civilization/ci_validation_matrix_targets.js');
   const releaseCandidateTargetSource = read('server/world_civilization/release_candidate_targets.js');
   const releaseObservabilitySource = read('server/world_civilization/release_observability.js');
+  const releaseOperationsSource = read('server/world_civilization/release_operations.js');
   const releaseSupportSource = read('server/world_civilization/release_support.js');
   const validationTargetSource = read('server/world_civilization/validation_targets.js');
   const requiredMilestones = [
@@ -345,6 +348,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(productSignoffTargetSource, /player_visible_scope/);
   assert.match(productSignoffTargetSource, /normal_gameplay_exposure_denial/);
   assert.match(productSignoffTargetSource, /server\/world_civilization\/release_observability\.js/);
+  assert.match(productSignoffTargetSource, /server\/world_civilization\/release_operations\.js/);
   assert.match(productSignoffTargetSource, /server\/world_civilization\/release_support\.js/);
   assert.match(productSignoffTargetSource, /go_no_go_record/);
   assert.match(productSignoffTargetSource, /post_release_monitoring/);
@@ -363,6 +367,18 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(releaseObservabilitySource, /runtime_tool_absence_monitor/);
   assert.match(releaseObservabilitySource, /support_escalation_link/);
   assert.match(releaseObservabilitySource, /V6_RELEASE_OBSERVABILITY_RUNTIME_TOOL_EXPOSURE_FORBIDDEN/);
+  assert.match(releaseOperationsSource, /V6_RELEASE_OPERATIONS_VERSION/);
+  assert.match(releaseOperationsSource, /production_flag_control/);
+  assert.match(releaseOperationsSource, /release_window/);
+  assert.match(releaseOperationsSource, /go_no_go_record/);
+  assert.match(releaseOperationsSource, /canary_scope/);
+  assert.match(releaseOperationsSource, /canary_exit/);
+  assert.match(releaseOperationsSource, /emergency_disable/);
+  assert.match(releaseOperationsSource, /rollback_disable_drill/);
+  assert.match(releaseOperationsSource, /post_release_verification/);
+  assert.match(releaseOperationsSource, /normal_gameplay_baseline/);
+  assert.match(releaseOperationsSource, /audit_replay_health_check/);
+  assert.match(releaseOperationsSource, /V6_RELEASE_OPERATIONS_RUNTIME_TOOL_EXPOSURE_FORBIDDEN/);
   assert.match(releaseSupportSource, /V6_RELEASE_SUPPORT_VERSION/);
   assert.match(releaseSupportSource, /known_issues/);
   assert.match(releaseSupportSource, /support_triage/);
@@ -1108,6 +1124,8 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(controlledRunbook, /readiness report hidden until controlled release/);
   assert.match(controlledRunbook, /readiness audit-summary proof/);
   assert.match(controlledSpec, /controlled release target gate/);
+  assert.match(controlledSpec, /server\/world_civilization\/release_operations\.js/);
+  assert.match(controlledSpec, /Release operations gate/);
   assert.match(controlledSpec, /server\/world_civilization\/release_support\.js/);
   assert.match(controlledSpec, /release support runbook/);
   assert.match(controlledSpec, /blocker\/exception register/);
@@ -1115,6 +1133,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(controlledSpec, /M16\/M17 audit-summary proof checks/);
   assert.match(controlledSource, /BLOCKER_EXCEPTION_REGISTER_ARTIFACT/);
   assert.match(controlledSource, /RELEASE_OBSERVABILITY_ARTIFACT/);
+  assert.match(controlledSource, /RELEASE_OPERATIONS_ARTIFACT/);
   assert.match(controlledSource, /CONTROLLED_RELEASE_TARGET_ARTIFACT/);
   assert.match(controlledSource, /v6ReadinessGateReport/);
   assert.match(controlledSource, /readiness_audit_summary_proof/);
@@ -1123,10 +1142,13 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(controlledTargetSource, /V6_CONTROLLED_RELEASE_TARGETS_VERSION/);
   assert.match(controlledTargetSource, /server\/world_civilization\/blocker_exception_register\.js/);
   assert.match(controlledTargetSource, /server\/world_civilization\/release_observability\.js/);
+  assert.match(controlledTargetSource, /server\/world_civilization\/release_operations\.js/);
   assert.match(controlledTargetSource, /production_flag_safety/);
   assert.match(controlledTargetSource, /emergency_disable/);
   assert.match(controlledTargetSource, /post_release_verification/);
   assert.match(skillLine, /V6 controlled release target gate/);
+  assert.match(skillLine, /V6 controlled release operations gate/);
+  assert.match(skillLine, /tests\/world_civilization_release_operations\.test\.js/);
   assert.match(skillLine, /explicit closed V6 readiness-gate report/);
   assert.match(skillLine, /readiness audit-summary proof/);
 });

@@ -65,14 +65,14 @@ const V6_PRODUCT_SIGNOFF_TARGETS = [
     key: 'rollback_plan',
     surface: 'release_rollback',
     requiredEvidence: 'Release must include owners, rehearsed rollback steps, data-preservation behavior, and post-rollback verification.',
-    currentEvidence: 'docs/ops/V6_AGENT_CIVILIZATION_CONTROLLED_RELEASE_RUNBOOK.md',
+    currentEvidence: 'server/world_civilization/release_operations.js',
     releaseEvidenceRequired: 'rollback_rehearsal_record'
   },
   {
     key: 'disable_plan',
     surface: 'feature_flag_disable',
     requiredEvidence: 'Release must include emergency disable steps, admin-only feature flag ownership, and verification that V6 disappears from runtime surfaces.',
-    currentEvidence: 'server/world_civilization/controlled_release.js',
+    currentEvidence: 'server/world_civilization/release_operations.js',
     releaseEvidenceRequired: 'emergency_disable_rehearsal_record'
   },
   {
@@ -100,14 +100,14 @@ const V6_PRODUCT_SIGNOFF_TARGETS = [
     key: 'go_no_go_record',
     surface: 'controlled_release_go_no_go',
     requiredEvidence: 'Controlled release must have a dated go/no-go record with product, engineering, security, QA, and support owners.',
-    currentEvidence: 'specs/69_agent_town_v6_controlled_release_completion_foundation.md',
+    currentEvidence: 'server/world_civilization/release_operations.js',
     releaseEvidenceRequired: 'controlled_release_go_no_go_record'
   },
   {
     key: 'post_release_monitoring',
     surface: 'canary_and_post_release_monitoring',
     requiredEvidence: 'Post-release monitoring must define canary exit criteria, rollback window, monitoring owner, and blocker response path.',
-    currentEvidence: 'server/world_civilization/release_observability.js',
+    currentEvidence: 'server/world_civilization/release_operations.js',
     releaseEvidenceRequired: 'post_release_monitoring_plan'
   }
 ];

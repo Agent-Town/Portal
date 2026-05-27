@@ -55,6 +55,10 @@ test('V6 release-candidate targets name every evidence packet surface', () => {
   assert.ok(matrix.targetKeys.includes('qa_owner_signoff'));
   assert.ok(matrix.targetKeys.includes('controlled_release_handoff'));
   assert.equal(
+    V6_RELEASE_CANDIDATE_TARGETS.find((target) => target.key === 'controlled_release_handoff').currentEvidence,
+    'server/world_civilization/release_operations.js'
+  );
+  assert.equal(
     V6_RELEASE_CANDIDATE_TARGETS.find((target) => target.key === 'blocker_exception_register').currentEvidence,
     'server/world_civilization/blocker_exception_register.js'
   );

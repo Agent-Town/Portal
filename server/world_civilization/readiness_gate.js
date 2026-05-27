@@ -362,6 +362,7 @@ const REQUIRED_V6_READINESS_GATES = [
       'server/world_civilization/privacy_review_targets.js',
       'server/world_civilization/product_signoff_targets.js',
       'server/world_civilization/release_observability.js',
+      'server/world_civilization/release_operations.js',
       'server/world_civilization/release_review.js',
       'server/world_civilization/release_support.js',
       'server/world_civilization/release_candidate_targets.js',
@@ -374,6 +375,7 @@ const REQUIRED_V6_READINESS_GATES = [
       'tests/world_civilization_privacy_review_targets.test.js',
       'tests/world_civilization_product_signoff_targets.test.js',
       'tests/world_civilization_release_observability.test.js',
+      'tests/world_civilization_release_operations.test.js',
       'tests/world_civilization_release_review.test.js',
       'tests/world_civilization_release_support.test.js',
       'tests/world_civilization_release_candidate_targets.test.js',
@@ -400,6 +402,7 @@ const REQUIRED_V6_READINESS_GATES = [
       'resilience_readiness_review',
       'product_signoff_target_gate',
       'release_observability_handoff',
+      'release_operations_gate',
       'release_support_runbook',
       'product_signoff'
     ]
