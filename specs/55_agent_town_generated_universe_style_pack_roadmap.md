@@ -39,7 +39,7 @@ This is a separate prototype-gated track. It must not change normal gameplay vis
 | G16 | Curated pack gallery | Only approved packs visible; moderation metadata complete |
 | G17 | Approved modifier system | Enum-only modifiers; no formula strings; balance simulation passes |
 | G18 | Generated tech flavor tree | Canonical effects covered; bounded modifiers; readable lore text |
-| G19 | Generation cost/auth/consent model | Versioned release approval evidence; consent, cost estimate, candidate review, human signoff, no secret logs |
+| G19 | Generation cost/auth/consent model | Versioned release approval evidence and candidate-review manifest; consent, cost estimate, candidate review, human signoff, no secret logs |
 | G20 | Production release gate | Schema, moderation, playtest, manifest, fallback, human review all pass |
 
 ## V0 Acceptance
@@ -422,17 +422,20 @@ Generated packs now include a `multiSurfaceCompatibility` contract that maps one
 
 Generated packs now have a standalone `productionReleaseGate` contract for controlled player-facing readiness. The gate is a report, not a generated-pack subdocument and not default gameplay visibility. It evaluates strict schemas, safety/moderation, measured first-loop evidence, asset manifest and prompt-plan validity, deterministic fallback safety, ten-prompt diversity, durable save/reload/import evidence, public-card privacy, candidate asset review, explicit auth/cost/consent approval, and human review signoff. It fails closed by default: missing approval evidence produces a valid `prototype-gated` report with blocking reasons, not a public release claim.
 
-Release approval is now a versioned evidence object, not a loose set of booleans. `release_approval_evidence.schema.json` records an auth model, cost model, consent record, candidate-review coverage, human release review, and hard boundary constraints. Public eligibility ignores `approvalInputs` unless they match the derived evidence summary, and unsafe evidence with secret-like fields, raw prompt instructions, short candidate-review coverage, production image promotion, normal gameplay exposure, canonical rule changes, or V6 civic changes fails validation.
+Release approval is now a versioned evidence object, not a loose set of booleans. `release_approval_evidence.schema.json` records an auth model, cost model, consent record, candidate-review coverage, human release review, and hard boundary constraints. `candidate_review_manifest.schema.json` records per-target candidate review decisions and must match the approval evidence hash before candidate assets count as reviewed. Public eligibility ignores `approvalInputs` unless they match the derived evidence summary, and unsafe evidence or review manifests with secret-like fields, raw prompt instructions, short candidate-review coverage, production image promotion, normal gameplay exposure, canonical rule changes, or V6 civic changes fail validation.
 
 ```json
 {
   "productionReleaseGateSchemaExists": true,
   "releaseApprovalEvidenceSchemaExists": true,
+  "candidateReviewManifestSchemaExists": true,
   "releaseGateFeatureGated": true,
   "looseApprovalBooleansIgnored": true,
   "approvalInputsDerivedFromEvidence": true,
   "approvalEvidenceSecretLikeCount": 0,
   "approvalEvidenceRawInstructionCount": 0,
+  "candidateReviewManifestHashMatchesEvidence": true,
+  "candidateReviewManifestProductionImageAssetCount": 0,
   "candidateReviewCoverageCountMin": 23,
   "schemaValid": true,
   "moderationPassed": true,

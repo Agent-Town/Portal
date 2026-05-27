@@ -19,6 +19,7 @@ const PUBLIC_PACK_CARD_VERSION = 'agent-town-generated-pack-public-card-v1';
 const PUBLIC_PACK_GALLERY_VERSION = 'agent-town-generated-pack-gallery-v1';
 const PUBLIC_PACK_GALLERY_ENTRY_VERSION = 'agent-town-generated-pack-gallery-entry-v1';
 const PUBLIC_PACK_GALLERY_CURATION_VERSION = 'agent-town-generated-pack-gallery-curation-v1';
+const CANDIDATE_REVIEW_MANIFEST_VERSION = 'agent-town-generated-pack-candidate-review-manifest-v1';
 const RELEASE_APPROVAL_EVIDENCE_VERSION = 'agent-town-generated-pack-release-approval-evidence-v1';
 const PRODUCTION_RELEASE_GATE_VERSION = 'agent-town-generated-pack-production-release-gate-v1';
 const DEFAULT_CANDIDATE_ROOT = 'data/generated-packs';
@@ -3851,6 +3852,229 @@ function normalizeReleaseApprovalInputs(approvalInputs = {}) {
   };
 }
 
+function reviewManifestContentHash(manifest = {}) {
+  const copy = clone(manifest);
+  delete copy.manifestHash;
+  return sha256(JSON.stringify(copy));
+}
+
+function buildCandidateReviewManifest({
+  pack = {},
+  nowMs = Date.now(),
+  reviewDecisions = {},
+  candidateRecords = {},
+  constraints = {}
+} = {}) {
+  const targets = Array.isArray(pack?.assetPromptPlan?.targets) ? pack.assetPromptPlan.targets : [];
+  const recordsByTarget = new Map();
+  const candidateRecordList = Array.isArray(candidateRecords)
+    ? candidateRecords
+    : Object.values(candidateRecords || {});
+  for (const record of candidateRecordList) {
+    if (record?.canonicalTarget) recordsByTarget.set(record.canonicalTarget, record);
+  }
+  const decisionsByTarget = reviewDecisions || {};
+  const candidates = targets.map((target) => {
+    const record = recordsByTarget.get(target.canonicalTarget) || {};
+    const decision = decisionsByTarget[target.canonicalTarget] || {};
+    const reviewStatus = ['approved-candidate', 'rejected-candidate', 'pending'].includes(decision.reviewStatus)
+      ? decision.reviewStatus
+      : 'pending';
+    const processedOutputPath = String(record.processedOutputPath || decision.processedOutputPath || '');
+    const byteLength = positiveNumberOrZero(record.byteLength ?? decision.byteLength);
+    return {
+      canonicalTarget: target.canonicalTarget,
+      promptId: target.promptId,
+      promptHash: target.promptHash,
+      candidateOutputPath: target.candidateOutputPath,
+      processedOutputPath,
+      approvedOutputPath: target.approvedOutputPath,
+      sourceStatus: processedOutputPath.includes('/postprocessed/candidates/')
+        ? 'postprocessed-candidate'
+        : byteLength > 0
+          ? 'candidate-recorded'
+          : 'planned-only',
+      byteLength,
+      contentHash: isSha256Hex(record.contentHash || decision.contentHash) ? String(record.contentHash || decision.contentHash) : '',
+      reviewStatus,
+      reviewerNoteHash: isSha256Hex(decision.reviewerNoteHash) ? decision.reviewerNoteHash : ''
+    };
+  });
+  const approvedCandidateCount = candidates.filter((candidate) => candidate.reviewStatus === 'approved-candidate').length;
+  const rejectedCandidateCount = candidates.filter((candidate) => candidate.reviewStatus === 'rejected-candidate').length;
+  const pendingCandidateCount = candidates.filter((candidate) => candidate.reviewStatus === 'pending').length;
+  const manifest = {
+    schemaVersion: CANDIDATE_REVIEW_MANIFEST_VERSION,
+    manifestId: sha256(JSON.stringify({
+      packId: pack?.packId || '',
+      nowMs,
+      promptPlanHash: pack?.assetPromptPlan?.planHash || '',
+      targetCount: targets.length
+    })).slice(0, 32),
+    manifestHash: '',
+    packId: String(pack?.packId || ''),
+    createdAtMs: positiveNumberOrZero(nowMs),
+    promptPlanHash: String(pack?.assetPromptPlan?.planHash || ''),
+    reviewPolicy: {
+      candidateOnly: true,
+      productionPromotionApproved: false,
+      humanReviewRequiredBeforeProduction: true,
+      defaultGameplayExposureApproved: false
+    },
+    candidates,
+    metrics: {
+      expectedTargetCount: targets.length,
+      reviewedCandidateCount: approvedCandidateCount + rejectedCandidateCount,
+      approvedCandidateCount,
+      rejectedCandidateCount,
+      pendingCandidateCount,
+      productionImageAssetCount: 0
+    },
+    constraints: {
+      candidateOnly: true,
+      productionPromotionApproved: constraints.productionPromotionApproved === true,
+      externalProviderPrivateDataStored: constraints.externalProviderPrivateDataStored === true,
+      canonicalServerRulesChanged: constraints.canonicalServerRulesChanged === true,
+      v6CivicMechanicsTouched: constraints.v6CivicMechanicsTouched === true,
+      normalGameplayVisibilityChanged: constraints.normalGameplayVisibilityChanged === true,
+      generatedPackDefaultExposure: constraints.generatedPackDefaultExposure === true
+    }
+  };
+  manifest.manifestHash = reviewManifestContentHash(manifest);
+  return manifest;
+}
+
+function validateCandidateReviewManifest(manifest = {}, pack = {}) {
+  const schemaReport = SCHEMA_REGISTRY?.candidateReviewManifest
+    ? validateGeneratedSchema(manifest, SCHEMA_REGISTRY.candidateReviewManifest, '$.candidateReviewManifest')
+    : { ok: true, errors: [] };
+  const secretLikePaths = findSecretLikePaths(manifest);
+  const rawInstructionPaths = findRawPromptInstructionPaths(manifest);
+  const targets = Array.isArray(pack?.assetPromptPlan?.targets) ? pack.assetPromptPlan.targets : [];
+  const targetsByCanonical = new Map(targets.map((target) => [target.canonicalTarget, target]));
+  const candidates = Array.isArray(manifest?.candidates) ? manifest.candidates : [];
+  const candidateTargets = candidates.map((candidate) => candidate.canonicalTarget);
+  const duplicateTargets = candidateTargets.filter((target, index) => candidateTargets.indexOf(target) !== index);
+  const missingTargets = targets
+    .map((target) => target.canonicalTarget)
+    .filter((target) => !candidateTargets.includes(target));
+  const unknownTargets = candidateTargets.filter((target) => !targetsByCanonical.has(target));
+  const pathProblems = [];
+  for (const candidate of candidates) {
+    const planned = targetsByCanonical.get(candidate.canonicalTarget);
+    if (!planned) continue;
+    if (candidate.promptId !== planned.promptId) pathProblems.push(`${candidate.canonicalTarget}:promptId`);
+    if (candidate.promptHash !== planned.promptHash) pathProblems.push(`${candidate.canonicalTarget}:promptHash`);
+    if (candidate.candidateOutputPath !== planned.candidateOutputPath || !String(candidate.candidateOutputPath || '').includes('/candidates/')) {
+      pathProblems.push(`${candidate.canonicalTarget}:candidateOutputPath`);
+    }
+    if (candidate.approvedOutputPath !== planned.approvedOutputPath || !String(candidate.approvedOutputPath || '').includes('/approved/')) {
+      pathProblems.push(`${candidate.canonicalTarget}:approvedOutputPath`);
+    }
+    if (String(candidate.processedOutputPath || '') && !String(candidate.processedOutputPath || '').includes('/postprocessed/candidates/')) {
+      pathProblems.push(`${candidate.canonicalTarget}:processedOutputPath`);
+    }
+    if (candidate.reviewStatus !== 'pending' && !isSha256Hex(candidate.reviewerNoteHash)) {
+      pathProblems.push(`${candidate.canonicalTarget}:reviewerNoteHash`);
+    }
+    if (candidate.sourceStatus !== 'planned-only' && !isSha256Hex(candidate.contentHash)) {
+      pathProblems.push(`${candidate.canonicalTarget}:contentHash`);
+    }
+  }
+  const constraints = manifest?.constraints || {};
+  const boundaryPreserved = constraints.candidateOnly === true
+    && constraints.productionPromotionApproved === false
+    && constraints.externalProviderPrivateDataStored === false
+    && constraints.canonicalServerRulesChanged === false
+    && constraints.v6CivicMechanicsTouched === false
+    && constraints.normalGameplayVisibilityChanged === false
+    && constraints.generatedPackDefaultExposure === false
+    && manifest?.reviewPolicy?.candidateOnly === true
+    && manifest?.reviewPolicy?.productionPromotionApproved === false
+    && manifest?.reviewPolicy?.defaultGameplayExposureApproved === false
+    && Number(manifest?.metrics?.productionImageAssetCount || 0) === 0;
+  const expectedHash = schemaReport.ok ? reviewManifestContentHash(manifest) : '';
+  const hashMatches = Boolean(expectedHash) && manifest?.manifestHash === expectedHash;
+  const reviewedCandidateCount = Number(manifest?.metrics?.reviewedCandidateCount || 0);
+  const approvedCandidateCount = Number(manifest?.metrics?.approvedCandidateCount || 0);
+  const rejectedCandidateCount = Number(manifest?.metrics?.rejectedCandidateCount || 0);
+  const pendingCandidateCount = Number(manifest?.metrics?.pendingCandidateCount || 0);
+  const countedCandidates = approvedCandidateCount + rejectedCandidateCount + pendingCandidateCount;
+  const checks = [
+    {
+      id: 'CANDIDATE_REVIEW_MANIFEST_SCHEMA_VALID',
+      passed: schemaReport.ok === true,
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
+    },
+    {
+      id: 'CANDIDATE_REVIEW_MANIFEST_CONTENT_SAFE',
+      passed: secretLikePaths.length === 0 && rawInstructionPaths.length === 0,
+      measured: { secretLikePaths, rawInstructionPaths }
+    },
+    {
+      id: 'CANDIDATE_REVIEW_MANIFEST_TARGET_COVERAGE',
+      passed: manifest?.packId === pack?.packId
+        && manifest?.promptPlanHash === pack?.assetPromptPlan?.planHash
+        && Number(manifest?.metrics?.expectedTargetCount || 0) === targets.length
+        && missingTargets.length === 0
+        && duplicateTargets.length === 0
+        && unknownTargets.length === 0
+        && pathProblems.length === 0,
+      measured: {
+        expectedTargetCount: targets.length,
+        candidateCount: candidates.length,
+        missingTargets,
+        duplicateTargets: [...new Set(duplicateTargets)],
+        unknownTargets,
+        pathProblems
+      }
+    },
+    {
+      id: 'CANDIDATE_REVIEW_MANIFEST_REVIEW_COUNTS',
+      passed: reviewedCandidateCount === approvedCandidateCount + rejectedCandidateCount
+        && countedCandidates === candidates.length,
+      measured: { reviewedCandidateCount, approvedCandidateCount, rejectedCandidateCount, pendingCandidateCount, candidateCount: candidates.length }
+    },
+    {
+      id: 'CANDIDATE_REVIEW_MANIFEST_HASH_STABLE',
+      passed: hashMatches,
+      measured: { expectedHash, actualHash: manifest?.manifestHash || '' }
+    },
+    {
+      id: 'CANDIDATE_REVIEW_MANIFEST_BOUNDARY_PRESERVED',
+      passed: boundaryPreserved,
+      measured: { constraints, reviewPolicy: manifest?.reviewPolicy || {}, productionImageAssetCount: Number(manifest?.metrics?.productionImageAssetCount || 0) }
+    }
+  ];
+  return {
+    ok: checks.every((check) => check.passed === true),
+    checks,
+    metrics: {
+      candidateReviewManifestSchemaExists: Boolean(SCHEMA_REGISTRY?.candidateReviewManifest),
+      schemaErrorCount: schemaReport.errors.length,
+      secretLikePathCount: secretLikePaths.length,
+      rawInstructionPathCount: rawInstructionPaths.length,
+      expectedTargetCount: targets.length,
+      candidateCount: candidates.length,
+      reviewedCandidateCount,
+      approvedCandidateCount,
+      rejectedCandidateCount,
+      pendingCandidateCount,
+      missingTargetCount: missingTargets.length,
+      duplicateTargetCount: new Set(duplicateTargets).size,
+      unknownTargetCount: unknownTargets.length,
+      pathProblemCount: pathProblems.length,
+      hashMatches,
+      boundaryPreserved,
+      productionImageAssetCount: Number(manifest?.metrics?.productionImageAssetCount || 0),
+      releaseReady: checks.every((check) => check.passed === true)
+        && targets.length > 0
+        && reviewedCandidateCount >= targets.length
+        && pendingCandidateCount === 0
+    }
+  };
+}
+
 function isSha256Hex(value = '') {
   return /^[0-9a-f]{64}$/.test(String(value || ''));
 }
@@ -4106,6 +4330,7 @@ function buildProductionReleaseGate({
   diversityReport = null,
   publicCard = null,
   persistenceReport = {},
+  candidateReviewManifest = null,
   approvalEvidence = null,
   approvalInputs = {},
   nowMs = Date.now()
@@ -4128,6 +4353,14 @@ function buildProductionReleaseGate({
     ? clone(approvalEvidence)
     : releaseApprovalEvidenceDefault(pack, nowMs);
   const approvalEvidenceReport = validateReleaseApprovalEvidence(evidence, pack);
+  const candidateManifest = candidateReviewManifest && typeof candidateReviewManifest === 'object'
+    ? clone(candidateReviewManifest)
+    : null;
+  const candidateReviewManifestReport = candidateManifest
+    ? validateCandidateReviewManifest(candidateManifest, pack)
+    : { ok: false, metrics: { schemaErrorCount: 0, secretLikePathCount: 0, rawInstructionPathCount: 0, expectedTargetCount: 0, reviewedCandidateCount: 0, releaseReady: false } };
+  const candidateReviewManifestHashMatchesEvidence = Boolean(candidateManifest?.manifestHash)
+    && candidateManifest.manifestHash === evidence?.candidateReview?.candidateManifestHash;
   const approvals = approvalInputsFromEvidence(evidence, approvalEvidenceReport);
   const approvalEvidenceOk = approvalEvidenceReport.ok === true;
   const costConsentModelApproved = approvalEvidenceOk && approvalEvidenceReport.metrics.costConsentModelApproved === true;
@@ -4163,7 +4396,10 @@ function buildProductionReleaseGate({
       && publicCardPrivateDataLeakCount === 0
       && publicCardBlockedFieldCount === 0,
     costConsentModelApproved,
-    candidateAssetsReviewed: approvalEvidenceOk && approvalEvidenceReport.metrics.candidateAssetsReviewed === true,
+    candidateAssetsReviewed: approvalEvidenceOk
+      && approvalEvidenceReport.metrics.candidateAssetsReviewed === true
+      && candidateReviewManifestReport.metrics.releaseReady === true
+      && candidateReviewManifestHashMatchesEvidence,
     humanReviewComplete
   };
   const blockingReasons = Object.entries(releasePrerequisites)
@@ -4188,8 +4424,15 @@ function buildProductionReleaseGate({
       approvalEvidenceSchemaErrorCount: Number(approvalEvidenceReport.metrics.schemaErrorCount || 0),
       approvalEvidenceSecretLikeCount: Number(approvalEvidenceReport.metrics.secretLikePathCount || 0),
       approvalEvidenceRawInstructionCount: Number(approvalEvidenceReport.metrics.rawInstructionPathCount || 0),
+      candidateReviewManifestSchemaErrorCount: Number(candidateReviewManifestReport.metrics.schemaErrorCount || 0),
+      candidateReviewManifestSecretLikeCount: Number(candidateReviewManifestReport.metrics.secretLikePathCount || 0),
+      candidateReviewManifestRawInstructionCount: Number(candidateReviewManifestReport.metrics.rawInstructionPathCount || 0),
+      candidateReviewManifestHashMatchesEvidence: candidateReviewManifestHashMatchesEvidence ? 1 : 0,
       candidateReviewExpectedTargetCount: Number(approvalEvidenceReport.metrics.expectedTargetCount || 0),
-      candidateReviewCoverageCount: Number(approvalEvidenceReport.metrics.reviewedCandidateCount || 0),
+      candidateReviewCoverageCount: Math.min(
+        Number(approvalEvidenceReport.metrics.reviewedCandidateCount || 0),
+        Number(candidateReviewManifestReport.metrics.reviewedCandidateCount || 0)
+      ),
       eligiblePrerequisiteCount: Object.values(releasePrerequisites).filter((passed) => passed === true).length,
       requiredPrerequisiteCount: Object.keys(releasePrerequisites).length,
       looseApprovalInputCount: Object.values(normalizedLooseApprovals).filter(Boolean).length
@@ -4268,6 +4511,8 @@ function validateProductionReleaseGate(gate = {}) {
           && approvals.costEstimateAccepted === true
           && approvals.explicitConsentRecorded === true
           && approvals.candidateAssetsReviewed === true
+          && Number(gate?.metrics?.candidateReviewManifestHashMatchesEvidence || 0) === 1
+          && Number(gate?.metrics?.candidateReviewManifestSchemaErrorCount || 0) === 0
           && /^[0-9a-f]{64}$/.test(String(approvals.humanReviewSignoffHash || ''))
         ),
       measured: { approvals, approvalEvidenceOk: approvalEvidenceReport.ok === true, approvalInputsMatchEvidence }
@@ -4280,7 +4525,7 @@ function validateProductionReleaseGate(gate = {}) {
         && Number(gate?.metrics?.approvalEvidenceSecretLikeCount || 0) === Number(approvalEvidenceReport.metrics.secretLikePathCount || 0)
         && Number(gate?.metrics?.approvalEvidenceRawInstructionCount || 0) === Number(approvalEvidenceReport.metrics.rawInstructionPathCount || 0)
         && Number(gate?.metrics?.candidateReviewExpectedTargetCount || 0) === Number(approvalEvidenceReport.metrics.expectedTargetCount || 0)
-        && Number(gate?.metrics?.candidateReviewCoverageCount || 0) === Number(approvalEvidenceReport.metrics.reviewedCandidateCount || 0),
+        && Number(gate?.metrics?.candidateReviewCoverageCount || 0) <= Number(approvalEvidenceReport.metrics.reviewedCandidateCount || 0),
       measured: {
         approvalEvidenceContractOk,
         approvalEvidenceComplete: approvalEvidenceReport.ok === true,
@@ -4295,6 +4540,8 @@ function validateProductionReleaseGate(gate = {}) {
         && Number(gate?.metrics?.blockedFieldCount || 0) === 0
         && Number(gate?.metrics?.approvalEvidenceSecretLikeCount || 0) === 0
         && Number(gate?.metrics?.approvalEvidenceRawInstructionCount || 0) === 0
+        && Number(gate?.metrics?.candidateReviewManifestSecretLikeCount || 0) === 0
+        && Number(gate?.metrics?.candidateReviewManifestRawInstructionCount || 0) === 0
         && Number(gate?.metrics?.productionImageAssetCount || 0) === 0
         && (
           Number(gate?.metrics?.missingAssetCount || 0) === 0
@@ -4947,6 +5194,7 @@ module.exports = {
   ASSET_PROMPT_PLAN_VERSION,
   CANONICAL_CONTRACTS,
   CANONICAL_TECH_CAPABILITIES,
+  CANDIDATE_REVIEW_MANIFEST_VERSION,
   DEFAULT_CANDIDATE_ROOT,
   GENERATION_BRIEF_VERSION,
   INHABITANT_ROLE_DEFINITIONS,
@@ -4957,6 +5205,7 @@ module.exports = {
   SCHEMA_VERSION,
   analyzePackDiversity,
   buildAssetPromptPlan,
+  buildCandidateReviewManifest,
   buildMeasuredPlaytestReport,
   buildReleaseApprovalEvidence,
   buildProductionReleaseGate,
@@ -4986,6 +5235,7 @@ module.exports = {
   validateGeneratedPackSchemas,
   validateAssetManifest,
   validateAssetPromptPlan,
+  validateCandidateReviewManifest,
   validateApprovedModifiers,
   validateGenerationBrief,
   validateInhabitantStyleOverlay,

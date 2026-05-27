@@ -8,7 +8,7 @@ This artifact audits the Generated Universe + Style Pack lane against the roadma
 
 It is evidence for a prototype-gated production-readiness lane, not a public release approval. Public release remains blocked until explicit auth/cost/consent approval, candidate asset review, and human review signoff are recorded in a valid production release gate.
 
-Those approvals must be represented by `release_approval_evidence.schema.json`. The release gate derives approval booleans from that versioned evidence and ignores loose approval flags. Evidence containing secret-like fields, raw prompt instructions, insufficient candidate-review coverage, production image promotion, normal gameplay exposure, canonical server-rule changes, or V6 civic changes fails validation.
+Those approvals must be represented by `release_approval_evidence.schema.json`. Candidate review must also be represented by `candidate_review_manifest.schema.json`, and the release gate requires the approval-evidence candidate-manifest hash to match the reviewed manifest before candidate assets count as reviewed. The release gate derives approval booleans from that versioned evidence and ignores loose approval flags. Evidence or review manifests containing secret-like fields, raw prompt instructions, insufficient candidate-review coverage, production image promotion, normal gameplay exposure, canonical server-rule changes, or V6 civic changes fail validation.
 
 ## Boundary Statement
 
@@ -46,7 +46,7 @@ Those approvals must be represented by `release_approval_evidence.schema.json`. 
 | GU-15 requester voices | `tests/generated_pack_requester_voice.test.js` verifies canonical contract templates, requester archetypes, Clover identity stability, unsafe text rejection, and disabled rewrite policy. | Covered |
 | GU-16 inhabitant overlay | `tests/generated_pack_inhabitant_overlay.test.js` verifies visual-only inhabitants, server-owned state reads, role budget, sprite prompt scaffolding, and no per-inhabitant external model use. | Covered |
 | GU-17 multi-surface compatibility | `tests/generated_pack_multi_surface_compatibility.test.js` verifies Z1/Z2/route/public-card/sandbox surfaces, public safety, sandbox safety, and unchanged V5 tools. | Covered |
-| GU-18 production release gate | `schemas/generated-packs/production_release_gate.schema.json`, `schemas/generated-packs/release_approval_evidence.schema.json`, and `tests/generated_pack_production_release_gate.test.js` verify fail-closed reports, versioned approval evidence, loose-boolean rejection, unsafe evidence rejection, full evidence approval path, tamper rejection, and feature-gated API. | Covered as fail-closed gate |
+| GU-18 production release gate | `schemas/generated-packs/production_release_gate.schema.json`, `schemas/generated-packs/release_approval_evidence.schema.json`, `schemas/generated-packs/candidate_review_manifest.schema.json`, `tests/generated_pack_candidate_review_manifest.test.js`, and `tests/generated_pack_production_release_gate.test.js` verify fail-closed reports, versioned approval evidence, candidate-review manifest matching, loose-boolean rejection, unsafe evidence rejection, full evidence approval path, tamper rejection, and feature-gated API. | Covered as fail-closed gate |
 
 ## Current Validation Set
 
@@ -96,7 +96,7 @@ Absent those explicit approvals, the release gate should remain:
 | Auth model approved | Product/security-reviewed auth model for any external image generation provider. |
 | Cost model accepted | Explicit cost estimate and acceptance record for candidate generation. |
 | User/team consent recorded | Consent record that allows candidate generation for a specific pack/run. |
-| Candidate assets reviewed | Human review of generated candidates before any production promotion. |
+| Candidate assets reviewed | Human review of generated candidates before any production promotion, recorded in a matching candidate-review manifest. |
 | Human release signoff | 64-hex signoff hash recorded in the production release gate. |
 
 Each item must be recorded as versioned release approval evidence. Boolean approval summaries are informational only and are not sufficient for public release eligibility.

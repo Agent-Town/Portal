@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-town-generated-pack-candidate-review-manifest-v1",
+  "title": "Agent Town Generated Pack Candidate Review Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "manifestId",
+    "manifestHash",
+    "packId",
+    "createdAtMs",
+    "promptPlanHash",
+    "reviewPolicy",
+    "candidates",
+    "metrics",
+    "constraints"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "agent-town-generated-pack-candidate-review-manifest-v1" },
+    "manifestId": { "type": "string", "minLength": 12 },
+    "manifestHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "packId": { "type": "string", "minLength": 3 },
+    "createdAtMs": { "type": "number" },
+    "promptPlanHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "reviewPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateOnly",
+        "productionPromotionApproved",
+        "humanReviewRequiredBeforeProduction",
+        "defaultGameplayExposureApproved"
+      ],
+      "properties": {
+        "candidateOnly": { "const": true },
+        "productionPromotionApproved": { "const": false },
+        "humanReviewRequiredBeforeProduction": { "const": true },
+        "defaultGameplayExposureApproved": { "const": false }
+      }
+    },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "canonicalTarget",
+          "promptId",
+          "promptHash",
+          "candidateOutputPath",
+          "processedOutputPath",
+          "approvedOutputPath",
+          "sourceStatus",
+          "byteLength",
+          "contentHash",
+          "reviewStatus",
+          "reviewerNoteHash"
+        ],
+        "properties": {
+          "canonicalTarget": { "type": "string", "minLength": 3 },
+          "promptId": { "type": "string", "minLength": 3 },
+          "promptHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "candidateOutputPath": { "type": "string", "minLength": 3 },
+          "processedOutputPath": { "type": "string" },
+          "approvedOutputPath": { "type": "string", "minLength": 3 },
+          "sourceStatus": { "enum": ["planned-only", "candidate-recorded", "postprocessed-candidate"] },
+          "byteLength": { "type": "number", "minimum": 0 },
+          "contentHash": { "type": "string", "pattern": "^$|^[0-9a-f]{64}$" },
+          "reviewStatus": { "enum": ["pending", "approved-candidate", "rejected-candidate"] },
+          "reviewerNoteHash": { "type": "string", "pattern": "^$|^[0-9a-f]{64}$" }
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expectedTargetCount",
+        "reviewedCandidateCount",
+        "approvedCandidateCount",
+        "rejectedCandidateCount",
+        "pendingCandidateCount",
+        "productionImageAssetCount"
+      ],
+      "properties": {
+        "expectedTargetCount": { "type": "number", "minimum": 0 },
+        "reviewedCandidateCount": { "type": "number", "minimum": 0 },
+        "approvedCandidateCount": { "type": "number", "minimum": 0 },
+        "rejectedCandidateCount": { "type": "number", "minimum": 0 },
+        "pendingCandidateCount": { "type": "number", "minimum": 0 },
+        "productionImageAssetCount": { "type": "number", "minimum": 0 }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateOnly",
+        "productionPromotionApproved",
+        "externalProviderPrivateDataStored",
+        "canonicalServerRulesChanged",
+        "v6CivicMechanicsTouched",
+        "normalGameplayVisibilityChanged",
+        "generatedPackDefaultExposure"
+      ],
+      "properties": {
+        "candidateOnly": { "const": true },
+        "productionPromotionApproved": { "const": false },
+        "externalProviderPrivateDataStored": { "const": false },
+        "canonicalServerRulesChanged": { "const": false },
+        "v6CivicMechanicsTouched": { "const": false },
+        "normalGameplayVisibilityChanged": { "const": false },
+        "generatedPackDefaultExposure": { "const": false }
+      }
+    }
+  }
+}

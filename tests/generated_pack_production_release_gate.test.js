@@ -11,6 +11,7 @@ const { createWorldGridRouter } = require('../server/world_grid/routes');
 const {
   REPLAYABILITY_PROMPT_SUITE,
   analyzePackDiversity,
+  buildCandidateReviewManifest,
   buildMeasuredPlaytestReport,
   buildProductionReleaseGate,
   buildReleaseApprovalEvidence,
@@ -143,6 +144,7 @@ function hashLabel(label) {
 }
 
 function approvedReleaseEvidence(pack) {
+  const candidateReviewManifest = reviewedCandidateManifest(pack);
   const targetCount = pack.assetPromptPlan.targets.length;
   return buildReleaseApprovalEvidence({
     pack,
@@ -177,7 +179,7 @@ function approvedReleaseEvidence(pack) {
       reviewedCandidateCount: targetCount,
       approvedCandidateCount: targetCount,
       rejectedCandidateCount: 0,
-      candidateManifestHash: hashLabel('candidate-review-manifest'),
+      candidateManifestHash: candidateReviewManifest.manifestHash,
       reviewerSignoffHash: hashLabel('candidate-reviewer'),
       reviewedAtMs: 152_300,
       productionPromotionApproved: false
@@ -188,6 +190,23 @@ function approvedReleaseEvidence(pack) {
       checklistHash: hashLabel('release-checklist'),
       reviewedAtMs: 152_350
     }
+  });
+}
+
+function reviewedCandidateManifest(pack) {
+  const reviewDecisions = Object.fromEntries(pack.assetPromptPlan.targets.map((target) => [
+    target.canonicalTarget,
+    {
+      reviewStatus: 'approved-candidate',
+      contentHash: hashLabel(`candidate-content:${target.canonicalTarget}`),
+      byteLength: 1024,
+      reviewerNoteHash: hashLabel(`review-note:${target.canonicalTarget}`)
+    }
+  ]));
+  return buildCandidateReviewManifest({
+    pack,
+    nowMs: 152_375,
+    reviewDecisions
   });
 }
 
@@ -238,6 +257,7 @@ test('GU-18 production release gate can pass only with explicit machine evidence
   invalidImportRejected = true;
 
   const diversityReport = suiteDiversityReport();
+  const candidateReviewManifest = reviewedCandidateManifest(pack);
   const persistenceReport = {
     durablePackStorage: reloadResult.reloadReport.durablePackStorage === true,
     restartReloadPass: reloadResult.generatedPack.packId === pack.packId && reloadResult.reloadReport.fallbackUsed === false,
@@ -254,6 +274,7 @@ test('GU-18 production release gate can pass only with explicit machine evidence
     diversityReport,
     publicCard,
     persistenceReport,
+    candidateReviewManifest,
     approvalEvidence: approvedReleaseEvidence(pack),
     nowMs: 152_500
   });
@@ -271,6 +292,7 @@ test('GU-18 production release gate can pass only with explicit machine evidence
   assert.equal(gate.approvalEvidence.candidateReview.productionPromotionApproved, false);
   assert.equal(gate.metrics.approvalEvidenceSchemaErrorCount, 0);
   assert.equal(gate.metrics.approvalEvidenceSecretLikeCount, 0);
+  assert.equal(gate.metrics.candidateReviewManifestHashMatchesEvidence, 1);
   assert.equal(gate.metrics.candidateReviewCoverageCount, pack.assetPromptPlan.targets.length);
   assert.equal(gate.metrics.replayabilityPromptCount, 10);
   assert.equal(gate.metrics.privateDataLeakCount, 0);

@@ -21,7 +21,8 @@ const GENERATED_PACK_SCHEMA_FILES = {
   releaseApprovalEvidence: 'release_approval_evidence.schema.json',
   productionReleaseGate: 'production_release_gate.schema.json',
   publicPackCard: 'public_pack_card.schema.json',
-  publicPackGallery: 'public_pack_gallery.schema.json'
+  publicPackGallery: 'public_pack_gallery.schema.json',
+  candidateReviewManifest: 'candidate_review_manifest.schema.json'
 };
 
 function clone(value) {
