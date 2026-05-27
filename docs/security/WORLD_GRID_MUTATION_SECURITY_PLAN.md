@@ -43,8 +43,8 @@ until the controls below are implemented and covered by deterministic tests.
   coverage proves rotation and explicit invalidation for both process-local and
   optional SQLite stores, browser coverage proves a pre-reset same-wallet token
   is rejected after session reset, and Playwright coverage proves the disconnect
-  invalidation endpoint rejects the old token before a new same-session token
-  succeeds.
+  invalidation endpoint and mocked provider disconnect callback path reject the
+  old token before a new same-session token succeeds.
 - V5.1+ mutating world-grid routes require an existing Founders Plot
   prerequisite and return `WORLD_GRID_PLOT_REQUIRED` when missing.
 - V5.1+ externally visible mutating prototype routes now require an
@@ -131,9 +131,9 @@ until the controls below are implemented and covered by deterministic tests.
   restart tokens plus browser same-wallet cross-session denial, same-session
   token rotation, explicit invalidation, and session-reset invalidation wiring;
   wallet/provider disconnect cleanup now has an explicit invalidation endpoint
-  and client disconnect hook; release promotion still needs final session-auth
-  integration, provider-specific logout callback signoff, and wallet/session
-  continuity review.
+  and client disconnect hook with mocked provider disconnect callback coverage;
+  release promotion still needs final session-auth integration, live
+  Privy/provider logout signoff, and wallet/session continuity review.
 - Session-auth and wallet-continuity checks that bind mutations to the current
   owner, not just to a public id or request body field.
 - Rate limits keyed by session and owner for public presence, claim planning,
@@ -175,9 +175,9 @@ until the controls below are implemented and covered by deterministic tests.
   same-wallet cross-session token reuse denial, and the current store coverage
   proves same-session token rotation plus explicit invalidation. Session reset
   and wallet/provider disconnect cleanup now invalidate current-session
-  world-grid tokens. Release promotion still needs final session-auth
-  integration, provider-specific logout callback signoff, and wallet/session
-  continuity review.
+  world-grid tokens, including the mocked provider callback path. Release
+  promotion still needs final session-auth integration, live Privy/provider
+  logout signoff, and wallet/session continuity review.
 - Current `WORLD_GRID_RATE_LIMIT_SQLITE_PATH` coverage is a mutation security
   foundation only; release promotion still needs final browser-session binding,
   wallet/session continuity, IP/risk-aware production sharing, and operational
@@ -189,6 +189,6 @@ until the controls below are implemented and covered by deterministic tests.
 ## Out Of Scope For This Hardening Pass
 
 This pass does not add final session-auth middleware, IP/risk-aware distributed
-rate limits, provider-specific logout callback signoff, or a public free-play
-security surface. Those controls remain release gates because the V5 world-grid
-branch is still prototype-gated.
+rate limits, live Privy/provider logout signoff, or a public free-play security
+surface. Those controls remain release gates because the V5 world-grid branch
+is still prototype-gated.

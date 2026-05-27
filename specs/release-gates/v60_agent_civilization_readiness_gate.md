@@ -216,10 +216,10 @@ persistence resilience, and security/product release review.
   this in `server/world_civilization/mutation_security.js`; release still
   requires applying the durable/session-bound CSRF foundation and current V5
   browser same-wallet cross-session denial plus token rotation/invalidation
-  proof plus wallet/provider disconnect invalidation endpoint evidence to V6
-  route/tool integration, durable/shared rate limits, final session/wallet
-  middleware, production browser coverage, audit integration,
-  provider-specific logout callback signoff, and security/product signoff.
+  proof plus wallet/provider disconnect invalidation endpoint and mocked
+  provider callback evidence to V6 route/tool integration, durable/shared rate
+  limits, final session/wallet middleware, production browser coverage, audit
+  integration, live Privy/provider logout signoff, and security/product signoff.
 - Worker-first V6 civic tools must pass the exposure gate before becoming
   runtime-callable. Current research-only coverage starts in
   `server/world_civilization/tool_exposure_gate.js`; release still requires

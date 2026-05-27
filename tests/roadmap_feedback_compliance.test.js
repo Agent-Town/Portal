@@ -701,7 +701,8 @@ test('world-grid CSRF policy is tracked as an M5 durable foundation', () => {
   assert.match(security, /pre-reset\s+same-wallet\s+token\s+is rejected after session reset/);
   assert.match(security, /\/api\/session\/world-grid-csrf\/invalidate/);
   assert.match(security, /wallet\/provider disconnect cleanup/);
-  assert.match(security, /provider-specific logout callback signoff/);
+  assert.match(security, /mocked provider disconnect callback coverage/);
+  assert.match(security, /live\s+Privy\/provider logout signoff/);
   assert.match(stateModel, /server\/world_grid\/csrf\.js/);
   assert.match(stateModel, /world_grid_csrf_tokens/);
   assert.match(stateModel, /WORLD_GRID_CSRF_SQLITE_PATH/);
@@ -712,6 +713,7 @@ test('world-grid CSRF policy is tracked as an M5 durable foundation', () => {
   assert.match(stateModel, /same-session token rotation/);
   assert.match(stateModel, /pre-reset tokens fail after `\/api\/session\/reset`/);
   assert.match(stateModel, /\/api\/session\/world-grid-csrf\/invalidate/);
+  assert.match(stateModel, /mocked provider\s+disconnect callback path/);
   assert.match(evidence, /Mutation CSRF guard/);
   assert.match(evidence, /tests\/world_grid_csrf_persistence\.test\.js/);
   assert.match(evidence, /e2e\/243_world_grid_csrf_session_binding\.spec\.js/);
@@ -724,11 +726,15 @@ test('world-grid CSRF policy is tracked as an M5 durable foundation', () => {
   assert.match(evidence, /WORLD_GRID_CSRF_REQUIRED=1/);
   assert.match(evidence, /separate Node process restarts/);
   assert.match(evidence, /old-token rejection after wallet\/provider disconnect invalidation/);
-  assert.match(evidence, /provider-specific logout callback signoff/);
+  assert.match(evidence, /mocked provider disconnect callback path/);
+  assert.match(evidence, /live Privy\/provider logout signoff/);
+  assert.match(evidence, /e2e\/243_world_grid_csrf_session_binding\.spec\.js/);
+  assert.match(evidence, /provider disconnect callback/);
   assert.match(serverSource, /app\.post\('\/api\/session\/world-grid-csrf\/invalidate'/);
   assert.match(serverSource, /invalidateWorldGridCsrfTokens\(owner\)/);
   assert.match(appSource, /invalidateWorldGridCsrfForWalletDisconnect/);
   assert.match(appSource, /\/api\/session\/world-grid-csrf\/invalidate/);
+  assert.match(appSource, /disconnectWallet\(\{ fromProvider: true \}\)/);
 });
 
 test('world-grid mutation rate-limit policy is tracked as an M5 durable foundation', () => {
