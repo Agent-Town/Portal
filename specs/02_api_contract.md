@@ -2800,7 +2800,7 @@ Release-gate invariants:
 - `evaluatedAtMs` must not be future-dated relative to validation time;
 - `publicReleaseEligible=true` requires all prerequisites to be true, `blockingReasons=[]`, diversity evidence including the release pack, diversity aggregate metrics that match per-pack rows/signatures/screenshots/comparisons, same-pack persistence evidence, same-pack public-card evidence, zero private-data leaks, zero missing assets, zero production image assets, explicit consent/cost/auth approval, candidate asset review, and a 64-hex human review signoff hash;
 - forged eligibility, mismatched blocking reasons, invalid gate pack ids, diversity evidence that excludes the release pack, metric-only diversity claims, mixed persistence evidence, mixed public-card evidence, approval evidence hash drift, future-dated approval evidence, future-dated gate reports, candidate-review approval evidence that predates its manifest, planned-only candidate-review approvals, approval evidence copied from another pack, secret-like fields, raw prompt instructions, production asset leaks, and private-card data fail validation;
-- oversized or noisy release-evidence request bodies fail before report construction and rejection responses return counts/paths/limits, not submitted evidence values;
+- oversized or noisy release-evidence request bodies and oversized evidence object keys fail before report construction and rejection responses return counts/redacted paths/limits, not submitted evidence values or oversized key text;
 - the route remains hidden in default gameplay unless `FEATURE_WORLD_GRID_GENERATED_PACKS` is enabled.
 
 ### POST `/api/world/generated-pack/release-evidence-bundle`
@@ -2829,9 +2829,9 @@ Response includes:
 - `validationReport`, which rejects missing release-gate context, source drift, claimed hashes or pack ids for unsupplied sources, mixed pack ids, failing generated-pack sources, failing playtest sources, failing persistence sources, failing public-card sources, failing approval-evidence sources, failing candidate-review manifest sources, copied diversity reports that exclude the release pack, invalid source pack-id shapes, bundles created before their bound gate, future-dated bundles, forged blocking reasons, forged prerequisite snapshots, approval evidence drift from the bound gate, missing ready-gate evidence, candidate-review metric tampering, unsafe request content, and boundary violations.
 
 Release-evidence-bundle invariants:
-- request bodies share the release-gate ingress guard for secret-like fields, secret-looking keys or values, raw prompt-instruction keys or values, request depth, node count, array size, object key count, and string length;
+- request bodies share the release-gate ingress guard for secret-like fields, secret-looking keys or values, raw prompt-instruction keys or values, request depth, node count, array size, object key count, object key length, and string length;
 - the generic tool dispatcher path `et.world.generated_pack.release_evidence_bundle` uses the same guard and returns the same fail-closed rejection code;
-- rejection responses must not echo raw submitted secrets, secret-looking keys or values, raw prompt-instruction keys or values, or oversized evidence values.
+- rejection responses must not echo raw submitted secrets, secret-looking keys or values, raw prompt-instruction keys or values, oversized object keys, or oversized evidence values.
 
 ### POST `/api/world/generated-pack/public-card`
 Publishes an unlisted public-safe card for a validated generated pack. This endpoint requires the generated-pack feature flag and the current wallet/session owner.

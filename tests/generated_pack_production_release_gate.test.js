@@ -1753,6 +1753,24 @@ test('GU-18/GU-19 release gate and evidence bundle APIs are generated-pack-gated
       assert.equal(unsafeReleaseInstructionKeyBody.error.details.rawInstructionPathCount > 0, true);
       assert.equal(JSON.stringify(unsafeReleaseInstructionKeyBody).includes(rawInstructionKey), false);
 
+      const oversizedKeyPrefix = 'oversized-evidence-key-should-not-echo';
+      const oversizedKey = `${oversizedKeyPrefix}-${'x'.repeat(9000)}`;
+      const oversizedKeyResponse = await fetch(`${baseUrl}/api/world/generated-pack/release-gate`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          approvalEvidence: {
+            schemaVersion: 'agent-town-generated-pack-release-approval-evidence-v1',
+            [oversizedKey]: 'metadata'
+          }
+        })
+      });
+      const oversizedKeyBody = await oversizedKeyResponse.json();
+      assert.equal(oversizedKeyResponse.status, 422, JSON.stringify(oversizedKeyBody));
+      assert.equal(oversizedKeyBody.error.code, 'GENPACK_RELEASE_EVIDENCE_REJECTED');
+      assert.equal(oversizedKeyBody.error.details.requestBoundProblemCount > 0, true);
+      assert.equal(JSON.stringify(oversizedKeyBody).includes(oversizedKeyPrefix), false);
+
       const unsafeBundleResponse = await fetch(`${baseUrl}/api/world/generated-pack/release-evidence-bundle`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
