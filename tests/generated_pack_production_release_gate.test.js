@@ -3036,10 +3036,43 @@ test('GU-18/GU-19 release gate and evidence bundle APIs are generated-pack-gated
       assert.equal(bundleBody.validationReport.metrics.missingSourceCount, bundleBody.releaseEvidenceBundle.metrics.missingSourceCount);
       assert.equal(bundleBody.validationReport.metrics.requiredSourceCount, bundleBody.releaseEvidenceBundle.metrics.requiredSourceCount);
       assert.equal(bundleBody.validationReport.metrics.suppliedSourceCount, bundleBody.releaseEvidenceBundle.metrics.presentSourceCount);
+      assert.equal(bundleBody.validationReport.metrics.productionImageAssetCount, bundleBody.releaseEvidenceBundle.metrics.productionImageAssetCount);
+      assert.equal(bundleBody.validationReport.metrics.privateDataLeakCount, bundleBody.releaseEvidenceBundle.metrics.privateDataLeakCount);
+      assert.equal(bundleBody.validationReport.metrics.productionImageAssetsCreated, false);
+      assert.equal(bundleBody.validationReport.metrics.externalProviderPrivateDataStored, false);
+      assert.equal(bundleBody.validationReport.metrics.canonicalServerRulesChanged, false);
+      assert.equal(bundleBody.validationReport.metrics.v6CivicMechanicsTouched, false);
+      assert.equal(bundleBody.validationReport.metrics.normalGameplayVisibilityChanged, false);
+      assert.equal(bundleBody.validationReport.metrics.generatedPackDefaultExposure, false);
+      assert.equal(bundleBody.validationReport.metrics.boundaryPreserved, true);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.sourceHashMismatchCount, 0);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.sourcePresenceMatchesHashes, true);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.sourceCoverageOk, true);
       assert.equal(bundleBody.releaseEvidenceBundle.constraints.productionImageAssetsCreated, false);
+
+      const boundaryFailureBody = {
+        publicCard: {
+          schemaVersion: 'agent-town-generated-pack-public-card-v1',
+          cardId: 'gen_card_boundary_failure_api',
+          packId: generateBody.generatedPack.packId,
+          moderation: {
+            privateDataLeakCount: 2,
+            blockedFieldCount: 0
+          }
+        }
+      };
+      const boundaryBundleResponse = await fetch(`${baseUrl}/api/world/generated-pack/release-evidence-bundle`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(boundaryFailureBody)
+      });
+      const boundaryBundleBody = await boundaryBundleResponse.json();
+      assert.equal(boundaryBundleResponse.status, 200, JSON.stringify(boundaryBundleBody));
+      assert.equal(boundaryBundleBody.releaseEvidenceBundle.metrics.privateDataLeakCount, 2);
+      assert.equal(boundaryBundleBody.validationReport.metrics.privateDataLeakCount, 2);
+      assert.equal(boundaryBundleBody.validationReport.metrics.productionImageAssetCount, 0);
+      assert.equal(boundaryBundleBody.validationReport.metrics.boundaryPreserved, false);
+      assert.equal(boundaryBundleBody.validationReport.ok, false);
 
       const toolBundleResponse = await fetch(`${baseUrl}/api/world/tool/et.world.generated_pack.release_evidence_bundle`, {
         method: 'POST',
@@ -3058,6 +3091,34 @@ test('GU-18/GU-19 release gate and evidence bundle APIs are generated-pack-gated
         toolBundleBody.data.validationReport.metrics.suppliedSourceCount,
         toolBundleBody.data.releaseEvidenceBundle.metrics.presentSourceCount
       );
+      assert.equal(
+        toolBundleBody.data.validationReport.metrics.productionImageAssetCount,
+        toolBundleBody.data.releaseEvidenceBundle.metrics.productionImageAssetCount
+      );
+      assert.equal(
+        toolBundleBody.data.validationReport.metrics.privateDataLeakCount,
+        toolBundleBody.data.releaseEvidenceBundle.metrics.privateDataLeakCount
+      );
+      assert.equal(toolBundleBody.data.validationReport.metrics.productionImageAssetsCreated, false);
+      assert.equal(toolBundleBody.data.validationReport.metrics.externalProviderPrivateDataStored, false);
+      assert.equal(toolBundleBody.data.validationReport.metrics.canonicalServerRulesChanged, false);
+      assert.equal(toolBundleBody.data.validationReport.metrics.v6CivicMechanicsTouched, false);
+      assert.equal(toolBundleBody.data.validationReport.metrics.normalGameplayVisibilityChanged, false);
+      assert.equal(toolBundleBody.data.validationReport.metrics.generatedPackDefaultExposure, false);
+      assert.equal(toolBundleBody.data.validationReport.metrics.boundaryPreserved, true);
+
+      const toolBoundaryBundleResponse = await fetch(`${baseUrl}/api/world/tool/et.world.generated_pack.release_evidence_bundle`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(boundaryFailureBody)
+      });
+      const toolBoundaryBundleBody = await toolBoundaryBundleResponse.json();
+      assert.equal(toolBoundaryBundleResponse.status, 200, JSON.stringify(toolBoundaryBundleBody));
+      assert.equal(toolBoundaryBundleBody.data.releaseEvidenceBundle.metrics.privateDataLeakCount, 2);
+      assert.equal(toolBoundaryBundleBody.data.validationReport.metrics.privateDataLeakCount, 2);
+      assert.equal(toolBoundaryBundleBody.data.validationReport.metrics.productionImageAssetCount, 0);
+      assert.equal(toolBoundaryBundleBody.data.validationReport.metrics.boundaryPreserved, false);
+      assert.equal(toolBoundaryBundleBody.data.validationReport.ok, false);
 
       const unsafeToolBundleResponse = await fetch(`${baseUrl}/api/world/tool/et.world.generated_pack.release_evidence_bundle`, {
         method: 'POST',

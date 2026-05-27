@@ -224,6 +224,7 @@ Status: prototype-gated
   "generatedImageAssetsCanChangeServerRules": false,
   "productionImageAssetCount": 0,
   "validationReportBoundaryMetricsMirrored": true,
+  "validationReportBoundaryMetricsApiMirrored": true,
   "externalImageModelUsed": false,
   "explicitConsentRequiredForImageGeneration": true,
   "costConsentModelApproved": true,
