@@ -73,6 +73,7 @@ function durableSnapshot(sqlitePath) {
   try {
     return {
       counts: store.counts(),
+      reports: store.listReports(),
       towns: store.listPublicTowns(),
       metadata: store.metadata()
     };
@@ -116,6 +117,27 @@ async function main() {
         publicTownId: publicTownIdArg,
         idempotencyKey: 'durable_public_presence_follow_b_again'
       }, headersFor(OWNER_B));
+    } else if (mode === 'report-abuse') {
+      mutation = await postJson(baseUrl, '/api/world/public-town/report-abuse', {
+        publicTownId: publicTownIdArg,
+        reason: 'impersonation',
+        note: 'Contains <script> plus token secret wallet details that must be redacted.',
+        idempotencyKey: 'durable_public_presence_report_b'
+      }, headersFor(OWNER_B));
+    } else if (mode === 'report-again') {
+      mutation = await postJson(baseUrl, '/api/world/public-town/report-abuse', {
+        publicTownId: publicTownIdArg,
+        reason: 'spam',
+        note: 'Changed report body should not create another report row.',
+        idempotencyKey: 'durable_public_presence_report_b_again'
+      }, headersFor(OWNER_B));
+    } else if (mode === 'report-self') {
+      mutation = await postJson(baseUrl, '/api/world/public-town/report-abuse', {
+        publicTownId: publicTownIdArg,
+        reason: 'spam',
+        note: 'Self report should fail.',
+        idempotencyKey: 'durable_public_presence_report_self'
+      }, headersFor(OWNER_A));
     } else if (mode === 'opt-out') {
       mutation = await postJson(baseUrl, '/api/world/public-presence/opt-out', {
         idempotencyKey: 'durable_public_presence_optout_a'
@@ -133,13 +155,27 @@ async function main() {
       }, headersFor(OWNER_B))
       : { status: 0, body: {} };
     const snapshot = durableSnapshot(publicPresencePath);
-    const serialized = JSON.stringify({ list: list.body, lookup: lookup.body, summarize: summarize.body });
+    const reportSerialized = JSON.stringify({
+      mutation: mutation.body?.report || null,
+      reports: snapshot.reports
+    });
+    const serialized = JSON.stringify({
+      list: list.body,
+      lookup: lookup.body,
+      mutation: mutation.body,
+      reports: snapshot.reports,
+      summarize: summarize.body
+    });
     writeJson({
-      ok: [0, 200].includes(mutation.status) && [0, 200].includes(followAgain.status),
+      ok: [0, 200, 400].includes(mutation.status) && [0, 200].includes(followAgain.status),
       mode,
       mutationStatus: mutation.status,
+      mutationErrorCode: mutation.body?.error?.code || '',
       followStatus: followAgain.status,
       publicTownId,
+      reportId: mutation.body.report?.reportId || snapshot.reports[0]?.reportId || '',
+      reportReason: mutation.body.report?.reasonCategory || snapshot.reports[0]?.reasonCategory || '',
+      reportNote: mutation.body.report?.note || snapshot.reports[0]?.note || '',
       townName: mutation.body.town?.townName || lookup.body.town?.townName || '',
       listStatus: list.status,
       lookupStatus: lookup.status,
@@ -148,6 +184,8 @@ async function main() {
       followCount: followAgain.body.followCount || 0,
       containsRawHtml: /<script|<img|onerror=/i.test(serialized),
       containsPrivateText: /secret|token|credential|provider|brain|wallet/i.test(serialized),
+      reportContainsRawHtml: /<script|<img|onerror=/i.test(reportSerialized),
+      reportContainsPrivateText: /secret|token|credential|provider|brain|wallet/i.test(reportSerialized),
       ...snapshot
     });
   });

@@ -4,6 +4,14 @@ const path = require('path');
 
 const WORLD_GRID_PUBLIC_PRESENCE_SCHEMA_VERSION = 'agent-town.v5.world-grid.public-presence.v1';
 const WORLD_GRID_PUBLIC_PRESENCE_MIGRATION_VERSION = 'world_grid_public_presence_v1';
+const PUBLIC_REPORT_PRIVATE_FIELD_RE = /(secret|token|credential|password|provider|brain|wallet)/ig;
+const PUBLIC_REPORT_REASON_CATEGORIES = new Set([
+  'spam',
+  'harassment',
+  'impersonation',
+  'unsafe_content',
+  'other'
+]);
 
 // Prototype/ephemeral process-local stores; release storage is documented in docs/technical/WORLD_GRID_STATE_MODEL.md.
 const presenceByOwner = new Map();
@@ -51,12 +59,35 @@ function ensureDurableSchema(db) {
     );
     CREATE INDEX IF NOT EXISTS idx_world_grid_public_follows_town
       ON world_grid_public_follows(public_town_id);
+
+    CREATE TABLE IF NOT EXISTS world_grid_public_abuse_reports (
+      report_id TEXT PRIMARY KEY,
+      reporter_account_id TEXT NOT NULL,
+      public_town_id TEXT NOT NULL,
+      reason_category TEXT NOT NULL,
+      note TEXT NOT NULL,
+      status TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      report_json TEXT NOT NULL,
+      migration_version TEXT NOT NULL,
+      schema_version TEXT NOT NULL,
+      UNIQUE(reporter_account_id, public_town_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_world_grid_public_reports_town_status
+      ON world_grid_public_abuse_reports(public_town_id, status);
+    CREATE INDEX IF NOT EXISTS idx_world_grid_public_reports_reporter
+      ON world_grid_public_abuse_reports(reporter_account_id, created_at);
   `);
 }
 
 function parseDurablePresence(row) {
   if (!row) return null;
   return JSON.parse(row.presence_json);
+}
+
+function parseDurableReport(row) {
+  if (!row) return null;
+  return JSON.parse(row.report_json);
 }
 
 function createWorldGridPublicPresenceStore({ sqlitePath } = {}) {
@@ -107,6 +138,23 @@ function createWorldGridPublicPresenceStore({ sqlitePath } = {}) {
         owner_account_id, public_town_id, created_at, migration_version, schema_version
       ) VALUES (?, ?, ?, ?, ?)
     `),
+    byReport: db.prepare(`
+      SELECT *
+      FROM world_grid_public_abuse_reports
+      WHERE reporter_account_id = ? AND public_town_id = ?
+      LIMIT 1
+    `),
+    insertReport: db.prepare(`
+      INSERT OR IGNORE INTO world_grid_public_abuse_reports (
+        report_id, reporter_account_id, public_town_id, reason_category,
+        note, status, created_at, report_json, migration_version, schema_version
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `),
+    listReports: db.prepare(`
+      SELECT *
+      FROM world_grid_public_abuse_reports
+      ORDER BY created_at ASC, report_id ASC
+    `),
     followCount: db.prepare(`
       SELECT COUNT(1) AS count
       FROM world_grid_public_follows
@@ -114,12 +162,15 @@ function createWorldGridPublicPresenceStore({ sqlitePath } = {}) {
     `),
     presenceCount: db.prepare('SELECT COUNT(1) AS count FROM world_grid_public_presence'),
     followsCount: db.prepare('SELECT COUNT(1) AS count FROM world_grid_public_follows'),
+    reportsCount: db.prepare('SELECT COUNT(1) AS count FROM world_grid_public_abuse_reports'),
     metadata: db.prepare(`
       SELECT migration_version, schema_version, COUNT(1) AS count
       FROM (
         SELECT migration_version, schema_version FROM world_grid_public_presence
         UNION ALL
         SELECT migration_version, schema_version FROM world_grid_public_follows
+        UNION ALL
+        SELECT migration_version, schema_version FROM world_grid_public_abuse_reports
       )
       GROUP BY migration_version, schema_version
       ORDER BY migration_version ASC, schema_version ASC
@@ -175,10 +226,35 @@ function createWorldGridPublicPresenceStore({ sqlitePath } = {}) {
     return Number(statements.followCount.get(String(ownerAccountId || '')).count || 0);
   }
 
+  function reportPublicTown(report = {}) {
+    const next = clone(report);
+    statements.insertReport.run(
+      String(next.reportId || ''),
+      String(next.reporterAccountId || ''),
+      String(next.publicTownId || ''),
+      String(next.reasonCategory || 'other'),
+      String(next.note || ''),
+      String(next.status || 'open'),
+      Number(next.createdAtMs) || Date.now(),
+      JSON.stringify(next),
+      WORLD_GRID_PUBLIC_PRESENCE_MIGRATION_VERSION,
+      WORLD_GRID_PUBLIC_PRESENCE_SCHEMA_VERSION
+    );
+    return parseDurableReport(statements.byReport.get(
+      String(next.reporterAccountId || ''),
+      String(next.publicTownId || '')
+    ));
+  }
+
+  function listReports() {
+    return statements.listReports.all().map(parseDurableReport);
+  }
+
   function counts() {
     return {
       presence: Number(statements.presenceCount.get().count || 0),
-      follows: Number(statements.followsCount.get().count || 0)
+      follows: Number(statements.followsCount.get().count || 0),
+      reports: Number(statements.reportsCount.get().count || 0)
     };
   }
 
@@ -202,8 +278,10 @@ function createWorldGridPublicPresenceStore({ sqlitePath } = {}) {
     counts,
     deletePresence,
     getPublicTown,
+    listReports,
     listPublicTowns,
     metadata,
+    reportPublicTown,
     savePresence,
     sqlitePath
   };
@@ -224,10 +302,11 @@ function getConfiguredWorldGridPublicPresenceStore(env = process.env) {
 }
 
 function closeWorldGridPublicPresenceStore() {
-  if (!durableSingleton) return;
-  durableSingleton.close();
+  if (durableSingleton) durableSingleton.close();
   durableSingleton = null;
   durableSingletonPath = '';
+  presenceByOwner.clear();
+  followsByOwner.clear();
 }
 
 function charmBandFromPlot(plotState) {
@@ -352,6 +431,60 @@ function followTown(owner, publicTownId = '') {
   };
 }
 
+function reportIdFor(owner, publicTownId = '') {
+  return `public_report_${owner.ownerAccountId}_${String(publicTownId || '')}`.replace(/[^a-zA-Z0-9_:-]/g, '_');
+}
+
+function normalizeReportReason(reason = '') {
+  const normalized = String(reason || '').trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '_');
+  return PUBLIC_REPORT_REASON_CATEGORIES.has(normalized) ? normalized : 'other';
+}
+
+function normalizeReportNote(note = '') {
+  const stripped = String(note || '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim();
+  const redacted = stripped.replace(PUBLIC_REPORT_PRIVATE_FIELD_RE, '[redacted]');
+  return (redacted || 'Public town reported for review.').slice(0, 160);
+}
+
+function buildPublicTownReport(owner, town, reason = '', note = '') {
+  return {
+    reportId: reportIdFor(owner, town.publicTownId),
+    reporterAccountId: owner.ownerAccountId,
+    publicTownId: town.publicTownId,
+    reasonCategory: normalizeReportReason(reason),
+    note: normalizeReportNote(note),
+    status: 'open',
+    createdAtMs: Date.now(),
+    privacy: {
+      redacted: true,
+      privateDataIncluded: false,
+      dataClasses: ['public_town_abuse_report']
+    }
+  };
+}
+
+function reportPublicTown(owner, publicTownId = '', reason = '', note = '') {
+  const town = getPublicTown(publicTownId);
+  if (!town) {
+    const error = new Error('NOT_FOUND');
+    error.details = { publicTownId };
+    throw error;
+  }
+  if (town.accountPublicId === owner.ownerAccountId) {
+    const error = new Error('INVALID_PUBLIC_TOWN');
+    error.details = { reason: 'CANNOT_REPORT_SELF' };
+    throw error;
+  }
+  const report = buildPublicTownReport(owner, town, reason, note);
+  const durableStore = getConfiguredWorldGridPublicPresenceStore();
+  if (durableStore) return clone(durableStore.reportPublicTown(report));
+  const key = `${owner.ownerAccountId}:${town.publicTownId}`;
+  const reports = followsByOwner.get('__public_reports__') || new Map();
+  if (!reports.has(key)) reports.set(key, clone(report));
+  followsByOwner.set('__public_reports__', reports);
+  return clone(reports.get(key));
+}
+
 function summarizeNeighbor(publicTownId = '') {
   const town = getPublicTown(publicTownId);
   if (!town) {
@@ -377,5 +510,6 @@ module.exports = {
   listPublicTowns,
   optInPublicPresence,
   optOutPublicPresence,
+  reportPublicTown,
   summarizeNeighbor
 };

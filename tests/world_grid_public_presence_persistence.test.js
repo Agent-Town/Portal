@@ -93,3 +93,52 @@ test('world-grid durable public presence and follows survive restarts and opt-ou
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('world-grid durable public presence abuse reports survive restarts without private text', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-world-grid-public-report-'));
+  const publicPresencePath = path.join(dir, 'world-grid-public-presence.sqlite');
+  const storePath = path.join(dir, 'portal-store.sqlite');
+  try {
+    const seeded = runProbe('seed', publicPresencePath, storePath);
+    const reported = runProbe('report-abuse', publicPresencePath, storePath, seeded.publicTownId);
+    const reportedAgain = runProbe('report-again', publicPresencePath, storePath, seeded.publicTownId);
+    const selfReport = runProbe('report-self', publicPresencePath, storePath, seeded.publicTownId);
+    const reopened = runProbe('read', publicPresencePath, storePath, seeded.publicTownId);
+
+    assert.equal(reported.ok, true);
+    assert.equal(reported.mutationStatus, 200);
+    assert.match(reported.reportId, /^public_report_/);
+    assert.equal(reported.reportReason, 'impersonation');
+    assert.equal(reported.counts.reports, 1);
+    assert.equal(reported.reports.length, 1);
+    assert.equal(reported.reports[0].privacy.privateDataIncluded, false);
+    assert.equal(reported.reportContainsRawHtml, false);
+    assert.equal(reported.reportContainsPrivateText, false);
+    assert.match(reported.reportNote, /\[redacted\]/);
+    assert.deepEqual(reported.metadata, [{
+      migrationVersion: 'world_grid_public_presence_v1',
+      schemaVersion: 'agent-town.v5.world-grid.public-presence.v1',
+      count: 3
+    }]);
+
+    assert.equal(reportedAgain.ok, true);
+    assert.equal(reportedAgain.mutationStatus, 200);
+    assert.equal(reportedAgain.reportId, reported.reportId);
+    assert.equal(reportedAgain.reportReason, 'impersonation');
+    assert.equal(reportedAgain.counts.reports, 1);
+    assert.equal(reportedAgain.reports.length, 1);
+
+    assert.equal(selfReport.ok, true);
+    assert.equal(selfReport.mutationStatus, 400);
+    assert.equal(selfReport.mutationErrorCode, 'INVALID_PUBLIC_TOWN');
+    assert.equal(selfReport.counts.reports, 1);
+
+    assert.equal(reopened.ok, true);
+    assert.equal(reopened.mutationStatus, 0);
+    assert.equal(reopened.counts.reports, 1);
+    assert.equal(reopened.reportId, reported.reportId);
+    assert.equal(reopened.reportContainsPrivateText, false);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

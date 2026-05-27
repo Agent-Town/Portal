@@ -194,11 +194,13 @@ function inferObjectRef(response = {}, surface = '') {
   const request = response?.request || data.request || {};
   const contribution = response?.contribution || data.contribution || {};
   const reward = response?.reward || data.reward || {};
+  const report = response?.report || data.report || {};
   return firstString(
     claim.claimId,
     response?.claimId,
     town.publicTownId,
     response?.publicTownId,
+    report.reportId,
     request.requestId,
     contribution.contributionId,
     reward.rewardId,

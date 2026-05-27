@@ -47,7 +47,7 @@ release-grade store is explicitly implemented and tested. Current stores are:
 | Region generation | Deterministic synthesis from owner identity in `server/world_grid/region.js` | Prototype, recomputed on demand |
 | Camera/focus preferences | Process-local `Map` in `server/world_grid/preferences.js`; optional SQLite `world_grid_region_preferences` table when `WORLD_GRID_REGION_PREFS_SQLITE_PATH` is configured | Durable foundation for V5.0 camera/focus state, owner/region indexes, schema/migration versions, and restart proof; release promotion still needs final browser-session preference continuity and production replay coverage |
 | Territory claims | Process-local `Map` in `server/world_grid/claims.js`; optional SQLite `world_grid_claims` table when `WORLD_GRID_CLAIMS_SQLITE_PATH` is configured | Durable foundation for planned/claimed V5.1 claim state, cancel cleanup, owner/status/cell indexes, schema/migration versions, restart proof, and cross-owner route-mutation denial; release promotion still needs final replay reconstruction, stale-session coverage, and production session-auth coverage |
-| Public presence/follows | Process-local `Map` values in `server/world_grid/public_presence.js`; optional SQLite `world_grid_public_presence` and `world_grid_public_follows` tables when `WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH` is configured | Durable foundation for V5.2 opt-in/list/lookup/follow/opt-out state, owner/town indexes, schema/migration versions, restart proof, and inbound follow cleanup on opt-out; release promotion still needs abuse reports, stale-session coverage, and public privacy review |
+| Public presence/follows/reports | Process-local `Map` values in `server/world_grid/public_presence.js`; optional SQLite `world_grid_public_presence`, `world_grid_public_follows`, and `world_grid_public_abuse_reports` tables when `WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH` is configured | Durable foundation for V5.2 opt-in/list/lookup/follow/opt-out/report state, owner/town/reporter indexes, schema/migration versions, restart proof, inbound follow cleanup on opt-out, and private-text redaction in abuse reports; release promotion still needs stale-session coverage, retention policy, and final public privacy review |
 | Civic service requests/reputation | Process-local `Map` values in `server/world_grid/services.js`; optional SQLite `world_grid_service_requests` and `world_grid_service_reputation` tables when `WORLD_GRID_SERVICES_SQLITE_PATH` is configured | Durable foundation for V5.3 request/accept/report state, owner/service/status indexes, service reputation counters, schema/migration versions, restart proof, and duplicate accept/report safety after reopen; release promotion still needs dispute workflow, stale-session coverage, and final privacy review |
 | World event contributions/rewards | Process-local `Map` values in `server/world_grid/events.js`; optional SQLite `world_grid_event_contributions` and `world_grid_event_rewards` tables when `WORLD_GRID_EVENTS_SQLITE_PATH` is configured | Durable foundation for V5.4 contribution/reward state, owner/event/day/settlement indexes, cap replay, schema/migration versions, restart proof, and duplicate contribution/reward safety after reopen; release promotion still needs rollback policy, multi-event migration coverage, and final public ledger review |
 | Sandbox participants/actions/snapshots/cells | Process-local arrays/maps and mutable in-memory district cells in `server/world_grid/sandbox.js`; optional SQLite `world_grid_sandbox_participants`, `world_grid_sandbox_actions`, `world_grid_sandbox_snapshots`, and `world_grid_sandbox_cells` tables when `WORLD_GRID_SANDBOX_SQLITE_PATH` is configured | Durable foundation for V5.5 participant/action/snapshot/cell state, participant owner key plus action/cell indexes, schema/migration versions, restart proof, moderation rejection replay, rollback replay, and private-town isolation; release promotion still needs abuse reports, cross-owner moderation review, stale-session cleanup, and final sandbox privacy review |
@@ -90,11 +90,13 @@ Before any V5 world-grid slice can claim release-grade persistence, it needs:
   rows after restart, and a different owner cannot mutate a persisted claim
   region through route parameters; stale-session handling, final production
   session-auth coverage, and release replay reconstruction remain gates.
-- Durable public presence and follow rows with owner/town indexes and restart
-  persistence for the V5.2 public discovery lifecycle. Current SQLite public
-  presence coverage proves opt-in/list/lookup/follow/opt-out across separate
-  Node lifetimes and clears inbound follows on opt-out; stale-session,
-  abuse-report, and final privacy-review coverage remain gates.
+- Durable public presence, follow, and abuse-report rows with owner/town/reporter
+  indexes and restart persistence for the V5.2 public discovery lifecycle.
+  Current SQLite public presence coverage proves opt-in/list/lookup/follow/
+  opt-out across separate Node lifetimes, clears inbound follows on opt-out,
+  stores one abuse report per reporter/town, rejects self-reports, and redacts
+  private-looking report text; stale-session handling, retention policy, and
+  final privacy-review coverage remain gates.
 - Durable service request and reputation rows with owner/service/status indexes
   and restart persistence for the V5.3 advice lifecycle. Current SQLite service
   coverage proves redacted request inputs, accepted/reported request state,

@@ -2770,6 +2770,13 @@ are read-only and do not create Founders Plot state.
 V5.2 public presence mutations require the Founders Plot prerequisite. Public
 strings are public-safe data and must be escaped or DOM-rendered by clients.
 
+### POST `/api/world/public-town/report-abuse`
+V5.2 abuse-report mutations require the Founders Plot prerequisite and an
+idempotency key. The route records only public-town report metadata, rejects
+self-reports, returns `mutationApplied: false`, and must not include private
+town, wallet, provider, brain, credential, token, or runtime data in the report
+payload.
+
 ### POST `/api/world/services/*`
 V5.3 civic service advice mutations require the Founders Plot prerequisite.
 Accepted service results are advice-only and return `mutationApplied: false`
@@ -2806,10 +2813,12 @@ route-mutation denial; this is only a foundation until stale-session handling,
 final production session-auth coverage, and release replay reconstruction are
 complete. When
 `WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH` is configured, V5.2 public
-presence/follow rows persist opt-in public town cards and follow edges with
-owner/town indexes, schema versioning, and migration metadata; this is only a
-foundation until stale-session, abuse-report, retention, and final privacy
-coverage are complete. When `WORLD_GRID_SERVICES_SQLITE_PATH` is configured,
+presence/follow/report rows persist opt-in public town cards, follow edges, and
+abuse-report metadata with owner/town/reporter indexes, schema versioning,
+migration metadata, restart proof, duplicate reporter/town suppression,
+self-report rejection, and private-looking report text redaction; this is only a
+foundation until stale-session, retention, moderation workflow integration, and
+final privacy coverage are complete. When `WORLD_GRID_SERVICES_SQLITE_PATH` is configured,
 V5.3 service request/reputation rows persist redacted advice requests,
 accepted/reported request state, and service reputation counters with
 owner/service/status indexes, schema versioning, and migration metadata; this is

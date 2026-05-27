@@ -258,6 +258,21 @@ async function seedRouteMatrix(baseUrl) {
     result: followed
   }));
 
+  const publicReportBody = {
+    publicTownId: ownerBPresence.body.town.publicTownId,
+    reason: 'spam',
+    note: 'Route matrix public report with token secret text.',
+    idempotencyKey: 'route_matrix_public_report_001'
+  };
+  const publicReported = await postJson(baseUrl, '/api/world/public-town/report-abuse', publicReportBody, ROUTE_OWNER_A);
+  assertOk(publicReported, 'PUBLIC_REPORT');
+  cases.push(caseRecord({
+    route: '/api/world/public-town/report-abuse',
+    body: publicReportBody,
+    conflictBody: { ...publicReportBody, reason: 'impersonation', note: 'Changed report category.' },
+    result: publicReported
+  }));
+
   const optOutBody = {
     idempotencyKey: 'route_matrix_public_opt_out_001'
   };

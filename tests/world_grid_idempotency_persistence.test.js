@@ -41,6 +41,7 @@ const EXPECTED_ROUTE_SURFACES = [
   '/api/world/public-presence/opt-in',
   '/api/world/public-presence/opt-out',
   '/api/world/follow-town',
+  '/api/world/public-town/report-abuse',
   '/api/world/services/request-advice',
   '/api/world/services/accept-result',
   '/api/world/services/report-issue',
@@ -114,7 +115,7 @@ test('world-grid durable idempotency rows replay every V5.1-V5.5 mutating route 
     const conflicted = runProbe('route-matrix-conflict', sqlitePath, storePath, scenarioPath);
 
     assert.equal(seeded.ok, true);
-    assert.equal(seeded.caseCount, 18);
+    assert.equal(seeded.caseCount, 19);
     assert.equal(seeded.durableCount, seeded.caseCount);
     for (const surface of EXPECTED_ROUTE_SURFACES) {
       assert.equal(seeded.surfaces.includes(surface), true, surface);

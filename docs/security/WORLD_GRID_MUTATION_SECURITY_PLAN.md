@@ -44,10 +44,12 @@ until the controls below are implemented and covered by deterministic tests.
   reopens again as a claimed route, rejects a different owner mutating the
   persisted claim region, and removes durable rows on cancel after restart.
 - When `WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH` is configured, V5.2 public
-  presence and follow state writes durable SQLite rows with owner, public-town,
-  schema, and migration metadata. Current restart coverage proves opt-in,
-  listing, lookup, follow, summary, and opt-out behavior across separate Node
-  process lifetimes, including inbound follow cleanup when a town opts out.
+  presence, follow, and abuse-report state writes durable SQLite rows with
+  owner, reporter, public-town, status, schema, and migration metadata. Current
+  restart coverage proves opt-in, listing, lookup, follow, summary, report, and
+  opt-out behavior across separate Node process lifetimes, including inbound
+  follow cleanup when a town opts out, one abuse report per reporter/town,
+  self-report rejection, and private-looking report text redaction.
 - When `WORLD_GRID_SERVICES_SQLITE_PATH` is configured, V5.3 civic service
   request and reputation state writes durable SQLite rows with owner, service,
   status, schema, and migration metadata. Current restart coverage proves
@@ -120,8 +122,9 @@ until the controls below are implemented and covered by deterministic tests.
   session-auth coverage, release replay reconstruction, and public-surface store
   persistence coverage.
 - Current `WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH` coverage is a V5.2 storage
-  foundation only; release promotion still needs stale-session, abuse-report,
-  retention, and final public-privacy review coverage.
+  foundation only; release promotion still needs stale-session handling,
+  retention policy, moderation workflow integration, and final public-privacy
+  review coverage.
 - Current `WORLD_GRID_SERVICES_SQLITE_PATH` coverage is a V5.3 storage
   foundation only; release promotion still needs stale-session, dispute workflow,
   retention, and final service privacy review coverage.

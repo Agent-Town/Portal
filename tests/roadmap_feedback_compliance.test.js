@@ -391,7 +391,9 @@ test('world-grid audit replay policy is tracked as an M3 release storage control
   assert.match(security, /completes from durable claim state/);
   assert.match(security, /rejects a different owner mutating the\s+persisted claim region/);
   assert.match(security, /removes durable rows on cancel after restart/);
-  assert.match(security, /inbound follow cleanup/);
+  assert.match(security, /inbound\s+follow cleanup/);
+  assert.match(security, /world_grid_public_abuse_reports|one abuse report per reporter\/town/);
+  assert.match(security, /private-looking report text redaction/);
   assert.match(security, /duplicate accept\/report safety/);
   assert.match(security, /duplicate\s+contribution\/reward safety/);
   assert.match(security, /rollback\s+snapshots, cell props, leave state/);
@@ -403,6 +405,7 @@ test('world-grid audit replay policy is tracked as an M3 release storage control
   assert.match(stateModel, /world_grid_claims/);
   assert.match(stateModel, /world_grid_public_presence/);
   assert.match(stateModel, /world_grid_public_follows/);
+  assert.match(stateModel, /world_grid_public_abuse_reports/);
   assert.match(stateModel, /world_grid_service_requests/);
   assert.match(stateModel, /world_grid_service_reputation/);
   assert.match(stateModel, /world_grid_event_contributions/);
@@ -415,7 +418,9 @@ test('world-grid audit replay policy is tracked as an M3 release storage control
   assert.match(stateModel, /planned and\s+claimed state reopens across separate Node lifetimes/);
   assert.match(stateModel, /cancel removes durable\s+rows after restart/);
   assert.match(stateModel, /different owner cannot mutate a persisted claim\s+region through route parameters/);
-  assert.match(stateModel, /opt-in\/list\/lookup\/follow\/opt-out across separate\s+Node lifetimes/);
+  assert.match(stateModel, /opt-in\/list\/lookup\/follow\/\s+opt-out across separate\s+Node lifetimes/);
+  assert.match(stateModel, /stores one abuse report per reporter\/town/);
+  assert.match(stateModel, /private-looking report text/);
   assert.match(stateModel, /redacted request inputs, accepted\/reported request state,\s+reputation counters/);
   assert.match(stateModel, /contribution totals, reward state, duplicate\s+contribution\/reward safety/);
   assert.match(stateModel, /participants,\s+moderated action records, rejected action records,\s+rollback snapshots/);
@@ -434,6 +439,9 @@ test('world-grid audit replay policy is tracked as an M3 release storage control
   assert.match(evidence, /remove durable rows on cancel after restart/);
   assert.match(evidence, /Durable public presence foundation/);
   assert.match(evidence, /tests\/world_grid_public_presence_persistence\.test\.js/);
+  assert.match(evidence, /world_grid_public_abuse_reports/);
+  assert.match(evidence, /duplicate reporter\/town reports/);
+  assert.match(evidence, /private-looking abuse-report text/);
   assert.match(evidence, /Durable services foundation/);
   assert.match(evidence, /tests\/world_grid_services_persistence\.test\.js/);
   assert.match(evidence, /Durable events foundation/);

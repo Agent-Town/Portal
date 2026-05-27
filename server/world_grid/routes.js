@@ -14,6 +14,7 @@ const {
   listPublicTowns,
   optInPublicPresence,
   optOutPublicPresence,
+  reportPublicTown,
   summarizeNeighbor
 } = require('./public_presence');
 const {
@@ -788,6 +789,21 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       sendIdempotentMutation(req, res, payload, '/api/world/follow-town', () => {
         const result = followTown(payload.owner, req.body?.publicTownId);
         return { ok: true, featureFlags: payload.featureFlags, ...result };
+      });
+    } catch (error) {
+      const normalized = normalizeError(error);
+      const status = statusForWorldGridError(normalized);
+      res.status(status).json({ ok: false, error: normalized });
+    }
+  });
+
+  router.post('/api/world/public-town/report-abuse', (req, res) => {
+    try {
+      const payload = buildRegionPayload(req, res);
+      requirePublicEnabled(payload.featureFlags);
+      sendIdempotentMutation(req, res, payload, '/api/world/public-town/report-abuse', () => {
+        const report = reportPublicTown(payload.owner, req.body?.publicTownId, req.body?.reason, req.body?.note);
+        return { ok: true, featureFlags: payload.featureFlags, report, mutationApplied: false };
       });
     } catch (error) {
       const normalized = normalizeError(error);

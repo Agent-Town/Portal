@@ -123,9 +123,11 @@ gate below has implementation, deterministic tests, and security/product signoff
 - V5.2 Public Presence and Safe Player Discovery has XSS-safe rendering,
   opt-in/out, redaction, abuse reporting, and privacy review. Current V5.2
   storage evidence includes the `WORLD_GRID_PUBLIC_PRESENCE_SQLITE_PATH`
-  foundation for public presence/follow restart proof, but release promotion
-  still requires abuse-report, retention, stale-session, and final privacy
-  coverage in the V5 gate.
+  foundation for public presence/follow/report restart proof, duplicate
+  reporter/town report suppression, self-report rejection, and private-looking
+  abuse-report text redaction, but release promotion still requires retention,
+  stale-session, moderation workflow integration, and final privacy coverage in
+  the V5 gate.
 - V5.3 Civic Service Advice Prototype proves input redaction, output schemas,
   reputation bounds, dispute handling, and no hidden mutation. Current V5.3
   storage evidence includes the `WORLD_GRID_SERVICES_SQLITE_PATH` foundation for

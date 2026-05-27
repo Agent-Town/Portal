@@ -332,6 +332,7 @@ test('mutating world-grid prototype routes require idempotency keys after plot p
       ['/api/world/public-presence/opt-in', { townName: 'Idempotency Town', displayName: 'Founder' }],
       ['/api/world/public-presence/opt-out', {}],
       ['/api/world/follow-town', { publicTownId: 'public_missing' }],
+      ['/api/world/public-town/report-abuse', { publicTownId: 'public_missing', reason: 'spam' }],
       ['/api/world/services/request-advice', { serviceId: 'service_route_advisor', input: {} }],
       ['/api/world/services/accept-result', { requestId: 'request_missing' }],
       ['/api/world/services/report-issue', { requestId: 'request_missing', reason: 'test' }],
@@ -569,6 +570,23 @@ test('all externally visible mutating world-grid routes replay exact idempotent 
       route: '/api/world/follow-town',
       body: { publicTownId: publicOwnerB.town.publicTownId, idempotencyKey: 'matrix_follow_town_001' },
       conflictBody: { publicTownId: publicOwnerA.town.publicTownId, idempotencyKey: 'matrix_follow_town_001' }
+    });
+    await assertWorldGridRouteIdempotency({
+      baseUrl,
+      headers: headersA,
+      route: '/api/world/public-town/report-abuse',
+      body: {
+        publicTownId: publicOwnerB.town.publicTownId,
+        reason: 'spam',
+        note: 'Matrix report with token secret text.',
+        idempotencyKey: 'matrix_public_report_001'
+      },
+      conflictBody: {
+        publicTownId: publicOwnerB.town.publicTownId,
+        reason: 'impersonation',
+        note: 'Changed report reason.',
+        idempotencyKey: 'matrix_public_report_001'
+      }
     });
     await assertWorldGridRouteIdempotency({
       baseUrl,
