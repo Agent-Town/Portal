@@ -10,6 +10,7 @@ const {
   validateCivicProposal,
   validateCivicVote,
   validateModerationDecision,
+  validateModerationReview,
   validatePublicWorksContribution,
   validateReputationRecord,
   validateRollbackPlan,
@@ -319,6 +320,48 @@ test('V6 moderation, action, rollback, and audit schemas require traceable safet
     redactedFields: []
   });
   assert.equal(moderation.ok, true, moderation.errors.join('\n'));
+
+  const moderationReview = validateModerationReview({
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    reviewId: 'modreview_bridge_text_appeal_001',
+    decisionId: 'moderation_bridge_text_001',
+    subjectRef: 'proposal_public_works_bridge_001',
+    surface: 'public_works',
+    policyVersion: 'policy_v6_public_001',
+    reviewType: 'appeal',
+    status: 'escalated',
+    requestedBy: actor(),
+    reviewerKind: 'human',
+    sourceRefs: ['public_report_bridge_text_001'],
+    reasons: ['Public abuse report escalated this civic text for human review.'],
+    privacy: privacy({ dataClasses: ['public_audit_summary'] })
+  });
+  assert.equal(moderationReview.ok, true, moderationReview.errors.join('\n'));
+
+  const unsafeReview = validateModerationReview({
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    reviewId: 'modreview_bridge_text_appeal_002',
+    decisionId: 'moderation_bridge_text_001',
+    subjectRef: 'proposal_public_works_bridge_001',
+    surface: 'public_works',
+    policyVersion: 'policy_v6_public_001',
+    reviewType: 'appeal',
+    status: 'queued',
+    requestedBy: {
+      kind: 'agent',
+      accountId: 'acct_v6_human_001',
+      agentId: 'agent_civic_clover_001'
+    },
+    reviewerKind: 'system',
+    sourceRefs: ['public_report_bridge_text_002'],
+    reasons: ['Contains sk-test-secret-value'],
+    privacy: privacy({ privateDataIncluded: true })
+  });
+  assert.equal(unsafeReview.ok, false);
+  assert.match(unsafeReview.errors.join('\n'), /requestedBy.kind unsupported/);
+  assert.match(unsafeReview.errors.join('\n'), /reviewerKind must be human/);
+  assert.match(unsafeReview.errors.join('\n'), /privateDataIncluded/);
+  assert.match(unsafeReview.errors.join('\n'), /private data forbidden/);
 
   const rollback = validateRollbackPlan(rollbackPlan());
   assert.equal(rollback.ok, true, rollback.errors.join('\n'));

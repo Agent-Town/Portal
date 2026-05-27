@@ -174,8 +174,10 @@ gate below has implementation, deterministic tests, and security/product signoff
 - Moderation must cover proposal text, attached media, sandbox actions, civic
   effects, public profile surfaces, and agent-authored content. Current
   research-only storage starts this in
-  `server/world_civilization/moderation.js`; release still requires appeals,
-  human-review workflow, abuse-report handling, media review, and full
+  `server/world_civilization/moderation.js` with durable decisions plus
+  human review/appeal records, abuse-report source references, and
+  `moderation.reviewed`/`moderation.appealed` audit rows; release still requires
+  production review tooling, appeals operations, media review, and full
   public-surface integration.
 - Rollback must exist for every public civic effect, with clear irreversible
   action exclusions. Current research-only storage starts this in

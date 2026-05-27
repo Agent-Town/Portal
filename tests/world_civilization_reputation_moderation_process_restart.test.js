@@ -48,9 +48,11 @@ test('V6 reputation and moderation stores survive separate Node process restarts
   try {
     const reputationSeed = runProbe('seed-reputation', paths);
     const moderationSeed = runProbe('seed-moderation', paths);
+    const moderationReviewSeed = runProbe('seed-moderation-review', paths);
     const snapshot = runProbe('snapshot', paths);
     const reputationRetry = runProbe('seed-reputation', paths);
     const moderationRetry = runProbe('seed-moderation', paths);
+    const moderationReviewRetry = runProbe('seed-moderation-review', paths);
     const finalSnapshot = runProbe('snapshot', paths);
 
     assert.equal(reputationSeed.ok, true);
@@ -69,6 +71,7 @@ test('V6 reputation and moderation stores survive separate Node process restarts
     assert.equal(moderationSeed.decisionId, 'moderation_restart_civic_notice_001');
     assert.equal(moderationSeed.reputationCount, 1);
     assert.equal(moderationSeed.moderationCount, 1);
+    assert.equal(moderationSeed.moderationReviewCount, 0);
     assert.equal(moderationSeed.auditCount, 2);
     assert.equal(moderationSeed.moderationSummary.decisionCount, 1);
     assert.equal(moderationSeed.moderationSummary.needsReviewCount, 1);
@@ -76,28 +79,49 @@ test('V6 reputation and moderation stores survive separate Node process restarts
     assert.equal(moderationSeed.moderationSummary.privateDataIncluded, false);
     assert.equal(moderationSeed.moderationSummary.executionStatus, 'not_executable');
 
+    assert.equal(moderationReviewSeed.ok, true);
+    assert.equal(moderationReviewSeed.duplicate, false);
+    assert.equal(moderationReviewSeed.reviewId, 'modreview_restart_civic_notice_appeal_001');
+    assert.equal(moderationReviewSeed.reputationCount, 1);
+    assert.equal(moderationReviewSeed.moderationCount, 1);
+    assert.equal(moderationReviewSeed.moderationReviewCount, 1);
+    assert.equal(moderationReviewSeed.auditCount, 3);
+    assert.equal(moderationReviewSeed.moderationSummary.reviewCount, 1);
+    assert.equal(moderationReviewSeed.moderationSummary.appealCount, 1);
+    assert.equal(moderationReviewSeed.moderationSummary.latestReviewId, 'modreview_restart_civic_notice_appeal_001');
+    assert.equal(moderationReviewSeed.moderationSummary.privateDataIncluded, false);
+    assert.equal(moderationReviewSeed.moderationSummary.executionStatus, 'not_executable');
+
     assert.equal(snapshot.ok, true);
     assert.equal(snapshot.replayOk, true);
-    assert.equal(snapshot.replayReport.entryCount, 2);
+    assert.equal(snapshot.replayReport.entryCount, 3);
     assert.equal(snapshot.replayReport.chainValid, true);
     assert.equal(snapshot.replayReport.privacySafe, true);
     assert.equal(snapshot.replayReport.appliesWorldState, false);
     assert.deepEqual(snapshot.replayReport.byActionType, {
       'moderation.decided': 1,
+      'moderation.appealed': 1,
       'reputation.recorded': 1
     });
-    assert.deepEqual(snapshot.replayReport.byMigrationVersion, { v1: 2 });
+    assert.deepEqual(snapshot.replayReport.byMigrationVersion, { v1: 3 });
 
     assert.equal(reputationRetry.duplicate, true);
     assert.equal(reputationRetry.reputationCount, 1);
     assert.equal(reputationRetry.moderationCount, 1);
-    assert.equal(reputationRetry.auditCount, 2);
+    assert.equal(reputationRetry.moderationReviewCount, 1);
+    assert.equal(reputationRetry.auditCount, 3);
     assert.equal(moderationRetry.duplicate, true);
     assert.equal(moderationRetry.reputationCount, 1);
     assert.equal(moderationRetry.moderationCount, 1);
-    assert.equal(moderationRetry.auditCount, 2);
+    assert.equal(moderationRetry.moderationReviewCount, 1);
+    assert.equal(moderationRetry.auditCount, 3);
+    assert.equal(moderationReviewRetry.duplicate, true);
+    assert.equal(moderationReviewRetry.reputationCount, 1);
+    assert.equal(moderationReviewRetry.moderationCount, 1);
+    assert.equal(moderationReviewRetry.moderationReviewCount, 1);
+    assert.equal(moderationReviewRetry.auditCount, 3);
     assert.equal(finalSnapshot.replayOk, true);
-    assert.equal(finalSnapshot.replayReport.entryCount, 2);
+    assert.equal(finalSnapshot.replayReport.entryCount, 3);
     assert.equal(finalSnapshot.replayReport.latestEntryHash, snapshot.replayReport.latestEntryHash);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });

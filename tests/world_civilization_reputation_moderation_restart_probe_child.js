@@ -40,6 +40,32 @@ function moderationDecision(overrides = {}) {
   };
 }
 
+function moderationReview(overrides = {}) {
+  return {
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    reviewId: 'modreview_restart_civic_notice_appeal_001',
+    decisionId: 'moderation_restart_civic_notice_001',
+    subjectRef: MODERATION_SUBJECT,
+    surface: 'civic_text',
+    policyVersion: 'policy_v6_restart_privacy_001',
+    reviewType: 'appeal',
+    status: 'escalated',
+    requestedBy: {
+      kind: 'human',
+      accountId: 'acct_v6_restart_human_001'
+    },
+    reviewerKind: 'human',
+    sourceRefs: ['public_report_restart_civic_notice_001'],
+    reasons: ['Public abuse report escalated this civic notice for human appeal review.'],
+    privacy: {
+      redacted: true,
+      privateDataIncluded: false,
+      dataClasses: ['public_audit_summary']
+    },
+    ...overrides
+  };
+}
+
 function writeJson(value) {
   process.stdout.write(`${JSON.stringify(value)}\n`);
 }
@@ -66,6 +92,7 @@ function snapshot({ auditLedger, reputationStore, moderationStore }) {
     auditCount: auditLedger.count(),
     reputationCount: reputationStore.count(),
     moderationCount: moderationStore.count(),
+    moderationReviewCount: moderationStore.reviewCount(),
     reputationSummary,
     moderationSummary,
     replayOk: replaySafety.ok,
@@ -100,6 +127,16 @@ function main() {
         ok: true,
         duplicate: row.duplicate === true,
         decisionId: row.decisionId,
+        ...snapshot(stores)
+      });
+      return;
+    }
+    if (mode === 'seed-moderation-review') {
+      const row = stores.moderationStore.recordReview(moderationReview(), { nowMs: 1_779_785_600_000 });
+      writeJson({
+        ok: true,
+        duplicate: row.duplicate === true,
+        reviewId: row.reviewId,
         ...snapshot(stores)
       });
       return;
