@@ -175,8 +175,11 @@ const REQUIRED_V6_READINESS_GATES = [
       'dispute_review',
       'moderation_review_appeal',
       'public_source_link',
+      'reputation_eligibility_advice_gate',
+      'eligibility_advice_policy',
       'private_data_redaction',
-      'public_text_rendering'
+      'public_text_rendering',
+      'no_score_mutation'
     ]
   },
   {

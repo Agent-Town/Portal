@@ -4,10 +4,19 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
+const { V6_WORLD_FEATURE_FLAG, parseWorldGridFeatureFlags } = require('../server/world_grid/feature_flags');
 const { CIVIC_SCHEMA_VERSION } = require('../server/world_civilization/schemas');
 const { createCivicAuditLedger } = require('../server/world_civilization/audit_ledger');
 const { createCivicModerationStore } = require('../server/world_civilization/moderation');
-const { createCivicReputationStore } = require('../server/world_civilization/reputation');
+const {
+  REQUIRED_REPUTATION_ELIGIBILITY_ADVICE_CHECKS,
+  REQUIRED_REPUTATION_ELIGIBILITY_EVIDENCE_CHECKS,
+  REQUIRED_REPUTATION_SOURCE_KINDS,
+  V6_REPUTATION_ELIGIBILITY_ADVICE_GATE_VERSION,
+  assertV6ReputationEligibilityAdviceGateSafe,
+  buildV6ReputationEligibilityAdviceGate,
+  createCivicReputationStore
+} = require('../server/world_civilization/reputation');
 
 function withTempReputationStore(fn) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-v6-reputation-'));
@@ -100,6 +109,194 @@ function moderationDecision(overrides = {}) {
     ...overrides
   };
 }
+
+function reputationEligibilityAdviceEvidence(overrides = {}) {
+  return {
+    status: 'complete',
+    executionStatus: 'not_executable',
+    runtimeExposed: false,
+    playerVisible: false,
+    normalGameplayExposure: false,
+    mutatesWorldState: false,
+    mutatesReputationScore: false,
+    appliesEligibility: false,
+    grantsAgentAuthority: false,
+    farmableCurrency: false,
+    exposesPrivateData: false,
+    eligibilityPolicyReviewed: true,
+    advicePolicyReviewed: true,
+    sourcePolicyReviewed: true,
+    moderationDisputeLinked: true,
+    privacyProductReviewed: true,
+    publicTextRenderingReviewed: true,
+    privateDataExcluded: true,
+    nonTransferable: true,
+    antiSelfAwardEnforced: true,
+    boundedDeltaEnforced: true,
+    duplicateSourceProtection: true,
+    humanDisputeRequesters: true,
+    auditRowsCovered: true,
+    checks: [...REQUIRED_REPUTATION_ELIGIBILITY_EVIDENCE_CHECKS],
+    sourceKinds: [...REQUIRED_REPUTATION_SOURCE_KINDS],
+    ...overrides
+  };
+}
+
+test('V6 reputation eligibility advice gate is hidden without explicit research opt-in and V6 flag', () => {
+  const noResearchOptIn = buildV6ReputationEligibilityAdviceGate({
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: reputationEligibilityAdviceEvidence()
+  });
+  const broadV5Override = buildV6ReputationEligibilityAdviceGate({
+    includeResearchReputationEligibility: true,
+    featureFlags: parseWorldGridFeatureFlags('all'),
+    evidence: reputationEligibilityAdviceEvidence()
+  });
+
+  for (const report of [noResearchOptIn, broadV5Override]) {
+    assert.equal(report.version, V6_REPUTATION_ELIGIBILITY_ADVICE_GATE_VERSION);
+    assert.equal(report.available, false);
+    assert.equal(report.researchReady, false);
+    assert.equal(report.releaseReady, false);
+    assert.equal(report.failClosed, true);
+    assert.equal(report.runtimeExposed, false);
+    assert.equal(report.playerVisible, false);
+    assert.equal(report.normalGameplayExposure, false);
+    assert.equal(report.mutatesWorldState, false);
+    assert.equal(report.mutatesReputationScore, false);
+    assert.equal(report.appliesEligibility, false);
+    assert.equal(report.grantsAgentAuthority, false);
+    assert.equal(report.farmableCurrency, false);
+    assert.equal(report.exposesPrivateData, false);
+    assert.equal(report.executionStatus, 'not_executable');
+    assert.deepEqual(report.checks, []);
+    assert.deepEqual(assertV6ReputationEligibilityAdviceGateSafe(report), { ok: true, errors: [] });
+  }
+});
+
+test('V6 reputation eligibility advice gate records policy evidence without execution', () => {
+  const report = buildV6ReputationEligibilityAdviceGate({
+    includeResearchReputationEligibility: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    source: 'node_test',
+    evidence: reputationEligibilityAdviceEvidence()
+  });
+
+  assert.equal(report.available, true);
+  assert.equal(report.source, 'node_test');
+  assert.equal(report.researchReady, true);
+  assert.equal(report.releaseReady, false);
+  assert.equal(report.failClosed, false);
+  assert.equal(report.runtimeExposed, false);
+  assert.equal(report.playerVisible, false);
+  assert.equal(report.normalGameplayExposure, false);
+  assert.equal(report.mutatesWorldState, false);
+  assert.equal(report.mutatesReputationScore, false);
+  assert.equal(report.appliesEligibility, false);
+  assert.equal(report.grantsAgentAuthority, false);
+  assert.equal(report.farmableCurrency, false);
+  assert.equal(report.exposesPrivateData, false);
+  assert.equal(report.executionStatus, 'not_executable');
+  assert.deepEqual(report.checks.map((entry) => entry.key), REQUIRED_REPUTATION_ELIGIBILITY_ADVICE_CHECKS);
+  assert.deepEqual(report.evidence.requiredChecks, REQUIRED_REPUTATION_ELIGIBILITY_EVIDENCE_CHECKS);
+  assert.deepEqual(report.evidence.missingChecks, []);
+  assert.deepEqual(report.evidence.requiredSourceKinds, REQUIRED_REPUTATION_SOURCE_KINDS);
+  assert.deepEqual(report.evidence.missingSourceKinds, []);
+  assert.deepEqual(assertV6ReputationEligibilityAdviceGateSafe(report), { ok: true, errors: [] });
+});
+
+test('V6 reputation eligibility advice gate fails closed without policy coverage and privacy review', () => {
+  const report = buildV6ReputationEligibilityAdviceGate({
+    includeResearchReputationEligibility: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: reputationEligibilityAdviceEvidence({
+      checks: REQUIRED_REPUTATION_ELIGIBILITY_EVIDENCE_CHECKS.filter((check) => (
+        check !== 'eligibility_policy_review'
+        && check !== 'advice_policy_review'
+        && check !== 'source_policy_review'
+        && check !== 'privacy_product_review'
+        && check !== 'public_text_rendering_review'
+      )),
+      sourceKinds: REQUIRED_REPUTATION_SOURCE_KINDS.filter((kind) => kind !== 'moderation_trust'),
+      eligibilityPolicyReviewed: false,
+      advicePolicyReviewed: false,
+      sourcePolicyReviewed: false,
+      moderationDisputeLinked: false,
+      privacyProductReviewed: false,
+      publicTextRenderingReviewed: false
+    })
+  });
+
+  assert.equal(report.available, true);
+  assert.equal(report.researchReady, false);
+  assert.equal(report.releaseReady, false);
+  assert.equal(report.failClosed, true);
+  assert.deepEqual(report.evidence.missingChecks, [
+    'eligibility_policy_review',
+    'advice_policy_review',
+    'source_policy_review',
+    'privacy_product_review',
+    'public_text_rendering_review'
+  ]);
+  assert.deepEqual(report.evidence.missingSourceKinds, ['moderation_trust']);
+  assert.deepEqual(report.errors, [
+    'REPUTATION_ELIGIBILITY_ADVICE_EVIDENCE_REQUIRED',
+    'REPUTATION_SOURCE_POLICY_COVERAGE_REQUIRED',
+    'REPUTATION_MODERATION_DISPUTE_LINK_REQUIRED',
+    'REPUTATION_PRIVACY_PRODUCT_REVIEW_REQUIRED'
+  ]);
+  assert.deepEqual(assertV6ReputationEligibilityAdviceGateSafe(report), { ok: true, errors: [] });
+});
+
+test('V6 reputation eligibility advice assertion rejects visible or mutating readiness drift', () => {
+  const report = buildV6ReputationEligibilityAdviceGate({
+    includeResearchReputationEligibility: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: reputationEligibilityAdviceEvidence()
+  });
+  const unsafe = {
+    ...report,
+    releaseReady: true,
+    runtimeExposed: true,
+    playerVisible: true,
+    normalGameplayExposure: true,
+    mutatesWorldState: true,
+    mutatesReputationScore: true,
+    appliesEligibility: true,
+    grantsAgentAuthority: true,
+    farmableCurrency: true,
+    exposesPrivateData: true,
+    executionStatus: 'executes',
+    evidence: {
+      ...report.evidence,
+      runtimeExposed: true,
+      playerVisible: true,
+      normalGameplayExposure: true,
+      mutatesWorldState: true,
+      mutatesReputationScore: true,
+      appliesEligibility: true,
+      grantsAgentAuthority: true,
+      farmableCurrency: true,
+      exposesPrivateData: true
+    }
+  };
+  const result = assertV6ReputationEligibilityAdviceGateSafe(unsafe);
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(','), /V6_REPUTATION_ELIGIBILITY_ADVICE_RUNTIME_HIDDEN_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_REPUTATION_ELIGIBILITY_ADVICE_PLAYER_HIDDEN_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_REPUTATION_ELIGIBILITY_ADVICE_NORMAL_GAMEPLAY_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_REPUTATION_ELIGIBILITY_ADVICE_WORLD_MUTATION_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_REPUTATION_ELIGIBILITY_ADVICE_SCORE_MUTATION_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_REPUTATION_ELIGIBILITY_ADVICE_APPLICATION_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_REPUTATION_ELIGIBILITY_ADVICE_AGENT_AUTHORITY_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_REPUTATION_ELIGIBILITY_ADVICE_CURRENCY_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_REPUTATION_ELIGIBILITY_ADVICE_PRIVATE_DATA_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_REPUTATION_ELIGIBILITY_ADVICE_NON_EXECUTING_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_REPUTATION_ELIGIBILITY_ADVICE_RELEASE_READY_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_REPUTATION_ELIGIBILITY_ADVICE_EVIDENCE_PLAYER_HIDDEN_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_REPUTATION_ELIGIBILITY_ADVICE_EVIDENCE_APPLICATION_FORBIDDEN/);
+});
 
 test('V6 reputation store records bounded accountability entries without execution', () => withTempReputationStore(({ auditLedger, store }) => {
   const row = store.recordReputation(reputationRecord(), { nowMs: 1_779_784_000_000 });

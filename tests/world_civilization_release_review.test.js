@@ -93,6 +93,27 @@ test('V6 release review audit coverage requires reputation moderation link evide
   assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_moderation.test.js'));
 });
 
+test('V6 release review requires reputation eligibility advice gate evidence', () => {
+  const reputationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'reputation_eligibility_advice_review');
+  const validationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'validation_evidence');
+
+  assert.equal(reputationGate.owner, 'trust_safety_privacy_product');
+  assert.ok(reputationGate.requiredArtifacts.includes('specs/60_agent_town_v6_reputation_accountability_foundation.md'));
+  assert.ok(reputationGate.requiredArtifacts.includes('server/world_civilization/reputation.js'));
+  assert.ok(reputationGate.requiredArtifacts.includes('server/world_civilization/moderation.js'));
+  assert.ok(reputationGate.requiredArtifacts.includes('docs/security/PUBLIC_TEXT_RENDERING_POLICY.md'));
+  assert.ok(reputationGate.requiredArtifacts.includes('tests/world_civilization_reputation.test.js'));
+  assert.ok(reputationGate.requiredChecks.includes('eligibility_policy_review'));
+  assert.ok(reputationGate.requiredChecks.includes('advice_policy_review'));
+  assert.ok(reputationGate.requiredChecks.includes('source_policy_coverage'));
+  assert.ok(reputationGate.requiredChecks.includes('moderation_dispute_link'));
+  assert.ok(reputationGate.requiredChecks.includes('privacy_product_review'));
+  assert.ok(reputationGate.requiredChecks.includes('public_text_rendering_review'));
+  assert.ok(reputationGate.requiredChecks.includes('no_score_mutation'));
+  assert.ok(reputationGate.requiredChecks.includes('no_world_mutation'));
+  assert.ok(validationGate.requiredChecks.includes('reputation_eligibility_advice_gate'));
+});
+
 test('V6 release review audit coverage requires store-specific audit-summary evidence', () => {
   const auditGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'audit_coverage');
   const resilienceGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'resilience_readiness_review');

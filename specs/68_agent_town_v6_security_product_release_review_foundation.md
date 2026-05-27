@@ -41,10 +41,10 @@ are present.
 - Validation evidence: targeted Node suite, split Playwright smokes,
   all-features regression, feature override safety, and load/rate replay
   evidence, including civic mutation security, vote authorization readiness,
-  delegated-agent proof, and governance preflight, effect execution gate, and
-  agent participation enforcement gate, institution readiness gate, and public
-  works readiness gate and lab readiness gate and resilience readiness gate
-  contract coverage.
+  reputation eligibility advice readiness, delegated-agent proof, and
+  governance preflight, effect execution gate, agent participation enforcement
+  gate, institution readiness gate, public works readiness gate, lab readiness
+  gate, and resilience readiness gate contract coverage.
 - Vote authorization readiness review: server-verified voter authorization,
   eligibility rule verification, one-vote accounting, idempotent receipt replay,
   changed-vote replay rejection, proposal expiry denial, delegation policy
@@ -52,6 +52,14 @@ are present.
   quorum/threshold policy, governance-preflight integration, vote audit rows,
   private-data exclusion, and no effect application before any vote route or
   worker tool can influence civic outcomes.
+- Reputation eligibility and advice review: eligibility policy review, advice
+  policy review, source-policy coverage for every current reputation kind,
+  moderation/dispute linkage, privacy/product review, public text rendering
+  review, private-data exclusion, non-transferable reputation, anti-self-award,
+  bounded deltas, duplicate-source protection, human dispute requesters,
+  reputation/dispute audit rows, no player-visible reputation, no score
+  mutation, and no world mutation before reputation can inform production
+  eligibility or advice.
 - Effect execution and rollback review: typed apply handlers, typed rollback
   handlers, real before/after state, authorization enforcement, idempotent
   apply/rollback behavior, irreversible-action review, conservation tests,

@@ -119,6 +119,7 @@ const REQUIRED_REVIEW_GATES = [
       'all_features_regression',
       'feature_override_safety',
       'vote_authorization_readiness_gate',
+      'reputation_eligibility_advice_gate',
       'store_backed_delegation_proof',
       'effect_execution_gate',
       'agent_participation_enforcement_gate',
@@ -184,6 +185,40 @@ const REQUIRED_REVIEW_GATES = [
       'vote_audit_rows',
       'private_data_exclusion',
       'no_effect_application'
+    ],
+    signoffRequired: true
+  },
+  {
+    key: 'reputation_eligibility_advice_review',
+    label: 'Reputation eligibility and advice review',
+    owner: 'trust_safety_privacy_product',
+    requiredArtifacts: [
+      RELEASE_REVIEW_ARTIFACT,
+      'specs/60_agent_town_v6_reputation_accountability_foundation.md',
+      'server/world_civilization/reputation.js',
+      'server/world_civilization/moderation.js',
+      'docs/security/PUBLIC_TEXT_RENDERING_POLICY.md',
+      'tests/world_civilization_reputation.test.js',
+      'tests/world_civilization_reputation_moderation_process_restart.test.js'
+    ],
+    requiredChecks: [
+      'eligibility_policy_review',
+      'advice_policy_review',
+      'source_policy_coverage',
+      'moderation_dispute_link',
+      'privacy_product_review',
+      'public_text_rendering_review',
+      'private_data_exclusion',
+      'non_transferable_reputation',
+      'anti_self_award',
+      'bounded_delta',
+      'duplicate_source_protection',
+      'human_dispute_requesters',
+      'reputation_audit_rows',
+      'dispute_audit_rows',
+      'no_player_visible_reputation',
+      'no_score_mutation',
+      'no_world_mutation'
     ],
     signoffRequired: true
   },

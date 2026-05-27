@@ -277,8 +277,17 @@ persistence resilience, and security/product release review.
   dispute/review records, human dispute requesters, optional required
   moderation-decision links that must match the reputation record source,
   privacy-safe before/after audit summaries, and `reputation.disputed` audit
-  rows; release still requires production eligibility/advice integration and
-  privacy/product review.
+  rows. `buildV6ReputationEligibilityAdviceGate()` adds the M9 research-only
+  reputation eligibility advice gate over reviewed eligibility policy, advice
+  policy, source-policy coverage for all current reputation kinds, moderation
+  dispute linkage, privacy/product review, public-text rendering review,
+  private-data exclusion, non-transferability, anti-self-award, bounded deltas,
+  duplicate-source protection, human dispute requesters, reputation/dispute
+  audit rows, no score mutation, no agent authority grant, no farmable currency,
+  no player-visible reputation, and no world mutation while keeping
+  `releaseReady: false` and `executionStatus: "not_executable"`; release still
+  requires real production eligibility/advice integration and privacy/product
+  signoff.
 - Moderation must cover proposal text, attached media, sandbox actions, civic
   effects, public profile surfaces, and agent-authored content. Current
   research-only storage starts this in

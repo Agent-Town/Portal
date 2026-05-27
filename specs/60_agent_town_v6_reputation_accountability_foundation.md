@@ -86,6 +86,31 @@ executable.
   delta, dispute status, moderation link, and public-source counts without
   exposing private wallet, Brain, provider, or debug material.
 
+## Eligibility and Advice Readiness Gate
+
+`buildV6ReputationEligibilityAdviceGate()` is a research-only M9 gate for
+reviewing how future eligibility and advice surfaces may consume reputation. It
+requires `FEATURE_WORLD_V60_AGENT_CIVILIZATION` plus explicit research opt-in
+and stays hidden from runtime tools and normal gameplay.
+
+The gate requires evidence for:
+
+- reviewed eligibility and advice policies;
+- source-policy coverage for `service_reliability`, `proposal_quality`, and
+  `moderation_trust`;
+- moderation/dispute linkage before reputation can inform advice;
+- privacy/product review, public-text rendering review, and private-data
+  exclusion;
+- anti-self-award, bounded-delta, duplicate-source, human dispute requester,
+  reputation audit row, and dispute audit row coverage.
+
+Even when research-ready, the gate keeps `releaseReady: false`,
+`executionStatus: "not_executable"`, `mutatesReputationScore: false`,
+`appliesEligibility: false`, `grantsAgentAuthority: false`,
+`farmableCurrency: false`, `runtimeExposed: false`, and `playerVisible: false`.
+It does not add a route, worker tool, score mutation, public reputation surface,
+or agent authority grant.
+
 ## Release Gate
 
 M9 cannot move to `done` until:

@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
 
+const { V6_WORLD_FEATURE_FLAG, isWorldGridFeatureEnabled } = require('../world_grid/feature_flags');
 const { createCivicAuditLedger, sha256, stableJson } = require('./audit_ledger');
 const { validateReputationDispute, validateReputationRecord } = require('./schemas');
 const {
@@ -11,6 +12,344 @@ const {
 
 const MIGRATION_VERSION = 'v1';
 const STORE_KEY = 'reputation';
+const V6_REPUTATION_ELIGIBILITY_ADVICE_GATE_VERSION = 'agent-town.v6.reputation_eligibility_advice.v1';
+const REQUIRED_REPUTATION_ELIGIBILITY_ADVICE_CHECKS = [
+  'feature_flag',
+  'research_opt_in',
+  'eligibility_advice_evidence',
+  'source_policy_coverage',
+  'moderation_dispute_link',
+  'privacy_product_review',
+  'no_runtime_exposure',
+  'no_player_visible_reputation',
+  'no_score_mutation',
+  'no_world_mutation'
+];
+const REQUIRED_REPUTATION_ELIGIBILITY_EVIDENCE_CHECKS = [
+  'eligibility_policy_review',
+  'advice_policy_review',
+  'source_policy_review',
+  'moderation_dispute_review',
+  'privacy_product_review',
+  'public_text_rendering_review',
+  'private_data_exclusion',
+  'non_transferable_reputation',
+  'anti_self_award',
+  'bounded_delta',
+  'duplicate_source_protection',
+  'human_dispute_requesters',
+  'reputation_audit_rows',
+  'dispute_audit_rows'
+];
+const REQUIRED_REPUTATION_SOURCE_KINDS = [
+  'service_reliability',
+  'proposal_quality',
+  'moderation_trust'
+];
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function normalizeList(value) {
+  return Array.isArray(value) ? value.map((entry) => String(entry || '')).filter(Boolean) : [];
+}
+
+function check(key, ok, error = '') {
+  return { key, ok: ok === true, error: ok === true ? '' : error };
+}
+
+function inspectReputationEligibilityAdviceEvidence(evidence = {}) {
+  const checks = normalizeList(evidence.checks);
+  const sourceKinds = normalizeList(evidence.sourceKinds);
+  const missingChecks = REQUIRED_REPUTATION_ELIGIBILITY_EVIDENCE_CHECKS.filter((entry) => !checks.includes(entry));
+  const missingSourceKinds = REQUIRED_REPUTATION_SOURCE_KINDS.filter((entry) => !sourceKinds.includes(entry));
+  const eligibilityPolicyReviewed = evidence.eligibilityPolicyReviewed === true;
+  const advicePolicyReviewed = evidence.advicePolicyReviewed === true;
+  const sourcePolicyReviewed = evidence.sourcePolicyReviewed === true;
+  const moderationDisputeLinked = evidence.moderationDisputeLinked === true;
+  const privacyProductReviewed = evidence.privacyProductReviewed === true;
+  const publicTextRenderingReviewed = evidence.publicTextRenderingReviewed === true;
+  const privateDataExcluded = evidence.privateDataExcluded === true;
+  const nonTransferable = evidence.nonTransferable === true;
+  const antiSelfAwardEnforced = evidence.antiSelfAwardEnforced === true;
+  const boundedDeltaEnforced = evidence.boundedDeltaEnforced === true;
+  const duplicateSourceProtection = evidence.duplicateSourceProtection === true;
+  const humanDisputeRequesters = evidence.humanDisputeRequesters === true;
+  const auditRowsCovered = evidence.auditRowsCovered === true;
+  const ok = evidence.status === 'complete'
+    && evidence.executionStatus === 'not_executable'
+    && evidence.runtimeExposed === false
+    && evidence.playerVisible === false
+    && evidence.normalGameplayExposure === false
+    && evidence.mutatesWorldState === false
+    && evidence.mutatesReputationScore === false
+    && evidence.appliesEligibility === false
+    && evidence.grantsAgentAuthority === false
+    && evidence.farmableCurrency === false
+    && evidence.exposesPrivateData === false
+    && eligibilityPolicyReviewed
+    && advicePolicyReviewed
+    && sourcePolicyReviewed
+    && moderationDisputeLinked
+    && privacyProductReviewed
+    && publicTextRenderingReviewed
+    && privateDataExcluded
+    && nonTransferable
+    && antiSelfAwardEnforced
+    && boundedDeltaEnforced
+    && duplicateSourceProtection
+    && humanDisputeRequesters
+    && auditRowsCovered
+    && missingChecks.length === 0
+    && missingSourceKinds.length === 0;
+  return {
+    ok,
+    status: String(evidence.status || 'missing'),
+    executionStatus: String(evidence.executionStatus || 'missing'),
+    runtimeExposed: evidence.runtimeExposed === true,
+    playerVisible: evidence.playerVisible === true,
+    normalGameplayExposure: evidence.normalGameplayExposure === true,
+    mutatesWorldState: evidence.mutatesWorldState === true,
+    mutatesReputationScore: evidence.mutatesReputationScore === true,
+    appliesEligibility: evidence.appliesEligibility === true,
+    grantsAgentAuthority: evidence.grantsAgentAuthority === true,
+    farmableCurrency: evidence.farmableCurrency === true,
+    exposesPrivateData: evidence.exposesPrivateData === true,
+    eligibilityPolicyReviewed,
+    advicePolicyReviewed,
+    sourcePolicyReviewed,
+    moderationDisputeLinked,
+    privacyProductReviewed,
+    publicTextRenderingReviewed,
+    privateDataExcluded,
+    nonTransferable,
+    antiSelfAwardEnforced,
+    boundedDeltaEnforced,
+    duplicateSourceProtection,
+    humanDisputeRequesters,
+    auditRowsCovered,
+    requiredChecks: [...REQUIRED_REPUTATION_ELIGIBILITY_EVIDENCE_CHECKS],
+    checks,
+    missingChecks,
+    requiredSourceKinds: [...REQUIRED_REPUTATION_SOURCE_KINDS],
+    sourceKinds,
+    missingSourceKinds
+  };
+}
+
+function disabledReputationEligibilityAdviceGateReport({ source, reason }) {
+  return {
+    version: V6_REPUTATION_ELIGIBILITY_ADVICE_GATE_VERSION,
+    status: 'research_only',
+    source,
+    featureFlag: V6_WORLD_FEATURE_FLAG,
+    available: false,
+    researchReady: false,
+    releaseReady: false,
+    failClosed: true,
+    runtimeExposed: false,
+    playerVisible: false,
+    normalGameplayExposure: false,
+    mutatesWorldState: false,
+    mutatesReputationScore: false,
+    appliesEligibility: false,
+    grantsAgentAuthority: false,
+    farmableCurrency: false,
+    exposesPrivateData: false,
+    executionStatus: 'not_executable',
+    evidence: inspectReputationEligibilityAdviceEvidence({}),
+    checks: [],
+    errors: [reason],
+    disabledReason: reason
+  };
+}
+
+function buildV6ReputationEligibilityAdviceGate({
+  featureFlags = {},
+  includeResearchReputationEligibility = false,
+  source = 'runtime',
+  evidence = {}
+} = {}) {
+  const enabled = includeResearchReputationEligibility === true
+    && isWorldGridFeatureEnabled(featureFlags, V6_WORLD_FEATURE_FLAG);
+  if (!enabled) {
+    return disabledReputationEligibilityAdviceGateReport({
+      source,
+      reason: 'V6 reputation eligibility advice requires explicit research opt-in and V6 feature flag'
+    });
+  }
+
+  const evidenceReport = inspectReputationEligibilityAdviceEvidence(evidence);
+  const checks = [
+    check('feature_flag', isWorldGridFeatureEnabled(featureFlags, V6_WORLD_FEATURE_FLAG), 'FEATURE_DISABLED'),
+    check('research_opt_in', includeResearchReputationEligibility === true, 'RESEARCH_OPT_IN_REQUIRED'),
+    check(
+      'eligibility_advice_evidence',
+      evidenceReport.status === 'complete'
+        && evidenceReport.missingChecks.length === 0
+        && evidenceReport.eligibilityPolicyReviewed
+        && evidenceReport.advicePolicyReviewed,
+      'REPUTATION_ELIGIBILITY_ADVICE_EVIDENCE_REQUIRED'
+    ),
+    check(
+      'source_policy_coverage',
+      evidenceReport.sourcePolicyReviewed && evidenceReport.missingSourceKinds.length === 0,
+      'REPUTATION_SOURCE_POLICY_COVERAGE_REQUIRED'
+    ),
+    check('moderation_dispute_link', evidenceReport.moderationDisputeLinked, 'REPUTATION_MODERATION_DISPUTE_LINK_REQUIRED'),
+    check(
+      'privacy_product_review',
+      evidenceReport.privacyProductReviewed
+        && evidenceReport.publicTextRenderingReviewed
+        && evidenceReport.privateDataExcluded
+        && evidenceReport.exposesPrivateData === false,
+      'REPUTATION_PRIVACY_PRODUCT_REVIEW_REQUIRED'
+    ),
+    check(
+      'no_runtime_exposure',
+      evidenceReport.executionStatus === 'not_executable' && evidenceReport.runtimeExposed === false,
+      'REPUTATION_RUNTIME_EXPOSURE_FORBIDDEN'
+    ),
+    check(
+      'no_player_visible_reputation',
+      evidenceReport.playerVisible === false && evidenceReport.normalGameplayExposure === false,
+      'REPUTATION_PLAYER_VISIBLE_SURFACE_FORBIDDEN'
+    ),
+    check(
+      'no_score_mutation',
+      evidenceReport.mutatesReputationScore === false
+        && evidenceReport.appliesEligibility === false
+        && evidenceReport.grantsAgentAuthority === false
+        && evidenceReport.farmableCurrency === false
+        && evidenceReport.nonTransferable,
+      'REPUTATION_SCORE_OR_AUTHORITY_MUTATION_FORBIDDEN'
+    ),
+    check(
+      'no_world_mutation',
+      evidenceReport.mutatesWorldState === false,
+      'REPUTATION_WORLD_MUTATION_FORBIDDEN'
+    )
+  ];
+  const researchReady = checks.every((entry) => entry.ok);
+
+  return {
+    version: V6_REPUTATION_ELIGIBILITY_ADVICE_GATE_VERSION,
+    status: 'research_only',
+    source,
+    featureFlag: V6_WORLD_FEATURE_FLAG,
+    available: true,
+    researchReady,
+    releaseReady: false,
+    failClosed: researchReady !== true,
+    runtimeExposed: false,
+    playerVisible: false,
+    normalGameplayExposure: false,
+    mutatesWorldState: false,
+    mutatesReputationScore: false,
+    appliesEligibility: false,
+    grantsAgentAuthority: false,
+    farmableCurrency: false,
+    exposesPrivateData: false,
+    executionStatus: 'not_executable',
+    evidence: evidenceReport,
+    checks,
+    errors: checks.filter((entry) => !entry.ok).map((entry) => entry.error)
+  };
+}
+
+function assertV6ReputationEligibilityAdviceGateSafe(report = {}) {
+  const errors = [];
+  if (report.version !== V6_REPUTATION_ELIGIBILITY_ADVICE_GATE_VERSION) {
+    errors.push('V6_REPUTATION_ELIGIBILITY_ADVICE_VERSION_REQUIRED');
+  }
+  if (report.featureFlag !== V6_WORLD_FEATURE_FLAG) {
+    errors.push('V6_REPUTATION_ELIGIBILITY_ADVICE_FEATURE_FLAG_REQUIRED');
+  }
+  if (report.status !== 'research_only') {
+    errors.push('V6_REPUTATION_ELIGIBILITY_ADVICE_RESEARCH_ONLY_REQUIRED');
+  }
+  if (report.runtimeExposed !== false) {
+    errors.push('V6_REPUTATION_ELIGIBILITY_ADVICE_RUNTIME_HIDDEN_REQUIRED');
+  }
+  if (report.playerVisible !== false) {
+    errors.push('V6_REPUTATION_ELIGIBILITY_ADVICE_PLAYER_HIDDEN_REQUIRED');
+  }
+  if (report.normalGameplayExposure !== false) {
+    errors.push('V6_REPUTATION_ELIGIBILITY_ADVICE_NORMAL_GAMEPLAY_FORBIDDEN');
+  }
+  if (report.mutatesWorldState !== false) {
+    errors.push('V6_REPUTATION_ELIGIBILITY_ADVICE_WORLD_MUTATION_FORBIDDEN');
+  }
+  if (report.mutatesReputationScore !== false) {
+    errors.push('V6_REPUTATION_ELIGIBILITY_ADVICE_SCORE_MUTATION_FORBIDDEN');
+  }
+  if (report.appliesEligibility !== false) {
+    errors.push('V6_REPUTATION_ELIGIBILITY_ADVICE_APPLICATION_FORBIDDEN');
+  }
+  if (report.grantsAgentAuthority !== false) {
+    errors.push('V6_REPUTATION_ELIGIBILITY_ADVICE_AGENT_AUTHORITY_FORBIDDEN');
+  }
+  if (report.farmableCurrency !== false) {
+    errors.push('V6_REPUTATION_ELIGIBILITY_ADVICE_CURRENCY_FORBIDDEN');
+  }
+  if (report.exposesPrivateData !== false) {
+    errors.push('V6_REPUTATION_ELIGIBILITY_ADVICE_PRIVATE_DATA_FORBIDDEN');
+  }
+  if (report.executionStatus !== 'not_executable') {
+    errors.push('V6_REPUTATION_ELIGIBILITY_ADVICE_NON_EXECUTING_REQUIRED');
+  }
+  if (report.releaseReady !== false) {
+    errors.push('V6_REPUTATION_ELIGIBILITY_ADVICE_RELEASE_READY_FORBIDDEN');
+  }
+  if (report.available === true) {
+    const checkKeys = new Set((report.checks || []).map((entry) => entry.key));
+    for (const key of REQUIRED_REPUTATION_ELIGIBILITY_ADVICE_CHECKS) {
+      if (!checkKeys.has(key)) errors.push(`V6_REPUTATION_ELIGIBILITY_ADVICE_CHECK_REQUIRED:${key}`);
+    }
+    const failedChecks = (report.checks || []).filter((entry) => entry.ok !== true);
+    if (report.researchReady === true && failedChecks.length > 0) {
+      errors.push('V6_REPUTATION_ELIGIBILITY_ADVICE_READY_WITH_FAILED_CHECKS');
+    }
+    if (report.researchReady !== true && report.failClosed !== true) {
+      errors.push('V6_REPUTATION_ELIGIBILITY_ADVICE_DENIAL_FAIL_CLOSED_REQUIRED');
+    }
+    const evidence = report.evidence || {};
+    if (evidence.runtimeExposed === true) {
+      errors.push('V6_REPUTATION_ELIGIBILITY_ADVICE_EVIDENCE_RUNTIME_HIDDEN_REQUIRED');
+    }
+    if (evidence.playerVisible === true || evidence.normalGameplayExposure === true) {
+      errors.push('V6_REPUTATION_ELIGIBILITY_ADVICE_EVIDENCE_PLAYER_HIDDEN_REQUIRED');
+    }
+    if (evidence.mutatesWorldState === true) {
+      errors.push('V6_REPUTATION_ELIGIBILITY_ADVICE_EVIDENCE_WORLD_MUTATION_FORBIDDEN');
+    }
+    if (evidence.mutatesReputationScore === true) {
+      errors.push('V6_REPUTATION_ELIGIBILITY_ADVICE_EVIDENCE_SCORE_MUTATION_FORBIDDEN');
+    }
+    if (evidence.appliesEligibility === true) {
+      errors.push('V6_REPUTATION_ELIGIBILITY_ADVICE_EVIDENCE_APPLICATION_FORBIDDEN');
+    }
+    if (evidence.grantsAgentAuthority === true) {
+      errors.push('V6_REPUTATION_ELIGIBILITY_ADVICE_EVIDENCE_AGENT_AUTHORITY_FORBIDDEN');
+    }
+    if (evidence.farmableCurrency === true) {
+      errors.push('V6_REPUTATION_ELIGIBILITY_ADVICE_EVIDENCE_CURRENCY_FORBIDDEN');
+    }
+    if (evidence.exposesPrivateData === true) {
+      errors.push('V6_REPUTATION_ELIGIBILITY_ADVICE_EVIDENCE_PRIVATE_DATA_FORBIDDEN');
+    }
+    if (report.researchReady === true && evidence.ok !== true) {
+      errors.push('V6_REPUTATION_ELIGIBILITY_ADVICE_READY_WITHOUT_EVIDENCE');
+    }
+  } else if (report.failClosed !== true) {
+    errors.push('V6_REPUTATION_ELIGIBILITY_ADVICE_DISABLED_FAIL_CLOSED_REQUIRED');
+  }
+  return {
+    ok: errors.length === 0,
+    errors
+  };
+}
 
 function parseReputationRow(row) {
   if (!row) return null;
@@ -533,5 +872,11 @@ function createCivicReputationStore({
 }
 
 module.exports = {
+  REQUIRED_REPUTATION_ELIGIBILITY_ADVICE_CHECKS: clone(REQUIRED_REPUTATION_ELIGIBILITY_ADVICE_CHECKS),
+  REQUIRED_REPUTATION_ELIGIBILITY_EVIDENCE_CHECKS: clone(REQUIRED_REPUTATION_ELIGIBILITY_EVIDENCE_CHECKS),
+  REQUIRED_REPUTATION_SOURCE_KINDS: clone(REQUIRED_REPUTATION_SOURCE_KINDS),
+  V6_REPUTATION_ELIGIBILITY_ADVICE_GATE_VERSION,
+  assertV6ReputationEligibilityAdviceGateSafe,
+  buildV6ReputationEligibilityAdviceGate,
   createCivicReputationStore
 };
