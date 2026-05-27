@@ -245,12 +245,13 @@ function normalizeError(error) {
 }
 
 const RELEASE_EVIDENCE_SECRET_VALUE_PATTERN = /\b(?:sk-[a-z0-9_-]{8,}|xox[baprs]-[a-z0-9-]{8,}|ghp_[a-z0-9_]{8,}|github_pat_[a-z0-9_]{8,}|ya29\.[a-z0-9_-]{8,}|bearer\s+[a-z0-9._-]{12,})\b/i;
+const RELEASE_EVIDENCE_SECRET_KEY_PATTERN = /(api[_-]?key|secret|private[_-]?key|credential|oauth|access[_-]?token|refresh[_-]?token|auth[_-]?token|bearer[_-]?token|id[_-]?token|session[_-]?token|provider[_-]?token|wallet[_-]?secret|seed[_-]?phrase|password|^token$)/i;
 const RELEASE_EVIDENCE_RAW_INSTRUCTION_PATTERN = /\bignore\s+(all\s+)?(previous|prior|above)\s+instructions\b|\b(system|developer)\s+(prompt|message|instructions)\b|\bexecute\s+(shell|bash|terminal|command)\b|<\s*script\b|javascript\s*:|\beval\s*\(/i;
 const RELEASE_EVIDENCE_MAX_OBJECT_KEY_LENGTH = 256;
 
 function releaseEvidencePathSegment(key = '') {
   const segment = String(key || '');
-  if (RELEASE_EVIDENCE_SECRET_VALUE_PATTERN.test(segment)) return '<secret-like-key>';
+  if (RELEASE_EVIDENCE_SECRET_KEY_PATTERN.test(segment) || RELEASE_EVIDENCE_SECRET_VALUE_PATTERN.test(segment)) return '<secret-like-key>';
   if (RELEASE_EVIDENCE_RAW_INSTRUCTION_PATTERN.test(segment)) return '<raw-instruction-key>';
   if (segment.length > RELEASE_EVIDENCE_MAX_OBJECT_KEY_LENGTH) return '<oversized-key>';
   return segment;
@@ -266,10 +267,9 @@ function findReleaseEvidenceSecretLikePaths(value, pathLabel = '$', matches = []
     return matches;
   }
   if (!value || typeof value !== 'object') return matches;
-  const secretKey = /(api[_-]?key|secret|private[_-]?key|credential|oauth|access[_-]?token|refresh[_-]?token|wallet[_-]?secret|seed[_-]?phrase|password)/i;
   for (const [key, child] of Object.entries(value)) {
     const childPath = releaseEvidenceChildPath(pathLabel, key);
-    if (secretKey.test(key) || RELEASE_EVIDENCE_SECRET_VALUE_PATTERN.test(key)) matches.push(childPath);
+    if (RELEASE_EVIDENCE_SECRET_KEY_PATTERN.test(key) || RELEASE_EVIDENCE_SECRET_VALUE_PATTERN.test(key)) matches.push(childPath);
     findReleaseEvidenceSecretLikePaths(child, childPath, matches);
   }
   return matches;

@@ -320,8 +320,10 @@ const RAW_EXECUTABLE_PROMPT_PATTERNS = [
   { id: 'network-exfiltration', pattern: /\b(curl|wget)\s+https?:|\bpost\s+to\s+https?:/i }
 ];
 
+const SECRET_LIKE_KEY_PATTERN = /(api[_-]?key|secret|private[_-]?key|credential|oauth|access[_-]?token|refresh[_-]?token|auth[_-]?token|bearer[_-]?token|id[_-]?token|session[_-]?token|provider[_-]?token|wallet[_-]?secret|seed[_-]?phrase|password|^token$)/i;
+
 const SENSITIVE_TEXT_PATTERNS = [
-  { id: 'api-key-reference', pattern: /\b(api[_ -]?key|access[_ -]?token|refresh[_ -]?token)\b/i },
+  { id: 'api-key-reference', pattern: /\b(api[_ -]?key|access[_ -]?token|refresh[_ -]?token|auth[_ -]?token|bearer[_ -]?token|id[_ -]?token|session[_ -]?token|provider[_ -]?token)\b/i },
   { id: 'private-key-reference', pattern: /\b(private[_ -]?key|seed[_ -]?phrase|wallet[_ -]?secret)\b/i },
   { id: 'password-reference', pattern: /\b(password|credential)\b/i }
 ];
@@ -1160,10 +1162,9 @@ function findForbiddenAuthorityPaths(value, path = '$', matches = []) {
 
 function findSecretLikePaths(value, path = '$', matches = []) {
   if (!value || typeof value !== 'object') return matches;
-  const secretKey = /(api[_-]?key|secret|private[_-]?key|credential|oauth|access[_-]?token|refresh[_-]?token|wallet[_-]?secret|seed[_-]?phrase|password)/i;
   for (const [key, child] of Object.entries(value)) {
     const childPath = `${path}.${key}`;
-    if (secretKey.test(key)) {
+    if (SECRET_LIKE_KEY_PATTERN.test(key)) {
       matches.push(childPath);
     }
     findSecretLikePaths(child, childPath, matches);

@@ -230,6 +230,16 @@ test('generated pack validation rejects missing mappings, arbitrary formulas, se
   const secretReport = validateGeneratedPack(secretPack);
   assert.equal(secretReport.ok, false);
   assert.equal(secretReport.checks.find((check) => check.id === 'GENPACK_NO_SECRET_FIELDS').passed, false);
+  const semanticTokenPack = {
+    ...valid,
+    generator: {
+      ...valid.generator,
+      sessionToken: 'session-token-should-not-ship'
+    }
+  };
+  const semanticTokenReport = validateGeneratedPack(semanticTokenPack);
+  assert.equal(semanticTokenReport.ok, false);
+  assert.equal(semanticTokenReport.checks.find((check) => check.id === 'GENPACK_NO_SECRET_FIELDS').passed, false);
 
   const rawInstructionPack = {
     ...valid,

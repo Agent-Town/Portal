@@ -10,7 +10,7 @@ Status: prototype-gated
 - Generated packs cannot carry raw executable prompt instructions in generated copy, prompt metadata, asset manifests, or asset prompt-plan records.
 - Asset manifests and asset prompt plans are allowlisted by canonical target, relative path, prompt hash, size, status, source, and no-production-image policy.
 - Generated-pack subdocuments must pass the local schema registry independently before runtime validation can pass.
-- Generated packs cannot store provider credentials, API keys, access tokens, refresh tokens, wallet secrets, Brain vault data, private event logs, or account recovery material.
+- Generated packs cannot store provider credentials, API keys, access tokens, refresh tokens, session/auth/id/bearer/provider tokens, wallet secrets, Brain vault data, private event logs, or account recovery material.
 - Scaffolded generation job logs must record `authMode=not_configured`, `externalImageGenerationUsed=false`, zero outputs, and no production approval until a separate consent/auth/cost model is approved.
 - Optional candidate-generation preflights must fail closed unless product/security approval, documented auth model, documented cost model, accepted cost estimate, and user/team consent are all present.
 - Candidate-generation preflight records must never persist raw provider credentials, and failure records must keep `fallbackStillPlayable=true` for valid deterministic packs.
@@ -31,7 +31,7 @@ Status: prototype-gated
 - Public release eligibility must come from the standalone `productionReleaseGate` report, which fails closed unless the gate uses a valid generated-pack id and every prerequisite, diversity evidence including the release pack, diversity metrics coherent with per-pack rows/signatures/screenshots/comparisons, same-pack persistence proof, same-pack public-card proof, explicit approval, candidate review, human signoff, and non-future gate evaluation timestamp is present.
 - Release approval evidence must be hash-bound, match the current generated pack id, contain timestamp-coherent approval events, and remain candidate-only; stale hashes, future-dated approvals, candidate reviews that predate their manifest, planned-only candidate approvals, or evidence copied from another pack cannot unlock production readiness.
 - Release evidence bundles must be created at or after the bound release gate evaluation time, must not be future-dated relative to validation time, and must bind ready evidence sources, generated-pack-source validation, playtest-source validation, persistence-source validation, public-card-source validation, approval-evidence-source validation, candidate-review manifest source validation, diversity-source pack inclusion/coherence, blocking reasons, and prerequisite snapshots back to the release gate; missing release-gate context, claimed hashes or pack ids for unsupplied sources, failing generated-pack sources, failing playtest sources, failing persistence sources, failing public-card sources, failing approval-evidence sources, failing candidate-review manifest sources, approval evidence drift, or copied diversity reports from another suite fail validation even when supplied source hashes are stable.
-- Release-gate and release-evidence-bundle API requests must reject secret-like fields, secret-looking keys or values, raw prompt-instruction keys or values, oversized object keys, and oversized/noisy evidence bodies before report construction; rejection responses may include counts, redacted paths, and limits, but not submitted evidence values or oversized key text.
+- Release-gate and release-evidence-bundle API requests must reject secret-like fields, semantic token fields, secret-looking keys or values, raw prompt-instruction keys or values, oversized object keys, and oversized/noisy evidence bodies before report construction; rejection responses may include counts, redacted paths, and limits, but not submitted evidence values, token field names, or oversized key text.
 
 ## Release Gate
 
@@ -61,6 +61,7 @@ Status: prototype-gated
   "releaseApiRequestBounded": true,
   "releaseApiOversizedEvidenceRejected": true,
   "releaseApiOversizedKeyRedacted": true,
+  "releaseApiSemanticSecretKeyRedacted": true,
   "releaseApiSecretValueRejected": true,
   "releaseApiSecretKeyRedacted": true,
   "releaseModeWhenIncomplete": "prototype-gated",
