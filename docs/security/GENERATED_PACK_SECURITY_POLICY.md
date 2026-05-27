@@ -29,7 +29,7 @@ Status: prototype-gated
 - Player-visible generated text must be escaped in DOM rendering.
 - Production image generation requires explicit consent and a documented cost/auth model before any user-facing release claim.
 - Public release eligibility must come from the standalone `productionReleaseGate` report, which fails closed unless every prerequisite, explicit approval, candidate review, and human signoff is present.
-- Release approval evidence must be hash-bound, match the current generated pack id, and remain candidate-only; stale hashes or evidence copied from another pack cannot unlock production readiness.
+- Release approval evidence must be hash-bound, match the current generated pack id, contain timestamp-coherent approval events, and remain candidate-only; stale hashes, future-dated approvals, or evidence copied from another pack cannot unlock production readiness.
 - Release-gate and release-evidence-bundle API requests must reject secret-like fields, raw prompt instructions, and oversized/noisy evidence bodies before report construction; rejection responses may include counts, paths, and limits, but not submitted evidence values.
 
 ## Release Gate
@@ -55,6 +55,8 @@ Status: prototype-gated
   "blockingReasonsMatchFailedPrerequisites": true,
   "approvalEvidenceHashMatches": true,
   "approvalEvidencePackIdMatches": true,
+  "approvalEvidenceTimestampProblemCount": 0,
+  "futureDatedApprovalEvidenceRejected": true,
   "mixedPackApprovalEvidenceRejected": true,
   "dangerousFieldRejectCountMin": 20,
   "candidateFolderCount": 23,

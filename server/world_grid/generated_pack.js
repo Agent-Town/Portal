@@ -4125,6 +4125,31 @@ function releaseApprovalEvidenceHash(evidence = {}) {
   return stableEvidenceHash(copy);
 }
 
+function releaseApprovalTimestampProblems(evidence = {}) {
+  const createdAtMs = positiveNumberOrZero(evidence?.createdAtMs);
+  const problems = [];
+  function timestampOk(value) {
+    const timestamp = positiveNumberOrZero(value);
+    return createdAtMs > 0 && timestamp > 0 && timestamp <= createdAtMs;
+  }
+  if (evidence?.authModel?.status === 'approved' && !timestampOk(evidence.authModel.approvedAtMs)) {
+    problems.push('authModel.approvedAtMs');
+  }
+  if (evidence?.costModel?.status === 'accepted' && !timestampOk(evidence.costModel.acceptedAtMs)) {
+    problems.push('costModel.acceptedAtMs');
+  }
+  if (evidence?.consentModel?.status === 'recorded' && !timestampOk(evidence.consentModel.recordedAtMs)) {
+    problems.push('consentModel.recordedAtMs');
+  }
+  if (evidence?.candidateReview?.status === 'reviewed' && !timestampOk(evidence.candidateReview.reviewedAtMs)) {
+    problems.push('candidateReview.reviewedAtMs');
+  }
+  if (evidence?.humanReview?.status === 'complete' && !timestampOk(evidence.humanReview.reviewedAtMs)) {
+    problems.push('humanReview.reviewedAtMs');
+  }
+  return problems;
+}
+
 function buildReleaseApprovalEvidence({
   pack = {},
   nowMs = Date.now(),
@@ -4228,6 +4253,7 @@ function validateReleaseApprovalEvidence(evidence = {}, pack = {}) {
   const expectedEvidenceHash = schemaReport.ok ? releaseApprovalEvidenceHash(evidence) : '';
   const evidenceHashMatches = Boolean(expectedEvidenceHash) && evidence?.evidenceHash === expectedEvidenceHash;
   const packIdMatches = pack?.packId ? evidence?.packId === pack.packId : true;
+  const timestampProblems = releaseApprovalTimestampProblems(evidence);
   const requiredTargetCount = Math.max(
     ASSET_PROMPT_TARGETS.length,
     Array.isArray(pack?.assetPromptPlan?.targets) ? pack.assetPromptPlan.targets.length : 0
@@ -4244,31 +4270,41 @@ function validateReleaseApprovalEvidence(evidence = {}, pack = {}) {
     && constraints.v6CivicMechanicsTouched === false
     && constraints.normalGameplayVisibilityChanged === false
     && constraints.generatedPackDefaultExposure === false;
+  const authTimestampOk = !timestampProblems.includes('authModel.approvedAtMs');
+  const costTimestampOk = !timestampProblems.includes('costModel.acceptedAtMs');
+  const consentTimestampOk = !timestampProblems.includes('consentModel.recordedAtMs');
+  const candidateReviewTimestampOk = !timestampProblems.includes('candidateReview.reviewedAtMs');
+  const humanReviewTimestampOk = !timestampProblems.includes('humanReview.reviewedAtMs');
   const authModelApproved = evidence?.authModel?.status === 'approved'
     && evidence?.authModel?.authMode !== 'not_configured'
     && evidence?.authModel?.providerAccessPolicy === 'out_of_band_only_no_pack_storage'
     && isSha256Hex(evidence?.authModel?.approvalDocHash)
-    && isSha256Hex(evidence?.authModel?.approvedByHash);
+    && isSha256Hex(evidence?.authModel?.approvedByHash)
+    && authTimestampOk;
   const costEstimateAccepted = evidence?.costModel?.status === 'accepted'
     && evidence?.costModel?.currency === 'USD'
     && positiveNumberOrZero(evidence?.costModel?.estimatedMax) >= positiveNumberOrZero(evidence?.costModel?.estimatedMin)
     && isSha256Hex(evidence?.costModel?.costEstimateHash)
-    && isSha256Hex(evidence?.costModel?.acceptedByHash);
+    && isSha256Hex(evidence?.costModel?.acceptedByHash)
+    && costTimestampOk;
   const explicitConsentRecorded = evidence?.consentModel?.status === 'recorded'
     && evidence?.consentModel?.scope !== 'not_applicable'
     && isSha256Hex(evidence?.consentModel?.userConsentHash)
     && isSha256Hex(evidence?.consentModel?.teamConsentHash)
-    && isSha256Hex(evidence?.consentModel?.consentRecordHash);
+    && isSha256Hex(evidence?.consentModel?.consentRecordHash)
+    && consentTimestampOk;
   const candidateAssetsReviewed = candidate.status === 'reviewed'
     && expectedTargetCount >= requiredTargetCount
     && reviewedCandidateCount >= expectedTargetCount
     && reviewedDispositionCount >= reviewedCandidateCount
     && isSha256Hex(candidate.candidateManifestHash)
     && isSha256Hex(candidate.reviewerSignoffHash)
-    && candidate.productionPromotionApproved === false;
+    && candidate.productionPromotionApproved === false
+    && candidateReviewTimestampOk;
   const humanReviewComplete = evidence?.humanReview?.status === 'complete'
     && isSha256Hex(evidence?.humanReview?.releaseSignoffHash)
-    && isSha256Hex(evidence?.humanReview?.checklistHash);
+    && isSha256Hex(evidence?.humanReview?.checklistHash)
+    && humanReviewTimestampOk;
   const contentSafe = secretLikePaths.length === 0 && rawInstructionPaths.length === 0;
   const checks = [
     {
@@ -4290,6 +4326,11 @@ function validateReleaseApprovalEvidence(evidence = {}, pack = {}) {
       id: 'RELEASE_APPROVAL_EVIDENCE_PACK_ID_MATCH',
       passed: packIdMatches,
       measured: { expectedPackId: pack?.packId || '', actualPackId: evidence?.packId || '' }
+    },
+    {
+      id: 'RELEASE_APPROVAL_EVIDENCE_TIMESTAMPS_COHERENT',
+      passed: timestampProblems.length === 0,
+      measured: { createdAtMs: positiveNumberOrZero(evidence?.createdAtMs), timestampProblems }
     },
     {
       id: 'RELEASE_APPROVAL_EVIDENCE_AUTH_COST_CONSENT',
@@ -4322,6 +4363,7 @@ function validateReleaseApprovalEvidence(evidence = {}, pack = {}) {
       rawInstructionPathCount: rawInstructionPaths.length,
       evidenceHashMatches,
       packIdMatches,
+      timestampProblemCount: timestampProblems.length,
       authModelApproved,
       costEstimateAccepted,
       explicitConsentRecorded,
@@ -4514,6 +4556,7 @@ function validateProductionReleaseGate(gate = {}) {
       'RELEASE_APPROVAL_EVIDENCE_SCHEMA_VALID',
       'RELEASE_APPROVAL_EVIDENCE_CONTENT_SAFE',
       'RELEASE_APPROVAL_EVIDENCE_HASH_STABLE',
+      'RELEASE_APPROVAL_EVIDENCE_TIMESTAMPS_COHERENT',
       'RELEASE_APPROVAL_EVIDENCE_BOUNDARY_PRESERVED'
     ].includes(check.id))
     .every((check) => check.passed === true);

@@ -109,7 +109,7 @@ test('GU-19 release gate requires approval evidence to match a reviewed candidat
   const manifest = reviewedManifest(pack);
   const evidence = buildReleaseApprovalEvidence({
     pack,
-    nowMs: 170_200,
+    nowMs: 170_250,
     authModel: {
       status: 'approved',
       authMode: 'operator_managed',

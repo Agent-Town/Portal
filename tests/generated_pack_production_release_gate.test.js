@@ -632,6 +632,86 @@ test('GU-18 release approval evidence rejects hash drift and mixed-pack approval
   );
 });
 
+test('GU-18 release approval evidence rejects future or missing approval timestamps', () => {
+  const pack = createGeneratedPack({
+    owner: { ownerAccountId: 'owner_release_gate_approval_time' },
+    prompt: 'lantern reef observatory with clockwork archivists',
+    nowMs: 153_150,
+    candidateRoot: 'data/generated-packs-test'
+  });
+  const manifest = reviewedCandidateManifest(pack);
+  const targetCount = pack.assetPromptPlan.targets.length;
+  const futureTimedEvidence = buildReleaseApprovalEvidence({
+    pack,
+    nowMs: 153_300,
+    authModel: {
+      status: 'approved',
+      authMode: 'operator_managed',
+      approvalDocHash: hashLabel('timed-auth-policy'),
+      approvedByHash: hashLabel('timed-auth-reviewer'),
+      approvedAtMs: 153_301,
+      providerAccessPolicy: 'out_of_band_only_no_pack_storage'
+    },
+    costModel: {
+      status: 'accepted',
+      estimatedMin: 0.4,
+      estimatedMax: 1.8,
+      costEstimateHash: hashLabel('timed-cost-estimate'),
+      acceptedByHash: hashLabel('timed-cost-owner'),
+      acceptedAtMs: 153_200
+    },
+    consentModel: {
+      status: 'recorded',
+      scope: 'single-pack-candidate-run',
+      userConsentHash: hashLabel('timed-user-consent'),
+      teamConsentHash: hashLabel('timed-team-consent'),
+      consentRecordHash: hashLabel('timed-consent-record'),
+      recordedAtMs: 153_210
+    },
+    candidateReview: {
+      status: 'reviewed',
+      expectedTargetCount: targetCount,
+      reviewedCandidateCount: targetCount,
+      approvedCandidateCount: targetCount,
+      rejectedCandidateCount: 0,
+      candidateManifestHash: manifest.manifestHash,
+      reviewerSignoffHash: hashLabel('timed-candidate-reviewer'),
+      reviewedAtMs: 153_220,
+      productionPromotionApproved: false
+    },
+    humanReview: {
+      status: 'complete',
+      releaseSignoffHash: hashLabel('timed-human-signoff'),
+      checklistHash: hashLabel('timed-checklist'),
+      reviewedAtMs: 153_230
+    }
+  });
+  const report = validateReleaseApprovalEvidence(futureTimedEvidence, pack);
+  const gate = buildProductionReleaseGate({
+    pack,
+    approvalEvidence: futureTimedEvidence,
+    candidateReviewManifest: manifest,
+    nowMs: 153_350
+  });
+  const gateReport = validateProductionReleaseGate(gate);
+
+  assert.equal(futureTimedEvidence.evidenceHash.length, 64);
+  assert.equal(report.metrics.evidenceHashMatches, true);
+  assert.equal(report.metrics.timestampProblemCount, 1);
+  assert.equal(report.metrics.authModelApproved, false);
+  assert.equal(
+    report.checks.find((check) => check.id === 'RELEASE_APPROVAL_EVIDENCE_TIMESTAMPS_COHERENT').passed,
+    false
+  );
+  assert.equal(gate.publicReleaseEligible, false);
+  assert.equal(gate.releasePrerequisites.costConsentModelApproved, false);
+  assert.equal(gateReport.ok, false);
+  assert.equal(
+    gateReport.checks.find((check) => check.id === 'PRODUCTION_RELEASE_GATE_APPROVAL_EVIDENCE_VALID').passed,
+    false
+  );
+});
+
 test('GU-18 production release gate validation rejects tampered eligibility and blocking reasons', () => {
   const pack = createGeneratedPack({
     owner: { ownerAccountId: 'owner_release_gate_tamper' },

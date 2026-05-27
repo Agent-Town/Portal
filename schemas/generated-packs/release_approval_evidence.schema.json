@@ -22,7 +22,7 @@
     "evidenceHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "evidenceId": { "type": "string", "minLength": 12 },
     "packId": { "type": "string", "pattern": "^gen_pack_[0-9a-f]{16}$" },
-    "createdAtMs": { "type": "number" },
+    "createdAtMs": { "type": "number", "minimum": 0 },
     "authModel": {
       "type": "object",
       "additionalProperties": false,
