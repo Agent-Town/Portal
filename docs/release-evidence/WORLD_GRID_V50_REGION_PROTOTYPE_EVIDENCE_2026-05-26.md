@@ -15,7 +15,7 @@ Status: `prototype_gated` for V5.0-V5.5 starter workflow
 | Mutation origin guard | `server/world_grid/mutation_origin.js` rejects explicit cross-origin mutation metadata and requires positive same-origin context for mutating world-grid routes/tools in production. |
 | Mutation CSRF guard | `server/world_grid/csrf.js` issues owner-bound process-local tokens through `/api/world/mutation-token`; production mutating routes/tools reject missing, invalid, or cross-owner tokens. |
 | Mutation rate-limit guard | `server/world_grid/rate_limit.js` applies process-local owner/surface buckets to mutating world-grid routes/tools and returns `RATE_LIMITED` with retry headers when exceeded. |
-| Mutation audit log | `server/world_grid/audit_log.js` writes hash-chained SQLite audit/replay rows for successful mutating V5.1+ routes/tools when `WORLD_GRID_AUDIT_SQLITE_PATH` is configured; release promotion still needs full before-state snapshots and per-store restart replay coverage. |
+| Mutation audit log | `server/world_grid/audit_log.js` writes hash-chained SQLite audit/replay rows for successful mutating V5.1+ routes/tools when `WORLD_GRID_AUDIT_SQLITE_PATH` is configured; `tests/world_grid_audit_persistence.test.js` proves every V5.1-V5.5 mutating route/tool surface writes durable audit rows across separate Node process restarts, exact idempotent replay does not duplicate audit rows, changed-payload conflicts add no audit rows, and private-looking service secrets stay out of entries. Release promotion still needs full before-state snapshots and release replay reconstruction. |
 | Server-authoritative region | `server/world_grid/region.js` deterministically generates `WorldRegion`, `WorldCell`, `SettlementNode`, and `RouteEdge` data from owner identity. |
 | Read-only V5.0 APIs | `server/world_grid/routes.js` exposes region, focus, camera, and read-only tool endpoints without claim/build/resource mutation. |
 | Durable V5.0 preferences foundation | `server/world_grid/preferences.js` can write SQLite `world_grid_region_preferences` rows when `WORLD_GRID_REGION_PREFS_SQLITE_PATH` is configured; `tests/world_grid_region_preferences_persistence.test.js` proves selected-cell and camera preferences reopen across restarts and stay isolated by owner/region. |
@@ -53,8 +53,9 @@ optional SQLite region preference rows, optional SQLite idempotency rows, option
 SQLite claim rows, optional SQLite public presence/follow/report rows, optional
 SQLite service request/reputation rows, optional SQLite event contribution/reward
 rows, and optional SQLite sandbox participant/action/snapshot/cell rows are durable
-foundations, but release promotion still requires durable owner indexes,
-migration versioning, full append-only audit/replay records with before-state
-snapshots, durable idempotency integration with final session-auth production
-replay, CSRF-token/session-auth integration, durable/shared rate limits, and
-restart replay coverage for every world-grid store.
+foundations. Optional SQLite audit rows now have route/tool-surface restart
+matrix coverage, but release promotion still requires durable owner indexes,
+migration versioning, complete before-state snapshots, durable idempotency
+integration with final session-auth production replay, CSRF-token/session-auth
+integration, durable/shared rate limits, and release replay reconstruction for
+every world-grid store.

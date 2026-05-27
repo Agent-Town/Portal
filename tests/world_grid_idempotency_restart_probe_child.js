@@ -8,6 +8,7 @@ const {
   closeWorldGridIdempotencyStore,
   createWorldGridIdempotencyStore
 } = require('../server/world_grid/idempotency');
+const { closeWorldGridAuditLog } = require('../server/world_grid/audit_log');
 const { createWorldGridRouter } = require('../server/world_grid/routes');
 
 const PAIR_ID = 'session:world-grid-durable-idempotency-restart';
@@ -41,6 +42,7 @@ async function withServer(fn) {
     return await fn(baseUrl);
   } finally {
     await new Promise((resolve) => server.close(resolve));
+    closeWorldGridAuditLog();
     closeWorldGridIdempotencyStore();
   }
 }

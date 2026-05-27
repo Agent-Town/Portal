@@ -53,3 +53,9 @@ V6 milestone plan.
 | V5.4 World Events and Public Works | `prototype_gated` | No | Preview, cap, idempotency, conservation, cosmetic reward coverage, and optional `WORLD_GRID_EVENTS_SQLITE_PATH` restart proof for contribution/reward state. |
 | V5.5 Controlled Free-Play Sandbox Districts | `prototype_gated` | No | Typed props, moderation rejection, agent demo, rollback, private-town isolation coverage, and optional `WORLD_GRID_SANDBOX_SQLITE_PATH` restart proof for participant/action/snapshot/cell state. |
 | V6.0 Agent Civilization Foundation | `research_only` | No | Worker-first civic tool draft and fail-closed tool exposure gate, civic mutation security envelope, proposal review transitions, governance preflight, reputation accountability foundation, moderation/privacy foundation, prepared-effect rollback foundation, scoped delegation foundation, civic institution charter foundation, public-works shared-resource foundation, modal lab surface and fail-closed launch-plan contracts, resilience baseline report, audit replay reconstruction, release-review gate, and controlled-release gate exist under `server/world_civilization/`, but runtime civic tools remain hidden until V5 safety, worker-origin evidence, rollback, redaction, retention, modal-first observability, replay resilience, security/product signoff, controlled rollout controls, and civic-governance gates are proven. |
+
+Shared V5 storage evidence now includes optional `WORLD_GRID_AUDIT_SQLITE_PATH`
+restart matrix coverage for all V5.1-V5.5 mutating route and tool surfaces,
+including duplicate-replay suppression and private service-secret exclusion.
+Complete before-state snapshots, release replay reconstruction, final session
+auth, durable CSRF, and shared rate limits remain promotion gates.

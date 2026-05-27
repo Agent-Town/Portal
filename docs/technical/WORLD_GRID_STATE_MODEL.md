@@ -54,7 +54,7 @@ release-grade store is explicitly implemented and tested. Current stores are:
 | Idempotency replay records | Process-local `Map` in `server/world_grid/idempotency.js`; optional SQLite `world_grid_idempotency_records` table when `WORLD_GRID_IDEMPOTENCY_SQLITE_PATH` is configured | Durable foundation for exact retry replay, changed payload rejection, schema/migration versions, planned-claim restart proof, and V5.1-V5.5 mutating route/tool-surface restart proof; release promotion still needs final session-auth integration and production replay coverage |
 | CSRF mutation tokens | Process-local `Map` in `server/world_grid/csrf.js` | Prototype/ephemeral; owner-bound only for the process lifetime |
 | Mutation rate-limit buckets | Process-local `Map` in `server/world_grid/rate_limit.js` | Prototype/ephemeral; per-owner and per-surface only for the process lifetime |
-| Mutation audit records | Optional SQLite `world_grid_audit_log` table in `server/world_grid/audit_log.js` when `WORLD_GRID_AUDIT_SQLITE_PATH` is configured | Durable foundation for append-only audit/replay; not yet complete release storage because before-state snapshots and store reconstruction are still release gates |
+| Mutation audit records | Optional SQLite `world_grid_audit_log` table in `server/world_grid/audit_log.js` when `WORLD_GRID_AUDIT_SQLITE_PATH` is configured | Durable foundation for append-only audit/replay, route/tool-surface restart matrix coverage, and duplicate-replay suppression; not yet complete release storage because complete before-state snapshots and store reconstruction are still release gates |
 
 The mandatory durable dependency used by mutating V5.1+ routes is the existing
 Founders Plot prerequisite check. Optional SQLite world-grid stores are
@@ -72,6 +72,13 @@ Before any V5 world-grid slice can claim release-grade persistence, it needs:
 - Append-only audit/replay records for every mutating route and tool, including
   actor identity, idempotency key, before/after summary, and rollback handle
   where applicable.
+- Durable audit rows for every V5.1-V5.5 mutating route and tool surface with
+  replay indexes, schema/migration metadata, privacy-safe summaries, restart
+  matrix coverage, and duplicate-replay suppression. Current
+  `WORLD_GRID_AUDIT_SQLITE_PATH` coverage proves route/tool audit rows reopen
+  after separate Node process restarts and exact idempotent replays do not add
+  duplicate audit rows; complete before-state snapshots and release replay
+  reconstruction remain gates.
 - Durable camera/focus preference rows with owner/region indexes and restart
   persistence for the V5.0 region lifecycle. Current SQLite preference coverage
   proves selected-cell and camera state reopens across separate Node lifetimes
