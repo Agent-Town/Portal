@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
+const { V6_WORLD_FEATURE_FLAG, parseWorldGridFeatureFlags } = require('../server/world_grid/feature_flags');
 const { CIVIC_SCHEMA_VERSION } = require('../server/world_civilization/schemas');
 const { createCivicAuditLedger } = require('../server/world_civilization/audit_ledger');
 const { createCivicInstitutionStore } = require('../server/world_civilization/institutions');
@@ -13,6 +14,11 @@ const { createCivicVoteStore } = require('../server/world_civilization/votes');
 const {
   CONTRIBUTION_STATUS_RECORDED,
   PROJECT_STATUS_RECORDED,
+  REQUIRED_PUBLIC_WORKS_INTEGRATION_EVIDENCE_CHECKS,
+  REQUIRED_PUBLIC_WORKS_READINESS_CHECKS,
+  REQUIRED_PUBLIC_WORKS_ROUTE_SURFACES,
+  assertV6PublicWorksReadinessGateSafe,
+  buildV6PublicWorksReadinessGate,
   createCivicPublicWorksStore
 } = require('../server/world_civilization/public_works');
 
@@ -229,6 +235,30 @@ function contribution(overrides = {}) {
       privateDataIncluded: false,
       dataClasses: ['public_audit_summary', 'public_world_state']
     },
+    ...overrides
+  };
+}
+
+function publicWorksReadinessEvidence(overrides = {}) {
+  return {
+    status: 'complete',
+    executionStatus: 'not_executable',
+    runtimeExposed: false,
+    playerVisible: false,
+    normalGameplayExposure: false,
+    opensPublicContributionRoute: false,
+    mutatesPrivateTown: false,
+    spendsPrivateInventory: false,
+    grantsRewards: false,
+    publicFreePlayEnabled: false,
+    workerToolEnforced: true,
+    routeAuthorizationEnforced: true,
+    inventorySpendReviewed: true,
+    rewardConservationReviewed: true,
+    rollbackReviewed: true,
+    publicTextRenderingReviewed: true,
+    checks: [...REQUIRED_PUBLIC_WORKS_INTEGRATION_EVIDENCE_CHECKS],
+    routeSurfaces: [...REQUIRED_PUBLIC_WORKS_ROUTE_SURFACES],
     ...overrides
   };
 }
@@ -611,4 +641,149 @@ test('V6 public works store persists contributions and supports replay indexes',
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('V6 public works readiness gate is hidden without explicit research opt-in and V6 flag', () => {
+  const withoutResearchOptIn = buildV6PublicWorksReadinessGate({
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: publicWorksReadinessEvidence()
+  });
+  const broadV5Override = buildV6PublicWorksReadinessGate({
+    includeResearchPublicWorksReadiness: true,
+    featureFlags: parseWorldGridFeatureFlags('all'),
+    evidence: publicWorksReadinessEvidence()
+  });
+
+  for (const report of [withoutResearchOptIn, broadV5Override]) {
+    assert.equal(report.available, false);
+    assert.equal(report.researchReady, false);
+    assert.equal(report.releaseReady, false);
+    assert.equal(report.failClosed, true);
+    assert.equal(report.runtimeExposed, false);
+    assert.equal(report.playerVisible, false);
+    assert.equal(report.normalGameplayExposure, false);
+    assert.equal(report.opensPublicContributionRoute, false);
+    assert.equal(report.mutatesPrivateTown, false);
+    assert.equal(report.spendsPrivateInventory, false);
+    assert.equal(report.grantsRewards, false);
+    assert.equal(report.publicFreePlayEnabled, false);
+    assert.deepEqual(report.checks, []);
+    assert.deepEqual(assertV6PublicWorksReadinessGateSafe(report), { ok: true, errors: [] });
+  }
+});
+
+test('V6 public works readiness gate records route inventory reward rollback evidence without exposure', () => {
+  const report = buildV6PublicWorksReadinessGate({
+    includeResearchPublicWorksReadiness: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    source: 'node_test',
+    evidence: publicWorksReadinessEvidence()
+  });
+
+  assert.equal(report.available, true);
+  assert.equal(report.source, 'node_test');
+  assert.equal(report.researchReady, true);
+  assert.equal(report.releaseReady, false);
+  assert.equal(report.failClosed, false);
+  assert.equal(report.runtimeExposed, false);
+  assert.equal(report.playerVisible, false);
+  assert.equal(report.normalGameplayExposure, false);
+  assert.equal(report.opensPublicContributionRoute, false);
+  assert.equal(report.mutatesPrivateTown, false);
+  assert.equal(report.spendsPrivateInventory, false);
+  assert.equal(report.grantsRewards, false);
+  assert.equal(report.publicFreePlayEnabled, false);
+  assert.equal(report.executionStatus, 'not_executable');
+  assert.deepEqual(report.checks.map((entry) => entry.key), REQUIRED_PUBLIC_WORKS_READINESS_CHECKS);
+  assert.equal(report.evidence.ok, true);
+  assert.deepEqual(report.evidence.missingChecks, []);
+  assert.deepEqual(report.evidence.missingRouteSurfaces, []);
+  assert.deepEqual(report.evidence.requiredRouteSurfaces, REQUIRED_PUBLIC_WORKS_ROUTE_SURFACES);
+  assert.deepEqual(assertV6PublicWorksReadinessGateSafe(report), { ok: true, errors: [] });
+});
+
+test('V6 public works readiness gate fails closed without route auth inventory reward and rollback evidence', () => {
+  const report = buildV6PublicWorksReadinessGate({
+    includeResearchPublicWorksReadiness: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: publicWorksReadinessEvidence({
+      checks: REQUIRED_PUBLIC_WORKS_INTEGRATION_EVIDENCE_CHECKS.filter((check) => (
+        check !== 'wallet_session_route_auth'
+        && check !== 'explicit_inventory_spend_authorization'
+        && check !== 'reward_cosmetic_or_conservation_tests'
+        && check !== 'rollback_execution_review'
+      )),
+      routeSurfaces: REQUIRED_PUBLIC_WORKS_ROUTE_SURFACES.filter((surface) => surface !== 'reward_claim'),
+      routeAuthorizationEnforced: false,
+      inventorySpendReviewed: false,
+      rewardConservationReviewed: false,
+      rollbackReviewed: false
+    })
+  });
+
+  assert.equal(report.available, true);
+  assert.equal(report.researchReady, false);
+  assert.equal(report.failClosed, true);
+  assert.deepEqual(report.evidence.missingChecks, [
+    'wallet_session_route_auth',
+    'explicit_inventory_spend_authorization',
+    'reward_cosmetic_or_conservation_tests',
+    'rollback_execution_review'
+  ]);
+  assert.deepEqual(report.evidence.missingRouteSurfaces, ['reward_claim']);
+  assert.deepEqual(report.errors, [
+    'PUBLIC_WORKS_INTEGRATION_EVIDENCE_REQUIRED',
+    'PUBLIC_WORKS_ROUTE_AUTHORIZATION_REQUIRED',
+    'PUBLIC_WORKS_INVENTORY_SPEND_PLAN_REQUIRED',
+    'PUBLIC_WORKS_REWARD_CONSERVATION_REQUIRED',
+    'PUBLIC_WORKS_ROLLBACK_RECOVERY_REQUIRED'
+  ]);
+  assert.deepEqual(assertV6PublicWorksReadinessGateSafe(report), { ok: true, errors: [] });
+});
+
+test('V6 public works readiness assertion rejects fake public route inventory spend or rewards', () => {
+  const report = buildV6PublicWorksReadinessGate({
+    includeResearchPublicWorksReadiness: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: publicWorksReadinessEvidence()
+  });
+  const unsafe = {
+    ...report,
+    runtimeExposed: true,
+    playerVisible: true,
+    normalGameplayExposure: true,
+    opensPublicContributionRoute: true,
+    mutatesPrivateTown: true,
+    spendsPrivateInventory: true,
+    grantsRewards: true,
+    publicFreePlayEnabled: true,
+    releaseReady: true,
+    executionStatus: 'executes',
+    evidence: {
+      ...report.evidence,
+      runtimeExposed: true,
+      playerVisible: true,
+      normalGameplayExposure: true,
+      opensPublicContributionRoute: true,
+      mutatesPrivateTown: true,
+      spendsPrivateInventory: true,
+      grantsRewards: true,
+      publicFreePlayEnabled: true
+    }
+  };
+  const result = assertV6PublicWorksReadinessGateSafe(unsafe);
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(','), /V6_PUBLIC_WORKS_READINESS_RUNTIME_HIDDEN_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_PUBLIC_WORKS_READINESS_PLAYER_HIDDEN_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_PUBLIC_WORKS_READINESS_NORMAL_GAMEPLAY_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_PUBLIC_WORKS_READINESS_PUBLIC_ROUTE_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_PUBLIC_WORKS_READINESS_PRIVATE_TOWN_MUTATION_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_PUBLIC_WORKS_READINESS_PRIVATE_INVENTORY_SPEND_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_PUBLIC_WORKS_READINESS_REWARD_GRANT_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_PUBLIC_WORKS_READINESS_PUBLIC_FREE_PLAY_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_PUBLIC_WORKS_READINESS_NON_EXECUTING_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_PUBLIC_WORKS_READINESS_RELEASE_READY_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_PUBLIC_WORKS_READINESS_EVIDENCE_PUBLIC_ROUTE_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_PUBLIC_WORKS_READINESS_EVIDENCE_REWARD_GRANT_FORBIDDEN/);
 });

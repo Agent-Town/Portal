@@ -321,6 +321,68 @@ test('V6 release review blocks signoff without institution templates public text
   assert.deepEqual(assertV6ReleaseReviewSafe(report), { ok: true, errors: [] });
 });
 
+test('V6 release review requires public works readiness evidence', () => {
+  const publicWorksGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'public_works_readiness_review');
+  const validationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'validation_evidence');
+
+  assert.equal(publicWorksGate.owner, 'engineering_security_product');
+  assert.ok(publicWorksGate.requiredArtifacts.includes('specs/65_agent_town_v6_public_works_shared_resources_foundation.md'));
+  assert.ok(publicWorksGate.requiredArtifacts.includes('server/world_civilization/public_works.js'));
+  assert.ok(publicWorksGate.requiredArtifacts.includes('server/world_civilization/institutions.js'));
+  assert.ok(publicWorksGate.requiredArtifacts.includes('server/world_civilization/effects.js'));
+  assert.ok(publicWorksGate.requiredArtifacts.includes('server/world_civilization/mutation_security.js'));
+  assert.ok(publicWorksGate.requiredArtifacts.includes('docs/security/PUBLIC_TEXT_RENDERING_POLICY.md'));
+  assert.ok(publicWorksGate.requiredArtifacts.includes('docs/technical/WORLD_EVENT_CONSERVATION_MODEL.md'));
+  assert.ok(publicWorksGate.requiredArtifacts.includes('tests/world_civilization_public_works.test.js'));
+  assert.ok(publicWorksGate.requiredChecks.includes('governed_project_review'));
+  assert.ok(publicWorksGate.requiredChecks.includes('worker_tool_enforcement'));
+  assert.ok(publicWorksGate.requiredChecks.includes('wallet_session_route_auth'));
+  assert.ok(publicWorksGate.requiredChecks.includes('durable_idempotency'));
+  assert.ok(publicWorksGate.requiredChecks.includes('explicit_inventory_spend_authorization'));
+  assert.ok(publicWorksGate.requiredChecks.includes('inventory_restart_replay'));
+  assert.ok(publicWorksGate.requiredChecks.includes('resource_conservation_tests'));
+  assert.ok(publicWorksGate.requiredChecks.includes('reward_cosmetic_or_conservation_tests'));
+  assert.ok(publicWorksGate.requiredChecks.includes('contribution_caps_under_retry'));
+  assert.ok(publicWorksGate.requiredChecks.includes('rollback_execution_review'));
+  assert.ok(publicWorksGate.requiredChecks.includes('public_text_rendering_review'));
+  assert.ok(publicWorksGate.requiredChecks.includes('private_data_exclusion'));
+  assert.ok(publicWorksGate.requiredChecks.includes('public_works_audit_rows'));
+  assert.ok(publicWorksGate.requiredChecks.includes('process_restart_replay'));
+  assert.ok(publicWorksGate.requiredChecks.includes('no_private_town_mutation'));
+  assert.ok(publicWorksGate.requiredChecks.includes('no_public_free_play'));
+  assert.ok(validationGate.requiredChecks.includes('public_works_readiness_gate'));
+  assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_public_works.test.js'));
+});
+
+test('V6 release review blocks signoff without public works route inventory reward and rollback evidence', () => {
+  const evidence = Object.fromEntries(REQUIRED_REVIEW_GATES.map((gate) => [gate.key, completeEvidenceFor(gate)]));
+  evidence.public_works_readiness_review = {
+    ...evidence.public_works_readiness_review,
+    checks: evidence.public_works_readiness_review.checks.filter((check) => (
+      check !== 'wallet_session_route_auth'
+      && check !== 'explicit_inventory_spend_authorization'
+      && check !== 'reward_cosmetic_or_conservation_tests'
+      && check !== 'rollback_execution_review'
+    ))
+  };
+  const report = buildV6ReleaseReviewReport({
+    includeResearchReview: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence
+  });
+  const publicWorksGate = report.gateReports.find((gate) => gate.key === 'public_works_readiness_review');
+
+  assert.equal(report.releaseReady, false);
+  assert.equal(publicWorksGate.ok, false);
+  assert.deepEqual(publicWorksGate.missingChecks, [
+    'wallet_session_route_auth',
+    'explicit_inventory_spend_authorization',
+    'reward_cosmetic_or_conservation_tests',
+    'rollback_execution_review'
+  ]);
+  assert.deepEqual(assertV6ReleaseReviewSafe(report), { ok: true, errors: [] });
+});
+
 test('V6 release review report can only become ready with complete evidence and signoff', () => {
   const evidence = Object.fromEntries(REQUIRED_REVIEW_GATES.map((gate) => [gate.key, completeEvidenceFor(gate)]));
   const report = buildV6ReleaseReviewReport({

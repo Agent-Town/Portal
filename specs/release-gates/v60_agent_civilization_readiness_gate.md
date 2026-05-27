@@ -294,7 +294,16 @@ gate below has implementation, deterministic tests, and security/product signoff
   project records plus capped contributions; release still requires
   worker/tool enforcement, wallet/session route auth, explicit
   private-inventory spend, rollback execution, public surfaces, and reward
-  conservation tests.
+  conservation tests. The M14 research-only public works readiness gate in
+  `server/world_civilization/public_works.js` must require governed project
+  review, worker/tool enforcement, wallet/session route authorization, durable
+  idempotency, explicit inventory-spend authorization, inventory restart replay,
+  resource conservation tests, reward conservation, contribution caps under
+  retry, rollback execution review, public text rendering, private-data
+  exclusion, public-works audit rows, process restart replay, no private-town
+  mutation, and no public free play while keeping
+  `opensPublicContributionRoute: false`, `spendsPrivateInventory: false`,
+  `grantsRewards: false`, and `executionStatus: "not_executable"`.
 - Any internal V6 lab UI must launch from the town hub modal flow, preserve
   page-scoped OpenClaw Lite worker continuity, keep Worker Tools, Skill Context,
   Worker Traffic, Brain, and Session Context observable, and prove with
@@ -351,7 +360,8 @@ gate below has implementation, deterministic tests, and security/product signoff
   store-backed delegation proof and scope-mismatch evidence, data-retention
   policy, audit coverage review, deterministic validation evidence, effect
   execution and rollback review, agent participation enforcement review, civic
-  institution readiness review, modal lab surface review, and product signoff.
+  institution readiness review, public works readiness review, modal lab surface
+  review, and product signoff.
 - Controlled release completion must remain a final go/no-go gate, not an
   automatic enablement path. Current gate tracking starts in
   `server/world_civilization/controlled_release.js` and

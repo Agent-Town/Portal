@@ -104,6 +104,7 @@ const REQUIRED_REVIEW_GATES = [
       'tests/world_civilization_rollback_recovery.test.js',
       'tests/world_civilization_delegations.test.js',
       'tests/world_civilization_institutions.test.js',
+      'tests/world_civilization_public_works.test.js',
       'tests/world_civilization_reputation.test.js',
       'tests/world_civilization_moderation.test.js',
       'tests/world_civilization_resilience.test.js',
@@ -117,7 +118,8 @@ const REQUIRED_REVIEW_GATES = [
       'store_backed_delegation_proof',
       'effect_execution_gate',
       'agent_participation_enforcement_gate',
-      'institution_readiness_gate'
+      'institution_readiness_gate',
+      'public_works_readiness_gate'
     ],
     signoffRequired: true
   },
@@ -210,6 +212,44 @@ const REQUIRED_REVIEW_GATES = [
       'institution_audit_rows',
       'no_player_visible_institutions',
       'no_world_mutation'
+    ],
+    signoffRequired: true
+  },
+  {
+    key: 'public_works_readiness_review',
+    label: 'Public works readiness review',
+    owner: 'engineering_security_product',
+    requiredArtifacts: [
+      RELEASE_REVIEW_ARTIFACT,
+      'specs/65_agent_town_v6_public_works_shared_resources_foundation.md',
+      'server/world_civilization/public_works.js',
+      'server/world_civilization/institutions.js',
+      'server/world_civilization/effects.js',
+      'server/world_civilization/mutation_security.js',
+      'docs/security/PUBLIC_TEXT_RENDERING_POLICY.md',
+      'docs/technical/WORLD_EVENT_CONSERVATION_MODEL.md',
+      'tests/world_civilization_public_works.test.js',
+      'tests/world_civilization_public_works_process_restart.test.js',
+      'tests/world_civilization_effects.test.js',
+      'tests/world_civilization_mutation_security.test.js'
+    ],
+    requiredChecks: [
+      'governed_project_review',
+      'worker_tool_enforcement',
+      'wallet_session_route_auth',
+      'durable_idempotency',
+      'explicit_inventory_spend_authorization',
+      'inventory_restart_replay',
+      'resource_conservation_tests',
+      'reward_cosmetic_or_conservation_tests',
+      'contribution_caps_under_retry',
+      'rollback_execution_review',
+      'public_text_rendering_review',
+      'private_data_exclusion',
+      'public_works_audit_rows',
+      'process_restart_replay',
+      'no_private_town_mutation',
+      'no_public_free_play'
     ],
     signoffRequired: true
   },

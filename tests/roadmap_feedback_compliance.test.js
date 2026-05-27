@@ -144,10 +144,12 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   const reputationSpec = read('specs/60_agent_town_v6_reputation_accountability_foundation.md');
   const moderationSpec = read('specs/61_agent_town_v6_moderation_privacy_foundation.md');
   const institutionSpec = read('specs/64_agent_town_v6_civic_institution_charter_foundation.md');
+  const publicWorksSpec = read('specs/65_agent_town_v6_public_works_shared_resources_foundation.md');
   const persistenceSpec = read('specs/67_agent_town_v6_persistence_replay_resilience_foundation.md');
   const releaseReview = read('docs/security/V6_AGENT_CIVILIZATION_RELEASE_REVIEW.md');
   const skillLine = read('docs/internal-skill-testline.md');
   const institutionSource = read('server/world_civilization/institutions.js');
+  const publicWorksSource = read('server/world_civilization/public_works.js');
   const requiredMilestones = [
     'M0 Hardened V5 world-grid baseline',
     'M1 Living V6 milestone contract',
@@ -272,8 +274,18 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /M14 Public works and shared resources integration \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/public_works\.js/);
   assert.match(plan, /proposal\/vote\/moderation-gated public works project/);
+  assert.match(plan, /buildV6PublicWorksReadinessGate\(\)/);
+  assert.match(plan, /explicit inventory-spend authorization/);
+  assert.match(plan, /no public free play/);
   assert.match(gate, /server\/world_civilization\/public_works\.js/);
   assert.match(gate, /public_works\.project\.recorded|proposal\/vote\/moderation-gated\s+project records/);
+  assert.match(gate, /M14\s+research-only public works readiness gate/);
+  assert.match(gate, /opensPublicContributionRoute: false/);
+  assert.match(publicWorksSpec, /buildV6PublicWorksReadinessGate\(\)/);
+  assert.match(publicWorksSpec, /reward-claim, rollback, and public-surface route contracts/);
+  assert.match(publicWorksSource, /REQUIRED_PUBLIC_WORKS_INTEGRATION_EVIDENCE_CHECKS/);
+  assert.match(publicWorksSource, /reward_cosmetic_or_conservation_tests/);
+  assert.match(publicWorksSource, /V6_PUBLIC_WORKS_READINESS_RELEASE_READY_FORBIDDEN/);
   assert.match(plan, /M15 Modal-first V6 lab surface \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/lab_surface\.js/);
   assert.match(plan, /fail-closed modal launch plan/);
@@ -327,15 +339,21 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /effect execution and rollback review/);
   assert.match(plan, /agent participation enforcement review/);
   assert.match(plan, /civic institution readiness review/);
+  assert.match(plan, /public works readiness review/);
   assert.match(gate, /modal lab\s+surface (launch )?review/);
   assert.match(gate, /effect\s+execution and rollback review/);
   assert.match(gate, /agent participation enforcement review/);
   assert.match(gate, /civic\s+institution readiness review/);
+  assert.match(gate, /public works readiness review/);
   assert.match(gate, /Worker-first V6 civic tools must pass the exposure gate/);
   assert.match(releaseReview, /Civic institution readiness review/);
   assert.match(releaseReview, /institution readiness gate/);
+  assert.match(releaseReview, /Public works readiness review/);
+  assert.match(releaseReview, /public works readiness gate/);
   assert.match(skillLine, /M13 readiness gate/);
   assert.match(skillLine, /civic institution readiness review/);
+  assert.match(skillLine, /M14 readiness gate/);
+  assert.match(skillLine, /public works readiness review/);
   assert.match(plan, /M18 V6 controlled release completion \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/controlled_release\.js/);
   assert.match(gate, /server\/world_civilization\/controlled_release\.js/);

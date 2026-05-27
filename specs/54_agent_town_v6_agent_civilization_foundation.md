@@ -134,6 +134,19 @@ template scope. It remains non-executing with `releaseReady: false`,
 `appliesCharterChange: false`, `mutatesWorldState: false`, and
 `executionStatus: "not_executable"`.
 
+The research-only M14 public works readiness gate in
+`server/world_civilization/public_works.js` records release evidence required
+before shared-resource public works can appear in normal gameplay: governed
+project review, worker/tool enforcement, wallet/session route authorization,
+durable idempotency, explicit inventory-spend authorization, inventory restart
+replay, resource conservation tests, reward conservation, contribution caps
+under retry, rollback execution review, public text rendering, private-data
+exclusion, public-works audit rows, process restart replay, no private-town
+mutation, and no public free play. It remains non-executing with
+`releaseReady: false`, `opensPublicContributionRoute: false`,
+`spendsPrivateInventory: false`, `grantsRewards: false`, and
+`executionStatus: "not_executable"`.
+
 The research-only modal lab surface contract in
 `server/world_civilization/lab_surface.js` is route-neutral and non-executing.
 It does not add a V6 route or normal gameplay surface; it only records the
@@ -154,9 +167,9 @@ The research-only release review gate in
 `server/world_civilization/release_review.js` names the threat model, privacy,
 abuse-case, data-retention, audit coverage, validation, effect execution and
 rollback review, agent participation enforcement review, civic institution
-readiness review, worker tool surface review, modal lab surface review, and
-product signoff requirements that must be complete before normal gameplay
-exposure.
+readiness review, public works readiness review, worker tool surface review,
+modal lab surface review, and product signoff requirements that must be
+complete before normal gameplay exposure.
 
 The research-only controlled release gate in
 `server/world_civilization/controlled_release.js` requires M0-M17 completion,

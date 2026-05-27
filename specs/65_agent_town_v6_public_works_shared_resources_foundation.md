@@ -97,6 +97,30 @@ Indexes cover project/status replay, institution replay, and contributor replay.
 - Projects write `public_works.project.recorded` audit ledger entries;
   contributions write `public_works.contribution.recorded` audit ledger entries.
 
+## M14 Readiness Gate
+
+`buildV6PublicWorksReadinessGate()` records non-executing readiness evidence
+for eventual release-grade shared-resource public works. It requires explicit
+research opt-in and `FEATURE_WORLD_V60_AGENT_CIVILIZATION`; broad V5 prototype
+overrides must not enable it.
+
+The gate remains `research_only`, `releaseReady: false`, `playerVisible: false`,
+`opensPublicContributionRoute: false`, `mutatesPrivateTown: false`,
+`spendsPrivateInventory: false`, `grantsRewards: false`,
+`publicFreePlayEnabled: false`, and `executionStatus: "not_executable"`. It
+only passes research readiness when evidence covers governed project review,
+worker/tool enforcement, wallet/session route authorization, durable
+idempotency, explicit inventory-spend authorization, inventory restart replay,
+resource conservation tests, reward conservation, contribution caps under
+retry, rollback execution review, public text rendering, private-data
+exclusion, public-works audit rows, process restart replay, no private-town
+mutation, and no public free play across project creation, contribution,
+inventory-spend, reward-claim, rollback, and public-surface route contracts.
+
+The corresponding assertion rejects fake readiness that exposes public routes,
+marks the gate release-ready, spends private inventory, grants rewards, mutates
+private town state, or enables public free play.
+
 ## Release Gate
 
 M14 cannot move to `done` until:

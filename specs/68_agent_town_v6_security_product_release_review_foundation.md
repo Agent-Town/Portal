@@ -42,7 +42,8 @@ are present.
   all-features regression, feature override safety, and load/rate replay
   evidence, including civic mutation security, delegated-agent proof, and
   governance preflight, effect execution gate, and agent participation
-  enforcement gate, and institution readiness gate contract coverage.
+  enforcement gate, institution readiness gate, and public works readiness gate
+  contract coverage.
 - Effect execution and rollback review: typed apply handlers, typed rollback
   handlers, real before/after state, authorization enforcement, idempotent
   apply/rollback behavior, irreversible-action review, conservation tests,
@@ -61,6 +62,14 @@ are present.
   private-data exclusion, institution audit rows, no player-visible
   institutions, and no world mutation before any institution can appear in
   normal gameplay.
+- Public works readiness review: governed project review, worker/tool
+  enforcement, wallet/session route authorization, durable idempotency, explicit
+  inventory-spend authorization, inventory restart replay, resource
+  conservation tests, reward conservation, contribution caps under retry,
+  rollback execution review, public text rendering, private-data exclusion,
+  public-works audit rows, process restart replay, no private-town mutation, and
+  no public free play before any shared-resource public works surface can appear
+  in normal gameplay.
 - Worker tool surface review: runtime manifest source-of-truth evidence,
   OpenClaw Lite worker origin, Worker Traffic and Skill Context observability,
   mutation security envelope coverage, and no backend shortcuts before any

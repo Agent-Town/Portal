@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
 
+const { V6_WORLD_FEATURE_FLAG, isWorldGridFeatureEnabled } = require('../world_grid/feature_flags');
 const { createCivicAuditLedger, sha256, stableJson } = require('./audit_ledger');
 const { validatePublicWorksContribution, validatePublicWorksProject } = require('./schemas');
 const {
@@ -14,6 +15,48 @@ const PROJECT_STATUS_RECORDED = 'recorded';
 const CONTRIBUTION_STATUS_RECORDED = 'recorded';
 const MIGRATION_VERSION = 'v1';
 const STORE_KEY = 'public_works';
+const V6_PUBLIC_WORKS_READINESS_GATE_VERSION = 'agent-town.v6.public_works.readiness.v1';
+const REQUIRED_PUBLIC_WORKS_READINESS_CHECKS = [
+  'feature_flag',
+  'research_opt_in',
+  'integration_evidence',
+  'worker_tool_enforcement',
+  'route_authorization',
+  'inventory_spend_plan',
+  'reward_conservation',
+  'rollback_recovery',
+  'public_text_rendering',
+  'no_runtime_exposure',
+  'no_player_visible_public_works',
+  'no_private_town_mutation',
+  'no_public_free_play'
+];
+const REQUIRED_PUBLIC_WORKS_INTEGRATION_EVIDENCE_CHECKS = [
+  'governed_project_review',
+  'worker_tool_enforcement',
+  'wallet_session_route_auth',
+  'durable_idempotency',
+  'explicit_inventory_spend_authorization',
+  'inventory_restart_replay',
+  'resource_conservation_tests',
+  'reward_cosmetic_or_conservation_tests',
+  'contribution_caps_under_retry',
+  'rollback_execution_review',
+  'public_text_rendering_review',
+  'private_data_exclusion',
+  'public_works_audit_rows',
+  'process_restart_replay',
+  'no_private_town_mutation',
+  'no_public_free_play'
+];
+const REQUIRED_PUBLIC_WORKS_ROUTE_SURFACES = [
+  'project_creation',
+  'contribution',
+  'inventory_spend',
+  'reward_claim',
+  'rollback',
+  'public_surface'
+];
 
 const DEFAULT_PUBLIC_WORKS_PROJECTS = [
   {
@@ -28,6 +71,264 @@ const DEFAULT_PUBLIC_WORKS_PROJECTS = [
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function normalizeList(value) {
+  return Array.isArray(value) ? value.map((entry) => String(entry || '')).filter(Boolean) : [];
+}
+
+function check(key, ok, error = '') {
+  return { key, ok: ok === true, error: ok === true ? '' : error };
+}
+
+function inspectPublicWorksReadinessEvidence(evidence = {}) {
+  const checks = normalizeList(evidence.checks);
+  const routeSurfaces = normalizeList(evidence.routeSurfaces);
+  const missingChecks = REQUIRED_PUBLIC_WORKS_INTEGRATION_EVIDENCE_CHECKS.filter((entry) => !checks.includes(entry));
+  const missingRouteSurfaces = REQUIRED_PUBLIC_WORKS_ROUTE_SURFACES.filter((entry) => !routeSurfaces.includes(entry));
+  const workerToolEnforced = evidence.workerToolEnforced === true;
+  const routeAuthorizationEnforced = evidence.routeAuthorizationEnforced === true;
+  const inventorySpendReviewed = evidence.inventorySpendReviewed === true;
+  const rewardConservationReviewed = evidence.rewardConservationReviewed === true;
+  const rollbackReviewed = evidence.rollbackReviewed === true;
+  const publicTextRenderingReviewed = evidence.publicTextRenderingReviewed === true;
+  const ok = evidence.status === 'complete'
+    && evidence.executionStatus === 'not_executable'
+    && evidence.runtimeExposed === false
+    && evidence.playerVisible === false
+    && evidence.normalGameplayExposure === false
+    && evidence.opensPublicContributionRoute === false
+    && evidence.mutatesPrivateTown === false
+    && evidence.spendsPrivateInventory === false
+    && evidence.grantsRewards === false
+    && evidence.publicFreePlayEnabled === false
+    && workerToolEnforced
+    && routeAuthorizationEnforced
+    && inventorySpendReviewed
+    && rewardConservationReviewed
+    && rollbackReviewed
+    && publicTextRenderingReviewed
+    && missingChecks.length === 0
+    && missingRouteSurfaces.length === 0;
+  return {
+    ok,
+    status: String(evidence.status || 'missing'),
+    executionStatus: String(evidence.executionStatus || 'missing'),
+    runtimeExposed: evidence.runtimeExposed === true,
+    playerVisible: evidence.playerVisible === true,
+    normalGameplayExposure: evidence.normalGameplayExposure === true,
+    opensPublicContributionRoute: evidence.opensPublicContributionRoute === true,
+    mutatesPrivateTown: evidence.mutatesPrivateTown === true,
+    spendsPrivateInventory: evidence.spendsPrivateInventory === true,
+    grantsRewards: evidence.grantsRewards === true,
+    publicFreePlayEnabled: evidence.publicFreePlayEnabled === true,
+    workerToolEnforced,
+    routeAuthorizationEnforced,
+    inventorySpendReviewed,
+    rewardConservationReviewed,
+    rollbackReviewed,
+    publicTextRenderingReviewed,
+    requiredChecks: [...REQUIRED_PUBLIC_WORKS_INTEGRATION_EVIDENCE_CHECKS],
+    checks,
+    missingChecks,
+    requiredRouteSurfaces: [...REQUIRED_PUBLIC_WORKS_ROUTE_SURFACES],
+    routeSurfaces,
+    missingRouteSurfaces
+  };
+}
+
+function disabledPublicWorksReadinessReport({ source, reason }) {
+  return {
+    version: V6_PUBLIC_WORKS_READINESS_GATE_VERSION,
+    status: 'research_only',
+    source,
+    featureFlag: V6_WORLD_FEATURE_FLAG,
+    available: false,
+    researchReady: false,
+    releaseReady: false,
+    failClosed: true,
+    runtimeExposed: false,
+    playerVisible: false,
+    normalGameplayExposure: false,
+    opensPublicContributionRoute: false,
+    mutatesPrivateTown: false,
+    spendsPrivateInventory: false,
+    grantsRewards: false,
+    publicFreePlayEnabled: false,
+    executionStatus: 'not_executable',
+    evidence: inspectPublicWorksReadinessEvidence({}),
+    checks: [],
+    errors: [reason],
+    disabledReason: reason
+  };
+}
+
+function buildV6PublicWorksReadinessGate({
+  featureFlags = {},
+  includeResearchPublicWorksReadiness = false,
+  source = 'runtime',
+  evidence = {}
+} = {}) {
+  const enabled = includeResearchPublicWorksReadiness === true
+    && isWorldGridFeatureEnabled(featureFlags, V6_WORLD_FEATURE_FLAG);
+  if (!enabled) {
+    return disabledPublicWorksReadinessReport({
+      source,
+      reason: 'V6 public works readiness requires explicit research opt-in and V6 feature flag'
+    });
+  }
+
+  const evidenceReport = inspectPublicWorksReadinessEvidence(evidence);
+  const checks = [
+    check('feature_flag', isWorldGridFeatureEnabled(featureFlags, V6_WORLD_FEATURE_FLAG), 'FEATURE_DISABLED'),
+    check('research_opt_in', includeResearchPublicWorksReadiness === true, 'RESEARCH_OPT_IN_REQUIRED'),
+    check(
+      'integration_evidence',
+      evidenceReport.status === 'complete'
+        && evidenceReport.missingChecks.length === 0
+        && evidenceReport.missingRouteSurfaces.length === 0,
+      'PUBLIC_WORKS_INTEGRATION_EVIDENCE_REQUIRED'
+    ),
+    check('worker_tool_enforcement', evidenceReport.workerToolEnforced, 'PUBLIC_WORKS_WORKER_TOOL_ENFORCEMENT_REQUIRED'),
+    check('route_authorization', evidenceReport.routeAuthorizationEnforced, 'PUBLIC_WORKS_ROUTE_AUTHORIZATION_REQUIRED'),
+    check(
+      'inventory_spend_plan',
+      evidenceReport.inventorySpendReviewed && evidenceReport.spendsPrivateInventory === false,
+      'PUBLIC_WORKS_INVENTORY_SPEND_PLAN_REQUIRED'
+    ),
+    check('reward_conservation', evidenceReport.rewardConservationReviewed && evidenceReport.grantsRewards === false, 'PUBLIC_WORKS_REWARD_CONSERVATION_REQUIRED'),
+    check('rollback_recovery', evidenceReport.rollbackReviewed, 'PUBLIC_WORKS_ROLLBACK_RECOVERY_REQUIRED'),
+    check('public_text_rendering', evidenceReport.publicTextRenderingReviewed, 'PUBLIC_WORKS_PUBLIC_TEXT_RENDERING_REQUIRED'),
+    check(
+      'no_runtime_exposure',
+      evidenceReport.executionStatus === 'not_executable' && evidenceReport.runtimeExposed === false,
+      'PUBLIC_WORKS_RUNTIME_EXPOSURE_FORBIDDEN'
+    ),
+    check(
+      'no_player_visible_public_works',
+      evidenceReport.playerVisible === false
+        && evidenceReport.normalGameplayExposure === false
+        && evidenceReport.opensPublicContributionRoute === false,
+      'PUBLIC_WORKS_PLAYER_VISIBLE_SURFACE_FORBIDDEN'
+    ),
+    check(
+      'no_private_town_mutation',
+      evidenceReport.mutatesPrivateTown === false && evidenceReport.spendsPrivateInventory === false,
+      'PUBLIC_WORKS_PRIVATE_TOWN_MUTATION_FORBIDDEN'
+    ),
+    check('no_public_free_play', evidenceReport.publicFreePlayEnabled === false, 'PUBLIC_WORKS_PUBLIC_FREE_PLAY_FORBIDDEN')
+  ];
+  const researchReady = checks.every((entry) => entry.ok);
+
+  return {
+    version: V6_PUBLIC_WORKS_READINESS_GATE_VERSION,
+    status: 'research_only',
+    source,
+    featureFlag: V6_WORLD_FEATURE_FLAG,
+    available: true,
+    researchReady,
+    releaseReady: false,
+    failClosed: researchReady !== true,
+    runtimeExposed: false,
+    playerVisible: false,
+    normalGameplayExposure: false,
+    opensPublicContributionRoute: false,
+    mutatesPrivateTown: false,
+    spendsPrivateInventory: false,
+    grantsRewards: false,
+    publicFreePlayEnabled: false,
+    executionStatus: 'not_executable',
+    evidence: evidenceReport,
+    checks,
+    errors: checks.filter((entry) => !entry.ok).map((entry) => entry.error)
+  };
+}
+
+function assertV6PublicWorksReadinessGateSafe(report = {}) {
+  const errors = [];
+  if (report.version !== V6_PUBLIC_WORKS_READINESS_GATE_VERSION) {
+    errors.push('V6_PUBLIC_WORKS_READINESS_VERSION_REQUIRED');
+  }
+  if (report.featureFlag !== V6_WORLD_FEATURE_FLAG) {
+    errors.push('V6_PUBLIC_WORKS_READINESS_FEATURE_FLAG_REQUIRED');
+  }
+  if (report.status !== 'research_only') {
+    errors.push('V6_PUBLIC_WORKS_READINESS_RESEARCH_ONLY_REQUIRED');
+  }
+  if (report.runtimeExposed !== false) {
+    errors.push('V6_PUBLIC_WORKS_READINESS_RUNTIME_HIDDEN_REQUIRED');
+  }
+  if (report.playerVisible !== false) {
+    errors.push('V6_PUBLIC_WORKS_READINESS_PLAYER_HIDDEN_REQUIRED');
+  }
+  if (report.normalGameplayExposure !== false) {
+    errors.push('V6_PUBLIC_WORKS_READINESS_NORMAL_GAMEPLAY_FORBIDDEN');
+  }
+  if (report.opensPublicContributionRoute !== false) {
+    errors.push('V6_PUBLIC_WORKS_READINESS_PUBLIC_ROUTE_FORBIDDEN');
+  }
+  if (report.mutatesPrivateTown !== false) {
+    errors.push('V6_PUBLIC_WORKS_READINESS_PRIVATE_TOWN_MUTATION_FORBIDDEN');
+  }
+  if (report.spendsPrivateInventory !== false) {
+    errors.push('V6_PUBLIC_WORKS_READINESS_PRIVATE_INVENTORY_SPEND_FORBIDDEN');
+  }
+  if (report.grantsRewards !== false) {
+    errors.push('V6_PUBLIC_WORKS_READINESS_REWARD_GRANT_FORBIDDEN');
+  }
+  if (report.publicFreePlayEnabled !== false) {
+    errors.push('V6_PUBLIC_WORKS_READINESS_PUBLIC_FREE_PLAY_FORBIDDEN');
+  }
+  if (report.executionStatus !== 'not_executable') {
+    errors.push('V6_PUBLIC_WORKS_READINESS_NON_EXECUTING_REQUIRED');
+  }
+  if (report.releaseReady !== false) {
+    errors.push('V6_PUBLIC_WORKS_READINESS_RELEASE_READY_FORBIDDEN');
+  }
+  if (report.available === true) {
+    const checkKeys = new Set((report.checks || []).map((entry) => entry.key));
+    for (const key of REQUIRED_PUBLIC_WORKS_READINESS_CHECKS) {
+      if (!checkKeys.has(key)) errors.push(`V6_PUBLIC_WORKS_READINESS_CHECK_REQUIRED:${key}`);
+    }
+    const failedChecks = (report.checks || []).filter((entry) => entry.ok !== true);
+    if (report.researchReady === true && failedChecks.length > 0) {
+      errors.push('V6_PUBLIC_WORKS_READINESS_READY_WITH_FAILED_CHECKS');
+    }
+    if (report.researchReady !== true && report.failClosed !== true) {
+      errors.push('V6_PUBLIC_WORKS_READINESS_DENIAL_FAIL_CLOSED_REQUIRED');
+    }
+    const evidence = report.evidence || {};
+    if (evidence.runtimeExposed === true) {
+      errors.push('V6_PUBLIC_WORKS_READINESS_EVIDENCE_RUNTIME_HIDDEN_REQUIRED');
+    }
+    if (evidence.playerVisible === true || evidence.normalGameplayExposure === true) {
+      errors.push('V6_PUBLIC_WORKS_READINESS_EVIDENCE_PLAYER_HIDDEN_REQUIRED');
+    }
+    if (evidence.opensPublicContributionRoute === true) {
+      errors.push('V6_PUBLIC_WORKS_READINESS_EVIDENCE_PUBLIC_ROUTE_FORBIDDEN');
+    }
+    if (evidence.mutatesPrivateTown === true) {
+      errors.push('V6_PUBLIC_WORKS_READINESS_EVIDENCE_PRIVATE_TOWN_MUTATION_FORBIDDEN');
+    }
+    if (evidence.spendsPrivateInventory === true) {
+      errors.push('V6_PUBLIC_WORKS_READINESS_EVIDENCE_PRIVATE_INVENTORY_SPEND_FORBIDDEN');
+    }
+    if (evidence.grantsRewards === true) {
+      errors.push('V6_PUBLIC_WORKS_READINESS_EVIDENCE_REWARD_GRANT_FORBIDDEN');
+    }
+    if (evidence.publicFreePlayEnabled === true) {
+      errors.push('V6_PUBLIC_WORKS_READINESS_EVIDENCE_PUBLIC_FREE_PLAY_FORBIDDEN');
+    }
+    if (report.researchReady === true && evidence.ok !== true) {
+      errors.push('V6_PUBLIC_WORKS_READINESS_READY_WITHOUT_EVIDENCE');
+    }
+  } else if (report.failClosed !== true) {
+    errors.push('V6_PUBLIC_WORKS_READINESS_DISABLED_FAIL_CLOSED_REQUIRED');
+  }
+  return {
+    ok: errors.length === 0,
+    errors
+  };
 }
 
 function normalizeCount(value) {
@@ -764,5 +1065,11 @@ module.exports = {
   CONTRIBUTION_STATUS_RECORDED,
   DEFAULT_PUBLIC_WORKS_PROJECTS,
   PROJECT_STATUS_RECORDED,
+  REQUIRED_PUBLIC_WORKS_INTEGRATION_EVIDENCE_CHECKS: clone(REQUIRED_PUBLIC_WORKS_INTEGRATION_EVIDENCE_CHECKS),
+  REQUIRED_PUBLIC_WORKS_READINESS_CHECKS: clone(REQUIRED_PUBLIC_WORKS_READINESS_CHECKS),
+  REQUIRED_PUBLIC_WORKS_ROUTE_SURFACES: clone(REQUIRED_PUBLIC_WORKS_ROUTE_SURFACES),
+  V6_PUBLIC_WORKS_READINESS_GATE_VERSION,
+  assertV6PublicWorksReadinessGateSafe,
+  buildV6PublicWorksReadinessGate,
   createCivicPublicWorksStore
 };
