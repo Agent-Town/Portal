@@ -74,6 +74,10 @@ persistence resilience, and security/product release review.
 - Internal V6 research requires an explicit `v60` or
   `FEATURE_WORLD_V60_AGENT_CIVILIZATION` opt-in.
 - Production player query/header overrides must not enable V6.0.
+- Route-level production coverage proves player `worldGridFeatureFlags=all,v60`
+  query/header overrides leave V6.0 disabled when V5 is server-enabled, and a
+  server-side V6 flag still does not publish `et.world.civic.*` tools through
+  runtime `/api/world/tools`.
 - Runtime V6 civic routes and tools must be absent or return
   `FEATURE_DISABLED` until the M6 worker-first tool surface is intentionally
   implemented and tested.
@@ -232,12 +236,12 @@ persistence resilience, and security/product release review.
   integration, live Privy/provider logout signoff, and security/product signoff.
 - Worker-first V6 civic tools must pass the exposure gate before becoming
   runtime-callable. Current research-only coverage starts in
-  `server/world_civilization/tool_exposure_gate.js`; release still requires
-  real OpenClaw Lite worker routing, Worker Traffic evidence, production
-  override safety, store-backed delegation proof evidence, delegation
-  scope-mismatch coverage, read-only delegation budget handling, browser
-  coverage, and release review signoff before any `et.world.civic.*` tool
-  appears in `/api/world/tools`.
+  `server/world_civilization/tool_exposure_gate.js`, with route-level production
+  override safety in `tests/world_grid_region.test.js`; release still requires
+  real OpenClaw Lite worker routing, Worker Traffic evidence, production browser
+  coverage, store-backed delegation proof evidence, delegation scope-mismatch
+  coverage, read-only delegation budget handling, and release review signoff
+  before any `et.world.civic.*` tool appears in `/api/world/tools`.
 - Vote authorization cannot be forged, replayed, self-delegated without policy,
   or applied to ineligible owners. Current research-only coverage starts this
   in `server/world_civilization/votes.js` with non-executing

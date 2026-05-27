@@ -8,6 +8,7 @@ const express = require('express');
 
 const { createWorldGridRouter } = require('../server/world_grid/routes');
 const {
+  WORLD_GRID_FEATURES,
   defaultWorldGridFeatureFlags,
   parseWorldGridFeatureFlags
 } = require('../server/world_grid/feature_flags');
@@ -38,7 +39,7 @@ async function withWorldGridServer({ identity, envPatch = {} }, fn) {
   const previous = {
     NODE_ENV: process.env.NODE_ENV,
     ADMIN_TOKEN: process.env.ADMIN_TOKEN,
-    FEATURE_WORLD_GRID_V50_REGION: process.env.FEATURE_WORLD_GRID_V50_REGION,
+    ...Object.fromEntries(WORLD_GRID_FEATURES.map((feature) => [feature.key, process.env[feature.key]])),
     WORLD_GRID_FEATURE_FLAGS: process.env.WORLD_GRID_FEATURE_FLAGS,
     WORLD_GRID_CSRF_REQUIRED: process.env.WORLD_GRID_CSRF_REQUIRED,
     WORLD_GRID_CSRF_SQLITE_PATH: process.env.WORLD_GRID_CSRF_SQLITE_PATH,
@@ -279,6 +280,57 @@ test('production world grid query overrides are ignored unless admin authorized'
     assert.equal(adminExplicitV6ToolsBody.tools.some((tool) => tool.featureFlag === 'FEATURE_WORLD_V60_AGENT_CIVILIZATION'), false);
     assert.equal(adminExplicitV6ToolsBody.tools.some((tool) => tool.name.startsWith('et.world.civic.')), false);
     assert.equal(adminExplicitV6ToolsBody.tools.some((tool) => /civic\./.test(tool.name)), false);
+  });
+});
+
+test('production player overrides cannot enable V6 when V5 is server enabled', async () => {
+  await withWorldGridServer({
+    identity: { pairId: 'session:world-grid-production-v6-player-override' },
+    envPatch: {
+      NODE_ENV: 'production',
+      ADMIN_TOKEN: 'admin-secret',
+      FEATURE_WORLD_GRID_V50_REGION: '1',
+      FEATURE_WORLD_V60_AGENT_CIVILIZATION: undefined,
+      WORLD_GRID_FEATURE_FLAGS: undefined
+    }
+  }, async (baseUrl) => {
+    const playerRegionResponse = await fetch(`${baseUrl}/api/world/region?worldGridFeatureFlags=all,v60`, {
+      headers: { 'x-world-grid-feature-flags': 'all,v60' }
+    });
+    const playerRegionBody = await playerRegionResponse.json();
+    assert.equal(playerRegionResponse.status, 200, JSON.stringify(playerRegionBody));
+    assert.equal(playerRegionBody.featureFlags.FEATURE_WORLD_GRID_V50_REGION, true);
+    assert.equal(playerRegionBody.featureFlags.FEATURE_WORLD_V60_AGENT_CIVILIZATION, false);
+
+    const playerToolsResponse = await fetch(`${baseUrl}/api/world/tools?worldGridFeatureFlags=all,v60`, {
+      headers: { 'x-world-grid-feature-flags': 'all,v60' }
+    });
+    const playerToolsBody = await playerToolsResponse.json();
+    assert.equal(playerToolsResponse.status, 200, JSON.stringify(playerToolsBody));
+    assert.equal(playerToolsBody.featureFlags.FEATURE_WORLD_GRID_V50_REGION, true);
+    assert.equal(playerToolsBody.featureFlags.FEATURE_WORLD_V60_AGENT_CIVILIZATION, false);
+    assert.equal(playerToolsBody.tools.some((tool) => tool.featureFlag === 'FEATURE_WORLD_V60_AGENT_CIVILIZATION'), false);
+    assert.equal(playerToolsBody.tools.some((tool) => tool.name.startsWith('et.world.civic.')), false);
+  });
+});
+
+test('production server V6 flag does not publish civic runtime tools before M6 release', async () => {
+  await withWorldGridServer({
+    identity: { pairId: 'session:world-grid-production-v6-server-flag' },
+    envPatch: {
+      NODE_ENV: 'production',
+      FEATURE_WORLD_GRID_V50_REGION: '1',
+      FEATURE_WORLD_V60_AGENT_CIVILIZATION: '1',
+      WORLD_GRID_FEATURE_FLAGS: undefined
+    }
+  }, async (baseUrl) => {
+    const toolsResponse = await fetch(`${baseUrl}/api/world/tools`);
+    const toolsBody = await toolsResponse.json();
+    assert.equal(toolsResponse.status, 200, JSON.stringify(toolsBody));
+    assert.equal(toolsBody.featureFlags.FEATURE_WORLD_GRID_V50_REGION, true);
+    assert.equal(toolsBody.featureFlags.FEATURE_WORLD_V60_AGENT_CIVILIZATION, true);
+    assert.equal(toolsBody.tools.some((tool) => tool.featureFlag === 'FEATURE_WORLD_V60_AGENT_CIVILIZATION'), false);
+    assert.equal(toolsBody.tools.some((tool) => tool.name.startsWith('et.world.civic.')), false);
   });
 });
 

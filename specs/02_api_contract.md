@@ -2738,7 +2738,10 @@ Broad V5 prototype overrides such as `worldGridFeatureFlags=all`,
 `WORLD_GRID_FEATURE_FLAGS=all`, `world`, or `prototype` enable V5.0-V5.5 only.
 V6.0 requires an explicit `v60` or
 `FEATURE_WORLD_V60_AGENT_CIVILIZATION` opt-in, and production player
-query/header overrides cannot enable it.
+query/header overrides cannot enable it. Current route-level coverage proves
+player `worldGridFeatureFlags=all,v60` overrides leave V6 disabled when V5 is
+server-enabled, and even a server-side V6 flag does not publish civic runtime
+tools before M6/M17/M18 release gates close.
 
 ### GET `/api/world/tools`
 Returns `{ ok, featureFlags, tools }`, where `tools` is the runtime source of

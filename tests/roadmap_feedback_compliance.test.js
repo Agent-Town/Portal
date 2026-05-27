@@ -662,25 +662,33 @@ test('V6 worker-first civic tool exposure gate is tracked as an M6 release contr
   const releaseReview = read('docs/security/V6_AGENT_CIVILIZATION_RELEASE_REVIEW.md');
   const skillLine = read('docs/internal-skill-testline.md');
   const toolGate = read('server/world_civilization/tool_exposure_gate.js');
+  const worldGridRegionTest = read('tests/world_grid_region.test.js');
 
   assert.match(plan, /server\/world_civilization\/tool_exposure_gate\.js/);
   assert.match(plan, /Worker Tools\/Skill Context\/Worker Traffic\/Brain\/Session Context/);
   assert.match(plan, /store-backed delegated-agent proof/);
   assert.match(plan, /read-only delegation budget handling/);
+  assert.match(plan, /production player `worldGridFeatureFlags=all,v60` query\/header overrides cannot enable V6/);
+  assert.match(plan, /server-side V6 flag still does not publish `et\.world\.civic\.\*` tools/);
   assert.match(spec, /Exposure gate: `server\/world_civilization\/tool_exposure_gate\.js`/);
   assert.match(spec, /OpenClaw Lite worker origin/);
   assert.match(spec, /same-origin, session\/wallet\s+binding/);
   assert.match(spec, /store-backed delegated-agent proof/);
   assert.match(spec, /read-only delegation budget handling/);
   assert.match(spec, /No `et\.world\.civic\.\*` entry in the runtime tool manifest/);
+  assert.match(spec, /worldGridFeatureFlags=all,v60/);
+  assert.match(spec, /server-side `FEATURE_WORLD_V60_AGENT_CIVILIZATION=1` flag/);
   assert.match(gate, /releaseReady: false/);
   assert.match(gate, /Worker-first V6 civic tools must pass the exposure gate/);
   assert.match(gate, /store-backed delegated-agent proof/);
   assert.match(gate, /read-only delegation budget handling/);
+  assert.match(gate, /Route-level production coverage proves player `worldGridFeatureFlags=all,v60`/);
   assert.match(releaseReview, /Worker tool surface review/);
   assert.match(releaseReview, /no backend shortcuts/);
+  assert.match(releaseReview, /route-level production override coverage proves player `all,v60` overrides cannot enable V6/);
   assert.match(skillLine, /mutation-security evidence with store-backed delegation proof/);
   assert.match(skillLine, /read-only delegation budget handling/);
+  assert.match(skillLine, /production player `worldGridFeatureFlags=all,v60`/);
   assert.match(skillLine, /tests\/world_civilization_tool_exposure_gate\.test\.js/);
   assert.match(toolGate, /mutation_security_evidence/);
   assert.match(toolGate, /REQUIRED_MUTATION_SECURITY_EVIDENCE_CHECKS/);
@@ -688,6 +696,10 @@ test('V6 worker-first civic tool exposure gate is tracked as an M6 release contr
   assert.match(toolGate, /delegation_scope_mismatch/);
   assert.match(toolGate, /delegation_budget_read_only/);
   assert.match(toolGate, /MUTATION_SECURITY_EVIDENCE_REQUIRED/);
+  assert.match(worldGridRegionTest, /production player overrides cannot enable V6 when V5 is server enabled/);
+  assert.match(worldGridRegionTest, /production server V6 flag does not publish civic runtime tools before M6 release/);
+  assert.match(worldGridRegionTest, /worldGridFeatureFlags=all,v60/);
+  assert.match(worldGridRegionTest, /FEATURE_WORLD_V60_AGENT_CIVILIZATION: '1'/);
 });
 
 test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () => {

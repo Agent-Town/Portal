@@ -12,6 +12,8 @@ Contract tests: `tests/world_civilization_tools.test.js`
 
 Exposure gate tests: `tests/world_civilization_tool_exposure_gate.test.js`
 
+Production override tests: `tests/world_grid_region.test.js`
+
 Feature flag: `FEATURE_WORLD_V60_AGENT_CIVILIZATION`
 
 ## Boundary
@@ -41,6 +43,13 @@ delegation policy preparation:
 - Every draft tool is feature-gated by `FEATURE_WORLD_V60_AGENT_CIVILIZATION`.
 - Broad V5 prototype overrides such as `WORLD_GRID_FEATURE_FLAGS=all` do not
   expose these drafts.
+- Production player query/header overrides such as `worldGridFeatureFlags=all,v60`
+  cannot enable the V6 flag or publish civic tools, even when V5 is
+  server-enabled.
+- A server-side `FEATURE_WORLD_V60_AGENT_CIVILIZATION=1` flag may make the V6
+  feature flag visible in internal evidence, but it still must not publish
+  `et.world.civic.*` tools through runtime `/api/world/tools` until M6/M17/M18
+  gates are closed.
 - Draft tools are returned only by explicit internal research calls that opt in
   to draft visibility.
 - No draft tool executes civic effects, mutates private towns, or mutates

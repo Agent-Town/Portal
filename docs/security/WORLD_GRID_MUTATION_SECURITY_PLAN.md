@@ -12,7 +12,10 @@ until the controls below are implemented and covered by deterministic tests.
   authorized by the existing feature-override guard.
 - Broad V5 prototype overrides enable V5.0-V5.5 only; the V6.0 Agent
   Civilization research flag requires an explicit `v60` or full flag opt-in and
-  still exposes no V6 civic tools.
+  still exposes no V6 civic tools. Current production route-level coverage proves
+  player `worldGridFeatureFlags=all,v60` query/header overrides cannot enable V6
+  when V5 is server-enabled, and a server-side V6 flag still does not publish
+  `et.world.civic.*` tools through runtime `/api/world/tools`.
 - Mutating V5.1+ world-grid routes and tool routes reject explicit
   cross-origin `Origin`, `Referer`, or Fetch Metadata. In production they also
   require positive same-origin context before any plot mutation or idempotency
