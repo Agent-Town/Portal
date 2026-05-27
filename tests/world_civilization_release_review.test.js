@@ -93,6 +93,16 @@ test('V6 release review audit coverage requires reputation moderation link evide
   assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_moderation.test.js'));
 });
 
+test('V6 release review audit coverage requires store-specific audit-summary evidence', () => {
+  const auditGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'audit_coverage');
+  const resilienceGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'resilience_readiness_review');
+
+  assert.ok(auditGate.requiredArtifacts.includes('server/world_civilization/resilience.js'));
+  assert.ok(auditGate.requiredArtifacts.includes('server/world_civilization/replay_reconstruction.js'));
+  assert.ok(auditGate.requiredChecks.includes('store_specific_audit_summary_coverage'));
+  assert.ok(resilienceGate.requiredChecks.includes('store_specific_zero_hash_only_fallbacks'));
+});
+
 test('V6 release review requires civic mutation security evidence for abuse review', () => {
   const abuseGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'abuse_case_review');
   const validationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'validation_evidence');
@@ -203,6 +213,7 @@ test('V6 release review requires persistence replay resilience readiness evidenc
   assert.ok(resilienceGate.requiredChecks.includes('all_civic_store_restart_probes'));
   assert.ok(resilienceGate.requiredChecks.includes('audit_replay_reconstruction'));
   assert.ok(resilienceGate.requiredChecks.includes('privacy_safe_replay_summaries'));
+  assert.ok(resilienceGate.requiredChecks.includes('store_specific_zero_hash_only_fallbacks'));
   assert.ok(resilienceGate.requiredChecks.includes('hash_chain_integrity'));
   assert.ok(resilienceGate.requiredChecks.includes('migration_upgrade_scripts'));
   assert.ok(resilienceGate.requiredChecks.includes('migration_downgrade_scripts'));
@@ -222,6 +233,7 @@ test('V6 release review blocks signoff without migration load rollback and backu
     ...evidence.resilience_readiness_review,
     checks: evidence.resilience_readiness_review.checks.filter((check) => (
       check !== 'migration_upgrade_scripts'
+      && check !== 'store_specific_zero_hash_only_fallbacks'
       && check !== 'production_load_rate_targets'
       && check !== 'typed_rollback_execution_recovery'
       && check !== 'backup_restore_rehearsal'
@@ -237,6 +249,7 @@ test('V6 release review blocks signoff without migration load rollback and backu
   assert.equal(report.releaseReady, false);
   assert.equal(resilienceGate.ok, false);
   assert.deepEqual(resilienceGate.missingChecks, [
+    'store_specific_zero_hash_only_fallbacks',
     'migration_upgrade_scripts',
     'backup_restore_rehearsal',
     'production_load_rate_targets',

@@ -35,9 +35,9 @@ are present.
 - Audit coverage: append-only ledger, owner indexes, migration versions,
   proposal review transition audit rows, reputation/moderation link evidence,
   schema metadata drift checks, migration rehearsal with unsupported
-  upgrade/downgrade targets failing closed, replay reconstruction, rollback
-  handles, governance preflight evidence, and non-executing rollback recovery
-  evidence.
+  upgrade/downgrade targets failing closed, replay reconstruction,
+  store-specific audit-summary coverage, rollback handles, governance preflight
+  evidence, and non-executing rollback recovery evidence.
 - Validation evidence: targeted Node suite, split Playwright smokes,
   all-features regression, feature override safety, and load/rate replay
   evidence, including civic mutation security, vote authorization readiness,
@@ -89,12 +89,13 @@ are present.
   exclusion before any internal V6 lab surface can become visible.
 - Persistence replay resilience readiness review: all civic store restart
   probes, audit replay reconstruction, privacy-safe replay summaries,
-  hash-chain integrity, migration upgrade/downgrade scripts, unsupported
-  transition denial, backup/restore rehearsal, migration load replay rehearsal,
-  production load/rate targets, multi-process write contention, duplicate retry
-  bursts, rollback handle reconstruction, typed rollback execution recovery,
-  private-data exclusion, and no effect application during replay before M16
-  can claim release-grade resilience.
+  store-specific zero hash-only fallback proof, hash-chain integrity, migration
+  upgrade/downgrade scripts, unsupported transition denial, backup/restore
+  rehearsal, migration load replay rehearsal, production load/rate targets,
+  multi-process write contention, duplicate retry bursts, rollback handle
+  reconstruction, typed rollback execution recovery, private-data exclusion, and
+  no effect application during replay before M16 can claim release-grade
+  resilience.
 - Product release signoff: player-visible scope, rollback plan, support runbook,
   and disable plan.
 

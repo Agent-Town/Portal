@@ -434,7 +434,8 @@ persistence resilience, and security/product release review.
   policy, audit coverage review, deterministic validation evidence, effect
   execution and rollback review, agent participation enforcement review, civic
   institution readiness review, public works readiness review, modal lab surface
-  review, resilience readiness review, and product signoff.
+  review, resilience readiness review with store-specific zero hash-only
+  fallback proof, and product signoff.
 - Controlled release completion must remain a final go/no-go gate, not an
   automatic enablement path. Current gate tracking starts in
   `server/world_civilization/controlled_release.js` and

@@ -86,6 +86,7 @@ const REQUIRED_REVIEW_GATES = [
       'reputation_moderation_links',
       'migration_rehearsal',
       'replay_reconstruction',
+      'store_specific_audit_summary_coverage',
       'governance_preflight',
       'rollback_handles'
     ],
@@ -360,6 +361,7 @@ const REQUIRED_REVIEW_GATES = [
       'all_civic_store_restart_probes',
       'audit_replay_reconstruction',
       'privacy_safe_replay_summaries',
+      'store_specific_zero_hash_only_fallbacks',
       'hash_chain_integrity',
       'migration_upgrade_scripts',
       'migration_downgrade_scripts',
