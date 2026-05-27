@@ -183,7 +183,7 @@ function approvedReleaseEvidence(pack) {
       rejectedCandidateCount: 0,
       candidateManifestHash: candidateReviewManifest.manifestHash,
       reviewerSignoffHash: hashLabel('candidate-reviewer'),
-      reviewedAtMs: 152_300,
+      reviewedAtMs: 152_390,
       productionPromotionApproved: false
     },
     humanReview: {
@@ -359,6 +359,7 @@ test('GU-18 production release gate can pass only with explicit machine evidence
   assert.equal(gate.metrics.approvalEvidenceHashMatches, 1);
   assert.equal(gate.metrics.approvalEvidencePackIdMatches, 1);
   assert.equal(gate.metrics.candidateReviewManifestHashMatchesEvidence, 1);
+  assert.equal(gate.metrics.candidateReviewManifestTimeMatchesEvidence, 1);
   assert.equal(gate.metrics.candidateReviewCoverageCount, pack.assetPromptPlan.targets.length);
   assert.equal(gate.metrics.replayabilityPromptCount, 10);
   assert.equal(gate.metrics.privateDataLeakCount, 0);
@@ -705,6 +706,80 @@ test('GU-18 release approval evidence rejects future or missing approval timesta
   );
   assert.equal(gate.publicReleaseEligible, false);
   assert.equal(gate.releasePrerequisites.costConsentModelApproved, false);
+  assert.equal(gateReport.ok, false);
+  assert.equal(
+    gateReport.checks.find((check) => check.id === 'PRODUCTION_RELEASE_GATE_APPROVAL_EVIDENCE_VALID').passed,
+    false
+  );
+});
+
+test('GU-18 release gate rejects candidate review evidence that predates the reviewed manifest', () => {
+  const pack = createGeneratedPack({
+    owner: { ownerAccountId: 'owner_release_gate_manifest_time' },
+    prompt: 'mirror orchard guild with canal lantern keepers',
+    nowMs: 153_450,
+    candidateRoot: 'data/generated-packs-test'
+  });
+  const manifest = reviewedCandidateManifest(pack);
+  const targetCount = pack.assetPromptPlan.targets.length;
+  const staleReviewEvidence = buildReleaseApprovalEvidence({
+    pack,
+    nowMs: 153_600,
+    authModel: {
+      status: 'approved',
+      authMode: 'operator_managed',
+      approvalDocHash: hashLabel('manifest-time-auth-policy'),
+      approvedByHash: hashLabel('manifest-time-auth-reviewer'),
+      approvedAtMs: 153_500,
+      providerAccessPolicy: 'out_of_band_only_no_pack_storage'
+    },
+    costModel: {
+      status: 'accepted',
+      estimatedMin: 0.4,
+      estimatedMax: 1.8,
+      costEstimateHash: hashLabel('manifest-time-cost-estimate'),
+      acceptedByHash: hashLabel('manifest-time-cost-owner'),
+      acceptedAtMs: 153_510
+    },
+    consentModel: {
+      status: 'recorded',
+      scope: 'single-pack-candidate-run',
+      userConsentHash: hashLabel('manifest-time-user-consent'),
+      teamConsentHash: hashLabel('manifest-time-team-consent'),
+      consentRecordHash: hashLabel('manifest-time-consent-record'),
+      recordedAtMs: 153_520
+    },
+    candidateReview: {
+      status: 'reviewed',
+      expectedTargetCount: targetCount,
+      reviewedCandidateCount: targetCount,
+      approvedCandidateCount: targetCount,
+      rejectedCandidateCount: 0,
+      candidateManifestHash: manifest.manifestHash,
+      reviewerSignoffHash: hashLabel('manifest-time-candidate-reviewer'),
+      reviewedAtMs: manifest.createdAtMs - 1,
+      productionPromotionApproved: false
+    },
+    humanReview: {
+      status: 'complete',
+      releaseSignoffHash: hashLabel('manifest-time-human-signoff'),
+      checklistHash: hashLabel('manifest-time-checklist'),
+      reviewedAtMs: 153_590
+    }
+  });
+  const gate = buildProductionReleaseGate({
+    pack,
+    approvalEvidence: staleReviewEvidence,
+    candidateReviewManifest: manifest,
+    nowMs: 153_650
+  });
+  const gateReport = validateProductionReleaseGate(gate);
+
+  assert.equal(validateReleaseApprovalEvidence(staleReviewEvidence, pack).ok, true);
+  assert.equal(gate.metrics.candidateReviewManifestHashMatchesEvidence, 1);
+  assert.equal(gate.metrics.candidateReviewManifestTimeMatchesEvidence, 0);
+  assert.equal(gate.releasePrerequisites.candidateAssetsReviewed, false);
+  assert.equal(gate.blockingReasons.includes('candidateAssetsReviewed'), true);
   assert.equal(gateReport.ok, false);
   assert.equal(
     gateReport.checks.find((check) => check.id === 'PRODUCTION_RELEASE_GATE_APPROVAL_EVIDENCE_VALID').passed,

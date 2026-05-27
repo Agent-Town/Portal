@@ -164,5 +164,6 @@ test('GU-19 release gate requires approval evidence to match a reviewed candidat
   assert.equal(withReport.ok, true, JSON.stringify(withReport.checks));
   assert.equal(withManifest.releasePrerequisites.candidateAssetsReviewed, true);
   assert.equal(withManifest.metrics.candidateReviewManifestHashMatchesEvidence, 1);
+  assert.equal(withManifest.metrics.candidateReviewManifestTimeMatchesEvidence, 1);
   assert.equal(withManifest.metrics.candidateReviewCoverageCount, pack.assetPromptPlan.targets.length);
 });

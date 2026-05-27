@@ -147,11 +147,11 @@ Player prompt
 
 - `buildProductionReleaseGate` creates a standalone readiness report and does not embed release approval state inside generated packs or default gameplay payloads.
 - `release_approval_evidence.schema.json` is the auditable auth/cost/consent/candidate-review/human-review contract used by the release gate. It carries a stable `evidenceHash`, requires timestamp-coherent approval events, and must match the generated pack id before it can unlock release prerequisites.
-- `candidate_review_manifest.schema.json` records every asset prompt-plan target's candidate review status, content hash, note hash, candidate path, postprocess path, and approved-output placeholder. It must remain candidate-only and its `manifestHash` must match the candidate-manifest hash recorded inside approval evidence before candidate assets can count as reviewed.
+- `candidate_review_manifest.schema.json` records every asset prompt-plan target's candidate review status, content hash, note hash, candidate path, postprocess path, and approved-output placeholder. It must remain candidate-only, its `manifestHash` must match the candidate-manifest hash recorded inside approval evidence, and the approval evidence review timestamp must not predate the manifest before candidate assets can count as reviewed.
 - `validateProductionReleaseGate` checks schema validity, prerequisite coherence, fail-closed behavior, explicit approval evidence, and zero public/private asset leaks.
 - The gate can be valid while `publicReleaseEligible=false`; that is the expected result when playtest evidence, diversity evidence, persistence evidence, public-card privacy evidence, candidate review, consent/cost/auth approval, or human signoff is absent.
 - `publicReleaseEligible=true` requires every prerequisite to be true and `blockingReasons=[]`; forged eligibility or missing blocking reasons fail validation.
-- Approval evidence or candidate-review manifests with secret-like fields, raw prompt instructions, hash drift, future-dated approvals, mixed pack ids, short candidate-review coverage, production image promotion, canonical rule changes, V6 civic changes, or default gameplay exposure fail closed.
+- Approval evidence or candidate-review manifests with secret-like fields, raw prompt instructions, hash drift, future-dated approvals, mixed pack ids, stale candidate-review timing, short candidate-review coverage, production image promotion, canonical rule changes, V6 civic changes, or default gameplay exposure fail closed.
 - `POST /api/world/generated-pack/release-gate` remains behind `FEATURE_WORLD_GRID_GENERATED_PACKS` and does not change canonical world-grid rules, V6 civic systems, pack visibility, or production image policy.
 
 ## GU-19 Release Evidence Bundle Slice
@@ -302,6 +302,8 @@ Player prompt
   "futureDatedApprovalEvidenceRejected": true,
   "mixedPackApprovalEvidenceRejected": true,
   "candidateReviewManifestHashMatchesEvidence": true,
+  "candidateReviewManifestTimeMatchesEvidence": true,
+  "staleCandidateReviewEvidenceRejected": true,
   "releaseGateHashStable": true,
   "releaseEvidenceSourceHashCount": 7,
   "releaseEvidenceSourceHashMismatchCount": 0,

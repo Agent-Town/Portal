@@ -2792,7 +2792,7 @@ Response includes:
 Release-gate invariants:
 - missing approval or evidence returns a valid fail-closed `prototype-gated` report;
 - `publicReleaseEligible=true` requires all prerequisites to be true, `blockingReasons=[]`, zero private-data leaks, zero missing assets, zero production image assets, explicit consent/cost/auth approval, candidate asset review, and a 64-hex human review signoff hash;
-- forged eligibility, mismatched blocking reasons, approval evidence hash drift, future-dated approval evidence, approval evidence copied from another pack, secret-like fields, raw prompt instructions, production asset leaks, and private-card data fail validation;
+- forged eligibility, mismatched blocking reasons, approval evidence hash drift, future-dated approval evidence, candidate-review approval evidence that predates its manifest, approval evidence copied from another pack, secret-like fields, raw prompt instructions, production asset leaks, and private-card data fail validation;
 - oversized or noisy release-evidence request bodies fail before report construction and rejection responses return counts/paths/limits, not submitted evidence values;
 - the route remains hidden in default gameplay unless `FEATURE_WORLD_GRID_GENERATED_PACKS` is enabled.
 

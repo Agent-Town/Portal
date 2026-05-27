@@ -20,8 +20,8 @@
     "schemaVersion": { "const": "agent-town-generated-pack-candidate-review-manifest-v1" },
     "manifestId": { "type": "string", "minLength": 12 },
     "manifestHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-    "packId": { "type": "string", "minLength": 3 },
-    "createdAtMs": { "type": "number" },
+    "packId": { "type": "string", "pattern": "^gen_pack_[0-9a-f]{16}$" },
+    "createdAtMs": { "type": "number", "minimum": 0 },
     "promptPlanHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "reviewPolicy": {
       "type": "object",
