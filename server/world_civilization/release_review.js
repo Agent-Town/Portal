@@ -17,8 +17,24 @@ const REQUIRED_REVIEW_GATES = [
     key: 'privacy_review',
     label: 'Privacy review',
     owner: 'security_product',
-    requiredArtifacts: [RELEASE_REVIEW_ARTIFACT],
-    requiredChecks: ['private_town_isolation', 'wallet_secret_exclusion', 'brain_secret_exclusion', 'debug_trace_redaction'],
+    requiredArtifacts: [
+      RELEASE_REVIEW_ARTIFACT,
+      'server/world_civilization/privacy_review_targets.js',
+      'tests/world_civilization_privacy_review_targets.test.js'
+    ],
+    requiredChecks: [
+      'private_town_isolation',
+      'public_surface_data_minimization',
+      'wallet_secret_exclusion',
+      'brain_secret_exclusion',
+      'debug_trace_redaction',
+      'worker_observability_redaction',
+      'public_text_rendering_xss',
+      'modal_lab_private_data_exclusion',
+      'audit_summary_minimization',
+      'cross_account_boundary',
+      'privacy_review_target_gate'
+    ],
     signoffRequired: true
   },
   {
@@ -126,6 +142,7 @@ const REQUIRED_REVIEW_GATES = [
       RELEASE_REVIEW_ARTIFACT,
       'tests/world_civilization_schemas.test.js',
       'tests/world_civilization_data_retention_targets.test.js',
+      'tests/world_civilization_privacy_review_targets.test.js',
       'tests/world_civilization_mutation_security.test.js',
       'tests/world_civilization_session_auth_targets.test.js',
       'tests/world_civilization_governance_preflight.test.js',
@@ -152,6 +169,7 @@ const REQUIRED_REVIEW_GATES = [
       'split_playwright_smokes',
       'all_features_regression',
       'feature_override_safety',
+      'privacy_review_target_gate',
       'data_retention_target_gate',
       'session_auth_target_gate',
       'proposal_intake_readiness_gate',

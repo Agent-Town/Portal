@@ -69,6 +69,24 @@ test('V6 release review audit coverage requires migration rehearsal evidence', (
   assert.ok(auditGate.requiredChecks.includes('migration_rehearsal'));
 });
 
+test('V6 release review requires privacy review target gate evidence', () => {
+  const privacyGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'privacy_review');
+  const validationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'validation_evidence');
+
+  assert.equal(privacyGate.owner, 'security_product');
+  assert.ok(privacyGate.requiredArtifacts.includes('server/world_civilization/privacy_review_targets.js'));
+  assert.ok(privacyGate.requiredArtifacts.includes('tests/world_civilization_privacy_review_targets.test.js'));
+  assert.ok(privacyGate.requiredChecks.includes('public_surface_data_minimization'));
+  assert.ok(privacyGate.requiredChecks.includes('worker_observability_redaction'));
+  assert.ok(privacyGate.requiredChecks.includes('public_text_rendering_xss'));
+  assert.ok(privacyGate.requiredChecks.includes('modal_lab_private_data_exclusion'));
+  assert.ok(privacyGate.requiredChecks.includes('audit_summary_minimization'));
+  assert.ok(privacyGate.requiredChecks.includes('cross_account_boundary'));
+  assert.ok(privacyGate.requiredChecks.includes('privacy_review_target_gate'));
+  assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_privacy_review_targets.test.js'));
+  assert.ok(validationGate.requiredChecks.includes('privacy_review_target_gate'));
+});
+
 test('V6 release review requires data-retention target gate evidence', () => {
   const retentionGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'data_retention_policy');
   const validationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'validation_evidence');

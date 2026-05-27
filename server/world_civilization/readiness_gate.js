@@ -356,13 +356,16 @@ const REQUIRED_V6_READINESS_GATES = [
       'specs/68_agent_town_v6_security_product_release_review_foundation.md',
       'docs/security/V6_AGENT_CIVILIZATION_RELEASE_REVIEW.md',
       'server/world_civilization/data_retention_targets.js',
+      'server/world_civilization/privacy_review_targets.js',
       'server/world_civilization/release_review.js',
       'tests/world_civilization_data_retention_targets.test.js',
+      'tests/world_civilization_privacy_review_targets.test.js',
       'tests/world_civilization_release_review.test.js'
     ],
     requiredChecks: [
       'threat_model',
       'privacy_review',
+      'privacy_review_target_gate',
       'abuse_case_review',
       'data_retention_policy',
       'data_retention_target_gate',

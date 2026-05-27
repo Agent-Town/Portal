@@ -24,8 +24,11 @@ are present.
 
 - Threat model: trust boundaries, assets, attacker capabilities, abuse paths,
   and mitigations.
-- Privacy review: private town isolation, wallet and Brain secret exclusion,
-  provider credential exclusion, and debug trace redaction.
+- Privacy review: private town isolation, public surface data minimization,
+  wallet and Brain secret exclusion, provider credential exclusion, debug trace
+  redaction, worker observability redaction, public text rendering/XSS, modal
+  lab private-data exclusion, audit summary minimization, cross-account
+  boundary, and privacy review target gate.
 - Abuse-case review: spam, harassment, impersonation, unauthorized mutation,
   store-backed delegated-agent proof, delegation scope mismatch, read-only
   delegation budget evidence, session-auth target gate evidence,
@@ -45,10 +48,11 @@ are present.
 - Validation evidence: targeted Node suite, split Playwright smokes,
   all-features regression, feature override safety, load-rate target coverage,
   migration-load replay evidence, load/rate replay evidence, and multi-process
-  write-contention evidence, including civic mutation security, data-retention
-  target coverage, session-auth target coverage, proposal intake readiness,
-  vote authorization readiness, worker vote adapter gate, reputation eligibility
-  advice readiness, moderation privacy readiness, delegated-agent proof, and
+  write-contention evidence, including civic mutation security, privacy review
+  target coverage, data-retention target coverage, session-auth target
+  coverage, proposal intake readiness, vote authorization readiness, worker vote
+  adapter gate, reputation eligibility advice readiness, moderation privacy
+  readiness, delegated-agent proof, and
   governance preflight, effect execution gate, agent participation enforcement
   gate, institution readiness
   gate, public works readiness gate, lab readiness gate, and resilience

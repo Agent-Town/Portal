@@ -192,7 +192,7 @@ persistence resilience, and security/product release review.
 - The research-only release review gate may exist in
   `server/world_civilization/release_review.js`, but it must keep V6 hidden
   from runtime/player surfaces until threat model, privacy review, abuse-case
-  review, M5 session-auth target evidence, store-backed delegated-agent proof
+  review with privacy review target gate evidence, M5 session-auth target evidence, store-backed delegated-agent proof
   evidence, data-retention policy with data-retention target gate evidence,
   audit coverage, validation evidence, modal lab surface launch review, and
   product signoff are complete.
