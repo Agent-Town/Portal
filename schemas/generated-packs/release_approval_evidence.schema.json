@@ -6,6 +6,7 @@
   "additionalProperties": false,
   "required": [
     "schemaVersion",
+    "evidenceHash",
     "evidenceId",
     "packId",
     "createdAtMs",
@@ -18,8 +19,9 @@
   ],
   "properties": {
     "schemaVersion": { "const": "agent-town-generated-pack-release-approval-evidence-v1" },
+    "evidenceHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "evidenceId": { "type": "string", "minLength": 12 },
-    "packId": { "type": "string", "minLength": 3 },
+    "packId": { "type": "string", "pattern": "^gen_pack_[0-9a-f]{16}$" },
     "createdAtMs": { "type": "number" },
     "authModel": {
       "type": "object",

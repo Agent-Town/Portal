@@ -352,9 +352,12 @@ test('GU-18 production release gate can pass only with explicit machine evidence
   assert.equal(gate.blockingReasons.length, 0);
   assert.equal(Object.values(gate.releasePrerequisites).every((value) => value === true), true);
   assert.equal(gate.approvalEvidence.schemaVersion, 'agent-town-generated-pack-release-approval-evidence-v1');
+  assert.match(gate.approvalEvidence.evidenceHash, /^[0-9a-f]{64}$/);
   assert.equal(gate.approvalEvidence.candidateReview.productionPromotionApproved, false);
   assert.equal(gate.metrics.approvalEvidenceSchemaErrorCount, 0);
   assert.equal(gate.metrics.approvalEvidenceSecretLikeCount, 0);
+  assert.equal(gate.metrics.approvalEvidenceHashMatches, 1);
+  assert.equal(gate.metrics.approvalEvidencePackIdMatches, 1);
   assert.equal(gate.metrics.candidateReviewManifestHashMatchesEvidence, 1);
   assert.equal(gate.metrics.candidateReviewCoverageCount, pack.assetPromptPlan.targets.length);
   assert.equal(gate.metrics.replayabilityPromptCount, 10);
@@ -574,6 +577,57 @@ test('GU-18 release approval evidence rejects secrets, prompt instructions, and 
   assert.equal(gateReport.ok, false);
   assert.equal(
     gateReport.checks.find((check) => check.id === 'PRODUCTION_RELEASE_GATE_APPROVAL_EVIDENCE_VALID').passed,
+    false
+  );
+});
+
+test('GU-18 release approval evidence rejects hash drift and mixed-pack approvals', () => {
+  const pack = createGeneratedPack({
+    owner: { ownerAccountId: 'owner_release_gate_approval_hash' },
+    prompt: 'orchid observatory village with glasshouse couriers',
+    nowMs: 153_050,
+    candidateRoot: 'data/generated-packs-test'
+  });
+  const otherPack = createGeneratedPack({
+    owner: { ownerAccountId: 'owner_release_gate_approval_other' },
+    prompt: 'basalt lighthouse town with ember sailwrights',
+    nowMs: 153_075,
+    candidateRoot: 'data/generated-packs-test'
+  });
+  const evidence = approvedReleaseEvidence(pack);
+  const driftedEvidence = {
+    ...evidence,
+    costModel: {
+      ...evidence.costModel,
+      estimatedMax: evidence.costModel.estimatedMax + 1
+    }
+  };
+  const otherEvidence = approvedReleaseEvidence(otherPack);
+  const hashDriftReport = validateReleaseApprovalEvidence(driftedEvidence, pack);
+  const mixedPackReport = validateReleaseApprovalEvidence(otherEvidence, pack);
+  const mixedPackGate = buildProductionReleaseGate({
+    pack,
+    approvalEvidence: otherEvidence,
+    candidateReviewManifest: reviewedCandidateManifest(pack),
+    nowMs: 153_125
+  });
+  const mixedPackGateReport = validateProductionReleaseGate(mixedPackGate);
+
+  assert.equal(hashDriftReport.ok, false);
+  assert.equal(
+    hashDriftReport.checks.find((check) => check.id === 'RELEASE_APPROVAL_EVIDENCE_HASH_STABLE').passed,
+    false
+  );
+  assert.equal(mixedPackReport.ok, false);
+  assert.equal(
+    mixedPackReport.checks.find((check) => check.id === 'RELEASE_APPROVAL_EVIDENCE_PACK_ID_MATCH').passed,
+    false
+  );
+  assert.equal(mixedPackGate.publicReleaseEligible, false);
+  assert.equal(mixedPackGate.metrics.approvalEvidencePackIdMatches, 0);
+  assert.equal(mixedPackGateReport.ok, false);
+  assert.equal(
+    mixedPackGateReport.checks.find((check) => check.id === 'PRODUCTION_RELEASE_GATE_APPROVAL_EVIDENCE_VALID').passed,
     false
   );
 });

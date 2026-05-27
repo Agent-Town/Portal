@@ -4119,6 +4119,12 @@ function releaseApprovalEvidenceDefault(pack = {}, nowMs = Date.now()) {
   return buildReleaseApprovalEvidence({ pack: { packId }, nowMs });
 }
 
+function releaseApprovalEvidenceHash(evidence = {}) {
+  const copy = clone(evidence);
+  delete copy.evidenceHash;
+  return stableEvidenceHash(copy);
+}
+
 function buildReleaseApprovalEvidence({
   pack = {},
   nowMs = Date.now(),
@@ -4148,8 +4154,9 @@ function buildReleaseApprovalEvidence({
     humanStatus,
     expectedTargetCount
   };
-  return {
+  const evidence = {
     schemaVersion: RELEASE_APPROVAL_EVIDENCE_VERSION,
+    evidenceHash: '',
     evidenceId: String(candidateReview.evidenceId || sha256(JSON.stringify(evidenceCore)).slice(0, 32)),
     packId,
     createdAtMs: positiveNumberOrZero(nowMs),
@@ -4208,6 +4215,8 @@ function buildReleaseApprovalEvidence({
       generatedPackDefaultExposure: constraints.generatedPackDefaultExposure === true
     }
   };
+  evidence.evidenceHash = releaseApprovalEvidenceHash(evidence);
+  return evidence;
 }
 
 function validateReleaseApprovalEvidence(evidence = {}, pack = {}) {
@@ -4216,6 +4225,9 @@ function validateReleaseApprovalEvidence(evidence = {}, pack = {}) {
     : { ok: true, errors: [] };
   const secretLikePaths = findSecretLikePaths(evidence);
   const rawInstructionPaths = findRawPromptInstructionPaths(evidence);
+  const expectedEvidenceHash = schemaReport.ok ? releaseApprovalEvidenceHash(evidence) : '';
+  const evidenceHashMatches = Boolean(expectedEvidenceHash) && evidence?.evidenceHash === expectedEvidenceHash;
+  const packIdMatches = pack?.packId ? evidence?.packId === pack.packId : true;
   const requiredTargetCount = Math.max(
     ASSET_PROMPT_TARGETS.length,
     Array.isArray(pack?.assetPromptPlan?.targets) ? pack.assetPromptPlan.targets.length : 0
@@ -4270,6 +4282,16 @@ function validateReleaseApprovalEvidence(evidence = {}, pack = {}) {
       measured: { secretLikePaths, rawInstructionPaths }
     },
     {
+      id: 'RELEASE_APPROVAL_EVIDENCE_HASH_STABLE',
+      passed: evidenceHashMatches,
+      measured: { expectedEvidenceHash, actualEvidenceHash: evidence?.evidenceHash || '' }
+    },
+    {
+      id: 'RELEASE_APPROVAL_EVIDENCE_PACK_ID_MATCH',
+      passed: packIdMatches,
+      measured: { expectedPackId: pack?.packId || '', actualPackId: evidence?.packId || '' }
+    },
+    {
       id: 'RELEASE_APPROVAL_EVIDENCE_AUTH_COST_CONSENT',
       passed: authModelApproved && costEstimateAccepted && explicitConsentRecorded,
       measured: { authModelApproved, costEstimateAccepted, explicitConsentRecorded }
@@ -4298,6 +4320,8 @@ function validateReleaseApprovalEvidence(evidence = {}, pack = {}) {
       schemaErrorCount: schemaReport.errors.length,
       secretLikePathCount: secretLikePaths.length,
       rawInstructionPathCount: rawInstructionPaths.length,
+      evidenceHashMatches,
+      packIdMatches,
       authModelApproved,
       costEstimateAccepted,
       explicitConsentRecorded,
@@ -4442,6 +4466,8 @@ function buildProductionReleaseGate({
       approvalEvidenceSchemaErrorCount: Number(approvalEvidenceReport.metrics.schemaErrorCount || 0),
       approvalEvidenceSecretLikeCount: Number(approvalEvidenceReport.metrics.secretLikePathCount || 0),
       approvalEvidenceRawInstructionCount: Number(approvalEvidenceReport.metrics.rawInstructionPathCount || 0),
+      approvalEvidenceHashMatches: approvalEvidenceReport.metrics.evidenceHashMatches === true ? 1 : 0,
+      approvalEvidencePackIdMatches: approvalEvidenceReport.metrics.packIdMatches === true ? 1 : 0,
       candidateReviewManifestSchemaErrorCount: Number(candidateReviewManifestReport.metrics.schemaErrorCount || 0),
       candidateReviewManifestSecretLikeCount: Number(candidateReviewManifestReport.metrics.secretLikePathCount || 0),
       candidateReviewManifestRawInstructionCount: Number(candidateReviewManifestReport.metrics.rawInstructionPathCount || 0),
@@ -4480,10 +4506,14 @@ function validateProductionReleaseGate(gate = {}) {
     && failedPrerequisites.every((reason) => blockingReasonSet.has(reason));
   const approvals = gate?.approvalInputs || {};
   const approvalEvidenceReport = validateReleaseApprovalEvidence(gate?.approvalEvidence || {});
+  const approvalEvidenceHashStable = approvalEvidenceReport.metrics.evidenceHashMatches === true;
+  const approvalEvidencePackIdMatchesGate = Boolean(gate?.packId)
+    && gate?.approvalEvidence?.packId === gate.packId;
   const approvalEvidenceContractOk = approvalEvidenceReport.checks
     .filter((check) => [
       'RELEASE_APPROVAL_EVIDENCE_SCHEMA_VALID',
       'RELEASE_APPROVAL_EVIDENCE_CONTENT_SAFE',
+      'RELEASE_APPROVAL_EVIDENCE_HASH_STABLE',
       'RELEASE_APPROVAL_EVIDENCE_BOUNDARY_PRESERVED'
     ].includes(check.id))
     .every((check) => check.passed === true);
@@ -4524,6 +4554,7 @@ function validateProductionReleaseGate(gate = {}) {
       passed: gate?.publicReleaseEligible !== true
         || (
           approvalEvidenceReport.ok === true
+          && approvalEvidencePackIdMatchesGate
           && approvalInputsMatchEvidence
           && approvals.authModelDocumented === true
           && approvals.costEstimateAccepted === true
@@ -4538,14 +4569,20 @@ function validateProductionReleaseGate(gate = {}) {
     {
       id: 'PRODUCTION_RELEASE_GATE_APPROVAL_EVIDENCE_VALID',
       passed: approvalEvidenceContractOk
+        && approvalEvidenceHashStable
+        && approvalEvidencePackIdMatchesGate
         && approvalInputsMatchEvidence
         && Number(gate?.metrics?.approvalEvidenceSchemaErrorCount || 0) === Number(approvalEvidenceReport.metrics.schemaErrorCount || 0)
         && Number(gate?.metrics?.approvalEvidenceSecretLikeCount || 0) === Number(approvalEvidenceReport.metrics.secretLikePathCount || 0)
         && Number(gate?.metrics?.approvalEvidenceRawInstructionCount || 0) === Number(approvalEvidenceReport.metrics.rawInstructionPathCount || 0)
+        && Number(gate?.metrics?.approvalEvidenceHashMatches || 0) === (approvalEvidenceHashStable ? 1 : 0)
+        && Number(gate?.metrics?.approvalEvidencePackIdMatches || 0) === (approvalEvidencePackIdMatchesGate ? 1 : 0)
         && Number(gate?.metrics?.candidateReviewExpectedTargetCount || 0) === Number(approvalEvidenceReport.metrics.expectedTargetCount || 0)
         && Number(gate?.metrics?.candidateReviewCoverageCount || 0) <= Number(approvalEvidenceReport.metrics.reviewedCandidateCount || 0),
       measured: {
         approvalEvidenceContractOk,
+        approvalEvidenceHashStable,
+        approvalEvidencePackIdMatchesGate,
         approvalEvidenceComplete: approvalEvidenceReport.ok === true,
         approvalInputsMatchEvidence,
         approvalEvidenceMetrics: approvalEvidenceReport.metrics,

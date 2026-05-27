@@ -433,7 +433,7 @@ Generated packs now include a `multiSurfaceCompatibility` contract that maps one
 
 Generated packs now have a standalone `productionReleaseGate` contract for controlled player-facing readiness. The gate is a report, not a generated-pack subdocument and not default gameplay visibility. It evaluates strict schemas, safety/moderation, measured first-loop evidence, asset manifest and prompt-plan validity, deterministic fallback safety, ten-prompt diversity, durable save/reload/import evidence, public-card privacy, candidate asset review, explicit auth/cost/consent approval, and human review signoff. It fails closed by default: missing approval evidence produces a valid `prototype-gated` report with blocking reasons, not a public release claim.
 
-Release approval is now a versioned evidence object, not a loose set of booleans. `release_approval_evidence.schema.json` records an auth model, cost model, consent record, candidate-review coverage, human release review, and hard boundary constraints. `candidate_review_manifest.schema.json` records per-target candidate review decisions and must match the approval evidence hash before candidate assets count as reviewed. Public eligibility ignores `approvalInputs` unless they match the derived evidence summary, and unsafe evidence or review manifests with secret-like fields, raw prompt instructions, short candidate-review coverage, production image promotion, normal gameplay exposure, canonical rule changes, or V6 civic changes fail validation.
+Release approval is now a versioned evidence object, not a loose set of booleans. `release_approval_evidence.schema.json` records an auth model, cost model, consent record, candidate-review coverage, human release review, hard boundary constraints, and a stable `evidenceHash`. `candidate_review_manifest.schema.json` records per-target candidate review decisions and its `manifestHash` must match the candidate-manifest hash recorded inside approval evidence before candidate assets count as reviewed. Public eligibility ignores `approvalInputs` unless they match the derived evidence summary, and unsafe evidence or review manifests with secret-like fields, raw prompt instructions, hash drift, mixed pack ids, short candidate-review coverage, production image promotion, normal gameplay exposure, canonical rule changes, or V6 civic changes fail validation.
 
 ```json
 {
@@ -445,6 +445,9 @@ Release approval is now a versioned evidence object, not a loose set of booleans
   "approvalInputsDerivedFromEvidence": true,
   "approvalEvidenceSecretLikeCount": 0,
   "approvalEvidenceRawInstructionCount": 0,
+  "approvalEvidenceHashMatches": true,
+  "approvalEvidencePackIdMatches": true,
+  "mixedPackApprovalEvidenceRejected": true,
   "candidateReviewManifestHashMatchesEvidence": true,
   "candidateReviewManifestProductionImageAssetCount": 0,
   "candidateReviewCoverageCountMin": 23,
