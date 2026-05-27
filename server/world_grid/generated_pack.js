@@ -4485,6 +4485,14 @@ function releaseDiversityIncludesPack(diversityReport = {}, packId = '') {
     && result?.playtestEvidenceRecorded === true);
 }
 
+function releasePlaytestSourcePassed(playtestReport = null, pack = {}) {
+  if (!playtestReport || typeof playtestReport !== 'object') return false;
+  const report = validatePlaytestReport(playtestReport, pack || {});
+  return report.ok === true
+    && playtestReport.playtestPassed !== false
+    && playtestReport.packId === pack?.packId;
+}
+
 function releasePersistencePassed(persistenceReport = {}) {
   return persistenceReport?.durablePackStorage === true
     && persistenceReport?.restartReloadPass === true
@@ -4949,6 +4957,7 @@ function buildReleaseEvidenceBundle({
   const blockingReasonsMatchGate = stableEvidenceHash(blockingReasons) === stableEvidenceHash(gate?.blockingReasons || []);
   const bundleCreatedAtMs = positiveNumberOrZero(nowMs);
   const gateEvaluatedAtMs = positiveNumberOrZero(gate?.evaluatedAtMs);
+  const playtestSourcePassed = releasePlaytestSourcePassed(playtestReport, pack || {});
   const diversitySourceIncludesGatePack = releaseDiversityIncludesPack(diversityReport || {}, bundlePackId);
   const diversitySourceMetricsCoherent = releaseDiversityPassed(diversityReport || {})
     && releaseDiversityMetricsCoherent(diversityReport || {});
@@ -4958,6 +4967,7 @@ function buildReleaseEvidenceBundle({
   const readyEvidenceSourcesMatchGate = gate?.publicReleaseEligible !== true
     || (
       prerequisiteSnapshotMatchesGate
+      && playtestSourcePassed
       && diversitySourceIncludesGatePack
       && diversitySourceMetricsCoherent
       && approvalEvidenceHashMatchesGate
@@ -4998,6 +5008,7 @@ function buildReleaseEvidenceBundle({
       blockingReasonsMatchGate,
       prerequisiteSnapshotMatchesGate,
       readyEvidenceSourcesMatchGate,
+      playtestSourcePassed,
       diversitySourceIncludesGatePack,
       diversitySourceMetricsCoherent,
       approvalEvidenceHashMatchesGate,
@@ -5090,6 +5101,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
   const prerequisiteSnapshotMatchesGate = releaseGate
     ? stableEvidenceHash(bundle?.prerequisiteSnapshot || {}) === stableEvidenceHash(releaseGate?.releasePrerequisites || {})
     : bundle?.publicReleaseEligible !== true;
+  const playtestSourcePassed = releasePlaytestSourcePassed(playtestReport, pack || {});
   const diversitySourceIncludesGatePack = diversityReport
     ? releaseDiversityIncludesPack(diversityReport, bundle?.packId || releaseGate?.packId || pack?.packId || '')
     : false;
@@ -5123,6 +5135,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
   const readyEvidenceSourcesMatchGate = bundle?.publicReleaseEligible !== true
     || (
       prerequisiteSnapshotMatchesGate
+      && playtestSourcePassed
       && diversitySourceIncludesGatePack
       && diversitySourceMetricsCoherent
       && approvalEvidenceHashMatchesGate
@@ -5152,6 +5165,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     && bundle?.metrics?.blockingReasonsMatchGate === blockingReasonsMatchGate
     && blockingReasonsMatchGate === true
     && bundle?.metrics?.prerequisiteSnapshotMatchesGate === prerequisiteSnapshotMatchesGate
+    && bundle?.metrics?.playtestSourcePassed === playtestSourcePassed
     && bundle?.metrics?.diversitySourceIncludesGatePack === diversitySourceIncludesGatePack
     && bundle?.metrics?.diversitySourceMetricsCoherent === diversitySourceMetricsCoherent
     && bundle?.metrics?.readyEvidenceSourcesMatchGate === readyEvidenceSourcesMatchGate
@@ -5215,6 +5229,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
         bundleCreatedAtNotFuture,
         blockingReasonsMatchGate,
         prerequisiteSnapshotMatchesGate,
+        playtestSourcePassed,
         diversitySourceIncludesGatePack,
         diversitySourceMetricsCoherent,
         readyEvidenceSourcesMatchGate,

@@ -482,6 +482,7 @@ test('GU-19 release evidence bundle binds a ready gate to source evidence hashes
   assert.equal(bundle.metrics.blockingReasonsMatchGate, true);
   assert.equal(bundle.metrics.prerequisiteSnapshotMatchesGate, true);
   assert.equal(bundle.metrics.readyEvidenceSourcesMatchGate, true);
+  assert.equal(bundle.metrics.playtestSourcePassed, true);
   assert.equal(bundle.metrics.diversitySourceIncludesGatePack, true);
   assert.equal(bundle.metrics.diversitySourceMetricsCoherent, true);
   assert.equal(bundle.metrics.approvalEvidenceHashMatchesGate, true);
@@ -768,6 +769,44 @@ test('GU-19 release evidence bundle rejects diversity source evidence copied fro
   );
   assert.equal(
     mixedReport.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,
+    false
+  );
+}));
+
+test('GU-19 release evidence bundle rejects playtest source evidence that does not support the ready gate', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_evidence_bundle_bad_playtest_source',
+    prompt: 'teal canyon archive with patient lantern surveyors',
+    nowMs: 158_650
+  });
+  const failingPlaytestReport = {
+    ...fixture.playtestReport,
+    firstLoopCompleted: false,
+    playtestPassed: false,
+    validationReport: { ok: false }
+  };
+  const bundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    playtestReport: failingPlaytestReport,
+    nowMs: 159_400
+  });
+  const report = validateReleaseEvidenceBundle(bundle, {
+    ...fixture,
+    playtestReport: failingPlaytestReport
+  });
+
+  assert.equal(validatePlaytestReport(failingPlaytestReport, fixture.pack).ok, false);
+  assert.equal(fixture.releaseGate.publicReleaseEligible, true);
+  assert.equal(bundle.metrics.sourceHashMismatchCount, 0);
+  assert.equal(bundle.metrics.playtestSourcePassed, false);
+  assert.equal(bundle.metrics.readyEvidenceSourcesMatchGate, false);
+  assert.equal(report.ok, false);
+  assert.equal(
+    report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_SOURCE_HASHES_MATCH').passed,
+    true
+  );
+  assert.equal(
+    report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,
     false
   );
 }));
