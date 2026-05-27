@@ -3190,7 +3190,7 @@ test('GU-18/GU-19/GPACK-157 release gate and evidence bundle APIs are generated-
   });
 });
 
-test('GPACK-154/155/156 release APIs can return ready evidence and ignore loose approvals', async () => {
+test('GPACK-154/155/156/158 release APIs can return ready evidence and ignore loose approvals', async () => {
   const identity = { pairId: 'session:release-evidence-ready-api', houseId: null };
 
   await withTempGeneratedPackStore(async (root) => {
@@ -3286,8 +3286,17 @@ test('GPACK-154/155/156 release APIs can return ready evidence and ignore loose 
       assert.equal(releaseGateBody.releaseGate.metrics.looseApprovalInputCount, 0);
       assert.equal(releaseGateBody.validationReport.ok, true, JSON.stringify(releaseGateBody.validationReport.checks));
       assert.equal(releaseGateBody.validationReport.metrics.publicReleaseEligible, true);
+      assert.equal(releaseGateBody.validationReport.metrics.authModelDocumented, true);
+      assert.equal(releaseGateBody.validationReport.metrics.costEstimateAccepted, true);
+      assert.equal(releaseGateBody.validationReport.metrics.explicitConsentRecorded, true);
       assert.equal(releaseGateBody.validationReport.metrics.costConsentModelApproved, true);
+      assert.equal(releaseGateBody.validationReport.metrics.candidateAssetsReviewed, true);
       assert.equal(releaseGateBody.validationReport.metrics.humanReviewComplete, true);
+      assert.equal(releaseGateBody.validationReport.metrics.approvalInputsMatchEvidence, true);
+      assert.equal(releaseGateBody.validationReport.metrics.approvalEvidencePackIdMatchesGate, true);
+      assert.equal(releaseGateBody.validationReport.metrics.candidateReviewManifestHashMatchesEvidence, true);
+      assert.equal(releaseGateBody.validationReport.metrics.candidateReviewManifestTimeMatchesEvidence, true);
+      assert.equal(releaseGateBody.validationReport.metrics.candidateReviewManifestCountsMatchEvidence, true);
 
       const { response: toolReleaseGateResponse, body: toolReleaseGateBody } = await postJson(
         `${baseUrl}/api/world/tool/et.world.generated_pack.release_gate`,
@@ -3301,6 +3310,14 @@ test('GPACK-154/155/156 release APIs can return ready evidence and ignore loose 
       assert.equal(toolReleaseGateBody.data.releaseGate.metrics.productionImageAssetCount, 0);
       assert.equal(toolReleaseGateBody.data.validationReport.ok, true, JSON.stringify(toolReleaseGateBody.data.validationReport.checks));
       assert.equal(toolReleaseGateBody.data.validationReport.metrics.publicReleaseEligible, true);
+      assert.equal(toolReleaseGateBody.data.validationReport.metrics.authModelDocumented, true);
+      assert.equal(toolReleaseGateBody.data.validationReport.metrics.costEstimateAccepted, true);
+      assert.equal(toolReleaseGateBody.data.validationReport.metrics.explicitConsentRecorded, true);
+      assert.equal(toolReleaseGateBody.data.validationReport.metrics.costConsentModelApproved, true);
+      assert.equal(toolReleaseGateBody.data.validationReport.metrics.candidateAssetsReviewed, true);
+      assert.equal(toolReleaseGateBody.data.validationReport.metrics.humanReviewComplete, true);
+      assert.equal(toolReleaseGateBody.data.validationReport.metrics.approvalInputsMatchEvidence, true);
+      assert.equal(toolReleaseGateBody.data.validationReport.metrics.candidateReviewManifestCountsMatchEvidence, true);
 
       const { response: bundleResponse, body: bundleBody } = await postJson(
         `${baseUrl}/api/world/generated-pack/release-evidence-bundle`,
@@ -3370,6 +3387,30 @@ test('GPACK-154/155/156 release APIs can return ready evidence and ignore loose 
       assert.equal(looseReleaseGateBody.releaseGate.approvalInputs.explicitConsentRecorded, false);
       assert.equal(looseReleaseGateBody.releaseGate.approvalInputs.candidateAssetsReviewed, false);
       assert.equal(looseReleaseGateBody.validationReport.ok, true, JSON.stringify(looseReleaseGateBody.validationReport.checks));
+      assert.equal(looseReleaseGateBody.validationReport.metrics.authModelDocumented, false);
+      assert.equal(looseReleaseGateBody.validationReport.metrics.costEstimateAccepted, false);
+      assert.equal(looseReleaseGateBody.validationReport.metrics.explicitConsentRecorded, false);
+      assert.equal(looseReleaseGateBody.validationReport.metrics.costConsentModelApproved, false);
+      assert.equal(looseReleaseGateBody.validationReport.metrics.candidateAssetsReviewed, false);
+      assert.equal(looseReleaseGateBody.validationReport.metrics.humanReviewComplete, false);
+      assert.equal(looseReleaseGateBody.validationReport.metrics.approvalInputsMatchEvidence, true);
+
+      const { response: looseToolReleaseGateResponse, body: looseToolReleaseGateBody } = await postJson(
+        `${baseUrl}/api/world/tool/et.world.generated_pack.release_gate`,
+        looseApprovalBody
+      );
+      assert.equal(looseToolReleaseGateResponse.status, 200, JSON.stringify(looseToolReleaseGateBody));
+      assert.equal(looseToolReleaseGateBody.data.releaseGate.releaseMode, 'prototype-gated');
+      assert.equal(looseToolReleaseGateBody.data.releaseGate.publicReleaseEligible, false);
+      assert.equal(looseToolReleaseGateBody.data.releaseGate.metrics.looseApprovalInputCount > 0, true);
+      assert.equal(looseToolReleaseGateBody.data.validationReport.ok, true, JSON.stringify(looseToolReleaseGateBody.data.validationReport.checks));
+      assert.equal(looseToolReleaseGateBody.data.validationReport.metrics.authModelDocumented, false);
+      assert.equal(looseToolReleaseGateBody.data.validationReport.metrics.costEstimateAccepted, false);
+      assert.equal(looseToolReleaseGateBody.data.validationReport.metrics.explicitConsentRecorded, false);
+      assert.equal(looseToolReleaseGateBody.data.validationReport.metrics.costConsentModelApproved, false);
+      assert.equal(looseToolReleaseGateBody.data.validationReport.metrics.candidateAssetsReviewed, false);
+      assert.equal(looseToolReleaseGateBody.data.validationReport.metrics.humanReviewComplete, false);
+      assert.equal(looseToolReleaseGateBody.data.validationReport.metrics.approvalInputsMatchEvidence, true);
 
       const { response: looseBundleResponse, body: looseBundleBody } = await postJson(
         `${baseUrl}/api/world/generated-pack/release-evidence-bundle`,
