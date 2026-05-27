@@ -272,6 +272,43 @@ test('GPACK-126 candidate generation validators reject expanded credential-token
   }
 });
 
+test('GPACK-129 candidate generation preflight rejects tampered job-log paths before writing evidence', async () => {
+  const pack = createRunPack('owner_candidate_generation_run_path_guard');
+  const target = pack.assetPromptPlan.targets[0];
+  const unsafeJobLogPath = target.approvedOutputPath.replace(/\.webp$/i, '.jsonl');
+  const badPlan = {
+    ...pack.assetPromptPlan,
+    targets: [
+      { ...target, jobLogPath: unsafeJobLogPath },
+      ...pack.assetPromptPlan.targets.slice(1)
+    ]
+  };
+  let caught;
+  let jobLogWritten = false;
+  try {
+    await runCandidateImageGenerationSpike({
+      pack,
+      assetPromptPlan: badPlan,
+      targetLimit: 1,
+      nowMs: 180_290,
+      config: approvedConfig(),
+      generatorAdapter: async ({ target: plannedTarget }) => ({
+        candidateOutputPath: plannedTarget.candidateOutputPath
+      })
+    });
+  } catch (error) {
+    caught = error;
+  } finally {
+    jobLogWritten = fs.existsSync(path.join(root, unsafeJobLogPath));
+    if (jobLogWritten) fs.rmSync(path.join(root, unsafeJobLogPath), { force: true });
+  }
+
+  assert.equal(caught?.message, 'INVALID_CANDIDATE_GENERATION_PLAN_PATH');
+  assert.equal(caught?.details?.reason, 'JOB_LOG_PATH_OUTSIDE_ROOT');
+  assert.equal(caught?.details?.field, '$.assetPromptPlan.targets[0].jobLogPath');
+  assert.equal(jobLogWritten, false);
+});
+
 test('GU-5 candidate generation validators reject fractional counters and target drift', async () => {
   const pack = createRunPack('owner_candidate_generation_run_limit_edges');
   const target = pack.assetPromptPlan.targets[0];

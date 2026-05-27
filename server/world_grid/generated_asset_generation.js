@@ -173,6 +173,12 @@ function isSafeRelativePath(value) {
     && !normalized.includes('/../');
 }
 
+function normalizedRelativePath(value = '') {
+  const normalized = path.posix.normalize(String(value || '').trim().replace(/\\/g, '/'));
+  if (!normalized || normalized === '.') return '';
+  return normalized.replace(/^\/+|\/+$/g, '');
+}
+
 function repoPathForRelativePath(relativePath) {
   if (!isSafeRelativePath(relativePath)) {
     const error = new Error('INVALID_CANDIDATE_GENERATION_PATH');
@@ -186,6 +192,45 @@ function repoPathForRelativePath(relativePath) {
     throw error;
   }
   return resolved;
+}
+
+function invalidCandidateGenerationPlanPath(reason, field, value) {
+  const error = new Error('INVALID_CANDIDATE_GENERATION_PLAN_PATH');
+  error.details = { reason, field, value: redactedReportValue(value) };
+  throw error;
+}
+
+function isPathInside(root, target) {
+  const base = normalizedRelativePath(root);
+  const child = normalizedRelativePath(target);
+  return Boolean(base && child && (child === base || child.startsWith(`${base}/`)));
+}
+
+function requireSafePlanPath(field, value) {
+  if (!isSafeRelativePath(value)) {
+    invalidCandidateGenerationPlanPath('UNSAFE_RELATIVE_PATH', field, value);
+  }
+}
+
+function requirePlanPathInside(field, value, root, reason) {
+  requireSafePlanPath(field, value);
+  if (!isPathInside(root, value)) {
+    invalidCandidateGenerationPlanPath(reason, field, value);
+  }
+}
+
+function validateCandidateGenerationPlanPaths(plan = {}) {
+  requireSafePlanPath('$.assetPromptPlan.candidateRoot', plan.candidateRoot);
+  const packRoot = `${normalizedRelativePath(plan.candidateRoot)}/${normalizedRelativePath(plan.packId)}`;
+  const candidateRoot = `${packRoot}/candidates`;
+  const approvedRoot = `${packRoot}/approved`;
+  const jobRoot = `${packRoot}/jobs`;
+  (plan.targets || []).forEach((target, index) => {
+    const targetPath = `$.assetPromptPlan.targets[${index}]`;
+    requirePlanPathInside(`${targetPath}.candidateOutputPath`, target.candidateOutputPath, candidateRoot, 'CANDIDATE_OUTPUT_PATH_OUTSIDE_ROOT');
+    requirePlanPathInside(`${targetPath}.approvedOutputPath`, target.approvedOutputPath, approvedRoot, 'APPROVED_OUTPUT_PATH_OUTSIDE_ROOT');
+    requirePlanPathInside(`${targetPath}.jobLogPath`, target.jobLogPath, jobRoot, 'JOB_LOG_PATH_OUTSIDE_ROOT');
+  });
 }
 
 function canonicalMappingFingerprint(pack = {}) {
@@ -508,6 +553,9 @@ async function runCandidateImageGenerationSpike({
   const validationReport = validateGeneratedPack(pack || {});
   const promptPlanReport = validateAssetPromptPlan(plan, pack || {});
   const targets = Array.isArray(plan.targets) ? plan.targets : [];
+  if (writeJobLogs) {
+    validateCandidateGenerationPlanPaths(plan);
+  }
   const selectedTargets = Number.isInteger(targetLimit) && targetLimit > 0
     ? targets.slice(0, targetLimit)
     : targets;

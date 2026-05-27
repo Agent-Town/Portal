@@ -14,6 +14,7 @@ Status: prototype-gated
 - Credential-like prompt spans, including expanded GitHub, GitLab, Google, AWS, Slack, Stripe, and JWT-shaped token families, must be marked for review and stripped before runtime keyword extraction so secret fragments cannot become generated labels, names, titles, or hints.
 - Scaffolded generation job logs must record `authMode=not_configured`, `externalImageGenerationUsed=false`, zero outputs, and no production approval until a separate consent/auth/cost model is approved.
 - Optional candidate-generation preflights must fail closed unless product/security approval, documented auth model, documented cost model, accepted cost estimate, and user/team consent are all present.
+- Candidate-generation preflights must reject tampered job-log, candidate-output, or approved-output paths before writing job-log evidence outside the generated-pack candidate roots.
 - Candidate-generation preflight records must never persist raw provider credentials, and failure records must keep `fallbackStillPlayable=true` for valid deterministic packs.
 - Candidate-generation run and job-log validation reports must reject and redact submitted secret-looking keys, secret-looking values, expanded credential-token-family values, raw-instruction keys, and executable instruction values from both content checks and schema-error paths.
 - Asset prompt-plan, candidate-review, and candidate-generation validation reports must redact unsafe submitted canonical target labels from measured problem lists.
@@ -128,6 +129,7 @@ Status: prototype-gated
   "candidateFolderCount": 23,
   "generationJobLogCount": 23,
   "jobLogsReplayableFromPromptPlan": true,
+  "candidateGenerationJobLogWritablePathsCandidateOnly": true,
   "candidateGenerationPreflightExists": true,
   "generationDisabledWithoutConsentAuthCost": true,
   "productSecurityApprovalRequired": true,
