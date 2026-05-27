@@ -245,9 +245,13 @@ function normalizeError(error) {
 }
 
 const RELEASE_EVIDENCE_SECRET_VALUE_PATTERN = /\b(?:sk-[a-z0-9_-]{8,}|xox[baprs]-[a-z0-9-]{8,}|ghp_[a-z0-9_]{8,}|github_pat_[a-z0-9_]{8,}|ya29\.[a-z0-9_-]{8,}|bearer\s+[a-z0-9._-]{12,})\b/i;
+const RELEASE_EVIDENCE_RAW_INSTRUCTION_PATTERN = /\bignore\s+(all\s+)?(previous|prior|above)\s+instructions\b|\b(system|developer)\s+(prompt|message|instructions)\b|\bexecute\s+(shell|bash|terminal|command)\b|<\s*script\b|javascript\s*:|\beval\s*\(/i;
 
 function releaseEvidencePathSegment(key = '') {
-  return RELEASE_EVIDENCE_SECRET_VALUE_PATTERN.test(String(key || '')) ? '<secret-like-key>' : String(key || '');
+  const segment = String(key || '');
+  if (RELEASE_EVIDENCE_SECRET_VALUE_PATTERN.test(segment)) return '<secret-like-key>';
+  if (RELEASE_EVIDENCE_RAW_INSTRUCTION_PATTERN.test(segment)) return '<raw-instruction-key>';
+  return segment;
 }
 
 function releaseEvidenceChildPath(pathLabel = '$', key = '') {
@@ -271,15 +275,14 @@ function findReleaseEvidenceSecretLikePaths(value, pathLabel = '$', matches = []
 
 function findReleaseEvidenceRawInstructionPaths(value, pathLabel = '$', matches = []) {
   const rawPromptKey = /^(rawprompt|normalizedprompt|systemprompt|developerprompt|promptinstructions)$/i;
-  const rawTextPattern = /\bignore\s+(all\s+)?(previous|prior|above)\s+instructions\b|\b(system|developer)\s+(prompt|message|instructions)\b|\bexecute\s+(shell|bash|terminal|command)\b|<\s*script\b|javascript\s*:|\beval\s*\(/i;
   if (typeof value === 'string') {
-    if (rawTextPattern.test(value)) matches.push(pathLabel);
+    if (RELEASE_EVIDENCE_RAW_INSTRUCTION_PATTERN.test(value)) matches.push(pathLabel);
     return matches;
   }
   if (!value || typeof value !== 'object') return matches;
   for (const [key, child] of Object.entries(value)) {
     const childPath = releaseEvidenceChildPath(pathLabel, key);
-    if (rawPromptKey.test(key)) matches.push(childPath);
+    if (rawPromptKey.test(key) || RELEASE_EVIDENCE_RAW_INSTRUCTION_PATTERN.test(key)) matches.push(childPath);
     findReleaseEvidenceRawInstructionPaths(child, childPath, matches);
   }
   return matches;

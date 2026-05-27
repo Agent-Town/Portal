@@ -118,3 +118,4 @@ owner: "Agent Town product"
 | GPACK-104 | Release evidence | Release evidence bundle validation requires the bound release gate even when the bundle is fail-closed | `schemas/generated-packs/release_evidence_bundle.schema.json`, `tests/generated_pack_production_release_gate.test.js` |
 | GPACK-105 | API security | Release-gate API ingress rejects secret-looking evidence values under otherwise harmless keys before constructing or echoing reports | `tests/generated_pack_production_release_gate.test.js` |
 | GPACK-106 | API security | Release-gate API ingress rejects secret-looking evidence object keys and redacts those key names from rejection paths | `tests/generated_pack_production_release_gate.test.js` |
+| GPACK-107 | API security | Release-gate API ingress rejects raw-instruction evidence object keys and redacts those key names from rejection paths | `tests/generated_pack_production_release_gate.test.js` |
