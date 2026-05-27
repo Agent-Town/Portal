@@ -116,13 +116,16 @@ function passingPlaytestInput(pack) {
   };
 }
 
-function suiteDiversityReport() {
-  const packs = REPLAYABILITY_PROMPT_SUITE.map((prompt, index) => createGeneratedPack({
+function suiteDiversityReport({ includePack = null } = {}) {
+  const generatedPacks = REPLAYABILITY_PROMPT_SUITE.map((prompt, index) => createGeneratedPack({
     owner: { ownerAccountId: `owner_release_gate_diversity_${index}` },
     prompt,
     nowMs: 160_000 + index,
     candidateRoot: 'data/generated-packs-test'
   }));
+  const packs = includePack
+    ? [includePack, ...generatedPacks.filter((pack) => pack.packId !== includePack.packId)].slice(0, 10)
+    : generatedPacks;
   const playtestReports = packs.map((pack, index) => {
     const report = buildMeasuredPlaytestReport({
       pack,
@@ -324,7 +327,7 @@ function readyReleaseGateFixture({
       Number(importResult.importReport.privateDataLeakCount || 0)
     )
   };
-  const diversityReport = suiteDiversityReport();
+  const diversityReport = suiteDiversityReport({ includePack: pack });
   const candidateReviewManifest = reviewedCandidateManifest(pack);
   const approvalEvidence = approvedReleaseEvidence(pack);
   const releaseGate = buildProductionReleaseGate({
@@ -395,7 +398,7 @@ test('GU-18 production release gate can pass only with explicit machine evidence
   }, /INVALID_GENERATED_PACK_EXPORT/);
   invalidImportRejected = true;
 
-  const diversityReport = suiteDiversityReport();
+  const diversityReport = suiteDiversityReport({ includePack: pack });
   const candidateReviewManifest = reviewedCandidateManifest(pack);
   const persistenceReport = {
     packId: pack.packId,
@@ -442,6 +445,7 @@ test('GU-18 production release gate can pass only with explicit machine evidence
   assert.equal(gate.metrics.replayabilityPromptCount, 10);
   assert.equal(gate.metrics.privateDataLeakCount, 0);
   assert.equal(gate.metrics.productionImageAssetCount, 0);
+  assert.equal(gate.metrics.diversityPackIdMatches, true);
   assert.equal(gate.metrics.publicCardPackIdMatches, true);
   assert.equal(gate.metrics.persistencePackIdMatches, true);
   assert.equal(gate.metrics.eligiblePrerequisiteCount, gate.metrics.requiredPrerequisiteCount);
@@ -741,9 +745,10 @@ test('GU-18 release gate ignores loose approval flags without versioned approval
   const gate = buildProductionReleaseGate({
     pack,
     playtestReport,
-    diversityReport: suiteDiversityReport(),
+    diversityReport: suiteDiversityReport({ includePack: pack }),
     publicCard,
     persistenceReport: {
+      packId: pack.packId,
       durablePackStorage: true,
       restartReloadPass: true,
       exportImportRoundTrip: true,
@@ -1118,6 +1123,32 @@ test('GU-18 production release gate rejects persistence evidence copied from ano
   assert.equal(gate.releasePrerequisites.packSaveReloadPassed, false);
   assert.equal(gate.metrics.persistencePackIdMatches, false);
   assert.equal(gate.blockingReasons.includes('packSaveReloadPassed'), true);
+  assert.equal(report.ok, true, JSON.stringify(report.checks));
+}));
+
+test('GU-18 production release gate rejects diversity evidence that excludes the release pack', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_gate_mixed_diversity',
+    prompt: 'silver reed observatory with patient glass cartographers',
+    nowMs: 153_725
+  });
+  const otherFixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_gate_mixed_diversity_other',
+    prompt: 'cobalt orchard harbor with careful kite surveyors',
+    nowMs: 153_750
+  });
+  const gate = buildProductionReleaseGate({
+    ...fixture,
+    diversityReport: otherFixture.diversityReport,
+    nowMs: 155_350
+  });
+  const report = validateProductionReleaseGate(gate);
+
+  assert.equal(otherFixture.diversityReport.packResults.some((result) => result.packId === fixture.pack.packId), false);
+  assert.equal(gate.publicReleaseEligible, false);
+  assert.equal(gate.releasePrerequisites.diversitySuitePassed, false);
+  assert.equal(gate.metrics.diversityPackIdMatches, false);
+  assert.equal(gate.blockingReasons.includes('diversitySuitePassed'), true);
   assert.equal(report.ok, true, JSON.stringify(report.checks));
 }));
 

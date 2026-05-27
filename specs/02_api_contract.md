@@ -2788,6 +2788,7 @@ Response includes:
 - `releaseGate.releaseMode`, either `prototype-gated` or `ready-for-controlled-release`;
 - `releaseGate.releasePrerequisites` for schema, moderation, playtest, asset manifest, fallback, diversity, persistence, public-card privacy, consent/cost/auth approval, candidate review, and human review;
 - `releaseGate.blockingReasons`, which must exactly match failed prerequisites;
+- `releaseGate.metrics.diversityPackIdMatches`;
 - `releaseGate.metrics.persistencePackIdMatches`;
 - `releaseGate.metrics.publicCardPackIdMatches`;
 - `releaseGate.metrics.releaseGateEvaluatedAtNotFuture`;
@@ -2796,8 +2797,8 @@ Response includes:
 Release-gate invariants:
 - missing approval or evidence returns a valid fail-closed `prototype-gated` report;
 - `evaluatedAtMs` must not be future-dated relative to validation time;
-- `publicReleaseEligible=true` requires all prerequisites to be true, `blockingReasons=[]`, same-pack persistence evidence, same-pack public-card evidence, zero private-data leaks, zero missing assets, zero production image assets, explicit consent/cost/auth approval, candidate asset review, and a 64-hex human review signoff hash;
-- forged eligibility, mismatched blocking reasons, invalid gate pack ids, mixed persistence evidence, mixed public-card evidence, approval evidence hash drift, future-dated approval evidence, future-dated gate reports, candidate-review approval evidence that predates its manifest, planned-only candidate-review approvals, approval evidence copied from another pack, secret-like fields, raw prompt instructions, production asset leaks, and private-card data fail validation;
+- `publicReleaseEligible=true` requires all prerequisites to be true, `blockingReasons=[]`, diversity evidence including the release pack, same-pack persistence evidence, same-pack public-card evidence, zero private-data leaks, zero missing assets, zero production image assets, explicit consent/cost/auth approval, candidate asset review, and a 64-hex human review signoff hash;
+- forged eligibility, mismatched blocking reasons, invalid gate pack ids, diversity evidence that excludes the release pack, mixed persistence evidence, mixed public-card evidence, approval evidence hash drift, future-dated approval evidence, future-dated gate reports, candidate-review approval evidence that predates its manifest, planned-only candidate-review approvals, approval evidence copied from another pack, secret-like fields, raw prompt instructions, production asset leaks, and private-card data fail validation;
 - oversized or noisy release-evidence request bodies fail before report construction and rejection responses return counts/paths/limits, not submitted evidence values;
 - the route remains hidden in default gameplay unless `FEATURE_WORLD_GRID_GENERATED_PACKS` is enabled.
 

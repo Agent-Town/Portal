@@ -28,7 +28,7 @@ Status: prototype-gated
 - Generated multi-surface compatibility profiles must remain visual-only across Z1 settlement, Z2 region, route, public-card, and sandbox surfaces; private public-card data, unsafe sandbox labels, V5 tool changes, server-rule changes, unknown surfaces, formulas, and tool authority are forbidden.
 - Player-visible generated text must be escaped in DOM rendering.
 - Production image generation requires explicit consent and a documented cost/auth model before any user-facing release claim.
-- Public release eligibility must come from the standalone `productionReleaseGate` report, which fails closed unless the gate uses a valid generated-pack id and every prerequisite, same-pack persistence proof, same-pack public-card proof, explicit approval, candidate review, human signoff, and non-future gate evaluation timestamp is present.
+- Public release eligibility must come from the standalone `productionReleaseGate` report, which fails closed unless the gate uses a valid generated-pack id and every prerequisite, diversity evidence including the release pack, same-pack persistence proof, same-pack public-card proof, explicit approval, candidate review, human signoff, and non-future gate evaluation timestamp is present.
 - Release approval evidence must be hash-bound, match the current generated pack id, contain timestamp-coherent approval events, and remain candidate-only; stale hashes, future-dated approvals, candidate reviews that predate their manifest, planned-only candidate approvals, or evidence copied from another pack cannot unlock production readiness.
 - Release evidence bundles must be created at or after the bound release gate evaluation time, must not be future-dated relative to validation time, and must bind ready evidence sources, blocking reasons, and prerequisite snapshots back to the release gate; approval evidence drift from the bound gate fails validation even when replacement evidence is valid for the same pack.
 - Release-gate and release-evidence-bundle API requests must reject secret-like fields, raw prompt instructions, and oversized/noisy evidence bodies before report construction; rejection responses may include counts, paths, and limits, but not submitted evidence values.
@@ -50,6 +50,8 @@ Status: prototype-gated
   "productionReleaseGateSchemaExists": true,
   "releaseGateFeatureGated": true,
   "invalidReleaseGatePackIdRejected": true,
+  "diversityPackIdMatches": true,
+  "mixedDiversityEvidenceRejected": true,
   "persistencePackIdMatches": true,
   "mixedPersistenceEvidenceRejected": true,
   "publicCardPackIdMatches": true,

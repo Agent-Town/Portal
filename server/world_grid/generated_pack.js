@@ -4490,6 +4490,13 @@ function buildProductionReleaseGate({
     && publicCard?.packId === pack.packId;
   const persistencePackIdMatches = Boolean(pack?.packId)
     && persistenceReport?.packId === pack.packId;
+  const diversityPackResult = Array.isArray(diversityReport?.packResults)
+    ? diversityReport.packResults.find((result) => result?.packId === pack?.packId)
+    : null;
+  const diversityPackIdMatches = Boolean(pack?.packId)
+    && diversityPackResult?.validationOk === true
+    && diversityPackResult?.firstLoopPassed === true
+    && diversityPackResult?.playtestEvidenceRecorded === true;
   const assetLoaderEvidence = playtestReport?.assetLoader || playtestReport?.scoreEvidence?.assetLoader || {};
   const missingAssetCount = Number(playtestReport?.missingAssets || 0)
     + Number(assetLoaderEvidence?.missingTextureCount || 0);
@@ -4505,7 +4512,8 @@ function buildProductionReleaseGate({
     playtestPassed: playtestValidation.ok === true && playtestReport?.playtestPassed !== false,
     assetManifestValid: assetManifestReport.ok === true && assetPromptPlanReport.ok === true,
     fallbackVerified,
-    diversitySuitePassed: releaseDiversityPassed(diversityReport || {}),
+    diversitySuitePassed: releaseDiversityPassed(diversityReport || {})
+      && diversityPackIdMatches,
     packSaveReloadPassed: releasePersistencePassed(persistenceReport || {})
       && persistencePackIdMatches,
     publicCardPrivacyPassed: publicCardReport.ok === true
@@ -4538,6 +4546,7 @@ function buildProductionReleaseGate({
       blockedFieldCount: publicCardBlockedFieldCount,
       publicCardPackIdMatches,
       persistencePackIdMatches,
+      diversityPackIdMatches,
       missingAssetCount,
       productionImageAssetCount: Number(pack?.assetScaffold?.productionImageAssetCount || 0),
       replayabilityPromptCount: Number(diversityReport?.metrics?.promptCount || diversityReport?.metrics?.validPackCount || 0),
@@ -4621,6 +4630,7 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
       id: 'PRODUCTION_RELEASE_GATE_PREREQUISITES_COHERENT',
       passed: gate?.publicReleaseEligible === allPrerequisitesPassed
         && blockingReasonsMatchFailures
+        && (prerequisites.diversitySuitePassed !== true || gate?.metrics?.diversityPackIdMatches === true)
         && (prerequisites.publicCardPrivacyPassed !== true || gate?.metrics?.publicCardPackIdMatches === true)
         && (prerequisites.packSaveReloadPassed !== true || gate?.metrics?.persistencePackIdMatches === true)
         && Number(gate?.metrics?.eligiblePrerequisiteCount || 0) === prerequisiteEntries.filter(([, passed]) => passed === true).length
@@ -4630,6 +4640,7 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
         publicReleaseEligible: gate?.publicReleaseEligible === true,
         failedPrerequisites,
         blockingReasonsMatchFailures,
+        diversityPackIdMatches: gate?.metrics?.diversityPackIdMatches === true,
         publicCardPackIdMatches: gate?.metrics?.publicCardPackIdMatches === true,
         persistencePackIdMatches: gate?.metrics?.persistencePackIdMatches === true
       }
