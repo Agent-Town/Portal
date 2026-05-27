@@ -4423,6 +4423,59 @@ function releaseDiversityPassed(diversityReport = {}) {
     && Number(metrics.rawPromptLeakCount || 0) === 0;
 }
 
+function releaseDiversityMetricsCoherent(diversityReport = {}) {
+  const metrics = diversityReport?.metrics || {};
+  const packResults = Array.isArray(diversityReport?.packResults)
+    ? diversityReport.packResults.filter((result) => result && typeof result === 'object')
+    : [];
+  const comparisons = Array.isArray(diversityReport?.comparisons)
+    ? diversityReport.comparisons.filter((comparison) => comparison && typeof comparison === 'object')
+    : [];
+  const signatures = Array.isArray(diversityReport?.signatures)
+    ? diversityReport.signatures.map((signature) => String(signature || '')).filter(Boolean)
+    : [];
+  const promptCount = positiveNumberOrZero(metrics.promptCount);
+  const expectedPromptCount = positiveNumberOrZero(metrics.expectedPromptCount);
+  const validationOkCount = packResults.filter((result) => result.validationOk === true).length;
+  const firstLoopPassCount = packResults.filter((result) => result.firstLoopPassed === true).length;
+  const uniquePackIds = new Set(packResults.map((result) => result.packId).filter(Boolean)).size;
+  const rowSignatures = packResults.map((result) => String(result.replayabilitySignature || '')).filter(Boolean);
+  const uniqueReplayabilitySignatures = new Set(rowSignatures).size;
+  const screenshotHashes = packResults
+    .map((result) => String(result.screenshotHash || ''))
+    .filter((hash) => isSha256Hex(hash));
+  const uniqueScreenshotHashes = new Set(screenshotHashes).size;
+  const forbiddenAuthorityCount = packResults.reduce(
+    (sum, result) => sum + Number(result.forbiddenAuthorityCount || 0),
+    0
+  );
+  const rawPromptLeakCount = packResults.reduce(
+    (sum, result) => sum + Number(result.rawPromptLeakCount || 0),
+    0
+  );
+  const expectedComparisonCount = packResults.length > 1
+    ? (packResults.length * (packResults.length - 1)) / 2
+    : 0;
+  const signaturesMatchRows = signatures.length === 0
+    || (signatures.length === rowSignatures.length
+      && signatures.every((signature, index) => signature === rowSignatures[index]));
+  const playtestEvidenceMode = metrics.firstLoopEvidenceMode === 'playtest-report';
+  return packResults.length >= REPLAYABILITY_PROMPT_SUITE.length
+    && promptCount === packResults.length
+    && expectedPromptCount >= REPLAYABILITY_PROMPT_SUITE.length
+    && positiveNumberOrZero(metrics.validPackCount) === validationOkCount
+    && positiveNumberOrZero(metrics.firstLoopPassCount) === firstLoopPassCount
+    && positiveNumberOrZero(metrics.uniquePackIds) === uniquePackIds
+    && positiveNumberOrZero(metrics.uniqueReplayabilitySignatures) === uniqueReplayabilitySignatures
+    && positiveNumberOrZero(metrics.forbiddenAuthorityCount) === forbiddenAuthorityCount
+    && positiveNumberOrZero(metrics.rawPromptLeakCount) === rawPromptLeakCount
+    && positiveNumberOrZero(metrics.pairwiseComparisonCount) === comparisons.length
+    && comparisons.length === expectedComparisonCount
+    && (!playtestEvidenceMode || positiveNumberOrZero(metrics.screenshotHashCount) === screenshotHashes.length)
+    && (!playtestEvidenceMode || positiveNumberOrZero(metrics.uniqueScreenshotHashes) === uniqueScreenshotHashes)
+    && signaturesMatchRows;
+}
+
 function releasePersistencePassed(persistenceReport = {}) {
   return persistenceReport?.durablePackStorage === true
     && persistenceReport?.restartReloadPass === true
@@ -4497,6 +4550,7 @@ function buildProductionReleaseGate({
     && diversityPackResult?.validationOk === true
     && diversityPackResult?.firstLoopPassed === true
     && diversityPackResult?.playtestEvidenceRecorded === true;
+  const diversityReportMetricsCoherent = releaseDiversityMetricsCoherent(diversityReport || {});
   const assetLoaderEvidence = playtestReport?.assetLoader || playtestReport?.scoreEvidence?.assetLoader || {};
   const missingAssetCount = Number(playtestReport?.missingAssets || 0)
     + Number(assetLoaderEvidence?.missingTextureCount || 0);
@@ -4513,6 +4567,7 @@ function buildProductionReleaseGate({
     assetManifestValid: assetManifestReport.ok === true && assetPromptPlanReport.ok === true,
     fallbackVerified,
     diversitySuitePassed: releaseDiversityPassed(diversityReport || {})
+      && diversityReportMetricsCoherent
       && diversityPackIdMatches,
     packSaveReloadPassed: releasePersistencePassed(persistenceReport || {})
       && persistencePackIdMatches,
@@ -4547,6 +4602,7 @@ function buildProductionReleaseGate({
       publicCardPackIdMatches,
       persistencePackIdMatches,
       diversityPackIdMatches,
+      diversityReportMetricsCoherent,
       missingAssetCount,
       productionImageAssetCount: Number(pack?.assetScaffold?.productionImageAssetCount || 0),
       replayabilityPromptCount: Number(diversityReport?.metrics?.promptCount || diversityReport?.metrics?.validPackCount || 0),
@@ -4630,7 +4686,10 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
       id: 'PRODUCTION_RELEASE_GATE_PREREQUISITES_COHERENT',
       passed: gate?.publicReleaseEligible === allPrerequisitesPassed
         && blockingReasonsMatchFailures
-        && (prerequisites.diversitySuitePassed !== true || gate?.metrics?.diversityPackIdMatches === true)
+        && (prerequisites.diversitySuitePassed !== true || (
+          gate?.metrics?.diversityPackIdMatches === true
+          && gate?.metrics?.diversityReportMetricsCoherent === true
+        ))
         && (prerequisites.publicCardPrivacyPassed !== true || gate?.metrics?.publicCardPackIdMatches === true)
         && (prerequisites.packSaveReloadPassed !== true || gate?.metrics?.persistencePackIdMatches === true)
         && Number(gate?.metrics?.eligiblePrerequisiteCount || 0) === prerequisiteEntries.filter(([, passed]) => passed === true).length
@@ -4641,6 +4700,7 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
         failedPrerequisites,
         blockingReasonsMatchFailures,
         diversityPackIdMatches: gate?.metrics?.diversityPackIdMatches === true,
+        diversityReportMetricsCoherent: gate?.metrics?.diversityReportMetricsCoherent === true,
         publicCardPackIdMatches: gate?.metrics?.publicCardPackIdMatches === true,
         persistencePackIdMatches: gate?.metrics?.persistencePackIdMatches === true
       }
