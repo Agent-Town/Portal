@@ -1404,6 +1404,52 @@ test('GPACK-149 release evidence bundle rejects source-problem count metric tamp
   }
 }));
 
+test('GPACK-163 release evidence bundle rejects evidence-diagnostic metric tampering', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_evidence_bundle_evidence_diagnostic_metrics',
+    prompt: 'cobalt switchyard orchard with careful prism surveyors',
+    nowMs: 155_210
+  });
+  const validationNowMs = fixture.releaseGate.evaluatedAtMs + 100;
+  const bundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    nowMs: fixture.releaseGate.evaluatedAtMs + 50
+  });
+  const diagnosticMetricUpdates = Object.fromEntries(
+    RELEASE_EVIDENCE_DIAGNOSTIC_METRIC_KEYS.map(([bundleKey]) => [
+      bundleKey,
+      { [bundleKey]: Number(bundle.metrics[bundleKey] || 0) + 1 }
+    ])
+  );
+
+  for (const [bundleKey, metricPatch] of Object.entries(diagnosticMetricUpdates)) {
+    const tamperedBundle = rehashReleaseEvidenceBundle({
+      ...bundle,
+      metrics: {
+        ...bundle.metrics,
+        ...metricPatch
+      }
+    });
+    const report = validateReleaseEvidenceBundle(tamperedBundle, {
+      ...fixture,
+      nowMs: validationNowMs
+    });
+
+    assert.equal(
+      report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_HASH_STABLE').passed,
+      true,
+      bundleKey
+    );
+    assert.equal(report.metrics[bundleKey], bundle.metrics[bundleKey], bundleKey);
+    assert.equal(report.ok, false, bundleKey);
+    assert.equal(
+      report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,
+      false,
+      bundleKey
+    );
+  }
+}));
+
 test('GPACK-150 release evidence bundle report mirrors source-count metrics', () => withTempGeneratedPackStore(() => {
   const fixture = readyReleaseGateFixture({
     ownerAccountId: 'owner_release_evidence_bundle_report_source_counts',
