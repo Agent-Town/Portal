@@ -2040,19 +2040,21 @@ test('GU-18 release gate ignores loose approval flags without versioned approval
   });
   const playtestReport = recordPlaytestReport(owner, passingPlaytestInput(pack));
   const { publicCard } = publishPublicPackCard(owner, pack.packId, { nowMs: 152_800 });
+  const diversityReport = suiteDiversityReport({ includePack: pack });
+  const persistenceReport = {
+    packId: pack.packId,
+    durablePackStorage: true,
+    restartReloadPass: true,
+    exportImportRoundTrip: true,
+    invalidImportRejected: true,
+    privateDataLeakCount: 0
+  };
   const gate = buildProductionReleaseGate({
     pack,
     playtestReport,
-    diversityReport: suiteDiversityReport({ includePack: pack }),
+    diversityReport,
     publicCard,
-    persistenceReport: {
-      packId: pack.packId,
-      durablePackStorage: true,
-      restartReloadPass: true,
-      exportImportRoundTrip: true,
-      invalidImportRejected: true,
-      privateDataLeakCount: 0
-    },
+    persistenceReport,
     approvalInputs: {
       authModelDocumented: true,
       costEstimateAccepted: true,
@@ -2062,7 +2064,13 @@ test('GU-18 release gate ignores loose approval flags without versioned approval
     },
     nowMs: 152_900
   });
-  const validationReport = validateProductionReleaseGate(gate);
+  const validationReport = validateProductionReleaseGate(gate, {
+    pack,
+    playtestReport,
+    diversityReport,
+    publicCard,
+    persistenceReport
+  });
 
   assert.equal(validationReport.ok, true, JSON.stringify(validationReport.checks));
   assert.equal(gate.publicReleaseEligible, false);
@@ -2420,6 +2428,55 @@ test('GPACK-165 release gate rejects metric-only ready gates without source evid
   assert.equal(sourceBoundReport.metrics.readySourceEvidenceBound, true);
 }));
 
+test('GPACK-166 release gate rejects metric-only prerequisite evidence claims', () => {
+  const pack = createGeneratedPack({
+    owner: { ownerAccountId: 'owner_release_gate_prerequisite_metric_only' },
+    prompt: 'copper harbor commons with careful signal gardens',
+    nowMs: 153_165,
+    candidateRoot: 'data/generated-packs-test'
+  });
+  const gate = buildProductionReleaseGate({ pack, nowMs: 153_175 });
+  const forgedPrerequisites = {
+    ...gate.releasePrerequisites,
+    playtestPassed: true,
+    fallbackVerified: true,
+    diversitySuitePassed: true,
+    packSaveReloadPassed: true,
+    publicCardPrivacyPassed: true,
+    costConsentModelApproved: true,
+    candidateAssetsReviewed: true,
+    humanReviewComplete: true
+  };
+  const forgedGate = {
+    ...gate,
+    releasePrerequisites: forgedPrerequisites,
+    blockingReasons: gate.blockingReasons.filter((reason) => !forgedPrerequisites[reason]),
+    metrics: {
+      ...gate.metrics,
+      diversityPackIdMatches: true,
+      diversityReportMetricsCoherent: true,
+      publicCardPackIdMatches: true,
+      persistencePackIdMatches: true,
+      replayabilityPromptCount: 10,
+      candidateReviewManifestHashMatchesEvidence: 1,
+      candidateReviewManifestTimeMatchesEvidence: 1,
+      candidateReviewManifestCountsMatchEvidence: 1,
+      eligiblePrerequisiteCount: Object.values(forgedPrerequisites).filter((value) => value === true).length,
+      requiredPrerequisiteCount: Object.keys(forgedPrerequisites).length
+    }
+  };
+  const report = validateProductionReleaseGate(forgedGate, { nowMs: 153_185 });
+
+  assert.equal(gate.publicReleaseEligible, false);
+  assert.equal(forgedGate.publicReleaseEligible, false);
+  assert.equal(report.ok, false);
+  assert.equal(
+    report.checks.find((check) => check.id === 'PRODUCTION_RELEASE_GATE_PREREQUISITE_EVIDENCE_BOUND').passed,
+    false
+  );
+  assert.equal(report.metrics.prerequisiteEvidenceBound, false);
+});
+
 test('GU-18 release approval evidence reports redact unsafe submitted keys and values', () => {
   const pack = createGeneratedPack({
     owner: { ownerAccountId: 'owner_release_gate_evidence_redaction' },
@@ -2767,7 +2824,10 @@ test('GU-18 production release gate rejects public-card evidence copied from ano
     publicCard: otherFixture.publicCard,
     nowMs: 155_200
   });
-  const report = validateProductionReleaseGate(gate);
+  const report = validateProductionReleaseGate(
+    gate,
+    releaseGateValidationContext(fixture, { publicCard: otherFixture.publicCard })
+  );
 
   assert.notEqual(otherFixture.publicCard.packId, fixture.pack.packId);
   assert.equal(gate.publicReleaseEligible, false);
@@ -2793,7 +2853,10 @@ test('GU-18 production release gate rejects persistence evidence copied from ano
     persistenceReport: otherFixture.persistenceReport,
     nowMs: 155_275
   });
-  const report = validateProductionReleaseGate(gate);
+  const report = validateProductionReleaseGate(
+    gate,
+    releaseGateValidationContext(fixture, { persistenceReport: otherFixture.persistenceReport })
+  );
 
   assert.notEqual(otherFixture.persistenceReport.packId, fixture.pack.packId);
   assert.equal(gate.publicReleaseEligible, false);
@@ -2819,7 +2882,10 @@ test('GU-18 production release gate rejects diversity evidence that excludes the
     diversityReport: otherFixture.diversityReport,
     nowMs: 155_350
   });
-  const report = validateProductionReleaseGate(gate);
+  const report = validateProductionReleaseGate(
+    gate,
+    releaseGateValidationContext(fixture, { diversityReport: otherFixture.diversityReport })
+  );
 
   assert.equal(otherFixture.diversityReport.packResults.some((result) => result.packId === fixture.pack.packId), false);
   assert.equal(gate.publicReleaseEligible, false);
@@ -2847,7 +2913,10 @@ test('GU-18 production release gate rejects diversity reports with metric-only t
     diversityReport: metricOnlyDiversityReport,
     nowMs: 155_375
   });
-  const report = validateProductionReleaseGate(gate);
+  const report = validateProductionReleaseGate(
+    gate,
+    releaseGateValidationContext(fixture, { diversityReport: metricOnlyDiversityReport })
+  );
 
   assert.equal(fixture.diversityReport.metrics.promptCount, 10);
   assert.equal(metricOnlyDiversityReport.metrics.promptCount, 10);
@@ -3486,6 +3555,8 @@ test('GPACK-154/155/156/158/159/160/161/162 release APIs can return ready eviden
       assert.equal(releaseGateBody.validationReport.metrics.candidateReviewManifestHashMatchesEvidence, true);
       assert.equal(releaseGateBody.validationReport.metrics.candidateReviewManifestTimeMatchesEvidence, true);
       assert.equal(releaseGateBody.validationReport.metrics.candidateReviewManifestCountsMatchEvidence, true);
+      assert.equal(releaseGateBody.validationReport.metrics.readySourceEvidenceBound, true);
+      assert.equal(releaseGateBody.validationReport.metrics.prerequisiteEvidenceBound, true);
 
       const { response: toolReleaseGateResponse, body: toolReleaseGateBody } = await postJson(
         `${baseUrl}/api/world/tool/et.world.generated_pack.release_gate`,
@@ -3526,6 +3597,8 @@ test('GPACK-154/155/156/158/159/160/161/162 release APIs can return ready eviden
       assert.equal(toolReleaseGateBody.data.validationReport.metrics.humanReviewComplete, true);
       assert.equal(toolReleaseGateBody.data.validationReport.metrics.approvalInputsMatchEvidence, true);
       assert.equal(toolReleaseGateBody.data.validationReport.metrics.candidateReviewManifestCountsMatchEvidence, true);
+      assert.equal(toolReleaseGateBody.data.validationReport.metrics.readySourceEvidenceBound, true);
+      assert.equal(toolReleaseGateBody.data.validationReport.metrics.prerequisiteEvidenceBound, true);
 
       const { response: bundleResponse, body: bundleBody } = await postJson(
         `${baseUrl}/api/world/generated-pack/release-evidence-bundle`,

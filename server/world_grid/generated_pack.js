@@ -4944,6 +4944,12 @@ function validateProductionReleaseGate(gate = {}, {
     && positiveNumberOrZero(gate?.approvalEvidence?.candidateReview?.reviewedAtMs) <= positiveNumberOrZero(gate?.approvalEvidence?.createdAtMs);
   const sourceCandidateReviewManifestCountsMatchEvidence = sourceCandidateReviewManifestHashMatchesEvidence
     && candidateReviewManifestCountsMatchApprovalEvidence(candidateReviewManifest, gate?.approvalEvidence || {});
+  const expectedApprovals = approvalInputsFromEvidence(gate?.approvalEvidence || {}, approvalEvidenceReport);
+  const approvalInputsMatchEvidence = approvals.authModelDocumented === expectedApprovals.authModelDocumented
+    && approvals.costEstimateAccepted === expectedApprovals.costEstimateAccepted
+    && approvals.explicitConsentRecorded === expectedApprovals.explicitConsentRecorded
+    && approvals.candidateAssetsReviewed === expectedApprovals.candidateAssetsReviewed
+    && String(approvals.humanReviewSignoffHash || '') === String(expectedApprovals.humanReviewSignoffHash || '');
   const readySourceEvidenceBound = gate?.publicReleaseEligible !== true
     || (
       sourceGeneratedPackPassed
@@ -4958,6 +4964,42 @@ function validateProductionReleaseGate(gate = {}, {
       && sourceCandidateReviewManifestTimeMatchesEvidence
       && sourceCandidateReviewManifestCountsMatchEvidence
     );
+  const prerequisiteEvidenceBound = (
+    prerequisites.playtestPassed !== true || sourcePlaytestPassed
+  ) && (
+    prerequisites.fallbackVerified !== true || (
+      sourcePlaytestPassed
+      && Number(gate?.metrics?.missingAssetCount || 0) === 0
+    )
+  ) && (
+    prerequisites.diversitySuitePassed !== true || (
+      sourceDiversityIncludesGatePack
+      && sourceDiversityMetricsCoherent
+    )
+  ) && (
+    prerequisites.packSaveReloadPassed !== true || sourcePersistencePassed
+  ) && (
+    prerequisites.publicCardPrivacyPassed !== true || sourcePublicCardPassed
+  ) && (
+    prerequisites.costConsentModelApproved !== true || (
+      approvalEvidenceReport.metrics.costConsentModelApproved === true
+      && approvalInputsMatchEvidence
+    )
+  ) && (
+    prerequisites.candidateAssetsReviewed !== true || (
+      approvalEvidenceReport.metrics.candidateAssetsReviewed === true
+      && sourceApprovalEvidencePassed
+      && sourceCandidateReviewManifestPassed
+      && sourceCandidateReviewManifestHashMatchesEvidence
+      && sourceCandidateReviewManifestTimeMatchesEvidence
+      && sourceCandidateReviewManifestCountsMatchEvidence
+    )
+  ) && (
+    prerequisites.humanReviewComplete !== true || (
+      approvalEvidenceReport.metrics.humanReviewComplete === true
+      && approvalInputsMatchEvidence
+    )
+  );
   const approvalEvidenceContractOk = approvalEvidenceReport.checks
     .filter((check) => [
       'RELEASE_APPROVAL_EVIDENCE_SCHEMA_VALID',
@@ -4967,12 +5009,6 @@ function validateProductionReleaseGate(gate = {}, {
       'RELEASE_APPROVAL_EVIDENCE_BOUNDARY_PRESERVED'
     ].includes(check.id))
     .every((check) => check.passed === true);
-  const expectedApprovals = approvalInputsFromEvidence(gate?.approvalEvidence || {}, approvalEvidenceReport);
-  const approvalInputsMatchEvidence = approvals.authModelDocumented === expectedApprovals.authModelDocumented
-    && approvals.costEstimateAccepted === expectedApprovals.costEstimateAccepted
-    && approvals.explicitConsentRecorded === expectedApprovals.explicitConsentRecorded
-    && approvals.candidateAssetsReviewed === expectedApprovals.candidateAssetsReviewed
-    && String(approvals.humanReviewSignoffHash || '') === String(expectedApprovals.humanReviewSignoffHash || '');
   const checks = [
     {
       id: 'PRODUCTION_RELEASE_GATE_SCHEMA_VALID',
@@ -5097,6 +5133,31 @@ function validateProductionReleaseGate(gate = {}, {
       }
     },
     {
+      id: 'PRODUCTION_RELEASE_GATE_PREREQUISITE_EVIDENCE_BOUND',
+      passed: prerequisiteEvidenceBound,
+      measured: {
+        playtestPassedClaimed: prerequisites.playtestPassed === true,
+        fallbackVerifiedClaimed: prerequisites.fallbackVerified === true,
+        diversitySuitePassedClaimed: prerequisites.diversitySuitePassed === true,
+        packSaveReloadPassedClaimed: prerequisites.packSaveReloadPassed === true,
+        publicCardPrivacyPassedClaimed: prerequisites.publicCardPrivacyPassed === true,
+        costConsentModelApprovedClaimed: prerequisites.costConsentModelApproved === true,
+        candidateAssetsReviewedClaimed: prerequisites.candidateAssetsReviewed === true,
+        humanReviewCompleteClaimed: prerequisites.humanReviewComplete === true,
+        sourcePlaytestPassed,
+        sourcePersistencePassed,
+        sourcePublicCardPassed,
+        sourceDiversityIncludesGatePack,
+        sourceDiversityMetricsCoherent,
+        sourceApprovalEvidencePassed,
+        sourceCandidateReviewManifestPassed,
+        sourceCandidateReviewManifestHashMatchesEvidence,
+        sourceCandidateReviewManifestTimeMatchesEvidence,
+        sourceCandidateReviewManifestCountsMatchEvidence,
+        approvalInputsMatchEvidence
+      }
+    },
+    {
       id: 'PRODUCTION_RELEASE_GATE_NO_PRIVATE_OR_ASSET_LEAKS',
       passed: Number(gate?.metrics?.privateDataLeakCount || 0) === 0
         && Number(gate?.metrics?.blockedFieldCount || 0) === 0
@@ -5168,6 +5229,7 @@ function validateProductionReleaseGate(gate = {}, {
       candidateReviewManifestTimeMatchesEvidence,
       candidateReviewManifestCountsMatchEvidence,
       readySourceEvidenceBound,
+      prerequisiteEvidenceBound,
       releaseGateEvaluatedAtNotFuture,
       privateDataLeakCount,
       blockedFieldCount,

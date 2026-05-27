@@ -329,8 +329,8 @@ test('GU-19 release gate requires approval evidence to match a reviewed candidat
   });
   const withoutManifest = buildProductionReleaseGate({ pack, approvalEvidence: evidence, nowMs: 170_300 });
   const withManifest = buildProductionReleaseGate({ pack, approvalEvidence: evidence, candidateReviewManifest: manifest, nowMs: 170_300 });
-  const withoutReport = validateProductionReleaseGate(withoutManifest);
-  const withReport = validateProductionReleaseGate(withManifest);
+  const withoutReport = validateProductionReleaseGate(withoutManifest, { pack, approvalEvidence: evidence });
+  const withReport = validateProductionReleaseGate(withManifest, { pack, approvalEvidence: evidence, candidateReviewManifest: manifest });
 
   assert.equal(withoutReport.ok, true, JSON.stringify(withoutReport.checks));
   assert.equal(withoutManifest.releasePrerequisites.candidateAssetsReviewed, false);
