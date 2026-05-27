@@ -5279,6 +5279,8 @@ function buildReleaseEvidenceBundle({
   const bundleCreatedAtOrAfterGate = gateEvaluatedAtMs > 0
     && bundleCreatedAtMs >= gateEvaluatedAtMs;
   const bundleCreatedAtNotFuture = bundleCreatedAtMs > 0;
+  const releaseGateValidationReport = validateProductionReleaseGate(gate, { nowMs: bundleCreatedAtMs });
+  const releaseGateValidationMetrics = releaseGateValidationReport.metrics || {};
   const readyEvidenceSourcesMatchGate = gate?.publicReleaseEligible !== true
     || (
       prerequisiteSnapshotMatchesGate
@@ -5325,7 +5327,7 @@ function buildReleaseEvidenceBundle({
       sourcePackIdMismatchCount: sourcePackIdProblems.length,
       sourceCoverageOk,
       releaseGateHashMatches,
-      releaseGateValid: validateProductionReleaseGate(gate, { nowMs: bundleCreatedAtMs }).ok === true,
+      releaseGateValid: releaseGateValidationReport.ok === true,
       releaseGatePublicEligible: gate?.publicReleaseEligible === true,
       bundleCreatedAtOrAfterGate,
       bundleCreatedAtNotFuture,
@@ -5344,6 +5346,14 @@ function buildReleaseEvidenceBundle({
       candidateReviewManifestHashMatchesEvidence,
       candidateReviewManifestTimeMatchesEvidence,
       candidateReviewManifestCountsMatchEvidence,
+      approvalEvidenceSchemaErrorCount: Number(releaseGateValidationMetrics.approvalEvidenceSchemaErrorCount || 0),
+      approvalEvidenceSensitiveFieldCount: Number(releaseGateValidationMetrics.approvalEvidenceSecretLikeCount || 0),
+      approvalEvidenceRawInstructionCount: Number(releaseGateValidationMetrics.approvalEvidenceRawInstructionCount || 0),
+      candidateReviewManifestSchemaErrorCount: Number(releaseGateValidationMetrics.candidateReviewManifestSchemaErrorCount || 0),
+      candidateReviewManifestSensitiveFieldCount: Number(releaseGateValidationMetrics.candidateReviewManifestSecretLikeCount || 0),
+      candidateReviewManifestRawInstructionCount: Number(releaseGateValidationMetrics.candidateReviewManifestRawInstructionCount || 0),
+      candidateReviewExpectedTargetCount: Number(releaseGateValidationMetrics.candidateReviewExpectedTargetCount || 0),
+      candidateReviewCoverageCount: Number(releaseGateValidationMetrics.candidateReviewCoverageCount || 0),
       productionImageAssetCount: Number(gate?.metrics?.productionImageAssetCount || 0),
       privateDataLeakCount: Number(gate?.metrics?.privateDataLeakCount || 0)
     }
@@ -5432,7 +5442,16 @@ function validateReleaseEvidenceBundle(bundle = {}, {
   const releaseGatePublicEligible = releaseGate?.publicReleaseEligible === true;
   const gateReport = releaseGate
     ? validateProductionReleaseGate(releaseGate, { nowMs })
-    : { ok: false };
+    : { ok: false, metrics: {} };
+  const gateMetrics = gateReport.metrics || {};
+  const approvalEvidenceSchemaErrorCount = Number(gateMetrics.approvalEvidenceSchemaErrorCount || 0);
+  const approvalEvidenceSensitiveFieldCount = Number(gateMetrics.approvalEvidenceSecretLikeCount || 0);
+  const approvalEvidenceRawInstructionCount = Number(gateMetrics.approvalEvidenceRawInstructionCount || 0);
+  const candidateReviewManifestSchemaErrorCount = Number(gateMetrics.candidateReviewManifestSchemaErrorCount || 0);
+  const candidateReviewManifestSensitiveFieldCount = Number(gateMetrics.candidateReviewManifestSecretLikeCount || 0);
+  const candidateReviewManifestRawInstructionCount = Number(gateMetrics.candidateReviewManifestRawInstructionCount || 0);
+  const candidateReviewExpectedTargetCount = Number(gateMetrics.candidateReviewExpectedTargetCount || 0);
+  const candidateReviewCoverageCount = Number(gateMetrics.candidateReviewCoverageCount || 0);
   const bundleCreatedAtMs = positiveNumberOrZero(bundle?.createdAtMs);
   const validationNowMs = positiveNumberOrZero(nowMs);
   const bundleCreatedAtOrAfterGate = releaseGate
@@ -5547,7 +5566,15 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     && bundle?.metrics?.candidateReviewManifestSourcePassed === candidateReviewManifestSourcePassed
     && bundle?.metrics?.candidateReviewManifestHashMatchesEvidence === candidateReviewManifestHashMatchesEvidence
     && bundle?.metrics?.candidateReviewManifestTimeMatchesEvidence === candidateReviewManifestTimeMatchesEvidence
-    && bundle?.metrics?.candidateReviewManifestCountsMatchEvidence === candidateReviewManifestCountsMatchEvidence;
+    && bundle?.metrics?.candidateReviewManifestCountsMatchEvidence === candidateReviewManifestCountsMatchEvidence
+    && Number(bundle?.metrics?.approvalEvidenceSchemaErrorCount || 0) === approvalEvidenceSchemaErrorCount
+    && Number(bundle?.metrics?.approvalEvidenceSensitiveFieldCount || 0) === approvalEvidenceSensitiveFieldCount
+    && Number(bundle?.metrics?.approvalEvidenceRawInstructionCount || 0) === approvalEvidenceRawInstructionCount
+    && Number(bundle?.metrics?.candidateReviewManifestSchemaErrorCount || 0) === candidateReviewManifestSchemaErrorCount
+    && Number(bundle?.metrics?.candidateReviewManifestSensitiveFieldCount || 0) === candidateReviewManifestSensitiveFieldCount
+    && Number(bundle?.metrics?.candidateReviewManifestRawInstructionCount || 0) === candidateReviewManifestRawInstructionCount
+    && Number(bundle?.metrics?.candidateReviewExpectedTargetCount || 0) === candidateReviewExpectedTargetCount
+    && Number(bundle?.metrics?.candidateReviewCoverageCount || 0) === candidateReviewCoverageCount;
   const checks = [
     {
       id: 'RELEASE_EVIDENCE_BUNDLE_SCHEMA_VALID',
@@ -5624,7 +5651,15 @@ function validateReleaseEvidenceBundle(bundle = {}, {
         approvalEvidenceSourcePassed,
         candidateReviewManifestHashMatchesEvidence,
         candidateReviewManifestTimeMatchesEvidence,
-        candidateReviewManifestCountsMatchEvidence
+        candidateReviewManifestCountsMatchEvidence,
+        approvalEvidenceSchemaErrorCount,
+        approvalEvidenceSensitiveFieldCount,
+        approvalEvidenceRawInstructionCount,
+        candidateReviewManifestSchemaErrorCount,
+        candidateReviewManifestSensitiveFieldCount,
+        candidateReviewManifestRawInstructionCount,
+        candidateReviewExpectedTargetCount,
+        candidateReviewCoverageCount
       }
     },
     {
@@ -5672,6 +5707,14 @@ function validateReleaseEvidenceBundle(bundle = {}, {
       candidateReviewManifestHashMatchesEvidence,
       candidateReviewManifestTimeMatchesEvidence,
       candidateReviewManifestCountsMatchEvidence,
+      approvalEvidenceSchemaErrorCount,
+      approvalEvidenceSensitiveFieldCount,
+      approvalEvidenceRawInstructionCount,
+      candidateReviewManifestSchemaErrorCount,
+      candidateReviewManifestSensitiveFieldCount,
+      candidateReviewManifestRawInstructionCount,
+      candidateReviewExpectedTargetCount,
+      candidateReviewCoverageCount,
       readyEvidenceSourcesMatchGate,
       productionImageAssetCount: Number(bundle?.metrics?.productionImageAssetCount || 0),
       privateDataLeakCount: Number(bundle?.metrics?.privateDataLeakCount || 0),

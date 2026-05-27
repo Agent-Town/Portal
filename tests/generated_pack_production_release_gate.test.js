@@ -33,6 +33,17 @@ const {
   validateProductionReleaseGate
 } = require('../server/world_grid/generated_pack');
 
+const RELEASE_EVIDENCE_DIAGNOSTIC_METRIC_KEYS = [
+  ['approvalEvidenceSchemaErrorCount', 'approvalEvidenceSchemaErrorCount'],
+  ['approvalEvidenceSensitiveFieldCount', 'approvalEvidenceSecretLikeCount'],
+  ['approvalEvidenceRawInstructionCount', 'approvalEvidenceRawInstructionCount'],
+  ['candidateReviewManifestSchemaErrorCount', 'candidateReviewManifestSchemaErrorCount'],
+  ['candidateReviewManifestSensitiveFieldCount', 'candidateReviewManifestSecretLikeCount'],
+  ['candidateReviewManifestRawInstructionCount', 'candidateReviewManifestRawInstructionCount'],
+  ['candidateReviewExpectedTargetCount', 'candidateReviewExpectedTargetCount'],
+  ['candidateReviewCoverageCount', 'candidateReviewCoverageCount']
+];
+
 async function withTempGeneratedPackStore(fn) {
   const previousRoot = process.env.GENERATED_PACK_STORE_ROOT;
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-town-generated-pack-release-gate-'));
@@ -456,7 +467,7 @@ test('GU-18 production release gate can pass only with explicit machine evidence
   assert.equal(gate.metrics.eligiblePrerequisiteCount, gate.metrics.requiredPrerequisiteCount);
 }));
 
-test('GU-19 release evidence bundle binds a ready gate to source evidence hashes', () => withTempGeneratedPackStore(() => {
+test('GU-19/GPACK-162 release evidence bundle binds a ready gate to source evidence hashes', () => withTempGeneratedPackStore(() => {
   const fixture = readyReleaseGateFixture();
   const bundle = buildReleaseEvidenceBundle({
     ...fixture,
@@ -501,6 +512,10 @@ test('GU-19 release evidence bundle binds a ready gate to source evidence hashes
   assert.equal(bundle.metrics.candidateReviewManifestHashMatchesEvidence, true);
   assert.equal(bundle.metrics.candidateReviewManifestTimeMatchesEvidence, true);
   assert.equal(bundle.metrics.candidateReviewManifestCountsMatchEvidence, true);
+  for (const [bundleKey, gateKey] of RELEASE_EVIDENCE_DIAGNOSTIC_METRIC_KEYS) {
+    assert.equal(bundle.metrics[bundleKey], fixture.releaseGate.metrics[gateKey], bundleKey);
+    assert.equal(report.metrics[bundleKey], bundle.metrics[bundleKey], bundleKey);
+  }
   assert.equal(report.metrics.generatedPackSourcePassed, true);
   assert.equal(report.metrics.playtestSourcePassed, true);
   assert.equal(report.metrics.persistenceSourcePassed, true);
@@ -2763,7 +2778,7 @@ test('GU-18 production release gate validation rejects future-dated gate reports
   );
 }));
 
-test('GU-18/GU-19/GPACK-157/159/160/161 release gate and evidence bundle APIs are generated-pack-gated and fail closed', async () => {
+test('GU-18/GU-19/GPACK-157/159/160/161/162 release gate and evidence bundle APIs are generated-pack-gated and fail closed', async () => {
   const identity = { pairId: 'session:release-gate-api', houseId: null };
   await withWorldGridServer({
     identity,
@@ -3073,6 +3088,10 @@ test('GU-18/GU-19/GPACK-157/159/160/161 release gate and evidence bundle APIs ar
       assert.equal(bundleBody.validationReport.metrics.normalGameplayVisibilityChanged, false);
       assert.equal(bundleBody.validationReport.metrics.generatedPackDefaultExposure, false);
       assert.equal(bundleBody.validationReport.metrics.boundaryPreserved, true);
+      for (const [bundleKey, gateKey] of RELEASE_EVIDENCE_DIAGNOSTIC_METRIC_KEYS) {
+        assert.equal(bundleBody.releaseEvidenceBundle.metrics[bundleKey], bundleBody.releaseGate.metrics[gateKey], bundleKey);
+        assert.equal(bundleBody.validationReport.metrics[bundleKey], bundleBody.releaseEvidenceBundle.metrics[bundleKey], bundleKey);
+      }
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.sourceHashMismatchCount, 0);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.sourcePresenceMatchesHashes, true);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.sourceCoverageOk, true);
@@ -3147,6 +3166,10 @@ test('GU-18/GU-19/GPACK-157/159/160/161 release gate and evidence bundle APIs ar
       assert.equal(toolBundleBody.data.validationReport.metrics.normalGameplayVisibilityChanged, false);
       assert.equal(toolBundleBody.data.validationReport.metrics.generatedPackDefaultExposure, false);
       assert.equal(toolBundleBody.data.validationReport.metrics.boundaryPreserved, true);
+      for (const [bundleKey, gateKey] of RELEASE_EVIDENCE_DIAGNOSTIC_METRIC_KEYS) {
+        assert.equal(toolBundleBody.data.releaseEvidenceBundle.metrics[bundleKey], toolBundleBody.data.releaseGate.metrics[gateKey], bundleKey);
+        assert.equal(toolBundleBody.data.validationReport.metrics[bundleKey], toolBundleBody.data.releaseEvidenceBundle.metrics[bundleKey], bundleKey);
+      }
 
       const toolBoundaryReleaseResponse = await fetch(`${baseUrl}/api/world/tool/et.world.generated_pack.release_gate`, {
         method: 'POST',
@@ -3209,7 +3232,7 @@ test('GU-18/GU-19/GPACK-157/159/160/161 release gate and evidence bundle APIs ar
   });
 });
 
-test('GPACK-154/155/156/158/159/160/161 release APIs can return ready evidence and ignore loose approvals', async () => {
+test('GPACK-154/155/156/158/159/160/161/162 release APIs can return ready evidence and ignore loose approvals', async () => {
   const identity = { pairId: 'session:release-evidence-ready-api', houseId: null };
 
   await withTempGeneratedPackStore(async (root) => {
@@ -3402,6 +3425,10 @@ test('GPACK-154/155/156/158/159/160/161 release APIs can return ready evidence a
       assert.equal(bundleBody.validationReport.metrics.missingSourceCount, 0);
       assert.equal(bundleBody.validationReport.metrics.readyEvidenceSourcesMatchGate, true);
       assert.equal(bundleBody.validationReport.metrics.boundaryPreserved, true);
+      for (const [bundleKey, gateKey] of RELEASE_EVIDENCE_DIAGNOSTIC_METRIC_KEYS) {
+        assert.equal(bundleBody.releaseEvidenceBundle.metrics[bundleKey], bundleBody.releaseGate.metrics[gateKey], bundleKey);
+        assert.equal(bundleBody.validationReport.metrics[bundleKey], bundleBody.releaseEvidenceBundle.metrics[bundleKey], bundleKey);
+      }
 
       const { response: toolBundleResponse, body: toolBundleBody } = await postJson(
         `${baseUrl}/api/world/tool/et.world.generated_pack.release_evidence_bundle`,
@@ -3415,6 +3442,10 @@ test('GPACK-154/155/156/158/159/160/161 release APIs can return ready evidence a
       assert.equal(toolBundleBody.data.validationReport.ok, true, JSON.stringify(toolBundleBody.data.validationReport.checks));
       assert.equal(toolBundleBody.data.validationReport.metrics.releaseGatePublicEligible, true);
       assert.equal(toolBundleBody.data.validationReport.metrics.boundaryPreserved, true);
+      for (const [bundleKey, gateKey] of RELEASE_EVIDENCE_DIAGNOSTIC_METRIC_KEYS) {
+        assert.equal(toolBundleBody.data.releaseEvidenceBundle.metrics[bundleKey], toolBundleBody.data.releaseGate.metrics[gateKey], bundleKey);
+        assert.equal(toolBundleBody.data.validationReport.metrics[bundleKey], toolBundleBody.data.releaseEvidenceBundle.metrics[bundleKey], bundleKey);
+      }
 
       const looseApprovalBody = {
         ...readyRequestBody,
@@ -3528,6 +3559,10 @@ test('GPACK-154/155/156/158/159/160/161 release APIs can return ready evidence a
       assert.equal(looseBundleBody.validationReport.ok, true, JSON.stringify(looseBundleBody.validationReport.checks));
       assert.equal(looseBundleBody.validationReport.metrics.releaseGatePublicEligible, false);
       assert.equal(looseBundleBody.validationReport.metrics.boundaryPreserved, true);
+      for (const [bundleKey, gateKey] of RELEASE_EVIDENCE_DIAGNOSTIC_METRIC_KEYS) {
+        assert.equal(looseBundleBody.releaseEvidenceBundle.metrics[bundleKey], looseBundleBody.releaseGate.metrics[gateKey], bundleKey);
+        assert.equal(looseBundleBody.validationReport.metrics[bundleKey], looseBundleBody.releaseEvidenceBundle.metrics[bundleKey], bundleKey);
+      }
 
       const { response: looseToolBundleResponse, body: looseToolBundleBody } = await postJson(
         `${baseUrl}/api/world/tool/et.world.generated_pack.release_evidence_bundle`,
@@ -3540,6 +3575,10 @@ test('GPACK-154/155/156/158/159/160/161 release APIs can return ready evidence a
       assert.equal(looseToolBundleBody.data.validationReport.ok, true, JSON.stringify(looseToolBundleBody.data.validationReport.checks));
       assert.equal(looseToolBundleBody.data.validationReport.metrics.releaseGatePublicEligible, false);
       assert.equal(looseToolBundleBody.data.validationReport.metrics.boundaryPreserved, true);
+      for (const [bundleKey, gateKey] of RELEASE_EVIDENCE_DIAGNOSTIC_METRIC_KEYS) {
+        assert.equal(looseToolBundleBody.data.releaseEvidenceBundle.metrics[bundleKey], looseToolBundleBody.data.releaseGate.metrics[gateKey], bundleKey);
+        assert.equal(looseToolBundleBody.data.validationReport.metrics[bundleKey], looseToolBundleBody.data.releaseEvidenceBundle.metrics[bundleKey], bundleKey);
+      }
     });
   });
 });
