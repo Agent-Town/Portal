@@ -4530,6 +4530,14 @@ function releaseCandidateReviewManifestSourcePassed(candidateReviewManifest = nu
     && Number(report.metrics?.productionImageAssetCount || 0) === 0;
 }
 
+function releaseGeneratedPackSourcePassed(pack = null) {
+  if (!pack || typeof pack !== 'object') return false;
+  const report = validateGeneratedPack(pack || {});
+  return report.ok === true
+    && /^gen_pack_[0-9a-f]{16}$/.test(String(pack?.packId || ''))
+    && Number(pack?.assetScaffold?.productionImageAssetCount || 0) === 0;
+}
+
 function buildProductionReleaseGate({
   pack = {},
   playtestReport = null,
@@ -4986,6 +4994,7 @@ function buildReleaseEvidenceBundle({
   const blockingReasonsMatchGate = stableEvidenceHash(blockingReasons) === stableEvidenceHash(gate?.blockingReasons || []);
   const bundleCreatedAtMs = positiveNumberOrZero(nowMs);
   const gateEvaluatedAtMs = positiveNumberOrZero(gate?.evaluatedAtMs);
+  const generatedPackSourcePassed = releaseGeneratedPackSourcePassed(pack);
   const playtestSourcePassed = releasePlaytestSourcePassed(playtestReport, pack || {});
   const persistenceSourcePassed = releasePersistenceSourcePassed(persistenceReport || {}, bundlePackId);
   const publicCardSourcePassed = releasePublicCardSourcePassed(publicCard || {}, bundlePackId);
@@ -4999,6 +5008,7 @@ function buildReleaseEvidenceBundle({
   const readyEvidenceSourcesMatchGate = gate?.publicReleaseEligible !== true
     || (
       prerequisiteSnapshotMatchesGate
+      && generatedPackSourcePassed
       && playtestSourcePassed
       && persistenceSourcePassed
       && publicCardSourcePassed
@@ -5043,6 +5053,7 @@ function buildReleaseEvidenceBundle({
       blockingReasonsMatchGate,
       prerequisiteSnapshotMatchesGate,
       readyEvidenceSourcesMatchGate,
+      generatedPackSourcePassed,
       playtestSourcePassed,
       persistenceSourcePassed,
       publicCardSourcePassed,
@@ -5139,6 +5150,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
   const prerequisiteSnapshotMatchesGate = releaseGate
     ? stableEvidenceHash(bundle?.prerequisiteSnapshot || {}) === stableEvidenceHash(releaseGate?.releasePrerequisites || {})
     : bundle?.publicReleaseEligible !== true;
+  const generatedPackSourcePassed = releaseGeneratedPackSourcePassed(pack);
   const playtestSourcePassed = releasePlaytestSourcePassed(playtestReport, pack || {});
   const persistenceSourcePassed = releasePersistenceSourcePassed(persistenceReport || {}, bundle?.packId || releaseGate?.packId || pack?.packId || '');
   const publicCardSourcePassed = releasePublicCardSourcePassed(publicCard || {}, bundle?.packId || releaseGate?.packId || pack?.packId || '');
@@ -5176,6 +5188,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
   const readyEvidenceSourcesMatchGate = bundle?.publicReleaseEligible !== true
     || (
       prerequisiteSnapshotMatchesGate
+      && generatedPackSourcePassed
       && playtestSourcePassed
       && persistenceSourcePassed
       && publicCardSourcePassed
@@ -5209,6 +5222,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     && bundle?.metrics?.blockingReasonsMatchGate === blockingReasonsMatchGate
     && blockingReasonsMatchGate === true
     && bundle?.metrics?.prerequisiteSnapshotMatchesGate === prerequisiteSnapshotMatchesGate
+    && bundle?.metrics?.generatedPackSourcePassed === generatedPackSourcePassed
     && bundle?.metrics?.playtestSourcePassed === playtestSourcePassed
     && bundle?.metrics?.persistenceSourcePassed === persistenceSourcePassed
     && bundle?.metrics?.publicCardSourcePassed === publicCardSourcePassed
@@ -5276,6 +5290,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
         bundleCreatedAtNotFuture,
         blockingReasonsMatchGate,
         prerequisiteSnapshotMatchesGate,
+        generatedPackSourcePassed,
         playtestSourcePassed,
         persistenceSourcePassed,
         publicCardSourcePassed,
