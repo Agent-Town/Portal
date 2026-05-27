@@ -14,9 +14,21 @@ const REQUIRED_EXPOSURE_CHECKS = [
   'worker_origin',
   'worker_observability',
   'mutation_security',
+  'mutation_security_evidence',
   'non_executing_drafts',
   'approval_bound_mutations',
   'no_public_runtime'
+];
+
+const REQUIRED_MUTATION_SECURITY_EVIDENCE_CHECKS = [
+  'same_origin',
+  'session_wallet_binding',
+  'store_backed_delegation_proof',
+  'delegation_scope_mismatch',
+  'delegation_budget_read_only',
+  'idempotency',
+  'rate_limit',
+  'runtime_hidden'
 ];
 
 const APPROVAL_BOUND_MODES = new Set([
@@ -75,6 +87,33 @@ function approvalBoundMutations(drafts = V6_CIVIC_TOOL_DRAFTS) {
       && tool.inputSchema.required.includes('idempotencyKey'));
 }
 
+function normalizeList(value) {
+  return Array.isArray(value) ? value.map((entry) => String(entry || '')).filter(Boolean) : [];
+}
+
+function inspectMutationSecurityEvidence(evidence = {}, mutationSecurityVersion = '') {
+  const checks = normalizeList(evidence.checks);
+  const missingChecks = REQUIRED_MUTATION_SECURITY_EVIDENCE_CHECKS.filter((entry) => !checks.includes(entry));
+  const version = String(evidence.version || mutationSecurityVersion || '');
+  const ok = version === V6_CIVIC_MUTATION_SECURITY_VERSION
+    && evidence.status === 'complete'
+    && evidence.runtimeExposed === false
+    && evidence.playerVisible === false
+    && evidence.mutationApplied === false
+    && missingChecks.length === 0;
+  return {
+    ok,
+    version,
+    status: String(evidence.status || 'missing'),
+    runtimeExposed: evidence.runtimeExposed === true,
+    playerVisible: evidence.playerVisible === true,
+    mutationApplied: evidence.mutationApplied === true,
+    requiredChecks: [...REQUIRED_MUTATION_SECURITY_EVIDENCE_CHECKS],
+    checks,
+    missingChecks
+  };
+}
+
 function disabledReport({ source, reason, runtimeTools }) {
   return {
     version: V6_CIVIC_TOOL_EXPOSURE_GATE_VERSION,
@@ -113,6 +152,7 @@ function buildV6CivicToolExposureGate({
   runtimeTools = [],
   workerEvidence = {},
   mutationSecurityVersion = '',
+  mutationSecurityEvidence = {},
   exposeRuntimeTools = false
 } = {}) {
   const enabled = isWorldGridFeatureEnabled(featureFlags, V6_WORLD_FEATURE_FLAG);
@@ -138,6 +178,7 @@ function buildV6CivicToolExposureGate({
     && workerEvidence.skillContextLoaded === true
     && workerEvidence.sessionContextLinked === true;
   const mutationSecurityOk = mutationSecurityVersion === V6_CIVIC_MUTATION_SECURITY_VERSION;
+  const mutationSecurityEvidenceReport = inspectMutationSecurityEvidence(mutationSecurityEvidence, mutationSecurityVersion);
   const noPublicRuntime = exposeRuntimeTools !== true && runtimeCivicTools.length === 0;
 
   const checks = [
@@ -147,6 +188,7 @@ function buildV6CivicToolExposureGate({
     check('worker_origin', originOk, 'OPENCLAW_LITE_WORKER_ORIGIN_REQUIRED'),
     check('worker_observability', observabilityOk, 'WORKER_OBSERVABILITY_REQUIRED'),
     check('mutation_security', mutationSecurityOk, 'MUTATION_SECURITY_ENVELOPE_REQUIRED'),
+    check('mutation_security_evidence', mutationSecurityEvidenceReport.ok, 'MUTATION_SECURITY_EVIDENCE_REQUIRED'),
     check('non_executing_drafts', draftsAreNonExecuting(draftTools), 'NON_EXECUTING_DRAFTS_REQUIRED'),
     check('approval_bound_mutations', approvalBoundMutations(draftTools), 'APPROVAL_BOUND_MUTATIONS_REQUIRED'),
     check('no_public_runtime', noPublicRuntime, 'RUNTIME_CIVIC_TOOL_EXPOSURE_FORBIDDEN')
@@ -176,6 +218,7 @@ function buildV6CivicToolExposureGate({
     missingDebugTabs: missingTabs,
     workerEvidence: clone(workerEvidence || {}),
     mutationSecurityVersion: String(mutationSecurityVersion || ''),
+    mutationSecurityEvidence: mutationSecurityEvidenceReport,
     draftTools: clone(draftTools),
     runtimeToolNames,
     civicRuntimeToolNames: runtimeCivicTools,
@@ -241,6 +284,25 @@ function assertV6CivicToolExposureGateSafe(report = {}) {
     if (!draftsAreNonExecuting(report.draftTools || [])) {
       errors.push('V6_CIVIC_TOOL_EXPOSURE_DRAFT_EXECUTION_FORBIDDEN');
     }
+    const evidence = report.mutationSecurityEvidence || {};
+    const evidenceChecks = new Set(normalizeList(evidence.checks));
+    for (const checkName of REQUIRED_MUTATION_SECURITY_EVIDENCE_CHECKS) {
+      if (!evidenceChecks.has(checkName)) {
+        errors.push(`V6_CIVIC_TOOL_EXPOSURE_MUTATION_SECURITY_EVIDENCE_REQUIRED:${checkName}`);
+      }
+    }
+    if (evidence.runtimeExposed === true) {
+      errors.push('V6_CIVIC_TOOL_EXPOSURE_MUTATION_SECURITY_RUNTIME_HIDDEN_REQUIRED');
+    }
+    if (evidence.playerVisible === true) {
+      errors.push('V6_CIVIC_TOOL_EXPOSURE_MUTATION_SECURITY_PLAYER_HIDDEN_REQUIRED');
+    }
+    if (evidence.mutationApplied === true) {
+      errors.push('V6_CIVIC_TOOL_EXPOSURE_MUTATION_SECURITY_NON_EXECUTING_REQUIRED');
+    }
+    if (report.researchReady === true && evidence.ok !== true) {
+      errors.push('V6_CIVIC_TOOL_EXPOSURE_READY_WITHOUT_MUTATION_SECURITY_EVIDENCE');
+    }
   } else if (report.failClosed !== true) {
     errors.push('V6_CIVIC_TOOL_EXPOSURE_DISABLED_FAIL_CLOSED_REQUIRED');
   }
@@ -252,6 +314,7 @@ function assertV6CivicToolExposureGateSafe(report = {}) {
 
 module.exports = {
   REQUIRED_EXPOSURE_CHECKS: [...REQUIRED_EXPOSURE_CHECKS],
+  REQUIRED_MUTATION_SECURITY_EVIDENCE_CHECKS: [...REQUIRED_MUTATION_SECURITY_EVIDENCE_CHECKS],
   RUNTIME_TOOL_SOURCE,
   V6_CIVIC_TOOL_EXPOSURE_GATE_VERSION,
   WORKER_ORIGIN,

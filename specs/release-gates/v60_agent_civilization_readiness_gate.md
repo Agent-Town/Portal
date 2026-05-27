@@ -74,9 +74,11 @@ gate below has implementation, deterministic tests, and security/product signoff
   `server/world_civilization/tool_exposure_gate.js`, but it must keep
   `releaseReady: false`, require `/api/world/tools` as runtime source of truth,
   require OpenClaw Lite worker origin and Worker Tools, Skill Context, Worker
-  Traffic, Brain, and Session Context observability, require the civic mutation
-  security envelope, and fail closed if any `et.world.civic.*` tool appears in
-  the runtime manifest before M6/M17/M18 close.
+  Traffic, Brain, and Session Context observability, require civic mutation
+  security evidence with store-backed delegated-agent proof, scope-mismatch
+  coverage, and read-only delegation budget handling, and fail closed if any
+  `et.world.civic.*` tool appears in the runtime manifest before M6/M17/M18
+  close.
 - The research-only civic mutation security envelope may exist in
   `server/world_civilization/mutation_security.js`, but it must stay
   fail-closed, route/tool-hidden, non-executing, and require explicit V6 opt-in,
@@ -201,8 +203,10 @@ gate below has implementation, deterministic tests, and security/product signoff
   runtime-callable. Current research-only coverage starts in
   `server/world_civilization/tool_exposure_gate.js`; release still requires
   real OpenClaw Lite worker routing, Worker Traffic evidence, production
-  override safety, browser coverage, and release review signoff before any
-  `et.world.civic.*` tool appears in `/api/world/tools`.
+  override safety, store-backed delegation proof evidence, delegation
+  scope-mismatch coverage, read-only delegation budget handling, browser
+  coverage, and release review signoff before any `et.world.civic.*` tool
+  appears in `/api/world/tools`.
 - Vote authorization cannot be forged, replayed, self-delegated without policy,
   or applied to ineligible owners. Current research-only coverage starts this
   in `server/world_civilization/votes.js` with non-executing

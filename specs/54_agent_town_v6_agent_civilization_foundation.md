@@ -77,8 +77,11 @@ The research-only civic tool exposure gate in
 `server/world_civilization/tool_exposure_gate.js` keeps M6 fail-closed. It
 requires `/api/world/tools` as the runtime source of truth, OpenClaw Lite worker
 origin, Worker Tools/Skill Context/Worker Traffic/Brain/Session Context
-observability, the civic mutation security envelope, non-executing draft
-metadata, approval/idempotency-bound future mutations, and no public runtime
+observability, civic mutation security evidence for same-origin context,
+session/wallet binding, store-backed delegated-agent proof, scope mismatch,
+read-only budget handling, idempotency, rate limits, hidden runtime status,
+non-executing draft metadata, approval/idempotency-bound future mutations, and
+no public runtime
 `et.world.civic.*` tools before any future exposure can proceed.
 
 The research-only civic mutation security envelope in

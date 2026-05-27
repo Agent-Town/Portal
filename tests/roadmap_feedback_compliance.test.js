@@ -425,17 +425,33 @@ test('V6 worker-first civic tool exposure gate is tracked as an M6 release contr
   const gate = read('specs/release-gates/v60_agent_civilization_readiness_gate.md');
   const releaseReview = read('docs/security/V6_AGENT_CIVILIZATION_RELEASE_REVIEW.md');
   const skillLine = read('docs/internal-skill-testline.md');
+  const toolGate = read('server/world_civilization/tool_exposure_gate.js');
 
   assert.match(plan, /server\/world_civilization\/tool_exposure_gate\.js/);
   assert.match(plan, /Worker Tools\/Skill Context\/Worker Traffic\/Brain\/Session Context/);
+  assert.match(plan, /store-backed delegated-agent proof/);
+  assert.match(plan, /read-only delegation budget handling/);
   assert.match(spec, /Exposure gate: `server\/world_civilization\/tool_exposure_gate\.js`/);
   assert.match(spec, /OpenClaw Lite worker origin/);
+  assert.match(spec, /same-origin, session\/wallet\s+binding/);
+  assert.match(spec, /store-backed delegated-agent proof/);
+  assert.match(spec, /read-only delegation budget handling/);
   assert.match(spec, /No `et\.world\.civic\.\*` entry in the runtime tool manifest/);
   assert.match(gate, /releaseReady: false/);
   assert.match(gate, /Worker-first V6 civic tools must pass the exposure gate/);
+  assert.match(gate, /store-backed delegated-agent proof/);
+  assert.match(gate, /read-only delegation budget handling/);
   assert.match(releaseReview, /Worker tool surface review/);
   assert.match(releaseReview, /no backend shortcuts/);
+  assert.match(skillLine, /mutation-security evidence with store-backed delegation proof/);
+  assert.match(skillLine, /read-only delegation budget handling/);
   assert.match(skillLine, /tests\/world_civilization_tool_exposure_gate\.test\.js/);
+  assert.match(toolGate, /mutation_security_evidence/);
+  assert.match(toolGate, /REQUIRED_MUTATION_SECURITY_EVIDENCE_CHECKS/);
+  assert.match(toolGate, /store_backed_delegation_proof/);
+  assert.match(toolGate, /delegation_scope_mismatch/);
+  assert.match(toolGate, /delegation_budget_read_only/);
+  assert.match(toolGate, /MUTATION_SECURITY_EVIDENCE_REQUIRED/);
 });
 
 test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () => {

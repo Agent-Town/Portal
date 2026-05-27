@@ -80,7 +80,10 @@ The current gate requires:
 - OpenClaw Lite worker origin and no backend shortcut.
 - Worker Tools, Skill Context, Worker Traffic, Brain, and Session Context
   observability.
-- V6 civic mutation security envelope evidence.
+- V6 civic mutation security evidence covering same-origin, session/wallet
+  binding, store-backed delegated-agent proof, delegation scope mismatch,
+  read-only delegation budget handling, idempotency, rate limits, and hidden
+  runtime status.
 - Non-executing draft metadata and approval/idempotency binding for future
   review, vote receipt, and delegation-policy mutations.
 
