@@ -240,7 +240,7 @@ function normalizeError(error) {
       : code === 'UNAUTHORIZED'
         ? 'Sign in to view your territory survey.'
         : code,
-    details: error?.details && typeof error.details === 'object' ? error.details : {}
+    details: error?.details && typeof error.details === 'object' ? redactRouteErrorDetails(error.details) : {}
   };
 }
 
@@ -255,6 +255,24 @@ function releaseEvidencePathSegment(key = '') {
   if (RELEASE_EVIDENCE_RAW_INSTRUCTION_PATTERN.test(segment)) return '<raw-instruction-key>';
   if (segment.length > RELEASE_EVIDENCE_MAX_OBJECT_KEY_LENGTH) return '<oversized-key>';
   return segment;
+}
+
+function routeErrorDetailKey(key = '') {
+  const segment = String(key || '');
+  if (RELEASE_EVIDENCE_SECRET_VALUE_PATTERN.test(segment)) return '<secret-like-key>';
+  if (RELEASE_EVIDENCE_RAW_INSTRUCTION_PATTERN.test(segment)) return '<raw-instruction-key>';
+  if (segment.length > RELEASE_EVIDENCE_MAX_OBJECT_KEY_LENGTH) return '<oversized-key>';
+  return segment;
+}
+
+function redactRouteErrorDetails(value) {
+  if (Array.isArray(value)) return value.map((entry) => redactRouteErrorDetails(entry));
+  if (typeof value === 'string') return releaseEvidencePathSegment(value);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.entries(value).map(([key, entry]) => [
+    routeErrorDetailKey(key),
+    redactRouteErrorDetails(entry)
+  ]));
 }
 
 function releaseEvidenceChildPath(pathLabel = '$', key = '') {

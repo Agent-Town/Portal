@@ -177,6 +177,7 @@ Player prompt
 - `validateReleaseEvidenceBundle` redacts unsafe submitted bundle hashes, source pack ids, release modes, prerequisite keys, blocking reasons, boundary values, and metric values from measured validation-report fields.
 - `POST /api/world/generated-pack/release-evidence-bundle` is feature-gated by `FEATURE_WORLD_GRID_GENERATED_PACKS` and returns only evidence reports; it does not approve release or change gameplay.
 - Release-gate and release-evidence-bundle API ingress, including the generic tool dispatcher, rejects secret-like fields, semantic token fields, secret-looking keys or values, raw executable prompt-instruction keys, executable instruction values, oversized object keys, or oversized/noisy evidence bodies before constructing reports, so unsafe submitted values, token field names, executable instruction text, and oversized key text are not echoed back to callers.
+- Generated-pack API and tool error responses redact unsafe submitted pack ids, public-card ids, and detail values before returning diagnostics, including missing-pack and missing-card errors.
 - The bundle is not a release approval surface. It only makes the release-gate evidence replayable and hash-bound for review.
 
 ## Machine Checks
@@ -371,6 +372,7 @@ Player prompt
   "releaseApiExecutableInstructionValueRejected": true,
   "releaseApiRawInstructionEchoCount": 0,
   "releaseEvidenceBundleReportUnsafeValueRedacted": true,
+  "generatedPackApiErrorDetailsRedacted": true,
   "releaseApiOversizedEvidenceEchoCount": 0,
   "candidateReviewManifestProductionImageAssetCount": 0,
   "candidateReviewCoverageCountMin": 23,

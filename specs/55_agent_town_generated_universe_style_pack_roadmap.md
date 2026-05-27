@@ -91,6 +91,7 @@ This is a separate prototype-gated track. It must not change normal gameplay vis
   "aggregateReportUnsafeValueRedacted": true,
   "releaseGateReportUnsafeValueRedacted": true,
   "releaseEvidenceBundleReportUnsafeValueRedacted": true,
+  "generatedPackApiErrorDetailsRedacted": true,
   "canonicalMappingCoverage": 1.0,
   "arbitraryToolMutationFormulaCount": 0,
   "invalidAssetManifestEntryCount": 0,
@@ -516,6 +517,8 @@ The evidence bundle has a generated-pack feature-gated API endpoint for QA revie
 
 Release-gate API ingress, including the generic tool dispatcher, now rejects secret-like fields, semantic token field names, secret-looking keys or values, raw executable prompt-instruction keys, executable instruction text, oversized object keys, and oversized/noisy evidence bodies before building or echoing release reports. Rejection responses include counts, limits, and safe field paths only, not submitted secret, token field, instruction, oversized key, or evidence values.
 
+Generated-pack API error responses redact unsafe submitted pack ids, public-card ids, and route/tool detail values before returning diagnostics, so missing-pack and missing-card errors cannot echo raw instructions or secret-looking strings.
+
 ```json
 {
   "releaseEvidenceBundleSchemaExists": true,
@@ -573,6 +576,7 @@ Release-gate API ingress, including the generic tool dispatcher, now rejects sec
   "releaseApiRawInstructionEchoCount": 0,
   "unsafeHashAndPackIdRedacted": true,
   "releaseEvidenceBundleReportUnsafeValueRedacted": true,
+  "generatedPackApiErrorDetailsRedacted": true,
   "releaseApiOversizedEvidenceEchoCount": 0,
   "productionImageAssetCount": 0,
   "privateDataLeakCount": 0,
