@@ -1341,6 +1341,80 @@ test('GU-18 release approval evidence rejects secrets, prompt instructions, and 
   );
 });
 
+test('GPACK-131 release approval evidence rejects accepted zero-cost estimates', () => {
+  const pack = createGeneratedPack({
+    owner: { ownerAccountId: 'owner_release_gate_zero_cost_evidence' },
+    prompt: 'clockwork marsh town with lantern barges',
+    nowMs: 153_000,
+    candidateRoot: 'data/generated-packs-test'
+  });
+  const candidateReviewManifest = reviewedCandidateManifest(pack);
+  const targetCount = pack.assetPromptPlan.targets.length;
+  const zeroCostEvidence = buildReleaseApprovalEvidence({
+    pack,
+    nowMs: 153_020,
+    authModel: {
+      status: 'approved',
+      authMode: 'operator_managed',
+      approvalDocHash: hashLabel('zero-cost-auth-policy'),
+      approvedByHash: hashLabel('zero-cost-security-reviewer'),
+      approvedAtMs: 153_001,
+      providerAccessPolicy: 'out_of_band_only_no_pack_storage'
+    },
+    costModel: {
+      status: 'accepted',
+      estimatedMin: 0,
+      estimatedMax: 0,
+      costEstimateHash: hashLabel('zero-cost-estimate-placeholder'),
+      acceptedByHash: hashLabel('zero-cost-owner'),
+      acceptedAtMs: 153_002
+    },
+    consentModel: {
+      status: 'recorded',
+      scope: 'single-pack-candidate-run',
+      userConsentHash: hashLabel('zero-cost-user-consent'),
+      teamConsentHash: hashLabel('zero-cost-team-consent'),
+      consentRecordHash: hashLabel('zero-cost-consent-record'),
+      recordedAtMs: 153_003
+    },
+    candidateReview: {
+      status: 'reviewed',
+      expectedTargetCount: targetCount,
+      reviewedCandidateCount: targetCount,
+      approvedCandidateCount: targetCount,
+      rejectedCandidateCount: 0,
+      candidateManifestHash: candidateReviewManifest.manifestHash,
+      reviewerSignoffHash: hashLabel('zero-cost-candidate-reviewer'),
+      reviewedAtMs: 153_004,
+      productionPromotionApproved: false
+    },
+    humanReview: {
+      status: 'complete',
+      releaseSignoffHash: hashLabel('zero-cost-human-reviewer'),
+      checklistHash: hashLabel('zero-cost-checklist'),
+      reviewedAtMs: 153_005
+    }
+  });
+  const evidenceReport = validateReleaseApprovalEvidence(zeroCostEvidence, pack);
+  const gate = buildProductionReleaseGate({
+    pack,
+    approvalEvidence: zeroCostEvidence,
+    candidateReviewManifest,
+    nowMs: 153_030
+  });
+
+  assert.equal(evidenceReport.ok, false);
+  assert.equal(evidenceReport.metrics.authModelApproved, true);
+  assert.equal(evidenceReport.metrics.explicitConsentRecorded, true);
+  assert.equal(evidenceReport.metrics.costEstimateAccepted, false);
+  assert.equal(
+    evidenceReport.checks.find((check) => check.id === 'RELEASE_APPROVAL_EVIDENCE_AUTH_COST_CONSENT').passed,
+    false
+  );
+  assert.equal(gate.releasePrerequisites.costConsentModelApproved, false);
+  assert.equal(gate.blockingReasons.includes('costConsentModelApproved'), true);
+});
+
 test('GU-18 release approval evidence reports redact unsafe submitted keys and values', () => {
   const pack = createGeneratedPack({
     owner: { ownerAccountId: 'owner_release_gate_evidence_redaction' },

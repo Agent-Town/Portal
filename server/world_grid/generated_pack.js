@@ -4422,9 +4422,13 @@ function validateReleaseApprovalEvidence(evidence = {}, pack = {}) {
     && isSha256Hex(evidence?.authModel?.approvalDocHash)
     && isSha256Hex(evidence?.authModel?.approvedByHash)
     && authTimestampOk;
+  const costEstimateMin = positiveNumberOrZero(evidence?.costModel?.estimatedMin);
+  const costEstimateMax = positiveNumberOrZero(evidence?.costModel?.estimatedMax);
+  const costEstimateHasNonZeroBudget = costEstimateMax > 0;
   const costEstimateAccepted = evidence?.costModel?.status === 'accepted'
     && evidence?.costModel?.currency === 'USD'
-    && positiveNumberOrZero(evidence?.costModel?.estimatedMax) >= positiveNumberOrZero(evidence?.costModel?.estimatedMin)
+    && costEstimateMax >= costEstimateMin
+    && costEstimateHasNonZeroBudget
     && isSha256Hex(evidence?.costModel?.costEstimateHash)
     && isSha256Hex(evidence?.costModel?.acceptedByHash)
     && costTimestampOk;
@@ -4479,7 +4483,7 @@ function validateReleaseApprovalEvidence(evidence = {}, pack = {}) {
     {
       id: 'RELEASE_APPROVAL_EVIDENCE_AUTH_COST_CONSENT',
       passed: authModelApproved && costEstimateAccepted && explicitConsentRecorded,
-      measured: { authModelApproved, costEstimateAccepted, explicitConsentRecorded }
+      measured: { authModelApproved, costEstimateAccepted, explicitConsentRecorded, costEstimateHasNonZeroBudget }
     },
     {
       id: 'RELEASE_APPROVAL_EVIDENCE_CANDIDATE_REVIEW_COVERAGE',
@@ -4510,6 +4514,7 @@ function validateReleaseApprovalEvidence(evidence = {}, pack = {}) {
       timestampProblemCount: timestampProblems.length,
       authModelApproved,
       costEstimateAccepted,
+      costEstimateHasNonZeroBudget,
       explicitConsentRecorded,
       costConsentModelApproved: authModelApproved && costEstimateAccepted && explicitConsentRecorded,
       candidateAssetsReviewed,
