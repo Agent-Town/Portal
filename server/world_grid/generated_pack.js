@@ -4838,6 +4838,11 @@ function buildReleaseEvidenceBundle({
   const prerequisiteSnapshotMatchesGate = stableEvidenceHash(prerequisiteSnapshot) === stableEvidenceHash(gate?.releasePrerequisites || {});
   const blockingReasons = Array.isArray(gate?.blockingReasons) ? clone(gate.blockingReasons) : [];
   const blockingReasonsMatchGate = stableEvidenceHash(blockingReasons) === stableEvidenceHash(gate?.blockingReasons || []);
+  const bundleCreatedAtMs = positiveNumberOrZero(nowMs);
+  const gateEvaluatedAtMs = positiveNumberOrZero(gate?.evaluatedAtMs);
+  const bundleCreatedAtOrAfterGate = gateEvaluatedAtMs > 0
+    && bundleCreatedAtMs >= gateEvaluatedAtMs;
+  const bundleCreatedAtNotFuture = bundleCreatedAtMs > 0;
   const readyEvidenceSourcesMatchGate = gate?.publicReleaseEligible !== true
     || (
       prerequisiteSnapshotMatchesGate
@@ -4849,7 +4854,7 @@ function buildReleaseEvidenceBundle({
     schemaVersion: RELEASE_EVIDENCE_BUNDLE_VERSION,
     bundleHash: '',
     packId: bundlePackId,
-    createdAtMs: positiveNumberOrZero(nowMs),
+    createdAtMs: bundleCreatedAtMs,
     releaseGateHash: stableEvidenceHash(gate),
     releaseGateMode: gate?.releaseMode || 'prototype-gated',
     publicReleaseEligible: gate?.publicReleaseEligible === true,
@@ -4874,6 +4879,8 @@ function buildReleaseEvidenceBundle({
       sourcePackIdMismatchCount: sourcePackIdProblems.length,
       releaseGateValid: validateProductionReleaseGate(gate).ok === true,
       releaseGatePublicEligible: gate?.publicReleaseEligible === true,
+      bundleCreatedAtOrAfterGate,
+      bundleCreatedAtNotFuture,
       blockingReasonsMatchGate,
       prerequisiteSnapshotMatchesGate,
       readyEvidenceSourcesMatchGate,
@@ -4896,7 +4903,8 @@ function validateReleaseEvidenceBundle(bundle = {}, {
   publicCard = null,
   persistenceReport = null,
   approvalEvidence = null,
-  candidateReviewManifest = null
+  candidateReviewManifest = null,
+  nowMs = Date.now()
 } = {}) {
   const schemaReport = SCHEMA_REGISTRY?.releaseEvidenceBundle
     ? validateGeneratedSchema(bundle, SCHEMA_REGISTRY.releaseEvidenceBundle, '$.releaseEvidenceBundle')
@@ -4951,6 +4959,15 @@ function validateReleaseEvidenceBundle(bundle = {}, {
   const gateReport = releaseGate
     ? validateProductionReleaseGate(releaseGate)
     : { ok: bundle?.metrics?.releaseGateValid === true };
+  const bundleCreatedAtMs = positiveNumberOrZero(bundle?.createdAtMs);
+  const validationNowMs = positiveNumberOrZero(nowMs);
+  const bundleCreatedAtOrAfterGate = releaseGate
+    ? positiveNumberOrZero(releaseGate?.evaluatedAtMs) > 0
+      && bundleCreatedAtMs >= positiveNumberOrZero(releaseGate.evaluatedAtMs)
+    : bundle?.publicReleaseEligible !== true;
+  const bundleCreatedAtNotFuture = validationNowMs > 0
+    && bundleCreatedAtMs > 0
+    && bundleCreatedAtMs <= validationNowMs;
   const blockingReasonsMatchGate = releaseGate
     ? stableEvidenceHash(bundle?.blockingReasons || []) === stableEvidenceHash(releaseGate?.blockingReasons || [])
     : bundle?.publicReleaseEligible !== true;
@@ -5004,6 +5021,10 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     && Number(bundle?.metrics?.sourcePackIdMismatchCount || 0) === sourcePackIdProblems.length
     && bundle?.metrics?.releaseGateValid === (gateReport.ok === true)
     && bundle?.metrics?.releaseGatePublicEligible === (bundle?.publicReleaseEligible === true)
+    && bundle?.metrics?.bundleCreatedAtOrAfterGate === bundleCreatedAtOrAfterGate
+    && bundleCreatedAtOrAfterGate === true
+    && bundle?.metrics?.bundleCreatedAtNotFuture === bundleCreatedAtNotFuture
+    && bundleCreatedAtNotFuture === true
     && bundle?.metrics?.blockingReasonsMatchGate === blockingReasonsMatchGate
     && blockingReasonsMatchGate === true
     && bundle?.metrics?.prerequisiteSnapshotMatchesGate === prerequisiteSnapshotMatchesGate
@@ -5064,6 +5085,8 @@ function validateReleaseEvidenceBundle(bundle = {}, {
         presentSourceCount,
         sourceHashProblemCount: sourceHashProblems.length,
         sourcePackIdProblemCount: sourcePackIdProblems.length,
+        bundleCreatedAtOrAfterGate,
+        bundleCreatedAtNotFuture,
         blockingReasonsMatchGate,
         prerequisiteSnapshotMatchesGate,
         readyEvidenceSourcesMatchGate,
@@ -5094,6 +5117,8 @@ function validateReleaseEvidenceBundle(bundle = {}, {
       requiredSourceCount: RELEASE_EVIDENCE_SOURCE_KEYS.length,
       sourceCoverageOk,
       releaseGateValid: gateReport.ok === true,
+      bundleCreatedAtOrAfterGate,
+      bundleCreatedAtNotFuture,
       blockingReasonsMatchGate,
       prerequisiteSnapshotMatchesGate,
       readyEvidenceSourcesMatchGate,

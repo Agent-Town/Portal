@@ -469,6 +469,8 @@ test('GU-19 release evidence bundle binds a ready gate to source evidence hashes
   assert.equal(bundle.sourcePackIds.releaseGate, fixture.pack.packId);
   assert.equal(bundle.metrics.releaseGateValid, true);
   assert.equal(bundle.metrics.releaseGatePublicEligible, true);
+  assert.equal(bundle.metrics.bundleCreatedAtOrAfterGate, true);
+  assert.equal(bundle.metrics.bundleCreatedAtNotFuture, true);
   assert.equal(bundle.metrics.blockingReasonsMatchGate, true);
   assert.equal(bundle.metrics.prerequisiteSnapshotMatchesGate, true);
   assert.equal(bundle.metrics.readyEvidenceSourcesMatchGate, true);
@@ -556,6 +558,57 @@ test('GU-19 release evidence bundle rejects forged blocking reasons', () => with
   assert.equal(bundle.metrics.blockingReasonsMatchGate, true);
   assert.equal(report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_HASH_STABLE').passed, true);
   assert.equal(report.ok, false);
+  assert.equal(
+    report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,
+    false
+  );
+}));
+
+test('GU-19 release evidence bundle rejects bundles created before the bound gate', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_evidence_bundle_time_order',
+    prompt: 'saffron observatory town with glass canal scouts',
+    nowMs: 154_925
+  });
+  const bundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    nowMs: fixture.releaseGate.evaluatedAtMs - 1
+  });
+  const report = validateReleaseEvidenceBundle(bundle, fixture);
+
+  assert.equal(bundle.createdAtMs < fixture.releaseGate.evaluatedAtMs, true);
+  assert.equal(bundle.metrics.bundleCreatedAtOrAfterGate, false);
+  assert.equal(report.ok, false);
+  assert.equal(
+    report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,
+    false
+  );
+}));
+
+test('GU-19 release evidence bundle rejects bundles created after validation time', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_evidence_bundle_future_time',
+    prompt: 'violet relay garden with copper rain archivists',
+    nowMs: 154_975
+  });
+  const validationNowMs = fixture.releaseGate.evaluatedAtMs + 10;
+  const bundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    nowMs: validationNowMs + 10_000
+  });
+  const report = validateReleaseEvidenceBundle(bundle, {
+    ...fixture,
+    nowMs: validationNowMs
+  });
+
+  assert.equal(bundle.createdAtMs > validationNowMs, true);
+  assert.equal(bundle.metrics.bundleCreatedAtNotFuture, true);
+  assert.equal(report.ok, false);
+  assert.equal(
+    report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT')
+      .measured.bundleCreatedAtNotFuture,
+    false
+  );
   assert.equal(
     report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,
     false
@@ -1141,6 +1194,8 @@ test('GU-18/GU-19 release gate and evidence bundle APIs are generated-pack-gated
       assert.equal(bundleBody.releaseEvidenceBundle.publicReleaseEligible, false);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.releaseGateValid, true);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.releaseGatePublicEligible, false);
+      assert.equal(bundleBody.releaseEvidenceBundle.metrics.bundleCreatedAtOrAfterGate, true);
+      assert.equal(bundleBody.releaseEvidenceBundle.metrics.bundleCreatedAtNotFuture, true);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.blockingReasonsMatchGate, true);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.prerequisiteSnapshotMatchesGate, true);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.readyEvidenceSourcesMatchGate, true);
