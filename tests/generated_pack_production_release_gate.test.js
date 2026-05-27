@@ -960,6 +960,64 @@ test('GPACK-141 release evidence bundle rejects bundle timing metric tampering',
   );
 }));
 
+test('GPACK-142 release evidence bundle rejects gate-context metric tampering', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_evidence_bundle_gate_context_metric',
+    prompt: 'ivory canal archive with careful signal stewards',
+    nowMs: 155_060
+  });
+  const validationNowMs = fixture.releaseGate.evaluatedAtMs + 100;
+  const bundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    nowMs: fixture.releaseGate.evaluatedAtMs + 50
+  });
+  const tamperedBlockingBundle = rehashReleaseEvidenceBundle({
+    ...bundle,
+    metrics: {
+      ...bundle.metrics,
+      blockingReasonsMatchGate: false
+    }
+  });
+  const tamperedPrerequisiteBundle = rehashReleaseEvidenceBundle({
+    ...bundle,
+    metrics: {
+      ...bundle.metrics,
+      prerequisiteSnapshotMatchesGate: false
+    }
+  });
+  const blockingReport = validateReleaseEvidenceBundle(tamperedBlockingBundle, {
+    ...fixture,
+    nowMs: validationNowMs
+  });
+  const prerequisiteReport = validateReleaseEvidenceBundle(tamperedPrerequisiteBundle, {
+    ...fixture,
+    nowMs: validationNowMs
+  });
+
+  assert.equal(bundle.metrics.blockingReasonsMatchGate, true);
+  assert.equal(bundle.metrics.prerequisiteSnapshotMatchesGate, true);
+  assert.equal(blockingReport.metrics.blockingReasonsMatchGate, true);
+  assert.equal(prerequisiteReport.metrics.prerequisiteSnapshotMatchesGate, true);
+  assert.equal(
+    blockingReport.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_HASH_STABLE').passed,
+    true
+  );
+  assert.equal(
+    prerequisiteReport.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_HASH_STABLE').passed,
+    true
+  );
+  assert.equal(blockingReport.ok, false);
+  assert.equal(prerequisiteReport.ok, false);
+  assert.equal(
+    blockingReport.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,
+    false
+  );
+  assert.equal(
+    prerequisiteReport.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,
+    false
+  );
+}));
+
 test('GU-19 release evidence bundle rejects source drift and missing ready-gate evidence', () => withTempGeneratedPackStore(() => {
   const fixture = readyReleaseGateFixture({
     ownerAccountId: 'owner_release_evidence_bundle_tamper',
