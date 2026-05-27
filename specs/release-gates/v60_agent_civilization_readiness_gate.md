@@ -359,7 +359,10 @@ persistence resilience, and security/product release review.
   Playwright visual coverage that it has no standalone route or normal gameplay
   exposure. Current contract-only coverage in
   `server/world_civilization/lab_surface.js` includes a fail-closed modal launch
-  plan for `/v6`, `/v6-lab`, and `/civilization`. The M15 research-only lab
+  plan for `/v6`, `/v6-lab`, and `/civilization`; current route coverage in
+  `e2e/244_v6_lab_modal_boundary.spec.js` proves those paths redirect to `/app`
+  without rendering V6 lab content and that normal `/app` exposes no
+  `et.world.civic.*` tools by default. The M15 research-only lab
   readiness gate in `server/world_civilization/lab_surface.js` must require
   town-hub modal launch, standalone route denial, worker continuity, debug
   observability, non-executing panels, browser visual coverage at

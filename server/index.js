@@ -30,6 +30,7 @@ const {
 } = require('./world_grid/csrf');
 const { requireWorldGridMutationOrigin } = require('./world_grid/mutation_origin');
 const { normalizeOwnerIdentity: normalizeWorldGridOwnerIdentity } = require('./world_grid/region');
+const { V6_LAB_STANDALONE_PATHS } = require('./world_civilization/lab_surface');
 const { resetFoundersPlotStore } = require('./founders_plot/store');
 const { getAtlasSnapshot, searchAtlasAgents } = require('./atlas');
 const { createPonyTransportService } = require('./ponyTransport');
@@ -9560,6 +9561,10 @@ function foundersPlotModalRedirectPath() {
   return `/app?${params.toString()}`;
 }
 
+function v6LabStandaloneRedirectPath() {
+  return '/app';
+}
+
 app.get('/openclaw-lite/manifest.json', (_req, res) => {
   res.json(VENDOR_LITE_MANIFEST);
 });
@@ -9587,6 +9592,12 @@ app.get('/founders-plot', (req, res) => {
   }
   return res.redirect(302, foundersPlotModalRedirectPath());
 });
+
+for (const standalonePath of V6_LAB_STANDALONE_PATHS) {
+  app.get(standalonePath, (_req, res) => {
+    return res.redirect(302, v6LabStandaloneRedirectPath());
+  });
+}
 
 app.use(
   express.static(PUBLIC_DIR, {

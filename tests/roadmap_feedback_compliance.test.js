@@ -134,6 +134,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'tests/world_grid_sandbox_persistence.test.js',
     'tests/world_grid_sandbox_restart_probe_child.js',
     'e2e/243_world_grid_csrf_session_binding.spec.js',
+    'e2e/244_v6_lab_modal_boundary.spec.js',
     'public/experiences/world-grid/manifest.json',
     'public/experiences/world-grid/skill.md',
     'public/experiences/world-grid/tools.md',
@@ -168,6 +169,8 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   const institutionSource = read('server/world_civilization/institutions.js');
   const publicWorksSource = read('server/world_civilization/public_works.js');
   const labSource = read('server/world_civilization/lab_surface.js');
+  const serverIndex = read('server/index.js');
+  const labE2e = read('e2e/244_v6_lab_modal_boundary.spec.js');
   const schemaSource = read('server/world_civilization/schemas.js');
   const replaySource = read('server/world_civilization/replay_reconstruction.js');
   const resilienceSource = read('server/world_civilization/resilience.js');
@@ -381,17 +384,27 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /buildV6LabReadinessGate\(\)/);
   assert.match(plan, /browser visual coverage at 390\/768\/1280 widths/);
   assert.match(plan, /runtime tool absence/);
+  assert.match(plan, /e2e\/244_v6_lab_modal_boundary\.spec\.js/);
+  assert.match(plan, /normal `\/app` gameplay exposes no V6 lab markers or `et\.world\.civic\.\*` tools by default/);
   assert.match(plan, /\/v6.*\/v6-lab.*\/civilization/);
   assert.match(gate, /server\/world_civilization\/lab_surface\.js/);
+  assert.match(gate, /e2e\/244_v6_lab_modal_boundary\.spec\.js/);
   assert.match(gate, /town hub modal flow/);
   assert.match(gate, /fail-closed modal launch\s+plan|fail closed for standalone\s+V6 paths/);
   assert.match(gate, /M15\s+research-only lab\s+readiness gate/);
   assert.match(gate, /standaloneRouteAllowed: false/);
   assert.match(labSpec, /buildV6LabReadinessGate\(\)/);
+  assert.match(labSpec, /e2e\/244_v6_lab_modal_boundary\.spec\.js/);
+  assert.match(labSpec, /redirects those standalone paths to\s+`\/app`/);
   assert.match(labSpec, /390\/768\/1280 widths/);
   assert.match(labSource, /REQUIRED_LAB_EVIDENCE_CHECKS/);
   assert.match(labSource, /runtime_tool_absence/);
   assert.match(labSource, /V6_LAB_READINESS_RELEASE_READY_FORBIDDEN/);
+  assert.match(serverIndex, /V6_LAB_STANDALONE_PATHS/);
+  assert.match(serverIndex, /v6LabStandaloneRedirectPath/);
+  assert.match(labE2e, /V6_LAB_STANDALONE_PATHS/);
+  assert.match(labE2e, /toBe\('\/app'\)/);
+  assert.match(labE2e, /et\.world\.civic/);
   assert.match(plan, /M16 Persistence, replay, and resilience hardening \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/resilience\.js/);
   assert.match(plan, /server\/world_civilization\/sqlite_schema\.js/);

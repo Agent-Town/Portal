@@ -6,7 +6,8 @@ Milestone: M15 Modal-first V6 lab surface
 
 Runtime contract: `server/world_civilization/lab_surface.js`
 
-Test coverage: `tests/world_civilization_lab_surface.test.js`
+Test coverage: `tests/world_civilization_lab_surface.test.js`,
+`e2e/244_v6_lab_modal_boundary.spec.js`
 
 ## Boundary
 
@@ -18,6 +19,9 @@ The lab surface remains route-neutral so later UI work must mount from the town
 hub modal flow instead of a standalone V6 page. Standalone routes such as `/v6`,
 `/v6-lab`, or `/civilization` are not valid release paths and must fail closed
 to the town hub path instead of rendering V6 content directly.
+The current Express route layer explicitly redirects those standalone paths to
+`/app`; Playwright coverage proves the redirect does not render V6 lab content
+or civic runtime details.
 
 ## Contract Rules
 
@@ -70,6 +74,9 @@ Before any real V6 lab UI is added, the release branch must prove:
 
 - The UI launches only through the town hub modal flow.
 - Direct standalone hits redirect or fail closed.
+- `e2e/244_v6_lab_modal_boundary.spec.js` proves `/v6`, `/v6-lab`, and
+  `/civilization` redirect to `/app` and that normal `/app` gameplay does not
+  expose V6 lab markers or `et.world.civic.*` tools by default.
 - Browser/Playwright visual coverage proves the modal renders without
   overlapping normal gameplay controls.
 - Worker Tools, Skill Context, Worker Traffic, Brain, and Session Context remain
