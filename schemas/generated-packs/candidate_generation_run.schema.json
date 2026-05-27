@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-town-generated-pack-candidate-generation-run-v1",
+  "title": "Agent Town Generated Pack Candidate Generation Run",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runHash",
+    "packId",
+    "status",
+    "targetCount",
+    "jobLogWriteCount",
+    "candidateRecordCount",
+    "failedJobCount",
+    "blockedReasons",
+    "jobStatuses",
+    "authModelDocumented",
+    "costConsentRequired",
+    "costConsentStatus",
+    "consentStatus",
+    "productSecurityApprovalGranted",
+    "rateLimit",
+    "retryPolicy",
+    "candidateImagesGenerated",
+    "externalImageGenerationUsed",
+    "approvedAssetsRequireHumanSignoff",
+    "approvedProductionAssetsCreated",
+    "productionImageAssetCount",
+    "fallbackStillPlayable",
+    "deterministicFallbackRoot",
+    "generatedImageAssetsCanChangeServerRules",
+    "canonicalMappingFingerprintBefore",
+    "canonicalMappingFingerprintAfter",
+    "canonicalMappingPreserved",
+    "localEvidenceScreenshotRequired",
+    "humanReviewChecklist"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "agent-town-candidate-image-generation-run-v1" },
+    "runHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "packId": { "type": "string", "minLength": 3 },
+    "status": { "enum": ["blocked", "failed", "candidate_recorded", "no_targets"] },
+    "targetCount": { "type": "integer", "minimum": 0 },
+    "jobLogWriteCount": { "type": "integer", "minimum": 0 },
+    "candidateRecordCount": { "type": "integer", "minimum": 0 },
+    "failedJobCount": { "type": "integer", "minimum": 0 },
+    "blockedReasons": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 3 }
+    },
+    "jobStatuses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["canonicalTarget", "status", "errors"],
+        "properties": {
+          "canonicalTarget": { "type": "string", "minLength": 3 },
+          "status": { "enum": ["blocked", "failed", "candidate_recorded"] },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["code"],
+              "properties": {
+                "code": { "type": "string", "minLength": 3 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "authModelDocumented": { "type": "boolean" },
+    "costConsentRequired": { "type": "boolean" },
+    "costConsentStatus": { "enum": ["required", "estimate_ready_acceptance_required", "accepted"] },
+    "consentStatus": { "enum": ["required", "partial", "granted"] },
+    "productSecurityApprovalGranted": { "type": "boolean" },
+    "rateLimit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxRequestsPerMinute", "maxConcurrentJobs"],
+      "properties": {
+        "maxRequestsPerMinute": { "type": "integer", "minimum": 1, "maximum": 10 },
+        "maxConcurrentJobs": { "type": "integer", "minimum": 1, "maximum": 2 }
+      }
+    },
+    "retryPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxRetries"],
+      "properties": {
+        "maxRetries": { "type": "integer", "minimum": 0, "maximum": 3 }
+      }
+    },
+    "candidateImagesGenerated": { "const": false },
+    "externalImageGenerationUsed": { "const": false },
+    "approvedAssetsRequireHumanSignoff": { "const": true },
+    "approvedProductionAssetsCreated": { "const": false },
+    "productionImageAssetCount": { "const": 0 },
+    "fallbackStillPlayable": { "type": "boolean" },
+    "deterministicFallbackRoot": { "type": "string", "minLength": 3 },
+    "generatedImageAssetsCanChangeServerRules": { "const": false },
+    "canonicalMappingFingerprintBefore": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "canonicalMappingFingerprintAfter": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "canonicalMappingPreserved": { "type": "boolean" },
+    "localEvidenceScreenshotRequired": { "const": true },
+    "humanReviewChecklist": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 3 }
+    }
+  }
+}

@@ -6,6 +6,9 @@ const path = require('node:path');
 const {
   createGeneratedPack
 } = require('../server/world_grid/generated_pack');
+const {
+  validateAssetGenerationJobLogRecord
+} = require('../server/world_grid/generated_asset_generation');
 
 const root = path.resolve(__dirname, '..');
 
@@ -25,8 +28,10 @@ test('candidate generation scaffold writes replayable no-generation job logs wit
   const target = pack.assetPromptPlan.targets.find((item) => item.canonicalTarget === 'postcard.pack-preview')
     || pack.assetPromptPlan.targets[0];
   const [entry] = readJobLog(target.jobLogPath);
+  const validationReport = validateAssetGenerationJobLogRecord(entry, { assetPromptPlan: pack.assetPromptPlan });
 
   assert.equal(pack.assetScaffold.jobLogCount, 23);
+  assert.equal(validationReport.ok, true, JSON.stringify(validationReport.checks));
   assert.equal(pack.assetScaffold.externalModelUsed, false);
   assert.equal(pack.assetScaffold.productionImageAssetCount, 0);
   assert.equal(pack.assetScaffold.replayableFromPromptPlan, true);

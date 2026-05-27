@@ -157,9 +157,18 @@ The candidate generation scaffold still does not call image models. Each planned
 
 The real image-generation spike remains blocked until product/security approval, an explicit auth model, an explicit cost model, and explicit user/team consent exist. This slice adds only the optional command and runtime guard for that future work. The guard writes candidate-generation preflight records to the same job logs, never reads provider credentials, never calls an image model by default, never creates approved production assets, and fails back to the deterministic generated pack.
 
+Candidate-generation run reports and asset-generation job logs now have strict schemas. The run report carries a stable hash, bounded integer rate/retry/count policy, redacted consent/cost/auth evidence, canonical mapping fingerprints, prompt-plan target checks, and zero production-promotion claims. Job-log validation enforces safe candidate/approved paths, known canonical prompt-plan targets, candidate-only output status, no raw prompt instructions, no secret-like fields, no production assets, and status/output-count coherence.
+
 ```json
 {
   "optionalGenerationCommandExists": true,
+  "candidateGenerationRunSchemaExists": true,
+  "assetGenerationJobLogSchemaExists": true,
+  "candidateGenerationRunHashStable": true,
+  "assetGenerationJobLogPathsSafe": true,
+  "candidateGenerationRunCanonicalTargetProblemCount": 0,
+  "assetGenerationJobLogTargetDriftCount": 0,
+  "integerCounterValidation": true,
   "generationDisabledWithoutConsentAuthCost": true,
   "productSecurityApprovalRequired": true,
   "authModelDocumentedRequired": true,
@@ -168,6 +177,8 @@ The real image-generation spike remains blocked until product/security approval,
   "failedJobsFallbackToDeterministicPack": true,
   "generatedImageAssetsCanChangeServerRules": false,
   "approvedAssetsRequireHumanSignoff": true,
+  "assetGenerationJobLogSecretLikeCount": 0,
+  "assetGenerationJobLogRawInstructionCount": 0,
   "candidateImagesGenerated": false
 }
 ```

@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-town-generated-pack-asset-generation-job-log-v1",
+  "title": "Agent Town Generated Pack Asset Generation Job Log",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "jobId",
+    "packId",
+    "promptId",
+    "promptHash",
+    "promptPlanHash",
+    "status",
+    "modelFamily",
+    "authMode",
+    "costConsentStatus",
+    "consentModel",
+    "costEstimate",
+    "sourceProvenance",
+    "retryPolicy",
+    "createdAtMs",
+    "outputCount",
+    "errors",
+    "externalImageGenerationUsed",
+    "approvedProductionAssetsCreated",
+    "canonicalTarget",
+    "candidateOutputPath",
+    "approvedOutputPath"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "agent-town-asset-generation-job-log-v1" },
+    "phase": { "enum": ["candidate-generation-preflight"] },
+    "jobId": { "type": "string", "minLength": 8 },
+    "packId": { "type": "string", "minLength": 3 },
+    "promptId": { "type": "string", "minLength": 3 },
+    "promptHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "promptPlanHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "status": { "enum": ["planned", "blocked", "failed", "candidate_recorded"] },
+    "modelFamily": { "enum": ["gpt-image-2-candidate", "deterministic-fallback"] },
+    "authMode": { "enum": ["not_configured", "operator_managed", "oauth_user_delegated"] },
+    "costConsentStatus": { "enum": ["not_required_for_scaffold", "required", "estimate_ready_acceptance_required", "accepted"] },
+    "consentModel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["explicitConsentRequiredForGeneration", "status"],
+      "properties": {
+        "explicitConsentRequiredForGeneration": { "const": true },
+        "status": { "enum": ["not_required_for_scaffold", "required", "partial", "granted"] },
+        "userConsentStatus": { "enum": ["required", "granted"] },
+        "teamConsentStatus": { "enum": ["required", "granted"] },
+        "productSecurityApprovalStatus": { "enum": ["required", "granted"] }
+      }
+    },
+    "costEstimate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "currency", "estimatedMin", "estimatedMax"],
+      "properties": {
+        "status": { "enum": ["not_required_for_scaffold", "required", "documented"] },
+        "currency": { "const": "USD" },
+        "estimatedMin": { "type": "number", "minimum": 0 },
+        "estimatedMax": { "type": "number", "minimum": 0 },
+        "accepted": { "type": "boolean" }
+      }
+    },
+    "rateLimit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxRequestsPerMinute", "maxConcurrentJobs"],
+      "properties": {
+        "maxRequestsPerMinute": { "type": "integer", "minimum": 1, "maximum": 10 },
+        "maxConcurrentJobs": { "type": "integer", "minimum": 1, "maximum": 2 }
+      }
+    },
+    "sourceProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generator", "promptPlanHash", "externalModelUsed", "productionAssetApproval"],
+      "properties": {
+        "generator": { "type": "string", "minLength": 3 },
+        "promptPlanHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "externalModelUsed": { "const": false },
+        "productionAssetApproval": { "const": "not_requested" }
+      }
+    },
+    "retryPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxRetries", "retryRecords"],
+      "properties": {
+        "maxRetries": { "type": "integer", "minimum": 0, "maximum": 3 },
+        "retryRecords": {
+          "type": "array",
+          "items": { "type": "object" }
+        }
+      }
+    },
+    "resume": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["replayableFromPromptPlan", "promptPlanPath", "promptId"],
+      "properties": {
+        "replayableFromPromptPlan": { "const": true },
+        "promptPlanPath": { "type": "string", "minLength": 3 },
+        "promptId": { "type": "string", "minLength": 3 }
+      }
+    },
+    "localEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["screenshotRequired", "screenshotCaptured", "reviewStatus"],
+      "properties": {
+        "screenshotRequired": { "const": true },
+        "screenshotCaptured": { "type": "boolean" },
+        "reviewStatus": { "enum": ["not_started", "captured", "reviewed"] }
+      }
+    },
+    "humanReviewChecklist": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 3 }
+    },
+    "createdAtMs": { "type": "integer" },
+    "promptCount": { "type": "integer", "minimum": 0 },
+    "outputCount": { "type": "integer", "minimum": 0 },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code"],
+        "properties": {
+          "code": { "type": "string", "minLength": 3 }
+        }
+      }
+    },
+    "externalImageGenerationUsed": { "const": false },
+    "approvedProductionAssetsCreated": { "const": false },
+    "fallbackStillPlayable": { "type": "boolean" },
+    "generatedImageAssetsCanChangeServerRules": { "const": false },
+    "canonicalMappingFingerprint": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "canonicalTarget": { "type": "string", "minLength": 3 },
+    "candidateOutputPath": { "type": "string", "minLength": 3 },
+    "approvedOutputPath": { "type": "string", "minLength": 3 },
+    "candidateOutputStatus": { "const": "candidate_only" }
+  }
+}

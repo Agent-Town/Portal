@@ -7,10 +7,15 @@ const {
   validateAssetPromptPlan,
   validateGeneratedPack
 } = require('./generated_pack');
+const {
+  loadGeneratedPackSchemaRegistry,
+  validateGeneratedSchema
+} = require('./generated_schema');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const CANDIDATE_GENERATION_RUN_VERSION = 'agent-town-candidate-image-generation-run-v1';
 const JOB_LOG_SCHEMA_VERSION = 'agent-town-asset-generation-job-log-v1';
+const SCHEMA_REGISTRY = loadGeneratedPackSchemaRegistry();
 const GENERATOR_ID = 'generated-pack-candidate-generation-preflight-v0.1';
 const ALLOWED_AUTH_MODES = new Set(['not_configured', 'operator_managed', 'oauth_user_delegated']);
 const DEFAULT_RATE_LIMIT = {
@@ -27,6 +32,43 @@ const HUMAN_REVIEW_CHECKLIST = [
 
 function sha256(value) {
   return crypto.createHash('sha256').update(String(value)).digest('hex');
+}
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function findSecretLikePaths(value, pathLabel = '$', matches = []) {
+  if (!value || typeof value !== 'object') return matches;
+  const secretKey = /(api[_-]?key|secret|private[_-]?key|credential|oauth|access[_-]?token|refresh[_-]?token|wallet[_-]?secret|seed[_-]?phrase|password)/i;
+  for (const [key, child] of Object.entries(value)) {
+    const childPath = `${pathLabel}.${key}`;
+    if (secretKey.test(key)) matches.push(childPath);
+    findSecretLikePaths(child, childPath, matches);
+  }
+  return matches;
+}
+
+function findRawPromptInstructionPaths(value, pathLabel = '$', matches = []) {
+  const rawPromptKey = /^(rawprompt|normalizedprompt|systemprompt|developerprompt|promptinstructions)$/i;
+  const rawTextPattern = /\bignore\s+(all\s+)?(previous|prior|above)\s+instructions\b|\b(system|developer)\s+(prompt|message|instructions)\b|\bexecute\s+(shell|bash|terminal|command)\b|<\s*script\b|javascript\s*:|\beval\s*\(/i;
+  if (typeof value === 'string') {
+    if (rawTextPattern.test(value)) matches.push(pathLabel);
+    return matches;
+  }
+  if (!value || typeof value !== 'object') return matches;
+  for (const [key, child] of Object.entries(value)) {
+    const childPath = `${pathLabel}.${key}`;
+    if (rawPromptKey.test(key)) matches.push(childPath);
+    findRawPromptInstructionPaths(child, childPath, matches);
+  }
+  return matches;
+}
+
+function candidateGenerationRunHash(run = {}) {
+  const copy = clone(run);
+  delete copy.runHash;
+  return sha256(JSON.stringify(copy));
 }
 
 function clampInteger(value, min, max, fallback) {
@@ -228,6 +270,192 @@ function sanitizeAdapterResult(result, target) {
   return { ok: true };
 }
 
+function validateAssetGenerationJobLogRecord(record = {}, { assetPromptPlan = null } = {}) {
+  const schemaReport = SCHEMA_REGISTRY?.assetGenerationJobLog
+    ? validateGeneratedSchema(record, SCHEMA_REGISTRY.assetGenerationJobLog, '$.assetGenerationJobLog')
+    : { ok: true, errors: [] };
+  const secretLikePaths = findSecretLikePaths(record);
+  const rawInstructionPaths = findRawPromptInstructionPaths(record);
+  const targets = Array.isArray(assetPromptPlan?.targets) ? assetPromptPlan.targets : [];
+  const target = targets.find((item) => item.canonicalTarget === record?.canonicalTarget);
+  const pathProblems = [];
+  if (!isSafeRelativePath(record?.candidateOutputPath) || !String(record?.candidateOutputPath || '').includes('/candidates/')) {
+    pathProblems.push('candidateOutputPath');
+  }
+  if (!isSafeRelativePath(record?.approvedOutputPath) || !String(record?.approvedOutputPath || '').includes('/approved/')) {
+    pathProblems.push('approvedOutputPath');
+  }
+  if (assetPromptPlan && targets.length > 0 && !target) {
+    pathProblems.push('canonicalTarget');
+  } else if (target) {
+    if (record.promptId !== target.promptId) pathProblems.push('promptId');
+    if (record.promptHash !== target.promptHash) pathProblems.push('promptHash');
+    if (record.promptPlanHash !== assetPromptPlan.planHash) pathProblems.push('promptPlanHash');
+    if (record.candidateOutputPath !== target.candidateOutputPath) pathProblems.push('plannedCandidateOutputPath');
+    if (record.approvedOutputPath !== target.approvedOutputPath) pathProblems.push('plannedApprovedOutputPath');
+  }
+  const outputCount = Number(record?.outputCount || 0);
+  const statusOutputMatches = record?.status === 'candidate_recorded'
+    ? outputCount > 0
+    : outputCount === 0;
+  const checks = [
+    {
+      id: 'ASSET_GENERATION_JOB_LOG_SCHEMA_VALID',
+      passed: schemaReport.ok === true,
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
+    },
+    {
+      id: 'ASSET_GENERATION_JOB_LOG_CONTENT_SAFE',
+      passed: secretLikePaths.length === 0 && rawInstructionPaths.length === 0,
+      measured: { secretLikePaths, rawInstructionPaths }
+    },
+    {
+      id: 'ASSET_GENERATION_JOB_LOG_PATHS_SAFE',
+      passed: pathProblems.length === 0,
+      measured: { pathProblems }
+    },
+    {
+      id: 'ASSET_GENERATION_JOB_LOG_OUTPUT_STATE_COHERENT',
+      passed: statusOutputMatches
+        && record?.externalImageGenerationUsed === false
+        && record?.approvedProductionAssetsCreated === false
+        && (record?.sourceProvenance?.productionAssetApproval || 'not_requested') === 'not_requested',
+      measured: {
+        status: record?.status || null,
+        outputCount,
+        externalImageGenerationUsed: record?.externalImageGenerationUsed,
+        approvedProductionAssetsCreated: record?.approvedProductionAssetsCreated
+      }
+    }
+  ];
+  return {
+    ok: checks.every((check) => check.passed === true),
+    checks,
+    metrics: {
+      schemaErrorCount: schemaReport.errors.length,
+      secretLikePathCount: secretLikePaths.length,
+      rawInstructionPathCount: rawInstructionPaths.length,
+      pathProblemCount: pathProblems.length,
+      outputCount,
+      productionImageAssetCount: record?.approvedProductionAssetsCreated === true ? outputCount : 0
+    }
+  };
+}
+
+function validateCandidateGenerationRun(run = {}, { pack = {}, assetPromptPlan = null, jobRecords = [] } = {}) {
+  const schemaReport = SCHEMA_REGISTRY?.candidateGenerationRun
+    ? validateGeneratedSchema(run, SCHEMA_REGISTRY.candidateGenerationRun, '$.candidateGenerationRun')
+    : { ok: true, errors: [] };
+  const secretLikePaths = findSecretLikePaths(run);
+  const rawInstructionPaths = findRawPromptInstructionPaths(run);
+  const expectedHash = schemaReport.ok ? candidateGenerationRunHash(run) : '';
+  const hashMatches = Boolean(expectedHash) && run?.runHash === expectedHash;
+  const jobStatuses = Array.isArray(run?.jobStatuses) ? run.jobStatuses : [];
+  const failedStatusCount = jobStatuses.filter((item) => item.status === 'failed').length;
+  const candidateRecordStatusCount = jobStatuses.filter((item) => item.status === 'candidate_recorded').length;
+  const statusCountsMatch = Number(run?.targetCount || 0) === jobStatuses.length
+    && Number(run?.failedJobCount || 0) === failedStatusCount
+    && Number(run?.candidateRecordCount || 0) === candidateRecordStatusCount;
+  const jobReports = Array.isArray(jobRecords)
+    ? jobRecords.map((record) => validateAssetGenerationJobLogRecord(record, { assetPromptPlan: assetPromptPlan || pack?.assetPromptPlan || null }))
+    : [];
+  const jobRecordsOk = jobReports.every((report) => report.ok === true)
+    && (!jobRecords.length || Number(run?.jobLogWriteCount || 0) === jobRecords.length);
+  const planTargets = Array.isArray((assetPromptPlan || pack?.assetPromptPlan)?.targets)
+    ? (assetPromptPlan || pack.assetPromptPlan).targets
+    : [];
+  const allowedCanonicalTargets = new Set(planTargets.map((target) => target.canonicalTarget));
+  const seenCanonicalTargets = new Set();
+  const canonicalTargetProblems = [];
+  for (const statusEntry of jobStatuses) {
+    const canonicalTarget = statusEntry?.canonicalTarget || '';
+    if (allowedCanonicalTargets.size > 0 && !allowedCanonicalTargets.has(canonicalTarget)) {
+      canonicalTargetProblems.push(`unknown:${canonicalTarget}`);
+    }
+    if (seenCanonicalTargets.has(canonicalTarget)) {
+      canonicalTargetProblems.push(`duplicate:${canonicalTarget}`);
+    }
+    seenCanonicalTargets.add(canonicalTarget);
+  }
+  const canonicalFingerprint = canonicalMappingFingerprint(pack || {});
+  const canonicalMappingPreserved = run?.canonicalMappingPreserved === true
+    && run?.canonicalMappingFingerprintBefore === run?.canonicalMappingFingerprintAfter
+    && (!pack?.packId || run?.canonicalMappingFingerprintBefore === canonicalFingerprint);
+  const noGenerationOrPromotion = run?.candidateImagesGenerated === false
+    && run?.externalImageGenerationUsed === false
+    && run?.approvedProductionAssetsCreated === false
+    && Number(run?.productionImageAssetCount || 0) === 0
+    && run?.generatedImageAssetsCanChangeServerRules === false;
+  const checks = [
+    {
+      id: 'CANDIDATE_GENERATION_RUN_SCHEMA_VALID',
+      passed: schemaReport.ok === true,
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
+    },
+    {
+      id: 'CANDIDATE_GENERATION_RUN_CONTENT_SAFE',
+      passed: secretLikePaths.length === 0 && rawInstructionPaths.length === 0,
+      measured: { secretLikePaths, rawInstructionPaths }
+    },
+    {
+      id: 'CANDIDATE_GENERATION_RUN_HASH_STABLE',
+      passed: hashMatches,
+      measured: { expectedHash, actualHash: run?.runHash || '' }
+    },
+    {
+      id: 'CANDIDATE_GENERATION_RUN_STATUS_COUNTS',
+      passed: statusCountsMatch,
+      measured: {
+        targetCount: run?.targetCount,
+        jobStatusCount: jobStatuses.length,
+        failedJobCount: run?.failedJobCount,
+        failedStatusCount,
+        candidateRecordCount: run?.candidateRecordCount,
+        candidateRecordStatusCount
+      }
+    },
+    {
+      id: 'CANDIDATE_GENERATION_RUN_TARGETS_CANONICAL',
+      passed: canonicalTargetProblems.length === 0,
+      measured: { canonicalTargetProblems }
+    },
+    {
+      id: 'CANDIDATE_GENERATION_RUN_JOB_LOGS_VALID',
+      passed: jobRecordsOk,
+      measured: {
+        jobRecordCount: jobRecords.length,
+        jobLogWriteCount: run?.jobLogWriteCount,
+        failedJobRecordCount: jobReports.filter((report) => report.ok !== true).length
+      }
+    },
+    {
+      id: 'CANDIDATE_GENERATION_RUN_BOUNDARY_PRESERVED',
+      passed: canonicalMappingPreserved && noGenerationOrPromotion,
+      measured: {
+        canonicalMappingPreserved,
+        noGenerationOrPromotion,
+        productionImageAssetCount: run?.productionImageAssetCount
+      }
+    }
+  ];
+  return {
+    ok: checks.every((check) => check.passed === true),
+    checks,
+    metrics: {
+      schemaErrorCount: schemaReport.errors.length,
+      secretLikePathCount: secretLikePaths.length,
+      rawInstructionPathCount: rawInstructionPaths.length,
+      hashMatches,
+      statusCountsMatch,
+      canonicalTargetProblemCount: canonicalTargetProblems.length,
+      jobRecordsOk,
+      canonicalMappingPreserved,
+      noGenerationOrPromotion,
+      productionImageAssetCount: Number(run?.productionImageAssetCount || 0)
+    }
+  };
+}
+
 async function runCandidateImageGenerationSpike({
   assetPromptPlan,
   config = {},
@@ -320,7 +548,7 @@ async function runCandidateImageGenerationSpike({
         ? 'candidate_recorded'
         : 'no_targets';
 
-  return {
+  const run = {
     schemaVersion: CANDIDATE_GENERATION_RUN_VERSION,
     packId: plan.packId || pack?.packId || '',
     status,
@@ -351,11 +579,16 @@ async function runCandidateImageGenerationSpike({
     localEvidenceScreenshotRequired: true,
     humanReviewChecklist: HUMAN_REVIEW_CHECKLIST
   };
+  run.runHash = candidateGenerationRunHash(run);
+  return run;
 }
 
 module.exports = {
   CANDIDATE_GENERATION_RUN_VERSION,
+  JOB_LOG_SCHEMA_VERSION,
   HUMAN_REVIEW_CHECKLIST,
   normalizeCandidateGenerationConfig,
-  runCandidateImageGenerationSpike
+  runCandidateImageGenerationSpike,
+  validateAssetGenerationJobLogRecord,
+  validateCandidateGenerationRun
 };

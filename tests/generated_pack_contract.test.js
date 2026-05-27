@@ -76,6 +76,8 @@ test('generated pack schema suite and fixtures exist', () => {
     'multi_surface_compatibility.schema.json',
     'approved_modifiers.schema.json',
     'asset_prompt_plan.schema.json',
+    'asset_generation_job_log.schema.json',
+    'candidate_generation_run.schema.json',
     'asset_postprocess_plan.schema.json',
     'asset_postprocess_report.schema.json',
     'generated_asset_manifest.schema.json',
@@ -91,7 +93,7 @@ test('generated pack schema suite and fixtures exist', () => {
     const parsed = readJson(`schemas/generated-packs/${schema}`);
     assert.ok(parsed.$id, schema);
   }
-  assert.equal(requiredSchemas.length, 20);
+  assert.equal(requiredSchemas.length, 22);
 
   for (const fixture of [
     'valid_world_grid_pack.json',

@@ -15,6 +15,8 @@ const GENERATED_PACK_SCHEMA_FILES = {
   multiSurfaceCompatibility: 'multi_surface_compatibility.schema.json',
   approvedModifiers: 'approved_modifiers.schema.json',
   assetPromptPlan: 'asset_prompt_plan.schema.json',
+  assetGenerationJobLog: 'asset_generation_job_log.schema.json',
+  candidateGenerationRun: 'candidate_generation_run.schema.json',
   assetManifest: 'generated_asset_manifest.schema.json',
   generatedPack: 'generated_pack.schema.json',
   playtestReport: 'playtest_report.schema.json',
