@@ -69,6 +69,19 @@ prepared effect persistence. It requires an existing, non-expired proposal whose
 review transition has reached `ready_for_vote` with approved moderation status
 and whose effect preview and rollback plan match the proposed civic action.
 
+## Review Queue Snapshot
+
+`getProposalReviewQueueSnapshot()` returns a research-only internal queue using
+`V6_PROPOSAL_REVIEW_QUEUE_VERSION`. The snapshot lists only proposals whose
+status is `drafted` and moderation status is `needs_review`.
+
+By default the queue excludes expired proposals. Once a moderation decision
+moves a proposal to `ready_for_vote` or `rejected`, the proposal is no longer in
+the queue. Queue entries contain metadata only: proposal id, proposer ids, scope,
+review surface, effect type, public-state count, timestamps, and non-executing
+safety flags. They do not include the full proposal payload, private data,
+runtime civic tools, player-visible surfaces, or effect execution authority.
+
 ## Proposal Intake Readiness Gate
 
 `buildV6ProposalIntakeReadinessGate()` is a research-only M7 gate for reviewing
@@ -83,7 +96,8 @@ The gate requires evidence for:
   observability;
 - civic mutation security envelope, same-origin/CSRF/session-auth controls, and
   idempotent submission replay;
-- review-queue indexes and moderation-decision linkage;
+- review-queue indexes, queue snapshots, reviewed/expired proposal exclusion,
+  and moderation-decision linkage;
 - `proposal.created` and `proposal.reviewed` audit rows;
 - public text rendering review, private-data exclusion, and no backend
   shortcuts.

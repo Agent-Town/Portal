@@ -216,10 +216,12 @@ persistence resilience, and security/product release review.
   `buildV6ProposalIntakeReadinessGate()` proves human route submission,
   worker-tool submission, OpenClaw Lite worker origin, Skill Context and Worker
   Traffic observability, mutation-security envelope, same-origin/CSRF/session
-  auth, idempotent submission replay, review-queue index, moderation-decision
-  link, proposal audit rows, public text privacy review, private-data exclusion,
-  no backend shortcuts, no civic tool exposure, and no effect execution while
-  keeping `releaseReady: false` and `executionStatus: "not_executable"`.
+  auth, idempotent submission replay, review-queue index, research-only queue
+  snapshot coverage, reviewed/expired proposal queue exclusion,
+  moderation-decision link, proposal audit rows, public text privacy review,
+  private-data exclusion, no backend shortcuts, no civic tool exposure, and no
+  effect execution while keeping `releaseReady: false` and
+  `executionStatus: "not_executable"`.
 - Vote schema with voter authorization, delegation status, eligibility proof,
   one-vote accounting, receipt id, and explicit quorum/approval-threshold policy
   evaluation before effect preparation.

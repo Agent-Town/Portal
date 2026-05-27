@@ -18,6 +18,7 @@ const MODERATION_STATUS_APPROVED = 'approved';
 const MODERATION_STATUS_REJECTED = 'rejected';
 const MIGRATION_VERSION = 'v1';
 const STORE_KEY = 'proposals';
+const V6_PROPOSAL_REVIEW_QUEUE_VERSION = 'agent-town.v6.proposal_review_queue.v1';
 const V6_PROPOSAL_INTAKE_READINESS_GATE_VERSION = 'agent-town.v6.proposal_intake_readiness.v1';
 const REQUIRED_PROPOSAL_INTAKE_READINESS_CHECKS = [
   'feature_flag',
@@ -42,6 +43,9 @@ const REQUIRED_PROPOSAL_INTAKE_EVIDENCE_CHECKS = [
   'same_origin_csrf_session_auth',
   'idempotent_submission_replay',
   'review_queue_index',
+  'review_queue_snapshot',
+  'reviewed_proposal_queue_exclusion',
+  'expired_proposal_queue_exclusion',
   'moderation_decision_link',
   'proposal_created_audit_rows',
   'proposal_reviewed_audit_rows',
@@ -340,6 +344,38 @@ function parseProposalRow(row) {
   };
 }
 
+function buildProposalReviewQueueEntry(row, queuePosition, nowMs) {
+  const proposal = parseProposalRow(row);
+  if (!proposal) return null;
+  return {
+    queueId: `proposal_review_queue:${proposal.proposalId}`,
+    queuePosition,
+    proposalId: proposal.proposalId,
+    proposerAccountId: proposal.proposerAccountId,
+    proposerKind: proposal.proposerKind,
+    proposerAgentId: proposal.proposerAgentId,
+    scopeKind: proposal.scopeKind,
+    scopeTargetId: proposal.scopeTargetId,
+    status: proposal.status,
+    moderationStatus: proposal.moderationStatus,
+    reviewSurface: proposal.proposal.moderationClass,
+    effectType: proposal.proposal.effectPreview.effectType,
+    affectedPublicStateCount: proposal.proposal.affectedPublicState.length,
+    createdAtMs: proposal.createdAtMs,
+    updatedAtMs: proposal.updatedAtMs,
+    expiresAtMs: proposal.expiresAtMs,
+    expired: proposal.expiresAtMs <= nowMs,
+    runtimeExposed: false,
+    playerVisible: false,
+    normalGameplayExposure: false,
+    mutatesWorldState: false,
+    executesProposalEffects: false,
+    exposesCivicTools: false,
+    exposesPrivateData: false,
+    executionStatus: 'not_executable'
+  };
+}
+
 function ensureSchema(db) {
   db.exec('PRAGMA journal_mode = WAL;');
   db.exec('PRAGMA synchronous = NORMAL;');
@@ -409,6 +445,17 @@ function buildStatements(db) {
       WHERE (? = '' OR proposer_account_id = ?)
         AND (? = '' OR status = ?)
         AND (? = '' OR moderation_status = ?)
+      ORDER BY created_at ASC, proposal_id ASC
+      LIMIT ?
+    `),
+    reviewQueue: db.prepare(`
+      SELECT *
+      FROM world_civic_proposals
+      WHERE status = ?
+        AND moderation_status = ?
+        AND (? = 1 OR expires_at > ?)
+        AND (? = '' OR scope_kind = ?)
+        AND (? = '' OR scope_target_id = ?)
       ORDER BY created_at ASC, proposal_id ASC
       LIMIT ?
     `),
@@ -685,6 +732,49 @@ function createCivicProposalStore({ sqlitePath, auditLedger = null, auditSqliteP
     ).map(parseProposalRow);
   }
 
+  function getProposalReviewQueueSnapshot({
+    scopeKind = '',
+    scopeTargetId = '',
+    limit = 100,
+    nowMs = Date.now(),
+    includeExpired = false
+  } = {}) {
+    const safeLimit = Number.isInteger(Number(limit)) ? Math.max(1, Math.min(250, Number(limit))) : 100;
+    const safeNowMs = Number.isFinite(Number(nowMs)) ? Number(nowMs) : Date.now();
+    const rows = statements.reviewQueue.all(
+      PROPOSAL_STATUS_DRAFTED,
+      MODERATION_STATUS_NEEDS_REVIEW,
+      includeExpired === true ? 1 : 0,
+      safeNowMs,
+      String(scopeKind || ''),
+      String(scopeKind || ''),
+      String(scopeTargetId || ''),
+      String(scopeTargetId || ''),
+      safeLimit
+    );
+    const entries = rows
+      .map((row, index) => buildProposalReviewQueueEntry(row, index + 1, safeNowMs))
+      .filter(Boolean);
+    return {
+      version: V6_PROPOSAL_REVIEW_QUEUE_VERSION,
+      status: 'research_only',
+      runtimeExposed: false,
+      playerVisible: false,
+      normalGameplayExposure: false,
+      mutatesWorldState: false,
+      executesProposalEffects: false,
+      exposesCivicTools: false,
+      exposesPrivateData: false,
+      executionStatus: 'not_executable',
+      scopeKind: String(scopeKind || ''),
+      scopeTargetId: String(scopeTargetId || ''),
+      includeExpired: includeExpired === true,
+      nowMs: safeNowMs,
+      count: entries.length,
+      entries
+    };
+  }
+
   function previewProposalEffect(proposalId = '') {
     const row = getProposal(proposalId);
     if (!row) return null;
@@ -717,6 +807,7 @@ function createCivicProposalStore({ sqlitePath, auditLedger = null, auditSqliteP
     count,
     draftProposal,
     getProposal,
+    getProposalReviewQueueSnapshot,
     getSchemaMetadata,
     listProposals,
     migrationVersion: schemaMetadata.migrationVersion,
@@ -737,6 +828,7 @@ module.exports = {
   REQUIRED_PROPOSAL_INTAKE_READINESS_CHECKS: clone(REQUIRED_PROPOSAL_INTAKE_READINESS_CHECKS),
   REQUIRED_PROPOSAL_SUBMISSION_SURFACES: clone(REQUIRED_PROPOSAL_SUBMISSION_SURFACES),
   V6_PROPOSAL_INTAKE_READINESS_GATE_VERSION,
+  V6_PROPOSAL_REVIEW_QUEUE_VERSION,
   assertV6ProposalIntakeReadinessGateSafe,
   buildV6ProposalIntakeReadinessGate,
   createCivicProposalStore

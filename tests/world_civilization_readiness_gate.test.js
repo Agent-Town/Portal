@@ -69,6 +69,8 @@ test('V6 readiness gate baseline names every prerequisite domain but remains ope
   assert.ok(proposalGate.requiredChecks.includes('proposal_intake_readiness_gate'));
   assert.ok(proposalGate.requiredChecks.includes('route_tool_submission'));
   assert.ok(proposalGate.requiredChecks.includes('review_queue_integration'));
+  assert.ok(proposalGate.requiredChecks.includes('review_queue_snapshot'));
+  assert.ok(proposalGate.requiredChecks.includes('expired_review_queue_exclusion'));
   assert.ok(reputationGate.requiredChecks.includes('reputation_eligibility_advice_gate'));
   assert.ok(reputationGate.requiredChecks.includes('moderation_privacy_readiness_gate'));
   assert.ok(reputationGate.requiredChecks.includes('surface_policy_coverage'));

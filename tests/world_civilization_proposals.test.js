@@ -18,6 +18,7 @@ const {
   REQUIRED_PROPOSAL_INTAKE_READINESS_CHECKS,
   REQUIRED_PROPOSAL_SUBMISSION_SURFACES,
   V6_PROPOSAL_INTAKE_READINESS_GATE_VERSION,
+  V6_PROPOSAL_REVIEW_QUEUE_VERSION,
   assertV6ProposalIntakeReadinessGateSafe,
   buildV6ProposalIntakeReadinessGate,
   createCivicProposalStore
@@ -287,6 +288,96 @@ test('V6 proposal lifecycle drafts bounded proposals without executing effects',
   assert.equal(auditLedger.count(), 1);
 }));
 
+test('V6 proposal review queue lists only live drafted proposals awaiting moderation', () => withTempProposalStore(({ auditLedger, store }) => {
+  store.draftProposal(proposal(), { nowMs: 1_779_784_000_000 });
+  store.draftProposal(proposal({
+    proposalId: 'proposal_public_works_bridge_002',
+    idempotencyKey: 'idem_proposal_bridge_002',
+    scope: {
+      kind: 'public_works',
+      targetId: 'district_great_ridge'
+    }
+  }), { nowMs: 1_779_784_010_000 });
+  store.draftProposal(proposal({
+    proposalId: 'proposal_public_works_bridge_reviewed',
+    idempotencyKey: 'idem_proposal_bridge_reviewed',
+    scope: {
+      kind: 'public_works',
+      targetId: 'district_great_ridge'
+    }
+  }), { nowMs: 1_779_784_020_000 });
+  store.draftProposal(proposal({
+    proposalId: 'proposal_public_works_bridge_expiring',
+    idempotencyKey: 'idem_proposal_bridge_expiring',
+    expiresAtMs: 1_779_784_050_000,
+    scope: {
+      kind: 'public_works',
+      targetId: 'district_river_bend'
+    }
+  }), { nowMs: 1_779_784_030_000 });
+  store.recordProposalReview(moderationDecision({
+    decisionId: 'moderation_proposal_bridge_reviewed',
+    subjectRef: 'proposal_public_works_bridge_reviewed'
+  }), { nowMs: 1_779_784_040_000 });
+
+  const queue = store.getProposalReviewQueueSnapshot({ nowMs: 1_779_784_045_000 });
+
+  assert.equal(queue.version, V6_PROPOSAL_REVIEW_QUEUE_VERSION);
+  assert.equal(queue.status, 'research_only');
+  assert.equal(queue.runtimeExposed, false);
+  assert.equal(queue.playerVisible, false);
+  assert.equal(queue.normalGameplayExposure, false);
+  assert.equal(queue.mutatesWorldState, false);
+  assert.equal(queue.executesProposalEffects, false);
+  assert.equal(queue.exposesCivicTools, false);
+  assert.equal(queue.exposesPrivateData, false);
+  assert.equal(queue.executionStatus, 'not_executable');
+  assert.equal(queue.count, 3);
+  assert.deepEqual(queue.entries.map((entry) => entry.proposalId), [
+    'proposal_public_works_bridge_001',
+    'proposal_public_works_bridge_002',
+    'proposal_public_works_bridge_expiring'
+  ]);
+  assert.deepEqual(queue.entries.map((entry) => entry.queuePosition), [1, 2, 3]);
+  assert.equal(queue.entries[0].queueId, 'proposal_review_queue:proposal_public_works_bridge_001');
+  assert.equal(queue.entries[0].reviewSurface, 'public_works');
+  assert.equal(queue.entries[0].effectType, 'public_works_accounting');
+  assert.equal(queue.entries[0].affectedPublicStateCount, 1);
+  assert.equal(queue.entries[0].expired, false);
+  assert.equal(queue.entries[0].runtimeExposed, false);
+  assert.equal(queue.entries[0].playerVisible, false);
+  assert.equal(queue.entries[0].executesProposalEffects, false);
+  assert.equal(typeof queue.entries[0].proposal, 'undefined');
+  assert.equal(auditLedger.replay().filter((row) => row.entry.actionType === 'proposal.reviewed').length, 1);
+
+  const scoped = store.getProposalReviewQueueSnapshot({
+    scopeKind: 'public_works',
+    scopeTargetId: 'district_great_ridge',
+    nowMs: 1_779_784_045_000
+  });
+  assert.deepEqual(scoped.entries.map((entry) => entry.proposalId), [
+    'proposal_public_works_bridge_001',
+    'proposal_public_works_bridge_002'
+  ]);
+
+  const afterExpiry = store.getProposalReviewQueueSnapshot({ nowMs: 1_779_784_060_000 });
+  assert.deepEqual(afterExpiry.entries.map((entry) => entry.proposalId), [
+    'proposal_public_works_bridge_001',
+    'proposal_public_works_bridge_002'
+  ]);
+
+  const withExpired = store.getProposalReviewQueueSnapshot({
+    nowMs: 1_779_784_060_000,
+    includeExpired: true
+  });
+  assert.deepEqual(withExpired.entries.map((entry) => entry.proposalId), [
+    'proposal_public_works_bridge_001',
+    'proposal_public_works_bridge_002',
+    'proposal_public_works_bridge_expiring'
+  ]);
+  assert.equal(withExpired.entries.find((entry) => entry.proposalId === 'proposal_public_works_bridge_expiring').expired, true);
+}));
+
 test('V6 proposal lifecycle idempotency returns duplicates and rejects changed reuse', () => withTempProposalStore(({ auditLedger, store }) => {
   const first = store.draftProposal(proposal(), { nowMs: 1_779_784_000_000 });
   const duplicate = store.draftProposal(proposal(), { nowMs: 1_779_784_123_000 });
@@ -411,23 +502,31 @@ test('V6 proposal lifecycle rejects invalid review transitions before persistenc
 test('V6 proposal lifecycle persists across reopen and supports proposer listing', () => withTempProposalStore(({ auditLedger, auditPath, proposalPath, store }) => {
   store.draftProposal(proposal(), { nowMs: 1_779_784_000_000 });
   store.recordProposalReview(moderationDecision(), { nowMs: 1_779_784_100_000 });
+  store.draftProposal(proposal({
+    proposalId: 'proposal_public_works_bridge_queue',
+    idempotencyKey: 'idem_proposal_bridge_queue'
+  }), { nowMs: 1_779_784_200_000 });
   store.close();
   auditLedger.close();
 
   const reopenedAudit = createCivicAuditLedger({ sqlitePath: auditPath });
   const reopened = createCivicProposalStore({ sqlitePath: proposalPath, auditLedger: reopenedAudit });
   try {
-    assert.equal(reopened.count(), 1);
+    assert.equal(reopened.count(), 2);
     assert.equal(reopened.getProposal('proposal_public_works_bridge_001').status, PROPOSAL_STATUS_READY_FOR_VOTE);
     assert.deepEqual(
       reopened.listProposals({ proposerAccountId: 'acct_v6_human_001' }).map((entry) => entry.proposalId),
-      ['proposal_public_works_bridge_001']
+      ['proposal_public_works_bridge_001', 'proposal_public_works_bridge_queue']
     );
     assert.deepEqual(
       reopened.listProposals({ moderationStatus: MODERATION_STATUS_APPROVED }).map((entry) => entry.proposalId),
       ['proposal_public_works_bridge_001']
     );
-    assert.equal(reopenedAudit.count(), 2);
+    assert.deepEqual(
+      reopened.getProposalReviewQueueSnapshot({ nowMs: 1_779_784_300_000 }).entries.map((entry) => entry.proposalId),
+      ['proposal_public_works_bridge_queue']
+    );
+    assert.equal(reopenedAudit.count(), 3);
   } finally {
     reopened.close();
     reopenedAudit.close();

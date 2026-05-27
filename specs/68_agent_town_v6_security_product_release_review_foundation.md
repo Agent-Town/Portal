@@ -49,7 +49,8 @@ are present.
 - Proposal intake readiness review: human submission envelope, worker-tool
   submission envelope, OpenClaw Lite worker origin, Skill Context and Worker
   Traffic observability, mutation security envelope, same-origin/CSRF/session
-  auth, idempotent submission replay, review queue indexes, moderation decision
+  auth, idempotent submission replay, review queue indexes, review queue
+  snapshots, reviewed/expired proposal queue exclusion, moderation decision
   links, proposal audit rows, public text rendering review, private-data
   exclusion, no backend shortcuts, no civic tool exposure, and no effect
   execution before any proposal route or worker tool can accept civic proposals.

@@ -153,6 +153,8 @@ const REQUIRED_V6_READINESS_GATES = [
       'proposal_intake_readiness_gate',
       'route_tool_submission',
       'review_queue_integration',
+      'review_queue_snapshot',
+      'expired_review_queue_exclusion',
       'vote_authorization',
       'vote_authorization_readiness_gate',
       'quorum_policy',
