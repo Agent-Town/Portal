@@ -90,6 +90,31 @@ moderation effects.
   policy version, redacted-field count, review type, reviewer kind, and
   public-source counts without storing raw private report text.
 
+## Moderation Privacy Readiness Gate
+
+`buildV6ModerationPrivacyReadinessGate()` is a research-only M10 gate for
+reviewing how moderation may later cover public civic surfaces. It requires
+`FEATURE_WORLD_V60_AGENT_CIVILIZATION` plus explicit research opt-in and stays
+hidden from runtime tools and normal gameplay.
+
+The gate requires evidence for:
+
+- proposal text, agent-authored content, public profile, attached media,
+  sandbox artifact, and public works effect policies;
+- policy coverage for `civic_text`, `public_works`, `sandbox_policy`,
+  `reputation_policy`, and `institution_charter` surfaces;
+- abuse-report triage, human review tooling, appeal operations, and media
+  review planning;
+- redaction policy review, public text rendering review, public presence
+  privacy review, and private-data exclusion;
+- review-queue replay, moderation audit rows, and appeal audit rows.
+
+Even when research-ready, the gate keeps `releaseReady: false`,
+`executionStatus: "not_executable"`, `appliesModerationEffects: false`,
+`publishesContent: false`, `mutatesWorldState: false`,
+`runtimeExposed: false`, and `playerVisible: false`. It does not add a route,
+worker tool, moderation UI, content publication path, or gameplay effect.
+
 ## Release Gate
 
 M10 cannot move to `done` until:

@@ -120,6 +120,7 @@ const REQUIRED_REVIEW_GATES = [
       'feature_override_safety',
       'vote_authorization_readiness_gate',
       'reputation_eligibility_advice_gate',
+      'moderation_privacy_readiness_gate',
       'store_backed_delegation_proof',
       'effect_execution_gate',
       'agent_participation_enforcement_gate',
@@ -218,6 +219,43 @@ const REQUIRED_REVIEW_GATES = [
       'dispute_audit_rows',
       'no_player_visible_reputation',
       'no_score_mutation',
+      'no_world_mutation'
+    ],
+    signoffRequired: true
+  },
+  {
+    key: 'moderation_privacy_readiness_review',
+    label: 'Moderation privacy readiness review',
+    owner: 'trust_safety_privacy_product',
+    requiredArtifacts: [
+      RELEASE_REVIEW_ARTIFACT,
+      'specs/61_agent_town_v6_moderation_privacy_foundation.md',
+      'server/world_civilization/moderation.js',
+      'docs/security/PUBLIC_TEXT_RENDERING_POLICY.md',
+      'docs/product/PUBLIC_PRESENCE_PRIVACY_MODEL_V5.md',
+      'tests/world_civilization_moderation.test.js',
+      'tests/world_civilization_reputation_moderation_process_restart.test.js'
+    ],
+    requiredChecks: [
+      'proposal_text_policy',
+      'agent_authored_content_policy',
+      'public_profile_policy',
+      'attached_media_policy',
+      'sandbox_artifact_policy',
+      'public_works_effect_policy',
+      'surface_policy_coverage',
+      'abuse_report_triage',
+      'appeal_operations',
+      'human_review_tooling_plan',
+      'redaction_policy_review',
+      'public_text_rendering_review',
+      'public_presence_privacy_review',
+      'private_data_exclusion',
+      'review_queue_replay',
+      'moderation_audit_rows',
+      'appeal_audit_rows',
+      'no_player_visible_moderation',
+      'no_moderation_effect_application',
       'no_world_mutation'
     ],
     signoffRequired: true

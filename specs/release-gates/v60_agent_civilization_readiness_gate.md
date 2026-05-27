@@ -295,9 +295,17 @@ persistence resilience, and security/product release review.
   human review/appeal records, abuse-report source references, and
   privacy-safe before/after audit summaries on
   `moderation.reviewed`/`moderation.appealed` audit rows; it can also serve as
-  the required public-source review link for reputation disputes. Release still
-  requires production review tooling, appeals operations, media review, and full
-  public-surface integration.
+  the required public-source review link for reputation disputes.
+  `buildV6ModerationPrivacyReadinessGate()` adds the M10 research-only
+  moderation privacy readiness gate over proposal text, agent-authored content,
+  public profile, attached media, sandbox artifact, public works effect,
+  abuse-report triage, appeal operations, human review tooling, redaction,
+  public-text rendering, public-presence privacy, private-data exclusion, review
+  replay, moderation/appeal audit rows, surface-policy coverage, no moderation
+  effect application, no content publication, no runtime exposure, and no
+  player-visible moderation while keeping `releaseReady: false` and
+  `executionStatus: "not_executable"`. Release still requires production review
+  tooling, appeals operations, media review, and full public-surface integration.
 - Rollback must exist for every public civic effect, with clear irreversible
   action exclusions. Current research-only storage starts this in
   `server/world_civilization/effects.js` with prepared-effect records and

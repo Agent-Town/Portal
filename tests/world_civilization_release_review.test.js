@@ -114,6 +114,30 @@ test('V6 release review requires reputation eligibility advice gate evidence', (
   assert.ok(validationGate.requiredChecks.includes('reputation_eligibility_advice_gate'));
 });
 
+test('V6 release review requires moderation privacy readiness gate evidence', () => {
+  const moderationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'moderation_privacy_readiness_review');
+  const validationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'validation_evidence');
+
+  assert.equal(moderationGate.owner, 'trust_safety_privacy_product');
+  assert.ok(moderationGate.requiredArtifacts.includes('specs/61_agent_town_v6_moderation_privacy_foundation.md'));
+  assert.ok(moderationGate.requiredArtifacts.includes('server/world_civilization/moderation.js'));
+  assert.ok(moderationGate.requiredArtifacts.includes('docs/security/PUBLIC_TEXT_RENDERING_POLICY.md'));
+  assert.ok(moderationGate.requiredArtifacts.includes('docs/product/PUBLIC_PRESENCE_PRIVACY_MODEL_V5.md'));
+  assert.ok(moderationGate.requiredArtifacts.includes('tests/world_civilization_moderation.test.js'));
+  assert.ok(moderationGate.requiredChecks.includes('proposal_text_policy'));
+  assert.ok(moderationGate.requiredChecks.includes('agent_authored_content_policy'));
+  assert.ok(moderationGate.requiredChecks.includes('attached_media_policy'));
+  assert.ok(moderationGate.requiredChecks.includes('surface_policy_coverage'));
+  assert.ok(moderationGate.requiredChecks.includes('abuse_report_triage'));
+  assert.ok(moderationGate.requiredChecks.includes('appeal_operations'));
+  assert.ok(moderationGate.requiredChecks.includes('human_review_tooling_plan'));
+  assert.ok(moderationGate.requiredChecks.includes('redaction_policy_review'));
+  assert.ok(moderationGate.requiredChecks.includes('public_presence_privacy_review'));
+  assert.ok(moderationGate.requiredChecks.includes('no_moderation_effect_application'));
+  assert.ok(moderationGate.requiredChecks.includes('no_world_mutation'));
+  assert.ok(validationGate.requiredChecks.includes('moderation_privacy_readiness_gate'));
+});
+
 test('V6 release review audit coverage requires store-specific audit-summary evidence', () => {
   const auditGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'audit_coverage');
   const resilienceGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'resilience_readiness_review');

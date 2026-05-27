@@ -41,10 +41,11 @@ are present.
 - Validation evidence: targeted Node suite, split Playwright smokes,
   all-features regression, feature override safety, and load/rate replay
   evidence, including civic mutation security, vote authorization readiness,
-  reputation eligibility advice readiness, delegated-agent proof, and
-  governance preflight, effect execution gate, agent participation enforcement
-  gate, institution readiness gate, public works readiness gate, lab readiness
-  gate, and resilience readiness gate contract coverage.
+  reputation eligibility advice readiness, moderation privacy readiness,
+  delegated-agent proof, and governance preflight, effect execution gate, agent
+  participation enforcement gate, institution readiness gate, public works
+  readiness gate, lab readiness gate, and resilience readiness gate contract
+  coverage.
 - Vote authorization readiness review: server-verified voter authorization,
   eligibility rule verification, one-vote accounting, idempotent receipt replay,
   changed-vote replay rejection, proposal expiry denial, delegation policy
@@ -60,6 +61,13 @@ are present.
   reputation/dispute audit rows, no player-visible reputation, no score
   mutation, and no world mutation before reputation can inform production
   eligibility or advice.
+- Moderation privacy readiness review: proposal text, agent-authored content,
+  public profile, attached media, sandbox artifact, and public works effect
+  policies; surface-policy coverage; abuse-report triage; appeal operations;
+  human review tooling; redaction, public-text rendering, and public-presence
+  privacy review; private-data exclusion; review replay; moderation/appeal audit
+  rows; no player-visible moderation; no moderation effect application; and no
+  world mutation before moderation can cover production public surfaces.
 - Effect execution and rollback review: typed apply handlers, typed rollback
   handlers, real before/after state, authorization enforcement, idempotent
   apply/rollback behavior, irreversible-action review, conservation tests,

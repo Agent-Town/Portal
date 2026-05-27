@@ -4,9 +4,18 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
+const { V6_WORLD_FEATURE_FLAG, parseWorldGridFeatureFlags } = require('../server/world_grid/feature_flags');
 const { CIVIC_SCHEMA_VERSION } = require('../server/world_civilization/schemas');
 const { createCivicAuditLedger } = require('../server/world_civilization/audit_ledger');
-const { createCivicModerationStore } = require('../server/world_civilization/moderation');
+const {
+  REQUIRED_MODERATION_PRIVACY_EVIDENCE_CHECKS,
+  REQUIRED_MODERATION_PRIVACY_READINESS_CHECKS,
+  REQUIRED_MODERATION_SURFACES,
+  V6_MODERATION_PRIVACY_READINESS_GATE_VERSION,
+  assertV6ModerationPrivacyReadinessGateSafe,
+  buildV6ModerationPrivacyReadinessGate,
+  createCivicModerationStore
+} = require('../server/world_civilization/moderation');
 
 function withTempModerationStore(fn) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-v6-moderation-'));
@@ -63,6 +72,183 @@ function moderationReview(overrides = {}) {
     ...overrides
   };
 }
+
+function moderationPrivacyReadinessEvidence(overrides = {}) {
+  return {
+    status: 'complete',
+    executionStatus: 'not_executable',
+    runtimeExposed: false,
+    playerVisible: false,
+    normalGameplayExposure: false,
+    mutatesWorldState: false,
+    appliesModerationEffects: false,
+    publishesContent: false,
+    exposesPrivateData: false,
+    surfacePoliciesReviewed: true,
+    reviewToolingReviewed: true,
+    appealOperationsReviewed: true,
+    redactionPolicyReviewed: true,
+    publicTextRenderingReviewed: true,
+    publicPresencePrivacyReviewed: true,
+    publicSourceTriageReviewed: true,
+    mediaReviewPlanned: true,
+    privateDataExcluded: true,
+    auditRowsCovered: true,
+    checks: [...REQUIRED_MODERATION_PRIVACY_EVIDENCE_CHECKS],
+    surfaces: [...REQUIRED_MODERATION_SURFACES],
+    ...overrides
+  };
+}
+
+test('V6 moderation privacy readiness gate is hidden without explicit research opt-in and V6 flag', () => {
+  const noResearchOptIn = buildV6ModerationPrivacyReadinessGate({
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: moderationPrivacyReadinessEvidence()
+  });
+  const broadV5Override = buildV6ModerationPrivacyReadinessGate({
+    includeResearchModerationPrivacy: true,
+    featureFlags: parseWorldGridFeatureFlags('all'),
+    evidence: moderationPrivacyReadinessEvidence()
+  });
+
+  for (const report of [noResearchOptIn, broadV5Override]) {
+    assert.equal(report.version, V6_MODERATION_PRIVACY_READINESS_GATE_VERSION);
+    assert.equal(report.available, false);
+    assert.equal(report.researchReady, false);
+    assert.equal(report.releaseReady, false);
+    assert.equal(report.failClosed, true);
+    assert.equal(report.runtimeExposed, false);
+    assert.equal(report.playerVisible, false);
+    assert.equal(report.normalGameplayExposure, false);
+    assert.equal(report.mutatesWorldState, false);
+    assert.equal(report.appliesModerationEffects, false);
+    assert.equal(report.publishesContent, false);
+    assert.equal(report.exposesPrivateData, false);
+    assert.equal(report.executionStatus, 'not_executable');
+    assert.deepEqual(report.checks, []);
+    assert.deepEqual(assertV6ModerationPrivacyReadinessGateSafe(report), { ok: true, errors: [] });
+  }
+});
+
+test('V6 moderation privacy readiness gate records surface review evidence without execution', () => {
+  const report = buildV6ModerationPrivacyReadinessGate({
+    includeResearchModerationPrivacy: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    source: 'node_test',
+    evidence: moderationPrivacyReadinessEvidence()
+  });
+
+  assert.equal(report.available, true);
+  assert.equal(report.source, 'node_test');
+  assert.equal(report.researchReady, true);
+  assert.equal(report.releaseReady, false);
+  assert.equal(report.failClosed, false);
+  assert.equal(report.runtimeExposed, false);
+  assert.equal(report.playerVisible, false);
+  assert.equal(report.normalGameplayExposure, false);
+  assert.equal(report.mutatesWorldState, false);
+  assert.equal(report.appliesModerationEffects, false);
+  assert.equal(report.publishesContent, false);
+  assert.equal(report.exposesPrivateData, false);
+  assert.equal(report.executionStatus, 'not_executable');
+  assert.deepEqual(report.checks.map((entry) => entry.key), REQUIRED_MODERATION_PRIVACY_READINESS_CHECKS);
+  assert.deepEqual(report.evidence.requiredChecks, REQUIRED_MODERATION_PRIVACY_EVIDENCE_CHECKS);
+  assert.deepEqual(report.evidence.missingChecks, []);
+  assert.deepEqual(report.evidence.requiredSurfaces, REQUIRED_MODERATION_SURFACES);
+  assert.deepEqual(report.evidence.missingSurfaces, []);
+  assert.deepEqual(assertV6ModerationPrivacyReadinessGateSafe(report), { ok: true, errors: [] });
+});
+
+test('V6 moderation privacy readiness gate fails closed without surface and appeal evidence', () => {
+  const report = buildV6ModerationPrivacyReadinessGate({
+    includeResearchModerationPrivacy: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: moderationPrivacyReadinessEvidence({
+      checks: REQUIRED_MODERATION_PRIVACY_EVIDENCE_CHECKS.filter((check) => (
+        check !== 'attached_media_policy'
+        && check !== 'appeal_operations'
+        && check !== 'human_review_tooling_plan'
+        && check !== 'redaction_policy_review'
+        && check !== 'public_presence_privacy_review'
+        && check !== 'abuse_report_triage'
+      )),
+      surfaces: REQUIRED_MODERATION_SURFACES.filter((surface) => surface !== 'institution_charter'),
+      surfacePoliciesReviewed: false,
+      reviewToolingReviewed: false,
+      appealOperationsReviewed: false,
+      redactionPolicyReviewed: false,
+      publicPresencePrivacyReviewed: false,
+      publicSourceTriageReviewed: false,
+      mediaReviewPlanned: false
+    })
+  });
+
+  assert.equal(report.available, true);
+  assert.equal(report.researchReady, false);
+  assert.equal(report.releaseReady, false);
+  assert.equal(report.failClosed, true);
+  assert.deepEqual(report.evidence.missingChecks, [
+    'attached_media_policy',
+    'abuse_report_triage',
+    'appeal_operations',
+    'human_review_tooling_plan',
+    'redaction_policy_review',
+    'public_presence_privacy_review'
+  ]);
+  assert.deepEqual(report.evidence.missingSurfaces, ['institution_charter']);
+  assert.deepEqual(report.errors, [
+    'MODERATION_PRIVACY_EVIDENCE_REQUIRED',
+    'MODERATION_SURFACE_POLICY_COVERAGE_REQUIRED',
+    'MODERATION_REVIEW_APPEAL_OPERATIONS_REQUIRED',
+    'MODERATION_REDACTION_POLICY_REVIEW_REQUIRED',
+    'MODERATION_PUBLIC_SOURCE_TRIAGE_REQUIRED'
+  ]);
+  assert.deepEqual(assertV6ModerationPrivacyReadinessGateSafe(report), { ok: true, errors: [] });
+});
+
+test('V6 moderation privacy assertion rejects visible publishing or effect readiness drift', () => {
+  const report = buildV6ModerationPrivacyReadinessGate({
+    includeResearchModerationPrivacy: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: moderationPrivacyReadinessEvidence()
+  });
+  const unsafe = {
+    ...report,
+    releaseReady: true,
+    runtimeExposed: true,
+    playerVisible: true,
+    normalGameplayExposure: true,
+    mutatesWorldState: true,
+    appliesModerationEffects: true,
+    publishesContent: true,
+    exposesPrivateData: true,
+    executionStatus: 'executes',
+    evidence: {
+      ...report.evidence,
+      runtimeExposed: true,
+      playerVisible: true,
+      normalGameplayExposure: true,
+      mutatesWorldState: true,
+      appliesModerationEffects: true,
+      publishesContent: true,
+      exposesPrivateData: true
+    }
+  };
+  const result = assertV6ModerationPrivacyReadinessGateSafe(unsafe);
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(','), /V6_MODERATION_PRIVACY_READINESS_RUNTIME_HIDDEN_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_MODERATION_PRIVACY_READINESS_PLAYER_HIDDEN_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_MODERATION_PRIVACY_READINESS_NORMAL_GAMEPLAY_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_MODERATION_PRIVACY_READINESS_WORLD_MUTATION_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_MODERATION_PRIVACY_READINESS_EFFECT_APPLICATION_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_MODERATION_PRIVACY_READINESS_CONTENT_PUBLICATION_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_MODERATION_PRIVACY_READINESS_PRIVATE_DATA_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_MODERATION_PRIVACY_READINESS_NON_EXECUTING_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_MODERATION_PRIVACY_READINESS_RELEASE_READY_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_MODERATION_PRIVACY_READINESS_EVIDENCE_PLAYER_HIDDEN_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_MODERATION_PRIVACY_READINESS_EVIDENCE_EFFECT_APPLICATION_FORBIDDEN/);
+});
 
 test('V6 moderation store records bounded decisions without execution', () => withTempModerationStore(({ auditLedger, store }) => {
   const row = store.recordDecision(moderationDecision(), { nowMs: 1_779_784_000_000 });

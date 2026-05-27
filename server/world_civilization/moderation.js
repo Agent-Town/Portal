@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
 
+const { V6_WORLD_FEATURE_FLAG, isWorldGridFeatureEnabled } = require('../world_grid/feature_flags');
 const { createCivicAuditLedger, sha256, stableJson } = require('./audit_ledger');
 const { validateModerationDecision, validateModerationReview } = require('./schemas');
 const {
@@ -11,6 +12,323 @@ const {
 
 const MIGRATION_VERSION = 'v1';
 const STORE_KEY = 'moderation';
+const V6_MODERATION_PRIVACY_READINESS_GATE_VERSION = 'agent-town.v6.moderation_privacy_readiness.v1';
+const REQUIRED_MODERATION_PRIVACY_READINESS_CHECKS = [
+  'feature_flag',
+  'research_opt_in',
+  'moderation_privacy_evidence',
+  'surface_policy_coverage',
+  'review_appeal_operations',
+  'redaction_policy_review',
+  'public_source_triage',
+  'no_runtime_exposure',
+  'no_player_visible_moderation',
+  'no_moderation_effect_application',
+  'no_world_mutation'
+];
+const REQUIRED_MODERATION_PRIVACY_EVIDENCE_CHECKS = [
+  'proposal_text_policy',
+  'agent_authored_content_policy',
+  'public_profile_policy',
+  'attached_media_policy',
+  'sandbox_artifact_policy',
+  'public_works_effect_policy',
+  'abuse_report_triage',
+  'appeal_operations',
+  'human_review_tooling_plan',
+  'redaction_policy_review',
+  'public_text_rendering_review',
+  'public_presence_privacy_review',
+  'private_data_exclusion',
+  'review_queue_replay',
+  'moderation_audit_rows',
+  'appeal_audit_rows'
+];
+const REQUIRED_MODERATION_SURFACES = [
+  'civic_text',
+  'public_works',
+  'sandbox_policy',
+  'reputation_policy',
+  'institution_charter'
+];
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function normalizeList(value) {
+  return Array.isArray(value) ? value.map((entry) => String(entry || '')).filter(Boolean) : [];
+}
+
+function check(key, ok, error = '') {
+  return { key, ok: ok === true, error: ok === true ? '' : error };
+}
+
+function inspectModerationPrivacyReadinessEvidence(evidence = {}) {
+  const checks = normalizeList(evidence.checks);
+  const surfaces = normalizeList(evidence.surfaces);
+  const missingChecks = REQUIRED_MODERATION_PRIVACY_EVIDENCE_CHECKS.filter((entry) => !checks.includes(entry));
+  const missingSurfaces = REQUIRED_MODERATION_SURFACES.filter((entry) => !surfaces.includes(entry));
+  const surfacePoliciesReviewed = evidence.surfacePoliciesReviewed === true;
+  const reviewToolingReviewed = evidence.reviewToolingReviewed === true;
+  const appealOperationsReviewed = evidence.appealOperationsReviewed === true;
+  const redactionPolicyReviewed = evidence.redactionPolicyReviewed === true;
+  const publicTextRenderingReviewed = evidence.publicTextRenderingReviewed === true;
+  const publicPresencePrivacyReviewed = evidence.publicPresencePrivacyReviewed === true;
+  const publicSourceTriageReviewed = evidence.publicSourceTriageReviewed === true;
+  const mediaReviewPlanned = evidence.mediaReviewPlanned === true;
+  const privateDataExcluded = evidence.privateDataExcluded === true;
+  const auditRowsCovered = evidence.auditRowsCovered === true;
+  const ok = evidence.status === 'complete'
+    && evidence.executionStatus === 'not_executable'
+    && evidence.runtimeExposed === false
+    && evidence.playerVisible === false
+    && evidence.normalGameplayExposure === false
+    && evidence.mutatesWorldState === false
+    && evidence.appliesModerationEffects === false
+    && evidence.publishesContent === false
+    && evidence.exposesPrivateData === false
+    && surfacePoliciesReviewed
+    && reviewToolingReviewed
+    && appealOperationsReviewed
+    && redactionPolicyReviewed
+    && publicTextRenderingReviewed
+    && publicPresencePrivacyReviewed
+    && publicSourceTriageReviewed
+    && mediaReviewPlanned
+    && privateDataExcluded
+    && auditRowsCovered
+    && missingChecks.length === 0
+    && missingSurfaces.length === 0;
+  return {
+    ok,
+    status: String(evidence.status || 'missing'),
+    executionStatus: String(evidence.executionStatus || 'missing'),
+    runtimeExposed: evidence.runtimeExposed === true,
+    playerVisible: evidence.playerVisible === true,
+    normalGameplayExposure: evidence.normalGameplayExposure === true,
+    mutatesWorldState: evidence.mutatesWorldState === true,
+    appliesModerationEffects: evidence.appliesModerationEffects === true,
+    publishesContent: evidence.publishesContent === true,
+    exposesPrivateData: evidence.exposesPrivateData === true,
+    surfacePoliciesReviewed,
+    reviewToolingReviewed,
+    appealOperationsReviewed,
+    redactionPolicyReviewed,
+    publicTextRenderingReviewed,
+    publicPresencePrivacyReviewed,
+    publicSourceTriageReviewed,
+    mediaReviewPlanned,
+    privateDataExcluded,
+    auditRowsCovered,
+    requiredChecks: [...REQUIRED_MODERATION_PRIVACY_EVIDENCE_CHECKS],
+    checks,
+    missingChecks,
+    requiredSurfaces: [...REQUIRED_MODERATION_SURFACES],
+    surfaces,
+    missingSurfaces
+  };
+}
+
+function disabledModerationPrivacyReadinessReport({ source, reason }) {
+  return {
+    version: V6_MODERATION_PRIVACY_READINESS_GATE_VERSION,
+    status: 'research_only',
+    source,
+    featureFlag: V6_WORLD_FEATURE_FLAG,
+    available: false,
+    researchReady: false,
+    releaseReady: false,
+    failClosed: true,
+    runtimeExposed: false,
+    playerVisible: false,
+    normalGameplayExposure: false,
+    mutatesWorldState: false,
+    appliesModerationEffects: false,
+    publishesContent: false,
+    exposesPrivateData: false,
+    executionStatus: 'not_executable',
+    evidence: inspectModerationPrivacyReadinessEvidence({}),
+    checks: [],
+    errors: [reason],
+    disabledReason: reason
+  };
+}
+
+function buildV6ModerationPrivacyReadinessGate({
+  featureFlags = {},
+  includeResearchModerationPrivacy = false,
+  source = 'runtime',
+  evidence = {}
+} = {}) {
+  const enabled = includeResearchModerationPrivacy === true
+    && isWorldGridFeatureEnabled(featureFlags, V6_WORLD_FEATURE_FLAG);
+  if (!enabled) {
+    return disabledModerationPrivacyReadinessReport({
+      source,
+      reason: 'V6 moderation privacy readiness requires explicit research opt-in and V6 feature flag'
+    });
+  }
+
+  const evidenceReport = inspectModerationPrivacyReadinessEvidence(evidence);
+  const checks = [
+    check('feature_flag', isWorldGridFeatureEnabled(featureFlags, V6_WORLD_FEATURE_FLAG), 'FEATURE_DISABLED'),
+    check('research_opt_in', includeResearchModerationPrivacy === true, 'RESEARCH_OPT_IN_REQUIRED'),
+    check(
+      'moderation_privacy_evidence',
+      evidenceReport.status === 'complete' && evidenceReport.missingChecks.length === 0,
+      'MODERATION_PRIVACY_EVIDENCE_REQUIRED'
+    ),
+    check(
+      'surface_policy_coverage',
+      evidenceReport.surfacePoliciesReviewed && evidenceReport.missingSurfaces.length === 0,
+      'MODERATION_SURFACE_POLICY_COVERAGE_REQUIRED'
+    ),
+    check(
+      'review_appeal_operations',
+      evidenceReport.reviewToolingReviewed && evidenceReport.appealOperationsReviewed,
+      'MODERATION_REVIEW_APPEAL_OPERATIONS_REQUIRED'
+    ),
+    check(
+      'redaction_policy_review',
+      evidenceReport.redactionPolicyReviewed
+        && evidenceReport.publicTextRenderingReviewed
+        && evidenceReport.publicPresencePrivacyReviewed
+        && evidenceReport.privateDataExcluded
+        && evidenceReport.exposesPrivateData === false,
+      'MODERATION_REDACTION_POLICY_REVIEW_REQUIRED'
+    ),
+    check(
+      'public_source_triage',
+      evidenceReport.publicSourceTriageReviewed && evidenceReport.mediaReviewPlanned,
+      'MODERATION_PUBLIC_SOURCE_TRIAGE_REQUIRED'
+    ),
+    check(
+      'no_runtime_exposure',
+      evidenceReport.executionStatus === 'not_executable' && evidenceReport.runtimeExposed === false,
+      'MODERATION_RUNTIME_EXPOSURE_FORBIDDEN'
+    ),
+    check(
+      'no_player_visible_moderation',
+      evidenceReport.playerVisible === false && evidenceReport.normalGameplayExposure === false,
+      'MODERATION_PLAYER_VISIBLE_SURFACE_FORBIDDEN'
+    ),
+    check(
+      'no_moderation_effect_application',
+      evidenceReport.appliesModerationEffects === false && evidenceReport.publishesContent === false,
+      'MODERATION_EFFECT_APPLICATION_FORBIDDEN'
+    ),
+    check(
+      'no_world_mutation',
+      evidenceReport.mutatesWorldState === false,
+      'MODERATION_WORLD_MUTATION_FORBIDDEN'
+    )
+  ];
+  const researchReady = checks.every((entry) => entry.ok);
+
+  return {
+    version: V6_MODERATION_PRIVACY_READINESS_GATE_VERSION,
+    status: 'research_only',
+    source,
+    featureFlag: V6_WORLD_FEATURE_FLAG,
+    available: true,
+    researchReady,
+    releaseReady: false,
+    failClosed: researchReady !== true,
+    runtimeExposed: false,
+    playerVisible: false,
+    normalGameplayExposure: false,
+    mutatesWorldState: false,
+    appliesModerationEffects: false,
+    publishesContent: false,
+    exposesPrivateData: false,
+    executionStatus: 'not_executable',
+    evidence: evidenceReport,
+    checks,
+    errors: checks.filter((entry) => !entry.ok).map((entry) => entry.error)
+  };
+}
+
+function assertV6ModerationPrivacyReadinessGateSafe(report = {}) {
+  const errors = [];
+  if (report.version !== V6_MODERATION_PRIVACY_READINESS_GATE_VERSION) {
+    errors.push('V6_MODERATION_PRIVACY_READINESS_VERSION_REQUIRED');
+  }
+  if (report.featureFlag !== V6_WORLD_FEATURE_FLAG) {
+    errors.push('V6_MODERATION_PRIVACY_READINESS_FEATURE_FLAG_REQUIRED');
+  }
+  if (report.status !== 'research_only') {
+    errors.push('V6_MODERATION_PRIVACY_READINESS_RESEARCH_ONLY_REQUIRED');
+  }
+  if (report.runtimeExposed !== false) {
+    errors.push('V6_MODERATION_PRIVACY_READINESS_RUNTIME_HIDDEN_REQUIRED');
+  }
+  if (report.playerVisible !== false) {
+    errors.push('V6_MODERATION_PRIVACY_READINESS_PLAYER_HIDDEN_REQUIRED');
+  }
+  if (report.normalGameplayExposure !== false) {
+    errors.push('V6_MODERATION_PRIVACY_READINESS_NORMAL_GAMEPLAY_FORBIDDEN');
+  }
+  if (report.mutatesWorldState !== false) {
+    errors.push('V6_MODERATION_PRIVACY_READINESS_WORLD_MUTATION_FORBIDDEN');
+  }
+  if (report.appliesModerationEffects !== false) {
+    errors.push('V6_MODERATION_PRIVACY_READINESS_EFFECT_APPLICATION_FORBIDDEN');
+  }
+  if (report.publishesContent !== false) {
+    errors.push('V6_MODERATION_PRIVACY_READINESS_CONTENT_PUBLICATION_FORBIDDEN');
+  }
+  if (report.exposesPrivateData !== false) {
+    errors.push('V6_MODERATION_PRIVACY_READINESS_PRIVATE_DATA_FORBIDDEN');
+  }
+  if (report.executionStatus !== 'not_executable') {
+    errors.push('V6_MODERATION_PRIVACY_READINESS_NON_EXECUTING_REQUIRED');
+  }
+  if (report.releaseReady !== false) {
+    errors.push('V6_MODERATION_PRIVACY_READINESS_RELEASE_READY_FORBIDDEN');
+  }
+  if (report.available === true) {
+    const checkKeys = new Set((report.checks || []).map((entry) => entry.key));
+    for (const key of REQUIRED_MODERATION_PRIVACY_READINESS_CHECKS) {
+      if (!checkKeys.has(key)) errors.push(`V6_MODERATION_PRIVACY_READINESS_CHECK_REQUIRED:${key}`);
+    }
+    const failedChecks = (report.checks || []).filter((entry) => entry.ok !== true);
+    if (report.researchReady === true && failedChecks.length > 0) {
+      errors.push('V6_MODERATION_PRIVACY_READINESS_READY_WITH_FAILED_CHECKS');
+    }
+    if (report.researchReady !== true && report.failClosed !== true) {
+      errors.push('V6_MODERATION_PRIVACY_READINESS_DENIAL_FAIL_CLOSED_REQUIRED');
+    }
+    const evidence = report.evidence || {};
+    if (evidence.runtimeExposed === true) {
+      errors.push('V6_MODERATION_PRIVACY_READINESS_EVIDENCE_RUNTIME_HIDDEN_REQUIRED');
+    }
+    if (evidence.playerVisible === true || evidence.normalGameplayExposure === true) {
+      errors.push('V6_MODERATION_PRIVACY_READINESS_EVIDENCE_PLAYER_HIDDEN_REQUIRED');
+    }
+    if (evidence.mutatesWorldState === true) {
+      errors.push('V6_MODERATION_PRIVACY_READINESS_EVIDENCE_WORLD_MUTATION_FORBIDDEN');
+    }
+    if (evidence.appliesModerationEffects === true) {
+      errors.push('V6_MODERATION_PRIVACY_READINESS_EVIDENCE_EFFECT_APPLICATION_FORBIDDEN');
+    }
+    if (evidence.publishesContent === true) {
+      errors.push('V6_MODERATION_PRIVACY_READINESS_EVIDENCE_CONTENT_PUBLICATION_FORBIDDEN');
+    }
+    if (evidence.exposesPrivateData === true) {
+      errors.push('V6_MODERATION_PRIVACY_READINESS_EVIDENCE_PRIVATE_DATA_FORBIDDEN');
+    }
+    if (report.researchReady === true && evidence.ok !== true) {
+      errors.push('V6_MODERATION_PRIVACY_READINESS_READY_WITHOUT_EVIDENCE');
+    }
+  } else if (report.failClosed !== true) {
+    errors.push('V6_MODERATION_PRIVACY_READINESS_DISABLED_FAIL_CLOSED_REQUIRED');
+  }
+  return {
+    ok: errors.length === 0,
+    errors
+  };
+}
 
 function parseModerationRow(row) {
   if (!row) return null;
@@ -495,5 +813,11 @@ function createCivicModerationStore({ sqlitePath, auditLedger = null, auditSqlit
 }
 
 module.exports = {
+  REQUIRED_MODERATION_PRIVACY_EVIDENCE_CHECKS: clone(REQUIRED_MODERATION_PRIVACY_EVIDENCE_CHECKS),
+  REQUIRED_MODERATION_PRIVACY_READINESS_CHECKS: clone(REQUIRED_MODERATION_PRIVACY_READINESS_CHECKS),
+  REQUIRED_MODERATION_SURFACES: clone(REQUIRED_MODERATION_SURFACES),
+  V6_MODERATION_PRIVACY_READINESS_GATE_VERSION,
+  assertV6ModerationPrivacyReadinessGateSafe,
+  buildV6ModerationPrivacyReadinessGate,
   createCivicModerationStore
 };
