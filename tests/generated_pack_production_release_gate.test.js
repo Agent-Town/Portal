@@ -483,6 +483,7 @@ test('GU-19 release evidence bundle binds a ready gate to source evidence hashes
   assert.equal(bundle.metrics.prerequisiteSnapshotMatchesGate, true);
   assert.equal(bundle.metrics.readyEvidenceSourcesMatchGate, true);
   assert.equal(bundle.metrics.playtestSourcePassed, true);
+  assert.equal(bundle.metrics.persistenceSourcePassed, true);
   assert.equal(bundle.metrics.diversitySourceIncludesGatePack, true);
   assert.equal(bundle.metrics.diversitySourceMetricsCoherent, true);
   assert.equal(bundle.metrics.approvalEvidenceHashMatchesGate, true);
@@ -799,6 +800,42 @@ test('GU-19 release evidence bundle rejects playtest source evidence that does n
   assert.equal(fixture.releaseGate.publicReleaseEligible, true);
   assert.equal(bundle.metrics.sourceHashMismatchCount, 0);
   assert.equal(bundle.metrics.playtestSourcePassed, false);
+  assert.equal(bundle.metrics.readyEvidenceSourcesMatchGate, false);
+  assert.equal(report.ok, false);
+  assert.equal(
+    report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_SOURCE_HASHES_MATCH').passed,
+    true
+  );
+  assert.equal(
+    report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,
+    false
+  );
+}));
+
+test('GU-19 release evidence bundle rejects persistence source evidence that does not support the ready gate', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_evidence_bundle_bad_persistence_source',
+    prompt: 'bronze garden depot with careful ridge archivists',
+    nowMs: 159_450
+  });
+  const failingPersistenceReport = {
+    ...fixture.persistenceReport,
+    restartReloadPass: false
+  };
+  const bundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    persistenceReport: failingPersistenceReport,
+    nowMs: 160_200
+  });
+  const report = validateReleaseEvidenceBundle(bundle, {
+    ...fixture,
+    persistenceReport: failingPersistenceReport
+  });
+
+  assert.equal(fixture.releaseGate.publicReleaseEligible, true);
+  assert.equal(failingPersistenceReport.packId, fixture.pack.packId);
+  assert.equal(bundle.metrics.sourceHashMismatchCount, 0);
+  assert.equal(bundle.metrics.persistenceSourcePassed, false);
   assert.equal(bundle.metrics.readyEvidenceSourcesMatchGate, false);
   assert.equal(report.ok, false);
   assert.equal(
