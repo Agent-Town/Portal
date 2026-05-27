@@ -2822,9 +2822,10 @@ Response includes:
 - `releaseEvidenceBundle.metrics.publicCardSourcePassed`;
 - `releaseEvidenceBundle.metrics.diversitySourceIncludesGatePack`;
 - `releaseEvidenceBundle.metrics.diversitySourceMetricsCoherent`;
+- `releaseEvidenceBundle.metrics.approvalEvidenceSourcePassed`;
 - `releaseEvidenceBundle.metrics.candidateReviewManifestSourcePassed`;
 - `releaseEvidenceBundle.metrics.candidateReviewManifestHashMatchesEvidence` and `candidateReviewManifestTimeMatchesEvidence`;
-- `validationReport`, which rejects source drift, mixed pack ids, failing generated-pack sources, failing playtest sources, failing persistence sources, failing public-card sources, failing candidate-review manifest sources, copied diversity reports that exclude the release pack, invalid source pack-id shapes, bundles created before their bound gate, future-dated bundles, forged blocking reasons, forged prerequisite snapshots, approval evidence drift from the bound gate, missing ready-gate evidence, candidate-review metric tampering, unsafe request content, and boundary violations.
+- `validationReport`, which rejects source drift, mixed pack ids, failing generated-pack sources, failing playtest sources, failing persistence sources, failing public-card sources, failing approval-evidence sources, failing candidate-review manifest sources, copied diversity reports that exclude the release pack, invalid source pack-id shapes, bundles created before their bound gate, future-dated bundles, forged blocking reasons, forged prerequisite snapshots, approval evidence drift from the bound gate, missing ready-gate evidence, candidate-review metric tampering, unsafe request content, and boundary violations.
 
 Release-evidence-bundle invariants:
 - request bodies share the release-gate ingress guard for secret-like fields, raw prompt instructions, request depth, node count, array size, object key count, and string length;

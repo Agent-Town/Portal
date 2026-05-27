@@ -492,6 +492,7 @@ test('GU-19 release evidence bundle binds a ready gate to source evidence hashes
   assert.equal(bundle.metrics.diversitySourceIncludesGatePack, true);
   assert.equal(bundle.metrics.diversitySourceMetricsCoherent, true);
   assert.equal(bundle.metrics.approvalEvidenceHashMatchesGate, true);
+  assert.equal(bundle.metrics.approvalEvidenceSourcePassed, true);
   assert.equal(bundle.metrics.candidateReviewManifestSourcePassed, true);
   assert.equal(bundle.metrics.candidateReviewManifestHashMatchesEvidence, true);
   assert.equal(bundle.metrics.candidateReviewManifestTimeMatchesEvidence, true);
@@ -521,6 +522,53 @@ test('GU-19 release evidence bundle rejects approval evidence that drifts from t
   assert.equal(bundle.metrics.approvalEvidenceHashMatchesGate, false);
   assert.equal(bundle.metrics.readyEvidenceSourcesMatchGate, false);
   assert.equal(report.ok, false);
+  assert.equal(
+    report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,
+    false
+  );
+}));
+
+test('GU-19 release evidence bundle rejects approval evidence source evidence that does not support the ready gate', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_evidence_bundle_bad_approval_source',
+    prompt: 'ivory observatory pier with careful signal builders',
+    nowMs: 154_790
+  });
+  const failingApprovalEvidence = {
+    ...fixture.approvalEvidence,
+    operatorApiKey: 'sk-release-evidence-secret'
+  };
+  const forgedReleaseGate = {
+    ...fixture.releaseGate,
+    approvalEvidence: failingApprovalEvidence
+  };
+  const bundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    releaseGate: forgedReleaseGate,
+    approvalEvidence: failingApprovalEvidence,
+    nowMs: 154_815
+  });
+  const report = validateReleaseEvidenceBundle(bundle, {
+    ...fixture,
+    releaseGate: forgedReleaseGate,
+    approvalEvidence: failingApprovalEvidence
+  });
+
+  assert.equal(validateReleaseApprovalEvidence(failingApprovalEvidence, fixture.pack).ok, false);
+  assert.equal(forgedReleaseGate.publicReleaseEligible, true);
+  assert.equal(bundle.metrics.sourceHashMismatchCount, 0);
+  assert.equal(bundle.metrics.approvalEvidenceHashMatchesGate, true);
+  assert.equal(bundle.metrics.approvalEvidenceSourcePassed, false);
+  assert.equal(bundle.metrics.readyEvidenceSourcesMatchGate, false);
+  assert.equal(report.ok, false);
+  assert.equal(
+    report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_SOURCE_HASHES_MATCH').passed,
+    true
+  );
+  assert.equal(
+    report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_RELEASE_GATE_VALID').passed,
+    false
+  );
   assert.equal(
     report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,
     false

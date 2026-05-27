@@ -4538,6 +4538,17 @@ function releaseGeneratedPackSourcePassed(pack = null) {
     && Number(pack?.assetScaffold?.productionImageAssetCount || 0) === 0;
 }
 
+function releaseApprovalEvidenceSourcePassed(approvalEvidence = null, pack = {}) {
+  if (!approvalEvidence || typeof approvalEvidence !== 'object') return false;
+  const report = validateReleaseApprovalEvidence(approvalEvidence, pack || {});
+  return report.ok === true
+    && report.metrics?.packIdMatches === true
+    && report.metrics?.costConsentModelApproved === true
+    && report.metrics?.candidateAssetsReviewed === true
+    && report.metrics?.humanReviewComplete === true
+    && report.metrics?.boundaryPreserved === true;
+}
+
 function buildProductionReleaseGate({
   pack = {},
   playtestReport = null,
@@ -4998,6 +5009,7 @@ function buildReleaseEvidenceBundle({
   const playtestSourcePassed = releasePlaytestSourcePassed(playtestReport, pack || {});
   const persistenceSourcePassed = releasePersistenceSourcePassed(persistenceReport || {}, bundlePackId);
   const publicCardSourcePassed = releasePublicCardSourcePassed(publicCard || {}, bundlePackId);
+  const approvalEvidenceSourcePassed = releaseApprovalEvidenceSourcePassed(gateApprovalEvidence, pack || {});
   const candidateReviewManifestSourcePassed = releaseCandidateReviewManifestSourcePassed(candidateReviewManifest, pack || {});
   const diversitySourceIncludesGatePack = releaseDiversityIncludesPack(diversityReport || {}, bundlePackId);
   const diversitySourceMetricsCoherent = releaseDiversityPassed(diversityReport || {})
@@ -5015,6 +5027,7 @@ function buildReleaseEvidenceBundle({
       && diversitySourceIncludesGatePack
       && diversitySourceMetricsCoherent
       && approvalEvidenceHashMatchesGate
+      && approvalEvidenceSourcePassed
       && candidateReviewManifestSourcePassed
       && candidateReviewManifestHashMatchesEvidence
       && candidateReviewManifestTimeMatchesEvidence
@@ -5060,6 +5073,7 @@ function buildReleaseEvidenceBundle({
       diversitySourceIncludesGatePack,
       diversitySourceMetricsCoherent,
       approvalEvidenceHashMatchesGate,
+      approvalEvidenceSourcePassed,
       candidateReviewManifestSourcePassed,
       candidateReviewManifestHashMatchesEvidence,
       candidateReviewManifestTimeMatchesEvidence,
@@ -5154,6 +5168,8 @@ function validateReleaseEvidenceBundle(bundle = {}, {
   const playtestSourcePassed = releasePlaytestSourcePassed(playtestReport, pack || {});
   const persistenceSourcePassed = releasePersistenceSourcePassed(persistenceReport || {}, bundle?.packId || releaseGate?.packId || pack?.packId || '');
   const publicCardSourcePassed = releasePublicCardSourcePassed(publicCard || {}, bundle?.packId || releaseGate?.packId || pack?.packId || '');
+  const approvalEvidenceSource = approvalEvidence || releaseGate?.approvalEvidence || null;
+  const approvalEvidenceSourcePassed = releaseApprovalEvidenceSourcePassed(approvalEvidenceSource, pack || {});
   const candidateReviewManifestSourcePassed = releaseCandidateReviewManifestSourcePassed(candidateReviewManifest, pack || {});
   const diversitySourceIncludesGatePack = diversityReport
     ? releaseDiversityIncludesPack(diversityReport, bundle?.packId || releaseGate?.packId || pack?.packId || '')
@@ -5195,6 +5211,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
       && diversitySourceIncludesGatePack
       && diversitySourceMetricsCoherent
       && approvalEvidenceHashMatchesGate
+      && approvalEvidenceSourcePassed
       && candidateReviewManifestSourcePassed
       && candidateReviewManifestHashMatchesEvidence
       && candidateReviewManifestTimeMatchesEvidence
@@ -5231,6 +5248,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     && bundle?.metrics?.readyEvidenceSourcesMatchGate === readyEvidenceSourcesMatchGate
     && readyEvidenceSourcesMatchGate === true
     && bundle?.metrics?.approvalEvidenceHashMatchesGate === approvalEvidenceHashMatchesGate
+    && bundle?.metrics?.approvalEvidenceSourcePassed === approvalEvidenceSourcePassed
     && bundle?.metrics?.candidateReviewManifestSourcePassed === candidateReviewManifestSourcePassed
     && bundle?.metrics?.candidateReviewManifestHashMatchesEvidence === candidateReviewManifestHashMatchesEvidence
     && bundle?.metrics?.candidateReviewManifestTimeMatchesEvidence === candidateReviewManifestTimeMatchesEvidence;
@@ -5299,6 +5317,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
         diversitySourceMetricsCoherent,
         readyEvidenceSourcesMatchGate,
         approvalEvidenceHashMatchesGate,
+        approvalEvidenceSourcePassed,
         candidateReviewManifestHashMatchesEvidence,
         candidateReviewManifestTimeMatchesEvidence
       }
