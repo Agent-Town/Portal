@@ -69,6 +69,65 @@ const V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE = {
   ]
 };
 
+const V6_CIVIC_AUDIT_SUMMARY_COVERAGE = {
+  modulePath: 'server/world_civilization/replay_reconstruction.js',
+  status: 'research_only',
+  releaseReady: false,
+  beforeAfterSummaryRequired: true,
+  zeroHashOnlyFallbacksRequired: true,
+  coveredReplayGroups: [
+    {
+      key: 'proposal_vote',
+      stores: ['proposals', 'votes'],
+      artifact: 'tests/world_civilization_proposal_vote_process_restart.test.js',
+      fallbackCoverage: 'zero_hash_only_fallbacks_proven'
+    },
+    {
+      key: 'reputation_moderation',
+      stores: ['reputation', 'moderation'],
+      artifact: 'tests/world_civilization_reputation_moderation_process_restart.test.js',
+      fallbackCoverage: 'zero_hash_only_fallbacks_proven'
+    },
+    {
+      key: 'effect_rollback',
+      stores: ['effects'],
+      artifact: 'tests/world_civilization_effect_process_restart.test.js',
+      fallbackCoverage: 'zero_hash_only_fallbacks_proven'
+    },
+    {
+      key: 'delegation_lifecycle',
+      stores: ['delegations'],
+      artifact: 'tests/world_civilization_delegation_process_restart.test.js',
+      fallbackCoverage: 'zero_hash_only_fallbacks_proven'
+    },
+    {
+      key: 'institution_charters',
+      stores: ['institutions'],
+      artifact: 'tests/world_civilization_institution_process_restart.test.js',
+      fallbackCoverage: 'zero_hash_only_fallbacks_proven'
+    },
+    {
+      key: 'public_works_resources',
+      stores: ['public_works'],
+      artifact: 'tests/world_civilization_public_works_process_restart.test.js',
+      fallbackCoverage: 'zero_hash_only_fallbacks_proven'
+    }
+  ],
+  excludedResearchFallbacks: [
+    {
+      key: 'manual_audit_ledger_rows',
+      artifact: 'tests/world_civilization_audit_ledger.test.js',
+      reason: 'Hash-only fallback remains documented only for manual ledger rows without store-provided summaries.'
+    }
+  ],
+  remainingReleaseGaps: [
+    'release_grade_replay_reconstruction',
+    'larger_dataset_store_summary_replay',
+    'backup_restore_summary_replay',
+    'applied_effect_summary_reconstruction'
+  ]
+};
+
 const V6_CIVIC_RESILIENCE_STORES = [
   {
     key: 'audit_ledger',
@@ -158,6 +217,7 @@ const REQUIRED_RESILIENCE_READINESS_CHECKS = [
   'rollback_recovery',
   'backup_restore',
   'privacy_safe_replay',
+  'store_specific_zero_hash_only_fallbacks',
   'no_runtime_exposure',
   'no_player_exposure',
   'private_data_exclusion',
@@ -167,6 +227,7 @@ const REQUIRED_RESILIENCE_EVIDENCE_CHECKS = [
   'all_civic_store_restart_probes',
   'audit_replay_reconstruction',
   'privacy_safe_replay_summaries',
+  'store_specific_zero_hash_only_fallbacks',
   'hash_chain_integrity',
   'migration_upgrade_scripts',
   'migration_downgrade_scripts',
@@ -190,6 +251,23 @@ function normalizeList(value) {
   return Array.isArray(value) ? value.map((entry) => String(entry || '')).filter(Boolean) : [];
 }
 
+function sameStringList(actual, expected) {
+  if (!Array.isArray(actual) || !Array.isArray(expected) || actual.length !== expected.length) return false;
+  return actual.every((entry, index) => entry === expected[index]);
+}
+
+function auditSummaryCoverageMatchesExpected(coverage = {}) {
+  if (!Array.isArray(coverage.coveredReplayGroups)) return false;
+  if (coverage.coveredReplayGroups.length !== V6_CIVIC_AUDIT_SUMMARY_COVERAGE.coveredReplayGroups.length) return false;
+  return coverage.coveredReplayGroups.every((group, index) => {
+    const expected = V6_CIVIC_AUDIT_SUMMARY_COVERAGE.coveredReplayGroups[index];
+    return group.key === expected.key
+      && sameStringList(group.stores, expected.stores)
+      && group.artifact === expected.artifact
+      && group.fallbackCoverage === expected.fallbackCoverage;
+  });
+}
+
 function check(key, ok, error = '') {
   return { key, ok: ok === true, error: ok === true ? '' : error };
 }
@@ -206,6 +284,7 @@ function inspectResilienceReadinessEvidence(evidence = {}) {
   const rollbackRecoveryReviewed = evidence.rollbackRecoveryReviewed === true;
   const backupRestoreReviewed = evidence.backupRestoreReviewed === true;
   const privacySafeReplayReviewed = evidence.privacySafeReplayReviewed === true;
+  const storeSpecificAuditSummaryCoverageComplete = evidence.storeSpecificAuditSummaryCoverageComplete === true;
   const ok = evidence.status === 'complete'
     && evidence.executionStatus === 'not_executable'
     && evidence.runtimeExposed === false
@@ -222,6 +301,7 @@ function inspectResilienceReadinessEvidence(evidence = {}) {
     && rollbackRecoveryReviewed
     && backupRestoreReviewed
     && privacySafeReplayReviewed
+    && storeSpecificAuditSummaryCoverageComplete
     && missingChecks.length === 0
     && missingStoreKeys.length === 0;
   return {
@@ -242,6 +322,7 @@ function inspectResilienceReadinessEvidence(evidence = {}) {
     rollbackRecoveryReviewed,
     backupRestoreReviewed,
     privacySafeReplayReviewed,
+    storeSpecificAuditSummaryCoverageComplete,
     requiredChecks: [...REQUIRED_RESILIENCE_EVIDENCE_CHECKS],
     checks,
     missingChecks,
@@ -309,6 +390,11 @@ function buildV6ResilienceReadinessGate({
     check('rollback_recovery', evidenceReport.rollbackRecoveryReviewed, 'RESILIENCE_ROLLBACK_RECOVERY_REQUIRED'),
     check('backup_restore', evidenceReport.backupRestoreReviewed, 'RESILIENCE_BACKUP_RESTORE_REQUIRED'),
     check('privacy_safe_replay', evidenceReport.privacySafeReplayReviewed, 'RESILIENCE_PRIVACY_SAFE_REPLAY_REQUIRED'),
+    check(
+      'store_specific_zero_hash_only_fallbacks',
+      evidenceReport.storeSpecificAuditSummaryCoverageComplete,
+      'RESILIENCE_STORE_SPECIFIC_AUDIT_SUMMARY_COVERAGE_REQUIRED'
+    ),
     check(
       'no_runtime_exposure',
       evidenceReport.executionStatus === 'not_executable' && evidenceReport.runtimeExposed === false,
@@ -450,6 +536,7 @@ function disabledReport(source) {
     releaseReady: false,
     executionStatus: 'not_executable',
     storeReports: [],
+    auditSummaryCoverage: null,
     loadRateCoverage: null,
     rollbackRecoveryCoverage: null,
     migrationRehearsalCoverage: null,
@@ -518,6 +605,7 @@ function buildV6ResilienceBaselineReport({
     releaseReady: false,
     executionStatus: 'not_executable',
     storeReports: V6_CIVIC_RESILIENCE_STORES.map((requirement) => inspectStore(requirement, stores[requirement.key])),
+    auditSummaryCoverage: clone(V6_CIVIC_AUDIT_SUMMARY_COVERAGE),
     loadRateCoverage: clone(V6_CIVIC_LOAD_RATE_COVERAGE),
     rollbackRecoveryCoverage: clone(V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE),
     migrationRehearsalCoverage: clone(V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE),
@@ -559,6 +647,17 @@ function assertV6ResilienceBaseline(report = {}) {
     }
     for (const storeReport of reports) {
       if (storeReport.ok !== true) errors.push(`V6_RESILIENCE_STORE_EVIDENCE_INVALID:${storeReport.key}`);
+    }
+    const auditSummaryCoverage = report.auditSummaryCoverage || {};
+    if (
+      auditSummaryCoverage.modulePath !== V6_CIVIC_AUDIT_SUMMARY_COVERAGE.modulePath
+      || auditSummaryCoverage.status !== 'research_only'
+      || auditSummaryCoverage.releaseReady !== false
+      || auditSummaryCoverage.beforeAfterSummaryRequired !== true
+      || auditSummaryCoverage.zeroHashOnlyFallbacksRequired !== true
+      || !auditSummaryCoverageMatchesExpected(auditSummaryCoverage)
+    ) {
+      errors.push('V6_RESILIENCE_AUDIT_SUMMARY_COVERAGE_REQUIRED');
     }
     const loadRateCoverage = report.loadRateCoverage || {};
     if (
@@ -605,6 +704,7 @@ module.exports = {
   REQUIRED_RESILIENCE_EVIDENCE_CHECKS: clone(REQUIRED_RESILIENCE_EVIDENCE_CHECKS),
   REQUIRED_RESILIENCE_READINESS_CHECKS: clone(REQUIRED_RESILIENCE_READINESS_CHECKS),
   REQUIRED_RESILIENCE_STORE_KEYS: clone(REQUIRED_RESILIENCE_STORE_KEYS),
+  V6_CIVIC_AUDIT_SUMMARY_COVERAGE: clone(V6_CIVIC_AUDIT_SUMMARY_COVERAGE),
   V6_CIVIC_LOAD_RATE_COVERAGE: clone(V6_CIVIC_LOAD_RATE_COVERAGE),
   V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE: clone(V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE),
   V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE: clone(V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE),

@@ -127,9 +127,10 @@ persistence resilience, and security/product release review.
   `tests/world_civilization_public_works_process_restart.test.js`;
   all replay probes must remain privacy-safe and non-executing. The V6 civic
   audit ledger now requires privacy-safe before/after summaries and replay
-  reconstruction fails closed when rows are missing them; hash-only summary
-  fallbacks remain research evidence until store-specific snapshots and release
-  replay reconstruction are complete. The M16
+  reconstruction fails closed when rows are missing them; the resilience
+  baseline now aggregates store-specific zero hash-only fallback proof for
+  current civic store replay, while manual audit-ledger hash-only fallbacks
+  remain research evidence until release replay reconstruction is complete. The M16
   research-only resilience readiness gate may also exist in
   `server/world_civilization/resilience.js`, but it must stay hidden,
   non-executing, fail closed, and require explicit restart/replay,
@@ -411,7 +412,8 @@ persistence resilience, and security/product release review.
   The M16 research-only resilience readiness gate in
   `server/world_civilization/resilience.js` must require all civic store
   restart probes, audit replay reconstruction, privacy-safe replay summaries,
-  hash-chain integrity, migration upgrade/downgrade scripts, unsupported
+  store-specific zero hash-only fallback proof, hash-chain integrity,
+  migration upgrade/downgrade scripts, unsupported
   transition denial, backup/restore rehearsal, migration load replay rehearsal,
   production load/rate targets, multi-process write contention, duplicate retry
   bursts, rollback handle reconstruction, typed rollback execution recovery,

@@ -395,10 +395,14 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /server\/world_civilization\/replay_reconstruction\.js/);
   assert.match(plan, /before\/after audit summary presence/);
   assert.match(plan, /hash-only fallbacks/);
+  assert.match(plan, /V6_CIVIC_AUDIT_SUMMARY_COVERAGE/);
+  assert.match(plan, /store-specific zero hash-only fallback proof/);
   assert.match(plan, /server\/world_civilization\/migration_rehearsal\.js/);
   assert.match(plan, /tests\/world_civilization_migration_rehearsal\.test\.js/);
   assert.match(plan, /unsupported upgrade\/downgrade targets fail closed/);
   assert.match(persistenceSpec, /server\/world_civilization\/migration_rehearsal\.js/);
+  assert.match(persistenceSpec, /V6_CIVIC_AUDIT_SUMMARY_COVERAGE/);
+  assert.match(persistenceSpec, /Manual audit-ledger rows without store-provided summaries/);
   assert.match(persistenceSpec, /tests\/world_civilization_migration_rehearsal\.test\.js/);
   assert.match(persistenceSpec, /Unsupported upgrade\/downgrade targets fail closed/);
   assert.match(persistenceSpec, /before\/after audit summary presence/);
@@ -441,6 +445,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(gate, /tests\/world_civilization_public_works_process_restart\.test\.js/);
   assert.match(gate, /privacy-safe before\/after summaries/);
   assert.match(gate, /hash-only summary\s+fallbacks/);
+  assert.match(gate, /store-specific zero hash-only fallback proof/);
   assert.match(gate, /These current probes cover every current civic store at research scale/);
   assert.match(gate, /Release still requires release-grade process restart coverage/);
   assert.match(persistenceSpec, /buildV6ResilienceReadinessGate\(\)/);
@@ -449,6 +454,8 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(replaySource, /CIVIC_REPLAY_AUDIT_SUMMARY_REQUIRED/);
   assert.match(replaySource, /summaryCoverage/);
   assert.match(resilienceSource, /REQUIRED_RESILIENCE_EVIDENCE_CHECKS/);
+  assert.match(resilienceSource, /V6_CIVIC_AUDIT_SUMMARY_COVERAGE/);
+  assert.match(resilienceSource, /store_specific_zero_hash_only_fallbacks/);
   assert.match(resilienceSource, /typed_rollback_execution_recovery/);
   assert.match(resilienceSource, /V6_RESILIENCE_READINESS_RELEASE_READY_FORBIDDEN/);
   assert.match(plan, /M17 Security and product release review \| `in_progress`/);

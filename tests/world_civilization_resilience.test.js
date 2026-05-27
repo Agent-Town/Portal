@@ -19,6 +19,7 @@ const {
   REQUIRED_RESILIENCE_EVIDENCE_CHECKS,
   REQUIRED_RESILIENCE_READINESS_CHECKS,
   REQUIRED_RESILIENCE_STORE_KEYS,
+  V6_CIVIC_AUDIT_SUMMARY_COVERAGE,
   V6_CIVIC_LOAD_RATE_COVERAGE,
   V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE,
   V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE,
@@ -99,6 +100,7 @@ function resilienceReadinessEvidence(overrides = {}) {
     rollbackRecoveryReviewed: true,
     backupRestoreReviewed: true,
     privacySafeReplayReviewed: true,
+    storeSpecificAuditSummaryCoverageComplete: true,
     checks: [...REQUIRED_RESILIENCE_EVIDENCE_CHECKS],
     storeKeys: [...REQUIRED_RESILIENCE_STORE_KEYS],
     ...overrides
@@ -152,6 +154,25 @@ test('V6 resilience baseline verifies current SQLite stores and keeps release ga
   assert.ok(report.migrationRehearsalCoverage.coveredChecks.includes('unsupported_upgrade_fails_closed'));
   assert.ok(report.migrationRehearsalCoverage.remainingReleaseGaps.includes('release_grade_upgrade_scripts'));
   assert.deepEqual(report.releaseGaps, REQUIRED_RELEASE_GAPS);
+  assert.deepEqual(report.auditSummaryCoverage, V6_CIVIC_AUDIT_SUMMARY_COVERAGE);
+  assert.equal(report.auditSummaryCoverage.releaseReady, false);
+  assert.equal(report.auditSummaryCoverage.beforeAfterSummaryRequired, true);
+  assert.equal(report.auditSummaryCoverage.zeroHashOnlyFallbacksRequired, true);
+  assert.deepEqual(
+    report.auditSummaryCoverage.coveredReplayGroups.map((entry) => entry.key),
+    [
+      'proposal_vote',
+      'reputation_moderation',
+      'effect_rollback',
+      'delegation_lifecycle',
+      'institution_charters',
+      'public_works_resources'
+    ]
+  );
+  assert.ok(report.auditSummaryCoverage.coveredReplayGroups.every((entry) => (
+    entry.fallbackCoverage === 'zero_hash_only_fallbacks_proven'
+  )));
+  assert.equal(report.auditSummaryCoverage.excludedResearchFallbacks[0].key, 'manual_audit_ledger_rows');
   assert.deepEqual(report.storeReports.map((entry) => entry.key), V6_CIVIC_RESILIENCE_STORES.map((entry) => entry.key));
   for (const storeReport of report.storeReports) {
     assert.equal(storeReport.ok, true, storeReport.key);
@@ -189,6 +210,12 @@ test('V6 resilience assertion fails closed for missing store evidence and releas
     playerVisible: true,
     releaseReady: true,
     executionStatus: 'executes',
+    auditSummaryCoverage: {
+      ...report.auditSummaryCoverage,
+      coveredReplayGroups: report.auditSummaryCoverage.coveredReplayGroups.map((entry) => (
+        entry.key === 'proposal_vote' ? { ...entry, artifact: 'tests/fake_replay.test.js' } : entry
+      ))
+    },
     releaseGaps: []
   };
   const result = assertV6ResilienceBaseline(unsafe);
@@ -199,6 +226,7 @@ test('V6 resilience assertion fails closed for missing store evidence and releas
   assert.match(result.errors.join(','), /V6_RESILIENCE_RELEASE_READY_FORBIDDEN/);
   assert.match(result.errors.join(','), /V6_RESILIENCE_NON_EXECUTING_REQUIRED/);
   assert.match(result.errors.join(','), /V6_RESILIENCE_RELEASE_GAPS_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_RESILIENCE_AUDIT_SUMMARY_COVERAGE_REQUIRED/);
   assert.match(result.errors.join(','), /V6_RESILIENCE_STORE_EVIDENCE_INVALID:audit_ledger/);
   assert.match(result.errors.join(','), /V6_RESILIENCE_STORE_EVIDENCE_INVALID:proposals/);
   assert.match(result.errors.join(','), /V6_RESILIENCE_STORE_EVIDENCE_INVALID:public_works/);
@@ -255,6 +283,7 @@ test('V6 resilience readiness gate records restart replay migration load and rol
   assert.equal(report.executionStatus, 'not_executable');
   assert.deepEqual(report.checks.map((entry) => entry.key), REQUIRED_RESILIENCE_READINESS_CHECKS);
   assert.equal(report.evidence.ok, true);
+  assert.equal(report.evidence.storeSpecificAuditSummaryCoverageComplete, true);
   assert.deepEqual(report.evidence.missingChecks, []);
   assert.deepEqual(report.evidence.missingStoreKeys, []);
   assert.deepEqual(report.evidence.requiredStoreKeys, REQUIRED_RESILIENCE_STORE_KEYS);
@@ -271,12 +300,14 @@ test('V6 resilience readiness gate fails closed without migration load rollback 
         && check !== 'production_load_rate_targets'
         && check !== 'typed_rollback_execution_recovery'
         && check !== 'backup_restore_rehearsal'
+        && check !== 'store_specific_zero_hash_only_fallbacks'
       )),
       storeKeys: REQUIRED_RESILIENCE_STORE_KEYS.filter((key) => key !== 'public_works'),
       migrationUpgradeDowngradeReviewed: false,
       loadRateReviewed: false,
       rollbackRecoveryReviewed: false,
-      backupRestoreReviewed: false
+      backupRestoreReviewed: false,
+      storeSpecificAuditSummaryCoverageComplete: false
     })
   });
 
@@ -284,6 +315,7 @@ test('V6 resilience readiness gate fails closed without migration load rollback 
   assert.equal(report.researchReady, false);
   assert.equal(report.failClosed, true);
   assert.deepEqual(report.evidence.missingChecks, [
+    'store_specific_zero_hash_only_fallbacks',
     'migration_upgrade_scripts',
     'backup_restore_rehearsal',
     'production_load_rate_targets',
@@ -295,7 +327,8 @@ test('V6 resilience readiness gate fails closed without migration load rollback 
     'RESILIENCE_MIGRATION_UPGRADE_DOWNGRADE_REQUIRED',
     'RESILIENCE_LOAD_RATE_REQUIRED',
     'RESILIENCE_ROLLBACK_RECOVERY_REQUIRED',
-    'RESILIENCE_BACKUP_RESTORE_REQUIRED'
+    'RESILIENCE_BACKUP_RESTORE_REQUIRED',
+    'RESILIENCE_STORE_SPECIFIC_AUDIT_SUMMARY_COVERAGE_REQUIRED'
   ]);
   assert.deepEqual(assertV6ResilienceReadinessGateSafe(report), { ok: true, errors: [] });
 });

@@ -83,6 +83,14 @@ rollback handle counts, and paginated ledger replay without applying world state
 or exposing actor account ids. Hash-only summary fallbacks are tracked as
 research evidence, not release-grade store reconstruction.
 
+`server/world_civilization/resilience.js` now aggregates the current
+store-specific audit-summary coverage in `V6_CIVIC_AUDIT_SUMMARY_COVERAGE`.
+That coverage names each process-restart replay group that proves privacy-safe
+before/after summaries and zero hash-only fallbacks for current proposal/vote,
+reputation/moderation, effect, delegation, institution, and public-works store
+rows. Manual audit-ledger rows without store-provided summaries remain an
+explicit research-only fallback contract, not release-grade store replay.
+
 `tests/world_civilization_process_restart.test.js` adds process-level restart
 evidence for the civic audit ledger by seeding, closing, reopening, replaying,
 and retrying exact idempotent writes across separate Node process lifetimes
@@ -174,6 +182,8 @@ The readiness gate requires evidence for:
 - Audit replay reconstruction with hash-chain continuity.
 - Privacy-safe before/after replay summaries, missing-summary denial, and
   private-data exclusion.
+- Store-specific zero hash-only fallback proof across the current civic store
+  restart probes.
 - Migration upgrade/downgrade scripts and unsupported transition denial.
 - Backup/restore and migration load replay rehearsal.
 - Production load/rate targets, multi-process write contention, duplicate
