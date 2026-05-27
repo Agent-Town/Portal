@@ -493,7 +493,7 @@ Release gates now have a companion `releaseEvidenceBundle` contract. The bundle 
 
 The evidence bundle has a generated-pack feature-gated API endpoint for QA review: `POST /api/world/generated-pack/release-evidence-bundle`. The endpoint returns the release gate, release-gate validation, hash-bound bundle, and bundle validation report. It remains hidden unless `FEATURE_WORLD_GRID_GENERATED_PACKS` is enabled and does not approve public release by itself.
 
-Release-gate API ingress, including the generic tool dispatcher, now rejects secret-like fields, raw executable prompt-instruction text, and oversized/noisy evidence bodies before building or echoing release reports. Rejection responses include counts, limits, and safe field paths only, not submitted secret, instruction, or evidence values.
+Release-gate API ingress, including the generic tool dispatcher, now rejects secret-like fields, secret-looking values, raw executable prompt-instruction text, and oversized/noisy evidence bodies before building or echoing release reports. Rejection responses include counts, limits, and safe field paths only, not submitted secret, instruction, or evidence values.
 
 ```json
 {
@@ -542,6 +542,7 @@ Release-gate API ingress, including the generic tool dispatcher, now rejects sec
   "failClosedBundleApiValid": true,
   "releaseApiRequestBounded": true,
   "releaseApiOversizedEvidenceRejected": true,
+  "releaseApiSecretValueRejected": true,
   "releaseApiSecretEchoCount": 0,
   "releaseApiRawInstructionEchoCount": 0,
   "releaseApiOversizedEvidenceEchoCount": 0,

@@ -245,6 +245,11 @@ function normalizeError(error) {
 }
 
 function findReleaseEvidenceSecretLikePaths(value, pathLabel = '$', matches = []) {
+  const secretValuePattern = /\b(?:sk-[a-z0-9_-]{8,}|xox[baprs]-[a-z0-9-]{8,}|ghp_[a-z0-9_]{8,}|github_pat_[a-z0-9_]{8,}|ya29\.[a-z0-9_-]{8,}|bearer\s+[a-z0-9._-]{12,})\b/i;
+  if (typeof value === 'string') {
+    if (secretValuePattern.test(value)) matches.push(pathLabel);
+    return matches;
+  }
   if (!value || typeof value !== 'object') return matches;
   const secretKey = /(api[_-]?key|secret|private[_-]?key|credential|oauth|access[_-]?token|refresh[_-]?token|wallet[_-]?secret|seed[_-]?phrase|password)/i;
   for (const [key, child] of Object.entries(value)) {
