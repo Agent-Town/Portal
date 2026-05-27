@@ -5360,6 +5360,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
   const releaseGateProvided = Boolean(releaseGate);
   const releaseGateHashExpected = releaseGateProvided ? stableEvidenceHash(releaseGate) : '';
   const releaseGateHashMatches = releaseGateProvided && bundle?.releaseGateHash === releaseGateHashExpected;
+  const releaseGatePublicEligible = releaseGate?.publicReleaseEligible === true;
   const gateReport = releaseGate
     ? validateProductionReleaseGate(releaseGate, { nowMs })
     : { ok: false };
@@ -5455,7 +5456,8 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     && bundle?.metrics?.releaseGateHashMatches === releaseGateHashMatches
     && releaseGateHashMatches === true
     && bundle?.metrics?.releaseGateValid === (gateReport.ok === true)
-    && bundle?.metrics?.releaseGatePublicEligible === (bundle?.publicReleaseEligible === true)
+    && bundle?.metrics?.releaseGatePublicEligible === releaseGatePublicEligible
+    && bundle?.publicReleaseEligible === releaseGatePublicEligible
     && bundle?.metrics?.bundleCreatedAtOrAfterGate === bundleCreatedAtOrAfterGate
     && bundleCreatedAtOrAfterGate === true
     && bundle?.metrics?.bundleCreatedAtNotFuture === bundleCreatedAtNotFuture
@@ -5536,6 +5538,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
         sourcePackIdProblemCount: sourcePackIdProblems.length,
         sourceCoverageOk,
         releaseGateHashMatches,
+        releaseGatePublicEligible,
         bundleCreatedAtOrAfterGate,
         bundleCreatedAtNotFuture,
         blockingReasonsMatchGate,
@@ -5581,6 +5584,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
       requiredSourceCount: RELEASE_EVIDENCE_SOURCE_KEYS.length,
       sourceCoverageOk,
       releaseGateValid: gateReport.ok === true,
+      releaseGatePublicEligible,
       bundleCreatedAtOrAfterGate,
       bundleCreatedAtNotFuture,
       blockingReasonsMatchGate,
