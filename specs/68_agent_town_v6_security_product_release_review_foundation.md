@@ -32,11 +32,13 @@ are present.
   lab private-data exclusion, audit summary minimization, cross-account
   boundary, and privacy review target gate.
 - Abuse-case review: spam, harassment, impersonation, unauthorized mutation,
-  store-backed delegated-agent proof, delegation scope mismatch, read-only
-  delegation budget evidence, session-auth target gate evidence,
-  provider-disconnect invalidation target evidence, production browser session
-  coverage target evidence, moderation escalation, and civic mutation security
-  envelope evidence.
+  delegation abuse, store-backed delegated-agent proof, delegation scope
+  mismatch, read-only delegation budget evidence, delegation budget abuse,
+  vote/reputation farming, public works spend abuse, session-auth target gate
+  evidence, provider-disconnect invalidation target evidence, production browser
+  session coverage target evidence, moderation escalation, rollback bypass,
+  public autonomous agent mutation denial, abuse-case target gate evidence, and
+  civic mutation security envelope evidence.
 - Data-retention policy: audit retention, deletion policy, debug log retention,
   export policy, data-retention target gate, private credential exclusion,
   backup retention expiry target, and retention-aware replay target.
@@ -50,8 +52,9 @@ are present.
 - Validation evidence: targeted Node suite, split Playwright smokes,
   all-features regression, feature override safety, load-rate target coverage,
   migration-load replay evidence, load/rate replay evidence, and multi-process
-  write-contention evidence, including civic mutation security, threat model
-  target coverage, privacy review target coverage, data-retention target
+  write-contention evidence, including civic mutation security, abuse-case
+  target coverage, threat model target coverage, privacy review target coverage,
+  data-retention target
   coverage, session-auth target coverage, proposal intake readiness, vote
   authorization readiness, worker vote adapter gate, reputation eligibility
   advice readiness, moderation privacy readiness, delegated-agent proof, and

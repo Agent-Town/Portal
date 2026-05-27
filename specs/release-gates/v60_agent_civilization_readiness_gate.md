@@ -192,9 +192,10 @@ persistence resilience, and security/product release review.
 - The research-only release review gate may exist in
   `server/world_civilization/release_review.js`, but it must keep V6 hidden
   from runtime/player surfaces until threat model, privacy review, abuse-case
-  review, threat model target gate evidence, privacy review target gate evidence,
-  M5 session-auth target evidence, store-backed delegated-agent proof
-  evidence, data-retention policy with data-retention target gate evidence,
+  review, abuse-case target gate evidence, threat model target gate evidence,
+  privacy review target gate evidence, M5 session-auth target evidence,
+  store-backed delegated-agent proof evidence, data-retention policy with
+  data-retention target gate evidence,
   audit coverage, validation evidence, modal lab surface launch review, and
   product signoff are complete.
 - The research-only controlled release gate may exist in
@@ -589,8 +590,9 @@ persistence resilience, and security/product release review.
   `server/world_civilization/release_review.js` and
   `docs/security/V6_AGENT_CIVILIZATION_RELEASE_REVIEW.md`; release still
   requires approved threat model, privacy review, abuse-case review,
-  store-backed delegation proof and scope-mismatch evidence, data-retention
-  policy, audit coverage review, deterministic validation evidence, effect
+  abuse-case target gate evidence, store-backed delegation proof and scope-mismatch evidence,
+  data-retention policy, audit coverage review,
+  deterministic validation evidence, effect
   execution and rollback review, agent participation enforcement review, civic
   institution readiness review, public works readiness review, modal lab surface
   review, resilience readiness review with store-specific zero hash-only

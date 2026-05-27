@@ -78,6 +78,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'server/world_grid/preferences.js',
     'server/world_grid/rate_limit.js',
     'server/world_civilization/audit_ledger.js',
+    'server/world_civilization/abuse_case_targets.js',
     'server/world_civilization/controlled_release.js',
     'server/world_civilization/data_retention_targets.js',
     'server/world_civilization/delegations.js',
@@ -115,6 +116,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'server/world_civilization/worker_vote_adapter.js',
     'tests/world_civilization_process_restart.test.js',
     'tests/world_civilization_proposal_vote_process_restart.test.js',
+    'tests/world_civilization_abuse_case_targets.test.js',
     'tests/world_civilization_data_retention_targets.test.js',
     'tests/world_civilization_privacy_review_targets.test.js',
     'tests/world_civilization_reputation_moderation_process_restart.test.js',
@@ -222,6 +224,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   const dataRetentionTargetSource = read('server/world_civilization/data_retention_targets.js');
   const privacyReviewTargetSource = read('server/world_civilization/privacy_review_targets.js');
   const threatModelTargetSource = read('server/world_civilization/threat_model_targets.js');
+  const abuseCaseTargetSource = read('server/world_civilization/abuse_case_targets.js');
   const requiredMilestones = [
     'M0 Hardened V5 world-grid baseline',
     'M1 Living V6 milestone contract',
@@ -266,11 +269,14 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(readinessSource, /production_browser_session_coverage_target/);
   assert.match(readinessSource, /V6_READINESS_GATE_PRODUCTION_ENABLEMENT_FORBIDDEN/);
   assert.match(readinessSource, /threat_model_target_gate/);
+  assert.match(readinessSource, /abuse_case_target_gate/);
   assert.match(readinessSource, /privacy_review_target_gate/);
   assert.match(readinessSource, /data_retention_target_gate/);
   assert.match(releaseReviewSource, /session_auth_target_gate/);
   assert.match(releaseReviewSource, /threat_model_target_gate/);
   assert.match(releaseReviewSource, /server\/world_civilization\/threat_model_targets\.js/);
+  assert.match(releaseReviewSource, /abuse_case_target_gate/);
+  assert.match(releaseReviewSource, /server\/world_civilization\/abuse_case_targets\.js/);
   assert.match(releaseReviewSource, /privacy_review_target_gate/);
   assert.match(releaseReviewSource, /server\/world_civilization\/privacy_review_targets\.js/);
   assert.match(releaseReviewSource, /data_retention_target_gate/);
@@ -285,6 +291,11 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(threatModelTargetSource, /attacker_capabilities/);
   assert.match(threatModelTargetSource, /rollback_failure_modes/);
   assert.match(threatModelTargetSource, /release_signoff_inputs/);
+  assert.match(abuseCaseTargetSource, /V6_ABUSE_CASE_TARGETS_VERSION/);
+  assert.match(abuseCaseTargetSource, /unauthorized_mutation/);
+  assert.match(abuseCaseTargetSource, /delegation_budget_abuse/);
+  assert.match(abuseCaseTargetSource, /vote_reputation_farming/);
+  assert.match(abuseCaseTargetSource, /public_autonomous_agent_mutation/);
   assert.match(skillLine, /V6 aggregate readiness gate/);
   assert.match(plan, /Source branch: `codex\/v6-agent-civilization-milestones`/);
   assert.match(plan, /broad V5 prototype overrides do not enable V6/);
@@ -812,6 +823,9 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /threat-model target matrix/);
   assert.match(plan, /worker\/route boundaries/);
   assert.match(plan, /rollback failure modes/);
+  assert.match(plan, /server\/world_civilization\/abuse_case_targets\.js/);
+  assert.match(plan, /abuse-case target matrix/);
+  assert.match(plan, /public autonomous agent mutation denial/);
   assert.match(plan, /server\/world_civilization\/privacy_review_targets\.js/);
   assert.match(plan, /privacy review target matrix/);
   assert.match(plan, /public surface minimization/);
@@ -822,6 +836,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /store-backed delegation proof and scope-mismatch evidence/);
   assert.match(plan, /store-specific audit-summary coverage/);
   assert.match(gate, /server\/world_civilization\/release_review\.js/);
+  assert.match(gate, /abuse-case target gate evidence/);
   assert.match(gate, /threat model target gate evidence/);
   assert.match(gate, /privacy review target gate evidence/);
   assert.match(gate, /data-retention target gate evidence/);
@@ -885,6 +900,9 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(releaseReview, /Threat model/);
   assert.match(releaseReview, /threat model target gate/);
   assert.match(releaseReview, /rollback failure modes/);
+  assert.match(releaseReview, /Abuse-case review/);
+  assert.match(releaseReview, /abuse-case target gate/);
+  assert.match(releaseReview, /public autonomous agent mutation denial/);
   assert.match(releaseReview, /Privacy review/);
   assert.match(releaseReview, /privacy review target gate/);
   assert.match(releaseReview, /public text rendering\/XSS/);
@@ -910,6 +928,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(skillLine, /normal gameplay exposure denial/);
   assert.match(skillLine, /M16 readiness gate/);
   assert.match(skillLine, /V6 threat-model target gate/);
+  assert.match(skillLine, /V6 abuse-case target gate/);
   assert.match(skillLine, /V6 privacy review target gate/);
   assert.match(skillLine, /V6 data-retention target gate/);
   assert.match(skillLine, /store-specific audit-summary coverage/);

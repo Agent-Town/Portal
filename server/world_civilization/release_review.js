@@ -60,8 +60,10 @@ const REQUIRED_REVIEW_GATES = [
     requiredArtifacts: [
       RELEASE_REVIEW_ARTIFACT,
       'docs/security/V6_CIVIC_MUTATION_SECURITY_PLAN.md',
+      'server/world_civilization/abuse_case_targets.js',
       'server/world_civilization/mutation_security.js',
       'server/world_civilization/session_auth_targets.js',
+      'tests/world_civilization_abuse_case_targets.test.js',
       'tests/world_civilization_session_auth_targets.test.js',
       'tests/world_civilization_mutation_security.test.js'
     ],
@@ -70,13 +72,20 @@ const REQUIRED_REVIEW_GATES = [
       'harassment',
       'impersonation',
       'unauthorized_mutation',
+      'delegation_abuse',
       'store_backed_delegation_proof',
       'delegation_scope_mismatch',
       'delegation_budget_read_only',
+      'delegation_budget_abuse',
+      'vote_reputation_farming',
+      'public_works_spend_abuse',
       'session_auth_target_gate',
       'provider_disconnect_invalidation_target',
       'production_browser_session_coverage_target',
-      'moderation_escalation'
+      'moderation_escalation',
+      'rollback_bypass',
+      'public_autonomous_agent_mutation',
+      'abuse_case_target_gate'
     ],
     signoffRequired: true
   },
@@ -157,6 +166,7 @@ const REQUIRED_REVIEW_GATES = [
     requiredArtifacts: [
       RELEASE_REVIEW_ARTIFACT,
       'tests/world_civilization_schemas.test.js',
+      'tests/world_civilization_abuse_case_targets.test.js',
       'tests/world_civilization_threat_model_targets.test.js',
       'tests/world_civilization_data_retention_targets.test.js',
       'tests/world_civilization_privacy_review_targets.test.js',
@@ -186,6 +196,7 @@ const REQUIRED_REVIEW_GATES = [
       'split_playwright_smokes',
       'all_features_regression',
       'feature_override_safety',
+      'abuse_case_target_gate',
       'threat_model_target_gate',
       'privacy_review_target_gate',
       'data_retention_target_gate',
