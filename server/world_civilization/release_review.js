@@ -29,6 +29,8 @@ const REQUIRED_REVIEW_GATES = [
       RELEASE_REVIEW_ARTIFACT,
       'docs/security/V6_CIVIC_MUTATION_SECURITY_PLAN.md',
       'server/world_civilization/mutation_security.js',
+      'server/world_civilization/session_auth_targets.js',
+      'tests/world_civilization_session_auth_targets.test.js',
       'tests/world_civilization_mutation_security.test.js'
     ],
     requiredChecks: [
@@ -39,6 +41,9 @@ const REQUIRED_REVIEW_GATES = [
       'store_backed_delegation_proof',
       'delegation_scope_mismatch',
       'delegation_budget_read_only',
+      'session_auth_target_gate',
+      'provider_disconnect_invalidation_target',
+      'production_browser_session_coverage_target',
       'moderation_escalation'
     ],
     signoffRequired: true
@@ -108,6 +113,7 @@ const REQUIRED_REVIEW_GATES = [
       RELEASE_REVIEW_ARTIFACT,
       'tests/world_civilization_schemas.test.js',
       'tests/world_civilization_mutation_security.test.js',
+      'tests/world_civilization_session_auth_targets.test.js',
       'tests/world_civilization_governance_preflight.test.js',
       'tests/world_civilization_votes.test.js',
       'tests/world_civilization_worker_vote_adapter.test.js',
@@ -132,6 +138,7 @@ const REQUIRED_REVIEW_GATES = [
       'split_playwright_smokes',
       'all_features_regression',
       'feature_override_safety',
+      'session_auth_target_gate',
       'proposal_intake_readiness_gate',
       'vote_authorization_readiness_gate',
       'worker_vote_adapter_gate',

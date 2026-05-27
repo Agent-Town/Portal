@@ -4,6 +4,8 @@ Status: `research_only`
 
 Runtime contract: `server/world_civilization/mutation_security.js`
 
+Session-auth target contract: `server/world_civilization/session_auth_targets.js`
+
 Milestone: M5 Mutation security controls
 
 This plan records the security envelope required before any V6 civic mutation
@@ -34,6 +36,12 @@ approval and does not expose V6 in normal gameplay.
   M12 route/tool enforcement is release-ready.
 - Mutations require an idempotency key before any future store call.
 - Owner/surface rate limiting uses the current prototype bucket shape.
+- `buildV6SessionAuthTargetReport()` now names the release target matrix for
+  session/wallet binding, session-bound CSRF, delegated-principal binding,
+  provider-disconnect invalidation, session-reset invalidation, route/tool
+  middleware integration, production browser session coverage, risk-aware
+  rate-limit identity, audit actor continuity, and private-data exclusion while
+  keeping `releaseReady: false`.
 - The report remains `research_only`, `runtimeExposed: false`,
   `playerVisible: false`, `productionEnabled: false`, and
   `mutationApplied: false`.
@@ -56,6 +64,11 @@ approval and does not expose V6 in normal gameplay.
   rollback handles where relevant.
 - Browser coverage for same-origin, cross-origin, stale session, cross-wallet,
   delegated-agent proof, scope mismatch, retry, and rate-limit cases.
+- Complete M5 session-auth target evidence from
+  `server/world_civilization/session_auth_targets.js`, including live
+  Privy/provider logout signoff, route/tool middleware integration, production
+  browser session coverage, risk-aware rate-limit identity, and audit
+  actor-continuity release review.
 - M17 security/product signoff before any player-visible V6 civic mutation.
 
 ## Out Of Scope

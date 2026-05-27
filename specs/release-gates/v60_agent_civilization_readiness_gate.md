@@ -125,6 +125,14 @@ persistence resilience, and security/product release review.
   exact same-idempotency delegated-action replay allowance, CSRF verification,
   idempotency, and owner/surface rate limiting before any future civic store
   write.
+- The research-only session-auth target report may exist in
+  `server/world_civilization/session_auth_targets.js`, but it must keep
+  `releaseReady: false`, expose no runtime/player surface, apply no world
+  state, and require final evidence for session/wallet continuity,
+  session-bound CSRF, delegated-principal binding, provider-disconnect
+  invalidation, session-reset invalidation, route/tool middleware integration,
+  production browser session coverage, risk-aware rate-limit identity, audit actor continuity,
+  and private-data exclusion before M5/M17 can close.
 - The research-only proposal submission route may exist in
   `server/world_civilization/routes.js`, but
   `POST /api/world/civilization/proposals/submit` must stay disabled by default
@@ -184,9 +192,9 @@ persistence resilience, and security/product release review.
 - The research-only release review gate may exist in
   `server/world_civilization/release_review.js`, but it must keep V6 hidden
   from runtime/player surfaces until threat model, privacy review, abuse-case
-  review, store-backed delegated-agent proof evidence, data-retention policy,
-  audit coverage, validation evidence, modal lab surface launch review, and
-  product signoff are complete.
+  review, M5 session-auth target evidence, store-backed delegated-agent proof
+  evidence, data-retention policy, audit coverage, validation evidence, modal lab
+  surface launch review, and product signoff are complete.
 - The research-only controlled release gate may exist in
   `server/world_civilization/controlled_release.js`, but it must keep
   `productionEnabled: false` until M0-M17 are done, the release-review report is
@@ -283,9 +291,12 @@ persistence resilience, and security/product release review.
   requires applying the durable/session-bound CSRF foundation and current V5
   browser same-wallet cross-session denial plus token rotation/invalidation
   proof plus wallet/provider disconnect invalidation endpoint and mocked
-  provider callback evidence to V6 route/tool integration, durable/shared rate
-  limits, final session/wallet middleware, production browser coverage, audit
-  integration, live Privy/provider logout signoff, and security/product signoff.
+  provider callback evidence to V6 route/tool integration. The M5 session-auth
+  target report in `server/world_civilization/session_auth_targets.js` tracks
+  final session/wallet middleware, route/tool middleware integration,
+  production browser session coverage, risk-aware rate-limit identity, audit actor continuity,
+  live Privy/provider logout signoff, durable/shared rate limits, audit
+  integration, and security/product signoff.
 - Worker-first V6 civic tools must pass the exposure gate before becoming
   runtime-callable. Current research-only coverage starts in
   `server/world_civilization/tool_exposure_gate.js`, with route-level production

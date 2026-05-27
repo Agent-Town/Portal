@@ -154,12 +154,19 @@ test('V6 release review requires civic mutation security evidence for abuse revi
 
   assert.ok(abuseGate.requiredArtifacts.includes('docs/security/V6_CIVIC_MUTATION_SECURITY_PLAN.md'));
   assert.ok(abuseGate.requiredArtifacts.includes('server/world_civilization/mutation_security.js'));
+  assert.ok(abuseGate.requiredArtifacts.includes('server/world_civilization/session_auth_targets.js'));
+  assert.ok(abuseGate.requiredArtifacts.includes('tests/world_civilization_session_auth_targets.test.js'));
   assert.ok(abuseGate.requiredArtifacts.includes('tests/world_civilization_mutation_security.test.js'));
   assert.ok(abuseGate.requiredChecks.includes('unauthorized_mutation'));
   assert.ok(abuseGate.requiredChecks.includes('store_backed_delegation_proof'));
   assert.ok(abuseGate.requiredChecks.includes('delegation_scope_mismatch'));
   assert.ok(abuseGate.requiredChecks.includes('delegation_budget_read_only'));
+  assert.ok(abuseGate.requiredChecks.includes('session_auth_target_gate'));
+  assert.ok(abuseGate.requiredChecks.includes('provider_disconnect_invalidation_target'));
+  assert.ok(abuseGate.requiredChecks.includes('production_browser_session_coverage_target'));
   assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_mutation_security.test.js'));
+  assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_session_auth_targets.test.js'));
+  assert.ok(validationGate.requiredChecks.includes('session_auth_target_gate'));
   assert.ok(validationGate.requiredChecks.includes('store_backed_delegation_proof'));
 });
 

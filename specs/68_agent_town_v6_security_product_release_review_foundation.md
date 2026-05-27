@@ -28,8 +28,10 @@ are present.
   provider credential exclusion, and debug trace redaction.
 - Abuse-case review: spam, harassment, impersonation, unauthorized mutation,
   store-backed delegated-agent proof, delegation scope mismatch, read-only
-  delegation budget evidence, moderation escalation, and civic mutation
-  security envelope evidence.
+  delegation budget evidence, session-auth target gate evidence,
+  provider-disconnect invalidation target evidence, production browser session
+  coverage target evidence, moderation escalation, and civic mutation security
+  envelope evidence.
 - Data-retention policy: audit retention, deletion policy, debug log retention,
   and export policy.
 - Audit coverage: append-only ledger, owner indexes, migration versions,
@@ -42,9 +44,10 @@ are present.
 - Validation evidence: targeted Node suite, split Playwright smokes,
   all-features regression, feature override safety, load-rate target coverage,
   migration-load replay evidence, load/rate replay evidence, and multi-process
-  write-contention evidence, including civic mutation security, proposal intake readiness, vote
-  authorization readiness, worker vote adapter gate, reputation eligibility
-  advice readiness, moderation privacy readiness, delegated-agent proof, and
+  write-contention evidence, including civic mutation security, session-auth
+  target coverage, proposal intake readiness, vote authorization readiness,
+  worker vote adapter gate, reputation eligibility advice readiness, moderation
+  privacy readiness, delegated-agent proof, and
   governance preflight, effect execution gate, agent participation enforcement
   gate, institution readiness
   gate, public works readiness gate, lab readiness gate, and resilience

@@ -6,9 +6,12 @@ Milestone: M5 Mutation security controls
 
 Runtime contract: `server/world_civilization/mutation_security.js`
 
+Session-auth target contract: `server/world_civilization/session_auth_targets.js`
+
 Security plan: `docs/security/V6_CIVIC_MUTATION_SECURITY_PLAN.md`
 
-Test coverage: `tests/world_civilization_mutation_security.test.js`
+Test coverage: `tests/world_civilization_mutation_security.test.js`,
+`tests/world_civilization_session_auth_targets.test.js`
 
 ## Boundary
 
@@ -21,6 +24,14 @@ The envelope is research-only and non-executing. It records whether a future
 mutation request would be allowed to reach a store, but the current contract
 still returns `mutationApplied: false` and keeps V6 hidden from runtime/player
 surfaces.
+
+`buildV6SessionAuthTargetReport()` is a companion research-only release target
+matrix. It does not authenticate requests or execute civic mutations; it records
+the required final session-auth surfaces for V6 release: session/wallet binding,
+session-bound CSRF, delegated-agent principal binding, provider-disconnect
+invalidation, session-reset invalidation, route/tool middleware integration,
+production browser coverage, risk-aware rate-limit identity, audit actor
+continuity, and private-data exclusion.
 
 ## Required Checks
 
@@ -43,6 +54,10 @@ surfaces.
 - owner/surface rate limiting using the existing world-grid prototype bucket
   shape.
 - Runtime-hidden, player-hidden, production-disabled, non-executing status.
+- A session-auth target report that keeps `releaseReady: false` until final
+  middleware, live Privy/provider logout signoff, production browser session
+  coverage, risk-aware rate-limit identity, and audit actor-continuity review
+  are complete.
 
 ## Release Gate
 
@@ -53,6 +68,9 @@ M5 cannot move to `done` until:
 - CSRF verification is backed by durable/session-bound token issuance;
 - rate limiting is durable or shared across production instances;
 - idempotency is bound to the final session/wallet authorization model;
+- `server/world_civilization/session_auth_targets.js` has complete approved
+  evidence for every release target, including provider-disconnect invalidation
+  and production browser session coverage;
 - security coverage includes browser same-origin, stale-session, cross-wallet,
   delegated-agent proof, scope mismatch, retry, and rate-limit cases;
 - audit/replay records are written after successful authorized mutations;

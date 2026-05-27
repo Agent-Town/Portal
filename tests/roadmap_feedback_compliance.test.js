@@ -102,6 +102,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'server/world_civilization/resilience.js',
     'server/world_civilization/release_review.js',
     'server/world_civilization/schemas.js',
+    'server/world_civilization/session_auth_targets.js',
     'server/world_civilization/sqlite_schema.js',
     'server/world_civilization/tool_exposure_gate.js',
     'server/world_civilization/tools.js',
@@ -126,6 +127,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'tests/world_civilization_rollback_execution_targets.test.js',
     'tests/world_civilization_readiness_gate.test.js',
     'tests/world_civilization_mutation_security.test.js',
+    'tests/world_civilization_session_auth_targets.test.js',
     'tests/world_civilization_routes.test.js',
     'tests/world_civilization_tool_exposure_gate.test.js',
     'tests/world_civilization_worker_runtime_registration.test.js',
@@ -197,6 +199,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   const rollbackExecutionTargetSource = read('server/world_civilization/rollback_execution_targets.js');
   const readinessSource = read('server/world_civilization/readiness_gate.js');
   const releaseReviewSource = read('server/world_civilization/release_review.js');
+  const sessionAuthTargetSource = read('server/world_civilization/session_auth_targets.js');
   const controlledSource = read('server/world_civilization/controlled_release.js');
   const proposalSource = read('server/world_civilization/proposals.js');
   const proposalRouteSource = read('server/world_civilization/routes.js');
@@ -250,7 +253,15 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(readinessSource, /security_product_release_review/);
   assert.match(readinessSource, /store_specific_zero_hash_only_fallbacks/);
   assert.match(readinessSource, /store_specific_audit_summary_coverage/);
+  assert.match(readinessSource, /session_wallet_continuity_targets/);
+  assert.match(readinessSource, /production_browser_session_coverage_target/);
   assert.match(readinessSource, /V6_READINESS_GATE_PRODUCTION_ENABLEMENT_FORBIDDEN/);
+  assert.match(releaseReviewSource, /session_auth_target_gate/);
+  assert.match(releaseReviewSource, /server\/world_civilization\/session_auth_targets\.js/);
+  assert.match(sessionAuthTargetSource, /V6_SESSION_AUTH_TARGETS_VERSION/);
+  assert.match(sessionAuthTargetSource, /session_wallet_binding/);
+  assert.match(sessionAuthTargetSource, /provider_disconnect_invalidation/);
+  assert.match(sessionAuthTargetSource, /risk_aware_rate_limit_identity/);
   assert.match(skillLine, /V6 aggregate readiness gate/);
   assert.match(plan, /Source branch: `codex\/v6-agent-civilization-milestones`/);
   assert.match(plan, /broad V5 prototype overrides do not enable V6/);
@@ -967,12 +978,20 @@ test('V6 civic mutation security envelope is tracked as an M5 release control', 
   const gate = read('specs/release-gates/v60_agent_civilization_readiness_gate.md');
   const security = read('docs/security/V6_CIVIC_MUTATION_SECURITY_PLAN.md');
   const skillLine = read('docs/internal-skill-testline.md');
+  const sessionAuthTargets = read('server/world_civilization/session_auth_targets.js');
 
   assert.match(plan, /server\/world_civilization\/mutation_security\.js/);
+  assert.match(plan, /server\/world_civilization\/session_auth_targets\.js/);
+  assert.match(plan, /session\/wallet binding, session-bound CSRF/);
+  assert.match(plan, /provider-disconnect invalidation/);
+  assert.match(plan, /risk-aware rate-limit identity/);
   assert.match(plan, /delegated-agent proof/);
   assert.match(plan, /store-backed delegated-agent proof with required scope/);
   assert.match(plan, /exact delegated-action replay allowance/);
   assert.match(plan, /read-only active `civic_execution` delegation proof/);
+  assert.match(spec, /Session-auth target contract/);
+  assert.match(spec, /buildV6SessionAuthTargetReport\(\)/);
+  assert.match(spec, /production browser session/);
   assert.match(spec, /same-origin checks/);
   assert.match(spec, /session\/wallet auth/);
   assert.match(spec, /store-backed delegated-agent\s+proof/);
@@ -981,13 +1000,25 @@ test('V6 civic mutation security envelope is tracked as an M5 release control', 
   assert.match(spec, /CSRF verification/);
   assert.match(spec, /owner\/surface rate limiting/);
   assert.match(gate, /server\/world_civilization\/mutation_security\.js/);
+  assert.match(gate, /server\/world_civilization\/session_auth_targets\.js/);
+  assert.match(gate, /production browser session coverage/);
+  assert.match(gate, /audit actor continuity/);
   assert.match(gate, /store-backed\s+delegated-agent proof/);
   assert.match(gate, /future civic store\s+write/);
+  assert.match(security, /Session-auth target contract/);
+  assert.match(security, /buildV6SessionAuthTargetReport\(\)/);
+  assert.match(security, /live\s+Privy\/provider logout signoff/);
   assert.match(security, /route\/tool-required scope/);
   assert.match(security, /Exact delegated-action retries/);
   assert.match(security, /mutationApplied: false/);
   assert.match(security, /durable\/session-bound CSRF/);
+  assert.match(sessionAuthTargets, /V6_SESSION_AUTH_TARGETS_VERSION/);
+  assert.match(sessionAuthTargets, /route_tool_middleware_integration/);
+  assert.match(sessionAuthTargets, /production_browser_coverage/);
+  assert.match(sessionAuthTargets, /audit_actor_continuity/);
   assert.match(skillLine, /V6 civic mutation security foundation/);
+  assert.match(skillLine, /session-auth target matrix/);
+  assert.match(skillLine, /tests\/world_civilization_session_auth_targets\.test\.js/);
   assert.match(skillLine, /exact same-idempotency delegated-action replay allowance/);
   assert.match(skillLine, /tests\/world_civilization_mutation_security\.test\.js/);
 });

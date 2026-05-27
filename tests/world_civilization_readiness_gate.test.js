@@ -64,6 +64,7 @@ test('V6 readiness gate baseline names every prerequisite domain but remains ope
   assert.ok(report.gateReports.some((gate) => gate.requiredArtifacts.includes(V6_MILESTONE_PLAN_ARTIFACT)));
   const persistenceGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'persistence_resilience');
   const effectGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'effect_rollback');
+  const mutationSecurityGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'mutation_security');
   const proposalGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'proposal_vote_governance');
   const reputationGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'reputation_moderation_privacy');
   const releaseReviewGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'security_product_release_review');
@@ -78,6 +79,13 @@ test('V6 readiness gate baseline names every prerequisite domain but remains ope
   assert.ok(workerToolGate.requiredChecks.includes('worker_vote_route_edge_authorization'));
   assert.ok(workerToolGate.requiredChecks.includes('browser_worker_runtime_registration_target'));
   assert.ok(workerToolGate.requiredChecks.includes('production_browser_worker_coverage_target'));
+  assert.ok(mutationSecurityGate.requiredArtifacts.includes('server/world_civilization/session_auth_targets.js'));
+  assert.ok(mutationSecurityGate.requiredArtifacts.includes('tests/world_civilization_session_auth_targets.test.js'));
+  assert.ok(mutationSecurityGate.requiredChecks.includes('session_wallet_continuity_targets'));
+  assert.ok(mutationSecurityGate.requiredChecks.includes('provider_disconnect_invalidation_target'));
+  assert.ok(mutationSecurityGate.requiredChecks.includes('route_tool_session_auth_target'));
+  assert.ok(mutationSecurityGate.requiredChecks.includes('production_browser_session_coverage_target'));
+  assert.ok(mutationSecurityGate.requiredChecks.includes('risk_aware_rate_limit_identity_target'));
   assert.ok(proposalGate.requiredChecks.includes('proposal_intake_readiness_gate'));
   assert.ok(proposalGate.requiredArtifacts.includes('server/world_civilization/routes.js'));
   assert.ok(proposalGate.requiredArtifacts.includes('server/world_civilization/store_wiring.js'));
