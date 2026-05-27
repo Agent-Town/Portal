@@ -151,10 +151,26 @@ function invokeArgs(stores, overrides = {}) {
 }
 
 test('V6 worker proposal tool adapter submits for review without runtime civic exposure', () => withStores((stores) => {
-  stores.delegationStore.recordDelegation(delegation(), { nowMs: 1_779_990_000_000 });
+  stores.delegationStore.recordDelegation(delegation({ maxActions: 1 }), { nowMs: 1_779_990_000_000 });
 
   const result = submitProposalForReviewFromWorkerTool(invokeArgs(stores));
   const replay = submitProposalForReviewFromWorkerTool(invokeArgs(stores));
+  const secondProposal = proposal({
+    proposalId: 'proposal_worker_tool_public_works_002',
+    idempotencyKey: 'idem_worker_tool_proposal_002',
+    scope: {
+      kind: 'public_works',
+      targetId: 'district_worker_tool_bridge_002'
+    },
+    affectedPublicState: ['public_works:worker_tool_bridge_002'],
+    rollbackPlan: {
+      planId: 'rollbackplan_worker_tool_public_works_002',
+      strategy: 'Restore previous worker-tool bridge snapshot.',
+      canRollback: true,
+      irreversibleEffects: [],
+      maxRollbackMs: 86_400_000
+    }
+  });
 
   assert.equal(result.version, V6_CIVIC_WORKER_TOOL_ADAPTER_VERSION);
   assert.equal(result.ok, true);
@@ -182,8 +198,41 @@ test('V6 worker proposal tool adapter submits for review without runtime civic e
   assert.equal(result.submissionEnvelope.mutationSecurity.ok, true);
   assert.equal(result.submissionEnvelope.workerEvidence.origin, WORKER_ORIGIN);
   assert.equal(replay.proposal.duplicate, true);
+  assert.equal(result.delegatedActionUse.usageId, 'delegationuse_proposal_worker_tool_public_works_001');
+  assert.equal(result.delegatedActionUse.delegationId, 'delegation_worker_tool_proposal_001');
+  assert.equal(result.delegatedActionUse.principalAccountId, ACCOUNT_ID);
+  assert.equal(result.delegatedActionUse.delegateAgentId, AGENT_ID);
+  assert.equal(result.delegatedActionUse.scope, 'proposal_drafting');
+  assert.equal(result.delegatedActionUse.actionRef, 'proposal_worker_tool_public_works_001');
+  assert.equal(result.delegatedActionUse.idempotencyKey, 'idem_worker_tool_proposal_001');
+  assert.equal(result.delegatedActionUse.duplicate, false);
+  assert.equal(replay.delegatedActionUse.duplicate, true);
   assert.equal(stores.proposalStore.count(), 1);
   assert.equal(stores.auditLedger.replay().filter((row) => row.entry.actionType === 'proposal.created').length, 1);
+  assert.equal(stores.auditLedger.replay().filter((row) => row.entry.actionType === 'delegation.action_consumed').length, 1);
+  assert.equal(stores.delegationStore.listDelegatedActionUses({
+    delegationId: 'delegation_worker_tool_proposal_001'
+  }).length, 1);
+  const policy = stores.delegationStore.getAgentParticipationPolicy({
+    principalAccountId: ACCOUNT_ID,
+    delegateAgentId: AGENT_ID,
+    atMs: 1_779_991_000_001
+  });
+  assert.equal(policy.remainingActionBudgetByScope.proposal_drafting, undefined);
+  assert.throws(
+    () => submitProposalForReviewFromWorkerTool(invokeArgs(stores, {
+      input: {
+        ...invokeArgs(stores).input,
+        proposal: secondProposal,
+        idempotencyKey: 'idem_worker_tool_proposal_002'
+      }
+    })),
+    /CIVIC_PROPOSAL_SUBMISSION_DENIED/
+  );
+  assert.equal(stores.proposalStore.count(), 1);
+  assert.equal(stores.delegationStore.listDelegatedActionUses({
+    delegationId: 'delegation_worker_tool_proposal_001'
+  }).length, 1);
 
   const runtimeWorldToolNames = WORLD_GRID_TOOLS.map((tool) => tool.name);
   assert.equal(runtimeWorldToolNames.includes(WORKER_PROPOSAL_SUBMIT_TOOL_NAME), false);

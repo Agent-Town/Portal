@@ -131,6 +131,9 @@ research opt-in and is not registered in runtime `/api/world/tools`.
   idempotency key.
 - `buildV6VoteRouteAuthorizationEnvelope()` authorization for
   `worker_tool_vote_surface`.
+- Idempotent delegated action-budget consumption for successful vote receipts;
+  exact replays return the existing vote and usage row, while a distinct vote
+  is denied once the delegation budget is exhausted.
 
 The worker adapter records only a vote receipt. It does not apply vote outcomes,
 execute proposal effects, publish V6 civic tools, expose player-visible UI,

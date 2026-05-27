@@ -4,6 +4,7 @@ const {
 } = require('../world_grid/feature_flags');
 const { REQUIRED_DEBUG_TABS } = require('./lab_surface');
 const { buildV6CivicMutationSecurityEnvelope } = require('./mutation_security');
+const { buildV6ProposalSubmissionEnvelope } = require('./proposals');
 
 const V6_CIVIC_WORKER_TOOL_ADAPTER_VERSION = 'agent-town.v6.civic.worker_tool_adapter.v1';
 const WORKER_PROPOSAL_SUBMIT_TOOL_NAME = 'et.world.civic.proposals.submit_for_review';
@@ -31,6 +32,49 @@ function normalizeIdentity(identity = {}) {
   return {
     accountId,
     walletAddress: String(identity.walletAddress || identity.address || accountId).trim()
+  };
+}
+
+function delegatedUsageIdFor(actionRef = '') {
+  const suffix = String(actionRef || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_:-]/g, '_')
+    .slice(0, 66);
+  return `delegationuse_${suffix || 'worker_action'}`;
+}
+
+function buildDelegatedActionUsage({
+  input = {},
+  principalAccountId = '',
+  delegateAgentId = '',
+  scope = '',
+  actionRef = '',
+  idempotencyKey = ''
+} = {}) {
+  const delegation = input.delegation && typeof input.delegation === 'object' ? input.delegation : {};
+  return {
+    usageId: delegatedUsageIdFor(actionRef),
+    delegationId: String(delegation.delegationId || '').trim(),
+    principalAccountId: String(delegation.principalAccountId || principalAccountId || '').trim(),
+    delegateAgentId: String(delegation.delegateAgentId || delegateAgentId || '').trim(),
+    scope: String(scope || '').trim(),
+    actionRef: String(actionRef || '').trim(),
+    idempotencyKey: String(idempotencyKey || '').trim()
+  };
+}
+
+function summarizeDelegatedActionUse(delegatedActionUse = {}) {
+  return {
+    usageId: delegatedActionUse.usageId,
+    delegationId: delegatedActionUse.delegationId,
+    principalAccountId: delegatedActionUse.principalAccountId,
+    delegateAgentId: delegatedActionUse.delegateAgentId,
+    scope: delegatedActionUse.scope,
+    actionRef: delegatedActionUse.actionRef,
+    idempotencyKey: delegatedActionUse.idempotencyKey,
+    auditEntryId: delegatedActionUse.auditEntryId,
+    duplicate: delegatedActionUse.duplicate === true
   };
 }
 
@@ -107,6 +151,9 @@ function submitProposalForReviewFromWorkerTool({
   if (!proposalStore || typeof proposalStore.submitProposalForReview !== 'function') {
     fail('V6_CIVIC_WORKER_TOOL_PROPOSAL_STORE_REQUIRED');
   }
+  if (!delegationStore || typeof delegationStore.consumeDelegatedAction !== 'function') {
+    fail('V6_CIVIC_WORKER_TOOL_DELEGATION_USAGE_STORE_REQUIRED');
+  }
 
   const civicIdentity = normalizeIdentity(identity);
   if (!civicIdentity) fail('V6_CIVIC_WORKER_TOOL_IDENTITY_REQUIRED');
@@ -155,6 +202,32 @@ function submitProposalForReviewFromWorkerTool({
     nowMs
   });
 
+  const submissionPreflight = buildV6ProposalSubmissionEnvelope({
+    featureFlags,
+    includeResearchProposalSubmission: true,
+    source: 'openclaw_lite_worker_tool',
+    sourceSurface: 'worker_tool_submission',
+    proposal,
+    approvalReceiptId: input.approvalReceiptId,
+    mutationSecurityEnvelope,
+    workerEvidence,
+    nowMs
+  });
+  if (submissionPreflight.accepted !== true) {
+    const error = new Error('CIVIC_PROPOSAL_SUBMISSION_DENIED');
+    error.details = submissionPreflight;
+    throw error;
+  }
+
+  const delegatedActionUse = delegationStore.consumeDelegatedAction(buildDelegatedActionUsage({
+    input,
+    principalAccountId: civicIdentity.accountId,
+    delegateAgentId: agentId,
+    scope: 'proposal_drafting',
+    actionRef: proposal.proposalId,
+    idempotencyKey: proposal.idempotencyKey
+  }), { nowMs });
+
   const submitted = proposalStore.submitProposalForReview({
     featureFlags,
     includeResearchProposalSubmission: true,
@@ -197,6 +270,7 @@ function submitProposalForReviewFromWorkerTool({
       auditEntryId: submitted.auditEntryId,
       duplicate: submitted.duplicate === true
     },
+    delegatedActionUse: summarizeDelegatedActionUse(delegatedActionUse),
     submissionEnvelope: submitted.submissionEnvelope || null
   };
 }
@@ -205,7 +279,10 @@ module.exports = {
   V6_CIVIC_WORKER_TOOL_ADAPTER_VERSION,
   WORKER_ORIGIN,
   WORKER_PROPOSAL_SUBMIT_TOOL_NAME,
+  buildDelegatedActionUsage,
+  delegatedUsageIdFor,
   inspectWorkerEvidence,
+  summarizeDelegatedActionUse,
   submitProposalForReviewFromWorkerTool,
   workerToolAdapterEnabled
 };

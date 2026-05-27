@@ -87,6 +87,9 @@ The adapter requires:
 - Same-origin/CSRF-reviewed M5 civic mutation security.
 - Store-backed `proposal_drafting` delegation for the agent proposer.
 - Explicit approval receipt and idempotency key.
+- Idempotent delegated action-budget consumption for successful proposal
+  receipts; exact replays return the existing usage row, and distinct actions
+  fail when the delegation budget is exhausted.
 - No proposal effect execution and no runtime civic tool exposure.
 
 The adapter may persist a proposal only into the internal M7 review queue. It
@@ -114,6 +117,9 @@ The adapter requires:
 - A server-attested delegation vote authorization and idempotency key.
 - The M8 `buildV6VoteRouteAuthorizationEnvelope()` for the
   `worker_tool_vote_surface`.
+- Idempotent delegated action-budget consumption for successful vote receipts;
+  exact replays return the existing usage row, and distinct votes fail when
+  the delegation budget is exhausted.
 - No vote outcome application and no runtime civic tool exposure.
 
 The adapter may persist only a vote receipt. It must never apply a proposal

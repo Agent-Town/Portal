@@ -258,6 +258,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /et\.world\.civic\.proposals\.submit_for_review/);
   assert.match(plan, /et\.world\.civic\.votes\.cast/);
   assert.match(plan, /store-backed `proposal_drafting` delegation/);
+  assert.match(plan, /idempotent delegated action-budget consumption/);
   assert.match(plan, /OpenClaw Lite worker origin/);
   assert.match(spec, /research-only civic tool draft/);
   assert.match(spec, /tool exposure gate/);
@@ -269,6 +270,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(toolSpec, /V6_CIVIC_WORKER_VOTE_ADAPTER_ENABLED/);
   assert.match(toolSpec, /et\.world\.civic\.proposals\.submit_for_review/);
   assert.match(toolSpec, /et\.world\.civic\.votes\.cast/);
+  assert.match(toolSpec, /Idempotent delegated action-budget consumption/);
   assert.match(toolSpec, /runtime `\/api\/world\/tools`/);
   assert.match(gate, /server\/world_civilization\/tools\.js/);
   assert.match(gate, /server\/world_civilization\/tool_exposure_gate\.js/);
@@ -333,6 +335,8 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(workerToolAdapterSource, /submitProposalForReviewFromWorkerTool/);
   assert.match(workerToolAdapterSource, /buildV6CivicMutationSecurityEnvelope/);
   assert.match(workerToolAdapterSource, /proposal_drafting/);
+  assert.match(workerToolAdapterSource, /consumeDelegatedAction/);
+  assert.match(workerToolAdapterSource, /delegatedActionUse/);
   assert.match(workerToolAdapterSource, /sameOriginCsrfReviewed/);
   assert.match(workerToolAdapterSource, /runtimeExposed: false/);
   assert.match(workerToolAdapterSource, /executesProposalEffects: false/);
@@ -343,6 +347,8 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(workerVoteAdapterSource, /buildV6CivicMutationSecurityEnvelope/);
   assert.match(workerVoteAdapterSource, /buildV6VoteRouteAuthorizationEnvelope/);
   assert.match(workerVoteAdapterSource, /vote_advice/);
+  assert.match(workerVoteAdapterSource, /consumeDelegatedAction/);
+  assert.match(workerVoteAdapterSource, /delegatedActionUse/);
   assert.match(workerVoteAdapterSource, /sameOriginCsrfReviewed/);
   assert.match(workerVoteAdapterSource, /recordsVote: true/);
   assert.match(workerVoteAdapterSource, /appliesVoteOutcome: false/);
@@ -707,7 +713,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(releaseReview, /research-only Express proposal submission route/);
   assert.match(releaseReview, /env-gated SQLite proposal\/audit\/delegation store wiring/);
   assert.match(releaseReview, /fail-closed route\/adapter tests/);
-  assert.match(releaseReview, /missing route flag, missing release store wiring, denied same-origin\/CSRF evidence, missing worker observability, and missing delegation/);
+  assert.match(releaseReview, /missing route flag, missing release store wiring, denied same-origin\/CSRF evidence, missing worker observability, missing delegation, and exhausted delegated action budgets/);
   assert.match(releaseReview, /browser worker registration, production route-store operations review/);
   assert.match(releaseReviewSource, /server\/world_civilization\/routes\.js/);
   assert.match(releaseReviewSource, /server\/world_civilization\/store_wiring\.js/);
@@ -862,20 +868,24 @@ test('V6 civic mutation security envelope is tracked as an M5 release control', 
   assert.match(plan, /server\/world_civilization\/mutation_security\.js/);
   assert.match(plan, /delegated-agent proof/);
   assert.match(plan, /store-backed delegated-agent proof with required scope/);
+  assert.match(plan, /exact delegated-action replay allowance/);
   assert.match(plan, /read-only active `civic_execution` delegation proof/);
   assert.match(spec, /same-origin checks/);
   assert.match(spec, /session\/wallet auth/);
   assert.match(spec, /store-backed delegated-agent\s+proof/);
   assert.match(spec, /remaining\s+action budget/);
+  assert.match(spec, /Exact delegated-action replay/);
   assert.match(spec, /CSRF verification/);
   assert.match(spec, /owner\/surface rate limiting/);
   assert.match(gate, /server\/world_civilization\/mutation_security\.js/);
   assert.match(gate, /store-backed\s+delegated-agent proof/);
-  assert.match(gate, /future\s+civic store write/);
+  assert.match(gate, /future civic store\s+write/);
   assert.match(security, /route\/tool-required scope/);
+  assert.match(security, /Exact delegated-action retries/);
   assert.match(security, /mutationApplied: false/);
   assert.match(security, /durable\/session-bound CSRF/);
   assert.match(skillLine, /V6 civic mutation security foundation/);
+  assert.match(skillLine, /exact same-idempotency delegated-action replay allowance/);
   assert.match(skillLine, /tests\/world_civilization_mutation_security\.test\.js/);
 });
 
@@ -896,6 +906,7 @@ test('V6 worker-first civic tool exposure gate is tracked as an M6 release contr
   assert.match(plan, /Worker Tools\/Skill Context\/Worker Traffic\/Brain\/Session Context/);
   assert.match(plan, /store-backed delegated-agent proof/);
   assert.match(plan, /store-backed `proposal_drafting` delegation/);
+  assert.match(plan, /idempotent delegated action-budget consumption/);
   assert.match(plan, /read-only delegation budget handling/);
   assert.match(plan, /production player `worldGridFeatureFlags=all,v60` query\/header overrides cannot enable V6/);
   assert.match(plan, /server-side V6 flag still does not publish `et\.world\.civic\.\*` tools/);
@@ -907,6 +918,7 @@ test('V6 worker-first civic tool exposure gate is tracked as an M6 release contr
   assert.match(spec, /OpenClaw Lite worker origin/);
   assert.match(spec, /same-origin, session\/wallet\s+binding/);
   assert.match(spec, /store-backed delegated-agent proof/);
+  assert.match(spec, /distinct actions\s+fail when the delegation budget is exhausted/);
   assert.match(spec, /read-only delegation budget handling/);
   assert.match(spec, /No `et\.world\.civic\.\*` entry in the runtime tool manifest/);
   assert.match(spec, /worldGridFeatureFlags=all,v60/);
@@ -914,15 +926,18 @@ test('V6 worker-first civic tool exposure gate is tracked as an M6 release contr
   assert.match(gate, /releaseReady: false/);
   assert.match(gate, /Worker-first V6 civic tools must pass the exposure gate/);
   assert.match(gate, /store-backed delegated-agent proof/);
+  assert.match(gate, /consume delegated action budget idempotently/);
   assert.match(gate, /read-only delegation budget handling/);
   assert.match(gate, /Route-level production coverage proves player `worldGridFeatureFlags=all,v60`/);
   assert.match(releaseReview, /Worker tool surface review/);
   assert.match(releaseReview, /worker-origin proposal tool adapter/);
   assert.match(releaseReview, /pending browser worker registration/);
+  assert.match(releaseReview, /idempotent delegated action-budget consumption/);
   assert.match(releaseReview, /no backend shortcuts/);
   assert.match(releaseReview, /route-level production override coverage proves player `all,v60` overrides cannot enable V6/);
   assert.match(skillLine, /mutation-security evidence with store-backed delegation proof/);
   assert.match(skillLine, /tests\/world_civilization_worker_tool_adapter\.test\.js/);
+  assert.match(skillLine, /idempotent delegated action-budget consumption/);
   assert.match(skillLine, /read-only delegation budget handling/);
   assert.match(skillLine, /production player `worldGridFeatureFlags=all,v60`/);
   assert.match(skillLine, /tests\/world_civilization_tool_exposure_gate\.test\.js/);
@@ -936,6 +951,8 @@ test('V6 worker-first civic tool exposure gate is tracked as an M6 release contr
   assert.match(workerToolAdapter, /WORKER_PROPOSAL_SUBMIT_TOOL_NAME/);
   assert.match(workerToolAdapter, /buildV6CivicMutationSecurityEnvelope/);
   assert.match(workerToolAdapter, /proposal_drafting/);
+  assert.match(workerToolAdapter, /buildDelegatedActionUsage/);
+  assert.match(workerToolAdapter, /consumeDelegatedAction/);
   assert.match(workerToolAdapter, /runtimeExposed: false/);
   assert.match(workerToolAdapter, /executesProposalEffects: false/);
   assert.match(worldGridRegionTest, /production player overrides cannot enable V6 when V5 is server enabled/);

@@ -73,6 +73,7 @@ function evaluateDelegatedAgentProof({
   delegation = {},
   delegationStore = null,
   requiredDelegationScope = '',
+  idempotencyKey = '',
   nowMs = Date.now()
 } = {}) {
   const actorKind = String(actor?.kind || '');
@@ -115,6 +116,7 @@ function evaluateDelegatedAgentProof({
 
   let stored = null;
   let policy = null;
+  let idempotentReplayUse = null;
   if (failures.length === 0) {
     stored = delegationStore.getDelegation(delegationId);
     if (!stored) failures.push('delegation_missing');
@@ -135,12 +137,24 @@ function evaluateDelegatedAgentProof({
       delegateAgentId,
       atMs: nowMs
     });
+    if (typeof delegationStore.listDelegatedActionUses === 'function' && idempotencyKey) {
+      idempotentReplayUse = delegationStore.listDelegatedActionUses({
+        delegationId,
+        principalAccountId,
+        delegateAgentId,
+        scope: requiredScope,
+        limit: 100
+      }).find((usage) => usage.idempotencyKey === String(idempotencyKey || '')) || null;
+    }
     const activeIds = Array.isArray(policy?.activeDelegationIds) ? policy.activeDelegationIds : [];
     const allowedScopes = Array.isArray(policy?.allowedScopes) ? policy.allowedScopes : [];
     const remainingActions = Number(policy?.remainingActionBudgetByScope?.[requiredScope] || 0);
+    const isIdempotentReplay = Boolean(idempotentReplayUse);
     if (!activeIds.includes(delegationId)) failures.push('delegation_not_active_in_policy');
-    if (!allowedScopes.includes(requiredScope)) failures.push('delegation_scope_not_allowed_by_policy');
-    if (remainingActions <= 0) failures.push('delegation_action_budget_exhausted');
+    if (!allowedScopes.includes(requiredScope) && !isIdempotentReplay) {
+      failures.push('delegation_scope_not_allowed_by_policy');
+    }
+    if (remainingActions <= 0 && !isIdempotentReplay) failures.push('delegation_action_budget_exhausted');
   }
 
   const ok = failures.length === 0;
@@ -160,6 +174,11 @@ function evaluateDelegatedAgentProof({
       activeDelegationIds: Array.isArray(policy?.activeDelegationIds) ? policy.activeDelegationIds : [],
       allowedScopes: Array.isArray(policy?.allowedScopes) ? policy.allowedScopes : [],
       remainingActionBudget: Number(policy?.remainingActionBudgetByScope?.[requiredScope] || 0),
+      idempotentReplay: Boolean(idempotentReplayUse),
+      delegatedActionUseId: idempotentReplayUse?.usageId || '',
+      budgetConsumptionStatus: idempotentReplayUse
+        ? 'already_consumed_for_idempotency_key'
+        : base.budgetConsumptionStatus,
       failures
     }
   };
@@ -223,6 +242,7 @@ function buildV6CivicMutationSecurityEnvelope({
     delegation,
     delegationStore,
     requiredDelegationScope,
+    idempotencyKey,
     nowMs
   });
 

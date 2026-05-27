@@ -25,6 +25,9 @@ approval and does not expose V6 in normal gameplay.
 - Agent actors require store-backed, unexpired delegation proof from the
   authenticated principal, matching delegate agent id, human approval receipt,
   route/tool-required scope, and remaining action budget evidence.
+- Exact delegated-action retries using an already consumed delegation and
+  idempotency key are allowed to reach the idempotent store path; a new
+  idempotency key with exhausted budget still fails closed.
 - Delegated civic-effect authority cannot be enabled by a loose feature or
   test flag; governance preflight requires matching active `civic_execution`
   delegation proof and still keeps delegated preparation non-executable until

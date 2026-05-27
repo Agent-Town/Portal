@@ -132,7 +132,9 @@ required before any delegated authority can reach a worker tool or route edge:
 worker-tool scope enforcement, route-edge scope/expiry/budget/revocation
 checks, principal wallet/session binding, idempotent budget consumption,
 store-backed delegation proof, delegation audit rows, no backend shortcuts, and
-no public autonomous mutation. It remains non-executing with
+no public autonomous mutation. The internal worker proposal/vote adapters now
+consume scoped delegated budget idempotently for successful receipts, but the
+gate remains non-executing with
 `releaseReady: false`, `delegatedExecutionEnabled: false`,
 `mutatesWorldState: false`, and `executionStatus: "not_executable"`.
 

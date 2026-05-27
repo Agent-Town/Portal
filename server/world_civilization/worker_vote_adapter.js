@@ -6,7 +6,9 @@ const { buildV6CivicMutationSecurityEnvelope } = require('./mutation_security');
 const { buildV6VoteRouteAuthorizationEnvelope } = require('./votes');
 const {
   WORKER_ORIGIN,
-  inspectWorkerEvidence
+  buildDelegatedActionUsage,
+  inspectWorkerEvidence,
+  summarizeDelegatedActionUse
 } = require('./worker_tool_adapter');
 
 const V6_CIVIC_WORKER_VOTE_ADAPTER_VERSION = 'agent-town.v6.civic.worker_vote_adapter.v1';
@@ -98,6 +100,9 @@ function castVoteFromWorkerTool({
     || !voteStore || typeof voteStore.recordVote !== 'function') {
     fail('V6_CIVIC_WORKER_VOTE_STORE_REQUIRED');
   }
+  if (!delegationStore || typeof delegationStore.consumeDelegatedAction !== 'function') {
+    fail('V6_CIVIC_WORKER_VOTE_DELEGATION_USAGE_STORE_REQUIRED');
+  }
 
   const civicIdentity = normalizeIdentity(identity);
   if (!civicIdentity) fail('V6_CIVIC_WORKER_VOTE_IDENTITY_REQUIRED');
@@ -161,6 +166,15 @@ function castVoteFromWorkerTool({
   }
 
   const recorded = voteStore.recordVote(vote, { nowMs });
+  const delegatedActionUse = delegationStore.consumeDelegatedAction(buildDelegatedActionUsage({
+    input,
+    principalAccountId: civicIdentity.accountId,
+    delegateAgentId: agentId,
+    scope: 'vote_advice',
+    actionRef: recorded.voteId,
+    idempotencyKey: vote.idempotencyKey
+  }), { nowMs });
+
   return {
     version: V6_CIVIC_WORKER_VOTE_ADAPTER_VERSION,
     ok: true,
@@ -194,6 +208,7 @@ function castVoteFromWorkerTool({
       auditEntryId: recorded.auditEntryId,
       duplicate: recorded.duplicate === true
     },
+    delegatedActionUse: summarizeDelegatedActionUse(delegatedActionUse),
     routeAuthorization
   };
 }

@@ -35,6 +35,9 @@ surfaces.
 - Delegated-agent proof requires a matching active delegation id, principal,
   delegate agent, approval receipt, route/tool-required scope, and remaining
   action budget. The envelope reads proof but does not consume budget.
+- Exact delegated-action replay by the same delegation/idempotency key remains
+  valid after budget consumption so retries can reach the idempotent store
+  path; distinct delegated actions still fail when the budget is exhausted.
 - CSRF verification in production/security-required mode.
 - Route/tool idempotency key with the V6 civic mutation format.
 - owner/surface rate limiting using the existing world-grid prototype bucket

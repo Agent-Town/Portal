@@ -98,23 +98,26 @@ persistence resilience, and security/product release review.
   by default behind `V6_CIVIC_WORKER_TOOL_ADAPTER_ENABLED`, require OpenClaw
   Lite origin and Worker Tools/Skill Context/Worker Traffic/Brain/Session
   Context observability, require store-backed `proposal_drafting` delegation and
-  M5 mutation security, write only to the internal proposal review queue, expose
-  no runtime civic tools, and execute no civic effects.
+  M5 mutation security, consume delegated action budget idempotently for
+  successful proposal receipts, write only to the internal proposal review
+  queue, expose no runtime civic tools, and execute no civic effects.
 - The research-only worker vote adapter may exist in
   `server/world_civilization/worker_vote_adapter.js`, but it must stay disabled
   by default behind `V6_CIVIC_WORKER_VOTE_ADAPTER_ENABLED`, require OpenClaw
   Lite origin and Worker Tools/Skill Context/Worker Traffic/Brain/Session
   Context observability, require store-backed `vote_advice` delegation, M5
   mutation security, `worker_tool_vote_surface` route-edge authorization,
-  server-attested vote authorization, and idempotency, record only vote
-  receipts, expose no runtime civic tools, and apply no vote outcomes.
+  server-attested vote authorization, idempotency, and delegated action-budget
+  consumption, record only vote receipts, expose no runtime civic tools, and
+  apply no vote outcomes.
 - The research-only civic mutation security envelope may exist in
   `server/world_civilization/mutation_security.js`, but it must stay
   fail-closed, route/tool-hidden, non-executing, and require explicit V6 opt-in,
   same-origin checks, session/wallet auth, actor/owner binding, store-backed
-  delegated-agent proof with required scope and remaining budget evidence, CSRF
-  verification, idempotency, and owner/surface rate limiting before any future
-  civic store write.
+  delegated-agent proof with required scope and remaining budget evidence,
+  exact same-idempotency delegated-action replay allowance, CSRF verification,
+  idempotency, and owner/surface rate limiting before any future civic store
+  write.
 - The research-only proposal submission route may exist in
   `server/world_civilization/routes.js`, but
   `POST /api/world/civilization/proposals/submit` must stay disabled by default
@@ -391,7 +394,9 @@ persistence resilience, and security/product release review.
   idempotent action-budget usage records, and `delegation.action_consumed`
   audit rows carrying privacy-safe before/after lifecycle summaries; governance
   preflight now validates delegation proof read-only
-  while leaving budget unconsumed and delegated preparation blocked. Release
+  while leaving budget unconsumed and delegated preparation blocked, and the
+  internal worker proposal/vote adapters now consume scoped delegated budget
+  idempotently for successful receipts. Release
   still requires worker/tool enforcement, expiry, budget, and revocation checks
   at every route edge, and principal wallet/session authorization. The M12
   research-only enforcement gate in `server/world_civilization/delegations.js`

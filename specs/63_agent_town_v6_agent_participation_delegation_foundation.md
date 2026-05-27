@@ -35,7 +35,17 @@ effect preparation available.
 proof read-only for future route/tool mutations. Future route/tool adapters
 must name the required delegation scope, and the envelope must see a matching
 active delegation with remaining budget before an agent actor can reach any
-civic store.
+civic store. Exact replays for an already consumed delegation/idempotency key
+remain valid so idempotent route/tool retries do not require fresh budget, but
+new idempotency keys still fail once the delegation budget is exhausted.
+
+`server/world_civilization/worker_tool_adapter.js` and
+`server/world_civilization/worker_vote_adapter.js` now connect that foundation
+to the internal research-only worker proposal and worker vote receipts. They
+consume scoped delegated action budget exactly once for successful
+`proposal_drafting` and `vote_advice` receipts, return duplicate usage rows for
+exact replays, and still expose no runtime civic tools or player-visible V6
+mechanics.
 
 The process-level restart proof currently covers creation of scoped advice and
 explicit civic-execution delegations, idempotent budget consumption, and
@@ -109,6 +119,10 @@ Indexes cover delegation replay, principal/scope replay, and agent/scope replay.
 - Delegated action budget usage is idempotent by delegation/idempotency key,
   audited, and rejected when the delegation is missing, mismatched, expired,
   revoked, or budget-exhausted.
+- Mutation security may recognize an existing matching delegated action usage
+  as an idempotent replay after the remaining budget reaches zero; distinct
+  action attempts with a new idempotency key still fail closed before
+  persistence.
 - Governance preflight delegation proof is read-only; the legacy
   `allowDelegatedExecution` boolean cannot grant authority without a matching
   active delegation proof, and delegated preparation remains blocked while M12
@@ -134,6 +148,8 @@ Indexes cover delegation replay, principal/scope replay, and agent/scope replay.
 M12 cannot move to `done` until:
 
 - worker-first V6 tools consult delegation policy instead of backend shortcuts;
+- internal worker proposal/vote adapters continue to consume delegated action
+  budgets exactly once for successful receipts;
 - action budgets are consulted by worker-first tools and route-edge guards
   before any delegated action runs;
 - delegated vote/advice/proposal scopes are enforced at every route/tool edge;

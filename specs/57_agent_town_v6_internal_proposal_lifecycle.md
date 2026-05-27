@@ -92,6 +92,12 @@ The submission contract remains hidden from runtime `/api/world/tools`, normal
 gameplay, and player-visible proposal UI. It does not execute effects or expose
 V6 civic tools.
 
+The internal worker proposal adapter consumes `proposal_drafting` delegated
+action budget exactly once for successful receipts. Exact replays return the
+existing proposal and delegated usage row, while a second distinct proposal is
+denied once the delegation budget is exhausted and no extra proposal is
+persisted.
+
 `server/world_civilization/routes.js` mounts the research-only
 `POST /api/world/civilization/proposals/submit` route. The route is disabled by
 default unless `V6_CIVIC_PROPOSAL_SUBMISSION_ROUTE_ENABLED=1`, requires a civic
@@ -159,6 +165,6 @@ Agent-authored proposals may be stored through
 worker-origin evidence, Worker Tools, Skill Context, Worker Traffic, Brain, and
 Session Context observability, store-backed `proposal_drafting` delegation,
 same-origin/CSRF-reviewed M5 mutation security, explicit approval, and
-idempotency. This adapter is still research-only and does not register a runtime
-civic tool, proposal UI, review queue UI, effect execution path, or public
-autonomous-agent mutation.
+idempotency, with idempotent delegated action-budget consumption. This adapter
+is still research-only and does not register a runtime civic tool, proposal UI,
+review queue UI, effect execution path, or public autonomous-agent mutation.

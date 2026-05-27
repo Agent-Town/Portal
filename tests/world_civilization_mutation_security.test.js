@@ -227,6 +227,68 @@ test('V6 civic mutation security envelope requires store-backed delegated agent 
   assert.deepEqual(assertV6CivicMutationSecuritySafe(mismatchedScope), { ok: true, errors: [] });
 }));
 
+test('V6 civic mutation security allows idempotent delegated-action replay after budget consumption', () => withDelegationStore(({
+  delegationStore
+}) => {
+  delegationStore.recordDelegation(delegation({ maxActions: 1 }), { nowMs: 1_779_789_900_000 });
+  delegationStore.consumeDelegatedAction({
+    usageId: 'delegationuse_mutation_replay_001',
+    delegationId: 'delegation_mutation_security_001',
+    principalAccountId: 'acct_v6_mutator_001',
+    delegateAgentId: 'agent_v6_delegate_001',
+    scope: 'proposal_drafting',
+    actionRef: 'proposal_mutation_replay_001',
+    idempotencyKey: 'idem_v6_agent_replay_001'
+  }, { nowMs: 1_779_789_950_000 });
+
+  const replay = buildV6CivicMutationSecurityEnvelope(humanContext({
+    actor: {
+      kind: 'agent',
+      accountId: 'acct_v6_mutator_001',
+      agentId: 'agent_v6_delegate_001'
+    },
+    delegation: {
+      delegationId: 'delegation_mutation_security_001',
+      principalAccountId: 'acct_v6_mutator_001',
+      delegateAgentId: 'agent_v6_delegate_001',
+      approvalReceiptId: 'receipt_v6_agent_delegate_001'
+    },
+    delegationStore,
+    requiredDelegationScope: 'proposal_drafting',
+    surface: 'delegation.consume.replay',
+    idempotencyKey: 'idem_v6_agent_replay_001'
+  }));
+  const newAction = buildV6CivicMutationSecurityEnvelope(humanContext({
+    actor: {
+      kind: 'agent',
+      accountId: 'acct_v6_mutator_001',
+      agentId: 'agent_v6_delegate_001'
+    },
+    delegation: {
+      delegationId: 'delegation_mutation_security_001',
+      principalAccountId: 'acct_v6_mutator_001',
+      delegateAgentId: 'agent_v6_delegate_001',
+      approvalReceiptId: 'receipt_v6_agent_delegate_001'
+    },
+    delegationStore,
+    requiredDelegationScope: 'proposal_drafting',
+    surface: 'delegation.consume.new_action_denied',
+    idempotencyKey: 'idem_v6_agent_new_action_001'
+  }));
+
+  assert.equal(replay.allowed, true);
+  assert.equal(replay.delegationProof.proofStatus, 'valid');
+  assert.equal(replay.delegationProof.remainingActionBudget, 0);
+  assert.equal(replay.delegationProof.idempotentReplay, true);
+  assert.equal(replay.delegationProof.delegatedActionUseId, 'delegationuse_mutation_replay_001');
+  assert.equal(replay.delegationProof.budgetConsumptionStatus, 'already_consumed_for_idempotency_key');
+  assert.deepEqual(assertV6CivicMutationSecuritySafe(replay), { ok: true, errors: [] });
+  assert.equal(newAction.allowed, false);
+  assert.match(newAction.delegationProof.failures.join(','), /delegation_action_budget_exhausted/);
+  assert.match(newAction.delegationProof.failures.join(','), /delegation_scope_not_allowed_by_policy/);
+  assert.deepEqual(assertV6CivicMutationSecuritySafe(newAction), { ok: true, errors: [] });
+}));
+
 test('V6 civic mutation security envelope rate-limits by owner and surface', () => {
   const env = {
     NODE_ENV: 'production',

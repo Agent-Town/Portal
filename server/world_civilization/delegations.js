@@ -437,6 +437,10 @@ function revokeAuditIdempotencyKey(delegationId) {
   return `idem_${`${delegationId}_revoke`.slice(0, 80)}`;
 }
 
+function delegatedUsageAuditIdempotencyKey(usage = {}) {
+  return `idem_${String(usage.usageId || 'delegationuse_action').slice(0, 80)}`;
+}
+
 function normalizedKey(key = '') {
   return String(key || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 }
@@ -566,7 +570,7 @@ function createDelegationActionConsumedAuditEntry({ usage, delegation, consumedB
     },
     actionType: 'delegation.action_consumed',
     objectRef: usage.usageId,
-    idempotencyKey: usage.idempotencyKey,
+    idempotencyKey: delegatedUsageAuditIdempotencyKey(usage),
     beforeHash: sha256(stableJson({
       delegationId: usage.delegationId,
       consumedActionCount: consumedBefore,

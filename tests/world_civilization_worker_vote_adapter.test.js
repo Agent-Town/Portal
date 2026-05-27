@@ -125,7 +125,7 @@ function delegation(overrides = {}) {
     delegateAgentId: AGENT_ID,
     scope: 'vote_advice',
     expiresAtMs: 4_102_444_800_000,
-    maxActions: 2,
+    maxActions: 1,
     approvalReceiptId: 'receipt_worker_tool_vote_delegation_001',
     revocable: true,
     canExecuteCivicEffects: false,
@@ -208,6 +208,22 @@ test('V6 worker vote adapter records receipt only through route-edge authorizati
 
   const result = castVoteFromWorkerTool(invokeArgs(stores));
   const replay = castVoteFromWorkerTool(invokeArgs(stores));
+  const secondProposal = proposal({
+    proposalId: 'proposal_worker_vote_public_works_002',
+    idempotencyKey: 'idem_worker_vote_proposal_002',
+    scope: {
+      kind: 'public_works',
+      targetId: 'district_worker_vote_bridge_002'
+    },
+    affectedPublicState: ['public_works:worker_vote_bridge_002'],
+    rollbackPlan: {
+      planId: 'rollbackplan_worker_vote_public_works_002',
+      strategy: 'Restore previous worker-vote bridge snapshot.',
+      canRollback: true,
+      irreversibleEffects: [],
+      maxRollbackMs: 86_400_000
+    }
+  });
 
   assert.equal(result.version, V6_CIVIC_WORKER_VOTE_ADAPTER_VERSION);
   assert.equal(result.ok, true);
@@ -239,8 +255,56 @@ test('V6 worker vote adapter records receipt only through route-edge authorizati
   assert.equal(result.vote.authorizationKind, 'server_attested_delegation');
   assert.equal(result.vote.eligibilityRuleId, 'rule_worker_tool_vote_001');
   assert.equal(replay.vote.duplicate, true);
+  assert.equal(result.delegatedActionUse.usageId, 'delegationuse_vote_worker_tool_public_works_001');
+  assert.equal(result.delegatedActionUse.delegationId, 'delegation_worker_tool_vote_001');
+  assert.equal(result.delegatedActionUse.principalAccountId, ACCOUNT_ID);
+  assert.equal(result.delegatedActionUse.delegateAgentId, AGENT_ID);
+  assert.equal(result.delegatedActionUse.scope, 'vote_advice');
+  assert.equal(result.delegatedActionUse.actionRef, 'vote_worker_tool_public_works_001');
+  assert.equal(result.delegatedActionUse.idempotencyKey, 'idem_worker_tool_vote_001');
+  assert.equal(result.delegatedActionUse.duplicate, false);
+  assert.equal(replay.delegatedActionUse.duplicate, true);
   assert.equal(stores.voteStore.count(), 1);
   assert.equal(stores.auditLedger.replay().filter((row) => row.entry.actionType === 'vote.recorded').length, 1);
+  assert.equal(stores.auditLedger.replay().filter((row) => row.entry.actionType === 'delegation.action_consumed').length, 1);
+  assert.equal(stores.delegationStore.listDelegatedActionUses({
+    delegationId: 'delegation_worker_tool_vote_001'
+  }).length, 1);
+  const policy = stores.delegationStore.getAgentParticipationPolicy({
+    principalAccountId: ACCOUNT_ID,
+    delegateAgentId: AGENT_ID,
+    atMs: 1_779_991_000_001
+  });
+  assert.equal(policy.remainingActionBudgetByScope.vote_advice, undefined);
+
+  stores.proposalStore.draftProposal(secondProposal, { nowMs: 1_779_990_300_000 });
+  stores.proposalStore.recordProposalReview(moderationDecision({
+    decisionId: 'moderation_worker_vote_proposal_002',
+    subjectRef: 'proposal_worker_vote_public_works_002'
+  }), { nowMs: 1_779_990_400_000 });
+  assert.throws(
+    () => castVoteFromWorkerTool(invokeArgs(stores, {
+      input: {
+        ...invokeArgs(stores).input,
+        vote: vote({
+          voteId: 'vote_worker_tool_public_works_002',
+          proposalId: 'proposal_worker_vote_public_works_002',
+          receiptId: 'receipt_worker_tool_vote_002',
+          idempotencyKey: 'idem_worker_tool_vote_002',
+          eligibilityProof: {
+            eligible: true,
+            ruleId: 'rule_worker_tool_vote_002'
+          }
+        }),
+        idempotencyKey: 'idem_worker_tool_vote_002'
+      }
+    })),
+    /V6_CIVIC_WORKER_VOTE_AUTHORIZATION_DENIED/
+  );
+  assert.equal(stores.voteStore.count(), 1);
+  assert.equal(stores.delegationStore.listDelegatedActionUses({
+    delegationId: 'delegation_worker_tool_vote_001'
+  }).length, 1);
 
   const runtimeWorldToolNames = WORLD_GRID_TOOLS.map((tool) => tool.name);
   assert.equal(runtimeWorldToolNames.includes(WORKER_VOTE_CAST_TOOL_NAME), false);
