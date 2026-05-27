@@ -71,7 +71,9 @@ The research-only modal lab surface contract in
 `server/world_civilization/lab_surface.js` is route-neutral and non-executing.
 It does not add a V6 route or normal gameplay surface; it only records the
 modal-first, debug-observable constraints that any later internal V6 lab UI must
-meet.
+meet. Its launch-plan contract fails closed for standalone `/v6`, `/v6-lab`, or
+`/civilization` paths, broad V5 feature overrides, missing debug tabs, and any
+non-town-hub-modal launch surface.
 
 The research-only resilience baseline in
 `server/world_civilization/resilience.js` inspects the current SQLite civic

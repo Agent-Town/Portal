@@ -66,8 +66,9 @@ gate below has implementation, deterministic tests, and security/product signoff
   hidden from runtime `/api/world/tools`, and covered by contract tests.
 - The research-only modal lab surface contract may exist in
   `server/world_civilization/lab_surface.js`, but it must stay route-neutral,
-  modal-first, hidden from players, non-executing, and covered by contract
-  tests.
+  modal-first, hidden from players, non-executing, fail closed for standalone
+  V6 paths, require debug observability before launch, and be covered by
+  contract tests.
 - The research-only resilience baseline may exist in
   `server/world_civilization/resilience.js`, but it must keep
   `releaseReady: false` until release-grade process restart coverage,
@@ -218,9 +219,10 @@ gate below has implementation, deterministic tests, and security/product signoff
   page-scoped OpenClaw Lite worker continuity, keep Worker Tools, Skill Context,
   Worker Traffic, Brain, and Session Context observable, and prove with
   Playwright visual coverage that it has no standalone route or normal gameplay
-  exposure. Current contract-only coverage starts in
-  `server/world_civilization/lab_surface.js`; release still requires real modal
-  UI checks before any player-visible V6 lab work.
+  exposure. Current contract-only coverage in
+  `server/world_civilization/lab_surface.js` includes a fail-closed modal launch
+  plan for `/v6`, `/v6-lab`, and `/civilization`; release still requires real
+  modal UI checks before any player-visible V6 lab work.
 - Persistence and replay resilience must prove every V6 civic store survives
   process restarts, reconstructs summaries from audit replay, rejects duplicate
   retries under load, migrates forward and backward through schema versions, and

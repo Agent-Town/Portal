@@ -5,7 +5,10 @@ const { V6_WORLD_FEATURE_FLAG, parseWorldGridFeatureFlags } = require('../server
 const {
   REQUIRED_DEBUG_TABS,
   V6_LAB_PANEL_IDS,
+  V6_LAB_STANDALONE_PATHS,
+  assertV6LabLaunchPlanSafe,
   assertV6LabSurfaceSafe,
+  buildV6LabModalLaunchPlan,
   buildV6LabSurfaceContract
 } = require('../server/world_civilization/lab_surface');
 
@@ -57,6 +60,62 @@ test('V6 lab surface contract is modal-only, observable, and non-executing when 
   assert.deepEqual(assertV6LabSurfaceSafe(contract), { ok: true, errors: [] });
 });
 
+test('V6 lab modal launch plan opens only from the town hub modal context', () => {
+  const plan = buildV6LabModalLaunchPlan({
+    includeResearchLab: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    requestPath: '/app?district=town',
+    launchSurface: 'town_hub_modal',
+    source: 'node_test'
+  });
+
+  assert.equal(plan.available, true);
+  assert.equal(plan.allowed, true);
+  assert.equal(plan.failClosed, false);
+  assert.equal(plan.routeAction, 'open_modal');
+  assert.equal(plan.modalId, 'v6-research-lab');
+  assert.equal(plan.mountMode, 'modal');
+  assert.equal(plan.launchSurface, 'town_hub_modal');
+  assert.equal(plan.requestPath, '/app');
+  assert.equal(plan.standaloneRouteAllowed, false);
+  assert.equal(plan.preservesWorkerContinuity, true);
+  assert.deepEqual(plan.requiredDebugTabs, REQUIRED_DEBUG_TABS);
+  assert.deepEqual(plan.missingDebugTabs, []);
+  assert.deepEqual(plan.panels.map((panel) => panel.id), V6_LAB_PANEL_IDS);
+  assert.equal(plan.executionStatus, 'not_executable');
+  assert.deepEqual(assertV6LabLaunchPlanSafe(plan), { ok: true, errors: [] });
+});
+
+test('V6 lab modal launch plan fails closed for standalone routes and missing debug tabs', () => {
+  for (const path of V6_LAB_STANDALONE_PATHS) {
+    const standalone = buildV6LabModalLaunchPlan({
+      includeResearchLab: true,
+      featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+      requestPath: `${path}?open=1`
+    });
+    assert.equal(standalone.allowed, false);
+    assert.equal(standalone.failClosed, true);
+    assert.equal(standalone.routeAction, 'redirect_to_town_hub');
+    assert.equal(standalone.redirectPath, '/app');
+    assert.equal(standalone.preservesWorkerContinuity, false);
+    assert.match(standalone.reason, /standalone route is forbidden/);
+    assert.deepEqual(assertV6LabLaunchPlanSafe(standalone), { ok: true, errors: [] });
+  }
+
+  const missingTabs = buildV6LabModalLaunchPlan({
+    includeResearchLab: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    requestPath: '/app',
+    debugTabsAvailable: ['Worker Tools', 'Brain']
+  });
+  assert.equal(missingTabs.allowed, false);
+  assert.equal(missingTabs.failClosed, true);
+  assert.equal(missingTabs.routeAction, 'deny');
+  assert.match(missingTabs.reason, /debug observability/);
+  assert.deepEqual(missingTabs.missingDebugTabs, ['Skill Context', 'Worker Traffic', 'Session Context']);
+  assert.deepEqual(assertV6LabLaunchPlanSafe(missingTabs), { ok: true, errors: [] });
+});
+
 test('V6 lab safety assertion fails closed for route, visibility, debug, and mutation drift', () => {
   const unsafe = {
     ...buildV6LabSurfaceContract({
@@ -93,6 +152,32 @@ test('V6 lab safety assertion fails closed for route, visibility, debug, and mut
   assert.match(result.errors.join(','), /V6_LAB_OTHER_USER_MUTATION_FORBIDDEN/);
   assert.match(result.errors.join(','), /V6_LAB_PANEL_EXECUTION_FORBIDDEN/);
   assert.match(result.errors.join(','), /V6_LAB_NON_EXECUTING_REQUIRED/);
+
+  const unsafeLaunch = {
+    ...buildV6LabModalLaunchPlan({
+      includeResearchLab: true,
+      featureFlags: { [V6_WORLD_FEATURE_FLAG]: true }
+    }),
+    requestPath: '/v6',
+    standaloneRouteAllowed: true,
+    routeAction: 'render_page',
+    mountMode: 'page',
+    launchSurface: '/v6',
+    preservesWorkerContinuity: false,
+    effects: {
+      executesCivicEffect: true,
+      mutatesPrivateTown: true,
+      mutatesOtherUserWorld: true
+    },
+    executionStatus: 'executes'
+  };
+  const launchResult = assertV6LabLaunchPlanSafe(unsafeLaunch);
+  assert.equal(launchResult.ok, false);
+  assert.match(launchResult.errors.join(','), /V6_LAB_LAUNCH_STANDALONE_ROUTE_FORBIDDEN/);
+  assert.match(launchResult.errors.join(','), /V6_LAB_LAUNCH_MODAL_REQUIRED/);
+  assert.match(launchResult.errors.join(','), /V6_LAB_LAUNCH_STANDALONE_ALLOWED/);
+  assert.match(launchResult.errors.join(','), /V6_LAB_LAUNCH_WORKER_CONTINUITY_REQUIRED/);
+  assert.match(launchResult.errors.join(','), /V6_LAB_LAUNCH_NON_EXECUTING_REQUIRED/);
 });
 
 test('broad V5 feature overrides do not enable the V6 lab surface accidentally', () => {
@@ -109,8 +194,16 @@ test('broad V5 feature overrides do not enable the V6 lab surface accidentally',
   assert.equal(v5All.playerVisible, false);
   assert.deepEqual(v5All.panels, []);
   assert.deepEqual(assertV6LabSurfaceSafe(v5All), { ok: true, errors: [] });
+  assert.equal(buildV6LabModalLaunchPlan({
+    includeResearchLab: true,
+    featureFlags: parseWorldGridFeatureFlags('all')
+  }).allowed, false);
 
   assert.equal(v60.available, true);
   assert.deepEqual(v60.panels.map((panel) => panel.id), V6_LAB_PANEL_IDS);
   assert.deepEqual(assertV6LabSurfaceSafe(v60), { ok: true, errors: [] });
+  assert.equal(buildV6LabModalLaunchPlan({
+    includeResearchLab: true,
+    featureFlags: parseWorldGridFeatureFlags('v60')
+  }).allowed, true);
 });

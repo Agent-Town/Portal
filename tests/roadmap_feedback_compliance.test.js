@@ -215,8 +215,11 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(gate, /public_works\.project\.recorded|proposal\/vote\/moderation-gated\s+project records/);
   assert.match(plan, /M15 Modal-first V6 lab surface \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/lab_surface\.js/);
+  assert.match(plan, /fail-closed modal launch plan/);
+  assert.match(plan, /\/v6.*\/v6-lab.*\/civilization/);
   assert.match(gate, /server\/world_civilization\/lab_surface\.js/);
   assert.match(gate, /town hub modal flow/);
+  assert.match(gate, /fail-closed modal launch\s+plan|fail closed for standalone\s+V6 paths/);
   assert.match(plan, /M16 Persistence, replay, and resilience hardening \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/resilience\.js/);
   assert.match(plan, /server\/world_civilization\/sqlite_schema\.js/);

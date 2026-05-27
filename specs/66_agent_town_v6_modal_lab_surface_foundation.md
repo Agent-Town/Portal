@@ -10,13 +10,14 @@ Test coverage: `tests/world_civilization_lab_surface.test.js`
 
 ## Boundary
 
-This foundation describes the internal V6 lab surface as a contract only. It
-does not add routes, page navigation, player-visible UI, autonomous civic
-agents, or executable civic mechanics.
+This foundation describes the internal V6 lab surface and modal launch plan as
+contracts only. It does not add routes, page navigation, player-visible UI,
+autonomous civic agents, or executable civic mechanics.
 
 The lab surface remains route-neutral so later UI work must mount from the town
 hub modal flow instead of a standalone V6 page. Standalone routes such as `/v6`,
-`/v6-lab`, or `/civilization` are not valid release paths.
+`/v6-lab`, or `/civilization` are not valid release paths and must fail closed
+to the town hub path instead of rendering V6 content directly.
 
 ## Contract Rules
 
@@ -34,6 +35,11 @@ hub modal flow instead of a standalone V6 page. Standalone routes such as `/v6`,
 - Panels may describe readiness, schemas, proposals, votes, moderation,
   reputation, effects, delegations, institutions, public works, and audit
   evidence, but each panel must remain non-executing.
+- `buildV6LabModalLaunchPlan` may allow launch only from `/app` through
+  `town_hub_modal` when the V6 feature flag, research opt-in, and required
+  debug tabs are present.
+- Missing debug tabs, broad V5 feature overrides, direct standalone paths, or
+  non-modal launch surfaces must return a fail-closed non-executing plan.
 
 ## Release Gate
 
