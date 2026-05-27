@@ -2803,11 +2803,13 @@ Response includes:
 
 Release-gate invariants:
 - missing approval or evidence returns a valid fail-closed `prototype-gated` report;
+- complete machine, persistence, versioned approval, and candidate-review evidence can produce `ready-for-controlled-release` HTTP/tool responses while production image creation, default generated-pack exposure, canonical server-rule changes, V6 civic changes, and private-data storage remain false/zero;
 - `evaluatedAtMs` must not be future-dated relative to validation time;
 - `publicReleaseEligible=true` requires all prerequisites to be true, `blockingReasons=[]`, diversity evidence including the release pack, diversity aggregate metrics that match per-pack rows/signatures/screenshots/comparisons, same-pack persistence evidence, same-pack public-card evidence, zero private-data leaks, zero missing assets, zero production image assets, explicit consent/cost/auth approval, candidate asset review, and a 64-hex human review signoff hash;
 - forged eligibility, mismatched blocking reasons, invalid gate pack ids, diversity evidence that excludes the release pack, metric-only diversity claims, mixed persistence evidence, mixed public-card evidence, approval evidence hash drift, future-dated approval evidence, future-dated gate reports, candidate-review approval evidence that predates its manifest, approval-evidence/manifest candidate-count drift, planned-only candidate-review approvals, approval evidence copied from another pack, secret-like fields including semantic token fields, raw prompt instructions, production asset leaks, and private-card data fail validation;
 - candidate-review and release-approval evidence validation reports redact submitted secret-looking keys, secret-looking values, raw-instruction keys, executable instruction values, manifest hashes, evidence hashes, and pack ids from content, schema-error, and measured evidence;
 - oversized or noisy release-evidence request bodies and oversized evidence object keys fail before report construction and rejection responses return counts/redacted paths/limits, not submitted evidence values or oversized key text;
+- the generic tool dispatcher path `et.world.generated_pack.release_gate` uses the same generated-pack guard and release-gate contract as the HTTP endpoint;
 - the route remains hidden in default gameplay unless `FEATURE_WORLD_GRID_GENERATED_PACKS` is enabled.
 
 ### POST `/api/world/generated-pack/release-evidence-bundle`

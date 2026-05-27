@@ -222,6 +222,7 @@ Status: prototype-gated
   "serverRuleChangeCount": 0,
   "approvedProductionAssetCount": 0,
   "generatedImageAssetsCanChangeServerRules": false,
+  "releaseGateReadyApiPathVerified": true,
   "productionImageAssetCount": 0,
   "validationReportBoundaryMetricsMirrored": true,
   "validationReportBoundaryMetricsApiMirrored": true,

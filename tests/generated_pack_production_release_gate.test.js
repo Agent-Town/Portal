@@ -3155,7 +3155,7 @@ test('GU-18/GU-19 release gate and evidence bundle APIs are generated-pack-gated
   });
 });
 
-test('GPACK-154/155 release evidence bundle APIs can return ready evidence and ignore loose approvals', async () => {
+test('GPACK-154/155/156 release APIs can return ready evidence and ignore loose approvals', async () => {
   const identity = { pairId: 'session:release-evidence-ready-api', houseId: null };
 
   await withTempGeneratedPackStore(async (root) => {
@@ -3236,6 +3236,36 @@ test('GPACK-154/155 release evidence bundle APIs can return ready evidence and i
         candidateReviewManifest,
         approvalEvidence: approvedReleaseEvidence(pack)
       };
+
+      const { response: releaseGateResponse, body: releaseGateBody } = await postJson(
+        `${baseUrl}/api/world/generated-pack/release-gate`,
+        readyRequestBody
+      );
+      assert.equal(releaseGateResponse.status, 200, JSON.stringify(releaseGateBody));
+      assert.equal(releaseGateBody.releaseGate.releaseMode, 'ready-for-controlled-release');
+      assert.equal(releaseGateBody.releaseGate.publicReleaseEligible, true);
+      assert.equal(releaseGateBody.releaseGate.blockingReasons.length, 0);
+      assert.equal(Object.values(releaseGateBody.releaseGate.releasePrerequisites).every((value) => value === true), true);
+      assert.equal(releaseGateBody.releaseGate.metrics.privateDataLeakCount, 0);
+      assert.equal(releaseGateBody.releaseGate.metrics.productionImageAssetCount, 0);
+      assert.equal(releaseGateBody.releaseGate.metrics.looseApprovalInputCount, 0);
+      assert.equal(releaseGateBody.validationReport.ok, true, JSON.stringify(releaseGateBody.validationReport.checks));
+      assert.equal(releaseGateBody.validationReport.metrics.publicReleaseEligible, true);
+      assert.equal(releaseGateBody.validationReport.metrics.costConsentModelApproved, true);
+      assert.equal(releaseGateBody.validationReport.metrics.humanReviewComplete, true);
+
+      const { response: toolReleaseGateResponse, body: toolReleaseGateBody } = await postJson(
+        `${baseUrl}/api/world/tool/et.world.generated_pack.release_gate`,
+        readyRequestBody
+      );
+      assert.equal(toolReleaseGateResponse.status, 200, JSON.stringify(toolReleaseGateBody));
+      assert.equal(toolReleaseGateBody.data.releaseGate.releaseMode, 'ready-for-controlled-release');
+      assert.equal(toolReleaseGateBody.data.releaseGate.publicReleaseEligible, true);
+      assert.equal(toolReleaseGateBody.data.releaseGate.blockingReasons.length, 0);
+      assert.equal(toolReleaseGateBody.data.releaseGate.metrics.privateDataLeakCount, 0);
+      assert.equal(toolReleaseGateBody.data.releaseGate.metrics.productionImageAssetCount, 0);
+      assert.equal(toolReleaseGateBody.data.validationReport.ok, true, JSON.stringify(toolReleaseGateBody.data.validationReport.checks));
+      assert.equal(toolReleaseGateBody.data.validationReport.metrics.publicReleaseEligible, true);
 
       const { response: bundleResponse, body: bundleBody } = await postJson(
         `${baseUrl}/api/world/generated-pack/release-evidence-bundle`,
