@@ -753,6 +753,48 @@ test('GU-19 release evidence bundle rejects source drift and missing ready-gate 
   );
 }));
 
+test('GU-19 release evidence bundle rejects unsupplied source hashes even when fail closed', () => withTempGeneratedPackStore(() => {
+  const owner = { ownerAccountId: 'owner_release_evidence_bundle_unsupplied_source_hash' };
+  const pack = generateAndStorePack({
+    owner,
+    prompt: 'quiet prism foundry with careful lantern archivists',
+    nowMs: 156_900
+  });
+  const releaseGate = buildProductionReleaseGate({ pack, nowMs: 156_950 });
+  const bundle = buildReleaseEvidenceBundle({
+    pack,
+    releaseGate,
+    nowMs: 157_000
+  });
+  const forgedBundle = rehashReleaseEvidenceBundle({
+    ...bundle,
+    sourceHashes: {
+      ...bundle.sourceHashes,
+      publicCard: hashLabel('unsupplied-public-card-source')
+    },
+    sourcePresence: {
+      ...bundle.sourcePresence,
+      publicCard: true
+    },
+    metrics: {
+      ...bundle.metrics,
+      presentSourceCount: bundle.metrics.presentSourceCount + 1,
+      missingSourceCount: bundle.metrics.missingSourceCount - 1
+    }
+  });
+  const report = validateReleaseEvidenceBundle(forgedBundle, { pack, releaseGate, nowMs: 157_050 });
+
+  assert.equal(releaseGate.publicReleaseEligible, false);
+  assert.equal(bundle.sourceHashes.publicCard, '');
+  assert.equal(forgedBundle.publicReleaseEligible, false);
+  assert.equal(report.ok, false);
+  assert.equal(report.metrics.sourceHashMismatchCount, 1);
+  assert.equal(
+    report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_SOURCE_HASHES_MATCH').passed,
+    false
+  );
+}));
+
 test('GU-19 release evidence bundle rejects mixed-pack source evidence even when hashes match supplied sources', () => withTempGeneratedPackStore(() => {
   const fixture = readyReleaseGateFixture({
     ownerAccountId: 'owner_release_evidence_bundle_mixed_pack',

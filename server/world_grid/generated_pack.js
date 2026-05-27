@@ -5124,10 +5124,14 @@ function validateReleaseEvidenceBundle(bundle = {}, {
   });
   const sourceHashProblems = [];
   for (const key of RELEASE_EVIDENCE_SOURCE_KEYS) {
-    if (suppliedHashes[key] && bundle?.sourceHashes?.[key] !== suppliedHashes[key]) {
-      sourceHashProblems.push(key);
+    const bundleSourceHash = String(bundle?.sourceHashes?.[key] || '');
+    const suppliedSourceHash = String(suppliedHashes[key] || '');
+    if (suppliedSourceHash) {
+      if (bundleSourceHash !== suppliedSourceHash) sourceHashProblems.push(key);
+    } else if (bundleSourceHash) {
+      sourceHashProblems.push(`${key}:unsupplied`);
     }
-    const expectedPresence = Boolean(bundle?.sourceHashes?.[key]);
+    const expectedPresence = Boolean(bundleSourceHash);
     if (bundle?.sourcePresence?.[key] !== expectedPresence) {
       sourceHashProblems.push(`${key}:presence`);
     }
