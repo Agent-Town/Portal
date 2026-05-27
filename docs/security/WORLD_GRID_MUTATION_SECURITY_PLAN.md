@@ -34,9 +34,11 @@ until the controls below are implemented and covered by deterministic tests.
   needs wallet/session continuity review.
 - CSRF token issuance now rotates old tokens for the same owner/session binding,
   and `invalidateWorldGridCsrfTokens()` supports explicit session-token
-  invalidation for future logout/session-reset wiring. Current coverage proves
-  rotation and explicit invalidation for both process-local and optional SQLite
-  stores.
+  invalidation for session lifecycle cleanup. `/api/session/reset` now calls
+  the invalidation hook before rotating the human session cookie. Current
+  coverage proves rotation and explicit invalidation for both process-local and
+  optional SQLite stores, and browser coverage proves a pre-reset same-wallet
+  token is rejected after session reset.
 - V5.1+ mutating world-grid routes require an existing Founders Plot
   prerequisite and return `WORLD_GRID_PLOT_REQUIRED` when missing.
 - V5.1+ externally visible mutating prototype routes now require an
@@ -121,9 +123,9 @@ until the controls below are implemented and covered by deterministic tests.
 - CSRF token protection for browser-authenticated mutations. Current coverage
   verifies missing, invalid, cross-owner, cross-session, expired, and durable
   restart tokens plus browser same-wallet cross-session denial, same-session
-  token rotation, and explicit invalidation; release promotion still needs
-  final session-auth integration, logout/session-reset invalidation wiring, and
-  wallet/session continuity review.
+  token rotation, explicit invalidation, and session-reset invalidation wiring;
+  release promotion still needs final session-auth integration, provider
+  logout/disconnect invalidation wiring, and wallet/session continuity review.
 - Session-auth and wallet-continuity checks that bind mutations to the current
   owner, not just to a public id or request body field.
 - Rate limits keyed by session and owner for public presence, claim planning,
@@ -163,9 +165,10 @@ until the controls below are implemented and covered by deterministic tests.
 - Current `WORLD_GRID_CSRF_SQLITE_PATH` coverage is a mutation security
   foundation only; the current browser session-binding proof covers
   same-wallet cross-session token reuse denial, and the current store coverage
-  proves same-session token rotation plus explicit invalidation, but release
-  promotion still needs final session-auth integration, logout/session-reset
-  invalidation wiring, and wallet/session continuity review.
+  proves same-session token rotation plus explicit invalidation. Session reset
+  now invalidates current-session world-grid tokens. Release promotion still
+  needs final session-auth integration, provider logout/disconnect invalidation
+  wiring, and wallet/session continuity review.
 - Current `WORLD_GRID_RATE_LIMIT_SQLITE_PATH` coverage is a mutation security
   foundation only; release promotion still needs final browser-session binding,
   wallet/session continuity, IP/risk-aware production sharing, and operational
@@ -177,6 +180,6 @@ until the controls below are implemented and covered by deterministic tests.
 ## Out Of Scope For This Hardening Pass
 
 This pass does not add final session-auth middleware, IP/risk-aware distributed
-rate limits, logout/session-reset CSRF invalidation wiring, or a public
+rate limits, provider logout/disconnect CSRF invalidation wiring, or a public
 free-play security surface. Those controls remain release gates because the V5
 world-grid branch is still prototype-gated.

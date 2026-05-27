@@ -218,7 +218,7 @@ persistence resilience, and security/product release review.
   browser same-wallet cross-session denial plus token rotation/invalidation
   proof to V6 route/tool integration, durable/shared rate limits, final
   session/wallet middleware, production browser coverage, audit integration,
-  logout/session-reset invalidation wiring, and security/product signoff.
+  provider logout/disconnect invalidation wiring, and security/product signoff.
 - Worker-first V6 civic tools must pass the exposure gate before becoming
   runtime-callable. Current research-only coverage starts in
   `server/world_civilization/tool_exposure_gate.js`; release still requires

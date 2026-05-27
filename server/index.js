@@ -24,6 +24,8 @@ const { readStore, writeStore, getStorePath } = require('./store');
 const { createExperiencesRouter } = require('./experience_loader');
 const { createFoundersPlotRouter } = require('./founders_plot/routes');
 const { createWorldGridRouter } = require('./world_grid/routes');
+const { invalidateWorldGridCsrfTokens } = require('./world_grid/csrf');
+const { normalizeOwnerIdentity: normalizeWorldGridOwnerIdentity } = require('./world_grid/region');
 const { resetFoundersPlotStore } = require('./founders_plot/store');
 const { getAtlasSnapshot, searchAtlasAgents } = require('./atlas');
 const { createPonyTransportService } = require('./ponyTransport');
@@ -3688,6 +3690,13 @@ app.get('/api/session', (req, res) => {
 app.post('/api/session/reset', (req, res) => {
   // Ensure we still have a valid response cookie context (Secure flag in prod).
   const store = readStore();
+  try {
+    const previousWorldGridOwner = normalizeWorldGridOwnerIdentity(resolveFoundersPlotIdentity(req, res));
+    if (previousWorldGridOwner) invalidateWorldGridCsrfTokens(previousWorldGridOwner);
+  } catch {
+    // Keep session reset available even when no world-grid owner can be resolved
+    // for token cleanup.
+  }
   const next = createSession();
   const onboarding = ensureSessionOnboarding(next);
   const experiencePreference = ensureSessionExperiencePreference(next);

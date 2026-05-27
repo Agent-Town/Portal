@@ -40,8 +40,9 @@ approval and does not expose V6 in normal gameplay.
 - durable/session-bound CSRF token issuance and verification; the V5
   world-grid foundation now stores owner/session-bound token hashes and proves
   browser same-wallet cross-session denial plus same-session token
-  rotation/invalidation, but V6 still needs route/tool integration,
-  logout/session-reset invalidation wiring, and final browser coverage.
+  rotation/invalidation and session-reset invalidation, but V6 still needs
+  route/tool integration, provider logout/disconnect invalidation wiring, and
+  final browser coverage.
 - Durable or shared rate-limit counters across production instances.
 - Final session/wallet ownership middleware connected to every mutating V6
   route and worker tool.

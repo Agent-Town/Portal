@@ -26,8 +26,9 @@ from `prototype_gated` to `release_ready`:
   which proves a token issued in one same-wallet browser session cannot mutate
   from another same-wallet browser session while a same-session token succeeds;
   current store coverage proves same-session token rotation plus explicit
-  invalidation; release promotion still requires logout/session-reset
-  invalidation wiring and session-auth integration.
+  invalidation; current browser coverage proves pre-reset tokens fail after
+  `/api/session/reset`; release promotion still requires provider
+  logout/disconnect invalidation wiring and session-auth integration.
 - Every mutating route and tool writes append-only audit/replay records with
   actor, route/tool name, idempotency key, before/after summary, and rollback
   handle when applicable.
