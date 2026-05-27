@@ -309,6 +309,48 @@ test('GPACK-129 candidate generation preflight rejects tampered job-log paths be
   assert.equal(jobLogWritten, false);
 });
 
+test('GPACK-130 candidate generation preflight rejects tampered adapter paths before execution', async () => {
+  const pack = createRunPack('owner_candidate_generation_run_adapter_path_guard');
+  const target = pack.assetPromptPlan.targets[0];
+  const outsideCandidateRoot = target.candidateOutputPath.replace(
+    'data/generated-packs-test',
+    'data/generated-packs-test-outside'
+  );
+  const badPlan = {
+    ...pack.assetPromptPlan,
+    targets: [
+      {
+        ...target,
+        candidateOutputPath: outsideCandidateRoot
+      },
+      ...pack.assetPromptPlan.targets.slice(1)
+    ]
+  };
+  let caught;
+  let adapterCalled = false;
+  try {
+    await runCandidateImageGenerationSpike({
+      pack,
+      assetPromptPlan: badPlan,
+      targetLimit: 1,
+      writeJobLogs: false,
+      nowMs: 180_295,
+      config: approvedConfig(),
+      generatorAdapter: async ({ target: plannedTarget }) => {
+        adapterCalled = true;
+        return { candidateOutputPath: plannedTarget.candidateOutputPath };
+      }
+    });
+  } catch (error) {
+    caught = error;
+  }
+
+  assert.equal(caught?.message, 'INVALID_CANDIDATE_GENERATION_PLAN_PATH');
+  assert.equal(caught?.details?.reason, 'CANDIDATE_OUTPUT_PATH_OUTSIDE_ROOT');
+  assert.equal(caught?.details?.field, '$.assetPromptPlan.targets[0].candidateOutputPath');
+  assert.equal(adapterCalled, false);
+});
+
 test('GU-5 candidate generation validators reject fractional counters and target drift', async () => {
   const pack = createRunPack('owner_candidate_generation_run_limit_edges');
   const target = pack.assetPromptPlan.targets[0];

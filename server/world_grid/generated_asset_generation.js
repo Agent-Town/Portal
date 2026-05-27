@@ -553,9 +553,6 @@ async function runCandidateImageGenerationSpike({
   const validationReport = validateGeneratedPack(pack || {});
   const promptPlanReport = validateAssetPromptPlan(plan, pack || {});
   const targets = Array.isArray(plan.targets) ? plan.targets : [];
-  if (writeJobLogs) {
-    validateCandidateGenerationPlanPaths(plan);
-  }
   const selectedTargets = Number.isInteger(targetLimit) && targetLimit > 0
     ? targets.slice(0, targetLimit)
     : targets;
@@ -564,6 +561,10 @@ async function runCandidateImageGenerationSpike({
     validationReport,
     promptPlanReport
   });
+  const adapterCanRun = gateProblems.length === 0 && typeof generatorAdapter === 'function';
+  if (writeJobLogs || adapterCanRun) {
+    validateCandidateGenerationPlanPaths(plan);
+  }
   const beforeFingerprint = canonicalMappingFingerprint(pack || {});
   let jobLogWriteCount = 0;
   let candidateRecordCount = 0;

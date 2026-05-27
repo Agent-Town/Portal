@@ -55,6 +55,7 @@ Player prompt
 - The guard requires product/security approval, documented auth, documented cost, accepted cost estimate, and user/team consent before any adapter can run.
 - No adapter is wired by default. Failed or blocked attempts keep deterministic fallback packs playable, write zero production outputs, preserve canonical gameplay mappings, and reject secret-like fields and values, expanded credential-token-family values, raw prompt instructions, unsafe paths, unknown/duplicate prompt-plan targets, fractional counters, unstable run hashes, or production-promotion claims.
 - The candidate-generation runner validates prompt-plan writable paths before job-log file I/O, rejecting tampered job-log, candidate-output, or approved-output paths that escape the generated-pack roots.
+- The same path preflight runs before an approved adapter can execute, so disabling job-log writes cannot hand a root-tampered candidate-output path to the adapter.
 - Candidate-generation run and job-log validation reports redact submitted secret-looking keys, secret-looking values, expanded credential-token-family values, raw-instruction keys, and executable instruction values from content and schema-error evidence before callers can inspect the report.
 - Asset prompt-plan, candidate-review manifest, and candidate-generation run reports redact unsafe submitted canonical target labels from measured problem lists while preserving approved canonical target names for QA diagnostics.
 - Core generated-pack contract reports also redact unsafe submitted measured metadata values before returning diagnostics to callers.
@@ -216,6 +217,7 @@ Player prompt
   "candidateGenerationRunHashStable": true,
   "assetGenerationJobLogPathsSafe": true,
   "candidateGenerationJobLogWritablePathsCandidateOnly": true,
+  "candidateGenerationAdapterPathsPreflighted": true,
   "candidateGenerationRunCanonicalTargetProblemCount": 0,
   "candidateGenerationExpandedCredentialFamiliesRejected": true,
   "assetGenerationJobLogTargetDriftCount": 0,
