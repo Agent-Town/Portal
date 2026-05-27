@@ -5175,6 +5175,7 @@ function buildReleaseEvidenceBundle({
   const releaseGateHashMatches = Boolean(releaseGateHash);
   const sourcePackIdProblems = releaseEvidencePackIdProblems(sourcePackIds, bundlePackId);
   const sourcePresence = sourcePresenceForHashes(sourceHashes);
+  const sourcePresenceMatchesHashes = true;
   const presentSourceCount = Object.values(sourcePresence).filter(Boolean).length;
   const approvalEvidenceHashMatchesGate = Boolean(gate?.approvalEvidence)
     && stableEvidenceHash(gate.approvalEvidence) === sourceHashes.approvalEvidence;
@@ -5248,6 +5249,7 @@ function buildReleaseEvidenceBundle({
       presentSourceCount,
       missingSourceCount: RELEASE_EVIDENCE_SOURCE_KEYS.length - presentSourceCount,
       sourceHashMismatchCount: 0,
+      sourcePresenceMatchesHashes,
       sourcePackIdMismatchCount: sourcePackIdProblems.length,
       releaseGateHashMatches,
       releaseGateValid: validateProductionReleaseGate(gate, { nowMs: bundleCreatedAtMs }).ok === true,
@@ -5315,6 +5317,8 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     releaseGate
   });
   const sourceHashProblems = [];
+  const expectedSourcePresence = sourcePresenceForHashes(bundle?.sourceHashes || {});
+  const sourcePresenceProblems = [];
   for (const key of RELEASE_EVIDENCE_SOURCE_KEYS) {
     const bundleSourceHash = String(bundle?.sourceHashes?.[key] || '');
     const suppliedSourceHash = String(suppliedHashes[key] || '');
@@ -5323,11 +5327,13 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     } else if (bundleSourceHash) {
       sourceHashProblems.push(`${key}:unsupplied`);
     }
-    const expectedPresence = Boolean(bundleSourceHash);
+    const expectedPresence = expectedSourcePresence[key] === true;
     if (bundle?.sourcePresence?.[key] !== expectedPresence) {
       sourceHashProblems.push(`${key}:presence`);
+      sourcePresenceProblems.push(key);
     }
   }
+  const sourcePresenceMatchesHashes = sourcePresenceProblems.length === 0;
   const sourcePackIdProblems = [
     ...releaseEvidencePackIdProblems(bundle?.sourcePackIds || {}, bundle?.packId || ''),
     ...Object.entries(suppliedPackIds)
@@ -5437,6 +5443,8 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     && Number(bundle?.metrics?.missingSourceCount || 0) === RELEASE_EVIDENCE_SOURCE_KEYS.length - presentSourceCount
     && Number(bundle?.metrics?.requiredSourceCount || 0) === RELEASE_EVIDENCE_SOURCE_KEYS.length
     && Number(bundle?.metrics?.sourceHashMismatchCount || 0) === sourceHashProblems.length
+    && bundle?.metrics?.sourcePresenceMatchesHashes === sourcePresenceMatchesHashes
+    && sourcePresenceMatchesHashes === true
     && Number(bundle?.metrics?.sourcePackIdMismatchCount || 0) === sourcePackIdProblems.length
     && bundle?.metrics?.releaseGateHashMatches === releaseGateHashMatches
     && releaseGateHashMatches === true
@@ -5482,7 +5490,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     {
       id: 'RELEASE_EVIDENCE_BUNDLE_SOURCE_HASHES_MATCH',
       passed: sourceHashProblems.length === 0 && releaseGateHashMatches,
-      measured: { sourceHashProblems, releaseGateHashMatches }
+      measured: { sourceHashProblems, sourcePresenceMatchesHashes, releaseGateHashMatches }
     },
     {
       id: 'RELEASE_EVIDENCE_BUNDLE_PACK_IDS_MATCH',
@@ -5517,6 +5525,8 @@ function validateReleaseEvidenceBundle(bundle = {}, {
       measured: {
         presentSourceCount,
         sourceHashProblemCount: sourceHashProblems.length,
+        sourcePresenceProblemCount: sourcePresenceProblems.length,
+        sourcePresenceMatchesHashes,
         sourcePackIdProblemCount: sourcePackIdProblems.length,
         releaseGateHashMatches,
         bundleCreatedAtOrAfterGate,
@@ -5557,6 +5567,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
       rawInstructionPathCount: rawInstructionPaths.length,
       bundleHashMatches,
       sourceHashMismatchCount: sourceHashProblems.length,
+      sourcePresenceMatchesHashes,
       sourcePackIdMismatchCount: sourcePackIdProblems.length,
       releaseGateHashMatches,
       presentSourceCount,

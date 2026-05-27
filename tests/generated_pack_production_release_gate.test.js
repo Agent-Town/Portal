@@ -471,6 +471,7 @@ test('GU-19 release evidence bundle binds a ready gate to source evidence hashes
   assert.equal(bundle.publicReleaseEligible, true);
   assert.equal(bundle.metrics.presentSourceCount, bundle.metrics.requiredSourceCount);
   assert.equal(bundle.metrics.sourceHashMismatchCount, 0);
+  assert.equal(bundle.metrics.sourcePresenceMatchesHashes, true);
   assert.equal(bundle.metrics.sourcePackIdMismatchCount, 0);
   assert.equal(bundle.metrics.releaseGateHashMatches, true);
   assert.equal(bundle.sourcePackIds.generatedPack, fixture.pack.packId);
@@ -508,6 +509,7 @@ test('GU-19 release evidence bundle binds a ready gate to source evidence hashes
   assert.equal(report.metrics.diversitySourceIncludesGatePack, true);
   assert.equal(report.metrics.diversitySourceMetricsCoherent, true);
   assert.equal(report.metrics.releaseGateHashMatches, true);
+  assert.equal(report.metrics.sourcePresenceMatchesHashes, true);
   assert.equal(bundle.constraints.productionImageAssetsCreated, false);
 }));
 
@@ -772,6 +774,35 @@ test('GPACK-136 release evidence bundle rejects release-gate hash-match metric t
 
   assert.equal(bundle.metrics.releaseGateHashMatches, true);
   assert.equal(report.metrics.releaseGateHashMatches, true);
+  assert.equal(report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_HASH_STABLE').passed, true);
+  assert.equal(report.ok, false);
+  assert.equal(
+    report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,
+    false
+  );
+}));
+
+test('GPACK-137 release evidence bundle rejects source-presence match metric tampering', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_evidence_bundle_source_presence_metric',
+    prompt: 'brass relay orchard with careful lantern surveyors',
+    nowMs: 154_960
+  });
+  const bundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    nowMs: 155_010
+  });
+  const tamperedBundle = rehashReleaseEvidenceBundle({
+    ...bundle,
+    metrics: {
+      ...bundle.metrics,
+      sourcePresenceMatchesHashes: false
+    }
+  });
+  const report = validateReleaseEvidenceBundle(tamperedBundle, fixture);
+
+  assert.equal(bundle.metrics.sourcePresenceMatchesHashes, true);
+  assert.equal(report.metrics.sourcePresenceMatchesHashes, true);
   assert.equal(report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_HASH_STABLE').passed, true);
   assert.equal(report.ok, false);
   assert.equal(
@@ -2382,6 +2413,7 @@ test('GU-18/GU-19 release gate and evidence bundle APIs are generated-pack-gated
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.readyEvidenceSourcesMatchGate, true);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.presentSourceCount < bundleBody.releaseEvidenceBundle.metrics.requiredSourceCount, true);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.sourceHashMismatchCount, 0);
+      assert.equal(bundleBody.releaseEvidenceBundle.metrics.sourcePresenceMatchesHashes, true);
       assert.equal(bundleBody.releaseEvidenceBundle.constraints.productionImageAssetsCreated, false);
 
       const toolBundleResponse = await fetch(`${baseUrl}/api/world/tool/et.world.generated_pack.release_evidence_bundle`, {
