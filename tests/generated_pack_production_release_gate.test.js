@@ -1101,6 +1101,54 @@ test('GPACK-144 release evidence bundle rejects primary source-pass metric tampe
   }
 }));
 
+test('GPACK-145 release evidence bundle rejects review and diversity source metric tampering', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_evidence_bundle_review_diversity_metrics',
+    prompt: 'cobalt ferry garden with careful archive masons',
+    nowMs: 155_120
+  });
+  const validationNowMs = fixture.releaseGate.evaluatedAtMs + 100;
+  const bundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    nowMs: fixture.releaseGate.evaluatedAtMs + 50
+  });
+  const reviewAndDiversityMetricKeys = [
+    'approvalEvidenceHashMatchesGate',
+    'approvalEvidenceSourcePassed',
+    'candidateReviewManifestSourcePassed',
+    'diversitySourceIncludesGatePack',
+    'diversitySourceMetricsCoherent'
+  ];
+
+  for (const metricKey of reviewAndDiversityMetricKeys) {
+    const tamperedBundle = rehashReleaseEvidenceBundle({
+      ...bundle,
+      metrics: {
+        ...bundle.metrics,
+        [metricKey]: false
+      }
+    });
+    const report = validateReleaseEvidenceBundle(tamperedBundle, {
+      ...fixture,
+      nowMs: validationNowMs
+    });
+
+    assert.equal(bundle.metrics[metricKey], true);
+    assert.equal(report.metrics[metricKey], true);
+    assert.equal(
+      report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_HASH_STABLE').passed,
+      true,
+      metricKey
+    );
+    assert.equal(report.ok, false, metricKey);
+    assert.equal(
+      report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,
+      false,
+      metricKey
+    );
+  }
+}));
+
 test('GU-19 release evidence bundle rejects source drift and missing ready-gate evidence', () => withTempGeneratedPackStore(() => {
   const fixture = readyReleaseGateFixture({
     ownerAccountId: 'owner_release_evidence_bundle_tamper',
