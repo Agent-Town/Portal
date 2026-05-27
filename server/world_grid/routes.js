@@ -244,17 +244,26 @@ function normalizeError(error) {
   };
 }
 
+const RELEASE_EVIDENCE_SECRET_VALUE_PATTERN = /\b(?:sk-[a-z0-9_-]{8,}|xox[baprs]-[a-z0-9-]{8,}|ghp_[a-z0-9_]{8,}|github_pat_[a-z0-9_]{8,}|ya29\.[a-z0-9_-]{8,}|bearer\s+[a-z0-9._-]{12,})\b/i;
+
+function releaseEvidencePathSegment(key = '') {
+  return RELEASE_EVIDENCE_SECRET_VALUE_PATTERN.test(String(key || '')) ? '<secret-like-key>' : String(key || '');
+}
+
+function releaseEvidenceChildPath(pathLabel = '$', key = '') {
+  return `${pathLabel}.${releaseEvidencePathSegment(key)}`;
+}
+
 function findReleaseEvidenceSecretLikePaths(value, pathLabel = '$', matches = []) {
-  const secretValuePattern = /\b(?:sk-[a-z0-9_-]{8,}|xox[baprs]-[a-z0-9-]{8,}|ghp_[a-z0-9_]{8,}|github_pat_[a-z0-9_]{8,}|ya29\.[a-z0-9_-]{8,}|bearer\s+[a-z0-9._-]{12,})\b/i;
   if (typeof value === 'string') {
-    if (secretValuePattern.test(value)) matches.push(pathLabel);
+    if (RELEASE_EVIDENCE_SECRET_VALUE_PATTERN.test(value)) matches.push(pathLabel);
     return matches;
   }
   if (!value || typeof value !== 'object') return matches;
   const secretKey = /(api[_-]?key|secret|private[_-]?key|credential|oauth|access[_-]?token|refresh[_-]?token|wallet[_-]?secret|seed[_-]?phrase|password)/i;
   for (const [key, child] of Object.entries(value)) {
-    const childPath = `${pathLabel}.${key}`;
-    if (secretKey.test(key)) matches.push(childPath);
+    const childPath = releaseEvidenceChildPath(pathLabel, key);
+    if (secretKey.test(key) || RELEASE_EVIDENCE_SECRET_VALUE_PATTERN.test(key)) matches.push(childPath);
     findReleaseEvidenceSecretLikePaths(child, childPath, matches);
   }
   return matches;
@@ -269,7 +278,7 @@ function findReleaseEvidenceRawInstructionPaths(value, pathLabel = '$', matches 
   }
   if (!value || typeof value !== 'object') return matches;
   for (const [key, child] of Object.entries(value)) {
-    const childPath = `${pathLabel}.${key}`;
+    const childPath = releaseEvidenceChildPath(pathLabel, key);
     if (rawPromptKey.test(key)) matches.push(childPath);
     findReleaseEvidenceRawInstructionPaths(child, childPath, matches);
   }
@@ -319,7 +328,7 @@ function findReleaseEvidenceRequestBoundProblems(value, pathLabel = '$', state =
     state.problems.push(`${pathLabel}:object_key_count:${entries.length}`);
   }
   for (const [key, child] of entries.slice(0, RELEASE_EVIDENCE_REQUEST_LIMITS.maxObjectKeyCount)) {
-    findReleaseEvidenceRequestBoundProblems(child, `${pathLabel}.${key}`, state, depth + 1);
+    findReleaseEvidenceRequestBoundProblems(child, releaseEvidenceChildPath(pathLabel, key), state, depth + 1);
     if (state.problems.length >= RELEASE_EVIDENCE_REQUEST_LIMITS.maxProblems) break;
   }
   return state;

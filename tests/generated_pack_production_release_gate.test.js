@@ -1719,6 +1719,23 @@ test('GU-18/GU-19 release gate and evidence bundle APIs are generated-pack-gated
       assert.equal(unsafeReleaseValueBody.error.details.secretLikePathCount > 0, true);
       assert.equal(JSON.stringify(unsafeReleaseValueBody).includes(secretValue), false);
 
+      const secretKeyValue = 'sk-release-secret-key-should-not-echo';
+      const unsafeReleaseKeyResponse = await fetch(`${baseUrl}/api/world/generated-pack/release-gate`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          approvalEvidence: {
+            schemaVersion: 'agent-town-generated-pack-release-approval-evidence-v1',
+            [secretKeyValue]: 'metadata'
+          }
+        })
+      });
+      const unsafeReleaseKeyBody = await unsafeReleaseKeyResponse.json();
+      assert.equal(unsafeReleaseKeyResponse.status, 422, JSON.stringify(unsafeReleaseKeyBody));
+      assert.equal(unsafeReleaseKeyBody.error.code, 'GENPACK_RELEASE_EVIDENCE_REJECTED');
+      assert.equal(unsafeReleaseKeyBody.error.details.secretLikePathCount > 0, true);
+      assert.equal(JSON.stringify(unsafeReleaseKeyBody).includes(secretKeyValue), false);
+
       const unsafeBundleResponse = await fetch(`${baseUrl}/api/world/generated-pack/release-evidence-bundle`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
