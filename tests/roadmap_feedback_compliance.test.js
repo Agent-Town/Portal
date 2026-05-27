@@ -52,6 +52,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'specs/67_agent_town_v6_persistence_replay_resilience_foundation.md',
     'specs/68_agent_town_v6_security_product_release_review_foundation.md',
     'specs/69_agent_town_v6_controlled_release_completion_foundation.md',
+    'specs/70_agent_town_v6_civic_mutation_security_foundation.md',
     'docs/product/WORLD_GRID_LADDER_V5_TO_V6.md',
     'docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md',
     'docs/product/PUBLIC_PRESENCE_PRIVACY_MODEL_V5.md',
@@ -64,6 +65,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'docs/security/V6_AGENT_CIVILIZATION_RELEASE_REVIEW.md',
     'docs/security/WORLD_LAYER_SECURITY_REVIEW_V5.md',
     'docs/security/WORLD_GRID_MUTATION_SECURITY_PLAN.md',
+    'docs/security/V6_CIVIC_MUTATION_SECURITY_PLAN.md',
     'docs/security/AGENT_SERVICES_DATA_ACCESS_POLICY.md',
     'docs/security/PUBLIC_TEXT_RENDERING_POLICY.md',
     'docs/security/PUBLIC_PRESENCE_REDACTION_POLICY.md',
@@ -80,6 +82,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'server/world_civilization/institutions.js',
     'server/world_civilization/lab_surface.js',
     'server/world_civilization/moderation.js',
+    'server/world_civilization/mutation_security.js',
     'server/world_civilization/proposals.js',
     'server/world_civilization/public_works.js',
     'server/world_civilization/reputation.js',
@@ -103,6 +106,7 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'tests/world_civilization_migration_rehearsal.test.js',
     'tests/world_civilization_load_rate.test.js',
     'tests/world_civilization_rollback_recovery.test.js',
+    'tests/world_civilization_mutation_security.test.js',
     'tests/world_grid_region_preferences_persistence.test.js',
     'tests/world_grid_region_preferences_restart_probe_child.js',
     'tests/world_grid_idempotency_persistence.test.js',
@@ -349,6 +353,24 @@ test('world-grid mutation origin policy is tracked as an M5 release security con
   assert.match(stateModel, /same-origin mutation context in production/);
   assert.match(evidence, /Mutation origin guard/);
   assert.match(evidence, /server\/world_grid\/mutation_origin\.js/);
+});
+
+test('V6 civic mutation security envelope is tracked as an M5 release control', () => {
+  const plan = read('docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md');
+  const spec = read('specs/70_agent_town_v6_civic_mutation_security_foundation.md');
+  const gate = read('specs/release-gates/v60_agent_civilization_readiness_gate.md');
+  const security = read('docs/security/V6_CIVIC_MUTATION_SECURITY_PLAN.md');
+
+  assert.match(plan, /server\/world_civilization\/mutation_security\.js/);
+  assert.match(plan, /delegated-agent proof/);
+  assert.match(spec, /same-origin checks/);
+  assert.match(spec, /session\/wallet auth/);
+  assert.match(spec, /CSRF verification/);
+  assert.match(spec, /owner\/surface rate limiting/);
+  assert.match(gate, /server\/world_civilization\/mutation_security\.js/);
+  assert.match(gate, /future civic store write/);
+  assert.match(security, /mutationApplied: false/);
+  assert.match(security, /durable\/session-bound CSRF/);
 });
 
 test('world-grid CSRF policy is tracked as prototype-only M5 coverage', () => {

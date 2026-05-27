@@ -16,10 +16,10 @@ and it must not be used to make V6 player-visible by itself.
 | --- | --- | --- |
 | Threat model | Trust boundaries, assets, attacker capabilities, abuse paths, mitigations | Pending full review |
 | Privacy review | Private town isolation, wallet secret exclusion, Brain/provider secret exclusion, debug trace redaction | Pending full review |
-| Abuse-case review | Spam, harassment, impersonation, unauthorized mutation, moderation escalation | Pending full review |
+| Abuse-case review | Spam, harassment, impersonation, unauthorized mutation, moderation escalation | Research-only V6 civic mutation security envelope exists; pending trust and safety review |
 | Data-retention policy | Audit retention, deletion policy, debug log retention, export policy | Pending full review |
 | Audit coverage | Append-only ledger, owner indexes, migration versions, replay reconstruction, rollback handles | Research-only replay reconstruction, v1 schema metadata drift checks, migration rehearsal with unsupported upgrade/downgrade targets failing closed, process restart probes for all current civic stores, audit-ledger load/rate replay evidence, and non-executing rollback recovery handle reconstruction exist; pending M16 release-grade replay, migration scripts, production load/rate, and real rollback recovery completion |
-| Validation evidence | Targeted Node suite, split Playwright smokes, all-features regression, feature override safety | Pending release-candidate run |
+| Validation evidence | Targeted Node suite, split Playwright smokes, all-features regression, feature override safety | Includes mutation security contract coverage; pending release-candidate run |
 | Modal lab surface review | Town hub modal launch, standalone route denial, worker continuity, debug observability, non-executing panels | Research-only launch-plan contract and Node coverage exist; pending real modal UI and Playwright visual review |
 | Product signoff | Player-visible scope, rollback plan, support runbook, disable plan | Pending product review |
 

@@ -13,6 +13,9 @@ Milestone plan: `docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md`
 
 Civic schema contracts: `specs/55_agent_town_v6_civic_schema_contracts.md`
 
+Civic mutation security foundation:
+`specs/70_agent_town_v6_civic_mutation_security_foundation.md`
+
 Civic audit ledger foundation: `specs/56_agent_town_v6_audit_ledger_foundation.md`
 
 Internal proposal lifecycle: `specs/57_agent_town_v6_internal_proposal_lifecycle.md`
@@ -66,6 +69,14 @@ research-only civic tool draft in `server/world_civilization/tools.js` is
 non-executing and hidden from runtime `/api/world/tools`; runtime V6 civic
 tools and routes remain absent or disabled until the worker-first V6 tool
 surface and readiness gate are implemented.
+
+The research-only civic mutation security envelope in
+`server/world_civilization/mutation_security.js` is fail-closed and
+non-executing. It requires explicit V6 research opt-in, same-origin checks,
+session/wallet auth, actor and owner binding, delegated-agent proof when an
+agent actor is used, CSRF verification in production/security-required mode,
+idempotency, and owner/surface rate limiting before future routes/tools may
+touch civic stores.
 
 The research-only modal lab surface contract in
 `server/world_civilization/lab_surface.js` is route-neutral and non-executing.

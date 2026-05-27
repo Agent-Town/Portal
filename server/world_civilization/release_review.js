@@ -25,7 +25,12 @@ const REQUIRED_REVIEW_GATES = [
     key: 'abuse_case_review',
     label: 'Abuse-case review',
     owner: 'trust_safety',
-    requiredArtifacts: [RELEASE_REVIEW_ARTIFACT],
+    requiredArtifacts: [
+      RELEASE_REVIEW_ARTIFACT,
+      'docs/security/V6_CIVIC_MUTATION_SECURITY_PLAN.md',
+      'server/world_civilization/mutation_security.js',
+      'tests/world_civilization_mutation_security.test.js'
+    ],
     requiredChecks: ['spam', 'harassment', 'impersonation', 'unauthorized_mutation', 'moderation_escalation'],
     signoffRequired: true
   },
@@ -76,6 +81,7 @@ const REQUIRED_REVIEW_GATES = [
     requiredArtifacts: [
       RELEASE_REVIEW_ARTIFACT,
       'tests/world_civilization_schemas.test.js',
+      'tests/world_civilization_mutation_security.test.js',
       'tests/world_civilization_resilience.test.js',
       'e2e/242_world_grid_all_features_demo_regression.spec.js'
     ],

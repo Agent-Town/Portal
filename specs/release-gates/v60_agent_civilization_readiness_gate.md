@@ -8,6 +8,9 @@ V5 promotion gate: `specs/release-gates/v5_world_grid_release_promotion_gate.md`
 
 Civic schema contracts: `specs/55_agent_town_v6_civic_schema_contracts.md`
 
+Civic mutation security foundation:
+`specs/70_agent_town_v6_civic_mutation_security_foundation.md`
+
 Civic audit ledger foundation: `specs/56_agent_town_v6_audit_ledger_foundation.md`
 
 Internal proposal lifecycle: `specs/57_agent_town_v6_internal_proposal_lifecycle.md`
@@ -64,6 +67,12 @@ gate below has implementation, deterministic tests, and security/product signoff
 - Research-only civic tool drafts may exist in
   `server/world_civilization/tools.js`, but they must be non-executing,
   hidden from runtime `/api/world/tools`, and covered by contract tests.
+- The research-only civic mutation security envelope may exist in
+  `server/world_civilization/mutation_security.js`, but it must stay
+  fail-closed, route/tool-hidden, non-executing, and require explicit V6 opt-in,
+  same-origin checks, session/wallet auth, actor/owner binding, delegated-agent
+  proof, CSRF verification, idempotency, and owner/surface rate limiting before
+  any future civic store write.
 - The research-only modal lab surface contract may exist in
   `server/world_civilization/lab_surface.js`, but it must stay route-neutral,
   modal-first, hidden from players, non-executing, fail closed for standalone
@@ -166,6 +175,12 @@ gate below has implementation, deterministic tests, and security/product signoff
 
 ## Release Gates
 
+- Mutating V6 civic routes and worker tools must use a fail-closed security
+  envelope before touching civic stores. Current research-only coverage starts
+  this in `server/world_civilization/mutation_security.js`; release still
+  requires durable/session-bound CSRF, durable/shared rate limits, final
+  session/wallet middleware, production browser coverage, audit integration,
+  and security/product signoff.
 - Vote authorization cannot be forged, replayed, self-delegated without policy,
   or applied to ineligible owners.
 - Reputation cannot be self-awarded, transferred as currency, or used without an

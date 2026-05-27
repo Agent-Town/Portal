@@ -27,7 +27,7 @@ are present.
 - Privacy review: private town isolation, wallet and Brain secret exclusion,
   provider credential exclusion, and debug trace redaction.
 - Abuse-case review: spam, harassment, impersonation, unauthorized mutation,
-  and moderation escalation.
+  moderation escalation, and civic mutation security envelope evidence.
 - Data-retention policy: audit retention, deletion policy, debug log retention,
   and export policy.
 - Audit coverage: append-only ledger, owner indexes, migration versions,
@@ -36,7 +36,7 @@ are present.
   handles, and non-executing rollback recovery evidence.
 - Validation evidence: targeted Node suite, split Playwright smokes,
   all-features regression, feature override safety, and load/rate replay
-  evidence.
+  evidence, including civic mutation security contract coverage.
 - Modal lab surface review: town hub modal launch, standalone route denial,
   worker continuity, debug observability, and non-executing panels.
 - Product release signoff: player-visible scope, rollback plan, support runbook,
