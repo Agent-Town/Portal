@@ -98,6 +98,7 @@ function submitProposalRoutePayload(submitted = {}) {
 function createWorldCivilizationRouter({
   proposalStore = null,
   delegationStore = null,
+  resolveProposalStores = null,
   resolveCivicIdentity = null,
   env = process.env
 } = {}) {
@@ -108,7 +109,12 @@ function createWorldCivilizationRouter({
       if (!routeEnabled(env)) {
         throw new Error('V6_CIVIC_PROPOSAL_ROUTE_DISABLED');
       }
-      if (!proposalStore || typeof proposalStore.submitProposalForReview !== 'function') {
+      const resolvedStores = typeof resolveProposalStores === 'function'
+        ? (resolveProposalStores(req, res) || {})
+        : {};
+      const activeProposalStore = proposalStore || resolvedStores.proposalStore || null;
+      const activeDelegationStore = delegationStore || resolvedStores.delegationStore || null;
+      if (!activeProposalStore || typeof activeProposalStore.submitProposalForReview !== 'function') {
         throw new Error('V6_CIVIC_PROPOSAL_STORE_REQUIRED');
       }
       const rawIdentity = typeof resolveCivicIdentity === 'function'
@@ -140,7 +146,7 @@ function createWorldCivilizationRouter({
         },
         actor,
         delegation: body.delegation || {},
-        delegationStore,
+        delegationStore: activeDelegationStore,
         requiredDelegationScope: sourceSurface === 'worker_tool_submission' ? 'proposal_drafting' : '',
         owner: {
           ownerAccountId: identity.accountId
@@ -150,7 +156,7 @@ function createWorldCivilizationRouter({
         csrfVerified: csrfReviewed(req),
         nowMs: Date.now()
       });
-      const submitted = proposalStore.submitProposalForReview({
+      const submitted = activeProposalStore.submitProposalForReview({
         featureFlags,
         includeResearchProposalSubmission: includeResearch,
         source: 'world_civilization_route',

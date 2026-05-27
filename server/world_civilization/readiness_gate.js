@@ -143,6 +143,7 @@ const REQUIRED_V6_READINESS_GATES = [
       'specs/71_agent_town_v6_governance_preflight_foundation.md',
       'server/world_civilization/proposals.js',
       'server/world_civilization/routes.js',
+      'server/world_civilization/store_wiring.js',
       'server/world_civilization/votes.js',
       'server/world_civilization/governance_preflight.js',
       'tests/world_civilization_proposals.test.js',

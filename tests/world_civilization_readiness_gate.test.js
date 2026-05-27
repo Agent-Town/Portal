@@ -68,6 +68,7 @@ test('V6 readiness gate baseline names every prerequisite domain but remains ope
   const releaseReviewGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'security_product_release_review');
   assert.ok(proposalGate.requiredChecks.includes('proposal_intake_readiness_gate'));
   assert.ok(proposalGate.requiredArtifacts.includes('server/world_civilization/routes.js'));
+  assert.ok(proposalGate.requiredArtifacts.includes('server/world_civilization/store_wiring.js'));
   assert.ok(proposalGate.requiredArtifacts.includes('tests/world_civilization_routes.test.js'));
   assert.ok(proposalGate.requiredChecks.includes('route_tool_submission'));
   assert.ok(proposalGate.requiredChecks.includes('submission_envelope'));

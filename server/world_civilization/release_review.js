@@ -168,6 +168,7 @@ const REQUIRED_REVIEW_GATES = [
       'specs/57_agent_town_v6_internal_proposal_lifecycle.md',
       'server/world_civilization/proposals.js',
       'server/world_civilization/routes.js',
+      'server/world_civilization/store_wiring.js',
       'server/world_civilization/mutation_security.js',
       'server/world_civilization/tool_exposure_gate.js',
       'docs/security/PUBLIC_TEXT_RENDERING_POLICY.md',

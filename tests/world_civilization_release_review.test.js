@@ -330,6 +330,7 @@ test('V6 release review requires proposal intake route tool and review queue evi
   assert.ok(proposalGate.requiredArtifacts.includes('specs/57_agent_town_v6_internal_proposal_lifecycle.md'));
   assert.ok(proposalGate.requiredArtifacts.includes('server/world_civilization/proposals.js'));
   assert.ok(proposalGate.requiredArtifacts.includes('server/world_civilization/routes.js'));
+  assert.ok(proposalGate.requiredArtifacts.includes('server/world_civilization/store_wiring.js'));
   assert.ok(proposalGate.requiredArtifacts.includes('server/world_civilization/mutation_security.js'));
   assert.ok(proposalGate.requiredArtifacts.includes('server/world_civilization/tool_exposure_gate.js'));
   assert.ok(proposalGate.requiredArtifacts.includes('tests/world_civilization_proposals.test.js'));

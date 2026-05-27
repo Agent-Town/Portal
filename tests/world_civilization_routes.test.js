@@ -14,6 +14,10 @@ const {
   createWorldCivilizationRouter
 } = require('../server/world_civilization/routes');
 const { CIVIC_SCHEMA_VERSION } = require('../server/world_civilization/schemas');
+const {
+  closeConfiguredWorldCivilizationProposalStores,
+  getConfiguredWorldCivilizationProposalStores
+} = require('../server/world_civilization/store_wiring');
 const { closeWorldGridRateLimitStore } = require('../server/world_grid/rate_limit');
 
 const ACCOUNT_ID = 'acct_v6_route_human_001';
@@ -103,6 +107,7 @@ async function withCivilizationServer({
   env = {},
   proposalStore = null,
   delegationStore = null,
+  resolveProposalStores = null,
   resolveCivicIdentity = () => ({
     accountId: ACCOUNT_ID,
     walletAddress: '0x0000000000000000000000000000000000000001'
@@ -113,6 +118,7 @@ async function withCivilizationServer({
   app.use(createWorldCivilizationRouter({
     proposalStore,
     delegationStore,
+    resolveProposalStores,
     resolveCivicIdentity,
     env
   }));
@@ -124,6 +130,7 @@ async function withCivilizationServer({
   } finally {
     await new Promise((resolve) => server.close(resolve));
     closeWorldGridRateLimitStore();
+    closeConfiguredWorldCivilizationProposalStores();
   }
 }
 
@@ -223,6 +230,53 @@ test('V6 proposal submission route stores human route submissions without exposi
       );
     });
   });
+});
+
+test('V6 proposal submission route can use env-gated SQLite store wiring across reopen', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-v6-civic-route-wiring-'));
+  const env = routeEnv({
+    V6_CIVIC_PROPOSAL_STORE_WIRING_ENABLED: '1',
+    V6_CIVIC_AUDIT_SQLITE_PATH: path.join(dir, 'audit.sqlite'),
+    V6_CIVIC_PROPOSAL_SQLITE_PATH: path.join(dir, 'proposals.sqlite'),
+    V6_CIVIC_DELEGATION_SQLITE_PATH: path.join(dir, 'delegations.sqlite')
+  });
+
+  try {
+    await withCivilizationServer({
+      env,
+      resolveProposalStores: () => getConfiguredWorldCivilizationProposalStores(env)
+    }, async (baseUrl) => {
+      const response = await postJson(baseUrl, PROPOSAL_SUBMISSION_ROUTE, {
+        sourceSurface: 'human_route_submission',
+        proposal: proposal(),
+        approvalReceiptId: 'approval_route_proposal_001'
+      }, sameOriginHeaders(baseUrl));
+
+      assert.equal(response.status, 200, JSON.stringify(response.body));
+      assert.equal(response.body.proposal.proposalId, 'proposal_route_public_works_001');
+      assert.equal(response.body.runtimeExposed, false);
+      assert.equal(response.body.executesProposalEffects, false);
+      assert.equal(response.body.exposesCivicTools, false);
+    });
+
+    closeConfiguredWorldCivilizationProposalStores();
+    const reopened = getConfiguredWorldCivilizationProposalStores(env);
+    try {
+      assert.equal(reopened.status, 'research_only');
+      assert.equal(reopened.releaseReady, false);
+      assert.equal(reopened.proposalStore.count(), 1);
+      assert.equal(reopened.auditLedger.count(), 1);
+      assert.deepEqual(
+        reopened.proposalStore.getProposalReviewQueueSnapshot({ nowMs: 1_779_991_000_000 }).entries.map((entry) => entry.proposalId),
+        ['proposal_route_public_works_001']
+      );
+    } finally {
+      closeConfiguredWorldCivilizationProposalStores();
+    }
+  } finally {
+    closeConfiguredWorldCivilizationProposalStores();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('V6 proposal submission route fails closed before persistence without same-origin CSRF review', async () => {
