@@ -461,6 +461,19 @@ test('GU-19 release evidence bundle rejects mixed-pack source evidence even when
     mixedReport.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_PACK_IDS_MATCH').passed,
     false
   );
+
+  const invalidSourceIdBundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    nowMs: 157_800
+  });
+  invalidSourceIdBundle.sourcePackIds.publicCard = '../other-pack';
+  const invalidSourceIdReport = validateReleaseEvidenceBundle(invalidSourceIdBundle, fixture);
+
+  assert.equal(invalidSourceIdReport.ok, false);
+  assert.equal(
+    invalidSourceIdReport.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_SCHEMA_VALID').passed,
+    false
+  );
 }));
 
 test('GU-18 release gate ignores loose approval flags without versioned approval evidence', () => withTempGeneratedPackStore(() => {

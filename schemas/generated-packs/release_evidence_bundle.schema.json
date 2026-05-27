@@ -23,7 +23,7 @@
   "properties": {
     "schemaVersion": { "const": "agent-town-generated-pack-release-evidence-bundle-v1" },
     "bundleHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-    "packId": { "type": "string", "minLength": 3 },
+    "packId": { "type": "string", "pattern": "^gen_pack_[0-9a-f]{16}$" },
     "createdAtMs": { "type": "integer", "minimum": 0 },
     "releaseGateHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "releaseGateMode": { "enum": ["prototype-gated", "ready-for-controlled-release"] },
@@ -82,14 +82,14 @@
         "releaseGate"
       ],
       "properties": {
-        "generatedPack": { "type": "string" },
-        "playtestReport": { "type": "string" },
-        "diversityReport": { "type": "string" },
-        "publicCard": { "type": "string" },
-        "persistenceReport": { "type": "string" },
-        "approvalEvidence": { "type": "string" },
-        "candidateReviewManifest": { "type": "string" },
-        "releaseGate": { "type": "string" }
+        "generatedPack": { "type": "string", "pattern": "^$|^gen_pack_[0-9a-f]{16}$" },
+        "playtestReport": { "type": "string", "pattern": "^$|^gen_pack_[0-9a-f]{16}$" },
+        "diversityReport": { "type": "string", "pattern": "^$|^gen_pack_[0-9a-f]{16}$" },
+        "publicCard": { "type": "string", "pattern": "^$|^gen_pack_[0-9a-f]{16}$" },
+        "persistenceReport": { "type": "string", "pattern": "^$|^gen_pack_[0-9a-f]{16}$" },
+        "approvalEvidence": { "type": "string", "pattern": "^$|^gen_pack_[0-9a-f]{16}$" },
+        "candidateReviewManifest": { "type": "string", "pattern": "^$|^gen_pack_[0-9a-f]{16}$" },
+        "releaseGate": { "type": "string", "pattern": "^$|^gen_pack_[0-9a-f]{16}$" }
       }
     },
     "sourcePresence": {
