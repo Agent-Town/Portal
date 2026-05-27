@@ -27,7 +27,9 @@ are present.
 - Privacy review: private town isolation, wallet and Brain secret exclusion,
   provider credential exclusion, and debug trace redaction.
 - Abuse-case review: spam, harassment, impersonation, unauthorized mutation,
-  moderation escalation, and civic mutation security envelope evidence.
+  store-backed delegated-agent proof, delegation scope mismatch, read-only
+  delegation budget evidence, moderation escalation, and civic mutation
+  security envelope evidence.
 - Data-retention policy: audit retention, deletion policy, debug log retention,
   and export policy.
 - Audit coverage: append-only ledger, owner indexes, migration versions,
@@ -38,8 +40,8 @@ are present.
   evidence.
 - Validation evidence: targeted Node suite, split Playwright smokes,
   all-features regression, feature override safety, and load/rate replay
-  evidence, including civic mutation security and governance preflight contract
-  coverage.
+  evidence, including civic mutation security, delegated-agent proof, and
+  governance preflight contract coverage.
 - Worker tool surface review: runtime manifest source-of-truth evidence,
   OpenClaw Lite worker origin, Worker Traffic and Skill Context observability,
   mutation security envelope coverage, and no backend shortcuts before any

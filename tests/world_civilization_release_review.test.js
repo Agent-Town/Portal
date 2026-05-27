@@ -101,7 +101,38 @@ test('V6 release review requires civic mutation security evidence for abuse revi
   assert.ok(abuseGate.requiredArtifacts.includes('server/world_civilization/mutation_security.js'));
   assert.ok(abuseGate.requiredArtifacts.includes('tests/world_civilization_mutation_security.test.js'));
   assert.ok(abuseGate.requiredChecks.includes('unauthorized_mutation'));
+  assert.ok(abuseGate.requiredChecks.includes('store_backed_delegation_proof'));
+  assert.ok(abuseGate.requiredChecks.includes('delegation_scope_mismatch'));
+  assert.ok(abuseGate.requiredChecks.includes('delegation_budget_read_only'));
   assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_mutation_security.test.js'));
+  assert.ok(validationGate.requiredChecks.includes('store_backed_delegation_proof'));
+});
+
+test('V6 release review blocks abuse signoff without delegated-agent proof evidence', () => {
+  const evidence = Object.fromEntries(REQUIRED_REVIEW_GATES.map((gate) => [gate.key, completeEvidenceFor(gate)]));
+  evidence.abuse_case_review = {
+    ...evidence.abuse_case_review,
+    checks: evidence.abuse_case_review.checks.filter((check) => (
+      check !== 'store_backed_delegation_proof'
+      && check !== 'delegation_scope_mismatch'
+      && check !== 'delegation_budget_read_only'
+    ))
+  };
+  const report = buildV6ReleaseReviewReport({
+    includeResearchReview: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence
+  });
+  const abuseGate = report.gateReports.find((gate) => gate.key === 'abuse_case_review');
+
+  assert.equal(report.releaseReady, false);
+  assert.equal(abuseGate.ok, false);
+  assert.deepEqual(abuseGate.missingChecks, [
+    'store_backed_delegation_proof',
+    'delegation_scope_mismatch',
+    'delegation_budget_read_only'
+  ]);
+  assert.deepEqual(assertV6ReleaseReviewSafe(report), { ok: true, errors: [] });
 });
 
 test('V6 release review requires modal lab launch-surface evidence', () => {

@@ -31,7 +31,16 @@ const REQUIRED_REVIEW_GATES = [
       'server/world_civilization/mutation_security.js',
       'tests/world_civilization_mutation_security.test.js'
     ],
-    requiredChecks: ['spam', 'harassment', 'impersonation', 'unauthorized_mutation', 'moderation_escalation'],
+    requiredChecks: [
+      'spam',
+      'harassment',
+      'impersonation',
+      'unauthorized_mutation',
+      'store_backed_delegation_proof',
+      'delegation_scope_mismatch',
+      'delegation_budget_read_only',
+      'moderation_escalation'
+    ],
     signoffRequired: true
   },
   {
@@ -96,7 +105,13 @@ const REQUIRED_REVIEW_GATES = [
       'tests/world_civilization_resilience.test.js',
       'e2e/242_world_grid_all_features_demo_regression.spec.js'
     ],
-    requiredChecks: ['targeted_node_suite', 'split_playwright_smokes', 'all_features_regression', 'feature_override_safety'],
+    requiredChecks: [
+      'targeted_node_suite',
+      'split_playwright_smokes',
+      'all_features_regression',
+      'feature_override_safety',
+      'store_backed_delegation_proof'
+    ],
     signoffRequired: true
   },
   {

@@ -294,11 +294,13 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(gate, /Release still requires release-grade process restart coverage/);
   assert.match(plan, /M17 Security and product release review \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/release_review\.js/);
+  assert.match(plan, /store-backed delegation proof and scope-mismatch evidence/);
   assert.match(gate, /server\/world_civilization\/release_review\.js/);
   assert.match(gate, /threat model, privacy review, abuse-case review/);
+  assert.match(gate, /store-backed delegation proof and scope-mismatch evidence/);
   assert.match(plan, /modal lab surface review/);
   assert.match(plan, /worker tool surface review/);
-  assert.match(gate, /modal lab surface (launch )?review/);
+  assert.match(gate, /modal lab\s+surface (launch )?review/);
   assert.match(gate, /Worker-first V6 civic tools must pass the exposure gate/);
   assert.match(plan, /M18 V6 controlled release completion \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/controlled_release\.js/);
