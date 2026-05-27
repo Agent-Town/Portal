@@ -4404,6 +4404,8 @@ function validateReleaseApprovalEvidence(evidence = {}, pack = {}) {
   const expectedTargetCount = positiveNumberOrZero(candidate.expectedTargetCount);
   const reviewedDispositionCount = positiveNumberOrZero(candidate.approvedCandidateCount)
     + positiveNumberOrZero(candidate.rejectedCandidateCount);
+  const candidateReviewDispositionCountsCoherent = reviewedDispositionCount === reviewedCandidateCount
+    && reviewedCandidateCount <= expectedTargetCount;
   const constraints = evidence?.constraints || {};
   const boundaryPreserved = constraints.externalProviderPrivateDataStored === false
     && constraints.productionImageAssetsCreated === false
@@ -4441,7 +4443,7 @@ function validateReleaseApprovalEvidence(evidence = {}, pack = {}) {
   const candidateAssetsReviewed = candidate.status === 'reviewed'
     && expectedTargetCount >= requiredTargetCount
     && reviewedCandidateCount >= expectedTargetCount
-    && reviewedDispositionCount >= reviewedCandidateCount
+    && candidateReviewDispositionCountsCoherent
     && isSha256Hex(candidate.candidateManifestHash)
     && isSha256Hex(candidate.reviewerSignoffHash)
     && candidate.productionPromotionApproved === false
@@ -4488,7 +4490,7 @@ function validateReleaseApprovalEvidence(evidence = {}, pack = {}) {
     {
       id: 'RELEASE_APPROVAL_EVIDENCE_CANDIDATE_REVIEW_COVERAGE',
       passed: candidateAssetsReviewed,
-      measured: { requiredTargetCount, expectedTargetCount, reviewedCandidateCount, reviewedDispositionCount }
+      measured: { requiredTargetCount, expectedTargetCount, reviewedCandidateCount, reviewedDispositionCount, candidateReviewDispositionCountsCoherent }
     },
     {
       id: 'RELEASE_APPROVAL_EVIDENCE_HUMAN_REVIEW',
@@ -4518,11 +4520,13 @@ function validateReleaseApprovalEvidence(evidence = {}, pack = {}) {
       explicitConsentRecorded,
       costConsentModelApproved: authModelApproved && costEstimateAccepted && explicitConsentRecorded,
       candidateAssetsReviewed,
+      candidateReviewDispositionCountsCoherent,
       humanReviewComplete,
       boundaryPreserved,
       requiredTargetCount,
       expectedTargetCount,
-      reviewedCandidateCount
+      reviewedCandidateCount,
+      reviewedDispositionCount
     }
   };
 }

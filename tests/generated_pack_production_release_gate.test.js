@@ -1415,6 +1415,81 @@ test('GPACK-131 release approval evidence rejects accepted zero-cost estimates',
   assert.equal(gate.blockingReasons.includes('costConsentModelApproved'), true);
 });
 
+test('GPACK-132 release approval evidence rejects incoherent candidate review disposition counts', () => {
+  const pack = createGeneratedPack({
+    owner: { ownerAccountId: 'owner_release_gate_candidate_count_evidence' },
+    prompt: 'amber observatory harbor with signal gardens',
+    nowMs: 153_040,
+    candidateRoot: 'data/generated-packs-test'
+  });
+  const candidateReviewManifest = reviewedCandidateManifest(pack);
+  const targetCount = pack.assetPromptPlan.targets.length;
+  const incoherentEvidence = buildReleaseApprovalEvidence({
+    pack,
+    nowMs: 153_060,
+    authModel: {
+      status: 'approved',
+      authMode: 'operator_managed',
+      approvalDocHash: hashLabel('count-auth-policy'),
+      approvedByHash: hashLabel('count-security-reviewer'),
+      approvedAtMs: 153_041,
+      providerAccessPolicy: 'out_of_band_only_no_pack_storage'
+    },
+    costModel: {
+      status: 'accepted',
+      estimatedMin: 0.25,
+      estimatedMax: 1.25,
+      costEstimateHash: hashLabel('count-cost-estimate'),
+      acceptedByHash: hashLabel('count-cost-owner'),
+      acceptedAtMs: 153_042
+    },
+    consentModel: {
+      status: 'recorded',
+      scope: 'single-pack-candidate-run',
+      userConsentHash: hashLabel('count-user-consent'),
+      teamConsentHash: hashLabel('count-team-consent'),
+      consentRecordHash: hashLabel('count-consent-record'),
+      recordedAtMs: 153_043
+    },
+    candidateReview: {
+      status: 'reviewed',
+      expectedTargetCount: targetCount,
+      reviewedCandidateCount: targetCount,
+      approvedCandidateCount: targetCount,
+      rejectedCandidateCount: targetCount,
+      candidateManifestHash: candidateReviewManifest.manifestHash,
+      reviewerSignoffHash: hashLabel('count-candidate-reviewer'),
+      reviewedAtMs: 153_044,
+      productionPromotionApproved: false
+    },
+    humanReview: {
+      status: 'complete',
+      releaseSignoffHash: hashLabel('count-human-reviewer'),
+      checklistHash: hashLabel('count-checklist'),
+      reviewedAtMs: 153_045
+    }
+  });
+  const evidenceReport = validateReleaseApprovalEvidence(incoherentEvidence, pack);
+  const gate = buildProductionReleaseGate({
+    pack,
+    approvalEvidence: incoherentEvidence,
+    candidateReviewManifest,
+    nowMs: 153_070
+  });
+
+  assert.equal(evidenceReport.ok, false);
+  assert.equal(evidenceReport.metrics.costConsentModelApproved, true);
+  assert.equal(evidenceReport.metrics.humanReviewComplete, true);
+  assert.equal(evidenceReport.metrics.reviewedDispositionCount, targetCount * 2);
+  assert.equal(evidenceReport.metrics.candidateAssetsReviewed, false);
+  assert.equal(
+    evidenceReport.checks.find((check) => check.id === 'RELEASE_APPROVAL_EVIDENCE_CANDIDATE_REVIEW_COVERAGE').passed,
+    false
+  );
+  assert.equal(gate.releasePrerequisites.candidateAssetsReviewed, false);
+  assert.equal(gate.blockingReasons.includes('candidateAssetsReviewed'), true);
+});
+
 test('GU-18 release approval evidence reports redact unsafe submitted keys and values', () => {
   const pack = createGeneratedPack({
     owner: { ownerAccountId: 'owner_release_gate_evidence_redaction' },
