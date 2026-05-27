@@ -182,10 +182,15 @@ non-town-hub-modal launch surface.
 The research-only resilience baseline in
 `server/world_civilization/resilience.js` inspects the current SQLite civic
 stores and keeps `releaseReady: false` until process restart, replay
-reconstruction, migration, load/rate, and rollback recovery gates are proven.
+reconstruction, migration, backup/restore, load/rate, and rollback recovery
+gates are proven.
 The companion reconstruction helper in
 `server/world_civilization/replay_reconstruction.js` rebuilds privacy-safe audit
 summaries from replay rows without applying world state.
+The backup/restore rehearsal in `server/world_civilization/backup_restore.js`
+copies closed SQLite civic store files, verifies source/restored hashes and v1
+schema metadata, excludes row payloads from reports, and remains a
+research-only rehearsal rather than a production backup claim.
 
 The research-only M16 resilience readiness gate in
 `server/world_civilization/resilience.js` records release evidence required

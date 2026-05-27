@@ -253,8 +253,10 @@ test('V6 release review requires persistence replay resilience readiness evidenc
   assert.ok(resilienceGate.requiredArtifacts.includes('server/world_civilization/resilience.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('server/world_civilization/replay_reconstruction.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('server/world_civilization/migration_rehearsal.js'));
+  assert.ok(resilienceGate.requiredArtifacts.includes('server/world_civilization/backup_restore.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('server/world_civilization/rollback_recovery.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('tests/world_civilization_resilience.test.js'));
+  assert.ok(resilienceGate.requiredArtifacts.includes('tests/world_civilization_backup_restore.test.js'));
   assert.ok(resilienceGate.requiredChecks.includes('all_civic_store_restart_probes'));
   assert.ok(resilienceGate.requiredChecks.includes('audit_replay_reconstruction'));
   assert.ok(resilienceGate.requiredChecks.includes('privacy_safe_replay_summaries'));

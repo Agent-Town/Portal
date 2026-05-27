@@ -493,10 +493,12 @@ const REQUIRED_REVIEW_GATES = [
       'server/world_civilization/resilience.js',
       'server/world_civilization/replay_reconstruction.js',
       'server/world_civilization/migration_rehearsal.js',
+      'server/world_civilization/backup_restore.js',
       'server/world_civilization/rollback_recovery.js',
       'tests/world_civilization_resilience.test.js',
       'tests/world_civilization_replay_reconstruction.test.js',
       'tests/world_civilization_migration_rehearsal.test.js',
+      'tests/world_civilization_backup_restore.test.js',
       'tests/world_civilization_load_rate.test.js',
       'tests/world_civilization_rollback_recovery.test.js'
     ],

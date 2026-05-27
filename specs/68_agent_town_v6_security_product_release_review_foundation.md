@@ -127,7 +127,9 @@ are present.
   multi-process write contention, duplicate retry bursts, rollback handle
   reconstruction, typed rollback execution recovery, private-data exclusion, and
   no effect application during replay before M16 can claim release-grade
-  resilience.
+  resilience. Current backup/restore evidence is research-only closed-store
+  file-copy/hash/schema-metadata rehearsal and still excludes encrypted storage,
+  point-in-time recovery, live WAL checkpointing, and restore SLO signoff.
 - Product release signoff: player-visible scope, rollback plan, support runbook,
   and disable plan.
 

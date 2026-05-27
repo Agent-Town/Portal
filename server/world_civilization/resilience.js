@@ -1,6 +1,10 @@
 const fs = require('fs');
 
 const { V6_WORLD_FEATURE_FLAG, isWorldGridFeatureEnabled } = require('../world_grid/feature_flags');
+const {
+  REQUIRED_BACKUP_RESTORE_RELEASE_GAPS,
+  V6_BACKUP_RESTORE_REHEARSAL_VERSION
+} = require('./backup_restore');
 
 const V6_RESILIENCE_BASELINE_VERSION = 'agent-town.v6.resilience.v1';
 const V6_RESILIENCE_READINESS_GATE_VERSION = 'agent-town.v6.resilience.readiness.v1';
@@ -10,7 +14,8 @@ const REQUIRED_RELEASE_GAPS = [
   'M16_REPLAY_RECONSTRUCTION_RELEASE_COVERAGE_REQUIRED',
   'M16_MIGRATION_UPGRADE_DOWNGRADE_TESTS_REQUIRED',
   'M16_LOAD_AND_RATE_TESTS_REQUIRED',
-  'M16_ROLLBACK_RECOVERY_EXECUTION_REQUIRED'
+  'M16_ROLLBACK_RECOVERY_EXECUTION_REQUIRED',
+  'M16_BACKUP_RESTORE_RELEASE_DRILL_REQUIRED'
 ];
 
 const V6_CIVIC_LOAD_RATE_COVERAGE = {
@@ -64,9 +69,25 @@ const V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE = {
   remainingReleaseGaps: [
     'release_grade_upgrade_scripts',
     'release_grade_downgrade_scripts',
-    'backup_restore_rehearsal',
+    'release_grade_backup_restore_drill',
     'migration_load_replay_rehearsal'
   ]
+};
+
+const V6_CIVIC_BACKUP_RESTORE_COVERAGE = {
+  modulePath: 'server/world_civilization/backup_restore.js',
+  artifact: 'tests/world_civilization_backup_restore.test.js',
+  version: V6_BACKUP_RESTORE_REHEARSAL_VERSION,
+  status: 'research_only',
+  releaseReady: false,
+  coveredChecks: [
+    'closed_store_sqlite_backup_copy',
+    'source_restored_hash_match',
+    'restored_schema_metadata_match',
+    'private_row_payload_exclusion',
+    'no_world_state_application'
+  ],
+  remainingReleaseGaps: [...REQUIRED_BACKUP_RESTORE_RELEASE_GAPS]
 };
 
 const V6_CIVIC_AUDIT_SUMMARY_COVERAGE = {
@@ -540,6 +561,7 @@ function disabledReport(source) {
     loadRateCoverage: null,
     rollbackRecoveryCoverage: null,
     migrationRehearsalCoverage: null,
+    backupRestoreCoverage: null,
     releaseGaps: [...REQUIRED_RELEASE_GAPS],
     disabledReason: 'V6 resilience evidence requires explicit research opt-in and V6 feature flag'
   };
@@ -609,6 +631,7 @@ function buildV6ResilienceBaselineReport({
     loadRateCoverage: clone(V6_CIVIC_LOAD_RATE_COVERAGE),
     rollbackRecoveryCoverage: clone(V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE),
     migrationRehearsalCoverage: clone(V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE),
+    backupRestoreCoverage: clone(V6_CIVIC_BACKUP_RESTORE_COVERAGE),
     releaseGaps: [...REQUIRED_RELEASE_GAPS]
   };
 }
@@ -692,6 +715,19 @@ function assertV6ResilienceBaseline(report = {}) {
     ) {
       errors.push('V6_RESILIENCE_MIGRATION_REHEARSAL_COVERAGE_REQUIRED');
     }
+    const backupRestoreCoverage = report.backupRestoreCoverage || {};
+    if (
+      backupRestoreCoverage.modulePath !== V6_CIVIC_BACKUP_RESTORE_COVERAGE.modulePath
+      || backupRestoreCoverage.artifact !== V6_CIVIC_BACKUP_RESTORE_COVERAGE.artifact
+      || backupRestoreCoverage.version !== V6_BACKUP_RESTORE_REHEARSAL_VERSION
+      || backupRestoreCoverage.status !== 'research_only'
+      || backupRestoreCoverage.releaseReady !== false
+      || !Array.isArray(backupRestoreCoverage.coveredChecks)
+      || !backupRestoreCoverage.coveredChecks.includes('source_restored_hash_match')
+      || !backupRestoreCoverage.coveredChecks.includes('private_row_payload_exclusion')
+    ) {
+      errors.push('V6_RESILIENCE_BACKUP_RESTORE_COVERAGE_REQUIRED');
+    }
   }
   return {
     ok: errors.length === 0,
@@ -705,6 +741,7 @@ module.exports = {
   REQUIRED_RESILIENCE_READINESS_CHECKS: clone(REQUIRED_RESILIENCE_READINESS_CHECKS),
   REQUIRED_RESILIENCE_STORE_KEYS: clone(REQUIRED_RESILIENCE_STORE_KEYS),
   V6_CIVIC_AUDIT_SUMMARY_COVERAGE: clone(V6_CIVIC_AUDIT_SUMMARY_COVERAGE),
+  V6_CIVIC_BACKUP_RESTORE_COVERAGE: clone(V6_CIVIC_BACKUP_RESTORE_COVERAGE),
   V6_CIVIC_LOAD_RATE_COVERAGE: clone(V6_CIVIC_LOAD_RATE_COVERAGE),
   V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE: clone(V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE),
   V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE: clone(V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE),

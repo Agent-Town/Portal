@@ -509,6 +509,12 @@ persistence resilience, and security/product release review.
   `tests/world_civilization_migration_rehearsal.test.js`; current v1 metadata can
   be inventoried and unsupported upgrade/downgrade targets fail closed without
   executing migration scripts.
+  Backup/restore research coverage starts in
+  `server/world_civilization/backup_restore.js` and
+  `tests/world_civilization_backup_restore.test.js`; closed SQLite civic store
+  files are copied into a restore rehearsal directory, source/restored hashes
+  and restored schema metadata are verified, report payloads exclude row
+  contents, and no world state is applied.
   The M16 research-only resilience readiness gate in
   `server/world_civilization/resilience.js` must require all civic store
   restart probes, audit replay reconstruction, privacy-safe replay summaries,
@@ -523,8 +529,9 @@ persistence resilience, and security/product release review.
   `executionStatus: "not_executable"`.
   These current probes cover every current civic store at research scale.
   Release still requires release-grade process restart coverage, larger replay
-  reconstruction, migration scripts with upgrade/downgrade proofs, load/rate,
-  and rollback recovery tests.
+  reconstruction, migration scripts with upgrade/downgrade proofs, encrypted
+  and point-in-time backup restore drills, load/rate, and rollback recovery
+  tests.
 - Security and product release review must be complete before normal gameplay
   exposure. Current gate tracking starts in
   `server/world_civilization/release_review.js` and

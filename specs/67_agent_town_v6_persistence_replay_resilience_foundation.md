@@ -9,6 +9,7 @@ Runtime contracts:
 - `server/world_civilization/resilience.js`
 - `server/world_civilization/replay_reconstruction.js`
 - `server/world_civilization/migration_rehearsal.js`
+- `server/world_civilization/backup_restore.js`
 - `server/world_civilization/rollback_recovery.js`
 
 Test coverage:
@@ -24,6 +25,7 @@ Test coverage:
 - `tests/world_civilization_public_works_process_restart.test.js`
 - `tests/world_civilization_schema_metadata.test.js`
 - `tests/world_civilization_migration_rehearsal.test.js`
+- `tests/world_civilization_backup_restore.test.js`
 - `tests/world_civilization_load_rate.test.js`
 - `tests/world_civilization_rollback_recovery.test.js`
 
@@ -73,7 +75,15 @@ SQLite `user_version` or a mismatched store migration marker.
 `server/world_civilization/migration_rehearsal.js` inventories the current v1
 store metadata without applying migrations or claiming executable migration
 scripts. Unsupported upgrade/downgrade targets fail closed until release-grade
-scripts, backup/restore rehearsal, and migration load replay evidence exist.
+scripts, backup/restore drills, and migration load replay evidence exist.
+
+`server/world_civilization/backup_restore.js` adds a research-only backup and
+restore rehearsal for closed SQLite civic stores. It copies every current store
+file into a rehearsal directory, verifies source/restored byte hashes, verifies
+restored schema metadata, and keeps the report payload free of row contents or
+private data. This is backup-copy evidence only; it is not encrypted backup
+storage, point-in-time recovery, live WAL checkpointing, operator runbook
+approval, or a release SLO drill.
 
 `server/world_civilization/replay_reconstruction.js` reconstructs a
 privacy-safe summary from civic audit ledger replay rows. The reconstruction
@@ -157,6 +167,12 @@ migration readiness evidence: every current store can be inventoried at v1
 from schema metadata, while unsupported v2 upgrades and v0 downgrades fail
 closed until real migration scripts exist.
 
+`tests/world_civilization_backup_restore.test.js` adds research-scale
+backup/restore evidence: closed SQLite stores are copied into a restore
+directory, restored files match source hashes and v1 schema metadata, the
+restored audit ledger can replay its seeded row, and the report exposes no row
+payloads or private data while keeping `releaseReady: false`.
+
 `tests/world_civilization_load_rate.test.js` adds research-scale load/rate
 evidence for the civic audit ledger: a larger append burst is replayed through
 bounded pages, exact duplicate retries do not create new rows, changed
@@ -211,6 +227,9 @@ M16 remains incomplete until all of these gates close:
 - Release-grade migration upgrade and downgrade scripts/tests for every civic
   table beyond the current v1 metadata, migration inventory, and fail-closed
   unsupported transition checks.
+- Release-grade backup and restore drills for encrypted storage, point-in-time
+  restore, live WAL checkpointing, operator runbooks, and restore SLOs beyond
+  the current closed-store file-copy/hash/schema-metadata rehearsal.
 - Release-grade load/rate tests for production route limits, store-specific
   throughput targets, multi-process write contention, and replay pagination
   beyond the current research-scale duplicate/replay probe.
