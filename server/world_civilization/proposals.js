@@ -4,6 +4,10 @@ const { DatabaseSync } = require('node:sqlite');
 
 const { V6_WORLD_FEATURE_FLAG, isWorldGridFeatureEnabled } = require('../world_grid/feature_flags');
 const { createCivicAuditLedger, sha256, stableJson } = require('./audit_ledger');
+const {
+  V6_CIVIC_MUTATION_SECURITY_VERSION,
+  assertV6CivicMutationSecuritySafe
+} = require('./mutation_security');
 const { validateCivicProposal, validateModerationDecision } = require('./schemas');
 const {
   ensureCivicSqliteSchemaMetadata,
@@ -18,8 +22,38 @@ const MODERATION_STATUS_APPROVED = 'approved';
 const MODERATION_STATUS_REJECTED = 'rejected';
 const MIGRATION_VERSION = 'v1';
 const STORE_KEY = 'proposals';
+const V6_PROPOSAL_SUBMISSION_ENVELOPE_VERSION = 'agent-town.v6.proposal_submission_envelope.v1';
 const V6_PROPOSAL_REVIEW_QUEUE_VERSION = 'agent-town.v6.proposal_review_queue.v1';
 const V6_PROPOSAL_INTAKE_READINESS_GATE_VERSION = 'agent-town.v6.proposal_intake_readiness.v1';
+const PROPOSAL_SUBMISSION_RECEIPT_RE = /^[A-Za-z0-9:_-]{6,120}$/;
+const PROPOSAL_SUBMISSION_MUTATION_SURFACE = 'proposal.submit_for_review';
+const WORKER_ORIGIN = 'openclaw_lite_worker';
+const PROPOSAL_SUBMISSION_SURFACE_RULES = Object.freeze({
+  human_route_submission: Object.freeze({
+    sourceSurface: 'human_route_submission',
+    actorKind: 'human',
+    requiresWorkerEvidence: false,
+    requiredDelegationScope: ''
+  }),
+  worker_tool_submission: Object.freeze({
+    sourceSurface: 'worker_tool_submission',
+    actorKind: 'agent',
+    requiresWorkerEvidence: true,
+    requiredDelegationScope: 'proposal_drafting'
+  })
+});
+const REQUIRED_PROPOSAL_SUBMISSION_ENVELOPE_CHECKS = [
+  'feature_flag',
+  'research_opt_in',
+  'source_surface',
+  'proposal_schema',
+  'approval_receipt',
+  'mutation_security',
+  'actor_binding',
+  'worker_origin',
+  'no_runtime_exposure',
+  'no_effect_execution'
+];
 const REQUIRED_PROPOSAL_INTAKE_READINESS_CHECKS = [
   'feature_flag',
   'research_opt_in',
@@ -42,6 +76,10 @@ const REQUIRED_PROPOSAL_INTAKE_EVIDENCE_CHECKS = [
   'mutation_security_envelope',
   'same_origin_csrf_session_auth',
   'idempotent_submission_replay',
+  'submission_envelope',
+  'approval_receipt_binding',
+  'proposal_submission_mutation_security',
+  'worker_tool_origin_enforcement',
   'review_queue_index',
   'review_queue_snapshot',
   'reviewed_proposal_queue_exclusion',
@@ -70,6 +108,247 @@ function normalizeList(value) {
 
 function check(key, ok, error = '') {
   return { key, ok: ok === true, error: ok === true ? '' : error };
+}
+
+function disabledProposalSubmissionEnvelope({ source, sourceSurface, reason }) {
+  return {
+    version: V6_PROPOSAL_SUBMISSION_ENVELOPE_VERSION,
+    status: 'research_only',
+    source,
+    featureFlag: V6_WORLD_FEATURE_FLAG,
+    available: false,
+    accepted: false,
+    failClosed: true,
+    releaseReady: false,
+    runtimeExposed: false,
+    playerVisible: false,
+    normalGameplayExposure: false,
+    mutatesWorldState: false,
+    executesProposalEffects: false,
+    exposesCivicTools: false,
+    exposesPrivateData: false,
+    executionStatus: 'not_executable',
+    sourceSurface: String(sourceSurface || ''),
+    approvalReceiptId: '',
+    proposalId: '',
+    proposerAccountId: '',
+    proposerKind: '',
+    proposerAgentId: '',
+    scopeKind: '',
+    scopeTargetId: '',
+    effectType: '',
+    mutationSecurity: null,
+    workerEvidence: {},
+    checks: [],
+    errors: [reason],
+    disabledReason: reason
+  };
+}
+
+function proposalSubmissionSurfaceRule(sourceSurface = '') {
+  return PROPOSAL_SUBMISSION_SURFACE_RULES[String(sourceSurface || '')] || null;
+}
+
+function inspectSubmissionMutationSecurity({ mutationSecurityEnvelope = null, proposal = null } = {}) {
+  if (!mutationSecurityEnvelope || typeof mutationSecurityEnvelope !== 'object') {
+    return { ok: false, errors: ['MUTATION_SECURITY_ENVELOPE_REQUIRED'] };
+  }
+  const safety = assertV6CivicMutationSecuritySafe(mutationSecurityEnvelope);
+  const errors = [...(safety.errors || [])];
+  if (safety.ok !== true) errors.push('MUTATION_SECURITY_ENVELOPE_UNSAFE');
+  if (mutationSecurityEnvelope.version !== V6_CIVIC_MUTATION_SECURITY_VERSION) {
+    errors.push('MUTATION_SECURITY_VERSION_REQUIRED');
+  }
+  if (mutationSecurityEnvelope.allowed !== true) errors.push('MUTATION_SECURITY_ALLOWED_REQUIRED');
+  if (mutationSecurityEnvelope.available !== true) errors.push('MUTATION_SECURITY_AVAILABLE_REQUIRED');
+  if (mutationSecurityEnvelope.mutationApplied !== false) errors.push('MUTATION_SECURITY_NON_MUTATING_REQUIRED');
+  if (mutationSecurityEnvelope.executionStatus !== 'not_executable') errors.push('MUTATION_SECURITY_NON_EXECUTING_REQUIRED');
+  if (String(mutationSecurityEnvelope.surface || '') !== PROPOSAL_SUBMISSION_MUTATION_SURFACE) {
+    errors.push('MUTATION_SECURITY_SURFACE_MISMATCH');
+  }
+  if (proposal) {
+    if (String(mutationSecurityEnvelope.idempotencyKey || '') !== String(proposal.idempotencyKey || '')) {
+      errors.push('MUTATION_SECURITY_IDEMPOTENCY_MISMATCH');
+    }
+    if (String(mutationSecurityEnvelope.ownerAccountId || '') !== String(proposal.proposer?.accountId || '')) {
+      errors.push('MUTATION_SECURITY_OWNER_MISMATCH');
+    }
+    if (String(mutationSecurityEnvelope.sessionAccountId || '') !== String(proposal.proposer?.accountId || '')) {
+      errors.push('MUTATION_SECURITY_SESSION_MISMATCH');
+    }
+  }
+  return { ok: errors.length === 0, errors };
+}
+
+function submissionActorBindingOk({ mutationSecurityEnvelope = null, proposal = null, rule = null } = {}) {
+  if (!mutationSecurityEnvelope || !proposal || !rule) return false;
+  const actor = mutationSecurityEnvelope.actor || {};
+  if (rule.actorKind === 'human') {
+    return proposal.proposer.kind === 'human'
+      && actor.kind === 'human'
+      && String(actor.accountId || '') === String(proposal.proposer.accountId || '');
+  }
+  if (rule.actorKind === 'agent') {
+    return proposal.proposer.kind === 'agent'
+      && actor.kind === 'agent'
+      && String(actor.accountId || '') === String(proposal.proposer.accountId || '')
+      && String(actor.agentId || '') === String(proposal.proposer.agentId || '')
+      && mutationSecurityEnvelope.delegationProof?.proofStatus === 'valid'
+      && mutationSecurityEnvelope.delegationProof?.requiredScope === rule.requiredDelegationScope;
+  }
+  return false;
+}
+
+function workerOriginOk({ rule = null, workerEvidence = {} } = {}) {
+  if (!rule?.requiresWorkerEvidence) return true;
+  return workerEvidence.origin === WORKER_ORIGIN
+    && workerEvidence.skillContextLoaded === true
+    && workerEvidence.workerTrafficTrace === true
+    && workerEvidence.backendShortcut !== true;
+}
+
+function buildV6ProposalSubmissionEnvelope({
+  featureFlags = {},
+  includeResearchProposalSubmission = false,
+  source = 'runtime',
+  sourceSurface = '',
+  proposal = {},
+  approvalReceiptId = '',
+  mutationSecurityEnvelope = null,
+  workerEvidence = {},
+  nowMs = Date.now()
+} = {}) {
+  const enabled = includeResearchProposalSubmission === true
+    && isWorldGridFeatureEnabled(featureFlags, V6_WORLD_FEATURE_FLAG);
+  if (!enabled) {
+    return disabledProposalSubmissionEnvelope({
+      source,
+      sourceSurface,
+      reason: 'V6 proposal submission requires explicit research opt-in and V6 feature flag'
+    });
+  }
+
+  const rule = proposalSubmissionSurfaceRule(sourceSurface);
+  const validation = validateCivicProposal(proposal);
+  const normalizedProposal = validation.value;
+  const proposalSchemaOk = validation.ok === true
+    && normalizedProposal.expiresAtMs > nowMs;
+  const mutationSecurityReport = inspectSubmissionMutationSecurity({
+    mutationSecurityEnvelope,
+    proposal: normalizedProposal
+  });
+  const approvalOk = PROPOSAL_SUBMISSION_RECEIPT_RE.test(String(approvalReceiptId || ''));
+  const actorOk = submissionActorBindingOk({
+    mutationSecurityEnvelope,
+    proposal: normalizedProposal,
+    rule
+  });
+  const workerOk = workerOriginOk({ rule, workerEvidence });
+  const checks = [
+    check('feature_flag', isWorldGridFeatureEnabled(featureFlags, V6_WORLD_FEATURE_FLAG), 'FEATURE_DISABLED'),
+    check('research_opt_in', includeResearchProposalSubmission === true, 'RESEARCH_OPT_IN_REQUIRED'),
+    check('source_surface', Boolean(rule), 'PROPOSAL_SUBMISSION_SURFACE_UNSUPPORTED'),
+    check('proposal_schema', proposalSchemaOk, validation.ok ? 'CIVIC_PROPOSAL_EXPIRED' : 'CIVIC_PROPOSAL_INVALID'),
+    check('approval_receipt', approvalOk, 'PROPOSAL_SUBMISSION_APPROVAL_REQUIRED'),
+    check('mutation_security', mutationSecurityReport.ok, 'PROPOSAL_SUBMISSION_MUTATION_SECURITY_REQUIRED'),
+    check('actor_binding', actorOk, 'PROPOSAL_SUBMISSION_ACTOR_BINDING_REQUIRED'),
+    check('worker_origin', workerOk, 'PROPOSAL_SUBMISSION_WORKER_ORIGIN_REQUIRED'),
+    check(
+      'no_runtime_exposure',
+      mutationSecurityEnvelope?.runtimeExposed === false
+        && mutationSecurityEnvelope?.playerVisible === false
+        && mutationSecurityEnvelope?.normalGameplayExposure === false,
+      'PROPOSAL_SUBMISSION_RUNTIME_EXPOSURE_FORBIDDEN'
+    ),
+    check(
+      'no_effect_execution',
+      mutationSecurityEnvelope?.mutationApplied === false
+        && mutationSecurityEnvelope?.executionStatus === 'not_executable',
+      'PROPOSAL_SUBMISSION_EFFECT_EXECUTION_FORBIDDEN'
+    )
+  ];
+  const accepted = checks.every((entry) => entry.ok);
+
+  return {
+    version: V6_PROPOSAL_SUBMISSION_ENVELOPE_VERSION,
+    status: 'research_only',
+    source,
+    featureFlag: V6_WORLD_FEATURE_FLAG,
+    available: true,
+    accepted,
+    failClosed: accepted !== true,
+    releaseReady: false,
+    runtimeExposed: false,
+    playerVisible: false,
+    normalGameplayExposure: false,
+    mutatesWorldState: false,
+    executesProposalEffects: false,
+    exposesCivicTools: false,
+    exposesPrivateData: false,
+    executionStatus: 'not_executable',
+    sourceSurface: String(sourceSurface || ''),
+    approvalReceiptId: String(approvalReceiptId || ''),
+    proposalId: normalizedProposal?.proposalId || '',
+    proposerAccountId: normalizedProposal?.proposer?.accountId || '',
+    proposerKind: normalizedProposal?.proposer?.kind || '',
+    proposerAgentId: normalizedProposal?.proposer?.agentId || '',
+    scopeKind: normalizedProposal?.scope?.kind || '',
+    scopeTargetId: normalizedProposal?.scope?.targetId || '',
+    effectType: normalizedProposal?.effectPreview?.effectType || '',
+    mutationSecurity: {
+      ok: mutationSecurityReport.ok,
+      version: String(mutationSecurityEnvelope?.version || ''),
+      surface: String(mutationSecurityEnvelope?.surface || ''),
+      idempotencyKey: String(mutationSecurityEnvelope?.idempotencyKey || ''),
+      errors: mutationSecurityReport.errors
+    },
+    workerEvidence: rule?.requiresWorkerEvidence ? {
+      origin: String(workerEvidence.origin || ''),
+      skillContextLoaded: workerEvidence.skillContextLoaded === true,
+      workerTrafficTrace: workerEvidence.workerTrafficTrace === true,
+      backendShortcut: workerEvidence.backendShortcut === true
+    } : {},
+    checks,
+    errors: checks.filter((entry) => !entry.ok).map((entry) => entry.error)
+  };
+}
+
+function assertV6ProposalSubmissionEnvelopeSafe(report = {}) {
+  const errors = [];
+  if (report.version !== V6_PROPOSAL_SUBMISSION_ENVELOPE_VERSION) {
+    errors.push('V6_PROPOSAL_SUBMISSION_ENVELOPE_VERSION_REQUIRED');
+  }
+  if (report.featureFlag !== V6_WORLD_FEATURE_FLAG) {
+    errors.push('V6_PROPOSAL_SUBMISSION_FEATURE_FLAG_REQUIRED');
+  }
+  if (report.status !== 'research_only') {
+    errors.push('V6_PROPOSAL_SUBMISSION_RESEARCH_ONLY_REQUIRED');
+  }
+  if (report.runtimeExposed !== false) errors.push('V6_PROPOSAL_SUBMISSION_RUNTIME_HIDDEN_REQUIRED');
+  if (report.playerVisible !== false) errors.push('V6_PROPOSAL_SUBMISSION_PLAYER_HIDDEN_REQUIRED');
+  if (report.normalGameplayExposure !== false) errors.push('V6_PROPOSAL_SUBMISSION_NORMAL_GAMEPLAY_FORBIDDEN');
+  if (report.mutatesWorldState !== false) errors.push('V6_PROPOSAL_SUBMISSION_WORLD_MUTATION_FORBIDDEN');
+  if (report.executesProposalEffects !== false) errors.push('V6_PROPOSAL_SUBMISSION_EFFECT_EXECUTION_FORBIDDEN');
+  if (report.exposesCivicTools !== false) errors.push('V6_PROPOSAL_SUBMISSION_CIVIC_TOOL_EXPOSURE_FORBIDDEN');
+  if (report.exposesPrivateData !== false) errors.push('V6_PROPOSAL_SUBMISSION_PRIVATE_DATA_FORBIDDEN');
+  if (report.executionStatus !== 'not_executable') errors.push('V6_PROPOSAL_SUBMISSION_NON_EXECUTING_REQUIRED');
+  if (report.releaseReady !== false) errors.push('V6_PROPOSAL_SUBMISSION_RELEASE_READY_FORBIDDEN');
+  if (report.available === true) {
+    const checkKeys = new Set((report.checks || []).map((entry) => entry.key));
+    for (const key of REQUIRED_PROPOSAL_SUBMISSION_ENVELOPE_CHECKS) {
+      if (!checkKeys.has(key)) errors.push(`V6_PROPOSAL_SUBMISSION_CHECK_REQUIRED:${key}`);
+    }
+    const failedChecks = (report.checks || []).filter((entry) => entry.ok !== true);
+    if (report.accepted === true && failedChecks.length > 0) {
+      errors.push('V6_PROPOSAL_SUBMISSION_ACCEPTED_WITH_FAILED_CHECKS');
+    }
+    if (report.accepted !== true && report.failClosed !== true) {
+      errors.push('V6_PROPOSAL_SUBMISSION_DENIAL_FAIL_CLOSED_REQUIRED');
+    }
+  } else if (report.failClosed !== true) {
+    errors.push('V6_PROPOSAL_SUBMISSION_DISABLED_FAIL_CLOSED_REQUIRED');
+  }
+  return { ok: errors.length === 0, errors };
 }
 
 function inspectProposalIntakeReadinessEvidence(evidence = {}) {
@@ -648,6 +927,39 @@ function createCivicProposalStore({ sqlitePath, auditLedger = null, auditSqliteP
     return parseProposalRow(statements.byProposalId.get(proposal.proposalId));
   }
 
+  function submitProposalForReview({
+    proposal: rawProposal = {},
+    sourceSurface = '',
+    approvalReceiptId = '',
+    mutationSecurityEnvelope = null,
+    workerEvidence = {},
+    featureFlags = {},
+    includeResearchProposalSubmission = false,
+    source = 'runtime'
+  } = {}, { nowMs = Date.now() } = {}) {
+    const envelope = buildV6ProposalSubmissionEnvelope({
+      featureFlags,
+      includeResearchProposalSubmission,
+      source,
+      sourceSurface,
+      proposal: rawProposal,
+      approvalReceiptId,
+      mutationSecurityEnvelope,
+      workerEvidence,
+      nowMs
+    });
+    if (envelope.accepted !== true) {
+      const err = new Error('CIVIC_PROPOSAL_SUBMISSION_DENIED');
+      err.details = envelope;
+      throw err;
+    }
+    const row = draftProposal(rawProposal, { nowMs });
+    return {
+      ...row,
+      submissionEnvelope: envelope
+    };
+  }
+
   function getProposal(proposalId = '') {
     return parseProposalRow(statements.byProposalId.get(String(proposalId || '')));
   }
@@ -813,6 +1125,7 @@ function createCivicProposalStore({ sqlitePath, auditLedger = null, auditSqliteP
     migrationVersion: schemaMetadata.migrationVersion,
     previewProposalEffect,
     recordProposalReview,
+    submitProposalForReview,
     sqlitePath
   };
 }
@@ -826,10 +1139,14 @@ module.exports = {
   PROPOSAL_STATUS_REJECTED,
   REQUIRED_PROPOSAL_INTAKE_EVIDENCE_CHECKS: clone(REQUIRED_PROPOSAL_INTAKE_EVIDENCE_CHECKS),
   REQUIRED_PROPOSAL_INTAKE_READINESS_CHECKS: clone(REQUIRED_PROPOSAL_INTAKE_READINESS_CHECKS),
+  REQUIRED_PROPOSAL_SUBMISSION_ENVELOPE_CHECKS: clone(REQUIRED_PROPOSAL_SUBMISSION_ENVELOPE_CHECKS),
   REQUIRED_PROPOSAL_SUBMISSION_SURFACES: clone(REQUIRED_PROPOSAL_SUBMISSION_SURFACES),
   V6_PROPOSAL_INTAKE_READINESS_GATE_VERSION,
   V6_PROPOSAL_REVIEW_QUEUE_VERSION,
+  V6_PROPOSAL_SUBMISSION_ENVELOPE_VERSION,
   assertV6ProposalIntakeReadinessGateSafe,
+  assertV6ProposalSubmissionEnvelopeSafe,
   buildV6ProposalIntakeReadinessGate,
+  buildV6ProposalSubmissionEnvelope,
   createCivicProposalStore
 };

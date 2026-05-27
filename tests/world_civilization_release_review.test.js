@@ -337,6 +337,10 @@ test('V6 release review requires proposal intake route tool and review queue evi
   assert.ok(proposalGate.requiredChecks.includes('openclaw_lite_worker_origin'));
   assert.ok(proposalGate.requiredChecks.includes('mutation_security_envelope'));
   assert.ok(proposalGate.requiredChecks.includes('same_origin_csrf_session_auth'));
+  assert.ok(proposalGate.requiredChecks.includes('submission_envelope'));
+  assert.ok(proposalGate.requiredChecks.includes('approval_receipt_binding'));
+  assert.ok(proposalGate.requiredChecks.includes('proposal_submission_mutation_security'));
+  assert.ok(proposalGate.requiredChecks.includes('worker_tool_origin_enforcement'));
   assert.ok(proposalGate.requiredChecks.includes('review_queue_index'));
   assert.ok(proposalGate.requiredChecks.includes('review_queue_snapshot'));
   assert.ok(proposalGate.requiredChecks.includes('reviewed_proposal_queue_exclusion'));

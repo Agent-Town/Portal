@@ -69,6 +69,29 @@ prepared effect persistence. It requires an existing, non-expired proposal whose
 review transition has reached `ready_for_vote` with approved moderation status
 and whose effect preview and rollback plan match the proposed civic action.
 
+## Submission Envelope
+
+`buildV6ProposalSubmissionEnvelope()` is the internal route/tool submission
+guard. It is research-only and requires `FEATURE_WORLD_V60_AGENT_CIVILIZATION`
+plus explicit proposal-submission opt-in.
+
+The envelope supports two non-public source surfaces:
+
+- `human_route_submission`, bound to a human proposer, explicit approval
+  receipt, and an M5 mutation-security envelope whose actor/session/owner and
+  idempotency key match the proposal.
+- `worker_tool_submission`, bound to an agent proposer, a store-backed
+  `proposal_drafting` delegation proof inside the M5 mutation-security
+  envelope, and OpenClaw Lite worker evidence with Skill Context and Worker
+  Traffic observability.
+
+`submitProposalForReview()` uses an accepted envelope to draft the proposal and
+place it in the internal review queue. A denied envelope throws
+`CIVIC_PROPOSAL_SUBMISSION_DENIED` before proposal or audit rows are persisted.
+The submission contract remains hidden from runtime `/api/world/tools`, normal
+gameplay, and player-visible proposal UI. It does not execute effects or expose
+V6 civic tools.
+
 ## Review Queue Snapshot
 
 `getProposalReviewQueueSnapshot()` returns a research-only internal queue using
@@ -92,6 +115,8 @@ hidden from runtime tools and normal gameplay.
 The gate requires evidence for:
 
 - human route submission and worker-tool submission envelopes;
+- approval-receipt binding, proposal-submission mutation security, and
+  worker-tool origin enforcement;
 - OpenClaw Lite worker origin, Skill Context observability, and Worker Traffic
   observability;
 - civic mutation security envelope, same-origin/CSRF/session-auth controls, and

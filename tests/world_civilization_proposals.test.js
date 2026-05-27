@@ -7,6 +7,8 @@ const path = require('node:path');
 const { V6_WORLD_FEATURE_FLAG, parseWorldGridFeatureFlags } = require('../server/world_grid/feature_flags');
 const { CIVIC_SCHEMA_VERSION } = require('../server/world_civilization/schemas');
 const { createCivicAuditLedger } = require('../server/world_civilization/audit_ledger');
+const { createCivicDelegationStore } = require('../server/world_civilization/delegations');
+const { buildV6CivicMutationSecurityEnvelope } = require('../server/world_civilization/mutation_security');
 const {
   MODERATION_STATUS_APPROVED,
   MODERATION_STATUS_NEEDS_REVIEW,
@@ -16,11 +18,15 @@ const {
   PROPOSAL_STATUS_REJECTED,
   REQUIRED_PROPOSAL_INTAKE_EVIDENCE_CHECKS,
   REQUIRED_PROPOSAL_INTAKE_READINESS_CHECKS,
+  REQUIRED_PROPOSAL_SUBMISSION_ENVELOPE_CHECKS,
   REQUIRED_PROPOSAL_SUBMISSION_SURFACES,
   V6_PROPOSAL_INTAKE_READINESS_GATE_VERSION,
   V6_PROPOSAL_REVIEW_QUEUE_VERSION,
+  V6_PROPOSAL_SUBMISSION_ENVELOPE_VERSION,
   assertV6ProposalIntakeReadinessGateSafe,
+  assertV6ProposalSubmissionEnvelopeSafe,
   buildV6ProposalIntakeReadinessGate,
+  buildV6ProposalSubmissionEnvelope,
   createCivicProposalStore
 } = require('../server/world_civilization/proposals');
 
@@ -37,6 +43,33 @@ function withTempProposalStore(fn) {
     auditLedger.close();
     fs.rmSync(dir, { recursive: true, force: true });
   }
+}
+
+function withTempProposalAndDelegationStore(fn) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-v6-proposal-submission-'));
+  const auditPath = path.join(dir, 'audit.sqlite');
+  const auditLedger = createCivicAuditLedger({ sqlitePath: auditPath });
+  const proposalStore = createCivicProposalStore({ sqlitePath: path.join(dir, 'proposals.sqlite'), auditLedger });
+  const delegationStore = createCivicDelegationStore({ sqlitePath: path.join(dir, 'delegations.sqlite'), auditLedger });
+  try {
+    return fn({ auditLedger, delegationStore, proposalStore });
+  } finally {
+    proposalStore.close();
+    delegationStore.close();
+    auditLedger.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function headers(overrides = {}) {
+  return {
+    host: 'portal.local',
+    origin: 'https://portal.local',
+    'sec-fetch-site': 'same-origin',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-dest': 'empty',
+    ...overrides
+  };
 }
 
 function proposal(overrides = {}) {
@@ -76,6 +109,35 @@ function proposal(overrides = {}) {
   };
 }
 
+function agentProposal(overrides = {}) {
+  return proposal({
+    proposalId: 'proposal_agent_public_works_bridge_001',
+    proposer: {
+      kind: 'agent',
+      accountId: 'acct_v6_human_001',
+      agentId: 'agent_v6_delegate_001'
+    },
+    idempotencyKey: 'idem_proposal_agent_bridge_001',
+    ...overrides
+  });
+}
+
+function delegation(overrides = {}) {
+  return {
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    delegationId: 'delegation_proposal_submission_001',
+    principalAccountId: 'acct_v6_human_001',
+    delegateAgentId: 'agent_v6_delegate_001',
+    scope: 'proposal_drafting',
+    expiresAtMs: 4_102_444_800_000,
+    maxActions: 2,
+    approvalReceiptId: 'receipt_v6_agent_proposal_001',
+    revocable: true,
+    canExecuteCivicEffects: false,
+    ...overrides
+  };
+}
+
 function moderationDecision(overrides = {}) {
   return {
     schemaVersion: CIVIC_SCHEMA_VERSION,
@@ -89,6 +151,41 @@ function moderationDecision(overrides = {}) {
     redactedFields: [],
     ...overrides
   };
+}
+
+function mutationSecurityEnvelope(overrides = {}) {
+  return buildV6CivicMutationSecurityEnvelope({
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    includeResearchMutation: true,
+    source: 'proposal_submission_test',
+    headers: headers(),
+    env: {
+      NODE_ENV: 'production',
+      WORLD_GRID_MUTATION_RATE_LIMIT_MAX: '100',
+      WORLD_GRID_MUTATION_RATE_LIMIT_WINDOW_MS: '60000'
+    },
+    session: {
+      authenticated: true,
+      accountId: 'acct_v6_human_001'
+    },
+    wallet: {
+      serverVerified: true,
+      subjectAccountId: 'acct_v6_human_001',
+      walletAddress: '0x0000000000000000000000000000000000000001'
+    },
+    actor: {
+      kind: 'human',
+      accountId: 'acct_v6_human_001'
+    },
+    owner: {
+      ownerAccountId: 'acct_v6_human_001'
+    },
+    surface: 'proposal.submit_for_review',
+    idempotencyKey: 'idem_proposal_bridge_001',
+    csrfVerified: true,
+    nowMs: 1_779_790_000_000,
+    ...overrides
+  });
 }
 
 function proposalIntakeReadinessEvidence(overrides = {}) {
@@ -264,6 +361,184 @@ test('V6 proposal intake assertion rejects visible civic tool or effect executio
   assert.match(result.errors.join(','), /V6_PROPOSAL_INTAKE_READINESS_EVIDENCE_RUNTIME_HIDDEN_REQUIRED/);
   assert.match(result.errors.join(','), /V6_PROPOSAL_INTAKE_READINESS_EVIDENCE_EFFECT_EXECUTION_FORBIDDEN/);
 });
+
+test('V6 proposal submission envelope is hidden without explicit research opt-in and V6 flag', () => {
+  const noResearchOptIn = buildV6ProposalSubmissionEnvelope({
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    sourceSurface: 'human_route_submission',
+    proposal: proposal(),
+    approvalReceiptId: 'approval_proposal_bridge_001',
+    mutationSecurityEnvelope: mutationSecurityEnvelope()
+  });
+  const broadV5Override = buildV6ProposalSubmissionEnvelope({
+    includeResearchProposalSubmission: true,
+    featureFlags: parseWorldGridFeatureFlags('all'),
+    sourceSurface: 'human_route_submission',
+    proposal: proposal(),
+    approvalReceiptId: 'approval_proposal_bridge_001',
+    mutationSecurityEnvelope: mutationSecurityEnvelope()
+  });
+
+  for (const envelope of [noResearchOptIn, broadV5Override]) {
+    assert.equal(envelope.version, V6_PROPOSAL_SUBMISSION_ENVELOPE_VERSION);
+    assert.equal(envelope.available, false);
+    assert.equal(envelope.accepted, false);
+    assert.equal(envelope.failClosed, true);
+    assert.equal(envelope.runtimeExposed, false);
+    assert.equal(envelope.playerVisible, false);
+    assert.equal(envelope.normalGameplayExposure, false);
+    assert.equal(envelope.mutatesWorldState, false);
+    assert.equal(envelope.executesProposalEffects, false);
+    assert.equal(envelope.exposesCivicTools, false);
+    assert.equal(envelope.exposesPrivateData, false);
+    assert.equal(envelope.executionStatus, 'not_executable');
+    assert.deepEqual(envelope.checks, []);
+    assert.deepEqual(assertV6ProposalSubmissionEnvelopeSafe(envelope), { ok: true, errors: [] });
+  }
+});
+
+test('V6 proposal submission accepts human route envelope and queues draft without effects', () => withTempProposalStore(({
+  auditLedger,
+  store
+}) => {
+  const submitted = store.submitProposalForReview({
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    includeResearchProposalSubmission: true,
+    source: 'node_test',
+    sourceSurface: 'human_route_submission',
+    proposal: proposal(),
+    approvalReceiptId: 'approval_proposal_bridge_001',
+    mutationSecurityEnvelope: mutationSecurityEnvelope()
+  }, { nowMs: 1_779_790_000_000 });
+  const duplicate = store.submitProposalForReview({
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    includeResearchProposalSubmission: true,
+    source: 'node_test',
+    sourceSurface: 'human_route_submission',
+    proposal: proposal(),
+    approvalReceiptId: 'approval_proposal_bridge_001',
+    mutationSecurityEnvelope: mutationSecurityEnvelope()
+  }, { nowMs: 1_779_790_100_000 });
+
+  assert.equal(submitted.status, PROPOSAL_STATUS_DRAFTED);
+  assert.equal(submitted.moderationStatus, MODERATION_STATUS_NEEDS_REVIEW);
+  assert.equal(submitted.submissionEnvelope.version, V6_PROPOSAL_SUBMISSION_ENVELOPE_VERSION);
+  assert.equal(submitted.submissionEnvelope.accepted, true);
+  assert.equal(submitted.submissionEnvelope.releaseReady, false);
+  assert.equal(submitted.submissionEnvelope.runtimeExposed, false);
+  assert.equal(submitted.submissionEnvelope.playerVisible, false);
+  assert.equal(submitted.submissionEnvelope.normalGameplayExposure, false);
+  assert.equal(submitted.submissionEnvelope.mutatesWorldState, false);
+  assert.equal(submitted.submissionEnvelope.executesProposalEffects, false);
+  assert.equal(submitted.submissionEnvelope.exposesCivicTools, false);
+  assert.equal(submitted.submissionEnvelope.exposesPrivateData, false);
+  assert.equal(submitted.submissionEnvelope.executionStatus, 'not_executable');
+  assert.equal(submitted.submissionEnvelope.approvalReceiptId, 'approval_proposal_bridge_001');
+  assert.equal(submitted.submissionEnvelope.sourceSurface, 'human_route_submission');
+  assert.deepEqual(submitted.submissionEnvelope.checks.map((entry) => entry.key), REQUIRED_PROPOSAL_SUBMISSION_ENVELOPE_CHECKS);
+  assert.deepEqual(assertV6ProposalSubmissionEnvelopeSafe(submitted.submissionEnvelope), { ok: true, errors: [] });
+  assert.equal(duplicate.duplicate, true);
+  assert.equal(store.count(), 1);
+  assert.equal(auditLedger.replay().filter((row) => row.entry.actionType === 'proposal.created').length, 1);
+  assert.deepEqual(
+    store.getProposalReviewQueueSnapshot({ nowMs: 1_779_790_200_000 }).entries.map((entry) => entry.proposalId),
+    ['proposal_public_works_bridge_001']
+  );
+  assert.equal(typeof store.applyProposal, 'undefined');
+  assert.equal(typeof store.executeProposal, 'undefined');
+}));
+
+test('V6 proposal submission accepts worker tool envelope only with OpenClaw Lite delegation proof', () => withTempProposalAndDelegationStore(({
+  auditLedger,
+  delegationStore,
+  proposalStore
+}) => {
+  delegationStore.recordDelegation(delegation(), { nowMs: 1_779_789_900_000 });
+  const workerMutation = mutationSecurityEnvelope({
+    actor: {
+      kind: 'agent',
+      accountId: 'acct_v6_human_001',
+      agentId: 'agent_v6_delegate_001'
+    },
+    delegation: {
+      delegationId: 'delegation_proposal_submission_001',
+      principalAccountId: 'acct_v6_human_001',
+      delegateAgentId: 'agent_v6_delegate_001',
+      approvalReceiptId: 'receipt_v6_agent_proposal_001'
+    },
+    delegationStore,
+    requiredDelegationScope: 'proposal_drafting',
+    idempotencyKey: 'idem_proposal_agent_bridge_001'
+  });
+  const denied = buildV6ProposalSubmissionEnvelope({
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    includeResearchProposalSubmission: true,
+    sourceSurface: 'worker_tool_submission',
+    proposal: agentProposal(),
+    approvalReceiptId: 'approval_agent_proposal_bridge_001',
+    mutationSecurityEnvelope: workerMutation,
+    workerEvidence: {
+      origin: 'backend_route',
+      skillContextLoaded: true,
+      workerTrafficTrace: true,
+      backendShortcut: true
+    }
+  });
+  const submitted = proposalStore.submitProposalForReview({
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    includeResearchProposalSubmission: true,
+    sourceSurface: 'worker_tool_submission',
+    proposal: agentProposal(),
+    approvalReceiptId: 'approval_agent_proposal_bridge_001',
+    mutationSecurityEnvelope: workerMutation,
+    workerEvidence: {
+      origin: 'openclaw_lite_worker',
+      skillContextLoaded: true,
+      workerTrafficTrace: true,
+      backendShortcut: false
+    }
+  }, { nowMs: 1_779_790_100_000 });
+
+  assert.equal(denied.accepted, false);
+  assert.equal(denied.failClosed, true);
+  assert.match(denied.errors.join(','), /PROPOSAL_SUBMISSION_WORKER_ORIGIN_REQUIRED/);
+  assert.deepEqual(assertV6ProposalSubmissionEnvelopeSafe(denied), { ok: true, errors: [] });
+  assert.equal(submitted.proposalId, 'proposal_agent_public_works_bridge_001');
+  assert.equal(submitted.proposerKind, 'agent');
+  assert.equal(submitted.proposerAgentId, 'agent_v6_delegate_001');
+  assert.equal(submitted.submissionEnvelope.accepted, true);
+  assert.equal(submitted.submissionEnvelope.workerEvidence.origin, 'openclaw_lite_worker');
+  assert.equal(submitted.submissionEnvelope.mutationSecurity.ok, true);
+  assert.deepEqual(
+    proposalStore.getProposalReviewQueueSnapshot({ nowMs: 1_779_790_200_000 }).entries.map((entry) => entry.proposalId),
+    ['proposal_agent_public_works_bridge_001']
+  );
+  assert.equal(auditLedger.replay().filter((row) => row.entry.actionType === 'proposal.created').length, 1);
+}));
+
+test('V6 proposal submission denial fails closed before persistence', () => withTempProposalStore(({
+  auditLedger,
+  store
+}) => {
+  assert.throws(
+    () => store.submitProposalForReview({
+      featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+      includeResearchProposalSubmission: true,
+      sourceSurface: 'human_route_submission',
+      proposal: proposal(),
+      approvalReceiptId: '',
+      mutationSecurityEnvelope: mutationSecurityEnvelope({
+        csrfVerified: false,
+        idempotencyKey: 'wrong_idempotency_key'
+      })
+    }, { nowMs: 1_779_790_000_000 }),
+    /CIVIC_PROPOSAL_SUBMISSION_DENIED/
+  );
+
+  assert.equal(store.count(), 0);
+  assert.equal(auditLedger.count(), 0);
+  assert.deepEqual(store.getProposalReviewQueueSnapshot({ nowMs: 1_779_790_100_000 }).entries, []);
+}));
 
 test('V6 proposal lifecycle drafts bounded proposals without executing effects', () => withTempProposalStore(({ auditLedger, store }) => {
   const drafted = store.draftProposal(proposal(), { nowMs: 1_779_784_000_000 });

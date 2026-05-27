@@ -216,7 +216,9 @@ persistence resilience, and security/product release review.
   `buildV6ProposalIntakeReadinessGate()` proves human route submission,
   worker-tool submission, OpenClaw Lite worker origin, Skill Context and Worker
   Traffic observability, mutation-security envelope, same-origin/CSRF/session
-  auth, idempotent submission replay, review-queue index, research-only queue
+  auth, idempotent submission replay, accepted submission-envelope coverage,
+  approval-receipt binding, proposal-submission mutation-security binding,
+  worker-tool origin enforcement, review-queue index, research-only queue
   snapshot coverage, reviewed/expired proposal queue exclusion,
   moderation-decision link, proposal audit rows, public text privacy review,
   private-data exclusion, no backend shortcuts, no civic tool exposure, and no
