@@ -5,6 +5,7 @@ const REQUIRED_CONTROLLED_RELEASE_TARGET_KEYS = [
   'readiness_gate_closed',
   'production_flag_safety',
   'rollback_disable_controls',
+  'release_evidence_manifest',
   'observability',
   'support_runbook',
   'release_signoff_packet',
@@ -18,6 +19,7 @@ const REQUIRED_CONTROLLED_RELEASE_TARGET_GAPS = [
   'closed_readiness_gate_report_required',
   'admin_enablement_signoff_required',
   'rollback_disable_rehearsal_required',
+  'release_evidence_manifest_required',
   'privacy_safe_observability_owner_required',
   'controlled_release_operations_required',
   'support_oncall_signoff_required',
@@ -47,6 +49,13 @@ const V6_CONTROLLED_RELEASE_TARGETS = [
     requiredEvidence: 'Release must have named rollback owner, rehearsed disable and rollback steps, data-preservation behavior, and post-disable verification.',
     currentEvidence: 'server/world_civilization/release_operations.js',
     releaseEvidenceRequired: 'rollback_disable_rehearsal_record'
+  },
+  {
+    key: 'release_evidence_manifest',
+    surface: 'release_evidence_archive',
+    requiredEvidence: 'Release evidence archive must link environment, command transcripts, Node and Playwright results, override rechecks, trace archive, blocker register, signoff packet, operations, observability, support handoffs, audit health, and runbook evidence.',
+    currentEvidence: 'server/world_civilization/release_evidence_manifest.js',
+    releaseEvidenceRequired: 'release_evidence_manifest'
   },
   {
     key: 'observability',
@@ -183,6 +192,7 @@ function buildV6ControlledReleaseTargetReport({
     readinessGateProbeCount: numberValue(observed.readinessGateProbeCount),
     productionFlagProbeCount: numberValue(observed.productionFlagProbeCount),
     rollbackDisableProbeCount: numberValue(observed.rollbackDisableProbeCount),
+    releaseEvidenceManifestProbeCount: numberValue(observed.releaseEvidenceManifestProbeCount),
     observabilityProbeCount: numberValue(observed.observabilityProbeCount),
     supportRunbookProbeCount: numberValue(observed.supportRunbookProbeCount),
     releaseSignoffPacketProbeCount: numberValue(observed.releaseSignoffPacketProbeCount),
@@ -206,6 +216,7 @@ function buildV6ControlledReleaseTargetReport({
   if (observedEvidence.readinessGateProbeCount <= 0) errors.push('V6_CONTROLLED_RELEASE_READINESS_GATE_PROBE_REQUIRED');
   if (observedEvidence.productionFlagProbeCount <= 0) errors.push('V6_CONTROLLED_RELEASE_PRODUCTION_FLAG_PROBE_REQUIRED');
   if (observedEvidence.rollbackDisableProbeCount <= 0) errors.push('V6_CONTROLLED_RELEASE_ROLLBACK_DISABLE_PROBE_REQUIRED');
+  if (observedEvidence.releaseEvidenceManifestProbeCount <= 0) errors.push('V6_CONTROLLED_RELEASE_EVIDENCE_MANIFEST_PROBE_REQUIRED');
   if (observedEvidence.observabilityProbeCount <= 0) errors.push('V6_CONTROLLED_RELEASE_OBSERVABILITY_PROBE_REQUIRED');
   if (observedEvidence.supportRunbookProbeCount <= 0) errors.push('V6_CONTROLLED_RELEASE_SUPPORT_RUNBOOK_PROBE_REQUIRED');
   if (observedEvidence.releaseSignoffPacketProbeCount <= 0) errors.push('V6_CONTROLLED_RELEASE_SIGNOFF_PACKET_PROBE_REQUIRED');

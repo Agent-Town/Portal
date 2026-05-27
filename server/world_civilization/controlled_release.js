@@ -7,6 +7,8 @@ const V6_READINESS_GATE_ARTIFACT = 'specs/release-gates/v60_agent_civilization_r
 const V6_MILESTONE_PLAN_ARTIFACT = 'docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md';
 const BLOCKER_EXCEPTION_REGISTER_ARTIFACT = 'server/world_civilization/blocker_exception_register.js';
 const BLOCKER_EXCEPTION_REGISTER_TEST = 'tests/world_civilization_blocker_exception_register.test.js';
+const RELEASE_EVIDENCE_MANIFEST_ARTIFACT = 'server/world_civilization/release_evidence_manifest.js';
+const RELEASE_EVIDENCE_MANIFEST_TEST = 'tests/world_civilization_release_evidence_manifest.test.js';
 const RELEASE_OBSERVABILITY_ARTIFACT = 'server/world_civilization/release_observability.js';
 const RELEASE_OBSERVABILITY_TEST = 'tests/world_civilization_release_observability.test.js';
 const RELEASE_SUPPORT_ARTIFACT = 'server/world_civilization/release_support.js';
@@ -47,6 +49,8 @@ const REQUIRED_CONTROLLED_RELEASE_GATES = [
       CONTROLLED_RELEASE_RUNBOOK,
       BLOCKER_EXCEPTION_REGISTER_ARTIFACT,
       BLOCKER_EXCEPTION_REGISTER_TEST,
+      RELEASE_EVIDENCE_MANIFEST_ARTIFACT,
+      RELEASE_EVIDENCE_MANIFEST_TEST,
       RELEASE_OBSERVABILITY_ARTIFACT,
       RELEASE_OBSERVABILITY_TEST,
       RELEASE_SUPPORT_ARTIFACT,
@@ -62,6 +66,7 @@ const REQUIRED_CONTROLLED_RELEASE_GATES = [
       'readiness_gate_closed_target',
       'production_flag_safety_target',
       'rollback_disable_target',
+      'release_evidence_manifest_target',
       'observability_target',
       'release_operations_target',
       'release_signoff_packet_target',
@@ -96,6 +101,34 @@ const REQUIRED_CONTROLLED_RELEASE_GATES = [
     label: 'Rollback and disable controls',
     requiredArtifacts: [CONTROLLED_RELEASE_RUNBOOK, RELEASE_OPERATIONS_ARTIFACT, RELEASE_OPERATIONS_TEST],
     requiredChecks: ['release_operations_gate', 'disable_plan', 'rollback_owner', 'rollback_window', 'rollback_rehearsal', 'rollback_disable_drill', 'data_preservation', 'post_disable_verification']
+  },
+  {
+    key: 'release_evidence_manifest',
+    label: 'Release evidence manifest',
+    requiredArtifacts: [
+      CONTROLLED_RELEASE_RUNBOOK,
+      RELEASE_EVIDENCE_MANIFEST_ARTIFACT,
+      RELEASE_EVIDENCE_MANIFEST_TEST
+    ],
+    requiredChecks: [
+      'release_evidence_manifest',
+      'release_candidate_environment',
+      'command_transcripts',
+      'targeted_node_results',
+      'split_playwright_results',
+      'all_features_regression_results',
+      'production_override_recheck',
+      'runtime_tool_absence_recheck',
+      'browser_console_error_budget',
+      'playwright_trace_archive',
+      'blocker_exception_register',
+      'release_signoff_packet',
+      'release_operations_handoff',
+      'release_observability_handoff',
+      'release_support_handoff',
+      'audit_replay_health',
+      'controlled_release_runbook'
+    ]
   },
   {
     key: 'observability',
@@ -419,6 +452,8 @@ function assertV6ControlledReleaseSafe(report = {}) {
 module.exports = {
   BLOCKER_EXCEPTION_REGISTER_ARTIFACT,
   BLOCKER_EXCEPTION_REGISTER_TEST,
+  RELEASE_EVIDENCE_MANIFEST_ARTIFACT,
+  RELEASE_EVIDENCE_MANIFEST_TEST,
   RELEASE_OBSERVABILITY_ARTIFACT,
   RELEASE_OBSERVABILITY_TEST,
   RELEASE_SUPPORT_ARTIFACT,

@@ -16,6 +16,7 @@ function observedEvidence(overrides = {}) {
     readinessGateProbeCount: 1,
     productionFlagProbeCount: 1,
     rollbackDisableProbeCount: 1,
+    releaseEvidenceManifestProbeCount: 1,
     observabilityProbeCount: 1,
     supportRunbookProbeCount: 1,
     releaseSignoffPacketProbeCount: 1,
@@ -54,6 +55,11 @@ test('V6 controlled release targets name every launch control surface', () => {
   assert.equal(
     V6_CONTROLLED_RELEASE_TARGETS.find((target) => target.key === 'rollback_disable_controls').currentEvidence,
     'server/world_civilization/release_operations.js'
+  );
+  assert.ok(matrix.targetKeys.includes('release_evidence_manifest'));
+  assert.equal(
+    V6_CONTROLLED_RELEASE_TARGETS.find((target) => target.key === 'release_evidence_manifest').currentEvidence,
+    'server/world_civilization/release_evidence_manifest.js'
   );
   assert.ok(matrix.targetKeys.includes('observability'));
   assert.equal(
@@ -120,6 +126,7 @@ test('V6 controlled release target report records evidence without enabling prod
   assert.equal(report.executionStatus, 'not_executable');
   assert.equal(report.targetMatrix.ok, true);
   assert.equal(report.observedEvidence.productionFlagProbeCount, 1);
+  assert.equal(report.observedEvidence.releaseEvidenceManifestProbeCount, 1);
   assert.equal(report.observedEvidence.releaseSignoffPacketProbeCount, 1);
   assert.equal(report.observedEvidence.playerVisibleControlledReleaseSurfaceCount, 0);
   assert.deepEqual(report.releaseGaps, REQUIRED_CONTROLLED_RELEASE_TARGET_GAPS);
@@ -140,6 +147,7 @@ test('V6 controlled release target report fails closed for incomplete targets or
   assert.match(missingProbes.errors.join(','), /V6_CONTROLLED_RELEASE_READINESS_GATE_PROBE_REQUIRED/);
   assert.match(missingProbes.errors.join(','), /V6_CONTROLLED_RELEASE_PRODUCTION_FLAG_PROBE_REQUIRED/);
   assert.match(missingProbes.errors.join(','), /V6_CONTROLLED_RELEASE_ROLLBACK_DISABLE_PROBE_REQUIRED/);
+  assert.match(missingProbes.errors.join(','), /V6_CONTROLLED_RELEASE_EVIDENCE_MANIFEST_PROBE_REQUIRED/);
   assert.match(missingProbes.errors.join(','), /V6_CONTROLLED_RELEASE_SIGNOFF_PACKET_PROBE_REQUIRED/);
   assert.match(missingProbes.errors.join(','), /V6_CONTROLLED_RELEASE_BLOCKER_CLEARANCE_PROBE_REQUIRED/);
   assert.match(missingProbes.errors.join(','), /V6_CONTROLLED_RELEASE_EMERGENCY_DISABLE_PROBE_REQUIRED/);

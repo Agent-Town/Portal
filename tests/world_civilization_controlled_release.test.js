@@ -17,6 +17,8 @@ const {
   CONTROLLED_RELEASE_TARGET_ARTIFACT,
   CONTROLLED_RELEASE_TARGET_TEST,
   CONTROLLED_RELEASE_RUNBOOK,
+  RELEASE_EVIDENCE_MANIFEST_ARTIFACT,
+  RELEASE_EVIDENCE_MANIFEST_TEST,
   RELEASE_OBSERVABILITY_ARTIFACT,
   RELEASE_OBSERVABILITY_TEST,
   RELEASE_OPERATIONS_ARTIFACT,
@@ -145,6 +147,8 @@ test('V6 controlled release requires target gate evidence for launch controls', 
   assert.ok(targetGate.requiredArtifacts.includes(CONTROLLED_RELEASE_RUNBOOK));
   assert.ok(targetGate.requiredArtifacts.includes(BLOCKER_EXCEPTION_REGISTER_ARTIFACT));
   assert.ok(targetGate.requiredArtifacts.includes(BLOCKER_EXCEPTION_REGISTER_TEST));
+  assert.ok(targetGate.requiredArtifacts.includes(RELEASE_EVIDENCE_MANIFEST_ARTIFACT));
+  assert.ok(targetGate.requiredArtifacts.includes(RELEASE_EVIDENCE_MANIFEST_TEST));
   assert.ok(targetGate.requiredArtifacts.includes(RELEASE_OBSERVABILITY_ARTIFACT));
   assert.ok(targetGate.requiredArtifacts.includes(RELEASE_OBSERVABILITY_TEST));
   assert.ok(targetGate.requiredArtifacts.includes(RELEASE_OPERATIONS_ARTIFACT));
@@ -158,6 +162,7 @@ test('V6 controlled release requires target gate evidence for launch controls', 
   assert.ok(targetGate.requiredChecks.includes('readiness_gate_closed_target'));
   assert.ok(targetGate.requiredChecks.includes('production_flag_safety_target'));
   assert.ok(targetGate.requiredChecks.includes('rollback_disable_target'));
+  assert.ok(targetGate.requiredChecks.includes('release_evidence_manifest_target'));
   assert.ok(targetGate.requiredChecks.includes('observability_target'));
   assert.ok(targetGate.requiredChecks.includes('release_operations_target'));
   assert.ok(targetGate.requiredChecks.includes('release_signoff_packet_target'));
@@ -203,6 +208,23 @@ test('V6 controlled release requires target gate evidence for launch controls', 
   assert.ok(supportGate.requiredChecks.includes('privacy_safe_support_view'));
   assert.ok(supportGate.requiredChecks.includes('blocker_register_link'));
   assert.ok(supportGate.requiredChecks.includes('observability_link'));
+
+  const evidenceGate = REQUIRED_CONTROLLED_RELEASE_GATES.find((gate) => gate.key === 'release_evidence_manifest');
+  assert.ok(evidenceGate.requiredArtifacts.includes(RELEASE_EVIDENCE_MANIFEST_ARTIFACT));
+  assert.ok(evidenceGate.requiredArtifacts.includes(RELEASE_EVIDENCE_MANIFEST_TEST));
+  assert.ok(evidenceGate.requiredChecks.includes('release_evidence_manifest'));
+  assert.ok(evidenceGate.requiredChecks.includes('release_candidate_environment'));
+  assert.ok(evidenceGate.requiredChecks.includes('command_transcripts'));
+  assert.ok(evidenceGate.requiredChecks.includes('targeted_node_results'));
+  assert.ok(evidenceGate.requiredChecks.includes('split_playwright_results'));
+  assert.ok(evidenceGate.requiredChecks.includes('all_features_regression_results'));
+  assert.ok(evidenceGate.requiredChecks.includes('production_override_recheck'));
+  assert.ok(evidenceGate.requiredChecks.includes('runtime_tool_absence_recheck'));
+  assert.ok(evidenceGate.requiredChecks.includes('browser_console_error_budget'));
+  assert.ok(evidenceGate.requiredChecks.includes('playwright_trace_archive'));
+  assert.ok(evidenceGate.requiredChecks.includes('release_signoff_packet'));
+  assert.ok(evidenceGate.requiredChecks.includes('audit_replay_health'));
+  assert.ok(evidenceGate.requiredChecks.includes('controlled_release_runbook'));
 
   const signoffGate = REQUIRED_CONTROLLED_RELEASE_GATES.find((gate) => gate.key === 'release_signoff_packet');
   assert.ok(signoffGate.requiredArtifacts.includes(RELEASE_SIGNOFF_PACKET_ARTIFACT));

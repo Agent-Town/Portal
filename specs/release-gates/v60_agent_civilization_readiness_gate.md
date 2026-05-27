@@ -197,6 +197,7 @@ persistence resilience, and security/product release review.
   store-backed delegated-agent proof evidence, data-retention policy with
   data-retention target gate evidence,
   blocker/exception register evidence,
+  release evidence manifest,
   release observability handoff,
   release operations gate,
   release signoff packet,
@@ -213,6 +214,7 @@ persistence resilience, and security/product release review.
   controlled release, controlled release target gate evidence,
   readiness audit-summary proof, production-safe flags,
   rollback/disable controls, release operations gate,
+  release evidence manifest,
   observability, release observability handoff,
   support runbooks, release support runbook,
   release signoff packet with product, QA, security, privacy, support,

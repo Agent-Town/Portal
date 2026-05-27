@@ -132,12 +132,14 @@ test('V6 release review requires product signoff target gate evidence', () => {
   assert.ok(productGate.requiredArtifacts.includes('docs/ops/V6_AGENT_CIVILIZATION_CONTROLLED_RELEASE_RUNBOOK.md'));
   assert.ok(productGate.requiredArtifacts.includes('server/world_civilization/blocker_exception_register.js'));
   assert.ok(productGate.requiredArtifacts.includes('server/world_civilization/product_signoff_targets.js'));
+  assert.ok(productGate.requiredArtifacts.includes('server/world_civilization/release_evidence_manifest.js'));
   assert.ok(productGate.requiredArtifacts.includes('server/world_civilization/release_observability.js'));
   assert.ok(productGate.requiredArtifacts.includes('server/world_civilization/release_operations.js'));
   assert.ok(productGate.requiredArtifacts.includes('server/world_civilization/release_signoff_packet.js'));
   assert.ok(productGate.requiredArtifacts.includes('server/world_civilization/release_support.js'));
   assert.ok(productGate.requiredArtifacts.includes('tests/world_civilization_blocker_exception_register.test.js'));
   assert.ok(productGate.requiredArtifacts.includes('tests/world_civilization_product_signoff_targets.test.js'));
+  assert.ok(productGate.requiredArtifacts.includes('tests/world_civilization_release_evidence_manifest.test.js'));
   assert.ok(productGate.requiredArtifacts.includes('tests/world_civilization_release_observability.test.js'));
   assert.ok(productGate.requiredArtifacts.includes('tests/world_civilization_release_operations.test.js'));
   assert.ok(productGate.requiredArtifacts.includes('tests/world_civilization_release_signoff_packet.test.js'));
@@ -147,6 +149,7 @@ test('V6 release review requires product signoff target gate evidence', () => {
   assert.ok(productGate.requiredChecks.includes('product_owner_approval'));
   assert.ok(productGate.requiredChecks.includes('qa_release_evidence'));
   assert.ok(productGate.requiredChecks.includes('security_release_evidence'));
+  assert.ok(productGate.requiredChecks.includes('release_evidence_manifest'));
   assert.ok(productGate.requiredChecks.includes('release_signoff_packet'));
   assert.ok(productGate.requiredChecks.includes('qa_owner_signoff'));
   assert.ok(productGate.requiredChecks.includes('security_owner_signoff'));
@@ -172,9 +175,11 @@ test('V6 release review requires product signoff target gate evidence', () => {
   assert.ok(productGate.requiredChecks.includes('post_release_monitoring'));
   assert.ok(productGate.requiredChecks.includes('product_signoff_target_gate'));
   assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_product_signoff_targets.test.js'));
+  assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_release_evidence_manifest.test.js'));
   assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_release_signoff_packet.test.js'));
   assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_blocker_exception_register.test.js'));
   assert.ok(validationGate.requiredChecks.includes('blocker_exception_register'));
+  assert.ok(validationGate.requiredChecks.includes('release_evidence_manifest'));
   assert.ok(validationGate.requiredChecks.includes('release_signoff_packet'));
   assert.ok(validationGate.requiredChecks.includes('product_signoff_target_gate'));
 });

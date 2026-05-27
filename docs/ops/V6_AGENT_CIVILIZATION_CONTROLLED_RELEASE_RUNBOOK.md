@@ -8,6 +8,8 @@ Runtime target matrix: `server/world_civilization/controlled_release_targets.js`
 
 Blocker register: `server/world_civilization/blocker_exception_register.js`
 
+Release evidence manifest: `server/world_civilization/release_evidence_manifest.js`
+
 Observability handoff: `server/world_civilization/release_observability.js`
 
 Support runbook handoff: `server/world_civilization/release_support.js`
@@ -27,10 +29,11 @@ production enablement switch and does not approve player-visible V6.
 
 | Gate | Required Checks | Current Status |
 | --- | --- | --- |
-| Controlled release target gate | Readiness gate closed target, production flag safety target, rollback/disable target, observability target, release observability handoff, release operations target, release signoff packet target, support runbook target, release support runbook, blocker clearance target, blocker/exception register, controlled release window target, canary exit target, emergency disable target, post-release verification target | Pending |
+| Controlled release target gate | Readiness gate closed target, production flag safety target, rollback/disable target, release evidence manifest target, observability target, release observability handoff, release operations target, release signoff packet target, support runbook target, release support runbook, blocker clearance target, blocker/exception register, controlled release window target, canary exit target, emergency disable target, post-release verification target | Pending |
 | V6 readiness gate closed | M0-M17 done, explicit closed V6.0 readiness-gate report from `buildV6ReadinessGateReport()`, readiness report hidden until controlled release, readiness audit-summary proof, release review ready | Pending |
 | Production feature flag safety | Release operations gate, production flag control, default off, admin-only enablement, broad override exclusion, canary cohort, emergency disable | Pending |
 | Rollback and disable controls | Release operations gate, disable plan, rollback owner, rollback window, rollback rehearsal, rollback/disable drill, data preservation, post-disable verification | Pending |
+| Release evidence manifest | Release-candidate environment, command transcripts, targeted Node results, split Playwright results, all-features regression, production override recheck, runtime tool absence recheck, browser console error budget, Playwright trace archive, blocker register, release signoff packet, operations handoff, observability handoff, support handoff, audit/replay health, controlled-release runbook | Pending |
 | Release observability | Audit metrics, Worker Traffic trace, error alerts, privacy-safe logs, feature flag dashboard, monitoring owner, runtime tool absence monitor, support escalation link | Pending |
 | Support runbook | Known issues, support triage, incident response, user communications, rollback contact, support on-call, escalation owners, privacy-safe support view, blocker register link, observability link | Pending |
 | Release signoff packet | Product owner approval, QA owner signoff, security owner signoff, privacy owner signoff, support owner signoff, release manager approval, engineering owner approval, blocker register acceptance, release-candidate packet acceptance, operations handoff acceptance, observability handoff acceptance, support runbook acceptance | Pending |

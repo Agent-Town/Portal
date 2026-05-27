@@ -163,9 +163,20 @@ are present.
 - Product release signoff: player-visible scope, normal gameplay exposure
   denial, product owner approval, QA release evidence, security release
   evidence, rollback plan, disable plan, support runbook, user comms plan,
-  observability handoff, release observability handoff, release signoff packet,
-  blocker/exception register, go/no-go record, post-release monitoring, and
-  product signoff target gate.
+  observability handoff, release observability handoff, release evidence
+  manifest, release signoff packet, blocker/exception register, go/no-go
+  record, post-release monitoring, and product signoff target gate.
+- Release evidence manifest: `server/world_civilization/release_evidence_manifest.js`
+  and `tests/world_civilization_release_evidence_manifest.test.js` record the
+  research-only archive manifest for release-candidate environment, command
+  transcripts, targeted Node results, split Playwright results, all-features
+  regression, production override recheck, runtime tool absence recheck,
+  browser console error budget, Playwright trace archive, blocker/exception
+  register, release signoff packet, operations handoff, observability handoff,
+  support handoff, audit/replay health, and controlled-release runbook evidence
+  while running no validation, approving no release, opening no canary,
+  publishing no comms, exposing no runtime civic tools, and mutating no world
+  state.
 - Release signoff packet: `server/world_civilization/release_signoff_packet.js`
   and `tests/world_civilization_release_signoff_packet.test.js` record the
   research-only cross-functional packet for product owner approval, QA owner

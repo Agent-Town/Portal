@@ -8,6 +8,7 @@ Runtime contracts:
 
 - `server/world_civilization/readiness_gate.js`
 - `server/world_civilization/blocker_exception_register.js`
+- `server/world_civilization/release_evidence_manifest.js`
 - `server/world_civilization/release_observability.js`
 - `server/world_civilization/release_operations.js`
 - `server/world_civilization/release_signoff_packet.js`
@@ -46,6 +47,14 @@ release or enabling production.
   carries the M16/M17 audit-summary proof checks.
 - Production feature flag safety.
 - Rollback and disable controls.
+- release evidence manifest covering release-candidate environment, command
+  transcripts, targeted Node results, split Playwright results, all-features
+  regression, production override recheck, runtime tool absence recheck, browser
+  console error budget, Playwright trace archive, blocker register, signoff
+  packet, operations handoff, observability handoff, support handoff,
+  audit/replay health, and controlled-release runbook evidence while running no
+  validation, approving no release, opening no canary, publishing no comms, and
+  exposing no runtime civic tools.
 - Release operations gate covering production flag control, release window,
   go/no-go record, canary scope, canary exit, emergency disable, rollback
   window, rollback/disable drill, post-release verification, normal gameplay
