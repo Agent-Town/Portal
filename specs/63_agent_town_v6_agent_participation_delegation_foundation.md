@@ -39,13 +39,13 @@ civic store. Exact replays for an already consumed delegation/idempotency key
 remain valid so idempotent route/tool retries do not require fresh budget, but
 new idempotency keys still fail once the delegation budget is exhausted.
 
-`server/world_civilization/worker_tool_adapter.js` and
+`server/world_civilization/routes.js`,
+`server/world_civilization/worker_tool_adapter.js`, and
 `server/world_civilization/worker_vote_adapter.js` now connect that foundation
-to the internal research-only worker proposal and worker vote receipts. They
-consume scoped delegated action budget exactly once for successful
-`proposal_drafting` and `vote_advice` receipts, return duplicate usage rows for
-exact replays, and still expose no runtime civic tools or player-visible V6
-mechanics.
+to hidden research-only proposal and vote receipts. They consume scoped
+delegated action budget exactly once for successful `proposal_drafting` and
+`vote_advice` receipts, return duplicate usage rows for exact replays, and
+still expose no runtime civic tools or player-visible V6 mechanics.
 
 The process-level restart proof currently covers creation of scoped advice and
 explicit civic-execution delegations, idempotent budget consumption, and
@@ -148,8 +148,8 @@ Indexes cover delegation replay, principal/scope replay, and agent/scope replay.
 M12 cannot move to `done` until:
 
 - worker-first V6 tools consult delegation policy instead of backend shortcuts;
-- internal worker proposal/vote adapters continue to consume delegated action
-  budgets exactly once for successful receipts;
+- hidden research routes and internal worker proposal/vote adapters continue to
+  consume delegated action budgets exactly once for successful receipts;
 - action budgets are consulted by worker-first tools and route-edge guards
   before any delegated action runs;
 - delegated vote/advice/proposal scopes are enforced at every route/tool edge;

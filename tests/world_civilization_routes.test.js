@@ -270,6 +270,7 @@ test('V6 proposal submission route stores human route submissions without exposi
       assert.equal(response.body.proposal.proposalId, 'proposal_route_public_works_001');
       assert.equal(response.body.proposal.status, 'drafted');
       assert.equal(response.body.proposal.moderationStatus, 'needs_review');
+      assert.equal(response.body.delegatedActionUse, null);
       assert.equal(response.body.submissionEnvelope.accepted, true);
       assert.equal(response.body.submissionEnvelope.sourceSurface, 'human_route_submission');
       assert.equal(replay.status, 200, JSON.stringify(replay.body));
@@ -358,7 +359,7 @@ test('V6 proposal submission route fails closed before persistence without same-
 
 test('V6 proposal submission route accepts worker tool submission only with worker origin and delegation', async () => {
   await withStores(async ({ auditLedger, delegationStore, proposalStore }) => {
-    delegationStore.recordDelegation(delegation(), { nowMs: 1_779_990_000_000 });
+    delegationStore.recordDelegation(delegation({ maxActions: 1 }), { nowMs: 1_779_990_000_000 });
     await withCivilizationServer({
       env: routeEnv(),
       proposalStore,
@@ -391,14 +392,120 @@ test('V6 proposal submission route accepts worker tool submission only with work
         }
       };
       const response = await postJson(baseUrl, PROPOSAL_SUBMISSION_ROUTE, body, sameOriginHeaders(baseUrl));
+      const replay = await postJson(baseUrl, PROPOSAL_SUBMISSION_ROUTE, body, sameOriginHeaders(baseUrl));
 
       assert.equal(response.status, 200, JSON.stringify(response.body));
       assert.equal(response.body.proposal.proposerKind, 'agent');
       assert.equal(response.body.proposal.proposerAgentId, AGENT_ID);
+      assert.equal(response.body.delegatedActionUse.usageId, 'delegationuse_proposal_route_agent_public_works_001');
+      assert.equal(response.body.delegatedActionUse.delegationId, 'delegation_route_proposal_001');
+      assert.equal(response.body.delegatedActionUse.principalAccountId, ACCOUNT_ID);
+      assert.equal(response.body.delegatedActionUse.delegateAgentId, AGENT_ID);
+      assert.equal(response.body.delegatedActionUse.scope, 'proposal_drafting');
+      assert.equal(response.body.delegatedActionUse.actionRef, 'proposal_route_agent_public_works_001');
+      assert.equal(response.body.delegatedActionUse.idempotencyKey, 'idem_route_agent_proposal_001');
+      assert.equal(response.body.delegatedActionUse.duplicate, false);
+      assert.equal(replay.status, 200, JSON.stringify(replay.body));
+      assert.equal(replay.body.proposal.duplicate, true);
+      assert.equal(replay.body.delegatedActionUse.duplicate, true);
       assert.equal(response.body.submissionEnvelope.workerEvidence.origin, 'openclaw_lite_worker');
       assert.equal(response.body.submissionEnvelope.mutationSecurity.ok, true);
       assert.equal(proposalStore.count(), 1);
       assert.equal(auditLedger.replay().filter((row) => row.entry.actionType === 'proposal.created').length, 1);
+      assert.equal(auditLedger.replay().filter((row) => row.entry.actionType === 'delegation.action_consumed').length, 1);
+      assert.equal(delegationStore.listDelegatedActionUses({
+        delegationId: 'delegation_route_proposal_001'
+      }).length, 1);
+
+      const denied = await postJson(baseUrl, PROPOSAL_SUBMISSION_ROUTE, {
+        ...body,
+        proposal: proposal({
+          proposalId: 'proposal_route_agent_public_works_002',
+          proposer: {
+            kind: 'agent',
+            accountId: ACCOUNT_ID,
+            agentId: AGENT_ID
+          },
+          scope: {
+            kind: 'public_works',
+            targetId: 'district_route_bridge_002'
+          },
+          affectedPublicState: ['public_works:route_bridge_002'],
+          idempotencyKey: 'idem_route_agent_proposal_002',
+          rollbackPlan: {
+            planId: 'rollbackplan_route_public_works_002',
+            strategy: 'Restore previous route bridge snapshot.',
+            canRollback: true,
+            irreversibleEffects: [],
+            maxRollbackMs: 86_400_000
+          }
+        })
+      }, sameOriginHeaders(baseUrl));
+
+      assert.equal(denied.status, 403);
+      assert.equal(denied.body.ok, false);
+      assert.equal(denied.body.error.code, 'CIVIC_PROPOSAL_SUBMISSION_DENIED');
+      assert.equal(proposalStore.count(), 1);
+      assert.equal(delegationStore.listDelegatedActionUses({
+        delegationId: 'delegation_route_proposal_001'
+      }).length, 1);
+    });
+  });
+});
+
+test('V6 proposal submission route rejects storage conflicts before delegated budget consumption', async () => {
+  await withStores(async ({ auditLedger, delegationStore, proposalStore }) => {
+    delegationStore.recordDelegation(delegation({ maxActions: 2 }), { nowMs: 1_779_990_000_000 });
+    await withCivilizationServer({
+      env: routeEnv(),
+      proposalStore,
+      delegationStore
+    }, async (baseUrl) => {
+      const body = {
+        sourceSurface: 'worker_tool_submission',
+        actor: { agentId: AGENT_ID },
+        proposal: proposal({
+          proposalId: 'proposal_route_agent_public_works_001',
+          proposer: {
+            kind: 'agent',
+            accountId: ACCOUNT_ID,
+            agentId: AGENT_ID
+          },
+          idempotencyKey: 'idem_route_agent_proposal_001'
+        }),
+        approvalReceiptId: 'approval_route_agent_proposal_001',
+        delegation: {
+          delegationId: 'delegation_route_proposal_001',
+          principalAccountId: ACCOUNT_ID,
+          delegateAgentId: AGENT_ID,
+          approvalReceiptId: 'receipt_route_agent_proposal_001'
+        },
+        workerEvidence: {
+          origin: 'openclaw_lite_worker',
+          skillContextLoaded: true,
+          workerTrafficTrace: true,
+          backendShortcut: false
+        }
+      };
+      const response = await postJson(baseUrl, PROPOSAL_SUBMISSION_ROUTE, body, sameOriginHeaders(baseUrl));
+      const conflict = await postJson(baseUrl, PROPOSAL_SUBMISSION_ROUTE, {
+        ...body,
+        proposal: {
+          ...body.proposal,
+          idempotencyKey: 'idem_route_agent_proposal_conflict_001'
+        }
+      }, sameOriginHeaders(baseUrl));
+
+      assert.equal(response.status, 200, JSON.stringify(response.body));
+      assert.equal(conflict.status, 409, JSON.stringify(conflict.body));
+      assert.equal(conflict.body.ok, false);
+      assert.equal(conflict.body.error.code, 'CIVIC_PROPOSAL_ID_CONFLICT');
+      assert.equal(proposalStore.count(), 1);
+      assert.equal(auditLedger.replay().filter((row) => row.entry.actionType === 'proposal.created').length, 1);
+      assert.equal(auditLedger.replay().filter((row) => row.entry.actionType === 'delegation.action_consumed').length, 1);
+      assert.equal(delegationStore.listDelegatedActionUses({
+        delegationId: 'delegation_route_proposal_001'
+      }).length, 1);
     });
   });
 });
@@ -467,6 +574,7 @@ test('V6 vote route records human vote receipts without applying outcomes', asyn
       assert.equal(response.body.routeAuthorization.routeSurface, 'human_vote_route');
       assert.equal(response.body.routeAuthorization.recordsVote, false);
       assert.equal(response.body.routeAuthorization.appliesVoteOutcome, false);
+      assert.equal(response.body.delegatedActionUse, null);
       assert.equal(replay.status, 200, JSON.stringify(replay.body));
       assert.equal(replay.body.vote.duplicate, true);
       assert.equal(voteStore.count(), 1);
@@ -563,7 +671,8 @@ test('V6 vote route accepts delegated agent vote advice only with store-backed p
     delegationStore.recordDelegation(delegation({
       delegationId: 'delegation_route_vote_001',
       scope: 'vote_advice',
-      approvalReceiptId: 'receipt_route_agent_vote_001'
+      approvalReceiptId: 'receipt_route_agent_vote_001',
+      maxActions: 1
     }), { nowMs: 1_779_991_200_000 });
     await withCivilizationServer({
       env: routeEnv(),
@@ -571,7 +680,7 @@ test('V6 vote route accepts delegated agent vote advice only with store-backed p
       delegationStore,
       voteStore
     }, async (baseUrl) => {
-      const response = await postJson(baseUrl, VOTE_CAST_ROUTE, {
+      const body = {
         routeSurface: 'delegated_agent_vote_route',
         actor: { agentId: AGENT_ID },
         vote: vote({
@@ -590,16 +699,145 @@ test('V6 vote route accepts delegated agent vote advice only with store-backed p
           delegateAgentId: AGENT_ID,
           approvalReceiptId: 'receipt_route_agent_vote_001'
         }
-      }, sameOriginHeaders(baseUrl));
+      };
+      const response = await postJson(baseUrl, VOTE_CAST_ROUTE, body, sameOriginHeaders(baseUrl));
+      const replay = await postJson(baseUrl, VOTE_CAST_ROUTE, body, sameOriginHeaders(baseUrl));
 
       assert.equal(response.status, 200, JSON.stringify(response.body));
       assert.equal(response.body.vote.voteId, 'vote_route_agent_public_works_001');
       assert.equal(response.body.vote.authorizationKind, 'server_attested_delegation');
+      assert.equal(response.body.delegatedActionUse.usageId, 'delegationuse_vote_route_agent_public_works_001');
+      assert.equal(response.body.delegatedActionUse.delegationId, 'delegation_route_vote_001');
+      assert.equal(response.body.delegatedActionUse.principalAccountId, ACCOUNT_ID);
+      assert.equal(response.body.delegatedActionUse.delegateAgentId, AGENT_ID);
+      assert.equal(response.body.delegatedActionUse.scope, 'vote_advice');
+      assert.equal(response.body.delegatedActionUse.actionRef, 'vote_route_agent_public_works_001');
+      assert.equal(response.body.delegatedActionUse.idempotencyKey, 'idem_vote_route_agent_public_works_001');
+      assert.equal(response.body.delegatedActionUse.duplicate, false);
+      assert.equal(replay.status, 200, JSON.stringify(replay.body));
+      assert.equal(replay.body.vote.duplicate, true);
+      assert.equal(replay.body.delegatedActionUse.duplicate, true);
       assert.equal(response.body.routeAuthorization.routeSurface, 'delegated_agent_vote_route');
       assert.equal(response.body.routeAuthorization.mutationSecurity.delegationProofStatus, 'valid');
       assert.equal(response.body.appliesVoteOutcome, false);
       assert.equal(voteStore.count(), 1);
       assert.equal(auditLedger.replay().filter((row) => row.entry.actionType === 'vote.recorded').length, 1);
+      assert.equal(auditLedger.replay().filter((row) => row.entry.actionType === 'delegation.action_consumed').length, 1);
+      assert.equal(delegationStore.listDelegatedActionUses({
+        delegationId: 'delegation_route_vote_001'
+      }).length, 1);
+
+      proposalStore.draftProposal(proposal({
+        proposalId: 'proposal_route_public_works_002',
+        idempotencyKey: 'idem_route_proposal_002',
+        scope: {
+          kind: 'public_works',
+          targetId: 'district_route_bridge_002'
+        },
+        affectedPublicState: ['public_works:route_bridge_002'],
+        rollbackPlan: {
+          planId: 'rollbackplan_route_public_works_002',
+          strategy: 'Restore previous route bridge snapshot.',
+          canRollback: true,
+          irreversibleEffects: [],
+          maxRollbackMs: 86_400_000
+        }
+      }), { nowMs: 1_779_991_300_000 });
+      proposalStore.recordProposalReview(moderationDecision({
+        decisionId: 'moderation_route_public_works_002',
+        subjectRef: 'proposal_route_public_works_002'
+      }), { nowMs: 1_779_991_400_000 });
+      const denied = await postJson(baseUrl, VOTE_CAST_ROUTE, {
+        ...body,
+        vote: vote({
+          voteId: 'vote_route_agent_public_works_002',
+          proposalId: 'proposal_route_public_works_002',
+          authorization: {
+            kind: 'server_attested_delegation',
+            subjectAccountId: ACCOUNT_ID,
+            serverVerified: true
+          },
+          receiptId: 'receipt_vote_route_agent_public_works_002',
+          idempotencyKey: 'idem_vote_route_agent_public_works_002',
+          eligibilityProof: {
+            eligible: true,
+            ruleId: 'rule_route_public_works_voter_002'
+          }
+        })
+      }, sameOriginHeaders(baseUrl));
+
+      assert.equal(denied.status, 403);
+      assert.equal(denied.body.ok, false);
+      assert.equal(denied.body.error.code, 'V6_CIVIC_VOTE_ROUTE_AUTHORIZATION_DENIED');
+      assert.equal(voteStore.count(), 1);
+      assert.equal(delegationStore.listDelegatedActionUses({
+        delegationId: 'delegation_route_vote_001'
+      }).length, 1);
+    });
+  });
+});
+
+test('V6 vote route rejects receipt conflicts before delegated budget consumption', async () => {
+  await withStores(async ({ auditLedger, delegationStore, proposalStore, voteStore }) => {
+    proposalStore.draftProposal(proposal(), { nowMs: 1_779_991_000_000 });
+    proposalStore.recordProposalReview(moderationDecision(), { nowMs: 1_779_991_100_000 });
+    delegationStore.recordDelegation(delegation({
+      delegationId: 'delegation_route_vote_001',
+      scope: 'vote_advice',
+      approvalReceiptId: 'receipt_route_agent_vote_001',
+      maxActions: 2
+    }), { nowMs: 1_779_991_200_000 });
+    await withCivilizationServer({
+      env: routeEnv(),
+      proposalStore,
+      delegationStore,
+      voteStore
+    }, async (baseUrl) => {
+      const body = {
+        routeSurface: 'delegated_agent_vote_route',
+        actor: { agentId: AGENT_ID },
+        vote: vote({
+          voteId: 'vote_route_agent_public_works_001',
+          authorization: {
+            kind: 'server_attested_delegation',
+            subjectAccountId: ACCOUNT_ID,
+            serverVerified: true
+          },
+          receiptId: 'receipt_vote_route_agent_public_works_001',
+          idempotencyKey: 'idem_vote_route_agent_public_works_001'
+        }),
+        delegation: {
+          delegationId: 'delegation_route_vote_001',
+          principalAccountId: ACCOUNT_ID,
+          delegateAgentId: AGENT_ID,
+          approvalReceiptId: 'receipt_route_agent_vote_001'
+        }
+      };
+      const response = await postJson(baseUrl, VOTE_CAST_ROUTE, body, sameOriginHeaders(baseUrl));
+      const conflict = await postJson(baseUrl, VOTE_CAST_ROUTE, {
+        ...body,
+        vote: vote({
+          voteId: 'vote_route_agent_public_works_002',
+          authorization: {
+            kind: 'server_attested_delegation',
+            subjectAccountId: ACCOUNT_ID,
+            serverVerified: true
+          },
+          receiptId: 'receipt_vote_route_agent_public_works_002',
+          idempotencyKey: 'idem_vote_route_agent_public_works_002'
+        })
+      }, sameOriginHeaders(baseUrl));
+
+      assert.equal(response.status, 200, JSON.stringify(response.body));
+      assert.equal(conflict.status, 409, JSON.stringify(conflict.body));
+      assert.equal(conflict.body.ok, false);
+      assert.equal(conflict.body.error.code, 'CIVIC_VOTE_ALREADY_RECORDED');
+      assert.equal(voteStore.count(), 1);
+      assert.equal(auditLedger.replay().filter((row) => row.entry.actionType === 'vote.recorded').length, 1);
+      assert.equal(auditLedger.replay().filter((row) => row.entry.actionType === 'delegation.action_consumed').length, 1);
+      assert.equal(delegationStore.listDelegatedActionUses({
+        delegationId: 'delegation_route_vote_001'
+      }).length, 1);
     });
   });
 });

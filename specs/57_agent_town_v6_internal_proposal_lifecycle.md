@@ -92,11 +92,12 @@ The submission contract remains hidden from runtime `/api/world/tools`, normal
 gameplay, and player-visible proposal UI. It does not execute effects or expose
 V6 civic tools.
 
-The internal worker proposal adapter consumes `proposal_drafting` delegated
-action budget exactly once for successful receipts. Exact replays return the
-existing proposal and delegated usage row, while a second distinct proposal is
-denied once the delegation budget is exhausted and no extra proposal is
-persisted.
+The hidden worker submission route and internal worker proposal adapter consume
+`proposal_drafting` delegated action budget exactly once for successful
+receipts. Exact replays return the existing proposal and delegated usage row,
+while a second distinct proposal is denied once the delegation budget is
+exhausted and no extra proposal is persisted. Proposal receipt storage conflicts
+are rejected before delegated budget is consumed.
 
 `server/world_civilization/routes.js` mounts the research-only
 `POST /api/world/civilization/proposals/submit` route. The route is disabled by
@@ -105,7 +106,10 @@ identity resolved from the existing server session, requires
 `FEATURE_WORLD_V60_AGENT_CIVILIZATION`, and composes the M5 civic
 mutation-security envelope with same-origin, CSRF-reviewed, session/wallet,
 idempotency, rate-limit, and delegated-agent evidence before calling
-`submitProposalForReview()`. `server/world_civilization/store_wiring.js` may
+`submitProposalForReview()`. Hidden worker-tool route submissions consume
+`proposal_drafting` delegated action budget before proposal persistence, and
+exact retries reuse the existing delegated usage row; proposal ID conflicts are
+preflighted before delegated budget is consumed. `server/world_civilization/store_wiring.js` may
 provide env-gated SQLite proposal/audit/delegation stores only when
 `V6_CIVIC_PROPOSAL_STORE_WIRING_ENABLED=1`,
 `V6_CIVIC_AUDIT_SQLITE_PATH`, and `V6_CIVIC_PROPOSAL_SQLITE_PATH` are present;

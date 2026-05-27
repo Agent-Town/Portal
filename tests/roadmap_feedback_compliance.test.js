@@ -283,6 +283,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /server\/world_civilization\/store_wiring\.js/);
   assert.match(plan, /V6_CIVIC_PROPOSAL_SUBMISSION_ROUTE_ENABLED/);
   assert.match(plan, /V6_CIVIC_PROPOSAL_STORE_WIRING_ENABLED/);
+  assert.match(plan, /consumes `proposal_drafting` delegated action budget idempotently for hidden worker-tool route receipts/);
   assert.match(plan, /browser worker registration/);
   assert.match(plan, /same-origin\/CSRF-reviewed M5 security/);
   assert.match(plan, /getProposalReviewQueueSnapshot\(\)/);
@@ -301,6 +302,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(proposalSpec, /POST \/api\/world\/civilization\/proposals\/submit/);
   assert.match(proposalSpec, /V6_CIVIC_PROPOSAL_SUBMISSION_ROUTE_ENABLED/);
   assert.match(proposalSpec, /V6_CIVIC_PROPOSAL_STORE_WIRING_ENABLED/);
+  assert.match(proposalSpec, /Hidden worker-tool route submissions consume\s+`proposal_drafting` delegated action budget/);
   assert.match(proposalSpec, /CIVIC_PROPOSAL_SUBMISSION_DENIED/);
   assert.match(proposalSpec, /worker_tool_adapter\.js/);
   assert.match(proposalSpec, /proposal_drafting/);
@@ -321,7 +323,10 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(proposalRouteSource, /createWorldCivilizationRouter/);
   assert.match(proposalRouteSource, /V6_CIVIC_PROPOSAL_SUBMISSION_ROUTE_ENABLED/);
   assert.match(proposalRouteSource, /resolveProposalStores/);
+  assert.match(proposalRouteSource, /buildV6ProposalSubmissionEnvelope/);
   assert.match(proposalRouteSource, /buildV6CivicMutationSecurityEnvelope/);
+  assert.match(proposalRouteSource, /consumeRouteDelegatedAction/);
+  assert.match(proposalRouteSource, /delegatedActionUse/);
   assert.match(proposalRouteSource, /submitProposalForReview/);
   assert.match(proposalStoreWiringSource, /V6_CIVIC_PROPOSAL_STORE_WIRING_ENABLED/);
   assert.match(proposalStoreWiringSource, /V6_CIVIC_AUDIT_SQLITE_PATH/);
@@ -374,13 +379,17 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(readinessSource, /tests\/world_civilization_worker_vote_adapter\.test\.js/);
   assert.match(releaseReview, /worker-origin proposal tool adapter/);
   assert.match(releaseReview, /worker-origin vote tool adapter/);
+  assert.match(releaseReview, /proposal route reopen/);
+  assert.match(releaseReview, /idempotent `proposal_drafting` delegated action-budget consumption/);
   assert.match(releaseReview, /missing worker observability/);
   assert.match(releaseReview, /missing delegation/);
   assert.match(releaseReview, /browser worker registration/);
   assert.match(releaseReviewSource, /server\/world_civilization\/worker_tool_adapter\.js/);
   assert.match(releaseReviewSource, /server\/world_civilization\/worker_vote_adapter\.js/);
+  assert.match(releaseReviewSource, /server\/world_civilization\/routes\.js/);
   assert.match(releaseReviewSource, /tests\/world_civilization_worker_tool_adapter\.test\.js/);
   assert.match(releaseReviewSource, /tests\/world_civilization_worker_vote_adapter\.test\.js/);
+  assert.match(releaseReviewSource, /tests\/world_civilization_routes\.test\.js/);
   assert.match(plan, /M8 Vote authorization and delegation \| `in_progress`/);
   assert.match(plan, /evaluateVoteApprovalPolicy\(\)/);
   assert.match(plan, /buildV6VoteRouteAuthorizationEnvelope\(\)/);
@@ -390,6 +399,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /V6_CIVIC_VOTE_ROUTE_ENABLED/);
   assert.match(plan, /V6_CIVIC_VOTE_STORE_WIRING_ENABLED/);
   assert.match(plan, /V6_CIVIC_VOTE_SQLITE_PATH/);
+  assert.match(plan, /consumes `vote_advice` delegated action budget idempotently for hidden delegated-agent route receipts/);
   assert.match(plan, /worker-tool vote registration/);
   assert.match(plan, /castVoteFromWorkerTool\(\)/);
   assert.match(plan, /server\/world_civilization\/voting_templates\.js/);
@@ -412,6 +422,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(voteSpec, /POST \/api\/world\/civilization\/votes\/cast/);
   assert.match(voteSpec, /V6_CIVIC_VOTE_ROUTE_ENABLED/);
   assert.match(voteSpec, /V6_CIVIC_VOTE_STORE_WIRING_ENABLED/);
+  assert.match(voteSpec, /consumes `vote_advice`\s+delegated action budget idempotently/);
   assert.match(voteSpec, /buildV6VoteRouteAuthorizationEnvelope\(\)/);
   assert.match(voteSpec, /assertV6VoteRouteAuthorizationEnvelopeSafe\(\)/);
   assert.match(voteSpec, /store-backed `vote_advice` delegation proof/);
@@ -427,6 +438,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(releaseReview, /hidden vote route\/store wiring/);
   assert.match(releaseReview, /V6_CIVIC_VOTE_ROUTE_ENABLED/);
   assert.match(releaseReview, /V6_CIVIC_VOTE_STORE_WIRING_ENABLED/);
+  assert.match(releaseReview, /consumes `vote_advice` delegated action budget idempotently/);
   assert.match(releaseReview, /worker-tool vote registration/);
   assert.match(releaseReview, /V6_CIVIC_WORKER_VOTE_ADAPTER_ENABLED/);
   assert.match(releaseReview, /vote authorization readiness gate/);
@@ -713,7 +725,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(releaseReview, /research-only Express proposal submission route/);
   assert.match(releaseReview, /env-gated SQLite proposal\/audit\/delegation store wiring/);
   assert.match(releaseReview, /fail-closed route\/adapter tests/);
-  assert.match(releaseReview, /missing route flag, missing release store wiring, denied same-origin\/CSRF evidence, missing worker observability, missing delegation, and exhausted delegated action budgets/);
+  assert.match(releaseReview, /missing route flag, missing release store wiring, denied same-origin\/CSRF evidence, missing worker observability, missing delegation, exhausted delegated action budgets, and proposal receipt conflicts without extra budget usage/);
   assert.match(releaseReview, /browser worker registration, production route-store operations review/);
   assert.match(releaseReviewSource, /server\/world_civilization\/routes\.js/);
   assert.match(releaseReviewSource, /server\/world_civilization\/store_wiring\.js/);
@@ -976,6 +988,7 @@ test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () 
   const votingTemplateSource = read('server/world_civilization/voting_templates.js');
   const effectSource = read('server/world_civilization/effects.js');
   const delegationSource = read('server/world_civilization/delegations.js');
+  const proposalRouteSource = read('server/world_civilization/routes.js');
 
   assert.match(plan, /server\/world_civilization\/governance_preflight\.js/);
   assert.match(plan, /vote approval policy, human approval receipt/);
@@ -1005,6 +1018,8 @@ test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () 
   assert.match(effectSpec, /irreversible-action review/);
   assert.match(effectSpec, /conservation tests/);
   assert.match(delegationSpec, /buildV6AgentParticipationEnforcementGate\(\)/);
+  assert.match(delegationSpec, /server\/world_civilization\/routes\.js/);
+  assert.match(delegationSpec, /hidden research-only proposal and vote receipts/);
   assert.match(delegationSpec, /route-edge expiry checks/);
   assert.match(delegationSpec, /principal wallet\/session binding/);
   assert.match(delegationSpec, /no public autonomous mutation/);
@@ -1022,6 +1037,7 @@ test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () 
   assert.match(gate, /typed rollback handler evidence/);
   assert.match(gate, /appliesWorldState: false/);
   assert.match(gate, /M12\s+research-only enforcement gate/);
+  assert.match(gate, /hidden research proposal\/vote routes plus internal worker proposal\/vote\s+adapters/);
   assert.match(gate, /route-edge scope\/expiry\/budget\/\s+revocation checks/);
   assert.match(gate, /mutatesWorldState: false/);
   assert.match(gate, /`proposal\.reviewed`/);
@@ -1035,6 +1051,7 @@ test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () 
   assert.match(releaseReview, /effect execution gate/);
   assert.match(releaseReview, /Agent participation enforcement review/);
   assert.match(releaseReview, /agent participation enforcement gate/);
+  assert.match(releaseReview, /hidden research proposal\/vote routes and internal worker proposal\/vote adapters/);
   assert.match(skillLine, /V6 internal proposal lifecycle foundation/);
   assert.match(skillLine, /V6 vote authorization foundation/);
   assert.match(skillLine, /M8 readiness gate/);
@@ -1050,6 +1067,7 @@ test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () 
   assert.match(skillLine, /M11 effect execution gate/);
   assert.match(skillLine, /applied\/rollback audit evidence/);
   assert.match(skillLine, /M12 enforcement gate/);
+  assert.match(skillLine, /hidden research routes and internal worker proposal\/vote adapters/);
   assert.match(skillLine, /no public autonomous mutation/);
   assert.match(skillLine, /loose `allowDelegatedExecution` bypasses/);
   assert.match(skillLine, /tests\/world_civilization_votes\.test\.js/);
@@ -1076,6 +1094,8 @@ test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () 
   assert.match(delegationSource, /route_edge_budget_check/);
   assert.match(delegationSource, /no_public_autonomous_mutation/);
   assert.match(delegationSource, /V6_AGENT_PARTICIPATION_ENFORCEMENT_RELEASE_READY_FORBIDDEN/);
+  assert.match(proposalRouteSource, /consumeRouteDelegatedAction/);
+  assert.match(proposalRouteSource, /delegatedActionUse/);
 });
 
 test('world-grid CSRF policy is tracked as an M5 durable foundation', () => {

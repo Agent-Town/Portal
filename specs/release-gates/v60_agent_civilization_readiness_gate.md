@@ -123,8 +123,10 @@ persistence resilience, and security/product release review.
   `POST /api/world/civilization/proposals/submit` must stay disabled by default
   behind `V6_CIVIC_PROPOSAL_SUBMISSION_ROUTE_ENABLED`, require explicit V6
   feature opt-in, require same-origin and CSRF-reviewed M5 mutation-security
-  evidence, persist nothing on denial, expose no runtime civic tools, and fail
-  closed when the default app mount lacks release-grade store wiring. Any
+  evidence, consume `proposal_drafting` delegated action budget idempotently
+  for hidden worker-tool route receipts, persist no proposal rows on denial,
+  reject proposal receipt conflicts before delegated budget consumption,
+  expose no runtime civic tools, and fail closed when the default app mount lacks release-grade store wiring. Any
   proposal/audit/delegation SQLite store wiring through
   `server/world_civilization/store_wiring.js` must also stay disabled by default
   behind `V6_CIVIC_PROPOSAL_STORE_WIRING_ENABLED`, require explicit SQLite paths,
@@ -300,8 +302,10 @@ persistence resilience, and security/product release review.
   `V6_CIVIC_VOTE_ROUTE_ENABLED`, with optional SQLite wiring in
   `server/world_civilization/store_wiring.js` behind
   `V6_CIVIC_VOTE_STORE_WIRING_ENABLED` and `V6_CIVIC_VOTE_SQLITE_PATH`, and it
-  records only vote receipts after the route-edge envelope authorizes the
-  request; `server/world_civilization/voting_templates.js`
+  consumes `vote_advice` delegated action budget idempotently for hidden
+  delegated-agent route receipts and records only vote receipts after the
+  route-edge envelope authorizes the request; vote receipt conflicts must be
+  rejected before delegated budget consumption; `server/world_civilization/voting_templates.js`
   adds research-only per-institution voting templates plus a
   `buildV6VotingTemplateReviewReport()` that verifies scope coverage,
   route-surface coverage, public-audit text safety, no runtime exposure, no
@@ -395,10 +399,11 @@ persistence resilience, and security/product release review.
   audit rows carrying privacy-safe before/after lifecycle summaries; governance
   preflight now validates delegation proof read-only
   while leaving budget unconsumed and delegated preparation blocked, and the
-  internal worker proposal/vote adapters now consume scoped delegated budget
-  idempotently for successful receipts. Release
-  still requires worker/tool enforcement, expiry, budget, and revocation checks
-  at every route edge, and principal wallet/session authorization. The M12
+  hidden research proposal/vote routes plus internal worker proposal/vote
+  adapters now consume scoped delegated budget idempotently for successful
+  receipts. Release
+  still requires delegated effect execution integration, browser worker/runtime
+  signoff, and principal wallet/session authorization. The M12
   research-only enforcement gate in `server/world_civilization/delegations.js`
   must require worker-tool scope enforcement, route-edge scope/expiry/budget/
   revocation checks, principal wallet/session binding, idempotent budget

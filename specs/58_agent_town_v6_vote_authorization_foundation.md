@@ -102,9 +102,11 @@ flag is enabled, and explicit vote stores are provided directly or through
 `V6_CIVIC_VOTE_SQLITE_PATH`.
 
 The route builds the M5 civic mutation-security envelope, passes the vote
-through `buildV6VoteRouteAuthorizationEnvelope()`, and records a vote receipt
-only after the route-edge envelope authorizes the request. It supports the
-hidden human and delegated-agent vote route surfaces. The
+through `buildV6VoteRouteAuthorizationEnvelope()`, consumes `vote_advice`
+delegated action budget idempotently for delegated-agent route receipts, and
+records a vote receipt only after the route-edge envelope authorizes the
+request. Vote receipt conflicts are rejected before delegated budget is
+consumed. It supports the hidden human and delegated-agent vote route surfaces. The
 `worker_tool_vote_surface` remains reserved for the OpenClaw Lite worker adapter
 and is not HTTP-route callable. The route fails closed without
 same-origin/CSRF-reviewed session and wallet evidence, and does not publish

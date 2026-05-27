@@ -329,10 +329,16 @@ const REQUIRED_REVIEW_GATES = [
       'server/world_civilization/delegations.js',
       'server/world_civilization/governance_preflight.js',
       'server/world_civilization/mutation_security.js',
+      'server/world_civilization/routes.js',
+      'server/world_civilization/worker_tool_adapter.js',
+      'server/world_civilization/worker_vote_adapter.js',
       'tests/world_civilization_delegations.test.js',
       'tests/world_civilization_delegation_process_restart.test.js',
       'tests/world_civilization_governance_preflight.test.js',
-      'tests/world_civilization_mutation_security.test.js'
+      'tests/world_civilization_mutation_security.test.js',
+      'tests/world_civilization_routes.test.js',
+      'tests/world_civilization_worker_tool_adapter.test.js',
+      'tests/world_civilization_worker_vote_adapter.test.js'
     ],
     requiredChecks: [
       'worker_tool_scope_enforcement',

@@ -484,7 +484,13 @@ test('V6 release review requires agent participation route-edge enforcement evid
   assert.ok(agentGate.requiredArtifacts.includes('server/world_civilization/delegations.js'));
   assert.ok(agentGate.requiredArtifacts.includes('server/world_civilization/governance_preflight.js'));
   assert.ok(agentGate.requiredArtifacts.includes('server/world_civilization/mutation_security.js'));
+  assert.ok(agentGate.requiredArtifacts.includes('server/world_civilization/routes.js'));
+  assert.ok(agentGate.requiredArtifacts.includes('server/world_civilization/worker_tool_adapter.js'));
+  assert.ok(agentGate.requiredArtifacts.includes('server/world_civilization/worker_vote_adapter.js'));
   assert.ok(agentGate.requiredArtifacts.includes('tests/world_civilization_delegations.test.js'));
+  assert.ok(agentGate.requiredArtifacts.includes('tests/world_civilization_routes.test.js'));
+  assert.ok(agentGate.requiredArtifacts.includes('tests/world_civilization_worker_tool_adapter.test.js'));
+  assert.ok(agentGate.requiredArtifacts.includes('tests/world_civilization_worker_vote_adapter.test.js'));
   assert.ok(agentGate.requiredChecks.includes('worker_tool_scope_enforcement'));
   assert.ok(agentGate.requiredChecks.includes('route_edge_expiry_check'));
   assert.ok(agentGate.requiredChecks.includes('route_edge_budget_check'));

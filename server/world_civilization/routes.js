@@ -6,7 +6,12 @@ const {
   resolveWorldGridFeatureFlags
 } = require('../world_grid/feature_flags');
 const { buildV6CivicMutationSecurityEnvelope } = require('./mutation_security');
+const { buildV6ProposalSubmissionEnvelope } = require('./proposals');
 const { buildV6VoteRouteAuthorizationEnvelope } = require('./votes');
+const {
+  buildDelegatedActionUsage,
+  summarizeDelegatedActionUse
+} = require('./worker_tool_adapter');
 
 const PROPOSAL_SUBMISSION_ROUTE = '/api/world/civilization/proposals/submit';
 const PROPOSAL_SUBMISSION_MUTATION_SURFACE = 'proposal.submit_for_review';
@@ -35,6 +40,7 @@ function statusForError(error = null) {
   if (error.message === 'V6_CIVIC_VOTE_ROUTE_DISABLED') return 404;
   if (error.message === 'V6_CIVIC_PROPOSAL_STORE_REQUIRED') return 503;
   if (error.message === 'V6_CIVIC_VOTE_STORE_REQUIRED') return 503;
+  if (error.message === 'V6_CIVIC_DELEGATION_USAGE_STORE_REQUIRED') return 503;
   if (error.message === 'V6_CIVIC_PROPOSAL_IDENTITY_REQUIRED') return 401;
   if (error.message === 'V6_CIVIC_VOTE_IDENTITY_REQUIRED') return 401;
   if (error.message === 'CIVIC_PROPOSAL_SUBMISSION_DENIED') return 403;
@@ -42,10 +48,17 @@ function statusForError(error = null) {
   if (error.message === 'CIVIC_VOTE_PROPOSAL_REQUIRED') return 403;
   if (error.message === 'CIVIC_VOTE_PROPOSAL_EXPIRED') return 403;
   if (error.message === 'CIVIC_PROPOSAL_INVALID') return 400;
+  if (error.message === 'CIVIC_DELEGATION_USAGE_INVALID') return 400;
   if (error.message === 'CIVIC_VOTE_INVALID') return 400;
+  if (error.message === 'CIVIC_PROPOSAL_IDEMPOTENCY_CONFLICT') return 409;
+  if (error.message === 'CIVIC_PROPOSAL_ID_CONFLICT') return 409;
+  if (error.message === 'CIVIC_DELEGATION_USAGE_IDEMPOTENCY_CONFLICT') return 409;
+  if (error.message === 'CIVIC_DELEGATION_USAGE_ID_CONFLICT') return 409;
   if (error.message === 'CIVIC_VOTE_IDEMPOTENCY_CONFLICT') return 409;
   if (error.message === 'CIVIC_VOTE_ALREADY_RECORDED') return 409;
   if (error.message === 'CIVIC_VOTE_ID_CONFLICT') return 409;
+  if (String(error.message || '').startsWith('CIVIC_DELEGATION_USAGE_')) return 403;
+  if (error.message === 'CIVIC_DELEGATION_ACTION_BUDGET_EXHAUSTED') return 403;
   return 500;
 }
 
@@ -110,7 +123,78 @@ function routeCallableVoteSurface(routeSurface = '') {
   return routeSurface === HUMAN_VOTE_ROUTE_SURFACE || routeSurface === 'delegated_agent_vote_route';
 }
 
-function submitProposalRoutePayload(submitted = {}) {
+function delegatedSubmissionScope(sourceSurface = '') {
+  return sourceSurface === 'worker_tool_submission' ? 'proposal_drafting' : '';
+}
+
+function consumeRouteDelegatedAction({
+  delegationStore = null,
+  input = {},
+  principalAccountId = '',
+  delegateAgentId = '',
+  scope = '',
+  actionRef = '',
+  idempotencyKey = '',
+  nowMs = Date.now()
+} = {}) {
+  if (!scope) return null;
+  if (!delegationStore || typeof delegationStore.consumeDelegatedAction !== 'function') {
+    throw new Error('V6_CIVIC_DELEGATION_USAGE_STORE_REQUIRED');
+  }
+  return delegationStore.consumeDelegatedAction(buildDelegatedActionUsage({
+    input,
+    principalAccountId,
+    delegateAgentId,
+    scope,
+    actionRef,
+    idempotencyKey
+  }), { nowMs });
+}
+
+function preflightProposalReceiptStoreConflict(proposalStore = null, proposal = {}) {
+  if (!proposalStore || typeof proposalStore.getProposal !== 'function') return;
+  const proposalId = String(proposal?.proposalId || '').trim();
+  if (!proposalId) return;
+  const existing = proposalStore.getProposal(proposalId);
+  if (!existing) return;
+  if (String(existing.idempotencyKey || '') === String(proposal.idempotencyKey || '')) return;
+  const error = new Error('CIVIC_PROPOSAL_ID_CONFLICT');
+  error.details = { proposalId };
+  throw error;
+}
+
+function preflightVoteReceiptStoreConflict(voteStore = null, vote = {}) {
+  if (!voteStore) return;
+  const voteId = String(vote?.voteId || '').trim();
+  if (voteId && typeof voteStore.getVote === 'function') {
+    const existingVote = voteStore.getVote(voteId);
+    if (existingVote && String(existingVote.idempotencyKey || '') !== String(vote.idempotencyKey || '')) {
+      const error = new Error('CIVIC_VOTE_ID_CONFLICT');
+      error.details = { voteId };
+      throw error;
+    }
+  }
+  if (typeof voteStore.listVotes !== 'function') return;
+  const proposalId = String(vote?.proposalId || '').trim();
+  const voterAccountId = String(vote?.voter?.accountId || '').trim();
+  if (!proposalId || !voterAccountId) return;
+  const existingByProposalVoter = voteStore.listVotes({
+    proposalId,
+    voterAccountId,
+    limit: 1
+  })[0];
+  if (!existingByProposalVoter) return;
+  if (String(existingByProposalVoter.idempotencyKey || '') === String(vote.idempotencyKey || '')) return;
+  const error = new Error('CIVIC_VOTE_ALREADY_RECORDED');
+  error.details = {
+    proposalId,
+    voterAccountId,
+    existingVoteId: existingByProposalVoter.voteId
+  };
+  throw error;
+}
+
+function submitProposalRoutePayload(submitted = {}, delegatedActionUse = null) {
   return {
     ok: true,
     status: 'research_only',
@@ -133,11 +217,12 @@ function submitProposalRoutePayload(submitted = {}) {
       auditEntryId: submitted.auditEntryId,
       duplicate: submitted.duplicate === true
     },
+    delegatedActionUse: delegatedActionUse ? summarizeDelegatedActionUse(delegatedActionUse) : null,
     submissionEnvelope: submitted.submissionEnvelope || null
   };
 }
 
-function voteRoutePayload(recorded = {}, authorizationEnvelope = {}) {
+function voteRoutePayload(recorded = {}, authorizationEnvelope = {}, delegatedActionUse = null) {
   return {
     ok: true,
     status: 'research_only',
@@ -161,6 +246,7 @@ function voteRoutePayload(recorded = {}, authorizationEnvelope = {}) {
       auditEntryId: recorded.auditEntryId,
       duplicate: recorded.duplicate === true
     },
+    delegatedActionUse: delegatedActionUse ? summarizeDelegatedActionUse(delegatedActionUse) : null,
     routeAuthorization: authorizationEnvelope
   };
 }
@@ -201,6 +287,8 @@ function createWorldCivilizationRouter({
       const featureFlags = resolveWorldGridFeatureFlags(req, env);
       const includeResearch = proposalRouteEnabled(env) && isWorldGridFeatureEnabled(featureFlags, V6_WORLD_FEATURE_FLAG);
       const actor = actorForSubmission({ sourceSurface, identity, body });
+      const requiredDelegationScope = delegatedSubmissionScope(sourceSurface);
+      const nowMs = Date.now();
       const mutationSecurityEnvelope = buildV6CivicMutationSecurityEnvelope({
         featureFlags,
         includeResearchMutation: includeResearch,
@@ -219,14 +307,41 @@ function createWorldCivilizationRouter({
         actor,
         delegation: body.delegation || {},
         delegationStore: activeDelegationStore,
-        requiredDelegationScope: sourceSurface === 'worker_tool_submission' ? 'proposal_drafting' : '',
+        requiredDelegationScope,
         owner: {
           ownerAccountId: identity.accountId
         },
         surface: PROPOSAL_SUBMISSION_MUTATION_SURFACE,
         idempotencyKey: proposal.idempotencyKey,
         csrfVerified: csrfReviewed(req),
-        nowMs: Date.now()
+        nowMs
+      });
+      const submissionPreflight = buildV6ProposalSubmissionEnvelope({
+        featureFlags,
+        includeResearchProposalSubmission: includeResearch,
+        source: 'world_civilization_route',
+        sourceSurface,
+        proposal,
+        approvalReceiptId: body.approvalReceiptId,
+        mutationSecurityEnvelope,
+        workerEvidence: body.workerEvidence || {},
+        nowMs
+      });
+      if (submissionPreflight.accepted !== true) {
+        const error = new Error('CIVIC_PROPOSAL_SUBMISSION_DENIED');
+        error.details = submissionPreflight;
+        throw error;
+      }
+      preflightProposalReceiptStoreConflict(activeProposalStore, proposal);
+      const delegatedActionUse = consumeRouteDelegatedAction({
+        delegationStore: activeDelegationStore,
+        input: body,
+        principalAccountId: identity.accountId,
+        delegateAgentId: actor.agentId,
+        scope: requiredDelegationScope,
+        actionRef: proposal.proposalId,
+        idempotencyKey: proposal.idempotencyKey,
+        nowMs
       });
       const submitted = activeProposalStore.submitProposalForReview({
         featureFlags,
@@ -237,9 +352,9 @@ function createWorldCivilizationRouter({
         approvalReceiptId: body.approvalReceiptId,
         mutationSecurityEnvelope,
         workerEvidence: body.workerEvidence || {}
-      }, { nowMs: Date.now() });
+      }, { nowMs });
 
-      return res.json(submitProposalRoutePayload(submitted));
+      return res.json(submitProposalRoutePayload(submitted, delegatedActionUse));
     } catch (error) {
       const status = statusForError(error);
       return res.status(status).json({
@@ -284,6 +399,8 @@ function createWorldCivilizationRouter({
       const featureFlags = resolveWorldGridFeatureFlags(req, env);
       const includeResearch = voteRouteEnabled(env) && isWorldGridFeatureEnabled(featureFlags, V6_WORLD_FEATURE_FLAG);
       const actor = actorForVote({ routeSurface, identity, body });
+      const requiredDelegationScope = requiredDelegationScopeForVote(routeSurface);
+      const nowMs = Date.now();
       const mutationSecurityEnvelope = buildV6CivicMutationSecurityEnvelope({
         featureFlags,
         includeResearchMutation: includeResearch,
@@ -302,14 +419,14 @@ function createWorldCivilizationRouter({
         actor,
         delegation: body.delegation || {},
         delegationStore: activeDelegationStore,
-        requiredDelegationScope: requiredDelegationScopeForVote(routeSurface),
+        requiredDelegationScope,
         owner: {
           ownerAccountId: identity.accountId
         },
         surface: routeSurface,
         idempotencyKey: vote.idempotencyKey,
         csrfVerified: csrfReviewed(req),
-        nowMs: Date.now()
+        nowMs
       });
       const routeAuthorization = buildV6VoteRouteAuthorizationEnvelope({
         featureFlags,
@@ -319,7 +436,7 @@ function createWorldCivilizationRouter({
         rawVote: vote,
         proposalStore: activeProposalStore,
         mutationSecurityEnvelope,
-        nowMs: Date.now()
+        nowMs
       });
       if (routeAuthorization.authorized !== true) {
         const error = new Error('V6_CIVIC_VOTE_ROUTE_AUTHORIZATION_DENIED');
@@ -327,8 +444,19 @@ function createWorldCivilizationRouter({
         throw error;
       }
 
-      const recorded = activeVoteStore.recordVote(vote, { nowMs: Date.now() });
-      return res.json(voteRoutePayload(recorded, routeAuthorization));
+      preflightVoteReceiptStoreConflict(activeVoteStore, vote);
+      const delegatedActionUse = consumeRouteDelegatedAction({
+        delegationStore: activeDelegationStore,
+        input: body,
+        principalAccountId: identity.accountId,
+        delegateAgentId: actor.agentId,
+        scope: requiredDelegationScope,
+        actionRef: vote.voteId,
+        idempotencyKey: vote.idempotencyKey,
+        nowMs
+      });
+      const recorded = activeVoteStore.recordVote(vote, { nowMs });
+      return res.json(voteRoutePayload(recorded, routeAuthorization, delegatedActionUse));
     } catch (error) {
       const status = statusForError(error);
       return res.status(status).json({
