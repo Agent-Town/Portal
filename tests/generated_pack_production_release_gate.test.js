@@ -443,6 +443,7 @@ test('GU-18 production release gate can pass only with explicit machine evidence
   assert.equal(gate.metrics.privateDataLeakCount, 0);
   assert.equal(gate.metrics.productionImageAssetCount, 0);
   assert.equal(gate.metrics.publicCardPackIdMatches, true);
+  assert.equal(gate.metrics.persistencePackIdMatches, true);
   assert.equal(gate.metrics.eligiblePrerequisiteCount, gate.metrics.requiredPrerequisiteCount);
 }));
 
@@ -1091,6 +1092,32 @@ test('GU-18 production release gate rejects public-card evidence copied from ano
   assert.equal(gate.releasePrerequisites.publicCardPrivacyPassed, false);
   assert.equal(gate.metrics.publicCardPackIdMatches, false);
   assert.equal(gate.blockingReasons.includes('publicCardPrivacyPassed'), true);
+  assert.equal(report.ok, true, JSON.stringify(report.checks));
+}));
+
+test('GU-18 production release gate rejects persistence evidence copied from another pack', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_gate_mixed_persistence',
+    prompt: 'jade orchard ferry with patient signalkeepers',
+    nowMs: 153_650
+  });
+  const otherFixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_gate_mixed_persistence_other',
+    prompt: 'amber cliff market with mirror lantern surveyors',
+    nowMs: 153_675
+  });
+  const gate = buildProductionReleaseGate({
+    ...fixture,
+    persistenceReport: otherFixture.persistenceReport,
+    nowMs: 155_275
+  });
+  const report = validateProductionReleaseGate(gate);
+
+  assert.notEqual(otherFixture.persistenceReport.packId, fixture.pack.packId);
+  assert.equal(gate.publicReleaseEligible, false);
+  assert.equal(gate.releasePrerequisites.packSaveReloadPassed, false);
+  assert.equal(gate.metrics.persistencePackIdMatches, false);
+  assert.equal(gate.blockingReasons.includes('packSaveReloadPassed'), true);
   assert.equal(report.ok, true, JSON.stringify(report.checks));
 }));
 

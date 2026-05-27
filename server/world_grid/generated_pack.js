@@ -4488,6 +4488,8 @@ function buildProductionReleaseGate({
   );
   const publicCardPackIdMatches = Boolean(pack?.packId)
     && publicCard?.packId === pack.packId;
+  const persistencePackIdMatches = Boolean(pack?.packId)
+    && persistenceReport?.packId === pack.packId;
   const assetLoaderEvidence = playtestReport?.assetLoader || playtestReport?.scoreEvidence?.assetLoader || {};
   const missingAssetCount = Number(playtestReport?.missingAssets || 0)
     + Number(assetLoaderEvidence?.missingTextureCount || 0);
@@ -4504,7 +4506,8 @@ function buildProductionReleaseGate({
     assetManifestValid: assetManifestReport.ok === true && assetPromptPlanReport.ok === true,
     fallbackVerified,
     diversitySuitePassed: releaseDiversityPassed(diversityReport || {}),
-    packSaveReloadPassed: releasePersistencePassed(persistenceReport || {}),
+    packSaveReloadPassed: releasePersistencePassed(persistenceReport || {})
+      && persistencePackIdMatches,
     publicCardPrivacyPassed: publicCardReport.ok === true
       && publicCardPackIdMatches
       && publicCardPrivateDataLeakCount === 0
@@ -4534,6 +4537,7 @@ function buildProductionReleaseGate({
       privateDataLeakCount: publicCardPrivateDataLeakCount,
       blockedFieldCount: publicCardBlockedFieldCount,
       publicCardPackIdMatches,
+      persistencePackIdMatches,
       missingAssetCount,
       productionImageAssetCount: Number(pack?.assetScaffold?.productionImageAssetCount || 0),
       replayabilityPromptCount: Number(diversityReport?.metrics?.promptCount || diversityReport?.metrics?.validPackCount || 0),
@@ -4618,6 +4622,7 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
       passed: gate?.publicReleaseEligible === allPrerequisitesPassed
         && blockingReasonsMatchFailures
         && (prerequisites.publicCardPrivacyPassed !== true || gate?.metrics?.publicCardPackIdMatches === true)
+        && (prerequisites.packSaveReloadPassed !== true || gate?.metrics?.persistencePackIdMatches === true)
         && Number(gate?.metrics?.eligiblePrerequisiteCount || 0) === prerequisiteEntries.filter(([, passed]) => passed === true).length
         && Number(gate?.metrics?.requiredPrerequisiteCount || 0) === prerequisiteEntries.length,
       measured: {
@@ -4625,7 +4630,8 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
         publicReleaseEligible: gate?.publicReleaseEligible === true,
         failedPrerequisites,
         blockingReasonsMatchFailures,
-        publicCardPackIdMatches: gate?.metrics?.publicCardPackIdMatches === true
+        publicCardPackIdMatches: gate?.metrics?.publicCardPackIdMatches === true,
+        persistencePackIdMatches: gate?.metrics?.persistencePackIdMatches === true
       }
     },
     {
