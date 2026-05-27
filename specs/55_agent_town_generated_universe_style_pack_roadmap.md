@@ -478,7 +478,7 @@ Release approval is now a versioned evidence object, not a loose set of booleans
 
 ## GU-19 Tamper-Evident Release Evidence Bundle Slice
 
-Release gates now have a companion `releaseEvidenceBundle` contract. The bundle is evidence-only: it does not approve production release, promote assets, expose generated packs in default gameplay, or alter server rules. It records stable hashes for the generated pack, measured playtest report, replayability diversity report, public card, persistence report, release approval evidence, candidate-review manifest, and release gate. It also records schema-bounded `sourcePackIds` and candidate-review manifest hash/time-order metrics so single-pack evidence cannot be mixed into another pack's ready-gate bundle and review-order evidence cannot be hidden even when the supplied source hashes are stable. A ready gate requires every source hash to be present and to match the supplied source evidence; missing sources, drifted evidence, invalid source pack-id shapes, mismatched pack ids, or tampered candidate-review time-order metrics fail validation.
+Release gates now have a companion `releaseEvidenceBundle` contract. The bundle is evidence-only: it does not approve production release, promote assets, expose generated packs in default gameplay, or alter server rules. It records stable hashes for the generated pack, measured playtest report, replayability diversity report, public card, persistence report, release approval evidence, candidate-review manifest, and release gate. It also records schema-bounded `sourcePackIds`, a release-prerequisite snapshot binding, and candidate-review manifest hash/time-order metrics so single-pack evidence cannot be mixed into another pack's ready-gate bundle and review-order evidence cannot be hidden even when the supplied source hashes are stable. A ready gate requires every source hash to be present and to match the supplied source evidence; missing sources, drifted evidence, invalid source pack-id shapes, mismatched pack ids, forged prerequisite snapshots, or tampered candidate-review time-order metrics fail validation.
 
 The evidence bundle has a generated-pack feature-gated API endpoint for QA review: `POST /api/world/generated-pack/release-evidence-bundle`. The endpoint returns the release gate, release-gate validation, hash-bound bundle, and bundle validation report. It remains hidden unless `FEATURE_WORLD_GRID_GENERATED_PACKS` is enabled and does not approve public release by itself.
 
@@ -495,6 +495,8 @@ Release-gate API ingress, including the generic tool dispatcher, now rejects sec
   "sourceDriftRejected": true,
   "mixedPackEvidenceRejected": true,
   "invalidSourcePackIdShapeRejected": true,
+  "prerequisiteSnapshotMatchesGate": true,
+  "forgedPrerequisiteSnapshotRejected": true,
   "candidateReviewManifestHashMatchesEvidence": true,
   "candidateReviewManifestTimeMatchesEvidence": true,
   "candidateReviewManifestTimeMetricTamperRejected": true,

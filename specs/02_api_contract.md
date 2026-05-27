@@ -2804,8 +2804,9 @@ Response includes:
 - `releaseEvidenceBundle.schemaVersion="agent-town-generated-pack-release-evidence-bundle-v1"`;
 - `releaseEvidenceBundle.sourceHashes` for generated pack, playtest, diversity, public card, persistence, approval evidence, and candidate review;
 - `releaseEvidenceBundle.sourcePackIds` for single-pack evidence coherence;
+- `releaseEvidenceBundle.metrics.prerequisiteSnapshotMatchesGate`;
 - `releaseEvidenceBundle.metrics.candidateReviewManifestHashMatchesEvidence` and `candidateReviewManifestTimeMatchesEvidence`;
-- `validationReport`, which rejects source drift, mixed pack ids, invalid source pack-id shapes, missing ready-gate evidence, candidate-review metric tampering, unsafe request content, and boundary violations.
+- `validationReport`, which rejects source drift, mixed pack ids, invalid source pack-id shapes, forged prerequisite snapshots, missing ready-gate evidence, candidate-review metric tampering, unsafe request content, and boundary violations.
 
 Release-evidence-bundle invariants:
 - request bodies share the release-gate ingress guard for secret-like fields, raw prompt instructions, request depth, node count, array size, object key count, and string length;

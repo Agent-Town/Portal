@@ -4834,6 +4834,8 @@ function buildReleaseEvidenceBundle({
     && positiveNumberOrZero(gateApprovalEvidence?.candidateReview?.reviewedAtMs) >= positiveNumberOrZero(candidateReviewManifest.createdAtMs)
     && positiveNumberOrZero(gateApprovalEvidence?.candidateReview?.reviewedAtMs) <= positiveNumberOrZero(gateApprovalEvidence?.createdAtMs)
     && Number(gate?.metrics?.candidateReviewManifestTimeMatchesEvidence || 0) === 1;
+  const prerequisiteSnapshot = clone(gate?.releasePrerequisites || {});
+  const prerequisiteSnapshotMatchesGate = stableEvidenceHash(prerequisiteSnapshot) === stableEvidenceHash(gate?.releasePrerequisites || {});
   const bundle = {
     schemaVersion: RELEASE_EVIDENCE_BUNDLE_VERSION,
     bundleHash: '',
@@ -4846,7 +4848,7 @@ function buildReleaseEvidenceBundle({
     sourceHashes,
     sourcePackIds,
     sourcePresence,
-    prerequisiteSnapshot: clone(gate?.releasePrerequisites || {}),
+    prerequisiteSnapshot,
     constraints: {
       productionImageAssetsCreated: false,
       externalProviderPrivateDataStored: false,
@@ -4863,6 +4865,7 @@ function buildReleaseEvidenceBundle({
       sourcePackIdMismatchCount: sourcePackIdProblems.length,
       releaseGateValid: validateProductionReleaseGate(gate).ok === true,
       releaseGatePublicEligible: gate?.publicReleaseEligible === true,
+      prerequisiteSnapshotMatchesGate,
       approvalEvidenceHashMatchesGate,
       candidateReviewManifestHashMatchesEvidence,
       candidateReviewManifestTimeMatchesEvidence,
@@ -4937,6 +4940,9 @@ function validateReleaseEvidenceBundle(bundle = {}, {
   const gateReport = releaseGate
     ? validateProductionReleaseGate(releaseGate)
     : { ok: bundle?.metrics?.releaseGateValid === true };
+  const prerequisiteSnapshotMatchesGate = releaseGate
+    ? stableEvidenceHash(bundle?.prerequisiteSnapshot || {}) === stableEvidenceHash(releaseGate?.releasePrerequisites || {})
+    : bundle?.publicReleaseEligible !== true;
   const presentSourceCount = RELEASE_EVIDENCE_SOURCE_KEYS
     .filter((key) => Boolean(bundle?.sourceHashes?.[key]))
     .length;
@@ -4977,6 +4983,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     && Number(bundle?.metrics?.sourcePackIdMismatchCount || 0) === sourcePackIdProblems.length
     && bundle?.metrics?.releaseGateValid === (gateReport.ok === true)
     && bundle?.metrics?.releaseGatePublicEligible === (bundle?.publicReleaseEligible === true)
+    && bundle?.metrics?.prerequisiteSnapshotMatchesGate === prerequisiteSnapshotMatchesGate
     && bundle?.metrics?.approvalEvidenceHashMatchesGate === approvalEvidenceHashMatchesGate
     && bundle?.metrics?.candidateReviewManifestHashMatchesEvidence === candidateReviewManifestHashMatchesEvidence
     && bundle?.metrics?.candidateReviewManifestTimeMatchesEvidence === candidateReviewManifestTimeMatchesEvidence;
@@ -5032,6 +5039,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
         presentSourceCount,
         sourceHashProblemCount: sourceHashProblems.length,
         sourcePackIdProblemCount: sourcePackIdProblems.length,
+        prerequisiteSnapshotMatchesGate,
         approvalEvidenceHashMatchesGate,
         candidateReviewManifestHashMatchesEvidence,
         candidateReviewManifestTimeMatchesEvidence
@@ -5059,6 +5067,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
       requiredSourceCount: RELEASE_EVIDENCE_SOURCE_KEYS.length,
       sourceCoverageOk,
       releaseGateValid: gateReport.ok === true,
+      prerequisiteSnapshotMatchesGate,
       boundaryPreserved
     }
   };

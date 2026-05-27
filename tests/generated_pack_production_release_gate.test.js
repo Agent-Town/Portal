@@ -145,6 +145,33 @@ function hashLabel(label) {
   return crypto.createHash('sha256').update(String(label)).digest('hex');
 }
 
+function stableValueForHash(value) {
+  if (Array.isArray(value)) return value.map((item) => stableValueForHash(item));
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, stableValueForHash(value[key])])
+    );
+  }
+  return value === undefined ? null : value;
+}
+
+function stableEvidenceHash(value) {
+  return crypto.createHash('sha256')
+    .update(JSON.stringify(stableValueForHash(value)))
+    .digest('hex');
+}
+
+function rehashReleaseEvidenceBundle(bundle) {
+  const copy = JSON.parse(JSON.stringify(bundle));
+  delete copy.bundleHash;
+  return {
+    ...bundle,
+    bundleHash: stableEvidenceHash(copy)
+  };
+}
+
 function approvedReleaseEvidence(pack) {
   const candidateReviewManifest = reviewedCandidateManifest(pack);
   const targetCount = pack.assetPromptPlan.targets.length;
@@ -392,10 +419,40 @@ test('GU-19 release evidence bundle binds a ready gate to source evidence hashes
   assert.equal(bundle.sourcePackIds.releaseGate, fixture.pack.packId);
   assert.equal(bundle.metrics.releaseGateValid, true);
   assert.equal(bundle.metrics.releaseGatePublicEligible, true);
+  assert.equal(bundle.metrics.prerequisiteSnapshotMatchesGate, true);
   assert.equal(bundle.metrics.approvalEvidenceHashMatchesGate, true);
   assert.equal(bundle.metrics.candidateReviewManifestHashMatchesEvidence, true);
   assert.equal(bundle.metrics.candidateReviewManifestTimeMatchesEvidence, true);
   assert.equal(bundle.constraints.productionImageAssetsCreated, false);
+}));
+
+test('GU-19 release evidence bundle rejects forged prerequisite snapshots', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_evidence_bundle_prereq_snapshot',
+    prompt: 'amber canal garden with star ferry masons',
+    nowMs: 154_800
+  });
+  const bundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    nowMs: 154_850
+  });
+  const forgedBundle = rehashReleaseEvidenceBundle({
+    ...bundle,
+    prerequisiteSnapshot: {
+      ...bundle.prerequisiteSnapshot,
+      publicCardPrivacyPassed: false
+    }
+  });
+  const report = validateReleaseEvidenceBundle(forgedBundle, fixture);
+
+  assert.equal(bundle.prerequisiteSnapshot.publicCardPrivacyPassed, true);
+  assert.equal(bundle.metrics.prerequisiteSnapshotMatchesGate, true);
+  assert.equal(report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_HASH_STABLE').passed, true);
+  assert.equal(report.ok, false);
+  assert.equal(
+    report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,
+    false
+  );
 }));
 
 test('GU-19 release evidence bundle rejects candidate-review time-order metric tampering', () => withTempGeneratedPackStore(() => {
@@ -977,6 +1034,7 @@ test('GU-18/GU-19 release gate and evidence bundle APIs are generated-pack-gated
       assert.equal(bundleBody.releaseEvidenceBundle.publicReleaseEligible, false);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.releaseGateValid, true);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.releaseGatePublicEligible, false);
+      assert.equal(bundleBody.releaseEvidenceBundle.metrics.prerequisiteSnapshotMatchesGate, true);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.presentSourceCount < bundleBody.releaseEvidenceBundle.metrics.requiredSourceCount, true);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.sourceHashMismatchCount, 0);
       assert.equal(bundleBody.releaseEvidenceBundle.constraints.productionImageAssetsCreated, false);
