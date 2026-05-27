@@ -110,6 +110,12 @@ test('V6 controlled release baseline names all launch controls but remains block
   assert.match(report.v6ReadinessGate.errors.join(','), /V6_READINESS_GATE_REPORT_REQUIRED/);
   assert.deepEqual(report.priorMilestones.map((entry) => entry.key), PRIOR_MILESTONE_KEYS);
   assert.deepEqual(report.gateReports.map((entry) => entry.key), REQUIRED_CONTROLLED_RELEASE_GATES.map((gate) => gate.key));
+  assert.ok(
+    REQUIRED_CONTROLLED_RELEASE_GATES
+      .find((gate) => gate.key === 'readiness_gate_closed')
+      .requiredChecks
+      .includes('readiness_audit_summary_proof')
+  );
   assert.ok(report.priorMilestones.every((entry) => entry.ok === false));
   for (const gate of report.gateReports) {
     assert.equal(gate.ok, false, gate.key);
@@ -146,6 +152,7 @@ test('V6 controlled release can only become ready after prior milestones, releas
   assert.ok(report.gateReports.some((gate) => gate.requiredArtifacts.includes(CONTROLLED_RELEASE_RUNBOOK)));
   assert.ok(report.gateReports.some((gate) => gate.requiredArtifacts.includes(V6_READINESS_GATE_ARTIFACT)));
   assert.ok(report.gateReports.some((gate) => gate.requiredArtifacts.includes(V6_MILESTONE_PLAN_ARTIFACT)));
+  assert.ok(report.gateReports.find((gate) => gate.key === 'readiness_gate_closed').checks.includes('readiness_audit_summary_proof'));
   assert.ok(REQUIRED_REVIEW_GATES.every((gate) => gate.requiredArtifacts.includes(RELEASE_REVIEW_ARTIFACT)));
   assert.deepEqual(assertV6ControlledReleaseSafe(report), { ok: true, errors: [] });
 });

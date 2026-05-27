@@ -267,9 +267,12 @@ const REQUIRED_V6_READINESS_GATES = [
     requiredArtifacts: [
       'specs/67_agent_town_v6_persistence_replay_resilience_foundation.md',
       'server/world_civilization/resilience.js',
+      'server/world_civilization/replay_reconstruction.js',
       'server/world_civilization/migration_rehearsal.js',
       'server/world_civilization/rollback_recovery.js',
       'tests/world_civilization_resilience.test.js',
+      'tests/world_civilization_replay_reconstruction.test.js',
+      'tests/world_civilization_process_restart.test.js',
       'tests/world_civilization_migration_rehearsal.test.js',
       'tests/world_civilization_load_rate.test.js',
       'tests/world_civilization_rollback_recovery.test.js'
@@ -277,11 +280,15 @@ const REQUIRED_V6_READINESS_GATES = [
     requiredChecks: [
       'all_civic_store_restart_probes',
       'audit_replay_reconstruction',
+      'privacy_safe_replay_summaries',
+      'store_specific_zero_hash_only_fallbacks',
+      'hash_chain_integrity',
       'migration_upgrade_downgrade',
       'backup_restore',
       'production_load_rate',
       'rollback_recovery',
-      'private_data_exclusion'
+      'private_data_exclusion',
+      'no_effect_application_during_replay'
     ]
   },
   {
@@ -298,6 +305,8 @@ const REQUIRED_V6_READINESS_GATES = [
       'threat_model',
       'privacy_review',
       'abuse_case_review',
+      'audit_coverage',
+      'store_specific_audit_summary_coverage',
       'validation_evidence',
       'vote_authorization_readiness_review',
       'resilience_readiness_review',

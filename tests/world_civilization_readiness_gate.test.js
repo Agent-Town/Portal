@@ -62,6 +62,16 @@ test('V6 readiness gate baseline names every prerequisite domain but remains ope
   assert.ok(report.gateReports.some((gate) => gate.requiredArtifacts.includes(V5_PROMOTION_GATE_ARTIFACT)));
   assert.ok(report.gateReports.some((gate) => gate.requiredArtifacts.includes(V6_READINESS_GATE_ARTIFACT)));
   assert.ok(report.gateReports.some((gate) => gate.requiredArtifacts.includes(V6_MILESTONE_PLAN_ARTIFACT)));
+  const persistenceGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'persistence_resilience');
+  const releaseReviewGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'security_product_release_review');
+  assert.ok(persistenceGate.requiredArtifacts.includes('server/world_civilization/replay_reconstruction.js'));
+  assert.ok(persistenceGate.requiredArtifacts.includes('tests/world_civilization_replay_reconstruction.test.js'));
+  assert.ok(persistenceGate.requiredArtifacts.includes('tests/world_civilization_process_restart.test.js'));
+  assert.ok(persistenceGate.requiredChecks.includes('store_specific_zero_hash_only_fallbacks'));
+  assert.ok(persistenceGate.requiredChecks.includes('privacy_safe_replay_summaries'));
+  assert.ok(persistenceGate.requiredChecks.includes('no_effect_application_during_replay'));
+  assert.ok(releaseReviewGate.requiredChecks.includes('audit_coverage'));
+  assert.ok(releaseReviewGate.requiredChecks.includes('store_specific_audit_summary_coverage'));
   for (const gate of report.gateReports) {
     assert.equal(gate.ok, false, gate.key);
     assert.equal(gate.status, 'missing', gate.key);
@@ -103,7 +113,17 @@ test('V6 readiness gate fails closed without proposal vote privacy and resilienc
   };
   evidence.persistence_resilience = {
     ...evidence.persistence_resilience,
-    checks: evidence.persistence_resilience.checks.filter((check) => check !== 'production_load_rate')
+    checks: evidence.persistence_resilience.checks.filter((check) => (
+      check !== 'production_load_rate'
+      && check !== 'store_specific_zero_hash_only_fallbacks'
+    ))
+  };
+  evidence.security_product_release_review = {
+    ...evidence.security_product_release_review,
+    checks: evidence.security_product_release_review.checks.filter((check) => (
+      check !== 'audit_coverage'
+      && check !== 'store_specific_audit_summary_coverage'
+    ))
   };
   const report = buildV6ReadinessGateReport({
     includeResearchReadiness: true,
@@ -115,7 +135,14 @@ test('V6 readiness gate fails closed without proposal vote privacy and resilienc
   assert.equal(report.releaseReady, false);
   assert.deepEqual(report.gateReports.find((gate) => gate.key === 'proposal_vote_governance').missingChecks, ['vote_authorization']);
   assert.deepEqual(report.gateReports.find((gate) => gate.key === 'reputation_moderation_privacy').missingChecks, ['private_data_redaction']);
-  assert.deepEqual(report.gateReports.find((gate) => gate.key === 'persistence_resilience').missingChecks, ['production_load_rate']);
+  assert.deepEqual(report.gateReports.find((gate) => gate.key === 'persistence_resilience').missingChecks, [
+    'store_specific_zero_hash_only_fallbacks',
+    'production_load_rate'
+  ]);
+  assert.deepEqual(report.gateReports.find((gate) => gate.key === 'security_product_release_review').missingChecks, [
+    'audit_coverage',
+    'store_specific_audit_summary_coverage'
+  ]);
   assert.deepEqual(assertV6ReadinessGateSafe(report), { ok: true, errors: [] });
 });
 

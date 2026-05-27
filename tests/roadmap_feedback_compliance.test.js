@@ -161,6 +161,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   const publicWorksSpec = read('specs/65_agent_town_v6_public_works_shared_resources_foundation.md');
   const labSpec = read('specs/66_agent_town_v6_modal_lab_surface_foundation.md');
   const persistenceSpec = read('specs/67_agent_town_v6_persistence_replay_resilience_foundation.md');
+  const controlledSpec = read('specs/69_agent_town_v6_controlled_release_completion_foundation.md');
   const releaseReview = read('docs/security/V6_AGENT_CIVILIZATION_RELEASE_REVIEW.md');
   const controlledRunbook = read('docs/ops/V6_AGENT_CIVILIZATION_CONTROLLED_RELEASE_RUNBOOK.md');
   const skillLine = read('docs/internal-skill-testline.md');
@@ -217,6 +218,8 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(readinessSource, /reputation_moderation_privacy/);
   assert.match(readinessSource, /persistence_resilience/);
   assert.match(readinessSource, /security_product_release_review/);
+  assert.match(readinessSource, /store_specific_zero_hash_only_fallbacks/);
+  assert.match(readinessSource, /store_specific_audit_summary_coverage/);
   assert.match(readinessSource, /V6_READINESS_GATE_PRODUCTION_ENABLEMENT_FORBIDDEN/);
   assert.match(skillLine, /V6 aggregate readiness gate/);
   assert.match(plan, /Source branch: `codex\/v6-agent-civilization-milestones`/);
@@ -510,15 +513,22 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /server\/world_civilization\/controlled_release\.js/);
   assert.match(plan, /buildV6ReadinessGateReport\(\)/);
   assert.match(plan, /explicit closed V6 readiness-gate report/);
+  assert.match(plan, /readiness audit-summary proof/);
   assert.match(gate, /server\/world_civilization\/controlled_release\.js/);
   assert.match(gate, /closed readiness-gate report/);
-  assert.match(gate, /production\s+feature flag safety, rollback\/disable rehearsals/);
+  assert.match(gate, /readiness audit-summary proof/);
+  assert.match(gate, /production feature flag safety/);
+  assert.match(gate, /rollback\/disable rehearsals/);
   assert.match(controlledRunbook, /explicit closed V6\.0 readiness-gate report/);
   assert.match(controlledRunbook, /readiness report hidden until controlled release/);
+  assert.match(controlledRunbook, /readiness audit-summary proof/);
+  assert.match(controlledSpec, /M16\/M17 audit-summary proof checks/);
   assert.match(controlledSource, /v6ReadinessGateReport/);
+  assert.match(controlledSource, /readiness_audit_summary_proof/);
   assert.match(controlledSource, /V6_CONTROLLED_RELEASE_READY_WITHOUT_V6_READINESS_GATE/);
   assert.match(controlledSource, /V6_READINESS_GATE_PRE_RELEASE_HIDDEN_REQUIRED/);
   assert.match(skillLine, /explicit closed V6 readiness-gate report/);
+  assert.match(skillLine, /readiness audit-summary proof/);
 });
 
 test('V5 world-grid release promotion gate blocks V6 on prototype-only evidence', () => {

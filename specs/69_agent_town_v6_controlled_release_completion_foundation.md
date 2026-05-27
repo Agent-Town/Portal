@@ -28,7 +28,8 @@ controlled-release gate has complete evidence and approved signoff.
 ## Required Controlled-Release Gates
 
 - V6 readiness gate closed, including an explicit closed readiness-gate report
-  that remains hidden from runtime/player surfaces until controlled release.
+  that remains hidden from runtime/player surfaces until controlled release and
+  carries the M16/M17 audit-summary proof checks.
 - Production feature flag safety.
 - Rollback and disable controls.
 - Release observability.

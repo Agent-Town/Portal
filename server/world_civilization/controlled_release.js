@@ -32,7 +32,13 @@ const REQUIRED_CONTROLLED_RELEASE_GATES = [
     key: 'readiness_gate_closed',
     label: 'V6 readiness gate closed',
     requiredArtifacts: [V6_READINESS_GATE_ARTIFACT, V6_MILESTONE_PLAN_ARTIFACT],
-    requiredChecks: ['m0_m17_done', 'v60_gate_closed', 'v60_gate_report_closed', 'release_review_ready']
+    requiredChecks: [
+      'm0_m17_done',
+      'v60_gate_closed',
+      'v60_gate_report_closed',
+      'readiness_audit_summary_proof',
+      'release_review_ready'
+    ]
   },
   {
     key: 'production_flag_safety',
