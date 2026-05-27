@@ -336,6 +336,7 @@ Player prompt
   "releaseEvidenceFailingCandidateReviewManifestSourceRejected": true,
   "releaseEvidenceDiversitySourceIncludesGatePack": true,
   "releaseEvidenceDiversitySourceMetricsCoherent": true,
+  "releaseEvidenceValidationReportSourceMetricsMirrored": true,
   "releaseEvidenceMixedDiversitySourceRejected": true,
   "releaseEvidenceInvalidSourcePackIdRejected": true,
   "releaseEvidenceBundleApiFeatureGated": true,

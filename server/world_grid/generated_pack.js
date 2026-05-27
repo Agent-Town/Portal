@@ -5348,6 +5348,17 @@ function validateReleaseEvidenceBundle(bundle = {}, {
       bundleCreatedAtNotFuture,
       blockingReasonsMatchGate,
       prerequisiteSnapshotMatchesGate,
+      generatedPackSourcePassed,
+      playtestSourcePassed,
+      persistenceSourcePassed,
+      publicCardSourcePassed,
+      diversitySourceIncludesGatePack,
+      diversitySourceMetricsCoherent,
+      approvalEvidenceSourcePassed,
+      candidateReviewManifestSourcePassed,
+      approvalEvidenceHashMatchesGate,
+      candidateReviewManifestHashMatchesEvidence,
+      candidateReviewManifestTimeMatchesEvidence,
       readyEvidenceSourcesMatchGate,
       boundaryPreserved
     }

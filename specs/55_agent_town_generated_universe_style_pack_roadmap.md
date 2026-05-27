@@ -529,6 +529,7 @@ Release-gate API ingress, including the generic tool dispatcher, now rejects sec
   "failingCandidateReviewManifestSourceRejected": true,
   "diversitySourceIncludesGatePack": true,
   "diversitySourceMetricsCoherent": true,
+  "validationReportSourceMetricsMirrored": true,
   "mixedDiversitySourceRejected": true,
   "approvalEvidenceGateDriftRejected": true,
   "candidateReviewManifestHashMatchesEvidence": true,

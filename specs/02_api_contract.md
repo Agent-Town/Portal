@@ -2825,6 +2825,7 @@ Response includes:
 - `releaseEvidenceBundle.metrics.approvalEvidenceSourcePassed`;
 - `releaseEvidenceBundle.metrics.candidateReviewManifestSourcePassed`;
 - `releaseEvidenceBundle.metrics.candidateReviewManifestHashMatchesEvidence` and `candidateReviewManifestTimeMatchesEvidence`;
+- `validationReport.metrics` mirrors the source-pass booleans above so QA can classify generated-pack, playtest, persistence, public-card, diversity, approval-evidence, and candidate-review manifest source failures without inspecting internal checks;
 - `validationReport`, which rejects source drift, mixed pack ids, failing generated-pack sources, failing playtest sources, failing persistence sources, failing public-card sources, failing approval-evidence sources, failing candidate-review manifest sources, copied diversity reports that exclude the release pack, invalid source pack-id shapes, bundles created before their bound gate, future-dated bundles, forged blocking reasons, forged prerequisite snapshots, approval evidence drift from the bound gate, missing ready-gate evidence, candidate-review metric tampering, unsafe request content, and boundary violations.
 
 Release-evidence-bundle invariants:

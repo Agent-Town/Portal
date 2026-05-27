@@ -86,6 +86,7 @@ Status: prototype-gated
   "diversitySourceMetricsCoherent": true,
   "approvalEvidenceSourcePassed": true,
   "failingApprovalEvidenceSourceRejected": true,
+  "validationReportSourceMetricsMirrored": true,
   "mixedDiversitySourceRejected": true,
   "dangerousFieldRejectCountMin": 20,
   "candidateFolderCount": 23,

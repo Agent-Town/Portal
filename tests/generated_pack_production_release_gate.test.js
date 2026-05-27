@@ -496,6 +496,14 @@ test('GU-19 release evidence bundle binds a ready gate to source evidence hashes
   assert.equal(bundle.metrics.candidateReviewManifestSourcePassed, true);
   assert.equal(bundle.metrics.candidateReviewManifestHashMatchesEvidence, true);
   assert.equal(bundle.metrics.candidateReviewManifestTimeMatchesEvidence, true);
+  assert.equal(report.metrics.generatedPackSourcePassed, true);
+  assert.equal(report.metrics.playtestSourcePassed, true);
+  assert.equal(report.metrics.persistenceSourcePassed, true);
+  assert.equal(report.metrics.publicCardSourcePassed, true);
+  assert.equal(report.metrics.approvalEvidenceSourcePassed, true);
+  assert.equal(report.metrics.candidateReviewManifestSourcePassed, true);
+  assert.equal(report.metrics.diversitySourceIncludesGatePack, true);
+  assert.equal(report.metrics.diversitySourceMetricsCoherent, true);
   assert.equal(bundle.constraints.productionImageAssetsCreated, false);
 }));
 
@@ -559,6 +567,7 @@ test('GU-19 release evidence bundle rejects approval evidence source evidence th
   assert.equal(bundle.metrics.sourceHashMismatchCount, 0);
   assert.equal(bundle.metrics.approvalEvidenceHashMatchesGate, true);
   assert.equal(bundle.metrics.approvalEvidenceSourcePassed, false);
+  assert.equal(report.metrics.approvalEvidenceSourcePassed, false);
   assert.equal(bundle.metrics.readyEvidenceSourcesMatchGate, false);
   assert.equal(report.ok, false);
   assert.equal(
@@ -854,6 +863,7 @@ test('GU-19 release evidence bundle rejects playtest source evidence that does n
   assert.equal(fixture.releaseGate.publicReleaseEligible, true);
   assert.equal(bundle.metrics.sourceHashMismatchCount, 0);
   assert.equal(bundle.metrics.playtestSourcePassed, false);
+  assert.equal(report.metrics.playtestSourcePassed, false);
   assert.equal(bundle.metrics.readyEvidenceSourcesMatchGate, false);
   assert.equal(report.ok, false);
   assert.equal(
@@ -890,6 +900,7 @@ test('GU-19 release evidence bundle rejects persistence source evidence that doe
   assert.equal(failingPersistenceReport.packId, fixture.pack.packId);
   assert.equal(bundle.metrics.sourceHashMismatchCount, 0);
   assert.equal(bundle.metrics.persistenceSourcePassed, false);
+  assert.equal(report.metrics.persistenceSourcePassed, false);
   assert.equal(bundle.metrics.readyEvidenceSourcesMatchGate, false);
   assert.equal(report.ok, false);
   assert.equal(
@@ -930,6 +941,7 @@ test('GU-19 release evidence bundle rejects public-card source evidence that doe
   assert.equal(fixture.releaseGate.publicReleaseEligible, true);
   assert.equal(bundle.metrics.sourceHashMismatchCount, 0);
   assert.equal(bundle.metrics.publicCardSourcePassed, false);
+  assert.equal(report.metrics.publicCardSourcePassed, false);
   assert.equal(bundle.metrics.readyEvidenceSourcesMatchGate, false);
   assert.equal(report.ok, false);
   assert.equal(
@@ -977,6 +989,7 @@ test('GU-19 release evidence bundle rejects candidate-review manifest source evi
   assert.equal(bundle.metrics.candidateReviewManifestHashMatchesEvidence, true);
   assert.equal(bundle.metrics.candidateReviewManifestTimeMatchesEvidence, true);
   assert.equal(bundle.metrics.candidateReviewManifestSourcePassed, false);
+  assert.equal(report.metrics.candidateReviewManifestSourcePassed, false);
   assert.equal(bundle.metrics.readyEvidenceSourcesMatchGate, false);
   assert.equal(report.ok, false);
   assert.equal(
@@ -1016,6 +1029,7 @@ test('GU-19 release evidence bundle rejects generated-pack source evidence that 
   assert.equal(fixture.releaseGate.publicReleaseEligible, true);
   assert.equal(bundle.metrics.sourceHashMismatchCount, 0);
   assert.equal(bundle.metrics.generatedPackSourcePassed, false);
+  assert.equal(report.metrics.generatedPackSourcePassed, false);
   assert.equal(bundle.metrics.readyEvidenceSourcesMatchGate, false);
   assert.equal(report.ok, false);
   assert.equal(
