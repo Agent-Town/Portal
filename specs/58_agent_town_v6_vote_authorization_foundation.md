@@ -90,6 +90,25 @@ The envelope is available only with explicit V6 research opt-in plus
 claims runtime exposure, player visibility, vote recording, world mutation,
 private-data exposure, outcome application, or executable behavior.
 
+## Research Vote Route
+
+`server/world_civilization/routes.js` mounts
+`POST /api/world/civilization/votes/cast` as a disabled-by-default research
+route. It is available only when `V6_CIVIC_VOTE_ROUTE_ENABLED=1`, the V6 feature
+flag is enabled, and explicit vote stores are provided directly or through
+`server/world_civilization/store_wiring.js` with
+`V6_CIVIC_VOTE_STORE_WIRING_ENABLED=1`,
+`V6_CIVIC_AUDIT_SQLITE_PATH`, `V6_CIVIC_PROPOSAL_SQLITE_PATH`, and
+`V6_CIVIC_VOTE_SQLITE_PATH`.
+
+The route builds the M5 civic mutation-security envelope, passes the vote
+through `buildV6VoteRouteAuthorizationEnvelope()`, and records a vote receipt
+only after the route-edge envelope authorizes the request. It supports the
+hidden human and delegated-agent vote route surfaces, fails closed without
+same-origin/CSRF-reviewed session and wallet evidence, and does not publish
+runtime tools, apply vote outcomes, expose player-visible UI, mutate private
+town state, or execute proposal effects.
+
 ## Voting Template Review
 
 `server/world_civilization/voting_templates.js` defines research-only
@@ -142,4 +161,6 @@ Delegation lifecycle storage starts in
 `server/world_civilization/delegations.js`, but vote routes/tools must not trust
 delegation references until M12 worker/tool enforcement, action-budget
 consumption, expiry checks, revocation checks, and route-edge authorization are
-implemented and tested.
+implemented and tested. The current research vote route uses store-backed
+`vote_advice` proof for delegated-agent vote receipts; worker-tool vote
+registration remains pending.

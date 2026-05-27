@@ -168,6 +168,7 @@ const REQUIRED_V6_READINESS_GATES = [
       'expired_review_queue_exclusion',
       'vote_authorization',
       'vote_authorization_readiness_gate',
+      'vote_route_store_wiring',
       'quorum_policy',
       'preflight_blocks_missing_evidence',
       'no_effect_execution'

@@ -26,7 +26,8 @@ const { createFoundersPlotRouter } = require('./founders_plot/routes');
 const { createWorldGridRouter } = require('./world_grid/routes');
 const { createWorldCivilizationRouter } = require('./world_civilization/routes');
 const {
-  getConfiguredWorldCivilizationProposalStores
+  getConfiguredWorldCivilizationProposalStores,
+  getConfiguredWorldCivilizationVoteStores
 } = require('./world_civilization/store_wiring');
 const {
   invalidateWorldGridCsrfTokens,
@@ -3853,7 +3854,8 @@ app.use(createWorldGridRouter({
 }));
 app.use(createWorldCivilizationRouter({
   resolveCivicIdentity: resolveWorldCivilizationIdentity,
-  resolveProposalStores: () => getConfiguredWorldCivilizationProposalStores(process.env)
+  resolveProposalStores: () => getConfiguredWorldCivilizationProposalStores(process.env),
+  resolveVoteStores: () => getConfiguredWorldCivilizationVoteStores(process.env)
 }));
 
 app.post('/api/hatch/complete', (req, res) => {

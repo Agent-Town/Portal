@@ -76,6 +76,7 @@ test('V6 readiness gate baseline names every prerequisite domain but remains ope
   assert.ok(proposalGate.requiredArtifacts.includes('tests/world_civilization_routes.test.js'));
   assert.ok(proposalGate.requiredArtifacts.includes('tests/world_civilization_worker_tool_adapter.test.js'));
   assert.ok(proposalGate.requiredChecks.includes('route_tool_submission'));
+  assert.ok(proposalGate.requiredChecks.includes('vote_route_store_wiring'));
   assert.ok(proposalGate.requiredChecks.includes('submission_envelope'));
   assert.ok(proposalGate.requiredChecks.includes('approval_receipt_binding'));
   assert.ok(proposalGate.requiredChecks.includes('proposal_submission_mutation_security'));

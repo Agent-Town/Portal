@@ -63,10 +63,10 @@ are present.
 - Vote authorization readiness review: server-verified voter authorization,
   eligibility rule verification, one-vote accounting, idempotent receipt replay,
   changed-vote replay rejection, proposal expiry denial, delegation policy
-  review, per-institution voting templates, route-edge vote auth,
-  quorum/threshold policy, governance-preflight integration, vote audit rows,
-  private-data exclusion, and no effect application before any vote route or
-  worker tool can influence civic outcomes.
+  review, per-institution voting templates, route-edge vote auth, hidden vote
+  route/store wiring, quorum/threshold policy, governance-preflight integration,
+  vote audit rows, private-data exclusion, and no effect application before any
+  vote route or worker tool can influence civic outcomes.
 - Reputation eligibility and advice review: eligibility policy review, advice
   policy review, source-policy coverage for every current reputation kind,
   moderation/dispute linkage, privacy/product review, public text rendering

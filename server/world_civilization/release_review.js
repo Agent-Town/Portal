@@ -215,8 +215,11 @@ const REQUIRED_REVIEW_GATES = [
     requiredArtifacts: [
       RELEASE_REVIEW_ARTIFACT,
       'specs/58_agent_town_v6_vote_authorization_foundation.md',
+      'server/world_civilization/routes.js',
+      'server/world_civilization/store_wiring.js',
       'server/world_civilization/votes.js',
       'server/world_civilization/governance_preflight.js',
+      'tests/world_civilization_routes.test.js',
       'tests/world_civilization_votes.test.js',
       'tests/world_civilization_governance_preflight.test.js',
       'tests/world_civilization_proposal_vote_process_restart.test.js'
@@ -231,6 +234,7 @@ const REQUIRED_REVIEW_GATES = [
       'delegation_policy_review',
       'per_institution_voting_templates',
       'route_edge_vote_auth',
+      'hidden_vote_route_store_wiring',
       'quorum_threshold_policy',
       'governance_preflight_integration',
       'vote_audit_rows',

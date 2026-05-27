@@ -386,8 +386,11 @@ test('V6 release review requires vote authorization readiness evidence', () => {
 
   assert.equal(voteGate.owner, 'engineering_security_product');
   assert.ok(voteGate.requiredArtifacts.includes('specs/58_agent_town_v6_vote_authorization_foundation.md'));
+  assert.ok(voteGate.requiredArtifacts.includes('server/world_civilization/routes.js'));
+  assert.ok(voteGate.requiredArtifacts.includes('server/world_civilization/store_wiring.js'));
   assert.ok(voteGate.requiredArtifacts.includes('server/world_civilization/votes.js'));
   assert.ok(voteGate.requiredArtifacts.includes('server/world_civilization/governance_preflight.js'));
+  assert.ok(voteGate.requiredArtifacts.includes('tests/world_civilization_routes.test.js'));
   assert.ok(voteGate.requiredArtifacts.includes('tests/world_civilization_votes.test.js'));
   assert.ok(voteGate.requiredChecks.includes('server_verified_voter_authorization'));
   assert.ok(voteGate.requiredChecks.includes('eligibility_rule_verification'));
@@ -398,6 +401,7 @@ test('V6 release review requires vote authorization readiness evidence', () => {
   assert.ok(voteGate.requiredChecks.includes('delegation_policy_review'));
   assert.ok(voteGate.requiredChecks.includes('per_institution_voting_templates'));
   assert.ok(voteGate.requiredChecks.includes('route_edge_vote_auth'));
+  assert.ok(voteGate.requiredChecks.includes('hidden_vote_route_store_wiring'));
   assert.ok(voteGate.requiredChecks.includes('quorum_threshold_policy'));
   assert.ok(voteGate.requiredChecks.includes('governance_preflight_integration'));
   assert.ok(voteGate.requiredChecks.includes('vote_audit_rows'));
@@ -413,6 +417,7 @@ test('V6 release review blocks signoff without vote route template and replay ev
     ...evidence.vote_authorization_readiness_review,
     checks: evidence.vote_authorization_readiness_review.checks.filter((check) => (
       check !== 'route_edge_vote_auth'
+      && check !== 'hidden_vote_route_store_wiring'
       && check !== 'per_institution_voting_templates'
       && check !== 'idempotent_receipt_replay'
     ))
@@ -429,7 +434,8 @@ test('V6 release review blocks signoff without vote route template and replay ev
   assert.deepEqual(voteGate.missingChecks, [
     'idempotent_receipt_replay',
     'per_institution_voting_templates',
-    'route_edge_vote_auth'
+    'route_edge_vote_auth',
+    'hidden_vote_route_store_wiring'
   ]);
   assert.deepEqual(assertV6ReleaseReviewSafe(report), { ok: true, errors: [] });
 });

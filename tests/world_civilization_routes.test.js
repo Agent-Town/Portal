@@ -9,14 +9,18 @@ const express = require('express');
 const { createCivicAuditLedger } = require('../server/world_civilization/audit_ledger');
 const { createCivicDelegationStore } = require('../server/world_civilization/delegations');
 const { createCivicProposalStore } = require('../server/world_civilization/proposals');
+const { createCivicVoteStore } = require('../server/world_civilization/votes');
 const {
   PROPOSAL_SUBMISSION_ROUTE,
+  VOTE_CAST_ROUTE,
   createWorldCivilizationRouter
 } = require('../server/world_civilization/routes');
 const { CIVIC_SCHEMA_VERSION } = require('../server/world_civilization/schemas');
 const {
+  closeConfiguredWorldCivilizationVoteStores,
   closeConfiguredWorldCivilizationProposalStores,
-  getConfiguredWorldCivilizationProposalStores
+  getConfiguredWorldCivilizationProposalStores,
+  getConfiguredWorldCivilizationVoteStores
 } = require('../server/world_civilization/store_wiring');
 const { closeWorldGridRateLimitStore } = require('../server/world_grid/rate_limit');
 
@@ -76,6 +80,46 @@ function delegation(overrides = {}) {
   };
 }
 
+function vote(overrides = {}) {
+  return {
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    voteId: 'vote_route_public_works_001',
+    proposalId: 'proposal_route_public_works_001',
+    voter: {
+      kind: 'human',
+      accountId: ACCOUNT_ID
+    },
+    choice: 'approve',
+    authorization: {
+      kind: 'wallet_session',
+      subjectAccountId: ACCOUNT_ID,
+      serverVerified: true
+    },
+    eligibilityProof: {
+      eligible: true,
+      ruleId: 'rule_route_public_works_voter_001'
+    },
+    receiptId: 'receipt_vote_route_public_works_001',
+    idempotencyKey: 'idem_vote_route_public_works_001',
+    ...overrides
+  };
+}
+
+function moderationDecision(overrides = {}) {
+  return {
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    decisionId: 'moderation_route_public_works_001',
+    subjectRef: 'proposal_route_public_works_001',
+    surface: 'public_works',
+    status: 'approved',
+    policyVersion: 'policy_v6_route_public_works_001',
+    reviewerKind: 'system',
+    reasons: ['Public-safe route proposal text.'],
+    redactedFields: [],
+    ...overrides
+  };
+}
+
 function sameOriginHeaders(baseUrl, extra = {}) {
   return {
     'content-type': 'application/json',
@@ -106,8 +150,10 @@ async function postJson(baseUrl, route, body, headers = {}) {
 async function withCivilizationServer({
   env = {},
   proposalStore = null,
+  voteStore = null,
   delegationStore = null,
   resolveProposalStores = null,
+  resolveVoteStores = null,
   resolveCivicIdentity = () => ({
     accountId: ACCOUNT_ID,
     walletAddress: '0x0000000000000000000000000000000000000001'
@@ -117,8 +163,10 @@ async function withCivilizationServer({
   app.use(express.json());
   app.use(createWorldCivilizationRouter({
     proposalStore,
+    voteStore,
     delegationStore,
     resolveProposalStores,
+    resolveVoteStores,
     resolveCivicIdentity,
     env
   }));
@@ -131,6 +179,7 @@ async function withCivilizationServer({
     await new Promise((resolve) => server.close(resolve));
     closeWorldGridRateLimitStore();
     closeConfiguredWorldCivilizationProposalStores();
+    closeConfiguredWorldCivilizationVoteStores();
   }
 }
 
@@ -139,9 +188,11 @@ async function withStores(fn) {
   const auditLedger = createCivicAuditLedger({ sqlitePath: path.join(dir, 'audit.sqlite') });
   const proposalStore = createCivicProposalStore({ sqlitePath: path.join(dir, 'proposals.sqlite'), auditLedger });
   const delegationStore = createCivicDelegationStore({ sqlitePath: path.join(dir, 'delegations.sqlite'), auditLedger });
+  const voteStore = createCivicVoteStore({ sqlitePath: path.join(dir, 'votes.sqlite'), proposalStore, auditLedger });
   try {
-    return await fn({ auditLedger, delegationStore, proposalStore });
+    return await fn({ auditLedger, delegationStore, proposalStore, voteStore });
   } finally {
+    voteStore.close();
     proposalStore.close();
     delegationStore.close();
     auditLedger.close();
@@ -153,6 +204,7 @@ function routeEnv(overrides = {}) {
   return {
     NODE_ENV: 'production',
     V6_CIVIC_PROPOSAL_SUBMISSION_ROUTE_ENABLED: '1',
+    V6_CIVIC_VOTE_ROUTE_ENABLED: '1',
     FEATURE_WORLD_V60_AGENT_CIVILIZATION: '1',
     WORLD_GRID_MUTATION_RATE_LIMIT_MAX: '100',
     WORLD_GRID_MUTATION_RATE_LIMIT_WINDOW_MS: '60000',
@@ -347,6 +399,252 @@ test('V6 proposal submission route accepts worker tool submission only with work
       assert.equal(response.body.submissionEnvelope.mutationSecurity.ok, true);
       assert.equal(proposalStore.count(), 1);
       assert.equal(auditLedger.replay().filter((row) => row.entry.actionType === 'proposal.created').length, 1);
+    });
+  });
+});
+
+test('V6 vote route is hidden unless the research route flag is enabled', async () => {
+  await withCivilizationServer({}, async (baseUrl) => {
+    const response = await postJson(baseUrl, VOTE_CAST_ROUTE, {
+      routeSurface: 'human_vote_route',
+      vote: vote()
+    }, sameOriginHeaders(baseUrl));
+
+    assert.equal(response.status, 404);
+    assert.equal(response.body.ok, false);
+    assert.equal(response.body.error.code, 'V6_CIVIC_VOTE_ROUTE_DISABLED');
+  });
+});
+
+test('V6 vote route fails closed without explicit vote store wiring', async () => {
+  await withCivilizationServer({
+    env: routeEnv()
+  }, async (baseUrl) => {
+    const response = await postJson(baseUrl, VOTE_CAST_ROUTE, {
+      routeSurface: 'human_vote_route',
+      vote: vote()
+    }, sameOriginHeaders(baseUrl));
+
+    assert.equal(response.status, 503);
+    assert.equal(response.body.ok, false);
+    assert.equal(response.body.error.code, 'V6_CIVIC_VOTE_STORE_REQUIRED');
+  });
+});
+
+test('V6 vote route records human vote receipts without applying outcomes', async () => {
+  await withStores(async ({ auditLedger, proposalStore, voteStore }) => {
+    proposalStore.draftProposal(proposal(), { nowMs: 1_779_991_000_000 });
+    proposalStore.recordProposalReview(moderationDecision(), { nowMs: 1_779_991_100_000 });
+    await withCivilizationServer({
+      env: routeEnv(),
+      proposalStore,
+      voteStore
+    }, async (baseUrl) => {
+      const body = {
+        routeSurface: 'human_vote_route',
+        vote: vote()
+      };
+      const response = await postJson(baseUrl, VOTE_CAST_ROUTE, body, sameOriginHeaders(baseUrl));
+      const replay = await postJson(baseUrl, VOTE_CAST_ROUTE, body, sameOriginHeaders(baseUrl));
+
+      assert.equal(response.status, 200, JSON.stringify(response.body));
+      assert.equal(response.body.ok, true);
+      assert.equal(response.body.status, 'research_only');
+      assert.equal(response.body.runtimeExposed, false);
+      assert.equal(response.body.playerVisible, false);
+      assert.equal(response.body.normalGameplayExposure, false);
+      assert.equal(response.body.recordsVote, true);
+      assert.equal(response.body.appliesVoteOutcome, false);
+      assert.equal(response.body.mutatesWorldState, false);
+      assert.equal(response.body.exposesCivicTools, false);
+      assert.equal(response.body.exposesPrivateData, false);
+      assert.equal(response.body.executionStatus, 'not_executable');
+      assert.equal(response.body.vote.voteId, 'vote_route_public_works_001');
+      assert.equal(response.body.vote.proposalId, 'proposal_route_public_works_001');
+      assert.equal(response.body.vote.voterAccountId, ACCOUNT_ID);
+      assert.equal(response.body.vote.choice, 'approve');
+      assert.equal(response.body.routeAuthorization.authorized, true);
+      assert.equal(response.body.routeAuthorization.routeSurface, 'human_vote_route');
+      assert.equal(response.body.routeAuthorization.recordsVote, false);
+      assert.equal(response.body.routeAuthorization.appliesVoteOutcome, false);
+      assert.equal(replay.status, 200, JSON.stringify(replay.body));
+      assert.equal(replay.body.vote.duplicate, true);
+      assert.equal(voteStore.count(), 1);
+      assert.equal(auditLedger.replay().filter((row) => row.entry.actionType === 'vote.recorded').length, 1);
+      assert.deepEqual(voteStore.summarizeProposalVotes('proposal_route_public_works_001'), {
+        proposalId: 'proposal_route_public_works_001',
+        counts: { approve: 1, reject: 0, abstain: 0 },
+        total: 1,
+        executionStatus: 'not_executable'
+      });
+    });
+  });
+});
+
+test('V6 vote route can use env-gated SQLite store wiring across reopen', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-v6-civic-vote-route-wiring-'));
+  const env = routeEnv({
+    V6_CIVIC_VOTE_STORE_WIRING_ENABLED: '1',
+    V6_CIVIC_AUDIT_SQLITE_PATH: path.join(dir, 'audit.sqlite'),
+    V6_CIVIC_PROPOSAL_SQLITE_PATH: path.join(dir, 'proposals.sqlite'),
+    V6_CIVIC_VOTE_SQLITE_PATH: path.join(dir, 'votes.sqlite')
+  });
+
+  try {
+    const seededStores = getConfiguredWorldCivilizationVoteStores(env);
+    seededStores.proposalStore.draftProposal(proposal(), { nowMs: 1_779_991_000_000 });
+    seededStores.proposalStore.recordProposalReview(moderationDecision(), { nowMs: 1_779_991_100_000 });
+    closeConfiguredWorldCivilizationVoteStores();
+
+    await withCivilizationServer({
+      env,
+      resolveVoteStores: () => getConfiguredWorldCivilizationVoteStores(env)
+    }, async (baseUrl) => {
+      const response = await postJson(baseUrl, VOTE_CAST_ROUTE, {
+        routeSurface: 'human_vote_route',
+        vote: vote()
+      }, sameOriginHeaders(baseUrl));
+
+      assert.equal(response.status, 200, JSON.stringify(response.body));
+      assert.equal(response.body.vote.voteId, 'vote_route_public_works_001');
+      assert.equal(response.body.recordsVote, true);
+      assert.equal(response.body.appliesVoteOutcome, false);
+      assert.equal(response.body.exposesCivicTools, false);
+    });
+
+    closeConfiguredWorldCivilizationVoteStores();
+    const reopened = getConfiguredWorldCivilizationVoteStores(env);
+    try {
+      assert.equal(reopened.status, 'research_only');
+      assert.equal(reopened.releaseReady, false);
+      assert.equal(reopened.proposalStore.count(), 1);
+      assert.equal(reopened.voteStore.count(), 1);
+      assert.equal(reopened.auditLedger.replay().filter((row) => row.entry.actionType === 'vote.recorded').length, 1);
+    } finally {
+      closeConfiguredWorldCivilizationVoteStores();
+    }
+  } finally {
+    closeConfiguredWorldCivilizationVoteStores();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('V6 vote route fails closed before persistence without same-origin CSRF review', async () => {
+  await withStores(async ({ auditLedger, proposalStore, voteStore }) => {
+    proposalStore.draftProposal(proposal(), { nowMs: 1_779_991_000_000 });
+    proposalStore.recordProposalReview(moderationDecision(), { nowMs: 1_779_991_100_000 });
+    await withCivilizationServer({
+      env: routeEnv(),
+      proposalStore,
+      voteStore
+    }, async (baseUrl) => {
+      const response = await postJson(baseUrl, VOTE_CAST_ROUTE, {
+        routeSurface: 'human_vote_route',
+        vote: vote()
+      }, sameOriginHeaders(baseUrl, {
+        origin: 'https://evil.example',
+        'sec-fetch-site': 'cross-site',
+        'x-v6-civic-csrf-reviewed': '0'
+      }));
+
+      assert.equal(response.status, 403);
+      assert.equal(response.body.ok, false);
+      assert.equal(response.body.error.code, 'V6_CIVIC_VOTE_ROUTE_AUTHORIZATION_DENIED');
+      assert.equal(voteStore.count(), 0);
+      assert.equal(auditLedger.replay().filter((row) => row.entry.actionType === 'vote.recorded').length, 0);
+    });
+  });
+});
+
+test('V6 vote route accepts delegated agent vote advice only with store-backed proof', async () => {
+  await withStores(async ({ auditLedger, delegationStore, proposalStore, voteStore }) => {
+    proposalStore.draftProposal(proposal(), { nowMs: 1_779_991_000_000 });
+    proposalStore.recordProposalReview(moderationDecision(), { nowMs: 1_779_991_100_000 });
+    delegationStore.recordDelegation(delegation({
+      delegationId: 'delegation_route_vote_001',
+      scope: 'vote_advice',
+      approvalReceiptId: 'receipt_route_agent_vote_001'
+    }), { nowMs: 1_779_991_200_000 });
+    await withCivilizationServer({
+      env: routeEnv(),
+      proposalStore,
+      delegationStore,
+      voteStore
+    }, async (baseUrl) => {
+      const response = await postJson(baseUrl, VOTE_CAST_ROUTE, {
+        routeSurface: 'delegated_agent_vote_route',
+        actor: { agentId: AGENT_ID },
+        vote: vote({
+          voteId: 'vote_route_agent_public_works_001',
+          authorization: {
+            kind: 'server_attested_delegation',
+            subjectAccountId: ACCOUNT_ID,
+            serverVerified: true
+          },
+          receiptId: 'receipt_vote_route_agent_public_works_001',
+          idempotencyKey: 'idem_vote_route_agent_public_works_001'
+        }),
+        delegation: {
+          delegationId: 'delegation_route_vote_001',
+          principalAccountId: ACCOUNT_ID,
+          delegateAgentId: AGENT_ID,
+          approvalReceiptId: 'receipt_route_agent_vote_001'
+        }
+      }, sameOriginHeaders(baseUrl));
+
+      assert.equal(response.status, 200, JSON.stringify(response.body));
+      assert.equal(response.body.vote.voteId, 'vote_route_agent_public_works_001');
+      assert.equal(response.body.vote.authorizationKind, 'server_attested_delegation');
+      assert.equal(response.body.routeAuthorization.routeSurface, 'delegated_agent_vote_route');
+      assert.equal(response.body.routeAuthorization.mutationSecurity.delegationProofStatus, 'valid');
+      assert.equal(response.body.appliesVoteOutcome, false);
+      assert.equal(voteStore.count(), 1);
+      assert.equal(auditLedger.replay().filter((row) => row.entry.actionType === 'vote.recorded').length, 1);
+    });
+  });
+});
+
+test('V6 vote route keeps worker tool vote surface reserved for worker-first wiring', async () => {
+  await withStores(async ({ delegationStore, proposalStore, voteStore }) => {
+    proposalStore.draftProposal(proposal(), { nowMs: 1_779_991_000_000 });
+    proposalStore.recordProposalReview(moderationDecision(), { nowMs: 1_779_991_100_000 });
+    delegationStore.recordDelegation(delegation({
+      delegationId: 'delegation_route_vote_worker_surface_001',
+      scope: 'vote_advice',
+      approvalReceiptId: 'receipt_route_agent_vote_worker_surface_001'
+    }), { nowMs: 1_779_991_200_000 });
+    await withCivilizationServer({
+      env: routeEnv(),
+      proposalStore,
+      delegationStore,
+      voteStore
+    }, async (baseUrl) => {
+      const response = await postJson(baseUrl, VOTE_CAST_ROUTE, {
+        routeSurface: 'worker_tool_vote_surface',
+        actor: { agentId: AGENT_ID },
+        vote: vote({
+          voteId: 'vote_route_worker_surface_public_works_001',
+          authorization: {
+            kind: 'server_attested_delegation',
+            subjectAccountId: ACCOUNT_ID,
+            serverVerified: true
+          },
+          receiptId: 'receipt_vote_route_worker_surface_public_works_001',
+          idempotencyKey: 'idem_vote_route_worker_surface_public_works_001'
+        }),
+        delegation: {
+          delegationId: 'delegation_route_vote_worker_surface_001',
+          principalAccountId: ACCOUNT_ID,
+          delegateAgentId: AGENT_ID,
+          approvalReceiptId: 'receipt_route_agent_vote_worker_surface_001'
+        }
+      }, sameOriginHeaders(baseUrl));
+
+      assert.equal(response.status, 403);
+      assert.equal(response.body.ok, false);
+      assert.equal(response.body.error.code, 'V6_CIVIC_VOTE_ROUTE_AUTHORIZATION_DENIED');
+      assert.match(response.body.error.details.errors.join(','), /V6_CIVIC_VOTE_WORKER_TOOL_SURFACE_NOT_ROUTE_CALLABLE/);
+      assert.equal(voteStore.count(), 0);
     });
   });
 });
