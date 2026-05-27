@@ -60,13 +60,17 @@ Behavior:
 - Environment overrides:
   - `WORLD_GRID_MUTATION_RATE_LIMIT_WINDOW_MS`
   - `WORLD_GRID_MUTATION_RATE_LIMIT_MAX`
+  - `WORLD_GRID_RATE_LIMIT_SQLITE_PATH` for optional durable owner/surface
+    counters in the V5 hardening baseline
 - On reject: `Retry-After`, response `429 { ok: false, error: { code:
   'RATE_LIMITED' } }`.
 
 Release note:
-- This is prototype abuse resistance only. V5/V6 release promotion still needs
-  durable/shared counters bound to the final browser session and wallet/owner
-  identity.
+- Process-local buckets are prototype abuse resistance only. Optional
+  `WORLD_GRID_RATE_LIMIT_SQLITE_PATH` durable counters prove owner/surface
+  restart persistence, but V5/V6 release promotion still needs counters bound to
+  the final browser session, wallet/owner identity, and IP/risk-aware production
+  sharing.
 
 ## Pony message rate limit
 

@@ -14,7 +14,7 @@ Status: `prototype_gated` for V5.0-V5.5 starter workflow
 | Production override safety | `server/world_grid/feature_flags.js` reuses the production admin/QA override guard before honoring `worldGridFeatureFlags` or `x-world-grid-feature-flags`; broad `all` V5 prototype overrides do not enable the V6.0 research flag. |
 | Mutation origin guard | `server/world_grid/mutation_origin.js` rejects explicit cross-origin mutation metadata and requires positive same-origin context for mutating world-grid routes/tools in production. |
 | Mutation CSRF guard | `server/world_grid/csrf.js` issues owner-bound process-local tokens through `/api/world/mutation-token`; production mutating routes/tools reject missing, invalid, or cross-owner tokens. |
-| Mutation rate-limit guard | `server/world_grid/rate_limit.js` applies process-local owner/surface buckets to mutating world-grid routes/tools and returns `RATE_LIMITED` with retry headers when exceeded. |
+| Mutation rate-limit guard | `server/world_grid/rate_limit.js` applies owner/surface buckets to mutating world-grid routes/tools and returns `RATE_LIMITED` with retry headers when exceeded; `tests/world_grid_rate_limit_persistence.test.js` proves optional SQLite `WORLD_GRID_RATE_LIMIT_SQLITE_PATH` counters survive separate Node process restarts and block mutating routes after restart. |
 | Mutation audit log | `server/world_grid/audit_log.js` writes hash-chained SQLite audit/replay rows for successful mutating V5.1+ routes/tools when `WORLD_GRID_AUDIT_SQLITE_PATH` is configured; `tests/world_grid_audit_persistence.test.js` proves every V5.1-V5.5 mutating route/tool surface writes durable audit rows across separate Node process restarts, exact idempotent replay does not duplicate audit rows, changed-payload conflicts add no audit rows, and private-looking service secrets stay out of entries. Release promotion still needs full before-state snapshots and release replay reconstruction. |
 | Server-authoritative region | `server/world_grid/region.js` deterministically generates `WorldRegion`, `WorldCell`, `SettlementNode`, and `RouteEdge` data from owner identity. |
 | Read-only V5.0 APIs | `server/world_grid/routes.js` exposes region, focus, camera, and read-only tool endpoints without claim/build/resource mutation. |
@@ -54,8 +54,9 @@ SQLite claim rows, optional SQLite public presence/follow/report rows, optional
 SQLite service request/reputation rows, optional SQLite event contribution/reward
 rows, and optional SQLite sandbox participant/action/snapshot/cell rows are durable
 foundations. Optional SQLite audit rows now have route/tool-surface restart
-matrix coverage, but release promotion still requires durable owner indexes,
+matrix coverage, and optional SQLite rate-limit rows now have owner/surface route
+restart coverage, but release promotion still requires durable owner indexes,
 migration versioning, complete before-state snapshots, durable idempotency
 integration with final session-auth production replay, CSRF-token/session-auth
-integration, durable/shared rate limits, and release replay reconstruction for
-every world-grid store.
+integration, IP/risk-aware production rate limits, and release replay
+reconstruction for every world-grid store.

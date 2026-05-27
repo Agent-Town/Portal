@@ -67,9 +67,14 @@ until the controls below are implemented and covered by deterministic tests.
   redacted participants, moderated actions, rejected actions, rollback
   snapshots, cell props, leave state, and private-town isolation across separate
   Node process lifetimes.
-- Mutating V5.1+ world-grid routes and tool routes use process-local rate
-  buckets keyed by owner and mutation surface. This throttles prototype abuse
-  paths but is not durable, distributed, or session-auth aware.
+- Mutating V5.1+ world-grid routes and tool routes use rate buckets keyed by
+  owner and mutation surface. By default those buckets are process-local. When
+  `WORLD_GRID_RATE_LIMIT_SQLITE_PATH` is configured, the same guard writes
+  durable SQLite `world_grid_rate_limit_buckets` rows with owner/surface keys,
+  count, reset timestamp, schema/migration metadata, and restart replay. Current
+  restart coverage proves the durable counter blocks mutating routes across
+  separate Node process restarts. Release promotion still needs final session
+  binding plus IP/risk-aware production sharing.
 - When `WORLD_GRID_AUDIT_SQLITE_PATH` is configured, successful mutating V5.1+
   world-grid routes and tool routes append durable, hash-chained SQLite audit
   records with actor, surface, idempotency key, request/response hashes,
@@ -136,13 +141,17 @@ until the controls below are implemented and covered by deterministic tests.
 - Current `WORLD_GRID_EVENTS_SQLITE_PATH` coverage is a V5.4 storage foundation
   only; release promotion still needs rollback policy, multi-event migration,
   final public-ledger review, and larger contribution-load coverage.
+- Current `WORLD_GRID_RATE_LIMIT_SQLITE_PATH` coverage is a mutation security
+  foundation only; release promotion still needs final browser-session binding,
+  wallet/session continuity, IP/risk-aware production sharing, and operational
+  tuning for public traffic.
 - Current `WORLD_GRID_SANDBOX_SQLITE_PATH` coverage is a V5.5 storage
   foundation only; release promotion still needs abuse reports, stale-session
   cleanup, cross-owner moderation review, and final sandbox privacy coverage.
 
 ## Out Of Scope For This Hardening Pass
 
-This pass does not add final session-auth middleware, durable or distributed
+This pass does not add final session-auth middleware, IP/risk-aware distributed
 rate limits, durable CSRF token storage, or a public free-play security surface.
 Those controls remain release gates because the V5 world-grid branch is still
 prototype-gated.

@@ -117,6 +117,8 @@ test('V5/V6 handoff artifacts and recurring Three.js gate exist', () => {
     'tests/world_grid_region_preferences_persistence.test.js',
     'tests/world_grid_region_preferences_restart_probe_child.js',
     'tests/world_grid_audit_persistence.test.js',
+    'tests/world_grid_rate_limit_persistence.test.js',
+    'tests/world_grid_rate_limit_restart_probe_child.js',
     'tests/world_grid_idempotency_persistence.test.js',
     'tests/world_grid_idempotency_restart_probe_child.js',
     'tests/world_grid_claims_persistence.test.js',
@@ -683,22 +685,32 @@ test('world-grid CSRF policy is tracked as prototype-only M5 coverage', () => {
   assert.match(evidence, /cross-owner tokens/);
 });
 
-test('world-grid mutation rate-limit policy is tracked as prototype-only M5 coverage', () => {
+test('world-grid mutation rate-limit policy is tracked as an M5 durable foundation', () => {
   const plan = read('docs/product/V6_AGENT_CIVILIZATION_MILESTONE_PLAN.md');
   const security = read('docs/security/WORLD_GRID_MUTATION_SECURITY_PLAN.md');
   const stateModel = read('docs/technical/WORLD_GRID_STATE_MODEL.md');
   const evidence = read('docs/release-evidence/WORLD_GRID_V50_REGION_PROTOTYPE_EVIDENCE_2026-05-26.md');
   const rateLimits = read('docs/rate-limits.md');
 
-  assert.match(plan, /owner\/surface prototype rate limits are enforced/);
-  assert.match(security, /process-local rate\s+buckets keyed by owner and mutation surface/);
-  assert.match(security, /durable or shared\s+counters/);
+  assert.match(plan, /optional durable SQLite foundation/);
+  assert.match(plan, /WORLD_GRID_RATE_LIMIT_SQLITE_PATH/);
+  assert.match(security, /By default those buckets are process-local/);
+  assert.match(security, /WORLD_GRID_RATE_LIMIT_SQLITE_PATH/);
+  assert.match(security, /world_grid_rate_limit_buckets/);
+  assert.match(security, /blocks mutating routes across\s+separate Node process restarts/);
+  assert.match(security, /IP\/risk-aware production sharing/);
   assert.match(stateModel, /server\/world_grid\/rate_limit\.js/);
-  assert.match(stateModel, /Durable\/shared rate-limit counters/);
+  assert.match(stateModel, /world_grid_rate_limit_buckets/);
+  assert.match(stateModel, /WORLD_GRID_RATE_LIMIT_SQLITE_PATH/);
+  assert.match(stateModel, /block\s+mutating routes after restart/);
   assert.match(evidence, /Mutation rate-limit guard/);
-  assert.match(evidence, /durable\/shared rate limits/);
+  assert.match(evidence, /tests\/world_grid_rate_limit_persistence\.test\.js/);
+  assert.match(evidence, /survive separate Node process restarts/);
+  assert.match(evidence, /IP\/risk-aware production rate limits/);
   assert.match(rateLimits, /World-grid prototype mutation limit/);
   assert.match(rateLimits, /WORLD_GRID_MUTATION_RATE_LIMIT_MAX/);
+  assert.match(rateLimits, /WORLD_GRID_RATE_LIMIT_SQLITE_PATH/);
+  assert.match(rateLimits, /wallet\/owner identity, and IP\/risk-aware production\s+sharing/);
 });
 
 test('world-grid audit replay policy is tracked as an M3 release storage control', () => {

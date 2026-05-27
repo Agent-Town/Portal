@@ -53,7 +53,7 @@ release-grade store is explicitly implemented and tested. Current stores are:
 | Sandbox participants/actions/snapshots/cells | Process-local arrays/maps and mutable in-memory district cells in `server/world_grid/sandbox.js`; optional SQLite `world_grid_sandbox_participants`, `world_grid_sandbox_actions`, `world_grid_sandbox_snapshots`, and `world_grid_sandbox_cells` tables when `WORLD_GRID_SANDBOX_SQLITE_PATH` is configured | Durable foundation for V5.5 participant/action/snapshot/cell state, participant owner key plus action/cell indexes, schema/migration versions, restart proof, moderation rejection replay, rollback replay, and private-town isolation; release promotion still needs abuse reports, cross-owner moderation review, stale-session cleanup, and final sandbox privacy review |
 | Idempotency replay records | Process-local `Map` in `server/world_grid/idempotency.js`; optional SQLite `world_grid_idempotency_records` table when `WORLD_GRID_IDEMPOTENCY_SQLITE_PATH` is configured | Durable foundation for exact retry replay, changed payload rejection, schema/migration versions, planned-claim restart proof, and V5.1-V5.5 mutating route/tool-surface restart proof; release promotion still needs final session-auth integration and production replay coverage |
 | CSRF mutation tokens | Process-local `Map` in `server/world_grid/csrf.js` | Prototype/ephemeral; owner-bound only for the process lifetime |
-| Mutation rate-limit buckets | Process-local `Map` in `server/world_grid/rate_limit.js` | Prototype/ephemeral; per-owner and per-surface only for the process lifetime |
+| Mutation rate-limit buckets | Process-local `Map` in `server/world_grid/rate_limit.js`; optional SQLite `world_grid_rate_limit_buckets` table when `WORLD_GRID_RATE_LIMIT_SQLITE_PATH` is configured | Durable foundation for owner/surface mutation counters, schema/migration versions, window reset metadata, and restart proof; release promotion still needs final session binding plus IP/risk-aware shared production enforcement |
 | Mutation audit records | Optional SQLite `world_grid_audit_log` table in `server/world_grid/audit_log.js` when `WORLD_GRID_AUDIT_SQLITE_PATH` is configured | Durable foundation for append-only audit/replay, route/tool-surface restart matrix coverage, and duplicate-replay suppression; not yet complete release storage because complete before-state snapshots and store reconstruction are still release gates |
 
 The mandatory durable dependency used by mutating V5.1+ routes is the existing
@@ -132,6 +132,9 @@ Before any V5 world-grid slice can claim release-grade persistence, it needs:
   expiry, and cross-session tests.
 - Durable/shared rate-limit counters keyed by final session, wallet/owner, IP
   risk signal, and mutation surface, with replay-safe behavior for legitimate
-  retries.
+  retries. Current `WORLD_GRID_RATE_LIMIT_SQLITE_PATH` coverage proves
+  owner/surface buckets reopen across separate Node process lifetimes and block
+  mutating routes after restart; final session binding and IP/risk-aware
+  production sharing remain gates.
 - Backfill and migration tests for older prototype rows before enabling a public
   release flag.
