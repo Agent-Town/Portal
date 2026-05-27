@@ -8,7 +8,8 @@ const path = require('node:path');
 const {
   closeWorldGridRateLimitStore,
   createWorldGridRateLimitStore,
-  consumeWorldGridMutationRateLimit
+  consumeWorldGridMutationRateLimit,
+  rateLimitIdentityKey
 } = require('../server/world_grid/rate_limit');
 const { normalizeOwnerIdentity } = require('../server/world_grid/region');
 
@@ -37,6 +38,17 @@ function runProbe(mode, sqlitePath, storePath) {
     throw error;
   }
   return parsed;
+}
+
+function mockRequest(headers = {}) {
+  const normalized = Object.fromEntries(Object.entries(headers).map(([key, value]) => [key.toLowerCase(), value]));
+  return {
+    headers: normalized,
+    get(name) {
+      return normalized[String(name || '').toLowerCase()] || '';
+    },
+    ip: '127.0.0.1'
+  };
 }
 
 test('world-grid durable rate-limit counters persist owner and surface windows across store reopen', () => {
@@ -96,6 +108,84 @@ test('world-grid durable rate-limit counters persist owner and surface windows a
     assert.equal(third.remaining, 0);
     assert.equal(reset.allowed, true);
     assert.equal(reset.remaining, 1);
+  } finally {
+    closeWorldGridRateLimitStore();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('world-grid risk-aware rate-limit identity hashes session ip and risk without leaking raw values', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-world-grid-rate-limit-risk-'));
+  const sqlitePath = path.join(dir, 'world-grid-rate-limit.sqlite');
+  const owner = normalizeOwnerIdentity({
+    pairId: 'session:rate-limit-risk-owner',
+    sessionId: 'session-risk-alpha'
+  });
+  const env = {
+    WORLD_GRID_RATE_LIMIT_SQLITE_PATH: sqlitePath,
+    WORLD_GRID_RATE_LIMIT_IDENTITY_MODE: 'owner_session_ip_risk',
+    WORLD_GRID_MUTATION_RATE_LIMIT_MAX: '1',
+    WORLD_GRID_MUTATION_RATE_LIMIT_WINDOW_MS: '60000'
+  };
+  const baseRequest = mockRequest({
+    'x-forwarded-for': '203.0.113.10',
+    'x-world-grid-risk': 'medium'
+  });
+  const otherIpRequest = mockRequest({
+    'x-forwarded-for': '203.0.113.11',
+    'x-world-grid-risk': 'medium'
+  });
+  const otherRiskRequest = mockRequest({
+    'x-forwarded-for': '203.0.113.10',
+    'x-world-grid-risk': 'elevated'
+  });
+  try {
+    const identityKey = rateLimitIdentityKey({ owner, req: baseRequest, env });
+    const first = consumeWorldGridMutationRateLimit({
+      owner,
+      surface: '/api/world/territory/plan-claim',
+      nowMs: 1_779_984_000_000,
+      env,
+      req: baseRequest
+    });
+    const secondSameIdentity = consumeWorldGridMutationRateLimit({
+      owner,
+      surface: '/api/world/territory/plan-claim',
+      nowMs: 1_779_984_000_100,
+      env,
+      req: baseRequest
+    });
+    const otherIp = consumeWorldGridMutationRateLimit({
+      owner,
+      surface: '/api/world/territory/plan-claim',
+      nowMs: 1_779_984_000_200,
+      env,
+      req: otherIpRequest
+    });
+    const otherRisk = consumeWorldGridMutationRateLimit({
+      owner,
+      surface: '/api/world/territory/plan-claim',
+      nowMs: 1_779_984_000_300,
+      env,
+      req: otherRiskRequest
+    });
+    const store = createWorldGridRateLimitStore({ sqlitePath });
+    const buckets = store.listBuckets();
+    store.close();
+
+    assert.match(identityKey, /^owner_[a-f0-9]{16}\|session:[a-f0-9]{24}\|ip:[a-f0-9]{24}\|risk:medium$/);
+    assert.equal(identityKey.includes('session-risk-alpha'), false);
+    assert.equal(identityKey.includes('203.0.113.10'), false);
+    assert.equal(first.allowed, true);
+    assert.equal(first.remaining, 0);
+    assert.equal(secondSameIdentity.allowed, false);
+    assert.equal(otherIp.allowed, true);
+    assert.equal(otherRisk.allowed, true);
+    assert.equal(buckets.length, 3);
+    assert.equal(buckets.some((bucket) => bucket.ownerAccountId.includes('203.0.113.10')), false);
+    assert.equal(buckets.some((bucket) => bucket.ownerAccountId.includes('session-risk-alpha')), false);
+    assert.equal(buckets.every((bucket) => bucket.ownerAccountId.includes('|session:')), true);
+    assert.equal(buckets.every((bucket) => bucket.ownerAccountId.includes('|ip:')), true);
   } finally {
     closeWorldGridRateLimitStore();
     fs.rmSync(dir, { recursive: true, force: true });

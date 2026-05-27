@@ -125,8 +125,8 @@ const V5_WORLD_GRID_RELEASE_PROMOTION_TARGETS = [
   {
     key: 'owner_surface_rate_limits',
     slice: 'V5 mutation abuse controls',
-    requiredEvidence: 'Release promotion must prove durable owner/surface rate limits plus a release target for IP/risk-aware shared production enforcement.',
-    currentEvidence: 'server/world_grid/rate_limit.js, tests/world_grid_rate_limit_persistence.test.js',
+    requiredEvidence: 'Release promotion must prove durable owner/surface rate limits, replay-safe exact idempotent retries, optional hashed session/IP/risk identity, and a release target for trusted proxy/risk-signal production enforcement.',
+    currentEvidence: 'server/world_grid/rate_limit.js, server/world_grid/idempotency.js, tests/world_grid_region.test.js, tests/world_grid_rate_limit_persistence.test.js',
     releaseEvidenceRequired: 'owner_surface_rate_limit_packet'
   },
   {
@@ -182,7 +182,7 @@ const V5_WORLD_GRID_RELEASE_PROMOTION_TARGETS = [
     key: 'risk_rate_limit_identity',
     slice: 'V5 production abuse controls',
     requiredEvidence: 'Release promotion must define production rate-limit identity that combines owner/session with IP or risk signals without exposing private data or breaking legitimate idempotent retries.',
-    currentEvidence: 'docs/technical/WORLD_GRID_STATE_MODEL.md',
+    currentEvidence: 'server/world_grid/rate_limit.js, tests/world_grid_rate_limit_persistence.test.js, docs/technical/WORLD_GRID_STATE_MODEL.md',
     releaseEvidenceRequired: 'risk_rate_limit_identity_packet'
   }
 ];

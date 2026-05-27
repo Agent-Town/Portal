@@ -47,7 +47,10 @@ const {
   requireWorldGridCsrfToken,
   worldGridCsrfRequired
 } = require('./csrf');
-const { runIdempotentWorldGridMutation } = require('./idempotency');
+const {
+  getIdempotentWorldGridMutationReplay,
+  runIdempotentWorldGridMutation
+} = require('./idempotency');
 const { recordWorldGridMutationAudit } = require('./audit_log');
 const { requireWorldGridMutationOrigin } = require('./mutation_origin');
 const {
@@ -455,10 +458,11 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
     return requireWorldGridIdempotencyKey(req, surface);
   }
 
-  function requireMutationRateLimit(res, payload, surface) {
+  function requireMutationRateLimit(req, res, payload, surface) {
     const rateLimit = consumeWorldGridMutationRateLimit({
       owner: payload.owner,
-      surface
+      surface,
+      req
     });
     if (!rateLimit) return;
     res.set('X-RateLimit-Limit', String(rateLimit.limit));
@@ -477,7 +481,25 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
 
   function sendIdempotentMutation(req, res, payload, surface, mutate) {
     const idempotencyKey = requireMutationPrerequisites(req, payload, surface);
-    requireMutationRateLimit(res, payload, surface);
+    let replay = null;
+    try {
+      replay = getIdempotentWorldGridMutationReplay({
+        owner: payload.owner,
+        surface,
+        idempotencyKey,
+        body: req.body
+      });
+    } catch (error) {
+      if (error?.message === 'IDEMPOTENCY_CONFLICT') {
+        requireMutationRateLimit(req, res, payload, surface);
+      }
+      throw error;
+    }
+    if (replay) {
+      res.set('x-world-grid-idempotency-replay', '1');
+      return res.json(replay.response);
+    }
+    requireMutationRateLimit(req, res, payload, surface);
     const beforeSummary = buildWorldGridAuditSnapshot(payload, 'before');
     const outcome = runIdempotentWorldGridMutation({
       owner: payload.owner,

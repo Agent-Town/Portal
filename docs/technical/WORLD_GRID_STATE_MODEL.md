@@ -36,7 +36,11 @@ not leak private owner identifiers.
   production. When the resolved runtime identity includes a session id, the
   CSRF token is also bound to a hashed session binding.
 - Mutating routes/tools consume prototype rate-limit buckets keyed by owner and
-  mutation surface.
+  mutation surface. Exact idempotent replays are detected before rate-limit
+  consumption; changed-payload idempotency conflicts still pass through the
+  mutation rate limiter. Optional `WORLD_GRID_RATE_LIMIT_IDENTITY_MODE=owner_session_ip_risk`
+  also keys buckets by hashed session/IP material plus a sanitized risk signal
+  without storing raw session or IP values.
 
 ## Prototype Persistence Boundary
 
@@ -54,7 +58,7 @@ release-grade store is explicitly implemented and tested. Current stores are:
 | Sandbox participants/actions/snapshots/cells | Process-local arrays/maps and mutable in-memory district cells in `server/world_grid/sandbox.js`; optional SQLite `world_grid_sandbox_participants`, `world_grid_sandbox_actions`, `world_grid_sandbox_snapshots`, and `world_grid_sandbox_cells` tables when `WORLD_GRID_SANDBOX_SQLITE_PATH` is configured | Durable foundation for V5.5 participant/action/snapshot/cell state, participant owner key plus action/cell indexes, schema/migration versions, restart proof, moderation rejection replay, rollback replay, and private-town isolation; release promotion still needs abuse reports, cross-owner moderation review, stale-session cleanup, and final sandbox privacy review |
 | Idempotency replay records | Process-local `Map` in `server/world_grid/idempotency.js`; optional SQLite `world_grid_idempotency_records` table when `WORLD_GRID_IDEMPOTENCY_SQLITE_PATH` is configured | Durable foundation for exact retry replay, changed payload rejection, schema/migration versions, planned-claim restart proof, and V5.1-V5.5 mutating route/tool-surface restart proof; release promotion still needs final session-auth integration and production replay coverage |
 | CSRF mutation tokens | Process-local `Map` in `server/world_grid/csrf.js`; optional SQLite `world_grid_csrf_tokens` table with `session_binding_hash` when `WORLD_GRID_CSRF_SQLITE_PATH` is configured | Durable foundation for owner-bound hashed tokens, hashed session binding when identity supplies a session id, expiry pruning, schema/migration versions, production route restart proof, browser same-wallet cross-session denial proof, same-session rotation, explicit invalidation, session-reset invalidation wiring, wallet/provider disconnect invalidation endpoint plus client hook, and mocked provider disconnect callback proof; release promotion still needs live Privy/provider logout signoff and session-auth integration |
-| Mutation rate-limit buckets | Process-local `Map` in `server/world_grid/rate_limit.js`; optional SQLite `world_grid_rate_limit_buckets` table when `WORLD_GRID_RATE_LIMIT_SQLITE_PATH` is configured | Durable foundation for owner/surface mutation counters, schema/migration versions, window reset metadata, and restart proof; release promotion still needs final session binding plus IP/risk-aware shared production enforcement |
+| Mutation rate-limit buckets | Process-local `Map` in `server/world_grid/rate_limit.js`; optional SQLite `world_grid_rate_limit_buckets` table when `WORLD_GRID_RATE_LIMIT_SQLITE_PATH` is configured | Durable foundation for owner/surface mutation counters, schema/migration versions, window reset metadata, restart proof, replay-safe exact idempotent retries, and optional `WORLD_GRID_RATE_LIMIT_IDENTITY_MODE=owner_session_ip_risk` hashed session/IP/risk bucket identity without raw session/IP persistence; release promotion still needs final session-auth integration, trusted proxy/risk-signal wiring, and operational tuning |
 | Mutation audit records | Optional SQLite `world_grid_audit_log` table in `server/world_grid/audit_log.js` when `WORLD_GRID_AUDIT_SQLITE_PATH` is configured; replay target in `server/world_grid/replay_reconstruction.js` | Durable foundation for append-only audit/replay, route/tool-surface restart matrix coverage, duplicate-replay suppression, privacy-safe `agent-town.v5.world-grid.audit-snapshot.v1` before/after route snapshots with store-specific public presence, services, events, and sandbox aggregate summaries, and non-executing replay reconstruction over hash-chain, privacy, snapshot, and migration metadata; not yet complete release storage because complete exact per-record before-state reconstruction and store reconstruction are still release gates |
 
 The mandatory durable dependency used by mutating V5.1+ routes is the existing
@@ -151,7 +155,12 @@ Before any V5 world-grid slice can claim release-grade persistence, it needs:
   risk signal, and mutation surface, with replay-safe behavior for legitimate
   retries. Current `WORLD_GRID_RATE_LIMIT_SQLITE_PATH` coverage proves
   owner/surface buckets reopen across separate Node process lifetimes and block
-  mutating routes after restart; final session binding and IP/risk-aware
-  production sharing remain gates.
+  mutating routes after restart; `getIdempotentWorldGridMutationReplay()` lets
+  exact idempotent retries return before consuming another bucket hit; and
+  `WORLD_GRID_RATE_LIMIT_IDENTITY_MODE=owner_session_ip_risk` coverage proves
+  session/IP/risk bucket identity is hashed without persisting raw session or IP
+  values, while changed-payload idempotency conflicts still pass through the
+  limiter. Final session-auth integration, trusted proxy/risk-signal production
+  wiring, and operational tuning remain release gates.
 - Backfill and migration tests for older prototype rows before enabling a public
   release flag.

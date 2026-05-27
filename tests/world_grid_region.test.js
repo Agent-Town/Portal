@@ -989,10 +989,12 @@ test('mutating world-grid routes enforce prototype owner and surface rate limits
     const optionsResponse = await fetch(`${baseUrl}/api/world/territory/claim-options`);
     const optionsBody = await optionsResponse.json();
     assert.equal(optionsResponse.status, 200, JSON.stringify(optionsBody));
-    const option = optionsBody.options[0];
-    assert.ok(option);
+    const [firstOption, secondOption, thirdOption] = optionsBody.options;
+    assert.ok(firstOption);
+    assert.ok(secondOption);
+    assert.ok(thirdOption);
 
-    const planBody = { cellId: option.cellId, idempotencyKey: 'rate_limit_plan_001' };
+    const planBody = { cellId: firstOption.cellId, idempotencyKey: 'rate_limit_plan_001' };
     const firstPlanResponse = await fetch(`${baseUrl}/api/world/territory/plan-claim`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -1011,7 +1013,7 @@ test('mutating world-grid routes enforce prototype owner and surface rate limits
     const secondPlan = await secondPlanResponse.json();
     assert.equal(secondPlanResponse.status, 200, JSON.stringify(secondPlan));
     assert.equal(secondPlanResponse.headers.get('x-world-grid-idempotency-replay'), '1');
-    assert.equal(secondPlanResponse.headers.get('x-ratelimit-remaining'), '0');
+    assert.equal(secondPlanResponse.headers.get('x-ratelimit-remaining'), null);
 
     const thirdPlanResponse = await fetch(`${baseUrl}/api/world/territory/plan-claim`, {
       method: 'POST',
@@ -1019,16 +1021,44 @@ test('mutating world-grid routes enforce prototype owner and surface rate limits
       body: JSON.stringify(planBody)
     });
     const thirdPlan = await thirdPlanResponse.json();
-    assert.equal(thirdPlanResponse.status, 429, JSON.stringify(thirdPlan));
-    assert.equal(thirdPlan.error.code, 'RATE_LIMITED');
-    assert.ok(Number(thirdPlanResponse.headers.get('retry-after')) >= 1);
+    assert.equal(thirdPlanResponse.status, 200, JSON.stringify(thirdPlan));
+    assert.equal(thirdPlanResponse.headers.get('x-world-grid-idempotency-replay'), '1');
+    assert.equal(thirdPlanResponse.headers.get('x-ratelimit-remaining'), null);
+
+    const secondUniquePlanResponse = await fetch(`${baseUrl}/api/world/territory/plan-claim`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ cellId: secondOption.cellId, idempotencyKey: 'rate_limit_plan_002' })
+    });
+    const secondUniquePlan = await secondUniquePlanResponse.json();
+    assert.equal(secondUniquePlanResponse.status, 200, JSON.stringify(secondUniquePlan));
+    assert.equal(secondUniquePlanResponse.headers.get('x-ratelimit-remaining'), '0');
+
+    const rateLimitedPlanResponse = await fetch(`${baseUrl}/api/world/territory/plan-claim`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ cellId: thirdOption.cellId, idempotencyKey: 'rate_limit_plan_003' })
+    });
+    const rateLimitedPlan = await rateLimitedPlanResponse.json();
+    assert.equal(rateLimitedPlanResponse.status, 429, JSON.stringify(rateLimitedPlan));
+    assert.equal(rateLimitedPlan.error.code, 'RATE_LIMITED');
+    assert.ok(Number(rateLimitedPlanResponse.headers.get('retry-after')) >= 1);
+
+    const conflictAfterLimitResponse = await fetch(`${baseUrl}/api/world/territory/plan-claim`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ cellId: thirdOption.cellId, idempotencyKey: 'rate_limit_plan_001' })
+    });
+    const conflictAfterLimit = await conflictAfterLimitResponse.json();
+    assert.equal(conflictAfterLimitResponse.status, 429, JSON.stringify(conflictAfterLimit));
+    assert.equal(conflictAfterLimit.error.code, 'RATE_LIMITED');
 
     const serviceResponse = await fetch(`${baseUrl}/api/world/services/request-advice`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         serviceId: 'service_route_advisor',
-        input: { selectedCell: option },
+        input: { selectedCell: firstOption },
         idempotencyKey: 'rate_limit_service_001'
       })
     });

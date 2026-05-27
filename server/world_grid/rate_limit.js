@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
@@ -17,6 +18,18 @@ function readPositiveInteger(value, fallback) {
   return Number.isFinite(number) && number > 0 ? Math.floor(number) : fallback;
 }
 
+function truthy(value) {
+  return ['1', 'true', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
+}
+
+function sha256(value = '') {
+  return `sha256:${crypto.createHash('sha256').update(String(value || ''), 'utf8').digest('hex')}`;
+}
+
+function shortHash(value = '') {
+  return sha256(value).slice('sha256:'.length, 'sha256:'.length + 24);
+}
+
 function worldGridMutationRateLimitConfig(env = process.env) {
   return {
     windowMs: readPositiveInteger(env.WORLD_GRID_MUTATION_RATE_LIMIT_WINDOW_MS, DEFAULT_WINDOW_MS),
@@ -26,6 +39,56 @@ function worldGridMutationRateLimitConfig(env = process.env) {
 
 function ownerKey(owner = {}) {
   return String(owner.ownerAccountId || owner.regionId || owner.pairId || '').trim();
+}
+
+function sessionBindingKey(owner = {}) {
+  return String(owner.sessionBindingKey || owner.sessionId || owner.session?.sessionId || '').trim();
+}
+
+function requestHeader(req, name) {
+  if (!req || !name) return '';
+  if (typeof req.get === 'function') return String(req.get(name) || '').trim();
+  const headers = req.headers || {};
+  const lower = String(name).toLowerCase();
+  return String(headers[lower] || headers[name] || '').trim();
+}
+
+function clientIpFromRequest(req) {
+  const forwardedFor = requestHeader(req, 'x-forwarded-for').split(',')[0].trim();
+  return forwardedFor
+    || requestHeader(req, 'x-real-ip')
+    || String(req?.ip || '').trim()
+    || String(req?.socket?.remoteAddress || '').trim();
+}
+
+function riskSignalFromRequest(req) {
+  const risk = requestHeader(req, 'x-world-grid-risk')
+    || requestHeader(req, 'x-risk-signal')
+    || requestHeader(req, 'x-risk-score')
+    || 'none';
+  return String(risk || 'none').trim().toLowerCase().replace(/[^a-z0-9:_-]/g, '_').slice(0, 64) || 'none';
+}
+
+function rateLimitIdentityMode(env = process.env) {
+  const configured = String(env.WORLD_GRID_RATE_LIMIT_IDENTITY_MODE || '').trim().toLowerCase();
+  if (configured) return configured;
+  return truthy(env.WORLD_GRID_RISK_AWARE_RATE_LIMIT) ? 'owner_session_ip_risk' : 'owner';
+}
+
+function rateLimitIdentityKey({ owner, req = null, env = process.env } = {}) {
+  const baseOwner = ownerKey(owner);
+  if (!baseOwner) return '';
+  const mode = rateLimitIdentityMode(env);
+  if (!['owner_session_ip_risk', 'risk_aware', 'production_risk'].includes(mode)) return baseOwner;
+  const sessionKey = sessionBindingKey(owner) || requestHeader(req, 'x-session-id') || requestHeader(req, 'x-world-grid-session') || 'missing-session';
+  const ipKey = clientIpFromRequest(req) || 'missing-ip';
+  const riskKey = riskSignalFromRequest(req);
+  return [
+    baseOwner,
+    `session:${shortHash(sessionKey)}`,
+    `ip:${shortHash(ipKey)}`,
+    `risk:${riskKey}`
+  ].join('|');
 }
 
 function ensureDurableSchema(db) {
@@ -166,8 +229,8 @@ function getConfiguredWorldGridRateLimitStore(env = process.env) {
   return durableSingleton;
 }
 
-function consumeWorldGridMutationRateLimit({ owner, surface = '', nowMs = Date.now(), env = process.env } = {}) {
-  const keyOwner = ownerKey(owner);
+function consumeWorldGridMutationRateLimit({ owner, surface = '', nowMs = Date.now(), env = process.env, req = null } = {}) {
+  const keyOwner = rateLimitIdentityKey({ owner, req, env });
   if (!keyOwner) return null;
   const durableStore = getConfiguredWorldGridRateLimitStore(env);
   if (durableStore) {
@@ -225,6 +288,7 @@ module.exports = {
   configuredWorldGridRateLimitPath,
   consumeWorldGridMutationRateLimit,
   createWorldGridRateLimitStore,
+  rateLimitIdentityKey,
   worldGridMutationRateLimitBucketCount,
   worldGridMutationRateLimitConfig
 };

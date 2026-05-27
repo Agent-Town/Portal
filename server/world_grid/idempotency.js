@@ -222,16 +222,15 @@ function closeWorldGridIdempotencyStore() {
   durableSingletonPath = '';
 }
 
-function runIdempotentWorldGridMutation({
+function getIdempotentWorldGridMutationReplay({
   owner,
   surface = '',
   idempotencyKey = '',
-  body = {},
-  nowMs = Date.now()
-} = {}, mutate) {
+  body = {}
+} = {}) {
   const key = String(idempotencyKey || '').trim();
   const accountKey = ownerKey(owner);
-  if (!accountKey || !key || typeof mutate !== 'function') {
+  if (!accountKey || !key) {
     throw new Error('INVALID_IDEMPOTENCY_KEY');
   }
 
@@ -270,6 +269,27 @@ function runIdempotentWorldGridMutation({
       record: clone(existing)
     };
   }
+  return null;
+}
+
+function runIdempotentWorldGridMutation({
+  owner,
+  surface = '',
+  idempotencyKey = '',
+  body = {},
+  nowMs = Date.now()
+} = {}, mutate) {
+  if (typeof mutate !== 'function') {
+    throw new Error('INVALID_IDEMPOTENCY_KEY');
+  }
+  const replay = getIdempotentWorldGridMutationReplay({ owner, surface, idempotencyKey, body });
+  if (replay) return replay;
+
+  const key = String(idempotencyKey || '').trim();
+  const accountKey = ownerKey(owner);
+  const argsSha = requestHash({ surface, body });
+  const storeKey = recordKey(owner, key);
+  const durableStore = getConfiguredWorldGridIdempotencyStore();
 
   const response = mutate();
   const record = {
@@ -310,6 +330,7 @@ module.exports = {
   closeWorldGridIdempotencyStore,
   configuredWorldGridIdempotencyPath,
   createWorldGridIdempotencyStore,
+  getIdempotentWorldGridMutationReplay,
   runIdempotentWorldGridMutation,
   sha256,
   stableJson,

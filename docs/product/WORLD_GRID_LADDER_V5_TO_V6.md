@@ -63,7 +63,8 @@ rows without applying world state and checks hash-chain continuity,
 privacy-safe snapshots, migration metadata, rollback counts, and aggregate
 summary coverage. Complete exact per-record before-state reconstruction, final
 session auth, production replay coverage, live Privy/provider logout signoff,
-and IP/risk-aware production rate limits remain promotion gates. Optional
+and trusted-proxy/risk-signal production rollout for risk-aware rate limits
+remain promotion gates. Optional
 `WORLD_GRID_CSRF_SQLITE_PATH` coverage now proves owner-bound hashed CSRF tokens
 and hashed session-binding metadata persist across route restarts, Playwright
 coverage now proves browser same-wallet cross-session CSRF token reuse is
@@ -73,7 +74,11 @@ world-grid CSRF tokens, and wallet/provider disconnect cleanup now has an
 explicit invalidation endpoint plus client hook and mocked provider disconnect
 callback proof. Optional
 `WORLD_GRID_RATE_LIMIT_SQLITE_PATH` coverage now proves owner/surface mutation
-buckets persist across route restarts.
+buckets persist across route restarts. Exact idempotent retries are replayed
+before rate-limit consumption, and optional
+`WORLD_GRID_RATE_LIMIT_IDENTITY_MODE=owner_session_ip_risk` coverage proves
+session/IP/risk bucket identity is hashed without persisting raw session or IP
+values.
 
 `server/world_grid/release_promotion.js` now names the V5.0-V5.5 release
 promotion target matrix and keeps the report non-executing: it may record

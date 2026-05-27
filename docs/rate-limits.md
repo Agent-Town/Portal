@@ -57,20 +57,31 @@ Scope:
 Behavior:
 - Default process-local window: 60 seconds.
 - Default max: 30 requests per owner and mutation surface.
+- Exact idempotent world-grid mutation replays are detected before rate-limit
+  consumption and return `x-world-grid-idempotency-replay: 1` without consuming
+  another bucket hit.
+- Changed-payload reuse of an idempotency key still passes through the mutation
+  limiter before returning the conflict error.
 - Environment overrides:
   - `WORLD_GRID_MUTATION_RATE_LIMIT_WINDOW_MS`
   - `WORLD_GRID_MUTATION_RATE_LIMIT_MAX`
   - `WORLD_GRID_RATE_LIMIT_SQLITE_PATH` for optional durable owner/surface
     counters in the V5 hardening baseline
+  - `WORLD_GRID_RATE_LIMIT_IDENTITY_MODE=owner_session_ip_risk` or
+    `WORLD_GRID_RISK_AWARE_RATE_LIMIT=1` for optional owner/session/IP/risk
+    bucket identity. Session and IP values are hashed before storage; raw
+    session/IP values are not persisted in bucket rows.
 - On reject: `Retry-After`, response `429 { ok: false, error: { code:
   'RATE_LIMITED' } }`.
 
 Release note:
 - Process-local buckets are prototype abuse resistance only. Optional
   `WORLD_GRID_RATE_LIMIT_SQLITE_PATH` durable counters prove owner/surface
-  restart persistence, but V5/V6 release promotion still needs counters bound to
-  the final browser session, wallet/owner identity, and IP/risk-aware production
-  sharing.
+  restart persistence, exact idempotent replays no longer burn another bucket
+  hit, and optional hashed owner/session/IP/risk identity gives the release
+  target a privacy-safe foundation. V5/V6 release promotion still needs counters
+  bound to the final browser session, wallet/owner identity, trusted proxy/risk
+  signal wiring, and production operational tuning.
 
 ## Pony message rate limit
 

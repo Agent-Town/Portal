@@ -101,8 +101,14 @@ until the controls below are implemented and covered by deterministic tests.
   durable SQLite `world_grid_rate_limit_buckets` rows with owner/surface keys,
   count, reset timestamp, schema/migration metadata, and restart replay. Current
   restart coverage proves the durable counter blocks mutating routes across
-  separate Node process restarts. Release promotion still needs final session
-  binding plus IP/risk-aware production sharing.
+  separate Node process restarts. Exact idempotent retries are detected before
+  rate-limit consumption and return `x-world-grid-idempotency-replay: 1`
+  without consuming another bucket hit; changed-payload idempotency conflicts
+  still pass through the mutation rate limiter. Optional
+  `WORLD_GRID_RATE_LIMIT_IDENTITY_MODE=owner_session_ip_risk` coverage proves
+  owner/session/IP/risk bucket identity is hashed without storing raw session or
+  IP values. Release promotion still needs final session-auth integration,
+  trusted proxy/risk-signal production wiring, and operational tuning.
 - When `WORLD_GRID_AUDIT_SQLITE_PATH` is configured, successful mutating V5.1+
   world-grid routes and tool routes append durable, hash-chained SQLite audit
   records with actor, surface, idempotency key, request/response hashes,
@@ -148,8 +154,13 @@ until the controls below are implemented and covered by deterministic tests.
   owner, not just to a public id or request body field.
 - Rate limits keyed by session and owner for public presence, claim planning,
   service requests, event contributions, and sandbox actions. Current coverage
-  is owner/surface process-local only; release promotion needs durable or shared
-  counters and final session binding.
+  includes process-local owner/surface counters, optional durable owner/surface
+  SQLite counters, replay-safe exact idempotent retries before rate-limit
+  consumption, changed-payload conflict attempts that still pass through the
+  limiter, and optional hashed owner/session/IP/risk identity through
+  `WORLD_GRID_RATE_LIMIT_IDENTITY_MODE=owner_session_ip_risk`; release
+  promotion still needs final session-auth integration, trusted proxy/risk-signal
+  production wiring, and operational tuning.
 - Idempotency requirements for every resource-spending or externally visible
   mutation, not only world-event contribution. Current durable idempotency
   coverage starts this with SQLite-backed planned-claim replay after restart and
@@ -191,16 +202,19 @@ until the controls below are implemented and covered by deterministic tests.
   promotion still needs final session-auth integration, live Privy/provider
   logout signoff, and wallet/session continuity review.
 - Current `WORLD_GRID_RATE_LIMIT_SQLITE_PATH` coverage is a mutation security
-  foundation only; release promotion still needs final browser-session binding,
-  wallet/session continuity, IP/risk-aware production sharing, and operational
-  tuning for public traffic.
+  foundation only. Exact idempotent retry replay now bypasses additional
+  rate-limit charging, and optional `WORLD_GRID_RATE_LIMIT_IDENTITY_MODE=owner_session_ip_risk`
+  coverage proves hashed session/IP/risk bucket identity without raw session/IP
+  persistence; release promotion still needs final browser-session binding,
+  wallet/session continuity, trusted proxy/risk-signal production wiring, and
+  operational tuning for public traffic.
 - Current `WORLD_GRID_SANDBOX_SQLITE_PATH` coverage is a V5.5 storage
   foundation only; release promotion still needs abuse reports, stale-session
   cleanup, cross-owner moderation review, and final sandbox privacy coverage.
 
 ## Out Of Scope For This Hardening Pass
 
-This pass does not add final session-auth middleware, IP/risk-aware distributed
-rate limits, live Privy/provider logout signoff, or a public free-play security
-surface. Those controls remain release gates because the V5 world-grid branch
-is still prototype-gated.
+This pass does not add final session-auth middleware, trusted proxy/risk-signal
+production rollout, live Privy/provider logout signoff, or a public free-play
+security surface. Those controls remain release gates because the V5 world-grid
+branch is still prototype-gated.

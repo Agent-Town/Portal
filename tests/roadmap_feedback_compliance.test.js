@@ -1672,19 +1672,33 @@ test('world-grid mutation rate-limit policy is tracked as an M5 durable foundati
   assert.match(security, /WORLD_GRID_RATE_LIMIT_SQLITE_PATH/);
   assert.match(security, /world_grid_rate_limit_buckets/);
   assert.match(security, /blocks mutating routes across\s+separate Node process restarts/);
-  assert.match(security, /IP\/risk-aware production sharing/);
+  assert.match(security, /x-world-grid-idempotency-replay: 1/);
+  assert.match(security, /changed-payload idempotency conflicts\s+still pass through the mutation rate limiter/);
+  assert.match(security, /WORLD_GRID_RATE_LIMIT_IDENTITY_MODE=owner_session_ip_risk/);
+  assert.match(security, /without storing raw session or\s+IP values/);
+  assert.match(security, /trusted proxy\/risk-signal production wiring/);
   assert.match(stateModel, /server\/world_grid\/rate_limit\.js/);
   assert.match(stateModel, /world_grid_rate_limit_buckets/);
   assert.match(stateModel, /WORLD_GRID_RATE_LIMIT_SQLITE_PATH/);
   assert.match(stateModel, /block\s+mutating routes after restart/);
+  assert.match(stateModel, /getIdempotentWorldGridMutationReplay\(\)/);
+  assert.match(stateModel, /WORLD_GRID_RATE_LIMIT_IDENTITY_MODE=owner_session_ip_risk/);
+  assert.match(stateModel, /without persisting raw session or IP\s+values/);
   assert.match(evidence, /Mutation rate-limit guard/);
   assert.match(evidence, /tests\/world_grid_rate_limit_persistence\.test\.js/);
   assert.match(evidence, /survive separate Node process restarts/);
-  assert.match(evidence, /IP\/risk-aware\s+production rate limits/);
+  assert.match(evidence, /x-world-grid-idempotency-replay: 1/);
+  assert.match(evidence, /WORLD_GRID_RATE_LIMIT_IDENTITY_MODE=owner_session_ip_risk/);
+  assert.match(evidence, /without storing raw session\/IP values/);
+  assert.match(evidence, /trusted proxy\/risk-signal production rollout/);
   assert.match(rateLimits, /World-grid prototype mutation limit/);
   assert.match(rateLimits, /WORLD_GRID_MUTATION_RATE_LIMIT_MAX/);
   assert.match(rateLimits, /WORLD_GRID_RATE_LIMIT_SQLITE_PATH/);
-  assert.match(rateLimits, /wallet\/owner identity, and IP\/risk-aware production\s+sharing/);
+  assert.match(rateLimits, /x-world-grid-idempotency-replay: 1/);
+  assert.match(rateLimits, /Changed-payload reuse of an idempotency key still passes through the mutation\s+limiter/);
+  assert.match(rateLimits, /WORLD_GRID_RISK_AWARE_RATE_LIMIT=1/);
+  assert.match(rateLimits, /raw\s+session\/IP values are not persisted/);
+  assert.match(rateLimits, /trusted proxy\/risk\s+signal wiring/);
 });
 
 test('world-grid audit replay policy is tracked as an M3 release storage control', () => {
