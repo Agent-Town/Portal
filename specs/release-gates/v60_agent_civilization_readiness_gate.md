@@ -515,6 +515,12 @@ persistence resilience, and security/product release review.
   files are copied into a restore rehearsal directory, source/restored hashes
   and restored schema metadata are verified, report payloads exclude row
   contents, and no world state is applied.
+  multi-process write-contention research coverage starts in
+  `server/world_civilization/write_contention.js` and
+  `tests/world_civilization_write_contention.test.js`; concurrent audit-ledger
+  writers serialize before reading the latest hash-chain head, exact duplicate
+  retries are suppressed, replay remains privacy-safe, report payloads exclude
+  row contents, and no world state is applied.
   The M16 research-only resilience readiness gate in
   `server/world_civilization/resilience.js` must require all civic store
   restart probes, audit replay reconstruction, privacy-safe replay summaries,
@@ -530,8 +536,8 @@ persistence resilience, and security/product release review.
   These current probes cover every current civic store at research scale.
   Release still requires release-grade process restart coverage, larger replay
   reconstruction, migration scripts with upgrade/downgrade proofs, encrypted
-  and point-in-time backup restore drills, load/rate, and rollback recovery
-  tests.
+  and point-in-time backup restore drills, route/store load/rate and
+  write-contention SLO tests, and rollback recovery tests.
 - Security and product release review must be complete before normal gameplay
   exposure. Current gate tracking starts in
   `server/world_civilization/release_review.js` and

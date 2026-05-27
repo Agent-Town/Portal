@@ -139,7 +139,7 @@ function buildStatements(db) {
 }
 
 function withTransaction(db, fn) {
-  db.exec('BEGIN');
+  db.exec('BEGIN IMMEDIATE');
   try {
     const result = fn();
     db.exec('COMMIT');

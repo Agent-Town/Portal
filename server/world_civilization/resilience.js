@@ -5,6 +5,10 @@ const {
   REQUIRED_BACKUP_RESTORE_RELEASE_GAPS,
   V6_BACKUP_RESTORE_REHEARSAL_VERSION
 } = require('./backup_restore');
+const {
+  REQUIRED_WRITE_CONTENTION_RELEASE_GAPS,
+  V6_WRITE_CONTENTION_REHEARSAL_VERSION
+} = require('./write_contention');
 
 const V6_RESILIENCE_BASELINE_VERSION = 'agent-town.v6.resilience.v1';
 const V6_RESILIENCE_READINESS_GATE_VERSION = 'agent-town.v6.resilience.readiness.v1';
@@ -15,7 +19,8 @@ const REQUIRED_RELEASE_GAPS = [
   'M16_MIGRATION_UPGRADE_DOWNGRADE_TESTS_REQUIRED',
   'M16_LOAD_AND_RATE_TESTS_REQUIRED',
   'M16_ROLLBACK_RECOVERY_EXECUTION_REQUIRED',
-  'M16_BACKUP_RESTORE_RELEASE_DRILL_REQUIRED'
+  'M16_BACKUP_RESTORE_RELEASE_DRILL_REQUIRED',
+  'M16_WRITE_CONTENTION_RELEASE_DRILL_REQUIRED'
 ];
 
 const V6_CIVIC_LOAD_RATE_COVERAGE = {
@@ -31,9 +36,25 @@ const V6_CIVIC_LOAD_RATE_COVERAGE = {
   remainingReleaseGaps: [
     'production_route_rate_limits',
     'store_specific_load_targets',
-    'multi_process_write_contention',
     'release_slo_thresholds'
   ]
+};
+
+const V6_CIVIC_WRITE_CONTENTION_COVERAGE = {
+  modulePath: 'server/world_civilization/write_contention.js',
+  artifact: 'tests/world_civilization_write_contention.test.js',
+  version: V6_WRITE_CONTENTION_REHEARSAL_VERSION,
+  status: 'research_only',
+  releaseReady: false,
+  coveredChecks: [
+    'multi_process_audit_ledger_writes',
+    'begin_immediate_writer_serialization',
+    'hash_chain_integrity_under_contention',
+    'idempotent_duplicate_retry_under_contention',
+    'private_row_payload_exclusion',
+    'no_world_state_application'
+  ],
+  remainingReleaseGaps: [...REQUIRED_WRITE_CONTENTION_RELEASE_GAPS]
 };
 
 const V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE = {
@@ -562,6 +583,7 @@ function disabledReport(source) {
     rollbackRecoveryCoverage: null,
     migrationRehearsalCoverage: null,
     backupRestoreCoverage: null,
+    writeContentionCoverage: null,
     releaseGaps: [...REQUIRED_RELEASE_GAPS],
     disabledReason: 'V6 resilience evidence requires explicit research opt-in and V6 feature flag'
   };
@@ -632,6 +654,7 @@ function buildV6ResilienceBaselineReport({
     rollbackRecoveryCoverage: clone(V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE),
     migrationRehearsalCoverage: clone(V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE),
     backupRestoreCoverage: clone(V6_CIVIC_BACKUP_RESTORE_COVERAGE),
+    writeContentionCoverage: clone(V6_CIVIC_WRITE_CONTENTION_COVERAGE),
     releaseGaps: [...REQUIRED_RELEASE_GAPS]
   };
 }
@@ -728,6 +751,19 @@ function assertV6ResilienceBaseline(report = {}) {
     ) {
       errors.push('V6_RESILIENCE_BACKUP_RESTORE_COVERAGE_REQUIRED');
     }
+    const writeContentionCoverage = report.writeContentionCoverage || {};
+    if (
+      writeContentionCoverage.modulePath !== V6_CIVIC_WRITE_CONTENTION_COVERAGE.modulePath
+      || writeContentionCoverage.artifact !== V6_CIVIC_WRITE_CONTENTION_COVERAGE.artifact
+      || writeContentionCoverage.version !== V6_WRITE_CONTENTION_REHEARSAL_VERSION
+      || writeContentionCoverage.status !== 'research_only'
+      || writeContentionCoverage.releaseReady !== false
+      || !Array.isArray(writeContentionCoverage.coveredChecks)
+      || !writeContentionCoverage.coveredChecks.includes('multi_process_audit_ledger_writes')
+      || !writeContentionCoverage.coveredChecks.includes('private_row_payload_exclusion')
+    ) {
+      errors.push('V6_RESILIENCE_WRITE_CONTENTION_COVERAGE_REQUIRED');
+    }
   }
   return {
     ok: errors.length === 0,
@@ -746,6 +782,7 @@ module.exports = {
   V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE: clone(V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE),
   V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE: clone(V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE),
   V6_CIVIC_RESILIENCE_STORES: clone(V6_CIVIC_RESILIENCE_STORES),
+  V6_CIVIC_WRITE_CONTENTION_COVERAGE: clone(V6_CIVIC_WRITE_CONTENTION_COVERAGE),
   V6_RESILIENCE_BASELINE_VERSION,
   V6_RESILIENCE_READINESS_GATE_VERSION,
   assertV6ResilienceBaseline,

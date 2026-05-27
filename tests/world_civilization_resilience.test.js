@@ -25,6 +25,7 @@ const {
   V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE,
   V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE,
   V6_CIVIC_RESILIENCE_STORES,
+  V6_CIVIC_WRITE_CONTENTION_COVERAGE,
   assertV6ResilienceBaseline,
   assertV6ResilienceReadinessGateSafe,
   buildV6ResilienceBaselineReport,
@@ -127,6 +128,7 @@ test('V6 resilience report is hidden without explicit research opt-in and V6 fla
     assert.equal(report.rollbackRecoveryCoverage, null);
     assert.equal(report.migrationRehearsalCoverage, null);
     assert.equal(report.backupRestoreCoverage, null);
+    assert.equal(report.writeContentionCoverage, null);
     assert.deepEqual(report.releaseGaps, REQUIRED_RELEASE_GAPS);
     assert.deepEqual(assertV6ResilienceBaseline(report), { ok: true, errors: [] });
   }
@@ -160,6 +162,11 @@ test('V6 resilience baseline verifies current SQLite stores and keeps release ga
   assert.ok(report.backupRestoreCoverage.coveredChecks.includes('source_restored_hash_match'));
   assert.ok(report.backupRestoreCoverage.coveredChecks.includes('private_row_payload_exclusion'));
   assert.ok(report.backupRestoreCoverage.remainingReleaseGaps.includes('point_in_time_restore_drill_required'));
+  assert.deepEqual(report.writeContentionCoverage, V6_CIVIC_WRITE_CONTENTION_COVERAGE);
+  assert.equal(report.writeContentionCoverage.releaseReady, false);
+  assert.ok(report.writeContentionCoverage.coveredChecks.includes('multi_process_audit_ledger_writes'));
+  assert.ok(report.writeContentionCoverage.coveredChecks.includes('private_row_payload_exclusion'));
+  assert.ok(report.writeContentionCoverage.remainingReleaseGaps.includes('production_route_contention_slo_targets_required'));
   assert.deepEqual(report.releaseGaps, REQUIRED_RELEASE_GAPS);
   assert.deepEqual(report.auditSummaryCoverage, V6_CIVIC_AUDIT_SUMMARY_COVERAGE);
   assert.equal(report.auditSummaryCoverage.releaseReady, false);
@@ -227,6 +234,10 @@ test('V6 resilience assertion fails closed for missing store evidence and releas
       ...report.backupRestoreCoverage,
       artifact: 'tests/fake_backup_restore.test.js'
     },
+    writeContentionCoverage: {
+      ...report.writeContentionCoverage,
+      artifact: 'tests/fake_write_contention.test.js'
+    },
     releaseGaps: []
   };
   const result = assertV6ResilienceBaseline(unsafe);
@@ -239,6 +250,7 @@ test('V6 resilience assertion fails closed for missing store evidence and releas
   assert.match(result.errors.join(','), /V6_RESILIENCE_RELEASE_GAPS_REQUIRED/);
   assert.match(result.errors.join(','), /V6_RESILIENCE_AUDIT_SUMMARY_COVERAGE_REQUIRED/);
   assert.match(result.errors.join(','), /V6_RESILIENCE_BACKUP_RESTORE_COVERAGE_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_RESILIENCE_WRITE_CONTENTION_COVERAGE_REQUIRED/);
   assert.match(result.errors.join(','), /V6_RESILIENCE_STORE_EVIDENCE_INVALID:audit_ledger/);
   assert.match(result.errors.join(','), /V6_RESILIENCE_STORE_EVIDENCE_INVALID:proposals/);
   assert.match(result.errors.join(','), /V6_RESILIENCE_STORE_EVIDENCE_INVALID:public_works/);

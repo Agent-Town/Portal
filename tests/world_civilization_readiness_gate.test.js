@@ -99,11 +99,14 @@ test('V6 readiness gate baseline names every prerequisite domain but remains ope
   assert.ok(reputationGate.requiredChecks.includes('no_score_mutation'));
   assert.ok(persistenceGate.requiredArtifacts.includes('server/world_civilization/replay_reconstruction.js'));
   assert.ok(persistenceGate.requiredArtifacts.includes('server/world_civilization/backup_restore.js'));
+  assert.ok(persistenceGate.requiredArtifacts.includes('server/world_civilization/write_contention.js'));
   assert.ok(persistenceGate.requiredArtifacts.includes('tests/world_civilization_replay_reconstruction.test.js'));
   assert.ok(persistenceGate.requiredArtifacts.includes('tests/world_civilization_backup_restore.test.js'));
+  assert.ok(persistenceGate.requiredArtifacts.includes('tests/world_civilization_write_contention.test.js'));
   assert.ok(persistenceGate.requiredArtifacts.includes('tests/world_civilization_process_restart.test.js'));
   assert.ok(persistenceGate.requiredChecks.includes('store_specific_zero_hash_only_fallbacks'));
   assert.ok(persistenceGate.requiredChecks.includes('backup_restore'));
+  assert.ok(persistenceGate.requiredChecks.includes('multi_process_write_contention'));
   assert.ok(persistenceGate.requiredChecks.includes('privacy_safe_replay_summaries'));
   assert.ok(persistenceGate.requiredChecks.includes('no_effect_application_during_replay'));
   assert.ok(releaseReviewGate.requiredChecks.includes('audit_coverage'));
@@ -151,6 +154,7 @@ test('V6 readiness gate fails closed without proposal vote privacy and resilienc
     ...evidence.persistence_resilience,
     checks: evidence.persistence_resilience.checks.filter((check) => (
       check !== 'production_load_rate'
+      && check !== 'multi_process_write_contention'
       && check !== 'store_specific_zero_hash_only_fallbacks'
     ))
   };
@@ -173,7 +177,8 @@ test('V6 readiness gate fails closed without proposal vote privacy and resilienc
   assert.deepEqual(report.gateReports.find((gate) => gate.key === 'reputation_moderation_privacy').missingChecks, ['private_data_redaction']);
   assert.deepEqual(report.gateReports.find((gate) => gate.key === 'persistence_resilience').missingChecks, [
     'store_specific_zero_hash_only_fallbacks',
-    'production_load_rate'
+    'production_load_rate',
+    'multi_process_write_contention'
   ]);
   assert.deepEqual(report.gateReports.find((gate) => gate.key === 'security_product_release_review').missingChecks, [
     'audit_coverage',

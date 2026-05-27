@@ -39,8 +39,9 @@ are present.
   store-specific audit-summary coverage, rollback handles, governance preflight
   evidence, and non-executing rollback recovery evidence.
 - Validation evidence: targeted Node suite, split Playwright smokes,
-  all-features regression, feature override safety, and load/rate replay
-  evidence, including civic mutation security, proposal intake readiness, vote
+  all-features regression, feature override safety, load/rate replay evidence,
+  and multi-process write-contention evidence, including civic mutation
+  security, proposal intake readiness, vote
   authorization readiness, worker vote adapter gate, reputation eligibility
   advice readiness, moderation privacy readiness, delegated-agent proof, and
   governance preflight, effect execution gate, agent participation enforcement
@@ -128,8 +129,11 @@ are present.
   reconstruction, typed rollback execution recovery, private-data exclusion, and
   no effect application during replay before M16 can claim release-grade
   resilience. Current backup/restore evidence is research-only closed-store
-  file-copy/hash/schema-metadata rehearsal and still excludes encrypted storage,
-  point-in-time recovery, live WAL checkpointing, and restore SLO signoff.
+  file-copy/hash/schema-metadata rehearsal; current write-contention evidence is
+  research-only audit-ledger SQLite contention rehearsal with no row-payload
+  reports. Release still requires encrypted storage, point-in-time recovery,
+  live WAL checkpointing, restore SLO signoff, and route/store contention SLO
+  evidence.
 - Product release signoff: player-visible scope, rollback plan, support runbook,
   and disable plan.
 

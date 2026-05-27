@@ -10,6 +10,7 @@ Runtime contracts:
 - `server/world_civilization/replay_reconstruction.js`
 - `server/world_civilization/migration_rehearsal.js`
 - `server/world_civilization/backup_restore.js`
+- `server/world_civilization/write_contention.js`
 - `server/world_civilization/rollback_recovery.js`
 
 Test coverage:
@@ -27,6 +28,7 @@ Test coverage:
 - `tests/world_civilization_migration_rehearsal.test.js`
 - `tests/world_civilization_backup_restore.test.js`
 - `tests/world_civilization_load_rate.test.js`
+- `tests/world_civilization_write_contention.test.js`
 - `tests/world_civilization_rollback_recovery.test.js`
 
 ## Boundary
@@ -84,6 +86,14 @@ restored schema metadata, and keeps the report payload free of row contents or
 private data. This is backup-copy evidence only; it is not encrypted backup
 storage, point-in-time recovery, live WAL checkpointing, operator runbook
 approval, or a release SLO drill.
+
+`server/world_civilization/write_contention.js` adds a research-only
+multi-process write contention rehearsal for the civic audit ledger. It records
+only writer counts, entry-id digests, replay counts, hash-chain status, privacy
+status, and remaining release gaps; it does not expose ledger rows, apply world
+state, expose runtime tools, or claim release readiness. The audit ledger now
+uses `BEGIN IMMEDIATE` for append transactions so concurrent SQLite writers
+serialize before reading the latest hash-chain head.
 
 `server/world_civilization/replay_reconstruction.js` reconstructs a
 privacy-safe summary from civic audit ledger replay rows. The reconstruction
@@ -173,6 +183,13 @@ directory, restored files match source hashes and v1 schema metadata, the
 restored audit ledger can replay its seeded row, and the report exposes no row
 payloads or private data while keeping `releaseReady: false`.
 
+`tests/world_civilization_write_contention.test.js` adds research-scale
+multi-process write contention evidence: concurrent child Node processes append
+to the same civic audit ledger SQLite file, exact duplicate retries are
+suppressed, replay sequence numbers remain contiguous, the hash chain remains
+valid, privacy-safe summaries are present, and the report excludes row payloads
+while keeping `releaseReady: false`.
+
 `tests/world_civilization_load_rate.test.js` adds research-scale load/rate
 evidence for the civic audit ledger: a larger append burst is replayed through
 bounded pages, exact duplicate retries do not create new rows, changed
@@ -202,8 +219,8 @@ The readiness gate requires evidence for:
   restart probes.
 - Migration upgrade/downgrade scripts and unsupported transition denial.
 - Backup/restore and migration load replay rehearsal.
-- Production load/rate targets, multi-process write contention, duplicate
-  retry bursts, and idempotency conflict rejection.
+- Research-scale multi-process write contention, production load/rate targets,
+  duplicate retry bursts, and idempotency conflict rejection.
 - Rollback handle reconstruction and typed rollback execution recovery review.
 - No effect application during replay.
 
@@ -231,8 +248,9 @@ M16 remains incomplete until all of these gates close:
   restore, live WAL checkpointing, operator runbooks, and restore SLOs beyond
   the current closed-store file-copy/hash/schema-metadata rehearsal.
 - Release-grade load/rate tests for production route limits, store-specific
-  throughput targets, multi-process write contention, and replay pagination
-  beyond the current research-scale duplicate/replay probe.
+  throughput targets, route/store write-contention SLOs, and replay pagination
+  beyond the current research-scale duplicate/replay and audit-ledger
+  contention probes.
 - Release-grade rollback recovery tests that drive real recovery once effect
   execution exists, beyond the current non-executing handle reconstruction
   report.
