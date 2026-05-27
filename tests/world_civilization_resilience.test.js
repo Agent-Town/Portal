@@ -22,6 +22,7 @@ const {
   V6_CIVIC_AUDIT_SUMMARY_COVERAGE,
   V6_CIVIC_BACKUP_RESTORE_COVERAGE,
   V6_CIVIC_LOAD_RATE_COVERAGE,
+  V6_CIVIC_LOAD_RATE_TARGET_COVERAGE,
   V6_CIVIC_MIGRATION_LOAD_REPLAY_COVERAGE,
   V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE,
   V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE,
@@ -126,6 +127,7 @@ test('V6 resilience report is hidden without explicit research opt-in and V6 fla
     assert.equal(report.releaseReady, false);
     assert.deepEqual(report.storeReports, []);
     assert.equal(report.loadRateCoverage, null);
+    assert.equal(report.loadRateTargetCoverage, null);
     assert.equal(report.rollbackRecoveryCoverage, null);
     assert.equal(report.migrationRehearsalCoverage, null);
     assert.equal(report.migrationLoadReplayCoverage, null);
@@ -151,6 +153,11 @@ test('V6 resilience baseline verifies current SQLite stores and keeps release ga
   assert.equal(report.loadRateCoverage.releaseReady, false);
   assert.ok(report.loadRateCoverage.coveredChecks.includes('idempotent_duplicate_retry_suppression'));
   assert.ok(report.loadRateCoverage.remainingReleaseGaps.includes('production_route_rate_limits'));
+  assert.deepEqual(report.loadRateTargetCoverage, V6_CIVIC_LOAD_RATE_TARGET_COVERAGE);
+  assert.equal(report.loadRateTargetCoverage.releaseReady, false);
+  assert.ok(report.loadRateTargetCoverage.coveredChecks.includes('future_civic_route_rate_limit_targets'));
+  assert.ok(report.loadRateTargetCoverage.coveredChecks.includes('no_world_state_application'));
+  assert.ok(report.loadRateTargetCoverage.remainingReleaseGaps.includes('production_infrastructure_signoff_required'));
   assert.deepEqual(report.rollbackRecoveryCoverage, V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE);
   assert.equal(report.rollbackRecoveryCoverage.releaseReady, false);
   assert.ok(report.rollbackRecoveryCoverage.coveredChecks.includes('prepared_rollback_handle_reconstruction'));
@@ -241,6 +248,10 @@ test('V6 resilience assertion fails closed for missing store evidence and releas
       ...report.backupRestoreCoverage,
       artifact: 'tests/fake_backup_restore.test.js'
     },
+    loadRateTargetCoverage: {
+      ...report.loadRateTargetCoverage,
+      artifact: 'tests/fake_load_rate_targets.test.js'
+    },
     migrationLoadReplayCoverage: {
       ...report.migrationLoadReplayCoverage,
       artifact: 'tests/fake_migration_load_replay.test.js'
@@ -260,6 +271,7 @@ test('V6 resilience assertion fails closed for missing store evidence and releas
   assert.match(result.errors.join(','), /V6_RESILIENCE_NON_EXECUTING_REQUIRED/);
   assert.match(result.errors.join(','), /V6_RESILIENCE_RELEASE_GAPS_REQUIRED/);
   assert.match(result.errors.join(','), /V6_RESILIENCE_AUDIT_SUMMARY_COVERAGE_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_RESILIENCE_LOAD_RATE_TARGET_COVERAGE_REQUIRED/);
   assert.match(result.errors.join(','), /V6_RESILIENCE_MIGRATION_LOAD_REPLAY_COVERAGE_REQUIRED/);
   assert.match(result.errors.join(','), /V6_RESILIENCE_BACKUP_RESTORE_COVERAGE_REQUIRED/);
   assert.match(result.errors.join(','), /V6_RESILIENCE_WRITE_CONTENTION_COVERAGE_REQUIRED/);

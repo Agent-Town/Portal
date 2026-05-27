@@ -39,9 +39,9 @@ are present.
   store-specific audit-summary coverage, rollback handles, governance preflight
   evidence, and non-executing rollback recovery evidence.
 - Validation evidence: targeted Node suite, split Playwright smokes,
-  all-features regression, feature override safety, migration-load replay
-  evidence, load/rate replay evidence, and multi-process write-contention
-  evidence, including civic mutation security, proposal intake readiness, vote
+  all-features regression, feature override safety, load-rate target coverage,
+  migration-load replay evidence, load/rate replay evidence, and multi-process
+  write-contention evidence, including civic mutation security, proposal intake readiness, vote
   authorization readiness, worker vote adapter gate, reputation eligibility
   advice readiness, moderation privacy readiness, delegated-agent proof, and
   governance preflight, effect execution gate, agent participation enforcement
@@ -128,8 +128,10 @@ are present.
   multi-process write contention, duplicate retry bursts, rollback handle
   reconstruction, typed rollback execution recovery, private-data exclusion, and
   no effect application during replay before M16 can claim release-grade
-  resilience. Current migration-load replay evidence is research-only v1 schema
-  inventory plus bounded privacy-safe audit replay with no migration execution;
+  resilience. Current load-rate target coverage is research-only release SLO
+  surface definition plus calibration counts, not production signoff. Current
+  migration-load replay evidence is research-only v1 schema inventory plus
+  bounded privacy-safe audit replay with no migration execution;
   current backup/restore evidence is research-only closed-store
   file-copy/hash/schema-metadata rehearsal; current write-contention evidence is
   research-only audit-ledger SQLite contention rehearsal with no row-payload

@@ -8,6 +8,7 @@ Runtime contracts:
 
 - `server/world_civilization/resilience.js`
 - `server/world_civilization/replay_reconstruction.js`
+- `server/world_civilization/load_rate_targets.js`
 - `server/world_civilization/migration_rehearsal.js`
 - `server/world_civilization/migration_load_replay.js`
 - `server/world_civilization/backup_restore.js`
@@ -18,6 +19,7 @@ Test coverage:
 
 - `tests/world_civilization_resilience.test.js`
 - `tests/world_civilization_replay_reconstruction.test.js`
+- `tests/world_civilization_load_rate_targets.test.js`
 - `tests/world_civilization_process_restart.test.js`
 - `tests/world_civilization_proposal_vote_process_restart.test.js`
 - `tests/world_civilization_reputation_moderation_process_restart.test.js`
@@ -113,6 +115,13 @@ rollback handle counts, and paginated ledger replay without applying world state
 or exposing actor account ids. Hash-only summary fallbacks are tracked as
 research evidence, not release-grade store reconstruction.
 
+`server/world_civilization/load_rate_targets.js` defines research-only
+load-rate target surfaces for audit replay pagination, duplicate retry bursts,
+conflict rejection, migration-load replay, multi-process write contention, and
+future civic route rate limits. This target matrix is calibration-only: it
+does not benchmark production infrastructure, does not expose runtime tools,
+does not apply world state, and keeps `releaseReady: false`.
+
 `server/world_civilization/resilience.js` now aggregates the current
 store-specific audit-summary coverage in `V6_CIVIC_AUDIT_SUMMARY_COVERAGE`.
 That coverage names each process-restart replay group that proves privacy-safe
@@ -182,6 +191,11 @@ shared-resource records.
 store exposes v1 schema metadata to the resilience report and rejects version
 drift before the store can be used.
 
+`tests/world_civilization_load_rate_targets.test.js` proves the load-rate
+target matrix names every required release SLO surface, accepts only
+privacy-safe research calibration counts, rejects fake release readiness, and
+keeps private row payloads and world-state application out of the report.
+
 `tests/world_civilization_migration_rehearsal.test.js` adds research-scale
 migration readiness evidence: every current store can be inventoried at v1
 from schema metadata, while unsupported v2 upgrades and v0 downgrades fail
@@ -235,8 +249,8 @@ The readiness gate requires evidence for:
   restart probes.
 - Migration upgrade/downgrade scripts and unsupported transition denial.
 - Migration-load replay, backup/restore, and migration rehearsal.
-- Research-scale multi-process write contention, production load/rate targets,
-  duplicate retry bursts, and idempotency conflict rejection.
+- Research-scale multi-process write contention, production load/rate target
+  surfaces, duplicate retry bursts, and idempotency conflict rejection.
 - Rollback handle reconstruction and typed rollback execution recovery review.
 - No effect application during replay.
 

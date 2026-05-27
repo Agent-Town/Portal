@@ -497,6 +497,12 @@ persistence resilience, and security/product release review.
   `tests/world_civilization_schema_metadata.test.js`; current stores stamp
   v1 on-disk metadata and fail closed on unsupported SQLite `user_version` or
   mismatched migration markers.
+  Load-rate target coverage starts in
+  `server/world_civilization/load_rate_targets.js` and
+  `tests/world_civilization_load_rate_targets.test.js`; the release SLO surfaces
+  for audit replay, retry bursts, conflict rejection, migration replay,
+  write-contention, and future civic route rate limits are explicit while the
+  report remains calibration-only and `releaseReady: false`.
   Load/rate research coverage starts in
   `tests/world_civilization_load_rate.test.js`; the audit ledger now has a
   deterministic larger replay pagination and duplicate retry burst check.
@@ -532,7 +538,7 @@ persistence resilience, and security/product release review.
   store-specific zero hash-only fallback proof, hash-chain integrity,
   migration upgrade/downgrade scripts, unsupported
   transition denial, backup/restore rehearsal, migration-load replay rehearsal,
-  production load/rate targets, multi-process write contention, duplicate retry
+  production load-rate target surfaces, multi-process write contention, duplicate retry
   bursts, rollback handle reconstruction, typed rollback execution recovery,
   private-data exclusion, and no effect application during replay while keeping
   `releaseReady: false`, `appliesMigration: false`,

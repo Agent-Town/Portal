@@ -6,6 +6,10 @@ const {
   V6_BACKUP_RESTORE_REHEARSAL_VERSION
 } = require('./backup_restore');
 const {
+  REQUIRED_LOAD_RATE_TARGET_RELEASE_GAPS,
+  V6_LOAD_RATE_TARGETS_VERSION
+} = require('./load_rate_targets');
+const {
   REQUIRED_MIGRATION_LOAD_REPLAY_RELEASE_GAPS,
   V6_MIGRATION_LOAD_REPLAY_REHEARSAL_VERSION
 } = require('./migration_load_replay');
@@ -42,6 +46,25 @@ const V6_CIVIC_LOAD_RATE_COVERAGE = {
     'store_specific_load_targets',
     'release_slo_thresholds'
   ]
+};
+
+const V6_CIVIC_LOAD_RATE_TARGET_COVERAGE = {
+  modulePath: 'server/world_civilization/load_rate_targets.js',
+  artifact: 'tests/world_civilization_load_rate_targets.test.js',
+  version: V6_LOAD_RATE_TARGETS_VERSION,
+  status: 'research_only',
+  releaseReady: false,
+  coveredChecks: [
+    'audit_ledger_replay_pagination_targets',
+    'idempotency_retry_burst_targets',
+    'idempotency_conflict_rejection_targets',
+    'migration_load_replay_targets',
+    'multi_process_write_contention_targets',
+    'future_civic_route_rate_limit_targets',
+    'private_row_payload_exclusion',
+    'no_world_state_application'
+  ],
+  remainingReleaseGaps: [...REQUIRED_LOAD_RATE_TARGET_RELEASE_GAPS]
 };
 
 const V6_CIVIC_WRITE_CONTENTION_COVERAGE = {
@@ -601,6 +624,7 @@ function disabledReport(source) {
     storeReports: [],
     auditSummaryCoverage: null,
     loadRateCoverage: null,
+    loadRateTargetCoverage: null,
     rollbackRecoveryCoverage: null,
     migrationRehearsalCoverage: null,
     migrationLoadReplayCoverage: null,
@@ -673,6 +697,7 @@ function buildV6ResilienceBaselineReport({
     storeReports: V6_CIVIC_RESILIENCE_STORES.map((requirement) => inspectStore(requirement, stores[requirement.key])),
     auditSummaryCoverage: clone(V6_CIVIC_AUDIT_SUMMARY_COVERAGE),
     loadRateCoverage: clone(V6_CIVIC_LOAD_RATE_COVERAGE),
+    loadRateTargetCoverage: clone(V6_CIVIC_LOAD_RATE_TARGET_COVERAGE),
     rollbackRecoveryCoverage: clone(V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE),
     migrationRehearsalCoverage: clone(V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE),
     migrationLoadReplayCoverage: clone(V6_CIVIC_MIGRATION_LOAD_REPLAY_COVERAGE),
@@ -737,6 +762,19 @@ function assertV6ResilienceBaseline(report = {}) {
       || !loadRateCoverage.coveredChecks.includes('idempotent_duplicate_retry_suppression')
     ) {
       errors.push('V6_RESILIENCE_LOAD_RATE_COVERAGE_REQUIRED');
+    }
+    const loadRateTargetCoverage = report.loadRateTargetCoverage || {};
+    if (
+      loadRateTargetCoverage.modulePath !== V6_CIVIC_LOAD_RATE_TARGET_COVERAGE.modulePath
+      || loadRateTargetCoverage.artifact !== V6_CIVIC_LOAD_RATE_TARGET_COVERAGE.artifact
+      || loadRateTargetCoverage.version !== V6_LOAD_RATE_TARGETS_VERSION
+      || loadRateTargetCoverage.status !== 'research_only'
+      || loadRateTargetCoverage.releaseReady !== false
+      || !Array.isArray(loadRateTargetCoverage.coveredChecks)
+      || !loadRateTargetCoverage.coveredChecks.includes('future_civic_route_rate_limit_targets')
+      || !loadRateTargetCoverage.coveredChecks.includes('no_world_state_application')
+    ) {
+      errors.push('V6_RESILIENCE_LOAD_RATE_TARGET_COVERAGE_REQUIRED');
     }
     const rollbackRecoveryCoverage = report.rollbackRecoveryCoverage || {};
     if (
@@ -815,6 +853,7 @@ module.exports = {
   V6_CIVIC_AUDIT_SUMMARY_COVERAGE: clone(V6_CIVIC_AUDIT_SUMMARY_COVERAGE),
   V6_CIVIC_BACKUP_RESTORE_COVERAGE: clone(V6_CIVIC_BACKUP_RESTORE_COVERAGE),
   V6_CIVIC_LOAD_RATE_COVERAGE: clone(V6_CIVIC_LOAD_RATE_COVERAGE),
+  V6_CIVIC_LOAD_RATE_TARGET_COVERAGE: clone(V6_CIVIC_LOAD_RATE_TARGET_COVERAGE),
   V6_CIVIC_MIGRATION_LOAD_REPLAY_COVERAGE: clone(V6_CIVIC_MIGRATION_LOAD_REPLAY_COVERAGE),
   V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE: clone(V6_CIVIC_MIGRATION_REHEARSAL_COVERAGE),
   V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE: clone(V6_CIVIC_ROLLBACK_RECOVERY_COVERAGE),

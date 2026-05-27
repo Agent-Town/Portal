@@ -98,10 +98,12 @@ test('V6 readiness gate baseline names every prerequisite domain but remains ope
   assert.ok(reputationGate.requiredChecks.includes('eligibility_advice_policy'));
   assert.ok(reputationGate.requiredChecks.includes('no_score_mutation'));
   assert.ok(persistenceGate.requiredArtifacts.includes('server/world_civilization/replay_reconstruction.js'));
+  assert.ok(persistenceGate.requiredArtifacts.includes('server/world_civilization/load_rate_targets.js'));
   assert.ok(persistenceGate.requiredArtifacts.includes('server/world_civilization/backup_restore.js'));
   assert.ok(persistenceGate.requiredArtifacts.includes('server/world_civilization/migration_load_replay.js'));
   assert.ok(persistenceGate.requiredArtifacts.includes('server/world_civilization/write_contention.js'));
   assert.ok(persistenceGate.requiredArtifacts.includes('tests/world_civilization_replay_reconstruction.test.js'));
+  assert.ok(persistenceGate.requiredArtifacts.includes('tests/world_civilization_load_rate_targets.test.js'));
   assert.ok(persistenceGate.requiredArtifacts.includes('tests/world_civilization_backup_restore.test.js'));
   assert.ok(persistenceGate.requiredArtifacts.includes('tests/world_civilization_migration_load_replay.test.js'));
   assert.ok(persistenceGate.requiredArtifacts.includes('tests/world_civilization_write_contention.test.js'));

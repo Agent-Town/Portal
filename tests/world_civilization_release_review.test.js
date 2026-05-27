@@ -252,12 +252,14 @@ test('V6 release review requires persistence replay resilience readiness evidenc
   assert.ok(resilienceGate.requiredArtifacts.includes('specs/67_agent_town_v6_persistence_replay_resilience_foundation.md'));
   assert.ok(resilienceGate.requiredArtifacts.includes('server/world_civilization/resilience.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('server/world_civilization/replay_reconstruction.js'));
+  assert.ok(resilienceGate.requiredArtifacts.includes('server/world_civilization/load_rate_targets.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('server/world_civilization/migration_rehearsal.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('server/world_civilization/migration_load_replay.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('server/world_civilization/backup_restore.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('server/world_civilization/write_contention.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('server/world_civilization/rollback_recovery.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('tests/world_civilization_resilience.test.js'));
+  assert.ok(resilienceGate.requiredArtifacts.includes('tests/world_civilization_load_rate_targets.test.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('tests/world_civilization_migration_load_replay.test.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('tests/world_civilization_backup_restore.test.js'));
   assert.ok(resilienceGate.requiredArtifacts.includes('tests/world_civilization_write_contention.test.js'));
