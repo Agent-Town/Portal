@@ -286,7 +286,9 @@ persistence resilience, and security/product release review.
   delegation proof, and delegation-policy prerequisites to pass. Delegated
   execution cannot be enabled by a loose boolean flag; it must carry matching
   active `civic_execution` delegation proof and still remains blocked until M12
-  route/tool enforcement is release-ready.
+  route/tool enforcement is release-ready. Prepared-effect audit rows must carry
+  privacy-safe before/after summaries with rollback id and no-world-state-applied
+  evidence before effect replay can count as release-grade.
   The M11 research-only execution gate in
   `server/world_civilization/effects.js` must also require typed apply handler
   evidence, typed rollback handler evidence, real before/after state,
@@ -304,7 +306,8 @@ persistence resilience, and security/product release review.
   research-only delegation lifecycle storage starts this in
   `server/world_civilization/delegations.js` with scoped delegations,
   idempotent action-budget usage records, and `delegation.action_consumed`
-  audit rows; governance preflight now validates delegation proof read-only
+  audit rows carrying privacy-safe before/after lifecycle summaries; governance
+  preflight now validates delegation proof read-only
   while leaving budget unconsumed and delegated preparation blocked. Release
   still requires worker/tool enforcement, expiry, budget, and revocation checks
   at every route edge, and principal wallet/session authorization. The M12
@@ -376,9 +379,11 @@ persistence resilience, and security/product release review.
   Reputation/moderation process restart coverage starts in
   `tests/world_civilization_reputation_moderation_process_restart.test.js`.
   Effect/rollback process restart coverage starts in
-  `tests/world_civilization_effect_process_restart.test.js`.
+  `tests/world_civilization_effect_process_restart.test.js` and now proves zero
+  hash-only summary fallbacks for prepared-effect replay.
   Delegation process restart coverage starts in
-  `tests/world_civilization_delegation_process_restart.test.js`.
+  `tests/world_civilization_delegation_process_restart.test.js` and now proves
+  zero hash-only summary fallbacks for delegation lifecycle replay.
   Institution process restart coverage starts in
   `tests/world_civilization_institution_process_restart.test.js`.
   Public-works process restart coverage starts in

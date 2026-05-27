@@ -381,6 +381,11 @@ function buildStatements(db) {
 }
 
 function createPreparedEffectAuditEntry({ action, rollbackPlan, actor, nowMs }) {
+  const effectAfterSummaryPrefix = `Prepared effect ${action.actionId} is ${EFFECT_STATUS_PREPARED} with rollback ${action.rollbackId}; no world state was applied. Action summary: `;
+  const remainingSummaryLength = Math.max(0, 480 - effectAfterSummaryPrefix.length);
+  const boundedActionAfterSummary = action.afterSummary.length <= remainingSummaryLength
+    ? action.afterSummary
+    : action.afterSummary.slice(0, remainingSummaryLength);
   return {
     schemaVersion: action.schemaVersion,
     entryId: action.auditLedgerEntryId,
@@ -390,6 +395,8 @@ function createPreparedEffectAuditEntry({ action, rollbackPlan, actor, nowMs }) 
     idempotencyKey: action.idempotencyKey,
     beforeHash: sha256(`agent-town.v6.civic.effect.absent:${action.actionId}`),
     afterHash: sha256(stableJson({ action, rollbackPlan, status: EFFECT_STATUS_PREPARED })),
+    beforeSummary: action.beforeSummary,
+    afterSummary: `${effectAfterSummaryPrefix}${boundedActionAfterSummary}`,
     createdAtMs: nowMs,
     migrationVersion: MIGRATION_VERSION,
     replayable: true,

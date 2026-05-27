@@ -126,6 +126,10 @@ proposal/status replay.
   "not_executable"`.
 - Prepared effects write `civic_action.prepared` audit ledger entries, not
   `civic_action.applied`.
+- Prepared-effect audit entries include privacy-safe before/after summaries
+  from the validated civic action plus prepared status, rollback id, and a
+  no-world-state-applied statement; hash-only summary fallback is not accepted
+  for the effect/rollback restart proof.
 - Rollback recovery reports may validate handle availability and audit linkage,
   but must not call an apply or rollback handler until typed execution exists.
 - `buildV6CivicEffectExecutionGate()` may record M11 execution readiness

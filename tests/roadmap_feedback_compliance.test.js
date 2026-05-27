@@ -155,6 +155,8 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   const auditSpec = read('specs/56_agent_town_v6_audit_ledger_foundation.md');
   const proposalSpec = read('specs/57_agent_town_v6_internal_proposal_lifecycle.md');
   const voteSpec = read('specs/58_agent_town_v6_vote_authorization_foundation.md');
+  const effectSpec = read('specs/62_agent_town_v6_civic_effect_rollback_foundation.md');
+  const delegationSpec = read('specs/63_agent_town_v6_agent_participation_delegation_foundation.md');
   const institutionSpec = read('specs/64_agent_town_v6_civic_institution_charter_foundation.md');
   const publicWorksSpec = read('specs/65_agent_town_v6_public_works_shared_resources_foundation.md');
   const labSpec = read('specs/66_agent_town_v6_modal_lab_surface_foundation.md');
@@ -174,6 +176,8 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   const voteSource = read('server/world_civilization/votes.js');
   const reputationSource = read('server/world_civilization/reputation.js');
   const moderationSource = read('server/world_civilization/moderation.js');
+  const effectSource = read('server/world_civilization/effects.js');
+  const delegationSource = read('server/world_civilization/delegations.js');
   const requiredMilestones = [
     'M0 Hardened V5 world-grid baseline',
     'M1 Living V6 milestone contract',
@@ -294,6 +298,10 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /proposal\.reviewed/);
   assert.match(plan, /proposal review-ready state, approved moderation, vote approval policy, human approval receipt/);
   assert.match(plan, /schema-level typed effect handler registry/);
+  assert.match(plan, /prepared-effect audit rows include privacy-safe before\/after summaries/);
+  assert.match(effectSpec, /privacy-safe before\/after summaries/);
+  assert.match(effectSource, /beforeSummary/);
+  assert.match(effectSource, /afterSummary/);
   assert.match(plan, /buildV6CivicEffectExecutionGate\(\)/);
   assert.match(plan, /typed apply handlers, typed rollback handlers/);
   assert.match(plan, /release-signed conservation\/rollback execution/);
@@ -312,6 +320,10 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /idempotent action-budget consumption/);
   assert.match(plan, /allowDelegatedExecution/);
   assert.match(plan, /read-only active `civic_execution` delegation proof/);
+  assert.match(plan, /privacy-safe lifecycle before\/after summaries/);
+  assert.match(delegationSpec, /privacy-safe before\/after\s+summaries/);
+  assert.match(delegationSource, /beforeSummary/);
+  assert.match(delegationSource, /afterSummary/);
   assert.match(plan, /buildV6AgentParticipationEnforcementGate\(\)/);
   assert.match(plan, /route-edge scope\/expiry\/budget\/revocation checks/);
   assert.match(plan, /no public autonomous mutation/);
@@ -384,6 +396,8 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(persistenceSpec, /before\/after audit summary presence/);
   assert.match(persistenceSpec, /zero\s+hash-only summary fallbacks for those governance records/);
   assert.match(persistenceSpec, /zero hash-only summary fallbacks for\s+those privacy records/);
+  assert.match(persistenceSpec, /zero hash-only summary fallbacks for those rollback records/);
+  assert.match(persistenceSpec, /zero hash-only summary\s+fallbacks for those participation records/);
   assert.match(persistenceSpec, /missing-summary denial/);
   assert.match(auditSpec, /beforeSummary/);
   assert.match(auditSpec, /hash-only fallbacks/);

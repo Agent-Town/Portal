@@ -119,6 +119,10 @@ Indexes cover delegation replay, principal/scope replay, and agent/scope replay.
 - Delegation creation writes `delegation.created` audit entries; action-budget
   usage writes `delegation.action_consumed` audit entries; revocation writes
   `delegation.revoked` audit entries.
+- Delegation lifecycle audit entries include privacy-safe before/after
+  summaries covering scope, action budget, revocability, civic-execution
+  permission, consumption counts, revocation status, and no-effect execution;
+  hash-only summary fallback is not accepted for delegation restart proof.
 - `buildV6AgentParticipationEnforcementGate()` may record M12 enforcement
   readiness evidence, but it must stay hidden, non-executing, and fail closed
   when worker-tool scope checks, route-edge scope/expiry/budget/revocation

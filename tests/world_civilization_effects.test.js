@@ -328,6 +328,12 @@ test('V6 civic effect store prepares approved actions with rollback handles but 
   assert.equal(audit.entry.actionType, 'civic_action.prepared');
   assert.equal(audit.entry.actor.accountId, 'acct_v6_voter_001');
   assert.equal(audit.entry.rollbackId, 'rollback_bridge_001');
+  assert.match(audit.entry.beforeSummary, /Bridge contribution total is 20 wood/);
+  assert.match(audit.entry.afterSummary, /Prepared effect action_prepare_bridge_001 is prepared/);
+  assert.match(audit.entry.afterSummary, /rollback rollback_bridge_001/);
+  assert.match(audit.entry.afterSummary, /no world state was applied/);
+  assert.equal(audit.entry.beforeSummary.includes('Hash-only'), false);
+  assert.equal(audit.entry.afterSummary.includes('Hash-only'), false);
   assert.deepEqual(
     auditLedger.replay().map((row) => row.entry.actionType),
     ['proposal.created', 'moderation.decided', 'proposal.reviewed', 'vote.recorded', 'civic_action.prepared']

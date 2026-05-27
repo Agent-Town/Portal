@@ -232,6 +232,11 @@ test('V6 delegation store records scoped agent participation without execution a
   assert.equal(audit.entry.actionType, 'delegation.created');
   assert.equal(audit.entry.actor.accountId, 'acct_v6_human_001');
   assert.equal(audit.entry.objectRef, 'delegation_vote_advice_001');
+  assert.match(audit.entry.beforeSummary, /No civic delegation existed/);
+  assert.match(audit.entry.afterSummary, /vote_advice delegation/);
+  assert.match(audit.entry.afterSummary, /no world effect executed/);
+  assert.equal(audit.entry.beforeSummary.includes('Hash-only'), false);
+  assert.equal(audit.entry.afterSummary.includes('Hash-only'), false);
 }));
 
 test('V6 delegation store consumes action budgets idempotently without execution', () => withTempDelegationStore(({
@@ -282,6 +287,11 @@ test('V6 delegation store consumes action budgets idempotently without execution
       'delegation.action_consumed'
     ]
   );
+  const consumedAudit = auditLedger.getByEntryId('audit_delegationuse_vote_advice_001');
+  assert.match(consumedAudit.entry.beforeSummary, /0 of 3 actions consumed/);
+  assert.match(consumedAudit.entry.afterSummary, /Consumed delegated vote_advice action/);
+  assert.match(consumedAudit.entry.afterSummary, /no civic effect executed/);
+  assert.equal(consumedAudit.entry.afterSummary.includes('Hash-only'), false);
   assert.throws(
     () => store.consumeDelegatedAction(delegatedActionUse({
       usageId: 'delegationuse_vote_advice_004',
@@ -447,6 +457,10 @@ test('V6 delegation store revokes scoped authority with principal-owned audit', 
     auditLedger.replay().map((row) => row.entry.actionType),
     ['delegation.created', 'delegation.revoked']
   );
+  const revokeAudit = auditLedger.getByEntryId('audit_delegation_vote_advice_001_revoked');
+  assert.match(revokeAudit.entry.beforeSummary, /was active for vote_advice scope/);
+  assert.match(revokeAudit.entry.afterSummary, /future delegated action use is blocked/);
+  assert.equal(revokeAudit.entry.afterSummary.includes('Hash-only'), false);
 }));
 
 test('V6 delegation store persists policies and tracks civic execution delegation separately', () => {

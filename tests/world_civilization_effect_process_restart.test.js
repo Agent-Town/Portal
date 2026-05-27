@@ -91,6 +91,9 @@ test('V6 civic effect store survives separate Node process restarts with rollbac
     assert.equal(snapshot.replayReport.entryCount, 5);
     assert.equal(snapshot.replayReport.chainValid, true);
     assert.equal(snapshot.replayReport.privacySafe, true);
+    assert.equal(snapshot.replayReport.summaryComplete, true);
+    assert.equal(snapshot.replayReport.summaryCoverage.beforeAfterSummaryCount, 5);
+    assert.equal(snapshot.replayReport.summaryCoverage.hashOnlyFallbackCount, 0);
     assert.equal(snapshot.replayReport.appliesWorldState, false);
     assert.equal(snapshot.replayReport.rollbackCount, 1);
     assert.deepEqual(snapshot.replayReport.byActionType, {
@@ -109,6 +112,7 @@ test('V6 civic effect store survives separate Node process restarts with rollbac
     assert.equal(retry.auditCount, 5);
     assert.equal(finalSnapshot.replayOk, true);
     assert.equal(finalSnapshot.replayReport.entryCount, 5);
+    assert.equal(finalSnapshot.replayReport.summaryCoverage.hashOnlyFallbackCount, 0);
     assert.equal(finalSnapshot.replayReport.latestEntryHash, snapshot.replayReport.latestEntryHash);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });

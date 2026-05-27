@@ -110,14 +110,18 @@ process-level evidence to civic effect rollback preparation: one process seeds
 the proposal, approved moderation decision, and approval vote prerequisites, a
 later process prepares the non-executing civic action and rollback handle, a
 third process reconstructs replay, and exact retries do not append duplicate
-effect, rollback, or audit rows after restart.
+effect, rollback, or audit rows after restart. The effect/rollback replay
+chain now carries store-specific privacy-safe before/after audit summaries and
+proves zero hash-only summary fallbacks for those rollback records.
 
 `tests/world_civilization_delegation_process_restart.test.js` extends the
 process-level evidence to agent participation controls: separate processes
 record scoped advice and explicit civic-execution delegations, revoke the
 advice delegation through the principal account, reconstruct privacy-safe audit
 replay, and prove exact retries do not append duplicate delegation or audit
-rows after restart.
+rows after restart. The delegation replay chain now carries store-specific
+privacy-safe before/after audit summaries and proves zero hash-only summary
+fallbacks for those participation records.
 
 `tests/world_civilization_institution_process_restart.test.js` extends the
 process-level evidence to civic institution charters: separate processes record
