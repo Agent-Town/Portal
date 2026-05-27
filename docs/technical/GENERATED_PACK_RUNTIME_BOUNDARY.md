@@ -154,6 +154,13 @@ Player prompt
 - Approval evidence or candidate-review manifests with secret-like fields, raw prompt instructions, short candidate-review coverage, production image promotion, canonical rule changes, V6 civic changes, or default gameplay exposure fail closed.
 - `POST /api/world/generated-pack/release-gate` remains behind `FEATURE_WORLD_GRID_GENERATED_PACKS` and does not change canonical world-grid rules, V6 civic systems, pack visibility, or production image policy.
 
+## GU-19 Release Evidence Bundle Slice
+
+- `release_evidence_bundle.schema.json` defines the tamper-evident evidence envelope for release-gate source inputs.
+- `buildReleaseEvidenceBundle` records stable hashes for the generated pack, measured playtest report, diversity report, public card, persistence report, release approval evidence, candidate-review manifest, and release gate.
+- `validateReleaseEvidenceBundle` rejects drifted source evidence, missing source hashes for ready gates, secret-like fields, raw prompt instructions, production image assets, private-data leaks, default generated-pack exposure, V6 civic changes, or canonical server-rule changes.
+- The bundle is not a release approval surface. It only makes the release-gate evidence replayable and hash-bound for review.
+
 ## Machine Checks
 
 ```json
@@ -278,6 +285,7 @@ Player prompt
   "productionReleaseGateSchemaExists": true,
   "releaseApprovalEvidenceSchemaExists": true,
   "candidateReviewManifestSchemaExists": true,
+  "releaseEvidenceBundleSchemaExists": true,
   "releaseGateFeatureGated": true,
   "releaseGateFailsClosedWithoutApprovals": true,
   "blockingReasonsMatchFailedPrerequisites": true,
@@ -286,6 +294,11 @@ Player prompt
   "approvalEvidenceSecretLikeCount": 0,
   "approvalEvidenceRawInstructionCount": 0,
   "candidateReviewManifestHashMatchesEvidence": true,
+  "releaseGateHashStable": true,
+  "releaseEvidenceSourceHashCount": 7,
+  "releaseEvidenceSourceHashMismatchCount": 0,
+  "readyGateRequiresAllSourceEvidence": true,
+  "releaseEvidenceSourceDriftRejected": true,
   "candidateReviewManifestProductionImageAssetCount": 0,
   "candidateReviewCoverageCountMin": 23,
   "costConsentModelApproved": true,

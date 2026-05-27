@@ -22,6 +22,7 @@ const GENERATED_PACK_SCHEMA_FILES = {
   playtestReport: 'playtest_report.schema.json',
   releaseApprovalEvidence: 'release_approval_evidence.schema.json',
   productionReleaseGate: 'production_release_gate.schema.json',
+  releaseEvidenceBundle: 'release_evidence_bundle.schema.json',
   publicPackCard: 'public_pack_card.schema.json',
   publicPackGallery: 'public_pack_gallery.schema.json',
   candidateReviewManifest: 'candidate_review_manifest.schema.json'

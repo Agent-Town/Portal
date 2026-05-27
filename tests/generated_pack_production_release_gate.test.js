@@ -14,6 +14,7 @@ const {
   buildCandidateReviewManifest,
   buildMeasuredPlaytestReport,
   buildProductionReleaseGate,
+  buildReleaseEvidenceBundle,
   buildReleaseApprovalEvidence,
   clearGeneratedPacksForTests,
   createGeneratedPack,
@@ -25,6 +26,7 @@ const {
   reloadGeneratedPack,
   validatePlaytestReport,
   validateReleaseApprovalEvidence,
+  validateReleaseEvidenceBundle,
   validateProductionReleaseGate
 } = require('../server/world_grid/generated_pack');
 
@@ -210,6 +212,65 @@ function reviewedCandidateManifest(pack) {
   });
 }
 
+function readyReleaseGateFixture({
+  ownerAccountId = 'owner_release_evidence_bundle_ready',
+  prompt = 'brass orbit rail town with moon garden markets',
+  nowMs = 153_000
+} = {}) {
+  const owner = { ownerAccountId };
+  const pack = generateAndStorePack({
+    owner,
+    prompt,
+    nowMs
+  });
+  const playtestReport = recordPlaytestReport(owner, passingPlaytestInput(pack));
+  const { publicCard } = publishPublicPackCard(owner, pack.packId, { nowMs: nowMs + 500 });
+  const exportEnvelope = exportGeneratedPack(owner, pack.packId);
+
+  clearGeneratedPacksForTests();
+  const reloadResult = reloadGeneratedPack(owner, pack.packId);
+  const importResult = importGeneratedPack({ ownerAccountId: `${ownerAccountId}_import` }, exportEnvelope, { nowMs: nowMs + 1000 });
+  let invalidImportRejected = false;
+  assert.throws(() => {
+    importGeneratedPack(owner, { ...exportEnvelope, packHash: '0'.repeat(64) });
+  }, /INVALID_GENERATED_PACK_EXPORT/);
+  invalidImportRejected = true;
+
+  const persistenceReport = {
+    durablePackStorage: reloadResult.reloadReport.durablePackStorage === true,
+    restartReloadPass: reloadResult.generatedPack.packId === pack.packId && reloadResult.reloadReport.fallbackUsed === false,
+    exportImportRoundTrip: importResult.importReport.exportImportRoundTrip === true,
+    invalidImportRejected,
+    privateDataLeakCount: Math.max(
+      Number(exportEnvelope.privateDataLeakCount || 0),
+      Number(importResult.importReport.privateDataLeakCount || 0)
+    )
+  };
+  const diversityReport = suiteDiversityReport();
+  const candidateReviewManifest = reviewedCandidateManifest(pack);
+  const approvalEvidence = approvedReleaseEvidence(pack);
+  const releaseGate = buildProductionReleaseGate({
+    pack,
+    playtestReport,
+    diversityReport,
+    publicCard,
+    persistenceReport,
+    candidateReviewManifest,
+    approvalEvidence,
+    nowMs: nowMs + 1500
+  });
+  return {
+    pack,
+    playtestReport,
+    diversityReport,
+    publicCard,
+    persistenceReport,
+    candidateReviewManifest,
+    approvalEvidence,
+    releaseGate
+  };
+}
+
 test('GU-18 production release gate fails closed without playtest, approvals, diversity, persistence, or public-card evidence', () => {
   const pack = createGeneratedPack({
     owner: { ownerAccountId: 'owner_release_gate_closed' },
@@ -298,6 +359,63 @@ test('GU-18 production release gate can pass only with explicit machine evidence
   assert.equal(gate.metrics.privateDataLeakCount, 0);
   assert.equal(gate.metrics.productionImageAssetCount, 0);
   assert.equal(gate.metrics.eligiblePrerequisiteCount, gate.metrics.requiredPrerequisiteCount);
+}));
+
+test('GU-19 release evidence bundle binds a ready gate to source evidence hashes', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture();
+  const bundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    nowMs: 154_700
+  });
+  const report = validateReleaseEvidenceBundle(bundle, fixture);
+
+  assert.equal(validateProductionReleaseGate(fixture.releaseGate).ok, true);
+  assert.equal(fixture.releaseGate.publicReleaseEligible, true);
+  assert.equal(report.ok, true, JSON.stringify(report.checks));
+  assert.equal(bundle.schemaVersion, 'agent-town-generated-pack-release-evidence-bundle-v1');
+  assert.equal(bundle.publicReleaseEligible, true);
+  assert.equal(bundle.metrics.presentSourceCount, bundle.metrics.requiredSourceCount);
+  assert.equal(bundle.metrics.sourceHashMismatchCount, 0);
+  assert.equal(bundle.metrics.releaseGateValid, true);
+  assert.equal(bundle.metrics.releaseGatePublicEligible, true);
+  assert.equal(bundle.metrics.approvalEvidenceHashMatchesGate, true);
+  assert.equal(bundle.metrics.candidateReviewManifestHashMatchesEvidence, true);
+  assert.equal(bundle.constraints.productionImageAssetsCreated, false);
+}));
+
+test('GU-19 release evidence bundle rejects source drift and missing ready-gate evidence', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_evidence_bundle_tamper',
+    prompt: 'glass orchard station with lantern botanists',
+    nowMs: 155_000
+  });
+  const driftedBundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    publicCard: {
+      ...fixture.publicCard,
+      title: `${fixture.publicCard.title} drift`
+    },
+    nowMs: 156_700
+  });
+  const missingReadySourceBundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    candidateReviewManifest: null,
+    nowMs: 156_800
+  });
+  const driftReport = validateReleaseEvidenceBundle(driftedBundle, fixture);
+  const missingReport = validateReleaseEvidenceBundle(missingReadySourceBundle, fixture);
+
+  assert.equal(driftReport.ok, false);
+  assert.equal(
+    driftReport.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_SOURCE_HASHES_MATCH').passed,
+    false
+  );
+  assert.equal(missingReadySourceBundle.publicReleaseEligible, true);
+  assert.equal(missingReport.ok, false);
+  assert.equal(
+    missingReport.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_SOURCE_COVERAGE').passed,
+    false
+  );
 }));
 
 test('GU-18 release gate ignores loose approval flags without versioned approval evidence', () => withTempGeneratedPackStore(() => {

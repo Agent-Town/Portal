@@ -22,6 +22,7 @@ const PUBLIC_PACK_GALLERY_CURATION_VERSION = 'agent-town-generated-pack-gallery-
 const CANDIDATE_REVIEW_MANIFEST_VERSION = 'agent-town-generated-pack-candidate-review-manifest-v1';
 const RELEASE_APPROVAL_EVIDENCE_VERSION = 'agent-town-generated-pack-release-approval-evidence-v1';
 const PRODUCTION_RELEASE_GATE_VERSION = 'agent-town-generated-pack-production-release-gate-v1';
+const RELEASE_EVIDENCE_BUNDLE_VERSION = 'agent-town-generated-pack-release-evidence-bundle-v1';
 const DEFAULT_CANDIDATE_ROOT = 'data/generated-packs';
 const DEFAULT_DURABLE_ROOT = 'data/generated-packs-durable';
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
@@ -545,6 +546,23 @@ function canonicalContractHash() {
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function stableValueForHash(value) {
+  if (Array.isArray(value)) return value.map((item) => stableValueForHash(item));
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, stableValueForHash(value[key])])
+    );
+  }
+  return value === undefined ? null : value;
+}
+
+function stableEvidenceHash(value) {
+  if (value === null || value === undefined) return '';
+  return sha256(JSON.stringify(stableValueForHash(value)));
 }
 
 function durableRoot() {
@@ -4567,6 +4585,276 @@ function validateProductionReleaseGate(gate = {}) {
   };
 }
 
+const RELEASE_EVIDENCE_SOURCE_KEYS = [
+  'generatedPack',
+  'playtestReport',
+  'diversityReport',
+  'publicCard',
+  'persistenceReport',
+  'approvalEvidence',
+  'candidateReviewManifest'
+];
+
+function releaseEvidenceBundleHash(bundle = {}) {
+  const copy = clone(bundle);
+  delete copy.bundleHash;
+  return stableEvidenceHash(copy);
+}
+
+function sourceHashesForReleaseEvidence({
+  pack = null,
+  playtestReport = null,
+  diversityReport = null,
+  publicCard = null,
+  persistenceReport = null,
+  approvalEvidence = null,
+  candidateReviewManifest = null
+} = {}) {
+  return {
+    generatedPack: stableEvidenceHash(pack),
+    playtestReport: stableEvidenceHash(playtestReport),
+    diversityReport: stableEvidenceHash(diversityReport),
+    publicCard: stableEvidenceHash(publicCard),
+    persistenceReport: stableEvidenceHash(persistenceReport),
+    approvalEvidence: stableEvidenceHash(approvalEvidence),
+    candidateReviewManifest: stableEvidenceHash(candidateReviewManifest)
+  };
+}
+
+function sourcePresenceForHashes(sourceHashes = {}) {
+  return Object.fromEntries(
+    RELEASE_EVIDENCE_SOURCE_KEYS.map((key) => [key, /^[0-9a-f]{64}$/.test(String(sourceHashes[key] || ''))])
+  );
+}
+
+function buildReleaseEvidenceBundle({
+  pack = null,
+  releaseGate = null,
+  playtestReport = null,
+  diversityReport = null,
+  publicCard = null,
+  persistenceReport = null,
+  approvalEvidence = null,
+  candidateReviewManifest = null,
+  nowMs = Date.now()
+} = {}) {
+  const gate = releaseGate && typeof releaseGate === 'object'
+    ? clone(releaseGate)
+    : buildProductionReleaseGate({
+        pack: pack || {},
+        playtestReport,
+        diversityReport,
+        publicCard,
+        persistenceReport: persistenceReport || {},
+        candidateReviewManifest,
+        approvalEvidence,
+        nowMs
+      });
+  const gateApprovalEvidence = approvalEvidence || gate.approvalEvidence || null;
+  const sourceHashes = sourceHashesForReleaseEvidence({
+    pack,
+    playtestReport,
+    diversityReport,
+    publicCard,
+    persistenceReport,
+    approvalEvidence: gateApprovalEvidence,
+    candidateReviewManifest
+  });
+  const sourcePresence = sourcePresenceForHashes(sourceHashes);
+  const presentSourceCount = Object.values(sourcePresence).filter(Boolean).length;
+  const approvalEvidenceHashMatchesGate = Boolean(gate?.approvalEvidence)
+    && stableEvidenceHash(gate.approvalEvidence) === sourceHashes.approvalEvidence;
+  const candidateReviewManifestHashMatchesEvidence = Boolean(candidateReviewManifest?.manifestHash)
+    && candidateReviewManifest.manifestHash === gateApprovalEvidence?.candidateReview?.candidateManifestHash;
+  const bundle = {
+    schemaVersion: RELEASE_EVIDENCE_BUNDLE_VERSION,
+    bundleHash: '',
+    packId: String(gate?.packId || pack?.packId || ''),
+    createdAtMs: positiveNumberOrZero(nowMs),
+    releaseGateHash: stableEvidenceHash(gate),
+    releaseGateMode: gate?.releaseMode || 'prototype-gated',
+    publicReleaseEligible: gate?.publicReleaseEligible === true,
+    blockingReasons: Array.isArray(gate?.blockingReasons) ? clone(gate.blockingReasons) : [],
+    sourceHashes,
+    sourcePresence,
+    prerequisiteSnapshot: clone(gate?.releasePrerequisites || {}),
+    constraints: {
+      productionImageAssetsCreated: false,
+      externalProviderPrivateDataStored: false,
+      canonicalServerRulesChanged: false,
+      v6CivicMechanicsTouched: false,
+      normalGameplayVisibilityChanged: false,
+      generatedPackDefaultExposure: false
+    },
+    metrics: {
+      requiredSourceCount: RELEASE_EVIDENCE_SOURCE_KEYS.length,
+      presentSourceCount,
+      missingSourceCount: RELEASE_EVIDENCE_SOURCE_KEYS.length - presentSourceCount,
+      sourceHashMismatchCount: 0,
+      releaseGateValid: validateProductionReleaseGate(gate).ok === true,
+      releaseGatePublicEligible: gate?.publicReleaseEligible === true,
+      approvalEvidenceHashMatchesGate,
+      candidateReviewManifestHashMatchesEvidence,
+      productionImageAssetCount: Number(gate?.metrics?.productionImageAssetCount || 0),
+      privateDataLeakCount: Number(gate?.metrics?.privateDataLeakCount || 0)
+    }
+  };
+  bundle.bundleHash = releaseEvidenceBundleHash(bundle);
+  return bundle;
+}
+
+function validateReleaseEvidenceBundle(bundle = {}, {
+  pack = null,
+  releaseGate = null,
+  playtestReport = null,
+  diversityReport = null,
+  publicCard = null,
+  persistenceReport = null,
+  approvalEvidence = null,
+  candidateReviewManifest = null
+} = {}) {
+  const schemaReport = SCHEMA_REGISTRY?.releaseEvidenceBundle
+    ? validateGeneratedSchema(bundle, SCHEMA_REGISTRY.releaseEvidenceBundle, '$.releaseEvidenceBundle')
+    : { ok: true, errors: [] };
+  const secretLikePaths = findSecretLikePaths(bundle);
+  const rawInstructionPaths = findRawPromptInstructionPaths(bundle);
+  const expectedBundleHash = schemaReport.ok ? releaseEvidenceBundleHash(bundle) : '';
+  const bundleHashMatches = Boolean(expectedBundleHash) && bundle?.bundleHash === expectedBundleHash;
+  const suppliedHashes = sourceHashesForReleaseEvidence({
+    pack,
+    playtestReport,
+    diversityReport,
+    publicCard,
+    persistenceReport,
+    approvalEvidence: approvalEvidence || releaseGate?.approvalEvidence || null,
+    candidateReviewManifest
+  });
+  const sourceHashProblems = [];
+  for (const key of RELEASE_EVIDENCE_SOURCE_KEYS) {
+    if (suppliedHashes[key] && bundle?.sourceHashes?.[key] !== suppliedHashes[key]) {
+      sourceHashProblems.push(key);
+    }
+    const expectedPresence = Boolean(bundle?.sourceHashes?.[key]);
+    if (bundle?.sourcePresence?.[key] !== expectedPresence) {
+      sourceHashProblems.push(`${key}:presence`);
+    }
+  }
+  const releaseGateHashExpected = releaseGate ? stableEvidenceHash(releaseGate) : '';
+  const releaseGateHashMatches = !releaseGate || bundle?.releaseGateHash === releaseGateHashExpected;
+  const gateReport = releaseGate
+    ? validateProductionReleaseGate(releaseGate)
+    : { ok: bundle?.metrics?.releaseGateValid === true };
+  const presentSourceCount = RELEASE_EVIDENCE_SOURCE_KEYS
+    .filter((key) => Boolean(bundle?.sourceHashes?.[key]))
+    .length;
+  const suppliedSourceCount = RELEASE_EVIDENCE_SOURCE_KEYS
+    .filter((key) => Boolean(suppliedHashes[key]))
+    .length;
+  const sourceCoverageOk = bundle?.publicReleaseEligible === true
+    ? presentSourceCount === RELEASE_EVIDENCE_SOURCE_KEYS.length
+      && suppliedSourceCount === RELEASE_EVIDENCE_SOURCE_KEYS.length
+      && Boolean(releaseGate)
+    : presentSourceCount >= 1;
+  const approvalEvidenceHashMatchesGate = releaseGate?.approvalEvidence
+    ? bundle?.sourceHashes?.approvalEvidence === stableEvidenceHash(releaseGate.approvalEvidence)
+    : bundle?.metrics?.approvalEvidenceHashMatchesGate === true || bundle?.publicReleaseEligible !== true;
+  const candidateReviewManifestHashMatchesEvidence = candidateReviewManifest?.manifestHash
+    ? candidateReviewManifest.manifestHash === (approvalEvidence || releaseGate?.approvalEvidence || {})?.candidateReview?.candidateManifestHash
+      && bundle?.sourceHashes?.candidateReviewManifest === stableEvidenceHash(candidateReviewManifest)
+    : bundle?.metrics?.candidateReviewManifestHashMatchesEvidence === true || bundle?.publicReleaseEligible !== true;
+  const constraints = bundle?.constraints || {};
+  const boundaryPreserved = constraints.productionImageAssetsCreated === false
+    && constraints.externalProviderPrivateDataStored === false
+    && constraints.canonicalServerRulesChanged === false
+    && constraints.v6CivicMechanicsTouched === false
+    && constraints.normalGameplayVisibilityChanged === false
+    && constraints.generatedPackDefaultExposure === false
+    && Number(bundle?.metrics?.productionImageAssetCount || 0) === 0
+    && Number(bundle?.metrics?.privateDataLeakCount || 0) === 0;
+  const metricsMatch = Number(bundle?.metrics?.presentSourceCount || 0) === presentSourceCount
+    && Number(bundle?.metrics?.missingSourceCount || 0) === RELEASE_EVIDENCE_SOURCE_KEYS.length - presentSourceCount
+    && Number(bundle?.metrics?.requiredSourceCount || 0) === RELEASE_EVIDENCE_SOURCE_KEYS.length
+    && Number(bundle?.metrics?.sourceHashMismatchCount || 0) === sourceHashProblems.length
+    && bundle?.metrics?.releaseGateValid === (gateReport.ok === true)
+    && bundle?.metrics?.releaseGatePublicEligible === (bundle?.publicReleaseEligible === true)
+    && bundle?.metrics?.approvalEvidenceHashMatchesGate === approvalEvidenceHashMatchesGate
+    && bundle?.metrics?.candidateReviewManifestHashMatchesEvidence === candidateReviewManifestHashMatchesEvidence;
+  const checks = [
+    {
+      id: 'RELEASE_EVIDENCE_BUNDLE_SCHEMA_VALID',
+      passed: schemaReport.ok === true,
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
+    },
+    {
+      id: 'RELEASE_EVIDENCE_BUNDLE_CONTENT_SAFE',
+      passed: secretLikePaths.length === 0 && rawInstructionPaths.length === 0,
+      measured: { secretLikePaths, rawInstructionPaths }
+    },
+    {
+      id: 'RELEASE_EVIDENCE_BUNDLE_HASH_STABLE',
+      passed: bundleHashMatches,
+      measured: { expectedBundleHash, actualBundleHash: bundle?.bundleHash || '' }
+    },
+    {
+      id: 'RELEASE_EVIDENCE_BUNDLE_SOURCE_HASHES_MATCH',
+      passed: sourceHashProblems.length === 0 && releaseGateHashMatches,
+      measured: { sourceHashProblems, releaseGateHashMatches }
+    },
+    {
+      id: 'RELEASE_EVIDENCE_BUNDLE_SOURCE_COVERAGE',
+      passed: sourceCoverageOk,
+      measured: {
+        presentSourceCount,
+        suppliedSourceCount,
+        requiredSourceCount: RELEASE_EVIDENCE_SOURCE_KEYS.length,
+        releaseGateProvided: Boolean(releaseGate),
+        publicReleaseEligible: bundle?.publicReleaseEligible === true
+      }
+    },
+    {
+      id: 'RELEASE_EVIDENCE_BUNDLE_RELEASE_GATE_VALID',
+      passed: gateReport.ok === true
+        && (bundle?.publicReleaseEligible !== true || Boolean(releaseGate))
+        && (!releaseGate || bundle?.publicReleaseEligible === (releaseGate.publicReleaseEligible === true))
+        && (!releaseGate || bundle?.releaseGateMode === releaseGate.releaseMode),
+      measured: { releaseGateProvided: Boolean(releaseGate), releaseGateValid: gateReport.ok === true }
+    },
+    {
+      id: 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT',
+      passed: metricsMatch,
+      measured: {
+        presentSourceCount,
+        sourceHashProblemCount: sourceHashProblems.length,
+        approvalEvidenceHashMatchesGate,
+        candidateReviewManifestHashMatchesEvidence
+      }
+    },
+    {
+      id: 'RELEASE_EVIDENCE_BUNDLE_BOUNDARY_PRESERVED',
+      passed: boundaryPreserved,
+      measured: { constraints, metrics: bundle?.metrics || {} }
+    }
+  ];
+  return {
+    ok: checks.every((check) => check.passed === true),
+    checks,
+    metrics: {
+      releaseEvidenceBundleSchemaExists: Boolean(SCHEMA_REGISTRY?.releaseEvidenceBundle),
+      schemaErrorCount: schemaReport.errors.length,
+      secretLikePathCount: secretLikePaths.length,
+      rawInstructionPathCount: rawInstructionPaths.length,
+      bundleHashMatches,
+      sourceHashMismatchCount: sourceHashProblems.length,
+      releaseGateHashMatches,
+      presentSourceCount,
+      requiredSourceCount: RELEASE_EVIDENCE_SOURCE_KEYS.length,
+      sourceCoverageOk,
+      releaseGateValid: gateReport.ok === true,
+      boundaryPreserved
+    }
+  };
+}
+
 function normalizeGalleryTag(value = '') {
   const tag = slugForTarget(value).slice(0, 32);
   if (tag.length < 2) return '';
@@ -5208,6 +5496,7 @@ module.exports = {
   buildCandidateReviewManifest,
   buildMeasuredPlaytestReport,
   buildReleaseApprovalEvidence,
+  buildReleaseEvidenceBundle,
   buildProductionReleaseGate,
   clearGeneratedPacksForTests,
   createGenerationBrief,
@@ -5246,6 +5535,7 @@ module.exports = {
   validatePublicPackCard,
   validatePlaytestReport,
   validateReleaseApprovalEvidence,
+  validateReleaseEvidenceBundle,
   validateProductionReleaseGate,
   validateGeneratedPack
 };

@@ -86,6 +86,7 @@ test('generated pack schema suite and fixtures exist', () => {
     'candidate_review_manifest.schema.json',
     'release_approval_evidence.schema.json',
     'production_release_gate.schema.json',
+    'release_evidence_bundle.schema.json',
     'public_pack_card.schema.json',
     'public_pack_gallery.schema.json'
   ];
@@ -93,7 +94,7 @@ test('generated pack schema suite and fixtures exist', () => {
     const parsed = readJson(`schemas/generated-packs/${schema}`);
     assert.ok(parsed.$id, schema);
   }
-  assert.equal(requiredSchemas.length, 22);
+  assert.equal(requiredSchemas.length, 23);
 
   for (const fixture of [
     'valid_world_grid_pack.json',
@@ -111,7 +112,7 @@ test('generated pack schema suite and fixtures exist', () => {
 
 test('generated pack production readiness evidence documents roadmap coverage and fail-closed release stance', () => {
   const evidence = readText('docs/release-evidence/GENERATED_PACK_PRODUCTION_READINESS_EVIDENCE_2026-05-26.md');
-  for (let index = 0; index <= 18; index += 1) {
+  for (let index = 0; index <= 19; index += 1) {
     assert.match(evidence, new RegExp(`GU-${index}\\b`), `GU-${index}`);
   }
   for (const required of [

@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-town-generated-pack-release-evidence-bundle-v1",
+  "title": "Agent Town Generated Pack Release Evidence Bundle",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "bundleHash",
+    "packId",
+    "createdAtMs",
+    "releaseGateHash",
+    "releaseGateMode",
+    "publicReleaseEligible",
+    "blockingReasons",
+    "sourceHashes",
+    "sourcePresence",
+    "prerequisiteSnapshot",
+    "constraints",
+    "metrics"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "agent-town-generated-pack-release-evidence-bundle-v1" },
+    "bundleHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "packId": { "type": "string", "minLength": 3 },
+    "createdAtMs": { "type": "integer", "minimum": 0 },
+    "releaseGateHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "releaseGateMode": { "enum": ["prototype-gated", "ready-for-controlled-release"] },
+    "publicReleaseEligible": { "type": "boolean" },
+    "blockingReasons": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "schemaValid",
+          "moderationPassed",
+          "playtestPassed",
+          "assetManifestValid",
+          "fallbackVerified",
+          "diversitySuitePassed",
+          "packSaveReloadPassed",
+          "publicCardPrivacyPassed",
+          "costConsentModelApproved",
+          "candidateAssetsReviewed",
+          "humanReviewComplete"
+        ]
+      }
+    },
+    "sourceHashes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generatedPack",
+        "playtestReport",
+        "diversityReport",
+        "publicCard",
+        "persistenceReport",
+        "approvalEvidence",
+        "candidateReviewManifest"
+      ],
+      "properties": {
+        "generatedPack": { "type": "string", "pattern": "^$|^[0-9a-f]{64}$" },
+        "playtestReport": { "type": "string", "pattern": "^$|^[0-9a-f]{64}$" },
+        "diversityReport": { "type": "string", "pattern": "^$|^[0-9a-f]{64}$" },
+        "publicCard": { "type": "string", "pattern": "^$|^[0-9a-f]{64}$" },
+        "persistenceReport": { "type": "string", "pattern": "^$|^[0-9a-f]{64}$" },
+        "approvalEvidence": { "type": "string", "pattern": "^$|^[0-9a-f]{64}$" },
+        "candidateReviewManifest": { "type": "string", "pattern": "^$|^[0-9a-f]{64}$" }
+      }
+    },
+    "sourcePresence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generatedPack",
+        "playtestReport",
+        "diversityReport",
+        "publicCard",
+        "persistenceReport",
+        "approvalEvidence",
+        "candidateReviewManifest"
+      ],
+      "properties": {
+        "generatedPack": { "type": "boolean" },
+        "playtestReport": { "type": "boolean" },
+        "diversityReport": { "type": "boolean" },
+        "publicCard": { "type": "boolean" },
+        "persistenceReport": { "type": "boolean" },
+        "approvalEvidence": { "type": "boolean" },
+        "candidateReviewManifest": { "type": "boolean" }
+      }
+    },
+    "prerequisiteSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaValid",
+        "moderationPassed",
+        "playtestPassed",
+        "assetManifestValid",
+        "fallbackVerified",
+        "diversitySuitePassed",
+        "packSaveReloadPassed",
+        "publicCardPrivacyPassed",
+        "costConsentModelApproved",
+        "candidateAssetsReviewed",
+        "humanReviewComplete"
+      ],
+      "properties": {
+        "schemaValid": { "type": "boolean" },
+        "moderationPassed": { "type": "boolean" },
+        "playtestPassed": { "type": "boolean" },
+        "assetManifestValid": { "type": "boolean" },
+        "fallbackVerified": { "type": "boolean" },
+        "diversitySuitePassed": { "type": "boolean" },
+        "packSaveReloadPassed": { "type": "boolean" },
+        "publicCardPrivacyPassed": { "type": "boolean" },
+        "costConsentModelApproved": { "type": "boolean" },
+        "candidateAssetsReviewed": { "type": "boolean" },
+        "humanReviewComplete": { "type": "boolean" }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "productionImageAssetsCreated",
+        "externalProviderPrivateDataStored",
+        "canonicalServerRulesChanged",
+        "v6CivicMechanicsTouched",
+        "normalGameplayVisibilityChanged",
+        "generatedPackDefaultExposure"
+      ],
+      "properties": {
+        "productionImageAssetsCreated": { "const": false },
+        "externalProviderPrivateDataStored": { "const": false },
+        "canonicalServerRulesChanged": { "const": false },
+        "v6CivicMechanicsTouched": { "const": false },
+        "normalGameplayVisibilityChanged": { "const": false },
+        "generatedPackDefaultExposure": { "const": false }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requiredSourceCount",
+        "presentSourceCount",
+        "missingSourceCount",
+        "sourceHashMismatchCount",
+        "releaseGateValid",
+        "releaseGatePublicEligible",
+        "approvalEvidenceHashMatchesGate",
+        "candidateReviewManifestHashMatchesEvidence",
+        "productionImageAssetCount",
+        "privateDataLeakCount"
+      ],
+      "properties": {
+        "requiredSourceCount": { "type": "integer", "minimum": 0 },
+        "presentSourceCount": { "type": "integer", "minimum": 0 },
+        "missingSourceCount": { "type": "integer", "minimum": 0 },
+        "sourceHashMismatchCount": { "type": "integer", "minimum": 0 },
+        "releaseGateValid": { "type": "boolean" },
+        "releaseGatePublicEligible": { "type": "boolean" },
+        "approvalEvidenceHashMatchesGate": { "type": "boolean" },
+        "candidateReviewManifestHashMatchesEvidence": { "type": "boolean" },
+        "productionImageAssetCount": { "type": "integer", "minimum": 0 },
+        "privateDataLeakCount": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

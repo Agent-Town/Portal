@@ -465,3 +465,24 @@ Release approval is now a versioned evidence object, not a loose set of booleans
   "publicReleaseEligible": true
 }
 ```
+
+## GU-19 Tamper-Evident Release Evidence Bundle Slice
+
+Release gates now have a companion `releaseEvidenceBundle` contract. The bundle is evidence-only: it does not approve production release, promote assets, expose generated packs in default gameplay, or alter server rules. It records stable hashes for the generated pack, measured playtest report, replayability diversity report, public card, persistence report, release approval evidence, candidate-review manifest, and release gate. A ready gate requires every source hash to be present and to match the supplied source evidence; missing sources or drifted evidence fail validation.
+
+```json
+{
+  "releaseEvidenceBundleSchemaExists": true,
+  "releaseGateHashStable": true,
+  "sourceHashCount": 7,
+  "sourceHashMismatchCount": 0,
+  "readyGateRequiresAllSourceEvidence": true,
+  "sourceDriftRejected": true,
+  "productionImageAssetCount": 0,
+  "privateDataLeakCount": 0,
+  "canonicalServerRulesChanged": false,
+  "v6CivicMechanicsTouched": false,
+  "normalGameplayVisibilityChanged": false,
+  "generatedPackDefaultExposure": false
+}
+```
