@@ -1,12 +1,18 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 
 const { V6_WORLD_FEATURE_FLAG, parseWorldGridFeatureFlags } = require('../server/world_grid/feature_flags');
+const { createCivicAuditLedger } = require('../server/world_civilization/audit_ledger');
+const { createCivicDelegationStore } = require('../server/world_civilization/delegations');
 const {
   REQUIRED_SECURITY_CHECKS,
   assertV6CivicMutationSecuritySafe,
   buildV6CivicMutationSecurityEnvelope
 } = require('../server/world_civilization/mutation_security');
+const { CIVIC_SCHEMA_VERSION } = require('../server/world_civilization/schemas');
 
 function headers(overrides = {}) {
   return {
@@ -50,6 +56,35 @@ function humanContext(overrides = {}) {
     idempotencyKey: 'idem_v6_mutation_001',
     csrfVerified: true,
     nowMs: 1_779_790_000_000,
+    ...overrides
+  };
+}
+
+function withDelegationStore(fn) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-v6-mutation-security-delegation-'));
+  const auditLedger = createCivicAuditLedger({ sqlitePath: path.join(dir, 'audit.sqlite') });
+  const delegationStore = createCivicDelegationStore({ sqlitePath: path.join(dir, 'delegations.sqlite'), auditLedger });
+  try {
+    return fn({ auditLedger, delegationStore });
+  } finally {
+    delegationStore.close();
+    auditLedger.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function delegation(overrides = {}) {
+  return {
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    delegationId: 'delegation_mutation_security_001',
+    principalAccountId: 'acct_v6_mutator_001',
+    delegateAgentId: 'agent_v6_delegate_001',
+    scope: 'proposal_drafting',
+    expiresAtMs: 4_102_444_800_000,
+    maxActions: 2,
+    approvalReceiptId: 'receipt_v6_agent_delegate_001',
+    revocable: true,
+    canExecuteCivicEffects: false,
     ...overrides
   };
 }
@@ -127,7 +162,9 @@ test('V6 civic mutation security envelope rejects cross-origin CSRF auth owner a
   assert.deepEqual(assertV6CivicMutationSecuritySafe(report), { ok: true, errors: [] });
 });
 
-test('V6 civic mutation security envelope allows delegated agent only with verified human authority', () => {
+test('V6 civic mutation security envelope requires store-backed delegated agent proof', () => withDelegationStore(({
+  delegationStore
+}) => {
   const denied = buildV6CivicMutationSecurityEnvelope(humanContext({
     actor: {
       kind: 'agent',
@@ -137,6 +174,7 @@ test('V6 civic mutation security envelope allows delegated agent only with verif
     surface: 'delegation.consume.denied',
     idempotencyKey: 'idem_v6_agent_denied'
   }));
+  delegationStore.recordDelegation(delegation(), { nowMs: 1_779_789_900_000 });
   const allowed = buildV6CivicMutationSecurityEnvelope(humanContext({
     actor: {
       kind: 'agent',
@@ -144,22 +182,50 @@ test('V6 civic mutation security envelope allows delegated agent only with verif
       agentId: 'agent_v6_delegate_001'
     },
     delegation: {
-      verified: true,
-      expired: false,
+      delegationId: 'delegation_mutation_security_001',
       principalAccountId: 'acct_v6_mutator_001',
       delegateAgentId: 'agent_v6_delegate_001',
       approvalReceiptId: 'receipt_v6_agent_delegate_001'
     },
+    delegationStore,
+    requiredDelegationScope: 'proposal_drafting',
     surface: 'delegation.consume.allowed',
     idempotencyKey: 'idem_v6_agent_allowed'
   }));
+  const mismatchedScope = buildV6CivicMutationSecurityEnvelope(humanContext({
+    actor: {
+      kind: 'agent',
+      accountId: 'acct_v6_mutator_001',
+      agentId: 'agent_v6_delegate_001'
+    },
+    delegation: {
+      delegationId: 'delegation_mutation_security_001',
+      principalAccountId: 'acct_v6_mutator_001',
+      delegateAgentId: 'agent_v6_delegate_001',
+      approvalReceiptId: 'receipt_v6_agent_delegate_001'
+    },
+    delegationStore,
+    requiredDelegationScope: 'civic_execution',
+    surface: 'delegation.consume.scope_denied',
+    idempotencyKey: 'idem_v6_agent_scope_denied'
+  }));
 
   assert.equal(denied.allowed, false);
+  assert.match(denied.errors.join(','), /DELEGATION_PROOF_REQUIRED/);
   assert.match(denied.errors.join(','), /ACTOR_BINDING_REQUIRED/);
   assert.deepEqual(assertV6CivicMutationSecuritySafe(denied), { ok: true, errors: [] });
   assert.equal(allowed.allowed, true);
+  assert.equal(allowed.delegationProof.proofStatus, 'valid');
+  assert.equal(allowed.delegationProof.requiredScope, 'proposal_drafting');
+  assert.equal(allowed.delegationProof.remainingActionBudget, 2);
+  assert.equal(allowed.delegationProof.budgetConsumptionStatus, 'not_consumed_by_security_envelope');
   assert.deepEqual(assertV6CivicMutationSecuritySafe(allowed), { ok: true, errors: [] });
-});
+  assert.equal(delegationStore.listDelegatedActionUses({ delegationId: 'delegation_mutation_security_001' }).length, 0);
+  assert.equal(mismatchedScope.allowed, false);
+  assert.match(mismatchedScope.errors.join(','), /DELEGATION_PROOF_REQUIRED/);
+  assert.match(mismatchedScope.delegationProof.failures.join(','), /delegation_scope_mismatch/);
+  assert.deepEqual(assertV6CivicMutationSecuritySafe(mismatchedScope), { ok: true, errors: [] });
+}));
 
 test('V6 civic mutation security envelope rate-limits by owner and surface', () => {
   const env = {

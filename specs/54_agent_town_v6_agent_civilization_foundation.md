@@ -87,7 +87,9 @@ non-executing. It requires explicit V6 research opt-in, same-origin checks,
 session/wallet auth, actor and owner binding, delegated-agent proof when an
 agent actor is used, CSRF verification in production/security-required mode,
 idempotency, and owner/surface rate limiting before future routes/tools may
-touch civic stores.
+touch civic stores. Delegated-agent proof is store-backed and scope-bound; a
+future route/tool must name the required delegation scope, and the envelope
+must see active delegation and remaining budget evidence without consuming it.
 
 The research-only governance preflight in
 `server/world_civilization/governance_preflight.js` is called by

@@ -22,8 +22,9 @@ approval and does not expose V6 in normal gameplay.
 - Session and wallet state must be server verified and bound to the same
   account.
 - Human actors must match the authenticated session account.
-- Agent actors require verified, unexpired delegation from the authenticated
-  principal and a human approval receipt.
+- Agent actors require store-backed, unexpired delegation proof from the
+  authenticated principal, matching delegate agent id, human approval receipt,
+  route/tool-required scope, and remaining action budget evidence.
 - Delegated civic-effect authority cannot be enabled by a loose feature or
   test flag; governance preflight requires matching active `civic_execution`
   delegation proof and still keeps delegated preparation non-executable until
@@ -45,7 +46,7 @@ approval and does not expose V6 in normal gameplay.
 - Audit ledger entries for successful authorized mutations, with replay and
   rollback handles where relevant.
 - Browser coverage for same-origin, cross-origin, stale session, cross-wallet,
-  delegated-agent, retry, and rate-limit cases.
+  delegated-agent proof, scope mismatch, retry, and rate-limit cases.
 - M17 security/product signoff before any player-visible V6 civic mutation.
 
 ## Out Of Scope

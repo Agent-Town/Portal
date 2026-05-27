@@ -395,18 +395,26 @@ test('V6 civic mutation security envelope is tracked as an M5 release control', 
   const spec = read('specs/70_agent_town_v6_civic_mutation_security_foundation.md');
   const gate = read('specs/release-gates/v60_agent_civilization_readiness_gate.md');
   const security = read('docs/security/V6_CIVIC_MUTATION_SECURITY_PLAN.md');
+  const skillLine = read('docs/internal-skill-testline.md');
 
   assert.match(plan, /server\/world_civilization\/mutation_security\.js/);
   assert.match(plan, /delegated-agent proof/);
+  assert.match(plan, /store-backed delegated-agent proof with required scope/);
   assert.match(plan, /read-only active `civic_execution` delegation proof/);
   assert.match(spec, /same-origin checks/);
   assert.match(spec, /session\/wallet auth/);
+  assert.match(spec, /store-backed delegated-agent\s+proof/);
+  assert.match(spec, /remaining\s+action budget/);
   assert.match(spec, /CSRF verification/);
   assert.match(spec, /owner\/surface rate limiting/);
   assert.match(gate, /server\/world_civilization\/mutation_security\.js/);
-  assert.match(gate, /future civic store write/);
+  assert.match(gate, /store-backed\s+delegated-agent proof/);
+  assert.match(gate, /future\s+civic store write/);
+  assert.match(security, /route\/tool-required scope/);
   assert.match(security, /mutationApplied: false/);
   assert.match(security, /durable\/session-bound CSRF/);
+  assert.match(skillLine, /V6 civic mutation security foundation/);
+  assert.match(skillLine, /tests\/world_civilization_mutation_security\.test\.js/);
 });
 
 test('V6 worker-first civic tool exposure gate is tracked as an M6 release control', () => {

@@ -80,9 +80,10 @@ gate below has implementation, deterministic tests, and security/product signoff
 - The research-only civic mutation security envelope may exist in
   `server/world_civilization/mutation_security.js`, but it must stay
   fail-closed, route/tool-hidden, non-executing, and require explicit V6 opt-in,
-  same-origin checks, session/wallet auth, actor/owner binding, delegated-agent
-  proof, CSRF verification, idempotency, and owner/surface rate limiting before
-  any future civic store write.
+  same-origin checks, session/wallet auth, actor/owner binding, store-backed
+  delegated-agent proof with required scope and remaining budget evidence, CSRF
+  verification, idempotency, and owner/surface rate limiting before any future
+  civic store write.
 - The research-only modal lab surface contract may exist in
   `server/world_civilization/lab_surface.js`, but it must stay route-neutral,
   modal-first, hidden from players, non-executing, fail closed for standalone

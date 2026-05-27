@@ -11,6 +11,7 @@ const REQUIRED_SECURITY_CHECKS = [
   'same_origin',
   'session_auth',
   'wallet_auth',
+  'delegation_proof',
   'actor_binding',
   'csrf',
   'idempotency',
@@ -50,18 +51,118 @@ function sessionAccount(session = {}) {
   return String(session.accountId || session.subjectAccountId || '').trim();
 }
 
-function actorBoundToSession({ actor = {}, session = {}, delegation = {} } = {}) {
+function isPlainObject(value) {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function actorBoundToSession({ actor = {}, session = {}, delegationProof = {} } = {}) {
   if (actor.kind === 'human') {
     return Boolean(actorAccount(actor) && actorAccount(actor) === sessionAccount(session));
   }
   if (actor.kind === 'agent') {
-    return delegation.verified === true
-      && delegation.expired !== true
-      && String(delegation.principalAccountId || '') === sessionAccount(session)
-      && String(delegation.delegateAgentId || '') === String(actor.agentId || '')
-      && CIVIC_MUTATION_IDEMPOTENCY_RE.test(String(delegation.approvalReceiptId || ''));
+    return delegationProof.ok === true
+      && String(delegationProof.principalAccountId || '') === sessionAccount(session)
+      && String(delegationProof.delegateAgentId || '') === String(actor.agentId || '');
   }
   return false;
+}
+
+function evaluateDelegatedAgentProof({
+  actor = {},
+  session = {},
+  delegation = {},
+  delegationStore = null,
+  requiredDelegationScope = '',
+  nowMs = Date.now()
+} = {}) {
+  const actorKind = String(actor?.kind || '');
+  const base = {
+    proofRequired: actorKind === 'agent',
+    proofStatus: actorKind === 'agent' ? 'missing' : 'not_required',
+    requiredScope: String(requiredDelegationScope || ''),
+    budgetConsumptionStatus: 'not_consumed_by_security_envelope',
+    executionStatus: 'not_executable'
+  };
+
+  if (actorKind !== 'agent') {
+    return {
+      ok: true,
+      principalAccountId: '',
+      delegateAgentId: '',
+      details: base
+    };
+  }
+
+  const proof = isPlainObject(delegation) ? delegation : {};
+  const delegationId = String(proof.delegationId || '').trim();
+  const principalAccountId = String(proof.principalAccountId || '').trim();
+  const delegateAgentId = String(proof.delegateAgentId || '').trim();
+  const approvalReceiptId = String(proof.approvalReceiptId || '').trim();
+  const requiredScope = String(requiredDelegationScope || '').trim();
+  const failures = [];
+
+  if (!delegationStore || typeof delegationStore.getDelegation !== 'function') {
+    failures.push('delegation_store_required');
+  }
+  if (!delegationStore || typeof delegationStore.getAgentParticipationPolicy !== 'function') {
+    failures.push('delegation_policy_store_required');
+  }
+  if (!delegationId) failures.push('delegation_id_required');
+  if (!principalAccountId) failures.push('principal_account_id_required');
+  if (!delegateAgentId) failures.push('delegate_agent_id_required');
+  if (!approvalReceiptId) failures.push('approval_receipt_id_required');
+  if (!requiredScope) failures.push('required_delegation_scope_required');
+
+  let stored = null;
+  let policy = null;
+  if (failures.length === 0) {
+    stored = delegationStore.getDelegation(delegationId);
+    if (!stored) failures.push('delegation_missing');
+  }
+  if (stored) {
+    if (stored.principalAccountId !== principalAccountId) failures.push('principal_account_mismatch');
+    if (stored.delegateAgentId !== delegateAgentId) failures.push('delegate_agent_mismatch');
+    if (stored.delegateAgentId !== String(actor.agentId || '')) failures.push('actor_agent_mismatch');
+    if (stored.principalAccountId !== sessionAccount(session)) failures.push('session_principal_mismatch');
+    if (stored.approvalReceiptId !== approvalReceiptId) failures.push('approval_receipt_mismatch');
+    if (stored.scope !== requiredScope) failures.push('delegation_scope_mismatch');
+    if (stored.status !== 'active') failures.push('delegation_inactive');
+    if (stored.expiresAtMs <= nowMs) failures.push('delegation_expired');
+  }
+  if (stored && failures.length === 0) {
+    policy = delegationStore.getAgentParticipationPolicy({
+      principalAccountId,
+      delegateAgentId,
+      atMs: nowMs
+    });
+    const activeIds = Array.isArray(policy?.activeDelegationIds) ? policy.activeDelegationIds : [];
+    const allowedScopes = Array.isArray(policy?.allowedScopes) ? policy.allowedScopes : [];
+    const remainingActions = Number(policy?.remainingActionBudgetByScope?.[requiredScope] || 0);
+    if (!activeIds.includes(delegationId)) failures.push('delegation_not_active_in_policy');
+    if (!allowedScopes.includes(requiredScope)) failures.push('delegation_scope_not_allowed_by_policy');
+    if (remainingActions <= 0) failures.push('delegation_action_budget_exhausted');
+  }
+
+  const ok = failures.length === 0;
+  return {
+    ok,
+    principalAccountId,
+    delegateAgentId,
+    details: {
+      ...base,
+      proofStatus: ok ? 'valid' : 'invalid',
+      delegationId,
+      principalAccountId,
+      delegateAgentId,
+      approvalReceiptId,
+      storedScope: stored?.scope || '',
+      storedStatus: stored?.status || '',
+      activeDelegationIds: Array.isArray(policy?.activeDelegationIds) ? policy.activeDelegationIds : [],
+      allowedScopes: Array.isArray(policy?.allowedScopes) ? policy.allowedScopes : [],
+      remainingActionBudget: Number(policy?.remainingActionBudgetByScope?.[requiredScope] || 0),
+      failures
+    }
+  };
 }
 
 function check(key, ok, error = '') {
@@ -98,6 +199,8 @@ function buildV6CivicMutationSecurityEnvelope({
   wallet = {},
   actor = {},
   delegation = {},
+  delegationStore = null,
+  requiredDelegationScope = '',
   owner = {},
   surface = '',
   idempotencyKey = '',
@@ -114,6 +217,14 @@ function buildV6CivicMutationSecurityEnvelope({
   const ownerOk = ownerAccount(owner) === sessionAccount(session);
   const csrfOk = productionRequired(env) ? csrfVerified === true : true;
   const idempotencyOk = CIVIC_MUTATION_IDEMPOTENCY_RE.test(String(idempotencyKey || ''));
+  const delegatedAgentProof = evaluateDelegatedAgentProof({
+    actor,
+    session,
+    delegation,
+    delegationStore,
+    requiredDelegationScope,
+    nowMs
+  });
 
   const checks = [
     check('feature_flag', enabled, 'FEATURE_DISABLED'),
@@ -121,7 +232,8 @@ function buildV6CivicMutationSecurityEnvelope({
     check('same_origin', sameOrigin.ok, sameOrigin.error),
     check('session_auth', sessionOk, 'SESSION_AUTH_REQUIRED'),
     check('wallet_auth', walletOk, 'WALLET_AUTH_REQUIRED'),
-    check('actor_binding', ownerOk && actorBoundToSession({ actor, session, delegation }), 'ACTOR_BINDING_REQUIRED'),
+    check('delegation_proof', delegatedAgentProof.ok, 'DELEGATION_PROOF_REQUIRED'),
+    check('actor_binding', ownerOk && actorBoundToSession({ actor, session, delegationProof: delegatedAgentProof }), 'ACTOR_BINDING_REQUIRED'),
     check('csrf', csrfOk, 'CSRF_REQUIRED'),
     check('idempotency', idempotencyOk, 'INVALID_IDEMPOTENCY_KEY'),
     check('rate_limit', rateLimit.ok, rateLimit.error),
@@ -144,6 +256,7 @@ function buildV6CivicMutationSecurityEnvelope({
     mutationApplied: false,
     surface: String(surface || ''),
     actor: clone(actor || {}),
+    delegationProof: clone(delegatedAgentProof.details),
     ownerAccountId: ownerAccount(owner),
     sessionAccountId: sessionAccount(session),
     idempotencyKey: String(idempotencyKey || ''),

@@ -31,6 +31,12 @@ permission flag, expiry, and remaining action budget match the action context.
 The preflight does not consume delegation budget and does not make delegated
 effect preparation available.
 
+`server/world_civilization/mutation_security.js` also validates delegated-agent
+proof read-only for future route/tool mutations. Future route/tool adapters
+must name the required delegation scope, and the envelope must see a matching
+active delegation with remaining budget before an agent actor can reach any
+civic store.
+
 The process-level restart proof currently covers creation of scoped advice and
 explicit civic-execution delegations, idempotent budget consumption, and
 principal-owned revocation. It proves policy summaries and audit replay survive
@@ -94,6 +100,8 @@ Indexes cover delegation replay, principal/scope replay, and agent/scope replay.
   `allowDelegatedExecution` boolean cannot grant authority without a matching
   active delegation proof, and delegated preparation remains blocked while M12
   route/tool enforcement is incomplete.
+- Mutation security delegated-agent proof is store-backed and scope-bound; a
+  loose `verified: true` proof object is not enough to bind an agent actor.
 - Participation policy summaries return `executionStatus: "not_executable"`.
 - Delegation creation writes `delegation.created` audit entries; action-budget
   usage writes `delegation.action_consumed` audit entries; revocation writes

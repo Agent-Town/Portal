@@ -30,8 +30,11 @@ surfaces.
   mutation-origin guard.
 - Authenticated session account.
 - Server-verified wallet/session binding.
-- Actor binding to the authenticated account, or verified delegation for an
-  agent actor.
+- Actor binding to the authenticated account, or store-backed delegated-agent
+  proof for an agent actor.
+- Delegated-agent proof requires a matching active delegation id, principal,
+  delegate agent, approval receipt, route/tool-required scope, and remaining
+  action budget. The envelope reads proof but does not consume budget.
 - CSRF verification in production/security-required mode.
 - Route/tool idempotency key with the V6 civic mutation format.
 - owner/surface rate limiting using the existing world-grid prototype bucket
@@ -48,6 +51,6 @@ M5 cannot move to `done` until:
 - rate limiting is durable or shared across production instances;
 - idempotency is bound to the final session/wallet authorization model;
 - security coverage includes browser same-origin, stale-session, cross-wallet,
-  delegated-agent, retry, and rate-limit cases;
+  delegated-agent proof, scope mismatch, retry, and rate-limit cases;
 - audit/replay records are written after successful authorized mutations;
 - the M17 release review approves the final route/tool security surface.
