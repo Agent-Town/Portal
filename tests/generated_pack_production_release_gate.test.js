@@ -1281,6 +1281,54 @@ test('GPACK-148 release evidence bundle rejects source-count metric tampering', 
   }
 }));
 
+test('GPACK-149 release evidence bundle rejects source-problem count metric tampering', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_evidence_bundle_source_problem_metrics',
+    prompt: 'pearl relay orchard with careful slate navigators',
+    nowMs: 155_200
+  });
+  const validationNowMs = fixture.releaseGate.evaluatedAtMs + 100;
+  const bundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    nowMs: fixture.releaseGate.evaluatedAtMs + 50
+  });
+  const sourceProblemMetricUpdates = [
+    { sourceHashMismatchCount: 1 },
+    { sourcePackIdMismatchCount: 1 }
+  ];
+
+  assert.equal(bundle.metrics.sourceHashMismatchCount, 0);
+  assert.equal(bundle.metrics.sourcePackIdMismatchCount, 0);
+
+  for (const metricPatch of sourceProblemMetricUpdates) {
+    const tamperedBundle = rehashReleaseEvidenceBundle({
+      ...bundle,
+      metrics: {
+        ...bundle.metrics,
+        ...metricPatch
+      }
+    });
+    const report = validateReleaseEvidenceBundle(tamperedBundle, {
+      ...fixture,
+      nowMs: validationNowMs
+    });
+
+    assert.equal(
+      report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_HASH_STABLE').passed,
+      true,
+      JSON.stringify(metricPatch)
+    );
+    assert.equal(report.metrics.sourceHashMismatchCount, 0, JSON.stringify(metricPatch));
+    assert.equal(report.metrics.sourcePackIdMismatchCount, 0, JSON.stringify(metricPatch));
+    assert.equal(report.ok, false, JSON.stringify(metricPatch));
+    assert.equal(
+      report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,
+      false,
+      JSON.stringify(metricPatch)
+    );
+  }
+}));
+
 test('GU-19 release evidence bundle rejects source drift and missing ready-gate evidence', () => withTempGeneratedPackStore(() => {
   const fixture = readyReleaseGateFixture({
     ownerAccountId: 'owner_release_evidence_bundle_tamper',
