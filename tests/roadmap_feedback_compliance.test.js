@@ -172,6 +172,8 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   const controlledSource = read('server/world_civilization/controlled_release.js');
   const proposalSource = read('server/world_civilization/proposals.js');
   const voteSource = read('server/world_civilization/votes.js');
+  const reputationSource = read('server/world_civilization/reputation.js');
+  const moderationSource = read('server/world_civilization/moderation.js');
   const requiredMilestones = [
     'M0 Hardened V5 world-grid baseline',
     'M1 Living V6 milestone contract',
@@ -259,18 +261,27 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /server\/world_civilization\/reputation\.js/);
   assert.match(plan, /reputation dispute\/review/);
   assert.match(plan, /human dispute requesters/);
+  assert.match(plan, /privacy-safe before\/after audit summaries for reputation\/dispute records/);
   assert.match(plan, /require an existing moderation decision linked to the reputation record source/);
   assert.match(reputationSpec, /requireModerationDecisionForDisputes/);
   assert.match(reputationSpec, /CIVIC_REPUTATION_DISPUTE_MODERATION_DECISION_REQUIRED/);
   assert.match(reputationSpec, /CIVIC_REPUTATION_DISPUTE_MODERATION_DECISION_MISMATCH/);
+  assert.match(reputationSpec, /privacy-safe before\/after\s+summaries/);
+  assert.match(reputationSource, /beforeSummary/);
+  assert.match(reputationSource, /afterSummary/);
   assert.match(gate, /server\/world_civilization\/reputation\.js/);
   assert.match(gate, /moderation-decision links that must match the reputation record source/);
+  assert.match(gate, /privacy-safe before\/after audit summaries/);
   assert.match(gate, /reputation\.disputed/);
   assert.match(plan, /M10 Moderation and privacy layer \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/moderation\.js/);
   assert.match(plan, /moderation review\/appeal/);
+  assert.match(plan, /privacy-safe before\/after audit summaries/);
   assert.match(plan, /abuse-report source references/);
   assert.match(moderationSpec, /reputation disputes may optionally require a moderation-store link/);
+  assert.match(moderationSpec, /privacy-safe\s+before\/after summaries/);
+  assert.match(moderationSource, /beforeSummary/);
+  assert.match(moderationSource, /afterSummary/);
   assert.match(gate, /server\/world_civilization\/moderation\.js/);
   assert.match(gate, /required public-source review link for reputation disputes/);
   assert.match(gate, /moderation\.reviewed/);
@@ -372,6 +383,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(persistenceSpec, /Unsupported upgrade\/downgrade targets fail closed/);
   assert.match(persistenceSpec, /before\/after audit summary presence/);
   assert.match(persistenceSpec, /zero\s+hash-only summary fallbacks for those governance records/);
+  assert.match(persistenceSpec, /zero hash-only summary fallbacks for\s+those privacy records/);
   assert.match(persistenceSpec, /missing-summary denial/);
   assert.match(auditSpec, /beforeSummary/);
   assert.match(auditSpec, /hash-only fallbacks/);

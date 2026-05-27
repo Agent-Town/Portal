@@ -81,6 +81,10 @@ executable.
 - Reputation records write `reputation.recorded` audit ledger entries. Opened
   disputes write `reputation.disputed` entries; reviewed dispute outcomes write
   `reputation.reviewed` entries.
+- Reputation and dispute audit entries include privacy-safe before/after
+  summaries covering record id, source reference, reputation kind, bounded
+  delta, dispute status, moderation link, and public-source counts without
+  exposing private wallet, Brain, provider, or debug material.
 
 ## Release Gate
 

@@ -100,7 +100,10 @@ hash-only summary fallbacks for those governance records.
 extends the same process-level evidence to reputation and moderation stores:
 separate processes record a bounded reputation entry and a redacted moderation
 decision, reconstruct the privacy-safe audit replay, and prove exact retries do
-not add duplicate store rows or audit entries after restart.
+not add duplicate store rows or audit entries after restart. The
+reputation/moderation replay chain now carries store-specific privacy-safe
+before/after audit summaries and proves zero hash-only summary fallbacks for
+those privacy records.
 
 `tests/world_civilization_effect_process_restart.test.js` extends the
 process-level evidence to civic effect rollback preparation: one process seeds

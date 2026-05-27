@@ -85,6 +85,10 @@ moderation effects.
 - Decisions write `moderation.decided` audit ledger entries with redacted
   public-audit summaries. Review records write `moderation.reviewed` entries;
   appeal records write `moderation.appealed` entries.
+- Moderation decision, review, and appeal audit entries include privacy-safe
+  before/after summaries covering subject reference, public surface, status,
+  policy version, redacted-field count, review type, reviewer kind, and
+  public-source counts without storing raw private report text.
 
 ## Release Gate
 

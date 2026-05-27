@@ -197,6 +197,7 @@ function auditActorForReview(review) {
 }
 
 function createModerationAuditEntry(decision, nowMs) {
+  const redactedFieldCount = Array.isArray(decision.redactedFields) ? decision.redactedFields.length : 0;
   return {
     schemaVersion: decision.schemaVersion,
     entryId: `audit_${decision.decisionId.replace(/^moderation_/, 'moderation_')}`,
@@ -206,6 +207,8 @@ function createModerationAuditEntry(decision, nowMs) {
     idempotencyKey: auditIdempotencyKey(decision),
     beforeHash: sha256(`agent-town.v6.civic.moderation.absent:${decision.decisionId}`),
     afterHash: sha256(stableJson(decision)),
+    beforeSummary: `No moderation decision existed for ${decision.decisionId} on ${decision.subjectRef}.`,
+    afterSummary: `Recorded moderation decision ${decision.decisionId} as ${decision.status} for ${decision.surface} under ${decision.policyVersion}; redacted field count ${redactedFieldCount}.`,
     createdAtMs: nowMs,
     migrationVersion: MIGRATION_VERSION,
     replayable: true,
@@ -223,6 +226,7 @@ function reviewAuditIdempotencyKey(review) {
 }
 
 function createModerationReviewAuditEntry(review, nowMs) {
+  const sourceRefCount = Array.isArray(review.sourceRefs) ? review.sourceRefs.length : 0;
   return {
     schemaVersion: review.schemaVersion,
     entryId: `audit_${review.reviewId.replace(/^modreview_/, 'modreview_')}`,
@@ -232,6 +236,8 @@ function createModerationReviewAuditEntry(review, nowMs) {
     idempotencyKey: reviewAuditIdempotencyKey(review),
     beforeHash: sha256(`agent-town.v6.civic.moderation.review.absent:${review.reviewId}`),
     afterHash: sha256(stableJson(review)),
+    beforeSummary: `No moderation ${review.reviewType} review existed for ${review.reviewId} on decision ${review.decisionId}.`,
+    afterSummary: `Recorded moderation ${review.reviewType} review ${review.reviewId} with status ${review.status}, reviewer kind ${review.reviewerKind}, and ${sourceRefCount} public source refs.`,
     createdAtMs: nowMs,
     migrationVersion: MIGRATION_VERSION,
     replayable: true,

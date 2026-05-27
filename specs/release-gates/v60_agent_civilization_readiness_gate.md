@@ -260,13 +260,15 @@ persistence resilience, and security/product release review.
   `server/world_civilization/reputation.js` with durable reputation records,
   dispute/review records, human dispute requesters, optional required
   moderation-decision links that must match the reputation record source,
-  and `reputation.disputed` audit rows; release still requires production
-  eligibility/advice integration and privacy/product review.
+  privacy-safe before/after audit summaries, and `reputation.disputed` audit
+  rows; release still requires production eligibility/advice integration and
+  privacy/product review.
 - Moderation must cover proposal text, attached media, sandbox actions, civic
   effects, public profile surfaces, and agent-authored content. Current
   research-only storage starts this in
   `server/world_civilization/moderation.js` with durable decisions plus
   human review/appeal records, abuse-report source references, and
+  privacy-safe before/after audit summaries on
   `moderation.reviewed`/`moderation.appealed` audit rows; it can also serve as
   the required public-source review link for reputation disputes. Release still
   requires production review tooling, appeals operations, media review, and full

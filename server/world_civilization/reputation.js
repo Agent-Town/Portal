@@ -190,6 +190,8 @@ function createReputationAuditEntry(record, nowMs) {
     idempotencyKey: auditIdempotencyKey(record),
     beforeHash: sha256(`agent-town.v6.civic.reputation.absent:${record.recordId}`),
     afterHash: sha256(stableJson(record)),
+    beforeSummary: `No reputation record existed for ${record.recordId} from ${record.sourceRef}.`,
+    afterSummary: `Recorded ${record.kind} reputation ${record.recordId} with delta ${record.delta} and dispute status ${record.disputeStatus}; non-transferable summary only.`,
     createdAtMs: nowMs,
     migrationVersion: MIGRATION_VERSION,
     replayable: true,
@@ -207,6 +209,7 @@ function disputeAuditIdempotencyKey(dispute) {
 }
 
 function createReputationDisputeAuditEntry(dispute, nowMs) {
+  const sourceRefCount = Array.isArray(dispute.sourceRefs) ? dispute.sourceRefs.length : 0;
   return {
     schemaVersion: dispute.schemaVersion,
     entryId: `audit_${dispute.disputeId.replace(/^repdispute_/, 'repdispute_')}`,
@@ -219,6 +222,8 @@ function createReputationDisputeAuditEntry(dispute, nowMs) {
     idempotencyKey: disputeAuditIdempotencyKey(dispute),
     beforeHash: sha256(`agent-town.v6.civic.reputation.dispute.absent:${dispute.disputeId}`),
     afterHash: sha256(stableJson(dispute)),
+    beforeSummary: `No reputation dispute existed for ${dispute.disputeId} on ${dispute.recordId}.`,
+    afterSummary: `Recorded reputation dispute ${dispute.disputeId} with status ${dispute.status}, reviewer kind ${dispute.reviewerKind}, moderation link ${dispute.moderationDecisionId || 'none'}, and ${sourceRefCount} public source refs.`,
     createdAtMs: nowMs,
     migrationVersion: MIGRATION_VERSION,
     replayable: true,

@@ -119,6 +119,11 @@ test('V6 reputation store records bounded accountability entries without executi
   assert.equal(audit.entry.actionType, 'reputation.recorded');
   assert.equal(audit.entry.actor.accountId, 'acct_v6_human_001');
   assert.equal(audit.entry.objectRef, 'reputation_service_quality_001');
+  assert.match(audit.entry.beforeSummary, /No reputation record existed/);
+  assert.match(audit.entry.afterSummary, /service_reliability reputation/);
+  assert.match(audit.entry.afterSummary, /non-transferable summary only/);
+  assert.equal(audit.entry.beforeSummary.includes('Hash-only'), false);
+  assert.equal(audit.entry.afterSummary.includes('Hash-only'), false);
 }));
 
 test('V6 reputation store records dispute review workflow without score mutation', () => withTempReputationStore(({ auditLedger, store }) => {
@@ -156,6 +161,10 @@ test('V6 reputation store records dispute review workflow without score mutation
   assert.equal(audit.entry.actor.accountId, 'acct_v6_human_002');
   assert.equal(audit.entry.objectRef, 'repdispute_service_quality_001');
   assert.equal(audit.entry.privacy.privateDataIncluded, false);
+  assert.match(audit.entry.beforeSummary, /No reputation dispute existed/);
+  assert.match(audit.entry.afterSummary, /moderation link moderation_bridge_text_001/);
+  assert.match(audit.entry.afterSummary, /1 public source refs/);
+  assert.equal(audit.entry.afterSummary.includes('Hash-only'), false);
 }));
 
 test('V6 reputation disputes can require linked moderation decisions before persistence', () => withTempReputationModerationStores(({

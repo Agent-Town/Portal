@@ -84,6 +84,11 @@ test('V6 moderation store records bounded decisions without execution', () => wi
   assert.equal(audit.entry.actor.kind, 'agent');
   assert.equal(audit.entry.actor.accountId, 'acct_system_moderation');
   assert.equal(audit.entry.objectRef, 'moderation_bridge_text_001');
+  assert.match(audit.entry.beforeSummary, /No moderation decision existed/);
+  assert.match(audit.entry.afterSummary, /Recorded moderation decision/);
+  assert.match(audit.entry.afterSummary, /redacted field count 0/);
+  assert.equal(audit.entry.beforeSummary.includes('Hash-only'), false);
+  assert.equal(audit.entry.afterSummary.includes('Hash-only'), false);
 }));
 
 test('V6 moderation store records human review and appeal states without execution', () => withTempModerationStore(({ auditLedger, store }) => {
@@ -116,6 +121,10 @@ test('V6 moderation store records human review and appeal states without executi
   assert.equal(audit.entry.actor.accountId, 'acct_v6_human_001');
   assert.equal(audit.entry.objectRef, 'modreview_bridge_text_appeal_001');
   assert.equal(audit.entry.privacy.privateDataIncluded, false);
+  assert.match(audit.entry.beforeSummary, /No moderation appeal review existed/);
+  assert.match(audit.entry.afterSummary, /status escalated/);
+  assert.match(audit.entry.afterSummary, /1 public source refs/);
+  assert.equal(audit.entry.afterSummary.includes('Hash-only'), false);
 }));
 
 test('V6 moderation store is idempotent by decision and rejects duplicate subject policy', () => withTempModerationStore(({ store }) => {
