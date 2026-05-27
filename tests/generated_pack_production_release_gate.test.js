@@ -237,6 +237,7 @@ function readyReleaseGateFixture({
   invalidImportRejected = true;
 
   const persistenceReport = {
+    packId: pack.packId,
     durablePackStorage: reloadResult.reloadReport.durablePackStorage === true,
     restartReloadPass: reloadResult.generatedPack.packId === pack.packId && reloadResult.reloadReport.fallbackUsed === false,
     exportImportRoundTrip: importResult.importReport.exportImportRoundTrip === true,
@@ -320,6 +321,7 @@ test('GU-18 production release gate can pass only with explicit machine evidence
   const diversityReport = suiteDiversityReport();
   const candidateReviewManifest = reviewedCandidateManifest(pack);
   const persistenceReport = {
+    packId: pack.packId,
     durablePackStorage: reloadResult.reloadReport.durablePackStorage === true,
     restartReloadPass: reloadResult.generatedPack.packId === pack.packId && reloadResult.reloadReport.fallbackUsed === false,
     exportImportRoundTrip: importResult.importReport.exportImportRoundTrip === true,
@@ -376,6 +378,14 @@ test('GU-19 release evidence bundle binds a ready gate to source evidence hashes
   assert.equal(bundle.publicReleaseEligible, true);
   assert.equal(bundle.metrics.presentSourceCount, bundle.metrics.requiredSourceCount);
   assert.equal(bundle.metrics.sourceHashMismatchCount, 0);
+  assert.equal(bundle.metrics.sourcePackIdMismatchCount, 0);
+  assert.equal(bundle.sourcePackIds.generatedPack, fixture.pack.packId);
+  assert.equal(bundle.sourcePackIds.playtestReport, fixture.pack.packId);
+  assert.equal(bundle.sourcePackIds.publicCard, fixture.pack.packId);
+  assert.equal(bundle.sourcePackIds.persistenceReport, fixture.pack.packId);
+  assert.equal(bundle.sourcePackIds.approvalEvidence, fixture.pack.packId);
+  assert.equal(bundle.sourcePackIds.candidateReviewManifest, fixture.pack.packId);
+  assert.equal(bundle.sourcePackIds.releaseGate, fixture.pack.packId);
   assert.equal(bundle.metrics.releaseGateValid, true);
   assert.equal(bundle.metrics.releaseGatePublicEligible, true);
   assert.equal(bundle.metrics.approvalEvidenceHashMatchesGate, true);
@@ -414,6 +424,41 @@ test('GU-19 release evidence bundle rejects source drift and missing ready-gate 
   assert.equal(missingReport.ok, false);
   assert.equal(
     missingReport.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_SOURCE_COVERAGE').passed,
+    false
+  );
+}));
+
+test('GU-19 release evidence bundle rejects mixed-pack source evidence even when hashes match supplied sources', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_evidence_bundle_mixed_pack',
+    prompt: 'sunlit mycelium pier town with copper tide clocks',
+    nowMs: 157_000
+  });
+  const mixedPackPublicCard = {
+    ...fixture.publicCard,
+    packId: `${fixture.pack.packId}_mixed`
+  };
+  const mixedBundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    publicCard: mixedPackPublicCard,
+    nowMs: 157_700
+  });
+  const mixedReport = validateReleaseEvidenceBundle(mixedBundle, {
+    ...fixture,
+    publicCard: mixedPackPublicCard
+  });
+
+  assert.equal(mixedBundle.metrics.sourceHashMismatchCount, 0);
+  assert.equal(mixedBundle.metrics.sourcePackIdMismatchCount, 1);
+  assert.equal(mixedReport.ok, false);
+  assert.equal(mixedReport.metrics.sourceHashMismatchCount, 0);
+  assert.equal(mixedReport.metrics.sourcePackIdMismatchCount, 1);
+  assert.equal(
+    mixedReport.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_SOURCE_HASHES_MATCH').passed,
+    true
+  );
+  assert.equal(
+    mixedReport.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_PACK_IDS_MATCH').passed,
     false
   );
 }));

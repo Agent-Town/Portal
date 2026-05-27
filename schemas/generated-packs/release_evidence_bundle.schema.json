@@ -14,6 +14,7 @@
     "publicReleaseEligible",
     "blockingReasons",
     "sourceHashes",
+    "sourcePackIds",
     "sourcePresence",
     "prerequisiteSnapshot",
     "constraints",
@@ -65,6 +66,30 @@
         "persistenceReport": { "type": "string", "pattern": "^$|^[0-9a-f]{64}$" },
         "approvalEvidence": { "type": "string", "pattern": "^$|^[0-9a-f]{64}$" },
         "candidateReviewManifest": { "type": "string", "pattern": "^$|^[0-9a-f]{64}$" }
+      }
+    },
+    "sourcePackIds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generatedPack",
+        "playtestReport",
+        "diversityReport",
+        "publicCard",
+        "persistenceReport",
+        "approvalEvidence",
+        "candidateReviewManifest",
+        "releaseGate"
+      ],
+      "properties": {
+        "generatedPack": { "type": "string" },
+        "playtestReport": { "type": "string" },
+        "diversityReport": { "type": "string" },
+        "publicCard": { "type": "string" },
+        "persistenceReport": { "type": "string" },
+        "approvalEvidence": { "type": "string" },
+        "candidateReviewManifest": { "type": "string" },
+        "releaseGate": { "type": "string" }
       }
     },
     "sourcePresence": {
@@ -147,6 +172,7 @@
         "presentSourceCount",
         "missingSourceCount",
         "sourceHashMismatchCount",
+        "sourcePackIdMismatchCount",
         "releaseGateValid",
         "releaseGatePublicEligible",
         "approvalEvidenceHashMatchesGate",
@@ -159,6 +185,7 @@
         "presentSourceCount": { "type": "integer", "minimum": 0 },
         "missingSourceCount": { "type": "integer", "minimum": 0 },
         "sourceHashMismatchCount": { "type": "integer", "minimum": 0 },
+        "sourcePackIdMismatchCount": { "type": "integer", "minimum": 0 },
         "releaseGateValid": { "type": "boolean" },
         "releaseGatePublicEligible": { "type": "boolean" },
         "approvalEvidenceHashMatchesGate": { "type": "boolean" },

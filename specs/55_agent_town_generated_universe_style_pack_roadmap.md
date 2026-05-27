@@ -468,7 +468,7 @@ Release approval is now a versioned evidence object, not a loose set of booleans
 
 ## GU-19 Tamper-Evident Release Evidence Bundle Slice
 
-Release gates now have a companion `releaseEvidenceBundle` contract. The bundle is evidence-only: it does not approve production release, promote assets, expose generated packs in default gameplay, or alter server rules. It records stable hashes for the generated pack, measured playtest report, replayability diversity report, public card, persistence report, release approval evidence, candidate-review manifest, and release gate. A ready gate requires every source hash to be present and to match the supplied source evidence; missing sources or drifted evidence fail validation.
+Release gates now have a companion `releaseEvidenceBundle` contract. The bundle is evidence-only: it does not approve production release, promote assets, expose generated packs in default gameplay, or alter server rules. It records stable hashes for the generated pack, measured playtest report, replayability diversity report, public card, persistence report, release approval evidence, candidate-review manifest, and release gate. It also records `sourcePackIds` so single-pack evidence cannot be mixed into another pack's ready-gate bundle even when the supplied source hashes are stable. A ready gate requires every source hash to be present and to match the supplied source evidence; missing sources, drifted evidence, or mismatched pack ids fail validation.
 
 The evidence bundle has a generated-pack feature-gated API endpoint for QA review: `POST /api/world/generated-pack/release-evidence-bundle`. The endpoint returns the release gate, release-gate validation, hash-bound bundle, and bundle validation report. It remains hidden unless `FEATURE_WORLD_GRID_GENERATED_PACKS` is enabled and does not approve public release by itself.
 
@@ -480,8 +480,10 @@ Release-gate API ingress, including the generic tool dispatcher, now rejects sec
   "releaseGateHashStable": true,
   "sourceHashCount": 7,
   "sourceHashMismatchCount": 0,
+  "sourcePackIdMismatchCount": 0,
   "readyGateRequiresAllSourceEvidence": true,
   "sourceDriftRejected": true,
+  "mixedPackEvidenceRejected": true,
   "releaseEvidenceBundleApiFeatureGated": true,
   "failClosedBundleApiValid": true,
   "releaseApiSecretEchoCount": 0,

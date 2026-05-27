@@ -4633,6 +4633,36 @@ function sourcePresenceForHashes(sourceHashes = {}) {
   );
 }
 
+function sourcePackIdsForReleaseEvidence({
+  pack = null,
+  playtestReport = null,
+  diversityReport = null,
+  publicCard = null,
+  persistenceReport = null,
+  approvalEvidence = null,
+  candidateReviewManifest = null,
+  releaseGate = null
+} = {}) {
+  return {
+    generatedPack: String(pack?.packId || ''),
+    playtestReport: String(playtestReport?.packId || ''),
+    diversityReport: String(diversityReport?.packId || ''),
+    publicCard: String(publicCard?.packId || ''),
+    persistenceReport: String(persistenceReport?.packId || ''),
+    approvalEvidence: String(approvalEvidence?.packId || ''),
+    candidateReviewManifest: String(candidateReviewManifest?.packId || ''),
+    releaseGate: String(releaseGate?.packId || '')
+  };
+}
+
+function releaseEvidencePackIdProblems(sourcePackIds = {}, expectedPackId = '') {
+  const problems = [];
+  for (const [source, packId] of Object.entries(sourcePackIds || {})) {
+    if (packId && packId !== expectedPackId) problems.push(`${source}:${packId}`);
+  }
+  return problems;
+}
+
 function buildReleaseEvidenceBundle({
   pack = null,
   releaseGate = null,
@@ -4666,6 +4696,18 @@ function buildReleaseEvidenceBundle({
     approvalEvidence: gateApprovalEvidence,
     candidateReviewManifest
   });
+  const sourcePackIds = sourcePackIdsForReleaseEvidence({
+    pack,
+    playtestReport,
+    diversityReport,
+    publicCard,
+    persistenceReport,
+    approvalEvidence: gateApprovalEvidence,
+    candidateReviewManifest,
+    releaseGate: gate
+  });
+  const bundlePackId = String(gate?.packId || pack?.packId || '');
+  const sourcePackIdProblems = releaseEvidencePackIdProblems(sourcePackIds, bundlePackId);
   const sourcePresence = sourcePresenceForHashes(sourceHashes);
   const presentSourceCount = Object.values(sourcePresence).filter(Boolean).length;
   const approvalEvidenceHashMatchesGate = Boolean(gate?.approvalEvidence)
@@ -4675,13 +4717,14 @@ function buildReleaseEvidenceBundle({
   const bundle = {
     schemaVersion: RELEASE_EVIDENCE_BUNDLE_VERSION,
     bundleHash: '',
-    packId: String(gate?.packId || pack?.packId || ''),
+    packId: bundlePackId,
     createdAtMs: positiveNumberOrZero(nowMs),
     releaseGateHash: stableEvidenceHash(gate),
     releaseGateMode: gate?.releaseMode || 'prototype-gated',
     publicReleaseEligible: gate?.publicReleaseEligible === true,
     blockingReasons: Array.isArray(gate?.blockingReasons) ? clone(gate.blockingReasons) : [],
     sourceHashes,
+    sourcePackIds,
     sourcePresence,
     prerequisiteSnapshot: clone(gate?.releasePrerequisites || {}),
     constraints: {
@@ -4697,6 +4740,7 @@ function buildReleaseEvidenceBundle({
       presentSourceCount,
       missingSourceCount: RELEASE_EVIDENCE_SOURCE_KEYS.length - presentSourceCount,
       sourceHashMismatchCount: 0,
+      sourcePackIdMismatchCount: sourcePackIdProblems.length,
       releaseGateValid: validateProductionReleaseGate(gate).ok === true,
       releaseGatePublicEligible: gate?.publicReleaseEligible === true,
       approvalEvidenceHashMatchesGate,
@@ -4735,6 +4779,16 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     approvalEvidence: approvalEvidence || releaseGate?.approvalEvidence || null,
     candidateReviewManifest
   });
+  const suppliedPackIds = sourcePackIdsForReleaseEvidence({
+    pack,
+    playtestReport,
+    diversityReport,
+    publicCard,
+    persistenceReport,
+    approvalEvidence: approvalEvidence || releaseGate?.approvalEvidence || null,
+    candidateReviewManifest,
+    releaseGate
+  });
   const sourceHashProblems = [];
   for (const key of RELEASE_EVIDENCE_SOURCE_KEYS) {
     if (suppliedHashes[key] && bundle?.sourceHashes?.[key] !== suppliedHashes[key]) {
@@ -4744,6 +4798,18 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     if (bundle?.sourcePresence?.[key] !== expectedPresence) {
       sourceHashProblems.push(`${key}:presence`);
     }
+  }
+  const sourcePackIdProblems = [
+    ...releaseEvidencePackIdProblems(bundle?.sourcePackIds || {}, bundle?.packId || ''),
+    ...Object.entries(suppliedPackIds)
+      .filter(([source, packId]) => packId && bundle?.sourcePackIds?.[source] !== packId)
+      .map(([source, packId]) => `${source}:supplied:${packId}`)
+  ];
+  if (releaseGate?.packId && bundle?.packId !== releaseGate.packId) {
+    sourcePackIdProblems.push(`releaseGate:bundle:${releaseGate.packId}`);
+  }
+  if (pack?.packId && bundle?.packId !== pack.packId) {
+    sourcePackIdProblems.push(`generatedPack:bundle:${pack.packId}`);
   }
   const releaseGateHashExpected = releaseGate ? stableEvidenceHash(releaseGate) : '';
   const releaseGateHashMatches = !releaseGate || bundle?.releaseGateHash === releaseGateHashExpected;
@@ -4781,6 +4847,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     && Number(bundle?.metrics?.missingSourceCount || 0) === RELEASE_EVIDENCE_SOURCE_KEYS.length - presentSourceCount
     && Number(bundle?.metrics?.requiredSourceCount || 0) === RELEASE_EVIDENCE_SOURCE_KEYS.length
     && Number(bundle?.metrics?.sourceHashMismatchCount || 0) === sourceHashProblems.length
+    && Number(bundle?.metrics?.sourcePackIdMismatchCount || 0) === sourcePackIdProblems.length
     && bundle?.metrics?.releaseGateValid === (gateReport.ok === true)
     && bundle?.metrics?.releaseGatePublicEligible === (bundle?.publicReleaseEligible === true)
     && bundle?.metrics?.approvalEvidenceHashMatchesGate === approvalEvidenceHashMatchesGate
@@ -4807,6 +4874,11 @@ function validateReleaseEvidenceBundle(bundle = {}, {
       measured: { sourceHashProblems, releaseGateHashMatches }
     },
     {
+      id: 'RELEASE_EVIDENCE_BUNDLE_PACK_IDS_MATCH',
+      passed: sourcePackIdProblems.length === 0,
+      measured: { packId: bundle?.packId || '', sourcePackIdProblems }
+    },
+    {
       id: 'RELEASE_EVIDENCE_BUNDLE_SOURCE_COVERAGE',
       passed: sourceCoverageOk,
       measured: {
@@ -4831,6 +4903,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
       measured: {
         presentSourceCount,
         sourceHashProblemCount: sourceHashProblems.length,
+        sourcePackIdProblemCount: sourcePackIdProblems.length,
         approvalEvidenceHashMatchesGate,
         candidateReviewManifestHashMatchesEvidence
       }
@@ -4851,6 +4924,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
       rawInstructionPathCount: rawInstructionPaths.length,
       bundleHashMatches,
       sourceHashMismatchCount: sourceHashProblems.length,
+      sourcePackIdMismatchCount: sourcePackIdProblems.length,
       releaseGateHashMatches,
       presentSourceCount,
       requiredSourceCount: RELEASE_EVIDENCE_SOURCE_KEYS.length,

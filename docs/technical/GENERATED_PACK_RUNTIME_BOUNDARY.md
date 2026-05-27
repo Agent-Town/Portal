@@ -158,7 +158,8 @@ Player prompt
 
 - `release_evidence_bundle.schema.json` defines the tamper-evident evidence envelope for release-gate source inputs.
 - `buildReleaseEvidenceBundle` records stable hashes for the generated pack, measured playtest report, diversity report, public card, persistence report, release approval evidence, candidate-review manifest, and release gate.
-- `validateReleaseEvidenceBundle` rejects drifted source evidence, missing source hashes for ready gates, secret-like fields, raw prompt instructions, production image assets, private-data leaks, default generated-pack exposure, V6 civic changes, or canonical server-rule changes.
+- The bundle records `sourcePackIds` for single-pack evidence sources, plus the release gate, so QA can detect mixed-pack evidence even when every supplied source hash is internally stable.
+- `validateReleaseEvidenceBundle` rejects drifted source evidence, mixed-pack source evidence, missing source hashes for ready gates, secret-like fields, raw prompt instructions, production image assets, private-data leaks, default generated-pack exposure, V6 civic changes, or canonical server-rule changes.
 - `POST /api/world/generated-pack/release-evidence-bundle` is feature-gated by `FEATURE_WORLD_GRID_GENERATED_PACKS` and returns only evidence reports; it does not approve release or change gameplay.
 - Release-gate and release-evidence-bundle API ingress, including the generic tool dispatcher, rejects secret-like fields or raw executable prompt instructions before constructing reports, so unsafe submitted values are not echoed back to callers.
 - The bundle is not a release approval surface. It only makes the release-gate evidence replayable and hash-bound for review.
@@ -299,8 +300,10 @@ Player prompt
   "releaseGateHashStable": true,
   "releaseEvidenceSourceHashCount": 7,
   "releaseEvidenceSourceHashMismatchCount": 0,
+  "releaseEvidenceSourcePackIdMismatchCount": 0,
   "readyGateRequiresAllSourceEvidence": true,
   "releaseEvidenceSourceDriftRejected": true,
+  "releaseEvidenceMixedPackRejected": true,
   "releaseEvidenceBundleApiFeatureGated": true,
   "failClosedBundleApiValid": true,
   "releaseApiSecretEchoCount": 0,
