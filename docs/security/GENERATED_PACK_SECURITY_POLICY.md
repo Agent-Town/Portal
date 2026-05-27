@@ -5,12 +5,12 @@ Status: prototype-gated
 ## Hard Rules
 
 - A generated pack is untrusted input until schema validation, content validation, asset manifest validation, and first-loop playtest pass.
-- Generated packs cannot introduce tool handlers, formulas, script fields, eval fields, server-rule overrides, mutation handlers, or secret-like fields.
+- Generated packs cannot introduce tool handlers, formulas, script fields, eval fields, server-rule overrides, mutation handlers, secret-like fields, or secret-looking values.
 - Generated packs cannot store raw prompts as executable instructions. Runtime packs store a prompt hash, safe keyword hints, and a structured `GenerationBrief`.
 - Generated packs cannot carry raw executable prompt instructions in generated copy, prompt metadata, asset manifests, or asset prompt-plan records.
 - Asset manifests and asset prompt plans are allowlisted by canonical target, relative path, prompt hash, size, status, source, and no-production-image policy.
 - Generated-pack subdocuments must pass the local schema registry independently before runtime validation can pass.
-- Generated packs cannot store provider credentials, API keys, access tokens, refresh tokens, session/auth/id/bearer/provider tokens, wallet secrets, Brain vault data, private event logs, or account recovery material.
+- Generated packs cannot store provider credentials, API keys, access tokens, refresh tokens, session/auth/id/bearer/provider tokens, wallet secrets, Brain vault data, private event logs, account recovery material, or secret-looking credential strings under harmless generated-copy keys.
 - Scaffolded generation job logs must record `authMode=not_configured`, `externalImageGenerationUsed=false`, zero outputs, and no production approval until a separate consent/auth/cost model is approved.
 - Optional candidate-generation preflights must fail closed unless product/security approval, documented auth model, documented cost model, accepted cost estimate, and user/team consent are all present.
 - Candidate-generation preflight records must never persist raw provider credentials, and failure records must keep `fallbackStillPlayable=true` for valid deterministic packs.
@@ -43,6 +43,7 @@ Status: prototype-gated
   "assetManifestValid": true,
   "assetPromptPlanValid": true,
   "secretLeakCount": 0,
+  "secretLikeValueRejected": true,
   "rawExecutablePromptInstructionCount": 0,
   "arbitraryToolMutationFormulaCount": 0,
   "schemaRegistryExists": true,

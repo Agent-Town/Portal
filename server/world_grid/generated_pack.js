@@ -321,6 +321,7 @@ const RAW_EXECUTABLE_PROMPT_PATTERNS = [
 ];
 
 const SECRET_LIKE_KEY_PATTERN = /(api[_-]?key|secret|private[_-]?key|credential|oauth|access[_-]?token|refresh[_-]?token|auth[_-]?token|bearer[_-]?token|id[_-]?token|session[_-]?token|provider[_-]?token|wallet[_-]?secret|seed[_-]?phrase|password|^token$)/i;
+const SECRET_LIKE_VALUE_PATTERN = /\b(?:sk-[a-z0-9_-]{8,}|xox[baprs]-[a-z0-9-]{8,}|ghp_[a-z0-9_]{8,}|github_pat_[a-z0-9_]{8,}|ya29\.[a-z0-9_-]{8,}|bearer\s+[a-z0-9._-]{12,})\b/i;
 
 const SENSITIVE_TEXT_PATTERNS = [
   { id: 'api-key-reference', pattern: /\b(api[_ -]?key|access[_ -]?token|refresh[_ -]?token|auth[_ -]?token|bearer[_ -]?token|id[_ -]?token|session[_ -]?token|provider[_ -]?token)\b/i },
@@ -1161,6 +1162,12 @@ function findForbiddenAuthorityPaths(value, path = '$', matches = []) {
 }
 
 function findSecretLikePaths(value, path = '$', matches = []) {
+  if (typeof value === 'string') {
+    if (SECRET_LIKE_VALUE_PATTERN.test(value)) {
+      matches.push(path);
+    }
+    return matches;
+  }
   if (!value || typeof value !== 'object') return matches;
   for (const [key, child] of Object.entries(value)) {
     const childPath = `${path}.${key}`;

@@ -240,6 +240,17 @@ test('generated pack validation rejects missing mappings, arbitrary formulas, se
   const semanticTokenReport = validateGeneratedPack(semanticTokenPack);
   assert.equal(semanticTokenReport.ok, false);
   assert.equal(semanticTokenReport.checks.find((check) => check.id === 'GENPACK_NO_SECRET_FIELDS').passed, false);
+  const secretValuePack = {
+    ...valid,
+    stylePack: {
+      ...valid.stylePack,
+      themeSummary: 'sk-generated-secret-value-should-not-ship'
+    }
+  };
+  const secretValueReport = validateGeneratedPack(secretValuePack);
+  assert.equal(secretValueReport.ok, false);
+  assert.equal(secretValueReport.checks.find((check) => check.id === 'GENPACK_NO_SECRET_FIELDS').passed, false);
+  assert.equal(JSON.stringify(secretValueReport).includes('sk-generated-secret-value-should-not-ship'), false);
 
   const rawInstructionPack = {
     ...valid,

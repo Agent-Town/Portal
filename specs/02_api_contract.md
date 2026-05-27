@@ -2751,7 +2751,7 @@ Export invariants:
 - `packHash` must match the redacted generated-pack content.
 
 ### POST `/api/world/generated-pack/import`
-Imports a generated-pack export into the current owner session. The server rejects tampered hashes, invalid generated-pack content, private owner fields, raw prompt fields, secret-like fields, and forbidden authority fields before saving.
+Imports a generated-pack export into the current owner session. The server rejects tampered hashes, invalid generated-pack content, private owner fields, raw prompt fields, secret-like fields or values, and forbidden authority fields before saving.
 
 ### POST `/api/world/generated-pack/remix`
 Creates a child generated pack from a parent durable pack and a new prompt. The child records `remix.parentPackId`, `remix.rootPackId`, `remix.generation`, and lineage entries. Remixing does not add tools, mutations, formulas, or server-rule overrides.

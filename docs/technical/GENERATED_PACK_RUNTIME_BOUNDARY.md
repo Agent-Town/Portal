@@ -35,7 +35,7 @@ Player prompt
 
 - `server/world_grid/generated_schema.js` is the local schema registry and minimal JSON Schema runner for generated-pack contracts.
 - Generated packs now validate `GenerationBrief`, `StyleBible`, `UniverseBible`, `GameplayMapping`, `AssetPromptPlan`, `GeneratedAssetManifest`, and the outer generated pack independently.
-- Runtime pack validation fails closed when schema validation finds missing required fields, unknown fields in strict subdocuments, wrong enum values, raw-prompt forbidden fields, or semantic token fields such as `sessionToken`.
+- Runtime pack validation fails closed when schema validation finds missing required fields, unknown fields in strict subdocuments, wrong enum values, raw-prompt forbidden fields, semantic token fields such as `sessionToken`, or secret-looking values under harmless generated-copy keys.
 - The schema runner is intentionally local and deterministic; it does not call external validators or image/model services.
 
 ## GU-4 Job Scaffold Slice
