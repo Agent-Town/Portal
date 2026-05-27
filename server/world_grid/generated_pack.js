@@ -4855,7 +4855,7 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
       measured: {
         allPrerequisitesPassed,
         publicReleaseEligible: gate?.publicReleaseEligible === true,
-        failedPrerequisites,
+        failedPrerequisites: failedPrerequisites.map(redactGeneratedPackReportValue),
         blockingReasonsMatchFailures,
         diversityPackIdMatches: gate?.metrics?.diversityPackIdMatches === true,
         diversityReportMetricsCoherent: gate?.metrics?.diversityReportMetricsCoherent === true,
@@ -4878,7 +4878,10 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
       passed: gate?.publicReleaseEligible === true
         ? gate?.releaseMode === 'ready-for-controlled-release' && blockingReasons.length === 0
         : gate?.releaseMode === 'prototype-gated' && blockingReasons.length > 0,
-      measured: { releaseMode: gate?.releaseMode || null, blockingReasons }
+      measured: {
+        releaseMode: redactGeneratedPackReportValue(gate?.releaseMode || null),
+        blockingReasons: blockingReasons.map(redactGeneratedPackReportValue)
+      }
     },
     {
       id: 'PRODUCTION_RELEASE_GATE_APPROVALS_EXPLICIT',
@@ -4896,7 +4899,11 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
           && Number(gate?.metrics?.candidateReviewManifestSchemaErrorCount || 0) === 0
           && /^[0-9a-f]{64}$/.test(String(approvals.humanReviewSignoffHash || ''))
         ),
-      measured: { approvals, approvalEvidenceOk: approvalEvidenceReport.ok === true, approvalInputsMatchEvidence }
+      measured: {
+        approvals: redactGeneratedPackReportObject(approvals),
+        approvalEvidenceOk: approvalEvidenceReport.ok === true,
+        approvalInputsMatchEvidence
+      }
     },
     {
       id: 'PRODUCTION_RELEASE_GATE_APPROVAL_EVIDENCE_VALID',
@@ -4921,7 +4928,7 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
         approvalEvidenceComplete: approvalEvidenceReport.ok === true,
         approvalInputsMatchEvidence,
         approvalEvidenceMetrics: approvalEvidenceReport.metrics,
-        gateMetrics: gate?.metrics || {}
+        gateMetrics: redactGeneratedPackReportObject(gate?.metrics || {})
       }
     },
     {
@@ -4937,7 +4944,7 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
           Number(gate?.metrics?.missingAssetCount || 0) === 0
           || (gate?.publicReleaseEligible !== true && failedPrerequisiteSet.has('fallbackVerified'))
         ),
-      measured: gate?.metrics || {}
+      measured: redactGeneratedPackReportObject(gate?.metrics || {})
     }
   ];
   return {
@@ -4946,7 +4953,7 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
     metrics: {
       productionReleaseGateSchemaExists: Boolean(SCHEMA_REGISTRY?.productionReleaseGate),
       publicReleaseEligible: gate?.publicReleaseEligible === true,
-      releaseMode: gate?.releaseMode || null,
+      releaseMode: redactGeneratedPackReportValue(gate?.releaseMode || null),
       blockingReasonCount: blockingReasons.length,
       costConsentModelApproved: prerequisites.costConsentModelApproved === true,
       humanReviewComplete: prerequisites.humanReviewComplete === true,
@@ -5433,7 +5440,10 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     {
       id: 'RELEASE_EVIDENCE_BUNDLE_BOUNDARY_PRESERVED',
       passed: boundaryPreserved,
-      measured: { constraints, metrics: bundle?.metrics || {} }
+      measured: {
+        constraints: redactGeneratedPackReportObject(constraints),
+        metrics: redactGeneratedPackReportObject(bundle?.metrics || {})
+      }
     }
   ];
   return {

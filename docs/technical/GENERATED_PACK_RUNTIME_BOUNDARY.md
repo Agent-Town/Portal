@@ -165,6 +165,7 @@ Player prompt
 - `publicReleaseEligible=true` requires every prerequisite to be true and `blockingReasons=[]`; forged eligibility or missing blocking reasons fail validation.
 - Approval evidence, candidate-review manifests, diversity reports, persistence reports, public cards, or release gates with secret-like fields, raw prompt instructions, hash drift, invalid pack ids, diversity evidence that excludes the release pack, metric-only diversity claims, mixed persistence evidence, mixed public-card evidence, future-dated approvals, future-dated gate evaluations, mixed pack ids, stale candidate-review timing, planned-only reviewed candidates, short candidate-review coverage, production image promotion, canonical rule changes, V6 civic changes, or default gameplay exposure fail closed.
 - Candidate-review and release-approval evidence validation reports redact submitted secret-looking keys, secret-looking values, raw-instruction keys, executable instruction values, manifest hashes, evidence hashes, and pack ids from content checks, schema-error paths, and measured evidence.
+- Production release-gate validation reports redact unsafe submitted release modes, prerequisite keys, blocking reasons, approval fields, and metric values from measured evidence.
 - `POST /api/world/generated-pack/release-gate` remains behind `FEATURE_WORLD_GRID_GENERATED_PACKS` and does not change canonical world-grid rules, V6 civic systems, pack visibility, or production image policy.
 
 ## GU-19 Release Evidence Bundle Slice
@@ -173,7 +174,7 @@ Player prompt
 - `buildReleaseEvidenceBundle` records stable hashes for the generated pack, measured playtest report, diversity report, public card, persistence report, release approval evidence, candidate-review manifest, and release gate. It also records bundle/gate timestamp ordering, future-date rejection metrics, blocking-reason binding, release-prerequisite snapshot binding, ready-evidence source binding, generated-pack-source validation, playtest-source validation, persistence-source validation, public-card-source validation, approval-evidence-source validation, candidate-review manifest source validation, diversity-source pack inclusion/coherence, and candidate-review manifest hash and time-order metrics from the reviewed evidence path.
 - The bundle records schema-bounded `sourcePackIds` for single-pack evidence sources, plus the release gate, so QA can detect mixed-pack evidence even when every supplied source hash is internally stable.
 - `validateReleaseEvidenceBundle` rejects missing release-gate context, drifted source evidence, unsupplied claimed source hashes, unsupplied claimed source pack ids, mixed-pack source evidence, failing generated-pack sources, failing playtest sources, failing persistence sources, failing public-card sources, failing approval-evidence sources, failing candidate-review manifest sources, copied diversity reports that exclude the release pack, invalid source pack-id shapes, missing source hashes for ready gates, bundles created before their bound release gate, future-dated bundles, forged blocking reasons, forged prerequisite snapshots, approval evidence drift from the bound release gate, candidate-review time-order metric tampering, secret-like fields, raw prompt instructions, production image assets, private-data leaks, default generated-pack exposure, V6 civic changes, or canonical server-rule changes.
-- `validateReleaseEvidenceBundle` redacts unsafe submitted bundle hashes and source pack ids from measured validation-report fields.
+- `validateReleaseEvidenceBundle` redacts unsafe submitted bundle hashes, source pack ids, release modes, prerequisite keys, blocking reasons, boundary values, and metric values from measured validation-report fields.
 - `POST /api/world/generated-pack/release-evidence-bundle` is feature-gated by `FEATURE_WORLD_GRID_GENERATED_PACKS` and returns only evidence reports; it does not approve release or change gameplay.
 - Release-gate and release-evidence-bundle API ingress, including the generic tool dispatcher, rejects secret-like fields, semantic token fields, secret-looking keys or values, raw executable prompt-instruction keys, executable instruction values, oversized object keys, or oversized/noisy evidence bodies before constructing reports, so unsafe submitted values, token field names, executable instruction text, and oversized key text are not echoed back to callers.
 - The bundle is not a release approval surface. It only makes the release-gate evidence replayable and hash-bound for review.
@@ -325,6 +326,7 @@ Player prompt
   "futureDatedApprovalEvidenceRejected": true,
   "releaseGateEvaluatedAtNotFuture": true,
   "futureDatedReleaseGateRejected": true,
+  "releaseGateReportUnsafeValueRedacted": true,
   "mixedPackApprovalEvidenceRejected": true,
   "candidateReviewManifestHashMatchesEvidence": true,
   "candidateReviewManifestTimeMatchesEvidence": true,
@@ -368,6 +370,7 @@ Player prompt
   "releaseApiRawInstructionKeyRedacted": true,
   "releaseApiExecutableInstructionValueRejected": true,
   "releaseApiRawInstructionEchoCount": 0,
+  "releaseEvidenceBundleReportUnsafeValueRedacted": true,
   "releaseApiOversizedEvidenceEchoCount": 0,
   "candidateReviewManifestProductionImageAssetCount": 0,
   "candidateReviewCoverageCountMin": 23,
