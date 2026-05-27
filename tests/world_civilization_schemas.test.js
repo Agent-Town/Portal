@@ -7,6 +7,7 @@ const {
   validateAuditLedgerEntry,
   validateCivicAction,
   validateCivicDelegation,
+  validateCivicInstitutionAmendment,
   validateCivicInstitution,
   validateCivicProposal,
   validateCivicVote,
@@ -242,6 +243,45 @@ test('V6 institution schema requires human-chartered public governance boundarie
   assert.match(unsafe.errors.join('\n'), /private data forbidden/);
 });
 
+test('V6 institution amendment schema requires human requester and redacted charter evidence', () => {
+  const valid = validateCivicInstitutionAmendment({
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    amendmentId: 'charteramend_bridge_council_001',
+    institutionId: 'institution_bridge_council_001',
+    proposalId: 'proposal_bridge_charter_update_001',
+    requestedBy: actor(),
+    approvalReceiptId: 'receipt_bridge_charter_update_001',
+    newCharterId: 'charter_bridge_council_002',
+    publicSummary: 'Record a Bridge Council charter update for later review.',
+    effectiveAtMs: 1_779_784_000_000,
+    idempotencyKey: 'idem_bridge_charter_amendment_001',
+    privacy: privacy({ dataClasses: ['public_audit_summary', 'public_world_state'] })
+  });
+  assert.equal(valid.ok, true, valid.errors.join('\n'));
+
+  const unsafe = validateCivicInstitutionAmendment({
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    amendmentId: 'charteramend_bridge_council_002',
+    institutionId: 'institution_bridge_council_001',
+    proposalId: 'proposal_bridge_charter_update_001',
+    requestedBy: {
+      kind: 'agent',
+      accountId: 'acct_v6_human_001',
+      agentId: 'agent_civic_clover_001'
+    },
+    approvalReceiptId: 'receipt_bridge_charter_update_001',
+    newCharterId: 'charter_bridge_council_002',
+    publicSummary: 'Contains sk-test-secret-value',
+    effectiveAtMs: 1_779_784_000_000,
+    idempotencyKey: 'idem_bridge_charter_amendment_002',
+    privacy: privacy({ privateDataIncluded: true })
+  });
+  assert.equal(unsafe.ok, false);
+  assert.match(unsafe.errors.join('\n'), /requestedBy.kind unsupported/);
+  assert.match(unsafe.errors.join('\n'), /privateDataIncluded/);
+  assert.match(unsafe.errors.join('\n'), /private data forbidden/);
+});
+
 test('V6 public works contribution schema requires public bundles and redacted audit data', () => {
   const valid = validatePublicWorksContribution({
     schemaVersion: CIVIC_SCHEMA_VERSION,
@@ -464,6 +504,23 @@ test('V6 moderation, action, rollback, and audit schemas require traceable safet
     privacy: privacy({ dataClasses: ['public_audit_summary'] })
   });
   assert.equal(delegationUsageAudit.ok, true, delegationUsageAudit.errors.join('\n'));
+
+  const institutionAmendmentAudit = validateAuditLedgerEntry({
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    entryId: 'audit_charteramend_bridge_council_001',
+    actor: actor(),
+    actionType: 'institution.charter_amendment.recorded',
+    objectRef: 'charteramend_bridge_council_001',
+    idempotencyKey: 'idem_bridge_charter_amendment_001',
+    beforeHash: HASH_A,
+    afterHash: HASH_B,
+    createdAtMs: 1_779_784_000_000,
+    migrationVersion: 'v1',
+    replayable: true,
+    rollbackId: '',
+    privacy: privacy({ dataClasses: ['public_audit_summary'] })
+  });
+  assert.equal(institutionAmendmentAudit.ok, true, institutionAmendmentAudit.errors.join('\n'));
 });
 
 test('V6 civic action schema enforces typed effect handler registry', () => {
@@ -528,6 +585,19 @@ test('V6 civic schema dispatcher fails closed for unknown schemas', () => {
     votingRuleId: 'rule_bridge_majority_001',
     publicAuditSummary: 'Bridge Council charter for public works coordination.',
     effectiveAtMs: 1_779_784_000_000,
+    privacy: privacy({ dataClasses: ['public_audit_summary'] })
+  }).ok, true);
+  assert.equal(validateV6CivicSchema('institutionAmendment', {
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    amendmentId: 'charteramend_bridge_council_001',
+    institutionId: 'institution_bridge_council_001',
+    proposalId: 'proposal_bridge_charter_update_001',
+    requestedBy: actor(),
+    approvalReceiptId: 'receipt_bridge_charter_update_001',
+    newCharterId: 'charter_bridge_council_002',
+    publicSummary: 'Record a Bridge Council charter update.',
+    effectiveAtMs: 1_779_784_000_000,
+    idempotencyKey: 'idem_bridge_charter_amendment_001',
     privacy: privacy({ dataClasses: ['public_audit_summary'] })
   }).ok, true);
   assert.equal(validateV6CivicSchema('publicWorksContribution', {

@@ -33,10 +33,11 @@ Public works shared resources foundation:
 These schemas do not make V6 player-visible. They define the fail-closed
 contracts that later V6 routes, worker tools, and audit stores must use.
 
-No V6 proposal, vote, delegation, institution charter, public works
-contribution, reputation update, reputation dispute/review, moderation decision,
-moderation review/appeal, civic effect, rollback, or audit ledger row may be
-accepted without passing the matching schema validator.
+No V6 proposal, vote, delegation, institution charter, institution charter
+amendment, public works contribution, reputation update, reputation
+dispute/review, moderation decision, moderation review/appeal, civic effect,
+rollback, or audit ledger row may be accepted without passing the matching
+schema validator.
 
 ## Schema Version
 
@@ -57,6 +58,7 @@ unversioned payloads are invalid for V6 civic state.
 | Vote | Human voter identity, server-verified authorization, eligibility proof, explicit choice, receipt id, and idempotency key. |
 | Delegation | Principal account, delegate agent, scoped authority, expiry, action cap, approval receipt, revocability, and explicit civic-effect execution permission. |
 | Institution | Human chartering actor, public scope, proposal types, membership and eligibility rules, moderation policy, voting rule, public audit summary, effective timestamp, and redacted privacy envelope. |
+| Institution Charter Amendment | Institution reference, proposal reference, human requester, approval receipt, replacement charter id, public summary, effective timestamp, idempotency key, and redacted privacy envelope. |
 | Public Works Contribution | Institution, project, contributor, source reference, requested public resource bundle, idempotency key, public summary, and redacted privacy envelope. |
 | Reputation | Subject, awarding account, bounded non-zero delta, source reference, dispute status, and audit entry reference. Self-awards are invalid. |
 | Reputation Dispute/Review | Reputation record reference, subject account, human requester, queue/outcome status, reviewer kind, optional moderation decision reference, public source references, reasons, and redacted privacy envelope. |

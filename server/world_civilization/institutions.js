@@ -3,13 +3,14 @@ const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
 
 const { createCivicAuditLedger, sha256, stableJson } = require('./audit_ledger');
-const { validateCivicInstitution } = require('./schemas');
+const { validateCivicInstitution, validateCivicInstitutionAmendment } = require('./schemas');
 const {
   ensureCivicSqliteSchemaMetadata,
   readCivicSqliteSchemaMetadata
 } = require('./sqlite_schema');
 
 const INSTITUTION_STATUS_CHARTERED = 'chartered';
+const INSTITUTION_AMENDMENT_STATUS_RECORDED = 'recorded';
 const MIGRATION_VERSION = 'v1';
 const STORE_KEY = 'institutions';
 
@@ -32,6 +33,24 @@ function parseInstitutionRow(row) {
     createdAtMs: Number(row.created_at),
     updatedAtMs: Number(row.updated_at),
     institution: JSON.parse(row.institution_json)
+  };
+}
+
+function parseAmendmentRow(row) {
+  if (!row) return null;
+  return {
+    amendmentId: row.amendment_id,
+    institutionId: row.institution_id,
+    proposalId: row.proposal_id,
+    requestedByAccountId: row.requested_by_account_id,
+    approvalReceiptId: row.approval_receipt_id,
+    newCharterId: row.new_charter_id,
+    idempotencyKey: row.idempotency_key,
+    status: row.status,
+    auditEntryId: row.audit_entry_id,
+    effectiveAtMs: Number(row.effective_at),
+    createdAtMs: Number(row.created_at),
+    amendment: JSON.parse(row.amendment_json)
   };
 }
 
@@ -65,6 +84,27 @@ function ensureSchema(db) {
       ON world_civic_institutions(moderation_policy_id, voting_rule_id);
     CREATE INDEX IF NOT EXISTS idx_world_civic_institutions_chartered_by
       ON world_civic_institutions(chartered_by_account_id, created_at);
+    CREATE TABLE IF NOT EXISTS world_civic_institution_charter_amendments (
+      amendment_id TEXT PRIMARY KEY,
+      institution_id TEXT NOT NULL,
+      proposal_id TEXT NOT NULL,
+      requested_by_account_id TEXT NOT NULL,
+      approval_receipt_id TEXT NOT NULL,
+      new_charter_id TEXT NOT NULL,
+      idempotency_key TEXT NOT NULL,
+      status TEXT NOT NULL,
+      audit_entry_id TEXT NOT NULL,
+      effective_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      amendment_json TEXT NOT NULL,
+      UNIQUE(institution_id, idempotency_key)
+    );
+    CREATE INDEX IF NOT EXISTS idx_world_civic_institution_amendments_institution
+      ON world_civic_institution_charter_amendments(institution_id, status, created_at);
+    CREATE INDEX IF NOT EXISTS idx_world_civic_institution_amendments_proposal
+      ON world_civic_institution_charter_amendments(proposal_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_world_civic_institution_amendments_requester
+      ON world_civic_institution_charter_amendments(requested_by_account_id, created_at);
   `);
   return ensureCivicSqliteSchemaMetadata(db, {
     storeKey: STORE_KEY,
@@ -94,6 +134,47 @@ function buildStatements(db) {
         membership_rule_id, eligibility_rule_id, status, audit_entry_id,
         effective_at, created_at, updated_at, institution_json
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `),
+    byAmendmentId: db.prepare(`
+      SELECT *
+      FROM world_civic_institution_charter_amendments
+      WHERE amendment_id = ?
+      LIMIT 1
+    `),
+    byInstitutionIdempotency: db.prepare(`
+      SELECT *
+      FROM world_civic_institution_charter_amendments
+      WHERE institution_id = ? AND idempotency_key = ?
+      LIMIT 1
+    `),
+    insertAmendment: db.prepare(`
+      INSERT INTO world_civic_institution_charter_amendments (
+        amendment_id, institution_id, proposal_id, requested_by_account_id,
+        approval_receipt_id, new_charter_id, idempotency_key, status,
+        audit_entry_id, effective_at, created_at, amendment_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `),
+    listAmendments: db.prepare(`
+      SELECT *
+      FROM world_civic_institution_charter_amendments
+      WHERE (? = '' OR institution_id = ?)
+        AND (? = '' OR proposal_id = ?)
+        AND (? = '' OR status = ?)
+      ORDER BY created_at ASC, amendment_id ASC
+      LIMIT ?
+    `),
+    amendmentSummary: db.prepare(`
+      SELECT status, COUNT(1) AS count
+      FROM world_civic_institution_charter_amendments
+      WHERE institution_id = ?
+      GROUP BY status
+    `),
+    latestAmendment: db.prepare(`
+      SELECT amendment_id
+      FROM world_civic_institution_charter_amendments
+      WHERE institution_id = ?
+      ORDER BY created_at DESC, amendment_id DESC
+      LIMIT 1
     `),
     list: db.prepare(`
       SELECT *
@@ -137,7 +218,61 @@ function createInstitutionAuditEntry(institution, nowMs) {
   };
 }
 
-function createCivicInstitutionStore({ sqlitePath, auditLedger = null, auditSqlitePath = '' }) {
+function matchingVoteForReceipt(voteStore, proposalId, receiptId) {
+  if (!voteStore || typeof voteStore.listVotes !== 'function') return null;
+  return voteStore
+    .listVotes({ proposalId, limit: 500 })
+    .find((vote) => vote.receiptId === receiptId && vote.choice === 'approve') || null;
+}
+
+function approvedModerationForProposal(moderationStore, proposal) {
+  if (!moderationStore || typeof moderationStore.listDecisions !== 'function') return null;
+  return moderationStore
+    .listDecisions({
+      subjectRef: proposal.proposalId,
+      surface: proposal.proposal.moderationClass,
+      status: 'approved',
+      limit: 1
+    })[0] || null;
+}
+
+function createCharterAmendmentAuditEntry({ amendment, institution, actor, nowMs }) {
+  return {
+    schemaVersion: amendment.schemaVersion,
+    entryId: `audit_${amendment.amendmentId.replace(/^charteramend_/, 'charteramend_')}`,
+    actor,
+    actionType: 'institution.charter_amendment.recorded',
+    objectRef: amendment.amendmentId,
+    idempotencyKey: amendment.idempotencyKey,
+    beforeHash: sha256(stableJson({
+      institutionId: institution.institutionId,
+      charterId: institution.charterId,
+      status: institution.status
+    })),
+    afterHash: sha256(stableJson({
+      amendment,
+      status: INSTITUTION_AMENDMENT_STATUS_RECORDED
+    })),
+    createdAtMs: nowMs,
+    migrationVersion: MIGRATION_VERSION,
+    replayable: true,
+    rollbackId: '',
+    privacy: {
+      redacted: true,
+      privateDataIncluded: false,
+      dataClasses: ['public_audit_summary']
+    }
+  };
+}
+
+function createCivicInstitutionStore({
+  sqlitePath,
+  auditLedger = null,
+  auditSqlitePath = '',
+  proposalStore = null,
+  voteStore = null,
+  moderationStore = null
+}) {
   if (!sqlitePath || typeof sqlitePath !== 'string') {
     throw new Error('CIVIC_INSTITUTION_SQLITE_PATH_REQUIRED');
   }
@@ -217,6 +352,152 @@ function createCivicInstitutionStore({ sqlitePath, auditLedger = null, auditSqli
     return parseInstitutionRow(statements.byInstitutionId.get(String(institutionId || '')));
   }
 
+  function validateCharterAmendmentPrerequisites({ amendment, institution, proposal, nowMs }) {
+    if (!proposalStore || typeof proposalStore.getProposal !== 'function') {
+      throw new Error('CIVIC_INSTITUTION_AMENDMENT_PROPOSAL_STORE_REQUIRED');
+    }
+    if (!voteStore || typeof voteStore.summarizeProposalVotes !== 'function') {
+      throw new Error('CIVIC_INSTITUTION_AMENDMENT_VOTE_STORE_REQUIRED');
+    }
+    if (!moderationStore || typeof moderationStore.listDecisions !== 'function') {
+      throw new Error('CIVIC_INSTITUTION_AMENDMENT_MODERATION_STORE_REQUIRED');
+    }
+    if (!institution) {
+      const err = new Error('CIVIC_INSTITUTION_AMENDMENT_INSTITUTION_REQUIRED');
+      err.details = { institutionId: amendment.institutionId };
+      throw err;
+    }
+    if (!proposal) {
+      const err = new Error('CIVIC_INSTITUTION_AMENDMENT_PROPOSAL_REQUIRED');
+      err.details = { proposalId: amendment.proposalId };
+      throw err;
+    }
+    if (proposal.expiresAtMs <= nowMs) {
+      const err = new Error('CIVIC_INSTITUTION_AMENDMENT_PROPOSAL_EXPIRED');
+      err.details = { proposalId: amendment.proposalId, expiresAtMs: proposal.expiresAtMs, nowMs };
+      throw err;
+    }
+    if (proposal.scopeKind !== 'institution_charter' || proposal.scopeTargetId !== amendment.institutionId) {
+      const err = new Error('CIVIC_INSTITUTION_AMENDMENT_PROPOSAL_SCOPE_REQUIRED');
+      err.details = {
+        proposalId: amendment.proposalId,
+        expectedScopeKind: 'institution_charter',
+        expectedScopeTargetId: amendment.institutionId,
+        receivedScopeKind: proposal.scopeKind,
+        receivedScopeTargetId: proposal.scopeTargetId
+      };
+      throw err;
+    }
+    if (proposal.proposal.effectPreview.effectType !== 'charter_update') {
+      const err = new Error('CIVIC_INSTITUTION_AMENDMENT_EFFECT_REQUIRED');
+      err.details = { proposalId: amendment.proposalId, effectType: proposal.proposal.effectPreview.effectType };
+      throw err;
+    }
+    if (!proposal.proposal.affectedPublicState.includes(`institution:${amendment.institutionId}`)) {
+      const err = new Error('CIVIC_INSTITUTION_AMENDMENT_AFFECTED_STATE_REQUIRED');
+      err.details = { proposalId: amendment.proposalId, institutionId: amendment.institutionId };
+      throw err;
+    }
+    const moderation = approvedModerationForProposal(moderationStore, proposal);
+    if (!moderation) {
+      const err = new Error('CIVIC_INSTITUTION_AMENDMENT_MODERATION_REQUIRED');
+      err.details = { proposalId: amendment.proposalId };
+      throw err;
+    }
+    const voteSummary = voteStore.summarizeProposalVotes(amendment.proposalId);
+    if (!voteSummary || voteSummary.counts.approve <= voteSummary.counts.reject || voteSummary.counts.approve < 1) {
+      const err = new Error('CIVIC_INSTITUTION_AMENDMENT_APPROVAL_REQUIRED');
+      err.details = { proposalId: amendment.proposalId, counts: voteSummary?.counts || null };
+      throw err;
+    }
+    const approvingVote = matchingVoteForReceipt(voteStore, amendment.proposalId, amendment.approvalReceiptId);
+    if (!approvingVote) {
+      const err = new Error('CIVIC_INSTITUTION_AMENDMENT_APPROVAL_RECEIPT_REQUIRED');
+      err.details = { proposalId: amendment.proposalId, receiptId: amendment.approvalReceiptId };
+      throw err;
+    }
+    return { approvingVote, moderation };
+  }
+
+  function recordCharterAmendment(rawAmendment = {}, { nowMs = Date.now() } = {}) {
+    const validation = validateCivicInstitutionAmendment(rawAmendment);
+    if (!validation.ok) {
+      const err = new Error('CIVIC_INSTITUTION_AMENDMENT_INVALID');
+      err.details = { errors: validation.errors };
+      throw err;
+    }
+    const amendment = validation.value;
+    const normalizedJson = stableJson(amendment);
+    const existingByIdempotency = parseAmendmentRow(
+      statements.byInstitutionIdempotency.get(amendment.institutionId, amendment.idempotencyKey)
+    );
+    if (existingByIdempotency) {
+      if (stableJson(existingByIdempotency.amendment) !== normalizedJson) {
+        const err = new Error('CIVIC_INSTITUTION_AMENDMENT_IDEMPOTENCY_CONFLICT');
+        err.details = {
+          institutionId: amendment.institutionId,
+          idempotencyKey: amendment.idempotencyKey,
+          existingAmendmentId: existingByIdempotency.amendmentId
+        };
+        throw err;
+      }
+      return { ...existingByIdempotency, duplicate: true };
+    }
+    const existingById = parseAmendmentRow(statements.byAmendmentId.get(amendment.amendmentId));
+    if (existingById) {
+      const err = new Error('CIVIC_INSTITUTION_AMENDMENT_ID_CONFLICT');
+      err.details = { amendmentId: amendment.amendmentId };
+      throw err;
+    }
+
+    const institution = getInstitution(amendment.institutionId);
+    const proposal = proposalStore?.getProposal?.(amendment.proposalId) || null;
+    const { approvingVote } = validateCharterAmendmentPrerequisites({
+      amendment,
+      institution,
+      proposal,
+      nowMs
+    });
+    const auditRow = ledger.append(createCharterAmendmentAuditEntry({
+      amendment,
+      institution,
+      actor: approvingVote.vote.voter,
+      nowMs
+    }));
+    statements.insertAmendment.run(
+      amendment.amendmentId,
+      amendment.institutionId,
+      amendment.proposalId,
+      amendment.requestedBy.accountId,
+      amendment.approvalReceiptId,
+      amendment.newCharterId,
+      amendment.idempotencyKey,
+      INSTITUTION_AMENDMENT_STATUS_RECORDED,
+      auditRow.entry.entryId,
+      amendment.effectiveAtMs,
+      nowMs,
+      normalizedJson
+    );
+    return parseAmendmentRow(statements.byAmendmentId.get(amendment.amendmentId));
+  }
+
+  function getCharterAmendment(amendmentId = '') {
+    return parseAmendmentRow(statements.byAmendmentId.get(String(amendmentId || '')));
+  }
+
+  function listCharterAmendments({ institutionId = '', proposalId = '', status = '', limit = 100 } = {}) {
+    const safeLimit = Number.isInteger(Number(limit)) ? Math.max(1, Math.min(500, Number(limit))) : 100;
+    return statements.listAmendments.all(
+      String(institutionId || ''),
+      String(institutionId || ''),
+      String(proposalId || ''),
+      String(proposalId || ''),
+      String(status || ''),
+      String(status || ''),
+      safeLimit
+    ).map(parseAmendmentRow);
+  }
+
   function listInstitutions({
     scopeKind = '',
     scopeTargetId = '',
@@ -259,6 +540,29 @@ function createCivicInstitutionStore({ sqlitePath, auditLedger = null, auditSqli
     };
   }
 
+  function summarizeInstitutionGovernance(institutionId = '') {
+    const institution = getInstitution(institutionId);
+    const rows = statements.amendmentSummary.all(String(institutionId || ''));
+    const amendmentsByStatus = {};
+    let amendmentCount = 0;
+    for (const row of rows) {
+      const status = String(row.status || '');
+      const count = Number(row.count || 0);
+      amendmentsByStatus[status] = count;
+      amendmentCount += count;
+    }
+    return {
+      institutionId: String(institutionId || ''),
+      charterId: institution?.charterId || '',
+      amendmentCount,
+      amendmentsByStatus,
+      latestAmendmentId: statements.latestAmendment.get(String(institutionId || ''))?.amendment_id || '',
+      playerVisible: false,
+      appliesCharterChanges: false,
+      executionStatus: 'not_executable'
+    };
+  }
+
   function count() {
     return Number(statements.count.get().count || 0);
   }
@@ -278,16 +582,21 @@ function createCivicInstitutionStore({ sqlitePath, auditLedger = null, auditSqli
     charterInstitution,
     close,
     count,
+    getCharterAmendment,
     getInstitution,
     getSchemaMetadata,
+    listCharterAmendments,
     listInstitutions,
     migrationVersion: schemaMetadata.migrationVersion,
+    recordCharterAmendment,
     sqlitePath,
+    summarizeInstitutionGovernance,
     summarizeScopeInstitutions
   };
 }
 
 module.exports = {
+  INSTITUTION_AMENDMENT_STATUS_RECORDED,
   INSTITUTION_STATUS_CHARTERED,
   createCivicInstitutionStore
 };

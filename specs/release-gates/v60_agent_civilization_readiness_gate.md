@@ -201,9 +201,11 @@ gate below has implementation, deterministic tests, and security/product signoff
 - Civic institutions must have explicit charters, scopes, eligibility rules,
   voting rules, moderation policies, and public audit summaries before any
   player-visible institution appears. Current research-only storage starts this
-  in `server/world_civilization/institutions.js`; release still requires
-  proposal/vote-governed charter changes, worker/tool integration, and public
-  text rendering review.
+  in `server/world_civilization/institutions.js` with public-safe charters plus
+  proposal/vote/moderation-gated charter amendment records and
+  `institution.charter_amendment.recorded` audit rows; release still requires
+  worker/tool integration, applied charter-change execution/rollback,
+  release-reviewed templates, and public text rendering review.
 - Public works and shared resources must conserve accepted inputs, public
   progress, caps, rewards, and rollbacks across retries and restarts. Current
   research-only accounting starts this in

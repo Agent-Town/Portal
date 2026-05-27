@@ -43,9 +43,10 @@ participation-control evidence and must not be treated as agent execution
 authority unless later route/tool checks verify active scope, expiry, budget,
 and principal approval.
 
-Research-only institution charters use `institution.chartered` audit entries.
-They are charter evidence and must not be treated as player-visible civic
-institutions until the M13 release gate closes.
+Research-only institution charters and charter amendments use
+`institution.chartered` and `institution.charter_amendment.recorded` audit
+entries. They are charter evidence and must not be treated as player-visible
+civic institutions or applied charter changes until the M13 release gate closes.
 
 Research-only shared public works contributions use
 `public_works.contribution.recorded` audit entries. They are capped accounting

@@ -54,6 +54,7 @@ const AUDIT_ACTION_TYPES = new Set([
   'delegation.action_consumed',
   'delegation.revoked',
   'institution.chartered',
+  'institution.charter_amendment.recorded',
   'public_works.contribution.recorded',
   'reputation.recorded',
   'reputation.disputed',
@@ -358,6 +359,41 @@ function validateCivicInstitution(raw = {}) {
   };
 }
 
+function validateCivicInstitutionAmendment(raw = {}) {
+  const errors = [];
+  if (!isPlainObject(raw)) return { ok: false, errors: ['institution amendment must be object'] };
+  validateSchemaVersion(errors, raw);
+  const amendmentId = validateString(errors, raw.amendmentId, 'amendmentId', { pattern: /^charteramend_[a-z0-9_:-]{4,88}$/ });
+  const institutionId = validateString(errors, raw.institutionId, 'institutionId', { pattern: /^institution_[a-z0-9_:-]{4,88}$/ });
+  const proposalId = validateString(errors, raw.proposalId, 'proposalId', { pattern: /^proposal_[a-z0-9_:-]{4,88}$/ });
+  const requestedBy = validateActor(errors, raw.requestedBy, 'requestedBy', { allowAgent: false });
+  const approvalReceiptId = validateString(errors, raw.approvalReceiptId, 'approvalReceiptId', { pattern: /^receipt_[a-z0-9_:-]{4,88}$/ });
+  const newCharterId = validateString(errors, raw.newCharterId, 'newCharterId', { pattern: /^charter_[a-z0-9_:-]{4,88}$/ });
+  const publicSummary = validateString(errors, raw.publicSummary, 'publicSummary', { max: 480 });
+  const effectiveAtMs = validateNumber(errors, raw.effectiveAtMs, 'effectiveAtMs', { min: 1 });
+  const idempotencyKey = validateString(errors, raw.idempotencyKey, 'idempotencyKey', { pattern: CIVIC_ID_RE, max: 96 });
+  const privacy = validatePrivacy(errors, raw.privacy, 'privacy');
+  const privatePaths = findPrivateData(raw);
+  if (privatePaths.length) errors.push(`private data forbidden: ${privatePaths.join(', ')}`);
+  return {
+    ok: errors.length === 0,
+    errors,
+    value: errors.length ? null : {
+      schemaVersion: CIVIC_SCHEMA_VERSION,
+      amendmentId,
+      institutionId,
+      proposalId,
+      requestedBy,
+      approvalReceiptId,
+      newCharterId,
+      publicSummary,
+      effectiveAtMs,
+      idempotencyKey,
+      privacy
+    }
+  };
+}
+
 function normalizeResourceBundle(errors, raw, path) {
   if (!isPlainObject(raw)) {
     errors.push(`${path} required`);
@@ -649,6 +685,7 @@ function validateV6CivicSchema(kind, raw = {}) {
     vote: validateCivicVote,
     delegation: validateCivicDelegation,
     institution: validateCivicInstitution,
+    institutionAmendment: validateCivicInstitutionAmendment,
     publicWorksContribution: validatePublicWorksContribution,
     reputation: validateReputationRecord,
     reputationDispute: validateReputationDispute,
@@ -672,6 +709,7 @@ module.exports = {
   validateAuditLedgerEntry,
   validateCivicAction,
   validateCivicDelegation,
+  validateCivicInstitutionAmendment,
   validateCivicInstitution,
   validateCivicProposal,
   validateCivicVote,

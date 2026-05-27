@@ -133,7 +133,7 @@ const V6_CIVIC_RESILIENCE_STORES = [
     modulePath: 'server/world_civilization/institutions.js',
     migrationVersion: 'v1',
     restartCoverage: 'tests/world_civilization_institution_process_restart.test.js',
-    requiredMethods: ['charterInstitution', 'getInstitution', 'getSchemaMetadata', 'listInstitutions', 'summarizeScopeInstitutions', 'count', 'close']
+    requiredMethods: ['charterInstitution', 'recordCharterAmendment', 'getCharterAmendment', 'getInstitution', 'getSchemaMetadata', 'listCharterAmendments', 'listInstitutions', 'summarizeInstitutionGovernance', 'summarizeScopeInstitutions', 'count', 'close']
   },
   {
     key: 'public_works',
