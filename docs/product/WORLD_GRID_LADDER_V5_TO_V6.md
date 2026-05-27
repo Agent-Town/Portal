@@ -78,13 +78,16 @@ buckets persist across route restarts. Exact idempotent retries are replayed
 before rate-limit consumption, and optional
 `WORLD_GRID_RATE_LIMIT_IDENTITY_MODE=owner_session_ip_risk` coverage proves
 session/IP/risk bucket identity is hashed without persisting raw session or IP
-values.
+values. `server/world_grid/rate_limit_rollout.js` now defines the non-executing
+trusted proxy, risk-signal, distributed-counter, calibration, abuse-burst, and
+production-observability rollout target while keeping V5 prototype-gated and
+not release-ready.
 
 `server/world_grid/release_promotion.js` now names the V5.0-V5.5 release
 promotion target matrix and keeps the report non-executing: it may record
 evidence for durable storage, owner indexes, migration versions, restart
 persistence, mutation security, CSRF, rate limits, idempotency, audit/replay,
 public text privacy, player-route prerequisites, release replay reconstruction,
-provider logout signoff, and risk-rate-limit identity, but it may not mark V5
-release-ready, enable V6, expose prototype features by default, or mutate world
-state.
+provider logout signoff, risk-rate-limit identity, and trusted
+proxy/risk-signal rollout, but it may not mark V5 release-ready, enable V6,
+expose prototype features by default, or mutate world state.

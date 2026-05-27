@@ -82,6 +82,10 @@ Release note:
   target a privacy-safe foundation. V5/V6 release promotion still needs counters
   bound to the final browser session, wallet/owner identity, trusted proxy/risk
   signal wiring, and production operational tuning.
+  `server/world_grid/rate_limit_rollout.js` names the non-executing release
+  target for trusted proxy header ownership, risk-signal ownership, distributed
+  counters, per-surface budget calibration, abuse-burst backoff, and
+  privacy-safe production observability.
 
 ## Pony message rate limit
 

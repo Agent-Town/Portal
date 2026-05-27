@@ -9,6 +9,8 @@ const V5_PROMOTION_TARGET_ARTIFACT = 'server/world_grid/release_promotion.js';
 const V5_PROMOTION_TARGET_TEST = 'tests/world_grid_release_promotion.test.js';
 const V5_REPLAY_RECONSTRUCTION_ARTIFACT = 'server/world_grid/replay_reconstruction.js';
 const V5_REPLAY_RECONSTRUCTION_TEST = 'tests/world_grid_replay_reconstruction.test.js';
+const V5_RATE_LIMIT_ROLLOUT_ARTIFACT = 'server/world_grid/rate_limit_rollout.js';
+const V5_RATE_LIMIT_ROLLOUT_TEST = 'tests/world_grid_rate_limit_rollout.test.js';
 
 const REQUIRED_V6_READINESS_GATES = [
   {
@@ -21,6 +23,8 @@ const REQUIRED_V6_READINESS_GATES = [
       V5_PROMOTION_TARGET_TEST,
       V5_REPLAY_RECONSTRUCTION_ARTIFACT,
       V5_REPLAY_RECONSTRUCTION_TEST,
+      V5_RATE_LIMIT_ROLLOUT_ARTIFACT,
+      V5_RATE_LIMIT_ROLLOUT_TEST,
       V6_MILESTONE_PLAN_ARTIFACT,
       'docs/product/WORLD_GRID_LADDER_V5_TO_V6.md',
       'tests/world_grid_region.test.js',
@@ -46,7 +50,8 @@ const REQUIRED_V6_READINESS_GATES = [
       'exact_before_state_reconstruction_target',
       'production_replay_coverage_target',
       'live_provider_logout_signoff_target',
-      'risk_rate_limit_identity_target'
+      'risk_rate_limit_identity_target',
+      'trusted_proxy_risk_signal_rollout_target'
     ]
   },
   {

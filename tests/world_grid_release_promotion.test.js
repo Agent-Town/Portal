@@ -34,6 +34,7 @@ function observedEvidence(overrides = {}) {
     releaseReplayReconstructionProbeCount: 1,
     providerLogoutSignoffProbeCount: 1,
     riskRateLimitIdentityProbeCount: 1,
+    trustedProxyRiskSignalRolloutProbeCount: 1,
     privateDataExposureCount: 0,
     playerVisibleByDefaultCount: 0,
     productionOverrideBypassCount: 0,
@@ -72,6 +73,7 @@ test('V5 world-grid promotion targets name every slice and release control', () 
   assert.ok(matrix.targetKeys.includes('release_replay_reconstruction'));
   assert.ok(matrix.targetKeys.includes('provider_logout_signoff'));
   assert.ok(matrix.targetKeys.includes('risk_rate_limit_identity'));
+  assert.ok(matrix.targetKeys.includes('trusted_proxy_risk_signal_rollout'));
   assert.match(matrix.digest, /^sha256:[a-f0-9]{64}$/);
 });
 
@@ -122,6 +124,7 @@ test('V5 world-grid promotion report fails closed for incomplete targets or miss
   assert.match(missingProbes.errors.join(','), /V5_WORLD_GRID_PROMOTION_AUDIT_REPLAY_REQUIRED/);
   assert.match(missingProbes.errors.join(','), /V5_WORLD_GRID_PROMOTION_PLAYER_ROUTE_PREREQUISITE_REQUIRED/);
   assert.match(missingProbes.errors.join(','), /V5_WORLD_GRID_PROMOTION_PROVIDER_LOGOUT_SIGNOFF_REQUIRED/);
+  assert.match(missingProbes.errors.join(','), /V5_WORLD_GRID_PROMOTION_TRUSTED_PROXY_RISK_ROLLOUT_REQUIRED/);
 });
 
 test('V5 world-grid promotion assertion rejects fake release readiness and unsafe exposure', () => {

@@ -331,9 +331,11 @@ test('V6 release review requires civic mutation security evidence for abuse revi
   assert.ok(abuseGate.requiredArtifacts.includes('server/world_civilization/abuse_case_targets.js'));
   assert.ok(abuseGate.requiredArtifacts.includes('server/world_civilization/mutation_security.js'));
   assert.ok(abuseGate.requiredArtifacts.includes('server/world_civilization/session_auth_targets.js'));
+  assert.ok(abuseGate.requiredArtifacts.includes('server/world_grid/rate_limit_rollout.js'));
   assert.ok(abuseGate.requiredArtifacts.includes('tests/world_civilization_abuse_case_targets.test.js'));
   assert.ok(abuseGate.requiredArtifacts.includes('tests/world_civilization_session_auth_targets.test.js'));
   assert.ok(abuseGate.requiredArtifacts.includes('tests/world_civilization_mutation_security.test.js'));
+  assert.ok(abuseGate.requiredArtifacts.includes('tests/world_grid_rate_limit_rollout.test.js'));
   assert.ok(abuseGate.requiredChecks.includes('spam'));
   assert.ok(abuseGate.requiredChecks.includes('harassment'));
   assert.ok(abuseGate.requiredChecks.includes('impersonation'));
@@ -348,6 +350,7 @@ test('V6 release review requires civic mutation security evidence for abuse revi
   assert.ok(abuseGate.requiredChecks.includes('session_auth_target_gate'));
   assert.ok(abuseGate.requiredChecks.includes('provider_disconnect_invalidation_target'));
   assert.ok(abuseGate.requiredChecks.includes('production_browser_session_coverage_target'));
+  assert.ok(abuseGate.requiredChecks.includes('trusted_proxy_risk_signal_rollout_target'));
   assert.ok(abuseGate.requiredChecks.includes('moderation_escalation'));
   assert.ok(abuseGate.requiredChecks.includes('rollback_bypass'));
   assert.ok(abuseGate.requiredChecks.includes('public_autonomous_agent_mutation'));
@@ -355,8 +358,10 @@ test('V6 release review requires civic mutation security evidence for abuse revi
   assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_abuse_case_targets.test.js'));
   assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_mutation_security.test.js'));
   assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_session_auth_targets.test.js'));
+  assert.ok(validationGate.requiredArtifacts.includes('tests/world_grid_rate_limit_rollout.test.js'));
   assert.ok(validationGate.requiredChecks.includes('abuse_case_target_gate'));
   assert.ok(validationGate.requiredChecks.includes('session_auth_target_gate'));
+  assert.ok(validationGate.requiredChecks.includes('trusted_proxy_risk_signal_rollout_target'));
   assert.ok(validationGate.requiredChecks.includes('store_backed_delegation_proof'));
 });
 

@@ -1335,12 +1335,15 @@ test('V6 civic mutation security envelope is tracked as an M5 release control', 
   const security = read('docs/security/V6_CIVIC_MUTATION_SECURITY_PLAN.md');
   const skillLine = read('docs/internal-skill-testline.md');
   const sessionAuthTargets = read('server/world_civilization/session_auth_targets.js');
+  const rateLimitRollout = read('server/world_grid/rate_limit_rollout.js');
 
   assert.match(plan, /server\/world_civilization\/mutation_security\.js/);
   assert.match(plan, /server\/world_civilization\/session_auth_targets\.js/);
   assert.match(plan, /session\/wallet binding, session-bound CSRF/);
   assert.match(plan, /provider-disconnect invalidation/);
   assert.match(plan, /risk-aware rate-limit identity/);
+  assert.match(plan, /server\/world_grid\/rate_limit_rollout\.js/);
+  assert.match(plan, /trusted proxy headers, risk-signal ownership/);
   assert.match(plan, /delegated-agent proof/);
   assert.match(plan, /store-backed delegated-agent proof with required scope/);
   assert.match(plan, /exact delegated-action replay allowance/);
@@ -1355,9 +1358,13 @@ test('V6 civic mutation security envelope is tracked as an M5 release control', 
   assert.match(spec, /Exact delegated-action replay/);
   assert.match(spec, /CSRF verification/);
   assert.match(spec, /owner\/surface rate limiting/);
+  assert.match(spec, /trusted proxy\/risk-signal production rollout target/);
+  assert.match(spec, /trusted proxy headers and risk signals are release-reviewed/);
   assert.match(gate, /server\/world_civilization\/mutation_security\.js/);
   assert.match(gate, /server\/world_civilization\/session_auth_targets\.js/);
   assert.match(gate, /production browser session coverage/);
+  assert.match(gate, /server\/world_grid\/rate_limit_rollout\.js/);
+  assert.match(gate, /trusted proxy,\s+risk-signal/);
   assert.match(gate, /audit actor continuity/);
   assert.match(gate, /store-backed\s+delegated-agent proof/);
   assert.match(gate, /future civic store\s+write/);
@@ -1365,6 +1372,8 @@ test('V6 civic mutation security envelope is tracked as an M5 release control', 
   assert.match(security, /buildV6SessionAuthTargetReport\(\)/);
   assert.match(security, /live\s+Privy\/provider logout signoff/);
   assert.match(security, /route\/tool-required scope/);
+  assert.match(security, /server\/world_grid\/rate_limit_rollout\.js/);
+  assert.match(security, /trusted proxy headers/);
   assert.match(security, /Exact delegated-action retries/);
   assert.match(security, /mutationApplied: false/);
   assert.match(security, /durable\/session-bound CSRF/);
@@ -1372,6 +1381,13 @@ test('V6 civic mutation security envelope is tracked as an M5 release control', 
   assert.match(sessionAuthTargets, /route_tool_middleware_integration/);
   assert.match(sessionAuthTargets, /production_browser_coverage/);
   assert.match(sessionAuthTargets, /audit_actor_continuity/);
+  assert.match(rateLimitRollout, /WORLD_GRID_RATE_LIMIT_ROLLOUT_VERSION/);
+  assert.match(rateLimitRollout, /trusted_proxy_header_contract/);
+  assert.match(rateLimitRollout, /risk_signal_contract/);
+  assert.match(rateLimitRollout, /distributed_counter_store/);
+  assert.match(rateLimitRollout, /per_surface_budget_calibration/);
+  assert.match(rateLimitRollout, /production_observability/);
+  assert.match(rateLimitRollout, /WORLD_GRID_RATE_LIMIT_ROLLOUT_PRODUCTION_ENABLEMENT_FORBIDDEN/);
   assert.match(skillLine, /V6 civic mutation security foundation/);
   assert.match(skillLine, /session-auth target matrix/);
   assert.match(skillLine, /tests\/world_civilization_session_auth_targets\.test\.js/);
@@ -1665,9 +1681,15 @@ test('world-grid mutation rate-limit policy is tracked as an M5 durable foundati
   const stateModel = read('docs/technical/WORLD_GRID_STATE_MODEL.md');
   const evidence = read('docs/release-evidence/WORLD_GRID_V50_REGION_PROTOTYPE_EVIDENCE_2026-05-26.md');
   const rateLimits = read('docs/rate-limits.md');
+  const rateLimitRollout = read('server/world_grid/rate_limit_rollout.js');
+  const rateLimitRolloutTest = read('tests/world_grid_rate_limit_rollout.test.js');
+  const promotionTarget = read('server/world_grid/release_promotion.js');
+  const readinessGate = read('server/world_civilization/readiness_gate.js');
 
   assert.match(plan, /optional durable SQLite foundation/);
   assert.match(plan, /WORLD_GRID_RATE_LIMIT_SQLITE_PATH/);
+  assert.match(plan, /server\/world_grid\/rate_limit_rollout\.js/);
+  assert.match(plan, /trusted proxy\/risk-signal rollout target/);
   assert.match(security, /By default those buckets are process-local/);
   assert.match(security, /WORLD_GRID_RATE_LIMIT_SQLITE_PATH/);
   assert.match(security, /world_grid_rate_limit_buckets/);
@@ -1677,6 +1699,8 @@ test('world-grid mutation rate-limit policy is tracked as an M5 durable foundati
   assert.match(security, /WORLD_GRID_RATE_LIMIT_IDENTITY_MODE=owner_session_ip_risk/);
   assert.match(security, /without storing raw session or\s+IP values/);
   assert.match(security, /trusted proxy\/risk-signal production wiring/);
+  assert.match(security, /server\/world_grid\/rate_limit_rollout\.js/);
+  assert.match(security, /distributed\s+counters/);
   assert.match(stateModel, /server\/world_grid\/rate_limit\.js/);
   assert.match(stateModel, /world_grid_rate_limit_buckets/);
   assert.match(stateModel, /WORLD_GRID_RATE_LIMIT_SQLITE_PATH/);
@@ -1691,6 +1715,8 @@ test('world-grid mutation rate-limit policy is tracked as an M5 durable foundati
   assert.match(evidence, /WORLD_GRID_RATE_LIMIT_IDENTITY_MODE=owner_session_ip_risk/);
   assert.match(evidence, /without storing raw session\/IP values/);
   assert.match(evidence, /trusted proxy\/risk-signal production rollout/);
+  assert.match(evidence, /server\/world_grid\/rate_limit_rollout\.js/);
+  assert.match(evidence, /tests\/world_grid_rate_limit_rollout\.test\.js/);
   assert.match(rateLimits, /World-grid prototype mutation limit/);
   assert.match(rateLimits, /WORLD_GRID_MUTATION_RATE_LIMIT_MAX/);
   assert.match(rateLimits, /WORLD_GRID_RATE_LIMIT_SQLITE_PATH/);
@@ -1699,6 +1725,21 @@ test('world-grid mutation rate-limit policy is tracked as an M5 durable foundati
   assert.match(rateLimits, /WORLD_GRID_RISK_AWARE_RATE_LIMIT=1/);
   assert.match(rateLimits, /raw\s+session\/IP values are not persisted/);
   assert.match(rateLimits, /trusted proxy\/risk\s+signal wiring/);
+  assert.match(rateLimits, /server\/world_grid\/rate_limit_rollout\.js/);
+  assert.match(rateLimits, /per-surface budget calibration/);
+  assert.match(rateLimitRollout, /WORLD_GRID_RATE_LIMIT_ROLLOUT_VERSION/);
+  assert.match(rateLimitRollout, /buildWorldGridRateLimitRolloutReport/);
+  assert.match(rateLimitRollout, /trusted_proxy_header_contract/);
+  assert.match(rateLimitRollout, /risk_signal_contract/);
+  assert.match(rateLimitRollout, /distributed_counter_store/);
+  assert.match(rateLimitRollout, /per_surface_budget_calibration/);
+  assert.match(rateLimitRollout, /abuse_burst_backoff/);
+  assert.match(rateLimitRollout, /production_observability/);
+  assert.match(rateLimitRollout, /WORLD_GRID_RATE_LIMIT_ROLLOUT_WORLD_MUTATION_FORBIDDEN/);
+  assert.match(rateLimitRolloutTest, /WORLD_GRID_RATE_LIMIT_ROLLOUT_PRODUCTION_ENABLEMENT_FORBIDDEN/);
+  assert.match(promotionTarget, /trusted_proxy_risk_signal_rollout/);
+  assert.match(promotionTarget, /V5_WORLD_GRID_PROMOTION_TRUSTED_PROXY_RISK_ROLLOUT_REQUIRED/);
+  assert.match(readinessGate, /trusted_proxy_risk_signal_rollout_target/);
 });
 
 test('world-grid audit replay policy is tracked as an M3 release storage control', () => {

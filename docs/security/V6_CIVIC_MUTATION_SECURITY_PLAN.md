@@ -42,6 +42,11 @@ approval and does not expose V6 in normal gameplay.
   middleware integration, production browser session coverage, risk-aware
   rate-limit identity, audit actor continuity, and private-data exclusion while
   keeping `releaseReady: false`.
+- `server/world_grid/rate_limit_rollout.js` now names the non-executing V5
+  production abuse-control rollout target for trusted proxy headers,
+  risk-signal ownership, distributed counters, per-surface calibration,
+  abuse-burst backoff, and production observability. V6 civic mutations may not
+  rely on spoofable player-supplied proxy or risk metadata.
 - The report remains `research_only`, `runtimeExposed: false`,
   `playerVisible: false`, `productionEnabled: false`, and
   `mutationApplied: false`.
@@ -67,8 +72,8 @@ approval and does not expose V6 in normal gameplay.
 - Complete M5 session-auth target evidence from
   `server/world_civilization/session_auth_targets.js`, including live
   Privy/provider logout signoff, route/tool middleware integration, production
-  browser session coverage, risk-aware rate-limit identity, and audit
-  actor-continuity release review.
+  browser session coverage, risk-aware rate-limit identity, trusted
+  proxy/risk-signal rollout, and audit actor-continuity release review.
 - M17 security/product signoff before any player-visible V6 civic mutation.
 
 ## Out Of Scope

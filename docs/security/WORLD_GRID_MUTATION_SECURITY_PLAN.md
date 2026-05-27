@@ -109,6 +109,10 @@ until the controls below are implemented and covered by deterministic tests.
   owner/session/IP/risk bucket identity is hashed without storing raw session or
   IP values. Release promotion still needs final session-auth integration,
   trusted proxy/risk-signal production wiring, and operational tuning.
+  `server/world_grid/rate_limit_rollout.js` now records the non-executing
+  release target for trusted proxy headers, risk-signal ownership, distributed
+  counters, per-surface calibration, abuse-burst backoff, and production
+  observability without approving release.
 - When `WORLD_GRID_AUDIT_SQLITE_PATH` is configured, successful mutating V5.1+
   world-grid routes and tool routes append durable, hash-chained SQLite audit
   records with actor, surface, idempotency key, request/response hashes,
@@ -207,7 +211,9 @@ until the controls below are implemented and covered by deterministic tests.
   coverage proves hashed session/IP/risk bucket identity without raw session/IP
   persistence; release promotion still needs final browser-session binding,
   wallet/session continuity, trusted proxy/risk-signal production wiring, and
-  operational tuning for public traffic.
+  operational tuning for public traffic. Current
+  `server/world_grid/rate_limit_rollout.js` target coverage makes those release
+  gates explicit and non-executing.
 - Current `WORLD_GRID_SANDBOX_SQLITE_PATH` coverage is a V5.5 storage
   foundation only; release promotion still needs abuse reports, stale-session
   cleanup, cross-owner moderation review, and final sandbox privacy coverage.

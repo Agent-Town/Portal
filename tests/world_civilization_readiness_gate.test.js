@@ -78,12 +78,15 @@ test('V6 readiness gate baseline names every prerequisite domain but remains ope
   assert.ok(v5PromotionGate.requiredArtifacts.includes(V5_PROMOTION_TARGET_TEST));
   assert.ok(v5PromotionGate.requiredArtifacts.includes(V5_REPLAY_RECONSTRUCTION_ARTIFACT));
   assert.ok(v5PromotionGate.requiredArtifacts.includes(V5_REPLAY_RECONSTRUCTION_TEST));
+  assert.ok(v5PromotionGate.requiredArtifacts.includes('server/world_grid/rate_limit_rollout.js'));
+  assert.ok(v5PromotionGate.requiredArtifacts.includes('tests/world_grid_rate_limit_rollout.test.js'));
   assert.ok(v5PromotionGate.requiredChecks.includes('v5_release_promotion_target'));
   assert.ok(v5PromotionGate.requiredChecks.includes('v5_replay_reconstruction_target'));
   assert.ok(v5PromotionGate.requiredChecks.includes('exact_before_state_reconstruction_target'));
   assert.ok(v5PromotionGate.requiredChecks.includes('production_replay_coverage_target'));
   assert.ok(v5PromotionGate.requiredChecks.includes('live_provider_logout_signoff_target'));
   assert.ok(v5PromotionGate.requiredChecks.includes('risk_rate_limit_identity_target'));
+  assert.ok(v5PromotionGate.requiredChecks.includes('trusted_proxy_risk_signal_rollout_target'));
   assert.ok(workerToolGate.requiredArtifacts.includes('server/world_civilization/worker_tool_adapter.js'));
   assert.ok(workerToolGate.requiredArtifacts.includes('server/world_civilization/worker_vote_adapter.js'));
   assert.ok(workerToolGate.requiredArtifacts.includes('server/world_civilization/worker_runtime_registration.js'));

@@ -135,8 +135,9 @@ persistence resilience, and security/product release review.
   state, and require final evidence for session/wallet continuity,
   session-bound CSRF, delegated-principal binding, provider-disconnect
   invalidation, session-reset invalidation, route/tool middleware integration,
-  production browser session coverage, risk-aware rate-limit identity, audit actor continuity,
-  and private-data exclusion before M5/M17 can close.
+  production browser session coverage, risk-aware rate-limit identity, trusted
+  proxy/risk-signal rollout, audit actor continuity, and private-data exclusion
+  before M5/M17 can close.
 - The research-only proposal submission route may exist in
   `server/world_civilization/routes.js`, but
   `POST /api/world/civilization/proposals/submit` must stay disabled by default
@@ -554,7 +555,12 @@ persistence resilience, and security/product release review.
   `tests/world_civilization_load_rate_targets.test.js`; the release SLO surfaces
   for audit replay, retry bursts, conflict rejection, migration replay,
   write-contention, and future civic route rate limits are explicit while the
-  report remains calibration-only and `releaseReady: false`.
+  report remains calibration-only and `releaseReady: false`. V5 production
+  rate-limit rollout target coverage starts in
+  `server/world_grid/rate_limit_rollout.js` and
+  `tests/world_grid_rate_limit_rollout.test.js`; it names trusted proxy,
+  risk-signal, distributed-counter, per-surface calibration, abuse-burst
+  backoff, and production observability gates without enabling production.
   Load/rate research coverage starts in
   `tests/world_civilization_load_rate.test.js`; the audit ledger now has a
   deterministic larger replay pagination and duplicate retry burst check.

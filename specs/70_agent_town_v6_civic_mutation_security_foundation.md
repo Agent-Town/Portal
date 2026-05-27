@@ -53,11 +53,15 @@ continuity, and private-data exclusion.
 - Route/tool idempotency key with the V6 civic mutation format.
 - owner/surface rate limiting using the existing world-grid prototype bucket
   shape.
+- A trusted proxy/risk-signal production rollout target that stays
+  non-executing until proxy header ownership, risk-signal ownership,
+  distributed counters, per-surface calibration, abuse-burst backoff, and
+  production observability are approved.
 - Runtime-hidden, player-hidden, production-disabled, non-executing status.
 - A session-auth target report that keeps `releaseReady: false` until final
   middleware, live Privy/provider logout signoff, production browser session
-  coverage, risk-aware rate-limit identity, and audit actor-continuity review
-  are complete.
+  coverage, risk-aware rate-limit identity, trusted proxy/risk-signal rollout,
+  and audit actor-continuity review are complete.
 
 ## Release Gate
 
@@ -67,6 +71,8 @@ M5 cannot move to `done` until:
   release-reviewed successor before touching civic stores;
 - CSRF verification is backed by durable/session-bound token issuance;
 - rate limiting is durable or shared across production instances;
+- trusted proxy headers and risk signals are release-reviewed and cannot be
+  spoofed by player requests;
 - idempotency is bound to the final session/wallet authorization model;
 - `server/world_civilization/session_auth_targets.js` has complete approved
   evidence for every release target, including provider-disconnect invalidation

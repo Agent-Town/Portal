@@ -63,9 +63,12 @@ from `prototype_gated` to `release_ready`:
   security, session-bound CSRF, rate-limit, idempotency, audit/replay,
   production override, public-text privacy, player-route prerequisite,
   release replay reconstruction, live provider logout signoff, and
-  risk-rate-limit identity targets. The report is non-executing and may not mark
-  V5 `releaseReady`, may not enable V6, may not expose player-visible defaults,
-  and may not mutate world state.
+  risk-rate-limit identity targets. `server/world_grid/rate_limit_rollout.js`
+  adds the trusted proxy, risk-signal, distributed counter, per-surface
+  calibration, abuse-burst backoff, and production observability rollout target.
+  The reports are non-executing and may not mark V5 `releaseReady`, may not
+  enable V6, may not expose player-visible defaults, and may not mutate world
+  state.
 - `server/world_grid/replay_reconstruction.js` verifies the current
   `WORLD_GRID_AUDIT_SQLITE_PATH` replay stream without applying world state:
   hash-chain continuity, privacy-safe before/after snapshots, migration

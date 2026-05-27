@@ -63,9 +63,11 @@ const REQUIRED_REVIEW_GATES = [
       'server/world_civilization/abuse_case_targets.js',
       'server/world_civilization/mutation_security.js',
       'server/world_civilization/session_auth_targets.js',
+      'server/world_grid/rate_limit_rollout.js',
       'tests/world_civilization_abuse_case_targets.test.js',
       'tests/world_civilization_session_auth_targets.test.js',
-      'tests/world_civilization_mutation_security.test.js'
+      'tests/world_civilization_mutation_security.test.js',
+      'tests/world_grid_rate_limit_rollout.test.js'
     ],
     requiredChecks: [
       'spam',
@@ -82,6 +84,7 @@ const REQUIRED_REVIEW_GATES = [
       'session_auth_target_gate',
       'provider_disconnect_invalidation_target',
       'production_browser_session_coverage_target',
+      'trusted_proxy_risk_signal_rollout_target',
       'moderation_escalation',
       'rollback_bypass',
       'public_autonomous_agent_mutation',
@@ -185,6 +188,7 @@ const REQUIRED_REVIEW_GATES = [
       'tests/world_civilization_privacy_review_targets.test.js',
       'tests/world_civilization_mutation_security.test.js',
       'tests/world_civilization_session_auth_targets.test.js',
+      'tests/world_grid_rate_limit_rollout.test.js',
       'tests/world_civilization_governance_preflight.test.js',
       'tests/world_civilization_votes.test.js',
       'tests/world_civilization_worker_vote_adapter.test.js',
@@ -221,6 +225,7 @@ const REQUIRED_REVIEW_GATES = [
       'privacy_review_target_gate',
       'data_retention_target_gate',
       'session_auth_target_gate',
+      'trusted_proxy_risk_signal_rollout_target',
       'proposal_intake_readiness_gate',
       'vote_authorization_readiness_gate',
       'worker_vote_adapter_gate',

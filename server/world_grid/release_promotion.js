@@ -23,13 +23,15 @@ const REQUIRED_V5_WORLD_GRID_PROMOTION_TARGET_KEYS = [
   'player_route_plot_prerequisite',
   'release_replay_reconstruction',
   'provider_logout_signoff',
-  'risk_rate_limit_identity'
+  'risk_rate_limit_identity',
+  'trusted_proxy_risk_signal_rollout'
 ];
 
 const REQUIRED_V5_WORLD_GRID_RELEASE_GAPS = [
   'final_session_auth_integration_required',
   'live_provider_logout_signoff_required',
   'ip_risk_rate_limit_identity_required',
+  'trusted_proxy_risk_signal_rollout_required',
   'exact_before_state_reconstruction_required',
   'release_replay_reconstruction_required',
   'production_browser_replay_required',
@@ -184,6 +186,13 @@ const V5_WORLD_GRID_RELEASE_PROMOTION_TARGETS = [
     requiredEvidence: 'Release promotion must define production rate-limit identity that combines owner/session with IP or risk signals without exposing private data or breaking legitimate idempotent retries.',
     currentEvidence: 'server/world_grid/rate_limit.js, tests/world_grid_rate_limit_persistence.test.js, docs/technical/WORLD_GRID_STATE_MODEL.md',
     releaseEvidenceRequired: 'risk_rate_limit_identity_packet'
+  },
+  {
+    key: 'trusted_proxy_risk_signal_rollout',
+    slice: 'V5 production abuse controls',
+    requiredEvidence: 'Release promotion must define trusted proxy header handling, risk-signal ownership, distributed counter storage, per-surface budget calibration, abuse-burst backoff, and privacy-safe production observability before public rollout.',
+    currentEvidence: 'server/world_grid/rate_limit_rollout.js, tests/world_grid_rate_limit_rollout.test.js',
+    releaseEvidenceRequired: 'trusted_proxy_risk_signal_rollout_packet'
   }
 ];
 
@@ -284,6 +293,7 @@ function buildV5WorldGridReleasePromotionReport({
     releaseReplayReconstructionProbeCount: numberValue(observed.releaseReplayReconstructionProbeCount),
     providerLogoutSignoffProbeCount: numberValue(observed.providerLogoutSignoffProbeCount),
     riskRateLimitIdentityProbeCount: numberValue(observed.riskRateLimitIdentityProbeCount),
+    trustedProxyRiskSignalRolloutProbeCount: numberValue(observed.trustedProxyRiskSignalRolloutProbeCount),
     privateDataExposureCount: numberValue(observed.privateDataExposureCount),
     playerVisibleByDefaultCount: numberValue(observed.playerVisibleByDefaultCount),
     productionOverrideBypassCount: numberValue(observed.productionOverrideBypassCount),
@@ -323,6 +333,9 @@ function buildV5WorldGridReleasePromotionReport({
   if (observedEvidence.releaseReplayReconstructionProbeCount <= 0) errors.push('V5_WORLD_GRID_PROMOTION_RELEASE_REPLAY_REQUIRED');
   if (observedEvidence.providerLogoutSignoffProbeCount <= 0) errors.push('V5_WORLD_GRID_PROMOTION_PROVIDER_LOGOUT_SIGNOFF_REQUIRED');
   if (observedEvidence.riskRateLimitIdentityProbeCount <= 0) errors.push('V5_WORLD_GRID_PROMOTION_RISK_RATE_LIMIT_REQUIRED');
+  if (observedEvidence.trustedProxyRiskSignalRolloutProbeCount <= 0) {
+    errors.push('V5_WORLD_GRID_PROMOTION_TRUSTED_PROXY_RISK_ROLLOUT_REQUIRED');
+  }
   if (observedEvidence.privateDataExposureCount > 0 || observedEvidence.exposesPrivateData) {
     errors.push('V5_WORLD_GRID_PROMOTION_PRIVATE_DATA_FORBIDDEN');
   }
