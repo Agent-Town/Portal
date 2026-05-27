@@ -5171,6 +5171,8 @@ function buildReleaseEvidenceBundle({
     releaseGate: gate
   });
   const bundlePackId = String(gate?.packId || pack?.packId || '');
+  const releaseGateHash = stableEvidenceHash(gate);
+  const releaseGateHashMatches = Boolean(releaseGateHash);
   const sourcePackIdProblems = releaseEvidencePackIdProblems(sourcePackIds, bundlePackId);
   const sourcePresence = sourcePresenceForHashes(sourceHashes);
   const presentSourceCount = Object.values(sourcePresence).filter(Boolean).length;
@@ -5225,7 +5227,7 @@ function buildReleaseEvidenceBundle({
     bundleHash: '',
     packId: bundlePackId,
     createdAtMs: bundleCreatedAtMs,
-    releaseGateHash: stableEvidenceHash(gate),
+    releaseGateHash,
     releaseGateMode: gate?.releaseMode || 'prototype-gated',
     publicReleaseEligible: gate?.publicReleaseEligible === true,
     blockingReasons,
@@ -5247,6 +5249,7 @@ function buildReleaseEvidenceBundle({
       missingSourceCount: RELEASE_EVIDENCE_SOURCE_KEYS.length - presentSourceCount,
       sourceHashMismatchCount: 0,
       sourcePackIdMismatchCount: sourcePackIdProblems.length,
+      releaseGateHashMatches,
       releaseGateValid: validateProductionReleaseGate(gate, { nowMs: bundleCreatedAtMs }).ok === true,
       releaseGatePublicEligible: gate?.publicReleaseEligible === true,
       bundleCreatedAtOrAfterGate,
@@ -5435,6 +5438,8 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     && Number(bundle?.metrics?.requiredSourceCount || 0) === RELEASE_EVIDENCE_SOURCE_KEYS.length
     && Number(bundle?.metrics?.sourceHashMismatchCount || 0) === sourceHashProblems.length
     && Number(bundle?.metrics?.sourcePackIdMismatchCount || 0) === sourcePackIdProblems.length
+    && bundle?.metrics?.releaseGateHashMatches === releaseGateHashMatches
+    && releaseGateHashMatches === true
     && bundle?.metrics?.releaseGateValid === (gateReport.ok === true)
     && bundle?.metrics?.releaseGatePublicEligible === (bundle?.publicReleaseEligible === true)
     && bundle?.metrics?.bundleCreatedAtOrAfterGate === bundleCreatedAtOrAfterGate
@@ -5513,6 +5518,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
         presentSourceCount,
         sourceHashProblemCount: sourceHashProblems.length,
         sourcePackIdProblemCount: sourcePackIdProblems.length,
+        releaseGateHashMatches,
         bundleCreatedAtOrAfterGate,
         bundleCreatedAtNotFuture,
         blockingReasonsMatchGate,
