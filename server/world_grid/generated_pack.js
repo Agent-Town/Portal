@@ -5484,6 +5484,8 @@ function buildReleaseEvidenceBundle({
       sourceCoverageOk,
       releaseGateHashMatches,
       releaseGateValid: releaseGateValidationReport.ok === true,
+      releaseGateReadySourceEvidenceBound: releaseGateValidationMetrics.readySourceEvidenceBound === true,
+      releaseGatePrerequisiteEvidenceBound: releaseGateValidationMetrics.prerequisiteEvidenceBound === true,
       releaseGatePublicEligible: gate?.publicReleaseEligible === true,
       bundleCreatedAtOrAfterGate,
       bundleCreatedAtNotFuture,
@@ -5610,6 +5612,8 @@ function validateReleaseEvidenceBundle(bundle = {}, {
       })
     : { ok: false, metrics: {} };
   const gateMetrics = gateReport.metrics || {};
+  const releaseGateReadySourceEvidenceBound = gateMetrics.readySourceEvidenceBound === true;
+  const releaseGatePrerequisiteEvidenceBound = gateMetrics.prerequisiteEvidenceBound === true;
   const approvalEvidenceSchemaErrorCount = Number(gateMetrics.approvalEvidenceSchemaErrorCount || 0);
   const approvalEvidenceSensitiveFieldCount = Number(gateMetrics.approvalEvidenceSecretLikeCount || 0);
   const approvalEvidenceRawInstructionCount = Number(gateMetrics.approvalEvidenceRawInstructionCount || 0);
@@ -5710,6 +5714,8 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     && bundle?.metrics?.releaseGateHashMatches === releaseGateHashMatches
     && releaseGateHashMatches === true
     && bundle?.metrics?.releaseGateValid === (gateReport.ok === true)
+    && bundle?.metrics?.releaseGateReadySourceEvidenceBound === releaseGateReadySourceEvidenceBound
+    && bundle?.metrics?.releaseGatePrerequisiteEvidenceBound === releaseGatePrerequisiteEvidenceBound
     && bundle?.metrics?.releaseGatePublicEligible === releaseGatePublicEligible
     && bundle?.publicReleaseEligible === releaseGatePublicEligible
     && bundle?.metrics?.bundleCreatedAtOrAfterGate === bundleCreatedAtOrAfterGate
@@ -5800,6 +5806,8 @@ function validateReleaseEvidenceBundle(bundle = {}, {
         sourcePackIdProblemCount: sourcePackIdProblems.length,
         sourceCoverageOk,
         releaseGateHashMatches,
+        releaseGateReadySourceEvidenceBound,
+        releaseGatePrerequisiteEvidenceBound,
         releaseGatePublicEligible,
         bundleCreatedAtOrAfterGate,
         bundleCreatedAtNotFuture,
@@ -5856,6 +5864,8 @@ function validateReleaseEvidenceBundle(bundle = {}, {
       suppliedSourceCount,
       sourceCoverageOk,
       releaseGateValid: gateReport.ok === true,
+      releaseGateReadySourceEvidenceBound,
+      releaseGatePrerequisiteEvidenceBound,
       releaseGatePublicEligible,
       bundleCreatedAtOrAfterGate,
       bundleCreatedAtNotFuture,

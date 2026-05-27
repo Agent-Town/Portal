@@ -1472,6 +1472,55 @@ test('GPACK-163 release evidence bundle rejects evidence-diagnostic metric tampe
   }
 }));
 
+test('GPACK-168 release evidence bundle rejects release-gate source-context metric tampering', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_evidence_bundle_gate_source_context_metrics',
+    prompt: 'violet signal quay with careful orchard cartographers',
+    nowMs: 155_215
+  });
+  const validationNowMs = fixture.releaseGate.evaluatedAtMs + 100;
+  const bundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    nowMs: fixture.releaseGate.evaluatedAtMs + 50
+  });
+  const metricUpdates = [
+    { releaseGateReadySourceEvidenceBound: false },
+    { releaseGatePrerequisiteEvidenceBound: false }
+  ];
+
+  assert.equal(bundle.metrics.releaseGateValid, true);
+  assert.equal(bundle.metrics.releaseGateReadySourceEvidenceBound, true);
+  assert.equal(bundle.metrics.releaseGatePrerequisiteEvidenceBound, true);
+
+  for (const metricPatch of metricUpdates) {
+    const tamperedBundle = rehashReleaseEvidenceBundle({
+      ...bundle,
+      metrics: {
+        ...bundle.metrics,
+        ...metricPatch
+      }
+    });
+    const report = validateReleaseEvidenceBundle(tamperedBundle, {
+      ...fixture,
+      nowMs: validationNowMs
+    });
+    const metricKey = Object.keys(metricPatch)[0];
+
+    assert.equal(
+      report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_HASH_STABLE').passed,
+      true,
+      metricKey
+    );
+    assert.equal(report.metrics[metricKey], true, metricKey);
+    assert.equal(report.ok, false, metricKey);
+    assert.equal(
+      report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,
+      false,
+      metricKey
+    );
+  }
+}));
+
 test('GPACK-150 release evidence bundle report mirrors source-count metrics', () => withTempGeneratedPackStore(() => {
   const fixture = readyReleaseGateFixture({
     ownerAccountId: 'owner_release_evidence_bundle_report_source_counts',
@@ -3291,6 +3340,10 @@ test('GU-18/GU-19/GPACK-157/159/160/161/162 release gate and evidence bundle API
       assert.equal(bundleBody.validationReport.metrics.releaseGateValid, true);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.releaseGatePublicEligible, false);
       assert.equal(bundleBody.validationReport.metrics.releaseGatePublicEligible, false);
+      assert.equal(bundleBody.releaseEvidenceBundle.metrics.releaseGateReadySourceEvidenceBound, true);
+      assert.equal(bundleBody.releaseEvidenceBundle.metrics.releaseGatePrerequisiteEvidenceBound, true);
+      assert.equal(bundleBody.validationReport.metrics.releaseGateReadySourceEvidenceBound, true);
+      assert.equal(bundleBody.validationReport.metrics.releaseGatePrerequisiteEvidenceBound, true);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.bundleCreatedAtOrAfterGate, true);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.bundleCreatedAtNotFuture, true);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.blockingReasonsMatchGate, true);
@@ -3389,6 +3442,10 @@ test('GU-18/GU-19/GPACK-157/159/160/161/162 release gate and evidence bundle API
       assert.equal(toolBundleBody.data.validationReport.metrics.normalGameplayVisibilityChanged, false);
       assert.equal(toolBundleBody.data.validationReport.metrics.generatedPackDefaultExposure, false);
       assert.equal(toolBundleBody.data.validationReport.metrics.boundaryPreserved, true);
+      assert.equal(toolBundleBody.data.releaseEvidenceBundle.metrics.releaseGateReadySourceEvidenceBound, true);
+      assert.equal(toolBundleBody.data.releaseEvidenceBundle.metrics.releaseGatePrerequisiteEvidenceBound, true);
+      assert.equal(toolBundleBody.data.validationReport.metrics.releaseGateReadySourceEvidenceBound, true);
+      assert.equal(toolBundleBody.data.validationReport.metrics.releaseGatePrerequisiteEvidenceBound, true);
       for (const [bundleKey, gateKey] of RELEASE_EVIDENCE_DIAGNOSTIC_METRIC_KEYS) {
         assert.equal(toolBundleBody.data.releaseEvidenceBundle.metrics[bundleKey], toolBundleBody.data.releaseGate.metrics[gateKey], bundleKey);
         assert.equal(toolBundleBody.data.validationReport.metrics[bundleKey], toolBundleBody.data.releaseEvidenceBundle.metrics[bundleKey], bundleKey);
@@ -3638,6 +3695,8 @@ test('GPACK-154/155/156/158/159/160/161/162 release APIs can return ready eviden
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.presentSourceCount, bundleBody.releaseEvidenceBundle.metrics.requiredSourceCount);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.missingSourceCount, 0);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.readyEvidenceSourcesMatchGate, true);
+      assert.equal(bundleBody.releaseEvidenceBundle.metrics.releaseGateReadySourceEvidenceBound, true);
+      assert.equal(bundleBody.releaseEvidenceBundle.metrics.releaseGatePrerequisiteEvidenceBound, true);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.privateDataLeakCount, 0);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.productionImageAssetCount, 0);
       assert.equal(bundleBody.releaseEvidenceBundle.constraints.productionImageAssetsCreated, false);
@@ -3651,6 +3710,8 @@ test('GPACK-154/155/156/158/159/160/161/162 release APIs can return ready eviden
       assert.equal(bundleBody.validationReport.metrics.presentSourceCount, bundleBody.releaseEvidenceBundle.metrics.requiredSourceCount);
       assert.equal(bundleBody.validationReport.metrics.missingSourceCount, 0);
       assert.equal(bundleBody.validationReport.metrics.readyEvidenceSourcesMatchGate, true);
+      assert.equal(bundleBody.validationReport.metrics.releaseGateReadySourceEvidenceBound, true);
+      assert.equal(bundleBody.validationReport.metrics.releaseGatePrerequisiteEvidenceBound, true);
       assert.equal(bundleBody.validationReport.metrics.boundaryPreserved, true);
       for (const [bundleKey, gateKey] of RELEASE_EVIDENCE_DIAGNOSTIC_METRIC_KEYS) {
         assert.equal(bundleBody.releaseEvidenceBundle.metrics[bundleKey], bundleBody.releaseGate.metrics[gateKey], bundleKey);
@@ -3666,8 +3727,12 @@ test('GPACK-154/155/156/158/159/160/161/162 release APIs can return ready eviden
       assert.equal(toolBundleBody.data.releaseEvidenceBundle.publicReleaseEligible, true);
       assert.equal(toolBundleBody.data.releaseEvidenceBundle.metrics.missingSourceCount, 0);
       assert.equal(toolBundleBody.data.releaseEvidenceBundle.metrics.readyEvidenceSourcesMatchGate, true);
+      assert.equal(toolBundleBody.data.releaseEvidenceBundle.metrics.releaseGateReadySourceEvidenceBound, true);
+      assert.equal(toolBundleBody.data.releaseEvidenceBundle.metrics.releaseGatePrerequisiteEvidenceBound, true);
       assert.equal(toolBundleBody.data.validationReport.ok, true, JSON.stringify(toolBundleBody.data.validationReport.checks));
       assert.equal(toolBundleBody.data.validationReport.metrics.releaseGatePublicEligible, true);
+      assert.equal(toolBundleBody.data.validationReport.metrics.releaseGateReadySourceEvidenceBound, true);
+      assert.equal(toolBundleBody.data.validationReport.metrics.releaseGatePrerequisiteEvidenceBound, true);
       assert.equal(toolBundleBody.data.validationReport.metrics.boundaryPreserved, true);
       for (const [bundleKey, gateKey] of RELEASE_EVIDENCE_DIAGNOSTIC_METRIC_KEYS) {
         assert.equal(toolBundleBody.data.releaseEvidenceBundle.metrics[bundleKey], toolBundleBody.data.releaseGate.metrics[gateKey], bundleKey);
