@@ -310,8 +310,16 @@ gate below has implementation, deterministic tests, and security/product signoff
   Playwright visual coverage that it has no standalone route or normal gameplay
   exposure. Current contract-only coverage in
   `server/world_civilization/lab_surface.js` includes a fail-closed modal launch
-  plan for `/v6`, `/v6-lab`, and `/civilization`; release still requires real
-  modal UI checks before any player-visible V6 lab work.
+  plan for `/v6`, `/v6-lab`, and `/civilization`. The M15 research-only lab
+  readiness gate in `server/world_civilization/lab_surface.js` must require
+  town-hub modal launch, standalone route denial, worker continuity, debug
+  observability, non-executing panels, browser visual coverage at
+  390/768/1280 widths, keyboard accessibility, focus trap review,
+  screen-reader names, runtime tool absence, private debug-data exclusion, and
+  normal gameplay exposure denial while keeping `standaloneRouteAllowed: false`,
+  `civicEffectsEnabled: false`, and `executionStatus: "not_executable"`.
+  Release still requires real modal UI checks before any player-visible V6 lab
+  work.
 - Persistence and replay resilience must prove every V6 civic store survives
   process restarts, reconstructs summaries from audit replay, rejects duplicate
   retries under load, migrates forward and backward through schema versions, and

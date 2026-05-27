@@ -43,7 +43,7 @@ are present.
   evidence, including civic mutation security, delegated-agent proof, and
   governance preflight, effect execution gate, and agent participation
   enforcement gate, institution readiness gate, and public works readiness gate
-  contract coverage.
+  and lab readiness gate contract coverage.
 - Effect execution and rollback review: typed apply handlers, typed rollback
   handlers, real before/after state, authorization enforcement, idempotent
   apply/rollback behavior, irreversible-action review, conservation tests,
@@ -75,7 +75,10 @@ are present.
   mutation security envelope coverage, and no backend shortcuts before any
   civic tool exposure.
 - Modal lab surface review: town hub modal launch, standalone route denial,
-  worker continuity, debug observability, and non-executing panels.
+  worker continuity, debug observability, non-executing panels, browser visual
+  coverage at 390/768/1280 widths, keyboard accessibility, focus trap review,
+  runtime tool absence, normal gameplay exposure denial, and private debug-data
+  exclusion before any internal V6 lab surface can become visible.
 - Product release signoff: player-visible scope, rollback plan, support runbook,
   and disable plan.
 

@@ -108,6 +108,7 @@ const REQUIRED_REVIEW_GATES = [
       'tests/world_civilization_reputation.test.js',
       'tests/world_civilization_moderation.test.js',
       'tests/world_civilization_resilience.test.js',
+      'tests/world_civilization_lab_surface.test.js',
       'e2e/242_world_grid_all_features_demo_regression.spec.js'
     ],
     requiredChecks: [
@@ -119,7 +120,8 @@ const REQUIRED_REVIEW_GATES = [
       'effect_execution_gate',
       'agent_participation_enforcement_gate',
       'institution_readiness_gate',
-      'public_works_readiness_gate'
+      'public_works_readiness_gate',
+      'lab_readiness_gate'
     ],
     signoffRequired: true
   },
@@ -291,7 +293,15 @@ const REQUIRED_REVIEW_GATES = [
       'standalone_route_denial',
       'worker_continuity',
       'debug_observability',
-      'non_executing_panels'
+      'non_executing_panels',
+      'browser_visual_390',
+      'browser_visual_768',
+      'browser_visual_1280',
+      'keyboard_accessibility',
+      'focus_trap_review',
+      'runtime_tool_absence',
+      'normal_gameplay_exposure_denial',
+      'private_debug_data_exclusion'
     ],
     signoffRequired: true
   },

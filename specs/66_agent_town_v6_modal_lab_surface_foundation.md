@@ -41,6 +41,29 @@ to the town hub path instead of rendering V6 content directly.
 - Missing debug tabs, broad V5 feature overrides, direct standalone paths, or
   non-modal launch surfaces must return a fail-closed non-executing plan.
 
+## M15 Readiness Gate
+
+`buildV6LabReadinessGate()` records non-executing readiness evidence for the
+eventual internal V6 lab UI. It requires explicit research opt-in and
+`FEATURE_WORLD_V60_AGENT_CIVILIZATION`; broad V5 prototype overrides must not
+enable it.
+
+The gate remains `research_only`, `releaseReady: false`, `playerVisible:
+false`, `normalGameplayExposure: false`, `standaloneRouteAllowed: false`,
+`civicEffectsEnabled: false`, `mutatesPrivateTown: false`,
+`mutatesOtherUserWorld: false`, `exposesPrivateDebugData: false`, and
+`executionStatus: "not_executable"`. It only passes research readiness when
+evidence covers town-hub modal launch, standalone route denial, worker
+continuity, debug observability, non-executing panels, browser visual coverage
+at 390/768/1280 widths, keyboard accessibility, focus trap review,
+screen-reader names, runtime tool absence, private debug-data exclusion, and
+normal gameplay exposure denial.
+
+The corresponding assertion rejects fake readiness that exposes runtime/player
+surfaces, allows standalone routes, enables civic effects, mutates private town
+or other-user world state, exposes private debug data, or marks the gate
+release-ready.
+
 ## Release Gate
 
 Before any real V6 lab UI is added, the release branch must prove:

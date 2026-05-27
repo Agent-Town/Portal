@@ -145,11 +145,13 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   const moderationSpec = read('specs/61_agent_town_v6_moderation_privacy_foundation.md');
   const institutionSpec = read('specs/64_agent_town_v6_civic_institution_charter_foundation.md');
   const publicWorksSpec = read('specs/65_agent_town_v6_public_works_shared_resources_foundation.md');
+  const labSpec = read('specs/66_agent_town_v6_modal_lab_surface_foundation.md');
   const persistenceSpec = read('specs/67_agent_town_v6_persistence_replay_resilience_foundation.md');
   const releaseReview = read('docs/security/V6_AGENT_CIVILIZATION_RELEASE_REVIEW.md');
   const skillLine = read('docs/internal-skill-testline.md');
   const institutionSource = read('server/world_civilization/institutions.js');
   const publicWorksSource = read('server/world_civilization/public_works.js');
+  const labSource = read('server/world_civilization/lab_surface.js');
   const requiredMilestones = [
     'M0 Hardened V5 world-grid baseline',
     'M1 Living V6 milestone contract',
@@ -289,10 +291,20 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /M15 Modal-first V6 lab surface \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/lab_surface\.js/);
   assert.match(plan, /fail-closed modal launch plan/);
+  assert.match(plan, /buildV6LabReadinessGate\(\)/);
+  assert.match(plan, /browser visual coverage at 390\/768\/1280 widths/);
+  assert.match(plan, /runtime tool absence/);
   assert.match(plan, /\/v6.*\/v6-lab.*\/civilization/);
   assert.match(gate, /server\/world_civilization\/lab_surface\.js/);
   assert.match(gate, /town hub modal flow/);
   assert.match(gate, /fail-closed modal launch\s+plan|fail closed for standalone\s+V6 paths/);
+  assert.match(gate, /M15\s+research-only lab\s+readiness gate/);
+  assert.match(gate, /standaloneRouteAllowed: false/);
+  assert.match(labSpec, /buildV6LabReadinessGate\(\)/);
+  assert.match(labSpec, /390\/768\/1280 widths/);
+  assert.match(labSource, /REQUIRED_LAB_EVIDENCE_CHECKS/);
+  assert.match(labSource, /runtime_tool_absence/);
+  assert.match(labSource, /V6_LAB_READINESS_RELEASE_READY_FORBIDDEN/);
   assert.match(plan, /M16 Persistence, replay, and resilience hardening \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/resilience\.js/);
   assert.match(plan, /server\/world_civilization\/sqlite_schema\.js/);
@@ -340,12 +352,15 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(plan, /agent participation enforcement review/);
   assert.match(plan, /civic institution readiness review/);
   assert.match(plan, /public works readiness review/);
+  assert.match(plan, /lab readiness gate/);
   assert.match(gate, /modal lab\s+surface (launch )?review/);
   assert.match(gate, /effect\s+execution and rollback review/);
   assert.match(gate, /agent participation enforcement review/);
   assert.match(gate, /civic\s+institution readiness review/);
   assert.match(gate, /public works readiness review/);
   assert.match(gate, /Worker-first V6 civic tools must pass the exposure gate/);
+  assert.match(releaseReview, /lab readiness gate/);
+  assert.match(releaseReview, /browser visual 390\/768\/1280 coverage/);
   assert.match(releaseReview, /Civic institution readiness review/);
   assert.match(releaseReview, /institution readiness gate/);
   assert.match(releaseReview, /Public works readiness review/);
@@ -354,6 +369,8 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(skillLine, /civic institution readiness review/);
   assert.match(skillLine, /M14 readiness gate/);
   assert.match(skillLine, /public works readiness review/);
+  assert.match(skillLine, /M15 readiness gate/);
+  assert.match(skillLine, /normal gameplay exposure denial/);
   assert.match(plan, /M18 V6 controlled release completion \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/controlled_release\.js/);
   assert.match(gate, /server\/world_civilization\/controlled_release\.js/);

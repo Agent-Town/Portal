@@ -147,6 +147,16 @@ mutation, and no public free play. It remains non-executing with
 `spendsPrivateInventory: false`, `grantsRewards: false`, and
 `executionStatus: "not_executable"`.
 
+The research-only M15 lab readiness gate in
+`server/world_civilization/lab_surface.js` records release evidence required
+before any internal V6 lab surface can appear: town-hub modal launch,
+standalone route denial, worker continuity, debug observability, non-executing
+panels, browser visual coverage at 390/768/1280 widths, keyboard accessibility,
+focus trap review, screen-reader names, runtime tool absence, private debug-data
+exclusion, and normal gameplay exposure denial. It remains non-executing with
+`releaseReady: false`, `standaloneRouteAllowed: false`, `civicEffectsEnabled:
+false`, and `executionStatus: "not_executable"`.
+
 The research-only modal lab surface contract in
 `server/world_civilization/lab_surface.js` is route-neutral and non-executing.
 It does not add a V6 route or normal gameplay surface; it only records the

@@ -137,6 +137,7 @@ test('V6 release review blocks abuse signoff without delegated-agent proof evide
 
 test('V6 release review requires modal lab launch-surface evidence', () => {
   const labGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'modal_lab_surface_review');
+  const validationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'validation_evidence');
 
   assert.equal(labGate.owner, 'product_engineering');
   assert.ok(labGate.requiredArtifacts.includes('specs/66_agent_town_v6_modal_lab_surface_foundation.md'));
@@ -147,6 +148,45 @@ test('V6 release review requires modal lab launch-surface evidence', () => {
   assert.ok(labGate.requiredChecks.includes('worker_continuity'));
   assert.ok(labGate.requiredChecks.includes('debug_observability'));
   assert.ok(labGate.requiredChecks.includes('non_executing_panels'));
+  assert.ok(labGate.requiredChecks.includes('browser_visual_390'));
+  assert.ok(labGate.requiredChecks.includes('browser_visual_768'));
+  assert.ok(labGate.requiredChecks.includes('browser_visual_1280'));
+  assert.ok(labGate.requiredChecks.includes('keyboard_accessibility'));
+  assert.ok(labGate.requiredChecks.includes('focus_trap_review'));
+  assert.ok(labGate.requiredChecks.includes('runtime_tool_absence'));
+  assert.ok(labGate.requiredChecks.includes('normal_gameplay_exposure_denial'));
+  assert.ok(labGate.requiredChecks.includes('private_debug_data_exclusion'));
+  assert.ok(validationGate.requiredChecks.includes('lab_readiness_gate'));
+  assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_lab_surface.test.js'));
+});
+
+test('V6 release review blocks signoff without lab visual accessibility and runtime absence evidence', () => {
+  const evidence = Object.fromEntries(REQUIRED_REVIEW_GATES.map((gate) => [gate.key, completeEvidenceFor(gate)]));
+  evidence.modal_lab_surface_review = {
+    ...evidence.modal_lab_surface_review,
+    checks: evidence.modal_lab_surface_review.checks.filter((check) => (
+      check !== 'browser_visual_768'
+      && check !== 'keyboard_accessibility'
+      && check !== 'runtime_tool_absence'
+      && check !== 'normal_gameplay_exposure_denial'
+    ))
+  };
+  const report = buildV6ReleaseReviewReport({
+    includeResearchReview: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence
+  });
+  const labGate = report.gateReports.find((gate) => gate.key === 'modal_lab_surface_review');
+
+  assert.equal(report.releaseReady, false);
+  assert.equal(labGate.ok, false);
+  assert.deepEqual(labGate.missingChecks, [
+    'browser_visual_768',
+    'keyboard_accessibility',
+    'runtime_tool_absence',
+    'normal_gameplay_exposure_denial'
+  ]);
+  assert.deepEqual(assertV6ReleaseReviewSafe(report), { ok: true, errors: [] });
 });
 
 test('V6 release review requires worker tool exposure evidence', () => {
