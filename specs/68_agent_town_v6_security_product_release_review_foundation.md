@@ -40,10 +40,18 @@ are present.
   evidence.
 - Validation evidence: targeted Node suite, split Playwright smokes,
   all-features regression, feature override safety, and load/rate replay
-  evidence, including civic mutation security, delegated-agent proof, and
-  governance preflight, effect execution gate, and agent participation
-  enforcement gate, institution readiness gate, and public works readiness gate
-  and lab readiness gate and resilience readiness gate contract coverage.
+  evidence, including civic mutation security, vote authorization readiness,
+  delegated-agent proof, and governance preflight, effect execution gate, and
+  agent participation enforcement gate, institution readiness gate, and public
+  works readiness gate and lab readiness gate and resilience readiness gate
+  contract coverage.
+- Vote authorization readiness review: server-verified voter authorization,
+  eligibility rule verification, one-vote accounting, idempotent receipt replay,
+  changed-vote replay rejection, proposal expiry denial, delegation policy
+  review, per-institution voting templates, route-edge vote auth,
+  quorum/threshold policy, governance-preflight integration, vote audit rows,
+  private-data exclusion, and no effect application before any vote route or
+  worker tool can influence civic outcomes.
 - Effect execution and rollback review: typed apply handlers, typed rollback
   handlers, real before/after state, authorization enforcement, idempotent
   apply/rollback behavior, irreversible-action review, conservation tests,

@@ -105,6 +105,18 @@ Delegated authority remains blocked even with valid proof until M12 worker/tool
 enforcement and route-edge authorization are release-ready; the legacy
 `allowDelegatedExecution` flag is not sufficient.
 
+The research-only M8 vote authorization readiness gate in
+`server/world_civilization/votes.js` records release evidence required before
+any vote route or worker vote tool can affect civic outcomes: server-verified
+voter authorization, eligibility rule verification, one-vote accounting,
+idempotent receipt replay, changed-vote replay rejection, proposal expiry
+denial, delegation policy review, per-institution voting templates,
+route-edge vote auth, quorum/threshold policy, governance-preflight
+integration, vote audit rows, private-data exclusion, and no effect
+application. It remains non-executing with `releaseReady: false`,
+`appliesVoteOutcome: false`, `mutatesWorldState: false`, and
+`executionStatus: "not_executable"`.
+
 The research-only M11 effect execution gate in
 `server/world_civilization/effects.js` records the release evidence required
 before any typed effect can execute: typed apply handlers, typed rollback

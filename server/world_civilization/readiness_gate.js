@@ -151,6 +151,7 @@ const REQUIRED_V6_READINESS_GATES = [
     requiredChecks: [
       'proposal_review_ready',
       'vote_authorization',
+      'vote_authorization_readiness_gate',
       'quorum_policy',
       'preflight_blocks_missing_evidence',
       'no_effect_execution'
@@ -298,6 +299,7 @@ const REQUIRED_V6_READINESS_GATES = [
       'privacy_review',
       'abuse_case_review',
       'validation_evidence',
+      'vote_authorization_readiness_review',
       'resilience_readiness_review',
       'product_signoff'
     ]

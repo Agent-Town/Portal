@@ -284,6 +284,60 @@ test('V6 release review requires effect execution and rollback gate evidence', (
   assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_effects.test.js'));
 });
 
+test('V6 release review requires vote authorization readiness evidence', () => {
+  const voteGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'vote_authorization_readiness_review');
+  const validationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'validation_evidence');
+
+  assert.equal(voteGate.owner, 'engineering_security_product');
+  assert.ok(voteGate.requiredArtifacts.includes('specs/58_agent_town_v6_vote_authorization_foundation.md'));
+  assert.ok(voteGate.requiredArtifacts.includes('server/world_civilization/votes.js'));
+  assert.ok(voteGate.requiredArtifacts.includes('server/world_civilization/governance_preflight.js'));
+  assert.ok(voteGate.requiredArtifacts.includes('tests/world_civilization_votes.test.js'));
+  assert.ok(voteGate.requiredChecks.includes('server_verified_voter_authorization'));
+  assert.ok(voteGate.requiredChecks.includes('eligibility_rule_verification'));
+  assert.ok(voteGate.requiredChecks.includes('one_vote_accounting'));
+  assert.ok(voteGate.requiredChecks.includes('idempotent_receipt_replay'));
+  assert.ok(voteGate.requiredChecks.includes('changed_vote_replay_rejection'));
+  assert.ok(voteGate.requiredChecks.includes('proposal_expiry_denial'));
+  assert.ok(voteGate.requiredChecks.includes('delegation_policy_review'));
+  assert.ok(voteGate.requiredChecks.includes('per_institution_voting_templates'));
+  assert.ok(voteGate.requiredChecks.includes('route_edge_vote_auth'));
+  assert.ok(voteGate.requiredChecks.includes('quorum_threshold_policy'));
+  assert.ok(voteGate.requiredChecks.includes('governance_preflight_integration'));
+  assert.ok(voteGate.requiredChecks.includes('vote_audit_rows'));
+  assert.ok(voteGate.requiredChecks.includes('private_data_exclusion'));
+  assert.ok(voteGate.requiredChecks.includes('no_effect_application'));
+  assert.ok(validationGate.requiredChecks.includes('vote_authorization_readiness_gate'));
+  assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_votes.test.js'));
+});
+
+test('V6 release review blocks signoff without vote route template and replay evidence', () => {
+  const evidence = Object.fromEntries(REQUIRED_REVIEW_GATES.map((gate) => [gate.key, completeEvidenceFor(gate)]));
+  evidence.vote_authorization_readiness_review = {
+    ...evidence.vote_authorization_readiness_review,
+    checks: evidence.vote_authorization_readiness_review.checks.filter((check) => (
+      check !== 'route_edge_vote_auth'
+      && check !== 'per_institution_voting_templates'
+      && check !== 'idempotent_receipt_replay'
+    ))
+  };
+  const report = buildV6ReleaseReviewReport({
+    includeResearchReview: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence
+  });
+  const voteGate = report.gateReports.find((gate) => gate.key === 'vote_authorization_readiness_review');
+
+  assert.equal(report.releaseReady, false);
+  assert.equal(voteGate.ok, false);
+  assert.deepEqual(voteGate.missingChecks, [
+    'idempotent_receipt_replay',
+    'per_institution_voting_templates',
+    'route_edge_vote_auth'
+  ]);
+  assert.deepEqual(assertV6ReleaseReviewSafe(report), { ok: true, errors: [] });
+});
+
 test('V6 release review blocks signoff without effect execution rollback evidence', () => {
   const evidence = Object.fromEntries(REQUIRED_REVIEW_GATES.map((gate) => [gate.key, completeEvidenceFor(gate)]));
   evidence.effect_execution_review = {

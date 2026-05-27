@@ -58,6 +58,26 @@ vote, more approvals than rejections, an explicit vote approval policy that
 passes quorum/threshold checks, and an execution-authority receipt that matches
 an approving vote.
 
+## M8 Readiness Gate
+
+`buildV6VoteAuthorizationReadinessGate()` records the non-executing M8 vote
+authorization readiness gate. It is available only with explicit V6 research
+opt-in and remains hidden from runtime/player surfaces.
+
+The gate requires signed evidence for server-verified voter authorization,
+eligibility rule verification, one-vote accounting, idempotent receipt replay,
+changed-vote replay rejection, proposal expiry denial, delegation policy
+review, per-institution voting templates, route-edge vote auth,
+quorum/threshold policy, governance-preflight integration, vote audit rows,
+private-data exclusion, and no effect application.
+
+The required route surfaces are `human_vote_route`,
+`delegated_agent_vote_route`, and `worker_tool_vote_surface`. Missing any of
+those keeps the report fail-closed. Even with complete evidence, the gate keeps
+`releaseReady: false`, `appliesVoteOutcome: false`,
+`mutatesWorldState: false`, and `executionStatus: not_executable` until V6
+release review and controlled release complete.
+
 ## Delegation Boundary
 
 The vote schema accepts a `server_attested_delegation` authorization kind, but

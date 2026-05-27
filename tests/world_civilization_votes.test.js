@@ -4,10 +4,19 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
+const { V6_WORLD_FEATURE_FLAG, parseWorldGridFeatureFlags } = require('../server/world_grid/feature_flags');
 const { CIVIC_SCHEMA_VERSION } = require('../server/world_civilization/schemas');
 const { createCivicAuditLedger } = require('../server/world_civilization/audit_ledger');
 const { createCivicProposalStore } = require('../server/world_civilization/proposals');
-const { DEFAULT_VOTE_APPROVAL_POLICY, createCivicVoteStore } = require('../server/world_civilization/votes');
+const {
+  DEFAULT_VOTE_APPROVAL_POLICY,
+  REQUIRED_VOTE_AUTHORIZATION_EVIDENCE_CHECKS,
+  REQUIRED_VOTE_AUTHORIZATION_READINESS_CHECKS,
+  REQUIRED_VOTE_ROUTE_SURFACES,
+  assertV6VoteAuthorizationReadinessGateSafe,
+  buildV6VoteAuthorizationReadinessGate,
+  createCivicVoteStore
+} = require('../server/world_civilization/votes');
 
 function withTempCivicStores(fn) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-v6-votes-'));
@@ -88,6 +97,153 @@ function vote(overrides = {}) {
     ...overrides
   };
 }
+
+function voteReadinessEvidence(overrides = {}) {
+  return {
+    status: 'complete',
+    executionStatus: 'not_executable',
+    runtimeExposed: false,
+    playerVisible: false,
+    normalGameplayExposure: false,
+    mutatesWorldState: false,
+    appliesVoteOutcome: false,
+    exposesPrivateData: false,
+    routeEdgeAuthReviewed: true,
+    votingTemplatesReviewed: true,
+    replayIdempotencyReviewed: true,
+    governancePreflightReviewed: true,
+    checks: [...REQUIRED_VOTE_AUTHORIZATION_EVIDENCE_CHECKS],
+    routeSurfaces: [...REQUIRED_VOTE_ROUTE_SURFACES],
+    ...overrides
+  };
+}
+
+test('V6 vote authorization readiness gate is hidden without explicit research opt-in and V6 flag', () => {
+  const withoutResearchOptIn = buildV6VoteAuthorizationReadinessGate({
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: voteReadinessEvidence()
+  });
+  const broadV5Override = buildV6VoteAuthorizationReadinessGate({
+    includeResearchVoteReadiness: true,
+    featureFlags: parseWorldGridFeatureFlags('all'),
+    evidence: voteReadinessEvidence()
+  });
+
+  for (const report of [withoutResearchOptIn, broadV5Override]) {
+    assert.equal(report.available, false);
+    assert.equal(report.researchReady, false);
+    assert.equal(report.releaseReady, false);
+    assert.equal(report.failClosed, true);
+    assert.equal(report.runtimeExposed, false);
+    assert.equal(report.playerVisible, false);
+    assert.equal(report.normalGameplayExposure, false);
+    assert.equal(report.mutatesWorldState, false);
+    assert.equal(report.appliesVoteOutcome, false);
+    assert.equal(report.exposesPrivateData, false);
+    assert.deepEqual(report.checks, []);
+    assert.deepEqual(assertV6VoteAuthorizationReadinessGateSafe(report), { ok: true, errors: [] });
+  }
+});
+
+test('V6 vote authorization readiness gate records route template replay and preflight evidence without execution', () => {
+  const report = buildV6VoteAuthorizationReadinessGate({
+    includeResearchVoteReadiness: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    source: 'node_test',
+    evidence: voteReadinessEvidence()
+  });
+
+  assert.equal(report.available, true);
+  assert.equal(report.source, 'node_test');
+  assert.equal(report.researchReady, true);
+  assert.equal(report.releaseReady, false);
+  assert.equal(report.failClosed, false);
+  assert.equal(report.runtimeExposed, false);
+  assert.equal(report.playerVisible, false);
+  assert.equal(report.normalGameplayExposure, false);
+  assert.equal(report.mutatesWorldState, false);
+  assert.equal(report.appliesVoteOutcome, false);
+  assert.equal(report.exposesPrivateData, false);
+  assert.equal(report.executionStatus, 'not_executable');
+  assert.deepEqual(report.checks.map((entry) => entry.key), REQUIRED_VOTE_AUTHORIZATION_READINESS_CHECKS);
+  assert.deepEqual(report.evidence.missingChecks, []);
+  assert.deepEqual(report.evidence.missingRouteSurfaces, []);
+  assert.deepEqual(assertV6VoteAuthorizationReadinessGateSafe(report), { ok: true, errors: [] });
+});
+
+test('V6 vote authorization readiness gate fails closed without route auth template and replay evidence', () => {
+  const report = buildV6VoteAuthorizationReadinessGate({
+    includeResearchVoteReadiness: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: voteReadinessEvidence({
+      checks: REQUIRED_VOTE_AUTHORIZATION_EVIDENCE_CHECKS.filter((check) => (
+        check !== 'route_edge_vote_auth'
+        && check !== 'per_institution_voting_templates'
+        && check !== 'idempotent_receipt_replay'
+      )),
+      routeSurfaces: REQUIRED_VOTE_ROUTE_SURFACES.filter((surface) => surface !== 'delegated_agent_vote_route'),
+      routeEdgeAuthReviewed: false,
+      votingTemplatesReviewed: false,
+      replayIdempotencyReviewed: false
+    })
+  });
+
+  assert.equal(report.researchReady, false);
+  assert.equal(report.failClosed, true);
+  assert.deepEqual(report.evidence.missingChecks, [
+    'idempotent_receipt_replay',
+    'per_institution_voting_templates',
+    'route_edge_vote_auth'
+  ]);
+  assert.deepEqual(report.evidence.missingRouteSurfaces, ['delegated_agent_vote_route']);
+  assert.deepEqual(report.errors, [
+    'VOTE_AUTHORIZATION_EVIDENCE_REQUIRED',
+    'VOTE_ROUTE_EDGE_AUTHORIZATION_REQUIRED',
+    'VOTE_TEMPLATE_REVIEW_REQUIRED',
+    'VOTE_REPLAY_IDEMPOTENCY_REQUIRED'
+  ]);
+  assert.deepEqual(assertV6VoteAuthorizationReadinessGateSafe(report), { ok: true, errors: [] });
+});
+
+test('V6 vote authorization readiness assertion rejects fake visible outcome-applying readiness', () => {
+  const report = buildV6VoteAuthorizationReadinessGate({
+    includeResearchVoteReadiness: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: voteReadinessEvidence()
+  });
+  const unsafe = {
+    ...report,
+    runtimeExposed: true,
+    playerVisible: true,
+    normalGameplayExposure: true,
+    mutatesWorldState: true,
+    appliesVoteOutcome: true,
+    exposesPrivateData: true,
+    releaseReady: true,
+    executionStatus: 'executes',
+    evidence: {
+      ...report.evidence,
+      runtimeExposed: true,
+      playerVisible: true,
+      normalGameplayExposure: true,
+      mutatesWorldState: true,
+      appliesVoteOutcome: true,
+      exposesPrivateData: true
+    }
+  };
+  const result = assertV6VoteAuthorizationReadinessGateSafe(unsafe);
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(','), /V6_VOTE_AUTHORIZATION_READINESS_RUNTIME_HIDDEN_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_VOTE_AUTHORIZATION_READINESS_PLAYER_HIDDEN_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_VOTE_AUTHORIZATION_READINESS_NORMAL_GAMEPLAY_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_VOTE_AUTHORIZATION_READINESS_WORLD_MUTATION_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_VOTE_AUTHORIZATION_READINESS_OUTCOME_APPLICATION_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_VOTE_AUTHORIZATION_READINESS_PRIVATE_DATA_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_VOTE_AUTHORIZATION_READINESS_NON_EXECUTING_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_VOTE_AUTHORIZATION_READINESS_RELEASE_READY_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_VOTE_AUTHORIZATION_READINESS_EVIDENCE_OUTCOME_APPLICATION_FORBIDDEN/);
+});
 
 test('V6 vote store records authorized votes for existing proposals without execution', () => withTempCivicStores(({ auditLedger, proposalStore, voteStore }) => {
   proposalStore.draftProposal(proposal(), { nowMs: 1_779_784_000_000 });

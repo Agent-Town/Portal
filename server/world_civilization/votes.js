@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
 
+const { V6_WORLD_FEATURE_FLAG, isWorldGridFeatureEnabled } = require('../world_grid/feature_flags');
 const { createCivicAuditLedger, sha256, stableJson } = require('./audit_ledger');
 const { validateCivicVote } = require('./schemas');
 const {
@@ -11,6 +12,7 @@ const {
 
 const MIGRATION_VERSION = 'v1';
 const STORE_KEY = 'votes';
+const V6_VOTE_AUTHORIZATION_READINESS_GATE_VERSION = 'agent-town.v6.vote_authorization_readiness.v1';
 const DEFAULT_VOTE_APPROVAL_POLICY = Object.freeze({
   policyId: 'policy_v6_simple_majority_v1',
   quorumMinVotes: 1,
@@ -18,6 +20,267 @@ const DEFAULT_VOTE_APPROVAL_POLICY = Object.freeze({
   approvalThresholdBps: 5001,
   countAbstainForQuorum: true
 });
+const REQUIRED_VOTE_AUTHORIZATION_READINESS_CHECKS = [
+  'feature_flag',
+  'research_opt_in',
+  'vote_authorization_evidence',
+  'route_edge_authorization',
+  'voting_template_review',
+  'replay_idempotency',
+  'governance_preflight',
+  'no_runtime_exposure',
+  'no_world_mutation'
+];
+const REQUIRED_VOTE_AUTHORIZATION_EVIDENCE_CHECKS = [
+  'server_verified_voter_authorization',
+  'eligibility_rule_verification',
+  'one_vote_accounting',
+  'idempotent_receipt_replay',
+  'changed_vote_replay_rejection',
+  'proposal_expiry_denial',
+  'delegation_policy_review',
+  'per_institution_voting_templates',
+  'route_edge_vote_auth',
+  'quorum_threshold_policy',
+  'governance_preflight_integration',
+  'vote_audit_rows',
+  'private_data_exclusion',
+  'no_effect_application'
+];
+const REQUIRED_VOTE_ROUTE_SURFACES = [
+  'human_vote_route',
+  'delegated_agent_vote_route',
+  'worker_tool_vote_surface'
+];
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function normalizeList(value) {
+  return Array.isArray(value) ? value.map((entry) => String(entry || '')).filter(Boolean) : [];
+}
+
+function check(key, ok, error = '') {
+  return { key, ok: ok === true, error: ok === true ? '' : error };
+}
+
+function inspectVoteAuthorizationReadinessEvidence(evidence = {}) {
+  const checks = normalizeList(evidence.checks);
+  const routeSurfaces = normalizeList(evidence.routeSurfaces);
+  const missingChecks = REQUIRED_VOTE_AUTHORIZATION_EVIDENCE_CHECKS.filter((entry) => !checks.includes(entry));
+  const missingRouteSurfaces = REQUIRED_VOTE_ROUTE_SURFACES.filter((entry) => !routeSurfaces.includes(entry));
+  const routeEdgeAuthReviewed = evidence.routeEdgeAuthReviewed === true;
+  const votingTemplatesReviewed = evidence.votingTemplatesReviewed === true;
+  const replayIdempotencyReviewed = evidence.replayIdempotencyReviewed === true;
+  const governancePreflightReviewed = evidence.governancePreflightReviewed === true;
+  const ok = evidence.status === 'complete'
+    && evidence.executionStatus === 'not_executable'
+    && evidence.runtimeExposed === false
+    && evidence.playerVisible === false
+    && evidence.normalGameplayExposure === false
+    && evidence.mutatesWorldState === false
+    && evidence.appliesVoteOutcome === false
+    && evidence.exposesPrivateData === false
+    && routeEdgeAuthReviewed
+    && votingTemplatesReviewed
+    && replayIdempotencyReviewed
+    && governancePreflightReviewed
+    && missingChecks.length === 0
+    && missingRouteSurfaces.length === 0;
+  return {
+    ok,
+    status: String(evidence.status || 'missing'),
+    executionStatus: String(evidence.executionStatus || 'missing'),
+    runtimeExposed: evidence.runtimeExposed === true,
+    playerVisible: evidence.playerVisible === true,
+    normalGameplayExposure: evidence.normalGameplayExposure === true,
+    mutatesWorldState: evidence.mutatesWorldState === true,
+    appliesVoteOutcome: evidence.appliesVoteOutcome === true,
+    exposesPrivateData: evidence.exposesPrivateData === true,
+    routeEdgeAuthReviewed,
+    votingTemplatesReviewed,
+    replayIdempotencyReviewed,
+    governancePreflightReviewed,
+    requiredChecks: [...REQUIRED_VOTE_AUTHORIZATION_EVIDENCE_CHECKS],
+    checks,
+    missingChecks,
+    requiredRouteSurfaces: [...REQUIRED_VOTE_ROUTE_SURFACES],
+    routeSurfaces,
+    missingRouteSurfaces
+  };
+}
+
+function disabledVoteAuthorizationReadinessReport({ source, reason }) {
+  return {
+    version: V6_VOTE_AUTHORIZATION_READINESS_GATE_VERSION,
+    status: 'research_only',
+    source,
+    featureFlag: V6_WORLD_FEATURE_FLAG,
+    available: false,
+    researchReady: false,
+    releaseReady: false,
+    failClosed: true,
+    runtimeExposed: false,
+    playerVisible: false,
+    normalGameplayExposure: false,
+    mutatesWorldState: false,
+    appliesVoteOutcome: false,
+    exposesPrivateData: false,
+    executionStatus: 'not_executable',
+    evidence: inspectVoteAuthorizationReadinessEvidence({}),
+    checks: [],
+    errors: [reason],
+    disabledReason: reason
+  };
+}
+
+function buildV6VoteAuthorizationReadinessGate({
+  featureFlags = {},
+  includeResearchVoteReadiness = false,
+  source = 'runtime',
+  evidence = {}
+} = {}) {
+  const enabled = includeResearchVoteReadiness === true
+    && isWorldGridFeatureEnabled(featureFlags, V6_WORLD_FEATURE_FLAG);
+  if (!enabled) {
+    return disabledVoteAuthorizationReadinessReport({
+      source,
+      reason: 'V6 vote authorization readiness requires explicit research opt-in and V6 feature flag'
+    });
+  }
+
+  const evidenceReport = inspectVoteAuthorizationReadinessEvidence(evidence);
+  const checks = [
+    check('feature_flag', isWorldGridFeatureEnabled(featureFlags, V6_WORLD_FEATURE_FLAG), 'FEATURE_DISABLED'),
+    check('research_opt_in', includeResearchVoteReadiness === true, 'RESEARCH_OPT_IN_REQUIRED'),
+    check(
+      'vote_authorization_evidence',
+      evidenceReport.status === 'complete' && evidenceReport.missingChecks.length === 0,
+      'VOTE_AUTHORIZATION_EVIDENCE_REQUIRED'
+    ),
+    check(
+      'route_edge_authorization',
+      evidenceReport.routeEdgeAuthReviewed && evidenceReport.missingRouteSurfaces.length === 0,
+      'VOTE_ROUTE_EDGE_AUTHORIZATION_REQUIRED'
+    ),
+    check('voting_template_review', evidenceReport.votingTemplatesReviewed, 'VOTE_TEMPLATE_REVIEW_REQUIRED'),
+    check('replay_idempotency', evidenceReport.replayIdempotencyReviewed, 'VOTE_REPLAY_IDEMPOTENCY_REQUIRED'),
+    check('governance_preflight', evidenceReport.governancePreflightReviewed, 'VOTE_GOVERNANCE_PREFLIGHT_REQUIRED'),
+    check(
+      'no_runtime_exposure',
+      evidenceReport.executionStatus === 'not_executable'
+        && evidenceReport.runtimeExposed === false
+        && evidenceReport.playerVisible === false
+        && evidenceReport.normalGameplayExposure === false,
+      'VOTE_RUNTIME_EXPOSURE_FORBIDDEN'
+    ),
+    check(
+      'no_world_mutation',
+      evidenceReport.mutatesWorldState === false
+        && evidenceReport.appliesVoteOutcome === false
+        && evidenceReport.exposesPrivateData === false,
+      'VOTE_WORLD_MUTATION_FORBIDDEN'
+    )
+  ];
+  const researchReady = checks.every((entry) => entry.ok);
+
+  return {
+    version: V6_VOTE_AUTHORIZATION_READINESS_GATE_VERSION,
+    status: 'research_only',
+    source,
+    featureFlag: V6_WORLD_FEATURE_FLAG,
+    available: true,
+    researchReady,
+    releaseReady: false,
+    failClosed: researchReady !== true,
+    runtimeExposed: false,
+    playerVisible: false,
+    normalGameplayExposure: false,
+    mutatesWorldState: false,
+    appliesVoteOutcome: false,
+    exposesPrivateData: false,
+    executionStatus: 'not_executable',
+    evidence: evidenceReport,
+    checks,
+    errors: checks.filter((entry) => !entry.ok).map((entry) => entry.error)
+  };
+}
+
+function assertV6VoteAuthorizationReadinessGateSafe(report = {}) {
+  const errors = [];
+  if (report.version !== V6_VOTE_AUTHORIZATION_READINESS_GATE_VERSION) {
+    errors.push('V6_VOTE_AUTHORIZATION_READINESS_VERSION_REQUIRED');
+  }
+  if (report.featureFlag !== V6_WORLD_FEATURE_FLAG) {
+    errors.push('V6_VOTE_AUTHORIZATION_READINESS_FEATURE_FLAG_REQUIRED');
+  }
+  if (report.status !== 'research_only') {
+    errors.push('V6_VOTE_AUTHORIZATION_READINESS_RESEARCH_ONLY_REQUIRED');
+  }
+  if (report.runtimeExposed !== false) {
+    errors.push('V6_VOTE_AUTHORIZATION_READINESS_RUNTIME_HIDDEN_REQUIRED');
+  }
+  if (report.playerVisible !== false) {
+    errors.push('V6_VOTE_AUTHORIZATION_READINESS_PLAYER_HIDDEN_REQUIRED');
+  }
+  if (report.normalGameplayExposure !== false) {
+    errors.push('V6_VOTE_AUTHORIZATION_READINESS_NORMAL_GAMEPLAY_FORBIDDEN');
+  }
+  if (report.mutatesWorldState !== false) {
+    errors.push('V6_VOTE_AUTHORIZATION_READINESS_WORLD_MUTATION_FORBIDDEN');
+  }
+  if (report.appliesVoteOutcome !== false) {
+    errors.push('V6_VOTE_AUTHORIZATION_READINESS_OUTCOME_APPLICATION_FORBIDDEN');
+  }
+  if (report.exposesPrivateData !== false) {
+    errors.push('V6_VOTE_AUTHORIZATION_READINESS_PRIVATE_DATA_FORBIDDEN');
+  }
+  if (report.executionStatus !== 'not_executable') {
+    errors.push('V6_VOTE_AUTHORIZATION_READINESS_NON_EXECUTING_REQUIRED');
+  }
+  if (report.releaseReady !== false) {
+    errors.push('V6_VOTE_AUTHORIZATION_READINESS_RELEASE_READY_FORBIDDEN');
+  }
+  if (report.available === true) {
+    const checkKeys = new Set((report.checks || []).map((entry) => entry.key));
+    for (const key of REQUIRED_VOTE_AUTHORIZATION_READINESS_CHECKS) {
+      if (!checkKeys.has(key)) errors.push(`V6_VOTE_AUTHORIZATION_READINESS_CHECK_REQUIRED:${key}`);
+    }
+    const failedChecks = (report.checks || []).filter((entry) => entry.ok !== true);
+    if (report.researchReady === true && failedChecks.length > 0) {
+      errors.push('V6_VOTE_AUTHORIZATION_READINESS_READY_WITH_FAILED_CHECKS');
+    }
+    if (report.researchReady !== true && report.failClosed !== true) {
+      errors.push('V6_VOTE_AUTHORIZATION_READINESS_DENIAL_FAIL_CLOSED_REQUIRED');
+    }
+    const evidence = report.evidence || {};
+    if (evidence.runtimeExposed === true) {
+      errors.push('V6_VOTE_AUTHORIZATION_READINESS_EVIDENCE_RUNTIME_HIDDEN_REQUIRED');
+    }
+    if (evidence.playerVisible === true || evidence.normalGameplayExposure === true) {
+      errors.push('V6_VOTE_AUTHORIZATION_READINESS_EVIDENCE_PLAYER_HIDDEN_REQUIRED');
+    }
+    if (evidence.mutatesWorldState === true) {
+      errors.push('V6_VOTE_AUTHORIZATION_READINESS_EVIDENCE_WORLD_MUTATION_FORBIDDEN');
+    }
+    if (evidence.appliesVoteOutcome === true) {
+      errors.push('V6_VOTE_AUTHORIZATION_READINESS_EVIDENCE_OUTCOME_APPLICATION_FORBIDDEN');
+    }
+    if (evidence.exposesPrivateData === true) {
+      errors.push('V6_VOTE_AUTHORIZATION_READINESS_EVIDENCE_PRIVATE_DATA_FORBIDDEN');
+    }
+    if (report.researchReady === true && evidence.ok !== true) {
+      errors.push('V6_VOTE_AUTHORIZATION_READINESS_READY_WITHOUT_EVIDENCE');
+    }
+  } else if (report.failClosed !== true) {
+    errors.push('V6_VOTE_AUTHORIZATION_READINESS_DISABLED_FAIL_CLOSED_REQUIRED');
+  }
+  return {
+    ok: errors.length === 0,
+    errors
+  };
+}
 
 function normalizePolicyInteger(errors, rawValue, key, fallback, { min, max }) {
   const value = rawValue === undefined ? fallback : rawValue;
@@ -378,6 +641,12 @@ function createCivicVoteStore({ sqlitePath, proposalStore, auditLedger = null, a
 
 module.exports = {
   DEFAULT_VOTE_APPROVAL_POLICY,
+  REQUIRED_VOTE_AUTHORIZATION_EVIDENCE_CHECKS: clone(REQUIRED_VOTE_AUTHORIZATION_EVIDENCE_CHECKS),
+  REQUIRED_VOTE_AUTHORIZATION_READINESS_CHECKS: clone(REQUIRED_VOTE_AUTHORIZATION_READINESS_CHECKS),
+  REQUIRED_VOTE_ROUTE_SURFACES: clone(REQUIRED_VOTE_ROUTE_SURFACES),
+  V6_VOTE_AUTHORIZATION_READINESS_GATE_VERSION,
+  assertV6VoteAuthorizationReadinessGateSafe,
+  buildV6VoteAuthorizationReadinessGate,
   createCivicVoteStore,
   evaluateVoteApprovalPolicy,
   normalizeVoteApprovalPolicy

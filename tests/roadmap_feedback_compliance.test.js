@@ -158,6 +158,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   const resilienceSource = read('server/world_civilization/resilience.js');
   const readinessSource = read('server/world_civilization/readiness_gate.js');
   const controlledSource = read('server/world_civilization/controlled_release.js');
+  const voteSource = read('server/world_civilization/votes.js');
   const requiredMilestones = [
     'M0 Hardened V5 world-grid baseline',
     'M1 Living V6 milestone contract',
@@ -215,10 +216,21 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(gate, /hidden from runtime `\/api\/world\/tools`/);
   assert.match(plan, /M8 Vote authorization and delegation \| `in_progress`/);
   assert.match(plan, /evaluateVoteApprovalPolicy\(\)/);
+  assert.match(plan, /buildV6VoteAuthorizationReadinessGate\(\)/);
+  assert.match(plan, /route-edge vote auth/);
+  assert.match(plan, /per-institution voting templates/);
   assert.match(plan, /quorumMinVotes/);
   assert.match(plan, /approvalThresholdBps/);
   assert.match(gate, /evaluateVoteApprovalPolicy\(\)/);
+  assert.match(gate, /M8 research-only vote authorization readiness gate/);
+  assert.match(gate, /appliesVoteOutcome: false/);
   assert.match(gate, /per-institution voting templates/);
+  assert.match(releaseReview, /Vote authorization readiness review/);
+  assert.match(releaseReview, /vote authorization readiness gate/);
+  assert.match(readinessSource, /vote_authorization_readiness_gate/);
+  assert.match(voteSource, /REQUIRED_VOTE_AUTHORIZATION_EVIDENCE_CHECKS/);
+  assert.match(voteSource, /route_edge_vote_auth/);
+  assert.match(voteSource, /V6_VOTE_AUTHORIZATION_READINESS_RELEASE_READY_FORBIDDEN/);
   assert.match(plan, /M9 Reputation and accountability \| `in_progress`/);
   assert.match(plan, /server\/world_civilization\/reputation\.js/);
   assert.match(plan, /reputation dispute\/review/);
@@ -575,6 +587,7 @@ test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () 
   const gate = read('specs/release-gates/v60_agent_civilization_readiness_gate.md');
   const releaseReview = read('docs/security/V6_AGENT_CIVILIZATION_RELEASE_REVIEW.md');
   const skillLine = read('docs/internal-skill-testline.md');
+  const voteSource = read('server/world_civilization/votes.js');
   const effectSource = read('server/world_civilization/effects.js');
   const delegationSource = read('server/world_civilization/delegations.js');
 
@@ -589,6 +602,8 @@ test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () 
   assert.match(proposalSpec, /`ready_for_vote`/);
   assert.match(proposalSpec, /`proposal\.reviewed`/);
   assert.match(voteSpec, /Approval Policy Rules/);
+  assert.match(voteSpec, /buildV6VoteAuthorizationReadinessGate\(\)/);
+  assert.match(voteSpec, /delegated_agent_vote_route/);
   assert.match(voteSpec, /quorumMinVotes/);
   assert.match(voteSpec, /approvalThresholdBps/);
   assert.match(effectSpec, /failed preflights preserve the existing `CIVIC_EFFECT_\*` error surface/);
@@ -622,12 +637,15 @@ test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () 
   assert.match(gate, /`proposal\.reviewed`/);
   assert.match(releaseReview, /proposal `ready_for_vote`\/`rejected` transitions/);
   assert.match(releaseReview, /governance preflight coverage/);
+  assert.match(releaseReview, /Vote authorization readiness review/);
+  assert.match(releaseReview, /route-edge vote auth/);
   assert.match(releaseReview, /Effect execution and rollback review/);
   assert.match(releaseReview, /effect execution gate/);
   assert.match(releaseReview, /Agent participation enforcement review/);
   assert.match(releaseReview, /agent participation enforcement gate/);
   assert.match(skillLine, /V6 internal proposal lifecycle foundation/);
   assert.match(skillLine, /V6 vote authorization foundation/);
+  assert.match(skillLine, /M8 readiness gate/);
   assert.match(skillLine, /M11 effect execution gate/);
   assert.match(skillLine, /applied\/rollback audit evidence/);
   assert.match(skillLine, /M12 enforcement gate/);
@@ -635,6 +653,9 @@ test('V6 governance preflight is tracked as an M7-M12 prerequisite control', () 
   assert.match(skillLine, /loose `allowDelegatedExecution` bypasses/);
   assert.match(skillLine, /tests\/world_civilization_votes\.test\.js/);
   assert.match(skillLine, /tests\/world_civilization_governance_preflight\.test\.js/);
+  assert.match(voteSource, /REQUIRED_VOTE_ROUTE_SURFACES/);
+  assert.match(voteSource, /human_vote_route/);
+  assert.match(voteSource, /V6_VOTE_AUTHORIZATION_READINESS_OUTCOME_APPLICATION_FORBIDDEN/);
   assert.match(effectSource, /REQUIRED_EFFECT_EXECUTION_EVIDENCE_CHECKS/);
   assert.match(effectSource, /irreversible_action_review/);
   assert.match(effectSource, /conservation_tests/);

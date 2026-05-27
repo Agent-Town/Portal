@@ -230,6 +230,16 @@ persistence resilience, and security/product release review.
   in `server/world_civilization/votes.js` with non-executing
   `evaluateVoteApprovalPolicy()` checks for quorum, minimum approvals, approval
   threshold, abstain quorum handling, and governance-preflight integration;
+  the M8 research-only vote authorization readiness gate in
+  `server/world_civilization/votes.js` must require server-verified voter
+  authorization, eligibility rule verification, one-vote accounting,
+  idempotent receipt replay, changed-vote replay rejection, proposal expiry
+  denial, delegation policy review, per-institution voting templates,
+  route-edge vote auth, quorum/threshold policy, governance-preflight
+  integration, vote audit rows, private-data exclusion, and no effect
+  application while keeping `releaseReady: false`,
+  `appliesVoteOutcome: false`, `mutatesWorldState: false`, and
+  `executionStatus: "not_executable"`;
   release still requires per-institution voting templates, route-edge vote
   authorization, and product/security review of quorum and threshold choices.
 - Reputation cannot be self-awarded, transferred as currency, or used without an

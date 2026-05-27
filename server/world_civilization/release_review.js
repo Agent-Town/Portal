@@ -100,6 +100,7 @@ const REQUIRED_REVIEW_GATES = [
       'tests/world_civilization_schemas.test.js',
       'tests/world_civilization_mutation_security.test.js',
       'tests/world_civilization_governance_preflight.test.js',
+      'tests/world_civilization_votes.test.js',
       'tests/world_civilization_effects.test.js',
       'tests/world_civilization_rollback_recovery.test.js',
       'tests/world_civilization_delegations.test.js',
@@ -116,6 +117,7 @@ const REQUIRED_REVIEW_GATES = [
       'split_playwright_smokes',
       'all_features_regression',
       'feature_override_safety',
+      'vote_authorization_readiness_gate',
       'store_backed_delegation_proof',
       'effect_execution_gate',
       'agent_participation_enforcement_gate',
@@ -150,6 +152,37 @@ const REQUIRED_REVIEW_GATES = [
       'conservation_tests',
       'applied_and_rollback_audit',
       'worker_route_security'
+    ],
+    signoffRequired: true
+  },
+  {
+    key: 'vote_authorization_readiness_review',
+    label: 'Vote authorization readiness review',
+    owner: 'engineering_security_product',
+    requiredArtifacts: [
+      RELEASE_REVIEW_ARTIFACT,
+      'specs/58_agent_town_v6_vote_authorization_foundation.md',
+      'server/world_civilization/votes.js',
+      'server/world_civilization/governance_preflight.js',
+      'tests/world_civilization_votes.test.js',
+      'tests/world_civilization_governance_preflight.test.js',
+      'tests/world_civilization_proposal_vote_process_restart.test.js'
+    ],
+    requiredChecks: [
+      'server_verified_voter_authorization',
+      'eligibility_rule_verification',
+      'one_vote_accounting',
+      'idempotent_receipt_replay',
+      'changed_vote_replay_rejection',
+      'proposal_expiry_denial',
+      'delegation_policy_review',
+      'per_institution_voting_templates',
+      'route_edge_vote_auth',
+      'quorum_threshold_policy',
+      'governance_preflight_integration',
+      'vote_audit_rows',
+      'private_data_exclusion',
+      'no_effect_application'
     ],
     signoffRequired: true
   },
