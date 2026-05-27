@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
+const { V6_WORLD_FEATURE_FLAG, parseWorldGridFeatureFlags } = require('../server/world_grid/feature_flags');
 const { CIVIC_SCHEMA_VERSION } = require('../server/world_civilization/schemas');
 const { createCivicAuditLedger } = require('../server/world_civilization/audit_ledger');
 const {
@@ -13,6 +14,12 @@ const {
   PROPOSAL_STATUS_DRAFTED,
   PROPOSAL_STATUS_READY_FOR_VOTE,
   PROPOSAL_STATUS_REJECTED,
+  REQUIRED_PROPOSAL_INTAKE_EVIDENCE_CHECKS,
+  REQUIRED_PROPOSAL_INTAKE_READINESS_CHECKS,
+  REQUIRED_PROPOSAL_SUBMISSION_SURFACES,
+  V6_PROPOSAL_INTAKE_READINESS_GATE_VERSION,
+  assertV6ProposalIntakeReadinessGateSafe,
+  buildV6ProposalIntakeReadinessGate,
   createCivicProposalStore
 } = require('../server/world_civilization/proposals');
 
@@ -82,6 +89,180 @@ function moderationDecision(overrides = {}) {
     ...overrides
   };
 }
+
+function proposalIntakeReadinessEvidence(overrides = {}) {
+  return {
+    status: 'complete',
+    executionStatus: 'not_executable',
+    runtimeExposed: false,
+    playerVisible: false,
+    normalGameplayExposure: false,
+    mutatesWorldState: false,
+    executesProposalEffects: false,
+    exposesCivicTools: false,
+    exposesPrivateData: false,
+    routeToolSubmissionReviewed: true,
+    reviewQueueIntegrated: true,
+    workerFirstOriginReviewed: true,
+    mutationSecurityEnvelopeReviewed: true,
+    publicTextPrivacyReviewed: true,
+    privateDataExcluded: true,
+    auditRowsCovered: true,
+    idempotencyReviewed: true,
+    noBackendShortcuts: true,
+    checks: [...REQUIRED_PROPOSAL_INTAKE_EVIDENCE_CHECKS],
+    submissionSurfaces: [...REQUIRED_PROPOSAL_SUBMISSION_SURFACES],
+    ...overrides
+  };
+}
+
+test('V6 proposal intake readiness gate is hidden without explicit research opt-in and V6 flag', () => {
+  const noResearchOptIn = buildV6ProposalIntakeReadinessGate({
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: proposalIntakeReadinessEvidence()
+  });
+  const broadV5Override = buildV6ProposalIntakeReadinessGate({
+    includeResearchProposalIntake: true,
+    featureFlags: parseWorldGridFeatureFlags('all'),
+    evidence: proposalIntakeReadinessEvidence()
+  });
+
+  for (const report of [noResearchOptIn, broadV5Override]) {
+    assert.equal(report.version, V6_PROPOSAL_INTAKE_READINESS_GATE_VERSION);
+    assert.equal(report.available, false);
+    assert.equal(report.researchReady, false);
+    assert.equal(report.releaseReady, false);
+    assert.equal(report.failClosed, true);
+    assert.equal(report.runtimeExposed, false);
+    assert.equal(report.playerVisible, false);
+    assert.equal(report.normalGameplayExposure, false);
+    assert.equal(report.mutatesWorldState, false);
+    assert.equal(report.executesProposalEffects, false);
+    assert.equal(report.exposesCivicTools, false);
+    assert.equal(report.exposesPrivateData, false);
+    assert.equal(report.executionStatus, 'not_executable');
+    assert.deepEqual(report.checks, []);
+    assert.deepEqual(assertV6ProposalIntakeReadinessGateSafe(report), { ok: true, errors: [] });
+  }
+});
+
+test('V6 proposal intake readiness gate records route tool and review queue evidence without execution', () => {
+  const report = buildV6ProposalIntakeReadinessGate({
+    includeResearchProposalIntake: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    source: 'node_test',
+    evidence: proposalIntakeReadinessEvidence()
+  });
+
+  assert.equal(report.available, true);
+  assert.equal(report.source, 'node_test');
+  assert.equal(report.researchReady, true);
+  assert.equal(report.releaseReady, false);
+  assert.equal(report.failClosed, false);
+  assert.equal(report.runtimeExposed, false);
+  assert.equal(report.playerVisible, false);
+  assert.equal(report.normalGameplayExposure, false);
+  assert.equal(report.mutatesWorldState, false);
+  assert.equal(report.executesProposalEffects, false);
+  assert.equal(report.exposesCivicTools, false);
+  assert.equal(report.exposesPrivateData, false);
+  assert.equal(report.executionStatus, 'not_executable');
+  assert.deepEqual(report.checks.map((entry) => entry.key), REQUIRED_PROPOSAL_INTAKE_READINESS_CHECKS);
+  assert.deepEqual(report.evidence.requiredChecks, REQUIRED_PROPOSAL_INTAKE_EVIDENCE_CHECKS);
+  assert.deepEqual(report.evidence.missingChecks, []);
+  assert.deepEqual(report.evidence.requiredSubmissionSurfaces, REQUIRED_PROPOSAL_SUBMISSION_SURFACES);
+  assert.deepEqual(report.evidence.missingSubmissionSurfaces, []);
+  assert.deepEqual(assertV6ProposalIntakeReadinessGateSafe(report), { ok: true, errors: [] });
+});
+
+test('V6 proposal intake readiness gate fails closed without route tool and queue evidence', () => {
+  const report = buildV6ProposalIntakeReadinessGate({
+    includeResearchProposalIntake: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: proposalIntakeReadinessEvidence({
+      checks: REQUIRED_PROPOSAL_INTAKE_EVIDENCE_CHECKS.filter((check) => (
+        check !== 'worker_tool_submission_envelope'
+        && check !== 'mutation_security_envelope'
+        && check !== 'review_queue_index'
+        && check !== 'public_text_rendering_review'
+        && check !== 'no_backend_shortcuts'
+      )),
+      submissionSurfaces: ['human_route_submission'],
+      routeToolSubmissionReviewed: false,
+      reviewQueueIntegrated: false,
+      workerFirstOriginReviewed: false,
+      mutationSecurityEnvelopeReviewed: false,
+      publicTextPrivacyReviewed: false,
+      noBackendShortcuts: false
+    })
+  });
+
+  assert.equal(report.available, true);
+  assert.equal(report.researchReady, false);
+  assert.equal(report.releaseReady, false);
+  assert.equal(report.failClosed, true);
+  assert.deepEqual(report.evidence.missingChecks, [
+    'worker_tool_submission_envelope',
+    'mutation_security_envelope',
+    'review_queue_index',
+    'public_text_rendering_review',
+    'no_backend_shortcuts'
+  ]);
+  assert.deepEqual(report.evidence.missingSubmissionSurfaces, ['worker_tool_submission', 'review_queue']);
+  assert.deepEqual(report.errors, [
+    'PROPOSAL_INTAKE_EVIDENCE_REQUIRED',
+    'PROPOSAL_ROUTE_TOOL_SUBMISSION_REQUIRED',
+    'PROPOSAL_REVIEW_QUEUE_INTEGRATION_REQUIRED',
+    'PROPOSAL_WORKER_FIRST_ORIGIN_REQUIRED',
+    'PROPOSAL_MUTATION_SECURITY_ENVELOPE_REQUIRED',
+    'PROPOSAL_PUBLIC_TEXT_PRIVACY_REVIEW_REQUIRED'
+  ]);
+  assert.deepEqual(assertV6ProposalIntakeReadinessGateSafe(report), { ok: true, errors: [] });
+});
+
+test('V6 proposal intake assertion rejects visible civic tool or effect execution drift', () => {
+  const report = buildV6ProposalIntakeReadinessGate({
+    includeResearchProposalIntake: true,
+    featureFlags: { [V6_WORLD_FEATURE_FLAG]: true },
+    evidence: proposalIntakeReadinessEvidence()
+  });
+  const unsafe = {
+    ...report,
+    releaseReady: true,
+    runtimeExposed: true,
+    playerVisible: true,
+    normalGameplayExposure: true,
+    mutatesWorldState: true,
+    executesProposalEffects: true,
+    exposesCivicTools: true,
+    exposesPrivateData: true,
+    executionStatus: 'executes',
+    evidence: {
+      ...report.evidence,
+      runtimeExposed: true,
+      playerVisible: true,
+      normalGameplayExposure: true,
+      mutatesWorldState: true,
+      executesProposalEffects: true,
+      exposesCivicTools: true,
+      exposesPrivateData: true
+    }
+  };
+  const result = assertV6ProposalIntakeReadinessGateSafe(unsafe);
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(','), /V6_PROPOSAL_INTAKE_READINESS_RUNTIME_HIDDEN_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_PROPOSAL_INTAKE_READINESS_PLAYER_HIDDEN_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_PROPOSAL_INTAKE_READINESS_NORMAL_GAMEPLAY_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_PROPOSAL_INTAKE_READINESS_WORLD_MUTATION_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_PROPOSAL_INTAKE_READINESS_EFFECT_EXECUTION_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_PROPOSAL_INTAKE_READINESS_CIVIC_TOOL_EXPOSURE_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_PROPOSAL_INTAKE_READINESS_PRIVATE_DATA_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_PROPOSAL_INTAKE_READINESS_NON_EXECUTING_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_PROPOSAL_INTAKE_READINESS_RELEASE_READY_FORBIDDEN/);
+  assert.match(result.errors.join(','), /V6_PROPOSAL_INTAKE_READINESS_EVIDENCE_RUNTIME_HIDDEN_REQUIRED/);
+  assert.match(result.errors.join(','), /V6_PROPOSAL_INTAKE_READINESS_EVIDENCE_EFFECT_EXECUTION_FORBIDDEN/);
+});
 
 test('V6 proposal lifecycle drafts bounded proposals without executing effects', () => withTempProposalStore(({ auditLedger, store }) => {
   const drafted = store.draftProposal(proposal(), { nowMs: 1_779_784_000_000 });

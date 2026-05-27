@@ -40,12 +40,19 @@ are present.
   evidence, and non-executing rollback recovery evidence.
 - Validation evidence: targeted Node suite, split Playwright smokes,
   all-features regression, feature override safety, and load/rate replay
-  evidence, including civic mutation security, vote authorization readiness,
-  reputation eligibility advice readiness, moderation privacy readiness,
-  delegated-agent proof, and governance preflight, effect execution gate, agent
-  participation enforcement gate, institution readiness gate, public works
-  readiness gate, lab readiness gate, and resilience readiness gate contract
-  coverage.
+  evidence, including civic mutation security, proposal intake readiness, vote
+  authorization readiness, reputation eligibility advice readiness, moderation
+  privacy readiness, delegated-agent proof, and governance preflight, effect
+  execution gate, agent participation enforcement gate, institution readiness
+  gate, public works readiness gate, lab readiness gate, and resilience
+  readiness gate contract coverage.
+- Proposal intake readiness review: human submission envelope, worker-tool
+  submission envelope, OpenClaw Lite worker origin, Skill Context and Worker
+  Traffic observability, mutation security envelope, same-origin/CSRF/session
+  auth, idempotent submission replay, review queue indexes, moderation decision
+  links, proposal audit rows, public text rendering review, private-data
+  exclusion, no backend shortcuts, no civic tool exposure, and no effect
+  execution before any proposal route or worker tool can accept civic proposals.
 - Vote authorization readiness review: server-verified voter authorization,
   eligibility rule verification, one-vote accounting, idempotent receipt replay,
   changed-vote replay rejection, proposal expiry denial, delegation policy

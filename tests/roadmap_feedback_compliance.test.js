@@ -243,10 +243,19 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(gate, /hidden from runtime `\/api\/world\/tools`/);
   assert.match(plan, /M7 Internal proposal lifecycle \| `in_progress`/);
   assert.match(plan, /proposal draft\/review audit entries now include privacy-safe before\/after summaries/);
+  assert.match(plan, /buildV6ProposalIntakeReadinessGate\(\)/);
+  assert.match(plan, /human route submission, worker tool submission/);
+  assert.match(plan, /review-queue integration/);
+  assert.match(plan, /no civic tool exposure/);
   assert.match(proposalSpec, /privacy-safe before\/after summary/);
   assert.match(proposalSpec, /proposal\.reviewed`\s+audit ledger entry with privacy-safe before\/after status summaries/);
+  assert.match(proposalSpec, /Proposal Intake Readiness Gate/);
+  assert.match(proposalSpec, /exposesCivicTools: false/);
   assert.match(proposalSource, /beforeSummary/);
   assert.match(proposalSource, /afterSummary/);
+  assert.match(proposalSource, /buildV6ProposalIntakeReadinessGate/);
+  assert.match(proposalSource, /REQUIRED_PROPOSAL_SUBMISSION_SURFACES/);
+  assert.match(readinessSource, /proposal_intake_readiness_gate/);
   assert.match(plan, /M8 Vote authorization and delegation \| `in_progress`/);
   assert.match(plan, /evaluateVoteApprovalPolicy\(\)/);
   assert.match(plan, /buildV6VoteRouteAuthorizationEnvelope\(\)/);
@@ -519,6 +528,7 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(gate, /store-backed delegation proof and scope-mismatch evidence/);
   assert.match(plan, /modal lab surface review/);
   assert.match(plan, /worker tool surface review/);
+  assert.match(plan, /proposal intake readiness review/);
   assert.match(plan, /effect execution and rollback review/);
   assert.match(plan, /reputation eligibility\/advice readiness/);
   assert.match(plan, /moderation privacy readiness review/);
@@ -539,6 +549,8 @@ test('V6 milestone plan preserves the complete civilization ladder', () => {
   assert.match(gate, /Worker-first V6 civic tools must pass the exposure gate/);
   assert.match(releaseReview, /lab readiness gate/);
   assert.match(releaseReview, /resilience readiness gate/);
+  assert.match(releaseReview, /proposal intake readiness gate/);
+  assert.match(releaseReview, /non-executing M7 proposal intake readiness gate/);
   assert.match(releaseReview, /reputation eligibility advice gate/);
   assert.match(releaseReview, /Reputation eligibility and advice review/);
   assert.match(releaseReview, /moderation privacy readiness gate/);

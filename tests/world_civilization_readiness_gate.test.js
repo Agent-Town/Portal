@@ -63,8 +63,12 @@ test('V6 readiness gate baseline names every prerequisite domain but remains ope
   assert.ok(report.gateReports.some((gate) => gate.requiredArtifacts.includes(V6_READINESS_GATE_ARTIFACT)));
   assert.ok(report.gateReports.some((gate) => gate.requiredArtifacts.includes(V6_MILESTONE_PLAN_ARTIFACT)));
   const persistenceGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'persistence_resilience');
+  const proposalGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'proposal_vote_governance');
   const reputationGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'reputation_moderation_privacy');
   const releaseReviewGate = REQUIRED_V6_READINESS_GATES.find((gate) => gate.key === 'security_product_release_review');
+  assert.ok(proposalGate.requiredChecks.includes('proposal_intake_readiness_gate'));
+  assert.ok(proposalGate.requiredChecks.includes('route_tool_submission'));
+  assert.ok(proposalGate.requiredChecks.includes('review_queue_integration'));
   assert.ok(reputationGate.requiredChecks.includes('reputation_eligibility_advice_gate'));
   assert.ok(reputationGate.requiredChecks.includes('moderation_privacy_readiness_gate'));
   assert.ok(reputationGate.requiredChecks.includes('surface_policy_coverage'));

@@ -150,6 +150,9 @@ const REQUIRED_V6_READINESS_GATES = [
     ],
     requiredChecks: [
       'proposal_review_ready',
+      'proposal_intake_readiness_gate',
+      'route_tool_submission',
+      'review_queue_integration',
       'vote_authorization',
       'vote_authorization_readiness_gate',
       'quorum_policy',

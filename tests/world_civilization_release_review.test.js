@@ -322,6 +322,30 @@ test('V6 release review requires worker tool exposure evidence', () => {
   assert.ok(validationGate.requiredArtifacts.includes('tests/world_civilization_mutation_security.test.js'));
 });
 
+test('V6 release review requires proposal intake route tool and review queue evidence', () => {
+  const proposalGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'proposal_intake_readiness_review');
+  const validationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'validation_evidence');
+
+  assert.equal(proposalGate.owner, 'engineering_security_product');
+  assert.ok(proposalGate.requiredArtifacts.includes('specs/57_agent_town_v6_internal_proposal_lifecycle.md'));
+  assert.ok(proposalGate.requiredArtifacts.includes('server/world_civilization/proposals.js'));
+  assert.ok(proposalGate.requiredArtifacts.includes('server/world_civilization/mutation_security.js'));
+  assert.ok(proposalGate.requiredArtifacts.includes('server/world_civilization/tool_exposure_gate.js'));
+  assert.ok(proposalGate.requiredArtifacts.includes('tests/world_civilization_proposals.test.js'));
+  assert.ok(proposalGate.requiredChecks.includes('human_submission_envelope'));
+  assert.ok(proposalGate.requiredChecks.includes('worker_tool_submission_envelope'));
+  assert.ok(proposalGate.requiredChecks.includes('openclaw_lite_worker_origin'));
+  assert.ok(proposalGate.requiredChecks.includes('mutation_security_envelope'));
+  assert.ok(proposalGate.requiredChecks.includes('same_origin_csrf_session_auth'));
+  assert.ok(proposalGate.requiredChecks.includes('review_queue_index'));
+  assert.ok(proposalGate.requiredChecks.includes('proposal_created_audit_rows'));
+  assert.ok(proposalGate.requiredChecks.includes('proposal_reviewed_audit_rows'));
+  assert.ok(proposalGate.requiredChecks.includes('no_backend_shortcuts'));
+  assert.ok(proposalGate.requiredChecks.includes('no_civic_tool_exposure'));
+  assert.ok(proposalGate.requiredChecks.includes('no_effect_execution'));
+  assert.ok(validationGate.requiredChecks.includes('proposal_intake_readiness_gate'));
+});
+
 test('V6 release review requires effect execution and rollback gate evidence', () => {
   const effectGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'effect_execution_review');
   const validationGate = REQUIRED_REVIEW_GATES.find((gate) => gate.key === 'validation_evidence');

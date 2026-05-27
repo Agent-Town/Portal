@@ -69,6 +69,32 @@ prepared effect persistence. It requires an existing, non-expired proposal whose
 review transition has reached `ready_for_vote` with approved moderation status
 and whose effect preview and rollback plan match the proposed civic action.
 
+## Proposal Intake Readiness Gate
+
+`buildV6ProposalIntakeReadinessGate()` is a research-only M7 gate for reviewing
+future route and worker-tool submission paths. It requires
+`FEATURE_WORLD_V60_AGENT_CIVILIZATION` plus explicit research opt-in and stays
+hidden from runtime tools and normal gameplay.
+
+The gate requires evidence for:
+
+- human route submission and worker-tool submission envelopes;
+- OpenClaw Lite worker origin, Skill Context observability, and Worker Traffic
+  observability;
+- civic mutation security envelope, same-origin/CSRF/session-auth controls, and
+  idempotent submission replay;
+- review-queue indexes and moderation-decision linkage;
+- `proposal.created` and `proposal.reviewed` audit rows;
+- public text rendering review, private-data exclusion, and no backend
+  shortcuts.
+
+Even when research-ready, the gate keeps `releaseReady: false`,
+`executionStatus: "not_executable"`, `exposesCivicTools: false`,
+`executesProposalEffects: false`, `mutatesWorldState: false`,
+`runtimeExposed: false`, and `playerVisible: false`. It does not add a public
+route, runtime civic tool, proposal UI, review queue UI, or effect execution
+path.
+
 ## Worker-First Rule
 
 Agent-authored proposals may be stored only after a later worker/tool integration

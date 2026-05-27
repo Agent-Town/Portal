@@ -118,6 +118,7 @@ const REQUIRED_REVIEW_GATES = [
       'split_playwright_smokes',
       'all_features_regression',
       'feature_override_safety',
+      'proposal_intake_readiness_gate',
       'vote_authorization_readiness_gate',
       'reputation_eligibility_advice_gate',
       'moderation_privacy_readiness_gate',
@@ -155,6 +156,43 @@ const REQUIRED_REVIEW_GATES = [
       'conservation_tests',
       'applied_and_rollback_audit',
       'worker_route_security'
+    ],
+    signoffRequired: true
+  },
+  {
+    key: 'proposal_intake_readiness_review',
+    label: 'Proposal intake readiness review',
+    owner: 'engineering_security_product',
+    requiredArtifacts: [
+      RELEASE_REVIEW_ARTIFACT,
+      'specs/57_agent_town_v6_internal_proposal_lifecycle.md',
+      'server/world_civilization/proposals.js',
+      'server/world_civilization/mutation_security.js',
+      'server/world_civilization/tool_exposure_gate.js',
+      'docs/security/PUBLIC_TEXT_RENDERING_POLICY.md',
+      'tests/world_civilization_proposals.test.js',
+      'tests/world_civilization_governance_preflight.test.js',
+      'tests/world_civilization_mutation_security.test.js',
+      'tests/world_civilization_tool_exposure_gate.test.js'
+    ],
+    requiredChecks: [
+      'human_submission_envelope',
+      'worker_tool_submission_envelope',
+      'openclaw_lite_worker_origin',
+      'skill_context_observability',
+      'worker_traffic_observability',
+      'mutation_security_envelope',
+      'same_origin_csrf_session_auth',
+      'idempotent_submission_replay',
+      'review_queue_index',
+      'moderation_decision_link',
+      'proposal_created_audit_rows',
+      'proposal_reviewed_audit_rows',
+      'public_text_rendering_review',
+      'private_data_exclusion',
+      'no_backend_shortcuts',
+      'no_civic_tool_exposure',
+      'no_effect_execution'
     ],
     signoffRequired: true
   },
