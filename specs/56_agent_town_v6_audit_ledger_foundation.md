@@ -26,12 +26,21 @@ compatible stronger store, before accepting mutating civic actions.
 - Validates every row with `server/world_civilization/schemas.js` before insert.
 - Rejects private data, unredacted audit payloads, and unsupported schema
   versions before persistence.
+- Validated entries now carry privacy-safe `beforeSummary` and `afterSummary`
+  strings. When a caller still has only hashes, the schema adds honest
+  hash-only fallbacks that mark complete store-specific before-state snapshots
+  and release replay reconstruction as remaining gates.
 
 ## Replay Properties
 
 Replay returns entries in ascending sequence order. Consumers can replay all
 entries, replay by actor account, replay by object reference, or continue after a
 known sequence number.
+
+`server/world_civilization/replay_reconstruction.js` now treats missing
+before/after audit summaries as a replay defect. Current summaries are
+research-only replay evidence; hash-only fallbacks are allowed only to avoid
+overclaiming until store-specific snapshots exist.
 
 Prepared civic effects use `civic_action.prepared` audit entries. They are
 readiness evidence for rollback handles and must not be treated as
@@ -66,4 +75,5 @@ different content fails with `CIVIC_AUDIT_IDEMPOTENCY_CONFLICT`.
 This foundation is necessary but not sufficient for release-grade V6 storage.
 Before V6 release, civic proposal, vote, delegation, reputation, moderation,
 rollback, and public-effect state must also have durable owner indexes,
-migration tests, backup/restore procedures, and restart persistence tests.
+migration tests, complete store-specific before/after summaries, backup/restore
+procedures, and restart persistence tests.

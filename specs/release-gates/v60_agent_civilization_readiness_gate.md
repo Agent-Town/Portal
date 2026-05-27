@@ -125,7 +125,11 @@ persistence resilience, and security/product release review.
   `tests/world_civilization_institution_process_restart.test.js`;
   public-works process restart coverage starts in
   `tests/world_civilization_public_works_process_restart.test.js`;
-  all replay probes must remain privacy-safe and non-executing. The M16
+  all replay probes must remain privacy-safe and non-executing. The V6 civic
+  audit ledger now requires privacy-safe before/after summaries and replay
+  reconstruction fails closed when rows are missing them; hash-only summary
+  fallbacks remain research evidence until store-specific snapshots and release
+  replay reconstruction are complete. The M16
   research-only resilience readiness gate may also exist in
   `server/world_civilization/resilience.js`, but it must stay hidden,
   non-executing, fail closed, and require explicit restart/replay,

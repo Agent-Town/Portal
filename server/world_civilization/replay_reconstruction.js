@@ -33,6 +33,9 @@ function reconstructCivicAuditReplay(rows = [], {
   let firstSeq = 0;
   let lastSeq = 0;
   let rollbackCount = 0;
+  let beforeAfterSummaryCount = 0;
+  let missingSummaryCount = 0;
+  let hashOnlyFallbackCount = 0;
 
   if (!Array.isArray(rows)) errors.push('CIVIC_REPLAY_ROWS_REQUIRED');
 
@@ -64,6 +67,17 @@ function reconstructCivicAuditReplay(rows = [], {
     if (entry.privacy?.privateDataIncluded !== false) {
       errors.push('CIVIC_REPLAY_PRIVATE_DATA_FORBIDDEN');
     }
+    const hasBeforeSummary = typeof entry.beforeSummary === 'string' && entry.beforeSummary.trim().length > 0;
+    const hasAfterSummary = typeof entry.afterSummary === 'string' && entry.afterSummary.trim().length > 0;
+    if (hasBeforeSummary && hasAfterSummary) {
+      beforeAfterSummaryCount += 1;
+      if (entry.beforeSummary.includes('Hash-only') || entry.afterSummary.includes('Hash-only')) {
+        hashOnlyFallbackCount += 1;
+      }
+    } else {
+      missingSummaryCount += 1;
+      errors.push('CIVIC_REPLAY_AUDIT_SUMMARY_REQUIRED');
+    }
     increment(actionCounts, entry.actionType);
     increment(actorKindCounts, entry.actor?.kind);
     increment(migrationVersionCounts, entry.migrationVersion);
@@ -84,6 +98,12 @@ function reconstructCivicAuditReplay(rows = [], {
     chainValid: chainErrors.length === 0,
     privacySafe: privacyErrors.length === 0,
     privateDataIncluded: false,
+    summaryComplete: missingSummaryCount === 0,
+    summaryCoverage: {
+      beforeAfterSummaryCount,
+      missingSummaryCount,
+      hashOnlyFallbackCount
+    },
     uniqueActorCount: actorAccounts.size,
     uniqueObjectCount: objectRefs.size,
     rollbackCount,
@@ -144,6 +164,9 @@ function assertCivicReplayReconstructionSafe(report = {}) {
   }
   if (report.privateDataIncluded !== false || report.privacySafe !== true) {
     errors.push('CIVIC_REPLAY_RECONSTRUCTION_PRIVACY_SAFE_REQUIRED');
+  }
+  if (report.summaryComplete !== true) {
+    errors.push('CIVIC_REPLAY_RECONSTRUCTION_SUMMARY_REQUIRED');
   }
   if (report.chainValid !== true) {
     errors.push('CIVIC_REPLAY_RECONSTRUCTION_CHAIN_VALID_REQUIRED');

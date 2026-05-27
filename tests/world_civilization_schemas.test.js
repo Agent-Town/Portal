@@ -528,6 +528,8 @@ test('V6 moderation, action, rollback, and audit schemas require traceable safet
     idempotencyKey: 'idem_action_bridge_001',
     beforeHash: HASH_A,
     afterHash: HASH_B,
+    beforeSummary: 'Bridge contribution total was 20 wood.',
+    afterSummary: 'Bridge contribution total is now 30 wood.',
     createdAtMs: 1_779_784_000_000,
     migrationVersion: 'v1',
     replayable: true,
@@ -535,6 +537,8 @@ test('V6 moderation, action, rollback, and audit schemas require traceable safet
     privacy: privacy({ dataClasses: ['public_audit_summary'] })
   });
   assert.equal(audit.ok, true, audit.errors.join('\n'));
+  assert.equal(audit.value.beforeSummary, 'Bridge contribution total was 20 wood.');
+  assert.equal(audit.value.afterSummary, 'Bridge contribution total is now 30 wood.');
 
   const delegationUsageAudit = validateAuditLedgerEntry({
     schemaVersion: CIVIC_SCHEMA_VERSION,
@@ -590,6 +594,45 @@ test('V6 moderation, action, rollback, and audit schemas require traceable safet
     privacy: privacy({ dataClasses: ['public_audit_summary'] })
   });
   assert.equal(publicWorksProjectAudit.ok, true, publicWorksProjectAudit.errors.join('\n'));
+
+  const hashOnlyFallbackAudit = validateAuditLedgerEntry({
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    entryId: 'audit_hash_only_summary_001',
+    actor: actor(),
+    actionType: 'proposal.created',
+    objectRef: 'proposal_hash_only_summary_001',
+    idempotencyKey: 'idem_hash_only_summary_001',
+    beforeHash: HASH_A,
+    afterHash: HASH_B,
+    createdAtMs: 1_779_784_000_000,
+    migrationVersion: 'v1',
+    replayable: true,
+    rollbackId: '',
+    privacy: privacy({ dataClasses: ['public_audit_summary'] })
+  });
+  assert.equal(hashOnlyFallbackAudit.ok, true, hashOnlyFallbackAudit.errors.join('\n'));
+  assert.match(hashOnlyFallbackAudit.value.beforeSummary, /Hash-only before summary/);
+  assert.match(hashOnlyFallbackAudit.value.afterSummary, /Hash-only after summary/);
+
+  const unsafeSummaryAudit = validateAuditLedgerEntry({
+    schemaVersion: CIVIC_SCHEMA_VERSION,
+    entryId: 'audit_private_summary_001',
+    actor: actor(),
+    actionType: 'proposal.created',
+    objectRef: 'proposal_private_summary_001',
+    idempotencyKey: 'idem_private_summary_001',
+    beforeHash: HASH_A,
+    afterHash: HASH_B,
+    beforeSummary: 'Before summary includes sk-private-secret-123456.',
+    afterSummary: 'After summary should not persist.',
+    createdAtMs: 1_779_784_000_000,
+    migrationVersion: 'v1',
+    replayable: true,
+    rollbackId: '',
+    privacy: privacy({ dataClasses: ['public_audit_summary'] })
+  });
+  assert.equal(unsafeSummaryAudit.ok, false);
+  assert.match(unsafeSummaryAudit.errors.join('\n'), /private data forbidden/);
 });
 
 test('V6 civic action schema enforces typed effect handler registry', () => {

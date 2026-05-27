@@ -67,7 +67,7 @@ unversioned payloads are invalid for V6 civic state.
 | Moderation Review/Appeal | Decision reference, human requester, review type, queue/outcome status, policy version, reviewer kind, public source references such as abuse reports, reasons, and redacted privacy envelope. |
 | Civic Action | Proposal reference, typed public effect, execution authority, handler name from the typed effect registry, before/after summaries, audit entry, rollback id, and idempotency key. |
 | Rollback Plan | Plan id, strategy, explicit rollback support, irreversible-effect list, and maximum rollback window. |
-| Audit Ledger Entry | Actor, action type, object reference, idempotency key, before/after hashes, migration version, replayability, rollback handle, and redacted privacy envelope. |
+| Audit Ledger Entry | Actor, action type, object reference, idempotency key, before/after hashes, privacy-safe before/after summaries, migration version, replayability, rollback handle, and redacted privacy envelope. |
 
 ## Privacy Rule
 

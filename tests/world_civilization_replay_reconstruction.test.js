@@ -42,6 +42,8 @@ function auditEntry(overrides = {}) {
     idempotencyKey: 'idem_proposal_bridge_001',
     beforeHash: HASH_A,
     afterHash: HASH_B,
+    beforeSummary: 'No proposal record existed before this draft.',
+    afterSummary: 'Proposal draft is recorded for moderation review only.',
     createdAtMs: 1_779_784_000_000,
     migrationVersion: 'v1',
     replayable: true,
@@ -78,6 +80,12 @@ test('V6 replay reconstruction summarizes civic audit rows without executing eff
   assert.equal(report.chainValid, true);
   assert.equal(report.privacySafe, true);
   assert.equal(report.privateDataIncluded, false);
+  assert.equal(report.summaryComplete, true);
+  assert.deepEqual(report.summaryCoverage, {
+    beforeAfterSummaryCount: 2,
+    missingSummaryCount: 0,
+    hashOnlyFallbackCount: 0
+  });
   assert.deepEqual(report.byActionType, {
     'proposal.created': 1,
     'vote.recorded': 1
@@ -130,10 +138,36 @@ test('V6 replay reconstruction fails closed on hash tampering and private data',
   assert.match(report.errors.join(','), /CIVIC_REPLAY_ENTRY_HASH_MISMATCH/);
   assert.match(report.errors.join(','), /CIVIC_REPLAY_REDACTION_REQUIRED/);
   assert.match(report.errors.join(','), /CIVIC_REPLAY_PRIVATE_DATA_FORBIDDEN/);
+  assert.equal(report.summaryComplete, true);
   assert.equal(safety.ok, false);
   assert.match(safety.errors.join(','), /CIVIC_REPLAY_RECONSTRUCTION_CHAIN_VALID_REQUIRED/);
   assert.match(safety.errors.join(','), /CIVIC_REPLAY_RECONSTRUCTION_PRIVACY_SAFE_REQUIRED/);
   assert.match(safety.errors.join(','), /CIVIC_REPLAY_RECONSTRUCTION_ERRORS_PRESENT/);
+}));
+
+test('V6 replay reconstruction fails closed when audit summaries are missing from replay rows', () => withTempLedger((ledger) => {
+  seedLedger(ledger);
+  const rows = ledger.replay();
+  const missingSummary = [
+    {
+      ...rows[0],
+      entry: {
+        ...rows[0].entry,
+        beforeSummary: undefined,
+        afterSummary: undefined
+      }
+    }
+  ];
+  const report = reconstructCivicAuditReplay(missingSummary);
+  const safety = assertCivicReplayReconstructionSafe(report);
+
+  assert.equal(report.ok, false);
+  assert.equal(report.summaryComplete, false);
+  assert.equal(report.summaryCoverage.beforeAfterSummaryCount, 0);
+  assert.equal(report.summaryCoverage.missingSummaryCount, 1);
+  assert.match(report.errors.join(','), /CIVIC_REPLAY_AUDIT_SUMMARY_REQUIRED/);
+  assert.equal(safety.ok, false);
+  assert.match(safety.errors.join(','), /CIVIC_REPLAY_RECONSTRUCTION_SUMMARY_REQUIRED/);
 }));
 
 test('V6 replay reconstruction fails closed when ledger API is missing', () => {

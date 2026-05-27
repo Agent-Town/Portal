@@ -78,8 +78,10 @@ scripts, backup/restore rehearsal, and migration load replay evidence exist.
 `server/world_civilization/replay_reconstruction.js` reconstructs a
 privacy-safe summary from civic audit ledger replay rows. The reconstruction
 verifies sequence order, hash-chain continuity, redacted privacy envelopes,
-action counts, migration-version counts, rollback handle counts, and paginated
-ledger replay without applying world state or exposing actor account ids.
+before/after audit summary presence, action counts, migration-version counts,
+rollback handle counts, and paginated ledger replay without applying world state
+or exposing actor account ids. Hash-only summary fallbacks are tracked as
+research evidence, not release-grade store reconstruction.
 
 `tests/world_civilization_process_restart.test.js` adds process-level restart
 evidence for the civic audit ledger by seeding, closing, reopening, replaying,
@@ -156,7 +158,8 @@ The readiness gate requires evidence for:
 
 - All current civic store restart probes.
 - Audit replay reconstruction with hash-chain continuity.
-- Privacy-safe replay summaries and private-data exclusion.
+- Privacy-safe before/after replay summaries, missing-summary denial, and
+  private-data exclusion.
 - Migration upgrade/downgrade scripts and unsupported transition denial.
 - Backup/restore and migration load replay rehearsal.
 - Production load/rate targets, multi-process write contention, duplicate

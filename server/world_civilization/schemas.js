@@ -68,6 +68,8 @@ const AUDIT_ACTION_TYPES = new Set([
   'civic_action.applied',
   'rollback.applied'
 ]);
+const AUDIT_HASH_ONLY_BEFORE_SUMMARY = 'Hash-only before summary; complete store-specific before-state snapshots remain a release gate.';
+const AUDIT_HASH_ONLY_AFTER_SUMMARY = 'Hash-only after summary; release replay reconstruction remains non-executing.';
 
 function isPlainObject(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -134,6 +136,11 @@ function validateStringArray(errors, value, path, { maxItems = 8, maxLen = 80, r
   }
   if (value.length > maxItems) errors.push(`${path} too many items`);
   return value.slice(0, maxItems).map((entry, index) => validateString(errors, entry, `${path}[${index}]`, { max: maxLen }));
+}
+
+function validateOptionalAuditSummary(errors, value, path, fallback) {
+  if (value === undefined || value === null || value === '') return fallback;
+  return validateString(errors, value, path, { max: 480 });
 }
 
 function validateSchemaVersion(errors, raw) {
@@ -684,6 +691,18 @@ function validateAuditLedgerEntry(raw = {}) {
   const idempotencyKey = validateString(errors, raw.idempotencyKey, 'idempotencyKey', { pattern: CIVIC_ID_RE, max: 96 });
   const beforeHash = validateString(errors, raw.beforeHash, 'beforeHash', { pattern: HASH_RE, max: 80 });
   const afterHash = validateString(errors, raw.afterHash, 'afterHash', { pattern: HASH_RE, max: 80 });
+  const beforeSummary = validateOptionalAuditSummary(
+    errors,
+    raw.beforeSummary,
+    'beforeSummary',
+    AUDIT_HASH_ONLY_BEFORE_SUMMARY
+  );
+  const afterSummary = validateOptionalAuditSummary(
+    errors,
+    raw.afterSummary,
+    'afterSummary',
+    AUDIT_HASH_ONLY_AFTER_SUMMARY
+  );
   const createdAtMs = validateNumber(errors, raw.createdAtMs, 'createdAtMs', { min: 1 });
   const migrationVersion = validateString(errors, raw.migrationVersion, 'migrationVersion', { pattern: /^v[0-9]+(?:\.[0-9]+){0,2}$/i, max: 24 });
   if (raw.replayable !== true) errors.push('replayable must be true');
@@ -705,6 +724,8 @@ function validateAuditLedgerEntry(raw = {}) {
       idempotencyKey,
       beforeHash,
       afterHash,
+      beforeSummary,
+      afterSummary,
       createdAtMs,
       migrationVersion,
       replayable: raw.replayable === true,

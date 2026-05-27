@@ -34,6 +34,8 @@ function auditEntry(overrides = {}) {
     idempotencyKey: 'idem_action_bridge_001',
     beforeHash: HASH_A,
     afterHash: HASH_B,
+    beforeSummary: 'Bridge action was not applied before this audit entry.',
+    afterSummary: 'Bridge action remains an auditable civic effect record.',
     createdAtMs: 1_779_784_000_000,
     migrationVersion: 'v1',
     replayable: true,
@@ -65,6 +67,8 @@ test('V6 civic audit ledger appends validated entries in replay order with hash 
   assert.equal(first.prevEntryHash, sha256('agent-town.v6.civic.audit.genesis'));
   assert.equal(second.prevEntryHash, first.entryHash);
   assert.notEqual(first.entryHash, second.entryHash);
+  assert.equal(first.entry.beforeSummary, 'Bridge action was not applied before this audit entry.');
+  assert.equal(first.entry.afterSummary, 'Bridge action remains an auditable civic effect record.');
   assert.deepEqual(ledger.replay().map((row) => row.entry.entryId), [
     'audit_action_bridge_001',
     'audit_vote_bridge_001'
@@ -109,6 +113,23 @@ test('V6 civic audit ledger rejects invalid or private-data entries before persi
     /CIVIC_AUDIT_ENTRY_INVALID/
   );
   assert.equal(ledger.count(), 0);
+  ledger.close();
+}));
+
+test('V6 civic audit ledger adds honest hash-only summary fallbacks when store summaries are absent', () => withTempLedger((sqlitePath) => {
+  const ledger = createCivicAuditLedger({ sqlitePath });
+  const row = ledger.append(auditEntry({
+    entryId: 'audit_hash_only_bridge_001',
+    idempotencyKey: 'idem_hash_only_bridge_001',
+    beforeSummary: undefined,
+    afterSummary: undefined
+  }));
+
+  assert.match(row.entry.beforeSummary, /Hash-only before summary/);
+  assert.match(row.entry.beforeSummary, /store-specific before-state snapshots remain a release gate/);
+  assert.match(row.entry.afterSummary, /Hash-only after summary/);
+  assert.match(row.entry.afterSummary, /replay reconstruction remains non-executing/);
+  assert.equal(ledger.count(), 1);
   ledger.close();
 }));
 
