@@ -160,6 +160,7 @@ Player prompt
 - `buildReleaseEvidenceBundle` records stable hashes for the generated pack, measured playtest report, diversity report, public card, persistence report, release approval evidence, candidate-review manifest, and release gate.
 - `validateReleaseEvidenceBundle` rejects drifted source evidence, missing source hashes for ready gates, secret-like fields, raw prompt instructions, production image assets, private-data leaks, default generated-pack exposure, V6 civic changes, or canonical server-rule changes.
 - `POST /api/world/generated-pack/release-evidence-bundle` is feature-gated by `FEATURE_WORLD_GRID_GENERATED_PACKS` and returns only evidence reports; it does not approve release or change gameplay.
+- Release-gate and release-evidence-bundle API ingress, including the generic tool dispatcher, rejects secret-like fields or raw executable prompt instructions before constructing reports, so unsafe submitted values are not echoed back to callers.
 - The bundle is not a release approval surface. It only makes the release-gate evidence replayable and hash-bound for review.
 
 ## Machine Checks
@@ -302,6 +303,8 @@ Player prompt
   "releaseEvidenceSourceDriftRejected": true,
   "releaseEvidenceBundleApiFeatureGated": true,
   "failClosedBundleApiValid": true,
+  "releaseApiSecretEchoCount": 0,
+  "releaseApiRawInstructionEchoCount": 0,
   "candidateReviewManifestProductionImageAssetCount": 0,
   "candidateReviewCoverageCountMin": 23,
   "costConsentModelApproved": true,

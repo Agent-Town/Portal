@@ -244,6 +244,48 @@ function normalizeError(error) {
   };
 }
 
+function findReleaseEvidenceSecretLikePaths(value, pathLabel = '$', matches = []) {
+  if (!value || typeof value !== 'object') return matches;
+  const secretKey = /(api[_-]?key|secret|private[_-]?key|credential|oauth|access[_-]?token|refresh[_-]?token|wallet[_-]?secret|seed[_-]?phrase|password)/i;
+  for (const [key, child] of Object.entries(value)) {
+    const childPath = `${pathLabel}.${key}`;
+    if (secretKey.test(key)) matches.push(childPath);
+    findReleaseEvidenceSecretLikePaths(child, childPath, matches);
+  }
+  return matches;
+}
+
+function findReleaseEvidenceRawInstructionPaths(value, pathLabel = '$', matches = []) {
+  const rawPromptKey = /^(rawprompt|normalizedprompt|systemprompt|developerprompt|promptinstructions)$/i;
+  const rawTextPattern = /\bignore\s+(all\s+)?(previous|prior|above)\s+instructions\b|\b(system|developer)\s+(prompt|message|instructions)\b|\bexecute\s+(shell|bash|terminal|command)\b|<\s*script\b|javascript\s*:|\beval\s*\(/i;
+  if (typeof value === 'string') {
+    if (rawTextPattern.test(value)) matches.push(pathLabel);
+    return matches;
+  }
+  if (!value || typeof value !== 'object') return matches;
+  for (const [key, child] of Object.entries(value)) {
+    const childPath = `${pathLabel}.${key}`;
+    if (rawPromptKey.test(key)) matches.push(childPath);
+    findReleaseEvidenceRawInstructionPaths(child, childPath, matches);
+  }
+  return matches;
+}
+
+function assertReleaseEvidenceRequestSafe(body = {}) {
+  const secretLikePaths = findReleaseEvidenceSecretLikePaths(body);
+  const rawInstructionPaths = findReleaseEvidenceRawInstructionPaths(body);
+  if (secretLikePaths.length || rawInstructionPaths.length) {
+    const error = new Error('GENPACK_RELEASE_EVIDENCE_REJECTED');
+    error.details = {
+      secretLikePathCount: secretLikePaths.length,
+      rawInstructionPathCount: rawInstructionPaths.length,
+      secretLikePaths: secretLikePaths.slice(0, 12),
+      rawInstructionPaths: rawInstructionPaths.slice(0, 12)
+    };
+    throw error;
+  }
+}
+
 function createWorldGridRouter({ resolveIdentity } = {}) {
   const router = express.Router();
 
@@ -408,6 +450,7 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
   }
 
   function buildGeneratedPackReleaseInputs(owner, body = {}) {
+    assertReleaseEvidenceRequestSafe(body);
     const generatedPack = currentGeneratedPack(owner);
     if (!generatedPack) {
       const error = new Error('NO_GENERATED_PACK');
@@ -779,10 +822,17 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
           data: buildGeneratedPackReleaseGatePayload(payload.owner, req.body || {})
         });
       }
+      if (toolName === 'et.world.generated_pack.release_evidence_bundle') {
+        requireGeneratedPacksEnabled(payload.featureFlags);
+        return res.json({
+          ok: true,
+          data: buildGeneratedPackReleaseEvidenceBundlePayload(payload.owner, req.body || {})
+        });
+      }
       res.status(404).json({ ok: false, error: { code: 'TOOL_NOT_FOUND' } });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'NOT_FOUND' || normalized.code === 'NO_GENERATED_PACK' || normalized.code === 'PACK_NOT_FOUND' || normalized.code === 'PUBLIC_CARD_NOT_FOUND' ? 404 : normalized.code === 'INVALID_SERVICE_REQUEST_STATE' || normalized.code === 'OUT_OF_RESOURCES' || normalized.code === 'CONTRIBUTION_CAP_EXCEEDED' || normalized.code === 'INVALID_REWARD_STATE' ? 409 : normalized.code === 'INVALID_IDEMPOTENCY_KEY' || normalized.code === 'INVALID_EVENT_STATE' || normalized.code === 'INVALID_PROMPT' || normalized.code === 'INVALID_GENERATED_PACK_EXPORT' ? 400 : normalized.code === 'GENPACK_VALIDATION_FAILED' || normalized.code === 'PUBLIC_PACK_CARD_REJECTED' || normalized.code === 'PUBLIC_GALLERY_REVIEW_REJECTED' ? 422 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = normalized.code === 'NOT_FOUND' || normalized.code === 'NO_GENERATED_PACK' || normalized.code === 'PACK_NOT_FOUND' || normalized.code === 'PUBLIC_CARD_NOT_FOUND' ? 404 : normalized.code === 'INVALID_SERVICE_REQUEST_STATE' || normalized.code === 'OUT_OF_RESOURCES' || normalized.code === 'CONTRIBUTION_CAP_EXCEEDED' || normalized.code === 'INVALID_REWARD_STATE' ? 409 : normalized.code === 'INVALID_IDEMPOTENCY_KEY' || normalized.code === 'INVALID_EVENT_STATE' || normalized.code === 'INVALID_PROMPT' || normalized.code === 'INVALID_GENERATED_PACK_EXPORT' ? 400 : normalized.code === 'GENPACK_VALIDATION_FAILED' || normalized.code === 'GENPACK_RELEASE_EVIDENCE_REJECTED' || normalized.code === 'PUBLIC_PACK_CARD_REJECTED' || normalized.code === 'PUBLIC_GALLERY_REVIEW_REJECTED' ? 422 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -855,7 +905,7 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'NO_GENERATED_PACK' ? 404 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = normalized.code === 'NO_GENERATED_PACK' ? 404 : normalized.code === 'GENPACK_RELEASE_EVIDENCE_REJECTED' ? 422 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
       res.status(status).json({ ok: false, error: normalized });
     }
   });
@@ -872,7 +922,7 @@ function createWorldGridRouter({ resolveIdentity } = {}) {
       });
     } catch (error) {
       const normalized = normalizeError(error);
-      const status = normalized.code === 'NO_GENERATED_PACK' ? 404 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
+      const status = normalized.code === 'NO_GENERATED_PACK' ? 404 : normalized.code === 'GENPACK_RELEASE_EVIDENCE_REJECTED' ? 422 : normalized.code === 'UNAUTHORIZED' ? 401 : normalized.code === 'FORBIDDEN' || normalized.code === 'FEATURE_DISABLED' ? 403 : 500;
       res.status(status).json({ ok: false, error: normalized });
     }
   });
