@@ -153,6 +153,7 @@ Player prompt
 - The gate can be valid while `publicReleaseEligible=false`; that is the expected result when playtest evidence, diversity evidence, persistence evidence, public-card privacy evidence, candidate review, consent/cost/auth approval, or human signoff is absent.
 - `publicReleaseEligible=true` requires every prerequisite to be true and `blockingReasons=[]`; forged eligibility or missing blocking reasons fail validation.
 - Approval evidence, candidate-review manifests, diversity reports, persistence reports, public cards, or release gates with secret-like fields, raw prompt instructions, hash drift, invalid pack ids, diversity evidence that excludes the release pack, metric-only diversity claims, mixed persistence evidence, mixed public-card evidence, future-dated approvals, future-dated gate evaluations, mixed pack ids, stale candidate-review timing, planned-only reviewed candidates, short candidate-review coverage, production image promotion, canonical rule changes, V6 civic changes, or default gameplay exposure fail closed.
+- Candidate-review and release-approval evidence validation reports redact submitted secret-looking keys, secret-looking values, raw-instruction keys, and executable instruction values from both content checks and schema-error paths.
 - `POST /api/world/generated-pack/release-gate` remains behind `FEATURE_WORLD_GRID_GENERATED_PACKS` and does not change canonical world-grid rules, V6 civic systems, pack visibility, or production image policy.
 
 ## GU-19 Release Evidence Bundle Slice

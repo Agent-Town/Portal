@@ -1354,7 +1354,7 @@ function validateGenerationBrief(brief = {}) {
     {
       id: 'GENBRIEF_JSON_SCHEMA_VALID',
       passed: schemaReport.ok === true,
-      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5).map(redactGeneratedPackSchemaError) }
     },
     {
       id: 'GENBRIEF_NO_RAW_EXECUTABLE_INSTRUCTIONS',
@@ -1478,7 +1478,7 @@ function validateAssetPromptPlan(plan = {}, pack = {}) {
     {
       id: 'ASSET_PROMPT_PLAN_JSON_SCHEMA_VALID',
       passed: schemaReport.ok === true,
-      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5).map(redactGeneratedPackSchemaError) }
     },
     {
       id: 'ASSET_PROMPT_PLAN_PACK_MATCH',
@@ -1606,7 +1606,7 @@ function validateTechFlavorTree(tree = {}) {
     {
       id: 'TECH_FLAVOR_SCHEMA_VALID',
       passed: schemaReport.ok === true,
-      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5).map(redactGeneratedPackSchemaError) }
     },
     {
       id: 'TECH_FLAVOR_CANONICAL_EFFECT_COVERAGE',
@@ -1903,7 +1903,7 @@ function validateRequesterVoicePack(requesterVoice = {}) {
     {
       id: 'REQUESTER_VOICE_SCHEMA_VALID',
       passed: schemaReport.ok === true,
-      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5).map(redactGeneratedPackSchemaError) }
     },
     {
       id: 'REQUESTER_ARCHETYPES_GENERATED',
@@ -2214,7 +2214,7 @@ function validateInhabitantStyleOverlay(overlay = {}) {
     {
       id: 'INHABITANT_OVERLAY_SCHEMA_VALID',
       passed: schemaReport.ok === true,
-      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5).map(redactGeneratedPackSchemaError) }
     },
     {
       id: 'INHABITANT_ROLES_VISUAL_ONLY',
@@ -2468,7 +2468,7 @@ function validateMultiSurfaceCompatibility(compatibility = {}) {
     {
       id: 'MULTI_SURFACE_SCHEMA_VALID',
       passed: schemaReport.ok === true,
-      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5).map(redactGeneratedPackSchemaError) }
     },
     {
       id: 'MULTI_SURFACE_REQUIRED_SURFACES',
@@ -2674,7 +2674,7 @@ function validateApprovedModifiers(modifiers = {}) {
     {
       id: 'APPROVED_MODIFIERS_SCHEMA_VALID',
       passed: schemaReport.ok === true,
-      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5).map(redactGeneratedPackSchemaError) }
     },
     {
       id: 'APPROVED_MODIFIERS_ENUM_ONLY',
@@ -3851,7 +3851,7 @@ function validatePublicPackCard(card = {}, owner = {}) {
     {
       id: 'PUBLIC_CARD_SCHEMA_VALID',
       passed: schemaReport.ok === true,
-      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5).map(redactGeneratedPackSchemaError) }
     },
     {
       id: 'PUBLIC_CARD_SCREENSHOT_PRESENT',
@@ -4072,7 +4072,7 @@ function validateCandidateReviewManifest(manifest = {}, pack = {}) {
     {
       id: 'CANDIDATE_REVIEW_MANIFEST_SCHEMA_VALID',
       passed: schemaReport.ok === true,
-      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5).map(redactGeneratedPackSchemaError) }
     },
     {
       id: 'CANDIDATE_REVIEW_MANIFEST_CONTENT_SAFE',
@@ -4371,7 +4371,7 @@ function validateReleaseApprovalEvidence(evidence = {}, pack = {}) {
     {
       id: 'RELEASE_APPROVAL_EVIDENCE_SCHEMA_VALID',
       passed: schemaReport.ok === true,
-      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5).map(redactGeneratedPackSchemaError) }
     },
     {
       id: 'RELEASE_APPROVAL_EVIDENCE_CONTENT_SAFE',
@@ -4783,7 +4783,7 @@ function validateProductionReleaseGate(gate = {}, { nowMs = Date.now() } = {}) {
     {
       id: 'PRODUCTION_RELEASE_GATE_SCHEMA_VALID',
       passed: schemaReport.ok === true,
-      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5).map(redactGeneratedPackSchemaError) }
     },
     {
       id: 'PRODUCTION_RELEASE_GATE_PREREQUISITES_COHERENT',
@@ -5306,7 +5306,7 @@ function validateReleaseEvidenceBundle(bundle = {}, {
     {
       id: 'RELEASE_EVIDENCE_BUNDLE_SCHEMA_VALID',
       passed: schemaReport.ok === true,
-      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5).map(redactGeneratedPackSchemaError) }
     },
     {
       id: 'RELEASE_EVIDENCE_BUNDLE_CONTENT_SAFE',
@@ -5709,7 +5709,7 @@ function validatePublicPackGallery(gallery = {}) {
     {
       id: 'PUBLIC_GALLERY_SCHEMA_VALID',
       passed: schemaReport.ok === true,
-      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5).map(redactGeneratedPackSchemaError) }
     },
     {
       id: 'PUBLIC_GALLERY_APPROVED_ONLY',

@@ -126,3 +126,4 @@ owner: "Agent Town product"
 | GPACK-112 | Security | Generated-pack validation rejects secret-looking object keys and redacts those key names from content and schema-error paths | `tests/generated_pack_contract.test.js` |
 | GPACK-113 | Security | Generated-pack validation rejects raw-instruction object keys and redacts those key names from content and schema-error paths | `tests/generated_pack_contract.test.js` |
 | GPACK-114 | Generation guard | Candidate-generation run and job-log validators reject secret-looking values and raw-instruction object keys while redacting submitted keys and values from validation reports | `tests/generated_pack_candidate_generation_run.test.js` |
+| GPACK-115 | Release evidence | Candidate-review and release-approval evidence validators redact unsafe submitted keys and values from content and schema-error reports | `tests/generated_pack_candidate_review_manifest.test.js`, `tests/generated_pack_production_release_gate.test.js` |
