@@ -510,6 +510,7 @@ test('GU-19 release evidence bundle binds a ready gate to source evidence hashes
   assert.equal(report.metrics.diversitySourceIncludesGatePack, true);
   assert.equal(report.metrics.diversitySourceMetricsCoherent, true);
   assert.equal(report.metrics.releaseGateHashMatches, true);
+  assert.equal(report.metrics.releaseGateValid, true);
   assert.equal(report.metrics.releaseGatePublicEligible, true);
   assert.equal(report.metrics.sourcePresenceMatchesHashes, true);
   assert.equal(report.metrics.sourceCoverageOk, true);
@@ -864,6 +865,35 @@ test('GPACK-139 release evidence bundle rejects release-gate eligibility metric 
 
   assert.equal(bundle.metrics.releaseGatePublicEligible, true);
   assert.equal(report.metrics.releaseGatePublicEligible, true);
+  assert.equal(report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_HASH_STABLE').passed, true);
+  assert.equal(report.ok, false);
+  assert.equal(
+    report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_METRICS_COHERENT').passed,
+    false
+  );
+}));
+
+test('GPACK-140 release evidence bundle rejects release-gate validity metric tampering', () => withTempGeneratedPackStore(() => {
+  const fixture = readyReleaseGateFixture({
+    ownerAccountId: 'owner_release_evidence_bundle_gate_valid_metric',
+    prompt: 'cobalt harbor archive with careful signal masons',
+    nowMs: 155_020
+  });
+  const bundle = buildReleaseEvidenceBundle({
+    ...fixture,
+    nowMs: fixture.releaseGate.evaluatedAtMs + 50
+  });
+  const tamperedBundle = rehashReleaseEvidenceBundle({
+    ...bundle,
+    metrics: {
+      ...bundle.metrics,
+      releaseGateValid: false
+    }
+  });
+  const report = validateReleaseEvidenceBundle(tamperedBundle, fixture);
+
+  assert.equal(bundle.metrics.releaseGateValid, true);
+  assert.equal(report.metrics.releaseGateValid, true);
   assert.equal(report.checks.find((check) => check.id === 'RELEASE_EVIDENCE_BUNDLE_HASH_STABLE').passed, true);
   assert.equal(report.ok, false);
   assert.equal(
@@ -2466,6 +2496,7 @@ test('GU-18/GU-19 release gate and evidence bundle APIs are generated-pack-gated
       assert.equal(bundleBody.releaseEvidenceBundle.releaseGateMode, 'prototype-gated');
       assert.equal(bundleBody.releaseEvidenceBundle.publicReleaseEligible, false);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.releaseGateValid, true);
+      assert.equal(bundleBody.validationReport.metrics.releaseGateValid, true);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.releaseGatePublicEligible, false);
       assert.equal(bundleBody.validationReport.metrics.releaseGatePublicEligible, false);
       assert.equal(bundleBody.releaseEvidenceBundle.metrics.bundleCreatedAtOrAfterGate, true);
