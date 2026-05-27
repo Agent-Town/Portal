@@ -50,7 +50,8 @@ Player prompt
 - `scripts/generated_pack_candidate_generation_spike.js` is the optional command surface; by default it only reports blocked preflight state and can append candidate-generation evidence to JSONL job logs.
 - `candidate_generation_run.schema.json` and `asset_generation_job_log.schema.json` validate preflight run reports and per-target job records before they can be used as production-readiness evidence.
 - The guard requires product/security approval, documented auth, documented cost, accepted cost estimate, and user/team consent before any adapter can run.
-- No adapter is wired by default. Failed or blocked attempts keep deterministic fallback packs playable, write zero production outputs, preserve canonical gameplay mappings, and reject secret-like fields, raw prompt instructions, unsafe paths, unknown/duplicate prompt-plan targets, fractional counters, unstable run hashes, or production-promotion claims.
+- No adapter is wired by default. Failed or blocked attempts keep deterministic fallback packs playable, write zero production outputs, preserve canonical gameplay mappings, and reject secret-like fields and values, raw prompt instructions, unsafe paths, unknown/duplicate prompt-plan targets, fractional counters, unstable run hashes, or production-promotion claims.
+- Candidate-generation run and job-log validation reports redact submitted secret-looking keys, secret-looking values, raw-instruction keys, and executable instruction values from content and schema-error evidence before callers can inspect the report.
 
 ## GU-6 Post-Processing Contract Slice
 

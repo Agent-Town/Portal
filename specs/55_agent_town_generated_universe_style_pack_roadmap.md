@@ -82,6 +82,7 @@ This is a separate prototype-gated track. It must not change normal gameplay vis
   "secretLikeFieldCount": 0,
   "secretLikeKeyRedacted": true,
   "secretLikeValueRejected": true,
+  "candidateGenerationUnsafeKeyValueRedacted": true,
   "canonicalMappingCoverage": 1.0,
   "arbitraryToolMutationFormulaCount": 0,
   "invalidAssetManifestEntryCount": 0,
@@ -160,7 +161,7 @@ The candidate generation scaffold still does not call image models. Each planned
 
 The real image-generation spike remains blocked until product/security approval, an explicit auth model, an explicit cost model, and explicit user/team consent exist. This slice adds only the optional command and runtime guard for that future work. The guard writes candidate-generation preflight records to the same job logs, never reads provider credentials, never calls an image model by default, never creates approved production assets, and fails back to the deterministic generated pack.
 
-Candidate-generation run reports and asset-generation job logs now have strict schemas. The run report carries a stable hash, bounded integer rate/retry/count policy, redacted consent/cost/auth evidence, canonical mapping fingerprints, prompt-plan target checks, and zero production-promotion claims. Job-log validation enforces safe candidate/approved paths, known canonical prompt-plan targets, candidate-only output status, no raw prompt instructions, no secret-like fields, no production assets, and status/output-count coherence.
+Candidate-generation run reports and asset-generation job logs now have strict schemas. The run report carries a stable hash, bounded integer rate/retry/count policy, redacted consent/cost/auth evidence, canonical mapping fingerprints, prompt-plan target checks, and zero production-promotion claims. Job-log validation enforces safe candidate/approved paths, known canonical prompt-plan targets, candidate-only output status, no raw prompt instructions, no secret-like fields or values, no production assets, and status/output-count coherence. Validation reports must redact submitted secret-looking keys, secret-looking values, raw-instruction keys, and executable instruction values from content and schema-error evidence.
 
 ```json
 {
@@ -182,6 +183,7 @@ Candidate-generation run reports and asset-generation job logs now have strict s
   "approvedAssetsRequireHumanSignoff": true,
   "assetGenerationJobLogSecretLikeCount": 0,
   "assetGenerationJobLogRawInstructionCount": 0,
+  "candidateGenerationUnsafeReportEchoCount": 0,
   "candidateImagesGenerated": false
 }
 ```

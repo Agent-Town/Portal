@@ -29,6 +29,10 @@ const HUMAN_REVIEW_CHECKLIST = [
   'no_account_or_wallet_data',
   'human_signoff_required_before_production'
 ];
+const SECRET_LIKE_KEY_PATTERN = /(api[_-]?key|secret|private[_-]?key|credential|oauth|access[_-]?token|refresh[_-]?token|auth[_-]?token|bearer[_-]?token|id[_-]?token|session[_-]?token|provider[_-]?token|wallet[_-]?secret|seed[_-]?phrase|password|^token$)/i;
+const SECRET_LIKE_VALUE_PATTERN = /\b(?:sk-[a-z0-9_-]{8,}|xox[baprs]-[a-z0-9-]{8,}|ghp_[a-z0-9_]{8,}|github_pat_[a-z0-9_]{8,}|ya29\.[a-z0-9_-]{8,}|bearer\s+[a-z0-9._-]{12,})\b/i;
+const RAW_PROMPT_KEY_PATTERN = /^(rawprompt|normalizedprompt|systemprompt|developerprompt|promptinstructions)$/i;
+const RAW_TEXT_PATTERN = /\bignore\s+(all\s+)?(previous|prior|above)\s+instructions\b|\b(system|developer)\s+(prompt|message|instructions)\b|\b(tool|function)\s+call\b|\bexecute\s+(shell|bash|terminal|command|javascript|python)\b|\b(curl|wget)\s+https?:|<\s*script\b|javascript\s*:|\beval\s*\(|\bFunction\s*\(/i;
 
 function sha256(value) {
   return crypto.createHash('sha256').update(String(value)).digest('hex');
@@ -38,29 +42,57 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function redactedPathSegment(key = '') {
+  const segment = String(key || '');
+  if (SECRET_LIKE_KEY_PATTERN.test(segment) || SECRET_LIKE_VALUE_PATTERN.test(segment)) return '<secret-like-key>';
+  if (RAW_PROMPT_KEY_PATTERN.test(segment) || RAW_TEXT_PATTERN.test(segment)) return '<raw-instruction-key>';
+  return segment;
+}
+
+function childPath(pathLabel = '$', key = '') {
+  return `${pathLabel}.${redactedPathSegment(key)}`;
+}
+
+function redactValidationPath(pathLabel = '$') {
+  return String(pathLabel || '$')
+    .replace(SECRET_LIKE_VALUE_PATTERN, '<secret-like-key>')
+    .split('.')
+    .map((segment, index) => index === 0 ? segment : redactedPathSegment(segment))
+    .join('.');
+}
+
+function redactSchemaError(error = {}) {
+  const redacted = { ...error, path: redactValidationPath(error.path) };
+  if (typeof redacted.actual === 'string' && (SECRET_LIKE_VALUE_PATTERN.test(redacted.actual) || RAW_TEXT_PATTERN.test(redacted.actual))) {
+    redacted.actual = '<redacted-value>';
+  }
+  return redacted;
+}
+
 function findSecretLikePaths(value, pathLabel = '$', matches = []) {
+  if (typeof value === 'string') {
+    if (SECRET_LIKE_VALUE_PATTERN.test(value)) matches.push(pathLabel);
+    return matches;
+  }
   if (!value || typeof value !== 'object') return matches;
-  const secretKey = /(api[_-]?key|secret|private[_-]?key|credential|oauth|access[_-]?token|refresh[_-]?token|wallet[_-]?secret|seed[_-]?phrase|password)/i;
   for (const [key, child] of Object.entries(value)) {
-    const childPath = `${pathLabel}.${key}`;
-    if (secretKey.test(key)) matches.push(childPath);
-    findSecretLikePaths(child, childPath, matches);
+    const nextPath = childPath(pathLabel, key);
+    if (SECRET_LIKE_KEY_PATTERN.test(key) || SECRET_LIKE_VALUE_PATTERN.test(key)) matches.push(nextPath);
+    findSecretLikePaths(child, nextPath, matches);
   }
   return matches;
 }
 
 function findRawPromptInstructionPaths(value, pathLabel = '$', matches = []) {
-  const rawPromptKey = /^(rawprompt|normalizedprompt|systemprompt|developerprompt|promptinstructions)$/i;
-  const rawTextPattern = /\bignore\s+(all\s+)?(previous|prior|above)\s+instructions\b|\b(system|developer)\s+(prompt|message|instructions)\b|\bexecute\s+(shell|bash|terminal|command)\b|<\s*script\b|javascript\s*:|\beval\s*\(/i;
   if (typeof value === 'string') {
-    if (rawTextPattern.test(value)) matches.push(pathLabel);
+    if (RAW_TEXT_PATTERN.test(value)) matches.push(pathLabel);
     return matches;
   }
   if (!value || typeof value !== 'object') return matches;
   for (const [key, child] of Object.entries(value)) {
-    const childPath = `${pathLabel}.${key}`;
-    if (rawPromptKey.test(key)) matches.push(childPath);
-    findRawPromptInstructionPaths(child, childPath, matches);
+    const nextPath = childPath(pathLabel, key);
+    if (RAW_PROMPT_KEY_PATTERN.test(key) || RAW_TEXT_PATTERN.test(key)) matches.push(nextPath);
+    findRawPromptInstructionPaths(child, nextPath, matches);
   }
   return matches;
 }
@@ -302,7 +334,7 @@ function validateAssetGenerationJobLogRecord(record = {}, { assetPromptPlan = nu
     {
       id: 'ASSET_GENERATION_JOB_LOG_SCHEMA_VALID',
       passed: schemaReport.ok === true,
-      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5).map(redactSchemaError) }
     },
     {
       id: 'ASSET_GENERATION_JOB_LOG_CONTENT_SAFE',
@@ -390,7 +422,7 @@ function validateCandidateGenerationRun(run = {}, { pack = {}, assetPromptPlan =
     {
       id: 'CANDIDATE_GENERATION_RUN_SCHEMA_VALID',
       passed: schemaReport.ok === true,
-      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5) }
+      measured: { schemaErrorCount: schemaReport.errors.length, errors: schemaReport.errors.slice(0, 5).map(redactSchemaError) }
     },
     {
       id: 'CANDIDATE_GENERATION_RUN_CONTENT_SAFE',
