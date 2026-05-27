@@ -44,21 +44,21 @@ const V6_PRODUCT_SIGNOFF_TARGETS = [
     key: 'product_owner_approval',
     surface: 'product_release_approval',
     requiredEvidence: 'Product owner must approve the scope, rollout sequence, user-facing copy, support path, and fallback decision before release.',
-    currentEvidence: 'docs/security/V6_AGENT_CIVILIZATION_RELEASE_REVIEW.md',
+    currentEvidence: 'server/world_civilization/release_signoff_packet.js',
     releaseEvidenceRequired: 'product_owner_approval_record'
   },
   {
     key: 'qa_release_evidence',
     surface: 'deterministic_validation_evidence',
     requiredEvidence: 'QA signoff must cite the targeted Node suite, split Playwright smokes, all-features regression, and production override safety evidence.',
-    currentEvidence: 'server/world_civilization/release_review.js',
+    currentEvidence: 'server/world_civilization/release_signoff_packet.js',
     releaseEvidenceRequired: 'qa_release_evidence_packet'
   },
   {
     key: 'security_release_evidence',
     surface: 'security_release_gates',
     requiredEvidence: 'Security signoff must cite threat, abuse, privacy, data-retention, session-auth, mutation-security, rollback, and audit/replay gates.',
-    currentEvidence: 'server/world_civilization/readiness_gate.js',
+    currentEvidence: 'server/world_civilization/release_signoff_packet.js',
     releaseEvidenceRequired: 'security_release_evidence_packet'
   },
   {

@@ -152,6 +152,9 @@ test('V6 readiness gate baseline names every prerequisite domain but remains ope
   assert.ok(releaseReviewGate.requiredArtifacts.includes('server/world_civilization/release_operations.js'));
   assert.ok(releaseReviewGate.requiredArtifacts.includes('tests/world_civilization_release_operations.test.js'));
   assert.ok(releaseReviewGate.requiredChecks.includes('release_operations_gate'));
+  assert.ok(releaseReviewGate.requiredArtifacts.includes('server/world_civilization/release_signoff_packet.js'));
+  assert.ok(releaseReviewGate.requiredArtifacts.includes('tests/world_civilization_release_signoff_packet.test.js'));
+  assert.ok(releaseReviewGate.requiredChecks.includes('release_signoff_packet'));
   assert.ok(releaseReviewGate.requiredArtifacts.includes('server/world_civilization/release_support.js'));
   assert.ok(releaseReviewGate.requiredArtifacts.includes('tests/world_civilization_release_support.test.js'));
   assert.ok(releaseReviewGate.requiredChecks.includes('release_support_runbook'));

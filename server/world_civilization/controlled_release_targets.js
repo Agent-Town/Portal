@@ -7,6 +7,7 @@ const REQUIRED_CONTROLLED_RELEASE_TARGET_KEYS = [
   'rollback_disable_controls',
   'observability',
   'support_runbook',
+  'release_signoff_packet',
   'blocker_clearance',
   'controlled_release_window',
   'canary_exit',
@@ -20,6 +21,7 @@ const REQUIRED_CONTROLLED_RELEASE_TARGET_GAPS = [
   'privacy_safe_observability_owner_required',
   'controlled_release_operations_required',
   'support_oncall_signoff_required',
+  'release_signoff_packet_required',
   'blocker_clearance_required',
   'controlled_release_go_no_go_required'
 ];
@@ -59,6 +61,13 @@ const V6_CONTROLLED_RELEASE_TARGETS = [
     requiredEvidence: 'Support needs known issues, triage path, incident response, user comms, and rollback contact coverage.',
     currentEvidence: 'server/world_civilization/release_support.js',
     releaseEvidenceRequired: 'support_runbook_signoff'
+  },
+  {
+    key: 'release_signoff_packet',
+    surface: 'cross_functional_release_signoff',
+    requiredEvidence: 'Release needs product, QA, security, privacy, support, release manager, engineering, blocker register, release-candidate packet, operations, observability, and support-runbook acceptance.',
+    currentEvidence: 'server/world_civilization/release_signoff_packet.js',
+    releaseEvidenceRequired: 'release_signoff_packet'
   },
   {
     key: 'blocker_clearance',
@@ -176,6 +185,7 @@ function buildV6ControlledReleaseTargetReport({
     rollbackDisableProbeCount: numberValue(observed.rollbackDisableProbeCount),
     observabilityProbeCount: numberValue(observed.observabilityProbeCount),
     supportRunbookProbeCount: numberValue(observed.supportRunbookProbeCount),
+    releaseSignoffPacketProbeCount: numberValue(observed.releaseSignoffPacketProbeCount),
     blockerClearanceProbeCount: numberValue(observed.blockerClearanceProbeCount),
     releaseWindowProbeCount: numberValue(observed.releaseWindowProbeCount),
     canaryExitProbeCount: numberValue(observed.canaryExitProbeCount),
@@ -198,6 +208,7 @@ function buildV6ControlledReleaseTargetReport({
   if (observedEvidence.rollbackDisableProbeCount <= 0) errors.push('V6_CONTROLLED_RELEASE_ROLLBACK_DISABLE_PROBE_REQUIRED');
   if (observedEvidence.observabilityProbeCount <= 0) errors.push('V6_CONTROLLED_RELEASE_OBSERVABILITY_PROBE_REQUIRED');
   if (observedEvidence.supportRunbookProbeCount <= 0) errors.push('V6_CONTROLLED_RELEASE_SUPPORT_RUNBOOK_PROBE_REQUIRED');
+  if (observedEvidence.releaseSignoffPacketProbeCount <= 0) errors.push('V6_CONTROLLED_RELEASE_SIGNOFF_PACKET_PROBE_REQUIRED');
   if (observedEvidence.blockerClearanceProbeCount <= 0) errors.push('V6_CONTROLLED_RELEASE_BLOCKER_CLEARANCE_PROBE_REQUIRED');
   if (observedEvidence.releaseWindowProbeCount <= 0) errors.push('V6_CONTROLLED_RELEASE_WINDOW_PROBE_REQUIRED');
   if (observedEvidence.canaryExitProbeCount <= 0) errors.push('V6_CONTROLLED_RELEASE_CANARY_EXIT_PROBE_REQUIRED');

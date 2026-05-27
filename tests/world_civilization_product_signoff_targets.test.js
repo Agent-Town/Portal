@@ -47,8 +47,20 @@ test('V6 product signoff targets name every release decision surface', () => {
   assert.ok(matrix.targetKeys.includes('player_visible_scope'));
   assert.ok(matrix.targetKeys.includes('normal_gameplay_exposure_denial'));
   assert.ok(matrix.targetKeys.includes('product_owner_approval'));
+  assert.equal(
+    V6_PRODUCT_SIGNOFF_TARGETS.find((target) => target.key === 'product_owner_approval').currentEvidence,
+    'server/world_civilization/release_signoff_packet.js'
+  );
   assert.ok(matrix.targetKeys.includes('qa_release_evidence'));
+  assert.equal(
+    V6_PRODUCT_SIGNOFF_TARGETS.find((target) => target.key === 'qa_release_evidence').currentEvidence,
+    'server/world_civilization/release_signoff_packet.js'
+  );
   assert.ok(matrix.targetKeys.includes('security_release_evidence'));
+  assert.equal(
+    V6_PRODUCT_SIGNOFF_TARGETS.find((target) => target.key === 'security_release_evidence').currentEvidence,
+    'server/world_civilization/release_signoff_packet.js'
+  );
   assert.ok(matrix.targetKeys.includes('rollback_plan'));
   assert.equal(
     V6_PRODUCT_SIGNOFF_TARGETS.find((target) => target.key === 'rollback_plan').currentEvidence,

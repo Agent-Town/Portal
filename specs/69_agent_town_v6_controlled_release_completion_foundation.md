@@ -10,6 +10,7 @@ Runtime contracts:
 - `server/world_civilization/blocker_exception_register.js`
 - `server/world_civilization/release_observability.js`
 - `server/world_civilization/release_operations.js`
+- `server/world_civilization/release_signoff_packet.js`
 - `server/world_civilization/release_support.js`
 - `server/world_civilization/controlled_release.js`
 - `server/world_civilization/controlled_release_targets.js`
@@ -58,6 +59,12 @@ release or enabling production.
   support triage, incident response, approved user comms, rollback contact,
   support on-call, escalation owners, privacy-safe support views, blocker
   register links, and observability links.
+- release signoff packet covering product owner approval, QA/security/privacy
+  owner signoff, support owner signoff, release manager approval, engineering
+  owner approval, blocker register acceptance, release-candidate packet
+  acceptance, operations handoff, observability handoff, and support runbook
+  acceptance while approving no release, opening no canary, publishing no comms,
+  exposing no runtime civic tools, and mutating no world state.
 - Release blocker clearance through the blocker/exception register, including
   P0/P1 clearance, no expired exceptions, owner/expiry/mitigation records,
   security dependency review, QA signoff, product signoff, and private-data

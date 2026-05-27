@@ -95,14 +95,14 @@ const V6_RELEASE_CANDIDATE_TARGETS = [
     key: 'qa_owner_signoff',
     owner: 'qa_owner',
     requiredEvidence: 'QA owner must sign the release-candidate packet with unresolved blocker disposition and explicit acceptance or rejection.',
-    currentEvidence: 'server/world_civilization/product_signoff_targets.js',
+    currentEvidence: 'server/world_civilization/release_signoff_packet.js',
     releaseEvidenceRequired: 'qa_owner_release_candidate_signoff'
   },
   {
     key: 'security_product_signoff_packet',
     owner: 'security_product',
     requiredEvidence: 'Security and product signoff must reference the release-candidate packet, privacy review, abuse-case review, threat model, rollback plan, and support readiness.',
-    currentEvidence: 'docs/security/V6_AGENT_CIVILIZATION_RELEASE_REVIEW.md',
+    currentEvidence: 'server/world_civilization/release_signoff_packet.js',
     releaseEvidenceRequired: 'security_product_release_candidate_signoff'
   },
   {

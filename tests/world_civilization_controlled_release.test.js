@@ -21,6 +21,8 @@ const {
   RELEASE_OBSERVABILITY_TEST,
   RELEASE_OPERATIONS_ARTIFACT,
   RELEASE_OPERATIONS_TEST,
+  RELEASE_SIGNOFF_PACKET_ARTIFACT,
+  RELEASE_SIGNOFF_PACKET_TEST,
   RELEASE_SUPPORT_ARTIFACT,
   RELEASE_SUPPORT_TEST,
   PRIOR_MILESTONE_KEYS,
@@ -147,6 +149,8 @@ test('V6 controlled release requires target gate evidence for launch controls', 
   assert.ok(targetGate.requiredArtifacts.includes(RELEASE_OBSERVABILITY_TEST));
   assert.ok(targetGate.requiredArtifacts.includes(RELEASE_OPERATIONS_ARTIFACT));
   assert.ok(targetGate.requiredArtifacts.includes(RELEASE_OPERATIONS_TEST));
+  assert.ok(targetGate.requiredArtifacts.includes(RELEASE_SIGNOFF_PACKET_ARTIFACT));
+  assert.ok(targetGate.requiredArtifacts.includes(RELEASE_SIGNOFF_PACKET_TEST));
   assert.ok(targetGate.requiredArtifacts.includes(RELEASE_SUPPORT_ARTIFACT));
   assert.ok(targetGate.requiredArtifacts.includes(RELEASE_SUPPORT_TEST));
   assert.ok(targetGate.requiredArtifacts.includes(CONTROLLED_RELEASE_TARGET_ARTIFACT));
@@ -156,6 +160,7 @@ test('V6 controlled release requires target gate evidence for launch controls', 
   assert.ok(targetGate.requiredChecks.includes('rollback_disable_target'));
   assert.ok(targetGate.requiredChecks.includes('observability_target'));
   assert.ok(targetGate.requiredChecks.includes('release_operations_target'));
+  assert.ok(targetGate.requiredChecks.includes('release_signoff_packet_target'));
   assert.ok(targetGate.requiredChecks.includes('support_runbook_target'));
   assert.ok(targetGate.requiredChecks.includes('blocker_clearance_target'));
   assert.ok(targetGate.requiredChecks.includes('controlled_release_window_target'));
@@ -198,6 +203,23 @@ test('V6 controlled release requires target gate evidence for launch controls', 
   assert.ok(supportGate.requiredChecks.includes('privacy_safe_support_view'));
   assert.ok(supportGate.requiredChecks.includes('blocker_register_link'));
   assert.ok(supportGate.requiredChecks.includes('observability_link'));
+
+  const signoffGate = REQUIRED_CONTROLLED_RELEASE_GATES.find((gate) => gate.key === 'release_signoff_packet');
+  assert.ok(signoffGate.requiredArtifacts.includes(RELEASE_SIGNOFF_PACKET_ARTIFACT));
+  assert.ok(signoffGate.requiredArtifacts.includes(RELEASE_SIGNOFF_PACKET_TEST));
+  assert.ok(signoffGate.requiredChecks.includes('release_signoff_packet'));
+  assert.ok(signoffGate.requiredChecks.includes('product_owner_approval'));
+  assert.ok(signoffGate.requiredChecks.includes('qa_owner_signoff'));
+  assert.ok(signoffGate.requiredChecks.includes('security_owner_signoff'));
+  assert.ok(signoffGate.requiredChecks.includes('privacy_owner_signoff'));
+  assert.ok(signoffGate.requiredChecks.includes('support_owner_signoff'));
+  assert.ok(signoffGate.requiredChecks.includes('release_manager_approval'));
+  assert.ok(signoffGate.requiredChecks.includes('engineering_owner_approval'));
+  assert.ok(signoffGate.requiredChecks.includes('blocker_register_acceptance'));
+  assert.ok(signoffGate.requiredChecks.includes('release_candidate_packet_acceptance'));
+  assert.ok(signoffGate.requiredChecks.includes('operations_handoff_acceptance'));
+  assert.ok(signoffGate.requiredChecks.includes('observability_handoff_acceptance'));
+  assert.ok(signoffGate.requiredChecks.includes('support_runbook_acceptance'));
 
   const operationsGate = REQUIRED_CONTROLLED_RELEASE_GATES.find((gate) => gate.key === 'release_operations');
   assert.ok(operationsGate.requiredArtifacts.includes(RELEASE_OPERATIONS_ARTIFACT));

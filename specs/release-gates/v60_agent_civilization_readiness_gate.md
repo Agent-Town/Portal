@@ -199,6 +199,7 @@ persistence resilience, and security/product release review.
   blocker/exception register evidence,
   release observability handoff,
   release operations gate,
+  release signoff packet,
   release support runbook,
   audit coverage, CI validation matrix target gate evidence,
   release-candidate target gate evidence, validation target gate evidence,
@@ -214,6 +215,9 @@ persistence resilience, and security/product release review.
   rollback/disable controls, release operations gate,
   observability, release observability handoff,
   support runbooks, release support runbook,
+  release signoff packet with product, QA, security, privacy, support,
+  release manager, engineering, blocker register, release-candidate packet,
+  operations, observability, and support-runbook acceptance,
   blocker/exception register clearance with no open P0/P1 blockers or expired
   exceptions, blocker clearance, and a controlled release window have approved
   evidence.

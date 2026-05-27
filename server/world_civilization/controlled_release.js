@@ -13,6 +13,8 @@ const RELEASE_SUPPORT_ARTIFACT = 'server/world_civilization/release_support.js';
 const RELEASE_SUPPORT_TEST = 'tests/world_civilization_release_support.test.js';
 const RELEASE_OPERATIONS_ARTIFACT = 'server/world_civilization/release_operations.js';
 const RELEASE_OPERATIONS_TEST = 'tests/world_civilization_release_operations.test.js';
+const RELEASE_SIGNOFF_PACKET_ARTIFACT = 'server/world_civilization/release_signoff_packet.js';
+const RELEASE_SIGNOFF_PACKET_TEST = 'tests/world_civilization_release_signoff_packet.test.js';
 const CONTROLLED_RELEASE_TARGET_ARTIFACT = 'server/world_civilization/controlled_release_targets.js';
 const CONTROLLED_RELEASE_TARGET_TEST = 'tests/world_civilization_controlled_release_targets.test.js';
 
@@ -51,6 +53,8 @@ const REQUIRED_CONTROLLED_RELEASE_GATES = [
       RELEASE_SUPPORT_TEST,
       RELEASE_OPERATIONS_ARTIFACT,
       RELEASE_OPERATIONS_TEST,
+      RELEASE_SIGNOFF_PACKET_ARTIFACT,
+      RELEASE_SIGNOFF_PACKET_TEST,
       CONTROLLED_RELEASE_TARGET_ARTIFACT,
       CONTROLLED_RELEASE_TARGET_TEST
     ],
@@ -60,6 +64,7 @@ const REQUIRED_CONTROLLED_RELEASE_GATES = [
       'rollback_disable_target',
       'observability_target',
       'release_operations_target',
+      'release_signoff_packet_target',
       'support_runbook_target',
       'blocker_clearance_target',
       'controlled_release_window_target',
@@ -124,6 +129,30 @@ const REQUIRED_CONTROLLED_RELEASE_GATES = [
       'privacy_safe_support_view',
       'blocker_register_link',
       'observability_link'
+    ]
+  },
+  {
+    key: 'release_signoff_packet',
+    label: 'Release signoff packet',
+    requiredArtifacts: [
+      CONTROLLED_RELEASE_RUNBOOK,
+      RELEASE_SIGNOFF_PACKET_ARTIFACT,
+      RELEASE_SIGNOFF_PACKET_TEST
+    ],
+    requiredChecks: [
+      'release_signoff_packet',
+      'product_owner_approval',
+      'qa_owner_signoff',
+      'security_owner_signoff',
+      'privacy_owner_signoff',
+      'support_owner_signoff',
+      'release_manager_approval',
+      'engineering_owner_approval',
+      'blocker_register_acceptance',
+      'release_candidate_packet_acceptance',
+      'operations_handoff_acceptance',
+      'observability_handoff_acceptance',
+      'support_runbook_acceptance'
     ]
   },
   {
@@ -396,6 +425,8 @@ module.exports = {
   RELEASE_SUPPORT_TEST,
   RELEASE_OPERATIONS_ARTIFACT,
   RELEASE_OPERATIONS_TEST,
+  RELEASE_SIGNOFF_PACKET_ARTIFACT,
+  RELEASE_SIGNOFF_PACKET_TEST,
   CONTROLLED_RELEASE_TARGET_ARTIFACT,
   CONTROLLED_RELEASE_TARGET_TEST,
   CONTROLLED_RELEASE_RUNBOOK,
