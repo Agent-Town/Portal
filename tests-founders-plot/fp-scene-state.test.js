@@ -54,6 +54,13 @@ test('FP-SCENE-001 projects server visualActors into visual-only scene inhabitan
   assert.equal(builder.actionAnimation.mode, 'work_swing');
   assert.equal(builder.actionAnimation.hasWalkOffset, true);
   assert.equal(builder.actionAnimation.stepStyle, 'shuffle');
+  assert.equal(builder.assetSrc, '/experiences/founders-plot/assets/characters/inhabitants/builder/builder-sprite-sheet-gpt2-v1.png');
+  assert.equal(builder.assetSprite.id, 'builder-sprite-sheet-gpt2-v1');
+  assert.equal(builder.assetSprite.action, 'work');
+  assert.equal(builder.assetSprite.columns, 4);
+  assert.equal(builder.assetSprite.rows, 4);
+  assert.equal(builder.assetSprite.row, 2);
+  assert.deepEqual(builder.assetSprite.frames, [0, 1, 2, 3]);
   assert.match(builder.actionAnimation.phaseSeed, /builder/);
   assert.match(builder.sourceObjectId, /^job_/);
   assert.match(builder.selectionKey, /^building:/);

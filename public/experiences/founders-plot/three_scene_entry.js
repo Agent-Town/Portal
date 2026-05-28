@@ -501,7 +501,7 @@ function makeProgressTexture(role = 'worker', progress = 0) {
   return texture;
 }
 
-function loadTexture(src, onLoad) {
+function loadTexture(src, onLoad, onError) {
   const key = String(src || '').trim();
   if (!key) return null;
   if (textureCache.has(key)) return textureCache.get(key);
@@ -510,10 +510,56 @@ function loadTexture(src, onLoad) {
     texture.minFilter = THREE.LinearMipmapLinearFilter;
     texture.magFilter = THREE.LinearFilter;
     if (typeof onLoad === 'function') onLoad();
+  }, undefined, () => {
+    textureCache.delete(key);
+    if (typeof onError === 'function') onError();
   });
   texture.colorSpace = THREE.SRGBColorSpace;
   textureCache.set(key, texture);
   return texture;
+}
+
+function spriteSheetConfig(assetSprite = null) {
+  if (!assetSprite || typeof assetSprite !== 'object') return null;
+  const columns = clamp(Math.round(number(assetSprite.columns, 1)), 1, 32);
+  const rows = clamp(Math.round(number(assetSprite.rows, 1)), 1, 32);
+  const row = clamp(Math.round(number(assetSprite.row, 0)), 0, rows - 1);
+  const rawFrames = Array.isArray(assetSprite.frames) ? assetSprite.frames : [0];
+  const frames = rawFrames
+    .map((frame) => clamp(Math.round(number(frame, 0)), 0, columns - 1))
+    .filter((frame, index, list) => list.indexOf(frame) === index);
+  return {
+    id: String(assetSprite.id || ''),
+    metadataSrc: String(assetSprite.metadataSrc || ''),
+    action: String(assetSprite.action || ''),
+    columns,
+    rows,
+    row,
+    frames: frames.length > 0 ? frames : [0],
+    fps: clamp(number(assetSprite.fps, 4), 1, 12),
+    frameWidth: number(assetSprite.frameWidth, 1),
+    frameHeight: number(assetSprite.frameHeight, 1)
+  };
+}
+
+function setSpriteSheetFrame(texture, sheet, frame) {
+  if (!texture || !sheet) return;
+  const column = clamp(Math.round(number(frame, 0)), 0, sheet.columns - 1);
+  texture.repeat.set(1 / sheet.columns, 1 / sheet.rows);
+  texture.offset.set(column / sheet.columns, 1 - ((sheet.row + 1) / sheet.rows));
+  texture.needsUpdate = true;
+}
+
+function spriteTextureForObject(object = {}, texture) {
+  const sheet = spriteSheetConfig(object.assetSprite);
+  if (!sheet || !texture) return { texture, sheet: null };
+  const spriteTexture = texture.clone();
+  spriteTexture.colorSpace = THREE.SRGBColorSpace;
+  spriteTexture.minFilter = THREE.LinearMipmapLinearFilter;
+  spriteTexture.magFilter = THREE.LinearFilter;
+  spriteTexture.userData = { spriteSheetClone: true };
+  setSpriteSheetFrame(spriteTexture, sheet, sheet.frames[0]);
+  return { texture: spriteTexture, sheet };
 }
 
 function spriteHeight(object = {}) {
@@ -524,15 +570,19 @@ function spriteHeight(object = {}) {
 }
 
 function makeSprite(object = {}, texture, extraDepth = 0) {
+  const spriteTexture = spriteTextureForObject(object, texture);
+  const sheet = spriteTexture.sheet;
   const material = new THREE.SpriteMaterial({
-    map: texture,
+    map: spriteTexture.texture,
     transparent: true,
     depthTest: true,
     depthWrite: false,
     alphaTest: 0.04
   });
   const sprite = new THREE.Sprite(material);
-  const image = texture?.image || null;
+  const image = sheet?.frameWidth && sheet?.frameHeight
+    ? { width: sheet.frameWidth, height: sheet.frameHeight }
+    : spriteTexture.texture?.image || null;
   const aspect = image && image.width && image.height ? image.width / image.height : 1;
   const height = spriteHeight(object);
   sprite.position.set(worldX(object.x), worldY(object.y), depthFor(object, extraDepth));
@@ -544,7 +594,16 @@ function makeSprite(object = {}, texture, extraDepth = 0) {
     baseScaleX: sprite.scale.x,
     baseScaleY: sprite.scale.y,
     baseRotation: sprite.material.rotation || 0,
-    phase: stablePhase(object.actionAnimation?.phaseSeed || object.actorId || object.id)
+    phase: stablePhase(object.actionAnimation?.phaseSeed || object.actorId || object.id),
+    spriteSheet: !!sheet,
+    spriteSheetId: sheet?.id || '',
+    spriteSheetAction: sheet?.action || '',
+    spriteSheetMetadataSrc: sheet?.metadataSrc || '',
+    spriteSheetColumns: sheet?.columns || 0,
+    spriteSheetRows: sheet?.rows || 0,
+    spriteSheetRow: sheet?.row ?? -1,
+    spriteSheetFrames: sheet?.frames || [],
+    spriteSheetFps: sheet?.fps || 0
   });
   return sprite;
 }
@@ -566,6 +625,8 @@ function userDataForObject(object = {}, extra = {}) {
     sourceObjectId: String(object.sourceObjectId || ''),
     sourceStateHash: String(object.sourceStateHash || ''),
     visualState: String(object.visualState || ''),
+    assetSrc: String(object.assetSrc || ''),
+    assetSprite: object.assetSprite || null,
     actionKind: String(object.actionKind || ''),
     actionCueType: String(object.actionCue?.cueType || ''),
     actionCueAccessory: String(object.actionCue?.accessory || ''),
@@ -792,7 +853,13 @@ class FoundersPlotThreeStage {
       this.scene.remove(child);
       child.traverse((node) => {
         if (node.geometry) node.geometry.dispose();
-        if (node.material) node.material.dispose();
+        if (node.material) {
+          const materials = Array.isArray(node.material) ? node.material : [node.material];
+          for (const material of materials) {
+            if (material.map?.userData?.spriteSheetClone) material.map.dispose();
+            material.dispose();
+          }
+        }
       });
     });
     this.pickables = [];
@@ -848,8 +915,21 @@ class FoundersPlotThreeStage {
     }
 
     for (const object of payload.objects || []) {
-      const texture = object.assetSrc ? loadTexture(object.assetSrc, () => this.render()) : makeRoleTexture(object.canonicalRoleId || object.kind);
-      const sprite = makeSprite(object, texture || makeRoleTexture(object.canonicalRoleId || 'worker'), object.kind === 'actor' ? 0.8 : 0);
+      const role = object.canonicalRoleId || object.kind;
+      const fallbackTexture = makeRoleTexture(role || 'worker');
+      let sprite = null;
+      const texture = object.assetSrc
+        ? loadTexture(object.assetSrc, () => this.render(), () => {
+          if (!sprite?.material) return;
+          if (sprite.material.map?.userData?.spriteSheetClone) sprite.material.map.dispose();
+          sprite.material.map = fallbackTexture;
+          sprite.material.needsUpdate = true;
+          sprite.userData.assetFallback = true;
+          sprite.userData.spriteSheet = false;
+          this.render();
+        })
+        : fallbackTexture;
+      sprite = makeSprite(object, texture || fallbackTexture, object.kind === 'actor' ? 0.8 : 0);
       this.scene.add(sprite);
       this.objectMeshes.push(sprite);
       const hit = makeHitTarget(object, sprite);
@@ -922,6 +1002,17 @@ class FoundersPlotThreeStage {
         progress: number(actor.actionCue?.progress, actor.progress || 0)
       })),
       roles: (payload.actors || []).map((actor) => actor.canonicalRoleId),
+      renderedActors: this.objectMeshes
+        .filter((mesh) => mesh.userData?.kind === 'actor' && mesh.userData?.sprite === true)
+        .map((mesh) => ({
+          actorId: mesh.userData.actorId || '',
+          canonicalRoleId: mesh.userData.canonicalRoleId || '',
+          assetSrc: mesh.userData.assetSrc || '',
+          spriteSheet: mesh.userData.spriteSheet === true,
+          spriteSheetId: mesh.userData.spriteSheetId || '',
+          spriteSheetAction: mesh.userData.spriteSheetAction || '',
+          assetFallback: mesh.userData.assetFallback === true
+        })),
       pickTargets: objects.map((object) => ({
         objectId: object.id,
         kind: object.kind,
@@ -936,6 +1027,8 @@ class FoundersPlotThreeStage {
         sourceObjectId: object.sourceObjectId || '',
         sourceStateHash: object.sourceStateHash || '',
         visualState: object.visualState || '',
+        assetSrc: object.assetSrc || '',
+        assetSprite: object.assetSprite || null,
         actionKind: object.actionKind || '',
         actionCue: object.actionCue || null,
         actionAnimation: object.actionAnimation || null,
@@ -955,6 +1048,18 @@ class FoundersPlotThreeStage {
       const baseScaleY = number(data.baseScaleY, mesh.scale.y);
       const baseRotation = number(data.baseRotation, 0);
       if (data.kind === 'actor') {
+        if (data.spriteSheet && mesh.material?.map) {
+          const frames = Array.isArray(data.spriteSheetFrames) && data.spriteSheetFrames.length > 0
+            ? data.spriteSheetFrames
+            : [0];
+          const fps = number(data.spriteSheetFps, 4);
+          const frame = frames[Math.floor((time / 1000) * fps + number(data.phase, 0)) % frames.length];
+          setSpriteSheetFrame(mesh.material.map, {
+            columns: number(data.spriteSheetColumns, 1),
+            rows: number(data.spriteSheetRows, 1),
+            row: number(data.spriteSheetRow, 0)
+          }, frame);
+        }
         if (this.reducedMotion) {
           mesh.position.x = baseX;
           mesh.position.y = baseY;

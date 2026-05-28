@@ -71,6 +71,21 @@
     messenger: { mode: 'attention_wave', tempo: 1.35 }
   };
 
+  const BUILDER_SPRITE_SHEET = {
+    src: '/experiences/founders-plot/assets/characters/inhabitants/builder/builder-sprite-sheet-gpt2-v1.png',
+    metadataSrc: '/experiences/founders-plot/assets/characters/inhabitants/builder/builder-sprite-sheet-gpt2-v1.json',
+    columns: 4,
+    rows: 4,
+    frameWidth: 512,
+    frameHeight: 512,
+    actions: {
+      idle: { row: 0, frames: [0, 1, 2, 3], fps: 3 },
+      walk: { row: 1, frames: [0, 1, 2, 3], fps: 6 },
+      work: { row: 2, frames: [0, 1, 2, 3], fps: 6 },
+      ready: { row: 3, frames: [0, 1, 2, 3], fps: 4 }
+    }
+  };
+
   function num(value, fallback = 0) {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
@@ -120,11 +135,33 @@
 
   function actorAsset(actor = {}) {
     const role = String(actor.canonicalRoleId || '').trim();
+    if (role === 'builder') return BUILDER_SPRITE_SHEET.src;
     if (role !== 'clover') return '';
     const state = String(actor.visualState || '').trim().replace(/_/g, '-');
     const allowed = ['acting', 'blocked', 'celebrating', 'idle', 'observing', 'paused', 'thinking', 'waiting-approval'];
     const fileState = allowed.includes(state) ? state : 'observing';
     return `/experiences/founders-plot/assets/characters/clover-${fileState}.webp`;
+  }
+
+  function actorSpriteSheet(actor = {}) {
+    const role = String(actor.canonicalRoleId || '').trim();
+    if (role !== 'builder') return null;
+    const actionKind = upper(actor.actionKind || actor.visualState || '');
+    const action = actionKind === 'CONSTRUCT' || actionKind === 'UPGRADE'
+      ? 'work'
+      : actionKind === 'OUTPUT_READY'
+        ? 'ready'
+        : 'idle';
+    return {
+      id: 'builder-sprite-sheet-gpt2-v1',
+      metadataSrc: BUILDER_SPRITE_SHEET.metadataSrc,
+      columns: BUILDER_SPRITE_SHEET.columns,
+      rows: BUILDER_SPRITE_SHEET.rows,
+      frameWidth: BUILDER_SPRITE_SHEET.frameWidth,
+      frameHeight: BUILDER_SPRITE_SHEET.frameHeight,
+      action,
+      ...BUILDER_SPRITE_SHEET.actions[action]
+    };
   }
 
   function objectIdForBuilding(building = {}) {
@@ -307,6 +344,7 @@
       z: base.z + 10 + index,
       scale: role === 'clover' ? 0.85 : 0.64,
       assetSrc: actorAsset(actor),
+      assetSprite: actorSpriteSheet(actor),
       selectionKey: selectionKeyForActor(actor),
       drawerKey: drawerKeyForActor(actor),
       testId: `fp-visual-actor-${role}`,
@@ -360,6 +398,8 @@
         target: object.target,
         actionCue: object.actionCue,
         actionAnimation: object.actionAnimation,
+        assetSrc: object.assetSrc,
+        assetSprite: object.assetSprite,
         visualOnly: true
       }));
     return {

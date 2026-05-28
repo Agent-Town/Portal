@@ -106,7 +106,24 @@ test('Three.js Founders Plot renders Clover plus builder, worker, and hauler fro
   expect(builderInfo.actors).toEqual(expect.arrayContaining([
     expect.objectContaining({
       canonicalRoleId: 'builder',
+      assetSrc: '/experiences/founders-plot/assets/characters/inhabitants/builder/builder-sprite-sheet-gpt2-v1.png',
+      assetSprite: expect.objectContaining({
+        id: 'builder-sprite-sheet-gpt2-v1',
+        action: 'work',
+        row: 2,
+        columns: 4,
+        rows: 4
+      }),
       actionAnimation: expect.objectContaining({ mode: 'work_swing', hasWalkOffset: true })
+    })
+  ]));
+  expect(builderInfo.renderedActors).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      canonicalRoleId: 'builder',
+      spriteSheet: true,
+      spriteSheetId: 'builder-sprite-sheet-gpt2-v1',
+      spriteSheetAction: 'work',
+      assetFallback: false
     })
   ]));
   expect(builderInfo.actionCues).toEqual(expect.arrayContaining([

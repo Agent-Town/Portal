@@ -1,0 +1,54 @@
+{
+  "id": "builder-sprite-sheet-gpt2-v1",
+  "role": "builder",
+  "model": "openai/gpt-image-2",
+  "sourceImage": "builder-sprite-sheet-gpt2-v1.source.png",
+  "image": "builder-sprite-sheet-gpt2-v1.png",
+  "sourceSize": {
+    "width": 2048,
+    "height": 2048
+  },
+  "frame": {
+    "width": 512,
+    "height": 512
+  },
+  "layout": {
+    "columns": 4,
+    "rows": 4,
+    "frameCount": 16
+  },
+  "actions": {
+    "idle": {
+      "row": 0,
+      "frames": [0, 1, 2, 3],
+      "fps": 3
+    },
+    "walk": {
+      "row": 1,
+      "frames": [0, 1, 2, 3],
+      "fps": 6
+    },
+    "work": {
+      "row": 2,
+      "frames": [0, 1, 2, 3],
+      "fps": 6
+    },
+    "ready": {
+      "row": 3,
+      "frames": [0, 1, 2, 3],
+      "fps": 4
+    }
+  },
+  "actionMapping": {
+    "CONSTRUCT": "work",
+    "UPGRADE": "work",
+    "OUTPUT_READY": "ready"
+  },
+  "promptSummary": "Cute warm frontier storybook builder inhabitant sprite sheet, 4 columns by 4 rows, idle/walk/hammer-work/carry-ready rows, hardhat or frontier cap, tool belt, hammer and rolled plans, no text or logos, generated on a flat magenta chroma-key background.",
+  "transparency": {
+    "method": "ImageMagick chroma key after GPT Image 2 source generation",
+    "sourceKeyRequested": "#ff00ff",
+    "sampledKey": "#f207f4",
+    "fuzz": "22%"
+  }
+}
