@@ -380,6 +380,10 @@
       button.dataset.sourceObjectId = actor.sourceObjectId;
       button.dataset.selectionKey = actor.selectionKey;
       button.dataset.drawerKey = actor.drawerKey;
+      button.dataset.actionKind = actor.actionKind || '';
+      button.dataset.actionCue = actor.actionCue?.cueType || '';
+      button.dataset.accessory = actor.actionCue?.accessory || '';
+      button.dataset.progress = String(actor.progress ?? 0);
       button.dataset.visualOnly = 'true';
       button.textContent = `${actor.canonicalRoleId} ${actor.sourceObjectId}`;
       button.addEventListener('click', () => handleScenePick({ detail: actor }));

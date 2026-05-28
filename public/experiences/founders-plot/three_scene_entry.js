@@ -29,16 +29,25 @@ function depthFor(object = {}, extra = 0) {
 function roleStyle(role = '') {
   switch (String(role)) {
     case 'builder':
-      return { fill: '#c97a3d', stroke: '#5a2f16', mark: 'B' };
+      return { fill: '#c97a3d', stroke: '#5a2f16', cue: '#ffe4a0', mark: 'B' };
     case 'worker':
-      return { fill: '#5f8d8e', stroke: '#173f41', mark: 'W' };
+      return { fill: '#5f8d8e', stroke: '#173f41', cue: '#d6f1ef', mark: 'W' };
     case 'hauler':
-      return { fill: '#d7ae50', stroke: '#654716', mark: 'H' };
+      return { fill: '#d7ae50', stroke: '#654716', cue: '#fff0bd', mark: 'H' };
     case 'messenger':
-      return { fill: '#c85c75', stroke: '#5a1c2b', mark: '!' };
+      return { fill: '#c85c75', stroke: '#5a1c2b', cue: '#ffd5de', mark: '!' };
     default:
-      return { fill: '#7f9b66', stroke: '#254526', mark: 'C' };
+      return { fill: '#7f9b66', stroke: '#254526', cue: '#daf0cf', mark: 'C' };
   }
+}
+
+function stablePhase(value = '') {
+  const text = String(value || '');
+  let hash = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    hash = ((hash << 5) - hash + text.charCodeAt(index)) | 0;
+  }
+  return Math.abs(hash % 628) / 100;
 }
 
 function makeRoleTexture(role = 'worker') {
@@ -104,6 +113,165 @@ function makeTextTexture(text = '', tone = 'neutral') {
   return texture;
 }
 
+function drawStar(ctx, cx, cy, outer, inner) {
+  ctx.beginPath();
+  for (let point = 0; point < 10; point += 1) {
+    const radius = point % 2 === 0 ? outer : inner;
+    const angle = (-Math.PI / 2) + (point * Math.PI / 5);
+    const x = cx + Math.cos(angle) * radius;
+    const y = cy + Math.sin(angle) * radius;
+    if (point === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+}
+
+function makeActionCueTexture(role = 'worker', cue = {}) {
+  const accessory = String(cue.accessory || 'tools');
+  const actionKind = String(cue.actionKind || '');
+  const key = `cue:${role}:${accessory}:${actionKind}`;
+  if (textureCache.has(key)) return textureCache.get(key);
+  const style = roleStyle(role);
+  const canvas = document.createElement('canvas');
+  canvas.width = 160;
+  canvas.height = 160;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = 'rgba(46, 27, 14, 0.24)';
+  ctx.beginPath();
+  ctx.ellipse(84, 126, 46, 14, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = style.cue;
+  ctx.strokeStyle = style.stroke;
+  ctx.lineWidth = 8;
+  ctx.beginPath();
+  ctx.roundRect(31, 20, 98, 98, 28);
+  ctx.fill();
+  ctx.stroke();
+  ctx.strokeStyle = style.stroke;
+  ctx.fillStyle = style.fill;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 10;
+
+  if (accessory === 'hammer') {
+    ctx.beginPath();
+    ctx.moveTo(58, 88);
+    ctx.lineTo(104, 42);
+    ctx.moveTo(85, 37);
+    ctx.lineTo(119, 71);
+    ctx.stroke();
+  } else if (accessory === 'wrench') {
+    ctx.beginPath();
+    ctx.arc(62, 50, 18, 0.2, Math.PI * 1.55);
+    ctx.moveTo(73, 65);
+    ctx.lineTo(108, 100);
+    ctx.stroke();
+  } else if (accessory === 'bundle') {
+    ctx.fillStyle = '#c4883a';
+    ctx.strokeStyle = style.stroke;
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.roundRect(50, 54, 60, 46, 10);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(50, 78);
+    ctx.lineTo(110, 78);
+    ctx.moveTo(80, 54);
+    ctx.lineTo(80, 100);
+    ctx.stroke();
+  } else if (accessory === 'coin') {
+    ctx.fillStyle = '#d7ae50';
+    for (const y of [92, 77, 62]) {
+      ctx.beginPath();
+      ctx.ellipse(80, y, 30, 10, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+  } else if (accessory === 'approval') {
+    ctx.font = '900 46px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('OK', 80, 74);
+  } else if (accessory === 'reward') {
+    ctx.fillStyle = '#d7ae50';
+    drawStar(ctx, 80, 74, 34, 15);
+    ctx.fill();
+    ctx.stroke();
+  } else if (accessory === 'quest') {
+    ctx.beginPath();
+    ctx.moveTo(80, 38);
+    ctx.lineTo(112, 74);
+    ctx.lineTo(80, 110);
+    ctx.lineTo(48, 74);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  } else if (accessory === 'clover') {
+    ctx.font = '900 58px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('C', 80, 76);
+  } else if (accessory === 'notice') {
+    ctx.font = '900 70px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('!', 80, 74);
+  } else {
+    ctx.beginPath();
+    ctx.arc(80, 74, 24, 0, Math.PI * 2);
+    ctx.moveTo(48, 74);
+    ctx.lineTo(112, 74);
+    ctx.moveTo(80, 42);
+    ctx.lineTo(80, 106);
+    ctx.stroke();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  textureCache.set(key, texture);
+  return texture;
+}
+
+function makeProgressTexture(role = 'worker', progress = 0) {
+  const clamped = clamp(number(progress, 0), 0, 1);
+  const bucket = Math.round(clamped * 100);
+  const key = `progress:${role}:${bucket}`;
+  if (textureCache.has(key)) return textureCache.get(key);
+  const style = roleStyle(role);
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = 'rgba(46, 27, 14, 0.40)';
+  ctx.beginPath();
+  ctx.roundRect(18, 18, 220, 28, 14);
+  ctx.fill();
+  ctx.fillStyle = '#fff8e8';
+  ctx.beginPath();
+  ctx.roundRect(24, 23, 208, 18, 9);
+  ctx.fill();
+  ctx.fillStyle = style.fill;
+  ctx.beginPath();
+  ctx.roundRect(24, 23, Math.max(12, 208 * clamped), 18, 9);
+  ctx.fill();
+  ctx.strokeStyle = style.stroke;
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.roundRect(18, 18, 220, 28, 14);
+  ctx.stroke();
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  textureCache.set(key, texture);
+  return texture;
+}
+
 function loadTexture(src, onLoad) {
   const key = String(src || '').trim();
   if (!key) return null;
@@ -140,7 +308,11 @@ function makeSprite(object = {}, texture, extraDepth = 0) {
   const height = spriteHeight(object);
   sprite.position.set(worldX(object.x), worldY(object.y), depthFor(object, extraDepth));
   sprite.scale.set(height * clamp(aspect, 0.62, 1.75), height, 1);
-  sprite.userData = userDataForObject(object, { sprite: true, phase: Math.random() * Math.PI * 2 });
+  sprite.userData = userDataForObject(object, {
+    sprite: true,
+    baseY: sprite.position.y,
+    phase: stablePhase(object.actorId || object.id)
+  });
   return sprite;
 }
 
@@ -161,6 +333,9 @@ function userDataForObject(object = {}, extra = {}) {
     sourceObjectId: String(object.sourceObjectId || ''),
     sourceStateHash: String(object.sourceStateHash || ''),
     visualState: String(object.visualState || ''),
+    actionKind: String(object.actionKind || ''),
+    actionCueType: String(object.actionCue?.cueType || ''),
+    actionCueAccessory: String(object.actionCue?.accessory || ''),
     progress: number(object.progress, 0),
     validPlacement: object.validPlacement === true,
     x: number(object.x, 0.5),
@@ -203,6 +378,55 @@ function makeLabel(object = {}, sprite) {
   label.scale.set(1.55, 0.39, 1);
   label.userData = userDataForObject(object, { labelSprite: true });
   return label;
+}
+
+function makeActionCues(object = {}, sprite) {
+  if (object.kind !== 'actor' || !object.actionCue) return [];
+  const role = String(object.canonicalRoleId || 'worker');
+  const cue = object.actionCue || {};
+  const sprites = [];
+  const badge = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: makeActionCueTexture(role, cue),
+    transparent: true,
+    depthTest: true,
+    depthWrite: false,
+    alphaTest: 0.03
+  }));
+  const xOffset = role === 'hauler' ? 0.52 : role === 'messenger' ? 0.38 : 0.44;
+  const yOffset = role === 'hauler' ? -0.08 : sprite.scale.y * 0.52;
+  badge.position.set(sprite.position.x + xOffset, sprite.position.y + yOffset, sprite.position.z + 0.22);
+  badge.scale.set(role === 'messenger' ? 0.62 : 0.54, role === 'messenger' ? 0.62 : 0.54, 1);
+  badge.userData = userDataForObject(object, {
+    actionCueSprite: true,
+    actionCueType: String(cue.cueType || ''),
+    actionCueAccessory: String(cue.accessory || ''),
+    baseY: badge.position.y,
+    phase: stablePhase(object.actorId || object.id)
+  });
+  sprites.push(badge);
+
+  if (role === 'builder' || role === 'worker') {
+    const progress = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: makeProgressTexture(role, cue.progress),
+      transparent: true,
+      depthTest: true,
+      depthWrite: false,
+      alphaTest: 0.03
+    }));
+    progress.position.set(sprite.position.x, sprite.position.y - (sprite.scale.y * 0.62), sprite.position.z + 0.24);
+    progress.scale.set(1.15, 0.29, 1);
+    progress.userData = userDataForObject(object, {
+      actionCueSprite: true,
+      progressSprite: true,
+      actionCueType: String(cue.cueType || ''),
+      actionCueAccessory: 'progress',
+      baseY: progress.position.y,
+      phase: stablePhase(object.actorId || object.id)
+    });
+    sprites.push(progress);
+  }
+
+  return sprites;
 }
 
 function cellColor(cell = {}) {
@@ -256,6 +480,9 @@ function detailFromObject(object, source = 'three-raycast') {
     sourceObjectId: String(data.sourceObjectId || ''),
     sourceStateHash: String(data.sourceStateHash || ''),
     visualState: String(data.visualState || ''),
+    actionKind: String(data.actionKind || ''),
+    actionCueType: String(data.actionCueType || ''),
+    actionCueAccessory: String(data.actionCueAccessory || ''),
     progress: number(data.progress, 0),
     validPlacement: data.validPlacement === true,
     source,
@@ -287,6 +514,9 @@ class FoundersPlotThreeStage {
     this.onResize = this.onResize.bind(this);
     this.animate = this.animate.bind(this);
     this.running = true;
+    this.reducedMotion = typeof window.matchMedia === 'function'
+      ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      : false;
     this.resizeObserver = new ResizeObserver(this.onResize);
     requestAnimationFrame(this.animate);
   }
@@ -380,6 +610,10 @@ class FoundersPlotThreeStage {
       this.pickables.push(hit);
       const label = makeLabel(object, sprite);
       if (label) this.scene.add(label);
+      for (const cue of makeActionCues(object, sprite)) {
+        this.scene.add(cue);
+        this.objectMeshes.push(cue);
+      }
     }
     this.updateInfo();
   }
@@ -430,6 +664,16 @@ class FoundersPlotThreeStage {
         ...actor,
         canvas: this.canvasPointFor(objects.find((object) => object.actorId === actor.actorId || object.id === actor.id) || {})
       })),
+      actionCues: (payload.actors || []).map((actor) => ({
+        actorId: actor.actorId,
+        canonicalRoleId: actor.canonicalRoleId,
+        sourceDomain: actor.sourceDomain,
+        sourceObjectId: actor.sourceObjectId,
+        actionKind: actor.actionKind || '',
+        cueType: actor.actionCue?.cueType || '',
+        accessory: actor.actionCue?.accessory || '',
+        progress: number(actor.actionCue?.progress, actor.progress || 0)
+      })),
       roles: (payload.actors || []).map((actor) => actor.canonicalRoleId),
       pickTargets: objects.map((object) => ({
         objectId: object.id,
@@ -444,6 +688,9 @@ class FoundersPlotThreeStage {
         sourceDomain: object.sourceDomain || '',
         sourceObjectId: object.sourceObjectId || '',
         sourceStateHash: object.sourceStateHash || '',
+        visualState: object.visualState || '',
+        actionKind: object.actionKind || '',
+        actionCue: object.actionCue || null,
         canvas: this.canvasPointFor(object)
       }))
     };
@@ -454,8 +701,13 @@ class FoundersPlotThreeStage {
     if (!this.running) return;
     for (const mesh of this.objectMeshes) {
       if (mesh.userData?.kind === 'actor') {
+        const baseY = number(mesh.userData.baseY, mesh.position.y);
+        if (this.reducedMotion) {
+          mesh.position.y = baseY;
+          continue;
+        }
         const phase = number(mesh.userData.phase, 0);
-        mesh.position.y += Math.sin((time / 260) + phase) * 0.0016;
+        mesh.position.y = baseY + (Math.sin((time / 260) + phase) * 0.025);
       }
     }
     this.render();

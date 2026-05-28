@@ -179,6 +179,7 @@ test('FP-UT-009 visual actors are deterministic projections, not simulation acto
   assert.equal(builder.generatedOverlayRoleId, 'inhabitant.worker');
   assert.equal(builder.sourceDomain, 'job');
   assert.equal(builder.sourceStateHash, s1.state.audit.stateHash);
+  assert.equal(builder.actionKind, 'CONSTRUCT');
   assert.equal(builder.visualOnly, true);
   for (const actor of actors) {
     assert.equal('toolName' in actor, false);

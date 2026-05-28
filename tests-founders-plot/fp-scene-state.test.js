@@ -47,6 +47,10 @@ test('FP-SCENE-001 projects server visualActors into visual-only scene inhabitan
   const builder = scene.actors.find((actor) => actor.canonicalRoleId === 'builder');
   assert.equal(builder.visualOnly, true);
   assert.equal(builder.sourceDomain, 'job');
+  assert.equal(builder.actionKind, 'CONSTRUCT');
+  assert.equal(builder.actionCue.cueType, 'construction_progress');
+  assert.equal(builder.actionCue.accessory, 'hammer');
+  assert.equal(builder.actionCue.targetId, builder.target.id);
   assert.match(builder.sourceObjectId, /^job_/);
   assert.match(builder.selectionKey, /^building:/);
   assert.equal(scene.objects.some((object) => object.id === 'CLOVER' && object.visualOnly === true), true);
@@ -86,7 +90,11 @@ test('FP-SCENE-002 represents worker and hauler roles from production and ready 
     ...queued.state,
     stateHash: queued.stateHash
   });
-  assert.ok(producingScene.actors.some((actor) => actor.canonicalRoleId === 'worker' && actor.visualOnly === true));
+  const worker = producingScene.actors.find((actor) => actor.canonicalRoleId === 'worker');
+  assert.ok(worker && worker.visualOnly === true);
+  assert.equal(worker.actionKind, 'PRODUCE');
+  assert.equal(worker.actionCue.cueType, 'production_work');
+  assert.equal(worker.actionCue.accessory, 'tools');
 
   const outputReady = engine.advancePlotTimeForTests({
     pairId: env.state.plot.pairId,
@@ -102,4 +110,24 @@ test('FP-SCENE-002 represents worker and hauler roles from production and ready 
   assert.ok(hauler);
   assert.equal(hauler.sourceDomain, 'building');
   assert.equal(hauler.visualOnly, true);
+  assert.equal(hauler.actionKind, 'OUTPUT_READY');
+  assert.equal(hauler.actionCue.cueType, 'carry_bundle');
+  assert.equal(hauler.actionCue.accessory, 'bundle');
+});
+
+test('FP-SCENE-003 messenger actors project attention cues without mutating targets', () => {
+  const env = fresh();
+  const scene = sceneState.createSceneState({
+    ...env.state,
+    stateHash: env.stateHash
+  });
+  const messenger = scene.actors.find((actor) => actor.canonicalRoleId === 'messenger');
+
+  assert.ok(messenger, 'current quest should project a messenger');
+  assert.equal(messenger.visualOnly, true);
+  assert.equal(messenger.sourceDomain, 'quest');
+  assert.equal(messenger.drawerKey, 'quest');
+  assert.equal(messenger.actionKind, 'QUEST');
+  assert.equal(messenger.actionCue.cueType, 'attention_marker');
+  assert.equal(messenger.actionCue.accessory, 'quest');
 });
