@@ -16,6 +16,14 @@ future.
 Generated universes may later personalize species, clothes, materials,
 buildings, voice, and animation style. The baseline must stay coherent first.
 
+This playbook defines the shared universe. Character-specific generation should
+start from the companion exploration doc:
+
+- `docs/specs/agent-town-frontier-agentfolk-character-exploration.md`
+
+The practical rule is: same universe, different lives. Do not generate four
+uniform variants on one body type.
+
 ## Story Baseline
 
 Agent Town sits on a frontier between two eras:
@@ -41,6 +49,10 @@ They can be:
 - adult human settlers;
 - AI agent settlers with humanoid bodies;
 - human-agent hybrid collaborators;
+- machinefolk;
+- alien settlers;
+- animated paper/light/courier constructs;
+- other original cartoon frontier citizens that fit the role and story;
 - toolsmiths and operators;
 - wagon crew, builders, scouts, haulers, couriers, foremen, and repair hands.
 
@@ -256,9 +268,36 @@ Generated universes must not change:
 
 Every visible inhabitant must still answer: what server fact am I showing?
 
+## Character Exploration Before Generation
+
+Before generating a sprite sheet, write a short character exploration that
+combines:
+
+- the Agent Town universe;
+- the exact server fact the character visualizes;
+- the character's relationship to the rescued-agent / defended-town backstory;
+- a short origin story;
+- a visual contrast brief;
+- the 4x4 animation-row needs.
+
+The prompt should be generated from that exploration. Do not prompt only from
+`builder`, `worker`, `hauler`, or `messenger`, because that produces same-body
+role variants instead of a watchable cast.
+
+See the companion exploration doc for the first proposed cast:
+
+- Mara Boltwick, human bridge carpenter builder;
+- Kettle-37, assay-kettle machinefolk worker;
+- Oona Tallpack, alien freight-runner hauler;
+- Vell Quill, paper-and-light courier messenger.
+
 ## Sprite Prompt Template
 
-Use this for GPT Image generation. Replace `{ROLE}` and `{ROLE_DETAILS}`.
+Use this only for quick baseline drafting. For production character generation,
+prefer the origin-story prompt assembly in
+`agent-town-frontier-agentfolk-character-exploration.md`.
+
+Replace `{ROLE}` and `{ROLE_DETAILS}`.
 
 ```text
 Use case: illustration-story
