@@ -30,6 +30,14 @@
     messenger: { x: 0.13, y: 0.09 }
   };
 
+  const ROLE_ROUTE_LANES = {
+    clover: -0.045,
+    builder: -0.020,
+    worker: 0.020,
+    hauler: 0.050,
+    messenger: -0.060
+  };
+
   const ACTION_CUES = {
     clover: {
       cueType: 'foreman_presence',
@@ -73,19 +81,19 @@
 
   const ACTOR_SPRITE_SHEETS = {
     builder: {
-      id: 'builder-agentfolk-v2',
-      src: '/experiences/founders-plot/assets/characters/inhabitants/builder/builder-agentfolk-v2.png',
-      metadataSrc: '/experiences/founders-plot/assets/characters/inhabitants/builder/builder-agentfolk-v2.json',
+      id: 'rigger-slate-builder-v2',
+      src: '/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.png',
+      metadataSrc: '/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.json',
       actionMapping: {
-        CONSTRUCT: 'work',
-        UPGRADE: 'work',
+        CONSTRUCT: 'build',
+        UPGRADE: 'build',
         OUTPUT_READY: 'ready'
       }
     },
     worker: {
-      id: 'worker-agentfolk-v1',
-      src: '/experiences/founders-plot/assets/characters/inhabitants/worker/worker-agentfolk-v1.png',
-      metadataSrc: '/experiences/founders-plot/assets/characters/inhabitants/worker/worker-agentfolk-v1.json',
+      id: 'kettle-37-worker-v1',
+      src: '/experiences/founders-plot/assets/characters/inhabitants/worker/kettle-37-worker-v1.png',
+      metadataSrc: '/experiences/founders-plot/assets/characters/inhabitants/worker/kettle-37-worker-v1.json',
       actionMapping: {
         PRODUCE: 'work',
         SELL: 'work',
@@ -93,9 +101,9 @@
       }
     },
     hauler: {
-      id: 'hauler-agentfolk-v1',
-      src: '/experiences/founders-plot/assets/characters/inhabitants/hauler/hauler-agentfolk-v1.png',
-      metadataSrc: '/experiences/founders-plot/assets/characters/inhabitants/hauler/hauler-agentfolk-v1.json',
+      id: 'oona-tallpack-hauler-v1',
+      src: '/experiences/founders-plot/assets/characters/inhabitants/hauler/oona-tallpack-hauler-v1.png',
+      metadataSrc: '/experiences/founders-plot/assets/characters/inhabitants/hauler/oona-tallpack-hauler-v1.json',
       actionMapping: {
         OUTPUT_READY: 'ready'
       }
@@ -115,6 +123,7 @@
   const DEFAULT_SPRITE_SHEET_ACTIONS = {
     idle: { row: 0, frames: [0, 1, 2, 3], fps: 3 },
     walk: { row: 1, frames: [0, 1, 2, 3], fps: 6 },
+    build: { row: 1, frames: [0, 1, 2, 3], fps: 6 },
     work: { row: 2, frames: [0, 1, 2, 3], fps: 6 },
     ready: { row: 3, frames: [0, 1, 2, 3], fps: 4 }
   };
@@ -171,9 +180,19 @@
     if (ACTOR_SPRITE_SHEETS[role]) return ACTOR_SPRITE_SHEETS[role].src;
     if (role !== 'clover') return '';
     const state = String(actor.visualState || '').trim().replace(/_/g, '-');
-    const allowed = ['acting', 'blocked', 'celebrating', 'idle', 'observing', 'paused', 'thinking', 'waiting-approval'];
+    const allowed = [
+      'acting',
+      'blocked',
+      'celebrating',
+      'idle',
+      'observing',
+      'paused',
+      'restart-needed',
+      'thinking',
+      'waiting-approval'
+    ];
     const fileState = allowed.includes(state) ? state : 'observing';
-    return `/experiences/founders-plot/assets/characters/clover-${fileState}.webp`;
+    return `/experiences/founders-plot/assets/characters/v1_4_4/clover-${fileState}.webp`;
   }
 
   function actorSpriteSheet(actor = {}) {
@@ -271,6 +290,145 @@
     return { x: 0.50, y: 0.42, z: 28 };
   }
 
+  function hqBuilding(buildings = []) {
+    return buildings.find((building) => upper(building.type) === 'HQ') || buildings[0] || null;
+  }
+
+  function hqAnchor(buildings = []) {
+    const hq = hqBuilding(buildings);
+    if (hq) {
+      const pos = padPosition(hq.x, hq.y);
+      return { id: objectIdForBuilding(hq), x: pos.x, y: clamp(pos.y + 0.10, 0.08, 0.92), z: pos.z };
+    }
+    return { id: 'HQ', x: 0.50, y: 0.34, z: 28 };
+  }
+
+  function buildingAnchor(building = {}) {
+    const pos = padPosition(building.x, building.y);
+    return {
+      id: objectIdForBuilding(building),
+      x: pos.x,
+      y: clamp(pos.y + 0.03, 0.08, 0.92),
+      z: pos.z
+    };
+  }
+
+  function routeMidpoint(from, to, lane = 0) {
+    return {
+      x: clamp((from.x + to.x) / 2 + lane, 0.06, 0.94),
+      y: clamp((from.y + to.y) / 2 + Math.abs(lane) * 0.35, 0.08, 0.92)
+    };
+  }
+
+  function wayForBuilding(building = {}, buildings = []) {
+    if (!building || upper(building.type) === 'HQ') return null;
+    const from = hqAnchor(buildings);
+    const to = buildingAnchor(building);
+    const lane = clamp((num(building.x, 1) - 1) * 0.018, -0.030, 0.030);
+    const points = [
+      { x: from.x, y: from.y },
+      routeMidpoint(from, to, lane),
+      { x: to.x, y: to.y }
+    ];
+    return {
+      wayId: `WAY:HQ:${to.id}`,
+      kind: 'way',
+      label: `HQ path to ${labelForBuilding(building.type)}`,
+      from: { kind: 'building', id: from.id },
+      to: { kind: 'building', id: to.id },
+      points,
+      targetId: to.id,
+      selectionKey: `building:${building.buildingId}`,
+      visualOnly: true
+    };
+  }
+
+  function pointAlong(points = [], progress = 0) {
+    const usable = points
+      .filter((point) => Number.isFinite(num(point.x, NaN)) && Number.isFinite(num(point.y, NaN)))
+      .map((point) => ({ x: num(point.x, 0.5), y: num(point.y, 0.5) }));
+    if (usable.length === 0) return { x: 0.5, y: 0.5 };
+    if (usable.length === 1) return usable[0];
+    const clamped = clamp(num(progress, 0), 0, 1);
+    const scaled = clamped * (usable.length - 1);
+    const index = Math.min(usable.length - 2, Math.floor(scaled));
+    const local = scaled - index;
+    const from = usable[index];
+    const to = usable[index + 1];
+    return {
+      x: from.x + ((to.x - from.x) * local),
+      y: from.y + ((to.y - from.y) * local)
+    };
+  }
+
+  function actorRouteProgress(actor = {}, role = 'worker') {
+    const progress = clamp(num(actor.progress, 0), 0, 1);
+    if (role === 'builder') return clamp(0.18 + (progress * 0.68), 0.18, 0.88);
+    if (role === 'worker') return clamp(0.28 + (progress * 0.50), 0.28, 0.82);
+    if (role === 'hauler') return 0.78;
+    if (role === 'messenger') return 0.38;
+    return 0.24;
+  }
+
+  function actorRoute(actor = {}, role = 'worker', index = 0, buildings = [], waysByTarget = new Map()) {
+    const target = actor.target || {};
+    const building = buildingByIdOrType(buildings, target.id || target.type);
+    const from = hqAnchor(buildings);
+    const lane = ROLE_ROUTE_LANES[role] || 0;
+    const progress = actorRouteProgress(actor, role);
+
+    if (building && upper(building.type) !== 'HQ') {
+      const to = buildingAnchor(building);
+      const way = waysByTarget.get(to.id) || wayForBuilding(building, buildings);
+      const points = (way?.points || [
+        { x: from.x, y: from.y },
+        routeMidpoint(from, to, lane),
+        { x: to.x, y: to.y }
+      ]).map((point) => ({
+        x: clamp(num(point.x, 0.5) + lane, 0.06, 0.94),
+        y: clamp(num(point.y, 0.5) + ((index % 2) * 0.010), 0.08, 0.92)
+      }));
+      const at = pointAlong(points, progress);
+      return {
+        routeId: `ROUTE:${role}:${String(actor.actorId || index)}`,
+        wayId: way?.wayId || `WAY:HQ:${to.id}`,
+        mode: role === 'hauler' ? 'carry' : role === 'messenger' ? 'notify' : 'work',
+        from: { kind: 'building', id: from.id },
+        to: { kind: 'building', id: to.id },
+        targetId: to.id,
+        points,
+        progress,
+        lane,
+        x: at.x,
+        y: at.y,
+        visualOnly: true
+      };
+    }
+
+    const radius = role === 'clover' ? 0.08 : 0.11;
+    const orbitY = role === 'messenger' ? from.y + 0.04 : from.y + 0.015;
+    const points = [
+      { x: clamp(from.x - radius, 0.06, 0.94), y: clamp(orbitY, 0.08, 0.92) },
+      { x: clamp(from.x, 0.06, 0.94), y: clamp(orbitY + Math.abs(lane) * 0.25, 0.08, 0.92) },
+      { x: clamp(from.x + radius, 0.06, 0.94), y: clamp(orbitY, 0.08, 0.92) }
+    ];
+    const at = pointAlong(points, progress);
+    return {
+      routeId: `ROUTE:${role}:${String(actor.actorId || index)}`,
+      wayId: 'WAY:HQ:TOWN_SQUARE',
+      mode: role === 'messenger' ? 'notify' : 'presence',
+      from: { kind: 'building', id: from.id },
+      to: { kind: 'town_square', id: 'HQ_APPROACH' },
+      targetId: from.id,
+      points,
+      progress,
+      lane,
+      x: at.x,
+      y: at.y,
+      visualOnly: true
+    };
+  }
+
   function drawerKeyForActor(actor = {}) {
     const domain = String(actor.sourceDomain || '').trim();
     if (domain === 'approval') return 'approvals';
@@ -348,9 +506,10 @@
     };
   }
 
-  function sceneObjectForActor(actor = {}, index = 0, buildings = []) {
+  function sceneObjectForActor(actor = {}, index = 0, buildings = [], waysByTarget = new Map()) {
     const role = String(actor.canonicalRoleId || 'worker').trim();
     const base = targetPosition(actor, buildings);
+    const route = actorRoute(actor, role, index, buildings, waysByTarget);
     const offset = ACTOR_OFFSETS[role] || { x: 0, y: 0 };
     const id = role === 'clover' ? 'CLOVER' : String(actor.actorId || `actor:${role}:${index}`);
     const label = role === 'clover'
@@ -370,8 +529,8 @@
       progress: clamp(num(actor.progress, 0), 0, 1),
       label,
       state: String(actor.visualState || 'idle').toUpperCase(),
-      x: clamp(base.x + offset.x, 0.06, 0.94),
-      y: clamp(base.y + offset.y + (index % 2) * 0.015, 0.08, 0.92),
+      x: clamp(route.x + (offset.x * 0.42), 0.06, 0.94),
+      y: clamp(route.y + (offset.y * 0.42) + (index % 2) * 0.010, 0.08, 0.92),
       z: base.z + 10 + index,
       scale: role === 'clover' ? 0.85 : 0.64,
       assetSrc: actorAsset(actor),
@@ -380,6 +539,7 @@
       drawerKey: drawerKeyForActor(actor),
       testId: `fp-visual-actor-${role}`,
       target: actor.target || null,
+      route,
       actionCue: actionCueForActor(actor, role),
       actionAnimation: actionAnimationForActor(actor, role, index, offset),
       visualOnly: true
@@ -401,15 +561,89 @@
     });
   }
 
+  function visualWays(buildings = [], actorObjects = []) {
+    const seen = new Set();
+    const ways = [];
+    for (const building of buildings) {
+      const way = wayForBuilding(building, buildings);
+      if (!way || seen.has(way.wayId)) continue;
+      seen.add(way.wayId);
+      ways.push(way);
+    }
+
+    const hasTownSquareRoute = actorObjects.some((actor) => actor.route?.wayId === 'WAY:HQ:TOWN_SQUARE');
+    if (hasTownSquareRoute && !seen.has('WAY:HQ:TOWN_SQUARE')) {
+      const from = hqAnchor(buildings);
+      ways.push({
+        wayId: 'WAY:HQ:TOWN_SQUARE',
+        kind: 'way',
+        label: 'HQ approach',
+        from: { kind: 'building', id: from.id },
+        to: { kind: 'town_square', id: 'HQ_APPROACH' },
+        points: [
+          { x: clamp(from.x - 0.12, 0.06, 0.94), y: clamp(from.y + 0.04, 0.08, 0.92) },
+          { x: from.x, y: clamp(from.y + 0.08, 0.08, 0.92) },
+          { x: clamp(from.x + 0.12, 0.06, 0.94), y: clamp(from.y + 0.04, 0.08, 0.92) }
+        ],
+        targetId: from.id,
+        selectionKey: 'building:HQ',
+        visualOnly: true
+      });
+    }
+
+    return ways;
+  }
+
+  function encounterProjections(actorObjects = []) {
+    const groups = new Map();
+    for (const actor of actorObjects) {
+      const route = actor.route || {};
+      const key = route.targetId || actor.target?.id || actor.selectionKey || '';
+      if (!key) continue;
+      const list = groups.get(key) || [];
+      list.push(actor);
+      groups.set(key, list);
+    }
+    const encounters = [];
+    for (const [targetId, actors] of groups.entries()) {
+      if (actors.length < 2) continue;
+      const roles = actors.map((actor) => actor.canonicalRoleId).filter(Boolean);
+      const sortedRoles = [...roles].sort();
+      const sourceIds = actors.map((actor) => actor.actorId).sort();
+      const x = actors.reduce((sum, actor) => sum + num(actor.x, 0.5), 0) / actors.length;
+      const y = actors.reduce((sum, actor) => sum + num(actor.y, 0.5), 0) / actors.length;
+      encounters.push({
+        encounterId: `ENCOUNTER:${targetId}:${sortedRoles.join('+')}`,
+        kind: 'encounter',
+        targetId,
+        actorIds: sourceIds,
+        roles,
+        cueType: sortedRoles.includes('hauler') ? 'handoff' : 'crossing_greeting',
+        label: sortedRoles.includes('hauler') ? 'Handoff moment' : 'Passing moment',
+        x: clamp(x, 0.06, 0.94),
+        y: clamp(y - 0.03, 0.08, 0.92),
+        visualOnly: true
+      });
+    }
+    return encounters.slice(0, 6);
+  }
+
   function createSceneState(bundle = {}, options = {}) {
     const buildings = Array.isArray(bundle.buildings) ? bundle.buildings : [];
     const pads = Array.isArray(bundle.pads) ? bundle.pads : [];
     const visualActors = Array.isArray(bundle.visualActors) ? bundle.visualActors : [];
     const context = { selectedKey: options.selectedKey || '' };
+    const seedWays = buildings
+      .map((building) => wayForBuilding(building, buildings))
+      .filter(Boolean);
+    const waysByTarget = new Map(seedWays.map((way) => [way.targetId, way]));
+    const actorObjects = visualActors.map((actor, index) => sceneObjectForActor(actor, index, buildings, waysByTarget));
+    const ways = visualWays(buildings, actorObjects);
+    const encounters = encounterProjections(actorObjects);
     const objects = [
       ...pads.map((pad) => sceneObjectForPad(pad, buildings, context)).filter(Boolean),
       ...buildings.map((building) => sceneObjectForBuilding(building, context)),
-      ...visualActors.map((actor, index) => sceneObjectForActor(actor, index, buildings))
+      ...actorObjects
     ];
     const actors = objects
       .filter((object) => object.kind === 'actor')
@@ -427,6 +661,7 @@
         selectionKey: object.selectionKey,
         drawerKey: object.drawerKey,
         target: object.target,
+        route: object.route,
         actionCue: object.actionCue,
         actionAnimation: object.actionAnimation,
         assetSrc: object.assetSrc,
@@ -447,7 +682,9 @@
         cells: gridCells(pads, buildings, context.selectedKey)
       },
       objects,
-      actors
+      actors,
+      ways,
+      encounters
     };
   }
 

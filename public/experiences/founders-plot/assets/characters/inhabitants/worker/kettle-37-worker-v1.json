@@ -1,0 +1,60 @@
+{
+  "id": "kettle-37-worker-v1",
+  "character": "Kettle-37",
+  "role": "worker",
+  "model": "openai/gpt-image-2",
+  "sourceImage": "kettle-37-worker-v1.source.png",
+  "image": "kettle-37-worker-v1.png",
+  "sourceSize": {
+    "width": 2048,
+    "height": 2048
+  },
+  "frame": {
+    "width": 512,
+    "height": 512
+  },
+  "layout": {
+    "columns": 4,
+    "rows": 4,
+    "frameCount": 16
+  },
+  "actions": {
+    "idle": {
+      "row": 0,
+      "frames": [0, 1, 2, 3],
+      "fps": 3
+    },
+    "walk": {
+      "row": 1,
+      "frames": [0, 1, 2, 3],
+      "fps": 6
+    },
+    "work": {
+      "row": 2,
+      "frames": [0, 1, 2, 3],
+      "fps": 6
+    },
+    "ready": {
+      "row": 3,
+      "frames": [0, 1, 2, 3],
+      "fps": 4
+    }
+  },
+  "actionMapping": {
+    "PRODUCE": "work",
+    "SELL": "work",
+    "OUTPUT_READY": "ready"
+  },
+  "origin": "Old assay-office service automaton rewired by the rescued AI agent to learn workshop recipes instead of repeating dead mining instructions.",
+  "promptFile": "kettle-37-worker-v1.prompt.md",
+  "styleReference": {
+    "canonicalCloverSet": "public/experiences/founders-plot/assets/characters/v1_4_4/",
+    "notes": "Character-first generation pass. Kettle-37 is intentionally nonhuman machinefolk, not a same-body role variant."
+  },
+  "transparency": {
+    "method": "ImageMagick chroma key after GPT Image 2 source generation",
+    "sourceKeyRequested": "#ff00ff",
+    "sampledKey": "#e90de9",
+    "fuzz": "24%"
+  }
+}

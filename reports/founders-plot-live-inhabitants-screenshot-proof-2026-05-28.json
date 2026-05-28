@@ -1,0 +1,186 @@
+{
+  "construction": "/Users/robin/Projects/Portal/reports/founders-plot-live-inhabitants-01-builder-constructing.png",
+  "production": "/Users/robin/Projects/Portal/reports/founders-plot-live-inhabitants-02-worker-producing.png",
+  "ready": "/Users/robin/Projects/Portal/reports/founders-plot-live-inhabitants-03-hauler-ready-output.png",
+  "constructionInfo": {
+    "renderer": "three.js",
+    "roles": [
+      "clover",
+      "builder",
+      "messenger"
+    ],
+    "renderedActors": [
+      {
+        "role": "clover",
+        "spriteSheetId": "",
+        "action": "",
+        "fallback": false
+      },
+      {
+        "role": "builder",
+        "spriteSheetId": "rigger-slate-builder-v2",
+        "action": "build",
+        "fallback": false
+      },
+      {
+        "role": "messenger",
+        "spriteSheetId": "messenger-agentfolk-v1",
+        "action": "ready",
+        "fallback": false
+      }
+    ],
+    "actors": [
+      {
+        "role": "clover",
+        "actionKind": "OBSERVE",
+        "cue": "foreman_presence",
+        "animation": "clover_watch",
+        "asset": ""
+      },
+      {
+        "role": "builder",
+        "actionKind": "CONSTRUCT",
+        "cue": "construction_progress",
+        "animation": "work_swing",
+        "asset": "rigger-slate-builder-v2"
+      },
+      {
+        "role": "messenger",
+        "actionKind": "QUEST",
+        "cue": "attention_marker",
+        "animation": "attention_wave",
+        "asset": "messenger-agentfolk-v1"
+      }
+    ]
+  },
+  "productionInfo": {
+    "renderer": "three.js",
+    "roles": [
+      "clover",
+      "worker",
+      "hauler",
+      "messenger"
+    ],
+    "renderedActors": [
+      {
+        "role": "clover",
+        "spriteSheetId": "",
+        "action": "",
+        "fallback": false
+      },
+      {
+        "role": "worker",
+        "spriteSheetId": "kettle-37-worker-v1",
+        "action": "work",
+        "fallback": false
+      },
+      {
+        "role": "hauler",
+        "spriteSheetId": "oona-tallpack-hauler-v1",
+        "action": "ready",
+        "fallback": false
+      },
+      {
+        "role": "messenger",
+        "spriteSheetId": "messenger-agentfolk-v1",
+        "action": "ready",
+        "fallback": false
+      }
+    ],
+    "actors": [
+      {
+        "role": "clover",
+        "actionKind": "OBSERVE",
+        "cue": "foreman_presence",
+        "animation": "clover_watch",
+        "asset": ""
+      },
+      {
+        "role": "worker",
+        "actionKind": "PRODUCE",
+        "cue": "production_work",
+        "animation": "busy_work",
+        "asset": "kettle-37-worker-v1"
+      },
+      {
+        "role": "hauler",
+        "actionKind": "OUTPUT_READY",
+        "cue": "carry_bundle",
+        "animation": "carry_wobble",
+        "asset": "oona-tallpack-hauler-v1"
+      },
+      {
+        "role": "messenger",
+        "actionKind": "QUEST",
+        "cue": "attention_marker",
+        "animation": "attention_wave",
+        "asset": "messenger-agentfolk-v1"
+      }
+    ]
+  },
+  "readyInfo": {
+    "renderer": "three.js",
+    "roles": [
+      "clover",
+      "worker",
+      "hauler",
+      "messenger"
+    ],
+    "renderedActors": [
+      {
+        "role": "clover",
+        "spriteSheetId": "",
+        "action": "",
+        "fallback": false
+      },
+      {
+        "role": "worker",
+        "spriteSheetId": "kettle-37-worker-v1",
+        "action": "work",
+        "fallback": false
+      },
+      {
+        "role": "hauler",
+        "spriteSheetId": "oona-tallpack-hauler-v1",
+        "action": "ready",
+        "fallback": false
+      },
+      {
+        "role": "messenger",
+        "spriteSheetId": "messenger-agentfolk-v1",
+        "action": "ready",
+        "fallback": false
+      }
+    ],
+    "actors": [
+      {
+        "role": "clover",
+        "actionKind": "OBSERVE",
+        "cue": "foreman_presence",
+        "animation": "clover_watch",
+        "asset": ""
+      },
+      {
+        "role": "worker",
+        "actionKind": "PRODUCE",
+        "cue": "production_work",
+        "animation": "busy_work",
+        "asset": "kettle-37-worker-v1"
+      },
+      {
+        "role": "hauler",
+        "actionKind": "OUTPUT_READY",
+        "cue": "carry_bundle",
+        "animation": "carry_wobble",
+        "asset": "oona-tallpack-hauler-v1"
+      },
+      {
+        "role": "messenger",
+        "actionKind": "QUEST",
+        "cue": "attention_marker",
+        "animation": "attention_wave",
+        "asset": "messenger-agentfolk-v1"
+      }
+    ]
+  }
+}

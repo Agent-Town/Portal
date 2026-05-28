@@ -384,6 +384,9 @@
       button.dataset.actionCue = actor.actionCue?.cueType || '';
       button.dataset.accessory = actor.actionCue?.accessory || '';
       button.dataset.progress = String(actor.progress ?? 0);
+      button.dataset.routeId = actor.route?.routeId || '';
+      button.dataset.wayId = actor.route?.wayId || '';
+      button.dataset.routeProgress = String(actor.route?.progress ?? '');
       button.dataset.visualOnly = 'true';
       button.textContent = `${actor.canonicalRoleId} ${actor.sourceObjectId}`;
       button.addEventListener('click', () => handleScenePick({ detail: actor }));

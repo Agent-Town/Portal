@@ -1,0 +1,93 @@
+{
+  "id": "rigger-slate-builder-v2",
+  "role": "builder",
+  "status": "candidate",
+  "displayName": "Rigger Slate",
+  "description": "Adult-coded AI construction agent and frontier machinefolk field-builder with a brass-and-teal survey body, cyan lens/display face, antenna beacon, jointed tool arms, weighted boots, and practical construction harness. This version intentionally reads as an agent rather than a Clover-like human settler.",
+  "source": {
+    "path": "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.source.png",
+    "background": "#ff00ff-ish chroma key",
+    "notes": "Built-in image generation returned a 1254x1254 chroma-key sheet despite the prompt requesting 2048x2048. The saved source was normalized to 2048x2048 with ImageMagick before alpha removal so the delivered sheet has exact 512x512 frame cells."
+  },
+  "texture": {
+    "path": "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.png",
+    "format": "png",
+    "colorSpace": "sRGB",
+    "channels": "sRGBA",
+    "width": 2048,
+    "height": 2048,
+    "alpha": true,
+    "transparentCorners": true
+  },
+  "sheet": {
+    "columns": 4,
+    "rows": 4,
+    "frameWidth": 512,
+    "frameHeight": 512,
+    "frameCount": 16,
+    "rowOrder": [
+      "idle",
+      "build",
+      "inspect",
+      "ready"
+    ],
+    "frames": [
+      { "index": 0, "row": 0, "column": 0, "name": "idle-standby" },
+      { "index": 1, "row": 0, "column": 1, "name": "idle-toolbelt" },
+      { "index": 2, "row": 0, "column": 2, "name": "idle-arms-folded" },
+      { "index": 3, "row": 0, "column": 3, "name": "idle-beacon" },
+      { "index": 4, "row": 1, "column": 0, "name": "build-tripod-sight" },
+      { "index": 5, "row": 1, "column": 1, "name": "build-beam-work" },
+      { "index": 6, "row": 1, "column": 2, "name": "build-brace-tighten" },
+      { "index": 7, "row": 1, "column": 3, "name": "build-sensor-grid" },
+      { "index": 8, "row": 2, "column": 0, "name": "inspect-plans" },
+      { "index": 9, "row": 2, "column": 1, "name": "inspect-tripod" },
+      { "index": 10, "row": 2, "column": 2, "name": "inspect-tablet" },
+      { "index": 11, "row": 2, "column": 3, "name": "inspect-binocular" },
+      { "index": 12, "row": 3, "column": 0, "name": "ready-thumbs-up" },
+      { "index": 13, "row": 3, "column": 1, "name": "ready-beacon" },
+      { "index": 14, "row": 3, "column": 2, "name": "ready-folded-tripod" },
+      { "index": 15, "row": 3, "column": 3, "name": "ready-hands-on-belt" }
+    ]
+  },
+  "generation": {
+    "date": "2026-05-28",
+    "mode": "built-in image_gen",
+    "model": "available built-in image generation path",
+    "referenceImagesUsedForDirection": [
+      "/Users/robin/.openclaw/media/agent-town-references/v1_4_4/clover-idle-v1_4_4-no-holes.png",
+      "/Users/robin/.openclaw/media/agent-town-references/v1_4_4/clover-acting-v1_4_4-no-holes.png",
+      "/Users/robin/.openclaw/media/agent-town-references/v1_4_4/clover-observing-v1_4_4-no-holes.png",
+      "/Users/robin/.openclaw/media/agent-town-references/v1_4_4/clover-celebrating-v1_4_4-no-holes.png",
+      "/Users/robin/.openclaw/media/agent-town-references/founders-plot-desktop.webp",
+      "/Users/robin/.openclaw/media/agent-town-references/lumber-camp.webp"
+    ],
+    "promptPath": "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.prompt.md",
+    "originalGeneratedPath": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e6db6-c0b0-7470-85b1-e8163787ea71/ig_0679144cc451e09d016a1801745b588191989e60093ebe2359.png",
+    "postProcessing": [
+      "Copied generated chroma source into the project as rigger-slate-builder-v2.source.png.",
+      "Resized source to exact 2048x2048 with ImageMagick because the built-in generator returned 1254x1254.",
+      "The bundled chroma-key helper could not run because Pillow is not installed in this environment.",
+      "Converted #ff00ff-ish chroma key to alpha with ImageMagick using -fuzz 28% -transparent '#e80ae5'.",
+      "Created checkerboard preview at reports/rigger-slate-builder-v2-checker-preview.png."
+    ]
+  },
+  "validation": {
+    "identify": "rigger-slate-builder-v2.png 2048x2048 sRGB channels=srgba 4.0 alpha-min=0 alpha-max=1",
+    "cornerPixels": {
+      "0,0": "srgba(0,0,0,0)",
+      "2047,0": "srgba(0,0,0,0)",
+      "0,2047": "srgba(0,0,0,0)",
+      "2047,2047": "srgba(0,0,0,0)"
+    },
+    "sha256": {
+      "source": "3286cfe5def46aa9c6f5a8859af068fe9ea220bbdabf6acd0100b8e7688700e1",
+      "png": "6af306d184a8439a0f143180109e536ef49e3230afdc6fb410a916b6c007d4d5",
+      "checkerPreview": "7b85a1e54b8ae92c32e498e1c74657640d3aa602f620d7f3a27d616d066781db"
+    }
+  },
+  "knownIssues": [
+    "A faint purple/magenta edge fringe remains on small parts of the silhouette after chroma removal.",
+    "The generated source was not natively 2048x2048; it was normalized to the required sheet size locally."
+  ]
+}

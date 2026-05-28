@@ -106,11 +106,11 @@ test('Three.js Founders Plot renders Clover plus builder, worker, and hauler fro
   expect(builderInfo.actors).toEqual(expect.arrayContaining([
     expect.objectContaining({
       canonicalRoleId: 'builder',
-      assetSrc: '/experiences/founders-plot/assets/characters/inhabitants/builder/builder-agentfolk-v2.png',
+      assetSrc: '/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.png',
       assetSprite: expect.objectContaining({
-        id: 'builder-agentfolk-v2',
-        action: 'work',
-        row: 2,
+        id: 'rigger-slate-builder-v2',
+        action: 'build',
+        row: 1,
         columns: 4,
         rows: 4
       }),
@@ -121,13 +121,32 @@ test('Three.js Founders Plot renders Clover plus builder, worker, and hauler fro
     expect.objectContaining({
       canonicalRoleId: 'builder',
       spriteSheet: true,
-      spriteSheetId: 'builder-agentfolk-v2',
-      spriteSheetAction: 'work',
+      spriteSheetId: 'rigger-slate-builder-v2',
+      spriteSheetAction: 'build',
       assetFallback: false
     })
   ]));
   expect(builderInfo.actionCues).toEqual(expect.arrayContaining([
     expect.objectContaining({ canonicalRoleId: 'builder', cueType: 'construction_progress', accessory: 'hammer' })
+  ]));
+  const builderActor = builderInfo.actors.find((actor) => actor.canonicalRoleId === 'builder');
+  expect(builderActor.route).toEqual(expect.objectContaining({
+    visualOnly: true,
+    mode: 'work',
+    targetId: builderActor.target.id
+  }));
+  expect(builderActor.route.points).toHaveLength(3);
+  expect(builderInfo.ways).toEqual(expect.arrayContaining([
+    expect.objectContaining({ wayId: builderActor.route.wayId, targetId: builderActor.target.id, visualOnly: true })
+  ]));
+  expect(builderInfo.renderedWays).toEqual(expect.arrayContaining([
+    expect.objectContaining({ wayId: builderActor.route.wayId, visualOnly: true })
+  ]));
+  expect(builderInfo.encounters).toEqual(expect.arrayContaining([
+    expect.objectContaining({ targetId: 'HQ', cueType: 'crossing_greeting', visualOnly: true })
+  ]));
+  expect(builderInfo.renderedEncounters).toEqual(expect.arrayContaining([
+    expect.objectContaining({ targetId: 'HQ', cueType: 'crossing_greeting', visualOnly: true })
   ]));
 
   const beforePickEvents = await eventCount(request);
@@ -149,9 +168,9 @@ test('Three.js Founders Plot renders Clover plus builder, worker, and hauler fro
   expect(workerInfo.actors).toEqual(expect.arrayContaining([
     expect.objectContaining({
       canonicalRoleId: 'worker',
-      assetSrc: '/experiences/founders-plot/assets/characters/inhabitants/worker/worker-agentfolk-v1.png',
+      assetSrc: '/experiences/founders-plot/assets/characters/inhabitants/worker/kettle-37-worker-v1.png',
       assetSprite: expect.objectContaining({
-        id: 'worker-agentfolk-v1',
+        id: 'kettle-37-worker-v1',
         action: 'work',
         row: 2,
         columns: 4,
@@ -164,13 +183,22 @@ test('Three.js Founders Plot renders Clover plus builder, worker, and hauler fro
     expect.objectContaining({
       canonicalRoleId: 'worker',
       spriteSheet: true,
-      spriteSheetId: 'worker-agentfolk-v1',
+      spriteSheetId: 'kettle-37-worker-v1',
       spriteSheetAction: 'work',
       assetFallback: false
     })
   ]));
   expect(workerInfo.actionCues).toEqual(expect.arrayContaining([
     expect.objectContaining({ canonicalRoleId: 'worker', cueType: 'production_work', accessory: 'tools' })
+  ]));
+  const workerActor = workerInfo.actors.find((actor) => actor.canonicalRoleId === 'worker');
+  expect(workerActor.route).toEqual(expect.objectContaining({
+    visualOnly: true,
+    mode: 'work',
+    targetId: workerActor.target.id
+  }));
+  expect(workerInfo.renderedWays).toEqual(expect.arrayContaining([
+    expect.objectContaining({ wayId: workerActor.route.wayId, visualOnly: true })
   ]));
 
   await advancePlot(page, 2 * 60 * 1000);
@@ -195,12 +223,16 @@ test('Three.js Founders Plot renders Clover plus builder, worker, and hauler fro
     expect.objectContaining({ canonicalRoleId: 'hauler', cueType: 'carry_bundle', accessory: 'bundle' }),
     expect.objectContaining({ canonicalRoleId: 'messenger', cueType: 'attention_marker' })
   ]));
+  expect(info.ways.length).toBeGreaterThan(0);
+  expect(info.renderedWays.length).toBeGreaterThan(0);
+  expect(info.renderedWays.every((way) => way.visualOnly === true)).toBe(true);
+  expect(info.encounters.every((encounter) => encounter.visualOnly === true)).toBe(true);
   expect(info.actors).toEqual(expect.arrayContaining([
     expect.objectContaining({
       canonicalRoleId: 'hauler',
-      assetSrc: '/experiences/founders-plot/assets/characters/inhabitants/hauler/hauler-agentfolk-v1.png',
+      assetSrc: '/experiences/founders-plot/assets/characters/inhabitants/hauler/oona-tallpack-hauler-v1.png',
       assetSprite: expect.objectContaining({
-        id: 'hauler-agentfolk-v1',
+        id: 'oona-tallpack-hauler-v1',
         action: 'ready',
         row: 3,
         columns: 4,
@@ -225,7 +257,7 @@ test('Three.js Founders Plot renders Clover plus builder, worker, and hauler fro
     expect.objectContaining({
       canonicalRoleId: 'hauler',
       spriteSheet: true,
-      spriteSheetId: 'hauler-agentfolk-v1',
+      spriteSheetId: 'oona-tallpack-hauler-v1',
       spriteSheetAction: 'ready',
       assetFallback: false
     }),

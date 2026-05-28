@@ -22,6 +22,10 @@ function worldY(y) {
   return (0.5 - number(y, 0.5)) * WORLD_HEIGHT;
 }
 
+function worldPoint(point = {}, z = -1.65) {
+  return new THREE.Vector3(worldX(point.x), worldY(point.y), z);
+}
+
 function depthFor(object = {}, extra = 0) {
   return -1 + ((1 - number(object.y, 0.5)) * 0.6) + (number(object.z, 0) * 0.025) + extra;
 }
@@ -501,6 +505,65 @@ function makeProgressTexture(role = 'worker', progress = 0) {
   return texture;
 }
 
+function makeEncounterTexture(encounter = {}) {
+  const cueType = String(encounter.cueType || 'crossing_greeting');
+  const roles = Array.isArray(encounter.roles) ? encounter.roles : [];
+  const key = `encounter:${cueType}:${roles.join('+')}`;
+  if (textureCache.has(key)) return textureCache.get(key);
+  const canvas = document.createElement('canvas');
+  canvas.width = 192;
+  canvas.height = 160;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = 'rgba(46, 27, 14, 0.22)';
+  ctx.beginPath();
+  ctx.ellipse(96, 126, 52, 14, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = cueType === 'handoff' ? '#fff0bd' : '#d6f1ef';
+  ctx.strokeStyle = '#3b2513';
+  ctx.lineWidth = 7;
+  ctx.beginPath();
+  ctx.roundRect(36, 22, 120, 84, 28);
+  ctx.fill();
+  ctx.stroke();
+
+  const left = roleStyle(roles[0] || 'worker');
+  const right = roleStyle(roles[1] || 'messenger');
+  ctx.fillStyle = left.fill;
+  ctx.strokeStyle = left.stroke;
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.arc(78, 64, 20, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = right.fill;
+  ctx.strokeStyle = right.stroke;
+  ctx.beginPath();
+  ctx.arc(116, 64, 20, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.strokeStyle = '#3b2513';
+  ctx.lineWidth = 6;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(91, 82);
+  ctx.lineTo(103, 82);
+  ctx.stroke();
+
+  ctx.fillStyle = cueType === 'handoff' ? '#c4883a' : '#c85c75';
+  drawStar(ctx, 97, 38, 13, 6);
+  ctx.fill();
+  ctx.stroke();
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  textureCache.set(key, texture);
+  return texture;
+}
+
 function loadTexture(src, onLoad, onError) {
   const key = String(src || '').trim();
   if (!key) return null;
@@ -635,6 +698,11 @@ function userDataForObject(object = {}, extra = {}) {
     animationStepStyle: String(object.actionAnimation?.stepStyle || ''),
     hasWalkOffset: object.actionAnimation?.hasWalkOffset === true,
     progress: number(object.progress, 0),
+    routeId: String(object.route?.routeId || ''),
+    wayId: String(object.route?.wayId || ''),
+    routeMode: String(object.route?.mode || ''),
+    routeProgress: number(object.route?.progress, 0),
+    routeTargetId: String(object.route?.targetId || ''),
     validPlacement: object.validPlacement === true,
     x: number(object.x, 0.5),
     y: number(object.y, 0.5),
@@ -769,6 +837,62 @@ function makeGridCell(cell = {}) {
   return mesh;
 }
 
+function makeWayMesh(way = {}) {
+  const rawPoints = Array.isArray(way.points) ? way.points : [];
+  const points = rawPoints.length >= 2
+    ? rawPoints.map((point) => worldPoint(point, -1.72))
+    : [worldPoint({ x: 0.5, y: 0.5 }, -1.72), worldPoint({ x: 0.55, y: 0.55 }, -1.72)];
+  const curve = new THREE.CatmullRomCurve3(points, false, 'centripetal', 0.4);
+  const mesh = new THREE.Mesh(
+    new THREE.TubeGeometry(curve, 18, 0.055, 7, false),
+    new THREE.MeshBasicMaterial({
+      color: 0x6d4825,
+      transparent: true,
+      opacity: 0.62,
+      depthWrite: false
+    })
+  );
+  mesh.userData = {
+    kind: 'way',
+    wayLine: true,
+    wayId: String(way.wayId || ''),
+    label: String(way.label || ''),
+    targetId: String(way.targetId || ''),
+    visualOnly: way.visualOnly === true,
+    points: rawPoints
+  };
+  return mesh;
+}
+
+function makeEncounterCue(encounter = {}) {
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: makeEncounterTexture(encounter),
+    transparent: true,
+    depthTest: true,
+    depthWrite: false,
+    alphaTest: 0.03
+  }));
+  sprite.position.set(worldX(encounter.x), worldY(encounter.y) + 0.46, 2.25);
+  sprite.scale.set(0.68, 0.56, 1);
+  sprite.userData = {
+    kind: 'encounter',
+    encounterSprite: true,
+    encounterId: String(encounter.encounterId || ''),
+    targetId: String(encounter.targetId || ''),
+    cueType: String(encounter.cueType || ''),
+    label: String(encounter.label || ''),
+    roles: Array.isArray(encounter.roles) ? encounter.roles : [],
+    actorIds: Array.isArray(encounter.actorIds) ? encounter.actorIds : [],
+    visualOnly: encounter.visualOnly === true,
+    baseX: sprite.position.x,
+    baseY: sprite.position.y,
+    baseScaleX: sprite.scale.x,
+    baseScaleY: sprite.scale.y,
+    phase: stablePhase(encounter.encounterId || encounter.targetId || '')
+  };
+  return sprite;
+}
+
 function detailFromObject(object, source = 'three-raycast') {
   const data = object?.userData || {};
   return {
@@ -792,6 +916,11 @@ function detailFromObject(object, source = 'three-raycast') {
     animationMode: String(data.animationMode || ''),
     animationStepStyle: String(data.animationStepStyle || ''),
     progress: number(data.progress, 0),
+    routeId: String(data.routeId || ''),
+    wayId: String(data.wayId || ''),
+    routeMode: String(data.routeMode || ''),
+    routeProgress: number(data.routeProgress, 0),
+    routeTargetId: String(data.routeTargetId || ''),
     validPlacement: data.validPlacement === true,
     source,
     atMs: Date.now()
@@ -914,6 +1043,12 @@ class FoundersPlotThreeStage {
       this.pickables.push(mesh);
     }
 
+    for (const way of payload.ways || []) {
+      const mesh = makeWayMesh(way);
+      this.scene.add(mesh);
+      this.objectMeshes.push(mesh);
+    }
+
     for (const object of payload.objects || []) {
       const role = object.canonicalRoleId || object.kind;
       const fallbackTexture = makeRoleTexture(role || 'worker');
@@ -941,6 +1076,12 @@ class FoundersPlotThreeStage {
         this.scene.add(cue);
         this.objectMeshes.push(cue);
       }
+    }
+
+    for (const encounter of payload.encounters || []) {
+      const cue = makeEncounterCue(encounter);
+      this.scene.add(cue);
+      this.objectMeshes.push(cue);
     }
     this.updateInfo();
   }
@@ -986,6 +1127,22 @@ class FoundersPlotThreeStage {
       canvasHeight: canvas.height,
       objectCount: objects.length,
       objectIds: objects.map((object) => object.id),
+      ways: (payload.ways || []).map((way) => ({
+        wayId: way.wayId || '',
+        targetId: way.targetId || '',
+        label: way.label || '',
+        points: way.points || [],
+        visualOnly: way.visualOnly === true
+      })),
+      encounters: (payload.encounters || []).map((encounter) => ({
+        encounterId: encounter.encounterId || '',
+        targetId: encounter.targetId || '',
+        roles: encounter.roles || [],
+        actorIds: encounter.actorIds || [],
+        cueType: encounter.cueType || '',
+        visualOnly: encounter.visualOnly === true,
+        canvas: this.canvasPointFor({ x: encounter.x, y: encounter.y, z: 0, kind: 'encounter' })
+      })),
       actorIds: (payload.actors || []).map((actor) => actor.actorId),
       actors: (payload.actors || []).map((actor) => ({
         ...actor,
@@ -1011,7 +1168,26 @@ class FoundersPlotThreeStage {
           spriteSheet: mesh.userData.spriteSheet === true,
           spriteSheetId: mesh.userData.spriteSheetId || '',
           spriteSheetAction: mesh.userData.spriteSheetAction || '',
+          routeId: mesh.userData.routeId || '',
+          wayId: mesh.userData.wayId || '',
+          routeProgress: number(mesh.userData.routeProgress, 0),
           assetFallback: mesh.userData.assetFallback === true
+        })),
+      renderedWays: this.objectMeshes
+        .filter((mesh) => mesh.userData?.wayLine === true)
+        .map((mesh) => ({
+          wayId: mesh.userData.wayId || '',
+          targetId: mesh.userData.targetId || '',
+          visualOnly: mesh.userData.visualOnly === true
+        })),
+      renderedEncounters: this.objectMeshes
+        .filter((mesh) => mesh.userData?.encounterSprite === true)
+        .map((mesh) => ({
+          encounterId: mesh.userData.encounterId || '',
+          targetId: mesh.userData.targetId || '',
+          cueType: mesh.userData.cueType || '',
+          roles: mesh.userData.roles || [],
+          visualOnly: mesh.userData.visualOnly === true
         })),
       pickTargets: objects.map((object) => ({
         objectId: object.id,
@@ -1030,6 +1206,7 @@ class FoundersPlotThreeStage {
         assetSrc: object.assetSrc || '',
         assetSprite: object.assetSprite || null,
         actionKind: object.actionKind || '',
+        route: object.route || null,
         actionCue: object.actionCue || null,
         actionAnimation: object.actionAnimation || null,
         canvas: this.canvasPointFor(object)

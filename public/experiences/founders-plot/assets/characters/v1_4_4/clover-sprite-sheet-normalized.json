@@ -1,0 +1,212 @@
+{
+  "source": {
+    "path": "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png",
+    "bytes": 1762658,
+    "sha256": "6db2b020b016366d9ea2ed03d11ee93d51dcb48f1946f250cd55ee209666f90b",
+    "width": 1254,
+    "height": 1254,
+    "channels": "srgb 3.0"
+  },
+  "options": {
+    "grid": {
+      "cols": 3,
+      "rows": 3
+    },
+    "targetSize": 512,
+    "key": "#ff00ff",
+    "fuzz": "45%",
+    "quality": "92",
+    "prefix": "clover"
+  },
+  "entries": [
+    {
+      "state": "idle",
+      "png": {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-idle.png",
+        "src": "/experiences/founders-plot/assets/characters/v1_4_4/clover-idle.png",
+        "bytes": 169659,
+        "sha256": "72cf0e72588ef99fb09e1a3f705825c75c2a8b47a951c74e2754804b7c717159",
+        "width": 512,
+        "height": 512,
+        "channels": "srgba 4.0"
+      },
+      "webp": {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-idle.webp",
+        "src": "/experiences/founders-plot/assets/characters/v1_4_4/clover-idle.webp",
+        "bytes": 32388,
+        "sha256": "8d72dc73ad6d9c4f11da7b76199980a3874941890d7e4907c48ec9427b202356",
+        "width": 512,
+        "height": 512,
+        "channels": "srgba 4.0"
+      }
+    },
+    {
+      "state": "observing",
+      "png": {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-observing.png",
+        "src": "/experiences/founders-plot/assets/characters/v1_4_4/clover-observing.png",
+        "bytes": 176477,
+        "sha256": "b9b8e5aed69e0c1f59251d176d4f6ab781416a57f50153bb8b282d262c79040f",
+        "width": 512,
+        "height": 512,
+        "channels": "srgba 4.0"
+      },
+      "webp": {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-observing.webp",
+        "src": "/experiences/founders-plot/assets/characters/v1_4_4/clover-observing.webp",
+        "bytes": 33440,
+        "sha256": "8a3406a0c140935a4cd95c73ff1c9359443dde8692cc181ec1fa30353d54f12b",
+        "width": 512,
+        "height": 512,
+        "channels": "srgba 4.0"
+      }
+    },
+    {
+      "state": "thinking",
+      "png": {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-thinking.png",
+        "src": "/experiences/founders-plot/assets/characters/v1_4_4/clover-thinking.png",
+        "bytes": 152025,
+        "sha256": "eaf0a6d56a46a38adf7936632b65f743f3bf97e75bfdf3e6efe4e7aea33c7554",
+        "width": 512,
+        "height": 512,
+        "channels": "srgba 4.0"
+      },
+      "webp": {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-thinking.webp",
+        "src": "/experiences/founders-plot/assets/characters/v1_4_4/clover-thinking.webp",
+        "bytes": 28632,
+        "sha256": "1f1c99c21f0e5bab129380ee9821b2789fc3477192df39de1e5d67c9def020fa",
+        "width": 512,
+        "height": 512,
+        "channels": "srgba 4.0"
+      }
+    },
+    {
+      "state": "acting",
+      "png": {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-acting.png",
+        "src": "/experiences/founders-plot/assets/characters/v1_4_4/clover-acting.png",
+        "bytes": 172431,
+        "sha256": "822885ce302f68aee06d8cd408bcd46e4bf6e30f3813bd1b15ee9ac4f3e23c6b",
+        "width": 512,
+        "height": 512,
+        "channels": "srgba 4.0"
+      },
+      "webp": {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-acting.webp",
+        "src": "/experiences/founders-plot/assets/characters/v1_4_4/clover-acting.webp",
+        "bytes": 33258,
+        "sha256": "d8660fb58cfa05e1823b650d27d3b83846cded672aaf477cc0b22afc5648fe3d",
+        "width": 512,
+        "height": 512,
+        "channels": "srgba 4.0"
+      }
+    },
+    {
+      "state": "waiting-approval",
+      "png": {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-waiting-approval.png",
+        "src": "/experiences/founders-plot/assets/characters/v1_4_4/clover-waiting-approval.png",
+        "bytes": 153836,
+        "sha256": "eb992c7c8fa77e13fae2a2b088dee062c795b2fb28474daccf170f41e28e72dc",
+        "width": 512,
+        "height": 512,
+        "channels": "srgba 4.0"
+      },
+      "webp": {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-waiting-approval.webp",
+        "src": "/experiences/founders-plot/assets/characters/v1_4_4/clover-waiting-approval.webp",
+        "bytes": 29756,
+        "sha256": "87a2acda54bb34ab9a9ccf375c94da183a28a8d76c4a3dbdf555855636c92038",
+        "width": 512,
+        "height": 512,
+        "channels": "srgba 4.0"
+      }
+    },
+    {
+      "state": "celebrating",
+      "png": {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-celebrating.png",
+        "src": "/experiences/founders-plot/assets/characters/v1_4_4/clover-celebrating.png",
+        "bytes": 174106,
+        "sha256": "4c4cebd56059c44bdd3524109d6e3695b22d2c1e5180f73547e4a2cd91d80c05",
+        "width": 512,
+        "height": 512,
+        "channels": "srgba 4.0"
+      },
+      "webp": {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-celebrating.webp",
+        "src": "/experiences/founders-plot/assets/characters/v1_4_4/clover-celebrating.webp",
+        "bytes": 34042,
+        "sha256": "fab52e922fda35485a00b37b8d4fc7d7a263b6e343fdf90748c7b73f9e1583d3",
+        "width": 512,
+        "height": 512,
+        "channels": "srgba 4.0"
+      }
+    },
+    {
+      "state": "paused",
+      "png": {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-paused.png",
+        "src": "/experiences/founders-plot/assets/characters/v1_4_4/clover-paused.png",
+        "bytes": 158912,
+        "sha256": "9db69220cd80695b5cb2e589372becef4153d68864ae4efb954f019314aa9065",
+        "width": 512,
+        "height": 512,
+        "channels": "srgba 4.0"
+      },
+      "webp": {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-paused.webp",
+        "src": "/experiences/founders-plot/assets/characters/v1_4_4/clover-paused.webp",
+        "bytes": 31558,
+        "sha256": "1e8bc2a502ab0d5ce31acb69edcf05b8966d17b843985b0ad18bcae1d36340f5",
+        "width": 512,
+        "height": 512,
+        "channels": "srgba 4.0"
+      }
+    },
+    {
+      "state": "blocked",
+      "png": {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-blocked.png",
+        "src": "/experiences/founders-plot/assets/characters/v1_4_4/clover-blocked.png",
+        "bytes": 145076,
+        "sha256": "2e61c302f6224a115ca567fa83b8be048d0e853b8b3794f24b15303483942c79",
+        "width": 512,
+        "height": 512,
+        "channels": "srgba 4.0"
+      },
+      "webp": {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-blocked.webp",
+        "src": "/experiences/founders-plot/assets/characters/v1_4_4/clover-blocked.webp",
+        "bytes": 27956,
+        "sha256": "e6bf5fcdde1ea157e1ec49c72cc354ad218412accb44be92619f507309493a12",
+        "width": 512,
+        "height": 512,
+        "channels": "srgba 4.0"
+      }
+    },
+    {
+      "state": "restart-needed",
+      "png": {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-restart-needed.png",
+        "src": "/experiences/founders-plot/assets/characters/v1_4_4/clover-restart-needed.png",
+        "bytes": 162041,
+        "sha256": "a18fc56dfc50458570b88c7e8e5de55416eb93ef08248deb974bf6bc3f7653b8",
+        "width": 512,
+        "height": 512,
+        "channels": "srgba 4.0"
+      },
+      "webp": {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-restart-needed.webp",
+        "src": "/experiences/founders-plot/assets/characters/v1_4_4/clover-restart-needed.webp",
+        "bytes": 30984,
+        "sha256": "ebd4c5f47d88ebcd9617337fb99b7b04928ca5be1a1087759507b0db676bce74",
+        "width": 512,
+        "height": 512,
+        "channels": "srgba 4.0"
+      }
+    }
+  ]
+}

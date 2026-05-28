@@ -1,0 +1,756 @@
+{
+  "capturedAt": "2026-05-28T10:22:56.996Z",
+  "builder": {
+    "renderer": "three.js",
+    "roles": [
+      "clover",
+      "builder",
+      "messenger"
+    ],
+    "ways": [
+      {
+        "wayId": "WAY:HQ:bldg_a69871126fd2a6ab",
+        "targetId": "bldg_a69871126fd2a6ab",
+        "label": "HQ path to Lumber Camp",
+        "points": [
+          {
+            "x": 0.5,
+            "y": 0.33999999999999997
+          },
+          {
+            "x": 0.357,
+            "y": 0.4513
+          },
+          {
+            "x": 0.25,
+            "y": 0.55
+          }
+        ],
+        "visualOnly": true
+      },
+      {
+        "wayId": "WAY:HQ:TOWN_SQUARE",
+        "targetId": "HQ",
+        "label": "HQ approach",
+        "points": [
+          {
+            "x": 0.38,
+            "y": 0.37999999999999995
+          },
+          {
+            "x": 0.5,
+            "y": 0.42
+          },
+          {
+            "x": 0.62,
+            "y": 0.37999999999999995
+          }
+        ],
+        "visualOnly": true
+      }
+    ],
+    "renderedWays": [
+      {
+        "wayId": "WAY:HQ:bldg_a69871126fd2a6ab",
+        "targetId": "bldg_a69871126fd2a6ab",
+        "visualOnly": true
+      },
+      {
+        "wayId": "WAY:HQ:TOWN_SQUARE",
+        "targetId": "HQ",
+        "visualOnly": true
+      }
+    ],
+    "encounters": [
+      {
+        "encounterId": "ENCOUNTER:HQ:clover+messenger",
+        "targetId": "HQ",
+        "roles": [
+          "clover",
+          "messenger"
+        ],
+        "actorIds": [
+          "actor:clover:foreman:plot_b575cdeec3e6c53e",
+          "actor:messenger:quest:collect-first-wood"
+        ],
+        "cueType": "crossing_greeting",
+        "visualOnly": true,
+        "canvas": {
+          "x": 392.19465937499996,
+          "y": 365.1008871093749
+        }
+      }
+    ],
+    "renderedEncounters": [
+      {
+        "encounterId": "ENCOUNTER:HQ:clover+messenger",
+        "targetId": "HQ",
+        "cueType": "crossing_greeting",
+        "roles": [
+          "clover",
+          "messenger"
+        ],
+        "visualOnly": true
+      }
+    ],
+    "actorRoutes": [
+      {
+        "role": "clover",
+        "route": {
+          "routeId": "ROUTE:clover:actor:clover:foreman:plot_b575cdeec3e6c53e",
+          "wayId": "WAY:HQ:TOWN_SQUARE",
+          "mode": "presence",
+          "from": {
+            "kind": "building",
+            "id": "HQ"
+          },
+          "to": {
+            "kind": "town_square",
+            "id": "HQ_APPROACH"
+          },
+          "targetId": "HQ",
+          "points": [
+            {
+              "x": 0.42,
+              "y": 0.355
+            },
+            {
+              "x": 0.5,
+              "y": 0.36624999999999996
+            },
+            {
+              "x": 0.58,
+              "y": 0.355
+            }
+          ],
+          "progress": 0.24,
+          "lane": -0.045,
+          "x": 0.4584,
+          "y": 0.3604,
+          "visualOnly": true
+        },
+        "visualOnly": true
+      },
+      {
+        "role": "builder",
+        "route": {
+          "routeId": "ROUTE:builder:actor:builder:job:job_438380ffec89be37",
+          "wayId": "WAY:HQ:bldg_a69871126fd2a6ab",
+          "mode": "work",
+          "from": {
+            "kind": "building",
+            "id": "HQ"
+          },
+          "to": {
+            "kind": "building",
+            "id": "bldg_a69871126fd2a6ab"
+          },
+          "targetId": "bldg_a69871126fd2a6ab",
+          "points": [
+            {
+              "x": 0.48,
+              "y": 0.35
+            },
+            {
+              "x": 0.33699999999999997,
+              "y": 0.4613
+            },
+            {
+              "x": 0.23,
+              "y": 0.56
+            }
+          ],
+          "progress": 0.182788,
+          "lane": -0.02,
+          "x": 0.427722632,
+          "y": 0.3906886088,
+          "visualOnly": true
+        },
+        "visualOnly": true
+      },
+      {
+        "role": "messenger",
+        "route": {
+          "routeId": "ROUTE:messenger:actor:messenger:quest:collect-first-wood",
+          "wayId": "WAY:HQ:TOWN_SQUARE",
+          "mode": "notify",
+          "from": {
+            "kind": "building",
+            "id": "HQ"
+          },
+          "to": {
+            "kind": "town_square",
+            "id": "HQ_APPROACH"
+          },
+          "targetId": "HQ",
+          "points": [
+            {
+              "x": 0.39,
+              "y": 0.37999999999999995
+            },
+            {
+              "x": 0.5,
+              "y": 0.39499999999999996
+            },
+            {
+              "x": 0.61,
+              "y": 0.37999999999999995
+            }
+          ],
+          "progress": 0.38,
+          "lane": -0.06,
+          "x": 0.4736,
+          "y": 0.39139999999999997,
+          "visualOnly": true
+        },
+        "visualOnly": true
+      }
+    ]
+  },
+  "worker": {
+    "renderer": "three.js",
+    "roles": [
+      "clover",
+      "worker",
+      "hauler",
+      "messenger"
+    ],
+    "ways": [
+      {
+        "wayId": "WAY:HQ:bldg_a69871126fd2a6ab",
+        "targetId": "bldg_a69871126fd2a6ab",
+        "label": "HQ path to Lumber Camp",
+        "points": [
+          {
+            "x": 0.5,
+            "y": 0.33999999999999997
+          },
+          {
+            "x": 0.357,
+            "y": 0.4513
+          },
+          {
+            "x": 0.25,
+            "y": 0.55
+          }
+        ],
+        "visualOnly": true
+      },
+      {
+        "wayId": "WAY:HQ:TOWN_SQUARE",
+        "targetId": "HQ",
+        "label": "HQ approach",
+        "points": [
+          {
+            "x": 0.38,
+            "y": 0.37999999999999995
+          },
+          {
+            "x": 0.5,
+            "y": 0.42
+          },
+          {
+            "x": 0.62,
+            "y": 0.37999999999999995
+          }
+        ],
+        "visualOnly": true
+      }
+    ],
+    "renderedWays": [
+      {
+        "wayId": "WAY:HQ:bldg_a69871126fd2a6ab",
+        "targetId": "bldg_a69871126fd2a6ab",
+        "visualOnly": true
+      },
+      {
+        "wayId": "WAY:HQ:TOWN_SQUARE",
+        "targetId": "HQ",
+        "visualOnly": true
+      }
+    ],
+    "encounters": [
+      {
+        "encounterId": "ENCOUNTER:HQ:clover+messenger",
+        "targetId": "HQ",
+        "roles": [
+          "clover",
+          "messenger"
+        ],
+        "actorIds": [
+          "actor:clover:foreman:plot_b575cdeec3e6c53e",
+          "actor:messenger:quest:collect-first-wood"
+        ],
+        "cueType": "crossing_greeting",
+        "visualOnly": true,
+        "canvas": {
+          "x": 392.19465937499996,
+          "y": 367.45732265624997
+        }
+      },
+      {
+        "encounterId": "ENCOUNTER:bldg_a69871126fd2a6ab:hauler+worker",
+        "targetId": "bldg_a69871126fd2a6ab",
+        "roles": [
+          "worker",
+          "hauler"
+        ],
+        "actorIds": [
+          "actor:hauler:building:bldg_a69871126fd2a6ab",
+          "actor:worker:job:job_ef02d1efd7e4a827"
+        ],
+        "cueType": "handoff",
+        "visualOnly": true,
+        "canvas": {
+          "x": 283.509568125,
+          "y": 416.55224341406245
+        }
+      }
+    ],
+    "renderedEncounters": [
+      {
+        "encounterId": "ENCOUNTER:HQ:clover+messenger",
+        "targetId": "HQ",
+        "cueType": "crossing_greeting",
+        "roles": [
+          "clover",
+          "messenger"
+        ],
+        "visualOnly": true
+      },
+      {
+        "encounterId": "ENCOUNTER:bldg_a69871126fd2a6ab:hauler+worker",
+        "targetId": "bldg_a69871126fd2a6ab",
+        "cueType": "handoff",
+        "roles": [
+          "worker",
+          "hauler"
+        ],
+        "visualOnly": true
+      }
+    ],
+    "actorRoutes": [
+      {
+        "role": "clover",
+        "route": {
+          "routeId": "ROUTE:clover:actor:clover:foreman:plot_b575cdeec3e6c53e",
+          "wayId": "WAY:HQ:TOWN_SQUARE",
+          "mode": "presence",
+          "from": {
+            "kind": "building",
+            "id": "HQ"
+          },
+          "to": {
+            "kind": "town_square",
+            "id": "HQ_APPROACH"
+          },
+          "targetId": "HQ",
+          "points": [
+            {
+              "x": 0.42,
+              "y": 0.355
+            },
+            {
+              "x": 0.5,
+              "y": 0.36624999999999996
+            },
+            {
+              "x": 0.58,
+              "y": 0.355
+            }
+          ],
+          "progress": 0.24,
+          "lane": -0.045,
+          "x": 0.4584,
+          "y": 0.3604,
+          "visualOnly": true
+        },
+        "visualOnly": true
+      },
+      {
+        "role": "worker",
+        "route": {
+          "routeId": "ROUTE:worker:actor:worker:job:job_ef02d1efd7e4a827",
+          "wayId": "WAY:HQ:bldg_a69871126fd2a6ab",
+          "mode": "work",
+          "from": {
+            "kind": "building",
+            "id": "HQ"
+          },
+          "to": {
+            "kind": "building",
+            "id": "bldg_a69871126fd2a6ab"
+          },
+          "targetId": "bldg_a69871126fd2a6ab",
+          "points": [
+            {
+              "x": 0.52,
+              "y": 0.35
+            },
+            {
+              "x": 0.377,
+              "y": 0.4613
+            },
+            {
+              "x": 0.27,
+              "y": 0.56
+            }
+          ],
+          "progress": 0.78,
+          "lane": 0.02,
+          "x": 0.31708000000000003,
+          "y": 0.516572,
+          "visualOnly": true
+        },
+        "visualOnly": true
+      },
+      {
+        "role": "hauler",
+        "route": {
+          "routeId": "ROUTE:hauler:actor:hauler:building:bldg_a69871126fd2a6ab",
+          "wayId": "WAY:HQ:bldg_a69871126fd2a6ab",
+          "mode": "carry",
+          "from": {
+            "kind": "building",
+            "id": "HQ"
+          },
+          "to": {
+            "kind": "building",
+            "id": "bldg_a69871126fd2a6ab"
+          },
+          "targetId": "bldg_a69871126fd2a6ab",
+          "points": [
+            {
+              "x": 0.55,
+              "y": 0.33999999999999997
+            },
+            {
+              "x": 0.407,
+              "y": 0.4513
+            },
+            {
+              "x": 0.3,
+              "y": 0.55
+            }
+          ],
+          "progress": 0.78,
+          "lane": 0.05,
+          "x": 0.34708,
+          "y": 0.506572,
+          "visualOnly": true
+        },
+        "visualOnly": true
+      },
+      {
+        "role": "messenger",
+        "route": {
+          "routeId": "ROUTE:messenger:actor:messenger:quest:collect-first-wood",
+          "wayId": "WAY:HQ:TOWN_SQUARE",
+          "mode": "notify",
+          "from": {
+            "kind": "building",
+            "id": "HQ"
+          },
+          "to": {
+            "kind": "town_square",
+            "id": "HQ_APPROACH"
+          },
+          "targetId": "HQ",
+          "points": [
+            {
+              "x": 0.39,
+              "y": 0.37999999999999995
+            },
+            {
+              "x": 0.5,
+              "y": 0.39499999999999996
+            },
+            {
+              "x": 0.61,
+              "y": 0.37999999999999995
+            }
+          ],
+          "progress": 0.38,
+          "lane": -0.06,
+          "x": 0.4736,
+          "y": 0.39139999999999997,
+          "visualOnly": true
+        },
+        "visualOnly": true
+      }
+    ]
+  },
+  "hauler": {
+    "renderer": "three.js",
+    "roles": [
+      "clover",
+      "worker",
+      "hauler",
+      "messenger"
+    ],
+    "ways": [
+      {
+        "wayId": "WAY:HQ:bldg_a69871126fd2a6ab",
+        "targetId": "bldg_a69871126fd2a6ab",
+        "label": "HQ path to Lumber Camp",
+        "points": [
+          {
+            "x": 0.5,
+            "y": 0.33999999999999997
+          },
+          {
+            "x": 0.357,
+            "y": 0.4513
+          },
+          {
+            "x": 0.25,
+            "y": 0.55
+          }
+        ],
+        "visualOnly": true
+      },
+      {
+        "wayId": "WAY:HQ:TOWN_SQUARE",
+        "targetId": "HQ",
+        "label": "HQ approach",
+        "points": [
+          {
+            "x": 0.38,
+            "y": 0.37999999999999995
+          },
+          {
+            "x": 0.5,
+            "y": 0.42
+          },
+          {
+            "x": 0.62,
+            "y": 0.37999999999999995
+          }
+        ],
+        "visualOnly": true
+      }
+    ],
+    "renderedWays": [
+      {
+        "wayId": "WAY:HQ:bldg_a69871126fd2a6ab",
+        "targetId": "bldg_a69871126fd2a6ab",
+        "visualOnly": true
+      },
+      {
+        "wayId": "WAY:HQ:TOWN_SQUARE",
+        "targetId": "HQ",
+        "visualOnly": true
+      }
+    ],
+    "encounters": [
+      {
+        "encounterId": "ENCOUNTER:HQ:clover+messenger",
+        "targetId": "HQ",
+        "roles": [
+          "clover",
+          "messenger"
+        ],
+        "actorIds": [
+          "actor:clover:foreman:plot_b575cdeec3e6c53e",
+          "actor:messenger:quest:collect-first-wood"
+        ],
+        "cueType": "crossing_greeting",
+        "visualOnly": true,
+        "canvas": {
+          "x": 392.19465937499996,
+          "y": 367.45732265624997
+        }
+      },
+      {
+        "encounterId": "ENCOUNTER:bldg_a69871126fd2a6ab:hauler+worker",
+        "targetId": "bldg_a69871126fd2a6ab",
+        "roles": [
+          "worker",
+          "hauler"
+        ],
+        "actorIds": [
+          "actor:hauler:building:bldg_a69871126fd2a6ab",
+          "actor:worker:job:job_ef02d1efd7e4a827"
+        ],
+        "cueType": "handoff",
+        "visualOnly": true,
+        "canvas": {
+          "x": 283.509568125,
+          "y": 416.55224341406245
+        }
+      }
+    ],
+    "renderedEncounters": [
+      {
+        "encounterId": "ENCOUNTER:HQ:clover+messenger",
+        "targetId": "HQ",
+        "cueType": "crossing_greeting",
+        "roles": [
+          "clover",
+          "messenger"
+        ],
+        "visualOnly": true
+      },
+      {
+        "encounterId": "ENCOUNTER:bldg_a69871126fd2a6ab:hauler+worker",
+        "targetId": "bldg_a69871126fd2a6ab",
+        "cueType": "handoff",
+        "roles": [
+          "worker",
+          "hauler"
+        ],
+        "visualOnly": true
+      }
+    ],
+    "actorRoutes": [
+      {
+        "role": "clover",
+        "route": {
+          "routeId": "ROUTE:clover:actor:clover:foreman:plot_b575cdeec3e6c53e",
+          "wayId": "WAY:HQ:TOWN_SQUARE",
+          "mode": "presence",
+          "from": {
+            "kind": "building",
+            "id": "HQ"
+          },
+          "to": {
+            "kind": "town_square",
+            "id": "HQ_APPROACH"
+          },
+          "targetId": "HQ",
+          "points": [
+            {
+              "x": 0.42,
+              "y": 0.355
+            },
+            {
+              "x": 0.5,
+              "y": 0.36624999999999996
+            },
+            {
+              "x": 0.58,
+              "y": 0.355
+            }
+          ],
+          "progress": 0.24,
+          "lane": -0.045,
+          "x": 0.4584,
+          "y": 0.3604,
+          "visualOnly": true
+        },
+        "visualOnly": true
+      },
+      {
+        "role": "worker",
+        "route": {
+          "routeId": "ROUTE:worker:actor:worker:job:job_ef02d1efd7e4a827",
+          "wayId": "WAY:HQ:bldg_a69871126fd2a6ab",
+          "mode": "work",
+          "from": {
+            "kind": "building",
+            "id": "HQ"
+          },
+          "to": {
+            "kind": "building",
+            "id": "bldg_a69871126fd2a6ab"
+          },
+          "targetId": "bldg_a69871126fd2a6ab",
+          "points": [
+            {
+              "x": 0.52,
+              "y": 0.35
+            },
+            {
+              "x": 0.377,
+              "y": 0.4613
+            },
+            {
+              "x": 0.27,
+              "y": 0.56
+            }
+          ],
+          "progress": 0.78,
+          "lane": 0.02,
+          "x": 0.31708000000000003,
+          "y": 0.516572,
+          "visualOnly": true
+        },
+        "visualOnly": true
+      },
+      {
+        "role": "hauler",
+        "route": {
+          "routeId": "ROUTE:hauler:actor:hauler:building:bldg_a69871126fd2a6ab",
+          "wayId": "WAY:HQ:bldg_a69871126fd2a6ab",
+          "mode": "carry",
+          "from": {
+            "kind": "building",
+            "id": "HQ"
+          },
+          "to": {
+            "kind": "building",
+            "id": "bldg_a69871126fd2a6ab"
+          },
+          "targetId": "bldg_a69871126fd2a6ab",
+          "points": [
+            {
+              "x": 0.55,
+              "y": 0.33999999999999997
+            },
+            {
+              "x": 0.407,
+              "y": 0.4513
+            },
+            {
+              "x": 0.3,
+              "y": 0.55
+            }
+          ],
+          "progress": 0.78,
+          "lane": 0.05,
+          "x": 0.34708,
+          "y": 0.506572,
+          "visualOnly": true
+        },
+        "visualOnly": true
+      },
+      {
+        "role": "messenger",
+        "route": {
+          "routeId": "ROUTE:messenger:actor:messenger:quest:collect-first-wood",
+          "wayId": "WAY:HQ:TOWN_SQUARE",
+          "mode": "notify",
+          "from": {
+            "kind": "building",
+            "id": "HQ"
+          },
+          "to": {
+            "kind": "town_square",
+            "id": "HQ_APPROACH"
+          },
+          "targetId": "HQ",
+          "points": [
+            {
+              "x": 0.39,
+              "y": 0.37999999999999995
+            },
+            {
+              "x": 0.5,
+              "y": 0.39499999999999996
+            },
+            {
+              "x": 0.61,
+              "y": 0.37999999999999995
+            }
+          ],
+          "progress": 0.38,
+          "lane": -0.06,
+          "x": 0.4736,
+          "y": 0.39139999999999997,
+          "visualOnly": true
+        },
+        "visualOnly": true
+      }
+    ]
+  }
+}

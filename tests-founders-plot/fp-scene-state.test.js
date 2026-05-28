@@ -54,17 +54,33 @@ test('FP-SCENE-001 projects server visualActors into visual-only scene inhabitan
   assert.equal(builder.actionAnimation.mode, 'work_swing');
   assert.equal(builder.actionAnimation.hasWalkOffset, true);
   assert.equal(builder.actionAnimation.stepStyle, 'shuffle');
-  assert.equal(builder.assetSrc, '/experiences/founders-plot/assets/characters/inhabitants/builder/builder-agentfolk-v2.png');
-  assert.equal(builder.assetSprite.id, 'builder-agentfolk-v2');
-  assert.equal(builder.assetSprite.action, 'work');
+  assert.equal(builder.route.visualOnly, true);
+  assert.match(builder.route.routeId, /^ROUTE:builder:/);
+  assert.match(builder.route.wayId, /^WAY:HQ:/);
+  assert.equal(builder.route.mode, 'work');
+  assert.equal(builder.route.to.kind, 'building');
+  assert.equal(builder.route.targetId, builder.target.id);
+  assert.equal(builder.route.points.length, 3);
+  assert.ok(builder.route.progress > 0);
+  assert.ok(builder.route.progress < 1);
+  assert.equal(builder.assetSrc, '/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.png');
+  assert.equal(builder.assetSprite.id, 'rigger-slate-builder-v2');
+  assert.equal(builder.assetSprite.action, 'build');
   assert.equal(builder.assetSprite.columns, 4);
   assert.equal(builder.assetSprite.rows, 4);
-  assert.equal(builder.assetSprite.row, 2);
+  assert.equal(builder.assetSprite.row, 1);
   assert.deepEqual(builder.assetSprite.frames, [0, 1, 2, 3]);
   assert.match(builder.actionAnimation.phaseSeed, /builder/);
   assert.match(builder.sourceObjectId, /^job_/);
   assert.match(builder.selectionKey, /^building:/);
-  assert.equal(scene.objects.some((object) => object.id === 'CLOVER' && object.visualOnly === true), true);
+  const clover = scene.objects.find((object) => object.id === 'CLOVER');
+  assert.equal(clover.visualOnly, true);
+  assert.equal(clover.assetSrc, '/experiences/founders-plot/assets/characters/v1_4_4/clover-observing.webp');
+  const lumberWay = scene.ways.find((way) => way.targetId === builder.target.id);
+  assert.ok(lumberWay, 'construction target should have an HQ path');
+  assert.equal(lumberWay.visualOnly, true);
+  assert.equal(lumberWay.points.length, 3);
+  assert.equal(scene.ways.some((way) => way.wayId === 'WAY:HQ:TOWN_SQUARE'), true);
 });
 
 test('FP-SCENE-002 represents worker and hauler roles from production and ready output state', () => {
@@ -107,13 +123,17 @@ test('FP-SCENE-002 represents worker and hauler roles from production and ready 
   assert.equal(worker.actionCue.cueType, 'production_work');
   assert.equal(worker.actionCue.accessory, 'tools');
   assert.equal(worker.actionAnimation.mode, 'busy_work');
-  assert.equal(worker.assetSrc, '/experiences/founders-plot/assets/characters/inhabitants/worker/worker-agentfolk-v1.png');
-  assert.equal(worker.assetSprite.id, 'worker-agentfolk-v1');
+  assert.equal(worker.assetSrc, '/experiences/founders-plot/assets/characters/inhabitants/worker/kettle-37-worker-v1.png');
+  assert.equal(worker.assetSprite.id, 'kettle-37-worker-v1');
   assert.equal(worker.assetSprite.action, 'work');
   assert.equal(worker.assetSprite.columns, 4);
   assert.equal(worker.assetSprite.rows, 4);
   assert.equal(worker.assetSprite.row, 2);
   assert.deepEqual(worker.assetSprite.frames, [0, 1, 2, 3]);
+  assert.equal(worker.route.visualOnly, true);
+  assert.match(worker.route.wayId, /^WAY:HQ:/);
+  assert.equal(worker.route.mode, 'work');
+  assert.equal(worker.route.targetId, worker.target.id);
 
   const outputReady = engine.advancePlotTimeForTests({
     pairId: env.state.plot.pairId,
@@ -134,13 +154,18 @@ test('FP-SCENE-002 represents worker and hauler roles from production and ready 
   assert.equal(hauler.actionCue.accessory, 'bundle');
   assert.equal(hauler.actionAnimation.mode, 'carry_wobble');
   assert.equal(hauler.actionAnimation.stepStyle, 'waddle');
-  assert.equal(hauler.assetSrc, '/experiences/founders-plot/assets/characters/inhabitants/hauler/hauler-agentfolk-v1.png');
-  assert.equal(hauler.assetSprite.id, 'hauler-agentfolk-v1');
+  assert.equal(hauler.assetSrc, '/experiences/founders-plot/assets/characters/inhabitants/hauler/oona-tallpack-hauler-v1.png');
+  assert.equal(hauler.assetSprite.id, 'oona-tallpack-hauler-v1');
   assert.equal(hauler.assetSprite.action, 'ready');
   assert.equal(hauler.assetSprite.columns, 4);
   assert.equal(hauler.assetSprite.rows, 4);
   assert.equal(hauler.assetSprite.row, 3);
   assert.deepEqual(hauler.assetSprite.frames, [0, 1, 2, 3]);
+  assert.equal(hauler.route.visualOnly, true);
+  assert.match(hauler.route.wayId, /^WAY:HQ:/);
+  assert.equal(hauler.route.mode, 'carry');
+  assert.equal(hauler.route.targetId, hauler.target.id);
+  assert.ok(readyScene.ways.some((way) => way.targetId === hauler.target.id));
 });
 
 test('FP-SCENE-003 messenger actors project attention cues without mutating targets', () => {
@@ -167,4 +192,12 @@ test('FP-SCENE-003 messenger actors project attention cues without mutating targ
   assert.equal(messenger.assetSprite.rows, 4);
   assert.equal(messenger.assetSprite.row, 3);
   assert.deepEqual(messenger.assetSprite.frames, [0, 1, 2, 3]);
+  assert.equal(messenger.route.visualOnly, true);
+  assert.equal(messenger.route.wayId, 'WAY:HQ:TOWN_SQUARE');
+  assert.equal(messenger.route.mode, 'notify');
+  const encounter = scene.encounters.find((entry) => entry.targetId === 'HQ');
+  assert.ok(encounter, 'Clover and messenger should project a non-mutating HQ encounter');
+  assert.equal(encounter.visualOnly, true);
+  assert.equal(encounter.cueType, 'crossing_greeting');
+  assert.deepEqual(encounter.roles.sort(), ['clover', 'messenger']);
 });

@@ -1,0 +1,58 @@
+{
+  "id": "oona-tallpack-hauler-v1",
+  "character": "Oona Tallpack",
+  "role": "hauler",
+  "model": "openai/gpt-image-2",
+  "sourceImage": "oona-tallpack-hauler-v1.source.png",
+  "image": "oona-tallpack-hauler-v1.png",
+  "sourceSize": {
+    "width": 2048,
+    "height": 2048
+  },
+  "frame": {
+    "width": 512,
+    "height": 512
+  },
+  "layout": {
+    "columns": 4,
+    "rows": 4,
+    "frameCount": 16
+  },
+  "actions": {
+    "idle": {
+      "row": 0,
+      "frames": [0, 1, 2, 3],
+      "fps": 3
+    },
+    "walk": {
+      "row": 1,
+      "frames": [0, 1, 2, 3],
+      "fps": 6
+    },
+    "work": {
+      "row": 2,
+      "frames": [0, 1, 2, 3],
+      "fps": 6
+    },
+    "ready": {
+      "row": 3,
+      "frames": [0, 1, 2, 3],
+      "fps": 4
+    }
+  },
+  "actionMapping": {
+    "OUTPUT_READY": "ready"
+  },
+  "origin": "Alien freight-runner from the Dust Comet caravan who hauled the first timber bundles that made the rescued AI agent's plan wagon livable.",
+  "promptFile": "oona-tallpack-hauler-v1.prompt.md",
+  "styleReference": {
+    "canonicalCloverSet": "public/experiences/founders-plot/assets/characters/v1_4_4/",
+    "notes": "Character-first generation pass. Oona is intentionally an alien freight-runner with load-bearing movement and rope/canvas material language."
+  },
+  "transparency": {
+    "method": "ImageMagick chroma key after GPT Image 2 source generation",
+    "sourceKeyRequested": "#ff00ff",
+    "sampledKey": "#ee0fed",
+    "fuzz": "24%"
+  }
+}
