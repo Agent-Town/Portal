@@ -1,0 +1,92 @@
+{
+  "id": "rigger-slate-builder-v1",
+  "role": "builder",
+  "status": "candidate",
+  "displayName": "Rigger Slate",
+  "description": "Adult-coded frontier construction rigger and surveyor-carpenter builder candidate with broad shoulders, square torso, heavy gloves, asymmetric AI survey harness, folding tripod-measure, tool satchel, and red scarf color anchor.",
+  "source": {
+    "path": "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v1.source.png",
+    "background": "#ff00ff-ish chroma key",
+    "notes": "Built-in image generation returned a 1254x1254 chroma-key sheet despite the prompt requesting 2048x2048. The saved source was normalized to 2048x2048 with ImageMagick before alpha removal so the delivered sheet has exact 512x512 frame cells."
+  },
+  "texture": {
+    "path": "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v1.png",
+    "format": "png",
+    "colorSpace": "sRGB",
+    "channels": "sRGBA",
+    "width": 2048,
+    "height": 2048,
+    "alpha": true,
+    "transparentCorners": true
+  },
+  "sheet": {
+    "columns": 4,
+    "rows": 4,
+    "frameWidth": 512,
+    "frameHeight": 512,
+    "frameCount": 16,
+    "rowOrder": [
+      "idle",
+      "build",
+      "observe",
+      "celebrate"
+    ],
+    "frames": [
+      { "index": 0, "row": 0, "column": 0, "name": "idle-0" },
+      { "index": 1, "row": 0, "column": 1, "name": "idle-1" },
+      { "index": 2, "row": 0, "column": 2, "name": "idle-2" },
+      { "index": 3, "row": 0, "column": 3, "name": "idle-3" },
+      { "index": 4, "row": 1, "column": 0, "name": "build-tripod-measure" },
+      { "index": 5, "row": 1, "column": 1, "name": "build-mark-beam" },
+      { "index": 6, "row": 1, "column": 2, "name": "build-tighten-brace" },
+      { "index": 7, "row": 1, "column": 3, "name": "build-check-alignment" },
+      { "index": 8, "row": 2, "column": 0, "name": "observe-plans" },
+      { "index": 9, "row": 2, "column": 1, "name": "observe-sight-tripod" },
+      { "index": 10, "row": 2, "column": 2, "name": "observe-horizon" },
+      { "index": 11, "row": 2, "column": 3, "name": "observe-ai-readout" },
+      { "index": 12, "row": 3, "column": 0, "name": "celebrate-thumbs-up" },
+      { "index": 13, "row": 3, "column": 1, "name": "celebrate-lift-measure" },
+      { "index": 14, "row": 3, "column": 2, "name": "celebrate-relaxed-grin" },
+      { "index": 15, "row": 3, "column": 3, "name": "celebrate-fist" }
+    ]
+  },
+  "generation": {
+    "date": "2026-05-28",
+    "mode": "built-in image_gen",
+    "model": "available built-in image generation path",
+    "referenceImagesUsedForDirection": [
+      "/Users/robin/.openclaw/media/agent-town-references/v1_4_4/clover-idle-v1_4_4-no-holes.png",
+      "/Users/robin/.openclaw/media/agent-town-references/v1_4_4/clover-acting-v1_4_4-no-holes.png",
+      "/Users/robin/.openclaw/media/agent-town-references/v1_4_4/clover-observing-v1_4_4-no-holes.png",
+      "/Users/robin/.openclaw/media/agent-town-references/v1_4_4/clover-celebrating-v1_4_4-no-holes.png",
+      "/Users/robin/.openclaw/media/agent-town-references/founders-plot-desktop.webp",
+      "/Users/robin/.openclaw/media/agent-town-references/lumber-camp.webp"
+    ],
+    "promptPath": "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v1.prompt.md",
+    "originalGeneratedPath": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e6d93-31f4-7ba0-aea3-85164378127f/ig_0917ecf16dc91473016a17f63509bc8191942cfcc9fefe6dfb.png",
+    "postProcessing": [
+      "Copied generated chroma source into the project as rigger-slate-builder-v1.source.png.",
+      "Resized source to exact 2048x2048 with ImageMagick because the built-in generator returned 1254x1254.",
+      "Converted #ff00ff-ish chroma key to alpha with ImageMagick using -fuzz 26% -transparent '#ff00ff'.",
+      "Created checkerboard preview at reports/rigger-slate-builder-v1-checker-preview.png."
+    ]
+  },
+  "validation": {
+    "identify": "rigger-slate-builder-v1.png PNG 2048x2048 sRGB channels=srgba 4.0 alpha-min=0 alpha-max=1",
+    "cornerPixels": {
+      "0,0": "srgba(0,0,0,0)",
+      "2047,0": "srgba(0,0,0,0)",
+      "0,2047": "srgba(0,0,0,0)",
+      "2047,2047": "srgba(0,0,0,0)"
+    },
+    "sha256": {
+      "source": "53fbc17fb255236573e7e306fdba281d31cb4810ff28681eea1f07a21aa72049",
+      "png": "718d33b539fbcb3bb985fcbf07df8d6471264c32e73d2fbcf2959150abcf33f8"
+    }
+  },
+  "knownIssues": [
+    "A thin magenta edge fringe remains on parts of the character/tool silhouette after chroma removal.",
+    "The generated source was not natively 2048x2048; it was normalized to the required sheet size locally.",
+    "This candidate is not wired into scene_state.js; integration is intentionally left for the later review/integration lane."
+  ]
+}
