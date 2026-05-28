@@ -54,8 +54,8 @@ test('FP-SCENE-001 projects server visualActors into visual-only scene inhabitan
   assert.equal(builder.actionAnimation.mode, 'work_swing');
   assert.equal(builder.actionAnimation.hasWalkOffset, true);
   assert.equal(builder.actionAnimation.stepStyle, 'shuffle');
-  assert.equal(builder.assetSrc, '/experiences/founders-plot/assets/characters/inhabitants/builder/builder-sprite-sheet-gpt2-v1.png');
-  assert.equal(builder.assetSprite.id, 'builder-sprite-sheet-gpt2-v1');
+  assert.equal(builder.assetSrc, '/experiences/founders-plot/assets/characters/inhabitants/builder/builder-agentfolk-v2.png');
+  assert.equal(builder.assetSprite.id, 'builder-agentfolk-v2');
   assert.equal(builder.assetSprite.action, 'work');
   assert.equal(builder.assetSprite.columns, 4);
   assert.equal(builder.assetSprite.rows, 4);
@@ -107,6 +107,13 @@ test('FP-SCENE-002 represents worker and hauler roles from production and ready 
   assert.equal(worker.actionCue.cueType, 'production_work');
   assert.equal(worker.actionCue.accessory, 'tools');
   assert.equal(worker.actionAnimation.mode, 'busy_work');
+  assert.equal(worker.assetSrc, '/experiences/founders-plot/assets/characters/inhabitants/worker/worker-agentfolk-v1.png');
+  assert.equal(worker.assetSprite.id, 'worker-agentfolk-v1');
+  assert.equal(worker.assetSprite.action, 'work');
+  assert.equal(worker.assetSprite.columns, 4);
+  assert.equal(worker.assetSprite.rows, 4);
+  assert.equal(worker.assetSprite.row, 2);
+  assert.deepEqual(worker.assetSprite.frames, [0, 1, 2, 3]);
 
   const outputReady = engine.advancePlotTimeForTests({
     pairId: env.state.plot.pairId,
@@ -127,6 +134,13 @@ test('FP-SCENE-002 represents worker and hauler roles from production and ready 
   assert.equal(hauler.actionCue.accessory, 'bundle');
   assert.equal(hauler.actionAnimation.mode, 'carry_wobble');
   assert.equal(hauler.actionAnimation.stepStyle, 'waddle');
+  assert.equal(hauler.assetSrc, '/experiences/founders-plot/assets/characters/inhabitants/hauler/hauler-agentfolk-v1.png');
+  assert.equal(hauler.assetSprite.id, 'hauler-agentfolk-v1');
+  assert.equal(hauler.assetSprite.action, 'ready');
+  assert.equal(hauler.assetSprite.columns, 4);
+  assert.equal(hauler.assetSprite.rows, 4);
+  assert.equal(hauler.assetSprite.row, 3);
+  assert.deepEqual(hauler.assetSprite.frames, [0, 1, 2, 3]);
 });
 
 test('FP-SCENE-003 messenger actors project attention cues without mutating targets', () => {
@@ -146,4 +160,11 @@ test('FP-SCENE-003 messenger actors project attention cues without mutating targ
   assert.equal(messenger.actionCue.accessory, 'quest');
   assert.equal(messenger.actionAnimation.mode, 'attention_wave');
   assert.equal(messenger.actionAnimation.stepStyle, 'skip');
+  assert.equal(messenger.assetSrc, '/experiences/founders-plot/assets/characters/inhabitants/messenger/messenger-agentfolk-v1.png');
+  assert.equal(messenger.assetSprite.id, 'messenger-agentfolk-v1');
+  assert.equal(messenger.assetSprite.action, 'ready');
+  assert.equal(messenger.assetSprite.columns, 4);
+  assert.equal(messenger.assetSprite.rows, 4);
+  assert.equal(messenger.assetSprite.row, 3);
+  assert.deepEqual(messenger.assetSprite.frames, [0, 1, 2, 3]);
 });

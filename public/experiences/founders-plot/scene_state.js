@@ -71,19 +71,52 @@
     messenger: { mode: 'attention_wave', tempo: 1.35 }
   };
 
-  const BUILDER_SPRITE_SHEET = {
-    src: '/experiences/founders-plot/assets/characters/inhabitants/builder/builder-sprite-sheet-gpt2-v1.png',
-    metadataSrc: '/experiences/founders-plot/assets/characters/inhabitants/builder/builder-sprite-sheet-gpt2-v1.json',
-    columns: 4,
-    rows: 4,
-    frameWidth: 512,
-    frameHeight: 512,
-    actions: {
-      idle: { row: 0, frames: [0, 1, 2, 3], fps: 3 },
-      walk: { row: 1, frames: [0, 1, 2, 3], fps: 6 },
-      work: { row: 2, frames: [0, 1, 2, 3], fps: 6 },
-      ready: { row: 3, frames: [0, 1, 2, 3], fps: 4 }
+  const ACTOR_SPRITE_SHEETS = {
+    builder: {
+      id: 'builder-agentfolk-v2',
+      src: '/experiences/founders-plot/assets/characters/inhabitants/builder/builder-agentfolk-v2.png',
+      metadataSrc: '/experiences/founders-plot/assets/characters/inhabitants/builder/builder-agentfolk-v2.json',
+      actionMapping: {
+        CONSTRUCT: 'work',
+        UPGRADE: 'work',
+        OUTPUT_READY: 'ready'
+      }
+    },
+    worker: {
+      id: 'worker-agentfolk-v1',
+      src: '/experiences/founders-plot/assets/characters/inhabitants/worker/worker-agentfolk-v1.png',
+      metadataSrc: '/experiences/founders-plot/assets/characters/inhabitants/worker/worker-agentfolk-v1.json',
+      actionMapping: {
+        PRODUCE: 'work',
+        SELL: 'work',
+        OUTPUT_READY: 'ready'
+      }
+    },
+    hauler: {
+      id: 'hauler-agentfolk-v1',
+      src: '/experiences/founders-plot/assets/characters/inhabitants/hauler/hauler-agentfolk-v1.png',
+      metadataSrc: '/experiences/founders-plot/assets/characters/inhabitants/hauler/hauler-agentfolk-v1.json',
+      actionMapping: {
+        OUTPUT_READY: 'ready'
+      }
+    },
+    messenger: {
+      id: 'messenger-agentfolk-v1',
+      src: '/experiences/founders-plot/assets/characters/inhabitants/messenger/messenger-agentfolk-v1.png',
+      metadataSrc: '/experiences/founders-plot/assets/characters/inhabitants/messenger/messenger-agentfolk-v1.json',
+      actionMapping: {
+        APPROVAL: 'ready',
+        REWARD: 'ready',
+        QUEST: 'ready'
+      }
     }
+  };
+
+  const DEFAULT_SPRITE_SHEET_ACTIONS = {
+    idle: { row: 0, frames: [0, 1, 2, 3], fps: 3 },
+    walk: { row: 1, frames: [0, 1, 2, 3], fps: 6 },
+    work: { row: 2, frames: [0, 1, 2, 3], fps: 6 },
+    ready: { row: 3, frames: [0, 1, 2, 3], fps: 4 }
   };
 
   function num(value, fallback = 0) {
@@ -135,7 +168,7 @@
 
   function actorAsset(actor = {}) {
     const role = String(actor.canonicalRoleId || '').trim();
-    if (role === 'builder') return BUILDER_SPRITE_SHEET.src;
+    if (ACTOR_SPRITE_SHEETS[role]) return ACTOR_SPRITE_SHEETS[role].src;
     if (role !== 'clover') return '';
     const state = String(actor.visualState || '').trim().replace(/_/g, '-');
     const allowed = ['acting', 'blocked', 'celebrating', 'idle', 'observing', 'paused', 'thinking', 'waiting-approval'];
@@ -145,22 +178,20 @@
 
   function actorSpriteSheet(actor = {}) {
     const role = String(actor.canonicalRoleId || '').trim();
-    if (role !== 'builder') return null;
+    const sheet = ACTOR_SPRITE_SHEETS[role];
+    if (!sheet) return null;
     const actionKind = upper(actor.actionKind || actor.visualState || '');
-    const action = actionKind === 'CONSTRUCT' || actionKind === 'UPGRADE'
-      ? 'work'
-      : actionKind === 'OUTPUT_READY'
-        ? 'ready'
-        : 'idle';
+    const action = sheet.actionMapping[actionKind] || 'idle';
+    const frames = DEFAULT_SPRITE_SHEET_ACTIONS[action] || DEFAULT_SPRITE_SHEET_ACTIONS.idle;
     return {
-      id: 'builder-sprite-sheet-gpt2-v1',
-      metadataSrc: BUILDER_SPRITE_SHEET.metadataSrc,
-      columns: BUILDER_SPRITE_SHEET.columns,
-      rows: BUILDER_SPRITE_SHEET.rows,
-      frameWidth: BUILDER_SPRITE_SHEET.frameWidth,
-      frameHeight: BUILDER_SPRITE_SHEET.frameHeight,
+      id: sheet.id,
+      metadataSrc: sheet.metadataSrc,
+      columns: 4,
+      rows: 4,
+      frameWidth: 512,
+      frameHeight: 512,
       action,
-      ...BUILDER_SPRITE_SHEET.actions[action]
+      ...frames
     };
   }
 

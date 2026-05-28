@@ -106,9 +106,9 @@ test('Three.js Founders Plot renders Clover plus builder, worker, and hauler fro
   expect(builderInfo.actors).toEqual(expect.arrayContaining([
     expect.objectContaining({
       canonicalRoleId: 'builder',
-      assetSrc: '/experiences/founders-plot/assets/characters/inhabitants/builder/builder-sprite-sheet-gpt2-v1.png',
+      assetSrc: '/experiences/founders-plot/assets/characters/inhabitants/builder/builder-agentfolk-v2.png',
       assetSprite: expect.objectContaining({
-        id: 'builder-sprite-sheet-gpt2-v1',
+        id: 'builder-agentfolk-v2',
         action: 'work',
         row: 2,
         columns: 4,
@@ -121,7 +121,7 @@ test('Three.js Founders Plot renders Clover plus builder, worker, and hauler fro
     expect.objectContaining({
       canonicalRoleId: 'builder',
       spriteSheet: true,
-      spriteSheetId: 'builder-sprite-sheet-gpt2-v1',
+      spriteSheetId: 'builder-agentfolk-v2',
       spriteSheetAction: 'work',
       assetFallback: false
     })
@@ -149,7 +149,24 @@ test('Three.js Founders Plot renders Clover plus builder, worker, and hauler fro
   expect(workerInfo.actors).toEqual(expect.arrayContaining([
     expect.objectContaining({
       canonicalRoleId: 'worker',
+      assetSrc: '/experiences/founders-plot/assets/characters/inhabitants/worker/worker-agentfolk-v1.png',
+      assetSprite: expect.objectContaining({
+        id: 'worker-agentfolk-v1',
+        action: 'work',
+        row: 2,
+        columns: 4,
+        rows: 4
+      }),
       actionAnimation: expect.objectContaining({ mode: 'busy_work' })
+    })
+  ]));
+  expect(workerInfo.renderedActors).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      canonicalRoleId: 'worker',
+      spriteSheet: true,
+      spriteSheetId: 'worker-agentfolk-v1',
+      spriteSheetAction: 'work',
+      assetFallback: false
     })
   ]));
   expect(workerInfo.actionCues).toEqual(expect.arrayContaining([
@@ -181,11 +198,43 @@ test('Three.js Founders Plot renders Clover plus builder, worker, and hauler fro
   expect(info.actors).toEqual(expect.arrayContaining([
     expect.objectContaining({
       canonicalRoleId: 'hauler',
+      assetSrc: '/experiences/founders-plot/assets/characters/inhabitants/hauler/hauler-agentfolk-v1.png',
+      assetSprite: expect.objectContaining({
+        id: 'hauler-agentfolk-v1',
+        action: 'ready',
+        row: 3,
+        columns: 4,
+        rows: 4
+      }),
       actionAnimation: expect.objectContaining({ mode: 'carry_wobble', stepStyle: 'waddle' })
     }),
     expect.objectContaining({
       canonicalRoleId: 'messenger',
+      assetSrc: '/experiences/founders-plot/assets/characters/inhabitants/messenger/messenger-agentfolk-v1.png',
+      assetSprite: expect.objectContaining({
+        id: 'messenger-agentfolk-v1',
+        action: 'ready',
+        row: 3,
+        columns: 4,
+        rows: 4
+      }),
       actionAnimation: expect.objectContaining({ mode: 'attention_wave', stepStyle: 'skip' })
+    })
+  ]));
+  expect(info.renderedActors).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      canonicalRoleId: 'hauler',
+      spriteSheet: true,
+      spriteSheetId: 'hauler-agentfolk-v1',
+      spriteSheetAction: 'ready',
+      assetFallback: false
+    }),
+    expect.objectContaining({
+      canonicalRoleId: 'messenger',
+      spriteSheet: true,
+      spriteSheetId: 'messenger-agentfolk-v1',
+      spriteSheetAction: 'ready',
+      assetFallback: false
     })
   ]));
 

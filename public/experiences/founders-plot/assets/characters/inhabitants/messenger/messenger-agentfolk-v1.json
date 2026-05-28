@@ -1,0 +1,54 @@
+{
+  "id": "messenger-agentfolk-v1",
+  "role": "messenger",
+  "model": "openai/gpt-image-2",
+  "sourceImage": "messenger-agentfolk-v1.source.png",
+  "image": "messenger-agentfolk-v1.png",
+  "sourceSize": {
+    "width": 2048,
+    "height": 2048
+  },
+  "frame": {
+    "width": 512,
+    "height": 512
+  },
+  "layout": {
+    "columns": 4,
+    "rows": 4,
+    "frameCount": 16
+  },
+  "actions": {
+    "idle": {
+      "row": 0,
+      "frames": [0, 1, 2, 3],
+      "fps": 3
+    },
+    "walk": {
+      "row": 1,
+      "frames": [0, 1, 2, 3],
+      "fps": 6
+    },
+    "work": {
+      "row": 2,
+      "frames": [0, 1, 2, 3],
+      "fps": 6
+    },
+    "ready": {
+      "row": 3,
+      "frames": [0, 1, 2, 3],
+      "fps": 4
+    }
+  },
+  "actionMapping": {
+    "APPROVAL": "ready",
+    "REWARD": "ready",
+    "QUEST": "ready"
+  },
+  "promptSummary": "Adult compact frontier agentfolk messenger sprite sheet, 4 columns by 4 rows, idle/walk/signal-work/attention rows, courier satchel and subtle AI collaboration details, generated on a flat magenta chroma-key background.",
+  "transparency": {
+    "method": "ImageMagick chroma key after GPT Image 2 source generation",
+    "sourceKeyRequested": "#ff00ff",
+    "sampledKey": "#ed0deb",
+    "fuzz": "24%"
+  }
+}

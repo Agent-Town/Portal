@@ -1,0 +1,58 @@
+{
+  "id": "builder-agentfolk-v2",
+  "role": "builder",
+  "model": "openai/gpt-image-2",
+  "sourceImage": "builder-agentfolk-v2.source.png",
+  "image": "builder-agentfolk-v2.png",
+  "sourceSize": {
+    "width": 2048,
+    "height": 2048
+  },
+  "frame": {
+    "width": 512,
+    "height": 512
+  },
+  "layout": {
+    "columns": 4,
+    "rows": 4,
+    "frameCount": 16
+  },
+  "actions": {
+    "idle": {
+      "row": 0,
+      "frames": [0, 1, 2, 3],
+      "fps": 3
+    },
+    "walk": {
+      "row": 1,
+      "frames": [0, 1, 2, 3],
+      "fps": 6
+    },
+    "work": {
+      "row": 2,
+      "frames": [0, 1, 2, 3],
+      "fps": 6
+    },
+    "ready": {
+      "row": 3,
+      "frames": [0, 1, 2, 3],
+      "fps": 4
+    }
+  },
+  "actionMapping": {
+    "CONSTRUCT": "work",
+    "UPGRADE": "work",
+    "OUTPUT_READY": "ready"
+  },
+  "promptSummary": "Adult compact frontier agentfolk builder sprite sheet generated from the clean no-hole Clover v1_4_4 references. 4 columns by 4 rows: idle, walk/trot, hammer-work, ready/celebrate. Warm frontier storybook style with subtle AI tool details, hard adult-worker constraints, and no child/mascot/toy language.",
+  "styleReference": {
+    "canonicalCloverSet": "public/experiences/founders-plot/assets/characters/v1_4_4/",
+    "notes": "Generated after Robin clarified that the earlier builder looked too childlike and that no-hole Clover v1_4_4 should be the style reference."
+  },
+  "transparency": {
+    "method": "ImageMagick chroma key after GPT Image 2 source generation",
+    "sourceKeyRequested": "#ff00ff",
+    "sampledKey": "#f207f4",
+    "fuzz": "22%"
+  }
+}
