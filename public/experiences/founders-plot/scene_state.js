@@ -30,6 +30,39 @@
     messenger: { x: 0.13, y: 0.09 }
   };
 
+  const ACTION_CUES = {
+    clover: {
+      cueType: 'foreman_presence',
+      accessory: 'clover',
+      lane: 'watching',
+      label: 'Clover watching the plot'
+    },
+    builder: {
+      cueType: 'construction_progress',
+      accessory: 'hammer',
+      lane: 'building',
+      label: 'Construction work'
+    },
+    worker: {
+      cueType: 'production_work',
+      accessory: 'tools',
+      lane: 'production',
+      label: 'Production work'
+    },
+    hauler: {
+      cueType: 'carry_bundle',
+      accessory: 'bundle',
+      lane: 'output_ready',
+      label: 'Output ready'
+    },
+    messenger: {
+      cueType: 'attention_marker',
+      accessory: 'notice',
+      lane: 'attention',
+      label: 'Attention marker'
+    }
+  };
+
   function num(value, fallback = 0) {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
@@ -177,6 +210,48 @@
     return actor.selectionKey || `${actor.sourceDomain || 'actor'}:${actor.sourceObjectId || actor.actorId || ''}`;
   }
 
+  function actionCueForActor(actor = {}, role = 'worker') {
+    const actionKind = upper(actor.actionKind || actor.visualState || '');
+    const base = ACTION_CUES[role] || ACTION_CUES.worker;
+    let cueType = base.cueType;
+    let accessory = base.accessory;
+    let lane = base.lane;
+    let label = base.label;
+
+    if (role === 'builder' && actionKind === 'UPGRADE') {
+      cueType = 'upgrade_progress';
+      accessory = 'wrench';
+      label = 'Upgrade work';
+    } else if (role === 'worker' && actionKind === 'SELL') {
+      cueType = 'sell_work';
+      accessory = 'coin';
+      lane = 'selling';
+      label = 'Sell work';
+    } else if (role === 'messenger') {
+      if (actionKind === 'APPROVAL') {
+        accessory = 'approval';
+        label = 'Approval waiting';
+      } else if (actionKind === 'REWARD') {
+        accessory = 'reward';
+        label = 'Reward ready';
+      } else if (actionKind === 'QUEST') {
+        accessory = 'quest';
+        label = 'Quest update';
+      }
+    }
+
+    return {
+      cueType,
+      accessory,
+      lane,
+      label,
+      actionKind,
+      progress: clamp(num(actor.progress, 0), 0, 1),
+      targetKind: actor.target?.kind || '',
+      targetId: actor.target?.id || ''
+    };
+  }
+
   function sceneObjectForActor(actor = {}, index = 0, buildings = []) {
     const role = String(actor.canonicalRoleId || 'worker').trim();
     const base = targetPosition(actor, buildings);
@@ -195,6 +270,7 @@
       sourceObjectId: String(actor.sourceObjectId || ''),
       sourceStateHash: String(actor.sourceStateHash || ''),
       visualState: String(actor.visualState || 'idle'),
+      actionKind: actor.actionKind ? String(actor.actionKind) : '',
       progress: clamp(num(actor.progress, 0), 0, 1),
       label,
       state: String(actor.visualState || 'idle').toUpperCase(),
@@ -207,6 +283,7 @@
       drawerKey: drawerKeyForActor(actor),
       testId: `fp-visual-actor-${role}`,
       target: actor.target || null,
+      actionCue: actionCueForActor(actor, role),
       visualOnly: true
     };
   }
@@ -247,10 +324,12 @@
         sourceObjectId: object.sourceObjectId,
         sourceStateHash: object.sourceStateHash,
         visualState: object.visualState,
+        actionKind: object.actionKind,
         progress: object.progress,
         selectionKey: object.selectionKey,
         drawerKey: object.drawerKey,
         target: object.target,
+        actionCue: object.actionCue,
         visualOnly: true
       }));
     return {

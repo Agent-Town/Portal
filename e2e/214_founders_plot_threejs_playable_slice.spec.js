@@ -76,7 +76,7 @@ async function canvasStats(page) {
   });
 }
 
-test('Three.js Founders Plot renders Clover plus builder, worker, and hauler from server visualActors', async ({ page, request }) => {
+test('Three.js Founders Plot renders Clover plus builder, worker, and hauler from server visualActors', async ({ page, request }, testInfo) => {
   await page.goto('/founders-plot');
   await expect(page.getByTestId('fp-root')).toBeVisible();
   await expect(page.getByTestId('founders-three-scene')).toBeVisible();
@@ -84,6 +84,8 @@ test('Three.js Founders Plot renders Clover plus builder, worker, and hauler fro
 
   await waitForRole(page, 'clover');
   await expect(page.getByTestId('fp-visual-actor-clover')).toHaveAttribute('data-visual-only', 'true');
+  await waitForRole(page, 'messenger');
+  await expect(page.getByTestId('fp-visual-actor-messenger')).toHaveAttribute('data-action-cue', 'attention_marker');
 
   const pixels = await canvasStats(page);
   expect(pixels.ok).toBe(true);
@@ -97,6 +99,13 @@ test('Three.js Founders Plot renders Clover plus builder, worker, and hauler fro
   await expect(page.getByTestId('fp-tile-0-1')).toContainText('Building');
   await waitForRole(page, 'builder');
   await expect(page.getByTestId('fp-visual-actor-builder')).toHaveAttribute('data-source-domain', 'job');
+  await expect(page.getByTestId('fp-visual-actor-builder')).toHaveAttribute('data-action-kind', 'CONSTRUCT');
+  await expect(page.getByTestId('fp-visual-actor-builder')).toHaveAttribute('data-action-cue', 'construction_progress');
+  await expect(page.getByTestId('fp-visual-actor-builder')).toHaveAttribute('data-accessory', 'hammer');
+  const builderInfo = await page.evaluate(() => window.__foundersPlotTest.getThreeSceneInfo());
+  expect(builderInfo.actionCues).toEqual(expect.arrayContaining([
+    expect.objectContaining({ canonicalRoleId: 'builder', cueType: 'construction_progress', accessory: 'hammer' })
+  ]));
 
   const beforePickEvents = await eventCount(request);
   await clickActorOnCanvas(page, 'builder');
@@ -110,15 +119,41 @@ test('Three.js Founders Plot renders Clover plus builder, worker, and hauler fro
   await page.getByTestId('fp-btn-queue').click();
   await waitForRole(page, 'worker');
   await expect(page.getByTestId('fp-visual-actor-worker')).toHaveAttribute('data-source-domain', 'job');
+  await expect(page.getByTestId('fp-visual-actor-worker')).toHaveAttribute('data-action-kind', 'PRODUCE');
+  await expect(page.getByTestId('fp-visual-actor-worker')).toHaveAttribute('data-action-cue', 'production_work');
+  await expect(page.getByTestId('fp-visual-actor-worker')).toHaveAttribute('data-accessory', 'tools');
+  const workerInfo = await page.evaluate(() => window.__foundersPlotTest.getThreeSceneInfo());
+  expect(workerInfo.actionCues).toEqual(expect.arrayContaining([
+    expect.objectContaining({ canonicalRoleId: 'worker', cueType: 'production_work', accessory: 'tools' })
+  ]));
 
   await advancePlot(page, 2 * 60 * 1000);
   await page.reload();
   await expect(page.getByTestId('fp-tile-0-1')).toContainText('Ready to collect');
   await waitForRole(page, 'hauler');
   await expect(page.getByTestId('fp-visual-actor-hauler')).toHaveAttribute('data-source-domain', 'building');
+  await expect(page.getByTestId('fp-visual-actor-hauler')).toHaveAttribute('data-action-kind', 'OUTPUT_READY');
+  await expect(page.getByTestId('fp-visual-actor-hauler')).toHaveAttribute('data-action-cue', 'carry_bundle');
+  await expect(page.getByTestId('fp-visual-actor-hauler')).toHaveAttribute('data-accessory', 'bundle');
+
+  const beforeMessengerPickEvents = await eventCount(request);
+  await clickActorOnCanvas(page, 'messenger');
+  await expect(page.getByTestId('fp-quest-step')).toBeVisible();
+  expect(await eventCount(request)).toBe(beforeMessengerPickEvents);
 
   const info = await page.evaluate(() => window.__foundersPlotTest.getThreeSceneInfo());
   expect(info.renderer).toBe('three.js');
   expect(info.roles).toEqual(expect.arrayContaining(['clover', 'hauler']));
   expect(info.actors.every((actor) => actor.visualOnly === true)).toBe(true);
+  expect(info.actionCues).toEqual(expect.arrayContaining([
+    expect.objectContaining({ canonicalRoleId: 'hauler', cueType: 'carry_bundle', accessory: 'bundle' }),
+    expect.objectContaining({ canonicalRoleId: 'messenger', cueType: 'attention_marker' })
+  ]));
+
+  const screenshotPath = testInfo.outputPath('founders-plot-inhabitants-action-feel-v2.png');
+  await page.screenshot({ path: screenshotPath, fullPage: false });
+  await testInfo.attach('founders-plot-inhabitants-action-feel-v2', {
+    path: screenshotPath,
+    contentType: 'image/png'
+  });
 });

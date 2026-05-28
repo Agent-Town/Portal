@@ -723,6 +723,7 @@ function makeVisualActor({
   sourceObjectId,
   sourceStateHash,
   visualState,
+  actionKind = null,
   progress = 0,
   target = null
 }) {
@@ -737,6 +738,7 @@ function makeVisualActor({
     sourceObjectId: safeSourceId,
     sourceStateHash,
     visualState: String(visualState || 'idle'),
+    actionKind: actionKind ? String(actionKind) : null,
     progress: Math.max(0, Math.min(1, Number(progress || 0))),
     target,
     selectionKey: target?.kind && target?.id ? `${target.kind}:${target.id}` : `${safeDomain}:${safeSourceId}`,
@@ -760,6 +762,7 @@ function visualActorProjections(bundle, { stateHash }) {
     sourceStateHash,
     visualState: bundle.policy.emergencyPause ? 'paused' : 'observing',
     progress: 0,
+    actionKind: 'OBSERVE',
     target: actorTargetForBuilding(hq)
   }));
 
@@ -775,6 +778,7 @@ function visualActorProjections(bundle, { stateHash }) {
         sourceObjectId: job.jobId,
         sourceStateHash,
         visualState: job.status === 'QUEUED' ? 'waiting_to_build' : 'building',
+        actionKind: job.kind,
         progress: visualActorProgress(job, nowMs),
         target
       }));
@@ -788,6 +792,7 @@ function visualActorProjections(bundle, { stateHash }) {
         sourceObjectId: job.jobId,
         sourceStateHash,
         visualState: job.status === 'QUEUED' ? 'waiting_to_work' : 'working',
+        actionKind: job.kind,
         progress: visualActorProgress(job, nowMs),
         target
       }));
@@ -803,6 +808,7 @@ function visualActorProjections(bundle, { stateHash }) {
       sourceObjectId: building.buildingId,
       sourceStateHash,
       visualState: 'ready_to_collect',
+      actionKind: 'OUTPUT_READY',
       progress: 1,
       target: actorTargetForBuilding(building)
     }));
@@ -819,6 +825,7 @@ function visualActorProjections(bundle, { stateHash }) {
       sourceObjectId: messengerSource.approvalId || messengerSource.rewardId || messengerSource.id || 'current',
       sourceStateHash,
       visualState: messengerSource.approvalId ? 'needs_approval' : 'notifying',
+      actionKind: messengerSource.approvalId ? 'APPROVAL' : messengerSource.rewardId ? 'REWARD' : 'QUEST',
       progress: 0,
       target: actorTargetForBuilding(hq)
     }));
