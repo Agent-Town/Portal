@@ -63,6 +63,14 @@
     }
   };
 
+  const ACTION_ANIMATIONS = {
+    clover: { mode: 'clover_watch', tempo: 0.8 },
+    builder: { mode: 'work_swing', tempo: 1.25 },
+    worker: { mode: 'busy_work', tempo: 1.15 },
+    hauler: { mode: 'carry_wobble', tempo: 1.05 },
+    messenger: { mode: 'attention_wave', tempo: 1.35 }
+  };
+
   function num(value, fallback = 0) {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
@@ -252,6 +260,26 @@
     };
   }
 
+  function actionAnimationForActor(actor = {}, role = 'worker', index = 0, offset = {}) {
+    const base = ACTION_ANIMATIONS[role] || ACTION_ANIMATIONS.worker;
+    const phaseSeed = [
+      actor.actorId,
+      actor.sourceDomain,
+      actor.sourceObjectId,
+      actor.sourceStateHash,
+      role,
+      index
+    ].filter(Boolean).join(':');
+    const offsetDistance = Math.abs(num(offset.x, 0)) + Math.abs(num(offset.y, 0));
+    return {
+      mode: base.mode,
+      tempo: base.tempo,
+      phaseSeed,
+      hasWalkOffset: offsetDistance > 0.015,
+      stepStyle: role === 'hauler' ? 'waddle' : role === 'messenger' ? 'skip' : 'shuffle'
+    };
+  }
+
   function sceneObjectForActor(actor = {}, index = 0, buildings = []) {
     const role = String(actor.canonicalRoleId || 'worker').trim();
     const base = targetPosition(actor, buildings);
@@ -284,6 +312,7 @@
       testId: `fp-visual-actor-${role}`,
       target: actor.target || null,
       actionCue: actionCueForActor(actor, role),
+      actionAnimation: actionAnimationForActor(actor, role, index, offset),
       visualOnly: true
     };
   }
@@ -330,6 +359,7 @@
         drawerKey: object.drawerKey,
         target: object.target,
         actionCue: object.actionCue,
+        actionAnimation: object.actionAnimation,
         visualOnly: true
       }));
     return {

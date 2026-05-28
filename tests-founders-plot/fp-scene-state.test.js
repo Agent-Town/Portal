@@ -51,6 +51,10 @@ test('FP-SCENE-001 projects server visualActors into visual-only scene inhabitan
   assert.equal(builder.actionCue.cueType, 'construction_progress');
   assert.equal(builder.actionCue.accessory, 'hammer');
   assert.equal(builder.actionCue.targetId, builder.target.id);
+  assert.equal(builder.actionAnimation.mode, 'work_swing');
+  assert.equal(builder.actionAnimation.hasWalkOffset, true);
+  assert.equal(builder.actionAnimation.stepStyle, 'shuffle');
+  assert.match(builder.actionAnimation.phaseSeed, /builder/);
   assert.match(builder.sourceObjectId, /^job_/);
   assert.match(builder.selectionKey, /^building:/);
   assert.equal(scene.objects.some((object) => object.id === 'CLOVER' && object.visualOnly === true), true);
@@ -95,6 +99,7 @@ test('FP-SCENE-002 represents worker and hauler roles from production and ready 
   assert.equal(worker.actionKind, 'PRODUCE');
   assert.equal(worker.actionCue.cueType, 'production_work');
   assert.equal(worker.actionCue.accessory, 'tools');
+  assert.equal(worker.actionAnimation.mode, 'busy_work');
 
   const outputReady = engine.advancePlotTimeForTests({
     pairId: env.state.plot.pairId,
@@ -113,6 +118,8 @@ test('FP-SCENE-002 represents worker and hauler roles from production and ready 
   assert.equal(hauler.actionKind, 'OUTPUT_READY');
   assert.equal(hauler.actionCue.cueType, 'carry_bundle');
   assert.equal(hauler.actionCue.accessory, 'bundle');
+  assert.equal(hauler.actionAnimation.mode, 'carry_wobble');
+  assert.equal(hauler.actionAnimation.stepStyle, 'waddle');
 });
 
 test('FP-SCENE-003 messenger actors project attention cues without mutating targets', () => {
@@ -130,4 +137,6 @@ test('FP-SCENE-003 messenger actors project attention cues without mutating targ
   assert.equal(messenger.actionKind, 'QUEST');
   assert.equal(messenger.actionCue.cueType, 'attention_marker');
   assert.equal(messenger.actionCue.accessory, 'quest');
+  assert.equal(messenger.actionAnimation.mode, 'attention_wave');
+  assert.equal(messenger.actionAnimation.stepStyle, 'skip');
 });

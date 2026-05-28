@@ -103,6 +103,12 @@ test('Three.js Founders Plot renders Clover plus builder, worker, and hauler fro
   await expect(page.getByTestId('fp-visual-actor-builder')).toHaveAttribute('data-action-cue', 'construction_progress');
   await expect(page.getByTestId('fp-visual-actor-builder')).toHaveAttribute('data-accessory', 'hammer');
   const builderInfo = await page.evaluate(() => window.__foundersPlotTest.getThreeSceneInfo());
+  expect(builderInfo.actors).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      canonicalRoleId: 'builder',
+      actionAnimation: expect.objectContaining({ mode: 'work_swing', hasWalkOffset: true })
+    })
+  ]));
   expect(builderInfo.actionCues).toEqual(expect.arrayContaining([
     expect.objectContaining({ canonicalRoleId: 'builder', cueType: 'construction_progress', accessory: 'hammer' })
   ]));
@@ -123,6 +129,12 @@ test('Three.js Founders Plot renders Clover plus builder, worker, and hauler fro
   await expect(page.getByTestId('fp-visual-actor-worker')).toHaveAttribute('data-action-cue', 'production_work');
   await expect(page.getByTestId('fp-visual-actor-worker')).toHaveAttribute('data-accessory', 'tools');
   const workerInfo = await page.evaluate(() => window.__foundersPlotTest.getThreeSceneInfo());
+  expect(workerInfo.actors).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      canonicalRoleId: 'worker',
+      actionAnimation: expect.objectContaining({ mode: 'busy_work' })
+    })
+  ]));
   expect(workerInfo.actionCues).toEqual(expect.arrayContaining([
     expect.objectContaining({ canonicalRoleId: 'worker', cueType: 'production_work', accessory: 'tools' })
   ]));
@@ -149,10 +161,20 @@ test('Three.js Founders Plot renders Clover plus builder, worker, and hauler fro
     expect.objectContaining({ canonicalRoleId: 'hauler', cueType: 'carry_bundle', accessory: 'bundle' }),
     expect.objectContaining({ canonicalRoleId: 'messenger', cueType: 'attention_marker' })
   ]));
+  expect(info.actors).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      canonicalRoleId: 'hauler',
+      actionAnimation: expect.objectContaining({ mode: 'carry_wobble', stepStyle: 'waddle' })
+    }),
+    expect.objectContaining({
+      canonicalRoleId: 'messenger',
+      actionAnimation: expect.objectContaining({ mode: 'attention_wave', stepStyle: 'skip' })
+    })
+  ]));
 
-  const screenshotPath = testInfo.outputPath('founders-plot-inhabitants-action-feel-v2.png');
+  const screenshotPath = testInfo.outputPath('founders-plot-animated-inhabitant-characters.png');
   await page.screenshot({ path: screenshotPath, fullPage: false });
-  await testInfo.attach('founders-plot-inhabitants-action-feel-v2', {
+  await testInfo.attach('founders-plot-animated-inhabitant-characters', {
     path: screenshotPath,
     contentType: 'image/png'
   });
