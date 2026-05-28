@@ -6,7 +6,7 @@
 - Base branch: `neo/founders-plot-animated-inhabitant-characters-2026-05-28`
 - Implementation commit: `8cf077e008c2f78ddbb8c5a26e0834e30715f0b6`
 - Remote: `origin` (`git@github.com:Agent-Town/Portal.git`)
-- PR: not opened in this lane
+- PR: not opened in this lane; pushed branch can be opened at `https://github.com/Agent-Town/Portal/pull/new/neo/founders-plot-gpt-image-builder-sprite-2026-05-28`
 
 ## Final Assets
 
