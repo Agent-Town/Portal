@@ -6,6 +6,7 @@
   "license": "MIT",
   "scripts": {
     "build:openclaw-lite": "node scripts/build_openclaw_lite_runtime.mjs",
+    "build:founders-plot-threejs": "node scripts/build_founders_plot_threejs_bundle.mjs",
     "build:agent0-sdk": "node scripts/build_agent0_sdk_bundle.mjs --install --build",
     "bundle:agent0-sdk": "node scripts/build_agent0_sdk_bundle.mjs",
     "optimize:atlas-district-images": "bash scripts/optimize_atlas_district_images.sh",
@@ -35,7 +36,8 @@
     "@solana/web3.js": "^1.98.4",
     "8004-solana": "0.7.4",
     "ethers": "^6.16.0",
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "three": "^0.184.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.50.0",

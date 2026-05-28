@@ -31,8 +31,10 @@
 
   <main class="fp-main">
     <section class="fp-plot" aria-label="Founders Plot grid">
-      <div class="fp-plot__scene">
+      <div class="fp-plot__scene" id="fp-three-stage" data-testid="founders-plot-stage">
+        <div class="fp-three-viewport" id="fp-three-viewport" data-testid="founders-three-scene" aria-hidden="true"></div>
         <div class="fp-plot__grid" id="fp-grid" data-testid="fp-grid" role="grid"></div>
+        <div class="fp-scene-actor-hooks" id="fp-scene-actor-hooks" data-testid="fp-visual-actor-hooks" aria-label="Visual inhabitants"></div>
       </div>
       <div class="fp-plot__legend">
         <button class="fp-brass-btn" id="fp-close-palette" data-testid="fp-close-palette" hidden>Cancel placement</button>
@@ -97,6 +99,8 @@
 
   <div class="fp-toast" id="fp-toast" data-testid="fp-toast" hidden></div>
 
+  <script src="/experiences/founders-plot/scene_state.js" defer></script>
+  <script src="/experiences/founders-plot/three_scene_bundle.js" defer></script>
   <script src="/experiences/founders-plot/founders-plot.js" defer></script>
 </body>
 </html>

@@ -49,6 +49,9 @@
     resCoin:     document.querySelector('[data-testid="fp-res-coin"]'),
     hqLevel:     document.querySelector('[data-testid="fp-hq-level"]'),
     hqXp:        document.querySelector('[data-testid="fp-hq-xp"]'),
+    stage:       document.getElementById('fp-three-stage'),
+    threeViewport: document.getElementById('fp-three-viewport'),
+    actorHooks:  document.getElementById('fp-scene-actor-hooks'),
     grid:        document.getElementById('fp-grid'),
     palette:     document.getElementById('fp-palette'),
     palClose:    document.getElementById('fp-close-palette'),
@@ -76,6 +79,8 @@
     paletteOpenForTile: null,
     pollTimer: null,
     unlocks: ['LUMBER_CAMP'],
+    scene: null,
+    threeInfo: null,
   };
 
   async function api(path, method = 'GET', body = null) {
@@ -141,15 +146,20 @@
         tile.dataset.testid = `fp-tile-${x}-${y}`;
         tile.dataset.x = String(x); tile.dataset.y = String(y);
         tile.setAttribute('role', 'gridcell');
+        tile.dataset.selected = isTileSelected(x, y, building) ? 'true' : 'false';
         tile.setAttribute('aria-label', building
           ? `${BUILDING_LABELS[building.type] || building.type} at (${x}, ${y})`
           : `Empty pad at (${x}, ${y})`);
         if (!pad) {
           tile.classList.add('fp-tile--void');
+          tile.dataset.state = 'VOID';
           tile.setAttribute('aria-disabled', 'true');
           tile.disabled = true;
         } else if (building) {
           tile.classList.add('fp-tile--occupied', `fp-tile--${building.type.toLowerCase()}`);
+          tile.dataset.state = building.state === 'UNDER_CONSTRUCTION' || building.state === 'UPGRADING'
+            ? 'CONSTRUCTION'
+            : building.state;
           const label = document.createElement('span');
           label.className = 'fp-tile__label';
           label.textContent = BUILDING_LABELS[building.type] || building.type;
@@ -164,6 +174,7 @@
           }
         } else {
           tile.classList.add('fp-tile--empty');
+          tile.dataset.state = 'EMPTY';
           const plus = document.createElement('span');
           plus.className = 'fp-tile__plus';
           plus.textContent = '+';
@@ -173,6 +184,12 @@
         els.grid.appendChild(tile);
       }
     }
+  }
+
+  function isTileSelected(x, y, building) {
+    if (!state.selected) return false;
+    if (state.selected.kind === 'empty') return state.selected.x === x && state.selected.y === y && !building;
+    return !!building && state.selected.building?.buildingId === building.buildingId;
   }
 
   function humanizeState(b) {
@@ -327,6 +344,49 @@
     renderApprovals(bundle.pendingApprovals || []);
   }
 
+  function selectedKey() {
+    if (!state.selected) return '';
+    if (state.selected.kind === 'empty') return `pad:${state.selected.x},${state.selected.y}`;
+    if (state.selected.kind === 'building' && state.selected.building?.buildingId) {
+      return `building:${state.selected.building.buildingId}`;
+    }
+    return '';
+  }
+
+  function renderScene(bundle) {
+    if (!window.FoundersPlotSceneState || !els.stage || !els.threeViewport) return;
+    const scene = window.FoundersPlotSceneState.createSceneState(bundle, {
+      selectedKey: selectedKey()
+    });
+    state.scene = scene;
+    renderActorHooks(scene);
+    const renderer = window.FoundersPlotThreeRenderer;
+    if (renderer && typeof renderer.renderPlotScene === 'function') {
+      state.threeInfo = renderer.renderPlotScene(els.stage, els.threeViewport, scene);
+    }
+  }
+
+  function renderActorHooks(scene) {
+    if (!els.actorHooks) return;
+    els.actorHooks.innerHTML = '';
+    const actors = Array.isArray(scene?.actors) ? scene.actors : [];
+    actors.forEach((actor) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.dataset.testid = `fp-visual-actor-${actor.canonicalRoleId}`;
+      button.dataset.visualActorId = actor.actorId;
+      button.dataset.role = actor.canonicalRoleId;
+      button.dataset.sourceDomain = actor.sourceDomain;
+      button.dataset.sourceObjectId = actor.sourceObjectId;
+      button.dataset.selectionKey = actor.selectionKey;
+      button.dataset.drawerKey = actor.drawerKey;
+      button.dataset.visualOnly = 'true';
+      button.textContent = `${actor.canonicalRoleId} ${actor.sourceObjectId}`;
+      button.addEventListener('click', () => handleScenePick({ detail: actor }));
+      els.actorHooks.appendChild(button);
+    });
+  }
+
   function renderApprovals(list) {
     if (!els.approvals) return;
     if (!list.length) {
@@ -364,6 +424,54 @@
       state.selected = { kind: 'empty', x, y };
     }
     renderBuildingPanel(state.bundle || state.snapshot || {});
+    renderScene(state.bundle || state.snapshot || {});
+  }
+
+  function handleScenePick(ev) {
+    const detail = ev?.detail || {};
+    if (detail.drawerKey === 'approvals' || detail.sourceDomain === 'approval') {
+      els.foremanBody?.scrollIntoView({ block: 'nearest' });
+      els.approvals?.querySelector('button')?.focus();
+      return;
+    }
+    if (detail.drawerKey === 'foreman' || detail.sourceDomain === 'foreman') {
+      els.foremanBody?.scrollIntoView({ block: 'nearest' });
+      els.foremanAct?.focus();
+      return;
+    }
+    if (detail.drawerKey === 'rewards' || detail.sourceDomain === 'reward' || detail.drawerKey === 'quest' || detail.sourceDomain === 'quest') {
+      document.querySelector('[data-testid="fp-quest-step"]')?.scrollIntoView({ block: 'nearest' });
+      return;
+    }
+    selectByKey(detail.selectionKey || '');
+  }
+
+  function selectByKey(key) {
+    const bundle = state.bundle || {};
+    const buildings = Array.isArray(bundle.buildings) ? bundle.buildings : [];
+    if (String(key).startsWith('building:')) {
+      const id = key.slice('building:'.length);
+      const building = buildings.find((entry) => String(entry.buildingId || '') === id)
+        || buildings.find((entry) => entry.type === id)
+        || null;
+      if (building) {
+        state.selected = { kind: 'building', building, x: building.x, y: building.y };
+        closePalette();
+      }
+    } else if (String(key).startsWith('pad:')) {
+      const [xRaw, yRaw] = key.slice('pad:'.length).split(',');
+      const x = Number(xRaw);
+      const y = Number(yRaw);
+      if (Number.isFinite(x) && Number.isFinite(y)) {
+        const building = buildings.find((entry) => Number(entry.x) === x && Number(entry.y) === y);
+        state.selected = building ? { kind: 'building', building, x, y } : { kind: 'empty', x, y };
+      }
+    }
+    renderGrid(bundle);
+    renderBuildingPanel(bundle);
+    renderScene(bundle);
+    document.querySelector('[data-testid="fp-building-panel"]')?.scrollIntoView({ block: 'nearest' });
+    document.querySelector('[data-testid="fp-building-panel"] button')?.focus();
   }
 
   function openPalette(x, y, bundle) {
@@ -424,9 +532,13 @@
       policy: s.policy || plot.policy || {},
       permissions: s.permissions || {},
       pendingApprovals: s.approvals || s.pendingApprovals || plot.pendingApprovals || [],
+      rewards: s.rewards || [],
       quest: s.quest || plot.quest || null,
       unlocks: s.unlocks || { buildings: s.unlockedBuildings || [] },
       buildingDefs: s.buildingDefs || {},
+      visualActors: s.visualActors || [],
+      audit: s.audit || {},
+      stateHash: s.audit?.stateHash || envelope.stateHash || '',
       pads: s.pads || plot.pads || defaultPads(),
       hqLevel: plot.hqLevel || 1,
       townXp: plot.townXp || 0,
@@ -443,6 +555,7 @@
     renderBuildingPanel(bundle);
     renderForeman(bundle);
     renderRecap(bundle);
+    renderScene(bundle);
   }
 
   function refreshSelectedFromBundle(bundle) {
@@ -583,6 +696,7 @@
   // --- Boot -----------------------------------------------------------------
 
   function bind() {
+    window.addEventListener('founders-plot-scene-pick', handleScenePick);
     if (els.policyForm) els.policyForm.addEventListener('submit', savePolicy);
     if (els.drawerOpen) els.drawerOpen.addEventListener('click', () => toggleDrawer(true));
     if (els.drawerClose) els.drawerClose.addEventListener('click', () => acknowledgeRecap());
@@ -595,6 +709,19 @@
       els.foremanToggle.setAttribute('aria-expanded', hidden ? 'false' : 'true');
     });
   }
+
+  window.__foundersPlotTest = {
+    getState: () => state.bundle,
+    getScene: () => state.scene,
+    getVisualActors: () => state.scene?.actors || [],
+    getThreeSceneInfo: () => {
+      const renderer = window.FoundersPlotThreeRenderer;
+      if (renderer && typeof renderer.getPlotSceneInfo === 'function' && els.stage) {
+        return renderer.getPlotSceneInfo(els.stage) || state.threeInfo || {};
+      }
+      return state.threeInfo || {};
+    }
+  };
 
   function start() {
     bind();
