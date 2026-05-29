@@ -15,7 +15,12 @@
     atlas: null,
     draft: null,
     selectedStrategyId: null,
-    activeStrategyKey: initialStrategyKey()
+    activeStrategyKey: initialStrategyKey(),
+    editor: {
+      open: false,
+      strategy: null,
+      selectedStepId: null
+    }
   };
 
   function $(id) {
@@ -29,6 +34,10 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+  }
+
+  function clone(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
   }
 
   function testId(value) {
@@ -47,6 +56,14 @@
 
   function strategyTitle(strategy) {
     return strategy?.title || strategy?.strategyKey || 'Strategy';
+  }
+
+  function editorSafeId(value, fallback = 'editor.step') {
+    const safe = String(value || '')
+      .trim()
+      .replace(/[^a-zA-Z0-9._:-]/g, '_')
+      .replace(/^_+|_+$/g, '');
+    return safe || fallback;
   }
 
   function strategyOptionForKey(strategyKey) {
@@ -307,11 +324,208 @@
     node.innerHTML = strategies.map((strategy) => renderStrategy(strategy, { compact: true })).join('');
   }
 
+  function currentEditableStrategy() {
+    return state.editor.strategy || state.draft || strategyOptionForKey(state.activeStrategyKey);
+  }
+
+  function normalizeEditorStrategy(strategy) {
+    const source = clone(strategy || strategyOptionForKey(state.activeStrategyKey) || {});
+    const steps = Array.isArray(source.steps) ? source.steps : [];
+    source.title = source.title && !String(source.title).includes('Edited')
+      ? `${source.title} Edited`
+      : (source.title || 'Custom Strategy');
+    source.strategyKey = source.strategyKey && String(source.strategyKey).startsWith('custom-')
+      ? source.strategyKey
+      : `custom-${testId(source.title).toLowerCase() || 'strategy'}`;
+    source.generatedBy = 'progression_atlas_strategy_editor_v1';
+    source.steps = steps.map((step, index) => ({
+      ...clone(step),
+      stepId: editorSafeId(step.stepId || step.nodeId || `editor.step.${index + 1}`),
+      nodeId: editorSafeId(step.nodeId || step.stepId || `editor.step.${index + 1}`),
+      status: step.status || 'planned',
+      reason: step.reason || 'Player-authored progression step.',
+      beforeStepId: step.beforeStepId || step.connections?.beforeStepId || (index > 0 ? editorSafeId(steps[index - 1]?.stepId || steps[index - 1]?.nodeId) : null),
+      afterStepId: step.afterStepId || step.connections?.afterStepId || null,
+      iconPrompt: step.icon?.prompt || `${step.title || 'Strategy step'}, Agent Town strategy icon`,
+      editorEditable: true
+    }));
+    return source;
+  }
+
+  function selectedEditorStep() {
+    const steps = Array.isArray(state.editor.strategy?.steps) ? state.editor.strategy.steps : [];
+    return steps.find((step) => step.stepId === state.editor.selectedStepId) || steps[0] || null;
+  }
+
+  function stepOptions(selectedId, currentId) {
+    const steps = Array.isArray(state.editor.strategy?.steps) ? state.editor.strategy.steps : [];
+    const options = ['<option value="">None</option>'];
+    for (const step of steps) {
+      if (step.stepId === currentId) continue;
+      const selected = step.stepId === selectedId ? ' selected' : '';
+      options.push(`<option value="${escapeHtml(step.stepId)}"${selected}>${escapeHtml(step.title || step.stepId)}</option>`);
+    }
+    return options.join('');
+  }
+
+  function syncEditorForm() {
+    const step = selectedEditorStep();
+    if (!step) return;
+    const title = $('editorStepTitle');
+    const reason = $('editorStepReason');
+    const before = $('editorStepBefore');
+    const after = $('editorStepAfter');
+    const prompt = $('editorIconPrompt');
+    if (title) title.value = step.title || '';
+    if (reason) reason.value = step.reason || '';
+    if (before) before.innerHTML = stepOptions(step.beforeStepId, step.stepId);
+    if (after) after.innerHTML = stepOptions(step.afterStepId, step.stepId);
+    if (prompt) prompt.value = step.iconPrompt || step.icon?.prompt || `${step.title || 'Strategy step'}, Agent Town strategy icon`;
+  }
+
+  function renderEditor() {
+    const panel = $('strategyEditorPanel');
+    if (!panel) return;
+    panel.hidden = !state.editor.open;
+    if (!state.editor.open) return;
+    if (!state.editor.strategy) {
+      state.editor.strategy = normalizeEditorStrategy(currentEditableStrategy());
+      state.editor.selectedStepId = state.editor.strategy.steps[0]?.stepId || null;
+    }
+    const steps = Array.isArray(state.editor.strategy?.steps) ? state.editor.strategy.steps : [];
+    const list = $('editorStepList');
+    if (list) {
+      list.innerHTML = steps.map((step, index) => {
+        const selected = step.stepId === state.editor.selectedStepId;
+        return `
+          <button class="atlasEditorStep${selected ? ' isActive' : ''}" type="button" data-editor-step-id="${escapeHtml(step.stepId)}" data-testid="progression-atlas-editor-step-${escapeHtml(testId(step.stepId))}">
+            ${iconHtml(step.icon, 'atlasMiniIcon')}
+            <span>${escapeHtml(index + 1)}. ${escapeHtml(step.title || step.stepId)}</span>
+          </button>
+        `;
+      }).join('');
+    }
+    syncEditorForm();
+    markReadyImages(panel);
+  }
+
+  function applyEditorForm() {
+    const strategy = state.editor.strategy;
+    if (!strategy) return null;
+    const step = selectedEditorStep();
+    if (!step) return null;
+    const title = $('editorStepTitle');
+    const reason = $('editorStepReason');
+    const before = $('editorStepBefore');
+    const after = $('editorStepAfter');
+    const prompt = $('editorIconPrompt');
+    step.title = String(title?.value || step.title || 'Strategy Step').trim().slice(0, 80) || 'Strategy Step';
+    step.reason = String(reason?.value || step.reason || 'Player-authored progression step.').trim().slice(0, 400);
+    step.beforeStepId = String(before?.value || '').trim() || null;
+    step.afterStepId = String(after?.value || '').trim() || null;
+    step.connections = {
+      beforeStepId: step.beforeStepId,
+      afterStepId: step.afterStepId
+    };
+    step.iconPrompt = String(prompt?.value || step.iconPrompt || `${step.title}, Agent Town strategy icon`).trim().slice(0, 300);
+    if (step.icon) {
+      step.icon.label = step.title;
+      step.icon.prompt = step.iconPrompt;
+      if (step.icon.genAi) step.icon.genAi.prompt = step.iconPrompt;
+    }
+    strategy.generatedBy = 'progression_atlas_strategy_editor_v1';
+    state.draft = strategy;
+    return step;
+  }
+
+  function openEditor() {
+    state.editor.open = true;
+    state.editor.strategy = normalizeEditorStrategy(currentEditableStrategy());
+    state.editor.selectedStepId = state.editor.strategy.steps[0]?.stepId || null;
+    state.draft = state.editor.strategy;
+    renderAll();
+    $('strategyEditorPanel')?.scrollIntoView({ block: 'nearest' });
+  }
+
+  function addEditorStep() {
+    if (!state.editor.strategy) state.editor.strategy = normalizeEditorStrategy(currentEditableStrategy());
+    applyEditorForm();
+    const steps = state.editor.strategy.steps;
+    const previous = steps[steps.length - 1] || null;
+    const stepId = editorSafeId(`editor.custom.${steps.length + 1}`);
+    const step = {
+      stepId,
+      nodeId: stepId,
+      title: 'Scout Ridge',
+      status: 'planned',
+      reason: 'Player-authored expansion or strategy checkpoint.',
+      icon: globalIcon('progression.generic', {
+        label: 'Scout Ridge',
+        symbol: 'SR',
+        tone: 'custom',
+        source: 'progression_atlas_strategy_editor'
+      }),
+      requirements: { items: [], affordable: true, missing: {} },
+      blocker: null,
+      nextAction: 'Scout Ridge',
+      beforeStepId: previous?.stepId || null,
+      afterStepId: null,
+      connections: { beforeStepId: previous?.stepId || null, afterStepId: null },
+      iconPrompt: 'frontier ridge scout marker, Agent Town strategy icon',
+      editorEditable: true
+    };
+    steps.push(step);
+    state.editor.selectedStepId = stepId;
+    state.draft = state.editor.strategy;
+    renderAll();
+  }
+
+  async function generateEditorIcon() {
+    const step = applyEditorForm();
+    if (!step) return;
+    const data = await fetchJson('/api/founders-plot/progression-atlas/icons/generate', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: step.title,
+        prompt: step.iconPrompt || `${step.title}, Agent Town strategy icon`
+      })
+    });
+    step.icon = data.icon;
+    step.iconPrompt = data.icon?.prompt || step.iconPrompt;
+    state.draft = state.editor.strategy;
+    renderAll();
+    const explanation = $('atlasExplanation');
+    if (explanation) explanation.textContent = `Attached a GenAI icon draft to ${step.title}. Gameplay state did not change.`;
+  }
+
+  async function saveEditorStrategy() {
+    applyEditorForm();
+    const strategy = state.editor.strategy;
+    if (!strategy) return;
+    const data = await fetchJson('/api/founders-plot/progression-atlas/strategies', {
+      method: 'POST',
+      body: JSON.stringify({
+        strategy,
+        select: true
+      })
+    });
+    if (state.atlas) {
+      state.atlas.strategies = data.strategies || [];
+      state.atlas.selectedStrategyId = data.selectedStrategyId || null;
+    }
+    state.draft = data.strategy || strategy;
+    state.selectedStrategyId = data.selectedStrategyId || null;
+    renderAll();
+    const explanation = $('atlasExplanation');
+    if (explanation) explanation.textContent = `Saved ${strategyTitle(data.strategy || strategy)} as a private edited strategy.`;
+  }
+
   function renderAll() {
     renderSummary();
     renderTemplateControls();
     renderStrategyCompare();
     renderDraft();
+    renderEditor();
     renderSavedStrategies();
     markReadyImages(document);
   }
@@ -390,8 +604,39 @@
         if (node) node.textContent = String(err?.message || err || 'Save failed');
       });
     });
+    const openEditorBtn = $('openEditorBtn');
+    if (openEditorBtn) openEditorBtn.addEventListener('click', openEditor);
+    const addStepBtn = $('editorAddStepBtn');
+    if (addStepBtn) addStepBtn.addEventListener('click', addEditorStep);
+    const editorForm = $('strategyEditorForm');
+    if (editorForm) editorForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      applyEditorForm();
+      renderAll();
+    });
+    const generateIconBtn = $('editorGenerateIconBtn');
+    if (generateIconBtn) generateIconBtn.addEventListener('click', () => {
+      generateEditorIcon().catch((err) => {
+        const node = $('atlasExplanation');
+        if (node) node.textContent = String(err?.message || err || 'Icon generation failed');
+      });
+    });
+    const saveEditorBtn = $('editorSaveStrategyBtn');
+    if (saveEditorBtn) saveEditorBtn.addEventListener('click', () => {
+      saveEditorStrategy().catch((err) => {
+        const node = $('atlasExplanation');
+        if (node) node.textContent = String(err?.message || err || 'Edited strategy save failed');
+      });
+    });
 
     document.addEventListener('click', (event) => {
+      const editorStep = event.target.closest('.atlasEditorStep');
+      if (editorStep) {
+        applyEditorForm();
+        state.editor.selectedStepId = editorStep.getAttribute('data-editor-step-id');
+        renderAll();
+        return;
+      }
       const explain = event.target.closest('.atlasExplainBtn');
       if (explain) {
         explainNode(explain.getAttribute('data-node-id')).catch((err) => {

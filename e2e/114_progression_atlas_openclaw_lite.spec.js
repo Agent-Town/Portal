@@ -59,6 +59,20 @@ test('AC-63: OpenClaw Lite opens Progression Atlas and saves selected strategy t
   await expect(atlasFrame.getByTestId('progression-atlas-selected-strategy')).toBeVisible();
   await expect(atlasFrame.getByTestId('progression-atlas-saved-strategies').getByText('Delegate Outputs First')).toBeVisible();
 
+  await atlasFrame.getByTestId('progression-atlas-open-editor').click();
+  await expect(atlasFrame.getByTestId('progression-atlas-editor')).toBeVisible();
+  await atlasFrame.getByTestId('progression-atlas-editor-add-step').click();
+  await expect(atlasFrame.getByTestId('progression-atlas-editor-title')).toHaveValue('Scout Ridge');
+  await atlasFrame.getByTestId('progression-atlas-editor-reason').fill('Sketch a player-authored scout step after HQ3 planning.');
+  await atlasFrame.getByTestId('progression-atlas-editor-before').selectOption('hq.level.3');
+  await atlasFrame.getByTestId('progression-atlas-editor-after').selectOption('foreman.queue_production');
+  await atlasFrame.getByTestId('progression-atlas-editor-icon-prompt').fill('frontier ridge scout marker, Agent Town strategy icon');
+  await atlasFrame.getByTestId('progression-atlas-editor-generate-icon').click();
+  await expect(atlasFrame.getByTestId('progression-atlas-explanation')).toContainText('Attached a GenAI icon draft');
+  await atlasFrame.getByTestId('progression-atlas-editor-save').click();
+  await expect(atlasFrame.getByTestId('progression-atlas-saved-strategies').getByText('Delegate Outputs First Edited')).toBeVisible();
+  await expect(atlasFrame.getByTestId('progression-atlas-step-editor_custom_11').getByRole('heading', { name: 'Scout Ridge' })).toBeVisible();
+
   const afterAtlas = await page.evaluate(async () => {
     const res = await fetch('/api/founders-plot/progression-atlas', { credentials: 'include' });
     return await res.json();
@@ -66,7 +80,11 @@ test('AC-63: OpenClaw Lite opens Progression Atlas and saves selected strategy t
   expect(afterAtlas?.ok).toBe(true);
   expect(afterAtlas?.gameplayStableHash).toBe(beforeAtlas.gameplayStableHash);
   expect(afterAtlas?.atlas?.selectedStrategyId).toBeTruthy();
-  expect(afterAtlas?.atlas?.strategies?.find((strategy) => strategy.selected)?.strategyKey).toBe('delegate-outputs-first');
+  const selected = afterAtlas?.atlas?.strategies?.find((strategy) => strategy.selected);
+  expect(selected?.strategyKey).toBe('custom-delegate_outputs_first_edited');
+  expect(selected?.steps?.find((step) => step.title === 'Scout Ridge')?.icon?.generatedBy).toBe('progression_atlas_genai_icon_prompt_v1');
+  expect(selected?.steps?.find((step) => step.title === 'Scout Ridge')?.beforeStepId).toBe('hq.level.3');
+  expect(selected?.steps?.find((step) => step.title === 'Scout Ridge')?.afterStepId).toBe('foreman.queue_production');
   expect(afterAtlas?.gameplaySnapshot?.audit?.eventCount).toBe(beforeAtlas.gameplaySnapshot.audit.eventCount);
   expect(afterAtlas?.gameplaySnapshot?.plot?.inventory).toEqual(beforeAtlas.gameplaySnapshot.plot.inventory);
 });

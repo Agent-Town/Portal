@@ -97,13 +97,35 @@ function createFoundersPlotRouter({
 
   router.post('/api/founders-plot/progression-atlas/strategies', (req, res) => {
     const identity = identityFor(req, res);
-    const envelope = progressionAtlas.saveProgressionStrategy({
+    const envelope = req.body?.strategy?.generatedBy === 'progression_atlas_strategy_editor_v1' || Array.isArray(req.body?.strategy?.steps)
+      ? progressionAtlas.saveEditedProgressionStrategy({
+        pairId: identity.pairId,
+        houseId: identity.houseId || null,
+        plotId: typeof req.body?.plotId === 'string' ? req.body.plotId.trim() : null,
+        strategy: req.body?.strategy,
+        select: req.body?.select === true,
+        nowMs: nowMsFn()
+      })
+      : progressionAtlas.saveProgressionStrategy({
+        pairId: identity.pairId,
+        houseId: identity.houseId || null,
+        plotId: typeof req.body?.plotId === 'string' ? req.body.plotId.trim() : null,
+        strategyKey: req.body?.strategyKey || req.body?.strategy?.strategyKey,
+        title: req.body?.title || req.body?.strategy?.title,
+        select: req.body?.select === true,
+        nowMs: nowMsFn()
+      });
+    return sendEnvelope(res, envelope);
+  });
+
+  router.post('/api/founders-plot/progression-atlas/icons/generate', (req, res) => {
+    const identity = identityFor(req, res);
+    const envelope = progressionAtlas.generateProgressionIconDraft({
       pairId: identity.pairId,
       houseId: identity.houseId || null,
       plotId: typeof req.body?.plotId === 'string' ? req.body.plotId.trim() : null,
-      strategyKey: req.body?.strategyKey || req.body?.strategy?.strategyKey,
-      title: req.body?.title || req.body?.strategy?.title,
-      select: req.body?.select === true,
+      title: req.body?.title,
+      prompt: req.body?.prompt,
       nowMs: nowMsFn()
     });
     return sendEnvelope(res, envelope);

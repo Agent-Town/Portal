@@ -93,6 +93,22 @@ function normalizeStrategyKey(value) {
   return String(value || DEFAULT_STRATEGY_KEY).trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
 }
 
+function cleanText(value, fallback = '', max = 160) {
+  const text = String(value == null ? '' : value)
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return (text || fallback).slice(0, max);
+}
+
+function slugFor(value, fallback = 'step') {
+  const slug = cleanText(value, fallback, 80)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return slug || fallback;
+}
+
 function strategyTemplateForKey(value) {
   const key = normalizeStrategyKey(value);
   return STRATEGY_TEMPLATES[key] || null;
@@ -891,6 +907,213 @@ function listStrategyTemplates() {
   return STRATEGY_TEMPLATE_KEYS.map((key) => clone(STRATEGY_TEMPLATES[key]));
 }
 
+function symbolFromText(value) {
+  const words = cleanText(value, 'S', 80)
+    .split(/[^A-Za-z0-9]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const symbol = words.length > 1
+    ? words.slice(0, 2).map((word) => word[0]).join('')
+    : (words[0] || 'S').slice(0, 2);
+  return symbol.toUpperCase();
+}
+
+function makeEditorIconDraft({ title, prompt, nowMs }) {
+  const safeTitle = cleanText(title, 'Custom strategy step', 80);
+  const safePrompt = cleanText(prompt, `${safeTitle}, Agent Town strategy icon`, 300);
+  const slug = slugFor(safeTitle, 'custom_step');
+  return makeIcon({
+    iconId: `strategy.custom.${slug}.${hashId([safeTitle, safePrompt]).slice(0, 8)}`,
+    label: safeTitle,
+    symbol: symbolFromText(safeTitle),
+    tone: 'custom',
+    source: 'progression_atlas_strategy_editor',
+    assetPath: null
+  });
+}
+
+function normalizeEditorIcon(rawIcon, { title, prompt, nowMs }) {
+  const base = rawIcon && typeof rawIcon === 'object' ? rawIcon : {};
+  const draft = makeEditorIconDraft({ title, prompt: base.prompt || prompt, nowMs });
+  const label = cleanText(base.label, draft.label, 80);
+  const icon = {
+    ...draft,
+    iconId: cleanText(base.iconId, draft.iconId, 100).replace(/[^a-zA-Z0-9._:-]/g, '_'),
+    label,
+    symbol: cleanText(base.symbol, draft.symbol, 4).toUpperCase(),
+    tone: cleanText(base.tone, draft.tone, 24).replace(/[^a-zA-Z0-9_-]/g, '') || 'custom',
+    source: 'progression_atlas_strategy_editor',
+    assetPath: null,
+    generatedBy: 'progression_atlas_genai_icon_prompt_v1',
+    generatedAdHoc: true,
+    global: false,
+    generationMode: 'prompt_artifact',
+    prompt: cleanText(base.prompt, prompt || `${label}, Agent Town strategy icon`, 300),
+    genAi: {
+      status: 'draft_prompt_attached',
+      modelHint: 'openclaw-visible-genai',
+      prompt: cleanText(base.prompt, prompt || `${label}, Agent Town strategy icon`, 300),
+      createdAt: Number(nowMs || Date.now())
+    }
+  };
+  return icon;
+}
+
+function normalizeConnection(value, knownIds) {
+  const id = cleanText(value, '', 100);
+  return id && knownIds.has(id) ? id : null;
+}
+
+function normalizeActionRef(value) {
+  if (!value || typeof value !== 'object') return null;
+  const tool = cleanText(value.tool, '', 80);
+  if (!tool.startsWith('et.plot.')) return null;
+  return {
+    tool,
+    params: value.params && typeof value.params === 'object' && !Array.isArray(value.params)
+      ? stableValue(value.params)
+      : {}
+  };
+}
+
+function normalizeEditorSteps(rawSteps, nowMs) {
+  const inputSteps = Array.isArray(rawSteps) ? rawSteps.slice(0, 24) : [];
+  if (!inputSteps.length) return [];
+  const used = new Set();
+  const firstPass = inputSteps.map((raw, index) => {
+    const title = cleanText(raw?.title, `Strategy Step ${index + 1}`, 80);
+    const baseId = cleanText(raw?.stepId || raw?.nodeId, '', 100)
+      .replace(/[^a-zA-Z0-9._:-]/g, '_') || `editor.${slugFor(title, 'step')}`;
+    let stepId = baseId;
+    let suffix = 2;
+    while (used.has(stepId)) {
+      stepId = `${baseId}.${suffix}`;
+      suffix += 1;
+    }
+    used.add(stepId);
+    return { raw, title, stepId };
+  });
+  const knownIds = new Set(firstPass.map((entry) => entry.stepId));
+  return firstPass.map(({ raw, title, stepId }) => {
+    const beforeStepId = normalizeConnection(raw?.beforeStepId || raw?.before, knownIds);
+    const afterStepId = normalizeConnection(raw?.afterStepId || raw?.after, knownIds);
+    const reason = cleanText(raw?.reason || raw?.note, 'Player-authored progression step.', 400);
+    const prompt = cleanText(raw?.iconPrompt || raw?.icon?.prompt, `${title}, Agent Town strategy icon`, 300);
+    return {
+      stepId,
+      nodeId: stepId,
+      title,
+      status: cleanText(raw?.status, 'planned', 24).toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'planned',
+      reason,
+      icon: normalizeEditorIcon(raw?.icon, { title, prompt, nowMs }),
+      target: {
+        kind: 'custom_strategy_step',
+        source: 'progression_atlas_strategy_editor'
+      },
+      requirements: { items: [], affordable: true, missing: {} },
+      blocker: cleanText(raw?.blocker, '', 180) || null,
+      nextAction: cleanText(raw?.nextAction, title, 120),
+      actionRef: normalizeActionRef(raw?.actionRef),
+      connections: { beforeStepId, afterStepId },
+      beforeStepId,
+      afterStepId,
+      editorEditable: true
+    };
+  });
+}
+
+function buildEditorGraph(steps) {
+  const nodes = steps.map((step, index) => ({
+    nodeId: step.nodeId,
+    title: step.title,
+    status: step.status,
+    index,
+    target: step.target,
+    icon: step.icon,
+    requirements: step.requirements,
+    blocker: step.blocker,
+    nextAction: step.nextAction,
+    connections: step.connections || {}
+  }));
+  const edges = [];
+  const seen = new Set();
+  function addEdge(from, to, kind) {
+    if (!from || !to || from === to) return;
+    const key = `${from}->${to}:${kind}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    edges.push({ from, to, kind });
+  }
+  for (const step of steps) {
+    addEdge(step.beforeStepId, step.stepId, 'editor_before');
+    addEdge(step.stepId, step.afterStepId, 'editor_after');
+  }
+  if (!edges.length) {
+    for (let i = 0; i < steps.length - 1; i += 1) addEdge(steps[i].stepId, steps[i + 1].stepId, 'editor_sequence');
+  }
+  return { nodes, edges };
+}
+
+function buildEditedStrategyFromInput({ state, stateHash, strategyInput, nowMs }) {
+  const raw = strategyInput && typeof strategyInput === 'object' ? strategyInput : {};
+  const timestamp = Number(nowMs || Date.now());
+  const sourceSteps = Array.isArray(raw.steps) && raw.steps.length
+    ? raw.steps
+    : buildRushHq3Strategy(state, stateHash).steps;
+  const steps = normalizeEditorSteps(sourceSteps, timestamp);
+  if (!steps.length) return null;
+  const title = cleanText(raw.title, 'Custom Progression Strategy', 80);
+  const goal = cleanText(raw.goal, raw.summary || 'Player-authored Founders Plot strategy.', 220);
+  const focus = Array.isArray(raw.focus)
+    ? uniqueStrings(raw.focus, 6)
+    : ['Player-authored plan', 'Private strategy', 'Advisory only'];
+  const graph = buildEditorGraph(steps);
+  const strategyHash = stableHash({ title, goal, focus, steps, graph });
+  const strategyKey = normalizeStrategyKey(raw.strategyKey || `custom-${slugFor(title, 'strategy')}`);
+  return {
+    strategyId: `strategy_custom_${hashId([state?.plot?.plotId, strategyHash])}`,
+    strategyKey: strategyKey.startsWith('custom-') ? strategyKey : `custom-${strategyKey}`,
+    title,
+    visibility: 'private',
+    generatedBy: 'progression_atlas_strategy_editor_v1',
+    baseGraphVersion: ATLAS_VERSION,
+    baseStateHash: String(stateHash || state?.audit?.stateHash || ''),
+    baseGameplayStableHash: gameplayStableHashForState(state),
+    goal,
+    summary: cleanText(raw.summary, goal, 240),
+    focus,
+    compare: {
+      goal,
+      stepCount: steps.length,
+      focus,
+      roughBlockers: uniqueStrings(steps.map((step) => step.blocker).filter(Boolean), 4),
+      resourceShortfalls: {},
+      permissions: uniqueStrings(steps.map((step) => step.target?.key).filter(Boolean), 4),
+      tradeoff: 'Custom editor plan. It can guide play, but canonical gameplay still requires normal Founders Plot tools and approvals.',
+      approvalDelegationBurden: 'User-authored: review every linked action before execution.',
+      burden: {
+        playerActionRefs: steps.filter((step) => step.actionRef?.tool).length,
+        delegationMilestones: []
+      }
+    },
+    steps,
+    graph,
+    editor: {
+      version: 'progression_atlas_strategy_editor_v1',
+      connectionModel: 'before_after_step_ids',
+      iconModel: 'prompt_backed_genai_draft'
+    },
+    openClawLiteTools: [
+      'agent_town_progression_get_state',
+      'agent_town_progression_save_strategy',
+      'agent_town_progression_select_strategy'
+    ],
+    gameplayMutationPolicy: 'advisory_only',
+    createdAt: timestamp,
+    updatedAt: timestamp
+  };
+}
+
 function getStateEnvelope({ pairId, houseId = null, plotId = null, nowMs }) {
   const envelope = engine.getFoundersPlotState({
     pairId,
@@ -950,7 +1173,9 @@ function buildAtlasEnvelope({ stateEnvelope, nowMs }) {
         draft: 'agent_town_progression_draft_strategy',
         save: 'agent_town_progression_save_strategy',
         select: 'agent_town_progression_select_strategy',
-        explain: 'agent_town_progression_explain_node'
+        explain: 'agent_town_progression_explain_node',
+        editor: 'progression_atlas_iframe_editor',
+        iconDraft: '/api/founders-plot/progression-atlas/icons/generate'
       }
     }
   });
@@ -1023,6 +1248,73 @@ function saveProgressionStrategy({
   });
 }
 
+function saveEditedProgressionStrategy({
+  pairId,
+  houseId = null,
+  plotId = null,
+  strategy = null,
+  select = false,
+  nowMs
+}) {
+  const stateEnvelope = getStateEnvelope({ pairId, houseId, plotId, nowMs });
+  if (!stateEnvelope || stateEnvelope.ok === false) return stateEnvelope;
+  const edited = buildEditedStrategyFromInput({
+    state: stateEnvelope.state,
+    stateHash: stateEnvelope.stateHash,
+    strategyInput: strategy,
+    nowMs
+  });
+  if (!edited) return errorEnvelope('INVALID_REQUEST', 'At least one strategy step is required.');
+  const timestamp = Number(nowMs || Date.now());
+  const saved = store.writeProgressionStrategy({
+    strategyId: edited.strategyId,
+    plotId: stateEnvelope.state.plot.plotId,
+    strategyKey: edited.strategyKey,
+    title: edited.title,
+    selected: !!select,
+    strategy: edited,
+    createdAt: timestamp,
+    updatedAt: timestamp
+  });
+  let selected = saved;
+  if (select) {
+    selected = store.selectProgressionStrategy(stateEnvelope.state.plot.plotId, edited.strategyId, timestamp);
+  }
+  const latest = store.listProgressionStrategies(stateEnvelope.state.plot.plotId).map(strategyFromRecord).filter(Boolean);
+  return successEnvelope({
+    plotId: stateEnvelope.state.plot.plotId,
+    stateHash: stateEnvelope.stateHash,
+    gameplayStableHash: gameplayStableHashForState(stateEnvelope.state),
+    strategy: strategyFromRecord(selected) || edited,
+    strategies: latest,
+    selectedStrategyId: select ? edited.strategyId : (latest.find((entry) => entry.selected)?.strategyId || null)
+  });
+}
+
+function generateProgressionIconDraft({
+  pairId,
+  houseId = null,
+  plotId = null,
+  title = null,
+  prompt = null,
+  nowMs
+}) {
+  const stateEnvelope = getStateEnvelope({ pairId, houseId, plotId, nowMs });
+  if (!stateEnvelope || stateEnvelope.ok === false) return stateEnvelope;
+  const safeTitle = cleanText(title, 'Custom strategy step', 80);
+  const icon = normalizeEditorIcon(null, {
+    title: safeTitle,
+    prompt: cleanText(prompt, `${safeTitle}, Agent Town strategy icon`, 300),
+    nowMs
+  });
+  return successEnvelope({
+    plotId: stateEnvelope.state.plot.plotId,
+    stateHash: stateEnvelope.stateHash,
+    gameplayStableHash: gameplayStableHashForState(stateEnvelope.state),
+    icon
+  });
+}
+
 function selectProgressionStrategy({ pairId, houseId = null, plotId = null, strategyId, nowMs }) {
   const stateEnvelope = getStateEnvelope({ pairId, houseId, plotId, nowMs });
   if (!stateEnvelope || stateEnvelope.ok === false) return stateEnvelope;
@@ -1080,6 +1372,8 @@ module.exports = {
   getProgressionAtlasState,
   draftProgressionStrategy,
   saveProgressionStrategy,
+  saveEditedProgressionStrategy,
+  generateProgressionIconDraft,
   selectProgressionStrategy,
   explainProgressionNode
 };

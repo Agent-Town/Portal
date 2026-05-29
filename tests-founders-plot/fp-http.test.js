@@ -368,3 +368,78 @@ test('FP-HT-010 progression atlas drafts, saves, selects, and explains private s
     assert.equal(afterAtlas.body.gameplaySnapshot.audit.eventCount, beforeEvents);
   } finally { await close(); }
 });
+
+test('FP-HT-011 progression atlas saves edited strategy steps and GenAI icon drafts without gameplay mutation', async () => {
+  const { server, close } = await fresh('progression-editor');
+  try {
+    const before = await request(server, 'GET', '/api/founders-plot/progression-atlas');
+    assert.equal(before.status, 200);
+    const beforeGameplayHash = before.body.gameplayStableHash;
+    const beforeInventory = before.body.gameplaySnapshot.plot.inventory;
+    const beforeEvents = before.body.gameplaySnapshot.audit.eventCount;
+
+    const iconDraft = await request(server, 'POST', '/api/founders-plot/progression-atlas/icons/generate', {
+      title: 'Scout Ridge',
+      prompt: 'frontier ridge scout marker, Agent Town strategy icon'
+    });
+    assert.equal(iconDraft.status, 200);
+    assert.equal(iconDraft.body.ok, true);
+    assert.equal(iconDraft.body.gameplayStableHash, beforeGameplayHash);
+    assert.equal(iconDraft.body.icon.generatedBy, 'progression_atlas_genai_icon_prompt_v1');
+    assert.equal(iconDraft.body.icon.generatedAdHoc, true);
+    assert.equal(iconDraft.body.icon.generationMode, 'prompt_artifact');
+    assert.match(iconDraft.body.icon.genAi.prompt, /frontier ridge scout marker/);
+
+    const edited = {
+      title: 'Expansion Sketch',
+      goal: 'Sketch an editable expansion sequence without changing gameplay truth.',
+      summary: 'Player-authored strategy draft for future scout planning.',
+      focus: ['Private editor', 'Before-after links', 'Generated icon draft'],
+      steps: [
+        {
+          stepId: 'editor.scout_ridge',
+          title: 'Scout Ridge',
+          reason: 'Mark the first scouting thought after HQ3 planning.',
+          nextAction: 'Attach this as a future scouting idea.',
+          afterStepId: 'editor.claim_second_plot',
+          icon: iconDraft.body.icon
+        },
+        {
+          stepId: 'editor.claim_second_plot',
+          title: 'Claim Second Plot',
+          reason: 'Connect the scouting thought to a later territory claim.',
+          nextAction: 'Wait for canonical expedition tools.',
+          beforeStepId: 'editor.scout_ridge'
+        }
+      ]
+    };
+    const save = await request(server, 'POST', '/api/founders-plot/progression-atlas/strategies', {
+      strategy: edited,
+      select: true
+    });
+    assert.equal(save.status, 200);
+    assert.equal(save.body.ok, true);
+    assert.equal(save.body.gameplayStableHash, beforeGameplayHash);
+    assert.equal(save.body.strategy.generatedBy, 'progression_atlas_strategy_editor_v1');
+    assert.equal(save.body.strategy.strategyKey, 'custom-expansion_sketch');
+    assert.equal(save.body.strategy.steps.length, 2);
+    assert.equal(save.body.strategy.steps[0].afterStepId, 'editor.claim_second_plot');
+    assert.equal(save.body.strategy.steps[1].beforeStepId, 'editor.scout_ridge');
+    assert.ok(save.body.strategy.graph.edges.find((edge) => edge.from === 'editor.scout_ridge' && edge.to === 'editor.claim_second_plot'));
+    assert.equal(save.body.strategy.steps[0].icon.generatedBy, 'progression_atlas_genai_icon_prompt_v1');
+    assert.equal(save.body.strategy.steps[0].icon.genAi.status, 'draft_prompt_attached');
+    assert.equal(save.body.selectedStrategyId, save.body.strategy.strategyId);
+
+    const afterState = await request(server, 'GET', '/api/founders-plot/state');
+    assert.equal(afterState.status, 200);
+    assert.equal(afterState.body.state.audit.eventCount, beforeEvents);
+    assert.deepEqual(afterState.body.state.plot.inventory, beforeInventory);
+
+    const afterAtlas = await request(server, 'GET', '/api/founders-plot/progression-atlas');
+    assert.equal(afterAtlas.status, 200);
+    assert.equal(afterAtlas.body.gameplayStableHash, beforeGameplayHash);
+    assert.equal(afterAtlas.body.atlas.strategies.find((strategy) => strategy.selected)?.title, 'Expansion Sketch');
+    assert.equal(afterAtlas.body.gameplaySnapshot.audit.eventCount, beforeEvents);
+    assert.deepEqual(afterAtlas.body.gameplaySnapshot.plot.inventory, beforeInventory);
+  } finally { await close(); }
+});

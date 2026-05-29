@@ -19,6 +19,7 @@
         <button class="atlasButton atlasDraftStrategyBtn" id="draftRushHq3Btn" type="button" data-strategy-key="rush-hq3" data-testid="progression-atlas-draft-rush-hq3">Rush HQ3</button>
         <button class="atlasButton atlasDraftStrategyBtn" type="button" data-strategy-key="balanced-food-wood" data-testid="progression-atlas-draft-balanced-food-wood">Balanced Food-Wood</button>
         <button class="atlasButton atlasDraftStrategyBtn" type="button" data-strategy-key="delegate-outputs-first" data-testid="progression-atlas-draft-delegate-outputs-first">Delegate Outputs First</button>
+        <button class="atlasButton" id="openEditorBtn" type="button" data-testid="progression-atlas-open-editor">Edit Strategy</button>
         <button class="atlasButton atlasButtonPrimary" id="saveStrategyBtn" type="button" data-testid="progression-atlas-save-strategy" disabled>Save Strategy</button>
       </div>
     </header>
@@ -42,6 +43,51 @@
           <span class="atlasTag">read only</span>
         </div>
         <div id="draftStrategy" data-testid="progression-atlas-recommended-strategy"></div>
+      </div>
+
+      <div class="atlasPanel atlasEditorPanel" id="strategyEditorPanel" data-testid="progression-atlas-editor" hidden>
+        <div class="atlasPanelHeader">
+          <h2>Strategy Editor</h2>
+          <span class="atlasTag">private draft</span>
+        </div>
+        <div class="atlasEditorShell">
+          <div class="atlasEditorSteps">
+            <div class="atlasEditorBar">
+              <strong>Steps</strong>
+              <button class="atlasLinkButton" id="editorAddStepBtn" type="button" data-testid="progression-atlas-editor-add-step">Add Step</button>
+            </div>
+            <div id="editorStepList" class="atlasEditorStepList" data-testid="progression-atlas-editor-step-list"></div>
+          </div>
+          <form id="strategyEditorForm" class="atlasEditorForm" data-testid="progression-atlas-editor-form">
+            <label>
+              <span>Title</span>
+              <input id="editorStepTitle" data-testid="progression-atlas-editor-title" maxlength="80" />
+            </label>
+            <label>
+              <span>Note</span>
+              <textarea id="editorStepReason" data-testid="progression-atlas-editor-reason" maxlength="400"></textarea>
+            </label>
+            <div class="atlasEditorLinks">
+              <label>
+                <span>Before</span>
+                <select id="editorStepBefore" data-testid="progression-atlas-editor-before"></select>
+              </label>
+              <label>
+                <span>After</span>
+                <select id="editorStepAfter" data-testid="progression-atlas-editor-after"></select>
+              </label>
+            </div>
+            <label>
+              <span>GenAI icon prompt</span>
+              <textarea id="editorIconPrompt" data-testid="progression-atlas-editor-icon-prompt" maxlength="300"></textarea>
+            </label>
+            <div class="atlasEditorActions">
+              <button class="atlasButton" id="editorGenerateIconBtn" type="button" data-testid="progression-atlas-editor-generate-icon">Generate Icon Draft</button>
+              <button class="atlasButton" id="editorApplyStepBtn" type="submit" data-testid="progression-atlas-editor-apply-step">Apply Step</button>
+              <button class="atlasButton atlasButtonPrimary" id="editorSaveStrategyBtn" type="button" data-testid="progression-atlas-editor-save">Save Edited Strategy</button>
+            </div>
+          </form>
+        </div>
       </div>
 
       <div class="atlasPanel">
