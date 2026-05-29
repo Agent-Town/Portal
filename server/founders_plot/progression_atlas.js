@@ -12,6 +12,36 @@ const {
 
 const ATLAS_VERSION = 'founders-plot-progression-atlas-v1';
 const DEFAULT_STRATEGY_KEY = 'rush-hq3';
+const STRATEGY_TEMPLATES = Object.freeze({
+  'rush-hq3': Object.freeze({
+    strategyKey: 'rush-hq3',
+    title: 'Rush HQ3',
+    goal: 'Reach HQ Level 3 through normal Founders Plot play and unlock Foreman queueProduction.',
+    summary: 'Fastest safe route through Lumber Camp, Farm Plot, Quarry, and HQ Level 3.',
+    focus: ['Fast HQ upgrades', 'Quarry unlock', 'queueProduction readiness'],
+    tradeoff: 'Fastest path to HQ3, but it gives the player less time to inspect each resource loop before Foreman queueing appears.',
+    approvalDelegationBurden: 'Medium: most actions stay player-run until HQ3, then queueProduction becomes the first major Foreman delegation gate.'
+  }),
+  'balanced-food-wood': Object.freeze({
+    strategyKey: 'balanced-food-wood',
+    title: 'Balanced Food-Wood',
+    goal: 'Build a steadier early economy by proving both wood and food before pushing the stone gate.',
+    summary: 'Balanced opening that keeps Lumber Camp and Farm Plot visible before the HQ2 and Quarry push.',
+    focus: ['Wood and food base', 'Lower early resource whiplash', 'HQ2 after two production loops'],
+    tradeoff: 'More legible for new players, but it sacrifices some rush speed to make the wood and food chains feel understood.',
+    approvalDelegationBurden: 'Low: this plan keeps the human in direct control and delays Foreman delegation until the economy is easier to read.'
+  }),
+  'delegate-outputs-first': Object.freeze({
+    strategyKey: 'delegate-outputs-first',
+    title: 'Delegate Outputs First',
+    goal: 'Reach HQ Level 2 deliberately, review collectOutputs, then continue toward Foreman queueProduction.',
+    summary: 'Foreman-readiness route that makes the HQ2 collectOutputs permission an explicit checkpoint before HQ3.',
+    focus: ['Foreman readiness', 'collectOutputs checkpoint', 'queueProduction policy gate'],
+    tradeoff: 'Best for teaching delegation boundaries, but it asks the player to pause at HQ2 before pushing to HQ3.',
+    approvalDelegationBurden: 'High: this plan asks the player to inspect output collection at HQ2 before approving deeper queueProduction delegation at HQ3.'
+  })
+});
+const STRATEGY_TEMPLATE_KEYS = Object.freeze(Object.keys(STRATEGY_TEMPLATES));
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -60,8 +90,12 @@ function stableHash(value) {
 }
 
 function normalizeStrategyKey(value) {
-  const key = String(value || DEFAULT_STRATEGY_KEY).trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
-  return key === DEFAULT_STRATEGY_KEY ? DEFAULT_STRATEGY_KEY : DEFAULT_STRATEGY_KEY;
+  return String(value || DEFAULT_STRATEGY_KEY).trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+}
+
+function strategyTemplateForKey(value) {
+  const key = normalizeStrategyKey(value);
+  return STRATEGY_TEMPLATES[key] || null;
 }
 
 function normalizeInventory(value) {
@@ -317,8 +351,8 @@ function hqIcon(level) {
 function permissionIcon(permissionKey) {
   const key = String(permissionKey || 'permission');
   return getAgentTownIcon(`permission.${key}`, {
-    label: key === 'queueProduction' ? 'Foreman queueing' : labelForType(key),
-    symbol: key === 'queueProduction' ? 'Q' : 'P',
+    label: key === 'queueProduction' ? 'Foreman queueing' : key === 'collectOutputs' ? 'Foreman output collection' : labelForType(key),
+    symbol: key === 'queueProduction' ? 'Q' : key === 'collectOutputs' ? 'CO' : 'P',
     tone: 'foreman',
     source: `permission:${key}`
   });
@@ -496,22 +530,54 @@ function makeHqUpgradeStep(state, {
   };
 }
 
-function makePermissionStep(state) {
+function makePermissionStep(state, {
+  stepId,
+  title,
+  permissionKey,
+  requiredHqLevel,
+  reason,
+  nextWhenBlocked,
+  nextWhenDone
+}) {
   const hqLevel = Math.max(1, Math.floor(Number(state?.plot?.hqLevel || 1)));
-  const done = hqLevel >= 3;
+  const done = hqLevel >= requiredHqLevel;
   return {
-    stepId: 'foreman.queue_production',
-    nodeId: 'foreman.queue_production',
-    title: 'Unlock Foreman production queueing',
+    stepId,
+    nodeId: stepId,
+    title,
     status: done ? 'done' : 'blocked',
-    reason: 'HQ Level 3 gives Clover the first real production-planning permission, still gated by player policy.',
-    icon: permissionIcon('queueProduction'),
-    target: { kind: 'permission', key: 'queueProduction' },
-    requirements: requirementsFor(state, { hqLevelRequired: 3 }),
-    blocker: done ? null : 'Reach HQ Level 3 first.',
-    nextAction: done ? 'Review the queueProduction permission' : 'Finish the Rush HQ3 plan',
+    reason,
+    icon: permissionIcon(permissionKey),
+    target: { kind: 'permission', key: permissionKey },
+    requirements: requirementsFor(state, { hqLevelRequired: requiredHqLevel }),
+    blocker: done ? null : `Reach HQ Level ${requiredHqLevel} first.`,
+    nextAction: done ? nextWhenDone : nextWhenBlocked,
     actionRef: null
   };
+}
+
+function makeQueueProductionPermissionStep(state, nextWhenBlocked = 'Finish the Rush HQ3 plan') {
+  return makePermissionStep(state, {
+    stepId: 'foreman.queue_production',
+    title: 'Unlock Foreman production queueing',
+    permissionKey: 'queueProduction',
+    requiredHqLevel: 3,
+    reason: 'HQ Level 3 gives Clover the first real production-planning permission, still gated by player policy.',
+    nextWhenBlocked,
+    nextWhenDone: 'Review the queueProduction permission'
+  });
+}
+
+function makeCollectOutputsPermissionStep(state) {
+  return makePermissionStep(state, {
+    stepId: 'foreman.collect_outputs',
+    title: 'Review Foreman output collection',
+    permissionKey: 'collectOutputs',
+    requiredHqLevel: 2,
+    reason: 'HQ Level 2 unlocks the first narrow Foreman action: collecting ready outputs under player policy.',
+    nextWhenBlocked: 'Reach HQ Level 2 first',
+    nextWhenDone: 'Review the collectOutputs permission'
+  });
 }
 
 function buildRushHq3Steps(state) {
@@ -567,7 +633,122 @@ function buildRushHq3Steps(state) {
       targetLevel: 3,
       reason: 'HQ Level 3 unlocks the first true Foreman planning loop: queue production.'
     }),
-    makePermissionStep(state)
+    makeQueueProductionPermissionStep(state)
+  ];
+}
+
+function buildBalancedFoodWoodSteps(state) {
+  return [
+    makePlaceBuildingStep(state, {
+      stepId: 'building.lumber_camp.place',
+      title: 'Build Lumber Camp',
+      buildingType: 'LUMBER_CAMP',
+      reason: 'Start with wood so Farm Plot and HQ upgrade costs are easier to read.'
+    }),
+    makeProductionStep(state, {
+      stepId: 'production.lumber_camp.collect_wood',
+      title: 'Produce and collect wood',
+      buildingType: 'LUMBER_CAMP',
+      resource: 'wood',
+      reason: 'Prove the wood chain before spending into food.'
+    }),
+    makePlaceBuildingStep(state, {
+      stepId: 'building.farm_plot.place',
+      title: 'Build Farm Plot',
+      buildingType: 'FARM_PLOT',
+      reason: 'Add food early so the opening is not only a timber sprint.'
+    }),
+    makeProductionStep(state, {
+      stepId: 'production.farm_plot.collect_food',
+      title: 'Produce and collect food',
+      buildingType: 'FARM_PLOT',
+      resource: 'food',
+      reason: 'Food plus wood keeps HQ Level 2 reachable without hidden grants.'
+    }),
+    makeHqUpgradeStep(state, {
+      stepId: 'hq.level.2',
+      title: 'Upgrade HQ to Level 2',
+      targetLevel: 2,
+      reason: 'Upgrade only after both early production chains are visible.'
+    }),
+    makePlaceBuildingStep(state, {
+      stepId: 'building.quarry.place',
+      title: 'Build Quarry',
+      buildingType: 'QUARRY',
+      reason: 'Move into stone after the wood-food base is proven.'
+    }),
+    makeProductionStep(state, {
+      stepId: 'production.quarry.collect_stone',
+      title: 'Produce and collect stone',
+      buildingType: 'QUARRY',
+      resource: 'stone',
+      reason: 'Stone completes the first broad resource triangle.'
+    }),
+    makeHqUpgradeStep(state, {
+      stepId: 'hq.level.3',
+      title: 'Upgrade HQ to Level 3',
+      targetLevel: 3,
+      reason: 'HQ Level 3 follows from a steadier wood, food, and stone base.'
+    }),
+    makeQueueProductionPermissionStep(state, 'Finish the Balanced Food-Wood plan')
+  ];
+}
+
+function buildDelegateOutputsFirstSteps(state) {
+  return [
+    makePlaceBuildingStep(state, {
+      stepId: 'building.lumber_camp.place',
+      title: 'Build Lumber Camp',
+      buildingType: 'LUMBER_CAMP',
+      reason: 'Wood creates the first output loop the Foreman can later help collect.'
+    }),
+    makeProductionStep(state, {
+      stepId: 'production.lumber_camp.collect_wood',
+      title: 'Produce and collect wood',
+      buildingType: 'LUMBER_CAMP',
+      resource: 'wood',
+      reason: 'A collected output makes delegation review concrete instead of abstract.'
+    }),
+    makePlaceBuildingStep(state, {
+      stepId: 'building.farm_plot.place',
+      title: 'Build Farm Plot',
+      buildingType: 'FARM_PLOT',
+      reason: 'Food gets HQ Level 2 within reach while adding a second output source.'
+    }),
+    makeProductionStep(state, {
+      stepId: 'production.farm_plot.collect_food',
+      title: 'Produce and collect food',
+      buildingType: 'FARM_PLOT',
+      resource: 'food',
+      reason: 'Food collection proves the second loop before any Foreman authority expands.'
+    }),
+    makeHqUpgradeStep(state, {
+      stepId: 'hq.level.2',
+      title: 'Upgrade HQ to Level 2',
+      targetLevel: 2,
+      reason: 'HQ Level 2 unlocks the first output-delegation checkpoint.'
+    }),
+    makeCollectOutputsPermissionStep(state),
+    makePlaceBuildingStep(state, {
+      stepId: 'building.quarry.place',
+      title: 'Build Quarry',
+      buildingType: 'QUARRY',
+      reason: 'Add stone after the player has reviewed collectOutputs.'
+    }),
+    makeProductionStep(state, {
+      stepId: 'production.quarry.collect_stone',
+      title: 'Produce and collect stone',
+      buildingType: 'QUARRY',
+      resource: 'stone',
+      reason: 'Stone is still required for HQ Level 3 and queueProduction.'
+    }),
+    makeHqUpgradeStep(state, {
+      stepId: 'hq.level.3',
+      title: 'Upgrade HQ to Level 3',
+      targetLevel: 3,
+      reason: 'HQ Level 3 should follow a deliberate delegation checkpoint.'
+    }),
+    makeQueueProductionPermissionStep(state, 'Review collectOutputs, then finish the HQ3 plan')
   ];
 }
 
@@ -608,22 +789,85 @@ function summarizeAtlas(state, steps) {
   };
 }
 
-function buildRushHq3Strategy(state, stateHash, { title = 'Rush HQ3' } = {}) {
-  const steps = buildRushHq3Steps(state);
+function stepsForStrategyKey(state, strategyKey) {
+  switch (strategyKey) {
+    case 'balanced-food-wood':
+      return buildBalancedFoodWoodSteps(state);
+    case 'delegate-outputs-first':
+      return buildDelegateOutputsFirstSteps(state);
+    case 'rush-hq3':
+    default:
+      return buildRushHq3Steps(state);
+  }
+}
+
+function aggregateMissingRequirements(steps) {
+  const totals = {};
+  for (const step of Array.isArray(steps) ? steps : []) {
+    for (const item of Array.isArray(step.requirements?.items) ? step.requirements.items : []) {
+      const missing = Math.max(0, Math.floor(Number(item.missing || 0)));
+      if (missing <= 0) continue;
+      const key = String(item.resource || item.kind || 'unknown');
+      totals[key] = Math.max(Number(totals[key] || 0), missing);
+    }
+  }
+  return totals;
+}
+
+function uniqueStrings(items, limit = 4) {
+  const seen = new Set();
+  const out = [];
+  for (const item of Array.isArray(items) ? items : []) {
+    const text = String(item || '').trim();
+    if (!text || seen.has(text)) continue;
+    seen.add(text);
+    out.push(text);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+function compareForStrategy(template, steps) {
+  const blockers = uniqueStrings(steps.map((step) => step.blocker).filter(Boolean));
+  const approvalActions = steps.filter((step) => step.actionRef?.tool).length;
+  const permissionCheckpoints = steps
+    .filter((step) => step.target?.kind === 'permission')
+    .map((step) => step.target.key);
+  return {
+    goal: template.goal,
+    stepCount: steps.length,
+    focus: [...template.focus],
+    roughBlockers: blockers.length ? blockers : ['No current blocker from the read model.'],
+    resourceShortfalls: aggregateMissingRequirements(steps),
+    permissions: permissionCheckpoints,
+    tradeoff: template.tradeoff,
+    approvalDelegationBurden: template.approvalDelegationBurden,
+    burden: {
+      playerActionRefs: approvalActions,
+      delegationMilestones: permissionCheckpoints
+    }
+  };
+}
+
+function buildProgressionStrategy(state, stateHash, strategyKey = DEFAULT_STRATEGY_KEY, { title = null } = {}) {
+  const template = strategyTemplateForKey(strategyKey) || STRATEGY_TEMPLATES[DEFAULT_STRATEGY_KEY];
+  const steps = stepsForStrategyKey(state, template.strategyKey);
   const graph = buildGraph(state, steps);
-  const strategyId = `strategy_${hashId([state?.plot?.plotId, DEFAULT_STRATEGY_KEY])}`;
+  const strategyId = `strategy_${hashId([state?.plot?.plotId, template.strategyKey])}`;
   const gameplayStableHash = gameplayStableHashForState(state);
   return {
     strategyId,
-    strategyKey: DEFAULT_STRATEGY_KEY,
-    title: String(title || 'Rush HQ3').trim().slice(0, 80) || 'Rush HQ3',
+    strategyKey: template.strategyKey,
+    title: String(title || template.title).trim().slice(0, 80) || template.title,
     visibility: 'private',
     generatedBy: 'progression_atlas_v1',
     baseGraphVersion: ATLAS_VERSION,
     baseStateHash: String(stateHash || state?.audit?.stateHash || ''),
     baseGameplayStableHash: gameplayStableHash,
-    goal: 'Reach HQ Level 3 through normal Founders Plot play and unlock Foreman queueProduction.',
-    summary: 'Fastest safe route through Lumber Camp, Farm Plot, Quarry, and HQ Level 3.',
+    goal: template.goal,
+    summary: template.summary,
+    focus: [...template.focus],
+    compare: compareForStrategy(template, steps),
     steps,
     graph,
     openClawLiteTools: [
@@ -637,6 +881,14 @@ function buildRushHq3Strategy(state, stateHash, { title = 'Rush HQ3' } = {}) {
     createdAt: null,
     updatedAt: null
   };
+}
+
+function buildRushHq3Strategy(state, stateHash, options = {}) {
+  return buildProgressionStrategy(state, stateHash, DEFAULT_STRATEGY_KEY, options);
+}
+
+function listStrategyTemplates() {
+  return STRATEGY_TEMPLATE_KEYS.map((key) => clone(STRATEGY_TEMPLATES[key]));
 }
 
 function getStateEnvelope({ pairId, houseId = null, plotId = null, nowMs }) {
@@ -669,6 +921,7 @@ function buildAtlasEnvelope({ stateEnvelope, nowMs }) {
   const gameplaySnapshot = buildGameplaySnapshot(state);
   const gameplayStableHash = stableHash(gameplaySnapshot);
   const draft = buildRushHq3Strategy(state, stateHash);
+  const strategyOptions = STRATEGY_TEMPLATE_KEYS.map((key) => buildProgressionStrategy(state, stateHash, key));
   const records = store.listProgressionStrategies(state.plot.plotId);
   const strategies = records.map(strategyFromRecord).filter(Boolean);
   const selectedStrategy = strategies.find((strategy) => strategy.selected) || null;
@@ -686,6 +939,8 @@ function buildAtlasEnvelope({ stateEnvelope, nowMs }) {
       summary,
       nodes: draft.graph.nodes,
       edges: draft.graph.edges,
+      strategyTemplates: listStrategyTemplates(),
+      strategyOptions,
       recommendedStrategy: draft,
       strategies,
       selectedStrategyId: selectedStrategy?.strategyId || null,
@@ -709,12 +964,13 @@ function getProgressionAtlasState({ pairId, houseId = null, plotId = null, nowMs
 
 function draftProgressionStrategy({ pairId, houseId = null, plotId = null, strategyKey = DEFAULT_STRATEGY_KEY, title = null, nowMs }) {
   const key = normalizeStrategyKey(strategyKey);
-  if (key !== DEFAULT_STRATEGY_KEY) {
-    return errorEnvelope('INVALID_REQUEST', 'Only rush-hq3 is available in Progression Atlas v1.');
+  const template = strategyTemplateForKey(key);
+  if (!template) {
+    return errorEnvelope('INVALID_REQUEST', `Unknown Progression Atlas strategy template: ${key || 'empty'}.`);
   }
   const stateEnvelope = getStateEnvelope({ pairId, houseId, plotId, nowMs });
   if (!stateEnvelope || stateEnvelope.ok === false) return stateEnvelope;
-  const strategy = buildRushHq3Strategy(stateEnvelope.state, stateEnvelope.stateHash, { title: title || 'Rush HQ3' });
+  const strategy = buildProgressionStrategy(stateEnvelope.state, stateEnvelope.stateHash, template.strategyKey, { title });
   strategy.createdAt = Number(nowMs || Date.now());
   strategy.updatedAt = strategy.createdAt;
   return successEnvelope({
@@ -790,9 +1046,11 @@ function selectProgressionStrategy({ pairId, houseId = null, plotId = null, stra
 function explainProgressionNode({ pairId, houseId = null, plotId = null, nodeId, nowMs }) {
   const stateEnvelope = getStateEnvelope({ pairId, houseId, plotId, nowMs });
   if (!stateEnvelope || stateEnvelope.ok === false) return stateEnvelope;
-  const strategy = buildRushHq3Strategy(stateEnvelope.state, stateEnvelope.stateHash);
+  const strategies = STRATEGY_TEMPLATE_KEYS.map((key) => buildProgressionStrategy(stateEnvelope.state, stateEnvelope.stateHash, key));
   const safeNodeId = String(nodeId || '').trim();
-  const step = strategy.steps.find((entry) => entry.nodeId === safeNodeId || entry.stepId === safeNodeId);
+  const step = strategies
+    .flatMap((strategy) => strategy.steps)
+    .find((entry) => entry.nodeId === safeNodeId || entry.stepId === safeNodeId);
   if (!step) return errorEnvelope('INVALID_REQUEST', 'Unknown progression node.');
   const missing = Object.entries(step.requirements?.missing || {})
     .map(([key, amount]) => `${key} ${amount}`)
@@ -816,6 +1074,7 @@ function explainProgressionNode({ pairId, houseId = null, plotId = null, nodeId,
 module.exports = {
   ATLAS_VERSION,
   DEFAULT_STRATEGY_KEY,
+  STRATEGY_TEMPLATE_KEYS,
   buildGameplaySnapshot,
   gameplayStableHashForState,
   getProgressionAtlasState,

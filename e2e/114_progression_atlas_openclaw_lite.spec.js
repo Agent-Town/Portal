@@ -11,7 +11,7 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-test('AC-63: OpenClaw Lite opens Progression Atlas and saves Rush HQ3 through visible UI', async ({ page }) => {
+test('AC-63: OpenClaw Lite opens Progression Atlas and saves selected strategy through visible UI', async ({ page }) => {
   const visit = await bootstrapExperienceIntentHarness(page);
   expect(visit?.ok).toBe(true);
 
@@ -29,6 +29,12 @@ test('AC-63: OpenClaw Lite opens Progression Atlas and saves Rush HQ3 through vi
   const atlasFrame = page.frameLocator('#districtModalBody iframe.districtFrame');
   await expect(atlasFrame.getByTestId('progression-atlas-root')).toBeVisible();
   await expect(atlasFrame.getByText('Rush HQ3').first()).toBeVisible();
+  await expect(atlasFrame.getByTestId('progression-atlas-strategy-compare')).toBeVisible();
+  await expect(atlasFrame.getByTestId('progression-atlas-compare-balanced-food-wood').getByText('Balanced Food-Wood')).toBeVisible();
+  await expect(atlasFrame.getByTestId('progression-atlas-compare-balanced-food-wood').getByText('More legible for new players')).toBeVisible();
+  await expect(atlasFrame.getByTestId('progression-atlas-compare-delegate-outputs-first').getByText('Delegate Outputs First')).toBeVisible();
+  await expect(atlasFrame.getByTestId('progression-atlas-compare-delegate-outputs-first').getByText('collectOutputs checkpoint')).toBeVisible();
+  await expect(atlasFrame.getByTestId('progression-atlas-compare-delegate-outputs-first').getByText('collectOutputs, queueProduction')).toBeVisible();
   await expect(atlasFrame.getByTestId('progression-atlas-tree')).toBeVisible();
   const farmTreeNode = atlasFrame.getByTestId('progression-atlas-tree-node-building_farm_plot_place');
   await expect(farmTreeNode.getByLabel('Food chain')).toBeVisible();
@@ -45,9 +51,13 @@ test('AC-63: OpenClaw Lite opens Progression Atlas and saves Rush HQ3 through vi
   expect(beforeAtlas?.ok).toBe(true);
   expect(beforeAtlas?.gameplayStableHash).toMatch(/^[a-f0-9]{64}$/);
 
+  await atlasFrame.getByTestId('progression-atlas-draft-delegate-outputs-first').click();
+  await expect(atlasFrame.getByTestId('progression-atlas-recommended-strategy').getByRole('heading', { name: 'Delegate Outputs First' })).toBeVisible();
+  await expect(atlasFrame.getByTestId('progression-atlas-tree-node-foreman_collect_outputs').locator('.atlasTreeIcon[aria-label="Foreman output collection"]')).toBeVisible();
+
   await atlasFrame.getByTestId('progression-atlas-save-strategy').click();
   await expect(atlasFrame.getByTestId('progression-atlas-selected-strategy')).toBeVisible();
-  await expect(atlasFrame.getByTestId('progression-atlas-saved-strategies').getByText('Rush HQ3')).toBeVisible();
+  await expect(atlasFrame.getByTestId('progression-atlas-saved-strategies').getByText('Delegate Outputs First')).toBeVisible();
 
   const afterAtlas = await page.evaluate(async () => {
     const res = await fetch('/api/founders-plot/progression-atlas', { credentials: 'include' });
@@ -55,6 +65,8 @@ test('AC-63: OpenClaw Lite opens Progression Atlas and saves Rush HQ3 through vi
   });
   expect(afterAtlas?.ok).toBe(true);
   expect(afterAtlas?.gameplayStableHash).toBe(beforeAtlas.gameplayStableHash);
+  expect(afterAtlas?.atlas?.selectedStrategyId).toBeTruthy();
+  expect(afterAtlas?.atlas?.strategies?.find((strategy) => strategy.selected)?.strategyKey).toBe('delegate-outputs-first');
   expect(afterAtlas?.gameplaySnapshot?.audit?.eventCount).toBe(beforeAtlas.gameplaySnapshot.audit.eventCount);
   expect(afterAtlas?.gameplaySnapshot?.plot?.inventory).toEqual(beforeAtlas.gameplaySnapshot.plot.inventory);
 });

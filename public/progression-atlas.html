@@ -16,7 +16,9 @@
         <h1>Progression Atlas</h1>
       </div>
       <div class="atlasHeaderActions">
-        <button class="atlasButton" id="draftRushHq3Btn" type="button" data-testid="progression-atlas-draft-rush-hq3">Draft Rush HQ3</button>
+        <button class="atlasButton atlasDraftStrategyBtn" id="draftRushHq3Btn" type="button" data-strategy-key="rush-hq3" data-testid="progression-atlas-draft-rush-hq3">Rush HQ3</button>
+        <button class="atlasButton atlasDraftStrategyBtn" type="button" data-strategy-key="balanced-food-wood" data-testid="progression-atlas-draft-balanced-food-wood">Balanced Food-Wood</button>
+        <button class="atlasButton atlasDraftStrategyBtn" type="button" data-strategy-key="delegate-outputs-first" data-testid="progression-atlas-draft-delegate-outputs-first">Delegate Outputs First</button>
         <button class="atlasButton atlasButtonPrimary" id="saveStrategyBtn" type="button" data-testid="progression-atlas-save-strategy" disabled>Save Strategy</button>
       </div>
     </header>
@@ -26,6 +28,14 @@
     </section>
 
     <section class="atlasGrid">
+      <div class="atlasPanel">
+        <div class="atlasPanelHeader">
+          <h2>Strategy Compare</h2>
+          <span class="atlasTag">advisory</span>
+        </div>
+        <div id="strategyCompare" class="atlasCompareGrid" data-testid="progression-atlas-strategy-compare"></div>
+      </div>
+
       <div class="atlasPanel">
         <div class="atlasPanelHeader">
           <h2>Recommended Strategy</h2>

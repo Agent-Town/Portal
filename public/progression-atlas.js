@@ -1,10 +1,21 @@
 (function () {
   'use strict';
 
+  function initialStrategyKey() {
+    try {
+      const params = new URLSearchParams(window.location.search || '');
+      const raw = params.get('strategyKey') || 'rush-hq3';
+      return String(raw).trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-') || 'rush-hq3';
+    } catch (_) {
+      return 'rush-hq3';
+    }
+  }
+
   const state = {
     atlas: null,
     draft: null,
-    selectedStrategyId: null
+    selectedStrategyId: null,
+    activeStrategyKey: initialStrategyKey()
   };
 
   function $(id) {
@@ -32,6 +43,30 @@
     const path = String(value || '');
     const allowed = path.startsWith('/assets/icons/agent-town/');
     return allowed && !path.includes('..') ? path : '';
+  }
+
+  function strategyTitle(strategy) {
+    return strategy?.title || strategy?.strategyKey || 'Strategy';
+  }
+
+  function strategyOptionForKey(strategyKey) {
+    const key = String(strategyKey || state.activeStrategyKey || 'rush-hq3');
+    const options = Array.isArray(state.atlas?.strategyOptions) ? state.atlas.strategyOptions : [];
+    return options.find((strategy) => strategy.strategyKey === key) || state.atlas?.recommendedStrategy || null;
+  }
+
+  function compactList(items, fallback = 'None') {
+    const list = Array.isArray(items)
+      ? items.map((item) => String(item || '').trim()).filter(Boolean)
+      : [];
+    return list.length ? list.join(', ') : fallback;
+  }
+
+  function shortfallsText(shortfalls) {
+    const entries = Object.entries(shortfalls && typeof shortfalls === 'object' ? shortfalls : {})
+      .filter(([, amount]) => Number(amount || 0) > 0);
+    if (!entries.length) return 'none from current state';
+    return entries.map(([key, amount]) => `${key} ${amount}`).join(', ');
   }
 
   function globalIcon(iconId, overrides = {}) {
@@ -133,6 +168,45 @@
     ].join('');
   }
 
+  function renderTemplateControls() {
+    document.querySelectorAll('.atlasDraftStrategyBtn').forEach((button) => {
+      const key = button.getAttribute('data-strategy-key') || 'rush-hq3';
+      button.classList.toggle('isActive', key === state.activeStrategyKey);
+    });
+  }
+
+  function renderStrategyCompare() {
+    const node = $('strategyCompare');
+    if (!node) return;
+    const strategies = Array.isArray(state.atlas?.strategyOptions) ? state.atlas.strategyOptions : [];
+    if (!strategies.length) {
+      node.innerHTML = '<p class="atlasEmpty">Strategy variants unavailable.</p>';
+      return;
+    }
+    node.innerHTML = strategies.map((strategy) => {
+      const compare = strategy.compare || {};
+      const selected = strategy.strategyKey === state.activeStrategyKey;
+      return `
+        <article class="atlasCompareCard${selected ? ' isActive' : ''}" data-testid="progression-atlas-compare-${escapeHtml(testId(strategy.strategyKey))}">
+          <div class="atlasCompareHead">
+            <h3>${escapeHtml(strategyTitle(strategy))}</h3>
+            <button class="atlasLinkButton atlasDraftStrategyBtn" type="button" data-strategy-key="${escapeHtml(strategy.strategyKey)}">Draft</button>
+          </div>
+          <dl class="atlasCompareList">
+            <div><dt>Goal</dt><dd>${escapeHtml(compare.goal || strategy.goal || '')}</dd></div>
+            <div><dt>Steps</dt><dd>${escapeHtml(compare.stepCount || (Array.isArray(strategy.steps) ? strategy.steps.length : 0))}</dd></div>
+            <div><dt>Focus</dt><dd>${escapeHtml(compactList(compare.focus || strategy.focus))}</dd></div>
+            <div><dt>Blockers</dt><dd>${escapeHtml(compactList(compare.roughBlockers))}</dd></div>
+            <div><dt>Shortfalls</dt><dd>${escapeHtml(shortfallsText(compare.resourceShortfalls))}</dd></div>
+            <div><dt>Permissions</dt><dd>${escapeHtml(compactList(compare.permissions, 'manual only'))}</dd></div>
+            <div><dt>Tradeoff</dt><dd>${escapeHtml(compare.tradeoff || strategy.summary || '')}</dd></div>
+            <div><dt>Burden</dt><dd>${escapeHtml(compare.approvalDelegationBurden || '')}</dd></div>
+          </dl>
+        </article>
+      `;
+    }).join('');
+  }
+
   function renderTree(steps) {
     if (!steps.length) return '';
     const items = steps.map((step, index) => {
@@ -164,7 +238,7 @@
           <span class="atlasTag">tiered</span>
         </div>
         <div class="atlasResearchViewport">
-          <ol class="atlasResearchMap">${items}</ol>
+          <ol class="atlasResearchMap" style="grid-template-columns: repeat(${Math.max(1, steps.length)}, minmax(100px, 1fr));">${items}</ol>
         </div>
       </section>
     `;
@@ -207,6 +281,7 @@
           <div>${selected}${selectButton}</div>
         </div>
         <p class="atlasStrategyGoal">${escapeHtml(strategy.goal || strategy.summary || '')}</p>
+        ${Array.isArray(strategy.focus) && strategy.focus.length ? `<div class="atlasFocusList">${strategy.focus.map((entry) => `<span>${escapeHtml(entry)}</span>`).join('')}</div>` : ''}
         ${compact ? '' : `${renderTree(steps)}<div class="atlasStepList">${steps.map(renderStep).join('')}</div>`}
       </article>
     `;
@@ -215,9 +290,10 @@
   function renderDraft() {
     const node = $('draftStrategy');
     if (!node) return;
-    node.innerHTML = renderStrategy(state.draft || state.atlas?.recommendedStrategy || null);
+    const strategy = state.draft || strategyOptionForKey(state.activeStrategyKey);
+    node.innerHTML = renderStrategy(strategy);
     const saveBtn = $('saveStrategyBtn');
-    if (saveBtn) saveBtn.disabled = !(state.draft || state.atlas?.recommendedStrategy);
+    if (saveBtn) saveBtn.disabled = !strategy;
   }
 
   function renderSavedStrategies() {
@@ -225,7 +301,7 @@
     if (!node) return;
     const strategies = Array.isArray(state.atlas?.strategies) ? state.atlas.strategies : [];
     if (!strategies.length) {
-      node.innerHTML = '<p class="atlasEmpty">No private strategies saved yet. Save Rush HQ3 to validate the Atlas loop.</p>';
+      node.innerHTML = '<p class="atlasEmpty">No private strategies saved yet. Draft and save one option to validate the Atlas loop.</p>';
       return;
     }
     node.innerHTML = strategies.map((strategy) => renderStrategy(strategy, { compact: true })).join('');
@@ -233,6 +309,8 @@
 
   function renderAll() {
     renderSummary();
+    renderTemplateControls();
+    renderStrategyCompare();
     renderDraft();
     renderSavedStrategies();
     markReadyImages(document);
@@ -242,29 +320,33 @@
     const data = await fetchJson('/api/founders-plot/progression-atlas');
     state.atlas = data.atlas || null;
     state.selectedStrategyId = data.atlas?.selectedStrategyId || null;
-    if (!state.draft) state.draft = data.atlas?.recommendedStrategy || null;
+    const activeOption = strategyOptionForKey(state.activeStrategyKey);
+    state.activeStrategyKey = activeOption?.strategyKey || 'rush-hq3';
+    if (!state.draft) state.draft = activeOption;
     renderAll();
   }
 
-  async function draftRushHq3() {
+  async function draftStrategy(strategyKey = state.activeStrategyKey) {
+    const key = String(strategyKey || 'rush-hq3');
     const data = await fetchJson('/api/founders-plot/progression-atlas/strategies/draft', {
       method: 'POST',
-      body: JSON.stringify({ strategyKey: 'rush-hq3' })
+      body: JSON.stringify({ strategyKey: key })
     });
+    state.activeStrategyKey = data.strategy?.strategyKey || key;
     state.draft = data.strategy;
     renderAll();
     const explanation = $('atlasExplanation');
-    if (explanation) explanation.textContent = 'Rush HQ3 drafted from the current Founders Plot state. Nothing in gameplay changed.';
+    if (explanation) explanation.textContent = `${strategyTitle(data.strategy)} drafted from the current Founders Plot state. Nothing in gameplay changed.`;
   }
 
   async function saveDraft() {
-    const strategy = state.draft || state.atlas?.recommendedStrategy;
+    const strategy = state.draft || strategyOptionForKey(state.activeStrategyKey);
     if (!strategy) return;
     const data = await fetchJson('/api/founders-plot/progression-atlas/strategies', {
       method: 'POST',
       body: JSON.stringify({
         strategyKey: strategy.strategyKey || 'rush-hq3',
-        title: strategy.title || 'Rush HQ3',
+        title: strategy.title || strategyTitle(strategy),
         select: true
       })
     });
@@ -275,7 +357,7 @@
     state.selectedStrategyId = data.selectedStrategyId || null;
     renderAll();
     const explanation = $('atlasExplanation');
-    if (explanation) explanation.textContent = 'Saved Rush HQ3 as a private strategy and selected it for this plot.';
+    if (explanation) explanation.textContent = `Saved ${strategyTitle(strategy)} as a private strategy and selected it for this plot.`;
   }
 
   async function selectStrategy(strategyId) {
@@ -301,14 +383,6 @@
   }
 
   function bindEvents() {
-    const draftBtn = $('draftRushHq3Btn');
-    if (draftBtn) draftBtn.addEventListener('click', () => {
-      draftRushHq3().catch((err) => {
-        const node = $('atlasExplanation');
-        if (node) node.textContent = String(err?.message || err || 'Draft failed');
-      });
-    });
-
     const saveBtn = $('saveStrategyBtn');
     if (saveBtn) saveBtn.addEventListener('click', () => {
       saveDraft().catch((err) => {
@@ -331,6 +405,14 @@
         selectStrategy(select.getAttribute('data-strategy-id')).catch((err) => {
           const node = $('atlasExplanation');
           if (node) node.textContent = String(err?.message || err || 'Select failed');
+        });
+        return;
+      }
+      const draft = event.target.closest('.atlasDraftStrategyBtn');
+      if (draft) {
+        draftStrategy(draft.getAttribute('data-strategy-key')).catch((err) => {
+          const node = $('atlasExplanation');
+          if (node) node.textContent = String(err?.message || err || 'Draft failed');
         });
       }
     });
