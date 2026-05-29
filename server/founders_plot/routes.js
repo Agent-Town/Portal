@@ -1,6 +1,7 @@
 const express = require('express');
 
 const engine = require('./engine');
+const progressionAtlas = require('./progression_atlas');
 const { FOUNDERS_PLOT_TOOL_SPECS } = require('./tools');
 
 function isPlainObject(value) {
@@ -66,6 +67,68 @@ function createFoundersPlotRouter({
       nowMs: nowMsFn(),
       includeReplay: String(req.query?.includeReplay || '').trim() === '1',
       includePublicSummary: String(req.query?.includePublicSummary || '1').trim() !== '0'
+    });
+    return sendEnvelope(res, envelope);
+  });
+
+  router.get('/api/founders-plot/progression-atlas', (req, res) => {
+    const identity = identityFor(req, res);
+    const envelope = progressionAtlas.getProgressionAtlasState({
+      pairId: identity.pairId,
+      houseId: identity.houseId || null,
+      plotId: typeof req.query?.plotId === 'string' ? req.query.plotId.trim() : null,
+      nowMs: nowMsFn()
+    });
+    return sendEnvelope(res, envelope);
+  });
+
+  router.post('/api/founders-plot/progression-atlas/strategies/draft', (req, res) => {
+    const identity = identityFor(req, res);
+    const envelope = progressionAtlas.draftProgressionStrategy({
+      pairId: identity.pairId,
+      houseId: identity.houseId || null,
+      plotId: typeof req.body?.plotId === 'string' ? req.body.plotId.trim() : null,
+      strategyKey: req.body?.strategyKey,
+      title: req.body?.title,
+      nowMs: nowMsFn()
+    });
+    return sendEnvelope(res, envelope);
+  });
+
+  router.post('/api/founders-plot/progression-atlas/strategies', (req, res) => {
+    const identity = identityFor(req, res);
+    const envelope = progressionAtlas.saveProgressionStrategy({
+      pairId: identity.pairId,
+      houseId: identity.houseId || null,
+      plotId: typeof req.body?.plotId === 'string' ? req.body.plotId.trim() : null,
+      strategyKey: req.body?.strategyKey || req.body?.strategy?.strategyKey,
+      title: req.body?.title || req.body?.strategy?.title,
+      select: req.body?.select === true,
+      nowMs: nowMsFn()
+    });
+    return sendEnvelope(res, envelope);
+  });
+
+  router.post('/api/founders-plot/progression-atlas/strategies/:strategyId/select', (req, res) => {
+    const identity = identityFor(req, res);
+    const envelope = progressionAtlas.selectProgressionStrategy({
+      pairId: identity.pairId,
+      houseId: identity.houseId || null,
+      plotId: typeof req.body?.plotId === 'string' ? req.body.plotId.trim() : null,
+      strategyId: req.params.strategyId,
+      nowMs: nowMsFn()
+    });
+    return sendEnvelope(res, envelope);
+  });
+
+  router.post('/api/founders-plot/progression-atlas/explain', (req, res) => {
+    const identity = identityFor(req, res);
+    const envelope = progressionAtlas.explainProgressionNode({
+      pairId: identity.pairId,
+      houseId: identity.houseId || null,
+      plotId: typeof req.body?.plotId === 'string' ? req.body.plotId.trim() : null,
+      nodeId: req.body?.nodeId,
+      nowMs: nowMsFn()
     });
     return sendEnvelope(res, envelope);
   });

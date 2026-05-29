@@ -1,0 +1,629 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f6f2e8;
+  color: #1f2523;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.progressionAtlasPage {
+  min-height: 100vh;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0)),
+    #f6f2e8;
+}
+
+.progressionAtlasRoot {
+  width: min(1120px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 24px 0 28px;
+}
+
+.atlasHeader,
+.atlasPanelHeader,
+.atlasHeaderActions,
+.atlasSummary,
+.atlasResourceRow,
+.atlasStepHead,
+.atlasStrategyHead {
+  display: flex;
+  align-items: center;
+}
+
+.atlasHeader {
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.atlasHeader h1,
+.atlasPanel h2 {
+  margin: 0;
+  letter-spacing: 0;
+}
+
+.atlasHeader h1 {
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.atlasPanel h2 {
+  font-size: 15px;
+}
+
+.atlasEyebrow {
+  margin: 0 0 5px;
+  color: #6c6352;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.atlasHeaderActions {
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.atlasButton {
+  min-height: 36px;
+  border: 1px solid #9e8c65;
+  border-radius: 6px;
+  background: #fffaf0;
+  color: #252820;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 8px 12px;
+}
+
+.atlasButton:hover:not(:disabled) {
+  background: #fff3cc;
+}
+
+.atlasButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.atlasButtonPrimary {
+  background: #2c6b5c;
+  border-color: #2c6b5c;
+  color: #fff;
+}
+
+.atlasSummary {
+  gap: 10px;
+  flex-wrap: wrap;
+  min-height: 42px;
+  border: 1px solid #d5c7a5;
+  border-radius: 8px;
+  background: #fffaf0;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+}
+
+.atlasPill,
+.atlasTag,
+.atlasStatus {
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 6px 8px;
+}
+
+.atlasPill {
+  background: #e8dfca;
+  color: #312d25;
+}
+
+.atlasPillIcon {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+}
+
+.atlasTag {
+  background: #e8efe9;
+  color: #2b5f52;
+}
+
+.atlasGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+.atlasPanel {
+  border: 1px solid #d5c7a5;
+  border-radius: 8px;
+  background: rgba(255, 250, 240, 0.92);
+  padding: 14px;
+}
+
+.atlasPanelHeader {
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.atlasStrategy {
+  border: 1px solid #e1d3b1;
+  border-radius: 8px;
+  background: #fffdf7;
+  padding: 12px;
+}
+
+.atlasStrategy + .atlasStrategy {
+  margin-top: 10px;
+}
+
+.atlasStrategyHead {
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.atlasStrategyTitle {
+  margin: 0;
+  font-size: 16px;
+}
+
+.atlasStrategyGoal {
+  margin: 0 0 10px;
+  color: #5e5b50;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.atlasStepList {
+  display: grid;
+  gap: 8px;
+}
+
+.atlasTree {
+  border: 1px solid #cfdddc;
+  border-radius: 8px;
+  background: #f6fbfa;
+  margin: 12px 0;
+  padding: 12px;
+}
+
+.atlasResearchBoard {
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px) 0 0 / 96px 100%,
+    radial-gradient(circle at 50% 0, rgba(94, 69, 34, 0.34), transparent 58%),
+    #17140f;
+  border-color: #5d5140;
+  box-shadow: inset 0 0 0 2px rgba(226, 180, 78, 0.14);
+  color: #efe4c8;
+  overflow: hidden;
+  padding: 12px 12px 14px;
+}
+
+.atlasTreeHeader {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.atlasTreeHeader h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.atlasResearchViewport {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.atlasResearchMap {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(9, minmax(100px, 1fr));
+  list-style: none;
+  margin: 0;
+  min-width: 940px;
+  padding: 0 6px 2px;
+  position: relative;
+}
+
+.atlasResearchMap::before {
+  background: #22bf38;
+  box-shadow:
+    0 0 0 1px rgba(6, 49, 16, 0.8),
+    0 0 10px rgba(34, 191, 56, 0.38);
+  content: "";
+  height: 3px;
+  left: 64px;
+  position: absolute;
+  right: 64px;
+  top: 93px;
+}
+
+.atlasResearchNode {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-rows: 32px 78px minmax(56px, auto);
+  justify-items: center;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.atlasResearchNode.isTierStart::before {
+  background: linear-gradient(180deg, transparent, rgba(204, 161, 69, 0.5), transparent);
+  bottom: 6px;
+  content: "";
+  left: -6px;
+  position: absolute;
+  top: 30px;
+  width: 1px;
+}
+
+.atlasResearchTierBadge,
+.atlasResearchTierSpacer {
+  min-height: 30px;
+}
+
+.atlasResearchTierBadge {
+  align-items: center;
+  background: #090908;
+  border: 1px solid #6e6351;
+  border-radius: 4px;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  justify-content: center;
+  min-width: 78px;
+  padding: 5px 8px;
+}
+
+.atlasResearchTierBadge span {
+  color: #f6e6bd;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.atlasResearchTierBadge strong {
+  color: #aa9f88;
+  font-size: 9px;
+  line-height: 1;
+}
+
+.atlasResearchTile {
+  align-items: center;
+  background:
+    linear-gradient(180deg, #5f411c, #9b742c 18%, #4a3217 100%);
+  border: 1px solid #d19a36;
+  border-radius: 5px;
+  box-shadow:
+    inset 0 0 0 3px rgba(42, 24, 9, 0.82),
+    0 3px 0 rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  display: inline-flex;
+  height: 72px;
+  justify-content: center;
+  padding: 7px;
+  position: relative;
+  width: 72px;
+}
+
+.atlasResearchTile:hover {
+  filter: brightness(1.08);
+}
+
+.atlasResearchTileFrame {
+  align-items: center;
+  background: #fff7df;
+  border: 1px solid #2b2118;
+  display: inline-flex;
+  height: 56px;
+  justify-content: center;
+  width: 56px;
+}
+
+.atlasResearchIndex {
+  align-items: center;
+  background: #16120d;
+  border: 1px solid rgba(255, 236, 185, 0.58);
+  border-radius: 999px;
+  bottom: -6px;
+  color: #f6e6bd;
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 900;
+  height: 20px;
+  justify-content: center;
+  position: absolute;
+  right: -6px;
+  width: 20px;
+}
+
+.atlasResearchBody {
+  min-width: 0;
+  text-align: center;
+}
+
+.atlasResearchBody h4 {
+  color: #efe4c8;
+  font-size: 12px;
+  line-height: 1.2;
+  margin: 0 0 4px;
+}
+
+.atlasResearchBody p {
+  color: #aeb6aa;
+  font-size: 11px;
+  line-height: 1.25;
+  margin: 0;
+}
+
+.atlasStep {
+  border: 1px solid #e5d9bb;
+  border-radius: 8px;
+  background: #fffaf0;
+  padding: 10px;
+}
+
+.atlasStepHead {
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.atlasStepTitle {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.atlasStep h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.atlasStep p {
+  margin: 7px 0 0;
+  color: #5d594d;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.atlasStatus.done {
+  background: #dcede6;
+  color: #1e5a49;
+}
+
+.atlasStatus.available {
+  background: #e1ecff;
+  color: #274d87;
+}
+
+.atlasStatus.blocked {
+  background: #f8ddd4;
+  color: #9b3c28;
+}
+
+.atlasStatus.waiting {
+  background: #f3e8c0;
+  color: #756027;
+}
+
+.atlasIcon,
+.atlasMiniIcon,
+.atlasTreeIcon {
+  align-items: center;
+  border: 1px solid rgba(24, 30, 30, 0.12);
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-weight: 900;
+  justify-content: center;
+  letter-spacing: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.atlasIcon {
+  border-radius: 10px;
+  font-size: 11px;
+  height: 34px;
+  width: 34px;
+}
+
+.atlasMiniIcon {
+  border-radius: 8px;
+  font-size: 9px;
+  height: 22px;
+  width: 22px;
+}
+
+.atlasTreeIcon {
+  border-radius: 14px;
+  box-shadow: 0 3px 0 rgba(29, 53, 48, 0.16);
+  font-size: 12px;
+  height: 46px;
+  width: 46px;
+}
+
+.atlasResearchTile .atlasTreeIcon {
+  border-radius: 4px;
+  box-shadow: none;
+  height: 52px;
+  width: 52px;
+}
+
+.tone-command {
+  background: #284f6d;
+  color: #fff;
+}
+
+.tone-wood {
+  background: #476f45;
+  color: #fff;
+}
+
+.tone-food {
+  background: #8c4f3d;
+  color: #fff;
+}
+
+.tone-stone {
+  background: #526372;
+  color: #fff;
+}
+
+.tone-coin {
+  background: #b6851d;
+  color: #1f2523;
+}
+
+.tone-xp,
+.tone-foreman {
+  background: #614f8a;
+  color: #fff;
+}
+
+.tone-craft,
+.tone-building,
+.tone-resource,
+.tone-neutral {
+  background: #3a7273;
+  color: #fff;
+}
+
+.atlasIcon.withImage,
+.atlasMiniIcon.withImage,
+.atlasTreeIcon.withImage {
+  background:
+    radial-gradient(circle at 50% 45%, rgba(255, 250, 240, 0.96), rgba(232, 219, 188, 0.82));
+  border-color: rgba(98, 83, 51, 0.28);
+}
+
+.atlasIconImage {
+  display: block;
+  filter: drop-shadow(0 1px 1px rgba(31, 37, 35, 0.24));
+  height: 92%;
+  object-fit: contain;
+  width: 92%;
+}
+
+.atlasMiniIcon .atlasIconImage {
+  height: 112%;
+  width: 112%;
+}
+
+.atlasTreeIcon .atlasIconImage {
+  height: 110%;
+  width: 110%;
+}
+
+.atlasIconFallback {
+  line-height: 1;
+}
+
+.withImage.isImageReady .atlasIconFallback {
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  position: absolute;
+  width: 1px;
+}
+
+.atlasRequirementList {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.atlasRequirement {
+  border: 1px solid #d7c9aa;
+  border-radius: 999px;
+  background: #fbf5e5;
+  color: #4a473e;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 7px;
+}
+
+.atlasRequirement.missing {
+  border-color: #d99a82;
+  background: #fff0e8;
+  color: #9b3c28;
+}
+
+.atlasStepActions {
+  margin-top: 8px;
+}
+
+.atlasLinkButton {
+  border: 0;
+  background: transparent;
+  color: #2c6b5c;
+  cursor: pointer;
+  font-weight: 800;
+  padding: 0;
+}
+
+.atlasEmpty {
+  color: #6f685a;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.atlasExplanationPanel {
+  margin-top: 14px;
+}
+
+.atlasExplanation {
+  margin: 0;
+  color: #4d4b43;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+@media (max-width: 820px) {
+  .progressionAtlasRoot {
+    width: min(100vw - 20px, 1120px);
+    padding-top: 14px;
+  }
+
+  .atlasHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .atlasHeaderActions {
+    justify-content: flex-start;
+  }
+
+  .atlasGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .atlasStepHead,
+  .atlasStrategyHead {
+    align-items: flex-start;
+  }
+
+  .atlasResearchMap {
+    grid-template-columns: repeat(9, 92px);
+    min-width: 880px;
+  }
+
+  .atlasResearchBody h4 {
+    font-size: 11px;
+  }
+}

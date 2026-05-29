@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Progression Atlas</title>
+  <link rel="stylesheet" href="/progression-atlas.css" />
+</head>
+
+<body class="progressionAtlasPage">
+  <main class="progressionAtlasRoot" data-testid="progression-atlas-root">
+    <header class="atlasHeader">
+      <div>
+        <p class="atlasEyebrow">Founders Plot</p>
+        <h1>Progression Atlas</h1>
+      </div>
+      <div class="atlasHeaderActions">
+        <button class="atlasButton" id="draftRushHq3Btn" type="button" data-testid="progression-atlas-draft-rush-hq3">Draft Rush HQ3</button>
+        <button class="atlasButton atlasButtonPrimary" id="saveStrategyBtn" type="button" data-testid="progression-atlas-save-strategy" disabled>Save Strategy</button>
+      </div>
+    </header>
+
+    <section class="atlasSummary" id="atlasSummary" data-testid="progression-atlas-summary">
+      Loading progression state...
+    </section>
+
+    <section class="atlasGrid">
+      <div class="atlasPanel">
+        <div class="atlasPanelHeader">
+          <h2>Recommended Strategy</h2>
+          <span class="atlasTag">read only</span>
+        </div>
+        <div id="draftStrategy" data-testid="progression-atlas-recommended-strategy"></div>
+      </div>
+
+      <div class="atlasPanel">
+        <div class="atlasPanelHeader">
+          <h2>Private Strategies</h2>
+          <span class="atlasTag">saved</span>
+        </div>
+        <div id="savedStrategies" data-testid="progression-atlas-saved-strategies"></div>
+      </div>
+    </section>
+
+    <section class="atlasPanel atlasExplanationPanel">
+      <div class="atlasPanelHeader">
+        <h2>Oracle Note</h2>
+        <span class="atlasTag">same surface</span>
+      </div>
+      <p id="atlasExplanation" class="atlasExplanation" data-testid="progression-atlas-explanation">
+        Choose a step to see what Clover or an Atlas Oracle would explain through OpenClaw Lite.
+      </p>
+    </section>
+  </main>
+  <script src="/agent-town-icons.js" defer></script>
+  <script src="/progression-atlas.js" defer></script>
+</body>
+
+</html>

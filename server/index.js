@@ -1707,6 +1707,7 @@ function setSecurityHeaders(req, res, next) {
   const allowSameOriginFrame = (
     reqPath.startsWith('/s/')
     || reqPath === '/atlas'
+    || reqPath === '/progression-atlas'
     || reqPath === '/create'
     || reqPath === '/house'
     || reqPath === '/inbox'
@@ -9467,6 +9468,8 @@ app.use((req, res, next) => {
 function isAtlasEmbedModalRequest(req) {
   const embed = String(req.query?.embed || '').trim() === '1';
   if (!embed) return false;
+  // Keep Atlas surfaces iframe-only even with embed=1; top-level visits redirect
+  // back into /app so OpenClaw Lite runtime/session continuity stays intact.
   const fetchDest = String(req.get('sec-fetch-dest') || '').trim().toLowerCase();
   if (fetchDest !== 'iframe' && fetchDest !== 'frame') return false;
   const fetchSite = String(req.get('sec-fetch-site') || '').trim().toLowerCase();
@@ -9476,6 +9479,12 @@ function isAtlasEmbedModalRequest(req) {
 function atlasModalRedirectPath() {
   const params = new URLSearchParams();
   params.set('district', 'atlas');
+  return `/?${params.toString()}`;
+}
+
+function progressionAtlasModalRedirectPath() {
+  const params = new URLSearchParams();
+  params.set('district', 'progression');
   return `/?${params.toString()}`;
 }
 
@@ -9493,6 +9502,18 @@ app.get('/atlas', (req, res) => {
     return sendHtmlNoStore(res, 'atlas.html');
   }
   return res.redirect(302, atlasModalRedirectPath());
+});
+
+// Progression Atlas is also modal-only so OpenClaw Lite drives the same visible UI surface.
+app.get('/progression-atlas.html', (_req, res) => {
+  return res.redirect(302, progressionAtlasModalRedirectPath());
+});
+
+app.get('/progression-atlas', (req, res) => {
+  if (isAtlasEmbedModalRequest(req)) {
+    return sendHtmlNoStore(res, 'progression-atlas.html');
+  }
+  return res.redirect(302, progressionAtlasModalRedirectPath());
 });
 
 app.use(

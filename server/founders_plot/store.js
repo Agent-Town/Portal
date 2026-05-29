@@ -167,6 +167,19 @@ function ensureDb() {
       resolved_at INTEGER
     );
     CREATE INDEX IF NOT EXISTS founder_approvals_plot_idx ON founder_approvals (plot_id, status, updated_at);
+
+    CREATE TABLE IF NOT EXISTS founder_progression_strategies (
+      strategy_id TEXT PRIMARY KEY,
+      plot_id TEXT NOT NULL,
+      strategy_key TEXT NOT NULL,
+      title TEXT NOT NULL,
+      selected INTEGER NOT NULL DEFAULT 0,
+      strategy_json TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS founder_progression_strategies_plot_idx
+      ON founder_progression_strategies (plot_id, selected, updated_at DESC);
   `);
   // Lightweight migration: add agent_tiers_xp_awarded_json if missing from pre-existing DBs.
   try {
@@ -358,7 +371,37 @@ function buildStatements(database) {
       ORDER BY hq_level DESC, town_xp DESC, updated_at ASC, plot_id ASC
       LIMIT ?
     `),
+    progressionStrategiesByPlot: database.prepare(`
+      SELECT * FROM founder_progression_strategies
+      WHERE plot_id = ?
+      ORDER BY selected DESC, updated_at DESC, created_at DESC, strategy_id ASC
+    `),
+    progressionStrategyById: database.prepare(`
+      SELECT * FROM founder_progression_strategies WHERE strategy_id = ? LIMIT 1
+    `),
+    upsertProgressionStrategy: database.prepare(`
+      INSERT INTO founder_progression_strategies (
+        strategy_id, plot_id, strategy_key, title, selected, strategy_json, created_at, updated_at
+      ) VALUES (
+        @strategy_id, @plot_id, @strategy_key, @title, @selected, @strategy_json, @created_at, @updated_at
+      )
+      ON CONFLICT(strategy_id) DO UPDATE SET
+        plot_id = excluded.plot_id,
+        strategy_key = excluded.strategy_key,
+        title = excluded.title,
+        selected = excluded.selected,
+        strategy_json = excluded.strategy_json,
+        created_at = excluded.created_at,
+        updated_at = excluded.updated_at
+    `),
+    clearSelectedProgressionStrategies: database.prepare(`
+      UPDATE founder_progression_strategies SET selected = 0, updated_at = ? WHERE plot_id = ?
+    `),
+    selectProgressionStrategy: database.prepare(`
+      UPDATE founder_progression_strategies SET selected = 1, updated_at = ? WHERE plot_id = ? AND strategy_id = ?
+    `),
     reset: {
+      progressionStrategies: database.prepare('DELETE FROM founder_progression_strategies'),
       approvals: database.prepare('DELETE FROM founder_approvals'),
       idempotency: database.prepare('DELETE FROM founder_idempotency'),
       events: database.prepare('DELETE FROM founder_event_log'),
@@ -600,6 +643,34 @@ function dehydrateApproval(approval) {
   };
 }
 
+function hydrateProgressionStrategy(row) {
+  if (!row) return null;
+  const strategy = parseJson(row.strategy_json, {});
+  return {
+    strategyId: row.strategy_id,
+    plotId: row.plot_id,
+    strategyKey: row.strategy_key,
+    title: row.title,
+    selected: !!row.selected,
+    strategy,
+    createdAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at)
+  };
+}
+
+function dehydrateProgressionStrategy(record) {
+  return {
+    strategy_id: record.strategyId,
+    plot_id: record.plotId,
+    strategy_key: record.strategyKey,
+    title: record.title,
+    selected: record.selected ? 1 : 0,
+    strategy_json: toJson(record.strategy || {}, {}),
+    created_at: Number(record.createdAt),
+    updated_at: Number(record.updatedAt)
+  };
+}
+
 function readPlotBundleByPairId(pairId) {
   ensureDb();
   const row = statements.plotByPair.get(pairId);
@@ -752,9 +823,35 @@ function listPublicPlots(limit = 20) {
   }));
 }
 
+function listProgressionStrategies(plotId) {
+  ensureDb();
+  return statements.progressionStrategiesByPlot.all(plotId).map(hydrateProgressionStrategy);
+}
+
+function getProgressionStrategy(strategyId) {
+  ensureDb();
+  return hydrateProgressionStrategy(statements.progressionStrategyById.get(strategyId));
+}
+
+function writeProgressionStrategy(record) {
+  ensureDb();
+  statements.upsertProgressionStrategy.run(dehydrateProgressionStrategy(record));
+  return getProgressionStrategy(record.strategyId);
+}
+
+function selectProgressionStrategy(plotId, strategyId, updatedAt) {
+  ensureDb();
+  return withTransaction(() => {
+    statements.clearSelectedProgressionStrategies.run(Number(updatedAt), plotId);
+    statements.selectProgressionStrategy.run(Number(updatedAt), plotId, strategyId);
+    return getProgressionStrategy(strategyId);
+  });
+}
+
 function resetFoundersPlotStore() {
   ensureDb();
   withTransaction(() => {
+    statements.reset.progressionStrategies.run();
     statements.reset.approvals.run();
     statements.reset.idempotency.run();
     statements.reset.events.run();
@@ -784,5 +881,9 @@ module.exports = {
   findApprovedUnusedApproval,
   writeApproval,
   listPublicPlots,
+  listProgressionStrategies,
+  getProgressionStrategy,
+  writeProgressionStrategy,
+  selectProgressionStrategy,
   resetFoundersPlotStore
 };

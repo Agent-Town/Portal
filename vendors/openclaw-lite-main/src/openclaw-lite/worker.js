@@ -1427,6 +1427,104 @@ async function runAgentTownUiIntentTool(params, toolName) {
   );
 }
 
+async function runAgentTownProgressionGetState(params, toolName = "agent_town_progression_get_state") {
+  const startedAtMs = nowMs();
+  try {
+    const query = new URLSearchParams();
+    if (typeof params?.plotId === "string" && params.plotId.trim()) {
+      query.set("plotId", params.plotId.trim());
+    }
+    const suffix = query.toString() ? `?${query.toString()}` : "";
+    const atlas = await apiJson(`/api/founders-plot/progression-atlas${suffix}`, { method: "GET" });
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({ atlas }));
+  } catch (e) {
+    const message = String(e?.message || "PROGRESSION_GET_STATE_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message));
+  }
+}
+
+async function runAgentTownProgressionDraftStrategy(params, toolName = "agent_town_progression_draft_strategy") {
+  const startedAtMs = nowMs();
+  try {
+    const body = {
+      plotId: typeof params?.plotId === "string" ? params.plotId.trim() : "",
+      strategyKey: typeof params?.strategyKey === "string" ? params.strategyKey.trim() : "rush-hq3",
+      title: typeof params?.title === "string" ? params.title.trim() : "",
+    };
+    const strategy = await apiJson("/api/founders-plot/progression-atlas/strategies/draft", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({ strategy }));
+  } catch (e) {
+    const message = String(e?.message || "PROGRESSION_DRAFT_STRATEGY_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message));
+  }
+}
+
+async function runAgentTownProgressionSaveStrategy(params, toolName = "agent_town_progression_save_strategy") {
+  const startedAtMs = nowMs();
+  try {
+    const body = {
+      plotId: typeof params?.plotId === "string" ? params.plotId.trim() : "",
+      strategyKey: typeof params?.strategyKey === "string" ? params.strategyKey.trim() : "rush-hq3",
+      title: typeof params?.title === "string" ? params.title.trim() : "",
+      select: params?.select === true,
+    };
+    const saved = await apiJson("/api/founders-plot/progression-atlas/strategies", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({ saved }));
+  } catch (e) {
+    const message = String(e?.message || "PROGRESSION_SAVE_STRATEGY_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message));
+  }
+}
+
+async function runAgentTownProgressionSelectStrategy(params, toolName = "agent_town_progression_select_strategy") {
+  const startedAtMs = nowMs();
+  try {
+    const strategyId = typeof params?.strategyId === "string" ? params.strategyId.trim() : "";
+    if (!strategyId) {
+      return withToolMeta(toolName, startedAtMs, makeToolFailure("INVALID_REQUEST", "strategyId is required"));
+    }
+    const selected = await apiJson(`/api/founders-plot/progression-atlas/strategies/${encodeURIComponent(strategyId)}/select`, {
+      method: "POST",
+      body: JSON.stringify({
+        plotId: typeof params?.plotId === "string" ? params.plotId.trim() : "",
+      }),
+    });
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({ selected }));
+  } catch (e) {
+    const message = String(e?.message || "PROGRESSION_SELECT_STRATEGY_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message));
+  }
+}
+
+async function runAgentTownProgressionExplainNode(params, toolName = "agent_town_progression_explain_node") {
+  const startedAtMs = nowMs();
+  try {
+    const body = {
+      plotId: typeof params?.plotId === "string" ? params.plotId.trim() : "",
+      nodeId: typeof params?.nodeId === "string" ? params.nodeId.trim() : "",
+    };
+    const explanation = await apiJson("/api/founders-plot/progression-atlas/explain", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({ explanation }));
+  } catch (e) {
+    const message = String(e?.message || "PROGRESSION_EXPLAIN_NODE_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message));
+  }
+}
+
 function makeToolSuccess(data) {
   return { ok: true, data };
 }
@@ -2790,10 +2888,46 @@ const LITE_TOOL_SPECS = [
     sampleArgs: { modal: "atlas", params: {} },
   },
   {
+    name: "agent_town_ui_open_progression_atlas",
+    label: "Agent Town UI Open Progression Atlas",
+    description: "Opens the Progression Atlas modal, the visible strategy-planning surface used by humans and agents.",
+    sampleArgs: { strategyKey: "rush-hq3" },
+  },
+  {
     name: "agent_town_ui_atlas_search",
     label: "Agent Town UI Atlas Search",
     description: "Opens Atlas modal and applies query/family/searchType intent state.",
     sampleArgs: { q: "sentinel", family: "ethereum", searchType: "keyword" },
+  },
+  {
+    name: "agent_town_progression_get_state",
+    label: "Agent Town Progression State",
+    description: "Reads the server-owned Progression Atlas state for Founders Plot without changing gameplay.",
+    sampleArgs: {},
+  },
+  {
+    name: "agent_town_progression_draft_strategy",
+    label: "Agent Town Progression Draft Strategy",
+    description: "Drafts a private strategy option from the current Progression Atlas state. V1 supports rush-hq3.",
+    sampleArgs: { strategyKey: "rush-hq3" },
+  },
+  {
+    name: "agent_town_progression_save_strategy",
+    label: "Agent Town Progression Save Strategy",
+    description: "Saves a private advisory strategy option. It does not mutate Founders Plot gameplay state.",
+    sampleArgs: { strategyKey: "rush-hq3", title: "Rush HQ3", select: true },
+  },
+  {
+    name: "agent_town_progression_select_strategy",
+    label: "Agent Town Progression Select Strategy",
+    description: "Selects one saved private Progression Atlas strategy for the current plot.",
+    sampleArgs: { strategyId: "strategy_example" },
+  },
+  {
+    name: "agent_town_progression_explain_node",
+    label: "Agent Town Progression Explain Node",
+    description: "Explains a Progression Atlas node or blocker from the current Founders Plot state.",
+    sampleArgs: { nodeId: "hq.level.3" },
   },
   {
     name: "agent_town_ui_pony_compose",
@@ -3117,11 +3251,32 @@ async function dispatchLiteTool(name, params, _signal, _onUpdate, toolCallId = n
       return envelopeToToolResult(envelope, "agent_town_state_get_pony_inbox");
     }
     case "agent_town_ui_open_modal":
+    case "agent_town_ui_open_progression_atlas":
     case "agent_town_ui_atlas_search":
     case "agent_town_ui_pony_compose":
     case "agent_town_ui_publish_post": {
       const envelope = await runAgentTownUiIntentTool(params || {}, normalizedName);
       return envelopeToToolResult(envelope, normalizedName);
+    }
+    case "agent_town_progression_get_state": {
+      const envelope = await runAgentTownProgressionGetState(params || {}, "agent_town_progression_get_state");
+      return envelopeToToolResult(envelope, "agent_town_progression_get_state");
+    }
+    case "agent_town_progression_draft_strategy": {
+      const envelope = await runAgentTownProgressionDraftStrategy(params || {}, "agent_town_progression_draft_strategy");
+      return envelopeToToolResult(envelope, "agent_town_progression_draft_strategy");
+    }
+    case "agent_town_progression_save_strategy": {
+      const envelope = await runAgentTownProgressionSaveStrategy(params || {}, "agent_town_progression_save_strategy");
+      return envelopeToToolResult(envelope, "agent_town_progression_save_strategy");
+    }
+    case "agent_town_progression_select_strategy": {
+      const envelope = await runAgentTownProgressionSelectStrategy(params || {}, "agent_town_progression_select_strategy");
+      return envelopeToToolResult(envelope, "agent_town_progression_select_strategy");
+    }
+    case "agent_town_progression_explain_node": {
+      const envelope = await runAgentTownProgressionExplainNode(params || {}, "agent_town_progression_explain_node");
+      return envelopeToToolResult(envelope, "agent_town_progression_explain_node");
     }
     case "secret_set": {
       const envelope = await runSecretSet(params || {}, "secret_set");

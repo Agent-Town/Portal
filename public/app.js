@@ -474,6 +474,7 @@ let activeDistrict = 'house';
 const districtViews = {
   house: { title: 'Plan Wagons', viewPath: '/views/house.html' },
   atlas: { title: 'Atlas Depot', viewPath: '/atlas?embed=1' },
+  progression: { title: 'Progression Atlas', viewPath: '/progression-atlas?embed=1' },
   townhall: { title: 'Town Hall', viewPath: '/views/townhall.html' },
   saloon: { title: 'Saloon', viewPath: '/views/saloon.html' },
   pony: { title: 'Pony Express', viewPath: '/views/pony.html' },
@@ -735,11 +736,12 @@ const TOUCH_PRIME_WINDOW_MS = 1500;
 const TOUCH_CLICK_SUPPRESS_MS = 700;
 const isTownHub = !!document.getElementById('districtMap') && !!document.getElementById('districtModalBackdrop');
 const popupDistrictByPath = {
+  '/progression-atlas': 'progression',
   '/leaderboard': 'leaderboard',
   '/wall': 'leaderboard',
   '/house': 'house'
 };
-const EXPERIENCE_UI_MODAL_NAMES = new Set(['atlas', 'pony', 'townhall', 'saloon', 'leaderboard', 'house', 'brain', 'sigil']);
+const EXPERIENCE_UI_MODAL_NAMES = new Set(['atlas', 'progression', 'pony', 'townhall', 'saloon', 'leaderboard', 'house', 'brain', 'sigil']);
 const EXPERIENCE_UI_CONFIRMATION_REQUIRED_TOOLS = new Set(['agent_town_ui_publish_post']);
 const EXPERIENCE_INTENT_TRACE_LIMIT = 200;
 const experienceIntentTrace = [];
@@ -747,6 +749,10 @@ let experienceIntentAtlasState = {
   query: '',
   family: '',
   searchType: 'keyword'
+};
+let experienceIntentProgressionAtlasState = {
+  strategyKey: '',
+  selectedStrategyId: ''
 };
 let experienceIntentPonyState = {
   composeOpen: false,
@@ -1111,6 +1117,7 @@ function districtStatusText(district) {
   }
   if (!district) return tApp('district.status.select');
   if (district === 'atlas') return tApp('district.status.atlas');
+  if (district === 'progression') return 'Progression Atlas selected: plan the next Founders Plot strategy.';
   if (district === 'townhall') return tApp('district.status.townhall');
   if (district === 'saloon') return tApp('district.status.saloon');
   if (district === 'pony') return tApp('district.status.pony');
@@ -1119,7 +1126,7 @@ function districtStatusText(district) {
 }
 
 function setActiveDistrict(district) {
-  const next = district === 'atlas' || district === 'townhall' || district === 'saloon' || district === 'pony' || district === 'leaderboard' || district === 'house'
+  const next = district === 'atlas' || district === 'progression' || district === 'townhall' || district === 'saloon' || district === 'pony' || district === 'leaderboard' || district === 'house'
     ? district
     : null;
   activeDistrict = next;
@@ -1136,6 +1143,7 @@ function setActiveDistrict(district) {
 
 function normalizeDistrict(district) {
   return district === 'atlas'
+    || district === 'progression'
     || district === 'townhall'
     || district === 'saloon'
     || district === 'pony'
@@ -1149,6 +1157,7 @@ function normalizeDistrict(district) {
 
 function explicitDistrictFromInput(district) {
   return district === 'atlas'
+    || district === 'progression'
     || district === 'townhall'
     || district === 'saloon'
     || district === 'pony'
@@ -1227,6 +1236,17 @@ function bindDistrictMapInteractions() {
       showDistrict(district);
     });
   });
+
+  const progressionBtn = el('progressionAtlasOpenBtn');
+  if (progressionBtn) {
+    progressionBtn.addEventListener('click', () => {
+      if (isTownHubDistrictGateLocked(lastState)) {
+        setActiveDistrict('townhall');
+        return;
+      }
+      showDistrict('progression');
+    });
+  }
 
   document.addEventListener('pointerdown', (ev) => {
     if (isTownhallGateLocked(lastState)) return;
@@ -3854,6 +3874,16 @@ function routeToPopupMode(rawHref) {
       title: 'Atlas Depot'
     };
   }
+  if (path === '/progression-atlas') {
+    const params = new URLSearchParams(parsed.search || '');
+    params.set('embed', '1');
+    const embedUrl = `${parsed.pathname}${params.toString() ? `?${params.toString()}` : ''}${parsed.hash}`;
+    return {
+      mode: 'frame',
+      url: embedUrl,
+      title: 'Progression Atlas'
+    };
+  }
   if (path === '/wall') {
     return { mode: 'district', district: 'leaderboard' };
   }
@@ -4203,6 +4233,7 @@ function setDistrictModalMode(mode) {
 const districtModalThemeByDistrict = {
   house: 'house',
   atlas: 'atlas',
+  progression: 'atlas',
   townhall: 'townhall',
   saloon: 'saloon',
   pony: 'pony',
@@ -4230,6 +4261,7 @@ function inferDistrictModalThemeFromUrl(url) {
   }
   const path = parsed.pathname || '';
   if (path === '/atlas') return 'atlas';
+  if (path === '/progression-atlas') return 'atlas';
   if (path === '/wall' || path === '/leaderboard') return 'leaderboard';
   if (path === '/house') return 'house';
   if (path === '/create' || path === '/claim' || path === '/claim-wallet' || path === '/trainer') return 'trainer';
@@ -4310,6 +4342,10 @@ function buildExperienceIntentStateSnapshot(overrides = {}) {
       family: String(experienceIntentAtlasState.family || ''),
       searchType: String(experienceIntentAtlasState.searchType || 'keyword')
     },
+    progressionAtlas: {
+      strategyKey: String(experienceIntentProgressionAtlasState.strategyKey || ''),
+      selectedStrategyId: String(experienceIntentProgressionAtlasState.selectedStrategyId || '')
+    },
     pony: {
       composeOpen: experienceIntentPonyState.composeOpen === true,
       composeTo: String(experienceIntentPonyState.toHouseId || ''),
@@ -4323,6 +4359,7 @@ function buildExperienceIntentStateSnapshot(overrides = {}) {
     modal: isPlainRecord(overrides.modal) ? { ...base.modal, ...overrides.modal } : base.modal,
     worker: isPlainRecord(overrides.worker) ? { ...base.worker, ...overrides.worker } : base.worker,
     atlas: isPlainRecord(overrides.atlas) ? { ...base.atlas, ...overrides.atlas } : base.atlas,
+    progressionAtlas: isPlainRecord(overrides.progressionAtlas) ? { ...base.progressionAtlas, ...overrides.progressionAtlas } : base.progressionAtlas,
     pony: isPlainRecord(overrides.pony) ? { ...base.pony, ...overrides.pony } : base.pony
   };
 }
@@ -4497,7 +4534,7 @@ async function runExperienceUiOpenModal(rawParams) {
   }
   const modal = String(rawParams.modal || '').trim().toLowerCase();
   if (!EXPERIENCE_UI_MODAL_NAMES.has(modal)) {
-    return invalidExperienceParam('modal must be one of atlas|pony|townhall|saloon|leaderboard|house|brain|sigil');
+    return invalidExperienceParam('modal must be one of atlas|progression|pony|townhall|saloon|leaderboard|house|brain|sigil');
   }
   const params = rawParams.params;
   if (params != null && !isPlainRecord(params)) {
@@ -4558,6 +4595,37 @@ async function runExperienceUiAtlasSearch(rawParams) {
         query: q,
         family,
         searchType
+      }
+    })
+  });
+}
+
+async function runExperienceUiOpenProgressionAtlas(rawParams) {
+  if (!validateStrictKeys(rawParams, new Set(['strategyKey']))) {
+    return invalidExperienceParam('open_progression_atlas accepts only { strategyKey }');
+  }
+  const rawStrategyKey = String(rawParams.strategyKey || 'rush-hq3').trim().toLowerCase();
+  if (!isSafeExperienceToken(rawStrategyKey, { allowEmpty: true, maxLen: 80 })) {
+    return invalidExperienceParam('strategyKey contains unsupported characters');
+  }
+  const strategyKey = rawStrategyKey || 'rush-hq3';
+  const params = new URLSearchParams();
+  params.set('embed', '1');
+  params.set('strategyKey', strategyKey);
+
+  setActiveDistrict('progression');
+  currentDistrict = 'progression';
+  openRouteInModalFrame(`/progression-atlas?${params.toString()}`, 'Progression Atlas');
+  experienceIntentProgressionAtlasState = { strategyKey, selectedStrategyId: '' };
+  await waitForDistrictModalOpen();
+  await waitForDistrictModalFrame();
+  return makeExperienceIntentEnvelope({
+    ok: true,
+    applied: true,
+    stateSnapshot: buildExperienceIntentStateSnapshot({
+      progressionAtlas: {
+        strategyKey,
+        selectedStrategyId: ''
       }
     })
   });
@@ -4640,6 +4708,8 @@ async function dispatchExperienceIntent(tool, rawParams = {}, options = {}) {
       envelope = await runExperienceUiOpenModal(params);
     } else if (toolName === 'agent_town_ui_atlas_search') {
       envelope = await runExperienceUiAtlasSearch(params);
+    } else if (toolName === 'agent_town_ui_open_progression_atlas') {
+      envelope = await runExperienceUiOpenProgressionAtlas(params);
     } else if (toolName === 'agent_town_ui_pony_compose') {
       envelope = await runExperienceUiPonyCompose(params);
     } else {
@@ -4735,6 +4805,11 @@ async function showDistrict(district) {
 
   if (safeDistrict === 'atlas') {
     openRouteInModalFrame('/atlas?embed=1', 'Atlas Depot');
+    return;
+  }
+
+  if (safeDistrict === 'progression') {
+    openRouteInModalFrame('/progression-atlas?embed=1', 'Progression Atlas');
     return;
   }
 

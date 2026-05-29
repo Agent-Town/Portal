@@ -424,6 +424,17 @@ h3 {
   margin: 0;
 }
 
+.townSceneActions {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 3;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .townDistrictHotspot {
   position: absolute;
   display: inline-flex;
@@ -3841,6 +3852,38 @@ body.town-hub-page #townSceneStatus {
   background: rgba(46, 27, 14, 0.76);
   padding: 7px 10px;
   text-shadow: none;
+}
+
+body.town-hub-page .townSceneActions {
+  right: 14px;
+  bottom: 14px;
+}
+
+body.town-hub-page .townSceneActions .btn {
+  border: 2px solid rgba(196, 136, 58, 0.82);
+  background: rgba(46, 27, 14, 0.82);
+  color: var(--v0-sun);
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.28);
+}
+
+body.town-hub-page .townSceneActions .btn:hover {
+  background: rgba(196, 136, 58, 0.92);
+  color: #2d180c;
+}
+
+@media (max-width: 720px) {
+  #townSceneStatus,
+  body.town-hub-page #townSceneStatus {
+    right: 14px;
+    bottom: 58px;
+  }
+
+  .townSceneActions,
+  body.town-hub-page .townSceneActions {
+    left: 14px;
+    right: 14px;
+    justify-content: flex-start;
+  }
 }
 
 body.town-hub-page .districtBackdrop {

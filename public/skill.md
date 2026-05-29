@@ -266,11 +266,23 @@ When running in the in-browser OpenClaw Lite runtime, prefer explicit Agent Town
   - Reads `GET /api/house/:id/meta` (uses runtime houseId when omitted).
 - `agent_town_state_get_pony_inbox`
   - Reads `GET /api/pony/inbox?houseId=...` (uses runtime houseId when omitted).
+- `agent_town_progression_get_state`
+  - Reads the server-owned Founders Plot Progression Atlas. Advisory only; it does not change gameplay.
+- `agent_town_progression_draft_strategy`
+  - Drafts a private strategy option from current Founders Plot state. V1 supports `rush-hq3`.
+- `agent_town_progression_save_strategy`
+  - Saves a private advisory strategy option. This is planning state, not a gameplay action.
+- `agent_town_progression_select_strategy`
+  - Selects one saved private strategy for the current plot.
+- `agent_town_progression_explain_node`
+  - Explains one Atlas node or blocker from the current plot state.
 
 ### UI tools
 
 - `agent_town_ui_open_modal({ modal, params })`
-  - Opens one whitelisted modal (`atlas`, `pony`, `townhall`, `saloon`, `leaderboard`, `house`, `brain`, `sigil`).
+  - Opens one whitelisted modal (`atlas`, `progression`, `pony`, `townhall`, `saloon`, `leaderboard`, `house`, `brain`, `sigil`).
+- `agent_town_ui_open_progression_atlas({ strategyKey })`
+  - Opens the Progression Atlas modal, the visible planning surface shared by player and agent.
 - `agent_town_ui_atlas_search({ q, family, searchType })`
   - Opens Atlas in modal and applies search/filter state.
 - `agent_town_ui_pony_compose({ toHouseId, subject, draft })`
@@ -281,6 +293,7 @@ When running in the in-browser OpenClaw Lite runtime, prefer explicit Agent Town
 - UI tools are intent-dispatch only; never use arbitrary DOM selectors or HTML payloads.
 - Keep all experience transitions inside `/app` modal surfaces so worker runtime/session continuity is preserved.
 - Do not navigate to direct standalone routes (for example `/atlas`) when a modal intent exists.
+- Progression Atlas tools may draft, save, select, and explain strategies, but actual Founders Plot actions still go through `et.plot.*` tools and approval/policy gates.
 - If a UI intent is unknown, return/expect deterministic `UI_INTENT_UNKNOWN`.
 - If params are invalid, return/expect deterministic `UI_INTENT_INVALID_PARAM`.
 - Irreversible intents require approval and return `CONFIRMATION_REQUIRED` when missing approval.

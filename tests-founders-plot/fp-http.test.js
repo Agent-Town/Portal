@@ -201,3 +201,91 @@ test('FP-HT-008 leaderboard endpoint responds', async () => {
     assert.ok(Array.isArray(out.body.plots));
   } finally { await close(); }
 });
+
+test('FP-HT-009 progression atlas exposes Rush HQ3 graph without gameplay mutation', async () => {
+  const { server, close } = await fresh('progression-atlas');
+  try {
+    const before = await request(server, 'GET', '/api/founders-plot/state');
+    assert.equal(before.status, 200);
+    const beforeEvents = before.body.state.audit.eventCount;
+
+    const out = await request(server, 'GET', '/api/founders-plot/progression-atlas');
+    assert.equal(out.status, 200);
+    assert.equal(out.body.ok, true);
+    assert.match(out.body.gameplayStableHash, /^[a-f0-9]{64}$/);
+    assert.equal(out.body.atlas.gameplayStableHash, out.body.gameplayStableHash);
+    assert.equal(out.body.atlas.graphVersion, 'founders-plot-progression-atlas-v1');
+    assert.equal(out.body.atlas.recommendedStrategy.strategyKey, 'rush-hq3');
+    assert.equal(out.body.atlas.recommendedStrategy.baseGameplayStableHash, out.body.gameplayStableHash);
+    const nodeIds = out.body.atlas.nodes.map((node) => node.nodeId);
+    for (const requiredNode of ['building.lumber_camp.place', 'building.farm_plot.place', 'building.quarry.place', 'hq.level.3']) {
+      assert.ok(nodeIds.includes(requiredNode), `atlas includes ${requiredNode}`);
+    }
+    const farmNode = out.body.atlas.nodes.find((node) => node.nodeId === 'building.farm_plot.place');
+    assert.equal(farmNode.icon.generatedBy, 'agent_town_global_icon_registry_v1');
+    assert.equal(farmNode.icon.generatedAdHoc, true);
+    assert.equal(farmNode.icon.global, true);
+    assert.equal(farmNode.icon.symbol, 'F');
+    assert.equal(farmNode.icon.source, 'building:FARM_PLOT');
+    assert.equal(farmNode.icon.assetSet, 'agent-town-global-icons-v1');
+    assert.equal(farmNode.icon.assetPath, '/assets/icons/agent-town/farm-plot-gpt-image-2-v1.png');
+    assert.equal(out.body.atlas.iconCatalog['resource.wood'].assetPath, '/assets/icons/agent-town/wood-resource-gpt-image-2-v1.png');
+    assert.equal(out.body.atlas.iconCatalog['resource.coin'].symbol, 'C');
+    assert.equal(out.body.atlas.iconCatalog['resource.coin'].assetPath, null);
+    const hqStep = out.body.atlas.recommendedStrategy.steps.find((step) => step.stepId === 'hq.level.3');
+    assert.equal(hqStep.icon.symbol, 'H3');
+    assert.equal(hqStep.icon.tone, 'command');
+    assert.equal(hqStep.icon.assetPath, '/assets/icons/agent-town/hq-upgrade-gpt-image-2-v1.png');
+
+    const repeat = await request(server, 'GET', '/api/founders-plot/progression-atlas');
+    assert.equal(repeat.status, 200);
+    assert.equal(repeat.body.gameplayStableHash, out.body.gameplayStableHash);
+
+    const after = await request(server, 'GET', '/api/founders-plot/state');
+    assert.equal(after.status, 200);
+    assert.equal(after.body.state.audit.eventCount, beforeEvents);
+  } finally { await close(); }
+});
+
+test('FP-HT-010 progression atlas drafts, saves, selects, and explains private strategy', async () => {
+  const { server, close } = await fresh('progression-strategy');
+  try {
+    const before = await request(server, 'GET', '/api/founders-plot/progression-atlas');
+    assert.equal(before.status, 200);
+    const beforeGameplayHash = before.body.gameplayStableHash;
+
+    const draft = await request(server, 'POST', '/api/founders-plot/progression-atlas/strategies/draft', {
+      strategyKey: 'rush-hq3'
+    });
+    assert.equal(draft.status, 200);
+    assert.equal(draft.body.ok, true);
+    assert.equal(draft.body.gameplayStableHash, beforeGameplayHash);
+    assert.equal(draft.body.strategy.title, 'Rush HQ3');
+    assert.ok(draft.body.strategy.steps.find((step) => step.stepId === 'hq.level.3'));
+
+    const save = await request(server, 'POST', '/api/founders-plot/progression-atlas/strategies', {
+      strategyKey: 'rush-hq3',
+      title: 'Rush HQ3',
+      select: true
+    });
+    assert.equal(save.status, 200);
+    assert.equal(save.body.ok, true);
+    assert.equal(save.body.gameplayStableHash, beforeGameplayHash);
+    assert.equal(save.body.selectedStrategyId, draft.body.strategy.strategyId);
+    assert.equal(save.body.strategies.length, 1);
+    assert.equal(save.body.strategies[0].selected, true);
+
+    const atlas = await request(server, 'GET', '/api/founders-plot/progression-atlas');
+    assert.equal(atlas.status, 200);
+    assert.equal(atlas.body.gameplayStableHash, beforeGameplayHash);
+    assert.equal(atlas.body.atlas.selectedStrategyId, draft.body.strategy.strategyId);
+
+    const explain = await request(server, 'POST', '/api/founders-plot/progression-atlas/explain', {
+      nodeId: 'hq.level.3'
+    });
+    assert.equal(explain.status, 200);
+    assert.equal(explain.body.ok, true);
+    assert.equal(explain.body.gameplayStableHash, beforeGameplayHash);
+    assert.match(explain.body.explanation, /HQ Level 3/);
+  } finally { await close(); }
+});
