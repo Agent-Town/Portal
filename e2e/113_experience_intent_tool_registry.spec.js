@@ -25,6 +25,8 @@ test('AC-62: worker tool registry exposes experience state/ui tool families', as
   expect(names).toContain('agent_town_progression_get_state');
   expect(names).toContain('agent_town_progression_draft_strategy');
   expect(names).toContain('agent_town_progression_save_strategy');
+  expect(names).toContain('agent_town_progression_generate_icon_draft');
+  expect(names).toContain('agent_town_progression_save_edited_strategy');
   expect(names).toContain('agent_town_progression_select_strategy');
   expect(names).toContain('agent_town_progression_explain_node');
 });

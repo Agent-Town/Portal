@@ -1056,6 +1056,15 @@ async function init() {
       if (!res?.ok) throw new Error(String(res?.error || "TOOLS_REGISTRY_FAILED"));
       return res.info || null;
     },
+    async runTool({ tool, params = {} } = {}) {
+      const res = await sendWorkerRequest({
+        requestType: "gateway.command.tools.dispatch",
+        responseType: "worker.tools.dispatch",
+        payload: { toolName: String(tool || ""), params: isPlainRecord(params) ? params : {} }
+      });
+      if (!res?.ok) throw new Error(String(res?.error || "TOOLS_DISPATCH_FAILED"));
+      return res.result || null;
+    },
     async runToolSmoke({ count = 5 } = {}) {
       const res = await sendWorkerRequest({
         requestType: "gateway.command.tools.smoke",

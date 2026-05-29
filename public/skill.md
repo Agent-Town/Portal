@@ -272,6 +272,10 @@ When running in the in-browser OpenClaw Lite runtime, prefer explicit Agent Town
   - Drafts a private strategy option from current Founders Plot state. V1 supports `rush-hq3`.
 - `agent_town_progression_save_strategy`
   - Saves a private advisory strategy option. This is planning state, not a gameplay action.
+- `agent_town_progression_generate_icon_draft`
+  - Creates prompt-backed icon metadata for a private Strategy Editor step. This records presentation intent only; it does not generate a gameplay rule or mutate Founders Plot state.
+- `agent_town_progression_save_edited_strategy`
+  - Saves private Strategy Editor JSON with custom advisory steps, before/after links, and icon drafts. Gameplay actions still require canonical `et.plot.*` tools and approvals.
 - `agent_town_progression_select_strategy`
   - Selects one saved private strategy for the current plot.
 - `agent_town_progression_explain_node`

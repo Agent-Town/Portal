@@ -277,6 +277,8 @@ test('FP-HT-009 progression atlas exposes Rush HQ3 graph without gameplay mutati
     assert.equal(hqStep.icon.symbol, 'H3');
     assert.equal(hqStep.icon.tone, 'command');
     assert.equal(hqStep.icon.assetPath, '/assets/icons/agent-town/hq-upgrade-gpt-image-2-v1.png');
+    assert.equal(out.body.atlas.openClawLiteSurface.generateIconDraft, 'agent_town_progression_generate_icon_draft');
+    assert.equal(out.body.atlas.openClawLiteSurface.saveEditedStrategy, 'agent_town_progression_save_edited_strategy');
 
     const repeat = await request(server, 'GET', '/api/founders-plot/progression-atlas');
     assert.equal(repeat.status, 200);

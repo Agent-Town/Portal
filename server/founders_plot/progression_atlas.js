@@ -1106,6 +1106,8 @@ function buildEditedStrategyFromInput({ state, stateHash, strategyInput, nowMs }
     openClawLiteTools: [
       'agent_town_progression_get_state',
       'agent_town_progression_save_strategy',
+      'agent_town_progression_generate_icon_draft',
+      'agent_town_progression_save_edited_strategy',
       'agent_town_progression_select_strategy'
     ],
     gameplayMutationPolicy: 'advisory_only',
@@ -1175,7 +1177,9 @@ function buildAtlasEnvelope({ stateEnvelope, nowMs }) {
         select: 'agent_town_progression_select_strategy',
         explain: 'agent_town_progression_explain_node',
         editor: 'progression_atlas_iframe_editor',
-        iconDraft: '/api/founders-plot/progression-atlas/icons/generate'
+        iconDraft: '/api/founders-plot/progression-atlas/icons/generate',
+        generateIconDraft: 'agent_town_progression_generate_icon_draft',
+        saveEditedStrategy: 'agent_town_progression_save_edited_strategy'
       }
     }
   });

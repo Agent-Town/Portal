@@ -1485,6 +1485,55 @@ async function runAgentTownProgressionSaveStrategy(params, toolName = "agent_tow
   }
 }
 
+async function runAgentTownProgressionGenerateIconDraft(params, toolName = "agent_town_progression_generate_icon_draft") {
+  const startedAtMs = nowMs();
+  try {
+    const body = {
+      plotId: typeof params?.plotId === "string" ? params.plotId.trim() : "",
+      title: typeof params?.title === "string" ? params.title.trim() : "",
+      prompt: typeof params?.prompt === "string" ? params.prompt.trim() : "",
+    };
+    const icon = await apiJson("/api/founders-plot/progression-atlas/icons/generate", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({ icon }));
+  } catch (e) {
+    const message = String(e?.message || "PROGRESSION_GENERATE_ICON_DRAFT_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message));
+  }
+}
+
+async function runAgentTownProgressionSaveEditedStrategy(params, toolName = "agent_town_progression_save_edited_strategy") {
+  const startedAtMs = nowMs();
+  try {
+    const providedStrategy = isPlainObject(params?.strategy) ? params.strategy : {};
+    const strategy = {
+      ...providedStrategy,
+      title: typeof params?.title === "string" && params.title.trim() ? params.title.trim() : providedStrategy.title,
+      goal: typeof params?.goal === "string" && params.goal.trim() ? params.goal.trim() : providedStrategy.goal,
+      summary: typeof params?.summary === "string" && params.summary.trim() ? params.summary.trim() : providedStrategy.summary,
+      focus: Array.isArray(params?.focus) ? params.focus : providedStrategy.focus,
+      steps: Array.isArray(params?.steps) ? params.steps : providedStrategy.steps,
+      generatedBy: "progression_atlas_strategy_editor_v1",
+    };
+    const saved = await apiJson("/api/founders-plot/progression-atlas/strategies", {
+      method: "POST",
+      body: JSON.stringify({
+        plotId: typeof params?.plotId === "string" ? params.plotId.trim() : "",
+        strategy,
+        select: params?.select !== false,
+      }),
+    });
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({ saved }));
+  } catch (e) {
+    const message = String(e?.message || "PROGRESSION_SAVE_EDITED_STRATEGY_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message));
+  }
+}
+
 async function runAgentTownProgressionSelectStrategy(params, toolName = "agent_town_progression_select_strategy") {
   const startedAtMs = nowMs();
   try {
@@ -2918,6 +2967,25 @@ const LITE_TOOL_SPECS = [
     sampleArgs: { strategyKey: "rush-hq3", title: "Rush HQ3", select: true },
   },
   {
+    name: "agent_town_progression_generate_icon_draft",
+    label: "Agent Town Progression Generate Icon Draft",
+    description: "Creates prompt-backed icon metadata for a private Strategy Editor step. It does not call gameplay tools or mutate Founders Plot state.",
+    sampleArgs: { title: "Scout Ridge", prompt: "frontier ridge scout marker, Agent Town strategy icon" },
+  },
+  {
+    name: "agent_town_progression_save_edited_strategy",
+    label: "Agent Town Progression Save Edited Strategy",
+    description: "Saves private Strategy Editor JSON with custom steps, before/after links, and icon drafts. Advisory only; gameplay still requires et.plot tools.",
+    sampleArgs: {
+      title: "Expansion Sketch",
+      steps: [
+        { stepId: "editor.scout_ridge", title: "Scout Ridge", afterStepId: "editor.claim_second_plot" },
+        { stepId: "editor.claim_second_plot", title: "Claim Second Plot", beforeStepId: "editor.scout_ridge" },
+      ],
+      select: true,
+    },
+  },
+  {
     name: "agent_town_progression_select_strategy",
     label: "Agent Town Progression Select Strategy",
     description: "Selects one saved private Progression Atlas strategy for the current plot.",
@@ -3269,6 +3337,14 @@ async function dispatchLiteTool(name, params, _signal, _onUpdate, toolCallId = n
     case "agent_town_progression_save_strategy": {
       const envelope = await runAgentTownProgressionSaveStrategy(params || {}, "agent_town_progression_save_strategy");
       return envelopeToToolResult(envelope, "agent_town_progression_save_strategy");
+    }
+    case "agent_town_progression_generate_icon_draft": {
+      const envelope = await runAgentTownProgressionGenerateIconDraft(params || {}, "agent_town_progression_generate_icon_draft");
+      return envelopeToToolResult(envelope, "agent_town_progression_generate_icon_draft");
+    }
+    case "agent_town_progression_save_edited_strategy": {
+      const envelope = await runAgentTownProgressionSaveEditedStrategy(params || {}, "agent_town_progression_save_edited_strategy");
+      return envelopeToToolResult(envelope, "agent_town_progression_save_edited_strategy");
     }
     case "agent_town_progression_select_strategy": {
       const envelope = await runAgentTownProgressionSelectStrategy(params || {}, "agent_town_progression_select_strategy");
@@ -8595,6 +8671,26 @@ self.addEventListener("message", async (ev) => {
         ok: true,
         info: getToolRegistryInfo(),
       });
+      return;
+    }
+
+    if (msg.type === "gateway.command.tools.dispatch") {
+      try {
+        const result = await dispatchLiteTool(String(msg.toolName || ""), msg.params || {}, undefined, undefined);
+        post({
+          type: "worker.tools.dispatch",
+          requestId: String(msg.requestId || ""),
+          ok: true,
+          result,
+        });
+      } catch (err) {
+        post({
+          type: "worker.tools.dispatch",
+          requestId: String(msg.requestId || ""),
+          ok: false,
+          error: String(err?.message || err || "TOOLS_DISPATCH_FAILED"),
+        });
+      }
       return;
     }
 
