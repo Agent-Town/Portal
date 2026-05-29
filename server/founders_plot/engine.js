@@ -30,19 +30,19 @@ const HQ_LEVEL_RULES = Object.freeze({
   1: {
     storageCaps: { wood: 100, stone: 100, food: 100 },
     constructionSlots: 1,
-    unlocks: ['LUMBER_CAMP'],
+    unlocks: ['LUMBER_CAMP', 'FARM_PLOT'],
     permissionUnlocks: ['observeAndSuggest']
   },
   2: {
     storageCaps: { wood: 100, stone: 100, food: 100 },
     constructionSlots: 1,
-    unlocks: ['FARM_PLOT'],
+    unlocks: ['QUARRY'],
     permissionUnlocks: ['collectOutputs']
   },
   3: {
     storageCaps: { wood: 100, stone: 100, food: 100 },
     constructionSlots: 2,
-    unlocks: ['QUARRY'],
+    unlocks: [],
     permissionUnlocks: ['queueProduction']
   },
   4: {
@@ -61,7 +61,7 @@ const HQ_LEVEL_RULES = Object.freeze({
 
 const HQ_UPGRADE_RULES = Object.freeze({
   1: { nextLevel: 2, cost: { wood: 20, food: 10 }, xpRequired: 25, durationMs: 60_000 },
-  2: { nextLevel: 3, cost: { wood: 30, stone: 20 }, xpRequired: 50, durationMs: 90_000 },
+  2: { nextLevel: 3, cost: { wood: 20, stone: 16 }, xpRequired: 50, durationMs: 90_000 },
   3: { nextLevel: 4, cost: { wood: 40, stone: 30, food: 20 }, xpRequired: 90, durationMs: 120_000 },
   4: { nextLevel: 5, cost: { wood: 60, stone: 50, food: 30 }, xpRequired: 140, durationMs: 150_000 }
 });
@@ -83,14 +83,14 @@ const BUILDING_DEFS = Object.freeze({
       return {
         kind: 'PRODUCE',
         input: {},
-        output: { wood: level >= 2 ? 8 : 6 },
+        output: { wood: level >= 2 ? 14 : 10 },
         durationMs: 60_000
       };
     }
   },
   FARM_PLOT: {
-    unlockHqLevel: 2,
-    construction: { cost: { wood: 12, coin: 6 }, durationMs: 60_000 },
+    unlockHqLevel: 1,
+    construction: { cost: { wood: 12, coin: 4 }, durationMs: 60_000 },
     upgrade: {
       1: { toLevel: 2, cost: { wood: 14, food: 8, coin: 8 }, durationMs: 90_000 }
     },
@@ -98,14 +98,14 @@ const BUILDING_DEFS = Object.freeze({
       return {
         kind: 'PRODUCE',
         input: {},
-        output: { food: level >= 2 ? 8 : 6 },
+        output: { food: level >= 2 ? 12 : 8 },
         durationMs: 90_000
       };
     }
   },
   QUARRY: {
-    unlockHqLevel: 3,
-    construction: { cost: { wood: 16, food: 12, coin: 8 }, durationMs: 90_000 },
+    unlockHqLevel: 2,
+    construction: { cost: { wood: 16, food: 10, coin: 6 }, durationMs: 90_000 },
     upgrade: {
       1: { toLevel: 2, cost: { wood: 18, stone: 12, coin: 10 }, durationMs: 120_000 }
     },
@@ -113,7 +113,7 @@ const BUILDING_DEFS = Object.freeze({
       return {
         kind: 'PRODUCE',
         input: {},
-        output: { stone: level >= 2 ? 6 : 4 },
+        output: { stone: level >= 2 ? 12 : 8 },
         durationMs: 90_000
       };
     }
@@ -240,6 +240,45 @@ function inventoryHasAtLeast(inventory, cost) {
   const bag = normalizeInventory(inventory);
   const needed = normalizeInventory(cost);
   return RESOURCE_KEYS.every((key) => bag[key] >= needed[key]);
+}
+
+function resourceShortfall(inventory, cost) {
+  const bag = normalizeInventory(inventory);
+  const needed = normalizeInventory(cost);
+  const missing = {};
+  for (const key of RESOURCE_KEYS) {
+    const gap = Math.max(0, needed[key] - bag[key]);
+    if (gap > 0) missing[key] = gap;
+  }
+  return missing;
+}
+
+function formatRequirementProgress(bundle, { cost = {}, xpRequired = null } = {}) {
+  const parts = [];
+  const inventory = normalizeInventory(bundle.plot.inventory);
+  const required = normalizeInventory(cost);
+  for (const key of RESOURCE_KEYS) {
+    if (!required[key]) continue;
+    const have = inventory[key];
+    const need = required[key];
+    const missing = Math.max(0, need - have);
+    parts.push(`${key}: ${have}/${need}${missing > 0 ? `, need ${missing}` : ''}`);
+  }
+  if (xpRequired != null) {
+    const haveXp = Math.max(0, Math.floor(Number(bundle.plot.townXp || 0)));
+    const needXp = Math.max(0, Math.floor(Number(xpRequired || 0)));
+    const missingXp = Math.max(0, needXp - haveXp);
+    parts.push(`XP: ${haveXp}/${needXp}${missingXp > 0 ? `, need ${missingXp}` : ''}`);
+  }
+  return parts.length ? parts.join('; ') : 'No cost.';
+}
+
+function canAffordProgression(bundle, { cost = {}, xpRequired = null } = {}) {
+  const missing = resourceShortfall(bundle.plot.inventory, cost);
+  const missingXp = xpRequired == null
+    ? 0
+    : Math.max(0, Number(xpRequired || 0) - Number(bundle.plot.townXp || 0));
+  return Object.keys(missing).length === 0 && missingXp === 0;
 }
 
 function deductResources(inventory, cost) {
@@ -612,6 +651,9 @@ function currentQuest(bundle) {
   const buildings = bundle.buildings;
   const hasType = (type) => buildings.some((building) => building.type === type);
   const collectedTypes = new Set(bundle.plot.collectedBuildingTypes || []);
+  const farmCost = BUILDING_DEFS.FARM_PLOT.construction.cost;
+  const quarryCost = BUILDING_DEFS.QUARRY.construction.cost;
+  const hqUpgrade = HQ_UPGRADE_RULES[bundle.plot.hqLevel] || null;
 
   if (!hasType('LUMBER_CAMP')) {
     return {
@@ -630,27 +672,83 @@ function currentQuest(bundle) {
     };
   }
   if (!hasType('FARM_PLOT')) {
+    const farmProgress = formatRequirementProgress(bundle, { cost: farmCost });
+    if (!canAffordProgression(bundle, { cost: farmCost })) {
+      return {
+        id: 'stock-farm-plot',
+        title: 'Stock supplies for a Farm Plot',
+        body: `Farm Plot cost progress: ${farmProgress}. Keep producing and collecting wood before placing it.`,
+        primaryAction: 'Collect Farm Plot supplies'
+      };
+    }
     return {
       id: 'place-farm-plot',
       title: 'Establish a Farm Plot',
-      body: 'Food is the next bottleneck. Place a Farm Plot as soon as the HQ allows it.',
+      body: `Food is the next bottleneck. Farm Plot is unlocked now. Cost progress: ${farmProgress}.`,
       primaryAction: 'Build Farm Plot'
     };
   }
   if (bundle.plot.hqLevel < 2) {
+    const hq2Progress = formatRequirementProgress(bundle, {
+      cost: hqUpgrade?.cost || {},
+      xpRequired: hqUpgrade?.xpRequired
+    });
+    if (!canAffordProgression(bundle, {
+      cost: hqUpgrade?.cost || {},
+      xpRequired: hqUpgrade?.xpRequired
+    })) {
+      return {
+        id: 'stock-hq-2',
+        title: 'Stock supplies for HQ Level 2',
+        body: `HQ Level 2 needs food from the Farm Plot and wood from the Lumber Camp. Progress: ${hq2Progress}.`,
+        primaryAction: 'Collect HQ2 supplies'
+      };
+    }
     return {
       id: 'upgrade-hq-2',
       title: 'Upgrade Headquarters to Level 2',
-      body: 'Level 2 unlocks the first real foreman automation: collecting finished outputs.',
+      body: `Ready for HQ Level 2. Cost progress: ${hq2Progress}. Level 2 unlocks Quarry access and foreman collection.`,
       primaryAction: 'Upgrade HQ'
     };
   }
   if (!hasType('QUARRY')) {
+    const quarryProgress = formatRequirementProgress(bundle, { cost: quarryCost });
+    if (!canAffordProgression(bundle, { cost: quarryCost })) {
+      return {
+        id: 'stock-quarry',
+        title: 'Stock supplies for a Quarry',
+        body: `Quarry unlocks at HQ Level 2 and provides the stone needed for HQ Level 3. Progress: ${quarryProgress}.`,
+        primaryAction: 'Collect Quarry supplies'
+      };
+    }
     return {
       id: 'place-quarry',
-      title: 'Unlock the Quarry',
-      body: 'Stone creates the first real production tradeoff and prepares the Workshop lane.',
+      title: 'Build the Quarry',
+      body: `Stone creates the first real production tradeoff and prepares HQ Level 3. Cost progress: ${quarryProgress}.`,
       primaryAction: 'Build Quarry'
+    };
+  }
+  if (bundle.plot.hqLevel < 3) {
+    const hq3Progress = formatRequirementProgress(bundle, {
+      cost: hqUpgrade?.cost || {},
+      xpRequired: hqUpgrade?.xpRequired
+    });
+    if (!canAffordProgression(bundle, {
+      cost: hqUpgrade?.cost || {},
+      xpRequired: hqUpgrade?.xpRequired
+    })) {
+      return {
+        id: 'stock-hq-3',
+        title: 'Stock supplies for HQ Level 3',
+        body: `HQ Level 3 needs stone from the Quarry plus a deeper wood reserve. Progress: ${hq3Progress}.`,
+        primaryAction: 'Collect HQ3 supplies'
+      };
+    }
+    return {
+      id: 'upgrade-hq-3',
+      title: 'Upgrade Headquarters to Level 3',
+      body: `Ready for HQ Level 3. Cost progress: ${hq3Progress}. Level 3 unlocks foreman production queueing.`,
+      primaryAction: 'Upgrade HQ'
     };
   }
   if (bundle.plot.hqLevel < 5) {
@@ -894,6 +992,7 @@ function buildState(bundle, { includeReplay = false, includePublicSummary = true
       buildings: unlockedBuildings.filter((type) => type !== 'HQ')
     },
     unlockedBuildings,
+    hqUpgrade: clone(HQ_UPGRADE_RULES[bundle.plot.hqLevel] || null),
     buildingDefs: publicBuildingDefs(),
     visualActors,
     publicSummary: includePublicSummary ? publicSummary(bundle) : null,

@@ -242,9 +242,10 @@ test('Three.js Founders Plot renders Clover plus builder, worker, and hauler fro
     }),
     expect.objectContaining({
       canonicalRoleId: 'messenger',
-      assetSrc: '/experiences/founders-plot/assets/characters/inhabitants/messenger/messenger-agentfolk-v1.png',
+      assetSrc: '/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.png',
       assetSprite: expect.objectContaining({
-        id: 'messenger-agentfolk-v1',
+        id: 'rook-signalpost-messenger-v1',
+        metadataSrc: '/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.json',
         action: 'ready',
         row: 3,
         columns: 4,
@@ -264,7 +265,7 @@ test('Three.js Founders Plot renders Clover plus builder, worker, and hauler fro
     expect.objectContaining({
       canonicalRoleId: 'messenger',
       spriteSheet: true,
-      spriteSheetId: 'messenger-agentfolk-v1',
+      spriteSheetId: 'rook-signalpost-messenger-v1',
       spriteSheetAction: 'ready',
       assetFallback: false
     })

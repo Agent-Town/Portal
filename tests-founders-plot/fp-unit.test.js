@@ -28,6 +28,100 @@ function fresh(pairId = `pair-${Math.random().toString(36).slice(2, 8)}`) {
   return engine.getFoundersPlotState({ pairId, houseId: null, nowMs: 1700_000_000_000 });
 }
 
+function buildingOf(stateEnvelope, type) {
+  return stateEnvelope.state.buildings.find((building) => building.type === type);
+}
+
+function makeProgressionHarness() {
+  const env = fresh('pair-hq1-hq3-reachability');
+  const ctx = {
+    pairId: env.state.plot.pairId,
+    plotId: env.plotId,
+    nowMs: 1700_000_000_000,
+    idem: 0,
+  };
+  ctx.key = (label) => `reach-${label}-${ctx.idem += 1}`;
+  ctx.state = () => engine.getFoundersPlotState({
+    pairId: ctx.pairId,
+    plotId: ctx.plotId,
+    nowMs: ctx.nowMs,
+  });
+  ctx.advance = (minutes) => {
+    const advanceMs = minutes * 60_000;
+    ctx.nowMs += advanceMs;
+    const out = engine.advancePlotTimeForTests({
+      pairId: ctx.pairId,
+      plotId: ctx.plotId,
+      advanceMs,
+      nowMs: ctx.nowMs,
+    });
+    assert.equal(out.ok, true);
+    return out;
+  };
+  ctx.place = (type, x, y) => {
+    const out = engine.placeBuilding({
+      pairId: ctx.pairId,
+      plotId: ctx.plotId,
+      type,
+      x,
+      y,
+      actor: 'HUMAN',
+      idempotencyKey: ctx.key(`place-${type}`),
+      nowMs: ctx.nowMs,
+    });
+    assert.equal(out.ok, true, out.error?.message || `${type} placement failed`);
+    ctx.advance(5);
+    return buildingOf(ctx.state(), type);
+  };
+  ctx.produceAndCollect = (type) => {
+    const before = ctx.state();
+    const building = buildingOf(before, type);
+    assert.ok(building, `${type} must exist`);
+    assert.equal(building.state, 'READY', `${type} must be ready`);
+    const queued = engine.queueJob({
+      pairId: ctx.pairId,
+      plotId: ctx.plotId,
+      buildingId: building.buildingId,
+      kind: 'PRODUCE',
+      actor: 'HUMAN',
+      idempotencyKey: ctx.key(`queue-${type}`),
+      nowMs: ctx.nowMs,
+    });
+    assert.equal(queued.ok, true, queued.error?.message || `${type} production failed`);
+    ctx.advance(5);
+    const ready = buildingOf(ctx.state(), type);
+    assert.equal(ready.state, 'OUTPUT_READY', `${type} output must be ready`);
+    const collected = engine.collectOutputs({
+      pairId: ctx.pairId,
+      plotId: ctx.plotId,
+      buildingId: ready.buildingId,
+      actor: 'HUMAN',
+      idempotencyKey: ctx.key(`collect-${type}`),
+      nowMs: ctx.nowMs,
+    });
+    assert.equal(collected.ok, true, collected.error?.message || `${type} collect failed`);
+    return ctx.state();
+  };
+  ctx.upgradeHq = (targetLevel) => {
+    const before = ctx.state();
+    const hq = buildingOf(before, 'HQ');
+    const out = engine.upgradeBuilding({
+      pairId: ctx.pairId,
+      plotId: ctx.plotId,
+      buildingId: hq.buildingId,
+      actor: 'HUMAN',
+      idempotencyKey: ctx.key(`upgrade-hq-${targetLevel}`),
+      nowMs: ctx.nowMs,
+    });
+    assert.equal(out.ok, true, out.error?.message || `HQ${targetLevel} upgrade failed`);
+    ctx.advance(5);
+    const after = ctx.state();
+    assert.equal(after.state.plot.hqLevel, targetLevel);
+    return after;
+  };
+  return ctx;
+}
+
 test('FP-UT-001 createPlot seeds HQ at center with starter coin', () => {
   const env = fresh();
   assert.equal(env.ok, true);
@@ -256,6 +350,46 @@ test('FP-IT-001 full loop: place → construct → produce → collect → inven
   assert.equal(c.ok, true);
   const s3 = engine.getFoundersPlotState({ pairId: env.state.plot.pairId, nowMs: 1700_000_400_000 });
   assert.ok(s3.state.plot.inventory.wood > 0);
+});
+
+test('FP-IT-004 fresh plot can reach HQ Level 3 through normal progression', () => {
+  const ctx = makeProgressionHarness();
+  const initial = ctx.state();
+  assert.ok(initial.state.unlockedBuildings.includes('LUMBER_CAMP'));
+  assert.ok(initial.state.unlockedBuildings.includes('FARM_PLOT'));
+  assert.equal(initial.state.unlockedBuildings.includes('QUARRY'), false);
+
+  ctx.place('LUMBER_CAMP', 0, 1);
+  ctx.produceAndCollect('LUMBER_CAMP');
+  ctx.produceAndCollect('LUMBER_CAMP');
+  const stocked = ctx.state();
+  assert.equal(stocked.state.quest.id, 'place-farm-plot');
+
+  ctx.place('FARM_PLOT', 1, 1);
+  ctx.produceAndCollect('FARM_PLOT');
+  ctx.produceAndCollect('FARM_PLOT');
+  ctx.produceAndCollect('LUMBER_CAMP');
+  const readyForHq2 = ctx.produceAndCollect('LUMBER_CAMP');
+  assert.equal(readyForHq2.state.quest.id, 'upgrade-hq-2');
+
+  const hq2 = ctx.upgradeHq(2);
+  assert.ok(hq2.state.unlockedBuildings.includes('QUARRY'));
+  assert.equal(hq2.state.hqUpgrade.nextLevel, 3);
+
+  ctx.produceAndCollect('LUMBER_CAMP');
+  ctx.produceAndCollect('FARM_PLOT');
+  ctx.place('QUARRY', 2, 1);
+  ctx.produceAndCollect('QUARRY');
+  ctx.produceAndCollect('QUARRY');
+  ctx.produceAndCollect('LUMBER_CAMP');
+  const readyForHq3 = ctx.produceAndCollect('LUMBER_CAMP');
+  assert.equal(readyForHq3.state.quest.id, 'upgrade-hq-3');
+  assert.deepEqual(readyForHq3.state.hqUpgrade.cost, { wood: 20, stone: 16 });
+  assert.equal(readyForHq3.state.hqUpgrade.xpRequired, 50);
+
+  const hq3 = ctx.upgradeHq(3);
+  assert.equal(hq3.state.plot.hqLevel, 3);
+  assert.ok(hq3.state.permissions.find((row) => row.key === 'queueProduction')?.unlocked);
 });
 
 test('FP-IT-002 agent blocked when policy disabled; allowed when enabled', () => {

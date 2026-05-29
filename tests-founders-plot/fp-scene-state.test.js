@@ -185,8 +185,9 @@ test('FP-SCENE-003 messenger actors project attention cues without mutating targ
   assert.equal(messenger.actionCue.accessory, 'quest');
   assert.equal(messenger.actionAnimation.mode, 'attention_wave');
   assert.equal(messenger.actionAnimation.stepStyle, 'skip');
-  assert.equal(messenger.assetSrc, '/experiences/founders-plot/assets/characters/inhabitants/messenger/messenger-agentfolk-v1.png');
-  assert.equal(messenger.assetSprite.id, 'messenger-agentfolk-v1');
+  assert.equal(messenger.assetSrc, '/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.png');
+  assert.equal(messenger.assetSprite.id, 'rook-signalpost-messenger-v1');
+  assert.equal(messenger.assetSprite.metadataSrc, '/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.json');
   assert.equal(messenger.assetSprite.action, 'ready');
   assert.equal(messenger.assetSprite.columns, 4);
   assert.equal(messenger.assetSprite.rows, 4);

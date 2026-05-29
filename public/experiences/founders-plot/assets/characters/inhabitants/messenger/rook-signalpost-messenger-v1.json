@@ -1,0 +1,91 @@
+{
+  "id": "rook-signalpost-messenger-v1",
+  "role": "messenger",
+  "roleFacts": ["APPROVAL", "REWARD", "QUEST"],
+  "model": "built-in image_gen, GPT Image 2 path",
+  "sourceImage": "rook-signalpost-messenger-v1.source.png",
+  "image": "rook-signalpost-messenger-v1.png",
+  "prompt": "rook-signalpost-messenger-v1.prompt.md",
+  "sourceSize": {
+    "width": 2048,
+    "height": 2048
+  },
+  "nativeGeneratedSize": {
+    "width": 1254,
+    "height": 1254
+  },
+  "frame": {
+    "width": 512,
+    "height": 512
+  },
+  "layout": {
+    "columns": 4,
+    "rows": 4,
+    "frameCount": 16
+  },
+  "actions": {
+    "idle": {
+      "row": 0,
+      "description": "Waiting with satchel/message plate in alert courier stance.",
+      "frames": [0, 1, 2, 3],
+      "fps": 3
+    },
+    "walk": {
+      "row": 1,
+      "description": "Quick courier trot with satchel and folded pennant.",
+      "frames": [0, 1, 2, 3],
+      "fps": 6
+    },
+    "work": {
+      "row": 2,
+      "description": "Presents approval/reward/quest notice and points/signals clearly.",
+      "frames": [0, 1, 2, 3],
+      "fps": 5
+    },
+    "ready": {
+      "row": 3,
+      "description": "Attention flourish, notice held up, pennant/pointing target gestures.",
+      "frames": [0, 1, 2, 3],
+      "fps": 4
+    }
+  },
+  "actionMapping": {
+    "APPROVAL": "work",
+    "REWARD": "work",
+    "QUEST": "work"
+  },
+  "generationNotes": {
+    "characterConcept": "Rook Signalpost, an adult-coded frontier signal-courier / notice-runner with a tall narrow silhouette, leather dispatch satchel, teal signal pennant, and amber message plate.",
+    "referenceImages": [
+      "/Users/robin/.openclaw/media/agent-town-references/v1_4_4/clover-idle-v1_4_4-no-holes.png",
+      "/Users/robin/.openclaw/media/agent-town-references/v1_4_4/clover-acting-v1_4_4-no-holes.png",
+      "/Users/robin/.openclaw/media/agent-town-references/v1_4_4/clover-observing-v1_4_4-no-holes.png",
+      "/Users/robin/.openclaw/media/agent-town-references/v1_4_4/clover-celebrating-v1_4_4-no-holes.png",
+      "/Users/robin/.openclaw/media/agent-town-references/founders-plot-desktop.webp",
+      "/Users/robin/.openclaw/media/agent-town-references/lumber-camp.webp"
+    ],
+    "rejectedDirectionsAvoided": [
+      "messenger-agentfolk-v1 reuse",
+      "Vell Quill / paper knight direction",
+      "childlike mascot proportions",
+      "fantasy mage/fairy/armor silhouette"
+    ],
+    "sourceProvenance": "Generated source saved by built-in image generation at /Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e6d93-9759-74f1-a656-0697cdd6c8fc/ig_03bde1d368a3cc2a016a17f9c12b388191b819bde1aadd7b7d.png, then resized from 1254x1254 to the required 2048x2048 project source sheet.",
+    "transparency": {
+      "method": "ImageMagick chroma-key conversion from resized source",
+      "sourceKeyRequested": "#ff00ff",
+      "sampledCornerRange": [
+        "srgb(229,10,234)",
+        "srgb(233,14,234)",
+        "srgb(226,35,229)",
+        "srgb(231,31,233)"
+      ],
+      "keyColorUsed": "#e50aea",
+      "fuzz": "42%"
+    },
+    "knownIssues": [
+      "The built-in generator returned a 1254x1254 native PNG despite the 2048x2048 prompt, so the project source was resized to 2048x2048 before alpha removal.",
+      "The generated art keeps a dark purple/magenta-ish painted edge in some places; corners and background are transparent after chroma keying, but edge review in-scene is recommended."
+    ]
+  }
+}

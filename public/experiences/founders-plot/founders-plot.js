@@ -24,6 +24,7 @@
   };
 
   const RES_ICONS = { wood: '🪵', stone: '🪨', food: '🌾', coin: '🪙' };
+  const RESOURCE_KEYS = ['wood', 'stone', 'food', 'coin'];
   const BUILDING_LABELS = {
     HQ: 'Headquarters',
     LUMBER_CAMP: 'Lumber Camp',
@@ -127,6 +128,96 @@
     // silently leave "Loading…" in the banner.
     els.quest.textContent = q.title || q.label || q.stepId || q.id || 'Chart the plot';
     if (els.questHint) els.questHint.textContent = q.body || q.hint || '';
+  }
+
+  function resourceAmount(bundle, key) {
+    return Number(bundle?.plot?.inventory?.[key] || bundle?.inventory?.[key] || 0);
+  }
+
+  function townXp(bundle) {
+    return Number(bundle?.plot?.townXp || bundle?.townXp || 0);
+  }
+
+  function normalizeCost(cost) {
+    const out = {};
+    const source = cost && typeof cost === 'object' ? cost : {};
+    RESOURCE_KEYS.forEach((key) => {
+      const value = Math.max(0, Math.floor(Number(source[key] || 0)));
+      if (value > 0) out[key] = value;
+    });
+    return out;
+  }
+
+  function affordability(bundle, { cost = {}, xpRequired = null } = {}) {
+    const missing = {};
+    const normalized = normalizeCost(cost);
+    RESOURCE_KEYS.forEach((key) => {
+      const gap = Math.max(0, Number(normalized[key] || 0) - resourceAmount(bundle, key));
+      if (gap > 0) missing[key] = gap;
+    });
+    const xpNeed = xpRequired == null ? null : Math.max(0, Math.floor(Number(xpRequired || 0)));
+    const xpGap = xpNeed == null ? 0 : Math.max(0, xpNeed - townXp(bundle));
+    if (xpGap > 0) missing.xp = xpGap;
+    return {
+      missing,
+      canAfford: Object.keys(missing).length === 0,
+    };
+  }
+
+  function makeRequirements(bundle, {
+    cost = {},
+    xpRequired = null,
+    lockedLabel = '',
+    output = null,
+    testid = '',
+  } = {}) {
+    const wrap = document.createElement('div');
+    wrap.className = 'fp-requirements';
+    if (testid) wrap.dataset.testid = testid;
+    if (lockedLabel) {
+      const lock = document.createElement('span');
+      lock.className = 'fp-requirement fp-requirement--locked';
+      lock.textContent = lockedLabel;
+      wrap.appendChild(lock);
+    }
+    const normalized = normalizeCost(cost);
+    RESOURCE_KEYS.forEach((key) => {
+      const need = Number(normalized[key] || 0);
+      if (!need) return;
+      const have = resourceAmount(bundle, key);
+      const missing = Math.max(0, need - have);
+      const row = document.createElement('span');
+      row.className = `fp-requirement${missing > 0 ? ' fp-requirement--missing' : ''}`;
+      row.textContent = `${RES_ICONS[key] || key} ${key}: ${have}/${need}${missing > 0 ? ` need ${missing}` : ''}`;
+      wrap.appendChild(row);
+    });
+    if (xpRequired != null) {
+      const need = Math.max(0, Math.floor(Number(xpRequired || 0)));
+      const have = townXp(bundle);
+      const missing = Math.max(0, need - have);
+      const row = document.createElement('span');
+      row.className = `fp-requirement${missing > 0 ? ' fp-requirement--missing' : ''}`;
+      row.textContent = `XP: ${have}/${need}${missing > 0 ? ` need ${missing}` : ''}`;
+      wrap.appendChild(row);
+    }
+    if (output && typeof output === 'object') {
+      const entries = Object.entries(output)
+        .filter(([, value]) => Number(value || 0) > 0)
+        .map(([key, value]) => `${RES_ICONS[key] || key} ${key} +${value}`);
+      if (entries.length) {
+        const row = document.createElement('span');
+        row.className = 'fp-requirement fp-requirement--output';
+        row.textContent = `Produces ${entries.join(', ')}`;
+        wrap.appendChild(row);
+      }
+    }
+    if (!wrap.children.length) {
+      const row = document.createElement('span');
+      row.className = 'fp-requirement';
+      row.textContent = 'No resource cost';
+      wrap.appendChild(row);
+    }
+    return wrap;
   }
 
   function renderGrid(bundle) {
@@ -251,7 +342,22 @@
       actions.appendChild(collectBtn);
     }
     if (b.state === 'READY' && b.canQueue) {
+      const spec = productionSpec(b);
+      if (spec) {
+        const label = document.createElement('p');
+        label.className = 'fp-helper';
+        label.textContent = 'Production requirements';
+        els.bldBody.appendChild(label);
+        els.bldBody.appendChild(makeRequirements(bundle, {
+          cost: spec.input,
+          output: spec.output,
+          testid: `fp-production-requirements-${b.type}`,
+        }));
+      }
       const produceBtn = brassBtn('Queue production', 'fp-btn-queue', () => doQueueJob(b.buildingId, 'PRODUCE'));
+      const specAfford = affordability(bundle, { cost: spec?.input || {} });
+      produceBtn.disabled = !specAfford.canAfford;
+      if (!specAfford.canAfford) produceBtn.title = 'Collect the missing inputs before queueing this job.';
       produceBtn.dataset.testid = 'fp-btn-queue';
       actions.appendChild(produceBtn);
     }
@@ -260,8 +366,28 @@
       actions.appendChild(sellBtn);
     }
     if (b.state === 'READY' && (b.type === 'HQ' || (def.upgrade && def.upgrade[b.level || 1]))) {
+      const upgradeRule = b.type === 'HQ' ? bundle.hqUpgrade : def.upgrade?.[b.level || 1];
+      if (upgradeRule) {
+        const label = document.createElement('p');
+        label.className = 'fp-helper';
+        label.textContent = b.type === 'HQ'
+          ? `Next upgrade: HQ Level ${upgradeRule.nextLevel}`
+          : `Next upgrade: Level ${upgradeRule.toLevel}`;
+        els.bldBody.appendChild(label);
+        els.bldBody.appendChild(makeRequirements(bundle, {
+          cost: upgradeRule.cost,
+          xpRequired: b.type === 'HQ' ? upgradeRule.xpRequired : null,
+          testid: `fp-upgrade-requirements-${b.type}`,
+        }));
+      }
       const upLabel = b.type === 'HQ' ? 'Upgrade HQ' : 'Upgrade building';
       const upBtn = brassBtn(upLabel, 'fp-btn-upgrade', () => doUpgrade(b.buildingId));
+      const upAfford = affordability(bundle, {
+        cost: upgradeRule?.cost || {},
+        xpRequired: b.type === 'HQ' ? upgradeRule?.xpRequired : null,
+      });
+      upBtn.disabled = !upAfford.canAfford;
+      if (!upAfford.canAfford) upBtn.title = 'Collect the missing resources or XP before starting this upgrade.';
       upBtn.dataset.testid = 'fp-btn-upgrade';
       actions.appendChild(upBtn);
     }
@@ -291,6 +417,24 @@
     if (id) b.id = id;
     b.addEventListener('click', onClick);
     return b;
+  }
+
+  function productionSpec(building) {
+    const level = Number(building?.level || 1);
+    switch (building?.type) {
+      case 'LUMBER_CAMP':
+        return { input: {}, output: { wood: level >= 2 ? 14 : 10 } };
+      case 'FARM_PLOT':
+        return { input: {}, output: { food: level >= 2 ? 12 : 8 } };
+      case 'QUARRY':
+        return { input: {}, output: { stone: level >= 2 ? 12 : 8 } };
+      case 'WORKSHOP':
+        return { input: { wood: 8, stone: 4 }, output: {} };
+      case 'MARKET_STALL':
+        return { input: { food: 6 }, output: { coin: level >= 2 ? 4 : 3 } };
+      default:
+        return null;
+    }
   }
 
   function renderJobs(bundle) {
@@ -486,19 +630,38 @@
     els.palette.hidden = false;
     els.palClose.hidden = false;
     els.palette.innerHTML = '';
-    const unlocks = (bundle.unlocks && bundle.unlocks.buildings) || state.unlocks;
     const defs = bundle.buildingDefs || {};
-    unlocks.forEach((type) => {
+    const hqLevel = Number(bundle?.plot?.hqLevel || bundle?.hqLevel || 1);
+    const types = Object.keys(defs).filter((type) => type !== 'HQ')
+      .sort((a, b) => Number(defs[a]?.unlockHqLevel || 1) - Number(defs[b]?.unlockHqLevel || 1));
+    const list = types.length ? types : ((bundle.unlocks && bundle.unlocks.buildings) || state.unlocks);
+    list.forEach((type) => {
       const def = defs[type] || {};
       const card = document.createElement('button');
       card.type = 'button';
       card.className = 'fp-palette__item fp-brass-btn';
       card.dataset.testid = `fp-palette-${type}`;
       const name = BUILDING_LABELS[type] || type;
-      const cost = def.construction && def.construction.cost
-        ? Object.entries(def.construction.cost).map(([k, v]) => `${v}${RES_ICONS[k] || k}`).join(' ')
-        : 'free';
-      card.innerHTML = `<strong>${name}</strong><span class="fp-palette__cost">${cost}</span>`;
+      const locked = hqLevel < Number(def.unlockHqLevel || 1);
+      const cost = def.construction?.cost || {};
+      const afford = affordability(bundle, { cost });
+      card.disabled = locked || !afford.canAfford;
+      card.dataset.locked = locked ? 'true' : 'false';
+      card.dataset.affordable = afford.canAfford ? 'true' : 'false';
+      if (locked) card.title = `${name} unlocks at HQ Level ${def.unlockHqLevel}.`;
+      else if (!afford.canAfford) card.title = `Collect the missing resources before placing ${name}.`;
+      const title = document.createElement('strong');
+      title.textContent = name;
+      card.appendChild(title);
+      const status = document.createElement('span');
+      status.className = 'fp-palette__cost';
+      status.textContent = locked ? `Locked until HQ Lv ${def.unlockHqLevel}` : 'Build cost';
+      card.appendChild(status);
+      card.appendChild(makeRequirements(bundle, {
+        cost,
+        lockedLabel: locked ? `HQ Lv ${hqLevel}/${def.unlockHqLevel}` : '',
+        testid: `fp-build-requirements-${type}`,
+      }));
       card.addEventListener('click', () => doPlace(type, x, y));
       els.palette.appendChild(card);
     });
@@ -543,6 +706,7 @@
       quest: s.quest || plot.quest || null,
       unlocks: s.unlocks || { buildings: s.unlockedBuildings || [] },
       buildingDefs: s.buildingDefs || {},
+      hqUpgrade: s.hqUpgrade || null,
       visualActors: s.visualActors || [],
       audit: s.audit || {},
       stateHash: s.audit?.stateHash || envelope.stateHash || '',

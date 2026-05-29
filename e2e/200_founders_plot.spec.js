@@ -161,7 +161,12 @@ test('FP-E2E-009 UI loop: player can queue production and collect through the pa
   await expect(page.getByTestId('fp-root')).toBeVisible();
 
   await page.getByTestId('fp-tile-0-1').click();
-  await expect(page.getByTestId('fp-palette-LUMBER_CAMP')).toContainText('8');
+  await expect(page.getByTestId('fp-palette-LUMBER_CAMP')).toContainText('coin: 20/8');
+  await expect(page.getByTestId('fp-palette-FARM_PLOT')).toBeDisabled();
+  await expect(page.getByTestId('fp-build-requirements-FARM_PLOT')).toContainText('wood: 0/12 need 12');
+  await expect(page.getByTestId('fp-build-requirements-FARM_PLOT')).toContainText('coin: 20/4');
+  await expect(page.getByTestId('fp-palette-QUARRY')).toBeDisabled();
+  await expect(page.getByTestId('fp-palette-QUARRY')).toContainText('Locked until HQ Lv 2');
   await page.getByTestId('fp-palette-LUMBER_CAMP').click();
   await expect(page.getByTestId('fp-tile-0-1')).toContainText('Building');
   await expect(page.getByTestId('fp-close-palette')).toBeHidden();
@@ -208,5 +213,10 @@ test('FP-E2E-009 UI loop: player can queue production and collect through the pa
   await expect(page.getByTestId('fp-res-wood')).not.toHaveText('0');
   await expect(page.getByTestId('fp-tile-0-1')).toContainText('Idle');
   await expect(page.getByTestId('fp-btn-collect')).toHaveCount(0);
+  await page.getByTestId('fp-tile-1-0').click();
+  await expect(page.getByTestId('fp-upgrade-requirements-HQ')).toContainText('wood: 10/20 need 10');
+  await expect(page.getByTestId('fp-upgrade-requirements-HQ')).toContainText('food: 0/10 need 10');
+  await expect(page.getByTestId('fp-upgrade-requirements-HQ')).toContainText('XP: 15/25 need 10');
+  await expect(page.getByTestId('fp-btn-upgrade')).toBeDisabled();
   await expect(page.getByTestId('fp-close-palette')).toBeHidden();
 });

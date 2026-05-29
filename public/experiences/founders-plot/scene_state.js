@@ -109,9 +109,9 @@
       }
     },
     messenger: {
-      id: 'messenger-agentfolk-v1',
-      src: '/experiences/founders-plot/assets/characters/inhabitants/messenger/messenger-agentfolk-v1.png',
-      metadataSrc: '/experiences/founders-plot/assets/characters/inhabitants/messenger/messenger-agentfolk-v1.json',
+      id: 'rook-signalpost-messenger-v1',
+      src: '/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.png',
+      metadataSrc: '/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.json',
       actionMapping: {
         APPROVAL: 'ready',
         REWARD: 'ready',
