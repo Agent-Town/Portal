@@ -397,21 +397,72 @@ test('FP-HT-011 progression atlas saves edited strategy steps and GenAI icon dra
       goal: 'Sketch an editable expansion sequence without changing gameplay truth.',
       summary: 'Player-authored strategy draft for future scout planning.',
       focus: ['Private editor', 'Before-after links', 'Generated icon draft'],
+      createdBy: 'openclaw_lite',
+      source: 'editor',
+      parentStrategyId: 'strategy_delegate_outputs_first_seed',
+      revision: 2,
+      sharePolicy: 'share_redacted',
       steps: [
+        {
+          stepId: 'hq.level.3',
+          title: 'Upgrade HQ to Level 3',
+          stepKind: 'canonical_node',
+          canonicalNodeId: 'hq.level.3',
+          reason: 'Keep the edited plan anchored to the canonical HQ3 node.',
+          nextAction: 'Reach HQ3 through normal Founders Plot play.',
+          afterStepId: 'editor.scout_ridge',
+          expectedBenefit: ['Unlock queueProduction planning'],
+          assumptions: ['Canonical HQ3 rules still own the gameplay upgrade.'],
+          actionRef: { tool: 'et.plot.upgrade_building', params: { buildingId: 'building_hq_1' } },
+          icon: iconDraft.body.icon
+        },
         {
           stepId: 'editor.scout_ridge',
           title: 'Scout Ridge',
+          stepKind: 'future_placeholder',
+          futureSystem: 'expedition',
           reason: 'Mark the first scouting thought after HQ3 planning.',
           nextAction: 'Attach this as a future scouting idea.',
+          beforeStepId: 'hq.level.3',
           afterStepId: 'editor.claim_second_plot',
+          targetRef: { kind: 'future_system', id: 'scout_ridge', type: 'expedition' },
+          requirements: {
+            items: [{ kind: 'future_tool', label: 'Expedition Board exists' }],
+            affordable: false,
+            missing: { ExpeditionBoard: 1 }
+          },
+          estimatedCost: { wood: 2, food: 1, unknown: 99 },
+          expectedBenefit: ['Reveal a candidate second plot'],
+          riskLevel: 'medium',
+          reversibility: 'layout_sensitive',
+          assumptions: ['Scouting will become canonical later.'],
+          privacy: 'share_redacted',
+          actionRef: { tool: 'wallet.sign', params: { message: 'nope' } },
           icon: iconDraft.body.icon
         },
         {
           stepId: 'editor.claim_second_plot',
           title: 'Claim Second Plot',
+          stepKind: 'custom_note',
           reason: 'Connect the scouting thought to a later territory claim.',
           nextAction: 'Wait for canonical expedition tools.',
-          beforeStepId: 'editor.scout_ridge'
+          beforeStepId: 'editor.scout_ridge',
+          requirements: {
+            items: [{ kind: 'note', label: 'Player still wants expansion.' }],
+            affordable: true,
+            missing: {}
+          },
+          actionRef: { tool: 'et.plot.set_priority', params: { buildingId: 'building_hq_1', priority: 'HIGH' } }
+        },
+        {
+          stepId: 'editor.unknown_canonical',
+          title: 'Oracle Research Placeholder',
+          stepKind: 'canonical_node',
+          canonicalNodeId: 'research.oracle_lane',
+          reason: 'This should not become a canonical node until it exists.',
+          nextAction: 'Wait for research/oracle progression.',
+          beforeStepId: 'editor.claim_second_plot',
+          actionRef: { tool: 'browser.open', params: { url: 'https://example.com' } }
         }
       ]
     };
@@ -424,12 +475,47 @@ test('FP-HT-011 progression atlas saves edited strategy steps and GenAI icon dra
     assert.equal(save.body.gameplayStableHash, beforeGameplayHash);
     assert.equal(save.body.strategy.generatedBy, 'progression_atlas_strategy_editor_v1');
     assert.equal(save.body.strategy.strategyKey, 'custom-expansion_sketch');
-    assert.equal(save.body.strategy.steps.length, 2);
-    assert.equal(save.body.strategy.steps[0].afterStepId, 'editor.claim_second_plot');
-    assert.equal(save.body.strategy.steps[1].beforeStepId, 'editor.scout_ridge');
+    assert.equal(save.body.strategy.createdBy, 'openclaw_lite');
+    assert.equal(save.body.strategy.source, 'editor');
+    assert.equal(save.body.strategy.parentStrategyId, 'strategy_delegate_outputs_first_seed');
+    assert.equal(save.body.strategy.revision, 2);
+    assert.equal(save.body.strategy.sharePolicy, 'share_redacted');
+    assert.match(save.body.strategy.contentHash, /^[a-f0-9]{64}$/);
+    assert.equal(save.body.strategy.steps.length, 4);
+    assert.equal(save.body.strategy.steps[0].stepKind, 'canonical_node');
+    assert.equal(save.body.strategy.steps[0].canonicalNodeId, 'hq.level.3');
+    assert.equal(save.body.strategy.steps[0].targetRef.kind, 'hq');
+    assert.equal(save.body.strategy.steps[0].requirements.advisory, false);
+    assert.equal(save.body.strategy.steps[0].actionRef.tool, 'et.plot.upgrade_building');
+    assert.equal(save.body.strategy.steps[0].actionRef.executable, false);
+    assert.equal(save.body.strategy.steps[1].stepKind, 'future_placeholder');
+    assert.equal(save.body.strategy.steps[1].canonicalNodeId, null);
+    assert.equal(save.body.strategy.steps[1].futureSystem, 'expedition');
+    assert.equal(save.body.strategy.steps[1].targetRef.type, 'expedition');
+    assert.deepEqual(save.body.strategy.steps[1].estimatedCost, { wood: 2, food: 1 });
+    assert.deepEqual(save.body.strategy.steps[1].expectedBenefit, ['Reveal a candidate second plot']);
+    assert.equal(save.body.strategy.steps[1].riskLevel, 'medium');
+    assert.equal(save.body.strategy.steps[1].reversibility, 'layout_sensitive');
+    assert.deepEqual(save.body.strategy.steps[1].assumptions, ['Scouting will become canonical later.']);
+    assert.equal(save.body.strategy.steps[1].privacy, 'share_redacted');
+    assert.equal(save.body.strategy.steps[1].requirements.advisory, true);
+    assert.equal(save.body.strategy.steps[1].requirements.items[0].advisory, true);
+    assert.equal(save.body.strategy.steps[1].actionRef, null);
+    assert.equal(save.body.strategy.steps[2].stepKind, 'custom_note');
+    assert.equal(save.body.strategy.steps[2].requirements.advisory, true);
+    assert.equal(save.body.strategy.steps[2].actionRef.tool, 'et.plot.set_priority');
+    assert.equal(save.body.strategy.steps[2].actionRef.executable, false);
+    assert.notEqual(save.body.strategy.steps[3].stepKind, 'canonical_node');
+    assert.equal(save.body.strategy.steps[3].canonicalNodeId, null);
+    assert.equal(save.body.strategy.steps[3].futureSystem, 'research');
+    assert.equal(save.body.strategy.steps[3].requestedCanonicalNodeId, 'research.oracle_lane');
+    assert.equal(save.body.strategy.steps[3].actionRef, null);
+    assert.equal(save.body.strategy.steps[0].afterStepId, 'editor.scout_ridge');
+    assert.equal(save.body.strategy.steps[1].afterStepId, 'editor.claim_second_plot');
+    assert.equal(save.body.strategy.steps[2].beforeStepId, 'editor.scout_ridge');
     assert.ok(save.body.strategy.graph.edges.find((edge) => edge.from === 'editor.scout_ridge' && edge.to === 'editor.claim_second_plot'));
-    assert.equal(save.body.strategy.steps[0].icon.generatedBy, 'progression_atlas_genai_icon_prompt_v1');
-    assert.equal(save.body.strategy.steps[0].icon.genAi.status, 'draft_prompt_attached');
+    assert.equal(save.body.strategy.steps[1].icon.generatedBy, 'progression_atlas_genai_icon_prompt_v1');
+    assert.equal(save.body.strategy.steps[1].icon.genAi.status, 'draft_prompt_attached');
     assert.equal(save.body.selectedStrategyId, save.body.strategy.strategyId);
 
     const afterState = await request(server, 'GET', '/api/founders-plot/state');

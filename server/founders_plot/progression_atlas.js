@@ -12,6 +12,13 @@ const {
 
 const ATLAS_VERSION = 'founders-plot-progression-atlas-v1';
 const DEFAULT_STRATEGY_KEY = 'rush-hq3';
+const STEP_KINDS = Object.freeze(['canonical_node', 'custom_note', 'future_placeholder']);
+const FUTURE_SYSTEMS = Object.freeze(['expedition', 'research', 'territory', 'unit', 'oracle']);
+const RISK_LEVELS = Object.freeze(['low', 'medium', 'high', 'unknown']);
+const REVERSIBILITY_LEVELS = Object.freeze(['safe', 'layout_sensitive', 'irreversible', 'unknown']);
+const PRIVACY_LEVELS = Object.freeze(['private', 'share_redacted', 'public_template_allowed']);
+const STRATEGY_CREATED_BY = Object.freeze(['human', 'openclaw_lite', 'clover', 'atlas_oracle']);
+const STRATEGY_SOURCES = Object.freeze(['template', 'editor', 'oracle_draft', 'import', 'fork']);
 const STRATEGY_TEMPLATES = Object.freeze({
   'rush-hq3': Object.freeze({
     strategyKey: 'rush-hq3',
@@ -129,6 +136,91 @@ function normalizeCost(value) {
     if (amount > 0) out[key] = amount;
   }
   return out;
+}
+
+function firstAllowed(value, allowed, fallback) {
+  const clean = cleanText(value, '', 80).toLowerCase();
+  return allowed.includes(clean) ? clean : fallback;
+}
+
+function nullableString(value, max = 120) {
+  const text = cleanText(value, '', max);
+  return text || null;
+}
+
+function normalizeStringArray(value, fallback = [], limit = 6, max = 160) {
+  const source = Array.isArray(value) ? value : fallback;
+  return uniqueStrings(source.map((entry) => cleanText(entry, '', max)), limit);
+}
+
+function normalizeTargetRef(value, fallback = null) {
+  const raw = value && typeof value === 'object' ? value : fallback;
+  if (!raw || typeof raw !== 'object') return null;
+  const kind = nullableString(raw.kind, 60);
+  const id = nullableString(raw.id ?? raw.buildingId ?? raw.stepId ?? raw.nodeId ?? raw.key, 120);
+  const type = nullableString(raw.type ?? raw.buildingType ?? raw.resource ?? raw.permissionKey ?? raw.key, 120);
+  if (!kind && !id && !type) return null;
+  return { kind, id, type };
+}
+
+function targetRefFromTarget(target) {
+  if (!target || typeof target !== 'object') return null;
+  return normalizeTargetRef({
+    kind: target.kind || null,
+    id: target.buildingId || target.key || target.permissionKey || target.resource || target.level || null,
+    type: target.type || target.buildingType || target.key || target.kind || null
+  });
+}
+
+function normalizeRequirementItem(item, advisory) {
+  if (!item || typeof item !== 'object') return null;
+  const kind = cleanText(item.kind, 'note', 60).toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'note';
+  const resource = nullableString(item.resource, 60);
+  const label = nullableString(item.label || item.title || item.description, 180);
+  const out = {
+    kind,
+    advisory: !!advisory
+  };
+  if (resource) out.resource = resource;
+  if (label) out.label = label;
+  for (const key of ['have', 'required', 'missing']) {
+    if (item[key] == null) continue;
+    out[key] = Math.max(0, Math.floor(Number(item[key] || 0)));
+  }
+  if (item.system) out.system = cleanText(item.system, '', 60).toLowerCase().replace(/[^a-z0-9_-]/g, '') || null;
+  if (item.ref && typeof item.ref === 'object') out.ref = normalizeTargetRef(item.ref);
+  return out;
+}
+
+function normalizePlanningRequirements(value, { fallback = null, advisory = false } = {}) {
+  if (!value || typeof value !== 'object') {
+    if (!fallback) return { items: [], affordable: true, missing: {}, advisory: !!advisory };
+    return {
+      ...clone(fallback),
+      advisory: !!advisory
+    };
+  }
+  const items = Array.isArray(value.items)
+    ? value.items.map((item) => normalizeRequirementItem(item, advisory)).filter(Boolean)
+    : [];
+  const missing = value.missing && typeof value.missing === 'object' && !Array.isArray(value.missing)
+    ? Object.entries(value.missing).reduce((acc, [key, amount]) => {
+      const cleanKey = cleanText(key, '', 60);
+      if (cleanKey) acc[cleanKey] = Math.max(0, Math.floor(Number(amount || 0)));
+      return acc;
+    }, {})
+    : {};
+  return {
+    items,
+    affordable: value.affordable == null ? Object.values(missing).every((amount) => Number(amount || 0) <= 0) : !!value.affordable,
+    missing,
+    advisory: !!advisory
+  };
+}
+
+function normalizeEstimatedCost(value) {
+  const cost = normalizeCost(value);
+  return Object.keys(cost).length ? cost : null;
 }
 
 function requirementsFor(state, { cost = {}, xpRequired = null, hqLevelRequired = null } = {}) {
@@ -865,18 +957,56 @@ function compareForStrategy(template, steps) {
   };
 }
 
+function normalizeStrategyMetadata(raw = {}, fallback = {}) {
+  const revision = Math.max(1, Math.floor(Number(raw.revision || fallback.revision || 1)));
+  return {
+    createdBy: firstAllowed(raw.createdBy, STRATEGY_CREATED_BY, fallback.createdBy || 'human'),
+    source: firstAllowed(raw.source, STRATEGY_SOURCES, fallback.source || 'editor'),
+    parentStrategyId: nullableString(raw.parentStrategyId ?? fallback.parentStrategyId, 140),
+    revision,
+    sharePolicy: firstAllowed(raw.sharePolicy, PRIVACY_LEVELS, fallback.sharePolicy || 'private')
+  };
+}
+
+function strategyContentHash(strategy) {
+  return stableHash({
+    strategyKey: strategy.strategyKey,
+    title: strategy.title,
+    goal: strategy.goal,
+    summary: strategy.summary,
+    focus: strategy.focus,
+    compare: strategy.compare,
+    steps: strategy.steps,
+    graph: strategy.graph,
+    createdBy: strategy.createdBy,
+    source: strategy.source,
+    parentStrategyId: strategy.parentStrategyId,
+    revision: strategy.revision,
+    sharePolicy: strategy.sharePolicy,
+    gameplayMutationPolicy: strategy.gameplayMutationPolicy
+  });
+}
+
 function buildProgressionStrategy(state, stateHash, strategyKey = DEFAULT_STRATEGY_KEY, { title = null } = {}) {
   const template = strategyTemplateForKey(strategyKey) || STRATEGY_TEMPLATES[DEFAULT_STRATEGY_KEY];
-  const steps = stepsForStrategyKey(state, template.strategyKey);
+  const steps = stepsForStrategyKey(state, template.strategyKey)
+    .map((step) => addStepContract(step, { stepKind: 'canonical_node', canonicalNodeId: step.stepId }));
   const graph = buildGraph(state, steps);
   const strategyId = `strategy_${hashId([state?.plot?.plotId, template.strategyKey])}`;
   const gameplayStableHash = gameplayStableHashForState(state);
-  return {
+  const strategy = {
     strategyId,
     strategyKey: template.strategyKey,
     title: String(title || template.title).trim().slice(0, 80) || template.title,
     visibility: 'private',
     generatedBy: 'progression_atlas_v1',
+    ...normalizeStrategyMetadata({}, {
+      createdBy: 'clover',
+      source: 'template',
+      parentStrategyId: null,
+      revision: 1,
+      sharePolicy: 'private'
+    }),
     baseGraphVersion: ATLAS_VERSION,
     baseStateHash: String(stateHash || state?.audit?.stateHash || ''),
     baseGameplayStableHash: gameplayStableHash,
@@ -897,6 +1027,8 @@ function buildProgressionStrategy(state, stateHash, strategyKey = DEFAULT_STRATE
     createdAt: null,
     updatedAt: null
   };
+  strategy.contentHash = strategyContentHash(strategy);
+  return strategy;
 }
 
 function buildRushHq3Strategy(state, stateHash, options = {}) {
@@ -972,17 +1104,93 @@ function normalizeActionRef(value) {
     tool,
     params: value.params && typeof value.params === 'object' && !Array.isArray(value.params)
       ? stableValue(value.params)
-      : {}
+      : {},
+    executable: false
   };
 }
 
-function normalizeEditorSteps(rawSteps, nowMs) {
+function addStepContract(step, overrides = {}) {
+  const stepKind = firstAllowed(overrides.stepKind || step.stepKind, STEP_KINDS, 'canonical_node');
+  const canonicalNodeId = stepKind === 'canonical_node'
+    ? nullableString(overrides.canonicalNodeId || step.canonicalNodeId || step.nodeId || step.stepId, 120)
+    : null;
+  const futureSystem = stepKind === 'future_placeholder'
+    ? firstAllowed(overrides.futureSystem || step.futureSystem, FUTURE_SYSTEMS, null)
+    : null;
+  return {
+    ...step,
+    stepKind,
+    canonicalNodeId,
+    futureSystem,
+    targetRef: normalizeTargetRef(overrides.targetRef || step.targetRef, targetRefFromTarget(step.target)),
+    requirements: normalizePlanningRequirements(step.requirements, {
+      fallback: step.requirements,
+      advisory: stepKind !== 'canonical_node'
+    }),
+    estimatedCost: normalizeEstimatedCost(overrides.estimatedCost || step.estimatedCost || step.requirements?.cost),
+    expectedBenefit: normalizeStringArray(overrides.expectedBenefit || step.expectedBenefit, [], 8, 180),
+    riskLevel: firstAllowed(overrides.riskLevel || step.riskLevel, RISK_LEVELS, stepKind === 'canonical_node' ? 'low' : 'unknown'),
+    reversibility: firstAllowed(overrides.reversibility || step.reversibility, REVERSIBILITY_LEVELS, stepKind === 'canonical_node' ? 'safe' : 'unknown'),
+    assumptions: normalizeStringArray(overrides.assumptions || step.assumptions, [], 8, 220),
+    privacy: firstAllowed(overrides.privacy || step.privacy, PRIVACY_LEVELS, 'private'),
+    actionRef: normalizeActionRef(step.actionRef)
+  };
+}
+
+function buildCanonicalStepIndex(state) {
+  const index = new Map();
+  for (const key of STRATEGY_TEMPLATE_KEYS) {
+    for (const step of stepsForStrategyKey(state, key)) {
+      if (!step?.stepId || index.has(step.stepId)) continue;
+      index.set(step.stepId, addStepContract(step, { stepKind: 'canonical_node', canonicalNodeId: step.stepId }));
+    }
+  }
+  return index;
+}
+
+function inferFutureSystem(raw) {
+  const explicit = firstAllowed(raw?.futureSystem || raw?.targetRef?.system || raw?.target?.system, FUTURE_SYSTEMS, null);
+  if (explicit) return explicit;
+  const haystack = `${raw?.stepId || ''} ${raw?.nodeId || ''} ${raw?.title || ''}`.toLowerCase();
+  return FUTURE_SYSTEMS.find((system) => haystack.includes(system)) || null;
+}
+
+function resolveEditorStepKind(raw, canonicalSteps) {
+  const requestedKind = firstAllowed(raw?.stepKind, STEP_KINDS, null);
+  const requestedCanonicalId = nullableString(raw?.canonicalNodeId || raw?.nodeId || raw?.stepId, 120);
+  if (requestedCanonicalId && canonicalSteps.has(requestedCanonicalId)) {
+    return {
+      stepKind: 'canonical_node',
+      canonicalNodeId: requestedCanonicalId,
+      futureSystem: null,
+      requestedCanonicalId
+    };
+  }
+  const futureSystem = inferFutureSystem(raw);
+  if (requestedKind === 'future_placeholder' || futureSystem) {
+    return {
+      stepKind: 'future_placeholder',
+      canonicalNodeId: null,
+      futureSystem,
+      requestedCanonicalId
+    };
+  }
+  return {
+    stepKind: 'custom_note',
+    canonicalNodeId: null,
+    futureSystem: null,
+    requestedCanonicalId: requestedKind === 'canonical_node' ? requestedCanonicalId : null
+  };
+}
+
+function normalizeEditorSteps(rawSteps, nowMs, { canonicalSteps = new Map() } = {}) {
   const inputSteps = Array.isArray(rawSteps) ? rawSteps.slice(0, 24) : [];
   if (!inputSteps.length) return [];
   const used = new Set();
   const firstPass = inputSteps.map((raw, index) => {
     const title = cleanText(raw?.title, `Strategy Step ${index + 1}`, 80);
-    const baseId = cleanText(raw?.stepId || raw?.nodeId, '', 100)
+    const resolved = resolveEditorStepKind(raw, canonicalSteps);
+    const baseId = cleanText(raw?.stepId || raw?.nodeId || resolved.canonicalNodeId, '', 100)
       .replace(/[^a-zA-Z0-9._:-]/g, '_') || `editor.${slugFor(title, 'step')}`;
     let stepId = baseId;
     let suffix = 2;
@@ -991,34 +1199,54 @@ function normalizeEditorSteps(rawSteps, nowMs) {
       suffix += 1;
     }
     used.add(stepId);
-    return { raw, title, stepId };
+    return { raw, title, stepId, resolved };
   });
   const knownIds = new Set(firstPass.map((entry) => entry.stepId));
-  return firstPass.map(({ raw, title, stepId }) => {
+  return firstPass.map(({ raw, title, stepId, resolved }) => {
     const beforeStepId = normalizeConnection(raw?.beforeStepId || raw?.before, knownIds);
     const afterStepId = normalizeConnection(raw?.afterStepId || raw?.after, knownIds);
     const reason = cleanText(raw?.reason || raw?.note, 'Player-authored progression step.', 400);
     const prompt = cleanText(raw?.iconPrompt || raw?.icon?.prompt, `${title}, Agent Town strategy icon`, 300);
-    return {
+    const canonical = resolved.canonicalNodeId ? canonicalSteps.get(resolved.canonicalNodeId) : null;
+    const fallbackRequirements = canonical?.requirements || null;
+    const requirements = resolved.stepKind === 'canonical_node'
+      ? normalizePlanningRequirements(fallbackRequirements, { fallback: fallbackRequirements, advisory: false })
+      : normalizePlanningRequirements(raw?.requirements, { advisory: true });
+    const target = canonical?.target || {
+      kind: resolved.stepKind === 'future_placeholder' ? 'future_system_placeholder' : 'custom_strategy_step',
+      source: 'progression_atlas_strategy_editor',
+      system: resolved.futureSystem
+    };
+    const normalized = {
       stepId,
       nodeId: stepId,
       title,
       status: cleanText(raw?.status, 'planned', 24).toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'planned',
       reason,
       icon: normalizeEditorIcon(raw?.icon, { title, prompt, nowMs }),
-      target: {
-        kind: 'custom_strategy_step',
-        source: 'progression_atlas_strategy_editor'
-      },
-      requirements: { items: [], affordable: true, missing: {} },
+      target,
+      requirements,
       blocker: cleanText(raw?.blocker, '', 180) || null,
       nextAction: cleanText(raw?.nextAction, title, 120),
-      actionRef: normalizeActionRef(raw?.actionRef),
+      actionRef: normalizeActionRef(raw?.actionRef || canonical?.actionRef),
       connections: { beforeStepId, afterStepId },
       beforeStepId,
       afterStepId,
+      requestedCanonicalNodeId: resolved.stepKind === 'canonical_node' ? null : resolved.requestedCanonicalId,
       editorEditable: true
     };
+    return addStepContract(normalized, {
+      stepKind: resolved.stepKind,
+      canonicalNodeId: resolved.canonicalNodeId,
+      futureSystem: resolved.futureSystem,
+      targetRef: normalizeTargetRef(raw?.targetRef || raw?.target, targetRefFromTarget(target)),
+      estimatedCost: raw?.estimatedCost || raw?.cost || canonical?.estimatedCost || canonical?.requirements?.cost,
+      expectedBenefit: raw?.expectedBenefit || raw?.expectedBenefits || raw?.benefits || canonical?.expectedBenefit,
+      riskLevel: raw?.riskLevel || canonical?.riskLevel,
+      reversibility: raw?.reversibility || canonical?.reversibility,
+      assumptions: raw?.assumptions || canonical?.assumptions,
+      privacy: raw?.privacy || canonical?.privacy
+    });
   });
 }
 
@@ -1060,7 +1288,8 @@ function buildEditedStrategyFromInput({ state, stateHash, strategyInput, nowMs }
   const sourceSteps = Array.isArray(raw.steps) && raw.steps.length
     ? raw.steps
     : buildRushHq3Strategy(state, stateHash).steps;
-  const steps = normalizeEditorSteps(sourceSteps, timestamp);
+  const canonicalSteps = buildCanonicalStepIndex(state);
+  const steps = normalizeEditorSteps(sourceSteps, timestamp, { canonicalSteps });
   if (!steps.length) return null;
   const title = cleanText(raw.title, 'Custom Progression Strategy', 80);
   const goal = cleanText(raw.goal, raw.summary || 'Player-authored Founders Plot strategy.', 220);
@@ -1070,12 +1299,19 @@ function buildEditedStrategyFromInput({ state, stateHash, strategyInput, nowMs }
   const graph = buildEditorGraph(steps);
   const strategyHash = stableHash({ title, goal, focus, steps, graph });
   const strategyKey = normalizeStrategyKey(raw.strategyKey || `custom-${slugFor(title, 'strategy')}`);
-  return {
+  const strategy = {
     strategyId: `strategy_custom_${hashId([state?.plot?.plotId, strategyHash])}`,
     strategyKey: strategyKey.startsWith('custom-') ? strategyKey : `custom-${strategyKey}`,
     title,
     visibility: 'private',
     generatedBy: 'progression_atlas_strategy_editor_v1',
+    ...normalizeStrategyMetadata(raw, {
+      createdBy: 'human',
+      source: 'editor',
+      parentStrategyId: null,
+      revision: 1,
+      sharePolicy: 'private'
+    }),
     baseGraphVersion: ATLAS_VERSION,
     baseStateHash: String(stateHash || state?.audit?.stateHash || ''),
     baseGameplayStableHash: gameplayStableHashForState(state),
@@ -1114,6 +1350,8 @@ function buildEditedStrategyFromInput({ state, stateHash, strategyInput, nowMs }
     createdAt: timestamp,
     updatedAt: timestamp
   };
+  strategy.contentHash = strategyContentHash(strategy);
+  return strategy;
 }
 
 function getStateEnvelope({ pairId, houseId = null, plotId = null, nowMs }) {
