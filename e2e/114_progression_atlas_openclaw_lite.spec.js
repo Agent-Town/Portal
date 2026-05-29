@@ -42,6 +42,8 @@ test('AC-63: OpenClaw Lite opens Progression Atlas and saves selected strategy t
   await expect(atlasFrame.getByTestId('progression-atlas-root')).toBeVisible();
   await expect(atlasFrame.getByText('Rush HQ3').first()).toBeVisible();
   await expect(atlasFrame.getByTestId('progression-atlas-canonical-coverage')).toBeVisible();
+  await expect(atlasFrame.getByTestId('progression-atlas-canonical-status-legend').getByText('DONE')).toBeVisible();
+  await expect(atlasFrame.getByTestId('progression-atlas-canonical-status-legend').getByText('AVAILABLE')).toBeVisible();
   await expect(atlasFrame.getByTestId('progression-atlas-canonical-building_WORKSHOP_place').getByText('Build Workshop')).toBeVisible();
   await expect(atlasFrame.getByTestId('progression-atlas-canonical-building_MARKET_STALL_place').getByText('Build Market Stall')).toBeVisible();
   await expect(atlasFrame.getByTestId('progression-atlas-canonical-permission_sellSurplusFood_unlock').getByText('Sell surplus food')).toBeVisible();

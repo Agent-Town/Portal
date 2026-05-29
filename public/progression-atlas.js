@@ -203,35 +203,54 @@
     const groups = [
       {
         title: 'HQ Spine',
+        index: 1,
+        summary: 'Command upgrades and coordination unlocks.',
         nodes: ['hq.level.1', 'hq.level.2', 'hq.level.3', 'hq.level.4', 'hq.level.5']
       },
       {
         title: 'Current Buildings',
+        index: 2,
+        summary: 'Structures already implemented in Founders Plot.',
         nodes: ['building.LUMBER_CAMP.place', 'building.FARM_PLOT.place', 'building.QUARRY.place', 'building.WORKSHOP.place', 'building.MARKET_STALL.place']
       },
       {
         title: 'Loops + Effects',
+        index: 3,
+        summary: 'Production, collection, selling, and buffs.',
         nodes: ['production.LUMBER_CAMP.PRODUCE', 'production.FARM_PLOT.PRODUCE', 'production.QUARRY.PRODUCE', 'production.WORKSHOP.PRODUCE', 'effect.workshop.next_build_buff', 'production.MARKET_STALL.SELL']
       },
       {
         title: 'Permissions',
+        index: 4,
+        summary: 'Delegation gates, policies, and safety caps.',
         nodes: ['permission.collectOutputs.unlock', 'permission.queueProduction.unlock', 'permission.setPriority.unlock', 'permission.sellSurplusFood.unlock', 'policy.sellDailyCoinCap']
       },
       {
         title: 'Rewards + Caps',
+        index: 5,
+        summary: 'Receipts, milestones, storage, and throughput.',
         nodes: ['reward.quest.first-lumber.claim', 'reward.hq.level-5.claim', 'constraint.storage.wood', 'constraint.construction_slots']
       }
     ];
-    const html = groups.map((group) => {
+    const legend = ['done', 'available', 'waiting', 'blocked', 'locked'].map((status) => (
+      `<span class="atlasCoverageLegendItem status-${status}"><i aria-hidden="true"></i>${escapeHtml(status)}</span>`
+    )).join('');
+    const lanes = groups.map((group) => {
       const items = group.nodes.map((nodeId) => canonicalNodeById(nodeId)).filter(Boolean);
       return `
-        <section class="atlasCoverageGroup">
-          <h3>${escapeHtml(group.title)}</h3>
-          <div class="atlasCoverageItems">
+        <section class="atlasCoverageLane">
+          <div class="atlasCoverageGroup">
+            <span class="atlasCoverageLaneNumber">${escapeHtml(group.index)}</span>
+            <div>
+              <h3>${escapeHtml(group.title)}</h3>
+              <p>${escapeHtml(group.summary)}</p>
+            </div>
+          </div>
+          <div class="atlasCoverageItems" style="--atlas-coverage-count: ${Math.max(items.length, 1)};">
             ${items.map((item) => `
               <button class="atlasCoverageNode atlasExplainBtn status-${escapeHtml(item.status || 'blocked')}" type="button" data-node-id="${escapeHtml(item.nodeId)}" data-testid="progression-atlas-canonical-${escapeHtml(testId(item.nodeId))}">
-                ${iconHtml(item.icon, 'atlasMiniIcon')}
-                <span>${escapeHtml(item.title || item.nodeId)}</span>
+                <span class="atlasCoverageNodeFrame">${iconHtml(item.icon, 'atlasCoverageIcon')}</span>
+                <span class="atlasCoverageNodeLabel">${escapeHtml(item.title || item.nodeId)}</span>
                 <strong>${escapeHtml(item.status || 'blocked')}</strong>
               </button>
             `).join('')}
@@ -239,7 +258,9 @@
         </section>
       `;
     }).join('');
-    node.innerHTML = html || '<p class="atlasEmpty">Canonical coverage unavailable.</p>';
+    node.innerHTML = lanes
+      ? `<div class="atlasCoverageLegend" data-testid="progression-atlas-canonical-status-legend">${legend}</div><div class="atlasCoverageLanes">${lanes}</div>`
+      : '<p class="atlasEmpty">Canonical coverage unavailable.</p>';
   }
 
   function renderStrategyCompare() {
