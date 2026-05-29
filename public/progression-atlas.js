@@ -161,8 +161,10 @@
 
   function tierForStep(index) {
     if (index <= 3) return { label: 'Tier 1', name: 'Foundation', start: 0 };
-    if (index <= 6) return { label: 'Tier 2', name: 'Stoneworks', start: 4 };
-    return { label: 'Tier 3', name: 'Foreman', start: 7 };
+    if (index <= 8) return { label: 'Tier 2', name: 'Resource Loops', start: 4 };
+    if (index <= 13) return { label: 'Tier 3', name: 'Foreman', start: 9 };
+    if (index <= 18) return { label: 'Tier 4', name: 'HQ5 Bridge', start: 14 };
+    return { label: 'Tier 5', name: 'HQ10 Horizon', start: 19 };
   }
 
   function renderSummary() {
@@ -287,12 +289,51 @@
             <div><dt>Blockers</dt><dd>${escapeHtml(compactList(compare.roughBlockers))}</dd></div>
             <div><dt>Shortfalls</dt><dd>${escapeHtml(shortfallsText(compare.resourceShortfalls))}</dd></div>
             <div><dt>Permissions</dt><dd>${escapeHtml(compactList(compare.permissions, 'manual only'))}</dd></div>
+            ${Array.isArray(compare.futureMilestones) && compare.futureMilestones.length
+              ? `<div><dt>Future</dt><dd>${escapeHtml(compactList(compare.futureMilestones.map((item) => item.title), 'none'))}</dd></div>`
+              : ''}
             <div><dt>Tradeoff</dt><dd>${escapeHtml(compare.tradeoff || strategy.summary || '')}</dd></div>
             <div><dt>Burden</dt><dd>${escapeHtml(compare.approvalDelegationBurden || '')}</dd></div>
           </dl>
         </article>
       `;
     }).join('');
+  }
+
+  function renderFutureHorizon() {
+    const node = $('futureHorizon');
+    if (!node) return;
+    const horizon = state.atlas?.futureHorizon;
+    const milestones = Array.isArray(horizon?.milestones) ? horizon.milestones : [];
+    if (!horizon || !milestones.length) {
+      node.innerHTML = '<p class="atlasEmpty">HQ10 horizon unavailable.</p>';
+      return;
+    }
+    const bridge = horizon.currentBridge || {};
+    const cards = milestones.map((milestone) => `
+      <button class="atlasHorizonNode atlasExplainBtn status-${escapeHtml(milestone.status || 'locked')}" type="button" data-node-id="${escapeHtml(milestone.nodeId)}" data-testid="progression-atlas-horizon-hq${escapeHtml(milestone.hqLevel)}">
+        <span class="atlasHorizonIcon">${iconHtml(milestone.icon, 'atlasTreeIcon')}</span>
+        <span class="atlasHorizonLevel">HQ${escapeHtml(milestone.hqLevel)}</span>
+        <strong>${escapeHtml(milestone.title)}</strong>
+        <em>${escapeHtml(milestone.system || 'future')}</em>
+        <span>${escapeHtml((milestone.possibilities || []).slice(0, 2).join(' '))}</span>
+      </button>
+    `).join('');
+    node.innerHTML = `
+      <div class="atlasHorizonIntro">
+        <div>
+          <strong>${escapeHtml(bridge.title || 'Current playable cap')}</strong>
+          <p>${escapeHtml(horizon.gameplayTruthBoundary || '')}</p>
+        </div>
+        <button class="atlasButton atlasDraftStrategyBtn" type="button" data-strategy-key="${escapeHtml(horizon.recommendedTemplateKey || 'hq10-horizon')}" data-testid="progression-atlas-horizon-draft">Draft HQ10 Path</button>
+      </div>
+      <div class="atlasHorizonRail" style="--atlas-horizon-count: ${Math.max(milestones.length, 1)};">
+        ${cards}
+      </div>
+      <div class="atlasHorizonGuardrails">
+        ${(horizon.guardrails || []).map((entry) => `<span>${escapeHtml(entry)}</span>`).join('')}
+      </div>
+    `;
   }
 
   function renderTree(steps) {
@@ -596,6 +637,7 @@
     renderTemplateControls();
     renderCanonicalCoverage();
     renderStrategyCompare();
+    renderFutureHorizon();
     renderDraft();
     renderEditor();
     renderSavedStrategies();

@@ -269,7 +269,7 @@ When running in the in-browser OpenClaw Lite runtime, prefer explicit Agent Town
 - `agent_town_progression_get_state`
   - Reads the server-owned Founders Plot Progression Atlas. Advisory only; it does not change gameplay.
 - `agent_town_progression_draft_strategy`
-  - Drafts a private strategy option from current Founders Plot state. V1 supports `rush-hq3`.
+  - Drafts a private strategy option from current Founders Plot state. Current templates include `rush-hq3`, `balanced-food-wood`, `delegate-outputs-first`, and advisory `hq10-horizon`.
 - `agent_town_progression_save_strategy`
   - Saves a private advisory strategy option. This is planning state, not a gameplay action.
 - `agent_town_progression_generate_icon_draft`

@@ -54,6 +54,11 @@ test('AC-63: OpenClaw Lite opens Progression Atlas and saves selected strategy t
   await expect(atlasFrame.getByTestId('progression-atlas-compare-delegate-outputs-first').getByText('Delegate Outputs First')).toBeVisible();
   await expect(atlasFrame.getByTestId('progression-atlas-compare-delegate-outputs-first').getByText('collectOutputs checkpoint')).toBeVisible();
   await expect(atlasFrame.getByTestId('progression-atlas-compare-delegate-outputs-first').getByText('collectOutputs, queueProduction')).toBeVisible();
+  await expect(atlasFrame.getByTestId('progression-atlas-compare-hq10-horizon').getByText('HQ10 Horizon')).toBeVisible();
+  await expect(atlasFrame.getByTestId('progression-atlas-compare-hq10-horizon').getByText('World Grid Civilization')).toBeVisible();
+  await expect(atlasFrame.getByTestId('progression-atlas-hq10-horizon')).toBeVisible();
+  await expect(atlasFrame.getByTestId('progression-atlas-horizon-hq6').getByText('HQ6: Expedition Board')).toBeVisible();
+  await expect(atlasFrame.getByTestId('progression-atlas-horizon-hq10').getByText('HQ10: World Grid Civilization')).toBeVisible();
   await expect(atlasFrame.getByTestId('progression-atlas-tree')).toBeVisible();
   const farmTreeNode = atlasFrame.getByTestId('progression-atlas-tree-node-building_farm_plot_place');
   await expect(farmTreeNode.getByLabel('Food chain')).toBeVisible();
@@ -69,6 +74,11 @@ test('AC-63: OpenClaw Lite opens Progression Atlas and saves selected strategy t
   });
   expect(beforeAtlas?.ok).toBe(true);
   expect(beforeAtlas?.gameplayStableHash).toMatch(/^[a-f0-9]{64}$/);
+
+  await atlasFrame.getByTestId('progression-atlas-draft-hq10-horizon').click();
+  await expect(atlasFrame.getByTestId('progression-atlas-recommended-strategy').getByRole('heading', { name: 'HQ10 Horizon' })).toBeVisible();
+  await expect(atlasFrame.getByTestId('progression-atlas-tree-node-future_hq_10_world_grid_civilization')).toBeVisible();
+  await expect(atlasFrame.getByTestId('progression-atlas-step-future_hq_10_world_grid_civilization').getByRole('heading', { name: 'HQ10: World Grid Civilization' })).toBeVisible();
 
   await atlasFrame.getByTestId('progression-atlas-draft-delegate-outputs-first').click();
   await expect(atlasFrame.getByTestId('progression-atlas-recommended-strategy').getByRole('heading', { name: 'Delegate Outputs First' })).toBeVisible();
@@ -116,6 +126,8 @@ test('AC-64: OpenClaw Lite saves private Progression Atlas editor steps without 
   expect(beforeEnvelope?.ok).toBe(true);
   const beforeAtlas = beforeEnvelope?.data?.atlas;
   expect(beforeAtlas?.ok).toBe(true);
+  expect(beforeAtlas?.atlas?.futureHorizon?.targetHqLevel).toBe(10);
+  expect(beforeAtlas?.atlas?.strategyOptions?.find((strategy) => strategy.strategyKey === 'hq10-horizon')?.compare?.futureMilestones?.length).toBe(5);
   const beforeGameplayHash = beforeAtlas.gameplayStableHash;
   const beforeEventCount = beforeAtlas.gameplaySnapshot.audit.eventCount;
   const beforeInventory = beforeAtlas.gameplaySnapshot.plot.inventory;

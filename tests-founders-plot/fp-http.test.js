@@ -423,16 +423,17 @@ test('FP-HT-009 progression atlas exposes Rush HQ3 graph without gameplay mutati
     assert.equal(out.body.atlas.graphVersion, 'founders-plot-progression-atlas-v1');
     assert.deepEqual(
       out.body.atlas.strategyTemplates.map((template) => template.strategyKey).sort(),
-      ['balanced-food-wood', 'delegate-outputs-first', 'rush-hq3']
+      ['balanced-food-wood', 'delegate-outputs-first', 'hq10-horizon', 'rush-hq3']
     );
     assert.deepEqual(
       out.body.atlas.strategyOptions.map((strategy) => strategy.strategyKey).sort(),
-      ['balanced-food-wood', 'delegate-outputs-first', 'rush-hq3']
+      ['balanced-food-wood', 'delegate-outputs-first', 'hq10-horizon', 'rush-hq3']
     );
     assert.equal(out.body.atlas.recommendedStrategy.strategyKey, 'rush-hq3');
     assert.equal(out.body.atlas.recommendedStrategy.baseGameplayStableHash, out.body.gameplayStableHash);
     const balanced = out.body.atlas.strategyOptions.find((strategy) => strategy.strategyKey === 'balanced-food-wood');
     const delegate = out.body.atlas.strategyOptions.find((strategy) => strategy.strategyKey === 'delegate-outputs-first');
+    const hq10 = out.body.atlas.strategyOptions.find((strategy) => strategy.strategyKey === 'hq10-horizon');
     assert.equal(balanced.compare.goal, balanced.goal);
     assert.equal(balanced.compare.stepCount, balanced.steps.length);
     assert.ok(balanced.compare.focus.includes('Wood and food base'));
@@ -442,6 +443,15 @@ test('FP-HT-009 progression atlas exposes Rush HQ3 graph without gameplay mutati
     assert.deepEqual(delegate.compare.permissions, ['collectOutputs', 'queueProduction']);
     assert.match(delegate.compare.tradeoff, /delegation boundaries/);
     assert.deepEqual(delegate.compare.burden.delegationMilestones, ['collectOutputs', 'queueProduction']);
+    assert.equal(hq10.title, 'HQ10 Horizon');
+    assert.equal(hq10.gameplayMutationPolicy, 'advisory_only');
+    assert.equal(hq10.compare.futureMilestones.length, 5);
+    assert.equal(hq10.compare.burden.futureMilestones, 5);
+    const hq10Future = hq10.steps.filter((step) => step.stepKind === 'future_placeholder');
+    assert.equal(hq10Future.length, 5);
+    assert.deepEqual(hq10Future.map((step) => step.target.level), [6, 7, 8, 9, 10]);
+    assert.ok(hq10Future.every((step) => step.actionRef === null));
+    assert.ok(hq10Future.every((step) => step.requirements.advisory === true));
     const nodeIds = out.body.atlas.nodes.map((node) => node.nodeId);
     for (const requiredNode of ['building.lumber_camp.place', 'building.farm_plot.place', 'building.quarry.place', 'hq.level.3']) {
       assert.ok(nodeIds.includes(requiredNode), `atlas includes ${requiredNode}`);
@@ -467,6 +477,7 @@ test('FP-HT-009 progression atlas exposes Rush HQ3 graph without gameplay mutati
     assert.ok(out.body.atlas.actionRefsByNode && typeof out.body.atlas.actionRefsByNode === 'object');
     assert.ok(out.body.atlas.receiptRefs && typeof out.body.atlas.receiptRefs === 'object');
     const canonical = new Map(out.body.atlas.canonicalNodes.map((node) => [node.nodeId, node]));
+    assert.equal(canonical.has('hq.level.10'), false);
     for (const requiredNode of [
       'hq.level.1',
       'hq.level.5',
@@ -512,6 +523,13 @@ test('FP-HT-009 progression atlas exposes Rush HQ3 graph without gameplay mutati
     assert.ok(out.body.atlas.canonicalEdges.find((edge) => edge.kind === 'unlocks_building' && edge.to === 'building.WORKSHOP.unlock'));
     assert.equal(out.body.atlas.openClawLiteSurface.generateIconDraft, 'agent_town_progression_generate_icon_draft');
     assert.equal(out.body.atlas.openClawLiteSurface.saveEditedStrategy, 'agent_town_progression_save_edited_strategy');
+    assert.equal(out.body.atlas.futureHorizon.targetHqLevel, 10);
+    assert.equal(out.body.atlas.futureHorizon.currentImplementedHqCap, 5);
+    assert.equal(out.body.atlas.futureHorizon.gameplayMutationPolicy, 'advisory_only');
+    assert.equal(out.body.atlas.futureHorizon.milestones.length, 5);
+    assert.deepEqual(out.body.atlas.futureHorizon.milestones.map((node) => node.hqLevel), [6, 7, 8, 9, 10]);
+    assert.ok(out.body.atlas.futureHorizon.milestones.every((node) => node.gameplayTruth === 'future_placeholder'));
+    assert.match(out.body.atlas.futureHorizon.milestones.find((node) => node.hqLevel === 10).summary, /civic\/world-grid/);
 
     const repeat = await request(server, 'GET', '/api/founders-plot/progression-atlas');
     assert.equal(repeat.status, 200);
@@ -593,7 +611,7 @@ test('FP-HT-011 progression atlas drafts, saves, selects, and explains private s
     const beforeInventory = before.body.gameplaySnapshot.plot.inventory;
     const beforeEvents = before.body.gameplaySnapshot.audit.eventCount;
 
-    const keys = ['rush-hq3', 'balanced-food-wood', 'delegate-outputs-first'];
+    const keys = ['rush-hq3', 'balanced-food-wood', 'delegate-outputs-first', 'hq10-horizon'];
     const drafted = {};
     for (const key of keys) {
       const first = await request(server, 'POST', '/api/founders-plot/progression-atlas/strategies/draft', { strategyKey: key });
@@ -616,6 +634,8 @@ test('FP-HT-011 progression atlas drafts, saves, selects, and explains private s
     assert.notEqual(drafted['rush-hq3'].strategyId, drafted['balanced-food-wood'].strategyId);
     assert.notEqual(drafted['rush-hq3'].strategyId, drafted['delegate-outputs-first'].strategyId);
     assert.ok(drafted['delegate-outputs-first'].steps.find((step) => step.stepId === 'foreman.collect_outputs'));
+    assert.equal(drafted['hq10-horizon'].steps.filter((step) => step.stepKind === 'future_placeholder').length, 5);
+    assert.ok(drafted['hq10-horizon'].compare.futureMilestones.find((node) => node.level === 10));
 
     for (const key of keys) {
       const save = await request(server, 'POST', '/api/founders-plot/progression-atlas/strategies', {
@@ -631,7 +651,7 @@ test('FP-HT-011 progression atlas drafts, saves, selects, and explains private s
     const atlas = await request(server, 'GET', '/api/founders-plot/progression-atlas');
     assert.equal(atlas.status, 200);
     assert.equal(atlas.body.gameplayStableHash, beforeGameplayHash);
-    assert.equal(atlas.body.atlas.strategies.length, 3);
+    assert.equal(atlas.body.atlas.strategies.length, keys.length);
     assert.deepEqual(
       atlas.body.atlas.strategies.map((strategy) => strategy.strategyKey).sort(),
       keys.slice().sort()

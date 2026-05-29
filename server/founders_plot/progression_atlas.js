@@ -14,7 +14,18 @@ const {
 const ATLAS_VERSION = 'founders-plot-progression-atlas-v1';
 const DEFAULT_STRATEGY_KEY = 'rush-hq3';
 const STEP_KINDS = Object.freeze(['canonical_node', 'custom_note', 'future_placeholder']);
-const FUTURE_SYSTEMS = Object.freeze(['expedition', 'research', 'territory', 'unit', 'oracle']);
+const FUTURE_SYSTEMS = Object.freeze([
+  'expedition',
+  'research',
+  'territory',
+  'unit',
+  'oracle',
+  'settlement',
+  'work_order',
+  'civic',
+  'world_grid',
+  'generated_universe'
+]);
 const RISK_LEVELS = Object.freeze(['low', 'medium', 'high', 'unknown']);
 const REVERSIBILITY_LEVELS = Object.freeze(['safe', 'layout_sensitive', 'irreversible', 'unknown']);
 const PRIVACY_LEVELS = Object.freeze(['private', 'share_redacted', 'public_template_allowed']);
@@ -47,9 +58,90 @@ const STRATEGY_TEMPLATES = Object.freeze({
     focus: ['Foreman readiness', 'collectOutputs checkpoint', 'queueProduction policy gate'],
     tradeoff: 'Best for teaching delegation boundaries, but it asks the player to pause at HQ2 before pushing to HQ3.',
     approvalDelegationBurden: 'High: this plan asks the player to inspect output collection at HQ2 before approving deeper queueProduction delegation at HQ3.'
+  }),
+  'hq10-horizon': Object.freeze({
+    strategyKey: 'hq10-horizon',
+    title: 'HQ10 Horizon',
+    goal: 'Extend the current settlement into expeditions, second plots, research, agent cohorts, and world-grid civilization.',
+    summary: 'Uses current HQ1-HQ5 truth as the launchpad, then marks HQ6-HQ10 as advisory future milestones.',
+    focus: ['Expansion', 'Research', 'Multi-plot strategy', 'Agent cohorts'],
+    tradeoff: 'Most of the path past HQ5 is future design, so it must stay advisory until each gameplay model exists.',
+    approvalDelegationBurden: 'High later: expeditions, claims, cohorts, and civic actions will all need explicit receipts and approval boundaries.'
   })
 });
 const STRATEGY_TEMPLATE_KEYS = Object.freeze(Object.keys(STRATEGY_TEMPLATES));
+const HQ10_HORIZON_MILESTONES = Object.freeze([
+  Object.freeze({
+    id: 'expedition_board',
+    level: 6,
+    system: 'expedition',
+    title: 'HQ6: Expedition Board',
+    summary: 'Turn the first settlement into a launch point for scouting nearby sites.',
+    possibilities: [
+      'Scout units leave Founders Plot and return site reports.',
+      'Atlas plans can compare nearby resource profiles before the player commits.',
+      'Rook can surface scouting approvals and expedition receipts.'
+    ],
+    nextImplementableSlice: 'Add an Expedition Board building, read-only site records, and a scout report receipt model.',
+    riskLevel: 'medium'
+  }),
+  Object.freeze({
+    id: 'second_settlement',
+    level: 7,
+    system: 'territory',
+    title: 'HQ7: Settler Convoy',
+    summary: 'Let the player claim or found a second plot from a scouted site.',
+    possibilities: [
+      'Settlers can reserve a second plot with explicit approval.',
+      'Plots can specialize by local resources and distance from the first town.',
+      'Atlas strategies can plan routes, dependencies, and expansion timing.'
+    ],
+    nextImplementableSlice: 'Add claimable site state, a settler or convoy job, and a second-plot creation approval gate.',
+    riskLevel: 'high'
+  }),
+  Object.freeze({
+    id: 'research_doctrines',
+    level: 8,
+    system: 'research',
+    title: 'HQ8: Research Lodge',
+    summary: 'Introduce doctrines and tech choices that make towns diverge strategically.',
+    possibilities: [
+      'Players pick research lanes instead of only climbing linear HQ levels.',
+      'Workshop buffs can evolve into named doctrines with tradeoffs.',
+      'Atlas can compare food-first, quarry-first, logistics, and automation strategies.'
+    ],
+    nextImplementableSlice: 'Add a small research/doctrine table and one reversible doctrine that changes planning recommendations only.',
+    riskLevel: 'medium'
+  }),
+  Object.freeze({
+    id: 'agent_cohorts',
+    level: 9,
+    system: 'work_order',
+    title: 'HQ9: Agent Cohorts',
+    summary: 'Group Foremen, inhabitants, and future citizen agents into bounded work orders.',
+    possibilities: [
+      'Players can assign scoped cohorts to collect, build, scout, or research plans.',
+      'Every delegated action keeps receipts, caps, idempotency, and human approval gates.',
+      'Clover or an Atlas Oracle can explain why a cohort is blocked or safe to run.'
+    ],
+    nextImplementableSlice: 'Add private cohort/work-order schemas that reference existing et.plot.* tools without broadening authority.',
+    riskLevel: 'high'
+  }),
+  Object.freeze({
+    id: 'world_grid_civilization',
+    level: 10,
+    system: 'world_grid',
+    title: 'HQ10: World Grid Civilization',
+    summary: 'Connect multiple settlements into a civic/world-grid layer while keeping generated visuals separate from truth.',
+    possibilities: [
+      'World Grid routes, public works, and civic projects can span player-owned plots.',
+      'Generated Universe packs can reskin the Atlas view without changing gameplay rules.',
+      'Long-term Oracle memory can connect goals, decisions, strategy revisions, and receipts.'
+    ],
+    nextImplementableSlice: 'Define public-safe world-grid projection contracts before allowing any civic mutation tools.',
+    riskLevel: 'high'
+  })
+]);
 const RESOURCE_STORAGE_KEYS = Object.freeze(['wood', 'stone', 'food']);
 const PRIORITY_OPTIONS = Object.freeze(['WOOD', 'STONE', 'FOOD', 'BALANCED']);
 const REWARD_CATALOG = Object.freeze([
@@ -910,6 +1002,134 @@ function buildDelegateOutputsFirstSteps(state) {
       reason: 'HQ Level 3 should follow a deliberate delegation checkpoint.'
     }),
     makeQueueProductionPermissionStep(state, 'Review collectOutputs, then finish the HQ3 plan')
+  ];
+}
+
+function implementedHqCap() {
+  const levels = Object.keys(engine.HQ_LEVEL_RULES || {}).map((level) => Number(level) || 1);
+  return levels.length ? Math.max(...levels) : 1;
+}
+
+function canonicalStepFromNode(node, reason = null) {
+  if (!node) return null;
+  return {
+    stepId: node.nodeId,
+    nodeId: node.nodeId,
+    title: node.title,
+    status: node.status,
+    reason: cleanText(reason || node.metadata?.body || node.title, node.title, 360),
+    icon: node.icon,
+    target: node.target,
+    requirements: clone(node.requirements || { items: [], affordable: true, missing: {} }),
+    blocker: node.blocker || node.availability?.blocker || null,
+    nextAction: node.nextAction || node.availability?.nextAction || null,
+    actionRef: node.actionRef || null,
+    expectedBenefit: Array.isArray(node.effects) ? node.effects : []
+  };
+}
+
+function futureHqNodeId(milestone) {
+  return `future.hq.${milestone.level}.${milestone.id}`;
+}
+
+function makeFutureHqMilestoneStep(state, milestone) {
+  const currentHq = Math.max(1, Math.floor(Number(state?.plot?.hqLevel || 1)));
+  const cap = implementedHqCap();
+  const nodeId = futureHqNodeId(milestone);
+  const previousLevel = Number(milestone.level || 0) - 1;
+  const previousNodeId = previousLevel <= cap
+    ? `hq.level.${previousLevel}`
+    : futureHqNodeId(HQ10_HORIZON_MILESTONES.find((item) => item.level === previousLevel) || { level: previousLevel, id: 'previous' });
+  const requirementItems = [
+    {
+      kind: 'hq',
+      resource: 'HQ',
+      have: Math.min(currentHq, cap),
+      required: Number(milestone.level || 0),
+      missing: Math.max(0, Number(milestone.level || 0) - Math.min(currentHq, cap))
+    },
+    {
+      kind: 'future_system',
+      resource: milestone.system,
+      have: 0,
+      required: 1,
+      missing: 1
+    },
+    {
+      kind: 'canonical_model',
+      resource: milestone.id,
+      have: 0,
+      required: 1,
+      missing: 1
+    }
+  ];
+  return {
+    stepId: nodeId,
+    nodeId,
+    stepKind: 'future_placeholder',
+    canonicalNodeId: null,
+    futureSystem: milestone.system,
+    title: milestone.title,
+    status: 'locked',
+    reason: milestone.summary,
+    icon: hqIcon(milestone.level),
+    target: {
+      kind: 'future_hq_level',
+      level: milestone.level,
+      system: milestone.system,
+      source: 'progression_atlas_hq10_horizon_v1'
+    },
+    targetRef: {
+      type: 'future_hq_level',
+      id: nodeId,
+      system: milestone.system,
+      level: milestone.level
+    },
+    requirements: {
+      items: requirementItems,
+      affordable: false,
+      missing: {
+        [`hq.level.${milestone.level}`]: Math.max(1, Number(milestone.level || 0) - Math.min(currentHq, cap)),
+        [`future.${milestone.system}`]: 1
+      }
+    },
+    blocker: `Future gameplay model not implemented yet; canonical Founders Plot currently stops at HQ${cap}.`,
+    nextAction: milestone.nextImplementableSlice,
+    expectedBenefit: [...milestone.possibilities],
+    assumptions: [
+      `HQ${milestone.level} is a planning milestone, not current engine truth.`,
+      `Promote this only after ${milestone.system} has server-owned state, receipts, and approval boundaries.`,
+      `Keep Generated Universe visuals presentation-only unless a later canonical model says otherwise.`
+    ],
+    riskLevel: milestone.riskLevel,
+    reversibility: 'unknown',
+    privacy: 'private',
+    previousNodeId,
+    actionRef: null
+  };
+}
+
+function buildHq10HorizonSteps(state) {
+  const graph = buildCanonicalAtlasGraph(state);
+  const canonicalByNode = new Map(graph.canonicalNodes.map((node) => [node.nodeId, node]));
+  const currentGamePath = [
+    'hq.upgrade.4',
+    'permission.setPriority.unlock',
+    'building.WORKSHOP.place',
+    'production.WORKSHOP.PRODUCE',
+    'effect.workshop.next_build_buff',
+    'hq.upgrade.5',
+    'building.MARKET_STALL.place',
+    'production.MARKET_STALL.SELL',
+    'permission.sellSurplusFood.unlock'
+  ]
+    .map((nodeId) => canonicalStepFromNode(canonicalByNode.get(nodeId), `Bridge current Founders Plot truth through ${nodeId}.`))
+    .filter(Boolean);
+  const futureMilestones = HQ10_HORIZON_MILESTONES.map((milestone) => makeFutureHqMilestoneStep(state, milestone));
+  return [
+    ...buildDelegateOutputsFirstSteps(state),
+    ...currentGamePath,
+    ...futureMilestones
   ];
 }
 
@@ -1808,6 +2028,66 @@ function buildCanonicalAtlasGraph(state) {
   };
 }
 
+function buildHq10Horizon(state) {
+  const currentHqLevel = Math.max(1, Math.floor(Number(state?.plot?.hqLevel || 1)));
+  const cap = implementedHqCap();
+  const milestones = HQ10_HORIZON_MILESTONES.map((milestone) => {
+    const nodeId = futureHqNodeId(milestone);
+    const previousLevel = Number(milestone.level || 0) - 1;
+    const previousMilestone = HQ10_HORIZON_MILESTONES.find((item) => item.level === previousLevel);
+    return {
+      nodeId,
+      hqLevel: milestone.level,
+      title: milestone.title,
+      system: milestone.system,
+      status: 'locked',
+      gameplayTruth: 'future_placeholder',
+      currentImplementedHqCap: cap,
+      summary: milestone.summary,
+      possibilities: [...milestone.possibilities],
+      blocker: `Canonical gameplay currently stops at HQ${cap}.`,
+      nextImplementableSlice: milestone.nextImplementableSlice,
+      riskLevel: milestone.riskLevel,
+      icon: hqIcon(milestone.level),
+      previousNodeId: previousMilestone ? futureHqNodeId(previousMilestone) : `hq.level.${cap}`
+    };
+  });
+  return {
+    version: 'progression_atlas_hq10_horizon_v1',
+    targetHqLevel: 10,
+    currentHqLevel,
+    currentImplementedHqCap: cap,
+    gameplayTruthBoundary: `HQ1-HQ${cap} are current Founders Plot engine truth; HQ6-HQ10 are advisory horizon nodes.`,
+    gameplayMutationPolicy: 'advisory_only',
+    recommendedTemplateKey: 'hq10-horizon',
+    currentBridge: {
+      nodeId: `hq.level.${cap}`,
+      title: `Current playable cap: HQ${cap}`,
+      status: currentHqLevel >= cap ? 'done' : 'locked',
+      gameplayTruth: 'implemented',
+      nextAction: currentHqLevel >= cap ? 'Plan the HQ6 expedition model' : `Reach HQ${cap} through current gameplay first`
+    },
+    milestones,
+    edges: milestones.map((milestone, index) => ({
+      from: index === 0 ? `hq.level.${cap}` : milestones[index - 1].nodeId,
+      to: milestone.nodeId,
+      kind: 'future_horizon_sequence'
+    })),
+    possibleUntilHq10: milestones.map((milestone) => ({
+      hqLevel: milestone.hqLevel,
+      title: milestone.title,
+      system: milestone.system,
+      possibilities: milestone.possibilities,
+      nextImplementableSlice: milestone.nextImplementableSlice
+    })),
+    guardrails: [
+      'Do not add HQ6-HQ10 as real upgrade rules until the engine owns their state.',
+      'Do not let generated visuals redefine costs, unlocks, resources, permissions, or receipts.',
+      'Keep Atlas plans advisory until a human promotes a future milestone into canonical gameplay work.'
+    ]
+  };
+}
+
 function summarizeAtlas(state, steps) {
   const firstOpen = steps.find((step) => step.status !== 'done') || steps[steps.length - 1] || null;
   return {
@@ -1828,6 +2108,8 @@ function stepsForStrategyKey(state, strategyKey) {
       return buildBalancedFoodWoodSteps(state);
     case 'delegate-outputs-first':
       return buildDelegateOutputsFirstSteps(state);
+    case 'hq10-horizon':
+      return buildHq10HorizonSteps(state);
     case 'rush-hq3':
     default:
       return buildRushHq3Steps(state);
@@ -1866,6 +2148,14 @@ function compareForStrategy(template, steps) {
   const permissionCheckpoints = steps
     .filter((step) => step.target?.kind === 'permission')
     .map((step) => step.target.key);
+  const futureMilestones = steps
+    .filter((step) => step.stepKind === 'future_placeholder' || step.target?.kind === 'future_hq_level')
+    .map((step) => ({
+      stepId: step.stepId,
+      title: step.title,
+      level: step.target?.level || null,
+      system: step.futureSystem || step.target?.system || null
+    }));
   return {
     goal: template.goal,
     stepCount: steps.length,
@@ -1873,11 +2163,13 @@ function compareForStrategy(template, steps) {
     roughBlockers: blockers.length ? blockers : ['No current blocker from the read model.'],
     resourceShortfalls: aggregateMissingRequirements(steps),
     permissions: permissionCheckpoints,
+    futureMilestones,
     tradeoff: template.tradeoff,
     approvalDelegationBurden: template.approvalDelegationBurden,
     burden: {
       playerActionRefs: approvalActions,
-      delegationMilestones: permissionCheckpoints
+      delegationMilestones: permissionCheckpoints,
+      futureMilestones: futureMilestones.length
     }
   };
 }
@@ -1915,7 +2207,11 @@ function strategyContentHash(strategy) {
 function buildProgressionStrategy(state, stateHash, strategyKey = DEFAULT_STRATEGY_KEY, { title = null } = {}) {
   const template = strategyTemplateForKey(strategyKey) || STRATEGY_TEMPLATES[DEFAULT_STRATEGY_KEY];
   const steps = stepsForStrategyKey(state, template.strategyKey)
-    .map((step) => addStepContract(step, { stepKind: 'canonical_node', canonicalNodeId: step.stepId }));
+    .map((step) => addStepContract(step, {
+      stepKind: step.stepKind || 'canonical_node',
+      canonicalNodeId: step.stepKind === 'future_placeholder' ? null : (step.canonicalNodeId || step.stepId),
+      futureSystem: step.futureSystem || null
+    }));
   const graph = buildGraph(state, steps);
   const strategyId = `strategy_${hashId([state?.plot?.plotId, template.strategyKey])}`;
   const gameplayStableHash = gameplayStableHashForState(state);
@@ -2067,7 +2363,11 @@ function buildCanonicalStepIndex(state) {
   for (const key of STRATEGY_TEMPLATE_KEYS) {
     for (const step of stepsForStrategyKey(state, key)) {
       if (!step?.stepId || index.has(step.stepId)) continue;
-      index.set(step.stepId, addStepContract(step, { stepKind: 'canonical_node', canonicalNodeId: step.stepId }));
+      index.set(step.stepId, addStepContract(step, {
+        stepKind: step.stepKind || 'canonical_node',
+        canonicalNodeId: step.stepKind === 'future_placeholder' ? null : (step.canonicalNodeId || step.stepId),
+        futureSystem: step.futureSystem || null
+      }));
     }
   }
   const canonicalGraph = buildCanonicalAtlasGraph(state);
@@ -2332,6 +2632,7 @@ function buildAtlasEnvelope({ stateEnvelope, nowMs }) {
   const selectedStrategy = strategies.find((strategy) => strategy.selected) || null;
   const summary = summarizeAtlas(state, draft.steps);
   const canonicalGraph = buildCanonicalAtlasGraph(state);
+  const futureHorizon = buildHq10Horizon(state);
   return successEnvelope({
     plotId: state.plot.plotId,
     stateHash,
@@ -2348,6 +2649,7 @@ function buildAtlasEnvelope({ stateEnvelope, nowMs }) {
       availabilityByNode: canonicalGraph.availabilityByNode,
       actionRefsByNode: canonicalGraph.actionRefsByNode,
       receiptRefs: canonicalGraph.receiptRefs,
+      futureHorizon,
       nodes: draft.graph.nodes,
       edges: draft.graph.edges,
       strategyTemplates: listStrategyTemplates(),

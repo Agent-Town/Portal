@@ -2957,8 +2957,8 @@ const LITE_TOOL_SPECS = [
   {
     name: "agent_town_progression_draft_strategy",
     label: "Agent Town Progression Draft Strategy",
-    description: "Drafts a private strategy option from the current Progression Atlas state. V1 supports rush-hq3.",
-    sampleArgs: { strategyKey: "rush-hq3" },
+    description: "Drafts a private strategy option from the current Progression Atlas state, including HQ3 openings and the advisory HQ10 horizon.",
+    sampleArgs: { strategyKey: "hq10-horizon" },
   },
   {
     name: "agent_town_progression_save_strategy",
