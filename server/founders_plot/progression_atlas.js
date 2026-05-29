@@ -4,6 +4,7 @@ const crypto = require('crypto');
 
 const engine = require('./engine');
 const store = require('./store');
+const { FOUNDERS_PLOT_TOOL_SPECS } = require('./tools');
 const {
   RESOURCE_KEYS,
   getAgentTownIcon,
@@ -49,6 +50,55 @@ const STRATEGY_TEMPLATES = Object.freeze({
   })
 });
 const STRATEGY_TEMPLATE_KEYS = Object.freeze(Object.keys(STRATEGY_TEMPLATES));
+const RESOURCE_STORAGE_KEYS = Object.freeze(['wood', 'stone', 'food']);
+const PRIORITY_OPTIONS = Object.freeze(['WOOD', 'STONE', 'FOOD', 'BALANCED']);
+const REWARD_CATALOG = Object.freeze([
+  {
+    rewardId: 'quest.first-lumber',
+    title: 'Supply crate',
+    body: 'The first lumber haul kept the camp alive.',
+    grant: { coin: 5 },
+    requiredCollectedBuildingType: 'LUMBER_CAMP'
+  },
+  {
+    rewardId: 'hq.level-2',
+    title: 'Field notes',
+    body: 'HQ Level 2 opens the food lane.',
+    grant: { coin: 6 },
+    requiredHqLevel: 2
+  },
+  {
+    rewardId: 'hq.level-3',
+    title: 'Quarry kit',
+    body: 'A small reserve to help the new quarry boot.',
+    grant: { wood: 8, stone: 4 },
+    requiredHqLevel: 3
+  },
+  {
+    rewardId: 'hq.level-4',
+    title: 'Workshop charter',
+    body: 'Your builders can now compress future timelines.',
+    grant: { coin: 8 },
+    requiredHqLevel: 4
+  },
+  {
+    rewardId: 'hq.level-5',
+    title: 'Founder stipend',
+    body: 'Your overnight planner is now part of the town rhythm.',
+    grant: { coin: 12, town_xp: 10 },
+    requiredHqLevel: 5
+  }
+]);
+const TOOL_HTTP = Object.freeze({
+  'et.plot.get_state': { method: 'GET', path: '/api/founders-plot/state' },
+  'et.plot.place_building': { method: 'POST', path: '/api/founders-plot/place-building' },
+  'et.plot.queue_job': { method: 'POST', path: '/api/founders-plot/queue-job' },
+  'et.plot.collect_outputs': { method: 'POST', path: '/api/founders-plot/collect-outputs' },
+  'et.plot.upgrade_building': { method: 'POST', path: '/api/founders-plot/upgrade-building' },
+  'et.plot.set_priority': { method: 'POST', path: '/api/founders-plot/set-priority' },
+  'et.plot.claim_reward': { method: 'POST', path: '/api/founders-plot/claim-reward' },
+  'et.plot.request_user_approval': { method: 'POST', path: '/api/founders-plot/request-approval' }
+});
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -338,6 +388,9 @@ function buildGameplaySnapshot(state) {
       inventory: normalizeInventory(state?.plot?.inventory),
       storageCaps: normalizeInventory(state?.plot?.storageCaps),
       constructionSlots: Number(state?.plot?.constructionSlots || 0),
+      nextBuildBuffPct: Number(state?.plot?.nextBuildBuffPct || 0),
+      dailySoldCoin: Number(state?.plot?.dailySoldCoin || 0),
+      dailySellDay: String(state?.plot?.dailySellDay || ''),
       collectedBuildingTypes: sortedStrings(state?.plot?.collectedBuildingTypes),
       seenBuildingTypes: sortedStrings(state?.plot?.seenBuildingTypes),
       claimedRewards: sortedStrings(state?.plot?.claimedRewards),
@@ -883,6 +936,878 @@ function buildGraph(state, steps) {
   return { nodes, edges };
 }
 
+function toolSpecFor(toolName) {
+  return FOUNDERS_PLOT_TOOL_SPECS.find((spec) => spec.name === toolName) || null;
+}
+
+function actionRefFor(toolName, paramsTemplate = {}, extra = {}) {
+  const spec = toolSpecFor(toolName);
+  const required = Array.isArray(spec?.argsSchema?.required) ? [...spec.argsSchema.required] : [];
+  return {
+    tool: toolName,
+    http: TOOL_HTTP[toolName] || null,
+    paramsTemplate: stableValue(paramsTemplate || {}),
+    required,
+    requiresIdempotencyKey: required.includes('idempotencyKey'),
+    actorSupport: ['HUMAN', 'AGENT'],
+    authority: 'et.plot.*',
+    executable: false,
+    executableByAtlas: false,
+    toolSpec: spec ? {
+      name: spec.name,
+      description: spec.description,
+      argsSchema: stableValue(spec.argsSchema || {}),
+      resultSchema: stableValue(spec.resultSchema || {})
+    } : null,
+    ...stableValue(extra || {})
+  };
+}
+
+function permissionLevelMap() {
+  const out = {};
+  for (const [level, rules] of Object.entries(engine.HQ_LEVEL_RULES || {})) {
+    for (const key of rules.permissionUnlocks || []) out[key] = Number(level);
+  }
+  return out;
+}
+
+function permissionRowsByKey(state) {
+  return Object.fromEntries((state?.permissions || []).map((row) => [row.key, row]));
+}
+
+function canonicalAvailability(node) {
+  const status = cleanText(node?.status, 'blocked', 40);
+  const blockedBy = Array.isArray(node?.availability?.blockedBy)
+    ? node.availability.blockedBy.filter(Boolean)
+    : [];
+  return {
+    status,
+    unlocked: status !== 'locked',
+    done: status === 'done',
+    available: status === 'available',
+    waiting: status === 'waiting',
+    blockedBy,
+    nextAction: node?.nextAction || node?.availability?.nextAction || null,
+    blocker: node?.blocker || node?.availability?.blocker || null,
+    ...stableValue(node?.availability || {})
+  };
+}
+
+function canonicalNode({
+  nodeId,
+  kind,
+  title,
+  status,
+  icon = null,
+  target = null,
+  requirements = null,
+  availability = {},
+  effects = [],
+  metadata = {},
+  blocker = null,
+  nextAction = null,
+  actionRef = null,
+  ui = {}
+}) {
+  const node = {
+    nodeId,
+    kind,
+    canonical: true,
+    title,
+    status,
+    icon,
+    target,
+    requirements: requirements || { items: [], affordable: true, missing: {} },
+    availability: {
+      ...availability,
+      status,
+      blocker: blocker || availability.blocker || null,
+      nextAction: nextAction || availability.nextAction || null
+    },
+    effects: Array.isArray(effects) ? effects : [],
+    metadata: stableValue(metadata || {}),
+    blocker: blocker || null,
+    nextAction: nextAction || null,
+    actionRef,
+    ui: stableValue(ui || {})
+  };
+  node.availability = canonicalAvailability(node);
+  return node;
+}
+
+function canonicalEdge(edgeId, from, to, kind, label = null, metadata = {}) {
+  return {
+    edgeId: edgeId || `${from}->${to}:${kind}`,
+    from,
+    to,
+    kind,
+    canonical: true,
+    label,
+    metadata: stableValue(metadata || {})
+  };
+}
+
+function missingRefs(requirements) {
+  return (requirements?.items || [])
+    .filter((item) => Number(item.missing || 0) > 0)
+    .map((item) => item.kind === 'hq'
+      ? `hq.level.${item.required}`
+      : item.kind === 'xp'
+        ? 'resource.xp'
+        : `constraint.storage.${String(item.resource || '').toLowerCase()}`);
+}
+
+function productionSpecFor(buildingType, level = 1) {
+  const def = engine.BUILDING_DEFS[buildingType];
+  return typeof def?.produces === 'function' ? def.produces(level) : null;
+}
+
+function buildCanonicalHqNodes(state) {
+  const nodes = [];
+  const edges = [];
+  const hqLevel = Math.max(1, Math.floor(Number(state?.plot?.hqLevel || 1)));
+  const hq = hqBuilding(state);
+  for (const [rawLevel, rules] of Object.entries(engine.HQ_LEVEL_RULES || {}).sort((a, b) => Number(a[0]) - Number(b[0]))) {
+    const level = Number(rawLevel);
+    const status = hqLevel >= level ? 'done' : level === hqLevel + 1 ? 'blocked' : 'locked';
+    nodes.push(canonicalNode({
+      nodeId: `hq.level.${level}`,
+      kind: 'hq_level',
+      title: `HQ Level ${level}`,
+      status,
+      icon: hqIcon(level),
+      target: { kind: 'hq', level, buildingId: hq?.buildingId || null },
+      requirements: requirementsFor(state, { hqLevelRequired: level }),
+      availability: {
+        hqLevel: hqLevel,
+        hqLevelRequired: level,
+        blockedBy: hqLevel >= level ? [] : [`hq.level.${Math.max(1, level - 1)}`]
+      },
+      effects: [
+        ...(rules.unlocks || []).map((type) => ({ kind: 'unlocks_building', buildingType: type })),
+        ...(rules.permissionUnlocks || []).map((key) => ({ kind: 'unlocks_permission', permissionKey: key })),
+        { kind: 'sets_storage_caps', storageCaps: clone(rules.storageCaps || {}) },
+        { kind: 'sets_construction_slots', constructionSlots: Number(rules.constructionSlots || 0) }
+      ],
+      nextAction: status === 'done' ? `HQ Level ${level} reached` : `Reach HQ Level ${level}`,
+      ui: { tier: `HQ${level}`, lane: 'HQ', sort: level * 100 }
+    }));
+  }
+  for (const [rawFromLevel, rule] of Object.entries(engine.HQ_UPGRADE_RULES || {}).sort((a, b) => Number(a[0]) - Number(b[0]))) {
+    const fromLevel = Number(rawFromLevel);
+    const targetLevel = Number(rule.nextLevel || fromLevel + 1);
+    const requirements = requirementsFor(state, {
+      cost: rule.cost || {},
+      xpRequired: rule.xpRequired || null,
+      hqLevelRequired: fromLevel
+    });
+    let status = 'locked';
+    let blocker = null;
+    let actionRef = null;
+    if (hqLevel >= targetLevel) {
+      status = 'done';
+    } else if (hqLevel < fromLevel) {
+      blocker = `Reach HQ Level ${fromLevel} first.`;
+    } else if (hq?.activeJob) {
+      status = 'waiting';
+      blocker = 'Headquarters is already upgrading.';
+    } else if (!requirements.affordable) {
+      status = 'blocked';
+      blocker = 'Collect the missing HQ upgrade requirements.';
+    } else {
+      status = 'available';
+      actionRef = actionRefFor('et.plot.upgrade_building', {
+        buildingId: hq?.buildingId || '$hqBuildingId',
+        actor: 'HUMAN',
+        idempotencyKey: '$idempotencyKey'
+      });
+    }
+    const nodeId = `hq.upgrade.${targetLevel}`;
+    nodes.push(canonicalNode({
+      nodeId,
+      kind: 'hq_upgrade',
+      title: `Upgrade HQ to Level ${targetLevel}`,
+      status,
+      icon: hqIcon(targetLevel),
+      target: { kind: 'hq_upgrade', fromLevel, targetLevel, buildingId: hq?.buildingId || null },
+      requirements,
+      availability: {
+        hqLevel,
+        hqLevelRequired: fromLevel,
+        affordable: requirements.affordable,
+        durationMs: Number(rule.durationMs || 0),
+        blockedBy: [
+          ...(hqLevel < fromLevel ? [`hq.level.${fromLevel}`] : []),
+          ...missingRefs(requirements)
+        ]
+      },
+      effects: [{ kind: 'unlocks_hq_level', level: targetLevel }],
+      metadata: { cost: normalizeCost(rule.cost || {}), xpRequired: Number(rule.xpRequired || 0), durationMs: Number(rule.durationMs || 0) },
+      blocker,
+      nextAction: status === 'done' ? `HQ Level ${targetLevel} reached` : `Upgrade HQ to Level ${targetLevel}`,
+      actionRef,
+      ui: { tier: `HQ${targetLevel}`, lane: 'HQ', sort: targetLevel * 100 + 10 }
+    }));
+    edges.push(canonicalEdge(`hq.level.${fromLevel}->${nodeId}`, `hq.level.${fromLevel}`, nodeId, 'requires_hq_level', `Requires HQ Level ${fromLevel}`));
+    edges.push(canonicalEdge(`${nodeId}->hq.level.${targetLevel}`, nodeId, `hq.level.${targetLevel}`, 'unlocks_hq_level', `Unlocks HQ Level ${targetLevel}`));
+  }
+  return { nodes, edges };
+}
+
+function buildCanonicalBuildingNodes(state) {
+  const nodes = [];
+  const edges = [];
+  const hqLevel = Math.max(1, Math.floor(Number(state?.plot?.hqLevel || 1)));
+  const openPads = openPadCount(state);
+  const sortedDefs = Object.entries(engine.BUILDING_DEFS || {})
+    .filter(([type, def]) => type !== 'HQ' && def?.construction)
+    .sort((a, b) => Number(a[1].unlockHqLevel || 1) - Number(b[1].unlockHqLevel || 1) || a[0].localeCompare(b[0]));
+  for (const [buildingType, def] of sortedDefs) {
+    const label = labelForType(buildingType);
+    const existing = findBuilding(state, buildingType);
+    const requiredHq = Number(def.unlockHqLevel || 1);
+    const unlocked = isBuildingUnlocked(state, buildingType) || hqLevel >= requiredHq;
+    const unlockNodeId = `building.${buildingType}.unlock`;
+    nodes.push(canonicalNode({
+      nodeId: unlockNodeId,
+      kind: 'building_unlock',
+      title: `Unlock ${label}`,
+      status: unlocked ? 'done' : 'locked',
+      icon: buildingIcon(buildingType),
+      target: { kind: 'building', type: buildingType },
+      requirements: requirementsFor(state, { hqLevelRequired: requiredHq }),
+      availability: {
+        hqLevelRequired: requiredHq,
+        unlocked,
+        blockedBy: unlocked ? [] : [`hq.level.${requiredHq}`]
+      },
+      effects: [{ kind: 'unlocks_action', action: `building.${buildingType}.place` }],
+      nextAction: unlocked ? `${label} unlocked` : `Reach HQ Level ${requiredHq}`,
+      ui: { tier: `HQ${requiredHq}`, lane: label, sort: requiredHq * 100 + 20 }
+    }));
+    edges.push(canonicalEdge(`hq.level.${requiredHq}->${unlockNodeId}`, `hq.level.${requiredHq}`, unlockNodeId, 'unlocks_building', `HQ${requiredHq} unlocks ${label}`));
+
+    const placeRequirements = requirementsFor(state, {
+      cost: def.construction?.cost || {},
+      hqLevelRequired: requiredHq
+    });
+    let placeStatus = 'locked';
+    let placeBlocker = null;
+    let placeActionRef = null;
+    if (existing) {
+      placeStatus = 'done';
+    } else if (!unlocked) {
+      placeBlocker = `Requires HQ Level ${requiredHq}.`;
+    } else if (openPads <= 0) {
+      placeStatus = 'blocked';
+      placeBlocker = 'No open build pads remain.';
+    } else if (!placeRequirements.affordable) {
+      placeStatus = 'blocked';
+      placeBlocker = 'Collect the missing construction resources.';
+    } else {
+      placeStatus = 'available';
+      placeActionRef = actionRefFor('et.plot.place_building', {
+        type: buildingType,
+        x: '$padX',
+        y: '$padY',
+        actor: 'HUMAN',
+        idempotencyKey: '$idempotencyKey'
+      }, {
+        note: 'Atlas does not choose a pad; gameplay placement still requires x/y.'
+      });
+    }
+    const placeNodeId = `building.${buildingType}.place`;
+    nodes.push(canonicalNode({
+      nodeId: placeNodeId,
+      kind: 'building_place',
+      title: `Build ${label}`,
+      status: placeStatus,
+      icon: buildingIcon(buildingType),
+      target: { kind: 'building', type: buildingType, buildingId: existing?.buildingId || null, level: existing?.level || 1 },
+      requirements: placeRequirements,
+      availability: {
+        hqLevelRequired: requiredHq,
+        unlocked,
+        placed: !!existing,
+        openPads,
+        affordable: placeRequirements.affordable,
+        durationMs: Number(def.construction?.durationMs || 0),
+        blockedBy: [
+          ...(unlocked ? [] : [`hq.level.${requiredHq}`]),
+          ...(openPads <= 0 && !existing ? ['constraint.build_pads'] : []),
+          ...missingRefs(placeRequirements)
+        ]
+      },
+      effects: [{ kind: 'unlocks_action', action: `production.${buildingType}.${productionSpecFor(buildingType)?.kind || 'PRODUCE'}` }],
+      metadata: { cost: normalizeCost(def.construction?.cost || {}), durationMs: Number(def.construction?.durationMs || 0) },
+      blocker: placeBlocker,
+      nextAction: existing ? `${label} is placed` : `Build ${label}`,
+      actionRef: placeActionRef,
+      ui: { tier: `HQ${requiredHq}`, lane: label, sort: requiredHq * 100 + 30 }
+    }));
+    edges.push(canonicalEdge(`${unlockNodeId}->${placeNodeId}`, unlockNodeId, placeNodeId, 'enables_action', `${label} can be placed once unlocked`));
+    edges.push(canonicalEdge(`constraint.construction_slots->${placeNodeId}`, 'constraint.construction_slots', placeNodeId, 'uses_construction_slot', 'Construction uses a slot'));
+
+    for (const [rawFromLevel, upgradeRule] of Object.entries(def.upgrade || {}).sort((a, b) => Number(a[0]) - Number(b[0]))) {
+      const fromLevel = Number(rawFromLevel);
+      const toLevel = Number(upgradeRule.toLevel || fromLevel + 1);
+      const upgradeRequirements = requirementsFor(state, {
+        cost: upgradeRule.cost || {},
+        hqLevelRequired: requiredHq
+      });
+      let status = 'locked';
+      let blocker = null;
+      let actionRef = null;
+      if (!existing) {
+        blocker = `Build ${label} first.`;
+      } else if (Number(existing.level || 1) >= toLevel) {
+        status = 'done';
+      } else if (Number(existing.level || 1) < fromLevel) {
+        blocker = `Upgrade ${label} to Level ${fromLevel} first.`;
+      } else if (existing.activeJob) {
+        status = 'waiting';
+        blocker = `${label} already has an active job.`;
+      } else if (!upgradeRequirements.affordable) {
+        status = 'blocked';
+        blocker = 'Collect the missing building upgrade resources.';
+      } else {
+        status = 'available';
+        actionRef = actionRefFor('et.plot.upgrade_building', {
+          buildingId: existing.buildingId,
+          actor: 'HUMAN',
+          idempotencyKey: '$idempotencyKey'
+        });
+      }
+      const nodeId = `building.${buildingType}.upgrade.${toLevel}`;
+      nodes.push(canonicalNode({
+        nodeId,
+        kind: 'building_upgrade',
+        title: `Upgrade ${label} to Level ${toLevel}`,
+        status,
+        icon: buildingIcon(buildingType),
+        target: { kind: 'building_upgrade', type: buildingType, buildingId: existing?.buildingId || null, fromLevel, toLevel },
+        requirements: upgradeRequirements,
+        availability: {
+          hqLevelRequired: requiredHq,
+          placed: !!existing,
+          currentLevel: Number(existing?.level || 0),
+          affordable: upgradeRequirements.affordable,
+          durationMs: Number(upgradeRule.durationMs || 0),
+          blockedBy: [
+            ...(existing ? [] : [placeNodeId]),
+            ...missingRefs(upgradeRequirements)
+          ]
+        },
+        effects: [{ kind: 'improves_building_output', buildingType, toLevel }],
+        metadata: { cost: normalizeCost(upgradeRule.cost || {}), durationMs: Number(upgradeRule.durationMs || 0) },
+        blocker,
+        nextAction: status === 'done' ? `${label} Level ${toLevel} reached` : `Upgrade ${label}`,
+        actionRef,
+        ui: { tier: `HQ${requiredHq}`, lane: label, sort: requiredHq * 100 + 40 + toLevel }
+      }));
+      edges.push(canonicalEdge(`${placeNodeId}->${nodeId}`, placeNodeId, nodeId, 'requires_building', `Requires ${label}`));
+      edges.push(canonicalEdge(`constraint.construction_slots->${nodeId}`, 'constraint.construction_slots', nodeId, 'uses_construction_slot', 'Upgrade uses a construction slot'));
+    }
+  }
+  return { nodes, edges };
+}
+
+function buildCanonicalProductionNodes(state) {
+  const nodes = [];
+  const edges = [];
+  const hqLevel = Math.max(1, Math.floor(Number(state?.plot?.hqLevel || 1)));
+  for (const [buildingType, def] of Object.entries(engine.BUILDING_DEFS || {}).filter(([type, row]) => type !== 'HQ' && typeof row?.produces === 'function')) {
+    const label = labelForType(buildingType);
+    const existing = findBuilding(state, buildingType);
+    const spec = productionSpecFor(buildingType, existing?.level || 1) || productionSpecFor(buildingType, 1);
+    if (!spec) continue;
+    const requiredHq = Number(def.unlockHqLevel || 1);
+    const locked = hqLevel < requiredHq || !existing;
+    const requirements = requirementsFor(state, { cost: spec.input || {}, hqLevelRequired: requiredHq });
+    let status = 'locked';
+    let blocker = null;
+    let actionRef = null;
+    if (locked) {
+      blocker = !existing ? `Build ${label} first.` : `Requires HQ Level ${requiredHq}.`;
+    } else if (existing.state === 'OUTPUT_READY' || existing.canCollect) {
+      status = 'waiting';
+      blocker = 'Collect the ready output before queueing another job.';
+    } else if (existing.activeJob) {
+      status = 'waiting';
+      blocker = `${label} has an active ${String(existing.activeJob.kind || 'job').toLowerCase()} job.`;
+    } else if (!requirements.affordable) {
+      status = 'blocked';
+      blocker = 'Collect the missing job inputs.';
+    } else {
+      status = 'available';
+      actionRef = actionRefFor('et.plot.queue_job', {
+        buildingId: existing.buildingId,
+        kind: spec.kind,
+        actor: 'HUMAN',
+        idempotencyKey: '$idempotencyKey'
+      }, {
+        agentPolicy: spec.kind === 'SELL'
+          ? { permissionKey: 'sellSurplusFood', requiredHqLevel: 5, requiresPolicyEnabled: true, dailyCapField: 'sellDailyCoinCap' }
+          : { permissionKey: 'queueProduction', requiredHqLevel: 3, requiresPolicyEnabled: true }
+      });
+    }
+    const productionNodeId = `production.${buildingType}.${spec.kind}`;
+    const output = normalizeCost(spec.output || {});
+    const input = normalizeCost(spec.input || {});
+    const effects = Object.entries(output).map(([resource, amount]) => ({ kind: 'produces_resource', resource, amount }));
+    if (buildingType === 'WORKSHOP') effects.push({ kind: 'applies_buff_to_next_build', construction_buff_pct: Number(spec.buffPct || 0) });
+    nodes.push(canonicalNode({
+      nodeId: productionNodeId,
+      kind: spec.kind === 'SELL' ? 'production_sell' : buildingType === 'WORKSHOP' ? 'production_effect' : 'production_loop',
+      title: spec.kind === 'SELL' ? `Sell food at ${label}` : `Run ${label}`,
+      status,
+      icon: spec.kind === 'SELL' ? resourceIcon('coin') : buildingIcon(buildingType),
+      target: { kind: 'building_job', type: buildingType, buildingId: existing?.buildingId || null, jobKind: spec.kind },
+      requirements,
+      availability: {
+        hqLevelRequired: requiredHq,
+        placed: !!existing,
+        buildingState: existing?.state || null,
+        canQueue: !!existing?.canQueue,
+        affordable: requirements.affordable,
+        durationMs: Number(spec.durationMs || 0),
+        blockedBy: [
+          ...(existing ? [] : [`building.${buildingType}.place`]),
+          ...(hqLevel >= requiredHq ? [] : [`hq.level.${requiredHq}`]),
+          ...missingRefs(requirements)
+        ]
+      },
+      effects,
+      metadata: {
+        kind: spec.kind,
+        input,
+        output,
+        durationMs: Number(spec.durationMs || 0),
+        buffPct: spec.buffPct == null ? null : Number(spec.buffPct)
+      },
+      blocker,
+      nextAction: status === 'available' ? `Queue ${spec.kind.toLowerCase()} job` : (blocker || `Prepare ${label}`),
+      actionRef,
+      ui: { tier: `HQ${requiredHq}`, lane: label, sort: requiredHq * 100 + 60 }
+    }));
+    edges.push(canonicalEdge(`building.${buildingType}.place->${productionNodeId}`, `building.${buildingType}.place`, productionNodeId, 'requires_building', `Requires ${label}`));
+    for (const resource of Object.keys(input)) {
+      edges.push(canonicalEdge(`constraint.storage.${resource}->${productionNodeId}`, `constraint.storage.${resource}`, productionNodeId, 'consumes_resource', `Consumes ${resource}`));
+    }
+
+    let collectStatus = 'locked';
+    let collectBlocker = null;
+    let collectActionRef = null;
+    if (!existing) {
+      collectBlocker = `Build ${label} first.`;
+    } else if (existing.canCollect || existing.state === 'OUTPUT_READY') {
+      collectStatus = 'available';
+      collectActionRef = actionRefFor('et.plot.collect_outputs', {
+        buildingId: existing.buildingId,
+        actor: 'HUMAN',
+        idempotencyKey: '$idempotencyKey'
+      }, {
+        agentPolicy: { permissionKey: 'collectOutputs', requiredHqLevel: 2, requiresPolicyEnabled: true }
+      });
+    } else if (existing.activeJob) {
+      collectStatus = 'waiting';
+      collectBlocker = `${label} output is not ready yet.`;
+    } else {
+      collectStatus = 'blocked';
+      collectBlocker = 'Queue a job before collecting output.';
+    }
+    const buffer = normalizeInventory(existing?.outputBuffer || {});
+    const collectNodeId = `production.${buildingType}.collect`;
+    nodes.push(canonicalNode({
+      nodeId: collectNodeId,
+      kind: buildingType === 'WORKSHOP' ? 'effect_collect' : 'production_collect',
+      title: buildingType === 'WORKSHOP' ? 'Collect Workshop buff' : `Collect ${label} output`,
+      status: collectStatus,
+      icon: buildingType === 'WORKSHOP' ? permissionIcon('setPriority') : buildingIcon(buildingType),
+      target: { kind: 'building_collect', type: buildingType, buildingId: existing?.buildingId || null },
+      requirements: { items: [], affordable: true, missing: {} },
+      availability: {
+        placed: !!existing,
+        buildingState: existing?.state || null,
+        canCollect: !!existing?.canCollect || existing?.state === 'OUTPUT_READY',
+        outputBuffer: buffer,
+        blockedBy: existing ? [] : [`building.${buildingType}.place`]
+      },
+      effects: buildingType === 'WORKSHOP'
+        ? [{ kind: 'applies_buff_to_next_build', construction_buff_pct: Number(spec.buffPct || 0) }]
+        : Object.entries(output).map(([resource, amount]) => ({ kind: 'fills_storage', resource, amount })),
+      metadata: {
+        outputBuffer: buffer,
+        storageCaps: normalizeInventory(state?.plot?.storageCaps),
+        leavesOverflowWhenCapped: RESOURCE_STORAGE_KEYS.some((key) => Number(buffer[key] || 0) > 0 && Number(state?.plot?.inventory?.[key] || 0) >= Number(state?.plot?.storageCaps?.[key] || 0))
+      },
+      blocker: collectBlocker,
+      nextAction: collectStatus === 'available' ? 'Collect outputs' : (collectBlocker || 'Wait for output'),
+      actionRef: collectActionRef,
+      ui: { tier: `HQ${requiredHq}`, lane: label, sort: requiredHq * 100 + 70 }
+    }));
+    edges.push(canonicalEdge(`${productionNodeId}->${collectNodeId}`, productionNodeId, collectNodeId, buildingType === 'WORKSHOP' ? 'applies_buff_to_next_build' : 'produces_resource', 'Job output becomes collectible'));
+  }
+  return { nodes, edges };
+}
+
+function buildCanonicalPermissionPolicyNodes(state) {
+  const nodes = [];
+  const edges = [];
+  const hqLevel = Math.max(1, Math.floor(Number(state?.plot?.hqLevel || 1)));
+  const policy = {
+    sellDailyCoinCap: 15,
+    maxAutonomousActionsPerHour: 12,
+    emergencyPause: false,
+    ...(state?.plot?.policy || {})
+  };
+  const levels = permissionLevelMap();
+  const rows = permissionRowsByKey(state);
+  for (const [permissionKey, requiredHq] of Object.entries(levels).sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]))) {
+    const row = rows[permissionKey] || {};
+    const unlocked = row.unlocked === true || hqLevel >= requiredHq;
+    const nodeId = `permission.${permissionKey}.unlock`;
+    nodes.push(canonicalNode({
+      nodeId,
+      kind: 'permission_unlock',
+      title: row.label || labelForType(permissionKey),
+      status: unlocked ? 'done' : 'locked',
+      icon: permissionIcon(permissionKey),
+      target: { kind: 'permission', key: permissionKey },
+      requirements: requirementsFor(state, { hqLevelRequired: requiredHq }),
+      availability: {
+        hqLevelRequired: requiredHq,
+        unlocked,
+        enabled: row.enabled === true,
+        requiresApproval: row.requiresApproval === true,
+        blockedBy: unlocked ? [] : [`hq.level.${requiredHq}`]
+      },
+      effects: [{ kind: 'enables_policy', policyKey: permissionKey }],
+      nextAction: unlocked ? `Review ${permissionKey}` : `Reach HQ Level ${requiredHq}`,
+      ui: { tier: `HQ${requiredHq}`, lane: 'Permissions', sort: requiredHq * 100 + 80 }
+    }));
+    edges.push(canonicalEdge(`hq.level.${requiredHq}->${nodeId}`, `hq.level.${requiredHq}`, nodeId, 'unlocks_permission', `HQ${requiredHq} unlocks ${permissionKey}`));
+    const policyNodeId = `policy.${permissionKey}.enable`;
+    const policyStatus = unlocked ? (row.enabled === true ? 'done' : 'available') : 'locked';
+    nodes.push(canonicalNode({
+      nodeId: policyNodeId,
+      kind: 'policy_enable',
+      title: `Policy: ${row.label || labelForType(permissionKey)}`,
+      status: policyStatus,
+      icon: permissionIcon(permissionKey),
+      target: { kind: 'policy', key: permissionKey },
+      requirements: requirementsFor(state, { hqLevelRequired: requiredHq }),
+      availability: {
+        hqLevelRequired: requiredHq,
+        unlocked,
+        enabled: row.enabled === true,
+        requiresApproval: row.requiresApproval === true,
+        blockedBy: unlocked ? [] : [nodeId]
+      },
+      effects: [{ kind: 'enables_agent_action', permissionKey }],
+      metadata: { policyValue: row.enabled === true },
+      nextAction: row.enabled ? `${permissionKey} policy enabled` : `Enable ${permissionKey} policy if desired`,
+      ui: { tier: `HQ${requiredHq}`, lane: 'Policy', sort: requiredHq * 100 + 85 }
+    }));
+    edges.push(canonicalEdge(`${nodeId}->${policyNodeId}`, nodeId, policyNodeId, 'enables_action', `${permissionKey} permission enables policy toggle`));
+  }
+  const capNodes = [
+    {
+      nodeId: 'policy.sellDailyCoinCap',
+      title: 'Policy: daily sell coin cap',
+      value: Number(policy.sellDailyCoinCap || 0),
+      requiredHq: levels.sellSurplusFood || 5
+    },
+    {
+      nodeId: 'policy.maxAutonomousActionsPerHour',
+      title: 'Policy: hourly autonomous action cap',
+      value: Number(policy.maxAutonomousActionsPerHour || 0),
+      requiredHq: 1
+    },
+    {
+      nodeId: 'policy.emergencyPause',
+      title: 'Policy: emergency pause',
+      value: policy.emergencyPause === true,
+      requiredHq: 1
+    }
+  ];
+  for (const cap of capNodes) {
+    const unlocked = hqLevel >= cap.requiredHq;
+    nodes.push(canonicalNode({
+      nodeId: cap.nodeId,
+      kind: 'policy_cap',
+      title: cap.title,
+      status: unlocked ? 'done' : 'locked',
+      icon: permissionIcon(cap.nodeId.split('.')[1]),
+      target: { kind: 'policy', key: cap.nodeId.replace('policy.', '') },
+      requirements: requirementsFor(state, { hqLevelRequired: cap.requiredHq }),
+      availability: {
+        hqLevelRequired: cap.requiredHq,
+        unlocked,
+        value: cap.value,
+        blockedBy: unlocked ? [] : [`hq.level.${cap.requiredHq}`]
+      },
+      metadata: { value: cap.value },
+      nextAction: 'Review policy cap',
+      ui: { tier: `HQ${cap.requiredHq}`, lane: 'Policy', sort: cap.requiredHq * 100 + 90 }
+    }));
+  }
+  const setPriorityUnlocked = hqLevel >= (levels.setPriority || 4);
+  nodes.push(canonicalNode({
+    nodeId: 'action.set_priority',
+    kind: 'policy_action',
+    title: 'Set building priority',
+    status: setPriorityUnlocked ? 'available' : 'locked',
+    icon: permissionIcon('setPriority'),
+    target: { kind: 'action', action: 'set_priority', options: [...PRIORITY_OPTIONS] },
+    requirements: requirementsFor(state, { hqLevelRequired: levels.setPriority || 4 }),
+    availability: {
+      hqLevelRequired: levels.setPriority || 4,
+      policyEnabled: rows.setPriority?.enabled === true,
+      blockedBy: setPriorityUnlocked ? [] : ['permission.setPriority.unlock']
+    },
+    metadata: { priorityOptions: [...PRIORITY_OPTIONS] },
+    nextAction: 'Set WOOD, STONE, FOOD, or BALANCED priority through gameplay tools',
+    actionRef: actionRefFor('et.plot.set_priority', {
+      buildingId: '$buildingId',
+      priority: '$priority',
+      actor: 'HUMAN',
+      idempotencyKey: '$idempotencyKey'
+    }),
+    ui: { tier: `HQ${levels.setPriority || 4}`, lane: 'Policy', sort: (levels.setPriority || 4) * 100 + 95 }
+  }));
+  return { nodes, edges };
+}
+
+function buildCanonicalRewardNodes(state) {
+  const nodes = [];
+  const edges = [];
+  const available = new Map((state?.rewards || []).map((reward) => [reward.rewardId, reward]));
+  const claimed = new Set(state?.plot?.claimedRewards || []);
+  const collected = new Set(state?.plot?.collectedBuildingTypes || []);
+  const hqLevel = Math.max(1, Math.floor(Number(state?.plot?.hqLevel || 1)));
+  for (const reward of REWARD_CATALOG) {
+    const isAvailable = available.has(reward.rewardId);
+    const isClaimed = claimed.has(reward.rewardId);
+    const requiredHq = Number(reward.requiredHqLevel || 1);
+    const requiredCollected = reward.requiredCollectedBuildingType || null;
+    const unlocked = requiredCollected ? collected.has(requiredCollected) : hqLevel >= requiredHq;
+    const status = isClaimed ? 'done' : isAvailable ? 'available' : unlocked ? 'blocked' : 'locked';
+    const nodeId = `reward.${reward.rewardId}.claim`;
+    nodes.push(canonicalNode({
+      nodeId,
+      kind: 'reward_claim',
+      title: `Claim ${reward.title}`,
+      status,
+      icon: resourceIcon(reward.grant?.town_xp ? 'xp' : Object.keys(reward.grant || {})[0] || 'coin'),
+      target: { kind: 'reward', rewardId: reward.rewardId },
+      requirements: requiredCollected
+        ? {
+          items: [{
+            kind: 'building_collection',
+            resource: requiredCollected,
+            have: collected.has(requiredCollected) ? 1 : 0,
+            required: 1,
+            missing: collected.has(requiredCollected) ? 0 : 1
+          }],
+          affordable: collected.has(requiredCollected),
+          missing: collected.has(requiredCollected) ? {} : { [requiredCollected]: 1 }
+        }
+        : requirementsFor(state, { hqLevelRequired: requiredHq }),
+      availability: {
+        available: isAvailable,
+        claimed: isClaimed,
+        unlocked,
+        blockedBy: isClaimed || isAvailable ? [] : requiredCollected ? [`production.${requiredCollected}.collect`] : [`hq.level.${requiredHq}`]
+      },
+      effects: [{ kind: 'grants_reward', grant: clone(available.get(reward.rewardId)?.grant || reward.grant || {}) }],
+      metadata: {
+        body: reward.body,
+        grant: clone(available.get(reward.rewardId)?.grant || reward.grant || {})
+      },
+      blocker: status === 'locked' ? 'Reward requirement has not been met yet.' : null,
+      nextAction: isClaimed ? `${reward.title} claimed` : isAvailable ? `Claim ${reward.title}` : 'Meet reward requirement',
+      actionRef: isAvailable ? actionRefFor('et.plot.claim_reward', {
+        rewardId: reward.rewardId,
+        actor: 'HUMAN',
+        idempotencyKey: '$idempotencyKey'
+      }) : null,
+      ui: { tier: requiredCollected ? 'HQ1' : `HQ${requiredHq}`, lane: 'Rewards', sort: requiredHq * 100 + 110 }
+    }));
+    if (requiredCollected) {
+      edges.push(canonicalEdge(`production.${requiredCollected}.collect->${nodeId}`, `production.${requiredCollected}.collect`, nodeId, 'unlocks_reward', `${requiredCollected} collection unlocks ${reward.title}`));
+    } else {
+      edges.push(canonicalEdge(`hq.level.${requiredHq}->${nodeId}`, `hq.level.${requiredHq}`, nodeId, 'unlocks_reward', `HQ${requiredHq} unlocks ${reward.title}`));
+    }
+  }
+  return { nodes, edges };
+}
+
+function buildCanonicalConstraintNodes(state) {
+  const nodes = [];
+  const edges = [];
+  const inventory = normalizeInventory(state?.plot?.inventory);
+  const caps = normalizeInventory(state?.plot?.storageCaps);
+  for (const resource of RESOURCE_STORAGE_KEYS) {
+    const current = Number(inventory[resource] || 0);
+    const cap = Number(caps[resource] || 0);
+    nodes.push(canonicalNode({
+      nodeId: `constraint.storage.${resource}`,
+      kind: 'storage_cap',
+      title: `${labelForType(resource)} storage`,
+      status: 'done',
+      icon: resourceIcon(resource),
+      target: { kind: 'storage', resource },
+      requirements: { items: [], affordable: true, missing: {} },
+      availability: {
+        current,
+        cap,
+        remaining: Math.max(0, cap - current),
+        full: cap > 0 && current >= cap,
+        blockedBy: []
+      },
+      metadata: { current, cap, remaining: Math.max(0, cap - current) },
+      nextAction: cap > 0 && current >= cap ? `Spend or upgrade before collecting more ${resource}` : `${resource} storage has room`,
+      ui: { tier: 'Constraints', lane: 'Storage', sort: 900 + RESOURCE_STORAGE_KEYS.indexOf(resource) }
+    }));
+  }
+  const jobs = Array.isArray(state?.jobs) ? state.jobs : [];
+  const activeConstruction = jobs.filter((job) => ['CONSTRUCT', 'UPGRADE'].includes(job.kind) && ['QUEUED', 'RUNNING'].includes(job.status));
+  const runningConstruction = activeConstruction.filter((job) => job.status === 'RUNNING');
+  const queuedConstruction = activeConstruction.filter((job) => job.status === 'QUEUED');
+  const constructionSlots = Number(state?.plot?.constructionSlots || 0);
+  nodes.push(canonicalNode({
+    nodeId: 'constraint.construction_slots',
+    kind: 'construction_slots',
+    title: 'Construction slots',
+    status: runningConstruction.length >= constructionSlots ? 'waiting' : 'available',
+    icon: permissionIcon('constructionSlots'),
+    target: { kind: 'constraint', key: 'construction_slots' },
+    requirements: { items: [], affordable: true, missing: {} },
+    availability: {
+      slots: constructionSlots,
+      running: runningConstruction.length,
+      queued: queuedConstruction.length,
+      open: Math.max(0, constructionSlots - runningConstruction.length),
+      blockedBy: []
+    },
+    metadata: {
+      slots: constructionSlots,
+      runningJobs: runningConstruction.map(compactJob).filter(Boolean),
+      queuedJobs: queuedConstruction.map(compactJob).filter(Boolean)
+    },
+    nextAction: queuedConstruction.length ? 'Wait for a construction slot' : 'Construction slot available',
+    ui: { tier: 'Constraints', lane: 'Construction', sort: 920 }
+  }));
+  const buffPct = Number(state?.plot?.nextBuildBuffPct || 0);
+  const workshop = findBuilding(state, 'WORKSHOP');
+  const workshopSpec = productionSpecFor('WORKSHOP', workshop?.level || 1);
+  nodes.push(canonicalNode({
+    nodeId: 'effect.workshop.next_build_buff',
+    kind: 'workshop_buff',
+    title: 'Workshop next-build buff',
+    status: buffPct > 0 ? 'done' : workshop ? 'blocked' : 'locked',
+    icon: buildingIcon('WORKSHOP'),
+    target: { kind: 'effect', key: 'nextBuildBuffPct', buildingId: workshop?.buildingId || null },
+    requirements: requirementsFor(state, { hqLevelRequired: 4 }),
+    availability: {
+      hqLevelRequired: 4,
+      placed: !!workshop,
+      activeBuffPct: buffPct,
+      availableBuffPct: Number(workshopSpec?.buffPct || 20),
+      blockedBy: workshop ? [] : ['building.WORKSHOP.place']
+    },
+    effects: [{ kind: 'applies_buff_to_next_build', construction_buff_pct: buffPct || Number(workshopSpec?.buffPct || 20) }],
+    metadata: { activeBuffPct: buffPct, availableBuffPct: Number(workshopSpec?.buffPct || 20) },
+    nextAction: buffPct > 0 ? 'Start the next construction to consume the buff' : 'Run and collect Workshop prep',
+    ui: { tier: 'HQ4', lane: 'Workshop', sort: 480 }
+  }));
+  edges.push(canonicalEdge('production.WORKSHOP.collect->effect.workshop.next_build_buff', 'production.WORKSHOP.collect', 'effect.workshop.next_build_buff', 'applies_buff_to_next_build', 'Workshop collection applies next-build buff'));
+  return { nodes, edges };
+}
+
+function buildCanonicalApprovalNodes(state) {
+  const nodes = [];
+  for (const approval of Array.isArray(state?.approvals) ? state.approvals : []) {
+    const approvalId = String(approval.approvalId || '');
+    if (!approvalId) continue;
+    const status = String(approval.status || '').toUpperCase() === 'PENDING'
+      ? 'available'
+      : String(approval.status || '').toUpperCase() === 'APPROVED'
+        ? 'done'
+        : 'blocked';
+    nodes.push(canonicalNode({
+      nodeId: `approval.${approvalId}`,
+      kind: 'approval',
+      title: cleanText(approval.title || approval.actionName || 'Approval request', 'Approval request', 120),
+      status,
+      icon: permissionIcon('approval'),
+      target: { kind: 'approval', approvalId, actionName: approval.actionName || approval.action || null },
+      requirements: { items: [], affordable: true, missing: {} },
+      availability: {
+        approvalId,
+        approvalStatus: approval.status || null,
+        actionName: approval.actionName || approval.action || null,
+        blockedBy: []
+      },
+      metadata: {
+        actionName: approval.actionName || approval.action || null,
+        requestedParams: stableValue(approval.requestedParams || approval.params || {})
+      },
+      nextAction: status === 'available' ? 'Resolve approval in the gameplay approval surface' : 'Review approval record',
+      ui: { tier: 'Approvals', lane: 'Approvals', sort: 1000 }
+    }));
+  }
+  return { nodes, edges: [] };
+}
+
+function buildCanonicalAtlasGraph(state) {
+  const sections = [
+    buildCanonicalHqNodes(state),
+    buildCanonicalConstraintNodes(state),
+    buildCanonicalBuildingNodes(state),
+    buildCanonicalProductionNodes(state),
+    buildCanonicalPermissionPolicyNodes(state),
+    buildCanonicalRewardNodes(state),
+    buildCanonicalApprovalNodes(state)
+  ];
+  const nodeMap = new Map();
+  const edges = [];
+  for (const section of sections) {
+    for (const node of section.nodes || []) {
+      if (!node?.nodeId || nodeMap.has(node.nodeId)) continue;
+      nodeMap.set(node.nodeId, node);
+    }
+    for (const edge of section.edges || []) edges.push(edge);
+  }
+  const canonicalNodes = Array.from(nodeMap.values())
+    .sort((a, b) => Number(a.ui?.sort || 0) - Number(b.ui?.sort || 0) || a.nodeId.localeCompare(b.nodeId));
+  const seenEdges = new Set();
+  const canonicalEdges = edges
+    .filter((edge) => edge?.from && edge?.to && nodeMap.has(edge.from) && nodeMap.has(edge.to))
+    .filter((edge) => {
+      const key = edge.edgeId || `${edge.from}->${edge.to}:${edge.kind}`;
+      if (seenEdges.has(key)) return false;
+      seenEdges.add(key);
+      return true;
+    });
+  const availabilityByNode = {};
+  const actionRefsByNode = {};
+  const receiptRefs = {};
+  for (const node of canonicalNodes) {
+    availabilityByNode[node.nodeId] = canonicalAvailability(node);
+    receiptRefs[node.nodeId] = [];
+    if (node.actionRef) actionRefsByNode[node.nodeId] = node.actionRef;
+  }
+  return {
+    canonicalNodes,
+    canonicalEdges,
+    availabilityByNode,
+    actionRefsByNode,
+    receiptRefs
+  };
+}
+
 function summarizeAtlas(state, steps) {
   const firstOpen = steps.find((step) => step.status !== 'done') || steps[steps.length - 1] || null;
   return {
@@ -1145,6 +2070,23 @@ function buildCanonicalStepIndex(state) {
       index.set(step.stepId, addStepContract(step, { stepKind: 'canonical_node', canonicalNodeId: step.stepId }));
     }
   }
+  const canonicalGraph = buildCanonicalAtlasGraph(state);
+  for (const node of canonicalGraph.canonicalNodes || []) {
+    if (!node?.nodeId || index.has(node.nodeId)) continue;
+    index.set(node.nodeId, addStepContract({
+      stepId: node.nodeId,
+      nodeId: node.nodeId,
+      title: node.title,
+      status: node.status,
+      reason: node.metadata?.body || node.title,
+      icon: node.icon,
+      target: node.target,
+      requirements: node.requirements,
+      blocker: node.blocker,
+      nextAction: node.nextAction,
+      actionRef: node.actionRef
+    }, { stepKind: 'canonical_node', canonicalNodeId: node.nodeId }));
+  }
   return index;
 }
 
@@ -1389,6 +2331,7 @@ function buildAtlasEnvelope({ stateEnvelope, nowMs }) {
   const strategies = records.map(strategyFromRecord).filter(Boolean);
   const selectedStrategy = strategies.find((strategy) => strategy.selected) || null;
   const summary = summarizeAtlas(state, draft.steps);
+  const canonicalGraph = buildCanonicalAtlasGraph(state);
   return successEnvelope({
     plotId: state.plot.plotId,
     stateHash,
@@ -1400,6 +2343,11 @@ function buildAtlasEnvelope({ stateEnvelope, nowMs }) {
       gameplayStableHash,
       iconCatalog: getAgentTownIconCatalog(),
       summary,
+      canonicalNodes: canonicalGraph.canonicalNodes,
+      canonicalEdges: canonicalGraph.canonicalEdges,
+      availabilityByNode: canonicalGraph.availabilityByNode,
+      actionRefsByNode: canonicalGraph.actionRefsByNode,
+      receiptRefs: canonicalGraph.receiptRefs,
       nodes: draft.graph.nodes,
       edges: draft.graph.edges,
       strategyTemplates: listStrategyTemplates(),
@@ -1582,9 +2530,24 @@ function explainProgressionNode({ pairId, houseId = null, plotId = null, nodeId,
   if (!stateEnvelope || stateEnvelope.ok === false) return stateEnvelope;
   const strategies = STRATEGY_TEMPLATE_KEYS.map((key) => buildProgressionStrategy(stateEnvelope.state, stateEnvelope.stateHash, key));
   const safeNodeId = String(nodeId || '').trim();
-  const step = strategies
+  const strategyStep = strategies
     .flatMap((strategy) => strategy.steps)
     .find((entry) => entry.nodeId === safeNodeId || entry.stepId === safeNodeId);
+  const canonicalNode = strategyStep ? null : buildCanonicalAtlasGraph(stateEnvelope.state).canonicalNodes
+    .find((entry) => entry.nodeId === safeNodeId);
+  const step = strategyStep || (canonicalNode ? {
+    stepId: canonicalNode.nodeId,
+    nodeId: canonicalNode.nodeId,
+    title: canonicalNode.title,
+    status: canonicalNode.status,
+    reason: canonicalNode.metadata?.body || `${canonicalNode.title} is part of the canonical Founders Plot graph.`,
+    requirements: canonicalNode.requirements,
+    blocker: canonicalNode.blocker,
+    nextAction: canonicalNode.nextAction,
+    icon: canonicalNode.icon,
+    target: canonicalNode.target,
+    actionRef: canonicalNode.actionRef
+  } : null);
   if (!step) return errorEnvelope('INVALID_REQUEST', 'Unknown progression node.');
   const missing = Object.entries(step.requirements?.missing || {})
     .map(([key, amount]) => `${key} ${amount}`)

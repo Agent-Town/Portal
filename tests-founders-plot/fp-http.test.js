@@ -104,6 +104,190 @@ function strategyFingerprint(strategy) {
   };
 }
 
+async function getGameState(server) {
+  const out = await request(server, 'GET', '/api/founders-plot/state');
+  assert.equal(out.status, 200);
+  assert.equal(out.body.ok, true);
+  return out.body.state;
+}
+
+async function advanceGame(server, minutes = 5) {
+  nowMs += minutes * 60_000;
+  return getGameState(server);
+}
+
+async function catchUpGame(server) {
+  let state = await getGameState(server);
+  let guard = 12;
+  while (Number(state.plot.lastSimulatedAt || 0) < nowMs && guard > 0) {
+    state = await getGameState(server);
+    guard -= 1;
+  }
+  return state;
+}
+
+function findBuildingInState(state, type) {
+  return (state.buildings || []).find((building) => building.type === type);
+}
+
+function openBuildPad(state) {
+  const pad = (state.pads || []).find((entry) => entry.kind === 'BUILD' && !entry.occupiedBy);
+  assert.ok(pad, 'expected an open build pad');
+  return pad;
+}
+
+async function claimAvailableRewards(server, plotId, tag) {
+  let state = await getGameState(server);
+  for (const reward of state.rewards || []) {
+    const out = await request(server, 'POST', '/api/founders-plot/claim-reward', {
+      plotId,
+      rewardId: reward.rewardId,
+      actor: 'HUMAN',
+      idempotencyKey: `${tag}-claim-${reward.rewardId}-${nowMs}`
+    });
+    assert.equal(out.status, 200, out.body?.error?.message || `claim ${reward.rewardId}`);
+    assert.equal(out.body.ok, true);
+    state = out.body.state;
+  }
+  return state;
+}
+
+async function placeAndFinish(server, plotId, type, tag) {
+  let state = await getGameState(server);
+  if (findBuildingInState(state, type)) return findBuildingInState(state, type);
+  const pad = openBuildPad(state);
+  const out = await request(server, 'POST', '/api/founders-plot/place-building', {
+    plotId,
+    type,
+    x: pad.x,
+    y: pad.y,
+    actor: 'HUMAN',
+    idempotencyKey: `${tag}-place-${type}-${nowMs}`
+  });
+  assert.equal(out.status, 200, out.body?.error?.message || `place ${type}`);
+  assert.equal(out.body.ok, true);
+  state = await advanceGame(server, 5);
+  const building = findBuildingInState(state, type);
+  assert.ok(building, `${type} exists after placement`);
+  assert.equal(building.state, 'READY');
+  return building;
+}
+
+async function produceAndCollect(server, plotId, type, tag) {
+  let state = await getGameState(server);
+  const building = findBuildingInState(state, type);
+  assert.ok(building, `${type} must exist`);
+  assert.equal(building.state, 'READY', `${type} must be ready`);
+  const kind = type === 'MARKET_STALL' ? 'SELL' : 'PRODUCE';
+  const queued = await request(server, 'POST', '/api/founders-plot/queue-job', {
+    plotId,
+    buildingId: building.buildingId,
+    kind,
+    actor: 'HUMAN',
+    idempotencyKey: `${tag}-queue-${type}-${nowMs}`
+  });
+  assert.equal(queued.status, 200, queued.body?.error?.message || `queue ${type}`);
+  assert.equal(queued.body.ok, true);
+  state = await advanceGame(server, 5);
+  const ready = findBuildingInState(state, type);
+  assert.equal(ready.state, 'OUTPUT_READY', `${type} output should be ready`);
+  const collected = await request(server, 'POST', '/api/founders-plot/collect-outputs', {
+    plotId,
+    buildingId: ready.buildingId,
+    actor: 'HUMAN',
+    idempotencyKey: `${tag}-collect-${type}-${nowMs}`
+  });
+  assert.equal(collected.status, 200, collected.body?.error?.message || `collect ${type}`);
+  assert.equal(collected.body.ok, true);
+  return collected.body.state;
+}
+
+async function ensureResource(server, plotId, type, resource, amount, tag) {
+  let state = await getGameState(server);
+  let guard = 40;
+  while (Number(state.plot.inventory[resource] || 0) < amount && guard > 0) {
+    state = await produceAndCollect(server, plotId, type, `${tag}-${guard}`);
+    guard -= 1;
+  }
+  assert.ok(Number(state.plot.inventory[resource] || 0) >= amount, `expected ${resource} >= ${amount}`);
+  return state;
+}
+
+async function ensureTownXp(server, minXp) {
+  let state = await getGameState(server);
+  let guard = 20;
+  while (Number(state.plot.townXp || 0) < minXp && guard > 0) {
+    nowMs += (24 * 60 + 1) * 60_000;
+    state = await catchUpGame(server);
+    guard -= 1;
+  }
+  assert.ok(Number(state.plot.townXp || 0) >= minXp, `expected XP >= ${minXp}`);
+  return state;
+}
+
+async function upgradeHqAndFinish(server, plotId, targetLevel, tag) {
+  let state = await catchUpGame(server);
+  const hq = findBuildingInState(state, 'HQ');
+  const out = await request(server, 'POST', '/api/founders-plot/upgrade-building', {
+    plotId,
+    buildingId: hq.buildingId,
+    actor: 'HUMAN',
+    idempotencyKey: `${tag}-upgrade-hq-${targetLevel}-${nowMs}`
+  });
+  assert.equal(out.status, 200, out.body?.error?.message || `upgrade HQ${targetLevel}`);
+  assert.equal(out.body.ok, true);
+  state = await advanceGame(server, 5);
+  if (state.plot.hqLevel < targetLevel) state = await catchUpGame(server);
+  assert.equal(state.plot.hqLevel, targetLevel);
+  return claimAvailableRewards(server, plotId, `${tag}-post-hq${targetLevel}`);
+}
+
+async function reachHq(server, targetLevel, tag) {
+  let state = await getGameState(server);
+  const plotId = state.plot.plotId;
+  await placeAndFinish(server, plotId, 'LUMBER_CAMP', tag);
+  await ensureResource(server, plotId, 'LUMBER_CAMP', 'wood', 32, tag);
+  await claimAvailableRewards(server, plotId, tag);
+  await placeAndFinish(server, plotId, 'FARM_PLOT', tag);
+  await ensureResource(server, plotId, 'LUMBER_CAMP', 'wood', 20, tag);
+  await ensureResource(server, plotId, 'FARM_PLOT', 'food', 10, tag);
+  await ensureTownXp(server, 25);
+  state = await getGameState(server);
+  if (state.plot.hqLevel < 2) await upgradeHqAndFinish(server, plotId, 2, tag);
+  if (targetLevel <= 2) return getGameState(server);
+
+  await ensureResource(server, plotId, 'LUMBER_CAMP', 'wood', 36, tag);
+  await ensureResource(server, plotId, 'FARM_PLOT', 'food', 10, tag);
+  await placeAndFinish(server, plotId, 'QUARRY', tag);
+  await ensureResource(server, plotId, 'LUMBER_CAMP', 'wood', 20, tag);
+  await ensureResource(server, plotId, 'QUARRY', 'stone', 16, tag);
+  await ensureTownXp(server, 50);
+  state = await getGameState(server);
+  if (state.plot.hqLevel < 3) await upgradeHqAndFinish(server, plotId, 3, tag);
+  if (targetLevel <= 3) return getGameState(server);
+
+  await ensureResource(server, plotId, 'LUMBER_CAMP', 'wood', 40, tag);
+  await ensureResource(server, plotId, 'QUARRY', 'stone', 30, tag);
+  await ensureResource(server, plotId, 'FARM_PLOT', 'food', 20, tag);
+  await ensureTownXp(server, 90);
+  state = await getGameState(server);
+  if (state.plot.hqLevel < 4) await upgradeHqAndFinish(server, plotId, 4, tag);
+  if (targetLevel <= 4) return getGameState(server);
+
+  await ensureResource(server, plotId, 'LUMBER_CAMP', 'wood', 84, tag);
+  await ensureResource(server, plotId, 'QUARRY', 'stone', 66, tag);
+  await ensureResource(server, plotId, 'FARM_PLOT', 'food', 30, tag);
+  await placeAndFinish(server, plotId, 'WORKSHOP', tag);
+  await produceAndCollect(server, plotId, 'WORKSHOP', tag);
+  await ensureResource(server, plotId, 'LUMBER_CAMP', 'wood', 60, tag);
+  await ensureResource(server, plotId, 'QUARRY', 'stone', 50, tag);
+  await ensureResource(server, plotId, 'FARM_PLOT', 'food', 30, tag);
+  await ensureTownXp(server, 140);
+  state = await getGameState(server);
+  if (state.plot.hqLevel < 5) await upgradeHqAndFinish(server, plotId, 5, tag);
+  return getGameState(server);
+}
+
 test('FP-HT-001 GET /api/founders-plot/tools returns all 8 tools', async () => {
   const { server, close } = await fresh('tools');
   try {
@@ -277,12 +461,63 @@ test('FP-HT-009 progression atlas exposes Rush HQ3 graph without gameplay mutati
     assert.equal(hqStep.icon.symbol, 'H3');
     assert.equal(hqStep.icon.tone, 'command');
     assert.equal(hqStep.icon.assetPath, '/assets/icons/agent-town/hq-upgrade-gpt-image-2-v1.png');
+    assert.ok(Array.isArray(out.body.atlas.canonicalNodes));
+    assert.ok(Array.isArray(out.body.atlas.canonicalEdges));
+    assert.ok(out.body.atlas.availabilityByNode && typeof out.body.atlas.availabilityByNode === 'object');
+    assert.ok(out.body.atlas.actionRefsByNode && typeof out.body.atlas.actionRefsByNode === 'object');
+    assert.ok(out.body.atlas.receiptRefs && typeof out.body.atlas.receiptRefs === 'object');
+    const canonical = new Map(out.body.atlas.canonicalNodes.map((node) => [node.nodeId, node]));
+    for (const requiredNode of [
+      'hq.level.1',
+      'hq.level.5',
+      'hq.upgrade.5',
+      'building.LUMBER_CAMP.place',
+      'building.FARM_PLOT.place',
+      'building.QUARRY.place',
+      'building.WORKSHOP.place',
+      'building.MARKET_STALL.place',
+      'production.WORKSHOP.PRODUCE',
+      'production.MARKET_STALL.SELL',
+      'permission.observeAndSuggest.unlock',
+      'permission.setPriority.unlock',
+      'permission.sellSurplusFood.unlock',
+      'policy.sellSurplusFood.enable',
+      'policy.sellDailyCoinCap',
+      'reward.hq.level-5.claim',
+      'constraint.storage.wood',
+      'constraint.construction_slots',
+      'effect.workshop.next_build_buff'
+    ]) {
+      assert.ok(canonical.has(requiredNode), `canonical graph includes ${requiredNode}`);
+      assert.deepEqual(out.body.atlas.receiptRefs[requiredNode], []);
+    }
+    assert.equal(canonical.get('hq.level.1').status, 'done');
+    assert.equal(canonical.get('hq.level.5').status, 'locked');
+    assert.equal(canonical.get('building.WORKSHOP.place').status, 'locked');
+    assert.equal(canonical.get('building.MARKET_STALL.place').status, 'locked');
+    assert.equal(canonical.get('permission.observeAndSuggest.unlock').status, 'done');
+    assert.equal(canonical.get('permission.sellSurplusFood.unlock').status, 'locked');
+    assert.equal(canonical.get('constraint.storage.wood').metadata.cap, 100);
+    assert.equal(canonical.get('constraint.construction_slots').metadata.slots, 1);
+    assert.equal(canonical.get('production.WORKSHOP.PRODUCE').metadata.input.wood, 8);
+    assert.equal(canonical.get('production.WORKSHOP.PRODUCE').metadata.input.stone, 4);
+    assert.equal(canonical.get('production.WORKSHOP.PRODUCE').metadata.output.wood, undefined);
+    assert.equal(canonical.get('production.WORKSHOP.PRODUCE').metadata.buffPct, 20);
+    assert.equal(canonical.get('production.MARKET_STALL.SELL').metadata.input.food, 6);
+    assert.equal(canonical.get('production.MARKET_STALL.SELL').metadata.output.coin, 3);
+    assert.equal(out.body.atlas.actionRefsByNode['building.LUMBER_CAMP.place'].tool, 'et.plot.place_building');
+    assert.equal(out.body.atlas.actionRefsByNode['building.LUMBER_CAMP.place'].executableByAtlas, false);
+    assert.equal(out.body.atlas.actionRefsByNode['building.LUMBER_CAMP.place'].executable, false);
+    assert.equal(out.body.atlas.actionRefsByNode['production.MARKET_STALL.SELL'], undefined);
+    assert.ok(out.body.atlas.canonicalEdges.find((edge) => edge.kind === 'unlocks_building' && edge.to === 'building.WORKSHOP.unlock'));
     assert.equal(out.body.atlas.openClawLiteSurface.generateIconDraft, 'agent_town_progression_generate_icon_draft');
     assert.equal(out.body.atlas.openClawLiteSurface.saveEditedStrategy, 'agent_town_progression_save_edited_strategy');
 
     const repeat = await request(server, 'GET', '/api/founders-plot/progression-atlas');
     assert.equal(repeat.status, 200);
     assert.equal(repeat.body.gameplayStableHash, out.body.gameplayStableHash);
+    assert.equal(repeat.body.gameplaySnapshot.audit.eventCount, out.body.gameplaySnapshot.audit.eventCount);
+    assert.deepEqual(repeat.body.gameplaySnapshot.plot.inventory, out.body.gameplaySnapshot.plot.inventory);
 
     const after = await request(server, 'GET', '/api/founders-plot/state');
     assert.equal(after.status, 200);
@@ -290,7 +525,66 @@ test('FP-HT-009 progression atlas exposes Rush HQ3 graph without gameplay mutati
   } finally { await close(); }
 });
 
-test('FP-HT-010 progression atlas drafts, saves, selects, and explains private strategies without gameplay mutation', async () => {
+test('FP-HT-010 progression atlas canonical graph follows real HQ4/HQ5 gameplay state', async () => {
+  const { server, close } = await fresh('progression-canonical-hq5');
+  try {
+    let state = await reachHq(server, 4, 'canon-hq4');
+    const plotId = state.plot.plotId;
+    let atlas = await request(server, 'GET', '/api/founders-plot/progression-atlas');
+    assert.equal(atlas.status, 200);
+    let canonical = new Map(atlas.body.atlas.canonicalNodes.map((node) => [node.nodeId, node]));
+    assert.equal(canonical.get('hq.level.4').status, 'done');
+    assert.equal(canonical.get('permission.setPriority.unlock').status, 'done');
+    assert.equal(canonical.get('constraint.storage.wood').metadata.cap, 160);
+    assert.notEqual(canonical.get('building.WORKSHOP.place').status, 'locked');
+    assert.equal(canonical.get('building.MARKET_STALL.place').status, 'locked');
+    assert.equal(canonical.get('production.WORKSHOP.PRODUCE').metadata.buffPct, 20);
+    assert.deepEqual(canonical.get('production.WORKSHOP.PRODUCE').metadata.output, {});
+    assert.equal(canonical.get('production.WORKSHOP.PRODUCE').metadata.input.wood, 8);
+    assert.equal(canonical.get('production.WORKSHOP.PRODUCE').metadata.input.stone, 4);
+    assert.equal(atlas.body.atlas.actionRefsByNode['action.set_priority'].tool, 'et.plot.set_priority');
+    assert.equal(atlas.body.atlas.actionRefsByNode['action.set_priority'].executableByAtlas, false);
+
+    state = await reachHq(server, 5, 'canon-hq5');
+    atlas = await request(server, 'GET', '/api/founders-plot/progression-atlas');
+    assert.equal(atlas.status, 200);
+    canonical = new Map(atlas.body.atlas.canonicalNodes.map((node) => [node.nodeId, node]));
+    assert.equal(canonical.get('hq.level.5').status, 'done');
+    assert.equal(canonical.get('permission.sellSurplusFood.unlock').status, 'done');
+    assert.equal(canonical.get('building.WORKSHOP.place').status, 'done');
+    assert.equal(canonical.get('effect.workshop.next_build_buff').metadata.availableBuffPct, 20);
+    assert.notEqual(canonical.get('building.MARKET_STALL.place').status, 'locked');
+    assert.equal(canonical.get('policy.sellDailyCoinCap').metadata.value, 15);
+    assert.equal(canonical.get('production.MARKET_STALL.SELL').metadata.input.food, 6);
+    assert.equal(canonical.get('production.MARKET_STALL.SELL').metadata.output.coin, 3);
+    assert.equal(canonical.get('production.MARKET_STALL.SELL').metadata.kind, 'SELL');
+    assert.equal(atlas.body.atlas.actionRefsByNode['production.MARKET_STALL.SELL'], undefined);
+
+    await ensureResource(server, plotId, 'LUMBER_CAMP', 'wood', 20, 'canon-market');
+    await ensureResource(server, plotId, 'QUARRY', 'stone', 18, 'canon-market');
+    await ensureResource(server, plotId, 'FARM_PLOT', 'food', 6, 'canon-market');
+    await placeAndFinish(server, plotId, 'MARKET_STALL', 'canon-market');
+    atlas = await request(server, 'GET', '/api/founders-plot/progression-atlas');
+    assert.equal(atlas.status, 200);
+    canonical = new Map(atlas.body.atlas.canonicalNodes.map((node) => [node.nodeId, node]));
+    assert.equal(canonical.get('building.MARKET_STALL.place').status, 'done');
+    assert.equal(canonical.get('production.MARKET_STALL.SELL').status, 'available');
+    assert.equal(atlas.body.atlas.actionRefsByNode['production.MARKET_STALL.SELL'].tool, 'et.plot.queue_job');
+    assert.equal(atlas.body.atlas.actionRefsByNode['production.MARKET_STALL.SELL'].agentPolicy.permissionKey, 'sellSurplusFood');
+    assert.equal(atlas.body.atlas.actionRefsByNode['production.MARKET_STALL.SELL'].agentPolicy.dailyCapField, 'sellDailyCoinCap');
+
+    const beforeReadHash = atlas.body.gameplayStableHash;
+    const beforeReadEvents = atlas.body.gameplaySnapshot.audit.eventCount;
+    const beforeReadInventory = atlas.body.gameplaySnapshot.plot.inventory;
+    const repeat = await request(server, 'GET', '/api/founders-plot/progression-atlas');
+    assert.equal(repeat.status, 200);
+    assert.equal(repeat.body.gameplayStableHash, beforeReadHash);
+    assert.equal(repeat.body.gameplaySnapshot.audit.eventCount, beforeReadEvents);
+    assert.deepEqual(repeat.body.gameplaySnapshot.plot.inventory, beforeReadInventory);
+  } finally { await close(); }
+});
+
+test('FP-HT-011 progression atlas drafts, saves, selects, and explains private strategies without gameplay mutation', async () => {
   const { server, close } = await fresh('progression-strategy');
   try {
     const before = await request(server, 'GET', '/api/founders-plot/progression-atlas');
@@ -371,7 +665,7 @@ test('FP-HT-010 progression atlas drafts, saves, selects, and explains private s
   } finally { await close(); }
 });
 
-test('FP-HT-011 progression atlas saves edited strategy steps and GenAI icon drafts without gameplay mutation', async () => {
+test('FP-HT-012 progression atlas saves edited strategy steps and GenAI icon drafts without gameplay mutation', async () => {
   const { server, close } = await fresh('progression-editor');
   try {
     const before = await request(server, 'GET', '/api/founders-plot/progression-atlas');

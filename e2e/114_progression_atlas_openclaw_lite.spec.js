@@ -41,6 +41,11 @@ test('AC-63: OpenClaw Lite opens Progression Atlas and saves selected strategy t
   const atlasFrame = page.frameLocator('#districtModalBody iframe.districtFrame');
   await expect(atlasFrame.getByTestId('progression-atlas-root')).toBeVisible();
   await expect(atlasFrame.getByText('Rush HQ3').first()).toBeVisible();
+  await expect(atlasFrame.getByTestId('progression-atlas-canonical-coverage')).toBeVisible();
+  await expect(atlasFrame.getByTestId('progression-atlas-canonical-building_WORKSHOP_place').getByText('Build Workshop')).toBeVisible();
+  await expect(atlasFrame.getByTestId('progression-atlas-canonical-building_MARKET_STALL_place').getByText('Build Market Stall')).toBeVisible();
+  await expect(atlasFrame.getByTestId('progression-atlas-canonical-permission_sellSurplusFood_unlock').getByText('Sell surplus food')).toBeVisible();
+  await expect(atlasFrame.getByTestId('progression-atlas-canonical-reward_hq_level-5_claim').getByText('Claim Founder stipend')).toBeVisible();
   await expect(atlasFrame.getByTestId('progression-atlas-strategy-compare')).toBeVisible();
   await expect(atlasFrame.getByTestId('progression-atlas-compare-balanced-food-wood').getByText('Balanced Food-Wood')).toBeVisible();
   await expect(atlasFrame.getByTestId('progression-atlas-compare-balanced-food-wood').getByText('More legible for new players')).toBeVisible();

@@ -192,6 +192,56 @@
     });
   }
 
+  function canonicalNodeById(nodeId) {
+    const nodes = Array.isArray(state.atlas?.canonicalNodes) ? state.atlas.canonicalNodes : [];
+    return nodes.find((node) => node.nodeId === nodeId) || null;
+  }
+
+  function renderCanonicalCoverage() {
+    const node = $('canonicalCoverage');
+    if (!node) return;
+    const groups = [
+      {
+        title: 'HQ Spine',
+        nodes: ['hq.level.1', 'hq.level.2', 'hq.level.3', 'hq.level.4', 'hq.level.5']
+      },
+      {
+        title: 'Current Buildings',
+        nodes: ['building.LUMBER_CAMP.place', 'building.FARM_PLOT.place', 'building.QUARRY.place', 'building.WORKSHOP.place', 'building.MARKET_STALL.place']
+      },
+      {
+        title: 'Loops + Effects',
+        nodes: ['production.LUMBER_CAMP.PRODUCE', 'production.FARM_PLOT.PRODUCE', 'production.QUARRY.PRODUCE', 'production.WORKSHOP.PRODUCE', 'effect.workshop.next_build_buff', 'production.MARKET_STALL.SELL']
+      },
+      {
+        title: 'Permissions',
+        nodes: ['permission.collectOutputs.unlock', 'permission.queueProduction.unlock', 'permission.setPriority.unlock', 'permission.sellSurplusFood.unlock', 'policy.sellDailyCoinCap']
+      },
+      {
+        title: 'Rewards + Caps',
+        nodes: ['reward.quest.first-lumber.claim', 'reward.hq.level-5.claim', 'constraint.storage.wood', 'constraint.construction_slots']
+      }
+    ];
+    const html = groups.map((group) => {
+      const items = group.nodes.map((nodeId) => canonicalNodeById(nodeId)).filter(Boolean);
+      return `
+        <section class="atlasCoverageGroup">
+          <h3>${escapeHtml(group.title)}</h3>
+          <div class="atlasCoverageItems">
+            ${items.map((item) => `
+              <button class="atlasCoverageNode atlasExplainBtn status-${escapeHtml(item.status || 'blocked')}" type="button" data-node-id="${escapeHtml(item.nodeId)}" data-testid="progression-atlas-canonical-${escapeHtml(testId(item.nodeId))}">
+                ${iconHtml(item.icon, 'atlasMiniIcon')}
+                <span>${escapeHtml(item.title || item.nodeId)}</span>
+                <strong>${escapeHtml(item.status || 'blocked')}</strong>
+              </button>
+            `).join('')}
+          </div>
+        </section>
+      `;
+    }).join('');
+    node.innerHTML = html || '<p class="atlasEmpty">Canonical coverage unavailable.</p>';
+  }
+
   function renderStrategyCompare() {
     const node = $('strategyCompare');
     if (!node) return;
@@ -523,6 +573,7 @@
   function renderAll() {
     renderSummary();
     renderTemplateControls();
+    renderCanonicalCoverage();
     renderStrategyCompare();
     renderDraft();
     renderEditor();
