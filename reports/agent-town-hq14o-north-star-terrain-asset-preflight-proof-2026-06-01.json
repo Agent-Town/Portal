@@ -1,0 +1,82 @@
+{
+  "ok": true,
+  "verdict": "BLOCKED_PREFLIGHT_NO_RUNTIME_CHANGE",
+  "date": "2026-06-01",
+  "branch": "neo/progression-atlas-editor-next-2026-05-29",
+  "baseHead": "a9a3459",
+  "route": "/experiences/founders-plot/",
+  "runtimeBaseline": {
+    "visualShell": "hq14n_cartographic_fog_depth_v1",
+    "regionAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+    "keyProofTest": "FP-E2E-023",
+    "uiProofTest": "FP-E2E-022",
+    "onlyMutationPath": "Scout Sector"
+  },
+  "prototype": {
+    "implemented": false,
+    "rendererChanged": false,
+    "e2eChanged": false,
+    "reason": "HQ14L-HQ14N already cover the safe procedural lane with continuous underlay, soft seams, and cartographic fog depth. A stronger north-star terrain/world read now needs a same-origin generated or painted terrain asset pack; this task was prohibited from generating, fetching, or promoting new runtime assets."
+  },
+  "visualShell": {
+    "current": "hq14n_cartographic_fog_depth_v1",
+    "new": null,
+    "prototypeFlagsAdded": []
+  },
+  "preflightEvidence": {
+    "currentRuntimeAssetsSameOrigin": true,
+    "currentRuntimeAtlas": "/experiences/founders-plot/assets/expedition-map/hq14a-region-faithful-terrain-fog-atlas-v1.png",
+    "existingSafeRendererLayers": [
+      "continuousTerrainUnderlay",
+      "softRegionSeams",
+      "cartographicFogDepth",
+      "ambientContourField",
+      "fogDepthGlyphsVisualOnly"
+    ],
+    "assetGap": "Need authored terrain/world massing and fog overlays slot-bound to server-owned public terrain/fog state.",
+    "unsafeProceduralRisks": [
+      "synthetic biome silhouettes can imply hidden terrain truth",
+      "pseudo route/world strokes can read as route authority",
+      "more procedural noise increases clutter without matching the north-star art direction"
+    ]
+  },
+  "guardrails": {
+    "noCommitsPushesDeploysMerges": true,
+    "noGeneratedImageTask": true,
+    "noExternalAssetFetch": true,
+    "noReportMediaPromotion": true,
+    "noServerStoreRoutesToolsSchemaChanges": true,
+    "noNewMutationPath": true,
+    "scoutSectorOnlyMutationPath": true,
+    "hiddenCellsRemainFogUnknownOnly": true,
+    "hiddenCellsNoResourcesRoutesJobsReceiptsRecommendationsOrActions": true,
+    "readOnlySurfacesUnchanged": true,
+    "noAtlasExecution": true,
+    "noPublicSharing": true,
+    "noGeneratedUniverseRendering": true,
+    "noHiddenAutonomy": true,
+    "noRouteTradeEconomyResourceRewardCombatSchedulerBehavior": true,
+    "noCrossPlotMutation": true,
+    "noExternalEffects": true,
+    "noWildWestDrift": true
+  },
+  "verification": {
+    "jqEmpty": "passed",
+    "gitDiffCheck": "passed",
+    "nodeCheck": "not_applicable_no_js_or_e2e_changes",
+    "buildFoundersPlotThreeJs": "not_applicable_renderer_source_unchanged",
+    "playwrightFpE2E023": "not_run_no_runtime_change_and_current_test_would_overwrite_hq14n_artifacts",
+    "playwrightFpE2E022": "not_run_no_ui_change"
+  },
+  "artifacts": {
+    "report": "reports/agent-town-hq14o-north-star-terrain-asset-preflight-2026-06-01.md",
+    "proofJson": "reports/agent-town-hq14o-north-star-terrain-asset-preflight-proof-2026-06-01.json",
+    "newScreenshots": [],
+    "baselineScreenshots": [
+      "reports/agent-town-hq14n-cartographic-fog-depth-desktop-2026-06-01.png",
+      "reports/agent-town-hq14n-cartographic-fog-depth-mobile-2026-06-01.png",
+      "reports/agent-town-hq14n-cartographic-fog-depth-contact-sheet-2026-06-01.png"
+    ]
+  },
+  "recommendedNextStep": "Create a same-origin generated or painted Expedition Map terrain/world asset pack with fog-only hidden variants, public terrain-gated discovered/known slots, manifest guardrails, and deterministic FP-E2E-023 coverage before further runtime visual work."
+}
