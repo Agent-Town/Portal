@@ -1,0 +1,367 @@
+{
+  "ok": true,
+  "generatedAt": "2026-06-01T07:16:33.767Z",
+  "baseURL": "http://[::1]:4174",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "screenshots": [
+    "reports/agent-town-qa-replay-mobile-expedition-map-2026-06-01-01-initial-full-mobile-page.png",
+    "reports/agent-town-qa-replay-mobile-expedition-map-2026-06-01-02-expedition-map-panel-initial.png",
+    "reports/agent-town-qa-replay-mobile-expedition-map-2026-06-01-03-fog-legend-current-focus-boundary.png",
+    "reports/agent-town-qa-replay-mobile-expedition-map-2026-06-01-04-selected-hinted-sector-rules.png",
+    "reports/agent-town-qa-replay-mobile-expedition-map-2026-06-01-05-scout-sector-before-click.png",
+    "reports/agent-town-qa-replay-mobile-expedition-map-2026-06-01-06-selected-known-sector-resource-receipts.png",
+    "reports/agent-town-qa-replay-mobile-expedition-map-2026-06-01-07-selected-locked-sector-sealed.png",
+    "reports/agent-town-qa-replay-mobile-expedition-map-2026-06-01-08-semantic-zoom-detail-view.png",
+    "reports/agent-town-qa-replay-mobile-expedition-map-2026-06-01-09-touch-panned-map-surface.png",
+    "reports/agent-town-qa-replay-mobile-expedition-map-2026-06-01-10-after-scout-sector-map-panel.png",
+    "reports/agent-town-qa-replay-mobile-expedition-map-2026-06-01-11-event-packet-read-only-card.png",
+    "reports/agent-town-qa-replay-mobile-expedition-map-2026-06-01-12-expedition-party-read-only-roster.png",
+    "reports/agent-town-qa-replay-mobile-expedition-map-2026-06-01-13-future-horizon-boundary-note.png"
+  ],
+  "observations": {
+    "initialInfo": {
+      "renderer": "three.js",
+      "surface": "expedition-map",
+      "projectionHash": "qa-replay-expedition-map-before-scout",
+      "canvasWidth": 626,
+      "canvasHeight": 436,
+      "cellCount": 5,
+      "selectedCellId": "cell_q0_r1",
+      "zoom": 1,
+      "visualShell": "hq13y_agenttown_runtime_composition_prototype_v1",
+      "visualLayers": {
+        "terrainTexture": true,
+        "candidate02Cues": true,
+        "agentTownIdentityCues": true,
+        "scoutLedgerHud": true,
+        "beaconPlanWagonCues": true,
+        "homeNodeEmphasis": true,
+        "riverFlatCues": true,
+        "woodlandRidgeCues": true,
+        "ruinSignalCues": true,
+        "frontierBoundaryDashes": true,
+        "frontierBoundaryVisualOnly": true,
+        "fogVeils": 2,
+        "edgeFogCount": 4,
+        "civicBeaconCount": 3,
+        "surveyStrokeCount": 5,
+        "surveyStrokesVisualOnly": true,
+        "receiptTraceVisualOnly": true,
+        "markerCount": 5,
+        "clientAuthority": false
+      },
+      "camera": {
+        "x": 0,
+        "y": 0,
+        "zoom": 1
+      },
+      "bounds": {
+        "minX": -2.795,
+        "maxX": 2.795,
+        "minY": -1.803,
+        "maxY": 1.803
+      },
+      "fogStates": {
+        "discovered": 2,
+        "known": 1,
+        "hinted": 1,
+        "locked_unknown": 1
+      },
+      "pickTargets": [
+        {
+          "cellId": "cell_origin",
+          "fogState": "discovered",
+          "status": "OWNED_HOME",
+          "title": "Founders Plot",
+          "canvas": {
+            "x": 95.24375,
+            "y": 108
+          }
+        },
+        {
+          "cellId": "cell_q1_r0",
+          "fogState": "known",
+          "status": "SITE_PLAN_REVIEWED",
+          "title": "Forest Ridge Survey Site Plan",
+          "canvas": {
+            "x": 135.41458333333333,
+            "y": 108
+          }
+        },
+        {
+          "cellId": "cell_q1_r-1",
+          "fogState": "discovered",
+          "status": "OWNED_OUTPOST",
+          "title": "Forest Ridge Outpost",
+          "canvas": {
+            "x": 115.32916666666667,
+            "y": 73.54989908256881
+          }
+        },
+        {
+          "cellId": "cell_q0_r1",
+          "fogState": "hinted",
+          "status": "HINTED_BY_KNOWN_FRONTIER",
+          "title": "Unresolved Frontier Hint",
+          "canvas": {
+            "x": 115.32916666666667,
+            "y": 142.45010091743117
+          }
+        },
+        {
+          "cellId": "cell_q3_r0",
+          "fogState": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 215.75625,
+            "y": 108
+          }
+        }
+      ]
+    },
+    "scoutRequest": {
+      "plotId": "plot_qa_replay_mobile_exp_map",
+      "cellId": "cell_q0_r1",
+      "actor": "HUMAN",
+      "idempotencyKey": "fp-scout-sector-plot_qa_replay_mobile_exp_map-cell_q0_r1-qa-replay-expedition-map-before-scout"
+    },
+    "zoomInfo": {
+      "renderer": "three.js",
+      "surface": "expedition-map",
+      "projectionHash": "qa-replay-expedition-map-before-scout",
+      "canvasWidth": 626,
+      "canvasHeight": 436,
+      "cellCount": 5,
+      "selectedCellId": "cell_q3_r0",
+      "zoom": 2.353,
+      "visualShell": "hq13y_agenttown_runtime_composition_prototype_v1",
+      "visualLayers": {
+        "terrainTexture": true,
+        "candidate02Cues": true,
+        "agentTownIdentityCues": true,
+        "scoutLedgerHud": true,
+        "beaconPlanWagonCues": true,
+        "homeNodeEmphasis": true,
+        "riverFlatCues": true,
+        "woodlandRidgeCues": true,
+        "ruinSignalCues": true,
+        "frontierBoundaryDashes": true,
+        "frontierBoundaryVisualOnly": true,
+        "fogVeils": 2,
+        "edgeFogCount": 4,
+        "civicBeaconCount": 3,
+        "surveyStrokeCount": 5,
+        "surveyStrokesVisualOnly": true,
+        "receiptTraceVisualOnly": true,
+        "markerCount": 5,
+        "clientAuthority": false
+      },
+      "camera": {
+        "x": 0,
+        "y": 0,
+        "zoom": 2.353
+      },
+      "bounds": {
+        "minX": -2.795,
+        "maxX": 2.795,
+        "minY": -1.803,
+        "maxY": 1.803
+      },
+      "fogStates": {
+        "discovered": 2,
+        "known": 1,
+        "hinted": 1,
+        "locked_unknown": 1
+      },
+      "pickTargets": [
+        {
+          "cellId": "cell_origin",
+          "fogState": "discovered",
+          "status": "OWNED_HOME",
+          "title": "Founders Plot",
+          "canvas": {
+            "x": 13.74081601874506,
+            "y": 108
+          }
+        },
+        {
+          "cellId": "cell_q1_r0",
+          "fogState": "known",
+          "status": "SITE_PLAN_REVIEWED",
+          "title": "Forest Ridge Survey Site Plan",
+          "canvas": {
+            "x": 108.24693867291504,
+            "y": 108
+          }
+        },
+        {
+          "cellId": "cell_q1_r-1",
+          "fogState": "discovered",
+          "status": "OWNED_OUTPOST",
+          "title": "Forest Ridge Outpost",
+          "canvas": {
+            "x": 60.99387734583004,
+            "y": 26.952503779658933
+          }
+        },
+        {
+          "cellId": "cell_q0_r1",
+          "fogState": "hinted",
+          "status": "HINTED_BY_KNOWN_FRONTIER",
+          "title": "Unresolved Frontier Hint",
+          "canvas": {
+            "x": 60.99387734583004,
+            "y": 189.0474962203411
+          }
+        },
+        {
+          "cellId": "cell_q3_r0",
+          "fogState": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 297.2591839812549,
+            "y": 108
+          }
+        }
+      ]
+    },
+    "panInfo": {
+      "renderer": "three.js",
+      "surface": "expedition-map",
+      "projectionHash": "qa-replay-expedition-map-before-scout",
+      "canvasWidth": 626,
+      "canvasHeight": 436,
+      "cellCount": 5,
+      "selectedCellId": "cell_q3_r0",
+      "zoom": 2.353,
+      "visualShell": "hq13y_agenttown_runtime_composition_prototype_v1",
+      "visualLayers": {
+        "terrainTexture": true,
+        "candidate02Cues": true,
+        "agentTownIdentityCues": true,
+        "scoutLedgerHud": true,
+        "beaconPlanWagonCues": true,
+        "homeNodeEmphasis": true,
+        "riverFlatCues": true,
+        "woodlandRidgeCues": true,
+        "ruinSignalCues": true,
+        "frontierBoundaryDashes": true,
+        "frontierBoundaryVisualOnly": true,
+        "fogVeils": 2,
+        "edgeFogCount": 4,
+        "civicBeaconCount": 3,
+        "surveyStrokeCount": 5,
+        "surveyStrokesVisualOnly": true,
+        "receiptTraceVisualOnly": true,
+        "markerCount": 5,
+        "clientAuthority": false
+      },
+      "camera": {
+        "x": 1.095,
+        "y": 0.493,
+        "zoom": 2.353
+      },
+      "bounds": {
+        "minX": -2.795,
+        "maxX": 2.795,
+        "minY": -1.803,
+        "maxY": 1.803
+      },
+      "fogStates": {
+        "discovered": 2,
+        "known": 1,
+        "hinted": 1,
+        "locked_unknown": 1
+      },
+      "pickTargets": [
+        {
+          "cellId": "cell_origin",
+          "fogState": "discovered",
+          "status": "OWNED_HOME",
+          "title": "Founders Plot",
+          "canvas": {
+            "x": -53.001001448641695,
+            "y": 138
+          }
+        },
+        {
+          "cellId": "cell_q1_r0",
+          "fogState": "known",
+          "status": "SITE_PLAN_REVIEWED",
+          "title": "Forest Ridge Survey Site Plan",
+          "canvas": {
+            "x": 41.505121205528276,
+            "y": 138
+          }
+        },
+        {
+          "cellId": "cell_q1_r-1",
+          "fogState": "discovered",
+          "status": "OWNED_OUTPOST",
+          "title": "Forest Ridge Outpost",
+          "canvas": {
+            "x": -5.747940121556693,
+            "y": 56.95250377965893
+          }
+        },
+        {
+          "cellId": "cell_q0_r1",
+          "fogState": "hinted",
+          "status": "HINTED_BY_KNOWN_FRONTIER",
+          "title": "Unresolved Frontier Hint",
+          "canvas": {
+            "x": -5.747940121556693,
+            "y": 219.04749622034106
+          }
+        },
+        {
+          "cellId": "cell_q3_r0",
+          "fogState": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 230.51736651386818,
+            "y": 138
+          }
+        }
+      ]
+    },
+    "domAfterScout": {
+      "width": 390,
+      "scrollWidth": 390,
+      "bodyScrollWidth": 390,
+      "selectedSector": "Scouted Frontier Sectorcell_q0_r1 - SCOUTED SECTOR KNOWN - knownScout Sector receipt made this map-edge cell known without movement, route creation, or harvesting.VisibilityVisible: verified server truth can show receipts, terrain, risk, and resource hints.Scout pathUse existing verified panels for any allowed follow-up.Zoom contextSemantic zoom mirrors this selected card.AuthorityServer read model only; this card adds no mutation path.Mira Trailmark field partyPacket filedMira Trailmark and Vale-Desk 7 keep this packet as named receipt flavor for cell_q0_r1; it does not unlock routes, resources, or actions.OperatorMira Trailmark - scoutDeskVale-Desk 7 - HQ civic operatorAnchorexpedition_event_packet_qa_cell_q0_r1Manifestexpedition_party_current_plot_v1Mira TrailmarkscoutRook SignalpostmessengerVale-Desk 7HQ civic operatorParty flavor is presentation-only: zero actions, no autonomy, no routes, no resources, no combat, no sharing, and no Atlas execution.cell cell_q0_r1fog knownsource scout sector receiptterrain unresolved frontierrisk unknownReceiptderived frontier hint celladjacentCellId cell_q1_r0Receiptscout sector known cellscoutId scout_sector_qa_001, adjacentCellId cell_q1_r0, eventPacketId expedition_event_packet_qa_cell_q0_r1Use future bounded expedition packets for any follow-up; this panel only reveals map truth.",
+      "scoutButtons": [],
+      "eventPacketButtons": 0,
+      "partyButtons": 0,
+      "boundary": "server owned read only expedition map fog of war projection v1. No autonomous movement, resource gathering, routes, trades, combat, public sharing, Atlas execution, or external effects.",
+      "fogLegend": [
+        "DISCDiscovered 2Owned plot or founded outpost truth is visible.",
+        "KNOWNKnown 2Reviewed or scouted sector truth is recorded.",
+        "HINTHinted 0A server-hinted frontier edge exists.",
+        "LOCKLocked 1A sealed placeholder beyond the current frontier."
+      ],
+      "zoomTier": "Survey view",
+      "zoomCopy": "Broad region silhouette from discovered, known, hinted, and locked cells."
+    }
+  },
+  "guardrails": {
+    "routeFixtureOnly": true,
+    "productionSourceEdited": false,
+    "readOnly": true,
+    "executableActions": [],
+    "scoutSectorButtonsAfterScout": [],
+    "eventPacketButtons": 0,
+    "partyButtons": 0,
+    "routeCreation": false,
+    "atlasExecution": false,
+    "visualShell": "hq13y_agenttown_runtime_composition_prototype_v1",
+    "clientAuthorityFalse": true
+  },
+  "verdict": "PASS_WITH_NOTES_READY_FOR_ROBIN_QA"
+}

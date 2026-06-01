@@ -474,7 +474,7 @@ let activeDistrict = 'house';
 const districtViews = {
   house: { title: 'Plan Wagons', viewPath: '/views/house.html' },
   atlas: { title: 'Atlas Depot', viewPath: '/atlas?embed=1' },
-  progression: { title: 'Progression Atlas', viewPath: '/progression-atlas?embed=1' },
+  progression: { title: 'Founders Plot', viewPath: '/founders-plot?embed=1&atlas=1' },
   townhall: { title: 'Town Hall', viewPath: '/views/townhall.html' },
   saloon: { title: 'Saloon', viewPath: '/views/saloon.html' },
   pony: { title: 'Pony Express', viewPath: '/views/pony.html' },
@@ -1117,7 +1117,7 @@ function districtStatusText(district) {
   }
   if (!district) return tApp('district.status.select');
   if (district === 'atlas') return tApp('district.status.atlas');
-  if (district === 'progression') return 'Progression Atlas selected: plan the next Founders Plot strategy.';
+  if (district === 'progression') return 'Founders Plot selected: Progression Atlas opens inside the plot district.';
   if (district === 'townhall') return tApp('district.status.townhall');
   if (district === 'saloon') return tApp('district.status.saloon');
   if (district === 'pony') return tApp('district.status.pony');
@@ -3877,11 +3877,17 @@ function routeToPopupMode(rawHref) {
   if (path === '/progression-atlas') {
     const params = new URLSearchParams(parsed.search || '');
     params.set('embed', '1');
-    const embedUrl = `${parsed.pathname}${params.toString() ? `?${params.toString()}` : ''}${parsed.hash}`;
+    params.set('atlas', '1');
+    const strategyKey = params.get('strategyKey');
+    const foundryParams = new URLSearchParams();
+    foundryParams.set('embed', '1');
+    foundryParams.set('atlas', '1');
+    if (strategyKey) foundryParams.set('strategyKey', strategyKey);
+    const embedUrl = `/founders-plot?${foundryParams.toString()}${parsed.hash}`;
     return {
       mode: 'frame',
       url: embedUrl,
-      title: 'Progression Atlas'
+      title: 'Founders Plot'
     };
   }
   if (path === '/wall') {
@@ -4262,6 +4268,7 @@ function inferDistrictModalThemeFromUrl(url) {
   const path = parsed.pathname || '';
   if (path === '/atlas') return 'atlas';
   if (path === '/progression-atlas') return 'atlas';
+  if (path === '/founders-plot') return 'atlas';
   if (path === '/wall' || path === '/leaderboard') return 'leaderboard';
   if (path === '/house') return 'house';
   if (path === '/create' || path === '/claim' || path === '/claim-wallet' || path === '/trainer') return 'trainer';
@@ -4613,9 +4620,10 @@ async function runExperienceUiOpenProgressionAtlas(rawParams) {
   params.set('embed', '1');
   params.set('strategyKey', strategyKey);
 
-  setActiveDistrict('progression');
-  currentDistrict = 'progression';
-  openRouteInModalFrame(`/progression-atlas?${params.toString()}`, 'Progression Atlas');
+  setActiveDistrict('house');
+  currentDistrict = 'house';
+  params.set('atlas', '1');
+  openRouteInModalFrame(`/founders-plot?${params.toString()}`, 'Founders Plot');
   experienceIntentProgressionAtlasState = { strategyKey, selectedStrategyId: '' };
   await waitForDistrictModalOpen();
   await waitForDistrictModalFrame();
@@ -4809,7 +4817,9 @@ async function showDistrict(district) {
   }
 
   if (safeDistrict === 'progression') {
-    openRouteInModalFrame('/progression-atlas?embed=1', 'Progression Atlas');
+    setActiveDistrict('house');
+    currentDistrict = 'house';
+    openRouteInModalFrame('/founders-plot?embed=1&atlas=1', 'Founders Plot');
     return;
   }
 

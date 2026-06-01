@@ -1,0 +1,109 @@
+{
+  "date": "2026-05-31",
+  "worktree": "/Users/robin/Projects/Portal-atlas-editor",
+  "scope": "AgentTown playable-world visual target gap audit",
+  "writeScope": "reports-only",
+  "verdict": "PROMISING_STRONG_POCKETS_NOT_FULLY_TOP_NOTCH",
+  "assetSnapshot": {
+    "inhabitantAssetFiles": 110,
+    "inhabitantJsonSidecars": 25,
+    "objectAssetFiles": 40,
+    "objectWebpFiles": 16,
+    "buildingAssetFiles": 18,
+    "globalIconFiles": 30,
+    "globalIconPngFiles": 27
+  },
+  "closestSurfaces": [
+    {
+      "surface": "Founders Plot HQ11 Civic Operations",
+      "readiness": "near_target_for_panel_ux",
+      "evidence": [
+        "reports/agent-town-hq11-user-ready-ux-polish-2026-05-31.md",
+        "reports/agent-town-post-hq11-civic-operations-regression-qa-2026-05-31.md"
+      ],
+      "gap": "Still a long dashboard-like panel, not a playable frontier map."
+    },
+    {
+      "surface": "GPT Image 2 cards and object assets",
+      "readiness": "closest_to_visual_target",
+      "evidence": [
+        "reports/agent-town-hq3-hq10-image-assets-integration-2026-05-31.md",
+        "reports/agent-town-hq10-hq11-gpt-image-2-asset-pack-2026-05-31.md"
+      ],
+      "gap": "High-quality assets are not yet the dominant hierarchy across every surface."
+    },
+    {
+      "surface": "Base operators",
+      "readiness": "near_target_for_named_character_direction",
+      "evidence": [
+        "reports/agent-town-base-operators-readiness-wrap-2026-05-31.md",
+        "reports/agent-town-base-operators-scene-wiring-slice-2026-05-31.md",
+        "reports/agent-town-post-base-operator-scene-wiring-live-smoke-2026-05-31.md"
+      ],
+      "gap": "Named operators are not yet presented as expedition parties or map-facing units."
+    },
+    {
+      "surface": "Civic and World Grid assets",
+      "readiness": "strong_identity_partial_surface",
+      "evidence": [
+        "reports/agent-town-batch-c-civic-world-grid-inhabitants-sprite-integration-2026-05-31.md",
+        "reports/agent-town-hq11-civic-actors-scene-wiring-2026-05-31.md"
+      ],
+      "gap": "World Grid remains read-model/status presentation, not a spatial playable map."
+    },
+    {
+      "surface": "Progression Atlas",
+      "readiness": "solid_internal_surface_not_premium_consumer_fantasy",
+      "evidence": [
+        "reports/agent-town-progression-atlas-gpt-image-2-top-notch-ui-audit-2026-05-31.md",
+        "reports/agent-town-progression-atlas-hq9-hq10-ux-polish-2026-05-31.md"
+      ],
+      "gap": "Still dense, dashboard-like, and partially symbol-only."
+    }
+  ],
+  "rankedGaps": {
+    "high": [
+      "No playable frontier map yet.",
+      "No fog or reveal visual system yet.",
+      "No sector tile/card grammar yet.",
+      "UI density still fights the premium visual target.",
+      "New GPT Image 2 assets coexist with older provenance-thin base assets."
+    ],
+    "medium": [
+      "Atlas registry still has symbol-only core entries.",
+      "Expedition mission-card presentation is underdeveloped.",
+      "Named operator party strips do not exist yet.",
+      "Older building art needs provenance recovery or regeneration.",
+      "High-quality art is not consistently used as visual hierarchy."
+    ],
+    "low": [
+      "Chroma/alpha cleanup artifacts need final visual QA.",
+      "Fallback labels need product-copy polish.",
+      "Some visual proofs use labeled projection fixtures.",
+      "Proof artifacts need a lightweight latest-evidence index."
+    ]
+  },
+  "recommendedMilestones": [
+    "HQ12 private frontier map UI",
+    "Sector tiles and cards",
+    "Fog and reveal states",
+    "Expedition mission cards",
+    "Named operator party strips",
+    "Atlas and World Grid polish",
+    "Older base building provenance recovery or regeneration"
+  ],
+  "guardrails": [
+    "no public sharing",
+    "no real Generated Universe rendering",
+    "no Atlas execution",
+    "no autonomous operations",
+    "no scheduler or background expedition loops",
+    "no route or trade economy",
+    "no fabricated actors",
+    "no fake sector knowledge from art-only overlays"
+  ],
+  "createdArtifacts": [
+    "reports/agent-town-playable-world-visual-gap-audit-2026-05-31.md",
+    "reports/agent-town-playable-world-visual-gap-audit-2026-05-31.json"
+  ]
+}

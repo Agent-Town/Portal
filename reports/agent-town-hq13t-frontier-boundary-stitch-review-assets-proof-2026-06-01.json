@@ -1,0 +1,109 @@
+{
+  "ok": true,
+  "date": "2026-06-01",
+  "lane": "HQ13T simple frontier-boundary stitch repair",
+  "worktree": "/Users/robin/Projects/Portal-atlas-editor",
+  "verdict": "PASS_REVIEW_CANDIDATE",
+  "scope": {
+    "reviewOnly": true,
+    "reportsMediaOnly": true,
+    "targetsWeakHq13rSlotOnly": true,
+    "runtimeAssetsPromoted": false,
+    "runtimePackDirectoryCreated": false,
+    "runtimePackLoaderCreated": false,
+    "appSourceEdited": false,
+    "serverStoreRoutesToolsEdited": false,
+    "schemaValidatorEdited": false,
+    "atlasExecution": false,
+    "publicSharing": false,
+    "generatedUniverseRendering": false,
+    "expeditionMapMutationPathEdited": false
+  },
+  "artifacts": {
+    "report": "reports/agent-town-hq13t-frontier-boundary-stitch-review-assets-2026-06-01.md",
+    "proof": "reports/agent-town-hq13t-frontier-boundary-stitch-review-assets-proof-2026-06-01.json",
+    "repairDirectory": "reports/media/agent-town-hq13t-frontier-boundary-stitch-review-assets-2026-06-01",
+    "contactSheet": "reports/agent-town-hq13t-frontier-boundary-stitch-review-assets-contact-sheet-2026-06-01.png"
+  },
+  "asset": {
+    "slotId": "expedition_map.fog.frontier_border",
+    "source": "frontier-dotted-boundary-v3.gpt-image-2-source.png",
+    "processedAlpha": "frontier-dotted-boundary-v3.review-alpha.png",
+    "repairReview": "frontier-dotted-boundary-v3.repair-review.png",
+    "runtimeSamples": [
+      "frontier-dotted-boundary-v3.runtime-512x64.png",
+      "frontier-dotted-boundary-v3.runtime-256x32.png"
+    ],
+    "sourceDimensions": "2048x1152",
+    "repairDimensions": "1024x128",
+    "runtimeSampleDimensions": [
+      "512x64",
+      "256x32"
+    ],
+    "repairChannels": "srgba 4.0",
+    "sourceSha256": "a3a3c4665e80a615e830c904daaa6f682e4741b4cfcb300ccccb53603545502c",
+    "alphaSha256": "f939c2896a9db5b05c041994d7097373c0c279eea034188f5193da2de3dd3914",
+    "repairSha256": "aef65f46a908191197375025ab83635b82ee67c1e97f842817d60c0439284f27",
+    "runtime512Sha256": "be2bfaffa1af7bf235466265bf6c42169d21e85520f13dc8c14eaf1fb863c6a6",
+    "runtime256Sha256": "cbec84a787da92944f521c27cf00826585104cc1374a494c777a53976cbd537d",
+    "reviewVerdict": "REVIEW_CANDIDATE",
+    "notes": "Lightweight stitched line fixes the HQ13Q ornate-boundary issue; still needs contextual map review."
+  },
+  "contactSheet": {
+    "path": "reports/agent-town-hq13t-frontier-boundary-stitch-review-assets-contact-sheet-2026-06-01.png",
+    "dimensions": "960x360",
+    "channels": "srgb 3.0",
+    "sha256": "2e27868621b43428866b0b78c5d41717fc1b6ad157ddf0dee271c27942ac94a7",
+    "labels": false
+  },
+  "hq13mHarnessSummary": {
+    "expectedSlots": 8,
+    "pngFilesFound": 5,
+    "presentSlots": 1,
+    "missingSlots": 7,
+    "processedAlphaFilesFound": 1,
+    "sourceFilesFound": 1,
+    "unmatchedPngFiles": 0,
+    "status": "warn",
+    "verdict": "PARTIAL_OR_WARN_REVIEW_INPUT",
+    "note": "Expected because HQ13T is a single-slot frontier-boundary repair bundle."
+  },
+  "checks": [
+    {
+      "command": "file reports/media/agent-town-hq13t-frontier-boundary-stitch-review-assets-2026-06-01/*.png reports/agent-town-hq13t-frontier-boundary-stitch-review-assets-contact-sheet-2026-06-01.png",
+      "exitCode": 0
+    },
+    {
+      "command": "magick identify -format '%f|%wx%h|%[channels]\\n' reports/media/agent-town-hq13t-frontier-boundary-stitch-review-assets-2026-06-01/*.png reports/agent-town-hq13t-frontier-boundary-stitch-review-assets-contact-sheet-2026-06-01.png",
+      "exitCode": 0
+    },
+    {
+      "command": "node reports/agent-town-hq13m-generated-asset-qa-harness-2026-06-01.mjs --pretty reports/media/agent-town-hq13t-frontier-boundary-stitch-review-assets-2026-06-01",
+      "exitCode": 0
+    },
+    {
+      "command": "jq empty reports/agent-town-hq13t-frontier-boundary-stitch-review-assets-proof-2026-06-01.json",
+      "exitCode": 0
+    },
+    {
+      "command": "git diff --check -- reports/media/agent-town-hq13t-frontier-boundary-stitch-review-assets-2026-06-01 reports/agent-town-hq13t-frontier-boundary-stitch-review-assets-contact-sheet-2026-06-01.png reports/agent-town-hq13t-frontier-boundary-stitch-review-assets-2026-06-01.md reports/agent-town-hq13t-frontier-boundary-stitch-review-assets-proof-2026-06-01.json",
+      "exitCode": 0
+    }
+  ],
+  "guardrails": {
+    "noRuntimeAssetPromotion": true,
+    "noRuntimePackDirectory": true,
+    "noRuntimeLoader": true,
+    "noAppSourceEdits": true,
+    "noServerStoreRoutesToolsEdits": true,
+    "noSchemaValidatorEdits": true,
+    "noAtlasExecution": true,
+    "noPublicSharing": true,
+    "noGeneratedUniverseRendering": true,
+    "noHiddenAutonomy": true,
+    "noRouteTradeEconomyResourceRewardCombatSchedulerBehavior": true,
+    "noCrossPlotMutation": true,
+    "noExternalEffects": true,
+    "scoutSectorOnlyCurrentExpeditionMapMutationPath": true
+  }
+}

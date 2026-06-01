@@ -1,0 +1,170 @@
+[
+  {
+    "actorId": "workshop_active_1",
+    "canonicalRoleId": "workshop_specialist",
+    "actionKind": "PRODUCE",
+    "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/workshop_specialist/workshop-specialist-v1.png",
+    "assetSprite": {
+      "id": "workshop-specialist-v1",
+      "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/workshop_specialist/workshop-specialist-v1.json",
+      "columns": 4,
+      "rows": 4,
+      "frameWidth": 512,
+      "frameHeight": 512,
+      "action": "tune",
+      "row": 2,
+      "frames": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "fps": 5
+    },
+    "actionCue": {
+      "cueType": "workshop_tune",
+      "accessory": "tools",
+      "lane": "buff_work",
+      "label": "Workshop tune",
+      "actionKind": "PRODUCE",
+      "progress": 0.45,
+      "targetKind": "building",
+      "targetId": "building_workshop_1"
+    },
+    "route": {
+      "mode": "tune",
+      "to": {
+        "kind": "building",
+        "id": "building_workshop_1"
+      },
+      "progress": 0.505,
+      "visualOnly": true
+    }
+  },
+  {
+    "actorId": "market_active_1",
+    "canonicalRoleId": "trader",
+    "actionKind": "SELL",
+    "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/trader/market-trader-v1.png",
+    "assetSprite": {
+      "id": "market-trader-v1",
+      "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/trader/market-trader-v1.json",
+      "columns": 4,
+      "rows": 4,
+      "frameWidth": 512,
+      "frameHeight": 512,
+      "action": "sell",
+      "row": 2,
+      "frames": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "fps": 5
+    },
+    "actionCue": {
+      "cueType": "sell_work",
+      "accessory": "coin",
+      "lane": "selling",
+      "label": "Sell work",
+      "actionKind": "SELL",
+      "progress": 0.5,
+      "targetKind": "building",
+      "targetId": "building_market_1"
+    },
+    "route": {
+      "mode": "trade",
+      "to": {
+        "kind": "building",
+        "id": "building_market_1"
+      },
+      "progress": 0.53,
+      "visualOnly": true
+    }
+  },
+  {
+    "actorId": "settler_departing_1",
+    "canonicalRoleId": "settler",
+    "actionKind": "SETTLER_CONVOY",
+    "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/settler/settler-convoy-crew-v1.png",
+    "assetSprite": {
+      "id": "settler-convoy-crew-v1",
+      "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/settler/settler-convoy-crew-v1.json",
+      "columns": 4,
+      "rows": 4,
+      "frameWidth": 512,
+      "frameHeight": 512,
+      "action": "prepare",
+      "row": 2,
+      "frames": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "fps": 5
+    },
+    "actionCue": {
+      "cueType": "settler_convoy",
+      "accessory": "route_marker",
+      "lane": "convoy",
+      "label": "Settler convoy",
+      "actionKind": "SETTLER_CONVOY",
+      "progress": 0.4,
+      "targetKind": "settlement_claim",
+      "targetId": "claim_1"
+    },
+    "route": {
+      "mode": "convoy",
+      "to": {
+        "kind": "settlement_claim",
+        "id": "claim_1"
+      },
+      "progress": 0.42400000000000004,
+      "visualOnly": true
+    }
+  },
+  {
+    "actorId": "settler_ready_1",
+    "canonicalRoleId": "settler",
+    "actionKind": "SETTLEMENT_READY",
+    "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/settler/settler-convoy-crew-v1.png",
+    "assetSprite": {
+      "id": "settler-convoy-crew-v1",
+      "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/settler/settler-convoy-crew-v1.json",
+      "columns": 4,
+      "rows": 4,
+      "frameWidth": 512,
+      "frameHeight": 512,
+      "action": "ready",
+      "row": 3,
+      "frames": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "fps": 4
+    },
+    "actionCue": {
+      "cueType": "settlement_ready",
+      "accessory": "route_marker",
+      "lane": "arrived_ready",
+      "label": "Settlement ready",
+      "actionKind": "SETTLEMENT_READY",
+      "progress": 1,
+      "targetKind": "settlement_claim",
+      "targetId": "claim_2"
+    },
+    "route": {
+      "mode": "convoy",
+      "to": {
+        "kind": "settlement_claim",
+        "id": "claim_2"
+      },
+      "progress": 0.9,
+      "visualOnly": true
+    }
+  }
+]

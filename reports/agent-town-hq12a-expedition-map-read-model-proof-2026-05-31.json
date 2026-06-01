@@ -1,0 +1,174 @@
+{
+  "ok": true,
+  "proofKind": "hq12a_expedition_map_read_model_sample",
+  "generatedAt": "2026-05-31",
+  "route": "GET /api/founders-plot/expedition-map",
+  "tool": "et.plot.get_expedition_map",
+  "readOnly": true,
+  "executableActions": [],
+  "authorityBoundary": "server_owned_read_only_expedition_map_fog_of_war_projection_v1",
+  "projectionHash": "396fd944bc19a060",
+  "fog": {
+    "states": [
+      "discovered",
+      "known",
+      "hinted",
+      "locked_unknown"
+    ],
+    "counts": {
+      "discovered": 2,
+      "known": 1,
+      "hinted": 3,
+      "locked_unknown": 8
+    },
+    "cellsByFogState": {
+      "discovered": [
+        "cell_origin",
+        "cell_q1_r0"
+      ],
+      "known": [
+        "cell_q1_r-1"
+      ],
+      "hinted": [
+        "cell_q0_r-1",
+        "cell_q0_r1",
+        "cell_q2_r-2"
+      ],
+      "locked_unknown": [
+        "cell_q-3_r0",
+        "cell_q-3_r3",
+        "cell_q0_r-3",
+        "cell_q0_r3",
+        "cell_q3_r-3",
+        "cell_q3_r0",
+        "cell_q3_r3",
+        "cell_q6_r-3"
+      ]
+    }
+  },
+  "sourceSummary": {
+    "originPlotId": "plot_197e89f08f233c37",
+    "worldGridStatus": "READ_MODEL_READY",
+    "worldGridProjectionHash": "b0f21c70c1d146da",
+    "civicReadinessReady": true,
+    "civicReadinessScore": 2,
+    "scoutReportIds": [
+      "scout_report_proof_forest",
+      "scout_report_proof_river"
+    ],
+    "reviewedSitePlanIds": [
+      "site_plan_proof_forest"
+    ],
+    "foundedPlotIds": [
+      "plot_15e8126ae5d41fc6"
+    ]
+  },
+  "sampleCells": {
+    "discovered": {
+      "cellId": "cell_origin",
+      "q": 0,
+      "r": 0,
+      "fogState": "discovered",
+      "kind": "origin_plot",
+      "title": "Founders Plot",
+      "status": "OWNED_HOME",
+      "sourceTruth": "founder_plot",
+      "sourceIds": {
+        "plotId": "plot_197e89f08f233c37"
+      },
+      "readOnly": true,
+      "authorityBoundary": "server_owned_read_only_expedition_map_fog_of_war_projection_v1"
+    },
+    "known": {
+      "cellId": "cell_q1_r-1",
+      "q": 1,
+      "r": -1,
+      "fogState": "known",
+      "kind": "frontier_site",
+      "title": "Proof River Flat Survey",
+      "status": "SCOUT_REPORTED",
+      "sourceTruth": "scout_report",
+      "sourceIds": {
+        "plotId": "plot_197e89f08f233c37",
+        "reportId": "scout_report_proof_river"
+      },
+      "resourceHints": {
+        "wood": 0,
+        "stone": 0,
+        "food": 2,
+        "coin": 0
+      },
+      "readOnly": true,
+      "authorityBoundary": "server_owned_read_only_expedition_map_fog_of_war_projection_v1"
+    },
+    "hinted": {
+      "cellId": "cell_q0_r-1",
+      "q": 0,
+      "r": -1,
+      "fogState": "hinted",
+      "kind": "frontier_hint",
+      "title": "Unresolved Frontier Hint",
+      "status": "HINTED_BY_KNOWN_FRONTIER",
+      "sourceTruth": "derived_hint",
+      "sourceIds": {
+        "adjacentCellId": "cell_origin"
+      },
+      "resourceHints": {
+        "wood": 0,
+        "stone": 0,
+        "food": 0,
+        "coin": 0
+      },
+      "readOnly": true,
+      "authorityBoundary": "server_owned_read_only_expedition_map_fog_of_war_projection_v1"
+    },
+    "lockedUnknown": {
+      "cellId": "cell_q-3_r0",
+      "q": -3,
+      "r": 0,
+      "fogState": "locked_unknown",
+      "kind": "fog_placeholder",
+      "title": "Locked Unknown",
+      "status": "LOCKED_UNKNOWN",
+      "sourceTruth": "fog_placeholder",
+      "sourceIds": {
+        "ring": 3,
+        "index": 3
+      },
+      "resourceHints": {
+        "wood": 0,
+        "stone": 0,
+        "food": 0,
+        "coin": 0
+      },
+      "readOnly": true,
+      "authorityBoundary": "server_owned_read_only_expedition_map_fog_of_war_projection_v1"
+    }
+  },
+  "receipt": {
+    "kind": "expedition_map_read_model_projection",
+    "sourceIds": {
+      "plotId": "plot_197e89f08f233c37",
+      "worldGridProjectionHash": "b0f21c70c1d146da"
+    },
+    "readOnly": true,
+    "authorityBoundary": "server_owned_read_only_expedition_map_fog_of_war_projection_v1",
+    "resourceDelta": {},
+    "routeCreation": false,
+    "tradeRouteCreation": false,
+    "backgroundScheduling": false,
+    "atlasExecution": false,
+    "externalEffects": false,
+    "projectionHash": "396fd944bc19a060"
+  },
+  "boundaryAssertions": {
+    "noMovement": true,
+    "noResourceGathering": true,
+    "noRouteOrTradeEconomy": true,
+    "noCombat": true,
+    "noPublicSharing": true,
+    "noGeneratedUniverseRendering": true,
+    "noAtlasExecution": true,
+    "worldDelta": []
+  }
+}

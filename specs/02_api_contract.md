@@ -2045,6 +2045,631 @@ Errors:
 
 ---
 
+## Founders Plot Expedition Map
+
+The Expedition Map is server-owned fog-of-war state. Atlas and UI surfaces may
+display this read model, but Atlas action refs are metadata only and must not
+execute map mutations directly.
+
+### GET `/api/founders-plot/expedition-map`
+Returns the HQ12A read-only Expedition Map projection for the current plot.
+
+Query:
+```json
+{ "plotId": "<optional plot id>" }
+```
+
+Response includes:
+```json
+{
+  "ok": true,
+  "expeditionMap": {
+    "readOnly": true,
+    "executableActions": [],
+    "fog": {
+      "counts": { "discovered": 1, "known": 1, "hinted": 1, "locked_unknown": 8 }
+	    },
+	    "cells": [
+	      { "cellId": "cell_q1_r0", "fogState": "hinted", "readOnly": true }
+	    ],
+	    "eventPackets": [],
+      "expeditionParty": {
+        "partyId": "expedition_party_current_plot_v1",
+        "kind": "expedition_party_manifest",
+        "readOnly": true,
+        "executableActions": [],
+        "authorityBoundary": "server_owned_read_only_expedition_party_manifest_v1",
+        "members": [
+          {
+            "memberId": "pathfinder-scout-v1",
+            "displayName": "Mira Trailmark",
+            "role": "scout",
+            "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/scout/pathfinder-scout-v1.png",
+            "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/scout/pathfinder-scout-v1.json",
+            "authority": "visual_read_model_only"
+          },
+          {
+            "memberId": "rook-signalpost-messenger-v1",
+            "displayName": "Rook Signalpost",
+            "role": "messenger"
+          },
+          {
+            "memberId": "hq-civic-operator-vale-desk-7-v1",
+            "displayName": "Vale-Desk 7",
+            "role": "hq_civic_operator"
+          }
+        ],
+        "boundaryFlags": {
+          "autonomousMovement": false,
+          "operatorAssignment": false,
+          "resourceHarvesting": false,
+          "resourceDelta": {},
+          "routeCreation": false,
+          "tradeRouteCreation": false,
+          "backgroundScheduling": false,
+          "combat": false,
+          "publicSharing": false,
+          "generatedUniverseRendering": false,
+          "crossPlotMutation": false,
+          "atlasExecution": false,
+          "externalEffects": false
+        }
+      }
+	  }
+	}
+	```
+
+### POST `/api/founders-plot/expedition-map/scout-sector`
+Reveals exactly one eligible same-plot `hinted` frontier sector as known
+Expedition Map truth.
+
+Request shape:
+```json
+{
+  "plotId": "<plot id>",
+  "cellId": "<optional hinted cell id; omitted chooses the first eligible hint>",
+  "actor": "HUMAN|AGENT",
+  "actorType": "HUMAN|AGENT",
+  "idempotencyKey": "<stable caller key>"
+}
+```
+
+Success response includes:
+```json
+{
+  "ok": true,
+  "revealedCellId": "cell_q1_r0",
+  "alreadyScouted": false,
+  "scoutSector": {
+    "scoutId": "expedition_scout_...",
+    "plotId": "<same plot id>",
+    "cellId": "cell_q1_r0",
+    "status": "SCOUTED",
+	    "receipt": {
+	      "kind": "scout_sector_receipt",
+	      "actionName": "et.plot.scout_sector",
+	      "eventPacketId": "expedition_event_packet_...",
+	      "routeCreation": false,
+	      "atlasExecution": false,
+	      "crossPlotMutation": false
+	    },
+	    "eventPacket": {
+	      "packetId": "expedition_event_packet_...",
+	      "kind": "expedition_event_packet",
+	      "readOnly": true,
+	      "executableActions": [],
+        "partyId": "expedition_party_current_plot_v1",
+        "partySnapshot": {
+          "readOnly": true,
+          "executableActions": [],
+          "members": [
+            { "memberId": "pathfinder-scout-v1", "displayName": "Mira Trailmark", "role": "scout" },
+            { "memberId": "rook-signalpost-messenger-v1", "displayName": "Rook Signalpost", "role": "messenger" },
+            { "memberId": "hq-civic-operator-vale-desk-7-v1", "displayName": "Vale-Desk 7", "role": "hq_civic_operator" }
+          ]
+        },
+	      "discoveryFlavor": "Ridge Lantern packet",
+	      "terrainExplanation": "Read-only terrain flavor for the newly known sector.",
+	      "riskExplanation": "Planning risk only; no damage, resources, routes, combat, or scheduler effects.",
+	      "operatorNote": "Receipt-linked note for later human review.",
+	      "receiptLink": {
+	        "kind": "scout_sector_receipt",
+	        "actionName": "et.plot.scout_sector",
+	        "scoutId": "expedition_scout_...",
+	        "cellId": "cell_q1_r0"
+	      }
+	    }
+	  },
+	  "eventPacket": { "packetId": "expedition_event_packet_...", "readOnly": true },
+	  "proof": {
+	    "targetBeforeFogState": "hinted",
+	    "targetAfterFogState": "known",
+    "beforeFogCounts": { "discovered": 1, "known": 1, "hinted": 1, "locked_unknown": 8 },
+    "afterFogCounts": { "discovered": 1, "known": 2, "hinted": 1, "locked_unknown": 8 },
+    "newlyKnownOrDiscoveredCellIds": ["cell_q1_r0"],
+    "boundaryFlags": {
+      "samePlotOnly": true,
+      "revealsExactlyOneSector": true,
+      "autonomousMovement": false,
+      "resourceHarvesting": false,
+      "routeCreation": false,
+      "tradeRouteCreation": false,
+      "backgroundScheduling": false,
+      "combat": false,
+      "publicSharing": false,
+      "generatedUniverseRendering": false,
+      "crossPlotMutation": false,
+      "atlasExecution": false,
+      "externalEffects": false
+    }
+  }
+}
+```
+
+Boundaries:
+- mutates only the current owned plot after session/plot access checks
+- requires idempotency; key reuse with different arguments returns `IDEMPOTENCY_CONFLICT`
+- the target must be a current `hinted` Expedition Map cell unless it is already scouted
+- agent callers require matching human approval for `scout_sector` with `{ "cellId": "<target>" }`
+- writes only server-owned discovery/receipt state and deterministic read-only event packet metadata for the read model
+- event packets are receipt-linked flavor/read-model metadata only and expose no executable actions
+- Expedition Party members are read-model/presentation metadata only; they cannot be selected, assigned, dispatched, scheduled, moved, or used for stats
+- does not move actors, gather resources, create routes, create trade, schedule background work, start combat, publish/share, render Generated Universe assets, mutate another plot, execute Atlas, or call external systems
+
+Errors include:
+- `INVALID_STATE`
+- `UNAUTHORIZED`
+- `FORBIDDEN_POLICY`
+- `IDEMPOTENCY_CONFLICT`
+
+---
+
+## Founders Plot Work Orders
+
+Founders Plot gameplay mutations are server-owned. Progression Atlas action refs are advisory metadata and must not execute these routes directly.
+
+### POST `/api/founders-plot/work-orders/draft`
+Creates one server-owned work-order draft from the engine template catalog.
+
+Request shape:
+```json
+{
+  "plotId": "<plot id>",
+  "templateId": "collect_ready_outputs_once",
+  "scope": { "buildingIds": ["<optional same-plot building id>"] },
+  "actor": "HUMAN|AGENT",
+  "idempotencyKey": "<stable caller key>"
+}
+```
+
+Success response includes:
+```json
+{
+  "ok": true,
+  "workOrder": {
+    "workOrderId": "work_order_...",
+    "templateId": "collect_ready_outputs_once",
+    "status": "DRAFT",
+    "allowedActions": ["et.plot.collect_outputs"],
+    "caps": { "maxChildActions": 2, "maxResourceSpend": { "wood": 0, "stone": 0, "food": 0, "coin": 0 } },
+    "childReceipts": []
+  },
+  "executionAvailable": true,
+  "state": { "...": "Founders Plot state snapshot" }
+}
+```
+
+Errors include:
+- `UNKNOWN_WORK_ORDER_TEMPLATE`
+- `INVALID_STATE`
+- `IDEMPOTENCY_CONFLICT`
+
+### POST `/api/founders-plot/work-orders/execute`
+Explicitly executes one HQ9B work order. The only executable template is `collect_ready_outputs_once`.
+
+Request shape:
+```json
+{
+  "plotId": "<plot id>",
+  "workOrderId": "work_order_...",
+  "actor": "HUMAN|AGENT",
+  "idempotencyKey": "<stable caller key>"
+}
+```
+
+Success response includes:
+```json
+{
+  "ok": true,
+  "executedChildCount": 1,
+  "workOrder": {
+    "workOrderId": "work_order_...",
+    "templateId": "collect_ready_outputs_once",
+    "status": "COMPLETED",
+    "childReceipts": [
+      {
+        "parentWorkOrderId": "work_order_...",
+        "childAction": "et.plot.collect_outputs",
+        "childIdempotencyKey": "<stable caller key>:child:1:<building id>",
+        "plotId": "<same plot id>",
+        "buildingId": "<building id>",
+        "authorityBoundary": "server_owned_child_collect_outputs_same_plot_no_spend"
+      }
+    ]
+  },
+  "childReceipts": [{ "...": "same receipt objects" }],
+  "state": { "...": "Founders Plot state snapshot" }
+}
+```
+
+Execution boundaries:
+- only `collect_ready_outputs_once` drafts can execute
+- the draft must still be unlocked in live state
+- at least one ready same-plot output is required
+- at most two child `et.plot.collect_outputs` actions run
+- child actions spend no resources, place no buildings, queue no jobs, select no doctrines, scout no sites, found no settlements, and mutate no other plot
+- agent callers require a matching human approval for `execute_work_order` and live `collectOutputs` policy/cap checks before child collection
+
+Errors include:
+- `UNKNOWN_WORK_ORDER_TEMPLATE`
+- `INVALID_STATE`
+- `FORBIDDEN_POLICY`
+- `RATE_LIMITED`
+- `IDEMPOTENCY_CONFLICT`
+
+---
+
+## Founders Plot Civic Proposal Records
+
+HQ10B civic proposal records are a server-owned review surface only. They record advisory civic intent after HQ10A World Grid readiness and do not execute civic work.
+
+### GET `/api/founders-plot/civic-proposals`
+Lists persisted civic proposal records for the current plot.
+
+Query:
+```text
+plotId=<optional owned plot id>
+```
+
+Response includes:
+```json
+{
+  "ok": true,
+  "worldDelta": [],
+  "civicProposals": {
+    "status": "LOCKED|RECORDING_READY",
+    "proposalOnly": true,
+    "authorityBoundary": "server_owned_civic_proposal_record_no_execution_v1",
+    "counts": { "total": 0, "draftCount": 0, "reviewedCount": 0, "archivedCount": 0 },
+    "proposals": []
+  },
+  "proposals": []
+}
+```
+
+### POST `/api/founders-plot/civic-proposals`
+Creates one persisted civic proposal record. Requires idempotency and HQ10A World Grid readiness.
+
+Request shape:
+```json
+{
+  "plotId": "<plot id>",
+  "title": "Shared map table review",
+  "category": "coordination|public_work|route_study|civic_memory",
+  "summary": "Advisory proposal text.",
+  "status": "DRAFT|REVIEWED|ARCHIVED",
+  "relatedPlotIds": ["<optional owned plot id>"],
+  "reviewNote": "<optional note>",
+  "actor": "HUMAN|AGENT",
+  "idempotencyKey": "<stable caller key>"
+}
+```
+
+Success response includes:
+```json
+{
+  "ok": true,
+  "proposalOnly": true,
+  "executionAllowed": false,
+  "civicProposal": {
+    "proposalId": "civic_proposal_...",
+    "status": "DRAFT",
+    "authorityBoundary": "server_owned_civic_proposal_record_no_execution_v1",
+    "scope": {
+      "source": "world_grid_read_model",
+      "executionAllowed": false,
+      "worldGridProjectionHash": "<hash>"
+    }
+  },
+  "state": { "...": "Founders Plot state snapshot" }
+}
+```
+
+Boundaries:
+- no civic mutation or public-work execution
+- no trade routes or route creation
+- no scheduling/background work
+- no arbitrary tool execution
+- no resource spending
+- no Atlas-owned execution
+- no settlement founding or cross-plot mutation
+- no external/public effects
+- agent callers require a matching human approval for `create_civic_proposal`
+
+Errors include:
+- `INVALID_STATE`
+- `FORBIDDEN_POLICY`
+- `IDEMPOTENCY_CONFLICT`
+
+---
+
+## Founders Plot Generated Universe Overlay Pack Records
+
+HQ10C overlay pack records are server-owned presentation metadata only. They can label skins, display hints, sanitized prompt/provenance, and target Atlas/World Grid node IDs after HQ10A readiness and a reviewed HQ10B civic proposal. They do not render assets or change gameplay.
+
+### GET `/api/founders-plot/overlay-packs`
+Lists persisted overlay pack records for the current plot.
+
+Query:
+```text
+plotId=<optional owned plot id>
+```
+
+Response includes:
+```json
+{
+  "ok": true,
+  "worldDelta": [],
+  "overlayPacks": {
+    "status": "LOCKED|RECORDING_READY",
+    "presentationOnly": true,
+    "visualOnly": true,
+    "authorityBoundary": "server_owned_generated_universe_overlay_pack_presentation_only_v1",
+    "counts": { "total": 0, "draftCount": 0, "reviewedCount": 0, "archivedCount": 0 },
+    "packs": []
+  },
+  "packs": []
+}
+```
+
+### POST `/api/founders-plot/overlay-packs`
+Creates one persisted overlay pack record. Requires idempotency, HQ10A World Grid readiness, and a same-plot reviewed civic proposal.
+
+Request shape:
+```json
+{
+  "plotId": "<plot id>",
+  "sourceProposalId": "civic_proposal_...",
+  "title": "Lantern Grid Overlay",
+  "theme": "lantern_grid",
+  "summary": "Presentation-only labels and skins.",
+  "status": "DRAFT|REVIEWED|ARCHIVED",
+  "targetSurfaceIds": ["progression_atlas", "world_grid"],
+  "targetNodeIds": ["world_grid.read_model"],
+  "displayHints": { "labels": {}, "skins": [] },
+  "prompt": "Sanitized visual prompt.",
+  "provenance": { "source": "manual" },
+  "actor": "HUMAN|AGENT",
+  "idempotencyKey": "<stable caller key>"
+}
+```
+
+Success response includes:
+```json
+{
+  "ok": true,
+  "worldDelta": [],
+  "presentationOnly": true,
+  "visualOnly": true,
+  "executionAllowed": false,
+  "gameplayMutationPolicy": "presentation_only",
+  "overlayPack": {
+    "overlayPackId": "overlay_pack_...",
+    "sourceProposalId": "civic_proposal_...",
+    "authorityBoundary": "server_owned_generated_universe_overlay_pack_presentation_only_v1",
+    "prompt": {
+      "sanitizedPrompt": "Sanitized visual prompt.",
+      "promptDigest": "<stable short hash>",
+      "rawPromptStored": false
+    }
+  },
+  "state": { "...": "Founders Plot state snapshot" }
+}
+```
+
+Boundaries:
+- no gameplay mutation, cost changes, resources, buffs, doctrine effects, routes, trade, settlement founding, scheduler/background work, Atlas-owned execution, public sharing, rendering, or external effects
+- overlay packs are excluded from the Progression Atlas stable gameplay hash
+- agent callers require a matching human approval for `create_overlay_pack`
+
+Errors include:
+- `INVALID_STATE`
+- `FORBIDDEN_POLICY`
+- `IDEMPOTENCY_CONFLICT`
+
+---
+
+## Founders Plot Civic Project Activation
+
+HQ10D civic project activation is the first bounded civic gameplay mutation after HQ10B proposal records and HQ10C presentation records. It promotes a same-plot `REVIEWED` civic proposal into a server-owned public-work record. The initial project type is `civic_beacon`, which applies one local readiness/morale marker only.
+
+### GET `/api/founders-plot/civic-projects`
+Lists persisted civic project records for the current plot.
+
+Query:
+```text
+plotId=<optional owned plot id>
+```
+
+Response includes:
+```json
+{
+  "ok": true,
+  "worldDelta": [],
+  "civicProjects": {
+    "status": "LOCKED|ACTIVATION_READY|ACTIVE",
+    "activationAllowed": true,
+    "publicWork": true,
+    "authorityBoundary": "server_owned_civic_project_activation_local_public_work_v1",
+    "activeEffects": {
+      "localCivicBeacon": true,
+      "localReadinessDelta": 1,
+      "moraleMarkers": ["civic_beacon_lit"]
+    },
+    "projects": []
+  },
+  "projects": []
+}
+```
+
+### POST `/api/founders-plot/civic-projects/activate`
+Activates one bounded civic project. Requires idempotency, HQ10A World Grid readiness, and a same-plot `REVIEWED` civic proposal.
+
+Request shape:
+```json
+{
+  "plotId": "<plot id>",
+  "sourceProposalId": "civic_proposal_...",
+  "projectType": "civic_beacon",
+  "title": "Civic Beacon",
+  "summary": "Activate a local public-work beacon.",
+  "actor": "HUMAN|AGENT",
+  "idempotencyKey": "<stable caller key>"
+}
+```
+
+Success response includes:
+```json
+{
+  "ok": true,
+  "worldDelta": [{ "type": "CIVIC_PROJECT_ACTIVATED", "summary": "..." }],
+  "effectApplied": true,
+  "alreadyActivated": false,
+  "civicProject": {
+    "projectId": "civic_project_...",
+    "sourceProposalId": "civic_proposal_...",
+    "status": "ACTIVE",
+    "projectType": "civic_beacon",
+    "effect": {
+      "effectId": "local_civic_beacon_v1",
+      "readinessDelta": 1,
+      "moraleMarker": "civic_beacon_lit"
+    },
+    "receipt": {
+      "kind": "civic_project_activation",
+      "worldGridProjectionHash": "<hash>",
+      "routeCreation": false,
+      "backgroundScheduling": false,
+      "externalEffects": false
+    },
+    "authorityBoundary": "server_owned_civic_project_activation_local_public_work_v1"
+  },
+  "state": { "...": "Founders Plot state snapshot" }
+}
+```
+
+Boundaries:
+- only same-plot `REVIEWED` civic proposals can be activated
+- activation is unique per proposal and idempotent by both idempotency key and source proposal
+- the first effect is local `civic_beacon` readiness/morale marker only
+- no resource spending, cost changes, buffs, doctrine changes, routes, trade, settlement founding, scheduler/background work, Atlas-owned execution, public sharing, or external effects
+- agent callers require a matching human approval for `activate_civic_project`
+
+Errors include:
+- `INVALID_STATE`
+- `FORBIDDEN_POLICY`
+- `IDEMPOTENCY_CONFLICT`
+
+---
+
+## Founders Plot Civic Project Inspection
+
+HQ11 civic project inspection is a one-shot, server-owned readiness check for an `ACTIVE` same-plot civic project. It records the initial `baseline_readiness` inspection, writes receipt/audit metadata, updates local World Grid readiness metadata, and exposes Atlas metadata only.
+
+Tool contract:
+- `et.plot.inspect_civic_project`
+- args schema accepts `plotId`, required `projectId`, optional `inspectionType` constrained to `baseline_readiness`, optional `note`, `actor`, and required `idempotencyKey`
+- result envelope follows the standard Founders Plot world-delta shape: `ok`, `plotId`, `worldDelta`, `error`, plus `civicProject`, `project`, `inspection`, `alreadyInspected`, `inspectionApplied`, `civicProjects`, and `state` when successful
+
+### POST `/api/founders-plot/civic-projects/inspect`
+Records one bounded baseline readiness inspection. Requires idempotency and an `ACTIVE` civic project on the current plot.
+
+Request shape:
+```json
+{
+  "plotId": "<plot id>",
+  "projectId": "civic_project_...",
+  "inspectionType": "baseline_readiness",
+  "note": "Baseline beacon inspection for HQ11 local operations.",
+  "actor": "HUMAN|AGENT",
+  "idempotencyKey": "<stable caller key>"
+}
+```
+
+Success response includes:
+```json
+{
+  "ok": true,
+  "worldDelta": [{ "type": "CIVIC_PROJECT_INSPECTED", "summary": "..." }],
+  "inspectionApplied": true,
+  "alreadyInspected": false,
+  "inspection": {
+    "kind": "civic_project_inspection",
+    "actionName": "et.plot.inspect_civic_project",
+    "projectId": "civic_project_...",
+    "inspectionType": "baseline_readiness",
+    "authorityBoundary": "server_owned_civic_project_inspection_current_plot_v1",
+    "resourceDelta": {},
+    "routeCreation": false,
+    "tradeRouteCreation": false,
+    "backgroundScheduling": false,
+    "externalEffects": false,
+    "atlasExecution": false,
+    "crossPlotMutation": false
+  },
+  "civicProject": {
+    "projectId": "civic_project_...",
+    "status": "ACTIVE",
+    "effect": {
+      "inspection": {
+        "baselineReadinessInspected": true,
+        "inspectionCount": 1,
+        "latestInspectedAt": 1700000360500
+      }
+    },
+    "receipt": {
+      "inspections": [{ "...": "same inspection receipt" }]
+    },
+    "authorityBoundary": "server_owned_civic_project_activation_local_public_work_v1"
+  },
+  "state": { "...": "Founders Plot state snapshot" }
+}
+```
+
+Envelope behavior and idempotency:
+- same idempotency key replays the original successful inspection envelope
+- a later `baseline_readiness` request with a different idempotency key returns `ok: true`, the existing inspection, `alreadyInspected: true`, `inspectionApplied: false`, and an empty `worldDelta`
+- error envelopes keep the same result shape with `ok: false`, `worldDelta: []`, and `error.code`
+
+State, World Grid, and read-model effects:
+- writes one `CIVIC_PROJECT_INSPECTED` audit event and appends the inspection receipt under the civic project receipt
+- records project inspection metadata: baseline completion, inspection count, latest inspection timestamp, and inspection readiness delta
+- updates World Grid readiness metadata including inspection count, latest inspection time, local project readiness score, and the `civic_project_baseline_inspection` readiness signal
+- does not change inventory, jobs, buildings, settlement claims, doctrines, routes, trade state, or other plots
+
+Atlas and authority boundaries:
+- Progression Atlas may display `et.plot.inspect_civic_project` as non-executable metadata with `executableByAtlas: false`
+- Atlas cannot execute the route, spend resources, mutate state, or promote inspection metadata into frontend authority
+- agent callers require a matching human approval for `inspect_civic_project`
+- no scheduler/background automation, public sharing, external effects, routes/trade, cross-plot mutation, arbitrary tool execution, Atlas execution, resource spend, frontend authority, or settlement founding
+
+Errors include:
+- `INVALID_STATE`
+- `FORBIDDEN_POLICY`
+- `IDEMPOTENCY_CONFLICT`
+
+---
+
 ## Wallet House Recovery
 
 ### GET `/api/wallet/nonce`

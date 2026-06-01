@@ -1,6 +1,6 @@
 # Internal: Skill Test Line
 
-Status: Active  
+Status: Active
 Audience: Engineering only
 Last updated: 2026-03-09
 
@@ -90,8 +90,14 @@ Keep `skill.md` evolution testable as we:
 | Trainer namespace human-agent coop verification loop | `public/trainer_namespace_plugin.js`, `public/trainer.js` | builder demonstration + repeat invocation + evidence-backed verification flow remains deterministic in trainer tooling | `e2e/107_trainer_namespace_coop_canvas.spec.js` (`trainer namespace supports a deterministic human-agent coop loop for canvas verification`) |
 | Experience UI intent tools (modal open / Atlas search / Pony compose) | `public/skill.md`, `public/app.js`, `vendors/openclaw-lite-main/src/openclaw-lite/gateway.js`, `vendors/openclaw-lite-main/src/openclaw-lite/worker.js` | worker tools `agent_town_ui_open_modal`, `agent_town_ui_atlas_search`, `agent_town_ui_pony_compose` dispatch through strict browser intent whitelist; no route replacement, no arbitrary DOM access | `e2e/108_experience_intent_open_modal.spec.js`, `e2e/109_experience_intent_atlas_search.spec.js`, `e2e/110_experience_intent_pony_compose.spec.js` |
 | Experience intent continuity + policy guards | `public/app.js`, `vendors/openclaw-lite-main/src/openclaw-lite/gateway.js` | deterministic intent envelope + trace, team/worker continuity under multi-intent flow, deterministic rejection codes (`UI_INTENT_UNKNOWN`, `UI_INTENT_INVALID_PARAM`, `CONFIRMATION_REQUIRED`) | `e2e/111_experience_intent_worker_continuity.spec.js`, `e2e/112_experience_intent_policy_negative.spec.js` |
+| Founders Plot HQ9B work-order execution boundary | `public/skill.md`, `public/experiences/founders-plot/skill.md`, `public/experiences/founders-plot/tools.md`, `server/founders_plot/engine.js`, `server/founders_plot/routes.js`, `server/founders_plot/tools.js` | `et.plot.execute_work_order` can execute only engine-owned `collect_ready_outputs_once` drafts, requires ready same-plot outputs, caps at two `collect_outputs` children, writes child receipts/idempotency keys, and requires human approval plus live `collectOutputs` policy for agent callers | `e2e/55_phase3_skill_contract_line.spec.js` (`skill.md keeps the minimal external-agent contract`), `tests-founders-plot/fp-unit.test.js` (`FP-UT-020`, `FP-UT-021`, `FP-UT-022`), `tests-founders-plot/fp-http.test.js` (`FP-HT-011c`) |
 
 ## Progress Log
+
+### 2026-05-31
+
+- Added HQ9B Founders Plot work-order executor contract coverage for `collect_ready_outputs_once`, including empty-output rejection, tampered action rejection, child receipts, idempotency, and agent approval/policy boundaries.
+- Updated the external skill contract line so `public/skill.md` documents the HQ9B executor as explicit, one-shot, same-plot, receipt-linked, and not a scheduler or arbitrary tool runner.
 
 ### 2026-02-26
 

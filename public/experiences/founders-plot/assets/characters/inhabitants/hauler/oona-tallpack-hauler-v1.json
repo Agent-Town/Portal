@@ -1,7 +1,17 @@
 {
   "id": "oona-tallpack-hauler-v1",
   "character": "Oona Tallpack",
+  "displayName": "Oona Tallpack",
   "role": "hauler",
+  "title": "Frontier Freight-Runner",
+  "backstory": "Oona Tallpack came with the Dust Comet caravan, a freight family that crossed the dry flats by following broken satellite lights. She hauled the first timber bundles that made the rescued AI agent's plan wagon livable and joined AgentTown because impossible places always need someone who can carry one more thing.",
+  "personality": "Calm, trustworthy, load-wise, quietly funny, and protective of promises attached to deliveries.",
+  "authorityBoundary": "Visual-only hauler inhabitant for collectable output and OUTPUT_READY states. Oona shows that server-side production has finished; she does not create resources or alter collection authority.",
+  "relationships": [
+    "Honors the rescued AI agent's first plan wagon by treating every bundle as part of a home.",
+    "Receives finished goods from Kettle-37 and carries construction materials toward Rigger Slate's surfaces.",
+    "Her rope knots record completed deliveries without becoming readable UI or gameplay state."
+  ],
   "model": "openai/gpt-image-2",
   "sourceImage": "oona-tallpack-hauler-v1.source.png",
   "image": "oona-tallpack-hauler-v1.png",

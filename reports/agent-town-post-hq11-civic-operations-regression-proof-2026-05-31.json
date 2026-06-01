@@ -1,0 +1,248 @@
+{
+  "generatedAt": "2026-05-31T09:03:06.927Z",
+  "title": "Post-HQ11 Civic Operations regression proof",
+  "source": "direct engine/progression_atlas/scene_state proof with isolated test STORE_PATH",
+  "plotId": "plot_dbe1001d9ffce537",
+  "civicProjectId": "civic_project_53458d642fe582c4",
+  "hq10dActivation": {
+    "ok": true,
+    "projectType": "civic_beacon",
+    "status": "ACTIVE",
+    "publicWork": true,
+    "localReadinessDelta": 1,
+    "receiptBoundary": {
+      "resourceDeltaEmpty": true,
+      "routeCreation": false,
+      "backgroundScheduling": false,
+      "externalEffects": false
+    }
+  },
+  "hq11Inspection": {
+    "ok": true,
+    "inspectionApplied": true,
+    "repeatedAlreadyInspected": true,
+    "repeatedInspectionApplied": false,
+    "repeatedWorldDeltaLength": 0,
+    "worldDeltaTypes": [
+      "CIVIC_PROJECT_INSPECTED"
+    ],
+    "eventCountBefore": 8,
+    "eventCountAfter": 9,
+    "inventoryUnchanged": true,
+    "jobsUnchanged": true,
+    "settlementClaimsUnchanged": true,
+    "civicReadinessBefore": 1,
+    "civicReadinessAfter": 2,
+    "receiptBoundary": {
+      "resourceDeltaEmpty": true,
+      "routeCreation": false,
+      "tradeRouteCreation": false,
+      "backgroundScheduling": false,
+      "externalEffects": false,
+      "atlasExecution": false,
+      "crossPlotMutation": false
+    }
+  },
+  "atlasBoundary": {
+    "civicProjectActionRefBeforeInspection": {
+      "tool": "et.plot.inspect_civic_project",
+      "http": {
+        "method": "POST",
+        "path": "/api/founders-plot/civic-projects/inspect"
+      },
+      "paramsTemplate": {
+        "actor": "HUMAN",
+        "idempotencyKey": "inspect-civic-project-baseline",
+        "inspectionType": "baseline_readiness",
+        "note": "Baseline inspection for local civic operations readiness.",
+        "projectId": "civic_project_53458d642fe582c4"
+      },
+      "required": [
+        "projectId",
+        "idempotencyKey"
+      ],
+      "requiresIdempotencyKey": true,
+      "actorSupport": [
+        "HUMAN",
+        "AGENT"
+      ],
+      "authority": "et.plot.*",
+      "executable": false,
+      "executableByAtlas": false,
+      "toolSpec": {
+        "name": "et.plot.inspect_civic_project",
+        "description": "Records one HQ11 baseline inspection for an ACTIVE same-plot civic project. This writes a receipt and audit event and updates local readiness metadata only: no resource spending, route/trade behavior, scheduler/background work, public sharing, cross-plot mutation, arbitrary tool execution, Atlas execution, or external effects. Agent callers require matching human approval.",
+        "argsSchema": {
+          "additionalProperties": false,
+          "properties": {
+            "actor": {
+              "type": "string"
+            },
+            "idempotencyKey": {
+              "maxLength": 160,
+              "minLength": 4,
+              "type": "string"
+            },
+            "inspectionType": {
+              "enum": [
+                "baseline_readiness"
+              ],
+              "type": "string"
+            },
+            "note": {
+              "type": "string"
+            },
+            "plotId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "projectId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "projectId",
+            "idempotencyKey"
+          ],
+          "type": "object"
+        },
+        "resultSchema": {
+          "additionalProperties": true,
+          "properties": {
+            "alreadyInspected": {
+              "type": "boolean"
+            },
+            "civicProject": {
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "civicProjects": {
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "error": {
+              "additionalProperties": true,
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "retryable": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "code",
+                "message",
+                "retryable"
+              ],
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "inspection": {
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "inspectionApplied": {
+              "type": "boolean"
+            },
+            "ok": {
+              "type": "boolean"
+            },
+            "plotId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "project": {
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "worldDelta": {
+              "items": {
+                "additionalProperties": true,
+                "properties": {
+                  "summary": {
+                    "type": "string"
+                  },
+                  "target": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "type": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "summary"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "ok",
+            "plotId",
+            "worldDelta",
+            "error"
+          ],
+          "type": "object"
+        }
+      },
+      "authorityBoundary": "server_owned_civic_project_inspection_current_plot_v1",
+      "note": "Atlas exposes this inspection reference as metadata only; Founders Plot owns the mutation and audit receipt."
+    },
+    "civicProjectActionRefAfterInspection": null,
+    "executableActionRefCount": 0,
+    "executableActionRefs": []
+  },
+  "visualActorBoundary": {
+    "civic_routekeeper": {
+      "serverPresent": true,
+      "scenePresent": true,
+      "serverVisualOnly": true,
+      "sceneRouteVisualOnly": true,
+      "sourceDomain": "civic_project",
+      "sourceObjectId": "civic_project_53458d642fe582c4",
+      "actionKind": "CIVIC_BEACON_ACTIVE",
+      "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/civic_routekeeper/civic-routekeeper-v1.png"
+    },
+    "oracle_adjunct": {
+      "serverPresent": true,
+      "scenePresent": true,
+      "serverVisualOnly": true,
+      "sceneRouteVisualOnly": true,
+      "sourceDomain": "world_grid",
+      "sourceObjectId": "7599e6c077de5bd8",
+      "actionKind": "WORLD_GRID_READ_MODEL",
+      "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/oracle_adjunct/oracle-adjunct-v1.png"
+    },
+    "outpost_keeper": {
+      "serverPresent": true,
+      "scenePresent": true,
+      "serverVisualOnly": true,
+      "sceneRouteVisualOnly": true,
+      "sourceDomain": "settlement_claim",
+      "sourceObjectId": "claim_0799b211e05fda37",
+      "actionKind": "OUTPOST_FOUNDED",
+      "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/outpost_keeper/outpost-keeper-v1.png"
+    }
+  }
+}

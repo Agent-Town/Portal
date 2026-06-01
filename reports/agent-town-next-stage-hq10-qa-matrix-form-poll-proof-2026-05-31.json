@@ -1,0 +1,13 @@
+{
+  "timestamp": "2026-05-31T07:10:24.700Z",
+  "command": "PORT=4251 inline Playwright form poll check",
+  "result": {
+    "stateHits": 2,
+    "titleValue": "",
+    "summaryValue": "",
+    "buttonText": "Create civic proposal",
+    "expectedTitle": "Slow typed civic title",
+    "expectedSummary": "Slow typed civic summary that should survive polling.",
+    "passed": false
+  }
+}

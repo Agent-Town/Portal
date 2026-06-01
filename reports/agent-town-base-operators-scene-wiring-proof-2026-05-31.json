@@ -1,0 +1,124 @@
+{
+  "date": "2026-05-31",
+  "repo": "/Users/robin/Projects/Portal-atlas-editor",
+  "branch": "neo/progression-atlas-editor-next-2026-05-29",
+  "lane": "base-operators-scene-wiring",
+  "mode": "visual-only",
+  "changedFiles": [
+    "public/experiences/founders-plot/scene_state.js",
+    "tests-founders-plot/fp-scene-state.test.js",
+    "reports/agent-town-base-operators-scene-wiring-slice-2026-05-31.md",
+    "reports/agent-town-base-operators-scene-wiring-proof-2026-05-31.json"
+  ],
+  "spriteSheets": {
+    "farmer": {
+      "id": "farmer-mira-seedhand-v1",
+      "src": "/experiences/founders-plot/assets/characters/inhabitants/farmer/farmer-mira-seedhand-v1.png",
+      "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/farmer/farmer-mira-seedhand-v1.json",
+      "actions": {
+        "PRODUCE": "tend",
+        "OUTPUT_READY": "ready"
+      }
+    },
+    "quarry_mason": {
+      "id": "quarry-mason-bram-stonecalm-v1",
+      "src": "/experiences/founders-plot/assets/characters/inhabitants/quarry_mason/quarry-mason-bram-stonecalm-v1.png",
+      "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/quarry_mason/quarry-mason-bram-stonecalm-v1.json",
+      "actions": {
+        "PRODUCE": "cut",
+        "OUTPUT_READY": "ready"
+      }
+    },
+    "lumber_worker": {
+      "id": "lumber-worker-jun-timberline-v1",
+      "src": "/experiences/founders-plot/assets/characters/inhabitants/lumber_worker/lumber-worker-jun-timberline-v1.png",
+      "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/lumber_worker/lumber-worker-jun-timberline-v1.json",
+      "actions": {
+        "PRODUCE": "mill",
+        "OUTPUT_READY": "ready"
+      }
+    },
+    "hq_civic_operator": {
+      "id": "hq-civic-operator-vale-desk-7-v1",
+      "src": "/experiences/founders-plot/assets/characters/inhabitants/hq_civic_operator/hq-civic-operator-vale-desk-7-v1.png",
+      "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/hq_civic_operator/hq-civic-operator-vale-desk-7-v1.json",
+      "actions": {
+        "APPROVAL": "coordinate",
+        "REWARD": "ready"
+      }
+    }
+  },
+  "sourceAnchorsUsed": [
+    {
+      "buildingType": "FARM_PLOT",
+      "existingDescriptorRoles": ["worker", "hauler"],
+      "existingActions": ["PRODUCE", "OUTPUT_READY"],
+      "projectedRole": "farmer"
+    },
+    {
+      "buildingType": "QUARRY",
+      "existingDescriptorRoles": ["worker", "hauler"],
+      "existingActions": ["PRODUCE", "OUTPUT_READY"],
+      "projectedRole": "quarry_mason"
+    },
+    {
+      "buildingType": "LUMBER_CAMP",
+      "existingDescriptorRoles": ["worker", "hauler"],
+      "existingActions": ["PRODUCE", "OUTPUT_READY"],
+      "projectedRole": "lumber_worker"
+    },
+    {
+      "buildingType": "HQ",
+      "existingDescriptorRoles": ["messenger"],
+      "existingActions": ["APPROVAL", "REWARD"],
+      "projectedRole": "hq_civic_operator",
+      "notes": "QUEST remains messenger; no general HQ actor was fabricated."
+    }
+  ],
+  "fallbacksPreserved": [
+    "CONSTRUCT and UPGRADE remain builder",
+    "non-specialized production remains worker",
+    "non-specialized ready output remains hauler",
+    "ordinary HQ QUEST remains messenger"
+  ],
+  "validation": [
+    {
+      "command": "node --check public/experiences/founders-plot/scene_state.js",
+      "result": "passed"
+    },
+    {
+      "command": "node --check tests-founders-plot/fp-scene-state.test.js",
+      "result": "passed"
+    },
+    {
+      "command": "NODE_ENV=test node --test tests-founders-plot/fp-scene-state.test.js",
+      "result": "passed",
+      "tests": 9,
+      "passed": 9,
+      "failed": 0
+    },
+    {
+      "command": "jq empty reports/agent-town-base-operators-scene-wiring-proof-2026-05-31.json",
+      "result": "passed"
+    },
+    {
+      "command": "git diff --check -- public/experiences/founders-plot/scene_state.js tests-founders-plot/fp-scene-state.test.js reports/agent-town-base-operators-scene-wiring-slice-2026-05-31.md reports/agent-town-base-operators-scene-wiring-proof-2026-05-31.json",
+      "result": "passed"
+    }
+  ],
+  "boundary": {
+    "visualOnly": true,
+    "serverChanged": false,
+    "resourceMathChanged": false,
+    "productionTimingChanged": false,
+    "rewardsChanged": false,
+    "costsChanged": false,
+    "routesOrTradeChanged": false,
+    "schedulerChanged": false,
+    "workOrdersChanged": false,
+    "civicOverlayOrProposalBehaviorChanged": false,
+    "atlasExecutionChanged": false,
+    "publicSharingChanged": false,
+    "serverAuthorityChanged": false
+  }
+}

@@ -1,0 +1,158 @@
+{
+  "ok": true,
+  "lane": "HQ13J",
+  "date": "2026-06-01",
+  "worktree": "/Users/robin/Projects/Portal-atlas-editor",
+  "verdict": "PASS_SCHEMA_SLOT_RECONCILED",
+  "scope": {
+    "docsSpecsFixturesValidatorReportProofOnly": true,
+    "runtimeAssetsPromoted": false,
+    "runtimePackLoaderCreated": false,
+    "runtimePackDirectoryCreated": false,
+    "generatedImagesCreated": false,
+    "appSourceEdited": false,
+    "serverAuthorityEdited": false,
+    "atlasExecutionEdited": false,
+    "publicSharingEdited": false,
+    "expeditionMapMutationPathEdited": false
+  },
+  "artifacts": {
+    "schema": "docs/specs/agent-town.visual-pack.v1.schema.json",
+    "validFixture": "docs/specs/fixtures/agent-town.visual-pack.v1.valid-tiny.manifest.json",
+    "invalidFixture": "docs/specs/fixtures/agent-town.visual-pack.v1.invalid-forbidden-field-path-action.manifest.json",
+    "validator": "reports/agent-town-hq13d-visual-pack-schema-validator-2026-06-01-validator.mjs",
+    "report": "reports/agent-town-hq13j-schema-slot-reconciliation-2026-06-01.md",
+    "proof": "reports/agent-town-hq13j-schema-slot-reconciliation-proof-2026-06-01.json",
+    "sourcePlaceholderProof": "reports/agent-town-hq13g-candidate-02-tiny-asset-batch-preflight-proof-2026-06-01.json",
+    "sourceSlotQaProof": "reports/agent-town-hq13i-placeholder-slot-qa-proof-2026-06-01.json"
+  },
+  "slotPolicy": {
+    "fogMarkerPackPattern": "^expedition_map\\.(fog\\.(discovered|known|hinted|locked_unknown|frontier_border)|marker\\.[a-z0-9_]+|stroke\\.[a-z0-9_]+)$",
+    "hudCardPackPattern": "^(hud\\.(card|frame)\\.[a-z0-9_]+|atlas\\.node_icon\\.[a-z0-9_]+)$",
+    "newlyAllowedNamespaces": [
+      "expedition_map.fog.frontier_border",
+      "expedition_map.stroke.<lowercase_id>",
+      "hud.frame.<lowercase_id>"
+    ]
+  },
+  "slotIntents": [
+    {
+      "slotIntent": "expedition_map.fog.hinted",
+      "module": "fogMarkers",
+      "schemaAllowed": true
+    },
+    {
+      "slotIntent": "expedition_map.fog.locked_unknown",
+      "module": "fogMarkers",
+      "schemaAllowed": true
+    },
+    {
+      "slotIntent": "expedition_map.fog.frontier_border",
+      "module": "fogMarkers",
+      "schemaAllowed": true,
+      "reconciledBy": "explicit fog frontier_border visual-only slot"
+    },
+    {
+      "slotIntent": "expedition_map.marker.known_site_plan",
+      "module": "fogMarkers",
+      "schemaAllowed": true
+    },
+    {
+      "slotIntent": "expedition_map.marker.hinted_unknown",
+      "module": "fogMarkers",
+      "schemaAllowed": true
+    },
+    {
+      "slotIntent": "expedition_map.marker.owned_outpost",
+      "module": "fogMarkers",
+      "schemaAllowed": true
+    },
+    {
+      "slotIntent": "expedition_map.stroke.scout_receipt_trace",
+      "module": "fogMarkers",
+      "schemaAllowed": true,
+      "reconciledBy": "expedition_map.stroke.<lowercase_id> visual-only slot namespace"
+    },
+    {
+      "slotIntent": "hud.frame.selected_sector_card",
+      "module": "hudCards",
+      "schemaAllowed": true,
+      "reconciledBy": "hud.frame.<lowercase_id> visual-only slot namespace"
+    }
+  ],
+  "slotSummary": {
+    "totalSlotIntents": 8,
+    "schemaAllowed": 8,
+    "schemaBlocked": 0,
+    "allCandidate02SlotIntentsAllowed": true
+  },
+  "validatorResult": {
+    "schemaPath": "docs/specs/agent-town.visual-pack.v1.schema.json",
+    "results": [
+      {
+        "fixturePath": "docs/specs/fixtures/agent-town.visual-pack.v1.valid-tiny.manifest.json",
+        "expectedValid": true,
+        "actualValid": true,
+        "pass": true,
+        "errors": []
+      },
+      {
+        "fixturePath": "docs/specs/fixtures/agent-town.visual-pack.v1.invalid-forbidden-field-path-action.manifest.json",
+        "expectedValid": false,
+        "actualValid": false,
+        "pass": true,
+        "errors": [
+          "$.modules.hudCards.slotBindings.hud.card.scout_report: forbidden field \"action\"",
+          "$.modules.hudCards.slotBindings.hud.card.scout_report: forbidden field \"serverHandler\"",
+          "$.publicSharing: must be false",
+          "$.atlasExecution: must be false",
+          "$.modules.hudCards.slotBindings.hud.card.scout_report.assetSrc: must be a same-origin static asset path"
+        ]
+      }
+    ],
+    "ok": true
+  },
+  "forbiddenRejectionProof": {
+    "actionRejected": true,
+    "serverHandlerRejected": true,
+    "publicSharingTrueRejected": true,
+    "atlasExecutionTrueRejected": true,
+    "externalHttpsAssetUrlRejected": true,
+    "sameOriginAssetPathRequired": true
+  },
+  "checks": [
+    {
+      "command": "jq empty docs/specs/agent-town.visual-pack.v1.schema.json docs/specs/fixtures/agent-town.visual-pack.v1.valid-tiny.manifest.json docs/specs/fixtures/agent-town.visual-pack.v1.invalid-forbidden-field-path-action.manifest.json reports/agent-town-hq13j-schema-slot-reconciliation-proof-2026-06-01.json",
+      "exitCode": 0
+    },
+    {
+      "command": "node --check reports/agent-town-hq13d-visual-pack-schema-validator-2026-06-01-validator.mjs",
+      "exitCode": 0
+    },
+    {
+      "command": "node reports/agent-town-hq13d-visual-pack-schema-validator-2026-06-01-validator.mjs docs/specs/agent-town.visual-pack.v1.schema.json docs/specs/fixtures/agent-town.visual-pack.v1.valid-tiny.manifest.json docs/specs/fixtures/agent-town.visual-pack.v1.invalid-forbidden-field-path-action.manifest.json",
+      "exitCode": 0
+    },
+    {
+      "command": "git diff --check -- docs/specs/agent-town.visual-pack.v1.schema.json docs/specs/fixtures/agent-town.visual-pack.v1.valid-tiny.manifest.json docs/specs/fixtures/agent-town.visual-pack.v1.invalid-forbidden-field-path-action.manifest.json reports/agent-town-hq13d-visual-pack-schema-validator-2026-06-01-validator.mjs reports/agent-town-hq13j-schema-slot-reconciliation-2026-06-01.md reports/agent-town-hq13j-schema-slot-reconciliation-proof-2026-06-01.json",
+      "exitCode": 0
+    }
+  ],
+  "guardrails": {
+    "presentationOnly": true,
+    "visualOnly": true,
+    "gameplayMutationPolicy": "presentation_only",
+    "scoutSectorOnlyCurrentMapMutation": true,
+    "eventPacketPartyCurrentFocusReadOnly": true,
+    "noServerAuthorityChange": true,
+    "noClientAuthorityChange": true,
+    "noAtlasExecution": true,
+    "noPublicSharing": true,
+    "noGeneratedUniverseRendering": true,
+    "noHiddenAutonomy": true,
+    "noRouteTradeEconomyResourceCombatSchedulerBehavior": true,
+    "noCrossPlotMutation": true,
+    "noExternalEffects": true,
+    "noWildWestDrift": true
+  }
+}

@@ -1,0 +1,97 @@
+{
+  "ok": true,
+  "date": "2026-06-01",
+  "lane": "agent-town-hq13g-candidate-02-tiny-asset-batch-preflight",
+  "verdict": "PASS_WITH_NOTES_PARENT_BACKFILLED",
+  "workerStatus": "timed_out_without_text_handoff",
+  "scope": {
+    "reportOnly": true,
+    "preflightOnly": true,
+    "productionAssetGeneration": false,
+    "runtimeWiring": false,
+    "runtimePackDirectory": false,
+    "runtimeLoader": false,
+    "appSourceEdited": false,
+    "serverAuthorityEdited": false,
+    "atlasExecutionEdited": false,
+    "expeditionMapMutationPathEdited": false
+  },
+  "artifacts": {
+    "report": "reports/agent-town-hq13g-candidate-02-tiny-asset-batch-preflight-2026-06-01.md",
+    "proof": "reports/agent-town-hq13g-candidate-02-tiny-asset-batch-preflight-proof-2026-06-01.json",
+    "contactSheet": {
+      "path": "reports/agent-town-hq13g-candidate-02-tiny-asset-batch-contact-sheet-2026-06-01.png",
+      "dimensions": "912x372",
+      "sha256": "e21dc1a47ef5c490ea3df30bed5471a2c570304d2af85e8801060d8e4f4fc5a9"
+    },
+    "placeholderDirectory": "reports/agent-town-hq13g-candidate-02-tiny-asset-batch-placeholders-2026-06-01"
+  },
+  "placeholderAssets": [
+    {
+      "slotIntent": "expedition_map.fog.hinted",
+      "file": "fog-hinted-soft-veil-v1.preflight-placeholder.png",
+      "dimensions": "512x512",
+      "sha256": "3b8d057fb85e6609e13018753af727aceffa8b43181f04f4cbc7b45909309148"
+    },
+    {
+      "slotIntent": "expedition_map.fog.locked_unknown",
+      "file": "fog-locked-heavy-cloud-v1.preflight-placeholder.png",
+      "dimensions": "512x512",
+      "sha256": "254cdbfb3211077d4d5d2b3554472f73683027af08520130b964db533af08af8"
+    },
+    {
+      "slotIntent": "expedition_map.fog.frontier_border",
+      "file": "frontier-dotted-boundary-v1.preflight-placeholder.png",
+      "dimensions": "1024x128",
+      "sha256": "dd4ad37c89e632b35542404a6f228dce188430569a920965fe46ebd45ff6c13b"
+    },
+    {
+      "slotIntent": "expedition_map.marker.known_site_plan",
+      "file": "marker-known-site-plan-v1.preflight-placeholder.png",
+      "dimensions": "128x192",
+      "sha256": "47ba388f34d1551a4871491f94aeeec53b8df9f500b7c713dfe1ccb78f8a7723"
+    },
+    {
+      "slotIntent": "expedition_map.marker.hinted_unknown",
+      "file": "marker-hinted-unknown-v1.preflight-placeholder.png",
+      "dimensions": "128x192",
+      "sha256": "177d467e4b2c50ac9c22facab461464a4345c55485bdfac4f926a5b4bfe7ba6c"
+    },
+    {
+      "slotIntent": "expedition_map.marker.owned_outpost",
+      "file": "marker-owned-outpost-v1.preflight-placeholder.png",
+      "dimensions": "128x192",
+      "sha256": "53d71b1c36b9b7495345874e14ebe23d52e1706cb0b5c9b1d91383249a791dcd"
+    },
+    {
+      "slotIntent": "expedition_map.stroke.scout_receipt_trace",
+      "file": "survey-receipt-stroke-v1.preflight-placeholder.png",
+      "dimensions": "1024x128",
+      "sha256": "d8201bf2c62f8f83bd15ed2e7862b522d52deae2e436da7a999fe5f79fa6994d"
+    },
+    {
+      "slotIntent": "hud.frame.selected_sector_card",
+      "file": "hud-selected-sector-frame-v1.preflight-placeholder.png",
+      "dimensions": "640x360",
+      "sha256": "303df2b99f59a935e3edcb6ce84a37c56750830c0cbb772abea72cd596931355"
+    }
+  ],
+  "guardrails": {
+    "runtimeAssetsPromoted": false,
+    "runtimePackLoaderCreated": false,
+    "runtimePackDirectoryCreated": false,
+    "serverAuthorityChanged": false,
+    "clientAuthorityChanged": false,
+    "scoutSectorOnlyMutationPath": true,
+    "atlasExecution": false,
+    "publicSharing": false,
+    "generatedUniverseRendering": false,
+    "hiddenAutonomy": false,
+    "routeTradeEconomyHooks": false,
+    "combatSchedulerExternalEffects": false
+  },
+  "parentChecks": [
+    "file reports/agent-town-hq13g-candidate-02-tiny-asset-batch-contact-sheet-2026-06-01.png reports/agent-town-hq13g-candidate-02-tiny-asset-batch-placeholders-2026-06-01/*.png",
+    "shasum -a 256 reports/agent-town-hq13g-candidate-02-tiny-asset-batch-contact-sheet-2026-06-01.png reports/agent-town-hq13g-candidate-02-tiny-asset-batch-placeholders-2026-06-01/*.png"
+  ]
+}

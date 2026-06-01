@@ -3,7 +3,16 @@
   "role": "builder",
   "status": "candidate",
   "displayName": "Rigger Slate",
+  "title": "Frontier Field Builder",
   "description": "Adult-coded AI construction agent and frontier machinefolk field-builder with a brass-and-teal survey body, cyan lens/display face, antenna beacon, jointed tool arms, weighted boots, and practical construction harness. This version intentionally reads as an agent rather than a Clover-like human settler.",
+  "backstory": "Rigger Slate is a compact brass-and-teal survey machinefolk builder drawn to the frontier between human settlers and future autonomous agents. He treats every beam, brace, and route marker as proof that AgentTown can make room for both careful human craft and helpful AI site work.",
+  "personality": "Competent, practical, warm through signal-light gestures, and quietly proud of sturdy work.",
+  "authorityBoundary": "Visual-only builder inhabitant. Rigger may signal construction, inspection, or readiness, but does not mutate gameplay, approve builds, or override server-owned state.",
+  "relationships": [
+    "Uses Clover's no-hole sprite set only as a polish and scale reference, not as a body or identity template.",
+    "Pairs naturally with Kettle-37 on production work and Oona Tallpack when finished materials are ready to move.",
+    "Represents current runtime builder visuals for Founders Plot construction surfaces."
+  ],
   "source": {
     "path": "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.source.png",
     "background": "#ff00ff-ish chroma key",

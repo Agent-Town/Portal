@@ -1,0 +1,61 @@
+{
+  "id": "agent-town-base-operator-farmer-sprite-integration-proof-2026-05-31",
+  "date": "2026-05-31",
+  "asset": "farmer-mira-seedhand-v1",
+  "role": "farmer",
+  "displayName": "Mira Seedhand",
+  "sourceRecoveredFrom": "/Users/robin/.openclaw/media/tool-image-generation/agent-town-farmer-mira-seedhand-sprite-sheet-v1-opaque---1c765b5e-1556-40cc-bc0e-b8c1b0734f39.png",
+  "files": {
+    "generated": "public/experiences/founders-plot/assets/characters/inhabitants/farmer/farmer-mira-seedhand-v1.generated.png",
+    "source": "public/experiences/founders-plot/assets/characters/inhabitants/farmer/farmer-mira-seedhand-v1.source.png",
+    "runtime": "public/experiences/founders-plot/assets/characters/inhabitants/farmer/farmer-mira-seedhand-v1.png",
+    "metadata": "public/experiences/founders-plot/assets/characters/inhabitants/farmer/farmer-mira-seedhand-v1.json",
+    "prompt": "public/experiences/founders-plot/assets/characters/inhabitants/farmer/farmer-mira-seedhand-v1.prompt.md",
+    "proof": "reports/agent-town-base-operator-farmer-sprite-integration-proof-2026-05-31.png",
+    "rowStrip": "reports/agent-town-base-operator-farmer-row-strip-2026-05-31.png"
+  },
+  "imageChecks": {
+    "generated": {
+      "identify": "2048x2048 sRGB srgb 3.0",
+      "sha256": "394297c3dc77f0e2a501fb209d4b773cbbd144e8cc112cf0d7e1a67a72f27865"
+    },
+    "source": {
+      "identify": "2048x2048 sRGB srgb 3.0",
+      "sha256": "394297c3dc77f0e2a501fb209d4b773cbbd144e8cc112cf0d7e1a67a72f27865"
+    },
+    "runtime": {
+      "identify": "2048x2048 sRGB srgba 4.0",
+      "sha256": "d07b0fdbd0266271e5a53718a3ecf93362c4af45364d2774a1e9b119a5dc5f0c",
+      "cornerSamples": {
+        "topLeft": "srgba(0,0,0,0)",
+        "topRight": "srgba(0,0,0,0)",
+        "bottomLeft": "srgba(0,0,0,0)",
+        "bottomRight": "srgba(0,0,0,0)"
+      },
+      "alphaMean": 0.239559
+    },
+    "proof": {
+      "identify": "1024x512 sRGB srgb 3.0",
+      "sha256": "ed2a75d204bf17b05f690f0d169824bac40113751eb0a3e3f330e9114a8a98af"
+    },
+    "rowStrip": {
+      "identify": "1024x1024 sRGB srgb 3.0",
+      "sha256": "df467e99fa5f0278e238cccaad8f911e349de75f9bb9f7ac59a45719e09260b6"
+    }
+  },
+  "postProcessing": {
+    "tool": "ImageMagick",
+    "steps": [
+      "Converted #f503f4-like magenta background to alpha with 22 percent fuzz.",
+      "Converted #fdf5fe-like pale magenta/near-white background to alpha with 18 percent fuzz.",
+      "Cleared 24px guide strips around 512px grid boundaries."
+    ]
+  },
+  "boundary": {
+    "visualOnly": true,
+    "sceneWiringChanged": false,
+    "gameplayAuthorityChanged": false,
+    "serverChanged": false,
+    "atlasChanged": false
+  }
+}

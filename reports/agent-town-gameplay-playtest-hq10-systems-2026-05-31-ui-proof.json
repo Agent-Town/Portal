@@ -1,0 +1,178 @@
+{
+  "desktop": {
+    "workOrders": {
+      "text": "Work Orders Bounded delegation only: draft here, execute explicitly, collect receipts.Collect Ready Outputs OnceDraft readyDrafts and explicitly executes a bounded cohort work order for collecting up to two ready outputs once.collect outputscap 2 child actionsspend cap 0runtime cap 2m 0scurrent plot onlydraft expires 24hExplicit execution only. No scheduler, spending, placement, scouting, founding, or Atlas mutation.Create DraftReceipts and draftsCollect Ready Outputs OnceCOMPLETEDcollect ready outputs once - all ready outputs, output ready, max 2collect outputscap 2 child actionsspend cap 0runtime cap 2m 0scurrent plot only2 child receiptsCompleted receipt. Child receipts are preserved for audit.Execution is a human-clicked endpoint call. No background automation runs this draft.",
+      "buttons": [
+        "Create Draft"
+      ]
+    },
+    "worldGrid": {
+      "text": "World Grid World Grid statusREAD MODEL READY - read-only4/4 requirements ready for HQ10B civic proposal records.Read-only advisory projection. No civic mutation, routes, scheduling, spending, Atlas execution, or arbitrary tool execution.RequirementsReady: HQ6 Settlement CharterReady: Founded outpostReady: Survey Discipline selectedReady: Collect-ready work-order executor availableKnown scope2 known plots, 1 founded outpost, 1 settlement claim.Claims: FOUNDED 1. Home plot_54b62cf5242eaddd, active plot_54b62cf5242eaddd.Civic readinessReady: multi plot visibilityReady: claim receiptsReady: doctrine contextReady: bounded work ordersCivic proposal records may be promoted next, but this panel cannot create or execute them.Prohibited capabilitiescivic mutationtrade routesbackground schedulingarbitrary tool executionresource spendingatlas owned executionexternal or public effectsserver_owned_read_only_world_grid_projection_no_civic_mutation_v1",
+      "buttons": []
+    },
+    "civicProposals": {
+      "text": "Civic Proposals Civic Proposal RecordsRECORDING READY - proposal only1 proposal record: DRAFT 0, REVIEWED 1, ARCHIVED 0.DRAFTREVIEWEDARCHIVEDcoordinationpublic workroute studycivic memoryserver_owned_civic_proposal_record_no_execution_v1. Records are for review and memory; execution is not implemented.Create civic proposalThis writes one advisory record through POST /api/founders-plot/civic-proposals. It does not execute, apply, route, trade, spend, share, or schedule anything.TitleCategorycoordinationpublic workroute studycivic memoryRecord statusDRAFTREVIEWEDARCHIVEDSummaryReview noteCreate civic proposalAdvisory record only. No world mutation, public effect, route creation, scheduling, spending, sharing, or Atlas execution.Stored proposal recordsOutpost welcome reviewREVIEWEDReview-only memory-only proposal for a future welcome board near the first founded outpost.civic memoryproposalOnly true, execution not implemented, 2 known plots, 1 outpostsreviewed record onlyreviewed by humannot executablecreated by humanReview memory: Reviewed as a record only; no civic execution or route creation.server_owned_civic_proposal_record_no_execution_v1; execution is not implemented.",
+      "buttons": [
+        "Create civic proposal"
+      ]
+    },
+    "overlayPacks": {
+      "text": "Generated Universe Overlay Packs Generated Universe Overlay PacksRECORDING READY - presentation only1 overlay pack record: DRAFT 1, REVIEWED 0, ARCHIVED 0.presentationOnly truevisualOnly trueexecution disabledrendering not implementedpublic sharing falsestable gameplay hash excludedserver_owned_generated_universe_overlay_pack_presentation_only_v1. Records are presentation-only memory/proposal artifacts; they are not applied overlays, generated renders, or public shares.Server requirementsReady: HQ6 Settlement CharterReady: Founded outpostReady: Survey Discipline selectedReady: Collect-ready work-order executor availableReady: Reviewed civic proposalAll published requirements are ready; the UI can only write a record.Omitted capabilitiespublic sharingactual Generated Universe renderinggameplay costs resources buffsroutes trade behaviorscheduler background executionAtlas owned executionexternal effectsNone of these are available from this Founders Plot surface.Create overlay recordThis writes one presentation-only record through POST /api/founders-plot/overlay-packs. It does not apply, render, publish, share, route, trade, spend, schedule, or execute anything.Reviewed civic proposalOutpost welcome review (civic_proposal_871c54e36600fae8)TitleThemeRecord statusDRAFTREVIEWEDARCHIVEDSummarySanitized promptTargets recorded as metadata: Progression Atlas and World Grid nodes only.Create Overlay RecordRecord only. No applied overlay, render, public share, gameplay mutation, resource spend, route, scheduler, external effect, or Atlas execution.Stored overlay recordsLantern Grid OverlayDRAFTPresentation-only labels, skins, and display hints for World Grid and Atlas nodes.lantern gridpresentationOnly truevisualOnly trueexecution disabledpublic sharing falseexternal effects falsecreated by humansurfaces progression atlas, world grid; nodes generated universe overlay pack records, world grid read modelPrompt digest e16edc05edceabd7; raw prompt stored false.Source proposal civic_proposal_871c54e36600fae8; rendering and public sharing are not implemented.server_owned_generated_universe_overlay_pack_presentation_only_v1; gameplay mutation policy presentation_only.",
+      "buttons": [
+        "Create Overlay Record"
+      ]
+    },
+    "hq10ButtonTexts": [
+      "Create civic proposal",
+      "Create Overlay Record"
+    ]
+  },
+  "mobile": {
+    "viewport": 390,
+    "documentScrollWidth": 390,
+    "bodyScrollWidth": 390,
+    "clipped": []
+  },
+  "consoleMessages": [
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0x13c00198a00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0x13c00198a00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0x13c00198a00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0x13c00198a00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    }
+  ]
+}

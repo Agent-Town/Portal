@@ -1,0 +1,119 @@
+{
+  "id": "agent-town-gpt-image-2-ui-asset-quality-proof-2026-05-31",
+  "date": "2026-05-31",
+  "scope": "HQ10/HQ10D Founders Plot UI image asset quality audit",
+  "proofImages": [
+    {
+      "path": "reports/agent-town-gpt-image-2-ui-asset-quality-contact-sheet-2026-05-31.png",
+      "kind": "contact_sheet",
+      "dimensions": "1128x894",
+      "channels": "srgb"
+    },
+    {
+      "path": "reports/agent-town-gpt-image-2-ui-asset-quality-hq10-card-art-proof-2026-05-31.png",
+      "kind": "playwright_ui_proof",
+      "dimensions": "1280x5965",
+      "channels": "srgb"
+    }
+  ],
+  "auditedGeneratedAssets": [
+    {
+      "id": "world-grid-civic-beacon-v1",
+      "files": [
+        "public/experiences/founders-plot/assets/objects/world-grid-civic-beacon.prompt.md",
+        "public/experiences/founders-plot/assets/objects/world-grid-civic-beacon.generated.png",
+        "public/experiences/founders-plot/assets/objects/world-grid-civic-beacon.source.png",
+        "public/experiences/founders-plot/assets/objects/world-grid-civic-beacon.png",
+        "public/experiences/founders-plot/assets/objects/world-grid-civic-beacon.webp",
+        "public/experiences/founders-plot/assets/objects/world-grid-civic-beacon.json"
+      ],
+      "runtimeDimensions": "1024x1024",
+      "runtimeChannels": "srgba",
+      "transparentCorners": true,
+      "provenanceStatus": "complete_repo_sidecars_and_native_generated_path_recorded"
+    },
+    {
+      "id": "civic-routekeeper-v1",
+      "files": [
+        "public/experiences/founders-plot/assets/characters/inhabitants/civic_routekeeper/civic-routekeeper-v1.prompt.md",
+        "public/experiences/founders-plot/assets/characters/inhabitants/civic_routekeeper/civic-routekeeper-v1.generated.png",
+        "public/experiences/founders-plot/assets/characters/inhabitants/civic_routekeeper/civic-routekeeper-v1.source.png",
+        "public/experiences/founders-plot/assets/characters/inhabitants/civic_routekeeper/civic-routekeeper-v1.png",
+        "public/experiences/founders-plot/assets/characters/inhabitants/civic_routekeeper/civic-routekeeper-v1.json"
+      ],
+      "runtimeDimensions": "2048x2048",
+      "runtimeChannels": "srgba",
+      "sheetContract": "4x4, 512px cells",
+      "transparentCorners": true,
+      "provenanceStatus": "complete_repo_sidecars_and_native_generated_path_recorded"
+    },
+    {
+      "id": "oracle-adjunct-v1",
+      "files": [
+        "public/experiences/founders-plot/assets/characters/inhabitants/oracle_adjunct/oracle-adjunct-v1.prompt.md",
+        "public/experiences/founders-plot/assets/characters/inhabitants/oracle_adjunct/oracle-adjunct-v1.generated.png",
+        "public/experiences/founders-plot/assets/characters/inhabitants/oracle_adjunct/oracle-adjunct-v1.source.png",
+        "public/experiences/founders-plot/assets/characters/inhabitants/oracle_adjunct/oracle-adjunct-v1.png",
+        "public/experiences/founders-plot/assets/characters/inhabitants/oracle_adjunct/oracle-adjunct-v1.json"
+      ],
+      "runtimeDimensions": "2048x2048",
+      "runtimeChannels": "srgba",
+      "sheetContract": "4x4, 512px cells",
+      "transparentCorners": true,
+      "provenanceStatus": "complete_repo_sidecars_and_native_generated_path_recorded"
+    },
+    {
+      "id": "outpost-keeper-v1",
+      "files": [
+        "public/experiences/founders-plot/assets/characters/inhabitants/outpost_keeper/outpost-keeper-v1.prompt.md",
+        "public/experiences/founders-plot/assets/characters/inhabitants/outpost_keeper/outpost-keeper-v1.generated.png",
+        "public/experiences/founders-plot/assets/characters/inhabitants/outpost_keeper/outpost-keeper-v1.source.png",
+        "public/experiences/founders-plot/assets/characters/inhabitants/outpost_keeper/outpost-keeper-v1.png",
+        "public/experiences/founders-plot/assets/characters/inhabitants/outpost_keeper/outpost-keeper-v1.json"
+      ],
+      "runtimeDimensions": "2048x2048",
+      "runtimeChannels": "srgba",
+      "sheetContract": "4x4, 512px cells",
+      "transparentCorners": true,
+      "provenanceStatus": "complete_repo_sidecars_and_native_generated_path_recorded"
+    }
+  ],
+  "uiWiringProof": [
+    {
+      "testId": "fp-world-grid-status-art",
+      "src": "/experiences/founders-plot/assets/objects/world-grid-civic-beacon.webp",
+      "naturalWidth": 1024,
+      "naturalHeight": 1024
+    },
+    {
+      "testId": "fp-civic-proposals-status-art",
+      "src": "/experiences/founders-plot/assets/objects/world-grid-civic-beacon.webp",
+      "naturalWidth": 1024,
+      "naturalHeight": 1024
+    },
+    {
+      "testId": "fp-overlay-packs-status-art",
+      "src": "/experiences/founders-plot/assets/objects/world-grid-civic-beacon.webp",
+      "naturalWidth": 1024,
+      "naturalHeight": 1024
+    }
+  ],
+  "imageMagickChecks": [
+    "Batch C final character sprites: 2048x2048 PNG srgba, transparent corners.",
+    "World Grid Civic Beacon final PNG/WebP: 1024x1024 srgba, transparent corners.",
+    "Existing HQ3-HQ10 scene/card assets sampled for this audit: 512x512 srgba PNG/WebP runtime pairs where sidecars exist.",
+    "HQ10 proof screenshots are srgb PNG captures."
+  ],
+  "blockedOnGeneration": [
+    "Dedicated HQ10 Civic Proposal dossier/card art.",
+    "Dedicated HQ10 Generated Universe Overlay Pack card art.",
+    "Dedicated World Grid Atlas/node icon registry asset.",
+    "Dedicated Coin, XP, Workshop, Market Stall, Construct, Produce, and Collect icon registry assets where the current registries still use symbol fallbacks.",
+    "Repo-side prompt/source/generated provenance for older base scene assets that predate the GPT Image 2.0 asset workflow."
+  ],
+  "boundaries": [
+    "No server, store, route, tool, scheduler, route/trade, public sharing, or gameplay authority changes.",
+    "UI card-art wiring is browser presentation only.",
+    "No external image generation was called in this session."
+  ]
+}

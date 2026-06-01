@@ -1,0 +1,80 @@
+{
+  "proof": "agent-town-hq10b-civic-proposal-records-slice-2026-05-31",
+  "generatedBy": "server_founders_plot_engine",
+  "setup": {
+    "doctrineSelected": true,
+    "workOrderDrafted": true,
+    "worldGridReadyBeforeRecord": "06f8497a77b885d0"
+  },
+  "created": {
+    "ok": true,
+    "proposalId": "civic_proposal_d03167b69f3a7073",
+    "status": "DRAFT",
+    "category": "coordination",
+    "proposalOnly": true,
+    "executionAllowed": false,
+    "authorityBoundary": "server_owned_civic_proposal_record_no_execution_v1",
+    "relatedPlotIds": []
+  },
+  "list": {
+    "ok": true,
+    "status": "RECORDING_READY",
+    "proposalOnly": true,
+    "counts": {
+      "total": 1,
+      "byStatus": {
+        "DRAFT": 1,
+        "REVIEWED": 0,
+        "ARCHIVED": 0
+      },
+      "draftCount": 1,
+      "reviewedCount": 0,
+      "archivedCount": 0
+    },
+    "worldDelta": []
+  },
+  "worldGrid": {
+    "status": "READ_MODEL_READY",
+    "ready": true,
+    "proposalSummary": {
+      "proposalOnly": true,
+      "executionAllowed": false,
+      "authorityBoundary": "server_owned_civic_proposal_record_no_execution_v1",
+      "total": 1,
+      "byStatus": {
+        "DRAFT": 1,
+        "REVIEWED": 0,
+        "ARCHIVED": 0
+      },
+      "latestProposalId": "civic_proposal_d03167b69f3a7073"
+    },
+    "projectionHash": "ad1b7ff1f67dc528",
+    "plotProjectionHasUpdatedAt": false
+  },
+  "state": {
+    "civicProposalCount": 1,
+    "civicProposalDraftCount": 1,
+    "jobCount": 0,
+    "settlementClaimCount": 1
+  },
+  "atlas": {
+    "summary": {
+      "civicProposalCount": 1,
+      "civicProposalDraftCount": 1,
+      "worldGridStatus": "READ_MODEL_READY",
+      "worldGridReady": true
+    },
+    "proposalRecordsNode": {
+      "status": "available",
+      "executableByAtlas": false,
+      "boundary": "server_owned_civic_proposal_record_no_execution_v1",
+      "count": 1
+    },
+    "proposalNode": {
+      "nodeId": "civic_proposal.civic_proposal_d03167b69f3a7073",
+      "status": "waiting",
+      "actionRef": null,
+      "executionAllowed": false
+    }
+  }
+}

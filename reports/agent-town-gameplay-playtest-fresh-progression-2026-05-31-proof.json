@@ -1,0 +1,3482 @@
+{
+  "ok": true,
+  "baseUrl": "http://[::1]:6292",
+  "generatedAt": "2026-05-31T07:22:23.315Z",
+  "reportStem": "agent-town-gameplay-playtest-fresh-progression-2026-05-31",
+  "appStore": "/Users/robin/Projects/Portal-atlas-editor/reports/agent-town-gameplay-playtest-fresh-progression-2026-05-31-app-store.sqlite",
+  "foundersPlotStore": "/Users/robin/Projects/Portal-atlas-editor/reports/agent-town-gameplay-playtest-fresh-progression-2026-05-31-founders-plot-store.sqlite",
+  "screenshots": [
+    {
+      "label": "initial-hq-resource-strip",
+      "path": "/Users/robin/Projects/Portal-atlas-editor/reports/agent-town-gameplay-playtest-fresh-progression-2026-05-31-01-initial-hq-resource-strip.png"
+    },
+    {
+      "label": "hq2-gate-missing-resource-buildings",
+      "path": "/Users/robin/Projects/Portal-atlas-editor/reports/agent-town-gameplay-playtest-fresh-progression-2026-05-31-02-hq2-gate-missing-resource-buildings.png"
+    },
+    {
+      "label": "hq2-after-basic-collect-loop",
+      "path": "/Users/robin/Projects/Portal-atlas-editor/reports/agent-town-gameplay-playtest-fresh-progression-2026-05-31-03-hq2-after-basic-collect-loop.png"
+    },
+    {
+      "label": "hq3-expedition-board-ready",
+      "path": "/Users/robin/Projects/Portal-atlas-editor/reports/agent-town-gameplay-playtest-fresh-progression-2026-05-31-04-hq3-expedition-board-ready.png"
+    },
+    {
+      "label": "expedition-board-scout-affordance",
+      "path": "/Users/robin/Projects/Portal-atlas-editor/reports/agent-town-gameplay-playtest-fresh-progression-2026-05-31-05-expedition-board-scout-affordance.png"
+    },
+    {
+      "label": "scout-dispatched-action-queue",
+      "path": "/Users/robin/Projects/Portal-atlas-editor/reports/agent-town-gameplay-playtest-fresh-progression-2026-05-31-06-scout-dispatched-action-queue.png"
+    },
+    {
+      "label": "scout-report-collected",
+      "path": "/Users/robin/Projects/Portal-atlas-editor/reports/agent-town-gameplay-playtest-fresh-progression-2026-05-31-07-scout-report-collected.png"
+    },
+    {
+      "label": "site-plan-drafted",
+      "path": "/Users/robin/Projects/Portal-atlas-editor/reports/agent-town-gameplay-playtest-fresh-progression-2026-05-31-08-site-plan-drafted.png"
+    },
+    {
+      "label": "hq4-workshop-blocked-without-reward-ui",
+      "path": "/Users/robin/Projects/Portal-atlas-editor/reports/agent-town-gameplay-playtest-fresh-progression-2026-05-31-09-hq4-workshop-blocked-without-reward-ui.png"
+    },
+    {
+      "label": "hq5-market-stall-blocked-without-reward-ui",
+      "path": "/Users/robin/Projects/Portal-atlas-editor/reports/agent-town-gameplay-playtest-fresh-progression-2026-05-31-10-hq5-market-stall-blocked-without-reward-ui.png"
+    },
+    {
+      "label": "hq6-settlement-charter-ready",
+      "path": "/Users/robin/Projects/Portal-atlas-editor/reports/agent-town-gameplay-playtest-fresh-progression-2026-05-31-11-hq6-settlement-charter-ready.png"
+    },
+    {
+      "label": "site-plan-reviewed-settlement-charter",
+      "path": "/Users/robin/Projects/Portal-atlas-editor/reports/agent-town-gameplay-playtest-fresh-progression-2026-05-31-12-site-plan-reviewed-settlement-charter.png"
+    },
+    {
+      "label": "settler-convoy-preparing",
+      "path": "/Users/robin/Projects/Portal-atlas-editor/reports/agent-town-gameplay-playtest-fresh-progression-2026-05-31-13-settler-convoy-preparing.png"
+    },
+    {
+      "label": "second-plot-founded-owned-plots",
+      "path": "/Users/robin/Projects/Portal-atlas-editor/reports/agent-town-gameplay-playtest-fresh-progression-2026-05-31-14-second-plot-founded-owned-plots.png"
+    },
+    {
+      "label": "research-lodge-doctrine-selected",
+      "path": "/Users/robin/Projects/Portal-atlas-editor/reports/agent-town-gameplay-playtest-fresh-progression-2026-05-31-15-research-lodge-doctrine-selected.png"
+    },
+    {
+      "label": "ready-outputs-before-work-order",
+      "path": "/Users/robin/Projects/Portal-atlas-editor/reports/agent-town-gameplay-playtest-fresh-progression-2026-05-31-16-ready-outputs-before-work-order.png"
+    },
+    {
+      "label": "work-order-draft-created",
+      "path": "/Users/robin/Projects/Portal-atlas-editor/reports/agent-town-gameplay-playtest-fresh-progression-2026-05-31-17-work-order-draft-created.png"
+    },
+    {
+      "label": "work-order-executed",
+      "path": "/Users/robin/Projects/Portal-atlas-editor/reports/agent-town-gameplay-playtest-fresh-progression-2026-05-31-18-work-order-executed.png"
+    },
+    {
+      "label": "world-grid-read-only-boundary",
+      "path": "/Users/robin/Projects/Portal-atlas-editor/reports/agent-town-gameplay-playtest-fresh-progression-2026-05-31-19-world-grid-read-only-boundary.png"
+    },
+    {
+      "label": "mobile-390-final-layout",
+      "path": "/Users/robin/Projects/Portal-atlas-editor/reports/agent-town-gameplay-playtest-fresh-progression-2026-05-31-20-mobile-390-final-layout.png"
+    }
+  ],
+  "milestones": [
+    {
+      "label": "Initial HQ and resource strip",
+      "hqLevel": 1,
+      "townXp": 0,
+      "inventory": {
+        "wood": 0,
+        "stone": 0,
+        "food": 0,
+        "coin": 20
+      },
+      "questStep": "Raise your first Lumber Camp",
+      "questHint": "Place a Lumber Camp on any open pad so the settlement can start producing wood.",
+      "buildings": [
+        {
+          "type": "HQ",
+          "level": 1,
+          "state": "READY",
+          "x": 1,
+          "y": 0
+        }
+      ],
+      "scoutReports": [],
+      "sitePlans": [],
+      "settlementClaims": [],
+      "ownedPlots": [
+        {
+          "plotId": "plot_970554f13b8664b9",
+          "role": "HOME",
+          "title": "Founders Plot",
+          "active": true
+        }
+      ],
+      "selectedDoctrine": null,
+      "workOrders": []
+    },
+    {
+      "label": "HQ2 gate before resource buildings",
+      "hqLevel": 1,
+      "townXp": 0,
+      "inventory": {
+        "wood": 0,
+        "stone": 0,
+        "food": 0,
+        "coin": 20
+      },
+      "questStep": "Raise your first Lumber Camp",
+      "questHint": "Place a Lumber Camp on any open pad so the settlement can start producing wood.",
+      "buildings": [
+        {
+          "type": "HQ",
+          "level": 1,
+          "state": "READY",
+          "x": 1,
+          "y": 0
+        }
+      ],
+      "scoutReports": [],
+      "sitePlans": [],
+      "settlementClaims": [],
+      "ownedPlots": [
+        {
+          "plotId": "plot_970554f13b8664b9",
+          "role": "HOME",
+          "title": "Founders Plot",
+          "active": true
+        }
+      ],
+      "selectedDoctrine": null,
+      "workOrders": [],
+      "hqGateText": "🪵 wood: 0/20 need 20🌾 food: 0/10 need 10XP: 0/25 need 25Lumber Camp: missing/READYFarm Plot: missing/READY"
+    },
+    {
+      "label": "HQ2 after basic collect loop",
+      "hqLevel": 2,
+      "townXp": 50,
+      "inventory": {
+        "wood": 8,
+        "stone": 0,
+        "food": 6,
+        "coin": 8
+      },
+      "questStep": "Stock supplies for a Quarry",
+      "questHint": "Quarry unlocks at HQ Level 2 and provides the stone needed for HQ Level 3. Progress: wood: 8/16, need 8; food: 6/10, need 4; coin: 8/6.",
+      "buildings": [
+        {
+          "type": "HQ",
+          "level": 2,
+          "state": "READY",
+          "x": 1,
+          "y": 0
+        },
+        {
+          "type": "LUMBER_CAMP",
+          "level": 1,
+          "state": "READY",
+          "x": 0,
+          "y": 1
+        },
+        {
+          "type": "FARM_PLOT",
+          "level": 1,
+          "state": "READY",
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "scoutReports": [],
+      "sitePlans": [],
+      "settlementClaims": [],
+      "ownedPlots": [
+        {
+          "plotId": "plot_970554f13b8664b9",
+          "role": "HOME",
+          "title": "Founders Plot",
+          "active": true
+        }
+      ],
+      "selectedDoctrine": null,
+      "workOrders": []
+    },
+    {
+      "label": "HQ3 with Expedition Board ready",
+      "hqLevel": 3,
+      "townXp": 95,
+      "inventory": {
+        "wood": 8,
+        "stone": 4,
+        "food": 4,
+        "coin": 2
+      },
+      "questStep": "Stock supplies for the first scout",
+      "questHint": "Scouting spends a little food and wood so expansion has a real cost. Progress: wood: 8/4; food: 4/6, need 2.",
+      "buildings": [
+        {
+          "type": "HQ",
+          "level": 3,
+          "state": "READY",
+          "x": 1,
+          "y": 0
+        },
+        {
+          "type": "LUMBER_CAMP",
+          "level": 1,
+          "state": "READY",
+          "x": 0,
+          "y": 1
+        },
+        {
+          "type": "FARM_PLOT",
+          "level": 1,
+          "state": "READY",
+          "x": 1,
+          "y": 1
+        },
+        {
+          "type": "QUARRY",
+          "level": 1,
+          "state": "READY",
+          "x": 2,
+          "y": 1
+        },
+        {
+          "type": "EXPEDITION_BOARD",
+          "level": 1,
+          "state": "READY",
+          "x": 0,
+          "y": 2
+        }
+      ],
+      "scoutReports": [],
+      "sitePlans": [],
+      "settlementClaims": [],
+      "ownedPlots": [
+        {
+          "plotId": "plot_970554f13b8664b9",
+          "role": "HOME",
+          "title": "Founders Plot",
+          "active": true
+        }
+      ],
+      "selectedDoctrine": null,
+      "workOrders": []
+    },
+    {
+      "label": "Scout Report collected",
+      "hqLevel": 3,
+      "townXp": 100,
+      "inventory": {
+        "wood": 4,
+        "stone": 4,
+        "food": 6,
+        "coin": 2
+      },
+      "questStep": "Draft the first Site Plan",
+      "questHint": "Forest Ridge Survey is a real receipt now. Turn it into a server-owned Site Plan before any future claim or settler convoy exists.",
+      "buildings": [
+        {
+          "type": "HQ",
+          "level": 3,
+          "state": "READY",
+          "x": 1,
+          "y": 0
+        },
+        {
+          "type": "LUMBER_CAMP",
+          "level": 1,
+          "state": "READY",
+          "x": 0,
+          "y": 1
+        },
+        {
+          "type": "FARM_PLOT",
+          "level": 1,
+          "state": "READY",
+          "x": 1,
+          "y": 1
+        },
+        {
+          "type": "QUARRY",
+          "level": 1,
+          "state": "READY",
+          "x": 2,
+          "y": 1
+        },
+        {
+          "type": "EXPEDITION_BOARD",
+          "level": 1,
+          "state": "READY",
+          "x": 0,
+          "y": 2
+        }
+      ],
+      "scoutReports": [
+        {
+          "reportId": "scout_report_1_forest-ridge",
+          "title": "Forest Ridge Survey",
+          "recommendedNext": "Save this report as the first candidate for a later settler convoy."
+        }
+      ],
+      "sitePlans": [],
+      "settlementClaims": [],
+      "ownedPlots": [
+        {
+          "plotId": "plot_970554f13b8664b9",
+          "role": "HOME",
+          "title": "Founders Plot",
+          "active": true
+        }
+      ],
+      "selectedDoctrine": null,
+      "workOrders": [],
+      "firstReport": {
+        "reportId": "scout_report_1_forest-ridge",
+        "originPlotId": "plot_970554f13b8664b9",
+        "sourceBuildingId": "bldg_b73f37d046cb2f23",
+        "title": "Forest Ridge Survey",
+        "siteType": "woodland_ridge",
+        "risk": "low",
+        "traits": [
+          "wood-rich",
+          "stone outcrop",
+          "settler-safe"
+        ],
+        "resourceHints": {
+          "wood": 2,
+          "stone": 1
+        },
+        "summary": "A nearby ridge has timber, surface stone, and enough flat ground for a future outpost.",
+        "recommendedNext": "Save this report as the first candidate for a later settler convoy.",
+        "sequence": 1,
+        "createdAt": 1780211654110
+      }
+    },
+    {
+      "label": "Site Plan drafted from Scout Report",
+      "hqLevel": 3,
+      "townXp": 100,
+      "inventory": {
+        "wood": 4,
+        "stone": 4,
+        "food": 6,
+        "coin": 2
+      },
+      "questStep": "Reach HQ Level 4",
+      "questHint": "Keep the loop moving: queue jobs, collect outputs, and convert the surplus into progression.",
+      "buildings": [
+        {
+          "type": "HQ",
+          "level": 3,
+          "state": "READY",
+          "x": 1,
+          "y": 0
+        },
+        {
+          "type": "LUMBER_CAMP",
+          "level": 1,
+          "state": "READY",
+          "x": 0,
+          "y": 1
+        },
+        {
+          "type": "FARM_PLOT",
+          "level": 1,
+          "state": "READY",
+          "x": 1,
+          "y": 1
+        },
+        {
+          "type": "QUARRY",
+          "level": 1,
+          "state": "READY",
+          "x": 2,
+          "y": 1
+        },
+        {
+          "type": "EXPEDITION_BOARD",
+          "level": 1,
+          "state": "READY",
+          "x": 0,
+          "y": 2
+        }
+      ],
+      "scoutReports": [
+        {
+          "reportId": "scout_report_1_forest-ridge",
+          "title": "Forest Ridge Survey",
+          "recommendedNext": "Save this report as the first candidate for a later settler convoy."
+        }
+      ],
+      "sitePlans": [
+        {
+          "planId": "site_plan_scout_report_1_forest_ridge",
+          "title": "Forest Ridge Survey Site Plan",
+          "status": "DRAFT",
+          "promotionStatus": "draft",
+          "authorityBoundary": "requires_engine_promotion_for_settlement"
+        }
+      ],
+      "settlementClaims": [],
+      "ownedPlots": [
+        {
+          "plotId": "plot_970554f13b8664b9",
+          "role": "HOME",
+          "title": "Founders Plot",
+          "active": true
+        }
+      ],
+      "selectedDoctrine": null,
+      "workOrders": [],
+      "firstPlan": {
+        "planId": "site_plan_scout_report_1_forest_ridge",
+        "reportId": "scout_report_1_forest-ridge",
+        "originPlotId": "plot_970554f13b8664b9",
+        "title": "Forest Ridge Survey Site Plan",
+        "focus": "balanced",
+        "status": "DRAFT",
+        "promotionStatus": "draft",
+        "reviewStatus": "unreviewed",
+        "source": "scout_report",
+        "authorityBoundary": "requires_engine_promotion_for_settlement",
+        "siteType": "woodland_ridge",
+        "risk": "low",
+        "traits": [
+          "wood-rich",
+          "stone outcrop",
+          "settler-safe"
+        ],
+        "resourceHints": {
+          "wood": 2,
+          "stone": 1
+        },
+        "summary": "Draft balanced settlement from Forest Ridge Survey. A nearby ridge has timber, surface stone, and enough flat ground for a future outpost.",
+        "recommendedNext": "Compare in the Progression Atlas, then promote only after second-settlement rules, costs, and tools exist.",
+        "reviewedAt": null,
+        "reviewNote": "",
+        "sequence": 1,
+        "createdAt": 1780211580700
+      }
+    },
+    {
+      "label": "HQ4 Workshop affordability check before hidden rewards",
+      "hqLevel": 4,
+      "townXp": 120,
+      "inventory": {
+        "wood": 4,
+        "stone": 6,
+        "food": 2,
+        "coin": 2
+      },
+      "questStep": "Reach HQ Level 5",
+      "questHint": "Keep the loop moving: queue jobs, collect outputs, and convert the surplus into progression.",
+      "buildings": [
+        {
+          "type": "HQ",
+          "level": 4,
+          "state": "READY",
+          "x": 1,
+          "y": 0
+        },
+        {
+          "type": "LUMBER_CAMP",
+          "level": 1,
+          "state": "READY",
+          "x": 0,
+          "y": 1
+        },
+        {
+          "type": "FARM_PLOT",
+          "level": 1,
+          "state": "READY",
+          "x": 1,
+          "y": 1
+        },
+        {
+          "type": "QUARRY",
+          "level": 1,
+          "state": "READY",
+          "x": 2,
+          "y": 1
+        },
+        {
+          "type": "EXPEDITION_BOARD",
+          "level": 1,
+          "state": "READY",
+          "x": 0,
+          "y": 2
+        }
+      ],
+      "scoutReports": [
+        {
+          "reportId": "scout_report_1_forest-ridge",
+          "title": "Forest Ridge Survey",
+          "recommendedNext": "Save this report as the first candidate for a later settler convoy."
+        }
+      ],
+      "sitePlans": [
+        {
+          "planId": "site_plan_scout_report_1_forest_ridge",
+          "title": "Forest Ridge Survey Site Plan",
+          "status": "DRAFT",
+          "promotionStatus": "draft",
+          "authorityBoundary": "requires_engine_promotion_for_settlement"
+        }
+      ],
+      "settlementClaims": [],
+      "ownedPlots": [
+        {
+          "plotId": "plot_970554f13b8664b9",
+          "role": "HOME",
+          "title": "Founders Plot",
+          "active": true
+        }
+      ],
+      "selectedDoctrine": null,
+      "workOrders": [],
+      "workshopDisabledBeforeRewards": true,
+      "workshopPaletteText": "WorkshopBuild cost🪵 wood: 4/24 need 20🪨 stone: 6/16 need 10🪙 coin: 2/12 need 10"
+    },
+    {
+      "label": "HQ5 Market Stall affordability check before hidden rewards",
+      "hqLevel": 5,
+      "townXp": 165,
+      "inventory": {
+        "wood": 10,
+        "stone": 4,
+        "food": 4,
+        "coin": 9
+      },
+      "questStep": "Reach HQ Level 6",
+      "questHint": "Keep the loop moving: queue jobs, collect outputs, and convert the surplus into progression.",
+      "buildings": [
+        {
+          "type": "HQ",
+          "level": 5,
+          "state": "READY",
+          "x": 1,
+          "y": 0
+        },
+        {
+          "type": "LUMBER_CAMP",
+          "level": 1,
+          "state": "READY",
+          "x": 0,
+          "y": 1
+        },
+        {
+          "type": "FARM_PLOT",
+          "level": 1,
+          "state": "READY",
+          "x": 1,
+          "y": 1
+        },
+        {
+          "type": "QUARRY",
+          "level": 1,
+          "state": "READY",
+          "x": 2,
+          "y": 1
+        },
+        {
+          "type": "EXPEDITION_BOARD",
+          "level": 1,
+          "state": "READY",
+          "x": 0,
+          "y": 2
+        },
+        {
+          "type": "WORKSHOP",
+          "level": 1,
+          "state": "READY",
+          "x": 1,
+          "y": 2
+        }
+      ],
+      "scoutReports": [
+        {
+          "reportId": "scout_report_1_forest-ridge",
+          "title": "Forest Ridge Survey",
+          "recommendedNext": "Save this report as the first candidate for a later settler convoy."
+        }
+      ],
+      "sitePlans": [
+        {
+          "planId": "site_plan_scout_report_1_forest_ridge",
+          "title": "Forest Ridge Survey Site Plan",
+          "status": "DRAFT",
+          "promotionStatus": "draft",
+          "authorityBoundary": "requires_engine_promotion_for_settlement"
+        }
+      ],
+      "settlementClaims": [],
+      "ownedPlots": [
+        {
+          "plotId": "plot_970554f13b8664b9",
+          "role": "HOME",
+          "title": "Founders Plot",
+          "active": true
+        }
+      ],
+      "selectedDoctrine": null,
+      "workOrders": [],
+      "marketDisabledBeforeRewards": true,
+      "marketPaletteText": "Market StallBuild cost🪵 wood: 10/20 need 10🪨 stone: 4/18 need 14🪙 coin: 9/14 need 5"
+    },
+    {
+      "label": "HQ6 Settlement Charter reached",
+      "hqLevel": 6,
+      "townXp": 240,
+      "inventory": {
+        "wood": 0,
+        "stone": 2,
+        "food": 6,
+        "coin": 13
+      },
+      "questStep": "Review the first Site Plan",
+      "questHint": "Forest Ridge Survey Site Plan can become claim-ready planning state. This still does not create territory or a second plot.",
+      "buildings": [
+        {
+          "type": "HQ",
+          "level": 6,
+          "state": "READY",
+          "x": 1,
+          "y": 0
+        },
+        {
+          "type": "LUMBER_CAMP",
+          "level": 1,
+          "state": "READY",
+          "x": 0,
+          "y": 1
+        },
+        {
+          "type": "FARM_PLOT",
+          "level": 1,
+          "state": "READY",
+          "x": 1,
+          "y": 1
+        },
+        {
+          "type": "QUARRY",
+          "level": 1,
+          "state": "READY",
+          "x": 2,
+          "y": 1
+        },
+        {
+          "type": "EXPEDITION_BOARD",
+          "level": 1,
+          "state": "READY",
+          "x": 0,
+          "y": 2
+        },
+        {
+          "type": "WORKSHOP",
+          "level": 1,
+          "state": "READY",
+          "x": 1,
+          "y": 2
+        },
+        {
+          "type": "MARKET_STALL",
+          "level": 1,
+          "state": "READY",
+          "x": 2,
+          "y": 2
+        }
+      ],
+      "scoutReports": [
+        {
+          "reportId": "scout_report_1_forest-ridge",
+          "title": "Forest Ridge Survey",
+          "recommendedNext": "Save this report as the first candidate for a later settler convoy."
+        }
+      ],
+      "sitePlans": [
+        {
+          "planId": "site_plan_scout_report_1_forest_ridge",
+          "title": "Forest Ridge Survey Site Plan",
+          "status": "DRAFT",
+          "promotionStatus": "draft",
+          "authorityBoundary": "requires_engine_promotion_for_settlement"
+        }
+      ],
+      "settlementClaims": [],
+      "ownedPlots": [
+        {
+          "plotId": "plot_970554f13b8664b9",
+          "role": "HOME",
+          "title": "Founders Plot",
+          "active": true
+        }
+      ],
+      "selectedDoctrine": null,
+      "workOrders": []
+    },
+    {
+      "label": "Site Plan reviewed by Settlement Charter",
+      "hqLevel": 6,
+      "townXp": 240,
+      "inventory": {
+        "wood": 0,
+        "stone": 2,
+        "food": 6,
+        "coin": 13
+      },
+      "questStep": "Keep the overnight planner honest",
+      "questHint": "The town is stable. Tighten priorities, use the Workshop buff, and keep the recap trail readable.",
+      "buildings": [
+        {
+          "type": "HQ",
+          "level": 6,
+          "state": "READY",
+          "x": 1,
+          "y": 0
+        },
+        {
+          "type": "LUMBER_CAMP",
+          "level": 1,
+          "state": "READY",
+          "x": 0,
+          "y": 1
+        },
+        {
+          "type": "FARM_PLOT",
+          "level": 1,
+          "state": "READY",
+          "x": 1,
+          "y": 1
+        },
+        {
+          "type": "QUARRY",
+          "level": 1,
+          "state": "READY",
+          "x": 2,
+          "y": 1
+        },
+        {
+          "type": "EXPEDITION_BOARD",
+          "level": 1,
+          "state": "READY",
+          "x": 0,
+          "y": 2
+        },
+        {
+          "type": "WORKSHOP",
+          "level": 1,
+          "state": "READY",
+          "x": 1,
+          "y": 2
+        },
+        {
+          "type": "MARKET_STALL",
+          "level": 1,
+          "state": "READY",
+          "x": 2,
+          "y": 2
+        }
+      ],
+      "scoutReports": [
+        {
+          "reportId": "scout_report_1_forest-ridge",
+          "title": "Forest Ridge Survey",
+          "recommendedNext": "Save this report as the first candidate for a later settler convoy."
+        }
+      ],
+      "sitePlans": [
+        {
+          "planId": "site_plan_scout_report_1_forest_ridge",
+          "title": "Forest Ridge Survey Site Plan",
+          "status": "REVIEWED",
+          "promotionStatus": "reviewed_claim_ready",
+          "authorityBoundary": "claim_ready_planning_only_no_territory"
+        }
+      ],
+      "settlementClaims": [],
+      "ownedPlots": [
+        {
+          "plotId": "plot_970554f13b8664b9",
+          "role": "HOME",
+          "title": "Founders Plot",
+          "active": true
+        }
+      ],
+      "selectedDoctrine": null,
+      "workOrders": [],
+      "reviewedPlanId": "site_plan_scout_report_1_forest_ridge"
+    },
+    {
+      "label": "Settler Convoy preparing from reviewed Site Plan",
+      "hqLevel": 6,
+      "townXp": 240,
+      "inventory": {
+        "wood": 8,
+        "stone": 6,
+        "food": 2,
+        "coin": 5
+      },
+      "questStep": "Keep the overnight planner honest",
+      "questHint": "The town is stable. Tighten priorities, use the Workshop buff, and keep the recap trail readable.",
+      "buildings": [
+        {
+          "type": "HQ",
+          "level": 6,
+          "state": "READY",
+          "x": 1,
+          "y": 0
+        },
+        {
+          "type": "LUMBER_CAMP",
+          "level": 1,
+          "state": "READY",
+          "x": 0,
+          "y": 1
+        },
+        {
+          "type": "FARM_PLOT",
+          "level": 1,
+          "state": "READY",
+          "x": 1,
+          "y": 1
+        },
+        {
+          "type": "QUARRY",
+          "level": 1,
+          "state": "READY",
+          "x": 2,
+          "y": 1
+        },
+        {
+          "type": "EXPEDITION_BOARD",
+          "level": 1,
+          "state": "READY",
+          "x": 0,
+          "y": 2
+        },
+        {
+          "type": "WORKSHOP",
+          "level": 1,
+          "state": "READY",
+          "x": 1,
+          "y": 2
+        },
+        {
+          "type": "MARKET_STALL",
+          "level": 1,
+          "state": "READY",
+          "x": 2,
+          "y": 2
+        }
+      ],
+      "scoutReports": [
+        {
+          "reportId": "scout_report_1_forest-ridge",
+          "title": "Forest Ridge Survey",
+          "recommendedNext": "Save this report as the first candidate for a later settler convoy."
+        }
+      ],
+      "sitePlans": [
+        {
+          "planId": "site_plan_scout_report_1_forest_ridge",
+          "title": "Forest Ridge Survey Site Plan",
+          "status": "CONVOY_PREPARING",
+          "promotionStatus": "convoy_preparing",
+          "authorityBoundary": "claim_ready_planning_only_no_territory"
+        }
+      ],
+      "settlementClaims": [
+        {
+          "claimId": "claim_5cdf872ebf5a034c",
+          "title": "Forest Ridge Survey Site Plan",
+          "status": "CONVOY_ARRIVED",
+          "foundedPlotId": null
+        }
+      ],
+      "ownedPlots": [
+        {
+          "plotId": "plot_970554f13b8664b9",
+          "role": "HOME",
+          "title": "Founders Plot",
+          "active": true
+        }
+      ],
+      "selectedDoctrine": null,
+      "workOrders": []
+    },
+    {
+      "label": "Second plot founded explicitly",
+      "hqLevel": 6,
+      "townXp": 240,
+      "inventory": {
+        "wood": 8,
+        "stone": 6,
+        "food": 2,
+        "coin": 5
+      },
+      "questStep": "Keep the overnight planner honest",
+      "questHint": "The town is stable. Tighten priorities, use the Workshop buff, and keep the recap trail readable.",
+      "buildings": [
+        {
+          "type": "HQ",
+          "level": 6,
+          "state": "READY",
+          "x": 1,
+          "y": 0
+        },
+        {
+          "type": "LUMBER_CAMP",
+          "level": 1,
+          "state": "READY",
+          "x": 0,
+          "y": 1
+        },
+        {
+          "type": "FARM_PLOT",
+          "level": 1,
+          "state": "READY",
+          "x": 1,
+          "y": 1
+        },
+        {
+          "type": "QUARRY",
+          "level": 1,
+          "state": "READY",
+          "x": 2,
+          "y": 1
+        },
+        {
+          "type": "EXPEDITION_BOARD",
+          "level": 1,
+          "state": "READY",
+          "x": 0,
+          "y": 2
+        },
+        {
+          "type": "WORKSHOP",
+          "level": 1,
+          "state": "READY",
+          "x": 1,
+          "y": 2
+        },
+        {
+          "type": "MARKET_STALL",
+          "level": 1,
+          "state": "READY",
+          "x": 2,
+          "y": 2
+        }
+      ],
+      "scoutReports": [
+        {
+          "reportId": "scout_report_1_forest-ridge",
+          "title": "Forest Ridge Survey",
+          "recommendedNext": "Save this report as the first candidate for a later settler convoy."
+        }
+      ],
+      "sitePlans": [
+        {
+          "planId": "site_plan_scout_report_1_forest_ridge",
+          "title": "Forest Ridge Survey Site Plan",
+          "status": "FOUNDED",
+          "promotionStatus": "claimed",
+          "authorityBoundary": "claim_ready_planning_only_no_territory"
+        }
+      ],
+      "settlementClaims": [
+        {
+          "claimId": "claim_5cdf872ebf5a034c",
+          "title": "Forest Ridge Survey Site Plan",
+          "status": "FOUNDED",
+          "foundedPlotId": "plot_0799bfc4e0153080"
+        }
+      ],
+      "ownedPlots": [
+        {
+          "plotId": "plot_970554f13b8664b9",
+          "role": "HOME",
+          "title": "Founders Plot",
+          "active": true
+        },
+        {
+          "plotId": "plot_0799bfc4e0153080",
+          "role": "OUTPOST",
+          "title": "Forest Ridge Survey Site Plan",
+          "active": false
+        }
+      ],
+      "selectedDoctrine": null,
+      "workOrders": []
+    },
+    {
+      "label": "Survey Discipline selected",
+      "hqLevel": 6,
+      "townXp": 240,
+      "inventory": {
+        "wood": 8,
+        "stone": 6,
+        "food": 2,
+        "coin": 5
+      },
+      "questStep": "Keep the overnight planner honest",
+      "questHint": "The town is stable. Tighten priorities, use the Workshop buff, and keep the recap trail readable.",
+      "buildings": [
+        {
+          "type": "HQ",
+          "level": 6,
+          "state": "READY",
+          "x": 1,
+          "y": 0
+        },
+        {
+          "type": "LUMBER_CAMP",
+          "level": 1,
+          "state": "READY",
+          "x": 0,
+          "y": 1
+        },
+        {
+          "type": "FARM_PLOT",
+          "level": 1,
+          "state": "READY",
+          "x": 1,
+          "y": 1
+        },
+        {
+          "type": "QUARRY",
+          "level": 1,
+          "state": "READY",
+          "x": 2,
+          "y": 1
+        },
+        {
+          "type": "EXPEDITION_BOARD",
+          "level": 1,
+          "state": "READY",
+          "x": 0,
+          "y": 2
+        },
+        {
+          "type": "WORKSHOP",
+          "level": 1,
+          "state": "READY",
+          "x": 1,
+          "y": 2
+        },
+        {
+          "type": "MARKET_STALL",
+          "level": 1,
+          "state": "READY",
+          "x": 2,
+          "y": 2
+        }
+      ],
+      "scoutReports": [
+        {
+          "reportId": "scout_report_1_forest-ridge",
+          "title": "Forest Ridge Survey",
+          "recommendedNext": "Save this report as the first candidate for a later settler convoy."
+        }
+      ],
+      "sitePlans": [
+        {
+          "planId": "site_plan_scout_report_1_forest_ridge",
+          "title": "Forest Ridge Survey Site Plan",
+          "status": "FOUNDED",
+          "promotionStatus": "claimed",
+          "authorityBoundary": "claim_ready_planning_only_no_territory"
+        }
+      ],
+      "settlementClaims": [
+        {
+          "claimId": "claim_5cdf872ebf5a034c",
+          "title": "Forest Ridge Survey Site Plan",
+          "status": "FOUNDED",
+          "foundedPlotId": "plot_0799bfc4e0153080"
+        }
+      ],
+      "ownedPlots": [
+        {
+          "plotId": "plot_970554f13b8664b9",
+          "role": "HOME",
+          "title": "Founders Plot",
+          "active": true
+        },
+        {
+          "plotId": "plot_0799bfc4e0153080",
+          "role": "OUTPOST",
+          "title": "Forest Ridge Survey Site Plan",
+          "active": false
+        }
+      ],
+      "selectedDoctrine": "survey_discipline",
+      "workOrders": []
+    },
+    {
+      "label": "Work Order draft created",
+      "hqLevel": 6,
+      "townXp": 240,
+      "inventory": {
+        "wood": 8,
+        "stone": 6,
+        "food": 2,
+        "coin": 5
+      },
+      "questStep": "Keep the overnight planner honest",
+      "questHint": "The town is stable. Tighten priorities, use the Workshop buff, and keep the recap trail readable.",
+      "buildings": [
+        {
+          "type": "HQ",
+          "level": 6,
+          "state": "READY",
+          "x": 1,
+          "y": 0
+        },
+        {
+          "type": "LUMBER_CAMP",
+          "level": 1,
+          "state": "OUTPUT_READY",
+          "x": 0,
+          "y": 1
+        },
+        {
+          "type": "FARM_PLOT",
+          "level": 1,
+          "state": "OUTPUT_READY",
+          "x": 1,
+          "y": 1
+        },
+        {
+          "type": "QUARRY",
+          "level": 1,
+          "state": "READY",
+          "x": 2,
+          "y": 1
+        },
+        {
+          "type": "EXPEDITION_BOARD",
+          "level": 1,
+          "state": "READY",
+          "x": 0,
+          "y": 2
+        },
+        {
+          "type": "WORKSHOP",
+          "level": 1,
+          "state": "READY",
+          "x": 1,
+          "y": 2
+        },
+        {
+          "type": "MARKET_STALL",
+          "level": 1,
+          "state": "READY",
+          "x": 2,
+          "y": 2
+        }
+      ],
+      "scoutReports": [
+        {
+          "reportId": "scout_report_1_forest-ridge",
+          "title": "Forest Ridge Survey",
+          "recommendedNext": "Save this report as the first candidate for a later settler convoy."
+        }
+      ],
+      "sitePlans": [
+        {
+          "planId": "site_plan_scout_report_1_forest_ridge",
+          "title": "Forest Ridge Survey Site Plan",
+          "status": "FOUNDED",
+          "promotionStatus": "claimed",
+          "authorityBoundary": "claim_ready_planning_only_no_territory"
+        }
+      ],
+      "settlementClaims": [
+        {
+          "claimId": "claim_5cdf872ebf5a034c",
+          "title": "Forest Ridge Survey Site Plan",
+          "status": "FOUNDED",
+          "foundedPlotId": "plot_0799bfc4e0153080"
+        }
+      ],
+      "ownedPlots": [
+        {
+          "plotId": "plot_970554f13b8664b9",
+          "role": "HOME",
+          "title": "Founders Plot",
+          "active": true
+        },
+        {
+          "plotId": "plot_0799bfc4e0153080",
+          "role": "OUTPOST",
+          "title": "Forest Ridge Survey Site Plan",
+          "active": false
+        }
+      ],
+      "selectedDoctrine": "survey_discipline",
+      "workOrders": [
+        {
+          "workOrderId": "work_order_e6c9f7168741713c",
+          "status": "DRAFT",
+          "templateId": "collect_ready_outputs_once"
+        }
+      ]
+    },
+    {
+      "label": "Work Order executed explicitly",
+      "hqLevel": 6,
+      "townXp": 240,
+      "inventory": {
+        "wood": 18,
+        "stone": 6,
+        "food": 10,
+        "coin": 5
+      },
+      "questStep": "Keep the overnight planner honest",
+      "questHint": "The town is stable. Tighten priorities, use the Workshop buff, and keep the recap trail readable.",
+      "buildings": [
+        {
+          "type": "HQ",
+          "level": 6,
+          "state": "READY",
+          "x": 1,
+          "y": 0
+        },
+        {
+          "type": "LUMBER_CAMP",
+          "level": 1,
+          "state": "READY",
+          "x": 0,
+          "y": 1
+        },
+        {
+          "type": "FARM_PLOT",
+          "level": 1,
+          "state": "READY",
+          "x": 1,
+          "y": 1
+        },
+        {
+          "type": "QUARRY",
+          "level": 1,
+          "state": "READY",
+          "x": 2,
+          "y": 1
+        },
+        {
+          "type": "EXPEDITION_BOARD",
+          "level": 1,
+          "state": "READY",
+          "x": 0,
+          "y": 2
+        },
+        {
+          "type": "WORKSHOP",
+          "level": 1,
+          "state": "READY",
+          "x": 1,
+          "y": 2
+        },
+        {
+          "type": "MARKET_STALL",
+          "level": 1,
+          "state": "READY",
+          "x": 2,
+          "y": 2
+        }
+      ],
+      "scoutReports": [
+        {
+          "reportId": "scout_report_1_forest-ridge",
+          "title": "Forest Ridge Survey",
+          "recommendedNext": "Save this report as the first candidate for a later settler convoy."
+        }
+      ],
+      "sitePlans": [
+        {
+          "planId": "site_plan_scout_report_1_forest_ridge",
+          "title": "Forest Ridge Survey Site Plan",
+          "status": "FOUNDED",
+          "promotionStatus": "claimed",
+          "authorityBoundary": "claim_ready_planning_only_no_territory"
+        }
+      ],
+      "settlementClaims": [
+        {
+          "claimId": "claim_5cdf872ebf5a034c",
+          "title": "Forest Ridge Survey Site Plan",
+          "status": "FOUNDED",
+          "foundedPlotId": "plot_0799bfc4e0153080"
+        }
+      ],
+      "ownedPlots": [
+        {
+          "plotId": "plot_970554f13b8664b9",
+          "role": "HOME",
+          "title": "Founders Plot",
+          "active": true
+        },
+        {
+          "plotId": "plot_0799bfc4e0153080",
+          "role": "OUTPOST",
+          "title": "Forest Ridge Survey Site Plan",
+          "active": false
+        }
+      ],
+      "selectedDoctrine": "survey_discipline",
+      "workOrders": [
+        {
+          "workOrderId": "work_order_e6c9f7168741713c",
+          "status": "COMPLETED",
+          "templateId": "collect_ready_outputs_once"
+        }
+      ]
+    },
+    {
+      "label": "World Grid and Atlas read-only boundary",
+      "hqLevel": 6,
+      "townXp": 240,
+      "inventory": {
+        "wood": 18,
+        "stone": 6,
+        "food": 10,
+        "coin": 5
+      },
+      "questStep": "Keep the overnight planner honest",
+      "questHint": "The town is stable. Tighten priorities, use the Workshop buff, and keep the recap trail readable.",
+      "buildings": [
+        {
+          "type": "HQ",
+          "level": 6,
+          "state": "READY",
+          "x": 1,
+          "y": 0
+        },
+        {
+          "type": "LUMBER_CAMP",
+          "level": 1,
+          "state": "READY",
+          "x": 0,
+          "y": 1
+        },
+        {
+          "type": "FARM_PLOT",
+          "level": 1,
+          "state": "READY",
+          "x": 1,
+          "y": 1
+        },
+        {
+          "type": "QUARRY",
+          "level": 1,
+          "state": "READY",
+          "x": 2,
+          "y": 1
+        },
+        {
+          "type": "EXPEDITION_BOARD",
+          "level": 1,
+          "state": "READY",
+          "x": 0,
+          "y": 2
+        },
+        {
+          "type": "WORKSHOP",
+          "level": 1,
+          "state": "READY",
+          "x": 1,
+          "y": 2
+        },
+        {
+          "type": "MARKET_STALL",
+          "level": 1,
+          "state": "READY",
+          "x": 2,
+          "y": 2
+        }
+      ],
+      "scoutReports": [
+        {
+          "reportId": "scout_report_1_forest-ridge",
+          "title": "Forest Ridge Survey",
+          "recommendedNext": "Save this report as the first candidate for a later settler convoy."
+        }
+      ],
+      "sitePlans": [
+        {
+          "planId": "site_plan_scout_report_1_forest_ridge",
+          "title": "Forest Ridge Survey Site Plan",
+          "status": "FOUNDED",
+          "promotionStatus": "claimed",
+          "authorityBoundary": "claim_ready_planning_only_no_territory"
+        }
+      ],
+      "settlementClaims": [
+        {
+          "claimId": "claim_5cdf872ebf5a034c",
+          "title": "Forest Ridge Survey Site Plan",
+          "status": "FOUNDED",
+          "foundedPlotId": "plot_0799bfc4e0153080"
+        }
+      ],
+      "ownedPlots": [
+        {
+          "plotId": "plot_970554f13b8664b9",
+          "role": "HOME",
+          "title": "Founders Plot",
+          "active": true
+        },
+        {
+          "plotId": "plot_0799bfc4e0153080",
+          "role": "OUTPOST",
+          "title": "Forest Ridge Survey Site Plan",
+          "active": false
+        }
+      ],
+      "selectedDoctrine": "survey_discipline",
+      "workOrders": [
+        {
+          "workOrderId": "work_order_e6c9f7168741713c",
+          "status": "COMPLETED",
+          "templateId": "collect_ready_outputs_once"
+        }
+      ],
+      "worldGrid": {
+        "status": "READ_MODEL_READY",
+        "title": "World Grid",
+        "implementation": "hq10a_server_owned_world_grid_read_model_v1",
+        "readOnly": true,
+        "executableActions": [],
+        "authorityBoundary": "server_owned_read_only_world_grid_projection_no_civic_mutation_v1",
+        "requirements": {
+          "items": [
+            {
+              "key": "hq.level.6",
+              "label": "HQ6 Settlement Charter",
+              "satisfied": true,
+              "current": 6,
+              "required": 6
+            },
+            {
+              "key": "settlement.outpost.founded",
+              "label": "Founded outpost",
+              "satisfied": true,
+              "current": 1,
+              "required": 1
+            },
+            {
+              "key": "doctrine.survey_discipline.selected",
+              "label": "Survey Discipline selected",
+              "satisfied": true,
+              "current": "survey_discipline",
+              "required": "survey_discipline"
+            },
+            {
+              "key": "work_order.collect_ready_outputs_once.available",
+              "label": "Collect-ready work-order executor available",
+              "satisfied": true,
+              "current": true,
+              "required": true
+            }
+          ],
+          "blockedBy": [],
+          "satisfiedCount": 4,
+          "totalCount": 4
+        },
+        "scope": {
+          "homePlotId": "plot_970554f13b8664b9",
+          "activePlotId": "plot_970554f13b8664b9",
+          "knownPlotCount": 2,
+          "outpostCount": 1,
+          "knownClaimCount": 1
+        },
+        "plots": [
+          {
+            "plotId": "plot_970554f13b8664b9",
+            "role": "HOME",
+            "title": "Founders Plot",
+            "hqLevel": 6,
+            "status": "ACTIVE",
+            "originClaimId": null,
+            "siteType": null,
+            "risk": null,
+            "active": true
+          },
+          {
+            "plotId": "plot_0799bfc4e0153080",
+            "role": "OUTPOST",
+            "title": "Forest Ridge Survey Site Plan",
+            "hqLevel": 1,
+            "status": "ACTIVE",
+            "originClaimId": "claim_5cdf872ebf5a034c",
+            "siteType": "woodland_ridge",
+            "risk": "low",
+            "active": false
+          }
+        ],
+        "claims": {
+          "total": 1,
+          "byStatus": {
+            "FOUNDED": 1
+          },
+          "claimReadyPlanCount": 1,
+          "activeConvoyCount": 0,
+          "foundedOutpostCount": 1,
+          "foundedPlotIds": [
+            "plot_0799bfc4e0153080"
+          ]
+        },
+        "doctrine": {
+          "selectedDoctrineId": "survey_discipline",
+          "status": "SELECTED",
+          "activeEffects": [
+            {
+              "doctrineId": "survey_discipline",
+              "effectKind": "scout_duration_modifier",
+              "buildingType": "EXPEDITION_BOARD",
+              "jobKind": "SCOUT",
+              "durationMultiplier": 0.95,
+              "reductionPct": 5,
+              "authorityBoundary": "server_owned_scout_duration_modifier_v1"
+            }
+          ]
+        },
+        "workOrders": {
+          "draftCount": 0,
+          "completedCount": 1,
+          "executionAvailable": true,
+          "templateIds": [
+            "collect_ready_outputs_once"
+          ]
+        },
+        "civicProposals": {
+          "proposalOnly": true,
+          "executionAllowed": false,
+          "authorityBoundary": "server_owned_civic_proposal_record_no_execution_v1",
+          "total": 0,
+          "byStatus": {
+            "DRAFT": 0,
+            "REVIEWED": 0,
+            "ARCHIVED": 0
+          },
+          "latestProposalId": null
+        },
+        "civicProjects": {
+          "publicWork": true,
+          "activationAllowed": false,
+          "authorityBoundary": "server_owned_civic_project_activation_local_public_work_v1",
+          "total": 0,
+          "activeCount": 0,
+          "byStatus": {
+            "ACTIVE": 0,
+            "ARCHIVED": 0
+          },
+          "byType": {
+            "civic_beacon": 0
+          },
+          "localCivicBeaconActive": false,
+          "localReadinessDelta": 0,
+          "latestProjectId": null
+        },
+        "civicReadiness": {
+          "ready": true,
+          "nextPromotableSlice": "HQ10B_CIVIC_PROPOSAL_RECORDS",
+          "blockedBy": [],
+          "localProjectReadinessScore": 0,
+          "moraleMarkers": [],
+          "signals": [
+            {
+              "key": "multi_plot_visibility",
+              "ready": true,
+              "value": 2
+            },
+            {
+              "key": "claim_receipts",
+              "ready": true,
+              "value": 1
+            },
+            {
+              "key": "doctrine_context",
+              "ready": true,
+              "value": "survey_discipline"
+            },
+            {
+              "key": "bounded_work_orders",
+              "ready": true,
+              "value": true
+            },
+            {
+              "key": "local_civic_beacon",
+              "ready": false,
+              "value": 0
+            }
+          ],
+          "boundedCapabilities": [
+            "local_civic_beacon_activation"
+          ],
+          "prohibitedCapabilities": [
+            "civic_mutation",
+            "trade_routes",
+            "background_scheduling",
+            "arbitrary_tool_execution",
+            "resource_spending",
+            "atlas_owned_execution",
+            "external_or_public_effects"
+          ]
+        },
+        "projectionHash": "6a489f7fe844c18a"
+      },
+      "atlasSummary": {
+        "hqLevel": 6,
+        "townXp": 240,
+        "inventory": {
+          "wood": 18,
+          "stone": 6,
+          "food": 10,
+          "coin": 5
+        },
+        "scoutReportCount": 1,
+        "sitePlanCount": 1,
+        "reviewedSitePlanCount": 1,
+        "claimReadySitePlanCount": 1,
+        "settlementClaimCount": 1,
+        "activeConvoyCount": 0,
+        "outpostCount": 1,
+        "selectedDoctrineId": "survey_discipline",
+        "doctrineAdvisoryOnly": false,
+        "doctrineEngineOwnedEffect": true,
+        "workOrderDraftCount": 0,
+        "workOrderExecutionAvailable": false,
+        "worldGridStatus": "READ_MODEL_READY",
+        "worldGridReady": true,
+        "worldGridKnownPlotCount": 2,
+        "worldGridOutpostCount": 1,
+        "worldGridProjectionHash": "6a489f7fe844c18a",
+        "civicProposalCount": 0,
+        "civicProposalDraftCount": 0,
+        "civicProposalReviewedCount": 0,
+        "overlayPackCount": 0,
+        "overlayPackDraftCount": 0,
+        "overlayPackReviewedCount": 0,
+        "civicProjectCount": 0,
+        "civicProjectActiveCount": 0,
+        "civicBeaconActive": false,
+        "currentPlotId": "plot_970554f13b8664b9",
+        "homePlotId": "plot_970554f13b8664b9",
+        "quest": {
+          "id": "overnight-planner",
+          "title": "Keep the overnight planner honest",
+          "body": "The town is stable. Tighten priorities, use the Workshop buff, and keep the recap trail readable.",
+          "primaryAction": "Review recap"
+        },
+        "currentStepId": "foreman.queue_production",
+        "currentStepTitle": "Unlock Foreman production queueing",
+        "currentBlocker": null,
+        "currentNextAction": "Review the queueProduction permission"
+      },
+      "atlasActionRefsExecutable": 0
+    },
+    {
+      "label": "Mobile 390 final progression layout",
+      "hqLevel": 6,
+      "townXp": 240,
+      "inventory": {
+        "wood": 18,
+        "stone": 6,
+        "food": 10,
+        "coin": 5
+      },
+      "questStep": "Keep the overnight planner honest",
+      "questHint": "The town is stable. Tighten priorities, use the Workshop buff, and keep the recap trail readable.",
+      "buildings": [
+        {
+          "type": "HQ",
+          "level": 6,
+          "state": "READY",
+          "x": 1,
+          "y": 0
+        },
+        {
+          "type": "LUMBER_CAMP",
+          "level": 1,
+          "state": "READY",
+          "x": 0,
+          "y": 1
+        },
+        {
+          "type": "FARM_PLOT",
+          "level": 1,
+          "state": "READY",
+          "x": 1,
+          "y": 1
+        },
+        {
+          "type": "QUARRY",
+          "level": 1,
+          "state": "READY",
+          "x": 2,
+          "y": 1
+        },
+        {
+          "type": "EXPEDITION_BOARD",
+          "level": 1,
+          "state": "READY",
+          "x": 0,
+          "y": 2
+        },
+        {
+          "type": "WORKSHOP",
+          "level": 1,
+          "state": "READY",
+          "x": 1,
+          "y": 2
+        },
+        {
+          "type": "MARKET_STALL",
+          "level": 1,
+          "state": "READY",
+          "x": 2,
+          "y": 2
+        }
+      ],
+      "scoutReports": [
+        {
+          "reportId": "scout_report_1_forest-ridge",
+          "title": "Forest Ridge Survey",
+          "recommendedNext": "Save this report as the first candidate for a later settler convoy."
+        }
+      ],
+      "sitePlans": [
+        {
+          "planId": "site_plan_scout_report_1_forest_ridge",
+          "title": "Forest Ridge Survey Site Plan",
+          "status": "FOUNDED",
+          "promotionStatus": "claimed",
+          "authorityBoundary": "claim_ready_planning_only_no_territory"
+        }
+      ],
+      "settlementClaims": [
+        {
+          "claimId": "claim_5cdf872ebf5a034c",
+          "title": "Forest Ridge Survey Site Plan",
+          "status": "FOUNDED",
+          "foundedPlotId": "plot_0799bfc4e0153080"
+        }
+      ],
+      "ownedPlots": [
+        {
+          "plotId": "plot_970554f13b8664b9",
+          "role": "HOME",
+          "title": "Founders Plot",
+          "active": true
+        },
+        {
+          "plotId": "plot_0799bfc4e0153080",
+          "role": "OUTPOST",
+          "title": "Forest Ridge Survey Site Plan",
+          "active": false
+        }
+      ],
+      "selectedDoctrine": "survey_discipline",
+      "workOrders": [
+        {
+          "workOrderId": "work_order_e6c9f7168741713c",
+          "status": "COMPLETED",
+          "templateId": "collect_ready_outputs_once"
+        }
+      ],
+      "overflow": {
+        "innerWidth": 390,
+        "bodyScrollWidth": 390,
+        "documentScrollWidth": 390,
+        "rootScrollWidth": 390
+      }
+    }
+  ],
+  "hiddenRewardClaims": [
+    {
+      "reason": "continue-after-hq4-workshop-block",
+      "rewardId": "quest.first-lumber",
+      "title": "Supply crate",
+      "grant": {
+        "coin": 5
+      },
+      "ok": true
+    },
+    {
+      "reason": "continue-after-hq4-workshop-block",
+      "rewardId": "hq.level-2",
+      "title": "Field notes",
+      "grant": {
+        "coin": 6
+      },
+      "ok": true
+    },
+    {
+      "reason": "continue-after-hq4-workshop-block",
+      "rewardId": "hq.level-3",
+      "title": "Quarry kit",
+      "grant": {
+        "wood": 8,
+        "stone": 4
+      },
+      "ok": true
+    },
+    {
+      "reason": "continue-after-hq4-workshop-block",
+      "rewardId": "hq.level-4",
+      "title": "Workshop charter",
+      "grant": {
+        "coin": 8
+      },
+      "ok": true
+    },
+    {
+      "reason": "continue-after-hq5-market-block",
+      "rewardId": "hq.level-5",
+      "title": "Founder stipend",
+      "grant": {
+        "coin": 12,
+        "town_xp": 10
+      },
+      "ok": true
+    }
+  ],
+  "apiAssist": [
+    {
+      "kind": "ui-place-building",
+      "type": "LUMBER_CAMP"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP construction",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "ui-queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "ui-collect-output",
+      "type": "LUMBER_CAMP"
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP"
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP"
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP"
+    },
+    {
+      "kind": "place-building",
+      "type": "FARM_PLOT"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish FARM_PLOT construction",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "queue-job",
+      "type": "FARM_PLOT",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish FARM_PLOT PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "FARM_PLOT"
+    },
+    {
+      "kind": "queue-job",
+      "type": "FARM_PLOT",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish FARM_PLOT PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "FARM_PLOT"
+    },
+    {
+      "kind": "ui-upgrade-hq",
+      "targetLevel": 2
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish HQ2",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP"
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP"
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP"
+    },
+    {
+      "kind": "queue-job",
+      "type": "FARM_PLOT",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish FARM_PLOT PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "FARM_PLOT"
+    },
+    {
+      "kind": "place-building",
+      "type": "QUARRY"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY construction",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "ui-queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "ui-collect-output",
+      "type": "QUARRY"
+    },
+    {
+      "kind": "queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "QUARRY"
+    },
+    {
+      "kind": "upgrade-hq",
+      "targetLevel": 3
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish HQ3",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP"
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP"
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP"
+    },
+    {
+      "kind": "queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "QUARRY"
+    },
+    {
+      "kind": "queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "QUARRY"
+    },
+    {
+      "kind": "queue-job",
+      "type": "FARM_PLOT",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish FARM_PLOT PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "FARM_PLOT"
+    },
+    {
+      "kind": "place-building",
+      "type": "EXPEDITION_BOARD"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish EXPEDITION_BOARD construction",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "queue-job",
+      "type": "FARM_PLOT",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish FARM_PLOT PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "FARM_PLOT"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish first scout",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP"
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP"
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP"
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP"
+    },
+    {
+      "kind": "queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "QUARRY"
+    },
+    {
+      "kind": "queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "QUARRY"
+    },
+    {
+      "kind": "queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "QUARRY"
+    },
+    {
+      "kind": "queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "QUARRY"
+    },
+    {
+      "kind": "queue-job",
+      "type": "FARM_PLOT",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish FARM_PLOT PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "FARM_PLOT"
+    },
+    {
+      "kind": "queue-job",
+      "type": "FARM_PLOT",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish FARM_PLOT PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "FARM_PLOT"
+    },
+    {
+      "kind": "upgrade-hq",
+      "targetLevel": 4
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish HQ4",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP"
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP"
+    },
+    {
+      "kind": "queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "QUARRY"
+    },
+    {
+      "kind": "place-building",
+      "type": "WORKSHOP"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish WORKSHOP construction",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "QUARRY"
+    },
+    {
+      "kind": "ui-queue-job",
+      "type": "WORKSHOP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish WORKSHOP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "ui-collect-output",
+      "type": "WORKSHOP"
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP"
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP"
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP"
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP"
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP"
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP"
+    },
+    {
+      "kind": "queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "QUARRY"
+    },
+    {
+      "kind": "queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "QUARRY"
+    },
+    {
+      "kind": "queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "QUARRY"
+    },
+    {
+      "kind": "queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "QUARRY"
+    },
+    {
+      "kind": "queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "QUARRY"
+    },
+    {
+      "kind": "queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "QUARRY"
+    },
+    {
+      "kind": "queue-job",
+      "type": "FARM_PLOT",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish FARM_PLOT PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "FARM_PLOT"
+    },
+    {
+      "kind": "queue-job",
+      "type": "FARM_PLOT",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish FARM_PLOT PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "FARM_PLOT"
+    },
+    {
+      "kind": "queue-job",
+      "type": "FARM_PLOT",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish FARM_PLOT PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "FARM_PLOT"
+    },
+    {
+      "kind": "queue-job",
+      "type": "FARM_PLOT",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish FARM_PLOT PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "FARM_PLOT"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 140",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "enable-foreman-policy",
+      "permission": "collectOutputs"
+    },
+    {
+      "kind": "agent-collect-output",
+      "type": "LUMBER_CAMP",
+      "reason": "bridge HQ5 XP"
+    },
+    {
+      "kind": "upgrade-hq",
+      "targetLevel": 5
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish HQ5",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP",
+      "actor": "HUMAN"
+    },
+    {
+      "kind": "queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "QUARRY",
+      "actor": "HUMAN"
+    },
+    {
+      "kind": "queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "QUARRY",
+      "actor": "HUMAN"
+    },
+    {
+      "kind": "queue-job",
+      "type": "FARM_PLOT",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish FARM_PLOT PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "FARM_PLOT",
+      "actor": "HUMAN"
+    },
+    {
+      "kind": "place-building",
+      "type": "MARKET_STALL"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish MARKET_STALL construction",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "ui-queue-job",
+      "type": "MARKET_STALL",
+      "jobKind": "SELL"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish MARKET_STALL SELL",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "ui-collect-output",
+      "type": "MARKET_STALL"
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP",
+      "actor": "HUMAN"
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP",
+      "actor": "HUMAN"
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP",
+      "actor": "HUMAN"
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP",
+      "actor": "HUMAN"
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP",
+      "actor": "HUMAN"
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP",
+      "actor": "HUMAN"
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP",
+      "actor": "HUMAN"
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP",
+      "actor": "HUMAN"
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP",
+      "actor": "HUMAN"
+    },
+    {
+      "kind": "queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "QUARRY",
+      "actor": "HUMAN"
+    },
+    {
+      "kind": "queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "QUARRY",
+      "actor": "HUMAN"
+    },
+    {
+      "kind": "queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "QUARRY",
+      "actor": "HUMAN"
+    },
+    {
+      "kind": "queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "QUARRY",
+      "actor": "HUMAN"
+    },
+    {
+      "kind": "queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "QUARRY",
+      "actor": "HUMAN"
+    },
+    {
+      "kind": "queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "QUARRY",
+      "actor": "HUMAN"
+    },
+    {
+      "kind": "queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "QUARRY",
+      "actor": "HUMAN"
+    },
+    {
+      "kind": "queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "QUARRY",
+      "actor": "HUMAN"
+    },
+    {
+      "kind": "queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "QUARRY",
+      "actor": "HUMAN"
+    },
+    {
+      "kind": "queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "QUARRY",
+      "actor": "HUMAN"
+    },
+    {
+      "kind": "queue-job",
+      "type": "FARM_PLOT",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish FARM_PLOT PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "FARM_PLOT",
+      "actor": "HUMAN"
+    },
+    {
+      "kind": "queue-job",
+      "type": "FARM_PLOT",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish FARM_PLOT PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "FARM_PLOT",
+      "actor": "HUMAN"
+    },
+    {
+      "kind": "queue-job",
+      "type": "FARM_PLOT",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish FARM_PLOT PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "FARM_PLOT",
+      "actor": "HUMAN"
+    },
+    {
+      "kind": "queue-job",
+      "type": "FARM_PLOT",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish FARM_PLOT PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "FARM_PLOT",
+      "actor": "HUMAN"
+    },
+    {
+      "kind": "queue-job",
+      "type": "FARM_PLOT",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish FARM_PLOT PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "FARM_PLOT",
+      "actor": "HUMAN"
+    },
+    {
+      "kind": "queue-job",
+      "type": "FARM_PLOT",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish FARM_PLOT PRODUCE",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "FARM_PLOT",
+      "actor": "HUMAN"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "daily return XP to 220",
+      "advanceMs": 86460000
+    },
+    {
+      "kind": "enable-foreman-policy",
+      "permissions": [
+        "collectOutputs",
+        "queueProduction",
+        "setPriority",
+        "sellSurplusFood"
+      ]
+    },
+    {
+      "kind": "agent-queue-job",
+      "type": "FARM_PLOT",
+      "permission": "queueProduction"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish agent farm production",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "agent-collect-output",
+      "type": "FARM_PLOT",
+      "permission": "collectOutputs"
+    },
+    {
+      "kind": "agent-set-priority",
+      "permission": "setPriority"
+    },
+    {
+      "kind": "agent-queue-job",
+      "type": "MARKET_STALL",
+      "permission": "sellSurplusFood"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish agent market sell",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "agent-collect-output",
+      "type": "MARKET_STALL",
+      "permission": "collectOutputs"
+    },
+    {
+      "kind": "upgrade-hq",
+      "targetLevel": 6
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish HQ6",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP"
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP"
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP"
+    },
+    {
+      "kind": "queue-job",
+      "type": "LUMBER_CAMP",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish LUMBER_CAMP",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "LUMBER_CAMP"
+    },
+    {
+      "kind": "queue-job",
+      "type": "FARM_PLOT",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish FARM_PLOT",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "FARM_PLOT"
+    },
+    {
+      "kind": "queue-job",
+      "type": "FARM_PLOT",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish FARM_PLOT",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "FARM_PLOT"
+    },
+    {
+      "kind": "queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "QUARRY"
+    },
+    {
+      "kind": "queue-job",
+      "type": "QUARRY",
+      "jobKind": "PRODUCE"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish QUARRY",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "collect-output",
+      "type": "QUARRY"
+    },
+    {
+      "kind": "advance-time",
+      "reason": "finish settler convoy",
+      "advanceMs": 300000
+    },
+    {
+      "kind": "advance-time",
+      "reason": "prepare ready outputs for work order",
+      "advanceMs": 300000
+    }
+  ],
+  "notes": [
+    {
+      "severity": "High",
+      "title": "Workshop path relies on hidden reward claims",
+      "evidence": "WorkshopBuild cost🪵 wood: 4/24 need 20🪨 stone: 6/16 need 10🪙 coin: 2/12 need 10"
+    },
+    {
+      "severity": "Medium",
+      "title": "HQ5 XP path is opaque without Foreman automation",
+      "evidence": "Used first AGENT collectOutputs automation to move XP from below 140 to 145."
+    },
+    {
+      "severity": "Medium",
+      "title": "Market path also relies on hidden reward claims",
+      "evidence": "Market StallBuild cost🪵 wood: 10/20 need 10🪨 stone: 4/18 need 14🪙 coin: 9/14 need 5"
+    },
+    {
+      "severity": "Medium",
+      "title": "HQ6 XP required controlled continuation",
+      "evidence": "XP was 190 before HQ6; continuing with current stored value may fail if below 220."
+    },
+    {
+      "severity": "Medium",
+      "title": "HQ6 XP path depends on Foreman permission-tier XP",
+      "evidence": "Used engine-backed first agent actions to reach 220/220 XP."
+    }
+  ],
+  "serverLog": [
+    "[agent-town] http://localhost:6292"
+  ],
+  "serverErr": [
+    "(node:52267) ExperimentalWarning: SQLite is an experimental feature and might change at any time",
+    "(Use `node --trace-warnings ...` to show where the warning was created)"
+  ]
+}

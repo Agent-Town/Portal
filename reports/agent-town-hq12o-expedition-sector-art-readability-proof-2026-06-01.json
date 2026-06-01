@@ -1,0 +1,303 @@
+{
+  "ok": true,
+  "generatedAt": "2026-06-01T07:37:10.050Z",
+  "source": "FP-E2E-022 mocked server-owned Expedition Map read model; HQ12O verifies frontend-only sector art/readability and guardrails",
+  "changeScope": [
+    "public/experiences/founders-plot/founders-plot.css",
+    "public/experiences/founders-plot/founders-plot.js",
+    "e2e/200_founders_plot.spec.js"
+  ],
+  "initialFogStates": [
+    "discovered",
+    "known",
+    "discovered",
+    "hinted",
+    "locked_unknown"
+  ],
+  "initialSelectedSector": {
+    "fogState": "hinted",
+    "cellId": "cell_q0_r1",
+    "buttons": 0,
+    "text": "Unresolved Frontier Hintcell_q0_r1 - HINTED BY KNOWN FRONTIER - hintedServer-provided frontier hint. Resources and hidden gameplay truth remain unrevealed until a verified Scout Sector receipt changes this cell.VisibilityHidden: no resources, routes, or actions are exposed.Scout pathOnly Scout Sector can reveal one eligible hinted edge as known.Zoom contextSemantic zoom clarifies status only.AuthorityServer read model only; this card adds no mutation path.Scout Sector watch partyAwaiting Scout Sector receiptVale-Desk 7 and Mira Trailmark keep this sector as read-only map context from the server party manifest.OperatorMira Trailmark - scoutDeskVale-Desk 7 - HQ civic operatorAnchorcell_q0_r1Manifestexpedition_party_current_plot_v1Mira TrailmarkscoutRook SignalpostmessengerVale-Desk 7HQ civic operatorParty flavor is presentation-only: zero actions, no autonomy, no routes, no resources, no combat, no sharing, and no Atlas execution.cell cell_q0_r1fog hintedsource derived hintSelection is visual-only and cannot scout, harvest, move, route, trade, or execute Atlas actions."
+  },
+  "legendStates": [
+    {
+      "className": "fp-expedition-fog-legend__item fp-expedition-fog-legend__item--discovered",
+      "selected": null,
+      "text": "DISCDiscovered 2Owned plot or founded outpost truth is visible."
+    },
+    {
+      "className": "fp-expedition-fog-legend__item fp-expedition-fog-legend__item--known",
+      "selected": null,
+      "text": "KNOWNKnown 1Reviewed or scouted sector truth is recorded."
+    },
+    {
+      "className": "fp-expedition-fog-legend__item fp-expedition-fog-legend__item--hinted",
+      "selected": "true",
+      "text": "HINTHinted 1A server-hinted frontier edge exists."
+    },
+    {
+      "className": "fp-expedition-fog-legend__item fp-expedition-fog-legend__item--locked_unknown",
+      "selected": null,
+      "text": "LOCKLocked 1A sealed placeholder beyond the current frontier."
+    }
+  ],
+  "sectorCards": [
+    {
+      "testid": "fp-expedition-sector-list",
+      "fogState": "",
+      "cellId": "",
+      "buttons": 0,
+      "text": "Founders PlotOWNED HOME - discoveredTerrain home plot, risk ownedterrain home plotrisk ownedhomeReceiptorigin plot discoveredplotId plot_hq12b_expedition_map_uiNo map mutation is available from this panel.Forest Ridge Survey Site PlanSITE PLAN REVIEWED - knownReviewed frontier planning truth from the HQ12A server read model.terrain forest edgerisk lowresources wood +2, food +1woodedshelteredReceiptreviewed site plan known cellreportId scout_report_hq12b_forest, planId site_plan_hq12b_forestScout report: scout_report_hq12b_forestSite plan: site_plan_hq12b_forestUse existing Site Plan and Settlement Claim panels for safe follow-up actions.Forest Ridge OutpostOWNED OUTPOST - discoveredFounded outpost marker tied to an owned plot record.terrain outpostrisk ownedowned-outpostReceiptowned outpost discovered cellplotId plot_hq12b_forest_outpost, originClaimId claim_hq12b_forestSettlement claim: claim_hq12b_forestOwned outpost: plot_hq12b_forest_outpostNo map mutation is available from this panel.",
+      "borderLeftColor": "rgb(46, 27, 14)"
+    },
+    {
+      "testid": "fp-expedition-sector-cell_origin",
+      "fogState": "discovered",
+      "cellId": "cell_origin",
+      "buttons": 0,
+      "text": "Founders PlotOWNED HOME - discoveredTerrain home plot, risk ownedterrain home plotrisk ownedhomeReceiptorigin plot discoveredplotId plot_hq12b_expedition_map_uiNo map mutation is available from this panel.",
+      "borderLeftColor": "rgb(139, 125, 60)"
+    },
+    {
+      "testid": "fp-expedition-sector-status-cell_origin",
+      "fogState": "",
+      "cellId": "",
+      "buttons": 0,
+      "text": "OWNED HOME - discovered",
+      "borderLeftColor": "rgba(27, 106, 100, 0.34)"
+    },
+    {
+      "testid": "fp-expedition-sector-cell_q1_r0",
+      "fogState": "known",
+      "cellId": "cell_q1_r0",
+      "buttons": 0,
+      "text": "Forest Ridge Survey Site PlanSITE PLAN REVIEWED - knownReviewed frontier planning truth from the HQ12A server read model.terrain forest edgerisk lowresources wood +2, food +1woodedshelteredReceiptreviewed site plan known cellreportId scout_report_hq12b_forest, planId site_plan_hq12b_forestScout report: scout_report_hq12b_forestSite plan: site_plan_hq12b_forestUse existing Site Plan and Settlement Claim panels for safe follow-up actions.",
+      "borderLeftColor": "rgb(27, 106, 100)"
+    },
+    {
+      "testid": "fp-expedition-sector-status-cell_q1_r0",
+      "fogState": "",
+      "cellId": "",
+      "buttons": 0,
+      "text": "SITE PLAN REVIEWED - known",
+      "borderLeftColor": "rgba(139, 125, 60, 0.36)"
+    },
+    {
+      "testid": "fp-expedition-sector-cell_q1_r-1",
+      "fogState": "discovered",
+      "cellId": "cell_q1_r-1",
+      "buttons": 0,
+      "text": "Forest Ridge OutpostOWNED OUTPOST - discoveredFounded outpost marker tied to an owned plot record.terrain outpostrisk ownedowned-outpostReceiptowned outpost discovered cellplotId plot_hq12b_forest_outpost, originClaimId claim_hq12b_forestSettlement claim: claim_hq12b_forestOwned outpost: plot_hq12b_forest_outpostNo map mutation is available from this panel.",
+      "borderLeftColor": "rgb(139, 125, 60)"
+    },
+    {
+      "testid": "fp-expedition-sector-status-cell_q1_r-1",
+      "fogState": "",
+      "cellId": "",
+      "buttons": 0,
+      "text": "OWNED OUTPOST - discovered",
+      "borderLeftColor": "rgba(27, 106, 100, 0.34)"
+    }
+  ],
+  "visualStateStyles": [
+    {
+      "fogState": "discovered",
+      "backgroundImage": "repeating-linear-gradient(60deg, rgba(255, 248, 232, 0.14) 0px, rgba(255, 248, 232, 0.14) 2px, rgba(0, 0, 0, 0) 2px, rgba(0, 0, 0, 0) 10px), linear-gradient(rgba(210, 244, 205, 0.98), rgba(117, 171, 115, 0.78))",
+      "borderStyle": "solid"
+    },
+    {
+      "fogState": "known",
+      "backgroundImage": "repeating-linear-gradient(60deg, rgba(255, 248, 232, 0.14) 0px, rgba(255, 248, 232, 0.14) 2px, rgba(0, 0, 0, 0) 2px, rgba(0, 0, 0, 0) 10px), linear-gradient(rgba(218, 239, 233, 0.98), rgba(111, 173, 158, 0.78))",
+      "borderStyle": "solid"
+    },
+    {
+      "fogState": "discovered",
+      "backgroundImage": "repeating-linear-gradient(60deg, rgba(255, 248, 232, 0.14) 0px, rgba(255, 248, 232, 0.14) 2px, rgba(0, 0, 0, 0) 2px, rgba(0, 0, 0, 0) 10px), linear-gradient(rgba(210, 244, 205, 0.98), rgba(117, 171, 115, 0.78))",
+      "borderStyle": "solid"
+    },
+    {
+      "fogState": "hinted",
+      "backgroundImage": "repeating-linear-gradient(45deg, rgba(138, 109, 65, 0.18) 0px, rgba(138, 109, 65, 0.18) 3px, rgba(0, 0, 0, 0) 3px, rgba(0, 0, 0, 0) 9px), none",
+      "borderStyle": "dashed"
+    },
+    {
+      "fogState": "locked_unknown",
+      "backgroundImage": "repeating-linear-gradient(45deg, rgba(46, 27, 14, 0.42) 0px, rgba(46, 27, 14, 0.42) 5px, rgba(255, 248, 232, 0.1) 5px, rgba(255, 248, 232, 0.1) 10px), none",
+      "borderStyle": "solid"
+    }
+  ],
+  "postScoutDomProof": {
+    "panelVisible": true,
+    "scoutReceiptVisible": false,
+    "targetFogState": "known",
+    "objectiveStrip": {
+      "visible": true,
+      "mode": "packet",
+      "readOnly": "true",
+      "actions": 0,
+      "targetCellId": "cell_q0_r1",
+      "packetId": "expedition_event_packet_hq12f_cell_q0_r1",
+      "partyId": "expedition_party_current_plot_v1",
+      "text": "Current focusReview the latest packetexpedition_event_packet_hq12f_cell_q0_r1 is the latest Scout Sector receipt packet. It is evidence for cell_q0_r1 only, with zero executable actions.Packets1Actions0Revealed4Party3Read-only focus from existing map, packet, and party state. No new server objectives, hidden truth, resources, routes, assignments, timers, rewards, Atlas execution, sharing, or external effects.",
+      "factsText": "Packets1Actions0Revealed4Party3",
+      "boundaryText": "Read-only focus from existing map, packet, and party state. No new server objectives, hidden truth, resources, routes, assignments, timers, rewards, Atlas execution, sharing, or external effects.",
+      "buttons": 0
+    },
+    "eventPacketCardVisible": true,
+    "eventPacketHeaderText": "Map evidence packetRidge Lantern packetRead-only",
+    "eventPacketChipsText": "type ridge lantern packet v1source scout sector - scout sector ui 001 - receipt metadata onlyreceipt scout_sector_ui_001cell cell_q0_r1read model onlyreceipt metadata onlyzero executable actions",
+    "eventPacketLedeText": "Selected-sector map evidence only. The packet records what the Scout Sector receipt revealed; it cannot be executed, assigned, traded, shared, or routed.",
+    "eventPacketFactsText": "Packetexpedition_event_packet_hq12f_cell_q0_r1Receiptreceipt scout sector - scout scout_sector_ui_001 - cell cell_q0_r1 - via scout_sector_receiptRead-onlytrueActions0",
+    "eventPacketBoundaryText": "Read-only receipt metadata. No packet actions, route/trade creation, resource changes, combat, scheduler work, public sharing, Generated Universe rendering, Atlas execution, cross-plot mutation, or external effects.",
+    "partyBlocks": [
+      {
+        "testid": "fp-expedition-party-selected-cell_q0_r1",
+        "actions": 0,
+        "readOnly": "true",
+        "text": "Mira Trailmark field partyPacket filedMira Trailmark and Vale-Desk 7 keep this packet as named receipt flavor for cell_q0_r1; it does not unlock routes, resources, or actions.OperatorMira Trailmark - scoutDeskVale-Desk 7 - HQ civic operatorAnchorexpedition_event_packet_hq12f_cell_q0_r1Manifestexpedition_party_current_plot_v1Mira TrailmarkscoutRook SignalpostmessengerVale-Desk 7HQ civic operatorParty flavor is presentation-only: zero actions, no autonomy, no routes, no resources, no combat, no sharing, and no Atlas execution."
+      },
+      {
+        "testid": "fp-expedition-party-roster-selected-cell_q0_r1",
+        "actions": 0,
+        "readOnly": null,
+        "text": "Mira TrailmarkscoutRook SignalpostmessengerVale-Desk 7HQ civic operator"
+      },
+      {
+        "testid": "fp-expedition-party-packet-cell_q0_r1",
+        "actions": 0,
+        "readOnly": "true",
+        "text": "Mira Trailmark field partyPacket filedMira Trailmark and Vale-Desk 7 keep this packet as named receipt flavor for cell_q0_r1; it does not unlock routes, resources, or actions.OperatorMira Trailmark - scoutDeskVale-Desk 7 - HQ civic operatorAnchorexpedition_event_packet_hq12f_cell_q0_r1Manifestexpedition_party_current_plot_v1Mira TrailmarkscoutRook SignalpostmessengerVale-Desk 7HQ civic operatorParty flavor is presentation-only: zero actions, no autonomy, no routes, no resources, no combat, no sharing, and no Atlas execution."
+      },
+      {
+        "testid": "fp-expedition-party-roster-packet-cell_q0_r1",
+        "actions": 0,
+        "readOnly": null,
+        "text": "Mira TrailmarkscoutRook SignalpostmessengerVale-Desk 7HQ civic operator"
+      }
+    ],
+    "partyRosterText": "Mira TrailmarkscoutRook SignalpostmessengerVale-Desk 7HQ civic operator",
+    "eventPacketMutationButtons": [],
+    "scoutButtons": [],
+    "sectorCards": [
+      "fp-expedition-sector-list",
+      "fp-expedition-sector-cell_origin",
+      "fp-expedition-sector-status-cell_origin",
+      "fp-expedition-sector-cell_q1_r0",
+      "fp-expedition-sector-status-cell_q1_r0",
+      "fp-expedition-sector-cell_q1_r-1",
+      "fp-expedition-sector-status-cell_q1_r-1",
+      "fp-expedition-sector-cell_q0_r1",
+      "fp-expedition-sector-status-cell_q0_r1",
+      "fp-expedition-sector-packet-cell_q0_r1"
+    ]
+  },
+  "mobileFit": {
+    "viewport": 390,
+    "documentScrollWidth": 390,
+    "bodyScrollWidth": 390,
+    "clipped": [],
+    "surfaces": {
+      "panel": {
+        "top": -1564,
+        "left": 12,
+        "right": 378,
+        "width": 366,
+        "height": 3973
+      },
+      "objectiveStrip": {
+        "top": -988,
+        "left": 26,
+        "right": 364,
+        "width": 338,
+        "height": 156
+      },
+      "threeHost": {
+        "top": -792,
+        "left": 40,
+        "right": 353,
+        "width": 313,
+        "height": 218
+      },
+      "selectedSector": {
+        "top": -517,
+        "left": 26,
+        "right": 364,
+        "width": 338,
+        "height": 964
+      },
+      "eventPacket": {
+        "top": 455,
+        "left": 26,
+        "right": 364,
+        "width": 338,
+        "height": 1089
+      },
+      "eventPacketChips": {
+        "top": 548,
+        "left": 40,
+        "right": 353,
+        "width": 313,
+        "height": 144
+      },
+      "partyPacket": {
+        "top": 762,
+        "left": 40,
+        "right": 353,
+        "width": 313,
+        "height": 382
+      },
+      "partyRoster": {
+        "top": 989,
+        "left": 49,
+        "right": 344,
+        "width": 295,
+        "height": 90
+      }
+    },
+    "gridColumns": {
+      "metrics": 2,
+      "objectiveFacts": 4,
+      "packetFacts": 2,
+      "partyFacts": 2
+    },
+    "buttons": {
+      "packetButtons": 0,
+      "partyButtons": 0,
+      "scoutButtons": 0
+    }
+  },
+  "screenshots": [
+    "reports/agent-town-hq12o-expedition-sector-art-readability-desktop-2026-06-01.png",
+    "reports/agent-town-hq12o-expedition-sector-art-readability-mobile-2026-06-01.png"
+  ],
+  "guardrails": {
+    "frontendOnly": true,
+    "serverAuthorityUnchanged": true,
+    "fogStatesPreserved": true,
+    "hintedSelectedNoButtons": true,
+    "hintedSelectedNoHiddenTruth": true,
+    "lockedUnknownNoSectorCard": true,
+    "lockedUnknownNoScoutButton": true,
+    "scoutSectorOnlyMutationPathBeforeReveal": true,
+    "scoutSectorOnlyMutationPathAfterReveal": true,
+    "eventPacketButtons": 0,
+    "partyActions": 0,
+    "objectiveActions": 0,
+    "objectiveButtons": 0,
+    "executableActions": [],
+    "routeCreation": false,
+    "tradeRouteCreation": false,
+    "resourceHarvesting": false,
+    "resourceDelta": {},
+    "combat": false,
+    "backgroundScheduling": false,
+    "publicSharing": false,
+    "generatedUniverseRendering": false,
+    "atlasExecution": false,
+    "crossPlotMutation": false,
+    "externalEffects": false,
+    "wildWestGenreDrift": false,
+    "mobileHorizontalOverflow": 0
+  }
+}

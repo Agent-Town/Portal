@@ -1,0 +1,64 @@
+{
+  "generatedAt": "2026-05-31T07:02:07.999Z",
+  "source": {
+    "mtime": "2026-05-31T06:59:17.629Z",
+    "sha256": "8973b2e490638a4865880f245aea67113f4fdf580ad5a42b126296fa76de7567"
+  },
+  "plotId": "plot_54b62cf5242eaddd",
+  "recordCounts": {
+    "workOrders": 1,
+    "civicProposals": 1,
+    "overlayPacks": 1
+  },
+  "desktop": {
+    "toast": "TypeError: Cannot read properties of null (reading 'overlayPackId')",
+    "workOrders": {
+      "text": "Work Orders Bounded delegation only: draft here, execute explicitly, collect receipts.Collect Ready Outputs OnceDraft readyDrafts and explicitly executes a bounded cohort work order for collecting up to two ready outputs once.collect outputscap 2 child actionsspend cap 0runtime cap 2m 0scurrent plot onlydraft expires 24hExplicit execution only. No scheduler, spending, placement, scouting, founding, or Atlas mutation.Create DraftReceipts and draftsCollect Ready Outputs OnceCOMPLETEDcollect ready outputs once - all ready outputs, output ready, max 2collect outputscap 2 child actionsspend cap 0runtime cap 2m 0scurrent plot only2 child receiptsCompleted receipt. Child receipts are preserved for audit.Execution is a human-clicked endpoint call. No background automation runs this draft.",
+      "buttons": [
+        "Create Draft"
+      ]
+    },
+    "worldGrid": {
+      "text": "World Grid",
+      "buttons": []
+    },
+    "civicProposals": {
+      "text": "Civic Proposals Civic proposal records loading.",
+      "buttons": []
+    },
+    "overlayPacks": {
+      "text": "Generated Universe Overlay Packs Overlay pack records loading.",
+      "buttons": []
+    },
+    "overlayPreview": null,
+    "buttons": [
+      "Atlas",
+      "HeadquartersIdle",
+      "Lumber CampIdle",
+      "Farm PlotIdle",
+      "Expedition BoardIdle",
+      "QuarryIdle",
+      "WorkshopIdle",
+      "Market StallIdle",
+      "Cancel placement",
+      "Hide",
+      "Save permissions",
+      "Ask the Foreman",
+      "Site Plan drafted",
+      "Create Draft",
+      "Close",
+      "Recap",
+      "Close"
+    ]
+  },
+  "mobile": {
+    "toast": "TypeError: Cannot read properties of null (reading 'overlayPackId')",
+    "documentScrollWidth": 390,
+    "bodyScrollWidth": 390,
+    "viewport": 390,
+    "clipped": [],
+    "civicText": "Civic Proposals Civic proposal records loading.",
+    "overlayText": "Generated Universe Overlay Packs Overlay pack records loading."
+  },
+  "consoleMessages": []
+}

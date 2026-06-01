@@ -1,0 +1,175 @@
+{
+  "ok": true,
+  "generatedAt": "2026-06-01T07:37:10.048Z",
+  "source": "mocked Playwright state using verified HQ12E event packet read-model shape; UI presents packets read-only after Scout Sector receipt",
+  "capturedRequest": {
+    "plotId": "plot_hq12b_expedition_map_ui",
+    "cellId": "cell_q0_r1",
+    "actor": "HUMAN",
+    "idempotencyKey": "fp-scout-sector-plot_hq12b_expedition_map_ui-cell_q0_r1-hq12b-expedition-map-proof"
+  },
+  "eventPacket": {
+    "packetId": "expedition_event_packet_hq12f_cell_q0_r1",
+    "kind": "expedition_event_packet",
+    "templateId": "ridge_lantern_packet_v1",
+    "scoutId": "scout_sector_ui_001",
+    "cellId": "cell_q0_r1",
+    "discoveryFlavor": "Ridge Lantern packet",
+    "terrainExplanation": "Lantern survey notes mark a sheltered ridge line, two wind breaks, and no harvestable claim in this packet.",
+    "riskExplanation": "The risk stays observational: loose shale and fog pockets are noted for future planning, not acted on here.",
+    "operatorNote": "Mira Trailmark files this as receipt-bound field color for later review.",
+    "readOnly": true,
+    "executableActions": [],
+    "authorityBoundary": "server_owned_expedition_event_packet_read_model_v1",
+    "partyId": "expedition_party_current_plot_v1",
+    "partySnapshot": {
+      "partyId": "expedition_party_current_plot_v1",
+      "kind": "expedition_party_snapshot",
+      "version": "hq12g.v1",
+      "readOnly": true,
+      "executableActions": [],
+      "authorityBoundary": "server_owned_read_only_expedition_party_manifest_v1",
+      "members": [
+        {
+          "memberId": "pathfinder-scout-v1",
+          "displayName": "Mira Trailmark",
+          "role": "scout"
+        },
+        {
+          "memberId": "rook-signalpost-messenger-v1",
+          "displayName": "Rook Signalpost",
+          "role": "messenger"
+        },
+        {
+          "memberId": "hq-civic-operator-vale-desk-7-v1",
+          "displayName": "Vale-Desk 7",
+          "role": "hq_civic_operator"
+        }
+      ],
+      "boundaryFlags": {
+        "autonomousMovement": false,
+        "operatorAssignment": false,
+        "resourceHarvesting": false,
+        "resourceDelta": {},
+        "routeCreation": false,
+        "tradeRouteCreation": false,
+        "backgroundScheduling": false,
+        "combat": false,
+        "publicSharing": false,
+        "generatedUniverseRendering": false,
+        "crossPlotMutation": false,
+        "atlasExecution": false,
+        "externalEffects": false
+      }
+    },
+    "receiptLink": {
+      "actionName": "et.plot.scout_sector",
+      "scoutId": "scout_sector_ui_001",
+      "cellId": "cell_q0_r1",
+      "via": "scout_sector_receipt"
+    },
+    "boundaryFlags": {
+      "readModelOnly": true,
+      "receiptMetadataOnly": true,
+      "routeCreation": false,
+      "tradeRouteCreation": false,
+      "resourceHarvesting": false,
+      "resourceDelta": {},
+      "combat": false,
+      "backgroundScheduling": false,
+      "publicSharing": false,
+      "generatedUniverseRendering": false,
+      "atlasExecution": false,
+      "crossPlotMutation": false,
+      "externalEffects": false
+    },
+    "packetHash": "hq12f-event-packet-ui-proof"
+  },
+  "eventPacketIds": [
+    "expedition_event_packet_hq12f_cell_q0_r1"
+  ],
+  "domProof": {
+    "panelVisible": true,
+    "scoutReceiptVisible": false,
+    "targetFogState": "known",
+    "objectiveStrip": {
+      "visible": true,
+      "mode": "packet",
+      "readOnly": "true",
+      "actions": 0,
+      "targetCellId": "cell_q0_r1",
+      "packetId": "expedition_event_packet_hq12f_cell_q0_r1",
+      "partyId": "expedition_party_current_plot_v1",
+      "text": "Current focusReview the latest packetexpedition_event_packet_hq12f_cell_q0_r1 is the latest Scout Sector receipt packet. It is evidence for cell_q0_r1 only, with zero executable actions.Packets1Actions0Revealed4Party3Read-only focus from existing map, packet, and party state. No new server objectives, hidden truth, resources, routes, assignments, timers, rewards, Atlas execution, sharing, or external effects.",
+      "factsText": "Packets1Actions0Revealed4Party3",
+      "boundaryText": "Read-only focus from existing map, packet, and party state. No new server objectives, hidden truth, resources, routes, assignments, timers, rewards, Atlas execution, sharing, or external effects.",
+      "buttons": 0
+    },
+    "eventPacketCardVisible": true,
+    "eventPacketHeaderText": "Map evidence packetRidge Lantern packetRead-only",
+    "eventPacketChipsText": "type ridge lantern packet v1source scout sector - scout sector ui 001 - receipt metadata onlyreceipt scout_sector_ui_001cell cell_q0_r1read model onlyreceipt metadata onlyzero executable actions",
+    "eventPacketLedeText": "Selected-sector map evidence only. The packet records what the Scout Sector receipt revealed; it cannot be executed, assigned, traded, shared, or routed.",
+    "eventPacketFactsText": "Packetexpedition_event_packet_hq12f_cell_q0_r1Receiptreceipt scout sector - scout scout_sector_ui_001 - cell cell_q0_r1 - via scout_sector_receiptRead-onlytrueActions0",
+    "eventPacketBoundaryText": "Read-only receipt metadata. No packet actions, route/trade creation, resource changes, combat, scheduler work, public sharing, Generated Universe rendering, Atlas execution, cross-plot mutation, or external effects.",
+    "partyBlocks": [
+      {
+        "testid": "fp-expedition-party-selected-cell_q0_r1",
+        "actions": 0,
+        "readOnly": "true",
+        "text": "Mira Trailmark field partyPacket filedMira Trailmark and Vale-Desk 7 keep this packet as named receipt flavor for cell_q0_r1; it does not unlock routes, resources, or actions.OperatorMira Trailmark - scoutDeskVale-Desk 7 - HQ civic operatorAnchorexpedition_event_packet_hq12f_cell_q0_r1Manifestexpedition_party_current_plot_v1Mira TrailmarkscoutRook SignalpostmessengerVale-Desk 7HQ civic operatorParty flavor is presentation-only: zero actions, no autonomy, no routes, no resources, no combat, no sharing, and no Atlas execution."
+      },
+      {
+        "testid": "fp-expedition-party-roster-selected-cell_q0_r1",
+        "actions": 0,
+        "readOnly": null,
+        "text": "Mira TrailmarkscoutRook SignalpostmessengerVale-Desk 7HQ civic operator"
+      },
+      {
+        "testid": "fp-expedition-party-packet-cell_q0_r1",
+        "actions": 0,
+        "readOnly": "true",
+        "text": "Mira Trailmark field partyPacket filedMira Trailmark and Vale-Desk 7 keep this packet as named receipt flavor for cell_q0_r1; it does not unlock routes, resources, or actions.OperatorMira Trailmark - scoutDeskVale-Desk 7 - HQ civic operatorAnchorexpedition_event_packet_hq12f_cell_q0_r1Manifestexpedition_party_current_plot_v1Mira TrailmarkscoutRook SignalpostmessengerVale-Desk 7HQ civic operatorParty flavor is presentation-only: zero actions, no autonomy, no routes, no resources, no combat, no sharing, and no Atlas execution."
+      },
+      {
+        "testid": "fp-expedition-party-roster-packet-cell_q0_r1",
+        "actions": 0,
+        "readOnly": null,
+        "text": "Mira TrailmarkscoutRook SignalpostmessengerVale-Desk 7HQ civic operator"
+      }
+    ],
+    "partyRosterText": "Mira TrailmarkscoutRook SignalpostmessengerVale-Desk 7HQ civic operator",
+    "eventPacketMutationButtons": [],
+    "scoutButtons": [],
+    "sectorCards": [
+      "fp-expedition-sector-list",
+      "fp-expedition-sector-cell_origin",
+      "fp-expedition-sector-status-cell_origin",
+      "fp-expedition-sector-cell_q1_r0",
+      "fp-expedition-sector-status-cell_q1_r0",
+      "fp-expedition-sector-cell_q1_r-1",
+      "fp-expedition-sector-status-cell_q1_r-1",
+      "fp-expedition-sector-cell_q0_r1",
+      "fp-expedition-sector-status-cell_q0_r1",
+      "fp-expedition-sector-packet-cell_q0_r1"
+    ]
+  },
+  "screenshots": [
+    "reports/agent-town-hq12f-expedition-event-packets-ui-desktop-2026-05-31.png",
+    "reports/agent-town-hq12f-expedition-event-packets-ui-mobile-2026-05-31.png"
+  ],
+  "guardrails": {
+    "packetButtons": 0,
+    "scoutSectorOnlyMutationPath": true,
+    "executableActions": [],
+    "readOnly": true,
+    "routeCreation": false,
+    "tradeRouteCreation": false,
+    "resourceHarvesting": false,
+    "combat": false,
+    "atlasExecution": false,
+    "publicSharing": false,
+    "generatedUniverseRendering": false,
+    "crossPlotMutation": false,
+    "externalEffects": false
+  }
+}

@@ -1,0 +1,143 @@
+{
+  "generatedAt": "2026-06-01T07:16:04.189Z",
+  "date": "2026-06-01",
+  "viewport": {
+    "width": 1440,
+    "height": 1000,
+    "deviceScaleFactor": 1
+  },
+  "server": {
+    "baseURL": "http://[::1]:4174",
+    "mode": "local test server",
+    "env": [
+      "NODE_ENV=test",
+      "TEST_RESET_TOKEN=test-reset",
+      "START_PAGE_ENABLED=0"
+    ],
+    "storePath": "data/store.e2e.agent-town-qa-replay.sqlite"
+  },
+  "sourceModes": [
+    "real local fresh server session for first impression and HQ1 production loop",
+    "advanced Playwright route replay using current Founders Plot UI renderer for HQ11/HQ12 read-model surfaces"
+  ],
+  "guardrails": {
+    "reportOnly": true,
+    "productionSourceEdited": false,
+    "committed": false,
+    "pushed": false,
+    "externalMessages": false,
+    "scoutSectorOnlyExpeditionMutationPath": true,
+    "noAtlasExecution": true,
+    "noGeneratedUniverseRendering": true,
+    "noPublicSharing": true,
+    "noHiddenAutonomy": true
+  },
+  "screenshots": [
+    {
+      "path": "reports/agent-town-qa-replay-desktop-2026-06-01-01-first-impression-real-fresh-page.png",
+      "width": 1440,
+      "height": 9106,
+      "bytes": 5428586
+    },
+    {
+      "path": "reports/agent-town-qa-replay-desktop-2026-06-01-02-immediate-actions-build-menu.png",
+      "width": 1440,
+      "height": 9085,
+      "bytes": 5391722
+    },
+    {
+      "path": "reports/agent-town-qa-replay-desktop-2026-06-01-03-production-loop-building-started.png",
+      "width": 1440,
+      "height": 9160,
+      "bytes": 5466475
+    },
+    {
+      "path": "reports/agent-town-qa-replay-desktop-2026-06-01-04-hq-progression-loop-ready-to-produce.png",
+      "width": 1440,
+      "height": 9400,
+      "bytes": 3985933
+    },
+    {
+      "path": "reports/agent-town-qa-replay-desktop-2026-06-01-05-hq-progression-loop-ready-to-collect.png",
+      "width": 1440,
+      "height": 9171,
+      "bytes": 5464087
+    },
+    {
+      "path": "reports/agent-town-qa-replay-desktop-2026-06-01-06-hq-upgrade-gate-after-first-collect.png",
+      "width": 1440,
+      "height": 9387,
+      "bytes": 5567936
+    },
+    {
+      "path": "reports/agent-town-qa-replay-desktop-2026-06-01-07-visible-inhabitants-assets-stage.png",
+      "width": 842,
+      "height": 527,
+      "bytes": 716764
+    },
+    {
+      "path": "reports/agent-town-qa-replay-desktop-2026-06-01-08-progression-atlas-modal-real.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 382350
+    },
+    {
+      "path": "reports/agent-town-qa-replay-desktop-2026-06-01-09-advanced-hq-expedition-board-scouthub.png",
+      "width": 1440,
+      "height": 8987,
+      "bytes": 5500638
+    },
+    {
+      "path": "reports/agent-town-qa-replay-desktop-2026-06-01-10-scout-reports-site-plans-ledgers.png",
+      "width": 1440,
+      "height": 8987,
+      "bytes": 5498342
+    },
+    {
+      "path": "reports/agent-town-qa-replay-desktop-2026-06-01-11-expedition-map-before-scout-sector.png",
+      "width": 527,
+      "height": 3889,
+      "bytes": 1569877
+    },
+    {
+      "path": "reports/agent-town-qa-replay-desktop-2026-06-01-12-scout-sector-event-packet-party.png",
+      "width": 527,
+      "height": 5230,
+      "bytes": 2220435
+    },
+    {
+      "path": "reports/agent-town-qa-replay-desktop-2026-06-01-13-event-packet-detail.png",
+      "width": 491,
+      "height": 1100,
+      "bytes": 478684
+    },
+    {
+      "path": "reports/agent-town-qa-replay-desktop-2026-06-01-14-expedition-party-detail.png",
+      "width": 462,
+      "height": 403,
+      "bytes": 154481
+    },
+    {
+      "path": "reports/agent-town-qa-replay-desktop-2026-06-01-15-world-grid-civic-operations-reachable.png",
+      "width": 1440,
+      "height": 10328,
+      "bytes": 4816761
+    },
+    {
+      "path": "reports/agent-town-qa-replay-desktop-2026-06-01-16-civic-operations-local-care-ledger.png",
+      "width": 527,
+      "height": 1606,
+      "bytes": 392216
+    }
+  ],
+  "contactSheet": {
+    "path": "reports/agent-town-qa-replay-desktop-contact-sheet-2026-06-01.png",
+    "width": 1440,
+    "height": 1032,
+    "bytes": 1178149
+  },
+  "notes": [
+    "A first attempt to write proof JSON failed after screenshots completed due to a local variable referenced from page.evaluate; proof was backfilled from generated artifact metadata.",
+    "ImageMagick montage failed because this host has no default font configured; contact sheet was assembled manually with ImageMagick thumbnail rows."
+  ]
+}

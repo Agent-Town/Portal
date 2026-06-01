@@ -1,0 +1,3120 @@
+{
+  "generatedAt": "2026-05-31T00:00:00+07:00",
+  "worktree": "/Users/robin/Projects/Portal-atlas-editor",
+  "branch": "neo/progression-atlas-editor-next-2026-05-29",
+  "scannedSources": [
+    "public/experiences/founders-plot/founders-plot.js",
+    "public/experiences/founders-plot/founders-plot.css",
+    "public/experiences/founders-plot/index.html",
+    "public/experiences/founders-plot/scene_state.js",
+    "public/experiences/founders-plot/three_scene_entry.js",
+    "public/experiences/founders-plot/three_scene_bundle.js",
+    "public/agent-town-icons.js",
+    "server/agent_town_icons.js",
+    "public/progression-atlas.js",
+    "public/progression-atlas.css",
+    "public/progression-atlas.html"
+  ],
+  "referencedAssets": {
+    "total": 135,
+    "missingRuntimeCount": 0,
+    "missingRuntime": [],
+    "missingLocalProvenanceCount": 2,
+    "missingLocalProvenance": [
+      {
+        "ref": "/Users/robin/.openclaw/media/agent-town-references/founders-plot-desktop.webp",
+        "local": "/Users/robin/.openclaw/media/agent-town-references/founders-plot-desktop.webp",
+        "exists": false,
+        "category": "local-provenance",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v1.json",
+          "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.json",
+          "public/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/Users/robin/.openclaw/media/agent-town-references/lumber-camp.webp",
+        "local": "/Users/robin/.openclaw/media/agent-town-references/lumber-camp.webp",
+        "exists": false,
+        "category": "local-provenance",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v1.json",
+          "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.json",
+          "public/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.json"
+        ],
+        "kind": "metadata-reference"
+      }
+    ],
+    "dynamicTemplates": [
+      {
+        "ref": "/experiences/founders-plot/assets/buildings/${files[type]}.webp",
+        "local": null,
+        "exists": null,
+        "category": "dynamic-template",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/buildings/hq-lv${level}.webp",
+        "local": null,
+        "exists": null,
+        "category": "dynamic-template",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/v1_4_4/clover-${fileState}.webp",
+        "local": null,
+        "exists": null,
+        "category": "dynamic-template",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      }
+    ],
+    "dynamicResolved": [
+      {
+        "ref": "/experiences/founders-plot/assets/buildings/hq-lv1.webp",
+        "local": "public/experiences/founders-plot/assets/buildings/hq-lv1.webp",
+        "exists": true
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/buildings/hq-lv2.webp",
+        "local": "public/experiences/founders-plot/assets/buildings/hq-lv2.webp",
+        "exists": true
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/buildings/hq-lv3.webp",
+        "local": "public/experiences/founders-plot/assets/buildings/hq-lv3.webp",
+        "exists": true
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/buildings/hq-lv4.webp",
+        "local": "public/experiences/founders-plot/assets/buildings/hq-lv4.webp",
+        "exists": true
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/buildings/hq-lv5.webp",
+        "local": "public/experiences/founders-plot/assets/buildings/hq-lv5.webp",
+        "exists": true
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/buildings/lumber-camp.webp",
+        "local": "public/experiences/founders-plot/assets/buildings/lumber-camp.webp",
+        "exists": true
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/buildings/farm-plot.webp",
+        "local": "public/experiences/founders-plot/assets/buildings/farm-plot.webp",
+        "exists": true
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/buildings/quarry.webp",
+        "local": "public/experiences/founders-plot/assets/buildings/quarry.webp",
+        "exists": true
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/buildings/expedition-board.webp",
+        "local": "public/experiences/founders-plot/assets/buildings/expedition-board.webp",
+        "exists": true
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/buildings/workshop.webp",
+        "local": "public/experiences/founders-plot/assets/buildings/workshop.webp",
+        "exists": true
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/buildings/market-stall.webp",
+        "local": "public/experiences/founders-plot/assets/buildings/market-stall.webp",
+        "exists": true
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/objects/empty-lot.webp",
+        "local": "public/experiences/founders-plot/assets/objects/empty-lot.webp",
+        "exists": true
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/objects/locked-lot.webp",
+        "local": "public/experiences/founders-plot/assets/objects/locked-lot.webp",
+        "exists": true
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/v1_4_4/clover-acting.webp",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-acting.webp",
+        "exists": true
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/v1_4_4/clover-blocked.webp",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-blocked.webp",
+        "exists": true
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/v1_4_4/clover-celebrating.webp",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-celebrating.webp",
+        "exists": true
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/v1_4_4/clover-idle.webp",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-idle.webp",
+        "exists": true
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/v1_4_4/clover-observing.webp",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-observing.webp",
+        "exists": true
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/v1_4_4/clover-paused.webp",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-paused.webp",
+        "exists": true
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/v1_4_4/clover-restart-needed.webp",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-restart-needed.webp",
+        "exists": true
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/v1_4_4/clover-thinking.webp",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-thinking.webp",
+        "exists": true
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/v1_4_4/clover-waiting-approval.webp",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-waiting-approval.webp",
+        "exists": true
+      }
+    ],
+    "rows": [
+      {
+        "ref": "/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.source.png",
+        "local": "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.source.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/assets/icons/agent-town/claim-ready-plan-gpt-image-2-v1.png",
+        "local": "public/assets/icons/agent-town/claim-ready-plan-gpt-image-2-v1.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/assets/icons/agent-town/cohort-work-order-gpt-image-2-v1.png",
+        "local": "public/assets/icons/agent-town/cohort-work-order-gpt-image-2-v1.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/assets/icons/agent-town/convoy-route-gpt-image-2-v1.png",
+        "local": "public/assets/icons/agent-town/convoy-route-gpt-image-2-v1.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/assets/icons/agent-town/expedition-board-gpt-image-2-v1.png",
+        "local": "public/assets/icons/agent-town/expedition-board-gpt-image-2-v1.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/assets/icons/agent-town/food-resource-gpt-image-2-v1.png",
+        "local": "public/assets/icons/agent-town/food-resource-gpt-image-2-v1.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/founders-plot.css"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/assets/icons/agent-town/outpost-core-gpt-image-2-v1.png",
+        "local": "public/assets/icons/agent-town/outpost-core-gpt-image-2-v1.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/assets/icons/agent-town/outpost-marker-gpt-image-2-v1.png",
+        "local": "public/assets/icons/agent-town/outpost-marker-gpt-image-2-v1.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/assets/icons/agent-town/research-lodge-gpt-image-2-v1.png",
+        "local": "public/assets/icons/agent-town/research-lodge-gpt-image-2-v1.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/assets/icons/agent-town/reviewed-plan-receipt-gpt-image-2-v1.png",
+        "local": "public/assets/icons/agent-town/reviewed-plan-receipt-gpt-image-2-v1.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/assets/icons/agent-town/scout-action-gpt-image-2-v1.png",
+        "local": "public/assets/icons/agent-town/scout-action-gpt-image-2-v1.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/assets/icons/agent-town/scout-report-gpt-image-2-v1.png",
+        "local": "public/assets/icons/agent-town/scout-report-gpt-image-2-v1.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/assets/icons/agent-town/second-plot-founded-gpt-image-2-v1.png",
+        "local": "public/assets/icons/agent-town/second-plot-founded-gpt-image-2-v1.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/assets/icons/agent-town/settlement-charter-document-gpt-image-2-v1.png",
+        "local": "public/assets/icons/agent-town/settlement-charter-document-gpt-image-2-v1.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/assets/icons/agent-town/settlement-charter-gpt-image-2-v1.png",
+        "local": "public/assets/icons/agent-town/settlement-charter-gpt-image-2-v1.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/assets/icons/agent-town/settlement-claim-gpt-image-2-v1.png",
+        "local": "public/assets/icons/agent-town/settlement-claim-gpt-image-2-v1.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/assets/icons/agent-town/settler-convoy-gpt-image-2-v1.png",
+        "local": "public/assets/icons/agent-town/settler-convoy-gpt-image-2-v1.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/assets/icons/agent-town/site-plan-gpt-image-2-v1.png",
+        "local": "public/assets/icons/agent-town/site-plan-gpt-image-2-v1.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/assets/icons/agent-town/stone-resource-gpt-image-2-v1.png",
+        "local": "public/assets/icons/agent-town/stone-resource-gpt-image-2-v1.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/founders-plot.css"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/assets/icons/agent-town/wood-resource-gpt-image-2-v1.png",
+        "local": "public/assets/icons/agent-town/wood-resource-gpt-image-2-v1.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/founders-plot.css"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/buildings/${files[type]}.webp",
+        "local": null,
+        "exists": null,
+        "category": "dynamic-template",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/buildings/expedition-board.webp",
+        "local": "public/experiences/founders-plot/assets/buildings/expedition-board.webp",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/buildings/hq-lv${level}.webp",
+        "local": null,
+        "exists": null,
+        "category": "dynamic-template",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/buildings/outpost-core-lv1.webp",
+        "local": "public/experiences/founders-plot/assets/buildings/outpost-core-lv1.webp",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/buildings/research-lodge.webp",
+        "local": "public/experiences/founders-plot/assets/buildings/research-lodge.webp",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/buildings/settlement-charter-board.webp",
+        "local": "public/experiences/founders-plot/assets/buildings/settlement-charter-board.webp",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.json",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.json",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.png",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/inhabitants/civic_routekeeper/civic-routekeeper-v1.json",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/civic_routekeeper/civic-routekeeper-v1.json",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/inhabitants/civic_routekeeper/civic-routekeeper-v1.png",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/civic_routekeeper/civic-routekeeper-v1.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/inhabitants/hauler/oona-tallpack-hauler-v1.json",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/hauler/oona-tallpack-hauler-v1.json",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/inhabitants/hauler/oona-tallpack-hauler-v1.png",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/hauler/oona-tallpack-hauler-v1.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.json",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.json",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.png",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/inhabitants/oracle_adjunct/oracle-adjunct-v1.json",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/oracle_adjunct/oracle-adjunct-v1.json",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/inhabitants/oracle_adjunct/oracle-adjunct-v1.png",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/oracle_adjunct/oracle-adjunct-v1.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/inhabitants/outpost_keeper/outpost-keeper-v1.json",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/outpost_keeper/outpost-keeper-v1.json",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/inhabitants/outpost_keeper/outpost-keeper-v1.png",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/outpost_keeper/outpost-keeper-v1.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/inhabitants/scout/pathfinder-scout-v1.json",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/scout/pathfinder-scout-v1.json",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/inhabitants/scout/pathfinder-scout-v1.png",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/scout/pathfinder-scout-v1.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/inhabitants/settler/settler-convoy-crew-v1.json",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/settler/settler-convoy-crew-v1.json",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/inhabitants/settler/settler-convoy-crew-v1.png",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/settler/settler-convoy-crew-v1.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/inhabitants/trader/market-trader-v1.json",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/trader/market-trader-v1.json",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/inhabitants/trader/market-trader-v1.png",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/trader/market-trader-v1.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/inhabitants/worker/kettle-37-worker-v1.json",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/worker/kettle-37-worker-v1.json",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/inhabitants/worker/kettle-37-worker-v1.png",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/worker/kettle-37-worker-v1.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/inhabitants/workshop_specialist/workshop-specialist-v1.json",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/workshop_specialist/workshop-specialist-v1.json",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/inhabitants/workshop_specialist/workshop-specialist-v1.png",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/workshop_specialist/workshop-specialist-v1.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/v1_4_4/clover-${fileState}.webp",
+        "local": null,
+        "exists": null,
+        "category": "dynamic-template",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/v1_4_4/clover-acting.png",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-acting.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/v1_4_4/clover-acting.webp",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-acting.webp",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/v1_4_4/clover-blocked.png",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-blocked.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/v1_4_4/clover-blocked.webp",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-blocked.webp",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/v1_4_4/clover-celebrating.png",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-celebrating.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/v1_4_4/clover-celebrating.webp",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-celebrating.webp",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/v1_4_4/clover-idle.png",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-idle.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/v1_4_4/clover-idle.webp",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-idle.webp",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/v1_4_4/clover-observing.png",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-observing.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/v1_4_4/clover-observing.webp",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-observing.webp",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/v1_4_4/clover-paused.png",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-paused.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/v1_4_4/clover-paused.webp",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-paused.webp",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/v1_4_4/clover-restart-needed.png",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-restart-needed.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/v1_4_4/clover-restart-needed.webp",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-restart-needed.webp",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/v1_4_4/clover-thinking.png",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-thinking.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/v1_4_4/clover-thinking.webp",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-thinking.webp",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/v1_4_4/clover-waiting-approval.png",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-waiting-approval.png",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/characters/v1_4_4/clover-waiting-approval.webp",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-waiting-approval.webp",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/objects/claim-ready-plan.webp",
+        "local": "public/experiences/founders-plot/assets/objects/claim-ready-plan.webp",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/objects/cohort-work-order-dossier.webp",
+        "local": "public/experiences/founders-plot/assets/objects/cohort-work-order-dossier.webp",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/objects/convoy-route-map.webp",
+        "local": "public/experiences/founders-plot/assets/objects/convoy-route-map.webp",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/objects/empty-lot.webp",
+        "local": "public/experiences/founders-plot/assets/objects/empty-lot.webp",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/objects/locked-lot.webp",
+        "local": "public/experiences/founders-plot/assets/objects/locked-lot.webp",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/objects/outpost-marker.webp",
+        "local": "public/experiences/founders-plot/assets/objects/outpost-marker.webp",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/objects/reviewed-plan-stamp.webp",
+        "local": "public/experiences/founders-plot/assets/objects/reviewed-plan-stamp.webp",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/objects/scout-report-dossier.webp",
+        "local": "public/experiences/founders-plot/assets/objects/scout-report-dossier.webp",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/objects/second-plot-founded-receipt.webp",
+        "local": "public/experiences/founders-plot/assets/objects/second-plot-founded-receipt.webp",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/objects/settlement-charter-document.webp",
+        "local": "public/experiences/founders-plot/assets/objects/settlement-charter-document.webp",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/objects/settlement-claim-manifest.webp",
+        "local": "public/experiences/founders-plot/assets/objects/settlement-claim-manifest.webp",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/objects/settler-convoy-wagon.webp",
+        "local": "public/experiences/founders-plot/assets/objects/settler-convoy-wagon.webp",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/objects/site-plan-dossier.webp",
+        "local": "public/experiences/founders-plot/assets/objects/site-plan-dossier.webp",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/scenes/founders-plot-desktop.webp",
+        "local": "public/experiences/founders-plot/assets/scenes/founders-plot-desktop.webp",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/experiences/founders-plot/assets/scenes/founders-plot-mobile.webp",
+        "local": "public/experiences/founders-plot/assets/scenes/founders-plot-mobile.webp",
+        "exists": true,
+        "category": "runtime-url",
+        "sources": [
+          "public/experiences/founders-plot/scene_state.js"
+        ],
+        "kind": "source-reference"
+      },
+      {
+        "ref": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e6d93-31f4-7ba0-aea3-85164378127f/ig_0917ecf16dc91473016a17f63509bc8191942cfcc9fefe6dfb.png",
+        "local": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e6d93-31f4-7ba0-aea3-85164378127f/ig_0917ecf16dc91473016a17f63509bc8191942cfcc9fefe6dfb.png",
+        "exists": true,
+        "category": "local-provenance",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v1.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e6db6-c0b0-7470-85b1-e8163787ea71/ig_0679144cc451e09d016a1801745b588191989e60093ebe2359.png",
+        "local": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e6db6-c0b0-7470-85b1-e8163787ea71/ig_0679144cc451e09d016a1801745b588191989e60093ebe2359.png",
+        "exists": true,
+        "category": "local-provenance",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e7be0-6db3-72e1-9eef-f04981d4eec2/ig_067e65cae1df0ec4016a1b9f7ff8788191982ba2426f5b81bf.png",
+        "local": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e7be0-6db3-72e1-9eef-f04981d4eec2/ig_067e65cae1df0ec4016a1b9f7ff8788191982ba2426f5b81bf.png",
+        "exists": true,
+        "category": "local-provenance",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/scout/pathfinder-scout-v1.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e7c45-8e1f-7fa3-a67c-4ccf4bf0859b/ig_0ab5d2a9f79f2c3f016a1bb820f1bc8191bcb1e2d3733ae8cf.png",
+        "local": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e7c45-8e1f-7fa3-a67c-4ccf4bf0859b/ig_0ab5d2a9f79f2c3f016a1bb820f1bc8191bcb1e2d3733ae8cf.png",
+        "exists": true,
+        "category": "local-provenance",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/charter_clerk/charter-clerk-v1.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e7c45-8e1f-7fa3-a67c-4ccf4bf0859b/ig_0ab5d2a9f79f2c3f016a1bb8e387848191b63107b40abd684e.png",
+        "local": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e7c45-8e1f-7fa3-a67c-4ccf4bf0859b/ig_0ab5d2a9f79f2c3f016a1bb8e387848191b63107b40abd684e.png",
+        "exists": true,
+        "category": "local-provenance",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/research_doctrine_keeper/research-doctrine-keeper-v1.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e7c45-8e1f-7fa3-a67c-4ccf4bf0859b/ig_0ab5d2a9f79f2c3f016a1bb9ab4b9081918b509f919431a687.png",
+        "local": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e7c45-8e1f-7fa3-a67c-4ccf4bf0859b/ig_0ab5d2a9f79f2c3f016a1bb9ab4b9081918b509f919431a687.png",
+        "exists": true,
+        "category": "local-provenance",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/cohort_hall_coordinator/cohort-hall-coordinator-v1.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e7c63-12e6-76d1-85d0-cd38068fd851/ig_03427427825ed960016a1bc1f35efc8191a61250633a33c260.png",
+        "local": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e7c63-12e6-76d1-85d0-cd38068fd851/ig_03427427825ed960016a1bc1f35efc8191a61250633a33c260.png",
+        "exists": true,
+        "category": "local-provenance",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/civic_routekeeper/civic-routekeeper-v1.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e7c63-12e6-76d1-85d0-cd38068fd851/ig_03427427825ed960016a1bc2438e34819192b8ef5ee67de852.png",
+        "local": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e7c63-12e6-76d1-85d0-cd38068fd851/ig_03427427825ed960016a1bc2438e34819192b8ef5ee67de852.png",
+        "exists": true,
+        "category": "local-provenance",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/oracle_adjunct/oracle-adjunct-v1.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e7c63-12e6-76d1-85d0-cd38068fd851/ig_03427427825ed960016a1bc2fb27248191a2a4a942470bb0c9.png",
+        "local": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e7c63-12e6-76d1-85d0-cd38068fd851/ig_03427427825ed960016a1bc2fb27248191a2a4a942470bb0c9.png",
+        "exists": true,
+        "category": "local-provenance",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/outpost_keeper/outpost-keeper-v1.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e7c63-12e6-76d1-85d0-cd38068fd851/ig_03427427825ed960016a1bc3ff7c1c8191b28c62eb8b78c415.png",
+        "local": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e7c63-12e6-76d1-85d0-cd38068fd851/ig_03427427825ed960016a1bc3ff7c1c8191b28c62eb8b78c415.png",
+        "exists": true,
+        "category": "local-provenance",
+        "sources": [
+          "public/experiences/founders-plot/assets/objects/world-grid-civic-beacon.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/Users/robin/.openclaw/media/agent-town-references/founders-plot-desktop.webp",
+        "local": "/Users/robin/.openclaw/media/agent-town-references/founders-plot-desktop.webp",
+        "exists": false,
+        "category": "local-provenance",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v1.json",
+          "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.json",
+          "public/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/Users/robin/.openclaw/media/agent-town-references/lumber-camp.webp",
+        "local": "/Users/robin/.openclaw/media/agent-town-references/lumber-camp.webp",
+        "exists": false,
+        "category": "local-provenance",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v1.json",
+          "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.json",
+          "public/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/Users/robin/.openclaw/media/agent-town-references/v1_4_4/clover-acting-v1_4_4-no-holes.png",
+        "local": "/Users/robin/.openclaw/media/agent-town-references/v1_4_4/clover-acting-v1_4_4-no-holes.png",
+        "exists": true,
+        "category": "local-provenance",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v1.json",
+          "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.json",
+          "public/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/Users/robin/.openclaw/media/agent-town-references/v1_4_4/clover-celebrating-v1_4_4-no-holes.png",
+        "local": "/Users/robin/.openclaw/media/agent-town-references/v1_4_4/clover-celebrating-v1_4_4-no-holes.png",
+        "exists": true,
+        "category": "local-provenance",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v1.json",
+          "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.json",
+          "public/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/Users/robin/.openclaw/media/agent-town-references/v1_4_4/clover-idle-v1_4_4-no-holes.png",
+        "local": "/Users/robin/.openclaw/media/agent-town-references/v1_4_4/clover-idle-v1_4_4-no-holes.png",
+        "exists": true,
+        "category": "local-provenance",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v1.json",
+          "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.json",
+          "public/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/Users/robin/.openclaw/media/agent-town-references/v1_4_4/clover-observing-v1_4_4-no-holes.png",
+        "local": "/Users/robin/.openclaw/media/agent-town-references/v1_4_4/clover-observing-v1_4_4-no-holes.png",
+        "exists": true,
+        "category": "local-provenance",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v1.json",
+          "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.json",
+          "public/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/Users/robin/.openclaw/media/tool-image-generation/agent-town-hq3-hq10-icon-sheet-v1-opaque---b3dd520b-5e46-4304-9545-b52722766947.png",
+        "local": "/Users/robin/.openclaw/media/tool-image-generation/agent-town-hq3-hq10-icon-sheet-v1-opaque---b3dd520b-5e46-4304-9545-b52722766947.png",
+        "exists": true,
+        "category": "local-provenance",
+        "sources": [
+          "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.manifest.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/Users/robin/.openclaw/media/tool-image-generation/agent-town-market-trader-sprite-sheet-v1-opaque---2e57d26d-e68b-4b57-ac17-3f1e0a403e8e.png",
+        "local": "/Users/robin/.openclaw/media/tool-image-generation/agent-town-market-trader-sprite-sheet-v1-opaque---2e57d26d-e68b-4b57-ac17-3f1e0a403e8e.png",
+        "exists": true,
+        "category": "local-provenance",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/market_trader/market-trader-v1.json",
+          "public/experiences/founders-plot/assets/characters/inhabitants/trader/market-trader-v1.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/Users/robin/.openclaw/media/tool-image-generation/agent-town-settler-convoy-crew-sprite-sheet-v1-opaque---1c7c71c8-a00f-40aa-a434-336aeea35ff4.png",
+        "local": "/Users/robin/.openclaw/media/tool-image-generation/agent-town-settler-convoy-crew-sprite-sheet-v1-opaque---1c7c71c8-a00f-40aa-a434-336aeea35ff4.png",
+        "exists": true,
+        "category": "local-provenance",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/settler/settler-convoy-crew-v1.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "/Users/robin/.openclaw/media/tool-image-generation/agent-town-workshop-specialist-sprite-sheet-v1-opaque---03f7387d-dbb0-4c2e-863e-2885927c27d6.png",
+        "local": "/Users/robin/.openclaw/media/tool-image-generation/agent-town-workshop-specialist-sprite-sheet-v1-opaque---03f7387d-dbb0-4c2e-863e-2885927c27d6.png",
+        "exists": true,
+        "category": "local-provenance",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/workshop_specialist/workshop-specialist-v1.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png",
+        "local": "public/experiences/founders-plot/assets/candidates/v1_4_4/characters/clover-v2-sheet-magenta.png",
+        "exists": false,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v1.png",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v1.png",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v1.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v1.prompt.md",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v1.prompt.md",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v1.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v1.source.png",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v1.source.png",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v1.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.png",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.png",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.prompt.md",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.prompt.md",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.source.png",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.source.png",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/inhabitants/charter_clerk/charter-clerk-v1.png",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/charter_clerk/charter-clerk-v1.png",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/charter_clerk/charter-clerk-v1.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/inhabitants/civic_routekeeper/civic-routekeeper-v1.png",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/civic_routekeeper/civic-routekeeper-v1.png",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/civic_routekeeper/civic-routekeeper-v1.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/inhabitants/cohort_hall_coordinator/cohort-hall-coordinator-v1.png",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/cohort_hall_coordinator/cohort-hall-coordinator-v1.png",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/cohort_hall_coordinator/cohort-hall-coordinator-v1.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/inhabitants/oracle_adjunct/oracle-adjunct-v1.png",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/oracle_adjunct/oracle-adjunct-v1.png",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/oracle_adjunct/oracle-adjunct-v1.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/inhabitants/outpost_keeper/outpost-keeper-v1.png",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/outpost_keeper/outpost-keeper-v1.png",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/outpost_keeper/outpost-keeper-v1.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/inhabitants/research_doctrine_keeper/research-doctrine-keeper-v1.png",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/research_doctrine_keeper/research-doctrine-keeper-v1.png",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/research_doctrine_keeper/research-doctrine-keeper-v1.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/inhabitants/settler/settler-convoy-crew-v1.png",
+        "local": "public/experiences/founders-plot/assets/characters/inhabitants/settler/settler-convoy-crew-v1.png",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/inhabitants/settler/settler-convoy-crew-v1.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-acting.png",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-acting.png",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-acting.webp",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-acting.webp",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-blocked.png",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-blocked.png",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-blocked.webp",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-blocked.webp",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-celebrating.png",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-celebrating.png",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-celebrating.webp",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-celebrating.webp",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-idle.png",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-idle.png",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-idle.webp",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-idle.webp",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-observing.png",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-observing.png",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-observing.webp",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-observing.webp",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-paused.png",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-paused.png",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-paused.webp",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-paused.webp",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-restart-needed.png",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-restart-needed.png",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-restart-needed.webp",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-restart-needed.webp",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-thinking.png",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-thinking.png",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-thinking.webp",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-thinking.webp",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-waiting-approval.png",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-waiting-approval.png",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-waiting-approval.webp",
+        "local": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-waiting-approval.webp",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/characters/v1_4_4/clover-sprite-sheet-normalized.json"
+        ],
+        "kind": "metadata-reference"
+      },
+      {
+        "ref": "public/experiences/founders-plot/assets/objects/world-grid-civic-beacon.png",
+        "local": "public/experiences/founders-plot/assets/objects/world-grid-civic-beacon.png",
+        "exists": true,
+        "category": "repo-relative",
+        "sources": [
+          "public/experiences/founders-plot/assets/objects/world-grid-civic-beacon.json"
+        ],
+        "kind": "metadata-reference"
+      }
+    ]
+  },
+  "runtimeAssets": {
+    "total": 155,
+    "byClass": {
+      "icon": 27,
+      "building": 18,
+      "foreman": 27,
+      "inhabitant": 53,
+      "object-card-prop": 28,
+      "scene-background": 2
+    },
+    "items": [
+      {
+        "path": "public/assets/icons/agent-town/agent-town-global-icons-v1.source.png",
+        "url": "/assets/icons/agent-town/agent-town-global-icons-v1.source.png",
+        "class": "icon",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "1254x1254",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.source.png",
+        "url": "/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.source.png",
+        "class": "icon",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/assets/icons/agent-town/claim-ready-plan-gpt-image-2-v1.png",
+        "url": "/assets/icons/agent-town/claim-ready-plan-gpt-image-2-v1.png",
+        "class": "icon",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "256x256",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/assets/icons/agent-town/cohort-work-order-gpt-image-2-v1.png",
+        "url": "/assets/icons/agent-town/cohort-work-order-gpt-image-2-v1.png",
+        "class": "icon",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "256x256",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/assets/icons/agent-town/convoy-route-gpt-image-2-v1.png",
+        "url": "/assets/icons/agent-town/convoy-route-gpt-image-2-v1.png",
+        "class": "icon",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "256x256",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/assets/icons/agent-town/expedition-board-gpt-image-2-v1.png",
+        "url": "/assets/icons/agent-town/expedition-board-gpt-image-2-v1.png",
+        "class": "icon",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "256x256",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/assets/icons/agent-town/farm-plot-gpt-image-2-v1.png",
+        "url": "/assets/icons/agent-town/farm-plot-gpt-image-2-v1.png",
+        "class": "icon",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "256x256",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/assets/icons/agent-town/food-resource-gpt-image-2-v1.png",
+        "url": "/assets/icons/agent-town/food-resource-gpt-image-2-v1.png",
+        "class": "icon",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "256x256",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/assets/icons/agent-town/foreman-queue-gpt-image-2-v1.png",
+        "url": "/assets/icons/agent-town/foreman-queue-gpt-image-2-v1.png",
+        "class": "icon",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "256x256",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/assets/icons/agent-town/hq-command-gpt-image-2-v1.png",
+        "url": "/assets/icons/agent-town/hq-command-gpt-image-2-v1.png",
+        "class": "icon",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "256x256",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/assets/icons/agent-town/hq-upgrade-gpt-image-2-v1.png",
+        "url": "/assets/icons/agent-town/hq-upgrade-gpt-image-2-v1.png",
+        "class": "icon",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "256x256",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/assets/icons/agent-town/lumber-camp-gpt-image-2-v1.png",
+        "url": "/assets/icons/agent-town/lumber-camp-gpt-image-2-v1.png",
+        "class": "icon",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "256x256",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/assets/icons/agent-town/outpost-core-gpt-image-2-v1.png",
+        "url": "/assets/icons/agent-town/outpost-core-gpt-image-2-v1.png",
+        "class": "icon",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "256x256",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/assets/icons/agent-town/outpost-marker-gpt-image-2-v1.png",
+        "url": "/assets/icons/agent-town/outpost-marker-gpt-image-2-v1.png",
+        "class": "icon",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "256x256",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/assets/icons/agent-town/quarry-gpt-image-2-v1.png",
+        "url": "/assets/icons/agent-town/quarry-gpt-image-2-v1.png",
+        "class": "icon",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "256x256",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/assets/icons/agent-town/research-lodge-gpt-image-2-v1.png",
+        "url": "/assets/icons/agent-town/research-lodge-gpt-image-2-v1.png",
+        "class": "icon",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "256x256",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/assets/icons/agent-town/reviewed-plan-receipt-gpt-image-2-v1.png",
+        "url": "/assets/icons/agent-town/reviewed-plan-receipt-gpt-image-2-v1.png",
+        "class": "icon",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "256x256",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/assets/icons/agent-town/scout-action-gpt-image-2-v1.png",
+        "url": "/assets/icons/agent-town/scout-action-gpt-image-2-v1.png",
+        "class": "icon",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "256x256",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/assets/icons/agent-town/scout-report-gpt-image-2-v1.png",
+        "url": "/assets/icons/agent-town/scout-report-gpt-image-2-v1.png",
+        "class": "icon",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "256x256",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/assets/icons/agent-town/second-plot-founded-gpt-image-2-v1.png",
+        "url": "/assets/icons/agent-town/second-plot-founded-gpt-image-2-v1.png",
+        "class": "icon",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "256x256",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/assets/icons/agent-town/settlement-charter-document-gpt-image-2-v1.png",
+        "url": "/assets/icons/agent-town/settlement-charter-document-gpt-image-2-v1.png",
+        "class": "icon",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "256x256",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/assets/icons/agent-town/settlement-charter-gpt-image-2-v1.png",
+        "url": "/assets/icons/agent-town/settlement-charter-gpt-image-2-v1.png",
+        "class": "icon",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "256x256",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/assets/icons/agent-town/settlement-claim-gpt-image-2-v1.png",
+        "url": "/assets/icons/agent-town/settlement-claim-gpt-image-2-v1.png",
+        "class": "icon",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "256x256",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/assets/icons/agent-town/settler-convoy-gpt-image-2-v1.png",
+        "url": "/assets/icons/agent-town/settler-convoy-gpt-image-2-v1.png",
+        "class": "icon",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "256x256",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/assets/icons/agent-town/site-plan-gpt-image-2-v1.png",
+        "url": "/assets/icons/agent-town/site-plan-gpt-image-2-v1.png",
+        "class": "icon",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "256x256",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/assets/icons/agent-town/stone-resource-gpt-image-2-v1.png",
+        "url": "/assets/icons/agent-town/stone-resource-gpt-image-2-v1.png",
+        "class": "icon",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "256x256",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/assets/icons/agent-town/wood-resource-gpt-image-2-v1.png",
+        "url": "/assets/icons/agent-town/wood-resource-gpt-image-2-v1.png",
+        "class": "icon",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "256x256",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/buildings/expedition-board.source.png",
+        "url": "/experiences/founders-plot/assets/buildings/expedition-board.source.png",
+        "class": "building",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/buildings/expedition-board.webp",
+        "url": "/experiences/founders-plot/assets/buildings/expedition-board.webp",
+        "class": "building",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/buildings/farm-plot.webp",
+        "url": "/experiences/founders-plot/assets/buildings/farm-plot.webp",
+        "class": "building",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/buildings/hq-lv1.webp",
+        "url": "/experiences/founders-plot/assets/buildings/hq-lv1.webp",
+        "class": "building",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/buildings/hq-lv2.webp",
+        "url": "/experiences/founders-plot/assets/buildings/hq-lv2.webp",
+        "class": "building",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/buildings/hq-lv3.webp",
+        "url": "/experiences/founders-plot/assets/buildings/hq-lv3.webp",
+        "class": "building",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/buildings/hq-lv4.webp",
+        "url": "/experiences/founders-plot/assets/buildings/hq-lv4.webp",
+        "class": "building",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/buildings/hq-lv5.webp",
+        "url": "/experiences/founders-plot/assets/buildings/hq-lv5.webp",
+        "class": "building",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/buildings/lumber-camp.webp",
+        "url": "/experiences/founders-plot/assets/buildings/lumber-camp.webp",
+        "class": "building",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/buildings/market-stall.webp",
+        "url": "/experiences/founders-plot/assets/buildings/market-stall.webp",
+        "class": "building",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/buildings/outpost-core-lv1.source.png",
+        "url": "/experiences/founders-plot/assets/buildings/outpost-core-lv1.source.png",
+        "class": "building",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/buildings/outpost-core-lv1.webp",
+        "url": "/experiences/founders-plot/assets/buildings/outpost-core-lv1.webp",
+        "class": "building",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/buildings/quarry.webp",
+        "url": "/experiences/founders-plot/assets/buildings/quarry.webp",
+        "class": "building",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/buildings/research-lodge.source.png",
+        "url": "/experiences/founders-plot/assets/buildings/research-lodge.source.png",
+        "class": "building",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/buildings/research-lodge.webp",
+        "url": "/experiences/founders-plot/assets/buildings/research-lodge.webp",
+        "class": "building",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/buildings/settlement-charter-board.source.png",
+        "url": "/experiences/founders-plot/assets/buildings/settlement-charter-board.source.png",
+        "class": "building",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/buildings/settlement-charter-board.webp",
+        "url": "/experiences/founders-plot/assets/buildings/settlement-charter-board.webp",
+        "class": "building",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/buildings/workshop.webp",
+        "url": "/experiences/founders-plot/assets/buildings/workshop.webp",
+        "class": "building",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/clover-acting.webp",
+        "url": "/experiences/founders-plot/assets/characters/clover-acting.webp",
+        "class": "foreman",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/clover-blocked.webp",
+        "url": "/experiences/founders-plot/assets/characters/clover-blocked.webp",
+        "class": "foreman",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "768x1024",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/clover-celebrating.webp",
+        "url": "/experiences/founders-plot/assets/characters/clover-celebrating.webp",
+        "class": "foreman",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/clover-idle.webp",
+        "url": "/experiences/founders-plot/assets/characters/clover-idle.webp",
+        "class": "foreman",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/clover-observing.webp",
+        "url": "/experiences/founders-plot/assets/characters/clover-observing.webp",
+        "class": "foreman",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/clover-paused.webp",
+        "url": "/experiences/founders-plot/assets/characters/clover-paused.webp",
+        "class": "foreman",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "768x1024",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/clover-restart-needed.webp",
+        "url": "/experiences/founders-plot/assets/characters/clover-restart-needed.webp",
+        "class": "foreman",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "768x1024",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/clover-thinking.webp",
+        "url": "/experiences/founders-plot/assets/characters/clover-thinking.webp",
+        "class": "foreman",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/clover-waiting-approval.webp",
+        "url": "/experiences/founders-plot/assets/characters/clover-waiting-approval.webp",
+        "class": "foreman",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/builder/builder-agentfolk-v2.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/builder/builder-agentfolk-v2.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/builder/builder-agentfolk-v2.source.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/builder/builder-agentfolk-v2.source.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/builder/builder-sprite-sheet-gpt2-v1.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/builder/builder-sprite-sheet-gpt2-v1.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/builder/builder-sprite-sheet-gpt2-v1.source.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/builder/builder-sprite-sheet-gpt2-v1.source.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v1.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v1.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v1.source.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v1.source.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.source.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/builder/rigger-slate-builder-v2.source.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/charter_clerk/charter-clerk-v1.generated.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/charter_clerk/charter-clerk-v1.generated.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "1254x1254",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/charter_clerk/charter-clerk-v1.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/charter_clerk/charter-clerk-v1.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/charter_clerk/charter-clerk-v1.source.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/charter_clerk/charter-clerk-v1.source.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/civic_routekeeper/civic-routekeeper-v1.generated.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/civic_routekeeper/civic-routekeeper-v1.generated.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "1254x1254",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/civic_routekeeper/civic-routekeeper-v1.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/civic_routekeeper/civic-routekeeper-v1.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/civic_routekeeper/civic-routekeeper-v1.source.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/civic_routekeeper/civic-routekeeper-v1.source.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/cohort_hall_coordinator/cohort-hall-coordinator-v1.generated.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/cohort_hall_coordinator/cohort-hall-coordinator-v1.generated.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "1254x1254",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/cohort_hall_coordinator/cohort-hall-coordinator-v1.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/cohort_hall_coordinator/cohort-hall-coordinator-v1.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/cohort_hall_coordinator/cohort-hall-coordinator-v1.source.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/cohort_hall_coordinator/cohort-hall-coordinator-v1.source.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/hauler/hauler-agentfolk-v1.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/hauler/hauler-agentfolk-v1.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/hauler/hauler-agentfolk-v1.source.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/hauler/hauler-agentfolk-v1.source.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/hauler/oona-tallpack-hauler-v1.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/hauler/oona-tallpack-hauler-v1.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/hauler/oona-tallpack-hauler-v1.source.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/hauler/oona-tallpack-hauler-v1.source.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/market_trader/market-trader-v1.generated.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/market_trader/market-trader-v1.generated.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/market_trader/market-trader-v1.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/market_trader/market-trader-v1.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/market_trader/market-trader-v1.source.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/market_trader/market-trader-v1.source.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/messenger/messenger-agentfolk-v1.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/messenger/messenger-agentfolk-v1.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/messenger/messenger-agentfolk-v1.source.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/messenger/messenger-agentfolk-v1.source.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.source.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.source.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/oracle_adjunct/oracle-adjunct-v1.generated.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/oracle_adjunct/oracle-adjunct-v1.generated.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "1254x1254",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/oracle_adjunct/oracle-adjunct-v1.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/oracle_adjunct/oracle-adjunct-v1.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/oracle_adjunct/oracle-adjunct-v1.source.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/oracle_adjunct/oracle-adjunct-v1.source.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/outpost_keeper/outpost-keeper-v1.generated.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/outpost_keeper/outpost-keeper-v1.generated.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "1254x1254",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/outpost_keeper/outpost-keeper-v1.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/outpost_keeper/outpost-keeper-v1.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/outpost_keeper/outpost-keeper-v1.source.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/outpost_keeper/outpost-keeper-v1.source.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/research_doctrine_keeper/research-doctrine-keeper-v1.generated.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/research_doctrine_keeper/research-doctrine-keeper-v1.generated.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "1254x1254",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/research_doctrine_keeper/research-doctrine-keeper-v1.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/research_doctrine_keeper/research-doctrine-keeper-v1.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/research_doctrine_keeper/research-doctrine-keeper-v1.source.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/research_doctrine_keeper/research-doctrine-keeper-v1.source.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/scout/pathfinder-scout-v1.generated.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/scout/pathfinder-scout-v1.generated.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "1254x1254",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/scout/pathfinder-scout-v1.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/scout/pathfinder-scout-v1.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/scout/pathfinder-scout-v1.source.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/scout/pathfinder-scout-v1.source.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/settler/settler-convoy-crew-v1.generated.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/settler/settler-convoy-crew-v1.generated.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/settler/settler-convoy-crew-v1.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/settler/settler-convoy-crew-v1.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/settler/settler-convoy-crew-v1.source.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/settler/settler-convoy-crew-v1.source.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/trader/market-trader-v1.generated.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/trader/market-trader-v1.generated.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/trader/market-trader-v1.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/trader/market-trader-v1.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/trader/market-trader-v1.source.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/trader/market-trader-v1.source.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/worker/kettle-37-worker-v1.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/worker/kettle-37-worker-v1.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/worker/kettle-37-worker-v1.source.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/worker/kettle-37-worker-v1.source.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/worker/worker-agentfolk-v1.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/worker/worker-agentfolk-v1.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/worker/worker-agentfolk-v1.source.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/worker/worker-agentfolk-v1.source.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/workshop_specialist/workshop-specialist-v1.generated.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/workshop_specialist/workshop-specialist-v1.generated.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/workshop_specialist/workshop-specialist-v1.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/workshop_specialist/workshop-specialist-v1.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/inhabitants/workshop_specialist/workshop-specialist-v1.source.png",
+        "url": "/experiences/founders-plot/assets/characters/inhabitants/workshop_specialist/workshop-specialist-v1.source.png",
+        "class": "inhabitant",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "2048x2048",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-acting.png",
+        "url": "/experiences/founders-plot/assets/characters/v1_4_4/clover-acting.png",
+        "class": "foreman",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-acting.webp",
+        "url": "/experiences/founders-plot/assets/characters/v1_4_4/clover-acting.webp",
+        "class": "foreman",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-blocked.png",
+        "url": "/experiences/founders-plot/assets/characters/v1_4_4/clover-blocked.png",
+        "class": "foreman",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-blocked.webp",
+        "url": "/experiences/founders-plot/assets/characters/v1_4_4/clover-blocked.webp",
+        "class": "foreman",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-celebrating.png",
+        "url": "/experiences/founders-plot/assets/characters/v1_4_4/clover-celebrating.png",
+        "class": "foreman",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-celebrating.webp",
+        "url": "/experiences/founders-plot/assets/characters/v1_4_4/clover-celebrating.webp",
+        "class": "foreman",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-idle.png",
+        "url": "/experiences/founders-plot/assets/characters/v1_4_4/clover-idle.png",
+        "class": "foreman",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-idle.webp",
+        "url": "/experiences/founders-plot/assets/characters/v1_4_4/clover-idle.webp",
+        "class": "foreman",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-observing.png",
+        "url": "/experiences/founders-plot/assets/characters/v1_4_4/clover-observing.png",
+        "class": "foreman",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-observing.webp",
+        "url": "/experiences/founders-plot/assets/characters/v1_4_4/clover-observing.webp",
+        "class": "foreman",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-paused.png",
+        "url": "/experiences/founders-plot/assets/characters/v1_4_4/clover-paused.png",
+        "class": "foreman",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-paused.webp",
+        "url": "/experiences/founders-plot/assets/characters/v1_4_4/clover-paused.webp",
+        "class": "foreman",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-restart-needed.png",
+        "url": "/experiences/founders-plot/assets/characters/v1_4_4/clover-restart-needed.png",
+        "class": "foreman",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-restart-needed.webp",
+        "url": "/experiences/founders-plot/assets/characters/v1_4_4/clover-restart-needed.webp",
+        "class": "foreman",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-thinking.png",
+        "url": "/experiences/founders-plot/assets/characters/v1_4_4/clover-thinking.png",
+        "class": "foreman",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-thinking.webp",
+        "url": "/experiences/founders-plot/assets/characters/v1_4_4/clover-thinking.webp",
+        "class": "foreman",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-waiting-approval.png",
+        "url": "/experiences/founders-plot/assets/characters/v1_4_4/clover-waiting-approval.png",
+        "class": "foreman",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/characters/v1_4_4/clover-waiting-approval.webp",
+        "url": "/experiences/founders-plot/assets/characters/v1_4_4/clover-waiting-approval.webp",
+        "class": "foreman",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/objects/claim-ready-plan.source.png",
+        "url": "/experiences/founders-plot/assets/objects/claim-ready-plan.source.png",
+        "class": "object-card-prop",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/objects/claim-ready-plan.webp",
+        "url": "/experiences/founders-plot/assets/objects/claim-ready-plan.webp",
+        "class": "object-card-prop",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/objects/cohort-work-order-dossier.source.png",
+        "url": "/experiences/founders-plot/assets/objects/cohort-work-order-dossier.source.png",
+        "class": "object-card-prop",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/objects/cohort-work-order-dossier.webp",
+        "url": "/experiences/founders-plot/assets/objects/cohort-work-order-dossier.webp",
+        "class": "object-card-prop",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/objects/convoy-route-map.source.png",
+        "url": "/experiences/founders-plot/assets/objects/convoy-route-map.source.png",
+        "class": "object-card-prop",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/objects/convoy-route-map.webp",
+        "url": "/experiences/founders-plot/assets/objects/convoy-route-map.webp",
+        "class": "object-card-prop",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/objects/empty-lot.webp",
+        "url": "/experiences/founders-plot/assets/objects/empty-lot.webp",
+        "class": "object-card-prop",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/objects/locked-lot.webp",
+        "url": "/experiences/founders-plot/assets/objects/locked-lot.webp",
+        "class": "object-card-prop",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/objects/outpost-marker.source.png",
+        "url": "/experiences/founders-plot/assets/objects/outpost-marker.source.png",
+        "class": "object-card-prop",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/objects/outpost-marker.webp",
+        "url": "/experiences/founders-plot/assets/objects/outpost-marker.webp",
+        "class": "object-card-prop",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/objects/reviewed-plan-stamp.source.png",
+        "url": "/experiences/founders-plot/assets/objects/reviewed-plan-stamp.source.png",
+        "class": "object-card-prop",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/objects/reviewed-plan-stamp.webp",
+        "url": "/experiences/founders-plot/assets/objects/reviewed-plan-stamp.webp",
+        "class": "object-card-prop",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/objects/scout-report-dossier.source.png",
+        "url": "/experiences/founders-plot/assets/objects/scout-report-dossier.source.png",
+        "class": "object-card-prop",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/objects/scout-report-dossier.webp",
+        "url": "/experiences/founders-plot/assets/objects/scout-report-dossier.webp",
+        "class": "object-card-prop",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/objects/second-plot-founded-receipt.source.png",
+        "url": "/experiences/founders-plot/assets/objects/second-plot-founded-receipt.source.png",
+        "class": "object-card-prop",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/objects/second-plot-founded-receipt.webp",
+        "url": "/experiences/founders-plot/assets/objects/second-plot-founded-receipt.webp",
+        "class": "object-card-prop",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/objects/settlement-charter-document.source.png",
+        "url": "/experiences/founders-plot/assets/objects/settlement-charter-document.source.png",
+        "class": "object-card-prop",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/objects/settlement-charter-document.webp",
+        "url": "/experiences/founders-plot/assets/objects/settlement-charter-document.webp",
+        "class": "object-card-prop",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/objects/settlement-claim-manifest.source.png",
+        "url": "/experiences/founders-plot/assets/objects/settlement-claim-manifest.source.png",
+        "class": "object-card-prop",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/objects/settlement-claim-manifest.webp",
+        "url": "/experiences/founders-plot/assets/objects/settlement-claim-manifest.webp",
+        "class": "object-card-prop",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/objects/settler-convoy-wagon.source.png",
+        "url": "/experiences/founders-plot/assets/objects/settler-convoy-wagon.source.png",
+        "class": "object-card-prop",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/objects/settler-convoy-wagon.webp",
+        "url": "/experiences/founders-plot/assets/objects/settler-convoy-wagon.webp",
+        "class": "object-card-prop",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/objects/site-plan-dossier.source.png",
+        "url": "/experiences/founders-plot/assets/objects/site-plan-dossier.source.png",
+        "class": "object-card-prop",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/objects/site-plan-dossier.webp",
+        "url": "/experiences/founders-plot/assets/objects/site-plan-dossier.webp",
+        "class": "object-card-prop",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "512x512",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/objects/world-grid-civic-beacon.generated.png",
+        "url": "/experiences/founders-plot/assets/objects/world-grid-civic-beacon.generated.png",
+        "class": "object-card-prop",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "1254x1254",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/objects/world-grid-civic-beacon.png",
+        "url": "/experiences/founders-plot/assets/objects/world-grid-civic-beacon.png",
+        "class": "object-card-prop",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "1024x1024",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/objects/world-grid-civic-beacon.source.png",
+        "url": "/experiences/founders-plot/assets/objects/world-grid-civic-beacon.source.png",
+        "class": "object-card-prop",
+        "exists": true,
+        "format": "PNG",
+        "dimensions": "1024x1024",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/objects/world-grid-civic-beacon.webp",
+        "url": "/experiences/founders-plot/assets/objects/world-grid-civic-beacon.webp",
+        "class": "object-card-prop",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "1024x1024",
+        "channels": "srgba 4.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/scenes/founders-plot-desktop.webp",
+        "url": "/experiences/founders-plot/assets/scenes/founders-plot-desktop.webp",
+        "class": "scene-background",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "1536x1024",
+        "channels": "srgb 3.0"
+      },
+      {
+        "path": "public/experiences/founders-plot/assets/scenes/founders-plot-mobile.webp",
+        "url": "/experiences/founders-plot/assets/scenes/founders-plot-mobile.webp",
+        "class": "scene-background",
+        "exists": true,
+        "format": "WEBP",
+        "dimensions": "1024x1536",
+        "channels": "srgb 3.0"
+      }
+    ]
+  },
+  "visualGaps": {
+    "dedicatedCivicProposalDossierMissing": true,
+    "dedicatedGeneratedUniverseOverlayPackMissing": true,
+    "atlasNodeIconBacklog": [
+      "world-grid-read-model-gpt-image-2-v1.png",
+      "civic-readiness-gpt-image-2-v1.png",
+      "generated-universe-node-gpt-image-2-v1.png"
+    ],
+    "iconRegistrySymbolFallbacks": [
+      "action.collect",
+      "action.construct",
+      "action.produce",
+      "building.market_stall",
+      "building.workshop",
+      "resource.coin",
+      "resource.xp"
+    ],
+    "provenanceThinBaseAssets": [
+      "public/experiences/founders-plot/assets/buildings/farm-plot.webp",
+      "public/experiences/founders-plot/assets/buildings/hq-lv1.webp",
+      "public/experiences/founders-plot/assets/buildings/hq-lv2.webp",
+      "public/experiences/founders-plot/assets/buildings/hq-lv3.webp",
+      "public/experiences/founders-plot/assets/buildings/hq-lv4.webp",
+      "public/experiences/founders-plot/assets/buildings/hq-lv5.webp",
+      "public/experiences/founders-plot/assets/buildings/lumber-camp.webp",
+      "public/experiences/founders-plot/assets/buildings/market-stall.webp",
+      "public/experiences/founders-plot/assets/buildings/quarry.webp",
+      "public/experiences/founders-plot/assets/buildings/workshop.webp",
+      "public/experiences/founders-plot/assets/objects/empty-lot.webp",
+      "public/experiences/founders-plot/assets/objects/locked-lot.webp"
+    ]
+  },
+  "sourceReports": [
+    "reports/agent-town-hq3-hq10-image-assets-integration-2026-05-31.md",
+    "reports/agent-town-gpt-image-2-ui-asset-quality-audit-2026-05-31.md",
+    "reports/agent-town-pathfinder-scout-sprite-integration-2026-05-31.md",
+    "reports/agent-town-batch-a-functional-inhabitants-sprite-integration-2026-05-31.md",
+    "reports/agent-town-batch-b-functional-inhabitants-sprite-integration-2026-05-31.md",
+    "reports/agent-town-batch-c-civic-world-grid-inhabitants-sprite-integration-2026-05-31.md",
+    "reports/agent-town-hq11-civic-actors-scene-wiring-2026-05-31.md",
+    "reports/agent-town-hq11-civic-operations-ui-slice-2026-05-31.md",
+    "reports/agent-town-hq11-progression-atlas-civic-operations-ux-2026-05-31.md"
+  ],
+  "contactSheet": {
+    "path": "reports/agent-town-asset-readiness-visual-smoke-contact-sheet-2026-05-31.png",
+    "itemCount": 60,
+    "groups": {
+      "Buildings": 14,
+      "Foreman": 9,
+      "Inhabitants": 21,
+      "Props and Cards": 14,
+      "Scene Backgrounds": 2
+    }
+  },
+  "httpLoad": {
+    "baseUrl": "http://[::1]:4199",
+    "total": 166,
+    "failedCount": 0,
+    "failed": [],
+    "checkedAt": "2026-05-31T00:00:00+07:00"
+  },
+  "playwrightSmoke": {
+    "ok": true,
+    "proofScreenshot": "reports/agent-town-asset-readiness-visual-smoke-founders-plot-2026-05-31.png",
+    "setup": {
+      "plotId": "plot_81d82b7e34f83663",
+      "pairId": "session:f48db3d58826675b50005a8c46757e8f",
+      "lumberId": "bldg_9641be0d8e4dc048"
+    },
+    "facts": {
+      "canvas": {
+        "present": true,
+        "width": 739.375,
+        "height": 460.609375,
+        "nonblank": true,
+        "sample": {
+          "coloredPixels": 9216,
+          "totalPixels": 9216
+        }
+      },
+      "loadedImages": [
+        {
+          "testId": "fp-doctrine-art-survey_discipline",
+          "src": "/experiences/founders-plot/assets/buildings/research-lodge.webp",
+          "naturalWidth": 512,
+          "naturalHeight": 512,
+          "complete": true
+        },
+        {
+          "testId": "fp-work-order-template-art-collect_ready_outputs_once",
+          "src": "/experiences/founders-plot/assets/objects/cohort-work-order-dossier.webp",
+          "naturalWidth": 512,
+          "naturalHeight": 512,
+          "complete": true
+        },
+        {
+          "testId": "fp-world-grid-status-art",
+          "src": "/experiences/founders-plot/assets/objects/world-grid-civic-beacon.webp",
+          "naturalWidth": 1024,
+          "naturalHeight": 1024,
+          "complete": true
+        },
+        {
+          "testId": "fp-civic-proposals-status-art",
+          "src": "/experiences/founders-plot/assets/objects/world-grid-civic-beacon.webp",
+          "naturalWidth": 1024,
+          "naturalHeight": 1024,
+          "complete": true
+        },
+        {
+          "testId": "fp-overlay-packs-status-art",
+          "src": "/experiences/founders-plot/assets/objects/world-grid-civic-beacon.webp",
+          "naturalWidth": 1024,
+          "naturalHeight": 1024,
+          "complete": true
+        },
+        {
+          "testId": "fp-civic-operations-status-art",
+          "src": "/experiences/founders-plot/assets/objects/world-grid-civic-beacon.webp",
+          "naturalWidth": 1024,
+          "naturalHeight": 1024,
+          "complete": true
+        }
+      ],
+      "bodyIncludes": {
+        "lumberCamp": true,
+        "producing": true,
+        "hq": true
+      }
+    },
+    "pageErrors": [],
+    "failedRequests": [
+      {
+        "url": "http://[::1]:4199/api/founders-plot/place-building",
+        "failure": "net::ERR_ABORTED"
+      },
+      {
+        "url": "http://[::1]:4199/api/founders-plot/queue-job",
+        "failure": "net::ERR_ABORTED"
+      }
+    ],
+    "failedAssetRequests": [],
+    "nonAssetAbortedRequests": [
+      {
+        "url": "http://[::1]:4199/api/founders-plot/place-building",
+        "failure": "net::ERR_ABORTED"
+      },
+      {
+        "url": "http://[::1]:4199/api/founders-plot/queue-job",
+        "failure": "net::ERR_ABORTED"
+      }
+    ]
+  }
+}

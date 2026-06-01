@@ -1,0 +1,147 @@
+{
+  "proof": "agent-town-hq10-world-grid-read-model-slice-2026-05-31",
+  "generatedBy": "server_founders_plot_engine",
+  "worldGrid": {
+    "status": "READ_MODEL_READY",
+    "readOnly": true,
+    "executableActions": [],
+    "authorityBoundary": "server_owned_read_only_world_grid_projection_no_civic_mutation_v1",
+    "requirements": {
+      "items": [
+        {
+          "key": "hq.level.6",
+          "label": "HQ6 Settlement Charter",
+          "satisfied": true,
+          "current": 6,
+          "required": 6
+        },
+        {
+          "key": "settlement.outpost.founded",
+          "label": "Founded outpost",
+          "satisfied": true,
+          "current": 1,
+          "required": 1
+        },
+        {
+          "key": "doctrine.survey_discipline.selected",
+          "label": "Survey Discipline selected",
+          "satisfied": true,
+          "current": "survey_discipline",
+          "required": "survey_discipline"
+        },
+        {
+          "key": "work_order.collect_ready_outputs_once.available",
+          "label": "Collect-ready work-order executor available",
+          "satisfied": true,
+          "current": true,
+          "required": true
+        }
+      ],
+      "blockedBy": [],
+      "satisfiedCount": 4,
+      "totalCount": 4
+    },
+    "scope": {
+      "homePlotId": "plot_ef8156e8961aaaab",
+      "activePlotId": "plot_ef8156e8961aaaab",
+      "knownPlotCount": 2,
+      "outpostCount": 1,
+      "knownClaimCount": 1
+    },
+    "claims": {
+      "total": 1,
+      "byStatus": {
+        "FOUNDED": 1
+      },
+      "claimReadyPlanCount": 0,
+      "activeConvoyCount": 0,
+      "foundedOutpostCount": 1,
+      "foundedPlotIds": [
+        "plot_hq10a_proof_outpost"
+      ]
+    },
+    "doctrine": {
+      "selectedDoctrineId": "survey_discipline",
+      "status": "SELECTED",
+      "activeEffects": [
+        {
+          "doctrineId": "survey_discipline",
+          "effectKind": "scout_duration_modifier",
+          "buildingType": "EXPEDITION_BOARD",
+          "jobKind": "SCOUT",
+          "durationMultiplier": 0.95,
+          "reductionPct": 5,
+          "authorityBoundary": "server_owned_scout_duration_modifier_v1"
+        }
+      ]
+    },
+    "workOrders": {
+      "draftCount": 1,
+      "completedCount": 0,
+      "executionAvailable": true,
+      "templateIds": [
+        "collect_ready_outputs_once"
+      ]
+    },
+    "civicReadiness": {
+      "ready": true,
+      "nextPromotableSlice": "HQ10B_CIVIC_PROPOSAL_RECORDS",
+      "blockedBy": [],
+      "signals": [
+        {
+          "key": "multi_plot_visibility",
+          "ready": true,
+          "value": 2
+        },
+        {
+          "key": "claim_receipts",
+          "ready": true,
+          "value": 1
+        },
+        {
+          "key": "doctrine_context",
+          "ready": true,
+          "value": "survey_discipline"
+        },
+        {
+          "key": "bounded_work_orders",
+          "ready": true,
+          "value": true
+        }
+      ],
+      "prohibitedCapabilities": [
+        "civic_mutation",
+        "trade_routes",
+        "background_scheduling",
+        "arbitrary_tool_execution",
+        "resource_spending",
+        "atlas_owned_execution",
+        "external_or_public_effects"
+      ]
+    },
+    "projectionHash": "37d4fbab1b36be94"
+  },
+  "atlas": {
+    "summary": {
+      "worldGridStatus": "READ_MODEL_READY",
+      "worldGridReady": true,
+      "worldGridProjectionHash": "37d4fbab1b36be94"
+    },
+    "canonicalNodes": [
+      {
+        "nodeId": "world_grid.read_model",
+        "status": "available",
+        "actionRef": null,
+        "blockedBy": [],
+        "boundary": "server_owned_read_only_world_grid_projection_no_civic_mutation_v1"
+      },
+      {
+        "nodeId": "world_grid.civic_readiness",
+        "status": "waiting",
+        "actionRef": null,
+        "blockedBy": [],
+        "boundary": null
+      }
+    ]
+  }
+}

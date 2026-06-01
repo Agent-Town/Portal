@@ -1,0 +1,76 @@
+{
+  "id": "workshop-specialist-v1",
+  "role": "workshop_specialist",
+  "canonicalRoleId": "workshop_specialist",
+  "roleFacts": ["PRODUCE", "BUFF_READY", "OUTPUT_READY"],
+  "displayName": "Bria Coppernotch",
+  "title": "Workshop Specialist",
+  "backstory": "Bria Coppernotch learned to read a town by the tiny gaps in its doors, jigs, and roof beams. In AgentTown she keeps the Workshop honest: every improvement token is measured, sealed, and checked before anyone builds with it.",
+  "personality": "Warm, focused, practical, and quietly delighted by good mechanisms.",
+  "visualOnly": true,
+  "model": "openai/gpt-image-2 via built-in image_gen/OpenClaw media path",
+  "sourceImage": "workshop-specialist-v1.source.png",
+  "image": "workshop-specialist-v1.png",
+  "prompt": "workshop-specialist-v1.prompt.md",
+  "sourceSize": {
+    "width": 2048,
+    "height": 2048
+  },
+  "nativeGeneratedSize": {
+    "width": 2048,
+    "height": 2048
+  },
+  "columns": 4,
+  "rows": 4,
+  "frameWidth": 512,
+  "frameHeight": 512,
+  "frameCount": 16,
+  "rowOrder": ["idle", "walk", "tune", "ready"],
+  "actions": {
+    "idle": {
+      "row": 0,
+      "description": "Idle workbench stances with calipers, sample jig, goggles, and a compact cyan tuning light.",
+      "frames": [0, 1, 2, 3],
+      "fps": 3
+    },
+    "walk": {
+      "row": 1,
+      "description": "Walking with compact tools and work apron.",
+      "frames": [0, 1, 2, 3],
+      "fps": 6
+    },
+    "tune": {
+      "row": 2,
+      "description": "Tuning or crafting a next-build improvement effect.",
+      "frames": [0, 1, 2, 3],
+      "fps": 5
+    },
+    "ready": {
+      "row": 3,
+      "description": "Presenting a sealed improvement token for a ready Workshop buff.",
+      "frames": [0, 1, 2, 3],
+      "fps": 4
+    }
+  },
+  "actionMapping": {
+    "PRODUCE": "tune",
+    "WORKSHOP_TUNE": "tune",
+    "BUFF_READY": "ready",
+    "OUTPUT_READY": "ready"
+  },
+  "generationNotes": {
+    "sourceProvenance": "/Users/robin/.openclaw/media/tool-image-generation/agent-town-workshop-specialist-sprite-sheet-v1-opaque---03f7387d-dbb0-4c2e-863e-2885927c27d6.png",
+    "postProcessing": [
+      "Copied generated opaque source into the project.",
+      "Converted mint and near-white chroma background to alpha with ImageMagick."
+    ],
+    "transparency": {
+      "method": "ImageMagick chroma-key conversion from opaque source",
+      "sourceKeyRequested": "flat chroma mint",
+      "sampledCornerRange": ["srgb(252,254,254)", "srgb(128,247,214)", "srgb(129,246,214)"],
+      "keyColorsUsed": ["#80f7d6", "#fcfefe"],
+      "fuzz": ["24%", "10%"]
+    },
+    "constraints": ["adult-coded", "visual-only", "no readable text", "no logos", "no weapons", "no gameplay authority"]
+  }
+}

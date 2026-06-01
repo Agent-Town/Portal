@@ -1,0 +1,157 @@
+{
+  "id": "agent-town-sprite-cutout-repair-technique-proof-2026-05-31",
+  "date": "2026-05-31",
+  "technique": "runtime-alpha-preserving edge residue removal plus guarded enclosed-hole fill from source",
+  "candidates": [
+    {
+      "id": "workshop-specialist-v1",
+      "source": "public/experiences/founders-plot/assets/characters/inhabitants/workshop_specialist/workshop-specialist-v1.source.png",
+      "currentRuntime": "public/experiences/founders-plot/assets/characters/inhabitants/workshop_specialist/workshop-specialist-v1.png",
+      "candidate": "reports/agent-town-sprite-cutout-repair-candidates-2026-05-31/workshop-specialist-v1.repaired.png",
+      "backgroundSampleRgb": [
+        252,
+        254,
+        253
+      ],
+      "before": {
+        "visiblePx": 1224865,
+        "edgeAdjacentArtificialBgPx": 18239
+      },
+      "after": {
+        "visiblePx": 1204222,
+        "edgeAdjacentArtificialBgPx": 1362
+      },
+      "removedEdgeResiduePx": 21015,
+      "filledInteriorHolePx": 372,
+      "filledInteriorHoleComponents": 61
+    },
+    {
+      "id": "market-trader-v1",
+      "source": "public/experiences/founders-plot/assets/characters/inhabitants/trader/market-trader-v1.source.png",
+      "currentRuntime": "public/experiences/founders-plot/assets/characters/inhabitants/trader/market-trader-v1.png",
+      "candidate": "reports/agent-town-sprite-cutout-repair-candidates-2026-05-31/market-trader-v1.repaired.png",
+      "backgroundSampleRgb": [
+        189,
+        249,
+        231
+      ],
+      "before": {
+        "visiblePx": 1042050,
+        "edgeAdjacentArtificialBgPx": 10519
+      },
+      "after": {
+        "visiblePx": 1031294,
+        "edgeAdjacentArtificialBgPx": 86
+      },
+      "removedEdgeResiduePx": 10756,
+      "filledInteriorHolePx": 0,
+      "filledInteriorHoleComponents": 0
+    },
+    {
+      "id": "settler-convoy-crew-v1",
+      "source": "public/experiences/founders-plot/assets/characters/inhabitants/settler/settler-convoy-crew-v1.source.png",
+      "currentRuntime": "public/experiences/founders-plot/assets/characters/inhabitants/settler/settler-convoy-crew-v1.png",
+      "candidate": "reports/agent-town-sprite-cutout-repair-candidates-2026-05-31/settler-convoy-crew-v1.repaired.png",
+      "backgroundSampleRgb": [
+        251,
+        254,
+        252
+      ],
+      "before": {
+        "visiblePx": 1355663,
+        "edgeAdjacentArtificialBgPx": 9576
+      },
+      "after": {
+        "visiblePx": 1345543,
+        "edgeAdjacentArtificialBgPx": 494
+      },
+      "removedEdgeResiduePx": 10446,
+      "filledInteriorHolePx": 326,
+      "filledInteriorHoleComponents": 44
+    },
+    {
+      "id": "pathfinder-scout-v1",
+      "source": "public/experiences/founders-plot/assets/characters/inhabitants/scout/pathfinder-scout-v1.source.png",
+      "currentRuntime": "public/experiences/founders-plot/assets/characters/inhabitants/scout/pathfinder-scout-v1.png",
+      "candidate": "reports/agent-town-sprite-cutout-repair-candidates-2026-05-31/pathfinder-scout-v1.repaired.png",
+      "backgroundSampleRgb": [
+        243,
+        11,
+        241
+      ],
+      "before": {
+        "visiblePx": 952659,
+        "edgeAdjacentArtificialBgPx": 248
+      },
+      "after": {
+        "visiblePx": 952308,
+        "edgeAdjacentArtificialBgPx": 198
+      },
+      "removedEdgeResiduePx": 378,
+      "filledInteriorHolePx": 27,
+      "filledInteriorHoleComponents": 4
+    },
+    {
+      "id": "cohort-hall-coordinator-v1",
+      "source": "public/experiences/founders-plot/assets/characters/inhabitants/cohort_hall_coordinator/cohort-hall-coordinator-v1.source.png",
+      "currentRuntime": "public/experiences/founders-plot/assets/characters/inhabitants/cohort_hall_coordinator/cohort-hall-coordinator-v1.png",
+      "candidate": "reports/agent-town-sprite-cutout-repair-candidates-2026-05-31/cohort-hall-coordinator-v1.repaired.png",
+      "backgroundSampleRgb": [
+        17,
+        242,
+        15
+      ],
+      "before": {
+        "visiblePx": 1534136,
+        "edgeAdjacentArtificialBgPx": 5895
+      },
+      "after": {
+        "visiblePx": 1527544,
+        "edgeAdjacentArtificialBgPx": 450
+      },
+      "removedEdgeResiduePx": 6595,
+      "filledInteriorHolePx": 3,
+      "filledInteriorHoleComponents": 1
+    },
+    {
+      "id": "oracle-adjunct-v1",
+      "source": "public/experiences/founders-plot/assets/characters/inhabitants/oracle_adjunct/oracle-adjunct-v1.source.png",
+      "currentRuntime": "public/experiences/founders-plot/assets/characters/inhabitants/oracle_adjunct/oracle-adjunct-v1.png",
+      "candidate": "reports/agent-town-sprite-cutout-repair-candidates-2026-05-31/oracle-adjunct-v1.repaired.png",
+      "backgroundSampleRgb": [
+        19,
+        238,
+        19
+      ],
+      "before": {
+        "visiblePx": 1097427,
+        "edgeAdjacentArtificialBgPx": 3896
+      },
+      "after": {
+        "visiblePx": 1093349,
+        "edgeAdjacentArtificialBgPx": 121
+      },
+      "removedEdgeResiduePx": 4078,
+      "filledInteriorHolePx": 0,
+      "filledInteriorHoleComponents": 0
+    }
+  ],
+  "contactSheet": "reports/agent-town-sprite-cutout-repair-technique-contact-sheet-2026-05-31.png",
+  "candidateDirectory": "reports/agent-town-sprite-cutout-repair-candidates-2026-05-31/",
+  "layoutPreserved": "All candidate PNGs identify as 2048x2048 sRGBA and preserve the 4x4 / 512px cell sheet contract.",
+  "scriptSteps": [
+    "Read each current runtime PNG alpha channel and matching .source.png RGB data.",
+    "Sample artificial background family from source border/corners, including white, mint/green, and magenta chroma variants.",
+    "Use current runtime alpha as the silhouette authority; do not re-key the whole source globally.",
+    "Remove only visible pixels that are adjacent to transparency and match the artificial background/chroma predicate.",
+    "Run two conservative edge passes to catch one-pixel residue without eating interior colors.",
+    "Per 512px frame, fill only enclosed transparent components when the source pixel is not classified as artificial background.",
+    "Write repaired candidate copies as PNG32 under reports/agent-town-sprite-cutout-repair-candidates-2026-05-31/."
+  ],
+  "imageMagickVerificationCommands": [
+    "identify -format '%f %w %h %[channels] %[pixel:p{0,0}]\\n' reports/agent-town-sprite-cutout-repair-candidates-2026-05-31/*.repaired.png",
+    "identify -format '%w %h %[channels]\\n' reports/agent-town-sprite-cutout-repair-technique-contact-sheet-2026-05-31.png",
+    "jq empty reports/agent-town-sprite-cutout-repair-technique-proof-2026-05-31.json",
+    "git diff --check -- reports/agent-town-sprite-cutout-repair-technique-pilot-2026-05-31.md reports/agent-town-sprite-cutout-repair-technique-proof-2026-05-31.json reports/agent-town-sprite-cutout-repair-technique-contact-sheet-2026-05-31.png reports/agent-town-sprite-cutout-repair-candidates-2026-05-31/"
+  ]
+}

@@ -1,0 +1,623 @@
+{
+  "audit": {
+    "id": "agent-town-inhabitant-building-coverage-audit-2026-05-31",
+    "date": "2026-05-31",
+    "repo": "/Users/robin/Projects/Portal-atlas-editor",
+    "branchObserved": "neo/progression-atlas-editor-next-2026-05-29",
+    "mode": "report-only",
+    "authorityNote": "Visual/story coverage audit only. Gameplay authority remains server-owned in server/founders_plot/engine.js and related tests.",
+    "sourceEdits": false
+  },
+  "buildingSurfaceMatrix": [
+    {
+      "surface": "HQ",
+      "type": "gameplay_building",
+      "coverageStatus": "generic_worker_hauler_coverage_only",
+      "dedicatedRoleWired": false,
+      "assetStatus": "building_art_present",
+      "buildingAssets": [
+        "public/experiences/founders-plot/assets/buildings/hq-lv1.webp",
+        "public/experiences/founders-plot/assets/buildings/hq-lv2.webp",
+        "public/experiences/founders-plot/assets/buildings/hq-lv3.webp",
+        "public/experiences/founders-plot/assets/buildings/hq-lv4.webp",
+        "public/experiences/founders-plot/assets/buildings/hq-lv5.webp"
+      ],
+      "runtimeCoverage": "Clover foreman/messenger presence plus builder/worker/hauler/messenger actors around HQ routes.",
+      "gap": "No HQ-specific operator role or sheet in ACTOR_SPRITE_SHEETS."
+    },
+    {
+      "surface": "LUMBER_CAMP",
+      "type": "gameplay_building",
+      "coverageStatus": "generic_worker_hauler_coverage_only",
+      "dedicatedRoleWired": false,
+      "assetStatus": "building_art_present_missing_dedicated_inhabitant_asset",
+      "buildingAssets": [
+        "public/experiences/founders-plot/assets/buildings/lumber-camp.webp"
+      ],
+      "runtimeCoverage": "builder for construction/upgrade, worker for PRODUCE, hauler for OUTPUT_READY.",
+      "gap": "No lumber-worker/woodcutter dedicated sheet or building-specific role mapping."
+    },
+    {
+      "surface": "FARM_PLOT",
+      "type": "gameplay_building",
+      "coverageStatus": "generic_worker_hauler_coverage_only",
+      "dedicatedRoleWired": false,
+      "assetStatus": "building_art_present_missing_dedicated_inhabitant_asset",
+      "buildingAssets": [
+        "public/experiences/founders-plot/assets/buildings/farm-plot.webp"
+      ],
+      "runtimeCoverage": "builder for construction/upgrade, worker for PRODUCE, hauler for OUTPUT_READY.",
+      "gap": "No farmer/grower dedicated sheet or FARM_PLOT-specific role mapping."
+    },
+    {
+      "surface": "QUARRY",
+      "type": "gameplay_building",
+      "coverageStatus": "generic_worker_hauler_coverage_only",
+      "dedicatedRoleWired": false,
+      "assetStatus": "building_art_present_missing_dedicated_inhabitant_asset",
+      "buildingAssets": [
+        "public/experiences/founders-plot/assets/buildings/quarry.webp"
+      ],
+      "runtimeCoverage": "builder for construction/upgrade, worker for PRODUCE, hauler for OUTPUT_READY.",
+      "gap": "No quarry mason/stonecutter dedicated sheet or QUARRY-specific role mapping."
+    },
+    {
+      "surface": "EXPEDITION_BOARD",
+      "type": "gameplay_building",
+      "coverageStatus": "dedicated_inhabitant_wired",
+      "dedicatedRoleWired": true,
+      "runtimeRoles": [
+        "scout"
+      ],
+      "assetStatus": "building_and_inhabitant_assets_present",
+      "buildingAssets": [
+        "public/experiences/founders-plot/assets/buildings/expedition-board.webp"
+      ],
+      "objectAssets": [
+        "public/experiences/founders-plot/assets/objects/scout-report-dossier.webp"
+      ],
+      "runtimeCoverage": "SCOUT jobs and scout-report-ready output project Pathfinder Scout with scene-state tests."
+    },
+    {
+      "surface": "WORKSHOP",
+      "type": "gameplay_building",
+      "coverageStatus": "dedicated_inhabitant_wired",
+      "dedicatedRoleWired": true,
+      "runtimeRoles": [
+        "workshop_specialist"
+      ],
+      "assetStatus": "building_and_inhabitant_assets_present",
+      "buildingAssets": [
+        "public/experiences/founders-plot/assets/buildings/workshop.webp"
+      ],
+      "runtimeCoverage": "PRODUCE/WORKSHOP_TUNE and buff-ready/OUTPUT_READY map to Workshop Specialist."
+    },
+    {
+      "surface": "MARKET_STALL",
+      "type": "gameplay_building",
+      "coverageStatus": "dedicated_inhabitant_wired",
+      "dedicatedRoleWired": true,
+      "runtimeRoles": [
+        "market_trader",
+        "trader"
+      ],
+      "assetStatus": "building_and_inhabitant_assets_present",
+      "buildingAssets": [
+        "public/experiences/founders-plot/assets/buildings/market-stall.webp"
+      ],
+      "runtimeCoverage": "SELL and coin-ready/OUTPUT_READY map to Market Trader, normalized to scene role trader."
+    },
+    {
+      "surface": "SETTLEMENT_CHARTER",
+      "type": "gameplay_surface",
+      "coverageStatus": "asset_ready_but_not_wired",
+      "dedicatedRoleWired": false,
+      "runtimeRoles": [],
+      "assetReadyRoles": [
+        "charter_clerk"
+      ],
+      "assetStatus": "surface_and_inhabitant_assets_present_missing_scene_wiring",
+      "buildingAssets": [
+        "public/experiences/founders-plot/assets/buildings/settlement-charter-board.webp"
+      ],
+      "objectAssets": [
+        "public/experiences/founders-plot/assets/objects/settlement-charter-document.webp",
+        "public/experiences/founders-plot/assets/objects/site-plan-dossier.webp",
+        "public/experiences/founders-plot/assets/objects/claim-ready-plan.webp",
+        "public/experiences/founders-plot/assets/objects/reviewed-plan-stamp.webp"
+      ],
+      "gap": "The Charter Clerk sheet is asset-ready, but no server visualActor or ACTOR_SPRITE_SHEETS role projects it."
+    },
+    {
+      "surface": "RESEARCH_LODGE",
+      "type": "gameplay_surface",
+      "coverageStatus": "asset_ready_but_not_wired",
+      "dedicatedRoleWired": false,
+      "runtimeRoles": [],
+      "assetReadyRoles": [
+        "research_doctrine_keeper"
+      ],
+      "assetStatus": "surface_and_inhabitant_assets_present_missing_scene_wiring",
+      "buildingAssets": [
+        "public/experiences/founders-plot/assets/buildings/research-lodge.webp"
+      ],
+      "gap": "Research Doctrine Keeper is asset-ready, but doctrine selection/read-model surfaces do not emit a scene actor."
+    },
+    {
+      "surface": "COHORT_HALL",
+      "type": "gameplay_surface",
+      "coverageStatus": "asset_ready_but_not_wired",
+      "dedicatedRoleWired": false,
+      "runtimeRoles": [],
+      "assetReadyRoles": [
+        "cohort_hall_coordinator"
+      ],
+      "assetStatus": "inhabitant_and_dossier_asset_present_missing_scene_wiring_and_physical_building_asset",
+      "objectAssets": [
+        "public/experiences/founders-plot/assets/objects/cohort-work-order-dossier.webp"
+      ],
+      "gap": "Cohort Hall Coordinator is asset-ready, but no Cohort Hall building asset or server visualActor projects it."
+    },
+    {
+      "surface": "SETTLER_CONVOY",
+      "type": "gameplay_surface",
+      "coverageStatus": "dedicated_inhabitant_wired",
+      "dedicatedRoleWired": true,
+      "runtimeRoles": [
+        "settler"
+      ],
+      "assetStatus": "object_and_inhabitant_assets_present",
+      "objectAssets": [
+        "public/experiences/founders-plot/assets/objects/settler-convoy-wagon.webp",
+        "public/experiences/founders-plot/assets/objects/convoy-route-map.webp",
+        "public/experiences/founders-plot/assets/objects/settlement-claim-manifest.webp"
+      ],
+      "runtimeCoverage": "Settlement claim states CONVOY_PREPARING/CONVOY_ARRIVED/FOUNDED project Settler Convoy Crew."
+    },
+    {
+      "surface": "OUTPOST",
+      "type": "gameplay_surface",
+      "coverageStatus": "dedicated_inhabitant_wired",
+      "dedicatedRoleWired": true,
+      "runtimeRoles": [
+        "outpost_keeper"
+      ],
+      "assetStatus": "building_object_and_inhabitant_assets_present",
+      "buildingAssets": [
+        "public/experiences/founders-plot/assets/buildings/outpost-core-lv1.webp"
+      ],
+      "objectAssets": [
+        "public/experiences/founders-plot/assets/objects/outpost-marker.webp",
+        "public/experiences/founders-plot/assets/objects/second-plot-founded-receipt.webp"
+      ],
+      "runtimeCoverage": "Founded outpost/settlement claim emits Outpost Keeper after HQ11 civic actor wiring."
+    },
+    {
+      "surface": "WORLD_GRID",
+      "type": "gameplay_read_model_surface",
+      "coverageStatus": "dedicated_inhabitant_wired",
+      "dedicatedRoleWired": true,
+      "runtimeRoles": [
+        "oracle_adjunct"
+      ],
+      "assetStatus": "inhabitant_asset_present_prop_asset_present_prop_not_scene_object",
+      "objectAssets": [
+        "public/experiences/founders-plot/assets/objects/world-grid-civic-beacon.webp"
+      ],
+      "runtimeCoverage": "World Grid read model projects Oracle Adjunct only when active civic beacon state exists.",
+      "gap": "World Grid Civic Beacon prop exists, but is not itself a scene object."
+    },
+    {
+      "surface": "CIVIC_BEACON",
+      "type": "gameplay_civic_project_surface",
+      "coverageStatus": "dedicated_inhabitant_wired",
+      "dedicatedRoleWired": true,
+      "runtimeRoles": [
+        "civic_routekeeper"
+      ],
+      "assetStatus": "inhabitant_asset_present_prop_asset_present_prop_not_scene_object",
+      "objectAssets": [
+        "public/experiences/founders-plot/assets/objects/world-grid-civic-beacon.webp"
+      ],
+      "runtimeCoverage": "Active civic_beacon project projects Civic Routekeeper after HQ11 civic actor wiring."
+    }
+  ],
+  "runtimeActorSpriteSheets": [
+    {
+      "role": "builder",
+      "id": "rigger-slate-builder-v2",
+      "png": true,
+      "json": true,
+      "source": true,
+      "generated": false,
+      "prompt": true,
+      "dimensions": "2048x2048",
+      "channels": "srgba",
+      "columns": 4,
+      "rows": 4,
+      "frameWidth": 512,
+      "frameHeight": 512,
+      "rowCoverage": [
+        "idle",
+        "walk/build",
+        "work",
+        "ready"
+      ],
+      "runtimeActions": {
+        "CONSTRUCT": "build",
+        "UPGRADE": "build",
+        "OUTPUT_READY": "ready"
+      },
+      "readiness": "runtime_ready_with_older_missing_generated_provenance"
+    },
+    {
+      "role": "worker",
+      "id": "kettle-37-worker-v1",
+      "png": true,
+      "json": true,
+      "source": true,
+      "generated": false,
+      "prompt": true,
+      "dimensions": "2048x2048",
+      "channels": "srgba",
+      "columns": 4,
+      "rows": 4,
+      "frameWidth": 512,
+      "frameHeight": 512,
+      "rowCoverage": [
+        "idle",
+        "walk",
+        "work",
+        "ready"
+      ],
+      "runtimeActions": {
+        "PRODUCE": "work",
+        "SELL": "work",
+        "OUTPUT_READY": "ready"
+      },
+      "readiness": "runtime_ready_with_older_missing_generated_provenance"
+    },
+    {
+      "role": "hauler",
+      "id": "oona-tallpack-hauler-v1",
+      "png": true,
+      "json": true,
+      "source": true,
+      "generated": false,
+      "prompt": true,
+      "dimensions": "2048x2048",
+      "channels": "srgba",
+      "columns": 4,
+      "rows": 4,
+      "frameWidth": 512,
+      "frameHeight": 512,
+      "rowCoverage": [
+        "idle",
+        "walk",
+        "work",
+        "ready"
+      ],
+      "runtimeActions": {
+        "OUTPUT_READY": "ready"
+      },
+      "readiness": "runtime_ready_with_older_missing_generated_provenance"
+    },
+    {
+      "role": "messenger",
+      "id": "rook-signalpost-messenger-v1",
+      "png": true,
+      "json": true,
+      "source": true,
+      "generated": false,
+      "prompt": true,
+      "dimensions": "2048x2048",
+      "channels": "srgba",
+      "columns": 4,
+      "rows": 4,
+      "frameWidth": 512,
+      "frameHeight": 512,
+      "rowCoverage": [
+        "idle",
+        "walk",
+        "work",
+        "ready"
+      ],
+      "runtimeActions": {
+        "APPROVAL": "ready",
+        "REWARD": "ready",
+        "QUEST": "ready",
+        "SCOUT": "walk",
+        "SCOUT_REPORT_READY": "ready"
+      },
+      "readiness": "runtime_ready_with_older_missing_generated_provenance"
+    },
+    {
+      "role": "scout",
+      "id": "pathfinder-scout-v1",
+      "png": true,
+      "json": true,
+      "source": true,
+      "generated": true,
+      "prompt": true,
+      "dimensions": "2048x2048",
+      "channels": "srgba",
+      "columns": 4,
+      "rows": 4,
+      "frameWidth": 512,
+      "frameHeight": 512,
+      "rowCoverage": [
+        "idle",
+        "walk",
+        "scout",
+        "ready"
+      ],
+      "runtimeActions": {
+        "SCOUT": "scout",
+        "SCOUT_REPORT_READY": "ready",
+        "OUTPUT_READY": "ready"
+      },
+      "readiness": "fully_runtime_ready"
+    },
+    {
+      "role": "workshop_specialist",
+      "id": "workshop-specialist-v1",
+      "png": true,
+      "json": true,
+      "source": true,
+      "generated": true,
+      "prompt": true,
+      "dimensions": "2048x2048",
+      "channels": "srgba",
+      "columns": 4,
+      "rows": 4,
+      "frameWidth": 512,
+      "frameHeight": 512,
+      "rowCoverage": [
+        "idle",
+        "walk",
+        "tune",
+        "ready"
+      ],
+      "runtimeActions": {
+        "PRODUCE": "tune",
+        "WORKSHOP_TUNE": "tune",
+        "BUFF_READY": "ready",
+        "OUTPUT_READY": "ready"
+      },
+      "readiness": "fully_runtime_ready"
+    },
+    {
+      "role": "trader",
+      "id": "market-trader-v1",
+      "png": true,
+      "json": true,
+      "source": true,
+      "generated": true,
+      "prompt": true,
+      "dimensions": "2048x2048",
+      "channels": "srgba",
+      "columns": 4,
+      "rows": 4,
+      "frameWidth": 512,
+      "frameHeight": 512,
+      "rowCoverage": [
+        "idle",
+        "walk",
+        "sell",
+        "ready"
+      ],
+      "runtimeActions": {
+        "SELL": "sell",
+        "COIN_READY": "ready",
+        "OUTPUT_READY": "ready"
+      },
+      "readiness": "fully_runtime_ready"
+    },
+    {
+      "role": "settler",
+      "id": "settler-convoy-crew-v1",
+      "png": true,
+      "json": true,
+      "source": true,
+      "generated": true,
+      "prompt": true,
+      "dimensions": "2048x2048",
+      "channels": "srgba",
+      "columns": 4,
+      "rows": 4,
+      "frameWidth": 512,
+      "frameHeight": 512,
+      "rowCoverage": [
+        "idle",
+        "walk",
+        "prepare",
+        "ready"
+      ],
+      "runtimeActions": {
+        "SETTLER_CONVOY": "prepare",
+        "CONVOY_PREPARING": "prepare",
+        "SETTLEMENT_READY": "ready",
+        "CONVOY_ARRIVED": "ready",
+        "FOUNDED": "ready"
+      },
+      "readiness": "fully_runtime_ready"
+    },
+    {
+      "role": "civic_routekeeper",
+      "id": "civic-routekeeper-v1",
+      "png": true,
+      "json": true,
+      "source": true,
+      "generated": true,
+      "prompt": true,
+      "dimensions": "2048x2048",
+      "channels": "srgba",
+      "columns": 4,
+      "rows": 4,
+      "frameWidth": 512,
+      "frameHeight": 512,
+      "rowCoverage": [
+        "idle",
+        "walk",
+        "mark",
+        "ready"
+      ],
+      "runtimeActions": {
+        "CIVIC_BEACON_ACTIVE": "mark",
+        "WORLD_GRID_READ_MODEL": "ready",
+        "CIVIC_READINESS": "ready",
+        "OUTPOST_FOUNDED": "mark",
+        "OUTPUT_READY": "ready"
+      },
+      "readiness": "fully_runtime_ready"
+    },
+    {
+      "role": "oracle_adjunct",
+      "id": "oracle-adjunct-v1",
+      "png": true,
+      "json": true,
+      "source": true,
+      "generated": true,
+      "prompt": true,
+      "dimensions": "2048x2048",
+      "channels": "srgba",
+      "columns": 4,
+      "rows": 4,
+      "frameWidth": 512,
+      "frameHeight": 512,
+      "rowCoverage": [
+        "idle",
+        "walk",
+        "consult",
+        "ready"
+      ],
+      "runtimeActions": {
+        "WORLD_GRID_READ_MODEL": "consult",
+        "CIVIC_BEACON_ACTIVE": "consult",
+        "CIVIC_READINESS": "ready",
+        "DOCTRINE_SELECTED": "consult",
+        "OUTPUT_READY": "ready"
+      },
+      "readiness": "fully_runtime_ready"
+    },
+    {
+      "role": "outpost_keeper",
+      "id": "outpost-keeper-v1",
+      "png": true,
+      "json": true,
+      "source": true,
+      "generated": true,
+      "prompt": true,
+      "dimensions": "2048x2048",
+      "channels": "srgba",
+      "columns": 4,
+      "rows": 4,
+      "frameWidth": 512,
+      "frameHeight": 512,
+      "rowCoverage": [
+        "idle",
+        "walk",
+        "tend",
+        "ready"
+      ],
+      "runtimeActions": {
+        "OUTPOST_FOUNDED": "tend",
+        "SETTLEMENT_CLAIM": "tend",
+        "CIVIC_READINESS": "ready",
+        "OUTPUT_READY": "ready"
+      },
+      "readiness": "fully_runtime_ready"
+    }
+  ],
+  "assetOnlyInhabitantRoles": [
+    {
+      "role": "charter_clerk",
+      "id": "charter-clerk-v1",
+      "png": true,
+      "json": true,
+      "source": true,
+      "generated": true,
+      "prompt": true,
+      "dimensions": "2048x2048",
+      "channels": "srgba",
+      "rowCoverage": [
+        "idle",
+        "walk",
+        "review",
+        "ready"
+      ],
+      "readiness": "asset_ready_not_game_ready_missing_runtime_scene_wiring"
+    },
+    {
+      "role": "research_doctrine_keeper",
+      "id": "research-doctrine-keeper-v1",
+      "png": true,
+      "json": true,
+      "source": true,
+      "generated": true,
+      "prompt": true,
+      "dimensions": "2048x2048",
+      "channels": "srgba",
+      "rowCoverage": [
+        "idle",
+        "walk",
+        "research",
+        "ready"
+      ],
+      "readiness": "asset_ready_not_game_ready_missing_runtime_scene_wiring"
+    },
+    {
+      "role": "cohort_hall_coordinator",
+      "id": "cohort-hall-coordinator-v1",
+      "png": true,
+      "json": true,
+      "source": true,
+      "generated": true,
+      "prompt": true,
+      "dimensions": "2048x2048",
+      "channels": "srgba",
+      "rowCoverage": [
+        "idle",
+        "walk",
+        "coordinate",
+        "ready"
+      ],
+      "readiness": "asset_ready_not_game_ready_missing_runtime_scene_wiring"
+    },
+    {
+      "role": "market_trader",
+      "id": "market-trader-v1",
+      "png": true,
+      "json": true,
+      "source": true,
+      "generated": true,
+      "prompt": true,
+      "dimensions": "2048x2048",
+      "channels": "srgba",
+      "rowCoverage": [
+        "idle",
+        "walk",
+        "sell",
+        "ready"
+      ],
+      "readiness": "compatibility_alias_asset_ready_runtime_normalizes_to_trader"
+    }
+  ],
+  "highestValueMissingNext": [
+    "Dedicated farmer/grower role for FARM_PLOT",
+    "Dedicated quarry mason/stonecutter role for QUARRY",
+    "Dedicated lumber worker/woodcutter role for LUMBER_CAMP",
+    "Scene projection for Charter Clerk on Settlement Charter/Site Plan Review state",
+    "Scene projection for Research Doctrine Keeper on Research Lodge doctrine state",
+    "Scene projection and physical building art for Cohort Hall Coordinator"
+  ],
+  "checksRun": [
+    "git status --short --branch",
+    "rg --files public/experiences/founders-plot/assets/characters/inhabitants public/experiences/founders-plot/assets/buildings public/experiences/founders-plot/assets/objects",
+    "rg -n \"ACTOR_SPRITE_SHEETS|canonicalRoleId|EXPEDITION_BOARD|WORKSHOP|MARKET_STALL|WORLD_GRID|CIVIC|OUTPOST\" public/experiences/founders-plot/scene_state.js server/founders_plot/engine.js tests-founders-plot/fp-scene-state.test.js",
+    "sed -n on reports/agent-town-functional-building-inhabitants-production-matrix-2026-05-31.md and recent Batch A/B/C/HQ11 reports",
+    "jq -c on runtime and asset-only inhabitant metadata JSON files",
+    "identify -format '%wx%h %[channels]' on runtime and asset-only inhabitant PNG files",
+    "presence checks for png/json/source/generated/prompt files"
+  ]
+}

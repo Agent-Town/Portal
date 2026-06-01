@@ -1,7 +1,17 @@
 {
   "id": "kettle-37-worker-v1",
   "character": "Kettle-37",
+  "displayName": "Kettle-37",
   "role": "worker",
+  "title": "Workshop Worker",
+  "backstory": "Kettle-37 was an old assay-office service automaton built to test ore, boil water, and keep miners from poisoning themselves. After the raid, the rescued AI agent rewired Kettle's memory spool so it could learn new workshop recipes instead of repeating dead mining instructions. Kettle calls every recipe a small treaty with matter and understands belonging through useful production work.",
+  "personality": "Warm, funny, competent, treaty-minded about materials, and proud of each finished good.",
+  "authorityBoundary": "Visual-only worker inhabitant for PRODUCE, SELL, and output-ready production states. Kettle-37 is a receipt of server-side work and does not perform autonomous gameplay mutations.",
+  "relationships": [
+    "Learns new recipes through the rescued AI agent's repaired memory spool.",
+    "Works well beside Rigger Slate on build and workshop surfaces.",
+    "Hands finished goods into Oona Tallpack's hauling and ready-output loop."
+  ],
   "model": "openai/gpt-image-2",
   "sourceImage": "kettle-37-worker-v1.source.png",
   "image": "kettle-37-worker-v1.png",

@@ -1,0 +1,202 @@
+{
+  "ok": true,
+  "date": "2026-06-01",
+  "lane": "HQ13N candidate-02 slot-sized review derivative prep",
+  "worktree": "/Users/robin/Projects/Portal-atlas-editor",
+  "verdict": "PASS_SLOT_SIZED_REVIEW_DERIVATIVES_CREATED",
+  "scope": {
+    "reviewOnly": true,
+    "reportsMediaOnly": true,
+    "derivedFromHq13kReviewAlpha": true,
+    "hq13kFilesEdited": false,
+    "runtimeAssetsPromoted": false,
+    "runtimePackDirectoryCreated": false,
+    "runtimePackLoaderCreated": false,
+    "appSourceEdited": false,
+    "serverStoreRoutesToolsEdited": false,
+    "schemaValidatorEdited": false,
+    "atlasExecution": false,
+    "publicSharing": false,
+    "generatedUniverseRendering": false,
+    "expeditionMapMutationPathEdited": false
+  },
+  "artifacts": {
+    "report": "reports/agent-town-hq13n-candidate-02-slot-sized-review-derivatives-2026-06-01.md",
+    "proof": "reports/agent-town-hq13n-candidate-02-slot-sized-review-derivatives-proof-2026-06-01.json",
+    "derivativeDirectory": "reports/media/agent-town-hq13n-candidate-02-slot-sized-review-derivatives-2026-06-01",
+    "contactSheet": "reports/agent-town-hq13n-candidate-02-slot-sized-review-derivatives-contact-sheet-2026-06-01.png",
+    "sourceReviewDirectory": "reports/media/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-2026-06-01",
+    "rubric": "reports/agent-town-hq13l-generated-asset-review-rubric-2026-06-01.md",
+    "qaHarness": "reports/agent-town-hq13m-generated-asset-qa-harness-2026-06-01.mjs"
+  },
+  "assetSummary": {
+    "plannedSlots": 8,
+    "sourceReviewAlphaPngCountRead": 8,
+    "slotReviewDerivativePngCount": 8,
+    "contactSheetCreated": true,
+    "runtimePromotionApproved": false,
+    "hq13mHarnessMatchedSlotReviewNames": true
+  },
+  "processing": {
+    "tool": "ImageMagick",
+    "method": "RGBA-preserving Lanczos resize with center gravity and exact transparent extent/crop",
+    "contactSheetLabels": false,
+    "contactSheetLabelReason": "Font support was unavailable for montage labels; unlabeled tiles were composed directly without text."
+  },
+  "dimensions": [
+    {
+      "slotId": "expedition_map.fog.hinted",
+      "source": "hinted-fog-veil-v1.review-alpha.png",
+      "sourceDimensions": "1024x1024",
+      "derivative": "hinted-fog-veil-v1.slot-review.png",
+      "targetDimensions": "512x512",
+      "outputDimensions": "512x512",
+      "channels": "srgba 4.0",
+      "sha256": "ea7ae1c76afa7cd137775478e22a62485bfd17f07eee4b29106fc73d9f8d3395"
+    },
+    {
+      "slotId": "expedition_map.fog.locked_unknown",
+      "source": "locked-unknown-fog-v1.review-alpha.png",
+      "sourceDimensions": "1024x1024",
+      "derivative": "locked-unknown-fog-v1.slot-review.png",
+      "targetDimensions": "512x512",
+      "outputDimensions": "512x512",
+      "channels": "srgba 4.0",
+      "sha256": "aae8ec6d714de345e6239b32fa0debd305884a7ebafab4e0736f69e30d94dead"
+    },
+    {
+      "slotId": "expedition_map.fog.frontier_border",
+      "source": "frontier-dotted-boundary-v1.review-alpha.png",
+      "sourceDimensions": "1536x1024",
+      "derivative": "frontier-dotted-boundary-v1.slot-review.png",
+      "targetDimensions": "1024x128",
+      "outputDimensions": "1024x128",
+      "channels": "srgba 4.0",
+      "sha256": "b9c2127561016f122a2049f941d4163602178a6eca7e6009d60b065e9ecf7c04",
+      "processingRisk": "Source aspect differs from target; center crop/extent needs human review."
+    },
+    {
+      "slotId": "expedition_map.marker.known_site_plan",
+      "source": "marker-known-site-plan-v1.review-alpha.png",
+      "sourceDimensions": "1024x1536",
+      "derivative": "marker-known-site-plan-v1.slot-review.png",
+      "targetDimensions": "128x192",
+      "outputDimensions": "128x192",
+      "channels": "srgba 4.0",
+      "sha256": "4be84b4935ee77dc71c795981edb14bb12716381bf3112adbf06b3dd98b2d284"
+    },
+    {
+      "slotId": "expedition_map.marker.hinted_unknown",
+      "source": "marker-hinted-unknown-v1.review-alpha.png",
+      "sourceDimensions": "1024x1536",
+      "derivative": "marker-hinted-unknown-v1.slot-review.png",
+      "targetDimensions": "128x192",
+      "outputDimensions": "128x192",
+      "channels": "srgba 4.0",
+      "sha256": "e454b6accba30669429c46bc042ae113485f800d1c6f832811f57df349000bf7"
+    },
+    {
+      "slotId": "expedition_map.marker.owned_outpost",
+      "source": "marker-owned-outpost-v1.review-alpha.png",
+      "sourceDimensions": "1024x1536",
+      "derivative": "marker-owned-outpost-v1.slot-review.png",
+      "targetDimensions": "128x192",
+      "outputDimensions": "128x192",
+      "channels": "srgba 4.0",
+      "sha256": "c2783907dcdc22ae41a2203866c673768d1d432261d1ee3be52b07f4bf892030"
+    },
+    {
+      "slotId": "expedition_map.stroke.scout_receipt_trace",
+      "source": "survey-receipt-stroke-v1.review-alpha.png",
+      "sourceDimensions": "1536x1024",
+      "derivative": "survey-receipt-stroke-v1.slot-review.png",
+      "targetDimensions": "1024x128",
+      "outputDimensions": "1024x128",
+      "channels": "srgba 4.0",
+      "sha256": "85e673ea38b32a6b2459bf9037d0767c698fd8c7b7f0124db58601419f092ec7",
+      "processingRisk": "Source aspect differs from target; center crop/extent needs human review."
+    },
+    {
+      "slotId": "hud.frame.selected_sector_card",
+      "source": "hud-selected-sector-frame-v1.review-alpha.png",
+      "sourceDimensions": "1536x1024",
+      "derivative": "hud-selected-sector-frame-v1.slot-review.png",
+      "targetDimensions": "640x360",
+      "outputDimensions": "640x360",
+      "channels": "srgba 4.0",
+      "sha256": "6bce617817e60dd0ac22730aa39c45133fd5d2dcfe684ee26978aa09204ba8b3",
+      "processingRisk": "Source aspect differs from target; center crop/extent needs human review."
+    }
+  ],
+  "contactSheet": {
+    "path": "reports/agent-town-hq13n-candidate-02-slot-sized-review-derivatives-contact-sheet-2026-06-01.png",
+    "dimensions": "960x320",
+    "channels": "srgb  3.0",
+    "sha256": "ff3c91daf563a4de5c786fa3910d31c177aba5d9e84d0047dd633ceb5a1cb98f"
+  },
+  "hq13mHarnessSummary": {
+    "expectedSlots": 8,
+    "pngFilesFound": 8,
+    "presentSlots": 8,
+    "missingSlots": 0,
+    "processedAlphaFilesFound": 0,
+    "sourceFilesFound": 0,
+    "unmatchedPngFiles": 0,
+    "warnSlots": 0,
+    "passSlots": 8,
+    "warningCount": 0,
+    "status": "pass",
+    "verdict": "PASS_ALL_EXPECTED_REVIEW_ASSETS_PRESENT",
+    "note": "processedAlphaFilesFound and sourceFilesFound are zero because HQ13N derivatives intentionally use *.slot-review.png names."
+  },
+  "checks": [
+    {
+      "command": "node reports/agent-town-hq13m-generated-asset-qa-harness-2026-06-01.mjs --pretty reports/media/agent-town-hq13n-candidate-02-slot-sized-review-derivatives-2026-06-01 | jq '.summary'",
+      "exitCode": 0
+    },
+    {
+      "command": "file reports/media/agent-town-hq13n-candidate-02-slot-sized-review-derivatives-2026-06-01/*.slot-review.png reports/agent-town-hq13n-candidate-02-slot-sized-review-derivatives-contact-sheet-2026-06-01.png",
+      "exitCode": 0
+    },
+    {
+      "command": "magick identify -format '%f|%wx%h|%[channels]\\n' reports/media/agent-town-hq13n-candidate-02-slot-sized-review-derivatives-2026-06-01/*.slot-review.png reports/agent-town-hq13n-candidate-02-slot-sized-review-derivatives-contact-sheet-2026-06-01.png",
+      "exitCode": 0
+    },
+    {
+      "command": "shasum -a 256 reports/media/agent-town-hq13n-candidate-02-slot-sized-review-derivatives-2026-06-01/*.slot-review.png reports/agent-town-hq13n-candidate-02-slot-sized-review-derivatives-contact-sheet-2026-06-01.png",
+      "exitCode": 0
+    },
+    {
+      "command": "jq empty reports/agent-town-hq13n-candidate-02-slot-sized-review-derivatives-proof-2026-06-01.json",
+      "exitCode": 0
+    },
+    {
+      "command": "git diff --check -- reports/media/agent-town-hq13n-candidate-02-slot-sized-review-derivatives-2026-06-01 reports/agent-town-hq13n-candidate-02-slot-sized-review-derivatives-contact-sheet-2026-06-01.png reports/agent-town-hq13n-candidate-02-slot-sized-review-derivatives-2026-06-01.md reports/agent-town-hq13n-candidate-02-slot-sized-review-derivatives-proof-2026-06-01.json",
+      "exitCode": 0
+    }
+  ],
+  "reviewNotes": {
+    "promotionReady": false,
+    "needsHumanVisualReview": true,
+    "needsGreenEdgeCleanupReview": true,
+    "needsAspectCropReviewForStripsAndFrame": true,
+    "aestheticAcceptancePerformed": false
+  },
+  "guardrails": {
+    "noRuntimeAssetPromotion": true,
+    "noRuntimePackDirectory": true,
+    "noRuntimeLoader": true,
+    "noHq13kEditsMovesDeletesOrOverwrites": true,
+    "noAppSourceEdits": true,
+    "noServerStoreRoutesToolsEdits": true,
+    "noSchemaValidatorEdits": true,
+    "noAtlasExecution": true,
+    "noPublicSharing": true,
+    "noGeneratedUniverseRendering": true,
+    "noHiddenAutonomy": true,
+    "noRouteTradeEconomyResourceRewardCombatSchedulerBehavior": true,
+    "noCrossPlotMutation": true,
+    "noExternalEffects": true,
+    "scoutSectorOnlyCurrentExpeditionMapMutationPath": true
+  }
+}

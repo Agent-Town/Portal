@@ -1,0 +1,133 @@
+{
+  "ok": true,
+  "verdict": "READY_FOR_NEXT_BOUNDED_SLICES",
+  "generatedAt": "2026-05-31T19:36:38Z",
+  "lane": "agenttown_hq12q_sprint_wrap_20260601",
+  "source": {
+    "type": "parent_backfill_after_worker_failure",
+    "reportOnly": true,
+    "appSourceEdited": false
+  },
+  "artifactsReviewed": [
+    {
+      "name": "HQ12M live Scout Sector preflight",
+      "report": "reports/agent-town-hq12m-scout-sector-live-preflight-2026-06-01.md",
+      "proof": "reports/agent-town-hq12m-scout-sector-live-preflight-proof-2026-06-01.json",
+      "verdict": "PASS",
+      "note": "Real local Founders Plot page, real state route, real Scout Sector UI click, and real Scout Sector POST with no Playwright route mocking."
+    },
+    {
+      "name": "HQ12O sector art/readability",
+      "report": "reports/agent-town-hq12o-expedition-sector-art-readability-2026-06-01.md",
+      "proof": "reports/agent-town-hq12o-expedition-sector-art-readability-proof-2026-06-01.json",
+      "screenshots": [
+        "reports/agent-town-hq12o-expedition-sector-art-readability-desktop-2026-06-01.png",
+        "reports/agent-town-hq12o-expedition-sector-art-readability-mobile-2026-06-01.png"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "name": "Post-HQ12O sector readability regression QA",
+      "report": "reports/agent-town-post-hq12o-expedition-sector-readability-regression-qa-2026-06-01.md",
+      "proof": "reports/agent-town-post-hq12o-expedition-sector-readability-regression-qa-proof-2026-06-01.json",
+      "verdict": "PASS"
+    },
+    {
+      "name": "HQ12P fresh progression map preflight",
+      "report": "reports/agent-town-hq12p-fresh-progression-map-preflight-2026-06-01.md",
+      "proof": "reports/agent-town-hq12p-fresh-progression-map-preflight-proof-2026-06-01.json",
+      "screenshots": [
+        "reports/agent-town-hq12p-fresh-progression-map-preflight-sector-readability-desktop-2026-06-01.png",
+        "reports/agent-town-hq12p-fresh-progression-map-preflight-sector-readability-mobile-2026-06-01.png",
+        "reports/agent-town-hq12p-fresh-progression-map-preflight-threejs-desktop-2026-06-01.png",
+        "reports/agent-town-hq12p-fresh-progression-map-preflight-threejs-mobile-2026-06-01.png"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "name": "HQ12P Scout Sector post-readability live smoke",
+      "report": "reports/agent-town-hq12p-scout-sector-post-readability-live-smoke-2026-06-01.md",
+      "proof": "reports/agent-town-hq12p-scout-sector-post-readability-live-smoke-proof-2026-06-01.json",
+      "verdict": "PASS_WITH_NOTES",
+      "note": "Confirms the Scout Sector HTTP route and current UI guardrails after HQ12O, but does not replace the earlier HQ12M live UI click proof."
+    }
+  ],
+  "parentChecks": [
+    {
+      "name": "artifact_presence",
+      "passed": true,
+      "evidence": "HQ12M, HQ12O, post-HQ12O, and HQ12P report/proof files exist."
+    },
+    {
+      "name": "proof_ok_jq",
+      "passed": true,
+      "command": "jq -e '.ok == true' reports/agent-town-hq12o-expedition-sector-art-readability-proof-2026-06-01.json reports/agent-town-post-hq12o-expedition-sector-readability-regression-qa-proof-2026-06-01.json reports/agent-town-hq12p-fresh-progression-map-preflight-proof-2026-06-01.json reports/agent-town-hq12p-scout-sector-post-readability-live-smoke-proof-2026-06-01.json reports/agent-town-hq12m-scout-sector-live-preflight-proof-2026-06-01.json"
+    },
+    {
+      "name": "screenshot_identify",
+      "passed": true,
+      "dimensions": {
+        "hq12pSectorReadabilityDesktop": "465x3821",
+        "hq12pSectorReadabilityMobile": "366x2867",
+        "hq12pThreejsDesktop": "465x3282",
+        "hq12pThreejsMobile": "366x2482",
+        "hq12oDesktop": "465x3821",
+        "hq12oMobile": "366x2867"
+      }
+    }
+  ],
+  "playableState": {
+    "privateExpeditionMap": true,
+    "serverOwnedFogCells": true,
+    "fogStates": [
+      "discovered",
+      "known",
+      "hinted",
+      "locked_unknown"
+    ],
+    "selectedSectorUi": true,
+    "threejsPanZoomSelect": true,
+    "semanticZoom": true,
+    "scoutSectorUiAction": true,
+    "eventPacketReceiptFlavor": true,
+    "expeditionPartyReadModelFlavor": true,
+    "currentFocusReadOnlyStrip": true,
+    "fullTravelSimulation": false
+  },
+  "guardrails": {
+    "serverAuthorityPreserved": true,
+    "atlasNonExecutionPreserved": true,
+    "scoutSectorOnlyMutationPath": true,
+    "eventPacketReadOnly": true,
+    "expeditionPartyReadOnly": true,
+    "currentFocusReadOnly": true,
+    "packetButtons": 0,
+    "partyActions": 0,
+    "objectiveActions": 0,
+    "objectiveButtons": 0,
+    "executableActions": [],
+    "routeCreation": false,
+    "tradeRouteCreation": false,
+    "resourceHarvesting": false,
+    "resourceDelta": {},
+    "combat": false,
+    "backgroundScheduling": false,
+    "publicSharing": false,
+    "generatedUniverseRendering": false,
+    "crossPlotMutation": false,
+    "externalEffects": false,
+    "hiddenAutonomy": false,
+    "wildWestGenreDrift": false
+  },
+  "residualCaveats": [
+    "Canonical playable progression is still capped around HQ6; HQ12 is a verified map horizon, not a full HQ1-to-HQ12 campaign.",
+    "The parked HQ12P post-readability live-smoke lane did not complete a fresh browser click replay after HQ12O; earlier HQ12M remains the live UI click proof.",
+    "The map is currently a reveal, receipt, and read-model loop rather than a travel simulation.",
+    "The worktree remains heavily dirty with intentional AgentTown sprint changes."
+  ],
+  "recommendedNextLanes": [
+    "Post-wrap evidence index",
+    "Fresh live Scout Sector click rerun after readability polish",
+    "Next server-owned HQ12 gameplay design note"
+  ]
+}

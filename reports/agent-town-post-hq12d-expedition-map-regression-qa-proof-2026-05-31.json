@@ -1,0 +1,174 @@
+{
+  "ok": true,
+  "generatedAt": "2026-05-31T15:33:34.455Z",
+  "lane": "post-hq12d-expedition-map-regression-qa",
+  "source": "Focused Playwright post-renderer regression lane over existing Founders Plot progression, HQ12B/HQ12C Expedition Map affordances, and HQ12D Three.js renderer proof.",
+  "commands": [
+    {
+      "cmd": "npx playwright test e2e/200_founders_plot.spec.js -g \"FP-E2E-(009|009a|009b|010|011|012|013|014|015|016|022)\" --reporter=line",
+      "result": "passed",
+      "tests": 11
+    },
+    {
+      "cmd": "npx playwright test e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js --reporter=line",
+      "result": "passed",
+      "tests": 1
+    }
+  ],
+  "regressionScope": {
+    "foundersPlotProgression": [
+      "FP-E2E-009",
+      "FP-E2E-009a",
+      "FP-E2E-009b",
+      "FP-E2E-010",
+      "FP-E2E-011",
+      "FP-E2E-012",
+      "FP-E2E-013",
+      "FP-E2E-014"
+    ],
+    "layout": [
+      "FP-E2E-015",
+      "FP-E2E-016",
+      "FP-E2E-022 mobile layout",
+      "FP-E2E-023 mobile layout"
+    ],
+    "expeditionMap": [
+      "FP-E2E-022 HQ12B read-only read model",
+      "FP-E2E-022 HQ12C Scout Sector UI affordance",
+      "FP-E2E-023 HQ12D Three.js zoom/pan/selectable sectors"
+    ]
+  },
+  "hq12dRenderer": {
+    "projectionHash": "hq12d-threejs-expedition-map-proof",
+    "desktop": {
+      "canvasWidth": 399,
+      "canvasHeight": 399,
+      "cellCount": 5,
+      "fogStates": {
+        "discovered": 2,
+        "known": 1,
+        "hinted": 1,
+        "locked_unknown": 1
+      },
+      "pixelSample": {
+        "width": 399,
+        "height": 399,
+        "opaquePixels": 6144,
+        "uniqueColorSamples": 584
+      },
+      "zoomBefore": 1,
+      "zoomAfter": 3.004,
+      "panAfter": {
+        "x": 1.648,
+        "y": 0.301,
+        "zoom": 3.004
+      },
+      "selectedKnownCell": "cell_q1_r0",
+      "selectedLockedCell": "cell_q3_r0"
+    },
+    "mobile": {
+      "canvasWidth": 313,
+      "canvasHeight": 313,
+      "layout": {
+        "viewport": 390,
+        "documentScrollWidth": 390,
+        "bodyScrollWidth": 390,
+        "hostRect": {
+          "left": 40,
+          "right": 353,
+          "width": 313,
+          "height": 313
+        }
+      },
+      "pixelSample": {
+        "width": 313,
+        "height": 313,
+        "opaquePixels": 6144,
+        "uniqueColorSamples": 470
+      },
+      "cameraBefore": {
+        "x": 0,
+        "y": 0,
+        "zoom": 1
+      },
+      "cameraAfterTouchDrag": {
+        "x": 1.095,
+        "y": 0.103,
+        "zoom": 2.353
+      }
+    },
+    "guardrails": {
+      "readOnly": true,
+      "executableActions": [],
+      "routeCreation": false,
+      "atlasExecution": false,
+      "hiddenCellResourceTextSuppressed": true
+    }
+  },
+  "hq12bReadOnly": {
+    "status": "FOG_READ_MODEL_READY",
+    "counts": {
+      "discovered": 2,
+      "known": 1,
+      "hinted": 1,
+      "locked_unknown": 1
+    },
+    "mobileLayout": {
+      "viewport": 390,
+      "documentScrollWidth": 390,
+      "bodyScrollWidth": 390,
+      "clipped": []
+    },
+    "guardrails": {
+      "mutationButtons": 1,
+      "scoutSectorButtons": [
+        {
+          "testid": "fp-btn-scout-sector-cell_q0_r1",
+          "cellId": "cell_q0_r1"
+        }
+      ],
+      "knownLockedScoutButtons": [],
+      "executableActions": [],
+      "readOnly": true,
+      "routeCreation": false,
+      "atlasExecution": false
+    }
+  },
+  "hq12cScoutSector": {
+    "counts": {
+      "discovered": 2,
+      "known": 2,
+      "hinted": 0,
+      "locked_unknown": 1
+    },
+    "capturedRequest": {
+      "plotId": "plot_hq12b_expedition_map_ui",
+      "cellId": "cell_q0_r1",
+      "actor": "HUMAN",
+      "idempotencyKey": "fp-scout-sector-plot_hq12b_expedition_map_ui-cell_q0_r1-hq12b-expedition-map-proof"
+    },
+    "guardrails": {
+      "hintedScoutButtonsAfterReveal": [],
+      "knownTargetNonMutating": true,
+      "lockedUnknownNonMutating": true,
+      "routeCreation": false,
+      "tradeRouteCreation": false,
+      "resourceHarvesting": false,
+      "atlasExecution": false,
+      "publicSharing": false,
+      "generatedUniverseRendering": false,
+      "crossPlotMutation": false
+    }
+  },
+  "screenshots": [
+    "reports/agent-town-post-hq12d-expedition-map-regression-qa-desktop-2026-05-31.png",
+    "reports/agent-town-post-hq12d-expedition-map-regression-qa-mobile-2026-05-31.png"
+  ],
+  "upstreamProofs": [
+    "reports/agent-town-hq12d-threejs-zoomable-expedition-map-renderer-proof-2026-05-31.json",
+    "reports/agent-town-hq12b-expedition-map-ui-proof-2026-05-31.json",
+    "reports/agent-town-hq12c-scout-sector-ui-proof-2026-05-31.json"
+  ],
+  "productionSourceChangedByThisLane": false,
+  "regressionsFound": []
+}

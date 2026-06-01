@@ -1,0 +1,76 @@
+{
+  "id": "market-trader-v1",
+  "role": "trader",
+  "canonicalRoleId": "trader",
+  "aliases": ["market_trader"],
+  "roleFacts": ["SELL", "COIN_READY", "OUTPUT_READY"],
+  "displayName": "Maro Tallyseed",
+  "title": "Market Trader",
+  "backstory": "Maro Tallyseed keeps the Market Stall from feeling like a ledger and turns it back into a neighborly exchange. They know which crates should become supper, which surplus can become coin, and which deal should wait for a better day.",
+  "personality": "Generous, quick with mental math, community-minded, and never flashy.",
+  "visualOnly": true,
+  "model": "openai/gpt-image-2 via built-in image_gen/OpenClaw media path",
+  "sourceImage": "market-trader-v1.source.png",
+  "image": "market-trader-v1.png",
+  "prompt": "market-trader-v1.prompt.md",
+  "sourceSize": {
+    "width": 2048,
+    "height": 2048
+  },
+  "nativeGeneratedSize": {
+    "width": 2048,
+    "height": 2048
+  },
+  "columns": 4,
+  "rows": 4,
+  "frameWidth": 512,
+  "frameHeight": 512,
+  "frameCount": 16,
+  "rowOrder": ["idle", "walk", "sell", "ready"],
+  "actions": {
+    "idle": {
+      "row": 0,
+      "description": "Welcoming market stance with produce crate, coin tray, ledger beads, and subtle cyan tally lamp.",
+      "frames": [0, 1, 2, 3],
+      "fps": 3
+    },
+    "walk": {
+      "row": 1,
+      "description": "Walking with a compact produce crate.",
+      "frames": [0, 1, 2, 3],
+      "fps": 6
+    },
+    "sell": {
+      "row": 2,
+      "description": "Selling or bartering food for coins without readable prices or text.",
+      "frames": [0, 1, 2, 3],
+      "fps": 5
+    },
+    "ready": {
+      "row": 3,
+      "description": "Coin-ready poses with receipt pouch and closed coin tray.",
+      "frames": [0, 1, 2, 3],
+      "fps": 4
+    }
+  },
+  "actionMapping": {
+    "SELL": "sell",
+    "COIN_READY": "ready",
+    "OUTPUT_READY": "ready"
+  },
+  "generationNotes": {
+    "sourceProvenance": "/Users/robin/.openclaw/media/tool-image-generation/agent-town-market-trader-sprite-sheet-v1-opaque---2e57d26d-e68b-4b57-ac17-3f1e0a403e8e.png",
+    "postProcessing": [
+      "Copied generated opaque source into the project.",
+      "Converted mint and near-white chroma background to alpha with ImageMagick."
+    ],
+    "transparency": {
+      "method": "ImageMagick chroma-key conversion from opaque source",
+      "sourceKeyRequested": "flat chroma mint",
+      "sampledCornerRange": ["srgb(134,243,210)", "srgb(125,247,212)", "srgb(122,247,211)"],
+      "keyColorsUsed": ["#7df7d4", "#fcfefe"],
+      "fuzz": ["22%", "10%"]
+    },
+    "constraints": ["adult-coded", "visual-only", "no readable text", "no prices", "no logos", "no casino vibe", "no weapons", "no gameplay authority"]
+  }
+}

@@ -119,7 +119,7 @@ function findSpec(name) {
 // ---------------------------------------------------------------------------
 
 test('FP-CT-001 every tool spec has name, description, argsSchema, resultSchema', () => {
-  assert.ok(Array.isArray(FOUNDERS_PLOT_TOOL_SPECS) && FOUNDERS_PLOT_TOOL_SPECS.length >= 8);
+  assert.ok(Array.isArray(FOUNDERS_PLOT_TOOL_SPECS) && FOUNDERS_PLOT_TOOL_SPECS.length >= 9);
   for (const spec of FOUNDERS_PLOT_TOOL_SPECS) {
     assert.equal(typeof spec.name, 'string', 'name is string');
     assert.ok(spec.name.startsWith('et.plot.'), `spec name must be namespaced: ${spec.name}`);
@@ -136,6 +136,10 @@ test('FP-CT-001 every tool spec has name, description, argsSchema, resultSchema'
 
 test('FP-CT-002 argsSchema rejects requests missing idempotencyKey on mutations', () => {
   const mutators = ['et.plot.place_building', 'et.plot.queue_job', 'et.plot.collect_outputs',
+    'et.plot.draft_site_plan', 'et.plot.review_site_plan', 'et.plot.select_doctrine',
+    'et.plot.create_work_order_draft', 'et.plot.execute_work_order', 'et.plot.scout_sector', 'et.plot.create_civic_proposal',
+    'et.plot.create_overlay_pack', 'et.plot.activate_civic_project', 'et.plot.inspect_civic_project',
+    'et.plot.prepare_settler_convoy', 'et.plot.found_settlement',
     'et.plot.upgrade_building', 'et.plot.set_priority', 'et.plot.claim_reward',
     'et.plot.request_user_approval'];
   for (const name of mutators) {
@@ -185,6 +189,135 @@ test('FP-CT-005 request_user_approval argsSchema requires action/params/title/bo
   }, spec.argsSchema, 'request_user_approval missing params');
 });
 
+test('FP-CT-006 HQ7 Settler Convoy argsSchemas validate', () => {
+  expectValid({ sitePlanId: 'site_plan_1', idempotencyKey: 'ct-6-prepare' },
+    findSpec('et.plot.prepare_settler_convoy').argsSchema, 'prepare_settler_convoy valid');
+  expectInvalid({ idempotencyKey: 'ct-6-prepare' },
+    findSpec('et.plot.prepare_settler_convoy').argsSchema, 'prepare_settler_convoy missing sitePlanId');
+  expectValid({ claimId: 'claim_1', idempotencyKey: 'ct-6-found' },
+    findSpec('et.plot.found_settlement').argsSchema, 'found_settlement valid');
+  expectInvalid({ claimId: 'claim_1' },
+    findSpec('et.plot.found_settlement').argsSchema, 'found_settlement missing idempotencyKey');
+  expectValid({}, findSpec('et.plot.list_plots').argsSchema, 'list_plots valid');
+});
+
+test('FP-CT-006b HQ10A World Grid read-only argsSchema validates', () => {
+  expectValid({}, findSpec('et.plot.get_world_grid_status').argsSchema, 'get_world_grid_status empty args valid');
+  expectValid({ plotId: 'plot_1' }, findSpec('et.plot.get_world_grid_status').argsSchema, 'get_world_grid_status plot args valid');
+  expectInvalid({ idempotencyKey: 'ct-6b-not-a-mutation' },
+    findSpec('et.plot.get_world_grid_status').argsSchema, 'get_world_grid_status rejects mutation idempotency');
+  expectValid({}, findSpec('et.plot.get_expedition_map').argsSchema, 'get_expedition_map empty args valid');
+  expectValid({ plotId: 'plot_1' }, findSpec('et.plot.get_expedition_map').argsSchema, 'get_expedition_map plot args valid');
+  expectInvalid({ idempotencyKey: 'ct-6b-expedition-map-not-a-mutation' },
+    findSpec('et.plot.get_expedition_map').argsSchema, 'get_expedition_map rejects mutation idempotency');
+  expectValid({ idempotencyKey: 'ct-6b-scout-sector' },
+    findSpec('et.plot.scout_sector').argsSchema, 'scout_sector default target valid');
+  expectValid({ cellId: 'cell_q1_r0', actorType: 'AGENT', idempotencyKey: 'ct-6b-scout-sector-agent' },
+    findSpec('et.plot.scout_sector').argsSchema, 'scout_sector actorType valid');
+  expectInvalid({ cellId: 'cell_q1_r0' },
+    findSpec('et.plot.scout_sector').argsSchema, 'scout_sector missing idempotency');
+  expectValid({}, findSpec('et.plot.list_civic_proposals').argsSchema, 'list_civic_proposals empty args valid');
+  expectInvalid({ idempotencyKey: 'ct-6b-list-not-a-mutation' },
+    findSpec('et.plot.list_civic_proposals').argsSchema, 'list_civic_proposals rejects mutation idempotency');
+  expectValid({}, findSpec('et.plot.list_overlay_packs').argsSchema, 'list_overlay_packs empty args valid');
+  expectInvalid({ idempotencyKey: 'ct-6b-overlay-list-not-a-mutation' },
+    findSpec('et.plot.list_overlay_packs').argsSchema, 'list_overlay_packs rejects mutation idempotency');
+  expectValid({}, findSpec('et.plot.list_civic_projects').argsSchema, 'list_civic_projects empty args valid');
+  expectInvalid({ idempotencyKey: 'ct-6b-project-list-not-a-mutation' },
+    findSpec('et.plot.list_civic_projects').argsSchema, 'list_civic_projects rejects mutation idempotency');
+});
+
+test('FP-CT-007 HQ8B Research Lodge doctrine argsSchema validates', () => {
+  expectValid({ doctrineId: 'survey_discipline', idempotencyKey: 'ct-7-doctrine' },
+    findSpec('et.plot.select_doctrine').argsSchema, 'select_doctrine valid');
+  expectInvalid({ idempotencyKey: 'ct-7-doctrine' },
+    findSpec('et.plot.select_doctrine').argsSchema, 'select_doctrine missing doctrineId');
+});
+
+test('FP-CT-008 HQ9A work-order draft argsSchema validates', () => {
+  expectValid({
+    templateId: 'collect_ready_outputs_once',
+    scope: { buildingIds: ['bldg_1'] },
+    idempotencyKey: 'ct-8-work-order'
+  }, findSpec('et.plot.create_work_order_draft').argsSchema, 'create_work_order_draft valid');
+  expectInvalid({ idempotencyKey: 'ct-8-work-order' },
+    findSpec('et.plot.create_work_order_draft').argsSchema, 'create_work_order_draft missing templateId');
+});
+
+test('FP-CT-009 HQ9B work-order executor argsSchema validates narrow explicit action', () => {
+  expectValid({
+    workOrderId: 'work_order_1',
+    actor: 'HUMAN',
+    idempotencyKey: 'ct-9-work-order-execute'
+  }, findSpec('et.plot.execute_work_order').argsSchema, 'execute_work_order valid');
+  expectInvalid({ idempotencyKey: 'ct-9-work-order-execute' },
+    findSpec('et.plot.execute_work_order').argsSchema, 'execute_work_order missing workOrderId');
+});
+
+test('FP-CT-010 HQ10B civic proposal argsSchema validates narrow advisory records', () => {
+  expectValid({
+    title: 'Civic map table',
+    category: 'coordination',
+    summary: 'Review whether the outpost needs a shared civic map table.',
+    status: 'DRAFT',
+    relatedPlotIds: ['plot_1'],
+    actor: 'HUMAN',
+    idempotencyKey: 'ct-10-civic-proposal'
+  }, findSpec('et.plot.create_civic_proposal').argsSchema, 'create_civic_proposal valid');
+  expectInvalid({
+    title: 'Missing summary',
+    idempotencyKey: 'ct-10-civic-proposal'
+  }, findSpec('et.plot.create_civic_proposal').argsSchema, 'create_civic_proposal missing summary');
+});
+
+test('FP-CT-011 HQ10C overlay pack argsSchema validates presentation-only records', () => {
+  expectValid({
+    sourceProposalId: 'civic_proposal_1',
+    title: 'Civic lantern skin',
+    theme: 'civic_lanterns',
+    summary: 'Presentation-only labels and skins for World Grid nodes.',
+    status: 'DRAFT',
+    targetSurfaceIds: ['progression_atlas', 'world_grid'],
+    targetNodeIds: ['world_grid.read_model'],
+    displayHints: { labels: { world_grid: 'Lantern Grid' }, skins: ['lantern'] },
+    prompt: 'Warm civic lantern overlay, no gameplay changes.',
+    provenance: { source: 'test' },
+    actor: 'HUMAN',
+    idempotencyKey: 'ct-11-overlay-pack'
+  }, findSpec('et.plot.create_overlay_pack').argsSchema, 'create_overlay_pack valid');
+  expectInvalid({
+    title: 'Missing source proposal',
+    summary: 'No source.',
+    idempotencyKey: 'ct-11-overlay-pack'
+  }, findSpec('et.plot.create_overlay_pack').argsSchema, 'create_overlay_pack missing sourceProposalId');
+});
+
+test('FP-CT-012 HQ10D civic project activation argsSchema validates bounded project records', () => {
+  expectValid({
+    sourceProposalId: 'civic_proposal_1',
+    projectType: 'civic_beacon',
+    title: 'Civic Beacon',
+    summary: 'Activate a local public-work beacon with a readiness marker.',
+    actor: 'HUMAN',
+    idempotencyKey: 'ct-12-civic-project'
+  }, findSpec('et.plot.activate_civic_project').argsSchema, 'activate_civic_project valid');
+  expectInvalid({
+    title: 'Missing proposal',
+    idempotencyKey: 'ct-12-civic-project'
+  }, findSpec('et.plot.activate_civic_project').argsSchema, 'activate_civic_project missing sourceProposalId');
+  expectValid({
+    projectId: 'civic_project_1',
+    inspectionType: 'baseline_readiness',
+    note: 'Baseline readiness inspection.',
+    actor: 'HUMAN',
+    idempotencyKey: 'ct-12-civic-project-inspection'
+  }, findSpec('et.plot.inspect_civic_project').argsSchema, 'inspect_civic_project valid');
+  expectInvalid({
+    note: 'Missing project id',
+    idempotencyKey: 'ct-12-civic-project-inspection'
+  }, findSpec('et.plot.inspect_civic_project').argsSchema, 'inspect_civic_project missing projectId');
+});
+
 // ---------------------------------------------------------------------------
 // Engine envelope conforms to resultSchema
 // ---------------------------------------------------------------------------
@@ -193,6 +326,134 @@ test('FP-CT-101 get_state envelope conforms to resultSchema', () => {
   const env = fresh();
   const spec = findSpec('et.plot.get_state');
   expectValid(env, spec.resultSchema, 'get_state envelope');
+});
+
+test('FP-CT-101b get_world_grid_status envelope conforms to resultSchema', () => {
+  const env = fresh();
+  const spec = findSpec('et.plot.get_world_grid_status');
+  const out = engine.getWorldGridStatus({
+    pairId: env.state.plot.pairId,
+    plotId: env.plotId,
+    nowMs: 1700_000_000_000
+  });
+  expectValid(out, spec.resultSchema, 'get_world_grid_status envelope');
+  assert.equal(out.worldDelta.length, 0);
+  assert.equal(out.worldGrid.readOnly, true);
+});
+
+test('FP-CT-101b2 get_expedition_map envelope conforms to resultSchema', () => {
+  const env = fresh();
+  const spec = findSpec('et.plot.get_expedition_map');
+  const out = engine.getExpeditionMapStatus({
+    pairId: env.state.plot.pairId,
+    plotId: env.plotId,
+    nowMs: 1700_000_000_000
+  });
+  expectValid(out, spec.resultSchema, 'get_expedition_map envelope');
+  assert.equal(out.worldDelta.length, 0);
+  assert.equal(out.expeditionMap.readOnly, true);
+  assert.deepEqual(out.expeditionMap.executableActions, []);
+  assert.equal(out.expeditionMap.expeditionParty.readOnly, true);
+  assert.deepEqual(out.expeditionMap.expeditionParty.executableActions, []);
+  assert.deepEqual(out.expeditionMap.expeditionParty.members.map((member) => member.memberId), [
+    'pathfinder-scout-v1',
+    'rook-signalpost-messenger-v1',
+    'hq-civic-operator-vale-desk-7-v1'
+  ]);
+  assert.equal(out.expeditionMap.expeditionParty.boundaryFlags.operatorAssignment, false);
+  assert.equal(out.expeditionMap.expeditionParty.boundaryFlags.externalEffects, false);
+});
+
+test('FP-CT-101b3 scout_sector envelope conforms to resultSchema', () => {
+  const env = fresh();
+  const target = env.state.expeditionMap.cells.find((cell) => cell.fogState === 'hinted');
+  assert.ok(target, 'fresh map has an origin-adjacent hinted cell');
+  const spec = findSpec('et.plot.scout_sector');
+  const out = engine.scoutExpeditionSector({
+    pairId: env.state.plot.pairId,
+    plotId: env.plotId,
+    cellId: target.cellId,
+    actor: 'HUMAN',
+    idempotencyKey: 'ct-101b3-scout-sector',
+    nowMs: 1700_000_000_000
+  });
+  expectValid(out, spec.resultSchema, 'scout_sector envelope');
+  assert.equal(out.ok, true);
+  assert.equal(out.proof.targetBeforeFogState, 'hinted');
+  assert.equal(out.proof.targetAfterFogState, 'known');
+  assert.equal(out.scoutSector.receipt.routeCreation, false);
+  assert.equal(out.eventPacket.packetId, out.scoutSector.eventPacket.packetId);
+  assert.equal(out.scoutSector.receipt.eventPacketId, out.eventPacket.packetId);
+  assert.equal(out.eventPacket.readOnly, true);
+  assert.deepEqual(out.eventPacket.executableActions, []);
+  assert.equal(out.eventPacket.partyId, out.eventPacket.partySnapshot.partyId);
+  assert.equal(out.eventPacket.partySnapshot.readOnly, true);
+  assert.deepEqual(out.eventPacket.partySnapshot.executableActions, []);
+  assert.deepEqual(out.eventPacket.partySnapshot.members.map((member) => member.displayName), [
+    'Mira Trailmark',
+    'Rook Signalpost',
+    'Vale-Desk 7'
+  ]);
+  assert.equal(out.eventPacket.partySnapshot.boundaryFlags.operatorAssignment, false);
+  assert.equal(out.eventPacket.partySnapshot.boundaryFlags.routeCreation, false);
+  assert.equal(out.eventPacket.receiptLink.actionName, 'et.plot.scout_sector');
+  assert.equal(out.eventPacket.boundaryFlags.routeCreation, false);
+  assert.equal(out.eventPacket.boundaryFlags.atlasExecution, false);
+});
+
+test('FP-CT-101c list_civic_proposals envelope conforms to resultSchema', () => {
+  const env = fresh();
+  const spec = findSpec('et.plot.list_civic_proposals');
+  const out = engine.listCivicProposalRecords({
+    pairId: env.state.plot.pairId,
+    plotId: env.plotId,
+    nowMs: 1700_000_000_000
+  });
+  expectValid(out, spec.resultSchema, 'list_civic_proposals envelope');
+  assert.deepEqual(out.proposals, []);
+  assert.equal(out.civicProposals.proposalOnly, true);
+});
+
+test('FP-CT-101d list_overlay_packs envelope conforms to resultSchema', () => {
+  const env = fresh();
+  const spec = findSpec('et.plot.list_overlay_packs');
+  const out = engine.listOverlayPackRecords({
+    pairId: env.state.plot.pairId,
+    plotId: env.plotId,
+    nowMs: 1700_000_000_000
+  });
+  expectValid(out, spec.resultSchema, 'list_overlay_packs envelope');
+  assert.deepEqual(out.packs, []);
+  assert.equal(out.overlayPacks.presentationOnly, true);
+  assert.deepEqual(out.overlayPacks.executableActions, []);
+});
+
+test('FP-CT-101e list_civic_projects envelope conforms to resultSchema', () => {
+  const env = fresh();
+  const spec = findSpec('et.plot.list_civic_projects');
+  const out = engine.listCivicProjectRecords({
+    pairId: env.state.plot.pairId,
+    plotId: env.plotId,
+    nowMs: 1700_000_000_000
+  });
+  expectValid(out, spec.resultSchema, 'list_civic_projects envelope');
+  assert.deepEqual(out.projects, []);
+  assert.equal(out.civicProjects.publicWork, true);
+});
+
+test('FP-CT-101f inspect_civic_project error envelope conforms to resultSchema', () => {
+  const env = fresh();
+  const spec = findSpec('et.plot.inspect_civic_project');
+  const out = engine.inspectCivicProject({
+    pairId: env.state.plot.pairId,
+    plotId: env.plotId,
+    projectId: 'missing_civic_project',
+    actor: 'HUMAN',
+    idempotencyKey: 'ct-101f-inspect',
+    nowMs: 1700_000_000_000
+  });
+  assert.equal(out.ok, false);
+  expectValid(out, spec.resultSchema, 'inspect_civic_project error envelope');
 });
 
 test('FP-CT-102 place_building envelope conforms to resultSchema', () => {

@@ -1,0 +1,235 @@
+{
+  "generated_at": "2026-05-31T09:58:37.664Z",
+  "scope": "accepted sprite PNG repair promotion only",
+  "promoted_candidates": [
+    "workshop-specialist-v1.repaired.png",
+    "market-trader-v1.repaired.png",
+    "settler-convoy-crew-v1.repaired.png"
+  ],
+  "not_promoted_candidates": [
+    "pathfinder-scout-v1.repaired.png",
+    "cohort-hall-coordinator-v1.repaired.png",
+    "oracle-adjunct-v1.repaired.png"
+  ],
+  "records": [
+    {
+      "id": "workshop_runtime",
+      "role": "promoted_runtime",
+      "path": "public/experiences/founders-plot/assets/characters/inhabitants/workshop_specialist/workshop-specialist-v1.png",
+      "sha256": "2742e3bdf0bfc96fbc4a773c5366d8e8913b7788dd84c94b7f3c6cd1f2db0f96",
+      "identify": {
+        "format": "PNG",
+        "width": 2048,
+        "height": 2048,
+        "channels": "srgba 4.0",
+        "type": "TrueColorAlpha",
+        "depth": 8,
+        "colorspace": "sRGB"
+      },
+      "corner_alpha_samples": {
+        "0,0": "srgb(0,0,0)",
+        "2047,0": "srgb(0,0,0)",
+        "0,2047": "srgb(0,0,0)",
+        "2047,2047": "srgb(0,0,0)"
+      }
+    },
+    {
+      "id": "market_trader_runtime",
+      "role": "promoted_runtime",
+      "path": "public/experiences/founders-plot/assets/characters/inhabitants/trader/market-trader-v1.png",
+      "sha256": "f1aceabae100c5a8411568f2d61322d3243e69498255da3861296d5fe6f7a827",
+      "identify": {
+        "format": "PNG",
+        "width": 2048,
+        "height": 2048,
+        "channels": "srgba 4.0",
+        "type": "TrueColorAlpha",
+        "depth": 8,
+        "colorspace": "sRGB"
+      },
+      "corner_alpha_samples": {
+        "0,0": "srgb(0,0,0)",
+        "2047,0": "srgb(0,0,0)",
+        "0,2047": "srgb(0,0,0)",
+        "2047,2047": "srgb(0,0,0)"
+      }
+    },
+    {
+      "id": "market_trader_alias_runtime",
+      "role": "promoted_runtime_alias",
+      "path": "public/experiences/founders-plot/assets/characters/inhabitants/market_trader/market-trader-v1.png",
+      "sha256": "f1aceabae100c5a8411568f2d61322d3243e69498255da3861296d5fe6f7a827",
+      "identify": {
+        "format": "PNG",
+        "width": 2048,
+        "height": 2048,
+        "channels": "srgba 4.0",
+        "type": "TrueColorAlpha",
+        "depth": 8,
+        "colorspace": "sRGB"
+      },
+      "corner_alpha_samples": {
+        "0,0": "srgb(0,0,0)",
+        "2047,0": "srgb(0,0,0)",
+        "0,2047": "srgb(0,0,0)",
+        "2047,2047": "srgb(0,0,0)"
+      }
+    },
+    {
+      "id": "settler_runtime",
+      "role": "promoted_runtime",
+      "path": "public/experiences/founders-plot/assets/characters/inhabitants/settler/settler-convoy-crew-v1.png",
+      "sha256": "702d04dee1be1fea7024a25b028c35be06fa4845f7ca9c12f613a608bfe6d7a3",
+      "identify": {
+        "format": "PNG",
+        "width": 2048,
+        "height": 2048,
+        "channels": "srgba 4.0",
+        "type": "TrueColorAlpha",
+        "depth": 8,
+        "colorspace": "sRGB"
+      },
+      "corner_alpha_samples": {
+        "0,0": "srgb(0,0,0)",
+        "2047,0": "srgb(0,0,0)",
+        "0,2047": "srgb(0,0,0)",
+        "2047,2047": "srgb(0,0,0)"
+      }
+    },
+    {
+      "id": "workshop_original_backup",
+      "role": "original_backup",
+      "path": "reports/agent-town-sprite-cutout-repair-promotion-originals-2026-05-31/workshop-specialist-v1.original.png",
+      "sha256": "709d765aa4afa89004c7914d2108e09c14d86611071d427e9a7a885c500330d0",
+      "identify": {
+        "format": "PNG",
+        "width": 2048,
+        "height": 2048,
+        "channels": "srgba 4.0",
+        "type": "TrueColorAlpha",
+        "depth": 8,
+        "colorspace": "sRGB"
+      },
+      "corner_alpha_samples": {
+        "0,0": "srgb(0,0,0)",
+        "2047,0": "srgb(0,0,0)",
+        "0,2047": "srgb(0,0,0)",
+        "2047,2047": "srgb(0,0,0)"
+      }
+    },
+    {
+      "id": "market_trader_original_backup",
+      "role": "original_backup",
+      "path": "reports/agent-town-sprite-cutout-repair-promotion-originals-2026-05-31/market-trader-v1.original.png",
+      "sha256": "08f3480ab246ab62c1761de80c944b5132e03e37a73e0189b548429da4348c29",
+      "identify": {
+        "format": "PNG",
+        "width": 2048,
+        "height": 2048,
+        "channels": "srgba 4.0",
+        "type": "TrueColorAlpha",
+        "depth": 8,
+        "colorspace": "sRGB"
+      },
+      "corner_alpha_samples": {
+        "0,0": "srgb(0,0,0)",
+        "2047,0": "srgb(0,0,0)",
+        "0,2047": "srgb(0,0,0)",
+        "2047,2047": "srgb(0,0,0)"
+      }
+    },
+    {
+      "id": "market_trader_alias_original_backup",
+      "role": "original_backup_alias",
+      "path": "reports/agent-town-sprite-cutout-repair-promotion-originals-2026-05-31/market-trader-v1.market_trader-alias.original.png",
+      "sha256": "60cc0fc611b888e792b30f53bd4193f2b1c85054431e256756f482285d15e59c",
+      "identify": {
+        "format": "PNG",
+        "width": 2048,
+        "height": 2048,
+        "channels": "srgba 4.0",
+        "type": "TrueColorAlpha",
+        "depth": 8,
+        "colorspace": "sRGB"
+      },
+      "corner_alpha_samples": {
+        "0,0": "srgb(0,0,0)",
+        "2047,0": "srgb(0,0,0)",
+        "0,2047": "srgb(0,0,0)",
+        "2047,2047": "srgb(0,0,0)"
+      }
+    },
+    {
+      "id": "settler_original_backup",
+      "role": "original_backup",
+      "path": "reports/agent-town-sprite-cutout-repair-promotion-originals-2026-05-31/settler-convoy-crew-v1.original.png",
+      "sha256": "7d889e0453924378fed413431263393dcb77f1fb80d61f3cdda7368c5eea9b6d",
+      "identify": {
+        "format": "PNG",
+        "width": 2048,
+        "height": 2048,
+        "channels": "srgba 4.0",
+        "type": "TrueColorAlpha",
+        "depth": 8,
+        "colorspace": "sRGB"
+      },
+      "corner_alpha_samples": {
+        "0,0": "srgb(0,0,0)",
+        "2047,0": "srgb(0,0,0)",
+        "0,2047": "srgb(0,0,0)",
+        "2047,2047": "srgb(0,0,0)"
+      }
+    },
+    {
+      "id": "promotion_contact_sheet",
+      "role": "proof_contact_sheet",
+      "path": "reports/agent-town-sprite-cutout-repair-promotion-contact-sheet-2026-05-31.png",
+      "sha256": "3b627c4900af4dbf87a2cbbc3271cb093a76e671a6fcc287e77d6733d6ca1378",
+      "identify": {
+        "format": "PNG",
+        "width": 1024,
+        "height": 864,
+        "channels": "srgba 4.0",
+        "type": "TrueColorAlpha",
+        "depth": 16,
+        "colorspace": "sRGB"
+      },
+      "corner_alpha_samples": {
+        "0,0": "srgb(255,255,255)",
+        "1023,0": "srgb(255,255,255)",
+        "0,863": "srgb(255,255,255)",
+        "1023,863": "srgb(255,255,255)"
+      }
+    }
+  ],
+  "promoted_pairs": [
+    {
+      "id": "workshop_runtime",
+      "candidate_path": "reports/agent-town-sprite-cutout-repair-candidates-2026-05-31/workshop-specialist-v1.repaired.png",
+      "runtime_sha256": "2742e3bdf0bfc96fbc4a773c5366d8e8913b7788dd84c94b7f3c6cd1f2db0f96",
+      "candidate_sha256": "2742e3bdf0bfc96fbc4a773c5366d8e8913b7788dd84c94b7f3c6cd1f2db0f96",
+      "runtime_matches_candidate": true
+    },
+    {
+      "id": "market_trader_runtime",
+      "candidate_path": "reports/agent-town-sprite-cutout-repair-candidates-2026-05-31/market-trader-v1.repaired.png",
+      "runtime_sha256": "f1aceabae100c5a8411568f2d61322d3243e69498255da3861296d5fe6f7a827",
+      "candidate_sha256": "f1aceabae100c5a8411568f2d61322d3243e69498255da3861296d5fe6f7a827",
+      "runtime_matches_candidate": true
+    },
+    {
+      "id": "market_trader_alias_runtime",
+      "candidate_path": "reports/agent-town-sprite-cutout-repair-candidates-2026-05-31/market-trader-v1.repaired.png",
+      "runtime_sha256": "f1aceabae100c5a8411568f2d61322d3243e69498255da3861296d5fe6f7a827",
+      "candidate_sha256": "f1aceabae100c5a8411568f2d61322d3243e69498255da3861296d5fe6f7a827",
+      "runtime_matches_candidate": true
+    },
+    {
+      "id": "settler_runtime",
+      "candidate_path": "reports/agent-town-sprite-cutout-repair-candidates-2026-05-31/settler-convoy-crew-v1.repaired.png",
+      "runtime_sha256": "702d04dee1be1fea7024a25b028c35be06fa4845f7ca9c12f613a608bfe6d7a3",
+      "candidate_sha256": "702d04dee1be1fea7024a25b028c35be06fa4845f7ca9c12f613a608bfe6d7a3",
+      "runtime_matches_candidate": true
+    }
+  ]
+}

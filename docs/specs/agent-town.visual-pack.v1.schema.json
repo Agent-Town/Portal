@@ -1,0 +1,269 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-town.visual-pack.v1.schema.json",
+  "title": "Agent Town Visual Pack Manifest v1",
+  "description": "Read-only presentation manifest for Agent Town visual universe packs. Visual packs may bind same-origin assets to known presentation slots only; they do not create gameplay authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "allOf": [
+    { "$ref": "#/definitions/forbiddenFieldNames" }
+  ],
+  "required": [
+    "packId",
+    "packVersion",
+    "schemaVersion",
+    "title",
+    "status",
+    "scope",
+    "presentationOnly",
+    "visualOnly",
+    "gameplayMutationPolicy",
+    "authorityBoundary",
+    "publicSharing",
+    "atlasExecution",
+    "generatedUniverseRendering",
+    "modules"
+  ],
+  "properties": {
+    "packId": {
+      "type": "string",
+      "pattern": "^agent-town\\.[a-z0-9][a-z0-9.-]*$"
+    },
+    "packVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"
+    },
+    "schemaVersion": {
+      "const": "agent-town.visual-pack.v1"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "status": {
+      "enum": ["draft", "previewable", "reviewed", "promoted_visual", "archived"]
+    },
+    "scope": {
+      "const": "private_owner_scoped"
+    },
+    "presentationOnly": {
+      "const": true
+    },
+    "visualOnly": {
+      "const": true
+    },
+    "gameplayMutationPolicy": {
+      "const": "presentation_only"
+    },
+    "authorityBoundary": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(requires_engine_promotion_for_any_gameplay_effect|visual_only_projection_of_server_state|server_owned_visual_presentation_only_v1)$"
+    },
+    "publicSharing": {
+      "const": false
+    },
+    "atlasExecution": {
+      "const": false
+    },
+    "generatedUniverseRendering": {
+      "const": false
+    },
+    "modules": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "mapTerrain": { "$ref": "#/definitions/mapTerrainModule" },
+        "fogMarkers": { "$ref": "#/definitions/fogMarkerModule" },
+        "hudCards": { "$ref": "#/definitions/hudCardModule" },
+        "inhabitants": { "$ref": "#/definitions/inhabitantOperatorModule" },
+        "locations": { "$ref": "#/definitions/locationSceneModule" }
+      }
+    }
+  },
+  "definitions": {
+    "forbiddenFieldNames": {
+      "not": {
+        "anyOf": [
+          { "required": ["action"] },
+          { "required": ["actions"] },
+          { "required": ["atlasAction"] },
+          { "required": ["atlasActions"] },
+          { "required": ["clientAction"] },
+          { "required": ["serverAction"] },
+          { "required": ["tool"] },
+          { "required": ["tools"] },
+          { "required": ["toolName"] },
+          { "required": ["handler"] },
+          { "required": ["serverHandler"] },
+          { "required": ["serverHandlers"] },
+          { "required": ["route"] },
+          { "required": ["routes"] },
+          { "required": ["apiRoute"] },
+          { "required": ["mutation"] },
+          { "required": ["mutations"] },
+          { "required": ["resourceDelta"] },
+          { "required": ["resourceDeltas"] },
+          { "required": ["cost"] },
+          { "required": ["costs"] },
+          { "required": ["output"] },
+          { "required": ["outputs"] },
+          { "required": ["timer"] },
+          { "required": ["timers"] },
+          { "required": ["permission"] },
+          { "required": ["permissions"] },
+          { "required": ["publicUrl"] },
+          { "required": ["externalUrl"] },
+          { "required": ["webhook"] },
+          { "required": ["webhooks"] }
+        ]
+      }
+    },
+    "sameOriginAssetPath": {
+      "type": "string",
+      "pattern": "^/(?!/)(?!.*(?:^|/)\\.\\.)(?!.*\\b(?:https?:|data:|javascript:))[A-Za-z0-9._~!$&'()*+,;=:@/%-]+\\.(?:png|webp|jpg|jpeg|json|md)$"
+    },
+    "assetBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "allOf": [
+        { "$ref": "#/definitions/forbiddenFieldNames" }
+      ],
+      "properties": {
+        "assetSrc": { "$ref": "#/definitions/sameOriginAssetPath" },
+        "metadataSrc": { "$ref": "#/definitions/sameOriginAssetPath" },
+        "promptSrc": { "$ref": "#/definitions/sameOriginAssetPath" },
+        "generatedSrc": { "$ref": "#/definitions/sameOriginAssetPath" },
+        "sourceSrc": { "$ref": "#/definitions/sameOriginAssetPath" },
+        "webpSrc": { "$ref": "#/definitions/sameOriginAssetPath" },
+        "variant": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "reducedMotionFallback": {
+          "$ref": "#/definitions/sameOriginAssetPath"
+        },
+        "palette": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          },
+          "maxItems": 8
+        }
+      },
+      "anyOf": [
+        { "required": ["assetSrc"] },
+        { "required": ["metadataSrc"] },
+        { "required": ["webpSrc"] }
+      ]
+    },
+    "moduleBase": {
+      "type": "object",
+      "additionalProperties": false,
+      "allOf": [
+        { "$ref": "#/definitions/forbiddenFieldNames" }
+      ],
+      "required": ["type", "slotBindings"],
+      "properties": {
+        "type": { "type": "string" },
+        "slotBindings": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "$ref": "#/definitions/assetBinding" }
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500
+        }
+      }
+    },
+    "mapTerrainModule": {
+      "allOf": [
+        { "$ref": "#/definitions/moduleBase" },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "map_terrain_pack" },
+            "slotBindings": {
+              "propertyNames": {
+                "pattern": "^expedition_map\\.terrain\\.[a-z0-9_]+$"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "fogMarkerModule": {
+      "allOf": [
+        { "$ref": "#/definitions/moduleBase" },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "fog_marker_pack" },
+            "slotBindings": {
+              "propertyNames": {
+                "pattern": "^expedition_map\\.(fog\\.(discovered|known|hinted|locked_unknown|frontier_border)|marker\\.[a-z0-9_]+|stroke\\.[a-z0-9_]+)$"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "hudCardModule": {
+      "allOf": [
+        { "$ref": "#/definitions/moduleBase" },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "hud_card_pack" },
+            "slotBindings": {
+              "propertyNames": {
+                "pattern": "^(hud\\.(card|frame)\\.[a-z0-9_]+|atlas\\.node_icon\\.[a-z0-9_]+)$"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "inhabitantOperatorModule": {
+      "allOf": [
+        { "$ref": "#/definitions/moduleBase" },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "inhabitant_operator_pack" },
+            "slotBindings": {
+              "propertyNames": {
+                "pattern": "^founders_plot\\.(actor|party\\.member)\\.[a-z0-9_]+$"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "locationSceneModule": {
+      "allOf": [
+        { "$ref": "#/definitions/moduleBase" },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "location_scene_pack" },
+            "slotBindings": {
+              "propertyNames": {
+                "pattern": "^founders_plot\\.(stage\\.background\\.(desktop|mobile)|building\\.[A-Z0-9_]+|pad\\.empty)$"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

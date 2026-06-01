@@ -1,0 +1,56 @@
+{
+  "packId": "agent-town.founders-plot.schema-fixture-v1",
+  "packVersion": "1.0.0",
+  "schemaVersion": "agent-town.visual-pack.v1",
+  "title": "Schema Fixture Visual Pack",
+  "status": "draft",
+  "scope": "private_owner_scoped",
+  "presentationOnly": true,
+  "visualOnly": true,
+  "gameplayMutationPolicy": "presentation_only",
+  "authorityBoundary": "requires_engine_promotion_for_any_gameplay_effect",
+  "publicSharing": false,
+  "atlasExecution": false,
+  "generatedUniverseRendering": false,
+  "modules": {
+    "fogMarkers": {
+      "type": "fog_marker_pack",
+      "slotBindings": {
+        "expedition_map.fog.known": {
+          "assetSrc": "/experiences/founders-plot/assets/objects/scout-report-dossier.webp",
+          "metadataSrc": "/experiences/founders-plot/assets/objects/scout-report-dossier.json",
+          "variant": "known"
+        },
+        "expedition_map.fog.frontier_border": {
+          "assetSrc": "/experiences/founders-plot/assets/objects/outpost-marker.webp",
+          "variant": "frontier_border"
+        },
+        "expedition_map.stroke.scout_receipt_trace": {
+          "assetSrc": "/experiences/founders-plot/assets/objects/reviewed-plan-stamp.webp",
+          "variant": "scout_receipt_trace"
+        }
+      },
+      "notes": "Tiny valid fixture: presentation-only same-origin fog and stroke slots."
+    },
+    "hudCards": {
+      "type": "hud_card_pack",
+      "slotBindings": {
+        "hud.frame.selected_sector_card": {
+          "assetSrc": "/experiences/founders-plot/assets/objects/site-plan-dossier.webp",
+          "variant": "selected_sector_card"
+        }
+      },
+      "notes": "Exercises the visual-only HUD frame slot namespace without adding actions."
+    },
+    "inhabitants": {
+      "type": "inhabitant_operator_pack",
+      "slotBindings": {
+        "founders_plot.actor.scout": {
+          "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/scout/pathfinder-scout-v1.png",
+          "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/scout/pathfinder-scout-v1.json",
+          "variant": "idle"
+        }
+      }
+    }
+  }
+}

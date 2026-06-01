@@ -1,0 +1,244 @@
+{
+  "ok": true,
+  "verdict": "PASS_WITH_PARTIAL_CURRENT_INPUT",
+  "date": "2026-06-01",
+  "lane": "HQ13M generated asset QA harness/report",
+  "worktree": "/Users/robin/Projects/Portal-atlas-editor",
+  "scope": {
+    "reportsOnly": true,
+    "reviewAssetDirectoryOnly": true,
+    "dependencyFreeNodeHarness": true,
+    "runtimeAssetPromotion": false,
+    "runtimePackDirectory": false,
+    "runtimeLoader": false,
+    "hq13kFilesEdited": false,
+    "runtimeAssetDirectoriesInspected": false,
+    "appSourceEdited": false,
+    "serverStoreRoutesToolsEdited": false,
+    "schemaValidatorEdited": false,
+    "atlasExecution": false,
+    "publicSharing": false,
+    "generatedUniverseRendering": false,
+    "externalEffects": false
+  },
+  "artifacts": {
+    "harness": "reports/agent-town-hq13m-generated-asset-qa-harness-2026-06-01.mjs",
+    "report": "reports/agent-town-hq13m-generated-asset-qa-harness-2026-06-01.md",
+    "proof": "reports/agent-town-hq13m-generated-asset-qa-harness-proof-2026-06-01.json",
+    "rubricSource": "reports/agent-town-hq13l-generated-asset-review-rubric-2026-06-01.md",
+    "reviewAssetDirectory": "reports/media/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-2026-06-01"
+  },
+  "harnessRun": {
+    "command": "node reports/agent-town-hq13m-generated-asset-qa-harness-2026-06-01.mjs --pretty reports/media/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-2026-06-01",
+    "exitCode": 0,
+    "summary": {
+      "expectedSlots": 8,
+      "pngFilesFound": 10,
+      "presentSlots": 5,
+      "missingSlots": 3,
+      "processedAlphaFilesFound": 5,
+      "sourceFilesFound": 5,
+      "unmatchedPngFiles": 0,
+      "warnSlots": 8,
+      "passSlots": 0,
+      "warningCount": 13,
+      "status": "warn",
+      "verdict": "PARTIAL_OR_WARN_REVIEW_INPUT"
+    },
+    "partialCurrentInput": true,
+    "presentSlots": [
+      {
+        "slotId": "expedition_map.fog.hinted",
+        "expectedDimensions": "512x512",
+        "files": [
+          {
+            "file": "reports/media/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-2026-06-01/hinted-fog-veil-v1.gpt-image-2-source.png",
+            "dimensions": "1024x1024",
+            "colorType": "truecolor_rgb",
+            "sha256": "76c94f4c8129ec15555ed9d55ed70db07eacb98846fd31ecd3d855014446da18"
+          },
+          {
+            "file": "reports/media/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-2026-06-01/hinted-fog-veil-v1.review-alpha.png",
+            "dimensions": "1024x1024",
+            "colorType": "truecolor_rgba",
+            "cornerAlpha": {
+              "status": "parsed",
+              "values": {
+                "topLeft": 0,
+                "topRight": 0,
+                "bottomLeft": 0,
+                "bottomRight": 0
+              }
+            },
+            "sha256": "7e350524ee2b2a8edb4f7608b4a93b49da5faea7c5f12dbf27d202f3ef69b9e7"
+          }
+        ],
+        "status": "warn",
+        "warning": "Observed PNGs are larger than the HQ13L final slot dimensions."
+      },
+      {
+        "slotId": "expedition_map.fog.locked_unknown",
+        "expectedDimensions": "512x512",
+        "files": [
+          {
+            "file": "reports/media/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-2026-06-01/locked-unknown-fog-v1.gpt-image-2-source.png",
+            "dimensions": "1024x1024",
+            "colorType": "truecolor_rgb",
+            "sha256": "82e42260f6986f33bab6a4f1c90103b7cd26fb8200940a797a6363b230319031"
+          },
+          {
+            "file": "reports/media/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-2026-06-01/locked-unknown-fog-v1.review-alpha.png",
+            "dimensions": "1024x1024",
+            "colorType": "truecolor_rgba",
+            "cornerAlpha": {
+              "status": "parsed",
+              "values": {
+                "topLeft": 0,
+                "topRight": 0,
+                "bottomLeft": 0,
+                "bottomRight": 0
+              }
+            },
+            "sha256": "c27f256eedbc57f2ee36f58780dbe61d8265ec2a7a4862135ca82d951d0d34f0"
+          }
+        ],
+        "status": "warn",
+        "warning": "Observed PNGs are larger than the HQ13L final slot dimensions."
+      },
+      {
+        "slotId": "expedition_map.fog.frontier_border",
+        "expectedDimensions": "1024x128",
+        "files": [
+          {
+            "file": "reports/media/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-2026-06-01/frontier-dotted-boundary-v1.gpt-image-2-source.png",
+            "dimensions": "1536x1024",
+            "colorType": "truecolor_rgb",
+            "sha256": "4e23926cf742588481c4fc6c968624a283a93be5d9d3ae655edf58bdc9d8ab31"
+          },
+          {
+            "file": "reports/media/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-2026-06-01/frontier-dotted-boundary-v1.review-alpha.png",
+            "dimensions": "1536x1024",
+            "colorType": "truecolor_rgba",
+            "cornerAlpha": {
+              "status": "parsed",
+              "values": {
+                "topLeft": 0,
+                "topRight": 0,
+                "bottomLeft": 0,
+                "bottomRight": 0
+              }
+            },
+            "sha256": "003ce082388281be0a5b09e9b808ae2d4e3c7c94a0180d5361e017598071aa31"
+          }
+        ],
+        "status": "warn",
+        "warning": "Observed PNGs are larger than the HQ13L final slot dimensions."
+      },
+      {
+        "slotId": "expedition_map.marker.known_site_plan",
+        "expectedDimensions": "128x192",
+        "files": [
+          {
+            "file": "reports/media/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-2026-06-01/marker-known-site-plan-v1.gpt-image-2-source.png",
+            "dimensions": "1024x1536",
+            "colorType": "truecolor_rgb",
+            "sha256": "1475e63be835b77b3f1bd754040e0afa0906b91d1449fa51e66d567b3e42635e"
+          },
+          {
+            "file": "reports/media/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-2026-06-01/marker-known-site-plan-v1.review-alpha.png",
+            "dimensions": "1024x1536",
+            "colorType": "truecolor_rgba",
+            "cornerAlpha": {
+              "status": "parsed",
+              "values": {
+                "topLeft": 0,
+                "topRight": 0,
+                "bottomLeft": 0,
+                "bottomRight": 0
+              }
+            },
+            "sha256": "c15e742fb02919d0fb1ded90c9e9e275618b5ec76b6d27f71eb4d83ad0139cfd"
+          }
+        ],
+        "status": "warn",
+        "warning": "Observed PNGs are larger than the HQ13L final slot dimensions."
+      },
+      {
+        "slotId": "expedition_map.marker.hinted_unknown",
+        "expectedDimensions": "128x192",
+        "files": [
+          {
+            "file": "reports/media/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-2026-06-01/marker-hinted-unknown-v1.gpt-image-2-source.png",
+            "dimensions": "1024x1536",
+            "colorType": "truecolor_rgb",
+            "sha256": "179b4290ab9381d9e7a34f293d722f1908fbae67e66f4be5d57ac48575806151"
+          },
+          {
+            "file": "reports/media/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-2026-06-01/marker-hinted-unknown-v1.review-alpha.png",
+            "dimensions": "1024x1536",
+            "colorType": "truecolor_rgba",
+            "cornerAlpha": {
+              "status": "parsed",
+              "values": {
+                "topLeft": 0,
+                "topRight": 0,
+                "bottomLeft": 0,
+                "bottomRight": 0
+              }
+            },
+            "sha256": "da46cd34a99e68265c8ce8d1dc890ee9f6b04a10d9947b5b5242045a62e40a1e"
+          }
+        ],
+        "status": "warn",
+        "warning": "Observed PNGs are larger than the HQ13L final slot dimensions."
+      }
+    ],
+    "missingSlots": [
+      "expedition_map.marker.owned_outpost",
+      "expedition_map.stroke.scout_receipt_trace",
+      "hud.frame.selected_sector_card"
+    ],
+    "notes": [
+      "Partial current input is not a lane failure because HQ13K generation is still in progress.",
+      "Dimension warnings are expected until the generated source/review images are cropped or resized to the HQ13L slot dimensions in a later review/repair lane."
+    ]
+  },
+  "checks": [
+    {
+      "command": "node --check reports/agent-town-hq13m-generated-asset-qa-harness-2026-06-01.mjs",
+      "exitCode": 0,
+      "purpose": "verified harness syntax"
+    },
+    {
+      "command": "node reports/agent-town-hq13m-generated-asset-qa-harness-2026-06-01.mjs --pretty reports/media/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-2026-06-01",
+      "exitCode": 0,
+      "purpose": "ran the harness against the current HQ13K reports/media review directory"
+    },
+    {
+      "command": "jq empty reports/agent-town-hq13m-generated-asset-qa-harness-proof-2026-06-01.json",
+      "exitCode": 0,
+      "purpose": "validated proof JSON"
+    },
+    {
+      "command": "git diff --check -- reports/agent-town-hq13m-generated-asset-qa-harness-2026-06-01.mjs reports/agent-town-hq13m-generated-asset-qa-harness-2026-06-01.md reports/agent-town-hq13m-generated-asset-qa-harness-proof-2026-06-01.json",
+      "exitCode": 0,
+      "purpose": "checked whitespace only on the three HQ13M owned files"
+    }
+  ],
+  "guardrails": {
+    "noRuntimeAssetPromotion": true,
+    "noRuntimePackDirectory": true,
+    "noRuntimeLoader": true,
+    "noHq13kFileEditsMovesOrCleanup": true,
+    "noAppSourceEdits": true,
+    "noServerStoreRoutesToolsSchemaValidatorEdits": true,
+    "noAtlasExecution": true,
+    "noPublicSharing": true,
+    "noGeneratedUniverseRendering": true,
+    "noHiddenAutonomy": true,
+    "noRouteTradeEconomyResourceCombatSchedulerBehavior": true,
+    "noCrossPlotMutation": true,
+    "noExternalEffects": true,
+    "scoutSectorOnlyCurrentExpeditionMapMutationPath": true
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "ok": true,
+  "date": "2026-06-01",
+  "lane": "HQ13V map UI theme course correction",
+  "verdict": "COURSE_CORRECTION_REQUIRED_PROMPT_ANCHOR_ADDED",
+  "reconciledTheme": {
+    "literalWildWestRejected": true,
+    "agentTownFrontierTechIdentityRequired": true,
+    "frontierMeansFoundingThresholdOrUnrevealedMapEdge": true,
+    "humanPlusAgentCivicToneRequired": true,
+    "genericCozyCivilizationBuilderPromptInsufficient": true
+  },
+  "updatedArtifacts": [
+    "docs/specs/agent-town-frontier-agentfolk-style-playbook.md",
+    "reports/agent-town-hq13e-candidate-02-asset-extraction-plan-2026-06-01.md",
+    "reports/agent-town-hq13l-generated-asset-review-rubric-2026-06-01.md",
+    "reports/agent-town-hq13v-map-ui-theme-course-correction-2026-06-01.md"
+  ],
+  "promptCapsuleKeywords": [
+    "frontier-tech civic",
+    "human-plus-agent collaboration",
+    "scout reports",
+    "ledgers",
+    "receipts",
+    "plan wagons",
+    "beacons",
+    "brass",
+    "canvas",
+    "parchment",
+    "worn teal",
+    "subtle agent-tech glow"
+  ],
+  "hardNegativeStillApplies": [
+    "cowboys",
+    "saloons",
+    "gold-rush prospecting",
+    "wanted posters",
+    "guns",
+    "conquest borders",
+    "military lines",
+    "trade-route implication"
+  ],
+  "guardrails": {
+    "reportSpecPromptCorrectionOnly": true,
+    "runtimeAssetPromotion": false,
+    "runtimePackDirectory": false,
+    "runtimeLoader": false,
+    "appSourceEdits": false,
+    "serverStoreRoutesToolsEngineEdits": false,
+    "atlasExecution": false,
+    "publicSharing": false,
+    "generatedUniverseRendering": false,
+    "hiddenAutonomy": false,
+    "routeTradeEconomyResourceRewardCombatSchedulerBehavior": false,
+    "crossPlotMutation": false,
+    "externalEffects": false,
+    "scoutSectorOnlyCurrentExpeditionMapMutationPath": true
+  },
+  "checks": [
+    {
+      "command": "jq empty reports/agent-town-hq13v-map-ui-theme-course-correction-proof-2026-06-01.json",
+      "status": "passed"
+    },
+    {
+      "command": "git diff --check -- docs/specs/agent-town-frontier-agentfolk-style-playbook.md reports/agent-town-hq13e-candidate-02-asset-extraction-plan-2026-06-01.md reports/agent-town-hq13l-generated-asset-review-rubric-2026-06-01.md reports/agent-town-hq13v-map-ui-theme-course-correction-2026-06-01.md reports/agent-town-hq13v-map-ui-theme-course-correction-proof-2026-06-01.json",
+      "status": "passed"
+    }
+  ]
+}

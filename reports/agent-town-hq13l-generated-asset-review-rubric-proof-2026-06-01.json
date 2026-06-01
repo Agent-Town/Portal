@@ -1,0 +1,136 @@
+{
+  "ok": true,
+  "verdict": "READY_FOR_REPORT_ONLY_REVIEW",
+  "date": "2026-06-01",
+  "lane": "HQ13L",
+  "worktree": "/Users/robin/Projects/Portal-atlas-editor",
+  "scope": {
+    "reportOnly": true,
+    "proofOnly": true,
+    "runtimeAssetPromotion": false,
+    "runtimePackDirectory": false,
+    "runtimeLoader": false,
+    "schemaValidatorFixturesEdited": false,
+    "hq13kFilesEdited": false,
+    "appSourceEdited": false,
+    "serverStoreRoutesToolsEdited": false,
+    "atlasExecution": false,
+    "publicSharing": false,
+    "generatedUniverseRendering": false
+  },
+  "artifacts": {
+    "report": "reports/agent-town-hq13l-generated-asset-review-rubric-2026-06-01.md",
+    "proof": "reports/agent-town-hq13l-generated-asset-review-rubric-proof-2026-06-01.json",
+    "sourceReports": [
+      "reports/agent-town-hq13e-candidate-02-asset-extraction-plan-2026-06-01.md",
+      "reports/agent-town-hq13g-candidate-02-tiny-asset-batch-preflight-2026-06-01.md",
+      "reports/agent-town-hq13j-schema-slot-reconciliation-2026-06-01.md"
+    ],
+    "sourceProofs": [
+      "reports/agent-town-hq13e-candidate-02-asset-extraction-plan-proof-2026-06-01.json",
+      "reports/agent-town-hq13g-candidate-02-tiny-asset-batch-preflight-proof-2026-06-01.json",
+      "reports/agent-town-hq13j-schema-slot-reconciliation-proof-2026-06-01.json"
+    ]
+  },
+  "slotRubricCount": 8,
+  "slotRubric": [
+    {
+      "assetFile": "fog-hinted-soft-veil-v1.png",
+      "slot": "expedition_map.fog.hinted",
+      "dimensions": "512x512",
+      "usage": "transparent hinted fog overlay from server-owned fogState",
+      "runtimePromotionApproved": false
+    },
+    {
+      "assetFile": "fog-locked-heavy-cloud-v1.png",
+      "slot": "expedition_map.fog.locked_unknown",
+      "dimensions": "512x512",
+      "usage": "generic locked-unknown cloud overlay that hides detail",
+      "runtimePromotionApproved": false
+    },
+    {
+      "assetFile": "frontier-dotted-boundary-v1.png",
+      "slot": "expedition_map.fog.frontier_border",
+      "dimensions": "1024x128",
+      "usage": "visual-only frontier edge between visible and server-provided hinted/locked cells",
+      "runtimePromotionApproved": false
+    },
+    {
+      "assetFile": "marker-known-site-plan-v1.png",
+      "slot": "expedition_map.marker.known_site_plan",
+      "dimensions": "128x192",
+      "usage": "known or reviewed site-plan marker over visible server state",
+      "runtimePromotionApproved": false
+    },
+    {
+      "assetFile": "marker-hinted-unknown-v1.png",
+      "slot": "expedition_map.marker.hinted_unknown",
+      "dimensions": "128x192",
+      "usage": "generic hinted unknown marker with no hidden-sector clue",
+      "runtimePromotionApproved": false
+    },
+    {
+      "assetFile": "marker-owned-outpost-v1.png",
+      "slot": "expedition_map.marker.owned_outpost",
+      "dimensions": "128x192",
+      "usage": "owned outpost marker over visible server-owned outpost state",
+      "runtimePromotionApproved": false
+    },
+    {
+      "assetFile": "survey-receipt-stroke-v1.png",
+      "slot": "expedition_map.stroke.scout_receipt_trace",
+      "dimensions": "1024x128",
+      "usage": "decorative visible receipt trace, not route gameplay",
+      "runtimePromotionApproved": false
+    },
+    {
+      "assetFile": "hud-selected-sector-frame-v1.png",
+      "slot": "hud.frame.selected_sector_card",
+      "dimensions": "640x360",
+      "usage": "empty selected-sector frame for app-rendered read-model text",
+      "runtimePromotionApproved": false
+    }
+  ],
+  "guardrails": {
+    "noRuntimeAssetPromotion": true,
+    "noRuntimePackDirectory": true,
+    "noRuntimeLoader": true,
+    "noSchemaValidatorFixtureEdits": true,
+    "noHq13kFileEdits": true,
+    "noServerStoreRoutesToolsEdits": true,
+    "noAtlasExecution": true,
+    "noPublicSharing": true,
+    "noGeneratedUniverseRendering": true,
+    "noHiddenTruthLeakage": true,
+    "noResourceRewardRouteTradeEconomyCombatImplications": true,
+    "noSchedulerHiddenAutonomyCrossPlotExternalEffects": true,
+    "noWildWestDrift": true,
+    "sameOriginFuturePackBindingRequired": true,
+    "alphaOrChromaKeyReviewRequired": true,
+    "mobileReadabilityReviewRequired": true,
+    "provenanceMetadataRequired": true,
+    "scoutSectorOnlyCurrentExpeditionMapMutationPath": true
+  },
+  "checks": [
+    {
+      "command": "file reports/agent-town-hq13g-candidate-02-tiny-asset-batch-placeholders-2026-06-01/*.png reports/agent-town-hq13g-candidate-02-tiny-asset-batch-contact-sheet-2026-06-01.png",
+      "exitCode": 0,
+      "purpose": "inspected source preflight placeholder dimensions for the eight-slot rubric"
+    },
+    {
+      "command": "jq empty reports/agent-town-hq13e-candidate-02-asset-extraction-plan-proof-2026-06-01.json reports/agent-town-hq13g-candidate-02-tiny-asset-batch-preflight-proof-2026-06-01.json reports/agent-town-hq13j-schema-slot-reconciliation-proof-2026-06-01.json",
+      "exitCode": 0,
+      "purpose": "validated source proof JSON files used by this report"
+    },
+    {
+      "command": "jq empty reports/agent-town-hq13l-generated-asset-review-rubric-proof-2026-06-01.json",
+      "exitCode": 0,
+      "purpose": "validated this proof JSON"
+    },
+    {
+      "command": "git diff --check -- reports/agent-town-hq13l-generated-asset-review-rubric-2026-06-01.md reports/agent-town-hq13l-generated-asset-review-rubric-proof-2026-06-01.json",
+      "exitCode": 0,
+      "purpose": "checked whitespace only on the owned HQ13L files"
+    }
+  ]
+}

@@ -5,6 +5,22 @@ const { buildRecapFromEvents } = require('./recap');
 const { computeStateHash, stableJsonStringify, buildReplayAudit } = require('./replay');
 
 const RESOURCE_KEYS = ['wood', 'stone', 'food', 'coin'];
+const CIVIC_PROPOSAL_STATUSES = Object.freeze(['DRAFT', 'REVIEWED', 'ARCHIVED']);
+const CIVIC_PROPOSAL_CATEGORIES = Object.freeze(['coordination', 'public_work', 'route_study', 'civic_memory']);
+const CIVIC_PROPOSAL_AUTHORITY_BOUNDARY = 'server_owned_civic_proposal_record_no_execution_v1';
+const OVERLAY_PACK_STATUSES = Object.freeze(['DRAFT', 'REVIEWED', 'ARCHIVED']);
+const OVERLAY_PACK_AUTHORITY_BOUNDARY = 'server_owned_generated_universe_overlay_pack_presentation_only_v1';
+const CIVIC_PROJECT_STATUSES = Object.freeze(['ACTIVE', 'ARCHIVED']);
+const CIVIC_PROJECT_TYPES = Object.freeze(['civic_beacon']);
+const CIVIC_PROJECT_AUTHORITY_BOUNDARY = 'server_owned_civic_project_activation_local_public_work_v1';
+const CIVIC_PROJECT_INSPECTION_AUTHORITY_BOUNDARY = 'server_owned_civic_project_inspection_current_plot_v1';
+const CIVIC_PROJECT_INSPECTION_TYPES = Object.freeze(['baseline_readiness']);
+const CIVIC_BEACON_EFFECT_ID = 'local_civic_beacon_v1';
+const EXPEDITION_MAP_AUTHORITY_BOUNDARY = 'server_owned_read_only_expedition_map_fog_of_war_projection_v1';
+const EXPEDITION_SCOUT_SECTOR_AUTHORITY_BOUNDARY = 'server_owned_scout_sector_current_plot_fog_receipt_v1';
+const EXPEDITION_EVENT_PACKET_AUTHORITY_BOUNDARY = 'server_owned_expedition_event_packet_read_model_v1';
+const EXPEDITION_PARTY_MANIFEST_AUTHORITY_BOUNDARY = 'server_owned_read_only_expedition_party_manifest_v1';
+const EXPEDITION_MAP_FOG_STATES = Object.freeze(['discovered', 'known', 'hinted', 'locked_unknown']);
 const OFFLINE_CLAMP_MS = 8 * 60 * 60 * 1000;
 const DAILY_RETURN_XP = 5;
 const PADS = Object.freeze([
@@ -22,6 +38,7 @@ const BUILDING_LABELS = Object.freeze({
   LUMBER_CAMP: 'Lumber Camp',
   FARM_PLOT: 'Farm Plot',
   QUARRY: 'Quarry',
+  EXPEDITION_BOARD: 'Expedition Board',
   WORKSHOP: 'Workshop',
   MARKET_STALL: 'Market Stall'
 });
@@ -42,7 +59,7 @@ const HQ_LEVEL_RULES = Object.freeze({
   3: {
     storageCaps: { wood: 100, stone: 100, food: 100 },
     constructionSlots: 2,
-    unlocks: [],
+    unlocks: ['EXPEDITION_BOARD'],
     permissionUnlocks: ['queueProduction']
   },
   4: {
@@ -56,14 +73,62 @@ const HQ_LEVEL_RULES = Object.freeze({
     constructionSlots: 2,
     unlocks: ['MARKET_STALL'],
     permissionUnlocks: ['sellSurplusFood']
+  },
+  6: {
+    storageCaps: { wood: 220, stone: 220, food: 220 },
+    constructionSlots: 3,
+    unlocks: [],
+    permissionUnlocks: []
   }
 });
 
 const HQ_UPGRADE_RULES = Object.freeze({
-  1: { nextLevel: 2, cost: { wood: 20, food: 10 }, xpRequired: 25, durationMs: 60_000 },
-  2: { nextLevel: 3, cost: { wood: 20, stone: 16 }, xpRequired: 50, durationMs: 90_000 },
-  3: { nextLevel: 4, cost: { wood: 40, stone: 30, food: 20 }, xpRequired: 90, durationMs: 120_000 },
-  4: { nextLevel: 5, cost: { wood: 60, stone: 50, food: 30 }, xpRequired: 140, durationMs: 150_000 }
+  1: {
+    nextLevel: 2,
+    cost: { wood: 20, food: 10 },
+    xpRequired: 25,
+    durationMs: 60_000,
+    buildingPrerequisites: Object.freeze([
+      Object.freeze({ type: 'LUMBER_CAMP', requiredState: 'READY' }),
+      Object.freeze({ type: 'FARM_PLOT', requiredState: 'READY' })
+    ])
+  },
+  2: {
+    nextLevel: 3,
+    cost: { wood: 20, stone: 16 },
+    xpRequired: 50,
+    durationMs: 90_000,
+    buildingPrerequisites: Object.freeze([
+      Object.freeze({ type: 'QUARRY', requiredState: 'READY' })
+    ])
+  },
+  3: {
+    nextLevel: 4,
+    cost: { wood: 40, stone: 30, food: 20 },
+    xpRequired: 90,
+    durationMs: 120_000,
+    buildingPrerequisites: Object.freeze([
+      Object.freeze({ type: 'EXPEDITION_BOARD', requiredState: 'READY' })
+    ])
+  },
+  4: {
+    nextLevel: 5,
+    cost: { wood: 60, stone: 50, food: 30 },
+    xpRequired: 140,
+    durationMs: 150_000,
+    buildingPrerequisites: Object.freeze([
+      Object.freeze({ type: 'WORKSHOP', requiredState: 'READY' })
+    ])
+  },
+  5: {
+    nextLevel: 6,
+    cost: { wood: 90, stone: 80, food: 50 },
+    xpRequired: 220,
+    durationMs: 180_000,
+    buildingPrerequisites: Object.freeze([
+      Object.freeze({ type: 'MARKET_STALL', requiredState: 'READY' })
+    ])
+  }
 });
 
 const BUILDING_DEFS = Object.freeze({
@@ -118,6 +183,20 @@ const BUILDING_DEFS = Object.freeze({
       };
     }
   },
+  EXPEDITION_BOARD: {
+    unlockHqLevel: 3,
+    construction: { cost: { wood: 24, stone: 12, food: 8 }, durationMs: 120_000 },
+    upgrade: null,
+    produces() {
+      return {
+        kind: 'SCOUT',
+        input: { food: 6, wood: 4 },
+        output: { scout_report: 1 },
+        durationMs: 90_000,
+        reportKind: 'nearby_site'
+      };
+    }
+  },
   WORKSHOP: {
     unlockHqLevel: 4,
     construction: { cost: { wood: 24, stone: 16, coin: 12 }, durationMs: 120_000 },
@@ -150,6 +229,166 @@ const BUILDING_DEFS = Object.freeze({
     }
   }
 });
+
+const SCOUT_REPORT_TEMPLATES = Object.freeze([
+  {
+    templateId: 'forest-ridge',
+    title: 'Forest Ridge Survey',
+    siteType: 'woodland_ridge',
+    risk: 'low',
+    traits: ['wood-rich', 'stone outcrop', 'settler-safe'],
+    resourceHints: { wood: 2, stone: 1 },
+    summary: 'A nearby ridge has timber, surface stone, and enough flat ground for a future outpost.',
+    recommendedNext: 'Save this report as the first candidate for a later settler convoy.'
+  },
+  {
+    templateId: 'river-flat',
+    title: 'River Flat Survey',
+    siteType: 'river_flat',
+    risk: 'medium',
+    traits: ['food-rich', 'water access', 'flood watch'],
+    resourceHints: { food: 2, wood: 1 },
+    summary: 'The scout marked a fertile bend that could support farms, but seasonal water needs planning.',
+    recommendedNext: 'Compare this with other reports before committing a second settlement.'
+  },
+  {
+    templateId: 'old-trail',
+    title: 'Old Trail Signal',
+    siteType: 'ruin_signal',
+    risk: 'medium',
+    traits: ['old road', 'signal marker', 'approval-needed'],
+    resourceHints: { stone: 1, coin: 1 },
+    summary: 'Rook found an old route marker. It is useful intelligence, not a claimable plot yet.',
+    recommendedNext: 'Promote a proper expedition/claim rule before letting this become territory.'
+  }
+]);
+
+const SITE_PLAN_FOCUS_OPTIONS = Object.freeze(['balanced', 'resource', 'safe', 'trade']);
+
+const SETTLER_CONVOY_DEF = Object.freeze({
+  unlockHqLevel: 7,
+  bridgeRequiredHqLevel: 6,
+  requiresSitePlanPromotionStatus: 'reviewed_claim_ready',
+  cost: { wood: 32, food: 20, stone: 12, coin: 8 },
+  durationMs: 180_000,
+  output: { settlement_claim: 1 }
+});
+
+const SURVEY_DISCIPLINE_SCOUT_DURATION_MULTIPLIER = 0.95;
+const SURVEY_DISCIPLINE_SCOUT_DURATION_REDUCTION_PCT = 5;
+
+const DOCTRINE_CATALOG = Object.freeze({
+  survey_discipline: Object.freeze({
+    doctrineId: 'survey_discipline',
+    title: 'Survey Discipline',
+    unlockHqLevel: 6,
+    requiresFoundedOutpost: true,
+    cost: {},
+    effectKind: 'scout_duration_modifier',
+    effectValue: Object.freeze({
+      buildingType: 'EXPEDITION_BOARD',
+      jobKind: 'SCOUT',
+      durationMultiplier: SURVEY_DISCIPLINE_SCOUT_DURATION_MULTIPLIER,
+      reductionPct: SURVEY_DISCIPLINE_SCOUT_DURATION_REDUCTION_PCT
+    }),
+    gameplayBuff: true,
+    engineOwnedEffect: true,
+    reversibility: 'safe_replaceable_server_owned',
+    riskLevel: 'low',
+    privacyDefault: 'private',
+    summary: 'Research Lodge doctrine that trims Expedition Board SCOUT job duration by 5% while preserving costs, outputs, and settlement rules.',
+    authorityBoundary: 'server_owned_scout_duration_modifier_v1'
+  })
+});
+
+const WORK_ORDER_TEMPLATES = Object.freeze({
+  collect_ready_outputs_once: Object.freeze({
+    templateId: 'collect_ready_outputs_once',
+    title: 'Collect Ready Outputs Once',
+    unlockHqLevel: 6,
+    requiresFoundedOutpost: true,
+    requiresSelectedDoctrine: 'survey_discipline',
+    status: 'EXECUTOR_AVAILABLE',
+    allowedActions: Object.freeze(['et.plot.collect_outputs']),
+    caps: Object.freeze({
+      maxChildActions: 2,
+      maxResourceSpend: zeroInventory(),
+      maxRuntimeMs: 120_000,
+      allowedPlotScope: 'current_plot_only'
+    }),
+    summary: 'Drafts and explicitly executes a bounded cohort work order for collecting up to two ready outputs once.',
+    authorityBoundary: 'server_owned_work_order_executor_collect_ready_outputs_once_v1'
+  })
+});
+
+const EXPEDITION_MAP_RING_COORDINATES = Object.freeze([
+  Object.freeze({ q: 1, r: 0 }),
+  Object.freeze({ q: 1, r: -1 }),
+  Object.freeze({ q: 0, r: -1 }),
+  Object.freeze({ q: -1, r: 0 }),
+  Object.freeze({ q: -1, r: 1 }),
+  Object.freeze({ q: 0, r: 1 }),
+  Object.freeze({ q: 2, r: -1 }),
+  Object.freeze({ q: 1, r: 1 }),
+  Object.freeze({ q: -1, r: 2 }),
+  Object.freeze({ q: -2, r: 1 }),
+  Object.freeze({ q: -1, r: -1 }),
+  Object.freeze({ q: 1, r: -2 })
+]);
+
+const EXPEDITION_EVENT_PACKET_TEMPLATES = Object.freeze([
+  Object.freeze({
+    templateId: 'ridge-lantern',
+    discoveryFlavor: 'Ridge Lantern packet',
+    terrainExplanation: 'The sector has enough ridgeline and landmark context to become a map note, but no path or claim exists yet.',
+    riskExplanation: 'Planning risk only: visibility improved, with no damage, combat, resource payout, or route opened.',
+    operatorNote: 'Mira filed this as a receipt-bound frontier note for later human review.'
+  }),
+  Object.freeze({
+    templateId: 'quiet-hollow',
+    discoveryFlavor: 'Quiet Hollow packet',
+    terrainExplanation: 'The scout marked a sheltered hollow on the edge of known ground; terrain remains descriptive until a later explicit rule uses it.',
+    riskExplanation: 'Unresolved terrain risk remains advisory and cannot change inventory, actors, routes, or other plots.',
+    operatorNote: 'The Expedition Board stamped this as read-only context, not an executable order.'
+  }),
+  Object.freeze({
+    templateId: 'marker-stone',
+    discoveryFlavor: 'Marker Stone packet',
+    terrainExplanation: 'A stable landmark makes this sector easier to discuss on the map while deeper details stay behind fog.',
+    riskExplanation: 'Unknown-world risk is preserved as flavor metadata with no autonomous travel, scheduling, or public sharing.',
+    operatorNote: 'Rook linked the note back to the Scout Sector receipt so future planning can audit its source.'
+  })
+]);
+
+const EXPEDITION_PARTY_MEMBERS = Object.freeze([
+  Object.freeze({
+    memberId: 'pathfinder-scout-v1',
+    displayName: 'Mira Trailmark',
+    role: 'scout',
+    assetSrc: '/experiences/founders-plot/assets/characters/inhabitants/scout/pathfinder-scout-v1.png',
+    metadataSrc: '/experiences/founders-plot/assets/characters/inhabitants/scout/pathfinder-scout-v1.json',
+    flavorDuty: 'Reads the newly known edge.',
+    authority: 'visual_read_model_only'
+  }),
+  Object.freeze({
+    memberId: 'rook-signalpost-messenger-v1',
+    displayName: 'Rook Signalpost',
+    role: 'messenger',
+    assetSrc: '/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.png',
+    metadataSrc: '/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.json',
+    flavorDuty: 'Carries the packet receipt back to the board.',
+    authority: 'visual_read_model_only'
+  }),
+  Object.freeze({
+    memberId: 'hq-civic-operator-vale-desk-7-v1',
+    displayName: 'Vale-Desk 7',
+    role: 'hq_civic_operator',
+    assetSrc: '/experiences/founders-plot/assets/characters/inhabitants/hq_civic_operator/hq-civic-operator-vale-desk-7-v1.png',
+    metadataSrc: '/experiences/founders-plot/assets/characters/inhabitants/hq_civic_operator/hq-civic-operator-vale-desk-7-v1.json',
+    flavorDuty: 'Files the receipt at HQ without changing town state.',
+    authority: 'visual_read_model_only'
+  })
+]);
 
 const REWARD_DEFS = Object.freeze([
   {
@@ -227,6 +466,1883 @@ function normalizeInventory(value) {
   return next;
 }
 
+function normalizeScoutReports(value) {
+  const rows = Array.isArray(value) ? value : [];
+  return rows
+    .filter((row) => row && typeof row === 'object')
+    .slice(-30)
+    .map((row, index) => {
+      const sequence = Math.max(1, Math.floor(Number(row.sequence || index + 1)));
+      const traits = Array.isArray(row.traits)
+        ? row.traits.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 8)
+        : [];
+      const hints = {};
+      const rawHints = row.resourceHints && typeof row.resourceHints === 'object' ? row.resourceHints : {};
+      for (const key of RESOURCE_KEYS) {
+        const amount = Math.max(0, Math.floor(Number(rawHints[key] || 0)));
+        if (amount > 0) hints[key] = amount;
+      }
+      return {
+        reportId: String(row.reportId || `scout_report_${sequence}`),
+        originPlotId: String(row.originPlotId || row.plotId || ''),
+        sourceBuildingId: String(row.sourceBuildingId || ''),
+        title: String(row.title || `Scout Report ${sequence}`),
+        siteType: String(row.siteType || 'nearby_site'),
+        risk: String(row.risk || 'unknown'),
+        traits,
+        resourceHints: hints,
+        summary: String(row.summary || ''),
+        recommendedNext: String(row.recommendedNext || ''),
+        sequence,
+        createdAt: Number(row.createdAt || 0)
+      };
+    });
+}
+
+function safeText(value, fallback = '', max = 160) {
+  const text = String(value == null ? '' : value)
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return (text || fallback).slice(0, max);
+}
+
+function slugFor(value, fallback = 'item') {
+  const slug = safeText(value, fallback, 80)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return slug || fallback;
+}
+
+function sitePlanFocus(value) {
+  const clean = String(value || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+  return SITE_PLAN_FOCUS_OPTIONS.includes(clean) ? clean : 'balanced';
+}
+
+function normalizeSitePlans(value) {
+  const rows = Array.isArray(value) ? value : [];
+  return rows
+    .filter((row) => row && typeof row === 'object')
+    .slice(-30)
+    .map((row, index) => {
+      const sequence = Math.max(1, Math.floor(Number(row.sequence || index + 1)));
+      const resourceHints = {};
+      const rawHints = row.resourceHints && typeof row.resourceHints === 'object' ? row.resourceHints : {};
+      for (const key of RESOURCE_KEYS) {
+        const amount = Math.max(0, Math.floor(Number(rawHints[key] || 0)));
+        if (amount > 0) resourceHints[key] = amount;
+      }
+      const traits = Array.isArray(row.traits)
+        ? row.traits.map((item) => safeText(item, '', 48)).filter(Boolean).slice(0, 8)
+        : [];
+      const normalized = {
+        planId: safeText(row.planId, `site_plan_${sequence}`, 120),
+        reportId: safeText(row.reportId, '', 120),
+        originPlotId: safeText(row.originPlotId || row.plotId, '', 120),
+        title: safeText(row.title, `Site Plan ${sequence}`, 120),
+        focus: sitePlanFocus(row.focus),
+        status: safeText(row.status, 'DRAFT', 40).toUpperCase(),
+        promotionStatus: safeText(row.promotionStatus, 'draft', 40).toLowerCase(),
+        reviewStatus: safeText(row.reviewStatus, 'unreviewed', 40).toLowerCase(),
+        source: safeText(row.source, 'scout_report', 80),
+        authorityBoundary: safeText(row.authorityBoundary, 'requires_engine_promotion_for_settlement', 120),
+        siteType: safeText(row.siteType, 'nearby_site', 80),
+        risk: safeText(row.risk, 'unknown', 40),
+        traits,
+        resourceHints,
+        summary: safeText(row.summary, '', 320),
+        recommendedNext: safeText(row.recommendedNext, '', 240),
+        reviewedAt: row.reviewedAt == null ? null : Number(row.reviewedAt),
+        reviewNote: safeText(row.reviewNote, '', 320),
+        sequence,
+        createdAt: Number(row.createdAt || 0)
+      };
+      const claimId = safeText(row.claimId, '', 120);
+      const convoyJobId = safeText(row.convoyJobId, '', 120);
+      const foundedPlotId = safeText(row.foundedPlotId, '', 120);
+      if (claimId) normalized.claimId = claimId;
+      if (convoyJobId) normalized.convoyJobId = convoyJobId;
+      if (foundedPlotId) normalized.foundedPlotId = foundedPlotId;
+      if (row.claimedAt != null) normalized.claimedAt = Number(row.claimedAt);
+      return normalized;
+    })
+    .filter((plan) => plan.planId && plan.reportId);
+}
+
+function normalizeExpeditionScouts(value) {
+  const rows = Array.isArray(value) ? value : [];
+  return rows
+    .filter((row) => row && typeof row === 'object')
+    .slice(-60)
+    .map((row, index) => {
+      const q = Number(row.q || row.coord?.q || 0);
+      const r = Number(row.r || row.coord?.r || 0);
+      const cellId = safeText(row.cellId, expeditionCellId({ q, r }), 80);
+      const receipt = row.receipt && typeof row.receipt === 'object' ? clone(row.receipt) : {};
+      const scout = {
+        scoutId: safeText(row.scoutId, `expedition_scout_${index + 1}`, 120),
+        plotId: safeText(row.plotId, '', 120),
+        cellId,
+        q,
+        r,
+        sourceCellId: safeText(row.sourceCellId || row.adjacentCellId, '', 80) || null,
+        sourceFogState: safeText(row.sourceFogState, 'hinted', 40),
+        title: safeText(row.title, 'Scouted Frontier Sector', 120),
+        status: safeText(row.status, 'SCOUTED', 40).toUpperCase(),
+        sourceTruth: 'expedition_scout_sector',
+        traits: Array.isArray(row.traits) ? row.traits.map((item) => safeText(item, '', 48)).filter(Boolean).slice(0, 8) : [],
+        resourceHints: normalizeInventory(row.resourceHints || {}),
+        siteType: safeText(row.siteType, 'scouted_frontier', 80),
+        risk: safeText(row.risk, 'unknown', 40),
+        summary: safeText(row.summary, 'A frontier sector was scouted from an adjacent map hint.', 320),
+        recommendedNext: safeText(row.recommendedNext, 'Keep the sector as known map truth until a later explicit planning action exists.', 240),
+        authorityBoundary: safeText(row.authorityBoundary, EXPEDITION_SCOUT_SECTOR_AUTHORITY_BOUNDARY, 160),
+        receipt: {
+          ...receipt,
+          kind: safeText(receipt.kind, 'scout_sector_receipt', 80),
+          actionName: safeText(receipt.actionName, 'et.plot.scout_sector', 80),
+          authorityBoundary: safeText(receipt.authorityBoundary, EXPEDITION_SCOUT_SECTOR_AUTHORITY_BOUNDARY, 160)
+        },
+        createdBy: mutationActor(row.createdBy),
+        approvedBy: row.approvedBy ? safeText(row.approvedBy, '', 80) : null,
+        createdAt: Number(row.createdAt || 0),
+        updatedAt: Number(row.updatedAt || row.createdAt || 0)
+      };
+      const eventPacket = buildExpeditionEventPacket({ scoutSector: scout });
+      scout.receipt.eventPacketId = eventPacket.packetId;
+      scout.eventPacket = eventPacket;
+      return scout;
+    })
+    .filter((entry) => entry.scoutId && entry.cellId);
+}
+
+function normalizeDoctrineState(value) {
+  const state = value && typeof value === 'object' ? value : {};
+  const doctrineId = safeText(state.selectedDoctrineId || state.doctrineId, '', 80);
+  if (!doctrineId) {
+    return {
+      selectedDoctrineId: null,
+      status: 'NONE',
+      selectedAt: null,
+      selectedBy: null,
+      revision: 0,
+      authorityBoundary: 'no_doctrine_selected',
+      receiptEventType: null
+    };
+  }
+  return {
+    selectedDoctrineId: doctrineId,
+    status: safeText(state.status, 'SELECTED', 40).toUpperCase(),
+    selectedAt: state.selectedAt == null ? null : Number(state.selectedAt),
+    selectedBy: state.selectedBy ? mutationActor(state.selectedBy) : null,
+    revision: Math.max(1, Math.floor(Number(state.revision || 1))),
+    authorityBoundary: safeText(state.authorityBoundary, 'server_owned_doctrine_effect_v1', 120),
+    receiptEventType: safeText(state.receiptEventType, 'DOCTRINE_SELECTED', 80)
+  };
+}
+
+function foundedOutpostCount(bundle) {
+  return normalizeSettlementClaims(bundle?.settlementClaims || [])
+    .filter((claim) => claim.status === 'FOUNDED' && claim.foundedPlotId)
+    .length;
+}
+
+function doctrineAvailability(bundle, doctrine) {
+  const hqLevel = Number(bundle?.plot?.hqLevel || 1);
+  const outpostCount = foundedOutpostCount(bundle);
+  const blockedBy = [];
+  if (hqLevel < Number(doctrine.unlockHqLevel || 1)) {
+    blockedBy.push(`hq.level.${Number(doctrine.unlockHqLevel || 1)}`);
+  }
+  if (doctrine.requiresFoundedOutpost && outpostCount < 1) {
+    blockedBy.push('settlement.outpost.founded');
+  }
+  return {
+    unlocked: blockedBy.length === 0,
+    hqLevel,
+    hqLevelRequired: Number(doctrine.unlockHqLevel || 1),
+    outpostCount,
+    requiresFoundedOutpost: doctrine.requiresFoundedOutpost === true,
+    blockedBy
+  };
+}
+
+function publicDoctrineCatalog(bundle) {
+  const selected = normalizeDoctrineState(bundle?.plot?.doctrineState);
+  return Object.values(DOCTRINE_CATALOG).map((doctrine) => {
+    const availability = doctrineAvailability(bundle, doctrine);
+    return {
+      ...clone(doctrine),
+      selected: selected.selectedDoctrineId === doctrine.doctrineId && selected.status === 'SELECTED',
+      availability
+    };
+  });
+}
+
+function selectedDoctrineForBundle(bundleOrState) {
+  const state = normalizeDoctrineState(bundleOrState?.plot?.doctrineState || bundleOrState?.doctrineState);
+  if (state.status !== 'SELECTED' || !state.selectedDoctrineId) return null;
+  return DOCTRINE_CATALOG[state.selectedDoctrineId] || null;
+}
+
+function activeScoutDurationDoctrineEffect(bundleOrState) {
+  const doctrine = selectedDoctrineForBundle(bundleOrState);
+  if (!doctrine || doctrine.effectKind !== 'scout_duration_modifier') return null;
+  const value = doctrine.effectValue && typeof doctrine.effectValue === 'object' ? doctrine.effectValue : {};
+  if (value.buildingType !== 'EXPEDITION_BOARD' || value.jobKind !== 'SCOUT') return null;
+  const multiplier = Number(value.durationMultiplier);
+  if (!Number.isFinite(multiplier) || multiplier <= 0 || multiplier >= 1) return null;
+  return {
+    doctrineId: doctrine.doctrineId,
+    effectKind: doctrine.effectKind,
+    buildingType: value.buildingType,
+    jobKind: value.jobKind,
+    durationMultiplier: multiplier,
+    reductionPct: Number(value.reductionPct || 0),
+    authorityBoundary: doctrine.authorityBoundary
+  };
+}
+
+function applyDoctrineEffectsToJobSpec(bundleOrState, buildingType, spec) {
+  const next = clone(spec || {});
+  const baseDurationMs = Math.max(1, Math.floor(Number(next.durationMs || 0)));
+  next.baseDurationMs = baseDurationMs;
+  const effect = activeScoutDurationDoctrineEffect(bundleOrState);
+  if (effect && buildingType === effect.buildingType && next.kind === effect.jobKind) {
+    next.durationMs = Math.max(1, Math.round(baseDurationMs * effect.durationMultiplier));
+    next.doctrineEffect = effect;
+  } else {
+    next.durationMs = baseDurationMs;
+    next.doctrineEffect = null;
+  }
+  return next;
+}
+
+function researchReadModel(bundle) {
+  const catalog = publicDoctrineCatalog(bundle);
+  const unlocked = catalog.some((entry) => entry.availability.unlocked);
+  const selectedDoctrine = catalog.find((entry) => entry.selected) || null;
+  const scoutDurationEffect = activeScoutDurationDoctrineEffect(bundle);
+  return {
+    lodge: {
+      status: unlocked ? 'OPERATIONAL_READY' : 'LOCKED',
+      title: 'Research Lodge',
+      buildingRequired: false,
+      implementation: 'hq6_plus_founded_outpost_doctrine_read_model',
+      advisoryOnly: false,
+      engineOwnedEffect: true,
+      authorityBoundary: 'server_owned_read_model_no_building_scout_duration_effect_v1',
+      requirements: {
+        hqLevelRequired: 6,
+        foundedOutpostRequired: true,
+        blockedBy: unlocked ? [] : Array.from(new Set(catalog.flatMap((entry) => entry.availability.blockedBy || [])))
+      }
+    },
+    doctrineState: normalizeDoctrineState(bundle?.plot?.doctrineState),
+    selectedDoctrine,
+    activeEffects: scoutDurationEffect ? [scoutDurationEffect] : [],
+    doctrineCatalog: catalog
+  };
+}
+
+function normalizeWorkOrders(value) {
+  const rows = Array.isArray(value) ? value : [];
+  return rows
+    .filter((row) => row && typeof row === 'object')
+    .map((row) => ({
+      workOrderId: safeText(row.workOrderId, '', 120),
+      plotId: safeText(row.plotId, '', 120),
+      templateId: safeText(row.templateId, '', 120),
+      status: safeText(row.status, 'DRAFT', 40).toUpperCase(),
+      title: safeText(row.title, 'Work Order Draft', 120),
+      scope: row.scope && typeof row.scope === 'object' ? clone(row.scope) : {},
+      allowedActions: Array.isArray(row.allowedActions)
+        ? row.allowedActions.map((entry) => safeText(entry, '', 80)).filter(Boolean).slice(0, 8)
+        : [],
+      caps: row.caps && typeof row.caps === 'object' ? clone(row.caps) : {},
+      policySnapshot: row.policySnapshot && typeof row.policySnapshot === 'object' ? clone(row.policySnapshot) : {},
+      childReceipts: Array.isArray(row.childReceipts) ? clone(row.childReceipts).slice(0, 20) : [],
+      createdBy: mutationActor(row.createdBy || 'HUMAN'),
+      approvedBy: safeText(row.approvedBy, '', 80) || null,
+      failureReason: safeText(row.failureReason, '', 160) || null,
+      createdAt: Number(row.createdAt || 0),
+      updatedAt: Number(row.updatedAt || 0),
+      expiresAt: row.expiresAt == null ? null : Number(row.expiresAt)
+    }))
+    .filter((row) => row.workOrderId && row.plotId && row.templateId);
+}
+
+function normalizeCivicProposalStatus(value, fallback = 'DRAFT') {
+  const status = safeText(value, fallback, 40).toUpperCase();
+  return CIVIC_PROPOSAL_STATUSES.includes(status) ? status : fallback;
+}
+
+function normalizeCivicProposalCategory(value) {
+  const category = slugFor(value, 'coordination');
+  return CIVIC_PROPOSAL_CATEGORIES.includes(category) ? category : 'coordination';
+}
+
+function normalizeCivicProposals(value) {
+  const rows = Array.isArray(value) ? value : [];
+  return rows
+    .filter((row) => row && typeof row === 'object')
+    .map((row) => ({
+      proposalId: safeText(row.proposalId, '', 120),
+      plotId: safeText(row.plotId, '', 120),
+      status: normalizeCivicProposalStatus(row.status),
+      title: safeText(row.title, 'Civic Proposal', 120),
+      category: normalizeCivicProposalCategory(row.category),
+      summary: safeText(row.summary, '', 480),
+      scope: row.scope && typeof row.scope === 'object' ? clone(row.scope) : {},
+      review: row.review && typeof row.review === 'object' ? clone(row.review) : {},
+      authorityBoundary: safeText(row.authorityBoundary, CIVIC_PROPOSAL_AUTHORITY_BOUNDARY, 160),
+      createdBy: mutationActor(row.createdBy || 'HUMAN'),
+      approvedBy: safeText(row.approvedBy, '', 80) || null,
+      createdAt: Number(row.createdAt || 0),
+      updatedAt: Number(row.updatedAt || 0),
+      reviewedAt: row.reviewedAt == null ? null : Number(row.reviewedAt),
+      archivedAt: row.archivedAt == null ? null : Number(row.archivedAt)
+    }))
+    .filter((row) => row.proposalId && row.plotId);
+}
+
+function civicProposalCounts(proposals) {
+  const counts = { DRAFT: 0, REVIEWED: 0, ARCHIVED: 0 };
+  for (const proposal of normalizeCivicProposals(proposals)) {
+    counts[proposal.status] = Number(counts[proposal.status] || 0) + 1;
+  }
+  return counts;
+}
+
+function civicProposalsReadModel(bundle) {
+  const worldGrid = worldGridReadModel(bundle);
+  const proposals = normalizeCivicProposals(bundle?.civicProposals || []);
+  const byStatus = civicProposalCounts(proposals);
+  return {
+    status: worldGrid.civicReadiness.ready ? 'RECORDING_READY' : 'LOCKED',
+    title: 'Civic Proposal Records',
+    implementation: 'hq10b_server_owned_civic_proposal_records_v1',
+    proposalOnly: true,
+    readOnlyExecution: true,
+    authorityBoundary: CIVIC_PROPOSAL_AUTHORITY_BOUNDARY,
+    allowedStatuses: clone(CIVIC_PROPOSAL_STATUSES),
+    allowedCategories: clone(CIVIC_PROPOSAL_CATEGORIES),
+    requirements: clone(worldGrid.requirements),
+    worldGridProjectionHash: worldGrid.projectionHash,
+    counts: {
+      total: proposals.length,
+      byStatus,
+      draftCount: byStatus.DRAFT,
+      reviewedCount: byStatus.REVIEWED,
+      archivedCount: byStatus.ARCHIVED
+    },
+    proposals
+  };
+}
+
+function normalizeOverlayPackStatus(value, fallback = 'DRAFT') {
+  const status = safeText(value, fallback, 40).toUpperCase();
+  return OVERLAY_PACK_STATUSES.includes(status) ? status : fallback;
+}
+
+function sanitizeStringList(value, maxItems = 12, maxText = 120) {
+  return Array.from(new Set((Array.isArray(value) ? value : [])
+    .map((entry) => safeText(entry, '', maxText))
+    .filter(Boolean)))
+    .slice(0, maxItems);
+}
+
+function sanitizePresentationValue(value, depth = 0) {
+  if (depth > 2) return null;
+  if (Array.isArray(value)) {
+    return value.slice(0, 12)
+      .map((entry) => sanitizePresentationValue(entry, depth + 1))
+      .filter((entry) => entry !== null && entry !== undefined);
+  }
+  if (value && typeof value === 'object') {
+    const out = {};
+    for (const [key, entry] of Object.entries(value).slice(0, 20)) {
+      const cleanKey = slugFor(key, '').slice(0, 64);
+      if (!cleanKey) continue;
+      const cleanValue = sanitizePresentationValue(entry, depth + 1);
+      if (cleanValue !== null && cleanValue !== undefined) out[cleanKey] = cleanValue;
+    }
+    return out;
+  }
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value === 'boolean') return value;
+  return safeText(value, '', 220);
+}
+
+function normalizeOverlayDisplayHints(value) {
+  const allowed = new Set([
+    'labels', 'skins', 'iconIds', 'colorway', 'layout', 'decorativeRouteStyle',
+    'surfaceStyle', 'assetManifest', 'notes'
+  ]);
+  const source = value && typeof value === 'object' ? value : {};
+  const out = {};
+  for (const [key, entry] of Object.entries(source)) {
+    if (!allowed.has(key)) continue;
+    const cleanValue = sanitizePresentationValue(entry);
+    if (cleanValue !== null && cleanValue !== undefined) out[key] = cleanValue;
+  }
+  return out;
+}
+
+function normalizeOverlayPrompt(value) {
+  const sanitizedPrompt = safeText(value, '', 600);
+  return {
+    sanitizedPrompt,
+    promptDigest: sanitizedPrompt ? hashPayload({ prompt: sanitizedPrompt }).slice(0, 16) : null,
+    redactionLevel: 'private_internal',
+    rawPromptStored: false
+  };
+}
+
+function normalizeOverlayProvenance(value, sourceProposalId) {
+  const source = value && typeof value === 'object' ? value : {};
+  return {
+    source: safeText(source.source, 'generated_universe_overlay_pack_record', 120),
+    provider: safeText(source.provider, '', 80) || null,
+    model: safeText(source.model, '', 80) || null,
+    assetManifest: sanitizePresentationValue(source.assetManifest || {}),
+    sourceProposalId: safeText(sourceProposalId, '', 120),
+    generatedBy: 'hq10c_overlay_pack_record_v1',
+    publicSharing: false,
+    externalEffects: false
+  };
+}
+
+function normalizeOverlayPacks(value) {
+  const rows = Array.isArray(value) ? value : [];
+  return rows
+    .filter((row) => row && typeof row === 'object')
+    .map((row) => ({
+      overlayPackId: safeText(row.overlayPackId, '', 120),
+      plotId: safeText(row.plotId, '', 120),
+      sourceProposalId: safeText(row.sourceProposalId, '', 120),
+      status: normalizeOverlayPackStatus(row.status),
+      title: safeText(row.title, 'Generated Universe Overlay Pack', 120),
+      theme: safeText(row.theme, 'civic', 80),
+      summary: safeText(row.summary, '', 480),
+      targetSurfaceIds: sanitizeStringList(row.targetSurfaceIds, 8, 80),
+      targetNodeIds: sanitizeStringList(row.targetNodeIds, 20, 120),
+      displayHints: normalizeOverlayDisplayHints(row.displayHints),
+      prompt: row.prompt && typeof row.prompt === 'object'
+        ? clone(row.prompt)
+        : normalizeOverlayPrompt(row.prompt),
+      provenance: row.provenance && typeof row.provenance === 'object'
+        ? clone(row.provenance)
+        : normalizeOverlayProvenance(row.provenance, row.sourceProposalId),
+      visualOnly: true,
+      presentationOnly: true,
+      gameplayMutationPolicy: 'presentation_only',
+      authorityBoundary: safeText(row.authorityBoundary, OVERLAY_PACK_AUTHORITY_BOUNDARY, 180),
+      createdBy: mutationActor(row.createdBy || 'HUMAN'),
+      approvedBy: safeText(row.approvedBy, '', 80) || null,
+      createdAt: Number(row.createdAt || 0),
+      updatedAt: Number(row.updatedAt || 0),
+      reviewedAt: row.reviewedAt == null ? null : Number(row.reviewedAt),
+      archivedAt: row.archivedAt == null ? null : Number(row.archivedAt)
+    }))
+    .filter((row) => row.overlayPackId && row.plotId && row.sourceProposalId);
+}
+
+function overlayPackCounts(packs) {
+  const counts = { DRAFT: 0, REVIEWED: 0, ARCHIVED: 0 };
+  for (const pack of normalizeOverlayPacks(packs)) {
+    counts[pack.status] = Number(counts[pack.status] || 0) + 1;
+  }
+  return counts;
+}
+
+function overlayPacksReadModel(bundle) {
+  const worldGrid = worldGridReadModel(bundle);
+  const packs = normalizeOverlayPacks(bundle?.overlayPacks || []);
+  const proposals = normalizeCivicProposals(bundle?.civicProposals || []);
+  const reviewedProposalIds = proposals
+    .filter((proposal) => proposal.status === 'REVIEWED')
+    .map((proposal) => proposal.proposalId)
+    .sort();
+  const byStatus = overlayPackCounts(packs);
+  const ready = worldGrid.civicReadiness.ready === true && reviewedProposalIds.length > 0;
+  const blockedBy = [
+    ...(worldGrid.requirements?.blockedBy || []),
+    ...(reviewedProposalIds.length > 0 ? [] : ['civic_proposal.reviewed'])
+  ];
+  return {
+    status: ready ? 'RECORDING_READY' : 'LOCKED',
+    title: 'Generated Universe Overlay Packs',
+    implementation: 'hq10c_server_owned_generated_universe_overlay_pack_records_v1',
+    presentationOnly: true,
+    visualOnly: true,
+    gameplayMutationPolicy: 'presentation_only',
+    stableGameplayHashExcluded: true,
+    executableActions: [],
+    publicSharing: false,
+    renderingImplemented: false,
+    authorityBoundary: OVERLAY_PACK_AUTHORITY_BOUNDARY,
+    allowedStatuses: clone(OVERLAY_PACK_STATUSES),
+    requirements: {
+      items: [
+        ...(worldGrid.requirements?.items || []),
+        {
+          key: 'civic_proposal.reviewed',
+          label: 'Reviewed civic proposal',
+          satisfied: reviewedProposalIds.length > 0,
+          current: reviewedProposalIds.length,
+          required: 1
+        }
+      ],
+      blockedBy,
+      satisfiedCount: Math.max(0, Number(worldGrid.requirements?.satisfiedCount || 0) + (reviewedProposalIds.length > 0 ? 1 : 0)),
+      totalCount: Math.max(1, Number(worldGrid.requirements?.totalCount || 0) + 1)
+    },
+    sourceProposalIds: reviewedProposalIds,
+    counts: {
+      total: packs.length,
+      byStatus,
+      draftCount: byStatus.DRAFT,
+      reviewedCount: byStatus.REVIEWED,
+      archivedCount: byStatus.ARCHIVED
+    },
+    packs
+  };
+}
+
+function normalizeCivicProjectStatus(value, fallback = 'ACTIVE') {
+  const status = safeText(value, fallback, 40).toUpperCase();
+  return CIVIC_PROJECT_STATUSES.includes(status) ? status : fallback;
+}
+
+function normalizeCivicProjectType(value) {
+  const projectType = slugFor(value, 'civic_beacon');
+  return CIVIC_PROJECT_TYPES.includes(projectType) ? projectType : 'civic_beacon';
+}
+
+function normalizeCivicProjectEffect(value, projectType = 'civic_beacon') {
+  const source = value && typeof value === 'object' ? value : {};
+  if (normalizeCivicProjectType(projectType) !== 'civic_beacon') return {};
+  const inspection = source.inspection && typeof source.inspection === 'object' ? source.inspection : {};
+  const baselineReadinessInspected = inspection.baselineReadinessInspected === true;
+  const inspectionCount = Math.max(0, Math.floor(Number(inspection.inspectionCount || 0)));
+  return {
+    effectId: CIVIC_BEACON_EFFECT_ID,
+    kind: 'local_civic_beacon',
+    scope: 'local_plot',
+    readinessDelta: 1,
+    inspection: {
+      baselineReadinessInspected,
+      inspectionCount,
+      latestInspectedAt: inspection.latestInspectedAt == null ? null : Number(inspection.latestInspectedAt),
+      maintenanceState: baselineReadinessInspected ? 'INSPECTED' : 'PENDING_BASELINE_INSPECTION',
+      inspectionReadinessDelta: baselineReadinessInspected ? 1 : 0
+    },
+    moraleMarker: 'civic_beacon_lit',
+    publicWork: true,
+    visibleInWorldGrid: true,
+    resourceDelta: {},
+    routeCreation: false,
+    tradeRouteCreation: false,
+    backgroundScheduling: false,
+    externalEffects: false,
+    appliedAt: source.appliedAt == null ? null : Number(source.appliedAt)
+  };
+}
+
+function normalizeCivicProjectInspections(project) {
+  const receipt = project?.receipt && typeof project.receipt === 'object' ? project.receipt : {};
+  return (Array.isArray(receipt.inspections) ? receipt.inspections : [])
+    .filter((entry) => entry && typeof entry === 'object')
+    .map((entry) => {
+      const inspectionType = slugFor(entry.inspectionType, 'baseline_readiness');
+      return {
+        kind: 'civic_project_inspection',
+        actionName: 'et.plot.inspect_civic_project',
+        projectId: safeText(entry.projectId || project?.projectId, '', 120),
+        inspectionType: CIVIC_PROJECT_INSPECTION_TYPES.includes(inspectionType) ? inspectionType : 'baseline_readiness',
+        inspectedBy: mutationActor(entry.inspectedBy || entry.actor || 'HUMAN'),
+        note: safeText(entry.note, '', 320),
+        worldGridProjectionHash: safeText(entry.worldGridProjectionHash, '', 80) || null,
+        authorityBoundary: safeText(entry.authorityBoundary, CIVIC_PROJECT_INSPECTION_AUTHORITY_BOUNDARY, 180),
+        inspectedAt: entry.inspectedAt == null ? null : Number(entry.inspectedAt),
+        resourceDelta: {},
+        routeCreation: false,
+        tradeRouteCreation: false,
+        backgroundScheduling: false,
+        externalEffects: false,
+        atlasExecution: false,
+        crossPlotMutation: false
+      };
+    })
+    .filter((entry) => entry.projectId && entry.inspectionType);
+}
+
+function civicProjectInspectionStats(projects) {
+  const rows = normalizeCivicProjects(projects);
+  const inspections = rows.flatMap((project) => normalizeCivicProjectInspections(project));
+  const baselineProjectIds = new Set(inspections
+    .filter((entry) => entry.inspectionType === 'baseline_readiness')
+    .map((entry) => entry.projectId));
+  const latestInspectedAt = inspections
+    .map((entry) => Number(entry.inspectedAt || 0))
+    .filter((value) => value > 0)
+    .sort((a, b) => b - a)[0] || null;
+  return {
+    totalInspectionCount: inspections.length,
+    baselineInspectedCount: baselineProjectIds.size,
+    latestInspectedAt,
+    inspections
+  };
+}
+
+function normalizeCivicProjects(value) {
+  const rows = Array.isArray(value) ? value : [];
+  return rows
+    .filter((row) => row && typeof row === 'object')
+    .map((row) => {
+      const projectType = normalizeCivicProjectType(row.projectType);
+      return {
+        projectId: safeText(row.projectId, '', 120),
+        plotId: safeText(row.plotId, '', 120),
+        sourceProposalId: safeText(row.sourceProposalId, '', 120),
+        status: normalizeCivicProjectStatus(row.status),
+        projectType,
+        title: safeText(row.title, 'Civic Beacon', 120),
+        summary: safeText(row.summary, '', 480),
+        effect: normalizeCivicProjectEffect(row.effect, projectType),
+        receipt: row.receipt && typeof row.receipt === 'object' ? clone(row.receipt) : {},
+        authorityBoundary: safeText(row.authorityBoundary, CIVIC_PROJECT_AUTHORITY_BOUNDARY, 180),
+        createdBy: mutationActor(row.createdBy || 'HUMAN'),
+        approvedBy: safeText(row.approvedBy, '', 80) || null,
+        createdAt: Number(row.createdAt || 0),
+        updatedAt: Number(row.updatedAt || 0),
+        activatedAt: row.activatedAt == null ? null : Number(row.activatedAt),
+        archivedAt: row.archivedAt == null ? null : Number(row.archivedAt)
+      };
+    })
+    .filter((row) => row.projectId && row.plotId && row.sourceProposalId);
+}
+
+function civicProjectCounts(projects) {
+  const byStatus = { ACTIVE: 0, ARCHIVED: 0 };
+  const byType = { civic_beacon: 0 };
+  for (const project of normalizeCivicProjects(projects)) {
+    byStatus[project.status] = Number(byStatus[project.status] || 0) + 1;
+    byType[project.projectType] = Number(byType[project.projectType] || 0) + 1;
+  }
+  return { byStatus, byType };
+}
+
+function civicProjectsReadModel(bundle) {
+  const worldGrid = worldGridReadModel(bundle);
+  const projects = normalizeCivicProjects(bundle?.civicProjects || []);
+  const proposals = normalizeCivicProposals(bundle?.civicProposals || []);
+  const reviewedProposalIds = proposals
+    .filter((proposal) => proposal.status === 'REVIEWED')
+    .map((proposal) => proposal.proposalId)
+    .sort();
+  const counts = civicProjectCounts(projects);
+  const activeProjects = projects.filter((project) => project.status === 'ACTIVE');
+  const activeBeaconCount = activeProjects.filter((project) => project.projectType === 'civic_beacon').length;
+  const inspectionStats = civicProjectInspectionStats(activeProjects);
+  const ready = worldGrid.civicReadiness.ready === true && reviewedProposalIds.length > 0;
+  const blockedBy = [
+    ...(worldGrid.requirements?.blockedBy || []),
+    ...(reviewedProposalIds.length > 0 ? [] : ['civic_proposal.reviewed'])
+  ];
+  return {
+    status: activeBeaconCount > 0 ? 'ACTIVE' : ready ? 'ACTIVATION_READY' : 'LOCKED',
+    title: 'Civic Project Activation',
+    implementation: 'hq10d_server_owned_civic_project_activation_v1',
+    activationAllowed: ready,
+    publicWork: true,
+    authorityBoundary: CIVIC_PROJECT_AUTHORITY_BOUNDARY,
+    allowedStatuses: clone(CIVIC_PROJECT_STATUSES),
+    allowedProjectTypes: clone(CIVIC_PROJECT_TYPES),
+    requirements: {
+      items: [
+        ...(worldGrid.requirements?.items || []),
+        {
+          key: 'civic_proposal.reviewed',
+          label: 'Reviewed civic proposal',
+          satisfied: reviewedProposalIds.length > 0,
+          current: reviewedProposalIds.length,
+          required: 1
+        }
+      ],
+      blockedBy,
+      satisfiedCount: Math.max(0, Number(worldGrid.requirements?.satisfiedCount || 0) + (reviewedProposalIds.length > 0 ? 1 : 0)),
+      totalCount: Math.max(1, Number(worldGrid.requirements?.totalCount || 0) + 1)
+    },
+    sourceProposalIds: reviewedProposalIds,
+    counts: {
+      total: projects.length,
+      activeCount: counts.byStatus.ACTIVE,
+      archivedCount: counts.byStatus.ARCHIVED,
+      byStatus: counts.byStatus,
+      byType: counts.byType
+    },
+    activeEffects: {
+      localCivicBeacon: activeBeaconCount > 0,
+      activeBeaconCount,
+      localReadinessDelta: Math.min(1, activeBeaconCount),
+      baselineInspectionComplete: inspectionStats.baselineInspectedCount > 0,
+      baselineInspectedCount: inspectionStats.baselineInspectedCount,
+      inspectionCount: inspectionStats.totalInspectionCount,
+      latestInspectedAt: inspectionStats.latestInspectedAt,
+      inspectionReadinessDelta: Math.min(1, inspectionStats.baselineInspectedCount),
+      moraleMarkers: [
+        ...(activeBeaconCount > 0 ? ['civic_beacon_lit'] : []),
+        ...(inspectionStats.baselineInspectedCount > 0 ? ['civic_beacon_inspected'] : [])
+      ]
+    },
+    projects
+  };
+}
+
+function workOrderTemplateAvailability(bundle, template) {
+  const hqLevel = Math.max(1, Math.floor(Number(bundle?.plot?.hqLevel || 1)));
+  const outpostCount = foundedOutpostCount(bundle);
+  const doctrineState = normalizeDoctrineState(bundle?.plot?.doctrineState);
+  const blockedBy = [];
+  if (hqLevel < Number(template.unlockHqLevel || 1)) blockedBy.push(`hq.level.${Number(template.unlockHqLevel || 1)}`);
+  if (template.requiresFoundedOutpost && outpostCount < 1) blockedBy.push('settlement.outpost.founded');
+  if (template.requiresSelectedDoctrine && doctrineState.selectedDoctrineId !== template.requiresSelectedDoctrine) {
+    blockedBy.push(`doctrine.${template.requiresSelectedDoctrine}.selected`);
+  }
+  return {
+    unlocked: blockedBy.length === 0,
+    hqLevelRequired: Number(template.unlockHqLevel || 1),
+    outpostCount,
+    selectedDoctrineId: doctrineState.selectedDoctrineId,
+    requiresFoundedOutpost: template.requiresFoundedOutpost === true,
+    requiresSelectedDoctrine: template.requiresSelectedDoctrine || null,
+    blockedBy
+  };
+}
+
+function publicWorkOrderTemplates(bundle) {
+  return Object.values(WORK_ORDER_TEMPLATES).map((template) => ({
+    templateId: template.templateId,
+    title: template.title,
+    status: template.status,
+    summary: template.summary,
+    allowedActions: clone(template.allowedActions || []),
+    caps: clone(template.caps || {}),
+    authorityBoundary: template.authorityBoundary,
+    availability: workOrderTemplateAvailability(bundle, template)
+  }));
+}
+
+function workOrderPlannerReadModel(bundle) {
+  const templates = publicWorkOrderTemplates(bundle);
+  const unlocked = templates.some((template) => template.availability.unlocked);
+  const executionAvailable = templates.some((template) => (
+    template.templateId === 'collect_ready_outputs_once'
+    && template.availability.unlocked
+  ));
+  return {
+    status: unlocked ? 'DRAFTING_READY' : 'LOCKED',
+    title: 'Cohort Work Orders',
+    implementation: 'hq9b_server_owned_single_executor_collect_ready_outputs_once',
+    executionAvailable,
+    authorityBoundary: 'server_owned_work_order_executor_collect_ready_outputs_once_v1',
+    templates,
+    workOrders: normalizeWorkOrders(bundle?.workOrders || [])
+  };
+}
+
+function countByField(rows, field) {
+  return (Array.isArray(rows) ? rows : []).reduce((acc, row) => {
+    const key = safeText(row?.[field], 'UNKNOWN', 80).toUpperCase();
+    acc[key] = Number(acc[key] || 0) + 1;
+    return acc;
+  }, {});
+}
+
+function expeditionCoordinateForIndex(index) {
+  const safeIndex = Math.max(0, Math.floor(Number(index || 0)));
+  const base = EXPEDITION_MAP_RING_COORDINATES[safeIndex % EXPEDITION_MAP_RING_COORDINATES.length];
+  const multiplier = Math.floor(safeIndex / EXPEDITION_MAP_RING_COORDINATES.length) + 1;
+  return {
+    q: Number(base.q) * multiplier,
+    r: Number(base.r) * multiplier
+  };
+}
+
+function expeditionCellId(coord) {
+  return `cell_q${Number(coord?.q || 0)}_r${Number(coord?.r || 0)}`;
+}
+
+function expeditionReceipt(kind, sourceIds = {}) {
+  return {
+    kind,
+    sourceIds: clone(sourceIds || {}),
+    readOnly: true,
+    authorityBoundary: EXPEDITION_MAP_AUTHORITY_BOUNDARY,
+    resourceDelta: {},
+    routeCreation: false,
+    tradeRouteCreation: false,
+    backgroundScheduling: false,
+    atlasExecution: false,
+    externalEffects: false
+  };
+}
+
+function expeditionEventPacketBoundaryFlags() {
+  return {
+    readModelOnly: true,
+    receiptMetadataOnly: true,
+    autonomousMovement: false,
+    resourceHarvesting: false,
+    resourceDelta: {},
+    resourceGain: false,
+    resourceLoss: false,
+    routeCreation: false,
+    tradeRouteCreation: false,
+    backgroundScheduling: false,
+    combat: false,
+    publicSharing: false,
+    generatedUniverseRendering: false,
+    crossPlotMutation: false,
+    atlasExecution: false,
+    externalEffects: false
+  };
+}
+
+function expeditionPartyBoundaryFlags() {
+  return {
+    autonomousMovement: false,
+    operatorAssignment: false,
+    resourceHarvesting: false,
+    resourceDelta: {},
+    resourceGain: false,
+    resourceLoss: false,
+    routeCreation: false,
+    tradeRouteCreation: false,
+    backgroundScheduling: false,
+    combat: false,
+    publicSharing: false,
+    generatedUniverseRendering: false,
+    crossPlotMutation: false,
+    atlasExecution: false,
+    externalEffects: false
+  };
+}
+
+function buildExpeditionPartyManifest({ plotId = null, projectionHash = null } = {}) {
+  return {
+    partyId: 'expedition_party_current_plot_v1',
+    kind: 'expedition_party_manifest',
+    version: 'hq12g.v1',
+    readOnly: true,
+    executableActions: [],
+    authorityBoundary: EXPEDITION_PARTY_MANIFEST_AUTHORITY_BOUNDARY,
+    source: {
+      plotId: plotId || null,
+      projectionHash: projectionHash || null
+    },
+    members: EXPEDITION_PARTY_MEMBERS.map((member) => clone(member)),
+    boundaryFlags: expeditionPartyBoundaryFlags()
+  };
+}
+
+function buildExpeditionPartySnapshot() {
+  const manifest = buildExpeditionPartyManifest();
+  return {
+    partyId: manifest.partyId,
+    kind: 'expedition_party_snapshot',
+    version: manifest.version,
+    readOnly: true,
+    executableActions: [],
+    authorityBoundary: manifest.authorityBoundary,
+    members: manifest.members.map((member) => ({
+      memberId: member.memberId,
+      displayName: member.displayName,
+      role: member.role
+    })),
+    boundaryFlags: clone(manifest.boundaryFlags)
+  };
+}
+
+function expeditionEventPacketTemplate(coord) {
+  const q = Number(coord?.q || 0);
+  const r = Number(coord?.r || 0);
+  const index = Math.abs((q * 31) + (r * 17)) % EXPEDITION_EVENT_PACKET_TEMPLATES.length;
+  return EXPEDITION_EVENT_PACKET_TEMPLATES[index];
+}
+
+function buildExpeditionEventPacket({ scoutSector, targetCell = null }) {
+  const scout = scoutSector && typeof scoutSector === 'object' ? scoutSector : {};
+  const q = Number(scout.q ?? targetCell?.q ?? 0);
+  const r = Number(scout.r ?? targetCell?.r ?? 0);
+  const cellId = safeText(scout.cellId || targetCell?.cellId, expeditionCellId({ q, r }), 80);
+  const scoutId = safeText(scout.scoutId, `expedition_scout_${cellId}`, 120);
+  const plotId = safeText(scout.plotId || targetCell?.sourceIds?.plotId, '', 120) || null;
+  const sourceCellId = safeText(scout.sourceCellId || targetCell?.sourceIds?.adjacentCellId, '', 80) || null;
+  const template = expeditionEventPacketTemplate({ q, r });
+  const partySnapshot = buildExpeditionPartySnapshot();
+  const packetHash = hashPayload({
+    kind: 'expedition_event_packet',
+    version: 'hq12g.v1',
+    templateId: template.templateId,
+    plotId,
+    scoutId,
+    cellId,
+    q,
+    r,
+    sourceCellId,
+    partyId: partySnapshot.partyId
+  }).slice(0, 16);
+  return {
+    packetId: `expedition_event_packet_${packetHash}`,
+    kind: 'expedition_event_packet',
+    version: 'hq12g.v1',
+    readOnly: true,
+    executableActions: [],
+    authorityBoundary: EXPEDITION_EVENT_PACKET_AUTHORITY_BOUNDARY,
+    partyId: partySnapshot.partyId,
+    partySnapshot,
+    templateId: template.templateId,
+    scoutId,
+    plotId,
+    cellId,
+    q,
+    r,
+    sourceCellId,
+    discoveryFlavor: template.discoveryFlavor,
+    terrainExplanation: template.terrainExplanation,
+    riskExplanation: template.riskExplanation,
+    operatorNote: template.operatorNote,
+    receiptLink: {
+      kind: 'scout_sector_receipt',
+      actionName: 'et.plot.scout_sector',
+      scoutId,
+      cellId,
+      via: 'scoutSector.receipt'
+    },
+    boundaryFlags: expeditionEventPacketBoundaryFlags(),
+    createdAt: Number(scout.createdAt || scout.receipt?.scoutedAt || 0),
+    packetHash
+  };
+}
+
+function normalizeExpeditionSource(source) {
+  if (!source || typeof source !== 'object') return null;
+  return {
+    kind: safeText(source.kind, 'unknown', 80),
+    id: safeText(source.id, '', 160),
+    status: safeText(source.status, '', 80) || null
+  };
+}
+
+function mergeExpeditionResourceHints(left, right) {
+  const a = normalizeInventory(left || {});
+  const b = normalizeInventory(right || {});
+  const out = zeroInventory();
+  for (const key of RESOURCE_KEYS) out[key] = Math.max(Number(a[key] || 0), Number(b[key] || 0));
+  return out;
+}
+
+function mergeExpeditionCells(cells, next) {
+  const priority = { locked_unknown: 0, hinted: 1, known: 2, discovered: 3 };
+  const source = {
+    ...next,
+    fogState: EXPEDITION_MAP_FOG_STATES.includes(next.fogState) ? next.fogState : 'locked_unknown',
+    readOnly: true,
+    authorityBoundary: EXPEDITION_MAP_AUTHORITY_BOUNDARY
+  };
+  const existing = cells.get(source.cellId);
+  if (!existing) {
+    cells.set(source.cellId, {
+      ...source,
+      sources: (Array.isArray(source.sources) ? source.sources : [])
+        .map(normalizeExpeditionSource)
+        .filter(Boolean),
+      receipts: (Array.isArray(source.receipts) ? source.receipts : [])
+        .filter((entry) => entry && typeof entry === 'object'),
+      traits: Array.isArray(source.traits) ? source.traits.slice(0, 8) : [],
+      resourceHints: normalizeInventory(source.resourceHints || {})
+    });
+    return;
+  }
+  const keepIncoming = (priority[source.fogState] || 0) >= (priority[existing.fogState] || 0);
+  const sources = new Map();
+  for (const entry of [...(existing.sources || []), ...(source.sources || [])]) {
+    const normalized = normalizeExpeditionSource(entry);
+    if (normalized?.id) sources.set(`${normalized.kind}:${normalized.id}`, normalized);
+  }
+  const receipts = new Map();
+  for (const receipt of [...(existing.receipts || []), ...(source.receipts || [])]) {
+    const kind = safeText(receipt?.kind, 'receipt', 80);
+    const ids = stableJsonStringify(receipt?.sourceIds || {});
+    receipts.set(`${kind}:${ids}`, receipt);
+  }
+  const resourceHints = mergeExpeditionResourceHints(existing.resourceHints, source.resourceHints);
+  cells.set(source.cellId, {
+    ...(keepIncoming ? existing : source),
+    ...(keepIncoming ? source : existing),
+    sources: Array.from(sources.values()),
+    receipts: Array.from(receipts.values()),
+    traits: Array.from(new Set([
+      ...(Array.isArray(existing.traits) ? existing.traits : []),
+      ...(Array.isArray(source.traits) ? source.traits : [])
+    ])).slice(0, 8),
+    resourceHints,
+    readOnly: true,
+    authorityBoundary: EXPEDITION_MAP_AUTHORITY_BOUNDARY
+  });
+}
+
+function expeditionCoordinateMaps({ scoutReports, sitePlans, settlementClaims }) {
+  const reportCoordinates = new Map();
+  const planCoordinates = new Map();
+  const claimCoordinates = new Map();
+  let cursor = 0;
+  const nextCoordinate = () => expeditionCoordinateForIndex(cursor++);
+
+  for (const report of scoutReports) {
+    if (!reportCoordinates.has(report.reportId)) {
+      reportCoordinates.set(report.reportId, nextCoordinate());
+    }
+  }
+  for (const plan of sitePlans) {
+    const coord = reportCoordinates.get(plan.reportId) || nextCoordinate();
+    planCoordinates.set(plan.planId, coord);
+    if (plan.reportId && !reportCoordinates.has(plan.reportId)) reportCoordinates.set(plan.reportId, coord);
+  }
+  for (const claim of settlementClaims) {
+    const coord = planCoordinates.get(claim.sitePlanId) || reportCoordinates.get(claim.reportId) || nextCoordinate();
+    claimCoordinates.set(claim.claimId, coord);
+    if (claim.sitePlanId && !planCoordinates.has(claim.sitePlanId)) planCoordinates.set(claim.sitePlanId, coord);
+    if (claim.reportId && !reportCoordinates.has(claim.reportId)) reportCoordinates.set(claim.reportId, coord);
+  }
+
+  return { reportCoordinates, planCoordinates, claimCoordinates };
+}
+
+function adjacentExpeditionHintCoordinate(coord, index = 0) {
+  const directions = EXPEDITION_MAP_RING_COORDINATES.slice(0, 6);
+  const direction = directions[Math.max(0, Math.floor(Number(index || 0))) % directions.length];
+  return {
+    q: Number(coord?.q || 0) + Number(direction.q || 0),
+    r: Number(coord?.r || 0) + Number(direction.r || 0)
+  };
+}
+
+function expeditionCoordinateOccupied(cells, coord) {
+  return Array.from(cells.values()).some((cell) => (
+    Number(cell.q || 0) === Number(coord?.q || 0)
+    && Number(cell.r || 0) === Number(coord?.r || 0)
+  ));
+}
+
+function openAdjacentExpeditionHintCoordinate(cells, coord, index = 0) {
+  for (let offset = 0; offset < 6; offset += 1) {
+    const candidate = adjacentExpeditionHintCoordinate(coord, Number(index || 0) + offset);
+    if (!cells.has(expeditionCellId(candidate)) && !expeditionCoordinateOccupied(cells, candidate)) return candidate;
+  }
+  return adjacentExpeditionHintCoordinate(coord, Number(index || 0) + 6);
+}
+
+function expeditionFogCounts(cells) {
+  const counts = {
+    discovered: 0,
+    known: 0,
+    hinted: 0,
+    locked_unknown: 0
+  };
+  for (const cell of cells) {
+    counts[cell.fogState] = Number(counts[cell.fogState] || 0) + 1;
+  }
+  return counts;
+}
+
+function buildExpeditionMapReadModel(bundle) {
+  const plot = bundle?.plot || {};
+  const scoutReports = normalizeScoutReports(plot.scoutReports);
+  const sitePlans = normalizeSitePlans(plot.sitePlans);
+  const expeditionScouts = normalizeExpeditionScouts(plot.expeditionScouts);
+  const settlementClaims = normalizeSettlementClaims(bundle?.settlementClaims || []);
+  const ownedPlots = ownedPlotSummaries(bundle?.ownerPairId || plot.pairId, plot.plotId);
+  const worldGrid = worldGridReadModel(bundle);
+  const maps = expeditionCoordinateMaps({ scoutReports, sitePlans, settlementClaims });
+  const cells = new Map();
+
+  mergeExpeditionCells(cells, {
+    cellId: 'cell_origin',
+    q: 0,
+    r: 0,
+    fogState: 'discovered',
+    kind: 'origin_plot',
+    title: 'Founders Plot',
+    status: 'OWNED_HOME',
+    sourceTruth: 'founder_plot',
+    sourceIds: { plotId: plot.plotId || null },
+    sources: [{ kind: 'plot', id: plot.plotId || 'origin', status: plot.status || 'ACTIVE' }],
+    receipts: [expeditionReceipt('origin_plot_discovered', { plotId: plot.plotId || null })],
+    traits: ['home', 'server-owned'],
+    resourceHints: {},
+    siteType: 'home_plot',
+    risk: 'owned'
+  });
+
+  scoutReports.forEach((report, index) => {
+    const coord = maps.reportCoordinates.get(report.reportId) || expeditionCoordinateForIndex(index);
+    mergeExpeditionCells(cells, {
+      cellId: expeditionCellId(coord),
+      q: coord.q,
+      r: coord.r,
+      fogState: 'known',
+      kind: 'frontier_site',
+      title: report.title,
+      status: 'SCOUT_REPORTED',
+      sourceTruth: 'scout_report',
+      sourceIds: { plotId: plot.plotId || null, reportId: report.reportId },
+      sources: [{ kind: 'scout_report', id: report.reportId, status: 'COLLECTED' }],
+      receipts: [expeditionReceipt('scout_report_known_cell', { reportId: report.reportId })],
+      traits: report.traits,
+      resourceHints: report.resourceHints,
+      siteType: report.siteType,
+      risk: report.risk,
+      summary: report.summary,
+      recommendedNext: report.recommendedNext
+    });
+  });
+
+  sitePlans.forEach((plan) => {
+    const coord = maps.planCoordinates.get(plan.planId) || maps.reportCoordinates.get(plan.reportId);
+    if (!coord) return;
+    const reviewed = plan.reviewStatus === 'reviewed' || plan.promotionStatus === 'reviewed_claim_ready';
+    mergeExpeditionCells(cells, {
+      cellId: expeditionCellId(coord),
+      q: coord.q,
+      r: coord.r,
+      fogState: 'known',
+      kind: 'planned_site',
+      title: plan.title,
+      status: reviewed ? 'SITE_PLAN_REVIEWED' : 'SITE_PLAN_DRAFTED',
+      sourceTruth: 'site_plan',
+      sourceIds: { plotId: plot.plotId || null, reportId: plan.reportId, planId: plan.planId },
+      sources: [{ kind: 'site_plan', id: plan.planId, status: plan.promotionStatus }],
+      receipts: [expeditionReceipt(reviewed ? 'reviewed_site_plan_known_cell' : 'draft_site_plan_known_cell', {
+        reportId: plan.reportId,
+        planId: plan.planId
+      })],
+      traits: plan.traits,
+      resourceHints: plan.resourceHints,
+      siteType: plan.siteType,
+      risk: plan.risk,
+      summary: plan.summary,
+      recommendedNext: plan.recommendedNext
+    });
+  });
+
+  settlementClaims.forEach((claim) => {
+    const coord = maps.claimCoordinates.get(claim.claimId);
+    if (!coord) return;
+    const founded = claim.status === 'FOUNDED' && !!claim.foundedPlotId;
+    mergeExpeditionCells(cells, {
+      cellId: expeditionCellId(coord),
+      q: coord.q,
+      r: coord.r,
+      fogState: founded ? 'discovered' : 'known',
+      kind: founded ? 'owned_outpost' : 'settlement_claim',
+      title: claim.title,
+      status: claim.status,
+      sourceTruth: 'settlement_claim',
+      sourceIds: {
+        plotId: claim.foundedPlotId || plot.plotId || null,
+        originPlotId: claim.originPlotId,
+        reportId: claim.reportId,
+        planId: claim.sitePlanId,
+        claimId: claim.claimId
+      },
+      sources: [{ kind: 'settlement_claim', id: claim.claimId, status: claim.status }],
+      receipts: [expeditionReceipt(founded ? 'founded_outpost_discovered_cell' : 'settlement_claim_known_cell', {
+        claimId: claim.claimId,
+        foundedPlotId: claim.foundedPlotId || null
+      })],
+      traits: claim.traits,
+      resourceHints: claim.resourceHints,
+      siteType: claim.siteType,
+      risk: claim.risk,
+      summary: claim.receipt?.summary || ''
+    });
+  });
+
+  ownedPlots
+    .filter((entry) => entry.role !== 'HOME')
+    .forEach((entry, index) => {
+      const claimCoord = entry.originClaimId ? maps.claimCoordinates.get(entry.originClaimId) : null;
+      const coord = claimCoord || expeditionCoordinateForIndex(scoutReports.length + sitePlans.length + settlementClaims.length + index);
+      mergeExpeditionCells(cells, {
+        cellId: expeditionCellId(coord),
+        q: coord.q,
+        r: coord.r,
+        fogState: 'discovered',
+        kind: 'owned_outpost',
+        title: entry.title || 'Settler Outpost',
+        status: 'OWNED_OUTPOST',
+        sourceTruth: 'plot_membership',
+        sourceIds: { plotId: entry.plotId, originClaimId: entry.originClaimId || null },
+        sources: [{ kind: 'owned_plot', id: entry.plotId, status: entry.role }],
+        receipts: [expeditionReceipt('owned_outpost_discovered_cell', {
+          plotId: entry.plotId,
+          originClaimId: entry.originClaimId || null
+        })],
+        traits: ['owned-outpost'],
+        resourceHints: {},
+        siteType: entry.siteType || 'outpost',
+        risk: entry.risk || 'owned'
+      });
+    });
+
+  expeditionScouts.forEach((scout) => {
+    mergeExpeditionCells(cells, {
+      cellId: scout.cellId,
+      q: scout.q,
+      r: scout.r,
+      fogState: 'known',
+      kind: 'scouted_sector',
+      title: scout.title,
+      status: scout.status,
+      sourceTruth: 'expedition_scout_sector',
+      sourceIds: {
+        plotId: plot.plotId || null,
+        scoutId: scout.scoutId,
+        cellId: scout.cellId,
+        sourceCellId: scout.sourceCellId || null
+      },
+      sources: [{
+        kind: 'expedition_scout_sector',
+        id: scout.scoutId,
+        status: scout.status
+      }],
+      receipts: [
+        expeditionReceipt('scout_sector_known_cell', {
+          scoutId: scout.scoutId,
+          cellId: scout.cellId,
+          sourceCellId: scout.sourceCellId || null
+        }),
+        scout.receipt
+      ],
+      traits: scout.traits,
+      resourceHints: scout.resourceHints,
+      siteType: scout.siteType,
+      risk: scout.risk,
+      summary: scout.summary,
+      recommendedNext: scout.recommendedNext,
+      eventPacket: scout.eventPacket
+    });
+  });
+
+  const truthCells = Array.from(cells.values())
+    .filter((cell) => cell.fogState === 'known' || cell.fogState === 'discovered')
+    .sort((a, b) => a.q - b.q || a.r - b.r || a.cellId.localeCompare(b.cellId));
+  truthCells.slice(0, 6).forEach((cell, index) => {
+    const coord = openAdjacentExpeditionHintCoordinate(cells, cell, index);
+    mergeExpeditionCells(cells, {
+      cellId: expeditionCellId(coord),
+      q: coord.q,
+      r: coord.r,
+      fogState: 'hinted',
+      kind: 'frontier_hint',
+      title: 'Unresolved Frontier Hint',
+      status: 'HINTED_BY_KNOWN_FRONTIER',
+      sourceTruth: 'derived_hint',
+      sourceIds: { adjacentCellId: cell.cellId },
+      sources: [{ kind: 'adjacent_fog_hint', id: cell.cellId, status: cell.fogState }],
+      receipts: [expeditionReceipt('derived_frontier_hint_cell', { adjacentCellId: cell.cellId })],
+      traits: [],
+      resourceHints: {},
+      siteType: 'unresolved_frontier',
+      risk: 'unknown'
+    });
+  });
+
+  EXPEDITION_MAP_RING_COORDINATES.slice(0, 8).forEach((base, index) => {
+    const coord = {
+      q: Number(base.q || 0) * 3,
+      r: Number(base.r || 0) * 3
+    };
+    mergeExpeditionCells(cells, {
+      cellId: expeditionCellId(coord),
+      q: coord.q,
+      r: coord.r,
+      fogState: 'locked_unknown',
+      kind: 'fog_placeholder',
+      title: 'Locked Unknown',
+      status: 'LOCKED_UNKNOWN',
+      sourceTruth: 'fog_placeholder',
+      sourceIds: { ring: 3, index },
+      sources: [{ kind: 'fog_placeholder', id: `ring3_${index}`, status: 'LOCKED_UNKNOWN' }],
+      receipts: [expeditionReceipt('locked_unknown_placeholder_cell', { ring: 3, index })],
+      traits: [],
+      resourceHints: {},
+      siteType: 'unknown',
+      risk: 'unknown'
+    });
+  });
+
+  const cellList = Array.from(cells.values())
+    .sort((a, b) => (b.fogState === 'discovered') - (a.fogState === 'discovered')
+      || (b.fogState === 'known') - (a.fogState === 'known')
+      || (b.fogState === 'hinted') - (a.fogState === 'hinted')
+      || a.q - b.q
+      || a.r - b.r
+      || a.cellId.localeCompare(b.cellId));
+  const eventPackets = expeditionScouts
+    .map((scout) => scout.eventPacket)
+    .filter((packet) => packet && packet.packetId)
+    .sort((a, b) => a.packetId.localeCompare(b.packetId));
+  const counts = expeditionFogCounts(cellList);
+  const expeditionParty = buildExpeditionPartyManifest({ plotId: plot.plotId || null });
+  const baseReadModel = {
+    status: scoutReports.length || expeditionScouts.length || sitePlans.length || settlementClaims.length || ownedPlots.length > 1
+      ? 'FOG_READ_MODEL_READY'
+      : 'ORIGIN_ONLY',
+    title: 'Expedition Map',
+    implementation: 'hq12a_server_owned_expedition_map_read_model_v1',
+    readOnly: true,
+    executableActions: [],
+    authorityBoundary: EXPEDITION_MAP_AUTHORITY_BOUNDARY,
+    fog: {
+      states: clone(EXPEDITION_MAP_FOG_STATES),
+      semantics: {
+        discovered: 'Server-owned plots and founded outposts the player owns.',
+        known: 'Collected Scout Reports, canonical Site Plans, and settlement claims grounded in receipts.',
+        hinted: 'Adjacency hints derived from known frontier cells; not claimable and not resource truth.',
+        locked_unknown: 'Opaque fog placeholders with no gameplay truth, resources, or actions.'
+      },
+      counts,
+      cellsByFogState: {
+        discovered: cellList.filter((cell) => cell.fogState === 'discovered').map((cell) => cell.cellId),
+        known: cellList.filter((cell) => cell.fogState === 'known').map((cell) => cell.cellId),
+        hinted: cellList.filter((cell) => cell.fogState === 'hinted').map((cell) => cell.cellId),
+        locked_unknown: cellList.filter((cell) => cell.fogState === 'locked_unknown').map((cell) => cell.cellId)
+      }
+    },
+    scope: {
+      homePlotId: ownedPlots.find((entry) => entry.role === 'HOME')?.plotId || plot.plotId || null,
+      activePlotId: plot.plotId || null,
+      ownedPlotCount: ownedPlots.length,
+      scoutReportCount: scoutReports.length,
+      scoutedSectorCount: expeditionScouts.length,
+      sitePlanCount: sitePlans.length,
+      settlementClaimCount: settlementClaims.length
+    },
+    sourceSummary: {
+      originPlotId: plot.plotId || null,
+      worldGridStatus: worldGrid.status,
+      worldGridProjectionHash: worldGrid.projectionHash || null,
+      civicReadinessReady: worldGrid.civicReadiness?.ready === true,
+      civicReadinessScore: Number(worldGrid.civicReadiness?.localProjectReadinessScore || 0),
+      scoutReportIds: scoutReports.map((report) => report.reportId),
+      scoutSectorIds: expeditionScouts.map((scout) => scout.scoutId),
+      eventPacketIds: eventPackets.map((packet) => packet.packetId),
+      reviewedSitePlanIds: sitePlans
+        .filter((plan) => plan.reviewStatus === 'reviewed' || plan.promotionStatus === 'reviewed_claim_ready')
+        .map((plan) => plan.planId),
+      foundedPlotIds: settlementClaims
+        .filter((claim) => claim.status === 'FOUNDED' && claim.foundedPlotId)
+        .map((claim) => claim.foundedPlotId)
+        .sort()
+    },
+    expeditionParty,
+    cells: cellList,
+    eventPackets,
+    receipt: expeditionReceipt('expedition_map_read_model_projection', {
+      plotId: plot.plotId || null,
+      worldGridProjectionHash: worldGrid.projectionHash || null
+    })
+  };
+  const projectionHash = hashPayload({
+    status: baseReadModel.status,
+    fog: baseReadModel.fog,
+    scope: baseReadModel.scope,
+    sourceSummary: baseReadModel.sourceSummary,
+    cells: baseReadModel.cells.map((cell) => ({
+      cellId: cell.cellId,
+      q: cell.q,
+      r: cell.r,
+      fogState: cell.fogState,
+      kind: cell.kind,
+      status: cell.status,
+      sourceIds: cell.sourceIds,
+      eventPacketId: cell.eventPacket?.packetId || null
+    })),
+    expeditionParty: {
+      partyId: baseReadModel.expeditionParty.partyId,
+      version: baseReadModel.expeditionParty.version,
+      members: baseReadModel.expeditionParty.members.map((member) => ({
+        memberId: member.memberId,
+        displayName: member.displayName,
+        role: member.role
+      })),
+      boundaryFlags: baseReadModel.expeditionParty.boundaryFlags
+    },
+    eventPackets: baseReadModel.eventPackets.map((packet) => ({
+      packetId: packet.packetId,
+      templateId: packet.templateId,
+      scoutId: packet.scoutId,
+      cellId: packet.cellId,
+      partyId: packet.partyId || null,
+      packetHash: packet.packetHash
+    }))
+  }).slice(0, 16);
+  return {
+    ...baseReadModel,
+    expeditionParty: buildExpeditionPartyManifest({
+      plotId: plot.plotId || null,
+      projectionHash
+    }),
+    projectionHash,
+    receipt: {
+      ...baseReadModel.receipt,
+      projectionHash
+    }
+  };
+}
+
+function worldGridReadModel(bundle) {
+  const plot = bundle?.plot || {};
+  const hqLevel = Math.max(1, Math.floor(Number(plot.hqLevel || 1)));
+  const settlementClaims = normalizeSettlementClaims(bundle?.settlementClaims || []);
+  const ownedPlots = ownedPlotSummaries(bundle?.ownerPairId || plot.pairId, plot.plotId)
+    .map((entry) => ({
+      plotId: entry.plotId,
+      role: entry.role,
+      title: entry.title,
+      hqLevel: entry.hqLevel,
+      status: entry.status,
+      originClaimId: entry.originClaimId || null,
+      siteType: entry.siteType || null,
+      risk: entry.risk || null,
+      active: entry.active === true
+    }));
+  const sitePlans = normalizeSitePlans(plot.sitePlans);
+  const doctrineState = normalizeDoctrineState(plot.doctrineState);
+  const cohortPlanner = workOrderPlannerReadModel(bundle);
+  const workOrders = normalizeWorkOrders(bundle?.workOrders || []);
+  const civicProposals = normalizeCivicProposals(bundle?.civicProposals || []);
+  const proposalCounts = civicProposalCounts(civicProposals);
+  const reviewedProposalCount = civicProposals.filter((proposal) => proposal.status === 'REVIEWED').length;
+  const civicProjects = normalizeCivicProjects(bundle?.civicProjects || []);
+  const projectCounts = civicProjectCounts(civicProjects);
+  const activeCivicProjects = civicProjects.filter((project) => project.status === 'ACTIVE');
+  const activeCivicBeaconCount = activeCivicProjects.filter((project) => project.projectType === 'civic_beacon').length;
+  const civicProjectInspection = civicProjectInspectionStats(activeCivicProjects);
+  const localProjectReadinessScore = Math.min(2, Math.min(1, activeCivicBeaconCount) + Math.min(1, civicProjectInspection.baselineInspectedCount));
+  const civicMoraleMarkers = [
+    ...(activeCivicBeaconCount > 0 ? ['civic_beacon_lit'] : []),
+    ...(civicProjectInspection.baselineInspectedCount > 0 ? ['civic_beacon_inspected'] : [])
+  ];
+  const outpostCount = settlementClaims.filter((claim) => claim.status === 'FOUNDED' && claim.foundedPlotId).length;
+  const activeConvoyCount = settlementClaims.filter((claim) => claim.status === 'CONVOY_PREPARING').length;
+  const claimReadyPlanCount = sitePlans.filter((plan) => (
+    plan.reviewStatus === 'reviewed'
+    || ['reviewed_claim_ready', 'convoy_preparing', 'claimed'].includes(plan.promotionStatus)
+  )).length;
+  const requirements = [
+    {
+      key: 'hq.level.6',
+      label: 'HQ6 Settlement Charter',
+      satisfied: hqLevel >= 6,
+      current: hqLevel,
+      required: 6
+    },
+    {
+      key: 'settlement.outpost.founded',
+      label: 'Founded outpost',
+      satisfied: outpostCount > 0,
+      current: outpostCount,
+      required: 1
+    },
+    {
+      key: 'doctrine.survey_discipline.selected',
+      label: 'Survey Discipline selected',
+      satisfied: doctrineState.selectedDoctrineId === 'survey_discipline' && doctrineState.status === 'SELECTED',
+      current: doctrineState.selectedDoctrineId,
+      required: 'survey_discipline'
+    },
+    {
+      key: 'work_order.collect_ready_outputs_once.available',
+      label: 'Collect-ready work-order executor available',
+      satisfied: cohortPlanner.executionAvailable === true,
+      current: cohortPlanner.executionAvailable === true,
+      required: true
+    }
+  ];
+  const blockedBy = requirements.filter((entry) => !entry.satisfied).map((entry) => entry.key);
+  const ready = blockedBy.length === 0;
+  const readModel = {
+    status: ready ? 'READ_MODEL_READY' : 'LOCKED',
+    title: 'World Grid',
+    implementation: 'hq10a_server_owned_world_grid_read_model_v1',
+    readOnly: true,
+    executableActions: [],
+    authorityBoundary: 'server_owned_read_only_world_grid_projection_no_civic_mutation_v1',
+    requirements: {
+      items: requirements,
+      blockedBy,
+      satisfiedCount: requirements.length - blockedBy.length,
+      totalCount: requirements.length
+    },
+    scope: {
+      homePlotId: ownedPlots.find((entry) => entry.role === 'HOME')?.plotId || plot.plotId || null,
+      activePlotId: plot.plotId || null,
+      knownPlotCount: ownedPlots.length,
+      outpostCount,
+      knownClaimCount: settlementClaims.length
+    },
+    plots: ownedPlots,
+    claims: {
+      total: settlementClaims.length,
+      byStatus: countByField(settlementClaims, 'status'),
+      claimReadyPlanCount,
+      activeConvoyCount,
+      foundedOutpostCount: outpostCount,
+      foundedPlotIds: settlementClaims
+        .filter((claim) => claim.status === 'FOUNDED' && claim.foundedPlotId)
+        .map((claim) => claim.foundedPlotId)
+        .sort()
+    },
+    doctrine: {
+      selectedDoctrineId: doctrineState.selectedDoctrineId,
+      status: doctrineState.status,
+      activeEffects: researchReadModel(bundle).activeEffects
+    },
+    workOrders: {
+      draftCount: workOrders.filter((order) => order.status === 'DRAFT').length,
+      completedCount: workOrders.filter((order) => order.status === 'COMPLETED').length,
+      executionAvailable: cohortPlanner.executionAvailable === true,
+      templateIds: cohortPlanner.templates.map((template) => template.templateId).sort()
+    },
+    civicProposals: {
+      proposalOnly: true,
+      executionAllowed: false,
+      authorityBoundary: CIVIC_PROPOSAL_AUTHORITY_BOUNDARY,
+      total: civicProposals.length,
+      byStatus: proposalCounts,
+      latestProposalId: civicProposals[civicProposals.length - 1]?.proposalId || null
+    },
+    civicProjects: {
+      publicWork: true,
+      activationAllowed: ready && reviewedProposalCount > 0,
+      authorityBoundary: CIVIC_PROJECT_AUTHORITY_BOUNDARY,
+      total: civicProjects.length,
+      activeCount: projectCounts.byStatus.ACTIVE,
+      byStatus: projectCounts.byStatus,
+      byType: projectCounts.byType,
+      localCivicBeaconActive: activeCivicBeaconCount > 0,
+      localReadinessDelta: Math.min(1, activeCivicBeaconCount),
+      inspectionAuthorityBoundary: CIVIC_PROJECT_INSPECTION_AUTHORITY_BOUNDARY,
+      baselineInspectedCount: civicProjectInspection.baselineInspectedCount,
+      inspectionCount: civicProjectInspection.totalInspectionCount,
+      latestInspectedAt: civicProjectInspection.latestInspectedAt,
+      inspectionReadinessDelta: Math.min(1, civicProjectInspection.baselineInspectedCount),
+      latestProjectId: civicProjects[civicProjects.length - 1]?.projectId || null
+    },
+    civicReadiness: {
+      ready,
+      nextPromotableSlice: ready
+        ? activeCivicBeaconCount > 0
+          ? 'HQ10D_CIVIC_PROJECT_ACTIVE'
+          : reviewedProposalCount > 0
+            ? 'HQ10D_CIVIC_PROJECT_ACTIVATION'
+            : 'HQ10B_CIVIC_PROPOSAL_RECORDS'
+        : null,
+      blockedBy,
+      localProjectReadinessScore,
+      moraleMarkers: civicMoraleMarkers,
+      signals: [
+        { key: 'multi_plot_visibility', ready: ownedPlots.length > 1 || outpostCount > 0, value: ownedPlots.length },
+        { key: 'claim_receipts', ready: settlementClaims.length > 0, value: settlementClaims.length },
+        { key: 'doctrine_context', ready: !!doctrineState.selectedDoctrineId, value: doctrineState.selectedDoctrineId },
+        { key: 'bounded_work_orders', ready: cohortPlanner.executionAvailable === true, value: cohortPlanner.executionAvailable === true },
+        { key: 'local_civic_beacon', ready: activeCivicBeaconCount > 0, value: activeCivicBeaconCount },
+        { key: 'civic_project_baseline_inspection', ready: civicProjectInspection.baselineInspectedCount > 0, value: civicProjectInspection.baselineInspectedCount }
+      ],
+      boundedCapabilities: [
+        'local_civic_beacon_activation',
+        'current_plot_civic_project_inspection'
+      ],
+      prohibitedCapabilities: [
+        'civic_mutation',
+        'trade_routes',
+        'background_scheduling',
+        'arbitrary_tool_execution',
+        'resource_spending',
+        'atlas_owned_execution',
+        'external_or_public_effects'
+      ]
+    }
+  };
+  return {
+    ...readModel,
+    projectionHash: hashPayload({
+      status: readModel.status,
+      scope: readModel.scope,
+      claims: readModel.claims,
+      doctrine: readModel.doctrine,
+      workOrders: readModel.workOrders,
+      civicProposals: readModel.civicProposals,
+      civicProjects: readModel.civicProjects,
+      blockedBy
+    }).slice(0, 16)
+  };
+}
+
+function workOrderScopeForTemplate(bundle, template, scope = {}) {
+  const rawIds = Array.isArray(scope?.buildingIds) ? scope.buildingIds : [];
+  const known = new Set(bundle.buildings.map((building) => building.buildingId));
+  const buildingIds = Array.from(new Set(rawIds
+    .map((id) => safeText(id, '', 120))
+    .filter(Boolean)
+    .filter((id) => known.has(id))))
+    .slice(0, Number(template.caps?.maxChildActions || 2));
+  if (rawIds.length && !buildingIds.length) {
+    return {
+      ok: false,
+      error: errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Work order scope must reference buildings on the current plot.', false, {
+        reason: 'unknown_building_scope'
+      })
+    };
+  }
+  return {
+    ok: true,
+    scope: {
+      mode: buildingIds.length ? 'selected_buildings' : 'all_ready_outputs',
+      plotId: bundle.plot.plotId,
+      buildingIds,
+      targetState: 'OUTPUT_READY',
+      maxBuildings: Number(template.caps?.maxChildActions || 2)
+    }
+  };
+}
+
+function workOrderTemplateForExecution(workOrder) {
+  const templateId = safeText(workOrder?.templateId, '', 120).toLowerCase();
+  if (templateId !== 'collect_ready_outputs_once') return null;
+  return WORK_ORDER_TEMPLATES.collect_ready_outputs_once;
+}
+
+function workOrderAllowedActionsAreSafe(workOrder, template) {
+  const orderActions = Array.isArray(workOrder?.allowedActions) ? workOrder.allowedActions : [];
+  const templateActions = Array.isArray(template?.allowedActions) ? template.allowedActions : [];
+  if (orderActions.length !== templateActions.length) return false;
+  return templateActions.every((action, index) => orderActions[index] === action);
+}
+
+function workOrderReadyBuildings(bundle, workOrder, template) {
+  const maxChildren = Math.max(0, Math.min(2, Number(template?.caps?.maxChildActions || 2)));
+  const scopedPlotId = safeText(workOrder?.scope?.plotId, '', 120);
+  if (scopedPlotId && scopedPlotId !== bundle.plot.plotId) return [];
+  const selectedIds = Array.isArray(workOrder?.scope?.buildingIds)
+    ? Array.from(new Set(workOrder.scope.buildingIds.map((id) => safeText(id, '', 120)).filter(Boolean)))
+    : [];
+  const byId = new Map(bundle.buildings.map((building) => [building.buildingId, building]));
+  const candidates = selectedIds.length
+    ? selectedIds.map((id) => byId.get(id)).filter(Boolean)
+    : [...bundle.buildings].sort((a, b) => String(a.buildingId).localeCompare(String(b.buildingId)));
+  return candidates
+    .filter((building) => building.plotId === bundle.plot.plotId)
+    .filter((building) => building.state === 'OUTPUT_READY')
+    .slice(0, maxChildren);
+}
+
+function pendingAgentActionCountLastHour(pendingEvents, nowMs) {
+  return (Array.isArray(pendingEvents) ? pendingEvents : [])
+    .filter((event) => event.eventType === 'AGENT_ACTION_EXECUTED')
+    .filter((event) => Number(event.createdAt || 0) >= (nowMs - 60 * 60 * 1000))
+    .length;
+}
+
+function assertAgentPolicyForWorkOrderChild(bundle, pendingEvents, { nowMs, actionName }) {
+  const denied = assertAgentPolicy(bundle, 'collectOutputs', {
+    nowMs,
+    actionName,
+    retryableMessage: 'Work-order output collection requires the collectOutputs policy toggle and approval discipline.'
+  });
+  if (denied) return denied;
+  const recentActions = countAgentActionsLastHour(bundle, nowMs) + pendingAgentActionCountLastHour(pendingEvents, nowMs);
+  if (recentActions >= Number(bundle.policy.maxAutonomousActionsPerHour || 0)) {
+    return errorEnvelope(bundle.plot.plotId, 'RATE_LIMITED', 'Agent hourly action cap reached for this plot.', true, {
+      reason: 'hourly_cap'
+    });
+  }
+  return null;
+}
+
+function collectReadyOutputForWorkOrder(bundle, building, {
+  actor,
+  nowMs,
+  pendingEvents,
+  parentWorkOrderId,
+  childIdempotencyKey
+}) {
+  let collected = {};
+  if (building.type === 'WORKSHOP') {
+    const buffPct = Number(BUILDING_DEFS.WORKSHOP.produces(building.level).buffPct || 20);
+    bundle.plot.nextBuildBuffPct = buffPct;
+    collected = { construction_buff_pct: buffPct };
+    building.outputBuffer = {};
+  } else if (building.type === 'EXPEDITION_BOARD') {
+    collected = collectScoutReport(bundle, building, nowMs);
+  } else {
+    const transfer = addResourcesWithCaps(bundle.plot.inventory, building.outputBuffer || {}, bundle.plot.storageCaps);
+    bundle.plot.inventory = transfer.inventory;
+    building.outputBuffer = transfer.remainder;
+    collected = transfer.applied;
+  }
+  const stillBuffered = RESOURCE_KEYS.some((key) => Number(building.outputBuffer?.[key] || 0) > 0)
+    || !!building.outputBuffer?.scoutReport;
+  building.state = stillBuffered ? 'OUTPUT_READY' : 'READY';
+  building.updatedAt = nowMs;
+  const completedJob = bundle.jobs
+    .filter((job) => job.buildingId === building.buildingId && job.status === 'COMPLETED')
+    .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0))[0];
+  if (completedJob && building.state === 'READY') {
+    completedJob.status = 'CLAIMED';
+    completedJob.updatedAt = nowMs;
+  }
+  const firstCollect = !(bundle.plot.collectedBuildingTypes || []).includes(building.type);
+  bundle.plot.collectedBuildingTypes = includesOnce(bundle.plot.collectedBuildingTypes, building.type);
+  if (firstCollect) addTownXp(bundle.plot, 5);
+  createEvent(pendingEvents, {
+    plotId: bundle.plot.plotId,
+    eventType: 'OUTPUT_COLLECTED',
+    actor,
+    buildingId: building.buildingId,
+    jobId: completedJob?.jobId || null,
+    summary: building.type === 'WORKSHOP'
+      ? `Workshop output collected. The next construction now has a ${bundle.plot.nextBuildBuffPct}% speed buff.`
+      : building.type === 'EXPEDITION_BOARD'
+        ? `Scout report collected: ${collected.report?.title || 'nearby site report'}.`
+        : `${BUILDING_LABELS[building.type]} outputs were collected.`,
+    explanation: actor === 'AGENT'
+      ? 'The foreman collected finished outputs through an approved bounded work order.'
+      : 'Collected through an explicit bounded cohort work order.',
+    data: {
+      collected: clone(collected),
+      parentWorkOrderId,
+      childIdempotencyKey
+    },
+    createdAt: nowMs
+  });
+  if (actor === 'AGENT') {
+    markAgentAction(bundle, pendingEvents, 'collect_outputs', 'Foreman collected finished outputs from an approved work order.', nowMs, 'collectOutputs');
+  }
+  return {
+    receiptId: `${parentWorkOrderId}:child:${building.buildingId}`,
+    parentWorkOrderId,
+    childAction: 'et.plot.collect_outputs',
+    childIdempotencyKey,
+    plotId: bundle.plot.plotId,
+    buildingId: building.buildingId,
+    buildingType: building.type,
+    collected: clone(collected),
+    completedJobId: completedJob?.jobId || null,
+    statusAfter: building.state,
+    executedBy: actor,
+    executedAt: nowMs,
+    authorityBoundary: 'server_owned_child_collect_outputs_same_plot_no_spend'
+  };
+}
+
+function buildSitePlanFromReport(bundle, report, input = {}, nowMs) {
+  const existingPlans = normalizeSitePlans(bundle.plot.sitePlans);
+  const sequence = existingPlans.length + 1;
+  const focus = sitePlanFocus(input.focus);
+  const reportSlug = slugFor(report.reportId || report.title, `report_${sequence}`);
+  const focusLabels = {
+    balanced: 'balanced settlement',
+    resource: 'resource outpost',
+    safe: 'low-risk foothold',
+    trade: 'trade waypoint'
+  };
+  const title = safeText(input.title, `${report.title || 'Scout Report'} Site Plan`, 120);
+  const focusLabel = focusLabels[focus] || focusLabels.balanced;
+  return {
+    planId: `site_plan_${reportSlug}`,
+    reportId: report.reportId,
+    originPlotId: bundle.plot.plotId,
+    title,
+    focus,
+    status: 'DRAFT',
+    promotionStatus: 'draft',
+    reviewStatus: 'unreviewed',
+    source: 'scout_report',
+    authorityBoundary: 'requires_engine_promotion_for_settlement',
+    siteType: report.siteType,
+    risk: report.risk,
+    traits: clone(report.traits || []),
+    resourceHints: clone(report.resourceHints || {}),
+    summary: `Draft ${focusLabel} from ${report.title}. ${report.summary || 'The report is preserved as the planning receipt.'}`.slice(0, 320),
+    recommendedNext: 'Compare in the Progression Atlas, then promote only after second-settlement rules, costs, and tools exist.',
+    reviewedAt: null,
+    reviewNote: '',
+    sequence,
+    createdAt: Number(nowMs)
+  };
+}
+
+function normalizeSettlementClaims(value) {
+  const rows = Array.isArray(value) ? value : [];
+  return rows
+    .filter((row) => row && typeof row === 'object')
+    .map((row) => ({
+      claimId: safeText(row.claimId, '', 120),
+      ownerPairId: safeText(row.ownerPairId, '', 160),
+      originPlotId: safeText(row.originPlotId, '', 120),
+      sitePlanId: safeText(row.sitePlanId, '', 120),
+      reportId: safeText(row.reportId, '', 120),
+      foundedPlotId: safeText(row.foundedPlotId, '', 120) || null,
+      convoyJobId: safeText(row.convoyJobId, '', 120) || null,
+      approvalId: safeText(row.approvalId, '', 120) || null,
+      status: safeText(row.status, 'CLAIM_READY', 40).toUpperCase(),
+      title: safeText(row.title, 'Settlement Claim', 120),
+      focus: sitePlanFocus(row.focus),
+      siteType: safeText(row.siteType, 'nearby_site', 80),
+      risk: safeText(row.risk, 'unknown', 40),
+      traits: Array.isArray(row.traits) ? row.traits.map((item) => safeText(item, '', 48)).filter(Boolean).slice(0, 8) : [],
+      resourceHints: normalizeInventory(row.resourceHints || {}),
+      route: row.route && typeof row.route === 'object' ? clone(row.route) : {},
+      cost: normalizeInventory(row.cost || {}),
+      receipt: row.receipt && typeof row.receipt === 'object' ? clone(row.receipt) : {},
+      createdBy: mutationActor(row.createdBy || 'HUMAN'),
+      createdAt: Number(row.createdAt || 0),
+      updatedAt: Number(row.updatedAt || 0),
+      convoyStartedAt: row.convoyStartedAt == null ? null : Number(row.convoyStartedAt),
+      convoyEndsAt: row.convoyEndsAt == null ? null : Number(row.convoyEndsAt),
+      foundedAt: row.foundedAt == null ? null : Number(row.foundedAt)
+    }))
+    .filter((claim) => claim.claimId && claim.ownerPairId && claim.originPlotId && claim.sitePlanId);
+}
+
+function buildScoutReport(bundle, building, nowMs) {
+  const existing = normalizeScoutReports(bundle.plot.scoutReports);
+  const sequence = existing.length + 1;
+  const template = SCOUT_REPORT_TEMPLATES[(sequence - 1) % SCOUT_REPORT_TEMPLATES.length];
+  return {
+    reportId: `scout_report_${sequence}_${template.templateId}`,
+    originPlotId: bundle.plot.plotId,
+    sourceBuildingId: building.buildingId,
+    title: template.title,
+    siteType: template.siteType,
+    risk: template.risk,
+    traits: clone(template.traits),
+    resourceHints: clone(template.resourceHints),
+    summary: template.summary,
+    recommendedNext: template.recommendedNext,
+    sequence,
+    createdAt: Number(nowMs)
+  };
+}
+
 function normalizeStorageCaps(value) {
   const source = value && typeof value === 'object' ? value : {};
   return {
@@ -279,6 +2395,50 @@ function canAffordProgression(bundle, { cost = {}, xpRequired = null } = {}) {
     ? 0
     : Math.max(0, Number(xpRequired || 0) - Number(bundle.plot.townXp || 0));
   return Object.keys(missing).length === 0 && missingXp === 0;
+}
+
+function normalizeBuildingPrerequisites(rule) {
+  return (Array.isArray(rule?.buildingPrerequisites) ? rule.buildingPrerequisites : [])
+    .map((entry) => ({
+      type: String(entry?.type || '').trim().toUpperCase(),
+      requiredState: String(entry?.requiredState || 'READY').trim().toUpperCase() || 'READY'
+    }))
+    .filter((entry) => entry.type);
+}
+
+function hqBuildingPrerequisiteStatus(bundle, rule) {
+  return normalizeBuildingPrerequisites(rule).map((entry) => {
+    const building = (bundle?.buildings || []).find((candidate) => candidate.type === entry.type) || null;
+    const state = building?.state || null;
+    const satisfied = !!building && state === entry.requiredState;
+    return {
+      type: entry.type,
+      label: BUILDING_LABELS[entry.type] || entry.type,
+      requiredState: entry.requiredState,
+      buildingId: building?.buildingId || null,
+      state,
+      satisfied,
+      reason: satisfied ? null : building ? 'building_not_ready' : 'missing_building'
+    };
+  });
+}
+
+function hqUpgradeReadModel(bundle) {
+  const rule = HQ_UPGRADE_RULES[bundle.plot.hqLevel] || null;
+  if (!rule) return null;
+  const prerequisiteStatus = hqBuildingPrerequisiteStatus(bundle, rule);
+  const missingPrerequisites = prerequisiteStatus.filter((entry) => !entry.satisfied);
+  const missingResources = resourceShortfall(bundle.plot.inventory, rule.cost || {});
+  const missingXp = Math.max(0, Number(rule.xpRequired || 0) - Number(bundle.plot.townXp || 0));
+  return {
+    ...clone(rule),
+    buildingPrerequisites: prerequisiteStatus,
+    missingBuildingPrerequisites: missingPrerequisites,
+    prerequisitesSatisfied: missingPrerequisites.length === 0,
+    canStart: missingPrerequisites.length === 0
+      && Object.keys(missingResources).length === 0
+      && missingXp === 0
+  };
 }
 
 function deductResources(inventory, cost) {
@@ -413,10 +2573,14 @@ function initialPlotForIdentity({ pairId, houseId = null, nowMs }) {
     constructionSlots: HQ_LEVEL_RULES[1].constructionSlots,
     nextBuildBuffPct: 0,
     claimedRewards: [],
-    seenBuildingTypes: ['HQ'],
-    collectedBuildingTypes: [],
-    agentTiersXpAwarded: [],
-    lastDailyBonusDay: null,
+	    seenBuildingTypes: ['HQ'],
+	    collectedBuildingTypes: [],
+	    agentTiersXpAwarded: [],
+	    scoutReports: [],
+	    sitePlans: [],
+	    doctrineState: {},
+	    expeditionScouts: [],
+	    lastDailyBonusDay: null,
     dailySoldCoin: 0,
     dailySellDay: nowDayKey(nowMs),
     lastViewedAt: nowMs,
@@ -449,8 +2613,72 @@ function bundleSnapshot(bundle) {
     policy: clone(bundle.policy),
     buildings: clone(bundle.buildings),
     jobs: clone(bundle.jobs),
-    approvals: clone(bundle.approvals || [])
+    approvals: clone(bundle.approvals || []),
+    settlementClaims: clone(bundle.settlementClaims || []),
+    plotMemberships: clone(bundle.memberships || []),
+    workOrders: clone(bundle.workOrders || []),
+    civicProposals: clone(bundle.civicProposals || []),
+    overlayPacks: clone(bundle.overlayPacks || []),
+    civicProjects: clone(bundle.civicProjects || [])
   };
+}
+
+function ensureHomeMembership(pairId, plotId, nowMs) {
+  const safePairId = safeText(pairId, '', 180);
+  const safePlotId = safeText(plotId, '', 120);
+  if (!safePairId || !safePlotId) return null;
+  const existing = store.getPlotMembership(safePairId, safePlotId);
+  if (existing) return existing;
+  return store.writePlotMembership({
+    pairId: safePairId,
+    plotId: safePlotId,
+    role: 'HOME',
+    originClaimId: null,
+    createdAt: nowMs,
+    updatedAt: nowMs
+  });
+}
+
+function verifyPlotAccess(bundle, pairId, requestedPlotId, nowMs) {
+  if (!requestedPlotId) return true;
+  if (!bundle?.plot || bundle.plot.plotId !== requestedPlotId) return false;
+  const safePairId = safeText(pairId, '', 180);
+  if (!safePairId) return false;
+  const membership = store.getPlotMembership(safePairId, requestedPlotId);
+  if (membership) return true;
+  if (bundle.plot.pairId === safePairId) {
+    ensureHomeMembership(safePairId, requestedPlotId, nowMs);
+    return true;
+  }
+  return false;
+}
+
+function ownedPlotSummaries(pairId, activePlotId = null) {
+  const memberships = pairId ? store.listPlotMemberships(pairId) : [];
+  return memberships
+    .map((membership) => {
+      const bundle = store.readPlotBundleById(membership.plotId);
+      if (!bundle?.plot) return null;
+      const claims = membership.originClaimId
+        ? [store.getSettlementClaim(membership.originClaimId)].filter(Boolean)
+        : [];
+      return {
+        plotId: bundle.plot.plotId,
+        role: membership.role,
+        title: membership.role === 'HOME'
+          ? 'Founders Plot'
+          : (claims[0]?.title || 'Settler Outpost'),
+        hqLevel: bundle.plot.hqLevel,
+        townXp: bundle.plot.townXp,
+        status: bundle.plot.status,
+        originClaimId: membership.originClaimId,
+        siteType: claims[0]?.siteType || null,
+        risk: claims[0]?.risk || null,
+        active: bundle.plot.plotId === activePlotId,
+        updatedAt: bundle.plot.updatedAt
+      };
+    })
+    .filter(Boolean);
 }
 
 function findBuilding(bundle, buildingId) {
@@ -517,6 +2745,7 @@ function ensurePlotBundle({
     store.writePlot(initial.plot);
     store.writeBuildings(initial.buildings);
     store.writePolicy(initial.policy);
+    ensureHomeMembership(pairId, initial.plot.plotId, nowMs);
     store.appendEvents([
       {
         plotId: initial.plot.plotId,
@@ -535,8 +2764,22 @@ function ensurePlotBundle({
     ]);
     bundle = store.readPlotBundleById(initial.plot.plotId);
   }
-  bundle.policy = bundle.policy || defaultPolicy(bundle.plot.plotId, nowMs);
-  bundle.approvals = store.listApprovals(bundle.plot.plotId);
+  if (bundle?.plot && bundle.plot.pairId === pairId) {
+    ensureHomeMembership(pairId, bundle.plot.plotId, nowMs);
+  }
+	  bundle.policy = bundle.policy || defaultPolicy(bundle.plot.plotId, nowMs);
+	  bundle.plot.scoutReports = normalizeScoutReports(bundle.plot.scoutReports);
+	  bundle.plot.sitePlans = normalizeSitePlans(bundle.plot.sitePlans);
+	  bundle.plot.doctrineState = normalizeDoctrineState(bundle.plot.doctrineState);
+	  bundle.plot.expeditionScouts = normalizeExpeditionScouts(bundle.plot.expeditionScouts);
+	  bundle.approvals = store.listApprovals(bundle.plot.plotId);
+  bundle.ownerPairId = pairId || bundle.plot.pairId;
+  bundle.memberships = pairId ? store.listPlotMemberships(pairId) : [];
+  bundle.settlementClaims = pairId ? normalizeSettlementClaims(store.listSettlementClaimsByOwner(pairId)) : [];
+  bundle.workOrders = normalizeWorkOrders(store.listWorkOrdersByPlot(bundle.plot.plotId));
+  bundle.civicProposals = normalizeCivicProposals(store.listCivicProposalsByPlot(bundle.plot.plotId));
+  bundle.overlayPacks = normalizeOverlayPacks(store.listOverlayPacksByPlot(bundle.plot.plotId));
+  bundle.civicProjects = normalizeCivicProjects(store.listCivicProjectsByPlot(bundle.plot.plotId));
   bundle.events = store.listEvents(bundle.plot.plotId);
   return bundle;
 }
@@ -653,6 +2896,7 @@ function currentQuest(bundle) {
   const collectedTypes = new Set(bundle.plot.collectedBuildingTypes || []);
   const farmCost = BUILDING_DEFS.FARM_PLOT.construction.cost;
   const quarryCost = BUILDING_DEFS.QUARRY.construction.cost;
+  const expeditionCost = BUILDING_DEFS.EXPEDITION_BOARD.construction.cost;
   const hqUpgrade = HQ_UPGRADE_RULES[bundle.plot.hqLevel] || null;
 
   if (!hasType('LUMBER_CAMP')) {
@@ -728,9 +2972,9 @@ function currentQuest(bundle) {
       primaryAction: 'Build Quarry'
     };
   }
-  if (bundle.plot.hqLevel < 3) {
-    const hq3Progress = formatRequirementProgress(bundle, {
-      cost: hqUpgrade?.cost || {},
+	  if (bundle.plot.hqLevel < 3) {
+	    const hq3Progress = formatRequirementProgress(bundle, {
+	      cost: hqUpgrade?.cost || {},
       xpRequired: hqUpgrade?.xpRequired
     });
     if (!canAffordProgression(bundle, {
@@ -749,12 +2993,84 @@ function currentQuest(bundle) {
       title: 'Upgrade Headquarters to Level 3',
       body: `Ready for HQ Level 3. Cost progress: ${hq3Progress}. Level 3 unlocks foreman production queueing.`,
       primaryAction: 'Upgrade HQ'
+	    };
+	  }
+  if (!hasType('EXPEDITION_BOARD')) {
+    const expeditionProgress = formatRequirementProgress(bundle, { cost: expeditionCost });
+    if (!canAffordProgression(bundle, { cost: expeditionCost })) {
+      return {
+        id: 'stock-expedition-board',
+        title: 'Stock supplies for an Expedition Board',
+        body: `HQ Level 3 can now turn the settlement outward. Expedition Board cost progress: ${expeditionProgress}.`,
+        primaryAction: 'Collect Expedition Board supplies'
+      };
+    }
+    return {
+      id: 'place-expedition-board',
+      title: 'Build the Expedition Board',
+      body: `The first post-HQ3 expansion loop starts with scouting. Cost progress: ${expeditionProgress}.`,
+      primaryAction: 'Build Expedition Board'
     };
   }
-  if (bundle.plot.hqLevel < 5) {
+  const expeditionBoard = buildings.find((building) => building.type === 'EXPEDITION_BOARD');
+  const scoutReports = normalizeScoutReports(bundle.plot.scoutReports);
+  if (scoutReports.length < 1 && expeditionBoard) {
+    if (expeditionBoard.state === 'OUTPUT_READY') {
+      return {
+        id: 'collect-first-scout-report',
+        title: 'Collect the first Scout Report',
+        body: 'A scout has returned with a nearby-site receipt. Collect it before planning the second settlement.',
+        primaryAction: 'Collect Scout Report'
+      };
+    }
+    if (expeditionBoard.state === 'READY') {
+      const scoutSpec = BUILDING_DEFS.EXPEDITION_BOARD.produces(expeditionBoard.level);
+      const scoutProgress = formatRequirementProgress(bundle, { cost: scoutSpec.input || {} });
+      if (!canAffordProgression(bundle, { cost: scoutSpec.input || {} })) {
+        return {
+          id: 'stock-first-scout',
+          title: 'Stock supplies for the first scout',
+          body: `Scouting spends a little food and wood so expansion has a real cost. Progress: ${scoutProgress}.`,
+          primaryAction: 'Collect scout supplies'
+        };
+      }
+      return {
+        id: 'dispatch-first-scout',
+        title: 'Dispatch the first scout',
+        body: `Send Rook from the Expedition Board to bring back a report. Scout cost progress: ${scoutProgress}.`,
+        primaryAction: 'Dispatch scout'
+      };
+    }
     return {
-      id: `reach-hq-${Math.min(5, bundle.plot.hqLevel + 1)}`,
-      title: `Reach HQ Level ${Math.min(5, bundle.plot.hqLevel + 1)}`,
+      id: 'finish-expedition-board',
+      title: 'Finish the Expedition Board',
+      body: 'The board is under construction. Once ready, it can dispatch the first scout.',
+      primaryAction: 'Wait for construction'
+    };
+  }
+  const sitePlans = normalizeSitePlans(bundle.plot.sitePlans);
+  if (scoutReports.length >= 1 && sitePlans.length < 1) {
+    const firstReport = scoutReports[0];
+    return {
+      id: 'draft-first-site-plan',
+      title: 'Draft the first Site Plan',
+      body: `${firstReport.title} is a real receipt now. Turn it into a server-owned Site Plan before any future claim or settler convoy exists.`,
+      primaryAction: 'Draft Site Plan'
+    };
+  }
+  const firstUnreviewedPlan = sitePlans.find((plan) => plan.reviewStatus !== 'reviewed');
+  if (firstUnreviewedPlan && bundle.plot.hqLevel >= 6) {
+    return {
+      id: 'review-first-site-plan',
+      title: 'Review the first Site Plan',
+      body: `${firstUnreviewedPlan.title} can become claim-ready planning state. This still does not create territory or a second plot.`,
+      primaryAction: 'Review Site Plan'
+    };
+  }
+  if (bundle.plot.hqLevel < 6) {
+    return {
+      id: `reach-hq-${Math.min(6, bundle.plot.hqLevel + 1)}`,
+      title: `Reach HQ Level ${Math.min(6, bundle.plot.hqLevel + 1)}`,
       body: 'Keep the loop moving: queue jobs, collect outputs, and convert the surplus into progression.',
       primaryAction: 'Advance the plot'
     };
@@ -882,14 +3198,38 @@ function visualActorProjections(bundle, { stateHash }) {
       }));
       continue;
     }
-    if (job.kind === 'PRODUCE' || job.kind === 'SELL') {
+    if (job.kind === 'SCOUT') {
       actors.push(makeVisualActor({
-        role: 'worker',
-        generatedOverlayRoleId: 'inhabitant.worker',
+        role: 'scout',
+        generatedOverlayRoleId: 'inhabitant.messenger',
         sourceDomain: 'job',
         sourceObjectId: job.jobId,
         sourceStateHash,
-        visualState: job.status === 'QUEUED' ? 'waiting_to_work' : 'working',
+        visualState: job.status === 'QUEUED' ? 'waiting_to_scout' : 'scouting',
+        actionKind: job.kind,
+        progress: visualActorProgress(job, nowMs),
+        target
+      }));
+      continue;
+    }
+    if (job.kind === 'PRODUCE' || job.kind === 'SELL') {
+      const operatorRole = building?.type === 'WORKSHOP'
+        ? 'workshop_specialist'
+        : building?.type === 'MARKET_STALL'
+          ? 'market_trader'
+          : 'worker';
+      const overlayRole = operatorRole === 'worker'
+        ? 'inhabitant.worker'
+        : `inhabitant.${operatorRole}`;
+      actors.push(makeVisualActor({
+        role: operatorRole,
+        generatedOverlayRoleId: overlayRole,
+        sourceDomain: 'job',
+        sourceObjectId: job.jobId,
+        sourceStateHash,
+        visualState: job.status === 'QUEUED'
+          ? `waiting_to_${operatorRole === 'market_trader' ? 'trade' : operatorRole === 'workshop_specialist' ? 'tune' : 'work'}`
+          : operatorRole === 'market_trader' ? 'trading' : operatorRole === 'workshop_specialist' ? 'tuning' : 'working',
         actionKind: job.kind,
         progress: visualActorProgress(job, nowMs),
         target
@@ -899,16 +3239,138 @@ function visualActorProjections(bundle, { stateHash }) {
 
   for (const building of [...bundle.buildings].sort((a, b) => String(a.buildingId).localeCompare(String(b.buildingId)))) {
     if (building.state !== 'OUTPUT_READY') continue;
+    const isScoutReport = building.type === 'EXPEDITION_BOARD';
+    const isWorkshopBuff = building.type === 'WORKSHOP';
+    const isMarketCoin = building.type === 'MARKET_STALL';
+    const readyRole = isScoutReport
+      ? 'scout'
+      : isWorkshopBuff
+        ? 'workshop_specialist'
+        : isMarketCoin
+          ? 'market_trader'
+          : 'hauler';
+    const readyAction = isScoutReport
+      ? 'SCOUT_REPORT_READY'
+      : isWorkshopBuff
+        ? 'BUFF_READY'
+        : isMarketCoin
+          ? 'COIN_READY'
+          : 'OUTPUT_READY';
     actors.push(makeVisualActor({
-      role: 'hauler',
-      generatedOverlayRoleId: 'inhabitant.hauler',
+      role: readyRole,
+      generatedOverlayRoleId: `inhabitant.${readyRole}`,
       sourceDomain: 'building',
       sourceObjectId: building.buildingId,
       sourceStateHash,
-      visualState: 'ready_to_collect',
-      actionKind: 'OUTPUT_READY',
+      visualState: isScoutReport ? 'report_ready' : isWorkshopBuff ? 'buff_ready' : isMarketCoin ? 'coin_ready' : 'ready_to_collect',
+      actionKind: readyAction,
       progress: 1,
       target: actorTargetForBuilding(building)
+    }));
+  }
+
+  for (const claim of normalizeSettlementClaims(bundle.settlementClaims || [])
+    .filter((entry) => entry.originPlotId === bundle.plot.plotId)
+    .sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0))) {
+    if (!['CONVOY_PREPARING', 'CONVOY_ARRIVED', 'FOUNDED'].includes(claim.status)) continue;
+    const activeJob = claim.convoyJobId ? bundle.jobs.find((job) => job.jobId === claim.convoyJobId) : null;
+    const route = {
+      ...(claim.route || {}),
+      progress: claim.status === 'CONVOY_PREPARING'
+        ? visualActorProgress(activeJob, nowMs)
+        : 1,
+      visualOnly: true
+    };
+    actors.push(makeVisualActor({
+      role: 'settler',
+      generatedOverlayRoleId: 'inhabitant.settler',
+      sourceDomain: 'settlement_claim',
+      sourceObjectId: claim.claimId,
+      sourceStateHash,
+      visualState: claim.status.toLowerCase(),
+      actionKind: claim.status === 'CONVOY_PREPARING' ? 'SETTLER_CONVOY' : 'SETTLEMENT_READY',
+      progress: route.progress,
+      target: {
+        kind: 'settlement_claim',
+        id: claim.claimId,
+        title: claim.title,
+        status: claim.status,
+        route,
+        foundedPlotId: claim.foundedPlotId || null
+      }
+    }));
+  }
+
+  const worldGrid = worldGridReadModel(bundle);
+  const activeCivicBeacon = normalizeCivicProjects(bundle.civicProjects || [])
+    .filter((project) => project.status === 'ACTIVE' && project.projectType === 'civic_beacon')
+    .sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0))[0] || null;
+  const foundedOutpost = normalizeSettlementClaims(bundle.settlementClaims || [])
+    .filter((claim) => claim.originPlotId === bundle.plot.plotId && claim.status === 'FOUNDED' && claim.foundedPlotId)
+    .sort((a, b) => Number(a.foundedAt || a.updatedAt || 0) - Number(b.foundedAt || b.updatedAt || 0))[0] || null;
+
+  if (foundedOutpost) {
+    actors.push(makeVisualActor({
+      role: 'outpost_keeper',
+      generatedOverlayRoleId: 'inhabitant.outpost_keeper',
+      sourceDomain: 'settlement_claim',
+      sourceObjectId: foundedOutpost.claimId,
+      sourceStateHash,
+      visualState: 'outpost_tending',
+      actionKind: 'OUTPOST_FOUNDED',
+      progress: 1,
+      target: {
+        kind: 'settlement_claim',
+        id: foundedOutpost.claimId,
+        title: foundedOutpost.title,
+        status: foundedOutpost.status,
+        foundedPlotId: foundedOutpost.foundedPlotId,
+        route: {
+          ...(foundedOutpost.route || {}),
+          progress: 1,
+          visualOnly: true
+        }
+      }
+    }));
+  }
+
+  if (activeCivicBeacon) {
+    actors.push(makeVisualActor({
+      role: 'civic_routekeeper',
+      generatedOverlayRoleId: 'inhabitant.civic_routekeeper',
+      sourceDomain: 'civic_project',
+      sourceObjectId: activeCivicBeacon.projectId,
+      sourceStateHash,
+      visualState: 'civic_route_marking',
+      actionKind: 'CIVIC_BEACON_ACTIVE',
+      progress: worldGrid.civicReadiness?.localProjectReadinessScore || 1,
+      target: {
+        kind: 'civic_project',
+        id: activeCivicBeacon.projectId,
+        projectType: activeCivicBeacon.projectType,
+        effectId: activeCivicBeacon.effect?.effectId || null,
+        moraleMarkers: clone(worldGrid.civicReadiness?.moraleMarkers || []),
+        visualOnly: true
+      }
+    }));
+
+    actors.push(makeVisualActor({
+      role: 'oracle_adjunct',
+      generatedOverlayRoleId: 'inhabitant.oracle_adjunct',
+      sourceDomain: 'world_grid',
+      sourceObjectId: worldGrid.projectionHash || activeCivicBeacon.projectId,
+      sourceStateHash,
+      visualState: 'world_grid_consulting',
+      actionKind: 'WORLD_GRID_READ_MODEL',
+      progress: worldGrid.civicReadiness?.ready ? 1 : 0,
+      target: {
+        kind: 'world_grid',
+        id: worldGrid.projectionHash || 'world_grid',
+        status: worldGrid.status,
+        ready: worldGrid.civicReadiness?.ready === true,
+        authorityBoundary: worldGrid.authorityBoundary,
+        visualOnly: true
+      }
     }));
   }
 
@@ -929,11 +3391,24 @@ function visualActorProjections(bundle, { stateHash }) {
     }));
   }
 
-  return actors.slice(0, 16);
+  return actors.slice(0, 20);
 }
 
 function publicSummary(bundle) {
   const plot = bundle.plot;
+  const settlementClaims = normalizeSettlementClaims(bundle.settlementClaims || []);
+  const workOrders = normalizeWorkOrders(bundle.workOrders || []);
+  const civicProposals = normalizeCivicProposals(bundle.civicProposals || []);
+  const civicProposalStatusCounts = civicProposalCounts(civicProposals);
+  const overlayPacks = normalizeOverlayPacks(bundle.overlayPacks || []);
+  const overlayPackStatusCounts = overlayPackCounts(overlayPacks);
+  const civicProjects = normalizeCivicProjects(bundle.civicProjects || []);
+  const civicProjectStatusCounts = civicProjectCounts(civicProjects).byStatus;
+  const activeCivicBeaconCount = civicProjects.filter((project) => (
+    project.status === 'ACTIVE' && project.projectType === 'civic_beacon'
+  )).length;
+  const worldGrid = worldGridReadModel(bundle);
+  const expeditionMap = buildExpeditionMapReadModel(bundle);
   const buildings = bundle.buildings.map((building) => ({
     buildingId: building.buildingId,
     type: building.type,
@@ -942,16 +3417,43 @@ function publicSummary(bundle) {
     y: building.y,
     state: building.state
   }));
-  return {
-    plotId: plot.plotId,
-    houseId: plot.houseId || null,
-    hqLevel: plot.hqLevel,
-    townXp: plot.townXp,
-    inventory: clone(plot.inventory),
-    buildings,
-    updatedAt: plot.updatedAt
-  };
-}
+	  return {
+	    plotId: plot.plotId,
+	    houseId: plot.houseId || null,
+	    hqLevel: plot.hqLevel,
+	    townXp: plot.townXp,
+	    inventory: clone(plot.inventory),
+	    scoutReportCount: normalizeScoutReports(plot.scoutReports).length,
+	    sitePlanCount: normalizeSitePlans(plot.sitePlans).length,
+	    selectedDoctrineId: normalizeDoctrineState(plot.doctrineState).selectedDoctrineId,
+      settlementClaimCount: settlementClaims.length,
+      outpostCount: settlementClaims.filter((claim) => claim.status === 'FOUNDED' && claim.foundedPlotId).length,
+      workOrderDraftCount: workOrders.filter((order) => order.status === 'DRAFT').length,
+      workOrderCompletedCount: workOrders.filter((order) => order.status === 'COMPLETED').length,
+      workOrderExecutionAvailable: workOrderPlannerReadModel(bundle).executionAvailable === true,
+      civicProposalCount: civicProposals.length,
+      civicProposalDraftCount: civicProposalStatusCounts.DRAFT,
+      civicProposalReviewedCount: civicProposalStatusCounts.REVIEWED,
+      overlayPackCount: overlayPacks.length,
+      overlayPackDraftCount: overlayPackStatusCounts.DRAFT,
+      overlayPackReviewedCount: overlayPackStatusCounts.REVIEWED,
+      civicProjectCount: civicProjects.length,
+      civicProjectActiveCount: civicProjectStatusCounts.ACTIVE,
+      civicBeaconActive: activeCivicBeaconCount > 0,
+      civicProjectInspectionCount: worldGrid.civicProjects.inspectionCount,
+      civicProjectBaselineInspectedCount: worldGrid.civicProjects.baselineInspectedCount,
+      civicReadinessScore: worldGrid.civicReadiness.localProjectReadinessScore,
+      worldGridStatus: worldGrid.status,
+      worldGridReady: worldGrid.civicReadiness.ready,
+      expeditionMapStatus: expeditionMap.status,
+      expeditionMapDiscoveredCount: expeditionMap.fog.counts.discovered,
+      expeditionMapKnownCount: expeditionMap.fog.counts.known,
+      expeditionMapHintedCount: expeditionMap.fog.counts.hinted,
+      expeditionMapLockedUnknownCount: expeditionMap.fog.counts.locked_unknown,
+		    buildings,
+		    updatedAt: plot.updatedAt
+		  };
+	}
 
 function buildState(bundle, { includeReplay = false, includePublicSummary = true } = {}) {
   const recap = bundle.plot.pendingRecapFrom && bundle.plot.pendingRecapTo
@@ -970,9 +3472,20 @@ function buildState(bundle, { includeReplay = false, includePublicSummary = true
   const approvals = (bundle.approvals || [])
     .filter((approval) => approval.status !== 'USED')
     .slice(0, 20);
-  const unlockedBuildings = unlockedBuildingsForHq(bundle.plot.hqLevel);
-  const rewards = availableRewards(bundle);
-  const queue = bundle.jobs
+	  const unlockedBuildings = unlockedBuildingsForHq(bundle.plot.hqLevel);
+	  const rewards = availableRewards(bundle);
+	  const scoutReports = normalizeScoutReports(bundle.plot.scoutReports);
+	  const sitePlans = normalizeSitePlans(bundle.plot.sitePlans);
+  const research = researchReadModel(bundle);
+  const cohortPlanner = workOrderPlannerReadModel(bundle);
+  const worldGrid = worldGridReadModel(bundle);
+  const expeditionMap = buildExpeditionMapReadModel(bundle);
+  const civicProposals = civicProposalsReadModel(bundle);
+  const overlayPacks = overlayPacksReadModel(bundle);
+  const civicProjects = civicProjectsReadModel(bundle);
+  const settlementClaims = normalizeSettlementClaims(bundle.settlementClaims || []);
+  const ownedPlots = ownedPlotSummaries(bundle.ownerPairId || bundle.plot.pairId, bundle.plot.plotId);
+	  const queue = bundle.jobs
     .filter((job) => ['QUEUED', 'RUNNING', 'COMPLETED'].includes(job.status))
     .sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
 
@@ -992,9 +3505,26 @@ function buildState(bundle, { includeReplay = false, includePublicSummary = true
       buildings: unlockedBuildings.filter((type) => type !== 'HQ')
     },
     unlockedBuildings,
-    hqUpgrade: clone(HQ_UPGRADE_RULES[bundle.plot.hqLevel] || null),
-    buildingDefs: publicBuildingDefs(),
-    visualActors,
+    hqUpgrade: hqUpgradeReadModel(bundle),
+	    buildingDefs: publicBuildingDefs(),
+	    scoutReports,
+	    sitePlans,
+      research,
+      doctrineCatalog: research.doctrineCatalog,
+      doctrineState: research.doctrineState,
+      cohortPlanner,
+      worldGrid,
+      expeditionMap,
+      civicProposals,
+      overlayPacks,
+      civicProjects,
+      workOrderTemplates: cohortPlanner.templates,
+      workOrders: cohortPlanner.workOrders,
+      settlementClaims,
+      ownedPlots,
+      activePlotId: bundle.plot.plotId,
+      homePlotId: ownedPlots.find((plot) => plot.role === 'HOME')?.plotId || bundle.plot.plotId,
+	    visualActors,
     publicSummary: includePublicSummary ? publicSummary(bundle) : null,
     audit: includeReplay
       ? {
@@ -1012,7 +3542,7 @@ function buildState(bundle, { includeReplay = false, includePublicSummary = true
 }
 
 function levelRules(hqLevel) {
-  return HQ_LEVEL_RULES[Math.max(1, Math.min(5, Number(hqLevel) || 1))] || HQ_LEVEL_RULES[1];
+  return HQ_LEVEL_RULES[Math.max(1, Math.min(6, Number(hqLevel) || 1))] || HQ_LEVEL_RULES[1];
 }
 
 function verifyPlotId(bundle, requestedPlotId) {
@@ -1179,6 +3709,165 @@ function markCompletedWorkshopJob(bundle, building, job, pendingEvents, nowMs) {
   });
 }
 
+function markCompletedScoutJob(bundle, building, job, pendingEvents, nowMs) {
+  const report = buildScoutReport(bundle, building, nowMs);
+  building.outputBuffer = {
+    scout_report: 1,
+    scoutReport: report
+  };
+  building.state = 'OUTPUT_READY';
+  building.updatedAt = nowMs;
+  job.status = 'COMPLETED';
+  job.updatedAt = nowMs;
+  createEvent(pendingEvents, {
+    plotId: bundle.plot.plotId,
+    eventType: 'JOB_COMPLETED',
+    actor: job.createdBy,
+    buildingId: building.buildingId,
+    jobId: job.jobId,
+    summary: `Scout returned with ${report.title}.`,
+    explanation: 'Collect the Expedition Board output to add this scout report to the plot receipts.',
+    data: {
+      kind: job.kind,
+      output: clone(job.output),
+      scoutReport: {
+        reportId: report.reportId,
+        title: report.title,
+        siteType: report.siteType,
+        risk: report.risk
+      }
+    },
+    createdAt: nowMs
+  });
+}
+
+function collectScoutReport(bundle, building, nowMs) {
+  const pending = building.outputBuffer?.scoutReport && typeof building.outputBuffer.scoutReport === 'object'
+    ? building.outputBuffer.scoutReport
+    : buildScoutReport(bundle, building, nowMs);
+  const report = normalizeScoutReports([pending])[0] || pending;
+  const reports = normalizeScoutReports(bundle.plot.scoutReports);
+  if (!reports.some((entry) => entry.reportId === report.reportId)) {
+    reports.push(report);
+  }
+  bundle.plot.scoutReports = normalizeScoutReports(reports);
+  building.outputBuffer = {};
+  return {
+    scout_report: 1,
+    report: clone(report)
+  };
+}
+
+function canPrepareSettlerConvoy(bundle, sitePlan) {
+  if (!sitePlan) return false;
+  if (Number(bundle.plot.hqLevel || 1) < SETTLER_CONVOY_DEF.bridgeRequiredHqLevel) return false;
+  return sitePlan.reviewStatus === 'reviewed'
+    && ['reviewed_claim_ready', 'claim_ready'].includes(String(sitePlan.promotionStatus || '').toLowerCase());
+}
+
+function convoyRouteForClaim(claimId, sitePlan, nowMs) {
+  return {
+    routeId: `route_${claimId}`,
+    from: { kind: 'plot', id: sitePlan.originPlotId },
+    to: { kind: 'site_plan', id: sitePlan.planId },
+    direction: 'east',
+    progress: 0,
+    visualOnlyProjection: true,
+    createdAt: Number(nowMs)
+  };
+}
+
+function buildSettlementClaimFromSitePlan(bundle, sitePlan, job, actor, nowMs) {
+  const claimId = `claim_${hashPayload({
+    ownerPairId: bundle.ownerPairId || bundle.plot.pairId,
+    originPlotId: bundle.plot.plotId,
+    sitePlanId: sitePlan.planId
+  }).slice(0, 16)}`;
+  return {
+    claimId,
+    ownerPairId: bundle.ownerPairId || bundle.plot.pairId,
+    originPlotId: bundle.plot.plotId,
+    sitePlanId: sitePlan.planId,
+    reportId: sitePlan.reportId,
+    foundedPlotId: null,
+    convoyJobId: job.jobId,
+    approvalId: null,
+    status: 'CONVOY_PREPARING',
+    title: sitePlan.title,
+    focus: sitePlan.focus,
+    siteType: sitePlan.siteType,
+    risk: sitePlan.risk,
+    traits: clone(sitePlan.traits || []),
+    resourceHints: clone(sitePlan.resourceHints || {}),
+    route: convoyRouteForClaim(claimId, sitePlan, nowMs),
+    cost: clone(SETTLER_CONVOY_DEF.cost),
+    receipt: {
+      kind: 'settler_convoy_prepared',
+      planId: sitePlan.planId,
+      reportId: sitePlan.reportId,
+      cost: clone(SETTLER_CONVOY_DEF.cost),
+      durationMs: SETTLER_CONVOY_DEF.durationMs,
+      authorityBoundary: 'engine_owned_expansion_claim_no_world_map'
+    },
+    createdBy: actor,
+    createdAt: Number(nowMs),
+    updatedAt: Number(nowMs),
+    convoyStartedAt: Number(job.startedAt),
+    convoyEndsAt: Number(job.endsAt),
+    foundedAt: null
+  };
+}
+
+function markCompletedSettlerConvoyJob(bundle, building, job, pendingEvents, nowMs) {
+  const claim = store.getSettlementClaim(job.output?.claimId);
+  if (!claim || claim.status === 'FOUNDED') {
+    job.status = 'CLAIMED';
+    job.updatedAt = nowMs;
+    if (building) {
+      building.state = 'READY';
+      building.updatedAt = nowMs;
+    }
+    return;
+  }
+  claim.status = 'CONVOY_ARRIVED';
+  claim.updatedAt = nowMs;
+  claim.route = {
+    ...(claim.route || {}),
+    progress: 1,
+    arrivedAt: Number(nowMs),
+    visualOnlyProjection: true
+  };
+  claim.receipt = {
+    ...(claim.receipt || {}),
+    arrivedAt: Number(nowMs),
+    kind: 'settler_convoy_arrived'
+  };
+  store.writeSettlementClaim(claim);
+  bundle.settlementClaims = normalizeSettlementClaims(store.listSettlementClaimsByOwner(claim.ownerPairId));
+  job.status = 'CLAIMED';
+  job.updatedAt = nowMs;
+  if (building) {
+    building.state = 'READY';
+    building.updatedAt = nowMs;
+  }
+  createEvent(pendingEvents, {
+    plotId: bundle.plot.plotId,
+    eventType: 'SETTLER_CONVOY_ARRIVED',
+    actor: job.createdBy,
+    buildingId: building?.buildingId || null,
+    jobId: job.jobId,
+    summary: `Settler Convoy arrived for ${claim.title}.`,
+    explanation: 'The convoy arrived at the reviewed Site Plan. Founding a settlement still requires an explicit action.',
+    data: {
+      claimId: claim.claimId,
+      sitePlanId: claim.sitePlanId,
+      status: claim.status,
+      createsSecondPlot: false
+    },
+    createdAt: nowMs
+  });
+}
+
 function completeConstructionOrUpgrade(bundle, building, job, pendingEvents, nowMs) {
   job.status = 'CLAIMED';
   job.updatedAt = nowMs;
@@ -1201,7 +3890,7 @@ function completeConstructionOrUpgrade(bundle, building, job, pendingEvents, now
   }
 
   if (building.type === 'HQ') {
-    bundle.plot.hqLevel = Math.min(5, bundle.plot.hqLevel + 1);
+    bundle.plot.hqLevel = Math.min(6, bundle.plot.hqLevel + 1);
     building.level = bundle.plot.hqLevel;
     building.state = 'READY';
     applyRuleChangesForHq(bundle.plot);
@@ -1274,11 +3963,19 @@ function simulateBundleTo(bundle, targetMs, pendingEvents) {
         completeConstructionOrUpgrade(bundle, building, job, pendingEvents, eventTime);
         continue;
       }
-      if (building.type === 'WORKSHOP') {
-        markCompletedWorkshopJob(bundle, building, job, pendingEvents, eventTime);
+      if (job.kind === 'SETTLER_CONVOY') {
+        markCompletedSettlerConvoyJob(bundle, building, job, pendingEvents, eventTime);
         continue;
       }
-      markCompletedProductionJob(bundle, building, job, pendingEvents, eventTime);
+	      if (building.type === 'WORKSHOP') {
+	        markCompletedWorkshopJob(bundle, building, job, pendingEvents, eventTime);
+	        continue;
+	      }
+	      if (job.kind === 'SCOUT') {
+	        markCompletedScoutJob(bundle, building, job, pendingEvents, eventTime);
+	        continue;
+	      }
+	      markCompletedProductionJob(bundle, building, job, pendingEvents, eventTime);
     }
   }
 
@@ -1330,7 +4027,7 @@ function withIdempotency({
 }) {
   return store.withTransaction(() => {
     const bundle = ensurePlotBundle({ pairId, houseId, plotId, nowMs });
-    if (!verifyPlotId(bundle, plotId)) {
+    if (!verifyPlotAccess(bundle, pairId, plotId, nowMs)) {
       return errorEnvelope(plotId, 'UNAUTHORIZED', 'Requested plot does not match the current session plot.', false);
     }
 
@@ -1380,7 +4077,7 @@ function getFoundersPlotState({
 }) {
   return store.withTransaction(() => {
     const bundle = ensurePlotBundle({ pairId, houseId, plotId, nowMs });
-    if (!verifyPlotId(bundle, plotId)) {
+    if (!verifyPlotAccess(bundle, pairId, plotId, nowMs)) {
       return errorEnvelope(plotId, 'UNAUTHORIZED', 'Requested plot does not match the current session plot.', false);
     }
 
@@ -1410,7 +4107,7 @@ function setFoundersPlotPolicy({
 }) {
   return store.withTransaction(() => {
     const bundle = ensurePlotBundle({ pairId, houseId, plotId, nowMs });
-    if (!verifyPlotId(bundle, plotId)) {
+    if (!verifyPlotAccess(bundle, pairId, plotId, nowMs)) {
       return errorEnvelope(plotId, 'UNAUTHORIZED', 'Requested plot does not match the current session plot.', false);
     }
     const availability = policyAvailabilityForHq(bundle.plot.hqLevel);
@@ -1741,7 +4438,8 @@ function queueJob({
       if (!def || typeof def.produces !== 'function') {
         return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'This building cannot queue jobs.', false);
       }
-      const spec = def.produces(building.level);
+      const baseSpec = def.produces(building.level);
+      const spec = applyDoctrineEffectsToJobSpec(bundle, building.type, baseSpec);
       const safeKind = String(kind || '').trim().toUpperCase();
       if (safeKind !== spec.kind) {
         return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', `Expected job kind ${spec.kind} for this building.`, false);
@@ -1783,11 +4481,13 @@ function queueJob({
         startedAt: nowMs,
         endsAt: nowMs + Number(spec.durationMs || 0),
         durationMs: Number(spec.durationMs || 0),
-        status: 'RUNNING',
-        createdBy: safeActor,
-        explanation: safeKind === 'SELL'
-          ? 'Sell surplus food for a controlled coin return.'
-          : `Queue ${BUILDING_LABELS[building.type]} production to relieve the current bottleneck.`,
+	        status: 'RUNNING',
+	        createdBy: safeActor,
+	        explanation: safeKind === 'SELL'
+	          ? 'Sell surplus food for a controlled coin return.'
+	          : safeKind === 'SCOUT'
+	            ? 'Dispatch a scout to turn post-HQ3 expansion into a concrete report receipt.'
+	            : `Queue ${BUILDING_LABELS[building.type]} production to relieve the current bottleneck.`,
         createdAt: nowMs,
         updatedAt: nowMs
       };
@@ -1798,12 +4498,15 @@ function queueJob({
         actor: safeActor,
         buildingId: building.buildingId,
         jobId: job.jobId,
-        summary: `${BUILDING_LABELS[building.type]} queued a ${spec.kind.toLowerCase()} job.`,
+	        summary: `${BUILDING_LABELS[building.type]} queued a ${spec.kind.toLowerCase()} job.`,
         explanation: job.explanation,
         data: {
           input: clone(job.input),
           output: clone(job.output),
-          kind: job.kind
+          kind: job.kind,
+          baseDurationMs: Number(spec.baseDurationMs || job.durationMs),
+          durationMs: job.durationMs,
+          doctrineEffect: spec.doctrineEffect ? clone(spec.doctrineEffect) : null
         },
         createdAt: nowMs
       });
@@ -1857,18 +4560,21 @@ function collectOutputs({
         if (denied) return denied;
       }
       let collected = {};
-      if (building.type === 'WORKSHOP') {
-        const buffPct = Number(BUILDING_DEFS.WORKSHOP.produces(building.level).buffPct || 20);
-        bundle.plot.nextBuildBuffPct = buffPct;
-        collected = { construction_buff_pct: buffPct };
-        building.outputBuffer = {};
-      } else {
-        const transfer = addResourcesWithCaps(bundle.plot.inventory, building.outputBuffer || {}, bundle.plot.storageCaps);
-        bundle.plot.inventory = transfer.inventory;
-        building.outputBuffer = transfer.remainder;
-        collected = transfer.applied;
-      }
-      const stillBuffered = RESOURCE_KEYS.some((key) => Number(building.outputBuffer?.[key] || 0) > 0);
+	      if (building.type === 'WORKSHOP') {
+	        const buffPct = Number(BUILDING_DEFS.WORKSHOP.produces(building.level).buffPct || 20);
+	        bundle.plot.nextBuildBuffPct = buffPct;
+	        collected = { construction_buff_pct: buffPct };
+	        building.outputBuffer = {};
+	      } else if (building.type === 'EXPEDITION_BOARD') {
+	        collected = collectScoutReport(bundle, building, nowMs);
+	      } else {
+	        const transfer = addResourcesWithCaps(bundle.plot.inventory, building.outputBuffer || {}, bundle.plot.storageCaps);
+	        bundle.plot.inventory = transfer.inventory;
+	        building.outputBuffer = transfer.remainder;
+	        collected = transfer.applied;
+	      }
+	      const stillBuffered = RESOURCE_KEYS.some((key) => Number(building.outputBuffer?.[key] || 0) > 0)
+	        || !!building.outputBuffer?.scoutReport;
       building.state = stillBuffered ? 'OUTPUT_READY' : 'READY';
       building.updatedAt = nowMs;
       const completedJob = bundle.jobs
@@ -1889,9 +4595,11 @@ function collectOutputs({
         actor: safeActor,
         buildingId: building.buildingId,
         jobId: completedJob?.jobId || null,
-        summary: building.type === 'WORKSHOP'
-          ? `Workshop output collected. The next construction now has a ${bundle.plot.nextBuildBuffPct}% speed buff.`
-          : `${BUILDING_LABELS[building.type]} outputs were collected.`,
+	        summary: building.type === 'WORKSHOP'
+	          ? `Workshop output collected. The next construction now has a ${bundle.plot.nextBuildBuffPct}% speed buff.`
+	          : building.type === 'EXPEDITION_BOARD'
+	            ? `Scout report collected: ${collected.report?.title || 'nearby site report'}.`
+	            : `${BUILDING_LABELS[building.type]} outputs were collected.`,
         explanation: safeActor === 'AGENT'
           ? 'The foreman collected finished outputs because the policy toggle is enabled.'
           : 'Collected manually from the building output buffer.',
@@ -1906,6 +4614,1754 @@ function collectOutputs({
       return {
         ok: true,
         extras: { collected }
+      };
+    }
+  });
+}
+
+function draftSitePlan({
+  pairId,
+  houseId = null,
+  plotId = null,
+  reportId,
+  title = '',
+  focus = 'balanced',
+  actor = 'HUMAN',
+  idempotencyKey,
+  nowMs
+}) {
+  return withIdempotency({
+    pairId,
+    houseId,
+    plotId,
+    actionName: 'draft_site_plan',
+    idempotencyKey,
+    requestPayload: { reportId, title, focus, actor },
+    nowMs,
+    mutator(bundle, pendingEvents) {
+      const safeActor = mutationActor(actor);
+      if (Number(bundle.plot.hqLevel || 1) < 3) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Site Plans unlock after HQ Level 3 and the first Scout Report.', false, {
+          reason: 'hq_locked'
+        });
+      }
+      const reports = normalizeScoutReports(bundle.plot.scoutReports);
+      const safeReportId = safeText(reportId, '', 120);
+      const report = reports.find((entry) => entry.reportId === safeReportId);
+      if (!report) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'A Site Plan must be grounded in a collected Scout Report.', false, {
+          reason: 'missing_scout_report'
+        });
+      }
+      const existing = normalizeSitePlans(bundle.plot.sitePlans).find((plan) => plan.reportId === report.reportId);
+      if (existing) {
+        return {
+          ok: true,
+          extras: { sitePlan: clone(existing), existing: true }
+        };
+      }
+      const sitePlan = buildSitePlanFromReport(bundle, report, { title, focus }, nowMs);
+      const nextPlans = normalizeSitePlans([...(bundle.plot.sitePlans || []), sitePlan]);
+      bundle.plot.sitePlans = nextPlans;
+      createEvent(pendingEvents, {
+        plotId: bundle.plot.plotId,
+        eventType: 'SITE_PLAN_DRAFTED',
+        actor: safeActor,
+        summary: `Site Plan drafted from ${report.title}.`,
+        explanation: 'A Scout Report became a canonical planning record, but no territory or second plot was claimed.',
+        data: {
+          planId: sitePlan.planId,
+          reportId: report.reportId,
+          focus: sitePlan.focus,
+          promotionStatus: sitePlan.promotionStatus,
+          authorityBoundary: sitePlan.authorityBoundary
+        },
+        createdAt: nowMs
+      });
+      return {
+        ok: true,
+        extras: { sitePlan: clone(sitePlan), existing: false }
+      };
+    }
+  });
+}
+
+function reviewSitePlan({
+  pairId,
+  houseId = null,
+  plotId = null,
+  planId,
+  reviewNote = '',
+  actor = 'HUMAN',
+  idempotencyKey,
+  nowMs
+}) {
+  return withIdempotency({
+    pairId,
+    houseId,
+    plotId,
+    actionName: 'review_site_plan',
+    idempotencyKey,
+    requestPayload: { planId, reviewNote, actor },
+    nowMs,
+    mutator(bundle, pendingEvents) {
+      const safeActor = mutationActor(actor);
+      if (Number(bundle.plot.hqLevel || 1) < 6) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Site Plan review unlocks at HQ Level 6 Settlement Charter.', false, {
+          reason: 'hq_locked',
+          requiredHqLevel: 6
+        });
+      }
+      const safePlanId = safeText(planId, '', 120);
+      const reports = normalizeScoutReports(bundle.plot.scoutReports);
+      const reportIds = new Set(reports.map((report) => report.reportId));
+      const plans = normalizeSitePlans(bundle.plot.sitePlans);
+      const planIndex = plans.findIndex((entry) => entry.planId === safePlanId);
+      if (planIndex < 0) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'A reviewed Site Plan must start from an existing canonical Site Plan draft.', false, {
+          reason: 'missing_site_plan'
+        });
+      }
+      const plan = plans[planIndex];
+      if (!reportIds.has(plan.reportId)) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'A reviewed Site Plan must remain grounded in its collected Scout Report.', false, {
+          reason: 'missing_scout_report',
+          reportId: plan.reportId
+        });
+      }
+      if (plan.reviewStatus === 'reviewed' || plan.promotionStatus === 'reviewed_claim_ready') {
+        return {
+          ok: true,
+          extras: { sitePlan: clone(plan), existing: true }
+        };
+      }
+      const reviewed = {
+        ...plan,
+        status: 'REVIEWED',
+        promotionStatus: 'reviewed_claim_ready',
+        reviewStatus: 'reviewed',
+        authorityBoundary: 'claim_ready_planning_only_no_territory',
+        reviewedAt: Number(nowMs),
+        reviewNote: safeText(reviewNote, 'Reviewed for future claim readiness. No territory or second plot created.', 320),
+        recommendedNext: 'Hold for HQ7 Settler Convoy claim rules before creating territory, routes, convoys, or a second plot.'
+      };
+      plans[planIndex] = reviewed;
+      bundle.plot.sitePlans = normalizeSitePlans(plans);
+      createEvent(pendingEvents, {
+        plotId: bundle.plot.plotId,
+        eventType: 'SITE_PLAN_REVIEWED',
+        actor: safeActor,
+        summary: `Site Plan reviewed for claim readiness: ${reviewed.title}.`,
+        explanation: 'HQ6 Settlement Charter review marks the plan as claim-ready planning state only; no territory, route, convoy, resource payout, or second plot was created.',
+        data: {
+          planId: reviewed.planId,
+          reportId: reviewed.reportId,
+          promotionStatus: reviewed.promotionStatus,
+          reviewStatus: reviewed.reviewStatus,
+          authorityBoundary: reviewed.authorityBoundary,
+          reviewedAt: reviewed.reviewedAt
+        },
+        createdAt: nowMs
+      });
+      return {
+        ok: true,
+        extras: { sitePlan: clone(reviewed), existing: false }
+      };
+    }
+  });
+}
+
+function selectDoctrine({
+  pairId,
+  houseId = null,
+  plotId = null,
+  doctrineId,
+  actor = 'HUMAN',
+  idempotencyKey,
+  nowMs
+}) {
+  return withIdempotency({
+    pairId,
+    houseId,
+    plotId,
+    actionName: 'select_doctrine',
+    idempotencyKey,
+    requestPayload: { doctrineId, actor },
+    nowMs,
+    mutator(bundle, pendingEvents) {
+      const safeActor = mutationActor(actor);
+      const safeDoctrineId = safeText(doctrineId, '', 80).toLowerCase();
+      const doctrine = DOCTRINE_CATALOG[safeDoctrineId];
+      if (!doctrine) {
+        return errorEnvelope(bundle.plot.plotId, 'UNKNOWN_DOCTRINE', 'Doctrine is not in the engine-owned doctrine catalog.', false, {
+          doctrineId: safeDoctrineId || null
+        });
+      }
+      const availability = doctrineAvailability(bundle, doctrine);
+      if (!availability.unlocked) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Research Lodge doctrine stance unlocks after HQ6 and a founded outpost.', false, {
+          reason: availability.hqLevel < doctrine.unlockHqLevel ? 'hq_locked' : 'outpost_required',
+          ...availability
+        });
+      }
+      if (safeActor === 'AGENT') {
+        const approval = consumeActionApproval(bundle, 'select_doctrine', { doctrineId: safeDoctrineId }, nowMs);
+        if (!approval) {
+          return errorEnvelope(bundle.plot.plotId, 'FORBIDDEN_POLICY', 'Agent doctrine selection requires matching human approval.', true, {
+            requiresApproval: true,
+            actionName: 'select_doctrine',
+            doctrineId: safeDoctrineId
+          });
+        }
+      }
+      const previous = normalizeDoctrineState(bundle.plot.doctrineState);
+      if (previous.selectedDoctrineId === safeDoctrineId && previous.status === 'SELECTED') {
+        return {
+          ok: true,
+          extras: {
+            doctrineState: clone(previous),
+            doctrine: clone(doctrine),
+            existing: true
+          }
+        };
+      }
+      const next = {
+        selectedDoctrineId: safeDoctrineId,
+        status: 'SELECTED',
+        selectedAt: Number(nowMs),
+        selectedBy: safeActor,
+        revision: Number(previous.revision || 0) + 1,
+        authorityBoundary: doctrine.authorityBoundary,
+        receiptEventType: 'DOCTRINE_SELECTED'
+      };
+      bundle.plot.doctrineState = normalizeDoctrineState(next);
+      createEvent(pendingEvents, {
+        plotId: bundle.plot.plotId,
+        eventType: 'DOCTRINE_SELECTED',
+        actor: safeActor,
+        summary: `Research Lodge doctrine stance selected: ${doctrine.title}.`,
+        explanation: 'This HQ8B doctrine has one server-owned effect: Expedition Board SCOUT duration is reduced by 5%. It does not change costs, outputs, settlement, routes, cohorts, or cross-plot math.',
+        data: {
+          doctrineId: doctrine.doctrineId,
+          previousDoctrineId: previous.selectedDoctrineId,
+          effectKind: doctrine.effectKind,
+          effectValue: clone(doctrine.effectValue || null),
+          gameplayBuff: doctrine.gameplayBuff === true,
+          cost: clone(doctrine.cost || {}),
+          authorityBoundary: doctrine.authorityBoundary,
+          reversible: doctrine.reversibility
+        },
+        createdAt: nowMs
+      });
+      if (safeActor === 'AGENT') {
+        markAgentAction(bundle, pendingEvents, 'select_doctrine', 'Foreman selected an engine-owned doctrine after matching human approval.', nowMs);
+      }
+      return {
+        ok: true,
+        extras: {
+          doctrineState: clone(bundle.plot.doctrineState),
+          doctrine: clone(doctrine),
+          existing: false
+        }
+      };
+    }
+  });
+}
+
+function createWorkOrderDraft({
+  pairId,
+  houseId = null,
+  plotId = null,
+  templateId,
+  scope = {},
+  actor = 'HUMAN',
+  idempotencyKey,
+  nowMs
+}) {
+  return withIdempotency({
+    pairId,
+    houseId,
+    plotId,
+    actionName: 'create_work_order_draft',
+    idempotencyKey,
+    requestPayload: { templateId, scope, actor },
+    nowMs,
+    mutator(bundle, pendingEvents) {
+      const safeActor = mutationActor(actor);
+      const safeTemplateId = safeText(templateId, '', 120).toLowerCase();
+      const template = WORK_ORDER_TEMPLATES[safeTemplateId];
+      if (!template) {
+        return errorEnvelope(bundle.plot.plotId, 'UNKNOWN_WORK_ORDER_TEMPLATE', 'Work order template is not in the engine-owned template catalog.', false, {
+          templateId: safeTemplateId || null
+        });
+      }
+      const availability = workOrderTemplateAvailability(bundle, template);
+      if (!availability.unlocked) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Cohort work-order drafts unlock after HQ6, a founded outpost, and the first selected doctrine.', false, {
+          ...availability
+        });
+      }
+      const scoped = workOrderScopeForTemplate(bundle, template, scope);
+      if (!scoped.ok) return scoped.error;
+      const workOrder = {
+        workOrderId: randomId('work_order'),
+        plotId: bundle.plot.plotId,
+        templateId: template.templateId,
+        status: 'DRAFT',
+        title: template.title,
+        scope: scoped.scope,
+        allowedActions: clone(template.allowedActions || []),
+        caps: clone(template.caps || {}),
+        policySnapshot: {
+          collectOutputs: bundle.policy.collectOutputs === true,
+          queueProduction: bundle.policy.queueProduction === true,
+          setPriority: bundle.policy.setPriority === true,
+          sellSurplusFood: bundle.policy.sellSurplusFood === true,
+          emergencyPause: bundle.policy.emergencyPause === true,
+          maxAutonomousActionsPerHour: Number(bundle.policy.maxAutonomousActionsPerHour || 0)
+        },
+        childReceipts: [],
+        createdBy: safeActor,
+        approvedBy: null,
+        failureReason: null,
+        createdAt: Number(nowMs),
+        updatedAt: Number(nowMs),
+        expiresAt: Number(nowMs) + 24 * 60 * 60 * 1000
+      };
+      const persisted = store.writeWorkOrder(workOrder);
+      bundle.workOrders = normalizeWorkOrders(store.listWorkOrdersByPlot(bundle.plot.plotId));
+      createEvent(pendingEvents, {
+        plotId: bundle.plot.plotId,
+        eventType: 'WORK_ORDER_DRAFTED',
+        actor: safeActor,
+        summary: `Cohort work-order draft created: ${template.title}.`,
+        explanation: 'This HQ9A draft records a bounded cohort plan with caps and allowed actions. It does not execute child actions.',
+        data: {
+          workOrderId: persisted.workOrderId,
+          templateId: persisted.templateId,
+          status: persisted.status,
+          allowedActions: clone(persisted.allowedActions),
+          caps: clone(persisted.caps),
+          executionAvailable: true,
+          authorityBoundary: template.authorityBoundary
+        },
+        createdAt: nowMs
+      });
+      return {
+        ok: true,
+        extras: {
+          workOrder: clone(persisted),
+          template: clone(publicWorkOrderTemplates(bundle).find((entry) => entry.templateId === template.templateId) || null),
+          executionAvailable: true
+        }
+      };
+    }
+  });
+}
+
+function executeWorkOrder({
+  pairId,
+  houseId = null,
+  plotId = null,
+  workOrderId,
+  actor = 'HUMAN',
+  idempotencyKey,
+  nowMs
+}) {
+  return withIdempotency({
+    pairId,
+    houseId,
+    plotId,
+    actionName: 'execute_work_order',
+    idempotencyKey,
+    requestPayload: { workOrderId, actor },
+    nowMs,
+    mutator(bundle, pendingEvents) {
+      const safeActor = mutationActor(actor);
+      const safeWorkOrderId = safeText(workOrderId, '', 120);
+      const workOrder = normalizeWorkOrders(bundle.workOrders).find((entry) => entry.workOrderId === safeWorkOrderId);
+      if (!workOrder) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Work order not found on this plot.', false, {
+          workOrderId: safeWorkOrderId || null
+        });
+      }
+      if (workOrder.status !== 'DRAFT') {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Only DRAFT work orders can be executed once.', false, {
+          workOrderId: workOrder.workOrderId,
+          status: workOrder.status
+        });
+      }
+      if (workOrder.plotId !== bundle.plot.plotId || safeText(workOrder.scope?.plotId, bundle.plot.plotId, 120) !== bundle.plot.plotId) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Work orders may only execute against their current plot scope.', false, {
+          workOrderId: workOrder.workOrderId,
+          orderPlotId: workOrder.plotId
+        });
+      }
+      if (workOrder.expiresAt != null && Number(workOrder.expiresAt) < Number(nowMs)) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Work order draft has expired and must be recreated.', false, {
+          workOrderId: workOrder.workOrderId,
+          status: 'EXPIRED'
+        });
+      }
+      const template = workOrderTemplateForExecution(workOrder);
+      if (!template || !workOrderAllowedActionsAreSafe(workOrder, template)) {
+        return errorEnvelope(bundle.plot.plotId, 'UNKNOWN_WORK_ORDER_TEMPLATE', 'Only engine-defined collect_ready_outputs_once work orders can execute in HQ9B.', false, {
+          workOrderId: workOrder.workOrderId,
+          templateId: workOrder.templateId
+        });
+      }
+      const availability = workOrderTemplateAvailability(bundle, template);
+      if (!availability.unlocked) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Work order execution requires the live HQ9B unlock state.', false, {
+          workOrderId: workOrder.workOrderId,
+          ...availability
+        });
+      }
+      const readyBuildings = workOrderReadyBuildings(bundle, workOrder, template);
+      if (!readyBuildings.length) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Work order has no ready outputs to collect.', true, {
+          workOrderId: workOrder.workOrderId,
+          reason: 'no_ready_outputs'
+        });
+      }
+      if (safeActor === 'AGENT') {
+        const approval = pendingApprovalForAction(bundle, 'execute_work_order', { workOrderId: workOrder.workOrderId });
+        if (!approval) {
+          return errorEnvelope(bundle.plot.plotId, 'FORBIDDEN_POLICY', 'Agent work-order execution requires matching human approval.', true, {
+            requiresApproval: true,
+            actionName: 'execute_work_order',
+            requestedParams: { workOrderId: workOrder.workOrderId }
+          });
+        }
+        const firstChildDenied = assertAgentPolicyForWorkOrderChild(bundle, pendingEvents, {
+          nowMs,
+          actionName: 'collect_outputs'
+        });
+        if (firstChildDenied) return firstChildDenied;
+        const recentActions = countAgentActionsLastHour(bundle, nowMs) + pendingAgentActionCountLastHour(pendingEvents, nowMs);
+        if ((recentActions + readyBuildings.length) > Number(bundle.policy.maxAutonomousActionsPerHour || 0)) {
+          return errorEnvelope(bundle.plot.plotId, 'RATE_LIMITED', 'Agent hourly action cap reached for this work order.', true, {
+            reason: 'hourly_cap',
+            requestedChildActions: readyBuildings.length
+          });
+        }
+        consumeActionApproval(bundle, 'execute_work_order', { workOrderId: workOrder.workOrderId }, nowMs);
+      }
+      const childReceipts = [];
+      for (const [index, building] of readyBuildings.entries()) {
+        if (building.plotId !== bundle.plot.plotId || building.state !== 'OUTPUT_READY') {
+          return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Work order child collection must revalidate a ready same-plot output.', true, {
+            workOrderId: workOrder.workOrderId,
+            buildingId: building.buildingId,
+            reason: 'child_live_state_revalidation_failed'
+          });
+        }
+        if (safeActor === 'AGENT') {
+          const childDenied = assertAgentPolicyForWorkOrderChild(bundle, pendingEvents, {
+            nowMs,
+            actionName: 'collect_outputs'
+          });
+          if (childDenied) return childDenied;
+        }
+        const childIdempotencyKey = `${idempotencyKey}:child:${index + 1}:${building.buildingId}`;
+        const receipt = collectReadyOutputForWorkOrder(bundle, building, {
+          actor: safeActor,
+          nowMs,
+          pendingEvents,
+          parentWorkOrderId: workOrder.workOrderId,
+          childIdempotencyKey
+        });
+        childReceipts.push(receipt);
+      }
+      const updated = {
+        ...workOrder,
+        status: 'COMPLETED',
+        childReceipts,
+        approvedBy: safeActor === 'AGENT' ? 'HUMAN_APPROVAL' : null,
+        failureReason: null,
+        updatedAt: nowMs
+      };
+      const persisted = store.writeWorkOrder(updated);
+      bundle.workOrders = normalizeWorkOrders(store.listWorkOrdersByPlot(bundle.plot.plotId));
+      createEvent(pendingEvents, {
+        plotId: bundle.plot.plotId,
+        eventType: 'WORK_ORDER_EXECUTED',
+        actor: safeActor,
+        summary: `Cohort work order executed: ${persisted.title}.`,
+        explanation: 'HQ9B executes only collect_ready_outputs_once, collecting at most two ready outputs on the same plot with no spend or cross-plot mutation.',
+        data: {
+          workOrderId: persisted.workOrderId,
+          templateId: persisted.templateId,
+          status: persisted.status,
+          childReceiptCount: childReceipts.length,
+          childReceipts: clone(childReceipts),
+          caps: clone(template.caps || {}),
+          authorityBoundary: template.authorityBoundary
+        },
+        createdAt: nowMs
+      });
+      return {
+        ok: true,
+        extras: {
+          workOrder: clone(persisted),
+          childReceipts: clone(childReceipts),
+          executedChildCount: childReceipts.length,
+          executionAvailable: true
+        }
+      };
+    }
+  });
+}
+
+function getWorldGridStatus({
+  pairId,
+  houseId = null,
+  plotId = null,
+  nowMs
+}) {
+  return store.withTransaction(() => {
+    const bundle = ensurePlotBundle({ pairId, houseId, plotId, nowMs });
+    if (!verifyPlotAccess(bundle, pairId, plotId, nowMs)) {
+      return errorEnvelope(plotId, 'UNAUTHORIZED', 'Requested plot does not belong to the current session.', false);
+    }
+    return successEnvelope({
+      plotId: bundle.plot.plotId,
+      worldDelta: [],
+      stateHash: computeStateHash(bundleSnapshot(bundle)),
+      extras: {
+        worldGrid: worldGridReadModel(bundle)
+      }
+    });
+  });
+}
+
+function getExpeditionMapStatus({
+  pairId,
+  houseId = null,
+  plotId = null,
+  nowMs
+}) {
+  return store.withTransaction(() => {
+    const bundle = ensurePlotBundle({ pairId, houseId, plotId, nowMs });
+    if (!verifyPlotAccess(bundle, pairId, plotId, nowMs)) {
+      return errorEnvelope(plotId, 'UNAUTHORIZED', 'Requested plot does not belong to the current session.', false);
+    }
+    return successEnvelope({
+      plotId: bundle.plot.plotId,
+      worldDelta: [],
+      stateHash: computeStateHash(bundleSnapshot(bundle)),
+      extras: {
+        expeditionMap: buildExpeditionMapReadModel(bundle)
+      }
+    });
+  });
+}
+
+function scoutSectorBoundaryFlags() {
+  return {
+    samePlotOnly: true,
+    serverOwnedDiscoveryReceipt: true,
+    revealsExactlyOneSector: true,
+    autonomousMovement: false,
+    resourceHarvesting: false,
+    resourceDelta: {},
+    routeCreation: false,
+    tradeRouteCreation: false,
+    backgroundScheduling: false,
+    combat: false,
+    publicSharing: false,
+    generatedUniverseRendering: false,
+    crossPlotMutation: false,
+    atlasExecution: false,
+    externalEffects: false
+  };
+}
+
+function knownOrDiscoveredCellIds(map) {
+  return new Set((Array.isArray(map?.cells) ? map.cells : [])
+    .filter((cell) => cell.fogState === 'known' || cell.fogState === 'discovered')
+    .map((cell) => cell.cellId));
+}
+
+function buildScoutSectorProof({ beforeMap, afterMap, targetCell, scoutSector, alreadyScouted = false }) {
+  const beforeKnown = knownOrDiscoveredCellIds(beforeMap);
+  const afterKnown = knownOrDiscoveredCellIds(afterMap);
+  const afterTarget = (afterMap.cells || []).find((cell) => cell.cellId === targetCell.cellId) || null;
+  return {
+    actionName: 'et.plot.scout_sector',
+    plotId: scoutSector.plotId,
+    scoutId: scoutSector.scoutId,
+    cellId: targetCell.cellId,
+    sourceCellId: scoutSector.sourceCellId || null,
+    alreadyScouted,
+    beforeProjectionHash: beforeMap.projectionHash,
+    afterProjectionHash: afterMap.projectionHash,
+    targetBeforeFogState: targetCell.fogState || null,
+    targetAfterFogState: afterTarget?.fogState || null,
+    beforeFogCounts: clone(beforeMap.fog?.counts || {}),
+    afterFogCounts: clone(afterMap.fog?.counts || {}),
+    newlyKnownOrDiscoveredCellIds: Array.from(afterKnown).filter((cellId) => !beforeKnown.has(cellId)).sort(),
+    eventPacketId: scoutSector.eventPacket?.packetId || null,
+    boundaryFlags: scoutSectorBoundaryFlags()
+  };
+}
+
+function scoutExpeditionSector({
+  pairId,
+  houseId = null,
+  plotId = null,
+  cellId = null,
+  actor = 'HUMAN',
+  actorType = null,
+  idempotencyKey,
+  nowMs
+}) {
+  const requestedCellId = safeText(cellId, '', 80);
+  const requestedActor = mutationActor(actorType || actor);
+  return withIdempotency({
+    pairId,
+    houseId,
+    plotId,
+    actionName: 'scout_sector',
+    idempotencyKey,
+    requestPayload: { cellId: requestedCellId, actor: requestedActor },
+    nowMs,
+    mutator(bundle, pendingEvents) {
+      const beforeMap = buildExpeditionMapReadModel(bundle);
+      const existingScout = requestedCellId
+        ? normalizeExpeditionScouts(bundle.plot.expeditionScouts)
+          .find((entry) => entry.cellId === requestedCellId)
+        : null;
+      if (existingScout) {
+        const afterMap = buildExpeditionMapReadModel(bundle);
+        const targetCell = afterMap.cells.find((cell) => cell.cellId === existingScout.cellId) || {
+          cellId: existingScout.cellId,
+          fogState: 'known'
+        };
+        return {
+          ok: true,
+          extras: {
+            scoutSector: clone(existingScout),
+            sector: clone(existingScout),
+            eventPacket: clone(existingScout.eventPacket),
+            alreadyScouted: true,
+            revealedCellId: existingScout.cellId,
+            proof: buildScoutSectorProof({
+              beforeMap,
+              afterMap,
+              targetCell,
+              scoutSector: existingScout,
+              alreadyScouted: true
+            }),
+            expeditionMap: afterMap
+          }
+        };
+      }
+
+      const hintedCells = (beforeMap.cells || [])
+        .filter((cell) => cell.fogState === 'hinted' && cell.kind === 'frontier_hint')
+        .sort((a, b) => a.q - b.q || a.r - b.r || a.cellId.localeCompare(b.cellId));
+      const targetCell = requestedCellId
+        ? hintedCells.find((cell) => cell.cellId === requestedCellId)
+        : hintedCells[0];
+      if (!targetCell) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Scout Sector requires one eligible hinted frontier cell on the current plot.', false, {
+          reason: requestedCellId ? 'hinted_frontier_cell_required' : 'no_hinted_frontier_cells',
+          cellId: requestedCellId || null,
+          availableHintedCellIds: hintedCells.map((cell) => cell.cellId)
+        });
+      }
+
+      const approvalParams = { cellId: targetCell.cellId };
+      let consumedApproval = null;
+      if (requestedActor === 'AGENT') {
+        consumedApproval = consumeActionApproval(bundle, 'scout_sector', approvalParams, nowMs);
+        if (!consumedApproval) {
+          return errorEnvelope(bundle.plot.plotId, 'FORBIDDEN_POLICY', 'Agent Scout Sector requires matching human approval.', true, {
+            requiresApproval: true,
+            actionName: 'scout_sector',
+            requestedParams: approvalParams
+          });
+        }
+      }
+
+      const sourceCellId = safeText(targetCell.sourceIds?.adjacentCellId || targetCell.sources?.[0]?.id, '', 80) || null;
+      const scoutId = randomId('expedition_scout');
+      const receipt = {
+        kind: 'scout_sector_receipt',
+        actionName: 'et.plot.scout_sector',
+        scoutId,
+        plotId: bundle.plot.plotId,
+        cellId: targetCell.cellId,
+        sourceCellId,
+        sourceFogState: targetCell.fogState,
+        beforeProjectionHash: beforeMap.projectionHash,
+        authorityBoundary: EXPEDITION_SCOUT_SECTOR_AUTHORITY_BOUNDARY,
+        createdBy: requestedActor,
+        approvedBy: requestedActor === 'AGENT' ? 'HUMAN_APPROVAL' : null,
+        scoutedAt: Number(nowMs),
+        ...scoutSectorBoundaryFlags()
+      };
+      const scoutSector = {
+        scoutId,
+        plotId: bundle.plot.plotId,
+        cellId: targetCell.cellId,
+        q: targetCell.q,
+        r: targetCell.r,
+        sourceCellId,
+        sourceFogState: targetCell.fogState,
+        title: 'Scouted Frontier Sector',
+        status: 'SCOUTED',
+        traits: ['scouted-frontier'],
+        resourceHints: {},
+        siteType: 'scouted_frontier',
+        risk: 'unknown',
+        summary: 'A hinted frontier sector was scouted and is now known map truth only.',
+        recommendedNext: 'Keep this as read-model truth until a later explicit planning action exists.',
+        authorityBoundary: EXPEDITION_SCOUT_SECTOR_AUTHORITY_BOUNDARY,
+        receipt,
+        createdBy: requestedActor,
+        approvedBy: requestedActor === 'AGENT' ? 'HUMAN_APPROVAL' : null,
+        createdAt: Number(nowMs),
+        updatedAt: Number(nowMs)
+      };
+      const eventPacket = buildExpeditionEventPacket({ scoutSector, targetCell });
+      scoutSector.receipt.eventPacketId = eventPacket.packetId;
+      scoutSector.eventPacket = eventPacket;
+      bundle.plot.expeditionScouts = [
+        ...normalizeExpeditionScouts(bundle.plot.expeditionScouts),
+        scoutSector
+      ];
+      bundle.plot.updatedAt = Number(nowMs);
+      const afterMap = buildExpeditionMapReadModel(bundle);
+      const proof = buildScoutSectorProof({
+        beforeMap,
+        afterMap,
+        targetCell,
+        scoutSector
+      });
+      createEvent(pendingEvents, {
+        plotId: bundle.plot.plotId,
+        eventType: 'EXPEDITION_SECTOR_SCOUTED',
+        actor: requestedActor,
+        summary: `Scout Sector revealed ${targetCell.cellId}.`,
+        explanation: 'HQ12C reveals exactly one existing hinted frontier sector into same-plot known map truth. It does not move actors, gather resources, create routes, schedule work, mutate other plots, or grant Atlas execution.',
+        data: {
+          scoutSector: clone(scoutSector),
+          eventPacket: clone(eventPacket),
+          receipt: clone(receipt),
+          proof,
+          approvalId: consumedApproval?.approvalId || null
+        },
+        createdAt: nowMs
+      });
+      if (requestedActor === 'AGENT') {
+        markAgentAction(bundle, pendingEvents, 'scout_sector', 'Foreman scouted one hinted same-plot frontier sector after matching human approval.', nowMs);
+      }
+      return {
+        ok: true,
+        extras: {
+          scoutSector: clone(scoutSector),
+          sector: clone(scoutSector),
+          eventPacket: clone(eventPacket),
+          alreadyScouted: false,
+          revealedCellId: scoutSector.cellId,
+          proof,
+          expeditionMap: afterMap
+        }
+      };
+    }
+  });
+}
+
+function listCivicProposalRecords({
+  pairId,
+  houseId = null,
+  plotId = null,
+  nowMs
+}) {
+  return store.withTransaction(() => {
+    const bundle = ensurePlotBundle({ pairId, houseId, plotId, nowMs });
+    if (!verifyPlotAccess(bundle, pairId, plotId, nowMs)) {
+      return errorEnvelope(plotId, 'UNAUTHORIZED', 'Requested plot does not belong to the current session.', false);
+    }
+    return successEnvelope({
+      plotId: bundle.plot.plotId,
+      worldDelta: [],
+      stateHash: computeStateHash(bundleSnapshot(bundle)),
+      extras: {
+        civicProposals: civicProposalsReadModel(bundle),
+        proposals: normalizeCivicProposals(bundle.civicProposals || [])
+      }
+    });
+  });
+}
+
+function createCivicProposalRecord({
+  pairId,
+  houseId = null,
+  plotId = null,
+  title,
+  category = 'coordination',
+  summary,
+  status = 'DRAFT',
+  relatedPlotIds = [],
+  reviewNote = '',
+  actor = 'HUMAN',
+  idempotencyKey,
+  nowMs
+}) {
+  const safeTitle = safeText(title, '', 120);
+  const safeCategory = normalizeCivicProposalCategory(category);
+  const safeSummary = safeText(summary, '', 480);
+  const safeStatus = normalizeCivicProposalStatus(status);
+  const safeReviewNote = safeText(reviewNote, '', 320);
+  const approvalParams = {
+    title: safeTitle,
+    category: safeCategory,
+    status: safeStatus,
+    summary: safeSummary
+  };
+  return withIdempotency({
+    pairId,
+    houseId,
+    plotId,
+    actionName: 'create_civic_proposal',
+    idempotencyKey,
+    requestPayload: { ...approvalParams, relatedPlotIds, reviewNote: safeReviewNote, actor },
+    nowMs,
+    mutator(bundle, pendingEvents) {
+      const safeActor = mutationActor(actor);
+      if (!safeTitle || !safeSummary) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Civic proposal records require title and summary.', false, {
+          reason: 'missing_title_or_summary'
+        });
+      }
+      const worldGrid = worldGridReadModel(bundle);
+      if (worldGrid.civicReadiness.ready !== true) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Civic proposal records unlock only after HQ10A World Grid readiness.', false, {
+          reason: 'world_grid_not_ready',
+          blockedBy: clone(worldGrid.requirements.blockedBy || [])
+        });
+      }
+      if (safeActor === 'AGENT') {
+        const approval = consumeActionApproval(bundle, 'create_civic_proposal', approvalParams, nowMs);
+        if (!approval) {
+          return errorEnvelope(bundle.plot.plotId, 'FORBIDDEN_POLICY', 'Agent civic proposal records require matching human approval.', true, {
+            requiresApproval: true,
+            actionName: 'create_civic_proposal',
+            requestedParams: approvalParams
+          });
+        }
+      }
+      const knownPlotIds = new Set((worldGrid.plots || []).map((entry) => entry.plotId).filter(Boolean));
+      const safeRelatedPlotIds = Array.from(new Set((Array.isArray(relatedPlotIds) ? relatedPlotIds : [])
+        .map((id) => safeText(id, '', 120))
+        .filter((id) => knownPlotIds.has(id))))
+        .slice(0, 8);
+      const proposal = {
+        proposalId: randomId('civic_proposal'),
+        plotId: bundle.plot.plotId,
+        status: safeStatus,
+        title: safeTitle,
+        category: safeCategory,
+        summary: safeSummary,
+        scope: {
+          source: 'world_grid_read_model',
+          proposalOnly: true,
+          executionAllowed: false,
+          plotId: bundle.plot.plotId,
+          worldGridProjectionHash: worldGrid.projectionHash,
+          knownPlotCount: Number(worldGrid.scope?.knownPlotCount || 0),
+          outpostCount: Number(worldGrid.scope?.outpostCount || 0),
+          relatedPlotIds: safeRelatedPlotIds
+        },
+        review: {
+          note: safeReviewNote,
+          reviewedBy: safeStatus === 'REVIEWED' ? safeActor : null,
+          reviewStatus: safeStatus === 'REVIEWED' ? 'reviewed_record_only' : 'unreviewed',
+          executionDecision: 'not_executable'
+        },
+        authorityBoundary: CIVIC_PROPOSAL_AUTHORITY_BOUNDARY,
+        createdBy: safeActor,
+        approvedBy: safeActor === 'AGENT' ? 'HUMAN_APPROVAL' : null,
+        createdAt: Number(nowMs),
+        updatedAt: Number(nowMs),
+        reviewedAt: safeStatus === 'REVIEWED' ? Number(nowMs) : null,
+        archivedAt: safeStatus === 'ARCHIVED' ? Number(nowMs) : null
+      };
+      const persisted = store.writeCivicProposal(proposal);
+      bundle.civicProposals = normalizeCivicProposals(store.listCivicProposalsByPlot(bundle.plot.plotId));
+      createEvent(pendingEvents, {
+        plotId: bundle.plot.plotId,
+        eventType: 'CIVIC_PROPOSAL_RECORDED',
+        actor: safeActor,
+        summary: `Civic proposal recorded: ${persisted.title}.`,
+        explanation: 'HQ10B records advisory civic proposals only. It does not execute civic changes, spend resources, create routes, schedule work, or affect external systems.',
+        data: {
+          proposalId: persisted.proposalId,
+          status: persisted.status,
+          category: persisted.category,
+          proposalOnly: true,
+          executionAllowed: false,
+          authorityBoundary: persisted.authorityBoundary,
+          prohibitedCapabilities: clone(worldGrid.civicReadiness.prohibitedCapabilities || [])
+        },
+        createdAt: nowMs
+      });
+      if (safeActor === 'AGENT') {
+        markAgentAction(bundle, pendingEvents, 'create_civic_proposal', 'Foreman recorded an advisory civic proposal after matching human approval.', nowMs);
+      }
+      return {
+        ok: true,
+        extras: {
+          civicProposal: clone(persisted),
+          proposal: clone(persisted),
+          proposalOnly: true,
+          executionAllowed: false,
+          civicProposals: civicProposalsReadModel(bundle)
+        }
+      };
+    }
+  });
+}
+
+function listOverlayPackRecords({
+  pairId,
+  houseId = null,
+  plotId = null,
+  nowMs
+}) {
+  return store.withTransaction(() => {
+    const bundle = ensurePlotBundle({ pairId, houseId, plotId, nowMs });
+    if (!verifyPlotAccess(bundle, pairId, plotId, nowMs)) {
+      return errorEnvelope(plotId, 'UNAUTHORIZED', 'Requested plot does not belong to the current session.', false);
+    }
+    return successEnvelope({
+      plotId: bundle.plot.plotId,
+      worldDelta: [],
+      stateHash: computeStateHash(bundleSnapshot(bundle)),
+      extras: {
+        overlayPacks: overlayPacksReadModel(bundle),
+        packs: normalizeOverlayPacks(bundle.overlayPacks || [])
+      }
+    });
+  });
+}
+
+function createOverlayPackRecord({
+  pairId,
+  houseId = null,
+  plotId = null,
+  sourceProposalId,
+  title,
+  theme = 'civic',
+  summary,
+  status = 'DRAFT',
+  targetSurfaceIds = [],
+  targetNodeIds = [],
+  displayHints = {},
+  prompt = '',
+  provenance = {},
+  actor = 'HUMAN',
+  idempotencyKey,
+  nowMs
+}) {
+  const safeSourceProposalId = safeText(sourceProposalId, '', 120);
+  const safeTitle = safeText(title, '', 120);
+  const safeTheme = safeText(theme, 'civic', 80);
+  const safeSummary = safeText(summary, '', 480);
+  const safeStatus = normalizeOverlayPackStatus(status);
+  const allowedSurfaceIds = new Set(['founders_plot', 'progression_atlas', 'world_grid']);
+  const safeTargetSurfaceIds = sanitizeStringList(targetSurfaceIds, 8, 80)
+    .filter((surfaceId) => allowedSurfaceIds.has(surfaceId));
+  const finalTargetSurfaceIds = safeTargetSurfaceIds.length
+    ? safeTargetSurfaceIds
+    : ['progression_atlas', 'world_grid'];
+  const safeTargetNodeIds = sanitizeStringList(targetNodeIds, 20, 120);
+  const safeDisplayHints = normalizeOverlayDisplayHints(displayHints);
+  const safePrompt = normalizeOverlayPrompt(prompt);
+  const safeProvenance = normalizeOverlayProvenance(provenance, safeSourceProposalId);
+  const approvalParams = {
+    sourceProposalId: safeSourceProposalId,
+    title: safeTitle,
+    theme: safeTheme,
+    status: safeStatus,
+    summary: safeSummary
+  };
+  return withIdempotency({
+    pairId,
+    houseId,
+    plotId,
+    actionName: 'create_overlay_pack',
+    idempotencyKey,
+    requestPayload: {
+      ...approvalParams,
+      targetSurfaceIds: finalTargetSurfaceIds,
+      targetNodeIds: safeTargetNodeIds,
+      displayHints: safeDisplayHints,
+      prompt: safePrompt,
+      provenance: safeProvenance,
+      actor
+    },
+    nowMs,
+    mutator(bundle) {
+      const safeActor = mutationActor(actor);
+      if (!safeSourceProposalId || !safeTitle || !safeSummary) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Overlay pack records require sourceProposalId, title, and summary.', false, {
+          reason: 'missing_source_title_or_summary'
+        });
+      }
+      const overlayReadModel = overlayPacksReadModel(bundle);
+      if (overlayReadModel.status !== 'RECORDING_READY') {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Overlay pack records unlock after HQ10A readiness and a reviewed civic proposal.', false, {
+          reason: 'overlay_pack_records_not_ready',
+          blockedBy: clone(overlayReadModel.requirements.blockedBy || [])
+        });
+      }
+      const sourceProposal = normalizeCivicProposals(bundle.civicProposals || [])
+        .find((proposal) => proposal.proposalId === safeSourceProposalId);
+      if (!sourceProposal || sourceProposal.status !== 'REVIEWED') {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Overlay pack records must reference a reviewed civic proposal on the same plot.', false, {
+          reason: 'reviewed_civic_proposal_required',
+          sourceProposalId: safeSourceProposalId
+        });
+      }
+      if (safeActor === 'AGENT') {
+        const approval = consumeActionApproval(bundle, 'create_overlay_pack', approvalParams, nowMs);
+        if (!approval) {
+          return errorEnvelope(bundle.plot.plotId, 'FORBIDDEN_POLICY', 'Agent overlay pack records require matching human approval.', true, {
+            requiresApproval: true,
+            actionName: 'create_overlay_pack',
+            requestedParams: approvalParams
+          });
+        }
+      }
+      const pack = {
+        overlayPackId: randomId('overlay_pack'),
+        plotId: bundle.plot.plotId,
+        sourceProposalId: sourceProposal.proposalId,
+        status: safeStatus,
+        title: safeTitle,
+        theme: safeTheme,
+        summary: safeSummary,
+        targetSurfaceIds: finalTargetSurfaceIds,
+        targetNodeIds: safeTargetNodeIds,
+        displayHints: safeDisplayHints,
+        prompt: safePrompt,
+        provenance: {
+          ...safeProvenance,
+          sourceProposalTitle: sourceProposal.title,
+          worldGridProjectionHash: worldGridReadModel(bundle).projectionHash
+        },
+        visualOnly: true,
+        presentationOnly: true,
+        gameplayMutationPolicy: 'presentation_only',
+        authorityBoundary: OVERLAY_PACK_AUTHORITY_BOUNDARY,
+        createdBy: safeActor,
+        approvedBy: safeActor === 'AGENT' ? 'HUMAN_APPROVAL' : null,
+        createdAt: Number(nowMs),
+        updatedAt: Number(nowMs),
+        reviewedAt: safeStatus === 'REVIEWED' ? Number(nowMs) : null,
+        archivedAt: safeStatus === 'ARCHIVED' ? Number(nowMs) : null
+      };
+      const persisted = store.writeOverlayPack(pack);
+      bundle.overlayPacks = normalizeOverlayPacks(store.listOverlayPacksByPlot(bundle.plot.plotId));
+      return {
+        ok: true,
+        extras: {
+          overlayPack: clone(persisted),
+          pack: clone(persisted),
+          presentationOnly: true,
+          visualOnly: true,
+          executionAllowed: false,
+          gameplayMutationPolicy: 'presentation_only',
+          overlayPacks: overlayPacksReadModel(bundle)
+        }
+      };
+    }
+  });
+}
+
+function listCivicProjectRecords({
+  pairId,
+  houseId = null,
+  plotId = null,
+  nowMs
+}) {
+  return store.withTransaction(() => {
+    const bundle = ensurePlotBundle({ pairId, houseId, plotId, nowMs });
+    if (!verifyPlotAccess(bundle, pairId, plotId, nowMs)) {
+      return errorEnvelope(plotId, 'UNAUTHORIZED', 'Requested plot does not belong to the current session.', false);
+    }
+    return successEnvelope({
+      plotId: bundle.plot.plotId,
+      worldDelta: [],
+      stateHash: computeStateHash(bundleSnapshot(bundle)),
+      extras: {
+        civicProjects: civicProjectsReadModel(bundle),
+        projects: normalizeCivicProjects(bundle.civicProjects || [])
+      }
+    });
+  });
+}
+
+function activateCivicProject({
+  pairId,
+  houseId = null,
+  plotId = null,
+  sourceProposalId,
+  projectType = 'civic_beacon',
+  title,
+  summary = '',
+  actor = 'HUMAN',
+  idempotencyKey,
+  nowMs
+}) {
+  const safeSourceProposalId = safeText(sourceProposalId, '', 120);
+  const safeProjectType = normalizeCivicProjectType(projectType);
+  const safeTitle = safeText(title, '', 120);
+  const safeSummary = safeText(summary, '', 480);
+  const approvalParams = {
+    sourceProposalId: safeSourceProposalId,
+    projectType: safeProjectType,
+    title: safeTitle,
+    summary: safeSummary
+  };
+  return withIdempotency({
+    pairId,
+    houseId,
+    plotId,
+    actionName: 'activate_civic_project',
+    idempotencyKey,
+    requestPayload: { ...approvalParams, actor },
+    nowMs,
+    mutator(bundle, pendingEvents) {
+      const safeActor = mutationActor(actor);
+      if (!safeSourceProposalId || !safeTitle) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Civic project activation requires sourceProposalId and title.', false, {
+          reason: 'missing_source_proposal_or_title'
+        });
+      }
+      const worldGrid = worldGridReadModel(bundle);
+      if (worldGrid.civicReadiness.ready !== true) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Civic project activation unlocks only after HQ10A World Grid readiness.', false, {
+          reason: 'world_grid_not_ready',
+          blockedBy: clone(worldGrid.requirements.blockedBy || [])
+        });
+      }
+      const sourceProposal = normalizeCivicProposals(bundle.civicProposals || [])
+        .find((proposal) => proposal.proposalId === safeSourceProposalId);
+      if (!sourceProposal || sourceProposal.status !== 'REVIEWED') {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Civic project activation requires a reviewed civic proposal on the same plot.', false, {
+          reason: 'reviewed_civic_proposal_required',
+          sourceProposalId: safeSourceProposalId
+        });
+      }
+      const existing = store.getCivicProjectForProposal(bundle.plot.plotId, sourceProposal.proposalId);
+      if (existing) {
+        bundle.civicProjects = normalizeCivicProjects(store.listCivicProjectsByPlot(bundle.plot.plotId));
+        return {
+          ok: true,
+          extras: {
+            civicProject: clone(existing),
+            project: clone(existing),
+            alreadyActivated: true,
+            effectApplied: existing.status === 'ACTIVE',
+            civicProjects: civicProjectsReadModel(bundle)
+          }
+        };
+      }
+      if (safeActor === 'AGENT') {
+        const approval = consumeActionApproval(bundle, 'activate_civic_project', approvalParams, nowMs);
+        if (!approval) {
+          return errorEnvelope(bundle.plot.plotId, 'FORBIDDEN_POLICY', 'Agent civic project activation requires matching human approval.', true, {
+            requiresApproval: true,
+            actionName: 'activate_civic_project',
+            requestedParams: approvalParams
+          });
+        }
+      }
+      const effect = normalizeCivicProjectEffect({ appliedAt: nowMs }, safeProjectType);
+      const project = {
+        projectId: randomId('civic_project'),
+        plotId: bundle.plot.plotId,
+        sourceProposalId: sourceProposal.proposalId,
+        status: 'ACTIVE',
+        projectType: safeProjectType,
+        title: safeTitle,
+        summary: safeSummary || sourceProposal.summary,
+        effect,
+        receipt: {
+          kind: 'civic_project_activation',
+          actionName: 'et.plot.activate_civic_project',
+          sourceProposalId: sourceProposal.proposalId,
+          sourceProposalStatus: sourceProposal.status,
+          projectType: safeProjectType,
+          effectId: effect.effectId,
+          worldGridProjectionHash: worldGrid.projectionHash,
+          authorityBoundary: CIVIC_PROJECT_AUTHORITY_BOUNDARY,
+          activatedAt: Number(nowMs),
+          resourceDelta: {},
+          routeCreation: false,
+          backgroundScheduling: false,
+          externalEffects: false
+        },
+        authorityBoundary: CIVIC_PROJECT_AUTHORITY_BOUNDARY,
+        createdBy: safeActor,
+        approvedBy: safeActor === 'AGENT' ? 'HUMAN_APPROVAL' : null,
+        createdAt: Number(nowMs),
+        updatedAt: Number(nowMs),
+        activatedAt: Number(nowMs),
+        archivedAt: null
+      };
+      const persisted = store.writeCivicProject(project);
+      bundle.civicProjects = normalizeCivicProjects(store.listCivicProjectsByPlot(bundle.plot.plotId));
+      createEvent(pendingEvents, {
+        plotId: bundle.plot.plotId,
+        eventType: 'CIVIC_PROJECT_ACTIVATED',
+        actor: safeActor,
+        summary: `Civic project activated: ${persisted.title}.`,
+        explanation: 'HQ10D activates one bounded local public-work project. The Civic Beacon adds a deterministic local readiness marker only; it does not spend resources, create routes, schedule work, publish externally, or grant Atlas execution.',
+        data: {
+          projectId: persisted.projectId,
+          sourceProposalId: persisted.sourceProposalId,
+          projectType: persisted.projectType,
+          status: persisted.status,
+          effect: clone(persisted.effect),
+          receipt: clone(persisted.receipt),
+          authorityBoundary: persisted.authorityBoundary
+        },
+        createdAt: nowMs
+      });
+      if (safeActor === 'AGENT') {
+        markAgentAction(bundle, pendingEvents, 'activate_civic_project', 'Foreman activated a bounded civic project after matching human approval.', nowMs);
+      }
+      return {
+        ok: true,
+        extras: {
+          civicProject: clone(persisted),
+          project: clone(persisted),
+          alreadyActivated: false,
+          effectApplied: true,
+          civicProjects: civicProjectsReadModel(bundle)
+        }
+      };
+    }
+  });
+}
+
+function inspectCivicProject({
+  pairId,
+  houseId = null,
+  plotId = null,
+  projectId,
+  inspectionType = 'baseline_readiness',
+  note = '',
+  actor = 'HUMAN',
+  idempotencyKey,
+  nowMs
+}) {
+  const safeProjectId = safeText(projectId, '', 120);
+  const normalizedInspectionType = slugFor(inspectionType, 'baseline_readiness');
+  const safeInspectionType = CIVIC_PROJECT_INSPECTION_TYPES.includes(normalizedInspectionType)
+    ? normalizedInspectionType
+    : 'baseline_readiness';
+  const safeNote = safeText(note, '', 320);
+  const approvalParams = {
+    projectId: safeProjectId,
+    inspectionType: safeInspectionType,
+    note: safeNote
+  };
+  return withIdempotency({
+    pairId,
+    houseId,
+    plotId,
+    actionName: 'inspect_civic_project',
+    idempotencyKey,
+    requestPayload: { ...approvalParams, actor },
+    nowMs,
+    mutator(bundle, pendingEvents) {
+      const safeActor = mutationActor(actor);
+      if (!safeProjectId) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Civic project inspection requires projectId.', false, {
+          reason: 'missing_project_id'
+        });
+      }
+      const project = normalizeCivicProjects(bundle.civicProjects || [])
+        .find((candidate) => candidate.projectId === safeProjectId);
+      if (!project) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Civic project inspection requires an existing project on the current plot.', false, {
+          reason: 'current_plot_civic_project_required',
+          projectId: safeProjectId
+        });
+      }
+      if (project.status !== 'ACTIVE') {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Only active civic projects can be inspected.', false, {
+          reason: 'active_civic_project_required',
+          projectId: safeProjectId,
+          status: project.status
+        });
+      }
+      if (safeActor === 'AGENT') {
+        const approval = consumeActionApproval(bundle, 'inspect_civic_project', approvalParams, nowMs);
+        if (!approval) {
+          return errorEnvelope(bundle.plot.plotId, 'FORBIDDEN_POLICY', 'Agent civic project inspection requires matching human approval.', true, {
+            requiresApproval: true,
+            actionName: 'inspect_civic_project',
+            requestedParams: approvalParams
+          });
+        }
+      }
+      const existingInspections = normalizeCivicProjectInspections(project);
+      const existing = existingInspections.find((entry) => entry.inspectionType === safeInspectionType);
+      if (existing) {
+        return {
+          ok: true,
+          extras: {
+            civicProject: clone(project),
+            project: clone(project),
+            inspection: clone(existing),
+            alreadyInspected: true,
+            inspectionApplied: false,
+            civicProjects: civicProjectsReadModel(bundle)
+          }
+        };
+      }
+      const worldGrid = worldGridReadModel(bundle);
+      const inspection = {
+        kind: 'civic_project_inspection',
+        actionName: 'et.plot.inspect_civic_project',
+        projectId: project.projectId,
+        inspectionType: safeInspectionType,
+        inspectedBy: safeActor,
+        note: safeNote,
+        worldGridProjectionHash: worldGrid.projectionHash,
+        authorityBoundary: CIVIC_PROJECT_INSPECTION_AUTHORITY_BOUNDARY,
+        inspectedAt: Number(nowMs),
+        resourceDelta: {},
+        routeCreation: false,
+        tradeRouteCreation: false,
+        backgroundScheduling: false,
+        externalEffects: false,
+        atlasExecution: false,
+        crossPlotMutation: false
+      };
+      const nextInspections = [...existingInspections, inspection];
+      const updated = {
+        ...project,
+        effect: normalizeCivicProjectEffect({
+          ...project.effect,
+          inspection: {
+            baselineReadinessInspected: nextInspections.some((entry) => entry.inspectionType === 'baseline_readiness'),
+            inspectionCount: nextInspections.length,
+            latestInspectedAt: Number(nowMs)
+          }
+        }, project.projectType),
+        receipt: {
+          ...(project.receipt && typeof project.receipt === 'object' ? clone(project.receipt) : {}),
+          inspections: clone(nextInspections)
+        },
+        approvedBy: safeActor === 'AGENT' ? project.approvedBy || 'HUMAN_APPROVAL' : project.approvedBy,
+        updatedAt: Number(nowMs)
+      };
+      const persisted = store.writeCivicProject(updated);
+      bundle.civicProjects = normalizeCivicProjects(store.listCivicProjectsByPlot(bundle.plot.plotId));
+      createEvent(pendingEvents, {
+        plotId: bundle.plot.plotId,
+        eventType: 'CIVIC_PROJECT_INSPECTED',
+        actor: safeActor,
+        summary: `Civic project inspected: ${persisted.title}.`,
+        explanation: 'HQ11 records one bounded baseline inspection for an active same-plot civic project. It updates local readiness metadata only; it does not spend resources, create routes, schedule work, publish externally, mutate other plots, or grant Atlas execution.',
+        data: {
+          projectId: persisted.projectId,
+          projectType: persisted.projectType,
+          inspection,
+          authorityBoundary: CIVIC_PROJECT_INSPECTION_AUTHORITY_BOUNDARY
+        },
+        createdAt: nowMs
+      });
+      if (safeActor === 'AGENT') {
+        markAgentAction(bundle, pendingEvents, 'inspect_civic_project', 'Foreman inspected a same-plot civic project after matching human approval.', nowMs);
+      }
+      return {
+        ok: true,
+        extras: {
+          civicProject: clone(persisted),
+          project: clone(persisted),
+          inspection: clone(inspection),
+          alreadyInspected: false,
+          inspectionApplied: true,
+          civicProjects: civicProjectsReadModel(bundle)
+        }
+      };
+    }
+  });
+}
+
+function listOwnedPlots({
+  pairId,
+  houseId = null,
+  plotId = null,
+  nowMs
+}) {
+  return store.withTransaction(() => {
+    const bundle = ensurePlotBundle({ pairId, houseId, plotId, nowMs });
+    if (!verifyPlotAccess(bundle, pairId, plotId, nowMs)) {
+      return errorEnvelope(plotId, 'UNAUTHORIZED', 'Requested plot does not belong to the current session.', false);
+    }
+    const plots = ownedPlotSummaries(pairId, bundle.plot.plotId);
+    const homePlotId = plots.find((plot) => plot.role === 'HOME')?.plotId || bundle.plot.plotId;
+    return successEnvelope({
+      plotId: bundle.plot.plotId,
+      worldDelta: [],
+      extras: {
+        homePlotId,
+        activePlotId: bundle.plot.plotId,
+        plots,
+        settlementClaims: normalizeSettlementClaims(bundle.settlementClaims || [])
+      }
+    });
+  });
+}
+
+function prepareSettlerConvoy({
+  pairId,
+  houseId = null,
+  plotId = null,
+  sitePlanId,
+  actor = 'HUMAN',
+  idempotencyKey,
+  nowMs
+}) {
+  return withIdempotency({
+    pairId,
+    houseId,
+    plotId,
+    actionName: 'prepare_settler_convoy',
+    idempotencyKey,
+    requestPayload: { sitePlanId, actor },
+    nowMs,
+    mutator(bundle, pendingEvents) {
+      const safeActor = mutationActor(actor);
+      const safeSitePlanId = safeText(sitePlanId, '', 120);
+      const existing = store.findSettlementClaimForPlan(bundle.plot.plotId, safeSitePlanId);
+      if (existing) {
+        return {
+          ok: true,
+          extras: {
+            settlementClaim: clone(existing),
+            job: existing.convoyJobId ? clone(bundle.jobs.find((job) => job.jobId === existing.convoyJobId) || null) : null,
+            existing: true
+          }
+        };
+      }
+      const plans = normalizeSitePlans(bundle.plot.sitePlans);
+      const planIndex = plans.findIndex((entry) => entry.planId === safeSitePlanId);
+      if (planIndex < 0) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Settler Convoy preparation requires an existing reviewed Site Plan.', false, {
+          reason: 'missing_site_plan'
+        });
+      }
+      const plan = plans[planIndex];
+      if (!canPrepareSettlerConvoy(bundle, plan)) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Settler Convoy preparation requires an HQ6-reviewed claim-ready Site Plan.', false, {
+          reason: Number(bundle.plot.hqLevel || 1) < SETTLER_CONVOY_DEF.bridgeRequiredHqLevel ? 'hq_locked' : 'site_plan_not_claim_ready',
+          requiredHqLevel: SETTLER_CONVOY_DEF.bridgeRequiredHqLevel,
+          promotionStatus: plan.promotionStatus
+        });
+      }
+      const expeditionBoard = bundle.buildings.find((building) => building.type === 'EXPEDITION_BOARD');
+      if (!expeditionBoard) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'A Settler Convoy must be prepared from a built Expedition Board.', false, {
+          reason: 'missing_expedition_board'
+        });
+      }
+      if (expeditionBoard.state !== 'READY' || findActiveJobForBuilding(bundle, expeditionBoard.buildingId)) {
+        return errorEnvelope(bundle.plot.plotId, 'JOB_ALREADY_RUNNING', 'The Expedition Board must be ready before preparing a Settler Convoy.', true, {
+          reason: 'expedition_board_busy'
+        });
+      }
+      if (safeActor === 'AGENT') {
+        const approval = consumeActionApproval(bundle, 'prepare_settler_convoy', { sitePlanId: safeSitePlanId }, nowMs);
+        if (!approval) {
+          return errorEnvelope(bundle.plot.plotId, 'FORBIDDEN_POLICY', 'Agent Settler Convoy preparation requires matching human approval.', true, {
+            requiresApproval: true
+          });
+        }
+      }
+      const paid = deductResources(bundle.plot.inventory, SETTLER_CONVOY_DEF.cost);
+      if (!paid.ok) {
+        return errorEnvelope(bundle.plot.plotId, 'OUT_OF_RESOURCES', 'Not enough resources to prepare a Settler Convoy.', false, {
+          missing: resourceShortfall(bundle.plot.inventory, SETTLER_CONVOY_DEF.cost),
+          cost: clone(SETTLER_CONVOY_DEF.cost)
+        });
+      }
+      bundle.plot.inventory = paid.inventory;
+      const job = {
+        jobId: randomId('job'),
+        plotId: bundle.plot.plotId,
+        buildingId: expeditionBoard.buildingId,
+        kind: 'SETTLER_CONVOY',
+        input: clone(SETTLER_CONVOY_DEF.cost),
+        output: clone(SETTLER_CONVOY_DEF.output),
+        startedAt: nowMs,
+        endsAt: nowMs + SETTLER_CONVOY_DEF.durationMs,
+        durationMs: SETTLER_CONVOY_DEF.durationMs,
+        status: 'RUNNING',
+        createdBy: safeActor,
+        explanation: 'Prepare a bounded Settler Convoy from one reviewed Site Plan. This creates a claim record and timed convoy, not a world map.',
+        createdAt: nowMs,
+        updatedAt: nowMs
+      };
+      const claim = buildSettlementClaimFromSitePlan(bundle, plan, job, safeActor, nowMs);
+      job.output = { ...job.output, claimId: claim.claimId };
+      expeditionBoard.state = 'PRODUCING';
+      expeditionBoard.updatedAt = nowMs;
+      bundle.jobs.push(job);
+      const persistedClaim = store.writeSettlementClaim(claim);
+      plans[planIndex] = {
+        ...plan,
+        status: 'CONVOY_PREPARING',
+        promotionStatus: 'convoy_preparing',
+        claimId: persistedClaim.claimId,
+        convoyJobId: job.jobId,
+        claimedAt: Number(nowMs),
+        recommendedNext: 'Wait for the Settler Convoy to arrive, then explicitly found the outpost.'
+      };
+      bundle.plot.sitePlans = normalizeSitePlans(plans);
+      bundle.settlementClaims = normalizeSettlementClaims(store.listSettlementClaimsByOwner(bundle.ownerPairId || pairId));
+      createEvent(pendingEvents, {
+        plotId: bundle.plot.plotId,
+        eventType: 'SETTLER_CONVOY_PREPARED',
+        actor: safeActor,
+        buildingId: expeditionBoard.buildingId,
+        jobId: job.jobId,
+        summary: `Settler Convoy prepared for ${plan.title}.`,
+        explanation: 'Resources were spent and a timed convoy was started. No second plot exists until founding is explicitly confirmed.',
+        data: {
+          claimId: persistedClaim.claimId,
+          sitePlanId: plan.planId,
+          cost: clone(SETTLER_CONVOY_DEF.cost),
+          durationMs: SETTLER_CONVOY_DEF.durationMs,
+          createsSecondPlot: false
+        },
+        createdAt: nowMs
+      });
+      if (safeActor === 'AGENT') {
+        markAgentAction(bundle, pendingEvents, 'prepare_settler_convoy', 'Foreman prepared a Settler Convoy after human approval.', nowMs);
+      }
+      return {
+        ok: true,
+        extras: { settlementClaim: clone(persistedClaim), job: clone(job), existing: false }
+      };
+    }
+  });
+}
+
+function createOutpostFromClaim({ pairId, houseId = null, claim, nowMs }) {
+  const plotId = `plot_${hashPayload({ settlementClaimId: claim.claimId }).slice(0, 16)}`;
+  const existing = store.readPlotBundleById(plotId);
+  if (existing?.plot) {
+    store.writePlotMembership({
+      pairId,
+      plotId,
+      role: 'OUTPOST',
+      originClaimId: claim.claimId,
+      createdAt: nowMs,
+      updatedAt: nowMs
+    });
+    return { plot: existing.plot, buildings: existing.buildings, policy: existing.policy || defaultPolicy(plotId, nowMs), existing: true };
+  }
+  const plot = {
+    plotId,
+    pairId: `settlement:${claim.claimId}`,
+    houseId: houseId || null,
+    status: 'ACTIVE',
+    hqLevel: 1,
+    townXp: 0,
+    inventory: { wood: 8, stone: 0, food: 8, coin: 4 },
+    storageCaps: clone(HQ_LEVEL_RULES[1].storageCaps),
+    constructionSlots: HQ_LEVEL_RULES[1].constructionSlots,
+    nextBuildBuffPct: 0,
+    claimedRewards: [],
+    seenBuildingTypes: ['HQ'],
+    collectedBuildingTypes: [],
+    agentTiersXpAwarded: [],
+    scoutReports: [],
+    sitePlans: [],
+    doctrineState: {},
+    lastDailyBonusDay: null,
+    dailySoldCoin: 0,
+    dailySellDay: nowDayKey(nowMs),
+    lastViewedAt: nowMs,
+    pendingRecapFrom: null,
+    pendingRecapTo: null,
+    createdAt: nowMs,
+    updatedAt: nowMs,
+    lastSimulatedAt: nowMs
+  };
+  const hq = {
+    buildingId: `bldg_hq_${plotId.slice(-8)}`,
+    plotId,
+    objectInstanceId: null,
+    type: 'HQ',
+    level: 1,
+    x: 1,
+    y: 0,
+    state: 'READY',
+    outputBuffer: {},
+    priority: 'BALANCED',
+    createdAt: nowMs,
+    updatedAt: nowMs
+  };
+  const policy = defaultPolicy(plotId, nowMs);
+  store.writePlot(plot);
+  store.writeBuildings([hq]);
+  store.writePolicy(policy);
+  store.writePlotMembership({
+    pairId,
+    plotId,
+    role: 'OUTPOST',
+    originClaimId: claim.claimId,
+    createdAt: nowMs,
+    updatedAt: nowMs
+  });
+  store.appendEvents([{
+    plotId,
+    eventType: 'PLOT_CREATED_FROM_CONVOY',
+    actor: 'SYSTEM',
+    buildingId: hq.buildingId,
+    jobId: null,
+    summary: `${claim.title} founded as a new outpost.`,
+    explanation: 'A reviewed Site Plan and arrived Settler Convoy created this player-owned outpost record.',
+    data: {
+      claimId: claim.claimId,
+      originPlotId: claim.originPlotId,
+      sitePlanId: claim.sitePlanId,
+      plotKind: 'OUTPOST',
+      siteType: claim.siteType,
+      risk: claim.risk,
+      traits: clone(claim.traits || []),
+      resourceHints: clone(claim.resourceHints || {})
+    },
+    createdAt: nowMs
+  }]);
+  return { plot, buildings: [hq], policy, existing: false };
+}
+
+function foundSettlement({
+  pairId,
+  houseId = null,
+  plotId = null,
+  claimId,
+  actor = 'HUMAN',
+  idempotencyKey,
+  nowMs
+}) {
+  return withIdempotency({
+    pairId,
+    houseId,
+    plotId,
+    actionName: 'found_settlement',
+    idempotencyKey,
+    requestPayload: { claimId, actor },
+    nowMs,
+    mutator(bundle, pendingEvents) {
+      const safeActor = mutationActor(actor);
+      const safeClaimId = safeText(claimId, '', 120);
+      const claim = store.getSettlementClaim(safeClaimId);
+      if (!claim || claim.ownerPairId !== (bundle.ownerPairId || pairId) || claim.originPlotId !== bundle.plot.plotId) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Settlement founding requires an arrived claim owned by this plot.', false, {
+          reason: 'missing_settlement_claim'
+        });
+      }
+      if (claim.status === 'FOUNDED' && claim.foundedPlotId) {
+        return {
+          ok: true,
+          extras: {
+            settlementClaim: clone(claim),
+            foundedPlot: ownedPlotSummaries(pairId, claim.foundedPlotId).find((plot) => plot.plotId === claim.foundedPlotId) || { plotId: claim.foundedPlotId },
+            ownedPlots: ownedPlotSummaries(pairId, bundle.plot.plotId),
+            existing: true
+          }
+        };
+      }
+      if (claim.status !== 'CONVOY_ARRIVED') {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'The Settler Convoy must arrive before founding a settlement.', true, {
+          reason: 'convoy_not_arrived',
+          status: claim.status
+        });
+      }
+      if (safeActor === 'AGENT') {
+        const approval = consumeActionApproval(bundle, 'found_settlement', { claimId: safeClaimId }, nowMs);
+        if (!approval) {
+          return errorEnvelope(bundle.plot.plotId, 'FORBIDDEN_POLICY', 'Agent settlement founding requires matching human approval.', true, {
+            requiresApproval: true
+          });
+        }
+      }
+      const founded = createOutpostFromClaim({ pairId, houseId, claim, nowMs });
+      claim.status = 'FOUNDED';
+      claim.foundedPlotId = founded.plot.plotId;
+      claim.foundedAt = Number(nowMs);
+      claim.updatedAt = Number(nowMs);
+      claim.route = {
+        ...(claim.route || {}),
+        progress: 1,
+        foundedPlotId: founded.plot.plotId,
+        visualOnlyProjection: true
+      };
+      claim.receipt = {
+        ...(claim.receipt || {}),
+        kind: 'settlement_founded',
+        foundedPlotId: founded.plot.plotId,
+        foundedAt: Number(nowMs),
+        authorityBoundary: 'server_owned_second_plot_no_world_map'
+      };
+      const persistedClaim = store.writeSettlementClaim(claim);
+      const plans = normalizeSitePlans(bundle.plot.sitePlans);
+      const planIndex = plans.findIndex((plan) => plan.planId === claim.sitePlanId);
+      if (planIndex >= 0) {
+        plans[planIndex] = {
+          ...plans[planIndex],
+          status: 'FOUNDED',
+          promotionStatus: 'claimed',
+          claimId: claim.claimId,
+          foundedPlotId: founded.plot.plotId,
+          recommendedNext: 'Open the outpost as a separate player-owned plot. Site traits are recorded but have no mechanical effect yet.'
+        };
+        bundle.plot.sitePlans = normalizeSitePlans(plans);
+      }
+      bundle.settlementClaims = normalizeSettlementClaims(store.listSettlementClaimsByOwner(pairId));
+      bundle.memberships = store.listPlotMemberships(pairId);
+      createEvent(pendingEvents, {
+        plotId: bundle.plot.plotId,
+        eventType: 'SETTLEMENT_FOUNDED',
+        actor: safeActor,
+        buildingId: null,
+        jobId: claim.convoyJobId || null,
+        summary: `${claim.title} founded as a second plot.`,
+        explanation: 'The server created one owned outpost plot from the arrived Settler Convoy claim.',
+        data: {
+          claimId: claim.claimId,
+          foundedPlotId: founded.plot.plotId,
+          sitePlanId: claim.sitePlanId,
+          plotKind: 'OUTPOST'
+        },
+        createdAt: nowMs
+      });
+      if (safeActor === 'AGENT') {
+        markAgentAction(bundle, pendingEvents, 'found_settlement', 'Foreman founded a settlement after human approval.', nowMs);
+      }
+      return {
+        ok: true,
+        extras: {
+          settlementClaim: clone(persistedClaim),
+          foundedPlot: ownedPlotSummaries(pairId, founded.plot.plotId).find((plot) => plot.plotId === founded.plot.plotId) || { plotId: founded.plot.plotId },
+          ownedPlots: ownedPlotSummaries(pairId, bundle.plot.plotId),
+          existing: founded.existing
+        }
       };
     }
   });
@@ -1950,6 +6406,23 @@ function upgradeBuilding({
       }
 
       if (building.type === 'HQ') {
+        const prerequisiteStatus = hqBuildingPrerequisiteStatus(bundle, upgradeRule);
+        const missingPrerequisites = prerequisiteStatus.filter((entry) => !entry.satisfied);
+        if (missingPrerequisites.length) {
+          const names = missingPrerequisites.map((entry) => entry.label).join(', ');
+          return errorEnvelope(
+            bundle.plot.plotId,
+            'MISSING_HQ_BUILDING_PREREQUISITES',
+            `HQ Level ${upgradeRule.nextLevel} requires completed prerequisite building${missingPrerequisites.length === 1 ? '' : 's'}: ${names}.`,
+            false,
+            {
+              fromLevel: bundle.plot.hqLevel,
+              targetLevel: upgradeRule.nextLevel,
+              buildingPrerequisites: prerequisiteStatus,
+              missingPrerequisites
+            }
+          );
+        }
         if (Number(bundle.plot.townXp || 0) < Number(upgradeRule.xpRequired || 0)) {
           return errorEnvelope(bundle.plot.plotId, 'OUT_OF_RESOURCES', 'Not enough town XP for the next HQ upgrade.', false);
         }
@@ -2170,6 +6643,9 @@ function advancePlotTimeForTests({
 }) {
   return store.withTransaction(() => {
     const bundle = ensurePlotBundle({ pairId, houseId, plotId, nowMs });
+    if (!verifyPlotAccess(bundle, pairId, plotId, nowMs)) {
+      return errorEnvelope(plotId, 'UNAUTHORIZED', 'Requested plot does not belong to the current session.', false);
+    }
     const pendingEvents = [];
     const targetMs = Math.max(nowMs, Number(bundle.plot.lastSimulatedAt || nowMs) + Math.max(0, Number(advanceMs || 0)));
     simulateBundleTo(bundle, targetMs, pendingEvents);
@@ -2189,9 +6665,48 @@ function advancePlotTimeForTests({
 module.exports = {
   PADS,
   BUILDING_DEFS,
+  SCOUT_REPORT_TEMPLATES,
+  SETTLER_CONVOY_DEF,
+  DOCTRINE_CATALOG,
+  WORK_ORDER_TEMPLATES,
+  CIVIC_PROPOSAL_STATUSES,
+  CIVIC_PROPOSAL_CATEGORIES,
+  CIVIC_PROPOSAL_AUTHORITY_BOUNDARY,
+  OVERLAY_PACK_STATUSES,
+  OVERLAY_PACK_AUTHORITY_BOUNDARY,
+  CIVIC_PROJECT_STATUSES,
+  CIVIC_PROJECT_TYPES,
+  CIVIC_PROJECT_AUTHORITY_BOUNDARY,
+  CIVIC_PROJECT_INSPECTION_AUTHORITY_BOUNDARY,
+  CIVIC_PROJECT_INSPECTION_TYPES,
+  CIVIC_BEACON_EFFECT_ID,
+  EXPEDITION_MAP_AUTHORITY_BOUNDARY,
+  EXPEDITION_SCOUT_SECTOR_AUTHORITY_BOUNDARY,
+  EXPEDITION_EVENT_PACKET_AUTHORITY_BOUNDARY,
+  EXPEDITION_PARTY_MANIFEST_AUTHORITY_BOUNDARY,
+  EXPEDITION_MAP_FOG_STATES,
+  SURVEY_DISCIPLINE_SCOUT_DURATION_MULTIPLIER,
+  SURVEY_DISCIPLINE_SCOUT_DURATION_REDUCTION_PCT,
   HQ_LEVEL_RULES,
   HQ_UPGRADE_RULES,
+  hqBuildingPrerequisiteStatus,
+  applyDoctrineEffectsToJobSpec,
+  worldGridReadModel,
+  buildExpeditionMapReadModel,
+  civicProposalsReadModel,
+  overlayPacksReadModel,
+  civicProjectsReadModel,
   getFoundersPlotState,
+  getWorldGridStatus,
+  getExpeditionMapStatus,
+  scoutExpeditionSector,
+  listCivicProposalRecords,
+  createCivicProposalRecord,
+  listOverlayPackRecords,
+  createOverlayPackRecord,
+  listCivicProjectRecords,
+  activateCivicProject,
+  inspectCivicProject,
   setFoundersPlotPolicy,
   resolveApproval,
   acknowledgeRecap,
@@ -2199,6 +6714,14 @@ module.exports = {
   placeBuilding,
   queueJob,
   collectOutputs,
+  draftSitePlan,
+  reviewSitePlan,
+  selectDoctrine,
+  createWorkOrderDraft,
+  executeWorkOrder,
+  listOwnedPlots,
+  prepareSettlerConvoy,
+  foundSettlement,
   upgradeBuilding,
   setPriority,
   claimReward,

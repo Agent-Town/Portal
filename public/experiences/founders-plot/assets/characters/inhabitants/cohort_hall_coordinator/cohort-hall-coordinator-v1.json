@@ -1,0 +1,97 @@
+{
+  "id": "cohort-hall-coordinator-v1",
+  "role": "cohort_hall_coordinator",
+  "canonicalRoleId": "cohort_hall_coordinator",
+  "roleFacts": ["CREATE_WORK_ORDER_DRAFT", "WORK_ORDER_DRAFTED", "WORK_ORDER_EXECUTED", "OUTPUT_READY"],
+  "displayName": "Oriel-9",
+  "title": "Cohort Hall Coordinator",
+  "backstory": "Oriel-9 was built to be helpful in public, boring in authority, and excellent at boundaries. It arranges work-order drafts into tidy receipt bundles, then waits for explicit human action before anything runs.",
+  "personality": "Neighborly, precise, bounded, and gently proud of good checklists.",
+  "visiblyAgenticOrRobotic": true,
+  "visualOnly": true,
+  "wiringStatus": "asset_ready_not_scene_wired",
+  "model": "built-in image_gen, requested GPT Image 2.0 path",
+  "sourceImage": "cohort-hall-coordinator-v1.source.png",
+  "nativeGeneratedImage": "cohort-hall-coordinator-v1.generated.png",
+  "image": "cohort-hall-coordinator-v1.png",
+  "prompt": "cohort-hall-coordinator-v1.prompt.md",
+  "nativeGeneratedSize": {
+    "width": 1254,
+    "height": 1254
+  },
+  "sourceSize": {
+    "width": 2048,
+    "height": 2048
+  },
+  "sheetContract": {
+    "width": 2048,
+    "height": 2048,
+    "columns": 4,
+    "rows": 4,
+    "frameWidth": 512,
+    "frameHeight": 512,
+    "frameCount": 16
+  },
+  "rowOrder": ["idle", "walk", "coordinate", "ready"],
+  "actions": {
+    "idle": {
+      "row": 0,
+      "description": "Friendly coordinator stances with bounded task tiles and receipt tabs.",
+      "frames": [0, 1, 2, 3],
+      "fps": 3
+    },
+    "walk": {
+      "row": 1,
+      "description": "Walking or shuffling with soft mechanical steps, satchel, and tiles secured.",
+      "frames": [0, 1, 2, 3],
+      "fps": 6
+    },
+    "coordinate": {
+      "row": 2,
+      "description": "Arranging safe work-order draft tiles and pointing to abstract limits/caps.",
+      "frames": [0, 1, 2, 3],
+      "fps": 5
+    },
+    "ready": {
+      "row": 3,
+      "description": "Presenting a sealed work-order receipt bundle or completion token.",
+      "frames": [0, 1, 2, 3],
+      "fps": 4
+    }
+  },
+  "actionMapping": {
+    "CREATE_WORK_ORDER_DRAFT": "coordinate",
+    "WORK_ORDER_DRAFT": "coordinate",
+    "WORK_ORDER_DRAFTED": "ready",
+    "WORK_ORDER_EXECUTED": "ready",
+    "OUTPUT_READY": "ready"
+  },
+  "texture": {
+    "path": "public/experiences/founders-plot/assets/characters/inhabitants/cohort_hall_coordinator/cohort-hall-coordinator-v1.png",
+    "format": "png",
+    "colorSpace": "sRGB",
+    "channels": "sRGBA",
+    "width": 2048,
+    "height": 2048,
+    "alpha": true,
+    "transparentCorners": true
+  },
+  "generationNotes": {
+    "sourceProvenance": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e7c45-8e1f-7fa3-a67c-4ccf4bf0859b/ig_0ab5d2a9f79f2c3f016a1bb9ab4b9081918b509f919431a687.png",
+    "mode": "built-in image_gen with requested GPT Image 2.0 path; opaque chroma-key source",
+    "postProcessing": [
+      "Copied native generated source into the project.",
+      "Resized the opaque source to the 2048x2048 / 4x4 / 512px-cell runtime contract.",
+      "Converted green chroma background to alpha with ImageMagick and removed remaining chroma-green pixels from the matte."
+    ],
+    "transparency": {
+      "method": "ImageMagick chroma-key conversion from opaque source",
+      "sourceKeyRequested": "#00ff00",
+      "sampledCornerColor": "srgb(29,237,24)",
+      "keyColorsUsed": ["#1ded18"],
+      "fuzz": "22%",
+      "transparentCorners": true
+    },
+    "constraints": ["robotic/synthetic", "adult-height", "visual-only", "no readable text", "no logos", "no weapons", "no surveillance", "no autonomous authority", "no gameplay authority"]
+  }
+}

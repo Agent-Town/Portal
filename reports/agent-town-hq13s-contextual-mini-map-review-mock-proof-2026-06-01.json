@@ -1,0 +1,90 @@
+{
+  "lane": "HQ13S contextual mini-map review mock",
+  "date": "2026-06-01",
+  "verdict": "PASS_REVIEW_MOCK_WITH_FRONTIER_BOUNDARY_OMITTED_AS_CANDIDATE",
+  "scope": "reports/media review-only static contextual composition",
+  "outputs": {
+    "mockPng": {
+      "path": "reports/agent-town-hq13s-contextual-mini-map-review-mock-2026-06-01.png",
+      "width": 1280,
+      "height": 720,
+      "kind": "static review-only composite"
+    },
+    "report": "reports/agent-town-hq13s-contextual-mini-map-review-mock-2026-06-01.md",
+    "proof": "reports/agent-town-hq13s-contextual-mini-map-review-mock-proof-2026-06-01.json",
+    "scratchDirectory": "reports/media/agent-town-hq13s-contextual-mini-map-review-mock-2026-06-01/",
+    "scratchSvg": "reports/media/agent-town-hq13s-contextual-mini-map-review-mock-2026-06-01/contextual-mini-map-review-mock.svg",
+    "sourceContactSheet": "reports/media/agent-town-hq13s-contextual-mini-map-review-mock-2026-06-01/contextual-mini-map-review-source-contact-sheet.png"
+  },
+  "inputs": {
+    "hq13pAccepted": [
+      "reports/media/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-2026-06-01/hinted-fog-veil-v1.edge-cleanup-review.png",
+      "reports/media/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-2026-06-01/locked-unknown-fog-v1.edge-cleanup-review.png",
+      "reports/media/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-2026-06-01/marker-known-site-plan-v1.edge-cleanup-review.png",
+      "reports/media/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-2026-06-01/marker-hinted-unknown-v1.edge-cleanup-review.png",
+      "reports/media/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-2026-06-01/marker-owned-outpost-v1.edge-cleanup-review.png",
+      "reports/media/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-2026-06-01/hud-selected-sector-frame-v1.edge-cleanup-review.png"
+    ],
+    "hq13qAccepted": [
+      "reports/media/agent-town-hq13q-dotted-line-repair-review-assets-2026-06-01/survey-receipt-stroke-v2.repair-review.png"
+    ],
+    "frontierBoundary": {
+      "hq13qOrnateCandidateUsed": false,
+      "localProceduralMockLineUsed": true,
+      "label": "review-mock-only local stitched boundary",
+      "candidateAsset": false
+    }
+  },
+  "perElementVerdicts": {
+    "expedition_map.fog.hinted": "ACCEPT_FOR_CONTEXT_REVIEW_MOCK",
+    "expedition_map.fog.locked_unknown": "ACCEPT_FOR_CONTEXT_REVIEW_MOCK",
+    "expedition_map.marker.known_site_plan": "ACCEPT_FOR_CONTEXT_REVIEW_MOCK",
+    "expedition_map.marker.hinted_unknown": "ACCEPT_FOR_CONTEXT_REVIEW_MOCK",
+    "expedition_map.marker.owned_outpost": "ACCEPT_FOR_CONTEXT_REVIEW_MOCK",
+    "expedition_map.stroke.scout_receipt_trace": "ACCEPT_FOR_CONTEXT_REVIEW_MOCK",
+    "hud.frame.selected_sector_card": "ACCEPT_FOR_CONTEXT_REVIEW_MOCK",
+    "expedition_map.fog.frontier_border": "OMIT_CANDIDATE_ASSET"
+  },
+  "composition": {
+    "coherentOverMapLikeSurface": true,
+    "visiblyReviewOnly": true,
+    "runtimeScreenshot": false,
+    "runtimePromotion": false
+  },
+  "guardrails": {
+    "usedOnlyExistingReviewPngsForCandidateElements": true,
+    "generatedImagesRequested": false,
+    "runtimeAssetPackCreated": false,
+    "loaderCreated": false,
+    "appSourceServerSchemaEdited": false,
+    "atlasExecuted": false,
+    "publicSharing": false,
+    "generatedUniverseRendering": false,
+    "hiddenAutonomy": false,
+    "routeTradeEconomyResourceRewardCombatSchedulerCrossPlotExternalEffects": false,
+    "scoutSectorOnlyCurrentMutationPath": true
+  },
+  "checks": [
+    {
+      "command": "file reports/agent-town-hq13s-contextual-mini-map-review-mock-2026-06-01.png reports/media/agent-town-hq13s-contextual-mini-map-review-mock-2026-06-01/contextual-mini-map-review-source-contact-sheet.png",
+      "status": "pass"
+    },
+    {
+      "command": "magick identify reports/agent-town-hq13s-contextual-mini-map-review-mock-2026-06-01.png reports/media/agent-town-hq13s-contextual-mini-map-review-mock-2026-06-01/contextual-mini-map-review-source-contact-sheet.png",
+      "status": "pass"
+    },
+    {
+      "command": "jq empty reports/agent-town-hq13s-contextual-mini-map-review-mock-proof-2026-06-01.json",
+      "status": "pass"
+    },
+    {
+      "command": "git diff --check -- reports/media/agent-town-hq13s-contextual-mini-map-review-mock-2026-06-01 reports/agent-town-hq13s-contextual-mini-map-review-mock-2026-06-01.png reports/agent-town-hq13s-contextual-mini-map-review-mock-2026-06-01.md reports/agent-town-hq13s-contextual-mini-map-review-mock-proof-2026-06-01.json",
+      "status": "pass"
+    }
+  ],
+  "residualRisks": [
+    "The mock confirms contextual coherence only; it does not prove promotion readiness.",
+    "The local stitched boundary is not a candidate asset and should be replaced by a proper review PNG before any acceptance lane.",
+    "The HUD frame still needs real runtime UI scale and text/crop review before promotion."
+  ]
+}

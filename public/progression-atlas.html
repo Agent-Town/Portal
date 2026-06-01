@@ -29,6 +29,68 @@
       Loading progression state...
     </section>
 
+    <section class="atlasWorkbench" aria-label="Atlas workbench">
+      <div class="atlasPanel atlasSituationPanel">
+        <div class="atlasPanelHeader">
+          <h2>Plot Snapshot</h2>
+          <span class="atlasTag">live</span>
+        </div>
+        <div id="atlasSituation" class="atlasSituationGrid" data-testid="progression-atlas-situation"></div>
+      </div>
+
+      <div class="atlasPanel atlasGatePanel">
+        <div class="atlasPanelHeader">
+          <h2>Resource Gates</h2>
+          <span class="atlasTag">engine-owned</span>
+        </div>
+        <div id="atlasGateDeck" class="atlasGateDeck" data-testid="progression-atlas-gate-deck"></div>
+      </div>
+
+      <div class="atlasPanel atlasExplanationPanel">
+        <div class="atlasPanelHeader">
+          <h2>Oracle Note</h2>
+          <span class="atlasTag">same surface</span>
+        </div>
+        <p id="atlasExplanation" class="atlasExplanation" data-testid="progression-atlas-explanation">
+          Choose a step to see what Clover or an Atlas Oracle would explain through OpenClaw Lite.
+        </p>
+      </div>
+    </section>
+
+    <section class="atlasOpsBoard" aria-label="Atlas operating boundaries">
+      <div class="atlasPanel atlasAuthorityPanel">
+        <div class="atlasPanelHeader">
+          <h2>Authority Boundary</h2>
+          <span class="atlasTag">metadata-only</span>
+        </div>
+        <div id="atlasAuthorityBoundary" class="atlasAuthorityBoundary" data-testid="progression-atlas-authority-boundary"></div>
+      </div>
+
+      <div class="atlasPanel atlasWorkOrderPanel">
+        <div class="atlasPanelHeader">
+          <h2>HQ9 Work Orders</h2>
+          <span class="atlasTag">server-owned</span>
+        </div>
+        <div id="atlasWorkOrderBrief" class="atlasWorkOrderBrief" data-testid="progression-atlas-work-order-brief"></div>
+      </div>
+
+      <div class="atlasPanel atlasWorldGridPanel">
+        <div class="atlasPanelHeader">
+          <h2>HQ10 World Grid</h2>
+          <span class="atlasTag">horizon</span>
+        </div>
+        <div id="atlasWorldGridBrief" class="atlasWorldGridBrief" data-testid="progression-atlas-world-grid-brief"></div>
+      </div>
+    </section>
+
+    <section class="atlasPanel atlasCivicOpsPanel" aria-label="HQ11 civic operations readiness">
+      <div class="atlasPanelHeader">
+        <h2>HQ11 Civic Operations</h2>
+        <span class="atlasTag">advisory surface</span>
+      </div>
+      <div id="atlasCivicOperations" class="atlasCivicOperations" data-testid="progression-atlas-civic-operations"></div>
+    </section>
+
     <section class="atlasGrid">
       <div class="atlasPanel atlasCoveragePanel">
         <div class="atlasPanelHeader">
@@ -36,6 +98,14 @@
           <span class="atlasTag">game truth</span>
         </div>
         <div id="canonicalCoverage" class="atlasCoverageGrid" data-testid="progression-atlas-canonical-coverage"></div>
+      </div>
+
+      <div class="atlasPanel atlasEngineGraphPanel">
+        <div class="atlasPanelHeader">
+          <h2>Engine Graph Studio</h2>
+          <span class="atlasTag">canonical graph</span>
+        </div>
+        <div id="engineGraphStudio" class="atlasEngineGraphStudio" data-testid="progression-atlas-engine-graph"></div>
       </div>
 
       <div class="atlasPanel">
@@ -84,6 +154,44 @@
               <span>Note</span>
               <textarea id="editorStepReason" data-testid="progression-atlas-editor-reason" maxlength="400"></textarea>
             </label>
+            <label>
+              <span>Resource gate</span>
+              <select id="editorStepGate" data-testid="progression-atlas-editor-gate"></select>
+            </label>
+            <fieldset class="atlasGateDraft">
+              <legend>Draft gate</legend>
+              <label>
+                <span>Gate title</span>
+                <input id="editorGateTitle" data-testid="progression-atlas-editor-gate-title" maxlength="80" />
+              </label>
+              <div class="atlasGateDraftGrid">
+                <label>
+                  <span>Wood</span>
+                  <input id="editorGateWood" data-testid="progression-atlas-editor-gate-wood" type="number" min="0" step="1" inputmode="numeric" />
+                </label>
+                <label>
+                  <span>Stone</span>
+                  <input id="editorGateStone" data-testid="progression-atlas-editor-gate-stone" type="number" min="0" step="1" inputmode="numeric" />
+                </label>
+                <label>
+                  <span>Food</span>
+                  <input id="editorGateFood" data-testid="progression-atlas-editor-gate-food" type="number" min="0" step="1" inputmode="numeric" />
+                </label>
+                <label>
+                  <span>Coin</span>
+                  <input id="editorGateCoin" data-testid="progression-atlas-editor-gate-coin" type="number" min="0" step="1" inputmode="numeric" />
+                </label>
+                <label>
+                  <span>XP</span>
+                  <input id="editorGateXp" data-testid="progression-atlas-editor-gate-xp" type="number" min="0" step="1" inputmode="numeric" />
+                </label>
+                <label>
+                  <span>HQ</span>
+                  <input id="editorGateHq" data-testid="progression-atlas-editor-gate-hq" type="number" min="1" step="1" inputmode="numeric" />
+                </label>
+              </div>
+              <button class="atlasButton" id="editorCreateGateBtn" type="button" data-testid="progression-atlas-editor-create-gate">Use Draft Gate</button>
+            </fieldset>
             <div class="atlasEditorLinks">
               <label>
                 <span>Before</span>
@@ -114,16 +222,6 @@
         </div>
         <div id="savedStrategies" data-testid="progression-atlas-saved-strategies"></div>
       </div>
-    </section>
-
-    <section class="atlasPanel atlasExplanationPanel">
-      <div class="atlasPanelHeader">
-        <h2>Oracle Note</h2>
-        <span class="atlasTag">same surface</span>
-      </div>
-      <p id="atlasExplanation" class="atlasExplanation" data-testid="progression-atlas-explanation">
-        Choose a step to see what Clover or an Atlas Oracle would explain through OpenClaw Lite.
-      </p>
     </section>
   </main>
   <script src="/agent-town-icons.js" defer></script>

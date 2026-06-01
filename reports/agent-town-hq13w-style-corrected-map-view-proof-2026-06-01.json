@@ -1,0 +1,74 @@
+{
+  "ok": true,
+  "date": "2026-06-01",
+  "lane": "HQ13W style-corrected map view mock",
+  "verdict": "PASS_REVIEW_MOCK",
+  "artifacts": {
+    "report": "reports/agent-town-hq13w-style-corrected-map-view-2026-06-01.md",
+    "png": {
+      "path": "reports/agent-town-hq13w-style-corrected-map-view-2026-06-01.png",
+      "width": 1280,
+      "height": 720,
+      "channels": "srgb",
+      "sha256": "f80b2c4e4839cf18e9526147e6b7d270b61d6f6695362e81a9a6d039c010429c"
+    },
+    "html": {
+      "path": "reports/media/agent-town-hq13w-style-corrected-map-view-2026-06-01/style-corrected-map-view.html",
+      "sha256": "3c30ee7e4c4afba9f543e02ba47570a17a10162021fc8e7f821e8f21a2cd70b7"
+    }
+  },
+  "styleInputs": {
+    "agentTownFrontierTechCivicIdentity": true,
+    "humanPlusAgentSettlementTone": true,
+    "timberBrassCanvasParchmentWornTeal": true,
+    "scoutLedgerReceiptBeaconPlanWagonLanguage": true,
+    "namedOperatorParty": [
+      "Mira Trailmark",
+      "Rook Signalpost",
+      "Vale-Desk 7"
+    ],
+    "avoidGenericCozyCivMapUi": true,
+    "avoidLiteralWesternGenre": true
+  },
+  "reusedReviewAssets": [
+    "reports/media/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-2026-06-01/hinted-fog-veil-v1.edge-cleanup-review.png",
+    "reports/media/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-2026-06-01/locked-unknown-fog-v1.edge-cleanup-review.png",
+    "reports/media/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-2026-06-01/marker-known-site-plan-v1.edge-cleanup-review.png",
+    "reports/media/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-2026-06-01/marker-hinted-unknown-v1.edge-cleanup-review.png",
+    "reports/media/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-2026-06-01/marker-owned-outpost-v1.edge-cleanup-review.png",
+    "reports/media/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-2026-06-01/hud-selected-sector-frame-v1.edge-cleanup-review.png",
+    "reports/media/agent-town-hq13q-dotted-line-repair-review-assets-2026-06-01/survey-receipt-stroke-v2.repair-review.png",
+    "reports/media/agent-town-hq13t-frontier-boundary-stitch-review-assets-2026-06-01/frontier-dotted-boundary-v3.repair-review.png"
+  ],
+  "scope": {
+    "reviewOnly": true,
+    "runtimeScreenshot": false,
+    "runtimeAssetsPromoted": false,
+    "runtimePackDirectoryCreated": false,
+    "runtimePackLoaderCreated": false,
+    "visualPackManifestCreated": false,
+    "appSourceChanged": false,
+    "serverChanged": false,
+    "schemaChanged": false
+  },
+  "guardrails": {
+    "noRuntimeAssetPromotion": true,
+    "noAtlasExecution": true,
+    "noPublicSharing": true,
+    "noGeneratedUniverseRendering": true,
+    "noHiddenAutonomy": true,
+    "noRouteTradeEconomyResourceRewardCombatSchedulerBehavior": true,
+    "noCrossPlotMutation": true,
+    "noExternalEffects": true,
+    "scoutSectorOnlyCurrentExpeditionMapMutationPath": true,
+    "noCowboySaloonGoldRushDrift": true,
+    "noRoadRouteTradeConquestImplication": true,
+    "noHiddenTruthLeakage": true
+  },
+  "verification": {
+    "playwrightScreenshot": "npx playwright screenshot --viewport-size=1280,720 file:///Users/robin/Projects/Portal-atlas-editor/reports/media/agent-town-hq13w-style-corrected-map-view-2026-06-01/style-corrected-map-view.html reports/agent-town-hq13w-style-corrected-map-view-2026-06-01.png",
+    "fileChecked": true,
+    "identifyChecked": true,
+    "visualInspection": "all ledger text fits; no observed row overlap; assets render in the map view"
+  }
+}

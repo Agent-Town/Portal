@@ -23,9 +23,14 @@
       <span class="fp-res" data-res="food"><span class="fp-res__icon" aria-hidden="true">🌾</span><span class="fp-res__value" data-testid="fp-res-food">0</span></span>
       <span class="fp-res" data-res="coin"><span class="fp-res__icon" aria-hidden="true">🪙</span><span class="fp-res__value" data-testid="fp-res-coin">20</span></span>
     </div>
-    <div class="fp-header__hq">
-      <span class="fp-pill fp-pill--brass" data-testid="fp-hq-level">HQ Lv 1</span>
-      <span class="fp-pill fp-pill--ochre" data-testid="fp-hq-xp">0 XP</span>
+	    <div class="fp-header__hq">
+	      <span class="fp-pill fp-pill--brass" data-testid="fp-hq-level">HQ Lv 1</span>
+	      <span class="fp-pill fp-pill--ochre" data-testid="fp-hq-xp">0 XP</span>
+	      <span class="fp-pill fp-pill--teal" data-testid="fp-scout-report-count">Reports 0</span>
+	      <span class="fp-pill fp-pill--brass" data-testid="fp-site-plan-count">Plans 0</span>
+	    </div>
+    <div class="fp-header__actions">
+      <button class="fp-teal-btn fp-teal-btn--small" id="fp-open-atlas" type="button" data-testid="fp-open-progression-atlas">Atlas</button>
     </div>
   </header>
 
@@ -52,6 +57,15 @@
         </div>
       </section>
 
+      <section class="fp-parchment fp-panel" data-testid="fp-rewards-panel">
+        <header class="fp-panel__head">
+          <h2 class="fp-panel__title">Rewards</h2>
+        </header>
+        <div class="fp-panel__body" id="fp-rewards-body" data-testid="fp-rewards-body">
+          <p class="fp-helper">Claimable milestones will appear here.</p>
+        </div>
+      </section>
+
       <section class="fp-parchment fp-panel" data-testid="fp-foreman-panel">
         <header class="fp-panel__head">
           <h2 class="fp-panel__title">The Foreman</h2>
@@ -75,16 +89,119 @@
         </div>
       </section>
 
-      <section class="fp-parchment fp-panel" data-testid="fp-jobs-panel">
-        <header class="fp-panel__head">
-          <h2 class="fp-panel__title">Action queue</h2>
+	      <section class="fp-parchment fp-panel" data-testid="fp-jobs-panel">
+	        <header class="fp-panel__head">
+	          <h2 class="fp-panel__title">Action queue</h2>
         </header>
         <div class="fp-panel__body" id="fp-jobs-body">
           <p class="fp-helper">No jobs running.</p>
-        </div>
-      </section>
-    </aside>
+	        </div>
+	      </section>
+
+	      <section class="fp-parchment fp-panel" data-testid="fp-owned-plots-panel">
+	        <header class="fp-panel__head">
+	          <h2 class="fp-panel__title">Owned plots</h2>
+	        </header>
+	        <div class="fp-panel__body" id="fp-owned-plots-body" data-testid="fp-owned-plots-body">
+	          <p class="fp-helper">Owned plot summary loading.</p>
+	        </div>
+	      </section>
+
+	      <section class="fp-parchment fp-panel" data-testid="fp-scout-reports-panel">
+	        <header class="fp-panel__head">
+	          <h2 class="fp-panel__title">Scout reports</h2>
+	        </header>
+	        <div class="fp-panel__body" id="fp-scout-reports-body" data-testid="fp-scout-reports-body">
+	          <p class="fp-helper">No reports yet.</p>
+	        </div>
+	      </section>
+
+	      <section class="fp-parchment fp-panel" data-testid="fp-site-plans-panel">
+	        <header class="fp-panel__head">
+	          <h2 class="fp-panel__title">Site plans</h2>
+	        </header>
+	        <div class="fp-panel__body" id="fp-site-plans-body" data-testid="fp-site-plans-body">
+	          <p class="fp-helper">Scout reports can become plan drafts here.</p>
+	        </div>
+	      </section>
+
+	      <section class="fp-parchment fp-panel" data-testid="fp-settlement-claims-panel">
+	        <header class="fp-panel__head">
+	          <h2 class="fp-panel__title">Settlement claims</h2>
+	        </header>
+	        <div class="fp-panel__body" id="fp-settlement-claims-body" data-testid="fp-settlement-claims-body">
+	          <p class="fp-helper">No Settlement Claims yet.</p>
+	        </div>
+	      </section>
+
+	      <section class="fp-parchment fp-panel" data-testid="fp-doctrine-panel">
+	        <header class="fp-panel__head">
+	          <h2 class="fp-panel__title">Research Lodge</h2>
+	        </header>
+	        <div class="fp-panel__body" id="fp-doctrine-body" data-testid="fp-doctrine-body">
+	          <p class="fp-helper">Doctrine state loading.</p>
+	        </div>
+	      </section>
+
+	      <section class="fp-parchment fp-panel" data-testid="fp-work-orders-panel">
+	        <header class="fp-panel__head">
+	          <h2 class="fp-panel__title">Work Orders</h2>
+	        </header>
+	        <div class="fp-panel__body" id="fp-work-orders-body" data-testid="fp-work-orders-body">
+	          <p class="fp-helper">Work Order planner loading.</p>
+	        </div>
+	      </section>
+
+	      <section class="fp-parchment fp-panel" data-testid="fp-world-grid-panel">
+	        <header class="fp-panel__head">
+	          <h2 class="fp-panel__title">World Grid</h2>
+	        </header>
+	        <div class="fp-panel__body" id="fp-world-grid-body" data-testid="fp-world-grid-body">
+	          <p class="fp-helper">World Grid readiness loading.</p>
+	        </div>
+	      </section>
+
+	      <section class="fp-parchment fp-panel" data-testid="fp-civic-proposals-panel">
+	        <header class="fp-panel__head">
+	          <h2 class="fp-panel__title">Civic Proposals</h2>
+	        </header>
+	        <div class="fp-panel__body" id="fp-civic-proposals-body" data-testid="fp-civic-proposals-body">
+	          <p class="fp-helper">Civic proposal records loading.</p>
+	        </div>
+	      </section>
+
+	      <section class="fp-parchment fp-panel" data-testid="fp-overlay-packs-panel">
+	        <header class="fp-panel__head">
+	          <h2 class="fp-panel__title">Generated Universe Overlay Packs</h2>
+	        </header>
+	        <div class="fp-panel__body" id="fp-overlay-packs-body" data-testid="fp-overlay-packs-body">
+	          <p class="fp-helper">Overlay pack records loading.</p>
+	        </div>
+	      </section>
+
+	      <section class="fp-parchment fp-panel" data-testid="fp-civic-operations-panel">
+	        <header class="fp-panel__head">
+	          <h2 class="fp-panel__title">Civic Operations</h2>
+	        </header>
+	        <div class="fp-panel__body" id="fp-civic-operations-body" data-testid="fp-civic-operations-body">
+	          <p class="fp-helper">Civic operations state loading.</p>
+	        </div>
+	      </section>
+	    </aside>
   </main>
+
+  <div class="fp-atlas-backdrop" id="fp-atlas-backdrop" data-testid="fp-progression-atlas-backdrop" aria-hidden="true" hidden>
+    <section class="fp-atlas-modal" role="dialog" aria-labelledby="fp-atlas-title" aria-modal="true">
+      <header class="fp-atlas-modal__head">
+        <div>
+          <p class="fp-atlas-modal__eyebrow">Founders Plot district</p>
+          <h2 class="fp-atlas-modal__title" id="fp-atlas-title">Progression Atlas</h2>
+        </div>
+        <button class="fp-brass-btn fp-brass-btn--small" id="fp-close-atlas" type="button" data-testid="fp-close-progression-atlas">Close</button>
+      </header>
+      <iframe class="fp-atlas-frame" id="fp-atlas-frame" title="Founders Plot Progression Atlas" data-testid="fp-progression-atlas-frame"></iframe>
+    </section>
+  </div>
 
   <button class="fp-drawer-toggle" id="fp-drawer-toggle" data-testid="fp-drawer-toggle" aria-controls="fp-recap-drawer">Recap</button>
   <aside class="fp-drawer" id="fp-recap-drawer" data-testid="fp-recap-drawer" aria-hidden="true">

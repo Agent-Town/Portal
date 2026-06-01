@@ -1,0 +1,142 @@
+{
+  "id": "lumber-worker-jun-timberline-v1",
+  "role": "lumber_worker",
+  "canonicalRoleId": "lumber_worker",
+  "roleFacts": [
+    "LUMBER_CAMP_PRESENT",
+    "PRODUCE",
+    "LUMBER_MILL",
+    "OUTPUT_READY"
+  ],
+  "displayName": "Jun Timberline",
+  "title": "Lumber Camp Wood Steward",
+  "buildingSurface": "LUMBER_CAMP",
+  "characterKind": "human_civic_operator",
+  "backstory": "Jun Timberline learned woodwork from repair crews who could make one good plank serve three emergencies. Jun joined Founders Plot to keep the lumber camp from feeling like a faceless resource tap: sorting, measuring, bundling, and preparing wood that server-owned state has already produced.",
+  "personality": "Upbeat, methodical, and quietly proud of clean stacks and straight cuts. Jun judges a town by how it treats spare boards.",
+  "presentationNotes": "Adult-coded androgynous/nonbinary-coded wood steward with a practical, grounded silhouette distinct from Mira Seedhand and Bram Stonecalm.",
+  "visualOnly": true,
+  "authorityBoundary": "visual_only_projection_of_existing_lumber_camp_state",
+  "model": "openai/gpt-image-2 via OpenClaw image_generate",
+  "sourceImage": "lumber-worker-jun-timberline-v1.source.png",
+  "generatedImage": "lumber-worker-jun-timberline-v1.generated.png",
+  "image": "lumber-worker-jun-timberline-v1.png",
+  "prompt": "lumber-worker-jun-timberline-v1.prompt.md",
+  "sourceSize": {
+    "width": 2048,
+    "height": 2048
+  },
+  "nativeGeneratedSize": {
+    "width": 2048,
+    "height": 2048
+  },
+  "columns": 4,
+  "rows": 4,
+  "frameWidth": 512,
+  "frameHeight": 512,
+  "frameCount": 16,
+  "rowOrder": [
+    "idle",
+    "walk",
+    "mill",
+    "ready"
+  ],
+  "actions": {
+    "idle": {
+      "row": 0,
+      "description": "Checking stacked planks, a plank gauge, or a camp marker.",
+      "frames": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "fps": 3
+    },
+    "walk": {
+      "row": 1,
+      "description": "Walking with a tied board bundle or bundle straps.",
+      "frames": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "fps": 6
+    },
+    "mill": {
+      "row": 2,
+      "description": "Measuring, sanding, or sorting planks with a subtle cyan grain-reader cue.",
+      "frames": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "fps": 5
+    },
+    "ready": {
+      "row": 3,
+      "description": "Presenting bundled wood and a sealed receipt pouch.",
+      "frames": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "fps": 4
+    }
+  },
+  "actionMapping": {
+    "PRODUCE": "mill",
+    "LUMBER_MILL": "mill",
+    "OUTPUT_READY": "ready",
+    "COLLECT_READY": "ready"
+  },
+  "generationNotes": {
+    "sourceProvenance": "/Users/robin/.openclaw/media/tool-image-generation/agent-town-lumber-worker-jun-timberline-sprite-sheet-v1-opaq---8c9e4578-d8b6-4dfd-8a5b-c0b190af62c9.png",
+    "deliveryNote": "Image generation completed through the inter-session GPT Image 2 route. The generated media file was recovered from the local OpenClaw media folder and integrated into the project.",
+    "postProcessing": [
+      "Copied generated opaque source into the project.",
+      "Converted saturated magenta background pixels to alpha.",
+      "Flood-filled pale edge background remnants from safe sheet boundary points.",
+      "Cleared generated guide strips around the expected 512px cell boundaries.",
+      "Zeroed hidden RGB in transparent pixels to prevent magenta bleed in resized proofs.",
+      "Created proof and row-strip previews under reports/."
+    ],
+    "transparency": {
+      "method": "ImageMagick chroma-key and edge flood-fill conversion from opaque source",
+      "sourceKeyRequested": "flat #ff00ff magenta",
+      "sampledCornerRange": [
+        "srgb(252,217,254)",
+        "srgb(244,1,239)",
+        "srgb(247,3,242)",
+        "srgb(249,208,252)"
+      ],
+      "keyRulesUsed": [
+        "18% transparent key around #ff00ff",
+        "8% edge flood-fill for pale magenta/near-white remnants",
+        "transparent guide strips around 512px frame boundaries"
+      ],
+      "transparentCorners": true,
+      "alphaMean": 0.316259
+    },
+    "knownIssues": [
+      "The opaque source includes generated separator traces, so runtime cleanup clears narrow strips around the expected 512px cell boundaries.",
+      "A few faint edge halos may remain under full-size inspection, but the proof is acceptable for asset-ready status before any later scene-wiring slice."
+    ],
+    "constraints": [
+      "adult-coded",
+      "androgynous or nonbinary-coded",
+      "visual-only",
+      "no readable text",
+      "no logos",
+      "no violent axe swing",
+      "no combat",
+      "no deforestation framing",
+      "no stereotype or costume shorthand",
+      "no gameplay authority",
+      "no scene wiring in this slice"
+    ]
+  }
+}

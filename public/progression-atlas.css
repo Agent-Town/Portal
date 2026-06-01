@@ -11,19 +11,26 @@
 
 body {
   margin: 0;
+  overflow-x: hidden;
 }
 
 .progressionAtlasPage {
   min-height: 100vh;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0)),
+    linear-gradient(180deg, rgba(10, 31, 31, 0.08), rgba(255, 255, 255, 0) 220px),
+    linear-gradient(90deg, rgba(44, 107, 92, 0.08) 1px, transparent 1px) 0 0 / 96px 100%,
     #f6f2e8;
 }
 
 .progressionAtlasRoot {
-  width: min(1280px, calc(100vw - 32px));
+  width: min(1320px, calc(100vw - 32px));
   margin: 0 auto;
   padding: 24px 0 28px;
+}
+
+body.isAtlasEmbedded .progressionAtlasRoot {
+  width: 100%;
+  padding: 18px 16px 22px;
 }
 
 .atlasHeader,
@@ -39,7 +46,7 @@ body {
 
 .atlasHeader {
   background:
-    linear-gradient(90deg, rgba(15, 29, 29, 0.96), rgba(28, 38, 32, 0.92)),
+    linear-gradient(90deg, rgba(9, 25, 24, 0.98), rgba(28, 38, 32, 0.94)),
     #111b1a;
   border: 1px solid #5d5140;
   border-radius: 8px;
@@ -135,7 +142,9 @@ body {
   min-height: 42px;
   border: 1px solid #d5c7a5;
   border-radius: 8px;
-  background: #fffaf0;
+  background:
+    linear-gradient(180deg, rgba(255, 253, 247, 0.96), rgba(246, 238, 218, 0.94)),
+    #fffaf0;
   padding: 10px 12px;
   margin-bottom: 14px;
 }
@@ -172,10 +181,31 @@ body {
   gap: 14px;
 }
 
+.atlasWorkbench {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(260px, 0.9fr) minmax(320px, 1.25fr) minmax(260px, 0.85fr);
+  margin-bottom: 14px;
+}
+
+.atlasOpsBoard {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(260px, 0.95fr) minmax(320px, 1.2fr) minmax(260px, 0.95fr);
+  margin-bottom: 14px;
+}
+
+.atlasCivicOpsPanel {
+  margin-bottom: 14px;
+}
+
 .atlasPanel {
   border: 1px solid #d5c7a5;
   border-radius: 8px;
-  background: rgba(255, 250, 240, 0.92);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 247, 0.96), rgba(247, 239, 219, 0.94)),
+    #fffaf0;
+  min-width: 0;
   padding: 14px;
 }
 
@@ -188,8 +218,326 @@ body {
 .atlasStrategy {
   border: 1px solid #e1d3b1;
   border-radius: 8px;
-  background: #fffdf7;
+  background:
+    linear-gradient(180deg, #fffdf7, #fbf1d7);
   padding: 12px;
+}
+
+.atlasSituationGrid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.atlasSituationMetric,
+.atlasGateCard {
+  background: #fffdf7;
+  border: 1px solid #e1d3b1;
+  border-radius: 8px;
+  min-width: 0;
+  padding: 9px;
+}
+
+.atlasSituationMetric strong {
+  color: #182725;
+  display: block;
+  font-size: 16px;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.atlasSituationMetric span {
+  color: #71664f;
+  display: block;
+  font-size: 10px;
+  font-weight: 900;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.atlasSituationMetric.isWide {
+  grid-column: 1 / -1;
+}
+
+.atlasGateDeck {
+  display: grid;
+  gap: 8px;
+}
+
+.atlasGateCard {
+  border-left: 4px solid #2c6b5c;
+  display: grid;
+  gap: 5px;
+}
+
+.atlasGateCard.isBlocked {
+  border-left-color: #b66f2a;
+}
+
+.atlasGateCardHead {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.atlasGateCardHead strong {
+  color: #252820;
+  font-size: 13px;
+  line-height: 1.2;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.atlasGateCardHead span {
+  border-radius: 999px;
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  padding: 5px 7px;
+  text-transform: uppercase;
+}
+
+.atlasGateCard:not(.isBlocked) .atlasGateCardHead span {
+  background: #dcede6;
+  color: #1e5a49;
+}
+
+.atlasGateCard.isBlocked .atlasGateCardHead span {
+  background: #f3e8c0;
+  color: #756027;
+}
+
+.atlasGateCard small,
+.atlasGateCard em {
+  color: #5d594d;
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.atlasAuthorityBoundary,
+.atlasWorkOrderBrief,
+.atlasWorldGridBrief {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.atlasCivicOperations {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.atlasCivicOpsGrid,
+.atlasCivicLifecycle {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.atlasCivicLifecycle {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.atlasCivicOpsCard,
+.atlasCivicLifecycle section,
+.atlasCivicRecord {
+  background: #fffdf7;
+  border: 1px solid #e1d3b1;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.atlasCivicOpsCard {
+  border-left: 4px solid #2c6b5c;
+}
+
+.atlasCivicOpsHead {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+
+.atlasCivicOpsHead div {
+  min-width: 0;
+}
+
+.atlasCivicOpsCard h3,
+.atlasCivicLifecycle h3,
+.atlasCivicRecord strong {
+  color: #252820;
+  font-size: 14px;
+  line-height: 1.2;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.atlasCivicOpsHead span {
+  color: #71664f;
+  display: block;
+  font-size: 11px;
+  font-weight: 900;
+  margin-top: 3px;
+  text-transform: uppercase;
+}
+
+.atlasCivicOpsCard p,
+.atlasCivicRecord p {
+  color: #4d4a40;
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.atlasCivicRecords {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.atlasAuthorityMetrics {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.atlasAuthorityMetrics div {
+  background: #fffdf7;
+  border: 1px solid #e1d3b1;
+  border-radius: 8px;
+  min-width: 0;
+  padding: 9px;
+}
+
+.atlasAuthorityMetrics span,
+.atlasOpsStatus {
+  color: #71664f;
+  display: block;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+
+.atlasAuthorityMetrics strong {
+  color: #182725;
+  display: block;
+  font-size: 20px;
+  line-height: 1.1;
+  margin-top: 3px;
+}
+
+.atlasBoundaryNote,
+.atlasWorkOrderBrief p,
+.atlasWorldGridBrief p {
+  color: #4d4a40;
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.atlasMiniList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.atlasMiniList span {
+  background: #edf3ec;
+  border: 1px solid #cddbc5;
+  border-radius: 999px;
+  color: #365944;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.15;
+  padding: 5px 7px;
+}
+
+.atlasOpsStatusRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.atlasOpsStatus {
+  background: #f7f1e2;
+  border: 1px solid #dac99f;
+  border-radius: 999px;
+  color: #594d36;
+  padding: 5px 7px;
+}
+
+.atlasOpsStatus.status-done,
+.atlasOpsStatus.status-available {
+  background: #dcede6;
+  border-color: #b9d3be;
+  color: #1e5a49;
+}
+
+.atlasOpsStatus.status-waiting {
+  background: #f3e8c0;
+  border-color: #d9c886;
+  color: #756027;
+}
+
+.atlasOpsStatus.status-blocked,
+.atlasOpsStatus.status-locked {
+  background: #f2e9da;
+  border-color: #d5c7a5;
+  color: #6d6252;
+}
+
+.atlasWorkOrderBrief h3 {
+  color: #252820;
+  font-size: 14px;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.atlasWorldGridHead {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+
+.atlasWorldGridHead div {
+  min-width: 0;
+}
+
+.atlasWorldGridHead strong {
+  color: #252820;
+  display: block;
+  font-size: 14px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.atlasWorldGridHead span {
+  color: #71664f;
+  display: block;
+  font-size: 11px;
+  font-weight: 900;
+  margin-top: 3px;
+  text-transform: uppercase;
+}
+
+.atlasExplanation {
+  color: #4d4a40;
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
 }
 
 .atlasStrategy + .atlasStrategy {
@@ -230,6 +578,272 @@ body {
   font-weight: 800;
   line-height: 1;
   padding: 5px 7px;
+}
+
+.atlasEngineGraphPanel {
+  overflow: hidden;
+}
+
+.atlasEngineGraphStudio {
+  min-width: 0;
+}
+
+.atlasEngineGraphShell {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
+}
+
+.atlasEngineGraphMap,
+.atlasEngineInspector {
+  background: #fffdf7;
+  border: 1px solid #e1d3b1;
+  border-radius: 8px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.atlasEngineStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.atlasEngineStats span {
+  background: #f7f1e2;
+  border: 1px solid #dac99f;
+  border-radius: 999px;
+  color: #534b39;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 5px 8px;
+}
+
+.atlasEngineGroups {
+  display: grid;
+  gap: 10px;
+  max-height: 520px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.atlasEngineGroup {
+  display: grid;
+  gap: 7px;
+}
+
+.atlasEngineGroup h3 {
+  color: #62543a;
+  font-size: 11px;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.atlasEngineNodes {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.atlasEngineNode {
+  align-items: center;
+  background: #fffaf0;
+  border: 1px solid #e4d7b7;
+  border-left: 5px solid #7d7a70;
+  border-radius: 7px;
+  color: #282a22;
+  cursor: pointer;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-height: 58px;
+  padding: 7px;
+  text-align: left;
+}
+
+.atlasEngineNode.status-done { border-left-color: #4aa14e; }
+.atlasEngineNode.status-available { border-left-color: #59a7c6; }
+.atlasEngineNode.status-waiting { border-left-color: #d99b34; }
+.atlasEngineNode.status-blocked,
+.atlasEngineNode.status-locked { border-left-color: #7d7a70; }
+
+.atlasEngineNode.isSelected {
+  border-color: #2c6b5c;
+  box-shadow: inset 0 0 0 2px rgba(44, 107, 92, 0.14);
+}
+
+.atlasEngineNode span,
+.atlasEngineNode small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atlasEngineNode span {
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.atlasEngineNode small {
+  color: #786f5e;
+  display: block;
+  font-size: 10px;
+  grid-column: 2;
+}
+
+.atlasEngineInspector {
+  align-content: start;
+  display: grid;
+  gap: 10px;
+}
+
+.atlasEngineInspectorHead {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+
+.atlasEngineInspector h3 {
+  font-size: 15px;
+  line-height: 1.2;
+  margin: 0 0 3px;
+}
+
+.atlasEngineInspector code {
+  color: #766a52;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.atlasEngineInspector p,
+.atlasEngineTool {
+  color: #5d594d;
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.atlasEngineBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.atlasEngineBadges span {
+  background: #edf3ec;
+  border: 1px solid #cddbc5;
+  border-radius: 999px;
+  color: #365944;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 7px;
+}
+
+.atlasEngineEdges {
+  background: #f8f2e4;
+  border: 1px solid #e2d4b5;
+  border-radius: 7px;
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+}
+
+.atlasActionRefBox,
+.atlasBlockedBy {
+  background: #f7f1e2;
+  border: 1px solid #dac99f;
+  border-left: 4px solid #2c6b5c;
+  border-radius: 7px;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px;
+}
+
+.atlasActionRefBox strong,
+.atlasBlockedBy strong {
+  color: #594d36;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.atlasActionRefBox p {
+  color: #4d4a40;
+  font-size: 12px;
+  line-height: 1.4;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.atlasEngineEdges strong,
+.atlasEngineProposal legend {
+  color: #594d36;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.atlasEngineEdges dl {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+}
+
+.atlasEngineEdges div {
+  min-width: 0;
+}
+
+.atlasEngineEdges dt {
+  color: #75694f;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.atlasEngineEdges dd {
+  color: #47443a;
+  font-size: 12px;
+  line-height: 1.35;
+  margin: 1px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.atlasEngineProposal {
+  background: #f7f1e2;
+  border: 1px solid #dac99f;
+  border-radius: 8px;
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  min-width: 0;
+  padding: 10px;
+}
+
+.atlasEngineProposal label {
+  display: grid;
+  gap: 5px;
+}
+
+.atlasEngineProposal label span {
+  color: #71664f;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.atlasEngineProposal input {
+  background: #fffaf0;
+  border: 1px solid #cfbf9b;
+  border-radius: 6px;
+  color: #22261f;
+  font: inherit;
+  min-height: 36px;
+  padding: 8px;
+  width: 100%;
 }
 
 .atlasCompareGrid {
@@ -337,6 +951,7 @@ body {
   border: 1px solid #8c774e;
   border-radius: 8px;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
 }
 
 .atlasCoverageLane {
@@ -568,6 +1183,31 @@ body {
   white-space: nowrap;
 }
 
+.atlasEditorStepText {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.atlasEditorStepText > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atlasEditorStepText small {
+  color: #71664f;
+  font-size: 11px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .atlasEditorForm {
   display: grid;
   gap: 10px;
@@ -610,6 +1250,31 @@ body {
 .atlasEditorLinks label {
   flex: 1 1 0;
   min-width: 0;
+}
+
+.atlasGateDraft {
+  background: #f7f1e2;
+  border: 1px solid #dac99f;
+  border-radius: 8px;
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  min-width: 0;
+  padding: 10px;
+}
+
+.atlasGateDraft legend {
+  color: #594d36;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 0 4px;
+  text-transform: uppercase;
+}
+
+.atlasGateDraftGrid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .atlasEditorActions {
@@ -1152,6 +1817,45 @@ body {
   margin-top: 8px;
 }
 
+.atlasGate {
+  background: #eef4ed;
+  border: 1px solid #cad9bd;
+  border-radius: 7px;
+  color: #365944;
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 8px;
+}
+
+.atlasGate strong,
+.atlasGate em,
+.atlasGate small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.atlasGate strong {
+  color: #2b5f52;
+  font-size: 11px;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.atlasGate span {
+  color: #252820;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.atlasGate em,
+.atlasGate small {
+  color: #5a614f;
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.35;
+}
+
 .atlasRequirement {
   border: 1px solid #d7c9aa;
   border-radius: 999px;
@@ -1188,13 +1892,13 @@ body {
 }
 
 .atlasExplanationPanel {
-  margin-top: 14px;
+  margin-top: 0;
 }
 
 .atlasExplanation {
   margin: 0;
   color: #4d4b43;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.5;
 }
 
@@ -1206,6 +1910,7 @@ body {
 
   .atlasCoveragePanel,
   .atlasHorizonPanel,
+  .atlasEngineGraphPanel,
   .atlasEditorPanel {
     grid-column: 1 / -1;
   }
@@ -1217,13 +1922,38 @@ body {
     padding-top: 14px;
   }
 
+  body.isAtlasEmbedded .progressionAtlasRoot {
+    width: 100%;
+    padding: 10px;
+  }
+
   .atlasHeader {
     align-items: flex-start;
     flex-direction: column;
   }
 
   .atlasHeaderActions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
     justify-content: flex-start;
+    width: 100%;
+  }
+
+  .atlasHeaderActions .atlasButton {
+    width: 100%;
+  }
+
+  .atlasWorkbench {
+    grid-template-columns: 1fr;
+  }
+
+  .atlasOpsBoard {
+    grid-template-columns: 1fr;
+  }
+
+  .atlasCivicOpsGrid,
+  .atlasCivicLifecycle {
+    grid-template-columns: 1fr;
   }
 
   .atlasGrid {
@@ -1232,6 +1962,14 @@ body {
 
   .atlasCompareGrid {
     grid-template-columns: 1fr;
+  }
+
+  .atlasEngineGraphShell {
+    grid-template-columns: 1fr;
+  }
+
+  .atlasEngineNodes {
+    grid-template-columns: repeat(2, minmax(150px, 1fr));
   }
 
   .atlasHorizonIntro {
@@ -1253,16 +1991,23 @@ body {
     justify-content: flex-start;
   }
 
+  .atlasCoverageLanes {
+    overflow-x: hidden;
+  }
+
   .atlasCoverageLane {
     gap: 10px;
-    grid-template-columns: 148px minmax(560px, 1fr);
-    min-width: 720px;
+    grid-template-columns: minmax(130px, 0.42fr) minmax(0, 1fr);
+    min-width: 0;
     padding: 10px;
   }
 
   .atlasCoverageItems {
     gap: 10px;
-    grid-template-columns: repeat(var(--atlas-coverage-count, 5), minmax(76px, 1fr));
+    grid-template-columns: repeat(var(--atlas-coverage-count, 5), minmax(70px, 1fr));
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding: 0 2px 6px;
   }
 
   .atlasCoverageNodeFrame {
@@ -1275,6 +2020,11 @@ body {
     width: 46px;
   }
 
+  .atlasCoverageNodeLabel {
+    font-size: 10px;
+    max-width: 82px;
+  }
+
   .atlasEditorShell {
     grid-template-columns: 1fr;
   }
@@ -1283,6 +2033,10 @@ body {
   .atlasEditorActions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .atlasGateDraftGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .atlasStepHead,
@@ -1297,5 +2051,100 @@ body {
 
   .atlasResearchBody h4 {
     font-size: 11px;
+  }
+}
+
+@media (max-width: 560px) {
+  .progressionAtlasRoot {
+    width: min(100vw - 16px, 1120px);
+    padding-top: 10px;
+  }
+
+  body.isAtlasEmbedded .progressionAtlasRoot {
+    width: 100%;
+    padding: 8px;
+  }
+
+  .atlasHeader h1 {
+    font-size: 26px;
+  }
+
+  .atlasHeaderActions {
+    width: 100%;
+  }
+
+  .atlasHeaderActions .atlasButton,
+  .atlasButton {
+    min-height: 38px;
+  }
+
+  .atlasSummary {
+    align-items: stretch;
+  }
+
+  .atlasPill {
+    flex: 1 1 104px;
+    justify-content: center;
+  }
+
+  .atlasSituationGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .atlasAuthorityMetrics {
+    grid-template-columns: 1fr;
+  }
+
+  .atlasCoverageLanes {
+    overflow-x: hidden;
+  }
+
+  .atlasCoverageLane {
+    grid-template-columns: 1fr;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .atlasCoverageGroup {
+    align-items: start;
+    grid-template-columns: auto minmax(0, 1fr);
+    padding: 9px;
+  }
+
+  .atlasCoverageItems {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: visible;
+  }
+
+  .atlasCoverageItems::before {
+    display: none;
+  }
+
+  .atlasCoverageNodeLabel {
+    max-width: 132px;
+  }
+
+  .atlasEngineNodes {
+    grid-template-columns: 1fr;
+  }
+
+  .atlasEngineGroups {
+    max-height: none;
+  }
+
+  .atlasHorizonRail {
+    grid-template-columns: 1fr;
+    overflow-x: visible;
+  }
+
+  .atlasHorizonRail::before {
+    display: none;
+  }
+
+  .atlasGateDraftGrid {
+    grid-template-columns: 1fr;
   }
 }

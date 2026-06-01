@@ -71,6 +71,87 @@ function createFoundersPlotRouter({
     return sendEnvelope(res, envelope);
   });
 
+  router.get('/api/founders-plot/plots', (req, res) => {
+    const identity = identityFor(req, res);
+    const envelope = engine.listOwnedPlots({
+      pairId: identity.pairId,
+      houseId: identity.houseId || null,
+      plotId: typeof req.query?.plotId === 'string' ? req.query.plotId.trim() : null,
+      nowMs: nowMsFn()
+    });
+    return sendEnvelope(res, envelope);
+  });
+
+  router.get('/api/founders-plot/world-grid', (req, res) => {
+    const identity = identityFor(req, res);
+    const envelope = engine.getWorldGridStatus({
+      pairId: identity.pairId,
+      houseId: identity.houseId || null,
+      plotId: typeof req.query?.plotId === 'string' ? req.query.plotId.trim() : null,
+      nowMs: nowMsFn()
+    });
+    return sendEnvelope(res, envelope);
+  });
+
+  router.get('/api/founders-plot/expedition-map', (req, res) => {
+    const identity = identityFor(req, res);
+    const envelope = engine.getExpeditionMapStatus({
+      pairId: identity.pairId,
+      houseId: identity.houseId || null,
+      plotId: typeof req.query?.plotId === 'string' ? req.query.plotId.trim() : null,
+      nowMs: nowMsFn()
+    });
+    return sendEnvelope(res, envelope);
+  });
+
+  router.post('/api/founders-plot/expedition-map/scout-sector', (req, res) => {
+    const identity = identityFor(req, res);
+    const envelope = engine.scoutExpeditionSector({
+      pairId: identity.pairId,
+      houseId: identity.houseId || null,
+      plotId: typeof req.body?.plotId === 'string' ? req.body.plotId.trim() : null,
+      cellId: req.body?.cellId,
+      actor: req.body?.actor,
+      actorType: req.body?.actorType,
+      idempotencyKey: req.body?.idempotencyKey,
+      nowMs: nowMsFn()
+    });
+    return sendEnvelope(res, envelope);
+  });
+
+  router.get('/api/founders-plot/civic-proposals', (req, res) => {
+    const identity = identityFor(req, res);
+    const envelope = engine.listCivicProposalRecords({
+      pairId: identity.pairId,
+      houseId: identity.houseId || null,
+      plotId: typeof req.query?.plotId === 'string' ? req.query.plotId.trim() : null,
+      nowMs: nowMsFn()
+    });
+    return sendEnvelope(res, envelope);
+  });
+
+  router.get('/api/founders-plot/overlay-packs', (req, res) => {
+    const identity = identityFor(req, res);
+    const envelope = engine.listOverlayPackRecords({
+      pairId: identity.pairId,
+      houseId: identity.houseId || null,
+      plotId: typeof req.query?.plotId === 'string' ? req.query.plotId.trim() : null,
+      nowMs: nowMsFn()
+    });
+    return sendEnvelope(res, envelope);
+  });
+
+  router.get('/api/founders-plot/civic-projects', (req, res) => {
+    const identity = identityFor(req, res);
+    const envelope = engine.listCivicProjectRecords({
+      pairId: identity.pairId,
+      houseId: identity.houseId || null,
+      plotId: typeof req.query?.plotId === 'string' ? req.query.plotId.trim() : null,
+      nowMs: nowMsFn()
+    });
+    return sendEnvelope(res, envelope);
+  });
+
   router.get('/api/founders-plot/progression-atlas', (req, res) => {
     const identity = identityFor(req, res);
     const envelope = progressionAtlas.getProgressionAtlasState({
@@ -193,6 +274,183 @@ function createFoundersPlotRouter({
       houseId: identity.houseId || null,
       plotId: typeof req.body?.plotId === 'string' ? req.body.plotId.trim() : null,
       buildingId: req.body?.buildingId,
+      actor: req.body?.actor,
+      idempotencyKey: req.body?.idempotencyKey,
+      nowMs: nowMsFn()
+    });
+    return sendEnvelope(res, envelope);
+  });
+
+  router.post('/api/founders-plot/draft-site-plan', (req, res) => {
+    const identity = identityFor(req, res);
+    const envelope = engine.draftSitePlan({
+      pairId: identity.pairId,
+      houseId: identity.houseId || null,
+      plotId: typeof req.body?.plotId === 'string' ? req.body.plotId.trim() : null,
+      reportId: req.body?.reportId,
+      title: req.body?.title,
+      focus: req.body?.focus,
+      actor: req.body?.actor,
+      idempotencyKey: req.body?.idempotencyKey,
+      nowMs: nowMsFn()
+    });
+    return sendEnvelope(res, envelope);
+  });
+
+  router.post('/api/founders-plot/review-site-plan', (req, res) => {
+    const identity = identityFor(req, res);
+    const envelope = engine.reviewSitePlan({
+      pairId: identity.pairId,
+      houseId: identity.houseId || null,
+      plotId: typeof req.body?.plotId === 'string' ? req.body.plotId.trim() : null,
+      planId: req.body?.planId,
+      reviewNote: req.body?.reviewNote,
+      actor: req.body?.actor,
+      idempotencyKey: req.body?.idempotencyKey,
+      nowMs: nowMsFn()
+    });
+    return sendEnvelope(res, envelope);
+  });
+
+  router.post('/api/founders-plot/select-doctrine', (req, res) => {
+    const identity = identityFor(req, res);
+    const envelope = engine.selectDoctrine({
+      pairId: identity.pairId,
+      houseId: identity.houseId || null,
+      plotId: typeof req.body?.plotId === 'string' ? req.body.plotId.trim() : null,
+      doctrineId: req.body?.doctrineId,
+      actor: req.body?.actor,
+      idempotencyKey: req.body?.idempotencyKey,
+      nowMs: nowMsFn()
+    });
+    return sendEnvelope(res, envelope);
+  });
+
+  router.post('/api/founders-plot/work-orders/draft', (req, res) => {
+    const identity = identityFor(req, res);
+    const envelope = engine.createWorkOrderDraft({
+      pairId: identity.pairId,
+      houseId: identity.houseId || null,
+      plotId: typeof req.body?.plotId === 'string' ? req.body.plotId.trim() : null,
+      templateId: req.body?.templateId,
+      scope: isPlainObject(req.body?.scope) ? req.body.scope : {},
+      actor: req.body?.actor,
+      idempotencyKey: req.body?.idempotencyKey,
+      nowMs: nowMsFn()
+    });
+    return sendEnvelope(res, envelope);
+  });
+
+  router.post('/api/founders-plot/work-orders/execute', (req, res) => {
+    const identity = identityFor(req, res);
+    const envelope = engine.executeWorkOrder({
+      pairId: identity.pairId,
+      houseId: identity.houseId || null,
+      plotId: typeof req.body?.plotId === 'string' ? req.body.plotId.trim() : null,
+      workOrderId: req.body?.workOrderId,
+      actor: req.body?.actor,
+      idempotencyKey: req.body?.idempotencyKey,
+      nowMs: nowMsFn()
+    });
+    return sendEnvelope(res, envelope);
+  });
+
+  router.post('/api/founders-plot/civic-proposals', (req, res) => {
+    const identity = identityFor(req, res);
+    const envelope = engine.createCivicProposalRecord({
+      pairId: identity.pairId,
+      houseId: identity.houseId || null,
+      plotId: typeof req.body?.plotId === 'string' ? req.body.plotId.trim() : null,
+      title: req.body?.title,
+      category: req.body?.category,
+      summary: req.body?.summary,
+      status: req.body?.status,
+      relatedPlotIds: Array.isArray(req.body?.relatedPlotIds) ? req.body.relatedPlotIds : [],
+      reviewNote: req.body?.reviewNote,
+      actor: req.body?.actor,
+      idempotencyKey: req.body?.idempotencyKey,
+      nowMs: nowMsFn()
+    });
+    return sendEnvelope(res, envelope);
+  });
+
+  router.post('/api/founders-plot/overlay-packs', (req, res) => {
+    const identity = identityFor(req, res);
+    const envelope = engine.createOverlayPackRecord({
+      pairId: identity.pairId,
+      houseId: identity.houseId || null,
+      plotId: typeof req.body?.plotId === 'string' ? req.body.plotId.trim() : null,
+      sourceProposalId: req.body?.sourceProposalId,
+      title: req.body?.title,
+      theme: req.body?.theme,
+      summary: req.body?.summary,
+      status: req.body?.status,
+      targetSurfaceIds: Array.isArray(req.body?.targetSurfaceIds) ? req.body.targetSurfaceIds : [],
+      targetNodeIds: Array.isArray(req.body?.targetNodeIds) ? req.body.targetNodeIds : [],
+      displayHints: req.body?.displayHints && typeof req.body.displayHints === 'object' ? req.body.displayHints : {},
+      prompt: req.body?.prompt,
+      provenance: req.body?.provenance && typeof req.body.provenance === 'object' ? req.body.provenance : {},
+      actor: req.body?.actor,
+      idempotencyKey: req.body?.idempotencyKey,
+      nowMs: nowMsFn()
+    });
+    return sendEnvelope(res, envelope);
+  });
+
+  router.post('/api/founders-plot/civic-projects/activate', (req, res) => {
+    const identity = identityFor(req, res);
+    const envelope = engine.activateCivicProject({
+      pairId: identity.pairId,
+      houseId: identity.houseId || null,
+      plotId: typeof req.body?.plotId === 'string' ? req.body.plotId.trim() : null,
+      sourceProposalId: req.body?.sourceProposalId,
+      projectType: req.body?.projectType,
+      title: req.body?.title,
+      summary: req.body?.summary,
+      actor: req.body?.actor,
+      idempotencyKey: req.body?.idempotencyKey,
+      nowMs: nowMsFn()
+    });
+    return sendEnvelope(res, envelope);
+  });
+
+  router.post('/api/founders-plot/civic-projects/inspect', (req, res) => {
+    const identity = identityFor(req, res);
+    const envelope = engine.inspectCivicProject({
+      pairId: identity.pairId,
+      houseId: identity.houseId || null,
+      plotId: typeof req.body?.plotId === 'string' ? req.body.plotId.trim() : null,
+      projectId: req.body?.projectId,
+      inspectionType: req.body?.inspectionType,
+      note: req.body?.note,
+      actor: req.body?.actor,
+      idempotencyKey: req.body?.idempotencyKey,
+      nowMs: nowMsFn()
+    });
+    return sendEnvelope(res, envelope);
+  });
+
+  router.post('/api/founders-plot/prepare-settler-convoy', (req, res) => {
+    const identity = identityFor(req, res);
+    const envelope = engine.prepareSettlerConvoy({
+      pairId: identity.pairId,
+      houseId: identity.houseId || null,
+      plotId: typeof req.body?.plotId === 'string' ? req.body.plotId.trim() : null,
+      sitePlanId: req.body?.sitePlanId,
+      actor: req.body?.actor,
+      idempotencyKey: req.body?.idempotencyKey,
+      nowMs: nowMsFn()
+    });
+    return sendEnvelope(res, envelope);
+  });
+
+  router.post('/api/founders-plot/found-settlement', (req, res) => {
+    const identity = identityFor(req, res);
+    const envelope = engine.foundSettlement({
+      pairId: identity.pairId,
+      houseId: identity.houseId || null,
+      plotId: typeof req.body?.plotId === 'string' ? req.body.plotId.trim() : null,
+      claimId: req.body?.claimId,
       actor: req.body?.actor,
       idempotencyKey: req.body?.idempotencyKey,
       nowMs: nowMsFn()

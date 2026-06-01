@@ -1,0 +1,167 @@
+{
+  "ok": true,
+  "generatedAt": "2026-06-01T07:37:10.049Z",
+  "source": "FP-E2E-022 mocked HQ12B/C/F/G read-model state after Scout Sector receipt; CSS-only compact mobile proof",
+  "selectedCellId": "cell_q0_r1",
+  "eventPacketId": "expedition_event_packet_hq12f_cell_q0_r1",
+  "projectionHash": "hq12c-scout-sector-ui-proof",
+  "mobilePolishProof": {
+    "viewport": 390,
+    "documentScrollWidth": 390,
+    "bodyScrollWidth": 390,
+    "clipped": [],
+    "surfaces": {
+      "panel": {
+        "top": -1564,
+        "left": 12,
+        "right": 378,
+        "width": 366,
+        "height": 3973
+      },
+      "objectiveStrip": {
+        "top": -988,
+        "left": 26,
+        "right": 364,
+        "width": 338,
+        "height": 156
+      },
+      "threeHost": {
+        "top": -792,
+        "left": 40,
+        "right": 353,
+        "width": 313,
+        "height": 218
+      },
+      "selectedSector": {
+        "top": -517,
+        "left": 26,
+        "right": 364,
+        "width": 338,
+        "height": 964
+      },
+      "eventPacket": {
+        "top": 455,
+        "left": 26,
+        "right": 364,
+        "width": 338,
+        "height": 1089
+      },
+      "eventPacketChips": {
+        "top": 548,
+        "left": 40,
+        "right": 353,
+        "width": 313,
+        "height": 144
+      },
+      "partyPacket": {
+        "top": 762,
+        "left": 40,
+        "right": 353,
+        "width": 313,
+        "height": 382
+      },
+      "partyRoster": {
+        "top": 989,
+        "left": 49,
+        "right": 344,
+        "width": 295,
+        "height": 90
+      }
+    },
+    "gridColumns": {
+      "metrics": 2,
+      "objectiveFacts": 4,
+      "packetFacts": 2,
+      "partyFacts": 2
+    },
+    "buttons": {
+      "packetButtons": 0,
+      "partyButtons": 0,
+      "scoutButtons": 0
+    }
+  },
+  "domProof": {
+    "panelVisible": true,
+    "scoutReceiptVisible": false,
+    "targetFogState": "known",
+    "objectiveStrip": {
+      "visible": true,
+      "mode": "packet",
+      "readOnly": "true",
+      "actions": 0,
+      "targetCellId": "cell_q0_r1",
+      "packetId": "expedition_event_packet_hq12f_cell_q0_r1",
+      "partyId": "expedition_party_current_plot_v1",
+      "text": "Current focusReview the latest packetexpedition_event_packet_hq12f_cell_q0_r1 is the latest Scout Sector receipt packet. It is evidence for cell_q0_r1 only, with zero executable actions.Packets1Actions0Revealed4Party3Read-only focus from existing map, packet, and party state. No new server objectives, hidden truth, resources, routes, assignments, timers, rewards, Atlas execution, sharing, or external effects.",
+      "factsText": "Packets1Actions0Revealed4Party3",
+      "boundaryText": "Read-only focus from existing map, packet, and party state. No new server objectives, hidden truth, resources, routes, assignments, timers, rewards, Atlas execution, sharing, or external effects.",
+      "buttons": 0
+    },
+    "eventPacketCardVisible": true,
+    "eventPacketHeaderText": "Map evidence packetRidge Lantern packetRead-only",
+    "eventPacketChipsText": "type ridge lantern packet v1source scout sector - scout sector ui 001 - receipt metadata onlyreceipt scout_sector_ui_001cell cell_q0_r1read model onlyreceipt metadata onlyzero executable actions",
+    "eventPacketLedeText": "Selected-sector map evidence only. The packet records what the Scout Sector receipt revealed; it cannot be executed, assigned, traded, shared, or routed.",
+    "eventPacketFactsText": "Packetexpedition_event_packet_hq12f_cell_q0_r1Receiptreceipt scout sector - scout scout_sector_ui_001 - cell cell_q0_r1 - via scout_sector_receiptRead-onlytrueActions0",
+    "eventPacketBoundaryText": "Read-only receipt metadata. No packet actions, route/trade creation, resource changes, combat, scheduler work, public sharing, Generated Universe rendering, Atlas execution, cross-plot mutation, or external effects.",
+    "partyBlocks": [
+      {
+        "testid": "fp-expedition-party-selected-cell_q0_r1",
+        "actions": 0,
+        "readOnly": "true",
+        "text": "Mira Trailmark field partyPacket filedMira Trailmark and Vale-Desk 7 keep this packet as named receipt flavor for cell_q0_r1; it does not unlock routes, resources, or actions.OperatorMira Trailmark - scoutDeskVale-Desk 7 - HQ civic operatorAnchorexpedition_event_packet_hq12f_cell_q0_r1Manifestexpedition_party_current_plot_v1Mira TrailmarkscoutRook SignalpostmessengerVale-Desk 7HQ civic operatorParty flavor is presentation-only: zero actions, no autonomy, no routes, no resources, no combat, no sharing, and no Atlas execution."
+      },
+      {
+        "testid": "fp-expedition-party-roster-selected-cell_q0_r1",
+        "actions": 0,
+        "readOnly": null,
+        "text": "Mira TrailmarkscoutRook SignalpostmessengerVale-Desk 7HQ civic operator"
+      },
+      {
+        "testid": "fp-expedition-party-packet-cell_q0_r1",
+        "actions": 0,
+        "readOnly": "true",
+        "text": "Mira Trailmark field partyPacket filedMira Trailmark and Vale-Desk 7 keep this packet as named receipt flavor for cell_q0_r1; it does not unlock routes, resources, or actions.OperatorMira Trailmark - scoutDeskVale-Desk 7 - HQ civic operatorAnchorexpedition_event_packet_hq12f_cell_q0_r1Manifestexpedition_party_current_plot_v1Mira TrailmarkscoutRook SignalpostmessengerVale-Desk 7HQ civic operatorParty flavor is presentation-only: zero actions, no autonomy, no routes, no resources, no combat, no sharing, and no Atlas execution."
+      },
+      {
+        "testid": "fp-expedition-party-roster-packet-cell_q0_r1",
+        "actions": 0,
+        "readOnly": null,
+        "text": "Mira TrailmarkscoutRook SignalpostmessengerVale-Desk 7HQ civic operator"
+      }
+    ],
+    "partyRosterText": "Mira TrailmarkscoutRook SignalpostmessengerVale-Desk 7HQ civic operator",
+    "eventPacketMutationButtons": [],
+    "scoutButtons": [],
+    "sectorCards": [
+      "fp-expedition-sector-list",
+      "fp-expedition-sector-cell_origin",
+      "fp-expedition-sector-status-cell_origin",
+      "fp-expedition-sector-cell_q1_r0",
+      "fp-expedition-sector-status-cell_q1_r0",
+      "fp-expedition-sector-cell_q1_r-1",
+      "fp-expedition-sector-status-cell_q1_r-1",
+      "fp-expedition-sector-cell_q0_r1",
+      "fp-expedition-sector-status-cell_q0_r1",
+      "fp-expedition-sector-packet-cell_q0_r1"
+    ]
+  },
+  "screenshots": [
+    "reports/agent-town-hq12h-expedition-map-mobile-polish-desktop-2026-05-31.png",
+    "reports/agent-town-hq12h-expedition-map-mobile-polish-mobile-2026-05-31.png"
+  ],
+  "guardrails": {
+    "scoutSectorOnlyMutationPath": true,
+    "packetActions": 0,
+    "partyActions": 0,
+    "readOnlyEventPacket": true,
+    "executableActions": [],
+    "atlasExecution": false,
+    "publicSharing": false,
+    "generatedUniverseRendering": false,
+    "routeTrade": false,
+    "resourceMutation": false,
+    "combat": false,
+    "hiddenAutonomy": false,
+    "wildWestGenreDrift": false
+  }
+}

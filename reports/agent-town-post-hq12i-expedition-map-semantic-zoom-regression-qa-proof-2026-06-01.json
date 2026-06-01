@@ -1,0 +1,112 @@
+{
+  "slice": "post_hq12i_semantic_zoom_regression_qa",
+  "status": "PASS",
+  "date": "2026-06-01",
+  "worktree": "/Users/robin/Projects/Portal-atlas-editor",
+  "inputsReviewed": [
+    "reports/agent-town-hq12i-expedition-map-semantic-zoom-polish-2026-05-31.md",
+    "reports/agent-town-hq12i-expedition-map-semantic-zoom-polish-proof-2026-05-31.json",
+    "reports/agent-town-hq12i-expedition-map-semantic-zoom-polish-desktop-2026-05-31.png",
+    "reports/agent-town-hq12i-expedition-map-semantic-zoom-polish-mobile-2026-05-31.png",
+    "public/experiences/founders-plot/founders-plot.js",
+    "public/experiences/founders-plot/founders-plot.css",
+    "e2e/200_founders_plot.spec.js",
+    "e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js"
+  ],
+  "semanticZoom": {
+    "desktopInitialTier": "Survey view",
+    "desktopInitialZoomTier": "survey",
+    "desktopAfterZoomTier": "Detail view",
+    "desktopAfterZoomFogState": "locked_unknown",
+    "desktopAfterZoomHiddenTruthCopy": "Selected: Locked Unknown stays sealed; no resources, routes, or action data.",
+    "mobileAfterTouchDragTier": "Detail view",
+    "mobileAfterTouchDragFogState": "hinted",
+    "mobileAfterTouchDragCopy": "Selected: Unresolved Map Edge Hint is a hinted edge; only Scout Sector can make it known."
+  },
+  "mobileLayout": {
+    "viewport": 390,
+    "documentScrollWidth": 390,
+    "bodyScrollWidth": 390,
+    "hostWidth": 313,
+    "hostHeight": 188
+  },
+  "screenshots": {
+    "desktop": {
+      "path": "reports/agent-town-hq12i-expedition-map-semantic-zoom-polish-desktop-2026-05-31.png",
+      "width": 400,
+      "height": 401,
+      "colorspace": "sRGB"
+    },
+    "mobile": {
+      "path": "reports/agent-town-hq12i-expedition-map-semantic-zoom-polish-mobile-2026-05-31.png",
+      "width": 313,
+      "height": 189,
+      "colorspace": "sRGB"
+    }
+  },
+  "checks": [
+    {
+      "command": "jq inspection of reports/agent-town-hq12i-expedition-map-semantic-zoom-polish-proof-2026-05-31.json",
+      "result": "passed"
+    },
+    {
+      "command": "magick identify on HQ12I desktop/mobile proof screenshots",
+      "result": "passed"
+    },
+    {
+      "command": "node --check public/experiences/founders-plot/founders-plot.js",
+      "result": "passed"
+    },
+    {
+      "command": "node --check e2e/200_founders_plot.spec.js",
+      "result": "passed"
+    },
+    {
+      "command": "node --check e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js",
+      "result": "passed"
+    },
+    {
+      "command": "NODE_ENV=test node --test tests-founders-plot/fp-unit.test.js tests-founders-plot/fp-contract.test.js tests-founders-plot/fp-http.test.js",
+      "result": "passed",
+      "tests": 83
+    },
+    {
+      "command": "PW_PORT=4291 npx playwright test e2e/200_founders_plot.spec.js --project=chromium --grep \"FP-E2E-022\" --reporter=line",
+      "result": "passed",
+      "tests": 1
+    },
+    {
+      "command": "PW_PORT=4292 npx playwright test e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js --project=chromium --reporter=line",
+      "result": "passed",
+      "tests": 1
+    },
+    {
+      "command": "focused git diff --check over HQ12I paths",
+      "result": "passed"
+    }
+  ],
+  "guardrails": {
+    "readOnly": true,
+    "executableActions": [],
+    "routeCreation": false,
+    "atlasExecution": false,
+    "hiddenCellResourceTextSuppressed": true,
+    "scoutSectorOnlyMutationPath": true,
+    "packetActions": 0,
+    "partyActions": 0,
+    "serverAuthorityChanged": false,
+    "newMutationPath": false,
+    "publicSharing": false,
+    "generatedUniverseRendering": false,
+    "routeTradeEconomyHooks": false,
+    "combat": false,
+    "schedulerBackgroundBehavior": false,
+    "hiddenAutonomy": false,
+    "crossPlotMutation": false,
+    "externalEffects": false,
+    "wildWestGenreDrift": false
+  },
+  "residualRisks": [
+    "Focused HQ12I regression pass only; full npm test and full browser suite were not run."
+  ]
+}

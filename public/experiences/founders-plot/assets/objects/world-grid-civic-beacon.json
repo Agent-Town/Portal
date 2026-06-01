@@ -1,0 +1,49 @@
+{
+  "id": "world-grid-civic-beacon-v1",
+  "role": "world_grid_civic_beacon",
+  "displayName": "World Grid Civic Beacon",
+  "description": "Visual-only read-model proof prop for civic readiness surfaces. It is a harmless beacon-like marker, not a route, trade, scheduler, security, or surveillance device.",
+  "visualOnly": true,
+  "wiringStatus": "asset_ready_not_scene_wired",
+  "sourceImage": "world-grid-civic-beacon.source.png",
+  "nativeGeneratedImage": "world-grid-civic-beacon.generated.png",
+  "image": "world-grid-civic-beacon.png",
+  "webp": "world-grid-civic-beacon.webp",
+  "prompt": "world-grid-civic-beacon.prompt.md",
+  "nativeGeneratedSize": {
+    "width": 1254,
+    "height": 1254
+  },
+  "sourceSize": {
+    "width": 1024,
+    "height": 1024
+  },
+  "texture": {
+    "path": "public/experiences/founders-plot/assets/objects/world-grid-civic-beacon.png",
+    "format": "png",
+    "colorSpace": "sRGB",
+    "channels": "sRGBA",
+    "width": 1024,
+    "height": 1024,
+    "alpha": true,
+    "transparentCorners": true
+  },
+  "generationNotes": {
+    "sourceProvenance": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e7c63-12e6-76d1-85d0-cd38068fd851/ig_03427427825ed960016a1bc3ff7c1c8191b28c62eb8b78c415.png",
+    "mode": "built-in image_gen with requested GPT Image 2.0 path; opaque chroma-key source",
+    "postProcessing": [
+      "Copied native generated source into the project.",
+      "Resized the opaque source to a 1024x1024 prop source.",
+      "Converted green chroma background to alpha with ImageMagick and wrote PNG/WebP runtime candidates."
+    ],
+    "transparency": {
+      "method": "ImageMagick chroma-key conversion from opaque source",
+      "sourceKeyRequested": "#00ff00",
+      "sampledCornerColor": "srgb(15,238,21)",
+      "keyColorsUsed": ["#0fee15"],
+      "fuzz": "22%",
+      "transparentCorners": true
+    },
+    "constraints": ["visual-only", "no readable text", "no logos", "no weapons", "no surveillance", "no route/trade authority", "no gameplay authority"]
+  }
+}

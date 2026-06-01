@@ -1,0 +1,71 @@
+{
+  "ok": true,
+  "date": "2026-06-01",
+  "lane": "agent-town-hq13-visual-architecture-kickoff",
+  "verdict": "STARTED",
+  "imageGeneration": {
+    "model": "openai/gpt-image-2",
+    "taskId": "7fdb3fc9-a34e-4de0-9df7-d50a4d9a962a",
+    "filenameHint": "agent-town-hq13-expedition-map-north-star-visual-direction",
+    "count": 4,
+    "aspectRatio": "16:9",
+    "quality": "high",
+    "references": [
+      "/Users/robin/.openclaw/media/tool-image-generation/agent-town-post-hq11-expedition-map-fog-of-war-concept-2026----10219297-b57c-4d0a-85d0-bb87544d8c64.png",
+      "/Users/robin/.openclaw/media/agent-town-references/agent-town-hq12p-threejs-current-reference-2026-06-01.png"
+    ]
+  },
+  "spawnedAgents": [
+    {
+      "lane": "HQ13A Visual Universe Pack Architecture",
+      "nickname": "Lorentz",
+      "agentId": "019e80c1-2714-7062-8a30-2092a35dfacd",
+      "writeScope": [
+        "docs/specs/agent-town-visual-universe-pack-architecture.md",
+        "reports/agent-town-hq13a-visual-universe-pack-architecture-2026-06-01.md",
+        "reports/agent-town-hq13a-visual-universe-pack-architecture-proof-2026-06-01.json"
+      ]
+    },
+    {
+      "lane": "HQ13B North-Star Expedition Map Visual Shell",
+      "nickname": "Jason",
+      "agentId": "019e80c1-2759-7350-81fe-166f1cf74da6",
+      "writeScope": [
+        "public/experiences/founders-plot/three_scene_entry.js",
+        "public/experiences/founders-plot/founders-plot.css",
+        "e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js",
+        "reports/agent-town-hq13b-north-star-expedition-map-visual-shell-2026-06-01.md",
+        "reports/agent-town-hq13b-north-star-expedition-map-visual-shell-proof-2026-06-01.json"
+      ]
+    },
+    {
+      "lane": "HQ13C Location Scene Visit Model",
+      "nickname": "Ampere",
+      "agentId": "019e80c1-279b-7582-ab96-a0eb6908adb2",
+      "writeScope": [
+        "docs/specs/agent-town-location-scene-visit-model.md",
+        "reports/agent-town-hq13c-location-scene-visit-model-2026-06-01.md",
+        "reports/agent-town-hq13c-location-scene-visit-model-proof-2026-06-01.json"
+      ]
+    }
+  ],
+  "inspectedPatterns": [
+    "public/experiences/founders-plot/manifest.json",
+    "public/experiences/founders-plot/assets/characters/inhabitants/scout/pathfinder-scout-v1.json",
+    "public/experiences/founders-plot/assets/characters/inhabitants/farmer/farmer-mira-seedhand-v1.json",
+    "public/experiences/founders-plot/assets/objects/generated-universe-overlay-pack-card-art.json",
+    "server/founders_plot/engine.js",
+    "public/experiences/founders-plot/three_scene_entry.js",
+    "public/experiences/founders-plot/founders-plot.js"
+  ],
+  "guardrails": {
+    "serverAuthorityChanges": false,
+    "newMutationPath": false,
+    "atlasExecution": false,
+    "publicSharing": false,
+    "generatedUniverseRealRendering": false,
+    "hiddenAutonomy": false,
+    "routeTradeEconomyCombatScheduler": false,
+    "wildWestDrift": false
+  }
+}

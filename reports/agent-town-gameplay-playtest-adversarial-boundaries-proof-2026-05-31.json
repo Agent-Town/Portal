@@ -1,0 +1,2276 @@
+{
+  "generatedAt": "2026-05-31T06:52:35.246Z",
+  "verdict": "PASS_WITH_NOTES",
+  "environment": {
+    "storePath": ":memory:",
+    "nodeEnv": "test",
+    "projectRoot": "/Users/robin/Projects/Portal-atlas-editor"
+  },
+  "apiCases": [
+    {
+      "id": "hq_gate_missing_prereq_level_1",
+      "severity": "high",
+      "request": {
+        "method": "POST",
+        "path": "/api/founders-plot/upgrade-building",
+        "pair": "qa:hqgate:1",
+        "body": {
+          "plotId": "plot_6a181a422b80d7a9",
+          "buildingId": "bldg_hq_2b80d7a9",
+          "actor": "HUMAN",
+          "idempotencyKey": "hqgate-1"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "errorCode": "MISSING_HQ_BUILDING_PREREQUISITES",
+        "noJobQueued": true
+      },
+      "actual": {
+        "status": 400,
+        "ok": false,
+        "plotId": "plot_6a181a422b80d7a9",
+        "error": {
+          "code": "MISSING_HQ_BUILDING_PREREQUISITES",
+          "message": "HQ Level 2 requires completed prerequisite buildings: Lumber Camp, Farm Plot.",
+          "retryable": false,
+          "details": {
+            "fromLevel": 1,
+            "targetLevel": 2,
+            "buildingPrerequisites": [
+              {
+                "type": "LUMBER_CAMP",
+                "label": "Lumber Camp",
+                "requiredState": "READY",
+                "buildingId": null,
+                "state": null,
+                "satisfied": false,
+                "reason": "missing_building"
+              },
+              {
+                "type": "FARM_PLOT",
+                "label": "Farm Plot",
+                "requiredState": "READY",
+                "buildingId": null,
+                "state": null,
+                "satisfied": false,
+                "reason": "missing_building"
+              }
+            ],
+            "missingPrerequisites": [
+              {
+                "type": "LUMBER_CAMP",
+                "label": "Lumber Camp",
+                "requiredState": "READY",
+                "buildingId": null,
+                "state": null,
+                "satisfied": false,
+                "reason": "missing_building"
+              },
+              {
+                "type": "FARM_PLOT",
+                "label": "Farm Plot",
+                "requiredState": "READY",
+                "buildingId": null,
+                "state": null,
+                "satisfied": false,
+                "reason": "missing_building"
+              }
+            ]
+          }
+        },
+        "worldDeltaTypes": []
+      },
+      "pass": true
+    },
+    {
+      "id": "hq_gate_missing_prereq_level_2",
+      "severity": "high",
+      "request": {
+        "method": "POST",
+        "path": "/api/founders-plot/upgrade-building",
+        "pair": "qa:hqgate:2",
+        "body": {
+          "plotId": "plot_ab7037298e34e288",
+          "buildingId": "bldg_hq_8e34e288",
+          "actor": "HUMAN",
+          "idempotencyKey": "hqgate-2"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "errorCode": "MISSING_HQ_BUILDING_PREREQUISITES",
+        "noJobQueued": true
+      },
+      "actual": {
+        "status": 400,
+        "ok": false,
+        "plotId": "plot_ab7037298e34e288",
+        "error": {
+          "code": "MISSING_HQ_BUILDING_PREREQUISITES",
+          "message": "HQ Level 3 requires completed prerequisite building: Quarry.",
+          "retryable": false,
+          "details": {
+            "fromLevel": 2,
+            "targetLevel": 3,
+            "buildingPrerequisites": [
+              {
+                "type": "QUARRY",
+                "label": "Quarry",
+                "requiredState": "READY",
+                "buildingId": null,
+                "state": null,
+                "satisfied": false,
+                "reason": "missing_building"
+              }
+            ],
+            "missingPrerequisites": [
+              {
+                "type": "QUARRY",
+                "label": "Quarry",
+                "requiredState": "READY",
+                "buildingId": null,
+                "state": null,
+                "satisfied": false,
+                "reason": "missing_building"
+              }
+            ]
+          }
+        },
+        "worldDeltaTypes": []
+      },
+      "pass": true
+    },
+    {
+      "id": "hq_gate_missing_prereq_level_3",
+      "severity": "high",
+      "request": {
+        "method": "POST",
+        "path": "/api/founders-plot/upgrade-building",
+        "pair": "qa:hqgate:3",
+        "body": {
+          "plotId": "plot_757ae568369ad5aa",
+          "buildingId": "bldg_hq_369ad5aa",
+          "actor": "HUMAN",
+          "idempotencyKey": "hqgate-3"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "errorCode": "MISSING_HQ_BUILDING_PREREQUISITES",
+        "noJobQueued": true
+      },
+      "actual": {
+        "status": 400,
+        "ok": false,
+        "plotId": "plot_757ae568369ad5aa",
+        "error": {
+          "code": "MISSING_HQ_BUILDING_PREREQUISITES",
+          "message": "HQ Level 4 requires completed prerequisite building: Expedition Board.",
+          "retryable": false,
+          "details": {
+            "fromLevel": 3,
+            "targetLevel": 4,
+            "buildingPrerequisites": [
+              {
+                "type": "EXPEDITION_BOARD",
+                "label": "Expedition Board",
+                "requiredState": "READY",
+                "buildingId": null,
+                "state": null,
+                "satisfied": false,
+                "reason": "missing_building"
+              }
+            ],
+            "missingPrerequisites": [
+              {
+                "type": "EXPEDITION_BOARD",
+                "label": "Expedition Board",
+                "requiredState": "READY",
+                "buildingId": null,
+                "state": null,
+                "satisfied": false,
+                "reason": "missing_building"
+              }
+            ]
+          }
+        },
+        "worldDeltaTypes": []
+      },
+      "pass": true
+    },
+    {
+      "id": "hq_gate_missing_prereq_level_4",
+      "severity": "high",
+      "request": {
+        "method": "POST",
+        "path": "/api/founders-plot/upgrade-building",
+        "pair": "qa:hqgate:4",
+        "body": {
+          "plotId": "plot_9d52c4c5645e5b82",
+          "buildingId": "bldg_hq_645e5b82",
+          "actor": "HUMAN",
+          "idempotencyKey": "hqgate-4"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "errorCode": "MISSING_HQ_BUILDING_PREREQUISITES",
+        "noJobQueued": true
+      },
+      "actual": {
+        "status": 400,
+        "ok": false,
+        "plotId": "plot_9d52c4c5645e5b82",
+        "error": {
+          "code": "MISSING_HQ_BUILDING_PREREQUISITES",
+          "message": "HQ Level 5 requires completed prerequisite building: Workshop.",
+          "retryable": false,
+          "details": {
+            "fromLevel": 4,
+            "targetLevel": 5,
+            "buildingPrerequisites": [
+              {
+                "type": "WORKSHOP",
+                "label": "Workshop",
+                "requiredState": "READY",
+                "buildingId": null,
+                "state": null,
+                "satisfied": false,
+                "reason": "missing_building"
+              }
+            ],
+            "missingPrerequisites": [
+              {
+                "type": "WORKSHOP",
+                "label": "Workshop",
+                "requiredState": "READY",
+                "buildingId": null,
+                "state": null,
+                "satisfied": false,
+                "reason": "missing_building"
+              }
+            ]
+          }
+        },
+        "worldDeltaTypes": []
+      },
+      "pass": true
+    },
+    {
+      "id": "hq_gate_missing_prereq_level_5",
+      "severity": "high",
+      "request": {
+        "method": "POST",
+        "path": "/api/founders-plot/upgrade-building",
+        "pair": "qa:hqgate:5",
+        "body": {
+          "plotId": "plot_269e05e2293e6f9c",
+          "buildingId": "bldg_hq_293e6f9c",
+          "actor": "HUMAN",
+          "idempotencyKey": "hqgate-5"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "errorCode": "MISSING_HQ_BUILDING_PREREQUISITES",
+        "noJobQueued": true
+      },
+      "actual": {
+        "status": 400,
+        "ok": false,
+        "plotId": "plot_269e05e2293e6f9c",
+        "error": {
+          "code": "MISSING_HQ_BUILDING_PREREQUISITES",
+          "message": "HQ Level 6 requires completed prerequisite building: Market Stall.",
+          "retryable": false,
+          "details": {
+            "fromLevel": 5,
+            "targetLevel": 6,
+            "buildingPrerequisites": [
+              {
+                "type": "MARKET_STALL",
+                "label": "Market Stall",
+                "requiredState": "READY",
+                "buildingId": null,
+                "state": null,
+                "satisfied": false,
+                "reason": "missing_building"
+              }
+            ],
+            "missingPrerequisites": [
+              {
+                "type": "MARKET_STALL",
+                "label": "Market Stall",
+                "requiredState": "READY",
+                "buildingId": null,
+                "state": null,
+                "satisfied": false,
+                "reason": "missing_building"
+              }
+            ]
+          }
+        },
+        "worldDeltaTypes": []
+      },
+      "pass": true
+    },
+    {
+      "id": "hq_agent_upgrade_requires_matching_approval",
+      "severity": "high",
+      "request": {
+        "method": "POST",
+        "path": "/api/founders-plot/upgrade-building",
+        "pair": "qa:hq-agent-no-approval",
+        "body": {
+          "plotId": "plot_1915b122a4fe4983",
+          "buildingId": "bldg_hq_a4fe4983",
+          "actor": "AGENT",
+          "idempotencyKey": "hq-agent-no-approval"
+        }
+      },
+      "expected": {
+        "status": 403,
+        "errorCode": "FORBIDDEN_POLICY",
+        "requiresApproval": true
+      },
+      "actual": {
+        "status": 403,
+        "ok": false,
+        "plotId": "plot_1915b122a4fe4983",
+        "error": {
+          "code": "FORBIDDEN_POLICY",
+          "message": "Agent HQ upgrades require a matching human approval request.",
+          "retryable": true,
+          "details": {
+            "requiresApproval": true
+          }
+        },
+        "worldDeltaTypes": []
+      },
+      "pass": true
+    },
+    {
+      "id": "early_place_locked_building_rejected",
+      "severity": "medium",
+      "request": {
+        "method": "POST",
+        "path": "/api/founders-plot/place-building",
+        "pair": "qa:early-building-gate",
+        "body": {
+          "plotId": "plot_449589b6c74e0ff5",
+          "type": "MARKET_STALL",
+          "x": 0,
+          "y": 1,
+          "actor": "HUMAN",
+          "idempotencyKey": "early-market-stall"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "errorCode": "INVALID_STATE",
+        "messageIncludes": "not unlocked yet"
+      },
+      "actual": {
+        "status": 400,
+        "ok": false,
+        "plotId": "plot_449589b6c74e0ff5",
+        "error": {
+          "code": "INVALID_STATE",
+          "message": "Market Stall is not unlocked yet.",
+          "retryable": false,
+          "details": {}
+        },
+        "worldDeltaTypes": []
+      },
+      "pass": true
+    },
+    {
+      "id": "work_order_draft_idempotent_same_payload",
+      "severity": "high",
+      "request": {
+        "method": "POST",
+        "path": "/api/founders-plot/work-orders/draft",
+        "pair": "qa:work-orders",
+        "body": {
+          "plotId": "plot_1590e98ea7dadbe6",
+          "templateId": "collect_ready_outputs_once",
+          "scope": {
+            "buildingIds": [
+              "bldg_work_orders_farm_plot_0",
+              "bldg_work_orders_lumber_camp_1"
+            ]
+          },
+          "actor": "HUMAN",
+          "idempotencyKey": "wo-draft-idem"
+        }
+      },
+      "expected": {
+        "sameKeySamePayloadReturnsSameWorkOrder": true
+      },
+      "actual": {
+        "status": 200,
+        "ok": true,
+        "plotId": "plot_1590e98ea7dadbe6",
+        "error": null,
+        "worldDeltaTypes": [
+          "WORK_ORDER_DRAFTED"
+        ],
+        "firstWorkOrderId": "work_order_e971c46151bc680d",
+        "repeatedWorkOrderId": "work_order_e971c46151bc680d"
+      },
+      "pass": true
+    },
+    {
+      "id": "work_order_draft_idempotency_conflict_diff_payload",
+      "severity": "high",
+      "request": {
+        "method": "POST",
+        "path": "/api/founders-plot/work-orders/draft",
+        "pair": "qa:work-orders",
+        "body": {
+          "plotId": "plot_1590e98ea7dadbe6",
+          "templateId": "collect_ready_outputs_once",
+          "scope": {
+            "buildingIds": [
+              "bldg_work_orders_quarry_2"
+            ]
+          },
+          "actor": "HUMAN",
+          "idempotencyKey": "wo-draft-idem"
+        }
+      },
+      "expected": {
+        "status": 409,
+        "errorCode": "IDEMPOTENCY_CONFLICT"
+      },
+      "actual": {
+        "status": 409,
+        "ok": false,
+        "plotId": "plot_1590e98ea7dadbe6",
+        "error": {
+          "code": "IDEMPOTENCY_CONFLICT",
+          "message": "The same idempotency key was reused with different arguments.",
+          "retryable": false,
+          "details": {}
+        },
+        "worldDeltaTypes": []
+      },
+      "pass": true
+    },
+    {
+      "id": "work_order_execute_idempotent_same_payload_after_completion",
+      "severity": "high",
+      "request": {
+        "method": "POST",
+        "path": "/api/founders-plot/work-orders/execute",
+        "pair": "qa:work-orders",
+        "body": {
+          "plotId": "plot_1590e98ea7dadbe6",
+          "workOrderId": "work_order_e971c46151bc680d",
+          "actor": "HUMAN",
+          "idempotencyKey": "wo-execute-idem"
+        }
+      },
+      "expected": {
+        "sameKeyReturnsCachedCompletion": true,
+        "completedOnce": true
+      },
+      "actual": {
+        "status": 200,
+        "ok": true,
+        "plotId": "plot_1590e98ea7dadbe6",
+        "error": null,
+        "worldDeltaTypes": [
+          "OUTPUT_COLLECTED",
+          "OUTPUT_COLLECTED",
+          "WORK_ORDER_EXECUTED"
+        ],
+        "firstStatus": "COMPLETED",
+        "repeatedStatus": "COMPLETED",
+        "executedChildCount": 2
+      },
+      "pass": true
+    },
+    {
+      "id": "work_order_execute_completed_new_key_rejected",
+      "severity": "high",
+      "request": {
+        "method": "POST",
+        "path": "/api/founders-plot/work-orders/execute",
+        "pair": "qa:work-orders",
+        "body": {
+          "plotId": "plot_1590e98ea7dadbe6",
+          "workOrderId": "work_order_e971c46151bc680d",
+          "actor": "HUMAN",
+          "idempotencyKey": "wo-execute-after-complete-new-key"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "errorCode": "INVALID_STATE",
+        "messageIncludes": "Only DRAFT work orders can be executed once"
+      },
+      "actual": {
+        "status": 400,
+        "ok": false,
+        "plotId": "plot_1590e98ea7dadbe6",
+        "error": {
+          "code": "INVALID_STATE",
+          "message": "Only DRAFT work orders can be executed once.",
+          "retryable": false,
+          "details": {
+            "workOrderId": "work_order_e971c46151bc680d",
+            "status": "COMPLETED"
+          }
+        },
+        "worldDeltaTypes": []
+      },
+      "pass": true
+    },
+    {
+      "id": "work_order_execute_expired_rejected",
+      "severity": "high",
+      "request": {
+        "method": "POST",
+        "path": "/api/founders-plot/work-orders/execute",
+        "pair": "qa:work-orders",
+        "body": {
+          "plotId": "plot_1590e98ea7dadbe6",
+          "workOrderId": "work_order_3cf5e8fa194fe5bd",
+          "actor": "HUMAN",
+          "idempotencyKey": "wo-execute-expired"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "errorCode": "INVALID_STATE",
+        "detailsStatus": "EXPIRED"
+      },
+      "actual": {
+        "status": 400,
+        "ok": false,
+        "plotId": "plot_1590e98ea7dadbe6",
+        "error": {
+          "code": "INVALID_STATE",
+          "message": "Work order draft has expired and must be recreated.",
+          "retryable": false,
+          "details": {
+            "workOrderId": "work_order_3cf5e8fa194fe5bd",
+            "status": "EXPIRED"
+          }
+        },
+        "worldDeltaTypes": []
+      },
+      "pass": true
+    },
+    {
+      "id": "foreign_pair_cannot_execute_work_order_on_other_plot",
+      "severity": "high",
+      "request": {
+        "method": "POST",
+        "path": "/api/founders-plot/work-orders/execute",
+        "pair": "qa:work-order-foreign",
+        "body": {
+          "plotId": "plot_1590e98ea7dadbe6",
+          "workOrderId": "work_order_e971c46151bc680d",
+          "actor": "HUMAN",
+          "idempotencyKey": "wo-foreign-execute"
+        }
+      },
+      "expected": {
+        "status": 401,
+        "errorCode": "UNAUTHORIZED"
+      },
+      "actual": {
+        "status": 401,
+        "ok": false,
+        "plotId": "plot_1590e98ea7dadbe6",
+        "error": {
+          "code": "UNAUTHORIZED",
+          "message": "Requested plot does not match the current session plot.",
+          "retryable": false,
+          "details": {}
+        },
+        "worldDeltaTypes": []
+      },
+      "pass": true
+    },
+    {
+      "id": "civic_proposal_before_world_grid_ready_rejected",
+      "severity": "high",
+      "request": {
+        "method": "POST",
+        "path": "/api/founders-plot/civic-proposals",
+        "pair": "qa:civic-early",
+        "body": {
+          "plotId": "plot_9873e4e1e468200b",
+          "title": "Too early civic proposal",
+          "category": "route_study",
+          "summary": "Attempt before World Grid readiness.",
+          "status": "DRAFT",
+          "actor": "HUMAN",
+          "idempotencyKey": "civic-too-early"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "errorCode": "INVALID_STATE",
+        "reason": "world_grid_not_ready"
+      },
+      "actual": {
+        "status": 400,
+        "ok": false,
+        "plotId": "plot_9873e4e1e468200b",
+        "error": {
+          "code": "INVALID_STATE",
+          "message": "Civic proposal records unlock only after HQ10A World Grid readiness.",
+          "retryable": false,
+          "details": {
+            "reason": "world_grid_not_ready",
+            "blockedBy": [
+              "hq.level.6",
+              "settlement.outpost.founded",
+              "doctrine.survey_discipline.selected",
+              "work_order.collect_ready_outputs_once.available"
+            ]
+          }
+        },
+        "worldDeltaTypes": []
+      },
+      "pass": true
+    },
+    {
+      "id": "civic_proposal_agent_without_approval_rejected",
+      "severity": "high",
+      "request": {
+        "method": "POST",
+        "path": "/api/founders-plot/civic-proposals",
+        "pair": "qa:civic-ready",
+        "body": {
+          "plotId": "plot_07cce843b49aa7b7",
+          "title": "Agent civic proposal without approval",
+          "category": "civic_memory",
+          "summary": "Agent tries to record without a matching human approval.",
+          "status": "DRAFT",
+          "actor": "AGENT",
+          "idempotencyKey": "civic-agent-no-approval"
+        }
+      },
+      "expected": {
+        "status": 403,
+        "errorCode": "FORBIDDEN_POLICY",
+        "requiresApproval": true
+      },
+      "actual": {
+        "status": 403,
+        "ok": false,
+        "plotId": "plot_07cce843b49aa7b7",
+        "error": {
+          "code": "FORBIDDEN_POLICY",
+          "message": "Agent civic proposal records require matching human approval.",
+          "retryable": true,
+          "details": {
+            "requiresApproval": true,
+            "actionName": "create_civic_proposal",
+            "requestedParams": {
+              "title": "Agent civic proposal without approval",
+              "category": "civic_memory",
+              "status": "DRAFT",
+              "summary": "Agent tries to record without a matching human approval."
+            }
+          }
+        },
+        "worldDeltaTypes": []
+      },
+      "pass": true
+    },
+    {
+      "id": "civic_proposal_agent_mismatched_approval_rejected",
+      "severity": "high",
+      "request": {
+        "method": "POST",
+        "path": "/api/founders-plot/civic-proposals",
+        "pair": "qa:civic-ready",
+        "body": {
+          "plotId": "plot_07cce843b49aa7b7",
+          "title": "Different title should not match",
+          "category": "civic_memory",
+          "summary": "Different summary should not match.",
+          "status": "DRAFT",
+          "actor": "AGENT",
+          "idempotencyKey": "civic-agent-mismatch-approval"
+        }
+      },
+      "expected": {
+        "status": 403,
+        "errorCode": "FORBIDDEN_POLICY",
+        "approvalMustMatchSanitizedParams": true
+      },
+      "actual": {
+        "status": 403,
+        "ok": false,
+        "plotId": "plot_07cce843b49aa7b7",
+        "error": {
+          "code": "FORBIDDEN_POLICY",
+          "message": "Agent civic proposal records require matching human approval.",
+          "retryable": true,
+          "details": {
+            "requiresApproval": true,
+            "actionName": "create_civic_proposal",
+            "requestedParams": {
+              "title": "Different title should not match",
+              "category": "civic_memory",
+              "status": "DRAFT",
+              "summary": "Different summary should not match."
+            }
+          }
+        },
+        "worldDeltaTypes": []
+      },
+      "pass": true
+    },
+    {
+      "id": "civic_proposal_foreign_related_plot_ids_filtered",
+      "severity": "medium",
+      "request": {
+        "method": "POST",
+        "path": "/api/founders-plot/civic-proposals",
+        "pair": "qa:civic-ready",
+        "body": {
+          "plotId": "plot_07cce843b49aa7b7",
+          "title": "Foreign related plot filter attempt",
+          "category": "route_study",
+          "summary": "A human tries to attach a foreign plot id as related metadata.",
+          "status": "DRAFT",
+          "relatedPlotIds": [
+            "plot_1bf4c335a2f56c13",
+            "plot_not_known"
+          ],
+          "actor": "HUMAN",
+          "idempotencyKey": "civic-related-foreign-filter"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "persistedForeignRelatedPlotIds": []
+      },
+      "actual": {
+        "status": 200,
+        "ok": true,
+        "plotId": "plot_07cce843b49aa7b7",
+        "error": null,
+        "worldDeltaTypes": [
+          "CIVIC_PROPOSAL_RECORDED"
+        ],
+        "relatedPlotIds": []
+      },
+      "pass": true
+    },
+    {
+      "id": "overlay_pack_before_readiness_rejected",
+      "severity": "high",
+      "request": {
+        "method": "POST",
+        "path": "/api/founders-plot/overlay-packs",
+        "pair": "qa:overlay-early",
+        "body": {
+          "plotId": "plot_e21f09268bdf9b08",
+          "sourceProposalId": "civic_proposal_missing",
+          "title": "Too early overlay",
+          "theme": "public_share_attempt",
+          "summary": "Try to create overlay before readiness.",
+          "status": "DRAFT",
+          "actor": "HUMAN",
+          "idempotencyKey": "overlay-too-early"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "errorCode": "INVALID_STATE",
+        "reason": "overlay_pack_records_not_ready"
+      },
+      "actual": {
+        "status": 400,
+        "ok": false,
+        "plotId": "plot_e21f09268bdf9b08",
+        "error": {
+          "code": "INVALID_STATE",
+          "message": "Overlay pack records unlock after HQ10A readiness and a reviewed civic proposal.",
+          "retryable": false,
+          "details": {
+            "reason": "overlay_pack_records_not_ready",
+            "blockedBy": [
+              "hq.level.6",
+              "settlement.outpost.founded",
+              "doctrine.survey_discipline.selected",
+              "work_order.collect_ready_outputs_once.available",
+              "civic_proposal.reviewed"
+            ]
+          }
+        },
+        "worldDeltaTypes": []
+      },
+      "pass": true
+    },
+    {
+      "id": "overlay_pack_from_unreviewed_proposal_rejected",
+      "severity": "high",
+      "request": {
+        "method": "POST",
+        "path": "/api/founders-plot/overlay-packs",
+        "pair": "qa:overlay-ready",
+        "body": {
+          "plotId": "plot_e1e14f2b3a5ca494",
+          "sourceProposalId": "civic_proposal_acd619fe0f75514f",
+          "title": "Overlay from unreviewed proposal",
+          "theme": "draft_only",
+          "summary": "Attempt from DRAFT proposal.",
+          "status": "DRAFT",
+          "actor": "HUMAN",
+          "idempotencyKey": "overlay-from-draft-proposal"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "errorCode": "INVALID_STATE",
+        "reason": "overlay_pack_records_not_ready"
+      },
+      "actual": {
+        "status": 400,
+        "ok": false,
+        "plotId": "plot_e1e14f2b3a5ca494",
+        "error": {
+          "code": "INVALID_STATE",
+          "message": "Overlay pack records unlock after HQ10A readiness and a reviewed civic proposal.",
+          "retryable": false,
+          "details": {
+            "reason": "overlay_pack_records_not_ready",
+            "blockedBy": [
+              "civic_proposal.reviewed"
+            ]
+          }
+        },
+        "worldDeltaTypes": []
+      },
+      "pass": true
+    },
+    {
+      "id": "overlay_pack_agent_without_approval_rejected",
+      "severity": "high",
+      "request": {
+        "method": "POST",
+        "path": "/api/founders-plot/overlay-packs",
+        "pair": "qa:overlay-ready",
+        "body": {
+          "plotId": "plot_e1e14f2b3a5ca494",
+          "sourceProposalId": "civic_proposal_509f1b22003818ca",
+          "title": "Agent overlay without approval",
+          "theme": "agent_attempt",
+          "summary": "Agent tries overlay record without approval.",
+          "status": "DRAFT",
+          "actor": "AGENT",
+          "idempotencyKey": "overlay-agent-no-approval"
+        }
+      },
+      "expected": {
+        "status": 403,
+        "errorCode": "FORBIDDEN_POLICY",
+        "requiresApproval": true
+      },
+      "actual": {
+        "status": 403,
+        "ok": false,
+        "plotId": "plot_e1e14f2b3a5ca494",
+        "error": {
+          "code": "FORBIDDEN_POLICY",
+          "message": "Agent overlay pack records require matching human approval.",
+          "retryable": true,
+          "details": {
+            "requiresApproval": true,
+            "actionName": "create_overlay_pack",
+            "requestedParams": {
+              "sourceProposalId": "civic_proposal_509f1b22003818ca",
+              "title": "Agent overlay without approval",
+              "theme": "agent_attempt",
+              "status": "DRAFT",
+              "summary": "Agent tries overlay record without approval."
+            }
+          }
+        },
+        "worldDeltaTypes": []
+      },
+      "pass": true
+    },
+    {
+      "id": "overlay_pack_human_payload_sanitized_presentation_only",
+      "severity": "medium",
+      "request": {
+        "method": "POST",
+        "path": "/api/founders-plot/overlay-packs",
+        "pair": "qa:overlay-ready",
+        "body": {
+          "plotId": "plot_e1e14f2b3a5ca494",
+          "sourceProposalId": "civic_proposal_509f1b22003818ca",
+          "title": "Public share and render payload attempt",
+          "theme": "public_share_attempt",
+          "summary": "Try to smuggle public sharing/render semantics into a presentation-only record.",
+          "status": "REVIEWED",
+          "targetSurfaceIds": [
+            "world_grid",
+            "founders_plot",
+            "external_public_site"
+          ],
+          "targetNodeIds": [
+            "generated_universe.overlay_pack_records",
+            "world_grid.read_model",
+            "foreign.plot.plot_1bf4c335a2f56c13"
+          ],
+          "displayHints": {
+            "labels": [
+              "share me"
+            ],
+            "assetManifest": {
+              "externalUrl": "https://example.com/should-not-fetch"
+            },
+            "unknownDangerKey": "drop this"
+          },
+          "prompt": "Publish this to the public world grid and render the final universe.",
+          "provenance": {
+            "provider": "qa",
+            "publicSharing": true,
+            "externalEffects": true,
+            "source": "adversarial_payload"
+          },
+          "actor": "HUMAN",
+          "idempotencyKey": "overlay-human-sanitized"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "presentationOnly": true,
+        "publicSharing": false,
+        "externalEffects": false,
+        "rawPromptStored": false,
+        "targetSurfaceIdsFiltered": true
+      },
+      "actual": {
+        "status": 200,
+        "ok": true,
+        "plotId": "plot_e1e14f2b3a5ca494",
+        "error": null,
+        "worldDeltaTypes": [],
+        "presentationOnly": true,
+        "visualOnly": true,
+        "gameplayMutationPolicy": "presentation_only",
+        "publicSharing": false,
+        "externalEffects": false,
+        "rawPromptStored": false,
+        "targetSurfaceIds": [
+          "world_grid",
+          "founders_plot"
+        ],
+        "targetNodeIds": [
+          "generated_universe.overlay_pack_records",
+          "world_grid.read_model",
+          "foreign.plot.plot_1bf4c335a2f56c13"
+        ],
+        "displayHintKeys": [
+          "labels",
+          "assetManifest"
+        ]
+      },
+      "pass": true
+    },
+    {
+      "id": "overlay_pack_foreign_source_proposal_rejected",
+      "severity": "high",
+      "request": {
+        "method": "POST",
+        "path": "/api/founders-plot/overlay-packs",
+        "pair": "qa:overlay-foreign-source",
+        "body": {
+          "plotId": "plot_b303905704614eda",
+          "sourceProposalId": "civic_proposal_509f1b22003818ca",
+          "title": "Foreign source proposal attempt",
+          "theme": "foreign_source",
+          "summary": "Use reviewed proposal ID from another plot.",
+          "status": "DRAFT",
+          "actor": "HUMAN",
+          "idempotencyKey": "overlay-foreign-source"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "errorCode": "INVALID_STATE",
+        "reason": "reviewed_civic_proposal_required"
+      },
+      "actual": {
+        "status": 400,
+        "ok": false,
+        "plotId": "plot_b303905704614eda",
+        "error": {
+          "code": "INVALID_STATE",
+          "message": "Overlay pack records must reference a reviewed civic proposal on the same plot.",
+          "retryable": false,
+          "details": {
+            "reason": "reviewed_civic_proposal_required",
+            "sourceProposalId": "civic_proposal_509f1b22003818ca"
+          }
+        },
+        "worldDeltaTypes": []
+      },
+      "pass": true
+    },
+    {
+      "id": "foreign_pair_cannot_read_other_private_plot_state",
+      "severity": "high",
+      "request": {
+        "method": "GET",
+        "path": "/api/founders-plot/state?plotId=plot_e1e14f2b3a5ca494",
+        "pair": "qa:foreign-state-read"
+      },
+      "expected": {
+        "status": 401,
+        "errorCode": "UNAUTHORIZED"
+      },
+      "actual": {
+        "status": 401,
+        "ok": false,
+        "plotId": "plot_e1e14f2b3a5ca494",
+        "error": {
+          "code": "UNAUTHORIZED",
+          "message": "Requested plot does not match the current session plot.",
+          "retryable": false,
+          "details": {}
+        },
+        "worldDeltaTypes": []
+      },
+      "pass": true
+    }
+  ],
+  "atlasChecks": {
+    "api": {
+      "status": 200,
+      "ok": true,
+      "summary": {
+        "hqLevel": 6,
+        "townXp": 300,
+        "inventory": {
+          "wood": 160,
+          "stone": 120,
+          "food": 120,
+          "coin": 80
+        },
+        "scoutReportCount": 0,
+        "sitePlanCount": 0,
+        "reviewedSitePlanCount": 0,
+        "claimReadySitePlanCount": 0,
+        "settlementClaimCount": 1,
+        "activeConvoyCount": 0,
+        "outpostCount": 1,
+        "selectedDoctrineId": "survey_discipline",
+        "doctrineAdvisoryOnly": false,
+        "doctrineEngineOwnedEffect": true,
+        "workOrderDraftCount": 0,
+        "workOrderExecutionAvailable": false,
+        "worldGridStatus": "READ_MODEL_READY",
+        "worldGridReady": true,
+        "worldGridKnownPlotCount": 1,
+        "worldGridOutpostCount": 1,
+        "worldGridProjectionHash": "d73085e6f137a31a",
+        "civicProposalCount": 2,
+        "civicProposalDraftCount": 1,
+        "civicProposalReviewedCount": 1,
+        "overlayPackCount": 1,
+        "overlayPackDraftCount": 0,
+        "overlayPackReviewedCount": 1,
+        "currentPlotId": "plot_e1e14f2b3a5ca494",
+        "homePlotId": "plot_e1e14f2b3a5ca494",
+        "quest": {
+          "id": "place-lumber-camp",
+          "title": "Raise your first Lumber Camp",
+          "body": "Place a Lumber Camp on any open pad so the settlement can start producing wood.",
+          "primaryAction": "Place Lumber Camp"
+        },
+        "currentStepId": "building.lumber_camp.place",
+        "currentStepTitle": "Build Lumber Camp",
+        "currentBlocker": null,
+        "currentNextAction": "Build Lumber Camp"
+      },
+      "actionRefCount": 14,
+      "executableRefs": [],
+      "sensitiveRefs": [
+        {
+          "nodeId": "work_order.template.collect_ready_outputs_once",
+          "tool": "et.plot.create_work_order_draft",
+          "executableByAtlas": false,
+          "executable": false,
+          "http": {
+            "method": "POST",
+            "path": "/api/founders-plot/work-orders/draft"
+          }
+        },
+        {
+          "nodeId": "world_grid.civic_proposal_records",
+          "tool": "et.plot.create_civic_proposal",
+          "executableByAtlas": false,
+          "executable": false,
+          "http": {
+            "method": "POST",
+            "path": "/api/founders-plot/civic-proposals"
+          }
+        },
+        {
+          "nodeId": "generated_universe.overlay_pack_records",
+          "tool": "et.plot.create_overlay_pack",
+          "executableByAtlas": false,
+          "executable": false,
+          "http": {
+            "method": "POST",
+            "path": "/api/founders-plot/overlay-packs"
+          }
+        }
+      ],
+      "pass": true
+    }
+  },
+  "uiChecks": {
+    "foundersPlot": {
+      "title": "Founders Plot — Agent Town",
+      "buttonCount": 23,
+      "buttons": [
+        {
+          "text": "Atlas",
+          "testid": "fp-open-progression-atlas",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "",
+          "testid": "fp-tile-0-0",
+          "disabled": true,
+          "title": ""
+        },
+        {
+          "text": "HeadquartersIdle",
+          "testid": "fp-tile-1-0",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "",
+          "testid": "fp-tile-2-0",
+          "disabled": true,
+          "title": ""
+        },
+        {
+          "text": "+",
+          "testid": "fp-tile-0-1",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "+",
+          "testid": "fp-tile-1-1",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "+",
+          "testid": "fp-tile-2-1",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "+",
+          "testid": "fp-tile-0-2",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "+",
+          "testid": "fp-tile-1-2",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "+",
+          "testid": "fp-tile-2-2",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "clover plot_e1e14f2b3a5ca494",
+          "testid": "fp-visual-actor-clover",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "settler claim_overlay_ready",
+          "testid": "fp-visual-actor-settler",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "messenger hq.level-2",
+          "testid": "fp-visual-actor-messenger",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Cancel placement",
+          "testid": "fp-close-palette",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Hide",
+          "testid": "fp-foreman-toggle",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Save permissions",
+          "testid": "fp-policy-save",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Ask the Foreman",
+          "testid": "fp-foreman-act",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Create Draft",
+          "testid": "fp-btn-create-work-order-collect_ready_outputs_once",
+          "disabled": false,
+          "title": "Create one server-owned DRAFT work order. It will not execute automatically."
+        },
+        {
+          "text": "Create civic proposal",
+          "testid": "fp-btn-create-civic-proposal",
+          "disabled": false,
+          "title": "Create one server-owned advisory civic proposal record. Execution is not implemented."
+        },
+        {
+          "text": "Create Overlay Record",
+          "testid": "fp-btn-create-overlay-pack",
+          "disabled": false,
+          "title": "Create one server-owned Generated Universe overlay pack record. Rendering and sharing are not implemented."
+        },
+        {
+          "text": "Close",
+          "testid": "fp-close-progression-atlas",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Recap",
+          "testid": "fp-drawer-toggle",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Close",
+          "testid": null,
+          "disabled": false,
+          "title": ""
+        }
+      ],
+      "disallowedRenderShareButtons": [],
+      "overlayPanelText": "Generated Universe Overlay Packs Generated Universe Overlay PacksRECORDING READY - presentation only1 overlay pack record: DRAFT 0, REVIEWED 1, ARCHIVED 0.presentationOnly truevisualOnly trueexecution disabledrendering not implementedpublic sharing falsestable gameplay hash excludedserver_owned_generated_universe_overlay_pack_presentation_only_v1. Records are presentation-only memory/proposal artifacts; they are not applied overlays, generated renders, or public shares.Server requirementsReady: HQ6 Settlement CharterReady: Founded outpostReady: Survey Discipline selectedReady: Collect-ready work-order executor availableReady: Reviewed civic proposalAll published requirements are ready; the UI can only write a record.Omitted capabilitiespublic sharingactual Generated Universe renderinggameplay costs resources buffsroutes trade behaviorscheduler background executionAtlas owned executionexternal effectsNone of these are available from this Founders Plot surface.Create overlay recordThis writes one presentation-only record through POST /api/founders-plot/overlay-packs. It does not apply, render, publish, share, route, trade, spend, schedule, or execute anything.Reviewed civic proposalR",
+      "civicPanelText": "Civic Proposals Civic Proposal RecordsRECORDING READY - proposal only2 proposal records: DRAFT 1, REVIEWED 1, ARCHIVED 0.DRAFTREVIEWEDARCHIVEDcoordinationpublic workroute studycivic memoryserver_owned_civic_proposal_record_no_execution_v1. Records are for review and memory; execution is not implemented.Create civic proposalThis writes one advisory record through POST /api/founders-plot/civic-proposals. It does not execute, apply, route, trade, spend, share, or schedule anything.TitleCategorycoordinationpublic workroute studycivic memoryRecord statusDRAFTREVIEWEDARCHIVEDSummaryReview noteCreate civic proposalAdvisory record only. No world mutation, public effect, route creation, scheduling, spending, sharing, or Atlas execution.Stored proposal recordsReviewed civic sourceREVIEWEDReviewed pr",
+      "overlayCreateButtonVisible": true,
+      "civicCreateButtonVisible": true,
+      "pass": true
+    },
+    "progressionAtlas": {
+      "title": "Progression Atlas",
+      "buttonCount": 158,
+      "buttons": [
+        {
+          "text": "Rush HQ3",
+          "testid": "progression-atlas-draft-rush-hq3",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Balanced Food-Wood",
+          "testid": "progression-atlas-draft-balanced-food-wood",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Delegate Outputs First",
+          "testid": "progression-atlas-draft-delegate-outputs-first",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "HQ10 Horizon",
+          "testid": "progression-atlas-draft-hq10-horizon",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Edit Strategy",
+          "testid": "progression-atlas-open-editor",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Save Strategy",
+          "testid": "progression-atlas-save-strategy",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "H1 HQ Level 1 done",
+          "testid": "progression-atlas-canonical-hq_level_1",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "H2 HQ Level 2 done",
+          "testid": "progression-atlas-canonical-hq_level_2",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "H3 HQ Level 3 done",
+          "testid": "progression-atlas-canonical-hq_level_3",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "H4 HQ Level 4 done",
+          "testid": "progression-atlas-canonical-hq_level_4",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "H5 HQ Level 5 done",
+          "testid": "progression-atlas-canonical-hq_level_5",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "H6 HQ Level 6 done",
+          "testid": "progression-atlas-canonical-hq_level_6",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "H2 Upgrade HQ to Level 2 done",
+          "testid": "progression-atlas-canonical-hq_upgrade_2",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "H3 Upgrade HQ to Level 3 done",
+          "testid": "progression-atlas-canonical-hq_upgrade_3",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "H4 Upgrade HQ to Level 4 done",
+          "testid": "progression-atlas-canonical-hq_upgrade_4",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "H5 Upgrade HQ to Level 5 done",
+          "testid": "progression-atlas-canonical-hq_upgrade_5",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "H6 Upgrade HQ to Level 6 done",
+          "testid": "progression-atlas-canonical-hq_upgrade_6",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "W Build Lumber Camp available",
+          "testid": "progression-atlas-canonical-building_LUMBER_CAMP_place",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "F Build Farm Plot available",
+          "testid": "progression-atlas-canonical-building_FARM_PLOT_place",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "S Build Quarry available",
+          "testid": "progression-atlas-canonical-building_QUARRY_place",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "EB Build Expedition Board available",
+          "testid": "progression-atlas-canonical-building_EXPEDITION_BOARD_place",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "WK Build Workshop available",
+          "testid": "progression-atlas-canonical-building_WORKSHOP_place",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "C Build Market Stall available",
+          "testid": "progression-atlas-canonical-building_MARKET_STALL_place",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "W Run Lumber Camp locked",
+          "testid": "progression-atlas-canonical-production_LUMBER_CAMP_PRODUCE",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "F Run Farm Plot locked",
+          "testid": "progression-atlas-canonical-production_FARM_PLOT_PRODUCE",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "S Run Quarry locked",
+          "testid": "progression-atlas-canonical-production_QUARRY_PRODUCE",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "SC Dispatch scout from Expedition Board locked",
+          "testid": "progression-atlas-canonical-production_EXPEDITION_BOARD_SCOUT",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "SR Collect Scout Report locked",
+          "testid": "progression-atlas-canonical-production_EXPEDITION_BOARD_collect",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "WK Run Workshop locked",
+          "testid": "progression-atlas-canonical-production_WORKSHOP_PRODUCE",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "WK Workshop next-build buff locked",
+          "testid": "progression-atlas-canonical-effect_workshop_next_build_buff",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "C Sell food at Market Stall locked",
+          "testid": "progression-atlas-canonical-production_MARKET_STALL_SELL",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "RL Research Lodge Doctrine Stance available",
+          "testid": "progression-atlas-canonical-research_lodge_advisory_stance",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "D Survey Discipline done",
+          "testid": "progression-atlas-canonical-doctrine_survey_discipline",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "CH Cohort Work-Order Planner available",
+          "testid": "progression-atlas-canonical-cohort_work_order_planner",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "WO Collect Ready Outputs Once available",
+          "testid": "progression-atlas-canonical-work_order_template_collect_ready_outputs_once",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "CO Collect outputs done",
+          "testid": "progression-atlas-canonical-permission_collectOutputs_unlock",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Q Queue production done",
+          "testid": "progression-atlas-canonical-permission_queueProduction_unlock",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "P Set one priority done",
+          "testid": "progression-atlas-canonical-permission_setPriority_unlock",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "P Sell surplus food done",
+          "testid": "progression-atlas-canonical-permission_sellSurplusFood_unlock",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "P Policy: daily sell coin cap done",
+          "testid": "progression-atlas-canonical-policy_sellDailyCoinCap",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "C Claim Supply crate locked",
+          "testid": "progression-atlas-canonical-reward_quest_first-lumber_claim",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "XP Claim Founder stipend available",
+          "testid": "progression-atlas-canonical-reward_hq_level-5_claim",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "W Wood storage done",
+          "testid": "progression-atlas-canonical-constraint_storage_wood",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "P Construction slots available",
+          "testid": "progression-atlas-canonical-constraint_construction_slots",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "H1 HQ Level 1 hq.level.1",
+          "testid": "progression-atlas-engine-node-hq_level_1",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "H2 HQ Level 2 hq.level.2",
+          "testid": "progression-atlas-engine-node-hq_level_2",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "H3 HQ Level 3 hq.level.3",
+          "testid": "progression-atlas-engine-node-hq_level_3",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "H4 HQ Level 4 hq.level.4",
+          "testid": "progression-atlas-engine-node-hq_level_4",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "H5 HQ Level 5 hq.level.5",
+          "testid": "progression-atlas-engine-node-hq_level_5",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "H6 HQ Level 6 hq.level.6",
+          "testid": "progression-atlas-engine-node-hq_level_6",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "H2 Upgrade HQ to Level 2 hq.upgrade.2",
+          "testid": "progression-atlas-engine-node-hq_upgrade_2",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "H3 Upgrade HQ to Level 3 hq.upgrade.3",
+          "testid": "progression-atlas-engine-node-hq_upgrade_3",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "H4 Upgrade HQ to Level 4 hq.upgrade.4",
+          "testid": "progression-atlas-engine-node-hq_upgrade_4",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "H5 Upgrade HQ to Level 5 hq.upgrade.5",
+          "testid": "progression-atlas-engine-node-hq_upgrade_5",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "H6 Upgrade HQ to Level 6 hq.upgrade.6",
+          "testid": "progression-atlas-engine-node-hq_upgrade_6",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "EB Build Expedition Board building.EXPEDITION_BOARD.place",
+          "testid": "progression-atlas-engine-node-building_EXPEDITION_BOARD_place",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "EB Unlock Expedition Board building.EXPEDITION_BOARD.unlock",
+          "testid": "progression-atlas-engine-node-building_EXPEDITION_BOARD_unlock",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "F Build Farm Plot building.FARM_PLOT.place",
+          "testid": "progression-atlas-engine-node-building_FARM_PLOT_place",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "F Unlock Farm Plot building.FARM_PLOT.unlock",
+          "testid": "progression-atlas-engine-node-building_FARM_PLOT_unlock",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "F Upgrade Farm Plot to Level 2 building.FARM_PLOT.upgrade.2",
+          "testid": "progression-atlas-engine-node-building_FARM_PLOT_upgrade_2",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "W Build Lumber Camp building.LUMBER_CAMP.place",
+          "testid": "progression-atlas-engine-node-building_LUMBER_CAMP_place",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "W Unlock Lumber Camp building.LUMBER_CAMP.unlock",
+          "testid": "progression-atlas-engine-node-building_LUMBER_CAMP_unlock",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "W Upgrade Lumber Camp to Level 2 building.LUMBER_CAMP.upgrade.2",
+          "testid": "progression-atlas-engine-node-building_LUMBER_CAMP_upgrade_2",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "C Build Market Stall building.MARKET_STALL.place",
+          "testid": "progression-atlas-engine-node-building_MARKET_STALL_place",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "C Unlock Market Stall building.MARKET_STALL.unlock",
+          "testid": "progression-atlas-engine-node-building_MARKET_STALL_unlock",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "C Upgrade Market Stall to Level 2 building.MARKET_STALL.upgrade.2",
+          "testid": "progression-atlas-engine-node-building_MARKET_STALL_upgrade_2",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "S Build Quarry building.QUARRY.place",
+          "testid": "progression-atlas-engine-node-building_QUARRY_place",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "S Unlock Quarry building.QUARRY.unlock",
+          "testid": "progression-atlas-engine-node-building_QUARRY_unlock",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "S Upgrade Quarry to Level 2 building.QUARRY.upgrade.2",
+          "testid": "progression-atlas-engine-node-building_QUARRY_upgrade_2",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "WK Build Workshop building.WORKSHOP.place",
+          "testid": "progression-atlas-engine-node-building_WORKSHOP_place",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "WK Unlock Workshop building.WORKSHOP.unlock",
+          "testid": "progression-atlas-engine-node-building_WORKSHOP_unlock",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "WK Upgrade Workshop to Level 2 building.WORKSHOP.upgrade.2",
+          "testid": "progression-atlas-engine-node-building_WORKSHOP_upgrade_2",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "F Collect Farm Plot output production.FARM_PLOT.collect",
+          "testid": "progression-atlas-engine-node-production_FARM_PLOT_collect",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "F Run Farm Plot production.FARM_PLOT.PRODUCE",
+          "testid": "progression-atlas-engine-node-production_FARM_PLOT_PRODUCE",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "W Collect Lumber Camp output production.LUMBER_CAMP.collect",
+          "testid": "progression-atlas-engine-node-production_LUMBER_CAMP_collect",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "W Run Lumber Camp production.LUMBER_CAMP.PRODUCE",
+          "testid": "progression-atlas-engine-node-production_LUMBER_CAMP_PRODUCE",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "C Collect Market Stall output production.MARKET_STALL.collect",
+          "testid": "progression-atlas-engine-node-production_MARKET_STALL_collect",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "C Sell food at Market Stall production.MARKET_STALL.SELL",
+          "testid": "progression-atlas-engine-node-production_MARKET_STALL_SELL",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "S Collect Quarry output production.QUARRY.collect",
+          "testid": "progression-atlas-engine-node-production_QUARRY_collect",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "S Run Quarry production.QUARRY.PRODUCE",
+          "testid": "progression-atlas-engine-node-production_QUARRY_PRODUCE",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "WK Run Workshop production.WORKSHOP.PRODUCE",
+          "testid": "progression-atlas-engine-node-production_WORKSHOP_PRODUCE",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "OP Outpost Plot: QA Research Outpost plot.outpost.plot_outpost_overlay_ready",
+          "testid": "progression-atlas-engine-node-plot_outpost_plot_outpost_overlay_ready",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "RT Convoy arrived: QA Research Outpost settlement.claim.claim_overlay_ready.arrived",
+          "testid": "progression-atlas-engine-node-settlement_claim_claim_overlay_ready_arrived",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "CV Settler Convoy: QA Research Outpost settlement.claim.claim_overlay_ready.convoy",
+          "testid": "progression-atlas-engine-node-settlement_claim_claim_overlay_ready_convoy",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "FS Settlement founded: QA Research Outpost settlement.claim.claim_overlay_ready.found",
+          "testid": "progression-atlas-engine-node-settlement_claim_claim_overlay_ready_found",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "D Survey Discipline doctrine.survey_discipline",
+          "testid": "progression-atlas-engine-node-doctrine_survey_discipline",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "RL Research Lodge Doctrine Stance research_lodge.advisory_stance",
+          "testid": "progression-atlas-engine-node-research_lodge_advisory_stance",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "CH Cohort Work-Order Planner cohort.work_order_planner",
+          "testid": "progression-atlas-engine-node-cohort_work_order_planner",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "WO Collect Ready Outputs Once work_order.template.collect_ready_outputs_once",
+          "testid": "progression-atlas-engine-node-work_order_template_collect_ready_outputs_once",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "SR Collect Scout Report production.EXPEDITION_BOARD.collect",
+          "testid": "progression-atlas-engine-node-production_EXPEDITION_BOARD_collect",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "SC Dispatch scout from Expedition Board production.EXPEDITION_BOARD.SCOUT",
+          "testid": "progression-atlas-engine-node-production_EXPEDITION_BOARD_SCOUT",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "2P Second Plot Founded: QA Research Outpost receipt.second_plot_founded.plot_outpost_overlay_ready",
+          "testid": "progression-atlas-engine-node-receipt_second_plot_founded_plot_outpost_overlay_ready",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "CL Settlement Claim Receipt: QA Research Outpost receipt.settlement_claim.claim_overlay_ready",
+          "testid": "progression-atlas-engine-node-receipt_settlement_claim_claim_overlay_ready",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "CO Collect outputs permission.collectOutputs.unlock",
+          "testid": "progression-atlas-engine-node-permission_collectOutputs_unlock",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "P Observe + suggest permission.observeAndSuggest.unlock",
+          "testid": "progression-atlas-engine-node-permission_observeAndSuggest_unlock",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Q Queue production permission.queueProduction.unlock",
+          "testid": "progression-atlas-engine-node-permission_queueProduction_unlock",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "P Sell surplus food permission.sellSurplusFood.unlock",
+          "testid": "progression-atlas-engine-node-permission_sellSurplusFood_unlock",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "P Set one priority permission.setPriority.unlock",
+          "testid": "progression-atlas-engine-node-permission_setPriority_unlock",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "P Set building priority action.set_priority",
+          "testid": "progression-atlas-engine-node-action_set_priority",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "CO Policy: Collect outputs policy.collectOutputs.enable",
+          "testid": "progression-atlas-engine-node-policy_collectOutputs_enable",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "P Policy: emergency pause policy.emergencyPause",
+          "testid": "progression-atlas-engine-node-policy_emergencyPause",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "P Policy: hourly autonomous action cap policy.maxAutonomousActionsPerHour",
+          "testid": "progression-atlas-engine-node-policy_maxAutonomousActionsPerHour",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "P Policy: Observe + suggest policy.observeAndSuggest.enable",
+          "testid": "progression-atlas-engine-node-policy_observeAndSuggest_enable",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Q Policy: Queue production policy.queueProduction.enable",
+          "testid": "progression-atlas-engine-node-policy_queueProduction_enable",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "P Policy: daily sell coin cap policy.sellDailyCoinCap",
+          "testid": "progression-atlas-engine-node-policy_sellDailyCoinCap",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "P Policy: Sell surplus food policy.sellSurplusFood.enable",
+          "testid": "progression-atlas-engine-node-policy_sellSurplusFood_enable",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "P Policy: Set one priority policy.setPriority.enable",
+          "testid": "progression-atlas-engine-node-policy_setPriority_enable",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "C Claim Field notes reward.hq.level-2.claim",
+          "testid": "progression-atlas-engine-node-reward_hq_level-2_claim",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "W Claim Quarry kit reward.hq.level-3.claim",
+          "testid": "progression-atlas-engine-node-reward_hq_level-3_claim",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "C Claim Workshop charter reward.hq.level-4.claim",
+          "testid": "progression-atlas-engine-node-reward_hq_level-4_claim",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "XP Claim Founder stipend reward.hq.level-5.claim",
+          "testid": "progression-atlas-engine-node-reward_hq_level-5_claim",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "C Claim Supply crate reward.quest.first-lumber.claim",
+          "testid": "progression-atlas-engine-node-reward_quest_first-lumber_claim",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "F Food storage constraint.storage.food",
+          "testid": "progression-atlas-engine-node-constraint_storage_food",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "S Stone storage constraint.storage.stone",
+          "testid": "progression-atlas-engine-node-constraint_storage_stone",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "W Wood storage constraint.storage.wood",
+          "testid": "progression-atlas-engine-node-constraint_storage_wood",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "WK Workshop next-build buff effect.workshop.next_build_buff",
+          "testid": "progression-atlas-engine-node-effect_workshop_next_build_buff",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "P Collect Workshop buff production.WORKSHOP.collect",
+          "testid": "progression-atlas-engine-node-production_WORKSHOP_collect",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "PR Reviewed civic source civic_proposal.civic_proposal_509f1b22003818ca",
+          "testid": "progression-atlas-engine-node-civic_proposal_civic_proposal_509f1b22003818ca",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "PR Draft civic source only civic_proposal.civic_proposal_acd619fe0f75514f",
+          "testid": "progression-atlas-engine-node-civic_proposal_civic_proposal_acd619fe0f75514f",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "P Construction slots constraint.construction_slots",
+          "testid": "progression-atlas-engine-node-constraint_construction_slots",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "GU Generated Universe Overlay Packs generated_universe.overlay_pack_records",
+          "testid": "progression-atlas-engine-node-generated_universe_overlay_pack_records",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "OV Public share and render payload attempt overlay_pack.overlay_pack_bc161b9ec3f2eece",
+          "testid": "progression-atlas-engine-node-overlay_pack_overlay_pack_bc161b9ec3f2eece",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "CP Civic Proposal Records world_grid.civic_proposal_records",
+          "testid": "progression-atlas-engine-node-world_grid_civic_proposal_records",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "CR Civic Readiness Status world_grid.civic_readiness",
+          "testid": "progression-atlas-engine-node-world_grid_civic_readiness",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "WG World Grid Read Model world_grid.read_model",
+          "testid": "progression-atlas-engine-node-world_grid_read_model",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Add Proposal Step",
+          "testid": "progression-atlas-engine-draft-proposal",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Draft",
+          "testid": null,
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Draft",
+          "testid": null,
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Draft",
+          "testid": null,
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Draft",
+          "testid": null,
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Draft HQ10 Path",
+          "testid": "progression-atlas-horizon-draft",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "H7 HQ7 HQ7: Settler Convoy territory Settlers can reserve a second plot with explicit approval. Plots can specialize by local resources and distance from the first town.",
+          "testid": "progression-atlas-horizon-hq7",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "H8 HQ8 HQ8: Research Lodge research Players pick research lanes instead of only climbing linear HQ levels. Workshop buffs can evolve into named doctrines with tradeoffs.",
+          "testid": "progression-atlas-horizon-hq8",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "H9 HQ9 HQ9: Agent Cohorts work_order Players can assign scoped cohorts to collect, build, scout, or research plans. Every delegated action keeps receipts, caps, idempotency, and human approval gates.",
+          "testid": "progression-atlas-horizon-hq9",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "H10 HQ10 HQ10: World Grid Civilization world_grid World Grid routes, public works, and civic projects can span player-owned plots. Generated Universe packs can reskin the Atlas view without changing gameplay rules.",
+          "testid": "progression-atlas-horizon-hq10",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "W 1",
+          "testid": null,
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "W 2",
+          "testid": null,
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "F 3",
+          "testid": null,
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "F 4",
+          "testid": null,
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "H2 5",
+          "testid": null,
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "S 6",
+          "testid": null,
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "S 7",
+          "testid": null,
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "H3 8",
+          "testid": null,
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Q 9",
+          "testid": null,
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Explain",
+          "testid": null,
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Explain",
+          "testid": null,
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Explain",
+          "testid": null,
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Explain",
+          "testid": null,
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Explain",
+          "testid": null,
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Explain",
+          "testid": null,
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Explain",
+          "testid": null,
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Explain",
+          "testid": null,
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Explain",
+          "testid": null,
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Add Step",
+          "testid": "progression-atlas-editor-add-step",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Use Draft Gate",
+          "testid": "progression-atlas-editor-create-gate",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Generate Icon Draft",
+          "testid": "progression-atlas-editor-generate-icon",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Apply Step",
+          "testid": "progression-atlas-editor-apply-step",
+          "disabled": false,
+          "title": ""
+        },
+        {
+          "text": "Save Edited Strategy",
+          "testid": "progression-atlas-editor-save",
+          "disabled": false,
+          "title": ""
+        }
+      ],
+      "executeRenderShareButtons": [
+        {
+          "text": "OV Public share and render payload attempt overlay_pack.overlay_pack_bc161b9ec3f2eece",
+          "testid": "progression-atlas-engine-node-overlay_pack_overlay_pack_bc161b9ec3f2eece",
+          "disabled": false,
+          "title": ""
+        }
+      ],
+      "hasCannotExecuteCopy": false,
+      "hasAtlasExecutesZero": true,
+      "boundaryText": "Server-owned refs14 Atlas executable actions0 Advisory strategies0 Canonical nodes81 Atlas explains, compares, and saves private strategy refs. Mutations stay with Founders Plot server routes and human-approved tools. et.plot.place_building: metadata onlyet.plot.place_building: metadata onlyet.plot.place_building: metadata onlyet.plot.claim_reward: metadata only",
+      "pass": true,
+      "inspectOnlyUserAuthoredRenderShareLabels": [
+        {
+          "text": "OV Public share and render payload attempt overlay_pack.overlay_pack_bc161b9ec3f2eece",
+          "testid": "progression-atlas-engine-node-overlay_pack_overlay_pack_bc161b9ec3f2eece",
+          "disabled": false,
+          "title": ""
+        }
+      ],
+      "functionalExecuteRenderShareButtons": [],
+      "classification": "The raw scanner hit came from an inspect-only Progression Atlas graph node whose label was the adversarial overlay-pack title. API actionRefs remain executableByAtlas:false and no render/share/publish endpoint or button was exposed."
+    }
+  },
+  "notes": [
+    "Progression Atlas renders user-authored overlay-pack titles inside inspect-only graph node buttons. A malicious or adversarial title can contain words like public share/render; this did not create an executable/render/share affordance, but copy/label hygiene may be worth tightening."
+  ],
+  "summary": {
+    "totalApiCases": 23,
+    "failedApiCases": [],
+    "atlasApiPass": true,
+    "foundersPlotUiPass": true,
+    "progressionAtlasUiPass": true
+  }
+}

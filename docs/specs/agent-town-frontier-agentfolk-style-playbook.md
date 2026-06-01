@@ -24,6 +24,18 @@ start from the companion exploration doc:
 The practical rule is: same universe, different lives. Do not generate four
 uniform variants on one body type.
 
+## 2026-06-01 Map And UI Reconciliation
+
+Use this playbook as AgentTown's positive style anchor, not as a request for
+literal Western genre art. For map UI, prompts should translate the frontier
+idea into frontier-tech civic material: warm timber, brass, canvas, parchment,
+worn teal, small agent-tech glows, scout reports, ledger/receipt marks, plan
+wagons, beacons, and human-plus-agent settlement work.
+
+Avoid cowboy/saloon/gold-rush/wanted-poster/gun/horse-as-genre-signal imagery,
+especially in Expedition Map and visual-pack generation. The correct tension is
+old-human settlement craft meeting new agent collaboration, not Western cosplay.
+
 ## Story Baseline
 
 Agent Town sits on a frontier between two eras:
@@ -304,7 +316,7 @@ Use case: illustration-story
 Asset type: 2D game sprite sheet for Agent Town Founders Plot frontier agentfolk
 
 Primary request:
-Create a production-style {ROLE} inhabitant sprite sheet for Agent Town. This is an adult compact frontier agentfolk character, not a child, not a plush mascot, not a toy. The character should belong in a wild west frontier town where humans and AI agents build a shared future together.
+Create a production-style {ROLE} inhabitant sprite sheet for Agent Town. This is an adult compact frontier agentfolk character, not a child, not a plush mascot, not a toy. The character should belong in an AgentTown frontier-tech settlement where humans and AI agents build a shared future together.
 
 Story/world:
 Agent Town sits at the frontier between old humanity and new AI agent collaboration. The town includes wagons, timber, dust, hand tools, campfires, plan wagons, helpful AI companions, small glowing interfaces, and human-agent teamwork.

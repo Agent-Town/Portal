@@ -1,0 +1,75 @@
+{
+  "id": "market-trader-v1",
+  "character": "Pip Vale",
+  "role": "market_trader",
+  "roleFacts": ["SELL", "COIN_READY", "OUTPUT_READY"],
+  "model": "openai/gpt-image-2",
+  "sourceImage": "market-trader-v1.source.png",
+  "image": "market-trader-v1.png",
+  "prompt": "market-trader-v1.prompt.md",
+  "sourceSize": {
+    "width": 2048,
+    "height": 2048
+  },
+  "frame": {
+    "width": 512,
+    "height": 512
+  },
+  "layout": {
+    "columns": 4,
+    "rows": 4,
+    "frameCount": 16
+  },
+  "actions": {
+    "idle": {
+      "row": 0,
+      "description": "Friendly market stance variations with satchel and produce crate.",
+      "frames": [0, 1, 2, 3],
+      "fps": 3
+    },
+    "walk": {
+      "row": 1,
+      "description": "Three-quarter-right walking cycle for market handoffs.",
+      "frames": [0, 1, 2, 3],
+      "fps": 6
+    },
+    "sell": {
+      "row": 2,
+      "description": "Selling and trading actions with produce, coin tray, and ledger beads.",
+      "frames": [0, 1, 2, 3],
+      "fps": 5
+    },
+    "ready": {
+      "row": 3,
+      "description": "Coin-ready poses presenting receipt bundles or coin tokens.",
+      "frames": [0, 1, 2, 3],
+      "fps": 4
+    }
+  },
+  "actionMapping": {
+    "SELL": "sell",
+    "COIN_READY": "ready",
+    "OUTPUT_READY": "ready"
+  },
+  "backstory": "Pip Vale keeps the Market Stall from turning into a black box. Pip knows every crate by origin, every coin by receipt, and treats trade as a civic promise: surplus can move, but the town remembers who made it possible.",
+  "generationNotes": {
+    "sourceProvenance": "/Users/robin/.openclaw/media/tool-image-generation/agent-town-market-trader-sprite-sheet-v1-opaque---2e57d26d-e68b-4b57-ac17-3f1e0a403e8e.png",
+    "postProcessing": [
+      "Copied GPT Image 2.0 source into the project as market-trader-v1.source.png.",
+      "Converted mint and near-white chroma background to alpha with ImageMagick.",
+      "Kept the sheet at the project-native 2048x2048 / 4x4 / 512px-cell sprite contract."
+    ],
+    "transparency": {
+      "method": "ImageMagick chroma-key conversion from GPT Image 2 opaque source",
+      "keyColorsUsed": ["#7df7d4", "#fcfefe"],
+      "fuzz": ["22%", "10%"]
+    },
+    "constraints": [
+      "visual-only inhabitant projection",
+      "no weapons",
+      "no readable text",
+      "no logos",
+      "no gameplay authority"
+    ]
+  }
+}

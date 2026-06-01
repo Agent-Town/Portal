@@ -1,0 +1,31 @@
+{
+  "actorCount": 4,
+  "hooks": [
+    {
+      "testid": "fp-visual-actor-hooks",
+      "label": "Visual inhabitants"
+    },
+    {
+      "testid": "fp-visual-actor-clover",
+      "role": "clover",
+      "sourceDomain": "foreman",
+      "label": "clover plot_7558f6a1cbee768b"
+    },
+    {
+      "testid": "fp-visual-actor-settler",
+      "role": "settler",
+      "sourceDomain": "settlement_claim",
+      "label": "settler claim_25be83cc1d08f1e4"
+    },
+    {
+      "testid": "fp-visual-actor-messenger",
+      "role": "messenger",
+      "sourceDomain": "reward",
+      "label": "messenger quest.first-lumber"
+    }
+  ],
+  "canvas": {
+    "width": 837,
+    "height": 522
+  }
+}

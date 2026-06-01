@@ -1,0 +1,96 @@
+{
+  "id": "research-doctrine-keeper-v1",
+  "role": "research_doctrine_keeper",
+  "canonicalRoleId": "research_doctrine_keeper",
+  "roleFacts": ["DOCTRINE_RESEARCH", "SELECT_DOCTRINE", "DOCTRINE_SELECTED", "OUTPUT_READY"],
+  "displayName": "Sera Vellumroot",
+  "title": "Research Lodge Doctrine Keeper",
+  "backstory": "Sera Vellumroot tends the Research Lodge like a shared library for hard choices. She compares doctrine tiles, explains the narrow server-owned effect, and makes sure civic knowledge stays bounded instead of mystical.",
+  "personality": "Thoughtful, grounded, precise, and generous with careful explanations.",
+  "visualOnly": true,
+  "wiringStatus": "asset_ready_not_scene_wired",
+  "model": "built-in image_gen, requested GPT Image 2.0 path",
+  "sourceImage": "research-doctrine-keeper-v1.source.png",
+  "nativeGeneratedImage": "research-doctrine-keeper-v1.generated.png",
+  "image": "research-doctrine-keeper-v1.png",
+  "prompt": "research-doctrine-keeper-v1.prompt.md",
+  "nativeGeneratedSize": {
+    "width": 1254,
+    "height": 1254
+  },
+  "sourceSize": {
+    "width": 2048,
+    "height": 2048
+  },
+  "sheetContract": {
+    "width": 2048,
+    "height": 2048,
+    "columns": 4,
+    "rows": 4,
+    "frameWidth": 512,
+    "frameHeight": 512,
+    "frameCount": 16
+  },
+  "rowOrder": ["idle", "walk", "research", "ready"],
+  "actions": {
+    "idle": {
+      "row": 0,
+      "description": "Archive stances with doctrine tiles, notebook, lantern, and measuring light.",
+      "frames": [0, 1, 2, 3],
+      "fps": 3
+    },
+    "walk": {
+      "row": 1,
+      "description": "Walking with bundled doctrine tiles and field notes.",
+      "frames": [0, 1, 2, 3],
+      "fps": 6
+    },
+    "research": {
+      "row": 2,
+      "description": "Comparing doctrine cards and marking a bounded effect with abstract symbols.",
+      "frames": [0, 1, 2, 3],
+      "fps": 5
+    },
+    "ready": {
+      "row": 3,
+      "description": "Presenting selected doctrine token or sealed research receipt.",
+      "frames": [0, 1, 2, 3],
+      "fps": 4
+    }
+  },
+  "actionMapping": {
+    "DOCTRINE_RESEARCH": "research",
+    "SELECT_DOCTRINE": "research",
+    "DOCTRINE_SELECTED": "ready",
+    "RESEARCH_READY": "ready",
+    "OUTPUT_READY": "ready"
+  },
+  "texture": {
+    "path": "public/experiences/founders-plot/assets/characters/inhabitants/research_doctrine_keeper/research-doctrine-keeper-v1.png",
+    "format": "png",
+    "colorSpace": "sRGB",
+    "channels": "sRGBA",
+    "width": 2048,
+    "height": 2048,
+    "alpha": true,
+    "transparentCorners": true
+  },
+  "generationNotes": {
+    "sourceProvenance": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e7c45-8e1f-7fa3-a67c-4ccf4bf0859b/ig_0ab5d2a9f79f2c3f016a1bb8e387848191b63107b40abd684e.png",
+    "mode": "built-in image_gen with requested GPT Image 2.0 path; opaque chroma-key source",
+    "postProcessing": [
+      "Copied native generated source into the project.",
+      "Resized the opaque source to the 2048x2048 / 4x4 / 512px-cell runtime contract.",
+      "Converted green chroma background to alpha with ImageMagick and removed remaining chroma-green pixels from the matte."
+    ],
+    "transparency": {
+      "method": "ImageMagick chroma-key conversion from opaque source",
+      "sourceKeyRequested": "#00ff00",
+      "sampledCornerColor": "srgb(24,236,24)",
+      "keyColorsUsed": ["#18ec18"],
+      "fuzz": "22%",
+      "transparentCorners": true
+    },
+    "constraints": ["adult-coded", "visual-only", "no readable text", "no logos", "no weapons", "no surveillance", "no gameplay authority"]
+  }
+}

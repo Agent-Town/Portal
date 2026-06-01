@@ -1,0 +1,54 @@
+{
+  "ok": true,
+  "date": "2026-06-01",
+  "lane": "agent-town-hq13-expedition-map-north-star-visual-direction",
+  "model": "openai/gpt-image-2",
+  "verdict": "USE_CANDIDATE_02_AS_PRIMARY_RUNTIME_DIRECTION",
+  "artifacts": {
+    "candidate01": "reports/agent-town-hq13-expedition-map-north-star-visual-direction-01-2026-06-01.png",
+    "candidate02": "reports/agent-town-hq13-expedition-map-north-star-visual-direction-02-2026-06-01.png",
+    "candidate03": "reports/agent-town-hq13-expedition-map-north-star-visual-direction-03-2026-06-01.png",
+    "candidate04": "reports/agent-town-hq13-expedition-map-north-star-visual-direction-04-2026-06-01.png",
+    "contactSheet": "reports/agent-town-hq13-expedition-map-north-star-visual-direction-contact-sheet-2026-06-01.png",
+    "prompt": "reports/agent-town-hq13-expedition-map-north-star-visual-direction-prompt-2026-06-01.md"
+  },
+  "imageSizes": {
+    "candidates": {
+      "width": 2048,
+      "height": 1152
+    },
+    "contactSheet": {
+      "width": 1452,
+      "height": 822
+    }
+  },
+  "assessment": {
+    "primaryCandidate": "candidate02",
+    "secondaryCandidate": "candidate04",
+    "candidate01": "rich but too cluttered and card-heavy",
+    "candidate02": "best balance of readable map, fog frontier, route language, node states, and restrained game UI",
+    "candidate03": "beautiful but fog borders are too magical/cinematic for strategic readability",
+    "candidate04": "good lighter HUD and atmosphere but compass/pin density risks clutter"
+  },
+  "assetExtractionTargets": [
+    "isometric terrain kit",
+    "settlement kit",
+    "fog-of-war overlays",
+    "dotted expedition route strokes",
+    "map pins",
+    "small human/agent party markers",
+    "compact HUD frames"
+  ],
+  "guardrails": {
+    "runtimeAssetIntegration": false,
+    "serverAuthorityChanges": false,
+    "newMutationPath": false,
+    "clientFabricatedTruth": false,
+    "atlasExecution": false,
+    "publicSharing": false,
+    "generatedUniverseRealRendering": false,
+    "hiddenAutonomy": false,
+    "routeTradeEconomyCombatScheduler": false,
+    "wildWestDriftObserved": false
+  }
+}

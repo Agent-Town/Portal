@@ -1,0 +1,37 @@
+AgentTown HQ building prerequisite gate proof - 2026-05-31
+
+Source: generated with the Founders Plot engine against a test SQLite store.
+
+Scenario:
+- Plot is at HQ3.
+- Inventory and XP are sufficient for HQ4.
+- Lumber Camp, Farm Plot, and Quarry are READY.
+- Expedition Board is missing.
+
+Blocked result:
+{
+  "ok": false,
+  "code": "MISSING_HQ_BUILDING_PREREQUISITES",
+  "retryable": false,
+  "missingPrerequisites": [
+    {
+      "type": "EXPEDITION_BOARD",
+      "requiredState": "READY",
+      "state": null,
+      "reason": "missing_building"
+    }
+  ],
+  "inventoryAfterBlocked": {
+    "wood": 50,
+    "stone": 40,
+    "food": 30,
+    "coin": 20
+  }
+}
+
+Satisfied result after adding READY Expedition Board:
+{
+  "hqUpgradeNextLevel": 4,
+  "missingBuildingPrerequisites": [],
+  "prerequisitesSatisfied": true
+}

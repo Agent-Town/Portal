@@ -1,0 +1,96 @@
+{
+  "id": "oracle-adjunct-v1",
+  "role": "oracle_adjunct",
+  "canonicalRoleId": "oracle_adjunct",
+  "roleFacts": ["WORLD_GRID_READ_MODEL", "CIVIC_READINESS", "DOCTRINE_SELECTED", "OUTPUT_READY"],
+  "displayName": "Pella-Node",
+  "title": "Oracle Adjunct",
+  "backstory": "Pella-Node translates civic signals into neighbor-sized receipts. It is intentionally partial: helpful for reading the World Grid horizon, unable to see everything, and happier when a human keeps the final say.",
+  "personality": "Curious, humble, library-quiet, and explicit about uncertainty.",
+  "visiblyAgenticOrRobotic": true,
+  "visualOnly": true,
+  "wiringStatus": "scene_wired_visual_only",
+  "model": "built-in image_gen, requested GPT Image 2.0 path",
+  "sourceImage": "oracle-adjunct-v1.source.png",
+  "nativeGeneratedImage": "oracle-adjunct-v1.generated.png",
+  "image": "oracle-adjunct-v1.png",
+  "prompt": "oracle-adjunct-v1.prompt.md",
+  "nativeGeneratedSize": {
+    "width": 1254,
+    "height": 1254
+  },
+  "sourceSize": {
+    "width": 2048,
+    "height": 2048
+  },
+  "sheetContract": {
+    "width": 2048,
+    "height": 2048,
+    "columns": 4,
+    "rows": 4,
+    "frameWidth": 512,
+    "frameHeight": 512,
+    "frameCount": 16
+  },
+  "rowOrder": ["idle", "walk", "consult", "ready"],
+  "actions": {
+    "idle": {
+      "row": 0,
+      "description": "Calm adjunct stances holding blank receipt slips and a small civic signal charm.",
+      "frames": [0, 1, 2, 3],
+      "fps": 3
+    },
+    "walk": {
+      "row": 1,
+      "description": "Measured walking with wrap movement and note slips secured.",
+      "frames": [0, 1, 2, 3],
+      "fps": 6
+    },
+    "consult": {
+      "row": 2,
+      "description": "Reading non-readable civic signal tiles and comparing blank receipts.",
+      "frames": [0, 1, 2, 3],
+      "fps": 5
+    },
+    "ready": {
+      "row": 3,
+      "description": "Presenting a sealed readiness receipt or warm signal token.",
+      "frames": [0, 1, 2, 3],
+      "fps": 4
+    }
+  },
+  "actionMapping": {
+    "WORLD_GRID_READ_MODEL": "consult",
+    "CIVIC_READINESS": "ready",
+    "DOCTRINE_SELECTED": "consult",
+    "OUTPUT_READY": "ready"
+  },
+  "texture": {
+    "path": "public/experiences/founders-plot/assets/characters/inhabitants/oracle_adjunct/oracle-adjunct-v1.png",
+    "format": "png",
+    "colorSpace": "sRGB",
+    "channels": "sRGBA",
+    "width": 2048,
+    "height": 2048,
+    "alpha": true,
+    "transparentCorners": true
+  },
+  "generationNotes": {
+    "sourceProvenance": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e7c63-12e6-76d1-85d0-cd38068fd851/ig_03427427825ed960016a1bc2438e34819192b8ef5ee67de852.png",
+    "mode": "built-in image_gen with requested GPT Image 2.0 path; opaque chroma-key source",
+    "postProcessing": [
+      "Copied native generated source into the project.",
+      "Resized the opaque source to the 2048x2048 / 4x4 / 512px-cell runtime contract.",
+      "Converted green chroma background to alpha with ImageMagick."
+    ],
+    "transparency": {
+      "method": "ImageMagick chroma-key conversion from opaque source",
+      "sourceKeyRequested": "#00ff00",
+      "sampledCornerColor": "srgb(28,234,28)",
+      "keyColorsUsed": ["#1cea1c"],
+      "fuzz": "22%",
+      "transparentCorners": true
+    },
+    "constraints": ["robotic/synthetic", "adult-height", "visual-only", "no readable text", "no logos", "no weapons", "no surveillance", "no autonomous authority", "no gameplay authority"]
+  }
+}

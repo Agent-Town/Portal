@@ -1,0 +1,104 @@
+{
+  "id": "settler-convoy-crew-v1",
+  "role": "settler",
+  "canonicalRoleId": "settler",
+  "aliases": ["convoy_crew", "settler_convoy_lead"],
+  "roleFacts": ["SETTLER_CONVOY", "SETTLEMENT_READY", "CONVOY_PREPARING", "CONVOY_ARRIVED"],
+  "displayName": "Luma Reedbarrel",
+  "title": "Settler Convoy Crew Lead",
+  "backstory": "Luma Reedbarrel is the one who checks the water barrel twice and the route beacon three times. They do not rush expansion; they make sure AgentTown's next home begins with supplies, consent, and a plan that can be found again.",
+  "personality": "Optimistic, steady, careful with supplies, and quietly protective of new beginnings.",
+  "visualOnly": true,
+  "model": "openai/gpt-image-2",
+  "sourceImage": "settler-convoy-crew-v1.source.png",
+  "nativeGeneratedImage": "settler-convoy-crew-v1.generated.png",
+  "image": "settler-convoy-crew-v1.png",
+  "prompt": "settler-convoy-crew-v1.prompt.md",
+  "sourceSize": {
+    "width": 2048,
+    "height": 2048
+  },
+  "nativeGeneratedSize": {
+    "width": 2048,
+    "height": 2048
+  },
+  "columns": 4,
+  "rows": 4,
+  "frameWidth": 512,
+  "frameHeight": 512,
+  "frameCount": 16,
+  "rowOrder": ["idle", "walk", "prepare", "ready"],
+  "frame": {
+    "width": 512,
+    "height": 512
+  },
+  "layout": {
+    "columns": 4,
+    "rows": 4,
+    "frameCount": 16
+  },
+  "actions": {
+    "idle": {
+      "row": 0,
+      "description": "Idle supply-check poses with canvas rolls, seed crate, water barrel, and route beacon.",
+      "frames": [0, 1, 2, 3],
+      "fps": 3
+    },
+    "walk": {
+      "row": 1,
+      "description": "Departing and walking with packed convoy gear.",
+      "frames": [0, 1, 2, 3],
+      "fps": 6
+    },
+    "prepare": {
+      "row": 2,
+      "description": "Preparing the convoy and checking an abstract route plan.",
+      "frames": [0, 1, 2, 3],
+      "fps": 5
+    },
+    "ready": {
+      "row": 3,
+      "description": "Arrived or founding-ready gestures with sealed site-plan tube and marker.",
+      "frames": [0, 1, 2, 3],
+      "fps": 4
+    }
+  },
+  "actionMapping": {
+    "SETTLER_CONVOY": "prepare",
+    "CONVOY_PREPARING": "prepare",
+    "SETTLEMENT_READY": "ready",
+    "CONVOY_ARRIVED": "ready",
+    "FOUNDED": "ready"
+  },
+  "texture": {
+    "path": "public/experiences/founders-plot/assets/characters/inhabitants/settler/settler-convoy-crew-v1.png",
+    "format": "png",
+    "colorSpace": "sRGB",
+    "channels": "sRGBA",
+    "width": 2048,
+    "height": 2048,
+    "alpha": true,
+    "transparentCorners": true
+  },
+  "generationNotes": {
+    "sourceProvenance": "/Users/robin/.openclaw/media/tool-image-generation/agent-town-settler-convoy-crew-sprite-sheet-v1-opaque---1c7c71c8-a00f-40aa-a434-336aeea35ff4.png",
+    "postProcessing": [
+      "Copied generated opaque source into the project.",
+      "Converted mint and near-white chroma background to alpha with ImageMagick."
+    ],
+    "transparency": {
+      "method": "ImageMagick chroma-key conversion from opaque source",
+      "sourceKeyRequested": "flat chroma mint",
+      "sampledCornerRange": ["srgb(250,254,251)", "srgb(252,253,252)", "srgb(251,254,253)"],
+      "keyColorsUsed": ["#83f7b2", "#fcfefb"],
+      "fuzz": ["22%", "10%"]
+    },
+    "constraints": ["adult-coded", "visual-only", "no readable text", "no logos", "no weapons", "no soldiers", "no horse or vehicle as main identity", "no gameplay authority"]
+  },
+  "generation": {
+    "date": "2026-05-31",
+    "mode": "OpenClaw media / built-in image_gen",
+    "model": "openai/gpt-image-2",
+    "originalGeneratedPath": "/Users/robin/.openclaw/media/tool-image-generation/agent-town-settler-convoy-crew-sprite-sheet-v1-opaque---1c7c71c8-a00f-40aa-a434-336aeea35ff4.png"
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "generatedAt": "2026-05-31T05:51:24.538Z",
+  "slice": "HQ10C Generated Universe overlay pack records",
+  "plotId": "plot_5ba529439f3c80ce",
+  "sourceProposalId": "civic_proposal_601e595d0f52c20c",
+  "overlayPackId": "overlay_pack_d741da88e5de1e08",
+  "readiness": {
+    "doctrineSelected": true,
+    "workOrderDrafted": true,
+    "reviewedCivicProposal": true
+  },
+  "createdRecord": {
+    "ok": true,
+    "status": "DRAFT",
+    "presentationOnly": true,
+    "visualOnly": true,
+    "executionAllowed": false,
+    "executionAllowedFalse": true,
+    "gameplayMutationPolicy": "presentation_only",
+    "authorityBoundary": "server_owned_generated_universe_overlay_pack_presentation_only_v1",
+    "promptDigest": "e16edc05edceabd7",
+    "rawPromptStored": false,
+    "publicSharing": false,
+    "externalEffects": false,
+    "renderingImplemented": false
+  },
+  "listReadModel": {
+    "ok": true,
+    "worldDeltaLength": 0,
+    "count": 1,
+    "status": "RECORDING_READY",
+    "presentationOnly": true,
+    "executableActionsLength": 0
+  },
+  "noGameplayMutationProof": {
+    "createWorldDeltaLength": 0,
+    "listWorldDeltaLength": 0,
+    "inventoryUnchanged": true,
+    "jobsUnchanged": true,
+    "settlementClaimsUnchanged": true,
+    "stableGameplayHashBefore": "95262bc4b57b68676790f17bdb95b4086bb4316337ae3a64726cc9ec7103411e",
+    "stableGameplayHashAfter": "95262bc4b57b68676790f17bdb95b4086bb4316337ae3a64726cc9ec7103411e",
+    "stableGameplayHashUnchanged": true,
+    "overlayPacksInGameplaySnapshot": false,
+    "overlayPacksInWorldGridProjection": false
+  },
+  "atlasProof": {
+    "overlayNodeCount": 2,
+    "overlayNodes": [
+      {
+        "nodeId": "generated_universe.overlay_pack_records",
+        "kind": "generated_universe_overlay_pack_records",
+        "status": "available",
+        "executableByAtlas": false,
+        "hasActionRef": true
+      },
+      {
+        "nodeId": "overlay_pack.overlay_pack_d741da88e5de1e08",
+        "kind": "generated_universe_overlay_pack_record",
+        "status": "waiting",
+        "executableByAtlas": false,
+        "hasActionRef": false
+      }
+    ],
+    "overlayActionRefs": [
+      {
+        "nodeId": "generated_universe.overlay_pack_records",
+        "executableByAtlas": false
+      }
+    ],
+    "noExecutableOverlayRefs": true,
+    "summaryOverlayPackCount": 1
+  },
+  "omittedCapabilities": [
+    "public sharing",
+    "actual Generated Universe rendering",
+    "gameplay costs/resources/buffs",
+    "routes/trade behavior",
+    "scheduler/background execution",
+    "Atlas-owned execution",
+    "external effects"
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "id": "outpost-keeper-v1",
+  "role": "outpost_keeper",
+  "canonicalRoleId": "outpost_keeper",
+  "roleFacts": ["OUTPOST_FOUNDED", "SETTLEMENT_CLAIM", "CIVIC_READINESS", "OUTPUT_READY"],
+  "displayName": "Noma Hearthpin",
+  "title": "Outpost Keeper",
+  "backstory": "Noma Hearthpin makes a new outpost feel less like a claim and more like a place to be welcomed. She tends lanterns, blank guest logs, and civic notice ribbons while leaving every real decision to the settlement systems.",
+  "personality": "Practical, hospitable, observant, and careful not to turn caretaking into command.",
+  "visiblyAgenticOrRobotic": false,
+  "visualOnly": true,
+  "wiringStatus": "scene_wired_visual_only",
+  "model": "built-in image_gen, requested GPT Image 2.0 path",
+  "sourceImage": "outpost-keeper-v1.source.png",
+  "nativeGeneratedImage": "outpost-keeper-v1.generated.png",
+  "image": "outpost-keeper-v1.png",
+  "prompt": "outpost-keeper-v1.prompt.md",
+  "nativeGeneratedSize": {
+    "width": 1254,
+    "height": 1254
+  },
+  "sourceSize": {
+    "width": 2048,
+    "height": 2048
+  },
+  "sheetContract": {
+    "width": 2048,
+    "height": 2048,
+    "columns": 4,
+    "rows": 4,
+    "frameWidth": 512,
+    "frameHeight": 512,
+    "frameCount": 16
+  },
+  "rowOrder": ["idle", "walk", "tend", "ready"],
+  "actions": {
+    "idle": {
+      "row": 0,
+      "description": "Friendly outpost keeper stances holding lantern or blank guest ledger.",
+      "frames": [0, 1, 2, 3],
+      "fps": 3
+    },
+    "walk": {
+      "row": 1,
+      "description": "Walking with lantern and satchel, practical and calm.",
+      "frames": [0, 1, 2, 3],
+      "fps": 6
+    },
+    "tend": {
+      "row": 2,
+      "description": "Adjusting a welcome marker, lantern, or notice-post ribbon.",
+      "frames": [0, 1, 2, 3],
+      "fps": 5
+    },
+    "ready": {
+      "row": 3,
+      "description": "Presenting a warm outpost welcome token or sealed blank receipt.",
+      "frames": [0, 1, 2, 3],
+      "fps": 4
+    }
+  },
+  "actionMapping": {
+    "OUTPOST_FOUNDED": "tend",
+    "SETTLEMENT_CLAIM": "tend",
+    "CIVIC_READINESS": "ready",
+    "OUTPUT_READY": "ready"
+  },
+  "texture": {
+    "path": "public/experiences/founders-plot/assets/characters/inhabitants/outpost_keeper/outpost-keeper-v1.png",
+    "format": "png",
+    "colorSpace": "sRGB",
+    "channels": "sRGBA",
+    "width": 2048,
+    "height": 2048,
+    "alpha": true,
+    "transparentCorners": true
+  },
+  "generationNotes": {
+    "sourceProvenance": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e7c63-12e6-76d1-85d0-cd38068fd851/ig_03427427825ed960016a1bc2fb27248191a2a4a942470bb0c9.png",
+    "mode": "built-in image_gen with requested GPT Image 2.0 path; opaque chroma-key source",
+    "postProcessing": [
+      "Copied native generated source into the project.",
+      "Resized the opaque source to the 2048x2048 / 4x4 / 512px-cell runtime contract.",
+      "Converted green chroma background to alpha with ImageMagick."
+    ],
+    "transparency": {
+      "method": "ImageMagick chroma-key conversion from opaque source",
+      "sourceKeyRequested": "#00ff00",
+      "sampledCornerColor": "srgb(25,237,21)",
+      "keyColorsUsed": ["#19ed15"],
+      "fuzz": "22%",
+      "transparentCorners": true
+    },
+    "constraints": ["adult-height", "visual-only", "no readable text", "no logos", "no weapons", "no surveillance", "no autonomous authority", "no gameplay authority"]
+  }
+}

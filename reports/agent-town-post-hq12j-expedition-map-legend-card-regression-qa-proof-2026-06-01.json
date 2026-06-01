@@ -1,0 +1,232 @@
+{
+  "ok": true,
+  "generatedAt": "2026-05-31T17:35:40Z",
+  "scope": "Post-HQ12J bounded regression QA for Expedition Map fog legend, selected-sector cards, semantic zoom, Scout Sector, Event Packet, Expedition Party, and mobile bounds.",
+  "branch": "neo/progression-atlas-editor-next-2026-05-29",
+  "artifactsUnderReview": [
+    "reports/agent-town-hq12j-expedition-map-legend-sector-card-polish-2026-06-01.md",
+    "reports/agent-town-hq12j-expedition-map-legend-sector-card-polish-proof-2026-06-01.json",
+    "reports/agent-town-hq12j-expedition-map-legend-sector-card-polish-desktop-2026-06-01.png",
+    "reports/agent-town-hq12j-expedition-map-legend-sector-card-polish-mobile-2026-06-01.png"
+  ],
+  "checks": [
+    {
+      "name": "founders plot syntax",
+      "command": "node --check public/experiences/founders-plot/founders-plot.js",
+      "exitCode": 0
+    },
+    {
+      "name": "FP-E2E-022 spec syntax",
+      "command": "node --check e2e/200_founders_plot.spec.js",
+      "exitCode": 0
+    },
+    {
+      "name": "FP-E2E-023 spec syntax",
+      "command": "node --check e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js",
+      "exitCode": 0
+    },
+    {
+      "name": "HQ12J proof assertions",
+      "command": "jq -e '<legend/rule/semantic/mobile/pixel/guardrail assertions>' reports/agent-town-hq12j-expedition-map-legend-sector-card-polish-proof-2026-06-01.json",
+      "exitCode": 0
+    },
+    {
+      "name": "HQ12B/C Scout Sector proof assertions",
+      "command": "jq -e '<read-model/scout-only/mobile assertions>' reports/agent-town-hq12b-expedition-map-ui-proof-2026-05-31.json",
+      "exitCode": 0
+    },
+    {
+      "name": "HQ12F/G/H Event Packet and Expedition Party proof assertions",
+      "command": "jq -e '<packet/party/mobile/guardrail assertions>' reports/agent-town-hq12h-expedition-map-mobile-polish-proof-2026-05-31.json",
+      "exitCode": 0
+    },
+    {
+      "name": "HQ12J screenshot identify",
+      "command": "identify reports/agent-town-hq12j-expedition-map-legend-sector-card-polish-desktop-2026-06-01.png reports/agent-town-hq12j-expedition-map-legend-sector-card-polish-mobile-2026-06-01.png",
+      "exitCode": 0
+    },
+    {
+      "name": "FP-E2E-022 Playwright regression",
+      "command": "PW_PORT=4932 npx playwright test e2e/200_founders_plot.spec.js --project=chromium --grep \"FP-E2E-022\"",
+      "exitCode": 0,
+      "passed": 1
+    },
+    {
+      "name": "FP-E2E-023 Playwright regression",
+      "command": "PW_PORT=4933 npx playwright test e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js --project=chromium --grep \"FP-E2E-023\"",
+      "exitCode": 0,
+      "passed": 1
+    },
+    {
+      "name": "diff whitespace check",
+      "command": "git diff --check",
+      "exitCode": 0
+    }
+  ],
+  "assertions": {
+    "hq12j": {
+      "proofOk": true,
+      "projectionHash": "hq12d-threejs-expedition-map-proof",
+      "proofGeneratedAt": "2026-05-31T17:34:26.097Z",
+      "fogStates": {
+        "discovered": 2,
+        "known": 1,
+        "hinted": 1,
+        "locked_unknown": 1
+      },
+      "legendStates": [
+        "discovered",
+        "known",
+        "hinted",
+        "locked_unknown"
+      ],
+      "selectedHintedRules": [
+        "Visibility: hidden, no resources, routes, or actions exposed.",
+        "Scout path: only Scout Sector can reveal one eligible hinted edge as known.",
+        "Zoom context: semantic zoom clarifies status only.",
+        "Authority: server read model only, no mutation path."
+      ],
+      "selectedKnownRules": [
+        "Visible verified server truth can show receipts, terrain, risk, and resource hints.",
+        "Semantic zoom mirrors the selected card."
+      ],
+      "selectedLockedRules": [
+        "Visibility: hidden, no resources, routes, actions, or receipts exposed.",
+        "Scout path: no Expedition Map action is available for locked unknown cells.",
+        "Zoom context: semantic zoom clarifies status only.",
+        "Authority: server read model only, no mutation path."
+      ],
+      "semanticZoom": {
+        "contextOnly": true,
+        "afterZoomTier": "detail",
+        "afterZoomFogState": "locked_unknown",
+        "afterZoomCopy": "Selected-cell facts stay below; close zoom does not unlock extra truth.",
+        "afterZoomSelectedHint": "Selected: Locked Unknown stays sealed; no resources, routes, or action data."
+      },
+      "mobileLayout": {
+        "viewport": 390,
+        "documentScrollWidth": 390,
+        "bodyScrollWidth": 390,
+        "threeHost": {
+          "width": 313,
+          "height": 188
+        },
+        "bounded": true
+      },
+      "pixelSamples": {
+        "desktopOpaquePixels": 6144,
+        "desktopUniqueColorSamples": 573,
+        "mobileOpaquePixels": 6144,
+        "mobileUniqueColorSamples": 448
+      },
+      "guardrails": {
+        "readOnly": true,
+        "executableActions": [],
+        "routeCreation": false,
+        "atlasExecution": false,
+        "hiddenCellResourceTextSuppressed": true,
+        "hiddenCellReceiptLinksSuppressed": true,
+        "scoutSectorOnlyMutationPath": true
+      }
+    },
+    "hq12bHq12c": {
+      "proofOk": true,
+      "status": "FOG_READ_MODEL_READY",
+      "fogStates": {
+        "discovered": 2,
+        "known": 1,
+        "hinted": 1,
+        "locked_unknown": 1
+      },
+      "mutationButtons": 1,
+      "scoutSectorButtons": [
+        {
+          "testid": "fp-btn-scout-sector-cell_q0_r1",
+          "cellId": "cell_q0_r1"
+        }
+      ],
+      "knownLockedScoutButtons": [],
+      "readOnly": true,
+      "executableActions": [],
+      "routeCreation": false,
+      "atlasExecution": false,
+      "mobileBounded": true,
+      "mobileClipped": []
+    },
+    "hq12dHq12i": {
+      "threeRendererPresent": true,
+      "canvasNonBlank": true,
+      "zoomPanPassed": true,
+      "semanticZoomContextOnly": true,
+      "desktopZoomAfter": 2.353,
+      "mobileZoomAfter": 2.353
+    },
+    "hq12fHq12gHq12h": {
+      "proofOk": true,
+      "selectedCellId": "cell_q0_r1",
+      "eventPacketId": "expedition_event_packet_hq12f_cell_q0_r1",
+      "eventPacketCardVisible": true,
+      "eventPacketReadOnly": true,
+      "eventPacketButtons": 0,
+      "eventPacketActions": 0,
+      "partyBlocksReadOnly": true,
+      "partyButtons": 0,
+      "partyActions": 0,
+      "scoutButtonsAfterReceipt": 0,
+      "mobileBounded": true,
+      "guardrails": {
+        "scoutSectorOnlyMutationPath": true,
+        "executableActions": [],
+        "atlasExecution": false,
+        "publicSharing": false,
+        "generatedUniverseRendering": false,
+        "routeTrade": false,
+        "resourceMutation": false,
+        "combat": false,
+        "hiddenAutonomy": false,
+        "wildWestGenreDrift": false
+      }
+    }
+  },
+  "screenshots": {
+    "hq12jDesktop": {
+      "path": "reports/agent-town-hq12j-expedition-map-legend-sector-card-polish-desktop-2026-06-01.png",
+      "identify": "PNG 465x3384 8-bit sRGB 785185B"
+    },
+    "hq12jMobile": {
+      "path": "reports/agent-town-hq12j-expedition-map-legend-sector-card-polish-mobile-2026-06-01.png",
+      "identify": "PNG 366x2575 8-bit sRGB 575517B"
+    }
+  },
+  "warnings": [
+    "Playwright webServer emitted Node experimental SQLite warning.",
+    "Playwright emitted NO_COLOR ignored because FORCE_COLOR is set."
+  ],
+  "filesTouched": {
+    "created": [
+      "reports/agent-town-post-hq12j-expedition-map-legend-card-regression-qa-2026-06-01.md",
+      "reports/agent-town-post-hq12j-expedition-map-legend-card-regression-qa-proof-2026-06-01.json"
+    ],
+    "refreshedExistingByPlaywright": [
+      "reports/agent-town-hq12b-expedition-map-ui-desktop-2026-05-31.png",
+      "reports/agent-town-hq12b-expedition-map-ui-mobile-2026-05-31.png",
+      "reports/agent-town-hq12b-expedition-map-ui-proof-2026-05-31.json",
+      "reports/agent-town-hq12c-scout-sector-ui-desktop-2026-05-31.png",
+      "reports/agent-town-hq12c-scout-sector-ui-mobile-2026-05-31.png",
+      "reports/agent-town-hq12c-scout-sector-ui-proof-2026-05-31.json",
+      "reports/agent-town-hq12f-expedition-event-packets-ui-desktop-2026-05-31.png",
+      "reports/agent-town-hq12f-expedition-event-packets-ui-mobile-2026-05-31.png",
+      "reports/agent-town-hq12f-expedition-event-packets-ui-proof-2026-05-31.json",
+      "reports/agent-town-hq12g-expedition-party-flavor-ui-desktop-2026-05-31.png",
+      "reports/agent-town-hq12g-expedition-party-flavor-ui-mobile-2026-05-31.png",
+      "reports/agent-town-hq12g-expedition-party-flavor-ui-proof-2026-05-31.json",
+      "reports/agent-town-hq12h-expedition-map-mobile-polish-desktop-2026-05-31.png",
+      "reports/agent-town-hq12h-expedition-map-mobile-polish-mobile-2026-05-31.png",
+      "reports/agent-town-hq12h-expedition-map-mobile-polish-proof-2026-05-31.json",
+      "reports/agent-town-hq12j-expedition-map-legend-sector-card-polish-desktop-2026-06-01.png",
+      "reports/agent-town-hq12j-expedition-map-legend-sector-card-polish-mobile-2026-06-01.png",
+      "reports/agent-town-hq12j-expedition-map-legend-sector-card-polish-proof-2026-06-01.json"
+    ],
+    "sourceFilesEdited": []
+  }
+}

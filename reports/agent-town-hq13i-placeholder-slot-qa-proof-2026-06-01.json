@@ -1,0 +1,69 @@
+{
+  "ok": false,
+  "date": "2026-06-01",
+  "lane": "agent-town-hq13i-placeholder-slot-qa",
+  "verdict": "BLOCKED_SCHEMA_SLOT_RECONCILIATION_REQUIRED",
+  "workerStatus": "timed_out_without_report_artifacts",
+  "sourcePlaceholderProof": "reports/agent-town-hq13g-candidate-02-tiny-asset-batch-preflight-proof-2026-06-01.json",
+  "sourceSchema": "docs/specs/agent-town.visual-pack.v1.schema.json",
+  "totalSlotIntents": 8,
+  "allowedSlotIntents": 5,
+  "blockedSlotIntents": 3,
+  "rows": [
+    {
+      "slotIntent": "expedition_map.fog.hinted",
+      "schemaAllowed": true
+    },
+    {
+      "slotIntent": "expedition_map.fog.locked_unknown",
+      "schemaAllowed": true
+    },
+    {
+      "slotIntent": "expedition_map.fog.frontier_border",
+      "schemaAllowed": false,
+      "reason": "current fogMarkers schema allows fog.discovered, fog.known, fog.hinted, fog.locked_unknown, and marker.* slots only"
+    },
+    {
+      "slotIntent": "expedition_map.marker.known_site_plan",
+      "schemaAllowed": true
+    },
+    {
+      "slotIntent": "expedition_map.marker.hinted_unknown",
+      "schemaAllowed": true
+    },
+    {
+      "slotIntent": "expedition_map.marker.owned_outpost",
+      "schemaAllowed": true
+    },
+    {
+      "slotIntent": "expedition_map.stroke.scout_receipt_trace",
+      "schemaAllowed": false,
+      "reason": "current fogMarkers schema does not allow expedition_map.stroke.* slots"
+    },
+    {
+      "slotIntent": "hud.frame.selected_sector_card",
+      "schemaAllowed": false,
+      "reason": "current hudCards schema allows hud.card.* and atlas.node_icon.* slots only"
+    }
+  ],
+  "guardrails": {
+    "reportOnly": true,
+    "runtimeAssetsPromoted": false,
+    "runtimePackLoaderCreated": false,
+    "runtimePackDirectoryCreated": false,
+    "serverAuthorityChanged": false,
+    "clientAuthorityChanged": false,
+    "scoutSectorOnlyMutationPath": true,
+    "atlasExecution": false,
+    "publicSharing": false,
+    "generatedUniverseRendering": false,
+    "hiddenAutonomy": false,
+    "routeTradeEconomyHooks": false,
+    "combatSchedulerExternalEffects": false
+  },
+  "artifacts": {
+    "report": "reports/agent-town-hq13i-placeholder-slot-qa-2026-06-01.md",
+    "proof": "reports/agent-town-hq13i-placeholder-slot-qa-proof-2026-06-01.json"
+  },
+  "recommendedNextLane": "HQ13J schema-slot reconciliation before real generated 8-asset batch"
+}

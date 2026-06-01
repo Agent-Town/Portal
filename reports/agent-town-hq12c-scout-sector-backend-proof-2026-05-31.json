@@ -1,0 +1,108 @@
+{
+  "generatedAt": "2026-05-31T14:44:00.000Z",
+  "lane": "HQ12C Scout Sector backend slice",
+  "ok": true,
+  "route": "POST /api/founders-plot/expedition-map/scout-sector",
+  "tool": "et.plot.scout_sector",
+  "plotId": "plot_6b7f73ad643eb2be",
+  "targetCellId": "cell_q1_r-1",
+  "scoutId": "expedition_scout_eb41fb720cc07386",
+  "before": {
+    "projectionHash": "10ef77b28e97148d",
+    "fogCounts": {
+      "discovered": 1,
+      "known": 1,
+      "hinted": 2,
+      "locked_unknown": 8
+    },
+    "targetFogState": "hinted"
+  },
+  "after": {
+    "projectionHash": "a53614cff0c03b77",
+    "fogCounts": {
+      "discovered": 1,
+      "known": 2,
+      "hinted": 3,
+      "locked_unknown": 8
+    },
+    "targetFogState": "known"
+  },
+  "proof": {
+    "actionName": "et.plot.scout_sector",
+    "plotId": "plot_6b7f73ad643eb2be",
+    "scoutId": "expedition_scout_eb41fb720cc07386",
+    "cellId": "cell_q1_r-1",
+    "sourceCellId": "cell_origin",
+    "alreadyScouted": false,
+    "beforeProjectionHash": "10ef77b28e97148d",
+    "afterProjectionHash": "a53614cff0c03b77",
+    "targetBeforeFogState": "hinted",
+    "targetAfterFogState": "known",
+    "beforeFogCounts": {
+      "discovered": 1,
+      "known": 1,
+      "hinted": 2,
+      "locked_unknown": 8
+    },
+    "afterFogCounts": {
+      "discovered": 1,
+      "known": 2,
+      "hinted": 3,
+      "locked_unknown": 8
+    },
+    "newlyKnownOrDiscoveredCellIds": [
+      "cell_q1_r-1"
+    ],
+    "boundaryFlags": {
+      "samePlotOnly": true,
+      "serverOwnedDiscoveryReceipt": true,
+      "revealsExactlyOneSector": true,
+      "autonomousMovement": false,
+      "resourceHarvesting": false,
+      "resourceDelta": {},
+      "routeCreation": false,
+      "tradeRouteCreation": false,
+      "backgroundScheduling": false,
+      "combat": false,
+      "publicSharing": false,
+      "generatedUniverseRendering": false,
+      "crossPlotMutation": false,
+      "atlasExecution": false,
+      "externalEffects": false
+    }
+  },
+  "receipt": {
+    "kind": "scout_sector_receipt",
+    "actionName": "et.plot.scout_sector",
+    "scoutId": "expedition_scout_eb41fb720cc07386",
+    "plotId": "plot_6b7f73ad643eb2be",
+    "cellId": "cell_q1_r-1",
+    "sourceCellId": "cell_origin",
+    "sourceFogState": "hinted",
+    "beforeProjectionHash": "10ef77b28e97148d",
+    "authorityBoundary": "server_owned_scout_sector_current_plot_fog_receipt_v1",
+    "createdBy": "HUMAN",
+    "approvedBy": null,
+    "scoutedAt": 1700000000002,
+    "samePlotOnly": true,
+    "serverOwnedDiscoveryReceipt": true,
+    "revealsExactlyOneSector": true,
+    "autonomousMovement": false,
+    "resourceHarvesting": false,
+    "resourceDelta": {},
+    "routeCreation": false,
+    "tradeRouteCreation": false,
+    "backgroundScheduling": false,
+    "combat": false,
+    "publicSharing": false,
+    "generatedUniverseRendering": false,
+    "crossPlotMutation": false,
+    "atlasExecution": false,
+    "externalEffects": false
+  },
+  "persistedReadModel": {
+    "scoutedSectorCount": 1,
+    "targetSourceTruth": "expedition_scout_sector",
+    "targetStatus": "SCOUTED"
+  }
+}

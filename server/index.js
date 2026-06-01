@@ -1708,6 +1708,7 @@ function setSecurityHeaders(req, res, next) {
     reqPath.startsWith('/s/')
     || reqPath === '/atlas'
     || reqPath === '/progression-atlas'
+    || reqPath === '/founders-plot'
     || reqPath === '/create'
     || reqPath === '/house'
     || reqPath === '/inbox'
@@ -9482,10 +9483,12 @@ function atlasModalRedirectPath() {
   return `/?${params.toString()}`;
 }
 
-function progressionAtlasModalRedirectPath() {
+function progressionAtlasModalRedirectPath(req = null) {
   const params = new URLSearchParams();
-  params.set('district', 'progression');
-  return `/?${params.toString()}`;
+  params.set('atlas', '1');
+  const strategyKey = String(req?.query?.strategyKey || '').trim();
+  if (strategyKey) params.set('strategyKey', strategyKey);
+  return `/founders-plot?${params.toString()}`;
 }
 
 app.get('/openclaw-lite/manifest.json', (_req, res) => {
@@ -9505,15 +9508,15 @@ app.get('/atlas', (req, res) => {
 });
 
 // Progression Atlas is also modal-only so OpenClaw Lite drives the same visible UI surface.
-app.get('/progression-atlas.html', (_req, res) => {
-  return res.redirect(302, progressionAtlasModalRedirectPath());
+app.get('/progression-atlas.html', (req, res) => {
+  return res.redirect(302, progressionAtlasModalRedirectPath(req));
 });
 
 app.get('/progression-atlas', (req, res) => {
   if (isAtlasEmbedModalRequest(req)) {
     return sendHtmlNoStore(res, 'progression-atlas.html');
   }
-  return res.redirect(302, progressionAtlasModalRedirectPath());
+  return res.redirect(302, progressionAtlasModalRedirectPath(req));
 });
 
 app.use(

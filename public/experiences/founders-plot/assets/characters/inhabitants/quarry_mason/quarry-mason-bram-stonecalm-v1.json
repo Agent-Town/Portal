@@ -1,0 +1,97 @@
+{
+  "id": "quarry-mason-bram-stonecalm-v1",
+  "role": "quarry_mason",
+  "canonicalRoleId": "quarry_mason",
+  "roleFacts": ["PRODUCE", "OUTPUT_READY", "COLLECT_READY"],
+  "displayName": "Bram Stonecalm",
+  "title": "Quarry Mason",
+  "buildingSurface": "QUARRY",
+  "characterKind": "human_civic_operator",
+  "backstory": "Bram Stonecalm was a marker before he was a mason: the person trusted to decide which stone was safe to cut and which should stay holding the hill together. In Founders Plot he gives the quarry a culture of measurement rather than extraction, making existing server-owned stone production feel deliberate and cared for.",
+  "personality": "Calm, exact, and steady under noise. He speaks softly because rock already does enough shouting.",
+  "visualOnly": true,
+  "authorityBoundary": "visual_only_projection_of_existing_quarry_state",
+  "model": "openai/gpt-image-2 via OpenClaw image_generate",
+  "sourceImage": "quarry-mason-bram-stonecalm-v1.source.png",
+  "generatedImage": "quarry-mason-bram-stonecalm-v1.generated.png",
+  "image": "quarry-mason-bram-stonecalm-v1.png",
+  "prompt": "quarry-mason-bram-stonecalm-v1.prompt.md",
+  "sourceSize": {
+    "width": 2048,
+    "height": 2048
+  },
+  "nativeGeneratedSize": {
+    "width": 2048,
+    "height": 2048
+  },
+  "columns": 4,
+  "rows": 4,
+  "frameWidth": 512,
+  "frameHeight": 512,
+  "frameCount": 16,
+  "rowOrder": ["idle", "walk", "cut", "ready"],
+  "actions": {
+    "idle": {
+      "row": 0,
+      "description": "Inspecting a small stone sample, marker tag, or measuring cord before Quarry work begins.",
+      "frames": [0, 1, 2, 3],
+      "fps": 3
+    },
+    "walk": {
+      "row": 1,
+      "description": "Walking with a sample crate or marker bundle.",
+      "frames": [0, 1, 2, 3],
+      "fps": 6
+    },
+    "cut": {
+      "row": 2,
+      "description": "Carefully marking and splitting stone with safe hand tools and a subtle cyan fracture-scanner cue.",
+      "frames": [0, 1, 2, 3],
+      "fps": 5
+    },
+    "ready": {
+      "row": 3,
+      "description": "Presenting a stacked stone sample and sealed receipt pouch for ready Quarry output.",
+      "frames": [0, 1, 2, 3],
+      "fps": 4
+    }
+  },
+  "actionMapping": {
+    "PRODUCE": "cut",
+    "QUARRY_CUT": "cut",
+    "OUTPUT_READY": "ready",
+    "COLLECT_READY": "ready"
+  },
+  "generationNotes": {
+    "sourceProvenance": "/Users/robin/.openclaw/media/tool-image-generation/agent-town-quarry-mason-bram-stonecalm-sprite-sheet-v1-opaqu---e47a6ae1-048a-4e48-a586-a924683f3f9b.png",
+    "deliveryNote": "Image generation completed, but the original delivery route failed. The generated media file was recovered from the local OpenClaw media folder and integrated into the project.",
+    "postProcessing": [
+      "Copied generated opaque source into the project.",
+      "Converted magenta and pale background keys to alpha with ImageMagick.",
+      "Cleared generated guide strips around the expected 512px cell boundaries.",
+      "Created proof and row-strip previews under reports/."
+    ],
+    "transparency": {
+      "method": "ImageMagick chroma-key conversion from opaque source",
+      "sourceKeyRequested": "flat #ff00ff magenta",
+      "keyColorsUsed": ["#ff00ff", "#fff3ff"],
+      "fuzz": ["24%", "18%"],
+      "transparentCorners": true,
+      "alphaMean": 0.383013
+    },
+    "knownIssues": [
+      "The opaque source includes generated separator traces, so runtime cleanup clears narrow strips around the expected 512px cell boundaries.",
+      "The proof is acceptable for asset-ready status before any later scene-wiring slice."
+    ],
+    "constraints": [
+      "adult-coded",
+      "visual-only",
+      "no readable text",
+      "no logos",
+      "no weapons",
+      "no explosives",
+      "no gameplay authority",
+      "no scene wiring in this slice"
+    ]
+  }
+}

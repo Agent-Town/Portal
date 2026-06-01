@@ -1,0 +1,119 @@
+{
+  "lane": "HQ13D",
+  "date": "2026-06-01",
+  "worktree": "/Users/robin/Projects/Portal-atlas-editor",
+  "task": "AgentTown HQ13D Visual Pack Schema + Validator Fixture",
+  "verdict": "COMPLETE_READ_ONLY_SCHEMA_VALIDATOR_FIXTURE",
+  "writeScope": [
+    "docs/specs/",
+    "reports/agent-town-hq13d-visual-pack-schema-validator-2026-06-01*"
+  ],
+  "filesCreated": [
+    "docs/specs/agent-town.visual-pack.v1.schema.json",
+    "docs/specs/fixtures/agent-town.visual-pack.v1.valid-tiny.manifest.json",
+    "docs/specs/fixtures/agent-town.visual-pack.v1.invalid-forbidden-field-path-action.manifest.json",
+    "reports/agent-town-hq13d-visual-pack-schema-validator-2026-06-01-validator.mjs",
+    "reports/agent-town-hq13d-visual-pack-schema-validator-2026-06-01.md",
+    "reports/agent-town-hq13d-visual-pack-schema-validator-2026-06-01-proof.json"
+  ],
+  "schema": {
+    "schemaVersion": "agent-town.visual-pack.v1",
+    "requiresPresentationOnlyTrue": true,
+    "requiresVisualOnlyTrue": true,
+    "requiresGameplayMutationPolicyPresentationOnly": true,
+    "requiresPublicSharingFalse": true,
+    "requiresAtlasExecutionFalse": true,
+    "requiresGeneratedUniverseRenderingFalse": true,
+    "typedModules": [
+      "map_terrain_pack",
+      "fog_marker_pack",
+      "hud_card_pack",
+      "inhabitant_operator_pack",
+      "location_scene_pack"
+    ],
+    "sameOriginRuntimeAssetPaths": true,
+    "forbiddenFieldNamesInclude": [
+      "action",
+      "actions",
+      "tool",
+      "tools",
+      "route",
+      "routes",
+      "serverHandler",
+      "serverHandlers",
+      "mutation",
+      "resourceDelta",
+      "cost",
+      "permission",
+      "publicUrl",
+      "externalUrl"
+    ]
+  },
+  "fixtures": {
+    "validFixture": "docs/specs/fixtures/agent-town.visual-pack.v1.valid-tiny.manifest.json",
+    "invalidFixture": "docs/specs/fixtures/agent-town.visual-pack.v1.invalid-forbidden-field-path-action.manifest.json",
+    "invalidFixtureExpectedFailures": [
+      "publicSharing true",
+      "atlasExecution true",
+      "external https assetSrc",
+      "forbidden action field",
+      "forbidden serverHandler field"
+    ]
+  },
+  "localJsonSchemaValidator": {
+    "command": "node -e \"try { require.resolve('ajv'); console.log('ajv available') } catch (error) { console.log('ajv unavailable') }\"",
+    "exitCode": 0,
+    "stdout": "ajv unavailable",
+    "fallback": "reports/agent-town-hq13d-visual-pack-schema-validator-2026-06-01-validator.mjs"
+  },
+  "checksRun": [
+    {
+      "command": "jq empty docs/specs/agent-town.visual-pack.v1.schema.json docs/specs/fixtures/agent-town.visual-pack.v1.valid-tiny.manifest.json docs/specs/fixtures/agent-town.visual-pack.v1.invalid-forbidden-field-path-action.manifest.json",
+      "exitCode": 0
+    },
+    {
+      "command": "node --check reports/agent-town-hq13d-visual-pack-schema-validator-2026-06-01-validator.mjs",
+      "exitCode": 0
+    },
+    {
+      "command": "node reports/agent-town-hq13d-visual-pack-schema-validator-2026-06-01-validator.mjs docs/specs/agent-town.visual-pack.v1.schema.json docs/specs/fixtures/agent-town.visual-pack.v1.valid-tiny.manifest.json docs/specs/fixtures/agent-town.visual-pack.v1.invalid-forbidden-field-path-action.manifest.json",
+      "exitCode": 0,
+      "summary": {
+        "ok": true,
+        "validFixtureAccepted": true,
+        "invalidFixtureRejected": true,
+        "invalidFixtureErrors": [
+          "$.modules.hudCards.slotBindings.hud.card.scout_report: forbidden field \"action\"",
+          "$.modules.hudCards.slotBindings.hud.card.scout_report: forbidden field \"serverHandler\"",
+          "$.publicSharing: must be false",
+          "$.atlasExecution: must be false",
+          "$.modules.hudCards.slotBindings.hud.card.scout_report.assetSrc: must be a same-origin static asset path"
+        ]
+      }
+    },
+    {
+      "command": "git diff --check -- docs/specs/agent-town.visual-pack.v1.schema.json docs/specs/fixtures/agent-town.visual-pack.v1.valid-tiny.manifest.json docs/specs/fixtures/agent-town.visual-pack.v1.invalid-forbidden-field-path-action.manifest.json reports/agent-town-hq13d-visual-pack-schema-validator-2026-06-01-validator.mjs reports/agent-town-hq13d-visual-pack-schema-validator-2026-06-01.md reports/agent-town-hq13d-visual-pack-schema-validator-2026-06-01-proof.json",
+      "exitCode": 0
+    }
+  ],
+  "guardrails": {
+    "docsSpecsOnlyPlusPrefixedReports": true,
+    "noAppJsCssServerRoutesToolsTestsAssetsEdited": true,
+    "noGameplayAuthorityCreated": true,
+    "noRendererWiring": true,
+    "noGeneratedUniverseRendering": true,
+    "noAtlasExecution": true,
+    "noPublicSharing": true,
+    "noRouteTradeEconomyCombatSchedulerResourceBehavior": true,
+    "noCrossPlotMutation": true,
+    "noExternalEffects": true,
+    "noHiddenAutonomy": true,
+    "noWildWestDrift": true,
+    "scoutSectorRemainsOnlyCurrentExpeditionMapMutationPath": true
+  },
+  "residualRisks": [
+    "No full JSON Schema validator dependency was available locally; the proof uses jq plus a dependency-free schema-specific Node harness.",
+    "The schema is intentionally conservative and may need a future compatibility pass before runtime preview loading."
+  ],
+  "recommendedNextLane": "repo-integrated validator command or tests for candidate visual pack manifests, still fail-closed and presentation-only"
+}

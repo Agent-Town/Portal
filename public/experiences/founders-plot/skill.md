@@ -28,9 +28,13 @@ the server does. You only participate through typed tools.
 | --------------------- | -------- | ------- | ---------------------------------------------------------------- |
 | Observe + suggest     | 1        | on      | `et.plot.get_state`, `et.plot.request_user_approval`             |
 | Collect outputs       | 2        | off     | `et.plot.collect_outputs`                                         |
-| Queue production      | 3        | off     | `et.plot.queue_job` (PRODUCE kind only)                           |
+| Queue production      | 3        | off     | `et.plot.queue_job` (PRODUCE or SCOUT kind)                        |
 | Set one priority      | 4        | off     | `et.plot.set_priority`                                            |
 | Sell surplus food     | 5        | off     | `et.plot.queue_job` (SELL kind) under daily coin cap              |
+| Settlement Charter    | 6        | n/a     | `et.plot.review_site_plan` for claim-ready planning state only     |
+| Settler Convoy        | 7 slice  | n/a     | `et.plot.prepare_settler_convoy`, `et.plot.found_settlement` with approval for agent callers |
+| Research Lodge        | 8B slice | n/a     | `et.plot.select_doctrine` with one engine-owned SCOUT duration effect and approval for agent callers |
+| Cohort Work Orders    | 9B slice | n/a     | `et.plot.create_work_order_draft`; `et.plot.execute_work_order` only for collect-ready outputs once |
 
 ## Rules
 
@@ -43,6 +47,32 @@ the server does. You only participate through typed tools.
 - Respect daily caps. If `et.plot.get_state` reports a cap is consumed,
   back off until the next UTC day.
 - Never attempt to place or destroy buildings in Phase 1.
+- `et.plot.draft_site_plan` may record a Site Plan from a collected Scout
+  Report, but it does not create territory or a second plot. Treat strategy
+  variants from the Atlas editor as proposals until engine promotion exists.
+- `et.plot.review_site_plan` is the HQ6 server-owned promotion path for a
+  canonical Site Plan. It marks claim-ready planning state only; it still does
+  not create territory, routes, convoys, resources, or a second plot.
+- `et.plot.prepare_settler_convoy` and `et.plot.found_settlement` are the only
+  HQ7 expansion mutations in this slice. They operate on reviewed Site Plans and
+  settlement claims only. Do not invent trade routes, world map coordinates,
+  doctrine effects, or autonomous founding.
+- For agent callers, convoy preparation and settlement founding require matching
+  human approvals for `prepare_settler_convoy` and `found_settlement`.
+- `et.plot.select_doctrine` is the HQ8B Research Lodge stance selector. It may
+  select only an engine-owned doctrine such as `survey_discipline`. That
+  doctrine's only gameplay effect is a server-owned 5% Expedition Board `SCOUT`
+  duration reduction. Do not invent buffs, stack doctrines, spend resources,
+  change outputs, or mutate settlement/route/cohort/world-grid formulas. Agent
+  callers require matching human approval for `select_doctrine`.
+- `et.plot.create_work_order_draft` is the HQ9A Cohort Work Orders planner.
+  It creates server-owned drafts only. It cannot execute child actions, spend
+  resources, collect outputs, queue jobs, approve itself, or widen agent
+  authority.
+- `et.plot.execute_work_order` is the HQ9B narrow executor. Use it only for
+  engine-owned `collect_ready_outputs_once` drafts. It is explicit, one-shot,
+  same-plot only, requires at least one ready output, capped at two child
+  `collect_outputs` actions, and never a scheduler or arbitrary tool runner.
 
 ## Observation payload shape
 

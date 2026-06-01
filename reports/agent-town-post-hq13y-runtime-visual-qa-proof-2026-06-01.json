@@ -1,0 +1,126 @@
+{
+  "ok": true,
+  "date": "2026-06-01",
+  "lane": "post-HQ13Y runtime visual QA/style-gate regression",
+  "verdict": "PASS_WITH_NOTES_KEEP_PROTOTYPE",
+  "sourceArtifacts": {
+    "hq13wStyleTarget": "reports/agent-town-hq13w-style-corrected-map-view-2026-06-01.png",
+    "hq13xStyleGateReport": "reports/agent-town-hq13x-style-gate-review-2026-06-01.md",
+    "hq13xStyleGateProof": "reports/agent-town-hq13x-style-gate-review-proof-2026-06-01.json",
+    "hq13yRuntimeReport": "reports/agent-town-hq13y-runtime-composition-prototype-2026-06-01.md",
+    "hq13yRuntimeProof": "reports/agent-town-hq13y-runtime-composition-prototype-proof-2026-06-01.json",
+    "hq13yDesktopScreenshot": "reports/agent-town-hq13y-runtime-composition-prototype-desktop-2026-06-01.png",
+    "hq13yMobileScreenshot": "reports/agent-town-hq13y-runtime-composition-prototype-mobile-2026-06-01.png",
+    "contactSheet": "reports/agent-town-post-hq13y-runtime-visual-qa-contact-sheet-2026-06-01.png"
+  },
+  "styleGate": {
+    "hq13wCurrentStyleTarget": true,
+    "hq13vAgentTownStyleAnchorApplied": true,
+    "agentTownFrontierTechCivicIdentityVisible": true,
+    "genericCozyCivilizationStyleRejected": true,
+    "literalWesternGenreRejected": true,
+    "noCowboySaloonGoldRushDriftObserved": true
+  },
+  "runtimeVisualProof": {
+    "visualShell": "hq13y_agenttown_runtime_composition_prototype_v1",
+    "agentTownIdentityCues": true,
+    "scoutLedgerHud": true,
+    "beaconPlanWagonCues": true,
+    "frontierBoundaryVisualOnly": true,
+    "receiptTraceVisualOnly": true,
+    "clientAuthority": false,
+    "civicBeaconCount": 3,
+    "surveyStrokeCount": 5,
+    "markerCount": 5
+  },
+  "imageEvidence": {
+    "hq13wStyleTarget": {
+      "width": 1280,
+      "height": 720,
+      "sha256": "f80b2c4e4839cf18e9526147e6b7d270b61d6f6695362e81a9a6d039c010429c"
+    },
+    "hq13yDesktopScreenshot": {
+      "width": 465,
+      "height": 3437,
+      "sha256": "b077e9b8f806f873e8447e9453757e8c018798d0b03055586b228d55c1c9fa66"
+    },
+    "hq13yMobileScreenshot": {
+      "width": 366,
+      "height": 2512,
+      "sha256": "eec847683c264042e54c2ac56137c90c1d9d3c9fb0fbf4c9a4570a07fd3f9cc3"
+    },
+    "contactSheet": {
+      "width": 996,
+      "height": 384,
+      "sha256": "19668484ee4d16904b3424969aef4e68e4c7fc4077e5a84af4e8da1c8df1cf0c"
+    }
+  },
+  "mobileLayout": {
+    "viewport": 390,
+    "documentScrollWidth": 390,
+    "bodyScrollWidth": 390,
+    "horizontalOverflowDetected": false,
+    "note": "Screenshot remains tall because the surrounding Founders Plot page has many proof surfaces, but recorded widths are bounded."
+  },
+  "guardrails": {
+    "reportProofOnly": true,
+    "runtimeAssetsPromoted": false,
+    "runtimeVisualPackManifestCreated": false,
+    "runtimePackDirectoryCreated": false,
+    "runtimePackLoaderCreated": false,
+    "generatedImagesStarted": false,
+    "appSourceChanged": false,
+    "serverChanged": false,
+    "schemaChanged": false,
+    "readOnly": true,
+    "executableActions": [],
+    "routeCreation": false,
+    "atlasExecution": false,
+    "publicSharing": false,
+    "generatedUniverseRendering": false,
+    "hiddenAutonomy": false,
+    "hiddenTruthLeakage": false,
+    "crossPlotMutation": false,
+    "externalEffects": false,
+    "scoutSectorOnlyCurrentExpeditionMapMutationPath": true
+  },
+  "checks": [
+    {
+      "name": "active subagents",
+      "command": "openclaw.subagents action=list recentMinutes=180",
+      "passed": true,
+      "summary": "No active or recent subagents visible."
+    },
+    {
+      "name": "HQ13Y proof guardrail predicate",
+      "command": "jq -e '<HQ13Y guardrail/style predicate>' reports/agent-town-hq13y-runtime-composition-prototype-proof-2026-06-01.json",
+      "passed": true
+    },
+    {
+      "name": "HQ13X style gate predicate",
+      "command": "jq -e '.ok == true and .verdict == \"PASS_WITH_NOTES_KEEP_REVIEW_ONLY\"' reports/agent-town-hq13x-style-gate-review-proof-2026-06-01.json",
+      "passed": true
+    },
+    {
+      "name": "source screenshot file check",
+      "command": "file reports/agent-town-hq13w-style-corrected-map-view-2026-06-01.png reports/agent-town-hq13y-runtime-composition-prototype-desktop-2026-06-01.png reports/agent-town-hq13y-runtime-composition-prototype-mobile-2026-06-01.png",
+      "passed": true
+    },
+    {
+      "name": "source screenshot identify",
+      "command": "magick identify reports/agent-town-hq13w-style-corrected-map-view-2026-06-01.png reports/agent-town-hq13y-runtime-composition-prototype-desktop-2026-06-01.png reports/agent-town-hq13y-runtime-composition-prototype-mobile-2026-06-01.png",
+      "passed": true
+    },
+    {
+      "name": "contact sheet identify",
+      "command": "magick identify reports/agent-town-post-hq13y-runtime-visual-qa-contact-sheet-2026-06-01.png",
+      "passed": true
+    }
+  ],
+  "residual": [
+    "HQ13Y is still procedural and not a final generated-art visual pack.",
+    "HQ13Y is still inside the current long Founders Plot page flow, not a premium full-bleed world-map screen.",
+    "Generated review assets remain unpromoted pending explicit Robin approval."
+  ],
+  "finalNote": "Post-HQ13Y visual QA passes with notes: runtime style moved toward HQ13W while preserving server-owned map authority and Scout Sector-only mutation."
+}

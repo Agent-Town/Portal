@@ -1,0 +1,66 @@
+{
+  "id": "agent-town-base-operator-quarry-mason-sprite-integration-proof-2026-05-31",
+  "date": "2026-05-31",
+  "asset": "quarry-mason-bram-stonecalm-v1",
+  "role": "quarry_mason",
+  "displayName": "Bram Stonecalm",
+  "sourceRecoveredFrom": "/Users/robin/.openclaw/media/tool-image-generation/agent-town-quarry-mason-bram-stonecalm-sprite-sheet-v1-opaqu---e47a6ae1-048a-4e48-a586-a924683f3f9b.png",
+  "files": {
+    "generated": "public/experiences/founders-plot/assets/characters/inhabitants/quarry_mason/quarry-mason-bram-stonecalm-v1.generated.png",
+    "source": "public/experiences/founders-plot/assets/characters/inhabitants/quarry_mason/quarry-mason-bram-stonecalm-v1.source.png",
+    "runtime": "public/experiences/founders-plot/assets/characters/inhabitants/quarry_mason/quarry-mason-bram-stonecalm-v1.png",
+    "metadata": "public/experiences/founders-plot/assets/characters/inhabitants/quarry_mason/quarry-mason-bram-stonecalm-v1.json",
+    "prompt": "public/experiences/founders-plot/assets/characters/inhabitants/quarry_mason/quarry-mason-bram-stonecalm-v1.prompt.md",
+    "proof": "reports/agent-town-base-operator-quarry-mason-sprite-integration-proof-2026-05-31.png",
+    "rowStrip": "reports/agent-town-base-operator-quarry-mason-row-strip-2026-05-31.png",
+    "rollbackOriginal": "reports/agent-town-base-operator-quarry-mason-originals-2026-05-31/quarry-mason-bram-stonecalm-v1.opaque-original.png"
+  },
+  "imageChecks": {
+    "generated": {
+      "identify": "2048x2048 sRGB srgb 3.0",
+      "sha256": "ad120ecb434cdb3214ff00564d9b1b85b7d7410eef5f00f5921acd642a7a537d"
+    },
+    "source": {
+      "identify": "2048x2048 sRGB srgb 3.0",
+      "sha256": "ad120ecb434cdb3214ff00564d9b1b85b7d7410eef5f00f5921acd642a7a537d"
+    },
+    "runtime": {
+      "identify": "2048x2048 sRGB srgba 4.0",
+      "sha256": "7f7dceb68b7ae171e6e6223ed6e4875b92c378a99f35a1fe36d129626130f080",
+      "cornerSamples": {
+        "topLeft": "srgba(0,0,0,0)",
+        "topRight": "srgba(0,0,0,0)",
+        "bottomLeft": "srgba(0,0,0,0)",
+        "bottomRight": "srgba(0,0,0,0)",
+        "center": "srgba(0,0,0,0)",
+        "gridX512": "srgba(0,0,0,0)",
+        "gridY512": "srgba(0,0,0,0)"
+      },
+      "alphaMean": 0.383013
+    },
+    "proof": {
+      "identify": "1024x512 sRGB srgb 3.0",
+      "sha256": "bc9d9c642f1c74bc0338a3d2424665d1573904751103919b29267000314e99b2"
+    },
+    "rowStrip": {
+      "identify": "1024x1024 sRGB srgb 3.0",
+      "sha256": "5b91673d4ca823674a5af1f8075880972d68118a9401c978d8655cf1cce869529"
+    }
+  },
+  "postProcessing": {
+    "tool": "ImageMagick",
+    "steps": [
+      "Converted magenta background to alpha.",
+      "Converted pale background spill to alpha.",
+      "Cleared guide strips around 512px grid boundaries.",
+      "Generated proof and row-strip preview images."
+    ]
+  },
+  "boundary": {
+    "visualOnly": true,
+    "sceneWiringChanged": false,
+    "gameplayAuthorityChanged": false,
+    "serverChanged": false,
+    "atlasChanged": false
+  }
+}

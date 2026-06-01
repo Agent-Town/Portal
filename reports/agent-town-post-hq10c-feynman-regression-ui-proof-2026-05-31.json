@@ -1,0 +1,66 @@
+{
+  "generatedAt": "2026-05-31T06:32:24.598Z",
+  "baseURL": "http://[::1]:4198",
+  "screenshots": {
+    "hq9Shot": "reports/agent-town-post-hq10c-feynman-regression-hq9-work-orders-proof-2026-05-31.png",
+    "hq10Shot": "reports/agent-town-post-hq10c-feynman-regression-hq10-panels-proof-2026-05-31.png",
+    "mobileShot": "reports/agent-town-post-hq10c-feynman-regression-mobile-390-proof-2026-05-31.png"
+  },
+  "hq9": {
+    "completedExpiry": "Completed receipt. Child receipts are preserved for audit.",
+    "expiredExpiry": "Expired draft. Recreate it before execution.",
+    "completedText": "Completed Receipt Run\nCOMPLETED\n\ncollect ready outputs once - all ready outputs, output ready, max 2\n\ncollect outputs\ncap 2 child actions\nspend cap 0\nruntime cap 2m 0s\ncurrent plot only\n2 child receipts\nCompleted receipt. Child receipts are preserved for audit.\nExecution is a human-clicked endpoint call. No background automation runs this draft.",
+    "expiredText": "Expired Draft Run\nEXPIRED\n\ncollect ready outputs once - all ready outputs, output ready, max 2\n\ncollect outputs\ncap 2 child actions\nspend cap 0\nruntime cap 2m 0s\ncurrent plot only\n0 child receipts\nExpired draft. Recreate it before execution.\nExecution is a human-clicked endpoint call. No background automation runs this draft."
+  },
+  "hq10": {
+    "worldGridContainsReadOnly": true,
+    "civicContainsProposalOnly": true,
+    "overlayContainsPresentationOnly": true,
+    "overlayContainsNoRenderingImplemented": true,
+    "overlayButtons": [
+      "Create Overlay Record"
+    ],
+    "civicButtons": [
+      "Create civic proposal"
+    ],
+    "forbiddenActionButtons": [],
+    "capturedOverlayCreate": {
+      "plotId": "plot_regression_hq10c",
+      "sourceProposalId": "civic_proposal_regression_reviewed",
+      "title": "Regression Overlay Record",
+      "theme": "regression_lantern",
+      "summary": "Presentation-only regression overlay record.",
+      "status": "DRAFT",
+      "targetSurfaceIds": [
+        "progression_atlas",
+        "world_grid"
+      ],
+      "targetNodeIds": [
+        "generated_universe.overlay_pack_records",
+        "world_grid.read_model"
+      ],
+      "displayHints": {
+        "labels": {
+          "generated_universe": "Regression Overlay Record"
+        },
+        "notes": "Presentation-only regression overlay record.",
+        "colorway": "regression_lantern"
+      },
+      "prompt": "Warm civic overlay, presentation only.",
+      "provenance": {
+        "source": "founders_plot_overlay_pack_ui",
+        "provider": "none",
+        "model": "none"
+      },
+      "actor": "HUMAN",
+      "idempotencyKey": "fp-overlay-pack-Regression_Overlay_Record-mptek5pw-1"
+    },
+    "capturedCivicCreate": null
+  },
+  "mobileLayout": {
+    "viewport": 390,
+    "documentScrollWidth": 390,
+    "bodyScrollWidth": 390,
+    "clipped": []
+  }
+}

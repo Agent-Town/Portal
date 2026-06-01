@@ -1,0 +1,121 @@
+{
+  "ok": true,
+  "date": "2026-06-01",
+  "lane": "HQ13Q dotted-line repair review assets",
+  "worktree": "/Users/robin/Projects/Portal-atlas-editor",
+  "verdict": "PASS_REVIEW_REPAIR_WITH_NOTES",
+  "scope": {
+    "reviewOnly": true,
+    "reportsMediaOnly": true,
+    "targetsWeakHq13pSlotsOnly": true,
+    "runtimeAssetsPromoted": false,
+    "runtimePackDirectoryCreated": false,
+    "runtimePackLoaderCreated": false,
+    "hq13kFilesEdited": false,
+    "hq13nFilesEdited": false,
+    "hq13pFilesEdited": false,
+    "appSourceEdited": false,
+    "serverStoreRoutesToolsEdited": false,
+    "schemaValidatorEdited": false,
+    "atlasExecution": false,
+    "publicSharing": false,
+    "generatedUniverseRendering": false,
+    "expeditionMapMutationPathEdited": false
+  },
+  "artifacts": {
+    "report": "reports/agent-town-hq13q-dotted-line-repair-review-assets-2026-06-01.md",
+    "proof": "reports/agent-town-hq13q-dotted-line-repair-review-assets-proof-2026-06-01.json",
+    "repairDirectory": "reports/media/agent-town-hq13q-dotted-line-repair-review-assets-2026-06-01",
+    "contactSheet": "reports/agent-town-hq13q-dotted-line-repair-review-assets-contact-sheet-2026-06-01.png"
+  },
+  "assets": [
+    {
+      "slotId": "expedition_map.fog.frontier_border",
+      "source": "frontier-dotted-boundary-v2.gpt-image-2-source.png",
+      "processedAlpha": "frontier-dotted-boundary-v2.review-alpha.png",
+      "repairReview": "frontier-dotted-boundary-v2.repair-review.png",
+      "sourceDimensions": "2048x1152",
+      "repairDimensions": "1024x128",
+      "repairChannels": "srgba 4.0",
+      "sourceSha256": "a5b317d9351e43e45e3f1aa7a3cb8e63e43084d8c89378470aeca58204c777a9",
+      "alphaSha256": "a4470625918f308787a2a356f446cf2c5aec13c7d3c7e727b2aaf8c13e513768",
+      "repairSha256": "76fce5cb2cfb67f6adc3dc147a43fc473aebc0f844bd0a27b044fd687521993f",
+      "reviewVerdict": "REVIEW_CANDIDATE_WITH_STYLE_NOTES",
+      "notes": "Readable repair candidate, but more ornate/heavy than ideal for a fog-edge boundary."
+    },
+    {
+      "slotId": "expedition_map.stroke.scout_receipt_trace",
+      "source": "survey-receipt-stroke-v2.gpt-image-2-source.png",
+      "processedAlpha": "survey-receipt-stroke-v2.review-alpha.png",
+      "repairReview": "survey-receipt-stroke-v2.repair-review.png",
+      "sourceDimensions": "2048x1152",
+      "repairDimensions": "1024x128",
+      "repairChannels": "srgba 4.0",
+      "sourceSha256": "93c4bd89d16b1d389435e99b7a6679f7a6c773b5320899b2af2278b29d015278",
+      "alphaSha256": "32e9b9cd0cf1f1d2e46b7bae73818697919a77c06d33ff3125335e1b76ffa9c4",
+      "repairSha256": "ea749f0f8e1bc64207a3d020bb9303b95592e2e3f226545ac0349edcabcf36da",
+      "reviewVerdict": "REVIEW_CANDIDATE",
+      "notes": "Cleaner, brighter, non-directional receipt trace candidate; still needs runtime-scale review."
+    }
+  ],
+  "contactSheet": {
+    "path": "reports/agent-town-hq13q-dotted-line-repair-review-assets-contact-sheet-2026-06-01.png",
+    "dimensions": "960x240",
+    "channels": "srgb 3.0",
+    "sha256": "6f948e6e7b1f9964c3d597f1cc241ed65949db81622b60e7ac482dc58fe201cd",
+    "labels": false
+  },
+  "hq13mHarnessSummary": {
+    "expectedSlots": 8,
+    "pngFilesFound": 6,
+    "presentSlots": 2,
+    "missingSlots": 6,
+    "processedAlphaFilesFound": 2,
+    "sourceFilesFound": 2,
+    "unmatchedPngFiles": 0,
+    "status": "warn",
+    "verdict": "PARTIAL_OR_WARN_REVIEW_INPUT",
+    "note": "Expected because HQ13Q is a two-slot repair bundle, not a full eight-slot candidate-02 pack."
+  },
+  "checks": [
+    {
+      "command": "file reports/media/agent-town-hq13q-dotted-line-repair-review-assets-2026-06-01/*.png",
+      "exitCode": 0
+    },
+    {
+      "command": "magick identify reports/media/agent-town-hq13q-dotted-line-repair-review-assets-2026-06-01/*.png",
+      "exitCode": 0
+    },
+    {
+      "command": "node reports/agent-town-hq13m-generated-asset-qa-harness-2026-06-01.mjs --pretty reports/media/agent-town-hq13q-dotted-line-repair-review-assets-2026-06-01",
+      "exitCode": 0
+    },
+    {
+      "command": "jq empty reports/agent-town-hq13q-dotted-line-repair-review-assets-proof-2026-06-01.json",
+      "exitCode": 0
+    },
+    {
+      "command": "git diff --check -- reports/media/agent-town-hq13q-dotted-line-repair-review-assets-2026-06-01 reports/agent-town-hq13q-dotted-line-repair-review-assets-contact-sheet-2026-06-01.png reports/agent-town-hq13q-dotted-line-repair-review-assets-2026-06-01.md reports/agent-town-hq13q-dotted-line-repair-review-assets-proof-2026-06-01.json",
+      "exitCode": 0
+    }
+  ],
+  "guardrails": {
+    "noRuntimeAssetPromotion": true,
+    "noRuntimePackDirectory": true,
+    "noRuntimeLoader": true,
+    "noHq13kEditsMovesDeletesOrOverwrites": true,
+    "noHq13nEditsMovesDeletesOrOverwrites": true,
+    "noHq13pEditsMovesDeletesOrOverwrites": true,
+    "noAppSourceEdits": true,
+    "noServerStoreRoutesToolsEdits": true,
+    "noSchemaValidatorEdits": true,
+    "noAtlasExecution": true,
+    "noPublicSharing": true,
+    "noGeneratedUniverseRendering": true,
+    "noHiddenAutonomy": true,
+    "noRouteTradeEconomyResourceRewardCombatSchedulerBehavior": true,
+    "noCrossPlotMutation": true,
+    "noExternalEffects": true,
+    "scoutSectorOnlyCurrentExpeditionMapMutationPath": true
+  }
+}

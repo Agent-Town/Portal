@@ -1,0 +1,129 @@
+{
+  "ok": true,
+  "generatedAt": "2026-06-01T07:37:10.050Z",
+  "source": "FP-E2E-022 mocked server-owned Expedition Map, Event Packet, and Expedition Party read models; HQ12N verifies read-only current-focus objective strip",
+  "selectedCellId": "cell_q0_r1",
+  "eventPacketId": "expedition_event_packet_hq12f_cell_q0_r1",
+  "objectiveStrip": {
+    "visible": true,
+    "mode": "packet",
+    "readOnly": "true",
+    "actions": 0,
+    "targetCellId": "cell_q0_r1",
+    "packetId": "expedition_event_packet_hq12f_cell_q0_r1",
+    "partyId": "expedition_party_current_plot_v1",
+    "text": "Current focusReview the latest packetexpedition_event_packet_hq12f_cell_q0_r1 is the latest Scout Sector receipt packet. It is evidence for cell_q0_r1 only, with zero executable actions.Packets1Actions0Revealed4Party3Read-only focus from existing map, packet, and party state. No new server objectives, hidden truth, resources, routes, assignments, timers, rewards, Atlas execution, sharing, or external effects.",
+    "factsText": "Packets1Actions0Revealed4Party3",
+    "boundaryText": "Read-only focus from existing map, packet, and party state. No new server objectives, hidden truth, resources, routes, assignments, timers, rewards, Atlas execution, sharing, or external effects.",
+    "buttons": 0
+  },
+  "mobileFit": {
+    "viewport": 390,
+    "documentScrollWidth": 390,
+    "bodyScrollWidth": 390,
+    "clipped": [],
+    "surfaces": {
+      "panel": {
+        "top": -1564,
+        "left": 12,
+        "right": 378,
+        "width": 366,
+        "height": 3973
+      },
+      "objectiveStrip": {
+        "top": -988,
+        "left": 26,
+        "right": 364,
+        "width": 338,
+        "height": 156
+      },
+      "threeHost": {
+        "top": -792,
+        "left": 40,
+        "right": 353,
+        "width": 313,
+        "height": 218
+      },
+      "selectedSector": {
+        "top": -517,
+        "left": 26,
+        "right": 364,
+        "width": 338,
+        "height": 964
+      },
+      "eventPacket": {
+        "top": 455,
+        "left": 26,
+        "right": 364,
+        "width": 338,
+        "height": 1089
+      },
+      "eventPacketChips": {
+        "top": 548,
+        "left": 40,
+        "right": 353,
+        "width": 313,
+        "height": 144
+      },
+      "partyPacket": {
+        "top": 762,
+        "left": 40,
+        "right": 353,
+        "width": 313,
+        "height": 382
+      },
+      "partyRoster": {
+        "top": 989,
+        "left": 49,
+        "right": 344,
+        "width": 295,
+        "height": 90
+      }
+    },
+    "gridColumns": {
+      "metrics": 2,
+      "objectiveFacts": 4,
+      "packetFacts": 2,
+      "partyFacts": 2
+    },
+    "buttons": {
+      "packetButtons": 0,
+      "partyButtons": 0,
+      "scoutButtons": 0
+    }
+  },
+  "screenshots": [
+    "reports/agent-town-hq12n-expedition-objective-strip-desktop-2026-06-01.png",
+    "reports/agent-town-hq12n-expedition-objective-strip-mobile-2026-06-01.png"
+  ],
+  "guardrails": {
+    "frontendOnly": true,
+    "readOnly": true,
+    "objectiveActions": 0,
+    "objectiveButtons": 0,
+    "sourceFields": [
+      "expeditionMap cells",
+      "expedition event packets",
+      "expedition party manifest"
+    ],
+    "hiddenTruthInvented": false,
+    "serverObjectivesCreated": false,
+    "scoutSectorOnlyMutationPath": true,
+    "packetButtons": 0,
+    "partyActions": 0,
+    "executableActions": [],
+    "routeCreation": false,
+    "tradeRouteCreation": false,
+    "resourceHarvesting": false,
+    "resourceDelta": {},
+    "combat": false,
+    "backgroundScheduling": false,
+    "publicSharing": false,
+    "generatedUniverseRendering": false,
+    "atlasExecution": false,
+    "crossPlotMutation": false,
+    "externalEffects": false,
+    "wildWestGenreDrift": false,
+    "mobileHorizontalOverflow": 0
+  }
+}

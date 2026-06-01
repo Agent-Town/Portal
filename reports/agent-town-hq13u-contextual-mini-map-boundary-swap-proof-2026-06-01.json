@@ -1,0 +1,91 @@
+{
+  "ok": true,
+  "date": "2026-06-01",
+  "lane": "HQ13U contextual mini-map boundary swap",
+  "worktree": "/Users/robin/Projects/Portal-atlas-editor",
+  "verdict": "PASS_CONTEXT_REVIEW_CANDIDATE_WITH_COMPOSITION_NOTES",
+  "scope": {
+    "reviewOnly": true,
+    "reportsMediaOnly": true,
+    "usedExistingPngsOnly": true,
+    "generatedImagesRequested": false,
+    "runtimeAssetsPromoted": false,
+    "runtimePackDirectoryCreated": false,
+    "runtimePackLoaderCreated": false,
+    "appSourceEdited": false,
+    "serverStoreRoutesToolsEdited": false,
+    "schemaValidatorEdited": false,
+    "atlasExecution": false,
+    "publicSharing": false,
+    "generatedUniverseRendering": false,
+    "expeditionMapMutationPathEdited": false
+  },
+  "artifacts": {
+    "report": "reports/agent-town-hq13u-contextual-mini-map-boundary-swap-2026-06-01.md",
+    "proof": "reports/agent-town-hq13u-contextual-mini-map-boundary-swap-proof-2026-06-01.json",
+    "mockPng": {
+      "path": "reports/agent-town-hq13u-contextual-mini-map-boundary-swap-2026-06-01.png",
+      "dimensions": "1280x720",
+      "channels": "srgba 4.0",
+      "sha256": "cdcc12d87231e4d6965ba26bfc71166112c6e682132203bf64c677280a50ad4f"
+    },
+    "scratchDirectory": "reports/media/agent-town-hq13u-contextual-mini-map-boundary-swap-2026-06-01",
+    "basePng": {
+      "path": "reports/media/agent-town-hq13u-contextual-mini-map-boundary-swap-2026-06-01/contextual-mini-map-boundary-swap-base.png",
+      "dimensions": "1280x720",
+      "channels": "srgba 4.0",
+      "sha256": "336e05c1a73c4b3da013d4d4d39d3c8a3953d3f3868e4c1159734c935a1119a8"
+    }
+  },
+  "inputs": {
+    "frontierBoundaryCandidate": "reports/media/agent-town-hq13t-frontier-boundary-stitch-review-assets-2026-06-01/frontier-dotted-boundary-v3.repair-review.png",
+    "fogMarkersHud": "reports/media/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-2026-06-01/",
+    "surveyTrace": "reports/media/agent-town-hq13q-dotted-line-repair-review-assets-2026-06-01/survey-receipt-stroke-v2.repair-review.png"
+  },
+  "verdicts": {
+    "expedition_map.fog.frontier_border": "PASS_CONTEXT_REVIEW_CANDIDATE",
+    "expedition_map.stroke.scout_receipt_trace": "UNCHANGED_REVIEW_CANDIDATE",
+    "fogMarkersHud": "UNCHANGED_REVIEW_CANDIDATES",
+    "overallComposition": "PASS_WITH_NOTES"
+  },
+  "comparisonToHq13s": {
+    "hq13sLocalMockBoundaryReplaced": true,
+    "hq13tCandidateBetterThanHq13qOrnateBoundary": true,
+    "compositionPolishLowerThanHq13s": true,
+    "reason": "HQ13U was rebuilt through direct ImageMagick composition to avoid SVG font rendering instability."
+  },
+  "checks": [
+    {
+      "command": "file reports/agent-town-hq13u-contextual-mini-map-boundary-swap-2026-06-01.png reports/media/agent-town-hq13u-contextual-mini-map-boundary-swap-2026-06-01/*.png",
+      "exitCode": 0
+    },
+    {
+      "command": "magick identify -format '%f|%wx%h|%[channels]\\n' reports/agent-town-hq13u-contextual-mini-map-boundary-swap-2026-06-01.png reports/media/agent-town-hq13u-contextual-mini-map-boundary-swap-2026-06-01/*.png",
+      "exitCode": 0
+    },
+    {
+      "command": "jq empty reports/agent-town-hq13u-contextual-mini-map-boundary-swap-proof-2026-06-01.json",
+      "exitCode": 0
+    },
+    {
+      "command": "git diff --check -- reports/media/agent-town-hq13u-contextual-mini-map-boundary-swap-2026-06-01 reports/agent-town-hq13u-contextual-mini-map-boundary-swap-2026-06-01.png reports/agent-town-hq13u-contextual-mini-map-boundary-swap-2026-06-01.md reports/agent-town-hq13u-contextual-mini-map-boundary-swap-proof-2026-06-01.json",
+      "exitCode": 0
+    }
+  ],
+  "guardrails": {
+    "noRuntimeAssetPromotion": true,
+    "noRuntimePackDirectory": true,
+    "noRuntimeLoader": true,
+    "noAppSourceEdits": true,
+    "noServerStoreRoutesToolsEdits": true,
+    "noSchemaValidatorEdits": true,
+    "noAtlasExecution": true,
+    "noPublicSharing": true,
+    "noGeneratedUniverseRendering": true,
+    "noHiddenAutonomy": true,
+    "noRouteTradeEconomyResourceRewardCombatSchedulerBehavior": true,
+    "noCrossPlotMutation": true,
+    "noExternalEffects": true,
+    "scoutSectorOnlyCurrentExpeditionMapMutationPath": true
+  }
+}

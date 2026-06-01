@@ -1,0 +1,113 @@
+{
+  "ok": true,
+  "generatedAt": "2026-06-01T07:37:10.049Z",
+  "source": "FP-E2E-022 mocked server-owned HQ12F event packet read model after Scout Sector receipt; HQ12K verifies frontend-only visual hierarchy and read-only guardrails",
+  "selectedCellId": "cell_q0_r1",
+  "eventPacketId": "expedition_event_packet_hq12f_cell_q0_r1",
+  "visualPolish": {
+    "headerText": "Map evidence packetRidge Lantern packetRead-only",
+    "chipsText": "type ridge lantern packet v1source scout sector - scout sector ui 001 - receipt metadata onlyreceipt scout_sector_ui_001cell cell_q0_r1read model onlyreceipt metadata onlyzero executable actions",
+    "ledeText": "Selected-sector map evidence only. The packet records what the Scout Sector receipt revealed; it cannot be executed, assigned, traded, shared, or routed.",
+    "factsText": "Packetexpedition_event_packet_hq12f_cell_q0_r1Receiptreceipt scout sector - scout scout_sector_ui_001 - cell cell_q0_r1 - via scout_sector_receiptRead-onlytrueActions0",
+    "boundaryText": "Read-only receipt metadata. No packet actions, route/trade creation, resource changes, combat, scheduler work, public sharing, Generated Universe rendering, Atlas execution, cross-plot mutation, or external effects.",
+    "mobileFit": {
+      "viewport": 390,
+      "documentScrollWidth": 390,
+      "bodyScrollWidth": 390,
+      "clipped": [],
+      "surfaces": {
+        "panel": {
+          "top": -1564,
+          "left": 12,
+          "right": 378,
+          "width": 366,
+          "height": 3973
+        },
+        "objectiveStrip": {
+          "top": -988,
+          "left": 26,
+          "right": 364,
+          "width": 338,
+          "height": 156
+        },
+        "threeHost": {
+          "top": -792,
+          "left": 40,
+          "right": 353,
+          "width": 313,
+          "height": 218
+        },
+        "selectedSector": {
+          "top": -517,
+          "left": 26,
+          "right": 364,
+          "width": 338,
+          "height": 964
+        },
+        "eventPacket": {
+          "top": 455,
+          "left": 26,
+          "right": 364,
+          "width": 338,
+          "height": 1089
+        },
+        "eventPacketChips": {
+          "top": 548,
+          "left": 40,
+          "right": 353,
+          "width": 313,
+          "height": 144
+        },
+        "partyPacket": {
+          "top": 762,
+          "left": 40,
+          "right": 353,
+          "width": 313,
+          "height": 382
+        },
+        "partyRoster": {
+          "top": 989,
+          "left": 49,
+          "right": 344,
+          "width": 295,
+          "height": 90
+        }
+      },
+      "gridColumns": {
+        "metrics": 2,
+        "objectiveFacts": 4,
+        "packetFacts": 2,
+        "partyFacts": 2
+      },
+      "buttons": {
+        "packetButtons": 0,
+        "partyButtons": 0,
+        "scoutButtons": 0
+      }
+    }
+  },
+  "screenshots": [
+    "reports/agent-town-hq12k-expedition-event-packet-visual-polish-desktop-2026-06-01.png",
+    "reports/agent-town-hq12k-expedition-event-packet-visual-polish-mobile-2026-06-01.png"
+  ],
+  "guardrails": {
+    "frontendOnly": true,
+    "scoutSectorOnlyMutationPath": true,
+    "packetButtons": 0,
+    "partyActions": 0,
+    "eventPacketReadOnly": true,
+    "executableActions": [],
+    "routeCreation": false,
+    "tradeRouteCreation": false,
+    "resourceHarvesting": false,
+    "resourceDelta": {},
+    "combat": false,
+    "backgroundScheduling": false,
+    "publicSharing": false,
+    "generatedUniverseRendering": false,
+    "atlasExecution": false,
+    "crossPlotMutation": false,
+    "externalEffects": false,
+    "wildWestGenreDrift": false
+  }
+}

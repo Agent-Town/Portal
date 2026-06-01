@@ -1,0 +1,42 @@
+{
+  "id": "generated-universe-overlay-pack-card-art-v1",
+  "role": "hq10c_generated_universe_overlay_pack_status_card_art",
+  "displayName": "Generated Universe Overlay Pack Card Art",
+  "description": "Presentation-only card art for Founders Plot HQ10C Generated Universe overlay-pack records. It replaces the shared World Grid beacon fallback on the Overlay Pack status card.",
+  "visualOnly": true,
+  "wiringStatus": "ui_status_card_wired",
+  "nativeGeneratedImage": "generated-universe-overlay-pack-card-art.generated.png",
+  "image": "generated-universe-overlay-pack-card-art.png",
+  "webp": "generated-universe-overlay-pack-card-art.webp",
+  "prompt": "generated-universe-overlay-pack-card-art.prompt.md",
+  "nativeGeneratedSize": {
+    "width": 1536,
+    "height": 1024
+  },
+  "texture": {
+    "path": "public/experiences/founders-plot/assets/objects/generated-universe-overlay-pack-card-art.png",
+    "format": "png",
+    "colorSpace": "sRGB",
+    "channels": "sRGB",
+    "width": 1536,
+    "height": 1024,
+    "alpha": false
+  },
+  "generationNotes": {
+    "sourceProvenance": "/Users/robin/.openclaw/media/tool-image-generation/agent-town-generated-universe-overlay-pack-card-art-v1---006e565e-963c-41bd-8aff-7236d0085846.png",
+    "mode": "GPT Image 2 generated source supplied by parent task",
+    "postProcessing": [
+      "Copied generated source into the project as a provenance-preserving .generated.png file.",
+      "Copied the same source as the PNG runtime candidate.",
+      "Converted the PNG runtime candidate to WebP with ImageMagick quality 90 for the Founders Plot status-card reference."
+    ],
+    "constraints": [
+      "presentation-only",
+      "HQ10C Generated Universe overlay-pack records only",
+      "no applied overlay authority",
+      "no generated render/public share behavior",
+      "no gameplay mutation",
+      "no route/trade/scheduler/spend behavior"
+    ]
+  }
+}

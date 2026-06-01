@@ -1,0 +1,943 @@
+{
+  "generatedAt": "2026-05-31T13:59:16.995Z",
+  "repo": "/Users/robin/Projects/Portal-atlas-editor",
+  "branch": "neo/progression-atlas-editor-next-2026-05-29",
+  "mode": "report/proof-only live browser smoke on dirty shared worktree",
+  "fixtureKind": "mocked client scene projection fixture; not gameplay truth",
+  "boundary": {
+    "sourceEditsMadeByThisQaLane": false,
+    "gameplayAuthorityChanged": false,
+    "serverRoutesStoresToolsChanged": false,
+    "resourceMathRewardsCostsSchedulingWorkOrdersCivicAtlasRouteTradeSharingChanged": false,
+    "actorProjectionOnly": true
+  },
+  "commandChecksAlreadyRun": [
+    {
+      "command": "node --check public/experiences/founders-plot/scene_state.js",
+      "exitCode": 0
+    },
+    {
+      "command": "node --check tests-founders-plot/fp-scene-state.test.js",
+      "exitCode": 0
+    },
+    {
+      "command": "NODE_ENV=test node --test tests-founders-plot/fp-scene-state.test.js",
+      "exitCode": 0,
+      "tests": 9,
+      "pass": 9,
+      "fail": 0
+    },
+    {
+      "command": "curl -fsS 'http://[::1]:4197/api/health'",
+      "exitCode": 0,
+      "ok": true
+    }
+  ],
+  "runtimeSpriteAssetProof": [
+    {
+      "role": "farmer",
+      "id": "farmer-mira-seedhand-v1",
+      "buildingSurface": "FARM_PLOT",
+      "runtimeUrl": "/experiences/founders-plot/assets/characters/inhabitants/farmer/farmer-mira-seedhand-v1.png",
+      "metadataUrl": "/experiences/founders-plot/assets/characters/inhabitants/farmer/farmer-mira-seedhand-v1.json",
+      "filePath": "public/experiences/founders-plot/assets/characters/inhabitants/farmer/farmer-mira-seedhand-v1.png",
+      "metadataPath": "public/experiences/founders-plot/assets/characters/inhabitants/farmer/farmer-mira-seedhand-v1.json",
+      "imageBytes": 4792342,
+      "sha256": "d07b0fdbd0266271e5a53718a3ecf93362c4af45364d2774a1e9b119a5dc5f0c",
+      "png": {
+        "width": 2048,
+        "height": 2048
+      },
+      "metadata": {
+        "canonicalRoleId": "farmer",
+        "visualOnly": true,
+        "authorityBoundary": "visual_only_projection_of_existing_farm_plot_state",
+        "columns": 4,
+        "rows": 4,
+        "frameWidth": 512,
+        "frameHeight": 512,
+        "frameCount": 16,
+        "rowOrder": [
+          "idle",
+          "walk",
+          "tend",
+          "ready"
+        ],
+        "checkedActions": [
+          "tend",
+          "ready"
+        ]
+      }
+    },
+    {
+      "role": "quarry_mason",
+      "id": "quarry-mason-bram-stonecalm-v1",
+      "buildingSurface": "QUARRY",
+      "runtimeUrl": "/experiences/founders-plot/assets/characters/inhabitants/quarry_mason/quarry-mason-bram-stonecalm-v1.png",
+      "metadataUrl": "/experiences/founders-plot/assets/characters/inhabitants/quarry_mason/quarry-mason-bram-stonecalm-v1.json",
+      "filePath": "public/experiences/founders-plot/assets/characters/inhabitants/quarry_mason/quarry-mason-bram-stonecalm-v1.png",
+      "metadataPath": "public/experiences/founders-plot/assets/characters/inhabitants/quarry_mason/quarry-mason-bram-stonecalm-v1.json",
+      "imageBytes": 5616129,
+      "sha256": "7f7dceb68b7ae171e6e6223ed6e4875b92c378a99f35a1fe36d129626130f080",
+      "png": {
+        "width": 2048,
+        "height": 2048
+      },
+      "metadata": {
+        "canonicalRoleId": "quarry_mason",
+        "visualOnly": true,
+        "authorityBoundary": "visual_only_projection_of_existing_quarry_state",
+        "columns": 4,
+        "rows": 4,
+        "frameWidth": 512,
+        "frameHeight": 512,
+        "frameCount": 16,
+        "rowOrder": [
+          "idle",
+          "walk",
+          "cut",
+          "ready"
+        ],
+        "checkedActions": [
+          "cut",
+          "ready"
+        ]
+      }
+    },
+    {
+      "role": "lumber_worker",
+      "id": "lumber-worker-jun-timberline-v1",
+      "buildingSurface": "LUMBER_CAMP",
+      "runtimeUrl": "/experiences/founders-plot/assets/characters/inhabitants/lumber_worker/lumber-worker-jun-timberline-v1.png",
+      "metadataUrl": "/experiences/founders-plot/assets/characters/inhabitants/lumber_worker/lumber-worker-jun-timberline-v1.json",
+      "filePath": "public/experiences/founders-plot/assets/characters/inhabitants/lumber_worker/lumber-worker-jun-timberline-v1.png",
+      "metadataPath": "public/experiences/founders-plot/assets/characters/inhabitants/lumber_worker/lumber-worker-jun-timberline-v1.json",
+      "imageBytes": 3353663,
+      "sha256": "49a79ec5f1c2046d7c4bdae30a1e5b35e3eebdb482aab0927e7e78c3874683a4",
+      "png": {
+        "width": 2048,
+        "height": 2048
+      },
+      "metadata": {
+        "canonicalRoleId": "lumber_worker",
+        "visualOnly": true,
+        "authorityBoundary": "visual_only_projection_of_existing_lumber_camp_state",
+        "columns": 4,
+        "rows": 4,
+        "frameWidth": 512,
+        "frameHeight": 512,
+        "frameCount": 16,
+        "rowOrder": [
+          "idle",
+          "walk",
+          "mill",
+          "ready"
+        ],
+        "checkedActions": [
+          "mill",
+          "ready"
+        ]
+      }
+    },
+    {
+      "role": "hq_civic_operator",
+      "id": "hq-civic-operator-vale-desk-7-v1",
+      "buildingSurface": "HQ",
+      "runtimeUrl": "/experiences/founders-plot/assets/characters/inhabitants/hq_civic_operator/hq-civic-operator-vale-desk-7-v1.png",
+      "metadataUrl": "/experiences/founders-plot/assets/characters/inhabitants/hq_civic_operator/hq-civic-operator-vale-desk-7-v1.json",
+      "filePath": "public/experiences/founders-plot/assets/characters/inhabitants/hq_civic_operator/hq-civic-operator-vale-desk-7-v1.png",
+      "metadataPath": "public/experiences/founders-plot/assets/characters/inhabitants/hq_civic_operator/hq-civic-operator-vale-desk-7-v1.json",
+      "imageBytes": 4061592,
+      "sha256": "2c952ae90466c6e8c604beae8ae72f0778c2ba44bd198bbddaec9544f8a74fad",
+      "png": {
+        "width": 2048,
+        "height": 2048
+      },
+      "metadata": {
+        "canonicalRoleId": "hq_civic_operator",
+        "visualOnly": true,
+        "authorityBoundary": "visual_only_projection_of_existing_hq_state",
+        "columns": 4,
+        "rows": 4,
+        "frameWidth": 512,
+        "frameHeight": 512,
+        "frameCount": 16,
+        "rowOrder": [
+          "idle",
+          "walk",
+          "coordinate",
+          "ready"
+        ],
+        "checkedActions": [
+          "coordinate",
+          "ready"
+        ]
+      }
+    }
+  ],
+  "httpLoadProof": [
+    {
+      "role": "farmer",
+      "kind": "image",
+      "url": "/experiences/founders-plot/assets/characters/inhabitants/farmer/farmer-mira-seedhand-v1.png",
+      "status": 200,
+      "contentType": "image/png",
+      "bytes": 4792342
+    },
+    {
+      "role": "farmer",
+      "kind": "metadata",
+      "url": "/experiences/founders-plot/assets/characters/inhabitants/farmer/farmer-mira-seedhand-v1.json",
+      "status": 200,
+      "contentType": "application/json; charset=UTF-8",
+      "bytes": 3864
+    },
+    {
+      "role": "quarry_mason",
+      "kind": "image",
+      "url": "/experiences/founders-plot/assets/characters/inhabitants/quarry_mason/quarry-mason-bram-stonecalm-v1.png",
+      "status": 200,
+      "contentType": "image/png",
+      "bytes": 5616129
+    },
+    {
+      "role": "quarry_mason",
+      "kind": "metadata",
+      "url": "/experiences/founders-plot/assets/characters/inhabitants/quarry_mason/quarry-mason-bram-stonecalm-v1.json",
+      "status": 200,
+      "contentType": "application/json; charset=UTF-8",
+      "bytes": 3822
+    },
+    {
+      "role": "lumber_worker",
+      "kind": "image",
+      "url": "/experiences/founders-plot/assets/characters/inhabitants/lumber_worker/lumber-worker-jun-timberline-v1.png",
+      "status": 200,
+      "contentType": "image/png",
+      "bytes": 3353663
+    },
+    {
+      "role": "lumber_worker",
+      "kind": "metadata",
+      "url": "/experiences/founders-plot/assets/characters/inhabitants/lumber_worker/lumber-worker-jun-timberline-v1.json",
+      "status": 200,
+      "contentType": "application/json; charset=UTF-8",
+      "bytes": 4818
+    },
+    {
+      "role": "hq_civic_operator",
+      "kind": "image",
+      "url": "/experiences/founders-plot/assets/characters/inhabitants/hq_civic_operator/hq-civic-operator-vale-desk-7-v1.png",
+      "status": 200,
+      "contentType": "image/png",
+      "bytes": 4061592
+    },
+    {
+      "role": "hq_civic_operator",
+      "kind": "metadata",
+      "url": "/experiences/founders-plot/assets/characters/inhabitants/hq_civic_operator/hq-civic-operator-vale-desk-7-v1.json",
+      "status": 200,
+      "contentType": "application/json; charset=UTF-8",
+      "bytes": 4519
+    }
+  ],
+  "projectionChecks": [
+    {
+      "actorId": "farm_running_1",
+      "canonicalRoleId": "farmer",
+      "sourceDomain": "job",
+      "sourceObjectId": "job_farm_1",
+      "actionKind": "PRODUCE",
+      "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/farmer/farmer-mira-seedhand-v1.png",
+      "assetSprite": {
+        "id": "farmer-mira-seedhand-v1",
+        "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/farmer/farmer-mira-seedhand-v1.json",
+        "columns": 4,
+        "rows": 4,
+        "frameWidth": 512,
+        "frameHeight": 512,
+        "action": "tend",
+        "row": 2,
+        "frames": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "fps": 5
+      },
+      "cueType": "farm_tending",
+      "routeMode": "tend",
+      "visualOnly": true,
+      "routeVisualOnly": true
+    },
+    {
+      "actorId": "farm_ready_1",
+      "canonicalRoleId": "farmer",
+      "sourceDomain": "building",
+      "sourceObjectId": "building_farm_1",
+      "actionKind": "OUTPUT_READY",
+      "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/farmer/farmer-mira-seedhand-v1.png",
+      "assetSprite": {
+        "id": "farmer-mira-seedhand-v1",
+        "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/farmer/farmer-mira-seedhand-v1.json",
+        "columns": 4,
+        "rows": 4,
+        "frameWidth": 512,
+        "frameHeight": 512,
+        "action": "ready",
+        "row": 3,
+        "frames": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "fps": 4
+      },
+      "cueType": "farm_output_ready",
+      "routeMode": "tend",
+      "visualOnly": true,
+      "routeVisualOnly": true
+    },
+    {
+      "actorId": "quarry_running_1",
+      "canonicalRoleId": "quarry_mason",
+      "sourceDomain": "job",
+      "sourceObjectId": "job_quarry_1",
+      "actionKind": "PRODUCE",
+      "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/quarry_mason/quarry-mason-bram-stonecalm-v1.png",
+      "assetSprite": {
+        "id": "quarry-mason-bram-stonecalm-v1",
+        "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/quarry_mason/quarry-mason-bram-stonecalm-v1.json",
+        "columns": 4,
+        "rows": 4,
+        "frameWidth": 512,
+        "frameHeight": 512,
+        "action": "cut",
+        "row": 2,
+        "frames": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "fps": 5
+      },
+      "cueType": "quarry_cutting",
+      "routeMode": "cut",
+      "visualOnly": true,
+      "routeVisualOnly": true
+    },
+    {
+      "actorId": "quarry_ready_1",
+      "canonicalRoleId": "quarry_mason",
+      "sourceDomain": "building",
+      "sourceObjectId": "building_quarry_1",
+      "actionKind": "OUTPUT_READY",
+      "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/quarry_mason/quarry-mason-bram-stonecalm-v1.png",
+      "assetSprite": {
+        "id": "quarry-mason-bram-stonecalm-v1",
+        "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/quarry_mason/quarry-mason-bram-stonecalm-v1.json",
+        "columns": 4,
+        "rows": 4,
+        "frameWidth": 512,
+        "frameHeight": 512,
+        "action": "ready",
+        "row": 3,
+        "frames": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "fps": 4
+      },
+      "cueType": "quarry_output_ready",
+      "routeMode": "cut",
+      "visualOnly": true,
+      "routeVisualOnly": true
+    },
+    {
+      "actorId": "lumber_running_1",
+      "canonicalRoleId": "lumber_worker",
+      "sourceDomain": "job",
+      "sourceObjectId": "job_lumber_1",
+      "actionKind": "PRODUCE",
+      "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/lumber_worker/lumber-worker-jun-timberline-v1.png",
+      "assetSprite": {
+        "id": "lumber-worker-jun-timberline-v1",
+        "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/lumber_worker/lumber-worker-jun-timberline-v1.json",
+        "columns": 4,
+        "rows": 4,
+        "frameWidth": 512,
+        "frameHeight": 512,
+        "action": "mill",
+        "row": 2,
+        "frames": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "fps": 5
+      },
+      "cueType": "lumber_milling",
+      "routeMode": "mill",
+      "visualOnly": true,
+      "routeVisualOnly": true
+    },
+    {
+      "actorId": "lumber_ready_1",
+      "canonicalRoleId": "lumber_worker",
+      "sourceDomain": "building",
+      "sourceObjectId": "building_lumber_1",
+      "actionKind": "OUTPUT_READY",
+      "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/lumber_worker/lumber-worker-jun-timberline-v1.png",
+      "assetSprite": {
+        "id": "lumber-worker-jun-timberline-v1",
+        "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/lumber_worker/lumber-worker-jun-timberline-v1.json",
+        "columns": 4,
+        "rows": 4,
+        "frameWidth": 512,
+        "frameHeight": 512,
+        "action": "ready",
+        "row": 3,
+        "frames": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "fps": 4
+      },
+      "cueType": "lumber_output_ready",
+      "routeMode": "mill",
+      "visualOnly": true,
+      "routeVisualOnly": true
+    },
+    {
+      "actorId": "hq_approval_1",
+      "canonicalRoleId": "hq_civic_operator",
+      "sourceDomain": "approval",
+      "sourceObjectId": "approval_1",
+      "actionKind": "APPROVAL",
+      "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/hq_civic_operator/hq-civic-operator-vale-desk-7-v1.png",
+      "assetSprite": {
+        "id": "hq-civic-operator-vale-desk-7-v1",
+        "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/hq_civic_operator/hq-civic-operator-vale-desk-7-v1.json",
+        "columns": 4,
+        "rows": 4,
+        "frameWidth": 512,
+        "frameHeight": 512,
+        "action": "coordinate",
+        "row": 2,
+        "frames": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "fps": 5
+      },
+      "cueType": "hq_approval_notice",
+      "routeMode": "coordinate",
+      "visualOnly": true,
+      "routeVisualOnly": true
+    },
+    {
+      "actorId": "hq_reward_1",
+      "canonicalRoleId": "hq_civic_operator",
+      "sourceDomain": "reward",
+      "sourceObjectId": "reward_1",
+      "actionKind": "REWARD",
+      "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/hq_civic_operator/hq-civic-operator-vale-desk-7-v1.png",
+      "assetSprite": {
+        "id": "hq-civic-operator-vale-desk-7-v1",
+        "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/hq_civic_operator/hq-civic-operator-vale-desk-7-v1.json",
+        "columns": 4,
+        "rows": 4,
+        "frameWidth": 512,
+        "frameHeight": 512,
+        "action": "ready",
+        "row": 3,
+        "frames": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "fps": 4
+      },
+      "cueType": "hq_reward_receipt",
+      "routeMode": "coordinate",
+      "visualOnly": true,
+      "routeVisualOnly": true
+    },
+    {
+      "actorId": "hq_quest_1",
+      "canonicalRoleId": "messenger",
+      "sourceDomain": "quest",
+      "sourceObjectId": "quest_1",
+      "actionKind": "QUEST",
+      "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.png",
+      "assetSprite": {
+        "id": "rook-signalpost-messenger-v1",
+        "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.json",
+        "columns": 4,
+        "rows": 4,
+        "frameWidth": 512,
+        "frameHeight": 512,
+        "action": "ready",
+        "row": 3,
+        "frames": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "fps": 4
+      },
+      "cueType": "attention_marker",
+      "routeMode": "notify",
+      "visualOnly": true,
+      "routeVisualOnly": true
+    }
+  ],
+  "sceneVisualOnlyChecks": {
+    "actorsVisualOnly": true,
+    "actorRoutesVisualOnly": true,
+    "buildingsRemainStateObjects": [
+      {
+        "id": "HQ",
+        "buildingType": "HQ",
+        "visualOnly": false
+      },
+      {
+        "id": "building_farm_1",
+        "buildingType": "FARM_PLOT",
+        "visualOnly": false
+      },
+      {
+        "id": "building_quarry_1",
+        "buildingType": "QUARRY",
+        "visualOnly": false
+      },
+      {
+        "id": "building_lumber_1",
+        "buildingType": "LUMBER_CAMP",
+        "visualOnly": false
+      }
+    ]
+  },
+  "browserProof": {
+    "href": "http://[::1]:4197/founders-plot",
+    "canvas": {
+      "ok": true,
+      "width": 954,
+      "height": 724,
+      "visibleSamples": 5,
+      "uniqueSamples": 5,
+      "samples": [
+        [
+          180,
+          115,
+          50,
+          255
+        ],
+        [
+          138,
+          100,
+          24,
+          255
+        ],
+        [
+          135,
+          85,
+          42,
+          255
+        ],
+        [
+          218,
+          240,
+          207,
+          255
+        ],
+        [
+          165,
+          99,
+          38,
+          255
+        ]
+      ]
+    },
+    "renderedActors": [
+      {
+        "actorId": "farm_running_1",
+        "canonicalRoleId": "farmer",
+        "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/farmer/farmer-mira-seedhand-v1.png",
+        "spriteSheet": true,
+        "spriteSheetId": "farmer-mira-seedhand-v1",
+        "spriteSheetAction": "tend",
+        "routeId": "ROUTE:farmer:farm_running_1",
+        "wayId": "WAY:HQ:building_farm_1",
+        "routeProgress": 0.53,
+        "assetFallback": false
+      },
+      {
+        "actorId": "farm_ready_1",
+        "canonicalRoleId": "farmer",
+        "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/farmer/farmer-mira-seedhand-v1.png",
+        "spriteSheet": true,
+        "spriteSheetId": "farmer-mira-seedhand-v1",
+        "spriteSheetAction": "ready",
+        "routeId": "ROUTE:farmer:farm_ready_1",
+        "wayId": "WAY:HQ:building_farm_1",
+        "routeProgress": 0.78,
+        "assetFallback": false
+      },
+      {
+        "actorId": "quarry_running_1",
+        "canonicalRoleId": "quarry_mason",
+        "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/quarry_mason/quarry-mason-bram-stonecalm-v1.png",
+        "spriteSheet": true,
+        "spriteSheetId": "quarry-mason-bram-stonecalm-v1",
+        "spriteSheetAction": "cut",
+        "routeId": "ROUTE:quarry_mason:quarry_running_1",
+        "wayId": "WAY:HQ:building_quarry_1",
+        "routeProgress": 0.455,
+        "assetFallback": false
+      },
+      {
+        "actorId": "quarry_ready_1",
+        "canonicalRoleId": "quarry_mason",
+        "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/quarry_mason/quarry-mason-bram-stonecalm-v1.png",
+        "spriteSheet": true,
+        "spriteSheetId": "quarry-mason-bram-stonecalm-v1",
+        "spriteSheetAction": "ready",
+        "routeId": "ROUTE:quarry_mason:quarry_ready_1",
+        "wayId": "WAY:HQ:building_quarry_1",
+        "routeProgress": 0.78,
+        "assetFallback": false
+      },
+      {
+        "actorId": "lumber_running_1",
+        "canonicalRoleId": "lumber_worker",
+        "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/lumber_worker/lumber-worker-jun-timberline-v1.png",
+        "spriteSheet": true,
+        "spriteSheetId": "lumber-worker-jun-timberline-v1",
+        "spriteSheetAction": "mill",
+        "routeId": "ROUTE:lumber_worker:lumber_running_1",
+        "wayId": "WAY:HQ:building_lumber_1",
+        "routeProgress": 0.5800000000000001,
+        "assetFallback": false
+      },
+      {
+        "actorId": "lumber_ready_1",
+        "canonicalRoleId": "lumber_worker",
+        "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/lumber_worker/lumber-worker-jun-timberline-v1.png",
+        "spriteSheet": true,
+        "spriteSheetId": "lumber-worker-jun-timberline-v1",
+        "spriteSheetAction": "ready",
+        "routeId": "ROUTE:lumber_worker:lumber_ready_1",
+        "wayId": "WAY:HQ:building_lumber_1",
+        "routeProgress": 0.78,
+        "assetFallback": false
+      },
+      {
+        "actorId": "hq_approval_1",
+        "canonicalRoleId": "hq_civic_operator",
+        "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/hq_civic_operator/hq-civic-operator-vale-desk-7-v1.png",
+        "spriteSheet": true,
+        "spriteSheetId": "hq-civic-operator-vale-desk-7-v1",
+        "spriteSheetAction": "coordinate",
+        "routeId": "ROUTE:hq_civic_operator:hq_approval_1",
+        "wayId": "WAY:HQ:TOWN_SQUARE",
+        "routeProgress": 0.24,
+        "assetFallback": false
+      },
+      {
+        "actorId": "hq_reward_1",
+        "canonicalRoleId": "hq_civic_operator",
+        "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/hq_civic_operator/hq-civic-operator-vale-desk-7-v1.png",
+        "spriteSheet": true,
+        "spriteSheetId": "hq-civic-operator-vale-desk-7-v1",
+        "spriteSheetAction": "ready",
+        "routeId": "ROUTE:hq_civic_operator:hq_reward_1",
+        "wayId": "WAY:HQ:TOWN_SQUARE",
+        "routeProgress": 0.24,
+        "assetFallback": false
+      },
+      {
+        "actorId": "hq_quest_1",
+        "canonicalRoleId": "messenger",
+        "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.png",
+        "spriteSheet": true,
+        "spriteSheetId": "rook-signalpost-messenger-v1",
+        "spriteSheetAction": "ready",
+        "routeId": "ROUTE:messenger:hq_quest_1",
+        "wayId": "WAY:HQ:TOWN_SQUARE",
+        "routeProgress": 0.38,
+        "assetFallback": false
+      }
+    ],
+    "pickTargets": [
+      {
+        "actorId": "farm_running_1",
+        "canonicalRoleId": "farmer",
+        "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/farmer/farmer-mira-seedhand-v1.png",
+        "assetSprite": {
+          "id": "farmer-mira-seedhand-v1",
+          "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/farmer/farmer-mira-seedhand-v1.json",
+          "columns": 4,
+          "rows": 4,
+          "frameWidth": 512,
+          "frameHeight": 512,
+          "action": "tend",
+          "row": 2,
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 5
+        },
+        "visualOnly": true,
+        "actionKind": "PRODUCE",
+        "routeMode": "tend",
+        "routeVisualOnly": true
+      },
+      {
+        "actorId": "farm_ready_1",
+        "canonicalRoleId": "farmer",
+        "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/farmer/farmer-mira-seedhand-v1.png",
+        "assetSprite": {
+          "id": "farmer-mira-seedhand-v1",
+          "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/farmer/farmer-mira-seedhand-v1.json",
+          "columns": 4,
+          "rows": 4,
+          "frameWidth": 512,
+          "frameHeight": 512,
+          "action": "ready",
+          "row": 3,
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 4
+        },
+        "visualOnly": true,
+        "actionKind": "OUTPUT_READY",
+        "routeMode": "tend",
+        "routeVisualOnly": true
+      },
+      {
+        "actorId": "quarry_running_1",
+        "canonicalRoleId": "quarry_mason",
+        "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/quarry_mason/quarry-mason-bram-stonecalm-v1.png",
+        "assetSprite": {
+          "id": "quarry-mason-bram-stonecalm-v1",
+          "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/quarry_mason/quarry-mason-bram-stonecalm-v1.json",
+          "columns": 4,
+          "rows": 4,
+          "frameWidth": 512,
+          "frameHeight": 512,
+          "action": "cut",
+          "row": 2,
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 5
+        },
+        "visualOnly": true,
+        "actionKind": "PRODUCE",
+        "routeMode": "cut",
+        "routeVisualOnly": true
+      },
+      {
+        "actorId": "quarry_ready_1",
+        "canonicalRoleId": "quarry_mason",
+        "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/quarry_mason/quarry-mason-bram-stonecalm-v1.png",
+        "assetSprite": {
+          "id": "quarry-mason-bram-stonecalm-v1",
+          "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/quarry_mason/quarry-mason-bram-stonecalm-v1.json",
+          "columns": 4,
+          "rows": 4,
+          "frameWidth": 512,
+          "frameHeight": 512,
+          "action": "ready",
+          "row": 3,
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 4
+        },
+        "visualOnly": true,
+        "actionKind": "OUTPUT_READY",
+        "routeMode": "cut",
+        "routeVisualOnly": true
+      },
+      {
+        "actorId": "lumber_running_1",
+        "canonicalRoleId": "lumber_worker",
+        "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/lumber_worker/lumber-worker-jun-timberline-v1.png",
+        "assetSprite": {
+          "id": "lumber-worker-jun-timberline-v1",
+          "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/lumber_worker/lumber-worker-jun-timberline-v1.json",
+          "columns": 4,
+          "rows": 4,
+          "frameWidth": 512,
+          "frameHeight": 512,
+          "action": "mill",
+          "row": 2,
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 5
+        },
+        "visualOnly": true,
+        "actionKind": "PRODUCE",
+        "routeMode": "mill",
+        "routeVisualOnly": true
+      },
+      {
+        "actorId": "lumber_ready_1",
+        "canonicalRoleId": "lumber_worker",
+        "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/lumber_worker/lumber-worker-jun-timberline-v1.png",
+        "assetSprite": {
+          "id": "lumber-worker-jun-timberline-v1",
+          "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/lumber_worker/lumber-worker-jun-timberline-v1.json",
+          "columns": 4,
+          "rows": 4,
+          "frameWidth": 512,
+          "frameHeight": 512,
+          "action": "ready",
+          "row": 3,
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 4
+        },
+        "visualOnly": true,
+        "actionKind": "OUTPUT_READY",
+        "routeMode": "mill",
+        "routeVisualOnly": true
+      },
+      {
+        "actorId": "hq_approval_1",
+        "canonicalRoleId": "hq_civic_operator",
+        "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/hq_civic_operator/hq-civic-operator-vale-desk-7-v1.png",
+        "assetSprite": {
+          "id": "hq-civic-operator-vale-desk-7-v1",
+          "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/hq_civic_operator/hq-civic-operator-vale-desk-7-v1.json",
+          "columns": 4,
+          "rows": 4,
+          "frameWidth": 512,
+          "frameHeight": 512,
+          "action": "coordinate",
+          "row": 2,
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 5
+        },
+        "visualOnly": true,
+        "actionKind": "APPROVAL",
+        "routeMode": "coordinate",
+        "routeVisualOnly": true
+      },
+      {
+        "actorId": "hq_reward_1",
+        "canonicalRoleId": "hq_civic_operator",
+        "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/hq_civic_operator/hq-civic-operator-vale-desk-7-v1.png",
+        "assetSprite": {
+          "id": "hq-civic-operator-vale-desk-7-v1",
+          "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/hq_civic_operator/hq-civic-operator-vale-desk-7-v1.json",
+          "columns": 4,
+          "rows": 4,
+          "frameWidth": 512,
+          "frameHeight": 512,
+          "action": "ready",
+          "row": 3,
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 4
+        },
+        "visualOnly": true,
+        "actionKind": "REWARD",
+        "routeMode": "coordinate",
+        "routeVisualOnly": true
+      },
+      {
+        "actorId": "hq_quest_1",
+        "canonicalRoleId": "messenger",
+        "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.png",
+        "assetSprite": {
+          "id": "rook-signalpost-messenger-v1",
+          "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.json",
+          "columns": 4,
+          "rows": 4,
+          "frameWidth": 512,
+          "frameHeight": 512,
+          "action": "ready",
+          "row": 3,
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 4
+        },
+        "visualOnly": true,
+        "actionKind": "QUEST",
+        "routeMode": "notify",
+        "routeVisualOnly": true
+      }
+    ]
+  },
+  "artifacts": [
+    {
+      "path": "reports/agent-town-post-base-operator-scene-wiring-live-smoke-2026-05-31.json",
+      "exists": true,
+      "bytes": 30650
+    },
+    {
+      "path": "reports/agent-town-post-base-operator-scene-wiring-live-smoke-2026-05-31.md",
+      "exists": true,
+      "bytes": 4720
+    },
+    {
+      "path": "reports/agent-town-post-base-operator-scene-wiring-live-smoke-2026-05-31-projection-fixture.png",
+      "exists": true,
+      "bytes": 1198197
+    },
+    {
+      "path": "reports/agent-town-post-base-operator-scene-wiring-live-smoke-2026-05-31-contact-sheet.png",
+      "exists": true,
+      "bytes": 113857
+    }
+  ]
+}

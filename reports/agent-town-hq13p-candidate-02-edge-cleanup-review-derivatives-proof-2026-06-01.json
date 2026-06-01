@@ -1,0 +1,225 @@
+{
+  "ok": true,
+  "date": "2026-06-01",
+  "lane": "HQ13P candidate-02 edge-cleanup review derivatives",
+  "worktree": "/Users/robin/Projects/Portal-atlas-editor",
+  "verdict": "PASS_REVIEW_PREP_WITH_REPAIR_OR_REGENERATE_NOTES",
+  "scope": {
+    "reviewOnly": true,
+    "reportsMediaOnly": true,
+    "derivedFromHq13nSlotReview": true,
+    "hq13kFilesEdited": false,
+    "hq13nFilesEdited": false,
+    "runtimeAssetsPromoted": false,
+    "runtimePackDirectoryCreated": false,
+    "runtimePackLoaderCreated": false,
+    "appSourceEdited": false,
+    "serverStoreRoutesToolsEdited": false,
+    "schemaValidatorEdited": false,
+    "atlasExecution": false,
+    "publicSharing": false,
+    "generatedUniverseRendering": false,
+    "expeditionMapMutationPathEdited": false
+  },
+  "artifacts": {
+    "report": "reports/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-2026-06-01.md",
+    "proof": "reports/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-proof-2026-06-01.json",
+    "derivativeDirectory": "reports/media/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-2026-06-01",
+    "contactSheet": "reports/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-contact-sheet-2026-06-01.png",
+    "sourceReviewDirectory": "reports/media/agent-town-hq13n-candidate-02-slot-sized-review-derivatives-2026-06-01",
+    "qaHarness": "reports/agent-town-hq13m-generated-asset-qa-harness-2026-06-01.mjs"
+  },
+  "processing": {
+    "tool": "ImageMagick 7.1.2-21",
+    "method": "Neon-green matte replacement, green-dominance despill, small alpha erosion/softening for edge-risk assets, exact-dimension PNG32 output",
+    "dependenciesInstalled": false,
+    "contactSheetLabels": false,
+    "contactSheetLabelReason": "ImageMagick montage font support was unavailable; contact sheet was composed as unlabeled tiles by direct append."
+  },
+  "assetSummary": {
+    "plannedSlots": 8,
+    "sourceSlotReviewPngCountRead": 8,
+    "edgeCleanupDerivativePngCount": 8,
+    "contactSheetCreated": true,
+    "runtimePromotionApproved": false,
+    "hq13mHarnessMatchedEdgeCleanupNames": true
+  },
+  "assets": [
+    {
+      "slotId": "expedition_map.fog.hinted",
+      "source": "hinted-fog-veil-v1.slot-review.png",
+      "derivative": "hinted-fog-veil-v1.edge-cleanup-review.png",
+      "targetDimensions": "512x512",
+      "outputDimensions": "512x512",
+      "channels": "srgba 4.0",
+      "sha256": "51bb1d466de5099b7cb20927aaf1062ef5d2d0110db7cc7feef450fdbd28f010",
+      "greenDominantVisiblePixelsBefore": 67620,
+      "greenDominantVisiblePixelsAfter": 0,
+      "cleanupVerdict": "CLEANUP_REVIEW_CANDIDATE",
+      "notes": "Neon edge reduced; fog remains softened and review-only."
+    },
+    {
+      "slotId": "expedition_map.fog.locked_unknown",
+      "source": "locked-unknown-fog-v1.slot-review.png",
+      "derivative": "locked-unknown-fog-v1.edge-cleanup-review.png",
+      "targetDimensions": "512x512",
+      "outputDimensions": "512x512",
+      "channels": "srgba 4.0",
+      "sha256": "c28a36e8a3ad9181b49b1f90230ab4f5ee89d4a8325631dea0e3489423bc4f5a",
+      "greenDominantVisiblePixelsBefore": 50085,
+      "greenDominantVisiblePixelsAfter": 0,
+      "cleanupVerdict": "CLEANUP_REVIEW_CANDIDATE",
+      "notes": "Green fringe reduced to neutral softened rim; review scale still required."
+    },
+    {
+      "slotId": "expedition_map.fog.frontier_border",
+      "source": "frontier-dotted-boundary-v1.slot-review.png",
+      "derivative": "frontier-dotted-boundary-v1.edge-cleanup-review.png",
+      "targetDimensions": "1024x128",
+      "outputDimensions": "1024x128",
+      "channels": "srgba 4.0",
+      "sha256": "80263e837c7254d9df81159e4e78412faf2f8ffac4390bcab8f2291f8062314d",
+      "greenDominantVisiblePixelsBefore": 9359,
+      "greenDominantVisiblePixelsAfter": 148,
+      "cleanupVerdict": "REPAIR_OR_REGENERATE",
+      "notes": "Neon spill mostly removed, but the strip remains too faint/thin after cleanup."
+    },
+    {
+      "slotId": "expedition_map.marker.known_site_plan",
+      "source": "marker-known-site-plan-v1.slot-review.png",
+      "derivative": "marker-known-site-plan-v1.edge-cleanup-review.png",
+      "targetDimensions": "128x192",
+      "outputDimensions": "128x192",
+      "channels": "srgba 4.0",
+      "sha256": "1933c95f40df984a9cd01d4b798ec9d91d0f5a9d59e56d1e29e6b7bc96bdc1f3",
+      "greenDominantVisiblePixelsBefore": 419,
+      "greenDominantVisiblePixelsAfter": 257,
+      "cleanupVerdict": "CLEANUP_REVIEW_CANDIDATE",
+      "notes": "Edge risk is lower; remaining green-dominant pixels appear mostly internal ornament/detail."
+    },
+    {
+      "slotId": "expedition_map.marker.hinted_unknown",
+      "source": "marker-hinted-unknown-v1.slot-review.png",
+      "derivative": "marker-hinted-unknown-v1.edge-cleanup-review.png",
+      "targetDimensions": "128x192",
+      "outputDimensions": "128x192",
+      "channels": "srgba 4.0",
+      "sha256": "c04523b5e1635dbca4b2b7f27b81e7363f7348e734b7093d6be3281876858240",
+      "greenDominantVisiblePixelsBefore": 39,
+      "greenDominantVisiblePixelsAfter": 2,
+      "cleanupVerdict": "CLEANUP_REVIEW_CANDIDATE",
+      "notes": "Edge cleanup looks usable for review; needs small runtime-scale readability review."
+    },
+    {
+      "slotId": "expedition_map.marker.owned_outpost",
+      "source": "marker-owned-outpost-v1.slot-review.png",
+      "derivative": "marker-owned-outpost-v1.edge-cleanup-review.png",
+      "targetDimensions": "128x192",
+      "outputDimensions": "128x192",
+      "channels": "srgba 4.0",
+      "sha256": "df331f5d0b13b461724a641c33d0f762229b2f01373633295cba4efff0376039",
+      "greenDominantVisiblePixelsBefore": 187,
+      "greenDominantVisiblePixelsAfter": 86,
+      "cleanupVerdict": "CLEANUP_REVIEW_CANDIDATE",
+      "notes": "Edge cleanup looks usable for review; check small-size state readability."
+    },
+    {
+      "slotId": "expedition_map.stroke.scout_receipt_trace",
+      "source": "survey-receipt-stroke-v1.slot-review.png",
+      "derivative": "survey-receipt-stroke-v1.edge-cleanup-review.png",
+      "targetDimensions": "1024x128",
+      "outputDimensions": "1024x128",
+      "channels": "srgba 4.0",
+      "sha256": "6a24110e9ed2e8f34c12da3bcb70db14889cd4c5fcbdb0473694caea5f2425f2",
+      "greenDominantVisiblePixelsBefore": 5210,
+      "greenDominantVisiblePixelsAfter": 96,
+      "cleanupVerdict": "REPAIR_OR_REGENERATE",
+      "notes": "Neon spill mostly removed, but the receipt trace is too faint and should be repaired or regenerated."
+    },
+    {
+      "slotId": "hud.frame.selected_sector_card",
+      "source": "hud-selected-sector-frame-v1.slot-review.png",
+      "derivative": "hud-selected-sector-frame-v1.edge-cleanup-review.png",
+      "targetDimensions": "640x360",
+      "outputDimensions": "640x360",
+      "channels": "srgba 4.0",
+      "sha256": "4ff266b4a0f89fcefa15a0ee2a73743af535d600d354943e743693290bb1c1b6",
+      "greenDominantVisiblePixelsBefore": 2797,
+      "greenDominantVisiblePixelsAfter": 87,
+      "cleanupVerdict": "CLEANUP_REVIEW_CANDIDATE",
+      "notes": "Edge cleanup retained the empty card frame; crop/detail still need human review."
+    }
+  ],
+  "contactSheet": {
+    "path": "reports/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-contact-sheet-2026-06-01.png",
+    "dimensions": "960x320",
+    "channels": "srgb  3.0",
+    "sha256": "bb727fea5c4e147dcdbd31ee3a92bf675fd3db88c95b1d88d5c63862f40e042f",
+    "labels": false
+  },
+  "hq13mHarnessSummary": {
+    "expectedSlots": 8,
+    "pngFilesFound": 8,
+    "presentSlots": 8,
+    "missingSlots": 0,
+    "processedAlphaFilesFound": 0,
+    "sourceFilesFound": 0,
+    "unmatchedPngFiles": 0,
+    "warnSlots": 0,
+    "passSlots": 8,
+    "warningCount": 0,
+    "status": "pass",
+    "verdict": "PASS_ALL_EXPECTED_REVIEW_ASSETS_PRESENT",
+    "note": "processedAlphaFilesFound and sourceFilesFound are zero because HQ13P derivatives intentionally use *.edge-cleanup-review.png names."
+  },
+  "checks": [
+    {
+      "command": "file reports/media/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-2026-06-01/*.edge-cleanup-review.png reports/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-contact-sheet-2026-06-01.png",
+      "exitCode": 0
+    },
+    {
+      "command": "magick identify -format '%f|%wx%h|%[channels]\\n' reports/media/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-2026-06-01/*.edge-cleanup-review.png reports/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-contact-sheet-2026-06-01.png",
+      "exitCode": 0
+    },
+    {
+      "command": "node reports/agent-town-hq13m-generated-asset-qa-harness-2026-06-01.mjs --pretty reports/media/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-2026-06-01 | jq '.summary'",
+      "exitCode": 0
+    },
+    {
+      "command": "jq empty reports/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-proof-2026-06-01.json",
+      "exitCode": 0
+    },
+    {
+      "command": "git diff --check -- reports/media/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-2026-06-01 reports/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-contact-sheet-2026-06-01.png reports/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-2026-06-01.md reports/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-proof-2026-06-01.json",
+      "exitCode": 0
+    }
+  ],
+  "reviewNotes": {
+    "promotionReady": false,
+    "needsHumanVisualReview": true,
+    "repairOrRegenerateSlots": [
+      "expedition_map.fog.frontier_border",
+      "expedition_map.stroke.scout_receipt_trace"
+    ],
+    "keepForReferenceOnlySlots": [],
+    "aestheticAcceptancePerformed": false
+  },
+  "guardrails": {
+    "noRuntimeAssetPromotion": true,
+    "noRuntimePackDirectory": true,
+    "noRuntimeLoader": true,
+    "noHq13kEditsMovesDeletesOrOverwrites": true,
+    "noHq13nEditsMovesDeletesOrOverwrites": true,
+    "noAppSourceEdits": true,
+    "noServerStoreRoutesToolsEdits": true,
+    "noSchemaValidatorEdits": true,
+    "noAtlasExecution": true,
+    "noPublicSharing": true,
+    "noGeneratedUniverseRendering": true,
+    "noHiddenAutonomy": true,
+    "noRouteTradeEconomyResourceRewardCombatSchedulerBehavior": true,
+    "noCrossPlotMutation": true,
+    "noExternalEffects": true,
+    "scoutSectorOnlyCurrentExpeditionMapMutationPath": true
+  }
+}

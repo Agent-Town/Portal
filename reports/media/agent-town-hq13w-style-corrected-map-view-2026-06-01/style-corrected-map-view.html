@@ -1,0 +1,713 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AgentTown HQ13W Style-Corrected Map View</title>
+  <style>
+    :root {
+      --ink: #203434;
+      --timber: #724e31;
+      --timber-dark: #3e2d23;
+      --canvas: #d8c9aa;
+      --paper: #eee0bd;
+      --paper-deep: #cba96e;
+      --brass: #d6a842;
+      --worn-teal: #2d8b86;
+      --teal-dark: #1f5959;
+      --mist: #dce8d7;
+      --signal: #9ae7dd;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 1280px;
+      height: 720px;
+      margin: 0;
+      overflow: hidden;
+      background: #233535;
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+
+    .view {
+      position: relative;
+      width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      background:
+        linear-gradient(90deg, rgba(22, 38, 38, .82), rgba(22, 38, 38, .36) 42%, rgba(47, 78, 74, .54)),
+        radial-gradient(circle at 28% 24%, rgba(210, 172, 93, .22), transparent 33%),
+        linear-gradient(135deg, #2d3f3a, #59412c 58%, #263b3b);
+    }
+
+    .view::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(255,255,255,.035) 1px, transparent 1px);
+      background-size: 42px 42px;
+      opacity: .18;
+      pointer-events: none;
+    }
+
+    .top-rail {
+      position: absolute;
+      left: 24px;
+      top: 18px;
+      right: 24px;
+      height: 46px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #efe3c8;
+      text-transform: uppercase;
+      font-weight: 800;
+      font-size: 14px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      border: 2px solid rgba(214, 168, 66, .94);
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(154, 231, 221, .88) 0 4px, transparent 5px),
+        conic-gradient(from -45deg, transparent 0 19%, rgba(214, 168, 66, .95) 20% 25%, transparent 26% 44%, rgba(214, 168, 66, .95) 45% 50%, transparent 51% 69%, rgba(214, 168, 66, .95) 70% 75%, transparent 76%);
+      box-shadow: 0 0 18px rgba(98, 207, 198, .36);
+    }
+
+    .rail-note {
+      color: rgba(239, 227, 200, .74);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .map-board {
+      position: absolute;
+      left: 24px;
+      top: 74px;
+      width: 854px;
+      height: 622px;
+      border: 8px solid var(--timber-dark);
+      border-radius: 8px;
+      background:
+        linear-gradient(135deg, rgba(45, 139, 134, .18), transparent 34%),
+        linear-gradient(0deg, rgba(114, 78, 49, .13), rgba(114, 78, 49, .03)),
+        #e5d4ae;
+      box-shadow:
+        0 26px 80px rgba(15, 24, 24, .46),
+        inset 0 0 0 2px rgba(214, 168, 66, .62),
+        inset 0 0 44px rgba(84, 52, 29, .26);
+      overflow: hidden;
+    }
+
+    .map-board::before {
+      content: "";
+      position: absolute;
+      inset: 14px;
+      border: 1px solid rgba(87, 64, 44, .26);
+      border-radius: 4px;
+      background:
+        linear-gradient(115deg, rgba(58, 99, 94, .12) 1px, transparent 1px),
+        linear-gradient(25deg, rgba(118, 82, 49, .1) 1px, transparent 1px);
+      background-size: 58px 58px, 74px 74px;
+      pointer-events: none;
+    }
+
+    .river {
+      position: absolute;
+      left: 114px;
+      top: 108px;
+      width: 570px;
+      height: 286px;
+      border: 18px solid transparent;
+      border-bottom-color: rgba(58, 148, 153, .42);
+      border-left-color: rgba(58, 148, 153, .22);
+      border-radius: 50%;
+      transform: rotate(-21deg);
+      filter: blur(.4px);
+      opacity: .7;
+    }
+
+    .road {
+      position: absolute;
+      left: 220px;
+      top: 332px;
+      width: 420px;
+      height: 80px;
+      border-top: 8px dotted rgba(104, 76, 42, .36);
+      transform: rotate(-11deg);
+      opacity: .62;
+    }
+
+    .cell {
+      position: absolute;
+      width: 188px;
+      height: 144px;
+      clip-path: polygon(23% 0, 77% 0, 100% 50%, 77% 100%, 23% 100%, 0 50%);
+      border: 1px solid rgba(68, 51, 38, .34);
+      background:
+        linear-gradient(135deg, rgba(255,255,255,.24), transparent 48%),
+        linear-gradient(0deg, rgba(45, 139, 134, .08), rgba(122, 91, 51, .12)),
+        #caad76;
+      box-shadow: inset 0 0 0 2px rgba(255, 244, 206, .14);
+    }
+
+    .cell.home {
+      left: 306px;
+      top: 212px;
+      background:
+        radial-gradient(circle at 54% 46%, rgba(154, 231, 221, .44), transparent 27%),
+        linear-gradient(135deg, rgba(255,255,255,.3), transparent 48%),
+        #d3b670;
+    }
+
+    .cell.known {
+      left: 470px;
+      top: 145px;
+      background:
+        linear-gradient(120deg, rgba(47, 116, 80, .35), transparent 47%),
+        linear-gradient(0deg, rgba(98, 77, 48, .14), rgba(255,255,255,.12)),
+        #b1bd76;
+    }
+
+    .cell.known.second {
+      left: 486px;
+      top: 304px;
+      background:
+        linear-gradient(135deg, rgba(43, 126, 119, .28), transparent 46%),
+        #c4b36d;
+    }
+
+    .cell.discovered {
+      left: 148px;
+      top: 300px;
+      background:
+        linear-gradient(135deg, rgba(118, 90, 50, .22), transparent 45%),
+        #d0b879;
+    }
+
+    .cell.hinted {
+      left: 610px;
+      top: 244px;
+      background: #bcc19a;
+    }
+
+    .cell.locked {
+      left: 614px;
+      top: 408px;
+      background: #aeb7a8;
+    }
+
+    .cell.locked.far {
+      left: 638px;
+      top: 80px;
+      background: #aab5a4;
+      opacity: .82;
+    }
+
+    .asset {
+      position: absolute;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .fog-hinted {
+      left: 568px;
+      top: 198px;
+      width: 270px;
+      opacity: .66;
+      mix-blend-mode: screen;
+    }
+
+    .fog-locked {
+      left: 578px;
+      top: 354px;
+      width: 286px;
+      opacity: .82;
+    }
+
+    .fog-locked.far {
+      left: 602px;
+      top: 30px;
+      width: 264px;
+      opacity: .62;
+    }
+
+    .frontier-boundary {
+      left: 552px;
+      top: 184px;
+      width: 336px;
+      height: 42px;
+      transform: rotate(31deg);
+      opacity: .88;
+      filter: drop-shadow(0 0 5px rgba(214, 168, 66, .28));
+    }
+
+    .receipt-trace {
+      left: 301px;
+      top: 250px;
+      width: 358px;
+      height: 45px;
+      transform: rotate(17deg);
+      opacity: .83;
+      filter: drop-shadow(0 0 6px rgba(214, 168, 66, .28));
+    }
+
+    .pin {
+      width: 55px;
+      filter: drop-shadow(0 8px 7px rgba(46, 32, 24, .28));
+    }
+
+    .pin.known-pin {
+      left: 535px;
+      top: 169px;
+    }
+
+    .pin.hinted-pin {
+      left: 676px;
+      top: 268px;
+      opacity: .92;
+    }
+
+    .pin.outpost-pin {
+      left: 365px;
+      top: 229px;
+      width: 60px;
+    }
+
+    .home-node {
+      position: absolute;
+      left: 355px;
+      top: 261px;
+      width: 96px;
+      height: 56px;
+      border-radius: 8px;
+      background:
+        linear-gradient(180deg, #e7cf82 0 22px, #8a6c39 23px 100%);
+      border: 2px solid rgba(80, 54, 30, .62);
+      box-shadow: 0 0 0 6px rgba(45, 139, 134, .15), 0 0 28px rgba(98, 207, 198, .34);
+    }
+
+    .home-node::before {
+      content: "";
+      position: absolute;
+      left: 10px;
+      top: -20px;
+      border-left: 36px solid transparent;
+      border-right: 36px solid transparent;
+      border-bottom: 26px solid #a55f3c;
+    }
+
+    .home-node::after {
+      content: "";
+      position: absolute;
+      right: 12px;
+      top: -40px;
+      width: 5px;
+      height: 46px;
+      background: #394b4a;
+      box-shadow: 0 0 12px rgba(154, 231, 221, .7);
+    }
+
+    .survey-van {
+      position: absolute;
+      left: 245px;
+      top: 352px;
+      width: 86px;
+      height: 42px;
+      border-radius: 10px 12px 8px 8px;
+      background: linear-gradient(180deg, #ceb37b, #796044);
+      border: 2px solid rgba(68, 45, 27, .68);
+      box-shadow: 0 10px 14px rgba(57, 35, 21, .23);
+    }
+
+    .survey-van::before,
+    .survey-van::after {
+      content: "";
+      position: absolute;
+      bottom: -8px;
+      width: 17px;
+      height: 17px;
+      border-radius: 50%;
+      background: #243332;
+      border: 3px solid #c89c41;
+    }
+
+    .survey-van::before {
+      left: 12px;
+    }
+
+    .survey-van::after {
+      right: 12px;
+    }
+
+    .beacon {
+      position: absolute;
+      left: 418px;
+      top: 206px;
+      width: 22px;
+      height: 78px;
+      border-radius: 10px;
+      background: linear-gradient(180deg, #2c6b66, #523a28);
+      border: 2px solid rgba(226, 174, 66, .76);
+      box-shadow: 0 0 18px rgba(154, 231, 221, .52);
+    }
+
+    .beacon::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: -18px;
+      width: 44px;
+      height: 44px;
+      transform: translateX(-50%);
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(154,231,221,.9) 0 4px, rgba(154,231,221,.16) 5px 21px, transparent 22px);
+    }
+
+    .ledger {
+      position: absolute;
+      right: 24px;
+      top: 74px;
+      width: 354px;
+      height: 622px;
+      border-radius: 8px;
+      background:
+        linear-gradient(180deg, rgba(238, 224, 189, .97), rgba(204, 185, 143, .95)),
+        #eadbb8;
+      border: 6px solid rgba(62, 45, 35, .96);
+      box-shadow:
+        0 26px 80px rgba(15, 24, 24, .46),
+        inset 0 0 0 2px rgba(214, 168, 66, .68);
+      overflow: hidden;
+    }
+
+    .ledger::before {
+      content: "";
+      position: absolute;
+      inset: 18px;
+      border: 1px solid rgba(105, 78, 50, .24);
+      border-radius: 4px;
+      pointer-events: none;
+    }
+
+    .ledger-header {
+      position: absolute;
+      left: 28px;
+      right: 28px;
+      top: 28px;
+      padding-bottom: 14px;
+      border-bottom: 2px solid rgba(112, 81, 49, .28);
+    }
+
+    .eyebrow {
+      color: var(--teal-dark);
+      font-size: 11px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .title {
+      margin-top: 4px;
+      color: #2f342c;
+      font-size: 26px;
+      font-weight: 900;
+      line-height: 1.02;
+    }
+
+    .subtitle {
+      margin-top: 8px;
+      color: #6e654d;
+      font-size: 13px;
+      line-height: 1.35;
+      font-weight: 700;
+    }
+
+    .selected-card {
+      position: absolute;
+      left: 24px;
+      right: 24px;
+      top: 154px;
+      height: 184px;
+    }
+
+    .selected-card img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: fill;
+      opacity: .86;
+    }
+
+    .selected-copy {
+      position: absolute;
+      inset: 28px 30px 24px;
+      color: #263835;
+    }
+
+    .selected-copy h2 {
+      margin: 0;
+      font-size: 19px;
+      line-height: 1.12;
+    }
+
+    .selected-copy p {
+      margin: 10px 0 0;
+      font-size: 13px;
+      line-height: 1.35;
+      color: #655c47;
+      font-weight: 700;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 12px;
+    }
+
+    .chip {
+      border-radius: 999px;
+      padding: 6px 9px;
+      background: rgba(45, 139, 134, .16);
+      border: 1px solid rgba(45, 139, 134, .34);
+      color: #245755;
+      font-size: 11px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .party {
+      position: absolute;
+      left: 28px;
+      right: 28px;
+      top: 370px;
+    }
+
+    .party-title,
+    .signals-title {
+      color: #31403a;
+      font-size: 12px;
+      font-weight: 900;
+      text-transform: uppercase;
+      margin-bottom: 7px;
+    }
+
+    .operator {
+      display: grid;
+      grid-template-columns: 38px 1fr;
+      gap: 9px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .portrait {
+      display: grid;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 45% 30%, rgba(154,231,221,.7), transparent 18px),
+        linear-gradient(135deg, #bd8e3d, #275d5d);
+      border: 2px solid rgba(214, 168, 66, .78);
+      color: #f7eed3;
+      font-weight: 900;
+      font-size: 12px;
+    }
+
+    .operator strong {
+      display: block;
+      color: #263835;
+      font-size: 13px;
+      line-height: 1.1;
+    }
+
+    .operator span {
+      display: block;
+      margin-top: 2px;
+      color: #705f43;
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .signals {
+      position: absolute;
+      left: 28px;
+      right: 28px;
+      top: 530px;
+      padding-top: 10px;
+      border-top: 2px solid rgba(112, 81, 49, .24);
+    }
+
+    .signal-row {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin: 0 5px 5px 0;
+      padding: 4px 7px;
+      border-radius: 999px;
+      border: 1px solid rgba(45, 139, 134, .23);
+      background: rgba(45, 139, 134, .09);
+      color: #605a47;
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .signal-row b {
+      color: var(--teal-dark);
+      font-size: 9px;
+      text-transform: uppercase;
+    }
+
+    .legend {
+      position: absolute;
+      left: 48px;
+      bottom: 34px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 14px;
+      border-radius: 7px;
+      background: rgba(238, 224, 189, .88);
+      border: 2px solid rgba(77, 56, 38, .35);
+      color: #4d4638;
+      font-size: 12px;
+      font-weight: 850;
+    }
+
+    .swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+      border: 1px solid rgba(61, 48, 35, .34);
+    }
+
+    .swatch.known {
+      background: #9fb672;
+    }
+
+    .swatch.hinted {
+      background: #dce8d7;
+    }
+
+    .swatch.locked {
+      background: #7e9090;
+    }
+  </style>
+</head>
+<body>
+  <main class="view" aria-label="AgentTown style-corrected Expedition Map review mock">
+    <div class="top-rail">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"></div>
+        <div>AgentTown Expedition Map</div>
+      </div>
+      <div class="rail-note">HQ13W style-corrected review mock</div>
+    </div>
+
+    <section class="map-board" aria-label="Founders Plot frontier-tech civic map">
+      <div class="river"></div>
+      <div class="road"></div>
+
+      <div class="cell discovered"></div>
+      <div class="cell home"></div>
+      <div class="cell known"></div>
+      <div class="cell known second"></div>
+      <div class="cell hinted"></div>
+      <div class="cell locked"></div>
+      <div class="cell locked far"></div>
+
+      <img class="asset fog-hinted" src="../agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-2026-06-01/hinted-fog-veil-v1.edge-cleanup-review.png" alt="">
+      <img class="asset fog-locked" src="../agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-2026-06-01/locked-unknown-fog-v1.edge-cleanup-review.png" alt="">
+      <img class="asset fog-locked far" src="../agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-2026-06-01/locked-unknown-fog-v1.edge-cleanup-review.png" alt="">
+      <img class="asset frontier-boundary" src="../agent-town-hq13t-frontier-boundary-stitch-review-assets-2026-06-01/frontier-dotted-boundary-v3.repair-review.png" alt="">
+      <img class="asset receipt-trace" src="../agent-town-hq13q-dotted-line-repair-review-assets-2026-06-01/survey-receipt-stroke-v2.repair-review.png" alt="">
+
+      <img class="asset pin known-pin" src="../agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-2026-06-01/marker-known-site-plan-v1.edge-cleanup-review.png" alt="">
+      <img class="asset pin hinted-pin" src="../agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-2026-06-01/marker-hinted-unknown-v1.edge-cleanup-review.png" alt="">
+      <img class="asset pin outpost-pin" src="../agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-2026-06-01/marker-owned-outpost-v1.edge-cleanup-review.png" alt="">
+
+      <div class="home-node" aria-hidden="true"></div>
+      <div class="beacon" aria-hidden="true"></div>
+      <div class="survey-van" aria-hidden="true"></div>
+
+      <div class="legend" aria-label="Map fog legend">
+        <span class="swatch known"></span><span>Known</span>
+        <span class="swatch hinted"></span><span>Hinted</span>
+        <span class="swatch locked"></span><span>Locked</span>
+      </div>
+    </section>
+
+    <aside class="ledger" aria-label="Scout ledger and selected sector">
+      <div class="ledger-header">
+        <div class="eyebrow">Founders Plot</div>
+        <div class="title">Scout Ledger</div>
+        <div class="subtitle">Private civic map view, rendered from server-owned expedition facts.</div>
+      </div>
+
+      <section class="selected-card" aria-label="Selected sector card">
+        <img src="../agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-2026-06-01/hud-selected-sector-frame-v1.edge-cleanup-review.png" alt="">
+        <div class="selected-copy">
+          <h2>Forest Ridge Survey Site</h2>
+          <p>Reviewed site plan, visible receipts, no hidden sector truth inferred by art.</p>
+          <div class="chips">
+            <span class="chip">Known</span>
+            <span class="chip">Receipt</span>
+            <span class="chip">No route</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="party" aria-label="Expedition party">
+        <div class="party-title">Operator Party</div>
+        <div class="operator">
+          <div class="portrait">MT</div>
+          <div>
+            <strong>Mira Trailmark</strong>
+            <span>Pathfinder scout</span>
+          </div>
+        </div>
+        <div class="operator">
+          <div class="portrait">RS</div>
+          <div>
+            <strong>Rook Signalpost</strong>
+            <span>Messenger witness</span>
+          </div>
+        </div>
+        <div class="operator">
+          <div class="portrait">V7</div>
+          <div>
+            <strong>Vale-Desk 7</strong>
+            <span>Civic operator</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="signals" aria-label="Authority signals">
+        <div class="signals-title">Civic Signals</div>
+        <div class="signal-row"><span>Scout</span><b>Only</b></div>
+        <div class="signal-row"><span>Atlas</span><b>Adv</b></div>
+        <div class="signal-row"><span>Pack</span><b>Review</b></div>
+      </section>
+    </aside>
+  </main>
+</body>
+</html>

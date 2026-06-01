@@ -1,0 +1,28 @@
+{
+  "packId": "agent-town.founders-plot.invalid-schema-fixture-v1",
+  "packVersion": "1.0.0",
+  "schemaVersion": "agent-town.visual-pack.v1",
+  "title": "Invalid Forbidden Field Path Action Fixture",
+  "status": "draft",
+  "scope": "private_owner_scoped",
+  "presentationOnly": true,
+  "visualOnly": true,
+  "gameplayMutationPolicy": "presentation_only",
+  "authorityBoundary": "requires_engine_promotion_for_any_gameplay_effect",
+  "publicSharing": true,
+  "atlasExecution": true,
+  "generatedUniverseRendering": false,
+  "modules": {
+    "hudCards": {
+      "type": "hud_card_pack",
+      "slotBindings": {
+        "hud.card.scout_report": {
+          "assetSrc": "https://example.invalid/external-scout-report.webp",
+          "metadataSrc": "/experiences/founders-plot/assets/objects/scout-report-dossier.json",
+          "action": "SCOUT_SECTOR",
+          "serverHandler": "server/founders_plot/routes.js"
+        }
+      }
+    }
+  }
+}

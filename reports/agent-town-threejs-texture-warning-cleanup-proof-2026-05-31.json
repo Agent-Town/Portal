@@ -1,0 +1,85 @@
+{
+  "ok": true,
+  "checkedAt": "2026-05-31T09:03:20.132Z",
+  "url": "/founders-plot",
+  "textureWarningCount": 0,
+  "textureWarnings": [],
+  "pageErrors": [],
+  "consoleWarningCount": 4,
+  "canvas": {
+    "ok": true,
+    "width": 739,
+    "height": 460,
+    "unique": 4,
+    "visible": 4,
+    "samples": [
+      [
+        139,
+        110,
+        41,
+        255
+      ],
+      [
+        147,
+        111,
+        45,
+        255
+      ],
+      [
+        115,
+        80,
+        30,
+        255
+      ],
+      [
+        197,
+        128,
+        59,
+        255
+      ]
+    ]
+  },
+  "renderer": "three.js",
+  "stateHash": "2a55d2e7f8af8e863c775972105f2297c42f72007a4a008d51dff27d45e33e4d",
+  "renderedActors": [
+    {
+      "canonicalRoleId": "clover",
+      "assetSrc": "/experiences/founders-plot/assets/characters/v1_4_4/clover-observing.webp",
+      "spriteSheet": false,
+      "spriteSheetId": "",
+      "spriteSheetAction": "",
+      "assetFallback": false
+    },
+    {
+      "canonicalRoleId": "messenger",
+      "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/messenger/rook-signalpost-messenger-v1.png",
+      "spriteSheet": true,
+      "spriteSheetId": "rook-signalpost-messenger-v1",
+      "spriteSheetAction": "ready",
+      "assetFallback": false
+    }
+  ],
+  "actionCues": [
+    {
+      "actorId": "actor:clover:foreman:plot_2d29781f2b5517be",
+      "canonicalRoleId": "clover",
+      "sourceDomain": "foreman",
+      "sourceObjectId": "plot_2d29781f2b5517be",
+      "actionKind": "OBSERVE",
+      "cueType": "foreman_presence",
+      "accessory": "clover",
+      "progress": 0
+    },
+    {
+      "actorId": "actor:messenger:quest:place-lumber-camp",
+      "canonicalRoleId": "messenger",
+      "sourceDomain": "quest",
+      "sourceObjectId": "place-lumber-camp",
+      "actionKind": "QUEST",
+      "cueType": "attention_marker",
+      "accessory": "quest",
+      "progress": 0
+    }
+  ],
+  "proofScreenshot": "reports/agent-town-threejs-texture-warning-cleanup-proof-2026-05-31.png"
+}

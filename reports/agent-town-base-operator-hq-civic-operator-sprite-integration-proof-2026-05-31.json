@@ -1,0 +1,63 @@
+{
+  "id": "agent-town-base-operator-hq-civic-operator-sprite-integration-proof-2026-05-31",
+  "date": "2026-05-31",
+  "asset": "hq-civic-operator-vale-desk-7-v1",
+  "role": "hq_civic_operator",
+  "displayName": "Vale-Desk 7",
+  "sourceRecoveredFrom": "/Users/robin/.openclaw/media/tool-image-generation/agent-town-hq-civic-operator-vale-desk-7-sprite-sheet-v1-opa---d05f5f0b-1667-4cda-a9f8-91f7b2db9cf6.png",
+  "files": {
+    "generated": "public/experiences/founders-plot/assets/characters/inhabitants/hq_civic_operator/hq-civic-operator-vale-desk-7-v1.generated.png",
+    "source": "public/experiences/founders-plot/assets/characters/inhabitants/hq_civic_operator/hq-civic-operator-vale-desk-7-v1.source.png",
+    "runtime": "public/experiences/founders-plot/assets/characters/inhabitants/hq_civic_operator/hq-civic-operator-vale-desk-7-v1.png",
+    "metadata": "public/experiences/founders-plot/assets/characters/inhabitants/hq_civic_operator/hq-civic-operator-vale-desk-7-v1.json",
+    "prompt": "public/experiences/founders-plot/assets/characters/inhabitants/hq_civic_operator/hq-civic-operator-vale-desk-7-v1.prompt.md",
+    "proof": "reports/agent-town-base-operator-hq-civic-operator-sprite-integration-proof-2026-05-31.png",
+    "rowStrip": "reports/agent-town-base-operator-hq-civic-operator-row-strip-2026-05-31.png"
+  },
+  "imageChecks": {
+    "generated": {
+      "identify": "2048x2048 sRGB srgb 3.0",
+      "sha256": "44f9c40ac3312a31db2ae982e08b824827255aafc8f4e43b0b88a83f9b3836b4"
+    },
+    "source": {
+      "identify": "2048x2048 sRGB srgb 3.0",
+      "sha256": "44f9c40ac3312a31db2ae982e08b824827255aafc8f4e43b0b88a83f9b3836b4"
+    },
+    "runtime": {
+      "identify": "2048x2048 sRGB srgba 4.0",
+      "sha256": "2c952ae90466c6e8c604beae8ae72f0778c2ba44bd198bbddaec9544f8a74fad",
+      "cornerSamples": {
+        "topLeft": "srgba(0,0,0,0)",
+        "topRight": "srgba(0,0,0,0)",
+        "bottomLeft": "srgba(0,0,0,0)",
+        "bottomRight": "srgba(0,0,0,0)",
+        "center": "srgba(0,0,0,0)"
+      },
+      "alphaMean": 0.412107
+    },
+    "proof": {
+      "identify": "1024x512 sRGB srgb 3.0",
+      "sha256": "05624ffdb8d4a625666cdd5a2455791e47f7625ab8063d615bb7baf0d2e4d6e5"
+    },
+    "rowStrip": {
+      "identify": "1024x1024 sRGB srgb 3.0",
+      "sha256": "5d9195ef8053b63a8aa98346ff495c9a408bb0927ba6e54f6e855ed848abbede"
+    }
+  },
+  "postProcessing": {
+    "tool": "ImageMagick",
+    "steps": [
+      "Converted saturated magenta background pixels to alpha with a channel rule.",
+      "Flood-filled pale magenta and near-white background remnants from sheet boundary points with 8 percent fuzz.",
+      "Cleared guide strips around 512px grid boundaries.",
+      "Zeroed hidden RGB in transparent pixels before generating proofs."
+    ]
+  },
+  "boundary": {
+    "visualOnly": true,
+    "sceneWiringChanged": false,
+    "gameplayAuthorityChanged": false,
+    "serverChanged": false,
+    "atlasChanged": false
+  }
+}

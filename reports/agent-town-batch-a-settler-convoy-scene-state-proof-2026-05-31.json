@@ -1,0 +1,141 @@
+{
+  "generatedAt": "2026-05-31T03:38:22.816Z",
+  "purpose": "AgentTown Batch A settler convoy scene-state proof",
+  "stateHash": "scene-batch-a-settler-proof",
+  "actors": [
+    {
+      "actorId": "settler_departing_proof",
+      "canonicalRoleId": "settler",
+      "actionKind": "SETTLER_CONVOY",
+      "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/settler/settler-convoy-crew-v1.png",
+      "assetSprite": {
+        "id": "settler-convoy-crew-v1",
+        "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/settler/settler-convoy-crew-v1.json",
+        "columns": 4,
+        "rows": 4,
+        "frameWidth": 512,
+        "frameHeight": 512,
+        "action": "prepare",
+        "row": 2,
+        "frames": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "fps": 5
+      },
+      "route": {
+        "routeId": "ROUTE:settler:settler_departing_proof",
+        "wayId": "WAY:HQ:SETTLEMENT_CLAIM:claim_proof_1",
+        "mode": "convoy",
+        "from": {
+          "kind": "building",
+          "id": "HQ"
+        },
+        "to": {
+          "kind": "settlement_claim",
+          "id": "claim_proof_1"
+        },
+        "targetId": "claim_proof_1",
+        "points": [
+          {
+            "x": 0.5,
+            "y": 0.38999999999999996
+          },
+          {
+            "x": 0.61,
+            "y": 0.5365
+          },
+          {
+            "x": 0.9,
+            "y": 0.62
+          }
+        ],
+        "progress": 0.4392,
+        "lane": -0.09,
+        "x": 0.596624,
+        "y": 0.5186856,
+        "visualOnly": true
+      },
+      "actionCue": {
+        "cueType": "settler_convoy",
+        "accessory": "route_marker",
+        "lane": "convoy",
+        "label": "Settler convoy",
+        "actionKind": "SETTLER_CONVOY",
+        "progress": 0.42,
+        "targetKind": "settlement_claim",
+        "targetId": "claim_proof_1"
+      },
+      "visualOnly": true
+    },
+    {
+      "actorId": "settler_ready_proof",
+      "canonicalRoleId": "settler",
+      "actionKind": "SETTLEMENT_READY",
+      "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/settler/settler-convoy-crew-v1.png",
+      "assetSprite": {
+        "id": "settler-convoy-crew-v1",
+        "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/settler/settler-convoy-crew-v1.json",
+        "columns": 4,
+        "rows": 4,
+        "frameWidth": 512,
+        "frameHeight": 512,
+        "action": "ready",
+        "row": 3,
+        "frames": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "fps": 4
+      },
+      "route": {
+        "routeId": "ROUTE:settler:settler_ready_proof",
+        "wayId": "WAY:HQ:SETTLEMENT_CLAIM:claim_proof_2",
+        "mode": "convoy",
+        "from": {
+          "kind": "building",
+          "id": "HQ"
+        },
+        "to": {
+          "kind": "settlement_claim",
+          "id": "claim_proof_2"
+        },
+        "targetId": "claim_proof_2",
+        "points": [
+          {
+            "x": 0.5,
+            "y": 0.38999999999999996
+          },
+          {
+            "x": 0.61,
+            "y": 0.5365
+          },
+          {
+            "x": 0.9,
+            "y": 0.62
+          }
+        ],
+        "progress": 0.9,
+        "lane": -0.09,
+        "x": 0.8420000000000001,
+        "y": 0.6033,
+        "visualOnly": true
+      },
+      "actionCue": {
+        "cueType": "settlement_ready",
+        "accessory": "route_marker",
+        "lane": "arrived_ready",
+        "label": "Settlement ready",
+        "actionKind": "SETTLEMENT_READY",
+        "progress": 1,
+        "targetKind": "settlement_claim",
+        "targetId": "claim_proof_2"
+      },
+      "visualOnly": true
+    }
+  ]
+}

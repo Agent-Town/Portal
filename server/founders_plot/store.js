@@ -65,10 +65,14 @@ function ensureDb() {
       construction_slots INTEGER NOT NULL,
       next_build_buff_pct REAL NOT NULL DEFAULT 0,
       claimed_rewards_json TEXT NOT NULL DEFAULT '[]',
-      seen_building_types_json TEXT NOT NULL DEFAULT '[]',
-      collected_building_types_json TEXT NOT NULL DEFAULT '[]',
-      agent_tiers_xp_awarded_json TEXT NOT NULL DEFAULT '[]',
-      last_daily_bonus_day TEXT,
+	      seen_building_types_json TEXT NOT NULL DEFAULT '[]',
+	      collected_building_types_json TEXT NOT NULL DEFAULT '[]',
+	      agent_tiers_xp_awarded_json TEXT NOT NULL DEFAULT '[]',
+	      scout_reports_json TEXT NOT NULL DEFAULT '[]',
+	      site_plans_json TEXT NOT NULL DEFAULT '[]',
+	      doctrine_state_json TEXT NOT NULL DEFAULT '{}',
+	      expedition_scouts_json TEXT NOT NULL DEFAULT '[]',
+	      last_daily_bonus_day TEXT,
       daily_sold_coin INTEGER NOT NULL DEFAULT 0,
       daily_sell_day TEXT,
       last_viewed_at INTEGER,
@@ -180,17 +184,166 @@ function ensureDb() {
     );
     CREATE INDEX IF NOT EXISTS founder_progression_strategies_plot_idx
       ON founder_progression_strategies (plot_id, selected, updated_at DESC);
+
+    CREATE TABLE IF NOT EXISTS founder_plot_memberships (
+      pair_id TEXT NOT NULL,
+      plot_id TEXT NOT NULL,
+      role TEXT NOT NULL,
+      origin_claim_id TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (pair_id, plot_id)
+    );
+    CREATE INDEX IF NOT EXISTS founder_plot_memberships_plot_idx
+      ON founder_plot_memberships (plot_id, pair_id);
+
+    CREATE TABLE IF NOT EXISTS founder_settlement_claims (
+      claim_id TEXT PRIMARY KEY,
+      owner_pair_id TEXT NOT NULL,
+      origin_plot_id TEXT NOT NULL,
+      site_plan_id TEXT NOT NULL,
+      report_id TEXT NOT NULL,
+      founded_plot_id TEXT,
+      convoy_job_id TEXT,
+      approval_id TEXT,
+      status TEXT NOT NULL,
+      title TEXT NOT NULL,
+      focus TEXT NOT NULL,
+      site_type TEXT NOT NULL,
+      risk TEXT NOT NULL,
+      traits_json TEXT NOT NULL DEFAULT '[]',
+      resource_hints_json TEXT NOT NULL DEFAULT '{}',
+      route_json TEXT NOT NULL DEFAULT '{}',
+      cost_json TEXT NOT NULL DEFAULT '{}',
+      receipt_json TEXT NOT NULL DEFAULT '{}',
+      created_by TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      convoy_started_at INTEGER,
+      convoy_ends_at INTEGER,
+      founded_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS founder_settlement_claims_owner_idx
+      ON founder_settlement_claims (owner_pair_id, status, updated_at DESC);
+    CREATE UNIQUE INDEX IF NOT EXISTS founder_settlement_claims_plan_unique_idx
+      ON founder_settlement_claims (origin_plot_id, site_plan_id)
+      WHERE status IN ('CLAIM_READY', 'CONVOY_PREPARING', 'CONVOY_ARRIVED', 'FOUNDED');
+
+    CREATE TABLE IF NOT EXISTS founder_work_orders (
+      work_order_id TEXT PRIMARY KEY,
+      plot_id TEXT NOT NULL,
+      template_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      title TEXT NOT NULL,
+      scope_json TEXT NOT NULL DEFAULT '{}',
+      allowed_actions_json TEXT NOT NULL DEFAULT '[]',
+      caps_json TEXT NOT NULL DEFAULT '{}',
+      policy_snapshot_json TEXT NOT NULL DEFAULT '{}',
+      child_receipts_json TEXT NOT NULL DEFAULT '[]',
+      created_by TEXT NOT NULL,
+      approved_by TEXT,
+      failure_reason TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      expires_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS founder_work_orders_plot_idx
+      ON founder_work_orders (plot_id, status, updated_at DESC);
+
+    CREATE TABLE IF NOT EXISTS founder_civic_proposals (
+      proposal_id TEXT PRIMARY KEY,
+      plot_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      title TEXT NOT NULL,
+      category TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      scope_json TEXT NOT NULL DEFAULT '{}',
+      review_json TEXT NOT NULL DEFAULT '{}',
+      authority_boundary TEXT NOT NULL,
+      created_by TEXT NOT NULL,
+      approved_by TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      reviewed_at INTEGER,
+      archived_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS founder_civic_proposals_plot_idx
+      ON founder_civic_proposals (plot_id, status, updated_at DESC);
+
+    CREATE TABLE IF NOT EXISTS founder_overlay_packs (
+      overlay_pack_id TEXT PRIMARY KEY,
+      plot_id TEXT NOT NULL,
+      source_proposal_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      title TEXT NOT NULL,
+      theme TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      target_surface_ids_json TEXT NOT NULL DEFAULT '[]',
+      target_node_ids_json TEXT NOT NULL DEFAULT '[]',
+      display_hints_json TEXT NOT NULL DEFAULT '{}',
+      prompt_json TEXT NOT NULL DEFAULT '{}',
+      provenance_json TEXT NOT NULL DEFAULT '{}',
+      visual_only INTEGER NOT NULL DEFAULT 1,
+      authority_boundary TEXT NOT NULL,
+      created_by TEXT NOT NULL,
+      approved_by TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      reviewed_at INTEGER,
+      archived_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS founder_overlay_packs_plot_idx
+      ON founder_overlay_packs (plot_id, status, updated_at DESC);
+
+    CREATE TABLE IF NOT EXISTS founder_civic_projects (
+      project_id TEXT PRIMARY KEY,
+      plot_id TEXT NOT NULL,
+      source_proposal_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      project_type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      effect_json TEXT NOT NULL DEFAULT '{}',
+      receipt_json TEXT NOT NULL DEFAULT '{}',
+      authority_boundary TEXT NOT NULL,
+      created_by TEXT NOT NULL,
+      approved_by TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      activated_at INTEGER,
+      archived_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS founder_civic_projects_plot_idx
+      ON founder_civic_projects (plot_id, status, updated_at DESC);
+    CREATE UNIQUE INDEX IF NOT EXISTS founder_civic_projects_source_unique_idx
+      ON founder_civic_projects (plot_id, source_proposal_id);
   `);
-  // Lightweight migration: add agent_tiers_xp_awarded_json if missing from pre-existing DBs.
-  try {
-    const cols = db.prepare("PRAGMA table_info(founder_plots)").all();
-    const hasColumn = cols.some((c) => c.name === 'agent_tiers_xp_awarded_json');
-    if (!hasColumn) {
-      db.exec("ALTER TABLE founder_plots ADD COLUMN agent_tiers_xp_awarded_json TEXT NOT NULL DEFAULT '[]';");
-    }
-  } catch {
-    /* ignore migration check errors; fresh DBs created above already have the column */
-  }
+	  // Lightweight migrations for pre-existing local/test DBs.
+	  try {
+	    const cols = db.prepare("PRAGMA table_info(founder_plots)").all();
+	    const hasAgentTiers = cols.some((c) => c.name === 'agent_tiers_xp_awarded_json');
+	    if (!hasAgentTiers) {
+	      db.exec("ALTER TABLE founder_plots ADD COLUMN agent_tiers_xp_awarded_json TEXT NOT NULL DEFAULT '[]';");
+	    }
+	    const hasScoutReports = cols.some((c) => c.name === 'scout_reports_json');
+	    if (!hasScoutReports) {
+	      db.exec("ALTER TABLE founder_plots ADD COLUMN scout_reports_json TEXT NOT NULL DEFAULT '[]';");
+	    }
+	    const hasSitePlans = cols.some((c) => c.name === 'site_plans_json');
+	    if (!hasSitePlans) {
+	      db.exec("ALTER TABLE founder_plots ADD COLUMN site_plans_json TEXT NOT NULL DEFAULT '[]';");
+	    }
+	    const hasDoctrineState = cols.some((c) => c.name === 'doctrine_state_json');
+	    if (!hasDoctrineState) {
+	      db.exec("ALTER TABLE founder_plots ADD COLUMN doctrine_state_json TEXT NOT NULL DEFAULT '{}';");
+	    }
+	    const hasExpeditionScouts = cols.some((c) => c.name === 'expedition_scouts_json');
+	    if (!hasExpeditionScouts) {
+	      db.exec("ALTER TABLE founder_plots ADD COLUMN expedition_scouts_json TEXT NOT NULL DEFAULT '[]';");
+	    }
+	  } catch {
+	    /* ignore migration check errors; fresh DBs created above already have the columns */
+	  }
   statements = buildStatements(db);
   return db;
 }
@@ -203,14 +356,14 @@ function buildStatements(database) {
       INSERT INTO founder_plots (
         plot_id, pair_id, house_id, status, hq_level, town_xp, inventory_json, storage_caps_json,
         construction_slots, next_build_buff_pct, claimed_rewards_json, seen_building_types_json,
-        collected_building_types_json, agent_tiers_xp_awarded_json, last_daily_bonus_day, daily_sold_coin, daily_sell_day,
-        last_viewed_at, pending_recap_from, pending_recap_to, created_at, updated_at, last_simulated_at
-      ) VALUES (
-        @plot_id, @pair_id, @house_id, @status, @hq_level, @town_xp, @inventory_json, @storage_caps_json,
-        @construction_slots, @next_build_buff_pct, @claimed_rewards_json, @seen_building_types_json,
-        @collected_building_types_json, @agent_tiers_xp_awarded_json, @last_daily_bonus_day, @daily_sold_coin, @daily_sell_day,
-        @last_viewed_at, @pending_recap_from, @pending_recap_to, @created_at, @updated_at, @last_simulated_at
-      )
+        collected_building_types_json, agent_tiers_xp_awarded_json, scout_reports_json, site_plans_json, doctrine_state_json, expedition_scouts_json, last_daily_bonus_day, daily_sold_coin, daily_sell_day,
+	        last_viewed_at, pending_recap_from, pending_recap_to, created_at, updated_at, last_simulated_at
+	      ) VALUES (
+	        @plot_id, @pair_id, @house_id, @status, @hq_level, @town_xp, @inventory_json, @storage_caps_json,
+	        @construction_slots, @next_build_buff_pct, @claimed_rewards_json, @seen_building_types_json,
+        @collected_building_types_json, @agent_tiers_xp_awarded_json, @scout_reports_json, @site_plans_json, @doctrine_state_json, @expedition_scouts_json, @last_daily_bonus_day, @daily_sold_coin, @daily_sell_day,
+	        @last_viewed_at, @pending_recap_from, @pending_recap_to, @created_at, @updated_at, @last_simulated_at
+	      )
       ON CONFLICT(plot_id) DO UPDATE SET
         pair_id = excluded.pair_id,
         house_id = excluded.house_id,
@@ -222,10 +375,14 @@ function buildStatements(database) {
         construction_slots = excluded.construction_slots,
         next_build_buff_pct = excluded.next_build_buff_pct,
         claimed_rewards_json = excluded.claimed_rewards_json,
-        seen_building_types_json = excluded.seen_building_types_json,
-        collected_building_types_json = excluded.collected_building_types_json,
-        agent_tiers_xp_awarded_json = excluded.agent_tiers_xp_awarded_json,
-        last_daily_bonus_day = excluded.last_daily_bonus_day,
+	        seen_building_types_json = excluded.seen_building_types_json,
+	        collected_building_types_json = excluded.collected_building_types_json,
+	        agent_tiers_xp_awarded_json = excluded.agent_tiers_xp_awarded_json,
+	        scout_reports_json = excluded.scout_reports_json,
+	        site_plans_json = excluded.site_plans_json,
+	        doctrine_state_json = excluded.doctrine_state_json,
+	        expedition_scouts_json = excluded.expedition_scouts_json,
+	        last_daily_bonus_day = excluded.last_daily_bonus_day,
         daily_sold_coin = excluded.daily_sold_coin,
         daily_sell_day = excluded.daily_sell_day,
         last_viewed_at = excluded.last_viewed_at,
@@ -400,7 +557,228 @@ function buildStatements(database) {
     selectProgressionStrategy: database.prepare(`
       UPDATE founder_progression_strategies SET selected = 1, updated_at = ? WHERE plot_id = ? AND strategy_id = ?
     `),
+    membershipsByPair: database.prepare(`
+      SELECT * FROM founder_plot_memberships WHERE pair_id = ? ORDER BY role ASC, created_at ASC, plot_id ASC
+    `),
+    membershipByPairPlot: database.prepare(`
+      SELECT * FROM founder_plot_memberships WHERE pair_id = ? AND plot_id = ? LIMIT 1
+    `),
+    upsertPlotMembership: database.prepare(`
+      INSERT INTO founder_plot_memberships (
+        pair_id, plot_id, role, origin_claim_id, created_at, updated_at
+      ) VALUES (
+        @pair_id, @plot_id, @role, @origin_claim_id, @created_at, @updated_at
+      )
+      ON CONFLICT(pair_id, plot_id) DO UPDATE SET
+        role = excluded.role,
+        origin_claim_id = excluded.origin_claim_id,
+        updated_at = excluded.updated_at
+    `),
+    settlementClaimsByOwner: database.prepare(`
+      SELECT * FROM founder_settlement_claims
+      WHERE owner_pair_id = ?
+      ORDER BY created_at ASC, claim_id ASC
+    `),
+    settlementClaimsByOrigin: database.prepare(`
+      SELECT * FROM founder_settlement_claims
+      WHERE origin_plot_id = ?
+      ORDER BY created_at ASC, claim_id ASC
+    `),
+    settlementClaimById: database.prepare(`
+      SELECT * FROM founder_settlement_claims WHERE claim_id = ? LIMIT 1
+    `),
+    settlementClaimByPlan: database.prepare(`
+      SELECT * FROM founder_settlement_claims
+      WHERE origin_plot_id = ? AND site_plan_id = ? AND status IN ('CLAIM_READY', 'CONVOY_PREPARING', 'CONVOY_ARRIVED', 'FOUNDED')
+      ORDER BY created_at ASC, claim_id ASC
+      LIMIT 1
+    `),
+    upsertSettlementClaim: database.prepare(`
+      INSERT INTO founder_settlement_claims (
+        claim_id, owner_pair_id, origin_plot_id, site_plan_id, report_id, founded_plot_id,
+        convoy_job_id, approval_id, status, title, focus, site_type, risk, traits_json,
+        resource_hints_json, route_json, cost_json, receipt_json, created_by, created_at,
+        updated_at, convoy_started_at, convoy_ends_at, founded_at
+      ) VALUES (
+        @claim_id, @owner_pair_id, @origin_plot_id, @site_plan_id, @report_id, @founded_plot_id,
+        @convoy_job_id, @approval_id, @status, @title, @focus, @site_type, @risk, @traits_json,
+        @resource_hints_json, @route_json, @cost_json, @receipt_json, @created_by, @created_at,
+        @updated_at, @convoy_started_at, @convoy_ends_at, @founded_at
+      )
+      ON CONFLICT(claim_id) DO UPDATE SET
+        owner_pair_id = excluded.owner_pair_id,
+        origin_plot_id = excluded.origin_plot_id,
+        site_plan_id = excluded.site_plan_id,
+        report_id = excluded.report_id,
+        founded_plot_id = excluded.founded_plot_id,
+        convoy_job_id = excluded.convoy_job_id,
+        approval_id = excluded.approval_id,
+        status = excluded.status,
+        title = excluded.title,
+        focus = excluded.focus,
+        site_type = excluded.site_type,
+        risk = excluded.risk,
+        traits_json = excluded.traits_json,
+        resource_hints_json = excluded.resource_hints_json,
+        route_json = excluded.route_json,
+        cost_json = excluded.cost_json,
+        receipt_json = excluded.receipt_json,
+        created_by = excluded.created_by,
+        created_at = excluded.created_at,
+        updated_at = excluded.updated_at,
+        convoy_started_at = excluded.convoy_started_at,
+        convoy_ends_at = excluded.convoy_ends_at,
+        founded_at = excluded.founded_at
+    `),
+    workOrdersByPlot: database.prepare(`
+      SELECT * FROM founder_work_orders
+      WHERE plot_id = ?
+      ORDER BY created_at ASC, work_order_id ASC
+    `),
+    workOrderById: database.prepare('SELECT * FROM founder_work_orders WHERE work_order_id = ? LIMIT 1'),
+    upsertWorkOrder: database.prepare(`
+      INSERT INTO founder_work_orders (
+        work_order_id, plot_id, template_id, status, title, scope_json,
+        allowed_actions_json, caps_json, policy_snapshot_json, child_receipts_json,
+        created_by, approved_by, failure_reason, created_at, updated_at, expires_at
+      ) VALUES (
+        @work_order_id, @plot_id, @template_id, @status, @title, @scope_json,
+        @allowed_actions_json, @caps_json, @policy_snapshot_json, @child_receipts_json,
+        @created_by, @approved_by, @failure_reason, @created_at, @updated_at, @expires_at
+      )
+      ON CONFLICT(work_order_id) DO UPDATE SET
+        plot_id = excluded.plot_id,
+        template_id = excluded.template_id,
+        status = excluded.status,
+        title = excluded.title,
+        scope_json = excluded.scope_json,
+        allowed_actions_json = excluded.allowed_actions_json,
+        caps_json = excluded.caps_json,
+        policy_snapshot_json = excluded.policy_snapshot_json,
+        child_receipts_json = excluded.child_receipts_json,
+        created_by = excluded.created_by,
+        approved_by = excluded.approved_by,
+        failure_reason = excluded.failure_reason,
+        created_at = excluded.created_at,
+        updated_at = excluded.updated_at,
+        expires_at = excluded.expires_at
+    `),
+    civicProposalsByPlot: database.prepare(`
+      SELECT * FROM founder_civic_proposals
+      WHERE plot_id = ?
+      ORDER BY created_at ASC, proposal_id ASC
+    `),
+    civicProposalById: database.prepare('SELECT * FROM founder_civic_proposals WHERE proposal_id = ? LIMIT 1'),
+    upsertCivicProposal: database.prepare(`
+      INSERT INTO founder_civic_proposals (
+        proposal_id, plot_id, status, title, category, summary, scope_json,
+        review_json, authority_boundary, created_by, approved_by, created_at,
+        updated_at, reviewed_at, archived_at
+      ) VALUES (
+        @proposal_id, @plot_id, @status, @title, @category, @summary, @scope_json,
+        @review_json, @authority_boundary, @created_by, @approved_by, @created_at,
+        @updated_at, @reviewed_at, @archived_at
+      )
+      ON CONFLICT(proposal_id) DO UPDATE SET
+        plot_id = excluded.plot_id,
+        status = excluded.status,
+        title = excluded.title,
+        category = excluded.category,
+        summary = excluded.summary,
+        scope_json = excluded.scope_json,
+        review_json = excluded.review_json,
+        authority_boundary = excluded.authority_boundary,
+        created_by = excluded.created_by,
+        approved_by = excluded.approved_by,
+        created_at = excluded.created_at,
+        updated_at = excluded.updated_at,
+        reviewed_at = excluded.reviewed_at,
+        archived_at = excluded.archived_at
+    `),
+    overlayPacksByPlot: database.prepare(`
+      SELECT * FROM founder_overlay_packs
+      WHERE plot_id = ?
+      ORDER BY created_at ASC, overlay_pack_id ASC
+    `),
+    overlayPackById: database.prepare('SELECT * FROM founder_overlay_packs WHERE overlay_pack_id = ? LIMIT 1'),
+    upsertOverlayPack: database.prepare(`
+      INSERT INTO founder_overlay_packs (
+        overlay_pack_id, plot_id, source_proposal_id, status, title, theme, summary,
+        target_surface_ids_json, target_node_ids_json, display_hints_json, prompt_json,
+        provenance_json, visual_only, authority_boundary, created_by, approved_by,
+        created_at, updated_at, reviewed_at, archived_at
+      ) VALUES (
+        @overlay_pack_id, @plot_id, @source_proposal_id, @status, @title, @theme, @summary,
+        @target_surface_ids_json, @target_node_ids_json, @display_hints_json, @prompt_json,
+        @provenance_json, @visual_only, @authority_boundary, @created_by, @approved_by,
+        @created_at, @updated_at, @reviewed_at, @archived_at
+      )
+      ON CONFLICT(overlay_pack_id) DO UPDATE SET
+        plot_id = excluded.plot_id,
+        source_proposal_id = excluded.source_proposal_id,
+        status = excluded.status,
+        title = excluded.title,
+        theme = excluded.theme,
+        summary = excluded.summary,
+        target_surface_ids_json = excluded.target_surface_ids_json,
+        target_node_ids_json = excluded.target_node_ids_json,
+        display_hints_json = excluded.display_hints_json,
+        prompt_json = excluded.prompt_json,
+        provenance_json = excluded.provenance_json,
+        visual_only = excluded.visual_only,
+        authority_boundary = excluded.authority_boundary,
+        created_by = excluded.created_by,
+        approved_by = excluded.approved_by,
+        created_at = excluded.created_at,
+        updated_at = excluded.updated_at,
+        reviewed_at = excluded.reviewed_at,
+        archived_at = excluded.archived_at
+    `),
+    civicProjectsByPlot: database.prepare(`
+      SELECT * FROM founder_civic_projects
+      WHERE plot_id = ?
+      ORDER BY created_at ASC, project_id ASC
+    `),
+    civicProjectById: database.prepare('SELECT * FROM founder_civic_projects WHERE project_id = ? LIMIT 1'),
+    civicProjectBySourceProposal: database.prepare(`
+      SELECT * FROM founder_civic_projects
+      WHERE plot_id = ? AND source_proposal_id = ?
+      LIMIT 1
+    `),
+    upsertCivicProject: database.prepare(`
+      INSERT INTO founder_civic_projects (
+        project_id, plot_id, source_proposal_id, status, project_type, title, summary,
+        effect_json, receipt_json, authority_boundary, created_by, approved_by,
+        created_at, updated_at, activated_at, archived_at
+      ) VALUES (
+        @project_id, @plot_id, @source_proposal_id, @status, @project_type, @title, @summary,
+        @effect_json, @receipt_json, @authority_boundary, @created_by, @approved_by,
+        @created_at, @updated_at, @activated_at, @archived_at
+      )
+      ON CONFLICT(project_id) DO UPDATE SET
+        plot_id = excluded.plot_id,
+        source_proposal_id = excluded.source_proposal_id,
+        status = excluded.status,
+        project_type = excluded.project_type,
+        title = excluded.title,
+        summary = excluded.summary,
+        effect_json = excluded.effect_json,
+        receipt_json = excluded.receipt_json,
+        authority_boundary = excluded.authority_boundary,
+        created_by = excluded.created_by,
+        approved_by = excluded.approved_by,
+        created_at = excluded.created_at,
+        updated_at = excluded.updated_at,
+        activated_at = excluded.activated_at,
+        archived_at = excluded.archived_at
+    `),
     reset: {
+      civicProjects: database.prepare('DELETE FROM founder_civic_projects'),
+      overlayPacks: database.prepare('DELETE FROM founder_overlay_packs'),
+      civicProposals: database.prepare('DELETE FROM founder_civic_proposals'),
+      workOrders: database.prepare('DELETE FROM founder_work_orders'),
+      settlementClaims: database.prepare('DELETE FROM founder_settlement_claims'),
+      plotMemberships: database.prepare('DELETE FROM founder_plot_memberships'),
       progressionStrategies: database.prepare('DELETE FROM founder_progression_strategies'),
       approvals: database.prepare('DELETE FROM founder_approvals'),
       idempotency: database.prepare('DELETE FROM founder_idempotency'),
@@ -441,9 +819,13 @@ function hydratePlot(row) {
     nextBuildBuffPct: Number(row.next_build_buff_pct || 0),
     claimedRewards: parseJson(row.claimed_rewards_json, []),
     seenBuildingTypes: parseJson(row.seen_building_types_json, []),
-    collectedBuildingTypes: parseJson(row.collected_building_types_json, []),
-    agentTiersXpAwarded: parseJson(row.agent_tiers_xp_awarded_json, []),
-    lastDailyBonusDay: row.last_daily_bonus_day || null,
+	    collectedBuildingTypes: parseJson(row.collected_building_types_json, []),
+	    agentTiersXpAwarded: parseJson(row.agent_tiers_xp_awarded_json, []),
+	    scoutReports: parseJson(row.scout_reports_json, []),
+	    sitePlans: parseJson(row.site_plans_json, []),
+	    doctrineState: parseJson(row.doctrine_state_json, {}),
+	    expeditionScouts: parseJson(row.expedition_scouts_json, []),
+	    lastDailyBonusDay: row.last_daily_bonus_day || null,
     dailySoldCoin: Number(row.daily_sold_coin || 0),
     dailySellDay: row.daily_sell_day || null,
     lastViewedAt: row.last_viewed_at == null ? null : Number(row.last_viewed_at),
@@ -469,9 +851,13 @@ function dehydratePlot(plot) {
     next_build_buff_pct: Number(plot.nextBuildBuffPct || 0),
     claimed_rewards_json: toJson(plot.claimedRewards || [], []),
     seen_building_types_json: toJson(plot.seenBuildingTypes || [], []),
-    collected_building_types_json: toJson(plot.collectedBuildingTypes || [], []),
-    agent_tiers_xp_awarded_json: toJson(plot.agentTiersXpAwarded || [], []),
-    last_daily_bonus_day: plot.lastDailyBonusDay || null,
+	    collected_building_types_json: toJson(plot.collectedBuildingTypes || [], []),
+	    agent_tiers_xp_awarded_json: toJson(plot.agentTiersXpAwarded || [], []),
+	    scout_reports_json: toJson(plot.scoutReports || [], []),
+	    site_plans_json: toJson(plot.sitePlans || [], []),
+	    doctrine_state_json: toJson(plot.doctrineState || {}, {}),
+	    expedition_scouts_json: toJson(plot.expeditionScouts || [], []),
+	    last_daily_bonus_day: plot.lastDailyBonusDay || null,
     daily_sold_coin: Number(plot.dailySoldCoin || 0),
     daily_sell_day: plot.dailySellDay || null,
     last_viewed_at: plot.lastViewedAt == null ? null : Number(plot.lastViewedAt),
@@ -671,6 +1057,268 @@ function dehydrateProgressionStrategy(record) {
   };
 }
 
+function hydratePlotMembership(row) {
+  if (!row) return null;
+  return {
+    pairId: row.pair_id,
+    plotId: row.plot_id,
+    role: row.role,
+    originClaimId: row.origin_claim_id || null,
+    createdAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at)
+  };
+}
+
+function dehydratePlotMembership(membership) {
+  return {
+    pair_id: membership.pairId,
+    plot_id: membership.plotId,
+    role: membership.role,
+    origin_claim_id: membership.originClaimId || null,
+    created_at: Number(membership.createdAt),
+    updated_at: Number(membership.updatedAt)
+  };
+}
+
+function hydrateSettlementClaim(row) {
+  if (!row) return null;
+  return {
+    claimId: row.claim_id,
+    ownerPairId: row.owner_pair_id,
+    originPlotId: row.origin_plot_id,
+    sitePlanId: row.site_plan_id,
+    reportId: row.report_id,
+    foundedPlotId: row.founded_plot_id || null,
+    convoyJobId: row.convoy_job_id || null,
+    approvalId: row.approval_id || null,
+    status: row.status,
+    title: row.title,
+    focus: row.focus,
+    siteType: row.site_type,
+    risk: row.risk,
+    traits: parseJson(row.traits_json, []),
+    resourceHints: parseJson(row.resource_hints_json, {}),
+    route: parseJson(row.route_json, {}),
+    cost: parseJson(row.cost_json, {}),
+    receipt: parseJson(row.receipt_json, {}),
+    createdBy: row.created_by,
+    createdAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at),
+    convoyStartedAt: row.convoy_started_at == null ? null : Number(row.convoy_started_at),
+    convoyEndsAt: row.convoy_ends_at == null ? null : Number(row.convoy_ends_at),
+    foundedAt: row.founded_at == null ? null : Number(row.founded_at)
+  };
+}
+
+function dehydrateSettlementClaim(claim) {
+  return {
+    claim_id: claim.claimId,
+    owner_pair_id: claim.ownerPairId,
+    origin_plot_id: claim.originPlotId,
+    site_plan_id: claim.sitePlanId,
+    report_id: claim.reportId,
+    founded_plot_id: claim.foundedPlotId || null,
+    convoy_job_id: claim.convoyJobId || null,
+    approval_id: claim.approvalId || null,
+    status: claim.status,
+    title: claim.title,
+    focus: claim.focus,
+    site_type: claim.siteType,
+    risk: claim.risk,
+    traits_json: toJson(claim.traits || [], []),
+    resource_hints_json: toJson(claim.resourceHints || {}, {}),
+    route_json: toJson(claim.route || {}, {}),
+    cost_json: toJson(claim.cost || {}, {}),
+    receipt_json: toJson(claim.receipt || {}, {}),
+    created_by: claim.createdBy,
+    created_at: Number(claim.createdAt),
+    updated_at: Number(claim.updatedAt),
+    convoy_started_at: claim.convoyStartedAt == null ? null : Number(claim.convoyStartedAt),
+    convoy_ends_at: claim.convoyEndsAt == null ? null : Number(claim.convoyEndsAt),
+    founded_at: claim.foundedAt == null ? null : Number(claim.foundedAt)
+  };
+}
+
+function hydrateWorkOrder(row) {
+  if (!row) return null;
+  return {
+    workOrderId: row.work_order_id,
+    plotId: row.plot_id,
+    templateId: row.template_id,
+    status: row.status,
+    title: row.title,
+    scope: parseJson(row.scope_json, {}),
+    allowedActions: parseJson(row.allowed_actions_json, []),
+    caps: parseJson(row.caps_json, {}),
+    policySnapshot: parseJson(row.policy_snapshot_json, {}),
+    childReceipts: parseJson(row.child_receipts_json, []),
+    createdBy: row.created_by,
+    approvedBy: row.approved_by || null,
+    failureReason: row.failure_reason || null,
+    createdAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at),
+    expiresAt: row.expires_at == null ? null : Number(row.expires_at)
+  };
+}
+
+function dehydrateWorkOrder(workOrder) {
+  return {
+    work_order_id: workOrder.workOrderId,
+    plot_id: workOrder.plotId,
+    template_id: workOrder.templateId,
+    status: workOrder.status,
+    title: workOrder.title,
+    scope_json: toJson(workOrder.scope || {}, {}),
+    allowed_actions_json: toJson(workOrder.allowedActions || [], []),
+    caps_json: toJson(workOrder.caps || {}, {}),
+    policy_snapshot_json: toJson(workOrder.policySnapshot || {}, {}),
+    child_receipts_json: toJson(workOrder.childReceipts || [], []),
+    created_by: workOrder.createdBy,
+    approved_by: workOrder.approvedBy || null,
+    failure_reason: workOrder.failureReason || null,
+    created_at: Number(workOrder.createdAt),
+    updated_at: Number(workOrder.updatedAt),
+    expires_at: workOrder.expiresAt == null ? null : Number(workOrder.expiresAt)
+  };
+}
+
+function hydrateCivicProposal(row) {
+  if (!row) return null;
+  return {
+    proposalId: row.proposal_id,
+    plotId: row.plot_id,
+    status: row.status,
+    title: row.title,
+    category: row.category,
+    summary: row.summary,
+    scope: parseJson(row.scope_json, {}),
+    review: parseJson(row.review_json, {}),
+    authorityBoundary: row.authority_boundary,
+    createdBy: row.created_by,
+    approvedBy: row.approved_by || null,
+    createdAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at),
+    reviewedAt: row.reviewed_at == null ? null : Number(row.reviewed_at),
+    archivedAt: row.archived_at == null ? null : Number(row.archived_at)
+  };
+}
+
+function dehydrateCivicProposal(proposal) {
+  return {
+    proposal_id: proposal.proposalId,
+    plot_id: proposal.plotId,
+    status: proposal.status,
+    title: proposal.title,
+    category: proposal.category,
+    summary: proposal.summary,
+    scope_json: toJson(proposal.scope || {}, {}),
+    review_json: toJson(proposal.review || {}, {}),
+    authority_boundary: proposal.authorityBoundary,
+    created_by: proposal.createdBy,
+    approved_by: proposal.approvedBy || null,
+    created_at: Number(proposal.createdAt),
+    updated_at: Number(proposal.updatedAt),
+    reviewed_at: proposal.reviewedAt == null ? null : Number(proposal.reviewedAt),
+    archived_at: proposal.archivedAt == null ? null : Number(proposal.archivedAt)
+  };
+}
+
+function hydrateOverlayPack(row) {
+  if (!row) return null;
+  return {
+    overlayPackId: row.overlay_pack_id,
+    plotId: row.plot_id,
+    sourceProposalId: row.source_proposal_id,
+    status: row.status,
+    title: row.title,
+    theme: row.theme,
+    summary: row.summary,
+    targetSurfaceIds: parseJson(row.target_surface_ids_json, []),
+    targetNodeIds: parseJson(row.target_node_ids_json, []),
+    displayHints: parseJson(row.display_hints_json, {}),
+    prompt: parseJson(row.prompt_json, {}),
+    provenance: parseJson(row.provenance_json, {}),
+    visualOnly: row.visual_only !== 0,
+    presentationOnly: true,
+    gameplayMutationPolicy: 'presentation_only',
+    authorityBoundary: row.authority_boundary,
+    createdBy: row.created_by,
+    approvedBy: row.approved_by || null,
+    createdAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at),
+    reviewedAt: row.reviewed_at == null ? null : Number(row.reviewed_at),
+    archivedAt: row.archived_at == null ? null : Number(row.archived_at)
+  };
+}
+
+function dehydrateOverlayPack(pack) {
+  return {
+    overlay_pack_id: pack.overlayPackId,
+    plot_id: pack.plotId,
+    source_proposal_id: pack.sourceProposalId,
+    status: pack.status,
+    title: pack.title,
+    theme: pack.theme,
+    summary: pack.summary,
+    target_surface_ids_json: toJson(pack.targetSurfaceIds || [], []),
+    target_node_ids_json: toJson(pack.targetNodeIds || [], []),
+    display_hints_json: toJson(pack.displayHints || {}, {}),
+    prompt_json: toJson(pack.prompt || {}, {}),
+    provenance_json: toJson(pack.provenance || {}, {}),
+    visual_only: pack.visualOnly === false ? 0 : 1,
+    authority_boundary: pack.authorityBoundary,
+    created_by: pack.createdBy,
+    approved_by: pack.approvedBy || null,
+    created_at: Number(pack.createdAt),
+    updated_at: Number(pack.updatedAt),
+    reviewed_at: pack.reviewedAt == null ? null : Number(pack.reviewedAt),
+    archived_at: pack.archivedAt == null ? null : Number(pack.archivedAt)
+  };
+}
+
+function hydrateCivicProject(row) {
+  if (!row) return null;
+  return {
+    projectId: row.project_id,
+    plotId: row.plot_id,
+    sourceProposalId: row.source_proposal_id,
+    status: row.status,
+    projectType: row.project_type,
+    title: row.title,
+    summary: row.summary,
+    effect: parseJson(row.effect_json, {}),
+    receipt: parseJson(row.receipt_json, {}),
+    authorityBoundary: row.authority_boundary,
+    createdBy: row.created_by,
+    approvedBy: row.approved_by || null,
+    createdAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at),
+    activatedAt: row.activated_at == null ? null : Number(row.activated_at),
+    archivedAt: row.archived_at == null ? null : Number(row.archived_at)
+  };
+}
+
+function dehydrateCivicProject(project) {
+  return {
+    project_id: project.projectId,
+    plot_id: project.plotId,
+    source_proposal_id: project.sourceProposalId,
+    status: project.status,
+    project_type: project.projectType,
+    title: project.title,
+    summary: project.summary,
+    effect_json: toJson(project.effect || {}, {}),
+    receipt_json: toJson(project.receipt || {}, {}),
+    authority_boundary: project.authorityBoundary,
+    created_by: project.createdBy,
+    approved_by: project.approvedBy || null,
+    created_at: Number(project.createdAt),
+    updated_at: Number(project.updatedAt),
+    activated_at: project.activatedAt == null ? null : Number(project.activatedAt),
+    archived_at: project.archivedAt == null ? null : Number(project.archivedAt)
+  };
+}
+
 function readPlotBundleByPairId(pairId) {
   ensureDb();
   const row = statements.plotByPair.get(pairId);
@@ -848,9 +1496,126 @@ function selectProgressionStrategy(plotId, strategyId, updatedAt) {
   });
 }
 
+function listPlotMemberships(pairId) {
+  ensureDb();
+  return statements.membershipsByPair.all(pairId).map(hydratePlotMembership);
+}
+
+function getPlotMembership(pairId, plotId) {
+  ensureDb();
+  return hydratePlotMembership(statements.membershipByPairPlot.get(pairId, plotId));
+}
+
+function writePlotMembership(membership) {
+  ensureDb();
+  statements.upsertPlotMembership.run(dehydratePlotMembership(membership));
+  return getPlotMembership(membership.pairId, membership.plotId);
+}
+
+function listSettlementClaimsByOwner(pairId) {
+  ensureDb();
+  return statements.settlementClaimsByOwner.all(pairId).map(hydrateSettlementClaim);
+}
+
+function listSettlementClaimsByOrigin(originPlotId) {
+  ensureDb();
+  return statements.settlementClaimsByOrigin.all(originPlotId).map(hydrateSettlementClaim);
+}
+
+function getSettlementClaim(claimId) {
+  ensureDb();
+  return hydrateSettlementClaim(statements.settlementClaimById.get(claimId));
+}
+
+function findSettlementClaimForPlan(originPlotId, sitePlanId) {
+  ensureDb();
+  return hydrateSettlementClaim(statements.settlementClaimByPlan.get(originPlotId, sitePlanId));
+}
+
+function writeSettlementClaim(claim) {
+  ensureDb();
+  statements.upsertSettlementClaim.run(dehydrateSettlementClaim(claim));
+  return getSettlementClaim(claim.claimId);
+}
+
+function listWorkOrdersByPlot(plotId) {
+  ensureDb();
+  return statements.workOrdersByPlot.all(plotId).map(hydrateWorkOrder);
+}
+
+function getWorkOrder(workOrderId) {
+  ensureDb();
+  return hydrateWorkOrder(statements.workOrderById.get(workOrderId));
+}
+
+function writeWorkOrder(workOrder) {
+  ensureDb();
+  statements.upsertWorkOrder.run(dehydrateWorkOrder(workOrder));
+  return getWorkOrder(workOrder.workOrderId);
+}
+
+function listCivicProposalsByPlot(plotId) {
+  ensureDb();
+  return statements.civicProposalsByPlot.all(plotId).map(hydrateCivicProposal);
+}
+
+function getCivicProposal(proposalId) {
+  ensureDb();
+  return hydrateCivicProposal(statements.civicProposalById.get(proposalId));
+}
+
+function writeCivicProposal(proposal) {
+  ensureDb();
+  statements.upsertCivicProposal.run(dehydrateCivicProposal(proposal));
+  return getCivicProposal(proposal.proposalId);
+}
+
+function listOverlayPacksByPlot(plotId) {
+  ensureDb();
+  return statements.overlayPacksByPlot.all(plotId).map(hydrateOverlayPack);
+}
+
+function getOverlayPack(overlayPackId) {
+  ensureDb();
+  return hydrateOverlayPack(statements.overlayPackById.get(overlayPackId));
+}
+
+function writeOverlayPack(pack) {
+  ensureDb();
+  statements.upsertOverlayPack.run(dehydrateOverlayPack(pack));
+  return getOverlayPack(pack.overlayPackId);
+}
+
+function listCivicProjectsByPlot(plotId) {
+  ensureDb();
+  return statements.civicProjectsByPlot.all(plotId).map(hydrateCivicProject);
+}
+
+function getCivicProject(projectId) {
+  ensureDb();
+  return hydrateCivicProject(statements.civicProjectById.get(projectId));
+}
+
+function getCivicProjectForProposal(plotId, sourceProposalId) {
+  ensureDb();
+  return hydrateCivicProject(statements.civicProjectBySourceProposal.get(plotId, sourceProposalId));
+}
+
+function writeCivicProject(project) {
+  ensureDb();
+  statements.upsertCivicProject.run(dehydrateCivicProject(project));
+  return getCivicProject(project.projectId);
+}
+
 function resetFoundersPlotStore() {
   ensureDb();
   withTransaction(() => {
+    statements.reset.civicProjects.run();
+    statements.reset.overlayPacks.run();
+    statements.reset.civicProposals.run();
+    statements.reset.workOrders.run();
+    statements.reset.settlementClaims.run();
+    statements.reset.plotMemberships.run();
     statements.reset.progressionStrategies.run();
     statements.reset.approvals.run();
     statements.reset.idempotency.run();
@@ -885,5 +1650,26 @@ module.exports = {
   getProgressionStrategy,
   writeProgressionStrategy,
   selectProgressionStrategy,
+  listPlotMemberships,
+  getPlotMembership,
+  writePlotMembership,
+  listSettlementClaimsByOwner,
+  listSettlementClaimsByOrigin,
+  getSettlementClaim,
+  findSettlementClaimForPlan,
+  writeSettlementClaim,
+  listWorkOrdersByPlot,
+  getWorkOrder,
+  writeWorkOrder,
+  listCivicProposalsByPlot,
+  getCivicProposal,
+  writeCivicProposal,
+  listOverlayPacksByPlot,
+  getOverlayPack,
+  writeOverlayPack,
+  listCivicProjectsByPlot,
+  getCivicProject,
+  getCivicProjectForProposal,
+  writeCivicProject,
   resetFoundersPlotStore
 };

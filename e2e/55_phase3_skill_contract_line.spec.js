@@ -74,6 +74,10 @@ test('skill.md keeps the minimal external-agent contract', async ({ request }) =
   expect(txt).toContain('Keep polling `GET /api/agent/state?teamCode=...` during ceremony too.');
   expect(txt).toContain('GET /api/agent/house/material?teamCode=');
   expect(txt).toContain('POST /api/agent/house/connect');
+  expect(txt).toContain('HQ9B Work Order execution is bounded to `et.plot.execute_work_order`');
+  expect(txt).toContain('engine-owned `collect_ready_outputs_once` drafts only');
+  expect(txt).toContain('requires ready outputs');
+  expect(txt).toContain('receipt-linked child idempotency keys');
 
   expect(txt).toContain('Start polling immediately after connect.');
   expect(txt).toContain('Default polling interval: 1 second.');

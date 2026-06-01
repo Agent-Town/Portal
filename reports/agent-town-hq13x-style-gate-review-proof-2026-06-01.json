@@ -1,0 +1,86 @@
+{
+  "ok": true,
+  "date": "2026-06-01",
+  "lane": "HQ13X style gate review",
+  "verdict": "PASS_WITH_NOTES_KEEP_REVIEW_ONLY",
+  "styleGate": {
+    "hq13vStyleAnchorApplied": true,
+    "agentTownFrontierTechCivicIdentityRequired": true,
+    "genericCozyCivMapInsufficient": true,
+    "literalWesternGenreRejected": true,
+    "frontierMeansFoundingThresholdOrUnrevealedMapEdge": true
+  },
+  "inspectedArtifacts": [
+    {
+      "path": "reports/agent-town-hq13w-style-corrected-map-view-2026-06-01.png",
+      "width": 1280,
+      "height": 720,
+      "sha256": "f80b2c4e4839cf18e9526147e6b7d270b61d6f6695362e81a9a6d039c010429c",
+      "styleVerdict": "PASS_REVIEW_DIRECTION"
+    },
+    {
+      "path": "reports/agent-town-hq13u-contextual-mini-map-boundary-swap-2026-06-01.png",
+      "width": 1280,
+      "height": 720,
+      "sha256": "cdcc12d87231e4d6965ba26bfc71166112c6e682132203bf64c677280a50ad4f",
+      "styleVerdict": "SUPERSEDED_BY_HQ13W_FOR_STYLE"
+    },
+    {
+      "path": "reports/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-contact-sheet-2026-06-01.png",
+      "width": 960,
+      "height": 480,
+      "sha256": "e1cb0ae2f20433257f34fa9f10648b469133848136af010e669a7a6c100765b4",
+      "styleVerdict": "REVIEW_ONLY_DO_NOT_PROMOTE"
+    },
+    {
+      "path": "reports/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-contact-sheet-2026-06-01.png",
+      "width": 960,
+      "height": 320,
+      "sha256": "bb727fea5c4e147dcdbd31ee3a92bf675fd3db88c95b1d88d5c63862f40e042f",
+      "styleVerdict": "USEFUL_REVIEW_INPUT_WITH_NOTES"
+    },
+    {
+      "path": "reports/agent-town-hq13t-frontier-boundary-stitch-review-assets-contact-sheet-2026-06-01.png",
+      "width": 960,
+      "height": 360,
+      "sha256": "2e27868621b43428866b0b78c5d41717fc1b6ad157ddf0dee271c27942ac94a7",
+      "styleVerdict": "PASS_BOUNDARY_REVIEW_CANDIDATE"
+    }
+  ],
+  "recommendation": {
+    "currentStyleTarget": "HQ13W style-corrected map view",
+    "promoteRuntimeAssetsNow": false,
+    "nextSafeStepIfRequested": "bounded runtime-style prototype based on HQ13W composition over existing server-owned Expedition Map renderer"
+  },
+  "scope": {
+    "reportProofOnly": true,
+    "runtimeAssetsPromoted": false,
+    "runtimePackDirectoryCreated": false,
+    "runtimePackLoaderCreated": false,
+    "visualPackManifestCreated": false,
+    "appSourceChanged": false,
+    "serverChanged": false,
+    "schemaChanged": false
+  },
+  "guardrails": {
+    "noRuntimeAssetPromotion": true,
+    "noAtlasExecution": true,
+    "noPublicSharing": true,
+    "noGeneratedUniverseRendering": true,
+    "noHiddenAutonomy": true,
+    "noRouteTradeEconomyResourceRewardCombatSchedulerBehavior": true,
+    "noCrossPlotMutation": true,
+    "noExternalEffects": true,
+    "noHiddenTruthLeakage": true,
+    "scoutSectorOnlyCurrentExpeditionMapMutationPath": true,
+    "noCowboySaloonGoldRushDrift": true,
+    "noRoadRouteTradeConquestImplication": true
+  },
+  "verification": {
+    "hq13vProofParsed": true,
+    "hq13wProofParsed": true,
+    "fileChecked": true,
+    "sha256Recorded": true,
+    "visualReviewCompleted": true
+  }
+}

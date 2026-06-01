@@ -1,0 +1,66 @@
+{
+  "id": "agent-town-batch-c-civic-world-grid-inhabitants-proof-2026-05-31",
+  "date": "2026-05-31",
+  "roles": [
+    {
+      "id": "civic-routekeeper-v1",
+      "role": "civic_routekeeper",
+      "displayName": "Tally-Route 14",
+      "roboticOrAgentic": true,
+      "runtimeSprite": "public/experiences/founders-plot/assets/characters/inhabitants/civic_routekeeper/civic-routekeeper-v1.png",
+      "metadata": "public/experiences/founders-plot/assets/characters/inhabitants/civic_routekeeper/civic-routekeeper-v1.json",
+      "checkerPreview": "reports/agent-town-batch-c-civic-routekeeper-checker-preview-2026-05-31.png",
+      "rowProof": "reports/agent-town-batch-c-civic-routekeeper-row-mark-2026-05-31.png",
+      "sheetContract": "2048x2048, 4 columns x 4 rows, 512px cells, sRGBA, transparent corners"
+    },
+    {
+      "id": "oracle-adjunct-v1",
+      "role": "oracle_adjunct",
+      "displayName": "Pella-Node",
+      "roboticOrAgentic": true,
+      "runtimeSprite": "public/experiences/founders-plot/assets/characters/inhabitants/oracle_adjunct/oracle-adjunct-v1.png",
+      "metadata": "public/experiences/founders-plot/assets/characters/inhabitants/oracle_adjunct/oracle-adjunct-v1.json",
+      "checkerPreview": "reports/agent-town-batch-c-oracle-adjunct-checker-preview-2026-05-31.png",
+      "rowProof": "reports/agent-town-batch-c-oracle-adjunct-row-consult-2026-05-31.png",
+      "sheetContract": "2048x2048, 4 columns x 4 rows, 512px cells, sRGBA, transparent corners"
+    },
+    {
+      "id": "outpost-keeper-v1",
+      "role": "outpost_keeper",
+      "displayName": "Noma Hearthpin",
+      "roboticOrAgentic": false,
+      "runtimeSprite": "public/experiences/founders-plot/assets/characters/inhabitants/outpost_keeper/outpost-keeper-v1.png",
+      "metadata": "public/experiences/founders-plot/assets/characters/inhabitants/outpost_keeper/outpost-keeper-v1.json",
+      "checkerPreview": "reports/agent-town-batch-c-outpost-keeper-checker-preview-2026-05-31.png",
+      "rowProof": "reports/agent-town-batch-c-outpost-keeper-row-tend-2026-05-31.png",
+      "sheetContract": "2048x2048, 4 columns x 4 rows, 512px cells, sRGBA, transparent corners"
+    }
+  ],
+  "props": [
+    {
+      "id": "world-grid-civic-beacon-v1",
+      "runtimeImage": "public/experiences/founders-plot/assets/objects/world-grid-civic-beacon.png",
+      "runtimeWebp": "public/experiences/founders-plot/assets/objects/world-grid-civic-beacon.webp",
+      "metadata": "public/experiences/founders-plot/assets/objects/world-grid-civic-beacon.json",
+      "checkerPreview": "reports/agent-town-batch-c-world-grid-civic-beacon-checker-preview-2026-05-31.png",
+      "contract": "1024x1024, sRGBA, transparent corners"
+    }
+  ],
+  "proofImages": [
+    "reports/agent-town-batch-c-civic-world-grid-inhabitants-contact-sheet-2026-05-31.png",
+    "reports/agent-town-batch-c-civic-world-grid-inhabitants-row-strip-2026-05-31.png",
+    "reports/agent-town-batch-c-civic-routekeeper-checker-preview-2026-05-31.png",
+    "reports/agent-town-batch-c-oracle-adjunct-checker-preview-2026-05-31.png",
+    "reports/agent-town-batch-c-outpost-keeper-checker-preview-2026-05-31.png",
+    "reports/agent-town-batch-c-world-grid-civic-beacon-checker-preview-2026-05-31.png",
+    "reports/agent-town-batch-c-civic-routekeeper-row-mark-2026-05-31.png",
+    "reports/agent-town-batch-c-oracle-adjunct-row-consult-2026-05-31.png",
+    "reports/agent-town-batch-c-outpost-keeper-row-tend-2026-05-31.png"
+  ],
+  "wiringStatus": "asset-ready only; no scene_state wiring because no current server visualActors emit civic_routekeeper, oracle_adjunct, or outpost_keeper",
+  "boundaries": [
+    "No mechanics, scheduler, route, trade, public-effect, or gameplay authority changes.",
+    "No Progression Atlas executable action refs or UI wiring were added.",
+    "World Grid prop is proof-only visual art for read-model/civic surfaces."
+  ]
+}

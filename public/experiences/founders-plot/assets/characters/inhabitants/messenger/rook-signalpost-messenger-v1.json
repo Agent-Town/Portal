@@ -1,6 +1,16 @@
 {
   "id": "rook-signalpost-messenger-v1",
+  "displayName": "Rook Signalpost",
   "role": "messenger",
+  "title": "Frontier Signal-Courier",
+  "backstory": "Rook Signalpost runs notices between old frontier habits and AgentTown's future human-agent collaboration. He keeps approval, reward, and quest signals visible without turning them into magic or authority: a quick, theatrical courier who knows that a clear message can keep a busy settlement honest.",
+  "personality": "Quick, funny, trustworthy, theatrical in small gestures, and practical about what the town needs to know.",
+  "authorityBoundary": "Visual-only messenger inhabitant for APPROVAL, REWARD, and QUEST facts. Rook presents notices and signals; he does not grant rewards, approve actions, or change quest state.",
+  "relationships": [
+    "Distinct from Mira Trailmark: Rook carries notices while Mira reads terrain and reports routes.",
+    "Complements the rescued AI agent's civic receipts by making server-owned facts readable in-scene.",
+    "Avoids the older messenger-agentfolk-v1 generic identity in favor of the current runtime named character."
+  ],
   "roleFacts": ["APPROVAL", "REWARD", "QUEST"],
   "model": "built-in image_gen, GPT Image 2 path",
   "sourceImage": "rook-signalpost-messenger-v1.source.png",

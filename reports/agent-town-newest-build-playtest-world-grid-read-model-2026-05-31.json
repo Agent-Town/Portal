@@ -1,0 +1,155 @@
+{
+  "ok": true,
+  "plotId": "plot_7558f6a1cbee768b",
+  "worldDelta": [],
+  "error": null,
+  "stateHash": "1128d43d5f493fc00b28262394bc5da86a1f3cf5089e60ce072f342640297000",
+  "worldGrid": {
+    "status": "READ_MODEL_READY",
+    "title": "World Grid",
+    "implementation": "hq10a_server_owned_world_grid_read_model_v1",
+    "readOnly": true,
+    "executableActions": [],
+    "authorityBoundary": "server_owned_read_only_world_grid_projection_no_civic_mutation_v1",
+    "requirements": {
+      "items": [
+        {
+          "key": "hq.level.6",
+          "label": "HQ6 Settlement Charter",
+          "satisfied": true,
+          "current": 6,
+          "required": 6
+        },
+        {
+          "key": "settlement.outpost.founded",
+          "label": "Founded outpost",
+          "satisfied": true,
+          "current": 1,
+          "required": 1
+        },
+        {
+          "key": "doctrine.survey_discipline.selected",
+          "label": "Survey Discipline selected",
+          "satisfied": true,
+          "current": "survey_discipline",
+          "required": "survey_discipline"
+        },
+        {
+          "key": "work_order.collect_ready_outputs_once.available",
+          "label": "Collect-ready work-order executor available",
+          "satisfied": true,
+          "current": true,
+          "required": true
+        }
+      ],
+      "blockedBy": [],
+      "satisfiedCount": 4,
+      "totalCount": 4
+    },
+    "scope": {
+      "homePlotId": "plot_7558f6a1cbee768b",
+      "activePlotId": "plot_7558f6a1cbee768b",
+      "knownPlotCount": 2,
+      "outpostCount": 1,
+      "knownClaimCount": 1
+    },
+    "plots": [
+      {
+        "plotId": "plot_7558f6a1cbee768b",
+        "role": "HOME",
+        "title": "Founders Plot",
+        "hqLevel": 6,
+        "status": "ACTIVE",
+        "originClaimId": null,
+        "siteType": null,
+        "risk": null,
+        "active": true,
+        "updatedAt": 1780204578807
+      },
+      {
+        "plotId": "plot_739aa1828e32d2f2",
+        "role": "OUTPOST",
+        "title": "Forest Ridge Survey Site Plan",
+        "hqLevel": 1,
+        "status": "ACTIVE",
+        "originClaimId": "claim_25be83cc1d08f1e4",
+        "siteType": "woodland_ridge",
+        "risk": "low",
+        "active": false,
+        "updatedAt": 1780203693652
+      }
+    ],
+    "claims": {
+      "total": 1,
+      "byStatus": {
+        "FOUNDED": 1
+      },
+      "claimReadyPlanCount": 1,
+      "activeConvoyCount": 0,
+      "foundedOutpostCount": 1,
+      "foundedPlotIds": [
+        "plot_739aa1828e32d2f2"
+      ]
+    },
+    "doctrine": {
+      "selectedDoctrineId": "survey_discipline",
+      "status": "SELECTED",
+      "activeEffects": [
+        {
+          "doctrineId": "survey_discipline",
+          "effectKind": "scout_duration_modifier",
+          "buildingType": "EXPEDITION_BOARD",
+          "jobKind": "SCOUT",
+          "durationMultiplier": 0.95,
+          "reductionPct": 5,
+          "authorityBoundary": "server_owned_scout_duration_modifier_v1"
+        }
+      ]
+    },
+    "workOrders": {
+      "draftCount": 0,
+      "completedCount": 1,
+      "executionAvailable": true,
+      "templateIds": [
+        "collect_ready_outputs_once"
+      ]
+    },
+    "civicReadiness": {
+      "ready": true,
+      "nextPromotableSlice": "HQ10B_CIVIC_PROPOSAL_RECORDS",
+      "blockedBy": [],
+      "signals": [
+        {
+          "key": "multi_plot_visibility",
+          "ready": true,
+          "value": 2
+        },
+        {
+          "key": "claim_receipts",
+          "ready": true,
+          "value": 1
+        },
+        {
+          "key": "doctrine_context",
+          "ready": true,
+          "value": "survey_discipline"
+        },
+        {
+          "key": "bounded_work_orders",
+          "ready": true,
+          "value": true
+        }
+      ],
+      "prohibitedCapabilities": [
+        "civic_mutation",
+        "trade_routes",
+        "background_scheduling",
+        "arbitrary_tool_execution",
+        "resource_spending",
+        "atlas_owned_execution",
+        "external_or_public_effects"
+      ]
+    },
+    "projectionHash": "49a5c47a69f841ae"
+  }
+}

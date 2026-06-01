@@ -1,0 +1,96 @@
+{
+  "id": "civic-routekeeper-v1",
+  "role": "civic_routekeeper",
+  "canonicalRoleId": "civic_routekeeper",
+  "roleFacts": ["WORLD_GRID_READ_MODEL", "CIVIC_READINESS", "OUTPOST_FOUNDED", "OUTPUT_READY"],
+  "displayName": "Tally-Route 14",
+  "title": "Civic Routekeeper",
+  "backstory": "Tally-Route 14 keeps civic paths legible without pretending to control them. It walks the edge of new settlements, placing friendly marker ribbons and explaining which World Grid signals are read-only readiness hints.",
+  "personality": "Warm, orderly, careful with boundaries, and quietly delighted by well-labeled paths.",
+  "visiblyAgenticOrRobotic": true,
+  "visualOnly": true,
+  "wiringStatus": "scene_wired_visual_only",
+  "model": "built-in image_gen, requested GPT Image 2.0 path",
+  "sourceImage": "civic-routekeeper-v1.source.png",
+  "nativeGeneratedImage": "civic-routekeeper-v1.generated.png",
+  "image": "civic-routekeeper-v1.png",
+  "prompt": "civic-routekeeper-v1.prompt.md",
+  "nativeGeneratedSize": {
+    "width": 1254,
+    "height": 1254
+  },
+  "sourceSize": {
+    "width": 2048,
+    "height": 2048
+  },
+  "sheetContract": {
+    "width": 2048,
+    "height": 2048,
+    "columns": 4,
+    "rows": 4,
+    "frameWidth": 512,
+    "frameHeight": 512,
+    "frameCount": 16
+  },
+  "rowOrder": ["idle", "walk", "mark", "ready"],
+  "actions": {
+    "idle": {
+      "row": 0,
+      "description": "Friendly routekeeper stances with map ribbon and wayfinding stake at rest.",
+      "frames": [0, 1, 2, 3],
+      "fps": 3
+    },
+    "walk": {
+      "row": 1,
+      "description": "Gentle mechanical walking while carrying the route ribbon and satchel.",
+      "frames": [0, 1, 2, 3],
+      "fps": 6
+    },
+    "mark": {
+      "row": 2,
+      "description": "Placing harmless civic wayfinding stakes or soft ribbon markers.",
+      "frames": [0, 1, 2, 3],
+      "fps": 5
+    },
+    "ready": {
+      "row": 3,
+      "description": "Presenting a sealed route-readiness token or folded civic path card.",
+      "frames": [0, 1, 2, 3],
+      "fps": 4
+    }
+  },
+  "actionMapping": {
+    "WORLD_GRID_READ_MODEL": "ready",
+    "CIVIC_READINESS": "ready",
+    "OUTPOST_FOUNDED": "mark",
+    "OUTPUT_READY": "ready"
+  },
+  "texture": {
+    "path": "public/experiences/founders-plot/assets/characters/inhabitants/civic_routekeeper/civic-routekeeper-v1.png",
+    "format": "png",
+    "colorSpace": "sRGB",
+    "channels": "sRGBA",
+    "width": 2048,
+    "height": 2048,
+    "alpha": true,
+    "transparentCorners": true
+  },
+  "generationNotes": {
+    "sourceProvenance": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e7c63-12e6-76d1-85d0-cd38068fd851/ig_03427427825ed960016a1bc1f35efc8191a61250633a33c260.png",
+    "mode": "built-in image_gen with requested GPT Image 2.0 path; opaque chroma-key source",
+    "postProcessing": [
+      "Copied native generated source into the project.",
+      "Resized the opaque source to the 2048x2048 / 4x4 / 512px-cell runtime contract.",
+      "Converted green chroma background to alpha with ImageMagick."
+    ],
+    "transparency": {
+      "method": "ImageMagick chroma-key conversion from opaque source",
+      "sourceKeyRequested": "#00ff00",
+      "sampledCornerColor": "srgb(22,238,19)",
+      "keyColorsUsed": ["#16ee13"],
+      "fuzz": "22%",
+      "transparentCorners": true
+    },
+    "constraints": ["robotic/synthetic", "adult-height", "visual-only", "no readable text", "no logos", "no weapons", "no surveillance", "no autonomous authority", "no gameplay authority"]
+  }
+}

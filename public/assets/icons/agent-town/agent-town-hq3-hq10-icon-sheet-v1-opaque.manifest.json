@@ -1,0 +1,45 @@
+{
+  "assetSet": "agent-town-hq3-hq10-icon-sheet-v1-opaque",
+  "source": {
+    "generator": "gpt-image-2",
+    "sourcePath": "/Users/robin/.openclaw/media/tool-image-generation/agent-town-hq3-hq10-icon-sheet-v1-opaque---b3dd520b-5e46-4304-9545-b52722766947.png",
+    "repoSourceCopy": "/assets/icons/agent-town/agent-town-hq3-hq10-icon-sheet-v1-opaque.source.png",
+    "grid": { "columns": 4, "rows": 4, "cellSizePx": 512 },
+    "background": "opaque parchment, locally keyed to alpha per crop"
+  },
+  "iconCrops": [
+    { "cell": [0, 0], "iconId": "building.expedition_board", "path": "/assets/icons/agent-town/expedition-board-gpt-image-2-v1.png" },
+    { "cell": [1, 0], "iconId": "action.scout", "path": "/assets/icons/agent-town/scout-action-gpt-image-2-v1.png" },
+    { "cell": [2, 0], "iconId": "receipt.scout_report", "path": "/assets/icons/agent-town/scout-report-gpt-image-2-v1.png" },
+    { "cell": [3, 0], "iconId": "planning.site_plan", "path": "/assets/icons/agent-town/site-plan-gpt-image-2-v1.png" },
+    { "cell": [0, 1], "iconId": "settlement.charter", "path": "/assets/icons/agent-town/settlement-charter-gpt-image-2-v1.png" },
+    { "cell": [1, 1], "iconId": "action.review_site_plan", "path": "/assets/icons/agent-town/reviewed-plan-receipt-gpt-image-2-v1.png" },
+    { "cell": [2, 1], "iconId": "planning.claim_ready", "path": "/assets/icons/agent-town/claim-ready-plan-gpt-image-2-v1.png" },
+    { "cell": [3, 1], "iconId": "unit.settler_convoy", "path": "/assets/icons/agent-town/settler-convoy-gpt-image-2-v1.png" },
+    { "cell": [0, 2], "iconId": "receipt.settlement_claim", "path": "/assets/icons/agent-town/settlement-claim-gpt-image-2-v1.png" },
+    { "cell": [1, 2], "iconId": "route.convoy", "path": "/assets/icons/agent-town/convoy-route-gpt-image-2-v1.png" },
+    { "cell": [2, 2], "iconId": "plot.second_settlement", "path": "/assets/icons/agent-town/outpost-core-gpt-image-2-v1.png" },
+    { "cell": [3, 2], "iconId": "action.found_settlement", "path": "/assets/icons/agent-town/outpost-marker-gpt-image-2-v1.png" },
+    { "cell": [0, 3], "iconId": "receipt.second_plot_founded", "path": "/assets/icons/agent-town/second-plot-founded-gpt-image-2-v1.png" },
+    { "cell": [1, 3], "iconId": "settlement.charter_document", "path": "/assets/icons/agent-town/settlement-charter-document-gpt-image-2-v1.png" },
+    { "cell": [2, 3], "iconId": "building.research_lodge", "path": "/assets/icons/agent-town/research-lodge-gpt-image-2-v1.png" },
+    { "cell": [3, 3], "iconId": "work_order.collect_ready_outputs_once", "path": "/assets/icons/agent-town/cohort-work-order-gpt-image-2-v1.png" }
+  ],
+  "sceneAssets": [
+    "/experiences/founders-plot/assets/buildings/expedition-board.webp",
+    "/experiences/founders-plot/assets/objects/scout-report-dossier.webp",
+    "/experiences/founders-plot/assets/objects/site-plan-dossier.webp",
+    "/experiences/founders-plot/assets/buildings/settlement-charter-board.webp",
+    "/experiences/founders-plot/assets/objects/reviewed-plan-stamp.webp",
+    "/experiences/founders-plot/assets/objects/claim-ready-plan.webp",
+    "/experiences/founders-plot/assets/objects/settler-convoy-wagon.webp",
+    "/experiences/founders-plot/assets/objects/settlement-claim-manifest.webp",
+    "/experiences/founders-plot/assets/objects/convoy-route-map.webp",
+    "/experiences/founders-plot/assets/buildings/outpost-core-lv1.webp",
+    "/experiences/founders-plot/assets/objects/outpost-marker.webp",
+    "/experiences/founders-plot/assets/objects/second-plot-founded-receipt.webp",
+    "/experiences/founders-plot/assets/objects/settlement-charter-document.webp",
+    "/experiences/founders-plot/assets/buildings/research-lodge.webp",
+    "/experiences/founders-plot/assets/objects/cohort-work-order-dossier.webp"
+  ]
+}

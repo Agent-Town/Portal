@@ -1,0 +1,541 @@
+{
+  "ok": true,
+  "generatedAt": "2026-05-31T17:14:06.451Z",
+  "source": "mocked Playwright state carrying server-owned HQ12A/HQ12B/HQ12C expeditionMap read-model cells only",
+  "projectionHash": "hq12d-threejs-expedition-map-proof",
+  "desktop": {
+    "initialInfo": {
+      "renderer": "three.js",
+      "surface": "expedition-map",
+      "projectionHash": "hq12d-threejs-expedition-map-proof",
+      "canvasWidth": 399,
+      "canvasHeight": 399,
+      "cellCount": 5,
+      "selectedCellId": "cell_q0_r1",
+      "zoom": 1,
+      "camera": {
+        "x": 0,
+        "y": 0,
+        "zoom": 1
+      },
+      "bounds": {
+        "minX": -2.795,
+        "maxX": 2.795,
+        "minY": -1.803,
+        "maxY": 1.803
+      },
+      "fogStates": {
+        "discovered": 2,
+        "known": 1,
+        "hinted": 1,
+        "locked_unknown": 1
+      },
+      "pickTargets": [
+        {
+          "cellId": "cell_origin",
+          "fogState": "discovered",
+          "status": "OWNED_HOME",
+          "title": "Founders Plot",
+          "canvas": {
+            "x": 121.77265625000001,
+            "y": 198.8125
+          }
+        },
+        {
+          "cellId": "cell_q1_r0",
+          "fogState": "known",
+          "status": "SITE_PLAN_REVIEWED",
+          "title": "Forest Ridge Survey Site Plan",
+          "canvas": {
+            "x": 173.13255208333334,
+            "y": 198.8125
+          }
+        },
+        {
+          "cellId": "cell_q1_r-1",
+          "fogState": "discovered",
+          "status": "OWNED_OUTPOST",
+          "title": "Forest Ridge Outpost",
+          "canvas": {
+            "x": 147.45260416666667,
+            "y": 154.64298958333333
+          }
+        },
+        {
+          "cellId": "cell_q0_r1",
+          "fogState": "hinted",
+          "status": "HINTED_BY_KNOWN_FRONTIER",
+          "title": "Unresolved Map Edge Hint",
+          "canvas": {
+            "x": 147.45260416666667,
+            "y": 242.98201041666667
+          }
+        },
+        {
+          "cellId": "cell_q3_r0",
+          "fogState": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 275.85234375,
+            "y": 198.8125
+          }
+        }
+      ]
+    },
+    "zoomBefore": {
+      "renderer": "three.js",
+      "surface": "expedition-map",
+      "projectionHash": "hq12d-threejs-expedition-map-proof",
+      "canvasWidth": 399,
+      "canvasHeight": 399,
+      "cellCount": 5,
+      "selectedCellId": "cell_q3_r0",
+      "zoom": 1,
+      "camera": {
+        "x": 0,
+        "y": 0,
+        "zoom": 1
+      },
+      "bounds": {
+        "minX": -2.795,
+        "maxX": 2.795,
+        "minY": -1.803,
+        "maxY": 1.803
+      },
+      "fogStates": {
+        "discovered": 2,
+        "known": 1,
+        "hinted": 1,
+        "locked_unknown": 1
+      },
+      "pickTargets": [
+        {
+          "cellId": "cell_origin",
+          "fogState": "discovered",
+          "status": "OWNED_HOME",
+          "title": "Founders Plot",
+          "canvas": {
+            "x": 121.77265625000001,
+            "y": 198.8125
+          }
+        },
+        {
+          "cellId": "cell_q1_r0",
+          "fogState": "known",
+          "status": "SITE_PLAN_REVIEWED",
+          "title": "Forest Ridge Survey Site Plan",
+          "canvas": {
+            "x": 173.13255208333334,
+            "y": 198.8125
+          }
+        },
+        {
+          "cellId": "cell_q1_r-1",
+          "fogState": "discovered",
+          "status": "OWNED_OUTPOST",
+          "title": "Forest Ridge Outpost",
+          "canvas": {
+            "x": 147.45260416666667,
+            "y": 154.64298958333333
+          }
+        },
+        {
+          "cellId": "cell_q0_r1",
+          "fogState": "hinted",
+          "status": "HINTED_BY_KNOWN_FRONTIER",
+          "title": "Unresolved Map Edge Hint",
+          "canvas": {
+            "x": 147.45260416666667,
+            "y": 242.98201041666667
+          }
+        },
+        {
+          "cellId": "cell_q3_r0",
+          "fogState": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 275.85234375,
+            "y": 198.8125
+          }
+        }
+      ]
+    },
+    "zoomAfter": {
+      "renderer": "three.js",
+      "surface": "expedition-map",
+      "projectionHash": "hq12d-threejs-expedition-map-proof",
+      "canvasWidth": 399,
+      "canvasHeight": 399,
+      "cellCount": 5,
+      "selectedCellId": "cell_q3_r0",
+      "zoom": 2.353,
+      "camera": {
+        "x": 0,
+        "y": 0,
+        "zoom": 2.353
+      },
+      "bounds": {
+        "minX": -2.795,
+        "maxX": 2.795,
+        "minY": -1.803,
+        "maxY": 1.803
+      },
+      "fogStates": {
+        "discovered": 2,
+        "known": 1,
+        "hinted": 1,
+        "locked_unknown": 1
+      },
+      "pickTargets": [
+        {
+          "cellId": "cell_origin",
+          "fogState": "discovered",
+          "status": "OWNED_HOME",
+          "title": "Founders Plot",
+          "canvas": {
+            "x": 17.568141380879435,
+            "y": 198.8125
+          }
+        },
+        {
+          "cellId": "cell_q1_r0",
+          "fogState": "known",
+          "status": "SITE_PLAN_REVIEWED",
+          "title": "Forest Ridge Survey Site Plan",
+          "canvas": {
+            "x": 138.39771379362648,
+            "y": 198.8125
+          }
+        },
+        {
+          "cellId": "cell_q1_r-1",
+          "fogState": "discovered",
+          "status": "OWNED_OUTPOST",
+          "title": "Forest Ridge Outpost",
+          "canvas": {
+            "x": 77.98292758725296,
+            "y": 94.89906772503757
+          }
+        },
+        {
+          "cellId": "cell_q0_r1",
+          "fogState": "hinted",
+          "status": "HINTED_BY_KNOWN_FRONTIER",
+          "title": "Unresolved Map Edge Hint",
+          "canvas": {
+            "x": 77.98292758725296,
+            "y": 302.7259322749624
+          }
+        },
+        {
+          "cellId": "cell_q3_r0",
+          "fogState": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 380.0568586191206,
+            "y": 198.8125
+          }
+        }
+      ]
+    },
+    "panAfter": {
+      "renderer": "three.js",
+      "surface": "expedition-map",
+      "projectionHash": "hq12d-threejs-expedition-map-proof",
+      "canvasWidth": 399,
+      "canvasHeight": 399,
+      "cellCount": 5,
+      "selectedCellId": "cell_q3_r0",
+      "zoom": 2.353,
+      "camera": {
+        "x": 1.095,
+        "y": 0.103,
+        "zoom": 2.353
+      },
+      "bounds": {
+        "minX": -2.795,
+        "maxX": 2.795,
+        "minY": -1.803,
+        "maxY": 1.803
+      },
+      "fogStates": {
+        "discovered": 2,
+        "known": 1,
+        "hinted": 1,
+        "locked_unknown": 1
+      },
+      "pickTargets": [
+        {
+          "cellId": "cell_origin",
+          "fogState": "discovered",
+          "status": "OWNED_HOME",
+          "title": "Founders Plot",
+          "canvas": {
+            "x": -67.76374019619342,
+            "y": 206.81345523291475
+          }
+        },
+        {
+          "cellId": "cell_q1_r0",
+          "fogState": "known",
+          "status": "SITE_PLAN_REVIEWED",
+          "title": "Forest Ridge Survey Site Plan",
+          "canvas": {
+            "x": 53.06583221655364,
+            "y": 206.81345523291475
+          }
+        },
+        {
+          "cellId": "cell_q1_r-1",
+          "fogState": "discovered",
+          "status": "OWNED_OUTPOST",
+          "title": "Forest Ridge Outpost",
+          "canvas": {
+            "x": -7.348953989819871,
+            "y": 102.90002295795232
+          }
+        },
+        {
+          "cellId": "cell_q0_r1",
+          "fogState": "hinted",
+          "status": "HINTED_BY_KNOWN_FRONTIER",
+          "title": "Unresolved Map Edge Hint",
+          "canvas": {
+            "x": -7.348953989819871,
+            "y": 310.7268875078772
+          }
+        },
+        {
+          "cellId": "cell_q3_r0",
+          "fogState": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 294.7249770420477,
+            "y": 206.81345523291475
+          }
+        }
+      ]
+    },
+    "semanticInitial": {
+      "tier": "Survey view",
+      "copy": "Broad region silhouette from discovered, known, hinted, and locked cells.",
+      "selectedHint": "3 revealed cells / 2 hidden silhouettes visible at survey scale.",
+      "fogState": "hinted",
+      "zoomTier": "survey"
+    },
+    "semanticAfterZoom": {
+      "tier": "Detail view",
+      "copy": "Selected-cell facts stay below; close zoom does not unlock extra truth.",
+      "selectedHint": "Selected: Locked Unknown stays sealed; no resources, routes, or action data.",
+      "fogState": "locked_unknown",
+      "zoomTier": "detail"
+    },
+    "pixelSample": {
+      "width": 399,
+      "height": 399,
+      "opaquePixels": 6144,
+      "uniqueColorSamples": 584
+    },
+    "selectedKnownCell": "cell_q1_r0",
+    "selectedLockedCell": "cell_q3_r0"
+  },
+  "mobile": {
+    "before": {
+      "renderer": "three.js",
+      "surface": "expedition-map",
+      "projectionHash": "hq12d-threejs-expedition-map-proof",
+      "canvasWidth": 313,
+      "canvasHeight": 188,
+      "cellCount": 5,
+      "selectedCellId": "cell_q0_r1",
+      "zoom": 1,
+      "camera": {
+        "x": 0,
+        "y": 0,
+        "zoom": 1
+      },
+      "bounds": {
+        "minX": -2.795,
+        "maxX": 2.795,
+        "minY": -1.803,
+        "maxY": 1.803
+      },
+      "fogStates": {
+        "discovered": 2,
+        "known": 1,
+        "hinted": 1,
+        "locked_unknown": 1
+      },
+      "pickTargets": [
+        {
+          "cellId": "cell_origin",
+          "fogState": "discovered",
+          "status": "OWNED_HOME",
+          "title": "Founders Plot",
+          "canvas": {
+            "x": 97.5923961661342,
+            "y": 93
+          }
+        },
+        {
+          "cellId": "cell_q1_r0",
+          "fogState": "known",
+          "status": "SITE_PLAN_REVIEWED",
+          "title": "Forest Ridge Survey Site Plan",
+          "canvas": {
+            "x": 136.19746538871138,
+            "y": 93
+          }
+        },
+        {
+          "cellId": "cell_q1_r-1",
+          "fogState": "discovered",
+          "status": "OWNED_OUTPOST",
+          "title": "Forest Ridge Outpost",
+          "canvas": {
+            "x": 116.89493077742279,
+            "y": 59.94160000000001
+          }
+        },
+        {
+          "cellId": "cell_q0_r1",
+          "fogState": "hinted",
+          "status": "HINTED_BY_KNOWN_FRONTIER",
+          "title": "Unresolved Map Edge Hint",
+          "canvas": {
+            "x": 116.89493077742279,
+            "y": 126.05839999999999
+          }
+        },
+        {
+          "cellId": "cell_q3_r0",
+          "fogState": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 213.4076038338658,
+            "y": 93
+          }
+        }
+      ]
+    },
+    "afterTouchDrag": {
+      "renderer": "three.js",
+      "surface": "expedition-map",
+      "projectionHash": "hq12d-threejs-expedition-map-proof",
+      "canvasWidth": 313,
+      "canvasHeight": 188,
+      "cellCount": 5,
+      "selectedCellId": "cell_q0_r1",
+      "zoom": 2.353,
+      "camera": {
+        "x": 0.991,
+        "y": 0.326,
+        "zoom": 2.353
+      },
+      "bounds": {
+        "minX": -2.795,
+        "maxX": 2.795,
+        "minY": -1.803,
+        "maxY": 1.803
+      },
+      "fogStates": {
+        "discovered": 2,
+        "known": 1,
+        "hinted": 1,
+        "locked_unknown": 1
+      },
+      "pickTargets": [
+        {
+          "cellId": "cell_origin",
+          "fogState": "discovered",
+          "status": "OWNED_HOME",
+          "title": "Founders Plot",
+          "canvas": {
+            "x": -38.81310298962116,
+            "y": 112
+          }
+        },
+        {
+          "cellId": "cell_q1_r0",
+          "fogState": "known",
+          "status": "SITE_PLAN_REVIEWED",
+          "title": "Forest Ridge Survey Site Plan",
+          "canvas": {
+            "x": 52.009394436494894,
+            "y": 112
+          }
+        },
+        {
+          "cellId": "cell_q1_r-1",
+          "fogState": "discovered",
+          "status": "OWNED_OUTPOST",
+          "title": "Forest Ridge Outpost",
+          "canvas": {
+            "x": 6.598145723436862,
+            "y": 34.22662698515229
+          }
+        },
+        {
+          "cellId": "cell_q0_r1",
+          "fogState": "hinted",
+          "status": "HINTED_BY_KNOWN_FRONTIER",
+          "title": "Unresolved Map Edge Hint",
+          "canvas": {
+            "x": 6.598145723436862,
+            "y": 189.7733730148477
+          }
+        },
+        {
+          "cellId": "cell_q3_r0",
+          "fogState": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 233.65438928872697,
+            "y": 112
+          }
+        }
+      ]
+    },
+    "semanticAfterTouchDrag": {
+      "tier": "Detail view",
+      "copy": "Selected-cell facts stay below; close zoom does not unlock extra truth.",
+      "selectedHint": "Selected: Unresolved Map Edge Hint is a hinted edge; only Scout Sector can make it known.",
+      "fogState": "hinted",
+      "zoomTier": "detail"
+    },
+    "pixelSample": {
+      "width": 313,
+      "height": 188,
+      "opaquePixels": 6144,
+      "uniqueColorSamples": 439
+    },
+    "layout": {
+      "viewport": 390,
+      "documentScrollWidth": 390,
+      "bodyScrollWidth": 390,
+      "hostRect": {
+        "left": 40,
+        "right": 353,
+        "width": 313,
+        "height": 188
+      }
+    }
+  },
+  "screenshots": [
+    "reports/agent-town-hq12i-expedition-map-semantic-zoom-polish-desktop-2026-05-31.png",
+    "reports/agent-town-hq12i-expedition-map-semantic-zoom-polish-mobile-2026-05-31.png"
+  ],
+  "guardrails": {
+    "readOnly": true,
+    "executableActions": [],
+    "routeCreation": false,
+    "atlasExecution": false,
+    "hiddenCellResourceTextSuppressed": true
+  }
+}

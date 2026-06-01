@@ -1,0 +1,260 @@
+{
+  "ok": true,
+  "date": "2026-06-01",
+  "lane": "agent-town-hq13e-candidate-02-asset-extraction-plan",
+  "verdict": "READY_FOR_SCHEMA_THEN_TINY_ASSET_BATCH",
+  "scope": {
+    "reportOnly": true,
+    "proofOnly": true,
+    "productionAssetGeneration": false,
+    "runtimeWiring": false,
+    "appJsCssServerTestsAssetsEdited": false
+  },
+  "artifacts": {
+    "report": "reports/agent-town-hq13e-candidate-02-asset-extraction-plan-2026-06-01.md",
+    "proof": "reports/agent-town-hq13e-candidate-02-asset-extraction-plan-proof-2026-06-01.json"
+  },
+  "references": {
+    "primaryCandidate02": {
+      "path": "reports/agent-town-hq13-expedition-map-north-star-visual-direction-02-2026-06-01.png",
+      "width": 2048,
+      "height": 1152,
+      "sha256": "b05751962b49469ee28d2ae4fed97f519368153da2f06c7d67473f433aaeab79"
+    },
+    "hq13bDesktopShell": {
+      "path": "reports/agent-town-hq13b-north-star-expedition-map-visual-shell-desktop-2026-06-01.png",
+      "width": 465,
+      "height": 3422,
+      "sha256": "206200854db9ba137d55ff9d8371bd93fd5c4560724cc2c54ba044625dcd6d17"
+    },
+    "hq13aPackArchitecture": {
+      "path": "docs/specs/agent-town-visual-universe-pack-architecture.md",
+      "sha256": "c8644652c09cffb0e0f482986c4f21902723a2f667269da7307d1227e4d39e53"
+    }
+  },
+  "assetCategories": [
+    {
+      "category": "terrain_tiles",
+      "packModule": "map_terrain_pack",
+      "runtimeSlots": [
+        "expedition_map.terrain.home_settlement",
+        "expedition_map.terrain.woodland_ridge",
+        "expedition_map.terrain.river_flat",
+        "expedition_map.terrain.farm_clearings",
+        "expedition_map.terrain.ruin_signal",
+        "expedition_map.terrain.locked_silhouette"
+      ],
+      "sourceTruth": "expeditionMap.cells[*] visible fogState/status/explicit visible terrain class",
+      "forbiddenAuthority": [
+        "fog transitions",
+        "hidden terrain",
+        "resources",
+        "scout eligibility",
+        "routes",
+        "adjacency creation",
+        "jobs",
+        "timers"
+      ]
+    },
+    {
+      "category": "fog_overlays",
+      "packModule": "fog_marker_pack",
+      "runtimeSlots": [
+        "expedition_map.fog.discovered",
+        "expedition_map.fog.known",
+        "expedition_map.fog.hinted",
+        "expedition_map.fog.locked_unknown",
+        "expedition_map.fog.frontier_border"
+      ],
+      "sourceTruth": "expeditionMap.cells[*].fogState and server-provided visible/hinted/locked projection",
+      "forbiddenAuthority": [
+        "hidden resources",
+        "hidden receipts",
+        "hidden routes",
+        "client-side reveal rules",
+        "Scout Sector mutation logic"
+      ]
+    },
+    {
+      "category": "marker_pins",
+      "packModule": "fog_marker_pack",
+      "runtimeSlots": [
+        "expedition_map.marker.home_base",
+        "expedition_map.marker.known_site_plan",
+        "expedition_map.marker.owned_outpost",
+        "expedition_map.marker.hinted_unknown",
+        "expedition_map.marker.locked_unknown",
+        "expedition_map.marker.current_focus"
+      ],
+      "sourceTruth": "visible expeditionMap cell status, server receipt/read-model records, current focus read model",
+      "forbiddenAuthority": [
+        "hidden POI identity",
+        "resources",
+        "rewards",
+        "actions",
+        "outpost production",
+        "route/trade state"
+      ]
+    },
+    {
+      "category": "route_and_survey_strokes",
+      "packModule": "fog_marker_pack",
+      "runtimeSlots": [
+        "expedition_map.stroke.survey_visible_adjacency",
+        "expedition_map.stroke.scout_receipt_trace",
+        "expedition_map.stroke.selected_cell_rim",
+        "expedition_map.stroke.frontier_hint_boundary"
+      ],
+      "sourceTruth": "renderer adjacency among server-provided visible cells, visible scout receipts, selected client UI state",
+      "forbiddenAuthority": [
+        "route creation",
+        "movement",
+        "trade",
+        "economy",
+        "pathfinding",
+        "travel time",
+        "hidden result"
+      ]
+    },
+    {
+      "category": "settlement_outpost_ruin_icons",
+      "packModule": "map_terrain_pack",
+      "runtimeSlots": [
+        "expedition_map.icon.home_settlement_cluster",
+        "expedition_map.icon.outpost_camp",
+        "expedition_map.icon.reviewed_site_marker",
+        "expedition_map.icon.ruin_silhouette_known",
+        "expedition_map.icon.crystal_landmark_known",
+        "expedition_map.icon.locked_ruin_shadow"
+      ],
+      "sourceTruth": "visible server cell status or explicit visible server POI class",
+      "forbiddenAuthority": [
+        "building inventory",
+        "resource amounts",
+        "outpost actions",
+        "hidden event outcomes",
+        "combat/risk",
+        "harvest availability"
+      ]
+    },
+    {
+      "category": "hud_card_frames",
+      "packModule": "hud_card_pack",
+      "runtimeSlots": [
+        "hud.frame.expedition_map_board",
+        "hud.frame.selected_sector_card",
+        "hud.frame.event_packet",
+        "hud.frame.expedition_party",
+        "hud.frame.minimap",
+        "hud.icon.legend_swatches"
+      ],
+      "sourceTruth": "server read model surfaces and client selected-cell presentation state",
+      "forbiddenAuthority": [
+        "buttons",
+        "tool ids",
+        "mutation routes",
+        "hidden truth",
+        "formulas",
+        "timers",
+        "Atlas execution",
+        "public sharing"
+      ]
+    },
+    {
+      "category": "party_tokens",
+      "packModule": "inhabitant_operator_pack",
+      "runtimeSlots": [
+        "founders_plot.party.member.scout",
+        "founders_plot.party.member.routekeeper",
+        "founders_plot.party.member.synthetic_assistant",
+        "expedition_map.party_token.cluster"
+      ],
+      "sourceTruth": "expeditionMap.expeditionParty and event packet partySnapshot records",
+      "forbiddenAuthority": [
+        "movement",
+        "assignments",
+        "inventory",
+        "hidden autonomy",
+        "route/trade behavior",
+        "combat"
+      ]
+    },
+    {
+      "category": "semantic_zoom_variants",
+      "packModule": "map_terrain_pack + fog_marker_pack + hud_card_pack",
+      "runtimeSlots": [
+        "expedition_map.zoom.survey.terrain",
+        "expedition_map.zoom.region.terrain",
+        "expedition_map.zoom.detail.terrain",
+        "expedition_map.zoom.survey.marker",
+        "expedition_map.zoom.detail.marker",
+        "hud.semantic_zoom.badge"
+      ],
+      "sourceTruth": "same server cells and selected-cell read model, plus client zoom tier for presentation only",
+      "forbiddenAuthority": [
+        "extra facts on zoom",
+        "hidden resources",
+        "hidden routes",
+        "new receipts",
+        "actions",
+        "unlock state"
+      ]
+    }
+  ],
+  "smallestNextBatch": [
+    "fog-hinted-soft-veil-v1.png",
+    "fog-locked-heavy-cloud-v1.png",
+    "frontier-dotted-boundary-v1.png",
+    "marker-known-site-plan-v1.png",
+    "marker-hinted-unknown-v1.png",
+    "marker-owned-outpost-v1.png",
+    "survey-receipt-stroke-v1.png",
+    "hud-selected-sector-frame-v1.png"
+  ],
+  "migrationPlan": [
+    "keep_hq13b_procedural_shell_as_fallback",
+    "schema_and_fixture_validation",
+    "reports_only_asset_generation_and_qa",
+    "private_runtime_pack_directory_after_approval",
+    "read_only_renderer_loader_with_fail_closed_fallback",
+    "desktop_mobile_guardrail_proof",
+    "terrain_and_semantic_zoom_expansion_later"
+  ],
+  "guardrails": {
+    "serverOwnedFogPreserved": true,
+    "scoutSectorOnlyCurrentMutationPath": true,
+    "eventPacketReadOnly": true,
+    "expeditionPartyReadOnly": true,
+    "currentFocusReadOnly": true,
+    "selectedSectorHiddenTruthSuppression": true,
+    "atlasExecution": false,
+    "publicSharing": false,
+    "generatedUniverseRealRendering": false,
+    "hiddenAutonomy": false,
+    "routeTradeEconomyCombatScheduler": false,
+    "resourceHarvesting": false,
+    "crossPlotMutation": false,
+    "externalEffects": false,
+    "wildWestDrift": false
+  },
+  "verification": {
+    "commands": [
+      {
+        "command": "jq empty reports/agent-town-hq13e-candidate-02-asset-extraction-plan-proof-2026-06-01.json",
+        "exitCode": 0
+      },
+      {
+        "command": "git diff --check -- reports/agent-town-hq13e-candidate-02-asset-extraction-plan-2026-06-01.md reports/agent-town-hq13e-candidate-02-asset-extraction-plan-proof-2026-06-01.json",
+        "exitCode": 0
+      },
+      {
+        "command": "rg -n \"[ \\\\t]+$|\\\\t\" reports/agent-town-hq13e-candidate-02-asset-extraction-plan-2026-06-01.md reports/agent-town-hq13e-candidate-02-asset-extraction-plan-proof-2026-06-01.json",
+        "exitCode": 1,
+        "meaning": "no trailing whitespace or tab matches"
+      }
+    ],
+    "runtimeChecksNeeded": false,
+    "reason": "Markdown and JSON report/proof artifacts only"
+  },
+  "recommendation": "Next lane should add a report/docs-only visual-pack schema validator fixture, then generate the 8-asset reports-only batch after the schema rejects forbidden authority fields."
+}

@@ -1,0 +1,41 @@
+{
+  "id": "civic-proposal-dossier-card-art-v1",
+  "role": "hq10b_civic_proposal_status_card_art",
+  "displayName": "Civic Proposal Dossier Card Art",
+  "description": "Presentation-only card art for Founders Plot HQ10B civic proposal records. It replaces the shared World Grid beacon fallback on the Civic Proposal status card.",
+  "visualOnly": true,
+  "wiringStatus": "ui_status_card_wired",
+  "nativeGeneratedImage": "civic-proposal-dossier-card-art.generated.png",
+  "image": "civic-proposal-dossier-card-art.png",
+  "webp": "civic-proposal-dossier-card-art.webp",
+  "prompt": "civic-proposal-dossier-card-art.prompt.md",
+  "nativeGeneratedSize": {
+    "width": 1536,
+    "height": 1024
+  },
+  "texture": {
+    "path": "public/experiences/founders-plot/assets/objects/civic-proposal-dossier-card-art.png",
+    "format": "png",
+    "colorSpace": "sRGB",
+    "channels": "sRGB",
+    "width": 1536,
+    "height": 1024,
+    "alpha": false
+  },
+  "generationNotes": {
+    "sourceProvenance": "/Users/robin/.openclaw/media/tool-image-generation/agent-town-civic-proposal-dossier-card-art-v1---0a810237-98d4-4817-9125-8df0a71f9296.png",
+    "mode": "GPT Image 2 generated source supplied by parent task",
+    "postProcessing": [
+      "Copied generated source into the project as a provenance-preserving .generated.png file.",
+      "Copied the same source as the PNG runtime candidate.",
+      "Converted the PNG runtime candidate to WebP with ImageMagick quality 90 for the Founders Plot status-card reference."
+    ],
+    "constraints": [
+      "presentation-only",
+      "HQ10B civic proposal records only",
+      "no gameplay authority",
+      "no world mutation",
+      "no route/trade/scheduler/spend/share behavior"
+    ]
+  }
+}

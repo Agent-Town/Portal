@@ -1,0 +1,345 @@
+{
+  "ok": true,
+  "generatedAt": "2026-05-31T18:38:19.654Z",
+  "localGeneratedAt": "2026-06-01 01:38 +07",
+  "lane": "HQ12M Scout Sector live preflight / proof lane",
+  "verdict": "PASS",
+  "summary": "A one-off live Playwright preflight opened the real /founders-plot page against a real local node server and clicked the real Scout Sector UI. The only POST observed was /api/founders-plot/expedition-map/scout-sector.",
+  "server": {
+    "healthOk": true,
+    "baseUrl": "http://127.0.0.1:51681",
+    "nodeEnv": "test",
+    "storePath": "/Users/robin/.openclaw/tmp/agent-town-hq12m-founders-1780252687130-44950.sqlite"
+  },
+  "seed": {
+    "plotId": "plot_d6c14849773f3929",
+    "pairId": "session:d26afd53d951e078c9538268ebdf91f2",
+    "reportId": "scout_report_hq12m_river",
+    "planId": "site_plan_hq12m_river",
+    "claimId": "claim_hq12m_river",
+    "foundedPlotId": "plot_hq12m_river_outpost"
+  },
+  "before": {
+    "projectionHash": "23d24107755c1869",
+    "counts": {
+      "discovered": 2,
+      "known": 0,
+      "hinted": 2,
+      "locked_unknown": 8
+    },
+    "targetCell": {
+      "cellId": "cell_q1_r-1",
+      "fogState": "hinted",
+      "kind": "frontier_hint",
+      "sourceTruth": "derived_hint",
+      "resourceHints": {
+        "wood": 0,
+        "stone": 0,
+        "food": 0,
+        "coin": 0
+      }
+    },
+    "knownOrDiscoveredCell": {
+      "cellId": "cell_origin",
+      "fogState": "discovered",
+      "kind": "origin_plot"
+    },
+    "lockedCell": {
+      "cellId": "cell_q-3_r0",
+      "fogState": "locked_unknown",
+      "kind": "fog_placeholder",
+      "resourceHints": {
+        "wood": 0,
+        "stone": 0,
+        "food": 0,
+        "coin": 0
+      },
+      "eventPacket": null
+    },
+    "ui": {
+      "panelVisible": true,
+      "targetScoutButtonVisible": true,
+      "knownScoutButtonCount": 0,
+      "lockedScoutButtonCount": 0,
+      "mapButtons": [
+        {
+          "testid": "fp-btn-scout-sector-cell_q1_r-1",
+          "cellId": "cell_q1_r-1",
+          "text": "Scout Sector"
+        },
+        {
+          "testid": "fp-btn-scout-sector-cell_q2_r-1",
+          "cellId": "cell_q2_r-1",
+          "text": "Scout Sector"
+        }
+      ],
+      "selectedRulesText": "VisibilityHidden: no resources, routes, or actions are exposed.Scout pathOnly Scout Sector can reveal one eligible hinted edge as known.Zoom contextSemantic zoom clarifies status only.AuthorityServer read model only; this card adds no mutation path.",
+      "hiddenSummaryText": "Hidden frontier2 hinted silhouettes and 8 locked unknown sectors remain private fog."
+    }
+  },
+  "scoutSectorResponse": {
+    "status": 200,
+    "revealedCellId": "cell_q1_r-1",
+    "alreadyScouted": false,
+    "scoutId": "expedition_scout_002a6188484492c5",
+    "proof": {
+      "actionName": "et.plot.scout_sector",
+      "targetBeforeFogState": "hinted",
+      "targetAfterFogState": "known",
+      "newlyKnownOrDiscoveredCellIds": [
+        "cell_q1_r-1"
+      ],
+      "eventPacketId": "expedition_event_packet_a30713b8c063523e",
+      "beforeFogCounts": {
+        "discovered": 2,
+        "known": 0,
+        "hinted": 2,
+        "locked_unknown": 8
+      },
+      "afterFogCounts": {
+        "discovered": 2,
+        "known": 1,
+        "hinted": 3,
+        "locked_unknown": 8
+      }
+    },
+    "receiptBoundary": {
+      "samePlotOnly": true,
+      "serverOwnedDiscoveryReceipt": true,
+      "revealsExactlyOneSector": true,
+      "autonomousMovement": false,
+      "resourceHarvesting": false,
+      "resourceDelta": {},
+      "routeCreation": false,
+      "tradeRouteCreation": false,
+      "backgroundScheduling": false,
+      "combat": false,
+      "publicSharing": false,
+      "generatedUniverseRendering": false,
+      "crossPlotMutation": false,
+      "atlasExecution": false,
+      "externalEffects": false
+    },
+    "eventPacket": {
+      "packetId": "expedition_event_packet_a30713b8c063523e",
+      "kind": "expedition_event_packet",
+      "readOnly": true,
+      "executableActions": [],
+      "authorityBoundary": "server_owned_expedition_event_packet_read_model_v1",
+      "partyId": "expedition_party_current_plot_v1",
+      "partySnapshotReadOnly": true,
+      "partySnapshotActions": [],
+      "partyMembers": [
+        {
+          "memberId": "pathfinder-scout-v1",
+          "displayName": "Mira Trailmark",
+          "role": "scout"
+        },
+        {
+          "memberId": "rook-signalpost-messenger-v1",
+          "displayName": "Rook Signalpost",
+          "role": "messenger"
+        },
+        {
+          "memberId": "hq-civic-operator-vale-desk-7-v1",
+          "displayName": "Vale-Desk 7",
+          "role": "hq_civic_operator"
+        }
+      ],
+      "boundaryFlags": {
+        "readModelOnly": true,
+        "receiptMetadataOnly": true,
+        "autonomousMovement": false,
+        "resourceHarvesting": false,
+        "resourceDelta": {},
+        "resourceGain": false,
+        "resourceLoss": false,
+        "routeCreation": false,
+        "tradeRouteCreation": false,
+        "backgroundScheduling": false,
+        "combat": false,
+        "publicSharing": false,
+        "generatedUniverseRendering": false,
+        "crossPlotMutation": false,
+        "atlasExecution": false,
+        "externalEffects": false
+      },
+      "partyBoundaryFlags": {
+        "autonomousMovement": false,
+        "operatorAssignment": false,
+        "resourceHarvesting": false,
+        "resourceDelta": {},
+        "resourceGain": false,
+        "resourceLoss": false,
+        "routeCreation": false,
+        "tradeRouteCreation": false,
+        "backgroundScheduling": false,
+        "combat": false,
+        "publicSharing": false,
+        "generatedUniverseRendering": false,
+        "crossPlotMutation": false,
+        "atlasExecution": false,
+        "externalEffects": false
+      }
+    }
+  },
+  "after": {
+    "projectionHash": "f9b94d7485093f0b",
+    "counts": {
+      "discovered": 2,
+      "known": 1,
+      "hinted": 3,
+      "locked_unknown": 8
+    },
+    "targetCell": {
+      "cellId": "cell_q1_r-1",
+      "fogState": "known",
+      "kind": "scouted_sector",
+      "sourceTruth": "expedition_scout_sector",
+      "eventPacketId": "expedition_event_packet_a30713b8c063523e",
+      "receiptKinds": [
+        "scout_sector_known_cell",
+        "scout_sector_receipt"
+      ]
+    },
+    "eventPacketIds": [
+      "expedition_event_packet_a30713b8c063523e"
+    ],
+    "expeditionParty": {
+      "partyId": "expedition_party_current_plot_v1",
+      "readOnly": true,
+      "executableActions": [],
+      "memberIds": [
+        "pathfinder-scout-v1",
+        "rook-signalpost-messenger-v1",
+        "hq-civic-operator-vale-desk-7-v1"
+      ],
+      "boundaryFlags": {
+        "autonomousMovement": false,
+        "operatorAssignment": false,
+        "resourceHarvesting": false,
+        "resourceDelta": {},
+        "resourceGain": false,
+        "resourceLoss": false,
+        "routeCreation": false,
+        "tradeRouteCreation": false,
+        "backgroundScheduling": false,
+        "combat": false,
+        "publicSharing": false,
+        "generatedUniverseRendering": false,
+        "crossPlotMutation": false,
+        "atlasExecution": false,
+        "externalEffects": false
+      }
+    },
+    "stateNoMutationEvidence": {
+      "inventoryUnchanged": true,
+      "jobsBefore": 0,
+      "jobsAfter": 0,
+      "settlementClaimsBefore": 1,
+      "settlementClaimsAfter": 1
+    },
+    "ui": {
+      "scoutResultText": "Scout Sector receiptcell_q1_r-1 moved from hinted to known map truth. Hinted 2 -> 3; known 0 -> 1.Receipt-only map update. No movement, harvesting, routes, trades, scheduler, Atlas execution, public sharing, or external effects.",
+      "targetFogState": "known",
+      "eventPacketVisible": true,
+      "eventPacketReadOnly": "true",
+      "eventPacketButtons": [],
+      "partyVisible": true,
+      "partyReadOnly": "true",
+      "partyActions": 0,
+      "partyButtons": [],
+      "scoutButtonsAfterReveal": [
+        {
+          "testid": "fp-btn-scout-sector-cell_q0_r-1",
+          "cellId": "cell_q0_r-1",
+          "text": "Scout Sector"
+        },
+        {
+          "testid": "fp-btn-scout-sector-cell_q0_r1",
+          "cellId": "cell_q0_r1",
+          "text": "Scout Sector"
+        },
+        {
+          "testid": "fp-btn-scout-sector-cell_q2_r-2",
+          "cellId": "cell_q2_r-2",
+          "text": "Scout Sector"
+        }
+      ],
+      "forbiddenGenreMatches": []
+    }
+  },
+  "network": {
+    "postApiMutations": [
+      {
+        "method": "POST",
+        "path": "/api/founders-plot/expedition-map/scout-sector"
+      }
+    ],
+    "atlasRequests": [],
+    "publicShareRequests": []
+  },
+  "guardrails": {
+    "liveUiUsedRealStateRoute": true,
+    "liveUiUsedRealScoutRoute": true,
+    "scoutSectorOnlyExpeditionMapMutationPath": true,
+    "hiddenLockedCellsExposeNoScout": true,
+    "revealedTargetNoScoutButtonAfterReveal": true,
+    "targetRevealKnown": true,
+    "serverOwnedKnownCellEvidence": true,
+    "eventPacketReadOnlyButtonless": true,
+    "expeditionPartyReadOnlyButtonless": true,
+    "noAtlasExecution": true,
+    "noPublicSharing": true,
+    "noGeneratedUniverseRendering": true,
+    "noRouteTradeEconomyHooks": true,
+    "noCombatSchedulerAutonomy": true,
+    "noCrossPlotMutation": true,
+    "noResourceMutation": true,
+    "noWildWestGenreDrift": true
+  },
+  "checks": [
+    {
+      "command": "jq . reports/agent-town-hq12m-scout-sector-live-preflight-proof-2026-06-01.json >/dev/null",
+      "status": "pass"
+    },
+    {
+      "command": "node --check public/experiences/founders-plot/founders-plot.js",
+      "status": "pass"
+    },
+    {
+      "command": "node --check e2e/200_founders_plot.spec.js",
+      "status": "pass"
+    },
+    {
+      "command": "node --check e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js",
+      "status": "pass"
+    },
+    {
+      "command": "node --check server/founders_plot/engine.js && node --check server/founders_plot/routes.js",
+      "status": "pass"
+    },
+    {
+      "command": "node --test tests-founders-plot/fp-unit.test.js tests-founders-plot/fp-contract.test.js tests-founders-plot/fp-http.test.js tests-founders-plot/fp-scene-state.test.js",
+      "status": "pass",
+      "tests": 92,
+      "pass": 92,
+      "fail": 0
+    },
+    {
+      "command": "git diff --check -- reports/agent-town-hq12m-scout-sector-live-preflight-2026-06-01.md reports/agent-town-hq12m-scout-sector-live-preflight-proof-2026-06-01.json",
+      "status": "pass"
+    },
+    {
+      "command": "rg -n \"expedition-map/scout-sector|scoutExpeditionSector|getExpeditionMapStatus|fp-btn-scout-sector|fp-expedition-event-packet|fp-expedition-party|renderExpedition\" server/founders_plot public/experiences/founders-plot public/progression-atlas.js e2e/200_founders_plot.spec.js e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js",
+      "status": "pass",
+      "notes": "Source scan found the existing Scout Sector route, engine handler, UI button path, and read-only packet/party render surfaces."
+    },
+    {
+      "command": "one-off live node + Playwright preflight against node server/index.js",
+      "status": "pass",
+      "notes": "No route mocking; temp sqlite; proof embedded in this file."
+    }
+  ],
+  "screenshots": []
+}

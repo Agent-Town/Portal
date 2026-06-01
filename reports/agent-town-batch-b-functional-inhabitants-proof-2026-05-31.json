@@ -1,0 +1,42 @@
+{
+  "id": "agent-town-batch-b-functional-inhabitants-proof-2026-05-31",
+  "date": "2026-05-31",
+  "roles": [
+    {
+      "id": "charter-clerk-v1",
+      "role": "charter_clerk",
+      "displayName": "Miri Ledgerwale",
+      "runtimeSprite": "public/experiences/founders-plot/assets/characters/inhabitants/charter_clerk/charter-clerk-v1.png",
+      "metadata": "public/experiences/founders-plot/assets/characters/inhabitants/charter_clerk/charter-clerk-v1.json",
+      "checkerPreview": "reports/agent-town-batch-b-charter-clerk-checker-preview-2026-05-31.png",
+      "sheetContract": "2048x2048, 4 columns x 4 rows, 512px cells, sRGBA, transparent corners"
+    },
+    {
+      "id": "research-doctrine-keeper-v1",
+      "role": "research_doctrine_keeper",
+      "displayName": "Sera Vellumroot",
+      "runtimeSprite": "public/experiences/founders-plot/assets/characters/inhabitants/research_doctrine_keeper/research-doctrine-keeper-v1.png",
+      "metadata": "public/experiences/founders-plot/assets/characters/inhabitants/research_doctrine_keeper/research-doctrine-keeper-v1.json",
+      "checkerPreview": "reports/agent-town-batch-b-research-doctrine-keeper-checker-preview-2026-05-31.png",
+      "sheetContract": "2048x2048, 4 columns x 4 rows, 512px cells, sRGBA, transparent corners"
+    },
+    {
+      "id": "cohort-hall-coordinator-v1",
+      "role": "cohort_hall_coordinator",
+      "displayName": "Oriel-9",
+      "roboticOrAgentic": true,
+      "runtimeSprite": "public/experiences/founders-plot/assets/characters/inhabitants/cohort_hall_coordinator/cohort-hall-coordinator-v1.png",
+      "metadata": "public/experiences/founders-plot/assets/characters/inhabitants/cohort_hall_coordinator/cohort-hall-coordinator-v1.json",
+      "checkerPreview": "reports/agent-town-batch-b-cohort-hall-coordinator-checker-preview-2026-05-31.png",
+      "sheetContract": "2048x2048, 4 columns x 4 rows, 512px cells, sRGBA, transparent corners"
+    }
+  ],
+  "proofImages": [
+    "reports/agent-town-batch-b-functional-inhabitants-contact-sheet-2026-05-31.png",
+    "reports/agent-town-batch-b-functional-inhabitants-row-strip-2026-05-31.png",
+    "reports/agent-town-batch-b-charter-clerk-checker-preview-2026-05-31.png",
+    "reports/agent-town-batch-b-research-doctrine-keeper-checker-preview-2026-05-31.png",
+    "reports/agent-town-batch-b-cohort-hall-coordinator-checker-preview-2026-05-31.png"
+  ],
+  "wiringStatus": "asset-ready only; no scene_state wiring because no current server visualActors emit charter_clerk, research_doctrine_keeper, or cohort_hall_coordinator"
+}

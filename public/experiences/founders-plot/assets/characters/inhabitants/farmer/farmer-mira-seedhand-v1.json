@@ -1,0 +1,101 @@
+{
+  "id": "farmer-mira-seedhand-v1",
+  "role": "farmer",
+  "canonicalRoleId": "farmer",
+  "roleFacts": ["PRODUCE", "OUTPUT_READY", "COLLECT_READY"],
+  "displayName": "Mira Seedhand",
+  "title": "Farm Plot Grower",
+  "buildingSurface": "FARM_PLOT",
+  "characterKind": "human_civic_operator",
+  "backstory": "Mira Seedhand grew up keeping tiny seed libraries in wagon drawers, labeling each packet by season, soil, and who first shared it. In Founders Plot she makes the existing food loop visible by tending rows, reading soil markers, and preparing receipt-bound baskets when server-owned production is ready.",
+  "personality": "Practical, patient, dryly funny, and protective of small things.",
+  "visualOnly": true,
+  "authorityBoundary": "visual_only_projection_of_existing_farm_plot_state",
+  "model": "openai/gpt-image-2 via OpenClaw image_generate",
+  "sourceImage": "farmer-mira-seedhand-v1.source.png",
+  "generatedImage": "farmer-mira-seedhand-v1.generated.png",
+  "image": "farmer-mira-seedhand-v1.png",
+  "prompt": "farmer-mira-seedhand-v1.prompt.md",
+  "sourceSize": {
+    "width": 2048,
+    "height": 2048
+  },
+  "nativeGeneratedSize": {
+    "width": 2048,
+    "height": 2048
+  },
+  "columns": 4,
+  "rows": 4,
+  "frameWidth": 512,
+  "frameHeight": 512,
+  "frameCount": 16,
+  "rowOrder": ["idle", "walk", "tend", "ready"],
+  "actions": {
+    "idle": {
+      "row": 0,
+      "description": "Checking a seed tray, soil marker, or nearby crop row before Farm Plot work begins.",
+      "frames": [0, 1, 2, 3],
+      "fps": 3
+    },
+    "walk": {
+      "row": 1,
+      "description": "Walking with a seed satchel or small watering can.",
+      "frames": [0, 1, 2, 3],
+      "fps": 6
+    },
+    "tend": {
+      "row": 2,
+      "description": "Tending a crop row with a subtle cyan soil-sensor cue.",
+      "frames": [0, 1, 2, 3],
+      "fps": 5
+    },
+    "ready": {
+      "row": 3,
+      "description": "Holding a gathered food basket and sealed receipt pouch for ready Farm Plot output.",
+      "frames": [0, 1, 2, 3],
+      "fps": 4
+    }
+  },
+  "actionMapping": {
+    "PRODUCE": "tend",
+    "FARM_TEND": "tend",
+    "OUTPUT_READY": "ready",
+    "COLLECT_READY": "ready"
+  },
+  "generationNotes": {
+    "sourceProvenance": "/Users/robin/.openclaw/media/tool-image-generation/agent-town-farmer-mira-seedhand-sprite-sheet-v1-opaque---1c765b5e-1556-40cc-bc0e-b8c1b0734f39.png",
+    "deliveryNote": "Image generation completed, but the original delivery route failed. The generated media file was recovered from the local OpenClaw media folder and integrated into the project.",
+    "postProcessing": [
+      "Copied generated opaque source into the project.",
+      "Converted magenta and pale-magenta or near-white chroma background to alpha with ImageMagick.",
+      "Cleared generated grid guide strips at 512px cell boundaries.",
+      "Created proof and row-strip previews under reports/."
+    ],
+    "transparency": {
+      "method": "ImageMagick chroma-key conversion from opaque source",
+      "sourceKeyRequested": "flat #ff00ff magenta",
+      "sampledCornerRange": [
+        "srgb(253,213,254)",
+        "srgb(253,236,254)",
+        "srgb(252,215,253)",
+        "srgb(249,208,252)"
+      ],
+      "keyColorsUsed": ["#f503f4", "#fdf5fe"],
+      "fuzz": ["22%", "18%"],
+      "transparentCorners": true
+    },
+    "knownIssues": [
+      "The opaque source includes generated magenta grid separators, so runtime cleanup clears narrow strips around the expected 512px cell boundaries.",
+      "A few faint magenta edge traces may remain at full-size inspection, but the proof is acceptable for asset-ready status before scene wiring."
+    ],
+    "constraints": [
+      "adult-coded",
+      "visual-only",
+      "no readable text",
+      "no logos",
+      "no weapons",
+      "no gameplay authority",
+      "no scene wiring in this slice"
+    ]
+  }
+}

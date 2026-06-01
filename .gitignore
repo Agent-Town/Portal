@@ -19,3 +19,17 @@ scripts/data/*.sqlite3
 # portal autoresearch harness
 research/portal/results.tsv
 research/portal/artifacts/
+
+# local OpenClaw/session context
+.openclaw/
+HEARTBEAT.md
+IDENTITY.md
+SOUL.md
+TOOLS.md
+USER.md
+tmp/
+
+# generated local replay stores
+reports/*.sqlite
+reports/*.sqlite-shm
+reports/*.sqlite-wal

@@ -1,0 +1,276 @@
+{
+  "slice": "HQ11 civic actors visual-only scene wiring",
+  "date": "2026-05-31",
+  "ok": true,
+  "generatedFrom": "fresh test store via server/founders_plot/engine.js mutations; no visualActors were injected into proof input",
+  "pairId": "pair-hq11-civic-actors-proof",
+  "plotId": "plot_e1116720f908aea6",
+  "stateHash": "5ba94ef1c6387cf2c3da20ffd0e3ccc1d71ff2446f11e682ab139579bd28d7a4",
+  "realServerState": {
+    "claimId": "claim_beb23dd2b66bb97d",
+    "foundedPlotId": "plot_672f5a417a2d1fd3",
+    "selectedDoctrineId": "survey_discipline",
+    "workOrderId": "work_order_0235f1e1a9822a03",
+    "sourceProposalId": "civic_proposal_959242232b84c9c0",
+    "civicProjectId": "civic_project_e4cb1199e43c24e5",
+    "civicProjectType": "civic_beacon",
+    "civicProjectStatus": "ACTIVE",
+    "civicBeaconEffectId": "local_civic_beacon_v1",
+    "worldGridProjectionHash": "705357e5cfe3be29",
+    "worldGridStatus": "READ_MODEL_READY",
+    "worldGridReady": true,
+    "civicBeaconActive": true,
+    "localProjectReadinessScore": 1,
+    "moraleMarkers": [
+      "civic_beacon_lit"
+    ]
+  },
+  "serverVisualActors": {
+    "civic_routekeeper": {
+      "actorId": "actor:civic_routekeeper:civic_project:civic_project_e4cb1199e43c24e5",
+      "sourceDomain": "civic_project",
+      "sourceObjectId": "civic_project_e4cb1199e43c24e5",
+      "actionKind": "CIVIC_BEACON_ACTIVE",
+      "visualState": "civic_route_marking",
+      "target": {
+        "kind": "civic_project",
+        "id": "civic_project_e4cb1199e43c24e5",
+        "projectType": "civic_beacon",
+        "effectId": "local_civic_beacon_v1",
+        "moraleMarkers": [
+          "civic_beacon_lit"
+        ],
+        "visualOnly": true
+      },
+      "visualOnly": true
+    },
+    "oracle_adjunct": {
+      "actorId": "actor:oracle_adjunct:world_grid:705357e5cfe3be29",
+      "sourceDomain": "world_grid",
+      "sourceObjectId": "705357e5cfe3be29",
+      "actionKind": "WORLD_GRID_READ_MODEL",
+      "visualState": "world_grid_consulting",
+      "target": {
+        "kind": "world_grid",
+        "id": "705357e5cfe3be29",
+        "status": "READ_MODEL_READY",
+        "ready": true,
+        "authorityBoundary": "server_owned_read_only_world_grid_projection_no_civic_mutation_v1",
+        "visualOnly": true
+      },
+      "visualOnly": true
+    },
+    "outpost_keeper": {
+      "actorId": "actor:outpost_keeper:settlement_claim:claim_beb23dd2b66bb97d",
+      "sourceDomain": "settlement_claim",
+      "sourceObjectId": "claim_beb23dd2b66bb97d",
+      "actionKind": "OUTPOST_FOUNDED",
+      "visualState": "outpost_tending",
+      "target": {
+        "kind": "settlement_claim",
+        "id": "claim_beb23dd2b66bb97d",
+        "title": "HQ11 Civic Proof Outpost",
+        "status": "FOUNDED",
+        "foundedPlotId": "plot_672f5a417a2d1fd3",
+        "route": {
+          "routeId": "route_claim_beb23dd2b66bb97d",
+          "from": {
+            "kind": "plot",
+            "id": "plot_e1116720f908aea6"
+          },
+          "to": {
+            "kind": "site_plan",
+            "id": "site_plan_hq11_civic_proof"
+          },
+          "direction": "east",
+          "progress": 1,
+          "visualOnlyProjection": true,
+          "createdAt": 1700000040000,
+          "arrivedAt": 1700000220000,
+          "foundedPlotId": "plot_672f5a417a2d1fd3",
+          "visualOnly": true
+        }
+      },
+      "visualOnly": true
+    }
+  },
+  "sceneActors": {
+    "civic_routekeeper": {
+      "actorId": "actor:civic_routekeeper:civic_project:civic_project_e4cb1199e43c24e5",
+      "sourceDomain": "civic_project",
+      "sourceObjectId": "civic_project_e4cb1199e43c24e5",
+      "actionKind": "CIVIC_BEACON_ACTIVE",
+      "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/civic_routekeeper/civic-routekeeper-v1.png",
+      "assetSprite": {
+        "id": "civic-routekeeper-v1",
+        "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/civic_routekeeper/civic-routekeeper-v1.json",
+        "action": "mark",
+        "row": 2,
+        "frames": [
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "actionCue": {
+        "cueType": "civic_beacon_route",
+        "accessory": "route_marker",
+        "lane": "civic_beacon",
+        "label": "Civic beacon route",
+        "actionKind": "CIVIC_BEACON_ACTIVE",
+        "progress": 1,
+        "targetKind": "civic_project",
+        "targetId": "civic_project_e4cb1199e43c24e5"
+      },
+      "actionAnimation": {
+        "mode": "civic_route_mark",
+        "tempo": 0.95,
+        "phaseSeed": "actor:civic_routekeeper:civic_project:civic_project_e4cb1199e43c24e5:civic_project:civic_project_e4cb1199e43c24e5:5ba94ef1c6387cf2c3da20ffd0e3ccc1d71ff2446f11e682ab139579bd28d7a4:civic_routekeeper:3",
+        "hasWalkOffset": true,
+        "stepStyle": "stride"
+      },
+      "route": {
+        "mode": "mark",
+        "wayId": "WAY:HQ:TOWN_SQUARE",
+        "targetId": "HQ",
+        "to": {
+          "kind": "town_square",
+          "id": "HQ_APPROACH"
+        },
+        "visualOnly": true
+      },
+      "visualOnly": true
+    },
+    "oracle_adjunct": {
+      "actorId": "actor:oracle_adjunct:world_grid:705357e5cfe3be29",
+      "sourceDomain": "world_grid",
+      "sourceObjectId": "705357e5cfe3be29",
+      "actionKind": "WORLD_GRID_READ_MODEL",
+      "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/oracle_adjunct/oracle-adjunct-v1.png",
+      "assetSprite": {
+        "id": "oracle-adjunct-v1",
+        "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/oracle_adjunct/oracle-adjunct-v1.json",
+        "action": "consult",
+        "row": 2,
+        "frames": [
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "actionCue": {
+        "cueType": "world_grid_read_model",
+        "accessory": "notice",
+        "lane": "read_model",
+        "label": "World Grid read model",
+        "actionKind": "WORLD_GRID_READ_MODEL",
+        "progress": 1,
+        "targetKind": "world_grid",
+        "targetId": "705357e5cfe3be29"
+      },
+      "actionAnimation": {
+        "mode": "world_grid_consult",
+        "tempo": 0.85,
+        "phaseSeed": "actor:oracle_adjunct:world_grid:705357e5cfe3be29:world_grid:705357e5cfe3be29:5ba94ef1c6387cf2c3da20ffd0e3ccc1d71ff2446f11e682ab139579bd28d7a4:oracle_adjunct:4",
+        "hasWalkOffset": true,
+        "stepStyle": "shuffle"
+      },
+      "route": {
+        "mode": "consult",
+        "wayId": "WAY:HQ:TOWN_SQUARE",
+        "targetId": "HQ",
+        "to": {
+          "kind": "town_square",
+          "id": "HQ_APPROACH"
+        },
+        "visualOnly": true
+      },
+      "visualOnly": true
+    },
+    "outpost_keeper": {
+      "actorId": "actor:outpost_keeper:settlement_claim:claim_beb23dd2b66bb97d",
+      "sourceDomain": "settlement_claim",
+      "sourceObjectId": "claim_beb23dd2b66bb97d",
+      "actionKind": "OUTPOST_FOUNDED",
+      "assetSrc": "/experiences/founders-plot/assets/characters/inhabitants/outpost_keeper/outpost-keeper-v1.png",
+      "assetSprite": {
+        "id": "outpost-keeper-v1",
+        "metadataSrc": "/experiences/founders-plot/assets/characters/inhabitants/outpost_keeper/outpost-keeper-v1.json",
+        "action": "tend",
+        "row": 2,
+        "frames": [
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "actionCue": {
+        "cueType": "outpost_keeper_tending",
+        "accessory": "lantern",
+        "lane": "outpost_founded",
+        "label": "Outpost founded",
+        "actionKind": "OUTPOST_FOUNDED",
+        "progress": 1,
+        "targetKind": "settlement_claim",
+        "targetId": "claim_beb23dd2b66bb97d"
+      },
+      "actionAnimation": {
+        "mode": "outpost_tend",
+        "tempo": 0.95,
+        "phaseSeed": "actor:outpost_keeper:settlement_claim:claim_beb23dd2b66bb97d:settlement_claim:claim_beb23dd2b66bb97d:5ba94ef1c6387cf2c3da20ffd0e3ccc1d71ff2446f11e682ab139579bd28d7a4:outpost_keeper:2",
+        "hasWalkOffset": true,
+        "stepStyle": "walk"
+      },
+      "route": {
+        "mode": "tend",
+        "wayId": "WAY:HQ:SETTLEMENT_CLAIM:claim_beb23dd2b66bb97d",
+        "targetId": "claim_beb23dd2b66bb97d",
+        "to": {
+          "kind": "settlement_claim",
+          "id": "claim_beb23dd2b66bb97d"
+        },
+        "visualOnly": true
+      },
+      "visualOnly": true
+    }
+  },
+  "visualOnlyBoundary": {
+    "sceneActorsVisualOnly": true,
+    "serverActorsVisualOnly": true,
+    "noInjectedVisualActorsInProofInput": true,
+    "noResourceDeltaFromProjection": true,
+    "noRouteOrTradeCreationFromProjection": true,
+    "noAtlasExecutionFromProjection": true,
+    "noSchedulerOrExternalEffectsFromProjection": true
+  },
+  "testsRun": [
+    {
+      "command": "node --check public/experiences/founders-plot/scene_state.js",
+      "result": "pass"
+    },
+    {
+      "command": "node --check server/founders_plot/engine.js",
+      "result": "pass"
+    },
+    {
+      "command": "node --check tests-founders-plot/fp-scene-state.test.js",
+      "result": "pass"
+    },
+    {
+      "command": "NODE_ENV=test node --test tests-founders-plot/fp-scene-state.test.js",
+      "result": "pass",
+      "passed": 8
+    },
+    {
+      "command": "node -e \"const fs=require('fs'); JSON.parse(fs.readFileSync('reports/agent-town-hq11-civic-actors-scene-state-proof-2026-05-31.json','utf8')); console.log('proof json ok')\"",
+      "result": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "result": "pass"
+    }
+  ]
+}

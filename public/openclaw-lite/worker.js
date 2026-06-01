@@ -49424,7 +49424,7 @@ var LITE_TOOL_SPECS = [
   {
     name: "agent_town_ui_open_progression_atlas",
     label: "Agent Town UI Open Progression Atlas",
-    description: "Opens the Progression Atlas modal, the visible strategy-planning surface used by humans and agents.",
+    description: "Opens Founders Plot and its embedded Progression Atlas planning surface used by humans and agents.",
     sampleArgs: { strategyKey: "rush-hq3" }
   },
   {

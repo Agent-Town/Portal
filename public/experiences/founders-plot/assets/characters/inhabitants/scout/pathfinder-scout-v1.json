@@ -1,0 +1,99 @@
+{
+  "id": "pathfinder-scout-v1",
+  "displayName": "Mira Trailmark",
+  "role": "scout",
+  "title": "Pathfinder Scout",
+  "backstory": "Mira Trailmark reads ridgelines, maps, and settlement sites before AgentTown asks a new route to carry people. She works from the Expedition Board as a visual-only pathfinder: practical, observant, and calm enough to turn uncertain terrain into a route report the town can discuss.",
+  "personality": "Calm, observant, practical, patient with uncertainty, and quietly confident after a clean survey.",
+  "authorityBoundary": "Visual-only scout inhabitant for SCOUT and SCOUT_REPORT_READY facts. Mira shows scouting and report readiness; she does not discover sites, mutate expedition state, or bypass server-owned progression.",
+  "relationships": [
+    "Distinct from Rook Signalpost: Mira scouts terrain while Rook carries notices.",
+    "Turns Expedition Board activity into a named inhabitant presence without claiming gameplay authority.",
+    "Connects settlement expansion planning to Luma Reedbarrel's convoy-readiness role."
+  ],
+  "roleFacts": ["SCOUT", "SCOUT_REPORT_READY"],
+  "model": "built-in image_gen, GPT Image 2 path",
+  "sourceImage": "pathfinder-scout-v1.source.png",
+  "image": "pathfinder-scout-v1.png",
+  "prompt": "pathfinder-scout-v1.prompt.md",
+  "sourceSize": {
+    "width": 2048,
+    "height": 2048
+  },
+  "nativeGeneratedSize": {
+    "width": 1254,
+    "height": 1254
+  },
+  "frame": {
+    "width": 512,
+    "height": 512
+  },
+  "layout": {
+    "columns": 4,
+    "rows": 4,
+    "frameCount": 16
+  },
+  "actions": {
+    "idle": {
+      "row": 0,
+      "description": "Calm pathfinder stance variations with compass, satchel, and ready posture.",
+      "frames": [0, 1, 2, 3],
+      "fps": 3
+    },
+    "walk": {
+      "row": 1,
+      "description": "Three-quarter-right scouting walk cycle for route projection.",
+      "frames": [0, 1, 2, 3],
+      "fps": 6
+    },
+    "scout": {
+      "row": 2,
+      "description": "Surveying actions using compass, map, spyglass, and directional gestures.",
+      "frames": [0, 1, 2, 3],
+      "fps": 5
+    },
+    "ready": {
+      "row": 3,
+      "description": "Returning/report-ready poses with folded scout report and route notes.",
+      "frames": [0, 1, 2, 3],
+      "fps": 4
+    }
+  },
+  "actionMapping": {
+    "SCOUT": "scout",
+    "SCOUT_REPORT_READY": "ready",
+    "OUTPUT_READY": "ready"
+  },
+  "generationNotes": {
+    "characterConcept": "Mira Trailmark, an adult-coded frontier pathfinder / terrain scout for visual-only Expedition Board projections, with field hat, canvas cloak, brass compass, leather satchel, map case, walking staff, and tiny cyan locator charm.",
+    "sourceProvenance": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e7be0-6db3-72e1-9eef-f04981d4eec2/ig_067e65cae1df0ec4016a1b9f7ff8788191982ba2426f5b81bf.png",
+    "postProcessing": [
+      "Copied generated source into the project as pathfinder-scout-v1.generated.png.",
+      "Resized from 1254x1254 to exact 2048x2048 as pathfinder-scout-v1.source.png.",
+      "Converted magenta chroma key to alpha with ImageMagick using -fuzz 34% -transparent '#ef0aee'.",
+      "Created checkerboard proof at reports/agent-town-pathfinder-scout-v1-checker-preview-2026-05-31.png."
+    ],
+    "transparency": {
+      "method": "ImageMagick chroma-key conversion from GPT Image 2 opaque source",
+      "sourceKeyRequested": "#ff00ff",
+      "sampledCornerRange": [
+        "srgb(239,10,238)",
+        "srgb(250,3,248)",
+        "srgb(240,28,238)"
+      ],
+      "keyColorUsed": "#ef0aee",
+      "fuzz": "34%"
+    },
+    "knownIssues": [
+      "The built-in generator returned a 1254x1254 native PNG despite the 2048x2048 prompt, so the project source was resized to the required sheet size.",
+      "A faint magenta edge remains on a few narrow staff and cloak edges after chroma removal; it is acceptable at current billboard scale but worth revisiting for a final native alpha pass."
+    ],
+    "constraints": [
+      "visual-only inhabitant projection",
+      "no weapons",
+      "no readable text",
+      "no logos",
+      "no gameplay authority"
+    ]
+  }
+}

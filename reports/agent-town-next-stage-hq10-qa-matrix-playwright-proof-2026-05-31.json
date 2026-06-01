@@ -1,0 +1,244 @@
+{
+  "timestamp": "2026-05-31T07:05:52.174Z",
+  "branch": "neo/progression-atlas-editor-next-2026-05-29",
+  "command": "PORT=4246 NODE_ENV=test STORE_PATH=/tmp/agent-town-next-stage-hq10-qa-matrix-4246.sqlite node server/index.js + inline Playwright QA probe",
+  "screenshots": {
+    "desktopFreshNoOverlay": "reports/agent-town-next-stage-hq10-qa-matrix-desktop-hq10-render-blocker-2026-05-31.png",
+    "mobile390FreshNoOverlay": "reports/agent-town-next-stage-hq10-qa-matrix-mobile-390-hq10-render-blocker-2026-05-31.png",
+    "preseededOverlayPreview": "reports/agent-town-next-stage-hq10-qa-matrix-overlay-preview-preseed-2026-05-31.png"
+  },
+  "summary": {
+    "totalChecks": 12,
+    "passed": 12,
+    "failed": 0
+  },
+  "checks": [
+    {
+      "id": "HQ9 completed work order keeps completed receipt copy",
+      "passed": true,
+      "actual": "Completed receipt. Child receipts are preserved for audit.",
+      "note": "Expected Feynman copy fix to hold with past expiresAt."
+    },
+    {
+      "id": "HQ9 expired draft keeps recreate copy",
+      "passed": true,
+      "actual": "Expired draft. Recreate it before execution.",
+      "note": "Expected expired DRAFT card to remain explicit."
+    },
+    {
+      "id": "HQ10A World Grid status renders for fresh no-overlay user",
+      "passed": true,
+      "actual": "World Grid status\nREAD MODEL READY - read-only\n\n4/4 requirements ready for HQ10B civic proposal records.\n\nRead-only advisory projection. No civic mutation, routes, scheduling, spending, Atlas execution, or arbitrary tool execution.",
+      "note": "Failed: fresh no-overlay state crashes while rendering World Grid."
+    },
+    {
+      "id": "HQ10B Civic Proposals status renders after World Grid",
+      "passed": true,
+      "actual": "Civic Proposal Records\nRECORDING READY - proposal only\n\n1 proposal record: DRAFT 0, REVIEWED 1, ARCHIVED 0.\n\nDRAFT\nREVIEWED\nARCHIVED\ncoordination\npublic work\nroute study\ncivic memory\nserver_owned_civic_proposal_record_no_execution_v1. Records are for review and memory; execution is not implemented.",
+      "note": "Failed because World Grid render aborts renderAll before Civic Proposals."
+    },
+    {
+      "id": "HQ10C Overlay Packs status renders after World Grid",
+      "passed": true,
+      "actual": "Generated Universe Overlay Packs\nRECORDING READY - presentation only\n\n1 overlay pack record: DRAFT 0, REVIEWED 1, ARCHIVED 0.\n\npresentationOnly true\nvisualOnly true\nexecution disabled\nrendering not implemented\npublic sharing false\nstable gameplay hash excluded\nserver_owned_generated_universe_overlay_pack_presentation_only_v1. Records are presentation-only memory/proposal artifacts; they are not applied overlays, generated renders, or public shares.",
+      "note": "Failed because World Grid render aborts renderAll before Overlay Packs."
+    },
+    {
+      "id": "No render-crash toast on fresh no-overlay state",
+      "passed": true,
+      "actual": null,
+      "note": "Expected no TypeError toast."
+    },
+    {
+      "id": "Desktop no horizontal overflow in QA fixture",
+      "passed": true,
+      "actual": {
+        "documentScrollWidth": 1280,
+        "bodyScrollWidth": 1280,
+        "viewport": 1280
+      },
+      "note": "Desktop layout width check."
+    },
+    {
+      "id": "Mobile 390 no horizontal overflow in QA fixture",
+      "passed": true,
+      "actual": {
+        "documentScrollWidth": 390,
+        "bodyScrollWidth": 390,
+        "viewport": 390,
+        "clipped": []
+      },
+      "note": "Mobile width remained contained despite render blocker."
+    },
+    {
+      "id": "Mobile 390 HQ10 panels render content for fresh no-overlay user",
+      "passed": true,
+      "actual": {
+        "worldGridStatusExists": true,
+        "civicStatusExists": true,
+        "overlayStatusExists": true,
+        "toast": null
+      },
+      "note": "Failed: HQ10 panel bodies remain empty/loading after TypeError."
+    },
+    {
+      "id": "HQ10D preseeded local overlay preview renders",
+      "passed": true,
+      "actual": {
+        "worldGridStatusText": "Lantern Grid\nREAD MODEL READY - read-only\n\n4/4 requirements ready for HQ10B civic proposal records.\n\nRead-only advisory projection. No civic mutation, routes, scheduling, spending, Atlas execution, or arbitrary tool execution.\nLantern Grid Overlay\nLocal preview only; server gameplay truth unchanged.",
+        "overlayPreviewActiveText": "Applied locally: Lantern Grid Overlay",
+        "overlayLocalProofExists": true
+      },
+      "note": "Preseeded localStorage preview path can render."
+    },
+    {
+      "id": "HQ10D preseeded preview does not send POST/external action",
+      "passed": true,
+      "actual": [],
+      "note": "Preview read/render should be browser-local."
+    },
+    {
+      "id": "HQ10D Clear Local Preview does not crash panel render",
+      "passed": true,
+      "actual": {
+        "toast": "Local overlay preview cleared.",
+        "worldGridStatusExists": true
+      },
+      "note": "Failed: clearing preview returns to null active overlay and crashes renderWorldGrid."
+    }
+  ],
+  "facts": {
+    "desktopFreshNoOverlay": {
+      "viewport": 1280,
+      "documentScrollWidth": 1280,
+      "bodyScrollWidth": 1280,
+      "clipped": [],
+      "toast": null,
+      "toastHidden": true,
+      "hq9CompletedCopy": "Completed receipt. Child receipts are preserved for audit.",
+      "hq9ExpiredDraftCopy": "Expired draft. Recreate it before execution.",
+      "hq9ExecuteButtons": [],
+      "worldGridStatusExists": true,
+      "worldGridStatusText": "World Grid status\nREAD MODEL READY - read-only\n\n4/4 requirements ready for HQ10B civic proposal records.\n\nRead-only advisory projection. No civic mutation, routes, scheduling, spending, Atlas execution, or arbitrary tool execution.",
+      "worldGridBoundaryText": "Read-only advisory projection. No civic mutation, routes, scheduling, spending, Atlas execution, or arbitrary tool execution.",
+      "civicStatusExists": true,
+      "civicStatusText": "Civic Proposal Records\nRECORDING READY - proposal only\n\n1 proposal record: DRAFT 0, REVIEWED 1, ARCHIVED 0.\n\nDRAFT\nREVIEWED\nARCHIVED\ncoordination\npublic work\nroute study\ncivic memory\nserver_owned_civic_proposal_record_no_execution_v1. Records are for review and memory; execution is not implemented.",
+      "overlayStatusExists": true,
+      "overlayStatusText": "Generated Universe Overlay Packs\nRECORDING READY - presentation only\n\n1 overlay pack record: DRAFT 0, REVIEWED 1, ARCHIVED 0.\n\npresentationOnly true\nvisualOnly true\nexecution disabled\nrendering not implemented\npublic sharing false\nstable gameplay hash excluded\nserver_owned_generated_universe_overlay_pack_presentation_only_v1. Records are presentation-only memory/proposal artifacts; they are not applied overlays, generated renders, or public shares.",
+      "overlayPreviewExists": true,
+      "overlayPreviewActiveText": "No local overlay applied",
+      "overlayLocalProofExists": false,
+      "applyOverlayButtonText": "Apply Local Preview",
+      "clearOverlayButtonText": null
+    },
+    "mobile390FreshNoOverlay": {
+      "viewport": 390,
+      "documentScrollWidth": 390,
+      "bodyScrollWidth": 390,
+      "clipped": [],
+      "toast": null,
+      "toastHidden": true,
+      "hq9CompletedCopy": "Completed receipt. Child receipts are preserved for audit.",
+      "hq9ExpiredDraftCopy": "Expired draft. Recreate it before execution.",
+      "hq9ExecuteButtons": [],
+      "worldGridStatusExists": true,
+      "worldGridStatusText": "World Grid status\nREAD MODEL READY - read-only\n\n4/4 requirements ready for HQ10B civic proposal records.\n\nRead-only advisory projection. No civic mutation, routes, scheduling, spending, Atlas execution, or arbitrary tool execution.",
+      "worldGridBoundaryText": "Read-only advisory projection. No civic mutation, routes, scheduling, spending, Atlas execution, or arbitrary tool execution.",
+      "civicStatusExists": true,
+      "civicStatusText": "Civic Proposal Records\nRECORDING READY - proposal only\n\n1 proposal record: DRAFT 0, REVIEWED 1, ARCHIVED 0.\n\nDRAFT\nREVIEWED\nARCHIVED\ncoordination\npublic work\nroute study\ncivic memory\nserver_owned_civic_proposal_record_no_execution_v1. Records are for review and memory; execution is not implemented.",
+      "overlayStatusExists": true,
+      "overlayStatusText": "Generated Universe Overlay Packs\nRECORDING READY - presentation only\n\n1 overlay pack record: DRAFT 0, REVIEWED 1, ARCHIVED 0.\n\npresentationOnly true\nvisualOnly true\nexecution disabled\nrendering not implemented\npublic sharing false\nstable gameplay hash excluded\nserver_owned_generated_universe_overlay_pack_presentation_only_v1. Records are presentation-only memory/proposal artifacts; they are not applied overlays, generated renders, or public shares.",
+      "overlayPreviewExists": true,
+      "overlayPreviewActiveText": "No local overlay applied",
+      "overlayLocalProofExists": false,
+      "applyOverlayButtonText": "Apply Local Preview",
+      "clearOverlayButtonText": null
+    },
+    "preseededOverlayPreview": {
+      "viewport": 1280,
+      "documentScrollWidth": 1280,
+      "bodyScrollWidth": 1280,
+      "clipped": [],
+      "toast": null,
+      "toastHidden": true,
+      "hq9CompletedCopy": "Completed receipt. Child receipts are preserved for audit.",
+      "hq9ExpiredDraftCopy": "Expired draft. Recreate it before execution.",
+      "hq9ExecuteButtons": [],
+      "worldGridStatusExists": true,
+      "worldGridStatusText": "Lantern Grid\nREAD MODEL READY - read-only\n\n4/4 requirements ready for HQ10B civic proposal records.\n\nRead-only advisory projection. No civic mutation, routes, scheduling, spending, Atlas execution, or arbitrary tool execution.\nLantern Grid Overlay\nLocal preview only; server gameplay truth unchanged.",
+      "worldGridBoundaryText": "Read-only advisory projection. No civic mutation, routes, scheduling, spending, Atlas execution, or arbitrary tool execution.",
+      "civicStatusExists": true,
+      "civicStatusText": "Civic Proposal Records\nRECORDING READY - proposal only\n\n1 proposal record: DRAFT 0, REVIEWED 1, ARCHIVED 0.\n\nDRAFT\nREVIEWED\nARCHIVED\ncoordination\npublic work\nroute study\ncivic memory\nserver_owned_civic_proposal_record_no_execution_v1. Records are for review and memory; execution is not implemented.",
+      "overlayStatusExists": true,
+      "overlayStatusText": "Generated Universe Overlay Packs\nRECORDING READY - presentation only\n\n1 overlay pack record: DRAFT 0, REVIEWED 1, ARCHIVED 0.\n\npresentationOnly true\nvisualOnly true\nexecution disabled\nrendering not implemented\npublic sharing false\nstable gameplay hash excluded\nserver_owned_generated_universe_overlay_pack_presentation_only_v1. Records are presentation-only memory/proposal artifacts; they are not applied overlays, generated renders, or public shares.",
+      "overlayPreviewExists": true,
+      "overlayPreviewActiveText": "Applied locally: Lantern Grid Overlay",
+      "overlayLocalProofExists": true,
+      "applyOverlayButtonText": "Preview Applied",
+      "clearOverlayButtonText": "Clear Local Preview"
+    },
+    "afterClearOverlayPreview": {
+      "viewport": 1280,
+      "documentScrollWidth": 1280,
+      "bodyScrollWidth": 1280,
+      "clipped": [],
+      "toast": "Local overlay preview cleared.",
+      "toastHidden": false,
+      "hq9CompletedCopy": "Completed receipt. Child receipts are preserved for audit.",
+      "hq9ExpiredDraftCopy": "Expired draft. Recreate it before execution.",
+      "hq9ExecuteButtons": [],
+      "worldGridStatusExists": true,
+      "worldGridStatusText": "World Grid status\nREAD MODEL READY - read-only\n\n4/4 requirements ready for HQ10B civic proposal records.\n\nRead-only advisory projection. No civic mutation, routes, scheduling, spending, Atlas execution, or arbitrary tool execution.",
+      "worldGridBoundaryText": "Read-only advisory projection. No civic mutation, routes, scheduling, spending, Atlas execution, or arbitrary tool execution.",
+      "civicStatusExists": true,
+      "civicStatusText": "Civic Proposal Records\nRECORDING READY - proposal only\n\n1 proposal record: DRAFT 0, REVIEWED 1, ARCHIVED 0.\n\nDRAFT\nREVIEWED\nARCHIVED\ncoordination\npublic work\nroute study\ncivic memory\nserver_owned_civic_proposal_record_no_execution_v1. Records are for review and memory; execution is not implemented.",
+      "overlayStatusExists": true,
+      "overlayStatusText": "Generated Universe Overlay Packs\nRECORDING READY - presentation only\n\n1 overlay pack record: DRAFT 0, REVIEWED 1, ARCHIVED 0.\n\npresentationOnly true\nvisualOnly true\nexecution disabled\nrendering not implemented\npublic sharing false\nstable gameplay hash excluded\nserver_owned_generated_universe_overlay_pack_presentation_only_v1. Records are presentation-only memory/proposal artifacts; they are not applied overlays, generated renders, or public shares.",
+      "overlayPreviewExists": true,
+      "overlayPreviewActiveText": "No local overlay applied",
+      "overlayLocalProofExists": false,
+      "applyOverlayButtonText": "Apply Local Preview",
+      "clearOverlayButtonText": null
+    }
+  },
+  "requestSummary": {
+    "fresh": [
+      {
+        "method": "GET",
+        "url": "http://[::1]:4246/api/founders-plot/state"
+      },
+      {
+        "method": "GET",
+        "url": "http://[::1]:4246/api/founders-plot/plots?plotId=plot_qa_matrix_hq10"
+      }
+    ],
+    "mobile": [
+      {
+        "method": "GET",
+        "url": "http://[::1]:4246/api/founders-plot/state"
+      },
+      {
+        "method": "GET",
+        "url": "http://[::1]:4246/api/founders-plot/plots?plotId=plot_qa_matrix_hq10"
+      }
+    ],
+    "preseeded": [
+      {
+        "method": "GET",
+        "url": "http://[::1]:4246/api/founders-plot/state"
+      },
+      {
+        "method": "GET",
+        "url": "http://[::1]:4246/api/founders-plot/plots?plotId=plot_qa_matrix_hq10"
+      },
+      {
+        "method": "GET",
+        "url": "http://[::1]:4246/api/founders-plot/state"
+      },
+      {
+        "method": "GET",
+        "url": "http://[::1]:4246/api/founders-plot/plots?plotId=plot_qa_matrix_hq10"
+      }
+    ]
+  }
+}

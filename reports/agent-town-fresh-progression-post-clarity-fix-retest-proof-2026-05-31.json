@@ -1,0 +1,1845 @@
+{
+  "ok": true,
+  "verdict": "PASS_WITH_NOTES",
+  "date": "2026-05-31",
+  "isolatedStores": {
+    "appStore": "reports/agent-town-fresh-progression-post-clarity-fix-retest-2026-05-31-app-store.sqlite",
+    "foundersPlotStore": "reports/agent-town-fresh-progression-post-clarity-fix-retest-2026-05-31-founders-plot-store.sqlite"
+  },
+  "screenshots": [
+    {
+      "file": "reports/agent-town-fresh-progression-post-clarity-fix-retest-2026-05-31-01-fresh-load-foreman-guidance.png",
+      "note": "Fresh load with Foreman +10 XP guidance visible"
+    },
+    {
+      "file": "reports/agent-town-fresh-progression-post-clarity-fix-retest-2026-05-31-02-first-lumber-reward-claim-visible.png",
+      "note": "Rewards panel shows quest.first-lumber with 🪙 coin +5 and Claim Reward button"
+    },
+    {
+      "file": "reports/agent-town-fresh-progression-post-clarity-fix-retest-2026-05-31-03-hq2-reward-claim-visible.png",
+      "note": "Rewards panel shows hq.level-2 with 🪙 coin +6 and Claim Reward button"
+    },
+    {
+      "file": "reports/agent-town-fresh-progression-post-clarity-fix-retest-2026-05-31-04-hq3-reward-claim-visible.png",
+      "note": "Rewards panel shows hq.level-3 with 🪵 wood +8, 🪨 stone +4 and Claim Reward button"
+    },
+    {
+      "file": "reports/agent-town-fresh-progression-post-clarity-fix-retest-2026-05-31-05-hq4-workshop-charter-reward-claim-visible.png",
+      "note": "Rewards panel shows hq.level-4 with 🪙 coin +8 and Claim Reward button"
+    },
+    {
+      "file": "reports/agent-town-fresh-progression-post-clarity-fix-retest-2026-05-31-06-foreman-permissions-xp-guidance-active.png",
+      "note": "Foreman panel explains first successful delegated action +10 XP after permissions are enabled"
+    },
+    {
+      "file": "reports/agent-town-fresh-progression-post-clarity-fix-retest-2026-05-31-07-hq5-founder-stipend-reward-claim-visible.png",
+      "note": "Rewards panel shows hq.level-5 with 🪙 coin +12, Town XP +10 and Claim Reward button"
+    },
+    {
+      "file": "reports/agent-town-fresh-progression-post-clarity-fix-retest-2026-05-31-08-hq6-continuation-after-visible-rewards-foreman.png",
+      "note": "HQ6 reached after visible reward claims and Foreman XP guidance path"
+    }
+  ],
+  "milestones": [
+    {
+      "action": "placed_LUMBER_CAMP",
+      "inventory": {
+        "wood": 0,
+        "stone": 0,
+        "food": 0,
+        "coin": 12
+      },
+      "townXp": 10,
+      "hqLevel": 1
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 10,
+        "stone": 0,
+        "food": 0,
+        "coin": 12
+      },
+      "townXp": 15,
+      "hqLevel": 1
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 20,
+        "stone": 0,
+        "food": 0,
+        "coin": 17
+      },
+      "townXp": 15,
+      "hqLevel": 1
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 30,
+        "stone": 0,
+        "food": 0,
+        "coin": 17
+      },
+      "townXp": 15,
+      "hqLevel": 1
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 40,
+        "stone": 0,
+        "food": 0,
+        "coin": 17
+      },
+      "townXp": 15,
+      "hqLevel": 1
+    },
+    {
+      "action": "placed_FARM_PLOT",
+      "inventory": {
+        "wood": 28,
+        "stone": 0,
+        "food": 0,
+        "coin": 13
+      },
+      "townXp": 25,
+      "hqLevel": 1
+    },
+    {
+      "action": "collected_FARM_PLOT_HUMAN",
+      "inventory": {
+        "wood": 28,
+        "stone": 0,
+        "food": 8,
+        "coin": 13
+      },
+      "townXp": 30,
+      "hqLevel": 1
+    },
+    {
+      "action": "collected_FARM_PLOT_HUMAN",
+      "inventory": {
+        "wood": 28,
+        "stone": 0,
+        "food": 16,
+        "coin": 13
+      },
+      "townXp": 30,
+      "hqLevel": 1
+    },
+    {
+      "action": "hq_2",
+      "inventory": {
+        "wood": 8,
+        "stone": 0,
+        "food": 6,
+        "coin": 13
+      },
+      "townXp": 50,
+      "rewards": [
+        "hq.level-2"
+      ]
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 18,
+        "stone": 0,
+        "food": 6,
+        "coin": 19
+      },
+      "townXp": 50,
+      "hqLevel": 2
+    },
+    {
+      "action": "collected_FARM_PLOT_HUMAN",
+      "inventory": {
+        "wood": 18,
+        "stone": 0,
+        "food": 14,
+        "coin": 19
+      },
+      "townXp": 50,
+      "hqLevel": 2
+    },
+    {
+      "action": "placed_QUARRY",
+      "inventory": {
+        "wood": 2,
+        "stone": 0,
+        "food": 4,
+        "coin": 13
+      },
+      "townXp": 60,
+      "hqLevel": 2
+    },
+    {
+      "action": "collected_QUARRY_HUMAN",
+      "inventory": {
+        "wood": 2,
+        "stone": 8,
+        "food": 4,
+        "coin": 13
+      },
+      "townXp": 65,
+      "hqLevel": 2
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 12,
+        "stone": 8,
+        "food": 4,
+        "coin": 13
+      },
+      "townXp": 65,
+      "hqLevel": 2
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 22,
+        "stone": 8,
+        "food": 4,
+        "coin": 13
+      },
+      "townXp": 65,
+      "hqLevel": 2
+    },
+    {
+      "action": "collected_QUARRY_HUMAN",
+      "inventory": {
+        "wood": 22,
+        "stone": 16,
+        "food": 4,
+        "coin": 13
+      },
+      "townXp": 65,
+      "hqLevel": 2
+    },
+    {
+      "action": "hq_3",
+      "inventory": {
+        "wood": 2,
+        "stone": 0,
+        "food": 4,
+        "coin": 13
+      },
+      "townXp": 85,
+      "rewards": [
+        "hq.level-3"
+      ]
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 20,
+        "stone": 4,
+        "food": 4,
+        "coin": 13
+      },
+      "townXp": 85,
+      "hqLevel": 3
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 30,
+        "stone": 4,
+        "food": 4,
+        "coin": 13
+      },
+      "townXp": 85,
+      "hqLevel": 3
+    },
+    {
+      "action": "collected_FARM_PLOT_HUMAN",
+      "inventory": {
+        "wood": 30,
+        "stone": 4,
+        "food": 12,
+        "coin": 13
+      },
+      "townXp": 85,
+      "hqLevel": 3
+    },
+    {
+      "action": "collected_QUARRY_HUMAN",
+      "inventory": {
+        "wood": 30,
+        "stone": 12,
+        "food": 12,
+        "coin": 13
+      },
+      "townXp": 85,
+      "hqLevel": 3
+    },
+    {
+      "action": "placed_EXPEDITION_BOARD",
+      "inventory": {
+        "wood": 6,
+        "stone": 0,
+        "food": 4,
+        "coin": 13
+      },
+      "townXp": 95,
+      "hqLevel": 3
+    },
+    {
+      "action": "collected_FARM_PLOT_HUMAN",
+      "inventory": {
+        "wood": 6,
+        "stone": 0,
+        "food": 12,
+        "coin": 13
+      },
+      "townXp": 95,
+      "hqLevel": 3
+    },
+    {
+      "action": "collected_EXPEDITION_BOARD_HUMAN",
+      "inventory": {
+        "wood": 2,
+        "stone": 0,
+        "food": 6,
+        "coin": 13
+      },
+      "townXp": 100,
+      "hqLevel": 3
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 12,
+        "stone": 0,
+        "food": 6,
+        "coin": 13
+      },
+      "townXp": 100,
+      "hqLevel": 3
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 22,
+        "stone": 0,
+        "food": 6,
+        "coin": 13
+      },
+      "townXp": 100,
+      "hqLevel": 3
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 32,
+        "stone": 0,
+        "food": 6,
+        "coin": 13
+      },
+      "townXp": 100,
+      "hqLevel": 3
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 42,
+        "stone": 0,
+        "food": 6,
+        "coin": 13
+      },
+      "townXp": 100,
+      "hqLevel": 3
+    },
+    {
+      "action": "collected_FARM_PLOT_HUMAN",
+      "inventory": {
+        "wood": 42,
+        "stone": 0,
+        "food": 14,
+        "coin": 13
+      },
+      "townXp": 100,
+      "hqLevel": 3
+    },
+    {
+      "action": "collected_FARM_PLOT_HUMAN",
+      "inventory": {
+        "wood": 42,
+        "stone": 0,
+        "food": 22,
+        "coin": 13
+      },
+      "townXp": 100,
+      "hqLevel": 3
+    },
+    {
+      "action": "collected_QUARRY_HUMAN",
+      "inventory": {
+        "wood": 42,
+        "stone": 8,
+        "food": 22,
+        "coin": 13
+      },
+      "townXp": 100,
+      "hqLevel": 3
+    },
+    {
+      "action": "collected_QUARRY_HUMAN",
+      "inventory": {
+        "wood": 42,
+        "stone": 16,
+        "food": 22,
+        "coin": 13
+      },
+      "townXp": 100,
+      "hqLevel": 3
+    },
+    {
+      "action": "collected_QUARRY_HUMAN",
+      "inventory": {
+        "wood": 42,
+        "stone": 24,
+        "food": 22,
+        "coin": 13
+      },
+      "townXp": 100,
+      "hqLevel": 3
+    },
+    {
+      "action": "collected_QUARRY_HUMAN",
+      "inventory": {
+        "wood": 42,
+        "stone": 32,
+        "food": 22,
+        "coin": 13
+      },
+      "townXp": 100,
+      "hqLevel": 3
+    },
+    {
+      "action": "hq_4",
+      "inventory": {
+        "wood": 2,
+        "stone": 2,
+        "food": 2,
+        "coin": 13
+      },
+      "townXp": 120,
+      "rewards": [
+        "hq.level-4"
+      ]
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 12,
+        "stone": 2,
+        "food": 2,
+        "coin": 21
+      },
+      "townXp": 120,
+      "hqLevel": 4
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 22,
+        "stone": 2,
+        "food": 2,
+        "coin": 21
+      },
+      "townXp": 120,
+      "hqLevel": 4
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 32,
+        "stone": 2,
+        "food": 2,
+        "coin": 21
+      },
+      "townXp": 120,
+      "hqLevel": 4
+    },
+    {
+      "action": "collected_QUARRY_HUMAN",
+      "inventory": {
+        "wood": 32,
+        "stone": 10,
+        "food": 2,
+        "coin": 21
+      },
+      "townXp": 120,
+      "hqLevel": 4
+    },
+    {
+      "action": "collected_QUARRY_HUMAN",
+      "inventory": {
+        "wood": 32,
+        "stone": 18,
+        "food": 2,
+        "coin": 21
+      },
+      "townXp": 120,
+      "hqLevel": 4
+    },
+    {
+      "action": "placed_WORKSHOP",
+      "inventory": {
+        "wood": 8,
+        "stone": 2,
+        "food": 2,
+        "coin": 9
+      },
+      "townXp": 130,
+      "hqLevel": 4
+    },
+    {
+      "action": "collected_QUARRY_HUMAN",
+      "inventory": {
+        "wood": 8,
+        "stone": 10,
+        "food": 2,
+        "coin": 9
+      },
+      "townXp": 130,
+      "hqLevel": 4
+    },
+    {
+      "action": "collected_WORKSHOP_HUMAN",
+      "inventory": {
+        "wood": 0,
+        "stone": 6,
+        "food": 2,
+        "coin": 9
+      },
+      "townXp": 135,
+      "hqLevel": 4
+    },
+    {
+      "action": "collected_LUMBER_CAMP_AGENT",
+      "inventory": {
+        "wood": 10,
+        "stone": 6,
+        "food": 2,
+        "coin": 9
+      },
+      "townXp": 155,
+      "hqLevel": 4
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 20,
+        "stone": 6,
+        "food": 2,
+        "coin": 9
+      },
+      "townXp": 155,
+      "hqLevel": 4
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 30,
+        "stone": 6,
+        "food": 2,
+        "coin": 9
+      },
+      "townXp": 155,
+      "hqLevel": 4
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 40,
+        "stone": 6,
+        "food": 2,
+        "coin": 9
+      },
+      "townXp": 155,
+      "hqLevel": 4
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 50,
+        "stone": 6,
+        "food": 2,
+        "coin": 9
+      },
+      "townXp": 155,
+      "hqLevel": 4
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 60,
+        "stone": 6,
+        "food": 2,
+        "coin": 9
+      },
+      "townXp": 155,
+      "hqLevel": 4
+    },
+    {
+      "action": "collected_FARM_PLOT_HUMAN",
+      "inventory": {
+        "wood": 60,
+        "stone": 6,
+        "food": 10,
+        "coin": 9
+      },
+      "townXp": 155,
+      "hqLevel": 4
+    },
+    {
+      "action": "collected_FARM_PLOT_HUMAN",
+      "inventory": {
+        "wood": 60,
+        "stone": 6,
+        "food": 18,
+        "coin": 9
+      },
+      "townXp": 155,
+      "hqLevel": 4
+    },
+    {
+      "action": "collected_FARM_PLOT_HUMAN",
+      "inventory": {
+        "wood": 60,
+        "stone": 6,
+        "food": 26,
+        "coin": 9
+      },
+      "townXp": 155,
+      "hqLevel": 4
+    },
+    {
+      "action": "collected_FARM_PLOT_HUMAN",
+      "inventory": {
+        "wood": 60,
+        "stone": 6,
+        "food": 34,
+        "coin": 9
+      },
+      "townXp": 155,
+      "hqLevel": 4
+    },
+    {
+      "action": "collected_QUARRY_HUMAN",
+      "inventory": {
+        "wood": 60,
+        "stone": 14,
+        "food": 34,
+        "coin": 9
+      },
+      "townXp": 155,
+      "hqLevel": 4
+    },
+    {
+      "action": "collected_QUARRY_HUMAN",
+      "inventory": {
+        "wood": 60,
+        "stone": 22,
+        "food": 34,
+        "coin": 9
+      },
+      "townXp": 155,
+      "hqLevel": 4
+    },
+    {
+      "action": "collected_QUARRY_HUMAN",
+      "inventory": {
+        "wood": 60,
+        "stone": 30,
+        "food": 34,
+        "coin": 9
+      },
+      "townXp": 155,
+      "hqLevel": 4
+    },
+    {
+      "action": "collected_QUARRY_HUMAN",
+      "inventory": {
+        "wood": 60,
+        "stone": 38,
+        "food": 34,
+        "coin": 9
+      },
+      "townXp": 155,
+      "hqLevel": 4
+    },
+    {
+      "action": "collected_QUARRY_HUMAN",
+      "inventory": {
+        "wood": 60,
+        "stone": 46,
+        "food": 34,
+        "coin": 9
+      },
+      "townXp": 155,
+      "hqLevel": 4
+    },
+    {
+      "action": "collected_QUARRY_HUMAN",
+      "inventory": {
+        "wood": 60,
+        "stone": 54,
+        "food": 34,
+        "coin": 9
+      },
+      "townXp": 155,
+      "hqLevel": 4
+    },
+    {
+      "action": "hq_5",
+      "inventory": {
+        "wood": 0,
+        "stone": 4,
+        "food": 4,
+        "coin": 9
+      },
+      "townXp": 175,
+      "rewards": [
+        "hq.level-5"
+      ]
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 10,
+        "stone": 4,
+        "food": 4,
+        "coin": 21
+      },
+      "townXp": 185,
+      "hqLevel": 5
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 20,
+        "stone": 4,
+        "food": 4,
+        "coin": 21
+      },
+      "townXp": 185,
+      "hqLevel": 5
+    },
+    {
+      "action": "collected_QUARRY_HUMAN",
+      "inventory": {
+        "wood": 20,
+        "stone": 12,
+        "food": 4,
+        "coin": 21
+      },
+      "townXp": 185,
+      "hqLevel": 5
+    },
+    {
+      "action": "collected_QUARRY_HUMAN",
+      "inventory": {
+        "wood": 20,
+        "stone": 20,
+        "food": 4,
+        "coin": 21
+      },
+      "townXp": 185,
+      "hqLevel": 5
+    },
+    {
+      "action": "placed_MARKET_STALL",
+      "inventory": {
+        "wood": 0,
+        "stone": 2,
+        "food": 4,
+        "coin": 7
+      },
+      "townXp": 195,
+      "hqLevel": 5
+    },
+    {
+      "action": "collected_FARM_PLOT_HUMAN",
+      "inventory": {
+        "wood": 0,
+        "stone": 2,
+        "food": 12,
+        "coin": 7
+      },
+      "townXp": 195,
+      "hqLevel": 5
+    },
+    {
+      "action": "collected_MARKET_STALL_AGENT",
+      "inventory": {
+        "wood": 0,
+        "stone": 2,
+        "food": 6,
+        "coin": 10
+      },
+      "townXp": 210,
+      "hqLevel": 5
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 10,
+        "stone": 2,
+        "food": 14,
+        "coin": 10
+      },
+      "townXp": 220,
+      "hqLevel": 5
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 20,
+        "stone": 2,
+        "food": 14,
+        "coin": 10
+      },
+      "townXp": 220,
+      "hqLevel": 5
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 30,
+        "stone": 2,
+        "food": 14,
+        "coin": 10
+      },
+      "townXp": 220,
+      "hqLevel": 5
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 40,
+        "stone": 2,
+        "food": 14,
+        "coin": 10
+      },
+      "townXp": 220,
+      "hqLevel": 5
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 50,
+        "stone": 2,
+        "food": 14,
+        "coin": 10
+      },
+      "townXp": 220,
+      "hqLevel": 5
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 60,
+        "stone": 2,
+        "food": 14,
+        "coin": 10
+      },
+      "townXp": 220,
+      "hqLevel": 5
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 70,
+        "stone": 2,
+        "food": 14,
+        "coin": 10
+      },
+      "townXp": 220,
+      "hqLevel": 5
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 80,
+        "stone": 2,
+        "food": 14,
+        "coin": 10
+      },
+      "townXp": 220,
+      "hqLevel": 5
+    },
+    {
+      "action": "collected_LUMBER_CAMP_HUMAN",
+      "inventory": {
+        "wood": 90,
+        "stone": 2,
+        "food": 14,
+        "coin": 10
+      },
+      "townXp": 220,
+      "hqLevel": 5
+    },
+    {
+      "action": "collected_FARM_PLOT_HUMAN",
+      "inventory": {
+        "wood": 90,
+        "stone": 2,
+        "food": 22,
+        "coin": 10
+      },
+      "townXp": 220,
+      "hqLevel": 5
+    },
+    {
+      "action": "collected_FARM_PLOT_HUMAN",
+      "inventory": {
+        "wood": 90,
+        "stone": 2,
+        "food": 30,
+        "coin": 10
+      },
+      "townXp": 220,
+      "hqLevel": 5
+    },
+    {
+      "action": "collected_FARM_PLOT_HUMAN",
+      "inventory": {
+        "wood": 90,
+        "stone": 2,
+        "food": 38,
+        "coin": 10
+      },
+      "townXp": 220,
+      "hqLevel": 5
+    },
+    {
+      "action": "collected_FARM_PLOT_HUMAN",
+      "inventory": {
+        "wood": 90,
+        "stone": 2,
+        "food": 46,
+        "coin": 10
+      },
+      "townXp": 220,
+      "hqLevel": 5
+    },
+    {
+      "action": "collected_FARM_PLOT_HUMAN",
+      "inventory": {
+        "wood": 90,
+        "stone": 2,
+        "food": 54,
+        "coin": 10
+      },
+      "townXp": 220,
+      "hqLevel": 5
+    },
+    {
+      "action": "collected_QUARRY_HUMAN",
+      "inventory": {
+        "wood": 90,
+        "stone": 10,
+        "food": 54,
+        "coin": 10
+      },
+      "townXp": 220,
+      "hqLevel": 5
+    },
+    {
+      "action": "collected_QUARRY_HUMAN",
+      "inventory": {
+        "wood": 90,
+        "stone": 18,
+        "food": 54,
+        "coin": 10
+      },
+      "townXp": 220,
+      "hqLevel": 5
+    },
+    {
+      "action": "collected_QUARRY_HUMAN",
+      "inventory": {
+        "wood": 90,
+        "stone": 26,
+        "food": 54,
+        "coin": 10
+      },
+      "townXp": 220,
+      "hqLevel": 5
+    },
+    {
+      "action": "collected_QUARRY_HUMAN",
+      "inventory": {
+        "wood": 90,
+        "stone": 34,
+        "food": 54,
+        "coin": 10
+      },
+      "townXp": 220,
+      "hqLevel": 5
+    },
+    {
+      "action": "collected_QUARRY_HUMAN",
+      "inventory": {
+        "wood": 90,
+        "stone": 42,
+        "food": 54,
+        "coin": 10
+      },
+      "townXp": 220,
+      "hqLevel": 5
+    },
+    {
+      "action": "collected_QUARRY_HUMAN",
+      "inventory": {
+        "wood": 90,
+        "stone": 50,
+        "food": 54,
+        "coin": 10
+      },
+      "townXp": 220,
+      "hqLevel": 5
+    },
+    {
+      "action": "collected_QUARRY_HUMAN",
+      "inventory": {
+        "wood": 90,
+        "stone": 58,
+        "food": 54,
+        "coin": 10
+      },
+      "townXp": 220,
+      "hqLevel": 5
+    },
+    {
+      "action": "collected_QUARRY_HUMAN",
+      "inventory": {
+        "wood": 90,
+        "stone": 66,
+        "food": 54,
+        "coin": 10
+      },
+      "townXp": 220,
+      "hqLevel": 5
+    },
+    {
+      "action": "collected_QUARRY_HUMAN",
+      "inventory": {
+        "wood": 90,
+        "stone": 74,
+        "food": 54,
+        "coin": 10
+      },
+      "townXp": 220,
+      "hqLevel": 5
+    },
+    {
+      "action": "collected_QUARRY_HUMAN",
+      "inventory": {
+        "wood": 90,
+        "stone": 82,
+        "food": 54,
+        "coin": 10
+      },
+      "townXp": 220,
+      "hqLevel": 5
+    },
+    {
+      "action": "hq_6",
+      "inventory": {
+        "wood": 0,
+        "stone": 2,
+        "food": 4,
+        "coin": 10
+      },
+      "townXp": 240,
+      "rewards": []
+    }
+  ],
+  "rewardChecks": [
+    {
+      "rewardId": "quest.first-lumber",
+      "panelTextBefore": "Rewards\n\nClaim these server-owned milestone rewards when they appear. They are part of the normal coin and XP path.\n\nSupply crate\n\nThe first lumber haul kept the camp alive.\n\n🪙 coin +5\nClaim Reward",
+      "grantText": "🪙 coin +5",
+      "claimedRewards": [
+        "quest.first-lumber"
+      ],
+      "inventoryAfter": {
+        "wood": 10,
+        "stone": 0,
+        "food": 0,
+        "coin": 17
+      },
+      "townXpAfter": 15,
+      "stillClaimable": false
+    },
+    {
+      "rewardId": "hq.level-2",
+      "panelTextBefore": "Rewards\n\nClaim these server-owned milestone rewards when they appear. They are part of the normal coin and XP path.\n\nField notes\n\nHQ Level 2 opens the food lane.\n\n🪙 coin +6\nClaim Reward",
+      "grantText": "🪙 coin +6",
+      "claimedRewards": [
+        "quest.first-lumber",
+        "hq.level-2"
+      ],
+      "inventoryAfter": {
+        "wood": 8,
+        "stone": 0,
+        "food": 6,
+        "coin": 19
+      },
+      "townXpAfter": 50,
+      "stillClaimable": false
+    },
+    {
+      "rewardId": "hq.level-3",
+      "panelTextBefore": "Rewards\n\nClaim these server-owned milestone rewards when they appear. They are part of the normal coin and XP path.\n\nQuarry kit\n\nA small reserve to help the new quarry boot.\n\n🪵 wood +8, 🪨 stone +4\nClaim Reward",
+      "grantText": "🪵 wood +8, 🪨 stone +4",
+      "claimedRewards": [
+        "quest.first-lumber",
+        "hq.level-2",
+        "hq.level-3"
+      ],
+      "inventoryAfter": {
+        "wood": 10,
+        "stone": 4,
+        "food": 4,
+        "coin": 13
+      },
+      "townXpAfter": 85,
+      "stillClaimable": false
+    },
+    {
+      "checkpoint": "hq4_before_claim",
+      "rewards": [
+        "hq.level-4"
+      ],
+      "inventoryBefore": {
+        "wood": 2,
+        "stone": 2,
+        "food": 2,
+        "coin": 13
+      },
+      "hqLevel": 4,
+      "townXp": 120
+    },
+    {
+      "rewardId": "hq.level-4",
+      "panelTextBefore": "Rewards\n\nClaim these server-owned milestone rewards when they appear. They are part of the normal coin and XP path.\n\nWorkshop charter\n\nYour builders can now compress future timelines.\n\n🪙 coin +8\nClaim Reward",
+      "grantText": "🪙 coin +8",
+      "claimedRewards": [
+        "quest.first-lumber",
+        "hq.level-2",
+        "hq.level-3",
+        "hq.level-4"
+      ],
+      "inventoryAfter": {
+        "wood": 2,
+        "stone": 2,
+        "food": 2,
+        "coin": 21
+      },
+      "townXpAfter": 120,
+      "stillClaimable": false
+    },
+    {
+      "checkpoint": "hq5_before_claim",
+      "rewards": [
+        "hq.level-5"
+      ],
+      "inventoryBefore": {
+        "wood": 0,
+        "stone": 4,
+        "food": 4,
+        "coin": 9
+      },
+      "hqLevel": 5,
+      "townXp": 175
+    },
+    {
+      "rewardId": "hq.level-5",
+      "panelTextBefore": "Rewards\n\nClaim these server-owned milestone rewards when they appear. They are part of the normal coin and XP path.\n\nFounder stipend\n\nYour overnight planner is now part of the town rhythm.\n\n🪙 coin +12, Town XP +10\nClaim Reward",
+      "grantText": "🪙 coin +12, Town XP +10",
+      "claimedRewards": [
+        "quest.first-lumber",
+        "hq.level-2",
+        "hq.level-3",
+        "hq.level-4",
+        "hq.level-5"
+      ],
+      "inventoryAfter": {
+        "wood": 0,
+        "stone": 4,
+        "food": 4,
+        "coin": 21
+      },
+      "townXpAfter": 185,
+      "stillClaimable": false
+    }
+  ],
+  "foremanChecks": [
+    {
+      "checkpoint": "fresh_load",
+      "text": "Foreman is observing. Enable a permission, then let the first delegated action resolve for +10 XP in that tier.",
+      "mentionsFirstDelegatedAction": true,
+      "mentionsTenXp": true
+    },
+    {
+      "checkpoint": "after_agent_collectOutputs",
+      "statusText": "Foreman is observing. Enable a permission, then let the first delegated action resolve for +10 XP in that tier.",
+      "xpBeforePolicy": 135,
+      "xpAfterFirstAgentAction": 155,
+      "xpDeltaFromCheckpoint": 20,
+      "hq6XpNeeded": 220
+    },
+    {
+      "checkpoint": "after_multiple_foreman_tiers",
+      "xpBeforeMoreForeman": 210,
+      "xpAfter": 220,
+      "xpDelta": 10,
+      "hq6XpNeeded": 220
+    }
+  ],
+  "consoleWarnings": [
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0x1240019cc00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0x1240019cc00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0x1240019cc00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0x1240019cc00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    },
+    {
+      "type": "warning",
+      "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+    }
+  ],
+  "serverLogs": [
+    "(node:57138) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\n",
+    "[agent-town] http://localhost:56203\n"
+  ],
+  "baseUrl": "http://[::1]:56203",
+  "finalState": {
+    "hqLevel": 6,
+    "townXp": 240,
+    "inventory": {
+      "wood": 0,
+      "stone": 2,
+      "food": 4,
+      "coin": 10
+    },
+    "claimedRewards": [
+      "quest.first-lumber",
+      "hq.level-2",
+      "hq.level-3",
+      "hq.level-4",
+      "hq.level-5"
+    ],
+    "rewardsRemaining": [],
+    "buildings": [
+      {
+        "type": "HQ",
+        "level": 6,
+        "state": "READY"
+      },
+      {
+        "type": "LUMBER_CAMP",
+        "level": 1,
+        "state": "READY"
+      },
+      {
+        "type": "FARM_PLOT",
+        "level": 1,
+        "state": "READY"
+      },
+      {
+        "type": "QUARRY",
+        "level": 1,
+        "state": "READY"
+      },
+      {
+        "type": "EXPEDITION_BOARD",
+        "level": 1,
+        "state": "READY"
+      },
+      {
+        "type": "WORKSHOP",
+        "level": 1,
+        "state": "READY"
+      },
+      {
+        "type": "MARKET_STALL",
+        "level": 1,
+        "state": "READY"
+      }
+    ],
+    "sitePlans": [
+      {
+        "planId": "site_plan_scout_report_1_forest_ridge",
+        "status": "DRAFT",
+        "promotionStatus": "draft"
+      }
+    ]
+  }
+}

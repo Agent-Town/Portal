@@ -1,0 +1,115 @@
+{
+  "ok": true,
+  "verdict": "PASS_WITH_NOTES",
+  "generatedAt": "2026-06-01T01:33:53+07:00",
+  "source": "Parent backfill after HQ12M player-readiness audit worker timed out without a usable handoff.",
+  "auditedStack": [
+    "HQ12A Expedition Map read model",
+    "HQ12B Expedition Map UI",
+    "HQ12C Scout Sector backend/UI",
+    "HQ12D Three.js zoomable renderer",
+    "HQ12E/HQ12F Expedition Event Packets",
+    "HQ12G/HQ12L Expedition Party manifest and visual polish",
+    "HQ12H/HQ12J/HQ12K mobile, legend, selected-sector, and packet polish",
+    "post-HQ12L Expedition Party visual regression QA"
+  ],
+  "playerReadiness": {
+    "coherentPrivateUnknownWorldMapPath": true,
+    "firstPlayableMapSlice": true,
+    "fullOutsideWorldSimulation": false,
+    "playableNow": [
+      "server-owned fog map",
+      "selected-sector UI",
+      "bounded Three.js pan/zoom/select",
+      "Scout Sector reveal action for eligible hinted cells",
+      "read-only event packet receipt flavor",
+      "read-only named expedition party flavor"
+    ],
+    "readModelOrFlavorOnly": [
+      "event packets",
+      "expedition party",
+      "risk/resource/terrain hints",
+      "Progression Atlas visibility",
+      "Generated Universe/local overlay presentation"
+    ]
+  },
+  "guardrails": {
+    "scoutSectorOnlyMutationPath": true,
+    "eventPacketReadOnly": true,
+    "partyReadOnly": true,
+    "packetButtons": 0,
+    "partyActions": 0,
+    "executableActions": [],
+    "serverStoreEngineRoutesToolsSpecChangesByAudit": false,
+    "partyManagement": false,
+    "operatorAssignment": false,
+    "autonomousMovement": false,
+    "resourceHarvesting": false,
+    "resourceDelta": {},
+    "routeCreation": false,
+    "tradeRouteCreation": false,
+    "combat": false,
+    "backgroundScheduling": false,
+    "publicSharing": false,
+    "generatedUniverseRendering": false,
+    "atlasExecution": false,
+    "crossPlotMutation": false,
+    "externalEffects": false,
+    "hiddenAutonomy": false,
+    "wildWestCowboySaloonGoldRushDrift": false
+  },
+  "checks": [
+    {
+      "name": "Founders Plot UI syntax",
+      "command": "node --check public/experiences/founders-plot/founders-plot.js",
+      "status": "pass"
+    },
+    {
+      "name": "Expedition Map UI e2e syntax",
+      "command": "node --check e2e/200_founders_plot.spec.js",
+      "status": "pass"
+    },
+    {
+      "name": "Expedition Map Three.js e2e syntax",
+      "command": "node --check e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js",
+      "status": "pass"
+    },
+    {
+      "name": "post-HQ12L regression QA",
+      "source": "reports/agent-town-post-hq12l-expedition-party-visual-regression-qa-proof-2026-06-01.json",
+      "status": "pass",
+      "recordedEvidence": [
+        "FP-E2E-022 passed after serial rerun",
+        "FP-E2E-023 passed",
+        "Founders Plot unit/contract/HTTP/scene-state tests passed 92/92"
+      ]
+    }
+  ],
+  "topNextBoundedSlices": [
+    {
+      "name": "Scout Sector live preflight proof",
+      "reason": "Reduce residual risk from mocked UI proof paths by proving the real backend/UI Scout Sector contract after later map/event/party polish.",
+      "authorityBoundary": "No new mutation path; Scout Sector remains the only Expedition Map mutation."
+    },
+    {
+      "name": "Expedition objective strip",
+      "reason": "Help players understand why a sector matters and what the one allowed Scout Sector action will do.",
+      "authorityBoundary": "Read-only guidance over existing server state."
+    },
+    {
+      "name": "Sector art and readability pass",
+      "reason": "Move the map closer to generated-image-quality play without revealing hidden truth.",
+      "authorityBoundary": "Presentation-only terrain/fog/card polish."
+    }
+  ],
+  "residualRisks": [
+    "Worktree was already heavily dirty before this audit.",
+    "This audit did not run a full fresh HQ1-to-HQ12 progression playthrough.",
+    "Some proof paths still use mocked route fixtures.",
+    "The map is currently a reveal/receipt surface, not a broader exploration/travel simulation."
+  ],
+  "filesCreated": [
+    "reports/agent-town-hq12m-expedition-map-player-readiness-audit-2026-06-01.md",
+    "reports/agent-town-hq12m-expedition-map-player-readiness-audit-proof-2026-06-01.json"
+  ]
+}

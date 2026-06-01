@@ -1,0 +1,1202 @@
+{
+  "generatedAt": "2026-05-31T06:48:36.410Z",
+  "baseURL": "http://[::1]:4231",
+  "screenshots": {
+    "realMobileTilePlacement": "reports/agent-town-gameplay-playtest-mobile-visual-real-mobile-390x844-tile-placement-2026-05-31.png",
+    "mobile390": "reports/agent-town-gameplay-playtest-mobile-visual-dense-mobile-390x844-2026-05-31.png",
+    "mobileExpeditionBoardSelected": "reports/agent-town-gameplay-playtest-mobile-visual-mobile-390x844-expedition-board-selected-2026-05-31.png",
+    "mobileHq9WorkOrdersPanel": "reports/agent-town-gameplay-playtest-mobile-visual-mobile-390x844-hq9-work-orders-panel-2026-05-31.png",
+    "mobileHq10WorldGridPanel": "reports/agent-town-gameplay-playtest-mobile-visual-mobile-390x844-hq10-world-grid-panel-2026-05-31.png",
+    "mobileHq10CivicProposalsPanel": "reports/agent-town-gameplay-playtest-mobile-visual-mobile-390x844-hq10-civic-proposals-panel-2026-05-31.png",
+    "mobileHq10OverlayPacksPanel": "reports/agent-town-gameplay-playtest-mobile-visual-mobile-390x844-hq10-overlay-packs-panel-2026-05-31.png",
+    "tablet768": "reports/agent-town-gameplay-playtest-mobile-visual-dense-tablet-768x1024-2026-05-31.png",
+    "desktop1280": "reports/agent-town-gameplay-playtest-mobile-visual-dense-desktop-1280x900-2026-05-31.png"
+  },
+  "metrics": {
+    "realMobileAfterTilePlacement": {
+      "label": "real-mobile-after-tile-placement",
+      "viewportWidth": 390,
+      "viewportHeight": 844,
+      "documentScrollWidth": 390,
+      "bodyScrollWidth": 390,
+      "documentScrollHeight": 5496,
+      "bodyScrollHeight": 5496,
+      "clipped": [
+        {
+          "testid": "fp-visual-actor-builder",
+          "left": 215,
+          "right": 406,
+          "width": 191,
+          "top": 543,
+          "bottom": 564
+        },
+        {
+          "testid": "fp-visual-actor-messenger",
+          "left": 406,
+          "right": 591,
+          "width": 186,
+          "top": 543,
+          "bottom": 564
+        },
+        {
+          "testid": "fp-drawer-close",
+          "left": 696,
+          "right": 768,
+          "width": 72,
+          "top": 16,
+          "bottom": 57
+        }
+      ],
+      "visibleInteractiveCount": 15,
+      "severeInteractiveOverlaps": [],
+      "imageCount": 2,
+      "brokenImages": [],
+      "canvas": {
+        "hasCanvas": true,
+        "width": 362,
+        "height": 270,
+        "sampledPixels": 1200,
+        "nonTransparentPixels": 1200,
+        "colorVariance": 914,
+        "nonblank": true,
+        "error": null
+      },
+      "actors": [],
+      "actorHooks": [
+        {
+          "testid": "fp-visual-actor-hooks",
+          "width": 1,
+          "height": 1,
+          "left": 24,
+          "top": 543
+        },
+        {
+          "testid": "fp-visual-actor-clover",
+          "role": "clover",
+          "sourceObjectId": "plot_fde3a0c2f99af1ad",
+          "width": 191,
+          "height": 21,
+          "left": 24,
+          "top": 543
+        },
+        {
+          "testid": "fp-visual-actor-builder",
+          "role": "builder",
+          "sourceObjectId": "job_fcf3c99d0f947d53",
+          "width": 191,
+          "height": 21,
+          "left": 215,
+          "top": 543
+        },
+        {
+          "testid": "fp-visual-actor-messenger",
+          "role": "messenger",
+          "sourceObjectId": "collect-first-wood",
+          "width": 186,
+          "height": 21,
+          "left": 406,
+          "top": 543
+        }
+      ],
+      "assetChecks": [],
+      "panelReachability": {
+        "hq9WorkOrders": true,
+        "worldGrid": true,
+        "civicProposals": true,
+        "overlayPacks": true
+      }
+    },
+    "mobile390": {
+      "label": "dense-mobile-390x844",
+      "viewportWidth": 390,
+      "viewportHeight": 844,
+      "documentScrollWidth": 390,
+      "bodyScrollWidth": 390,
+      "documentScrollHeight": 7980,
+      "bodyScrollHeight": 7980,
+      "clipped": [
+        {
+          "testid": "fp-visual-actor-workshop_specialist",
+          "left": 254,
+          "right": 527,
+          "width": 272,
+          "top": 543,
+          "bottom": 564
+        },
+        {
+          "testid": "fp-visual-actor-trader",
+          "left": 527,
+          "right": 698,
+          "width": 172,
+          "top": 543,
+          "bottom": 564
+        },
+        {
+          "testid": "fp-visual-actor-settler",
+          "left": 698,
+          "right": 912,
+          "width": 214,
+          "top": 543,
+          "bottom": 564
+        },
+        {
+          "testid": "fp-drawer-close",
+          "left": 696,
+          "right": 768,
+          "width": 72,
+          "top": 16,
+          "bottom": 57
+        }
+      ],
+      "visibleInteractiveCount": 16,
+      "severeInteractiveOverlaps": [],
+      "imageCount": 5,
+      "brokenImages": [],
+      "canvas": {
+        "hasCanvas": true,
+        "width": 362,
+        "height": 270,
+        "sampledPixels": 1200,
+        "nonTransparentPixels": 1200,
+        "colorVariance": 913,
+        "nonblank": true,
+        "error": null
+      },
+      "actors": [],
+      "actorHooks": [
+        {
+          "testid": "fp-visual-actor-hooks",
+          "width": 1,
+          "height": 1,
+          "left": 24,
+          "top": 543
+        },
+        {
+          "testid": "fp-visual-actor-scout",
+          "role": "scout",
+          "sourceObjectId": "bldg_expedition_board_dense",
+          "width": 230,
+          "height": 21,
+          "left": 24,
+          "top": 543
+        },
+        {
+          "testid": "fp-visual-actor-workshop_specialist",
+          "role": "workshop_specialist",
+          "sourceObjectId": "bldg_workshop_dense",
+          "width": 272,
+          "height": 21,
+          "left": 254,
+          "top": 543
+        },
+        {
+          "testid": "fp-visual-actor-trader",
+          "role": "trader",
+          "sourceObjectId": "bldg_market_dense",
+          "width": 172,
+          "height": 21,
+          "left": 527,
+          "top": 543
+        },
+        {
+          "testid": "fp-visual-actor-settler",
+          "role": "settler",
+          "sourceObjectId": "claim_hopper_forest_ridge",
+          "width": 214,
+          "height": 21,
+          "left": 698,
+          "top": 543
+        }
+      ],
+      "assetChecks": [],
+      "panelReachability": {
+        "hq9WorkOrders": true,
+        "worldGrid": true,
+        "civicProposals": true,
+        "overlayPacks": true
+      }
+    },
+    "tablet768": {
+      "label": "dense-tablet-768x1024",
+      "viewportWidth": 768,
+      "viewportHeight": 1024,
+      "documentScrollWidth": 768,
+      "bodyScrollWidth": 768,
+      "documentScrollHeight": 6634,
+      "bodyScrollHeight": 6634,
+      "clipped": [
+        {
+          "testid": "fp-visual-actor-settler",
+          "left": 711,
+          "right": 924,
+          "width": 214,
+          "top": 674,
+          "bottom": 695
+        },
+        {
+          "testid": "fp-drawer-close",
+          "left": 1084,
+          "right": 1156,
+          "width": 72,
+          "top": 16,
+          "bottom": 57
+        }
+      ],
+      "visibleInteractiveCount": 17,
+      "severeInteractiveOverlaps": [],
+      "imageCount": 5,
+      "brokenImages": [],
+      "canvas": {
+        "hasCanvas": true,
+        "width": 716,
+        "height": 446,
+        "sampledPixels": 1200,
+        "nonTransparentPixels": 1200,
+        "colorVariance": 1079,
+        "nonblank": true,
+        "error": null
+      },
+      "actors": [],
+      "actorHooks": [
+        {
+          "testid": "fp-visual-actor-hooks",
+          "width": 1,
+          "height": 1,
+          "left": 36,
+          "top": 674
+        },
+        {
+          "testid": "fp-visual-actor-scout",
+          "role": "scout",
+          "sourceObjectId": "bldg_expedition_board_dense",
+          "width": 230,
+          "height": 21,
+          "left": 36,
+          "top": 674
+        },
+        {
+          "testid": "fp-visual-actor-workshop_specialist",
+          "role": "workshop_specialist",
+          "sourceObjectId": "bldg_workshop_dense",
+          "width": 272,
+          "height": 21,
+          "left": 267,
+          "top": 674
+        },
+        {
+          "testid": "fp-visual-actor-trader",
+          "role": "trader",
+          "sourceObjectId": "bldg_market_dense",
+          "width": 172,
+          "height": 21,
+          "left": 539,
+          "top": 674
+        },
+        {
+          "testid": "fp-visual-actor-settler",
+          "role": "settler",
+          "sourceObjectId": "claim_hopper_forest_ridge",
+          "width": 214,
+          "height": 21,
+          "left": 711,
+          "top": 674
+        }
+      ],
+      "assetChecks": [],
+      "panelReachability": {
+        "hq9WorkOrders": true,
+        "worldGrid": true,
+        "civicProposals": true,
+        "overlayPacks": true
+      }
+    },
+    "desktop1280": {
+      "label": "dense-desktop-1280x900",
+      "viewportWidth": 1280,
+      "viewportHeight": 900,
+      "documentScrollWidth": 1280,
+      "bodyScrollWidth": 1280,
+      "documentScrollHeight": 7071,
+      "bodyScrollHeight": 7071,
+      "clipped": [
+        {
+          "testid": "fp-drawer-close",
+          "left": 1596,
+          "right": 1668,
+          "width": 72,
+          "top": 16,
+          "bottom": 57
+        }
+      ],
+      "visibleInteractiveCount": 24,
+      "severeInteractiveOverlaps": [
+        {
+          "a": "fp-visual-actor-settler",
+          "b": "fp-policy-pause",
+          "area": 121
+        },
+        {
+          "a": "fp-policy-queue",
+          "b": "fp-foreman-act",
+          "area": 169
+        }
+      ],
+      "imageCount": 5,
+      "brokenImages": [],
+      "canvas": {
+        "hasCanvas": true,
+        "width": 739,
+        "height": 460,
+        "sampledPixels": 1200,
+        "nonTransparentPixels": 1200,
+        "colorVariance": 1080,
+        "nonblank": true,
+        "error": null
+      },
+      "actors": [],
+      "actorHooks": [
+        {
+          "testid": "fp-visual-actor-hooks",
+          "width": 1,
+          "height": 1,
+          "left": 43,
+          "top": 565
+        },
+        {
+          "testid": "fp-visual-actor-scout",
+          "role": "scout",
+          "sourceObjectId": "bldg_expedition_board_dense",
+          "width": 230,
+          "height": 21,
+          "left": 43,
+          "top": 565
+        },
+        {
+          "testid": "fp-visual-actor-workshop_specialist",
+          "role": "workshop_specialist",
+          "sourceObjectId": "bldg_workshop_dense",
+          "width": 272,
+          "height": 21,
+          "left": 273,
+          "top": 565
+        },
+        {
+          "testid": "fp-visual-actor-trader",
+          "role": "trader",
+          "sourceObjectId": "bldg_market_dense",
+          "width": 172,
+          "height": 21,
+          "left": 546,
+          "top": 565
+        },
+        {
+          "testid": "fp-visual-actor-settler",
+          "role": "settler",
+          "sourceObjectId": "claim_hopper_forest_ridge",
+          "width": 214,
+          "height": 21,
+          "left": 717,
+          "top": 565
+        }
+      ],
+      "assetChecks": [],
+      "panelReachability": {
+        "hq9WorkOrders": true,
+        "worldGrid": true,
+        "civicProposals": true,
+        "overlayPacks": true
+      }
+    }
+  },
+  "interactions": {
+    "realMobileTilePlacement": {
+      "tileTapped": true,
+      "lumberPaletteVisible": true,
+      "placementAttempted": true,
+      "tileText": "Lumber CampBuilding…"
+    },
+    "mobileExpeditionBoard": {
+      "tileTapped": true,
+      "scoutAffordanceVisible": true,
+      "selectedPanelText": "\n        \n          Expedition Board · Lv 1\n        \n        IdlePad (2, 1)Scout requirements🪵 wood: 120/4🌾 food: 80/6Produces 🧭 Scout report +1Dispatch scoutWoodStoneFoodBalancedPriority biases one resource output at HQ 4+.\n      "
+    },
+    "mobileHq9": {
+      "reachable": true,
+      "completedReceiptCopy": "Completed receipt. Child receipts are preserved for audit."
+    },
+    "mobileHq10": {
+      "worldGridReachable": true,
+      "civicProposalsReachable": true,
+      "overlayPacksReachable": true,
+      "buttons": [
+        "Create civic proposal",
+        "Create Overlay Record"
+      ],
+      "worldGridText": "\n\t        \n\t          World Grid\n\t        \n\t        World Grid statusREAD MODEL READY - read-only4/4 requirements ready for HQ10B civic proposal records.Read-only advisory projection. No civic mutation, routes, scheduling, spending, Atlas execution, or arbitrary tool execution.RequirementsReady: HQ6 Settlement CharterReady: Founded outpostReady: Survey Discipline selectedReady: Collect-ready work-order executor availableKnown scope2 known plots, 1 founded outpost, 1 settlement claim.Claims: FOUNDED 1. Home plot_hopper_dense_mobile_visual, active plot_hopper_dense_mobile_visual.Civic readinessReady: multi plot visibilityReady: claim receiptsReady: doctrine contextReady: bounded work ordersCiv",
+      "civicText": "\n\t        \n\t          Civic Proposals\n\t        \n\t        Civic Proposal RecordsRECORDING READY - proposal only1 proposal record: DRAFT 0, REVIEWED 1, ARCHIVED 0.DRAFTREVIEWEDARCHIVEDcoordinationpublic workroute studycivic memoryserver_owned_civic_proposal_record_no_execution_v1. Records are for review and memory; execution is not implemented.Create civic proposalThis writes one advisory record through POST /api/founders-plot/civic-proposals. It does not execute, apply, route, trade, spend, share, or schedule anything.TitleCategorycoordinationpublic workroute studycivic memoryRecord statusDRAFTREVIEWEDARCHIVEDSummaryReview noteCreate civic proposalAdvisory record only. No world mutation, publ",
+      "overlayText": "\n\t        \n\t          Generated Universe Overlay Packs\n\t        \n\t        Generated Universe Overlay PacksRECORDING READY - presentation only1 overlay pack record: DRAFT 1, REVIEWED 0, ARCHIVED 0.presentationOnly truevisualOnly trueexecution disabledrendering not implementedpublic sharing falsestable gameplay hash excludedserver_owned_generated_universe_overlay_pack_presentation_only_v1. Records are presentation-only memory/proposal artifacts; they are not applied overlays, generated renders, or public shares.Server requirementsReady: HQ6 Settlement CharterReady: Founded outpostReady: Survey Discipline selectedReady: Collect-ready work-order executor availableReady: Reviewed civic proposalAl"
+    }
+  },
+  "consoleErrors": {
+    "realMobile": [
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "[.WebGL-0x1340019c000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+      },
+      {
+        "type": "warning",
+        "text": "[.WebGL-0x1340019c000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+      },
+      {
+        "type": "warning",
+        "text": "[.WebGL-0x1340019c000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+      },
+      {
+        "type": "warning",
+        "text": "[.WebGL-0x1340019c000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      }
+    ],
+    "mobile390": [
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      }
+    ],
+    "tablet768": [
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      }
+    ],
+    "desktop1280": [
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      },
+      {
+        "type": "warning",
+        "text": "THREE.WebGLRenderer: Texture marked for update but no image data found."
+      }
+    ]
+  }
+}

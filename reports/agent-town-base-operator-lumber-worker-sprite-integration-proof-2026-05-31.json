@@ -1,0 +1,76 @@
+{
+  "asset": "lumber-worker-jun-timberline-v1",
+  "role": "lumber_worker",
+  "displayName": "Jun Timberline",
+  "status": "ASSET_READY",
+  "visualOnly": true,
+  "authorityBoundary": "visual_only_projection_of_existing_lumber_camp_state",
+  "source": "/Users/robin/.openclaw/media/tool-image-generation/agent-town-lumber-worker-jun-timberline-sprite-sheet-v1-opaq---8c9e4578-d8b6-4dfd-8a5b-c0b190af62c9.png",
+  "outputs": {
+    "generated": "public/experiences/founders-plot/assets/characters/inhabitants/lumber_worker/lumber-worker-jun-timberline-v1.generated.png",
+    "source": "public/experiences/founders-plot/assets/characters/inhabitants/lumber_worker/lumber-worker-jun-timberline-v1.source.png",
+    "runtime": "public/experiences/founders-plot/assets/characters/inhabitants/lumber_worker/lumber-worker-jun-timberline-v1.png",
+    "metadata": "public/experiences/founders-plot/assets/characters/inhabitants/lumber_worker/lumber-worker-jun-timberline-v1.json",
+    "prompt": "public/experiences/founders-plot/assets/characters/inhabitants/lumber_worker/lumber-worker-jun-timberline-v1.prompt.md",
+    "proof": "reports/agent-town-base-operator-lumber-worker-sprite-integration-proof-2026-05-31.png",
+    "rowStrip": "reports/agent-town-base-operator-lumber-worker-row-strip-2026-05-31.png",
+    "original": "reports/agent-town-base-operator-lumber-worker-originals-2026-05-31/lumber-worker-jun-timberline-v1.opaque-original.png"
+  },
+  "imageChecks": {
+    "source": {
+      "width": 2048,
+      "height": 2048,
+      "colorspace": "sRGB",
+      "channels": "srgb",
+      "depth": 8
+    },
+    "runtime": {
+      "width": 2048,
+      "height": 2048,
+      "colorspace": "sRGB",
+      "channels": "srgba",
+      "depth": 8,
+      "alphaMean": 0.316259,
+      "transparentSamplePoints": [
+        "0,0",
+        "10,10",
+        "50,50",
+        "512,512",
+        "1024,1024",
+        "1536,1536",
+        "2047,2047"
+      ]
+    },
+    "proof": {
+      "width": 1024,
+      "height": 512,
+      "colorspace": "sRGB",
+      "channels": "srgb",
+      "depth": 8
+    },
+    "rowStrip": {
+      "width": 1024,
+      "height": 1024,
+      "colorspace": "sRGB",
+      "channels": "srgb",
+      "depth": 8
+    }
+  },
+  "hashes": {
+    "generated": "ef05df2552d5247d671e1ca8902e1434673d29996afb42113af67a1ea6df1598",
+    "source": "ef05df2552d5247d671e1ca8902e1434673d29996afb42113af67a1ea6df1598",
+    "runtime": "49a79ec5f1c2046d7c4bdae30a1e5b35e3eebdb482aab0927e7e78c3874683a4",
+    "proof": "7d75fe7a38cc7bdd8391ff8190dd8dd238d95bc6767be3c16827eb21f3425520",
+    "rowStrip": "5937c3b25c8f5c58bdb45e5127173eecf63ebdc9094082c0ee627e993cd6813f"
+  },
+  "validation": [
+    "jq empty on metadata and proof JSON",
+    "ImageMagick identify on generated/source/runtime/proof/row-strip",
+    "scene-state smoke tests",
+    "focused git diff --check"
+  ],
+  "notes": [
+    "Asset-only integration.",
+    "No scene_state.js, server, engine, route, tool, Atlas, generated bundle, scheduler, route/trade, resource, reward, public sharing, or gameplay authority changes."
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "verdict": "proof_capture_passed",
+  "generatedAt": "2026-05-31T05:42:05.241Z",
+  "fixturePlotId": "plot_dense_mobile_followup",
+  "screenshots": {
+    "mobile": "reports/agent-town-newest-build-post-parfit-carver-mobile-dense-390x844-2026-05-31.png",
+    "selected": "reports/agent-town-newest-build-post-parfit-carver-expedition-board-selected-390x844-2026-05-31.png",
+    "workOrders": "reports/agent-town-newest-build-post-parfit-carver-hq9-work-orders-panel-2026-05-31.png",
+    "worldGrid": "reports/agent-town-newest-build-post-parfit-carver-hq10-world-grid-panel-2026-05-31.png",
+    "proof": "reports/agent-town-newest-build-post-parfit-carver-ui-proof-2026-05-31.json"
+  },
+  "layout": {
+    "viewport": 390,
+    "documentScrollWidth": 390,
+    "bodyScrollWidth": 390,
+    "clipped": [],
+    "noHorizontalOverflow": true
+  },
+  "expeditionBoard": {
+    "selected": true,
+    "scoutAffordanceVisible": true,
+    "panelTextExcerpt": "Expedition Board · Lv 1\n\nIdle\n\nPad (2, 1)\n\nScout requirements\n\n🪵 wood: 120/4\n🌾 food: 80/6\nProduces 🧭 Scout report +1\nDispatch scout\nWoodStoneFoodBalanced\n\nPriority biases one resource output at HQ 4+."
+  },
+  "hq9WorkOrders": {
+    "explicitCreateDraftButtonCount": 1,
+    "executeButtonCountForCompletedFixture": 0,
+    "hasNoSchedulerCopy": true,
+    "hasSpendCapZeroCopy": true,
+    "hasCompletedReceipt": true,
+    "panelTextExcerpt": "Work Orders\n\nBounded delegation only: draft here, execute explicitly, collect receipts.\n\nCollect Ready Outputs Once\nDraft ready\n\nCreate a bounded collect-ready-outputs work order draft.\n\ncollect outputs\ncap 2 child actions\nspend cap 0\nruntime cap 2m 0s\ncurrent plot only\ndraft expires 24h\nExplicit execution only. No scheduler, spending, placement, scouting, founding, or Atlas mutation.\nCreate Draft\n\nReceipts and drafts\n\nCollect Ready Outputs Once\nCOMPLETED\n\ncollect ready outputs once - all ready outputs, output ready, max 2\n\ncollect outputs\ncap 2 child actions\nspend cap 0\nruntime cap 2m 0s\ncurrent plot only\n2 child receipts\nExpired draft. Recreate it before execution.\nExecution is a human-clicked endpoint call. No background automation runs this draft."
+  },
+  "hq10WorldGrid": {
+    "buttonCount": 0,
+    "readOnlyCopyVisible": true,
+    "civicProposalRecordsVisible": true,
+    "atlasExecutionBoundaryVisible": true,
+    "noMutationButtons": true,
+    "panelTextExcerpt": "World Grid\nWorld Grid status\nREAD MODEL READY - read-only\n\n4/4 requirements ready for HQ10B civic proposal records.\n\nRead-only advisory projection. No civic mutation, routes, scheduling, spending, Atlas execution, or arbitrary tool execution.\nRequirements\nReady: HQ6 Settlement Charter\nReady: Founded outpost\nReady: Survey Discipline selected\nReady: Collect-ready work-order executor available\nKnown scope\n\n2 known plots, 1 founded outpost, 1 settlement claim.\n\nClaims: FOUNDED 1. Home plot_dense_mobile_followup, active plot_dense_mobile_followup.\nCivic readiness\nReady: multi plot visibility\nReady: claim receipts\nReady: doctrine context\nReady: bounded work orders\nCivic proposal records may be promoted next, but this panel cannot create or execute them.\nProhibited capabilities\ncivic mutation\ntrade routes\nbackground scheduling\narbitrary tool execution\nresource spending\natlas owned execution\nserver_owned_read_only_world_grid_projection_no_civic_mutation_v1"
+  },
+  "batchCAssets": [
+    {
+      "path": "public/experiences/founders-plot/assets/characters/inhabitants/civic_routekeeper/civic-routekeeper-v1.json",
+      "exists": true,
+      "id": "civic-routekeeper-v1",
+      "role": "civic_routekeeper",
+      "name": "Civic Routekeeper",
+      "rows": null,
+      "authorityBoundary": null
+    },
+    {
+      "path": "public/experiences/founders-plot/assets/characters/inhabitants/oracle_adjunct/oracle-adjunct-v1.json",
+      "exists": true,
+      "id": "oracle-adjunct-v1",
+      "role": "oracle_adjunct",
+      "name": "Oracle Adjunct",
+      "rows": null,
+      "authorityBoundary": null
+    },
+    {
+      "path": "public/experiences/founders-plot/assets/characters/inhabitants/outpost_keeper/outpost-keeper-v1.json",
+      "exists": true,
+      "id": "outpost-keeper-v1",
+      "role": "outpost_keeper",
+      "name": "Outpost Keeper",
+      "rows": null,
+      "authorityBoundary": null
+    },
+    {
+      "path": "public/experiences/founders-plot/assets/objects/world-grid-civic-beacon.json",
+      "exists": true,
+      "id": "world-grid-civic-beacon-v1",
+      "role": "world_grid_civic_beacon",
+      "name": null,
+      "rows": null,
+      "authorityBoundary": null
+    }
+  ],
+  "scene": {
+    "canvasCount": 1
+  }
+}

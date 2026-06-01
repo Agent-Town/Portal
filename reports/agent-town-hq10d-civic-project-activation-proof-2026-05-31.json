@@ -1,0 +1,128 @@
+{
+  "slice": "HQ10D Civic Project Activation",
+  "date": "2026-05-31",
+  "ok": true,
+  "plotId": "plot_980702905aadfece",
+  "selectedDoctrineId": "survey_discipline",
+  "workOrderId": "work_order_55962d9882936d23",
+  "sourceProposalId": "civic_proposal_fccc5d7fdc243601",
+  "civicProjectId": "civic_project_706a8a7bdd2684ca",
+  "eventDelta": 1,
+  "worldDeltaTypes": [
+    "CIVIC_PROJECT_ACTIVATED"
+  ],
+  "effect": {
+    "effectId": "local_civic_beacon_v1",
+    "kind": "local_civic_beacon",
+    "scope": "local_plot",
+    "readinessDelta": 1,
+    "moraleMarker": "civic_beacon_lit",
+    "publicWork": true,
+    "visibleInWorldGrid": true,
+    "resourceDelta": {},
+    "routeCreation": false,
+    "tradeRouteCreation": false,
+    "backgroundScheduling": false,
+    "externalEffects": false,
+    "appliedAt": 1700000405000
+  },
+  "receipt": {
+    "kind": "civic_project_activation",
+    "actionName": "et.plot.activate_civic_project",
+    "sourceProposalId": "civic_proposal_fccc5d7fdc243601",
+    "sourceProposalStatus": "REVIEWED",
+    "projectType": "civic_beacon",
+    "effectId": "local_civic_beacon_v1",
+    "worldGridProjectionHash": "665cde67856b2a4b",
+    "authorityBoundary": "server_owned_civic_project_activation_local_public_work_v1",
+    "activatedAt": 1700000405000,
+    "resourceDelta": {},
+    "routeCreation": false,
+    "backgroundScheduling": false,
+    "externalEffects": false
+  },
+  "publicSummary": {
+    "civicProjectCount": 1,
+    "civicProjectActiveCount": 1,
+    "civicBeaconActive": true,
+    "civicReadinessScore": 1
+  },
+  "worldGrid": {
+    "civicProjects": {
+      "publicWork": true,
+      "activationAllowed": true,
+      "authorityBoundary": "server_owned_civic_project_activation_local_public_work_v1",
+      "total": 1,
+      "activeCount": 1,
+      "byStatus": {
+        "ACTIVE": 1,
+        "ARCHIVED": 0
+      },
+      "byType": {
+        "civic_beacon": 1
+      },
+      "localCivicBeaconActive": true,
+      "localReadinessDelta": 1,
+      "latestProjectId": "civic_project_706a8a7bdd2684ca"
+    },
+    "civicReadiness": {
+      "localProjectReadinessScore": 1,
+      "moraleMarkers": [
+        "civic_beacon_lit"
+      ],
+      "nextPromotableSlice": "HQ10D_CIVIC_PROJECT_ACTIVE"
+    }
+  },
+  "idempotency": {
+    "repeatedSameKeyProjectId": "civic_project_706a8a7bdd2684ca",
+    "duplicateSourceAlreadyActivated": true,
+    "duplicateSourceWorldDeltaLength": 0
+  },
+  "gameplayStableHashChanged": true,
+  "beforeGameplayStableHash": "df734757da5b957c69f57cc511a85792c41f194f9884fcf55649dacc2541f8a8",
+  "afterGameplayStableHash": "1672d08495ae39de2864d6c51ed6ce3cb806f6b0cf85521a0eb150fca82ca749",
+  "atlas": {
+    "summary": {
+      "civicProjectCount": 1,
+      "civicProjectActiveCount": 1,
+      "civicBeaconActive": true
+    },
+    "activationNodeStatus": "available",
+    "activationActionExecutableByAtlas": false,
+    "projectNodeCount": 1
+  },
+  "testsRun": [
+    {
+      "command": "node --check server/founders_plot/store.js && node --check server/founders_plot/engine.js && node --check server/founders_plot/routes.js && node --check server/founders_plot/tools.js && node --check server/founders_plot/progression_atlas.js && node --check tests-founders-plot/fp-unit.test.js && node --check tests-founders-plot/fp-contract.test.js && node --check tests-founders-plot/fp-http.test.js",
+      "result": "pass"
+    },
+    {
+      "command": "NODE_ENV=test node --test tests-founders-plot/fp-contract.test.js",
+      "result": "pass",
+      "passed": 21
+    },
+    {
+      "command": "NODE_ENV=test node --test tests-founders-plot/fp-unit.test.js",
+      "result": "pass",
+      "passed": 33
+    },
+    {
+      "command": "NODE_ENV=test node --test tests-founders-plot/fp-http.test.js",
+      "result": "pass",
+      "passed": 22
+    },
+    {
+      "command": "jq . reports/agent-town-hq10d-civic-project-activation-proof-2026-05-31.json >/dev/null",
+      "result": "pass"
+    },
+    {
+      "command": "NODE_ENV=test node --test tests-founders-plot/fp-unit.test.js tests-founders-plot/fp-contract.test.js tests-founders-plot/fp-http.test.js",
+      "result": "pass",
+      "passed": 76
+    },
+    {
+      "command": "git diff --check -- server/founders_plot/store.js server/founders_plot/engine.js server/founders_plot/routes.js server/founders_plot/tools.js server/founders_plot/progression_atlas.js tests-founders-plot/fp-unit.test.js tests-founders-plot/fp-contract.test.js tests-founders-plot/fp-http.test.js public/experiences/founders-plot/tools.md specs/02_api_contract.md reports/agent-town-hq10d-civic-project-activation-proof-2026-05-31.json reports/agent-town-hq10d-civic-project-activation-slice-2026-05-31.md",
+      "result": "pass"
+    }
+  ]
+}

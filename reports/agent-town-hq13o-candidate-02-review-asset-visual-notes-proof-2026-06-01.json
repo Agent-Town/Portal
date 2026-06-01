@@ -1,0 +1,65 @@
+{
+  "ok": true,
+  "date": "2026-06-01",
+  "lane": "HQ13O candidate-02 review asset visual notes",
+  "worktree": "/Users/robin/Projects/Portal-atlas-editor",
+  "verdict": "REVIEW_BUNDLE_USEFUL_NOT_PROMOTION_READY",
+  "scope": {
+    "reportOnly": true,
+    "proofOnly": true,
+    "assetFilesEdited": false,
+    "runtimeAssetsPromoted": false,
+    "runtimePackDirectoryCreated": false,
+    "runtimePackLoaderCreated": false,
+    "appSourceEdited": false,
+    "serverStoreRoutesToolsEdited": false,
+    "schemaValidatorEdited": false,
+    "atlasExecution": false,
+    "publicSharing": false,
+    "generatedUniverseRendering": false
+  },
+  "artifacts": {
+    "report": "reports/agent-town-hq13o-candidate-02-review-asset-visual-notes-2026-06-01.md",
+    "proof": "reports/agent-town-hq13o-candidate-02-review-asset-visual-notes-proof-2026-06-01.json",
+    "reviewedContactSheet": "reports/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-contact-sheet-2026-06-01.png",
+    "sourceBundleProof": "reports/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-proof-2026-06-01.json",
+    "rubric": "reports/agent-town-hq13l-generated-asset-review-rubric-2026-06-01.md",
+    "qaHarnessProof": "reports/agent-town-hq13m-generated-asset-qa-harness-proof-2026-06-01.json"
+  },
+  "visualNotes": {
+    "directionallyUseful": true,
+    "promotionReady": false,
+    "greenEdgeCleanupRisk": true,
+    "dimensionWarningsOpen": true,
+    "smallSizeReviewNeeded": true,
+    "runtimeManifestCreated": false,
+    "runtimeLoaderCreated": false
+  },
+  "slotNotesCount": 8,
+  "checks": [
+    {
+      "command": "viewed reports/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-contact-sheet-2026-06-01.png",
+      "exitCode": 0
+    },
+    {
+      "command": "jq empty reports/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-proof-2026-06-01.json reports/agent-town-hq13l-generated-asset-review-rubric-proof-2026-06-01.json reports/agent-town-hq13m-generated-asset-qa-harness-proof-2026-06-01.json",
+      "exitCode": 0
+    }
+  ],
+  "guardrails": {
+    "noAssetEdits": true,
+    "noRuntimeAssetPromotion": true,
+    "noRuntimePackDirectory": true,
+    "noRuntimeLoader": true,
+    "noAppSourceEdits": true,
+    "noServerStoreRoutesToolsEdits": true,
+    "noAtlasExecution": true,
+    "noPublicSharing": true,
+    "noGeneratedUniverseRendering": true,
+    "noHiddenAutonomy": true,
+    "noRouteTradeEconomyResourceRewardCombatSchedulerBehavior": true,
+    "noCrossPlotMutation": true,
+    "noExternalEffects": true,
+    "scoutSectorOnlyCurrentExpeditionMapMutationPath": true
+  }
+}

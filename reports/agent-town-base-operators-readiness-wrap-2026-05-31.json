@@ -1,0 +1,77 @@
+{
+  "status": "BASE_OPERATORS_ASSET_READY",
+  "date": "2026-05-31",
+  "scope": "asset readiness wrap for dedicated base-building operators",
+  "contactSheet": "reports/agent-town-base-operators-readiness-contact-sheet-2026-05-31.png",
+  "contactSheetIdentify": {
+    "width": 2048,
+    "height": 1024,
+    "colorspace": "sRGB",
+    "channels": "srgb",
+    "depth": 8,
+    "sha256": "81f58c6473d24095e656059d3f936cf1b252d818c9ffe9ce20a97b8872b8a86d"
+  },
+  "operators": [
+    {
+      "role": "farmer",
+      "displayName": "Mira Seedhand",
+      "surface": "FARM_PLOT",
+      "kind": "human civic operator",
+      "assetDirectory": "public/experiences/founders-plot/assets/characters/inhabitants/farmer/",
+      "runtimeImage": "public/experiences/founders-plot/assets/characters/inhabitants/farmer/farmer-mira-seedhand-v1.png",
+      "runtimeIdentify": "2048x2048 sRGB srgba 4.0 8",
+      "report": "reports/agent-town-base-operator-farmer-sprite-integration-2026-05-31.md",
+      "visualOnly": true,
+      "authorityBoundary": "visual_only_projection_of_existing_farm_plot_state"
+    },
+    {
+      "role": "quarry_mason",
+      "displayName": "Bram Stonecalm",
+      "surface": "QUARRY",
+      "kind": "human civic operator",
+      "assetDirectory": "public/experiences/founders-plot/assets/characters/inhabitants/quarry_mason/",
+      "runtimeImage": "public/experiences/founders-plot/assets/characters/inhabitants/quarry_mason/quarry-mason-bram-stonecalm-v1.png",
+      "runtimeIdentify": "2048x2048 sRGB srgba 4.0 8",
+      "report": "reports/agent-town-base-operator-quarry-mason-sprite-integration-2026-05-31.md",
+      "visualOnly": true,
+      "authorityBoundary": "visual_only_projection_of_existing_quarry_state"
+    },
+    {
+      "role": "lumber_worker",
+      "displayName": "Jun Timberline",
+      "surface": "LUMBER_CAMP",
+      "kind": "human civic operator",
+      "assetDirectory": "public/experiences/founders-plot/assets/characters/inhabitants/lumber_worker/",
+      "runtimeImage": "public/experiences/founders-plot/assets/characters/inhabitants/lumber_worker/lumber-worker-jun-timberline-v1.png",
+      "runtimeIdentify": "2048x2048 sRGB srgba 4.0 8",
+      "report": "reports/agent-town-base-operator-lumber-worker-sprite-integration-2026-05-31.md",
+      "visualOnly": true,
+      "authorityBoundary": "visual_only_projection_of_existing_lumber_camp_state"
+    },
+    {
+      "role": "hq_civic_operator",
+      "displayName": "Vale-Desk 7",
+      "surface": "HQ",
+      "kind": "synthetic civic operator",
+      "assetDirectory": "public/experiences/founders-plot/assets/characters/inhabitants/hq_civic_operator/",
+      "runtimeImage": "public/experiences/founders-plot/assets/characters/inhabitants/hq_civic_operator/hq-civic-operator-vale-desk-7-v1.png",
+      "runtimeIdentify": "2048x2048 sRGB srgba 4.0 8",
+      "report": "reports/agent-town-base-operator-hq-civic-operator-sprite-integration-2026-05-31.md",
+      "visualOnly": true,
+      "authorityBoundary": "visual_only_projection_of_existing_hq_state"
+    }
+  ],
+  "checks": [
+    "all four operators have generated/source/runtime PNG, JSON metadata, and prompt sidecar files",
+    "all four runtime PNGs identify as 2048x2048 sRGB sRGBA",
+    "all four metadata files parse with jq and preserve visualOnly=true",
+    "scene-state smoke tests pass 8/8 after Jun integration",
+    "focused git diff --check passes"
+  ],
+  "nextSafeStep": "separate bounded scene-wiring decision only after real server/read-model anchors are selected",
+  "authorityNotes": [
+    "no scene_state.js change in this wrap",
+    "no server, engine, route, store, tool, Atlas, scheduler, route/trade, resource, reward, public sharing, or gameplay authority changes",
+    "operators remain visual-only assets until a later explicitly bounded wiring slice"
+  ]
+}

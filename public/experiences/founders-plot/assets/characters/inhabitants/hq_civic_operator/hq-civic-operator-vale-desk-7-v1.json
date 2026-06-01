@@ -1,0 +1,110 @@
+{
+  "id": "hq-civic-operator-vale-desk-7-v1",
+  "role": "hq_civic_operator",
+  "canonicalRoleId": "hq_civic_operator",
+  "roleFacts": ["HQ_PRESENT", "RECEIPT_READY", "UPGRADE_READY"],
+  "displayName": "Vale-Desk 7",
+  "title": "HQ Civic Operator",
+  "buildingSurface": "HQ",
+  "characterKind": "synthetic_civic_operator",
+  "backstory": "Vale-Desk 7 began as a receipt desk in a rescued plan wagon: a little brass-and-wood synthetic clerk that learned names by watching which notices people kept. In Founders Plot, Vale belongs at HQ because it makes civic memory visible without becoming the town's authority, sorting receipts, readiness notices, and upgrade paperwork that already exists in server-owned state.",
+  "personality": "Warm, precise, gently bureaucratic in a useful way, proud when a queue gets shorter and a little embarrassed when a ribbon tangles.",
+  "visualOnly": true,
+  "authorityBoundary": "visual_only_projection_of_existing_hq_state",
+  "model": "openai/gpt-image-2 via OpenClaw image_generate",
+  "sourceImage": "hq-civic-operator-vale-desk-7-v1.source.png",
+  "generatedImage": "hq-civic-operator-vale-desk-7-v1.generated.png",
+  "image": "hq-civic-operator-vale-desk-7-v1.png",
+  "prompt": "hq-civic-operator-vale-desk-7-v1.prompt.md",
+  "sourceSize": {
+    "width": 2048,
+    "height": 2048
+  },
+  "nativeGeneratedSize": {
+    "width": 2048,
+    "height": 2048
+  },
+  "columns": 4,
+  "rows": 4,
+  "frameWidth": 512,
+  "frameHeight": 512,
+  "frameCount": 16,
+  "rowOrder": ["idle", "walk", "coordinate", "ready"],
+  "actions": {
+    "idle": {
+      "row": 0,
+      "description": "Waiting at a compact civic desk with a receipt tray and soft visor expression.",
+      "frames": [0, 1, 2, 3],
+      "fps": 3
+    },
+    "walk": {
+      "row": 1,
+      "description": "Walking or rolling with notice ribbons, a receipt bundle, or sealed packet.",
+      "frames": [0, 1, 2, 3],
+      "fps": 6
+    },
+    "coordinate": {
+      "row": 2,
+      "description": "Sorting receipts, stamping an abstract queue token, and pointing toward an unreadable HQ board.",
+      "frames": [0, 1, 2, 3],
+      "fps": 5
+    },
+    "ready": {
+      "row": 3,
+      "description": "Presenting a sealed upgrade or readiness notice packet.",
+      "frames": [0, 1, 2, 3],
+      "fps": 4
+    }
+  },
+  "actionMapping": {
+    "HQ_PRESENT": "idle",
+    "HQ_READY": "ready",
+    "RECEIPT_READY": "ready",
+    "UPGRADE_READY": "ready",
+    "CIVIC_NOTICE": "coordinate"
+  },
+  "generationNotes": {
+    "sourceProvenance": "/Users/robin/.openclaw/media/tool-image-generation/agent-town-hq-civic-operator-vale-desk-7-sprite-sheet-v1-opa---d05f5f0b-1667-4cda-a9f8-91f7b2db9cf6.png",
+    "deliveryNote": "Image generation completed through the inter-session GPT Image 2 route. The generated media file was recovered from the local OpenClaw media folder and integrated into the project.",
+    "postProcessing": [
+      "Copied generated opaque source into the project.",
+      "Converted saturated magenta background pixels to alpha.",
+      "Flood-filled pale edge background remnants from safe sheet boundary points.",
+      "Cleared generated guide strips around the expected 512px cell boundaries.",
+      "Zeroed hidden RGB in transparent pixels to prevent magenta bleed in resized proofs.",
+      "Created proof and row-strip previews under reports/."
+    ],
+    "transparency": {
+      "method": "ImageMagick chroma-key and edge flood-fill conversion from opaque source",
+      "sourceKeyRequested": "flat #ff00ff magenta",
+      "sampledCornerRange": [
+        "srgb(254,250,253)",
+        "srgb(254,249,254)",
+        "srgb(253,252,253)",
+        "srgb(254,248,254)"
+      ],
+      "keyRulesUsed": [
+        "alpha=0 when r>0.74, b>0.70, and g<0.35",
+        "8% edge flood-fill for pale magenta/near-white remnants"
+      ],
+      "transparentCorners": true,
+      "alphaMean": 0.412107
+    },
+    "knownIssues": [
+      "The opaque source includes generated separator traces, so runtime cleanup clears narrow strips around the expected 512px cell boundaries.",
+      "A few faint edge halos may remain under full-size inspection, but the proof is acceptable for asset-ready status before any later scene-wiring slice."
+    ],
+    "constraints": [
+      "adult-coded",
+      "synthetic civic neighbor",
+      "visual-only",
+      "no readable text",
+      "no logos",
+      "no weapons",
+      "no combat",
+      "no surveillance framing",
+      "no gameplay authority",
+      "no scene wiring in this slice"
+    ]
+  }
+}

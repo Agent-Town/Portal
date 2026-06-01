@@ -1,0 +1,97 @@
+{
+  "id": "charter-clerk-v1",
+  "role": "charter_clerk",
+  "canonicalRoleId": "charter_clerk",
+  "roleFacts": ["SITE_PLAN_REVIEW", "CHARTER_REVIEW", "CHARTER_READY", "OUTPUT_READY"],
+  "displayName": "Miri Ledgerwale",
+  "title": "Charter Clerk",
+  "backstory": "Miri Ledgerwale keeps civic promises from becoming vague town lore. She folds every reviewed site plan, consent mark, and charter receipt into a record that future settlers can actually understand.",
+  "personality": "Patient, careful, warm, and quietly stubborn about legible agreements.",
+  "visualOnly": true,
+  "wiringStatus": "asset_ready_not_scene_wired",
+  "model": "built-in image_gen, requested GPT Image 2.0 path",
+  "sourceImage": "charter-clerk-v1.source.png",
+  "nativeGeneratedImage": "charter-clerk-v1.generated.png",
+  "image": "charter-clerk-v1.png",
+  "prompt": "charter-clerk-v1.prompt.md",
+  "nativeGeneratedSize": {
+    "width": 1254,
+    "height": 1254
+  },
+  "sourceSize": {
+    "width": 2048,
+    "height": 2048
+  },
+  "sheetContract": {
+    "width": 2048,
+    "height": 2048,
+    "columns": 4,
+    "rows": 4,
+    "frameWidth": 512,
+    "frameHeight": 512,
+    "frameCount": 16
+  },
+  "rowOrder": ["idle", "walk", "review", "ready"],
+  "actions": {
+    "idle": {
+      "row": 0,
+      "description": "Record-keeping stances with charter folio, receipt clips, and civic seal token.",
+      "frames": [0, 1, 2, 3],
+      "fps": 3
+    },
+    "walk": {
+      "row": 1,
+      "description": "Walking with satchel, rolled plan tube, and desk-lamp charm.",
+      "frames": [0, 1, 2, 3],
+      "fps": 6
+    },
+    "review": {
+      "row": 2,
+      "description": "Reviewing or stamping an abstract charter/site-plan dossier.",
+      "frames": [0, 1, 2, 3],
+      "fps": 5
+    },
+    "ready": {
+      "row": 3,
+      "description": "Presenting a sealed charter receipt token or tidy folio.",
+      "frames": [0, 1, 2, 3],
+      "fps": 4
+    }
+  },
+  "actionMapping": {
+    "SITE_PLAN_REVIEW": "review",
+    "REVIEW_SITE_PLAN": "review",
+    "CHARTER_REVIEW": "review",
+    "SETTLEMENT_CHARTER": "ready",
+    "CHARTER_READY": "ready",
+    "OUTPUT_READY": "ready"
+  },
+  "texture": {
+    "path": "public/experiences/founders-plot/assets/characters/inhabitants/charter_clerk/charter-clerk-v1.png",
+    "format": "png",
+    "colorSpace": "sRGB",
+    "channels": "sRGBA",
+    "width": 2048,
+    "height": 2048,
+    "alpha": true,
+    "transparentCorners": true
+  },
+  "generationNotes": {
+    "sourceProvenance": "/Users/robin/.openclaw/agents/main/agent/codex-home/generated_images/019e7c45-8e1f-7fa3-a67c-4ccf4bf0859b/ig_0ab5d2a9f79f2c3f016a1bb820f1bc8191bcb1e2d3733ae8cf.png",
+    "mode": "built-in image_gen with requested GPT Image 2.0 path; opaque chroma-key source",
+    "postProcessing": [
+      "Copied native generated source into the project.",
+      "Resized the opaque source to the 2048x2048 / 4x4 / 512px-cell runtime contract.",
+      "Converted green chroma background to alpha with ImageMagick and removed remaining chroma-green pixels from the matte."
+    ],
+    "transparency": {
+      "method": "ImageMagick chroma-key conversion from opaque source",
+      "sourceKeyRequested": "#00ff00",
+      "sampledCornerColor": "srgb(29,236,30)",
+      "keyColorsUsed": ["#1dec1e"],
+      "fuzz": "22%",
+      "transparentCorners": true
+    },
+    "constraints": ["adult-coded", "visual-only", "no readable text", "no logos", "no weapons", "no surveillance", "no gameplay authority"]
+  }
+}

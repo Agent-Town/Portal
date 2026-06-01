@@ -1,0 +1,112 @@
+{
+  "ok": true,
+  "lane": "HQ12R Expedition Map evidence index",
+  "date": "2026-06-01",
+  "verdict": "COMPLETE_EVIDENCE_INDEX",
+  "workerStatus": {
+    "taskName": "agenttown_hq12r_evidence_index_20260601",
+    "runId": "87a3e871-43a5-4d9d-b8c1-3a358cbe7ee7",
+    "status": "timeout",
+    "parentBackfilled": true
+  },
+  "indexedArtifacts": {
+    "readModel": [
+      "reports/agent-town-hq12a-expedition-map-read-model-slice-2026-05-31.md",
+      "reports/agent-town-hq12a-expedition-map-read-model-proof-2026-05-31.json"
+    ],
+    "ui": [
+      "reports/agent-town-hq12b-expedition-map-ui-slice-2026-05-31.md",
+      "reports/agent-town-hq12b-expedition-map-ui-proof-2026-05-31.json",
+      "reports/agent-town-hq12c-scout-sector-ui-slice-2026-05-31.md",
+      "reports/agent-town-hq12c-scout-sector-ui-proof-2026-05-31.json"
+    ],
+    "renderer": [
+      "reports/agent-town-hq12d-threejs-zoomable-expedition-map-renderer-2026-05-31.md",
+      "reports/agent-town-hq12d-threejs-zoomable-expedition-map-renderer-proof-2026-05-31.json"
+    ],
+    "eventPackets": [
+      "reports/agent-town-hq12e-expedition-event-packets-backend-slice-2026-05-31.md",
+      "reports/agent-town-hq12f-expedition-event-packets-ui-slice-2026-05-31.md",
+      "reports/agent-town-hq12k-expedition-event-packet-visual-polish-2026-06-01.md"
+    ],
+    "expeditionParty": [
+      "reports/agent-town-hq12g-expedition-party-manifest-backend-slice-2026-05-31.md",
+      "reports/agent-town-hq12l-expedition-party-visual-polish-2026-06-01.md"
+    ],
+    "mapReadability": [
+      "reports/agent-town-hq12i-expedition-map-semantic-zoom-polish-2026-05-31.md",
+      "reports/agent-town-hq12j-expedition-map-legend-sector-card-polish-2026-06-01.md",
+      "reports/agent-town-hq12o-expedition-sector-art-readability-2026-06-01.md"
+    ],
+    "liveAndFreshProof": [
+      "reports/agent-town-hq12m-scout-sector-live-preflight-2026-06-01.md",
+      "reports/agent-town-hq12p-fresh-progression-map-preflight-2026-06-01.md",
+      "reports/agent-town-hq12p-scout-sector-post-readability-live-smoke-2026-06-01.md"
+    ],
+    "wrap": [
+      "reports/agent-town-hq12q-expedition-map-sprint-wrap-2026-06-01.md",
+      "reports/agent-town-hq12q-expedition-map-sprint-wrap-proof-2026-06-01.json"
+    ]
+  },
+  "bestProofs": [
+    "reports/agent-town-hq12m-scout-sector-live-preflight-proof-2026-06-01.json",
+    "reports/agent-town-hq12o-expedition-sector-art-readability-proof-2026-06-01.json",
+    "reports/agent-town-post-hq12o-expedition-sector-readability-regression-qa-proof-2026-06-01.json",
+    "reports/agent-town-hq12p-fresh-progression-map-preflight-proof-2026-06-01.json",
+    "reports/agent-town-hq12q-expedition-map-sprint-wrap-proof-2026-06-01.json"
+  ],
+  "bestScreenshots": [
+    {
+      "path": "reports/agent-town-hq12o-expedition-sector-art-readability-desktop-2026-06-01.png",
+      "dimensions": "465x3821"
+    },
+    {
+      "path": "reports/agent-town-hq12o-expedition-sector-art-readability-mobile-2026-06-01.png",
+      "dimensions": "366x2867"
+    },
+    {
+      "path": "reports/agent-town-hq12p-fresh-progression-map-preflight-threejs-desktop-2026-06-01.png",
+      "dimensions": "465x3282"
+    },
+    {
+      "path": "reports/agent-town-hq12p-fresh-progression-map-preflight-threejs-mobile-2026-06-01.png",
+      "dimensions": "366x2482"
+    }
+  ],
+  "checks": {
+    "activeSubagents": 0,
+    "hq12qGuardrailProof": true,
+    "hq12rReportWritten": true,
+    "hq12rProofWritten": true,
+    "sourceEdits": false
+  },
+  "guardrails": {
+    "reportProofOnly": true,
+    "serverAuthorityPreserved": true,
+    "atlasNonExecutionPreserved": true,
+    "scoutSectorOnlyMutationPath": true,
+    "eventPacketReadOnly": true,
+    "expeditionPartyReadOnly": true,
+    "currentFocusReadOnly": true,
+    "newMutationPath": false,
+    "packetActions": false,
+    "partyActions": false,
+    "objectiveActions": false,
+    "routeCreation": false,
+    "tradeRouteCreation": false,
+    "resourceHarvesting": false,
+    "combat": false,
+    "backgroundScheduling": false,
+    "publicSharing": false,
+    "generatedUniverseRendering": false,
+    "crossPlotMutation": false,
+    "externalEffects": false,
+    "hiddenAutonomy": false,
+    "wildWestGenreDrift": false
+  },
+  "residualCaveats": [
+    "Canonical progression remains capped around HQ6; HQ12 is a verified private map horizon, not a full HQ1-to-HQ12 campaign.",
+    "HQ12P post-readability live smoke parked with notes and does not supersede HQ12M live UI click proof.",
+    "The map is a reveal, evidence, receipt, and read-model loop, not a travel simulation."
+  ]
+}

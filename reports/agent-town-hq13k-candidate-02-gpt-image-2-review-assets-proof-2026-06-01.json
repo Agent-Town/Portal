@@ -1,0 +1,155 @@
+{
+  "ok": true,
+  "date": "2026-06-01",
+  "lane": "HQ13K candidate-02 GPT Image 2 review asset batch",
+  "worktree": "/Users/robin/Projects/Portal-atlas-editor",
+  "verdict": "COMPLETE_REVIEW_BUNDLE_WITH_NOTES",
+  "scope": {
+    "reviewOnly": true,
+    "reportsMediaOnly": true,
+    "runtimeAssetsPromoted": false,
+    "runtimePackDirectoryCreated": false,
+    "runtimePackLoaderCreated": false,
+    "appSourceEdited": false,
+    "serverStoreRoutesToolsEdited": false,
+    "schemaValidatorEditedInThisLane": false,
+    "atlasExecution": false,
+    "publicSharing": false,
+    "generatedUniverseRendering": false,
+    "expeditionMapMutationPathEdited": false
+  },
+  "artifacts": {
+    "report": "reports/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-2026-06-01.md",
+    "proof": "reports/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-proof-2026-06-01.json",
+    "reviewDirectory": "reports/media/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-2026-06-01",
+    "contactSheet": "reports/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-contact-sheet-2026-06-01.png",
+    "rubric": "reports/agent-town-hq13l-generated-asset-review-rubric-2026-06-01.md",
+    "qaHarness": "reports/agent-town-hq13m-generated-asset-qa-harness-2026-06-01.mjs"
+  },
+  "assetSummary": {
+    "plannedSlots": 8,
+    "representedSlots": 8,
+    "sourcePngCount": 8,
+    "reviewAlphaPngCount": 8,
+    "totalBundlePngCount": 16,
+    "contactSheetCreated": true,
+    "runtimePromotionApproved": false
+  },
+  "slots": [
+    {
+      "slotId": "expedition_map.fog.hinted",
+      "source": "hinted-fog-veil-v1.gpt-image-2-source.png",
+      "reviewAlpha": "hinted-fog-veil-v1.review-alpha.png",
+      "sourceSha256": "76c94f4c8129ec15555ed9d55ed70db07eacb98846fd31ecd3d855014446da18",
+      "reviewAlphaSha256": "7e350524ee2b2a8edb4f7608b4a93b49da5faea7c5f12dbf27d202f3ef69b9e7"
+    },
+    {
+      "slotId": "expedition_map.fog.locked_unknown",
+      "source": "locked-unknown-fog-v1.gpt-image-2-source.png",
+      "reviewAlpha": "locked-unknown-fog-v1.review-alpha.png",
+      "sourceSha256": "82e42260f6986f33bab6a4f1c90103b7cd26fb8200940a797a6363b230319031",
+      "reviewAlphaSha256": "c27f256eedbc57f2ee36f58780dbe61d8265ec2a7a4862135ca82d951d0d34f0"
+    },
+    {
+      "slotId": "expedition_map.fog.frontier_border",
+      "source": "frontier-dotted-boundary-v1.gpt-image-2-source.png",
+      "reviewAlpha": "frontier-dotted-boundary-v1.review-alpha.png",
+      "sourceSha256": "4e23926cf742588481c4fc6c968624a283a93be5d9d3ae655edf58bdc9d8ab31",
+      "reviewAlphaSha256": "003ce082388281be0a5b09e9b808ae2d4e3c7c94a0180d5361e017598071aa31"
+    },
+    {
+      "slotId": "expedition_map.marker.known_site_plan",
+      "source": "marker-known-site-plan-v1.gpt-image-2-source.png",
+      "reviewAlpha": "marker-known-site-plan-v1.review-alpha.png",
+      "sourceSha256": "1475e63be835b77b3f1bd754040e0afa0906b91d1449fa51e66d567b3e42635e",
+      "reviewAlphaSha256": "c15e742fb02919d0fb1ded90c9e9e275618b5ec76b6d27f71eb4d83ad0139cfd"
+    },
+    {
+      "slotId": "expedition_map.marker.hinted_unknown",
+      "source": "marker-hinted-unknown-v1.gpt-image-2-source.png",
+      "reviewAlpha": "marker-hinted-unknown-v1.review-alpha.png",
+      "sourceSha256": "179b4290ab9381d9e7a34f293d722f1908fbae67e66f4be5d57ac48575806151",
+      "reviewAlphaSha256": "da46cd34a99e68265c8ce8d1dc890ee9f6b04a10d9947b5b5242045a62e40a1e"
+    },
+    {
+      "slotId": "expedition_map.marker.owned_outpost",
+      "source": "marker-owned-outpost-v1.gpt-image-2-source.png",
+      "reviewAlpha": "marker-owned-outpost-v1.review-alpha.png",
+      "sourceSha256": "cd7f5675e8996ed62f1bf9270f4d5bf59df84e7969ca45d903dd8f16a5ea3499",
+      "reviewAlphaSha256": "464a9e9b5cf91ef429e0b8f7e7b988627439a3ac7620f3fb68c6c5ac3f17034f"
+    },
+    {
+      "slotId": "expedition_map.stroke.scout_receipt_trace",
+      "source": "survey-receipt-stroke-v1.gpt-image-2-source.png",
+      "reviewAlpha": "survey-receipt-stroke-v1.review-alpha.png",
+      "sourceSha256": "ef9275317e4c43cfbb078efaa0228326bacbae7e191ac0cd458c91dc9cf88810",
+      "reviewAlphaSha256": "3193eae528b8d0c00ebcd6f9eb3f8b1d5d1241688a1752c2bbbf8948268acbe8"
+    },
+    {
+      "slotId": "hud.frame.selected_sector_card",
+      "source": "hud-selected-sector-frame-v1.gpt-image-2-source.png",
+      "reviewAlpha": "hud-selected-sector-frame-v1.review-alpha.png",
+      "sourceSha256": "8713a83bdd88702f5e93910eec839c8d1a3e632798e90befa48ac34f1f8ab8ec",
+      "reviewAlphaSha256": "a459d1b8d7f7277ffba04b9cfaf7933f68f02c1a0226bceb67520c88910eb41d"
+    }
+  ],
+  "contactSheet": {
+    "path": "reports/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-contact-sheet-2026-06-01.png",
+    "dimensions": "960x480",
+    "sha256": "e1cb0ae2f20433257f34fa9f10648b469133848136af010e669a7a6c100765b4"
+  },
+  "qaHarnessSummary": {
+    "expectedSlots": 8,
+    "pngFilesFound": 16,
+    "presentSlots": 8,
+    "missingSlots": 0,
+    "processedAlphaFilesFound": 8,
+    "sourceFilesFound": 8,
+    "unmatchedPngFiles": 0,
+    "status": "warn",
+    "verdict": "PARTIAL_OR_WARN_REVIEW_INPUT",
+    "warningReason": "Review/source PNGs are larger than HQ13L final slot dimensions; crop/resize/repair still required before promotion."
+  },
+  "reviewNotes": {
+    "promotionReady": false,
+    "needsCropResize": true,
+    "needsGreenEdgeCleanupReview": true,
+    "needsSmallSizeMobileReview": true,
+    "messageAttachmentDelivery": "webchat message attachment delivery timed out/was unavailable; project-local files are present and verified"
+  },
+  "checks": [
+    {
+      "command": "node reports/agent-town-hq13m-generated-asset-qa-harness-2026-06-01.mjs --pretty reports/media/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-2026-06-01",
+      "exitCode": 0
+    },
+    {
+      "command": "file reports/media/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-2026-06-01/*.png reports/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-contact-sheet-2026-06-01.png",
+      "exitCode": 0
+    },
+    {
+      "command": "magick identify reports/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-contact-sheet-2026-06-01.png",
+      "exitCode": 0
+    },
+    {
+      "command": "shasum -a 256 reports/media/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-2026-06-01/*.png reports/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-contact-sheet-2026-06-01.png",
+      "exitCode": 0
+    }
+  ],
+  "guardrails": {
+    "noRuntimeAssetPromotion": true,
+    "noRuntimePackDirectory": true,
+    "noRuntimeLoader": true,
+    "noAppSourceEdits": true,
+    "noServerStoreRoutesToolsEdits": true,
+    "noSchemaValidatorEditsInThisLane": true,
+    "noAtlasExecution": true,
+    "noPublicSharing": true,
+    "noGeneratedUniverseRendering": true,
+    "noHiddenAutonomy": true,
+    "noRouteTradeEconomyResourceRewardCombatSchedulerBehavior": true,
+    "noCrossPlotMutation": true,
+    "noExternalEffects": true,
+    "scoutSectorOnlyCurrentExpeditionMapMutationPath": true,
+    "noWildWestDrift": true
+  }
+}

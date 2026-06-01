@@ -1,0 +1,222 @@
+{
+  "ok": true,
+  "lane": "HQ13C Location Scene Visit Model",
+  "date": "2026-06-01",
+  "verdict": "RECOMMEND_SCENE_BASED_LOCATION_VISITS",
+  "worktree": "/Users/robin/Projects/Portal-atlas-editor",
+  "artifactsWritten": [
+    "reports/agent-town-hq13c-location-scene-visit-model-2026-06-01.md",
+    "reports/agent-town-hq13c-location-scene-visit-model-proof-2026-06-01.json"
+  ],
+  "inspectedFiles": [
+    {
+      "path": "public/experiences/founders-plot/scene_state.js",
+      "evidence": [
+        "createSceneState returns renderer, grid, objects, actors, visual ways, and visual encounters from bundle data.",
+        "Actor projections carry sourceDomain/sourceObjectId/sourceStateHash/target/actionKind and visualOnly true.",
+        "Building-specific visual roles map generic worker/hauler activity onto dedicated inhabitant sheets over existing anchors."
+      ],
+      "lineRanges": ["1-130", "170-345", "390-535", "604-780", "941-1238"]
+    },
+    {
+      "path": "server/founders_plot/engine.js",
+      "evidence": [
+        "Expedition Map, Scout Sector, Event Packet, and Expedition Party authority boundaries are explicit.",
+        "buildExpeditionMapReadModel derives cells from existing server facts and returns readOnly true plus executableActions empty.",
+        "Scout Sector reveals one eligible hinted cell, creates a receipt/event packet, and forbids route/trade/resource/combat/scheduler/Atlas/public/cross-plot/external effects.",
+        "visualActorProjections emits visualOnly actors over jobs, buildings, settlement claims, civic projects, world grid, rewards, approvals, and quests."
+      ],
+      "lineRanges": ["1-24", "1310-1435", "1560-1905", "3080-3395", "3400-3530", "5160-5380"]
+    },
+    {
+      "path": "server/founders_plot/routes.js",
+      "evidence": [
+        "GET /api/founders-plot/expedition-map is a read-model route.",
+        "POST /api/founders-plot/expedition-map/scout-sector is the current bounded map mutation route."
+      ],
+      "lineRanges": ["61-120"]
+    },
+    {
+      "path": "public/experiences/founders-plot/founders-plot.js",
+      "evidence": [
+        "Frontend map copy distinguishes discovered, known, hinted, and locked semantics.",
+        "Selected-sector UI hides resources/receipts/actions for hinted and locked cells.",
+        "Event Packet and Expedition Party surfaces are explicitly read-only.",
+        "Scout Sector buttons appear only for eligible hinted frontier_hint cells.",
+        "Generated Universe overlay pack UI is presentation-only and rendering is not implemented."
+      ],
+      "lineRanges": ["1-90", "1410-1665", "1660-1977", "2440-2525"]
+    },
+    {
+      "path": "public/experiences/founders-plot/three_scene_entry.js",
+      "evidence": [
+        "Founders Plot Three.js stage consumes scene payload objects, ways, actors, and encounters.",
+        "Visual-only picks prevent default direct action behavior and dispatch detail events.",
+        "Expedition Map Three.js stage renders server-owned cells, supports bounded pan/zoom/select, and exposes read-only renderer info.",
+        "renderExpeditionMap/getExpeditionMapInfo/disposeExpeditionMap are isolated renderer entry points."
+      ],
+      "lineRanges": ["640-1265", "1350-1580", "1580-1950"]
+    },
+    {
+      "path": "tests-founders-plot/fp-scene-state.test.js",
+      "evidence": [
+        "Tests assert civic actors project only from active server-owned civic state.",
+        "Tests assert base operators and HQ notices map only over existing anchors."
+      ],
+      "lineRanges": ["777-1035"]
+    },
+    {
+      "path": "e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js",
+      "evidence": [
+        "Proof records Three.js map guardrails: readOnly, executableActions empty, routeCreation false, atlasExecution false, hidden-cell resource/receipt suppression, Scout Sector as only mutation path."
+      ],
+      "lineRanges": ["400-456"]
+    },
+    {
+      "path": "reports/agent-town-hq12r-expedition-map-evidence-index-2026-06-01.md",
+      "evidence": [
+        "HQ12 evidence index summarizes server-owned fog, private readable map, Three.js pan/zoom/select, Scout Sector-only reveal mutation, and read-only Event Packet/Party/Current focus surfaces."
+      ],
+      "lineRanges": ["1-96"]
+    },
+    {
+      "path": "reports/agent-town-next-slices-editor-vs-engine-boundary-2026-05-30.md",
+      "evidence": [
+        "Prior editor boundary report says editor-authored drafts are planning/content JSON and canonical engine graph must come from server/store/tool implementation."
+      ],
+      "lineRanges": ["43-80"]
+    },
+    {
+      "path": "reports/agent-town-playable-world-visual-roadmap-2026-05-31.md",
+      "evidence": [
+        "Prior roadmap targets private Civilization-style frontier map, server-owned fog-of-war, bounded expedition missions, named operator party flavor, and no hidden autonomy/Atlas execution."
+      ],
+      "lineRanges": ["1-21", "128-180"]
+    }
+  ],
+  "architecture": {
+    "recommendedModel": "Overview Map -> selectable sector -> visitable authored location scene -> event/receipt view -> return to map/town",
+    "overviewAuthority": "existing server-owned Expedition Map read model",
+    "sectorGate": "known_or_discovered_cells_only_for_visit_enabled_scene_refs",
+    "sceneAuthority": "server-owned or server-linked LocationSceneDescriptor.v1",
+    "visualLayer": "asset-pack-backed local props and actors with visualOnly true",
+    "receipts": "scene inspection links to scout receipts, event packets, site plans, outpost records, and future approved receipts",
+    "returnFlow": ["return_to_map", "return_to_town"]
+  },
+  "proposedContracts": {
+    "locationSceneDescriptor": {
+      "requiredFields": [
+        "sceneId",
+        "version",
+        "kind",
+        "status",
+        "sector.cellId",
+        "sector.fogStateRequired",
+        "authorityBoundary",
+        "readOnly",
+        "executableActions",
+        "assetPackRef",
+        "entryReceipts",
+        "anchors",
+        "props",
+        "localActors",
+        "allowedReadOnlyActions",
+        "mutationGates"
+      ],
+      "authorityBoundary": "server_owned_location_scene_descriptor_read_only_v1",
+      "defaultReadOnly": true,
+      "defaultExecutableActions": []
+    },
+    "assetPackManifest": {
+      "requiredFields": [
+        "packId",
+        "version",
+        "source",
+        "provenance",
+        "runtimeSlots",
+        "presentationOnly",
+        "stableGameplayHashExcluded",
+        "contentHash"
+      ],
+      "presentationOnly": true,
+      "stableGameplayHashExcluded": true
+    },
+    "serverOwnedSectorLinkage": {
+      "field": "expeditionMap.cells[].locationSceneRef",
+      "visitEnabledWhen": ["fogState=known", "fogState=discovered"],
+      "hiddenCells": "no visitable scene truth for hinted or locked_unknown"
+    },
+    "visualOnlyLocalSceneProps": {
+      "requiredFlags": ["visualOnly", "stableGameplayHashExcluded"],
+      "allowedInteractions": ["select_anchor", "inspect_receipt", "view_event_packet"]
+    },
+    "mutationGates": {
+      "defaultStatus": "disabled_future",
+      "requirementsBeforeEnable": [
+        "server route/action",
+        "store model if persistent",
+        "tool/spec contract if agent-callable",
+        "human approval policy for irreversible or agent actions",
+        "idempotency",
+        "receipt shape",
+        "unit/contract/http/e2e proofs",
+        "guardrail proof"
+      ]
+    },
+    "editorPreviewApprovalFlow": [
+      "draft descriptor and asset pack in editor",
+      "browser-local presentation-only preview",
+      "schema/provenance/guardrail validation",
+      "human reviewed proposal",
+      "source/test promotion",
+      "server publishes descriptor linkage",
+      "future mutation gates enabled only after explicit implementation"
+    ]
+  },
+  "tradeoffDecision": {
+    "sceneBasedPros": [
+      "bounded QA and mobile performance",
+      "better fit for GPT Image 2-quality authored/generated art packs",
+      "matches existing read-model and visual-only projection patterns",
+      "prevents hidden-truth leakage by gating visitable scenes on visible server cells",
+      "supports future in-game editor preview without making the editor authority"
+    ],
+    "sceneBasedCons": [
+      "less seamless than a single continuous world",
+      "needs polished transitions",
+      "global route continuity remains receipt/read-model based"
+    ],
+    "continuousWorldRisks": [
+      "large streaming/performance/camera/collision/QA burden",
+      "higher hidden-truth leak risk",
+      "encourages unapproved movement/routes/harvesting/encounters/scheduling expectations",
+      "harder to review generated packs as modular data"
+    ],
+    "recommendation": "Use scene-based visits for HQ13 and defer any continuous-world ambition until server authority, content streaming, and mutation gates are mature."
+  },
+  "guardrails": {
+    "reportProofOnly": true,
+    "sourceRuntimeChanges": false,
+    "newServerAction": false,
+    "atlasExecution": false,
+    "publicSharing": false,
+    "generatedUniverseRealRendering": false,
+    "hiddenAutonomy": false,
+    "routeBehavior": false,
+    "tradeBehavior": false,
+    "economyBehavior": false,
+    "combatBehavior": false,
+    "schedulerBehavior": false,
+    "packetActions": false,
+    "partyActions": false,
+    "objectiveActions": false,
+    "crossPlotMutation": false,
+    "externalEffects": false,
+    "unrelatedCleanup": false
+  },
+  "checks": {
+    "appJsCssServerTestsAssetsEdited": false,
+    "specOptionalFileCreated": false,
+    "dirtyWorktreeAcknowledged": true
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "ok": true,
+  "date": "2026-06-01",
+  "lane": "agent-town-hq13h-runtime-visual-qa",
+  "verdict": "PASS_WITH_NOTES_PARENT_BACKFILLED",
+  "workerStatus": "failed_without_report_artifacts",
+  "sourceProof": "reports/agent-town-hq13f-candidate-02-runtime-expedition-map-visual-pass-proof-2026-06-01.json",
+  "sourceVisualShell": "hq13f_candidate_02_runtime_expedition_map_visual_pass_v1",
+  "visualLayersVerifiedFromSourceProof": {
+    "terrainTexture": true,
+    "candidate02Cues": true,
+    "homeNodeEmphasis": true,
+    "riverFlatCues": true,
+    "woodlandRidgeCues": true,
+    "ruinSignalCues": true,
+    "frontierBoundaryDashes": true,
+    "fogVeils": 2,
+    "edgeFogCount": 4,
+    "surveyStrokeCount": 5,
+    "surveyStrokesVisualOnly": true,
+    "markerCount": 5,
+    "clientAuthority": false
+  },
+  "guardrails": {
+    "readOnly": true,
+    "executableActions": [],
+    "routeCreation": false,
+    "atlasExecution": false,
+    "hiddenCellResourceTextSuppressed": true,
+    "hiddenCellReceiptLinksSuppressed": true,
+    "scoutSectorOnlyMutationPath": true,
+    "runtimeAssetsPromoted": false,
+    "runtimePackLoaderCreated": false,
+    "runtimePackDirectoryCreated": false,
+    "serverAuthorityChanged": false,
+    "clientAuthorityChanged": false,
+    "publicSharing": false,
+    "generatedUniverseRendering": false,
+    "hiddenAutonomy": false,
+    "routeTradeEconomyHooks": false,
+    "combatSchedulerExternalEffects": false
+  },
+  "artifacts": {
+    "report": "reports/agent-town-hq13h-runtime-visual-qa-2026-06-01.md",
+    "proof": "reports/agent-town-hq13h-runtime-visual-qa-proof-2026-06-01.json",
+    "desktopScreenshot": "reports/agent-town-hq13f-candidate-02-runtime-expedition-map-visual-pass-desktop-2026-06-01.png",
+    "mobileScreenshot": "reports/agent-town-hq13f-candidate-02-runtime-expedition-map-visual-pass-mobile-2026-06-01.png"
+  }
+}

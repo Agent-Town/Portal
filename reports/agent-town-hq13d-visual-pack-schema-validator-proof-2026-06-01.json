@@ -1,0 +1,73 @@
+{
+  "ok": true,
+  "lane": "HQ13D",
+  "date": "2026-06-01",
+  "worktree": "/Users/robin/Projects/Portal-atlas-editor",
+  "verdict": "PASS_PARENT_VERIFIED",
+  "artifacts": {
+    "schema": "docs/specs/agent-town.visual-pack.v1.schema.json",
+    "validFixture": "docs/specs/fixtures/agent-town.visual-pack.v1.valid-tiny.manifest.json",
+    "invalidFixture": "docs/specs/fixtures/agent-town.visual-pack.v1.invalid-forbidden-field-path-action.manifest.json",
+    "validator": "reports/agent-town-hq13d-visual-pack-schema-validator-2026-06-01-validator.mjs",
+    "report": "reports/agent-town-hq13d-visual-pack-schema-validator-2026-06-01.md"
+  },
+  "validatorResult": {
+    "schemaPath": "docs/specs/agent-town.visual-pack.v1.schema.json",
+    "results": [
+      {
+        "fixturePath": "docs/specs/fixtures/agent-town.visual-pack.v1.valid-tiny.manifest.json",
+        "expectedValid": true,
+        "actualValid": true,
+        "pass": true,
+        "errors": []
+      },
+      {
+        "fixturePath": "docs/specs/fixtures/agent-town.visual-pack.v1.invalid-forbidden-field-path-action.manifest.json",
+        "expectedValid": false,
+        "actualValid": false,
+        "pass": true,
+        "errors": [
+          "$.modules.hudCards.slotBindings.hud.card.scout_report: forbidden field \"action\"",
+          "$.modules.hudCards.slotBindings.hud.card.scout_report: forbidden field \"serverHandler\"",
+          "$.publicSharing: must be false",
+          "$.atlasExecution: must be false",
+          "$.modules.hudCards.slotBindings.hud.card.scout_report.assetSrc: must be a same-origin static asset path"
+        ]
+      }
+    ]
+  },
+  "checks": [
+    {
+      "command": "jq empty docs/specs/agent-town.visual-pack.v1.schema.json docs/specs/fixtures/agent-town.visual-pack.v1.valid-tiny.manifest.json docs/specs/fixtures/agent-town.visual-pack.v1.invalid-forbidden-field-path-action.manifest.json",
+      "exitCode": 0
+    },
+    {
+      "command": "node --check reports/agent-town-hq13d-visual-pack-schema-validator-2026-06-01-validator.mjs",
+      "exitCode": 0
+    },
+    {
+      "command": "node reports/agent-town-hq13d-visual-pack-schema-validator-2026-06-01-validator.mjs docs/specs/agent-town.visual-pack.v1.schema.json docs/specs/fixtures/agent-town.visual-pack.v1.valid-tiny.manifest.json docs/specs/fixtures/agent-town.visual-pack.v1.invalid-forbidden-field-path-action.manifest.json",
+      "exitCode": 0
+    },
+    {
+      "command": "git diff --check -- docs/specs/agent-town.visual-pack.v1.schema.json docs/specs/fixtures/agent-town.visual-pack.v1.valid-tiny.manifest.json docs/specs/fixtures/agent-town.visual-pack.v1.invalid-forbidden-field-path-action.manifest.json reports/agent-town-hq13d-visual-pack-schema-validator-2026-06-01-validator.mjs",
+      "exitCode": 0
+    }
+  ],
+  "guardrails": {
+    "docsAndReportOnly": true,
+    "noRuntimeLoader": true,
+    "noServerAuthorityChange": true,
+    "noGameplayPromotion": true,
+    "scoutSectorOnlyCurrentMapMutation": true,
+    "eventPacketPartyCurrentFocusReadOnly": true,
+    "noAtlasExecution": true,
+    "noPublicSharing": true,
+    "noGeneratedUniverseRendering": true,
+    "noHiddenAutonomy": true,
+    "noRouteTradeEconomyResourceCombatSchedulerBehavior": true,
+    "noCrossPlotMutation": true,
+    "noExternalEffects": true,
+    "noWildWestDrift": true
+  }
+}
