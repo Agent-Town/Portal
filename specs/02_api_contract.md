@@ -2070,7 +2070,24 @@ Response includes:
       "counts": { "discovered": 1, "known": 1, "hinted": 1, "locked_unknown": 8 }
 	    },
 	    "cells": [
-	      { "cellId": "cell_q1_r0", "fogState": "hinted", "readOnly": true }
+	      {
+	        "cellId": "cell_q1_r0",
+	        "fogState": "hinted",
+	        "readOnly": true,
+	        "terrainAssetContractVersion": "agenttown_public_terrain_asset_slots_v1",
+	        "publicTerrainAssetSlot": null,
+	        "publicTerrainAssetSlotSource": null,
+	        "fogAssetSlot": "hinted_frontier_fog"
+	      },
+	      {
+	        "cellId": "cell_origin",
+	        "fogState": "discovered",
+	        "readOnly": true,
+	        "terrainAssetContractVersion": "agenttown_public_terrain_asset_slots_v1",
+	        "publicTerrainAssetSlot": "settled",
+	        "publicTerrainAssetSlotSource": "server_read_model_v1",
+	        "fogAssetSlot": null
+	      }
 	    ],
 	    "eventPackets": [],
       "expeditionParty": {

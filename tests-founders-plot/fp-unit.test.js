@@ -1428,6 +1428,21 @@ test('FP-UT-027 HQ12A Expedition Map read model exposes fog cells from server tr
   assert.ok(status.expeditionMap.cells.some((cell) => cell.status === 'SITE_PLAN_REVIEWED'));
   assert.ok(status.expeditionMap.cells.some((cell) => cell.fogState === 'hinted'));
   assert.ok(status.expeditionMap.cells.some((cell) => cell.fogState === 'locked_unknown'));
+  assert.equal(status.expeditionMap.cells.every((cell) => cell.terrainAssetContractVersion === engine.EXPEDITION_PUBLIC_TERRAIN_ASSET_CONTRACT_VERSION), true);
+  assert.equal(status.expeditionMap.cells
+    .filter((cell) => ['discovered', 'known'].includes(cell.fogState))
+    .every((cell) => engine.EXPEDITION_PUBLIC_TERRAIN_ASSET_SLOTS.includes(cell.publicTerrainAssetSlot)), true);
+  assert.equal(status.expeditionMap.cells
+    .filter((cell) => ['hinted', 'locked_unknown'].includes(cell.fogState))
+    .every((cell) => cell.publicTerrainAssetSlot == null), true);
+  assert.equal(status.expeditionMap.cells
+    .filter((cell) => ['hinted', 'locked_unknown'].includes(cell.fogState))
+    .every((cell) => ['hinted_frontier_fog', 'locked_unknown_fog'].includes(cell.fogAssetSlot)), true);
+  assert.equal(status.expeditionMap.cells
+    .filter((cell) => /river|water|coast/i.test(`${cell.siteType || ''} ${(cell.traits || []).join(' ')}`))
+    .every((cell) => cell.publicTerrainAssetSlot !== 'water' && cell.publicTerrainAssetSlot !== 'coast'), true);
+  assert.equal(status.expeditionMap.cells.some((cell) => cell.publicTerrainAssetSlot === 'forest'), true);
+  assert.equal(status.expeditionMap.cells.some((cell) => cell.publicTerrainAssetSlot === 'settled'), true);
 
   const state = engine.getFoundersPlotState({
     pairId: ctx.pairId,

@@ -1,0 +1,64 @@
+{
+  "ok": true,
+  "lane": "HQ14S",
+  "date": "2026-06-01",
+  "verdict": "PLAN_READY_AWAITING_EXPLICIT_RUNTIME_PROMOTION_APPROVAL",
+  "report": "reports/agent-town-hq14s-runtime-promotion-implementation-plan-2026-06-01.md",
+  "scope": {
+    "reportProofOnly": true,
+    "runtimePromotionPerformed": false,
+    "appSourceEdited": false,
+    "serverStoreRoutesToolsSchemaEdited": false,
+    "runtimeAssetsPromoted": false,
+    "imageGenerationStarted": false,
+    "testsChanged": false,
+    "commitOrPushPerformed": false
+  },
+  "currentEvidenceReviewed": [
+    "reports/agent-town-hq14r-runtime-promotion-gate-2026-06-01.md",
+    "reports/agent-town-hq14r-runtime-promotion-gate-proof-2026-06-01.json",
+    "reports/agent-town-hq14q-terrain-pack-review-samples-2026-06-01.md",
+    "reports/agent-town-hq14o-north-star-terrain-asset-preflight-2026-06-01.md",
+    "public/experiences/founders-plot/three_scene_entry.js",
+    "server/founders_plot/engine.js",
+    "tests-founders-plot/fp-unit.test.js",
+    "tests-founders-plot/fp-http.test.js",
+    "tests-founders-plot/fp-contract.test.js",
+    "e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js",
+    "docs/specs/agent-town-visual-universe-pack-architecture.md",
+    "specs/02_api_contract.md"
+  ],
+  "plannedRuntimePromotionRequirements": {
+    "serverPublicTerrainAssetSlot": true,
+    "hiddenCellsFogOnlySlots": true,
+    "visibleTerrainAssetsRequireServerSlot": true,
+    "waterCoastBlockedUntilExplicitPublicTruth": true,
+    "manifestPresentationOnly": true,
+    "manifestServerOwnedRegionTruthRequired": true,
+    "rendererConsumesServerSlotsInsteadOfClientClassification": true,
+    "perCellProofMetadataRequired": true,
+    "negativeHiddenTruthLeakageFixtureRequired": true,
+    "scoutSectorOnlyMutationPath": true
+  },
+  "guardrails": {
+    "noRuntimeAssetPromotion": true,
+    "noLoader": true,
+    "noNewMutationPath": true,
+    "noHiddenTruthLeakage": true,
+    "noClientTerrainClassification": true,
+    "noAtlasExecution": true,
+    "noPublicSharing": true,
+    "noGeneratedUniverseRendering": true,
+    "noHiddenAutonomy": true,
+    "noRouteTradeEconomyResourceRewardCombatSchedulerBehavior": true,
+    "noCrossPlotMutation": true,
+    "noExternalEffects": true,
+    "noWildWestDrift": true
+  },
+  "verification": {
+    "jqEmpty": "passed",
+    "gitDiffCheckFocused": "passed",
+    "sourceTestsRun": false,
+    "sourceTestsRunReason": "No app, server, renderer, e2e, or runtime asset source changed in this report-only lane."
+  }
+}

@@ -1,0 +1,80 @@
+{
+  "id": "hq14s_public_terrain_underlay_v1",
+  "kind": "agenttown.expedition_map.runtime_public_terrain_underlay_pack",
+  "presentationOnly": true,
+  "serverOwnedRegionTruthRequired": true,
+  "fogOnlyForHiddenCells": true,
+  "noHiddenTruthLeakage": true,
+  "scoutSectorOnlyMutationPath": true,
+  "terrainAssetContractVersion": "agenttown_public_terrain_asset_slots_v1",
+  "slotSource": "server_read_model_v1",
+  "allowedConcreteSlots": ["field", "forest", "ridge", "settled"],
+  "blockedSlots": ["water", "coast", "route", "resource", "combat", "reward"],
+  "source": {
+    "reviewReport": "reports/agent-town-hq14q-terrain-pack-review-samples-2026-06-01.md",
+    "reviewCandidate": "HQ14P Candidate 01 with Candidate 03 secondary crops",
+    "runtimePack": "public/experiences/founders-plot/assets/expedition-map/hq14s-public-terrain-underlay-v1/"
+  },
+  "assets": {
+    "underlay": {
+      "slot": "public_terrain_underlay",
+      "file": "public-terrain-underlay-candidate-01-v1.png",
+      "assetKind": "visual_underlay",
+      "allowedFogStates": ["discovered", "known", "hinted", "locked_unknown"],
+      "requiresServerOwnedCells": true
+    },
+    "fogOverlay": {
+      "slot": "fog_only_hidden_edge_overlay",
+      "file": "fog-only-hidden-edge-overlay-v1.png",
+      "assetKind": "fog_only_overlay",
+      "allowedFogStates": ["hinted", "locked_unknown"],
+      "requiresServerOwnedCells": true
+    },
+    "terrainSlots": [
+      {
+        "slot": "field",
+        "file": "field-v1.png",
+        "assetKind": "concrete_public_terrain",
+        "allowedFogStates": ["discovered", "known"],
+        "requiresPublicTerrainAssetSlot": "field"
+      },
+      {
+        "slot": "forest",
+        "file": "forest-v1.png",
+        "assetKind": "concrete_public_terrain",
+        "allowedFogStates": ["discovered", "known"],
+        "requiresPublicTerrainAssetSlot": "forest"
+      },
+      {
+        "slot": "ridge",
+        "file": "ridge-v1.png",
+        "assetKind": "concrete_public_terrain",
+        "allowedFogStates": ["discovered", "known"],
+        "requiresPublicTerrainAssetSlot": "ridge"
+      },
+      {
+        "slot": "settled",
+        "file": "settled-v1.png",
+        "assetKind": "concrete_public_terrain",
+        "allowedFogStates": ["discovered", "known"],
+        "requiresPublicTerrainAssetSlot": "settled"
+      }
+    ],
+    "fogSlots": [
+      {
+        "slot": "hinted_frontier_fog",
+        "file": "hinted-frontier-fog-v1.png",
+        "assetKind": "fog_only",
+        "allowedFogStates": ["hinted"],
+        "requiresPublicTerrainAssetSlot": null
+      },
+      {
+        "slot": "locked_unknown_fog",
+        "file": "locked-unknown-fog-v1.png",
+        "assetKind": "fog_only",
+        "allowedFogStates": ["locked_unknown"],
+        "requiresPublicTerrainAssetSlot": null
+      }
+    ]
+  }
+}

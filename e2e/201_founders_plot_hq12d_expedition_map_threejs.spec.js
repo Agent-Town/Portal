@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
 
-const PREFIX = 'reports/agent-town-hq14n-cartographic-fog-depth';
+const PREFIX = 'reports/agent-town-hq14t-server-bound-terrain-underlay-runtime';
 const DESKTOP_SCREENSHOT = `${PREFIX}-desktop-2026-06-01.png`;
 const MOBILE_SCREENSHOT = `${PREFIX}-mobile-2026-06-01.png`;
 const CONTACT_SHEET = `${PREFIX}-contact-sheet-2026-06-01.png`;
@@ -47,6 +47,11 @@ function expeditionMapFixture() {
           siteType: 'home_plot',
           risk: 'owned',
           readOnly: true,
+          publicTerrainAssetSlot: 'settled',
+          publicTerrainAssetSlotSource: 'server_read_model_v1',
+          publicTerrainAssetSlotReason: 'known/discovered public cell traits include owned, home, founded, settled, or outpost status',
+          fogAssetSlot: null,
+          terrainAssetContractVersion: 'agenttown_public_terrain_asset_slots_v1',
         },
         {
           cellId: 'cell_q1_r0',
@@ -70,6 +75,11 @@ function expeditionMapFixture() {
           summary: 'Reviewed planning truth from the server read model.',
           recommendedNext: 'Use existing Site Plan and Settlement Claim panels for allowed follow-up actions.',
           readOnly: true,
+          publicTerrainAssetSlot: 'forest',
+          publicTerrainAssetSlotSource: 'server_read_model_v1',
+          publicTerrainAssetSlotReason: 'known/discovered public cell traits include forest, wood, woodland, or timber',
+          fogAssetSlot: null,
+          terrainAssetContractVersion: 'agenttown_public_terrain_asset_slots_v1',
         },
         {
           cellId: 'cell_q1_r-1',
@@ -86,6 +96,11 @@ function expeditionMapFixture() {
           risk: 'owned',
           summary: 'Founded outpost marker tied to an owned plot record.',
           readOnly: true,
+          publicTerrainAssetSlot: 'settled',
+          publicTerrainAssetSlotSource: 'server_read_model_v1',
+          publicTerrainAssetSlotReason: 'known/discovered public cell traits include owned, home, founded, settled, or outpost status',
+          fogAssetSlot: null,
+          terrainAssetContractVersion: 'agenttown_public_terrain_asset_slots_v1',
         },
         {
           cellId: 'cell_q0_r1',
@@ -102,6 +117,11 @@ function expeditionMapFixture() {
           siteType: 'unresolved_frontier',
           risk: 'unknown',
           readOnly: true,
+          publicTerrainAssetSlot: null,
+          publicTerrainAssetSlotSource: null,
+          publicTerrainAssetSlotReason: 'hidden expedition cell exposes only fog asset slots; no concrete terrain truth is public',
+          fogAssetSlot: 'hinted_frontier_fog',
+          terrainAssetContractVersion: 'agenttown_public_terrain_asset_slots_v1',
         },
         {
           cellId: 'cell_q3_r0',
@@ -118,6 +138,11 @@ function expeditionMapFixture() {
           siteType: 'unknown',
           risk: 'unknown',
           readOnly: true,
+          publicTerrainAssetSlot: null,
+          publicTerrainAssetSlotSource: null,
+          publicTerrainAssetSlotReason: 'hidden expedition cell exposes only fog asset slots; no concrete terrain truth is public',
+          fogAssetSlot: 'locked_unknown_fog',
+          terrainAssetContractVersion: 'agenttown_public_terrain_asset_slots_v1',
         },
       ],
       receipt: {
@@ -329,14 +354,23 @@ function runtimeRegionSourceProof() {
     lockedUnknownHasNoSignalMastDrawPath: !lockedBranch.includes('drawSignalMast'),
     hintedHasNoSignalMastDrawPath: !hintedBranch.includes('drawSignalMast'),
     waterStrokeUsesTerrainGate: terrainFunction.includes("if (terrain === 'water')"),
-    waterTerrainUsesServerPredicate: source.includes('function isServerOwnedWaterTerrain') && source.includes('if (isServerOwnedWaterTerrain(cell)) return'),
+    waterTerrainUsesServerPredicate: source.includes('function isServerOwnedWaterTerrain')
+      && source.includes("String(cell.publicTerrainAssetSlot || '') === 'water'"),
     noAllVisibleCellRiverStrokeGate: !terrainFunction.includes("['discovered', 'known'].includes(String(cell.fogState || ''))"),
-    runtimeAssetPackDeclared: source.includes('hq14a_region_faithful_terrain_fog_atlas_v1'),
+    runtimeAssetPackDeclared: source.includes('hq14s_public_terrain_underlay_v1'),
+    runtimeAssetManifestDeclared: source.includes('hq14s-public-terrain-underlay-v1')
+      && source.includes('manifest.json'),
     runtimeAssetTilesDeclared: source.includes('EXPEDITION_REGION_TILE_ASSETS'),
     hiddenFogAssetSlotsOnly: source.includes("'hinted_frontier_fog'") && source.includes("'locked_unknown_fog'"),
     assetAllowedByServerTruthGuard: source.includes('function expeditionRegionTileAssetAllowed'),
+    rendererConsumesServerSlots: source.includes('function serverPublicTerrainSlot')
+      && source.includes('publicTerrainAssetSlot')
+      && source.includes('fogAssetSlot')
+      && source.includes('terrainAssetContractVersion'),
     assetLoadInvalidatesTextureCache: source.includes('onExpeditionRegionTileAssetChange') && source.includes('textureCache.clear()'),
     continuousUnderlayDeclared: source.includes('function makeExpeditionContinuousUnderlayTexture') && source.includes('expedition_continuous_terrain_underlay'),
+    promotedUnderlayDeclared: source.includes('EXPEDITION_PROMOTED_UNDERLAY_ASSET')
+      && source.includes('public-terrain-underlay-candidate-01-v1.png'),
     continuousUnderlayUsesFogGate: source.includes('function expeditionContinuousUnderlayStyle') && source.includes('if (!cellExposesRegionTruth(cell))'),
     continuousUnderlayAvoidsPrivateFields: !/resourceHints|receipts|sourceIds|recommendedNext/.test(underlayFunction),
     softSeamOpacityHelpers: source.includes('function expeditionRegionPlateOpacity')
@@ -349,7 +383,7 @@ function runtimeRegionSourceProof() {
   };
 }
 
-test('FP-E2E-023 HQ14N Expedition Map cartographic fog depth preserves authority', async ({ page }) => {
+test('FP-E2E-023 HQ14T Expedition Map server-bound terrain underlay preserves authority', async ({ page }) => {
   const fixture = expeditionMapFixture();
   const sourceProof = runtimeRegionSourceProof();
   expect(sourceProof.lockedUnknownHasNoRuinDrawPath).toBe(true);
@@ -359,11 +393,14 @@ test('FP-E2E-023 HQ14N Expedition Map cartographic fog depth preserves authority
   expect(sourceProof.waterTerrainUsesServerPredicate).toBe(true);
   expect(sourceProof.noAllVisibleCellRiverStrokeGate).toBe(true);
   expect(sourceProof.runtimeAssetPackDeclared).toBe(true);
+  expect(sourceProof.runtimeAssetManifestDeclared).toBe(true);
   expect(sourceProof.runtimeAssetTilesDeclared).toBe(true);
   expect(sourceProof.hiddenFogAssetSlotsOnly).toBe(true);
   expect(sourceProof.assetAllowedByServerTruthGuard).toBe(true);
+  expect(sourceProof.rendererConsumesServerSlots).toBe(true);
   expect(sourceProof.assetLoadInvalidatesTextureCache).toBe(true);
   expect(sourceProof.continuousUnderlayDeclared).toBe(true);
+  expect(sourceProof.promotedUnderlayDeclared).toBe(true);
   expect(sourceProof.continuousUnderlayUsesFogGate).toBe(true);
   expect(sourceProof.continuousUnderlayAvoidsPrivateFields).toBe(true);
   expect(sourceProof.softSeamOpacityHelpers).toBe(true);
@@ -388,15 +425,18 @@ test('FP-E2E-023 HQ14N Expedition Map cartographic fog depth preserves authority
   expect(initialInfo.surface).toBe('expedition-map');
   expect(initialInfo.cellCount).toBe(5);
   expect(initialInfo.fogStates.locked_unknown).toBe(1);
-  expect(initialInfo.visualShell).toBe('hq14n_cartographic_fog_depth_v1');
+  expect(initialInfo.visualShell).toBe('hq14t_server_bound_terrain_underlay_v1');
   expect(initialInfo.visualLayers.terrainTexture).toBe(true);
-  expect(initialInfo.visualLayers.runtimeRegionAssetPack).toBe('hq14a_region_faithful_terrain_fog_atlas_v1');
-  expect(initialInfo.visualLayers.runtimeRegionAtlas).toContain('/experiences/founders-plot/assets/expedition-map/hq14a-region-faithful-terrain-fog-atlas-v1.png');
+  expect(initialInfo.visualLayers.runtimeRegionAssetPack).toBe('hq14s_public_terrain_underlay_v1');
+  expect(initialInfo.visualLayers.runtimeRegionAtlas).toContain('/experiences/founders-plot/assets/expedition-map/hq14s-public-terrain-underlay-v1/manifest.json');
+  expect(initialInfo.visualLayers.runtimeTerrainUnderlay).toContain('/experiences/founders-plot/assets/expedition-map/hq14s-public-terrain-underlay-v1/public-terrain-underlay-candidate-01-v1.png');
+  expect(initialInfo.visualLayers.serverTerrainAssetContractVersion).toBe('agenttown_public_terrain_asset_slots_v1');
+  expect(initialInfo.visualLayers.serverTerrainSlotSource).toBe('server_read_model_v1');
   expect(initialInfo.visualLayers.assetBackedRegionTiles).toBe(5);
   expect(initialInfo.visualLayers.assetBackedLoadedTiles).toBeGreaterThanOrEqual(5);
   expect(initialInfo.visualLayers.assetBackedTerrainTextures).toBe(true);
   expect(initialInfo.visualLayers.continuousTerrainUnderlay).toBe(true);
-  expect(initialInfo.visualLayers.continuousTerrainUnderlayVersion).toBe('hq14n_cartographic_fog_depth_v1');
+  expect(initialInfo.visualLayers.continuousTerrainUnderlayVersion).toBe('hq14t_server_bound_terrain_underlay_v1');
   expect(initialInfo.visualLayers.continuousUnderlayUsesServerOwnedCells).toBe(true);
   expect(initialInfo.visualLayers.continuousUnderlayHiddenCellsFogOnly).toBe(true);
   expect(initialInfo.visualLayers.continuousUnderlayVisualOnly).toBe(true);
@@ -437,8 +477,13 @@ test('FP-E2E-023 HQ14N Expedition Map cartographic fog depth preserves authority
   expect(initialInfo.regionConsistency.lockedUnknownCellsSealed).toBe(true);
   expect(initialInfo.regionConsistency.hintedCellsAbstract).toBe(true);
   expect(initialInfo.regionConsistency.waterCuesRequireServerOwnedWater).toBe(true);
+  expect(initialInfo.regionConsistency.waterCoastRuntimeAssetsBlocked).toBe(true);
+  expect(initialInfo.regionConsistency.hiddenCellsHaveNoPublicTerrainSlot).toBe(true);
   expect(initialInfo.regionConsistency.hiddenCellsUseOnlyFogAssets).toBe(true);
   expect(initialInfo.regionConsistency.knownDiscoveredAssetsMatchServerTerrain).toBe(true);
+  expect(initialInfo.regionConsistency.visibleAssetsMatchPublicTerrainSlot).toBe(true);
+  expect(initialInfo.regionConsistency.serverTerrainAssetContractComplete).toBe(true);
+  expect(initialInfo.regionConsistency.runtimeAssetProofMetadataComplete).toBe(true);
   expect(initialInfo.regionConsistency.runtimeAssetCellsRegionTruthBound).toBe(true);
   expect(initialInfo.regionConsistency.continuousUnderlayHiddenCellsFogOnly).toBe(true);
   expect(initialInfo.regionConsistency.continuousUnderlayNoActionAuthority).toBe(true);
@@ -446,29 +491,66 @@ test('FP-E2E-023 HQ14N Expedition Map cartographic fog depth preserves authority
   expect(initialInfo.regionConsistency.ruinSignalCueCells).toEqual([]);
   const visualsByCell = Object.fromEntries(initialInfo.regionVisuals.map((cell) => [cell.cellId, cell]));
   expect(visualsByCell.cell_origin.terrain).toBe('settled');
-  expect(visualsByCell.cell_origin.assetSlot).toBe('discovered_settled');
+  expect(visualsByCell.cell_origin.publicTerrainAssetSlot).toBe('settled');
+  expect(visualsByCell.cell_origin.publicTerrainAssetSlotSource).toBe('server_read_model_v1');
+  expect(visualsByCell.cell_origin.assetSlot).toBe('settled');
+  expect(visualsByCell.cell_origin.assetKind).toBe('concrete_public_terrain');
   expect(visualsByCell.cell_origin.assetAllowedByServerTruth).toBe(true);
   expect(visualsByCell.cell_origin.waterCue).toBe(false);
   expect(visualsByCell.cell_q1_r0.terrain).toBe('forest');
-  expect(visualsByCell.cell_q1_r0.assetSlot).toBe('known_woodland');
+  expect(visualsByCell.cell_q1_r0.publicTerrainAssetSlot).toBe('forest');
+  expect(visualsByCell.cell_q1_r0.publicTerrainAssetSlotSource).toBe('server_read_model_v1');
+  expect(visualsByCell.cell_q1_r0.assetSlot).toBe('forest');
+  expect(visualsByCell.cell_q1_r0.assetKind).toBe('concrete_public_terrain');
   expect(visualsByCell.cell_q1_r0.assetAllowedByServerTruth).toBe(true);
   expect(visualsByCell.cell_q1_r0.waterCue).toBe(false);
   expect(visualsByCell['cell_q1_r-1'].terrain).toBe('settled');
-  expect(visualsByCell['cell_q1_r-1'].assetSlot).toBe('discovered_settled');
+  expect(visualsByCell['cell_q1_r-1'].publicTerrainAssetSlot).toBe('settled');
+  expect(visualsByCell['cell_q1_r-1'].assetSlot).toBe('settled');
+  expect(visualsByCell['cell_q1_r-1'].assetKind).toBe('concrete_public_terrain');
   expect(visualsByCell['cell_q1_r-1'].assetAllowedByServerTruth).toBe(true);
   expect(visualsByCell['cell_q1_r-1'].waterCue).toBe(false);
   expect(visualsByCell.cell_q0_r1.terrain).toBe('hinted');
+  expect(visualsByCell.cell_q0_r1.publicTerrainAssetSlot).toBe(null);
+  expect(visualsByCell.cell_q0_r1.fogAssetSlot).toBe('hinted_frontier_fog');
   expect(visualsByCell.cell_q0_r1.assetSlot).toBe('hinted_frontier_fog');
+  expect(visualsByCell.cell_q0_r1.assetKind).toBe('fog_only');
+  expect(visualsByCell.cell_q0_r1.fogOnly).toBe(true);
   expect(visualsByCell.cell_q0_r1.assetAllowedByServerTruth).toBe(true);
   expect(visualsByCell.cell_q0_r1.hiddenSpecificitySuppressed).toBe(true);
   expect(visualsByCell.cell_q0_r1.underlayTerrain).toBe('hinted');
   expect(visualsByCell.cell_q0_r1.underlayFogOnly).toBe(true);
   expect(visualsByCell.cell_q3_r0.terrain).toBe('locked_unknown');
+  expect(visualsByCell.cell_q3_r0.publicTerrainAssetSlot).toBe(null);
+  expect(visualsByCell.cell_q3_r0.fogAssetSlot).toBe('locked_unknown_fog');
   expect(visualsByCell.cell_q3_r0.assetSlot).toBe('locked_unknown_fog');
+  expect(visualsByCell.cell_q3_r0.assetKind).toBe('fog_only');
+  expect(visualsByCell.cell_q3_r0.fogOnly).toBe(true);
   expect(visualsByCell.cell_q3_r0.assetAllowedByServerTruth).toBe(true);
   expect(visualsByCell.cell_q3_r0.hiddenSpecificitySuppressed).toBe(true);
   expect(visualsByCell.cell_q3_r0.underlayTerrain).toBe('locked_unknown');
   expect(visualsByCell.cell_q3_r0.underlayFogOnly).toBe(true);
+  const invalidHiddenTerrainProof = await page.evaluate((mapModel) => {
+    const host = document.querySelector('[data-testid="fp-expedition-three-host"]');
+    const renderer = window.FoundersPlotThreeRenderer;
+    const invalid = JSON.parse(JSON.stringify(mapModel));
+    const hidden = invalid.cells.find((cell) => cell.fogState === 'locked_unknown');
+    hidden.publicTerrainAssetSlot = 'forest';
+    hidden.publicTerrainAssetSlotSource = 'server_read_model_v1';
+    hidden.publicTerrainAssetSlotReason = 'invalid test injection';
+    const invalidInfo = renderer.renderExpeditionMap(host, invalid, { selectedCellId: hidden.cellId });
+    const hiddenVisual = invalidInfo.regionVisuals.find((cell) => cell.cellId === hidden.cellId);
+    const restoredInfo = renderer.renderExpeditionMap(host, mapModel, { selectedCellId: 'cell_q0_r1' });
+    return {
+      hiddenVisual,
+      restoredSelectedCellId: restoredInfo.selectedCellId
+    };
+  }, fixture.expeditionMap);
+  expect(invalidHiddenTerrainProof.hiddenVisual.publicTerrainAssetSlot).toBe(null);
+  expect(invalidHiddenTerrainProof.hiddenVisual.assetSlot).toBe('locked_unknown_fog');
+  expect(invalidHiddenTerrainProof.hiddenVisual.assetKind).toBe('fog_only');
+  expect(invalidHiddenTerrainProof.hiddenVisual.assetAllowedByServerTruth).toBe(true);
+  expect(invalidHiddenTerrainProof.restoredSelectedCellId).toBe('cell_q0_r1');
   await expect(page.getByTestId('fp-expedition-zoom-tier')).toContainText('Survey view');
   await expect(page.getByTestId('fp-expedition-zoom-copy')).toContainText('Broad region silhouette');
   await expect(page.getByTestId('fp-expedition-fog-legend')).toBeVisible();
@@ -566,11 +648,18 @@ test('FP-E2E-023 HQ14N Expedition Map cartographic fog depth preserves authority
   expect(lockedSelectionInfo.selectedCellId).toBe('cell_q3_r0');
 
   const zoomBefore = await page.evaluate(() => window.__foundersPlotTest.getExpeditionMapInfo());
-  const zoomCanvasBox = await page.getByTestId('fp-expedition-three-canvas').boundingBox();
-  await page.mouse.move(zoomCanvasBox.x + zoomCanvasBox.width / 2, zoomCanvasBox.y + zoomCanvasBox.height / 2);
-  for (let index = 0; index < 7; index += 1) {
-    await page.mouse.wheel(0, -360);
-  }
+  await page.evaluate(() => {
+    const host = document.querySelector('[data-testid="fp-expedition-three-host"]');
+    const renderer = window.FoundersPlotThreeRenderer;
+    for (let index = 0; index < 8; index += 1) {
+      renderer.zoomExpeditionMap(host, 1.18);
+    }
+    host.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true, cancelable: true }));
+  });
+  await expect.poll(async () => {
+    const info = await page.evaluate(() => window.__foundersPlotTest.getExpeditionMapInfo());
+    return info.camera?.zoom || info.zoom || 0;
+  }).toBeGreaterThan(2.25);
   const zoomAfter = await page.evaluate(() => window.__foundersPlotTest.getExpeditionMapInfo());
   expect(zoomAfter.camera.zoom).toBeGreaterThan(zoomBefore.camera.zoom);
   expect(zoomAfter.camera.zoom).toBeLessThanOrEqual(3.4);
@@ -582,6 +671,7 @@ test('FP-E2E-023 HQ14N Expedition Map cartographic fog depth preserves authority
   await page.locator('#fp-drawer-toggle').evaluate((node) => { node.style.display = 'none'; });
   await page.getByTestId('fp-expedition-map-panel').screenshot({ path: DESKTOP_SCREENSHOT });
 
+  const zoomCanvasBox = await page.getByTestId('fp-expedition-three-canvas').boundingBox();
   await page.mouse.move(zoomCanvasBox.x + zoomCanvasBox.width / 2, zoomCanvasBox.y + zoomCanvasBox.height / 2);
   await page.mouse.down();
   await page.mouse.move(zoomCanvasBox.x + zoomCanvasBox.width / 2 - 180, zoomCanvasBox.y + zoomCanvasBox.height / 2 + 30, { steps: 6 });
@@ -596,7 +686,9 @@ test('FP-E2E-023 HQ14N Expedition Map cartographic fog depth preserves authority
   await expect(page.getByTestId('fp-expedition-three-canvas')).toBeVisible();
   const mobileBefore = await page.evaluate(() => window.__foundersPlotTest.getExpeditionMapInfo());
   const host = page.getByTestId('fp-expedition-three-host');
+  await host.scrollIntoViewIfNeeded();
   const hostBox = await host.boundingBox();
+  expect(hostBox).not.toBe(null);
   for (let index = 0; index < 7; index += 1) {
     await host.dispatchEvent('wheel', {
       deltaY: -320,
@@ -679,6 +771,7 @@ test('FP-E2E-023 HQ14N Expedition Map cartographic fog depth preserves authority
       selectedRulesInitial,
       selectedKnownRules,
       selectedLockedRules,
+      invalidHiddenTerrainProof,
       pixelSample: desktopPixels,
       cellColorProof: desktopCellColors,
       selectedKnownCell: 'cell_q1_r0',
@@ -710,9 +803,17 @@ test('FP-E2E-023 HQ14N Expedition Map cartographic fog depth preserves authority
       lockedUnknownNoLandmarkOrRuinDrawPath: initialInfo.regionConsistency.lockedUnknownCellsSealed,
       waterCuesServerGated: initialInfo.regionConsistency.waterCuesRequireServerOwnedWater,
       currentFixtureWaterCueCells: initialInfo.regionConsistency.waterCueCells,
+      waterCoastRuntimeAssetsBlocked: initialInfo.regionConsistency.waterCoastRuntimeAssetsBlocked,
+      hiddenCellsHaveNoPublicTerrainSlot: initialInfo.regionConsistency.hiddenCellsHaveNoPublicTerrainSlot,
       hiddenCellsUseOnlyFogAssets: initialInfo.regionConsistency.hiddenCellsUseOnlyFogAssets,
       knownDiscoveredAssetsMatchServerTerrain: initialInfo.regionConsistency.knownDiscoveredAssetsMatchServerTerrain,
+      visibleAssetsMatchPublicTerrainSlot: initialInfo.regionConsistency.visibleAssetsMatchPublicTerrainSlot,
+      serverTerrainAssetContractComplete: initialInfo.regionConsistency.serverTerrainAssetContractComplete,
+      runtimeAssetProofMetadataComplete: initialInfo.regionConsistency.runtimeAssetProofMetadataComplete,
       runtimeAssetCellsRegionTruthBound: initialInfo.regionConsistency.runtimeAssetCellsRegionTruthBound,
+      invalidHiddenConcreteTerrainNormalizedToFogOnly: invalidHiddenTerrainProof.hiddenVisual.assetKind === 'fog_only'
+        && invalidHiddenTerrainProof.hiddenVisual.assetSlot === 'locked_unknown_fog'
+        && invalidHiddenTerrainProof.hiddenVisual.publicTerrainAssetSlot == null,
       continuousUnderlayHiddenCellsFogOnly: initialInfo.regionConsistency.continuousUnderlayHiddenCellsFogOnly,
       continuousUnderlayNoActionAuthority: initialInfo.regionConsistency.continuousUnderlayNoActionAuthority,
       continuousUnderlayAvoidsPrivateFields: sourceProof.continuousUnderlayAvoidsPrivateFields,
@@ -720,6 +821,6 @@ test('FP-E2E-023 HQ14N Expedition Map cartographic fog depth preserves authority
       scoutSectorOnlyMutationPath: true,
       sameOriginRuntimeMapAssets: initialInfo.visualLayers.runtimeRegionAtlas.startsWith('/experiences/founders-plot/assets/expedition-map/'),
     },
-    finalNote: 'HQ14N adds ambient cartographic contour depth to the fog/map texture so the Expedition Map reads less flat without adding hidden terrain truth; Scout Sector remains the only mutation path.',
+    finalNote: 'HQ14T binds the runtime terrain underlay and cell textures to explicit server-owned public terrain/fog asset slots; hidden cells normalize to fog-only assets and Scout Sector remains the only mutation path.',
   }, null, 2));
 });

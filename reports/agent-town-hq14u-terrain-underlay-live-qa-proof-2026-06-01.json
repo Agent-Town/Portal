@@ -1,0 +1,118 @@
+{
+  "ok": true,
+  "verdict": "PASS_WITH_NOTES",
+  "generatedAt": "2026-06-01T21:04:25+07:00",
+  "scope": {
+    "qaOnly": true,
+    "runtimeAssetsPromoted": false,
+    "additionalRuntimeLoaderCreated": false,
+    "serverAuthorityChangedByQa": false,
+    "committed": false,
+    "pushed": false,
+    "deployed": false,
+    "externalMessageSent": false
+  },
+  "repo": {
+    "branch": "neo/progression-atlas-editor-next-2026-05-29",
+    "head": "96be2c7",
+    "expectedDirtyWorktree": true
+  },
+  "checkedArtifacts": {
+    "hq14tReport": "reports/agent-town-hq14t-server-bound-terrain-underlay-runtime-2026-06-01.md",
+    "hq14tProof": "reports/agent-town-hq14t-server-bound-terrain-underlay-runtime-proof-2026-06-01.json",
+    "desktopScreenshot": "reports/agent-town-hq14t-server-bound-terrain-underlay-runtime-desktop-2026-06-01.png",
+    "mobileScreenshot": "reports/agent-town-hq14t-server-bound-terrain-underlay-runtime-mobile-2026-06-01.png",
+    "contactSheet": "reports/agent-town-hq14t-server-bound-terrain-underlay-runtime-contact-sheet-2026-06-01.png",
+    "runtimeAssetPack": "public/experiences/founders-plot/assets/expedition-map/hq14s-public-terrain-underlay-v1/"
+  },
+  "proofSummary": {
+    "hq14tProofOk": true,
+    "visualShell": "hq14t_server_bound_terrain_underlay_v1",
+    "runtimeRegionAssetPack": "hq14s_public_terrain_underlay_v1",
+    "desktopCanvas": {
+      "width": 1228,
+      "height": 784
+    },
+    "desktopScreenshot": {
+      "width": 1232,
+      "height": 789
+    },
+    "mobileScreenshot": {
+      "width": 366,
+      "height": 757
+    },
+    "contactSheet": {
+      "width": 949,
+      "height": 640
+    }
+  },
+  "checks": [
+    {
+      "name": "jq empty HQ14T proof",
+      "command": "jq empty reports/agent-town-hq14t-server-bound-terrain-underlay-runtime-proof-2026-06-01.json",
+      "status": "passed"
+    },
+    {
+      "name": "HQ14T guardrail predicate",
+      "command": "jq -e '.ok == true and .guardrails.scoutSectorOnlyMutationPath == true and .guardrails.hiddenCellsUseOnlyFogAssets == true and .guardrails.visibleAssetsMatchPublicTerrainSlot == true and .guardrails.sameOriginRuntimeMapAssets == true and .guardrails.atlasExecution == false and (.guardrails.executableActions | length == 0)' reports/agent-town-hq14t-server-bound-terrain-underlay-runtime-proof-2026-06-01.json",
+      "status": "passed"
+    },
+    {
+      "name": "runtime asset manifest parses",
+      "command": "jq empty public/experiences/founders-plot/assets/expedition-map/hq14s-public-terrain-underlay-v1/manifest.json",
+      "status": "passed"
+    },
+    {
+      "name": "screenshot and runtime asset image checks",
+      "command": "file reports/agent-town-hq14t-server-bound-terrain-underlay-runtime-*.png public/experiences/founders-plot/assets/expedition-map/hq14s-public-terrain-underlay-v1/*.png",
+      "status": "passed"
+    },
+    {
+      "name": "focused syntax checks",
+      "command": "node --check public/experiences/founders-plot/founders-plot.js && node --check public/experiences/founders-plot/three_scene_entry.js && node --check server/founders_plot/engine.js && node --check server/founders_plot/tools.js && node --check e2e/200_founders_plot.spec.js && node --check e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js",
+      "status": "passed"
+    },
+    {
+      "name": "Three.js bundle build",
+      "command": "npm run build:founders-plot-threejs",
+      "status": "passed"
+    },
+    {
+      "name": "FP-E2E-023 HQ14T terrain underlay authority proof",
+      "command": "npx playwright test e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js --project=chromium --reporter=line",
+      "status": "passed",
+      "result": "1 passed"
+    },
+    {
+      "name": "FP-E2E-022 server read-model Expedition Map proof",
+      "command": "npx playwright test e2e/200_founders_plot.spec.js --project=chromium --grep \"FP-E2E-022\" --reporter=line",
+      "status": "passed",
+      "result": "1 passed"
+    },
+    {
+      "name": "workspace diff check",
+      "command": "git diff --check",
+      "status": "passed"
+    }
+  ],
+  "guardrails": {
+    "scoutSectorOnlyMutationPath": true,
+    "hiddenCellsUseOnlyFogAssets": true,
+    "hintedCellsUseOnlyFogAssets": true,
+    "visibleAssetsMatchPublicTerrainSlot": true,
+    "sameOriginRuntimeMapAssets": true,
+    "noClientTerrainClassification": true,
+    "noAtlasExecution": true,
+    "noPublicSharing": true,
+    "noDeployMergeCommitPush": true,
+    "noGeneratedUniverseRendering": true,
+    "noHiddenAutonomy": true,
+    "noRouteTradeEconomyResourceRewardCombatSchedulerBehavior": true,
+    "noExternalEffects": true,
+    "noWildWestDrift": true
+  },
+  "notes": [
+    "Legacy proof screenshot side effects from the focused FP-E2E-022 replay were restored immediately.",
+    "The known broad npm run test:founders-plot FP-PERF-001 payload threshold issue was not re-run in this focused heartbeat QA."
+  ]
+}

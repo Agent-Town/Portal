@@ -1501,6 +1501,16 @@ test('FP-HT-011d2 HQ12A Expedition Map route returns read-only fog cells', async
     assert.ok(map.body.expeditionMap.fog.counts.locked_unknown >= 1);
     assert.ok(map.body.expeditionMap.cells.some((cell) => cell.fogState === 'hinted'));
     assert.ok(map.body.expeditionMap.cells.some((cell) => cell.fogState === 'locked_unknown'));
+    assert.equal(map.body.expeditionMap.cells.every((cell) => cell.terrainAssetContractVersion === engine.EXPEDITION_PUBLIC_TERRAIN_ASSET_CONTRACT_VERSION), true);
+    assert.equal(map.body.expeditionMap.cells
+      .filter((cell) => ['discovered', 'known'].includes(cell.fogState))
+      .every((cell) => engine.EXPEDITION_PUBLIC_TERRAIN_ASSET_SLOTS.includes(cell.publicTerrainAssetSlot)), true);
+    assert.equal(map.body.expeditionMap.cells
+      .filter((cell) => ['hinted', 'locked_unknown'].includes(cell.fogState))
+      .every((cell) => cell.publicTerrainAssetSlot == null && ['hinted_frontier_fog', 'locked_unknown_fog'].includes(cell.fogAssetSlot)), true);
+    assert.equal(map.body.expeditionMap.cells
+      .filter((cell) => /river|water|coast/i.test(`${cell.siteType || ''} ${(cell.traits || []).join(' ')}`))
+      .every((cell) => cell.publicTerrainAssetSlot !== 'water' && cell.publicTerrainAssetSlot !== 'coast'), true);
 
     const after = await request(server, 'GET', `/api/founders-plot/state?plotId=${encodeURIComponent(seeded.plotId)}`);
     assert.equal(after.body.state.audit.eventCount, before.body.state.audit.eventCount);

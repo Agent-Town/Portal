@@ -21,6 +21,13 @@ const EXPEDITION_SCOUT_SECTOR_AUTHORITY_BOUNDARY = 'server_owned_scout_sector_cu
 const EXPEDITION_EVENT_PACKET_AUTHORITY_BOUNDARY = 'server_owned_expedition_event_packet_read_model_v1';
 const EXPEDITION_PARTY_MANIFEST_AUTHORITY_BOUNDARY = 'server_owned_read_only_expedition_party_manifest_v1';
 const EXPEDITION_MAP_FOG_STATES = Object.freeze(['discovered', 'known', 'hinted', 'locked_unknown']);
+const EXPEDITION_PUBLIC_TERRAIN_ASSET_CONTRACT_VERSION = 'agenttown_public_terrain_asset_slots_v1';
+const EXPEDITION_PUBLIC_TERRAIN_ASSET_SLOT_SOURCE = 'server_read_model_v1';
+const EXPEDITION_PUBLIC_TERRAIN_ASSET_SLOTS = Object.freeze(['field', 'forest', 'ridge', 'settled']);
+const EXPEDITION_FOG_ASSET_SLOTS = Object.freeze({
+  hinted: 'hinted_frontier_fog',
+  locked_unknown: 'locked_unknown_fog'
+});
 const OFFLINE_CLAMP_MS = 8 * 60 * 60 * 1000;
 const DAILY_RETURN_XP = 5;
 const PADS = Object.freeze([
@@ -1560,6 +1567,82 @@ function expeditionFogCounts(cells) {
   return counts;
 }
 
+function expeditionPublicTerrainSlotText(cell = {}) {
+  const siteType = safeText(cell.siteType, '', 80).toLowerCase();
+  const kind = safeText(cell.kind, '', 80).toLowerCase();
+  const status = safeText(cell.status, '', 80).toLowerCase();
+  const risk = safeText(cell.risk, '', 80).toLowerCase();
+  const traits = Array.isArray(cell.traits)
+    ? cell.traits.map((trait) => safeText(trait, '', 60).toLowerCase()).filter(Boolean)
+    : [];
+  return `${siteType} ${kind} ${status} ${risk} ${traits.join(' ')}`;
+}
+
+function cellExposesPublicTerrainAssetSlot(cell = {}) {
+  return ['discovered', 'known'].includes(String(cell.fogState || 'locked_unknown'));
+}
+
+function expeditionPublicTerrainAssetSlotForCell(cell = {}) {
+  if (!cellExposesPublicTerrainAssetSlot(cell)) return null;
+  const text = expeditionPublicTerrainSlotText(cell);
+  if (/(^|[_\s-])(forest|wood|wooded|woodland|timber)([_\s-]|$)/.test(text)) {
+    return {
+      slot: 'forest',
+      reason: 'known/discovered public cell traits include forest, wood, woodland, or timber'
+    };
+  }
+  if (/(^|[_\s-])(ridge|quarry|stone|rock|outcrop|ruin|signal)([_\s-]|$)/.test(text)) {
+    return {
+      slot: 'ridge',
+      reason: 'known/discovered public cell traits include ridge, quarry, stone, outcrop, ruin, or signal'
+    };
+  }
+  if (/(^|[_\s-])(settled|outpost|home|owned|founders|founded)([_\s-]|$)/.test(text)) {
+    return {
+      slot: 'settled',
+      reason: 'known/discovered public cell traits include owned, home, founded, settled, or outpost status'
+    };
+  }
+  return {
+    slot: 'field',
+    reason: /(^|[_\s-])(water|river|coast)([_\s-]|$)/.test(text)
+      ? 'public terrain falls back to neutral field because water/coast assets are blocked until explicit public water truth exists'
+      : 'known/discovered public cell traits expose only neutral field terrain'
+  };
+}
+
+function expeditionTerrainAssetContractForCell(cell = {}) {
+  const fogState = String(cell.fogState || 'locked_unknown');
+  const base = {
+    terrainAssetContractVersion: EXPEDITION_PUBLIC_TERRAIN_ASSET_CONTRACT_VERSION,
+    publicTerrainAssetSlot: null,
+    publicTerrainAssetSlotSource: null,
+    publicTerrainAssetSlotReason: null,
+    fogAssetSlot: null
+  };
+  if (!cellExposesPublicTerrainAssetSlot(cell)) {
+    return {
+      ...base,
+      fogAssetSlot: EXPEDITION_FOG_ASSET_SLOTS[fogState] || EXPEDITION_FOG_ASSET_SLOTS.locked_unknown,
+      publicTerrainAssetSlotReason: 'hidden expedition cell exposes only fog asset slots; no concrete terrain truth is public'
+    };
+  }
+  const slot = expeditionPublicTerrainAssetSlotForCell(cell);
+  return {
+    ...base,
+    publicTerrainAssetSlot: EXPEDITION_PUBLIC_TERRAIN_ASSET_SLOTS.includes(slot?.slot) ? slot.slot : 'field',
+    publicTerrainAssetSlotSource: EXPEDITION_PUBLIC_TERRAIN_ASSET_SLOT_SOURCE,
+    publicTerrainAssetSlotReason: slot?.reason || 'known/discovered public cell traits expose neutral field terrain'
+  };
+}
+
+function applyExpeditionTerrainAssetContract(cell = {}) {
+  return {
+    ...cell,
+    ...expeditionTerrainAssetContractForCell(cell)
+  };
+}
+
 function buildExpeditionMapReadModel(bundle) {
   const plot = bundle?.plot || {};
   const scoutReports = normalizeScoutReports(plot.scoutReports);
@@ -1793,7 +1876,8 @@ function buildExpeditionMapReadModel(bundle) {
       || (b.fogState === 'hinted') - (a.fogState === 'hinted')
       || a.q - b.q
       || a.r - b.r
-      || a.cellId.localeCompare(b.cellId));
+      || a.cellId.localeCompare(b.cellId))
+    .map(applyExpeditionTerrainAssetContract);
   const eventPackets = expeditionScouts
     .map((scout) => scout.eventPacket)
     .filter((packet) => packet && packet.packetId)
@@ -1871,6 +1955,9 @@ function buildExpeditionMapReadModel(bundle) {
       fogState: cell.fogState,
       kind: cell.kind,
       status: cell.status,
+      publicTerrainAssetSlot: cell.publicTerrainAssetSlot || null,
+      fogAssetSlot: cell.fogAssetSlot || null,
+      terrainAssetContractVersion: cell.terrainAssetContractVersion || null,
       sourceIds: cell.sourceIds,
       eventPacketId: cell.eventPacket?.packetId || null
     })),
@@ -6685,6 +6772,10 @@ module.exports = {
   EXPEDITION_EVENT_PACKET_AUTHORITY_BOUNDARY,
   EXPEDITION_PARTY_MANIFEST_AUTHORITY_BOUNDARY,
   EXPEDITION_MAP_FOG_STATES,
+  EXPEDITION_PUBLIC_TERRAIN_ASSET_CONTRACT_VERSION,
+  EXPEDITION_PUBLIC_TERRAIN_ASSET_SLOT_SOURCE,
+  EXPEDITION_PUBLIC_TERRAIN_ASSET_SLOTS,
+  EXPEDITION_FOG_ASSET_SLOTS,
   SURVEY_DISCIPLINE_SCOUT_DURATION_MULTIPLIER,
   SURVEY_DISCIPLINE_SCOUT_DURATION_REDUCTION_PCT,
   HQ_LEVEL_RULES,

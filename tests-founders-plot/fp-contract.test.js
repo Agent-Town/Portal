@@ -362,6 +362,10 @@ test('FP-CT-101b2 get_expedition_map envelope conforms to resultSchema', () => {
   ]);
   assert.equal(out.expeditionMap.expeditionParty.boundaryFlags.operatorAssignment, false);
   assert.equal(out.expeditionMap.expeditionParty.boundaryFlags.externalEffects, false);
+  assert.equal(out.expeditionMap.cells.every((cell) => cell.terrainAssetContractVersion === engine.EXPEDITION_PUBLIC_TERRAIN_ASSET_CONTRACT_VERSION), true);
+  assert.equal(out.expeditionMap.cells
+    .filter((cell) => ['hinted', 'locked_unknown'].includes(cell.fogState))
+    .every((cell) => cell.publicTerrainAssetSlot == null && ['hinted_frontier_fog', 'locked_unknown_fog'].includes(cell.fogAssetSlot)), true);
 });
 
 test('FP-CT-101b3 scout_sector envelope conforms to resultSchema', () => {

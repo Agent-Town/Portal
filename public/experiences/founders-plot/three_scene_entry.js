@@ -1346,43 +1346,49 @@ const EXPEDITION_WORLD_WIDTH = 13.6;
 const EXPEDITION_WORLD_HEIGHT = 8.2;
 const EXPEDITION_CELL_RADIUS = 0.86;
 const EXPEDITION_REGION_RADIUS = EXPEDITION_CELL_RADIUS * 1.64;
-const EXPEDITION_VISUAL_SHELL_VERSION = 'hq14n_cartographic_fog_depth_v1';
-const EXPEDITION_REGION_ASSET_PACK_VERSION = 'hq14a_region_faithful_terrain_fog_atlas_v1';
+const EXPEDITION_VISUAL_SHELL_VERSION = 'hq14t_server_bound_terrain_underlay_v1';
+const EXPEDITION_REGION_ASSET_PACK_VERSION = 'hq14s_public_terrain_underlay_v1';
 const EXPEDITION_REGION_ASSET_BASE = '/experiences/founders-plot/assets/expedition-map';
+const EXPEDITION_PUBLIC_TERRAIN_ASSET_BASE = `${EXPEDITION_REGION_ASSET_BASE}/hq14s-public-terrain-underlay-v1`;
+const EXPEDITION_PUBLIC_TERRAIN_CONTRACT_VERSION = 'agenttown_public_terrain_asset_slots_v1';
+const EXPEDITION_PUBLIC_TERRAIN_SLOT_SOURCE = 'server_read_model_v1';
+const EXPEDITION_ALLOWED_PUBLIC_TERRAIN_SLOTS = Object.freeze(['field', 'forest', 'ridge', 'settled']);
+const EXPEDITION_PROMOTED_UNDERLAY_ASSET = Object.freeze({
+  slot: 'public_terrain_underlay',
+  path: `${EXPEDITION_PUBLIC_TERRAIN_ASSET_BASE}/public-terrain-underlay-candidate-01-v1.png`,
+  assetKind: 'visual_underlay'
+});
 const EXPEDITION_REGION_TILE_ASSETS = Object.freeze({
+  field: {
+    slot: 'field',
+    path: `${EXPEDITION_PUBLIC_TERRAIN_ASSET_BASE}/field-v1.png`,
+    assetKind: 'concrete_public_terrain'
+  },
   settled: {
-    slot: 'discovered_settled',
-    path: `${EXPEDITION_REGION_ASSET_BASE}/tiles/discovered-settled-v1.png`,
-    publicTerrain: ['settled', 'outpost', 'home']
+    slot: 'settled',
+    path: `${EXPEDITION_PUBLIC_TERRAIN_ASSET_BASE}/settled-v1.png`,
+    assetKind: 'concrete_public_terrain'
   },
   forest: {
-    slot: 'known_woodland',
-    path: `${EXPEDITION_REGION_ASSET_BASE}/tiles/known-woodland-v1.png`,
-    publicTerrain: ['forest', 'wood']
+    slot: 'forest',
+    path: `${EXPEDITION_PUBLIC_TERRAIN_ASSET_BASE}/forest-v1.png`,
+    assetKind: 'concrete_public_terrain'
   },
   ridge: {
-    slot: 'known_ridge_ruin',
-    path: `${EXPEDITION_REGION_ASSET_BASE}/tiles/known-ridge-ruin-v1.png`,
-    publicTerrain: ['ridge', 'quarry', 'stone']
-  },
-  ruin_signal: {
-    slot: 'known_ridge_ruin',
-    path: `${EXPEDITION_REGION_ASSET_BASE}/tiles/known-ridge-ruin-v1.png`,
-    publicTerrain: ['ruin', 'signal']
-  },
-  water: {
-    slot: 'known_water_edge',
-    path: `${EXPEDITION_REGION_ASSET_BASE}/tiles/known-water-edge-v1.png`,
-    publicTerrain: ['water', 'river']
+    slot: 'ridge',
+    path: `${EXPEDITION_PUBLIC_TERRAIN_ASSET_BASE}/ridge-v1.png`,
+    assetKind: 'concrete_public_terrain'
   },
   hinted: {
     slot: 'hinted_frontier_fog',
-    path: `${EXPEDITION_REGION_ASSET_BASE}/tiles/hinted-frontier-fog-v1.png`,
+    path: `${EXPEDITION_PUBLIC_TERRAIN_ASSET_BASE}/hinted-frontier-fog-v1.png`,
+    assetKind: 'fog_only',
     fogOnly: true
   },
   locked_unknown: {
     slot: 'locked_unknown_fog',
-    path: `${EXPEDITION_REGION_ASSET_BASE}/tiles/locked-unknown-fog-v1.png`,
+    path: `${EXPEDITION_PUBLIC_TERRAIN_ASSET_BASE}/locked-unknown-fog-v1.png`,
+    assetKind: 'fog_only',
     fogOnly: true
   }
 });
@@ -1630,39 +1636,46 @@ function cellExposesRegionTruth(cell = {}) {
 }
 
 function isServerOwnedWaterTerrain(cell = {}) {
-  if (!cellExposesRegionTruth(cell)) return false;
-  return /(^|[_\s-])(water|river)([_\s-]|$)/.test(expeditionPublicTerrainText(cell));
+  return cellExposesRegionTruth(cell) && String(cell.publicTerrainAssetSlot || '') === 'water';
 }
 
 function isServerOwnedRuinSignalTerrain(cell = {}) {
-  if (!cellExposesRegionTruth(cell)) return false;
-  return /(^|[_\s-])(ruin|signal)([_\s-]|$)/.test(expeditionPublicTerrainText(cell));
+  return cellExposesRegionTruth(cell) && String(cell.publicTerrainAssetSlot || '') === 'ridge'
+    && /(^|[_\s-])(ruin|signal)([_\s-]|$)/.test(expeditionPublicTerrainText(cell));
+}
+
+function serverPublicTerrainSlot(cell = {}) {
+  if (!cellExposesRegionTruth(cell)) return null;
+  const slot = String(cell.publicTerrainAssetSlot || '');
+  return EXPEDITION_ALLOWED_PUBLIC_TERRAIN_SLOTS.includes(slot) ? slot : null;
+}
+
+function serverFogAssetSlot(cell = {}) {
+  const fogState = String(cell.fogState || 'locked_unknown');
+  const slot = String(cell.fogAssetSlot || '');
+  if (fogState === 'hinted' && slot === 'hinted_frontier_fog') return slot;
+  if (fogState === 'locked_unknown' && slot === 'locked_unknown_fog') return slot;
+  return fogState === 'hinted' ? 'hinted_frontier_fog' : 'locked_unknown_fog';
 }
 
 function expeditionCellTerrain(cell = {}) {
   const fogState = String(cell.fogState || 'locked_unknown');
   if (!cellExposesRegionTruth(cell)) return fogState;
-  if (isServerOwnedWaterTerrain(cell)) return 'water';
-  if (isServerOwnedRuinSignalTerrain(cell)) return 'ruin_signal';
-  const text = expeditionPublicTerrainText(cell);
-  if (text.includes('forest') || text.includes('wood')) return 'forest';
-  if (text.includes('ridge') || text.includes('quarry') || text.includes('stone')) return 'ridge';
-  if (text.includes('outpost') || text.includes('home')) return 'settled';
-  return 'field';
+  return serverPublicTerrainSlot(cell) || 'field';
 }
 
 function expeditionPublicTerrainAllows(cell = {}, asset = null) {
-  if (!asset?.publicTerrain?.length) return false;
-  const text = expeditionPublicTerrainText(cell);
-  return asset.publicTerrain.some((term) => text.includes(term));
+  if (!cellExposesRegionTruth(cell) || !asset?.slot) return false;
+  return asset.slot === serverPublicTerrainSlot(cell);
 }
 
 function expeditionRegionTileAssetForCell(cell = {}, terrain = expeditionCellTerrain(cell)) {
   const fogState = String(cell.fogState || 'locked_unknown');
   if (!cellExposesRegionTruth(cell)) {
-    return EXPEDITION_REGION_TILE_ASSETS[fogState] || null;
+    const fogAsset = EXPEDITION_REGION_TILE_ASSETS[fogState] || null;
+    return fogAsset && fogAsset.slot === serverFogAssetSlot(cell) ? fogAsset : null;
   }
-  const asset = EXPEDITION_REGION_TILE_ASSETS[terrain] || null;
+  const asset = EXPEDITION_REGION_TILE_ASSETS[serverPublicTerrainSlot(cell) || terrain] || null;
   if (!asset) return null;
   return expeditionPublicTerrainAllows(cell, asset) ? asset : null;
 }
@@ -1671,9 +1684,13 @@ function expeditionRegionTileAssetAllowed(cell = {}, terrain = expeditionCellTer
   const fogState = String(cell.fogState || 'locked_unknown');
   if (!asset) return terrain === 'field';
   if (!cellExposesRegionTruth(cell)) {
-    return asset.fogOnly === true && asset.slot === (fogState === 'hinted' ? 'hinted_frontier_fog' : 'locked_unknown_fog');
+    return asset.fogOnly === true && asset.assetKind === 'fog_only' && asset.slot === serverFogAssetSlot(cell);
   }
-  return asset.fogOnly !== true && expeditionPublicTerrainAllows(cell, asset);
+  return asset.fogOnly !== true
+    && asset.assetKind === 'concrete_public_terrain'
+    && asset.slot === serverPublicTerrainSlot(cell)
+    && String(cell.terrainAssetContractVersion || '') === EXPEDITION_PUBLIC_TERRAIN_CONTRACT_VERSION
+    && String(cell.publicTerrainAssetSlotSource || '') === EXPEDITION_PUBLIC_TERRAIN_SLOT_SOURCE;
 }
 
 function notifyExpeditionRegionTileLoaded() {
@@ -2617,8 +2634,9 @@ function drawExpeditionContinuousUnderlayBlob(ctx, point, radius, style, seed = 
 }
 
 function makeExpeditionContinuousUnderlayTexture(cells = [], layout = expeditionLayout(cells)) {
-  const terrainKey = cells.map((cell) => `${cell.cellId}:${cell.fogState}:${expeditionCellTerrain(cell)}`).join('|');
-  const key = `expedition-continuous-underlay:${EXPEDITION_VISUAL_SHELL_VERSION}:${terrainKey}`;
+  const promotedUnderlayImage = ensureExpeditionRegionTileImage(EXPEDITION_PROMOTED_UNDERLAY_ASSET);
+  const terrainKey = cells.map((cell) => `${cell.cellId}:${cell.fogState}:${expeditionCellTerrain(cell)}:${cell.publicTerrainAssetSlot || ''}:${cell.fogAssetSlot || ''}`).join('|');
+  const key = `expedition-continuous-underlay:${EXPEDITION_VISUAL_SHELL_VERSION}:${terrainKey}:${promotedUnderlayImage ? 'promoted-underlay-ready' : 'promoted-underlay-pending'}`;
   if (textureCache.has(key)) return textureCache.get(key);
   const canvas = document.createElement('canvas');
   canvas.width = 1024;
@@ -2635,6 +2653,16 @@ function makeExpeditionContinuousUnderlayTexture(cells = [], layout = expedition
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = 'rgba(255, 248, 232, 0.04)';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (promotedUnderlayImage) {
+    ctx.save();
+    ctx.globalAlpha = 0.68;
+    ctx.drawImage(promotedUnderlayImage, 0, 0, canvas.width, canvas.height);
+    ctx.globalCompositeOperation = 'screen';
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = 'rgba(255, 248, 232, 0.70)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  }
 
   for (let index = 0; index < cells.length; index += 1) {
     for (let next = index + 1; next < cells.length; next += 1) {
@@ -3411,16 +3439,25 @@ class ExpeditionMapThreeStage {
       const asset = expeditionRegionTileAssetForCell(cell, terrain);
       const assetImage = expeditionRegionTileReady(asset);
       const underlayStyle = expeditionContinuousUnderlayStyle(cell, terrain);
+      const publicTerrainAssetSlot = serverPublicTerrainSlot(cell);
+      const fogAssetSlot = !cellExposesRegionTruth(cell) ? serverFogAssetSlot(cell) : null;
       return {
         cellId: String(cell.cellId || ''),
         fogState,
         siteType: String(cell.siteType || ''),
         kind: String(cell.kind || ''),
         publicTerrainText,
+        publicTerrainAssetSlot,
+        publicTerrainAssetSlotSource: String(cell.publicTerrainAssetSlotSource || ''),
+        publicTerrainAssetSlotReason: String(cell.publicTerrainAssetSlotReason || ''),
+        fogAssetSlot,
+        terrainAssetContractVersion: String(cell.terrainAssetContractVersion || ''),
         terrain,
         runtimeAssetPack: EXPEDITION_REGION_ASSET_PACK_VERSION,
         assetSlot: asset?.slot || null,
         assetPath: asset?.path || null,
+        assetKind: asset?.assetKind || null,
+        fogOnly: asset?.fogOnly === true,
         assetReady: !!assetImage,
         assetAllowedByServerTruth: expeditionRegionTileAssetAllowed(cell, terrain, asset),
         underlayTerrain: underlayStyle.terrain,
@@ -3444,7 +3481,10 @@ class ExpeditionMapThreeStage {
         visualLayers: {
           terrainTexture: true,
           runtimeRegionAssetPack: EXPEDITION_REGION_ASSET_PACK_VERSION,
-          runtimeRegionAtlas: `${EXPEDITION_REGION_ASSET_BASE}/hq14a-region-faithful-terrain-fog-atlas-v1.png`,
+          runtimeRegionAtlas: `${EXPEDITION_PUBLIC_TERRAIN_ASSET_BASE}/manifest.json`,
+          runtimeTerrainUnderlay: EXPEDITION_PROMOTED_UNDERLAY_ASSET.path,
+          serverTerrainAssetContractVersion: EXPEDITION_PUBLIC_TERRAIN_CONTRACT_VERSION,
+          serverTerrainSlotSource: EXPEDITION_PUBLIC_TERRAIN_SLOT_SOURCE,
           assetBackedRegionTiles: regionVisuals.filter((cell) => cell.assetPath).length,
           assetBackedLoadedTiles: regionVisuals.filter((cell) => cell.assetReady).length,
           assetBackedTerrainTextures: true,
@@ -3501,13 +3541,28 @@ class ExpeditionMapThreeStage {
           .every((cell) => cell.hiddenSpecificitySuppressed && !cell.waterCue && !cell.ruinSignalCue),
         waterCuesRequireServerOwnedWater: regionVisuals
           .filter((cell) => cell.waterCue)
-          .every((cell) => /(^|[_\s-])(water|river)([_\s-]|$)/.test(cell.publicTerrainText)),
+          .every((cell) => cell.publicTerrainAssetSlot === 'water'),
+        waterCoastRuntimeAssetsBlocked: regionVisuals.every((cell) => !['water', 'coast'].includes(String(cell.assetSlot || ''))),
+        hiddenCellsHaveNoPublicTerrainSlot: regionVisuals
+          .filter((cell) => !['discovered', 'known'].includes(cell.fogState))
+          .every((cell) => cell.publicTerrainAssetSlot == null),
         hiddenCellsUseOnlyFogAssets: regionVisuals
           .filter((cell) => !['discovered', 'known'].includes(cell.fogState))
-          .every((cell) => ['hinted_frontier_fog', 'locked_unknown_fog'].includes(String(cell.assetSlot || ''))),
+          .every((cell) => ['hinted_frontier_fog', 'locked_unknown_fog'].includes(String(cell.assetSlot || '')) && cell.fogOnly === true && cell.assetKind === 'fog_only'),
         knownDiscoveredAssetsMatchServerTerrain: regionVisuals
           .filter((cell) => ['discovered', 'known'].includes(cell.fogState) && cell.assetPath)
           .every((cell) => cell.assetAllowedByServerTruth === true),
+        visibleAssetsMatchPublicTerrainSlot: regionVisuals
+          .filter((cell) => ['discovered', 'known'].includes(cell.fogState) && cell.assetPath)
+          .every((cell) => cell.assetSlot === cell.publicTerrainAssetSlot && cell.assetKind === 'concrete_public_terrain'),
+        serverTerrainAssetContractComplete: regionVisuals
+          .every((cell) => cell.terrainAssetContractVersion === EXPEDITION_PUBLIC_TERRAIN_CONTRACT_VERSION
+            && (['discovered', 'known'].includes(cell.fogState)
+              ? cell.publicTerrainAssetSlotSource === EXPEDITION_PUBLIC_TERRAIN_SLOT_SOURCE
+              : cell.fogAssetSlot != null)),
+        runtimeAssetProofMetadataComplete: regionVisuals
+          .filter((cell) => cell.assetPath)
+          .every((cell) => cell.cellId && cell.fogState && cell.runtimeAssetPack && cell.assetSlot && cell.assetKind && typeof cell.assetAllowedByServerTruth === 'boolean'),
         runtimeAssetCellsRegionTruthBound: regionVisuals
           .filter((cell) => cell.assetPath)
           .every((cell) => cell.assetAllowedByServerTruth === true),
