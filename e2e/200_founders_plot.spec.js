@@ -1606,6 +1606,18 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   await expect(page.getByTestId('fp-expedition-receipts-cell_q1_r0')).toContainText('reviewed site plan known cell');
   await expect(page.getByTestId('fp-expedition-sector-cell_q1_r-1')).toContainText('Owned outpost: plot_hq12b_forest_outpost');
   await expect(page.getByTestId('fp-btn-scout-sector-cell_q0_r1')).toBeVisible();
+  await expect(page.getByTestId('fp-expedition-map-visual-hud')).toHaveAttribute('data-fog-state', 'hinted');
+  await expect(page.getByTestId('fp-expedition-map-selected-summary')).toHaveAttribute('data-scoutable', 'true');
+  await expect(page.getByTestId('fp-expedition-map-selected-summary')).toContainText('Scout Sector eligible');
+  await expect(page.getByTestId('fp-btn-scout-sector-map-chip-cell_q0_r1')).toBeVisible();
+  await expect(page.getByTestId('fp-expedition-fog-pips').locator('.fp-expedition-fog-pip')).toHaveCount(4);
+  await expect(page.getByTestId('fp-expedition-receipt-trace-map-selected')).toContainText('Provenance sealed');
+  await expect(page.getByTestId('fp-expedition-party-badges-map-selected')).toContainText('MT');
+  await expect(page.getByTestId('fp-expedition-party-badges-map-selected')).toContainText('HQ civic operator');
+  await expect(page.getByTestId('fp-expedition-map-hud')).toHaveAttribute('data-drawer', 'visual-inspector');
+  await expect(page.getByTestId('fp-expedition-inspector-chrome')).toContainText('Visual inspector');
+  await expect(page.getByTestId('fp-expedition-inspector-chips')).toContainText('read-only');
+  await expect(page.getByTestId('fp-expedition-inspector-ledger')).not.toHaveAttribute('open', '');
   await expect(page.getByTestId('fp-expedition-sector-cell_q1_r0').locator('button')).toHaveCount(0);
   await expect(page.getByTestId('fp-btn-scout-sector-cell_q1_r0')).toHaveCount(0);
   await expect(page.getByTestId('fp-btn-scout-sector-cell_q3_r0')).toHaveCount(0);
@@ -1613,6 +1625,7 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   await page.locator('#fp-drawer-toggle').evaluate((node) => { node.style.display = 'none'; });
   await panel.screenshot({ path: 'reports/agent-town-hq12b-expedition-map-ui-desktop-2026-05-31.png' });
   await panel.screenshot({ path: 'reports/agent-town-hq12o-expedition-sector-art-readability-desktop-2026-06-01.png' });
+  await panel.screenshot({ path: 'reports/agent-town-hq14d-map-first-ui-playability-slice-desktop-2026-06-01.png' });
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
@@ -1628,6 +1641,11 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
       '.fp-expedition-map-board',
       '.fp-expedition-map-metrics',
       '.fp-expedition-sector-receipts',
+      '.fp-expedition-map-visual-hud',
+      '.fp-expedition-map-selected-summary',
+      '.fp-expedition-fog-pips',
+      '.fp-expedition-receipt-trace',
+      '.fp-expedition-party-badges',
     ].join(','))).map((node) => {
       const rect = node.getBoundingClientRect();
       return {
@@ -1644,9 +1662,20 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   await page.locator('#fp-drawer-toggle').evaluate((node) => { node.style.display = 'none'; });
   await page.getByTestId('fp-expedition-map-panel').screenshot({ path: 'reports/agent-town-hq12b-expedition-map-ui-mobile-2026-05-31.png' });
   await page.getByTestId('fp-expedition-map-panel').screenshot({ path: 'reports/agent-town-hq12o-expedition-sector-art-readability-mobile-2026-06-01.png' });
+  await page.getByTestId('fp-expedition-map-panel').screenshot({ path: 'reports/agent-town-hq14d-map-first-ui-playability-slice-mobile-2026-06-01.png' });
 
   const domProof = await page.evaluate(() => ({
     panelVisible: !!document.querySelector('[data-testid="fp-expedition-map-panel"]'),
+    mapFirstHud: {
+      visible: !!document.querySelector('[data-testid="fp-expedition-map-visual-hud"]'),
+      selectedCellId: document.querySelector('[data-testid="fp-expedition-map-visual-hud"]')?.getAttribute('data-selected-cell-id') || '',
+      fogState: document.querySelector('[data-testid="fp-expedition-map-visual-hud"]')?.getAttribute('data-fog-state') || '',
+      scoutable: document.querySelector('[data-testid="fp-expedition-map-visual-hud"]')?.getAttribute('data-scoutable') || '',
+      selectedSummaryText: document.querySelector('[data-testid="fp-expedition-map-selected-summary"]')?.textContent || '',
+      receiptTraceText: document.querySelector('[data-testid="fp-expedition-receipt-trace-map-selected"]')?.textContent || '',
+      partyBadgesText: document.querySelector('[data-testid="fp-expedition-party-badges-map-selected"]')?.textContent || '',
+      fogPipCount: document.querySelectorAll('[data-testid="fp-expedition-fog-pips"] .fp-expedition-fog-pip').length,
+    },
     cells: Array.from(document.querySelectorAll('[data-testid^="fp-expedition-cell-"]')).map((node) => ({
       testid: node.getAttribute('data-testid'),
       fogState: node.getAttribute('data-fog-state'),
@@ -1683,7 +1712,13 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
       backgroundImage: getComputedStyle(node).backgroundImage,
       borderStyle: getComputedStyle(node).borderStyle,
     })),
-    mutationButtons: Array.from(document.querySelectorAll('[data-testid="fp-expedition-map-panel"] button')).map((node) => ({
+    mapControlButtons: Array.from(document.querySelectorAll('[data-testid="fp-expedition-map-controls"] button')).map((node) => ({
+      label: node.getAttribute('aria-label'),
+      text: node.textContent,
+    })),
+    mutationButtons: Array.from(document.querySelectorAll('[data-testid="fp-expedition-map-panel"] button'))
+      .filter((node) => String(node.getAttribute('data-testid') || '').startsWith('fp-btn-scout-sector-'))
+      .map((node) => ({
       testid: node.getAttribute('data-testid'),
       cellId: node.getAttribute('data-cell-id'),
     })),
@@ -1696,6 +1731,17 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   expect(domProof.selectedSector.text).not.toMatch(/resources wood|wood \+2|food \+1|receipt scout_sector_ui_001|owned outpost: plot_hq12b_forest_outpost/i);
   expect(domProof.hiddenSummaryText).not.toMatch(/wood \+2|food \+1|route|receipt scout_sector_ui_001/i);
   expect(domProof.visualStateStyles).toHaveLength(5);
+  expect(domProof.mapFirstHud.visible).toBe(true);
+  expect(domProof.mapFirstHud.selectedCellId).toBe('cell_q0_r1');
+  expect(domProof.mapFirstHud.fogState).toBe('hinted');
+  expect(domProof.mapFirstHud.scoutable).toBe('true');
+  expect(domProof.mapFirstHud.selectedSummaryText).toContain('Scout Sector eligible');
+  expect(domProof.mapFirstHud.selectedSummaryText).not.toMatch(/wood \+2|food \+1|owned outpost: plot_hq12b_forest_outpost/i);
+  expect(domProof.mapFirstHud.receiptTraceText).toContain('Provenance sealed');
+  expect(domProof.mapFirstHud.partyBadgesText).toContain('MT');
+  expect(domProof.mapFirstHud.partyBadgesText).toContain('HQ civic operator');
+  expect(domProof.mapFirstHud.fogPipCount).toBe(4);
+  expect(domProof.mapControlButtons).toHaveLength(3);
   fs.writeFileSync('reports/agent-town-hq12b-expedition-map-ui-proof-2026-05-31.json', JSON.stringify({
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -1767,6 +1813,7 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   await page.getByTestId('fp-expedition-map-panel').screenshot({ path: 'reports/agent-town-hq12k-expedition-event-packet-visual-polish-desktop-2026-06-01.png' });
   await page.getByTestId('fp-expedition-map-panel').screenshot({ path: 'reports/agent-town-hq12l-expedition-party-visual-polish-desktop-2026-06-01.png' });
   await page.getByTestId('fp-expedition-map-panel').screenshot({ path: 'reports/agent-town-hq12n-expedition-objective-strip-desktop-2026-06-01.png' });
+  await page.getByTestId('fp-expedition-map-panel').screenshot({ path: 'reports/agent-town-hq14g-visual-inspector-drawer-desktop-2026-06-01.png' });
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
@@ -1789,11 +1836,53 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   await page.getByTestId('fp-expedition-map-panel').screenshot({ path: 'reports/agent-town-hq12k-expedition-event-packet-visual-polish-mobile-2026-06-01.png' });
   await page.getByTestId('fp-expedition-map-panel').screenshot({ path: 'reports/agent-town-hq12l-expedition-party-visual-polish-mobile-2026-06-01.png' });
   await page.getByTestId('fp-expedition-map-panel').screenshot({ path: 'reports/agent-town-hq12n-expedition-objective-strip-mobile-2026-06-01.png' });
+  await page.getByTestId('fp-expedition-map-panel').screenshot({ path: 'reports/agent-town-hq14g-visual-inspector-drawer-mobile-2026-06-01.png' });
 
   const scoutDomProof = await page.evaluate(() => ({
     panelVisible: !!document.querySelector('[data-testid="fp-expedition-map-panel"]'),
     scoutReceiptVisible: !!document.querySelector('[data-testid="fp-scout-sector-result"]'),
     targetFogState: document.querySelector('[data-testid="fp-expedition-cell-cell_q0_r1"]')?.getAttribute('data-fog-state'),
+    inspectorDrawer: (() => {
+      const drawer = document.querySelector('[data-testid="fp-expedition-map-hud"]');
+      const board = document.querySelector('[data-testid="fp-expedition-map-board-card"]');
+      const chrome = document.querySelector('[data-testid="fp-expedition-inspector-chrome"]');
+      const ledger = document.querySelector('[data-testid="fp-expedition-inspector-ledger"]');
+      const selectedDetails = document.querySelector('[data-testid="fp-expedition-inspector-selected-details"]');
+      const rect = drawer?.getBoundingClientRect();
+      return {
+        visible: !!drawer,
+        drawerKind: drawer?.getAttribute('data-drawer') || '',
+        readOnly: drawer?.getAttribute('data-read-only') || '',
+        actions: drawer ? drawer.querySelectorAll('button').length : 0,
+        chromeText: chrome?.textContent || '',
+        chipsText: document.querySelector('[data-testid="fp-expedition-inspector-chips"]')?.textContent || '',
+        containsStatus: !!drawer?.querySelector('[data-testid="fp-expedition-map-status"]'),
+        containsObjective: !!drawer?.querySelector('[data-testid="fp-expedition-objective-strip"]'),
+        containsSelectedSector: !!drawer?.querySelector('[data-testid="fp-expedition-selected-sector"]'),
+        containsEventPacket: !!drawer?.querySelector('[data-testid="fp-expedition-event-packet-cell_q0_r1"]'),
+        containsSectorLedger: !!drawer?.querySelector('[data-testid="fp-expedition-sector-list"]'),
+        selectedDetailsCollapsed: selectedDetails ? !selectedDetails.hasAttribute('open') : false,
+        ledgerCollapsed: ledger ? !ledger.hasAttribute('open') : false,
+        ledgerActions: Number(ledger?.getAttribute('data-actions') || 0),
+        boardBeforeDrawer: !!(board && drawer && (board.compareDocumentPosition(drawer) & Node.DOCUMENT_POSITION_FOLLOWING)),
+        rect: rect ? {
+          top: Math.round(rect.top),
+          left: Math.round(rect.left),
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+        } : null,
+      };
+    })(),
+    mapFirstHud: {
+      visible: !!document.querySelector('[data-testid="fp-expedition-map-visual-hud"]'),
+      selectedCellId: document.querySelector('[data-testid="fp-expedition-map-visual-hud"]')?.getAttribute('data-selected-cell-id') || '',
+      fogState: document.querySelector('[data-testid="fp-expedition-map-visual-hud"]')?.getAttribute('data-fog-state') || '',
+      scoutable: document.querySelector('[data-testid="fp-expedition-map-visual-hud"]')?.getAttribute('data-scoutable') || '',
+      selectedSummaryText: document.querySelector('[data-testid="fp-expedition-map-selected-summary"]')?.textContent || '',
+      receiptTraceText: document.querySelector('[data-testid="fp-expedition-receipt-trace-map-selected"]')?.textContent || '',
+      partyBadgesText: document.querySelector('[data-testid="fp-expedition-party-badges-map-selected"]')?.textContent || '',
+      fogPipCount: document.querySelectorAll('[data-testid="fp-expedition-fog-pips"] .fp-expedition-fog-pip').length,
+    },
     objectiveStrip: {
       visible: !!document.querySelector('[data-testid="fp-expedition-objective-strip"]'),
       mode: document.querySelector('[data-testid="fp-expedition-objective-strip"]')?.getAttribute('data-mode') || '',
@@ -1851,10 +1940,19 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
     };
     const clipped = Array.from(document.querySelectorAll([
       '[data-testid="fp-expedition-map-panel"]',
+      '[data-testid="fp-expedition-map-hud"]',
+      '[data-testid="fp-expedition-inspector-chrome"]',
+      '[data-testid="fp-expedition-inspector-chips"]',
+      '[data-testid="fp-expedition-inspector-ledger"]',
       '[data-testid="fp-expedition-map-status"]',
       '[data-testid="fp-expedition-objective-strip"]',
       '[data-testid="fp-expedition-objective-strip-facts"]',
       '[data-testid="fp-expedition-map-board-card"]',
+      '[data-testid="fp-expedition-map-visual-hud"]',
+      '[data-testid="fp-expedition-map-selected-summary"]',
+      '[data-testid="fp-expedition-fog-pips"]',
+      '[data-testid="fp-expedition-receipt-trace-map-selected"]',
+      '[data-testid="fp-expedition-party-badges-map-selected"]',
       '[data-testid="fp-expedition-selected-sector"]',
       '[data-testid="fp-expedition-event-packet-cell_q0_r1"]',
       '[data-testid="fp-expedition-event-packet-chips-expedition_event_packet_hq12f_cell_q0_r1"]',
@@ -1882,8 +1980,12 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
       clipped,
       surfaces: {
         panel: rectFor('[data-testid="fp-expedition-map-panel"]'),
+        inspectorDrawer: rectFor('[data-testid="fp-expedition-map-hud"]'),
+        inspectorChrome: rectFor('[data-testid="fp-expedition-inspector-chrome"]'),
         objectiveStrip: rectFor('[data-testid="fp-expedition-objective-strip"]'),
         threeHost: rectFor('[data-testid="fp-expedition-three-host"]'),
+        mapVisualHud: rectFor('[data-testid="fp-expedition-map-visual-hud"]'),
+        mapSelectedSummary: rectFor('[data-testid="fp-expedition-map-selected-summary"]'),
         selectedSector: rectFor('[data-testid="fp-expedition-selected-sector"]'),
         eventPacket: rectFor('[data-testid="fp-expedition-event-packet-cell_q0_r1"]'),
         eventPacketChips: rectFor('[data-testid="fp-expedition-event-packet-chips-expedition_event_packet_hq12f_cell_q0_r1"]'),
@@ -1910,10 +2012,14 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   expect(mobilePolishProof.gridColumns.objectiveFacts).toBeGreaterThanOrEqual(2);
   expect(mobilePolishProof.gridColumns.packetFacts).toBeGreaterThanOrEqual(2);
   expect(mobilePolishProof.gridColumns.partyFacts).toBeGreaterThanOrEqual(2);
+  expect(mobilePolishProof.surfaces.inspectorDrawer.width).toBeGreaterThan(0);
+  expect(mobilePolishProof.surfaces.inspectorChrome.width).toBeGreaterThan(0);
   expect(mobilePolishProof.surfaces.objectiveStrip.width).toBeGreaterThan(0);
-  expect(mobilePolishProof.surfaces.threeHost.height).toBeLessThanOrEqual(220);
-  expect(mobilePolishProof.surfaces.eventPacketChips.width).toBeGreaterThan(0);
-  expect(mobilePolishProof.surfaces.partyRoster.width).toBeGreaterThan(0);
+  expect(mobilePolishProof.surfaces.threeHost.height).toBeGreaterThanOrEqual(560);
+  expect(mobilePolishProof.surfaces.mapVisualHud.width).toBeGreaterThan(0);
+  expect(mobilePolishProof.surfaces.mapSelectedSummary.width).toBeGreaterThan(0);
+  expect(mobilePolishProof.surfaces.eventPacketChips).not.toBeNull();
+  expect(mobilePolishProof.surfaces.partyRoster).not.toBeNull();
   expect(mobilePolishProof.buttons.packetButtons).toBe(0);
   expect(mobilePolishProof.buttons.partyButtons).toBe(0);
   expect(mobilePolishProof.buttons.scoutButtons).toBe(0);
@@ -1931,6 +2037,28 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   expect(scoutDomProof.objectiveStrip.text).toContain('Review the latest packet');
   expect(scoutDomProof.objectiveStrip.text).toContain('zero executable actions');
   expect(scoutDomProof.objectiveStrip.boundaryText).toContain('No new server objectives');
+  expect(scoutDomProof.inspectorDrawer.visible).toBe(true);
+  expect(scoutDomProof.inspectorDrawer.drawerKind).toBe('visual-inspector');
+  expect(scoutDomProof.inspectorDrawer.readOnly).toBe('true');
+  expect(scoutDomProof.inspectorDrawer.actions).toBe(0);
+  expect(scoutDomProof.inspectorDrawer.chromeText).toContain('Visual inspector');
+  expect(scoutDomProof.inspectorDrawer.chipsText).toContain('read-only');
+  expect(scoutDomProof.inspectorDrawer.containsStatus).toBe(true);
+  expect(scoutDomProof.inspectorDrawer.containsObjective).toBe(true);
+  expect(scoutDomProof.inspectorDrawer.containsSelectedSector).toBe(true);
+  expect(scoutDomProof.inspectorDrawer.containsEventPacket).toBe(true);
+  expect(scoutDomProof.inspectorDrawer.containsSectorLedger).toBe(true);
+  expect(scoutDomProof.inspectorDrawer.selectedDetailsCollapsed).toBe(true);
+  expect(scoutDomProof.inspectorDrawer.ledgerCollapsed).toBe(true);
+  expect(scoutDomProof.inspectorDrawer.ledgerActions).toBe(0);
+  expect(scoutDomProof.inspectorDrawer.boardBeforeDrawer).toBe(true);
+  expect(scoutDomProof.mapFirstHud.visible).toBe(true);
+  expect(scoutDomProof.mapFirstHud.selectedCellId).toBe('cell_q0_r1');
+  expect(scoutDomProof.mapFirstHud.fogState).toBe('known');
+  expect(scoutDomProof.mapFirstHud.scoutable).toBe('false');
+  expect(scoutDomProof.mapFirstHud.selectedSummaryText).toContain('packet filed');
+  expect(scoutDomProof.mapFirstHud.receiptTraceText).toContain('scout scout_sector_ui_001');
+  expect(scoutDomProof.mapFirstHud.partyBadgesText).toContain('MT');
   fs.writeFileSync('reports/agent-town-hq12c-scout-sector-ui-proof-2026-05-31.json', JSON.stringify({
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -2214,6 +2342,116 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
         domProof.selectedSector.text,
         domProof.hiddenSummaryText,
         ...domProof.sectorCards.map((entry) => entry.text),
+        ...scoutDomProof.partyBlocks.map((block) => block.text),
+      ].join(' ')),
+      mobileHorizontalOverflow: mobilePolishProof.clipped.length,
+    },
+  }, null, 2));
+  fs.writeFileSync('reports/agent-town-hq14d-map-first-ui-playability-slice-proof-2026-06-01.json', JSON.stringify({
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    source: 'FP-E2E-022 mocked server-owned Expedition Map, Scout Sector receipt, Event Packet, and Expedition Party read models; HQ14D verifies map-first UI affordances only',
+    changeScope: [
+      'public/experiences/founders-plot/founders-plot.js',
+      'public/experiences/founders-plot/founders-plot.css',
+      'e2e/200_founders_plot.spec.js',
+    ],
+    initialMapFirstHud: domProof.mapFirstHud,
+    postScoutMapFirstHud: scoutDomProof.mapFirstHud,
+    mobileFit: mobilePolishProof,
+    screenshots: [
+      'reports/agent-town-hq14d-map-first-ui-playability-slice-desktop-2026-06-01.png',
+      'reports/agent-town-hq14d-map-first-ui-playability-slice-mobile-2026-06-01.png',
+    ],
+    guardrails: {
+      frontendOnly: true,
+      serverAuthorityUnchanged: true,
+      mapFirstHudVisible: domProof.mapFirstHud.visible && scoutDomProof.mapFirstHud.visible,
+      fogPips: domProof.mapFirstHud.fogPipCount,
+      selectedHintedNoHiddenTruth: !/wood \+2|food \+1|owned outpost: plot_hq12b_forest_outpost|receipt scout_sector_ui_001/i.test(domProof.mapFirstHud.selectedSummaryText),
+      receiptTraceHiddenProvenanceSealed: /Provenance sealed/i.test(domProof.mapFirstHud.receiptTraceText),
+      postScoutReceiptTraceFromServerReceipt: /scout scout_sector_ui_001/i.test(scoutDomProof.mapFirstHud.receiptTraceText),
+      partyBadgesFromReadModel: /MT/.test(domProof.mapFirstHud.partyBadgesText) && /HQ civic operator/i.test(domProof.mapFirstHud.partyBadgesText),
+      scoutSectorOnlyMutationPathBeforeReveal: domProof.mutationButtons.every((entry) => String(entry.testid || '').startsWith('fp-btn-scout-sector-') && entry.cellId === 'cell_q0_r1'),
+      scoutSectorOnlyMutationPathAfterReveal: scoutDomProof.scoutButtons.length === 0,
+      mapControlsNonMutating: domProof.mapControlButtons.length,
+      eventPacketButtons: scoutDomProof.eventPacketMutationButtons.length,
+      partyActions: hq12gPartyActions,
+      objectiveActions: scoutDomProof.objectiveStrip.actions,
+      objectiveButtons: scoutDomProof.objectiveStrip.buttons,
+      executableActions: hq12fEventPacket.executableActions,
+      routeCreation: hq12fEventPacket.boundaryFlags.routeCreation,
+      tradeRouteCreation: hq12fEventPacket.boundaryFlags.tradeRouteCreation,
+      resourceHarvesting: hq12fEventPacket.boundaryFlags.resourceHarvesting,
+      resourceDelta: hq12fEventPacket.boundaryFlags.resourceDelta,
+      combat: hq12fEventPacket.boundaryFlags.combat,
+      backgroundScheduling: hq12fEventPacket.boundaryFlags.backgroundScheduling,
+      publicSharing: hq12fEventPacket.boundaryFlags.publicSharing,
+      generatedUniverseRendering: hq12fEventPacket.boundaryFlags.generatedUniverseRendering,
+      atlasExecution: hq12fEventPacket.boundaryFlags.atlasExecution,
+      crossPlotMutation: hq12fEventPacket.boundaryFlags.crossPlotMutation,
+      externalEffects: hq12fEventPacket.boundaryFlags.externalEffects,
+      wildWestGenreDrift: hq12gForbiddenGenre.test([
+        domProof.mapFirstHud.selectedSummaryText,
+        domProof.hiddenSummaryText,
+        ...domProof.sectorCards.map((entry) => entry.text),
+        ...scoutDomProof.partyBlocks.map((block) => block.text),
+      ].join(' ')),
+      mobileHorizontalOverflow: mobilePolishProof.clipped.length,
+    },
+  }, null, 2));
+  fs.writeFileSync('reports/agent-town-hq14g-visual-inspector-drawer-proof-2026-06-01.json', JSON.stringify({
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    source: 'FP-E2E-022 mocked server-owned Expedition Map, Scout Sector receipt, Event Packet, and Expedition Party read models; HQ14G verifies the map-first visual inspector drawer',
+    changeScope: [
+      'public/experiences/founders-plot/founders-plot.js',
+      'public/experiences/founders-plot/founders-plot.css',
+      'e2e/200_founders_plot.spec.js',
+    ],
+    selectedCellId: 'cell_q0_r1',
+    eventPacketId: hq12fEventPacket.packetId,
+    inspectorDrawer: scoutDomProof.inspectorDrawer,
+    mobileFit: mobilePolishProof,
+    screenshots: [
+      'reports/agent-town-hq14g-visual-inspector-drawer-desktop-2026-06-01.png',
+      'reports/agent-town-hq14g-visual-inspector-drawer-mobile-2026-06-01.png',
+    ],
+    guardrails: {
+      frontendOnly: true,
+      serverAuthorityUnchanged: true,
+      drawerReadOnly: scoutDomProof.inspectorDrawer.readOnly === 'true' && scoutDomProof.inspectorDrawer.actions === 0,
+      drawerContainsExistingReadModels: [
+        scoutDomProof.inspectorDrawer.containsStatus,
+        scoutDomProof.inspectorDrawer.containsObjective,
+        scoutDomProof.inspectorDrawer.containsSelectedSector,
+        scoutDomProof.inspectorDrawer.containsEventPacket,
+        scoutDomProof.inspectorDrawer.containsSectorLedger,
+      ].every(Boolean),
+      boardBeforeDrawer: scoutDomProof.inspectorDrawer.boardBeforeDrawer,
+      selectedDetailsCollapsed: scoutDomProof.inspectorDrawer.selectedDetailsCollapsed,
+      legacySectorLedgerCollapsed: scoutDomProof.inspectorDrawer.ledgerCollapsed,
+      scoutSectorOnlyMutationPathAfterReveal: scoutDomProof.scoutButtons.length === 0,
+      eventPacketButtons: scoutDomProof.eventPacketMutationButtons.length,
+      partyActions: hq12gPartyActions,
+      objectiveActions: scoutDomProof.objectiveStrip.actions,
+      objectiveButtons: scoutDomProof.objectiveStrip.buttons,
+      executableActions: hq12fEventPacket.executableActions,
+      routeCreation: hq12fEventPacket.boundaryFlags.routeCreation,
+      tradeRouteCreation: hq12fEventPacket.boundaryFlags.tradeRouteCreation,
+      resourceHarvesting: hq12fEventPacket.boundaryFlags.resourceHarvesting,
+      resourceDelta: hq12fEventPacket.boundaryFlags.resourceDelta,
+      combat: hq12fEventPacket.boundaryFlags.combat,
+      backgroundScheduling: hq12fEventPacket.boundaryFlags.backgroundScheduling,
+      publicSharing: hq12fEventPacket.boundaryFlags.publicSharing,
+      generatedUniverseRendering: hq12fEventPacket.boundaryFlags.generatedUniverseRendering,
+      atlasExecution: hq12fEventPacket.boundaryFlags.atlasExecution,
+      crossPlotMutation: hq12fEventPacket.boundaryFlags.crossPlotMutation,
+      externalEffects: hq12fEventPacket.boundaryFlags.externalEffects,
+      wildWestGenreDrift: hq12gForbiddenGenre.test([
+        scoutDomProof.inspectorDrawer.chromeText,
+        scoutDomProof.mapFirstHud.selectedSummaryText,
+        scoutDomProof.eventPacketHeaderText,
         ...scoutDomProof.partyBlocks.map((block) => block.text),
       ].join(' ')),
       mobileHorizontalOverflow: mobilePolishProof.clipped.length,

@@ -1,0 +1,34 @@
+{
+  "ok": true,
+  "url": "http://localhost:4173/experiences/founders-plot/",
+  "title": "Founders Plot — Agent Town",
+  "foundFpRoot": true,
+  "foundOldTownHub": false,
+  "documentScrollWidth": 390,
+  "viewport": 390,
+  "expeditionPanel": {
+    "top": 280,
+    "left": 12,
+    "width": 366,
+    "height": 756
+  },
+  "expeditionCanvas": {
+    "top": 282,
+    "left": 14,
+    "width": 362,
+    "height": 752
+  },
+  "mapInfo": {
+    "renderer": "three.js",
+    "surface": "expedition-map",
+    "visualShell": "hq14e_region_faithful_runtime_asset_atlas_v1",
+    "canvasWidth": 362,
+    "canvasHeight": 752,
+    "cellCount": 10,
+    "fogStates": {
+      "discovered": 1,
+      "hinted": 1,
+      "locked_unknown": 8
+    }
+  }
+}

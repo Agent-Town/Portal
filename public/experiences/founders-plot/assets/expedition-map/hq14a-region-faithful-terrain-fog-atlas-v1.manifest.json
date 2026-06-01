@@ -1,0 +1,54 @@
+{
+  "id": "hq14a_region_faithful_terrain_fog_atlas_v1",
+  "kind": "agenttown.expedition_map.runtime_region_asset_pack",
+  "source": {
+    "reviewAtlas": "reports/media/agent-town-hq14a-region-faithful-terrain-fog-atlas-2026-06-01/agent-town-hq14a-region-faithful-terrain-fog-atlas-1024-review.png",
+    "model": "gpt-image-2",
+    "runtimeAtlas": "public/experiences/founders-plot/assets/expedition-map/hq14a-region-faithful-terrain-fog-atlas-v1.png"
+  },
+  "authority": {
+    "presentationOnly": true,
+    "serverOwnedRegionTruthRequired": true,
+    "scoutSectorOnlyMutationPath": true,
+    "noAtlasExecution": true,
+    "noHiddenTruthLeakage": true
+  },
+  "tiles": [
+    {
+      "slot": "discovered_settled",
+      "file": "tiles/discovered-settled-v1.png",
+      "allowedFogStates": ["discovered", "known"],
+      "requiresPublicTerrain": ["settled", "outpost", "home"]
+    },
+    {
+      "slot": "known_woodland",
+      "file": "tiles/known-woodland-v1.png",
+      "allowedFogStates": ["discovered", "known"],
+      "requiresPublicTerrain": ["forest", "wood"]
+    },
+    {
+      "slot": "known_ridge_ruin",
+      "file": "tiles/known-ridge-ruin-v1.png",
+      "allowedFogStates": ["discovered", "known"],
+      "requiresPublicTerrain": ["ridge", "quarry", "stone", "ruin", "signal"]
+    },
+    {
+      "slot": "known_water_edge",
+      "file": "tiles/known-water-edge-v1.png",
+      "allowedFogStates": ["discovered", "known"],
+      "requiresPublicTerrain": ["water", "river"]
+    },
+    {
+      "slot": "hinted_frontier_fog",
+      "file": "tiles/hinted-frontier-fog-v1.png",
+      "allowedFogStates": ["hinted"],
+      "requiresPublicTerrain": []
+    },
+    {
+      "slot": "locked_unknown_fog",
+      "file": "tiles/locked-unknown-fog-v1.png",
+      "allowedFogStates": ["locked_unknown"],
+      "requiresPublicTerrain": []
+    }
+  ]
+}

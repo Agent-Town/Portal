@@ -709,12 +709,233 @@ html, body {
 
 .fp-expedition-map-body {
   gap: 10px;
+  container-type: inline-size;
+}
+
+.fp-expedition-map-runtime {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  align-items: stretch;
+  min-height: 0;
+  overflow: visible;
+  padding: 8px;
+  border: 1px solid rgba(101, 74, 28, 0.26);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(27, 106, 100, 0.18), rgba(245, 212, 132, 0.12)),
+    rgba(255, 248, 232, 0.34);
+  box-shadow: 0 18px 42px rgba(46, 27, 14, 0.16);
+}
+
+.fp-expedition-map-hud {
+  position: relative;
+  z-index: 4;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  display: flex;
+  width: auto;
+  min-width: 0;
+  max-height: none;
+  flex-direction: column;
+  gap: 8px;
+  overflow: visible;
+  overscroll-behavior: contain;
+  padding: 0 0 8px;
+  scrollbar-width: thin;
+}
+
+.fp-expedition-inspector-drawer {
+  border: 1px solid rgba(27, 106, 100, 0.24);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 248, 232, 0.92), rgba(232, 213, 168, 0.78)),
+    repeating-linear-gradient(90deg, rgba(46, 27, 14, 0.03) 0 1px, transparent 1px 18px);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 248, 232, 0.42),
+    0 14px 30px rgba(46, 27, 14, 0.14);
+}
+
+.fp-expedition-inspector-drawer__chrome {
+  position: sticky;
+  z-index: 5;
+  top: 0;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border-bottom: 1px solid rgba(101, 74, 28, 0.20);
+  border-radius: 8px 8px 0 0;
+  background:
+    linear-gradient(135deg, rgba(223, 245, 241, 0.94), rgba(255, 228, 160, 0.34)),
+    rgba(255, 248, 232, 0.96);
+  box-shadow: 0 10px 20px rgba(46, 27, 14, 0.10);
+  backdrop-filter: blur(10px);
+}
+
+.fp-expedition-inspector-drawer__chrome > small,
+.fp-expedition-inspector-drawer__chrome > span {
+  color: #5b4831;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+
+.fp-expedition-inspector-drawer__chrome > strong {
+  color: #173f39;
+  font-family: Wellfleet, Georgia, serif;
+  font-size: 15px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.fp-expedition-inspector-drawer__chips {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.fp-expedition-inspector-drawer__chips i {
+  max-width: 100%;
+  padding: 3px 7px;
+  border: 1px solid rgba(27, 106, 100, 0.20);
+  border-radius: 999px;
+  background: rgba(255, 248, 232, 0.70);
+  color: #2c2118;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.fp-expedition-inspector-section {
+  margin: 0 8px;
+  border: 1px solid rgba(101, 74, 28, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 248, 232, 0.52);
+}
+
+.fp-expedition-inspector-section > summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 9px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.fp-expedition-inspector-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.fp-expedition-inspector-section > summary::after {
+  content: "+";
+  display: grid;
+  width: 22px;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid rgba(27, 106, 100, 0.22);
+  border-radius: 999px;
+  background: rgba(223, 245, 241, 0.76);
+  color: #104540;
+  font-family: Wellfleet, Georgia, serif;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.fp-expedition-inspector-section[open] > summary::after {
+  content: "-";
+}
+
+.fp-expedition-inspector-section > summary strong {
+  color: #173f39;
+  font-family: Wellfleet, Georgia, serif;
+  font-size: 13px;
+  line-height: 1.15;
+}
+
+.fp-expedition-inspector-section > summary small {
+  color: #5b4831;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.15;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.fp-expedition-inspector-section > .fp-expedition-sector-list {
+  grid-template-columns: 1fr;
+  max-height: 390px;
+  overflow: auto;
+  padding: 0 8px 8px;
+}
+
+.fp-expedition-inspector-section__body {
+  display: grid;
+  gap: 8px;
+  padding: 0 8px 8px;
+}
+
+@container (min-width: 760px) {
+  .fp-expedition-map-runtime {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
+    min-height: clamp(540px, 58vw, 780px);
+  }
+
+  .fp-expedition-map-hud {
+    position: sticky;
+    top: 8px;
+    max-height: clamp(540px, 58vw, 780px);
+    overflow: auto;
+  }
+}
+
+.fp-expedition-map-hud .fp-expedition-map-card,
+.fp-expedition-map-hud .fp-expedition-sector-card,
+.fp-expedition-map-hud .fp-expedition-event-packet,
+.fp-expedition-map-hud .fp-expedition-party,
+.fp-expedition-map-hud .fp-expedition-objective-strip {
+  border-left-width: 3px;
+  background:
+    repeating-linear-gradient(0deg, rgba(46, 27, 14, 0.026) 0 1px, transparent 1px 15px),
+    rgba(255, 248, 232, 0.82);
+  box-shadow: 0 12px 26px rgba(46, 27, 14, 0.14);
+  backdrop-filter: blur(10px);
+}
+
+.fp-expedition-map-hud .fp-expedition-map-card p,
+.fp-expedition-map-hud .fp-expedition-sector-card p,
+.fp-expedition-map-hud .fp-expedition-event-packet p,
+.fp-expedition-map-hud .fp-expedition-party p,
+.fp-expedition-map-hud .fp-expedition-map-card > small,
+.fp-expedition-map-hud .fp-expedition-sector-card > small,
+.fp-expedition-map-hud .fp-expedition-event-packet > small,
+.fp-expedition-map-hud .fp-expedition-party > small {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.fp-expedition-map-hud .fp-expedition-map-metrics,
+.fp-expedition-map-hud .fp-expedition-objective-strip__facts,
+.fp-expedition-map-hud .fp-expedition-event-packet-facts,
+.fp-expedition-map-hud .fp-expedition-party__facts {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .fp-expedition-map-card--board {
+  position: relative;
   gap: 9px;
-  padding: 12px;
+  min-height: clamp(540px, 58vw, 780px);
+  padding: 0;
   border-color: rgba(101, 74, 28, 0.34);
+  border-left-width: 0;
   background:
     repeating-linear-gradient(0deg, rgba(46, 27, 14, 0.028) 0 1px, transparent 1px 20px),
     linear-gradient(135deg, rgba(27, 106, 100, 0.10), rgba(245, 212, 132, 0.14) 48%, rgba(255, 248, 232, 0.10)),
@@ -724,12 +945,37 @@ html, body {
     0 12px 26px rgba(46, 27, 14, 0.12);
 }
 
+.fp-expedition-map-card--board > strong,
+.fp-expedition-map-card--board > small {
+  position: absolute;
+  z-index: 3;
+  left: 12px;
+  max-width: min(440px, calc(100% - 132px));
+  border: 1px solid rgba(101, 74, 28, 0.22);
+  background: rgba(255, 248, 232, 0.82);
+  box-shadow: 0 10px 22px rgba(46, 27, 14, 0.12);
+  backdrop-filter: blur(10px);
+}
+
+.fp-expedition-map-card--board > strong {
+  top: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: #104540;
+}
+
+.fp-expedition-map-card--board > small {
+  bottom: 12px;
+  padding: 6px 9px;
+  border-radius: 7px;
+}
+
 .fp-expedition-three-host {
   position: relative;
-  height: clamp(398px, 43vw, 582px);
-  min-height: 360px;
+  height: clamp(540px, 58vw, 780px);
+  min-height: 0;
   overflow: hidden;
-  border: 1px solid rgba(101, 74, 28, 0.42);
+  border: 0;
   border-radius: 8px;
   background:
     linear-gradient(145deg, rgba(245, 212, 132, 0.22), transparent 34%),
@@ -745,6 +991,354 @@ html, body {
     0 14px 28px rgba(46, 27, 14, 0.12);
   cursor: grab;
   touch-action: none;
+}
+
+.fp-expedition-map-controls {
+  position: absolute;
+  z-index: 4;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  gap: 6px;
+}
+
+.fp-expedition-map-control-btn {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid rgba(27, 106, 100, 0.32);
+  border-radius: 7px;
+  background: rgba(255, 248, 232, 0.88);
+  box-shadow: 0 8px 18px rgba(46, 27, 14, 0.14);
+  color: #104540;
+  cursor: pointer;
+  font: 900 15px/1 Wellfleet, Georgia, serif;
+}
+
+.fp-expedition-map-control-btn:hover,
+.fp-expedition-map-control-btn:focus-visible {
+  outline: 2px solid rgba(245, 212, 132, 0.72);
+  outline-offset: 2px;
+  background: rgba(223, 245, 241, 0.94);
+}
+
+.fp-expedition-map-visual-hud {
+  position: static;
+  z-index: 4;
+  display: grid;
+  max-width: none;
+  gap: 8px;
+  padding: 0 12px 12px;
+  pointer-events: auto;
+}
+
+.fp-expedition-fog-pips {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  width: min(100%, 520px);
+}
+
+.fp-expedition-fog-pip {
+  display: grid;
+  grid-template-columns: 24px minmax(0, auto);
+  grid-template-rows: auto auto;
+  gap: 1px 5px;
+  min-width: 0;
+  align-items: center;
+  padding: 5px 6px;
+  border: 1px solid rgba(46, 27, 14, 0.18);
+  border-radius: 7px;
+  background: rgba(255, 248, 232, 0.84);
+  box-shadow: 0 9px 20px rgba(46, 27, 14, 0.12);
+  backdrop-filter: blur(8px);
+}
+
+.fp-expedition-fog-pip[data-selected="true"] {
+  border-color: rgba(27, 106, 100, 0.46);
+  box-shadow:
+    inset 0 0 0 1px rgba(27, 106, 100, 0.18),
+    0 10px 22px rgba(46, 27, 14, 0.16);
+}
+
+.fp-expedition-fog-pip i {
+  grid-row: 1 / 3;
+  display: grid;
+  width: 23px;
+  aspect-ratio: 1;
+  place-items: center;
+  clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%);
+  border: 1px solid rgba(46, 27, 14, 0.24);
+  font-family: Wellfleet, Georgia, serif;
+  font-size: 7px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.fp-expedition-fog-pip strong {
+  color: #173f39;
+  font-family: Wellfleet, Georgia, serif;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.fp-expedition-fog-pip small {
+  min-width: 0;
+  color: #5b4831;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.fp-expedition-fog-pip--discovered i {
+  background:
+    repeating-linear-gradient(60deg, rgba(255, 248, 232, 0.16) 0 2px, transparent 2px 8px),
+    linear-gradient(180deg, rgba(210, 244, 205, 0.98), rgba(117, 171, 115, 0.78));
+}
+
+.fp-expedition-fog-pip--known i {
+  background:
+    repeating-linear-gradient(60deg, rgba(255, 248, 232, 0.16) 0 2px, transparent 2px 8px),
+    linear-gradient(180deg, rgba(218, 239, 233, 0.98), rgba(111, 173, 158, 0.78));
+}
+
+.fp-expedition-fog-pip--hinted i {
+  background:
+    repeating-linear-gradient(45deg, rgba(138, 109, 65, 0.20) 0 3px, transparent 3px 7px),
+    rgba(255, 248, 232, 0.56);
+  border-style: dashed;
+}
+
+.fp-expedition-fog-pip--locked_unknown i {
+  background:
+    repeating-linear-gradient(45deg, rgba(46, 27, 14, 0.44) 0 4px, rgba(255, 248, 232, 0.10) 4px 8px),
+    rgba(50, 43, 35, 0.66);
+  color: rgba(255, 248, 232, 0.92);
+}
+
+.fp-expedition-map-selected-summary {
+  display: grid;
+  width: min(100%, 520px);
+  gap: 7px;
+  padding: 9px;
+  border: 1px solid rgba(27, 106, 100, 0.26);
+  border-left: 4px solid var(--at-teal-600);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(223, 245, 241, 0.86), rgba(255, 248, 232, 0.76)),
+    repeating-linear-gradient(0deg, rgba(46, 27, 14, 0.028) 0 1px, transparent 1px 14px);
+  box-shadow: 0 14px 28px rgba(46, 27, 14, 0.18);
+  backdrop-filter: blur(10px);
+  pointer-events: auto;
+}
+
+.fp-expedition-map-selected-summary__scout {
+  pointer-events: auto;
+}
+
+.fp-expedition-map-selected-summary--hinted {
+  border-left-color: var(--at-brass-700);
+}
+
+.fp-expedition-map-selected-summary--locked_unknown {
+  border-left-color: var(--at-rust-600);
+}
+
+.fp-expedition-map-selected-summary__head {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.fp-expedition-map-selected-summary__head > i {
+  display: grid;
+  width: 36px;
+  aspect-ratio: 1;
+  place-items: center;
+  clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%);
+  border: 1px solid rgba(27, 106, 100, 0.26);
+  background: rgba(255, 248, 232, 0.80);
+  color: #173f39;
+  font-family: Wellfleet, Georgia, serif;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.fp-expedition-map-selected-summary__head span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fp-expedition-map-selected-summary__head strong {
+  color: #173f39;
+  font-family: Wellfleet, Georgia, serif;
+  font-size: 14px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.fp-expedition-map-selected-summary__head small,
+.fp-expedition-map-selected-summary__state {
+  color: #5b4831;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+
+.fp-expedition-map-selected-summary__chips,
+.fp-expedition-receipt-trace {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.fp-expedition-map-selected-summary__chips span,
+.fp-expedition-receipt-trace span {
+  max-width: 100%;
+  padding: 3px 7px;
+  border: 1px solid rgba(101, 74, 28, 0.24);
+  border-radius: 999px;
+  background: rgba(255, 248, 232, 0.70);
+  color: #3d2c1d;
+  font-size: 10px;
+  font-weight: 850;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.fp-expedition-map-selected-summary__scout {
+  justify-self: start;
+  padding: 6px 10px;
+  font-size: 11px;
+}
+
+.fp-expedition-receipt-trace {
+  align-items: center;
+}
+
+.fp-expedition-receipt-trace > small {
+  color: #5b4831;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.fp-expedition-party-badges {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.fp-expedition-party-badges span {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px 3px 3px;
+  border: 1px solid rgba(27, 106, 100, 0.18);
+  border-radius: 999px;
+  background: rgba(223, 245, 241, 0.60);
+}
+
+.fp-expedition-party-badges i {
+  display: grid;
+  width: 24px;
+  aspect-ratio: 1;
+  place-items: center;
+  border-radius: 999px;
+  background: #1b6a64;
+  color: #fff8e8;
+  font-family: Wellfleet, Georgia, serif;
+  font-size: 9px;
+  font-style: normal;
+  line-height: 1;
+}
+
+.fp-expedition-party-badges small {
+  max-width: 112px;
+  color: #4d3b25;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.fp-expedition-audit-details {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.fp-expedition-audit-details summary {
+  cursor: pointer;
+  color: #5b4831;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+@media (max-width: 900px) {
+  .fp-expedition-map-runtime {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+    overflow: visible;
+  }
+  .fp-expedition-map-hud {
+    position: static;
+    width: auto;
+    min-width: 0;
+    max-height: none;
+    padding: 8px;
+    overflow: visible;
+  }
+  .fp-expedition-map-card--board {
+    min-height: 0;
+  }
+  .fp-expedition-three-host {
+    height: clamp(320px, 62vw, 440px);
+    min-height: 0;
+  }
+  .fp-expedition-map-card--board > strong,
+  .fp-expedition-map-card--board > small {
+    max-width: calc(100% - 24px);
+  }
+  .fp-expedition-map-card--board > strong {
+    max-width: calc(100% - 116px);
+  }
+  .fp-expedition-map-card--board > small {
+    position: static;
+    margin: 0 8px;
+  }
+  .fp-expedition-map-controls {
+    right: 12px;
+  }
+  .fp-expedition-map-visual-hud {
+    position: static;
+    max-width: none;
+    padding: 0 8px 8px;
+  }
+  .fp-expedition-fog-pips,
+  .fp-expedition-map-selected-summary {
+    width: 100%;
+  }
 }
 
 .fp-expedition-three-host::after {
@@ -772,9 +1366,9 @@ html, body {
 .fp-expedition-semantic-zoom {
   position: absolute;
   z-index: 3;
-  top: 12px;
+  top: 54px;
   left: 12px;
-  right: 12px;
+  right: 54px;
   display: grid;
   grid-template-columns: minmax(108px, auto) minmax(0, 1fr);
   gap: 4px 10px;
@@ -1251,9 +1845,33 @@ html, body {
 }
 
 .fp-expedition-sector-list {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 8px;
+}
+
+.fp-expedition-map-body--map-first > .fp-expedition-sector-list {
+  margin-top: 8px;
+  align-items: start;
+}
+
+.fp-expedition-map-body--map-first > .fp-expedition-sector-list .fp-expedition-sector-card {
+  min-height: 0;
+  padding: 10px;
+}
+
+.fp-expedition-map-body--map-first > .fp-expedition-sector-list .fp-expedition-sector-card p,
+.fp-expedition-map-body--map-first > .fp-expedition-sector-list .fp-expedition-sector-card > small {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.fp-expedition-map-body--map-first > .fp-expedition-sector-list .fp-expedition-sector-receipts,
+.fp-expedition-map-body--map-first > .fp-expedition-sector-list .fp-expedition-sector-links {
+  max-height: 78px;
+  overflow: hidden;
 }
 
 .fp-expedition-sector-card--selected {
@@ -1937,10 +2555,16 @@ html, body {
   .fp-expedition-map-body {
     gap: 8px;
   }
+  .fp-expedition-map-runtime {
+    padding: 4px;
+  }
   .fp-expedition-map-card,
   .fp-expedition-sector-card {
     gap: 5px;
     padding: 8px 9px;
+  }
+  .fp-expedition-map-card--board {
+    padding: 0;
   }
   .fp-expedition-objective-strip {
     grid-template-columns: 1fr;
@@ -2014,13 +2638,23 @@ html, body {
     min-height: 204px;
   }
   .fp-expedition-three-host {
-    height: clamp(210px, 60vw, 220px);
+    height: clamp(300px, 72vw, 360px);
     min-height: 0;
   }
+  .fp-expedition-fog-pips {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .fp-expedition-map-selected-summary {
+    gap: 6px;
+    padding: 8px;
+  }
+  .fp-expedition-party-badges small {
+    max-width: 96px;
+  }
   .fp-expedition-semantic-zoom {
-    top: 7px;
+    top: 48px;
     left: 7px;
-    right: 7px;
+    right: 50px;
     grid-template-columns: minmax(92px, auto) minmax(0, 1fr);
     gap: 3px 6px;
   }
@@ -2168,12 +2802,231 @@ html, body {
     min-height: 176px;
   }
   .fp-expedition-three-host {
-    height: 218px;
+    height: 300px;
     min-height: 0;
   }
 
   .fp-expedition-cell {
     width: 34px;
     font-size: 10px;
+  }
+}
+
+/* HQ14J: make Expedition Map the first-screen surface, with details as overlays. */
+.fp-expedition-map-panel {
+  grid-column: 1 / -1;
+  position: relative;
+  min-height: calc(100svh - 116px);
+  overflow: hidden;
+  border-color: rgba(101, 74, 28, 0.34);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 248, 232, 0.28), rgba(27, 106, 100, 0.10)),
+    rgba(255, 248, 232, 0.48);
+}
+
+.fp-expedition-map-panel > .fp-panel__head {
+  position: absolute;
+  z-index: 8;
+  top: 14px;
+  left: 14px;
+  max-width: min(320px, calc(100% - 152px));
+  padding: 8px 12px;
+  border: 1px solid rgba(101, 74, 28, 0.26);
+  border-radius: 999px;
+  background: rgba(255, 248, 232, 0.86);
+  box-shadow: 0 12px 26px rgba(46, 27, 14, 0.16);
+  backdrop-filter: blur(10px);
+}
+
+.fp-expedition-map-panel > .fp-panel__head .fp-panel__title {
+  color: #104540;
+  font-family: Wellfleet, Georgia, serif;
+  font-size: 16px;
+  line-height: 1.1;
+}
+
+.fp-expedition-map-panel > .fp-panel__body {
+  min-height: inherit;
+  padding: 0;
+}
+
+.fp-expedition-map-panel .fp-expedition-map-runtime {
+  min-height: inherit;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.fp-expedition-map-panel .fp-expedition-map-card--board {
+  min-height: calc(100svh - 116px);
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: #173f39;
+  box-shadow: none;
+}
+
+.fp-expedition-map-panel .fp-expedition-three-host {
+  height: calc(100svh - 116px);
+  min-height: 620px;
+  border-radius: 8px;
+}
+
+.fp-expedition-map-panel .fp-expedition-map-hud {
+  position: absolute;
+  z-index: 7;
+  top: 70px;
+  right: 14px;
+  bottom: 14px;
+  width: clamp(268px, 22vw, 332px);
+  max-height: none;
+  padding: 8px;
+  overflow: auto;
+  background:
+    linear-gradient(180deg, rgba(255, 248, 232, 0.84), rgba(232, 213, 168, 0.64)),
+    repeating-linear-gradient(90deg, rgba(46, 27, 14, 0.025) 0 1px, transparent 1px 18px);
+  backdrop-filter: blur(12px);
+}
+
+.fp-expedition-map-panel .fp-expedition-map-hud .fp-expedition-map-card,
+.fp-expedition-map-panel .fp-expedition-map-hud .fp-expedition-sector-card,
+.fp-expedition-map-panel .fp-expedition-map-hud .fp-expedition-event-packet,
+.fp-expedition-map-panel .fp-expedition-map-hud .fp-expedition-party,
+.fp-expedition-map-panel .fp-expedition-map-hud .fp-expedition-objective-strip {
+  box-shadow: 0 10px 22px rgba(46, 27, 14, 0.12);
+}
+
+.fp-expedition-map-panel .fp-expedition-map-card--board > strong {
+  display: none;
+}
+
+.fp-expedition-map-panel .fp-expedition-map-card--board > small {
+  right: 14px;
+  bottom: 14px;
+  left: auto;
+  max-width: min(430px, calc(100% - 450px));
+}
+
+.fp-expedition-map-panel .fp-expedition-map-visual-hud {
+  position: absolute;
+  z-index: 6;
+  bottom: 14px;
+  left: 14px;
+  width: min(560px, calc(100% - 378px));
+  max-width: 520px;
+  padding: 0;
+  pointer-events: none;
+}
+
+.fp-expedition-map-panel .fp-expedition-fog-pips,
+.fp-expedition-map-panel .fp-expedition-map-selected-summary {
+  width: 100%;
+}
+
+.fp-expedition-map-panel .fp-expedition-map-selected-summary,
+.fp-expedition-map-panel .fp-expedition-map-selected-summary__scout {
+  pointer-events: auto;
+}
+
+.fp-expedition-map-panel .fp-expedition-inspector-section > .fp-expedition-inspector-section__body {
+  max-height: 360px;
+  overflow: auto;
+}
+
+.fp-expedition-map-panel .fp-expedition-inspector-section:not([open]) > .fp-expedition-inspector-section__body {
+  display: none;
+}
+
+@container (min-width: 760px) {
+  .fp-expedition-map-panel .fp-expedition-map-runtime {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fp-expedition-map-panel .fp-expedition-map-hud {
+    position: absolute;
+    top: 70px;
+  }
+}
+
+@media (max-width: 900px) {
+  .fp-expedition-map-panel {
+    min-height: calc(100svh - 92px);
+  }
+
+  .fp-expedition-map-panel .fp-expedition-map-card--board {
+    min-height: calc(100svh - 92px);
+  }
+
+  .fp-expedition-map-panel .fp-expedition-three-host {
+    height: calc(100svh - 92px);
+    min-height: 560px;
+  }
+
+  .fp-expedition-map-panel .fp-expedition-map-hud {
+    position: absolute;
+    top: auto;
+    right: 10px;
+    bottom: 218px;
+    width: min(332px, calc(100% - 20px));
+    max-height: min(26svh, 220px);
+    padding: 7px;
+    overflow: auto;
+  }
+
+  .fp-expedition-map-panel .fp-expedition-map-card--board > small {
+    display: none;
+  }
+
+  .fp-expedition-map-panel .fp-expedition-map-visual-hud {
+    right: 10px;
+    bottom: 10px;
+    left: 10px;
+    width: auto;
+    max-width: none;
+  }
+
+  .fp-expedition-map-panel .fp-expedition-fog-pips {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .fp-expedition-map-panel > .fp-panel__head {
+    top: 10px;
+    left: 10px;
+    max-width: calc(100% - 136px);
+    padding: 7px 10px;
+  }
+
+  .fp-expedition-map-panel .fp-expedition-map-card--board > strong {
+    display: none;
+  }
+
+  .fp-expedition-map-panel .fp-expedition-map-controls {
+    top: 10px;
+    right: 10px;
+  }
+
+  .fp-expedition-map-panel .fp-expedition-semantic-zoom {
+    top: 56px;
+    right: 10px;
+    left: 10px;
+  }
+
+  .fp-expedition-map-panel .fp-expedition-map-hud {
+    top: 132px;
+    bottom: auto;
+    max-height: 54px;
+    overflow: hidden;
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 248, 232, 0.46),
+      0 14px 28px rgba(46, 27, 14, 0.18);
+  }
+
+  .fp-expedition-map-panel .fp-expedition-fog-pips {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

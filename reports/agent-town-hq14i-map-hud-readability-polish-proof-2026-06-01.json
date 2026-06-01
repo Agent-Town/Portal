@@ -1,0 +1,87 @@
+{
+  "ok": true,
+  "verdict": "PASS",
+  "date": "2026-06-01",
+  "lane": "HQ14I",
+  "scope": "Expedition Map HUD/control-cluster readability polish",
+  "changedFiles": [
+    "public/experiences/founders-plot/founders-plot.css",
+    "reports/agent-town-hq14i-map-hud-readability-polish-2026-06-01.md",
+    "reports/agent-town-hq14i-map-hud-readability-polish-proof-2026-06-01.json"
+  ],
+  "sourceChange": {
+    "type": "css-only",
+    "summary": "Reserved title width away from the top-right map controls and moved the semantic zoom HUD below the map title on desktop and mobile.",
+    "selectors": [
+      ".fp-expedition-map-card--board > strong",
+      ".fp-expedition-semantic-zoom"
+    ],
+    "noJsOrE2eEditedByHq14i": true
+  },
+  "checks": [
+    {
+      "name": "Founders Plot Expedition Map UI proof",
+      "command": "PW_PORT=4981 npx playwright test e2e/200_founders_plot.spec.js --project=chromium --grep \"FP-E2E-022\" --reporter=line",
+      "status": "passed",
+      "passed": 1,
+      "total": 1
+    },
+    {
+      "name": "Three.js Expedition Map proof",
+      "command": "PW_PORT=4982 npx playwright test e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js --project=chromium --grep \"FP-E2E-023\" --reporter=line",
+      "status": "passed",
+      "passed": 1,
+      "total": 1
+    },
+    {
+      "name": "node --check touched JS/e2e files",
+      "command": "not run",
+      "status": "not_applicable",
+      "reason": "HQ14I touched no JS or e2e files."
+    },
+    {
+      "name": "proof JSON parse",
+      "command": "jq empty reports/agent-town-hq14i-map-hud-readability-polish-proof-2026-06-01.json",
+      "status": "passed"
+    },
+    {
+      "name": "focused diff check",
+      "command": "git diff --check -- public/experiences/founders-plot/founders-plot.css reports/agent-town-hq14i-map-hud-readability-polish-2026-06-01.md reports/agent-town-hq14i-map-hud-readability-polish-proof-2026-06-01.json",
+      "status": "passed"
+    }
+  ],
+  "guardrails": {
+    "frontendOnly": true,
+    "cssOnlyProductionFix": true,
+    "serverAuthorityUnchanged": true,
+    "serverStoreRoutesToolsSchemaChanged": false,
+    "newMutationPath": false,
+    "scoutSectorOnlyMutationPath": true,
+    "eventPacketReadOnly": true,
+    "expeditionPartyReadOnly": true,
+    "objectiveCurrentFocusReadOnly": true,
+    "receiptsReadOnly": true,
+    "selectedSectorProofReadOnly": true,
+    "ledgerReadOnly": true,
+    "mapControlsPanZoomResetOnly": true,
+    "mapControlsMutateServer": false,
+    "atlasExecution": false,
+    "publicSharing": false,
+    "deploy": false,
+    "merge": false,
+    "generatedUniverseRendering": false,
+    "gameplayEconomyChanged": false,
+    "routeTradeResourceRewardCombatSchedulerChanged": false,
+    "hiddenAutonomy": false,
+    "crossPlotMutation": false,
+    "externalEffects": false,
+    "wildWestGenreDrift": false,
+    "committed": false,
+    "pushed": false
+  },
+  "screenshots": [],
+  "residualRisks": [
+    "No dedicated HQ14I screenshot was captured; focused FP-E2E-022 and FP-E2E-023 visual/runtime proofs passed after the CSS-only spacing change.",
+    "The broader HQ14 dirty worktree remains uncommitted and outside this lane."
+  ]
+}

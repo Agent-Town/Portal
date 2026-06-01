@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "generatedAt": "2026-06-01T07:37:10.048Z",
+  "generatedAt": "2026-06-01T12:35:00.811Z",
   "source": "mocked Playwright state using verified HQ12E event packet read-model shape; UI presents packets read-only after Scout Sector receipt",
   "capturedRequest": {
     "plotId": "plot_hq12b_expedition_map_ui",
@@ -92,6 +92,39 @@
     "panelVisible": true,
     "scoutReceiptVisible": false,
     "targetFogState": "known",
+    "inspectorDrawer": {
+      "visible": true,
+      "drawerKind": "visual-inspector",
+      "readOnly": "true",
+      "actions": 0,
+      "chromeText": "Visual inspectorScouted Frontier Sectorcell_q0_r1 - knownread-only4 revealed sectors1 hidden silhouetteno drawer actions",
+      "chipsText": "read-only4 revealed sectors1 hidden silhouetteno drawer actions",
+      "containsStatus": true,
+      "containsObjective": true,
+      "containsSelectedSector": true,
+      "containsEventPacket": true,
+      "containsSectorLedger": true,
+      "selectedDetailsCollapsed": true,
+      "ledgerCollapsed": true,
+      "ledgerActions": 0,
+      "boardBeforeDrawer": true,
+      "rect": {
+        "top": 224,
+        "left": 34,
+        "width": 332,
+        "height": 54
+      }
+    },
+    "mapFirstHud": {
+      "visible": true,
+      "selectedCellId": "cell_q0_r1",
+      "fogState": "known",
+      "scoutable": "false",
+      "selectedSummaryText": "SITEScouted Frontier Sectorcell_q0_r1 - knownfog knownread-only selectionpacket filedno scout actionReceipt tracederived frontier hint cellscout sector known cell - scout scout_sector_ui_001packet expedition_event_packet_hq12f_cell_q0_r1MTscoutRSmessengerVDHQ civic operator",
+      "receiptTraceText": "Receipt tracederived frontier hint cellscout sector known cell - scout scout_sector_ui_001packet expedition_event_packet_hq12f_cell_q0_r1",
+      "partyBadgesText": "MTscoutRSmessengerVDHQ civic operator",
+      "fogPipCount": 4
+    },
     "objectiveStrip": {
       "visible": true,
       "mode": "packet",
@@ -112,6 +145,12 @@
     "eventPacketFactsText": "Packetexpedition_event_packet_hq12f_cell_q0_r1Receiptreceipt scout sector - scout scout_sector_ui_001 - cell cell_q0_r1 - via scout_sector_receiptRead-onlytrueActions0",
     "eventPacketBoundaryText": "Read-only receipt metadata. No packet actions, route/trade creation, resource changes, combat, scheduler work, public sharing, Generated Universe rendering, Atlas execution, cross-plot mutation, or external effects.",
     "partyBlocks": [
+      {
+        "testid": "fp-expedition-party-badges-map-selected",
+        "actions": 0,
+        "readOnly": null,
+        "text": "MTscoutRSmessengerVDHQ civic operator"
+      },
       {
         "testid": "fp-expedition-party-selected-cell_q0_r1",
         "actions": 0,

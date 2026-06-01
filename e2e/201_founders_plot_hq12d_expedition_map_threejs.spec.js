@@ -1,9 +1,10 @@
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
 
-const PREFIX = 'reports/agent-town-hq13y-runtime-composition-prototype';
+const PREFIX = 'reports/agent-town-hq14l-continuous-terrain-underlay';
 const DESKTOP_SCREENSHOT = `${PREFIX}-desktop-2026-06-01.png`;
 const MOBILE_SCREENSHOT = `${PREFIX}-mobile-2026-06-01.png`;
+const CONTACT_SHEET = `${PREFIX}-contact-sheet-2026-06-01.png`;
 const PROOF_JSON = `${PREFIX}-proof-2026-06-01.json`;
 
 function expeditionMapFixture() {
@@ -317,31 +318,97 @@ async function selectedRulesProof(page) {
   });
 }
 
-test('FP-E2E-023 HQ13Y Expedition Map renders AgentTown runtime composition prototype without changing server-owned authority', async ({ page }) => {
+function runtimeRegionSourceProof() {
+  const source = fs.readFileSync('public/experiences/founders-plot/three_scene_entry.js', 'utf8');
+  const terrainFunction = source.match(/function drawExpeditionMiniTerrain[\s\S]*?function makeExpeditionCellTexture/)?.[0] || '';
+  const underlayFunction = source.match(/function makeExpeditionContinuousUnderlayTexture[\s\S]*?function makeExpeditionCivicBeaconTexture/)?.[0] || '';
+  const hintedBranch = terrainFunction.match(/} else if \(terrain === 'hinted'\) \{[\s\S]*?} else if \(terrain === 'locked_unknown'\)/)?.[0] || '';
+  const lockedBranch = terrainFunction.match(/} else if \(terrain === 'locked_unknown'\) \{[\s\S]*?} else \{/)?.[0] || '';
+  return {
+    lockedUnknownHasNoRuinDrawPath: !lockedBranch.includes('drawRuinCue'),
+    lockedUnknownHasNoSignalMastDrawPath: !lockedBranch.includes('drawSignalMast'),
+    hintedHasNoSignalMastDrawPath: !hintedBranch.includes('drawSignalMast'),
+    waterStrokeUsesTerrainGate: terrainFunction.includes("if (terrain === 'water')"),
+    waterTerrainUsesServerPredicate: source.includes('function isServerOwnedWaterTerrain') && source.includes('if (isServerOwnedWaterTerrain(cell)) return'),
+    noAllVisibleCellRiverStrokeGate: !terrainFunction.includes("['discovered', 'known'].includes(String(cell.fogState || ''))"),
+    runtimeAssetPackDeclared: source.includes('hq14a_region_faithful_terrain_fog_atlas_v1'),
+    runtimeAssetTilesDeclared: source.includes('EXPEDITION_REGION_TILE_ASSETS'),
+    hiddenFogAssetSlotsOnly: source.includes("'hinted_frontier_fog'") && source.includes("'locked_unknown_fog'"),
+    assetAllowedByServerTruthGuard: source.includes('function expeditionRegionTileAssetAllowed'),
+    assetLoadInvalidatesTextureCache: source.includes('onExpeditionRegionTileAssetChange') && source.includes('textureCache.clear()'),
+    continuousUnderlayDeclared: source.includes('function makeExpeditionContinuousUnderlayTexture') && source.includes('expedition_continuous_terrain_underlay'),
+    continuousUnderlayUsesFogGate: source.includes('function expeditionContinuousUnderlayStyle') && source.includes('if (!cellExposesRegionTruth(cell))'),
+    continuousUnderlayAvoidsPrivateFields: !/resourceHints|receipts|sourceIds|recommendedNext/.test(underlayFunction),
+  };
+}
+
+test('FP-E2E-023 HQ14L Expedition Map continuous terrain underlay preserves authority', async ({ page }) => {
   const fixture = expeditionMapFixture();
+  const sourceProof = runtimeRegionSourceProof();
+  expect(sourceProof.lockedUnknownHasNoRuinDrawPath).toBe(true);
+  expect(sourceProof.lockedUnknownHasNoSignalMastDrawPath).toBe(true);
+  expect(sourceProof.hintedHasNoSignalMastDrawPath).toBe(true);
+  expect(sourceProof.waterStrokeUsesTerrainGate).toBe(true);
+  expect(sourceProof.waterTerrainUsesServerPredicate).toBe(true);
+  expect(sourceProof.noAllVisibleCellRiverStrokeGate).toBe(true);
+  expect(sourceProof.runtimeAssetPackDeclared).toBe(true);
+  expect(sourceProof.runtimeAssetTilesDeclared).toBe(true);
+  expect(sourceProof.hiddenFogAssetSlotsOnly).toBe(true);
+  expect(sourceProof.assetAllowedByServerTruthGuard).toBe(true);
+  expect(sourceProof.assetLoadInvalidatesTextureCache).toBe(true);
+  expect(sourceProof.continuousUnderlayDeclared).toBe(true);
+  expect(sourceProof.continuousUnderlayUsesFogGate).toBe(true);
+  expect(sourceProof.continuousUnderlayAvoidsPrivateFields).toBe(true);
   await installRoutes(page, fixture);
 
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto('/founders-plot');
+  await page.goto('/experiences/founders-plot/');
   await expect(page.getByTestId('fp-expedition-map-panel')).toBeVisible();
+  await expect(page.getByTestId('fp-expedition-map-runtime')).toBeVisible();
+  await expect(page.getByTestId('fp-expedition-map-hud')).toBeVisible();
   await expect(page.getByTestId('fp-expedition-three-host')).toBeVisible();
   await expect(page.getByTestId('fp-expedition-three-canvas')).toBeVisible();
+  await expect(page.getByTestId('fp-expedition-map-controls')).toBeVisible();
+  await expect.poll(async () => {
+    const info = await page.evaluate(() => window.__foundersPlotTest.getExpeditionMapInfo());
+    return info?.visualLayers?.assetBackedLoadedTiles || 0;
+  }, { timeout: 8000 }).toBeGreaterThanOrEqual(5);
 
   const initialInfo = await page.evaluate(() => window.__foundersPlotTest.getExpeditionMapInfo());
   expect(initialInfo.renderer).toBe('three.js');
   expect(initialInfo.surface).toBe('expedition-map');
   expect(initialInfo.cellCount).toBe(5);
   expect(initialInfo.fogStates.locked_unknown).toBe(1);
-  expect(initialInfo.visualShell).toBe('hq13y_agenttown_runtime_composition_prototype_v1');
+  expect(initialInfo.visualShell).toBe('hq14l_continuous_terrain_underlay_v1');
   expect(initialInfo.visualLayers.terrainTexture).toBe(true);
+  expect(initialInfo.visualLayers.runtimeRegionAssetPack).toBe('hq14a_region_faithful_terrain_fog_atlas_v1');
+  expect(initialInfo.visualLayers.runtimeRegionAtlas).toContain('/experiences/founders-plot/assets/expedition-map/hq14a-region-faithful-terrain-fog-atlas-v1.png');
+  expect(initialInfo.visualLayers.assetBackedRegionTiles).toBe(5);
+  expect(initialInfo.visualLayers.assetBackedLoadedTiles).toBeGreaterThanOrEqual(5);
+  expect(initialInfo.visualLayers.assetBackedTerrainTextures).toBe(true);
+  expect(initialInfo.visualLayers.continuousTerrainUnderlay).toBe(true);
+  expect(initialInfo.visualLayers.continuousTerrainUnderlayVersion).toBe('hq14l_continuous_terrain_underlay_v1');
+  expect(initialInfo.visualLayers.continuousUnderlayUsesServerOwnedCells).toBe(true);
+  expect(initialInfo.visualLayers.continuousUnderlayHiddenCellsFogOnly).toBe(true);
+  expect(initialInfo.visualLayers.continuousUnderlayVisualOnly).toBe(true);
+  expect(initialInfo.visualLayers.plateBlendLayer).toBe(true);
+  expect(initialInfo.visualLayers.terrainUnderlayCount).toBe(1);
+  expect(initialInfo.visualLayers.proceduralFallbackWhenAssetPending).toBe(true);
   expect(initialInfo.visualLayers.candidate02Cues).toBe(true);
   expect(initialInfo.visualLayers.agentTownIdentityCues).toBe(true);
   expect(initialInfo.visualLayers.scoutLedgerHud).toBe(true);
+  expect(initialInfo.visualLayers.mapFirstHudOverlays).toBe(true);
+  expect(initialInfo.visualLayers.hoverAffordance).toBe(true);
+  expect(initialInfo.visualLayers.selectedSectorOutline).toBe(true);
   expect(initialInfo.visualLayers.beaconPlanWagonCues).toBe(true);
   expect(initialInfo.visualLayers.homeNodeEmphasis).toBe(true);
   expect(initialInfo.visualLayers.riverFlatCues).toBe(true);
+  expect(initialInfo.visualLayers.waterCuesServerGated).toBe(true);
   expect(initialInfo.visualLayers.woodlandRidgeCues).toBe(true);
   expect(initialInfo.visualLayers.ruinSignalCues).toBe(true);
+  expect(initialInfo.visualLayers.ruinSignalCuesServerGated).toBe(true);
+  expect(initialInfo.visualLayers.lockedUnknownSealedFogOnly).toBe(true);
+  expect(initialInfo.visualLayers.hintedAbstractFogEdge).toBe(true);
   expect(initialInfo.visualLayers.frontierBoundaryDashes).toBe(true);
   expect(initialInfo.visualLayers.frontierBoundaryVisualOnly).toBe(true);
   expect(initialInfo.visualLayers.clientAuthority).toBe(false);
@@ -352,6 +419,41 @@ test('FP-E2E-023 HQ13Y Expedition Map renders AgentTown runtime composition prot
   expect(initialInfo.visualLayers.surveyStrokesVisualOnly).toBe(true);
   expect(initialInfo.visualLayers.receiptTraceVisualOnly).toBe(true);
   expect(initialInfo.visualLayers.markerCount).toBe(5);
+  expect(initialInfo.regionConsistency.lockedUnknownCellsSealed).toBe(true);
+  expect(initialInfo.regionConsistency.hintedCellsAbstract).toBe(true);
+  expect(initialInfo.regionConsistency.waterCuesRequireServerOwnedWater).toBe(true);
+  expect(initialInfo.regionConsistency.hiddenCellsUseOnlyFogAssets).toBe(true);
+  expect(initialInfo.regionConsistency.knownDiscoveredAssetsMatchServerTerrain).toBe(true);
+  expect(initialInfo.regionConsistency.runtimeAssetCellsRegionTruthBound).toBe(true);
+  expect(initialInfo.regionConsistency.continuousUnderlayHiddenCellsFogOnly).toBe(true);
+  expect(initialInfo.regionConsistency.continuousUnderlayNoActionAuthority).toBe(true);
+  expect(initialInfo.regionConsistency.waterCueCells).toEqual([]);
+  expect(initialInfo.regionConsistency.ruinSignalCueCells).toEqual([]);
+  const visualsByCell = Object.fromEntries(initialInfo.regionVisuals.map((cell) => [cell.cellId, cell]));
+  expect(visualsByCell.cell_origin.terrain).toBe('settled');
+  expect(visualsByCell.cell_origin.assetSlot).toBe('discovered_settled');
+  expect(visualsByCell.cell_origin.assetAllowedByServerTruth).toBe(true);
+  expect(visualsByCell.cell_origin.waterCue).toBe(false);
+  expect(visualsByCell.cell_q1_r0.terrain).toBe('forest');
+  expect(visualsByCell.cell_q1_r0.assetSlot).toBe('known_woodland');
+  expect(visualsByCell.cell_q1_r0.assetAllowedByServerTruth).toBe(true);
+  expect(visualsByCell.cell_q1_r0.waterCue).toBe(false);
+  expect(visualsByCell['cell_q1_r-1'].terrain).toBe('settled');
+  expect(visualsByCell['cell_q1_r-1'].assetSlot).toBe('discovered_settled');
+  expect(visualsByCell['cell_q1_r-1'].assetAllowedByServerTruth).toBe(true);
+  expect(visualsByCell['cell_q1_r-1'].waterCue).toBe(false);
+  expect(visualsByCell.cell_q0_r1.terrain).toBe('hinted');
+  expect(visualsByCell.cell_q0_r1.assetSlot).toBe('hinted_frontier_fog');
+  expect(visualsByCell.cell_q0_r1.assetAllowedByServerTruth).toBe(true);
+  expect(visualsByCell.cell_q0_r1.hiddenSpecificitySuppressed).toBe(true);
+  expect(visualsByCell.cell_q0_r1.underlayTerrain).toBe('hinted');
+  expect(visualsByCell.cell_q0_r1.underlayFogOnly).toBe(true);
+  expect(visualsByCell.cell_q3_r0.terrain).toBe('locked_unknown');
+  expect(visualsByCell.cell_q3_r0.assetSlot).toBe('locked_unknown_fog');
+  expect(visualsByCell.cell_q3_r0.assetAllowedByServerTruth).toBe(true);
+  expect(visualsByCell.cell_q3_r0.hiddenSpecificitySuppressed).toBe(true);
+  expect(visualsByCell.cell_q3_r0.underlayTerrain).toBe('locked_unknown');
+  expect(visualsByCell.cell_q3_r0.underlayFogOnly).toBe(true);
   await expect(page.getByTestId('fp-expedition-zoom-tier')).toContainText('Survey view');
   await expect(page.getByTestId('fp-expedition-zoom-copy')).toContainText('Broad region silhouette');
   await expect(page.getByTestId('fp-expedition-fog-legend')).toBeVisible();
@@ -374,9 +476,57 @@ test('FP-E2E-023 HQ13Y Expedition Map renders AgentTown runtime composition prot
   expect(colorDistance(desktopCellColors.cell_origin, desktopCellColors.cell_q1_r0)).toBeGreaterThan(12);
   expect(colorDistance(desktopCellColors.cell_q1_r0, desktopCellColors.cell_q0_r1)).toBeGreaterThan(18);
   expect(colorDistance(desktopCellColors.cell_q0_r1, desktopCellColors.cell_q3_r0)).toBeGreaterThan(22);
+  const desktopLayout = await page.evaluate(() => {
+    const rectFor = (selector) => {
+      const node = document.querySelector(selector);
+      if (!node) return null;
+      const rect = node.getBoundingClientRect();
+      return {
+        top: Math.round(rect.top),
+        left: Math.round(rect.left),
+        right: Math.round(rect.right),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+      };
+    };
+    const panel = document.querySelector('[data-testid="fp-expedition-map-panel"]');
+    const host = document.querySelector('[data-testid="fp-expedition-three-host"]');
+    const hud = document.querySelector('[data-testid="fp-expedition-map-hud"]');
+    return {
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      documentScrollWidth: document.documentElement.scrollWidth,
+      bodyScrollWidth: document.body.scrollWidth,
+      panelParentClass: panel?.parentElement?.className || '',
+      panel: rectFor('[data-testid="fp-expedition-map-panel"]'),
+      host: rectFor('[data-testid="fp-expedition-three-host"]'),
+      canvas: rectFor('[data-testid="fp-expedition-three-canvas"]'),
+      hud: rectFor('[data-testid="fp-expedition-map-hud"]'),
+      selectedOverlay: rectFor('[data-testid="fp-expedition-map-visual-hud"]'),
+      mapControls: rectFor('[data-testid="fp-expedition-map-controls"]'),
+      firstScreenHostShare: host ? Number((host.getBoundingClientRect().height / window.innerHeight).toFixed(3)) : 0,
+      hudButtonCount: hud ? hud.querySelectorAll('button').length : 0,
+      visibleScoutButtons: Array.from(document.querySelectorAll('[data-testid^="fp-btn-scout-sector-"]'))
+        .filter((node) => {
+          const rect = node.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        })
+        .map((node) => node.getAttribute('data-testid')),
+    };
+  });
+  expect(desktopLayout.panelParentClass).toContain('fp-main');
+  expect(desktopLayout.panel.width).toBeGreaterThan(1100);
+  expect(desktopLayout.host.height).toBeGreaterThanOrEqual(620);
+  expect(desktopLayout.firstScreenHostShare).toBeGreaterThan(0.68);
+  expect(desktopLayout.canvas.width).toBe(desktopLayout.host.width);
+  expect(desktopLayout.hud.width).toBeLessThan(desktopLayout.host.width * 0.38);
+  expect(desktopLayout.selectedOverlay.width).toBeGreaterThan(320);
+  expect(desktopLayout.mapControls.top - desktopLayout.host.top).toBeLessThan(24);
+  expect(desktopLayout.documentScrollWidth).toBeLessThanOrEqual(desktopLayout.viewport.width + 1);
+  expect(desktopLayout.bodyScrollWidth).toBeLessThanOrEqual(desktopLayout.viewport.width + 1);
+  expect(desktopLayout.visibleScoutButtons).toContain('fp-btn-scout-sector-map-chip-cell_q0_r1');
 
   const knownTarget = initialInfo.pickTargets.find((target) => target.cellId === 'cell_q1_r0');
-  await page.getByTestId('fp-expedition-three-canvas').click({ position: knownTarget.canvas });
+  await page.getByTestId('fp-expedition-three-canvas').click({ position: knownTarget.canvas, force: true });
   await expect(page.getByTestId('fp-expedition-selected-sector')).toHaveAttribute('data-cell-id', 'cell_q1_r0');
   await expect(page.getByTestId('fp-expedition-selected-sector')).toContainText('Forest Ridge Survey Site Plan');
   await expect(page.getByTestId('fp-expedition-selected-sector')).toContainText('resources wood +2, food +1');
@@ -388,7 +538,7 @@ test('FP-E2E-023 HQ13Y Expedition Map renders AgentTown runtime composition prot
 
   const hiddenTarget = (await page.evaluate(() => window.__foundersPlotTest.getExpeditionMapInfo()))
     .pickTargets.find((target) => target.cellId === 'cell_q3_r0');
-  await page.getByTestId('fp-expedition-three-canvas').click({ position: hiddenTarget.canvas });
+  await page.getByTestId('fp-expedition-three-canvas').click({ position: hiddenTarget.canvas, force: true });
   await expect(page.getByTestId('fp-expedition-selected-sector')).toHaveAttribute('data-cell-id', 'cell_q3_r0');
   await expect(page.getByTestId('fp-expedition-selected-sector')).toContainText('Locked unknown sector');
   await expect(page.getByTestId('fp-expedition-selected-rules')).toContainText('Hidden: no resources, routes, actions, or receipts are exposed.');
@@ -417,6 +567,7 @@ test('FP-E2E-023 HQ13Y Expedition Map renders AgentTown runtime composition prot
   await page.locator('#fp-drawer-toggle').evaluate((node) => { node.style.display = 'none'; });
   await page.getByTestId('fp-expedition-map-panel').screenshot({ path: DESKTOP_SCREENSHOT });
 
+  await page.mouse.move(zoomCanvasBox.x + zoomCanvasBox.width / 2, zoomCanvasBox.y + zoomCanvasBox.height / 2);
   await page.mouse.down();
   await page.mouse.move(zoomCanvasBox.x + zoomCanvasBox.width / 2 - 180, zoomCanvasBox.y + zoomCanvasBox.height / 2 + 30, { steps: 6 });
   await page.mouse.up();
@@ -488,6 +639,9 @@ test('FP-E2E-023 HQ13Y Expedition Map renders AgentTown runtime composition prot
   expect(colorDistance(mobileCellColors.cell_q0_r1, mobileCellColors.cell_q3_r0)).toBeGreaterThan(20);
   expect(mobileLayout.documentScrollWidth).toBeLessThanOrEqual(mobileLayout.viewport + 1);
   expect(mobileLayout.bodyScrollWidth).toBeLessThanOrEqual(mobileLayout.viewport + 1);
+  expect(mobileLayout.hostRect.height).toBeGreaterThanOrEqual(560);
+  expect(mobileLayout.hostRect.width).toBeGreaterThanOrEqual(330);
+  expect(mobileLayout.hostRect.width).toBeGreaterThanOrEqual(mobileLayout.viewport - 50);
   await page.locator('#fp-drawer-toggle').evaluate((node) => { node.style.display = 'none'; });
   await page.getByTestId('fp-expedition-map-panel').screenshot({ path: MOBILE_SCREENSHOT });
 
@@ -498,6 +652,9 @@ test('FP-E2E-023 HQ13Y Expedition Map renders AgentTown runtime composition prot
     projectionHash: fixture.expeditionMap.projectionHash,
     desktop: {
       initialInfo,
+      sourceProof,
+      regionConsistency: initialInfo.regionConsistency,
+      regionVisuals: initialInfo.regionVisuals,
       zoomBefore,
       zoomAfter,
       panAfter,
@@ -513,6 +670,7 @@ test('FP-E2E-023 HQ13Y Expedition Map renders AgentTown runtime composition prot
       selectedLockedCell: 'cell_q3_r0',
       visualShell: initialInfo.visualShell,
       visualLayers: initialInfo.visualLayers,
+      fullScreenLayout: desktopLayout,
     },
     mobile: {
       before: mobileBefore,
@@ -523,15 +681,30 @@ test('FP-E2E-023 HQ13Y Expedition Map renders AgentTown runtime composition prot
       layout: mobileLayout,
     },
     screenshots: [DESKTOP_SCREENSHOT, MOBILE_SCREENSHOT],
+    contactSheet: CONTACT_SHEET,
     guardrails: {
+      fullScreenThreeJsPrimaryViewport: desktopLayout.firstScreenHostShare > 0.68 && mobileLayout.hostRect.height >= 560,
+      hudOverlayDoesNotDominateDesktop: desktopLayout.hud.width < desktopLayout.host.width * 0.38,
+      selectedSectorAndScoutAffordanceMapFirst: desktopLayout.visibleScoutButtons.includes('fp-btn-scout-sector-map-chip-cell_q0_r1'),
       readOnly: fixture.expeditionMap.readOnly,
       executableActions: fixture.expeditionMap.executableActions,
       routeCreation: fixture.expeditionMap.receipt.routeCreation,
       atlasExecution: fixture.expeditionMap.receipt.atlasExecution,
       hiddenCellResourceTextSuppressed: true,
       hiddenCellReceiptLinksSuppressed: true,
+      lockedUnknownNoLandmarkOrRuinDrawPath: initialInfo.regionConsistency.lockedUnknownCellsSealed,
+      waterCuesServerGated: initialInfo.regionConsistency.waterCuesRequireServerOwnedWater,
+      currentFixtureWaterCueCells: initialInfo.regionConsistency.waterCueCells,
+      hiddenCellsUseOnlyFogAssets: initialInfo.regionConsistency.hiddenCellsUseOnlyFogAssets,
+      knownDiscoveredAssetsMatchServerTerrain: initialInfo.regionConsistency.knownDiscoveredAssetsMatchServerTerrain,
+      runtimeAssetCellsRegionTruthBound: initialInfo.regionConsistency.runtimeAssetCellsRegionTruthBound,
+      continuousUnderlayHiddenCellsFogOnly: initialInfo.regionConsistency.continuousUnderlayHiddenCellsFogOnly,
+      continuousUnderlayNoActionAuthority: initialInfo.regionConsistency.continuousUnderlayNoActionAuthority,
+      continuousUnderlayAvoidsPrivateFields: sourceProof.continuousUnderlayAvoidsPrivateFields,
+      hintedCellsUseAbstractFogEdgeTreatment: initialInfo.regionConsistency.hintedCellsAbstract,
       scoutSectorOnlyMutationPath: true,
+      sameOriginRuntimeMapAssets: initialInfo.visualLayers.runtimeRegionAtlas.startsWith('/experiences/founders-plot/assets/expedition-map/'),
     },
-    finalNote: 'HQ13Y runtime composition prototype completed with procedural same-origin AgentTown frontier-tech civic visuals only; server-owned map authority and Scout Sector-only mutation remain intact.',
+    finalNote: 'HQ14L adds a continuous terrain/fog underlay from the existing server-owned Expedition Map cells so the surface reads as one world; Scout Sector remains the only mutation path.',
   }, null, 2));
 });

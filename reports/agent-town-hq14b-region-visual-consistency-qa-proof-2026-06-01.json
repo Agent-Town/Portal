@@ -1,0 +1,208 @@
+{
+  "ok": false,
+  "date": "2026-06-01",
+  "lane": "HQ14B region-to-visual consistency QA and asset acceptance",
+  "verdict": "FAIL_RUNTIME_REGION_CONSISTENCY_BEFORE_PLAY",
+  "artifacts": {
+    "report": "reports/agent-town-hq14b-region-visual-consistency-qa-2026-06-01.md",
+    "proof": "reports/agent-town-hq14b-region-visual-consistency-qa-proof-2026-06-01.json",
+    "contactSheet": "reports/media/agent-town-hq14b-region-visual-consistency-qa-2026-06-01/contact-sheet.png"
+  },
+  "scope": {
+    "reportProofOnly": true,
+    "runtimeFilesChanged": false,
+    "serverFilesChanged": false,
+    "schemaFilesChanged": false,
+    "fixtureFilesChanged": false,
+    "runtimeAssetsPromoted": false,
+    "runtimeExpeditionMapAssetDirectoryPresent": false
+  },
+  "serverTruthBaseline": {
+    "fogStates": ["discovered", "known", "hinted", "locked_unknown"],
+    "hiddenTruthRules": {
+      "discovered": "May show server-owned home/outpost or discovered plot truth.",
+      "known": "May show server-owned scout report, site plan, settlement claim, Scout Sector receipt, public terrain/site/resource hints, and receipts.",
+      "hinted": "May show only adjacency hint/fog-edge flavor from public hint fields; no resources, routes, landmarks, or terrain specificity.",
+      "locked_unknown": "Must remain opaque fog/silhouette with no terrain, landmarks, routes, resources, or non-placeholder receipt truth."
+    },
+    "fixtureCells": [
+      {
+        "cellId": "cell_origin",
+        "fogState": "discovered",
+        "kind": "origin_plot",
+        "siteType": "home_plot",
+        "status": "OWNED_HOME",
+        "expectedVisual": "home/settled civic node",
+        "acceptanceStatus": "NEEDS_FIX_RIVER_STROKE"
+      },
+      {
+        "cellId": "cell_q1_r0",
+        "fogState": "known",
+        "kind": "planned_site",
+        "siteType": "forest_edge",
+        "resourceHints": {
+          "wood": 2,
+          "food": 1
+        },
+        "expectedVisual": "forest/wooded ridge site-plan treatment",
+        "acceptanceStatus": "PARTIAL_RIVER_STROKE_NOT_SERVER_BACKED"
+      },
+      {
+        "cellId": "cell_q1_r-1",
+        "fogState": "discovered",
+        "kind": "owned_outpost",
+        "siteType": "outpost",
+        "expectedVisual": "owned outpost civic marker",
+        "acceptanceStatus": "NEEDS_FIX_RIVER_STROKE"
+      },
+      {
+        "cellId": "cell_q0_r1",
+        "fogState": "hinted",
+        "kind": "frontier_hint",
+        "siteType": "unresolved_frontier",
+        "expectedVisual": "fog-edge hint treatment only",
+        "acceptanceStatus": "NEEDS_FIX_HINTED_MAST_LANDMARK_RISK"
+      },
+      {
+        "cellId": "cell_q3_r0",
+        "fogState": "locked_unknown",
+        "kind": "fog_placeholder",
+        "siteType": "unknown",
+        "expectedVisual": "sealed opaque fog only",
+        "acceptanceStatus": "FAIL_RUIN_CUE_LEAKS_LANDMARK_SPECIFICITY"
+      }
+    ]
+  },
+  "staticRendererPredicates": {
+    "terrainHiddenGatePresent": true,
+    "lockedUnknownRuinCuePresent": true,
+    "allDiscoveredKnownRiverStrokePresent": true,
+    "hintedSignalMastPresent": true,
+    "surveyStrokeSkipsLockedUnknown": true
+  },
+  "acceptanceMatrixSummary": {
+    "pass": [],
+    "partial": ["cell_q1_r0"],
+    "needsFix": ["cell_origin", "cell_q1_r-1", "cell_q0_r1"],
+    "fail": ["cell_q3_r0"]
+  },
+  "uiPlayabilityCriteria": {
+    "longTermGameShouldBeUiDrivenNotTextDriven": true,
+    "textAllowedForLabelsAccessibilityReceipts": true,
+    "doNotRelyOnLongParagraphsForCoreState": true,
+    "criteria": [
+      {
+        "affordance": "region/fog state",
+        "expected": "Fog and region state must read through shape, opacity, material, veil, and marker language before text.",
+        "status": "PARTIAL"
+      },
+      {
+        "affordance": "Scout Sector eligibility",
+        "expected": "Eligible hinted cells need a clear abstract scout-eligible edge glyph or pulse without implying a landmark.",
+        "status": "NEEDS_FIX"
+      },
+      {
+        "affordance": "selected cell",
+        "expected": "Selection needs obvious halo/frame/focus and a linked selected-card treatment.",
+        "status": "PASS_FOR_PROTOTYPE"
+      },
+      {
+        "affordance": "receipts",
+        "expected": "Receipt state should appear as compact stamps/traces/chips, with long audit text on demand.",
+        "status": "PARTIAL"
+      },
+      {
+        "affordance": "party context",
+        "expected": "Party context should use compact operator portraits, badges, or status chips before prose.",
+        "status": "PARTIAL"
+      },
+      {
+        "affordance": "overall screen composition",
+        "expected": "The map should feel like an attractive playable surface rather than a proof dashboard.",
+        "status": "NEEDS_PRODUCT_POLISH"
+      }
+    ]
+  },
+  "assetAcceptance": {
+    "publicRuntimeExpeditionMapAssets": [],
+    "reviewOnlyAssetsConsidered": [
+      "reports/media/agent-town-hq13k-candidate-02-gpt-image-2-review-assets-2026-06-01",
+      "reports/media/agent-town-hq13p-candidate-02-edge-cleanup-review-derivatives-2026-06-01",
+      "reports/media/agent-town-hq13q-dotted-line-repair-review-assets-2026-06-01",
+      "reports/media/agent-town-hq13r-runtime-scale-review-2026-06-01",
+      "reports/media/agent-town-hq13t-frontier-boundary-stitch-review-assets-2026-06-01"
+    ],
+    "schemaSlotsAcceptedForReviewOnly": [
+      "expedition_map.fog.hinted",
+      "expedition_map.fog.locked_unknown",
+      "expedition_map.fog.frontier_border",
+      "expedition_map.marker.known_site_plan",
+      "expedition_map.marker.hinted_unknown",
+      "expedition_map.marker.owned_outpost",
+      "expedition_map.stroke.scout_receipt_trace",
+      "hud.frame.selected_sector_card"
+    ],
+    "identityGate": {
+      "frontierTechCivicRequired": true,
+      "genericCozyCivRejected": true,
+      "fantasyRejected": true,
+      "sciFiControlPanelRejected": true,
+      "cowboySaloonGoldRushRejected": true,
+      "conquestTradeRouteFramingRejected": true
+    }
+  },
+  "implementationFixesBeforeRobinPlays": [
+    "Remove the locked_unknown drawRuinCue path and keep locked cells sealed.",
+    "Gate river/water strokes to explicit server-owned water or river terrain fields.",
+    "Replace hinted drawSignalMast with abstract fog-edge/hint treatment.",
+    "Declare visual-pack slot usage by fog state and siteType before any asset promotion.",
+    "Add proof predicates for locked_unknown no-landmark and water-cue gating.",
+    "Move toward UI-driven playability: compact visual fog, Scout Sector eligibility, selection, receipt, and party affordances should carry state before long paragraphs."
+  ],
+  "imageChecks": {
+    "sourceFilesChecked": [
+      "reports/agent-town-hq13w-style-corrected-map-view-2026-06-01.png",
+      "reports/agent-town-hq13y-runtime-composition-prototype-desktop-2026-06-01.png",
+      "reports/agent-town-hq13r-runtime-scale-review-contact-sheet-2026-06-01.png",
+      "reports/agent-town-post-hq13y-runtime-visual-qa-contact-sheet-2026-06-01.png"
+    ],
+    "contactSheet": {
+      "path": "reports/media/agent-town-hq14b-region-visual-consistency-qa-2026-06-01/contact-sheet.png",
+      "identify": "PNG 640x1112 16-bit sRGB"
+    }
+  },
+  "guardrails": {
+    "scoutSectorOnlyCurrentExpeditionMapMutationPath": true,
+    "noRuntimeAssetPromotion": true,
+    "noAtlasExecution": true,
+    "noPublicSharing": true,
+    "noGeneratedUniverseRendering": true,
+    "noHiddenAutonomy": true,
+    "noRouteTradeEconomyResourceRewardCombatSchedulerBehavior": true,
+    "noCrossPlotMutation": true,
+    "noExternalEffects": true,
+    "noRuntimeOrServerEdits": true
+  },
+  "checks": [
+    {
+      "name": "source screenshots file",
+      "command": "file reports/agent-town-hq13w-style-corrected-map-view-2026-06-01.png reports/agent-town-hq13y-runtime-composition-prototype-desktop-2026-06-01.png reports/agent-town-hq13r-runtime-scale-review-contact-sheet-2026-06-01.png reports/agent-town-post-hq13y-runtime-visual-qa-contact-sheet-2026-06-01.png",
+      "passed": true
+    },
+    {
+      "name": "source screenshots identify",
+      "command": "magick identify reports/agent-town-hq13w-style-corrected-map-view-2026-06-01.png reports/agent-town-hq13y-runtime-composition-prototype-desktop-2026-06-01.png reports/agent-town-hq13r-runtime-scale-review-contact-sheet-2026-06-01.png reports/agent-town-post-hq13y-runtime-visual-qa-contact-sheet-2026-06-01.png",
+      "passed": true
+    },
+    {
+      "name": "hq14b contact sheet identify",
+      "command": "magick identify reports/media/agent-town-hq14b-region-visual-consistency-qa-2026-06-01/contact-sheet.png",
+      "passed": true
+    },
+    {
+      "name": "static renderer predicates",
+      "command": "node static predicate scan over public/experiences/founders-plot/three_scene_entry.js",
+      "passed": true
+    }
+  ]
+}

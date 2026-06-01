@@ -1,0 +1,73 @@
+{
+  "ok": true,
+  "url": "http://localhost:4173/experiences/founders-plot/",
+  "path": "/experiences/founders-plot/",
+  "title": "Founders Plot — Agent Town",
+  "foundFpRoot": true,
+  "foundOldTownHub": false,
+  "expeditionPanel": {
+    "top": 120,
+    "left": 24,
+    "width": 1232,
+    "height": 788
+  },
+  "expeditionCanvas": {
+    "top": 122,
+    "left": 26,
+    "width": 1228,
+    "height": 784
+  },
+  "expeditionHud": {
+    "top": 192,
+    "left": 894,
+    "width": 346,
+    "height": 700
+  },
+  "mapInfo": {
+    "renderer": "three.js",
+    "surface": "expedition-map",
+    "visualShell": "hq14e_region_faithful_runtime_asset_atlas_v1",
+    "canvasWidth": 1228,
+    "canvasHeight": 784,
+    "cellCount": 10,
+    "visualLayers": {
+      "terrainTexture": true,
+      "runtimeRegionAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+      "runtimeRegionAtlas": "/experiences/founders-plot/assets/expedition-map/hq14a-region-faithful-terrain-fog-atlas-v1.png",
+      "assetBackedRegionTiles": 10,
+      "assetBackedLoadedTiles": 10,
+      "assetBackedTerrainTextures": true,
+      "proceduralFallbackWhenAssetPending": true,
+      "candidate02Cues": true,
+      "agentTownIdentityCues": true,
+      "scoutLedgerHud": true,
+      "mapFirstHudOverlays": true,
+      "hoverAffordance": true,
+      "selectedSectorOutline": true,
+      "beaconPlanWagonCues": true,
+      "homeNodeEmphasis": true,
+      "riverFlatCues": true,
+      "waterCuesServerGated": true,
+      "woodlandRidgeCues": true,
+      "ruinSignalCues": true,
+      "ruinSignalCuesServerGated": true,
+      "lockedUnknownSealedFogOnly": true,
+      "hintedAbstractFogEdge": true,
+      "frontierBoundaryDashes": true,
+      "frontierBoundaryVisualOnly": true,
+      "fogVeils": 9,
+      "edgeFogCount": 4,
+      "civicBeaconCount": 1,
+      "surveyStrokeCount": 1,
+      "surveyStrokesVisualOnly": true,
+      "receiptTraceVisualOnly": true,
+      "markerCount": 10,
+      "clientAuthority": false
+    },
+    "fogStates": {
+      "discovered": 1,
+      "hinted": 1,
+      "locked_unknown": 8
+    }
+  }
+}

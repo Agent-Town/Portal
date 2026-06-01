@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "generatedAt": "2026-06-01T07:36:59.820Z",
+  "generatedAt": "2026-06-01T12:34:49.498Z",
   "source": "mocked Playwright state carrying the HQ12A server read-model shape; UI renders only expeditionMap fields",
   "projectionHash": "hq12b-expedition-map-proof",
   "status": "FOG_READ_MODEL_READY",
@@ -18,6 +18,16 @@
   },
   "domProof": {
     "panelVisible": true,
+    "mapFirstHud": {
+      "visible": true,
+      "selectedCellId": "cell_q0_r1",
+      "fogState": "hinted",
+      "scoutable": "true",
+      "selectedSummaryText": "...Unresolved Frontier Hintcell_q0_r1 - hintedfog hintedScout Sector eligibleScout SectorProvenance sealed1 server receiptMTscoutRSmessengerVDHQ civic operator",
+      "receiptTraceText": "Provenance sealed1 server receipt",
+      "partyBadgesText": "MTscoutRSmessengerVDHQ civic operator",
+      "fogPipCount": 4
+    },
     "cells": [
       {
         "testid": "fp-expedition-cell-cell_origin",
@@ -76,7 +86,7 @@
       "fogState": "hinted",
       "cellId": "cell_q0_r1",
       "buttons": 0,
-      "text": "Unresolved Frontier Hintcell_q0_r1 - HINTED BY KNOWN FRONTIER - hintedServer-provided frontier hint. Resources and hidden gameplay truth remain unrevealed until a verified Scout Sector receipt changes this cell.VisibilityHidden: no resources, routes, or actions are exposed.Scout pathOnly Scout Sector can reveal one eligible hinted edge as known.Zoom contextSemantic zoom clarifies status only.AuthorityServer read model only; this card adds no mutation path.Scout Sector watch partyAwaiting Scout Sector receiptVale-Desk 7 and Mira Trailmark keep this sector as read-only map context from the server party manifest.OperatorMira Trailmark - scoutDeskVale-Desk 7 - HQ civic operatorAnchorcell_q0_r1Manifestexpedition_party_current_plot_v1Mira TrailmarkscoutRook SignalpostmessengerVale-Desk 7HQ civic operatorParty flavor is presentation-only: zero actions, no autonomy, no routes, no resources, no combat, no sharing, and no Atlas execution.cell cell_q0_r1fog hintedsource derived hintSelection is visual-only and cannot scout, harvest, move, route, trade, or execute Atlas actions."
+      "text": "Unresolved Frontier Hintcell_q0_r1 - HINTED BY KNOWN FRONTIER - hintedServer-provided frontier hint. Resources and hidden gameplay truth remain unrevealed until a verified Scout Sector receipt changes this cell.VisibilityHidden: no resources, routes, or actions are exposed.Scout pathOnly Scout Sector can reveal one eligible hinted edge as known.Zoom contextSemantic zoom clarifies status only.AuthorityServer read model only; this card adds no mutation path.Scout Sector watch partyAwaiting Scout Sector receiptVale-Desk 7 and Mira Trailmark keep this sector as read-only map context from the server party manifest.OperatorMira Trailmark - scoutDeskVale-Desk 7 - HQ civic operatorAnchorcell_q0_r1Manifestexpedition_party_current_plot_v1Mira TrailmarkscoutRook SignalpostmessengerVale-Desk 7HQ civic operatorParty flavor is presentation-only: zero actions, no autonomy, no routes, no resources, no combat, no sharing, and no Atlas execution.cell cell_q0_r1fog hintedsource derived hintProvenance sealed1 server receiptSelection is visual-only and cannot scout, harvest, move, route, trade, or execute Atlas actions."
     },
     "hiddenSummaryText": "Hidden frontier1 hinted silhouette and 1 locked unknown sector remain private fog.hinted cell_q0_r1locked unknown cell_q3_r0",
     "sectorCards": [
@@ -164,7 +174,25 @@
         "borderStyle": "solid"
       }
     ],
+    "mapControlButtons": [
+      {
+        "label": "Zoom in",
+        "text": "+"
+      },
+      {
+        "label": "Zoom out",
+        "text": "-"
+      },
+      {
+        "label": "Reset map view",
+        "text": "0"
+      }
+    ],
     "mutationButtons": [
+      {
+        "testid": "fp-btn-scout-sector-map-chip-cell_q0_r1",
+        "cellId": "cell_q0_r1"
+      },
       {
         "testid": "fp-btn-scout-sector-cell_q0_r1",
         "cellId": "cell_q0_r1"
@@ -176,8 +204,12 @@
     "reports/agent-town-hq12b-expedition-map-ui-mobile-2026-05-31.png"
   ],
   "guardrails": {
-    "mutationButtons": 1,
+    "mutationButtons": 2,
     "scoutSectorButtons": [
+      {
+        "testid": "fp-btn-scout-sector-map-chip-cell_q0_r1",
+        "cellId": "cell_q0_r1"
+      },
       {
         "testid": "fp-btn-scout-sector-cell_q0_r1",
         "cellId": "cell_q0_r1"

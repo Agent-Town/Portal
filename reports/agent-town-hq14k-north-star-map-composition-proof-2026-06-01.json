@@ -1,0 +1,877 @@
+{
+  "ok": true,
+  "checkedAt": "2026-06-01T12:18:02.870Z",
+  "route": "http://localhost:4173/experiences/founders-plot/",
+  "visualShell": "hq14k_north_star_region_composition_v1",
+  "runtimeRegionAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+  "desktop": {
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "screenshot": "reports/agent-town-hq14k-north-star-map-composition-desktop-2026-06-01.png",
+    "consoleErrors": [],
+    "title": "Founders Plot — Agent Town",
+    "path": "/experiences/founders-plot/",
+    "rootPresent": true,
+    "oldTownSelectorsPresent": false,
+    "bodyMentionsObsoleteTownMap": false,
+    "heading": "Expedition Map",
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "horizontalOverflow": false,
+    "rects": {
+      "panel": {
+        "x": 24,
+        "y": 120,
+        "width": 1392,
+        "height": 788,
+        "bottom": 908,
+        "right": 1416
+      },
+      "canvas": {
+        "x": 26,
+        "y": 122,
+        "width": 1388,
+        "height": 784,
+        "bottom": 906,
+        "right": 1414
+      },
+      "hud": {
+        "x": 1083,
+        "y": 192,
+        "width": 317,
+        "height": 700,
+        "bottom": 892,
+        "right": 1400
+      },
+      "visualHud": {
+        "x": 40,
+        "y": 659,
+        "width": 520,
+        "height": 233,
+        "bottom": 892,
+        "right": 560
+      },
+      "semantic": {
+        "x": 38,
+        "y": 176,
+        "width": 640,
+        "height": 63,
+        "bottom": 239,
+        "right": 678
+      },
+      "controls": {
+        "x": 1294,
+        "y": 134,
+        "width": 108,
+        "height": 32,
+        "bottom": 166,
+        "right": 1402
+      },
+      "selected": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "bottom": 0,
+        "right": 0
+      }
+    },
+    "hudOverlapsVisualHud": false,
+    "info": {
+      "renderer": "three.js",
+      "surface": "expedition-map",
+      "projectionHash": "6651d9abd42f45b2",
+      "canvasWidth": 1388,
+      "canvasHeight": 784,
+      "cellCount": 10,
+      "selectedCellId": "cell_q1_r0",
+      "hoverCellId": "",
+      "zoom": 1,
+      "visualShell": "hq14k_north_star_region_composition_v1",
+      "visualLayers": {
+        "terrainTexture": true,
+        "runtimeRegionAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+        "runtimeRegionAtlas": "/experiences/founders-plot/assets/expedition-map/hq14a-region-faithful-terrain-fog-atlas-v1.png",
+        "assetBackedRegionTiles": 10,
+        "assetBackedLoadedTiles": 10,
+        "assetBackedTerrainTextures": true,
+        "proceduralFallbackWhenAssetPending": true,
+        "candidate02Cues": true,
+        "agentTownIdentityCues": true,
+        "scoutLedgerHud": true,
+        "mapFirstHudOverlays": true,
+        "hoverAffordance": true,
+        "selectedSectorOutline": true,
+        "beaconPlanWagonCues": true,
+        "homeNodeEmphasis": true,
+        "riverFlatCues": true,
+        "waterCuesServerGated": true,
+        "woodlandRidgeCues": true,
+        "ruinSignalCues": true,
+        "ruinSignalCuesServerGated": true,
+        "lockedUnknownSealedFogOnly": true,
+        "hintedAbstractFogEdge": true,
+        "frontierBoundaryDashes": true,
+        "frontierBoundaryVisualOnly": true,
+        "fogVeils": 9,
+        "edgeFogCount": 4,
+        "civicBeaconCount": 1,
+        "surveyStrokeCount": 1,
+        "surveyStrokesVisualOnly": true,
+        "receiptTraceVisualOnly": true,
+        "markerCount": 10,
+        "clientAuthority": false
+      },
+      "regionConsistency": {
+        "waterCueCells": [],
+        "ruinSignalCueCells": [],
+        "lockedUnknownCellsSealed": true,
+        "hintedCellsAbstract": true,
+        "waterCuesRequireServerOwnedWater": true,
+        "hiddenCellsUseOnlyFogAssets": true,
+        "knownDiscoveredAssetsMatchServerTerrain": true,
+        "runtimeAssetCellsRegionTruthBound": true
+      },
+      "regionVisuals": [
+        {
+          "cellId": "cell_origin",
+          "fogState": "discovered",
+          "siteType": "home_plot",
+          "kind": "origin_plot",
+          "publicTerrainText": "home_plot origin_plot owned_home home server-owned",
+          "terrain": "settled",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "discovered_settled",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/discovered-settled-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": false
+        },
+        {
+          "cellId": "cell_q1_r0",
+          "fogState": "hinted",
+          "siteType": "unresolved_frontier",
+          "kind": "frontier_hint",
+          "publicTerrainText": "unresolved_frontier frontier_hint hinted_by_known_frontier ",
+          "terrain": "hinted",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "hinted_frontier_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/hinted-frontier-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        },
+        {
+          "cellId": "cell_q-3_r0",
+          "fogState": "locked_unknown",
+          "siteType": "unknown",
+          "kind": "fog_placeholder",
+          "publicTerrainText": "unknown fog_placeholder locked_unknown ",
+          "terrain": "locked_unknown",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "locked_unknown_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/locked-unknown-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        },
+        {
+          "cellId": "cell_q-3_r3",
+          "fogState": "locked_unknown",
+          "siteType": "unknown",
+          "kind": "fog_placeholder",
+          "publicTerrainText": "unknown fog_placeholder locked_unknown ",
+          "terrain": "locked_unknown",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "locked_unknown_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/locked-unknown-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        },
+        {
+          "cellId": "cell_q0_r-3",
+          "fogState": "locked_unknown",
+          "siteType": "unknown",
+          "kind": "fog_placeholder",
+          "publicTerrainText": "unknown fog_placeholder locked_unknown ",
+          "terrain": "locked_unknown",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "locked_unknown_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/locked-unknown-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        },
+        {
+          "cellId": "cell_q0_r3",
+          "fogState": "locked_unknown",
+          "siteType": "unknown",
+          "kind": "fog_placeholder",
+          "publicTerrainText": "unknown fog_placeholder locked_unknown ",
+          "terrain": "locked_unknown",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "locked_unknown_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/locked-unknown-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        },
+        {
+          "cellId": "cell_q3_r-3",
+          "fogState": "locked_unknown",
+          "siteType": "unknown",
+          "kind": "fog_placeholder",
+          "publicTerrainText": "unknown fog_placeholder locked_unknown ",
+          "terrain": "locked_unknown",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "locked_unknown_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/locked-unknown-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        },
+        {
+          "cellId": "cell_q3_r0",
+          "fogState": "locked_unknown",
+          "siteType": "unknown",
+          "kind": "fog_placeholder",
+          "publicTerrainText": "unknown fog_placeholder locked_unknown ",
+          "terrain": "locked_unknown",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "locked_unknown_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/locked-unknown-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        },
+        {
+          "cellId": "cell_q3_r3",
+          "fogState": "locked_unknown",
+          "siteType": "unknown",
+          "kind": "fog_placeholder",
+          "publicTerrainText": "unknown fog_placeholder locked_unknown ",
+          "terrain": "locked_unknown",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "locked_unknown_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/locked-unknown-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        },
+        {
+          "cellId": "cell_q6_r-3",
+          "fogState": "locked_unknown",
+          "siteType": "unknown",
+          "kind": "fog_placeholder",
+          "publicTerrainText": "unknown fog_placeholder locked_unknown ",
+          "terrain": "locked_unknown",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "locked_unknown_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/locked-unknown-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        }
+      ],
+      "camera": {
+        "x": 0,
+        "y": 0,
+        "zoom": 1
+      },
+      "bounds": {
+        "minX": -6.062,
+        "maxX": 6.062,
+        "minY": -4.61,
+        "maxY": 4.61
+      },
+      "fogStates": {
+        "discovered": 1,
+        "hinted": 1,
+        "locked_unknown": 8
+      },
+      "pickTargets": [
+        {
+          "cellId": "cell_origin",
+          "fogState": "discovered",
+          "terrain": "settled",
+          "status": "OWNED_HOME",
+          "title": "Founders Plot",
+          "canvas": {
+            "x": 605.0606920022689,
+            "y": 392
+          }
+        },
+        {
+          "cellId": "cell_q1_r0",
+          "fogState": "hinted",
+          "terrain": "hinted",
+          "status": "HINTED_BY_KNOWN_FRONTIER",
+          "title": "Unresolved Frontier Hint",
+          "canvas": {
+            "x": 723.6464359992437,
+            "y": 392
+          }
+        },
+        {
+          "cellId": "cell_q-3_r0",
+          "fogState": "locked_unknown",
+          "terrain": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 249.30346001134433,
+            "y": 392
+          }
+        },
+        {
+          "cellId": "cell_q-3_r3",
+          "fogState": "locked_unknown",
+          "terrain": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 427.18207600680665,
+            "y": 697.951219512195
+          }
+        },
+        {
+          "cellId": "cell_q0_r-3",
+          "fogState": "locked_unknown",
+          "terrain": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 427.18207600680665,
+            "y": 86.0487804878049
+          }
+        },
+        {
+          "cellId": "cell_q0_r3",
+          "fogState": "locked_unknown",
+          "terrain": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 782.9393079977311,
+            "y": 697.951219512195
+          }
+        },
+        {
+          "cellId": "cell_q3_r-3",
+          "fogState": "locked_unknown",
+          "terrain": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 782.9393079977311,
+            "y": 86.0487804878049
+          }
+        },
+        {
+          "cellId": "cell_q3_r0",
+          "fogState": "locked_unknown",
+          "terrain": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 960.8179239931934,
+            "y": 392
+          }
+        },
+        {
+          "cellId": "cell_q3_r3",
+          "fogState": "locked_unknown",
+          "terrain": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 1138.6965399886558,
+            "y": 697.951219512195
+          }
+        },
+        {
+          "cellId": "cell_q6_r-3",
+          "fogState": "locked_unknown",
+          "terrain": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 1138.6965399886558,
+            "y": 86.0487804878049
+          }
+        }
+      ]
+    },
+    "canvasSample": {
+      "sampledPixels": 81,
+      "opaquePixels": 81,
+      "uniqueColorSamples": 30
+    },
+    "hudText": "VISUAL INSPECTOR\nUnresolved Frontier Hint\nCELL_Q1_R0 - HINTED\nread-only\n1 revealed sector\n9 hidden silhouettes\nScout Sector eligible\nExpedition Map\nORIGIN ONLY - private read-only\n\n1 revealed sector and 9 hidden silhouettes from server-owned fog state.\n\nDISCOVERED\n1\nKNOWN\n0\nHINTED\n1\nHIDDEN\n8\nOUTPOSTS\n0\nDISC\nDiscovered 1\nOWNED PLOT OR FOUNDED OUTPOST TRUTH IS VISIBLE.\nKNOWN\nKnown 0\nREVIEWED OR SCOUTED SECTOR TRUTH IS ",
+    "selectedText": ""
+  },
+  "mobile": {
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "screenshot": "reports/agent-town-hq14k-north-star-map-composition-mobile-2026-06-01.png",
+    "consoleErrors": [],
+    "title": "Founders Plot — Agent Town",
+    "path": "/experiences/founders-plot/",
+    "rootPresent": true,
+    "oldTownSelectorsPresent": false,
+    "bodyMentionsObsoleteTownMap": false,
+    "heading": "Expedition Map",
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "horizontalOverflow": false,
+    "rects": {
+      "panel": {
+        "x": 12,
+        "y": 280,
+        "width": 366,
+        "height": 756,
+        "bottom": 1036,
+        "right": 378
+      },
+      "canvas": {
+        "x": 14,
+        "y": 282,
+        "width": 362,
+        "height": 752,
+        "bottom": 1034,
+        "right": 376
+      },
+      "hud": {
+        "x": 34,
+        "y": 414,
+        "width": 332,
+        "height": 54,
+        "bottom": 468,
+        "right": 366
+      },
+      "visualHud": {
+        "x": 24,
+        "y": 749,
+        "width": 342,
+        "height": 275,
+        "bottom": 1024,
+        "right": 366
+      },
+      "semantic": {
+        "x": 24,
+        "y": 338,
+        "width": 342,
+        "height": 62,
+        "bottom": 400,
+        "right": 366
+      },
+      "controls": {
+        "x": 258,
+        "y": 292,
+        "width": 108,
+        "height": 32,
+        "bottom": 324,
+        "right": 366
+      },
+      "selected": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "bottom": 0,
+        "right": 0
+      }
+    },
+    "hudOverlapsVisualHud": false,
+    "info": {
+      "renderer": "three.js",
+      "surface": "expedition-map",
+      "projectionHash": "cd59e0c92ce0fcaa",
+      "canvasWidth": 724,
+      "canvasHeight": 1504,
+      "cellCount": 10,
+      "selectedCellId": "cell_q1_r0",
+      "hoverCellId": "",
+      "zoom": 1,
+      "visualShell": "hq14k_north_star_region_composition_v1",
+      "visualLayers": {
+        "terrainTexture": true,
+        "runtimeRegionAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+        "runtimeRegionAtlas": "/experiences/founders-plot/assets/expedition-map/hq14a-region-faithful-terrain-fog-atlas-v1.png",
+        "assetBackedRegionTiles": 10,
+        "assetBackedLoadedTiles": 10,
+        "assetBackedTerrainTextures": true,
+        "proceduralFallbackWhenAssetPending": true,
+        "candidate02Cues": true,
+        "agentTownIdentityCues": true,
+        "scoutLedgerHud": true,
+        "mapFirstHudOverlays": true,
+        "hoverAffordance": true,
+        "selectedSectorOutline": true,
+        "beaconPlanWagonCues": true,
+        "homeNodeEmphasis": true,
+        "riverFlatCues": true,
+        "waterCuesServerGated": true,
+        "woodlandRidgeCues": true,
+        "ruinSignalCues": true,
+        "ruinSignalCuesServerGated": true,
+        "lockedUnknownSealedFogOnly": true,
+        "hintedAbstractFogEdge": true,
+        "frontierBoundaryDashes": true,
+        "frontierBoundaryVisualOnly": true,
+        "fogVeils": 9,
+        "edgeFogCount": 4,
+        "civicBeaconCount": 1,
+        "surveyStrokeCount": 1,
+        "surveyStrokesVisualOnly": true,
+        "receiptTraceVisualOnly": true,
+        "markerCount": 10,
+        "clientAuthority": false
+      },
+      "regionConsistency": {
+        "waterCueCells": [],
+        "ruinSignalCueCells": [],
+        "lockedUnknownCellsSealed": true,
+        "hintedCellsAbstract": true,
+        "waterCuesRequireServerOwnedWater": true,
+        "hiddenCellsUseOnlyFogAssets": true,
+        "knownDiscoveredAssetsMatchServerTerrain": true,
+        "runtimeAssetCellsRegionTruthBound": true
+      },
+      "regionVisuals": [
+        {
+          "cellId": "cell_origin",
+          "fogState": "discovered",
+          "siteType": "home_plot",
+          "kind": "origin_plot",
+          "publicTerrainText": "home_plot origin_plot owned_home home server-owned",
+          "terrain": "settled",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "discovered_settled",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/discovered-settled-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": false
+        },
+        {
+          "cellId": "cell_q1_r0",
+          "fogState": "hinted",
+          "siteType": "unresolved_frontier",
+          "kind": "frontier_hint",
+          "publicTerrainText": "unresolved_frontier frontier_hint hinted_by_known_frontier ",
+          "terrain": "hinted",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "hinted_frontier_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/hinted-frontier-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        },
+        {
+          "cellId": "cell_q-3_r0",
+          "fogState": "locked_unknown",
+          "siteType": "unknown",
+          "kind": "fog_placeholder",
+          "publicTerrainText": "unknown fog_placeholder locked_unknown ",
+          "terrain": "locked_unknown",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "locked_unknown_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/locked-unknown-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        },
+        {
+          "cellId": "cell_q-3_r3",
+          "fogState": "locked_unknown",
+          "siteType": "unknown",
+          "kind": "fog_placeholder",
+          "publicTerrainText": "unknown fog_placeholder locked_unknown ",
+          "terrain": "locked_unknown",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "locked_unknown_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/locked-unknown-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        },
+        {
+          "cellId": "cell_q0_r-3",
+          "fogState": "locked_unknown",
+          "siteType": "unknown",
+          "kind": "fog_placeholder",
+          "publicTerrainText": "unknown fog_placeholder locked_unknown ",
+          "terrain": "locked_unknown",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "locked_unknown_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/locked-unknown-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        },
+        {
+          "cellId": "cell_q0_r3",
+          "fogState": "locked_unknown",
+          "siteType": "unknown",
+          "kind": "fog_placeholder",
+          "publicTerrainText": "unknown fog_placeholder locked_unknown ",
+          "terrain": "locked_unknown",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "locked_unknown_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/locked-unknown-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        },
+        {
+          "cellId": "cell_q3_r-3",
+          "fogState": "locked_unknown",
+          "siteType": "unknown",
+          "kind": "fog_placeholder",
+          "publicTerrainText": "unknown fog_placeholder locked_unknown ",
+          "terrain": "locked_unknown",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "locked_unknown_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/locked-unknown-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        },
+        {
+          "cellId": "cell_q3_r0",
+          "fogState": "locked_unknown",
+          "siteType": "unknown",
+          "kind": "fog_placeholder",
+          "publicTerrainText": "unknown fog_placeholder locked_unknown ",
+          "terrain": "locked_unknown",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "locked_unknown_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/locked-unknown-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        },
+        {
+          "cellId": "cell_q3_r3",
+          "fogState": "locked_unknown",
+          "siteType": "unknown",
+          "kind": "fog_placeholder",
+          "publicTerrainText": "unknown fog_placeholder locked_unknown ",
+          "terrain": "locked_unknown",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "locked_unknown_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/locked-unknown-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        },
+        {
+          "cellId": "cell_q6_r-3",
+          "fogState": "locked_unknown",
+          "siteType": "unknown",
+          "kind": "fog_placeholder",
+          "publicTerrainText": "unknown fog_placeholder locked_unknown ",
+          "terrain": "locked_unknown",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "locked_unknown_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/locked-unknown-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        }
+      ],
+      "camera": {
+        "x": 0,
+        "y": 0,
+        "zoom": 1
+      },
+      "bounds": {
+        "minX": -6.062,
+        "maxX": 6.062,
+        "minY": -4.61,
+        "maxY": 4.61
+      },
+      "fogStates": {
+        "discovered": 1,
+        "hinted": 1,
+        "locked_unknown": 8
+      },
+      "pickTargets": [
+        {
+          "cellId": "cell_origin",
+          "fogState": "discovered",
+          "terrain": "settled",
+          "status": "OWNED_HOME",
+          "title": "Founders Plot",
+          "canvas": {
+            "x": 156.23939808481532,
+            "y": 376
+          }
+        },
+        {
+          "cellId": "cell_q1_r0",
+          "fogState": "hinted",
+          "terrain": "hinted",
+          "status": "HINTED_BY_KNOWN_FRONTIER",
+          "title": "Unresolved Frontier Hint",
+          "canvas": {
+            "x": 189.25353397172825,
+            "y": 376
+          }
+        },
+        {
+          "cellId": "cell_q-3_r0",
+          "fogState": "locked_unknown",
+          "terrain": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 57.19699042407662,
+            "y": 376
+          }
+        },
+        {
+          "cellId": "cell_q-3_r3",
+          "fogState": "locked_unknown",
+          "terrain": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 106.71819425444598,
+            "y": 461.17647058823525
+          }
+        },
+        {
+          "cellId": "cell_q0_r-3",
+          "fogState": "locked_unknown",
+          "terrain": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 106.71819425444598,
+            "y": 290.82352941176475
+          }
+        },
+        {
+          "cellId": "cell_q0_r3",
+          "fogState": "locked_unknown",
+          "terrain": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 205.76060191518468,
+            "y": 461.17647058823525
+          }
+        },
+        {
+          "cellId": "cell_q3_r-3",
+          "fogState": "locked_unknown",
+          "terrain": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 205.76060191518468,
+            "y": 290.82352941176475
+          }
+        },
+        {
+          "cellId": "cell_q3_r0",
+          "fogState": "locked_unknown",
+          "terrain": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 255.28180574555404,
+            "y": 376
+          }
+        },
+        {
+          "cellId": "cell_q3_r3",
+          "fogState": "locked_unknown",
+          "terrain": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 304.8030095759234,
+            "y": 461.17647058823525
+          }
+        },
+        {
+          "cellId": "cell_q6_r-3",
+          "fogState": "locked_unknown",
+          "terrain": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 304.8030095759234,
+            "y": 290.82352941176475
+          }
+        }
+      ]
+    },
+    "canvasSample": {
+      "sampledPixels": 81,
+      "opaquePixels": 81,
+      "uniqueColorSamples": 17
+    },
+    "hudText": "VISUAL INSPECTOR\nUnresolved Frontier Hint\nCELL_Q1_R0 - HINTED\nread-only\n1 revealed sector\n9 hidden silhouettes\nScout Sector eligible\nExpedition Map\nORIGIN ONLY - private read-only\n\n1 revealed sector and 9 hidden silhouettes from server-owned fog state.\n\nDISCOVERED\n1\nKNOWN\n0\nHINTED\n1\nHIDDEN\n8\nOUTPOSTS\n0\nDISC\nDiscovered 1\nOWNED PLOT OR FOUNDED OUTPOST TRUTH IS VISIBLE.\nKNOWN\nKnown 0\nREVIEWED OR SCOUTED SECTOR TRUTH IS ",
+    "selectedText": ""
+  },
+  "assertions": {
+    "exactRoute": true,
+    "foundersPlotRoot": true,
+    "noOldTownFallback": true,
+    "rendererThreeJs": true,
+    "visualShellHq14k": true,
+    "assetTilesLoaded": true,
+    "noHorizontalOverflow": true,
+    "canvasNonblank": true,
+    "mobileHudCompacted": true,
+    "mobileHudDoesNotOverlapSelectedContext": true
+  }
+}

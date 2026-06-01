@@ -1,0 +1,1612 @@
+{
+  "ok": true,
+  "generatedAt": "2026-06-01T09:44:10.436Z",
+  "source": "mocked Playwright state carrying server-owned HQ12A/HQ12B/HQ12C expeditionMap read-model cells only",
+  "projectionHash": "hq12d-threejs-expedition-map-proof",
+  "desktop": {
+    "initialInfo": {
+      "renderer": "three.js",
+      "surface": "expedition-map",
+      "projectionHash": "hq12d-threejs-expedition-map-proof",
+      "canvasWidth": 409,
+      "canvasHeight": 742,
+      "cellCount": 5,
+      "selectedCellId": "cell_q0_r1",
+      "hoverCellId": "",
+      "zoom": 1,
+      "visualShell": "hq14e_region_faithful_runtime_asset_atlas_v1",
+      "visualLayers": {
+        "terrainTexture": true,
+        "runtimeRegionAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+        "runtimeRegionAtlas": "/experiences/founders-plot/assets/expedition-map/hq14a-region-faithful-terrain-fog-atlas-v1.png",
+        "assetBackedRegionTiles": 5,
+        "assetBackedLoadedTiles": 5,
+        "assetBackedTerrainTextures": true,
+        "proceduralFallbackWhenAssetPending": true,
+        "candidate02Cues": true,
+        "agentTownIdentityCues": true,
+        "scoutLedgerHud": true,
+        "mapFirstHudOverlays": true,
+        "hoverAffordance": true,
+        "selectedSectorOutline": true,
+        "beaconPlanWagonCues": true,
+        "homeNodeEmphasis": true,
+        "riverFlatCues": true,
+        "waterCuesServerGated": true,
+        "woodlandRidgeCues": true,
+        "ruinSignalCues": true,
+        "ruinSignalCuesServerGated": true,
+        "lockedUnknownSealedFogOnly": true,
+        "hintedAbstractFogEdge": true,
+        "frontierBoundaryDashes": true,
+        "frontierBoundaryVisualOnly": true,
+        "fogVeils": 2,
+        "edgeFogCount": 4,
+        "civicBeaconCount": 3,
+        "surveyStrokeCount": 5,
+        "surveyStrokesVisualOnly": true,
+        "receiptTraceVisualOnly": true,
+        "markerCount": 5,
+        "clientAuthority": false
+      },
+      "regionConsistency": {
+        "waterCueCells": [],
+        "ruinSignalCueCells": [],
+        "lockedUnknownCellsSealed": true,
+        "hintedCellsAbstract": true,
+        "waterCuesRequireServerOwnedWater": true,
+        "hiddenCellsUseOnlyFogAssets": true,
+        "knownDiscoveredAssetsMatchServerTerrain": true,
+        "runtimeAssetCellsRegionTruthBound": true
+      },
+      "regionVisuals": [
+        {
+          "cellId": "cell_origin",
+          "fogState": "discovered",
+          "siteType": "home_plot",
+          "kind": "origin_plot",
+          "publicTerrainText": "home_plot origin_plot owned_home ",
+          "terrain": "settled",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "discovered_settled",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/discovered-settled-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": false
+        },
+        {
+          "cellId": "cell_q1_r0",
+          "fogState": "known",
+          "siteType": "forest_edge",
+          "kind": "planned_site",
+          "publicTerrainText": "forest_edge planned_site site_plan_reviewed wooded sheltered",
+          "terrain": "forest",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "known_woodland",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/known-woodland-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": false
+        },
+        {
+          "cellId": "cell_q1_r-1",
+          "fogState": "discovered",
+          "siteType": "outpost",
+          "kind": "owned_outpost",
+          "publicTerrainText": "outpost owned_outpost owned_outpost ",
+          "terrain": "settled",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "discovered_settled",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/discovered-settled-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": false
+        },
+        {
+          "cellId": "cell_q0_r1",
+          "fogState": "hinted",
+          "siteType": "unresolved_frontier",
+          "kind": "frontier_hint",
+          "publicTerrainText": "unresolved_frontier frontier_hint hinted_by_known_frontier ",
+          "terrain": "hinted",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "hinted_frontier_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/hinted-frontier-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        },
+        {
+          "cellId": "cell_q3_r0",
+          "fogState": "locked_unknown",
+          "siteType": "unknown",
+          "kind": "fog_placeholder",
+          "publicTerrainText": "unknown fog_placeholder locked_unknown ",
+          "terrain": "locked_unknown",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "locked_unknown_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/locked-unknown-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        }
+      ],
+      "camera": {
+        "x": 0,
+        "y": 0,
+        "zoom": 1
+      },
+      "bounds": {
+        "minX": -2.945,
+        "maxX": 2.945,
+        "minY": -1.953,
+        "maxY": 1.953
+      },
+      "fogStates": {
+        "discovered": 2,
+        "known": 1,
+        "hinted": 1,
+        "locked_unknown": 1
+      },
+      "pickTargets": [
+        {
+          "cellId": "cell_origin",
+          "fogState": "discovered",
+          "terrain": "settled",
+          "status": "OWNED_HOME",
+          "title": "Founders Plot",
+          "canvas": {
+            "x": 125.44765625000001,
+            "y": 371.1953125
+          }
+        },
+        {
+          "cellId": "cell_q1_r0",
+          "fogState": "known",
+          "terrain": "forest",
+          "status": "SITE_PLAN_REVIEWED",
+          "title": "Forest Ridge Survey Site Plan",
+          "canvas": {
+            "x": 178.35755208333333,
+            "y": 371.1953125
+          }
+        },
+        {
+          "cellId": "cell_q1_r-1",
+          "fogState": "discovered",
+          "terrain": "settled",
+          "status": "OWNED_OUTPOST",
+          "title": "Forest Ridge Outpost",
+          "canvas": {
+            "x": 151.90260416666666,
+            "y": 325.73831097505337
+          }
+        },
+        {
+          "cellId": "cell_q0_r1",
+          "fogState": "hinted",
+          "terrain": "hinted",
+          "status": "HINTED_BY_KNOWN_FRONTIER",
+          "title": "Unresolved Map Edge Hint",
+          "canvas": {
+            "x": 151.90260416666666,
+            "y": 416.65231402494663
+          }
+        },
+        {
+          "cellId": "cell_q3_r0",
+          "fogState": "locked_unknown",
+          "terrain": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 284.17734375,
+            "y": 371.1953125
+          }
+        }
+      ]
+    },
+    "sourceProof": {
+      "lockedUnknownHasNoRuinDrawPath": true,
+      "lockedUnknownHasNoSignalMastDrawPath": true,
+      "hintedHasNoSignalMastDrawPath": true,
+      "waterStrokeUsesTerrainGate": true,
+      "waterTerrainUsesServerPredicate": true,
+      "noAllVisibleCellRiverStrokeGate": true,
+      "runtimeAssetPackDeclared": true,
+      "runtimeAssetTilesDeclared": true,
+      "hiddenFogAssetSlotsOnly": true,
+      "assetAllowedByServerTruthGuard": true,
+      "assetLoadInvalidatesTextureCache": true
+    },
+    "regionConsistency": {
+      "waterCueCells": [],
+      "ruinSignalCueCells": [],
+      "lockedUnknownCellsSealed": true,
+      "hintedCellsAbstract": true,
+      "waterCuesRequireServerOwnedWater": true,
+      "hiddenCellsUseOnlyFogAssets": true,
+      "knownDiscoveredAssetsMatchServerTerrain": true,
+      "runtimeAssetCellsRegionTruthBound": true
+    },
+    "regionVisuals": [
+      {
+        "cellId": "cell_origin",
+        "fogState": "discovered",
+        "siteType": "home_plot",
+        "kind": "origin_plot",
+        "publicTerrainText": "home_plot origin_plot owned_home ",
+        "terrain": "settled",
+        "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+        "assetSlot": "discovered_settled",
+        "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/discovered-settled-v1.png",
+        "assetReady": true,
+        "assetAllowedByServerTruth": true,
+        "waterCue": false,
+        "ruinSignalCue": false,
+        "hiddenSpecificitySuppressed": false
+      },
+      {
+        "cellId": "cell_q1_r0",
+        "fogState": "known",
+        "siteType": "forest_edge",
+        "kind": "planned_site",
+        "publicTerrainText": "forest_edge planned_site site_plan_reviewed wooded sheltered",
+        "terrain": "forest",
+        "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+        "assetSlot": "known_woodland",
+        "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/known-woodland-v1.png",
+        "assetReady": true,
+        "assetAllowedByServerTruth": true,
+        "waterCue": false,
+        "ruinSignalCue": false,
+        "hiddenSpecificitySuppressed": false
+      },
+      {
+        "cellId": "cell_q1_r-1",
+        "fogState": "discovered",
+        "siteType": "outpost",
+        "kind": "owned_outpost",
+        "publicTerrainText": "outpost owned_outpost owned_outpost ",
+        "terrain": "settled",
+        "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+        "assetSlot": "discovered_settled",
+        "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/discovered-settled-v1.png",
+        "assetReady": true,
+        "assetAllowedByServerTruth": true,
+        "waterCue": false,
+        "ruinSignalCue": false,
+        "hiddenSpecificitySuppressed": false
+      },
+      {
+        "cellId": "cell_q0_r1",
+        "fogState": "hinted",
+        "siteType": "unresolved_frontier",
+        "kind": "frontier_hint",
+        "publicTerrainText": "unresolved_frontier frontier_hint hinted_by_known_frontier ",
+        "terrain": "hinted",
+        "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+        "assetSlot": "hinted_frontier_fog",
+        "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/hinted-frontier-fog-v1.png",
+        "assetReady": true,
+        "assetAllowedByServerTruth": true,
+        "waterCue": false,
+        "ruinSignalCue": false,
+        "hiddenSpecificitySuppressed": true
+      },
+      {
+        "cellId": "cell_q3_r0",
+        "fogState": "locked_unknown",
+        "siteType": "unknown",
+        "kind": "fog_placeholder",
+        "publicTerrainText": "unknown fog_placeholder locked_unknown ",
+        "terrain": "locked_unknown",
+        "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+        "assetSlot": "locked_unknown_fog",
+        "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/locked-unknown-fog-v1.png",
+        "assetReady": true,
+        "assetAllowedByServerTruth": true,
+        "waterCue": false,
+        "ruinSignalCue": false,
+        "hiddenSpecificitySuppressed": true
+      }
+    ],
+    "zoomBefore": {
+      "renderer": "three.js",
+      "surface": "expedition-map",
+      "projectionHash": "hq12d-threejs-expedition-map-proof",
+      "canvasWidth": 409,
+      "canvasHeight": 742,
+      "cellCount": 5,
+      "selectedCellId": "cell_q3_r0",
+      "hoverCellId": "",
+      "zoom": 1,
+      "visualShell": "hq14e_region_faithful_runtime_asset_atlas_v1",
+      "visualLayers": {
+        "terrainTexture": true,
+        "runtimeRegionAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+        "runtimeRegionAtlas": "/experiences/founders-plot/assets/expedition-map/hq14a-region-faithful-terrain-fog-atlas-v1.png",
+        "assetBackedRegionTiles": 5,
+        "assetBackedLoadedTiles": 5,
+        "assetBackedTerrainTextures": true,
+        "proceduralFallbackWhenAssetPending": true,
+        "candidate02Cues": true,
+        "agentTownIdentityCues": true,
+        "scoutLedgerHud": true,
+        "mapFirstHudOverlays": true,
+        "hoverAffordance": true,
+        "selectedSectorOutline": true,
+        "beaconPlanWagonCues": true,
+        "homeNodeEmphasis": true,
+        "riverFlatCues": true,
+        "waterCuesServerGated": true,
+        "woodlandRidgeCues": true,
+        "ruinSignalCues": true,
+        "ruinSignalCuesServerGated": true,
+        "lockedUnknownSealedFogOnly": true,
+        "hintedAbstractFogEdge": true,
+        "frontierBoundaryDashes": true,
+        "frontierBoundaryVisualOnly": true,
+        "fogVeils": 2,
+        "edgeFogCount": 4,
+        "civicBeaconCount": 3,
+        "surveyStrokeCount": 5,
+        "surveyStrokesVisualOnly": true,
+        "receiptTraceVisualOnly": true,
+        "markerCount": 5,
+        "clientAuthority": false
+      },
+      "regionConsistency": {
+        "waterCueCells": [],
+        "ruinSignalCueCells": [],
+        "lockedUnknownCellsSealed": true,
+        "hintedCellsAbstract": true,
+        "waterCuesRequireServerOwnedWater": true,
+        "hiddenCellsUseOnlyFogAssets": true,
+        "knownDiscoveredAssetsMatchServerTerrain": true,
+        "runtimeAssetCellsRegionTruthBound": true
+      },
+      "regionVisuals": [
+        {
+          "cellId": "cell_origin",
+          "fogState": "discovered",
+          "siteType": "home_plot",
+          "kind": "origin_plot",
+          "publicTerrainText": "home_plot origin_plot owned_home ",
+          "terrain": "settled",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "discovered_settled",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/discovered-settled-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": false
+        },
+        {
+          "cellId": "cell_q1_r0",
+          "fogState": "known",
+          "siteType": "forest_edge",
+          "kind": "planned_site",
+          "publicTerrainText": "forest_edge planned_site site_plan_reviewed wooded sheltered",
+          "terrain": "forest",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "known_woodland",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/known-woodland-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": false
+        },
+        {
+          "cellId": "cell_q1_r-1",
+          "fogState": "discovered",
+          "siteType": "outpost",
+          "kind": "owned_outpost",
+          "publicTerrainText": "outpost owned_outpost owned_outpost ",
+          "terrain": "settled",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "discovered_settled",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/discovered-settled-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": false
+        },
+        {
+          "cellId": "cell_q0_r1",
+          "fogState": "hinted",
+          "siteType": "unresolved_frontier",
+          "kind": "frontier_hint",
+          "publicTerrainText": "unresolved_frontier frontier_hint hinted_by_known_frontier ",
+          "terrain": "hinted",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "hinted_frontier_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/hinted-frontier-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        },
+        {
+          "cellId": "cell_q3_r0",
+          "fogState": "locked_unknown",
+          "siteType": "unknown",
+          "kind": "fog_placeholder",
+          "publicTerrainText": "unknown fog_placeholder locked_unknown ",
+          "terrain": "locked_unknown",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "locked_unknown_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/locked-unknown-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        }
+      ],
+      "camera": {
+        "x": 0,
+        "y": 0,
+        "zoom": 1
+      },
+      "bounds": {
+        "minX": -2.945,
+        "maxX": 2.945,
+        "minY": -1.953,
+        "maxY": 1.953
+      },
+      "fogStates": {
+        "discovered": 2,
+        "known": 1,
+        "hinted": 1,
+        "locked_unknown": 1
+      },
+      "pickTargets": [
+        {
+          "cellId": "cell_origin",
+          "fogState": "discovered",
+          "terrain": "settled",
+          "status": "OWNED_HOME",
+          "title": "Founders Plot",
+          "canvas": {
+            "x": 125.44765625000001,
+            "y": 371.1953125
+          }
+        },
+        {
+          "cellId": "cell_q1_r0",
+          "fogState": "known",
+          "terrain": "forest",
+          "status": "SITE_PLAN_REVIEWED",
+          "title": "Forest Ridge Survey Site Plan",
+          "canvas": {
+            "x": 178.35755208333333,
+            "y": 371.1953125
+          }
+        },
+        {
+          "cellId": "cell_q1_r-1",
+          "fogState": "discovered",
+          "terrain": "settled",
+          "status": "OWNED_OUTPOST",
+          "title": "Forest Ridge Outpost",
+          "canvas": {
+            "x": 151.90260416666666,
+            "y": 325.73831097505337
+          }
+        },
+        {
+          "cellId": "cell_q0_r1",
+          "fogState": "hinted",
+          "terrain": "hinted",
+          "status": "HINTED_BY_KNOWN_FRONTIER",
+          "title": "Unresolved Map Edge Hint",
+          "canvas": {
+            "x": 151.90260416666666,
+            "y": 416.65231402494663
+          }
+        },
+        {
+          "cellId": "cell_q3_r0",
+          "fogState": "locked_unknown",
+          "terrain": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 284.17734375,
+            "y": 371.1953125
+          }
+        }
+      ]
+    },
+    "zoomAfter": {
+      "renderer": "three.js",
+      "surface": "expedition-map",
+      "projectionHash": "hq12d-threejs-expedition-map-proof",
+      "canvasWidth": 409,
+      "canvasHeight": 742,
+      "cellCount": 5,
+      "selectedCellId": "cell_q3_r0",
+      "hoverCellId": "",
+      "zoom": 2.353,
+      "visualShell": "hq14e_region_faithful_runtime_asset_atlas_v1",
+      "visualLayers": {
+        "terrainTexture": true,
+        "runtimeRegionAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+        "runtimeRegionAtlas": "/experiences/founders-plot/assets/expedition-map/hq14a-region-faithful-terrain-fog-atlas-v1.png",
+        "assetBackedRegionTiles": 5,
+        "assetBackedLoadedTiles": 5,
+        "assetBackedTerrainTextures": true,
+        "proceduralFallbackWhenAssetPending": true,
+        "candidate02Cues": true,
+        "agentTownIdentityCues": true,
+        "scoutLedgerHud": true,
+        "mapFirstHudOverlays": true,
+        "hoverAffordance": true,
+        "selectedSectorOutline": true,
+        "beaconPlanWagonCues": true,
+        "homeNodeEmphasis": true,
+        "riverFlatCues": true,
+        "waterCuesServerGated": true,
+        "woodlandRidgeCues": true,
+        "ruinSignalCues": true,
+        "ruinSignalCuesServerGated": true,
+        "lockedUnknownSealedFogOnly": true,
+        "hintedAbstractFogEdge": true,
+        "frontierBoundaryDashes": true,
+        "frontierBoundaryVisualOnly": true,
+        "fogVeils": 2,
+        "edgeFogCount": 4,
+        "civicBeaconCount": 3,
+        "surveyStrokeCount": 5,
+        "surveyStrokesVisualOnly": true,
+        "receiptTraceVisualOnly": true,
+        "markerCount": 5,
+        "clientAuthority": false
+      },
+      "regionConsistency": {
+        "waterCueCells": [],
+        "ruinSignalCueCells": [],
+        "lockedUnknownCellsSealed": true,
+        "hintedCellsAbstract": true,
+        "waterCuesRequireServerOwnedWater": true,
+        "hiddenCellsUseOnlyFogAssets": true,
+        "knownDiscoveredAssetsMatchServerTerrain": true,
+        "runtimeAssetCellsRegionTruthBound": true
+      },
+      "regionVisuals": [
+        {
+          "cellId": "cell_origin",
+          "fogState": "discovered",
+          "siteType": "home_plot",
+          "kind": "origin_plot",
+          "publicTerrainText": "home_plot origin_plot owned_home ",
+          "terrain": "settled",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "discovered_settled",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/discovered-settled-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": false
+        },
+        {
+          "cellId": "cell_q1_r0",
+          "fogState": "known",
+          "siteType": "forest_edge",
+          "kind": "planned_site",
+          "publicTerrainText": "forest_edge planned_site site_plan_reviewed wooded sheltered",
+          "terrain": "forest",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "known_woodland",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/known-woodland-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": false
+        },
+        {
+          "cellId": "cell_q1_r-1",
+          "fogState": "discovered",
+          "siteType": "outpost",
+          "kind": "owned_outpost",
+          "publicTerrainText": "outpost owned_outpost owned_outpost ",
+          "terrain": "settled",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "discovered_settled",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/discovered-settled-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": false
+        },
+        {
+          "cellId": "cell_q0_r1",
+          "fogState": "hinted",
+          "siteType": "unresolved_frontier",
+          "kind": "frontier_hint",
+          "publicTerrainText": "unresolved_frontier frontier_hint hinted_by_known_frontier ",
+          "terrain": "hinted",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "hinted_frontier_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/hinted-frontier-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        },
+        {
+          "cellId": "cell_q3_r0",
+          "fogState": "locked_unknown",
+          "siteType": "unknown",
+          "kind": "fog_placeholder",
+          "publicTerrainText": "unknown fog_placeholder locked_unknown ",
+          "terrain": "locked_unknown",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "locked_unknown_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/locked-unknown-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        }
+      ],
+      "camera": {
+        "x": 0,
+        "y": 0,
+        "zoom": 2.353
+      },
+      "bounds": {
+        "minX": -2.945,
+        "maxX": 2.945,
+        "minY": -1.953,
+        "maxY": 1.953
+      },
+      "fogStates": {
+        "discovered": 2,
+        "known": 1,
+        "hinted": 1,
+        "locked_unknown": 1
+      },
+      "pickTargets": [
+        {
+          "cellId": "cell_origin",
+          "fogState": "discovered",
+          "terrain": "settled",
+          "status": "OWNED_HOME",
+          "title": "Founders Plot",
+          "canvas": {
+            "x": 18.098333638837445,
+            "y": 371.1953125
+          }
+        },
+        {
+          "cellId": "cell_q1_r0",
+          "fogState": "known",
+          "terrain": "forest",
+          "status": "SITE_PLAN_REVIEWED",
+          "title": "Forest Ridge Survey Site Plan",
+          "canvas": {
+            "x": 142.57444454627915,
+            "y": 371.1953125
+          }
+        },
+        {
+          "cellId": "cell_q1_r-1",
+          "fogState": "discovered",
+          "terrain": "settled",
+          "status": "OWNED_OUTPOST",
+          "title": "Forest Ridge Outpost",
+          "canvas": {
+            "x": 80.3363890925583,
+            "y": 264.2529215876698
+          }
+        },
+        {
+          "cellId": "cell_q0_r1",
+          "fogState": "hinted",
+          "terrain": "hinted",
+          "status": "HINTED_BY_KNOWN_FRONTIER",
+          "title": "Unresolved Map Edge Hint",
+          "canvas": {
+            "x": 80.3363890925583,
+            "y": 478.1377034123302
+          }
+        },
+        {
+          "cellId": "cell_q3_r0",
+          "fogState": "locked_unknown",
+          "terrain": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 391.52666636116254,
+            "y": 371.1953125
+          }
+        }
+      ]
+    },
+    "panAfter": {
+      "renderer": "three.js",
+      "surface": "expedition-map",
+      "projectionHash": "hq12d-threejs-expedition-map-proof",
+      "canvasWidth": 409,
+      "canvasHeight": 742,
+      "cellCount": 5,
+      "selectedCellId": "cell_q3_r0",
+      "hoverCellId": "",
+      "zoom": 2.353,
+      "visualShell": "hq14e_region_faithful_runtime_asset_atlas_v1",
+      "visualLayers": {
+        "terrainTexture": true,
+        "runtimeRegionAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+        "runtimeRegionAtlas": "/experiences/founders-plot/assets/expedition-map/hq14a-region-faithful-terrain-fog-atlas-v1.png",
+        "assetBackedRegionTiles": 5,
+        "assetBackedLoadedTiles": 5,
+        "assetBackedTerrainTextures": true,
+        "proceduralFallbackWhenAssetPending": true,
+        "candidate02Cues": true,
+        "agentTownIdentityCues": true,
+        "scoutLedgerHud": true,
+        "mapFirstHudOverlays": true,
+        "hoverAffordance": true,
+        "selectedSectorOutline": true,
+        "beaconPlanWagonCues": true,
+        "homeNodeEmphasis": true,
+        "riverFlatCues": true,
+        "waterCuesServerGated": true,
+        "woodlandRidgeCues": true,
+        "ruinSignalCues": true,
+        "ruinSignalCuesServerGated": true,
+        "lockedUnknownSealedFogOnly": true,
+        "hintedAbstractFogEdge": true,
+        "frontierBoundaryDashes": true,
+        "frontierBoundaryVisualOnly": true,
+        "fogVeils": 2,
+        "edgeFogCount": 4,
+        "civicBeaconCount": 3,
+        "surveyStrokeCount": 5,
+        "surveyStrokesVisualOnly": true,
+        "receiptTraceVisualOnly": true,
+        "markerCount": 5,
+        "clientAuthority": false
+      },
+      "regionConsistency": {
+        "waterCueCells": [],
+        "ruinSignalCueCells": [],
+        "lockedUnknownCellsSealed": true,
+        "hintedCellsAbstract": true,
+        "waterCuesRequireServerOwnedWater": true,
+        "hiddenCellsUseOnlyFogAssets": true,
+        "knownDiscoveredAssetsMatchServerTerrain": true,
+        "runtimeAssetCellsRegionTruthBound": true
+      },
+      "regionVisuals": [
+        {
+          "cellId": "cell_origin",
+          "fogState": "discovered",
+          "siteType": "home_plot",
+          "kind": "origin_plot",
+          "publicTerrainText": "home_plot origin_plot owned_home ",
+          "terrain": "settled",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "discovered_settled",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/discovered-settled-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": false
+        },
+        {
+          "cellId": "cell_q1_r0",
+          "fogState": "known",
+          "siteType": "forest_edge",
+          "kind": "planned_site",
+          "publicTerrainText": "forest_edge planned_site site_plan_reviewed wooded sheltered",
+          "terrain": "forest",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "known_woodland",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/known-woodland-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": false
+        },
+        {
+          "cellId": "cell_q1_r-1",
+          "fogState": "discovered",
+          "siteType": "outpost",
+          "kind": "owned_outpost",
+          "publicTerrainText": "outpost owned_outpost owned_outpost ",
+          "terrain": "settled",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "discovered_settled",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/discovered-settled-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": false
+        },
+        {
+          "cellId": "cell_q0_r1",
+          "fogState": "hinted",
+          "siteType": "unresolved_frontier",
+          "kind": "frontier_hint",
+          "publicTerrainText": "unresolved_frontier frontier_hint hinted_by_known_frontier ",
+          "terrain": "hinted",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "hinted_frontier_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/hinted-frontier-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        },
+        {
+          "cellId": "cell_q3_r0",
+          "fogState": "locked_unknown",
+          "siteType": "unknown",
+          "kind": "fog_placeholder",
+          "publicTerrainText": "unknown fog_placeholder locked_unknown ",
+          "terrain": "locked_unknown",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "locked_unknown_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/locked-unknown-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        }
+      ],
+      "camera": {
+        "x": 1.245,
+        "y": 0,
+        "zoom": 2.353
+      },
+      "bounds": {
+        "minX": -2.945,
+        "maxX": 2.945,
+        "minY": -1.953,
+        "maxY": 1.953
+      },
+      "fogStates": {
+        "discovered": 2,
+        "known": 1,
+        "hinted": 1,
+        "locked_unknown": 1
+      },
+      "pickTargets": [
+        {
+          "cellId": "cell_origin",
+          "fogState": "discovered",
+          "terrain": "settled",
+          "status": "OWNED_HOME",
+          "title": "Founders Plot",
+          "canvas": {
+            "x": -81.85487016357625,
+            "y": 371.1953125
+          }
+        },
+        {
+          "cellId": "cell_q1_r0",
+          "fogState": "known",
+          "terrain": "forest",
+          "status": "SITE_PLAN_REVIEWED",
+          "title": "Forest Ridge Survey Site Plan",
+          "canvas": {
+            "x": 42.62124074386544,
+            "y": 371.1953125
+          }
+        },
+        {
+          "cellId": "cell_q1_r-1",
+          "fogState": "discovered",
+          "terrain": "settled",
+          "status": "OWNED_OUTPOST",
+          "title": "Forest Ridge Outpost",
+          "canvas": {
+            "x": -19.61681470985537,
+            "y": 264.2529215876698
+          }
+        },
+        {
+          "cellId": "cell_q0_r1",
+          "fogState": "hinted",
+          "terrain": "hinted",
+          "status": "HINTED_BY_KNOWN_FRONTIER",
+          "title": "Unresolved Map Edge Hint",
+          "canvas": {
+            "x": -19.61681470985537,
+            "y": 478.1377034123302
+          }
+        },
+        {
+          "cellId": "cell_q3_r0",
+          "fogState": "locked_unknown",
+          "terrain": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 291.5734625587489,
+            "y": 371.1953125
+          }
+        }
+      ]
+    },
+    "fogLegend": [
+      {
+        "testid": "fp-expedition-fog-legend-discovered",
+        "fogState": "discovered",
+        "selected": false,
+        "text": "DISCDiscovered 2Owned plot or founded outpost truth is visible."
+      },
+      {
+        "testid": "fp-expedition-fog-legend-known",
+        "fogState": "known",
+        "selected": false,
+        "text": "KNOWNKnown 1Reviewed or scouted sector truth is recorded."
+      },
+      {
+        "testid": "fp-expedition-fog-legend-hinted",
+        "fogState": "hinted",
+        "selected": true,
+        "text": "HINTHinted 1A server-hinted frontier edge exists."
+      },
+      {
+        "testid": "fp-expedition-fog-legend-locked_unknown",
+        "fogState": "locked_unknown",
+        "selected": false,
+        "text": "LOCKLocked 1A sealed placeholder beyond the current frontier."
+      }
+    ],
+    "semanticInitial": {
+      "tier": "Survey view",
+      "copy": "Broad region silhouette from discovered, known, hinted, and locked cells.",
+      "selectedHint": "3 revealed cells / 2 hidden silhouettes visible at survey scale.",
+      "fogState": "hinted",
+      "zoomTier": "survey"
+    },
+    "semanticAfterZoom": {
+      "tier": "Detail view",
+      "copy": "Selected-cell facts stay below; close zoom does not unlock extra truth.",
+      "selectedHint": "Selected: Locked Unknown stays sealed; no resources, routes, or action data.",
+      "fogState": "locked_unknown",
+      "zoomTier": "detail"
+    },
+    "selectedRulesInitial": {
+      "fogState": "hinted",
+      "cellId": "cell_q0_r1",
+      "text": "VisibilityHidden: no resources, routes, or actions are exposed.Scout pathOnly Scout Sector can reveal one eligible hinted edge as known.Zoom contextSemantic zoom clarifies status only.AuthorityServer read model only; this card adds no mutation path.",
+      "items": [
+        "VisibilityHidden: no resources, routes, or actions are exposed.",
+        "Scout pathOnly Scout Sector can reveal one eligible hinted edge as known.",
+        "Zoom contextSemantic zoom clarifies status only.",
+        "AuthorityServer read model only; this card adds no mutation path."
+      ]
+    },
+    "selectedKnownRules": {
+      "fogState": "known",
+      "cellId": "cell_q1_r0",
+      "text": "VisibilityVisible: verified server truth can show receipts, terrain, risk, and resource hints.Scout pathUse existing verified panels for any allowed follow-up.Zoom contextSemantic zoom mirrors this selected card.AuthorityServer read model only; this card adds no mutation path.",
+      "items": [
+        "VisibilityVisible: verified server truth can show receipts, terrain, risk, and resource hints.",
+        "Scout pathUse existing verified panels for any allowed follow-up.",
+        "Zoom contextSemantic zoom mirrors this selected card.",
+        "AuthorityServer read model only; this card adds no mutation path."
+      ]
+    },
+    "selectedLockedRules": {
+      "fogState": "locked_unknown",
+      "cellId": "cell_q3_r0",
+      "text": "VisibilityHidden: no resources, routes, actions, or receipts are exposed.Scout pathNo Expedition Map action is available for locked unknown cells.Zoom contextSemantic zoom clarifies status only.AuthorityServer read model only; this card adds no mutation path.",
+      "items": [
+        "VisibilityHidden: no resources, routes, actions, or receipts are exposed.",
+        "Scout pathNo Expedition Map action is available for locked unknown cells.",
+        "Zoom contextSemantic zoom clarifies status only.",
+        "AuthorityServer read model only; this card adds no mutation path."
+      ]
+    },
+    "pixelSample": {
+      "width": 409,
+      "height": 742,
+      "opaquePixels": 6144,
+      "uniqueColorSamples": 630
+    },
+    "cellColorProof": {
+      "cell_origin": {
+        "fogState": "discovered",
+        "r": 148,
+        "g": 173,
+        "b": 135
+      },
+      "cell_q1_r0": {
+        "fogState": "known",
+        "r": 131,
+        "g": 164,
+        "b": 136
+      },
+      "cell_q1_r-1": {
+        "fogState": "discovered",
+        "r": 157,
+        "g": 177,
+        "b": 142
+      },
+      "cell_q0_r1": {
+        "fogState": "hinted",
+        "r": 148,
+        "g": 150,
+        "b": 107
+      },
+      "cell_q3_r0": {
+        "fogState": "locked_unknown",
+        "r": 92,
+        "g": 107,
+        "b": 86
+      }
+    },
+    "selectedKnownCell": "cell_q1_r0",
+    "selectedLockedCell": "cell_q3_r0",
+    "visualShell": "hq14e_region_faithful_runtime_asset_atlas_v1",
+    "visualLayers": {
+      "terrainTexture": true,
+      "runtimeRegionAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+      "runtimeRegionAtlas": "/experiences/founders-plot/assets/expedition-map/hq14a-region-faithful-terrain-fog-atlas-v1.png",
+      "assetBackedRegionTiles": 5,
+      "assetBackedLoadedTiles": 5,
+      "assetBackedTerrainTextures": true,
+      "proceduralFallbackWhenAssetPending": true,
+      "candidate02Cues": true,
+      "agentTownIdentityCues": true,
+      "scoutLedgerHud": true,
+      "mapFirstHudOverlays": true,
+      "hoverAffordance": true,
+      "selectedSectorOutline": true,
+      "beaconPlanWagonCues": true,
+      "homeNodeEmphasis": true,
+      "riverFlatCues": true,
+      "waterCuesServerGated": true,
+      "woodlandRidgeCues": true,
+      "ruinSignalCues": true,
+      "ruinSignalCuesServerGated": true,
+      "lockedUnknownSealedFogOnly": true,
+      "hintedAbstractFogEdge": true,
+      "frontierBoundaryDashes": true,
+      "frontierBoundaryVisualOnly": true,
+      "fogVeils": 2,
+      "edgeFogCount": 4,
+      "civicBeaconCount": 3,
+      "surveyStrokeCount": 5,
+      "surveyStrokesVisualOnly": true,
+      "receiptTraceVisualOnly": true,
+      "markerCount": 5,
+      "clientAuthority": false
+    }
+  },
+  "mobile": {
+    "before": {
+      "renderer": "three.js",
+      "surface": "expedition-map",
+      "projectionHash": "hq12d-threejs-expedition-map-proof",
+      "canvasWidth": 307,
+      "canvasHeight": 300,
+      "cellCount": 5,
+      "selectedCellId": "cell_q0_r1",
+      "hoverCellId": "",
+      "zoom": 1,
+      "visualShell": "hq14e_region_faithful_runtime_asset_atlas_v1",
+      "visualLayers": {
+        "terrainTexture": true,
+        "runtimeRegionAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+        "runtimeRegionAtlas": "/experiences/founders-plot/assets/expedition-map/hq14a-region-faithful-terrain-fog-atlas-v1.png",
+        "assetBackedRegionTiles": 5,
+        "assetBackedLoadedTiles": 5,
+        "assetBackedTerrainTextures": true,
+        "proceduralFallbackWhenAssetPending": true,
+        "candidate02Cues": true,
+        "agentTownIdentityCues": true,
+        "scoutLedgerHud": true,
+        "mapFirstHudOverlays": true,
+        "hoverAffordance": true,
+        "selectedSectorOutline": true,
+        "beaconPlanWagonCues": true,
+        "homeNodeEmphasis": true,
+        "riverFlatCues": true,
+        "waterCuesServerGated": true,
+        "woodlandRidgeCues": true,
+        "ruinSignalCues": true,
+        "ruinSignalCuesServerGated": true,
+        "lockedUnknownSealedFogOnly": true,
+        "hintedAbstractFogEdge": true,
+        "frontierBoundaryDashes": true,
+        "frontierBoundaryVisualOnly": true,
+        "fogVeils": 2,
+        "edgeFogCount": 4,
+        "civicBeaconCount": 3,
+        "surveyStrokeCount": 5,
+        "surveyStrokesVisualOnly": true,
+        "receiptTraceVisualOnly": true,
+        "markerCount": 5,
+        "clientAuthority": false
+      },
+      "regionConsistency": {
+        "waterCueCells": [],
+        "ruinSignalCueCells": [],
+        "lockedUnknownCellsSealed": true,
+        "hintedCellsAbstract": true,
+        "waterCuesRequireServerOwnedWater": true,
+        "hiddenCellsUseOnlyFogAssets": true,
+        "knownDiscoveredAssetsMatchServerTerrain": true,
+        "runtimeAssetCellsRegionTruthBound": true
+      },
+      "regionVisuals": [
+        {
+          "cellId": "cell_origin",
+          "fogState": "discovered",
+          "siteType": "home_plot",
+          "kind": "origin_plot",
+          "publicTerrainText": "home_plot origin_plot owned_home ",
+          "terrain": "settled",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "discovered_settled",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/discovered-settled-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": false
+        },
+        {
+          "cellId": "cell_q1_r0",
+          "fogState": "known",
+          "siteType": "forest_edge",
+          "kind": "planned_site",
+          "publicTerrainText": "forest_edge planned_site site_plan_reviewed wooded sheltered",
+          "terrain": "forest",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "known_woodland",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/known-woodland-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": false
+        },
+        {
+          "cellId": "cell_q1_r-1",
+          "fogState": "discovered",
+          "siteType": "outpost",
+          "kind": "owned_outpost",
+          "publicTerrainText": "outpost owned_outpost owned_outpost ",
+          "terrain": "settled",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "discovered_settled",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/discovered-settled-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": false
+        },
+        {
+          "cellId": "cell_q0_r1",
+          "fogState": "hinted",
+          "siteType": "unresolved_frontier",
+          "kind": "frontier_hint",
+          "publicTerrainText": "unresolved_frontier frontier_hint hinted_by_known_frontier ",
+          "terrain": "hinted",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "hinted_frontier_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/hinted-frontier-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        },
+        {
+          "cellId": "cell_q3_r0",
+          "fogState": "locked_unknown",
+          "siteType": "unknown",
+          "kind": "fog_placeholder",
+          "publicTerrainText": "unknown fog_placeholder locked_unknown ",
+          "terrain": "locked_unknown",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "locked_unknown_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/locked-unknown-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        }
+      ],
+      "camera": {
+        "x": 0,
+        "y": 0,
+        "zoom": 1
+      },
+      "bounds": {
+        "minX": -2.945,
+        "maxX": 2.945,
+        "minY": -1.953,
+        "maxY": 1.953
+      },
+      "fogStates": {
+        "discovered": 2,
+        "known": 1,
+        "hinted": 1,
+        "locked_unknown": 1
+      },
+      "pickTargets": [
+        {
+          "cellId": "cell_origin",
+          "fogState": "discovered",
+          "terrain": "settled",
+          "status": "OWNED_HOME",
+          "title": "Founders Plot",
+          "canvas": {
+            "x": 94.01875000000001,
+            "y": 150
+          }
+        },
+        {
+          "cellId": "cell_q1_r0",
+          "fogState": "known",
+          "terrain": "forest",
+          "status": "SITE_PLAN_REVIEWED",
+          "title": "Forest Ridge Survey Site Plan",
+          "canvas": {
+            "x": 133.67291666666668,
+            "y": 150
+          }
+        },
+        {
+          "cellId": "cell_q1_r-1",
+          "fogState": "discovered",
+          "terrain": "settled",
+          "status": "OWNED_OUTPOST",
+          "title": "Forest Ridge Outpost",
+          "canvas": {
+            "x": 113.84583333333333,
+            "y": 115.89741666666666
+          }
+        },
+        {
+          "cellId": "cell_q0_r1",
+          "fogState": "hinted",
+          "terrain": "hinted",
+          "status": "HINTED_BY_KNOWN_FRONTIER",
+          "title": "Unresolved Map Edge Hint",
+          "canvas": {
+            "x": 113.84583333333333,
+            "y": 184.1025833333333
+          }
+        },
+        {
+          "cellId": "cell_q3_r0",
+          "fogState": "locked_unknown",
+          "terrain": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 212.98125,
+            "y": 150
+          }
+        }
+      ]
+    },
+    "afterTouchDrag": {
+      "renderer": "three.js",
+      "surface": "expedition-map",
+      "projectionHash": "hq12d-threejs-expedition-map-proof",
+      "canvasWidth": 307,
+      "canvasHeight": 300,
+      "cellCount": 5,
+      "selectedCellId": "cell_q0_r1",
+      "hoverCellId": "",
+      "zoom": 2.353,
+      "visualShell": "hq14e_region_faithful_runtime_asset_atlas_v1",
+      "visualLayers": {
+        "terrainTexture": true,
+        "runtimeRegionAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+        "runtimeRegionAtlas": "/experiences/founders-plot/assets/expedition-map/hq14a-region-faithful-terrain-fog-atlas-v1.png",
+        "assetBackedRegionTiles": 5,
+        "assetBackedLoadedTiles": 5,
+        "assetBackedTerrainTextures": true,
+        "proceduralFallbackWhenAssetPending": true,
+        "candidate02Cues": true,
+        "agentTownIdentityCues": true,
+        "scoutLedgerHud": true,
+        "mapFirstHudOverlays": true,
+        "hoverAffordance": true,
+        "selectedSectorOutline": true,
+        "beaconPlanWagonCues": true,
+        "homeNodeEmphasis": true,
+        "riverFlatCues": true,
+        "waterCuesServerGated": true,
+        "woodlandRidgeCues": true,
+        "ruinSignalCues": true,
+        "ruinSignalCuesServerGated": true,
+        "lockedUnknownSealedFogOnly": true,
+        "hintedAbstractFogEdge": true,
+        "frontierBoundaryDashes": true,
+        "frontierBoundaryVisualOnly": true,
+        "fogVeils": 2,
+        "edgeFogCount": 4,
+        "civicBeaconCount": 3,
+        "surveyStrokeCount": 5,
+        "surveyStrokesVisualOnly": true,
+        "receiptTraceVisualOnly": true,
+        "markerCount": 5,
+        "clientAuthority": false
+      },
+      "regionConsistency": {
+        "waterCueCells": [],
+        "ruinSignalCueCells": [],
+        "lockedUnknownCellsSealed": true,
+        "hintedCellsAbstract": true,
+        "waterCuesRequireServerOwnedWater": true,
+        "hiddenCellsUseOnlyFogAssets": true,
+        "knownDiscoveredAssetsMatchServerTerrain": true,
+        "runtimeAssetCellsRegionTruthBound": true
+      },
+      "regionVisuals": [
+        {
+          "cellId": "cell_origin",
+          "fogState": "discovered",
+          "siteType": "home_plot",
+          "kind": "origin_plot",
+          "publicTerrainText": "home_plot origin_plot owned_home ",
+          "terrain": "settled",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "discovered_settled",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/discovered-settled-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": false
+        },
+        {
+          "cellId": "cell_q1_r0",
+          "fogState": "known",
+          "siteType": "forest_edge",
+          "kind": "planned_site",
+          "publicTerrainText": "forest_edge planned_site site_plan_reviewed wooded sheltered",
+          "terrain": "forest",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "known_woodland",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/known-woodland-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": false
+        },
+        {
+          "cellId": "cell_q1_r-1",
+          "fogState": "discovered",
+          "siteType": "outpost",
+          "kind": "owned_outpost",
+          "publicTerrainText": "outpost owned_outpost owned_outpost ",
+          "terrain": "settled",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "discovered_settled",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/discovered-settled-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": false
+        },
+        {
+          "cellId": "cell_q0_r1",
+          "fogState": "hinted",
+          "siteType": "unresolved_frontier",
+          "kind": "frontier_hint",
+          "publicTerrainText": "unresolved_frontier frontier_hint hinted_by_known_frontier ",
+          "terrain": "hinted",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "hinted_frontier_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/hinted-frontier-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        },
+        {
+          "cellId": "cell_q3_r0",
+          "fogState": "locked_unknown",
+          "siteType": "unknown",
+          "kind": "fog_placeholder",
+          "publicTerrainText": "unknown fog_placeholder locked_unknown ",
+          "terrain": "locked_unknown",
+          "runtimeAssetPack": "hq14a_region_faithful_terrain_fog_atlas_v1",
+          "assetSlot": "locked_unknown_fog",
+          "assetPath": "/experiences/founders-plot/assets/expedition-map/tiles/locked-unknown-fog-v1.png",
+          "assetReady": true,
+          "assetAllowedByServerTruth": true,
+          "waterCue": false,
+          "ruinSignalCue": false,
+          "hiddenSpecificitySuppressed": true
+        }
+      ],
+      "camera": {
+        "x": 1.245,
+        "y": 0.311,
+        "zoom": 2.353
+      },
+      "bounds": {
+        "minX": -2.945,
+        "maxX": 2.945,
+        "minY": -1.953,
+        "maxY": 1.953
+      },
+      "fogStates": {
+        "discovered": 2,
+        "known": 1,
+        "hinted": 1,
+        "locked_unknown": 1
+      },
+      "pickTargets": [
+        {
+          "cellId": "cell_origin",
+          "fogState": "discovered",
+          "terrain": "settled",
+          "status": "OWNED_HOME",
+          "title": "Founders Plot",
+          "canvas": {
+            "x": -61.34744007376969,
+            "y": 168.70553505339487
+          }
+        },
+        {
+          "cellId": "cell_q1_r0",
+          "fogState": "known",
+          "terrain": "forest",
+          "status": "SITE_PLAN_REVIEWED",
+          "title": "Forest Ridge Survey Site Plan",
+          "canvas": {
+            "x": 31.943169748835377,
+            "y": 168.70553505339487
+          }
+        },
+        {
+          "cellId": "cell_q1_r-1",
+          "fogState": "discovered",
+          "terrain": "settled",
+          "status": "OWNED_OUTPOST",
+          "title": "Forest Ridge Outpost",
+          "canvas": {
+            "x": -14.70213516246713,
+            "y": 88.4756106059545
+          }
+        },
+        {
+          "cellId": "cell_q0_r1",
+          "fogState": "hinted",
+          "terrain": "hinted",
+          "status": "HINTED_BY_KNOWN_FRONTIER",
+          "title": "Unresolved Map Edge Hint",
+          "canvas": {
+            "x": -14.70213516246713,
+            "y": 248.93545950083524
+          }
+        },
+        {
+          "cellId": "cell_q3_r0",
+          "fogState": "locked_unknown",
+          "terrain": "locked_unknown",
+          "status": "LOCKED_UNKNOWN",
+          "title": "Locked Unknown",
+          "canvas": {
+            "x": 218.52438939404553,
+            "y": 168.70553505339487
+          }
+        }
+      ]
+    },
+    "semanticAfterTouchDrag": {
+      "tier": "Detail view",
+      "copy": "Selected-cell facts stay below; close zoom does not unlock extra truth.",
+      "selectedHint": "Selected: Unresolved Map Edge Hint is a hinted edge; only Scout Sector can make it known.",
+      "fogState": "hinted",
+      "zoomTier": "detail"
+    },
+    "pixelSample": {
+      "width": 307,
+      "height": 300,
+      "opaquePixels": 6144,
+      "uniqueColorSamples": 1082
+    },
+    "cellColorProof": {
+      "cell_origin": {
+        "fogState": "discovered",
+        "r": 166,
+        "g": 195,
+        "b": 160
+      },
+      "cell_q1_r0": {
+        "fogState": "known",
+        "r": 129,
+        "g": 166,
+        "b": 142
+      },
+      "cell_q1_r-1": {
+        "fogState": "discovered",
+        "r": 159,
+        "g": 182,
+        "b": 150
+      },
+      "cell_q0_r1": {
+        "fogState": "hinted",
+        "r": 134,
+        "g": 148,
+        "b": 107
+      },
+      "cell_q3_r0": {
+        "fogState": "locked_unknown",
+        "r": 85,
+        "g": 99,
+        "b": 80
+      }
+    },
+    "layout": {
+      "viewport": 390,
+      "documentScrollWidth": 390,
+      "bodyScrollWidth": 390,
+      "hostRect": {
+        "left": 41,
+        "right": 348,
+        "width": 307,
+        "height": 300
+      }
+    }
+  },
+  "screenshots": [
+    "reports/agent-town-hq14e-runtime-asset-map-atlas-desktop-2026-06-01.png",
+    "reports/agent-town-hq14e-runtime-asset-map-atlas-mobile-2026-06-01.png"
+  ],
+  "guardrails": {
+    "readOnly": true,
+    "executableActions": [],
+    "routeCreation": false,
+    "atlasExecution": false,
+    "hiddenCellResourceTextSuppressed": true,
+    "hiddenCellReceiptLinksSuppressed": true,
+    "lockedUnknownNoLandmarkOrRuinDrawPath": true,
+    "waterCuesServerGated": true,
+    "currentFixtureWaterCueCells": [],
+    "hiddenCellsUseOnlyFogAssets": true,
+    "knownDiscoveredAssetsMatchServerTerrain": true,
+    "runtimeAssetCellsRegionTruthBound": true,
+    "hintedCellsUseAbstractFogEdgeTreatment": true,
+    "scoutSectorOnlyMutationPath": true
+  },
+  "finalNote": "HQ14E promotes the generated region-faithful terrain/fog atlas into same-origin runtime map tiles while keeping server-owned fog/region truth as the only source of what each sector may show."
+}

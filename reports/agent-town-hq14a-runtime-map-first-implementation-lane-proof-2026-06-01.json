@@ -1,0 +1,84 @@
+{
+  "ok": true,
+  "generatedAt": "2026-06-01T15:20:00+07:00",
+  "lane": "HQ14A Runtime Map-First Implementation",
+  "verdict": "PASS_WITH_CONCURRENT_HQ14C_HQ14D_INTEGRATION",
+  "visualShell": "hq14c_runtime_region_consistency_v1",
+  "changedFiles": [
+    "public/experiences/founders-plot/three_scene_entry.js",
+    "public/experiences/founders-plot/founders-plot.js",
+    "public/experiences/founders-plot/founders-plot.css",
+    "e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js",
+    "e2e/200_founders_plot.spec.js",
+    "public/experiences/founders-plot/three_scene_bundle.js"
+  ],
+  "artifacts": {
+    "report": "reports/agent-town-hq14a-runtime-map-first-implementation-lane-2026-06-01.md",
+    "proof": "reports/agent-town-hq14a-runtime-map-first-implementation-lane-proof-2026-06-01.json",
+    "regionConsistencyProof": "reports/agent-town-hq14c-runtime-region-consistency-fix-proof-2026-06-01.json",
+    "mapFirstPlayabilityProof": "reports/agent-town-hq14d-map-first-ui-playability-slice-proof-2026-06-01.json",
+    "reviewMedia": [
+      "reports/media/agent-town-hq14a-region-faithful-terrain-fog-atlas-2026-06-01/agent-town-hq14a-region-faithful-terrain-fog-atlas-1024-review.png",
+      "reports/media/agent-town-hq14b-region-visual-consistency-qa-2026-06-01/contact-sheet.png"
+    ],
+    "screenshots": [
+      "reports/agent-town-hq14c-runtime-region-consistency-fix-desktop-2026-06-01.png",
+      "reports/agent-town-hq14c-runtime-region-consistency-fix-mobile-2026-06-01.png",
+      "reports/agent-town-hq14d-map-first-ui-playability-slice-desktop-2026-06-01.png",
+      "reports/agent-town-hq14d-map-first-ui-playability-slice-mobile-2026-06-01.png"
+    ]
+  },
+  "verification": [
+    {
+      "command": "node --check public/experiences/founders-plot/three_scene_entry.js",
+      "passed": true
+    },
+    {
+      "command": "node --check public/experiences/founders-plot/founders-plot.js",
+      "passed": true
+    },
+    {
+      "command": "node --check e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js",
+      "passed": true
+    },
+    {
+      "command": "npm run build:founders-plot-threejs",
+      "passed": true
+    },
+    {
+      "command": "npx playwright test e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js --project=chromium --grep \"FP-E2E-023\"",
+      "passed": true
+    },
+    {
+      "command": "npx playwright test e2e/200_founders_plot.spec.js --project=chromium --grep \"FP-E2E-022\"",
+      "passed": true
+    },
+    {
+      "command": "file reports/agent-town-hq14c-runtime-region-consistency-fix-desktop-2026-06-01.png reports/agent-town-hq14c-runtime-region-consistency-fix-mobile-2026-06-01.png reports/agent-town-hq14d-map-first-ui-playability-slice-desktop-2026-06-01.png reports/agent-town-hq14d-map-first-ui-playability-slice-mobile-2026-06-01.png",
+      "passed": true
+    },
+    {
+      "command": "magick identify reports/agent-town-hq14c-runtime-region-consistency-fix-desktop-2026-06-01.png reports/agent-town-hq14c-runtime-region-consistency-fix-mobile-2026-06-01.png reports/agent-town-hq14d-map-first-ui-playability-slice-desktop-2026-06-01.png reports/agent-town-hq14d-map-first-ui-playability-slice-mobile-2026-06-01.png",
+      "passed": true
+    }
+  ],
+  "guardrails": {
+    "serverOwnedExpeditionMapCellsOnlyTruthSource": true,
+    "scoutSectorOnlyMutationPath": true,
+    "hiddenCellsFogSilhouetteOnly": true,
+    "knownDiscoveredTerrainMatchesServerCellData": true,
+    "noAtlasExecution": true,
+    "noPublicSharing": true,
+    "noGeneratedUniverseRendering": true,
+    "noHiddenAutonomy": true,
+    "noRoutesTradeEconomyResourcesRewardsCombatScheduler": true,
+    "noCrossPlotMutation": true,
+    "noExternalEffects": true,
+    "noWildWestGenreDrift": true,
+    "serverStoreRoutesToolsSchemaUntouched": true
+  },
+  "notes": [
+    "Concurrent HQ14B/HQ14C/HQ14D artifacts landed during this run; this proof intentionally adopts the stricter HQ14C visual shell instead of reverting it.",
+    "The active tool list in this session did not expose spawn_agent/sessions_spawn/subagents, so no new subagent was spawned by this process; existing concurrent lane artifacts were preserved and integrated."
+  ]
+}

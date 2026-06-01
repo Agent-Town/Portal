@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "generatedAt": "2026-06-01T07:37:10.049Z",
+  "generatedAt": "2026-06-01T12:35:00.811Z",
   "source": "FP-E2E-022 mocked server-owned expeditionMap.expeditionParty and eventPacket.partySnapshot; HQ12L verifies read-only party visual polish",
   "selectedCellId": "cell_q0_r1",
   "eventPacketId": "expedition_event_packet_hq12f_cell_q0_r1",
@@ -9,6 +9,12 @@
     "snapshotPartyId": "expedition_party_current_plot_v1",
     "rosterText": "Mira TrailmarkscoutRook SignalpostmessengerVale-Desk 7HQ civic operator",
     "partyBlocks": [
+      {
+        "testid": "fp-expedition-party-badges-map-selected",
+        "actions": 0,
+        "readOnly": null,
+        "text": "MTscoutRSmessengerVDHQ civic operator"
+      },
       {
         "testid": "fp-expedition-party-selected-cell_q0_r1",
         "actions": 0,
@@ -41,67 +47,95 @@
       "clipped": [],
       "surfaces": {
         "panel": {
-          "top": -1564,
+          "top": 90,
           "left": 12,
           "right": 378,
           "width": 366,
-          "height": 3973
+          "height": 756
+        },
+        "inspectorDrawer": {
+          "top": 224,
+          "left": 34,
+          "right": 366,
+          "width": 332,
+          "height": 54
+        },
+        "inspectorChrome": {
+          "top": 232,
+          "left": 42,
+          "right": 358,
+          "width": 316,
+          "height": 118
         },
         "objectiveStrip": {
-          "top": -988,
-          "left": 26,
-          "right": 364,
-          "width": 338,
-          "height": 156
+          "top": 908,
+          "left": 42,
+          "right": 358,
+          "width": 316,
+          "height": 200
         },
         "threeHost": {
-          "top": -792,
-          "left": 40,
-          "right": 353,
-          "width": 313,
-          "height": 218
+          "top": 92,
+          "left": 14,
+          "right": 376,
+          "width": 362,
+          "height": 752
+        },
+        "mapVisualHud": {
+          "top": 525,
+          "left": 24,
+          "right": 366,
+          "width": 342,
+          "height": 308
+        },
+        "mapSelectedSummary": {
+          "top": 622,
+          "left": 24,
+          "right": 366,
+          "width": 342,
+          "height": 212
         },
         "selectedSector": {
-          "top": -517,
-          "left": 26,
-          "right": 364,
-          "width": 338,
-          "height": 964
+          "top": 0,
+          "left": 0,
+          "right": 0,
+          "width": 0,
+          "height": 0
         },
         "eventPacket": {
-          "top": 455,
-          "left": 26,
-          "right": 364,
-          "width": 338,
-          "height": 1089
+          "top": 0,
+          "left": 0,
+          "right": 0,
+          "width": 0,
+          "height": 0
         },
         "eventPacketChips": {
-          "top": 548,
-          "left": 40,
-          "right": 353,
-          "width": 313,
-          "height": 144
+          "top": 0,
+          "left": 0,
+          "right": 0,
+          "width": 0,
+          "height": 0
         },
         "partyPacket": {
-          "top": 762,
-          "left": 40,
-          "right": 353,
-          "width": 313,
-          "height": 382
+          "top": 0,
+          "left": 0,
+          "right": 0,
+          "width": 0,
+          "height": 0
         },
         "partyRoster": {
-          "top": 989,
-          "left": 49,
-          "right": 344,
-          "width": 295,
-          "height": 90
+          "top": 0,
+          "left": 0,
+          "right": 0,
+          "width": 0,
+          "height": 0
         }
       },
       "gridColumns": {
         "metrics": 2,
-        "objectiveFacts": 4,
-        "packetFacts": 2,
-        "partyFacts": 2
+        "objectiveFacts": 2,
+        "packetFacts": 3,
+        "partyFacts": 3
       },
       "buttons": {
         "packetButtons": 0,

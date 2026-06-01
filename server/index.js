@@ -1709,6 +1709,8 @@ function setSecurityHeaders(req, res, next) {
     || reqPath === '/atlas'
     || reqPath === '/progression-atlas'
     || reqPath === '/founders-plot'
+    || reqPath === '/experiences/founders-plot'
+    || reqPath === '/experiences/founders-plot/'
     || reqPath === '/create'
     || reqPath === '/house'
     || reqPath === '/inbox'
@@ -9552,7 +9554,7 @@ function sendHtmlNoStore(res, fileName) {
 
 app.get('/', (_req, res) => sendHtmlNoStore(res, HOME_ROUTE_FILE));
 app.get('/start', (_req, res) => sendHtmlNoStore(res, 'start.html'));
-app.get('/founders-plot', (_req, res) => {
+app.get(['/founders-plot', '/experiences/founders-plot', '/experiences/founders-plot/'], (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   return res.sendFile(path.join(PUBLIC_DIR, 'experiences', 'founders-plot', 'index.html'));
 });

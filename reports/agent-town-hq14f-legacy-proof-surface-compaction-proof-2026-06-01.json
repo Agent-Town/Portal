@@ -1,0 +1,39 @@
+{
+  "ok": true,
+  "verdict": "PASS_SMALL_UI_DRIVEN_COMPACTION",
+  "scope": {
+    "cssOnly": true,
+    "serverAuthorityChanged": false,
+    "runtimeRendererChanged": false,
+    "newMutationPath": false
+  },
+  "changes": {
+    "sectorLedgerGrid": true,
+    "legacyProofCopyLineClamped": true,
+    "receiptAndLinkGroupsHeightBounded": true,
+    "mapFirstBodySelector": ".fp-expedition-map-body--map-first"
+  },
+  "checks": {
+    "foundersPlotJsSyntax": "passed",
+    "playwrightFpE2E022": "passed",
+    "desktopScreenshot": "reports/agent-town-hq14f-legacy-proof-surface-compaction-desktop-2026-06-01.png",
+    "mobileScreenshot": "reports/agent-town-hq14f-legacy-proof-surface-compaction-mobile-2026-06-01.png"
+  },
+  "guardrails": {
+    "scoutSectorOnlyMutationPath": true,
+    "eventPacketButtons": 0,
+    "partyActions": 0,
+    "objectiveActions": 0,
+    "routeCreation": false,
+    "tradeRouteCreation": false,
+    "resourceHarvesting": false,
+    "combat": false,
+    "backgroundScheduling": false,
+    "publicSharing": false,
+    "generatedUniverseRendering": false,
+    "atlasExecution": false,
+    "crossPlotMutation": false,
+    "externalEffects": false,
+    "wildWestGenreDrift": false
+  }
+}

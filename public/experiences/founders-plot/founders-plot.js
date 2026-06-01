@@ -883,11 +883,12 @@
     if (els.expeditionMapBody && document.body.contains(els.expeditionMapBody)) {
       return els.expeditionMapBody;
     }
+    const main = document.querySelector('.fp-main');
     const side = document.querySelector('.fp-side');
-    if (!side) return null;
+    if (!main && !side) return null;
 
     const panel = document.createElement('section');
-    panel.className = 'fp-parchment fp-panel';
+    panel.className = 'fp-parchment fp-panel fp-expedition-map-panel';
     panel.dataset.testid = 'fp-expedition-map-panel';
 
     const head = document.createElement('header');
@@ -904,10 +905,14 @@
     body.innerHTML = '<p class="fp-helper">Expedition Map readiness loading.</p>';
 
     panel.append(head, body);
-    const anchor = document.querySelector('[data-testid="fp-world-grid-panel"]')
-      || document.querySelector('[data-testid="fp-doctrine-panel"]');
-    if (anchor?.parentNode) anchor.parentNode.insertBefore(panel, anchor);
-    else side.appendChild(panel);
+    if (main) {
+      main.insertBefore(panel, main.firstElementChild || null);
+    } else {
+      const anchor = document.querySelector('[data-testid="fp-world-grid-panel"]')
+        || document.querySelector('[data-testid="fp-doctrine-panel"]');
+      if (anchor?.parentNode) anchor.parentNode.insertBefore(panel, anchor);
+      else side.appendChild(panel);
+    }
     els.expeditionMapBody = body;
     return body;
   }
@@ -981,6 +986,179 @@
     });
     card.appendChild(legend);
     return legend;
+  }
+
+  function appendExpeditionAuditDetails(card, labelText, bodyNodes = [], testid = '') {
+    const details = document.createElement('details');
+    details.className = 'fp-expedition-audit-details';
+    if (testid) details.dataset.testid = testid;
+    const summary = document.createElement('summary');
+    summary.textContent = labelText || 'Audit details';
+    details.appendChild(summary);
+    bodyNodes.filter(Boolean).forEach((node) => details.appendChild(node));
+    card.appendChild(details);
+    return details;
+  }
+
+  function expeditionPartyInitials(name = '') {
+    const parts = String(name || '').replace(/[^\w\s-]/g, ' ').split(/[\s-]+/).filter(Boolean);
+    const initials = parts.slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+    return initials || 'ET';
+  }
+
+  function appendExpeditionPartyBadges(card, members, scope = 'map') {
+    if (!card || !members.length) return null;
+    const row = document.createElement('div');
+    row.className = 'fp-expedition-party-badges';
+    row.dataset.testid = `fp-expedition-party-badges-${safeTestId(scope)}`;
+    members.slice(0, 5).forEach((member) => {
+      const badge = document.createElement('span');
+      badge.dataset.memberId = member.memberId;
+      badge.title = `${member.displayName} - ${expeditionPartyRoleText(member.role)}`;
+      const avatar = document.createElement('i');
+      avatar.textContent = expeditionPartyInitials(member.displayName);
+      avatar.setAttribute('aria-hidden', 'true');
+      const label = document.createElement('small');
+      label.textContent = expeditionPartyRoleText(member.role);
+      badge.append(avatar, label);
+      row.appendChild(badge);
+    });
+    card.appendChild(row);
+    return row;
+  }
+
+  function expeditionReceiptTraceItems(cell = {}, packet = null, hidden = false) {
+    const receipts = Array.isArray(cell?.receipts) ? cell.receipts : [];
+    if (hidden) {
+      return receipts.length ? [`${countLabel(receipts.length, 'server receipt')}`] : ['no public receipt'];
+    }
+    const items = receipts.slice(-2).map((receipt) => {
+      const ids = receipt?.sourceIds || {};
+      return [
+        friendlyToken(receipt.kind || 'read model receipt'),
+        ids.scoutId ? `scout ${ids.scoutId}` : '',
+        ids.planId ? `plan ${ids.planId}` : '',
+        ids.claimId || ids.originClaimId ? `claim ${ids.claimId || ids.originClaimId}` : '',
+      ].filter(Boolean).join(' - ');
+    });
+    if (packet?.packetId) items.push(`packet ${packet.packetId}`);
+    return items.length ? items : ['server read model'];
+  }
+
+  function appendExpeditionReceiptTrace(card, cell, packet = null, scope = 'selected') {
+    if (!card || !cell) return null;
+    const fogState = String(cell.fogState || 'locked_unknown');
+    const hidden = !['discovered', 'known'].includes(fogState);
+    const trace = document.createElement('div');
+    trace.className = 'fp-expedition-receipt-trace';
+    trace.dataset.testid = `fp-expedition-receipt-trace-${safeTestId(scope)}`;
+    trace.dataset.fogState = fogState;
+    const label = document.createElement('small');
+    label.textContent = hidden ? 'Provenance sealed' : 'Receipt trace';
+    trace.appendChild(label);
+    expeditionReceiptTraceItems(cell, packet, hidden).forEach((text) => {
+      const chip = document.createElement('span');
+      chip.textContent = text;
+      trace.appendChild(chip);
+    });
+    card.appendChild(trace);
+    return trace;
+  }
+
+  function appendExpeditionMapVisualHud(card, model, counts, selectedCell, scoutableCells, bundle) {
+    if (!card || !selectedCell) return null;
+    const fogState = String(selectedCell.fogState || 'locked_unknown');
+    const selectedScoutable = isExpeditionScoutSectorEligible(selectedCell);
+    const packet = expeditionPacketForCell(model, selectedCell);
+    const partySource = expeditionPartySource(model, packet);
+    const partyMembers = expeditionPartyMembers(partySource);
+
+    const hud = document.createElement('div');
+    hud.className = 'fp-expedition-map-visual-hud';
+    hud.dataset.testid = 'fp-expedition-map-visual-hud';
+    hud.dataset.selectedCellId = String(selectedCell.cellId || '');
+    hud.dataset.fogState = fogState;
+    hud.dataset.scoutable = selectedScoutable ? 'true' : 'false';
+
+    const fogRail = document.createElement('div');
+    fogRail.className = 'fp-expedition-fog-pips';
+    fogRail.dataset.testid = 'fp-expedition-fog-pips';
+    EXPEDITION_FOG_ORDER.forEach((stateKey) => {
+      const info = expeditionFogDefinition(stateKey);
+      const pip = document.createElement('span');
+      pip.className = `fp-expedition-fog-pip fp-expedition-fog-pip--${safeTestId(stateKey)}`;
+      pip.dataset.fogState = stateKey;
+      if (stateKey === fogState) pip.dataset.selected = 'true';
+      const swatch = document.createElement('i');
+      swatch.textContent = info.token;
+      swatch.setAttribute('aria-hidden', 'true');
+      const count = document.createElement('strong');
+      count.textContent = String(Number(counts?.[stateKey] || 0));
+      const label = document.createElement('small');
+      label.textContent = info.label;
+      pip.append(swatch, count, label);
+      fogRail.appendChild(pip);
+    });
+    hud.appendChild(fogRail);
+
+    const selected = document.createElement('section');
+    selected.className = `fp-expedition-map-selected-summary fp-expedition-map-selected-summary--${safeTestId(fogState)}`;
+    selected.dataset.testid = 'fp-expedition-map-selected-summary';
+    selected.dataset.cellId = String(selectedCell.cellId || '');
+    selected.dataset.fogState = fogState;
+    selected.dataset.scoutable = selectedScoutable ? 'true' : 'false';
+
+    const head = document.createElement('div');
+    head.className = 'fp-expedition-map-selected-summary__head';
+    const marker = document.createElement('i');
+    marker.textContent = expeditionCellKindLabel(selectedCell);
+    marker.setAttribute('aria-hidden', 'true');
+    const titleWrap = document.createElement('span');
+    const title = document.createElement('strong');
+    title.textContent = selectedCell.title || friendlyToken(selectedCell.kind || selectedCell.cellId);
+    const meta = document.createElement('small');
+    meta.textContent = `${selectedCell.cellId} - ${friendlyToken(fogState)}`;
+    titleWrap.append(title, meta);
+    head.append(marker, titleWrap);
+    selected.appendChild(head);
+
+    const chipRow = document.createElement('div');
+    chipRow.className = 'fp-expedition-map-selected-summary__chips';
+    [
+      `fog ${friendlyToken(fogState)}`,
+      selectedScoutable ? 'Scout Sector eligible' : 'read-only selection',
+      packet ? 'packet filed' : '',
+      ['discovered', 'known'].includes(fogState) && expeditionResourceHintsText(selectedCell.resourceHints)
+        ? `resources ${expeditionResourceHintsText(selectedCell.resourceHints)}`
+        : '',
+    ].filter(Boolean).forEach((text) => {
+      const chip = document.createElement('span');
+      chip.textContent = text;
+      chipRow.appendChild(chip);
+    });
+    selected.appendChild(chipRow);
+
+    if (selectedScoutable) {
+      const pending = state.scoutSectorPendingCellId === String(selectedCell.cellId || '');
+      const button = brassBtn(pending ? 'Scouting...' : 'Scout Sector', `fp-btn-scout-sector-map-chip-${safeTestId(selectedCell.cellId)}`, () => doScoutExpeditionSector(selectedCell.cellId));
+      button.classList.add('fp-brass-btn--small', 'fp-expedition-map-selected-summary__scout');
+      button.dataset.testid = `fp-btn-scout-sector-map-chip-${safeTestId(selectedCell.cellId)}`;
+      button.dataset.cellId = String(selectedCell.cellId || '');
+      button.dataset.idempotencyKey = scoutSectorIdempotencyKey(bundle, model, selectedCell);
+      button.disabled = !!state.scoutSectorPendingCellId;
+      selected.appendChild(button);
+    } else {
+      const stateChip = document.createElement('span');
+      stateChip.className = 'fp-expedition-map-selected-summary__state';
+      stateChip.textContent = scoutableCells.length ? `${scoutableCells.length} hinted sector eligible` : 'no scout action';
+      selected.appendChild(stateChip);
+    }
+
+    appendExpeditionReceiptTrace(selected, selectedCell, packet, 'map-selected');
+    appendExpeditionPartyBadges(selected, partyMembers, 'map-selected');
+    hud.appendChild(selected);
+    card.appendChild(hud);
+    return hud;
   }
 
   function expeditionResourceHintsText(resourceHints = {}) {
@@ -1187,6 +1365,65 @@
     strip.append(copy, facts, boundary);
     body.appendChild(strip);
     return strip;
+  }
+
+  function appendExpeditionInspectorChrome(drawer, model, selectedCell, counts) {
+    if (!drawer) return null;
+    const fogState = String(selectedCell?.fogState || 'locked_unknown');
+    const revealed = Number(counts?.discovered || 0) + Number(counts?.known || 0);
+    const hidden = Number(counts?.hinted || 0) + Number(counts?.locked_unknown || 0);
+    const chrome = document.createElement('div');
+    chrome.className = 'fp-expedition-inspector-drawer__chrome';
+    chrome.dataset.testid = 'fp-expedition-inspector-chrome';
+    chrome.dataset.selectedCellId = String(selectedCell?.cellId || '');
+    chrome.dataset.fogState = fogState;
+    chrome.dataset.readOnly = 'true';
+    chrome.dataset.actions = '0';
+
+    const label = document.createElement('small');
+    label.textContent = 'Visual inspector';
+    const title = document.createElement('strong');
+    title.textContent = selectedCell?.title || model?.title || 'Expedition Map';
+    const meta = document.createElement('span');
+    meta.textContent = `${selectedCell?.cellId || 'no selected cell'} - ${friendlyToken(fogState)}`;
+    chrome.append(label, title, meta);
+
+    const chips = document.createElement('div');
+    chips.className = 'fp-expedition-inspector-drawer__chips';
+    chips.dataset.testid = 'fp-expedition-inspector-chips';
+    [
+      'read-only',
+      `${countLabel(revealed, 'revealed sector')}`,
+      `${countLabel(hidden, 'hidden silhouette')}`,
+      selectedCell && isExpeditionScoutSectorEligible(selectedCell) ? 'Scout Sector eligible' : 'no drawer actions',
+    ].forEach((text) => {
+      const chip = document.createElement('i');
+      chip.textContent = text;
+      chips.appendChild(chip);
+    });
+    chrome.appendChild(chips);
+    drawer.appendChild(chrome);
+    return chrome;
+  }
+
+  function appendExpeditionInspectorSection(drawer, labelText, contentNode, testid, options = {}) {
+    if (!drawer || !contentNode) return null;
+    const section = document.createElement('details');
+    section.className = 'fp-expedition-inspector-section';
+    section.dataset.testid = testid;
+    section.dataset.readOnly = 'true';
+    section.dataset.actions = '0';
+    if (options.open) section.open = true;
+
+    const summary = document.createElement('summary');
+    const label = document.createElement('strong');
+    label.textContent = labelText;
+    const meta = document.createElement('small');
+    meta.textContent = options.meta || 'compact read-only drawer';
+    summary.append(label, meta);
+    section.append(summary, contentNode);
+    drawer.appendChild(section);
+    return section;
   }
 
   function appendExpeditionLinks(card, cell, model) {
@@ -1620,6 +1857,27 @@
 
     const updateSemanticZoom = appendExpeditionSemanticZoomOverlay(host, renderer, model, cells, selectedCellId);
     state.expeditionMapThreeInfo = renderer.renderExpeditionMap(host, { ...model, cells }, { selectedCellId });
+    const controls = document.createElement('div');
+    controls.className = 'fp-expedition-map-controls';
+    controls.dataset.testid = 'fp-expedition-map-controls';
+    [
+      ['+', 'Zoom in', () => renderer.zoomExpeditionMap?.(host, 1.18)],
+      ['-', 'Zoom out', () => renderer.zoomExpeditionMap?.(host, 1 / 1.18)],
+      ['0', 'Reset map view', () => renderer.resetExpeditionMapCamera?.(host)],
+    ].forEach(([label, ariaLabel, action]) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'fp-expedition-map-control-btn';
+      button.textContent = label;
+      button.setAttribute('aria-label', ariaLabel);
+      button.addEventListener('click', () => {
+        action();
+        state.expeditionMapThreeInfo = renderer.getExpeditionMapInfo?.(host) || state.expeditionMapThreeInfo;
+        updateSemanticZoom?.();
+      });
+      controls.appendChild(button);
+    });
+    host.appendChild(controls);
     updateSemanticZoom?.();
     host.dataset.renderer = 'three.js';
     return true;
@@ -1798,6 +2056,7 @@
       !hidden && cell.risk ? `risk ${friendlyToken(cell.risk)}` : '',
       !hidden && expeditionResourceHintsText(cell.resourceHints) ? `resources ${expeditionResourceHintsText(cell.resourceHints)}` : '',
     ]);
+    appendExpeditionReceiptTrace(card, cell, expeditionPacketForCell(model, cell), 'selected');
     if (!hidden) {
       appendExpeditionReceipts(card, cell);
       appendExpeditionLinks(card, cell, model);
@@ -1822,7 +2081,7 @@
       renderer.disposeExpeditionMap(previousThreeHost);
     }
     body.innerHTML = '';
-    body.classList.add('fp-expedition-map-body');
+    body.classList.add('fp-expedition-map-body', 'fp-expedition-map-body--map-first');
 
     if (!hasExpeditionMapReadModel(model, bundle)) {
       body.innerHTML = '<p class="fp-helper">Expedition Map fog state is not exposed by the server read model yet.</p>';
@@ -1837,6 +2096,18 @@
     const selectedCell = selectedExpeditionCell(cells, model);
     if (selectedCell) state.expeditionSelectedCellId = String(selectedCell.cellId || '');
     const objective = expeditionObjectiveModel({ model, cells, counts, selectedCell, scoutableCells });
+    const runtimeShell = document.createElement('section');
+    runtimeShell.className = 'fp-expedition-map-runtime';
+    runtimeShell.dataset.testid = 'fp-expedition-map-runtime';
+    const hud = document.createElement('aside');
+    hud.className = 'fp-expedition-map-hud fp-expedition-inspector-drawer';
+    hud.dataset.testid = 'fp-expedition-map-hud';
+    hud.dataset.drawer = 'visual-inspector';
+    hud.dataset.readOnly = 'true';
+    hud.dataset.actions = '0';
+    runtimeShell.appendChild(hud);
+    body.appendChild(runtimeShell);
+    appendExpeditionInspectorChrome(hud, model, selectedCell, counts);
 
     const statusCard = document.createElement('article');
     statusCard.className = `fp-expedition-map-card${model.status === 'FOG_READ_MODEL_READY' ? ' fp-expedition-map-card--ready' : ''}`;
@@ -1856,9 +2127,10 @@
     const boundary = document.createElement('small');
     boundary.dataset.testid = 'fp-expedition-map-boundary';
     boundary.textContent = `${friendlyToken(model.authorityBoundary || 'server-owned read-only expedition map projection')}. No autonomous movement, resource gathering, routes, trades, combat, public sharing, Atlas execution, or external effects.`;
-    statusCard.appendChild(boundary);
-    body.appendChild(statusCard);
-    appendExpeditionObjectiveStrip(body, objective);
+    appendExpeditionAuditDetails(statusCard, 'Authority guardrails', [boundary], 'fp-expedition-map-authority-details');
+    hud.appendChild(statusCard);
+    appendExpeditionObjectiveStrip(hud, objective);
+    const inspector = hud;
 
     const boardCard = document.createElement('article');
     boardCard.className = 'fp-expedition-map-card fp-expedition-map-card--board';
@@ -1899,9 +2171,32 @@
       ? 'Dim silhouettes are server-provided hinted or locked cells; they do not reveal resources or actions.'
       : 'No hidden silhouettes are present in this read model.';
     boardCard.appendChild(boardCopy);
-    body.appendChild(boardCard);
-    appendSelectedExpeditionDetails(body, selectedCell, model);
-    appendExpeditionEventPacketSurface(body, selectedCell, model);
+    appendExpeditionMapVisualHud(boardCard, model, counts, selectedCell, scoutableCells, bundle);
+    runtimeShell.insertBefore(boardCard, hud);
+    const selectedDetails = document.createElement('div');
+    selectedDetails.className = 'fp-expedition-inspector-section__body';
+    appendSelectedExpeditionDetails(selectedDetails, selectedCell, model);
+    appendExpeditionInspectorSection(
+      inspector,
+      'Selected-sector proof',
+      selectedDetails,
+      'fp-expedition-inspector-selected-details',
+      {
+        meta: selectedCell ? `${selectedCell.cellId} - visual details tucked away` : 'no selected sector',
+      },
+    );
+    const evidenceDetails = document.createElement('div');
+    evidenceDetails.className = 'fp-expedition-inspector-section__body';
+    appendExpeditionEventPacketSurface(evidenceDetails, selectedCell, model);
+    appendExpeditionInspectorSection(
+      inspector,
+      'Evidence packet',
+      evidenceDetails,
+      'fp-expedition-inspector-evidence',
+      {
+        meta: expeditionPacketForCell(model, selectedCell) ? 'receipt details tucked away' : 'pending Scout Sector receipt',
+      },
+    );
 
     const hiddenCard = document.createElement('article');
     hiddenCard.className = 'fp-expedition-map-card fp-expedition-map-card--hidden';
@@ -1913,9 +2208,9 @@
     hiddenCopy.textContent = `${countLabel(counts.hinted, 'hinted silhouette')} and ${countLabel(counts.locked_unknown, 'locked unknown sector')} remain private fog.`;
     hiddenCard.appendChild(hiddenCopy);
     appendChipSet(hiddenCard, hiddenCells.slice(0, 8).map((cell) => `${friendlyToken(cell.fogState)} ${cell.cellId}`));
-    body.appendChild(hiddenCard);
-    appendScoutSectorResult(body);
-    appendScoutSectorActions(body, scoutableCells, model, bundle);
+    inspector.appendChild(hiddenCard);
+    appendScoutSectorResult(inspector);
+    appendScoutSectorActions(inspector, scoutableCells, model, bundle);
 
     const sectorList = document.createElement('div');
     sectorList.className = 'fp-expedition-sector-list';
@@ -1973,7 +2268,15 @@
       empty.textContent = 'No revealed frontier sectors are present yet.';
       sectorList.appendChild(empty);
     }
-    body.appendChild(sectorList);
+    appendExpeditionInspectorSection(
+      hud,
+      'Revealed-sector ledger',
+      sectorList,
+      'fp-expedition-inspector-ledger',
+      {
+        meta: `${countLabel(revealedCells.length, 'read-only sector')} - receipts tucked away`,
+      },
+    );
   }
 
   function renderWorldGrid(bundle) {

@@ -1342,10 +1342,52 @@ class FoundersPlotThreeStage {
   }
 }
 
-const EXPEDITION_WORLD_WIDTH = 12;
-const EXPEDITION_WORLD_HEIGHT = 7.5;
-const EXPEDITION_CELL_RADIUS = 0.47;
-const EXPEDITION_VISUAL_SHELL_VERSION = 'hq13y_agenttown_runtime_composition_prototype_v1';
+const EXPEDITION_WORLD_WIDTH = 13.6;
+const EXPEDITION_WORLD_HEIGHT = 8.2;
+const EXPEDITION_CELL_RADIUS = 0.86;
+const EXPEDITION_REGION_RADIUS = EXPEDITION_CELL_RADIUS * 1.64;
+const EXPEDITION_VISUAL_SHELL_VERSION = 'hq14l_continuous_terrain_underlay_v1';
+const EXPEDITION_REGION_ASSET_PACK_VERSION = 'hq14a_region_faithful_terrain_fog_atlas_v1';
+const EXPEDITION_REGION_ASSET_BASE = '/experiences/founders-plot/assets/expedition-map';
+const EXPEDITION_REGION_TILE_ASSETS = Object.freeze({
+  settled: {
+    slot: 'discovered_settled',
+    path: `${EXPEDITION_REGION_ASSET_BASE}/tiles/discovered-settled-v1.png`,
+    publicTerrain: ['settled', 'outpost', 'home']
+  },
+  forest: {
+    slot: 'known_woodland',
+    path: `${EXPEDITION_REGION_ASSET_BASE}/tiles/known-woodland-v1.png`,
+    publicTerrain: ['forest', 'wood']
+  },
+  ridge: {
+    slot: 'known_ridge_ruin',
+    path: `${EXPEDITION_REGION_ASSET_BASE}/tiles/known-ridge-ruin-v1.png`,
+    publicTerrain: ['ridge', 'quarry', 'stone']
+  },
+  ruin_signal: {
+    slot: 'known_ridge_ruin',
+    path: `${EXPEDITION_REGION_ASSET_BASE}/tiles/known-ridge-ruin-v1.png`,
+    publicTerrain: ['ruin', 'signal']
+  },
+  water: {
+    slot: 'known_water_edge',
+    path: `${EXPEDITION_REGION_ASSET_BASE}/tiles/known-water-edge-v1.png`,
+    publicTerrain: ['water', 'river']
+  },
+  hinted: {
+    slot: 'hinted_frontier_fog',
+    path: `${EXPEDITION_REGION_ASSET_BASE}/tiles/hinted-frontier-fog-v1.png`,
+    fogOnly: true
+  },
+  locked_unknown: {
+    slot: 'locked_unknown_fog',
+    path: `${EXPEDITION_REGION_ASSET_BASE}/tiles/locked-unknown-fog-v1.png`,
+    fogOnly: true
+  }
+});
+const expeditionRegionTileImages = new Map();
+const expeditionRegionTileListeners = new Set();
 
 function hexCss(color, alpha = 1) {
   const value = Number(color || 0);
@@ -1387,7 +1429,7 @@ function expeditionLayout(cells = []) {
   const maxRawY = Math.max(...points.map((point) => point.y), 0);
   const rawWidth = Math.max(1, maxRawX - minRawX);
   const rawHeight = Math.max(1, maxRawY - minRawY);
-  const scale = Math.min((EXPEDITION_WORLD_WIDTH - 2.1) / rawWidth, (EXPEDITION_WORLD_HEIGHT - 1.6) / rawHeight, 1.55);
+  const scale = Math.min((EXPEDITION_WORLD_WIDTH - 2.4) / rawWidth, (EXPEDITION_WORLD_HEIGHT - 1.8) / rawHeight, 1.62);
   const centerX = (minRawX + maxRawX) / 2;
   const centerY = (minRawY + maxRawY) / 2;
   const positions = new Map();
@@ -1402,10 +1444,10 @@ function expeditionLayout(cells = []) {
       y: (raw.y - centerY) * scale
     };
     positions.set(String(cell.cellId || ''), position);
-    minX = Math.min(minX, position.x - EXPEDITION_CELL_RADIUS);
-    maxX = Math.max(maxX, position.x + EXPEDITION_CELL_RADIUS);
-    minY = Math.min(minY, position.y - EXPEDITION_CELL_RADIUS);
-    maxY = Math.max(maxY, position.y + EXPEDITION_CELL_RADIUS);
+    minX = Math.min(minX, position.x - EXPEDITION_REGION_RADIUS);
+    maxX = Math.max(maxX, position.x + EXPEDITION_REGION_RADIUS);
+    minY = Math.min(minY, position.y - EXPEDITION_REGION_RADIUS);
+    maxY = Math.max(maxY, position.y + EXPEDITION_REGION_RADIUS);
   }
   if (!Number.isFinite(minX)) {
     minX = -1;
@@ -1479,14 +1521,14 @@ function expeditionFogStyle(cell = {}, selected = false) {
     };
   }
   return {
-    fill: 0x2a2723,
-    line: 0x15110d,
-    rim: 0x7a674c,
-    shadow: 0x0b0907,
-    opacity: 0.80,
-    lineOpacity: 0.82,
+    fill: 0x9a9484,
+    line: 0x5d564a,
+    rim: 0xd7c7a8,
+    shadow: 0x524b42,
+    opacity: 0.54,
+    lineOpacity: 0.46,
     labelTone: 'neutral',
-    fogOverlay: 0x302923
+    fogOverlay: 0xc8bcaa
   };
 }
 
@@ -1509,6 +1551,26 @@ function expeditionHexGeometry(radius = EXPEDITION_CELL_RADIUS) {
   return new THREE.ShapeGeometry(shape);
 }
 
+function expeditionHexTexturedGeometry(radius = EXPEDITION_CELL_RADIUS) {
+  const points = expeditionHexPoints(radius).slice(0, 6);
+  const vertices = [0, 0, 0];
+  const uvs = [0.5, 0.5];
+  for (const point of points) {
+    vertices.push(point.x, point.y, 0);
+    uvs.push(0.5 + (point.x / (radius * 2)), 0.5 - (point.y / (radius * 2)));
+  }
+  const indices = [];
+  for (let index = 1; index <= points.length; index += 1) {
+    indices.push(0, index, index === points.length ? 1 : index + 1);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 function expeditionCellLabel(cell = {}) {
   const status = String(cell.status || '');
   const kind = String(cell.kind || '');
@@ -1522,19 +1584,98 @@ function expeditionCellLabel(cell = {}) {
   return 'MAP';
 }
 
-function expeditionCellTerrain(cell = {}) {
-  const fogState = String(cell.fogState || 'locked_unknown');
-  if (!['discovered', 'known'].includes(fogState)) return fogState;
+function expeditionPublicTerrainText(cell = {}) {
   const siteType = String(cell.siteType || '').toLowerCase();
   const traits = Array.isArray(cell.traits) ? cell.traits.map((trait) => String(trait || '').toLowerCase()) : [];
   const kind = String(cell.kind || '').toLowerCase();
   const status = String(cell.status || '').toLowerCase();
-  const text = `${siteType} ${kind} ${status} ${traits.join(' ')}`;
+  return `${siteType} ${kind} ${status} ${traits.join(' ')}`;
+}
+
+function cellExposesRegionTruth(cell = {}) {
+  return ['discovered', 'known'].includes(String(cell.fogState || 'locked_unknown'));
+}
+
+function isServerOwnedWaterTerrain(cell = {}) {
+  if (!cellExposesRegionTruth(cell)) return false;
+  return /(^|[_\s-])(water|river)([_\s-]|$)/.test(expeditionPublicTerrainText(cell));
+}
+
+function isServerOwnedRuinSignalTerrain(cell = {}) {
+  if (!cellExposesRegionTruth(cell)) return false;
+  return /(^|[_\s-])(ruin|signal)([_\s-]|$)/.test(expeditionPublicTerrainText(cell));
+}
+
+function expeditionCellTerrain(cell = {}) {
+  const fogState = String(cell.fogState || 'locked_unknown');
+  if (!cellExposesRegionTruth(cell)) return fogState;
+  if (isServerOwnedWaterTerrain(cell)) return 'water';
+  if (isServerOwnedRuinSignalTerrain(cell)) return 'ruin_signal';
+  const text = expeditionPublicTerrainText(cell);
   if (text.includes('forest') || text.includes('wood')) return 'forest';
   if (text.includes('ridge') || text.includes('quarry') || text.includes('stone')) return 'ridge';
   if (text.includes('outpost') || text.includes('home')) return 'settled';
-  if (text.includes('water') || text.includes('river')) return 'water';
   return 'field';
+}
+
+function expeditionPublicTerrainAllows(cell = {}, asset = null) {
+  if (!asset?.publicTerrain?.length) return false;
+  const text = expeditionPublicTerrainText(cell);
+  return asset.publicTerrain.some((term) => text.includes(term));
+}
+
+function expeditionRegionTileAssetForCell(cell = {}, terrain = expeditionCellTerrain(cell)) {
+  const fogState = String(cell.fogState || 'locked_unknown');
+  if (!cellExposesRegionTruth(cell)) {
+    return EXPEDITION_REGION_TILE_ASSETS[fogState] || null;
+  }
+  const asset = EXPEDITION_REGION_TILE_ASSETS[terrain] || null;
+  if (!asset) return null;
+  return expeditionPublicTerrainAllows(cell, asset) ? asset : null;
+}
+
+function expeditionRegionTileAssetAllowed(cell = {}, terrain = expeditionCellTerrain(cell), asset = expeditionRegionTileAssetForCell(cell, terrain)) {
+  const fogState = String(cell.fogState || 'locked_unknown');
+  if (!asset) return terrain === 'field';
+  if (!cellExposesRegionTruth(cell)) {
+    return asset.fogOnly === true && asset.slot === (fogState === 'hinted' ? 'hinted_frontier_fog' : 'locked_unknown_fog');
+  }
+  return asset.fogOnly !== true && expeditionPublicTerrainAllows(cell, asset);
+}
+
+function notifyExpeditionRegionTileLoaded() {
+  for (const listener of expeditionRegionTileListeners) {
+    listener();
+  }
+}
+
+function onExpeditionRegionTileAssetChange(listener) {
+  if (typeof listener !== 'function') return () => {};
+  expeditionRegionTileListeners.add(listener);
+  return () => expeditionRegionTileListeners.delete(listener);
+}
+
+function expeditionRegionTileReady(asset = null) {
+  if (!asset?.path) return null;
+  const image = expeditionRegionTileImages.get(asset.path);
+  if (!image || image.dataset?.loadFailed === 'true') return null;
+  return image.complete && image.naturalWidth > 0 ? image : null;
+}
+
+function ensureExpeditionRegionTileImage(asset = null) {
+  if (!asset?.path || typeof Image === 'undefined') return null;
+  const existing = expeditionRegionTileImages.get(asset.path);
+  if (existing) return expeditionRegionTileReady(asset);
+  const image = new Image();
+  image.decoding = 'async';
+  image.onload = () => notifyExpeditionRegionTileLoaded();
+  image.onerror = () => {
+    image.dataset.loadFailed = 'true';
+    notifyExpeditionRegionTileLoaded();
+  };
+  expeditionRegionTileImages.set(asset.path, image);
+  image.src = asset.path;
+  return expeditionRegionTileReady(asset);
 }
 
 function drawHexClip(ctx, radius = 120, center = 128) {
@@ -1700,7 +1841,7 @@ function drawExpeditionMiniTerrain(ctx, cell, style, terrain) {
     ctx.stroke();
   }
 
-  if (['discovered', 'known'].includes(String(cell.fogState || ''))) {
+  if (terrain === 'water') {
     ctx.strokeStyle = 'rgba(39, 126, 167, 0.26)';
     ctx.lineWidth = 9;
     ctx.lineCap = 'round';
@@ -1791,13 +1932,31 @@ function drawExpeditionMiniTerrain(ctx, cell, style, terrain) {
     }
     ctx.strokeStyle = 'rgba(255, 248, 232, 0.28)';
     ctx.lineWidth = 4;
-  } else if (terrain === 'hinted') {
-    ctx.fillStyle = 'rgba(226, 134, 40, 0.24)';
-    ctx.fillRect(0, 0, 256, 256);
+  } else if (terrain === 'ruin_signal') {
     ctx.fillStyle = 'rgba(255, 248, 232, 0.18)';
-    for (let index = 0; index < 9; index += 1) {
-      const y = 34 + (index * 22);
-      ctx.fillRect(30 + (index % 2) * 22, y, 198, 6);
+    ctx.fillRect(0, 0, 256, 256);
+    ctx.strokeStyle = 'rgba(80, 68, 55, 0.36)';
+    ctx.lineWidth = 7;
+    for (let index = 0; index < 4; index += 1) {
+      const y = 70 + (index * 29);
+      ctx.beginPath();
+      ctx.moveTo(34, y);
+      ctx.bezierCurveTo(76, y - 16, 128, y + 14, 212, y - 8);
+      ctx.stroke();
+    }
+    drawRuinCue(ctx, 105, 154, 0.72);
+    drawSignalMast(ctx, 160, 116, 0.48, 'rgba(101, 74, 28, 0.56)');
+    ctx.strokeStyle = 'rgba(101, 74, 28, 0.32)';
+    ctx.lineWidth = 4;
+  } else if (terrain === 'hinted') {
+    ctx.fillStyle = 'rgba(226, 134, 40, 0.18)';
+    ctx.fillRect(0, 0, 256, 256);
+    ctx.fillStyle = 'rgba(255, 248, 232, 0.16)';
+    for (let index = 0; index < 10; index += 1) {
+      const y = 28 + (index * 22);
+      ctx.beginPath();
+      ctx.ellipse(128 + (((index % 3) - 1) * 22), y, 112 - ((index % 2) * 18), 12, 0.12, 0, Math.PI * 2);
+      ctx.fill();
     }
     ctx.setLineDash([10, 9]);
     ctx.strokeStyle = 'rgba(255, 248, 232, 0.32)';
@@ -1806,16 +1965,28 @@ function drawExpeditionMiniTerrain(ctx, cell, style, terrain) {
     ctx.ellipse(128, 130, 72, 48, -0.15, 0, Math.PI * 2);
     ctx.stroke();
     ctx.setLineDash([]);
-    drawSignalMast(ctx, 131, 125, 0.82, 'rgba(255, 248, 232, 0.34)');
+    ctx.fillStyle = 'rgba(46, 27, 14, 0.12)';
+    ctx.beginPath();
+    ctx.ellipse(128, 136, 52, 31, -0.18, 0, Math.PI * 2);
+    ctx.fill();
     ctx.strokeStyle = 'rgba(138, 109, 65, 0.34)';
     ctx.lineWidth = 5;
   } else if (terrain === 'locked_unknown') {
-    ctx.fillStyle = 'rgba(255, 248, 232, 0.08)';
+    ctx.fillStyle = 'rgba(255, 248, 232, 0.10)';
     for (let index = -2; index < 11; index += 1) {
       ctx.fillRect(index * 31, 20, 13, 220);
     }
-    drawRuinCue(ctx, 128, 154, 0.88);
-    ctx.strokeStyle = 'rgba(255, 248, 232, 0.12)';
+    ctx.fillStyle = 'rgba(255, 248, 232, 0.12)';
+    for (let index = 0; index < 7; index += 1) {
+      ctx.beginPath();
+      ctx.ellipse(128, 42 + (index * 26), 116 - ((index % 2) * 18), 11, -0.12, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(68, 58, 48, 0.16)';
+    ctx.beginPath();
+    ctx.ellipse(128, 145, 60, 36, 0.1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 248, 232, 0.20)';
     ctx.lineWidth = 5;
   } else {
     drawPlanWagonCue(ctx, 88 + (seed * 64), 86 + (seed * 42), 0.32);
@@ -1845,7 +2016,10 @@ function drawExpeditionMiniTerrain(ctx, cell, style, terrain) {
 function makeExpeditionCellTexture(cell = {}, selected = false) {
   const fogState = String(cell.fogState || 'locked_unknown');
   const terrain = expeditionCellTerrain(cell);
-  const key = `expedition-cell:${EXPEDITION_VISUAL_SHELL_VERSION}:${cell.cellId}:${fogState}:${terrain}:${selected ? 'selected' : 'idle'}`;
+  const regionAsset = expeditionRegionTileAssetForCell(cell, terrain);
+  const regionAssetImage = ensureExpeditionRegionTileImage(regionAsset);
+  const assetState = regionAssetImage ? 'asset-ready' : regionAsset?.slot || 'procedural';
+  const key = `expedition-cell:${EXPEDITION_VISUAL_SHELL_VERSION}:${cell.cellId}:${fogState}:${terrain}:${assetState}:${selected ? 'selected' : 'idle'}`;
   if (textureCache.has(key)) return textureCache.get(key);
   const style = expeditionFogStyle(cell, selected);
   const canvas = document.createElement('canvas');
@@ -1858,14 +2032,26 @@ function makeExpeditionCellTexture(cell = {}, selected = false) {
   ctx.shadowBlur = selected ? 22 : 13;
   ctx.shadowOffsetY = selected ? 9 : 6;
   drawExpeditionMiniTerrain(ctx, cell, style, terrain);
+  if (regionAssetImage) {
+    ctx.save();
+    drawHexClip(ctx, 120, 128);
+    ctx.clip();
+    ctx.globalAlpha = fogState === 'locked_unknown' ? 0.74 : fogState === 'hinted' ? 0.72 : 0.92;
+    ctx.drawImage(regionAssetImage, 0, 0, 256, 256);
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.globalAlpha = fogState === 'locked_unknown' ? 0.16 : 0.10;
+    ctx.fillStyle = fogState === 'locked_unknown' ? '#3b3228' : '#fff8e8';
+    ctx.fillRect(0, 0, 256, 256);
+    ctx.restore();
+  }
   ctx.shadowColor = 'transparent';
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
 
   const fog = ctx.createRadialGradient(82, 62, 12, 128, 128, 130);
   fog.addColorStop(0, 'rgba(255, 248, 232, 0.20)');
-  fog.addColorStop(0.64, hexCss(style.fogOverlay, fogState === 'locked_unknown' ? 0.36 : 0.10));
-  fog.addColorStop(1, hexCss(style.shadow, fogState === 'locked_unknown' ? 0.34 : 0.12));
+  fog.addColorStop(0.64, hexCss(style.fogOverlay, fogState === 'locked_unknown' ? 0.22 : 0.10));
+  fog.addColorStop(1, hexCss(style.shadow, fogState === 'locked_unknown' ? 0.18 : 0.12));
   ctx.fillStyle = fog;
   ctx.beginPath();
   expeditionHexPoints(120).forEach((point, index) => {
@@ -1965,13 +2151,13 @@ function makeExpeditionFogTexture(kind = 'edge') {
   canvas.height = 512;
   const ctx = canvas.getContext('2d');
   const gradient = ctx.createRadialGradient(242, 238, 38, 256, 256, 250);
-  gradient.addColorStop(0, kind === 'locked' ? 'rgba(42, 37, 32, 0.52)' : 'rgba(228, 133, 38, 0.46)');
-  gradient.addColorStop(0.50, kind === 'locked' ? 'rgba(42, 36, 29, 0.56)' : 'rgba(238, 184, 86, 0.42)');
-  gradient.addColorStop(0.80, kind === 'locked' ? 'rgba(29, 24, 19, 0.34)' : 'rgba(255, 230, 158, 0.22)');
+  gradient.addColorStop(0, kind === 'locked' ? 'rgba(135, 129, 112, 0.34)' : 'rgba(228, 133, 38, 0.46)');
+  gradient.addColorStop(0.50, kind === 'locked' ? 'rgba(116, 108, 92, 0.38)' : 'rgba(238, 184, 86, 0.42)');
+  gradient.addColorStop(0.80, kind === 'locked' ? 'rgba(78, 70, 58, 0.22)' : 'rgba(255, 230, 158, 0.22)');
   gradient.addColorStop(1, 'rgba(255, 248, 232, 0)');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.strokeStyle = kind === 'locked' ? 'rgba(255, 248, 232, 0.11)' : 'rgba(255, 248, 232, 0.26)';
+  ctx.strokeStyle = kind === 'locked' ? 'rgba(255, 248, 232, 0.18)' : 'rgba(255, 248, 232, 0.26)';
   ctx.lineWidth = 8;
   ctx.lineCap = 'round';
   for (let index = 0; index < 7; index += 1) {
@@ -2062,16 +2248,16 @@ function makeExpeditionMapTexture() {
     ctx.fill();
   }
 
-  ctx.strokeStyle = 'rgba(38, 126, 168, 0.34)';
-  ctx.lineWidth = 24;
+  ctx.strokeStyle = 'rgba(101, 74, 28, 0.12)';
+  ctx.lineWidth = 15;
   ctx.lineCap = 'round';
   ctx.beginPath();
   ctx.moveTo(-70, 452);
   ctx.bezierCurveTo(112, 385, 247, 507, 399, 423);
   ctx.bezierCurveTo(552, 339, 709, 440, 1094, 305);
   ctx.stroke();
-  ctx.strokeStyle = 'rgba(222, 249, 255, 0.42)';
-  ctx.lineWidth = 8;
+  ctx.strokeStyle = 'rgba(255, 248, 232, 0.20)';
+  ctx.lineWidth = 4;
   ctx.stroke();
 
   ctx.fillStyle = 'rgba(33, 113, 80, 0.13)';
@@ -2189,6 +2375,232 @@ function makeExpeditionMapTexture() {
   return texture;
 }
 
+function expeditionContinuousUnderlayFrame(layout = {}) {
+  const bounds = layout.bounds || { minX: -1, maxX: 1, minY: -1, maxY: 1, centerX: 0, centerY: 0, width: 2, height: 2 };
+  const pad = EXPEDITION_REGION_RADIUS * 1.72;
+  const minX = bounds.minX - pad;
+  const maxX = bounds.maxX + pad;
+  const minY = bounds.minY - pad;
+  const maxY = bounds.maxY + pad;
+  return {
+    minX,
+    maxX,
+    minY,
+    maxY,
+    centerX: (minX + maxX) / 2,
+    centerY: (minY + maxY) / 2,
+    width: Math.max(0.01, maxX - minX),
+    height: Math.max(0.01, maxY - minY)
+  };
+}
+
+function expeditionContinuousUnderlayPoint(position = { x: 0, y: 0 }, frame, canvas) {
+  return {
+    x: ((position.x - frame.minX) / Math.max(0.01, frame.width)) * canvas.width,
+    y: canvas.height - (((position.y - frame.minY) / Math.max(0.01, frame.height)) * canvas.height)
+  };
+}
+
+function expeditionContinuousUnderlayStyle(cell = {}, terrain = expeditionCellTerrain(cell)) {
+  const fogState = String(cell.fogState || 'locked_unknown');
+  if (!cellExposesRegionTruth(cell)) {
+    return fogState === 'hinted'
+      ? {
+          terrain: 'hinted',
+          fill: 'rgba(224, 150, 52, 0.46)',
+          mid: 'rgba(245, 212, 132, 0.32)',
+          edge: 'rgba(255, 248, 232, 0)',
+          contour: 'rgba(101, 74, 28, 0.18)',
+          bridge: 'rgba(214, 148, 58, 0.20)',
+          fogOnly: true
+        }
+      : {
+          terrain: 'locked_unknown',
+          fill: 'rgba(157, 150, 132, 0.30)',
+          mid: 'rgba(104, 96, 82, 0.20)',
+          edge: 'rgba(255, 248, 232, 0)',
+          contour: 'rgba(255, 248, 232, 0.13)',
+          bridge: 'rgba(134, 126, 111, 0.14)',
+          fogOnly: true
+        };
+  }
+  if (terrain === 'forest') {
+    return {
+      terrain,
+      fill: 'rgba(42, 126, 86, 0.46)',
+      mid: 'rgba(35, 145, 123, 0.26)',
+      edge: 'rgba(255, 248, 232, 0)',
+      contour: 'rgba(23, 80, 64, 0.20)',
+      bridge: 'rgba(43, 126, 91, 0.24)',
+      fogOnly: false
+    };
+  }
+  if (terrain === 'ridge' || terrain === 'ruin_signal') {
+    return {
+      terrain,
+      fill: 'rgba(118, 104, 85, 0.42)',
+      mid: 'rgba(194, 176, 128, 0.24)',
+      edge: 'rgba(255, 248, 232, 0)',
+      contour: 'rgba(68, 57, 46, 0.20)',
+      bridge: 'rgba(129, 111, 82, 0.22)',
+      fogOnly: false
+    };
+  }
+  if (terrain === 'water') {
+    return {
+      terrain,
+      fill: 'rgba(63, 143, 166, 0.42)',
+      mid: 'rgba(123, 196, 207, 0.26)',
+      edge: 'rgba(255, 248, 232, 0)',
+      contour: 'rgba(35, 95, 126, 0.18)',
+      bridge: 'rgba(67, 148, 169, 0.22)',
+      fogOnly: false
+    };
+  }
+  if (terrain === 'settled') {
+    return {
+      terrain,
+      fill: 'rgba(214, 181, 102, 0.44)',
+      mid: 'rgba(73, 143, 128, 0.24)',
+      edge: 'rgba(255, 248, 232, 0)',
+      contour: 'rgba(101, 74, 28, 0.18)',
+      bridge: 'rgba(196, 165, 94, 0.22)',
+      fogOnly: false
+    };
+  }
+  return {
+    terrain,
+    fill: 'rgba(121, 158, 90, 0.38)',
+    mid: 'rgba(216, 209, 151, 0.22)',
+    edge: 'rgba(255, 248, 232, 0)',
+    contour: 'rgba(68, 91, 63, 0.17)',
+    bridge: 'rgba(124, 156, 97, 0.20)',
+    fogOnly: false
+  };
+}
+
+function drawExpeditionContinuousUnderlayBridge(ctx, start, end, style, seed = 0) {
+  const midX = (start.x + end.x) / 2;
+  const midY = (start.y + end.y) / 2;
+  const lift = 22 + (seed * 26);
+  ctx.save();
+  ctx.filter = 'blur(13px)';
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = style.bridge;
+  ctx.lineWidth = 104;
+  ctx.beginPath();
+  ctx.moveTo(start.x, start.y);
+  ctx.quadraticCurveTo(midX, midY - lift, end.x, end.y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawExpeditionContinuousUnderlayBlob(ctx, point, radius, style, seed = 0) {
+  ctx.save();
+  const gradient = ctx.createRadialGradient(point.x - radius * 0.22, point.y - radius * 0.24, radius * 0.08, point.x, point.y, radius);
+  gradient.addColorStop(0, style.fill);
+  gradient.addColorStop(0.54, style.mid);
+  gradient.addColorStop(1, style.edge);
+  ctx.filter = 'blur(9px)';
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(point.x, point.y);
+  ctx.rotate((seed - 0.5) * 0.26);
+  ctx.scale(1.28, 0.82);
+  ctx.strokeStyle = style.contour;
+  ctx.lineWidth = 5;
+  ctx.lineCap = 'round';
+  for (let index = -2; index <= 2; index += 1) {
+    const y = index * radius * 0.18;
+    ctx.beginPath();
+    ctx.moveTo(-radius * 0.78, y);
+    ctx.bezierCurveTo(-radius * 0.34, y - (radius * 0.17), radius * 0.18, y + (radius * 0.16), radius * 0.76, y - (radius * 0.08));
+    ctx.stroke();
+  }
+  if (style.fogOnly) {
+    ctx.setLineDash([15, 13]);
+    ctx.strokeStyle = style.terrain === 'locked_unknown' ? 'rgba(255, 248, 232, 0.14)' : 'rgba(101, 74, 28, 0.22)';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, radius * 0.58, radius * 0.34, -0.08, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function makeExpeditionContinuousUnderlayTexture(cells = [], layout = expeditionLayout(cells)) {
+  const terrainKey = cells.map((cell) => `${cell.cellId}:${cell.fogState}:${expeditionCellTerrain(cell)}`).join('|');
+  const key = `expedition-continuous-underlay:${EXPEDITION_VISUAL_SHELL_VERSION}:${terrainKey}`;
+  if (textureCache.has(key)) return textureCache.get(key);
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 768;
+  const ctx = canvas.getContext('2d');
+  const frame = expeditionContinuousUnderlayFrame(layout);
+  const points = new Map();
+  for (const cell of cells) {
+    const position = layout.positions.get(String(cell.cellId || ''));
+    if (!position) continue;
+    points.set(String(cell.cellId || ''), expeditionContinuousUnderlayPoint(position, frame, canvas));
+  }
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = 'rgba(255, 248, 232, 0.04)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  for (let index = 0; index < cells.length; index += 1) {
+    for (let next = index + 1; next < cells.length; next += 1) {
+      const a = cells[index];
+      const b = cells[next];
+      if (!cellsAreAdjacent(a, b)) continue;
+      const start = points.get(String(a.cellId || ''));
+      const end = points.get(String(b.cellId || ''));
+      if (!start || !end) continue;
+      const aStyle = expeditionContinuousUnderlayStyle(a);
+      const bStyle = expeditionContinuousUnderlayStyle(b);
+      const bridgeStyle = (aStyle.terrain === 'locked_unknown' || bStyle.terrain === 'locked_unknown')
+        ? { bridge: 'rgba(134, 126, 111, 0.12)' }
+        : { bridge: aStyle.fogOnly ? aStyle.bridge : bStyle.fogOnly ? bStyle.bridge : 'rgba(75, 132, 105, 0.20)' };
+      drawExpeditionContinuousUnderlayBridge(ctx, start, end, bridgeStyle, stableUnit(`${a.cellId}:${b.cellId}:underlay`));
+    }
+  }
+
+  const radiusScale = Math.min(canvas.width / frame.width, canvas.height / frame.height);
+  for (const cell of cells) {
+    const point = points.get(String(cell.cellId || ''));
+    if (!point) continue;
+    const terrain = expeditionCellTerrain(cell);
+    const style = expeditionContinuousUnderlayStyle(cell, terrain);
+    const radius = radiusScale * EXPEDITION_REGION_RADIUS * (style.fogOnly ? 1.28 : 1.38);
+    drawExpeditionContinuousUnderlayBlob(ctx, point, radius, style, stableUnit(`${cell.cellId}:${terrain}:underlay`));
+  }
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.strokeStyle = 'rgba(46, 27, 14, 0.06)';
+  ctx.lineWidth = 2;
+  for (let y = 42; y < canvas.height; y += 36) {
+    ctx.beginPath();
+    ctx.moveTo(-40, y);
+    ctx.bezierCurveTo(150, y - 24, 298, y + 28, 482, y - 8);
+    ctx.bezierCurveTo(648, y - 42, 818, y + 22, canvas.width + 40, y - 16);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  textureCache.set(key, texture);
+  return texture;
+}
+
 function makeExpeditionCivicBeaconTexture() {
   const key = `expedition-civic-beacon:${EXPEDITION_VISUAL_SHELL_VERSION}`;
   if (textureCache.has(key)) return textureCache.get(key);
@@ -2242,14 +2654,52 @@ function makeExpeditionCivicBeaconTexture() {
   return texture;
 }
 
-function makeExpeditionCellGroup(cell = {}, position = { x: 0, y: 0 }, selected = false) {
+function makeExpeditionCellGroup(cell = {}, position = { x: 0, y: 0 }, selected = false, hovered = false) {
   const style = expeditionFogStyle(cell, selected);
   const fogState = String(cell.fogState || '');
   const terrain = expeditionCellTerrain(cell);
   const group = new THREE.Group();
   group.position.set(position.x, position.y, 0);
+  const regionRadius = EXPEDITION_REGION_RADIUS * (selected ? 1.04 : hovered ? 1.02 : 1);
+  const regionPlate = new THREE.Mesh(
+    expeditionHexTexturedGeometry(regionRadius),
+    new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      map: makeExpeditionCellTexture(cell, selected),
+      transparent: true,
+      opacity: fogState === 'locked_unknown' ? 0.46 : fogState === 'hinted' ? 0.82 : 0.88,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    })
+  );
+  regionPlate.position.z = -0.10;
+  regionPlate.userData = {
+    kind: 'expedition_cell',
+    cellId: String(cell.cellId || ''),
+    fogState: String(cell.fogState || ''),
+    terrain,
+    regionPlate: true,
+    waterCue: terrain === 'water',
+    status: String(cell.status || ''),
+    title: String(cell.title || ''),
+    selected,
+    hovered
+  };
+  group.add(regionPlate);
+
+  const regionLine = new THREE.LineLoop(
+    new THREE.BufferGeometry().setFromPoints(expeditionHexPoints(regionRadius * 1.01)),
+    new THREE.LineBasicMaterial({
+      color: selected ? style.rim : style.line,
+      transparent: true,
+      opacity: selected ? 0.56 : fogState === 'locked_unknown' ? 0.16 : 0.34
+    })
+  );
+  regionLine.position.z = -0.04;
+  group.add(regionLine);
+
   const shadow = new THREE.Mesh(
-    expeditionHexGeometry(EXPEDITION_CELL_RADIUS * 1.08),
+    expeditionHexGeometry(EXPEDITION_CELL_RADIUS * 1.16),
     new THREE.MeshBasicMaterial({
       color: style.shadow,
       transparent: true,
@@ -2262,7 +2712,7 @@ function makeExpeditionCellGroup(cell = {}, position = { x: 0, y: 0 }, selected 
   group.add(shadow);
 
   const fill = new THREE.Mesh(
-    expeditionHexGeometry(EXPEDITION_CELL_RADIUS),
+    expeditionHexTexturedGeometry(EXPEDITION_CELL_RADIUS),
     new THREE.MeshBasicMaterial({
       color: 0xffffff,
       map: makeExpeditionCellTexture(cell, selected),
@@ -2277,9 +2727,12 @@ function makeExpeditionCellGroup(cell = {}, position = { x: 0, y: 0 }, selected 
     kind: 'expedition_cell',
     cellId: String(cell.cellId || ''),
     fogState: String(cell.fogState || ''),
+    terrain,
+    waterCue: terrain === 'water',
     status: String(cell.status || ''),
     title: String(cell.title || ''),
-    selected
+    selected,
+    hovered
   };
   group.add(fill);
 
@@ -2296,22 +2749,31 @@ function makeExpeditionCellGroup(cell = {}, position = { x: 0, y: 0 }, selected 
 
   if (selected) {
     const halo = new THREE.LineLoop(
-      new THREE.BufferGeometry().setFromPoints(expeditionHexPoints(EXPEDITION_CELL_RADIUS * 1.25)),
+      new THREE.BufferGeometry().setFromPoints(expeditionHexPoints(regionRadius * 1.08)),
       new THREE.LineBasicMaterial({ color: style.rim, transparent: true, opacity: 0.82 })
     );
     halo.position.z = 0.16;
     group.add(halo);
   }
 
+  if (hovered && !selected) {
+    const hoverRing = new THREE.LineLoop(
+      new THREE.BufferGeometry().setFromPoints(expeditionHexPoints(regionRadius * 1.04)),
+      new THREE.LineBasicMaterial({ color: 0xfff8e8, transparent: true, opacity: 0.70 })
+    );
+    hoverRing.position.z = 0.15;
+    group.add(hoverRing);
+  }
+
   if (fogState === 'discovered' && terrain === 'settled') {
     const homeRing = new THREE.LineLoop(
-      new THREE.BufferGeometry().setFromPoints(expeditionHexPoints(EXPEDITION_CELL_RADIUS * 1.38)),
+      new THREE.BufferGeometry().setFromPoints(expeditionHexPoints(regionRadius * 1.14)),
       new THREE.LineBasicMaterial({ color: 0xfff4c4, transparent: true, opacity: 0.58 })
     );
     homeRing.position.z = 0.14;
     group.add(homeRing);
     const homeGlow = new THREE.Mesh(
-      expeditionHexGeometry(EXPEDITION_CELL_RADIUS * 1.18),
+      expeditionHexGeometry(regionRadius * 1.02),
       new THREE.MeshBasicMaterial({ color: 0xfff4c4, transparent: true, opacity: 0.10, side: THREE.DoubleSide, depthWrite: false })
     );
     homeGlow.position.z = 0.07;
@@ -2325,14 +2787,14 @@ function makeExpeditionCellGroup(cell = {}, position = { x: 0, y: 0 }, selected 
         new THREE.Vector3(-0.34, 0.02, 0.10), new THREE.Vector3(0.12, 0.46, 0.10),
         new THREE.Vector3(-0.10, -0.46, 0.10), new THREE.Vector3(0.34, -0.02, 0.10)
       ]),
-      new THREE.LineBasicMaterial({ color: 0xfff8e8, transparent: true, opacity: 0.28 })
+      new THREE.LineBasicMaterial({ color: 0xfff8e8, transparent: true, opacity: 0.16 })
     );
     group.add(stripe);
   }
 
   if (fogState === 'hinted' && String(cell.kind || '') === 'frontier_hint') {
     const scoutLine = new THREE.LineLoop(
-      new THREE.BufferGeometry().setFromPoints(expeditionHexPoints(EXPEDITION_CELL_RADIUS * 1.18)),
+      new THREE.BufferGeometry().setFromPoints(expeditionHexPoints(regionRadius * 1.03)),
       new THREE.LineBasicMaterial({ color: 0x1b6a64, transparent: true, opacity: 0.64 })
     );
     scoutLine.position.z = 0.12;
@@ -2347,7 +2809,7 @@ function makeExpeditionCellGroup(cell = {}, position = { x: 0, y: 0 }, selected 
     alphaTest: 0.03
   }));
   marker.position.set(0, selected ? 0.03 : -0.01, 0.20);
-  marker.scale.set(selected ? 0.56 : 0.45, selected ? 0.56 : 0.45, 1);
+  marker.scale.set(selected ? 0.72 : 0.54, selected ? 0.72 : 0.54, 1);
   group.add(marker);
   return group;
 }
@@ -2427,6 +2889,8 @@ class ExpeditionMapThreeStage {
     this.info = {};
     this.pickables = [];
     this.cellMeshes = [];
+    this.hoverCellId = '';
+    this.terrainUnderlayCount = 0;
     this.surveyStrokeCount = 0;
     this.markerCount = 0;
     this.scene = new THREE.Scene();
@@ -2453,6 +2917,13 @@ class ExpeditionMapThreeStage {
     this.onPointerDown = this.onPointerDown.bind(this);
     this.onPointerMove = this.onPointerMove.bind(this);
     this.onPointerUp = this.onPointerUp.bind(this);
+    this.onPointerLeave = this.onPointerLeave.bind(this);
+    this.onRegionTileAssetLoaded = () => {
+      textureCache.clear();
+      this.rebuild();
+      this.render();
+    };
+    this.disposeRegionTileAssetListener = onExpeditionRegionTileAssetChange(this.onRegionTileAssetLoaded);
     this.resizeObserver = new ResizeObserver(this.onResize);
     this.attach();
   }
@@ -2466,6 +2937,7 @@ class ExpeditionMapThreeStage {
     this.hostNode.addEventListener('pointermove', this.onPointerMove);
     this.hostNode.addEventListener('pointerup', this.onPointerUp);
     this.hostNode.addEventListener('pointercancel', this.onPointerUp);
+    this.hostNode.addEventListener('pointerleave', this.onPointerLeave);
     this.resizeObserver.observe(this.hostNode);
     this.onResize();
   }
@@ -2476,6 +2948,8 @@ class ExpeditionMapThreeStage {
     this.hostNode.removeEventListener('pointermove', this.onPointerMove);
     this.hostNode.removeEventListener('pointerup', this.onPointerUp);
     this.hostNode.removeEventListener('pointercancel', this.onPointerUp);
+    this.hostNode.removeEventListener('pointerleave', this.onPointerLeave);
+    if (this.disposeRegionTileAssetListener) this.disposeRegionTileAssetListener();
     this.resizeObserver.disconnect();
     this.clearScene();
     this.renderer.dispose();
@@ -2498,6 +2972,7 @@ class ExpeditionMapThreeStage {
     });
     this.pickables = [];
     this.cellMeshes = [];
+    this.terrainUnderlayCount = 0;
     this.surveyStrokeCount = 0;
     this.markerCount = 0;
     this.edgeFogCount = 0;
@@ -2549,6 +3024,27 @@ class ExpeditionMapThreeStage {
     );
     bg.position.set(0, 0, -0.8);
     this.scene.add(bg);
+
+    this.terrainUnderlayCount = 0;
+    const underlayFrame = expeditionContinuousUnderlayFrame(layout);
+    const terrainUnderlay = new THREE.Mesh(
+      new THREE.PlaneGeometry(underlayFrame.width, underlayFrame.height),
+      new THREE.MeshBasicMaterial({
+        map: makeExpeditionContinuousUnderlayTexture(this.cells, layout),
+        transparent: true,
+        opacity: 0.94,
+        depthWrite: false
+      })
+    );
+    terrainUnderlay.position.set(underlayFrame.centerX, underlayFrame.centerY, -0.62);
+    terrainUnderlay.userData = {
+      kind: 'expedition_continuous_terrain_underlay',
+      visualOnly: true,
+      serverOwnedCellsOnly: true,
+      hiddenTruthLeakage: false
+    };
+    this.terrainUnderlayCount = 1;
+    this.scene.add(terrainUnderlay);
 
     const extent = Math.max(EXPEDITION_WORLD_WIDTH, EXPEDITION_WORLD_HEIGHT);
     const gridPoints = [];
@@ -2630,11 +3126,14 @@ class ExpeditionMapThreeStage {
       if (!position) continue;
       const fogState = String(cell.fogState || 'locked_unknown');
       const fog = new THREE.Mesh(
-        new THREE.PlaneGeometry(fogState === 'locked_unknown' ? 1.84 : 1.55, fogState === 'locked_unknown' ? 1.84 : 1.55),
+        new THREE.PlaneGeometry(
+          fogState === 'locked_unknown' ? EXPEDITION_REGION_RADIUS * 2.06 : EXPEDITION_REGION_RADIUS * 1.86,
+          fogState === 'locked_unknown' ? EXPEDITION_REGION_RADIUS * 2.06 : EXPEDITION_REGION_RADIUS * 1.86
+        ),
         new THREE.MeshBasicMaterial({
           map: makeExpeditionFogTexture(fogState === 'locked_unknown' ? 'locked' : 'hinted'),
           transparent: true,
-          opacity: fogState === 'locked_unknown' ? 0.62 : 0.50,
+          opacity: fogState === 'locked_unknown' ? 0.34 : 0.42,
           depthWrite: false
         })
       );
@@ -2646,7 +3145,8 @@ class ExpeditionMapThreeStage {
     for (const cell of this.cells) {
       const position = layout.positions.get(String(cell.cellId || '')) || { x: 0, y: 0 };
       const selected = String(cell.cellId || '') === this.selectedCellId;
-      const group = makeExpeditionCellGroup(cell, position, selected);
+      const hovered = String(cell.cellId || '') === this.hoverCellId;
+      const group = makeExpeditionCellGroup(cell, position, selected, hovered);
       this.scene.add(group);
       group.traverse((node) => {
         if (node.userData?.kind === 'expedition_cell') {
@@ -2691,6 +3191,14 @@ class ExpeditionMapThreeStage {
     this.render();
   }
 
+  resetView() {
+    this.camera.zoom = 1;
+    this.camera.position.x = this.mapBounds.centerX;
+    this.camera.position.y = this.mapBounds.centerY;
+    this.applyCameraBounds();
+    this.render();
+  }
+
   panBy(dx, dy) {
     const rect = this.renderer.domElement.getBoundingClientRect();
     const visible = this.visibleSize();
@@ -2725,7 +3233,10 @@ class ExpeditionMapThreeStage {
   }
 
   onPointerMove(event) {
-    if (!this.activePointers.has(event.pointerId)) return;
+    if (!this.activePointers.has(event.pointerId)) {
+      this.setHoverFromPoint(event.clientX, event.clientY);
+      return;
+    }
     const previous = this.activePointers.get(event.pointerId);
     this.activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (this.activePointers.size >= 2) {
@@ -2741,6 +3252,10 @@ class ExpeditionMapThreeStage {
       this.dragMoved = this.dragMoved || Math.abs(event.clientX - (this.lastPointer?.x || event.clientX)) + Math.abs(event.clientY - (this.lastPointer?.y || event.clientY)) > 4;
       this.panBy(dx, dy);
     }
+  }
+
+  onPointerLeave() {
+    this.setHoverCell('');
   }
 
   onPointerUp(event) {
@@ -2761,9 +3276,25 @@ class ExpeditionMapThreeStage {
       if (hit) {
         const detail = detailFromExpeditionCell(hit);
         this.selectedCellId = detail.cellId;
+        this.setHoverCell(detail.cellId);
         window.dispatchEvent(new CustomEvent('founders-plot-expedition-map-select', { detail }));
       }
     }
+  }
+
+  setHoverFromPoint(clientX, clientY) {
+    const hit = this.pickFromPoint(clientX, clientY);
+    this.setHoverCell(hit?.userData?.cellId || '');
+  }
+
+  setHoverCell(cellId = '') {
+    const nextCellId = String(cellId || '');
+    if (nextCellId === this.hoverCellId) return;
+    this.hoverCellId = nextCellId;
+    if (nextCellId) this.hostNode.dataset.hoverCellId = nextCellId;
+    else delete this.hostNode.dataset.hoverCellId;
+    this.rebuild();
+    this.render();
   }
 
   pickFromPoint(clientX, clientY) {
@@ -2790,6 +3321,32 @@ class ExpeditionMapThreeStage {
 
   updateInfo() {
     const canvas = this.renderer.domElement;
+    const regionVisuals = this.cells.map((cell) => {
+      const fogState = String(cell.fogState || 'locked_unknown');
+      const terrain = expeditionCellTerrain(cell);
+      const publicTerrainText = expeditionPublicTerrainText(cell);
+      const asset = expeditionRegionTileAssetForCell(cell, terrain);
+      const assetImage = expeditionRegionTileReady(asset);
+      const underlayStyle = expeditionContinuousUnderlayStyle(cell, terrain);
+      return {
+        cellId: String(cell.cellId || ''),
+        fogState,
+        siteType: String(cell.siteType || ''),
+        kind: String(cell.kind || ''),
+        publicTerrainText,
+        terrain,
+        runtimeAssetPack: EXPEDITION_REGION_ASSET_PACK_VERSION,
+        assetSlot: asset?.slot || null,
+        assetPath: asset?.path || null,
+        assetReady: !!assetImage,
+        assetAllowedByServerTruth: expeditionRegionTileAssetAllowed(cell, terrain, asset),
+        underlayTerrain: underlayStyle.terrain,
+        underlayFogOnly: underlayStyle.fogOnly === true,
+        waterCue: terrain === 'water',
+        ruinSignalCue: terrain === 'ruin_signal',
+        hiddenSpecificitySuppressed: !cellExposesRegionTruth(cell) && terrain === fogState
+      };
+    });
     this.info = {
       renderer: 'three.js',
       surface: 'expedition-map',
@@ -2798,18 +3355,41 @@ class ExpeditionMapThreeStage {
       canvasHeight: canvas.height,
       cellCount: this.cells.length,
       selectedCellId: String(this.selectedCellId || ''),
+      hoverCellId: String(this.hoverCellId || ''),
       zoom: Number(this.camera.zoom.toFixed(3)),
-      visualShell: EXPEDITION_VISUAL_SHELL_VERSION,
-      visualLayers: {
-        terrainTexture: true,
-        candidate02Cues: true,
-        agentTownIdentityCues: true,
-        scoutLedgerHud: true,
+        visualShell: EXPEDITION_VISUAL_SHELL_VERSION,
+        visualLayers: {
+          terrainTexture: true,
+          runtimeRegionAssetPack: EXPEDITION_REGION_ASSET_PACK_VERSION,
+          runtimeRegionAtlas: `${EXPEDITION_REGION_ASSET_BASE}/hq14a-region-faithful-terrain-fog-atlas-v1.png`,
+          assetBackedRegionTiles: regionVisuals.filter((cell) => cell.assetPath).length,
+          assetBackedLoadedTiles: regionVisuals.filter((cell) => cell.assetReady).length,
+          assetBackedTerrainTextures: true,
+          continuousTerrainUnderlay: true,
+          continuousTerrainUnderlayVersion: EXPEDITION_VISUAL_SHELL_VERSION,
+          continuousUnderlayUsesServerOwnedCells: true,
+          continuousUnderlayHiddenCellsFogOnly: regionVisuals
+            .filter((cell) => !['discovered', 'known'].includes(cell.fogState))
+            .every((cell) => cell.underlayFogOnly && cell.underlayTerrain === cell.fogState),
+          continuousUnderlayVisualOnly: true,
+          plateBlendLayer: true,
+          terrainUnderlayCount: this.terrainUnderlayCount,
+          proceduralFallbackWhenAssetPending: true,
+          candidate02Cues: true,
+          agentTownIdentityCues: true,
+          scoutLedgerHud: true,
+        mapFirstHudOverlays: true,
+        hoverAffordance: true,
+        selectedSectorOutline: true,
         beaconPlanWagonCues: true,
         homeNodeEmphasis: true,
         riverFlatCues: true,
+        waterCuesServerGated: true,
         woodlandRidgeCues: true,
         ruinSignalCues: true,
+        ruinSignalCuesServerGated: true,
+        lockedUnknownSealedFogOnly: true,
+        hintedAbstractFogEdge: true,
         frontierBoundaryDashes: true,
         frontierBoundaryVisualOnly: true,
         fogVeils: this.cells.filter((cell) => !['discovered', 'known'].includes(String(cell.fogState || ''))).length,
@@ -2821,6 +3401,33 @@ class ExpeditionMapThreeStage {
         markerCount: this.markerCount,
         clientAuthority: false
       },
+      regionConsistency: {
+        waterCueCells: regionVisuals.filter((cell) => cell.waterCue).map((cell) => cell.cellId),
+        ruinSignalCueCells: regionVisuals.filter((cell) => cell.ruinSignalCue).map((cell) => cell.cellId),
+        lockedUnknownCellsSealed: regionVisuals
+          .filter((cell) => cell.fogState === 'locked_unknown')
+          .every((cell) => cell.hiddenSpecificitySuppressed && !cell.waterCue && !cell.ruinSignalCue),
+        hintedCellsAbstract: regionVisuals
+          .filter((cell) => cell.fogState === 'hinted')
+          .every((cell) => cell.hiddenSpecificitySuppressed && !cell.waterCue && !cell.ruinSignalCue),
+        waterCuesRequireServerOwnedWater: regionVisuals
+          .filter((cell) => cell.waterCue)
+          .every((cell) => /(^|[_\s-])(water|river)([_\s-]|$)/.test(cell.publicTerrainText)),
+        hiddenCellsUseOnlyFogAssets: regionVisuals
+          .filter((cell) => !['discovered', 'known'].includes(cell.fogState))
+          .every((cell) => ['hinted_frontier_fog', 'locked_unknown_fog'].includes(String(cell.assetSlot || ''))),
+        knownDiscoveredAssetsMatchServerTerrain: regionVisuals
+          .filter((cell) => ['discovered', 'known'].includes(cell.fogState) && cell.assetPath)
+          .every((cell) => cell.assetAllowedByServerTruth === true),
+        runtimeAssetCellsRegionTruthBound: regionVisuals
+          .filter((cell) => cell.assetPath)
+          .every((cell) => cell.assetAllowedByServerTruth === true),
+        continuousUnderlayHiddenCellsFogOnly: regionVisuals
+          .filter((cell) => !['discovered', 'known'].includes(cell.fogState))
+          .every((cell) => cell.underlayFogOnly && cell.underlayTerrain === cell.fogState),
+        continuousUnderlayNoActionAuthority: this.terrainUnderlayCount === 1
+      },
+      regionVisuals,
       camera: {
         x: Number(this.camera.position.x.toFixed(3)),
         y: Number(this.camera.position.y.toFixed(3)),
@@ -2840,6 +3447,7 @@ class ExpeditionMapThreeStage {
       pickTargets: this.cells.map((cell) => ({
         cellId: String(cell.cellId || ''),
         fogState: String(cell.fogState || ''),
+        terrain: expeditionCellTerrain(cell),
         status: String(cell.status || ''),
         title: String(cell.title || ''),
         canvas: this.canvasPointForCell(cell.cellId)
@@ -2884,6 +3492,20 @@ function getExpeditionMapInfo(hostNode) {
   return stage ? stage.updateInfo() : null;
 }
 
+function zoomExpeditionMap(hostNode, multiplier = 1) {
+  const stage = expeditionMapRenderers.get(hostNode);
+  if (!stage) return null;
+  stage.setZoom(stage.camera.zoom * number(multiplier, 1));
+  return stage.updateInfo();
+}
+
+function resetExpeditionMapCamera(hostNode) {
+  const stage = expeditionMapRenderers.get(hostNode);
+  if (!stage) return null;
+  stage.resetView();
+  return stage.updateInfo();
+}
+
 function disposeExpeditionMap(hostNode) {
   const stage = expeditionMapRenderers.get(hostNode);
   if (!stage) return;
@@ -2896,5 +3518,7 @@ window.FoundersPlotThreeRenderer = {
   getPlotSceneInfo,
   renderExpeditionMap,
   getExpeditionMapInfo,
+  zoomExpeditionMap,
+  resetExpeditionMapCamera,
   disposeExpeditionMap
 };
