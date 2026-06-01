@@ -1346,7 +1346,7 @@ const EXPEDITION_WORLD_WIDTH = 13.6;
 const EXPEDITION_WORLD_HEIGHT = 8.2;
 const EXPEDITION_CELL_RADIUS = 0.86;
 const EXPEDITION_REGION_RADIUS = EXPEDITION_CELL_RADIUS * 1.64;
-const EXPEDITION_VISUAL_SHELL_VERSION = 'hq14m_soft_region_seams_v1';
+const EXPEDITION_VISUAL_SHELL_VERSION = 'hq14n_cartographic_fog_depth_v1';
 const EXPEDITION_REGION_ASSET_PACK_VERSION = 'hq14a_region_faithful_terrain_fog_atlas_v1';
 const EXPEDITION_REGION_ASSET_BASE = '/experiences/founders-plot/assets/expedition-map';
 const EXPEDITION_REGION_TILE_ASSETS = Object.freeze({
@@ -2200,6 +2200,16 @@ function makeExpeditionFogTexture(kind = 'edge') {
     ctx.bezierCurveTo(130, y - 28, 262, y + 36, 480, y - 20);
     ctx.stroke();
   }
+  ctx.save();
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.strokeStyle = kind === 'locked' ? 'rgba(57, 49, 40, 0.18)' : 'rgba(124, 91, 48, 0.18)';
+  ctx.lineWidth = 3;
+  for (let index = 0; index < 5; index += 1) {
+    ctx.beginPath();
+    ctx.ellipse(254, 242 + (index * 5), 188 - (index * 22), 122 - (index * 13), -0.14, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
   if (kind !== 'locked') {
     ctx.setLineDash([18, 16]);
     ctx.strokeStyle = 'rgba(101, 74, 28, 0.24)';
@@ -2215,6 +2225,45 @@ function makeExpeditionFogTexture(kind = 'edge') {
   texture.magFilter = THREE.LinearFilter;
   textureCache.set(key, texture);
   return texture;
+}
+
+function drawExpeditionAmbientContourField(ctx, width, height) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = 'rgba(46, 27, 14, 0.07)';
+  ctx.lineWidth = 3;
+  for (let index = -1; index < 11; index += 1) {
+    const y = 62 + (index * 58);
+    ctx.beginPath();
+    ctx.moveTo(-70, y);
+    ctx.bezierCurveTo(124, y - 54, 282, y + 48, 474, y - 18);
+    ctx.bezierCurveTo(650, y - 78, 814, y + 40, width + 80, y - 36);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(27, 106, 100, 0.08)';
+  ctx.lineWidth = 2;
+  for (let index = -2; index < 9; index += 1) {
+    const x = 112 + (index * 128);
+    ctx.beginPath();
+    ctx.moveTo(x, -50);
+    ctx.bezierCurveTo(x + 88, 92, x - 78, 222, x + 74, 362);
+    ctx.bezierCurveTo(x + 202, 480, x - 62, 546, x + 138, height + 52);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255, 248, 232, 0.26)';
+  ctx.lineWidth = 2;
+  for (let index = 0; index < 5; index += 1) {
+    const x = 610 + (index * 80);
+    const y = 118 + ((index % 2) * 74);
+    ctx.beginPath();
+    ctx.ellipse(x, y, 84 + (index * 10), 38 + (index * 4), -0.18, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function makeExpeditionEdgeFogTexture(kind = 'soft') {
@@ -2272,6 +2321,7 @@ function makeExpeditionMapTexture() {
   gradient.addColorStop(1, '#6aa39b');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+  drawExpeditionAmbientContourField(ctx, canvas.width, canvas.height);
 
   ctx.fillStyle = 'rgba(72, 152, 124, 0.11)';
   for (let index = 0; index < 9; index += 1) {
@@ -3409,6 +3459,9 @@ class ExpeditionMapThreeStage {
           softRegionSeams: true,
           reducedPlateEdgeContrast: true,
           centerTileMutedForUnderlay: true,
+          cartographicFogDepth: true,
+          ambientContourField: true,
+          fogDepthGlyphsVisualOnly: true,
           terrainUnderlayCount: this.terrainUnderlayCount,
           proceduralFallbackWhenAssetPending: true,
           candidate02Cues: true,

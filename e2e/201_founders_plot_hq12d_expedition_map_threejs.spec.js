@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
 
-const PREFIX = 'reports/agent-town-hq14m-soft-region-seams';
+const PREFIX = 'reports/agent-town-hq14n-cartographic-fog-depth';
 const DESKTOP_SCREENSHOT = `${PREFIX}-desktop-2026-06-01.png`;
 const MOBILE_SCREENSHOT = `${PREFIX}-mobile-2026-06-01.png`;
 const CONTACT_SHEET = `${PREFIX}-contact-sheet-2026-06-01.png`;
@@ -343,10 +343,13 @@ function runtimeRegionSourceProof() {
       && source.includes('function expeditionCorePlateOpacity')
       && source.includes('function expeditionRegionLineOpacity')
       && source.includes('function expeditionCoreLineOpacity'),
+    cartographicFogDepthDeclared: source.includes('function drawExpeditionAmbientContourField')
+      && source.includes('cartographicFogDepth: true')
+      && source.includes('fogDepthGlyphsVisualOnly: true'),
   };
 }
 
-test('FP-E2E-023 HQ14M Expedition Map soft region seams preserve authority', async ({ page }) => {
+test('FP-E2E-023 HQ14N Expedition Map cartographic fog depth preserves authority', async ({ page }) => {
   const fixture = expeditionMapFixture();
   const sourceProof = runtimeRegionSourceProof();
   expect(sourceProof.lockedUnknownHasNoRuinDrawPath).toBe(true);
@@ -364,6 +367,7 @@ test('FP-E2E-023 HQ14M Expedition Map soft region seams preserve authority', asy
   expect(sourceProof.continuousUnderlayUsesFogGate).toBe(true);
   expect(sourceProof.continuousUnderlayAvoidsPrivateFields).toBe(true);
   expect(sourceProof.softSeamOpacityHelpers).toBe(true);
+  expect(sourceProof.cartographicFogDepthDeclared).toBe(true);
   await installRoutes(page, fixture);
 
   await page.setViewportSize({ width: 1280, height: 900 });
@@ -384,7 +388,7 @@ test('FP-E2E-023 HQ14M Expedition Map soft region seams preserve authority', asy
   expect(initialInfo.surface).toBe('expedition-map');
   expect(initialInfo.cellCount).toBe(5);
   expect(initialInfo.fogStates.locked_unknown).toBe(1);
-  expect(initialInfo.visualShell).toBe('hq14m_soft_region_seams_v1');
+  expect(initialInfo.visualShell).toBe('hq14n_cartographic_fog_depth_v1');
   expect(initialInfo.visualLayers.terrainTexture).toBe(true);
   expect(initialInfo.visualLayers.runtimeRegionAssetPack).toBe('hq14a_region_faithful_terrain_fog_atlas_v1');
   expect(initialInfo.visualLayers.runtimeRegionAtlas).toContain('/experiences/founders-plot/assets/expedition-map/hq14a-region-faithful-terrain-fog-atlas-v1.png');
@@ -392,7 +396,7 @@ test('FP-E2E-023 HQ14M Expedition Map soft region seams preserve authority', asy
   expect(initialInfo.visualLayers.assetBackedLoadedTiles).toBeGreaterThanOrEqual(5);
   expect(initialInfo.visualLayers.assetBackedTerrainTextures).toBe(true);
   expect(initialInfo.visualLayers.continuousTerrainUnderlay).toBe(true);
-  expect(initialInfo.visualLayers.continuousTerrainUnderlayVersion).toBe('hq14m_soft_region_seams_v1');
+  expect(initialInfo.visualLayers.continuousTerrainUnderlayVersion).toBe('hq14n_cartographic_fog_depth_v1');
   expect(initialInfo.visualLayers.continuousUnderlayUsesServerOwnedCells).toBe(true);
   expect(initialInfo.visualLayers.continuousUnderlayHiddenCellsFogOnly).toBe(true);
   expect(initialInfo.visualLayers.continuousUnderlayVisualOnly).toBe(true);
@@ -400,6 +404,9 @@ test('FP-E2E-023 HQ14M Expedition Map soft region seams preserve authority', asy
   expect(initialInfo.visualLayers.softRegionSeams).toBe(true);
   expect(initialInfo.visualLayers.reducedPlateEdgeContrast).toBe(true);
   expect(initialInfo.visualLayers.centerTileMutedForUnderlay).toBe(true);
+  expect(initialInfo.visualLayers.cartographicFogDepth).toBe(true);
+  expect(initialInfo.visualLayers.ambientContourField).toBe(true);
+  expect(initialInfo.visualLayers.fogDepthGlyphsVisualOnly).toBe(true);
   expect(initialInfo.visualLayers.terrainUnderlayCount).toBe(1);
   expect(initialInfo.visualLayers.proceduralFallbackWhenAssetPending).toBe(true);
   expect(initialInfo.visualLayers.candidate02Cues).toBe(true);
@@ -713,6 +720,6 @@ test('FP-E2E-023 HQ14M Expedition Map soft region seams preserve authority', asy
       scoutSectorOnlyMutationPath: true,
       sameOriginRuntimeMapAssets: initialInfo.visualLayers.runtimeRegionAtlas.startsWith('/experiences/founders-plot/assets/expedition-map/'),
     },
-    finalNote: 'HQ14M softens region plate seams over the continuous terrain/fog underlay so the Expedition Map reads closer to one world; Scout Sector remains the only mutation path.',
+    finalNote: 'HQ14N adds ambient cartographic contour depth to the fog/map texture so the Expedition Map reads less flat without adding hidden terrain truth; Scout Sector remains the only mutation path.',
   }, null, 2));
 });
