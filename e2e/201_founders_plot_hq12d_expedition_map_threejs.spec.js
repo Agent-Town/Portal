@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
 
-const PREFIX = 'reports/agent-town-hq14l-continuous-terrain-underlay';
+const PREFIX = 'reports/agent-town-hq14m-soft-region-seams';
 const DESKTOP_SCREENSHOT = `${PREFIX}-desktop-2026-06-01.png`;
 const MOBILE_SCREENSHOT = `${PREFIX}-mobile-2026-06-01.png`;
 const CONTACT_SHEET = `${PREFIX}-contact-sheet-2026-06-01.png`;
@@ -339,10 +339,14 @@ function runtimeRegionSourceProof() {
     continuousUnderlayDeclared: source.includes('function makeExpeditionContinuousUnderlayTexture') && source.includes('expedition_continuous_terrain_underlay'),
     continuousUnderlayUsesFogGate: source.includes('function expeditionContinuousUnderlayStyle') && source.includes('if (!cellExposesRegionTruth(cell))'),
     continuousUnderlayAvoidsPrivateFields: !/resourceHints|receipts|sourceIds|recommendedNext/.test(underlayFunction),
+    softSeamOpacityHelpers: source.includes('function expeditionRegionPlateOpacity')
+      && source.includes('function expeditionCorePlateOpacity')
+      && source.includes('function expeditionRegionLineOpacity')
+      && source.includes('function expeditionCoreLineOpacity'),
   };
 }
 
-test('FP-E2E-023 HQ14L Expedition Map continuous terrain underlay preserves authority', async ({ page }) => {
+test('FP-E2E-023 HQ14M Expedition Map soft region seams preserve authority', async ({ page }) => {
   const fixture = expeditionMapFixture();
   const sourceProof = runtimeRegionSourceProof();
   expect(sourceProof.lockedUnknownHasNoRuinDrawPath).toBe(true);
@@ -359,6 +363,7 @@ test('FP-E2E-023 HQ14L Expedition Map continuous terrain underlay preserves auth
   expect(sourceProof.continuousUnderlayDeclared).toBe(true);
   expect(sourceProof.continuousUnderlayUsesFogGate).toBe(true);
   expect(sourceProof.continuousUnderlayAvoidsPrivateFields).toBe(true);
+  expect(sourceProof.softSeamOpacityHelpers).toBe(true);
   await installRoutes(page, fixture);
 
   await page.setViewportSize({ width: 1280, height: 900 });
@@ -379,7 +384,7 @@ test('FP-E2E-023 HQ14L Expedition Map continuous terrain underlay preserves auth
   expect(initialInfo.surface).toBe('expedition-map');
   expect(initialInfo.cellCount).toBe(5);
   expect(initialInfo.fogStates.locked_unknown).toBe(1);
-  expect(initialInfo.visualShell).toBe('hq14l_continuous_terrain_underlay_v1');
+  expect(initialInfo.visualShell).toBe('hq14m_soft_region_seams_v1');
   expect(initialInfo.visualLayers.terrainTexture).toBe(true);
   expect(initialInfo.visualLayers.runtimeRegionAssetPack).toBe('hq14a_region_faithful_terrain_fog_atlas_v1');
   expect(initialInfo.visualLayers.runtimeRegionAtlas).toContain('/experiences/founders-plot/assets/expedition-map/hq14a-region-faithful-terrain-fog-atlas-v1.png');
@@ -387,11 +392,14 @@ test('FP-E2E-023 HQ14L Expedition Map continuous terrain underlay preserves auth
   expect(initialInfo.visualLayers.assetBackedLoadedTiles).toBeGreaterThanOrEqual(5);
   expect(initialInfo.visualLayers.assetBackedTerrainTextures).toBe(true);
   expect(initialInfo.visualLayers.continuousTerrainUnderlay).toBe(true);
-  expect(initialInfo.visualLayers.continuousTerrainUnderlayVersion).toBe('hq14l_continuous_terrain_underlay_v1');
+  expect(initialInfo.visualLayers.continuousTerrainUnderlayVersion).toBe('hq14m_soft_region_seams_v1');
   expect(initialInfo.visualLayers.continuousUnderlayUsesServerOwnedCells).toBe(true);
   expect(initialInfo.visualLayers.continuousUnderlayHiddenCellsFogOnly).toBe(true);
   expect(initialInfo.visualLayers.continuousUnderlayVisualOnly).toBe(true);
   expect(initialInfo.visualLayers.plateBlendLayer).toBe(true);
+  expect(initialInfo.visualLayers.softRegionSeams).toBe(true);
+  expect(initialInfo.visualLayers.reducedPlateEdgeContrast).toBe(true);
+  expect(initialInfo.visualLayers.centerTileMutedForUnderlay).toBe(true);
   expect(initialInfo.visualLayers.terrainUnderlayCount).toBe(1);
   expect(initialInfo.visualLayers.proceduralFallbackWhenAssetPending).toBe(true);
   expect(initialInfo.visualLayers.candidate02Cues).toBe(true);
@@ -705,6 +713,6 @@ test('FP-E2E-023 HQ14L Expedition Map continuous terrain underlay preserves auth
       scoutSectorOnlyMutationPath: true,
       sameOriginRuntimeMapAssets: initialInfo.visualLayers.runtimeRegionAtlas.startsWith('/experiences/founders-plot/assets/expedition-map/'),
     },
-    finalNote: 'HQ14L adds a continuous terrain/fog underlay from the existing server-owned Expedition Map cells so the surface reads as one world; Scout Sector remains the only mutation path.',
+    finalNote: 'HQ14M softens region plate seams over the continuous terrain/fog underlay so the Expedition Map reads closer to one world; Scout Sector remains the only mutation path.',
   }, null, 2));
 });

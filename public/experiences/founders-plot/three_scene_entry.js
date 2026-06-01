@@ -1346,7 +1346,7 @@ const EXPEDITION_WORLD_WIDTH = 13.6;
 const EXPEDITION_WORLD_HEIGHT = 8.2;
 const EXPEDITION_CELL_RADIUS = 0.86;
 const EXPEDITION_REGION_RADIUS = EXPEDITION_CELL_RADIUS * 1.64;
-const EXPEDITION_VISUAL_SHELL_VERSION = 'hq14l_continuous_terrain_underlay_v1';
+const EXPEDITION_VISUAL_SHELL_VERSION = 'hq14m_soft_region_seams_v1';
 const EXPEDITION_REGION_ASSET_PACK_VERSION = 'hq14a_region_faithful_terrain_fog_atlas_v1';
 const EXPEDITION_REGION_ASSET_BASE = '/experiences/founders-plot/assets/expedition-map';
 const EXPEDITION_REGION_TILE_ASSETS = Object.freeze({
@@ -1582,6 +1582,39 @@ function expeditionCellLabel(cell = {}) {
   if (fogState === 'hinted') return '...';
   if (fogState === 'locked_unknown') return '?';
   return 'MAP';
+}
+
+function expeditionRegionPlateOpacity(fogState = '', selected = false, hovered = false) {
+  if (selected) return 0.72;
+  if (hovered) return 0.62;
+  if (fogState === 'locked_unknown') return 0.26;
+  if (fogState === 'hinted') return 0.46;
+  return 0.58;
+}
+
+function expeditionCorePlateOpacity(style = {}, fogState = '', selected = false, hovered = false) {
+  const base = number(style.opacity, 0.72);
+  if (selected) return Math.min(0.82, base * 0.88);
+  if (hovered) return Math.min(0.72, base * 0.76);
+  if (fogState === 'locked_unknown') return Math.min(0.34, base * 0.58);
+  if (fogState === 'hinted') return Math.min(0.52, base * 0.62);
+  return Math.min(0.58, base * 0.66);
+}
+
+function expeditionRegionLineOpacity(fogState = '', selected = false, hovered = false) {
+  if (selected) return 0.70;
+  if (hovered) return 0.42;
+  if (fogState === 'locked_unknown') return 0.08;
+  if (fogState === 'hinted') return 0.16;
+  return 0.18;
+}
+
+function expeditionCoreLineOpacity(style = {}, fogState = '', selected = false, hovered = false) {
+  if (selected) return Math.max(0.58, number(style.lineOpacity, 0.58));
+  if (hovered) return 0.38;
+  if (fogState === 'locked_unknown') return 0.14;
+  if (fogState === 'hinted') return 0.20;
+  return 0.22;
 }
 
 function expeditionPublicTerrainText(cell = {}) {
@@ -2667,7 +2700,7 @@ function makeExpeditionCellGroup(cell = {}, position = { x: 0, y: 0 }, selected 
       color: 0xffffff,
       map: makeExpeditionCellTexture(cell, selected),
       transparent: true,
-      opacity: fogState === 'locked_unknown' ? 0.46 : fogState === 'hinted' ? 0.82 : 0.88,
+      opacity: expeditionRegionPlateOpacity(fogState, selected, hovered),
       side: THREE.DoubleSide,
       depthWrite: false
     })
@@ -2692,7 +2725,7 @@ function makeExpeditionCellGroup(cell = {}, position = { x: 0, y: 0 }, selected 
     new THREE.LineBasicMaterial({
       color: selected ? style.rim : style.line,
       transparent: true,
-      opacity: selected ? 0.56 : fogState === 'locked_unknown' ? 0.16 : 0.34
+      opacity: expeditionRegionLineOpacity(fogState, selected, hovered)
     })
   );
   regionLine.position.z = -0.04;
@@ -2703,7 +2736,7 @@ function makeExpeditionCellGroup(cell = {}, position = { x: 0, y: 0 }, selected 
     new THREE.MeshBasicMaterial({
       color: style.shadow,
       transparent: true,
-      opacity: selected ? 0.28 : 0.18,
+      opacity: selected ? 0.18 : 0.08,
       side: THREE.DoubleSide,
       depthWrite: false
     })
@@ -2717,7 +2750,7 @@ function makeExpeditionCellGroup(cell = {}, position = { x: 0, y: 0 }, selected 
       color: 0xffffff,
       map: makeExpeditionCellTexture(cell, selected),
       transparent: true,
-      opacity: style.opacity,
+      opacity: expeditionCorePlateOpacity(style, fogState, selected, hovered),
       side: THREE.DoubleSide,
       depthWrite: false
     })
@@ -2741,7 +2774,7 @@ function makeExpeditionCellGroup(cell = {}, position = { x: 0, y: 0 }, selected 
     new THREE.LineBasicMaterial({
       color: style.line,
       transparent: true,
-      opacity: style.lineOpacity
+      opacity: expeditionCoreLineOpacity(style, fogState, selected, hovered)
     })
   );
   line.position.z = 0.08;
@@ -2768,13 +2801,13 @@ function makeExpeditionCellGroup(cell = {}, position = { x: 0, y: 0 }, selected 
   if (fogState === 'discovered' && terrain === 'settled') {
     const homeRing = new THREE.LineLoop(
       new THREE.BufferGeometry().setFromPoints(expeditionHexPoints(regionRadius * 1.14)),
-      new THREE.LineBasicMaterial({ color: 0xfff4c4, transparent: true, opacity: 0.58 })
+      new THREE.LineBasicMaterial({ color: 0xfff4c4, transparent: true, opacity: 0.44 })
     );
     homeRing.position.z = 0.14;
     group.add(homeRing);
     const homeGlow = new THREE.Mesh(
       expeditionHexGeometry(regionRadius * 1.02),
-      new THREE.MeshBasicMaterial({ color: 0xfff4c4, transparent: true, opacity: 0.10, side: THREE.DoubleSide, depthWrite: false })
+      new THREE.MeshBasicMaterial({ color: 0xfff4c4, transparent: true, opacity: 0.07, side: THREE.DoubleSide, depthWrite: false })
     );
     homeGlow.position.z = 0.07;
     group.add(homeGlow);
@@ -3373,6 +3406,9 @@ class ExpeditionMapThreeStage {
             .every((cell) => cell.underlayFogOnly && cell.underlayTerrain === cell.fogState),
           continuousUnderlayVisualOnly: true,
           plateBlendLayer: true,
+          softRegionSeams: true,
+          reducedPlateEdgeContrast: true,
+          centerTileMutedForUnderlay: true,
           terrainUnderlayCount: this.terrainUnderlayCount,
           proceduralFallbackWhenAssetPending: true,
           candidate02Cues: true,
