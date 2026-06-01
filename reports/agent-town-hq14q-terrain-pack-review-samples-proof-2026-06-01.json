@@ -1,0 +1,103 @@
+{
+  "ok": true,
+  "verdict": "PASS_REVIEW_SAMPLING_NO_RUNTIME_PROMOTION",
+  "date": "2026-06-01",
+  "branch": "neo/progression-atlas-editor-next-2026-05-29",
+  "baseHead": "19d643b",
+  "sourceInputs": {
+    "hq14pCandidate01": "reports/media/agent-town-hq14p-north-star-terrain-world-underlay-review-candidates-2026-06-01/candidate-01.gpt-image-2-source.png",
+    "hq14pCandidate03": "reports/media/agent-town-hq14p-north-star-terrain-world-underlay-review-candidates-2026-06-01/candidate-03.gpt-image-2-source.png",
+    "heldAsStyleReference": [
+      "reports/media/agent-town-hq14p-north-star-terrain-world-underlay-review-candidates-2026-06-01/candidate-02.gpt-image-2-source.png",
+      "reports/media/agent-town-hq14p-north-star-terrain-world-underlay-review-candidates-2026-06-01/candidate-04.gpt-image-2-source.png"
+    ]
+  },
+  "artifacts": {
+    "report": "reports/agent-town-hq14q-terrain-pack-review-samples-2026-06-01.md",
+    "sampleDirectory": "reports/media/agent-town-hq14q-terrain-pack-review-samples-2026-06-01/",
+    "contactSheet": {
+      "path": "reports/agent-town-hq14q-terrain-pack-review-samples-contact-sheet-2026-06-01.png",
+      "dimensions": "1100x960",
+      "sha256": "56a48d48936f7e2b076e3a2f7fbe7a4d92ae950501c5636bd12ab1e81d5ff64d"
+    },
+    "samples": [
+      {
+        "id": "candidate-01-underlay-review",
+        "path": "reports/media/agent-town-hq14q-terrain-pack-review-samples-2026-06-01/candidate-01-underlay-review-1024x576.png",
+        "dimensions": "1024x576",
+        "sha256": "b2f2d5e192914b4563fab8143ba9d0ef84ef34a973bdaba5afcfa96828a97dd8"
+      },
+      {
+        "id": "candidate-01-with-fog-overlay-review",
+        "path": "reports/media/agent-town-hq14q-terrain-pack-review-samples-2026-06-01/candidate-01-with-fog-overlay-review-1024x576.png",
+        "dimensions": "1024x576",
+        "sha256": "d8a9ae389f4584793059e21516a33a6ea983f71d49b112647195efead2ca0046"
+      },
+      {
+        "id": "candidate-01-public-terrain-slot-sample",
+        "path": "reports/media/agent-town-hq14q-terrain-pack-review-samples-2026-06-01/candidate-01-public-terrain-slot-sample-512.png",
+        "dimensions": "512x512",
+        "sha256": "6725d8d549fd95e005f07fc2b27f583a32f3a91a3d2c03d7ac8c2887f95ccdb0"
+      },
+      {
+        "id": "candidate-03-underlay-review",
+        "path": "reports/media/agent-town-hq14q-terrain-pack-review-samples-2026-06-01/candidate-03-underlay-review-1024x576.png",
+        "dimensions": "1024x576",
+        "sha256": "975b6304749872db189fd46435b41115f31821667275a9957af651debfc30a98"
+      },
+      {
+        "id": "candidate-03-with-fog-overlay-review",
+        "path": "reports/media/agent-town-hq14q-terrain-pack-review-samples-2026-06-01/candidate-03-with-fog-overlay-review-1024x576.png",
+        "dimensions": "1024x576",
+        "sha256": "cfc312f46ef2b76cf52119984c686db18181a82e6217da36e33595e4c0c04e05"
+      },
+      {
+        "id": "candidate-03-public-terrain-slot-sample",
+        "path": "reports/media/agent-town-hq14q-terrain-pack-review-samples-2026-06-01/candidate-03-public-terrain-slot-sample-512.png",
+        "dimensions": "512x512",
+        "sha256": "e6dee113b5bd43022872636112e57dd2cad64b1b34438c394b7948bcc7737d99"
+      },
+      {
+        "id": "fog-only-hidden-edge-overlay-concept",
+        "path": "reports/media/agent-town-hq14q-terrain-pack-review-samples-2026-06-01/fog-only-hidden-edge-overlay-concept-1024x576.png",
+        "dimensions": "1024x576",
+        "sha256": "9fe54c05638f4e4a52aac63ec4ead18ab0e97aa365d4e95a40efd783754e50ec",
+        "reviewNote": "Generic hidden-edge atmosphere only; not terrain truth."
+      }
+    ]
+  },
+  "runtimePromotionGate": {
+    "hiddenLockedCellsFogOnly": true,
+    "publicTerrainSemanticsRequiredForKnownTerrainArt": true,
+    "waterCoastRidgeRuinRequireMatchingPublicTruth": true,
+    "scoutSectorOnlyMutationPath": true,
+    "fpE2E023CoverageRequiredBeforePromotion": true
+  },
+  "guardrails": {
+    "reviewMediaOnly": true,
+    "noRuntimeAssetPromotion": true,
+    "noRuntimePackLoader": true,
+    "noJsCssServerStoreRoutesToolsSchemaE2eWorkerChanges": true,
+    "noNewMutationPath": true,
+    "scoutSectorOnlyMutationPath": true,
+    "hiddenCellsRemainFogUnknownOnly": true,
+    "noHiddenTerrainResourceRouteJobReceiptRecommendationOrActionLeakage": true,
+    "noAtlasExecution": true,
+    "noPublicSharing": true,
+    "noGeneratedUniverseRendering": true,
+    "noHiddenAutonomy": true,
+    "noRouteTradeEconomyResourceRewardCombatSchedulerBehavior": true,
+    "noCrossPlotMutation": true,
+    "noExternalEffects": true,
+    "noWildWestDrift": true
+  },
+  "verification": {
+    "fileSamples": "passed",
+    "magickIdentifySamples": "passed",
+    "sha256Samples": "recorded",
+    "contactSheetFile": "passed",
+    "contactSheetIdentify": "passed",
+    "jqEmpty": "passed",
+    "gitDiffCheck": "passed"
+  }
+}
