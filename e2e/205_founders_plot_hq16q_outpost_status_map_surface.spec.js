@@ -265,6 +265,9 @@ test('FP-E2E-022Q selected outpost crew shows read-only outpost status surface',
     const clipped = Array.from(document.querySelectorAll('[data-testid="fp-expedition-outpost-status"], [data-testid="fp-expedition-unit-roster"], [data-testid="fp-expedition-unit-command-bar"]'))
       .filter((node) => node.scrollWidth > node.clientWidth + 1)
       .map((node) => node.getAttribute('data-testid') || node.className || node.tagName);
+    const verticallyClipped = Array.from(document.querySelectorAll('[data-testid="fp-expedition-outpost-status"], [data-testid="fp-expedition-unit-command-bar"]'))
+      .filter((node) => node.scrollHeight > node.clientHeight + 1)
+      .map((node) => node.getAttribute('data-testid') || node.className || node.tagName);
     return {
       outpostStatus: {
         unitId: surface?.getAttribute('data-unit-id') || '',
@@ -301,6 +304,7 @@ test('FP-E2E-022Q selected outpost crew shows read-only outpost status surface',
         viewport: { width: window.innerWidth, height: window.innerHeight },
         documentScrollWidth: document.documentElement.scrollWidth,
         clipped,
+        verticallyClipped,
       },
       expected: { outpostUnitId, cellId },
     };
@@ -312,6 +316,8 @@ test('FP-E2E-022Q selected outpost crew shows read-only outpost status surface',
   }
   expect(proof.outpostStatus.text).toMatch(/⌂ Set/);
   expect(proof.outpostStatus.text).toMatch(/◇ Q1 R1/);
+  expect(proof.mobileFit.clipped).toEqual([]);
+  expect(proof.mobileFit.verticallyClipped).toEqual([]);
 
   fs.writeFileSync('reports/agent-town-hq16q-outpost-status-map-surface-proof-2026-06-02.json', JSON.stringify({
     ok: true,
@@ -393,6 +399,7 @@ test('FP-E2E-022Q selected outpost crew shows read-only outpost status surface',
       noOutpostCommands: proof.renderer.commandTargetCount === 0,
       noMovementRouteTradeResourcesSchedulesCombatAtlasGeneratedUniverseExternalEffects: true,
       mobileHorizontalOverflow: proof.mobileFit.clipped.length,
+      mobileVerticalClipping: proof.mobileFit.verticallyClipped.length,
     },
   }, null, 2));
 });

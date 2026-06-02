@@ -1,0 +1,53 @@
+{
+  "ok": true,
+  "generatedAt": "2026-06-02T12:52:00.000Z",
+  "title": "HQ16S Outpost Beacon Playtest Polish",
+  "source": "Focused FP-E2E-022Q replay after HQ16R outpost frontier beacon, with mobile outpost-status clipping assertions",
+  "screenshots": [
+    "reports/agent-town-hq16s-outpost-beacon-playtest-polish-2026-06-02-desktop.png",
+    "reports/agent-town-hq16s-outpost-beacon-playtest-polish-2026-06-02-mobile.png"
+  ],
+  "changedFiles": [
+    "public/experiences/founders-plot/founders-plot.css",
+    "e2e/205_founders_plot_hq16q_outpost_status_map_surface.spec.js",
+    "reports/agent-town-hq16q-outpost-status-map-surface-2026-06-02-mobile.png",
+    "reports/agent-town-hq16q-outpost-status-map-surface-proof-2026-06-02.json",
+    "reports/agent-town-hq16r-outpost-next-frontier-beacon-2026-06-02-mobile.png",
+    "reports/agent-town-hq16r-outpost-next-frontier-beacon-proof-2026-06-02.json"
+  ],
+  "checks": [
+    "node --check e2e/205_founders_plot_hq16q_outpost_status_map_surface.spec.js",
+    "node --check public/experiences/founders-plot/founders-plot.js",
+    "npm run build:founders-plot-threejs",
+    "npx playwright test e2e/205_founders_plot_hq16q_outpost_status_map_surface.spec.js --project=chromium --reporter=line",
+    "jq empty reports/agent-town-hq16q-outpost-status-map-surface-proof-2026-06-02.json reports/agent-town-hq16r-outpost-next-frontier-beacon-proof-2026-06-02.json",
+    "file reports/agent-town-hq16s-outpost-beacon-playtest-polish-2026-06-02-desktop.png reports/agent-town-hq16s-outpost-beacon-playtest-polish-2026-06-02-mobile.png",
+    "git diff --check"
+  ],
+  "guardrails": {
+    "tinyFrontendCssE2eProofOnly": true,
+    "serverAuthorityUnchanged": true,
+    "outpostStatusMobileDockCapped": true,
+    "outpostStatusHorizontalClipping": 0,
+    "outpostStatusVerticalClipping": 0,
+    "outpostBeaconStillVisualOnly": true,
+    "outpostBeaconStillReadOnly": true,
+    "outpostBeaconStillNotSelectable": true,
+    "outpostBeaconExecutableActions": 0,
+    "outpostBeaconRouteAuthority": false,
+    "outpostBeaconActionAuthority": false,
+    "noOutpostCommands": true,
+    "scoutSectorOnlyFogRevealMutation": true,
+    "movementAuthorityUnchanged": true,
+    "hiddenTruthLeakage": false,
+    "atlasExecution": false,
+    "generatedUniverseRuntimeExpansion": false,
+    "publicSharing": false,
+    "deploy": false,
+    "merge": false,
+    "push": false,
+    "externalEffects": false,
+    "routeTradeEconomyResourceRewardCombatScheduler": false,
+    "wildWestGenreDrift": false
+  }
+}

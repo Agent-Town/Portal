@@ -3820,6 +3820,10 @@ html, body {
     overflow: auto;
   }
 
+  .fp-expedition-map-panel .fp-expedition-unit-roster:has(.fp-expedition-outpost-status) {
+    max-height: min(30svh, 220px);
+  }
+
   .fp-expedition-map-panel .fp-expedition-fog-pips {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
