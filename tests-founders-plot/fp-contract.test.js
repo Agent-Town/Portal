@@ -392,6 +392,11 @@ test('FP-CT-101b2 get_expedition_map envelope conforms to resultSchema', () => {
   assert.equal(out.worldDelta.length, 0);
   assert.equal(out.expeditionMap.readOnly, true);
   assert.deepEqual(out.expeditionMap.executableActions, []);
+  assert.equal(out.expeditionMap.surveyBridge.readOnly, true);
+  assert.deepEqual(out.expeditionMap.surveyBridge.executableActions, []);
+  assert.equal(out.expeditionMap.surveyBridge.authorityBoundary, engine.EXPEDITION_SURVEY_BRIDGE_AUTHORITY_BOUNDARY);
+  assert.equal(out.expeditionMap.surveyBridge.status, 'WAITING_FOR_SCOUT_PACKET');
+  assert.equal(out.expeditionMap.surveyBridge.boundaryFlags.addsMutationAuthority, false);
   assert.equal(out.expeditionMap.expeditionParty.readOnly, true);
   assert.deepEqual(out.expeditionMap.expeditionParty.executableActions, []);
   assert.deepEqual(out.expeditionMap.expeditionParty.members.map((member) => member.memberId), [
@@ -458,6 +463,11 @@ test('FP-CT-101b3 scout_sector envelope conforms to resultSchema', () => {
   assert.equal(out.eventPacket.partySnapshot.boundaryFlags.routeCreation, false);
   assert.equal(out.eventPacket.receiptLink.actionName, 'et.plot.scout_sector');
   assert.equal(out.eventPacket.boundaryFlags.routeCreation, false);
+  assert.equal(out.expeditionMap.surveyBridge.readOnly, true);
+  assert.deepEqual(out.expeditionMap.surveyBridge.executableActions, []);
+  assert.equal(out.expeditionMap.surveyBridge.activePacketId, out.eventPacket.packetId);
+  assert.equal(out.expeditionMap.surveyBridge.activeCandidate.commandState.serverMutationImplemented, false);
+  assert.equal(out.expeditionMap.surveyBridge.boundaryFlags.createsSitePlan, false);
   assert.equal(out.eventPacket.boundaryFlags.atlasExecution, false);
 });
 

@@ -1433,6 +1433,9 @@ test('FP-HT-011d2 HQ12A Expedition Map route returns read-only fog cells', async
     assert.equal(locked.body.expeditionMap.status, 'ORIGIN_ONLY');
     assert.equal(locked.body.expeditionMap.readOnly, true);
     assert.deepEqual(locked.body.expeditionMap.executableActions, []);
+    assert.equal(locked.body.expeditionMap.surveyBridge.status, 'WAITING_FOR_SCOUT_PACKET');
+    assert.equal(locked.body.expeditionMap.surveyBridge.readOnly, true);
+    assert.deepEqual(locked.body.expeditionMap.surveyBridge.executableActions, []);
 
     const seeded = await seedResearchReadyPlot(server, 'expedition_map');
     const bundle = store.readPlotBundleById(seeded.plotId);
@@ -1495,6 +1498,10 @@ test('FP-HT-011d2 HQ12A Expedition Map route returns read-only fog cells', async
     assert.equal(map.body.expeditionMap.receipt.readOnly, true);
     assert.equal(map.body.expeditionMap.receipt.routeCreation, false);
     assert.equal(map.body.expeditionMap.receipt.atlasExecution, false);
+    assert.equal(map.body.expeditionMap.surveyBridge.readOnly, true);
+    assert.deepEqual(map.body.expeditionMap.surveyBridge.executableActions, []);
+    assert.equal(map.body.expeditionMap.surveyBridge.status, 'WAITING_FOR_SCOUT_PACKET');
+    assert.equal(map.body.expeditionMap.surveyBridge.boundaryFlags.addsMutationAuthority, false);
     assert.ok(map.body.expeditionMap.fog.counts.discovered >= 2);
     assert.ok(map.body.expeditionMap.fog.counts.known >= 1);
     assert.ok(map.body.expeditionMap.fog.counts.hinted >= 1);
@@ -1562,6 +1569,12 @@ test('FP-HT-011d3 POST /api/founders-plot/expedition-map/scout-sector reveals on
     assert.equal(scouted.body.eventPacket.boundaryFlags.resourceHarvesting, false);
     assert.deepEqual(scouted.body.eventPacket.boundaryFlags.resourceDelta, {});
     assert.equal(scouted.body.eventPacket.boundaryFlags.generatedUniverseRendering, false);
+    assert.equal(scouted.body.expeditionMap.surveyBridge.activePacketId, scouted.body.eventPacket.packetId);
+    assert.equal(scouted.body.expeditionMap.surveyBridge.status, 'PACKET_READY_FOR_SITE_PLAN_PREFLIGHT');
+    assert.equal(scouted.body.expeditionMap.surveyBridge.activeCandidate.commandState.serverMutationImplemented, false);
+    assert.deepEqual(scouted.body.expeditionMap.surveyBridge.activeCandidate.commandState.executableActions, []);
+    assert.equal(scouted.body.expeditionMap.surveyBridge.boundaryFlags.createsSitePlan, false);
+    assert.equal(scouted.body.expeditionMap.surveyBridge.boundaryFlags.hiddenTruthLeakage, false);
     assert.equal(scouted.body.worldDelta.some((entry) => entry.type === 'EXPEDITION_SECTOR_SCOUTED'), true);
     assert.deepEqual(scouted.body.state.plot.inventory, stateBefore.body.state.plot.inventory);
 
@@ -1594,6 +1607,8 @@ test('FP-HT-011d3 POST /api/founders-plot/expedition-map/scout-sector reveals on
     assert.equal(revealed.sourceTruth, 'expedition_scout_sector');
     assert.equal(revealed.eventPacket.packetId, scouted.body.eventPacket.packetId);
     assert.equal(later.body.expeditionMap.eventPackets.some((packet) => packet.packetId === scouted.body.eventPacket.packetId), true);
+    assert.equal(later.body.expeditionMap.surveyBridge.activePacketId, scouted.body.eventPacket.packetId);
+    assert.equal(later.body.expeditionMap.sourceSummary.surveyBridgeCandidatePacketIds.includes(scouted.body.eventPacket.packetId), true);
 
     const blockedAgent = await request(server, 'POST', '/api/founders-plot/expedition-map/scout-sector', {
       plotId: seeded.plotId,

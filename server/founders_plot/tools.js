@@ -108,7 +108,7 @@ const FOUNDERS_PLOT_TOOL_SPECS = [
   },
   {
     name: 'et.plot.get_expedition_map',
-    description: 'Returns the server-owned Expedition Map fog-of-war read model for discovered, known, hinted, and locked/unknown frontier cells, including public terrain/fog asset slots for presentation binding, the HQ12G read-only Expedition Party manifest, and the HQ15A read-only selectable unit roster for map tokens and command hints. Read-only: no movement, operator assignment, resource gathering, routes, trade, combat, public sharing, Atlas execution, or external effects.',
+    description: 'Returns the server-owned Expedition Map fog-of-war read model for discovered, known, hinted, and locked/unknown frontier cells, including public terrain/fog asset slots for presentation binding, the HQ12G read-only Expedition Party manifest, the HQ15A read-only selectable unit roster for map tokens and command hints, and the HQ16H read-only Scout Packet to Site Plan readiness bridge. Read-only: no movement, operator assignment, resource gathering, routes, trade, combat, public sharing, Atlas execution, or external effects.',
     argsSchema: {
       type: 'object',
       properties: {

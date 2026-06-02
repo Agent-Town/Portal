@@ -24,6 +24,8 @@ const EXPEDITION_UNIT_ROSTER_AUTHORITY_BOUNDARY = 'server_owned_read_only_expedi
 const EXPEDITION_UNIT_ROSTER_VERSION = 'hq15a_server_owned_expedition_unit_roster_v1';
 const EXPEDITION_UNIT_MOVE_AUTHORITY_BOUNDARY = 'server_owned_scout_unit_revealed_cell_move_receipt_v1';
 const EXPEDITION_UNIT_MOVE_VERSION = 'hq15g_server_owned_scout_unit_move_v1';
+const EXPEDITION_SURVEY_BRIDGE_AUTHORITY_BOUNDARY = 'server_owned_scout_packet_to_site_plan_readiness_v1';
+const EXPEDITION_SURVEY_BRIDGE_VERSION = 'hq16h_scout_packet_to_site_plan_readiness_v1';
 const EXPEDITION_MAP_FOG_STATES = Object.freeze(['discovered', 'known', 'hinted', 'locked_unknown']);
 const EXPEDITION_PUBLIC_TERRAIN_ASSET_CONTRACT_VERSION = 'agenttown_public_terrain_asset_slots_v1';
 const EXPEDITION_PUBLIC_TERRAIN_ASSET_SLOT_SOURCE = 'server_read_model_v1';
@@ -1362,6 +1364,33 @@ function expeditionEventPacketBoundaryFlags() {
   };
 }
 
+function expeditionSurveyBridgeBoundaryFlags() {
+  return {
+    readModelOnly: true,
+    readinessOnly: true,
+    createsSitePlan: false,
+    createsSurveyor: false,
+    addsMutationAuthority: false,
+    autonomousMovement: false,
+    operatorAssignment: false,
+    resourceHarvesting: false,
+    resourceDelta: {},
+    resourceGain: false,
+    resourceLoss: false,
+    routeCreation: false,
+    tradeRouteCreation: false,
+    rewardCreation: false,
+    backgroundScheduling: false,
+    combat: false,
+    publicSharing: false,
+    generatedUniverseRendering: false,
+    hiddenTruthLeakage: false,
+    crossPlotMutation: false,
+    atlasExecution: false,
+    externalEffects: false
+  };
+}
+
 function expeditionPartyBoundaryFlags() {
   return {
     autonomousMovement: false,
@@ -1943,6 +1972,146 @@ function buildExpeditionEventPacket({ scoutSector, targetCell = null }) {
   };
 }
 
+function expeditionSurveyBridgePlanByCellId(sitePlans = [], planCoordinates = new Map()) {
+  const out = new Map();
+  for (const plan of sitePlans) {
+    const coord = planCoordinates?.get(plan.planId);
+    if (!coord) continue;
+    out.set(expeditionCellId(coord), plan);
+  }
+  return out;
+}
+
+function expeditionSurveyBridgeSurveyorByPlanId(units = {}) {
+  const out = new Map();
+  for (const unit of Array.isArray(units?.items) ? units.items : []) {
+    const planId = safeText(unit.sourcePlanId, '', 120);
+    if (!planId || unit.unitType !== 'surveyor') continue;
+    out.set(planId, unit);
+  }
+  return out;
+}
+
+function buildExpeditionSurveyBridgeCandidate({ packet, cell, plan = null, surveyorUnit = null } = {}) {
+  const cellId = safeText(packet?.cellId || packet?.receiptLink?.cellId || cell?.cellId, '', 80);
+  const prepareCommand = (Array.isArray(surveyorUnit?.commandHints) ? surveyorUnit.commandHints : [])
+    .find((command) => (
+      command?.commandId === 'prepare_settler_convoy'
+      && command.enabled !== false
+      && command.serverMutationImplemented === true
+    )) || null;
+  const status = prepareCommand
+    ? 'SURVEYOR_COMMAND_READY'
+    : (plan ? 'SITE_PLAN_PRESENT' : 'PACKET_READY_FOR_SITE_PLAN_PREFLIGHT');
+  const nextRequiredContract = prepareCommand
+    ? 'existing_prepare_settler_convoy_endpoint'
+    : (plan ? 'reviewed_site_plan_to_surveyor_command_hint' : 'explicit_packet_to_site_plan_server_contract');
+  return {
+    candidateId: `survey_bridge_${safeText(packet?.packetHash || packet?.packetId || cellId, 'packet', 120)}`,
+    kind: 'scout_packet_to_survey_readiness',
+    status,
+    readOnly: true,
+    executableActions: [],
+    packetId: safeText(packet?.packetId, '', 160),
+    scoutId: safeText(packet?.scoutId || packet?.receiptLink?.scoutId, '', 120) || null,
+    cellId,
+    cellFogState: safeText(cell?.fogState, 'known', 40),
+    cellStatus: safeText(cell?.status, '', 80) || null,
+    sourceReceiptKind: safeText(packet?.receiptLink?.kind, 'scout_sector_receipt', 80),
+    sourceActionName: safeText(packet?.receiptLink?.actionName, 'et.plot.scout_sector', 120),
+    sitePlan: plan ? {
+      planId: plan.planId,
+      status: plan.status,
+      reviewStatus: plan.reviewStatus,
+      promotionStatus: plan.promotionStatus,
+      readOnly: true
+    } : null,
+    surveyorUnit: surveyorUnit ? {
+      unitId: surveyorUnit.unitId,
+      unitType: surveyorUnit.unitType,
+      state: surveyorUnit.state,
+      readOnly: true
+    } : null,
+    commandState: prepareCommand ? {
+      commandId: 'prepare_settler_convoy',
+      actionName: 'et.plot.prepare_settler_convoy',
+      label: 'Prepare Convoy',
+      enabled: true,
+      sourcePlanId: safeText(prepareCommand.sourcePlanId || surveyorUnit?.sourcePlanId, '', 120),
+      targetCellIds: Array.isArray(prepareCommand.targetCellIds)
+        ? prepareCommand.targetCellIds.map((entry) => safeText(entry, '', 80)).filter(Boolean)
+        : [],
+      serverMutationImplemented: true,
+      executableThroughExistingEndpoint: true,
+      readOnly: true,
+      executableActions: []
+    } : {
+      commandId: 'survey_site_plan_contract_required',
+      actionName: null,
+      label: 'Site Plan',
+      enabled: false,
+      sourcePlanId: plan?.planId || null,
+      targetCellIds: cellId ? [cellId] : [],
+      serverMutationImplemented: false,
+      executableThroughExistingEndpoint: false,
+      reason: 'Event Packet to Site Plan requires an explicit future server contract.',
+      readOnly: true,
+      executableActions: []
+    },
+    nextRequiredContract,
+    boundaryFlags: expeditionSurveyBridgeBoundaryFlags()
+  };
+}
+
+function buildExpeditionSurveyBridgeReadModel({ plotId, eventPackets = [], cellList = [], sitePlans = [], planCoordinates = new Map(), units = {} } = {}) {
+  const planByCellId = expeditionSurveyBridgePlanByCellId(sitePlans, planCoordinates);
+  const surveyorByPlanId = expeditionSurveyBridgeSurveyorByPlanId(units);
+  const candidates = eventPackets
+    .map((packet) => {
+      const cellId = safeText(packet?.cellId || packet?.receiptLink?.cellId, '', 80);
+      if (!cellId) return null;
+      const cell = cellList.find((entry) => String(entry.cellId || '') === cellId) || null;
+      if (!cell || !['known', 'discovered'].includes(String(cell.fogState || ''))) return null;
+      const plan = planByCellId.get(cellId) || null;
+      const surveyorUnit = plan ? surveyorByPlanId.get(plan.planId) || null : null;
+      return buildExpeditionSurveyBridgeCandidate({ packet, cell, plan, surveyorUnit });
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      const packetA = eventPackets.find((packet) => packet.packetId === a.packetId) || {};
+      const packetB = eventPackets.find((packet) => packet.packetId === b.packetId) || {};
+      return Number(packetB.createdAt || 0) - Number(packetA.createdAt || 0)
+        || String(b.packetId || '').localeCompare(String(a.packetId || ''));
+    });
+  const active = candidates[0] || null;
+  return {
+    bridgeId: 'scout_packet_to_survey_bridge_current_plot_v1',
+    kind: 'scout_packet_to_survey_bridge',
+    version: EXPEDITION_SURVEY_BRIDGE_VERSION,
+    plotId: plotId || null,
+    status: active ? active.status : 'WAITING_FOR_SCOUT_PACKET',
+    readOnly: true,
+    executableActions: [],
+    authorityBoundary: EXPEDITION_SURVEY_BRIDGE_AUTHORITY_BOUNDARY,
+    sourceProjectionHash: null,
+    activeCandidateId: active?.candidateId || null,
+    activePacketId: active?.packetId || null,
+    activeCellId: active?.cellId || null,
+    activeCandidate: active,
+    candidates,
+    derivedFrom: [
+      'expeditionMap.eventPackets',
+      'expeditionMap.cells',
+      'expeditionMap.units.items.commandHints',
+      'plot.sitePlans'
+    ],
+    ledgerText: active
+      ? 'Scout Sector Event Packet is server-recognized as Site Plan preflight readiness only. No survey/site-plan mutation is executable until an explicit guarded server contract exists.'
+      : 'No Scout Sector Event Packet exists yet; Scout Sector remains the only fog reveal path before survey/site-plan preflight can appear.',
+    boundaryFlags: expeditionSurveyBridgeBoundaryFlags()
+  };
+}
+
 function normalizeExpeditionSource(source) {
   if (!source || typeof source !== 'object') return null;
   return {
@@ -2403,6 +2572,14 @@ function buildExpeditionMapReadModel(bundle) {
     claimCoordinates: maps.claimCoordinates,
     unitMoves: expeditionUnitMoves
   });
+  const surveyBridge = buildExpeditionSurveyBridgeReadModel({
+    plotId: plot.plotId || null,
+    eventPackets,
+    cellList,
+    sitePlans,
+    planCoordinates: maps.planCoordinates,
+    units
+  });
   const baseReadModel = {
     status: scoutReports.length || expeditionScouts.length || sitePlans.length || settlementClaims.length || ownedPlots.length > 1
       ? 'FOG_READ_MODEL_READY'
@@ -2447,6 +2624,7 @@ function buildExpeditionMapReadModel(bundle) {
       scoutSectorIds: expeditionScouts.map((scout) => scout.scoutId),
       expeditionUnitMoveIds: expeditionUnitMoves.map((move) => move.moveId),
       eventPacketIds: eventPackets.map((packet) => packet.packetId),
+      surveyBridgeCandidatePacketIds: surveyBridge.candidates.map((candidate) => candidate.packetId),
       reviewedSitePlanIds: sitePlans
         .filter((plan) => plan.reviewStatus === 'reviewed' || plan.promotionStatus === 'reviewed_claim_ready')
         .map((plan) => plan.planId),
@@ -2457,6 +2635,7 @@ function buildExpeditionMapReadModel(bundle) {
     },
     expeditionParty,
     units,
+    surveyBridge,
     cells: cellList,
     eventPackets,
     receipt: expeditionReceipt('expedition_map_read_model_projection', {
@@ -2512,7 +2691,15 @@ function buildExpeditionMapReadModel(bundle) {
       cellId: packet.cellId,
       partyId: packet.partyId || null,
       packetHash: packet.packetHash
-    }))
+    })),
+    surveyBridge: {
+      status: baseReadModel.surveyBridge.status,
+      activeCandidateId: baseReadModel.surveyBridge.activeCandidateId,
+      activePacketId: baseReadModel.surveyBridge.activePacketId,
+      activeCellId: baseReadModel.surveyBridge.activeCellId,
+      candidateIds: baseReadModel.surveyBridge.candidates.map((candidate) => candidate.candidateId),
+      boundaryFlags: baseReadModel.surveyBridge.boundaryFlags
+    }
   }).slice(0, 16);
   return {
     ...baseReadModel,
@@ -2523,6 +2710,10 @@ function buildExpeditionMapReadModel(bundle) {
     units: {
       ...baseReadModel.units,
       projectionHash
+    },
+    surveyBridge: {
+      ...baseReadModel.surveyBridge,
+      sourceProjectionHash: projectionHash
     },
     projectionHash,
     receipt: {
@@ -7554,6 +7745,8 @@ module.exports = {
   EXPEDITION_UNIT_ROSTER_VERSION,
   EXPEDITION_UNIT_MOVE_AUTHORITY_BOUNDARY,
   EXPEDITION_UNIT_MOVE_VERSION,
+  EXPEDITION_SURVEY_BRIDGE_AUTHORITY_BOUNDARY,
+  EXPEDITION_SURVEY_BRIDGE_VERSION,
   EXPEDITION_MAP_FOG_STATES,
   EXPEDITION_PUBLIC_TERRAIN_ASSET_CONTRACT_VERSION,
   EXPEDITION_PUBLIC_TERRAIN_ASSET_SLOT_SOURCE,

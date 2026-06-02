@@ -1,0 +1,145 @@
+{
+  "ok": true,
+  "generatedAt": "2026-06-02T08:23:08.792Z",
+  "title": "HQ16H Scout Packet to Site Plan bridge UI",
+  "source": "FP-E2E-022H mocked server-owned expeditionMap.surveyBridge read model",
+  "screenshots": [
+    "reports/agent-town-hq16h-scout-to-survey-bridge-desktop-2026-06-02.png",
+    "reports/agent-town-hq16h-scout-to-survey-bridge-mobile-2026-06-02.png"
+  ],
+  "proof": {
+    "bridge": {
+      "visible": true,
+      "text": "PKTPacketQ0 R1SVYSite planPreflightCMDWaitContract",
+      "label": "Scout Packet to Site Plan bridge: Preflight at cell_q0_r1. Read-only; zero executable actions.",
+      "readOnly": "true",
+      "actions": 0,
+      "status": "PACKET_READY_FOR_SITE_PLAN_PREFLIGHT",
+      "serverMutationImplemented": "false",
+      "packetId": "expedition_event_packet_hq16h_cell_q0_r1",
+      "cellId": "cell_q0_r1",
+      "buttons": 0,
+      "rect": {
+        "x": 54,
+        "y": 225,
+        "width": 294,
+        "height": 46
+      },
+      "elementAtCenter": {
+        "testid": "fp-expedition-three-canvas",
+        "className": "fp-expedition-three-canvas",
+        "text": ""
+      },
+      "steps": [
+        {
+          "testid": "fp-expedition-survey-bridge-step-packet",
+          "text": "PKTPacketQ0 R1",
+          "readOnly": "true",
+          "actions": 0,
+          "cellId": "cell_q0_r1",
+          "packetId": "expedition_event_packet_hq16h_cell_q0_r1"
+        },
+        {
+          "testid": "fp-expedition-survey-bridge-step-site-plan",
+          "text": "SVYSite planPreflight",
+          "readOnly": "true",
+          "actions": 0,
+          "cellId": "cell_q0_r1",
+          "packetId": "expedition_event_packet_hq16h_cell_q0_r1"
+        },
+        {
+          "testid": "fp-expedition-survey-bridge-step-command",
+          "text": "CMDWaitContract",
+          "readOnly": "true",
+          "actions": 0,
+          "cellId": "cell_q0_r1",
+          "packetId": "expedition_event_packet_hq16h_cell_q0_r1"
+        }
+      ]
+    },
+    "mapBridge": {
+      "visible": true,
+      "text": "PKTPacketQ0 R1SVYSite planPreflightCMDWaitContract",
+      "label": "Scout Packet to Site Plan bridge: Preflight at cell_q0_r1. Read-only; zero executable actions.",
+      "readOnly": "true",
+      "actions": 0,
+      "status": "PACKET_READY_FOR_SITE_PLAN_PREFLIGHT",
+      "serverMutationImplemented": "false",
+      "packetId": "expedition_event_packet_hq16h_cell_q0_r1",
+      "cellId": "cell_q0_r1",
+      "buttons": 0,
+      "rect": {
+        "x": 36,
+        "y": 399,
+        "width": 321,
+        "height": 46
+      },
+      "elementAtCenter": {
+        "testid": "",
+        "className": "",
+        "text": "Site plan"
+      },
+      "steps": [
+        {
+          "testid": "fp-expedition-survey-bridge-map-selected-step-packet",
+          "text": "PKTPacketQ0 R1",
+          "readOnly": "true",
+          "actions": 0,
+          "cellId": "cell_q0_r1",
+          "packetId": "expedition_event_packet_hq16h_cell_q0_r1"
+        },
+        {
+          "testid": "fp-expedition-survey-bridge-map-selected-step-site-plan",
+          "text": "SVYSite planPreflight",
+          "readOnly": "true",
+          "actions": 0,
+          "cellId": "cell_q0_r1",
+          "packetId": "expedition_event_packet_hq16h_cell_q0_r1"
+        },
+        {
+          "testid": "fp-expedition-survey-bridge-map-selected-step-command",
+          "text": "CMDWaitContract",
+          "readOnly": "true",
+          "actions": 0,
+          "cellId": "cell_q0_r1",
+          "packetId": "expedition_event_packet_hq16h_cell_q0_r1"
+        }
+      ]
+    },
+    "objective": {
+      "readOnly": "true",
+      "actions": 0,
+      "buttons": 0
+    },
+    "mobileFit": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "documentScrollWidth": 390,
+      "clipped": []
+    }
+  },
+  "guardrails": {
+    "serverOwnedReadModel": true,
+    "frontendButtonsAdded": 0,
+    "objectiveButtons": 0,
+    "bridgeReadOnly": true,
+    "bridgeActions": 0,
+    "stepActions": 0,
+    "surveyCommandFabricatedInFrontend": false,
+    "serverMutationImplemented": false,
+    "createsSitePlan": false,
+    "createsSurveyor": false,
+    "resourceHarvesting": false,
+    "routeCreation": false,
+    "rewardCreation": false,
+    "backgroundScheduling": false,
+    "combat": false,
+    "hiddenTruthLeakage": false,
+    "crossPlotMutation": false,
+    "atlasExecution": false,
+    "externalEffects": false,
+    "mobileHorizontalOverflow": 0
+  }
+}

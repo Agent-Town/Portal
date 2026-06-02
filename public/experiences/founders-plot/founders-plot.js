@@ -1179,6 +1179,14 @@
     });
     selected.appendChild(chipRow);
 
+    const visualSurveyBridge = expeditionSurveyBridge(model);
+    if (visualSurveyBridge && String(visualSurveyBridge.activeCellId || '') === String(selectedCell.cellId || '')) {
+      appendExpeditionSurveyBridge(selected, visualSurveyBridge, {
+        scope: 'map-selected',
+        testId: 'fp-expedition-survey-bridge-map-selected',
+      });
+    }
+
     appendExpeditionReceiptTrace(selected, selectedCell, packet, 'map-selected');
     appendExpeditionPartyBadges(selected, partyMembers, 'map-selected');
     hud.appendChild(selected);
@@ -1924,6 +1932,30 @@
     return packets.length ? packets[packets.length - 1] : null;
   }
 
+  function expeditionSurveyBridge(model = {}) {
+    const bridge = model?.surveyBridge && typeof model.surveyBridge === 'object' ? model.surveyBridge : null;
+    if (!bridge || bridge.readOnly !== true) return null;
+    return bridge;
+  }
+
+  function expeditionSurveyBridgeActiveCandidate(bridge = null) {
+    const active = bridge?.activeCandidate && typeof bridge.activeCandidate === 'object'
+      ? bridge.activeCandidate
+      : null;
+    if (active?.packetId) return active;
+    const candidates = Array.isArray(bridge?.candidates) ? bridge.candidates : [];
+    return candidates.find((candidate) => candidate?.packetId) || null;
+  }
+
+  function expeditionSurveyBridgeStatusLabel(status = '') {
+    const key = String(status || '').toUpperCase();
+    if (key === 'SURVEYOR_COMMAND_READY') return 'Ready';
+    if (key === 'SITE_PLAN_PRESENT') return 'Plan';
+    if (key === 'PACKET_READY_FOR_SITE_PLAN_PREFLIGHT') return 'Preflight';
+    if (key === 'WAITING_FOR_SCOUT_PACKET') return 'Waiting';
+    return friendlyToken(status || 'Ready');
+  }
+
   function expeditionObjectiveModel({ model, cells, counts, selectedCell, scoutableCells }) {
     const selectedScoutable = selectedCell && isExpeditionScoutSectorEligible(selectedCell)
       ? selectedCell
@@ -2026,6 +2058,8 @@
         return 'Found';
       case 'review_packet':
         return 'Packet';
+      case 'survey_site_plan_contract_required':
+        return 'Plan';
       default:
         return fallback || 'Inspect';
     }
@@ -2043,6 +2077,8 @@
         return '⌂';
       case 'review_packet':
         return '⚿';
+      case 'survey_site_plan_contract_required':
+        return '▧';
       default:
         return '◎';
     }
@@ -2248,7 +2284,80 @@
     return rail;
   }
 
-  function appendExpeditionObjectiveStrip(body, objective, guidedLoop = null) {
+  function appendExpeditionSurveyBridge(strip, bridge = null, options = {}) {
+    const candidate = expeditionSurveyBridgeActiveCandidate(bridge);
+    if (!strip || !bridge || !candidate) return null;
+    const testId = String(options.testId || 'fp-expedition-survey-bridge');
+    const scope = String(options.scope || 'objective');
+    const commandState = candidate.commandState && typeof candidate.commandState === 'object'
+      ? candidate.commandState
+      : {};
+    const cellId = String(candidate.cellId || bridge.activeCellId || '');
+    const packetId = String(candidate.packetId || bridge.activePacketId || '');
+    const statusLabel = expeditionSurveyBridgeStatusLabel(candidate.status || bridge.status);
+    const cellLabel = expeditionCompactCellLabel(cellId);
+    const rail = document.createElement('div');
+    rail.className = 'fp-expedition-survey-bridge';
+    rail.dataset.testid = testId;
+    rail.dataset.scope = scope;
+    rail.dataset.bridgeVersion = String(bridge.version || '');
+    rail.dataset.status = String(candidate.status || bridge.status || '');
+    rail.dataset.cellId = cellId;
+    rail.dataset.packetId = packetId;
+    rail.dataset.readOnly = 'true';
+    rail.dataset.actions = '0';
+    rail.dataset.serverMutationImplemented = commandState.serverMutationImplemented === true ? 'true' : 'false';
+    rail.title = bridge.ledgerText || 'Scout Packet to Site Plan bridge is read-only readiness only.';
+    rail.setAttribute('aria-label', `Scout Packet to Site Plan bridge: ${statusLabel} at ${cellId || 'selected cell'}. Read-only; zero executable actions.`);
+
+    [
+      {
+        phase: 'packet',
+        code: 'PKT',
+        label: 'Packet',
+        meta: cellLabel,
+        testId: `${testId}-step-packet`,
+      },
+      {
+        phase: 'site-plan',
+        code: 'SVY',
+        label: candidate.sitePlan?.planId ? 'Plan' : 'Site plan',
+        meta: statusLabel,
+        testId: `${testId}-step-site-plan`,
+      },
+      {
+        phase: 'command',
+        code: 'CMD',
+        label: commandState.serverMutationImplemented === true ? expeditionGuidedCommandLabel(commandState.commandId, commandState.label) : 'Wait',
+        meta: commandState.serverMutationImplemented === true ? 'Endpoint' : 'Contract',
+        testId: `${testId}-step-command`,
+      },
+    ].forEach((step) => {
+      const item = document.createElement('span');
+      item.className = `fp-expedition-survey-bridge__step fp-expedition-survey-bridge__step--${safeTestId(step.phase)}`;
+      item.dataset.testid = step.testId;
+      item.dataset.phase = step.phase;
+      item.dataset.readOnly = 'true';
+      item.dataset.actions = '0';
+      item.dataset.cellId = cellId;
+      if (packetId) item.dataset.packetId = packetId;
+      item.title = `${step.code}: ${step.label} - ${step.meta}`;
+      item.setAttribute('aria-label', item.title);
+      const code = document.createElement('small');
+      code.textContent = step.code;
+      const label = document.createElement('strong');
+      label.textContent = step.label;
+      const meta = document.createElement('em');
+      meta.textContent = step.meta || 'SRV';
+      item.append(code, label, meta);
+      rail.appendChild(item);
+    });
+
+    strip.appendChild(rail);
+    return rail;
+  }
+
+  function appendExpeditionObjectiveStrip(body, objective, guidedLoop = null, surveyBridge = null) {
     if (!body || !objective) return null;
     const strip = document.createElement('article');
     strip.className = `fp-expedition-objective-strip fp-expedition-objective-strip--${safeTestId(objective.mode)}`;
@@ -2298,8 +2407,12 @@
 
     strip.append(copy, facts);
     appendExpeditionGuidedLoop(strip, guidedLoop);
+    appendExpeditionSurveyBridge(strip, surveyBridge);
     const ledgerCopy = document.createElement('small');
-    ledgerCopy.textContent = guidedLoop?.ledgerText || 'Ledger detail: focus markers are derived only from existing map cells, event packets, and party state. They cannot create resources, routes, assignments, timers, rewards, Atlas execution, sharing, or external effects.';
+    ledgerCopy.textContent = [
+      guidedLoop?.ledgerText || 'Ledger detail: focus markers are derived only from existing map cells, event packets, and party state. They cannot create resources, routes, assignments, timers, rewards, Atlas execution, sharing, or external effects.',
+      surveyBridge?.ledgerText || '',
+    ].filter(Boolean).join(' ');
     const ledger = appendExpeditionAuditDetails(strip, 'Receipts', [bodyCopy, boundary, ledgerCopy], 'fp-expedition-objective-ledger-details');
     if (ledger) {
       ledger.dataset.readOnly = 'true';
@@ -3360,7 +3473,7 @@
       statusLedger.dataset.actions = '0';
     }
     hud.appendChild(statusCard);
-    appendExpeditionObjectiveStrip(hud, objective, guidedLoop);
+    appendExpeditionObjectiveStrip(hud, objective, guidedLoop, expeditionSurveyBridge(model));
     appendExpeditionLocationVisitSurface(hud, selectedCell, model);
     const inspector = hud;
 

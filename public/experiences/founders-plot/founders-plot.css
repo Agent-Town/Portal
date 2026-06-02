@@ -707,6 +707,66 @@ html, body {
     rgba(255, 248, 232, 0.74);
 }
 
+.fp-expedition-survey-bridge {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  min-width: 0;
+}
+
+.fp-expedition-survey-bridge__step {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px 5px;
+  align-items: center;
+  padding: 5px 6px;
+  border: 1px solid rgba(101, 74, 28, 0.22);
+  border-radius: 7px;
+  background:
+    linear-gradient(135deg, rgba(255, 228, 160, 0.28), rgba(223, 245, 241, 0.34)),
+    rgba(255, 248, 232, 0.74);
+}
+
+.fp-expedition-survey-bridge__step small,
+.fp-expedition-survey-bridge__step em {
+  overflow: hidden;
+  color: #5b4831;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.fp-expedition-survey-bridge__step small {
+  display: grid;
+  width: 22px;
+  aspect-ratio: 1;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(101, 74, 28, 0.15);
+  color: #4d3b25;
+}
+
+.fp-expedition-survey-bridge__step strong {
+  overflow: hidden;
+  color: #134d49;
+  font-family: Wellfleet, Georgia, serif;
+  font-size: 11px;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fp-expedition-survey-bridge__step em {
+  grid-column: 1 / -1;
+}
+
 .fp-world-grid-card {
   border-left-color: var(--at-teal-600);
 }
@@ -3213,6 +3273,14 @@ html, body {
   .fp-expedition-guided-loop__step {
     padding: 5px;
   }
+  .fp-expedition-survey-bridge {
+    grid-template-columns: repeat(3, minmax(72px, 1fr));
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+  .fp-expedition-survey-bridge__step {
+    padding: 5px;
+  }
   .fp-expedition-objective-strip__copy p,
   .fp-expedition-objective-strip__boundary {
     display: -webkit-box;
@@ -3697,6 +3765,11 @@ html, body {
     box-shadow:
       inset 0 0 0 1px rgba(255, 248, 232, 0.46),
       0 14px 28px rgba(46, 27, 14, 0.18);
+  }
+
+  .fp-expedition-map-panel .fp-expedition-map-hud:has(.fp-expedition-survey-bridge) {
+    max-height: min(24svh, 132px);
+    overflow: auto;
   }
 
   .fp-expedition-map-panel .fp-expedition-fog-pips {

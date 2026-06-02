@@ -1588,6 +1588,25 @@ test('FP-UT-028 HQ12C Scout Sector reveals one same-plot hinted sector with appr
   assert.equal(later.expeditionMap.eventPackets.some((packet) => packet.packetId === scouted.eventPacket.packetId), true);
   assert.equal(later.expeditionMap.sourceSummary.eventPacketIds.includes(scouted.eventPacket.packetId), true);
   assert.equal(later.expeditionMap.scope.scoutedSectorCount, 1);
+  assert.equal(later.expeditionMap.surveyBridge.kind, 'scout_packet_to_survey_bridge');
+  assert.equal(later.expeditionMap.surveyBridge.version, engine.EXPEDITION_SURVEY_BRIDGE_VERSION);
+  assert.equal(later.expeditionMap.surveyBridge.readOnly, true);
+  assert.deepEqual(later.expeditionMap.surveyBridge.executableActions, []);
+  assert.equal(later.expeditionMap.surveyBridge.authorityBoundary, engine.EXPEDITION_SURVEY_BRIDGE_AUTHORITY_BOUNDARY);
+  assert.equal(later.expeditionMap.surveyBridge.activePacketId, scouted.eventPacket.packetId);
+  assert.equal(later.expeditionMap.surveyBridge.activeCellId, target.cellId);
+  assert.equal(later.expeditionMap.surveyBridge.status, 'PACKET_READY_FOR_SITE_PLAN_PREFLIGHT');
+  assert.equal(later.expeditionMap.surveyBridge.activeCandidate.commandState.commandId, 'survey_site_plan_contract_required');
+  assert.equal(later.expeditionMap.surveyBridge.activeCandidate.commandState.serverMutationImplemented, false);
+  assert.deepEqual(later.expeditionMap.surveyBridge.activeCandidate.commandState.executableActions, []);
+  assert.equal(later.expeditionMap.surveyBridge.activeCandidate.nextRequiredContract, 'explicit_packet_to_site_plan_server_contract');
+  assert.equal(later.expeditionMap.surveyBridge.boundaryFlags.createsSitePlan, false);
+  assert.equal(later.expeditionMap.surveyBridge.boundaryFlags.createsSurveyor, false);
+  assert.equal(later.expeditionMap.surveyBridge.boundaryFlags.addsMutationAuthority, false);
+  assert.equal(later.expeditionMap.surveyBridge.boundaryFlags.hiddenTruthLeakage, false);
+  assert.equal(later.expeditionMap.surveyBridge.boundaryFlags.routeCreation, false);
+  assert.equal(later.expeditionMap.surveyBridge.boundaryFlags.atlasExecution, false);
+  assert.equal(later.expeditionMap.sourceSummary.surveyBridgeCandidatePacketIds.includes(scouted.eventPacket.packetId), true);
 
   const repeated = engine.scoutExpeditionSector({
     pairId: ctx.pairId,
