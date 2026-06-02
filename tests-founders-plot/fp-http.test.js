@@ -1675,6 +1675,21 @@ test('FP-HT-011d3b POST /api/founders-plot/expedition-map/draft-site-plan drafts
     assert.equal(planned.body.worldDelta.some((entry) => entry.type === 'EXPEDITION_PACKET_SITE_PLAN_DRAFTED'), true);
     assert.equal(planned.body.expeditionMap.surveyBridge.status, 'SITE_PLAN_PRESENT');
     assert.equal(planned.body.expeditionMap.surveyBridge.activeCandidate.sitePlan.planId, planned.body.sitePlan.planId);
+    const plannedCell = planned.body.expeditionMap.cells.find((cell) => cell.cellId === target.cellId);
+    assert.ok(plannedCell, 'expected packet Site Plan cell on Expedition Map');
+    assert.equal(plannedCell.status, 'SITE_PLAN_DRAFTED');
+    assert.equal(plannedCell.sourceTruth, 'site_plan');
+    assert.equal(plannedCell.sourceIds.planId, planned.body.sitePlan.planId);
+    assert.equal(plannedCell.sourceIds.sourcePacketId, scouted.body.eventPacket.packetId);
+    assert.equal(plannedCell.eventPacket.packetId, scouted.body.eventPacket.packetId);
+    assert.equal(plannedCell.sitePlanObject.kind, 'packet_site_plan');
+    assert.equal(plannedCell.sitePlanObject.planId, planned.body.sitePlan.planId);
+    assert.equal(plannedCell.sitePlanObject.planningOnly, true);
+    assert.equal(plannedCell.sitePlanObject.readOnly, true);
+    assert.deepEqual(plannedCell.sitePlanObject.executableActions, []);
+    assert.equal(plannedCell.sitePlanObject.boundaryFlags.createsSurveyor, false);
+    assert.equal(plannedCell.sitePlanObject.boundaryFlags.routeCreation, false);
+    assert.equal(plannedCell.sitePlanObject.boundaryFlags.atlasExecution, false);
 
     const repeated = await request(server, 'POST', '/api/founders-plot/expedition-map/draft-site-plan', {
       plotId: seeded.plotId,

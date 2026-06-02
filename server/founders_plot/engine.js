@@ -2291,6 +2291,79 @@ function openAdjacentExpeditionHintCoordinate(cells, coord, index = 0) {
   return adjacentExpeditionHintCoordinate(coord, Number(index || 0) + 6);
 }
 
+function expeditionSitePlanMapObject(plan = {}, cellId = '') {
+  const sourcePacketId = sitePlanPacketSourceId(plan);
+  return {
+    objectId: `map_object_${safeText(plan.planId, 'site_plan', 160)}`,
+    kind: sourcePacketId ? 'packet_site_plan' : 'site_plan',
+    planId: safeText(plan.planId, '', 160),
+    source: safeText(plan.source, sourcePacketId ? 'scout_sector_event_packet' : 'scout_report', 80),
+    sourcePacketId: sourcePacketId || null,
+    sourceScoutId: safeText(plan.sourceScoutId, '', 120) || null,
+    sourceCellId: safeText(plan.sourceCellId || cellId, '', 80) || null,
+    status: safeText(plan.status, 'DRAFT', 80),
+    promotionStatus: safeText(plan.promotionStatus, 'draft', 80),
+    reviewStatus: safeText(plan.reviewStatus, 'unreviewed', 80),
+    planningOnly: true,
+    readOnly: true,
+    executableActions: [],
+    authorityBoundary: safeText(plan.authorityBoundary, 'requires_engine_promotion_for_settlement', 160),
+    boundaryFlags: {
+      createsSurveyor: false,
+      createsConvoy: false,
+      createsSettlement: false,
+      resourceDelta: {},
+      routeCreation: false,
+      tradeRouteCreation: false,
+      rewardCreation: false,
+      backgroundScheduling: false,
+      combat: false,
+      publicSharing: false,
+      generatedUniverseRendering: false,
+      hiddenTruthLeakage: false,
+      crossPlotMutation: false,
+      atlasExecution: false,
+      externalEffects: false
+    }
+  };
+}
+
+function expeditionCellFromSitePlan(plot = {}, plan = {}, coord = {}) {
+  const reviewed = plan.reviewStatus === 'reviewed' || plan.promotionStatus === 'reviewed_claim_ready';
+  const cellId = expeditionCellId(coord);
+  return {
+    cellId,
+    q: coord.q,
+    r: coord.r,
+    fogState: 'known',
+    kind: 'planned_site',
+    title: plan.title,
+    status: reviewed ? 'SITE_PLAN_REVIEWED' : 'SITE_PLAN_DRAFTED',
+    sourceTruth: 'site_plan',
+    sourceIds: {
+      plotId: plot.plotId || null,
+      reportId: plan.reportId,
+      planId: plan.planId,
+      sourcePacketId: plan.sourcePacketId || null,
+      sourceScoutId: plan.sourceScoutId || null,
+      sourceCellId: plan.sourceCellId || null
+    },
+    sources: [{ kind: 'site_plan', id: plan.planId, status: plan.promotionStatus }],
+    receipts: [expeditionReceipt(reviewed ? 'reviewed_site_plan_known_cell' : 'draft_site_plan_known_cell', {
+      reportId: plan.reportId,
+      planId: plan.planId,
+      sourcePacketId: plan.sourcePacketId || null
+    })],
+    traits: plan.traits,
+    resourceHints: plan.resourceHints,
+    siteType: plan.siteType,
+    risk: plan.risk,
+    summary: plan.summary,
+    recommendedNext: plan.recommendedNext,
+    sitePlanObject: expeditionSitePlanMapObject(plan, cellId)
+  };
+}
+
 function expeditionFogCounts(cells) {
   const counts = {
     discovered: 0,
@@ -2436,37 +2509,7 @@ function buildExpeditionMapReadModel(bundle) {
   sitePlans.forEach((plan) => {
     const coord = maps.planCoordinates.get(plan.planId) || maps.reportCoordinates.get(plan.reportId);
     if (!coord) return;
-    const reviewed = plan.reviewStatus === 'reviewed' || plan.promotionStatus === 'reviewed_claim_ready';
-    mergeExpeditionCells(cells, {
-      cellId: expeditionCellId(coord),
-      q: coord.q,
-      r: coord.r,
-      fogState: 'known',
-      kind: 'planned_site',
-      title: plan.title,
-      status: reviewed ? 'SITE_PLAN_REVIEWED' : 'SITE_PLAN_DRAFTED',
-      sourceTruth: 'site_plan',
-      sourceIds: {
-        plotId: plot.plotId || null,
-        reportId: plan.reportId,
-        planId: plan.planId,
-        sourcePacketId: plan.sourcePacketId || null,
-        sourceScoutId: plan.sourceScoutId || null,
-        sourceCellId: plan.sourceCellId || null
-      },
-      sources: [{ kind: 'site_plan', id: plan.planId, status: plan.promotionStatus }],
-      receipts: [expeditionReceipt(reviewed ? 'reviewed_site_plan_known_cell' : 'draft_site_plan_known_cell', {
-        reportId: plan.reportId,
-        planId: plan.planId,
-        sourcePacketId: plan.sourcePacketId || null
-      })],
-      traits: plan.traits,
-      resourceHints: plan.resourceHints,
-      siteType: plan.siteType,
-      risk: plan.risk,
-      summary: plan.summary,
-      recommendedNext: plan.recommendedNext
-    });
+    mergeExpeditionCells(cells, expeditionCellFromSitePlan(plot, plan, coord));
   });
 
   settlementClaims.forEach((claim) => {
@@ -2567,6 +2610,14 @@ function buildExpeditionMapReadModel(bundle) {
       eventPacket: scout.eventPacket
     });
   });
+
+  sitePlans
+    .filter((plan) => plan.source === 'scout_sector_event_packet' || !!plan.sourcePacketId)
+    .forEach((plan) => {
+      const coord = maps.planCoordinates.get(plan.planId) || expeditionCoordinateFromCellId(plan.sourceCellId);
+      if (!coord) return;
+      mergeExpeditionCells(cells, expeditionCellFromSitePlan(plot, plan, coord));
+    });
 
   const truthCells = Array.from(cells.values())
     .filter((cell) => cell.fogState === 'known' || cell.fogState === 'discovered')
@@ -2728,6 +2779,16 @@ function buildExpeditionMapReadModel(bundle) {
       fogAssetSlot: cell.fogAssetSlot || null,
       terrainAssetContractVersion: cell.terrainAssetContractVersion || null,
       sourceIds: cell.sourceIds,
+      sitePlanObject: cell.sitePlanObject ? {
+        objectId: cell.sitePlanObject.objectId,
+        kind: cell.sitePlanObject.kind,
+        planId: cell.sitePlanObject.planId,
+        sourcePacketId: cell.sitePlanObject.sourcePacketId || null,
+        sourceCellId: cell.sitePlanObject.sourceCellId || null,
+        reviewStatus: cell.sitePlanObject.reviewStatus,
+        planningOnly: cell.sitePlanObject.planningOnly === true,
+        readOnly: cell.sitePlanObject.readOnly === true
+      } : null,
       eventPacketId: cell.eventPacket?.packetId || null
     })),
     expeditionParty: {

@@ -1,0 +1,132 @@
+{
+  "ok": true,
+  "verdict": "IMPLEMENTED",
+  "generatedAt": "2026-06-02T17:31:36+07:00",
+  "branch": "neo/progression-atlas-editor-next-2026-05-29",
+  "baseCommit": "dfcdb42",
+  "slice": {
+    "id": "HQ16J",
+    "name": "Packet-derived Site Plan map object",
+    "authorityBoundary": "server_owned_scout_packet_site_plan_draft_v1",
+    "sourceAction": "et.plot.draft_site_plan_from_packet",
+    "readModelSurface": "expeditionMap.cells[].sitePlanObject",
+    "mapCellStatus": "SITE_PLAN_DRAFTED",
+    "mapObjectKind": "packet_site_plan",
+    "serverOwnedReadModel": true,
+    "planningOnly": true,
+    "readOnly": true,
+    "executableActions": 0
+  },
+  "artifacts": {
+    "report": "reports/agent-town-hq16j-packet-site-plan-map-object-2026-06-02.md",
+    "proof": "reports/agent-town-hq16j-packet-site-plan-map-object-proof-2026-06-02.json",
+    "screenshots": []
+  },
+  "filesChanged": [
+    "server/founders_plot/engine.js",
+    "specs/02_api_contract.md",
+    "tests-founders-plot/fp-contract.test.js",
+    "tests-founders-plot/fp-http.test.js",
+    "tests-founders-plot/fp-unit.test.js",
+    "reports/agent-town-hq16j-packet-site-plan-map-object-2026-06-02.md",
+    "reports/agent-town-hq16j-packet-site-plan-map-object-proof-2026-06-02.json"
+  ],
+  "assertions": {
+    "packetPlanCellVisible": true,
+    "packetPlanCellStatus": "SITE_PLAN_DRAFTED",
+    "packetPlanSourceTruth": "site_plan",
+    "packetPlanObjectKind": "packet_site_plan",
+    "packetPlanObjectReadOnly": true,
+    "packetPlanObjectExecutableActions": [],
+    "eventPacketProvenancePreservedOnCell": true,
+    "surveyBridgeStatusAfterDraft": "SITE_PLAN_PRESENT",
+    "createsSurveyor": false,
+    "routeCreation": false,
+    "atlasExecution": false,
+    "externalEffects": false
+  },
+  "checks": [
+    {
+      "command": "node --check server/founders_plot/engine.js",
+      "status": "passed"
+    },
+    {
+      "command": "node --check tests-founders-plot/fp-contract.test.js",
+      "status": "passed"
+    },
+    {
+      "command": "node --check tests-founders-plot/fp-unit.test.js",
+      "status": "passed"
+    },
+    {
+      "command": "node --check tests-founders-plot/fp-http.test.js",
+      "status": "passed"
+    },
+    {
+      "command": "node --check server/founders_plot/routes.js && node --check server/founders_plot/tools.js && node --check server/founders_plot/progression_atlas.js",
+      "status": "passed"
+    },
+    {
+      "command": "NODE_ENV=test node --test tests-founders-plot/fp-contract.test.js --test-name-pattern \"FP-CT-101b3i\"",
+      "status": "passed"
+    },
+    {
+      "command": "NODE_ENV=test node --test tests-founders-plot/fp-unit.test.js --test-name-pattern \"FP-UT-028b\"",
+      "status": "passed"
+    },
+    {
+      "command": "NODE_ENV=test node --test tests-founders-plot/fp-http.test.js --test-name-pattern \"FP-HT-011d3b\"",
+      "status": "passed"
+    },
+    {
+      "command": "npm run test:founders-plot",
+      "status": "passed",
+      "tests": "101/101"
+    },
+    {
+      "command": "jq empty reports/agent-town-hq16j-packet-site-plan-map-object-proof-2026-06-02.json",
+      "status": "passed"
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed"
+    }
+  ],
+  "notRun": [
+    {
+      "command": "npm run build:founders-plot-threejs",
+      "reason": "No Three.js renderer or map bundle source changed."
+    },
+    {
+      "command": "npx playwright test ...",
+      "reason": "No frontend JavaScript/CSS/browser surface changed; the existing UI consumes the updated server read-model fields."
+    }
+  ],
+  "guardrails": {
+    "scoutSectorOnlyFogRevealPath": true,
+    "scoutMovementSamePlotAdjacentKnownOrDiscoveredOnly": true,
+    "sitePlanOnly": true,
+    "planningRecordOnly": true,
+    "readOnlyMapObject": true,
+    "createsSurveyor": false,
+    "createsConvoy": false,
+    "createsSettlement": false,
+    "resourceDelta": {},
+    "routeCreation": false,
+    "tradeRouteCreation": false,
+    "rewardCreation": false,
+    "backgroundScheduling": false,
+    "combat": false,
+    "publicSharing": false,
+    "generatedUniverseRuntimeExpansion": false,
+    "hiddenAutonomy": false,
+    "hiddenTruthLeakage": false,
+    "crossPlotMutation": false,
+    "atlasExecution": false,
+    "externalEffects": false,
+    "deploy": false,
+    "merge": false,
+    "publicShare": false,
+    "externalMessage": false
+  }
+}

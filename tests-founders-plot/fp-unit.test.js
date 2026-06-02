@@ -1753,6 +1753,23 @@ test('FP-UT-028b HQ16I drafts one planning-only Site Plan from a Scout Sector Ev
   assert.equal(planned.expeditionMap.surveyBridge.status, 'SITE_PLAN_PRESENT');
   assert.equal(planned.expeditionMap.surveyBridge.activeCandidate.sitePlan.planId, planned.sitePlan.planId);
   assert.equal(planned.expeditionMap.units.items.some((unit) => unit.unitType === 'surveyor' && unit.sourcePlanId === planned.sitePlan.planId), false);
+  const plannedCell = planned.expeditionMap.cells.find((cell) => cell.cellId === target.cellId);
+  assert.ok(plannedCell, 'expected packet Site Plan cell on Expedition Map');
+  assert.equal(plannedCell.status, 'SITE_PLAN_DRAFTED');
+  assert.equal(plannedCell.sourceTruth, 'site_plan');
+  assert.equal(plannedCell.sourceIds.planId, planned.sitePlan.planId);
+  assert.equal(plannedCell.sourceIds.sourcePacketId, scouted.eventPacket.packetId);
+  assert.equal(plannedCell.eventPacket.packetId, scouted.eventPacket.packetId);
+  assert.equal(plannedCell.sitePlanObject.kind, 'packet_site_plan');
+  assert.equal(plannedCell.sitePlanObject.planId, planned.sitePlan.planId);
+  assert.equal(plannedCell.sitePlanObject.sourcePacketId, scouted.eventPacket.packetId);
+  assert.equal(plannedCell.sitePlanObject.sourceCellId, target.cellId);
+  assert.equal(plannedCell.sitePlanObject.planningOnly, true);
+  assert.equal(plannedCell.sitePlanObject.readOnly, true);
+  assert.deepEqual(plannedCell.sitePlanObject.executableActions, []);
+  assert.equal(plannedCell.sitePlanObject.boundaryFlags.createsSurveyor, false);
+  assert.equal(plannedCell.sitePlanObject.boundaryFlags.routeCreation, false);
+  assert.equal(plannedCell.sitePlanObject.boundaryFlags.atlasExecution, false);
 
   const duplicate = engine.draftSitePlanFromPacket({
     pairId: ctx.pairId,

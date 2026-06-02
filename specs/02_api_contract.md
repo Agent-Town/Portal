@@ -2071,13 +2071,39 @@ Response includes:
 	    },
 	    "cells": [
 	      {
-	        "cellId": "cell_q1_r0",
+	        "cellId": "cell_q2_r0",
 	        "fogState": "hinted",
 	        "readOnly": true,
 	        "terrainAssetContractVersion": "agenttown_public_terrain_asset_slots_v1",
 	        "publicTerrainAssetSlot": null,
 	        "publicTerrainAssetSlotSource": null,
 	        "fogAssetSlot": "hinted_frontier_fog"
+	      },
+	      {
+	        "cellId": "cell_q1_r0",
+	        "fogState": "known",
+	        "status": "SITE_PLAN_DRAFTED",
+	        "sourceTruth": "site_plan",
+	        "sourceIds": {
+	          "planId": "site_plan_expedition_event_packet_...",
+	          "sourcePacketId": "expedition_event_packet_...",
+	          "sourceCellId": "cell_q1_r0"
+	        },
+	        "sitePlanObject": {
+	          "kind": "packet_site_plan",
+	          "planId": "site_plan_expedition_event_packet_...",
+	          "sourcePacketId": "expedition_event_packet_...",
+	          "sourceCellId": "cell_q1_r0",
+	          "planningOnly": true,
+	          "readOnly": true,
+	          "executableActions": [],
+	          "boundaryFlags": {
+	            "createsSurveyor": false,
+	            "routeCreation": false,
+	            "atlasExecution": false,
+	            "externalEffects": false
+	          }
+	        }
 	      },
 	      {
 	        "cellId": "cell_origin",
@@ -2531,6 +2557,7 @@ Boundaries:
 - requires an existing Scout Sector Event Packet on a known/discovered cell in the current owned plot
 - requires idempotency; repeated packet drafts return the existing Site Plan
 - agent callers require matching human approval for `draft_site_plan_from_packet` with `{ "packetId": "...", "cellId": "..." }`
+- refreshed Expedition Map cells expose the packet-derived draft as a read-only `packet_site_plan` `sitePlanObject` on the source cell, while preserving the Scout Sector Event Packet receipt
 - creates only one draft Site Plan planning record; it does not review it, create a Surveyor, prepare a convoy, found territory, reveal fog, move units, create routes/trade, mutate resources, grant rewards, execute Atlas, render Generated Universe runtime content, or call external systems
 
 ---

@@ -512,6 +512,16 @@ test('FP-CT-101b3i draft_site_plan_from_packet envelope conforms to resultSchema
   assert.equal(out.proof.boundaryFlags.resourceHarvesting, false);
   assert.equal(out.proof.boundaryFlags.atlasExecution, false);
   assert.equal(out.expeditionMap.surveyBridge.status, 'SITE_PLAN_PRESENT');
+  const plannedCell = out.expeditionMap.cells.find((cell) => cell.cellId === target.cellId);
+  assert.ok(plannedCell, 'expected packet-derived Site Plan map object');
+  assert.equal(plannedCell.status, 'SITE_PLAN_DRAFTED');
+  assert.equal(plannedCell.sourceIds.planId, out.sitePlan.planId);
+  assert.equal(plannedCell.sitePlanObject.kind, 'packet_site_plan');
+  assert.equal(plannedCell.sitePlanObject.planId, out.sitePlan.planId);
+  assert.equal(plannedCell.sitePlanObject.readOnly, true);
+  assert.deepEqual(plannedCell.sitePlanObject.executableActions, []);
+  assert.equal(plannedCell.sitePlanObject.boundaryFlags.routeCreation, false);
+  assert.equal(plannedCell.sitePlanObject.boundaryFlags.atlasExecution, false);
 });
 
 test('FP-CT-101b4 move_expedition_unit envelope conforms to resultSchema', () => {
