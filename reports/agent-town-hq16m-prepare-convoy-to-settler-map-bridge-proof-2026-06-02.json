@@ -1,0 +1,272 @@
+{
+  "ok": true,
+  "generatedAt": "2026-06-02T11:33:59.927Z",
+  "title": "HQ16M Prepare Convoy to Settler Convoy map bridge",
+  "source": "FP-E2E-022M mocked server-owned Prepare Convoy response and reloaded expeditionMap.units.items",
+  "screenshots": [
+    "reports/agent-town-hq16m-prepare-convoy-to-settler-map-bridge-2026-06-02-desktop.png",
+    "reports/agent-town-hq16m-prepare-convoy-to-settler-map-bridge-2026-06-02-mobile.png"
+  ],
+  "capturedPrepare": {
+    "plotId": "plot_hq16m_prepare_to_settler_bridge",
+    "sitePlanId": "site_plan_hq16m_ridge",
+    "actor": "HUMAN",
+    "idempotencyKey": "fp-prepare-settler-convoy-site_plan_hq16m_ridge-mpwk7g0i-1"
+  },
+  "capturedFound": {
+    "plotId": "plot_hq16m_prepare_to_settler_bridge",
+    "claimId": "claim_hq16m_ridge",
+    "actor": "HUMAN",
+    "idempotencyKey": "fp-found-settlement-claim_hq16m_ridge-mpwk7p8o-1"
+  },
+  "foundBeforeArrivalCount": 0,
+  "preArrivalProof": {
+    "convoyToken": {
+      "unitId": "expedition_unit_settler_convoy_claim_hq16m_ridge",
+      "unitType": "settler_convoy",
+      "cellId": "cell_q0_r1",
+      "selected": "true",
+      "text": "▣CNVQ0 R10"
+    },
+    "commandBar": {
+      "unitId": "expedition_unit_settler_convoy_claim_hq16m_ridge",
+      "cellId": "cell_q0_r1",
+      "actions": 0,
+      "text": "▣ CNVInspect0 ↦WAIT"
+    },
+    "outcome": {
+      "commandId": "prepare_settler_convoy",
+      "unitId": "expedition_unit_settler_convoy_claim_hq16m_ridge",
+      "cellId": "cell_q0_r1",
+      "text": "▣RollingCNV · Q0 R1 · KNOWN"
+    }
+  },
+  "proof": {
+    "convoyToken": {
+      "unitId": "expedition_unit_settler_convoy_claim_hq16m_ridge",
+      "unitType": "settler_convoy",
+      "cellId": "cell_q0_r1",
+      "selected": "true",
+      "text": "▣CNVQ0 R11"
+    },
+    "commandBar": {
+      "unitId": "expedition_unit_settler_convoy_claim_hq16m_ridge",
+      "cellId": "cell_q0_r1",
+      "actions": 1,
+      "text": "▣ CNVFoundCLAIM0 ↦WAIT"
+    },
+    "outcome": {
+      "commandId": "found_settlement",
+      "unitId": "expedition_unit_settler_convoy_claim_hq16m_ridge",
+      "cellId": "cell_q0_r1",
+      "text": "⌂FoundedCNV · Q0 R1 · KNOWN"
+    },
+    "foundButton": {
+      "present": true,
+      "commandId": "found_settlement",
+      "serverMutationImplemented": "true"
+    },
+    "renderer": {
+      "selectedCellId": "cell_q0_r1",
+      "units": [
+        {
+          "unitId": "expedition_unit_surveyor_site_plan_hq16m_ridge",
+          "unitType": "surveyor",
+          "displayName": "Surveyor Crew",
+          "cellId": "cell_q0_r1",
+          "spriteAssetSlot": "surveyor",
+          "spriteAssetPath": "/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1/surveyor-beacon-v1.png",
+          "spriteAssetReady": true,
+          "selected": false,
+          "readOnly": true,
+          "movementMutationImplemented": false,
+          "canvas": {
+            "x": 137.87941176470588,
+            "y": 385.3215
+          }
+        },
+        {
+          "unitId": "expedition_unit_settler_convoy_claim_hq16m_ridge",
+          "unitType": "settler_convoy",
+          "displayName": "Settler Convoy",
+          "cellId": "cell_q0_r1",
+          "spriteAssetSlot": "settler_convoy",
+          "spriteAssetPath": "/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1/settler-convoy-v1.png",
+          "spriteAssetReady": true,
+          "selected": true,
+          "readOnly": true,
+          "movementMutationImplemented": false,
+          "canvas": {
+            "x": 137.87941176470588,
+            "y": 380.3386764705882
+          }
+        }
+      ],
+      "commandTargets": [
+        {
+          "unitId": "expedition_unit_settler_convoy_claim_hq16m_ridge",
+          "unitType": "settler_convoy",
+          "commandId": "found_settlement",
+          "cellId": "cell_q0_r1",
+          "fogState": "known",
+          "serverMutationImplemented": true,
+          "movementMutation": false,
+          "visualOnly": true,
+          "readOnly": true,
+          "previewOnly": true,
+          "selectable": true,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0,
+          "canvas": {
+            "x": 137.87941176470588,
+            "y": 393.2109705882353
+          }
+        }
+      ],
+      "commandOutcomeFeedback": [
+        {
+          "feedbackId": "found_settlement-cell_q0_r1-mpwk7p8z",
+          "unitId": "expedition_unit_settler_convoy_claim_hq16m_ridge",
+          "unitType": "settler_convoy",
+          "commandId": "found_settlement",
+          "cellId": "cell_q0_r1",
+          "targetCellId": "cell_q0_r1",
+          "sourceCellId": "",
+          "receiptId": "claim_hq16m_ridge",
+          "receiptKind": "settlement_found_receipt",
+          "serverOwnedResult": true,
+          "visualOnly": true,
+          "readOnly": true,
+          "selectable": false,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0,
+          "canvas": {
+            "x": 137.87941176470588,
+            "y": 393.2109705882353
+          }
+        }
+      ],
+      "visualLayers": {
+        "terrainTexture": true,
+        "runtimeRegionAssetPack": "hq14s_public_terrain_underlay_v1",
+        "runtimeRegionAtlas": "/experiences/founders-plot/assets/expedition-map/hq14s-public-terrain-underlay-v1/manifest.json",
+        "runtimeTerrainUnderlay": "/experiences/founders-plot/assets/expedition-map/hq14s-public-terrain-underlay-v1/public-terrain-underlay-candidate-01-v1.png",
+        "runtimeSpriteAssetPack": "hq15e_expedition_unit_marker_sprites_v1",
+        "runtimeSpriteAtlas": "/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1/manifest.json",
+        "generatedSpriteAssets": true,
+        "generatedSpriteAssetCount": 8,
+        "generatedSpriteAssetsReady": 8,
+        "generatedSpriteAssetsVisualOnly": true,
+        "generatedSpriteAssetsReadOnly": true,
+        "serverTerrainAssetContractVersion": "agenttown_public_terrain_asset_slots_v1",
+        "serverTerrainSlotSource": "server_read_model_v1",
+        "assetBackedRegionTiles": 2,
+        "assetBackedLoadedTiles": 2,
+        "assetBackedTerrainTextures": true,
+        "continuousTerrainUnderlay": true,
+        "continuousTerrainUnderlayVersion": "hq14t_server_bound_terrain_underlay_v1",
+        "continuousUnderlayUsesServerOwnedCells": true,
+        "continuousUnderlayHiddenCellsFogOnly": true,
+        "continuousUnderlayVisualOnly": true,
+        "plateBlendLayer": true,
+        "softRegionSeams": true,
+        "reducedPlateEdgeContrast": true,
+        "centerTileMutedForUnderlay": true,
+        "cartographicFogDepth": true,
+        "ambientContourField": true,
+        "fogDepthGlyphsVisualOnly": true,
+        "terrainUnderlayCount": 1,
+        "proceduralFallbackWhenAssetPending": true,
+        "candidate02Cues": true,
+        "agentTownIdentityCues": true,
+        "scoutLedgerHud": true,
+        "mapFirstHudOverlays": true,
+        "hoverAffordance": true,
+        "selectedSectorOutline": true,
+        "beaconPlanWagonCues": true,
+        "homeNodeEmphasis": true,
+        "riverFlatCues": true,
+        "waterCuesServerGated": true,
+        "woodlandRidgeCues": true,
+        "ruinSignalCues": true,
+        "ruinSignalCuesServerGated": true,
+        "lockedUnknownSealedFogOnly": true,
+        "hintedAbstractFogEdge": true,
+        "frontierBoundaryDashes": true,
+        "frontierBoundaryVisualOnly": true,
+        "fogVeils": 2,
+        "edgeFogCount": 4,
+        "civicBeaconCount": 2,
+        "surveyStrokeCount": 2,
+        "surveyStrokesVisualOnly": true,
+        "receiptTraceVisualOnly": true,
+        "markerCount": 4,
+        "eventPacketMarkers": true,
+        "eventPacketMarkerCount": 1,
+        "objectiveMarkers": true,
+        "objectiveMarkerCount": 1,
+        "eventObjectiveMarkersVisualOnly": true,
+        "eventObjectiveMarkersReadOnly": true,
+        "eventObjectiveMarkersInspectable": true,
+        "eventObjectiveMarkerAuthority": false,
+        "unitTokens": true,
+        "unitTokenCount": 2,
+        "unitTokensReadOnly": true,
+        "unitMovementMutationImplemented": false,
+        "commandTargetRings": true,
+        "commandTargetCount": 1,
+        "commandTargetRingsVisualOnly": true,
+        "commandTargetRingsReadOnly": true,
+        "commandTargetRingsSelectable": true,
+        "commandTargetRingsPreviewOnly": true,
+        "commandTargetRingAuthority": false,
+        "commandOutcomeFeedback": true,
+        "commandOutcomeFeedbackCount": 1,
+        "commandOutcomeFeedbackVisualOnly": true,
+        "commandOutcomeFeedbackReadOnly": true,
+        "commandOutcomeFeedbackServerOwned": true,
+        "commandOutcomeFeedbackSelectable": false,
+        "commandOutcomeFeedbackAuthority": false,
+        "clientAuthority": false
+      }
+    },
+    "mapNative": {
+      "primaryTokenVisible": true,
+      "selectedConvoyUnit": true,
+      "targetCellId": "cell_q0_r1",
+      "primaryOutcomeText": "⌂FoundedCNV · Q0 R1 · KNOWN"
+    },
+    "mobileFit": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "documentScrollWidth": 390,
+      "clipped": []
+    }
+  },
+  "guardrails": {
+    "prepareEndpointUsed": true,
+    "foundEndpointUsed": true,
+    "serverOwnedSettlerConvoyUnit": true,
+    "selectedConvoyAfterPrepare": true,
+    "mapNativePrimaryResult": true,
+    "immediateFoundOutpostBlockedUntilArrival": true,
+    "foundOutpostAvailableWhenArrived": true,
+    "rendererCreatedNoActions": true,
+    "commandTargetRingsPreviewOnly": true,
+    "unitTokensReadOnly": true,
+    "routeAuthority": false,
+    "resourceHarvesting": false,
+    "rewardCreation": false,
+    "backgroundScheduling": false,
+    "combat": false,
+    "hiddenTruthLeakage": false,
+    "crossPlotMutation": false,
+    "atlasExecution": false,
+    "externalEffects": false,
+    "mobileHorizontalOverflow": 0
+  }
+}

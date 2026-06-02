@@ -1733,6 +1733,53 @@ test('FP-HT-011d3b POST /api/founders-plot/expedition-map/draft-site-plan drafts
       && unit.sourcePlanId === planned.body.sitePlan.planId
       && unit.commandHints.some((command) => command.commandId === 'prepare_settler_convoy' && command.serverMutationImplemented === true)
     )), true);
+
+    const prepareBundle = store.readPlotBundleById(seeded.plotId);
+    store.writeBuildings([
+      ...prepareBundle.buildings,
+      {
+        buildingId: 'bldg_packet_plan_expedition_board',
+        plotId: seeded.plotId,
+        objectInstanceId: null,
+        type: 'EXPEDITION_BOARD',
+        level: 1,
+        x: 0,
+        y: 2,
+        state: 'READY',
+        outputBuffer: {},
+        priority: 'BALANCED',
+        createdAt: nowMs,
+        updatedAt: nowMs
+      }
+    ]);
+
+    const prepared = await request(server, 'POST', '/api/founders-plot/prepare-settler-convoy', {
+      plotId: seeded.plotId,
+      sitePlanId: planned.body.sitePlan.planId,
+      actor: 'HUMAN',
+      idempotencyKey: 'ht-11d5-prepare-convoy'
+    });
+    assert.equal(prepared.status, 200, prepared.body?.error?.message || 'prepare packet Site Plan convoy');
+    assert.equal(prepared.body.ok, true);
+    assert.equal(prepared.body.settlementClaim.sitePlanId, planned.body.sitePlan.planId);
+    assert.equal(prepared.body.settlementClaim.status, 'CONVOY_PREPARING');
+    assert.equal(prepared.body.state.expeditionMap.scope.settlementClaimCount, 2);
+    const preparedCell = prepared.body.state.expeditionMap.cells.find((cell) => (
+      cell.sourceIds?.claimId === prepared.body.settlementClaim.claimId
+    ));
+    assert.ok(preparedCell, 'expected prepared convoy claim cell in Expedition Map');
+    assert.equal(preparedCell.cellId, target.cellId);
+    assert.equal(preparedCell.sourceTruth, 'settlement_claim');
+    assert.equal(preparedCell.status, 'CONVOY_PREPARING');
+    const preparedConvoyUnit = prepared.body.state.expeditionMap.units.items.find((unit) => (
+      unit.unitType === 'settler_convoy'
+      && unit.sourceClaimId === prepared.body.settlementClaim.claimId
+    ));
+    assert.ok(preparedConvoyUnit, 'expected prepared Settler Convoy map unit from packet-derived plan');
+    assert.equal(preparedConvoyUnit.location.cellId, target.cellId);
+    assert.equal(preparedConvoyUnit.readOnly, true);
+    assert.equal(preparedConvoyUnit.movement.movementMutationImplemented, false);
+    assert.equal(preparedConvoyUnit.commandHints.some((command) => command.commandId === 'found_settlement'), false);
   } finally { await close(); }
 });
 

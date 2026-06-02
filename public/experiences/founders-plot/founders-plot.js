@@ -1748,9 +1748,9 @@
       case 'scout_sector':
         return { label: 'Scouted', icon: '⌖' };
       case 'draft_site_plan_from_packet':
-        return { label: 'Planned', icon: '▧' };
+        return { label: 'Surveyed', icon: '▧' };
       case 'review_site_plan':
-        return { label: 'Reviewed', icon: '▣' };
+        return { label: 'Ready', icon: '▣' };
       case 'prepare_settler_convoy':
         return { label: 'Convoy', icon: '▣' };
       case 'found_settlement':
@@ -1970,9 +1970,9 @@
   function expeditionSurveyBridgeStatusLabel(status = '') {
     const key = String(status || '').toUpperCase();
     if (key === 'SURVEYOR_COMMAND_READY') return 'Ready';
-    if (key === 'SITE_PLAN_PRESENT') return 'Plan';
-    if (key === 'PACKET_READY_FOR_SITE_PLAN_PREFLIGHT') return 'Preflight';
-    if (key === 'WAITING_FOR_SCOUT_PACKET') return 'Waiting';
+    if (key === 'SITE_PLAN_PRESENT') return 'Ready';
+    if (key === 'PACKET_READY_FOR_SITE_PLAN_PREFLIGHT') return 'Survey';
+    if (key === 'WAITING_FOR_SCOUT_PACKET') return 'Scout';
     return friendlyToken(status || 'Ready');
   }
 
@@ -1992,6 +1992,41 @@
       : {};
     const bridgeCellId = String(bridgeCandidate?.cellId || surveyBridge?.activeCellId || '').trim();
     const bridgePlanId = String(bridgeCommand.sourcePlanId || bridgeCandidate?.sitePlan?.planId || '').trim();
+    const settlerConvoyUnits = expeditionUnits(model)
+      .filter((unit) => String(unit.unitType || '') === 'settler_convoy' && String(unit.sourceClaimId || '').trim())
+      .sort((a, b) => {
+        const aReady = (a.commandHints || []).some((command) => String(command.commandId || '') === 'found_settlement' && command.enabled !== false);
+        const bReady = (b.commandHints || []).some((command) => String(command.commandId || '') === 'found_settlement' && command.enabled !== false);
+        return Number(bReady) - Number(aReady) || String(a.unitId || '').localeCompare(String(b.unitId || ''));
+      });
+    const focusedConvoyUnit = settlerConvoyUnits.find((unit) => String(unit.unitId || '') === String(state.expeditionSelectedUnitId || ''))
+      || settlerConvoyUnits.find((unit) => String(unit.cellId || '') === String(selectedCell?.cellId || ''))
+      || settlerConvoyUnits[0]
+      || null;
+    const focusedConvoyCommand = (focusedConvoyUnit?.commandHints || [])
+      .find((command) => String(command.commandId || '') === 'found_settlement' && command.enabled !== false) || null;
+
+    if (focusedConvoyUnit?.sourceClaimId && focusedConvoyUnit.cellId) {
+      const foundReady = !!(focusedConvoyCommand?.serverMutationImplemented === true);
+      return {
+        mode: 'convoy',
+        eyebrow: 'Current focus',
+        title: foundReady ? 'Found Outpost' : 'Convoy Rolling',
+        body: foundReady
+          ? `${expeditionCompactCellLabel(focusedConvoyUnit.cellId)} convoy has arrived. Pick Found to place the outpost.`
+          : `${expeditionCompactCellLabel(focusedConvoyUnit.cellId)} convoy is rolling. Found unlocks when it arrives.`,
+        selectedCellId: selectedCell?.cellId || focusedConvoyUnit.cellId,
+        targetCellId: focusedConvoyUnit.cellId,
+        packetId: latestPacket?.packetId || '',
+        partyId: partySource?.partyId || latestPacket?.partyId || '',
+        facts: [
+          ['Convoy', expeditionCompactCellLabel(focusedConvoyUnit.cellId)],
+          ['Claim', foundReady ? 'Arrived' : 'Preparing'],
+          ['Command', foundReady ? 'Found' : 'Locked'],
+          ['Actions', foundReady ? 1 : 0],
+        ],
+      };
+    }
 
     if (
       bridgeCandidate
@@ -2003,15 +2038,15 @@
       return {
         mode: 'convoy',
         eyebrow: 'Current focus',
-        title: 'Prepare Convoy from reviewed Site Plan',
-        body: `${expeditionCompactCellLabel(bridgeCellId)} has a reviewed Site Plan and Surveyor command target. Prepare Convoy uses the existing guarded endpoint.`,
+        title: 'Send Convoy',
+        body: `${expeditionCompactCellLabel(bridgeCellId)} is surveyed and ready. Use Convoy from the map target.`,
         selectedCellId: selectedCell?.cellId || bridgeCellId,
         targetCellId: bridgeCellId,
         packetId: bridgeCandidate.packetId || latestPacket?.packetId || '',
         partyId: partySource?.partyId || latestPacket?.partyId || '',
         facts: [
-          ['Plan', expeditionCompactCellLabel(bridgeCellId)],
-          ['Surveyor', 'Ready'],
+          ['Target', expeditionCompactCellLabel(bridgeCellId)],
+          ['Crew', 'Ready'],
           ['Command', 'Convoy'],
           ['Actions', 1],
         ],
@@ -2022,8 +2057,8 @@
       return {
         mode: 'scout',
         eyebrow: 'Current focus',
-        title: 'Scout an eligible hinted sector',
-        body: `${scoutTarget.cellId} is the current server-hinted objective marker. Scout Sector is the only mutation; hidden resources and routes stay sealed.`,
+        title: 'Scout Map Edge',
+        body: `${expeditionCompactCellLabel(scoutTarget.cellId)} is a hinted map target. Scout reveals one sector.`,
         selectedCellId: selectedCell?.cellId || scoutTarget.cellId,
         targetCellId: scoutTarget.cellId,
         packetId: latestPacket?.packetId || '',
@@ -2041,8 +2076,8 @@
       return {
         mode: 'packet',
         eyebrow: 'Current focus',
-        title: 'Review the latest packet',
-        body: `${latestPacket.packetId} marks ${latestPacket.cellId || latestPacket.receiptLink?.cellId || 'a revealed sector'} as receipt evidence with zero executable actions.`,
+        title: 'Scout Result Ready',
+        body: `${expeditionCompactCellLabel(latestPacket.cellId || latestPacket.receiptLink?.cellId || '') || 'A revealed sector'} has a new map marker. Open Receipts for proof.`,
         selectedCellId: selectedCell?.cellId || latestPacket.cellId || '',
         targetCellId: latestPacket.cellId || latestPacket.receiptLink?.cellId || '',
         packetId: latestPacket.packetId,
@@ -2059,10 +2094,10 @@
     return {
       mode: revealedCount ? 'inspect' : 'read',
       eyebrow: 'Current focus',
-      title: revealedCount ? 'Inspect revealed sectors' : 'Read the private map',
+      title: revealedCount ? 'Explore Revealed Sectors' : 'Open the Map',
       body: revealedCount
-        ? `${countLabel(revealedCount, 'revealed sector')} can be inspected from the optional ledger. Locked silhouettes remain private fog.`
-        : 'The server read model is present, but no revealed frontier sector is available yet.',
+        ? `${countLabel(revealedCount, 'revealed sector')} can be selected on the map. Receipts stay behind the ledger.`
+        : 'No revealed frontier sector is available yet.',
       selectedCellId: selectedCell?.cellId || '',
       targetCellId: selectedCell?.cellId || '',
       packetId: latestPacket?.packetId || '',
@@ -2095,6 +2130,8 @@
     if (label.startsWith('locked')) return 'LCK';
     if (label.startsWith('party')) return 'PTY';
     if (label.startsWith('actions')) return 'ACT';
+    if (label.startsWith('target')) return 'TGT';
+    if (label.startsWith('crew')) return 'CREW';
     if (label.startsWith('plan')) return 'PLAN';
     if (label.startsWith('surveyor')) return 'SVY';
     if (label.startsWith('command')) return 'CMD';
@@ -2108,9 +2145,9 @@
       case 'scout_sector':
         return 'Scout';
       case 'draft_site_plan_from_packet':
-        return 'Plan';
+        return 'Survey';
       case 'review_site_plan':
-        return 'Review';
+        return 'Ready';
       case 'prepare_settler_convoy':
         return 'Convoy';
       case 'found_settlement':
@@ -2118,7 +2155,7 @@
       case 'review_packet':
         return 'Packet';
       case 'survey_site_plan_contract_required':
-        return 'Plan';
+        return 'Survey';
       default:
         return fallback || 'Inspect';
     }
@@ -2395,20 +2432,20 @@
     if (reviewPlanId) rail.dataset.planId = reviewPlanId;
     if (pendingPacketPlan || pendingReviewPlan || pendingConvoyPlan) rail.dataset.pending = 'true';
     rail.title = bridge.ledgerText || 'Scout Packet to Site Plan bridge is read-only readiness only.';
-    rail.setAttribute('aria-label', `Scout Packet to Site Plan bridge: ${statusLabel} at ${cellId || 'selected cell'}. ${hasCommandAction ? 'Existing guarded command ready.' : 'Read-only; zero executable actions.'}`);
+    rail.setAttribute('aria-label', `Map bridge: ${statusLabel} at ${cellId || 'selected cell'}. ${hasCommandAction ? 'Command ready.' : 'Read-only; zero executable actions.'}`);
 
     [
       {
         phase: 'packet',
         code: 'PKT',
-        label: 'Packet',
+        label: 'Scout',
         meta: cellLabel,
         testId: `${testId}-step-packet`,
       },
       {
         phase: 'site-plan',
         code: 'SVY',
-        label: candidate.sitePlan?.planId ? 'Plan' : 'Site plan',
+        label: candidate.sitePlan?.planId ? 'Site' : 'Survey',
         meta: statusLabel,
         testId: `${testId}-step-site-plan`,
       },
@@ -2416,7 +2453,7 @@
         phase: 'command',
         code: 'CMD',
         label: commandState.serverMutationImplemented === true ? expeditionGuidedCommandLabel(commandState.commandId, commandState.label) : 'Wait',
-        meta: commandState.serverMutationImplemented === true ? 'Endpoint' : 'Contract',
+        meta: commandState.serverMutationImplemented === true ? 'Go' : 'Wait',
         testId: `${testId}-step-command`,
       },
     ].forEach((step) => {
@@ -5978,6 +6015,7 @@
     await refreshCivicProjects(bundle);
     syncLocalOverlayState(bundle);
     renderAll(bundle);
+    return bundle;
   }
 
   function normalizeBundle(envelope) {
@@ -6250,11 +6288,11 @@
       commandId: 'draft_site_plan_from_packet',
       cellId: nextCellId,
       unitType: 'surveyor',
-      label: data.existing ? 'Planned' : 'Planned',
+      label: data.existing ? 'Surveyed' : 'Surveyed',
       receiptId: data.sitePlan?.planId || '',
       receiptKind: 'packet_site_plan_draft',
     });
-    toast(data.existing ? 'Packet Site Plan already exists.' : 'Packet Site Plan drafted.');
+    toast(data.existing ? 'Map target already surveyed.' : 'Map target surveyed.');
     await loadState();
   }
 
@@ -6293,12 +6331,12 @@
         cellId: reviewedCellId,
         unitId: surveyorUnit?.unitId || '',
         unitType: 'surveyor',
-        label: 'Reviewed',
+        label: 'Ready',
         receiptId: safePlanId,
         receiptKind: 'site_plan_review',
       });
     }
-    toast(data.existing ? 'Site Plan already claim-ready.' : 'Site Plan reviewed for claim-ready planning.');
+    toast(data.existing ? 'Map target already ready.' : 'Map target ready for convoy.');
     await loadState();
   }
 
@@ -6323,20 +6361,35 @@
       renderExpeditionMap(state.bundle || {});
       return toast(data.error?.message || 'Could not prepare Settler Convoy.', 'danger');
     }
+    const nextBundle = await loadState();
+    const claimId = String(data.settlementClaim?.claimId || '');
     const targetCellId = target.cellId || state.expeditionSelectedCellId;
-    if (targetCellId) {
-      state.expeditionSelectedCellId = targetCellId;
-      if (target.unit?.unitId) state.expeditionSelectedUnitId = target.unit.unitId;
+    let convoyUnit = null;
+    if (claimId) {
+      const nextModel = expeditionMapModel(nextBundle || state.bundle || {});
+      convoyUnit = expeditionUnits(nextModel).find((unit) => (
+        String(unit.unitType || '') === 'settler_convoy'
+        && String(unit.sourceClaimId || '') === claimId
+      ));
+      if (convoyUnit?.unitId) {
+        state.expeditionSelectedUnitId = String(convoyUnit.unitId || '');
+        if (convoyUnit.cellId) state.expeditionSelectedCellId = String(convoyUnit.cellId || '');
+      }
+    }
+    const eventCellId = convoyUnit?.cellId || targetCellId;
+    if (eventCellId) {
+      state.expeditionSelectedCellId = eventCellId;
       setExpeditionCommandOutcomeFeedback({
         commandId: 'prepare_settler_convoy',
-        unitId: target.unit?.unitId || state.expeditionSelectedUnitId,
-        unitType: target.unit?.unitType || 'surveyor',
-        cellId: targetCellId,
+        unitId: convoyUnit?.unitId || target.unit?.unitId || state.expeditionSelectedUnitId,
+        unitType: convoyUnit?.unitType || 'settler_convoy',
+        cellId: eventCellId,
+        label: 'Rolling',
         receiptId: data.settlementClaim?.claimId || data.job?.jobId || '',
         receiptKind: data.settlementClaim?.claimId ? 'settler_convoy_claim' : 'settler_convoy_job',
       });
+      renderExpeditionMap(nextBundle || state.bundle || {});
     }
-    await loadState();
     toast(data.existing ? 'Settler Convoy claim already exists.' : 'Settler Convoy preparing.');
   }
 

@@ -2203,6 +2203,16 @@ function mergeExpeditionResourceHints(left, right) {
 
 function mergeExpeditionCells(cells, next) {
   const priority = { locked_unknown: 0, hinted: 1, known: 2, discovered: 3 };
+  const truthPriority = {
+    fog_placeholder: 0,
+    derived_hint: 1,
+    expedition_scout_sector: 2,
+    scout_report: 2,
+    site_plan: 3,
+    settlement_claim: 4,
+    plot_membership: 5,
+    founder_plot: 6
+  };
   const source = {
     ...next,
     fogState: EXPEDITION_MAP_FOG_STATES.includes(next.fogState) ? next.fogState : 'locked_unknown',
@@ -2223,7 +2233,11 @@ function mergeExpeditionCells(cells, next) {
     });
     return;
   }
-  const keepIncoming = (priority[source.fogState] || 0) >= (priority[existing.fogState] || 0);
+  const sourceFogPriority = priority[source.fogState] || 0;
+  const existingFogPriority = priority[existing.fogState] || 0;
+  const keepIncoming = sourceFogPriority > existingFogPriority
+    || (sourceFogPriority === existingFogPriority
+      && (truthPriority[source.sourceTruth] || 0) >= (truthPriority[existing.sourceTruth] || 0));
   const sources = new Map();
   for (const entry of [...(existing.sources || []), ...(source.sources || [])]) {
     const normalized = normalizeExpeditionSource(entry);

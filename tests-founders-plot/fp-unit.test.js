@@ -698,6 +698,45 @@ test('FP-UT-013 prepareSettlerConvoy spends resources and creates one claim/job'
   assert.deepEqual(out.settlementClaim.cost, engine.SETTLER_CONVOY_DEF.cost);
   assert.equal(out.state.plot.inventory.wood, 80 - engine.SETTLER_CONVOY_DEF.cost.wood);
   assert.equal(out.state.settlementClaims.length, 1);
+  const convoyCell = out.state.expeditionMap.cells.find((cell) => cell.sourceIds?.claimId === out.settlementClaim.claimId);
+  assert.ok(convoyCell, 'expected prepared Settler Convoy claim to project onto Expedition Map');
+  assert.equal(convoyCell.sourceTruth, 'settlement_claim');
+  assert.equal(convoyCell.status, 'CONVOY_PREPARING');
+  assert.equal(convoyCell.cellId, 'cell_q1_r0');
+  const convoyUnit = out.state.expeditionMap.units.items.find((unit) => (
+    unit.unitType === 'settler_convoy'
+    && unit.sourceClaimId === out.settlementClaim.claimId
+  ));
+  assert.ok(convoyUnit, 'expected prepared Settler Convoy map unit');
+  assert.equal(convoyUnit.location.cellId, convoyCell.cellId);
+  assert.equal(convoyUnit.readOnly, true);
+  assert.equal(convoyUnit.movement.movementMutationImplemented, false);
+  assert.equal(convoyUnit.commandHints.some((command) => command.commandId === 'found_settlement'), false);
+  const advanced = engine.advancePlotTimeForTests({
+    pairId: ctx.pairId,
+    plotId: ctx.plotId,
+    advanceMs: engine.SETTLER_CONVOY_DEF.durationMs + 1,
+    nowMs: 1700_000_010_000
+  });
+  assert.equal(advanced.ok, true);
+  const arrivedMap = engine.getExpeditionMapStatus({
+    pairId: ctx.pairId,
+    plotId: ctx.plotId,
+    nowMs: 1700_000_190_001
+  });
+  assert.equal(arrivedMap.ok, true, arrivedMap.error?.message);
+  const arrivedConvoyUnit = arrivedMap.expeditionMap.units.items.find((unit) => (
+    unit.unitType === 'settler_convoy'
+    && unit.sourceClaimId === out.settlementClaim.claimId
+  ));
+  assert.ok(arrivedConvoyUnit, 'expected arrived Settler Convoy map unit');
+  assert.equal(arrivedConvoyUnit.location.cellId, convoyCell.cellId);
+  assert.ok(arrivedConvoyUnit.commandHints.some((command) => (
+    command.commandId === 'found_settlement'
+    && command.actionName === 'et.plot.found_settlement'
+    && command.claimId === out.settlementClaim.claimId
+    && command.serverMutationImplemented === true
+  )));
   const repeat = engine.prepareSettlerConvoy({
     pairId: ctx.pairId,
     plotId: ctx.plotId,
