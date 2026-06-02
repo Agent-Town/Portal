@@ -1,0 +1,56 @@
+{
+  "ok": true,
+  "generatedAt": "2026-06-02T12:24:03.353Z",
+  "title": "HQ16P Expedition Map Game HUD Shell",
+  "source": "FP-E2E-022M extended after server-owned Found Outpost result to verify symbol-first HUD shell and collapsed debug details",
+  "screenshots": [
+    "reports/agent-town-hq16p-expedition-map-game-hud-shell-2026-06-02-desktop.png",
+    "reports/agent-town-hq16p-expedition-map-game-hud-shell-2026-06-02-mobile.png"
+  ],
+  "hudShellProof": {
+    "primaryText": {
+      "[data-testid=\"fp-expedition-map-status\"]": "◎\n◎\n◆2\n□2\nLEDGER / FOG",
+      "[data-testid=\"fp-expedition-objective-strip\"]": "⌾\n⌖\n⌖\n1\n◆\n2\n□\n2\n◎\n⚿\n⌖\nQ0 R1\n✦\n⚿\nMarker\n⚿ · Q0 R1\n✓\n⌂\nDone\nQ0 R1\n⚿\n⚿\nFound\nQ0 R1\n➜\n⚿\nMarker\nQ0 R1 · ⚿\n⚑\nScout\nQ0 R1\n▧\nSite\nReady\n✦\nWait\nWait\nDETAILS",
+      "[data-testid=\"fp-expedition-guided-loop\"]": "◎\n⚿\n⌖\nQ0 R1\n✦\n⚿\nMarker\n⚿ · Q0 R1\n✓\n⌂\nDone\nQ0 R1\n⚿\n⚿\nFound\nQ0 R1\n➜\n⚿\nMarker\nQ0 R1 · ⚿",
+      "[data-testid=\"fp-expedition-unit-roster\"]": "◉\n2 ◉\n⌗\n▧\n●\n0\n⌂\n⌂\n◆\n0\n⌂ ⌂\n◎\n0 ↦\n⏳",
+      "[data-testid=\"fp-expedition-unit-command-bar\"]": "⌂ ⌂\n◎\n0 ↦\n⏳",
+      "[data-testid=\"fp-expedition-command-outcome-chip\"]": "⌂\nFounded\nOUT · Q0 R1 · ◆",
+      "[data-testid=\"fp-expedition-map-visual-hud\"]": "◆\n1\n●\n1\n◇\n1\n□\n1\n⌂\n⌂\n◆\n◆\n○\n2 ⚿\n0 ◉\n⚑\nScout\nQ0 R1\n▧\nSite\nReady\n✦\nWait\nWait\n⚿\n2 ⚿",
+      "[data-testid=\"fp-expedition-map-selected-summary\"]": "⌂\n⌂\n◆\n◆\n○\n2 ⚿\n0 ◉\n⚑\nScout\nQ0 R1\n▧\nSite\nReady\n✦\nWait\nWait\n⚿\n2 ⚿",
+      "[data-testid=\"fp-expedition-fog-pips\"]": "◆\n1\n●\n1\n◇\n1\n□\n1"
+    },
+    "visiblePhaseText": "◎\n⚿\n⌖\nQ0 R1\n✦\n⚿\nMarker\n⚿ · Q0 R1\n✓\n⌂\nDone\nQ0 R1\n⚿\n⚿\nFound\nQ0 R1\n➜\n⚿\nMarker\nQ0 R1 · ⚿",
+    "unitDockText": "◉\n2 ◉\n⌗\n▧\n●\n0\n⌂\n⌂\n◆\n0\n⌂ ⌂\n◎\n0 ↦\n⏳",
+    "detailsDrawerCount": 5,
+    "closedDrawerCount": 5,
+    "authorityDatasets": {
+      "objectiveReadOnly": "true",
+      "objectiveActions": "0",
+      "commandBarReadOnly": "true",
+      "outcomeReadOnly": "true",
+      "outcomeServerOwned": "true"
+    }
+  },
+  "guardrails": {
+    "frontendCssE2eOnly": true,
+    "serverAuthorityUnchanged": true,
+    "primaryDebugTextHidden": true,
+    "oldPhaseCodesHidden": true,
+    "oldFogCodesHidden": true,
+    "unitDockIconFirst": true,
+    "detailsDrawerAvailable": true,
+    "detailsDrawerCollapsedByDefault": true,
+    "authorityDataPreserved": true,
+    "routeAuthority": false,
+    "tradeRouteCreation": false,
+    "resourceHarvesting": false,
+    "rewardCreation": false,
+    "backgroundScheduling": false,
+    "combat": false,
+    "hiddenTruthLeakage": false,
+    "crossPlotMutationBeyondExistingFoundSettlementContract": false,
+    "atlasExecution": false,
+    "generatedUniverseRuntimeExpansion": false,
+    "externalEffects": false
+  }
+}

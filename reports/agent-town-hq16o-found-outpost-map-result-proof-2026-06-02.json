@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "generatedAt": "2026-06-02T12:02:51.967Z",
+  "generatedAt": "2026-06-02T12:24:03.353Z",
   "title": "HQ16O Found Outpost to Outpost Map Result bridge",
   "source": "FP-E2E-022M extended Found Outpost result proof using mocked server-owned founded outpost read model",
   "screenshots": [
@@ -11,7 +11,7 @@
     "plotId": "plot_hq16m_prepare_to_settler_bridge",
     "claimId": "claim_hq16m_ridge",
     "actor": "HUMAN",
-    "idempotencyKey": "fp-found-settlement-claim_hq16m_ridge-mpwl8syp-1"
+    "idempotencyKey": "fp-found-settlement-claim_hq16m_ridge-mpwm01n0-1"
   },
   "result": {
     "claimId": "claim_hq16m_ridge",
@@ -23,19 +23,19 @@
       "unitType": "outpost_crew",
       "cellId": "cell_q0_r1",
       "selected": "true",
-      "text": "⌂OUTQ0 R10"
+      "text": "⌂⌂◆0"
     },
     "commandBar": {
       "unitId": "expedition_unit_outpost_crew_claim_hq16m_ridge",
       "cellId": "cell_q0_r1",
       "actions": 0,
-      "text": "⌂ OUTInspect0 ↦WAIT"
+      "text": "⌂ ⌂◎0 ↦⏳"
     },
     "outcome": {
       "commandId": "found_settlement",
       "unitId": "expedition_unit_outpost_crew_claim_hq16m_ridge",
       "cellId": "cell_q0_r1",
-      "text": "⌂FoundedOUT · Q0 R1 · DISC"
+      "text": "⌂FoundedOUT · Q0 R1 · ◆"
     },
     "renderer": {
       "selectedCellId": "cell_q0_r1",
@@ -76,7 +76,7 @@
       "commandTargets": [],
       "commandOutcomeFeedback": [
         {
-          "feedbackId": "found_settlement-cell_q0_r1-mpwl8t0v",
+          "feedbackId": "found_settlement-cell_q0_r1-mpwm01pk",
           "unitId": "expedition_unit_outpost_crew_claim_hq16m_ridge",
           "unitType": "outpost_crew",
           "commandId": "found_settlement",
@@ -187,12 +187,12 @@
       "selectedConvoyUnit": false,
       "selectedOutpostCrewUnit": true,
       "targetCellId": "cell_q0_r1",
-      "primaryOutcomeText": "⌂FoundedOUT · Q0 R1 · DISC"
+      "primaryOutcomeText": "⌂FoundedOUT · Q0 R1 · ◆"
     },
     "primarySurfaceText": {
-      "objective": "FOCUS\nSCOUT\nSCT\n1\nREV\n2\nHID\n2\nOBJ\n⚿\nSCOUT\nQ0 R1\nCMD\n⚿\nMarker\nMRK · Q0 R1\nRES\n⌂\nDone\nQ0 R1\nFX\n⚿\nFound\nQ0 R1\nNXT\n⚿\nMarker\nQ0 R1 · SRV\nMRK\nScout\nQ0 R1\nSVY\nSite\nREADY\nCMD\nWait\nWAIT\nDETAILS",
-      "commandBar": "⌂ OUT\nInspect\n0 ↦\nWAIT",
-      "outcome": "⌂\nFounded\nOUT · Q0 R1 · DISC",
+      "objective": "⌾\n⌖\n⌖\n1\n◆\n2\n□\n2\n◎\n⚿\n⌖\nQ0 R1\n✦\n⚿\nMarker\n⚿ · Q0 R1\n✓\n⌂\nDone\nQ0 R1\n⚿\n⚿\nFound\nQ0 R1\n➜\n⚿\nMarker\nQ0 R1 · ⚿\n⚑\nScout\nQ0 R1\n▧\nSite\nReady\n✦\nWait\nWait\nDETAILS",
+      "commandBar": "⌂ ⌂\n◎\n0 ↦\n⏳",
+      "outcome": "⌂\nFounded\nOUT · Q0 R1 · ◆",
       "preview": ""
     },
     "mobileFit": {

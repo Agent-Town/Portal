@@ -547,10 +547,10 @@ html, body {
 
 .fp-expedition-objective-strip {
   display: grid;
-  grid-template-columns: minmax(72px, auto) minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 6px 8px;
   align-items: center;
-  padding: 8px 9px;
+  padding: 7px 8px;
   border: 1px solid rgba(27, 106, 100, 0.24);
   border-left: 4px solid var(--at-teal-600);
   border-radius: 8px;
@@ -653,7 +653,7 @@ html, body {
   grid-template-columns: auto minmax(0, 1fr);
   gap: 2px 4px;
   align-items: center;
-  padding: 5px 6px;
+  padding: 5px;
   border: 1px solid rgba(27, 106, 100, 0.18);
   border-radius: 7px;
   background:
@@ -671,12 +671,18 @@ html, body {
   letter-spacing: 0;
   line-height: 1;
   text-overflow: ellipsis;
-  text-transform: uppercase;
   white-space: nowrap;
 }
 
 .fp-expedition-guided-loop__step small {
-  grid-column: 1 / -1;
+  display: grid;
+  width: 18px;
+  aspect-ratio: 1;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(27, 106, 100, 0.12);
+  color: #104540;
+  font-size: 11px;
 }
 
 .fp-expedition-guided-loop__step i {
@@ -758,7 +764,6 @@ html, body {
   letter-spacing: 0;
   line-height: 1;
   text-overflow: ellipsis;
-  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -1484,7 +1489,7 @@ html, body {
   display: grid;
   gap: 6px;
   margin: 0 12px 12px;
-  padding: 7px;
+  padding: 6px;
   border: 1px solid rgba(27, 106, 100, 0.24);
   border-radius: 8px;
   background:
@@ -1496,7 +1501,7 @@ html, body {
 .fp-expedition-unit-roster__head {
   display: flex;
   min-width: 0;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
@@ -1504,10 +1509,17 @@ html, body {
 .fp-expedition-unit-roster__head strong {
   color: #173f39;
   font-family: Wellfleet, Georgia, serif;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .fp-expedition-unit-roster__head small {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border: 1px solid rgba(27, 106, 100, 0.20);
+  border-radius: 999px;
+  background: rgba(223, 245, 241, 0.62);
   color: #5b4831;
   font-size: 9px;
   font-weight: 900;
@@ -1517,19 +1529,19 @@ html, body {
 
 .fp-expedition-unit-rail {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
   gap: 5px;
 }
 
 .fp-expedition-unit-token {
   position: relative;
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
-  gap: 5px;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 4px;
   min-width: 0;
   align-items: center;
-  min-height: 46px;
-  padding: 4px 5px;
+  min-height: 42px;
+  padding: 4px;
   border: 1px solid rgba(46, 27, 14, 0.18);
   border-radius: 8px;
   background: rgba(255, 248, 232, 0.76);
@@ -1549,7 +1561,7 @@ html, body {
 
 .fp-expedition-unit-token > i {
   display: grid;
-  width: 36px;
+  width: 31px;
   aspect-ratio: 1;
   place-items: center;
   border: 1px solid rgba(46, 27, 14, 0.20);
@@ -1615,8 +1627,8 @@ html, body {
   top: 3px;
   right: 3px;
   display: grid;
-  min-width: 15px;
-  height: 15px;
+  min-width: 14px;
+  height: 14px;
   place-items: center;
   border: 1px solid rgba(27, 106, 100, 0.28);
   border-radius: 999px;
@@ -1639,6 +1651,7 @@ html, body {
   flex-wrap: wrap;
   gap: 5px;
   align-items: center;
+  padding-top: 2px;
 }
 
 .fp-expedition-unit-command-bar small,
@@ -1659,7 +1672,7 @@ html, body {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  min-height: 29px;
+  min-height: 28px;
   padding: 5px 8px;
   border-radius: 999px;
   font-size: 10px;
@@ -1673,6 +1686,10 @@ html, body {
   line-height: 1;
 }
 
+.fp-expedition-unit-command-bar__button[data-icon-only="true"]::before {
+  content: none;
+}
+
 .fp-expedition-unit-command-bar__unit,
 .fp-expedition-unit-command-chip--authority[data-enabled="true"] {
   border-color: rgba(27, 106, 100, 0.30);
@@ -1683,6 +1700,12 @@ html, body {
 .fp-expedition-unit-command-chip--target,
 .fp-expedition-unit-command-chip--count {
   background: rgba(255, 248, 232, 0.84);
+}
+
+.fp-expedition-unit-command-chip--target {
+  min-width: 28px;
+  justify-content: center;
+  text-align: center;
 }
 
 .fp-expedition-unit-command-bar span[data-enabled="false"] {

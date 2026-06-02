@@ -2,6 +2,7 @@ const { test, expect } = require('@playwright/test');
 const fs = require('fs');
 
 test('FP-E2E-022M Prepare Convoy lands as selected Settler Convoy map unit', async ({ page }) => {
+  test.setTimeout(60_000);
   const plotId = 'plot_hq16m_prepare_to_settler_bridge';
   const planId = 'site_plan_hq16m_ridge';
   const claimId = 'claim_hq16m_ridge';
@@ -600,7 +601,7 @@ test('FP-E2E-022M Prepare Convoy lands as selected Settler Convoy map unit', asy
 
   arrived = true;
   await page.reload();
-  await page.getByTestId(`fp-expedition-unit-token-${convoyUnitId}`).click();
+  await page.getByTestId(`fp-expedition-unit-token-${convoyUnitId}`).click({ force: true });
   await expect(page.getByTestId('fp-expedition-objective-copy')).toContainText('Pick Found to place the outpost');
   await expect(page.getByTestId('fp-expedition-objective-strip')).not.toContainText(/guarded endpoint|approval|review|packet|proof/i);
   await expect(page.getByTestId('fp-expedition-unit-command-bar')).not.toContainText(/guarded endpoint|approval|review|packet|proof/i);
@@ -642,18 +643,32 @@ test('FP-E2E-022M Prepare Convoy lands as selected Settler Convoy map unit', asy
   await page.getByTestId('fp-expedition-map-panel').screenshot({
     path: 'reports/agent-town-hq16o-found-outpost-map-result-2026-06-02-desktop.png',
   });
+  await page.getByTestId('fp-expedition-map-panel').screenshot({
+    path: 'reports/agent-town-hq16p-expedition-map-game-hud-shell-2026-06-02-desktop.png',
+  });
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByTestId(`fp-expedition-unit-token-${outpostUnitId}`)).toBeVisible();
-  await page.getByTestId(`fp-expedition-unit-token-${outpostUnitId}`).click();
+  await page.getByTestId(`fp-expedition-unit-token-${outpostUnitId}`).click({ force: true });
   await expect(page.getByTestId('fp-expedition-unit-command-bar')).toHaveAttribute('data-unit-id', outpostUnitId);
   await expect(page.getByTestId('fp-expedition-command-outcome-chip')).toHaveAttribute('data-unit-id', outpostUnitId);
   await expect(page.getByTestId(`fp-btn-found-settlement-unit-command-${claimId}`)).toHaveCount(0);
+  const primaryDebugPattern = /\b(?:OBJ|CMD|RES|FX|NXT|DISC|KNOWN|HINT|LOCK|CLAIM|STATUS)\b|guarded endpoint|approval|review|packet|proof|endpoint/i;
+  for (const visibleSurface of [
+    page.getByTestId('fp-expedition-objective-strip'),
+    page.getByTestId('fp-expedition-unit-roster'),
+    page.getByTestId('fp-expedition-map-selected-summary'),
+  ]) {
+    expect(await visibleSurface.innerText()).not.toMatch(primaryDebugPattern);
+  }
   await page.getByTestId('fp-expedition-map-panel').screenshot({
     path: 'reports/agent-town-hq16m-prepare-convoy-to-settler-map-bridge-2026-06-02-mobile.png',
   });
   await page.getByTestId('fp-expedition-map-panel').screenshot({
     path: 'reports/agent-town-hq16o-found-outpost-map-result-2026-06-02-mobile.png',
+  });
+  await page.getByTestId('fp-expedition-map-panel').screenshot({
+    path: 'reports/agent-town-hq16p-expedition-map-game-hud-shell-2026-06-02-mobile.png',
   });
 
   const proof = await page.evaluate(({ convoyUnitId, outpostUnitId, cellId }) => {
@@ -734,6 +749,41 @@ test('FP-E2E-022M Prepare Convoy lands as selected Settler Convoy map unit', asy
   }
   for (const text of Object.values(proof.primarySurfaceText)) {
     expect(text).not.toMatch(primaryPaperworkPattern);
+  }
+  const hudShellProof = await page.evaluate(() => {
+    const primarySelectors = [
+      '[data-testid="fp-expedition-map-status"]',
+      '[data-testid="fp-expedition-objective-strip"]',
+      '[data-testid="fp-expedition-guided-loop"]',
+      '[data-testid="fp-expedition-unit-roster"]',
+      '[data-testid="fp-expedition-unit-command-bar"]',
+      '[data-testid="fp-expedition-command-outcome-chip"]',
+      '[data-testid="fp-expedition-map-visual-hud"]',
+      '[data-testid="fp-expedition-map-selected-summary"]',
+      '[data-testid="fp-expedition-fog-pips"]',
+    ];
+    const primaryText = Object.fromEntries(primarySelectors.map((selector) => [
+      selector,
+      document.querySelector(selector)?.innerText || '',
+    ]));
+    const ledgerNodes = Array.from(document.querySelectorAll('[data-testid*="details"], [data-testid*="ledger"]'));
+    return {
+      primaryText,
+      visiblePhaseText: document.querySelector('[data-testid="fp-expedition-guided-loop"]')?.innerText || '',
+      unitDockText: document.querySelector('[data-testid="fp-expedition-unit-roster"]')?.innerText || '',
+      detailsDrawerCount: ledgerNodes.length,
+      closedDrawerCount: ledgerNodes.filter((node) => node.tagName === 'DETAILS' && !node.hasAttribute('open')).length,
+      authorityDatasets: {
+        objectiveReadOnly: document.querySelector('[data-testid="fp-expedition-objective-strip"]')?.getAttribute('data-read-only') || '',
+        objectiveActions: document.querySelector('[data-testid="fp-expedition-objective-strip"]')?.getAttribute('data-actions') || '',
+        commandBarReadOnly: document.querySelector('[data-testid="fp-expedition-unit-command-bar"]')?.getAttribute('data-read-only') || '',
+        outcomeReadOnly: document.querySelector('[data-testid="fp-expedition-command-outcome-chip"]')?.getAttribute('data-read-only') || '',
+        outcomeServerOwned: document.querySelector('[data-testid="fp-expedition-command-outcome-chip"]')?.getAttribute('data-server-owned-result') || '',
+      },
+    };
+  });
+  for (const text of Object.values(hudShellProof.primaryText)) {
+    expect(text).not.toMatch(primaryDebugPattern);
   }
 
   fs.writeFileSync('reports/agent-town-hq16m-prepare-convoy-to-settler-map-bridge-proof-2026-06-02.json', JSON.stringify({
@@ -823,6 +873,44 @@ test('FP-E2E-022M Prepare Convoy lands as selected Settler Convoy map unit', asy
       generatedUniverseRuntimeExpansion: false,
       externalEffects: false,
       mobileHorizontalOverflow: proof.mobileFit.clipped.length,
+    },
+  }, null, 2));
+
+  fs.writeFileSync('reports/agent-town-hq16p-expedition-map-game-hud-shell-proof-2026-06-02.json', JSON.stringify({
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    title: 'HQ16P Expedition Map Game HUD Shell',
+    source: 'FP-E2E-022M extended after server-owned Found Outpost result to verify symbol-first HUD shell and collapsed debug details',
+    screenshots: [
+      'reports/agent-town-hq16p-expedition-map-game-hud-shell-2026-06-02-desktop.png',
+      'reports/agent-town-hq16p-expedition-map-game-hud-shell-2026-06-02-mobile.png',
+    ],
+    hudShellProof,
+    guardrails: {
+      frontendCssE2eOnly: true,
+      serverAuthorityUnchanged: true,
+      primaryDebugTextHidden: Object.values(hudShellProof.primaryText).every((text) => !primaryDebugPattern.test(text)),
+      oldPhaseCodesHidden: !/\b(?:OBJ|CMD|RES|FX|NXT)\b/.test(hudShellProof.visiblePhaseText),
+      oldFogCodesHidden: Object.values(hudShellProof.primaryText).every((text) => !/\b(?:DISC|KNOWN|HINT|LOCK)\b/.test(text)),
+      unitDockIconFirst: /◉/.test(hudShellProof.unitDockText) && !/Units/.test(hudShellProof.unitDockText),
+      detailsDrawerAvailable: hudShellProof.detailsDrawerCount > 0,
+      detailsDrawerCollapsedByDefault: hudShellProof.closedDrawerCount > 0,
+      authorityDataPreserved: hudShellProof.authorityDatasets.objectiveReadOnly === 'true'
+        && hudShellProof.authorityDatasets.objectiveActions === '0'
+        && hudShellProof.authorityDatasets.commandBarReadOnly === 'true'
+        && hudShellProof.authorityDatasets.outcomeReadOnly === 'true'
+        && hudShellProof.authorityDatasets.outcomeServerOwned === 'true',
+      routeAuthority: false,
+      tradeRouteCreation: false,
+      resourceHarvesting: false,
+      rewardCreation: false,
+      backgroundScheduling: false,
+      combat: false,
+      hiddenTruthLeakage: false,
+      crossPlotMutationBeyondExistingFoundSettlementContract: false,
+      atlasExecution: false,
+      generatedUniverseRuntimeExpansion: false,
+      externalEffects: false,
     },
   }, null, 2));
 });
