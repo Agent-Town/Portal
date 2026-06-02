@@ -1536,6 +1536,84 @@ html, body {
   color: rgba(61, 44, 29, 0.72);
 }
 
+.fp-expedition-command-preview {
+  position: absolute;
+  z-index: 9;
+  right: 14px;
+  bottom: 72px;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  max-width: min(430px, calc(100% - 28px));
+  padding: 8px;
+  border: 1px solid rgba(27, 106, 100, 0.30);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(255, 248, 232, 0.92), rgba(223, 245, 241, 0.82)),
+    repeating-linear-gradient(0deg, rgba(46, 27, 14, 0.028) 0 1px, transparent 1px 14px);
+  box-shadow: 0 16px 34px rgba(46, 27, 14, 0.22);
+  color: #2f2217;
+  pointer-events: auto;
+}
+
+.fp-expedition-command-preview > i {
+  display: grid;
+  width: 34px;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid rgba(27, 106, 100, 0.28);
+  border-radius: 999px;
+  background: rgba(27, 106, 100, 0.16);
+  color: #104540;
+  font-family: Wellfleet, Georgia, serif;
+  font-style: normal;
+  line-height: 1;
+}
+
+.fp-expedition-command-preview span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.fp-expedition-command-preview strong {
+  color: #104540;
+  font-family: Wellfleet, Georgia, serif;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.fp-expedition-command-preview small {
+  overflow: hidden;
+  color: #5b4831;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.fp-expedition-command-preview__actions {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.fp-expedition-command-preview__actions .fp-brass-btn {
+  min-height: 28px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.fp-expedition-command-preview__cancel {
+  min-width: 28px;
+}
+
 .fp-expedition-audit-details {
   display: grid;
   gap: 6px;
@@ -3266,6 +3344,14 @@ html, body {
     max-width: none;
   }
 
+  .fp-expedition-map-panel .fp-expedition-command-preview {
+    right: 10px;
+    bottom: 184px;
+    left: 10px;
+    grid-template-columns: 30px minmax(0, 1fr) auto;
+    max-width: none;
+  }
+
   .fp-expedition-map-panel .fp-expedition-unit-roster {
     top: 62px;
     right: 10px;
@@ -3346,6 +3432,20 @@ html, body {
 
   .fp-expedition-map-panel .fp-expedition-unit-command-bar__button {
     min-height: 25px;
+    padding: 4px 7px;
+    font-size: 9px;
+  }
+
+  .fp-expedition-map-panel .fp-expedition-command-preview {
+    bottom: 170px;
+    padding: 6px;
+  }
+
+  .fp-expedition-map-panel .fp-expedition-command-preview strong {
+    font-size: 12px;
+  }
+
+  .fp-expedition-map-panel .fp-expedition-command-preview__actions .fp-brass-btn {
     padding: 4px 7px;
     font-size: 9px;
   }

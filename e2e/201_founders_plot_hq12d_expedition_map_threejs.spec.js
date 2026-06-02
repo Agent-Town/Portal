@@ -682,9 +682,11 @@ test('FP-E2E-023 HQ14T Expedition Map server-bound terrain underlay preserves au
   expect(initialInfo.visualLayers.commandTargetCount).toBe(2);
   expect(initialInfo.visualLayers.commandTargetRingsVisualOnly).toBe(true);
   expect(initialInfo.visualLayers.commandTargetRingsReadOnly).toBe(true);
+  expect(initialInfo.visualLayers.commandTargetRingsPreviewOnly).toBe(true);
+  expect(initialInfo.visualLayers.commandTargetRingsSelectable).toBe(true);
   expect(initialInfo.visualLayers.commandTargetRingAuthority).toBe(false);
   expect(initialInfo.commandTargets.map((target) => target.commandId).sort()).toEqual(['move_unit', 'scout_sector']);
-  expect(initialInfo.commandTargets.every((target) => target.visualOnly && target.readOnly && target.executableActions === 0)).toBe(true);
+  expect(initialInfo.commandTargets.every((target) => target.visualOnly && target.readOnly && target.previewOnly && target.selectable && target.executableActions === 0)).toBe(true);
   expect(initialInfo.commandTargets.every((target) => target.routeAuthority === false && target.actionAuthority === false)).toBe(true);
   expect(initialInfo.commandTargets.find((target) => target.commandId === 'scout_sector')).toMatchObject({
     cellId: 'cell_q0_r1',

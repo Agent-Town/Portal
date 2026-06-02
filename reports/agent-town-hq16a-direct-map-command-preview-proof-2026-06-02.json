@@ -1,0 +1,90 @@
+{
+  "ok": true,
+  "verdict": "PASS",
+  "lane": "HQ16A",
+  "title": "Direct Map Command Preview",
+  "artifactPrefix": "reports/agent-town-hq16a-direct-map-command-preview",
+  "artifacts": {
+    "report": "reports/agent-town-hq16a-direct-map-command-preview-2026-06-02.md",
+    "proof": "reports/agent-town-hq16a-direct-map-command-preview-proof-2026-06-02.json",
+    "desktopScreenshot": "reports/agent-town-hq16a-direct-map-command-preview-desktop-2026-06-02.png"
+  },
+  "implementation": {
+    "rendererCommandTargetsSelectable": true,
+    "rendererPreviewOnly": true,
+    "rendererVisualOnly": true,
+    "rendererReadOnly": true,
+    "rendererExecutableActions": 0,
+    "frontendPreviewPanel": true,
+    "confirmUsesExistingCommandHandlers": true,
+    "cancelWithoutMutation": true,
+    "stalePreviewClearedOnMapSelection": true
+  },
+  "commands": {
+    "move_unit": {
+      "enabled": true,
+      "existingHandler": "doMoveExpeditionUnit",
+      "existingEndpoint": "POST /api/founders-plot/expedition-map/move-unit",
+      "validatedAgainstServerReadModel": true
+    },
+    "scout_sector": {
+      "enabled": true,
+      "existingHandler": "doScoutExpeditionSector",
+      "existingEndpoint": "POST /api/founders-plot/expedition-map/scout-sector",
+      "validatedAgainstServerReadModel": true
+    },
+    "prepare_settler_convoy": {
+      "enabled": true,
+      "existingHandler": "doPrepareSettlerConvoy",
+      "existingEndpoint": "POST /api/founders-plot/prepare-settler-convoy",
+      "validatedAgainstServerReadModel": true
+    },
+    "found_settlement": {
+      "enabled": true,
+      "existingHandler": "doFoundSettlement",
+      "existingEndpoint": "POST /api/founders-plot/found-settlement",
+      "validatedAgainstServerReadModel": true
+    }
+  },
+  "verification": {
+    "nodeCheck": [
+      "public/experiences/founders-plot/founders-plot.js",
+      "public/experiences/founders-plot/three_scene_entry.js",
+      "public/experiences/founders-plot/three_scene_bundle.js",
+      "e2e/200_founders_plot.spec.js",
+      "e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js"
+    ],
+    "buildFoundersPlotThreejs": true,
+    "playwrightFpE2E022": "passed 1/1",
+    "playwrightFpE2E023": "passed 1/1",
+    "foundersPlotTests": "passed 98/98",
+    "screenshotFile": {
+      "path": "reports/agent-town-hq16a-direct-map-command-preview-desktop-2026-06-02.png",
+      "width": 1232,
+      "height": 625,
+      "format": "PNG"
+    },
+    "gitDiffCheck": true
+  },
+  "guardrails": {
+    "newServerRoute": false,
+    "newToolAction": false,
+    "rendererDirectExecution": false,
+    "scoutSectorOnlyFogReveal": true,
+    "scoutMovementAdjacentKnownOrDiscoveredOnly": true,
+    "surveyorSettlerUseExistingEndpoints": true,
+    "atlasExecution": false,
+    "generatedUniverseRuntimeExpansion": false,
+    "hiddenAutonomy": false,
+    "hiddenTruthLeakage": false,
+    "routeTradeEconomyResourceRewardCombatSchedulerEffects": false,
+    "crossPlotMutation": false,
+    "externalEffects": false,
+    "deployMergePushPublicShare": false
+  },
+  "notes": [
+    "The renderer exposes selectable preview targets only; it still reports no action authority.",
+    "The frontend preview validates command details against the current server-owned read model before rendering Confirm.",
+    "Focused Playwright initially caught pointer propagation and reload readiness issues; both were fixed before final verification."
+  ]
+}

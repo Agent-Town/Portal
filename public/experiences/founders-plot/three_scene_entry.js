@@ -3332,6 +3332,25 @@ function detailFromExpeditionMarker(object, source = 'expedition-three-raycast')
   };
 }
 
+function detailFromExpeditionCommandTarget(object, source = 'expedition-three-raycast') {
+  const data = object?.userData || {};
+  return {
+    unitId: String(data.unitId || ''),
+    unitType: String(data.unitType || ''),
+    commandId: String(data.commandId || ''),
+    cellId: String(data.cellId || ''),
+    targetCellId: String(data.cellId || ''),
+    fogState: String(data.fogState || ''),
+    serverMutationImplemented: data.serverMutationImplemented === true,
+    movementMutation: data.movementMutation === true,
+    visualOnly: data.visualOnly === true,
+    readOnly: data.readOnly === true,
+    previewOnly: data.previewOnly === true,
+    source,
+    atMs: Date.now()
+  };
+}
+
 function expeditionCommandTargetStyle(commandId = '') {
   switch (String(commandId || '')) {
     case 'move_unit':
@@ -3913,11 +3932,13 @@ class ExpeditionMapThreeStage {
         movementMutation: target.movementMutation === true,
         visualOnly: true,
         readOnly: true,
-        selectable: false,
+        previewOnly: true,
+        selectable: true,
         routeAuthority: false,
         actionAuthority: false,
         executableActions: 0
       };
+      this.pickables.push(sprite);
       this.commandTargetSprites.push(sprite);
       this.commandTargetCount += 1;
       this.scene.add(sprite);
@@ -4104,6 +4125,11 @@ class ExpeditionMapThreeStage {
           if (detail.cellId) this.selectedCellId = detail.cellId;
           if (detail.cellId) this.setHoverCell(detail.cellId);
           window.dispatchEvent(new CustomEvent('founders-plot-expedition-map-select', { detail }));
+        } else if (hit.userData?.kind === 'expedition_command_target') {
+          const detail = detailFromExpeditionCommandTarget(hit);
+          if (detail.cellId) this.selectedCellId = detail.cellId;
+          if (detail.cellId) this.setHoverCell(detail.cellId);
+          window.dispatchEvent(new CustomEvent('founders-plot-expedition-command-target-preview', { detail }));
         } else {
           const detail = detailFromExpeditionCell(hit);
           this.selectedCellId = detail.cellId;
@@ -4287,6 +4313,8 @@ class ExpeditionMapThreeStage {
         commandTargetCount: this.commandTargetCount,
         commandTargetRingsVisualOnly: this.commandTargetSprites.every((sprite) => sprite.userData?.visualOnly === true),
         commandTargetRingsReadOnly: this.commandTargetSprites.every((sprite) => sprite.userData?.readOnly === true),
+        commandTargetRingsSelectable: this.commandTargetSprites.every((sprite) => sprite.userData?.selectable === true),
+        commandTargetRingsPreviewOnly: this.commandTargetSprites.every((sprite) => sprite.userData?.previewOnly === true),
         commandTargetRingAuthority: false,
         clientAuthority: false
       },
@@ -4387,6 +4415,7 @@ class ExpeditionMapThreeStage {
         movementMutation: sprite.userData?.movementMutation === true,
         visualOnly: sprite.userData?.visualOnly === true,
         readOnly: sprite.userData?.readOnly === true,
+        previewOnly: sprite.userData?.previewOnly === true,
         selectable: sprite.userData?.selectable === true,
         routeAuthority: sprite.userData?.routeAuthority === true,
         actionAuthority: sprite.userData?.actionAuthority === true,

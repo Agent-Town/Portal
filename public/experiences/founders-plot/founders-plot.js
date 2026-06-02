@@ -176,6 +176,7 @@
     scoutSectorReceipt: null,
     expeditionSelectedCellId: '',
     expeditionSelectedUnitId: '',
+    expeditionCommandPreview: null,
     expeditionMapThreeInfo: null,
     rewardClaimPendingId: '',
     civicProjectInspectionPendingId: '',
@@ -1566,6 +1567,168 @@
     return `fp-expedition-unit-move-${plotId}-${unitId}-${sourceCellId}-${targetCellId}-${projection}`;
   }
 
+  function expeditionCommandHint(unit = {}, commandId = '') {
+    return (Array.isArray(unit.commandHints) ? unit.commandHints : [])
+      .find((command) => String(command.commandId || '') === String(commandId || '')) || null;
+  }
+
+  function clearExpeditionCommandPreview() {
+    state.expeditionCommandPreview = null;
+  }
+
+  function expeditionCommandPreviewFromDetail(detail = {}) {
+    const commandId = String(detail.commandId || '').trim();
+    const unitId = String(detail.unitId || '').trim();
+    const cellId = String(detail.cellId || detail.targetCellId || '').trim();
+    if (!commandId || !unitId || !cellId) return null;
+    const bundle = state.bundle || {};
+    const model = expeditionMapModel(bundle);
+    const cells = expeditionCells(model);
+    const targetCell = cells.find((cell) => String(cell.cellId || '') === cellId);
+    const unit = expeditionUnits(model).find((entry) => String(entry.unitId || '') === unitId);
+    if (!unit || !targetCell) return null;
+    const command = expeditionCommandHint(unit, commandId);
+    if (!command && commandId !== 'move_unit') return null;
+    const targetCellIds = Array.isArray(command?.targetCellIds)
+      ? command.targetCellIds.map((target) => String(target || '')).filter(Boolean)
+      : [];
+    const preview = {
+      commandId,
+      unitId,
+      unitType: unit.unitType,
+      unitName: unit.displayName || expeditionUnitTypeLabel(unit),
+      cellId,
+      cellLabel: expeditionCompactCellLabel(cellId),
+      fogState: String(targetCell.fogState || ''),
+      fogLabel: expeditionFogShortLabel(targetCell.fogState),
+      serverMutationImplemented: command?.serverMutationImplemented === true,
+      readModelValidated: true,
+      previewOnly: true,
+    };
+
+    if (commandId === 'move_unit') {
+      const moveTarget = expeditionUnitMoveTargets(unit, model)
+        .find((cell) => String(cell.cellId || '') === cellId);
+      if (!moveTarget) return null;
+      preview.label = 'Move';
+      preview.icon = '↦';
+      preview.serverMutationImplemented = unit.movement?.movementMutationImplemented === true;
+      preview.idempotencyKey = expeditionUnitMoveIdempotencyKey(bundle, model, unit, moveTarget);
+      preview.ariaLabel = `Preview Move ${preview.unitName} to ${cellId}`;
+      return preview.serverMutationImplemented ? preview : null;
+    }
+
+    if (commandId === 'scout_sector') {
+      const scoutTarget = expeditionUnitScoutCommandTarget(unit, targetCell, model).targetCell;
+      if (!scoutTarget || String(scoutTarget.cellId || '') !== cellId) return null;
+      preview.label = 'Scout';
+      preview.icon = '⌖';
+      preview.serverMutationImplemented = command?.serverMutationImplemented === true;
+      preview.idempotencyKey = scoutSectorIdempotencyKey(bundle, model, scoutTarget);
+      preview.ariaLabel = `Preview Scout Sector with ${preview.unitName} at ${cellId}`;
+      return preview.serverMutationImplemented ? preview : null;
+    }
+
+    if (commandId === 'prepare_settler_convoy') {
+      const planId = String(command?.sourcePlanId || unit.sourcePlanId || '');
+      const targetMatches = !targetCellIds.length || targetCellIds.includes(cellId) || String(unit.cellId || '') === cellId;
+      if (!planId || !targetMatches || command?.enabled === false) return null;
+      preview.label = 'Convoy';
+      preview.icon = '▣';
+      preview.planId = planId;
+      preview.serverMutationImplemented = command?.serverMutationImplemented === true;
+      preview.ariaLabel = `Preview Prepare Convoy from site plan ${planId}`;
+      return preview.serverMutationImplemented ? preview : null;
+    }
+
+    if (commandId === 'found_settlement') {
+      const claimId = String(command?.claimId || unit.sourceClaimId || '');
+      const targetMatches = !targetCellIds.length || targetCellIds.includes(cellId) || String(unit.cellId || '') === cellId;
+      if (!claimId || !targetMatches || command?.enabled === false) return null;
+      preview.label = 'Found';
+      preview.icon = '⌂';
+      preview.claimId = claimId;
+      preview.serverMutationImplemented = command?.serverMutationImplemented === true;
+      preview.ariaLabel = `Preview Found Outpost from claim ${claimId}`;
+      return preview.serverMutationImplemented ? preview : null;
+    }
+
+    return null;
+  }
+
+  function appendExpeditionCommandPreview(host) {
+    const preview = expeditionCommandPreviewFromDetail(state.expeditionCommandPreview || {});
+    if (!preview || !host) {
+      clearExpeditionCommandPreview();
+      return null;
+    }
+    state.expeditionCommandPreview = preview;
+    const pending = !!(state.expeditionUnitMovePendingId || state.scoutSectorPendingCellId || state.convoyPendingPlanId || state.foundingPendingClaimId);
+    const panel = document.createElement('section');
+    panel.className = `fp-expedition-command-preview fp-expedition-command-preview--${safeTestId(preview.commandId)}`;
+    panel.dataset.testid = 'fp-expedition-command-preview';
+    panel.dataset.commandId = preview.commandId;
+    panel.dataset.unitId = preview.unitId;
+    panel.dataset.cellId = preview.cellId;
+    panel.dataset.previewOnly = 'true';
+    panel.dataset.serverMutationImplemented = preview.serverMutationImplemented ? 'true' : 'false';
+    panel.title = preview.ariaLabel || `${preview.label} ${preview.cellId}`;
+    panel.setAttribute('aria-label', panel.title);
+    ['pointerdown', 'pointermove', 'pointerup', 'click', 'wheel'].forEach((eventName) => {
+      panel.addEventListener(eventName, (event) => event.stopPropagation());
+    });
+
+    const icon = document.createElement('i');
+    icon.textContent = preview.icon || '◎';
+    icon.setAttribute('aria-hidden', 'true');
+    const text = document.createElement('span');
+    const title = document.createElement('strong');
+    title.textContent = preview.label;
+    const meta = document.createElement('small');
+    meta.textContent = `${expeditionUnitRoleCode(preview)} · ${preview.cellLabel} · ${preview.fogLabel}`;
+    text.append(title, meta);
+    panel.append(icon, text);
+
+    const actions = document.createElement('div');
+    actions.className = 'fp-expedition-command-preview__actions';
+    const confirm = brassBtn('Confirm', 'fp-btn-expedition-command-preview-confirm', () => confirmExpeditionCommandPreview());
+    confirm.classList.add('fp-brass-btn--small');
+    confirm.dataset.testid = 'fp-btn-expedition-command-preview-confirm';
+    confirm.dataset.commandId = preview.commandId;
+    confirm.dataset.unitId = preview.unitId;
+    confirm.dataset.cellId = preview.cellId;
+    confirm.disabled = pending;
+    const cancel = brassBtn('×', 'fp-btn-expedition-command-preview-cancel', () => {
+      clearExpeditionCommandPreview();
+      renderExpeditionMap(state.bundle || {});
+    });
+    cancel.classList.add('fp-brass-btn--small', 'fp-expedition-command-preview__cancel');
+    cancel.dataset.testid = 'fp-btn-expedition-command-preview-cancel';
+    cancel.setAttribute('aria-label', 'Cancel command preview');
+    actions.append(confirm, cancel);
+    panel.appendChild(actions);
+    host.appendChild(panel);
+    return panel;
+  }
+
+  function confirmExpeditionCommandPreview() {
+    const preview = expeditionCommandPreviewFromDetail(state.expeditionCommandPreview || {});
+    if (!preview) {
+      clearExpeditionCommandPreview();
+      renderExpeditionMap(state.bundle || {});
+      return toast('That map command target is no longer available.', 'danger');
+    }
+    clearExpeditionCommandPreview();
+    state.expeditionSelectedUnitId = preview.unitId;
+    state.expeditionSelectedCellId = preview.cellId;
+    if (preview.commandId === 'move_unit') return doMoveExpeditionUnit(preview.unitId, preview.cellId);
+    if (preview.commandId === 'scout_sector') return doScoutExpeditionSector(preview.cellId);
+    if (preview.commandId === 'prepare_settler_convoy' && preview.planId) return doPrepareSettlerConvoy(preview.planId);
+    if (preview.commandId === 'found_settlement' && preview.claimId) return doFoundSettlement(preview.claimId);
+    renderExpeditionMap(state.bundle || {});
+    return toast('That command preview is not executable from the map yet.', 'danger');
+  }
+
   function expeditionCellBounds(cells) {
     const points = cells.map((cell) => {
       const q = Number(cell.q || 0);
@@ -2396,6 +2559,7 @@
       controls.appendChild(button);
     });
     host.appendChild(controls);
+    appendExpeditionCommandPreview(host);
     updateSemanticZoom?.();
     host.dataset.renderer = 'three.js';
     return true;
@@ -5728,6 +5892,7 @@
     const model = expeditionMapModel(state.bundle || {});
     const exists = expeditionCells(model).some((cell) => String(cell.cellId || '') === cellId);
     if (!exists) return;
+    clearExpeditionCommandPreview();
     state.expeditionSelectedCellId = cellId;
     renderExpeditionMap(state.bundle || {});
   }
@@ -5739,7 +5904,21 @@
     const model = expeditionMapModel(state.bundle || {});
     const unit = expeditionUnits(model).find((entry) => String(entry.unitId || '') === unitId);
     if (!unit) return;
+    clearExpeditionCommandPreview();
     selectExpeditionUnit(unit, model, cellId || unit.cellId);
+    renderExpeditionMap(state.bundle || {});
+  }
+
+  function handleExpeditionCommandTargetPreview(ev) {
+    const preview = expeditionCommandPreviewFromDetail(ev?.detail || {});
+    if (!preview) {
+      clearExpeditionCommandPreview();
+      renderExpeditionMap(state.bundle || {});
+      return toast('That map command target is not valid for the current read model.', 'danger');
+    }
+    state.expeditionSelectedUnitId = preview.unitId;
+    state.expeditionSelectedCellId = preview.cellId;
+    state.expeditionCommandPreview = preview;
     renderExpeditionMap(state.bundle || {});
   }
 
@@ -5749,6 +5928,7 @@
     window.addEventListener('founders-plot-scene-pick', handleScenePick);
     window.addEventListener('founders-plot-expedition-map-select', handleExpeditionMapSelect);
     window.addEventListener('founders-plot-expedition-unit-select', handleExpeditionUnitSelect);
+    window.addEventListener('founders-plot-expedition-command-target-preview', handleExpeditionCommandTargetPreview);
     if (els.policyForm) els.policyForm.addEventListener('submit', savePolicy);
     if (els.drawerOpen) els.drawerOpen.addEventListener('click', () => toggleDrawer(true));
     if (els.drawerClose) els.drawerClose.addEventListener('click', () => acknowledgeRecap());
