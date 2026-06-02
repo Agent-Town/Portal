@@ -563,6 +563,13 @@ html, body {
   border-left-color: var(--at-brass-700);
 }
 
+.fp-expedition-objective-strip--convoy {
+  border-left-color: #1b6a64;
+  background:
+    linear-gradient(135deg, rgba(223, 245, 241, 0.64), rgba(255, 228, 160, 0.30)),
+    rgba(255, 248, 232, 0.86);
+}
+
 .fp-expedition-objective-strip__copy {
   display: flex;
   min-width: 0;

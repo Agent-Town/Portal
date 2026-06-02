@@ -1976,7 +1976,7 @@
     return friendlyToken(status || 'Ready');
   }
 
-  function expeditionObjectiveModel({ model, cells, counts, selectedCell, scoutableCells }) {
+  function expeditionObjectiveModel({ model, cells, counts, selectedCell, scoutableCells, surveyBridge = null }) {
     const selectedScoutable = selectedCell && isExpeditionScoutSectorEligible(selectedCell)
       ? selectedCell
       : null;
@@ -1986,6 +1986,37 @@
     const partyMembers = expeditionPartyMembers(partySource);
     const revealedCount = Number(counts.discovered || 0) + Number(counts.known || 0);
     const hiddenCount = Number(counts.hinted || 0) + Number(counts.locked_unknown || 0);
+    const bridgeCandidate = expeditionSurveyBridgeActiveCandidate(surveyBridge);
+    const bridgeCommand = bridgeCandidate?.commandState && typeof bridgeCandidate.commandState === 'object'
+      ? bridgeCandidate.commandState
+      : {};
+    const bridgeCellId = String(bridgeCandidate?.cellId || surveyBridge?.activeCellId || '').trim();
+    const bridgePlanId = String(bridgeCommand.sourcePlanId || bridgeCandidate?.sitePlan?.planId || '').trim();
+
+    if (
+      bridgeCandidate
+      && String(bridgeCommand.commandId || '') === 'prepare_settler_convoy'
+      && bridgeCommand.serverMutationImplemented === true
+      && bridgeCellId
+      && bridgePlanId
+    ) {
+      return {
+        mode: 'convoy',
+        eyebrow: 'Current focus',
+        title: 'Prepare Convoy from reviewed Site Plan',
+        body: `${expeditionCompactCellLabel(bridgeCellId)} has a reviewed Site Plan and Surveyor command target. Prepare Convoy uses the existing guarded endpoint.`,
+        selectedCellId: selectedCell?.cellId || bridgeCellId,
+        targetCellId: bridgeCellId,
+        packetId: bridgeCandidate.packetId || latestPacket?.packetId || '',
+        partyId: partySource?.partyId || latestPacket?.partyId || '',
+        facts: [
+          ['Plan', expeditionCompactCellLabel(bridgeCellId)],
+          ['Surveyor', 'Ready'],
+          ['Command', 'Convoy'],
+          ['Actions', 1],
+        ],
+      };
+    }
 
     if (scoutTarget) {
       return {
@@ -2049,6 +2080,7 @@
     const key = String(mode || '').toLowerCase();
     if (key === 'scout') return 'SCOUT';
     if (key === 'packet') return 'PKT';
+    if (key === 'convoy') return 'CNV';
     if (key === 'inspect') return 'LEDGER';
     return 'MAP';
   }
@@ -2063,6 +2095,9 @@
     if (label.startsWith('locked')) return 'LCK';
     if (label.startsWith('party')) return 'PTY';
     if (label.startsWith('actions')) return 'ACT';
+    if (label.startsWith('plan')) return 'PLAN';
+    if (label.startsWith('surveyor')) return 'SVY';
+    if (label.startsWith('command')) return 'CMD';
     return String(labelText || '').slice(0, 3).toUpperCase();
   }
 
@@ -3514,7 +3549,8 @@
     const scoutableCells = hiddenCells.filter(isExpeditionScoutSectorEligible);
     const selectedCell = selectedExpeditionCell(cells, model);
     if (selectedCell) state.expeditionSelectedCellId = String(selectedCell.cellId || '');
-    const objective = expeditionObjectiveModel({ model, cells, counts, selectedCell, scoutableCells });
+    const surveyBridge = expeditionSurveyBridge(model);
+    const objective = expeditionObjectiveModel({ model, cells, counts, selectedCell, scoutableCells, surveyBridge });
     const guidedLoop = expeditionGuidedLoopModel({
       model,
       cells,
@@ -3585,7 +3621,7 @@
       statusLedger.dataset.actions = '0';
     }
     hud.appendChild(statusCard);
-    appendExpeditionObjectiveStrip(hud, objective, guidedLoop, expeditionSurveyBridge(model));
+    appendExpeditionObjectiveStrip(hud, objective, guidedLoop, surveyBridge);
     appendExpeditionLocationVisitSurface(hud, selectedCell, model);
     const inspector = hud;
 
