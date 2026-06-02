@@ -1,0 +1,77 @@
+{
+  "ok": true,
+  "generatedAt": "2026-06-02T07:38:48.304Z",
+  "title": "HQ16G Scout Sector location visit UI",
+  "source": "FP-E2E-022 mocked server-owned Expedition Map after Scout Sector receipt with read-only Event Packet",
+  "screenshot": "reports/agent-town-hq16g-scout-sector-location-visit-ui-desktop-2026-06-02.png",
+  "changeScope": [
+    "public/experiences/founders-plot/founders-plot.js",
+    "public/experiences/founders-plot/founders-plot.css",
+    "e2e/200_founders_plot.spec.js"
+  ],
+  "locationVisit": {
+    "visible": true,
+    "kind": "expedition_location_visit",
+    "version": "hq16g_scout_sector_visit_layer_v1",
+    "readOnly": "true",
+    "actions": 0,
+    "cellId": "cell_q0_r1",
+    "packetId": "expedition_event_packet_hq12f_cell_q0_r1",
+    "sourceAction": "et.plot.scout_sector",
+    "fogState": "known",
+    "terrainSlot": "unresolved_frontier",
+    "hiddenVisitCount": 0,
+    "buttons": 0,
+    "sceneText": "⌖Ridge Lantern packetQ0 R1 · KNOWN · unresolved frontier",
+    "factsText": "CellQ0 R1PacketPKTReceiptScoutActions0",
+    "partyBadgesText": "MTRSVD",
+    "ledger": {
+      "present": true,
+      "collapsed": true,
+      "readOnly": "true",
+      "actions": 0,
+      "text": "Visit ledgerLedger detail: expedition_event_packet_hq12f_cell_q0_r1 is read-only receipt evidence from et.plot.scout_sector; hidden visit anchors: 0."
+    },
+    "visibleText": "VISITScouted Frontier SectorREAD⌖Ridge Lantern packetQ0 R1 · KNOWN · unresolved frontierCellQ0 R1PacketPKTReceiptScoutActions0Map-local place view from the Scout Sector packet. The selected cell stays anchored to the map; details stay in the ledger.MTRSVDVisit ledgerLedger detail: expedition_event_packet_hq12f_cell_q0_r1 is read-only receipt evidence from et.plot.scout_sector; hidden visit anchors: 0."
+  },
+  "selectedCellId": "cell_q0_r1",
+  "eventPacketId": "expedition_event_packet_hq12f_cell_q0_r1",
+  "mobileFit": {
+    "viewport": 390,
+    "documentScrollWidth": 390,
+    "clipped": [],
+    "locationVisit": {
+      "top": 578,
+      "left": 42,
+      "right": 358,
+      "width": 316,
+      "height": 20
+    }
+  },
+  "guardrails": {
+    "frontendReadModelOnly": true,
+    "serverAuthorityUnchanged": true,
+    "existingReadModelOnly": true,
+    "visitReadOnly": true,
+    "visitActions": 0,
+    "visitButtons": 0,
+    "selectedKnownScoutSectorOnly": true,
+    "packetReadOnlyZeroActions": true,
+    "hiddenVisitCount": 0,
+    "noRouteTravelRewardLanguageInDefaultSurface": true,
+    "routeCreation": false,
+    "tradeRouteCreation": false,
+    "resourceHarvesting": false,
+    "rewardExpansion": false,
+    "combat": false,
+    "backgroundScheduling": false,
+    "publicSharing": false,
+    "generatedUniverseRuntimeExpansion": false,
+    "atlasExecution": false,
+    "hiddenAutonomy": false,
+    "hiddenTruthLeakage": false,
+    "crossPlotMutationAdded": false,
+    "externalEffects": false,
+    "mobileHorizontalOverflow": 0
+  }
+}

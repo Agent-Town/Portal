@@ -2755,6 +2755,133 @@
     return chips;
   }
 
+  function expeditionLocationVisitModel(model = {}, cell = {}) {
+    const fogState = String(cell?.fogState || '');
+    if (!['known', 'discovered'].includes(fogState)) return null;
+    const packet = expeditionPacketForCell(model, cell);
+    const sourceTruth = String(cell?.sourceTruth || '');
+    const receiptAction = String(packet?.receiptLink?.actionName || '');
+    const packetActions = Array.isArray(packet?.executableActions) ? packet.executableActions.length : 0;
+    const scoutPacket = !!packet?.packetId
+      && packet.readOnly === true
+      && packetActions === 0
+      && receiptAction === 'et.plot.scout_sector'
+      && /scout[_-]?sector/i.test(sourceTruth);
+    if (!scoutPacket) return null;
+    const cells = expeditionCells(model);
+    const hiddenVisitCount = cells.filter((entry) => {
+      const entryFog = String(entry?.fogState || '');
+      return ['hinted', 'locked_unknown'].includes(entryFog) && !!expeditionPacketForCell(model, entry);
+    }).length;
+    const publicSlot = cell.publicTerrainAssetSlot || cell.terrainAssetSlot || cell.siteType || fogState;
+    const party = expeditionPartyModel(cell, model, packet);
+    return {
+      kind: 'expedition_location_visit',
+      version: 'hq16g_scout_sector_visit_layer_v1',
+      cellId: String(cell.cellId || ''),
+      cellTitle: cell.title || friendlyToken(cell.kind || cell.cellId || 'visited sector'),
+      fogState,
+      terrainSlot: String(publicSlot || 'known'),
+      packet,
+      party,
+      receiptAction,
+      readOnly: true,
+      actions: 0,
+      hiddenVisitCount,
+    };
+  }
+
+  function appendExpeditionLocationVisitSurface(body, cell, model) {
+    if (!body) return null;
+    const visit = expeditionLocationVisitModel(model, cell);
+    if (!visit) return null;
+    const slug = safeTestId(visit.cellId);
+    const card = document.createElement('article');
+    card.className = 'fp-expedition-map-card fp-expedition-location-visit';
+    card.dataset.testid = `fp-expedition-location-visit-${slug}`;
+    card.dataset.kind = visit.kind;
+    card.dataset.version = visit.version;
+    card.dataset.cellId = visit.cellId;
+    card.dataset.packetId = String(visit.packet.packetId || '');
+    card.dataset.fogState = visit.fogState;
+    card.dataset.terrainSlot = visit.terrainSlot;
+    card.dataset.sourceAction = visit.receiptAction;
+    card.dataset.readOnly = 'true';
+    card.dataset.actions = '0';
+    card.dataset.hiddenVisitCount = String(visit.hiddenVisitCount);
+    card.title = `Visit layer for ${visit.cellId}: read-only Scout Sector packet scene; zero actions.`;
+    card.setAttribute('aria-label', card.title);
+
+    const header = document.createElement('div');
+    header.className = 'fp-expedition-location-visit__header';
+    const titleWrap = document.createElement('div');
+    const eyebrow = document.createElement('small');
+    eyebrow.textContent = 'VISIT';
+    const title = document.createElement('strong');
+    title.textContent = visit.cellTitle;
+    titleWrap.append(eyebrow, title);
+    const seal = document.createElement('span');
+    seal.textContent = 'READ';
+    seal.title = 'Read-only visit layer, no map mutation actions';
+    seal.setAttribute('aria-label', seal.title);
+    header.append(titleWrap, seal);
+    card.appendChild(header);
+
+    const scene = document.createElement('div');
+    scene.className = 'fp-expedition-location-visit__scene';
+    scene.dataset.testid = `fp-expedition-location-visit-scene-${slug}`;
+    scene.dataset.packetId = String(visit.packet.packetId || '');
+    scene.dataset.readOnly = 'true';
+    scene.dataset.actions = '0';
+    const sceneIcon = document.createElement('i');
+    sceneIcon.textContent = '⌖';
+    sceneIcon.setAttribute('aria-hidden', 'true');
+    const sceneCopy = document.createElement('span');
+    const sceneTitle = document.createElement('strong');
+    sceneTitle.textContent = visit.packet.discoveryFlavor || 'Scout packet overlook';
+    const sceneMeta = document.createElement('small');
+    sceneMeta.textContent = `${expeditionCompactCellLabel(visit.cellId)} · ${expeditionFogShortLabel(visit.fogState)} · ${friendlyToken(visit.terrainSlot)}`;
+    sceneCopy.append(sceneTitle, sceneMeta);
+    scene.append(sceneIcon, sceneCopy);
+    card.appendChild(scene);
+
+    const facts = document.createElement('div');
+    facts.className = 'fp-expedition-location-visit__facts';
+    facts.dataset.testid = `fp-expedition-location-visit-facts-${slug}`;
+    [
+      ['Cell', expeditionCompactCellLabel(visit.cellId)],
+      ['Packet', 'PKT'],
+      ['Receipt', 'Scout'],
+      ['Actions', '0'],
+    ].forEach(([labelText, valueText]) => {
+      const item = document.createElement('span');
+      const label = document.createElement('small');
+      label.textContent = labelText;
+      const value = document.createElement('strong');
+      value.textContent = valueText;
+      item.title = `${labelText}: ${valueText}`;
+      item.setAttribute('aria-label', item.title);
+      item.append(label, value);
+      facts.appendChild(item);
+    });
+    card.appendChild(facts);
+
+    const copy = document.createElement('p');
+    copy.textContent = 'Map-local place view from the Scout Sector packet. The selected cell stays anchored to the map; details stay in the ledger.';
+    card.appendChild(copy);
+    appendExpeditionPartyBadges(card, visit.party?.members || [], 'visit');
+
+    const ledgerBody = document.createElement('small');
+    ledgerBody.textContent = `Ledger detail: ${visit.packet.packetId} is read-only receipt evidence from ${visit.receiptAction}; hidden visit anchors: ${visit.hiddenVisitCount}.`;
+    const ledger = appendExpeditionAuditDetails(card, 'Visit ledger', [ledgerBody], `fp-expedition-location-visit-ledger-${slug}`);
+    if (ledger) {
+      ledger.dataset.readOnly = 'true';
+      ledger.dataset.actions = '0';
+    }
+    body.appendChild(card);
+    return card;
+  }
+
   function appendExpeditionEventPacketSurface(body, cell, model) {
     if (!body) return null;
     const packets = expeditionEventPackets(model);
@@ -3234,6 +3361,7 @@
     }
     hud.appendChild(statusCard);
     appendExpeditionObjectiveStrip(hud, objective, guidedLoop);
+    appendExpeditionLocationVisitSurface(hud, selectedCell, model);
     const inspector = hud;
 
     const boardCard = document.createElement('article');

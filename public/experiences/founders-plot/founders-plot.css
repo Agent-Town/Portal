@@ -1995,6 +1995,141 @@ html, body {
   color: #4d3b25;
 }
 
+.fp-expedition-location-visit {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(27, 106, 100, 0.28);
+  border-left-color: var(--at-teal-600);
+  background:
+    radial-gradient(circle at 18% 18%, rgba(223, 245, 241, 0.72), transparent 34%),
+    linear-gradient(135deg, rgba(255, 228, 160, 0.26), rgba(194, 230, 255, 0.16) 52%, rgba(210, 244, 205, 0.20)),
+    rgba(255, 248, 232, 0.92);
+}
+
+.fp-expedition-location-visit__header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+}
+
+.fp-expedition-location-visit__header > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.fp-expedition-location-visit__header small,
+.fp-expedition-location-visit__facts small {
+  color: #5b4831;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.fp-expedition-location-visit__header strong {
+  overflow: hidden;
+  color: #134d49;
+  font-family: Wellfleet, Georgia, serif;
+  font-size: 15px;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fp-expedition-location-visit__header span {
+  justify-self: end;
+  padding: 4px 8px;
+  border: 1px solid rgba(27, 106, 100, 0.28);
+  border-radius: 999px;
+  background: rgba(223, 245, 241, 0.80);
+  color: #104540;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.fp-expedition-location-visit__scene {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid rgba(27, 106, 100, 0.20);
+  border-radius: 8px;
+  background:
+    repeating-linear-gradient(135deg, rgba(27, 106, 100, 0.045) 0 1px, transparent 1px 14px),
+    linear-gradient(135deg, rgba(255, 248, 232, 0.74), rgba(223, 245, 241, 0.42));
+}
+
+.fp-expedition-location-visit__scene i {
+  display: grid;
+  width: 38px;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid rgba(27, 106, 100, 0.32);
+  border-radius: 999px;
+  background: rgba(27, 106, 100, 0.16);
+  color: #104540;
+  font-family: Wellfleet, Georgia, serif;
+  font-style: normal;
+}
+
+.fp-expedition-location-visit__scene span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.fp-expedition-location-visit__scene strong {
+  overflow: hidden;
+  color: #2c2118;
+  font-family: Wellfleet, Georgia, serif;
+  font-size: 13px;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fp-expedition-location-visit__scene small {
+  overflow: hidden;
+  color: #5b4831;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.fp-expedition-location-visit__facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.fp-expedition-location-visit__facts span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  padding: 5px 6px;
+  border: 1px solid rgba(46, 27, 14, 0.14);
+  border-radius: 7px;
+  background: rgba(255, 248, 232, 0.64);
+}
+
+.fp-expedition-location-visit__facts strong {
+  overflow: hidden;
+  color: #2c2118;
+  font-family: Wellfleet, Georgia, serif;
+  font-size: 12px;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .fp-expedition-party {
   display: flex;
   flex-direction: column;
@@ -3206,6 +3341,7 @@ html, body {
     grid-column: 1 / -1;
   }
   .fp-expedition-party p,
+  .fp-expedition-location-visit p,
   .fp-expedition-party > small,
   [data-testid="fp-expedition-map-boundary"],
   [data-testid^="fp-expedition-event-packet-boundary-"] {
@@ -3214,6 +3350,9 @@ html, body {
     -webkit-box-orient: vertical;
   }
   .fp-expedition-party p {
+    -webkit-line-clamp: 2;
+  }
+  .fp-expedition-location-visit p {
     -webkit-line-clamp: 2;
   }
   .fp-expedition-event-packet p,

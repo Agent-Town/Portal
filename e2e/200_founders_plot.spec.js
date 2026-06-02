@@ -1531,6 +1531,8 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   const hq16bScreenshot = 'reports/agent-town-hq16b-command-outcome-feedback-desktop-2026-06-02.png';
   const hq16fProofPath = 'reports/agent-town-hq16f-guided-expedition-loop-ui-proof-2026-06-02.json';
   const hq16fScreenshot = 'reports/agent-town-hq16f-guided-expedition-loop-ui-desktop-2026-06-02.png';
+  const hq16gProofPath = 'reports/agent-town-hq16g-scout-sector-location-visit-ui-proof-2026-06-02.json';
+  const hq16gScreenshot = 'reports/agent-town-hq16g-scout-sector-location-visit-ui-desktop-2026-06-02.png';
 
   function makeState() {
     const state = {
@@ -2465,8 +2467,18 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   await expect(page.getByTestId('fp-expedition-event-packet-facts-expedition_event_packet_hq12f_cell_q0_r1')).toContainText('0');
   await expect(page.getByTestId('fp-expedition-event-packet-boundary-cell_q0_r1')).toContainText('No packet actions');
   await expect(page.getByTestId('fp-expedition-event-packet-boundary-cell_q0_r1')).toContainText('Atlas execution');
+  await expect(page.getByTestId('fp-expedition-location-visit-cell_q0_r1')).toHaveAttribute('data-read-only', 'true');
+  await expect(page.getByTestId('fp-expedition-location-visit-cell_q0_r1')).toHaveAttribute('data-actions', '0');
+  await expect(page.getByTestId('fp-expedition-location-visit-cell_q0_r1')).toHaveAttribute('data-cell-id', 'cell_q0_r1');
+  await expect(page.getByTestId('fp-expedition-location-visit-cell_q0_r1')).toHaveAttribute('data-packet-id', 'expedition_event_packet_hq12f_cell_q0_r1');
+  await expect(page.getByTestId('fp-expedition-location-visit-cell_q0_r1')).toHaveAttribute('data-source-action', 'et.plot.scout_sector');
+  await expect(page.getByTestId('fp-expedition-location-visit-cell_q0_r1')).toHaveAttribute('data-hidden-visit-count', '0');
+  await expect(page.getByTestId('fp-expedition-location-visit-scene-cell_q0_r1')).toContainText('Ridge Lantern packet');
+  await expect(page.getByTestId('fp-expedition-location-visit-facts-cell_q0_r1')).toContainText('Actions');
+  await expect(page.getByTestId('fp-expedition-location-visit-cell_q0_r1').locator('button')).toHaveCount(0);
   await page.getByTestId('fp-expedition-map-panel').screenshot({ path: hq16bScreenshot });
   await page.getByTestId('fp-expedition-map-panel').screenshot({ path: hq16fScreenshot });
+  await page.getByTestId('fp-expedition-map-panel').screenshot({ path: hq16gScreenshot });
   fs.writeFileSync('reports/agent-town-hq16b-command-outcome-feedback-proof-2026-06-02.json', JSON.stringify({
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -2561,6 +2573,9 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   await expect(page.getByTestId('fp-expedition-guided-loop')).toHaveAttribute('data-read-only', 'true');
   await expect(page.getByTestId('fp-expedition-guided-loop')).toHaveAttribute('data-actions', '0');
   await expect(page.getByTestId('fp-expedition-guided-loop-step-next')).toContainText('NXT');
+  await expect(page.getByTestId('fp-expedition-location-visit-cell_q0_r1')).toHaveAttribute('data-read-only', 'true');
+  await expect(page.getByTestId('fp-expedition-location-visit-cell_q0_r1')).toHaveAttribute('data-actions', '0');
+  await expect(page.getByTestId('fp-expedition-location-visit-cell_q0_r1').locator('button')).toHaveCount(0);
   await expect(page.getByTestId('fp-btn-scout-sector-cell_q0_r1')).toHaveCount(0);
   await expect(page.getByTestId('fp-btn-scout-sector-unit-command-cell_q0_r1')).toHaveCount(0);
   await page.locator('#fp-drawer-toggle').evaluate((node) => { node.style.display = 'none'; });
@@ -2683,6 +2698,37 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
         receiptChipText: document.querySelector('[data-testid="fp-expedition-guided-loop-receipt-chip"]')?.textContent || '',
       };
     })(),
+    locationVisit: (() => {
+      const visit = document.querySelector('[data-testid="fp-expedition-location-visit-cell_q0_r1"]');
+      return {
+        visible: !!visit,
+        kind: visit?.getAttribute('data-kind') || '',
+        version: visit?.getAttribute('data-version') || '',
+        readOnly: visit?.getAttribute('data-read-only') || '',
+        actions: Number(visit?.getAttribute('data-actions') || 0),
+        cellId: visit?.getAttribute('data-cell-id') || '',
+        packetId: visit?.getAttribute('data-packet-id') || '',
+        sourceAction: visit?.getAttribute('data-source-action') || '',
+        fogState: visit?.getAttribute('data-fog-state') || '',
+        terrainSlot: visit?.getAttribute('data-terrain-slot') || '',
+        hiddenVisitCount: Number(visit?.getAttribute('data-hidden-visit-count') || 0),
+        buttons: visit ? visit.querySelectorAll('button').length : 0,
+        sceneText: document.querySelector('[data-testid="fp-expedition-location-visit-scene-cell_q0_r1"]')?.textContent || '',
+        factsText: document.querySelector('[data-testid="fp-expedition-location-visit-facts-cell_q0_r1"]')?.textContent || '',
+        partyBadgesText: document.querySelector('[data-testid="fp-expedition-party-badges-visit"]')?.textContent || '',
+        ledger: (() => {
+          const ledger = document.querySelector('[data-testid="fp-expedition-location-visit-ledger-cell_q0_r1"]');
+          return {
+            present: !!ledger,
+            collapsed: ledger ? !ledger.hasAttribute('open') : false,
+            readOnly: ledger?.getAttribute('data-read-only') || '',
+            actions: Number(ledger?.getAttribute('data-actions') || 0),
+            text: ledger?.textContent || '',
+          };
+        })(),
+        visibleText: visit?.textContent || '',
+      };
+    })(),
     eventPacketCardVisible: !!document.querySelector('[data-testid="fp-expedition-event-packet-cell_q0_r1"]'),
     eventPacketHeaderText: document.querySelector('[data-testid="fp-expedition-event-packet-cell_q0_r1"] .fp-expedition-event-packet__header')?.textContent || '',
     eventPacketChipsText: document.querySelector('[data-testid="fp-expedition-event-packet-chips-expedition_event_packet_hq12f_cell_q0_r1"]')?.textContent || '',
@@ -2739,6 +2785,10 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
       '[data-testid="fp-expedition-guided-loop"]',
       '[data-testid^="fp-expedition-guided-loop-step-"]',
       '[data-testid="fp-expedition-objective-ledger-details"]',
+      '[data-testid="fp-expedition-location-visit-cell_q0_r1"]',
+      '[data-testid="fp-expedition-location-visit-scene-cell_q0_r1"]',
+      '[data-testid="fp-expedition-location-visit-facts-cell_q0_r1"]',
+      '[data-testid="fp-expedition-location-visit-ledger-cell_q0_r1"]',
       '[data-testid="fp-expedition-map-board-card"]',
       '[data-testid="fp-expedition-map-visual-hud"]',
       '[data-testid="fp-expedition-map-selected-summary"]',
@@ -2775,6 +2825,7 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
         inspectorDrawer: rectFor('[data-testid="fp-expedition-map-hud"]'),
         inspectorChrome: rectFor('[data-testid="fp-expedition-inspector-chrome"]'),
         objectiveStrip: rectFor('[data-testid="fp-expedition-objective-strip"]'),
+        locationVisit: rectFor('[data-testid="fp-expedition-location-visit-cell_q0_r1"]'),
         threeHost: rectFor('[data-testid="fp-expedition-three-host"]'),
         mapVisualHud: rectFor('[data-testid="fp-expedition-map-visual-hud"]'),
         mapSelectedSummary: rectFor('[data-testid="fp-expedition-map-selected-summary"]'),
@@ -2848,6 +2899,23 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   expect(scoutDomProof.guidedLoop.visibleText).toContain('NXT');
   expect(scoutDomProof.guidedLoop.visibleText).not.toContain('hidden truth');
   expect(scoutDomProof.guidedLoop.visibleText).not.toContain('Atlas execution');
+  expect(scoutDomProof.locationVisit.visible).toBe(true);
+  expect(scoutDomProof.locationVisit.kind).toBe('expedition_location_visit');
+  expect(scoutDomProof.locationVisit.readOnly).toBe('true');
+  expect(scoutDomProof.locationVisit.actions).toBe(0);
+  expect(scoutDomProof.locationVisit.buttons).toBe(0);
+  expect(scoutDomProof.locationVisit.cellId).toBe('cell_q0_r1');
+  expect(scoutDomProof.locationVisit.packetId).toBe(hq12fEventPacket.packetId);
+  expect(scoutDomProof.locationVisit.sourceAction).toBe('et.plot.scout_sector');
+  expect(scoutDomProof.locationVisit.hiddenVisitCount).toBe(0);
+  expect(scoutDomProof.locationVisit.sceneText).toContain('Ridge Lantern packet');
+  expect(scoutDomProof.locationVisit.factsText).toContain('Actions');
+  expect(scoutDomProof.locationVisit.factsText).toContain('0');
+  expect(scoutDomProof.locationVisit.ledger.present).toBe(true);
+  expect(scoutDomProof.locationVisit.ledger.collapsed).toBe(true);
+  expect(scoutDomProof.locationVisit.ledger.readOnly).toBe('true');
+  expect(scoutDomProof.locationVisit.ledger.actions).toBe(0);
+  expect(scoutDomProof.locationVisit.visibleText).not.toMatch(/travel|route creation|reward|combat|Atlas execution/i);
   expect(scoutDomProof.inspectorDrawer.visible).toBe(true);
   expect(scoutDomProof.inspectorDrawer.drawerKind).toBe('visual-inspector');
   expect(scoutDomProof.inspectorDrawer.readOnly).toBe('true');
@@ -3360,6 +3428,55 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
       objectiveFromExistingPacket: scoutDomProof.guidedLoop.objectiveMode === 'packet' && scoutDomProof.guidedLoop.packetId === hq12fEventPacket.packetId,
       nextStepFromExistingCommandHint: scoutDomProof.guidedLoop.nextCommandId === 'found_settlement',
       defaultRailHidesProofProse: !/hidden truth|Atlas execution|zero executable actions/i.test(scoutDomProof.guidedLoop.visibleText),
+      routeCreation: false,
+      tradeRouteCreation: false,
+      resourceHarvesting: false,
+      rewardExpansion: false,
+      combat: false,
+      backgroundScheduling: false,
+      publicSharing: false,
+      generatedUniverseRuntimeExpansion: false,
+      atlasExecution: false,
+      hiddenAutonomy: false,
+      hiddenTruthLeakage: false,
+      crossPlotMutationAdded: false,
+      externalEffects: false,
+      mobileHorizontalOverflow: mobilePolishProof.clipped.length,
+    },
+  }, null, 2));
+  fs.writeFileSync(hq16gProofPath, JSON.stringify({
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    title: 'HQ16G Scout Sector location visit UI',
+    source: 'FP-E2E-022 mocked server-owned Expedition Map after Scout Sector receipt with read-only Event Packet',
+    screenshot: hq16gScreenshot,
+    changeScope: [
+      'public/experiences/founders-plot/founders-plot.js',
+      'public/experiences/founders-plot/founders-plot.css',
+      'e2e/200_founders_plot.spec.js',
+    ],
+    locationVisit: scoutDomProof.locationVisit,
+    selectedCellId: 'cell_q0_r1',
+    eventPacketId: hq12fEventPacket.packetId,
+    mobileFit: {
+      viewport: mobilePolishProof.viewport,
+      documentScrollWidth: mobilePolishProof.documentScrollWidth,
+      clipped: mobilePolishProof.clipped,
+      locationVisit: mobilePolishProof.surfaces.locationVisit,
+    },
+    guardrails: {
+      frontendReadModelOnly: true,
+      serverAuthorityUnchanged: true,
+      existingReadModelOnly: true,
+      visitReadOnly: scoutDomProof.locationVisit.readOnly === 'true',
+      visitActions: scoutDomProof.locationVisit.actions,
+      visitButtons: scoutDomProof.locationVisit.buttons,
+      selectedKnownScoutSectorOnly: scoutDomProof.locationVisit.cellId === 'cell_q0_r1'
+        && scoutDomProof.locationVisit.fogState === 'known'
+        && scoutDomProof.locationVisit.sourceAction === 'et.plot.scout_sector',
+      packetReadOnlyZeroActions: hq12fEventPacket.readOnly === true && hq12fEventPacket.executableActions.length === 0,
+      hiddenVisitCount: scoutDomProof.locationVisit.hiddenVisitCount,
+      noRouteTravelRewardLanguageInDefaultSurface: !/travel|route creation|reward|combat|Atlas execution/i.test(scoutDomProof.locationVisit.visibleText),
       routeCreation: false,
       tradeRouteCreation: false,
       resourceHarvesting: false,
