@@ -685,6 +685,14 @@ test('FP-E2E-023 HQ14T Expedition Map server-bound terrain underlay preserves au
   expect(initialInfo.visualLayers.commandTargetRingsPreviewOnly).toBe(true);
   expect(initialInfo.visualLayers.commandTargetRingsSelectable).toBe(true);
   expect(initialInfo.visualLayers.commandTargetRingAuthority).toBe(false);
+  expect(initialInfo.visualLayers.commandOutcomeFeedback).toBe(false);
+  expect(initialInfo.visualLayers.commandOutcomeFeedbackCount).toBe(0);
+  expect(initialInfo.visualLayers.commandOutcomeFeedbackVisualOnly).toBe(true);
+  expect(initialInfo.visualLayers.commandOutcomeFeedbackReadOnly).toBe(true);
+  expect(initialInfo.visualLayers.commandOutcomeFeedbackServerOwned).toBe(true);
+  expect(initialInfo.visualLayers.commandOutcomeFeedbackSelectable).toBe(false);
+  expect(initialInfo.visualLayers.commandOutcomeFeedbackAuthority).toBe(false);
+  expect(initialInfo.commandOutcomeFeedback).toEqual([]);
   expect(initialInfo.commandTargets.map((target) => target.commandId).sort()).toEqual(['move_unit', 'scout_sector']);
   expect(initialInfo.commandTargets.every((target) => target.visualOnly && target.readOnly && target.previewOnly && target.selectable && target.executableActions === 0)).toBe(true);
   expect(initialInfo.commandTargets.every((target) => target.routeAuthority === false && target.actionAuthority === false)).toBe(true);

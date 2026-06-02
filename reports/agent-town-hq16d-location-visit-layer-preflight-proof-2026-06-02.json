@@ -1,0 +1,135 @@
+{
+  "ok": true,
+  "verdict": "READY_FOR_READ_ONLY_EXISTING_READ_MODEL_SLICE",
+  "lane": "HQ16D",
+  "title": "Location Visit Layer Preflight",
+  "date": "2026-06-02",
+  "branch": "neo/progression-atlas-editor-next-2026-05-29",
+  "baseCheckpoint": "1f6773e Add AgentTown direct map command preview",
+  "artifactsWritten": [
+    "reports/agent-town-hq16d-location-visit-layer-preflight-2026-06-02.md",
+    "reports/agent-town-hq16d-location-visit-layer-preflight-proof-2026-06-02.json"
+  ],
+  "filesReviewed": [
+    {
+      "path": "reports/agent-town-hq16-next-lanes-register-2026-06-02.md",
+      "evidence": "HQ16D is scoped as a report-first sidecar that defines selected known/discovered sector -> visit layer -> receipt/event context -> return to map, with hidden sectors sealed."
+    },
+    {
+      "path": "reports/agent-town-hq13c-location-scene-visit-model-2026-06-01.md",
+      "evidence": "Prior location-scene architecture recommends Overview Map -> selectable visible sector -> authored location scene -> event/receipt view -> return, with server-owned or server-linked descriptors."
+    },
+    {
+      "path": "reports/agent-town-hq13c-location-scene-visit-model-proof-2026-06-01.json",
+      "evidence": "Proof records known/discovered-only sector gate, read-only location scene descriptors, visual-only props, and disabled future mutation gates."
+    },
+    {
+      "path": "reports/agent-town-hq16a-direct-map-command-preview-2026-06-02.md",
+      "evidence": "Direct map command previews validate against the current server-owned read model and keep renderer targets preview-only/read-only."
+    },
+    {
+      "path": "reports/agent-town-hq16a-direct-map-command-preview-proof-2026-06-02.json",
+      "evidence": "Proof records command target rings as visualOnly/readOnly/previewOnly and confirms all command confirmation routes stay existing guarded handlers."
+    },
+    {
+      "path": "reports/agent-town-hq15d-event-objective-map-markers-2026-06-02.md",
+      "evidence": "Event Packet and objective markers are already visible, selectable, inspectable, read-only, visual-only, and zero-action map markers."
+    },
+    {
+      "path": "reports/agent-town-hq15g-scout-unit-move-and-payload-reconciliation-2026-06-02.md",
+      "evidence": "Scout movement is bounded to adjacent discovered/known cells and creates a receipt without revealing fog or creating routes/resources/etc."
+    },
+    {
+      "path": "server/founders_plot/engine.js",
+      "evidence": "buildExpeditionMapReadModel exposes discovered/known cell truth from server facts, creates hinted and locked_unknown placeholders, emits readOnly eventPackets, and applies fog-only terrain assets to hidden cells."
+    },
+    {
+      "path": "server/founders_plot/routes.js",
+      "evidence": "Existing Expedition Map route is GET/read-model, with Scout Sector and Move Unit as the bounded POST routes; no location visit route exists or is needed for this preflight."
+    },
+    {
+      "path": "public/experiences/founders-plot/founders-plot.js",
+      "evidence": "Selected-sector UI suppresses hidden details for hinted/locked cells, resolves event packets by cell/receipt, and renders selected-sector/event packet/party surfaces as read-only."
+    },
+    {
+      "path": "tests-founders-plot/fp-http.test.js",
+      "evidence": "HTTP tests prove Expedition Map read-only behavior, public terrain slots only for known/discovered cells, fog-only hidden cells, Scout Sector event packets, and hidden move target blocking."
+    },
+    {
+      "path": "e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js",
+      "evidence": "Browser proof fixture includes visible known/discovered cells, hidden/hinted cells, event packet markers, objective markers, command targets, and hidden-truth renderer assertions."
+    }
+  ],
+  "firstSafeVisitableSectorType": {
+    "name": "known_scouted_sector_with_event_packet",
+    "requiredCellGate": {
+      "fogState": "known",
+      "sourceTruth": "expedition_scout_sector",
+      "eventPacketRequired": true,
+      "allowedFogStatesForFirstSlice": [
+        "known"
+      ]
+    },
+    "requiredPacketGate": {
+      "readOnly": true,
+      "executableActionsLength": 0,
+      "receiptActionName": "et.plot.scout_sector",
+      "receiptMetadataOnly": true
+    },
+    "whyFirst": "It is already receipt/event anchored by Scout Sector and avoids turning generic resource-hinted site-plan cells into resource-like places."
+  },
+  "recommendedFlow": [
+    "select known scouted sector",
+    "show Visit affordance only when packet gate passes",
+    "open map-local read-only scene/read panel",
+    "inspect Scout Sector event packet and receipt context",
+    "return to map with same selected cell/event marker context"
+  ],
+  "implementationRecommendation": {
+    "mode": "existing_server_read_model_backed_frontend_shell",
+    "frontendOnlyArbitraryVisits": false,
+    "newServerRouteNeededForFirstSlice": false,
+    "smallServerReadModelNeededForReusableScenes": true,
+    "blockedUntilSmallServerReadModelExists": false,
+    "notes": [
+      "The first slice can be implemented without server changes if it uses only existing expeditionMap cells, eventPackets, receipts, public terrain slots, and party snapshots.",
+      "A future reusable LocationSceneDescriptor/locationSceneRef should be server read-model-backed before arbitrary known/discovered cells become visitable."
+    ]
+  },
+  "hiddenTruthProtected": true,
+  "hiddenTruthProtections": {
+    "hintedVisitAffordance": false,
+    "lockedUnknownVisitAffordance": false,
+    "hiddenConcreteTerrainScene": false,
+    "hiddenResourceSceneProps": false,
+    "hiddenRouteSceneProps": false,
+    "malformedHiddenSceneRefsMustBeIgnored": true,
+    "firstSceneAvoidsResourceHintsAsProps": true
+  },
+  "implementationReady": true,
+  "implementationReadyFor": "read-only frontend visit panel backed by existing Expedition Map event-packet read model",
+  "authorityChange": false,
+  "guardrails": {
+    "reportProofOnly": true,
+    "runtimeSourceEdited": false,
+    "e2eEdited": false,
+    "serverEdited": false,
+    "newMutationImplementation": false,
+    "newServerRoute": false,
+    "atlasExecution": false,
+    "generatedUniverseRuntimeExpansion": false,
+    "hiddenAutonomy": false,
+    "hiddenTruthLeakage": false,
+    "routeTradeEconomyResourceRewardCombatSchedulerEffects": false,
+    "crossPlotMutation": false,
+    "externalEffects": false,
+    "deployMergeCommitPushPublicShare": false
+  },
+  "suggestedImplementationProofs": [
+    "scouted known event-packet cell shows Visit and opens a read-only zero-action scene/read panel",
+    "Return to Map restores the same selected cell/packet context without POST or state mutation",
+    "hinted and locked_unknown cells have no Visit affordance",
+    "malicious hidden fixture scene/event/terrain metadata is ignored",
+    "proof JSON records hidden visit count 0 and authorityChange false"
+  ]
+}

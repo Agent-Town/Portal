@@ -177,6 +177,8 @@
     expeditionSelectedCellId: '',
     expeditionSelectedUnitId: '',
     expeditionCommandPreview: null,
+    expeditionCommandOutcomeFeedback: null,
+    expeditionCommandOutcomeFeedbackTimer: 0,
     expeditionMapThreeInfo: null,
     rewardClaimPendingId: '',
     civicProjectInspectionPendingId: '',
@@ -1729,6 +1731,140 @@
     return toast('That command preview is not executable from the map yet.', 'danger');
   }
 
+  function expeditionCommandOutcomeDefaults(commandId = '') {
+    switch (String(commandId || '')) {
+      case 'move_unit':
+        return { label: 'Moved', icon: '↦' };
+      case 'scout_sector':
+        return { label: 'Scouted', icon: '⌖' };
+      case 'prepare_settler_convoy':
+        return { label: 'Convoy', icon: '▣' };
+      case 'found_settlement':
+        return { label: 'Founded', icon: '⌂' };
+      default:
+        return { label: 'Done', icon: '◎' };
+    }
+  }
+
+  function expeditionCommandHintTarget(model = {}, commandId = '', matcher = () => false) {
+    for (const unit of expeditionUnits(model)) {
+      for (const command of unit.commandHints) {
+        if (String(command.commandId || '') !== String(commandId || '')) continue;
+        if (!matcher(command, unit)) continue;
+        const targetCellIds = Array.isArray(command.targetCellIds)
+          ? command.targetCellIds.map((target) => String(target || '')).filter(Boolean)
+          : [];
+        return {
+          unit,
+          command,
+          cellId: targetCellIds[0] || String(unit.cellId || ''),
+        };
+      }
+    }
+    return { unit: null, command: null, cellId: '' };
+  }
+
+  function clearExpeditionCommandOutcomeFeedback(feedbackId = '') {
+    if (feedbackId && String(state.expeditionCommandOutcomeFeedback?.feedbackId || '') !== String(feedbackId)) return;
+    state.expeditionCommandOutcomeFeedback = null;
+    if (state.expeditionCommandOutcomeFeedbackTimer) {
+      clearTimeout(state.expeditionCommandOutcomeFeedbackTimer);
+      state.expeditionCommandOutcomeFeedbackTimer = 0;
+    }
+  }
+
+  function setExpeditionCommandOutcomeFeedback(input = {}) {
+    const commandId = String(input.commandId || '').trim();
+    const cellId = String(input.cellId || input.targetCellId || '').trim();
+    if (!commandId || !cellId) return null;
+    const defaults = expeditionCommandOutcomeDefaults(commandId);
+    const now = Date.now();
+    const feedback = {
+      feedbackId: `${safeTestId(commandId)}-${safeTestId(cellId)}-${now.toString(36)}`,
+      commandId,
+      unitId: String(input.unitId || state.expeditionSelectedUnitId || '').trim(),
+      unitType: String(input.unitType || '').trim(),
+      cellId,
+      targetCellId: cellId,
+      sourceCellId: String(input.sourceCellId || '').trim(),
+      label: String(input.label || defaults.label),
+      icon: String(input.icon || defaults.icon),
+      receiptId: String(input.receiptId || '').trim(),
+      receiptKind: String(input.receiptKind || commandId).trim(),
+      serverOwnedResult: true,
+      visualOnly: true,
+      readOnly: true,
+      executableActions: 0,
+      routeAuthority: false,
+      actionAuthority: false,
+      createdAt: now,
+      expiresAt: now + 9000,
+    };
+    feedback.ariaLabel = input.ariaLabel
+      || `${feedback.label} ${expeditionUnitRoleCode(feedback)} at ${expeditionCompactCellLabel(feedback.cellId)} from server result.`;
+    clearExpeditionCommandOutcomeFeedback();
+    state.expeditionCommandOutcomeFeedback = feedback;
+    state.expeditionCommandOutcomeFeedbackTimer = setTimeout(() => {
+      clearExpeditionCommandOutcomeFeedback(feedback.feedbackId);
+      renderExpeditionMap(state.bundle || {});
+    }, Math.max(1000, feedback.expiresAt - now));
+    return feedback;
+  }
+
+  function expeditionCommandOutcomeFeedbackForRender(model = {}, cells = []) {
+    const feedback = state.expeditionCommandOutcomeFeedback;
+    if (!feedback) return null;
+    if (Number(feedback.expiresAt || 0) <= Date.now()) {
+      clearExpeditionCommandOutcomeFeedback(feedback.feedbackId);
+      return null;
+    }
+    const targetCell = cells.find((cell) => String(cell.cellId || '') === String(feedback.cellId || ''));
+    if (!targetCell) return null;
+    const unit = feedback.unitId
+      ? expeditionUnits(model).find((entry) => String(entry.unitId || '') === String(feedback.unitId || ''))
+      : null;
+    return {
+      ...feedback,
+      unitType: feedback.unitType || String(unit?.unitType || ''),
+      unitName: unit?.displayName || expeditionUnitTypeLabel(unit || feedback),
+      cellLabel: expeditionCompactCellLabel(targetCell.cellId || feedback.cellId),
+      fogState: String(targetCell.fogState || ''),
+      fogLabel: expeditionFogShortLabel(targetCell.fogState),
+    };
+  }
+
+  function appendExpeditionCommandOutcomeChip(host, outcome) {
+    if (!host || !outcome) return null;
+    const chip = document.createElement('section');
+    chip.className = `fp-expedition-command-outcome fp-expedition-command-outcome--${safeTestId(outcome.commandId)}`;
+    chip.dataset.testid = 'fp-expedition-command-outcome-chip';
+    chip.dataset.commandId = String(outcome.commandId || '');
+    chip.dataset.unitId = String(outcome.unitId || '');
+    chip.dataset.cellId = String(outcome.cellId || '');
+    chip.dataset.serverOwnedResult = 'true';
+    chip.dataset.visualOnly = 'true';
+    chip.dataset.readOnly = 'true';
+    chip.dataset.executableActions = '0';
+    chip.title = outcome.ariaLabel || `${outcome.label} ${outcome.cellLabel}`;
+    chip.setAttribute('aria-label', chip.title);
+    ['pointerdown', 'pointermove', 'pointerup', 'click', 'wheel'].forEach((eventName) => {
+      chip.addEventListener(eventName, (event) => event.stopPropagation());
+    });
+
+    const icon = document.createElement('i');
+    icon.textContent = outcome.icon || '◎';
+    icon.setAttribute('aria-hidden', 'true');
+    const text = document.createElement('span');
+    const title = document.createElement('strong');
+    title.textContent = outcome.label || 'Done';
+    const meta = document.createElement('small');
+    meta.textContent = `${expeditionUnitRoleCode(outcome)} · ${outcome.cellLabel} · ${outcome.fogLabel || 'SRV'}`;
+    text.append(title, meta);
+    chip.append(icon, text);
+    host.appendChild(chip);
+    return chip;
+  }
+
   function expeditionCellBounds(cells) {
     const points = cells.map((cell) => {
       const q = Number(cell.q || 0);
@@ -2534,9 +2670,11 @@
     }
 
     const updateSemanticZoom = appendExpeditionSemanticZoomOverlay(host, renderer, model, cells, selectedCellId);
+    const outcomeFeedback = expeditionCommandOutcomeFeedbackForRender(model, cells);
     state.expeditionMapThreeInfo = renderer.renderExpeditionMap(host, { ...model, cells }, {
       selectedCellId,
       selectedUnitId: state.expeditionSelectedUnitId,
+      outcomeFeedback,
     });
     const controls = document.createElement('div');
     controls.className = 'fp-expedition-map-controls';
@@ -2560,6 +2698,7 @@
     });
     host.appendChild(controls);
     appendExpeditionCommandPreview(host);
+    appendExpeditionCommandOutcomeChip(host, outcomeFeedback);
     updateSemanticZoom?.();
     host.dataset.renderer = 'three.js';
     return true;
@@ -5473,6 +5612,10 @@
 
   async function doPrepareSettlerConvoy(sitePlanId) {
     const safePlanId = String(sitePlanId || '');
+    const model = expeditionMapModel(state.bundle || {});
+    const target = expeditionCommandHintTarget(model, 'prepare_settler_convoy', (command, unit) => (
+      String(command.sourcePlanId || unit.sourcePlanId || '') === safePlanId
+    ));
     state.convoyPendingPlanId = safePlanId;
     renderSitePlans(state.bundle || {});
     const { data } = await api(API.prepareSettlerConvoy, 'POST', {
@@ -5486,12 +5629,29 @@
       renderSitePlans(state.bundle || {});
       return toast(data.error?.message || 'Could not prepare Settler Convoy.', 'danger');
     }
-    toast(data.existing ? 'Settler Convoy claim already exists.' : 'Settler Convoy preparing.');
+    const targetCellId = target.cellId || state.expeditionSelectedCellId;
+    if (targetCellId) {
+      state.expeditionSelectedCellId = targetCellId;
+      if (target.unit?.unitId) state.expeditionSelectedUnitId = target.unit.unitId;
+      setExpeditionCommandOutcomeFeedback({
+        commandId: 'prepare_settler_convoy',
+        unitId: target.unit?.unitId || state.expeditionSelectedUnitId,
+        unitType: target.unit?.unitType || 'surveyor',
+        cellId: targetCellId,
+        receiptId: data.settlementClaim?.claimId || data.job?.jobId || '',
+        receiptKind: data.settlementClaim?.claimId ? 'settler_convoy_claim' : 'settler_convoy_job',
+      });
+    }
     await loadState();
+    toast(data.existing ? 'Settler Convoy claim already exists.' : 'Settler Convoy preparing.');
   }
 
   async function doFoundSettlement(claimId) {
     const safeClaimId = String(claimId || '');
+    const model = expeditionMapModel(state.bundle || {});
+    const target = expeditionCommandHintTarget(model, 'found_settlement', (command, unit) => (
+      String(command.claimId || unit.sourceClaimId || '') === safeClaimId
+    ));
     state.foundingPendingClaimId = safeClaimId;
     renderSettlementClaims(state.bundle || {});
     const { data } = await api(API.foundSettlement, 'POST', {
@@ -5505,8 +5665,21 @@
       renderSettlementClaims(state.bundle || {});
       return toast(data.error?.message || 'Could not found settlement.', 'danger');
     }
-    toast(data.existing ? 'Settlement already founded.' : 'Second plot founded.');
+    const targetCellId = target.cellId || state.expeditionSelectedCellId;
+    if (targetCellId) {
+      state.expeditionSelectedCellId = targetCellId;
+      if (target.unit?.unitId) state.expeditionSelectedUnitId = target.unit.unitId;
+      setExpeditionCommandOutcomeFeedback({
+        commandId: 'found_settlement',
+        unitId: target.unit?.unitId || state.expeditionSelectedUnitId,
+        unitType: target.unit?.unitType || 'settler_convoy',
+        cellId: targetCellId,
+        receiptId: data.claimId || safeClaimId,
+        receiptKind: 'settlement_found_receipt',
+      });
+    }
     await loadState();
+    toast(data.existing ? 'Settlement already founded.' : 'Second plot founded.');
   }
 
   async function doSelectDoctrine(doctrineId) {
@@ -5600,8 +5773,23 @@
       recordedAt: new Date().toISOString(),
     };
     state.expeditionSelectedCellId = String(data.revealedCellId || safeCellId);
-    toast(data.alreadyScouted ? 'Scout Sector receipt already exists.' : 'Scout Sector recorded.');
+    const target = expeditionCommandHintTarget(model, 'scout_sector', (command) => (
+      (Array.isArray(command.targetCellIds) ? command.targetCellIds : [])
+        .map((targetCellId) => String(targetCellId || ''))
+        .includes(safeCellId)
+    ));
+    if (target.unit?.unitId) state.expeditionSelectedUnitId = target.unit.unitId;
+    setExpeditionCommandOutcomeFeedback({
+      commandId: 'scout_sector',
+      unitId: target.unit?.unitId || state.expeditionSelectedUnitId,
+      unitType: target.unit?.unitType || 'scout',
+      cellId: data.revealedCellId || safeCellId,
+      sourceCellId: data.scoutSector?.sourceCellId || data.sector?.sourceCellId || data.proof?.sourceCellId || '',
+      receiptId: data.scoutSector?.scoutId || data.sector?.scoutId || data.eventPacket?.packetId || '',
+      receiptKind: data.eventPacket?.packetId ? 'scout_sector_event_packet' : 'scout_sector_receipt',
+    });
     await loadState();
+    toast(data.alreadyScouted ? 'Scout Sector receipt already exists.' : 'Scout Sector recorded.');
   }
 
   async function doMoveExpeditionUnit(unitId, targetCellId) {
@@ -5632,8 +5820,17 @@
     }
     state.expeditionSelectedUnitId = safeUnitId;
     state.expeditionSelectedCellId = String(data.targetCellId || safeTargetCellId);
-    toast(data.alreadyMoved ? 'Scout is already there.' : 'Scout moved.');
+    setExpeditionCommandOutcomeFeedback({
+      commandId: 'move_unit',
+      unitId: safeUnitId,
+      unitType: unit.unitType,
+      cellId: data.targetCellId || data.move?.targetCellId || data.movement?.targetCellId || safeTargetCellId,
+      sourceCellId: data.sourceCellId || data.move?.sourceCellId || data.movement?.sourceCellId || unit.cellId || '',
+      receiptId: data.move?.moveId || data.movement?.moveId || '',
+      receiptKind: 'expedition_unit_move_receipt',
+    });
     await loadState();
+    toast(data.alreadyMoved ? 'Scout is already there.' : 'Scout moved.');
   }
 
   async function doInspectCivicProject(projectId) {

@@ -1,0 +1,107 @@
+{
+  "ok": true,
+  "verdict": "PASS_REPORT_ONLY_BACKLOG_NO_RUNTIME_PROMOTION",
+  "lane": "HQ16E Runtime Visual Pack Backlog",
+  "date": "2026-06-02",
+  "branch": "neo/progression-atlas-editor-next-2026-05-29",
+  "baseCheckpoint": "1f6773e Add AgentTown direct map command preview",
+  "report": "reports/agent-town-hq16e-runtime-visual-pack-backlog-2026-06-02.md",
+  "sourceReportsReviewed": [
+    "reports/agent-town-hq16-next-lanes-register-2026-06-02.md",
+    "reports/agent-town-hq16a-direct-map-command-preview-2026-06-02.md",
+    "reports/agent-town-hq16c-guided-expedition-loop-2026-06-02.md",
+    "reports/agent-town-hq16d-location-visit-layer-preflight-2026-06-02.md",
+    "reports/agent-town-hq15e-runtime-sprite-pack-2026-06-02.md",
+    "reports/agent-town-hq15e-expedition-unit-marker-asset-sheet-review-2026-06-02.md",
+    "reports/agent-town-hq15d-event-objective-map-markers-2026-06-02.md",
+    "reports/agent-town-hq14t-server-bound-terrain-underlay-runtime-2026-06-01.md",
+    "reports/agent-town-hq14s-runtime-promotion-implementation-plan-2026-06-01.md",
+    "reports/agent-town-hq14r-runtime-promotion-gate-2026-06-01.md",
+    "reports/agent-town-hq14q-terrain-pack-review-samples-2026-06-01.md",
+    "reports/agent-town-hq14p-north-star-terrain-world-underlay-review-candidates-2026-06-01.md",
+    "reports/agent-town-hq14o-north-star-terrain-asset-preflight-2026-06-01.md",
+    "reports/agent-town-hq13a-visual-universe-pack-architecture-2026-06-01.md",
+    "reports/agent-town-hq13d-visual-pack-schema-validator-2026-06-01.md",
+    "reports/agent-town-hq13e-candidate-02-asset-extraction-plan-2026-06-01.md",
+    "reports/agent-town-hq13c-location-scene-visit-model-2026-06-01.md",
+    "reports/agent-town-hq13l-generated-asset-review-rubric-2026-06-01.md",
+    "reports/agent-town-hq13m-generated-asset-qa-harness-2026-06-01.md",
+    "reports/agent-town-hq13r-runtime-scale-review-2026-06-01.md",
+    "reports/agent-town-hq13y-runtime-composition-port-plan-2026-06-01.md",
+    "docs/specs/agent-town-visual-universe-pack-architecture.md",
+    "public/experiences/founders-plot/assets/expedition-map/hq14s-public-terrain-underlay-v1/manifest.json",
+    "public/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1/manifest.json"
+  ],
+  "firstAssetBatch": [
+    {
+      "slotId": "expedition_map.effect.scout_sector_reveal_pulse.v1",
+      "category": "command_outcome_effect",
+      "reviewOnlyGenerationFirst": true,
+      "runtimeBindingRule": "Play only after the existing Scout Sector endpoint returns a server read model where the target cell is known or discovered.",
+      "runtimePromotionGate": "Later same-origin manifest plus renderer proof metadata and focused e2e hidden-truth gates."
+    },
+    {
+      "slotId": "expedition_map.effect.scout_move_arrival_ripple.v1",
+      "category": "command_outcome_effect",
+      "reviewOnlyGenerationFirst": true,
+      "runtimeBindingRule": "Play only after the existing move endpoint returns the Scout unit at the server-confirmed destination cell.",
+      "runtimePromotionGate": "Later same-origin manifest plus server-confirmed unit location proof."
+    },
+    {
+      "slotId": "expedition_map.effect.prepare_convoy_ready_stamp.v1",
+      "category": "command_outcome_effect",
+      "reviewOnlyGenerationFirst": true,
+      "runtimeBindingRule": "Bind only to existing guarded prepare-convoy response state for a visible reviewed site or convoy.",
+      "runtimePromotionGate": "Later same-origin manifest plus proof that no route, trade, resource, or hidden site outcome is implied."
+    },
+    {
+      "slotId": "expedition_map.effect.found_outpost_civic_beacon.v1",
+      "category": "command_outcome_effect",
+      "reviewOnlyGenerationFirst": true,
+      "runtimeBindingRule": "Play only after the existing Found Outpost endpoint returns visible server-owned outpost or settled state for that cell.",
+      "runtimePromotionGate": "Later same-origin manifest plus visible-status proof and no economy/combat/reward implication."
+    },
+    {
+      "slotId": "hud.frame.command_preview_panel.v1",
+      "category": "ui_frame",
+      "reviewOnlyGenerationFirst": true,
+      "runtimeBindingRule": "Bind only to HQ16A/HQ16B validated command preview UI state derived from current server command hints.",
+      "runtimePromotionGate": "Later same-origin HUD manifest plus proof that the frame defines no actions, costs, routes, timers, or rewards."
+    }
+  ],
+  "runtimePromotion": false,
+  "authorityChange": false,
+  "imageGeneration": false,
+  "sourceEdits": false,
+  "serverEdits": false,
+  "e2eEdits": false,
+  "assetRuntimeEdits": false,
+  "guardrails": {
+    "sameOriginOnly": true,
+    "presentationOnly": true,
+    "serverSlotBound": true,
+    "hiddenTruthLeakage": false,
+    "hiddenAutonomy": false,
+    "atlasExecution": false,
+    "generatedUniverseRuntimeExpansion": false,
+    "routeTradeEconomyResourceRewardCombatSchedulerBehavior": false,
+    "crossPlotMutation": false,
+    "externalEffects": false,
+    "deployMergeCommitPushPublicShare": false
+  },
+  "filesWritten": [
+    "reports/agent-town-hq16e-runtime-visual-pack-backlog-2026-06-02.md",
+    "reports/agent-town-hq16e-runtime-visual-pack-backlog-proof-2026-06-02.json"
+  ],
+  "verification": {
+    "jqEmpty": {
+      "command": "jq empty reports/agent-town-hq16e-runtime-visual-pack-backlog-proof-2026-06-02.json",
+      "passed": true
+    },
+    "diffCheck": {
+      "command": "git diff --check --no-index -- /dev/null <hq16e-file>",
+      "passed": true,
+      "note": "New untracked files were checked with --no-index; no whitespace warnings were emitted."
+    }
+  }
+}

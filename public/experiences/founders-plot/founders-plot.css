@@ -1614,6 +1614,78 @@ html, body {
   min-width: 28px;
 }
 
+.fp-expedition-command-outcome {
+  position: absolute;
+  z-index: 8;
+  left: 14px;
+  bottom: 72px;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  max-width: min(260px, calc(100% - 28px));
+  padding: 8px;
+  border: 1px solid rgba(27, 106, 100, 0.34);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(223, 245, 241, 0.94), rgba(255, 248, 232, 0.88)),
+    repeating-linear-gradient(0deg, rgba(27, 106, 100, 0.035) 0 1px, transparent 1px 13px);
+  box-shadow: 0 16px 34px rgba(46, 27, 14, 0.20);
+  color: #2f2217;
+  pointer-events: auto;
+  animation: fp-expedition-outcome-pop 760ms var(--at-ease) both;
+}
+
+.fp-expedition-command-outcome > i {
+  display: grid;
+  width: 32px;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid rgba(27, 106, 100, 0.30);
+  border-radius: 999px;
+  background: rgba(27, 106, 100, 0.18);
+  color: #104540;
+  font-family: Wellfleet, Georgia, serif;
+  font-style: normal;
+  line-height: 1;
+}
+
+.fp-expedition-command-outcome span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.fp-expedition-command-outcome strong {
+  color: #104540;
+  font-family: Wellfleet, Georgia, serif;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.fp-expedition-command-outcome small {
+  overflow: hidden;
+  color: #5b4831;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+@keyframes fp-expedition-outcome-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .fp-expedition-audit-details {
   display: grid;
   gap: 6px;
@@ -3352,6 +3424,14 @@ html, body {
     max-width: none;
   }
 
+  .fp-expedition-map-panel .fp-expedition-command-outcome {
+    right: 10px;
+    bottom: 136px;
+    left: 10px;
+    grid-template-columns: 30px minmax(0, 1fr);
+    max-width: none;
+  }
+
   .fp-expedition-map-panel .fp-expedition-unit-roster {
     top: 62px;
     right: 10px;
@@ -3441,7 +3521,16 @@ html, body {
     padding: 6px;
   }
 
+  .fp-expedition-map-panel .fp-expedition-command-outcome {
+    bottom: 132px;
+    padding: 6px;
+  }
+
   .fp-expedition-map-panel .fp-expedition-command-preview strong {
+    font-size: 12px;
+  }
+
+  .fp-expedition-map-panel .fp-expedition-command-outcome strong {
     font-size: 12px;
   }
 

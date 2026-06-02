@@ -1,0 +1,228 @@
+{
+  "ok": true,
+  "generatedAt": "2026-06-02T07:05:02.696Z",
+  "source": "FP-E2E-022 direct map command preview Confirm flow using existing guarded frontend handlers/endpoints",
+  "screenshot": "reports/agent-town-hq16b-command-outcome-feedback-desktop-2026-06-02.png",
+  "outcomes": {
+    "moveUnit": {
+      "chip": {
+        "visible": true,
+        "text": "↦MovedSCT · Q1 R0 · KNOWN",
+        "commandId": "move_unit",
+        "unitId": "expedition_unit_pathfinder_scout_v1",
+        "cellId": "cell_q1_r0",
+        "serverOwnedResult": "true",
+        "visualOnly": "true",
+        "readOnly": "true",
+        "executableActions": 0,
+        "ariaLabel": "Moved SCT at Q1 R0 from server result."
+      },
+      "renderer": {
+        "visible": true,
+        "commandOutcomeFeedbackCount": 1,
+        "commandOutcomeFeedbackVisualOnly": true,
+        "commandOutcomeFeedbackReadOnly": true,
+        "commandOutcomeFeedbackServerOwned": true,
+        "commandOutcomeFeedbackSelectable": false,
+        "commandOutcomeFeedbackAuthority": false,
+        "commandOutcomeFeedback": [
+          {
+            "feedbackId": "move_unit-cell_q1_r0-mpwal6zb",
+            "unitId": "expedition_unit_pathfinder_scout_v1",
+            "unitType": "scout",
+            "commandId": "move_unit",
+            "cellId": "cell_q1_r0",
+            "targetCellId": "cell_q1_r0",
+            "sourceCellId": "cell_origin",
+            "receiptId": "expedition_unit_move_ui_001",
+            "receiptKind": "expedition_unit_move_receipt",
+            "serverOwnedResult": true,
+            "visualOnly": true,
+            "readOnly": true,
+            "selectable": false,
+            "routeAuthority": false,
+            "actionAuthority": false,
+            "executableActions": 0,
+            "canvas": {
+              "x": 552.7560975609756,
+              "y": 306.2195121951219
+            }
+          }
+        ]
+      }
+    },
+    "prepareSettlerConvoy": {
+      "chip": {
+        "visible": true,
+        "text": "▣ConvoySVY · Q1 R0 · KNOWN",
+        "commandId": "prepare_settler_convoy",
+        "unitId": "expedition_unit_surveyor_site_plan_hq12b_forest",
+        "cellId": "cell_q1_r0",
+        "serverOwnedResult": "true",
+        "visualOnly": "true",
+        "readOnly": "true",
+        "executableActions": 0,
+        "ariaLabel": "Convoy SVY at Q1 R0 from server result."
+      },
+      "renderer": {
+        "visible": true,
+        "commandOutcomeFeedbackCount": 1,
+        "commandOutcomeFeedbackVisualOnly": true,
+        "commandOutcomeFeedbackReadOnly": true,
+        "commandOutcomeFeedbackServerOwned": true,
+        "commandOutcomeFeedbackSelectable": false,
+        "commandOutcomeFeedbackAuthority": false,
+        "commandOutcomeFeedback": [
+          {
+            "feedbackId": "prepare_settler_convoy-cell_q1_r0-mpwala2f",
+            "unitId": "expedition_unit_surveyor_site_plan_hq12b_forest",
+            "unitType": "surveyor",
+            "commandId": "prepare_settler_convoy",
+            "cellId": "cell_q1_r0",
+            "targetCellId": "cell_q1_r0",
+            "sourceCellId": "",
+            "receiptId": "claim_hq15i_unit_command",
+            "receiptKind": "settler_convoy_claim",
+            "serverOwnedResult": true,
+            "visualOnly": true,
+            "readOnly": true,
+            "selectable": false,
+            "routeAuthority": false,
+            "actionAuthority": false,
+            "executableActions": 0,
+            "canvas": {
+              "x": 552.7560975609756,
+              "y": 306.2195121951219
+            }
+          }
+        ]
+      }
+    },
+    "foundSettlement": {
+      "chip": {
+        "visible": true,
+        "text": "⌂FoundedCNV · Q1 R0 · KNOWN",
+        "commandId": "found_settlement",
+        "unitId": "expedition_unit_settler_convoy_claim_hq12b_arrived",
+        "cellId": "cell_q1_r0",
+        "serverOwnedResult": "true",
+        "visualOnly": "true",
+        "readOnly": "true",
+        "executableActions": 0,
+        "ariaLabel": "Founded CNV at Q1 R0 from server result."
+      },
+      "renderer": {
+        "visible": true,
+        "commandOutcomeFeedbackCount": 1,
+        "commandOutcomeFeedbackVisualOnly": true,
+        "commandOutcomeFeedbackReadOnly": true,
+        "commandOutcomeFeedbackServerOwned": true,
+        "commandOutcomeFeedbackSelectable": false,
+        "commandOutcomeFeedbackAuthority": false,
+        "commandOutcomeFeedback": [
+          {
+            "feedbackId": "found_settlement-cell_q1_r0-mpwalcr0",
+            "unitId": "expedition_unit_settler_convoy_claim_hq12b_arrived",
+            "unitType": "settler_convoy",
+            "commandId": "found_settlement",
+            "cellId": "cell_q1_r0",
+            "targetCellId": "cell_q1_r0",
+            "sourceCellId": "",
+            "receiptId": "claim_hq12b_arrived",
+            "receiptKind": "settlement_found_receipt",
+            "serverOwnedResult": true,
+            "visualOnly": true,
+            "readOnly": true,
+            "selectable": false,
+            "routeAuthority": false,
+            "actionAuthority": false,
+            "executableActions": 0,
+            "canvas": {
+              "x": 552.7560975609756,
+              "y": 306.2195121951219
+            }
+          }
+        ]
+      }
+    },
+    "scoutSector": {
+      "chip": {
+        "visible": true,
+        "text": "⌖ScoutedSCT · Q0 R1 · KNOWN",
+        "commandId": "scout_sector",
+        "unitId": "expedition_unit_pathfinder_scout_v1",
+        "cellId": "cell_q0_r1",
+        "serverOwnedResult": "true",
+        "visualOnly": "true",
+        "readOnly": "true",
+        "executableActions": 0,
+        "ariaLabel": "Scouted SCT at Q0 R1 from server result."
+      },
+      "renderer": {
+        "visible": true,
+        "commandOutcomeFeedbackCount": 1,
+        "commandOutcomeFeedbackVisualOnly": true,
+        "commandOutcomeFeedbackReadOnly": true,
+        "commandOutcomeFeedbackServerOwned": true,
+        "commandOutcomeFeedbackSelectable": false,
+        "commandOutcomeFeedbackAuthority": false,
+        "commandOutcomeFeedback": [
+          {
+            "feedbackId": "scout_sector-cell_q0_r1-mpwaltu6",
+            "unitId": "expedition_unit_pathfinder_scout_v1",
+            "unitType": "scout",
+            "commandId": "scout_sector",
+            "cellId": "cell_q0_r1",
+            "targetCellId": "cell_q0_r1",
+            "sourceCellId": "cell_q1_r0",
+            "receiptId": "scout_sector_ui_001",
+            "receiptKind": "scout_sector_event_packet",
+            "serverOwnedResult": true,
+            "visualOnly": true,
+            "readOnly": true,
+            "selectable": false,
+            "routeAuthority": false,
+            "actionAuthority": false,
+            "executableActions": 0,
+            "canvas": {
+              "x": 467.7235294117647,
+              "y": 513.2830588235294
+            }
+          }
+        ]
+      }
+    }
+  },
+  "coveredCommands": [
+    "found_settlement",
+    "move_unit",
+    "prepare_settler_convoy",
+    "scout_sector"
+  ],
+  "directMapPreviewConfirmCovered": {
+    "move_unit": true,
+    "scout_sector": true,
+    "prepare_settler_convoy": true,
+    "found_settlement": true
+  },
+  "guardrails": {
+    "existingEndpointsOnly": true,
+    "rendererExecutesMutations": false,
+    "outcomeFeedbackVisualOnly": true,
+    "outcomeFeedbackReadOnly": true,
+    "outcomeFeedbackServerOwned": true,
+    "outcomeFeedbackAuthority": false,
+    "outcomeFeedbackExecutableActions": 0,
+    "movePayloadHasNoRouteCreation": true,
+    "scoutPayloadHasNoMovement": true,
+    "preparePayloadHasNoUnitId": true,
+    "foundPayloadHasNoUnitId": true,
+    "atlasExecution": false,
+    "generatedUniverseRuntimeExpansion": false,
+    "hiddenAutonomy": false,
+    "hiddenTruthLeakage": false,
+    "routeTradeEconomyResourceRewardCombatSchedulerExpansion": false,
+    "crossPlotMutationAdded": false,
+    "externalEffects": false
+  }
+}

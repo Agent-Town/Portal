@@ -1,0 +1,51 @@
+{
+  "ok": true,
+  "lane": "HQ16 next lanes register",
+  "date": "2026-06-02",
+  "baseCheckpoint": "1f6773e Add AgentTown direct map command preview",
+  "branch": "neo/progression-atlas-editor-next-2026-05-29",
+  "lanes": [
+    {
+      "id": "HQ16B",
+      "name": "Command Outcome Feedback",
+      "mode": "implementation",
+      "primaryRisk": "frontend/renderer/e2e coupling",
+      "authorityChange": false
+    },
+    {
+      "id": "HQ16C",
+      "name": "Guided Expedition Loop",
+      "mode": "report-first, implementation-if-safe",
+      "primaryRisk": "too much new loop authority",
+      "authorityChange": false
+    },
+    {
+      "id": "HQ16D",
+      "name": "Location Visit Layer Preflight",
+      "mode": "report-first",
+      "primaryRisk": "hidden truth leakage from sector visits",
+      "authorityChange": false
+    },
+    {
+      "id": "HQ16E",
+      "name": "Runtime Visual Pack Backlog",
+      "mode": "report-first",
+      "primaryRisk": "asset promotion before slot/provenance gates",
+      "authorityChange": false
+    }
+  ],
+  "guardrails": {
+    "noDeploy": true,
+    "noMerge": true,
+    "noPublicShare": true,
+    "noExternalEffects": true,
+    "noAtlasExecution": true,
+    "noGeneratedUniverseRuntimeExpansion": true,
+    "noHiddenAutonomy": true,
+    "noHiddenTruthLeakage": true,
+    "scoutSectorOnlyFogRevealPath": true,
+    "scoutMovementAdjacentKnownOrDiscoveredSamePlotOnly": true,
+    "rendererDoesNotExecuteMutationsDirectly": true
+  },
+  "verdict": "LANES_READY_FOR_SUBAGENTS"
+}

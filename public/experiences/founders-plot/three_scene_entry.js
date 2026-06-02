@@ -3459,6 +3459,98 @@ function makeExpeditionCommandTargetTexture(target = {}) {
   return texture;
 }
 
+function makeExpeditionCommandOutcomeTexture(outcome = {}) {
+  const commandId = String(outcome.commandId || 'command');
+  const feedbackId = String(outcome.feedbackId || `${commandId}:${outcome.cellId || ''}`);
+  const key = `expedition-command-outcome:${EXPEDITION_VISUAL_SHELL_VERSION}:${feedbackId}`;
+  if (textureCache.has(key)) return textureCache.get(key);
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  const style = expeditionCommandTargetStyle(commandId);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = style.fill;
+  ctx.beginPath();
+  ctx.arc(128, 128, 116, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = style.stroke;
+  ctx.lineWidth = 10;
+  ctx.beginPath();
+  ctx.arc(128, 128, 104, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(255, 248, 232, 0.78)';
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.arc(128, 128, 78, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(255, 248, 232, 0.88)';
+  ctx.beginPath();
+  ctx.arc(128, 128, 42, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = style.stroke;
+  ctx.lineWidth = 9;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  if (commandId === 'move_unit') {
+    ctx.beginPath();
+    ctx.moveTo(92, 128);
+    ctx.lineTo(160, 128);
+    ctx.moveTo(138, 106);
+    ctx.lineTo(160, 128);
+    ctx.lineTo(138, 150);
+    ctx.stroke();
+  } else if (commandId === 'scout_sector') {
+    ctx.beginPath();
+    ctx.arc(128, 128, 24, 0, Math.PI * 2);
+    ctx.moveTo(128, 88);
+    ctx.lineTo(128, 104);
+    ctx.moveTo(128, 152);
+    ctx.lineTo(128, 168);
+    ctx.moveTo(88, 128);
+    ctx.lineTo(104, 128);
+    ctx.moveTo(152, 128);
+    ctx.lineTo(168, 128);
+    ctx.stroke();
+  } else if (commandId === 'prepare_settler_convoy') {
+    ctx.beginPath();
+    ctx.roundRect(92, 112, 72, 34, 9);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(106, 158, 8, 0, Math.PI * 2);
+    ctx.arc(150, 158, 8, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (commandId === 'found_settlement') {
+    ctx.beginPath();
+    ctx.moveTo(96, 158);
+    ctx.lineTo(128, 96);
+    ctx.lineTo(160, 158);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(108, 158);
+    ctx.lineTo(156, 158);
+    ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(98, 130);
+    ctx.lineTo(120, 152);
+    ctx.lineTo(164, 104);
+    ctx.stroke();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  textureCache.set(key, texture);
+  return texture;
+}
+
 function expeditionCommandTargetsForUnit(unit = {}, cellsById = new Map()) {
   if (!unit?.unitId) return [];
   const targets = new Map();
@@ -3534,14 +3626,17 @@ class ExpeditionMapThreeStage {
     this.cellMeshes = [];
     this.unitSprites = [];
     this.commandTargetSprites = [];
+    this.outcomeFeedbackSprites = [];
     this.eventMarkerSprites = [];
     this.objectiveMarkerSprites = [];
+    this.outcomeFeedback = null;
     this.hoverCellId = '';
     this.terrainUnderlayCount = 0;
     this.surveyStrokeCount = 0;
     this.markerCount = 0;
     this.unitTokenCount = 0;
     this.commandTargetCount = 0;
+    this.outcomeFeedbackCount = 0;
     this.eventMarkerCount = 0;
     this.objectiveMarkerCount = 0;
     this.scene = new THREE.Scene();
@@ -3625,6 +3720,7 @@ class ExpeditionMapThreeStage {
     this.cellMeshes = [];
     this.unitSprites = [];
     this.commandTargetSprites = [];
+    this.outcomeFeedbackSprites = [];
     this.eventMarkerSprites = [];
     this.objectiveMarkerSprites = [];
     this.terrainUnderlayCount = 0;
@@ -3632,6 +3728,7 @@ class ExpeditionMapThreeStage {
     this.markerCount = 0;
     this.unitTokenCount = 0;
     this.commandTargetCount = 0;
+    this.outcomeFeedbackCount = 0;
     this.eventMarkerCount = 0;
     this.objectiveMarkerCount = 0;
     this.edgeFogCount = 0;
@@ -3662,12 +3759,13 @@ class ExpeditionMapThreeStage {
     this.render();
   }
 
-  sync(model = {}, selectedCellId = '', selectedUnitId = '') {
+  sync(model = {}, selectedCellId = '', selectedUnitId = '', outcomeFeedback = null) {
     this.model = model && typeof model === 'object' ? model : {};
     this.cells = Array.isArray(this.model.cells) ? this.model.cells.filter((cell) => cell?.cellId) : [];
     this.selectedCellId = String(selectedCellId || this.selectedCellId || this.cells[0]?.cellId || '');
     const units = Array.isArray(this.model.units?.items) ? this.model.units.items.filter((unit) => unit?.unitId) : [];
     this.selectedUnitId = String(selectedUnitId || this.selectedUnitId || units[0]?.unitId || '');
+    this.outcomeFeedback = outcomeFeedback && typeof outcomeFeedback === 'object' ? outcomeFeedback : null;
     this.rebuild();
     this.applyCameraBounds();
     this.render();
@@ -3942,6 +4040,44 @@ class ExpeditionMapThreeStage {
       this.commandTargetSprites.push(sprite);
       this.commandTargetCount += 1;
       this.scene.add(sprite);
+    }
+    const outcome = this.outcomeFeedback;
+    if (outcome?.cellId) {
+      const position = layout.positions.get(String(outcome.cellId || ''));
+      if (position) {
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+          map: makeExpeditionCommandOutcomeTexture(outcome),
+          transparent: true,
+          depthWrite: false,
+          depthTest: true,
+          alphaTest: 0.03,
+          opacity: 0.92
+        }));
+        sprite.position.set(position.x, position.y + 0.05, 0.535);
+        sprite.scale.set(1.48, 1.48, 1);
+        sprite.userData = {
+          kind: 'expedition_command_outcome_feedback',
+          feedbackId: String(outcome.feedbackId || ''),
+          commandId: String(outcome.commandId || ''),
+          unitId: String(outcome.unitId || ''),
+          unitType: String(outcome.unitType || ''),
+          cellId: String(outcome.cellId || ''),
+          targetCellId: String(outcome.targetCellId || outcome.cellId || ''),
+          sourceCellId: String(outcome.sourceCellId || ''),
+          receiptId: String(outcome.receiptId || ''),
+          receiptKind: String(outcome.receiptKind || ''),
+          serverOwnedResult: outcome.serverOwnedResult === true,
+          visualOnly: true,
+          readOnly: true,
+          selectable: false,
+          routeAuthority: false,
+          actionAuthority: false,
+          executableActions: 0
+        };
+        this.outcomeFeedbackSprites.push(sprite);
+        this.outcomeFeedbackCount = 1;
+        this.scene.add(sprite);
+      }
     }
     this.unitTokenCount = 0;
     const unitsByCell = units.reduce((acc, unit) => {
@@ -4316,6 +4452,13 @@ class ExpeditionMapThreeStage {
         commandTargetRingsSelectable: this.commandTargetSprites.every((sprite) => sprite.userData?.selectable === true),
         commandTargetRingsPreviewOnly: this.commandTargetSprites.every((sprite) => sprite.userData?.previewOnly === true),
         commandTargetRingAuthority: false,
+        commandOutcomeFeedback: this.outcomeFeedbackCount > 0,
+        commandOutcomeFeedbackCount: this.outcomeFeedbackCount,
+        commandOutcomeFeedbackVisualOnly: this.outcomeFeedbackSprites.every((sprite) => sprite.userData?.visualOnly === true),
+        commandOutcomeFeedbackReadOnly: this.outcomeFeedbackSprites.every((sprite) => sprite.userData?.readOnly === true),
+        commandOutcomeFeedbackServerOwned: this.outcomeFeedbackSprites.every((sprite) => sprite.userData?.serverOwnedResult === true),
+        commandOutcomeFeedbackSelectable: this.outcomeFeedbackSprites.some((sprite) => sprite.userData?.selectable === true),
+        commandOutcomeFeedbackAuthority: false,
         clientAuthority: false
       },
       regionConsistency: {
@@ -4422,6 +4565,25 @@ class ExpeditionMapThreeStage {
         executableActions: Number(sprite.userData?.executableActions || 0),
         canvas: this.canvasPointForObject(sprite)
       })),
+      commandOutcomeFeedback: this.outcomeFeedbackSprites.map((sprite) => ({
+        feedbackId: String(sprite.userData?.feedbackId || ''),
+        unitId: String(sprite.userData?.unitId || ''),
+        unitType: String(sprite.userData?.unitType || ''),
+        commandId: String(sprite.userData?.commandId || ''),
+        cellId: String(sprite.userData?.cellId || ''),
+        targetCellId: String(sprite.userData?.targetCellId || ''),
+        sourceCellId: String(sprite.userData?.sourceCellId || ''),
+        receiptId: String(sprite.userData?.receiptId || ''),
+        receiptKind: String(sprite.userData?.receiptKind || ''),
+        serverOwnedResult: sprite.userData?.serverOwnedResult === true,
+        visualOnly: sprite.userData?.visualOnly === true,
+        readOnly: sprite.userData?.readOnly === true,
+        selectable: sprite.userData?.selectable === true,
+        routeAuthority: sprite.userData?.routeAuthority === true,
+        actionAuthority: sprite.userData?.actionAuthority === true,
+        executableActions: Number(sprite.userData?.executableActions || 0),
+        canvas: this.canvasPointForObject(sprite)
+      })),
       camera: {
         x: Number(this.camera.position.x.toFixed(3)),
         y: Number(this.camera.position.y.toFixed(3)),
@@ -4478,7 +4640,7 @@ function renderExpeditionMap(hostNode, model = {}, options = {}) {
     stage = new ExpeditionMapThreeStage(hostNode);
     expeditionMapRenderers.set(hostNode, stage);
   }
-  return stage.sync(model || {}, options.selectedCellId || '', options.selectedUnitId || '');
+  return stage.sync(model || {}, options.selectedCellId || '', options.selectedUnitId || '', options.outcomeFeedback || null);
 }
 
 function getExpeditionMapInfo(hostNode) {
