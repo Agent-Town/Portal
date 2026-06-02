@@ -1529,6 +1529,8 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   let hq12fEventPacket = null;
   const hq16bOutcomeProof = {};
   const hq16bScreenshot = 'reports/agent-town-hq16b-command-outcome-feedback-desktop-2026-06-02.png';
+  const hq16fProofPath = 'reports/agent-town-hq16f-guided-expedition-loop-ui-proof-2026-06-02.json';
+  const hq16fScreenshot = 'reports/agent-town-hq16f-guided-expedition-loop-ui-desktop-2026-06-02.png';
 
   function makeState() {
     const state = {
@@ -2446,6 +2448,17 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   await expect(page.getByTestId('fp-expedition-objective-strip')).toHaveAttribute('aria-label', /Review the latest packet/);
   await expect(page.getByTestId('fp-expedition-objective-strip').locator('.fp-expedition-objective-strip__copy')).toContainText('PKT');
   await expect(page.getByTestId('fp-expedition-objective-strip-boundary')).toContainText('No new server objectives');
+  await expect(page.getByTestId('fp-expedition-guided-loop')).toHaveAttribute('data-read-only', 'true');
+  await expect(page.getByTestId('fp-expedition-guided-loop')).toHaveAttribute('data-actions', '0');
+  await expect(page.getByTestId('fp-expedition-guided-loop')).toHaveAttribute('data-objective-mode', 'packet');
+  await expect(page.getByTestId('fp-expedition-guided-loop')).toHaveAttribute('data-next-command-id', 'found_settlement');
+  await expect(page.getByTestId('fp-expedition-guided-loop-step-objective')).toContainText('OBJ');
+  await expect(page.getByTestId('fp-expedition-guided-loop-step-command')).toContainText('CMD');
+  await expect(page.getByTestId('fp-expedition-guided-loop-step-resolve')).toContainText('RES');
+  await expect(page.getByTestId('fp-expedition-guided-loop-step-receipt')).toContainText('RCP');
+  await expect(page.getByTestId('fp-expedition-guided-loop-step-next')).toContainText('NXT');
+  await expect(page.getByTestId('fp-expedition-guided-loop-primary-command')).toContainText('Found');
+  await expect(page.getByTestId('fp-expedition-guided-loop-receipt-chip')).toContainText('Scout');
   await expect(page.getByTestId('fp-expedition-event-packet-facts-expedition_event_packet_hq12f_cell_q0_r1')).toContainText('Read-only');
   await expect(page.getByTestId('fp-expedition-event-packet-facts-expedition_event_packet_hq12f_cell_q0_r1')).toContainText('true');
   await expect(page.getByTestId('fp-expedition-event-packet-facts-expedition_event_packet_hq12f_cell_q0_r1')).toContainText('Actions');
@@ -2453,6 +2466,7 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   await expect(page.getByTestId('fp-expedition-event-packet-boundary-cell_q0_r1')).toContainText('No packet actions');
   await expect(page.getByTestId('fp-expedition-event-packet-boundary-cell_q0_r1')).toContainText('Atlas execution');
   await page.getByTestId('fp-expedition-map-panel').screenshot({ path: hq16bScreenshot });
+  await page.getByTestId('fp-expedition-map-panel').screenshot({ path: hq16fScreenshot });
   fs.writeFileSync('reports/agent-town-hq16b-command-outcome-feedback-proof-2026-06-02.json', JSON.stringify({
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -2544,6 +2558,9 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   await expect(page.getByTestId('fp-expedition-event-packet-boundary-cell_q0_r1')).toContainText('Read-only receipt metadata');
   await expect(page.getByTestId('fp-expedition-objective-strip')).toHaveAttribute('aria-label', /Review the latest packet/);
   await expect(page.getByTestId('fp-expedition-objective-strip-boundary')).toContainText('No new server objectives');
+  await expect(page.getByTestId('fp-expedition-guided-loop')).toHaveAttribute('data-read-only', 'true');
+  await expect(page.getByTestId('fp-expedition-guided-loop')).toHaveAttribute('data-actions', '0');
+  await expect(page.getByTestId('fp-expedition-guided-loop-step-next')).toContainText('NXT');
   await expect(page.getByTestId('fp-btn-scout-sector-cell_q0_r1')).toHaveCount(0);
   await expect(page.getByTestId('fp-btn-scout-sector-unit-command-cell_q0_r1')).toHaveCount(0);
   await page.locator('#fp-drawer-toggle').evaluate((node) => { node.style.display = 'none'; });
@@ -2645,6 +2662,27 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
         };
       })(),
     },
+    guidedLoop: (() => {
+      const loop = document.querySelector('[data-testid="fp-expedition-guided-loop"]');
+      const stepNodes = Array.from(document.querySelectorAll('[data-testid^="fp-expedition-guided-loop-step-"]'));
+      return {
+        visible: !!loop,
+        readOnly: loop?.getAttribute('data-read-only') || '',
+        actions: Number(loop?.getAttribute('data-actions') || 0),
+        objectiveMode: loop?.getAttribute('data-objective-mode') || '',
+        activeCommandId: loop?.getAttribute('data-active-command-id') || '',
+        nextCommandId: loop?.getAttribute('data-next-command-id') || '',
+        targetCellId: loop?.getAttribute('data-target-cell-id') || '',
+        packetId: loop?.getAttribute('data-packet-id') || '',
+        buttons: loop ? loop.querySelectorAll('button').length : 0,
+        visibleText: loop?.textContent || '',
+        phases: stepNodes.map((node) => node.getAttribute('data-phase') || ''),
+        commands: stepNodes.map((node) => node.getAttribute('data-command-id') || ''),
+        receiptKind: document.querySelector('[data-testid="fp-expedition-guided-loop-step-receipt"]')?.getAttribute('data-receipt-kind') || '',
+        primaryCommandText: document.querySelector('[data-testid="fp-expedition-guided-loop-primary-command"]')?.textContent || '',
+        receiptChipText: document.querySelector('[data-testid="fp-expedition-guided-loop-receipt-chip"]')?.textContent || '',
+      };
+    })(),
     eventPacketCardVisible: !!document.querySelector('[data-testid="fp-expedition-event-packet-cell_q0_r1"]'),
     eventPacketHeaderText: document.querySelector('[data-testid="fp-expedition-event-packet-cell_q0_r1"] .fp-expedition-event-packet__header')?.textContent || '',
     eventPacketChipsText: document.querySelector('[data-testid="fp-expedition-event-packet-chips-expedition_event_packet_hq12f_cell_q0_r1"]')?.textContent || '',
@@ -2698,6 +2736,8 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
       '[data-testid="fp-expedition-map-status"]',
       '[data-testid="fp-expedition-objective-strip"]',
       '[data-testid="fp-expedition-objective-strip-facts"]',
+      '[data-testid="fp-expedition-guided-loop"]',
+      '[data-testid^="fp-expedition-guided-loop-step-"]',
       '[data-testid="fp-expedition-objective-ledger-details"]',
       '[data-testid="fp-expedition-map-board-card"]',
       '[data-testid="fp-expedition-map-visual-hud"]',
@@ -2795,6 +2835,19 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   expect(scoutDomProof.objectiveStrip.ledger.readOnly).toBe('true');
   expect(scoutDomProof.objectiveStrip.ledger.actions).toBe(0);
   expect(scoutDomProof.objectiveStrip.ledger.text).toContain('Ledger detail');
+  expect(scoutDomProof.guidedLoop.visible).toBe(true);
+  expect(scoutDomProof.guidedLoop.readOnly).toBe('true');
+  expect(scoutDomProof.guidedLoop.actions).toBe(0);
+  expect(scoutDomProof.guidedLoop.buttons).toBe(0);
+  expect(scoutDomProof.guidedLoop.objectiveMode).toBe('packet');
+  expect(scoutDomProof.guidedLoop.nextCommandId).toBe('found_settlement');
+  expect(scoutDomProof.guidedLoop.phases).toEqual(['objective', 'command', 'resolve', 'receipt', 'next']);
+  expect(scoutDomProof.guidedLoop.primaryCommandText).toBe('Found');
+  expect(scoutDomProof.guidedLoop.receiptChipText).toBe('Packet');
+  expect(scoutDomProof.guidedLoop.visibleText).toContain('OBJ');
+  expect(scoutDomProof.guidedLoop.visibleText).toContain('NXT');
+  expect(scoutDomProof.guidedLoop.visibleText).not.toContain('hidden truth');
+  expect(scoutDomProof.guidedLoop.visibleText).not.toContain('Atlas execution');
   expect(scoutDomProof.inspectorDrawer.visible).toBe(true);
   expect(scoutDomProof.inspectorDrawer.drawerKind).toBe('visual-inspector');
   expect(scoutDomProof.inspectorDrawer.readOnly).toBe('true');
@@ -3275,6 +3328,51 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
       generatedUniverseRendering: hq12fEventPacket.boundaryFlags.generatedUniverseRendering,
       crossPlotMutation: hq12fEventPacket.boundaryFlags.crossPlotMutation,
       externalEffects: hq12fEventPacket.boundaryFlags.externalEffects,
+      mobileHorizontalOverflow: mobilePolishProof.clipped.length,
+    },
+  }, null, 2));
+  fs.writeFileSync(hq16fProofPath, JSON.stringify({
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    title: 'HQ16F guided expedition loop UI',
+    source: 'FP-E2E-022 mocked server-owned Expedition Map, unit command hints, Event Packet, and HQ16B command outcome state',
+    screenshot: hq16fScreenshot,
+    changeScope: [
+      'public/experiences/founders-plot/founders-plot.js',
+      'public/experiences/founders-plot/founders-plot.css',
+      'e2e/200_founders_plot.spec.js',
+    ],
+    guidedLoop: scoutDomProof.guidedLoop,
+    objectiveStrip: scoutDomProof.objectiveStrip,
+    mobileFit: {
+      viewport: mobilePolishProof.viewport,
+      documentScrollWidth: mobilePolishProof.documentScrollWidth,
+      clipped: mobilePolishProof.clipped,
+    },
+    guardrails: {
+      frontendReadModelOnly: true,
+      serverAuthorityUnchanged: true,
+      existingEndpointsOnly: true,
+      noNewButtons: scoutDomProof.guidedLoop.buttons,
+      guidedLoopReadOnly: scoutDomProof.guidedLoop.readOnly === 'true',
+      guidedLoopActions: scoutDomProof.guidedLoop.actions,
+      fivePhaseLoop: scoutDomProof.guidedLoop.phases,
+      objectiveFromExistingPacket: scoutDomProof.guidedLoop.objectiveMode === 'packet' && scoutDomProof.guidedLoop.packetId === hq12fEventPacket.packetId,
+      nextStepFromExistingCommandHint: scoutDomProof.guidedLoop.nextCommandId === 'found_settlement',
+      defaultRailHidesProofProse: !/hidden truth|Atlas execution|zero executable actions/i.test(scoutDomProof.guidedLoop.visibleText),
+      routeCreation: false,
+      tradeRouteCreation: false,
+      resourceHarvesting: false,
+      rewardExpansion: false,
+      combat: false,
+      backgroundScheduling: false,
+      publicSharing: false,
+      generatedUniverseRuntimeExpansion: false,
+      atlasExecution: false,
+      hiddenAutonomy: false,
+      hiddenTruthLeakage: false,
+      crossPlotMutationAdded: false,
+      externalEffects: false,
       mobileHorizontalOverflow: mobilePolishProof.clipped.length,
     },
   }, null, 2));

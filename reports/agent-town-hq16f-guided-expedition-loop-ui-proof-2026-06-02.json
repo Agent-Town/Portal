@@ -1,0 +1,100 @@
+{
+  "ok": true,
+  "generatedAt": "2026-06-02T07:31:09.334Z",
+  "title": "HQ16F guided expedition loop UI",
+  "source": "FP-E2E-022 mocked server-owned Expedition Map, unit command hints, Event Packet, and HQ16B command outcome state",
+  "screenshot": "reports/agent-town-hq16f-guided-expedition-loop-ui-desktop-2026-06-02.png",
+  "changeScope": [
+    "public/experiences/founders-plot/founders-plot.js",
+    "public/experiences/founders-plot/founders-plot.css",
+    "e2e/200_founders_plot.spec.js"
+  ],
+  "guidedLoop": {
+    "visible": true,
+    "readOnly": "true",
+    "actions": 0,
+    "objectiveMode": "packet",
+    "activeCommandId": "found_settlement",
+    "nextCommandId": "found_settlement",
+    "targetCellId": "cell_q1_r0",
+    "packetId": "expedition_event_packet_hq12f_cell_q0_r1",
+    "buttons": 0,
+    "visibleText": "OBJ⚿PKTQ1 R0CMD⌂FoundCNV · Q1 R0RES⌂ReadyKNOWNRCP⚿PacketQ0 R1NXT⌂FoundQ1 R0 · KNOWN",
+    "phases": [
+      "objective",
+      "command",
+      "resolve",
+      "receipt",
+      "next"
+    ],
+    "commands": [
+      "packet",
+      "found_settlement",
+      "found_settlement",
+      "review_packet",
+      "found_settlement"
+    ],
+    "receiptKind": "event_packet_receipt",
+    "primaryCommandText": "Found",
+    "receiptChipText": "Packet"
+  },
+  "objectiveStrip": {
+    "visible": true,
+    "mode": "packet",
+    "readOnly": "true",
+    "actions": 0,
+    "targetCellId": "cell_q0_r1",
+    "packetId": "expedition_event_packet_hq12f_cell_q0_r1",
+    "partyId": "expedition_party_current_plot_v1",
+    "label": "Review the latest packet: expedition_event_packet_hq12f_cell_q0_r1 marks cell_q0_r1 as receipt evidence with zero executable actions.",
+    "text": "FOCUSPKTPKT1ACT0REV4PTY3OBJ⚿PKTQ1 R0CMD⌂FoundCNV · Q1 R0RES⌂ReadyKNOWNRCP⚿PacketQ0 R1NXT⌂FoundQ1 R0 · KNOWNReceiptsexpedition_event_packet_hq12f_cell_q0_r1 marks cell_q0_r1 as receipt evidence with zero executable actions.Read-only marker. No new server objectives, hidden truth, or actions.Ledger detail: guided loop rows are derived from existing Expedition Map cells, unit command hints, event packets, and the latest local server result. They do not create commands, costs, rewards, routes, hidden truth, Atlas execution, or external effects.",
+    "visibleText": "FOCUSPKT PKT1ACT0REV4PTY3 OBJ⚿PKTQ1 R0CMD⌂FoundCNV · Q1 R0RES⌂ReadyKNOWNRCP⚿PacketQ0 R1NXT⌂FoundQ1 R0 · KNOWN",
+    "factsText": "PKT1ACT0REV4PTY3",
+    "boundaryText": "Read-only marker. No new server objectives, hidden truth, or actions.",
+    "buttons": 0,
+    "ledger": {
+      "present": true,
+      "collapsed": true,
+      "readOnly": "true",
+      "actions": 0,
+      "text": "Receiptsexpedition_event_packet_hq12f_cell_q0_r1 marks cell_q0_r1 as receipt evidence with zero executable actions.Read-only marker. No new server objectives, hidden truth, or actions.Ledger detail: guided loop rows are derived from existing Expedition Map cells, unit command hints, event packets, and the latest local server result. They do not create commands, costs, rewards, routes, hidden truth, Atlas execution, or external effects."
+    }
+  },
+  "mobileFit": {
+    "viewport": 390,
+    "documentScrollWidth": 390,
+    "clipped": []
+  },
+  "guardrails": {
+    "frontendReadModelOnly": true,
+    "serverAuthorityUnchanged": true,
+    "existingEndpointsOnly": true,
+    "noNewButtons": 0,
+    "guidedLoopReadOnly": true,
+    "guidedLoopActions": 0,
+    "fivePhaseLoop": [
+      "objective",
+      "command",
+      "resolve",
+      "receipt",
+      "next"
+    ],
+    "objectiveFromExistingPacket": true,
+    "nextStepFromExistingCommandHint": true,
+    "defaultRailHidesProofProse": true,
+    "routeCreation": false,
+    "tradeRouteCreation": false,
+    "resourceHarvesting": false,
+    "rewardExpansion": false,
+    "combat": false,
+    "backgroundScheduling": false,
+    "publicSharing": false,
+    "generatedUniverseRuntimeExpansion": false,
+    "atlasExecution": false,
+    "hiddenAutonomy": false,
+    "hiddenTruthLeakage": false,
+    "crossPlotMutationAdded": false,
+    "externalEffects": false,
+    "mobileHorizontalOverflow": 0
+  }
+}

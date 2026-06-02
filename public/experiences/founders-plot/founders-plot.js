@@ -2014,7 +2014,241 @@
     return String(labelText || '').slice(0, 3).toUpperCase();
   }
 
-  function appendExpeditionObjectiveStrip(body, objective) {
+  function expeditionGuidedCommandLabel(commandId = '', fallback = '') {
+    switch (String(commandId || '')) {
+      case 'move_unit':
+        return 'Move';
+      case 'scout_sector':
+        return 'Scout';
+      case 'prepare_settler_convoy':
+        return 'Convoy';
+      case 'found_settlement':
+        return 'Found';
+      case 'review_packet':
+        return 'Packet';
+      default:
+        return fallback || 'Inspect';
+    }
+  }
+
+  function expeditionGuidedCommandIcon(commandId = '') {
+    switch (String(commandId || '')) {
+      case 'move_unit':
+        return '↦';
+      case 'scout_sector':
+        return '⌖';
+      case 'prepare_settler_convoy':
+        return '▣';
+      case 'found_settlement':
+        return '⌂';
+      case 'review_packet':
+        return '⚿';
+      default:
+        return '◎';
+    }
+  }
+
+  function expeditionGuidedCommandTargetIds(command = {}, unit = {}) {
+    const targets = Array.isArray(command.targetCellIds)
+      ? command.targetCellIds.map((target) => String(target || '')).filter(Boolean)
+      : [];
+    const unitCellId = String(unit.cellId || unit.location?.cellId || '').trim();
+    return targets.length ? targets : (unitCellId ? [unitCellId] : []);
+  }
+
+  function expeditionGuidedCommandCandidate(model = {}, cells = [], commandId = '', validator = () => true) {
+    for (const unit of expeditionUnits(model)) {
+      for (const command of unit.commandHints) {
+        if (String(command.commandId || '') !== String(commandId || '')) continue;
+        if (command.enabled === false || command.serverMutationImplemented !== true) continue;
+        for (const targetCellId of expeditionGuidedCommandTargetIds(command, unit)) {
+          const targetCell = cells.find((cell) => String(cell.cellId || '') === targetCellId) || null;
+          if (!targetCell && commandId !== 'found_settlement' && commandId !== 'prepare_settler_convoy') continue;
+          if (!validator({ unit, command, targetCell, targetCellId })) continue;
+          return {
+            commandId,
+            actionName: String(command.actionName || ''),
+            unitId: String(unit.unitId || ''),
+            unitType: String(unit.unitType || ''),
+            unitCode: expeditionUnitRoleCode(unit),
+            targetCellId,
+            targetLabel: expeditionCompactCellLabel(targetCellId),
+            fogLabel: expeditionFogShortLabel(targetCell?.fogState || unit.location?.fogState || ''),
+            label: expeditionGuidedCommandLabel(commandId, command.label),
+            icon: expeditionGuidedCommandIcon(commandId),
+            sourcePlanId: String(command.sourcePlanId || unit.sourcePlanId || ''),
+            claimId: String(command.claimId || unit.sourceClaimId || ''),
+            serverMutationImplemented: true,
+          };
+        }
+      }
+    }
+    return null;
+  }
+
+  function expeditionGuidedLoopModel({ model = {}, cells = [], selectedCell = null, objective = null, outcome = null } = {}) {
+    const latestPacket = expeditionLatestPacket(model);
+    const found = expeditionGuidedCommandCandidate(model, cells, 'found_settlement', ({ command, unit, targetCellId }) => (
+      !!(command.claimId || unit.sourceClaimId) && !!targetCellId
+    ));
+    const convoy = expeditionGuidedCommandCandidate(model, cells, 'prepare_settler_convoy', ({ command, unit, targetCellId }) => (
+      !!(command.sourcePlanId || unit.sourcePlanId) && !!targetCellId
+    ));
+    const scout = expeditionGuidedCommandCandidate(model, cells, 'scout_sector', ({ targetCell }) => (
+      isExpeditionScoutSectorEligible(targetCell)
+    ));
+    const move = expeditionGuidedCommandCandidate(model, cells, 'move_unit', ({ unit, targetCellId, targetCell }) => (
+      ['discovered', 'known'].includes(String(targetCell?.fogState || ''))
+      && expeditionUnitMoveTargets(unit, model).some((cell) => String(cell.cellId || '') === targetCellId)
+    ));
+    const packet = latestPacket ? {
+      commandId: 'review_packet',
+      actionName: String(latestPacket.receiptLink?.actionName || 'et.plot.scout_sector'),
+      unitId: '',
+      unitType: 'receipt',
+      unitCode: 'PKT',
+      targetCellId: String(latestPacket.cellId || latestPacket.receiptLink?.cellId || objective?.targetCellId || ''),
+      targetLabel: expeditionCompactCellLabel(latestPacket.cellId || latestPacket.receiptLink?.cellId || objective?.targetCellId || ''),
+      fogLabel: 'SRV',
+      label: 'Packet',
+      icon: '⚿',
+      packetId: String(latestPacket.packetId || ''),
+      serverMutationImplemented: false,
+    } : null;
+    const active = found || convoy || scout || move || packet || null;
+    const receiptLabel = outcome
+      ? expeditionGuidedCommandLabel(outcome.commandId, outcome.label)
+      : (packet ? 'Packet' : 'Ledger');
+    const receiptCellId = outcome?.cellId || packet?.targetCellId || objective?.targetCellId || selectedCell?.cellId || '';
+    const receiptKind = outcome?.receiptKind || (packet ? 'event_packet_receipt' : 'map_focus_receipt');
+    const fallbackTarget = objective?.targetCellId || selectedCell?.cellId || active?.targetCellId || '';
+    const targetLabel = active?.targetLabel || expeditionCompactCellLabel(fallbackTarget);
+    const targetFog = active?.fogLabel || expeditionFogShortLabel(selectedCell?.fogState || '');
+
+    return {
+      kind: 'expedition_guided_loop',
+      version: 'hq16f_guided_loop_ui_v1',
+      readOnly: true,
+      executableActions: 0,
+      objectiveMode: String(objective?.mode || 'inspect'),
+      activeCommandId: String(active?.commandId || ''),
+      nextCommandId: String(active?.commandId || (packet ? 'review_packet' : 'inspect_map')),
+      targetCellId: String(active?.targetCellId || fallbackTarget || ''),
+      packetId: String(packet?.packetId || objective?.packetId || ''),
+      steps: [
+        {
+          phase: 'objective',
+          code: 'OBJ',
+          label: expeditionObjectiveShortLabel(objective?.mode || ''),
+          icon: expeditionGuidedCommandIcon(objective?.mode === 'packet' ? 'review_packet' : active?.commandId),
+          meta: targetLabel || 'MAP',
+          commandId: String(objective?.mode || ''),
+          targetCellId: String(objective?.targetCellId || active?.targetCellId || ''),
+        },
+        {
+          phase: 'command',
+          code: 'CMD',
+          label: active ? active.label : 'Inspect',
+          icon: active?.icon || '◎',
+          meta: active ? `${active.unitCode} · ${targetLabel || 'MAP'}` : '0 ACT',
+          commandId: String(active?.commandId || ''),
+          unitId: String(active?.unitId || ''),
+          targetCellId: String(active?.targetCellId || ''),
+          primaryCommand: true,
+        },
+        {
+          phase: 'resolve',
+          code: 'RES',
+          label: outcome ? 'Done' : (active ? 'Ready' : 'Idle'),
+          icon: outcome?.icon || active?.icon || '◎',
+          meta: outcome ? expeditionCompactCellLabel(outcome.cellId) : (targetFog || 'SRV'),
+          commandId: String(outcome?.commandId || active?.commandId || ''),
+          targetCellId: String(outcome?.cellId || active?.targetCellId || ''),
+        },
+        {
+          phase: 'receipt',
+          code: 'RCP',
+          label: receiptLabel,
+          icon: '⚿',
+          meta: expeditionCompactCellLabel(receiptCellId) || 'LEDGER',
+          commandId: String(outcome?.commandId || packet?.commandId || ''),
+          targetCellId: String(receiptCellId || ''),
+          receiptKind,
+          packetId: String(packet?.packetId || ''),
+          receiptChip: true,
+        },
+        {
+          phase: 'next',
+          code: 'NXT',
+          label: active ? active.label : (packet ? 'Packet' : 'Map'),
+          icon: active?.icon || packet?.icon || '◎',
+          meta: active ? `${targetLabel || 'MAP'} · ${targetFog || 'SRV'}` : 'READ',
+          commandId: String(active?.commandId || packet?.commandId || 'inspect_map'),
+          targetCellId: String(active?.targetCellId || packet?.targetCellId || selectedCell?.cellId || ''),
+        },
+      ],
+      ledgerText: 'Ledger detail: guided loop rows are derived from existing Expedition Map cells, unit command hints, event packets, and the latest local server result. They do not create commands, costs, rewards, routes, hidden truth, Atlas execution, or external effects.',
+    };
+  }
+
+  function appendExpeditionGuidedLoop(strip, loop) {
+    if (!strip || !loop) return null;
+    strip.dataset.guidedLoop = 'true';
+    strip.dataset.guidedLoopVersion = loop.version;
+    strip.dataset.guidedLoopReadOnly = 'true';
+    strip.dataset.guidedLoopActions = '0';
+    if (loop.activeCommandId) strip.dataset.activeCommandId = loop.activeCommandId;
+    if (loop.nextCommandId) strip.dataset.nextCommandId = loop.nextCommandId;
+
+    const rail = document.createElement('div');
+    rail.className = 'fp-expedition-guided-loop';
+    rail.dataset.testid = 'fp-expedition-guided-loop';
+    rail.dataset.readOnly = 'true';
+    rail.dataset.actions = '0';
+    rail.dataset.objectiveMode = loop.objectiveMode;
+    rail.dataset.activeCommandId = loop.activeCommandId;
+    rail.dataset.nextCommandId = loop.nextCommandId;
+    if (loop.targetCellId) rail.dataset.targetCellId = loop.targetCellId;
+    if (loop.packetId) rail.dataset.packetId = loop.packetId;
+    rail.title = loop.ledgerText;
+    rail.setAttribute('aria-label', `Guided expedition loop: ${loop.steps.map((step) => `${step.code} ${step.label}`).join(', ')}. Read-only view over server state.`);
+
+    loop.steps.forEach((step) => {
+      const item = document.createElement('span');
+      item.className = `fp-expedition-guided-loop__step fp-expedition-guided-loop__step--${safeTestId(step.phase)}`;
+      item.dataset.testid = `fp-expedition-guided-loop-step-${safeTestId(step.phase)}`;
+      item.dataset.phase = step.phase;
+      item.dataset.commandId = String(step.commandId || '');
+      item.dataset.targetCellId = String(step.targetCellId || '');
+      item.dataset.readOnly = 'true';
+      item.dataset.actions = '0';
+      if (step.unitId) item.dataset.unitId = step.unitId;
+      if (step.receiptKind) item.dataset.receiptKind = step.receiptKind;
+      if (step.packetId) item.dataset.packetId = step.packetId;
+      item.title = `${step.code}: ${step.label}${step.targetCellId ? ` - ${step.targetCellId}` : ''}`;
+      item.setAttribute('aria-label', item.title);
+      if (step.primaryCommand) item.dataset.primaryCommand = 'true';
+      if (step.receiptChip) item.dataset.receiptChip = 'true';
+
+      const code = document.createElement('small');
+      code.textContent = step.code;
+      const icon = document.createElement('i');
+      icon.textContent = step.icon || '◎';
+      icon.setAttribute('aria-hidden', 'true');
+      const label = document.createElement('strong');
+      label.textContent = step.label || 'Map';
+      if (step.primaryCommand) label.dataset.testid = 'fp-expedition-guided-loop-primary-command';
+      if (step.receiptChip) label.dataset.testid = 'fp-expedition-guided-loop-receipt-chip';
+      const meta = document.createElement('em');
+      meta.textContent = step.meta || 'SRV';
+      item.append(code, icon, label, meta);
+      rail.appendChild(item);
+    });
+    strip.appendChild(rail);
+    return rail;
+  }
+
+  function appendExpeditionObjectiveStrip(body, objective, guidedLoop = null) {
     if (!body || !objective) return null;
     const strip = document.createElement('article');
     strip.className = `fp-expedition-objective-strip fp-expedition-objective-strip--${safeTestId(objective.mode)}`;
@@ -2063,8 +2297,9 @@
     boundary.textContent = 'Read-only marker. No new server objectives, hidden truth, or actions.';
 
     strip.append(copy, facts);
+    appendExpeditionGuidedLoop(strip, guidedLoop);
     const ledgerCopy = document.createElement('small');
-    ledgerCopy.textContent = 'Ledger detail: focus markers are derived only from existing map cells, event packets, and party state. They cannot create resources, routes, assignments, timers, rewards, Atlas execution, sharing, or external effects.';
+    ledgerCopy.textContent = guidedLoop?.ledgerText || 'Ledger detail: focus markers are derived only from existing map cells, event packets, and party state. They cannot create resources, routes, assignments, timers, rewards, Atlas execution, sharing, or external effects.';
     const ledger = appendExpeditionAuditDetails(strip, 'Receipts', [bodyCopy, boundary, ledgerCopy], 'fp-expedition-objective-ledger-details');
     if (ledger) {
       ledger.dataset.readOnly = 'true';
@@ -2928,6 +3163,13 @@
     const selectedCell = selectedExpeditionCell(cells, model);
     if (selectedCell) state.expeditionSelectedCellId = String(selectedCell.cellId || '');
     const objective = expeditionObjectiveModel({ model, cells, counts, selectedCell, scoutableCells });
+    const guidedLoop = expeditionGuidedLoopModel({
+      model,
+      cells,
+      selectedCell,
+      objective,
+      outcome: expeditionCommandOutcomeFeedbackForRender(model, cells),
+    });
     const runtimeShell = document.createElement('section');
     runtimeShell.className = 'fp-expedition-map-runtime';
     runtimeShell.dataset.testid = 'fp-expedition-map-runtime';
@@ -2991,7 +3233,7 @@
       statusLedger.dataset.actions = '0';
     }
     hud.appendChild(statusCard);
-    appendExpeditionObjectiveStrip(hud, objective);
+    appendExpeditionObjectiveStrip(hud, objective, guidedLoop);
     const inspector = hud;
 
     const boardCard = document.createElement('article');
