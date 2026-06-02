@@ -43,7 +43,7 @@ test('FP-E2E-002 GET /api/founders-plot/tools returns current et.plot.* tools', 
   expect(Array.isArray(body.tools)).toBe(true);
   const names = body.tools.map((t) => t.name).sort();
   for (const n of ['et.plot.get_state', 'et.plot.place_building', 'et.plot.queue_job',
-    'et.plot.collect_outputs', 'et.plot.draft_site_plan', 'et.plot.review_site_plan', 'et.plot.list_plots',
+    'et.plot.collect_outputs', 'et.plot.draft_site_plan', 'et.plot.draft_site_plan_from_packet', 'et.plot.review_site_plan', 'et.plot.list_plots',
     'et.plot.prepare_settler_convoy', 'et.plot.found_settlement', 'et.plot.select_doctrine',
     'et.plot.create_work_order_draft', 'et.plot.execute_work_order', 'et.plot.get_world_grid_status',
     'et.plot.get_expedition_map',

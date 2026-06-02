@@ -311,6 +311,32 @@ const FOUNDERS_PLOT_TOOL_SPECS = [
     })
   },
   {
+    name: 'et.plot.draft_site_plan_from_packet',
+    description: 'Drafts one planning-only Site Plan from a Scout Sector Event Packet on the current Expedition Map. This does not create a Surveyor, route, resource, reward, territory, Atlas execution, Generated Universe runtime behavior, or external effect.',
+    argsSchema: {
+      type: 'object',
+      properties: {
+        ...plotIdProperty,
+        packetId: { type: 'string' },
+        title: { type: 'string' },
+        focus: { type: 'string' },
+        actor: { type: 'string' },
+        actorType: { type: 'string' },
+        ...idempotencyProperty
+      },
+      required: ['packetId', 'idempotencyKey'],
+      additionalProperties: false
+    },
+    resultSchema: worldDeltaResultSchema({
+      sitePlan: { type: ['object', 'null'] },
+      existing: { type: 'boolean' },
+      packetId: { type: 'string' },
+      cellId: { type: 'string' },
+      proof: { type: ['object', 'null'] },
+      expeditionMap: { type: ['object', 'null'] }
+    })
+  },
+  {
     name: 'et.plot.review_site_plan',
     description: 'Reviews an existing canonical Site Plan into HQ6 claim-ready planning state without creating territory, a convoy, resources, or a second plot.',
     argsSchema: {

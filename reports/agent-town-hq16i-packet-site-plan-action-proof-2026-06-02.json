@@ -1,0 +1,124 @@
+{
+  "ok": true,
+  "verdict": "IMPLEMENTED",
+  "generatedAt": "2026-06-02T17:20:00+07:00",
+  "branch": "neo/progression-atlas-editor-next-2026-05-29",
+  "baseCommit": "c6d2f57",
+  "slice": {
+    "id": "HQ16I",
+    "name": "Scout Sector packet to Site Plan action",
+    "version": "hq16i_scout_packet_site_plan_draft_v1",
+    "authorityBoundary": "server_owned_scout_packet_site_plan_draft_v1",
+    "serverOwnedMutation": true,
+    "idempotent": true,
+    "samePlotOnly": true,
+    "agentApprovalRequired": true,
+    "createsSitePlan": true,
+    "createsSurveyor": false,
+    "planningRecordOnly": true,
+    "source": "scout_sector_event_packet"
+  },
+  "artifacts": {
+    "report": "reports/agent-town-hq16i-packet-site-plan-action-2026-06-02.md",
+    "proof": "reports/agent-town-hq16i-packet-site-plan-action-proof-2026-06-02.json"
+  },
+  "filesChanged": [
+    "e2e/200_founders_plot.spec.js",
+    "public/experiences/founders-plot/founders-plot.css",
+    "public/experiences/founders-plot/founders-plot.js",
+    "public/experiences/founders-plot/skill.md",
+    "public/experiences/founders-plot/tools.md",
+    "server/founders_plot/engine.js",
+    "server/founders_plot/progression_atlas.js",
+    "server/founders_plot/routes.js",
+    "server/founders_plot/tools.js",
+    "specs/02_api_contract.md",
+    "tests-founders-plot/fp-contract.test.js",
+    "tests-founders-plot/fp-http.test.js",
+    "tests-founders-plot/fp-unit.test.js",
+    "reports/agent-town-hq16i-packet-site-plan-action-2026-06-02.md",
+    "reports/agent-town-hq16i-packet-site-plan-action-proof-2026-06-02.json"
+  ],
+  "checks": [
+    {
+      "command": "node --check public/experiences/founders-plot/founders-plot.js",
+      "status": "passed"
+    },
+    {
+      "command": "node --check server/founders_plot/engine.js",
+      "status": "passed"
+    },
+    {
+      "command": "node --check server/founders_plot/routes.js",
+      "status": "passed"
+    },
+    {
+      "command": "node --check server/founders_plot/tools.js",
+      "status": "passed"
+    },
+    {
+      "command": "node --check server/founders_plot/progression_atlas.js",
+      "status": "passed"
+    },
+    {
+      "command": "node --check tests-founders-plot/fp-contract.test.js && node --check tests-founders-plot/fp-unit.test.js && node --check tests-founders-plot/fp-http.test.js && node --check e2e/200_founders_plot.spec.js",
+      "status": "passed"
+    },
+    {
+      "command": "NODE_ENV=test node --test tests-founders-plot/fp-contract.test.js --test-name-pattern \"FP-CT-101b3|FP-CT-101b3i|FP-CT-002\"",
+      "status": "passed"
+    },
+    {
+      "command": "NODE_ENV=test node --test tests-founders-plot/fp-unit.test.js --test-name-pattern \"FP-UT-028|FP-UT-028b\"",
+      "status": "passed"
+    },
+    {
+      "command": "NODE_ENV=test node --test tests-founders-plot/fp-http.test.js --test-name-pattern \"FP-HT-011d3|FP-HT-011d3b\"",
+      "status": "passed"
+    },
+    {
+      "command": "npm run build:founders-plot-threejs",
+      "status": "passed"
+    },
+    {
+      "command": "npm run test:founders-plot",
+      "status": "passed",
+      "tests": "101/101"
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed"
+    }
+  ],
+  "guardrails": {
+    "scoutSectorOnlyFogRevealPath": true,
+    "scoutMovementSamePlotAdjacentKnownOrDiscoveredOnly": true,
+    "sitePlanOnly": true,
+    "reviewedByDefault": false,
+    "createsSurveyor": false,
+    "createsConvoy": false,
+    "createsSettlement": false,
+    "resourceDelta": {},
+    "routeCreation": false,
+    "tradeRouteCreation": false,
+    "rewardCreation": false,
+    "backgroundScheduling": false,
+    "combat": false,
+    "publicSharing": false,
+    "generatedUniverseRuntimeExpansion": false,
+    "hiddenAutonomy": false,
+    "hiddenTruthLeakage": false,
+    "crossPlotMutation": false,
+    "atlasExecution": false,
+    "externalEffects": false,
+    "deploy": false,
+    "merge": false,
+    "publicShare": false,
+    "externalMessage": false
+  },
+  "playwright": {
+    "rerun": false,
+    "reason": "HQ16H Playwright fixture represents the pre-HQ16I read-only bridge gap and rewrites committed HQ16H screenshot/proof artifacts; HQ16I is covered by server, HTTP, contract, full suite, docs, and UI wiring checks."
+  },
+  "nextLane": "Make packet-derived Site Plans visible as map/ledger objects, then scope a narrow reviewed Site Plan -> Surveyor step if desired."
+}

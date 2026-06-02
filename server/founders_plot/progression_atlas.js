@@ -192,6 +192,7 @@ const TOOL_HTTP = Object.freeze({
   'et.plot.queue_job': { method: 'POST', path: '/api/founders-plot/queue-job' },
   'et.plot.collect_outputs': { method: 'POST', path: '/api/founders-plot/collect-outputs' },
   'et.plot.draft_site_plan': { method: 'POST', path: '/api/founders-plot/draft-site-plan' },
+  'et.plot.draft_site_plan_from_packet': { method: 'POST', path: '/api/founders-plot/expedition-map/draft-site-plan' },
   'et.plot.review_site_plan': { method: 'POST', path: '/api/founders-plot/review-site-plan' },
   'et.plot.select_doctrine': { method: 'POST', path: '/api/founders-plot/select-doctrine' },
   'et.plot.create_work_order_draft': { method: 'POST', path: '/api/founders-plot/work-orders/draft' },
@@ -358,9 +359,21 @@ function compactSitePlan(plan) {
   const claimId = cleanText(plan.claimId, '', 120);
   const convoyJobId = cleanText(plan.convoyJobId, '', 120);
   const foundedPlotId = cleanText(plan.foundedPlotId, '', 120);
+  const sourcePacketId = cleanText(plan.sourcePacketId, '', 160);
+  const sourceScoutId = cleanText(plan.sourceScoutId, '', 120);
+  const sourceCellId = cleanText(plan.sourceCellId, '', 80);
+  const sourceReceiptKind = cleanText(plan.sourceReceiptKind, '', 80);
+  const sourceActionName = cleanText(plan.sourceActionName, '', 120);
+  const sourceBridgeVersion = cleanText(plan.sourceBridgeVersion, '', 120);
   if (claimId) out.claimId = claimId;
   if (convoyJobId) out.convoyJobId = convoyJobId;
   if (foundedPlotId) out.foundedPlotId = foundedPlotId;
+  if (sourcePacketId) out.sourcePacketId = sourcePacketId;
+  if (sourceScoutId) out.sourceScoutId = sourceScoutId;
+  if (sourceCellId) out.sourceCellId = sourceCellId;
+  if (sourceReceiptKind) out.sourceReceiptKind = sourceReceiptKind;
+  if (sourceActionName) out.sourceActionName = sourceActionName;
+  if (sourceBridgeVersion) out.sourceBridgeVersion = sourceBridgeVersion;
   if (plan.claimedAt != null) out.claimedAt = Number(plan.claimedAt);
   return out;
 }

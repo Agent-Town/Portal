@@ -1596,10 +1596,11 @@ test('FP-UT-028 HQ12C Scout Sector reveals one same-plot hinted sector with appr
   assert.equal(later.expeditionMap.surveyBridge.activePacketId, scouted.eventPacket.packetId);
   assert.equal(later.expeditionMap.surveyBridge.activeCellId, target.cellId);
   assert.equal(later.expeditionMap.surveyBridge.status, 'PACKET_READY_FOR_SITE_PLAN_PREFLIGHT');
-  assert.equal(later.expeditionMap.surveyBridge.activeCandidate.commandState.commandId, 'survey_site_plan_contract_required');
-  assert.equal(later.expeditionMap.surveyBridge.activeCandidate.commandState.serverMutationImplemented, false);
+  assert.equal(later.expeditionMap.surveyBridge.activeCandidate.commandState.commandId, 'draft_site_plan_from_packet');
+  assert.equal(later.expeditionMap.surveyBridge.activeCandidate.commandState.actionName, 'et.plot.draft_site_plan_from_packet');
+  assert.equal(later.expeditionMap.surveyBridge.activeCandidate.commandState.serverMutationImplemented, true);
   assert.deepEqual(later.expeditionMap.surveyBridge.activeCandidate.commandState.executableActions, []);
-  assert.equal(later.expeditionMap.surveyBridge.activeCandidate.nextRequiredContract, 'explicit_packet_to_site_plan_server_contract');
+  assert.equal(later.expeditionMap.surveyBridge.activeCandidate.nextRequiredContract, 'existing_draft_site_plan_from_packet_endpoint');
   assert.equal(later.expeditionMap.surveyBridge.boundaryFlags.createsSitePlan, false);
   assert.equal(later.expeditionMap.surveyBridge.boundaryFlags.createsSurveyor, false);
   assert.equal(later.expeditionMap.surveyBridge.boundaryFlags.addsMutationAuthority, false);
@@ -1682,6 +1683,102 @@ test('FP-UT-028 HQ12C Scout Sector reveals one same-plot hinted sector with appr
   assert.equal(agentScout.ok, true, agentScout.error?.message);
   assert.equal(agentScout.scoutSector.approvedBy, 'HUMAN_APPROVAL');
   assert.equal(agentScout.worldDelta.some((entry) => entry.type === 'AGENT_ACTION_EXECUTED'), true);
+});
+
+test('FP-UT-028b HQ16I drafts one planning-only Site Plan from a Scout Sector Event Packet', () => {
+  const ctx = seedFoundedOutpostFixture('pair-hq16i-packet-plan');
+  const before = engine.getExpeditionMapStatus({
+    pairId: ctx.pairId,
+    plotId: ctx.plotId,
+    nowMs: 1700_000_320_000
+  });
+  const target = before.expeditionMap.cells.find((cell) => cell.fogState === 'hinted');
+  assert.ok(target, 'expected a hinted sector before Scout Sector');
+  const scouted = engine.scoutExpeditionSector({
+    pairId: ctx.pairId,
+    plotId: ctx.plotId,
+    cellId: target.cellId,
+    actor: 'HUMAN',
+    idempotencyKey: 'ut-28b-scout-sector',
+    nowMs: 1700_000_321_000
+  });
+  assert.equal(scouted.ok, true, scouted.error?.message);
+  assert.equal(scouted.expeditionMap.surveyBridge.activeCandidate.commandState.commandId, 'draft_site_plan_from_packet');
+  assert.equal(scouted.expeditionMap.surveyBridge.activeCandidate.commandState.serverMutationImplemented, true);
+  const inventoryBefore = scouted.state.plot.inventory;
+
+  const blockedAgent = engine.draftSitePlanFromPacket({
+    pairId: ctx.pairId,
+    plotId: ctx.plotId,
+    packetId: scouted.eventPacket.packetId,
+    actorType: 'AGENT',
+    idempotencyKey: 'ut-28b-agent-blocked',
+    nowMs: 1700_000_322_000
+  });
+  assert.equal(blockedAgent.ok, false);
+  assert.equal(blockedAgent.error.code, 'FORBIDDEN_POLICY');
+  assert.equal(blockedAgent.error.details.requiresApproval, true);
+  assert.equal(blockedAgent.error.details.requestedParams.packetId, scouted.eventPacket.packetId);
+
+  const planned = engine.draftSitePlanFromPacket({
+    pairId: ctx.pairId,
+    plotId: ctx.plotId,
+    packetId: scouted.eventPacket.packetId,
+    title: 'Packet Ridge Site Plan',
+    focus: 'safe',
+    actor: 'HUMAN',
+    idempotencyKey: 'ut-28b-packet-plan',
+    nowMs: 1700_000_323_000
+  });
+  assert.equal(planned.ok, true, planned.error?.message);
+  assert.equal(planned.existing, false);
+  assert.equal(planned.sitePlan.planId, `site_plan_${scouted.eventPacket.packetId}`);
+  assert.equal(planned.sitePlan.reportId, scouted.eventPacket.packetId);
+  assert.equal(planned.sitePlan.source, 'scout_sector_event_packet');
+  assert.equal(planned.sitePlan.authorityBoundary, engine.EXPEDITION_PACKET_SITE_PLAN_AUTHORITY_BOUNDARY);
+  assert.equal(planned.sitePlan.sourcePacketId, scouted.eventPacket.packetId);
+  assert.equal(planned.sitePlan.sourceScoutId, scouted.scoutSector.scoutId);
+  assert.equal(planned.sitePlan.sourceCellId, target.cellId);
+  assert.deepEqual(planned.sitePlan.resourceHints, {});
+  assert.equal(planned.proof.version, engine.EXPEDITION_PACKET_SITE_PLAN_VERSION);
+  assert.equal(planned.proof.boundaryFlags.createsSitePlan, true);
+  assert.equal(planned.proof.boundaryFlags.createsSurveyor, false);
+  assert.equal(planned.proof.boundaryFlags.routeCreation, false);
+  assert.equal(planned.proof.boundaryFlags.resourceHarvesting, false);
+  assert.equal(planned.proof.boundaryFlags.rewardCreation, false);
+  assert.equal(planned.proof.boundaryFlags.atlasExecution, false);
+  assert.equal(planned.proof.boundaryFlags.externalEffects, false);
+  assert.deepEqual(planned.state.plot.inventory, inventoryBefore);
+  assert.equal(planned.worldDelta.some((entry) => entry.type === 'EXPEDITION_PACKET_SITE_PLAN_DRAFTED'), true);
+  assert.equal(planned.expeditionMap.surveyBridge.status, 'SITE_PLAN_PRESENT');
+  assert.equal(planned.expeditionMap.surveyBridge.activeCandidate.sitePlan.planId, planned.sitePlan.planId);
+  assert.equal(planned.expeditionMap.units.items.some((unit) => unit.unitType === 'surveyor' && unit.sourcePlanId === planned.sitePlan.planId), false);
+
+  const duplicate = engine.draftSitePlanFromPacket({
+    pairId: ctx.pairId,
+    plotId: ctx.plotId,
+    packetId: scouted.eventPacket.packetId,
+    actor: 'HUMAN',
+    idempotencyKey: 'ut-28b-packet-plan-duplicate',
+    nowMs: 1700_000_324_000
+  });
+  assert.equal(duplicate.ok, true, duplicate.error?.message);
+  assert.equal(duplicate.existing, true);
+  assert.equal(duplicate.sitePlan.planId, planned.sitePlan.planId);
+  assert.deepEqual(duplicate.worldDelta, []);
+
+  const reviewed = engine.reviewSitePlan({
+    pairId: ctx.pairId,
+    plotId: ctx.plotId,
+    planId: planned.sitePlan.planId,
+    reviewNote: 'Packet-grounded review only.',
+    actor: 'HUMAN',
+    idempotencyKey: 'ut-28b-review-packet-plan',
+    nowMs: 1700_000_325_000
+  });
+  assert.equal(reviewed.ok, true, reviewed.error?.message);
+  assert.equal(reviewed.sitePlan.reviewStatus, 'reviewed');
+  assert.equal(reviewed.sitePlan.sourcePacketId, scouted.eventPacket.packetId);
 });
 
 test('FP-UT-029 HQ15G Move Expedition Unit moves one Scout between revealed adjacent cells only', () => {

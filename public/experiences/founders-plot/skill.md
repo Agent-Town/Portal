@@ -50,6 +50,11 @@ the server does. You only participate through typed tools.
 - `et.plot.draft_site_plan` may record a Site Plan from a collected Scout
   Report, but it does not create territory or a second plot. Treat strategy
   variants from the Atlas editor as proposals until engine promotion exists.
+- `et.plot.draft_site_plan_from_packet` may record one planning-only Site Plan
+  from a Scout Sector Event Packet on the current Expedition Map. Agent callers
+  require matching human approval. It does not create a Surveyor, route,
+  resource, reward, territory, Atlas execution, Generated Universe runtime
+  behavior, or external effect.
 - `et.plot.review_site_plan` is the HQ6 server-owned promotion path for a
   canonical Site Plan. It marks claim-ready planning state only; it still does
   not create territory, routes, convoys, resources, or a second plot.

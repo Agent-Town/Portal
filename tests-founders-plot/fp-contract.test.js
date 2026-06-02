@@ -136,7 +136,7 @@ test('FP-CT-001 every tool spec has name, description, argsSchema, resultSchema'
 
 test('FP-CT-002 argsSchema rejects requests missing idempotencyKey on mutations', () => {
   const mutators = ['et.plot.place_building', 'et.plot.queue_job', 'et.plot.collect_outputs',
-    'et.plot.draft_site_plan', 'et.plot.review_site_plan', 'et.plot.select_doctrine',
+    'et.plot.draft_site_plan', 'et.plot.draft_site_plan_from_packet', 'et.plot.review_site_plan', 'et.plot.select_doctrine',
     'et.plot.create_work_order_draft', 'et.plot.execute_work_order', 'et.plot.scout_sector', 'et.plot.move_expedition_unit', 'et.plot.create_civic_proposal',
     'et.plot.create_overlay_pack', 'et.plot.activate_civic_project', 'et.plot.inspect_civic_project',
     'et.plot.prepare_settler_convoy', 'et.plot.found_settlement',
@@ -466,9 +466,52 @@ test('FP-CT-101b3 scout_sector envelope conforms to resultSchema', () => {
   assert.equal(out.expeditionMap.surveyBridge.readOnly, true);
   assert.deepEqual(out.expeditionMap.surveyBridge.executableActions, []);
   assert.equal(out.expeditionMap.surveyBridge.activePacketId, out.eventPacket.packetId);
-  assert.equal(out.expeditionMap.surveyBridge.activeCandidate.commandState.serverMutationImplemented, false);
+  assert.equal(out.expeditionMap.surveyBridge.activeCandidate.commandState.commandId, 'draft_site_plan_from_packet');
+  assert.equal(out.expeditionMap.surveyBridge.activeCandidate.commandState.actionName, 'et.plot.draft_site_plan_from_packet');
+  assert.equal(out.expeditionMap.surveyBridge.activeCandidate.commandState.serverMutationImplemented, true);
   assert.equal(out.expeditionMap.surveyBridge.boundaryFlags.createsSitePlan, false);
   assert.equal(out.eventPacket.boundaryFlags.atlasExecution, false);
+});
+
+test('FP-CT-101b3i draft_site_plan_from_packet envelope conforms to resultSchema', () => {
+  const env = fresh();
+  const bundle = store.readPlotBundleById(env.plotId);
+  bundle.plot.hqLevel = 3;
+  bundle.plot.storageCaps = engine.HQ_LEVEL_RULES[3].storageCaps;
+  bundle.plot.constructionSlots = engine.HQ_LEVEL_RULES[3].constructionSlots;
+  store.writePlot(bundle.plot);
+  const target = env.state.expeditionMap.cells.find((cell) => cell.fogState === 'hinted');
+  const scouted = engine.scoutExpeditionSector({
+    pairId: env.state.plot.pairId,
+    plotId: env.plotId,
+    cellId: target.cellId,
+    actor: 'HUMAN',
+    idempotencyKey: 'ct-101b3i-scout-sector',
+    nowMs: 1700_000_000_000
+  });
+  const spec = findSpec('et.plot.draft_site_plan_from_packet');
+  const out = engine.draftSitePlanFromPacket({
+    pairId: env.state.plot.pairId,
+    plotId: env.plotId,
+    packetId: scouted.eventPacket.packetId,
+    actor: 'HUMAN',
+    idempotencyKey: 'ct-101b3i-packet-plan',
+    nowMs: 1700_000_001_000
+  });
+  expectValid(out, spec.resultSchema, 'draft_site_plan_from_packet envelope');
+  assert.equal(out.ok, true);
+  assert.equal(out.packetId, scouted.eventPacket.packetId);
+  assert.equal(out.cellId, target.cellId);
+  assert.equal(out.sitePlan.source, 'scout_sector_event_packet');
+  assert.equal(out.sitePlan.sourcePacketId, scouted.eventPacket.packetId);
+  assert.equal(out.sitePlan.sourceCellId, target.cellId);
+  assert.equal(out.proof.actionName, 'et.plot.draft_site_plan_from_packet');
+  assert.equal(out.proof.boundaryFlags.createsSitePlan, true);
+  assert.equal(out.proof.boundaryFlags.createsSurveyor, false);
+  assert.equal(out.proof.boundaryFlags.routeCreation, false);
+  assert.equal(out.proof.boundaryFlags.resourceHarvesting, false);
+  assert.equal(out.proof.boundaryFlags.atlasExecution, false);
+  assert.equal(out.expeditionMap.surveyBridge.status, 'SITE_PLAN_PRESENT');
 });
 
 test('FP-CT-101b4 move_expedition_unit envelope conforms to resultSchema', () => {

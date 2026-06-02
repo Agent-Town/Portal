@@ -62,12 +62,21 @@ Drafts one canonical Site Plan from a collected Scout Report. This records
 planning intent only; it does not claim territory, create a second plot, or
 promote editor-authored variants into engine truth.
 
+### `et.plot.draft_site_plan_from_packet`
+
+Body: `{ plotId, packetId, title, focus, actor, actorType, idempotencyKey }`.
+Drafts one planning-only Site Plan from a Scout Sector Event Packet on the
+current Expedition Map. Agent callers require matching human approval. This
+does not create a Surveyor, route, resource, reward, territory, Atlas
+execution, Generated Universe runtime behavior, or external effect.
+
 ### `et.plot.review_site_plan`
 
 Body: `{ plotId, planId, reviewNote, idempotencyKey }`.
 HQ6 Settlement Charter action. Reviews an existing canonical Site Plan into
 claim-ready planning state. It requires a collected Scout Report-backed Site
-Plan and does not create territory, routes, convoys, resources, or a second
+Plan or a Scout Sector packet-backed Site Plan and does not create territory,
+routes, convoys, resources, or a second
 plot.
 
 ### `et.plot.select_doctrine`

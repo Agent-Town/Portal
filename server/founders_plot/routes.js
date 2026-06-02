@@ -137,6 +137,23 @@ function createFoundersPlotRouter({
     return sendEnvelope(res, envelope);
   });
 
+  router.post('/api/founders-plot/expedition-map/draft-site-plan', (req, res) => {
+    const identity = identityFor(req, res);
+    const envelope = engine.draftSitePlanFromPacket({
+      pairId: identity.pairId,
+      houseId: identity.houseId || null,
+      plotId: typeof req.body?.plotId === 'string' ? req.body.plotId.trim() : null,
+      packetId: req.body?.packetId,
+      title: req.body?.title,
+      focus: req.body?.focus,
+      actor: req.body?.actor,
+      actorType: req.body?.actorType,
+      idempotencyKey: req.body?.idempotencyKey,
+      nowMs: nowMsFn()
+    });
+    return sendEnvelope(res, envelope);
+  });
+
   router.get('/api/founders-plot/civic-proposals', (req, res) => {
     const identity = identityFor(req, res);
     const envelope = engine.listCivicProposalRecords({

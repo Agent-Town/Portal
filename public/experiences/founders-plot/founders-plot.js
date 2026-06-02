@@ -27,6 +27,7 @@
     expeditionMap:'/api/founders-plot/expedition-map',
     scoutSector:'/api/founders-plot/expedition-map/scout-sector',
     moveExpeditionUnit:'/api/founders-plot/expedition-map/move-unit',
+    packetSitePlan:'/api/founders-plot/expedition-map/draft-site-plan',
     civicProposals:'/api/founders-plot/civic-proposals',
     overlayPacks:'/api/founders-plot/overlay-packs',
     civicProjects:'/api/founders-plot/civic-projects',
@@ -173,6 +174,7 @@
     workOrderExecutePendingId: '',
     scoutSectorPendingCellId: '',
     expeditionUnitMovePendingId: '',
+    expeditionPacketSitePlanPendingId: '',
     scoutSectorReceipt: null,
     expeditionSelectedCellId: '',
     expeditionSelectedUnitId: '',
@@ -1745,6 +1747,8 @@
         return { label: 'Moved', icon: '↦' };
       case 'scout_sector':
         return { label: 'Scouted', icon: '⌖' };
+      case 'draft_site_plan_from_packet':
+        return { label: 'Planned', icon: '▧' };
       case 'prepare_settler_convoy':
         return { label: 'Convoy', icon: '▣' };
       case 'found_settlement':
@@ -2052,6 +2056,8 @@
         return 'Move';
       case 'scout_sector':
         return 'Scout';
+      case 'draft_site_plan_from_packet':
+        return 'Plan';
       case 'prepare_settler_convoy':
         return 'Convoy';
       case 'found_settlement':
@@ -2071,6 +2077,8 @@
         return '↦';
       case 'scout_sector':
         return '⌖';
+      case 'draft_site_plan_from_packet':
+        return '▧';
       case 'prepare_settler_convoy':
         return '▣';
       case 'found_settlement':
@@ -2296,6 +2304,12 @@
     const packetId = String(candidate.packetId || bridge.activePacketId || '');
     const statusLabel = expeditionSurveyBridgeStatusLabel(candidate.status || bridge.status);
     const cellLabel = expeditionCompactCellLabel(cellId);
+    const canDraftPacketPlan = commandState.commandId === 'draft_site_plan_from_packet'
+      && commandState.actionName === 'et.plot.draft_site_plan_from_packet'
+      && commandState.enabled !== false
+      && commandState.serverMutationImplemented === true
+      && !!packetId;
+    const pendingPacketPlan = canDraftPacketPlan && state.expeditionPacketSitePlanPendingId === packetId;
     const rail = document.createElement('div');
     rail.className = 'fp-expedition-survey-bridge';
     rail.dataset.testid = testId;
@@ -2305,10 +2319,13 @@
     rail.dataset.cellId = cellId;
     rail.dataset.packetId = packetId;
     rail.dataset.readOnly = 'true';
-    rail.dataset.actions = '0';
+    rail.dataset.actions = canDraftPacketPlan ? '1' : '0';
     rail.dataset.serverMutationImplemented = commandState.serverMutationImplemented === true ? 'true' : 'false';
+    rail.dataset.commandId = String(commandState.commandId || '');
+    rail.dataset.actionName = String(commandState.actionName || '');
+    if (pendingPacketPlan) rail.dataset.pending = 'true';
     rail.title = bridge.ledgerText || 'Scout Packet to Site Plan bridge is read-only readiness only.';
-    rail.setAttribute('aria-label', `Scout Packet to Site Plan bridge: ${statusLabel} at ${cellId || 'selected cell'}. Read-only; zero executable actions.`);
+    rail.setAttribute('aria-label', `Scout Packet to Site Plan bridge: ${statusLabel} at ${cellId || 'selected cell'}. ${canDraftPacketPlan ? 'Packet planning command ready.' : 'Read-only; zero executable actions.'}`);
 
     [
       {
@@ -2352,6 +2369,26 @@
       item.append(code, label, meta);
       rail.appendChild(item);
     });
+
+    if (canDraftPacketPlan) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'fp-expedition-survey-bridge__command fp-brass-btn';
+      button.dataset.testid = `fp-btn-draft-site-plan-from-packet-${safeTestId(packetId)}`;
+      button.dataset.packetId = packetId;
+      button.dataset.cellId = cellId;
+      button.dataset.commandId = commandState.commandId;
+      button.dataset.actionName = commandState.actionName;
+      button.dataset.serverMutationImplemented = 'true';
+      button.dataset.routeAuthority = 'false';
+      button.dataset.resourceDelta = '{}';
+      button.disabled = pendingPacketPlan;
+      button.textContent = pendingPacketPlan ? '...' : expeditionGuidedCommandLabel(commandState.commandId, commandState.label);
+      button.title = `Draft one planning-only Site Plan from ${packetId}. No route, resource, reward, Surveyor, Atlas execution, or external effect.`;
+      button.setAttribute('aria-label', button.title);
+      button.addEventListener('click', () => doDraftSitePlanFromPacket(packetId, cellId));
+      rail.appendChild(button);
+    }
 
     strip.appendChild(rail);
     return rail;
@@ -6070,6 +6107,43 @@
     });
     if (!data.ok) return toast(data.error?.message || 'Could not draft Site Plan.', 'danger');
     toast(data.existing ? 'Site Plan already exists.' : 'Site Plan drafted.');
+    await loadState();
+  }
+
+  async function doDraftSitePlanFromPacket(packetId, cellId = '') {
+    const safePacketId = String(packetId || '').trim();
+    if (!safePacketId) return;
+    const bundle = state.bundle || {};
+    const model = expeditionMapModel(bundle);
+    const packet = expeditionEventPackets(model).find((entry) => String(entry.packetId || '') === safePacketId) || {};
+    const targetCellId = String(cellId || packet.cellId || packet.receiptLink?.cellId || '').trim();
+    state.expeditionPacketSitePlanPendingId = safePacketId;
+    if (targetCellId) state.expeditionSelectedCellId = targetCellId;
+    renderExpeditionMap(bundle);
+    const { data } = await api(API.packetSitePlan, 'POST', {
+      plotId: state.plotId,
+      packetId: safePacketId,
+      title: targetCellId ? `${expeditionCompactCellLabel(targetCellId)} Site Plan` : 'Scout Packet Site Plan',
+      focus: 'balanced',
+      actor: 'HUMAN',
+      idempotencyKey: idem(`packet-site-plan-${safeTestId(safePacketId)}`),
+    });
+    state.expeditionPacketSitePlanPendingId = '';
+    if (!data.ok) {
+      renderExpeditionMap(state.bundle || {});
+      return toast(data.error?.message || 'Could not draft packet Site Plan.', 'danger');
+    }
+    const nextCellId = String(data.cellId || targetCellId || '').trim();
+    if (nextCellId) state.expeditionSelectedCellId = nextCellId;
+    setExpeditionCommandOutcomeFeedback({
+      commandId: 'draft_site_plan_from_packet',
+      cellId: nextCellId,
+      unitType: 'surveyor',
+      label: data.existing ? 'Planned' : 'Planned',
+      receiptId: data.sitePlan?.planId || '',
+      receiptKind: 'packet_site_plan_draft',
+    });
+    toast(data.existing ? 'Packet Site Plan already exists.' : 'Packet Site Plan drafted.');
     await loadState();
   }
 

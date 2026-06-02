@@ -383,7 +383,7 @@ test('FP-HT-001 GET /api/founders-plot/tools returns all current Founders Plot t
     assert.ok(out.body.tools.length >= 15);
     const names = out.body.tools.map((t) => t.name).sort();
     for (const req of ['et.plot.get_state', 'et.plot.place_building', 'et.plot.queue_job',
-      'et.plot.collect_outputs', 'et.plot.draft_site_plan', 'et.plot.review_site_plan',
+      'et.plot.collect_outputs', 'et.plot.draft_site_plan', 'et.plot.draft_site_plan_from_packet', 'et.plot.review_site_plan',
       'et.plot.select_doctrine', 'et.plot.create_work_order_draft', 'et.plot.execute_work_order',
       'et.plot.list_plots', 'et.plot.get_world_grid_status', 'et.plot.list_civic_proposals',
       'et.plot.get_expedition_map', 'et.plot.scout_sector', 'et.plot.create_civic_proposal', 'et.plot.list_overlay_packs', 'et.plot.create_overlay_pack',
@@ -1571,7 +1571,9 @@ test('FP-HT-011d3 POST /api/founders-plot/expedition-map/scout-sector reveals on
     assert.equal(scouted.body.eventPacket.boundaryFlags.generatedUniverseRendering, false);
     assert.equal(scouted.body.expeditionMap.surveyBridge.activePacketId, scouted.body.eventPacket.packetId);
     assert.equal(scouted.body.expeditionMap.surveyBridge.status, 'PACKET_READY_FOR_SITE_PLAN_PREFLIGHT');
-    assert.equal(scouted.body.expeditionMap.surveyBridge.activeCandidate.commandState.serverMutationImplemented, false);
+    assert.equal(scouted.body.expeditionMap.surveyBridge.activeCandidate.commandState.commandId, 'draft_site_plan_from_packet');
+    assert.equal(scouted.body.expeditionMap.surveyBridge.activeCandidate.commandState.actionName, 'et.plot.draft_site_plan_from_packet');
+    assert.equal(scouted.body.expeditionMap.surveyBridge.activeCandidate.commandState.serverMutationImplemented, true);
     assert.deepEqual(scouted.body.expeditionMap.surveyBridge.activeCandidate.commandState.executableActions, []);
     assert.equal(scouted.body.expeditionMap.surveyBridge.boundaryFlags.createsSitePlan, false);
     assert.equal(scouted.body.expeditionMap.surveyBridge.boundaryFlags.hiddenTruthLeakage, false);
@@ -1617,6 +1619,73 @@ test('FP-HT-011d3 POST /api/founders-plot/expedition-map/scout-sector reveals on
     });
     assert.equal(blockedAgent.status, 403);
     assert.equal(blockedAgent.body.error.details.requiresApproval, true);
+  } finally { await close(); }
+});
+
+test('FP-HT-011d3b POST /api/founders-plot/expedition-map/draft-site-plan drafts one packet-grounded plan', async () => {
+  const { server, close } = await fresh('packet-site-plan');
+  try {
+    const seeded = await seedResearchReadyPlot(server, 'packet_site_plan');
+    const before = await request(server, 'GET', `/api/founders-plot/expedition-map?plotId=${encodeURIComponent(seeded.plotId)}`);
+    const target = before.body.expeditionMap.cells.find((cell) => cell.fogState === 'hinted');
+    assert.ok(target, 'expected hinted frontier cell');
+    const scouted = await request(server, 'POST', '/api/founders-plot/expedition-map/scout-sector', {
+      plotId: seeded.plotId,
+      cellId: target.cellId,
+      actor: 'HUMAN',
+      idempotencyKey: 'ht-11d5-scout'
+    });
+    assert.equal(scouted.status, 200, scouted.body?.error?.message || 'scout sector');
+    const stateBefore = await request(server, 'GET', `/api/founders-plot/state?plotId=${encodeURIComponent(seeded.plotId)}`);
+
+    const agentBlocked = await request(server, 'POST', '/api/founders-plot/expedition-map/draft-site-plan', {
+      plotId: seeded.plotId,
+      packetId: scouted.body.eventPacket.packetId,
+      actorType: 'AGENT',
+      idempotencyKey: 'ht-11d5-agent-blocked'
+    });
+    assert.equal(agentBlocked.status, 403);
+    assert.equal(agentBlocked.body.error.details.requiresApproval, true);
+
+    const planned = await request(server, 'POST', '/api/founders-plot/expedition-map/draft-site-plan', {
+      plotId: seeded.plotId,
+      packetId: scouted.body.eventPacket.packetId,
+      title: 'HTTP Packet Site Plan',
+      focus: 'balanced',
+      actor: 'HUMAN',
+      idempotencyKey: 'ht-11d5-plan'
+    });
+    assert.equal(planned.status, 200, planned.body?.error?.message || 'packet site plan');
+    assert.equal(planned.body.ok, true);
+    assert.equal(planned.body.existing, false);
+    assert.equal(planned.body.packetId, scouted.body.eventPacket.packetId);
+    assert.equal(planned.body.cellId, target.cellId);
+    assert.equal(planned.body.sitePlan.source, 'scout_sector_event_packet');
+    assert.equal(planned.body.sitePlan.sourcePacketId, scouted.body.eventPacket.packetId);
+    assert.equal(planned.body.sitePlan.sourceCellId, target.cellId);
+    assert.deepEqual(planned.body.sitePlan.resourceHints, {});
+    assert.equal(planned.body.proof.boundaryFlags.createsSitePlan, true);
+    assert.equal(planned.body.proof.boundaryFlags.createsSurveyor, false);
+    assert.equal(planned.body.proof.boundaryFlags.routeCreation, false);
+    assert.equal(planned.body.proof.boundaryFlags.resourceHarvesting, false);
+    assert.equal(planned.body.proof.boundaryFlags.rewardCreation, false);
+    assert.equal(planned.body.proof.boundaryFlags.atlasExecution, false);
+    assert.equal(planned.body.proof.boundaryFlags.externalEffects, false);
+    assert.deepEqual(planned.body.state.plot.inventory, stateBefore.body.state.plot.inventory);
+    assert.equal(planned.body.worldDelta.some((entry) => entry.type === 'EXPEDITION_PACKET_SITE_PLAN_DRAFTED'), true);
+    assert.equal(planned.body.expeditionMap.surveyBridge.status, 'SITE_PLAN_PRESENT');
+    assert.equal(planned.body.expeditionMap.surveyBridge.activeCandidate.sitePlan.planId, planned.body.sitePlan.planId);
+
+    const repeated = await request(server, 'POST', '/api/founders-plot/expedition-map/draft-site-plan', {
+      plotId: seeded.plotId,
+      packetId: scouted.body.eventPacket.packetId,
+      actor: 'HUMAN',
+      idempotencyKey: 'ht-11d5-plan-repeat'
+    });
+    assert.equal(repeated.status, 200);
+    assert.equal(repeated.body.existing, true);
+    assert.equal(repeated.body.sitePlan.planId, planned.body.sitePlan.planId);
+    assert.deepEqual(repeated.body.worldDelta, []);
   } finally { await close(); }
 });
 

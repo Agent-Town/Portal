@@ -2481,6 +2481,58 @@ Errors include:
 - `FORBIDDEN_POLICY`
 - `IDEMPOTENCY_CONFLICT`
 
+### POST `/api/founders-plot/expedition-map/draft-site-plan`
+
+Drafts one canonical, planning-only Site Plan from a current-plot Scout Sector
+Event Packet.
+
+Request shape:
+```json
+{
+  "plotId": "plot_...",
+  "packetId": "expedition_event_packet_...",
+  "title": "Ridge Site Plan",
+  "focus": "balanced",
+  "actor": "HUMAN",
+  "idempotencyKey": "..."
+}
+```
+
+Response shape:
+```json
+{
+  "ok": true,
+  "sitePlan": {
+    "planId": "site_plan_expedition_event_packet_...",
+    "reportId": "expedition_event_packet_...",
+    "source": "scout_sector_event_packet",
+    "sourcePacketId": "expedition_event_packet_...",
+    "sourceCellId": "cell_q1_r0",
+    "promotionStatus": "draft",
+    "reviewStatus": "unreviewed"
+  },
+  "proof": {
+    "actionName": "et.plot.draft_site_plan_from_packet",
+    "boundaryFlags": {
+      "samePlotOnly": true,
+      "createsSitePlan": true,
+      "createsSurveyor": false,
+      "resourceHarvesting": false,
+      "routeCreation": false,
+      "rewardCreation": false,
+      "atlasExecution": false,
+      "externalEffects": false
+    }
+  }
+}
+```
+
+Boundaries:
+- requires an existing Scout Sector Event Packet on a known/discovered cell in the current owned plot
+- requires idempotency; repeated packet drafts return the existing Site Plan
+- agent callers require matching human approval for `draft_site_plan_from_packet` with `{ "packetId": "...", "cellId": "..." }`
+- creates only one draft Site Plan planning record; it does not review it, create a Surveyor, prepare a convoy, found territory, reveal fog, move units, create routes/trade, mutate resources, grant rewards, execute Atlas, render Generated Universe runtime content, or call external systems
+
 ---
 
 ## Founders Plot Work Orders

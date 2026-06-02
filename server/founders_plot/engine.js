@@ -26,6 +26,8 @@ const EXPEDITION_UNIT_MOVE_AUTHORITY_BOUNDARY = 'server_owned_scout_unit_reveale
 const EXPEDITION_UNIT_MOVE_VERSION = 'hq15g_server_owned_scout_unit_move_v1';
 const EXPEDITION_SURVEY_BRIDGE_AUTHORITY_BOUNDARY = 'server_owned_scout_packet_to_site_plan_readiness_v1';
 const EXPEDITION_SURVEY_BRIDGE_VERSION = 'hq16h_scout_packet_to_site_plan_readiness_v1';
+const EXPEDITION_PACKET_SITE_PLAN_AUTHORITY_BOUNDARY = 'server_owned_scout_packet_site_plan_draft_v1';
+const EXPEDITION_PACKET_SITE_PLAN_VERSION = 'hq16i_scout_packet_site_plan_draft_v1';
 const EXPEDITION_MAP_FOG_STATES = Object.freeze(['discovered', 'known', 'hinted', 'locked_unknown']);
 const EXPEDITION_PUBLIC_TERRAIN_ASSET_CONTRACT_VERSION = 'agenttown_public_terrain_asset_slots_v1';
 const EXPEDITION_PUBLIC_TERRAIN_ASSET_SLOT_SOURCE = 'server_read_model_v1';
@@ -574,9 +576,21 @@ function normalizeSitePlans(value) {
       const claimId = safeText(row.claimId, '', 120);
       const convoyJobId = safeText(row.convoyJobId, '', 120);
       const foundedPlotId = safeText(row.foundedPlotId, '', 120);
+      const sourcePacketId = safeText(row.sourcePacketId, '', 160);
+      const sourceScoutId = safeText(row.sourceScoutId, '', 120);
+      const sourceCellId = safeText(row.sourceCellId, '', 80);
+      const sourceReceiptKind = safeText(row.sourceReceiptKind, '', 80);
+      const sourceActionName = safeText(row.sourceActionName, '', 120);
+      const sourceBridgeVersion = safeText(row.sourceBridgeVersion, '', 120);
       if (claimId) normalized.claimId = claimId;
       if (convoyJobId) normalized.convoyJobId = convoyJobId;
       if (foundedPlotId) normalized.foundedPlotId = foundedPlotId;
+      if (sourcePacketId) normalized.sourcePacketId = sourcePacketId;
+      if (sourceScoutId) normalized.sourceScoutId = sourceScoutId;
+      if (sourceCellId) normalized.sourceCellId = sourceCellId;
+      if (sourceReceiptKind) normalized.sourceReceiptKind = sourceReceiptKind;
+      if (sourceActionName) normalized.sourceActionName = sourceActionName;
+      if (sourceBridgeVersion) normalized.sourceBridgeVersion = sourceBridgeVersion;
       if (row.claimedAt != null) normalized.claimedAt = Number(row.claimedAt);
       return normalized;
     })
@@ -1328,6 +1342,12 @@ function expeditionCellId(coord) {
   return `cell_q${Number(coord?.q || 0)}_r${Number(coord?.r || 0)}`;
 }
 
+function expeditionCoordinateFromCellId(cellId = '') {
+  const match = /^cell_q(-?\d+)_r(-?\d+)$/.exec(String(cellId || '').trim());
+  if (!match) return null;
+  return { q: Number(match[1]), r: Number(match[2]) };
+}
+
 function expeditionReceipt(kind, sourceIds = {}) {
   return {
     kind,
@@ -1371,6 +1391,33 @@ function expeditionSurveyBridgeBoundaryFlags() {
     createsSitePlan: false,
     createsSurveyor: false,
     addsMutationAuthority: false,
+    autonomousMovement: false,
+    operatorAssignment: false,
+    resourceHarvesting: false,
+    resourceDelta: {},
+    resourceGain: false,
+    resourceLoss: false,
+    routeCreation: false,
+    tradeRouteCreation: false,
+    rewardCreation: false,
+    backgroundScheduling: false,
+    combat: false,
+    publicSharing: false,
+    generatedUniverseRendering: false,
+    hiddenTruthLeakage: false,
+    crossPlotMutation: false,
+    atlasExecution: false,
+    externalEffects: false
+  };
+}
+
+function expeditionPacketSitePlanBoundaryFlags() {
+  return {
+    samePlotOnly: true,
+    createsSitePlan: true,
+    createsSurveyor: false,
+    planningRecordOnly: true,
+    reviewed: false,
     autonomousMovement: false,
     operatorAssignment: false,
     resourceHarvesting: false,
@@ -2005,7 +2052,7 @@ function buildExpeditionSurveyBridgeCandidate({ packet, cell, plan = null, surve
     : (plan ? 'SITE_PLAN_PRESENT' : 'PACKET_READY_FOR_SITE_PLAN_PREFLIGHT');
   const nextRequiredContract = prepareCommand
     ? 'existing_prepare_settler_convoy_endpoint'
-    : (plan ? 'reviewed_site_plan_to_surveyor_command_hint' : 'explicit_packet_to_site_plan_server_contract');
+    : (plan ? 'reviewed_site_plan_to_surveyor_command_hint' : 'existing_draft_site_plan_from_packet_endpoint');
   return {
     candidateId: `survey_bridge_${safeText(packet?.packetHash || packet?.packetId || cellId, 'packet', 120)}`,
     kind: 'scout_packet_to_survey_readiness',
@@ -2045,19 +2092,32 @@ function buildExpeditionSurveyBridgeCandidate({ packet, cell, plan = null, surve
       executableThroughExistingEndpoint: true,
       readOnly: true,
       executableActions: []
-    } : {
-      commandId: 'survey_site_plan_contract_required',
-      actionName: null,
-      label: 'Site Plan',
-      enabled: false,
-      sourcePlanId: plan?.planId || null,
+    } : (plan ? {
+      commandId: 'review_site_plan',
+      actionName: 'et.plot.review_site_plan',
+      label: 'Review Plan',
+      enabled: plan.reviewStatus !== 'reviewed',
+      sourcePlanId: plan.planId || null,
       targetCellIds: cellId ? [cellId] : [],
       serverMutationImplemented: false,
-      executableThroughExistingEndpoint: false,
-      reason: 'Event Packet to Site Plan requires an explicit future server contract.',
+      executableThroughExistingEndpoint: true,
+      reason: 'Site Plan exists; review remains available through the existing Site Plan surface.',
       readOnly: true,
       executableActions: []
-    },
+    } : {
+      commandId: 'draft_site_plan_from_packet',
+      actionName: 'et.plot.draft_site_plan_from_packet',
+      label: 'Plan',
+      enabled: true,
+      sourcePlanId: plan?.planId || null,
+      sourcePacketId: safeText(packet?.packetId, '', 160),
+      targetCellIds: cellId ? [cellId] : [],
+      serverMutationImplemented: true,
+      executableThroughExistingEndpoint: true,
+      reason: 'Event Packet can draft one planning-only Site Plan through an explicit guarded server contract.',
+      readOnly: true,
+      executableActions: []
+    }),
     nextRequiredContract,
     boundaryFlags: expeditionSurveyBridgeBoundaryFlags()
   };
@@ -2106,7 +2166,7 @@ function buildExpeditionSurveyBridgeReadModel({ plotId, eventPackets = [], cellL
       'plot.sitePlans'
     ],
     ledgerText: active
-      ? 'Scout Sector Event Packet is server-recognized as Site Plan preflight readiness only. No survey/site-plan mutation is executable until an explicit guarded server contract exists.'
+      ? 'Scout Sector Event Packet is server-recognized as Site Plan preflight. The bridge itself is read-only; a separate guarded packet-to-plan endpoint can draft one planning record without routes, resources, Surveyors, Atlas execution, or external effects.'
       : 'No Scout Sector Event Packet exists yet; Scout Sector remains the only fog reveal path before survey/site-plan preflight can appear.',
     boundaryFlags: expeditionSurveyBridgeBoundaryFlags()
   };
@@ -2192,7 +2252,8 @@ function expeditionCoordinateMaps({ scoutReports, sitePlans, settlementClaims })
     }
   }
   for (const plan of sitePlans) {
-    const coord = reportCoordinates.get(plan.reportId) || nextCoordinate();
+    const sourceCellCoord = expeditionCoordinateFromCellId(plan.sourceCellId);
+    const coord = sourceCellCoord || reportCoordinates.get(plan.reportId) || nextCoordinate();
     planCoordinates.set(plan.planId, coord);
     if (plan.reportId && !reportCoordinates.has(plan.reportId)) reportCoordinates.set(plan.reportId, coord);
   }
@@ -2385,11 +2446,19 @@ function buildExpeditionMapReadModel(bundle) {
       title: plan.title,
       status: reviewed ? 'SITE_PLAN_REVIEWED' : 'SITE_PLAN_DRAFTED',
       sourceTruth: 'site_plan',
-      sourceIds: { plotId: plot.plotId || null, reportId: plan.reportId, planId: plan.planId },
+      sourceIds: {
+        plotId: plot.plotId || null,
+        reportId: plan.reportId,
+        planId: plan.planId,
+        sourcePacketId: plan.sourcePacketId || null,
+        sourceScoutId: plan.sourceScoutId || null,
+        sourceCellId: plan.sourceCellId || null
+      },
       sources: [{ kind: 'site_plan', id: plan.planId, status: plan.promotionStatus }],
       receipts: [expeditionReceipt(reviewed ? 'reviewed_site_plan_known_cell' : 'draft_site_plan_known_cell', {
         reportId: plan.reportId,
-        planId: plan.planId
+        planId: plan.planId,
+        sourcePacketId: plan.sourcePacketId || null
       })],
       traits: plan.traits,
       resourceHints: plan.resourceHints,
@@ -3103,6 +3172,126 @@ function buildSitePlanFromReport(bundle, report, input = {}, nowMs) {
     reviewNote: '',
     sequence,
     createdAt: Number(nowMs)
+  };
+}
+
+function buildSitePlanFromExpeditionPacket(bundle, packet, cell, input = {}, nowMs) {
+  const existingPlans = normalizeSitePlans(bundle.plot.sitePlans);
+  const sequence = existingPlans.length + 1;
+  const focus = sitePlanFocus(input.focus);
+  const packetId = safeText(packet?.packetId, `packet_${sequence}`, 160);
+  const cellId = safeText(packet?.cellId || packet?.receiptLink?.cellId || cell?.cellId, '', 80);
+  const packetSlug = slugFor(packetId || cellId, `packet_${sequence}`);
+  const focusLabels = {
+    balanced: 'balanced packet plan',
+    resource: 'resource survey preflight',
+    safe: 'low-risk survey preflight',
+    trade: 'waypoint survey preflight'
+  };
+  const title = safeText(input.title, `${cell?.title || 'Scout Sector'} Site Plan`, 120);
+  const focusLabel = focusLabels[focus] || focusLabels.balanced;
+  return {
+    planId: `site_plan_${packetSlug}`,
+    reportId: packetId,
+    originPlotId: bundle.plot.plotId,
+    title,
+    focus,
+    status: 'DRAFT',
+    promotionStatus: 'draft',
+    reviewStatus: 'unreviewed',
+    source: 'scout_sector_event_packet',
+    authorityBoundary: EXPEDITION_PACKET_SITE_PLAN_AUTHORITY_BOUNDARY,
+    siteType: safeText(cell?.siteType, 'scouted_frontier', 80),
+    risk: safeText(cell?.risk, 'unknown', 40),
+    traits: Array.from(new Set([
+      ...(Array.isArray(cell?.traits) ? cell.traits : []),
+      'packet-grounded',
+      'planning-only'
+    ])).slice(0, 8),
+    resourceHints: {},
+    summary: `Draft ${focusLabel} from Scout Sector packet ${packetId}. ${(packet?.operatorNote || cell?.summary || 'The packet is preserved as the planning receipt.')}`.slice(0, 320),
+    recommendedNext: 'Review the Site Plan before any Surveyor command; no route, resource, reward, or territory exists from this draft.',
+    reviewedAt: null,
+    reviewNote: '',
+    sourcePacketId: packetId,
+    sourceScoutId: safeText(packet?.scoutId || packet?.receiptLink?.scoutId, '', 120),
+    sourceCellId: cellId,
+    sourceReceiptKind: safeText(packet?.receiptLink?.kind, 'scout_sector_receipt', 80),
+    sourceActionName: safeText(packet?.receiptLink?.actionName, 'et.plot.scout_sector', 120),
+    sourceBridgeVersion: EXPEDITION_PACKET_SITE_PLAN_VERSION,
+    sequence,
+    createdAt: Number(nowMs)
+  };
+}
+
+function sitePlanPacketSourceId(plan = {}) {
+  return safeText(plan.sourcePacketId || (plan.source === 'scout_sector_event_packet' ? plan.reportId : ''), '', 160);
+}
+
+function expeditionScoutPacketIds(bundle) {
+  return new Set(normalizeExpeditionScouts(bundle?.plot?.expeditionScouts)
+    .map((scout) => scout.eventPacket?.packetId)
+    .filter(Boolean));
+}
+
+function sitePlanGroundingStatus(bundle, plan = {}) {
+  const reportIds = new Set(normalizeScoutReports(bundle?.plot?.scoutReports).map((report) => report.reportId));
+  if (reportIds.has(plan.reportId)) {
+    return { ok: true, source: 'scout_report', id: plan.reportId };
+  }
+  const packetId = sitePlanPacketSourceId(plan);
+  if (packetId && expeditionScoutPacketIds(bundle).has(packetId)) {
+    return { ok: true, source: 'scout_sector_event_packet', id: packetId };
+  }
+  return {
+    ok: false,
+    source: packetId ? 'missing_scout_packet' : 'missing_scout_report',
+    id: packetId || plan.reportId || null
+  };
+}
+
+function expeditionSurveyBridgeCandidateForPacket(expeditionMap = {}, packetId = '') {
+  const bridge = expeditionMap?.surveyBridge && typeof expeditionMap.surveyBridge === 'object'
+    ? expeditionMap.surveyBridge
+    : {};
+  const safePacketId = safeText(packetId, '', 160);
+  const candidates = Array.isArray(bridge.candidates) ? bridge.candidates : [];
+  if (safePacketId) {
+    return candidates.find((candidate) => candidate?.packetId === safePacketId)
+      || (bridge.activeCandidate?.packetId === safePacketId ? bridge.activeCandidate : null)
+      || null;
+  }
+  return bridge.activeCandidate || candidates[0] || null;
+}
+
+function buildPacketSitePlanProof({ beforeMap, afterMap, sitePlansBefore = [], sitePlansAfter = [], packet, cell, sitePlan, existing = false }) {
+  const beforePlanIds = new Set(sitePlansBefore.map((plan) => plan.planId));
+  const afterPlanIds = new Set(sitePlansAfter.map((plan) => plan.planId));
+  return {
+    actionName: 'et.plot.draft_site_plan_from_packet',
+    version: EXPEDITION_PACKET_SITE_PLAN_VERSION,
+    plotId: sitePlan.originPlotId || packet?.plotId || null,
+    packetId: packet?.packetId || sitePlan.sourcePacketId || null,
+    scoutId: packet?.scoutId || sitePlan.sourceScoutId || null,
+    cellId: cell?.cellId || sitePlan.sourceCellId || null,
+    sitePlanId: sitePlan.planId,
+    sourceActionName: packet?.receiptLink?.actionName || sitePlan.sourceActionName || null,
+    existing,
+    beforeProjectionHash: beforeMap?.projectionHash || null,
+    afterProjectionHash: afterMap?.projectionHash || null,
+    beforeSitePlanCount: Number(beforeMap?.scope?.sitePlanCount || 0),
+    afterSitePlanCount: Number(afterMap?.scope?.sitePlanCount || 0),
+    newSitePlanIds: Array.from(afterPlanIds).filter((planId) => !beforePlanIds.has(planId)).sort(),
+    sitePlanReviewStatus: sitePlan.reviewStatus,
+    createsSurveyor: false,
+    createsSettlementClaim: false,
+    inventoryMutation: false,
+    routeCreation: false,
+    resourceDelta: {},
+    atlasExecution: false,
+    externalEffects: false,
+    hiddenTruthLeakage: false,
+    boundaryFlags: expeditionPacketSitePlanBoundaryFlags()
   };
 }
 
@@ -5520,6 +5709,151 @@ function draftSitePlan({
   });
 }
 
+function draftSitePlanFromPacket({
+  pairId,
+  houseId = null,
+  plotId = null,
+  packetId = '',
+  title = '',
+  focus = 'balanced',
+  actor = 'HUMAN',
+  actorType = null,
+  idempotencyKey,
+  nowMs
+}) {
+  const requestedPacketId = safeText(packetId, '', 160);
+  const requestedActor = mutationActor(actorType || actor);
+  return withIdempotency({
+    pairId,
+    houseId,
+    plotId,
+    actionName: 'draft_site_plan_from_packet',
+    idempotencyKey,
+    requestPayload: { packetId: requestedPacketId, title, focus, actor: requestedActor },
+    nowMs,
+    mutator(bundle, pendingEvents) {
+      if (Number(bundle.plot.hqLevel || 1) < 3) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Packet Site Plans unlock after HQ Level 3 and a Scout Sector packet.', false, {
+          reason: 'hq_locked'
+        });
+      }
+      const beforePlans = normalizeSitePlans(bundle.plot.sitePlans);
+      const beforeMap = buildExpeditionMapReadModel(bundle);
+      const candidate = expeditionSurveyBridgeCandidateForPacket(beforeMap, requestedPacketId);
+      const safePacketId = safeText(candidate?.packetId || requestedPacketId, '', 160);
+      const packet = (beforeMap.eventPackets || []).find((entry) => entry.packetId === safePacketId) || null;
+      const cell = (beforeMap.cells || []).find((entry) => entry.cellId === candidate?.cellId) || null;
+      if (!candidate || !packet || !cell) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Packet Site Plan draft requires one Scout Sector Event Packet on a known current-plot cell.', false, {
+          reason: requestedPacketId ? 'missing_packet_candidate' : 'no_packet_candidate',
+          packetId: requestedPacketId || null
+        });
+      }
+      if (!['known', 'discovered'].includes(String(cell.fogState || ''))) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Packet Site Plan draft requires a known or discovered current-plot cell.', false, {
+          reason: 'cell_not_known',
+          packetId: packet.packetId,
+          cellId: cell.cellId,
+          fogState: cell.fogState
+        });
+      }
+      const existing = beforePlans.find((plan) => (
+        sitePlanPacketSourceId(plan) === packet.packetId
+        || (plan.source === 'scout_sector_event_packet' && plan.reportId === packet.packetId)
+      ));
+      if (existing) {
+        const afterMap = buildExpeditionMapReadModel(bundle);
+        return {
+          ok: true,
+          extras: {
+            sitePlan: clone(existing),
+            existing: true,
+            packetId: packet.packetId,
+            cellId: cell.cellId,
+            proof: buildPacketSitePlanProof({
+              beforeMap,
+              afterMap,
+              sitePlansBefore: beforePlans,
+              sitePlansAfter: beforePlans,
+              packet,
+              cell,
+              sitePlan: existing,
+              existing: true
+            }),
+            expeditionMap: afterMap
+          }
+        };
+      }
+      if (candidate.commandState?.serverMutationImplemented !== true || candidate.commandState?.actionName !== 'et.plot.draft_site_plan_from_packet') {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Scout Packet bridge is not ready for packet-to-plan drafting.', false, {
+          reason: 'packet_plan_command_unavailable',
+          packetId: packet.packetId,
+          commandId: candidate.commandState?.commandId || null
+        });
+      }
+      const approvalParams = { packetId: packet.packetId, cellId: cell.cellId };
+      let consumedApproval = null;
+      if (requestedActor === 'AGENT') {
+        consumedApproval = consumeActionApproval(bundle, 'draft_site_plan_from_packet', approvalParams, nowMs);
+        if (!consumedApproval) {
+          return errorEnvelope(bundle.plot.plotId, 'FORBIDDEN_POLICY', 'Agent packet Site Plan drafting requires matching human approval.', true, {
+            requiresApproval: true,
+            actionName: 'draft_site_plan_from_packet',
+            requestedParams: approvalParams
+          });
+        }
+      }
+
+      const sitePlan = buildSitePlanFromExpeditionPacket(bundle, packet, cell, { title, focus }, nowMs);
+      const nextPlans = normalizeSitePlans([...beforePlans, sitePlan]);
+      bundle.plot.sitePlans = nextPlans;
+      bundle.plot.updatedAt = Number(nowMs);
+      const afterMap = buildExpeditionMapReadModel(bundle);
+      const proof = buildPacketSitePlanProof({
+        beforeMap,
+        afterMap,
+        sitePlansBefore: beforePlans,
+        sitePlansAfter: nextPlans,
+        packet,
+        cell,
+        sitePlan
+      });
+      createEvent(pendingEvents, {
+        plotId: bundle.plot.plotId,
+        eventType: 'EXPEDITION_PACKET_SITE_PLAN_DRAFTED',
+        actor: requestedActor,
+        summary: `Site Plan drafted from Scout Sector packet ${packet.packetId}.`,
+        explanation: 'HQ16I records one planning-only Site Plan from an existing Scout Sector Event Packet. It does not create a Surveyor, route, resource, reward, territory, Atlas execution, Generated Universe runtime behavior, or external effect.',
+        data: {
+          planId: sitePlan.planId,
+          packetId: packet.packetId,
+          cellId: cell.cellId,
+          focus: sitePlan.focus,
+          source: sitePlan.source,
+          authorityBoundary: sitePlan.authorityBoundary,
+          proof,
+          approvalId: consumedApproval?.approvalId || null
+        },
+        createdAt: nowMs
+      });
+      if (requestedActor === 'AGENT') {
+        markAgentAction(bundle, pendingEvents, 'draft_site_plan_from_packet', 'Foreman drafted one packet-grounded Site Plan after matching human approval.', nowMs);
+      }
+      return {
+        ok: true,
+        extras: {
+          sitePlan: clone(sitePlan),
+          existing: false,
+          packetId: packet.packetId,
+          cellId: cell.cellId,
+          proof,
+          expeditionMap: afterMap
+        }
+      };
+    }
+  });
+}
+
 function reviewSitePlan({
   pairId,
   houseId = null,
@@ -5547,8 +5881,6 @@ function reviewSitePlan({
         });
       }
       const safePlanId = safeText(planId, '', 120);
-      const reports = normalizeScoutReports(bundle.plot.scoutReports);
-      const reportIds = new Set(reports.map((report) => report.reportId));
       const plans = normalizeSitePlans(bundle.plot.sitePlans);
       const planIndex = plans.findIndex((entry) => entry.planId === safePlanId);
       if (planIndex < 0) {
@@ -5557,10 +5889,12 @@ function reviewSitePlan({
         });
       }
       const plan = plans[planIndex];
-      if (!reportIds.has(plan.reportId)) {
-        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'A reviewed Site Plan must remain grounded in its collected Scout Report.', false, {
-          reason: 'missing_scout_report',
-          reportId: plan.reportId
+      const grounding = sitePlanGroundingStatus(bundle, plan);
+      if (!grounding.ok) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'A reviewed Site Plan must remain grounded in its source Scout Report or Scout Sector packet.', false, {
+          reason: grounding.source,
+          reportId: plan.reportId,
+          packetId: sitePlanPacketSourceId(plan) || null
         });
       }
       if (plan.reviewStatus === 'reviewed' || plan.promotionStatus === 'reviewed_claim_ready') {
@@ -7747,6 +8081,8 @@ module.exports = {
   EXPEDITION_UNIT_MOVE_VERSION,
   EXPEDITION_SURVEY_BRIDGE_AUTHORITY_BOUNDARY,
   EXPEDITION_SURVEY_BRIDGE_VERSION,
+  EXPEDITION_PACKET_SITE_PLAN_AUTHORITY_BOUNDARY,
+  EXPEDITION_PACKET_SITE_PLAN_VERSION,
   EXPEDITION_MAP_FOG_STATES,
   EXPEDITION_PUBLIC_TERRAIN_ASSET_CONTRACT_VERSION,
   EXPEDITION_PUBLIC_TERRAIN_ASSET_SLOT_SOURCE,
@@ -7783,6 +8119,7 @@ module.exports = {
   queueJob,
   collectOutputs,
   draftSitePlan,
+  draftSitePlanFromPacket,
   reviewSitePlan,
   selectDoctrine,
   createWorkOrderDraft,

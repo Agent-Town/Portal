@@ -715,6 +715,18 @@ html, body {
   min-width: 0;
 }
 
+.fp-expedition-survey-bridge[data-actions="1"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+}
+
+.fp-expedition-survey-bridge__command {
+  align-self: stretch;
+  min-height: 0;
+  min-width: 48px;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
 .fp-expedition-survey-bridge__step {
   display: grid;
   min-width: 0;
@@ -3277,6 +3289,9 @@ html, body {
     grid-template-columns: repeat(3, minmax(72px, 1fr));
     overflow-x: auto;
     padding-bottom: 2px;
+  }
+  .fp-expedition-survey-bridge[data-actions="1"] {
+    grid-template-columns: repeat(3, minmax(72px, 1fr)) minmax(54px, auto);
   }
   .fp-expedition-survey-bridge__step {
     padding: 5px;
