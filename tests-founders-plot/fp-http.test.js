@@ -1079,6 +1079,23 @@ test('FP-HT-013 Expedition Board dispatches scout report receipts after HQ3', as
 	    assert.equal(found.body.settlementClaim.status, 'FOUNDED');
 	    assert.ok(found.body.foundedPlot.plotId);
 	    assert.ok(found.body.ownedPlots.some((plot) => plot.role === 'OUTPOST' && plot.plotId === found.body.foundedPlot.plotId));
+	    const mapAfterFounding = await request(server, 'GET', `/api/founders-plot/expedition-map?plotId=${plotId}`);
+	    assert.equal(mapAfterFounding.status, 200);
+	    const foundedCell = mapAfterFounding.body.expeditionMap.cells.find((cell) => (
+	      cell.kind === 'owned_outpost'
+	      && cell.fogState === 'discovered'
+	      && (
+	        cell.sourceIds?.originClaimId === prepare.body.settlementClaim.claimId
+	        || cell.receipts.some((receipt) => receipt.sourceIds?.claimId === prepare.body.settlementClaim.claimId)
+	      )
+	    ));
+	    assert.ok(foundedCell, 'expected Found Outpost result to expose a server-owned outpost map cell');
+	    const outpostCrew = mapAfterFounding.body.expeditionMap.units.items.find((unit) => (
+	      unit.unitType === 'outpost_crew'
+	      && unit.sourceClaimId === prepare.body.settlementClaim.claimId
+	    ));
+	    assert.ok(outpostCrew, 'expected Found Outpost result to expose an outpost_crew map unit');
+	    assert.equal(outpostCrew.location?.cellId, foundedCell.cellId);
 	    const outpost = await request(server, 'GET', `/api/founders-plot/state?plotId=${found.body.foundedPlot.plotId}`);
 	    assert.equal(outpost.status, 200);
 	    assert.equal(outpost.body.ok, true);

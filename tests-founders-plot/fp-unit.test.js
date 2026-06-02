@@ -808,6 +808,28 @@ test('FP-UT-014 foundSettlement waits for arrival then creates one owned outpost
   assert.equal(founded.settlementClaim.status, 'FOUNDED');
   assert.ok(founded.foundedPlot.plotId);
   assert.ok(founded.ownedPlots.some((plot) => plot.role === 'OUTPOST' && plot.plotId === founded.foundedPlot.plotId));
+  const foundedMap = engine.getExpeditionMapStatus({
+    pairId: ctx.pairId,
+    plotId: ctx.plotId,
+    nowMs: 1700_000_300_500
+  });
+  assert.equal(foundedMap.ok, true, foundedMap.error?.message);
+  const outpostCell = foundedMap.expeditionMap.cells.find((cell) => (
+    cell.kind === 'owned_outpost'
+    && cell.fogState === 'discovered'
+    && (
+      cell.sourceIds?.originClaimId === prepared.settlementClaim.claimId
+      || cell.receipts.some((receipt) => receipt.sourceIds?.claimId === prepared.settlementClaim.claimId)
+    )
+  ));
+  assert.ok(outpostCell, 'expected founded claim to project as a discovered owned-outpost map cell');
+  const outpostCrewUnit = foundedMap.expeditionMap.units.items.find((unit) => (
+    unit.unitType === 'outpost_crew'
+    && unit.sourceClaimId === prepared.settlementClaim.claimId
+  ));
+  assert.ok(outpostCrewUnit, 'expected founded claim to project as an Outpost Crew map unit');
+  assert.equal(outpostCrewUnit.location?.cellId, outpostCell.cellId);
+  assert.ok((foundedMap.expeditionMap.units.byCellId[outpostCell.cellId] || []).includes(outpostCrewUnit.unitId));
   const outpostState = engine.getFoundersPlotState({
     pairId: ctx.pairId,
     plotId: founded.foundedPlot.plotId,

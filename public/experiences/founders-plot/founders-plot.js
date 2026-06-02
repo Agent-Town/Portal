@@ -1778,6 +1778,51 @@
     return { unit: null, command: null, cellId: '' };
   }
 
+  function expeditionFoundedOutpostResultTarget(model = {}, { claimId = '', foundedPlotId = '', fallbackCellId = '' } = {}) {
+    const safeClaimId = String(claimId || '').trim();
+    const safeFoundedPlotId = String(foundedPlotId || '').trim();
+    const cells = expeditionCells(model);
+    const outpostCells = cells.filter((cell) => {
+      const sourceIds = cell?.sourceIds || {};
+      return String(cell.kind || '') === 'owned_outpost'
+        || String(cell.status || '') === 'OWNED_OUTPOST'
+        || (safeFoundedPlotId && String(sourceIds.plotId || '') === safeFoundedPlotId)
+        || (safeClaimId && (
+          String(sourceIds.claimId || '') === safeClaimId
+          || String(sourceIds.originClaimId || '') === safeClaimId
+        ));
+    });
+    const cell = outpostCells.find((entry) => {
+      const sourceIds = entry?.sourceIds || {};
+      return safeClaimId && (
+        String(sourceIds.claimId || '') === safeClaimId
+        || String(sourceIds.originClaimId || '') === safeClaimId
+      );
+    }) || outpostCells.find((entry) => {
+      const sourceIds = entry?.sourceIds || {};
+      return safeFoundedPlotId && String(sourceIds.plotId || '') === safeFoundedPlotId;
+    }) || outpostCells.find((entry) => (
+      fallbackCellId && String(entry.cellId || '') === String(fallbackCellId || '')
+    )) || null;
+
+    const units = expeditionUnits(model);
+    const unit = units.find((entry) => (
+      String(entry.unitType || '') === 'outpost_crew'
+      && safeClaimId
+      && String(entry.sourceClaimId || '') === safeClaimId
+    )) || units.find((entry) => (
+      String(entry.unitType || '') === 'outpost_crew'
+      && cell?.cellId
+      && String(entry.cellId || '') === String(cell.cellId || '')
+    )) || null;
+
+    return {
+      cell,
+      unit,
+      cellId: cell?.cellId || unit?.cellId || fallbackCellId || '',
+    };
+  }
+
   function clearExpeditionCommandOutcomeFeedback(feedbackId = '') {
     if (feedbackId && String(state.expeditionCommandOutcomeFeedback?.feedbackId || '') !== String(feedbackId)) return;
     state.expeditionCommandOutcomeFeedback = null;
@@ -6427,16 +6472,30 @@
     if (targetCellId) {
       state.expeditionSelectedCellId = targetCellId;
       if (target.unit?.unitId) state.expeditionSelectedUnitId = target.unit.unitId;
+    }
+    const nextBundle = await loadState();
+    const foundedPlotId = String(data.foundedPlot?.plotId || data.settlementClaim?.foundedPlotId || '');
+    const nextModel = expeditionMapModel(nextBundle || state.bundle || {});
+    const result = expeditionFoundedOutpostResultTarget(nextModel, {
+      claimId: data.settlementClaim?.claimId || safeClaimId,
+      foundedPlotId,
+      fallbackCellId: targetCellId,
+    });
+    if (result.cellId) state.expeditionSelectedCellId = String(result.cellId || '');
+    if (result.unit?.unitId) state.expeditionSelectedUnitId = String(result.unit.unitId || '');
+    if (result.cellId) {
       setExpeditionCommandOutcomeFeedback({
         commandId: 'found_settlement',
-        unitId: target.unit?.unitId || state.expeditionSelectedUnitId,
-        unitType: target.unit?.unitType || 'settler_convoy',
-        cellId: targetCellId,
-        receiptId: data.claimId || safeClaimId,
+        unitId: result.unit?.unitId || target.unit?.unitId || state.expeditionSelectedUnitId,
+        unitType: result.unit?.unitType || target.unit?.unitType || 'settler_convoy',
+        cellId: result.cellId,
+        receiptId: data.settlementClaim?.claimId || safeClaimId,
         receiptKind: 'settlement_found_receipt',
+        label: 'Founded',
+        icon: '⌂',
       });
+      renderExpeditionMap(nextBundle || state.bundle || {});
     }
-    await loadState();
     toast(data.existing ? 'Settlement already founded.' : 'Second plot founded.');
   }
 
