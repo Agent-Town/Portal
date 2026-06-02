@@ -1,0 +1,180 @@
+{
+  "ok": true,
+  "title": "AgentTown HQ16W Generated HUD Chrome Review Pack",
+  "generatedAt": "2026-06-02T16:44:00Z",
+  "date": "2026-06-02",
+  "lane": "HQ16W Generated HUD Chrome Review Pack",
+  "verdict": "REVIEW_MEDIA_READY_RUNTIME_PROMOTION_HELD",
+  "currentCheckpoint": {
+    "branch": "neo/progression-atlas-editor-next-2026-05-29",
+    "head": "0d303c1",
+    "aheadOfOrigin": 13,
+    "latestPushedCommit": "dfcdb42",
+    "worktreeScope": "report-media-provenance-only"
+  },
+  "sourceTask": {
+    "imageGenerationTaskId": "461e16a4-af76-4100-b73a-28deec2372a7",
+    "model": "openai/gpt-image-2",
+    "sourceAttachmentPath": "/Users/robin/.openclaw/media/tool-image-generation/agent-town-hq16w-generated-hud-chrome-review-sheet-2026-06-0---8b08e205-99c2-44b5-94f4-2c2c170a9529.png",
+    "sourceAttachmentSha256": "c1d63cbd8110b567087f076321eb51fb07c512aae4106bfe881cade841586c97"
+  },
+  "deliverables": {
+    "report": "reports/agent-town-hq16w-generated-hud-chrome-review-pack-2026-06-02.md",
+    "proof": "reports/agent-town-hq16w-generated-hud-chrome-review-pack-proof-2026-06-02.json",
+    "contactSheet": {
+      "path": "reports/agent-town-hq16w-generated-hud-chrome-review-pack-contact-sheet-2026-06-02.png",
+      "format": "png",
+      "dimensions": {
+        "width": 1056,
+        "height": 504
+      },
+      "sha256": "d38c153d0c334256f0f7e0d8a11fec2a88db571993409fa02929af34f0ace89a"
+    },
+    "mediaDirectory": "reports/media/agent-town-hq16w-generated-hud-chrome-review-pack-2026-06-02/"
+  },
+  "assets": [
+    {
+      "slotId": "hud.chrome.source_sheet.v1",
+      "kind": "source_review_sheet",
+      "path": "reports/media/agent-town-hq16w-generated-hud-chrome-review-pack-2026-06-02/agent-town-hq16w-generated-hud-chrome-review-sheet-2026-06-02.png",
+      "format": "png",
+      "dimensions": {
+        "width": 2048,
+        "height": 1152
+      },
+      "sha256": "c1d63cbd8110b567087f076321eb51fb07c512aae4106bfe881cade841586c97",
+      "reviewOnly": true,
+      "runtimePromoted": false
+    },
+    {
+      "slotId": "hud.chrome.unit_dock_rail.v1",
+      "kind": "rough_review_crop",
+      "path": "reports/media/agent-town-hq16w-generated-hud-chrome-review-pack-2026-06-02/hud-chrome-unit-dock-rail-review-crop-2026-06-02.png",
+      "format": "png",
+      "dimensions": {
+        "width": 760,
+        "height": 430
+      },
+      "sha256": "97a80ba25a0e88e86c80aa9b7ac90035637bf89179688f3e13f1307bda40622e",
+      "reviewOnly": true,
+      "runtimePromoted": false
+    },
+    {
+      "slotId": "hud.chrome.objective_plaque.v1",
+      "kind": "rough_review_crop",
+      "path": "reports/media/agent-town-hq16w-generated-hud-chrome-review-pack-2026-06-02/hud-chrome-objective-plaque-review-crop-2026-06-02.png",
+      "format": "png",
+      "dimensions": {
+        "width": 700,
+        "height": 520
+      },
+      "sha256": "12b01b33d506ebd6cef21d9cad25511ec9144a3e59ad37da7abac8ceac5ef998",
+      "reviewOnly": true,
+      "runtimePromoted": false
+    },
+    {
+      "slotId": "hud.chrome.command_puck.v1",
+      "kind": "rough_review_crop",
+      "path": "reports/media/agent-town-hq16w-generated-hud-chrome-review-pack-2026-06-02/hud-chrome-command-puck-review-crop-2026-06-02.png",
+      "format": "png",
+      "dimensions": {
+        "width": 480,
+        "height": 510
+      },
+      "sha256": "33c5ec1c659b77e5079102df74bbde9fa8babe8636a2671f992edc23ef6e4598",
+      "reviewOnly": true,
+      "runtimePromoted": false
+    },
+    {
+      "slotId": "hud.chrome.inspector_drawer_frame.v1",
+      "kind": "rough_review_crop",
+      "path": "reports/media/agent-town-hq16w-generated-hud-chrome-review-pack-2026-06-02/hud-chrome-inspector-drawer-frame-review-crop-2026-06-02.png",
+      "format": "png",
+      "dimensions": {
+        "width": 780,
+        "height": 470
+      },
+      "sha256": "f6cdb71691ce45ea5008b92a8cf9306b27bdd9b21384255c38ed2965400ba081",
+      "reviewOnly": true,
+      "runtimePromoted": false
+    },
+    {
+      "slotId": "hud.chrome.semantic_zoom_badge.v1",
+      "kind": "rough_review_crop",
+      "path": "reports/media/agent-town-hq16w-generated-hud-chrome-review-pack-2026-06-02/hud-chrome-semantic-zoom-badge-review-crop-2026-06-02.png",
+      "format": "png",
+      "dimensions": {
+        "width": 500,
+        "height": 470
+      },
+      "sha256": "1204f9aab59ae0dd5916334a544b56bfa365b13416a780baee58fb56017faf1b",
+      "reviewOnly": true,
+      "runtimePromoted": false
+    },
+    {
+      "slotId": "hud.chrome.receipt_ledger_tab.v1",
+      "kind": "rough_review_crop",
+      "path": "reports/media/agent-town-hq16w-generated-hud-chrome-review-pack-2026-06-02/hud-chrome-receipt-ledger-tab-review-crop-2026-06-02.png",
+      "format": "png",
+      "dimensions": {
+        "width": 450,
+        "height": 440
+      },
+      "sha256": "85cc444910118dc93d5485c372528a137e1381a1db3ab44ec70405cd60a4e837",
+      "reviewOnly": true,
+      "runtimePromoted": false
+    }
+  ],
+  "automatedChecks": {
+    "file": "passed",
+    "sipsDimensions": "passed",
+    "sha256Captured": "passed",
+    "ocrSmoke": {
+      "tool": "tesseract --psm 6",
+      "result": "nonzero-noisy-output",
+      "noReadableTextCleared": false,
+      "note": "Decorative generated UI art produced OCR guesses on several crops, so human visual QA remains required before runtime promotion."
+    }
+  },
+  "runtimePromotion": {
+    "approved": false,
+    "heldForHumanVisualReview": true,
+    "requiresSeparateLane": true,
+    "requiresAlphaOrSafeFillCleanup": true,
+    "requiresManifest": true,
+    "requiresDomCssOnlyBindingPlan": true
+  },
+  "guardrails": {
+    "reportMediaProvenanceOnly": true,
+    "runtimeSourceEdits": false,
+    "serverEdits": false,
+    "storeEdits": false,
+    "routeEdits": false,
+    "toolEdits": false,
+    "schemaEdits": false,
+    "packageEdits": false,
+    "runtimeAssetPromotion": false,
+    "domCssBinding": false,
+    "newMutationPath": false,
+    "scoutSectorOnlyFogRevealPath": true,
+    "hiddenTruthLeakage": false,
+    "movementAuthority": false,
+    "routeAuthority": false,
+    "tradeEffects": false,
+    "economyEffects": false,
+    "resourceEffects": false,
+    "rewardEffects": false,
+    "combatEffects": false,
+    "schedulerEffects": false,
+    "atlasExecution": false,
+    "generatedUniverseRuntime": false,
+    "hiddenAutonomy": false,
+    "crossPlotMutation": false,
+    "externalEffects": false,
+    "push": false,
+    "merge": false,
+    "deploy": false,
+    "publicShare": false
+  },
+  "nextRecommendedLane": "HQ16W visual QA / acceptance decision before any HQ16X runtime promotion plan"
+}
