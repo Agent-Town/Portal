@@ -1,0 +1,703 @@
+{
+  "ok": true,
+  "generatedAt": "2026-06-02T13:30:27.092Z",
+  "title": "HQ16U Outpost Scout Bridge Live QA",
+  "source": "Playwright live server route seeded through data/store.e2e.sqlite; browser used real /api/founders-plot/state and /api/founders-plot/expedition-map/scout-sector routes with no page.route API mocking.",
+  "screenshots": [
+    "reports/agent-town-hq16u-outpost-scout-bridge-live-qa-2026-06-02-before-scout.png",
+    "reports/agent-town-hq16u-outpost-scout-bridge-live-qa-2026-06-02-after-scout.png"
+  ],
+  "bridgeBefore": {
+    "renderer": {
+      "outpostNextFrontierBeacon": {
+        "unitId": "expedition_unit_outpost_crew_claim_hq16u_outpost_bridge",
+        "unitType": "outpost_crew",
+        "originCellId": "cell_q0_r1",
+        "targetCellId": "cell_q-1_r1",
+        "targetFogState": "hinted",
+        "targetKind": "frontier_hint",
+        "derivedFrom": "sourceIds.adjacentCellId",
+        "visualOnly": true,
+        "readOnly": true,
+        "selectable": false,
+        "routeAuthority": false,
+        "actionAuthority": false,
+        "executableActions": 0,
+        "hiddenTruthLeakage": false,
+        "canvas": {
+          "x": 496.775571941766,
+          "y": 388.38211382113826
+        }
+      },
+      "objectiveMarker": {
+        "mode": "scout",
+        "targetCellId": "cell_q-1_r1",
+        "packetId": "",
+        "spriteAssetSlot": "objective_beacon",
+        "spriteAssetPath": "/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1/objective-beacon-v1.png",
+        "spriteAssetReady": true,
+        "visualOnly": true,
+        "readOnly": true,
+        "selectable": true,
+        "inspectable": true,
+        "routeAuthority": false,
+        "actionAuthority": false,
+        "executableActions": 0,
+        "canvas": {
+          "x": 525.5072792588392,
+          "y": 359.650406504065
+        }
+      }
+    },
+    "dom": {
+      "outpost": {
+        "cellId": "cell_q0_r1",
+        "bridgeTargetCellId": "cell_q-1_r1",
+        "bridgeCommandId": "scout_sector",
+        "bridgeReadOnly": "true",
+        "bridgeActions": 0
+      },
+      "selectedSummary": {
+        "cellId": "cell_q-1_r1",
+        "scoutable": "true"
+      }
+    }
+  },
+  "proof": {
+    "fixture": {
+      "claimId": "claim_hq16u_outpost_bridge",
+      "planId": "site_plan_hq16u_outpost_bridge",
+      "reportId": "scout_report_hq16u_outpost_bridge",
+      "outpostPlotId": "plot_hq16u_outpost_bridge",
+      "outpostCellId": "cell_q0_r1",
+      "outpostUnitId": "expedition_unit_outpost_crew_claim_hq16u_outpost_bridge"
+    },
+    "targetCellId": "cell_q-1_r1",
+    "scoutPacketId": "expedition_event_packet_bd80b1a048d080d9",
+    "scoutId": "expedition_scout_209af84ac2b81711",
+    "outpost": {
+      "cellId": "",
+      "bridgeTargetCellId": "",
+      "bridgeCommandId": "",
+      "bridgeReadOnly": "",
+      "bridgeActions": 0
+    },
+    "selectedSummary": {
+      "cellId": "cell_q-1_r1",
+      "scoutable": "false"
+    },
+    "outcome": {
+      "commandId": "",
+      "cellId": "",
+      "serverOwnedResult": "",
+      "text": ""
+    },
+    "result": {
+      "text": "Sector Scouted\n\nQ-1 R1 is now known. The map gained one playable marker.\n\nDETAILS"
+    },
+    "renderer": {
+      "selectedCellId": "cell_q-1_r1",
+      "visualLayers": {
+        "terrainTexture": true,
+        "runtimeRegionAssetPack": "hq14s_public_terrain_underlay_v1",
+        "runtimeRegionAtlas": "/experiences/founders-plot/assets/expedition-map/hq14s-public-terrain-underlay-v1/manifest.json",
+        "runtimeTerrainUnderlay": "/experiences/founders-plot/assets/expedition-map/hq14s-public-terrain-underlay-v1/public-terrain-underlay-candidate-01-v1.png",
+        "runtimeSpriteAssetPack": "hq15e_expedition_unit_marker_sprites_v1",
+        "runtimeSpriteAtlas": "/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1/manifest.json",
+        "generatedSpriteAssets": true,
+        "generatedSpriteAssetCount": 8,
+        "generatedSpriteAssetsReady": 8,
+        "generatedSpriteAssetsVisualOnly": true,
+        "generatedSpriteAssetsReadOnly": true,
+        "serverTerrainAssetContractVersion": "agenttown_public_terrain_asset_slots_v1",
+        "serverTerrainSlotSource": "server_read_model_v1",
+        "assetBackedRegionTiles": 14,
+        "assetBackedLoadedTiles": 14,
+        "assetBackedTerrainTextures": true,
+        "continuousTerrainUnderlay": true,
+        "continuousTerrainUnderlayVersion": "hq14t_server_bound_terrain_underlay_v1",
+        "continuousUnderlayUsesServerOwnedCells": true,
+        "continuousUnderlayHiddenCellsFogOnly": true,
+        "continuousUnderlayVisualOnly": true,
+        "plateBlendLayer": true,
+        "softRegionSeams": true,
+        "reducedPlateEdgeContrast": true,
+        "centerTileMutedForUnderlay": true,
+        "cartographicFogDepth": true,
+        "ambientContourField": true,
+        "fogDepthGlyphsVisualOnly": true,
+        "terrainUnderlayCount": 1,
+        "proceduralFallbackWhenAssetPending": true,
+        "candidate02Cues": true,
+        "agentTownIdentityCues": true,
+        "scoutLedgerHud": true,
+        "mapFirstHudOverlays": true,
+        "hoverAffordance": true,
+        "selectedSectorOutline": true,
+        "beaconPlanWagonCues": true,
+        "homeNodeEmphasis": true,
+        "riverFlatCues": true,
+        "waterCuesServerGated": true,
+        "woodlandRidgeCues": true,
+        "ruinSignalCues": true,
+        "ruinSignalCuesServerGated": true,
+        "lockedUnknownSealedFogOnly": true,
+        "hintedAbstractFogEdge": true,
+        "frontierBoundaryDashes": true,
+        "frontierBoundaryVisualOnly": true,
+        "fogVeils": 11,
+        "edgeFogCount": 4,
+        "civicBeaconCount": 3,
+        "surveyStrokeCount": 8,
+        "surveyStrokesVisualOnly": true,
+        "receiptTraceVisualOnly": true,
+        "markerCount": 14,
+        "eventPacketMarkers": true,
+        "eventPacketMarkerCount": 1,
+        "objectiveMarkers": true,
+        "objectiveMarkerCount": 1,
+        "eventObjectiveMarkersVisualOnly": true,
+        "eventObjectiveMarkersReadOnly": true,
+        "eventObjectiveMarkersInspectable": true,
+        "eventObjectiveMarkerAuthority": false,
+        "outpostNextFrontierBeacon": true,
+        "outpostNextFrontierBeaconCount": 0,
+        "outpostNextFrontierBeaconVisualOnly": true,
+        "outpostNextFrontierBeaconReadOnly": true,
+        "outpostNextFrontierBeaconSelectable": false,
+        "outpostNextFrontierBeaconAuthority": false,
+        "outpostNextFrontierBeaconHiddenTruthLeakage": false,
+        "unitTokens": true,
+        "unitTokenCount": 5,
+        "unitTokensReadOnly": true,
+        "unitMovementMutationImplemented": true,
+        "commandTargetRings": true,
+        "commandTargetCount": 4,
+        "commandTargetRingsVisualOnly": true,
+        "commandTargetRingsReadOnly": true,
+        "commandTargetRingsSelectable": true,
+        "commandTargetRingsPreviewOnly": true,
+        "commandTargetRingAuthority": false,
+        "commandOutcomeFeedback": false,
+        "commandOutcomeFeedbackCount": 0,
+        "commandOutcomeFeedbackVisualOnly": true,
+        "commandOutcomeFeedbackReadOnly": true,
+        "commandOutcomeFeedbackServerOwned": true,
+        "commandOutcomeFeedbackSelectable": false,
+        "commandOutcomeFeedbackAuthority": false,
+        "clientAuthority": false
+      },
+      "outpostNextFrontierBeacons": [],
+      "objectiveMarkers": [
+        {
+          "mode": "scout",
+          "targetCellId": "cell_q-1_r0",
+          "packetId": "expedition_event_packet_bd80b1a048d080d9",
+          "spriteAssetSlot": "objective_beacon",
+          "spriteAssetPath": "/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1/objective-beacon-v1.png",
+          "spriteAssetReady": true,
+          "visualOnly": true,
+          "readOnly": true,
+          "selectable": true,
+          "inspectable": true,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0,
+          "canvas": {
+            "x": 478.6175080355455,
+            "y": 279
+          }
+        }
+      ],
+      "commandTargets": [
+        {
+          "unitId": "expedition_unit_pathfinder_scout_v1",
+          "unitType": "scout",
+          "commandId": "move_unit",
+          "cellId": "cell_origin",
+          "fogState": "discovered",
+          "serverMutationImplemented": true,
+          "movementMutation": true,
+          "visualOnly": true,
+          "readOnly": true,
+          "previewOnly": true,
+          "selectable": true,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0,
+          "canvas": {
+            "x": 543.6653431650595,
+            "y": 306.2195121951219
+          }
+        },
+        {
+          "unitId": "expedition_unit_pathfinder_scout_v1",
+          "unitType": "scout",
+          "commandId": "move_unit",
+          "cellId": "cell_q0_r1",
+          "fogState": "discovered",
+          "serverMutationImplemented": true,
+          "movementMutation": true,
+          "visualOnly": true,
+          "readOnly": true,
+          "previewOnly": true,
+          "selectable": true,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0,
+          "canvas": {
+            "x": 590.5551143883532,
+            "y": 386.869918699187
+          }
+        },
+        {
+          "unitId": "expedition_unit_pathfinder_scout_v1",
+          "unitType": "scout",
+          "commandId": "scout_sector",
+          "cellId": "cell_q-1_r0",
+          "fogState": "hinted",
+          "serverMutationImplemented": true,
+          "movementMutation": false,
+          "visualOnly": true,
+          "readOnly": true,
+          "previewOnly": true,
+          "selectable": true,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0,
+          "canvas": {
+            "x": 449.88580071847235,
+            "y": 306.2195121951219
+          }
+        },
+        {
+          "unitId": "expedition_unit_pathfinder_scout_v1",
+          "unitType": "scout",
+          "commandId": "scout_sector",
+          "cellId": "cell_q-1_r2",
+          "fogState": "hinted",
+          "serverMutationImplemented": true,
+          "movementMutation": false,
+          "visualOnly": true,
+          "readOnly": true,
+          "previewOnly": true,
+          "selectable": true,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0,
+          "canvas": {
+            "x": 543.6653431650595,
+            "y": 467.520325203252
+          }
+        }
+      ],
+      "commandOutcomeFeedback": []
+    },
+    "mutationButtons": [
+      {
+        "testid": "fp-btn-draft-site-plan-from-packet-expedition_event_packet_bd80b1a048d080d9",
+        "commandId": "draft_site_plan_from_packet",
+        "cellId": "cell_q-1_r1",
+        "visible": true
+      },
+      {
+        "testid": "fp-btn-move-expedition-unit-expedition_unit_pathfinder_scout_v1-cell_origin",
+        "commandId": "move_unit",
+        "cellId": "cell_origin",
+        "visible": true
+      },
+      {
+        "testid": "fp-btn-move-expedition-unit-expedition_unit_pathfinder_scout_v1-cell_q0_r1",
+        "commandId": "move_unit",
+        "cellId": "cell_q0_r1",
+        "visible": true
+      },
+      {
+        "testid": "fp-btn-scout-sector-unit-command-cell_q-1_r0",
+        "commandId": "scout_sector",
+        "cellId": "cell_q-1_r0",
+        "visible": true
+      },
+      {
+        "testid": "fp-btn-draft-site-plan-from-packet-expedition_event_packet_bd80b1a048d080d9",
+        "commandId": "draft_site_plan_from_packet",
+        "cellId": "cell_q-1_r1",
+        "visible": true
+      },
+      {
+        "testid": "fp-btn-scout-sector-cell_q-1_r0",
+        "commandId": "",
+        "cellId": "cell_q-1_r0",
+        "visible": false
+      },
+      {
+        "testid": "fp-btn-scout-sector-cell_q-1_r2",
+        "commandId": "",
+        "cellId": "cell_q-1_r2",
+        "visible": false
+      },
+      {
+        "testid": "fp-btn-scout-sector-cell_q1_r-1",
+        "commandId": "",
+        "cellId": "cell_q1_r-1",
+        "visible": false
+      }
+    ],
+    "mobileFit": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "documentScrollWidth": 1280,
+      "clipped": []
+    }
+  },
+  "liveState": {
+    "ok": true,
+    "cell": {
+      "cellId": "cell_q-1_r1",
+      "q": -1,
+      "r": 1,
+      "fogState": "known",
+      "kind": "scouted_sector",
+      "title": "Scouted Frontier Sector",
+      "status": "SCOUTED",
+      "sourceTruth": "expedition_scout_sector",
+      "sourceIds": {
+        "plotId": "plot_89fb19ffa910e048",
+        "scoutId": "expedition_scout_209af84ac2b81711",
+        "cellId": "cell_q-1_r1",
+        "sourceCellId": "cell_q0_r1"
+      },
+      "sources": [
+        {
+          "kind": "expedition_scout_sector",
+          "id": "expedition_scout_209af84ac2b81711",
+          "status": "SCOUTED"
+        }
+      ],
+      "receipts": [
+        {
+          "kind": "scout_sector_known_cell",
+          "sourceIds": {
+            "scoutId": "expedition_scout_209af84ac2b81711",
+            "cellId": "cell_q-1_r1",
+            "sourceCellId": "cell_q0_r1"
+          },
+          "readOnly": true,
+          "authorityBoundary": "server_owned_read_only_expedition_map_fog_of_war_projection_v1",
+          "resourceDelta": {},
+          "routeCreation": false,
+          "tradeRouteCreation": false,
+          "backgroundScheduling": false,
+          "atlasExecution": false,
+          "externalEffects": false
+        },
+        {
+          "kind": "scout_sector_receipt",
+          "actionName": "et.plot.scout_sector",
+          "scoutId": "expedition_scout_209af84ac2b81711",
+          "plotId": "plot_89fb19ffa910e048",
+          "cellId": "cell_q-1_r1",
+          "sourceCellId": "cell_q0_r1",
+          "sourceFogState": "hinted",
+          "beforeProjectionHash": "a6d3a5e0bfd58997",
+          "authorityBoundary": "server_owned_scout_sector_current_plot_fog_receipt_v1",
+          "createdBy": "HUMAN",
+          "approvedBy": null,
+          "scoutedAt": 1780407010350,
+          "samePlotOnly": true,
+          "serverOwnedDiscoveryReceipt": true,
+          "revealsExactlyOneSector": true,
+          "autonomousMovement": false,
+          "resourceHarvesting": false,
+          "resourceDelta": {},
+          "routeCreation": false,
+          "tradeRouteCreation": false,
+          "backgroundScheduling": false,
+          "combat": false,
+          "publicSharing": false,
+          "generatedUniverseRendering": false,
+          "crossPlotMutation": false,
+          "atlasExecution": false,
+          "externalEffects": false,
+          "eventPacketId": "expedition_event_packet_bd80b1a048d080d9"
+        }
+      ],
+      "traits": [
+        "scouted-frontier"
+      ],
+      "resourceHints": {
+        "wood": 0,
+        "stone": 0,
+        "food": 0,
+        "coin": 0
+      },
+      "siteType": "scouted_frontier",
+      "risk": "unknown",
+      "summary": "A hinted frontier sector was scouted and is now known map truth only.",
+      "recommendedNext": "Keep this as read-model truth until a later explicit planning action exists.",
+      "eventPacket": {
+        "packetId": "expedition_event_packet_bd80b1a048d080d9",
+        "kind": "expedition_event_packet",
+        "version": "hq12g.v1",
+        "readOnly": true,
+        "executableActions": [],
+        "authorityBoundary": "server_owned_expedition_event_packet_read_model_v1",
+        "partyId": "expedition_party_current_plot_v1",
+        "partySnapshot": {
+          "partyId": "expedition_party_current_plot_v1",
+          "kind": "expedition_party_snapshot",
+          "version": "hq12g.v1",
+          "readOnly": true,
+          "executableActions": [],
+          "authorityBoundary": "server_owned_read_only_expedition_party_manifest_v1",
+          "members": [
+            {
+              "memberId": "pathfinder-scout-v1",
+              "displayName": "Mira Trailmark",
+              "role": "scout"
+            },
+            {
+              "memberId": "rook-signalpost-messenger-v1",
+              "displayName": "Rook Signalpost",
+              "role": "messenger"
+            },
+            {
+              "memberId": "hq-civic-operator-vale-desk-7-v1",
+              "displayName": "Vale-Desk 7",
+              "role": "hq_civic_operator"
+            }
+          ],
+          "boundaryFlags": {
+            "autonomousMovement": false,
+            "operatorAssignment": false,
+            "resourceHarvesting": false,
+            "resourceDelta": {},
+            "resourceGain": false,
+            "resourceLoss": false,
+            "routeCreation": false,
+            "tradeRouteCreation": false,
+            "backgroundScheduling": false,
+            "combat": false,
+            "publicSharing": false,
+            "generatedUniverseRendering": false,
+            "crossPlotMutation": false,
+            "atlasExecution": false,
+            "externalEffects": false
+          }
+        },
+        "templateId": "marker-stone",
+        "scoutId": "expedition_scout_209af84ac2b81711",
+        "plotId": "plot_89fb19ffa910e048",
+        "cellId": "cell_q-1_r1",
+        "q": -1,
+        "r": 1,
+        "sourceCellId": "cell_q0_r1",
+        "discoveryFlavor": "Marker Stone packet",
+        "terrainExplanation": "A stable landmark makes this sector easier to discuss on the map while deeper details stay behind fog.",
+        "riskExplanation": "Unknown-world risk is preserved as flavor metadata with no autonomous travel, scheduling, or public sharing.",
+        "operatorNote": "Rook linked the note back to the Scout Sector receipt so future planning can audit its source.",
+        "receiptLink": {
+          "kind": "scout_sector_receipt",
+          "actionName": "et.plot.scout_sector",
+          "scoutId": "expedition_scout_209af84ac2b81711",
+          "cellId": "cell_q-1_r1",
+          "via": "scoutSector.receipt"
+        },
+        "boundaryFlags": {
+          "readModelOnly": true,
+          "receiptMetadataOnly": true,
+          "autonomousMovement": false,
+          "resourceHarvesting": false,
+          "resourceDelta": {},
+          "resourceGain": false,
+          "resourceLoss": false,
+          "routeCreation": false,
+          "tradeRouteCreation": false,
+          "backgroundScheduling": false,
+          "combat": false,
+          "publicSharing": false,
+          "generatedUniverseRendering": false,
+          "crossPlotMutation": false,
+          "atlasExecution": false,
+          "externalEffects": false
+        },
+        "createdAt": 1780407010350,
+        "packetHash": "bd80b1a048d080d9"
+      },
+      "readOnly": true,
+      "authorityBoundary": "server_owned_read_only_expedition_map_fog_of_war_projection_v1",
+      "terrainAssetContractVersion": "agenttown_public_terrain_asset_slots_v1",
+      "publicTerrainAssetSlot": "field",
+      "publicTerrainAssetSlotSource": "server_read_model_v1",
+      "publicTerrainAssetSlotReason": "known/discovered public cell traits expose only neutral field terrain",
+      "fogAssetSlot": null
+    },
+    "eventPackets": [
+      {
+        "packetId": "expedition_event_packet_bd80b1a048d080d9",
+        "kind": "expedition_event_packet",
+        "version": "hq12g.v1",
+        "readOnly": true,
+        "executableActions": [],
+        "authorityBoundary": "server_owned_expedition_event_packet_read_model_v1",
+        "partyId": "expedition_party_current_plot_v1",
+        "partySnapshot": {
+          "partyId": "expedition_party_current_plot_v1",
+          "kind": "expedition_party_snapshot",
+          "version": "hq12g.v1",
+          "readOnly": true,
+          "executableActions": [],
+          "authorityBoundary": "server_owned_read_only_expedition_party_manifest_v1",
+          "members": [
+            {
+              "memberId": "pathfinder-scout-v1",
+              "displayName": "Mira Trailmark",
+              "role": "scout"
+            },
+            {
+              "memberId": "rook-signalpost-messenger-v1",
+              "displayName": "Rook Signalpost",
+              "role": "messenger"
+            },
+            {
+              "memberId": "hq-civic-operator-vale-desk-7-v1",
+              "displayName": "Vale-Desk 7",
+              "role": "hq_civic_operator"
+            }
+          ],
+          "boundaryFlags": {
+            "autonomousMovement": false,
+            "operatorAssignment": false,
+            "resourceHarvesting": false,
+            "resourceDelta": {},
+            "resourceGain": false,
+            "resourceLoss": false,
+            "routeCreation": false,
+            "tradeRouteCreation": false,
+            "backgroundScheduling": false,
+            "combat": false,
+            "publicSharing": false,
+            "generatedUniverseRendering": false,
+            "crossPlotMutation": false,
+            "atlasExecution": false,
+            "externalEffects": false
+          }
+        },
+        "templateId": "marker-stone",
+        "scoutId": "expedition_scout_209af84ac2b81711",
+        "plotId": "plot_89fb19ffa910e048",
+        "cellId": "cell_q-1_r1",
+        "q": -1,
+        "r": 1,
+        "sourceCellId": "cell_q0_r1",
+        "discoveryFlavor": "Marker Stone packet",
+        "terrainExplanation": "A stable landmark makes this sector easier to discuss on the map while deeper details stay behind fog.",
+        "riskExplanation": "Unknown-world risk is preserved as flavor metadata with no autonomous travel, scheduling, or public sharing.",
+        "operatorNote": "Rook linked the note back to the Scout Sector receipt so future planning can audit its source.",
+        "receiptLink": {
+          "kind": "scout_sector_receipt",
+          "actionName": "et.plot.scout_sector",
+          "scoutId": "expedition_scout_209af84ac2b81711",
+          "cellId": "cell_q-1_r1",
+          "via": "scoutSector.receipt"
+        },
+        "boundaryFlags": {
+          "readModelOnly": true,
+          "receiptMetadataOnly": true,
+          "autonomousMovement": false,
+          "resourceHarvesting": false,
+          "resourceDelta": {},
+          "resourceGain": false,
+          "resourceLoss": false,
+          "routeCreation": false,
+          "tradeRouteCreation": false,
+          "backgroundScheduling": false,
+          "combat": false,
+          "publicSharing": false,
+          "generatedUniverseRendering": false,
+          "crossPlotMutation": false,
+          "atlasExecution": false,
+          "externalEffects": false
+        },
+        "createdAt": 1780407010350,
+        "packetHash": "bd80b1a048d080d9"
+      }
+    ],
+    "scoutSectorIds": [
+      "expedition_scout_209af84ac2b81711"
+    ],
+    "sourceSummary": {
+      "originPlotId": "plot_89fb19ffa910e048",
+      "worldGridStatus": "LOCKED",
+      "worldGridProjectionHash": "94c51e91c518b063",
+      "civicReadinessReady": false,
+      "civicReadinessScore": 0,
+      "scoutReportIds": [],
+      "scoutSectorIds": [
+        "expedition_scout_209af84ac2b81711"
+      ],
+      "expeditionUnitMoveIds": [],
+      "eventPacketIds": [
+        "expedition_event_packet_bd80b1a048d080d9"
+      ],
+      "surveyBridgeCandidatePacketIds": [
+        "expedition_event_packet_bd80b1a048d080d9"
+      ],
+      "reviewedSitePlanIds": [
+        "site_plan_hq16u_outpost_bridge"
+      ],
+      "foundedPlotIds": [
+        "plot_hq16u_outpost_bridge"
+      ]
+    },
+    "worldDeltaCount": 0
+  },
+  "scoutResponse": {
+    "ok": true,
+    "revealedCellId": "cell_q-1_r1",
+    "eventPacketId": "expedition_event_packet_bd80b1a048d080d9",
+    "scoutId": "expedition_scout_209af84ac2b81711",
+    "worldDeltaTypes": [
+      "EXPEDITION_SECTOR_SCOUTED"
+    ],
+    "boundaryFlags": {
+      "samePlotOnly": true,
+      "serverOwnedDiscoveryReceipt": true,
+      "revealsExactlyOneSector": true,
+      "autonomousMovement": false,
+      "resourceHarvesting": false,
+      "resourceDelta": {},
+      "routeCreation": false,
+      "tradeRouteCreation": false,
+      "backgroundScheduling": false,
+      "combat": false,
+      "publicSharing": false,
+      "generatedUniverseRendering": false,
+      "crossPlotMutation": false,
+      "atlasExecution": false,
+      "externalEffects": false
+    }
+  },
+  "guardrails": {
+    "browserApiMocking": false,
+    "serverAuthorityUnchanged": true,
+    "outpostStatusReadOnly": true,
+    "bridgeTargetMatchesScoutMutation": true,
+    "bridgeTargetBecameKnown": true,
+    "scoutSectorRouteUsed": true,
+    "scoutSectorOnlyFogRevealMutation": true,
+    "outpostCommandsCreated": false,
+    "routeAuthority": false,
+    "resourceHarvesting": false,
+    "rewardCreation": false,
+    "movementAuthority": false,
+    "atlasExecution": false,
+    "generatedUniverseRuntimeExpansion": false,
+    "hiddenTruthLeakage": false,
+    "crossPlotMutation": false,
+    "externalEffects": false,
+    "mobileHorizontalOverflow": 0
+  }
+}
