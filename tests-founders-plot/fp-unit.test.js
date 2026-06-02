@@ -1752,6 +1752,15 @@ test('FP-UT-028b HQ16I drafts one planning-only Site Plan from a Scout Sector Ev
   assert.equal(planned.worldDelta.some((entry) => entry.type === 'EXPEDITION_PACKET_SITE_PLAN_DRAFTED'), true);
   assert.equal(planned.expeditionMap.surveyBridge.status, 'SITE_PLAN_PRESENT');
   assert.equal(planned.expeditionMap.surveyBridge.activeCandidate.sitePlan.planId, planned.sitePlan.planId);
+  assert.equal(planned.expeditionMap.surveyBridge.activeCandidate.commandState.commandId, 'review_site_plan');
+  assert.equal(planned.expeditionMap.surveyBridge.activeCandidate.commandState.actionName, 'et.plot.review_site_plan');
+  assert.equal(planned.expeditionMap.surveyBridge.activeCandidate.commandState.enabled, true);
+  assert.equal(planned.expeditionMap.surveyBridge.activeCandidate.commandState.serverMutationImplemented, true);
+  assert.equal(planned.expeditionMap.surveyBridge.activeCandidate.commandState.executableThroughExistingEndpoint, true);
+  assert.equal(planned.expeditionMap.surveyBridge.activeCandidate.commandState.sourcePlanId, planned.sitePlan.planId);
+  assert.deepEqual(planned.expeditionMap.surveyBridge.activeCandidate.commandState.targetCellIds, [target.cellId]);
+  assert.deepEqual(planned.expeditionMap.surveyBridge.activeCandidate.commandState.executableActions, []);
+  assert.equal(planned.expeditionMap.surveyBridge.activeCandidate.nextRequiredContract, 'existing_review_site_plan_endpoint');
   assert.equal(planned.expeditionMap.units.items.some((unit) => unit.unitType === 'surveyor' && unit.sourcePlanId === planned.sitePlan.planId), false);
   const plannedCell = planned.expeditionMap.cells.find((cell) => cell.cellId === target.cellId);
   assert.ok(plannedCell, 'expected packet Site Plan cell on Expedition Map');
@@ -1796,6 +1805,19 @@ test('FP-UT-028b HQ16I drafts one planning-only Site Plan from a Scout Sector Ev
   assert.equal(reviewed.ok, true, reviewed.error?.message);
   assert.equal(reviewed.sitePlan.reviewStatus, 'reviewed');
   assert.equal(reviewed.sitePlan.sourcePacketId, scouted.eventPacket.packetId);
+  assert.equal(reviewed.state.expeditionMap.surveyBridge.status, 'SURVEYOR_COMMAND_READY');
+  assert.equal(reviewed.state.expeditionMap.surveyBridge.activeCandidate.sitePlan.planId, planned.sitePlan.planId);
+  assert.equal(reviewed.state.expeditionMap.surveyBridge.activeCandidate.sitePlan.reviewStatus, 'reviewed');
+  assert.equal(reviewed.state.expeditionMap.surveyBridge.activeCandidate.commandState.commandId, 'prepare_settler_convoy');
+  assert.equal(reviewed.state.expeditionMap.surveyBridge.activeCandidate.commandState.actionName, 'et.plot.prepare_settler_convoy');
+  assert.equal(reviewed.state.expeditionMap.surveyBridge.activeCandidate.commandState.serverMutationImplemented, true);
+  assert.equal(reviewed.state.expeditionMap.surveyBridge.activeCandidate.nextRequiredContract, 'existing_prepare_settler_convoy_endpoint');
+  assert.equal(reviewed.state.expeditionMap.sourceSummary.reviewedSitePlanIds.includes(planned.sitePlan.planId), true);
+  assert.equal(reviewed.state.expeditionMap.units.items.some((unit) => (
+    unit.unitType === 'surveyor'
+    && unit.sourcePlanId === planned.sitePlan.planId
+    && unit.commandHints.some((command) => command.commandId === 'prepare_settler_convoy' && command.serverMutationImplemented === true)
+  )), true);
 });
 
 test('FP-UT-029 HQ15G Move Expedition Unit moves one Scout between revealed adjacent cells only', () => {

@@ -2558,7 +2558,58 @@ Boundaries:
 - requires idempotency; repeated packet drafts return the existing Site Plan
 - agent callers require matching human approval for `draft_site_plan_from_packet` with `{ "packetId": "...", "cellId": "..." }`
 - refreshed Expedition Map cells expose the packet-derived draft as a read-only `packet_site_plan` `sitePlanObject` on the source cell, while preserving the Scout Sector Event Packet receipt
+- the refreshed `expeditionMap.surveyBridge.activeCandidate.commandState` for an unreviewed packet-derived Site Plan points at the existing guarded review command; it is executable only when the existing HQ6 `review_site_plan` rules are satisfied:
+  `{ "commandId": "review_site_plan", "actionName": "et.plot.review_site_plan", "enabled": true, "serverMutationImplemented": true, "executableThroughExistingEndpoint": true }`
+- before those rules unlock, the same bridge remains read-only and exposes the review command as disabled/unimplemented rather than fabricating authority
 - creates only one draft Site Plan planning record; it does not review it, create a Surveyor, prepare a convoy, found territory, reveal fog, move units, create routes/trade, mutate resources, grant rewards, execute Atlas, render Generated Universe runtime content, or call external systems
+
+### POST `/api/founders-plot/review-site-plan`
+
+Reviews an existing canonical Site Plan through the HQ6 Settlement Charter
+planning-only path.
+
+Request shape:
+```json
+{
+  "plotId": "plot_...",
+  "planId": "site_plan_...",
+  "reviewNote": "Claim-ready planning only.",
+  "actor": "HUMAN",
+  "idempotencyKey": "..."
+}
+```
+
+Response shape:
+```json
+{
+  "ok": true,
+  "sitePlan": {
+    "planId": "site_plan_...",
+    "promotionStatus": "reviewed_claim_ready",
+    "reviewStatus": "reviewed"
+  },
+  "state": {
+    "expeditionMap": {
+      "surveyBridge": {
+        "status": "SURVEYOR_COMMAND_READY",
+        "activeCandidate": {
+          "commandState": {
+            "commandId": "prepare_settler_convoy",
+            "actionName": "et.plot.prepare_settler_convoy",
+            "serverMutationImplemented": true
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Boundaries:
+- requires an existing canonical Site Plan grounded in its Scout Report or Scout Sector Event Packet receipt
+- idempotent review of an already reviewed Site Plan returns the existing plan
+- marks claim-ready planning state only; it does not create territory, a second plot, a convoy, resources, rewards, routes, Atlas execution, Generated Universe runtime content, or external effects
+- refreshed Expedition Map read models may derive a read-only Surveyor unit and `SURVEYOR_COMMAND_READY`/Prepare Convoy hint from the reviewed plan when existing server rules allow it; the browser must not create Surveyors manually
 
 ---
 

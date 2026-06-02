@@ -1675,6 +1675,15 @@ test('FP-HT-011d3b POST /api/founders-plot/expedition-map/draft-site-plan drafts
     assert.equal(planned.body.worldDelta.some((entry) => entry.type === 'EXPEDITION_PACKET_SITE_PLAN_DRAFTED'), true);
     assert.equal(planned.body.expeditionMap.surveyBridge.status, 'SITE_PLAN_PRESENT');
     assert.equal(planned.body.expeditionMap.surveyBridge.activeCandidate.sitePlan.planId, planned.body.sitePlan.planId);
+    assert.equal(planned.body.expeditionMap.surveyBridge.activeCandidate.commandState.commandId, 'review_site_plan');
+    assert.equal(planned.body.expeditionMap.surveyBridge.activeCandidate.commandState.actionName, 'et.plot.review_site_plan');
+    assert.equal(planned.body.expeditionMap.surveyBridge.activeCandidate.commandState.enabled, true);
+    assert.equal(planned.body.expeditionMap.surveyBridge.activeCandidate.commandState.serverMutationImplemented, true);
+    assert.equal(planned.body.expeditionMap.surveyBridge.activeCandidate.commandState.executableThroughExistingEndpoint, true);
+    assert.equal(planned.body.expeditionMap.surveyBridge.activeCandidate.commandState.sourcePlanId, planned.body.sitePlan.planId);
+    assert.deepEqual(planned.body.expeditionMap.surveyBridge.activeCandidate.commandState.targetCellIds, [target.cellId]);
+    assert.deepEqual(planned.body.expeditionMap.surveyBridge.activeCandidate.commandState.executableActions, []);
+    assert.equal(planned.body.expeditionMap.surveyBridge.activeCandidate.nextRequiredContract, 'existing_review_site_plan_endpoint');
     const plannedCell = planned.body.expeditionMap.cells.find((cell) => cell.cellId === target.cellId);
     assert.ok(plannedCell, 'expected packet Site Plan cell on Expedition Map');
     assert.equal(plannedCell.status, 'SITE_PLAN_DRAFTED');
@@ -1701,6 +1710,29 @@ test('FP-HT-011d3b POST /api/founders-plot/expedition-map/draft-site-plan drafts
     assert.equal(repeated.body.existing, true);
     assert.equal(repeated.body.sitePlan.planId, planned.body.sitePlan.planId);
     assert.deepEqual(repeated.body.worldDelta, []);
+
+    const reviewed = await request(server, 'POST', '/api/founders-plot/review-site-plan', {
+      plotId: seeded.plotId,
+      planId: planned.body.sitePlan.planId,
+      reviewNote: 'HTTP packet Site Plan review only.',
+      actor: 'HUMAN',
+      idempotencyKey: 'ht-11d5-review'
+    });
+    assert.equal(reviewed.status, 200, reviewed.body?.error?.message || 'review packet site plan');
+    assert.equal(reviewed.body.ok, true);
+    assert.equal(reviewed.body.sitePlan.reviewStatus, 'reviewed');
+    assert.equal(reviewed.body.sitePlan.sourcePacketId, scouted.body.eventPacket.packetId);
+    assert.equal(reviewed.body.state.expeditionMap.surveyBridge.status, 'SURVEYOR_COMMAND_READY');
+    assert.equal(reviewed.body.state.expeditionMap.surveyBridge.activeCandidate.sitePlan.planId, planned.body.sitePlan.planId);
+    assert.equal(reviewed.body.state.expeditionMap.surveyBridge.activeCandidate.commandState.commandId, 'prepare_settler_convoy');
+    assert.equal(reviewed.body.state.expeditionMap.surveyBridge.activeCandidate.commandState.actionName, 'et.plot.prepare_settler_convoy');
+    assert.equal(reviewed.body.state.expeditionMap.surveyBridge.activeCandidate.commandState.serverMutationImplemented, true);
+    assert.equal(reviewed.body.state.expeditionMap.sourceSummary.reviewedSitePlanIds.includes(planned.body.sitePlan.planId), true);
+    assert.equal(reviewed.body.state.expeditionMap.units.items.some((unit) => (
+      unit.unitType === 'surveyor'
+      && unit.sourcePlanId === planned.body.sitePlan.planId
+      && unit.commandHints.some((command) => command.commandId === 'prepare_settler_convoy' && command.serverMutationImplemented === true)
+    )), true);
   } finally { await close(); }
 });
 

@@ -1749,6 +1749,8 @@
         return { label: 'Scouted', icon: '⌖' };
       case 'draft_site_plan_from_packet':
         return { label: 'Planned', icon: '▧' };
+      case 'review_site_plan':
+        return { label: 'Reviewed', icon: '▣' };
       case 'prepare_settler_convoy':
         return { label: 'Convoy', icon: '▣' };
       case 'found_settlement':
@@ -1951,6 +1953,20 @@
     return candidates.find((candidate) => candidate?.packetId) || null;
   }
 
+  function expeditionSurveyBridgeCandidateForPlan(bridge = null, planId = '') {
+    const safePlanId = String(planId || '').trim();
+    if (!safePlanId) return null;
+    const candidates = [
+      bridge?.activeCandidate,
+      ...(Array.isArray(bridge?.candidates) ? bridge.candidates : []),
+    ].filter((candidate) => candidate && typeof candidate === 'object');
+    return candidates.find((candidate) => (
+      String(candidate.sitePlan?.planId || '') === safePlanId
+      || String(candidate.commandState?.sourcePlanId || '') === safePlanId
+      || String(candidate.surveyorUnit?.sourcePlanId || '') === safePlanId
+    )) || null;
+  }
+
   function expeditionSurveyBridgeStatusLabel(status = '') {
     const key = String(status || '').toUpperCase();
     if (key === 'SURVEYOR_COMMAND_READY') return 'Ready';
@@ -2058,6 +2074,8 @@
         return 'Scout';
       case 'draft_site_plan_from_packet':
         return 'Plan';
+      case 'review_site_plan':
+        return 'Review';
       case 'prepare_settler_convoy':
         return 'Convoy';
       case 'found_settlement':
@@ -2079,6 +2097,8 @@
         return '⌖';
       case 'draft_site_plan_from_packet':
         return '▧';
+      case 'review_site_plan':
+        return '▣';
       case 'prepare_settler_convoy':
         return '▣';
       case 'found_settlement':
@@ -2309,7 +2329,21 @@
       && commandState.enabled !== false
       && commandState.serverMutationImplemented === true
       && !!packetId;
+    const reviewPlanId = String(commandState.sourcePlanId || candidate.sitePlan?.planId || '').trim();
+    const canReviewSitePlan = commandState.commandId === 'review_site_plan'
+      && commandState.actionName === 'et.plot.review_site_plan'
+      && commandState.enabled !== false
+      && commandState.serverMutationImplemented === true
+      && !!reviewPlanId;
+    const canPrepareBridgeConvoy = commandState.commandId === 'prepare_settler_convoy'
+      && commandState.actionName === 'et.plot.prepare_settler_convoy'
+      && commandState.enabled !== false
+      && commandState.serverMutationImplemented === true
+      && !!reviewPlanId;
     const pendingPacketPlan = canDraftPacketPlan && state.expeditionPacketSitePlanPendingId === packetId;
+    const pendingReviewPlan = canReviewSitePlan && state.reviewPendingPlanId === reviewPlanId;
+    const pendingConvoyPlan = canPrepareBridgeConvoy && state.convoyPendingPlanId === reviewPlanId;
+    const hasCommandAction = canDraftPacketPlan || canReviewSitePlan || canPrepareBridgeConvoy;
     const rail = document.createElement('div');
     rail.className = 'fp-expedition-survey-bridge';
     rail.dataset.testid = testId;
@@ -2319,13 +2353,14 @@
     rail.dataset.cellId = cellId;
     rail.dataset.packetId = packetId;
     rail.dataset.readOnly = 'true';
-    rail.dataset.actions = canDraftPacketPlan ? '1' : '0';
+    rail.dataset.actions = hasCommandAction ? '1' : '0';
     rail.dataset.serverMutationImplemented = commandState.serverMutationImplemented === true ? 'true' : 'false';
     rail.dataset.commandId = String(commandState.commandId || '');
     rail.dataset.actionName = String(commandState.actionName || '');
-    if (pendingPacketPlan) rail.dataset.pending = 'true';
+    if (reviewPlanId) rail.dataset.planId = reviewPlanId;
+    if (pendingPacketPlan || pendingReviewPlan || pendingConvoyPlan) rail.dataset.pending = 'true';
     rail.title = bridge.ledgerText || 'Scout Packet to Site Plan bridge is read-only readiness only.';
-    rail.setAttribute('aria-label', `Scout Packet to Site Plan bridge: ${statusLabel} at ${cellId || 'selected cell'}. ${canDraftPacketPlan ? 'Packet planning command ready.' : 'Read-only; zero executable actions.'}`);
+    rail.setAttribute('aria-label', `Scout Packet to Site Plan bridge: ${statusLabel} at ${cellId || 'selected cell'}. ${hasCommandAction ? 'Existing guarded command ready.' : 'Read-only; zero executable actions.'}`);
 
     [
       {
@@ -2387,6 +2422,46 @@
       button.title = `Draft one planning-only Site Plan from ${packetId}. No route, resource, reward, Surveyor, Atlas execution, or external effect.`;
       button.setAttribute('aria-label', button.title);
       button.addEventListener('click', () => doDraftSitePlanFromPacket(packetId, cellId));
+      rail.appendChild(button);
+    }
+
+    if (canReviewSitePlan) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'fp-expedition-survey-bridge__command fp-brass-btn';
+      button.dataset.testid = `${testId}-btn-review-site-plan-${safeTestId(reviewPlanId)}`;
+      button.dataset.planId = reviewPlanId;
+      button.dataset.cellId = cellId;
+      button.dataset.commandId = commandState.commandId;
+      button.dataset.actionName = commandState.actionName;
+      button.dataset.serverMutationImplemented = 'true';
+      button.dataset.routeAuthority = 'false';
+      button.dataset.resourceDelta = '{}';
+      button.disabled = pendingReviewPlan;
+      button.textContent = pendingReviewPlan ? '...' : expeditionGuidedCommandLabel(commandState.commandId, commandState.label);
+      button.title = `Review Site Plan ${reviewPlanId} through the guarded HQ6 endpoint. No territory, route, resource, reward, Surveyor creation in browser, Atlas execution, or external effect.`;
+      button.setAttribute('aria-label', button.title);
+      button.addEventListener('click', () => doReviewSitePlan(reviewPlanId));
+      rail.appendChild(button);
+    }
+
+    if (canPrepareBridgeConvoy) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'fp-expedition-survey-bridge__command fp-brass-btn';
+      button.dataset.testid = `${testId}-btn-prepare-settler-convoy-${safeTestId(reviewPlanId)}`;
+      button.dataset.planId = reviewPlanId;
+      button.dataset.cellId = cellId;
+      button.dataset.commandId = commandState.commandId;
+      button.dataset.actionName = commandState.actionName;
+      button.dataset.serverMutationImplemented = 'true';
+      button.dataset.routeAuthority = 'false';
+      button.dataset.resourceDelta = '{}';
+      button.disabled = pendingConvoyPlan;
+      button.textContent = pendingConvoyPlan ? '...' : expeditionGuidedCommandLabel(commandState.commandId, commandState.label);
+      button.title = `Prepare Convoy from reviewed Site Plan ${reviewPlanId} through the guarded convoy endpoint.`;
+      button.setAttribute('aria-label', button.title);
+      button.addEventListener('click', () => doPrepareSettlerConvoy(reviewPlanId));
       rail.appendChild(button);
     }
 
@@ -6149,8 +6224,12 @@
 
   async function doReviewSitePlan(planId) {
     const safePlanId = String(planId || '');
+    const model = expeditionMapModel(state.bundle || {});
+    const bridgeCandidate = expeditionSurveyBridgeCandidateForPlan(expeditionSurveyBridge(model), safePlanId);
+    if (bridgeCandidate?.cellId) state.expeditionSelectedCellId = String(bridgeCandidate.cellId || '');
     state.reviewPendingPlanId = safePlanId;
     renderSitePlans(state.bundle || {});
+    renderExpeditionMap(state.bundle || {});
     const { data } = await api(API.reviewSitePlan, 'POST', {
       plotId: state.plotId,
       planId: safePlanId,
@@ -6161,7 +6240,27 @@
     state.reviewPendingPlanId = '';
     if (!data.ok) {
       renderSitePlans(state.bundle || {});
+      renderExpeditionMap(state.bundle || {});
       return toast(data.error?.message || 'Could not review Site Plan.', 'danger');
+    }
+    const reviewedMap = data.state?.expeditionMap || {};
+    const reviewedBridge = expeditionSurveyBridge(reviewedMap);
+    const reviewedCandidate = expeditionSurveyBridgeCandidateForPlan(reviewedBridge, safePlanId) || bridgeCandidate;
+    const reviewedCellId = String(reviewedCandidate?.cellId || '').trim();
+    const surveyorUnit = (Array.isArray(reviewedMap.units?.items) ? reviewedMap.units.items : [])
+      .find((unit) => String(unit.sourcePlanId || '') === safePlanId && String(unit.unitType || '') === 'surveyor') || null;
+    if (reviewedCellId) state.expeditionSelectedCellId = reviewedCellId;
+    if (surveyorUnit?.unitId) state.expeditionSelectedUnitId = String(surveyorUnit.unitId || '');
+    if (reviewedCellId) {
+      setExpeditionCommandOutcomeFeedback({
+        commandId: 'review_site_plan',
+        cellId: reviewedCellId,
+        unitId: surveyorUnit?.unitId || '',
+        unitType: 'surveyor',
+        label: 'Reviewed',
+        receiptId: safePlanId,
+        receiptKind: 'site_plan_review',
+      });
     }
     toast(data.existing ? 'Site Plan already claim-ready.' : 'Site Plan reviewed for claim-ready planning.');
     await loadState();
@@ -6175,6 +6274,7 @@
     ));
     state.convoyPendingPlanId = safePlanId;
     renderSitePlans(state.bundle || {});
+    renderExpeditionMap(state.bundle || {});
     const { data } = await api(API.prepareSettlerConvoy, 'POST', {
       plotId: state.plotId,
       sitePlanId: safePlanId,
@@ -6184,6 +6284,7 @@
     state.convoyPendingPlanId = '';
     if (!data.ok) {
       renderSitePlans(state.bundle || {});
+      renderExpeditionMap(state.bundle || {});
       return toast(data.error?.message || 'Could not prepare Settler Convoy.', 'danger');
     }
     const targetCellId = target.cellId || state.expeditionSelectedCellId;

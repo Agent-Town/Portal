@@ -2039,8 +2039,12 @@ function expeditionSurveyBridgeSurveyorByPlanId(units = {}) {
   return out;
 }
 
-function buildExpeditionSurveyBridgeCandidate({ packet, cell, plan = null, surveyorUnit = null } = {}) {
+function buildExpeditionSurveyBridgeCandidate({ packet, cell, plan = null, surveyorUnit = null, reviewAvailable = false } = {}) {
   const cellId = safeText(packet?.cellId || packet?.receiptLink?.cellId || cell?.cellId, '', 80);
+  const planReviewed = !!plan && (
+    plan.reviewStatus === 'reviewed'
+    || ['reviewed_claim_ready', 'convoy_preparing', 'claimed'].includes(String(plan.promotionStatus || '').toLowerCase())
+  );
   const prepareCommand = (Array.isArray(surveyorUnit?.commandHints) ? surveyorUnit.commandHints : [])
     .find((command) => (
       command?.commandId === 'prepare_settler_convoy'
@@ -2052,7 +2056,9 @@ function buildExpeditionSurveyBridgeCandidate({ packet, cell, plan = null, surve
     : (plan ? 'SITE_PLAN_PRESENT' : 'PACKET_READY_FOR_SITE_PLAN_PREFLIGHT');
   const nextRequiredContract = prepareCommand
     ? 'existing_prepare_settler_convoy_endpoint'
-    : (plan ? 'reviewed_site_plan_to_surveyor_command_hint' : 'existing_draft_site_plan_from_packet_endpoint');
+    : (plan
+      ? (planReviewed ? 'reviewed_site_plan_to_surveyor_command_hint' : 'existing_review_site_plan_endpoint')
+      : 'existing_draft_site_plan_from_packet_endpoint');
   return {
     candidateId: `survey_bridge_${safeText(packet?.packetHash || packet?.packetId || cellId, 'packet', 120)}`,
     kind: 'scout_packet_to_survey_readiness',
@@ -2095,13 +2101,18 @@ function buildExpeditionSurveyBridgeCandidate({ packet, cell, plan = null, surve
     } : (plan ? {
       commandId: 'review_site_plan',
       actionName: 'et.plot.review_site_plan',
-      label: 'Review Plan',
-      enabled: plan.reviewStatus !== 'reviewed',
+      label: 'Review',
+      enabled: !planReviewed && reviewAvailable === true,
       sourcePlanId: plan.planId || null,
       targetCellIds: cellId ? [cellId] : [],
-      serverMutationImplemented: false,
-      executableThroughExistingEndpoint: true,
-      reason: 'Site Plan exists; review remains available through the existing Site Plan surface.',
+      serverMutationImplemented: !planReviewed && reviewAvailable === true,
+      executableThroughExistingEndpoint: !planReviewed && reviewAvailable === true,
+      reason: planReviewed
+        ? 'Site Plan is already reviewed; wait for the existing Surveyor command hint.'
+        : reviewAvailable === true
+          ? 'Existing review_site_plan rules allow this packet-grounded Site Plan to be reviewed through the guarded endpoint.'
+          : 'Site Plan exists, but existing review_site_plan rules have not unlocked it yet.',
+      authorityBoundary: safeText(plan.authorityBoundary, 'requires_engine_promotion_for_settlement', 120),
       readOnly: true,
       executableActions: []
     } : {
@@ -2123,7 +2134,7 @@ function buildExpeditionSurveyBridgeCandidate({ packet, cell, plan = null, surve
   };
 }
 
-function buildExpeditionSurveyBridgeReadModel({ plotId, eventPackets = [], cellList = [], sitePlans = [], planCoordinates = new Map(), units = {} } = {}) {
+function buildExpeditionSurveyBridgeReadModel({ plotId, eventPackets = [], cellList = [], sitePlans = [], planCoordinates = new Map(), units = {}, reviewablePlanIds = new Set() } = {}) {
   const planByCellId = expeditionSurveyBridgePlanByCellId(sitePlans, planCoordinates);
   const surveyorByPlanId = expeditionSurveyBridgeSurveyorByPlanId(units);
   const candidates = eventPackets
@@ -2134,7 +2145,8 @@ function buildExpeditionSurveyBridgeReadModel({ plotId, eventPackets = [], cellL
       if (!cell || !['known', 'discovered'].includes(String(cell.fogState || ''))) return null;
       const plan = planByCellId.get(cellId) || null;
       const surveyorUnit = plan ? surveyorByPlanId.get(plan.planId) || null : null;
-      return buildExpeditionSurveyBridgeCandidate({ packet, cell, plan, surveyorUnit });
+      const reviewAvailable = !!(plan?.planId && reviewablePlanIds?.has(plan.planId));
+      return buildExpeditionSurveyBridgeCandidate({ packet, cell, plan, surveyorUnit, reviewAvailable });
     })
     .filter(Boolean)
     .sort((a, b) => {
@@ -2692,13 +2704,17 @@ function buildExpeditionMapReadModel(bundle) {
     claimCoordinates: maps.claimCoordinates,
     unitMoves: expeditionUnitMoves
   });
+  const reviewablePlanIds = new Set(sitePlans
+    .filter((plan) => canReviewSitePlan(bundle, plan))
+    .map((plan) => plan.planId));
   const surveyBridge = buildExpeditionSurveyBridgeReadModel({
     plotId: plot.plotId || null,
     eventPackets,
     cellList,
     sitePlans,
     planCoordinates: maps.planCoordinates,
-    units
+    units,
+    reviewablePlanIds
   });
   const baseReadModel = {
     status: scoutReports.length || expeditionScouts.length || sitePlans.length || settlementClaims.length || ownedPlots.length > 1
@@ -3309,6 +3325,13 @@ function sitePlanGroundingStatus(bundle, plan = {}) {
     source: packetId ? 'missing_scout_packet' : 'missing_scout_report',
     id: packetId || plan.reportId || null
   };
+}
+
+function canReviewSitePlan(bundle, plan = {}) {
+  if (!plan || !plan.planId) return false;
+  if (Number(bundle?.plot?.hqLevel || 1) < 6) return false;
+  if (plan.reviewStatus === 'reviewed' || plan.promotionStatus === 'reviewed_claim_ready') return false;
+  return sitePlanGroundingStatus(bundle, plan).ok === true;
 }
 
 function expeditionSurveyBridgeCandidateForPacket(expeditionMap = {}, packetId = '') {

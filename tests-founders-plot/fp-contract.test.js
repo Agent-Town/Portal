@@ -512,6 +512,15 @@ test('FP-CT-101b3i draft_site_plan_from_packet envelope conforms to resultSchema
   assert.equal(out.proof.boundaryFlags.resourceHarvesting, false);
   assert.equal(out.proof.boundaryFlags.atlasExecution, false);
   assert.equal(out.expeditionMap.surveyBridge.status, 'SITE_PLAN_PRESENT');
+  assert.equal(out.expeditionMap.surveyBridge.activeCandidate.commandState.commandId, 'review_site_plan');
+  assert.equal(out.expeditionMap.surveyBridge.activeCandidate.commandState.actionName, 'et.plot.review_site_plan');
+  assert.equal(out.expeditionMap.surveyBridge.activeCandidate.commandState.enabled, false);
+  assert.equal(out.expeditionMap.surveyBridge.activeCandidate.commandState.serverMutationImplemented, false);
+  assert.equal(out.expeditionMap.surveyBridge.activeCandidate.commandState.executableThroughExistingEndpoint, false);
+  assert.equal(out.expeditionMap.surveyBridge.activeCandidate.commandState.sourcePlanId, out.sitePlan.planId);
+  assert.deepEqual(out.expeditionMap.surveyBridge.activeCandidate.commandState.targetCellIds, [target.cellId]);
+  assert.deepEqual(out.expeditionMap.surveyBridge.activeCandidate.commandState.executableActions, []);
+  assert.equal(out.expeditionMap.surveyBridge.activeCandidate.nextRequiredContract, 'existing_review_site_plan_endpoint');
   const plannedCell = out.expeditionMap.cells.find((cell) => cell.cellId === target.cellId);
   assert.ok(plannedCell, 'expected packet-derived Site Plan map object');
   assert.equal(plannedCell.status, 'SITE_PLAN_DRAFTED');
