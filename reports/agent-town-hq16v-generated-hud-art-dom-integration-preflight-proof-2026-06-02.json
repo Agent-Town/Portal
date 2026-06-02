@@ -1,0 +1,135 @@
+{
+  "ok": true,
+  "title": "AgentTown HQ16V Generated HUD Art + DOM Integration Preflight",
+  "generatedAt": "2026-06-02T14:42:22Z",
+  "verdict": "PREFLIGHT_READY_BLOCKED_ON_VISUAL_ASSET_GENERATION",
+  "date": "2026-06-02",
+  "lane": "HQ16V Generated HUD Art + DOM Integration Preflight",
+  "currentCheckpoint": {
+    "branch": "neo/progression-atlas-editor-next-2026-05-29",
+    "head": "82051836b27a2103a7e8ff93affda7671d0c822a",
+    "aheadOfOrigin": 12,
+    "latestPushedCommit": "dfcdb42",
+    "worktreeScope": "report/proof-only"
+  },
+  "deliverables": {
+    "report": "reports/agent-town-hq16v-generated-hud-art-dom-integration-preflight-2026-06-02.md",
+    "proof": "reports/agent-town-hq16v-generated-hud-art-dom-integration-preflight-proof-2026-06-02.json"
+  },
+  "inspectedFiles": [
+    "public/experiences/founders-plot/founders-plot.css",
+    "public/experiences/founders-plot/founders-plot.js",
+    "public/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1/manifest.json",
+    "public/experiences/founders-plot/assets/expedition-map/hq14s-public-terrain-underlay-v1/manifest.json",
+    "reports/agent-town-hq16p-expedition-map-game-hud-shell-2026-06-02.md",
+    "reports/agent-town-hq15q-symbol-first-text-replacement-plan-2026-06-02.md",
+    "reports/agent-town-hq16e-runtime-visual-pack-backlog-2026-06-02.md",
+    "reports/agent-town-hq16p-expedition-map-game-hud-shell-2026-06-02-desktop.png",
+    "reports/agent-town-hq16p-expedition-map-game-hud-shell-2026-06-02-mobile.png"
+  ],
+  "recommendedFirstPack": {
+    "packId": "hq16v_generated_hud_dom_chrome_v1",
+    "sameOriginDirectory": "public/experiences/founders-plot/assets/expedition-map/hq16v-generated-hud-dom-chrome-v1/"
+  },
+  "proposedSlots": [
+    {
+      "slotId": "hud.chrome.unit_dock_rail.v1",
+      "purpose": "Timber/canvas/brass rail behind the selectable Expedition Map unit dock.",
+      "targetSurface": ".fp-expedition-unit-roster / .fp-expedition-unit-rail",
+      "runtimeBinding": "CSS background or pointer-events-none pseudo-element behind existing DOM buttons.",
+      "sourceOfTruth": "Existing server-owned expeditionMap.units read model and DOM button state.",
+      "guardrailNotes": "Decorative only; cannot create units, commands, movement, routes, resources, rewards, or hidden truth."
+    },
+    {
+      "slotId": "hud.chrome.objective_plaque.v1",
+      "purpose": "Civic objective plaque for Current Focus and guided-loop steps.",
+      "targetSurface": ".fp-expedition-objective-strip / .fp-expedition-guided-loop",
+      "runtimeBinding": "CSS background or 9-slice-style frame while text, data-testid, aria, and objective state remain DOM-owned.",
+      "sourceOfTruth": "Existing expeditionObjectiveModel and server-owned Expedition Map state.",
+      "guardrailNotes": "No baked labels, endpoint words, costs, route lines, or fake objective truth."
+    },
+    {
+      "slotId": "hud.chrome.command_puck.v1",
+      "purpose": "Brass/teal command puck treatment for Move, Scout, Convoy, and Found controls.",
+      "targetSurface": ".fp-expedition-unit-command-bar__button",
+      "runtimeBinding": "Transparent PNG/WebP or CSS mask/background on real button elements.",
+      "sourceOfTruth": "Existing command hints, guarded handlers, and server mutation flags.",
+      "guardrailNotes": "Art never creates command availability or target eligibility; button click paths stay unchanged."
+    },
+    {
+      "slotId": "hud.chrome.inspector_drawer_frame.v1",
+      "purpose": "Parchment/canvas receipt drawer frame for optional proof and details.",
+      "targetSurface": ".fp-expedition-inspector-drawer / .fp-expedition-inspector-section",
+      "runtimeBinding": "CSS border-image/background frame around existing details/summary elements.",
+      "sourceOfTruth": "Existing collapsed Details, Ledger, Receipts, data attributes, and proof surfaces.",
+      "guardrailNotes": "Keeps proof optional; no new server, schema, tool, route, or Atlas behavior."
+    },
+    {
+      "slotId": "hud.chrome.semantic_zoom_badge.v1",
+      "purpose": "Small map-native badge for the semantic zoom tier overlay.",
+      "targetSurface": ".fp-expedition-semantic-zoom",
+      "runtimeBinding": "CSS background/pseudo-element with pointer-events none.",
+      "sourceOfTruth": "Existing Three.js camera zoom info and semantic zoom DOM overlay.",
+      "guardrailNotes": "Status only; does not unlock extra truth or alter map selection."
+    },
+    {
+      "slotId": "hud.chrome.receipt_ledger_tab.v1",
+      "purpose": "Receipt tab treatment for collapsed ledger/proof summaries.",
+      "targetSurface": ".fp-expedition-audit-details summary / .fp-expedition-receipt-trace",
+      "runtimeBinding": "CSS background or pseudo-element on existing summary/tab elements.",
+      "sourceOfTruth": "Existing receipt/event/proof read-model data and collapsed drawer state.",
+      "guardrailNotes": "No baked receipt IDs or proof text; player-facing proof stays optional."
+    }
+  ],
+  "integrationGuardrails": {
+    "reportProofOnly": true,
+    "noRuntimePromotion": true,
+    "noRuntimeSourceEdits": true,
+    "noTestEdits": true,
+    "noServerEdits": true,
+    "noSchemaEdits": true,
+    "noPackageEdits": true,
+    "noAssetEdits": true,
+    "noImageGeneration": true,
+    "noGitCommit": true,
+    "noPush": true,
+    "noMerge": true,
+    "noDeploy": true,
+    "noPublicPost": true,
+    "noExternalMessages": true,
+    "serverAuthorityUnchanged": true,
+    "domControlsRemainLive": true,
+    "scoutSectorOnlyFogRevealPath": true,
+    "noNewMutationPath": true,
+    "noScoutAuthorityExpansion": true,
+    "noOutpostAuthorityExpansion": true,
+    "noAtlasExecution": true,
+    "noGeneratedUniverseRuntime": true,
+    "noHiddenAutonomy": true,
+    "noHiddenTruthLeakage": true,
+    "routeAuthority": false,
+    "tradeEffects": false,
+    "economyEffects": false,
+    "resourceEffects": false,
+    "rewardEffects": false,
+    "combatEffects": false,
+    "schedulerEffects": false,
+    "crossPlotMutation": false,
+    "externalEffects": false
+  },
+  "blockedNotes": [
+    "Runtime promotion should wait until the six-slot generated HUD chrome review pack exists.",
+    "This preflight did not generate images and did not promote assets.",
+    "The safe next lane should write review media/provenance under reports/media only with runtimePromotion false."
+  ],
+  "verificationPerformed": [
+    "git status --short --branch",
+    "git rev-parse --abbrev-ref HEAD",
+    "git rev-parse HEAD",
+    "rg over Founders Plot HUD, Expedition Map, assets, and reports",
+    "sed/nl inspection of Founders Plot DOM builders and CSS HUD surfaces",
+    "jq inspection of existing runtime asset manifests",
+    "file inspection of current HQ16P/HQ15F proof screenshots"
+  ],
+  "recommendedNextLane": "HQ16W Generated HUD Chrome Review Pack"
+}
