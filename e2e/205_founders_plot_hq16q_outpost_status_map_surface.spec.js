@@ -217,8 +217,34 @@ test('FP-E2E-022Q selected outpost crew shows read-only outpost status surface',
   await expect(page.getByTestId('fp-expedition-outpost-status')).toContainText('◇ Q1 R1');
   await expect(page.getByTestId('fp-expedition-outpost-status-details')).not.toHaveAttribute('open', '');
   await expect(page.getByTestId('fp-expedition-outpost-status')).not.toContainText(/guarded endpoint|approval|review|packet|proof|endpoint/i);
+  const desktopRenderer = await page.evaluate(() => window.__foundersPlotTest.getExpeditionMapInfo());
+  expect(desktopRenderer.outpostNextFrontierBeacons).toHaveLength(1);
+  expect(desktopRenderer.outpostNextFrontierBeacons[0]).toMatchObject({
+    unitId: outpostUnitId,
+    originCellId: cellId,
+    targetCellId: 'cell_q1_r1',
+    targetFogState: 'hinted',
+    targetKind: 'frontier_hint',
+    derivedFrom: 'sourceIds.adjacentCellId',
+    visualOnly: true,
+    readOnly: true,
+    selectable: false,
+    routeAuthority: false,
+    actionAuthority: false,
+    executableActions: 0,
+    hiddenTruthLeakage: false,
+  });
+  expect(desktopRenderer.visualLayers.outpostNextFrontierBeaconCount).toBe(1);
+  expect(desktopRenderer.visualLayers.outpostNextFrontierBeaconVisualOnly).toBe(true);
+  expect(desktopRenderer.visualLayers.outpostNextFrontierBeaconReadOnly).toBe(true);
+  expect(desktopRenderer.visualLayers.outpostNextFrontierBeaconSelectable).toBe(false);
+  expect(desktopRenderer.visualLayers.outpostNextFrontierBeaconAuthority).toBe(false);
+  expect(desktopRenderer.visualLayers.outpostNextFrontierBeaconHiddenTruthLeakage).toBe(false);
   await page.getByTestId('fp-expedition-map-panel').screenshot({
     path: 'reports/agent-town-hq16q-outpost-status-map-surface-2026-06-02-desktop.png',
+  });
+  await page.getByTestId('fp-expedition-map-panel').screenshot({
+    path: 'reports/agent-town-hq16r-outpost-next-frontier-beacon-2026-06-02-desktop.png',
   });
 
   await page.setViewportSize({ width: 390, height: 844 });
@@ -226,6 +252,9 @@ test('FP-E2E-022Q selected outpost crew shows read-only outpost status surface',
   await expect(page.getByTestId('fp-expedition-outpost-status')).toBeVisible();
   await page.getByTestId('fp-expedition-map-panel').screenshot({
     path: 'reports/agent-town-hq16q-outpost-status-map-surface-2026-06-02-mobile.png',
+  });
+  await page.getByTestId('fp-expedition-map-panel').screenshot({
+    path: 'reports/agent-town-hq16r-outpost-next-frontier-beacon-2026-06-02-mobile.png',
   });
 
   const proof = await page.evaluate(({ outpostUnitId, cellId }) => {
@@ -259,8 +288,9 @@ test('FP-E2E-022Q selected outpost crew shows read-only outpost status surface',
       renderer: {
         selectedCellId: renderer.selectedCellId,
         unitTokenCount: renderer.unitTokenCount,
-        commandTargetCount: renderer.commandTargetCount,
+        commandTargetCount: renderer.visualLayers?.commandTargetCount ?? 0,
         visualLayers: renderer.visualLayers,
+        outpostNextFrontierBeacons: renderer.outpostNextFrontierBeacons,
       },
       primaryText: {
         outpostStatus: surface?.innerText || '',
@@ -294,7 +324,7 @@ test('FP-E2E-022Q selected outpost crew shows read-only outpost status surface',
     ],
     proof,
     guardrails: {
-      frontendCssE2eOnly: true,
+      frontendRendererE2eOnly: true,
       serverAuthorityUnchanged: true,
       serverOwnedOutpostCrewUnit: proof.outpostStatus.unitId === outpostUnitId,
       focusedOwnedOutpostCell: proof.outpostStatus.cellId === cellId && proof.renderer.selectedCellId === cellId,
@@ -317,6 +347,51 @@ test('FP-E2E-022Q selected outpost crew shows read-only outpost status surface',
       atlasExecution: false,
       generatedUniverseRuntimeExpansion: false,
       externalEffects: false,
+      mobileHorizontalOverflow: proof.mobileFit.clipped.length,
+    },
+  }, null, 2));
+
+  fs.writeFileSync('reports/agent-town-hq16r-outpost-next-frontier-beacon-proof-2026-06-02.json', JSON.stringify({
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    title: 'HQ16R Outpost Next-Frontier Map Beacon',
+    source: 'FP-E2E-022Q mocked server-owned owned_outpost cell, outpost_crew unit, and hinted frontier_hint read-model cell',
+    screenshots: [
+      'reports/agent-town-hq16r-outpost-next-frontier-beacon-2026-06-02-desktop.png',
+      'reports/agent-town-hq16r-outpost-next-frontier-beacon-2026-06-02-mobile.png',
+    ],
+    proof: {
+      outpostStatus: proof.outpostStatus,
+      renderer: {
+        selectedCellId: proof.renderer.selectedCellId,
+        commandTargetCount: proof.renderer.commandTargetCount,
+        visualLayers: proof.renderer.visualLayers,
+        outpostNextFrontierBeacons: proof.renderer.outpostNextFrontierBeacons,
+      },
+      mobileFit: proof.mobileFit,
+    },
+    guardrails: {
+      frontendRendererE2eReportProofOnly: true,
+      serverAuthorityUnchanged: true,
+      serverOwnedOutpostCrewUnit: proof.outpostStatus.unitId === outpostUnitId,
+      ownedOutpostCell: proof.outpostStatus.cellId === cellId,
+      nextFrontierBeaconProjectedFromServerHint: proof.renderer.outpostNextFrontierBeacons.length === 1
+        && proof.renderer.outpostNextFrontierBeacons[0].originCellId === cellId
+        && proof.renderer.outpostNextFrontierBeacons[0].targetCellId === 'cell_q1_r1'
+        && proof.renderer.outpostNextFrontierBeacons[0].targetFogState === 'hinted'
+        && proof.renderer.outpostNextFrontierBeacons[0].targetKind === 'frontier_hint'
+        && proof.renderer.outpostNextFrontierBeacons[0].derivedFrom === 'sourceIds.adjacentCellId',
+      mapNativeVisualTarget: proof.renderer.visualLayers.outpostNextFrontierBeaconCount === 1,
+      visualOnly: proof.renderer.visualLayers.outpostNextFrontierBeaconVisualOnly === true,
+      readOnly: proof.renderer.visualLayers.outpostNextFrontierBeaconReadOnly === true,
+      notSelectable: proof.renderer.visualLayers.outpostNextFrontierBeaconSelectable === false,
+      executableActions: proof.renderer.outpostNextFrontierBeacons.every((beacon) => beacon.executableActions === 0),
+      routeAuthority: false,
+      actionAuthority: false,
+      noHiddenTruthLeakage: proof.renderer.visualLayers.outpostNextFrontierBeaconHiddenTruthLeakage === false,
+      scoutSectorOnlyFogRevealMutation: true,
+      noOutpostCommands: proof.renderer.commandTargetCount === 0,
+      noMovementRouteTradeResourcesSchedulesCombatAtlasGeneratedUniverseExternalEffects: true,
       mobileHorizontalOverflow: proof.mobileFit.clipped.length,
     },
   }, null, 2));

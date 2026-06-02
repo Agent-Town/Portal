@@ -3604,6 +3604,164 @@ function expeditionCommandTargetsForUnit(unit = {}, cellsById = new Map()) {
   return Array.from(targets.values());
 }
 
+function expeditionOutpostFrontierDistance(origin = {}, target = {}) {
+  const dq = number(origin.q, 0) - number(target.q, 0);
+  const dr = number(origin.r, 0) - number(target.r, 0);
+  const ds = (number(origin.q, 0) + number(origin.r, 0)) - (number(target.q, 0) + number(target.r, 0));
+  return Math.max(Math.abs(dq), Math.abs(dr), Math.abs(ds));
+}
+
+function expeditionOutpostFrontierBeaconForUnit(unit = {}, cellsById = new Map(), cells = []) {
+  if (!unit?.unitId || String(unit.unitType || unit.role || '').toLowerCase() !== 'outpost_crew') return null;
+  const originCellId = String(unit.location?.cellId || unit.cellId || '').trim();
+  if (!originCellId) return null;
+  const origin = cellsById.get(originCellId);
+  if (!origin || !['discovered', 'known'].includes(String(origin.fogState || ''))) return null;
+  const originText = `${origin.kind || ''} ${origin.status || ''} ${(Array.isArray(origin.traits) ? origin.traits : []).join(' ')}`.toLowerCase();
+  if (!originText.includes('outpost')) return null;
+  const hinted = cells
+    .filter((cell) => String(cell.fogState || '') === 'hinted' && String(cell.kind || '') === 'frontier_hint')
+    .filter((cell) => cell.readOnly !== false)
+    .map((cell) => {
+      const adjacentSource = String(cell.sourceIds?.adjacentCellId || '') === originCellId;
+      return {
+        cell,
+        adjacentSource,
+        adjacentGeometry: cellsAreAdjacent(origin, cell),
+        distance: expeditionOutpostFrontierDistance(origin, cell)
+      };
+    })
+    .filter((entry) => entry.adjacentSource || entry.adjacentGeometry || Number.isFinite(entry.distance));
+  if (!hinted.length) return null;
+  hinted.sort((a, b) => {
+    if (a.adjacentSource !== b.adjacentSource) return a.adjacentSource ? -1 : 1;
+    if (a.adjacentGeometry !== b.adjacentGeometry) return a.adjacentGeometry ? -1 : 1;
+    return a.distance - b.distance;
+  });
+  const target = hinted[0].cell;
+  return {
+    unitId: String(unit.unitId || ''),
+    unitType: String(unit.unitType || ''),
+    originCellId,
+    targetCellId: String(target.cellId || ''),
+    targetFogState: String(target.fogState || ''),
+    targetKind: String(target.kind || ''),
+    derivedFrom: hinted[0].adjacentSource ? 'sourceIds.adjacentCellId' : 'nearest_visible_hinted_frontier_cell',
+    visualOnly: true,
+    readOnly: true,
+    selectable: false,
+    routeAuthority: false,
+    actionAuthority: false,
+    executableActions: 0,
+    hiddenTruthLeakage: false
+  };
+}
+
+function makeExpeditionOutpostNextFrontierTexture(selected = false) {
+  const key = `expedition-outpost-next-frontier:${EXPEDITION_VISUAL_SHELL_VERSION}:${selected ? 'selected' : 'idle'}`;
+  if (textureCache.has(key)) return textureCache.get(key);
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = selected ? 'rgba(245, 212, 132, 0.22)' : 'rgba(255, 226, 128, 0.16)';
+  ctx.beginPath();
+  ctx.arc(128, 128, 112, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = selected ? 'rgba(245, 212, 132, 0.92)' : 'rgba(209, 154, 72, 0.76)';
+  ctx.lineWidth = selected ? 12 : 9;
+  ctx.setLineDash([18, 12]);
+  ctx.beginPath();
+  ctx.arc(128, 128, 100, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.strokeStyle = 'rgba(27, 106, 100, 0.58)';
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.arc(128, 128, 70, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(255, 248, 232, 0.86)';
+  ctx.beginPath();
+  ctx.moveTo(128, 70);
+  ctx.lineTo(148, 128);
+  ctx.lineTo(128, 186);
+  ctx.lineTo(108, 128);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(46, 27, 14, 0.42)';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  textureCache.set(key, texture);
+  return texture;
+}
+
+function makeExpeditionOutpostNextFrontierBeacon(beacon = {}, layout = {}, selected = false) {
+  const origin = layout.positions?.get?.(String(beacon.originCellId || ''));
+  const target = layout.positions?.get?.(String(beacon.targetCellId || ''));
+  if (!origin || !target) return null;
+  const mid = {
+    x: (origin.x + target.x) / 2,
+    y: (origin.y + target.y) / 2
+  };
+  const lift = 0.34 + (Math.min(2.2, Math.hypot(target.x - origin.x, target.y - origin.y)) * 0.12);
+  const curve = new THREE.QuadraticBezierCurve3(
+    new THREE.Vector3(origin.x, origin.y + 0.30, 0.485),
+    new THREE.Vector3(mid.x, mid.y + lift, 0.485),
+    new THREE.Vector3(target.x, target.y + 0.02, 0.485)
+  );
+  const geometry = new THREE.BufferGeometry().setFromPoints(curve.getPoints(34));
+  const line = new THREE.Line(
+    geometry,
+    new THREE.LineDashedMaterial({
+      color: 0xd19a48,
+      transparent: true,
+      opacity: selected ? 0.88 : 0.68,
+      dashSize: 0.12,
+      gapSize: 0.09
+    })
+  );
+  line.computeLineDistances();
+  line.userData = {
+    kind: 'expedition_outpost_next_frontier_connection',
+    ...beacon
+  };
+  const glow = new THREE.Line(
+    geometry.clone(),
+    new THREE.LineBasicMaterial({ color: 0xf5d484, transparent: true, opacity: selected ? 0.22 : 0.14 })
+  );
+  glow.position.z = -0.01;
+  glow.userData = {
+    kind: 'expedition_outpost_next_frontier_connection_glow',
+    ...beacon
+  };
+  const ring = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: makeExpeditionOutpostNextFrontierTexture(selected),
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+    alphaTest: 0.03,
+    opacity: selected ? 0.94 : 0.82
+  }));
+  ring.position.set(target.x, target.y + 0.03, 0.505);
+  ring.scale.set(selected ? 1.22 : 1.08, selected ? 1.22 : 1.08, 1);
+  ring.userData = {
+    kind: 'expedition_outpost_next_frontier_beacon',
+    ...beacon
+  };
+  const group = new THREE.Group();
+  group.add(glow, line, ring);
+  group.userData = {
+    kind: 'expedition_outpost_next_frontier_group',
+    ...beacon
+  };
+  return { group, ring, line };
+}
+
 function detailFromExpeditionCell(object, source = 'expedition-three-raycast') {
   const data = object?.userData || {};
   return {
@@ -3629,6 +3787,7 @@ class ExpeditionMapThreeStage {
     this.outcomeFeedbackSprites = [];
     this.eventMarkerSprites = [];
     this.objectiveMarkerSprites = [];
+    this.outpostFrontierBeaconSprites = [];
     this.outcomeFeedback = null;
     this.hoverCellId = '';
     this.terrainUnderlayCount = 0;
@@ -3639,6 +3798,7 @@ class ExpeditionMapThreeStage {
     this.outcomeFeedbackCount = 0;
     this.eventMarkerCount = 0;
     this.objectiveMarkerCount = 0;
+    this.outpostFrontierBeaconCount = 0;
     this.scene = new THREE.Scene();
     this.camera = new THREE.OrthographicCamera(-EXPEDITION_WORLD_WIDTH / 2, EXPEDITION_WORLD_WIDTH / 2, EXPEDITION_WORLD_HEIGHT / 2, -EXPEDITION_WORLD_HEIGHT / 2, 0.1, 100);
     this.camera.position.set(0, 0, 10);
@@ -3723,6 +3883,7 @@ class ExpeditionMapThreeStage {
     this.outcomeFeedbackSprites = [];
     this.eventMarkerSprites = [];
     this.objectiveMarkerSprites = [];
+    this.outpostFrontierBeaconSprites = [];
     this.terrainUnderlayCount = 0;
     this.surveyStrokeCount = 0;
     this.markerCount = 0;
@@ -3731,6 +3892,7 @@ class ExpeditionMapThreeStage {
     this.outcomeFeedbackCount = 0;
     this.eventMarkerCount = 0;
     this.objectiveMarkerCount = 0;
+    this.outpostFrontierBeaconCount = 0;
     this.edgeFogCount = 0;
     this.civicBeaconCount = 0;
   }
@@ -4005,6 +4167,20 @@ class ExpeditionMapThreeStage {
 
     const units = Array.isArray(this.model.units?.items) ? this.model.units.items.filter((unit) => unit?.unitId) : [];
     const selectedUnit = units.find((unit) => String(unit.unitId || '') === String(this.selectedUnitId || '')) || null;
+    this.outpostFrontierBeaconCount = 0;
+    const outpostFrontierBeacon = expeditionOutpostFrontierBeaconForUnit(selectedUnit || {}, cellsById, this.cells);
+    if (outpostFrontierBeacon) {
+      const beaconRender = makeExpeditionOutpostNextFrontierBeacon(
+        outpostFrontierBeacon,
+        layout,
+        String(outpostFrontierBeacon.targetCellId || '') === String(this.selectedCellId || '')
+      );
+      if (beaconRender?.group) {
+        this.outpostFrontierBeaconSprites.push(beaconRender.ring);
+        this.outpostFrontierBeaconCount = 1;
+        this.scene.add(beaconRender.group);
+      }
+    }
     this.commandTargetCount = 0;
     for (const target of expeditionCommandTargetsForUnit(selectedUnit || {}, cellsById)) {
       const position = layout.positions.get(String(target.cellId || ''));
@@ -4441,6 +4617,13 @@ class ExpeditionMapThreeStage {
         eventObjectiveMarkersInspectable: [...this.eventMarkerSprites, ...this.objectiveMarkerSprites]
           .every((sprite) => sprite.userData?.selectable === true && sprite.userData?.inspectable === true),
         eventObjectiveMarkerAuthority: false,
+        outpostNextFrontierBeacon: true,
+        outpostNextFrontierBeaconCount: this.outpostFrontierBeaconCount,
+        outpostNextFrontierBeaconVisualOnly: this.outpostFrontierBeaconSprites.every((sprite) => sprite.userData?.visualOnly === true),
+        outpostNextFrontierBeaconReadOnly: this.outpostFrontierBeaconSprites.every((sprite) => sprite.userData?.readOnly === true),
+        outpostNextFrontierBeaconSelectable: this.outpostFrontierBeaconSprites.some((sprite) => sprite.userData?.selectable === true),
+        outpostNextFrontierBeaconAuthority: false,
+        outpostNextFrontierBeaconHiddenTruthLeakage: this.outpostFrontierBeaconSprites.some((sprite) => sprite.userData?.hiddenTruthLeakage === true),
         unitTokens: true,
         unitTokenCount: this.unitTokenCount,
         unitTokensReadOnly: this.unitSprites.every((sprite) => sprite.userData?.readOnly === true),
@@ -4533,6 +4716,23 @@ class ExpeditionMapThreeStage {
         routeAuthority: sprite.userData?.routeAuthority === true,
         actionAuthority: sprite.userData?.actionAuthority === true,
         executableActions: Number(sprite.userData?.executableActions || 0),
+        canvas: this.canvasPointForObject(sprite)
+      })),
+      outpostNextFrontierBeacons: this.outpostFrontierBeaconSprites.map((sprite) => ({
+        unitId: String(sprite.userData?.unitId || ''),
+        unitType: String(sprite.userData?.unitType || ''),
+        originCellId: String(sprite.userData?.originCellId || ''),
+        targetCellId: String(sprite.userData?.targetCellId || ''),
+        targetFogState: String(sprite.userData?.targetFogState || ''),
+        targetKind: String(sprite.userData?.targetKind || ''),
+        derivedFrom: String(sprite.userData?.derivedFrom || ''),
+        visualOnly: sprite.userData?.visualOnly === true,
+        readOnly: sprite.userData?.readOnly === true,
+        selectable: sprite.userData?.selectable === true,
+        routeAuthority: sprite.userData?.routeAuthority === true,
+        actionAuthority: sprite.userData?.actionAuthority === true,
+        executableActions: Number(sprite.userData?.executableActions || 0),
+        hiddenTruthLeakage: sprite.userData?.hiddenTruthLeakage === true,
         canvas: this.canvasPointForObject(sprite)
       })),
       units: this.unitSprites.map((sprite) => ({
