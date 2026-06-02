@@ -1,0 +1,70 @@
+{
+  "ok": true,
+  "generatedAt": "2026-06-02T02:33:00+07:00",
+  "lane": "HQ15M",
+  "title": "Inspector / Ledger Text Compaction",
+  "source": "Focused FP-E2E-022 browser replay over the HQ15 text-to-gameplay Expedition Map stack",
+  "changeScope": [
+    "public/experiences/founders-plot/founders-plot.js",
+    "e2e/200_founders_plot.spec.js"
+  ],
+  "outputs": {
+    "report": "reports/agent-town-hq15m-inspector-ledger-text-compaction-2026-06-02.md",
+    "desktopScreenshot": "reports/agent-town-hq15m-inspector-ledger-text-compaction-desktop-2026-06-02.png",
+    "mobileScreenshot": "reports/agent-town-hq15m-inspector-ledger-text-compaction-mobile-2026-06-02.png",
+    "contactSheet": "reports/agent-town-hq15m-inspector-ledger-text-compaction-contact-sheet-2026-06-02.png"
+  },
+  "checks": [
+    {
+      "command": "node --check public/experiences/founders-plot/founders-plot.js",
+      "exitCode": 0
+    },
+    {
+      "command": "node --check e2e/200_founders_plot.spec.js",
+      "exitCode": 0
+    },
+    {
+      "command": "git diff --check -- public/experiences/founders-plot/founders-plot.js e2e/200_founders_plot.spec.js",
+      "exitCode": 0
+    },
+    {
+      "command": "npx playwright test e2e/200_founders_plot.spec.js -g \"FP-E2E-022\"",
+      "exitCode": 0,
+      "result": "1/1 passed"
+    },
+    {
+      "command": "file reports/agent-town-hq15m-inspector-ledger-text-compaction-*.png",
+      "exitCode": 0
+    }
+  ],
+  "uiProof": {
+    "fogLedgerCollapsed": true,
+    "fogLedgerActions": 0,
+    "sectorActionAliasesCollapsed": true,
+    "sectorAliasButtonCountBeforeReveal": 1,
+    "visibleSectorAliasButtonCountBeforeReveal": 0,
+    "sectorAliasButtonCountAfterReveal": 0,
+    "selectedDetailsCollapsed": true,
+    "evidencePacketCollapsed": true,
+    "revealedSectorLedgerCollapsed": true,
+    "unitCommandBarPrimary": true
+  },
+  "guardrails": {
+    "frontendUiCompactionOnly": true,
+    "serverAuthorityUnchanged": true,
+    "newMutationPath": false,
+    "scoutSectorOnlyFogRevealMutation": true,
+    "hiddenTruthLeakage": false,
+    "atlasExecution": false,
+    "publicSharing": false,
+    "deploy": false,
+    "merge": false,
+    "push": false,
+    "generatedUniverseRendering": false,
+    "hiddenAutonomy": false,
+    "routeTradeEconomyResourceRewardCombatSchedulerBehavior": false,
+    "crossPlotMutation": false,
+    "externalEffects": false,
+    "wildWestGenreDrift": false
+  }
+}

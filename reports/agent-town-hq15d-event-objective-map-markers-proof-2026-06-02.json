@@ -1,0 +1,205 @@
+{
+  "ok": true,
+  "generatedAt": "2026-06-02T02:24:51.414Z",
+  "title": "HQ15D event packet and objective map markers",
+  "source": "FP-E2E-023 mocked server-owned Expedition Map read model with existing Event Packet and Current Focus objective data",
+  "changeScope": [
+    "public/experiences/founders-plot/three_scene_entry.js",
+    "public/experiences/founders-plot/three_scene_bundle.js",
+    "public/experiences/founders-plot/founders-plot.js",
+    "e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js"
+  ],
+  "markers": {
+    "initialEventMarkers": [
+      {
+        "packetId": "expedition_event_packet_hq15d_cell_q1_r0",
+        "cellId": "cell_q1_r0",
+        "templateId": "marker-stone",
+        "spriteAssetSlot": "event_packet",
+        "spriteAssetPath": "/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1/event-packet-v1.png",
+        "spriteAssetReady": true,
+        "visualOnly": true,
+        "readOnly": true,
+        "selectable": true,
+        "inspectable": true,
+        "routeAuthority": false,
+        "actionAuthority": false,
+        "executableActions": 0,
+        "canvas": {
+          "x": 508.35588235294114,
+          "y": 360.3970588235294
+        }
+      }
+    ],
+    "initialObjectiveMarkers": [
+      {
+        "mode": "scout",
+        "targetCellId": "cell_q0_r1",
+        "packetId": "expedition_event_packet_hq15d_cell_q1_r0",
+        "spriteAssetSlot": "objective_beacon",
+        "spriteAssetPath": "/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1/objective-beacon-v1.png",
+        "spriteAssetReady": true,
+        "visualOnly": true,
+        "readOnly": true,
+        "selectable": true,
+        "inspectable": true,
+        "routeAuthority": false,
+        "actionAuthority": false,
+        "executableActions": 0,
+        "canvas": {
+          "x": 502.035294117647,
+          "y": 480.77717647058824
+        }
+      }
+    ],
+    "objectiveMarkerSelection": {
+      "selectedCellId": "cell_q0_r1",
+      "marker": {
+        "mode": "scout",
+        "targetCellId": "cell_q0_r1",
+        "packetId": "expedition_event_packet_hq15d_cell_q1_r0",
+        "spriteAssetSlot": "objective_beacon",
+        "spriteAssetPath": "/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1/objective-beacon-v1.png",
+        "spriteAssetReady": true,
+        "visualOnly": true,
+        "readOnly": true,
+        "selectable": true,
+        "inspectable": true,
+        "routeAuthority": false,
+        "actionAuthority": false,
+        "executableActions": 0,
+        "canvas": {
+          "x": 502.035294117647,
+          "y": 480.77717647058824
+        }
+      }
+    },
+    "eventMarkerSelection": {
+      "selectedCellId": "cell_q1_r0",
+      "marker": {
+        "packetId": "expedition_event_packet_hq15d_cell_q1_r0",
+        "cellId": "cell_q1_r0",
+        "templateId": "marker-stone",
+        "spriteAssetSlot": "event_packet",
+        "spriteAssetPath": "/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1/event-packet-v1.png",
+        "spriteAssetReady": true,
+        "visualOnly": true,
+        "readOnly": true,
+        "selectable": true,
+        "inspectable": true,
+        "routeAuthority": false,
+        "actionAuthority": false,
+        "executableActions": 0,
+        "canvas": {
+          "x": 508.35588235294114,
+          "y": 360.3970588235294
+        }
+      }
+    },
+    "visualLayers": {
+      "terrainTexture": true,
+      "runtimeRegionAssetPack": "hq14s_public_terrain_underlay_v1",
+      "runtimeRegionAtlas": "/experiences/founders-plot/assets/expedition-map/hq14s-public-terrain-underlay-v1/manifest.json",
+      "runtimeTerrainUnderlay": "/experiences/founders-plot/assets/expedition-map/hq14s-public-terrain-underlay-v1/public-terrain-underlay-candidate-01-v1.png",
+      "runtimeSpriteAssetPack": "hq15e_expedition_unit_marker_sprites_v1",
+      "runtimeSpriteAtlas": "/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1/manifest.json",
+      "generatedSpriteAssets": true,
+      "generatedSpriteAssetCount": 8,
+      "generatedSpriteAssetsReady": 8,
+      "generatedSpriteAssetsVisualOnly": true,
+      "generatedSpriteAssetsReadOnly": true,
+      "serverTerrainAssetContractVersion": "agenttown_public_terrain_asset_slots_v1",
+      "serverTerrainSlotSource": "server_read_model_v1",
+      "assetBackedRegionTiles": 5,
+      "assetBackedLoadedTiles": 5,
+      "assetBackedTerrainTextures": true,
+      "continuousTerrainUnderlay": true,
+      "continuousTerrainUnderlayVersion": "hq14t_server_bound_terrain_underlay_v1",
+      "continuousUnderlayUsesServerOwnedCells": true,
+      "continuousUnderlayHiddenCellsFogOnly": true,
+      "continuousUnderlayVisualOnly": true,
+      "plateBlendLayer": true,
+      "softRegionSeams": true,
+      "reducedPlateEdgeContrast": true,
+      "centerTileMutedForUnderlay": true,
+      "cartographicFogDepth": true,
+      "ambientContourField": true,
+      "fogDepthGlyphsVisualOnly": true,
+      "terrainUnderlayCount": 1,
+      "proceduralFallbackWhenAssetPending": true,
+      "candidate02Cues": true,
+      "agentTownIdentityCues": true,
+      "scoutLedgerHud": true,
+      "mapFirstHudOverlays": true,
+      "hoverAffordance": true,
+      "selectedSectorOutline": true,
+      "beaconPlanWagonCues": true,
+      "homeNodeEmphasis": true,
+      "riverFlatCues": true,
+      "waterCuesServerGated": true,
+      "woodlandRidgeCues": true,
+      "ruinSignalCues": true,
+      "ruinSignalCuesServerGated": true,
+      "lockedUnknownSealedFogOnly": true,
+      "hintedAbstractFogEdge": true,
+      "frontierBoundaryDashes": true,
+      "frontierBoundaryVisualOnly": true,
+      "fogVeils": 2,
+      "edgeFogCount": 4,
+      "civicBeaconCount": 3,
+      "surveyStrokeCount": 5,
+      "surveyStrokesVisualOnly": true,
+      "receiptTraceVisualOnly": true,
+      "markerCount": 5,
+      "eventPacketMarkers": true,
+      "eventPacketMarkerCount": 1,
+      "objectiveMarkers": true,
+      "objectiveMarkerCount": 1,
+      "eventObjectiveMarkersVisualOnly": true,
+      "eventObjectiveMarkersReadOnly": true,
+      "eventObjectiveMarkersInspectable": true,
+      "eventObjectiveMarkerAuthority": false,
+      "unitTokens": true,
+      "unitTokenCount": 4,
+      "unitTokensReadOnly": true,
+      "unitMovementMutationImplemented": true,
+      "commandTargetRings": true,
+      "commandTargetCount": 2,
+      "commandTargetRingsVisualOnly": true,
+      "commandTargetRingsReadOnly": true,
+      "commandTargetRingAuthority": false,
+      "clientAuthority": false
+    }
+  },
+  "hiddenTruthProof": {
+    "hiddenCellsHaveNoPublicTerrainSlot": true,
+    "hiddenCellsUseOnlyFogAssets": true,
+    "hintedCellsAbstract": true,
+    "lockedUnknownCellsSealed": true,
+    "invalidHiddenConcreteTerrainNormalizedToFogOnly": true
+  },
+  "screenshots": [
+    "reports/agent-town-hq15d-event-objective-map-markers-desktop-2026-06-02.png",
+    "reports/agent-town-hq15d-event-objective-map-markers-mobile-2026-06-02.png"
+  ],
+  "guardrails": {
+    "readOnly": true,
+    "executableActions": [],
+    "eventMarkerActions": [
+      0
+    ],
+    "objectiveMarkerActions": [
+      0
+    ],
+    "markersVisualOnly": true,
+    "markersReadOnly": true,
+    "markersInspectable": true,
+    "markerAuthority": false,
+    "scoutSectorOnlyMutationPath": true,
+    "primaryScoutUnitCommandVisible": true,
+    "routeCreation": false,
+    "atlasExecution": false,
+    "hiddenTruthLeakage": false,
+    "noNewServerMutations": true
+  }
+}

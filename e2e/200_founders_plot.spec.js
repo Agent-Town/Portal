@@ -1210,6 +1210,7 @@ test('FP-E2E-014 UI shows HQ10 World Grid readiness as read-only advisory status
 });
 
 test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only', async ({ page }) => {
+  test.setTimeout(90000);
   const plotId = 'plot_hq12b_expedition_map_ui';
   const outpostPlotId = 'plot_hq12b_forest_outpost';
   const hq12lExpeditionParty = {
@@ -1364,6 +1365,151 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
       },
     ],
     expeditionParty: hq12lExpeditionParty,
+    units: {
+      unitRosterId: 'expedition_unit_roster_current_plot_v1',
+      kind: 'expedition_unit_roster',
+      version: 'hq15a_server_owned_expedition_unit_roster_v1',
+      readOnly: true,
+      executableActions: [],
+      authorityBoundary: 'server_owned_read_only_expedition_unit_roster_v1',
+      interactionModel: {
+        selectable: true,
+        mapTokens: true,
+        commandBarReady: true,
+        movementPreviewOnly: false,
+        movementCommandReady: true,
+        serverAuthoritativeMovementRequiredForMutation: true,
+      },
+      items: [
+        {
+          unitId: 'expedition_unit_pathfinder_scout_v1',
+          kind: 'expedition_map_unit',
+          unitType: 'scout',
+          displayName: 'Mira Trailmark',
+          role: 'scout',
+          state: 'AT_ORIGIN',
+          readOnly: true,
+          selectable: true,
+          executableActions: [],
+          location: { cellId: 'cell_origin', q: 0, r: 0, fogState: 'discovered' },
+          movement: { canMove: true, movementMutationImplemented: true, allowedTargetCellIds: ['cell_q1_r0'], authority: 'server_owned_scout_unit_revealed_cell_move_receipt_v1', allowedFogStates: ['discovered', 'known'], revealsFog: false, routeCreation: false, resourceDelta: {} },
+          commandHints: [{
+            commandId: 'move_unit',
+            label: 'Move',
+            actionName: 'et.plot.move_expedition_unit',
+            enabled: true,
+            targetCellIds: ['cell_q1_r0'],
+            serverMutationImplemented: true,
+            requiresHumanApprovalForAgent: true,
+            revealsFog: false,
+            routeCreation: false,
+          }, {
+            commandId: 'scout_sector',
+            label: 'Scout Sector',
+            actionName: 'et.plot.scout_sector',
+            enabled: true,
+            targetCellIds: ['cell_q0_r1'],
+            serverMutationImplemented: true,
+            requiresHumanApprovalForAgent: true,
+          }],
+          boundaryFlags: { movementMutation: true, movementRevealsFog: false, autonomousMovement: false, routeCreation: false, combat: false, atlasExecution: false, externalEffects: false },
+        },
+        {
+          unitId: 'expedition_unit_rook_signalpost_messenger_v1',
+          kind: 'expedition_map_unit',
+          unitType: 'courier',
+          displayName: 'Rook Signalpost',
+          role: 'messenger',
+          state: 'AT_ORIGIN',
+          readOnly: true,
+          selectable: true,
+          executableActions: [],
+          location: { cellId: 'cell_origin', q: 0, r: 0, fogState: 'discovered' },
+          movement: { canMove: false, movementMutationImplemented: false, allowedTargetCellIds: [] },
+          commandHints: [{ commandId: 'inspect_event_packet', label: 'Inspect packet', enabled: false, serverMutationImplemented: false }],
+          boundaryFlags: { movementMutation: false, autonomousMovement: false, routeCreation: false, combat: false, atlasExecution: false, externalEffects: false },
+        },
+        {
+          unitId: 'expedition_unit_surveyor_site_plan_hq12b_forest',
+          kind: 'expedition_map_unit',
+          unitType: 'surveyor',
+          displayName: 'Surveyor Crew',
+          role: 'surveyor',
+          state: 'SURVEY_READY',
+          readOnly: true,
+          selectable: true,
+          executableActions: [],
+          location: { cellId: 'cell_q1_r0', q: 1, r: 0, fogState: 'known' },
+          movement: { canMove: false, movementMutationImplemented: false, allowedTargetCellIds: [] },
+          sourcePlanId: 'site_plan_hq12b_forest',
+          commandHints: [{
+            commandId: 'inspect_survey',
+            label: 'Inspect survey',
+            enabled: true,
+            serverMutationImplemented: false,
+          }, {
+            commandId: 'prepare_settler_convoy',
+            label: 'Prepare Convoy',
+            actionName: 'et.plot.prepare_settler_convoy',
+            enabled: true,
+            sourcePlanId: 'site_plan_hq12b_forest',
+            targetCellIds: ['cell_q1_r0'],
+            serverMutationImplemented: true,
+            requiresHumanApprovalForAgent: true,
+            routeCreation: false,
+          }],
+          boundaryFlags: { movementMutation: false, autonomousMovement: false, routeCreation: false, combat: false, atlasExecution: false, externalEffects: false },
+        },
+        {
+          unitId: 'expedition_unit_outpost_crew_claim_hq12b_forest',
+          kind: 'expedition_map_unit',
+          unitType: 'outpost_crew',
+          displayName: 'Outpost Crew',
+          role: 'outpost_crew',
+          state: 'STATIONED',
+          readOnly: true,
+          selectable: true,
+          executableActions: [],
+          location: { cellId: 'cell_q1_r-1', q: 1, r: -1, fogState: 'discovered' },
+          movement: { canMove: false, movementMutationImplemented: false, allowedTargetCellIds: [] },
+          commandHints: [{ commandId: 'inspect_outpost', label: 'Inspect outpost', enabled: true, serverMutationImplemented: false }],
+          boundaryFlags: { movementMutation: false, autonomousMovement: false, routeCreation: false, combat: false, atlasExecution: false, externalEffects: false },
+        },
+        {
+          unitId: 'expedition_unit_settler_convoy_claim_hq12b_arrived',
+          kind: 'expedition_map_unit',
+          unitType: 'settler_convoy',
+          displayName: 'Settler Convoy',
+          role: 'settler',
+          state: 'CONVOY_ARRIVED',
+          readOnly: true,
+          selectable: true,
+          executableActions: [],
+          location: { cellId: 'cell_q1_r0', q: 1, r: 0, fogState: 'known' },
+          movement: { canMove: false, movementMutationImplemented: false, allowedTargetCellIds: [] },
+          sourceClaimId: 'claim_hq12b_arrived',
+          sourcePlanId: 'site_plan_hq12b_forest',
+          commandHints: [{
+            commandId: 'found_settlement',
+            label: 'Found Outpost',
+            actionName: 'et.plot.found_settlement',
+            enabled: true,
+            claimId: 'claim_hq12b_arrived',
+            targetCellIds: ['cell_q1_r0'],
+            serverMutationImplemented: true,
+            requiresHumanApprovalForAgent: true,
+            routeCreation: false,
+          }],
+          boundaryFlags: { movementMutation: false, autonomousMovement: false, routeCreation: false, combat: false, atlasExecution: false, externalEffects: false },
+        },
+      ],
+      byCellId: {
+        cell_origin: ['expedition_unit_pathfinder_scout_v1', 'expedition_unit_rook_signalpost_messenger_v1'],
+        cell_q1_r0: ['expedition_unit_surveyor_site_plan_hq12b_forest', 'expedition_unit_settler_convoy_claim_hq12b_arrived'],
+        'cell_q1_r-1': ['expedition_unit_outpost_crew_claim_hq12b_forest'],
+      },
+      boundaryFlags: { movementMutation: true, movementRevealsFog: false, autonomousMovement: false, routeCreation: false, combat: false, atlasExecution: false, externalEffects: false },
+    },
     receipt: {
       kind: 'expedition_map_read_model_projection',
       sourceIds: { plotId, worldGridProjectionHash: 'hq12b-world-grid' },
@@ -1374,6 +1520,10 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
     },
     projectionHash: 'hq12b-expedition-map-proof',
   };
+  let capturedMoveUnit = null;
+  let capturedPrepareFromUnit = null;
+  let capturedFoundFromUnit = null;
+  let moveUnitReceipt = null;
   let capturedScoutSector = null;
   let scoutSectorReceipt = null;
   let hq12fEventPacket = null;
@@ -1449,12 +1599,154 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
     });
   });
 
+  await page.route('**/api/founders-plot/prepare-settler-convoy', async (route) => {
+    capturedPrepareFromUnit = route.request().postDataJSON();
+    expect(capturedPrepareFromUnit.plotId).toBe(plotId);
+    expect(capturedPrepareFromUnit.sitePlanId).toBe('site_plan_hq12b_forest');
+    expect(capturedPrepareFromUnit.actor).toBe('HUMAN');
+    expect(capturedPrepareFromUnit.unitId).toBeUndefined();
+    expect(capturedPrepareFromUnit.routeCreation).toBeUndefined();
+    expect(capturedPrepareFromUnit.idempotencyKey).toMatch(/^fp-prepare-settler-convoy-site_plan_hq12b_forest-/);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        plotId,
+        worldDelta: [{ type: 'SETTLER_CONVOY_PREPARED', sitePlanId: 'site_plan_hq12b_forest' }],
+        error: null,
+        state: makeState().state,
+        stateHash: 'hq15i-prepare-convoy-unit-command',
+        settlementClaim: {
+          claimId: 'claim_hq15i_unit_command',
+          sitePlanId: 'site_plan_hq12b_forest',
+          status: 'CONVOY_PREPARING',
+        },
+        job: {
+          jobId: 'job_hq15i_unit_command',
+          kind: 'SETTLER_CONVOY',
+          status: 'RUNNING',
+        },
+        existing: false,
+      }),
+    });
+  });
+
+  await page.route('**/api/founders-plot/found-settlement', async (route) => {
+    capturedFoundFromUnit = route.request().postDataJSON();
+    expect(capturedFoundFromUnit.plotId).toBe(plotId);
+    expect(capturedFoundFromUnit.claimId).toBe('claim_hq12b_arrived');
+    expect(capturedFoundFromUnit.actor).toBe('HUMAN');
+    expect(capturedFoundFromUnit.unitId).toBeUndefined();
+    expect(capturedFoundFromUnit.routeCreation).toBeUndefined();
+    expect(capturedFoundFromUnit.idempotencyKey).toMatch(/^fp-found-settlement-claim_hq12b_arrived-/);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        plotId,
+        claimId: 'claim_hq12b_arrived',
+        worldDelta: [{ type: 'SETTLEMENT_FOUNDED', claimId: 'claim_hq12b_arrived' }],
+        error: null,
+        state: makeState().state,
+        stateHash: 'hq15k-found-outpost-unit-command',
+        existing: false,
+      }),
+    });
+  });
+
+  await page.route('**/api/founders-plot/expedition-map/move-unit', async (route) => {
+    capturedMoveUnit = route.request().postDataJSON();
+    expect(capturedMoveUnit.plotId).toBe(plotId);
+    expect(capturedMoveUnit.unitId).toBe('expedition_unit_pathfinder_scout_v1');
+    expect(capturedMoveUnit.targetCellId).toBe('cell_q1_r0');
+    expect(capturedMoveUnit.actor).toBe('HUMAN');
+    expect(capturedMoveUnit.idempotencyKey).toMatch(/^fp-expedition-unit-move-plot_hq12b_expedition_map_ui-expedition_unit_pathfinder_scout_v1-cell_origin-cell_q1_r0-/);
+    const scoutUnit = expeditionMap.units.items.find((unit) => unit.unitId === capturedMoveUnit.unitId);
+    const target = expeditionMap.cells.find((cell) => cell.cellId === capturedMoveUnit.targetCellId);
+    expect(scoutUnit.location.cellId).toBe('cell_origin');
+    expect(target.fogState).toBe('known');
+    moveUnitReceipt = {
+      moveId: 'expedition_unit_move_ui_001',
+      plotId,
+      unitId: scoutUnit.unitId,
+      unitType: scoutUnit.unitType,
+      sourceCellId: scoutUnit.location.cellId,
+      targetCellId: target.cellId,
+      receipt: {
+        kind: 'expedition_unit_move_receipt',
+        actionName: 'et.plot.move_expedition_unit',
+        movementRevealsFog: false,
+        resourceHarvesting: false,
+        resourceDelta: {},
+        routeCreation: false,
+        tradeRouteCreation: false,
+        backgroundScheduling: false,
+        combat: false,
+        publicSharing: false,
+        generatedUniverseRendering: false,
+        crossPlotMutation: false,
+        atlasExecution: false,
+        externalEffects: false,
+      },
+    };
+    expeditionMap.units.byCellId.cell_origin = ['expedition_unit_rook_signalpost_messenger_v1'];
+    expeditionMap.units.byCellId.cell_q1_r0 = [
+      'expedition_unit_pathfinder_scout_v1',
+      'expedition_unit_surveyor_site_plan_hq12b_forest',
+      'expedition_unit_settler_convoy_claim_hq12b_arrived',
+    ];
+    scoutUnit.state = 'MOVED';
+    scoutUnit.location = { cellId: target.cellId, q: target.q, r: target.r, fogState: target.fogState, source: 'expedition_unit_move_receipt' };
+    scoutUnit.lastMove = {
+      moveId: moveUnitReceipt.moveId,
+      sourceCellId: 'cell_origin',
+      targetCellId: target.cellId,
+      readOnly: true,
+    };
+    scoutUnit.movement = { canMove: true, movementMutationImplemented: true, allowedTargetCellIds: ['cell_origin', 'cell_q1_r-1'], authority: 'server_owned_scout_unit_revealed_cell_move_receipt_v1', allowedFogStates: ['discovered', 'known'], revealsFog: false, routeCreation: false, resourceDelta: {} };
+    scoutUnit.commandHints[0].targetCellIds = scoutUnit.movement.allowedTargetCellIds;
+    expeditionMap.projectionHash = 'hq15f-move-unit-ui-proof';
+    expeditionMap.receipt.projectionHash = 'hq15f-move-unit-ui-proof';
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        plotId,
+        worldDelta: [{ type: 'EXPEDITION_UNIT_MOVED', data: { move: moveUnitReceipt } }],
+        error: null,
+        state: makeState().state,
+        stateHash: 'hq15f-move-unit-ui',
+        move: moveUnitReceipt,
+        movement: moveUnitReceipt,
+        movedUnitId: scoutUnit.unitId,
+        sourceCellId: 'cell_origin',
+        targetCellId: target.cellId,
+        alreadyMoved: false,
+        proof: {
+          actionName: 'et.plot.move_expedition_unit',
+          unitId: scoutUnit.unitId,
+          sourceCellId: 'cell_origin',
+          targetCellId: target.cellId,
+          fogCountsUnchanged: true,
+          boundaryFlags: moveUnitReceipt.receipt,
+        },
+        expeditionMap,
+      }),
+    });
+  });
+
   await page.route('**/api/founders-plot/expedition-map/scout-sector', async (route) => {
     capturedScoutSector = route.request().postDataJSON();
     expect(capturedScoutSector.plotId).toBe(plotId);
     expect(capturedScoutSector.cellId).toBe('cell_q0_r1');
     expect(capturedScoutSector.actor).toBe('HUMAN');
     expect(capturedScoutSector.idempotencyKey).toMatch(/^fp-scout-sector-plot_hq12b_expedition_map_ui-cell_q0_r1-/);
+    expect(capturedScoutSector.unitId).toBeUndefined();
+    expect(capturedScoutSector.movement).toBeUndefined();
+    expect(capturedScoutSector.targetCellId).toBeUndefined();
 
     const target = expeditionMap.cells.find((cell) => cell.cellId === capturedScoutSector.cellId);
     expect(target.fogState).toBe('hinted');
@@ -1592,8 +1884,9 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   await page.goto('/founders-plot');
   const panel = page.getByTestId('fp-expedition-map-panel');
   await expect(panel).toBeVisible();
-  await expect(page.getByTestId('fp-expedition-map-status')).toContainText('FOG READ MODEL READY - private read-only');
-  await expect(page.getByTestId('fp-expedition-map-metrics')).toContainText('Discovered');
+  await expect(page.getByTestId('fp-expedition-map-status')).toHaveAttribute('data-status', 'FOG_READ_MODEL_READY');
+  await expect(page.getByTestId('fp-expedition-map-status')).toHaveAttribute('data-read-only', 'true');
+  await expect(page.getByTestId('fp-expedition-map-status-symbols')).toContainText('SRV');
   await expect(page.getByTestId('fp-expedition-map-metrics')).toContainText('2');
   await expect(page.getByTestId('fp-expedition-map-boundary')).toContainText('No autonomous movement');
   await expect(page.getByTestId('fp-expedition-map-boundary')).toContainText('Atlas execution');
@@ -1605,18 +1898,79 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   await expect(page.getByTestId('fp-expedition-sector-cell_q1_r0')).toContainText('resources wood +2, food +1');
   await expect(page.getByTestId('fp-expedition-receipts-cell_q1_r0')).toContainText('reviewed site plan known cell');
   await expect(page.getByTestId('fp-expedition-sector-cell_q1_r-1')).toContainText('Owned outpost: plot_hq12b_forest_outpost');
-  await expect(page.getByTestId('fp-btn-scout-sector-cell_q0_r1')).toBeVisible();
+  await expect(page.getByTestId('fp-expedition-inspector-scout-aliases')).not.toHaveAttribute('open', '');
+  await expect(page.getByTestId('fp-btn-scout-sector-cell_q0_r1')).toHaveCount(1);
+  await expect(page.getByTestId('fp-btn-scout-sector-cell_q0_r1')).not.toBeVisible();
   await expect(page.getByTestId('fp-expedition-map-visual-hud')).toHaveAttribute('data-fog-state', 'hinted');
   await expect(page.getByTestId('fp-expedition-map-selected-summary')).toHaveAttribute('data-scoutable', 'true');
-  await expect(page.getByTestId('fp-expedition-map-selected-summary')).toContainText('Scout Sector eligible');
-  await expect(page.getByTestId('fp-btn-scout-sector-map-chip-cell_q0_r1')).toBeVisible();
+  await expect(page.getByTestId('fp-expedition-map-selected-summary')).toHaveAttribute('aria-label', /Scout Sector eligible/);
+  await expect(page.getByTestId('fp-expedition-map-selected-summary')).toContainText('HINT');
+  await expect(page.getByTestId('fp-expedition-map-selected-summary')).not.toContainText('Scout unit command ready');
+  await expect(page.getByTestId('fp-expedition-map-selected-summary')).not.toContainText('cell_q0_r1');
   await expect(page.getByTestId('fp-expedition-fog-pips').locator('.fp-expedition-fog-pip')).toHaveCount(4);
-  await expect(page.getByTestId('fp-expedition-receipt-trace-map-selected')).toContainText('Provenance sealed');
+  await expect(page.getByTestId('fp-expedition-receipt-trace-map-selected')).toHaveAttribute('aria-label', /Provenance sealed/);
+  await expect(page.getByTestId('fp-expedition-receipt-trace-map-selected')).not.toContainText('Provenance sealed');
   await expect(page.getByTestId('fp-expedition-party-badges-map-selected')).toContainText('MT');
-  await expect(page.getByTestId('fp-expedition-party-badges-map-selected')).toContainText('HQ civic operator');
+  await expect(page.getByTestId('fp-expedition-party-badges-map-selected')).toHaveAttribute('aria-label', /party member/);
+  await expect(page.getByTestId('fp-expedition-party-badges-map-selected')).not.toContainText('HQ civic operator');
+  await expect(page.getByTestId('fp-expedition-unit-roster')).toContainText('Map units');
+  await expect(page.getByTestId('fp-expedition-unit-roster')).toHaveAttribute('data-movement-mutation', 'true');
+  await expect(page.getByTestId('fp-expedition-unit-token-expedition_unit_pathfinder_scout_v1')).toHaveAttribute('data-movement-mutation', 'true');
+  await expect(page.getByTestId('fp-expedition-unit-token-expedition_unit_surveyor_site_plan_hq12b_forest')).toHaveAttribute('aria-label', /Surveyor Crew/);
+  await expect(page.getByTestId('fp-expedition-unit-token-expedition_unit_surveyor_site_plan_hq12b_forest')).toHaveAttribute('data-movement-mutation', 'false');
+  await expect(page.getByTestId('fp-btn-move-expedition-unit-expedition_unit_pathfinder_scout_v1-cell_q1_r0')).toBeVisible();
+  await expect(page.getByTestId('fp-btn-move-expedition-unit-expedition_unit_pathfinder_scout_v1-cell_q1_r0')).toHaveAttribute('data-command-id', 'move_unit');
+  await expect(page.getByTestId('fp-btn-move-expedition-unit-expedition_unit_pathfinder_scout_v1-cell_q1_r0')).toHaveAttribute('data-cell-id', 'cell_q1_r0');
+  await expect(page.getByTestId('fp-expedition-unit-command-bar')).toContainText('Scout');
+  await expect(page.getByTestId('fp-expedition-unit-command-bar')).toHaveAttribute('data-unit-id', 'expedition_unit_pathfinder_scout_v1');
+  await expect(page.getByTestId('fp-expedition-unit-command-bar')).toHaveAttribute('data-actions', '2');
+  await expect(page.getByTestId('fp-btn-scout-sector-unit-command-cell_q0_r1')).toBeVisible();
+  await expect(page.getByTestId('fp-btn-scout-sector-unit-command-cell_q0_r1')).toHaveAttribute('data-unit-id', 'expedition_unit_pathfinder_scout_v1');
+  await expect(page.getByTestId('fp-btn-scout-sector-unit-command-cell_q0_r1')).toHaveAttribute('data-cell-id', 'cell_q0_r1');
+  await expect(page.getByTestId('fp-btn-scout-sector-unit-command-cell_q0_r1')).toHaveAttribute('data-command-id', 'scout_sector');
+  await expect(page.getByTestId('fp-expedition-unit-command-target')).toHaveAttribute('data-cell-id', 'cell_q0_r1');
+  await expect(page.getByTestId('fp-expedition-unit-command-target')).toContainText('HINT');
+  await expect(page.getByTestId('fp-expedition-unit-command-target')).not.toContainText('cell_q0_r1');
+  await expect(page.getByTestId('fp-expedition-unit-command-move-preview')).toHaveAttribute('data-count', '1');
+  await expect(page.getByTestId('fp-expedition-unit-command-move-preview')).toContainText('1 ↦');
+  await expect(page.getByTestId('fp-expedition-unit-movement-boundary')).toContainText('SRV');
+  await expect(page.getByTestId('fp-expedition-unit-movement-boundary')).toHaveAttribute('aria-label', 'Server movement active');
+  await page.getByTestId('fp-btn-move-expedition-unit-expedition_unit_pathfinder_scout_v1-cell_q1_r0').click();
+  await expect.poll(() => capturedMoveUnit?.targetCellId || '').toBe('cell_q1_r0');
+  await expect(page.getByTestId('fp-expedition-unit-token-expedition_unit_pathfinder_scout_v1')).toHaveAttribute('data-cell-id', 'cell_q1_r0');
+  await expect(page.getByTestId('fp-expedition-unit-command-bar')).not.toContainText('Move cell_origin');
+  await expect(page.getByTestId('fp-expedition-unit-movement-boundary')).toContainText('SRV');
+  await page.getByTestId('fp-expedition-unit-token-expedition_unit_rook_signalpost_messenger_v1').click();
+  await expect(page.getByTestId('fp-expedition-unit-command-bar')).toHaveAttribute('data-unit-id', 'expedition_unit_rook_signalpost_messenger_v1');
+  await expect(page.getByTestId('fp-expedition-unit-command-bar')).toHaveAttribute('data-actions', '0');
+  await expect(page.getByTestId('fp-btn-scout-sector-unit-command-cell_q0_r1')).toHaveCount(0);
+  await page.getByTestId('fp-expedition-unit-token-expedition_unit_surveyor_site_plan_hq12b_forest').click();
+  await expect(page.getByTestId('fp-expedition-unit-command-bar')).toHaveAttribute('data-unit-id', 'expedition_unit_surveyor_site_plan_hq12b_forest');
+  await expect(page.getByTestId('fp-expedition-unit-command-bar')).toContainText('Inspect');
+  await expect(page.getByTestId('fp-expedition-unit-command-bar')).toContainText('Convoy');
+  await expect(page.getByTestId('fp-btn-prepare-settler-convoy-unit-command-site_plan_hq12b_forest')).toHaveAttribute('data-plan-id', 'site_plan_hq12b_forest');
+  await expect(page.getByTestId('fp-btn-prepare-settler-convoy-unit-command-site_plan_hq12b_forest')).toHaveAttribute('data-unit-id', 'expedition_unit_surveyor_site_plan_hq12b_forest');
+  await expect(page.getByTestId('fp-btn-prepare-settler-convoy-unit-command-site_plan_hq12b_forest')).toHaveAttribute('data-command-id', 'prepare_settler_convoy');
+  await page.getByTestId('fp-btn-prepare-settler-convoy-unit-command-site_plan_hq12b_forest').click();
+  await expect.poll(() => capturedPrepareFromUnit?.sitePlanId || '').toBe('site_plan_hq12b_forest');
+  await expect(page.getByTestId('fp-expedition-unit-command-move-preview')).toHaveAttribute('aria-label', 'Move locked');
+  await page.getByTestId('fp-expedition-unit-token-expedition_unit_settler_convoy_claim_hq12b_arrived').click();
+  await expect(page.getByTestId('fp-expedition-unit-command-bar')).toHaveAttribute('data-unit-id', 'expedition_unit_settler_convoy_claim_hq12b_arrived');
+  await expect(page.getByTestId('fp-expedition-unit-command-bar')).toContainText('Found');
+  await expect(page.getByTestId('fp-btn-found-settlement-unit-command-claim_hq12b_arrived')).toHaveAttribute('data-claim-id', 'claim_hq12b_arrived');
+  await expect(page.getByTestId('fp-btn-found-settlement-unit-command-claim_hq12b_arrived')).toHaveAttribute('data-unit-id', 'expedition_unit_settler_convoy_claim_hq12b_arrived');
+  await expect(page.getByTestId('fp-btn-found-settlement-unit-command-claim_hq12b_arrived')).toHaveAttribute('data-command-id', 'found_settlement');
+  await page.getByTestId('fp-btn-found-settlement-unit-command-claim_hq12b_arrived').click();
+  await expect.poll(() => capturedFoundFromUnit?.claimId || '').toBe('claim_hq12b_arrived');
+  await expect(page.getByTestId('fp-expedition-unit-command-move-preview')).toHaveAttribute('aria-label', 'Move locked');
+  await page.getByTestId('fp-expedition-unit-token-expedition_unit_pathfinder_scout_v1').click();
+  await expect(page.getByTestId('fp-expedition-map-visual-hud')).toHaveAttribute('data-selected-cell-id', 'cell_q0_r1');
+  await expect(page.getByTestId('fp-btn-scout-sector-unit-command-cell_q0_r1')).toBeVisible();
   await expect(page.getByTestId('fp-expedition-map-hud')).toHaveAttribute('data-drawer', 'visual-inspector');
-  await expect(page.getByTestId('fp-expedition-inspector-chrome')).toContainText('Visual inspector');
-  await expect(page.getByTestId('fp-expedition-inspector-chips')).toContainText('read-only');
+  await expect(page.getByTestId('fp-expedition-inspector-chrome')).toHaveAttribute('aria-label', /Visual inspector/);
+  await expect(page.getByTestId('fp-expedition-inspector-chips')).toContainText('SRV');
+  await expect(page.getByTestId('fp-expedition-inspector-fog-ledger')).not.toHaveAttribute('open', '');
+  await expect(page.getByTestId('fp-expedition-inspector-scout-aliases')).not.toHaveAttribute('open', '');
   await expect(page.getByTestId('fp-expedition-inspector-ledger')).not.toHaveAttribute('open', '');
   await expect(page.getByTestId('fp-expedition-sector-cell_q1_r0').locator('button')).toHaveCount(0);
   await expect(page.getByTestId('fp-btn-scout-sector-cell_q1_r0')).toHaveCount(0);
@@ -1626,6 +1980,10 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   await panel.screenshot({ path: 'reports/agent-town-hq12b-expedition-map-ui-desktop-2026-05-31.png' });
   await panel.screenshot({ path: 'reports/agent-town-hq12o-expedition-sector-art-readability-desktop-2026-06-01.png' });
   await panel.screenshot({ path: 'reports/agent-town-hq14d-map-first-ui-playability-slice-desktop-2026-06-01.png' });
+  await panel.screenshot({ path: 'reports/agent-town-hq15c-scout-unit-command-flow-desktop-2026-06-02.png' });
+  await panel.screenshot({ path: 'reports/agent-town-hq15l-command-target-playtest-desktop-2026-06-02.png' });
+  await panel.screenshot({ path: 'reports/agent-town-hq15m-inspector-ledger-text-compaction-desktop-2026-06-02.png' });
+  await panel.screenshot({ path: 'reports/agent-town-hq15s-fog-selected-inspector-symbol-compaction-desktop-2026-06-02.png' });
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
@@ -1635,6 +1993,41 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
     viewport: document.documentElement.clientWidth,
     documentScrollWidth: document.documentElement.scrollWidth,
     bodyScrollWidth: document.body.scrollWidth,
+    commandBarVisibility: (() => {
+      const roster = document.querySelector('[data-testid="fp-expedition-unit-roster"]');
+      const commandBar = document.querySelector('[data-testid="fp-expedition-unit-command-bar"]');
+      const rosterRect = roster?.getBoundingClientRect();
+      const commandRect = commandBar?.getBoundingClientRect();
+      const commandItems = Array.from(commandBar?.querySelectorAll('button, small, span') || []).map((node) => {
+        const rect = node.getBoundingClientRect();
+        return {
+          text: node.textContent || '',
+          top: Math.round(rect.top),
+          bottom: Math.round(rect.bottom),
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+        };
+      });
+      const clippedItems = commandItems.filter((entry) => (
+        rosterRect
+          && entry.height > 0
+          && (entry.top < rosterRect.top - 1 || entry.bottom > rosterRect.bottom + 1)
+      ));
+      return {
+        roster: rosterRect ? {
+          top: Math.round(rosterRect.top),
+          bottom: Math.round(rosterRect.bottom),
+          height: Math.round(rosterRect.height),
+        } : null,
+        commandBar: commandRect ? {
+          top: Math.round(commandRect.top),
+          bottom: Math.round(commandRect.bottom),
+          height: Math.round(commandRect.height),
+        } : null,
+        commandItems,
+        clippedItems,
+      };
+    })(),
     clipped: Array.from(document.querySelectorAll([
       '.fp-expedition-map-card',
       '.fp-expedition-sector-card',
@@ -1646,6 +2039,9 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
       '.fp-expedition-fog-pips',
       '.fp-expedition-receipt-trace',
       '.fp-expedition-party-badges',
+      '.fp-expedition-unit-roster',
+      '.fp-expedition-unit-rail',
+      '.fp-expedition-unit-command-bar',
     ].join(','))).map((node) => {
       const rect = node.getBoundingClientRect();
       return {
@@ -1659,10 +2055,19 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   expect(mobileLayout.documentScrollWidth).toBeLessThanOrEqual(mobileLayout.viewport + 1);
   expect(mobileLayout.bodyScrollWidth).toBeLessThanOrEqual(mobileLayout.viewport + 1);
   expect(mobileLayout.clipped).toEqual([]);
+  expect(mobileLayout.commandBarVisibility.commandBar.height).toBeGreaterThan(0);
+  expect(mobileLayout.commandBarVisibility.commandItems.map((entry) => entry.text).join(' ')).toContain('Scout');
+  expect(mobileLayout.commandBarVisibility.commandItems.map((entry) => entry.text).join(' ')).toContain('HINT');
+  expect(mobileLayout.commandBarVisibility.commandItems.map((entry) => entry.text).join(' ')).not.toContain('cell_q0_r1');
+  expect(mobileLayout.commandBarVisibility.clippedItems).toEqual([]);
   await page.locator('#fp-drawer-toggle').evaluate((node) => { node.style.display = 'none'; });
   await page.getByTestId('fp-expedition-map-panel').screenshot({ path: 'reports/agent-town-hq12b-expedition-map-ui-mobile-2026-05-31.png' });
   await page.getByTestId('fp-expedition-map-panel').screenshot({ path: 'reports/agent-town-hq12o-expedition-sector-art-readability-mobile-2026-06-01.png' });
   await page.getByTestId('fp-expedition-map-panel').screenshot({ path: 'reports/agent-town-hq14d-map-first-ui-playability-slice-mobile-2026-06-01.png' });
+  await page.getByTestId('fp-expedition-map-panel').screenshot({ path: 'reports/agent-town-hq15c-scout-unit-command-flow-mobile-2026-06-02.png' });
+  await page.getByTestId('fp-expedition-map-panel').screenshot({ path: 'reports/agent-town-hq15l-command-target-playtest-mobile-2026-06-02.png' });
+  await page.getByTestId('fp-expedition-map-panel').screenshot({ path: 'reports/agent-town-hq15m-inspector-ledger-text-compaction-mobile-2026-06-02.png' });
+  await page.getByTestId('fp-expedition-map-panel').screenshot({ path: 'reports/agent-town-hq15s-fog-selected-inspector-symbol-compaction-mobile-2026-06-02.png' });
 
   const domProof = await page.evaluate(() => ({
     panelVisible: !!document.querySelector('[data-testid="fp-expedition-map-panel"]'),
@@ -1672,9 +2077,14 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
       fogState: document.querySelector('[data-testid="fp-expedition-map-visual-hud"]')?.getAttribute('data-fog-state') || '',
       scoutable: document.querySelector('[data-testid="fp-expedition-map-visual-hud"]')?.getAttribute('data-scoutable') || '',
       selectedSummaryText: document.querySelector('[data-testid="fp-expedition-map-selected-summary"]')?.textContent || '',
+      selectedSummaryLabel: document.querySelector('[data-testid="fp-expedition-map-selected-summary"]')?.getAttribute('aria-label') || '',
       receiptTraceText: document.querySelector('[data-testid="fp-expedition-receipt-trace-map-selected"]')?.textContent || '',
+      receiptTraceLabel: document.querySelector('[data-testid="fp-expedition-receipt-trace-map-selected"]')?.getAttribute('aria-label') || '',
       partyBadgesText: document.querySelector('[data-testid="fp-expedition-party-badges-map-selected"]')?.textContent || '',
+      partyBadgesLabel: document.querySelector('[data-testid="fp-expedition-party-badges-map-selected"]')?.getAttribute('aria-label') || '',
       fogPipCount: document.querySelectorAll('[data-testid="fp-expedition-fog-pips"] .fp-expedition-fog-pip').length,
+      fogPipTexts: Array.from(document.querySelectorAll('[data-testid="fp-expedition-fog-pips"] .fp-expedition-fog-pip')).map((node) => node.textContent || ''),
+      fogPipLabels: Array.from(document.querySelectorAll('[data-testid="fp-expedition-fog-pips"] .fp-expedition-fog-pip')).map((node) => node.getAttribute('aria-label') || ''),
     },
     cells: Array.from(document.querySelectorAll('[data-testid^="fp-expedition-cell-"]')).map((node) => ({
       testid: node.getAttribute('data-testid'),
@@ -1694,6 +2104,18 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
       text: document.querySelector('[data-testid="fp-expedition-selected-sector"]')?.textContent || '',
     },
     hiddenSummaryText: document.querySelector('[data-testid="fp-expedition-map-hidden-summary"]')?.textContent || '',
+    inspectorCompaction: {
+      fogLedgerCollapsed: !document.querySelector('[data-testid="fp-expedition-inspector-fog-ledger"]')?.hasAttribute('open'),
+      fogLedgerActions: Number(document.querySelector('[data-testid="fp-expedition-inspector-fog-ledger"]')?.getAttribute('data-actions') || 0),
+      scoutAliasesCollapsed: !document.querySelector('[data-testid="fp-expedition-inspector-scout-aliases"]')?.hasAttribute('open'),
+      scoutAliasButtonCount: document.querySelectorAll('[data-testid="fp-expedition-inspector-scout-aliases"] [data-testid^="fp-btn-scout-sector-"]').length,
+      visibleScoutAliasButtonCount: Array.from(document.querySelectorAll('[data-testid="fp-expedition-inspector-scout-aliases"] [data-testid^="fp-btn-scout-sector-"]'))
+        .filter((node) => {
+          const style = getComputedStyle(node);
+          const rect = node.getBoundingClientRect();
+          return style.visibility !== 'hidden' && style.display !== 'none' && rect.width > 0 && rect.height > 0;
+        }).length,
+    },
     sectorCards: Array.from(document.querySelectorAll('[data-testid^="fp-expedition-sector-"]')).map((node) => ({
       testid: node.getAttribute('data-testid'),
       fogState: node.getAttribute('data-fog-state') || '',
@@ -1716,6 +2138,27 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
       label: node.getAttribute('aria-label'),
       text: node.textContent,
     })),
+    units: {
+      rosterText: document.querySelector('[data-testid="fp-expedition-unit-roster"]')?.textContent || '',
+      tokenCount: document.querySelectorAll('[data-testid^="fp-expedition-unit-token-"]').length,
+      tokenTypes: Array.from(document.querySelectorAll('[data-testid^="fp-expedition-unit-token-"]')).map((node) => node.getAttribute('data-unit-type')),
+      tokenLabels: Array.from(document.querySelectorAll('[data-testid^="fp-expedition-unit-token-"]')).map((node) => node.getAttribute('aria-label') || ''),
+      selectedToken: document.querySelector('[data-testid^="fp-expedition-unit-token-"][aria-pressed="true"]')?.getAttribute('data-unit-type') || '',
+      movementMutationValues: Array.from(document.querySelectorAll('[data-testid^="fp-expedition-unit-token-"]')).map((node) => node.getAttribute('data-movement-mutation')),
+      commandText: document.querySelector('[data-testid="fp-expedition-unit-command-bar"]')?.textContent || '',
+      commandMutationValues: Array.from(document.querySelectorAll('[data-testid="fp-expedition-unit-command-bar"] [data-command-id]')).map((node) => node.getAttribute('data-server-mutation-implemented')),
+      moveButtonText: document.querySelector('[data-testid^="fp-btn-move-expedition-unit-expedition_unit_pathfinder_scout_v1-"]')?.textContent || '',
+      moveButtonTargetCellId: document.querySelector('[data-testid^="fp-btn-move-expedition-unit-expedition_unit_pathfinder_scout_v1-"]')?.getAttribute('data-cell-id') || '',
+      moveTargetText: document.querySelector('[data-testid="fp-expedition-unit-move-target"]')?.textContent || '',
+      movePreviewCount: document.querySelector('[data-testid="fp-expedition-unit-command-move-preview"]')?.getAttribute('data-count') || '',
+      movementBoundaryText: document.querySelector('[data-testid="fp-expedition-unit-movement-boundary"]')?.textContent || '',
+      movementBoundaryLabel: document.querySelector('[data-testid="fp-expedition-unit-movement-boundary"]')?.getAttribute('aria-label') || '',
+      primaryScoutButtonText: document.querySelector('[data-testid="fp-btn-scout-sector-unit-command-cell_q0_r1"]')?.textContent || '',
+      primaryScoutButtonUnitId: document.querySelector('[data-testid="fp-btn-scout-sector-unit-command-cell_q0_r1"]')?.getAttribute('data-unit-id') || '',
+      primaryScoutButtonTargetCellId: document.querySelector('[data-testid="fp-btn-scout-sector-unit-command-cell_q0_r1"]')?.getAttribute('data-cell-id') || '',
+      commandTargetText: document.querySelector('[data-testid="fp-expedition-unit-command-target"]')?.textContent || '',
+      commandTargetCellId: document.querySelector('[data-testid="fp-expedition-unit-command-target"]')?.getAttribute('data-cell-id') || '',
+    },
     mutationButtons: Array.from(document.querySelectorAll('[data-testid="fp-expedition-map-panel"] button'))
       .filter((node) => String(node.getAttribute('data-testid') || '').startsWith('fp-btn-scout-sector-'))
       .map((node) => ({
@@ -1730,18 +2173,53 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   expect(domProof.selectedSector.text).toContain('Resources and hidden gameplay truth remain unrevealed');
   expect(domProof.selectedSector.text).not.toMatch(/resources wood|wood \+2|food \+1|receipt scout_sector_ui_001|owned outpost: plot_hq12b_forest_outpost/i);
   expect(domProof.hiddenSummaryText).not.toMatch(/wood \+2|food \+1|route|receipt scout_sector_ui_001/i);
+  expect(domProof.inspectorCompaction.fogLedgerCollapsed).toBe(true);
+  expect(domProof.inspectorCompaction.fogLedgerActions).toBe(0);
+  expect(domProof.inspectorCompaction.scoutAliasesCollapsed).toBe(true);
+  expect(domProof.inspectorCompaction.scoutAliasButtonCount).toBe(1);
+  expect(domProof.inspectorCompaction.visibleScoutAliasButtonCount).toBe(0);
   expect(domProof.visualStateStyles).toHaveLength(5);
   expect(domProof.mapFirstHud.visible).toBe(true);
   expect(domProof.mapFirstHud.selectedCellId).toBe('cell_q0_r1');
   expect(domProof.mapFirstHud.fogState).toBe('hinted');
   expect(domProof.mapFirstHud.scoutable).toBe('true');
-  expect(domProof.mapFirstHud.selectedSummaryText).toContain('Scout Sector eligible');
+  expect(domProof.mapFirstHud.selectedSummaryLabel).toContain('Scout Sector eligible');
+  expect(domProof.mapFirstHud.selectedSummaryText).toContain('HINT');
+  expect(domProof.mapFirstHud.selectedSummaryText).not.toMatch(/Scout unit command ready|Scout Sector eligible|fog hinted|cell_q0_r1|Provenance sealed/i);
   expect(domProof.mapFirstHud.selectedSummaryText).not.toMatch(/wood \+2|food \+1|owned outpost: plot_hq12b_forest_outpost/i);
-  expect(domProof.mapFirstHud.receiptTraceText).toContain('Provenance sealed');
+  expect(domProof.mapFirstHud.receiptTraceLabel).toContain('Provenance sealed');
+  expect(domProof.mapFirstHud.receiptTraceText).not.toContain('Provenance sealed');
   expect(domProof.mapFirstHud.partyBadgesText).toContain('MT');
-  expect(domProof.mapFirstHud.partyBadgesText).toContain('HQ civic operator');
+  expect(domProof.mapFirstHud.partyBadgesText).not.toContain('HQ civic operator');
+  expect(domProof.mapFirstHud.fogPipTexts.join(' ')).not.toMatch(/DISCOVERED|HINTED|LOCKED/);
+  expect(domProof.mapFirstHud.fogPipLabels.join(' ')).toContain('Discovered');
   expect(domProof.mapFirstHud.fogPipCount).toBe(4);
   expect(domProof.mapControlButtons).toHaveLength(3);
+  expect(domProof.units.tokenCount).toBe(5);
+  expect(domProof.units.tokenTypes).toContain('surveyor');
+  expect(domProof.units.tokenTypes).toContain('settler_convoy');
+  expect(domProof.units.rosterText).not.toContain('cell_q0_r1');
+  expect(domProof.units.tokenLabels.join(' ')).toContain('Surveyor Crew');
+  expect(domProof.units.tokenLabels.join(' ')).toContain('Settler Convoy');
+  expect(domProof.units.selectedToken).toBe('scout');
+  expect(domProof.units.movementMutationValues).toContain('true');
+  expect(domProof.units.commandText).toContain('Scout');
+  expect(domProof.units.commandText).toMatch(/\d+ ↦/);
+  expect(domProof.units.commandText).toContain('SRV');
+  expect(domProof.units.commandText).not.toMatch(/Target cell_|Move cell_|server movement active|move targets?/i);
+  expect(domProof.units.moveButtonText).toContain('Move');
+  expect(['cell_origin', 'cell_q1_r-1']).toContain(domProof.units.moveButtonTargetCellId);
+  expect(domProof.units.moveTargetText).toMatch(/↦/);
+  expect(Number(domProof.units.movePreviewCount)).toBeGreaterThan(0);
+  expect(domProof.units.movementBoundaryText).toContain('SRV');
+  expect(domProof.units.movementBoundaryLabel).toBe('Server movement active');
+  expect(domProof.units.primaryScoutButtonText).toContain('Scout');
+  expect(domProof.units.primaryScoutButtonUnitId).toBe('expedition_unit_pathfinder_scout_v1');
+  expect(domProof.units.primaryScoutButtonTargetCellId).toBe('cell_q0_r1');
+  expect(domProof.units.commandTargetText).toContain('HINT');
+  expect(domProof.units.commandTargetText).not.toContain('cell_q0_r1');
+  expect(domProof.units.commandTargetCellId).toBe('cell_q0_r1');
+  expect(domProof.units.commandMutationValues).toContain('true');
   fs.writeFileSync('reports/agent-town-hq12b-expedition-map-ui-proof-2026-05-31.json', JSON.stringify({
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -1768,7 +2246,7 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.reload();
-  await page.getByTestId('fp-btn-scout-sector-cell_q0_r1').click();
+  await page.getByTestId('fp-btn-scout-sector-unit-command-cell_q0_r1').click();
   await expect(page.getByTestId('fp-scout-sector-result')).toContainText('cell_q0_r1 moved from hinted to known');
   await expect(page.getByTestId('fp-expedition-cell-cell_q0_r1')).toHaveAttribute('data-fog-state', 'known');
   await expect(page.getByTestId('fp-expedition-sector-cell_q0_r1')).toContainText('Scouted Frontier Sector');
@@ -1793,8 +2271,8 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   await expect(page.getByTestId('fp-expedition-objective-strip')).toHaveAttribute('data-read-only', 'true');
   await expect(page.getByTestId('fp-expedition-objective-strip')).toHaveAttribute('data-actions', '0');
   await expect(page.getByTestId('fp-expedition-objective-strip')).toHaveAttribute('data-mode', 'packet');
-  await expect(page.getByTestId('fp-expedition-objective-strip')).toContainText('Review the latest packet');
-  await expect(page.getByTestId('fp-expedition-objective-strip')).toContainText('zero executable actions');
+  await expect(page.getByTestId('fp-expedition-objective-strip')).toHaveAttribute('aria-label', /Review the latest packet/);
+  await expect(page.getByTestId('fp-expedition-objective-strip').locator('.fp-expedition-objective-strip__copy')).toContainText('PKT');
   await expect(page.getByTestId('fp-expedition-objective-strip-boundary')).toContainText('No new server objectives');
   await expect(page.getByTestId('fp-expedition-event-packet-facts-expedition_event_packet_hq12f_cell_q0_r1')).toContainText('Read-only');
   await expect(page.getByTestId('fp-expedition-event-packet-facts-expedition_event_packet_hq12f_cell_q0_r1')).toContainText('true');
@@ -1803,9 +2281,37 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   await expect(page.getByTestId('fp-expedition-event-packet-boundary-cell_q0_r1')).toContainText('No packet actions');
   await expect(page.getByTestId('fp-expedition-event-packet-boundary-cell_q0_r1')).toContainText('Atlas execution');
   await expect(page.getByTestId('fp-btn-scout-sector-cell_q0_r1')).toHaveCount(0);
+  await expect(page.getByTestId('fp-btn-scout-sector-unit-command-cell_q0_r1')).toHaveCount(0);
   await expect(page.getByTestId('fp-btn-scout-sector-cell_q1_r0')).toHaveCount(0);
   await expect(page.getByTestId('fp-btn-scout-sector-cell_q3_r0')).toHaveCount(0);
   await page.locator('#fp-drawer-toggle').evaluate((node) => { node.style.display = 'none'; });
+  await expect.poll(async () => {
+    const info = await page.evaluate(() => window.__foundersPlotTest.getExpeditionMapInfo());
+    return info?.visualLayers?.generatedSpriteAssetsReady || 0;
+  }, { timeout: 8000 }).toBeGreaterThanOrEqual(8);
+  const initialRendererInfo = await page.evaluate(() => window.__foundersPlotTest.getExpeditionMapInfo());
+  expect(initialRendererInfo.visualLayers.commandTargetRings).toBe(true);
+  expect(initialRendererInfo.visualLayers.commandTargetCount).toBeGreaterThanOrEqual(1);
+  expect(initialRendererInfo.visualLayers.commandTargetRingsVisualOnly).toBe(true);
+  expect(initialRendererInfo.visualLayers.commandTargetRingsReadOnly).toBe(true);
+  expect(initialRendererInfo.visualLayers.commandTargetRingAuthority).toBe(false);
+  expect(initialRendererInfo.commandTargets.every((target) => target.visualOnly && target.readOnly)).toBe(true);
+  expect(initialRendererInfo.commandTargets.every((target) => target.executableActions === 0 && target.routeAuthority === false && target.actionAuthority === false)).toBe(true);
+  expect(initialRendererInfo.commandTargets.every((target) => ['known', 'discovered', 'hinted'].includes(target.fogState))).toBe(true);
+  if (initialRendererInfo.commandTargets.some((target) => target.commandId === 'scout_sector')) {
+    expect(initialRendererInfo.commandTargets.find((target) => target.commandId === 'scout_sector')).toMatchObject({
+      cellId: 'cell_q0_r1',
+      fogState: 'hinted',
+      executableActions: 0,
+      routeAuthority: false,
+      actionAuthority: false,
+    });
+  }
+  expect(initialRendererInfo.commandTargets.find((target) => target.commandId === 'move_unit')).toMatchObject({
+    executableActions: 0,
+    routeAuthority: false,
+    actionAuthority: false,
+  });
   await page.getByTestId('fp-expedition-map-panel').screenshot({ path: 'reports/agent-town-hq12f-expedition-event-packets-ui-desktop-2026-05-31.png' });
   await page.getByTestId('fp-expedition-map-panel').screenshot({ path: 'reports/agent-town-hq12c-scout-sector-ui-desktop-2026-05-31.png' });
   await page.getByTestId('fp-expedition-map-panel').screenshot({ path: 'reports/agent-town-hq12g-expedition-party-flavor-ui-desktop-2026-05-31.png' });
@@ -1825,10 +2331,15 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   await expect(page.getByTestId('fp-expedition-party-packet-cell_q0_r1')).toContainText('Mira Trailmark field party');
   await expect(page.getByTestId('fp-expedition-party-roster-packet-cell_q0_r1')).toContainText('Rook Signalpost');
   await expect(page.getByTestId('fp-expedition-event-packet-boundary-cell_q0_r1')).toContainText('Read-only receipt metadata');
-  await expect(page.getByTestId('fp-expedition-objective-strip')).toContainText('Review the latest packet');
+  await expect(page.getByTestId('fp-expedition-objective-strip')).toHaveAttribute('aria-label', /Review the latest packet/);
   await expect(page.getByTestId('fp-expedition-objective-strip-boundary')).toContainText('No new server objectives');
   await expect(page.getByTestId('fp-btn-scout-sector-cell_q0_r1')).toHaveCount(0);
+  await expect(page.getByTestId('fp-btn-scout-sector-unit-command-cell_q0_r1')).toHaveCount(0);
   await page.locator('#fp-drawer-toggle').evaluate((node) => { node.style.display = 'none'; });
+  await expect.poll(async () => {
+    const info = await page.evaluate(() => window.__foundersPlotTest.getExpeditionMapInfo());
+    return info?.visualLayers?.generatedSpriteAssetsReady || 0;
+  }, { timeout: 8000 }).toBeGreaterThanOrEqual(8);
   await page.getByTestId('fp-expedition-map-panel').screenshot({ path: 'reports/agent-town-hq12f-expedition-event-packets-ui-mobile-2026-05-31.png' });
   await page.getByTestId('fp-expedition-map-panel').screenshot({ path: 'reports/agent-town-hq12c-scout-sector-ui-mobile-2026-05-31.png' });
   await page.getByTestId('fp-expedition-map-panel').screenshot({ path: 'reports/agent-town-hq12g-expedition-party-flavor-ui-mobile-2026-05-31.png' });
@@ -1848,6 +2359,8 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
       const chrome = document.querySelector('[data-testid="fp-expedition-inspector-chrome"]');
       const ledger = document.querySelector('[data-testid="fp-expedition-inspector-ledger"]');
       const selectedDetails = document.querySelector('[data-testid="fp-expedition-inspector-selected-details"]');
+      const fogLedger = document.querySelector('[data-testid="fp-expedition-inspector-fog-ledger"]');
+      const scoutAliases = document.querySelector('[data-testid="fp-expedition-inspector-scout-aliases"]');
       const rect = drawer?.getBoundingClientRect();
       return {
         visible: !!drawer,
@@ -1855,6 +2368,7 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
         readOnly: drawer?.getAttribute('data-read-only') || '',
         actions: drawer ? drawer.querySelectorAll('button').length : 0,
         chromeText: chrome?.textContent || '',
+        chromeLabel: chrome?.getAttribute('aria-label') || '',
         chipsText: document.querySelector('[data-testid="fp-expedition-inspector-chips"]')?.textContent || '',
         containsStatus: !!drawer?.querySelector('[data-testid="fp-expedition-map-status"]'),
         containsObjective: !!drawer?.querySelector('[data-testid="fp-expedition-objective-strip"]'),
@@ -1862,6 +2376,9 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
         containsEventPacket: !!drawer?.querySelector('[data-testid="fp-expedition-event-packet-cell_q0_r1"]'),
         containsSectorLedger: !!drawer?.querySelector('[data-testid="fp-expedition-sector-list"]'),
         selectedDetailsCollapsed: selectedDetails ? !selectedDetails.hasAttribute('open') : false,
+        fogLedgerCollapsed: fogLedger ? !fogLedger.hasAttribute('open') : false,
+        scoutAliasesCollapsed: scoutAliases ? !scoutAliases.hasAttribute('open') : true,
+        scoutAliasButtonCount: scoutAliases ? scoutAliases.querySelectorAll('[data-testid^="fp-btn-scout-sector-"]').length : 0,
         ledgerCollapsed: ledger ? !ledger.hasAttribute('open') : false,
         ledgerActions: Number(ledger?.getAttribute('data-actions') || 0),
         boardBeforeDrawer: !!(board && drawer && (board.compareDocumentPosition(drawer) & Node.DOCUMENT_POSITION_FOLLOWING)),
@@ -1879,8 +2396,11 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
       fogState: document.querySelector('[data-testid="fp-expedition-map-visual-hud"]')?.getAttribute('data-fog-state') || '',
       scoutable: document.querySelector('[data-testid="fp-expedition-map-visual-hud"]')?.getAttribute('data-scoutable') || '',
       selectedSummaryText: document.querySelector('[data-testid="fp-expedition-map-selected-summary"]')?.textContent || '',
+      selectedSummaryLabel: document.querySelector('[data-testid="fp-expedition-map-selected-summary"]')?.getAttribute('aria-label') || '',
       receiptTraceText: document.querySelector('[data-testid="fp-expedition-receipt-trace-map-selected"]')?.textContent || '',
+      receiptTraceLabel: document.querySelector('[data-testid="fp-expedition-receipt-trace-map-selected"]')?.getAttribute('aria-label') || '',
       partyBadgesText: document.querySelector('[data-testid="fp-expedition-party-badges-map-selected"]')?.textContent || '',
+      partyBadgesLabel: document.querySelector('[data-testid="fp-expedition-party-badges-map-selected"]')?.getAttribute('aria-label') || '',
       fogPipCount: document.querySelectorAll('[data-testid="fp-expedition-fog-pips"] .fp-expedition-fog-pip').length,
     },
     objectiveStrip: {
@@ -1891,10 +2411,28 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
       targetCellId: document.querySelector('[data-testid="fp-expedition-objective-strip"]')?.getAttribute('data-target-cell-id') || '',
       packetId: document.querySelector('[data-testid="fp-expedition-objective-strip"]')?.getAttribute('data-packet-id') || '',
       partyId: document.querySelector('[data-testid="fp-expedition-objective-strip"]')?.getAttribute('data-party-id') || '',
+      label: document.querySelector('[data-testid="fp-expedition-objective-strip"]')?.getAttribute('aria-label') || '',
       text: document.querySelector('[data-testid="fp-expedition-objective-strip"]')?.textContent || '',
+      visibleText: (() => {
+        const strip = document.querySelector('[data-testid="fp-expedition-objective-strip"]');
+        return Array.from(strip?.children || [])
+          .filter((node) => node.tagName !== 'DETAILS')
+          .map((node) => node.textContent || '')
+          .join(' ');
+      })(),
       factsText: document.querySelector('[data-testid="fp-expedition-objective-strip-facts"]')?.textContent || '',
       boundaryText: document.querySelector('[data-testid="fp-expedition-objective-strip-boundary"]')?.textContent || '',
       buttons: document.querySelectorAll('[data-testid="fp-expedition-objective-strip"] button').length,
+      ledger: (() => {
+        const ledger = document.querySelector('[data-testid="fp-expedition-objective-ledger-details"]');
+        return {
+          present: !!ledger,
+          collapsed: ledger ? !ledger.hasAttribute('open') : false,
+          readOnly: ledger?.getAttribute('data-read-only') || '',
+          actions: Number(ledger?.getAttribute('data-actions') || 0),
+          text: ledger?.textContent || '',
+        };
+      })(),
     },
     eventPacketCardVisible: !!document.querySelector('[data-testid="fp-expedition-event-packet-cell_q0_r1"]'),
     eventPacketHeaderText: document.querySelector('[data-testid="fp-expedition-event-packet-cell_q0_r1"] .fp-expedition-event-packet__header')?.textContent || '',
@@ -1943,10 +2481,13 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
       '[data-testid="fp-expedition-map-hud"]',
       '[data-testid="fp-expedition-inspector-chrome"]',
       '[data-testid="fp-expedition-inspector-chips"]',
+      '[data-testid="fp-expedition-inspector-fog-ledger"]',
+      '[data-testid="fp-expedition-inspector-scout-aliases"]',
       '[data-testid="fp-expedition-inspector-ledger"]',
       '[data-testid="fp-expedition-map-status"]',
       '[data-testid="fp-expedition-objective-strip"]',
       '[data-testid="fp-expedition-objective-strip-facts"]',
+      '[data-testid="fp-expedition-objective-ledger-details"]',
       '[data-testid="fp-expedition-map-board-card"]',
       '[data-testid="fp-expedition-map-visual-hud"]',
       '[data-testid="fp-expedition-map-selected-summary"]',
@@ -2034,21 +2575,31 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   expect(scoutDomProof.objectiveStrip.actions).toBe(0);
   expect(scoutDomProof.objectiveStrip.buttons).toBe(0);
   expect(scoutDomProof.objectiveStrip.packetId).toBe(hq12fEventPacket.packetId);
-  expect(scoutDomProof.objectiveStrip.text).toContain('Review the latest packet');
-  expect(scoutDomProof.objectiveStrip.text).toContain('zero executable actions');
+  expect(scoutDomProof.objectiveStrip.label).toContain('Review the latest packet');
+  expect(scoutDomProof.objectiveStrip.visibleText).toContain('PKT');
+  expect(scoutDomProof.objectiveStrip.visibleText).not.toContain('zero executable actions');
   expect(scoutDomProof.objectiveStrip.boundaryText).toContain('No new server objectives');
+  expect(scoutDomProof.objectiveStrip.ledger.present).toBe(true);
+  expect(scoutDomProof.objectiveStrip.ledger.collapsed).toBe(true);
+  expect(scoutDomProof.objectiveStrip.ledger.readOnly).toBe('true');
+  expect(scoutDomProof.objectiveStrip.ledger.actions).toBe(0);
+  expect(scoutDomProof.objectiveStrip.ledger.text).toContain('Ledger detail');
   expect(scoutDomProof.inspectorDrawer.visible).toBe(true);
   expect(scoutDomProof.inspectorDrawer.drawerKind).toBe('visual-inspector');
   expect(scoutDomProof.inspectorDrawer.readOnly).toBe('true');
   expect(scoutDomProof.inspectorDrawer.actions).toBe(0);
-  expect(scoutDomProof.inspectorDrawer.chromeText).toContain('Visual inspector');
-  expect(scoutDomProof.inspectorDrawer.chipsText).toContain('read-only');
+  expect(scoutDomProof.inspectorDrawer.chromeLabel).toContain('Visual inspector');
+  expect(scoutDomProof.inspectorDrawer.chromeText).toContain('VIS');
+  expect(scoutDomProof.inspectorDrawer.chipsText).toContain('SRV');
   expect(scoutDomProof.inspectorDrawer.containsStatus).toBe(true);
   expect(scoutDomProof.inspectorDrawer.containsObjective).toBe(true);
   expect(scoutDomProof.inspectorDrawer.containsSelectedSector).toBe(true);
   expect(scoutDomProof.inspectorDrawer.containsEventPacket).toBe(true);
   expect(scoutDomProof.inspectorDrawer.containsSectorLedger).toBe(true);
   expect(scoutDomProof.inspectorDrawer.selectedDetailsCollapsed).toBe(true);
+  expect(scoutDomProof.inspectorDrawer.fogLedgerCollapsed).toBe(true);
+  expect(scoutDomProof.inspectorDrawer.scoutAliasesCollapsed).toBe(true);
+  expect(scoutDomProof.inspectorDrawer.scoutAliasButtonCount).toBe(0);
   expect(scoutDomProof.inspectorDrawer.ledgerCollapsed).toBe(true);
   expect(scoutDomProof.inspectorDrawer.ledgerActions).toBe(0);
   expect(scoutDomProof.inspectorDrawer.boardBeforeDrawer).toBe(true);
@@ -2056,8 +2607,10 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   expect(scoutDomProof.mapFirstHud.selectedCellId).toBe('cell_q0_r1');
   expect(scoutDomProof.mapFirstHud.fogState).toBe('known');
   expect(scoutDomProof.mapFirstHud.scoutable).toBe('false');
-  expect(scoutDomProof.mapFirstHud.selectedSummaryText).toContain('packet filed');
-  expect(scoutDomProof.mapFirstHud.receiptTraceText).toContain('scout scout_sector_ui_001');
+  expect(scoutDomProof.mapFirstHud.selectedSummaryText).toContain('KNOWN');
+  expect(scoutDomProof.mapFirstHud.selectedSummaryText).not.toMatch(/packet filed|cell_q0_r1|Scout unit command ready/i);
+  expect(scoutDomProof.mapFirstHud.receiptTraceLabel).toContain('scout scout_sector_ui_001');
+  expect(scoutDomProof.mapFirstHud.receiptTraceText).not.toContain('scout scout_sector_ui_001');
   expect(scoutDomProof.mapFirstHud.partyBadgesText).toContain('MT');
   fs.writeFileSync('reports/agent-town-hq12c-scout-sector-ui-proof-2026-05-31.json', JSON.stringify({
     ok: true,
@@ -2369,9 +2922,9 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
       mapFirstHudVisible: domProof.mapFirstHud.visible && scoutDomProof.mapFirstHud.visible,
       fogPips: domProof.mapFirstHud.fogPipCount,
       selectedHintedNoHiddenTruth: !/wood \+2|food \+1|owned outpost: plot_hq12b_forest_outpost|receipt scout_sector_ui_001/i.test(domProof.mapFirstHud.selectedSummaryText),
-      receiptTraceHiddenProvenanceSealed: /Provenance sealed/i.test(domProof.mapFirstHud.receiptTraceText),
-      postScoutReceiptTraceFromServerReceipt: /scout scout_sector_ui_001/i.test(scoutDomProof.mapFirstHud.receiptTraceText),
-      partyBadgesFromReadModel: /MT/.test(domProof.mapFirstHud.partyBadgesText) && /HQ civic operator/i.test(domProof.mapFirstHud.partyBadgesText),
+      receiptTraceHiddenProvenanceSealed: /Provenance sealed/i.test(domProof.mapFirstHud.receiptTraceLabel) && !/Provenance sealed/i.test(domProof.mapFirstHud.receiptTraceText),
+      postScoutReceiptTraceFromServerReceipt: /scout scout_sector_ui_001/i.test(scoutDomProof.mapFirstHud.receiptTraceLabel) && !/scout scout_sector_ui_001/i.test(scoutDomProof.mapFirstHud.receiptTraceText),
+      partyBadgesFromReadModel: /MT/.test(domProof.mapFirstHud.partyBadgesText) && /party member/i.test(domProof.mapFirstHud.partyBadgesLabel),
       scoutSectorOnlyMutationPathBeforeReveal: domProof.mutationButtons.every((entry) => String(entry.testid || '').startsWith('fp-btn-scout-sector-') && entry.cellId === 'cell_q0_r1'),
       scoutSectorOnlyMutationPathAfterReveal: scoutDomProof.scoutButtons.length === 0,
       mapControlsNonMutating: domProof.mapControlButtons.length,
@@ -2430,6 +2983,9 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
       ].every(Boolean),
       boardBeforeDrawer: scoutDomProof.inspectorDrawer.boardBeforeDrawer,
       selectedDetailsCollapsed: scoutDomProof.inspectorDrawer.selectedDetailsCollapsed,
+      fogLedgerCollapsed: scoutDomProof.inspectorDrawer.fogLedgerCollapsed,
+      sectorActionAliasesCollapsed: scoutDomProof.inspectorDrawer.scoutAliasesCollapsed,
+      sectorActionAliasButtonsAfterReveal: scoutDomProof.inspectorDrawer.scoutAliasButtonCount,
       legacySectorLedgerCollapsed: scoutDomProof.inspectorDrawer.ledgerCollapsed,
       scoutSectorOnlyMutationPathAfterReveal: scoutDomProof.scoutButtons.length === 0,
       eventPacketButtons: scoutDomProof.eventPacketMutationButtons.length,
@@ -2454,6 +3010,60 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
         scoutDomProof.eventPacketHeaderText,
         ...scoutDomProof.partyBlocks.map((block) => block.text),
       ].join(' ')),
+      mobileHorizontalOverflow: mobilePolishProof.clipped.length,
+    },
+  }, null, 2));
+  fs.writeFileSync('reports/agent-town-hq15s-fog-selected-inspector-symbol-compaction-proof-2026-06-02.json', JSON.stringify({
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    source: 'FP-E2E-022 mocked server-owned Expedition Map, Event Packet, Expedition Party, and Expedition Unit read models; HQ15S verifies symbol-first fog, selected summary, objective, and inspector surfaces',
+    changeScope: [
+      'public/experiences/founders-plot/founders-plot.js',
+      'public/experiences/founders-plot/founders-plot.css',
+      'e2e/200_founders_plot.spec.js',
+    ],
+    initialMapFirstHud: domProof.mapFirstHud,
+    postScoutMapFirstHud: scoutDomProof.mapFirstHud,
+    objectiveStrip: scoutDomProof.objectiveStrip,
+    inspectorDrawer: scoutDomProof.inspectorDrawer,
+    mobileFit: mobilePolishProof,
+    screenshots: [
+      'reports/agent-town-hq15s-fog-selected-inspector-symbol-compaction-desktop-2026-06-02.png',
+      'reports/agent-town-hq15s-fog-selected-inspector-symbol-compaction-mobile-2026-06-02.png',
+    ],
+    guardrails: {
+      frontendOnly: true,
+      serverAuthorityUnchanged: true,
+      fogPipsSymbolFirst: domProof.mapFirstHud.fogPipCount === 4 && !/DISCOVERED|HINTED|LOCKED/.test(domProof.mapFirstHud.fogPipTexts.join(' ')),
+      fogMeaningsAccessible: /Discovered/.test(domProof.mapFirstHud.fogPipLabels.join(' ')) && /Locked/.test(domProof.mapFirstHud.fogPipLabels.join(' ')),
+      selectedSummaryNoRawCellOrProse: !/cell_q0_r1|Scout unit command ready|Scout Sector eligible|Provenance sealed|HQ civic operator/i.test(domProof.mapFirstHud.selectedSummaryText),
+      selectedSummaryAccessibilityKeepsFacts: /Scout Sector eligible/.test(domProof.mapFirstHud.selectedSummaryLabel) && /Provenance sealed/.test(domProof.mapFirstHud.receiptTraceLabel),
+      receiptTraceCompactVisible: !/Provenance sealed|scout scout_sector_ui_001/i.test([domProof.mapFirstHud.receiptTraceText, scoutDomProof.mapFirstHud.receiptTraceText].join(' ')),
+      partyBadgesCompactVisible: /MT/.test(domProof.mapFirstHud.partyBadgesText) && !/HQ civic operator|messenger|scout/i.test(domProof.mapFirstHud.partyBadgesText),
+      semanticObjectiveCompact: /PKT/.test(scoutDomProof.objectiveStrip.visibleText) && !/zero executable actions|No new server objectives/.test(scoutDomProof.objectiveStrip.visibleText),
+      objectiveLedgerCollapsed: scoutDomProof.objectiveStrip.ledger.collapsed && scoutDomProof.objectiveStrip.ledger.actions === 0,
+      inspectorChromeCompact: /VIS/.test(scoutDomProof.inspectorDrawer.chromeText) && /SRV/.test(scoutDomProof.inspectorDrawer.chipsText),
+      inspectorLedgersCollapsed: [
+        scoutDomProof.inspectorDrawer.selectedDetailsCollapsed,
+        scoutDomProof.inspectorDrawer.fogLedgerCollapsed,
+        scoutDomProof.inspectorDrawer.scoutAliasesCollapsed,
+        scoutDomProof.inspectorDrawer.ledgerCollapsed,
+      ].every(Boolean),
+      scoutSectorOnlyMutationPathBeforeReveal: domProof.mutationButtons.every((entry) => String(entry.testid || '').startsWith('fp-btn-scout-sector-') && entry.cellId === 'cell_q0_r1'),
+      scoutSectorOnlyMutationPathAfterReveal: scoutDomProof.scoutButtons.length === 0,
+      eventPacketButtons: scoutDomProof.eventPacketMutationButtons.length,
+      partyActions: hq12gPartyActions,
+      objectiveActions: scoutDomProof.objectiveStrip.actions,
+      objectiveButtons: scoutDomProof.objectiveStrip.buttons,
+      executableActions: hq12fEventPacket.executableActions,
+      routeCreation: hq12fEventPacket.boundaryFlags.routeCreation,
+      tradeRouteCreation: hq12fEventPacket.boundaryFlags.tradeRouteCreation,
+      resourceHarvesting: hq12fEventPacket.boundaryFlags.resourceHarvesting,
+      atlasExecution: hq12fEventPacket.boundaryFlags.atlasExecution,
+      publicSharing: hq12fEventPacket.boundaryFlags.publicSharing,
+      generatedUniverseRendering: hq12fEventPacket.boundaryFlags.generatedUniverseRendering,
+      crossPlotMutation: hq12fEventPacket.boundaryFlags.crossPlotMutation,
+      externalEffects: hq12fEventPacket.boundaryFlags.externalEffects,
       mobileHorizontalOverflow: mobilePolishProof.clipped.length,
     },
   }, null, 2));

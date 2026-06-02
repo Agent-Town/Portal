@@ -196,6 +196,7 @@ const TOOL_HTTP = Object.freeze({
   'et.plot.select_doctrine': { method: 'POST', path: '/api/founders-plot/select-doctrine' },
   'et.plot.create_work_order_draft': { method: 'POST', path: '/api/founders-plot/work-orders/draft' },
   'et.plot.execute_work_order': { method: 'POST', path: '/api/founders-plot/work-orders/execute' },
+  'et.plot.move_expedition_unit': { method: 'POST', path: '/api/founders-plot/expedition-map/move-unit' },
   'et.plot.create_civic_proposal': { method: 'POST', path: '/api/founders-plot/civic-proposals' },
   'et.plot.create_overlay_pack': { method: 'POST', path: '/api/founders-plot/overlay-packs' },
   'et.plot.activate_civic_project': { method: 'POST', path: '/api/founders-plot/civic-projects/activate' },

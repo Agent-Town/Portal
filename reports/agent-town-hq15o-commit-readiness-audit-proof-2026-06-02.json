@@ -1,0 +1,74 @@
+{
+  "slice": "HQ15O",
+  "title": "Agent Town HQ15O Commit Readiness Audit",
+  "date": "2026-06-02",
+  "status": "PASS_AFTER_RECONCILIATION",
+  "committed": false,
+  "pushed": false,
+  "deployed": false,
+  "branch": "neo/progression-atlas-editor-next-2026-05-29",
+  "head": "09cc45d",
+  "subagents": {
+    "active": 0,
+    "recentHq15nStatus": "timeout_at_subagent_layer_but_local_artifacts_verified_pass"
+  },
+  "treeBeforeAuditReport": {
+    "modifiedTrackedFiles": 16,
+    "untrackedPaths": 51,
+    "legacyHq12Hq14TrackedSideEffectsPresent": false
+  },
+  "verification": {
+    "hq15ProofJsonAndSpriteManifestJqEmpty": true,
+    "gitDiffCheck": true,
+    "hq15ImageFileCheck": true,
+    "syntaxChecks": {
+      "foundersPlotJs": true,
+      "threeSceneEntry": true,
+      "threeSceneBundle": true,
+      "engine": true,
+      "routes": true,
+      "foundersPlotE2e": true,
+      "threeSceneE2e": true
+    },
+    "foundersPlotTests": {
+      "command": "npm run test:founders-plot",
+      "tests": 98,
+      "pass": 98,
+      "fail": 0
+    },
+    "threejsBundleBuild": true
+  },
+  "reconciliationNotes": {
+    "resolvedBy": [
+      "reports/agent-town-hq15p-artifact-reconciliation-2026-06-02.md",
+      "reports/agent-town-hq15p-artifact-reconciliation-proof-2026-06-02.json"
+    ],
+    "canonicalHq15dReportPrefix": "event-objective-map-markers",
+    "supplementalHq15dReportPrefix": "expedition-event-objective-markers",
+    "hq15dDuplicateReportPrefixes": [
+      "reports/agent-town-hq15d-event-objective-map-markers-2026-06-02.md",
+      "reports/agent-town-hq15d-expedition-event-objective-markers-2026-06-02.md"
+    ],
+    "hq15dDuplicateProofsParse": true,
+    "stalePerfNoteInFullerHq15dReport": false,
+    "stalePerfNoteSupersededByHq15gAndHq15o": true,
+    "newerMovementTruth": "HQ15G adds bounded server-owned Scout movement between adjacent discovered/known cells; Scout Sector remains the only fog reveal mutation."
+  },
+  "guardrails": {
+    "noCommit": true,
+    "noPush": true,
+    "noDeploy": true,
+    "noMerge": true,
+    "noPublicShare": true,
+    "noExternalEffects": true,
+    "noDestructiveCleanup": true,
+    "noAtlasExecution": true,
+    "noGeneratedUniverseRuntimeExpansion": true,
+    "noHiddenAutonomy": true,
+    "noHiddenTruthLeakage": true,
+    "scoutSectorOnlyFogRevealMutation": true,
+    "scoutMovementAdjacentRevealedCellsOnly": true,
+    "surveySettlerCommandsUseExistingGuardedEndpoints": true
+  },
+  "nextSafeAction": "Robin-approved staging/commit/push, or a new bounded product polish lane if Robin asks for more gameplay iteration."
+}

@@ -137,7 +137,7 @@ test('FP-CT-001 every tool spec has name, description, argsSchema, resultSchema'
 test('FP-CT-002 argsSchema rejects requests missing idempotencyKey on mutations', () => {
   const mutators = ['et.plot.place_building', 'et.plot.queue_job', 'et.plot.collect_outputs',
     'et.plot.draft_site_plan', 'et.plot.review_site_plan', 'et.plot.select_doctrine',
-    'et.plot.create_work_order_draft', 'et.plot.execute_work_order', 'et.plot.scout_sector', 'et.plot.create_civic_proposal',
+    'et.plot.create_work_order_draft', 'et.plot.execute_work_order', 'et.plot.scout_sector', 'et.plot.move_expedition_unit', 'et.plot.create_civic_proposal',
     'et.plot.create_overlay_pack', 'et.plot.activate_civic_project', 'et.plot.inspect_civic_project',
     'et.plot.prepare_settler_convoy', 'et.plot.found_settlement',
     'et.plot.upgrade_building', 'et.plot.set_priority', 'et.plot.claim_reward',
@@ -216,6 +216,10 @@ test('FP-CT-006b HQ10A World Grid read-only argsSchema validates', () => {
     findSpec('et.plot.scout_sector').argsSchema, 'scout_sector actorType valid');
   expectInvalid({ cellId: 'cell_q1_r0' },
     findSpec('et.plot.scout_sector').argsSchema, 'scout_sector missing idempotency');
+  expectValid({ unitId: 'expedition_unit_pathfinder_scout_v1', targetCellId: 'cell_q1_r0', idempotencyKey: 'ct-6b-move-unit' },
+    findSpec('et.plot.move_expedition_unit').argsSchema, 'move_expedition_unit valid');
+  expectInvalid({ unitId: 'expedition_unit_pathfinder_scout_v1', targetCellId: 'cell_q1_r0' },
+    findSpec('et.plot.move_expedition_unit').argsSchema, 'move_expedition_unit missing idempotency');
   expectValid({}, findSpec('et.plot.list_civic_proposals').argsSchema, 'list_civic_proposals empty args valid');
   expectInvalid({ idempotencyKey: 'ct-6b-list-not-a-mutation' },
     findSpec('et.plot.list_civic_proposals').argsSchema, 'list_civic_proposals rejects mutation idempotency');
@@ -343,6 +347,41 @@ test('FP-CT-101b get_world_grid_status envelope conforms to resultSchema', () =>
 
 test('FP-CT-101b2 get_expedition_map envelope conforms to resultSchema', () => {
   const env = fresh();
+  const bundle = store.readPlotBundleById(env.plotId);
+  bundle.plot.scoutReports = [{
+    reportId: 'scout_report_ct_units',
+    originPlotId: env.plotId,
+    sourceBuildingId: 'bldg_expedition_ct_units',
+    title: 'Contract Unit Survey',
+    siteType: 'forest_edge',
+    risk: 'low',
+    traits: ['safe'],
+    resourceHints: {},
+    summary: 'Known revealed cell for unit roster contract.',
+    recommendedNext: 'Keep this as map truth.',
+    sequence: 1,
+    createdAt: 1700_000_000_000
+  }];
+  bundle.plot.sitePlans = [{
+    planId: 'site_plan_ct_units',
+    reportId: 'scout_report_ct_units',
+    originPlotId: env.plotId,
+    title: 'Contract Unit Site Plan',
+    focus: 'safe',
+    status: 'REVIEWED',
+    promotionStatus: 'reviewed_claim_ready',
+    reviewStatus: 'reviewed',
+    source: 'scout_report',
+    siteType: 'forest_edge',
+    risk: 'low',
+    traits: ['safe'],
+    resourceHints: {},
+    summary: 'Reviewed known cell.',
+    recommendedNext: 'Show a Surveyor token.',
+    sequence: 1,
+    createdAt: 1700_000_000_000
+  }];
+  store.writePlot(bundle.plot);
   const spec = findSpec('et.plot.get_expedition_map');
   const out = engine.getExpeditionMapStatus({
     pairId: env.state.plot.pairId,
@@ -362,6 +401,23 @@ test('FP-CT-101b2 get_expedition_map envelope conforms to resultSchema', () => {
   ]);
   assert.equal(out.expeditionMap.expeditionParty.boundaryFlags.operatorAssignment, false);
   assert.equal(out.expeditionMap.expeditionParty.boundaryFlags.externalEffects, false);
+  assert.equal(out.expeditionMap.units.authorityBoundary, engine.EXPEDITION_UNIT_ROSTER_AUTHORITY_BOUNDARY);
+  assert.equal(out.expeditionMap.units.version, engine.EXPEDITION_UNIT_ROSTER_VERSION);
+  assert.equal(out.expeditionMap.units.readOnly, true);
+  assert.deepEqual(out.expeditionMap.units.executableActions, []);
+  assert.equal(out.expeditionMap.units.interactionModel.mapTokens, true);
+  assert.equal(out.expeditionMap.units.interactionModel.movementPreviewOnly, false);
+  assert.equal(out.expeditionMap.units.interactionModel.movementCommandReady, true);
+  assert.equal(out.expeditionMap.units.boundaryFlags.movementMutation, true);
+  assert.equal(out.expeditionMap.units.boundaryFlags.movementRevealsFog, false);
+  assert.equal(out.expeditionMap.units.boundaryFlags.autonomousMovement, false);
+  assert.equal(out.expeditionMap.units.boundaryFlags.externalEffects, false);
+  assert.ok(out.expeditionMap.units.items.some((unit) => unit.unitType === 'scout'));
+  assert.ok(out.expeditionMap.units.items.some((unit) => unit.unitType === 'courier'));
+  assert.ok(out.expeditionMap.units.items.some((unit) => unit.unitType === 'surveyor'));
+  assert.ok(out.expeditionMap.units.items.some((unit) => unit.unitType === 'field_support'));
+  assert.equal(out.expeditionMap.units.items.every((unit) => unit.readOnly === true), true);
+  assert.equal(out.expeditionMap.units.items.some((unit) => unit.unitType === 'scout' && unit.movement.movementMutationImplemented === true), true);
   assert.equal(out.expeditionMap.cells.every((cell) => cell.terrainAssetContractVersion === engine.EXPEDITION_PUBLIC_TERRAIN_ASSET_CONTRACT_VERSION), true);
   assert.equal(out.expeditionMap.cells
     .filter((cell) => ['hinted', 'locked_unknown'].includes(cell.fogState))
@@ -403,6 +459,73 @@ test('FP-CT-101b3 scout_sector envelope conforms to resultSchema', () => {
   assert.equal(out.eventPacket.receiptLink.actionName, 'et.plot.scout_sector');
   assert.equal(out.eventPacket.boundaryFlags.routeCreation, false);
   assert.equal(out.eventPacket.boundaryFlags.atlasExecution, false);
+});
+
+test('FP-CT-101b4 move_expedition_unit envelope conforms to resultSchema', () => {
+  const env = fresh();
+  const bundle = store.readPlotBundleById(env.plotId);
+  bundle.plot.scoutReports = [{
+    reportId: 'scout_report_ct_move',
+    originPlotId: env.plotId,
+    sourceBuildingId: 'bldg_expedition_ct_move',
+    title: 'Contract Move Survey',
+    siteType: 'forest_edge',
+    risk: 'low',
+    traits: ['safe'],
+    resourceHints: {},
+    summary: 'Known revealed cell for movement contract.',
+    recommendedNext: 'Move Scout for contract proof.',
+    sequence: 1,
+    createdAt: 1700_000_000_000
+  }];
+  bundle.plot.sitePlans = [{
+    planId: 'site_plan_ct_move',
+    reportId: 'scout_report_ct_move',
+    originPlotId: env.plotId,
+    title: 'Contract Move Site Plan',
+    focus: 'safe',
+    status: 'REVIEWED',
+    promotionStatus: 'reviewed_claim_ready',
+    reviewStatus: 'reviewed',
+    source: 'scout_report',
+    siteType: 'forest_edge',
+    risk: 'low',
+    traits: ['safe'],
+    resourceHints: {},
+    summary: 'Reviewed known cell.',
+    recommendedNext: 'Move Scout for contract proof.',
+    sequence: 1,
+    createdAt: 1700_000_000_000
+  }];
+  store.writePlot(bundle.plot);
+  const map = engine.getExpeditionMapStatus({
+    pairId: env.state.plot.pairId,
+    plotId: env.plotId,
+    nowMs: 1700_000_000_000
+  }).expeditionMap;
+  const scout = map.units.items.find((unit) => unit.unitType === 'scout');
+  const targetCellId = scout.movement.allowedTargetCellIds[0];
+  assert.ok(targetCellId, 'fresh scout has an adjacent revealed move target');
+  const spec = findSpec('et.plot.move_expedition_unit');
+  const out = engine.moveExpeditionUnit({
+    pairId: env.state.plot.pairId,
+    plotId: env.plotId,
+    unitId: scout.unitId,
+    targetCellId,
+    actor: 'HUMAN',
+    idempotencyKey: 'ct-101b4-move-unit',
+    nowMs: 1700_000_001_000
+  });
+  expectValid(out, spec.resultSchema, 'move_expedition_unit envelope');
+  assert.equal(out.ok, true);
+  assert.equal(out.movedUnitId, scout.unitId);
+  assert.equal(out.targetCellId, targetCellId);
+  assert.equal(out.move.receipt.actionName, 'et.plot.move_expedition_unit');
+  assert.equal(out.move.receipt.movementRevealsFog, false);
+  assert.equal(out.move.receipt.routeCreation, false);
+  assert.equal(out.proof.fogCountsUnchanged, true);
+  assert.equal(out.proof.boundaryFlags.autonomousMovement, false);
+  assert.equal(out.proof.boundaryFlags.externalEffects, false);
 });
 
 test('FP-CT-101c list_civic_proposals envelope conforms to resultSchema', () => {

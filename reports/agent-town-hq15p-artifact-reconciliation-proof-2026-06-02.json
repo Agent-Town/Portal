@@ -1,0 +1,61 @@
+{
+  "slice": "HQ15P",
+  "title": "Agent Town HQ15P Artifact Reconciliation",
+  "date": "2026-06-02",
+  "status": "PASS_REPORT_ONLY_RECONCILIATION",
+  "committed": false,
+  "pushed": false,
+  "deployed": false,
+  "canonicalHq15d": {
+    "prefix": "event-objective-map-markers",
+    "report": "reports/agent-town-hq15d-event-objective-map-markers-2026-06-02.md",
+    "proof": "reports/agent-town-hq15d-event-objective-map-markers-proof-2026-06-02.json",
+    "reason": "Fuller HQ15D report with desktop and mobile screenshots."
+  },
+  "supplementalHq15d": {
+    "prefix": "expedition-event-objective-markers",
+    "report": "reports/agent-town-hq15d-expedition-event-objective-markers-2026-06-02.md",
+    "proof": "reports/agent-town-hq15d-expedition-event-objective-markers-proof-2026-06-02.json",
+    "reason": "Narrower renderer-focused evidence from the same HQ15D lane."
+  },
+  "reconciliations": {
+    "bothHq15dProofsRetained": true,
+    "bothHq15dProofsParse": true,
+    "canonicalPrefixDocumented": true,
+    "supplementalPrefixDocumented": true,
+    "stalePerfNoteMarkedSuperseded": true,
+    "newerPerfTruth": "HQ15G/HQ15O compact observation reconciliation made npm run test:founders-plot pass 98/98."
+  },
+  "verification": {
+    "jqEmpty": true,
+    "stalePerfTextCheck": true,
+    "gitDiffCheckFocused": true
+  },
+  "guardrails": {
+    "reportOnly": true,
+    "runtimeSourceChanged": false,
+    "serverChanged": false,
+    "routesChanged": false,
+    "toolsChanged": false,
+    "rendererChanged": false,
+    "cssChanged": false,
+    "e2eChanged": false,
+    "assetsChanged": false,
+    "commit": false,
+    "push": false,
+    "deploy": false,
+    "merge": false,
+    "publicShare": false,
+    "externalMessage": false,
+    "destructiveCleanup": false,
+    "scoutSectorOnlyFogRevealMutation": true,
+    "scoutMovementAdjacentRevealedCellsOnly": true,
+    "surveySettlerCommandsUseExistingGuardedEndpoints": true,
+    "atlasExecution": false,
+    "generatedUniverseRuntimeExpansion": false,
+    "hiddenAutonomy": false,
+    "hiddenTruthLeakage": false,
+    "crossPlotMutation": false,
+    "externalEffects": false
+  }
+}

@@ -1350,6 +1350,8 @@ const EXPEDITION_VISUAL_SHELL_VERSION = 'hq14t_server_bound_terrain_underlay_v1'
 const EXPEDITION_REGION_ASSET_PACK_VERSION = 'hq14s_public_terrain_underlay_v1';
 const EXPEDITION_REGION_ASSET_BASE = '/experiences/founders-plot/assets/expedition-map';
 const EXPEDITION_PUBLIC_TERRAIN_ASSET_BASE = `${EXPEDITION_REGION_ASSET_BASE}/hq14s-public-terrain-underlay-v1`;
+const EXPEDITION_SPRITE_ASSET_PACK_VERSION = 'hq15e_expedition_unit_marker_sprites_v1';
+const EXPEDITION_SPRITE_ASSET_BASE = `${EXPEDITION_REGION_ASSET_BASE}/hq15e-expedition-unit-marker-sprites-v1`;
 const EXPEDITION_PUBLIC_TERRAIN_CONTRACT_VERSION = 'agenttown_public_terrain_asset_slots_v1';
 const EXPEDITION_PUBLIC_TERRAIN_SLOT_SOURCE = 'server_read_model_v1';
 const EXPEDITION_ALLOWED_PUBLIC_TERRAIN_SLOTS = Object.freeze(['field', 'forest', 'ridge', 'settled']);
@@ -1391,6 +1393,19 @@ const EXPEDITION_REGION_TILE_ASSETS = Object.freeze({
     assetKind: 'fog_only',
     fogOnly: true
   }
+});
+const EXPEDITION_UNIT_SPRITE_ASSETS = Object.freeze({
+  scout: { slot: 'scout', path: `${EXPEDITION_SPRITE_ASSET_BASE}/scout-pathfinder-v1.png`, assetKind: 'generated_unit_sprite' },
+  settler_convoy: { slot: 'settler_convoy', path: `${EXPEDITION_SPRITE_ASSET_BASE}/settler-convoy-v1.png`, assetKind: 'generated_unit_sprite' },
+  surveyor: { slot: 'surveyor', path: `${EXPEDITION_SPRITE_ASSET_BASE}/surveyor-beacon-v1.png`, assetKind: 'generated_unit_sprite' },
+  courier: { slot: 'courier', path: `${EXPEDITION_SPRITE_ASSET_BASE}/courier-signal-runner-v1.png`, assetKind: 'generated_unit_sprite' },
+  outpost_crew: { slot: 'outpost_crew', path: `${EXPEDITION_SPRITE_ASSET_BASE}/outpost-crew-v1.png`, assetKind: 'generated_unit_sprite' },
+  field_support: { slot: 'surveyor', path: `${EXPEDITION_SPRITE_ASSET_BASE}/surveyor-beacon-v1.png`, assetKind: 'generated_unit_sprite' }
+});
+const EXPEDITION_MARKER_SPRITE_ASSETS = Object.freeze({
+  objective_beacon: { slot: 'objective_beacon', path: `${EXPEDITION_SPRITE_ASSET_BASE}/objective-beacon-v1.png`, assetKind: 'generated_marker_sprite' },
+  event_packet: { slot: 'event_packet', path: `${EXPEDITION_SPRITE_ASSET_BASE}/event-packet-v1.png`, assetKind: 'generated_marker_sprite' },
+  receipt_ledger: { slot: 'receipt_ledger', path: `${EXPEDITION_SPRITE_ASSET_BASE}/receipt-ledger-v1.png`, assetKind: 'generated_marker_sprite' }
 });
 const expeditionRegionTileImages = new Map();
 const expeditionRegionTileListeners = new Set();
@@ -1726,6 +1741,22 @@ function ensureExpeditionRegionTileImage(asset = null) {
   expeditionRegionTileImages.set(asset.path, image);
   image.src = asset.path;
   return expeditionRegionTileReady(asset);
+}
+
+function expeditionUnitSpriteAsset(unit = {}) {
+  return EXPEDITION_UNIT_SPRITE_ASSETS[String(unit.unitType || '')] || null;
+}
+
+function drawExpeditionGeneratedSprite(ctx, asset = null, x = 0, y = 0, width = 128, height = 128, radius = 22) {
+  const image = ensureExpeditionRegionTileImage(asset);
+  if (!image) return false;
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(x, y, width, height, radius);
+  ctx.clip();
+  ctx.drawImage(image, x, y, width, height);
+  ctx.restore();
+  return true;
 }
 
 function drawHexClip(ctx, radius = 120, center = 128) {
@@ -2185,6 +2216,162 @@ function makeExpeditionMarkerTexture(cell = {}, selected = false) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(label.length > 3 ? label.slice(0, 3) : label, 96, 84);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  textureCache.set(key, texture);
+  return texture;
+}
+
+function expeditionPacketCellId(packet = {}) {
+  return String(packet.cellId || packet.receiptLink?.cellId || packet.sourceIds?.cellId || '').trim();
+}
+
+function expeditionEventPacketsForMarkers(model = {}) {
+  return (Array.isArray(model?.eventPackets) ? model.eventPackets : [])
+    .filter((packet) => packet && typeof packet === 'object' && packet.packetId && expeditionPacketCellId(packet));
+}
+
+function makeExpeditionEventPacketMarkerTexture(packet = {}, selected = false) {
+  const packetId = String(packet.packetId || 'packet');
+  const template = String(packet.templateId || packet.kind || 'event_packet');
+  const key = `expedition-event-marker:${EXPEDITION_VISUAL_SHELL_VERSION}:${packetId}:${template}:${selected ? 'selected' : 'idle'}`;
+  if (textureCache.has(key)) return textureCache.get(key);
+  const canvas = document.createElement('canvas');
+  canvas.width = 192;
+  canvas.height = 192;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = 'rgba(46, 27, 14, 0.22)';
+  ctx.beginPath();
+  ctx.ellipse(96, 150, 48, 14, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = selected ? 'rgba(255, 248, 232, 0.94)' : 'rgba(255, 248, 232, 0.84)';
+  ctx.strokeStyle = selected ? '#f5d484' : '#8a6d41';
+  ctx.lineWidth = selected ? 8 : 6;
+  ctx.beginPath();
+  ctx.roundRect(52, 48, 88, 78, 12);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.strokeStyle = '#1b6a64';
+  ctx.lineWidth = 6;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(56, 60);
+  ctx.lineTo(96, 92);
+  ctx.lineTo(136, 60);
+  ctx.stroke();
+
+  ctx.fillStyle = '#d19a48';
+  ctx.strokeStyle = '#5a3418';
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.arc(122, 116, 17, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = '#82d6d0';
+  ctx.globalAlpha = selected ? 0.82 : 0.58;
+  ctx.beginPath();
+  ctx.arc(62, 42, 8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  drawExpeditionGeneratedSprite(ctx, EXPEDITION_MARKER_SPRITE_ASSETS.event_packet, 42, 34, 108, 108, 16);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  textureCache.set(key, texture);
+  return texture;
+}
+
+function makeExpeditionObjectiveMarkerTexture(objective = {}, selected = false) {
+  const mode = String(objective.mode || 'inspect');
+  const key = `expedition-objective-marker:${EXPEDITION_VISUAL_SHELL_VERSION}:${mode}:${objective.targetCellId || ''}:${selected ? 'selected' : 'idle'}`;
+  if (textureCache.has(key)) return textureCache.get(key);
+  const canvas = document.createElement('canvas');
+  canvas.width = 192;
+  canvas.height = 192;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const glowColor = mode === 'scout' ? 'rgba(245, 212, 132, 0.40)' : mode === 'packet' ? 'rgba(130, 214, 208, 0.38)' : 'rgba(255, 248, 232, 0.30)';
+  const fillColor = mode === 'scout' ? '#d19a48' : mode === 'packet' ? '#1b6a64' : '#8a6d41';
+  ctx.fillStyle = glowColor;
+  ctx.beginPath();
+  ctx.arc(96, 88, selected ? 68 : 58, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = 'rgba(46, 27, 14, 0.22)';
+  ctx.beginPath();
+  ctx.ellipse(96, 150, 52, 15, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = fillColor;
+  ctx.strokeStyle = selected ? '#fff8e8' : '#5a3418';
+  ctx.lineWidth = selected ? 9 : 6;
+  ctx.beginPath();
+  ctx.arc(96, 82, 38, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.strokeStyle = '#fff8e8';
+  ctx.fillStyle = '#fff8e8';
+  ctx.lineWidth = 8;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  if (mode === 'scout') {
+    ctx.beginPath();
+    ctx.arc(96, 82, 20, 0, Math.PI * 2);
+    ctx.moveTo(96, 48);
+    ctx.lineTo(96, 61);
+    ctx.moveTo(96, 103);
+    ctx.lineTo(96, 118);
+    ctx.moveTo(62, 82);
+    ctx.lineTo(75, 82);
+    ctx.moveTo(117, 82);
+    ctx.lineTo(130, 82);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(96, 58);
+    ctx.lineTo(108, 86);
+    ctx.lineTo(84, 106);
+    ctx.closePath();
+    ctx.fill();
+  } else if (mode === 'packet') {
+    ctx.beginPath();
+    ctx.roundRect(72, 60, 48, 44, 7);
+    ctx.moveTo(76, 69);
+    ctx.lineTo(96, 86);
+    ctx.lineTo(116, 69);
+    ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(72, 116);
+    ctx.lineTo(96, 52);
+    ctx.lineTo(120, 116);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(96, 56, 12, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  drawExpeditionGeneratedSprite(
+    ctx,
+    mode === 'packet' ? EXPEDITION_MARKER_SPRITE_ASSETS.event_packet : EXPEDITION_MARKER_SPRITE_ASSETS.objective_beacon,
+    42,
+    28,
+    108,
+    108,
+    18
+  );
+
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.minFilter = THREE.LinearFilter;
@@ -2980,6 +3167,332 @@ function makeExpeditionSurveyStroke(a, b, layout) {
   return group;
 }
 
+function expeditionUnitStyle(unit = {}) {
+  switch (String(unit.unitType || unit.role || '').toLowerCase()) {
+    case 'scout':
+      return { fill: '#1f756e', stroke: '#102f2f', accent: '#d6f1ef', glow: '#f5d484', glyph: 'compass' };
+    case 'courier':
+      return { fill: '#b95368', stroke: '#4f202b', accent: '#fff0bd', glow: '#78a9d6', glyph: 'flag' };
+    case 'surveyor':
+      return { fill: '#7a6540', stroke: '#342719', accent: '#d6f1ef', glow: '#82d6d0', glyph: 'tripod' };
+    case 'settler_convoy':
+      return { fill: '#c4883a', stroke: '#5a3418', accent: '#fff8e8', glow: '#f5d484', glyph: 'wagon' };
+    case 'outpost_crew':
+      return { fill: '#637f58', stroke: '#223a25', accent: '#ffe4a0', glow: '#82d6d0', glyph: 'beacon' };
+    default:
+      return { fill: '#8a6d41', stroke: '#3b2513', accent: '#fff8e8', glow: '#82d6d0', glyph: 'ledger' };
+  }
+}
+
+function makeExpeditionUnitTexture(unit = {}, selected = false) {
+  const key = `expedition-unit:${EXPEDITION_VISUAL_SHELL_VERSION}:${unit.unitType}:${unit.unitId}:${selected ? 'selected' : 'idle'}`;
+  if (textureCache.has(key)) return textureCache.get(key);
+  const style = expeditionUnitStyle(unit);
+  const canvas = document.createElement('canvas');
+  canvas.width = 192;
+  canvas.height = 192;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = 'rgba(46, 27, 14, 0.24)';
+  ctx.beginPath();
+  ctx.ellipse(96, 146, 55, 18, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = selected ? 'rgba(245, 212, 132, 0.34)' : 'rgba(255, 248, 232, 0.20)';
+  ctx.strokeStyle = selected ? '#f5d484' : 'rgba(59, 37, 19, 0.55)';
+  ctx.lineWidth = selected ? 9 : 6;
+  ctx.beginPath();
+  ctx.roundRect(38, 30, 116, 116, 34);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = style.fill;
+  ctx.strokeStyle = style.stroke;
+  ctx.lineWidth = 8;
+  ctx.beginPath();
+  ctx.arc(96, 88, 42, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.strokeStyle = style.accent;
+  ctx.fillStyle = style.accent;
+  ctx.lineWidth = 8;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  if (style.glyph === 'compass') {
+    ctx.beginPath();
+    ctx.arc(96, 88, 24, 0, Math.PI * 2);
+    ctx.moveTo(96, 52);
+    ctx.lineTo(96, 66);
+    ctx.moveTo(96, 110);
+    ctx.lineTo(96, 124);
+    ctx.moveTo(60, 88);
+    ctx.lineTo(74, 88);
+    ctx.moveTo(118, 88);
+    ctx.lineTo(132, 88);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(96, 58);
+    ctx.lineTo(108, 92);
+    ctx.lineTo(84, 118);
+    ctx.closePath();
+    ctx.fill();
+  } else if (style.glyph === 'flag') {
+    ctx.beginPath();
+    ctx.moveTo(80, 122);
+    ctx.lineTo(80, 56);
+    ctx.lineTo(124, 68);
+    ctx.lineTo(80, 84);
+    ctx.stroke();
+  } else if (style.glyph === 'wagon') {
+    ctx.beginPath();
+    ctx.roundRect(66, 80, 60, 34, 9);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(78, 124, 9, 0, Math.PI * 2);
+    ctx.arc(116, 124, 9, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (style.glyph === 'beacon') {
+    ctx.beginPath();
+    ctx.moveTo(72, 124);
+    ctx.lineTo(96, 58);
+    ctx.lineTo(120, 124);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(96, 62, 15, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (style.glyph === 'tripod') {
+    ctx.beginPath();
+    ctx.moveTo(96, 58);
+    ctx.lineTo(96, 92);
+    ctx.moveTo(96, 92);
+    ctx.lineTo(70, 126);
+    ctx.moveTo(96, 92);
+    ctx.lineTo(122, 126);
+    ctx.moveTo(76, 70);
+    ctx.lineTo(116, 70);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(96, 56, 13, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.beginPath();
+    ctx.roundRect(68, 62, 56, 60, 8);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(80, 82);
+    ctx.lineTo(112, 82);
+    ctx.moveTo(80, 100);
+    ctx.lineTo(106, 100);
+    ctx.stroke();
+  }
+
+  drawExpeditionGeneratedSprite(ctx, expeditionUnitSpriteAsset(unit), 28, 22, 136, 136, 34);
+
+  ctx.fillStyle = style.glow;
+  ctx.globalAlpha = selected ? 0.80 : 0.46;
+  ctx.beginPath();
+  ctx.arc(136, 47, selected ? 8 : 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  textureCache.set(key, texture);
+  return texture;
+}
+
+function detailFromExpeditionUnit(object, source = 'expedition-three-raycast') {
+  const data = object?.userData || {};
+  return {
+    unitId: String(data.unitId || ''),
+    unitType: String(data.unitType || ''),
+    displayName: String(data.displayName || ''),
+    cellId: String(data.cellId || ''),
+    source,
+    atMs: Date.now()
+  };
+}
+
+function detailFromExpeditionMarker(object, source = 'expedition-three-raycast') {
+  const data = object?.userData || {};
+  return {
+    markerKind: String(data.kind || ''),
+    packetId: String(data.packetId || ''),
+    mode: String(data.mode || ''),
+    cellId: String(data.cellId || data.targetCellId || ''),
+    targetCellId: String(data.targetCellId || data.cellId || ''),
+    visualOnly: data.visualOnly === true,
+    readOnly: data.readOnly === true,
+    source,
+    atMs: Date.now()
+  };
+}
+
+function expeditionCommandTargetStyle(commandId = '') {
+  switch (String(commandId || '')) {
+    case 'move_unit':
+      return { stroke: '#1b6a64', fill: 'rgba(130, 214, 208, 0.18)', glyph: 'move' };
+    case 'scout_sector':
+      return { stroke: '#d19a48', fill: 'rgba(245, 212, 132, 0.20)', glyph: 'scout' };
+    case 'prepare_settler_convoy':
+      return { stroke: '#c4883a', fill: 'rgba(255, 226, 128, 0.18)', glyph: 'convoy' };
+    case 'found_settlement':
+      return { stroke: '#637f58', fill: 'rgba(130, 214, 208, 0.16)', glyph: 'outpost' };
+    default:
+      return { stroke: '#8a6d41', fill: 'rgba(255, 248, 232, 0.16)', glyph: 'inspect' };
+  }
+}
+
+function makeExpeditionCommandTargetTexture(target = {}) {
+  const commandId = String(target.commandId || 'inspect');
+  const fogState = String(target.fogState || '');
+  const key = `expedition-command-target:${EXPEDITION_VISUAL_SHELL_VERSION}:${commandId}:${fogState}`;
+  if (textureCache.has(key)) return textureCache.get(key);
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  const style = expeditionCommandTargetStyle(commandId);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = style.fill;
+  ctx.beginPath();
+  ctx.arc(128, 128, 106, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = style.stroke;
+  ctx.lineWidth = commandId === 'scout_sector' ? 10 : 8;
+  if (commandId === 'scout_sector') ctx.setLineDash([18, 12]);
+  ctx.beginPath();
+  ctx.arc(128, 128, 98, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.strokeStyle = 'rgba(255, 248, 232, 0.72)';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(128, 128, 80, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(46, 27, 14, 0.24)';
+  ctx.beginPath();
+  ctx.ellipse(128, 210, 54, 13, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = style.stroke;
+  ctx.fillStyle = '#fff8e8';
+  ctx.lineWidth = 8;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  if (style.glyph === 'move') {
+    ctx.beginPath();
+    ctx.moveTo(86, 128);
+    ctx.lineTo(164, 128);
+    ctx.moveTo(140, 104);
+    ctx.lineTo(164, 128);
+    ctx.lineTo(140, 152);
+    ctx.stroke();
+  } else if (style.glyph === 'scout') {
+    ctx.beginPath();
+    ctx.arc(128, 128, 30, 0, Math.PI * 2);
+    ctx.moveTo(128, 78);
+    ctx.lineTo(128, 98);
+    ctx.moveTo(128, 158);
+    ctx.lineTo(128, 178);
+    ctx.moveTo(78, 128);
+    ctx.lineTo(98, 128);
+    ctx.moveTo(158, 128);
+    ctx.lineTo(178, 128);
+    ctx.stroke();
+  } else if (style.glyph === 'convoy') {
+    ctx.beginPath();
+    ctx.roundRect(88, 112, 80, 38, 10);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(104, 164, 10, 0, Math.PI * 2);
+    ctx.arc(152, 164, 10, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (style.glyph === 'outpost') {
+    ctx.beginPath();
+    ctx.moveTo(96, 174);
+    ctx.lineTo(128, 82);
+    ctx.lineTo(160, 174);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(128, 84, 18, 0, Math.PI * 2);
+    ctx.fillStyle = style.stroke;
+    ctx.fill();
+  } else {
+    ctx.beginPath();
+    ctx.roundRect(96, 88, 64, 78, 10);
+    ctx.stroke();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  textureCache.set(key, texture);
+  return texture;
+}
+
+function expeditionCommandTargetsForUnit(unit = {}, cellsById = new Map()) {
+  if (!unit?.unitId) return [];
+  const targets = new Map();
+  const addTarget = (command = {}, cellId = '', source = '') => {
+    const commandId = String(command.commandId || source || '');
+    const safeCellId = String(cellId || '').trim();
+    if (!commandId || !safeCellId) return;
+    const cell = cellsById.get(safeCellId);
+    if (!cell) return;
+    const fogState = String(cell.fogState || '');
+    if (commandId === 'scout_sector') {
+      if (!(fogState === 'hinted' && String(cell.kind || '') === 'frontier_hint')) return;
+    } else if (!['discovered', 'known'].includes(fogState)) {
+      return;
+    }
+    const key = `${commandId}:${safeCellId}`;
+    if (targets.has(key)) return;
+    targets.set(key, {
+      unitId: String(unit.unitId || ''),
+      unitType: String(unit.unitType || ''),
+      commandId,
+      cellId: safeCellId,
+      fogState,
+      serverMutationImplemented: command.serverMutationImplemented === true || (commandId === 'move_unit' && unit.movement?.movementMutationImplemented === true),
+      movementMutation: commandId === 'move_unit',
+      routeAuthority: false,
+      actionAuthority: false,
+      visualOnly: true,
+      readOnly: true,
+      source
+    });
+  };
+
+  const commandHints = Array.isArray(unit.commandHints) ? unit.commandHints : [];
+  commandHints
+    .filter((command) => command && command.enabled !== false)
+    .forEach((command) => {
+      const commandId = String(command.commandId || '');
+      const targetCellIds = Array.isArray(command.targetCellIds)
+        ? command.targetCellIds.map((cellId) => String(cellId || '')).filter(Boolean)
+        : [];
+      if (commandId === 'move_unit') {
+        const movementTargets = Array.isArray(unit.movement?.allowedTargetCellIds)
+          ? unit.movement.allowedTargetCellIds.map((cellId) => String(cellId || '')).filter(Boolean)
+          : [];
+        [...new Set([...targetCellIds, ...movementTargets])].forEach((cellId) => addTarget(command, cellId, 'movement'));
+        return;
+      }
+      targetCellIds.forEach((cellId) => addTarget(command, cellId, 'command_hint'));
+    });
+  return Array.from(targets.values());
+}
+
 function detailFromExpeditionCell(object, source = 'expedition-three-raycast') {
   const data = object?.userData || {};
   return {
@@ -3000,10 +3513,18 @@ class ExpeditionMapThreeStage {
     this.info = {};
     this.pickables = [];
     this.cellMeshes = [];
+    this.unitSprites = [];
+    this.commandTargetSprites = [];
+    this.eventMarkerSprites = [];
+    this.objectiveMarkerSprites = [];
     this.hoverCellId = '';
     this.terrainUnderlayCount = 0;
     this.surveyStrokeCount = 0;
     this.markerCount = 0;
+    this.unitTokenCount = 0;
+    this.commandTargetCount = 0;
+    this.eventMarkerCount = 0;
+    this.objectiveMarkerCount = 0;
     this.scene = new THREE.Scene();
     this.camera = new THREE.OrthographicCamera(-EXPEDITION_WORLD_WIDTH / 2, EXPEDITION_WORLD_WIDTH / 2, EXPEDITION_WORLD_HEIGHT / 2, -EXPEDITION_WORLD_HEIGHT / 2, 0.1, 100);
     this.camera.position.set(0, 0, 10);
@@ -3083,9 +3604,17 @@ class ExpeditionMapThreeStage {
     });
     this.pickables = [];
     this.cellMeshes = [];
+    this.unitSprites = [];
+    this.commandTargetSprites = [];
+    this.eventMarkerSprites = [];
+    this.objectiveMarkerSprites = [];
     this.terrainUnderlayCount = 0;
     this.surveyStrokeCount = 0;
     this.markerCount = 0;
+    this.unitTokenCount = 0;
+    this.commandTargetCount = 0;
+    this.eventMarkerCount = 0;
+    this.objectiveMarkerCount = 0;
     this.edgeFogCount = 0;
     this.civicBeaconCount = 0;
   }
@@ -3114,10 +3643,12 @@ class ExpeditionMapThreeStage {
     this.render();
   }
 
-  sync(model = {}, selectedCellId = '') {
+  sync(model = {}, selectedCellId = '', selectedUnitId = '') {
     this.model = model && typeof model === 'object' ? model : {};
     this.cells = Array.isArray(this.model.cells) ? this.model.cells.filter((cell) => cell?.cellId) : [];
     this.selectedCellId = String(selectedCellId || this.selectedCellId || this.cells[0]?.cellId || '');
+    const units = Array.isArray(this.model.units?.items) ? this.model.units.items.filter((unit) => unit?.unitId) : [];
+    this.selectedUnitId = String(selectedUnitId || this.selectedUnitId || units[0]?.unitId || '');
     this.rebuild();
     this.applyCameraBounds();
     this.render();
@@ -3267,6 +3798,176 @@ class ExpeditionMapThreeStage {
       });
       this.markerCount += 1;
     }
+
+    const cellsById = new Map(this.cells.map((cell) => [String(cell.cellId || ''), cell]));
+    const objective = this.model.objective && typeof this.model.objective === 'object' ? this.model.objective : null;
+    this.eventMarkerCount = 0;
+    for (const packet of expeditionEventPacketsForMarkers(this.model)) {
+      const cellId = expeditionPacketCellId(packet);
+      const cell = cellsById.get(cellId);
+      const fogState = String(cell?.fogState || '');
+      if (!cell || !['discovered', 'known'].includes(fogState)) continue;
+      const position = layout.positions.get(cellId);
+      if (!position) continue;
+      const selected = String(packet.packetId || '') === String(objective?.packetId || '')
+        || String(cellId) === String(this.selectedCellId || '');
+      const spriteAsset = EXPEDITION_MARKER_SPRITE_ASSETS.event_packet;
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: makeExpeditionEventPacketMarkerTexture(packet, selected),
+        transparent: true,
+        depthWrite: false,
+        depthTest: true,
+        alphaTest: 0.03
+      }));
+      sprite.position.set(position.x - 0.36, position.y + 0.35, 0.47);
+      sprite.scale.set(selected ? 0.48 : 0.40, selected ? 0.48 : 0.40, 1);
+      sprite.userData = {
+        kind: 'expedition_event_packet_marker',
+        packetId: String(packet.packetId || ''),
+        cellId,
+        templateId: String(packet.templateId || packet.kind || ''),
+        spriteAssetSlot: String(spriteAsset.slot || ''),
+        spriteAssetPath: String(spriteAsset.path || ''),
+        spriteAssetReady: !!expeditionRegionTileReady(spriteAsset),
+        visualOnly: true,
+        readOnly: true,
+        selectable: true,
+        inspectable: true,
+        routeAuthority: false,
+        actionAuthority: false,
+        executableActions: 0
+      };
+      this.pickables.push(sprite);
+      this.eventMarkerSprites.push(sprite);
+      this.eventMarkerCount += 1;
+      this.scene.add(sprite);
+    }
+
+    this.objectiveMarkerCount = 0;
+    if (objective && String(objective.mode || 'read') !== 'read' && objective.targetCellId) {
+      const targetCellId = String(objective.targetCellId || '');
+      const targetCell = cellsById.get(targetCellId);
+      const position = layout.positions.get(targetCellId);
+      if (targetCell && position) {
+        const selected = targetCellId === String(this.selectedCellId || '');
+        const spriteAsset = String(objective.mode || '') === 'packet'
+          ? EXPEDITION_MARKER_SPRITE_ASSETS.event_packet
+          : EXPEDITION_MARKER_SPRITE_ASSETS.objective_beacon;
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+          map: makeExpeditionObjectiveMarkerTexture(objective, selected),
+          transparent: true,
+          depthWrite: false,
+          depthTest: true,
+          alphaTest: 0.03
+        }));
+        sprite.position.set(position.x + 0.38, position.y + 0.41, 0.50);
+        sprite.scale.set(selected ? 0.56 : 0.48, selected ? 0.56 : 0.48, 1);
+        sprite.userData = {
+          kind: 'expedition_objective_marker',
+          mode: String(objective.mode || ''),
+          cellId: targetCellId,
+          targetCellId,
+          packetId: String(objective.packetId || ''),
+          spriteAssetSlot: String(spriteAsset.slot || ''),
+          spriteAssetPath: String(spriteAsset.path || ''),
+          spriteAssetReady: !!expeditionRegionTileReady(spriteAsset),
+          visualOnly: true,
+          readOnly: true,
+          selectable: true,
+          inspectable: true,
+          routeAuthority: false,
+          actionAuthority: false,
+          executableActions: 0
+        };
+        this.pickables.push(sprite);
+        this.objectiveMarkerSprites.push(sprite);
+        this.objectiveMarkerCount = 1;
+        this.scene.add(sprite);
+      }
+    }
+
+    const units = Array.isArray(this.model.units?.items) ? this.model.units.items.filter((unit) => unit?.unitId) : [];
+    const selectedUnit = units.find((unit) => String(unit.unitId || '') === String(this.selectedUnitId || '')) || null;
+    this.commandTargetCount = 0;
+    for (const target of expeditionCommandTargetsForUnit(selectedUnit || {}, cellsById)) {
+      const position = layout.positions.get(String(target.cellId || ''));
+      if (!position) continue;
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: makeExpeditionCommandTargetTexture(target),
+        transparent: true,
+        depthWrite: false,
+        depthTest: true,
+        alphaTest: 0.03,
+        opacity: target.commandId === 'scout_sector' ? 0.92 : 0.84
+      }));
+      sprite.position.set(position.x, position.y + 0.05, 0.515);
+      sprite.scale.set(target.commandId === 'scout_sector' ? 1.34 : 1.20, target.commandId === 'scout_sector' ? 1.34 : 1.20, 1);
+      sprite.userData = {
+        kind: 'expedition_command_target',
+        unitId: target.unitId,
+        unitType: target.unitType,
+        commandId: target.commandId,
+        cellId: target.cellId,
+        fogState: target.fogState,
+        serverMutationImplemented: target.serverMutationImplemented === true,
+        movementMutation: target.movementMutation === true,
+        visualOnly: true,
+        readOnly: true,
+        selectable: false,
+        routeAuthority: false,
+        actionAuthority: false,
+        executableActions: 0
+      };
+      this.commandTargetSprites.push(sprite);
+      this.commandTargetCount += 1;
+      this.scene.add(sprite);
+    }
+    this.unitTokenCount = 0;
+    const unitsByCell = units.reduce((acc, unit) => {
+      const cellId = String(unit.location?.cellId || '');
+      if (!cellId) return acc;
+      if (!acc[cellId]) acc[cellId] = [];
+      acc[cellId].push(unit);
+      return acc;
+    }, {});
+    for (const [cellId, cellUnits] of Object.entries(unitsByCell)) {
+      const position = layout.positions.get(cellId);
+      if (!position) continue;
+      cellUnits.forEach((unit, index) => {
+        const selected = String(unit.unitId || '') === this.selectedUnitId;
+        const spriteAsset = expeditionUnitSpriteAsset(unit);
+        const spriteAssetReady = !!expeditionRegionTileReady(spriteAsset);
+        const offsetAngle = ((index / Math.max(1, cellUnits.length)) * Math.PI * 2) - Math.PI / 2;
+        const radius = cellUnits.length > 1 ? 0.26 : 0;
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+          map: makeExpeditionUnitTexture(unit, selected),
+          transparent: true,
+          depthWrite: false,
+          depthTest: true,
+          alphaTest: 0.03
+        }));
+        sprite.position.set(position.x + (Math.cos(offsetAngle) * radius), position.y + 0.44 + (Math.sin(offsetAngle) * radius * 0.36), 0.54 + (index * 0.01));
+        const scale = selected ? 0.72 : 0.58;
+        sprite.scale.set(scale, scale, 1);
+        sprite.userData = {
+          kind: 'expedition_unit',
+          unitId: String(unit.unitId || ''),
+          unitType: String(unit.unitType || ''),
+          displayName: String(unit.displayName || ''),
+          cellId,
+          spriteAssetSlot: String(spriteAsset?.slot || ''),
+          spriteAssetPath: String(spriteAsset?.path || ''),
+          spriteAssetReady,
+          selectable: unit.selectable !== false,
+          readOnly: unit.readOnly !== false,
+          movementMutationImplemented: unit.movement?.movementMutationImplemented === true
+        };
+        this.pickables.push(sprite);
+        this.unitSprites.push(sprite);
+        this.unitTokenCount += 1;
+        this.scene.add(sprite);
+      });
+    }
     this.updateInfo();
   }
 
@@ -3300,6 +4001,7 @@ class ExpeditionMapThreeStage {
     this.camera.zoom = clamp(nextZoom, 0.85, 3.4);
     this.applyCameraBounds();
     this.render();
+    this.notifyViewChange();
   }
 
   resetView() {
@@ -3308,6 +4010,7 @@ class ExpeditionMapThreeStage {
     this.camera.position.y = this.mapBounds.centerY;
     this.applyCameraBounds();
     this.render();
+    this.notifyViewChange();
   }
 
   panBy(dx, dy) {
@@ -3317,6 +4020,11 @@ class ExpeditionMapThreeStage {
     this.camera.position.y += (dy / Math.max(1, rect.height)) * visible.height;
     this.applyCameraBounds();
     this.render();
+    this.notifyViewChange();
+  }
+
+  notifyViewChange() {
+    this.hostNode.dispatchEvent(new CustomEvent('founders-plot-expedition-map-view-change'));
   }
 
   onWheel(event) {
@@ -3385,17 +4093,30 @@ class ExpeditionMapThreeStage {
     if (wasClick) {
       const hit = this.pickFromPoint(event.clientX, event.clientY);
       if (hit) {
-        const detail = detailFromExpeditionCell(hit);
-        this.selectedCellId = detail.cellId;
-        this.setHoverCell(detail.cellId);
-        window.dispatchEvent(new CustomEvent('founders-plot-expedition-map-select', { detail }));
+        if (hit.userData?.kind === 'expedition_unit') {
+          const detail = detailFromExpeditionUnit(hit);
+          this.selectedUnitId = detail.unitId;
+          if (detail.cellId) this.selectedCellId = detail.cellId;
+          if (detail.cellId) this.setHoverCell(detail.cellId);
+          window.dispatchEvent(new CustomEvent('founders-plot-expedition-unit-select', { detail }));
+        } else if (['expedition_event_packet_marker', 'expedition_objective_marker'].includes(String(hit.userData?.kind || ''))) {
+          const detail = detailFromExpeditionMarker(hit);
+          if (detail.cellId) this.selectedCellId = detail.cellId;
+          if (detail.cellId) this.setHoverCell(detail.cellId);
+          window.dispatchEvent(new CustomEvent('founders-plot-expedition-map-select', { detail }));
+        } else {
+          const detail = detailFromExpeditionCell(hit);
+          this.selectedCellId = detail.cellId;
+          this.setHoverCell(detail.cellId);
+          window.dispatchEvent(new CustomEvent('founders-plot-expedition-map-select', { detail }));
+        }
       }
     }
   }
 
   setHoverFromPoint(clientX, clientY) {
     const hit = this.pickFromPoint(clientX, clientY);
-    this.setHoverCell(hit?.userData?.cellId || '');
+    this.setHoverCell(hit?.userData?.cellId || hit?.userData?.targetCellId || '');
   }
 
   setHoverCell(cellId = '') {
@@ -3420,8 +4141,13 @@ class ExpeditionMapThreeStage {
   canvasPointForCell(cellId) {
     const mesh = this.cellMeshes.find((entry) => String(entry.userData?.cellId || '') === String(cellId || ''));
     if (!mesh) return null;
+    return this.canvasPointForObject(mesh);
+  }
+
+  canvasPointForObject(object) {
+    if (!object) return null;
     const world = new THREE.Vector3();
-    mesh.getWorldPosition(world);
+    object.getWorldPosition(world);
     world.project(this.camera);
     const rect = this.renderer.domElement.getBoundingClientRect();
     return {
@@ -3467,6 +4193,13 @@ class ExpeditionMapThreeStage {
         hiddenSpecificitySuppressed: !cellExposesRegionTruth(cell) && terrain === fogState
       };
     });
+    const generatedSpriteAssets = Array.from(new Map([
+      ...Object.values(EXPEDITION_UNIT_SPRITE_ASSETS),
+      ...Object.values(EXPEDITION_MARKER_SPRITE_ASSETS)
+    ].map((asset) => [asset.path, asset])).values());
+    const generatedSpriteAssetReadyCount = generatedSpriteAssets
+      .filter((asset) => !!ensureExpeditionRegionTileImage(asset))
+      .length;
     this.info = {
       renderer: 'three.js',
       surface: 'expedition-map',
@@ -3483,6 +4216,13 @@ class ExpeditionMapThreeStage {
           runtimeRegionAssetPack: EXPEDITION_REGION_ASSET_PACK_VERSION,
           runtimeRegionAtlas: `${EXPEDITION_PUBLIC_TERRAIN_ASSET_BASE}/manifest.json`,
           runtimeTerrainUnderlay: EXPEDITION_PROMOTED_UNDERLAY_ASSET.path,
+          runtimeSpriteAssetPack: EXPEDITION_SPRITE_ASSET_PACK_VERSION,
+          runtimeSpriteAtlas: `${EXPEDITION_SPRITE_ASSET_BASE}/manifest.json`,
+          generatedSpriteAssets: true,
+          generatedSpriteAssetCount: generatedSpriteAssets.length,
+          generatedSpriteAssetsReady: generatedSpriteAssetReadyCount,
+          generatedSpriteAssetsVisualOnly: true,
+          generatedSpriteAssetsReadOnly: true,
           serverTerrainAssetContractVersion: EXPEDITION_PUBLIC_TERRAIN_CONTRACT_VERSION,
           serverTerrainSlotSource: EXPEDITION_PUBLIC_TERRAIN_SLOT_SOURCE,
           assetBackedRegionTiles: regionVisuals.filter((cell) => cell.assetPath).length,
@@ -3528,6 +4268,26 @@ class ExpeditionMapThreeStage {
         surveyStrokesVisualOnly: true,
         receiptTraceVisualOnly: true,
         markerCount: this.markerCount,
+        eventPacketMarkers: true,
+        eventPacketMarkerCount: this.eventMarkerCount,
+        objectiveMarkers: true,
+        objectiveMarkerCount: this.objectiveMarkerCount,
+        eventObjectiveMarkersVisualOnly: [...this.eventMarkerSprites, ...this.objectiveMarkerSprites]
+          .every((sprite) => sprite.userData?.visualOnly === true),
+        eventObjectiveMarkersReadOnly: [...this.eventMarkerSprites, ...this.objectiveMarkerSprites]
+          .every((sprite) => sprite.userData?.readOnly === true),
+        eventObjectiveMarkersInspectable: [...this.eventMarkerSprites, ...this.objectiveMarkerSprites]
+          .every((sprite) => sprite.userData?.selectable === true && sprite.userData?.inspectable === true),
+        eventObjectiveMarkerAuthority: false,
+        unitTokens: true,
+        unitTokenCount: this.unitTokenCount,
+        unitTokensReadOnly: this.unitSprites.every((sprite) => sprite.userData?.readOnly === true),
+        unitMovementMutationImplemented: this.unitSprites.some((sprite) => sprite.userData?.movementMutationImplemented === true),
+        commandTargetRings: true,
+        commandTargetCount: this.commandTargetCount,
+        commandTargetRingsVisualOnly: this.commandTargetSprites.every((sprite) => sprite.userData?.visualOnly === true),
+        commandTargetRingsReadOnly: this.commandTargetSprites.every((sprite) => sprite.userData?.readOnly === true),
+        commandTargetRingAuthority: false,
         clientAuthority: false
       },
       regionConsistency: {
@@ -3572,6 +4332,67 @@ class ExpeditionMapThreeStage {
         continuousUnderlayNoActionAuthority: this.terrainUnderlayCount === 1
       },
       regionVisuals,
+      eventMarkers: this.eventMarkerSprites.map((sprite) => ({
+        packetId: String(sprite.userData?.packetId || ''),
+        cellId: String(sprite.userData?.cellId || ''),
+        templateId: String(sprite.userData?.templateId || ''),
+        spriteAssetSlot: String(sprite.userData?.spriteAssetSlot || ''),
+        spriteAssetPath: String(sprite.userData?.spriteAssetPath || ''),
+        spriteAssetReady: sprite.userData?.spriteAssetReady === true,
+        visualOnly: sprite.userData?.visualOnly === true,
+        readOnly: sprite.userData?.readOnly === true,
+        selectable: sprite.userData?.selectable === true,
+        inspectable: sprite.userData?.inspectable === true,
+        routeAuthority: sprite.userData?.routeAuthority === true,
+        actionAuthority: sprite.userData?.actionAuthority === true,
+        executableActions: Number(sprite.userData?.executableActions || 0),
+        canvas: this.canvasPointForObject(sprite)
+      })),
+      objectiveMarkers: this.objectiveMarkerSprites.map((sprite) => ({
+        mode: String(sprite.userData?.mode || ''),
+        targetCellId: String(sprite.userData?.targetCellId || ''),
+        packetId: String(sprite.userData?.packetId || ''),
+        spriteAssetSlot: String(sprite.userData?.spriteAssetSlot || ''),
+        spriteAssetPath: String(sprite.userData?.spriteAssetPath || ''),
+        spriteAssetReady: sprite.userData?.spriteAssetReady === true,
+        visualOnly: sprite.userData?.visualOnly === true,
+        readOnly: sprite.userData?.readOnly === true,
+        selectable: sprite.userData?.selectable === true,
+        inspectable: sprite.userData?.inspectable === true,
+        routeAuthority: sprite.userData?.routeAuthority === true,
+        actionAuthority: sprite.userData?.actionAuthority === true,
+        executableActions: Number(sprite.userData?.executableActions || 0),
+        canvas: this.canvasPointForObject(sprite)
+      })),
+      units: this.unitSprites.map((sprite) => ({
+        unitId: String(sprite.userData?.unitId || ''),
+        unitType: String(sprite.userData?.unitType || ''),
+        displayName: String(sprite.userData?.displayName || ''),
+        cellId: String(sprite.userData?.cellId || ''),
+        spriteAssetSlot: String(sprite.userData?.spriteAssetSlot || ''),
+        spriteAssetPath: String(sprite.userData?.spriteAssetPath || ''),
+        spriteAssetReady: sprite.userData?.spriteAssetReady === true,
+        selected: String(sprite.userData?.unitId || '') === String(this.selectedUnitId || ''),
+        readOnly: sprite.userData?.readOnly === true,
+        movementMutationImplemented: sprite.userData?.movementMutationImplemented === true,
+        canvas: this.canvasPointForObject(sprite)
+      })),
+      commandTargets: this.commandTargetSprites.map((sprite) => ({
+        unitId: String(sprite.userData?.unitId || ''),
+        unitType: String(sprite.userData?.unitType || ''),
+        commandId: String(sprite.userData?.commandId || ''),
+        cellId: String(sprite.userData?.cellId || ''),
+        fogState: String(sprite.userData?.fogState || ''),
+        serverMutationImplemented: sprite.userData?.serverMutationImplemented === true,
+        movementMutation: sprite.userData?.movementMutation === true,
+        visualOnly: sprite.userData?.visualOnly === true,
+        readOnly: sprite.userData?.readOnly === true,
+        selectable: sprite.userData?.selectable === true,
+        routeAuthority: sprite.userData?.routeAuthority === true,
+        actionAuthority: sprite.userData?.actionAuthority === true,
+        executableActions: Number(sprite.userData?.executableActions || 0),
+        canvas: this.canvasPointForObject(sprite)
+      })),
       camera: {
         x: Number(this.camera.position.x.toFixed(3)),
         y: Number(this.camera.position.y.toFixed(3)),
@@ -3628,7 +4449,7 @@ function renderExpeditionMap(hostNode, model = {}, options = {}) {
     stage = new ExpeditionMapThreeStage(hostNode);
     expeditionMapRenderers.set(hostNode, stage);
   }
-  return stage.sync(model || {}, options.selectedCellId || '');
+  return stage.sync(model || {}, options.selectedCellId || '', options.selectedUnitId || '');
 }
 
 function getExpeditionMapInfo(hostNode) {

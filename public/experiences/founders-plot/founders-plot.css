@@ -547,10 +547,10 @@ html, body {
 
 .fp-expedition-objective-strip {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.45fr);
-  gap: 8px 10px;
+  grid-template-columns: minmax(72px, auto) minmax(0, 1fr);
+  gap: 6px 8px;
   align-items: center;
-  padding: 9px 11px;
+  padding: 8px 9px;
   border: 1px solid rgba(27, 106, 100, 0.24);
   border-left: 4px solid var(--at-teal-600);
   border-radius: 8px;
@@ -566,8 +566,8 @@ html, body {
 .fp-expedition-objective-strip__copy {
   display: flex;
   min-width: 0;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 6px;
 }
 
 .fp-expedition-objective-strip__copy small,
@@ -583,8 +583,8 @@ html, body {
 .fp-expedition-objective-strip__copy strong {
   color: #134d49;
   font-family: Wellfleet, Georgia, serif;
-  font-size: 15px;
-  line-height: 1.2;
+  font-size: 13px;
+  line-height: 1;
 }
 
 .fp-expedition-objective-strip__copy p {
@@ -596,17 +596,19 @@ html, body {
 }
 
 .fp-expedition-objective-strip__facts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
   gap: 5px;
+  justify-content: flex-end;
 }
 
 .fp-expedition-objective-strip__facts span {
-  display: flex;
+  display: inline-flex;
   min-width: 0;
-  flex-direction: column;
-  gap: 1px;
-  padding: 6px 7px;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
   border: 1px solid rgba(46, 27, 14, 0.13);
   border-radius: 7px;
   background: rgba(255, 248, 232, 0.62);
@@ -615,8 +617,8 @@ html, body {
 .fp-expedition-objective-strip__facts strong {
   color: #2c2118;
   font-family: Wellfleet, Georgia, serif;
-  font-size: 13px;
-  line-height: 1.1;
+  font-size: 12px;
+  line-height: 1;
   overflow-wrap: anywhere;
 }
 
@@ -624,6 +626,10 @@ html, body {
   grid-column: 1 / -1;
   overflow-wrap: anywhere;
   text-transform: none;
+}
+
+.fp-expedition-objective-strip .fp-expedition-audit-details {
+  grid-column: 1 / -1;
 }
 
 .fp-world-grid-card {
@@ -822,9 +828,10 @@ html, body {
 .fp-expedition-inspector-section > summary {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
-  padding: 8px 9px;
+  min-width: 0;
+  padding: 8px;
   cursor: pointer;
   list-style: none;
 }
@@ -853,19 +860,28 @@ html, body {
 }
 
 .fp-expedition-inspector-section > summary strong {
+  min-width: 0;
   color: #173f39;
   font-family: Wellfleet, Georgia, serif;
   font-size: 13px;
   line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .fp-expedition-inspector-section > summary small {
+  min-width: 0;
+  max-width: 86px;
   color: #5b4831;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 900;
   line-height: 1.15;
+  overflow: hidden;
   text-align: right;
+  text-overflow: ellipsis;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .fp-expedition-inspector-section > .fp-expedition-sector-list {
@@ -1047,7 +1063,7 @@ html, body {
   gap: 1px 5px;
   min-width: 0;
   align-items: center;
-  padding: 5px 6px;
+  padding: 5px;
   border: 1px solid rgba(46, 27, 14, 0.18);
   border-radius: 7px;
   background: rgba(255, 248, 232, 0.84);
@@ -1087,7 +1103,7 @@ html, body {
 .fp-expedition-fog-pip small {
   min-width: 0;
   color: #5b4831;
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 900;
   line-height: 1;
   overflow: hidden;
@@ -1124,9 +1140,11 @@ html, body {
 
 .fp-expedition-map-selected-summary {
   display: grid;
+  grid-template-columns: minmax(160px, 1fr) auto;
   width: min(100%, 520px);
-  gap: 7px;
-  padding: 9px;
+  gap: 6px 8px;
+  align-items: center;
+  padding: 8px;
   border: 1px solid rgba(27, 106, 100, 0.26);
   border-left: 4px solid var(--at-teal-600);
   border-radius: 8px;
@@ -1152,14 +1170,14 @@ html, body {
 
 .fp-expedition-map-selected-summary__head {
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
-  gap: 8px;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 7px;
   align-items: center;
 }
 
 .fp-expedition-map-selected-summary__head > i {
   display: grid;
-  width: 36px;
+  width: 32px;
   aspect-ratio: 1;
   place-items: center;
   clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%);
@@ -1182,7 +1200,7 @@ html, body {
 .fp-expedition-map-selected-summary__head strong {
   color: #173f39;
   font-family: Wellfleet, Georgia, serif;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.15;
   overflow-wrap: anywhere;
 }
@@ -1202,6 +1220,10 @@ html, body {
   min-width: 0;
   flex-wrap: wrap;
   gap: 5px;
+}
+
+.fp-expedition-map-selected-summary__chips {
+  justify-content: flex-end;
 }
 
 .fp-expedition-map-selected-summary__chips span,
@@ -1225,6 +1247,7 @@ html, body {
 }
 
 .fp-expedition-receipt-trace {
+  grid-column: 1 / 2;
   align-items: center;
 }
 
@@ -1237,18 +1260,19 @@ html, body {
 }
 
 .fp-expedition-party-badges {
+  grid-column: 2 / 3;
   display: flex;
   min-width: 0;
   flex-wrap: wrap;
   gap: 5px;
+  justify-content: flex-end;
 }
 
 .fp-expedition-party-badges span {
   display: inline-flex;
   min-width: 0;
   align-items: center;
-  gap: 4px;
-  padding: 3px 6px 3px 3px;
+  padding: 2px;
   border: 1px solid rgba(27, 106, 100, 0.18);
   border-radius: 999px;
   background: rgba(223, 245, 241, 0.60);
@@ -1278,6 +1302,238 @@ html, body {
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+.fp-expedition-map-status-symbols {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.fp-expedition-map-status-symbols span {
+  display: inline-grid;
+  min-width: 34px;
+  place-items: center;
+  padding: 4px 7px;
+  border: 1px solid rgba(27, 106, 100, 0.22);
+  border-radius: 999px;
+  background: rgba(223, 245, 241, 0.74);
+  color: #104540;
+  font-family: Wellfleet, Georgia, serif;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.fp-expedition-unit-roster {
+  position: relative;
+  z-index: 5;
+  display: grid;
+  gap: 6px;
+  margin: 0 12px 12px;
+  padding: 7px;
+  border: 1px solid rgba(27, 106, 100, 0.24);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(255, 248, 232, 0.86), rgba(223, 245, 241, 0.68)),
+    repeating-linear-gradient(0deg, rgba(46, 27, 14, 0.024) 0 1px, transparent 1px 12px);
+  box-shadow: 0 12px 24px rgba(46, 27, 14, 0.14);
+}
+
+.fp-expedition-unit-roster__head {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.fp-expedition-unit-roster__head strong {
+  color: #173f39;
+  font-family: Wellfleet, Georgia, serif;
+  font-size: 13px;
+}
+
+.fp-expedition-unit-roster__head small {
+  color: #5b4831;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.fp-expedition-unit-rail {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: 5px;
+}
+
+.fp-expedition-unit-token {
+  position: relative;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 5px;
+  min-width: 0;
+  align-items: center;
+  min-height: 46px;
+  padding: 4px 5px;
+  border: 1px solid rgba(46, 27, 14, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 248, 232, 0.76);
+  color: #2f2217;
+  cursor: pointer;
+  text-align: left;
+}
+
+.fp-expedition-unit-token:hover,
+.fp-expedition-unit-token:focus-visible,
+.fp-expedition-unit-token--selected {
+  outline: 2px solid rgba(245, 212, 132, 0.62);
+  outline-offset: 1px;
+  border-color: rgba(27, 106, 100, 0.42);
+  background: rgba(223, 245, 241, 0.86);
+}
+
+.fp-expedition-unit-token > i {
+  display: grid;
+  width: 36px;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid rgba(46, 27, 14, 0.20);
+  border-radius: 50%;
+  background:
+    var(--unit-sprite, none) center / 88% 88% no-repeat,
+    radial-gradient(circle at 50% 42%, rgba(255, 248, 232, 0.88), rgba(27, 106, 100, 0.82));
+  color: rgba(255, 248, 232, 0.22);
+  font-family: Wellfleet, Georgia, serif;
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.fp-expedition-unit-token--courier > i {
+  background:
+    var(--unit-sprite, none) center / 88% 88% no-repeat,
+    radial-gradient(circle at 50% 42%, rgba(255, 248, 232, 0.88), rgba(185, 83, 104, 0.84));
+}
+
+.fp-expedition-unit-token--settler_convoy > i {
+  background:
+    var(--unit-sprite, none) center / 88% 88% no-repeat,
+    radial-gradient(circle at 50% 42%, rgba(255, 248, 232, 0.88), rgba(138, 93, 31, 0.84));
+}
+
+.fp-expedition-unit-token--outpost_crew > i {
+  background:
+    var(--unit-sprite, none) center / 88% 88% no-repeat,
+    radial-gradient(circle at 50% 42%, rgba(255, 248, 232, 0.88), rgba(99, 127, 88, 0.84));
+}
+
+.fp-expedition-unit-token span {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.fp-expedition-unit-token strong {
+  color: #173f39;
+  font-family: Wellfleet, Georgia, serif;
+  font-size: 10px;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fp-expedition-unit-token small {
+  color: #5b4831;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.fp-expedition-unit-token__ready {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  display: grid;
+  min-width: 15px;
+  height: 15px;
+  place-items: center;
+  border: 1px solid rgba(27, 106, 100, 0.28);
+  border-radius: 999px;
+  background: rgba(255, 248, 232, 0.92);
+  color: #173f39;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.fp-expedition-unit-token__ready[data-actions="0"] {
+  border-color: rgba(101, 74, 28, 0.18);
+  color: rgba(61, 44, 29, 0.54);
+}
+
+.fp-expedition-unit-command-bar {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+.fp-expedition-unit-command-bar small,
+.fp-expedition-unit-command-bar span {
+  padding: 3px 6px;
+  border: 1px solid rgba(101, 74, 28, 0.24);
+  border-radius: 999px;
+  background: rgba(255, 248, 232, 0.72);
+  color: #3d2c1d;
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 0;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.fp-expedition-unit-command-bar__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 29px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.fp-expedition-unit-command-bar__button::before {
+  content: attr(data-command-icon);
+  font-family: Wellfleet, Georgia, serif;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.fp-expedition-unit-command-bar__unit,
+.fp-expedition-unit-command-chip--authority[data-enabled="true"] {
+  border-color: rgba(27, 106, 100, 0.30);
+  background: rgba(223, 245, 241, 0.78);
+  color: #173f39;
+}
+
+.fp-expedition-unit-command-chip--target,
+.fp-expedition-unit-command-chip--count {
+  background: rgba(255, 248, 232, 0.84);
+}
+
+.fp-expedition-unit-command-bar span[data-enabled="false"] {
+  border-style: dashed;
+  color: rgba(61, 44, 29, 0.72);
 }
 
 .fp-expedition-audit-details {
@@ -1339,6 +1595,17 @@ html, body {
   .fp-expedition-map-selected-summary {
     width: 100%;
   }
+  .fp-expedition-map-selected-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .fp-expedition-map-selected-summary__chips,
+  .fp-expedition-party-badges {
+    grid-column: 1;
+    justify-content: flex-start;
+  }
+  .fp-expedition-receipt-trace {
+    grid-column: 1;
+  }
 }
 
 .fp-expedition-three-host::after {
@@ -1368,12 +1635,12 @@ html, body {
   z-index: 3;
   top: 54px;
   left: 12px;
-  right: 54px;
-  display: grid;
-  grid-template-columns: minmax(108px, auto) minmax(0, 1fr);
-  gap: 4px 10px;
+  right: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
   align-items: center;
-  max-width: 640px;
+  max-width: min(360px, calc(100% - 92px));
   pointer-events: none;
 }
 
@@ -1397,25 +1664,26 @@ html, body {
   background: rgba(223, 245, 241, 0.94);
   color: #104540;
   font-family: Wellfleet, Georgia, serif;
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.15;
-  padding: 5px 9px;
+  padding: 5px 8px;
   text-align: center;
 }
 
 .fp-expedition-semantic-zoom p,
 .fp-expedition-semantic-zoom small {
-  border-radius: 7px;
-  font-size: 12px;
-  line-height: 1.25;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.1;
   overflow-wrap: anywhere;
-  padding: 5px 8px;
+  padding: 5px 7px;
+  text-transform: uppercase;
 }
 
 .fp-expedition-semantic-zoom small {
-  grid-column: 1 / -1;
   color: #4d3b25;
-  max-width: min(520px, 100%);
+  max-width: min(160px, 100%);
 }
 
 .fp-expedition-semantic-zoom[data-zoom-tier="detail"] strong {
@@ -2921,6 +3189,16 @@ html, body {
   pointer-events: none;
 }
 
+.fp-expedition-map-panel .fp-expedition-unit-roster {
+  position: absolute;
+  z-index: 8;
+  top: 70px;
+  left: 14px;
+  width: min(520px, calc(100% - 378px));
+  margin: 0;
+  pointer-events: auto;
+}
+
 .fp-expedition-map-panel .fp-expedition-fog-pips,
 .fp-expedition-map-panel .fp-expedition-map-selected-summary {
   width: 100%;
@@ -2988,6 +3266,15 @@ html, body {
     max-width: none;
   }
 
+  .fp-expedition-map-panel .fp-expedition-unit-roster {
+    top: 62px;
+    right: 10px;
+    left: 10px;
+    width: auto;
+    max-height: min(22svh, 164px);
+    overflow: auto;
+  }
+
   .fp-expedition-map-panel .fp-expedition-fog-pips {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
@@ -3011,9 +3298,7 @@ html, body {
   }
 
   .fp-expedition-map-panel .fp-expedition-semantic-zoom {
-    top: 56px;
-    right: 10px;
-    left: 10px;
+    display: none;
   }
 
   .fp-expedition-map-panel .fp-expedition-map-hud {
@@ -3028,5 +3313,40 @@ html, body {
 
   .fp-expedition-map-panel .fp-expedition-fog-pips {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .fp-expedition-map-panel .fp-expedition-unit-rail {
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scroll-snap-type: x proximity;
+  }
+
+  .fp-expedition-map-panel .fp-expedition-unit-token {
+    flex: 0 0 76px;
+    grid-template-columns: 34px minmax(0, 1fr);
+    min-height: 43px;
+    padding: 4px;
+    scroll-snap-align: start;
+  }
+
+  .fp-expedition-map-panel .fp-expedition-unit-token > i {
+    width: 32px;
+  }
+
+  .fp-expedition-map-panel .fp-expedition-unit-command-bar {
+    gap: 3px;
+  }
+
+  .fp-expedition-map-panel .fp-expedition-unit-command-bar small,
+  .fp-expedition-map-panel .fp-expedition-unit-command-bar span {
+    padding: 3px 5px;
+    font-size: 8px;
+  }
+
+  .fp-expedition-map-panel .fp-expedition-unit-command-bar__button {
+    min-height: 25px;
+    padding: 4px 7px;
+    font-size: 9px;
   }
 }

@@ -1,0 +1,85 @@
+{
+  "ok": true,
+  "lane": "HQ15E",
+  "title": "Runtime sprite pack parent reconciliation",
+  "generatedAt": "2026-06-02T01:20:00+07:00",
+  "runtimeSpriteAssetPack": "hq15e_expedition_unit_marker_sprites_v1",
+  "manifest": "public/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1/manifest.json",
+  "sourceReviewSheet": "reports/media/agent-town-hq15e-expedition-unit-marker-asset-sheet-review-2026-06-02/agent-town-hq15e-expedition-unit-marker-asset-sheet-review-2026-06-02.png",
+  "contactSheet": "reports/agent-town-hq15e-runtime-sprite-pack-contact-sheet-2026-06-02.png",
+  "sprites": [
+    "scout-pathfinder-v1.png",
+    "settler-convoy-v1.png",
+    "surveyor-beacon-v1.png",
+    "courier-signal-runner-v1.png",
+    "outpost-crew-v1.png",
+    "objective-beacon-v1.png",
+    "event-packet-v1.png",
+    "receipt-ledger-v1.png"
+  ],
+  "spriteDimensions": {
+    "expected": "512x512 RGBA",
+    "actualCount": 8
+  },
+  "rendererProof": {
+    "declaresPackVersion": true,
+    "runtimeSpriteAtlas": "/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1/manifest.json",
+    "generatedSpriteAssetsReadyMinimum": 8,
+    "unitSpritesUseSameOriginPack": true,
+    "eventObjectiveMarkersUsePackSlots": true
+  },
+  "guardrails": {
+    "presentationOnly": true,
+    "sameOriginAssets": true,
+    "serverOwnedReadModelRequired": true,
+    "visualOnly": true,
+    "readOnly": true,
+    "movementAuthority": false,
+    "routeAuthority": false,
+    "resourceTruth": false,
+    "combat": false,
+    "atlasExecution": false,
+    "publicSharing": false,
+    "externalEffects": false,
+    "hiddenTruthLeakage": false,
+    "scoutSectorOnlyMutationPath": true
+  },
+  "checks": [
+    {
+      "command": "file reports/agent-town-hq15e-runtime-sprite-pack-contact-sheet-2026-06-02.png public/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1/*.png",
+      "result": "passed"
+    },
+    {
+      "command": "jq empty public/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1/manifest.json",
+      "result": "passed"
+    },
+    {
+      "command": "node --check public/experiences/founders-plot/three_scene_entry.js",
+      "result": "passed"
+    },
+    {
+      "command": "node --check public/experiences/founders-plot/three_scene_bundle.js",
+      "result": "passed"
+    },
+    {
+      "command": "node --check public/experiences/founders-plot/founders-plot.js",
+      "result": "passed"
+    },
+    {
+      "command": "node --check e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js",
+      "result": "passed"
+    },
+    {
+      "command": "npm run build:founders-plot-threejs",
+      "result": "passed"
+    },
+    {
+      "command": "PW_PORT=5075 npx playwright test e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js --project=chromium --grep \"FP-E2E-023\" --reporter=line",
+      "result": "passed: 1 test"
+    },
+    {
+      "command": "git diff --check",
+      "result": "passed"
+    }
+  ]
+}

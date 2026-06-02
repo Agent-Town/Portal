@@ -1,0 +1,54 @@
+{
+  "ok": true,
+  "verdict": "PASS_REVIEW_ONLY",
+  "lane": "HQ15E",
+  "date": "2026-06-02",
+  "sourceModel": "openai/gpt-image-2",
+  "sourcePath": "/Users/robin/.openclaw/media/tool-image-generation/agent-town-hq15e-expedition-unit-marker-asset-sheet-gpt-imag---2010881c-93a6-4945-b58c-95de65644152.png",
+  "reviewPath": "reports/media/agent-town-hq15e-expedition-unit-marker-asset-sheet-review-2026-06-02/agent-town-hq15e-expedition-unit-marker-asset-sheet-review-2026-06-02.png",
+  "mimeType": "image/png",
+  "dimensions": {
+    "width": 2048,
+    "height": 1152
+  },
+  "sha256": "13f05c179e12c0652aa320eae7f7917be0e3a52dbbc3a8e7e2c97977a3a2e03f",
+  "reviewOnly": true,
+  "runtimePromoted": false,
+  "croppedSprites": false,
+  "loaderAdded": false,
+  "serverAuthorityChanged": false,
+  "checks": [
+    {
+      "command": "file reports/media/agent-town-hq15e-expedition-unit-marker-asset-sheet-review-2026-06-02/agent-town-hq15e-expedition-unit-marker-asset-sheet-review-2026-06-02.png",
+      "exitCode": 0,
+      "observed": "PNG image data, 2048 x 1152, 8-bit/color RGB, non-interlaced"
+    },
+    {
+      "command": "magick identify reports/media/agent-town-hq15e-expedition-unit-marker-asset-sheet-review-2026-06-02/agent-town-hq15e-expedition-unit-marker-asset-sheet-review-2026-06-02.png",
+      "exitCode": 0,
+      "observed": "PNG 2048x1152"
+    },
+    {
+      "command": "shasum -a 256 reports/media/agent-town-hq15e-expedition-unit-marker-asset-sheet-review-2026-06-02/agent-town-hq15e-expedition-unit-marker-asset-sheet-review-2026-06-02.png",
+      "exitCode": 0
+    }
+  ],
+  "guardrails": {
+    "runtimeAssetPack": false,
+    "runtimeLoader": false,
+    "appSourceChange": false,
+    "serverStoreRoutesToolsSchemaAuthorityChange": false,
+    "newMutationPath": false,
+    "atlasExecution": false,
+    "publicSharing": false,
+    "generatedUniverseRendering": false,
+    "hiddenAutonomy": false,
+    "routeTradeEconomyResourceRewardCombatSchedulerBehavior": false,
+    "crossPlotMutation": false,
+    "externalEffects": false,
+    "wildWestGenreDrift": false,
+    "deploy": false,
+    "merge": false,
+    "push": false
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "ok": true,
+  "date": "2026-06-02",
+  "lane": "HQ15T",
+  "verdict": "PASS_SYMBOL_FIRST_COMMAND_SURFACE_QA",
+  "source": "Parent QA over HQ15Q plan, HQ15R unit/command compaction, and HQ15S fog/selected/inspector compaction.",
+  "screenshots": {
+    "desktop": "reports/agent-town-hq15t-symbol-first-command-surface-qa-desktop-2026-06-02.png",
+    "mobile": "reports/agent-town-hq15t-symbol-first-command-surface-qa-mobile-2026-06-02.png",
+    "contactSheet": "reports/agent-town-hq15t-symbol-first-command-surface-qa-contact-sheet-2026-06-02.png",
+    "desktopSize": "1232x625",
+    "mobileSize": "366x757",
+    "contactSheetSize": "1598x757"
+  },
+  "parentFixes": [
+    {
+      "kind": "frontend_css_js",
+      "summary": "Shortened visible inspector drawer summary labels and metadata, preserved full text in title/aria-label, and added ellipsis/no-wrap CSS to prevent overlap."
+    }
+  ],
+  "verification": {
+    "nodeCheck": true,
+    "proofJsonParse": true,
+    "gitDiffCheck": true,
+    "fpE2E022": true,
+    "fpE2E023": true,
+    "buildFoundersPlotThreejs": true,
+    "testFoundersPlot": "98/98",
+    "screenshotFileChecks": true
+  },
+  "guardrails": {
+    "noCommit": true,
+    "noPush": true,
+    "noDeploy": true,
+    "noMerge": true,
+    "noPublicShare": true,
+    "noExternalEffects": true,
+    "serverAuthorityUnchanged": true,
+    "newMutationPaths": 0,
+    "scoutSectorOnlyFogRevealPath": true,
+    "scoutMovementAdjacentDiscoveredKnownOnly": true,
+    "surveyorSettlerUseExistingEndpoints": true,
+    "hiddenTruthLeakage": false,
+    "routeCreation": false,
+    "tradeCreation": false,
+    "resourceHarvesting": false,
+    "rewardBehaviorChange": false,
+    "combatBehavior": false,
+    "schedulerBehavior": false,
+    "atlasExecution": false,
+    "generatedUniverseRuntimeExpansion": false,
+    "crossPlotMutation": false
+  },
+  "textReplacementChecks": {
+    "unitRosterSymbolFirst": true,
+    "commandBarNoRawTargetProse": true,
+    "fogPipsSymbolFirst": true,
+    "selectedSummaryNoPrimaryRawCellOrAuthorityProse": true,
+    "receiptAndPartyFactsAccessibleNotPrimary": true,
+    "semanticZoomCompact": true,
+    "inspectorDefaultCompact": true,
+    "ledgersCollapsedByDefault": true
+  },
+  "artifacts": [
+    "reports/agent-town-hq15q-symbol-first-text-replacement-plan-2026-06-02.md",
+    "reports/agent-town-hq15q-symbol-first-text-replacement-plan-proof-2026-06-02.json",
+    "reports/agent-town-hq15r-symbol-first-unit-command-surface-2026-06-02.md",
+    "reports/agent-town-hq15r-symbol-first-unit-command-surface-proof-2026-06-02.json",
+    "reports/agent-town-hq15s-fog-selected-inspector-symbol-compaction-2026-06-02.md",
+    "reports/agent-town-hq15s-fog-selected-inspector-symbol-compaction-proof-2026-06-02.json",
+    "reports/agent-town-hq15t-symbol-first-command-surface-qa-2026-06-02.md",
+    "reports/agent-town-hq15t-symbol-first-command-surface-qa-proof-2026-06-02.json"
+  ]
+}

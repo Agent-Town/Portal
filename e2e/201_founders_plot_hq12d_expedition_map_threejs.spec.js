@@ -6,6 +6,10 @@ const DESKTOP_SCREENSHOT = `${PREFIX}-desktop-2026-06-01.png`;
 const MOBILE_SCREENSHOT = `${PREFIX}-mobile-2026-06-01.png`;
 const CONTACT_SHEET = `${PREFIX}-contact-sheet-2026-06-01.png`;
 const PROOF_JSON = `${PREFIX}-proof-2026-06-01.json`;
+const HQ15D_PREFIX = 'reports/agent-town-hq15d-event-objective-map-markers';
+const HQ15D_DESKTOP_SCREENSHOT = `${HQ15D_PREFIX}-desktop-2026-06-02.png`;
+const HQ15D_MOBILE_SCREENSHOT = `${HQ15D_PREFIX}-mobile-2026-06-02.png`;
+const HQ15D_PROOF_JSON = `${HQ15D_PREFIX}-proof-2026-06-02.json`;
 
 function expeditionMapFixture() {
   const plotId = 'plot_hq12d_exp_map_threejs';
@@ -145,6 +149,142 @@ function expeditionMapFixture() {
           terrainAssetContractVersion: 'agenttown_public_terrain_asset_slots_v1',
         },
       ],
+      units: {
+        unitRosterId: 'expedition_unit_roster_current_plot_v1',
+        kind: 'expedition_unit_roster',
+        version: 'hq15a_server_owned_expedition_unit_roster_v1',
+        readOnly: true,
+        executableActions: [],
+        authorityBoundary: 'server_owned_read_only_expedition_unit_roster_v1',
+        interactionModel: {
+          selectable: true,
+          mapTokens: true,
+          commandBarReady: true,
+          movementPreviewOnly: false,
+          movementCommandReady: true,
+          serverAuthoritativeMovementRequiredForMutation: true,
+        },
+        items: [
+          {
+            unitId: 'expedition_unit_pathfinder_scout_v1',
+            kind: 'expedition_map_unit',
+            unitType: 'scout',
+            displayName: 'Mira Trailmark',
+            role: 'scout',
+            state: 'AT_ORIGIN',
+            readOnly: true,
+            selectable: true,
+            executableActions: [],
+            location: { cellId: 'cell_origin', q: 0, r: 0, fogState: 'discovered' },
+            movement: { canMove: true, movementMutationImplemented: true, allowedTargetCellIds: ['cell_q1_r0'], authority: 'server_owned_scout_unit_revealed_cell_move_receipt_v1', allowedFogStates: ['discovered', 'known'], revealsFog: false, routeCreation: false, resourceDelta: {} },
+            commandHints: [{
+              commandId: 'move_unit',
+              label: 'Move',
+              actionName: 'et.plot.move_expedition_unit',
+              enabled: true,
+              targetCellIds: ['cell_q1_r0'],
+              serverMutationImplemented: true,
+              requiresHumanApprovalForAgent: true,
+              revealsFog: false,
+              routeCreation: false,
+            }, {
+              commandId: 'scout_sector',
+              label: 'Scout Sector',
+              actionName: 'et.plot.scout_sector',
+              enabled: true,
+              targetCellIds: ['cell_q0_r1'],
+              serverMutationImplemented: true,
+              requiresHumanApprovalForAgent: true,
+            }],
+            boundaryFlags: { movementMutation: true, movementRevealsFog: false, autonomousMovement: false, routeCreation: false, combat: false, atlasExecution: false, externalEffects: false },
+          },
+          {
+            unitId: 'expedition_unit_rook_signalpost_messenger_v1',
+            kind: 'expedition_map_unit',
+            unitType: 'courier',
+            displayName: 'Rook Signalpost',
+            role: 'messenger',
+            state: 'AT_ORIGIN',
+            readOnly: true,
+            selectable: true,
+            executableActions: [],
+            location: { cellId: 'cell_origin', q: 0, r: 0, fogState: 'discovered' },
+            movement: { canMove: false, movementMutationImplemented: false, allowedTargetCellIds: [] },
+            commandHints: [{ commandId: 'inspect_event_packet', label: 'Inspect packet', enabled: false, serverMutationImplemented: false }],
+            boundaryFlags: { movementMutation: false, autonomousMovement: false, routeCreation: false, combat: false, atlasExecution: false, externalEffects: false },
+          },
+          {
+            unitId: 'expedition_unit_surveyor_site_plan_hq12d_forest',
+            kind: 'expedition_map_unit',
+            unitType: 'surveyor',
+            displayName: 'Surveyor Crew',
+            role: 'surveyor',
+            state: 'SURVEY_READY',
+            readOnly: true,
+            selectable: true,
+            executableActions: [],
+            location: { cellId: 'cell_q1_r0', q: 1, r: 0, fogState: 'known' },
+            movement: { canMove: false, movementMutationImplemented: false, allowedTargetCellIds: [] },
+            commandHints: [{ commandId: 'inspect_survey', label: 'Inspect survey', enabled: true, serverMutationImplemented: false }],
+            boundaryFlags: { movementMutation: false, autonomousMovement: false, routeCreation: false, combat: false, atlasExecution: false, externalEffects: false },
+          },
+          {
+            unitId: 'expedition_unit_outpost_crew_claim_hq12d_forest',
+            kind: 'expedition_map_unit',
+            unitType: 'outpost_crew',
+            displayName: 'Outpost Crew',
+            role: 'outpost_crew',
+            state: 'STATIONED',
+            readOnly: true,
+            selectable: true,
+            executableActions: [],
+            location: { cellId: 'cell_q1_r-1', q: 1, r: -1, fogState: 'discovered' },
+            movement: { canMove: false, movementMutationImplemented: false, allowedTargetCellIds: [] },
+            commandHints: [{ commandId: 'inspect_outpost', label: 'Inspect outpost', enabled: true, serverMutationImplemented: false }],
+            boundaryFlags: { movementMutation: false, autonomousMovement: false, routeCreation: false, combat: false, atlasExecution: false, externalEffects: false },
+          },
+        ],
+        byCellId: {
+          cell_origin: ['expedition_unit_pathfinder_scout_v1', 'expedition_unit_rook_signalpost_messenger_v1'],
+          cell_q1_r0: ['expedition_unit_surveyor_site_plan_hq12d_forest'],
+          'cell_q1_r-1': ['expedition_unit_outpost_crew_claim_hq12d_forest'],
+        },
+        boundaryFlags: { movementMutation: true, movementRevealsFog: false, autonomousMovement: false, routeCreation: false, combat: false, atlasExecution: false, externalEffects: false },
+      },
+      eventPackets: [{
+        packetId: 'expedition_event_packet_hq15d_cell_q1_r0',
+        templateId: 'marker-stone',
+        scoutId: 'scout_sector_hq15d_001',
+        cellId: 'cell_q1_r0',
+        partyId: 'expedition_party_plot_hq12d_exp_map_threejs',
+        discoveryFlavor: 'Marker Stone packet',
+        readOnly: true,
+        executableActions: [],
+        authorityBoundary: 'server_owned_expedition_event_packet_read_model_v1',
+        receiptLink: {
+          actionName: 'et.plot.scout_sector',
+          scoutId: 'scout_sector_hq15d_001',
+          cellId: 'cell_q1_r0',
+          via: 'scout_sector_receipt',
+        },
+        boundaryFlags: {
+          receiptMetadataOnly: true,
+          executableActions: false,
+          routeCreation: false,
+          atlasExecution: false,
+          externalEffects: false,
+        },
+      }],
+      objective: {
+        mode: 'scout',
+        title: 'Scout an eligible hinted sector',
+        targetCellId: 'cell_q0_r1',
+        selectedCellId: 'cell_q0_r1',
+        packetId: 'expedition_event_packet_hq15d_cell_q1_r0',
+        partyId: 'expedition_party_plot_hq12d_exp_map_threejs',
+        readOnly: true,
+        executableActions: [],
+      },
       receipt: {
         kind: 'expedition_map_read_model_projection',
         sourceIds: { plotId },
@@ -314,8 +454,11 @@ async function semanticZoomProof(page) {
     const overlay = document.querySelector('[data-testid="fp-expedition-semantic-zoom"]');
     return {
       tier: tier?.textContent || '',
+      tierLabel: tier?.getAttribute('aria-label') || '',
       copy: copy?.textContent || '',
+      copyLabel: copy?.getAttribute('aria-label') || '',
       selectedHint: selectedHint?.textContent || '',
+      selectedHintLabel: selectedHint?.getAttribute('aria-label') || '',
       fogState: selectedHint?.getAttribute('data-fog-state') || '',
       zoomTier: overlay?.getAttribute('data-zoom-tier') || '',
     };
@@ -380,6 +523,15 @@ function runtimeRegionSourceProof() {
     cartographicFogDepthDeclared: source.includes('function drawExpeditionAmbientContourField')
       && source.includes('cartographicFogDepth: true')
       && source.includes('fogDepthGlyphsVisualOnly: true'),
+    eventObjectiveMarkersDeclared: source.includes('function makeExpeditionEventPacketMarkerTexture')
+      && source.includes('function makeExpeditionObjectiveMarkerTexture')
+      && source.includes('eventObjectiveMarkersVisualOnly')
+      && source.includes('eventObjectiveMarkersInspectable')
+      && source.includes('eventObjectiveMarkerAuthority: false'),
+    generatedSpritePackDeclared: source.includes('EXPEDITION_SPRITE_ASSET_PACK_VERSION')
+      && source.includes('hq15e-expedition-unit-marker-sprites-v1')
+      && source.includes('generatedSpriteAssetsReady')
+      && source.includes('drawExpeditionGeneratedSprite'),
   };
 }
 
@@ -405,6 +557,8 @@ test('FP-E2E-023 HQ14T Expedition Map server-bound terrain underlay preserves au
   expect(sourceProof.continuousUnderlayAvoidsPrivateFields).toBe(true);
   expect(sourceProof.softSeamOpacityHelpers).toBe(true);
   expect(sourceProof.cartographicFogDepthDeclared).toBe(true);
+  expect(sourceProof.eventObjectiveMarkersDeclared).toBe(true);
+  expect(sourceProof.generatedSpritePackDeclared).toBe(true);
   await installRoutes(page, fixture);
 
   await page.setViewportSize({ width: 1280, height: 900 });
@@ -419,6 +573,10 @@ test('FP-E2E-023 HQ14T Expedition Map server-bound terrain underlay preserves au
     const info = await page.evaluate(() => window.__foundersPlotTest.getExpeditionMapInfo());
     return info?.visualLayers?.assetBackedLoadedTiles || 0;
   }, { timeout: 8000 }).toBeGreaterThanOrEqual(5);
+  await expect.poll(async () => {
+    const info = await page.evaluate(() => window.__foundersPlotTest.getExpeditionMapInfo());
+    return info?.visualLayers?.generatedSpriteAssetsReady || 0;
+  }, { timeout: 8000 }).toBeGreaterThanOrEqual(8);
 
   const initialInfo = await page.evaluate(() => window.__foundersPlotTest.getExpeditionMapInfo());
   expect(initialInfo.renderer).toBe('three.js');
@@ -430,6 +588,13 @@ test('FP-E2E-023 HQ14T Expedition Map server-bound terrain underlay preserves au
   expect(initialInfo.visualLayers.runtimeRegionAssetPack).toBe('hq14s_public_terrain_underlay_v1');
   expect(initialInfo.visualLayers.runtimeRegionAtlas).toContain('/experiences/founders-plot/assets/expedition-map/hq14s-public-terrain-underlay-v1/manifest.json');
   expect(initialInfo.visualLayers.runtimeTerrainUnderlay).toContain('/experiences/founders-plot/assets/expedition-map/hq14s-public-terrain-underlay-v1/public-terrain-underlay-candidate-01-v1.png');
+  expect(initialInfo.visualLayers.runtimeSpriteAssetPack).toBe('hq15e_expedition_unit_marker_sprites_v1');
+  expect(initialInfo.visualLayers.runtimeSpriteAtlas).toContain('/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1/manifest.json');
+  expect(initialInfo.visualLayers.generatedSpriteAssets).toBe(true);
+  expect(initialInfo.visualLayers.generatedSpriteAssetCount).toBe(8);
+  expect(initialInfo.visualLayers.generatedSpriteAssetsReady).toBeGreaterThanOrEqual(8);
+  expect(initialInfo.visualLayers.generatedSpriteAssetsVisualOnly).toBe(true);
+  expect(initialInfo.visualLayers.generatedSpriteAssetsReadOnly).toBe(true);
   expect(initialInfo.visualLayers.serverTerrainAssetContractVersion).toBe('agenttown_public_terrain_asset_slots_v1');
   expect(initialInfo.visualLayers.serverTerrainSlotSource).toBe('server_read_model_v1');
   expect(initialInfo.visualLayers.assetBackedRegionTiles).toBe(5);
@@ -474,6 +639,72 @@ test('FP-E2E-023 HQ14T Expedition Map server-bound terrain underlay preserves au
   expect(initialInfo.visualLayers.surveyStrokesVisualOnly).toBe(true);
   expect(initialInfo.visualLayers.receiptTraceVisualOnly).toBe(true);
   expect(initialInfo.visualLayers.markerCount).toBe(5);
+  expect(initialInfo.visualLayers.eventPacketMarkers).toBe(true);
+  expect(initialInfo.visualLayers.eventPacketMarkerCount).toBe(1);
+  expect(initialInfo.visualLayers.objectiveMarkers).toBe(true);
+  expect(initialInfo.visualLayers.objectiveMarkerCount).toBe(1);
+  expect(initialInfo.visualLayers.eventObjectiveMarkersVisualOnly).toBe(true);
+  expect(initialInfo.visualLayers.eventObjectiveMarkersReadOnly).toBe(true);
+  expect(initialInfo.visualLayers.eventObjectiveMarkersInspectable).toBe(true);
+  expect(initialInfo.visualLayers.eventObjectiveMarkerAuthority).toBe(false);
+  expect(initialInfo.eventMarkers).toHaveLength(1);
+  expect(initialInfo.eventMarkers[0]).toMatchObject({
+    packetId: 'expedition_event_packet_hq15d_cell_q1_r0',
+    cellId: 'cell_q1_r0',
+    spriteAssetSlot: 'event_packet',
+    visualOnly: true,
+    readOnly: true,
+    selectable: true,
+    inspectable: true,
+    routeAuthority: false,
+    actionAuthority: false,
+    executableActions: 0,
+  });
+  expect(initialInfo.objectiveMarkers).toHaveLength(1);
+  expect(initialInfo.objectiveMarkers[0]).toMatchObject({
+    mode: 'scout',
+    targetCellId: 'cell_q0_r1',
+    packetId: 'expedition_event_packet_hq15d_cell_q1_r0',
+    spriteAssetSlot: 'objective_beacon',
+    visualOnly: true,
+    readOnly: true,
+    selectable: true,
+    inspectable: true,
+    routeAuthority: false,
+    actionAuthority: false,
+    executableActions: 0,
+  });
+  expect(initialInfo.visualLayers.unitTokens).toBe(true);
+  expect(initialInfo.visualLayers.unitTokenCount).toBe(4);
+  expect(initialInfo.visualLayers.unitTokensReadOnly).toBe(true);
+  expect(initialInfo.visualLayers.unitMovementMutationImplemented).toBe(true);
+  expect(initialInfo.visualLayers.commandTargetRings).toBe(true);
+  expect(initialInfo.visualLayers.commandTargetCount).toBe(2);
+  expect(initialInfo.visualLayers.commandTargetRingsVisualOnly).toBe(true);
+  expect(initialInfo.visualLayers.commandTargetRingsReadOnly).toBe(true);
+  expect(initialInfo.visualLayers.commandTargetRingAuthority).toBe(false);
+  expect(initialInfo.commandTargets.map((target) => target.commandId).sort()).toEqual(['move_unit', 'scout_sector']);
+  expect(initialInfo.commandTargets.every((target) => target.visualOnly && target.readOnly && target.executableActions === 0)).toBe(true);
+  expect(initialInfo.commandTargets.every((target) => target.routeAuthority === false && target.actionAuthority === false)).toBe(true);
+  expect(initialInfo.commandTargets.find((target) => target.commandId === 'scout_sector')).toMatchObject({
+    cellId: 'cell_q0_r1',
+    fogState: 'hinted',
+    serverMutationImplemented: true,
+    movementMutation: false
+  });
+  expect(initialInfo.commandTargets.find((target) => target.commandId === 'move_unit')).toMatchObject({
+    cellId: 'cell_q1_r0',
+    fogState: 'known',
+    serverMutationImplemented: true,
+    movementMutation: true
+  });
+  expect(initialInfo.units.map((unit) => unit.unitType).sort()).toEqual(['courier', 'outpost_crew', 'scout', 'surveyor']);
+  expect(initialInfo.units.find((unit) => unit.unitType === 'scout')).toMatchObject({
+    cellId: 'cell_origin',
+    movementMutationImplemented: true,
+  });
+  expect(initialInfo.units.every((unit) => unit.spriteAssetPath.includes('/hq15e-expedition-unit-marker-sprites-v1/'))).toBe(true);
+  expect(initialInfo.units.every((unit) => unit.spriteAssetReady === true)).toBe(true);
   expect(initialInfo.regionConsistency.lockedUnknownCellsSealed).toBe(true);
   expect(initialInfo.regionConsistency.hintedCellsAbstract).toBe(true);
   expect(initialInfo.regionConsistency.waterCuesRequireServerOwnedWater).toBe(true);
@@ -551,9 +782,11 @@ test('FP-E2E-023 HQ14T Expedition Map server-bound terrain underlay preserves au
   expect(invalidHiddenTerrainProof.hiddenVisual.assetKind).toBe('fog_only');
   expect(invalidHiddenTerrainProof.hiddenVisual.assetAllowedByServerTruth).toBe(true);
   expect(invalidHiddenTerrainProof.restoredSelectedCellId).toBe('cell_q0_r1');
-  await expect(page.getByTestId('fp-expedition-zoom-tier')).toContainText('Survey view');
-  await expect(page.getByTestId('fp-expedition-zoom-copy')).toContainText('Broad region silhouette');
-  await expect(page.getByTestId('fp-expedition-fog-legend')).toBeVisible();
+  await expect(page.getByTestId('fp-expedition-zoom-tier')).toContainText('Survey');
+  await expect(page.getByTestId('fp-expedition-zoom-copy')).toContainText('R3 H2');
+  await expect(page.getByTestId('fp-expedition-zoom-copy')).toHaveAttribute('aria-label', /Broad region silhouette/);
+  await expect(page.getByTestId('fp-expedition-map-authority-details')).not.toHaveAttribute('open', '');
+  await expect(page.getByTestId('fp-expedition-fog-legend')).toBeAttached();
   await expect(page.getByTestId('fp-expedition-fog-legend-discovered')).toContainText('Owned plot or founded outpost truth is visible');
   await expect(page.getByTestId('fp-expedition-fog-legend-known')).toContainText('Reviewed or scouted sector truth is recorded');
   await expect(page.getByTestId('fp-expedition-fog-legend-hinted')).toContainText('server-hinted frontier edge exists');
@@ -620,7 +853,19 @@ test('FP-E2E-023 HQ14T Expedition Map server-bound terrain underlay preserves au
   expect(desktopLayout.mapControls.top - desktopLayout.host.top).toBeLessThan(24);
   expect(desktopLayout.documentScrollWidth).toBeLessThanOrEqual(desktopLayout.viewport.width + 1);
   expect(desktopLayout.bodyScrollWidth).toBeLessThanOrEqual(desktopLayout.viewport.width + 1);
-  expect(desktopLayout.visibleScoutButtons).toContain('fp-btn-scout-sector-map-chip-cell_q0_r1');
+  expect(desktopLayout.visibleScoutButtons).toContain('fp-btn-scout-sector-unit-command-cell_q0_r1');
+
+  await page.getByTestId('fp-expedition-three-canvas').click({ position: initialInfo.objectiveMarkers[0].canvas, force: true });
+  await expect(page.getByTestId('fp-expedition-selected-sector')).toHaveAttribute('data-cell-id', 'cell_q0_r1');
+  const objectiveMarkerSelectionInfo = await page.evaluate(() => window.__foundersPlotTest.getExpeditionMapInfo());
+  expect(objectiveMarkerSelectionInfo.selectedCellId).toBe('cell_q0_r1');
+  const eventMarkerTarget = objectiveMarkerSelectionInfo.eventMarkers.find((marker) => marker.packetId === 'expedition_event_packet_hq15d_cell_q1_r0');
+  await page.getByTestId('fp-expedition-three-canvas').click({ position: eventMarkerTarget.canvas, force: true });
+  await expect(page.getByTestId('fp-expedition-selected-sector')).toHaveAttribute('data-cell-id', 'cell_q1_r0');
+  const eventMarkerSelectionInfo = await page.evaluate(() => window.__foundersPlotTest.getExpeditionMapInfo());
+  expect(eventMarkerSelectionInfo.selectedCellId).toBe('cell_q1_r0');
+  await page.locator('#fp-drawer-toggle').evaluate((node) => { node.style.display = 'none'; });
+  await page.getByTestId('fp-expedition-map-panel').screenshot({ path: HQ15D_DESKTOP_SCREENSHOT });
 
   const knownTarget = initialInfo.pickTargets.find((target) => target.cellId === 'cell_q1_r0');
   await page.getByTestId('fp-expedition-three-canvas').click({ position: knownTarget.canvas, force: true });
@@ -663,8 +908,9 @@ test('FP-E2E-023 HQ14T Expedition Map server-bound terrain underlay preserves au
   const zoomAfter = await page.evaluate(() => window.__foundersPlotTest.getExpeditionMapInfo());
   expect(zoomAfter.camera.zoom).toBeGreaterThan(zoomBefore.camera.zoom);
   expect(zoomAfter.camera.zoom).toBeLessThanOrEqual(3.4);
-  await expect(page.getByTestId('fp-expedition-zoom-tier')).toContainText('Detail view');
-  await expect(page.getByTestId('fp-expedition-selected-zoom-hint')).toContainText('Locked Unknown stays sealed');
+  await expect(page.getByTestId('fp-expedition-zoom-tier')).toContainText('Detail');
+  await expect(page.getByTestId('fp-expedition-selected-zoom-hint')).toContainText('Q3 R0');
+  await expect(page.getByTestId('fp-expedition-selected-zoom-hint')).toHaveAttribute('aria-label', /stays sealed/);
   const semanticAfterZoom = await semanticZoomProof(page);
   expect(semanticAfterZoom.zoomTier).toBe('detail');
   expect(semanticAfterZoom.fogState).toBe('locked_unknown');
@@ -685,6 +931,8 @@ test('FP-E2E-023 HQ14T Expedition Map server-bound terrain underlay preserves au
   await page.reload();
   await expect(page.getByTestId('fp-expedition-three-canvas')).toBeVisible();
   const mobileBefore = await page.evaluate(() => window.__foundersPlotTest.getExpeditionMapInfo());
+  await page.locator('#fp-drawer-toggle').evaluate((node) => { node.style.display = 'none'; });
+  await page.getByTestId('fp-expedition-map-panel').screenshot({ path: HQ15D_MOBILE_SCREENSHOT });
   const host = page.getByTestId('fp-expedition-three-host');
   await host.scrollIntoViewIfNeeded();
   const hostBox = await host.boundingBox();
@@ -723,7 +971,7 @@ test('FP-E2E-023 HQ14T Expedition Map server-bound terrain underlay preserves au
     clientY: Math.round(hostBox.y + hostBox.height * 0.58),
   });
   const mobileAfter = await page.evaluate(() => window.__foundersPlotTest.getExpeditionMapInfo());
-  await expect(page.getByTestId('fp-expedition-zoom-tier')).toContainText('Detail view');
+  await expect(page.getByTestId('fp-expedition-zoom-tier')).toContainText('Detail');
   const mobileSemanticAfter = await semanticZoomProof(page);
   const mobilePixels = await canvasSample(page);
   const mobileCellColors = await cellColorProof(page);
@@ -793,7 +1041,7 @@ test('FP-E2E-023 HQ14T Expedition Map server-bound terrain underlay preserves au
     guardrails: {
       fullScreenThreeJsPrimaryViewport: desktopLayout.firstScreenHostShare > 0.68 && mobileLayout.hostRect.height >= 560,
       hudOverlayDoesNotDominateDesktop: desktopLayout.hud.width < desktopLayout.host.width * 0.38,
-      selectedSectorAndScoutAffordanceMapFirst: desktopLayout.visibleScoutButtons.includes('fp-btn-scout-sector-map-chip-cell_q0_r1'),
+      selectedSectorAndScoutAffordanceMapFirst: desktopLayout.visibleScoutButtons.includes('fp-btn-scout-sector-unit-command-cell_q0_r1'),
       readOnly: fixture.expeditionMap.readOnly,
       executableActions: fixture.expeditionMap.executableActions,
       routeCreation: fixture.expeditionMap.receipt.routeCreation,
@@ -822,5 +1070,56 @@ test('FP-E2E-023 HQ14T Expedition Map server-bound terrain underlay preserves au
       sameOriginRuntimeMapAssets: initialInfo.visualLayers.runtimeRegionAtlas.startsWith('/experiences/founders-plot/assets/expedition-map/'),
     },
     finalNote: 'HQ14T binds the runtime terrain underlay and cell textures to explicit server-owned public terrain/fog asset slots; hidden cells normalize to fog-only assets and Scout Sector remains the only mutation path.',
+  }, null, 2));
+  fs.writeFileSync(HQ15D_PROOF_JSON, JSON.stringify({
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    title: 'HQ15D event packet and objective map markers',
+    source: 'FP-E2E-023 mocked server-owned Expedition Map read model with existing Event Packet and Current Focus objective data',
+    changeScope: [
+      'public/experiences/founders-plot/three_scene_entry.js',
+      'public/experiences/founders-plot/three_scene_bundle.js',
+      'public/experiences/founders-plot/founders-plot.js',
+      'e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js',
+    ],
+    markers: {
+      initialEventMarkers: initialInfo.eventMarkers,
+      initialObjectiveMarkers: initialInfo.objectiveMarkers,
+      objectiveMarkerSelection: {
+        selectedCellId: objectiveMarkerSelectionInfo.selectedCellId,
+        marker: objectiveMarkerSelectionInfo.objectiveMarkers[0],
+      },
+      eventMarkerSelection: {
+        selectedCellId: eventMarkerSelectionInfo.selectedCellId,
+        marker: eventMarkerSelectionInfo.eventMarkers[0],
+      },
+      visualLayers: initialInfo.visualLayers,
+    },
+    hiddenTruthProof: {
+      hiddenCellsHaveNoPublicTerrainSlot: initialInfo.regionConsistency.hiddenCellsHaveNoPublicTerrainSlot,
+      hiddenCellsUseOnlyFogAssets: initialInfo.regionConsistency.hiddenCellsUseOnlyFogAssets,
+      hintedCellsAbstract: initialInfo.regionConsistency.hintedCellsAbstract,
+      lockedUnknownCellsSealed: initialInfo.regionConsistency.lockedUnknownCellsSealed,
+      invalidHiddenConcreteTerrainNormalizedToFogOnly: invalidHiddenTerrainProof.hiddenVisual.assetKind === 'fog_only'
+        && invalidHiddenTerrainProof.hiddenVisual.assetSlot === 'locked_unknown_fog'
+        && invalidHiddenTerrainProof.hiddenVisual.publicTerrainAssetSlot == null,
+    },
+    screenshots: [HQ15D_DESKTOP_SCREENSHOT, HQ15D_MOBILE_SCREENSHOT],
+    guardrails: {
+      readOnly: fixture.expeditionMap.readOnly,
+      executableActions: fixture.expeditionMap.executableActions,
+      eventMarkerActions: initialInfo.eventMarkers.map((marker) => marker.executableActions),
+      objectiveMarkerActions: initialInfo.objectiveMarkers.map((marker) => marker.executableActions),
+      markersVisualOnly: initialInfo.visualLayers.eventObjectiveMarkersVisualOnly,
+      markersReadOnly: initialInfo.visualLayers.eventObjectiveMarkersReadOnly,
+      markersInspectable: initialInfo.visualLayers.eventObjectiveMarkersInspectable,
+      markerAuthority: initialInfo.visualLayers.eventObjectiveMarkerAuthority,
+      scoutSectorOnlyMutationPath: desktopLayout.visibleScoutButtons.every((testid) => String(testid || '').startsWith('fp-btn-scout-sector-')),
+      primaryScoutUnitCommandVisible: desktopLayout.visibleScoutButtons.includes('fp-btn-scout-sector-unit-command-cell_q0_r1'),
+      routeCreation: fixture.expeditionMap.receipt.routeCreation,
+      atlasExecution: fixture.expeditionMap.receipt.atlasExecution,
+      hiddenTruthLeakage: false,
+      noNewServerMutations: true,
+    },
   }, null, 2));
 });

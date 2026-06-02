@@ -1,0 +1,89 @@
+{
+  "ok": true,
+  "lane": "HQ15J",
+  "title": "Spatial command target rings for selected Expedition Map units",
+  "generatedAt": "2026-06-02T02:18:00+07:00",
+  "rendererLayers": {
+    "commandTargetRings": true,
+    "commandTargetRingsVisualOnly": true,
+    "commandTargetRingsReadOnly": true,
+    "commandTargetRingAuthority": false,
+    "proofMetadata": [
+      "visualLayers.commandTargetCount",
+      "commandTargets[].unitId",
+      "commandTargets[].commandId",
+      "commandTargets[].cellId",
+      "commandTargets[].fogState",
+      "commandTargets[].serverMutationImplemented",
+      "commandTargets[].movementMutation",
+      "commandTargets[].visualOnly",
+      "commandTargets[].readOnly",
+      "commandTargets[].routeAuthority",
+      "commandTargets[].actionAuthority",
+      "commandTargets[].executableActions"
+    ]
+  },
+  "commandTargets": {
+    "move_unit": {
+      "allowedFogStates": ["discovered", "known"],
+      "serverMutationImplemented": true,
+      "movementMutation": true,
+      "revealsFog": false
+    },
+    "scout_sector": {
+      "allowedFogStates": ["hinted"],
+      "requiresKind": "frontier_hint",
+      "serverMutationImplemented": true,
+      "movementMutation": false,
+      "revealsFog": true,
+      "existingFogRevealPath": true
+    },
+    "prepare_settler_convoy": {
+      "allowedFogStates": ["discovered", "known"],
+      "usesExistingEndpoint": "/api/founders-plot/prepare-settler-convoy",
+      "movementMutation": false,
+      "routeCreation": false
+    },
+    "found_settlement": {
+      "allowedFogStates": ["discovered", "known"],
+      "usesExistingEndpoint": "/api/founders-plot/found-settlement",
+      "movementMutation": false,
+      "routeCreation": false
+    }
+  },
+  "guardrails": {
+    "newServerMutationPath": false,
+    "canvasExecutableCommandButtons": false,
+    "clientAuthority": false,
+    "commandTargetRouteAuthority": false,
+    "commandTargetActionAuthority": false,
+    "scoutSectorRemainsOnlyFogRevealMutation": true,
+    "lockedUnknownTargetsExcluded": true,
+    "hiddenTruthLeakage": false,
+    "routeCreation": false,
+    "tradeEconomy": false,
+    "resourceRewardLoop": false,
+    "combat": false,
+    "scheduler": false,
+    "atlasExecution": false,
+    "publicSharing": false,
+    "generatedUniverseRuntimeExpansion": false,
+    "crossPlotMutation": false,
+    "hiddenAutonomy": false,
+    "externalEffects": false
+  },
+  "playwrightFindings": {
+    "staleSemanticOverlayCaughtAgain": true,
+    "fix": "appendExpeditionSemanticZoomOverlay removes all existing semantic zoom overlays from the document before appending the current one"
+  },
+  "validation": [
+    "node --check public/experiences/founders-plot/three_scene_entry.js",
+    "node --check public/experiences/founders-plot/founders-plot.js",
+    "node --check e2e/200_founders_plot.spec.js",
+    "node --check e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js",
+    "npm run build:founders-plot-threejs",
+    "npx playwright test e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js -g \"FP-E2E-023\" (1/1)",
+    "npx playwright test e2e/200_founders_plot.spec.js -g \"FP-E2E-022\" (1/1)",
+    "npm run test:founders-plot (98/98)"
+  ]
+}

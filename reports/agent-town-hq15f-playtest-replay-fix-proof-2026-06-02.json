@@ -1,0 +1,194 @@
+{
+  "ok": true,
+  "generatedAt": "2026-06-02T01:18:49+07:00",
+  "lane": "HQ15F playtest/replay/fix loop",
+  "scope": "desktop and mobile replay of the current Founders Plot Expedition Map text-to-gameplay surface",
+  "sourceProofs": [
+    "reports/agent-town-hq12b-expedition-map-ui-proof-2026-05-31.json",
+    "reports/agent-town-hq12h-expedition-map-mobile-polish-proof-2026-05-31.json",
+    "reports/agent-town-hq14t-server-bound-terrain-underlay-runtime-proof-2026-06-01.json",
+    "reports/agent-town-hq15d-event-objective-map-markers-proof-2026-06-02.json"
+  ],
+  "screenshots": {
+    "desktop": "reports/agent-town-hq15f-playtest-replay-fix-desktop-2026-06-02.png",
+    "mobile": "reports/agent-town-hq15f-playtest-replay-fix-mobile-2026-06-02.png",
+    "contactSheet": "reports/agent-town-hq15f-playtest-replay-fix-contact-sheet-2026-06-02.png",
+    "comparisonInputs": [
+      "reports/agent-town-hq15d-event-objective-map-markers-desktop-2026-06-02.png",
+      "reports/agent-town-hq15d-event-objective-map-markers-mobile-2026-06-02.png",
+      "reports/agent-town-hq15c-scout-unit-command-flow-desktop-2026-06-02.png",
+      "reports/agent-town-hq15c-scout-unit-command-flow-mobile-2026-06-02.png"
+    ],
+    "dimensions": {
+      "desktop": "1232x789",
+      "mobile": "366x757",
+      "contactSheet": "1280x920"
+    }
+  },
+  "playtestObservations": {
+    "desktop": {
+      "mapReadsAsPrimaryPlaySurface": true,
+      "unitSpritesVisibleOnMap": true,
+      "unitCommandBarVisible": true,
+      "eventPacketMarkerVisible": true,
+      "objectiveMarkerVisible": true,
+      "hudDoesNotDominateMap": true,
+      "ledgerReceiptsCollapsed": true
+    },
+    "mobile": {
+      "mapReadsAsPrimaryPlaySurface": true,
+      "unitSpritesVisibleOnMap": true,
+      "unitCommandBarVisible": true,
+      "eventPacketMarkerVisible": true,
+      "objectiveMarkerVisible": true,
+      "proofTextCompacted": true,
+      "ledgerReceiptsCollapsed": true,
+      "horizontalOverflow": false
+    }
+  },
+  "fixApplied": {
+    "needed": true,
+    "issue": "The mobile Map units rail used a two-row grid inside a capped roster, leaving Scout command chips partially clipped in the primary mobile viewport.",
+    "files": [
+      "public/experiences/founders-plot/founders-plot.css",
+      "e2e/200_founders_plot.spec.js"
+    ],
+    "summary": [
+      "Mobile unit tokens now use a horizontal rail under 520px so Scout Sector, target, move-lock, and movement-boundary chips stay visible.",
+      "The mobile semantic zoom copy is hidden under 520px to avoid text sitting behind the unit roster.",
+      "FP-E2E-022 now asserts the mobile Scout-unit command bar has nonzero height, contains Scout Sector and Target cell_q0_r1, and has no vertically clipped command items."
+    ]
+  },
+  "runtimeProof": {
+    "visualLayers": {
+      "runtimeSpriteAssetPack": "hq15e_expedition_unit_marker_sprites_v1",
+      "generatedSpriteAssetCount": 8,
+      "generatedSpriteAssetsReady": 8,
+      "generatedSpriteAssetsVisualOnly": true,
+      "generatedSpriteAssetsReadOnly": true,
+      "unitTokenCount": 3,
+      "unitTokensReadOnly": true,
+      "unitMovementMutationImplemented": false,
+      "eventPacketMarkerCount": 1,
+      "objectiveMarkerCount": 1,
+      "eventObjectiveMarkersVisualOnly": true,
+      "eventObjectiveMarkersReadOnly": true,
+      "eventObjectiveMarkersInspectable": true,
+      "eventObjectiveMarkerAuthority": false,
+      "clientAuthority": false
+    },
+    "units": [
+      {
+        "unitId": "expedition_unit_pathfinder_scout_v1",
+        "unitType": "scout",
+        "cellId": "cell_origin",
+        "spriteAssetSlot": "scout",
+        "spriteAssetReady": true,
+        "readOnly": true,
+        "movementMutationImplemented": false
+      },
+      {
+        "unitId": "expedition_unit_rook_signalpost_messenger_v1",
+        "unitType": "courier",
+        "cellId": "cell_origin",
+        "spriteAssetSlot": "courier",
+        "spriteAssetReady": true,
+        "readOnly": true,
+        "movementMutationImplemented": false
+      },
+      {
+        "unitId": "expedition_unit_outpost_crew_claim_hq12d_forest",
+        "unitType": "outpost_crew",
+        "cellId": "cell_q1_r-1",
+        "spriteAssetSlot": "outpost_crew",
+        "spriteAssetReady": true,
+        "readOnly": true,
+        "movementMutationImplemented": false
+      }
+    ],
+    "markers": {
+      "event": {
+        "packetId": "expedition_event_packet_hq15d_cell_q1_r0",
+        "cellId": "cell_q1_r0",
+        "spriteAssetSlot": "event_packet",
+        "spriteAssetReady": true,
+        "visualOnly": true,
+        "readOnly": true,
+        "selectable": true,
+        "inspectable": true,
+        "routeAuthority": false,
+        "actionAuthority": false,
+        "executableActions": 0
+      },
+      "objective": {
+        "mode": "scout",
+        "targetCellId": "cell_q0_r1",
+        "packetId": "expedition_event_packet_hq15d_cell_q1_r0",
+        "spriteAssetSlot": "objective_beacon",
+        "spriteAssetReady": true,
+        "visualOnly": true,
+        "readOnly": true,
+        "selectable": true,
+        "inspectable": true,
+        "routeAuthority": false,
+        "actionAuthority": false,
+        "executableActions": 0
+      }
+    },
+    "mobileCommandBar": {
+      "commandBarHeight": 50,
+      "commandItems": [
+        "Mira Trailmark selected",
+        "Scout Sector",
+        "Target cell_q0_r1",
+        "Move locked",
+        "movement pending server slice"
+      ],
+      "clippedItems": []
+    },
+    "collapsedReceipts": {
+      "objectiveLedgerPresent": true,
+      "objectiveLedgerCollapsed": true,
+      "objectiveLedgerReadOnly": true,
+      "objectiveLedgerActions": 0,
+      "inspectorLedgerCollapsed": true,
+      "inspectorLedgerActions": 0
+    }
+  },
+  "guardrails": {
+    "scoutSectorOnlyMutationPath": true,
+    "primaryScoutUnitCommandVisible": true,
+    "readOnly": true,
+    "executableActions": [],
+    "routeCreation": false,
+    "tradeRouteCreation": false,
+    "resourceHarvesting": false,
+    "combat": false,
+    "atlasExecution": false,
+    "publicSharing": false,
+    "generatedUniverseRendering": false,
+    "crossPlotMutation": false,
+    "externalEffects": false,
+    "hiddenTruthLeakage": false,
+    "noNewServerMutations": true
+  },
+  "verification": {
+    "focusedPlaywright": [
+      "npx playwright test e2e/200_founders_plot.spec.js -g \"FP-E2E-022\"",
+      "npx playwright test e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js -g \"FP-E2E-023\""
+    ],
+    "nodeCheck": [
+      "node --check e2e/200_founders_plot.spec.js",
+      "node --check e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js",
+      "node --check public/experiences/founders-plot/founders-plot.js",
+      "node --check public/experiences/founders-plot/three_scene_entry.js",
+      "node --check public/experiences/founders-plot/three_scene_bundle.js"
+    ],
+    "jqEmpty": "jq empty reports/agent-town-hq15f-playtest-replay-fix-proof-2026-06-02.json",
+    "gitDiffCheck": "git diff --check"
+  },
+  "residualBlockers": [
+    "Full npm test was not run in this bounded HQ15F pass.",
+    "Known broad FP-PERF-001 observation-payload failure remains outside this focused Expedition Map playtest."
+  ]
+}

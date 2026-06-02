@@ -1,0 +1,108 @@
+{
+  "ok": true,
+  "task": "HQ15R symbol-first unit command surface",
+  "date": "2026-06-02",
+  "scope": {
+    "sourceFiles": [
+      "public/experiences/founders-plot/founders-plot.js",
+      "public/experiences/founders-plot/founders-plot.css",
+      "e2e/200_founders_plot.spec.js"
+    ],
+    "report": "reports/agent-town-hq15r-symbol-first-unit-command-surface-2026-06-02.md",
+    "screenshots": [
+      {
+        "path": "reports/agent-town-hq15r-symbol-first-unit-command-surface-desktop-2026-06-02.png",
+        "dimensions": "1232 x 625"
+      },
+      {
+        "path": "reports/agent-town-hq15r-symbol-first-unit-command-surface-mobile-2026-06-02.png",
+        "dimensions": "366 x 757"
+      }
+    ]
+  },
+  "uiProof": {
+    "unitRoster": {
+      "symbolFirst": true,
+      "spriteRail": true,
+      "visibleFullNamesRemovedFromPrimaryRail": true,
+      "fullNamesPreservedInAriaAndTitle": true,
+      "fullCellIdsPreservedInDataAttributes": true,
+      "readyCountChips": true
+    },
+    "commandBar": {
+      "shortVisibleVerbs": [
+        "Move",
+        "Scout",
+        "Convoy",
+        "Found"
+      ],
+      "compactTargetChips": [
+        "◎ HINT",
+        "↦ DISC",
+        "PLAN",
+        "CLAIM"
+      ],
+      "compactCountChip": "N ↦",
+      "compactAuthorityChip": "SRV",
+      "fullTargetIdsHiddenFromPrimaryText": true,
+      "fullTargetIdsPreservedInAttributesAndA11y": true
+    }
+  },
+  "commandPathProof": {
+    "scoutSector": {
+      "buttonTestId": "fp-btn-scout-sector-unit-command-cell_q0_r1",
+      "route": "/api/founders-plot/expedition-map/scout-sector",
+      "payloadShapeChanged": false
+    },
+    "moveUnit": {
+      "buttonTestIdPrefix": "fp-btn-move-expedition-unit-expedition_unit_pathfinder_scout_v1-",
+      "route": "/api/founders-plot/expedition-map/move-unit",
+      "payloadShapeChanged": false
+    },
+    "prepareSettlerConvoy": {
+      "buttonTestId": "fp-btn-prepare-settler-convoy-unit-command-site_plan_hq12b_forest",
+      "route": "/api/founders-plot/prepare-settler-convoy",
+      "payloadShapeChanged": false
+    },
+    "foundOutpost": {
+      "buttonTestId": "fp-btn-found-settlement-unit-command-claim_hq12b_arrived",
+      "route": "/api/founders-plot/found-settlement",
+      "payloadShapeChanged": false
+    }
+  },
+  "guardrails": {
+    "serverRoutesChanged": false,
+    "payloadShapeChanged": false,
+    "commandIdsChanged": false,
+    "mutationAuthorityChanged": false,
+    "unitReadModelChanged": false,
+    "rendererTargetRingsChanged": false,
+    "assetsChanged": false,
+    "hiddenTruthRulesChanged": false,
+    "externalEffects": false,
+    "commitPushDeployMerge": false
+  },
+  "verification": [
+    {
+      "command": "node --check public/experiences/founders-plot/founders-plot.js",
+      "result": "pass"
+    },
+    {
+      "command": "node --check e2e/200_founders_plot.spec.js",
+      "result": "pass"
+    },
+    {
+      "command": "npx playwright test e2e/200_founders_plot.spec.js -g \"FP-E2E-022\" --reporter=line",
+      "result": "pass",
+      "notes": "1 passed in 1.2m; focused test timeout raised to 90s for existing screenshot-heavy proof path"
+    },
+    {
+      "command": "jq empty reports/agent-town-hq15r-symbol-first-unit-command-surface-proof-2026-06-02.json",
+      "result": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "result": "pass"
+    }
+  ]
+}

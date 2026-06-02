@@ -20,6 +20,10 @@ const EXPEDITION_MAP_AUTHORITY_BOUNDARY = 'server_owned_read_only_expedition_map
 const EXPEDITION_SCOUT_SECTOR_AUTHORITY_BOUNDARY = 'server_owned_scout_sector_current_plot_fog_receipt_v1';
 const EXPEDITION_EVENT_PACKET_AUTHORITY_BOUNDARY = 'server_owned_expedition_event_packet_read_model_v1';
 const EXPEDITION_PARTY_MANIFEST_AUTHORITY_BOUNDARY = 'server_owned_read_only_expedition_party_manifest_v1';
+const EXPEDITION_UNIT_ROSTER_AUTHORITY_BOUNDARY = 'server_owned_read_only_expedition_unit_roster_v1';
+const EXPEDITION_UNIT_ROSTER_VERSION = 'hq15a_server_owned_expedition_unit_roster_v1';
+const EXPEDITION_UNIT_MOVE_AUTHORITY_BOUNDARY = 'server_owned_scout_unit_revealed_cell_move_receipt_v1';
+const EXPEDITION_UNIT_MOVE_VERSION = 'hq15g_server_owned_scout_unit_move_v1';
 const EXPEDITION_MAP_FOG_STATES = Object.freeze(['discovered', 'known', 'hinted', 'locked_unknown']);
 const EXPEDITION_PUBLIC_TERRAIN_ASSET_CONTRACT_VERSION = 'agenttown_public_terrain_asset_slots_v1';
 const EXPEDITION_PUBLIC_TERRAIN_ASSET_SLOT_SOURCE = 'server_read_model_v1';
@@ -622,6 +626,45 @@ function normalizeExpeditionScouts(value) {
       return scout;
     })
     .filter((entry) => entry.scoutId && entry.cellId);
+}
+
+function normalizeExpeditionUnitMoves(value) {
+  const rows = Array.isArray(value) ? value : [];
+  return rows
+    .filter((row) => row && typeof row === 'object')
+    .slice(-80)
+    .map((row, index) => {
+      const sourceQ = Number(row.sourceQ ?? row.source?.q ?? 0);
+      const sourceR = Number(row.sourceR ?? row.source?.r ?? 0);
+      const targetQ = Number(row.targetQ ?? row.target?.q ?? 0);
+      const targetR = Number(row.targetR ?? row.target?.r ?? 0);
+      const receipt = row.receipt && typeof row.receipt === 'object' ? clone(row.receipt) : {};
+      return {
+        moveId: safeText(row.moveId, `expedition_unit_move_${index + 1}`, 120),
+        plotId: safeText(row.plotId, '', 120),
+        unitId: safeText(row.unitId, '', 160),
+        unitType: safeText(row.unitType, 'scout', 80),
+        sourceCellId: safeText(row.sourceCellId || row.fromCellId, expeditionCellId({ q: sourceQ, r: sourceR }), 80),
+        targetCellId: safeText(row.targetCellId || row.cellId, expeditionCellId({ q: targetQ, r: targetR }), 80),
+        sourceQ,
+        sourceR,
+        targetQ,
+        targetR,
+        status: safeText(row.status, 'MOVED', 40).toUpperCase(),
+        authorityBoundary: safeText(row.authorityBoundary, EXPEDITION_UNIT_MOVE_AUTHORITY_BOUNDARY, 160),
+        receipt: {
+          ...receipt,
+          kind: safeText(receipt.kind, 'expedition_unit_move_receipt', 80),
+          actionName: safeText(receipt.actionName, 'et.plot.move_expedition_unit', 120),
+          authorityBoundary: safeText(receipt.authorityBoundary, EXPEDITION_UNIT_MOVE_AUTHORITY_BOUNDARY, 160)
+        },
+        createdBy: mutationActor(row.createdBy),
+        approvedBy: row.approvedBy ? safeText(row.approvedBy, '', 80) : null,
+        createdAt: Number(row.createdAt || 0),
+        updatedAt: Number(row.updatedAt || row.createdAt || 0)
+      };
+    })
+    .filter((entry) => entry.moveId && entry.unitId && entry.targetCellId);
 }
 
 function normalizeDoctrineState(value) {
@@ -1374,6 +1417,470 @@ function buildExpeditionPartySnapshot() {
   };
 }
 
+function expeditionUnitBoundaryFlags({ movementMutation = false } = {}) {
+  return {
+    serverOwnedPositions: true,
+    readOnlySelection: true,
+    movementMutation: movementMutation === true,
+    movementMutationAuthority: movementMutation === true ? EXPEDITION_UNIT_MOVE_AUTHORITY_BOUNDARY : null,
+    movementVersion: movementMutation === true ? EXPEDITION_UNIT_MOVE_VERSION : null,
+    movementRevealsFog: false,
+    autonomousMovement: false,
+    operatorAssignment: false,
+    resourceHarvesting: false,
+    resourceDelta: {},
+    resourceGain: false,
+    resourceLoss: false,
+    routeCreation: false,
+    tradeRouteCreation: false,
+    backgroundScheduling: false,
+    combat: false,
+    publicSharing: false,
+    generatedUniverseRendering: false,
+    crossPlotMutation: false,
+    atlasExecution: false,
+    externalEffects: false
+  };
+}
+
+function expeditionAxialDistance(a = {}, b = {}) {
+  const aq = Number(a.q || 0);
+  const ar = Number(a.r || 0);
+  const bq = Number(b.q || 0);
+  const br = Number(b.r || 0);
+  const as = -aq - ar;
+  const bs = -bq - br;
+  return Math.max(Math.abs(aq - bq), Math.abs(ar - br), Math.abs(as - bs));
+}
+
+function expeditionCellsAdjacent(a = {}, b = {}) {
+  return expeditionAxialDistance(a, b) === 1;
+}
+
+function revealedExpeditionMoveTargetCells(location = {}, cellList = []) {
+  const sourceCell = cellList.find((cell) => String(cell.cellId || '') === String(location.cellId || '')) || location;
+  return cellList
+    .filter((cell) => ['discovered', 'known'].includes(String(cell.fogState || '')))
+    .filter((cell) => String(cell.cellId || '') !== String(sourceCell.cellId || ''))
+    .filter((cell) => expeditionCellsAdjacent(sourceCell, cell))
+    .sort((a, b) => a.q - b.q || a.r - b.r || a.cellId.localeCompare(b.cellId));
+}
+
+function hintedScoutTargetCells(location = {}, cellList = []) {
+  const sourceCell = cellList.find((cell) => String(cell.cellId || '') === String(location.cellId || '')) || location;
+  return cellList
+    .filter((cell) => cell.fogState === 'hinted' && cell.kind === 'frontier_hint')
+    .filter((cell) => expeditionCellsAdjacent(sourceCell, cell))
+    .sort((a, b) => a.q - b.q || a.r - b.r || a.cellId.localeCompare(b.cellId));
+}
+
+function expeditionUnitMovementModel({ unitType, location, cellList }) {
+  const canUseServerMove = safeText(unitType, '', 80).toLowerCase() === 'scout';
+  const targets = canUseServerMove ? revealedExpeditionMoveTargetCells(location, cellList) : [];
+  return {
+    canMove: canUseServerMove && targets.length > 0,
+    movementMutationImplemented: canUseServerMove,
+    allowedTargetCellIds: targets.map((cell) => cell.cellId),
+    authority: canUseServerMove
+      ? EXPEDITION_UNIT_MOVE_AUTHORITY_BOUNDARY
+      : 'future_server_authoritative_slice_required',
+    allowedFogStates: canUseServerMove ? ['discovered', 'known'] : [],
+    revealsFog: false,
+    routeCreation: false,
+    resourceDelta: {}
+  };
+}
+
+function expeditionCellLocation(cell = {}, source = 'server_read_model_cell') {
+  return {
+    cellId: safeText(cell.cellId, 'cell_origin', 80),
+    q: Number(cell.q || 0),
+    r: Number(cell.r || 0),
+    fogState: safeText(cell.fogState, 'discovered', 40),
+    source
+  };
+}
+
+function expeditionUnitCommandHints({ member = {}, unit = {}, cellList = [], eventPackets = [] } = {}) {
+  const role = safeText(unit.role || member.role, '', 80).toLowerCase();
+  const unitType = safeText(unit.unitType || role, '', 80).toLowerCase();
+  const location = unit.location || null;
+  if (role === 'scout') {
+    const moveTargetCellIds = expeditionUnitMovementModel({ unitType, location, cellList }).allowedTargetCellIds;
+    const scoutTargetCellIds = hintedScoutTargetCells(location, cellList).map((cell) => cell.cellId);
+    return [
+      {
+        commandId: 'move_unit',
+        label: 'Move',
+        actionName: 'et.plot.move_expedition_unit',
+        enabled: moveTargetCellIds.length > 0,
+        targetCellIds: moveTargetCellIds,
+        serverMutationImplemented: true,
+        requiresHumanApprovalForAgent: true,
+        previewOnlyUntilSelected: true,
+        authorityBoundary: EXPEDITION_UNIT_MOVE_AUTHORITY_BOUNDARY,
+        revealsFog: false,
+        routeCreation: false
+      },
+      {
+        commandId: 'scout_sector',
+        label: 'Scout Sector',
+        actionName: 'et.plot.scout_sector',
+        enabled: scoutTargetCellIds.length > 0,
+        targetCellIds: scoutTargetCellIds,
+        serverMutationImplemented: true,
+        requiresHumanApprovalForAgent: true,
+        previewOnlyUntilSelected: true
+      }
+    ];
+  }
+  if (role === 'messenger') {
+    return [{
+      commandId: 'inspect_event_packet',
+      label: 'Inspect packet',
+      enabled: eventPackets.length > 0,
+      targetPacketIds: eventPackets.map((packet) => packet.packetId),
+      serverMutationImplemented: false,
+      previewOnlyUntilSelected: true
+    }];
+  }
+  return [{
+    commandId: 'inspect_receipts',
+    label: 'Open ledger',
+    enabled: true,
+    serverMutationImplemented: false,
+    previewOnlyUntilSelected: true
+  }];
+}
+
+function buildExpeditionPartyUnit({ member, cell, unitType, state, cellList, eventPackets }) {
+  const unitRole = safeText(member.role, unitType, 80);
+  const unitId = `expedition_unit_${slugFor(member.memberId || member.displayName || unitRole, unitType)}`;
+  const unit = {
+    unitId,
+    kind: 'expedition_map_unit',
+    unitType,
+    displayName: safeText(member.displayName, friendlyRoleLabel(unitRole), 120),
+    role: unitRole,
+    state: safeText(state, 'READY', 40).toUpperCase(),
+    readOnly: true,
+    selectable: true,
+    executableActions: [],
+    authorityBoundary: EXPEDITION_UNIT_ROSTER_AUTHORITY_BOUNDARY,
+    sourceMemberId: safeText(member.memberId, unitId, 120),
+    assetSrc: safeText(member.assetSrc, '', 240) || null,
+    metadataSrc: safeText(member.metadataSrc, '', 240) || null,
+    location: expeditionCellLocation(cell),
+    movement: null,
+    commandHints: [],
+    boundaryFlags: expeditionUnitBoundaryFlags({ movementMutation: unitType === 'scout' })
+  };
+  unit.movement = expeditionUnitMovementModel({ unitType, location: unit.location, cellList });
+  unit.commandHints = expeditionUnitCommandHints({ member, unit, cellList, eventPackets });
+  return unit;
+}
+
+function friendlyRoleLabel(role = '') {
+  return safeText(role, 'unit', 80)
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1).toLowerCase()}`)
+    .join(' ') || 'Unit';
+}
+
+function buildSettlementClaimUnit({ claim, coord, cell, status }) {
+  const founded = status === 'FOUNDED';
+  const preparing = status === 'CONVOY_PREPARING';
+  const arrived = status === 'CONVOY_ARRIVED';
+  const unitType = founded ? 'outpost_crew' : 'settler_convoy';
+  const route = claim.route && typeof claim.route === 'object' ? clone(claim.route) : {};
+  const targetCellId = cell?.cellId || expeditionCellId(coord);
+  const commandHints = arrived ? [{
+    commandId: 'found_settlement',
+    label: 'Found Outpost',
+    actionName: 'et.plot.found_settlement',
+    enabled: true,
+    claimId: claim.claimId,
+    targetCellIds: [targetCellId],
+    serverMutationImplemented: true,
+    requiresHumanApprovalForAgent: true,
+    previewOnlyUntilSelected: true,
+    movementMutation: false,
+    routeCreation: false
+  }] : [{
+    commandId: founded ? 'inspect_outpost' : 'inspect_convoy',
+    label: founded ? 'Inspect outpost' : 'Inspect convoy',
+    enabled: true,
+    serverMutationImplemented: false,
+    previewOnlyUntilSelected: true
+  }];
+  return {
+    unitId: `expedition_unit_${unitType}_${slugFor(claim.claimId, 'claim')}`,
+    kind: 'expedition_map_unit',
+    unitType,
+    displayName: founded ? 'Outpost Crew' : 'Settler Convoy',
+    role: founded ? 'outpost_crew' : 'settler',
+    state: founded ? 'STATIONED' : status,
+    readOnly: true,
+    selectable: true,
+    executableActions: [],
+    authorityBoundary: EXPEDITION_UNIT_ROSTER_AUTHORITY_BOUNDARY,
+    sourceClaimId: claim.claimId,
+    sourcePlanId: claim.sitePlanId || null,
+    sourceReportId: claim.reportId || null,
+    assetSrc: '/experiences/founders-plot/assets/characters/inhabitants/settler/settler-convoy-crew-v1.png',
+    metadataSrc: '/experiences/founders-plot/assets/characters/inhabitants/settler/settler-convoy-crew-v1.json',
+    location: expeditionCellLocation(cell || {
+      cellId: expeditionCellId(coord),
+      q: coord.q,
+      r: coord.r,
+      fogState: founded ? 'discovered' : 'known'
+    }, 'settlement_claim_coordinate'),
+    movement: {
+      canMove: false,
+      movementMutationImplemented: false,
+      allowedTargetCellIds: [],
+      authority: 'future_server_authoritative_slice_required',
+      pathPreview: preparing ? {
+        ...route,
+        visualOnly: true,
+        routeCreation: false
+      } : null
+    },
+    commandHints,
+    boundaryFlags: expeditionUnitBoundaryFlags()
+  };
+}
+
+function buildSurveyorUnit({ plan, coord, cell, settlementClaims = [] }) {
+  const targetCellId = cell?.cellId || expeditionCellId(coord);
+  const reviewed = plan.reviewStatus === 'reviewed'
+    || ['reviewed_claim_ready', 'convoy_preparing', 'claimed'].includes(plan.promotionStatus);
+  const hasClaim = settlementClaims.some((claim) => String(claim.sitePlanId || '') === String(plan.planId || ''));
+  const commandHints = [{
+    commandId: 'inspect_survey',
+    label: 'Inspect survey',
+    enabled: true,
+    serverMutationImplemented: false,
+    previewOnlyUntilSelected: true
+  }];
+  if (reviewed && !hasClaim) {
+    commandHints.push({
+      commandId: 'prepare_settler_convoy',
+      label: 'Prepare Convoy',
+      actionName: 'et.plot.prepare_settler_convoy',
+      enabled: true,
+      sourcePlanId: plan.planId || null,
+      targetCellIds: [targetCellId],
+      serverMutationImplemented: true,
+      requiresHumanApprovalForAgent: true,
+      previewOnlyUntilSelected: true,
+      movementMutation: false,
+      routeCreation: false
+    });
+  }
+  return {
+    unitId: `expedition_unit_surveyor_${slugFor(plan.planId, 'plan')}`,
+    kind: 'expedition_map_unit',
+    unitType: 'surveyor',
+    displayName: 'Surveyor Crew',
+    role: 'surveyor',
+    state: 'SURVEY_READY',
+    readOnly: true,
+    selectable: true,
+    executableActions: [],
+    authorityBoundary: EXPEDITION_UNIT_ROSTER_AUTHORITY_BOUNDARY,
+    sourcePlanId: plan.planId || null,
+    sourceReportId: plan.reportId || null,
+    assetSrc: null,
+    metadataSrc: null,
+    location: expeditionCellLocation(cell || {
+      cellId: expeditionCellId(coord),
+      q: coord.q,
+      r: coord.r,
+      fogState: 'known'
+    }, 'site_plan_coordinate'),
+    movement: {
+      canMove: false,
+      movementMutationImplemented: false,
+      allowedTargetCellIds: [],
+      authority: 'future_server_authoritative_slice_required',
+      allowedFogStates: [],
+      revealsFog: false,
+      routeCreation: false,
+      resourceDelta: {}
+    },
+    commandHints,
+    boundaryFlags: expeditionUnitBoundaryFlags()
+  };
+}
+
+function latestExpeditionUnitMovesByUnitId(unitMoves = []) {
+  const latest = new Map();
+  normalizeExpeditionUnitMoves(unitMoves)
+    .sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0) || a.moveId.localeCompare(b.moveId))
+    .forEach((move) => {
+      latest.set(move.unitId, move);
+    });
+  return latest;
+}
+
+function applyExpeditionUnitMoves(units, { unitMoves = [], cellList = [], eventPackets = [] } = {}) {
+  const latestMoves = latestExpeditionUnitMovesByUnitId(unitMoves);
+  return units.map((unit) => {
+    const move = latestMoves.get(unit.unitId);
+    const targetCell = move
+      ? cellList.find((cell) => (
+        String(cell.cellId || '') === String(move.targetCellId || '')
+        && ['discovered', 'known'].includes(String(cell.fogState || ''))
+      ))
+      : null;
+    const next = targetCell ? {
+      ...unit,
+      state: unit.unitType === 'scout' ? 'MOVED' : unit.state,
+      location: expeditionCellLocation(targetCell, 'expedition_unit_move_receipt'),
+      lastMove: {
+        moveId: move.moveId,
+        sourceCellId: move.sourceCellId,
+        targetCellId: move.targetCellId,
+        receiptKind: move.receipt?.kind || 'expedition_unit_move_receipt',
+        actionName: move.receipt?.actionName || 'et.plot.move_expedition_unit',
+        createdAt: move.createdAt,
+        readOnly: true
+      }
+    } : { ...unit };
+    next.movement = expeditionUnitMovementModel({
+      unitType: next.unitType,
+      location: next.location,
+      cellList
+    });
+    const refreshedCommandHints = expeditionUnitCommandHints({
+      member: { role: next.role },
+      unit: next,
+      cellList,
+      eventPackets
+    });
+    next.commandHints = ['scout', 'courier'].includes(String(next.unitType || ''))
+      ? refreshedCommandHints
+      : (Array.isArray(next.commandHints) && next.commandHints.length ? next.commandHints : refreshedCommandHints);
+    next.boundaryFlags = expeditionUnitBoundaryFlags({
+      movementMutation: next.movement?.movementMutationImplemented === true
+    });
+    return next;
+  });
+}
+
+function buildExpeditionUnitRoster({ plotId, expeditionParty, cellList, eventPackets, sitePlans = [], planCoordinates, settlementClaims, claimCoordinates, unitMoves = [] }) {
+  const originCell = cellList.find((cell) => cell.cellId === 'cell_origin') || { cellId: 'cell_origin', q: 0, r: 0, fogState: 'discovered' };
+  const latestPacket = eventPackets.slice().sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))[0] || null;
+  const latestPacketCell = latestPacket
+    ? cellList.find((cell) => cell.cellId === latestPacket.cellId)
+    : null;
+  const latestKnownScoutCell = cellList
+    .filter((cell) => cell.sourceTruth === 'expedition_scout_sector')
+    .sort((a, b) => a.cellId.localeCompare(b.cellId))[0] || null;
+  const members = Array.isArray(expeditionParty?.members) ? expeditionParty.members : [];
+  const units = members.map((member) => {
+    const role = safeText(member.role, '', 80).toLowerCase();
+    if (role === 'scout') {
+      return buildExpeditionPartyUnit({
+        member,
+        unitType: 'scout',
+        state: latestKnownScoutCell ? 'FIELD_READY' : 'AT_ORIGIN',
+        cell: latestKnownScoutCell || originCell,
+        cellList,
+        eventPackets
+      });
+    }
+    if (role === 'messenger') {
+      return buildExpeditionPartyUnit({
+        member,
+        unitType: 'courier',
+        state: latestPacketCell ? 'PACKET_LINKED' : 'AT_ORIGIN',
+        cell: latestPacketCell || originCell,
+        cellList,
+        eventPackets
+      });
+    }
+    return buildExpeditionPartyUnit({
+      member,
+      unitType: 'field_support',
+      state: 'SUPPORT_READY',
+      cell: originCell,
+      cellList,
+      eventPackets
+    });
+  });
+
+  const surveyPlans = sitePlans
+    .filter((plan) => plan && plan.planId)
+    .filter((plan) => (
+      plan.reviewStatus === 'reviewed'
+      || ['reviewed_claim_ready', 'convoy_preparing', 'claimed'].includes(plan.promotionStatus)
+    ))
+    .slice(0, 4);
+  for (const plan of surveyPlans) {
+    const coord = planCoordinates?.get(plan.planId);
+    if (!coord) continue;
+    const cellId = expeditionCellId(coord);
+    units.push(buildSurveyorUnit({
+      plan,
+      coord,
+      cell: cellList.find((entry) => entry.cellId === cellId),
+      settlementClaims
+    }));
+  }
+
+  for (const claim of settlementClaims) {
+    const status = safeText(claim.status, '', 40).toUpperCase();
+    if (!['CONVOY_PREPARING', 'CONVOY_ARRIVED', 'FOUNDED'].includes(status)) continue;
+    const coord = claimCoordinates.get(claim.claimId);
+    if (!coord) continue;
+    const cellId = expeditionCellId(coord);
+    units.push(buildSettlementClaimUnit({
+      claim,
+      coord,
+      status,
+      cell: cellList.find((entry) => entry.cellId === cellId)
+    }));
+  }
+
+  const positionedUnits = applyExpeditionUnitMoves(units, { unitMoves, cellList, eventPackets });
+  const movementMutation = positionedUnits.some((unit) => unit.movement?.movementMutationImplemented === true);
+  const byCellId = {};
+  for (const unit of positionedUnits) {
+    const cellId = unit.location?.cellId || 'cell_origin';
+    if (!byCellId[cellId]) byCellId[cellId] = [];
+    byCellId[cellId].push(unit.unitId);
+  }
+
+  return {
+    unitRosterId: 'expedition_unit_roster_current_plot_v1',
+    kind: 'expedition_unit_roster',
+    version: EXPEDITION_UNIT_ROSTER_VERSION,
+    plotId: plotId || null,
+    readOnly: true,
+    executableActions: [],
+    authorityBoundary: EXPEDITION_UNIT_ROSTER_AUTHORITY_BOUNDARY,
+    interactionModel: {
+      selectable: true,
+      mapTokens: true,
+      commandBarReady: true,
+      movementPreviewOnly: false,
+      movementCommandReady: movementMutation,
+      serverAuthoritativeMovementRequiredForMutation: true
+    },
+    items: positionedUnits,
+    byCellId,
+    counts: positionedUnits.reduce((acc, unit) => {
+      acc.total += 1;
+      acc.byType[unit.unitType] = Number(acc.byType[unit.unitType] || 0) + 1;
+      return acc;
+    }, { total: 0, byType: {} }),
+    boundaryFlags: expeditionUnitBoundaryFlags({ movementMutation })
+  };
+}
+
 function expeditionEventPacketTemplate(coord) {
   const q = Number(coord?.q || 0);
   const r = Number(coord?.r || 0);
@@ -1648,6 +2155,7 @@ function buildExpeditionMapReadModel(bundle) {
   const scoutReports = normalizeScoutReports(plot.scoutReports);
   const sitePlans = normalizeSitePlans(plot.sitePlans);
   const expeditionScouts = normalizeExpeditionScouts(plot.expeditionScouts);
+  const expeditionUnitMoves = normalizeExpeditionUnitMoves(plot.expeditionUnitMoves);
   const settlementClaims = normalizeSettlementClaims(bundle?.settlementClaims || []);
   const ownedPlots = ownedPlotSummaries(bundle?.ownerPairId || plot.pairId, plot.plotId);
   const worldGrid = worldGridReadModel(bundle);
@@ -1884,6 +2392,17 @@ function buildExpeditionMapReadModel(bundle) {
     .sort((a, b) => a.packetId.localeCompare(b.packetId));
   const counts = expeditionFogCounts(cellList);
   const expeditionParty = buildExpeditionPartyManifest({ plotId: plot.plotId || null });
+  const units = buildExpeditionUnitRoster({
+    plotId: plot.plotId || null,
+    expeditionParty,
+    cellList,
+    eventPackets,
+    sitePlans,
+    planCoordinates: maps.planCoordinates,
+    settlementClaims,
+    claimCoordinates: maps.claimCoordinates,
+    unitMoves: expeditionUnitMoves
+  });
   const baseReadModel = {
     status: scoutReports.length || expeditionScouts.length || sitePlans.length || settlementClaims.length || ownedPlots.length > 1
       ? 'FOG_READ_MODEL_READY'
@@ -1926,6 +2445,7 @@ function buildExpeditionMapReadModel(bundle) {
       civicReadinessScore: Number(worldGrid.civicReadiness?.localProjectReadinessScore || 0),
       scoutReportIds: scoutReports.map((report) => report.reportId),
       scoutSectorIds: expeditionScouts.map((scout) => scout.scoutId),
+      expeditionUnitMoveIds: expeditionUnitMoves.map((move) => move.moveId),
       eventPacketIds: eventPackets.map((packet) => packet.packetId),
       reviewedSitePlanIds: sitePlans
         .filter((plan) => plan.reviewStatus === 'reviewed' || plan.promotionStatus === 'reviewed_claim_ready')
@@ -1936,6 +2456,7 @@ function buildExpeditionMapReadModel(bundle) {
         .sort()
     },
     expeditionParty,
+    units,
     cells: cellList,
     eventPackets,
     receipt: expeditionReceipt('expedition_map_read_model_projection', {
@@ -1971,6 +2492,19 @@ function buildExpeditionMapReadModel(bundle) {
       })),
       boundaryFlags: baseReadModel.expeditionParty.boundaryFlags
     },
+    units: baseReadModel.units.items.map((unit) => ({
+      unitId: unit.unitId,
+      unitType: unit.unitType,
+      role: unit.role,
+      state: unit.state,
+      cellId: unit.location?.cellId || null,
+      q: unit.location?.q ?? null,
+      r: unit.location?.r ?? null,
+      moveId: unit.lastMove?.moveId || null,
+      commandIds: unit.commandHints.map((command) => command.commandId),
+      movementMutationImplemented: unit.movement?.movementMutationImplemented === true
+    })),
+    unitBoundaryFlags: baseReadModel.units.boundaryFlags,
     eventPackets: baseReadModel.eventPackets.map((packet) => ({
       packetId: packet.packetId,
       templateId: packet.templateId,
@@ -1986,6 +2520,10 @@ function buildExpeditionMapReadModel(bundle) {
       plotId: plot.plotId || null,
       projectionHash
     }),
+    units: {
+      ...baseReadModel.units,
+      projectionHash
+    },
     projectionHash,
     receipt: {
       ...baseReadModel.receipt,
@@ -2667,6 +3205,7 @@ function initialPlotForIdentity({ pairId, houseId = null, nowMs }) {
 	    sitePlans: [],
 	    doctrineState: {},
 	    expeditionScouts: [],
+	    expeditionUnitMoves: [],
 	    lastDailyBonusDay: null,
     dailySoldCoin: 0,
     dailySellDay: nowDayKey(nowMs),
@@ -2859,6 +3398,7 @@ function ensurePlotBundle({
 	  bundle.plot.sitePlans = normalizeSitePlans(bundle.plot.sitePlans);
 	  bundle.plot.doctrineState = normalizeDoctrineState(bundle.plot.doctrineState);
 	  bundle.plot.expeditionScouts = normalizeExpeditionScouts(bundle.plot.expeditionScouts);
+	  bundle.plot.expeditionUnitMoves = normalizeExpeditionUnitMoves(bundle.plot.expeditionUnitMoves);
 	  bundle.approvals = store.listApprovals(bundle.plot.plotId);
   bundle.ownerPairId = pairId || bundle.plot.pairId;
   bundle.memberships = pairId ? store.listPlotMemberships(pairId) : [];
@@ -3542,7 +4082,12 @@ function publicSummary(bundle) {
 		  };
 	}
 
-function buildState(bundle, { includeReplay = false, includePublicSummary = true } = {}) {
+function buildState(bundle, {
+  includeReplay = false,
+  includePublicSummary = true,
+  includeAdvancedReadModels = true,
+  includeVisualActors = true
+} = {}) {
   const recap = bundle.plot.pendingRecapFrom && bundle.plot.pendingRecapTo
     ? buildRecapFromEvents(bundle.events, {
       fromMs: bundle.plot.pendingRecapFrom,
@@ -3554,7 +4099,7 @@ function buildState(bundle, { includeReplay = false, includePublicSummary = true
 
   const snapshot = bundleSnapshot(bundle);
   const stateHash = computeStateHash(snapshot);
-  const visualActors = visualActorProjections(bundle, { stateHash });
+  const visualActors = includeVisualActors ? visualActorProjections(bundle, { stateHash }) : [];
   const permissions = unlockedPermissionRows(bundle);
   const approvals = (bundle.approvals || [])
     .filter((approval) => approval.status !== 'USED')
@@ -3563,13 +4108,17 @@ function buildState(bundle, { includeReplay = false, includePublicSummary = true
 	  const rewards = availableRewards(bundle);
 	  const scoutReports = normalizeScoutReports(bundle.plot.scoutReports);
 	  const sitePlans = normalizeSitePlans(bundle.plot.sitePlans);
-  const research = researchReadModel(bundle);
-  const cohortPlanner = workOrderPlannerReadModel(bundle);
-  const worldGrid = worldGridReadModel(bundle);
-  const expeditionMap = buildExpeditionMapReadModel(bundle);
-  const civicProposals = civicProposalsReadModel(bundle);
-  const overlayPacks = overlayPacksReadModel(bundle);
-  const civicProjects = civicProjectsReadModel(bundle);
+  const research = includeAdvancedReadModels
+    ? researchReadModel(bundle)
+    : { status: 'COMPACT_OBSERVATION_OMITTED', doctrineCatalog: [], doctrineState: normalizeDoctrineState(bundle.plot.doctrineState) };
+  const cohortPlanner = includeAdvancedReadModels
+    ? workOrderPlannerReadModel(bundle)
+    : { templates: [], workOrders: [], executionAvailable: false };
+  const worldGrid = includeAdvancedReadModels ? worldGridReadModel(bundle) : null;
+  const expeditionMap = includeAdvancedReadModels ? buildExpeditionMapReadModel(bundle) : null;
+  const civicProposals = includeAdvancedReadModels ? civicProposalsReadModel(bundle) : null;
+  const overlayPacks = includeAdvancedReadModels ? overlayPacksReadModel(bundle) : null;
+  const civicProjects = includeAdvancedReadModels ? civicProjectsReadModel(bundle) : null;
   const settlementClaims = normalizeSettlementClaims(bundle.settlementClaims || []);
   const ownedPlots = ownedPlotSummaries(bundle.ownerPairId || bundle.plot.pairId, bundle.plot.plotId);
 	  const queue = bundle.jobs
@@ -4160,7 +4709,9 @@ function getFoundersPlotState({
   plotId = null,
   nowMs,
   includeReplay = false,
-  includePublicSummary = true
+  includePublicSummary = true,
+  includeAdvancedReadModels = true,
+  includeVisualActors = true
 }) {
   return store.withTransaction(() => {
     const bundle = ensurePlotBundle({ pairId, houseId, plotId, nowMs });
@@ -4174,7 +4725,12 @@ function getFoundersPlotState({
     maybeCreatePendingRecap(bundle.plot, nowMs);
     const inserted = applyPendingEvents(bundle, pendingEvents);
     persistBundle(bundle);
-    const { state, recap, stateHash } = buildState(bundle, { includeReplay, includePublicSummary });
+    const { state, recap, stateHash } = buildState(bundle, {
+      includeReplay,
+      includePublicSummary,
+      includeAdvancedReadModels,
+      includeVisualActors
+    });
     return successEnvelope({
       plotId: bundle.plot.plotId,
       worldDelta: inserted.map((event) => makeWorldDelta(event.eventType, event.summary, event.buildingId || event.jobId || bundle.plot.plotId)),
@@ -5291,6 +5847,229 @@ function buildScoutSectorProof({ beforeMap, afterMap, targetCell, scoutSector, a
     eventPacketId: scoutSector.eventPacket?.packetId || null,
     boundaryFlags: scoutSectorBoundaryFlags()
   };
+}
+
+function expeditionUnitMoveBoundaryFlags() {
+  return {
+    samePlotOnly: true,
+    serverOwnedPositionReceipt: true,
+    movementMutation: true,
+    movementVersion: EXPEDITION_UNIT_MOVE_VERSION,
+    movementRevealsFog: false,
+    autonomousMovement: false,
+    operatorAssignment: false,
+    resourceHarvesting: false,
+    resourceDelta: {},
+    resourceGain: false,
+    resourceLoss: false,
+    routeCreation: false,
+    tradeRouteCreation: false,
+    backgroundScheduling: false,
+    combat: false,
+    publicSharing: false,
+    generatedUniverseRendering: false,
+    crossPlotMutation: false,
+    atlasExecution: false,
+    externalEffects: false
+  };
+}
+
+function buildExpeditionUnitMoveProof({ beforeMap, afterMap, unit, targetCell, move, alreadyMoved = false }) {
+  return {
+    actionName: 'et.plot.move_expedition_unit',
+    plotId: move.plotId,
+    moveId: move.moveId,
+    unitId: unit.unitId,
+    unitType: unit.unitType,
+    alreadyMoved,
+    sourceCellId: unit.location?.cellId || null,
+    targetCellId: targetCell.cellId,
+    sourceFogState: unit.location?.fogState || null,
+    targetFogState: targetCell.fogState || null,
+    beforeProjectionHash: beforeMap.projectionHash,
+    afterProjectionHash: afterMap.projectionHash,
+    beforeFogCounts: clone(beforeMap.fog?.counts || {}),
+    afterFogCounts: clone(afterMap.fog?.counts || {}),
+    fogCountsUnchanged: stableJsonStringify(beforeMap.fog?.counts || {}) === stableJsonStringify(afterMap.fog?.counts || {}),
+    inventoryMutation: false,
+    routeCreation: false,
+    atlasExecution: false,
+    externalEffects: false,
+    boundaryFlags: expeditionUnitMoveBoundaryFlags()
+  };
+}
+
+function moveExpeditionUnit({
+  pairId,
+  houseId = null,
+  plotId = null,
+  unitId = null,
+  targetCellId = null,
+  actor = 'HUMAN',
+  actorType = null,
+  idempotencyKey,
+  nowMs
+}) {
+  const safeUnitId = safeText(unitId, '', 160);
+  const safeTargetCellId = safeText(targetCellId, '', 80);
+  const requestedActor = mutationActor(actorType || actor);
+  return withIdempotency({
+    pairId,
+    houseId,
+    plotId,
+    actionName: 'move_expedition_unit',
+    idempotencyKey,
+    requestPayload: { unitId: safeUnitId, targetCellId: safeTargetCellId, actor: requestedActor },
+    nowMs,
+    mutator(bundle, pendingEvents) {
+      const beforeMap = buildExpeditionMapReadModel(bundle);
+      const unit = beforeMap.units?.items?.find((entry) => entry.unitId === safeUnitId) || null;
+      if (!unit) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Move Unit requires a server-owned Expedition Map unit.', false, {
+          unitId: safeUnitId || null
+        });
+      }
+      if (unit.unitType !== 'scout') {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Only the Scout unit has server-owned movement in this slice.', false, {
+          unitId: unit.unitId,
+          unitType: unit.unitType
+        });
+      }
+      const targetCell = (beforeMap.cells || []).find((cell) => cell.cellId === safeTargetCellId) || null;
+      if (!targetCell || !['discovered', 'known'].includes(targetCell.fogState)) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Move Unit targets must be discovered or known server map cells.', false, {
+          unitId: unit.unitId,
+          targetCellId: safeTargetCellId || null,
+          allowedFogStates: ['discovered', 'known']
+        });
+      }
+      if (targetCell.cellId === unit.location?.cellId) {
+        const noopMove = {
+          moveId: `noop_${hashPayload({ unitId: unit.unitId, targetCellId: targetCell.cellId }).slice(0, 12)}`,
+          plotId: bundle.plot.plotId,
+          unitId: unit.unitId,
+          unitType: unit.unitType,
+          sourceCellId: unit.location?.cellId || null,
+          targetCellId: targetCell.cellId
+        };
+        return {
+          ok: true,
+          extras: {
+            move: noopMove,
+            movement: noopMove,
+            movedUnitId: unit.unitId,
+            sourceCellId: unit.location?.cellId || null,
+            targetCellId: targetCell.cellId,
+            alreadyMoved: true,
+            proof: buildExpeditionUnitMoveProof({ beforeMap, afterMap: beforeMap, unit, targetCell, move: noopMove, alreadyMoved: true }),
+            expeditionMap: beforeMap
+          }
+        };
+      }
+      const allowedTargetCellIds = Array.isArray(unit.movement?.allowedTargetCellIds)
+        ? unit.movement.allowedTargetCellIds
+        : [];
+      if (!allowedTargetCellIds.includes(targetCell.cellId)) {
+        return errorEnvelope(bundle.plot.plotId, 'INVALID_STATE', 'Move Unit can only target adjacent discovered or known cells.', false, {
+          unitId: unit.unitId,
+          targetCellId: targetCell.cellId,
+          allowedTargetCellIds
+        });
+      }
+
+      const approvalParams = { unitId: unit.unitId, targetCellId: targetCell.cellId };
+      let consumedApproval = null;
+      if (requestedActor === 'AGENT') {
+        consumedApproval = consumeActionApproval(bundle, 'move_expedition_unit', approvalParams, nowMs);
+        if (!consumedApproval) {
+          return errorEnvelope(bundle.plot.plotId, 'FORBIDDEN_POLICY', 'Agent Move Unit requires matching human approval.', true, {
+            requiresApproval: true,
+            actionName: 'move_expedition_unit',
+            requestedParams: approvalParams
+          });
+        }
+      }
+
+      const moveId = randomId('expedition_unit_move');
+      const receipt = {
+        kind: 'expedition_unit_move_receipt',
+        actionName: 'et.plot.move_expedition_unit',
+        moveId,
+        plotId: bundle.plot.plotId,
+        unitId: unit.unitId,
+        unitType: unit.unitType,
+        sourceCellId: unit.location?.cellId || null,
+        targetCellId: targetCell.cellId,
+        sourceFogState: unit.location?.fogState || null,
+        targetFogState: targetCell.fogState,
+        beforeProjectionHash: beforeMap.projectionHash,
+        authorityBoundary: EXPEDITION_UNIT_MOVE_AUTHORITY_BOUNDARY,
+        createdBy: requestedActor,
+        approvedBy: requestedActor === 'AGENT' ? 'HUMAN_APPROVAL' : null,
+        movedAt: Number(nowMs),
+        ...expeditionUnitMoveBoundaryFlags()
+      };
+      const move = {
+        moveId,
+        plotId: bundle.plot.plotId,
+        unitId: unit.unitId,
+        unitType: unit.unitType,
+        sourceCellId: unit.location?.cellId || null,
+        targetCellId: targetCell.cellId,
+        sourceQ: Number(unit.location?.q || 0),
+        sourceR: Number(unit.location?.r || 0),
+        targetQ: Number(targetCell.q || 0),
+        targetR: Number(targetCell.r || 0),
+        status: 'MOVED',
+        authorityBoundary: EXPEDITION_UNIT_MOVE_AUTHORITY_BOUNDARY,
+        receipt,
+        createdBy: requestedActor,
+        approvedBy: requestedActor === 'AGENT' ? 'HUMAN_APPROVAL' : null,
+        createdAt: Number(nowMs),
+        updatedAt: Number(nowMs)
+      };
+      bundle.plot.expeditionUnitMoves = [
+        ...normalizeExpeditionUnitMoves(bundle.plot.expeditionUnitMoves),
+        move
+      ];
+      bundle.plot.updatedAt = Number(nowMs);
+      const afterMap = buildExpeditionMapReadModel(bundle);
+      const afterUnit = afterMap.units?.items?.find((entry) => entry.unitId === unit.unitId) || null;
+      const proof = buildExpeditionUnitMoveProof({ beforeMap, afterMap, unit, targetCell, move });
+      createEvent(pendingEvents, {
+        plotId: bundle.plot.plotId,
+        eventType: 'EXPEDITION_UNIT_MOVED',
+        actor: requestedActor,
+        summary: `Scout moved to ${targetCell.cellId}.`,
+        explanation: 'HQ15G moves one selected Scout token between adjacent discovered/known cells. It does not reveal fog, gather resources, create routes, schedule work, mutate other plots, or grant Atlas execution.',
+        data: {
+          move: clone(move),
+          receipt: clone(receipt),
+          unitBefore: clone(unit),
+          unitAfter: clone(afterUnit),
+          proof,
+          approvalId: consumedApproval?.approvalId || null
+        },
+        createdAt: nowMs
+      });
+      if (requestedActor === 'AGENT') {
+        markAgentAction(bundle, pendingEvents, 'move_expedition_unit', 'Foreman moved one Scout token after matching human approval.', nowMs);
+      }
+      return {
+        ok: true,
+        extras: {
+          move: clone(move),
+          movement: clone(move),
+          movedUnitId: unit.unitId,
+          sourceCellId: unit.location?.cellId || null,
+          targetCellId: targetCell.cellId,
+          alreadyMoved: false,
+          proof,
+          expeditionMap: afterMap
+        }
+      };
+    }
+  });
 }
 
 function scoutExpeditionSector({
@@ -6771,6 +7550,10 @@ module.exports = {
   EXPEDITION_SCOUT_SECTOR_AUTHORITY_BOUNDARY,
   EXPEDITION_EVENT_PACKET_AUTHORITY_BOUNDARY,
   EXPEDITION_PARTY_MANIFEST_AUTHORITY_BOUNDARY,
+  EXPEDITION_UNIT_ROSTER_AUTHORITY_BOUNDARY,
+  EXPEDITION_UNIT_ROSTER_VERSION,
+  EXPEDITION_UNIT_MOVE_AUTHORITY_BOUNDARY,
+  EXPEDITION_UNIT_MOVE_VERSION,
   EXPEDITION_MAP_FOG_STATES,
   EXPEDITION_PUBLIC_TERRAIN_ASSET_CONTRACT_VERSION,
   EXPEDITION_PUBLIC_TERRAIN_ASSET_SLOT_SOURCE,
@@ -6791,6 +7574,7 @@ module.exports = {
   getWorldGridStatus,
   getExpeditionMapStatus,
   scoutExpeditionSector,
+  moveExpeditionUnit,
   listCivicProposalRecords,
   createCivicProposalRecord,
   listOverlayPackRecords,

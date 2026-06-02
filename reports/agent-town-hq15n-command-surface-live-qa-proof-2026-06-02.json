@@ -1,0 +1,228 @@
+{
+  "ok": true,
+  "generatedAt": "2026-06-01T19:48:33.917Z",
+  "lane": "HQ15N",
+  "title": "Command Surface Live QA",
+  "source": "Focused browser/e2e QA after HQ15M using FP-E2E-022 and FP-E2E-023 on local Playwright web servers.",
+  "outputs": {
+    "report": "reports/agent-town-hq15n-command-surface-live-qa-2026-06-02.md",
+    "proof": "reports/agent-town-hq15n-command-surface-live-qa-proof-2026-06-02.json",
+    "desktopScreenshot": "reports/agent-town-hq15n-command-surface-live-qa-desktop-2026-06-02.png",
+    "mobileScreenshot": "reports/agent-town-hq15n-command-surface-live-qa-mobile-2026-06-02.png",
+    "contactSheet": "reports/agent-town-hq15n-command-surface-live-qa-contact-sheet-2026-06-02.png"
+  },
+  "checks": [
+    {
+      "command": "node --check e2e/200_founders_plot.spec.js",
+      "exitCode": 0
+    },
+    {
+      "command": "node --check e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js",
+      "exitCode": 0
+    },
+    {
+      "command": "node --check public/experiences/founders-plot/founders-plot.js",
+      "exitCode": 0
+    },
+    {
+      "command": "node --check public/experiences/founders-plot/three_scene_entry.js",
+      "exitCode": 0
+    },
+    {
+      "command": "PW_PORT=5188 npx playwright test e2e/200_founders_plot.spec.js -g \"FP-E2E-022\" --reporter=line",
+      "exitCode": 0,
+      "result": "1/1 passed"
+    },
+    {
+      "command": "PW_PORT=5189 npx playwright test e2e/201_founders_plot_hq12d_expedition_map_threejs.spec.js -g \"FP-E2E-023\" --reporter=line",
+      "exitCode": 0,
+      "result": "1/1 passed"
+    },
+    {
+      "command": "jq proof checks for HQ12B/HQ14T/HQ15M command and authority assertions",
+      "exitCode": 0
+    },
+    {
+      "command": "file reports/agent-town-hq15n-command-surface-live-qa-*.png",
+      "exitCode": 0
+    },
+    {
+      "command": "jq -e . reports/agent-town-hq15n-command-surface-live-qa-proof-2026-06-02.json",
+      "exitCode": 0
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0
+    }
+  ],
+  "commandSurface": {
+    "unitRoster": {
+      "tokenCount": 5,
+      "tokenTypes": [
+        "scout",
+        "courier",
+        "surveyor",
+        "outpost_crew",
+        "settler_convoy"
+      ],
+      "selectedToken": "scout",
+      "rosterContainsSurveyor": true,
+      "rosterContainsSettlerConvoy": true,
+      "movementMutationValues": [
+        "true",
+        "false",
+        "false",
+        "false",
+        "false"
+      ]
+    },
+    "scoutCommands": {
+      "scoutSectorButtonText": "Scout Sector",
+      "scoutSectorTargetCellId": "cell_q0_r1",
+      "commandTargetText": "Target cell_q0_r1",
+      "initialMoveTargetAssertedBySpec": "cell_q1_r0",
+      "postMoveButtonTargetCellId": "cell_origin",
+      "moveButtonText": "Move",
+      "moveTargetText": "Move cell_origin",
+      "scoutSectorEndpointPayloadGuardedBySpec": {
+        "endpoint": "/api/founders-plot/expedition-map/scout-sector",
+        "actor": "HUMAN",
+        "cellId": "cell_q0_r1",
+        "noUnitIdInPayload": true,
+        "noMovementPayload": true,
+        "noTargetCellPayload": true
+      },
+      "moveEndpointPayloadGuardedBySpec": {
+        "endpoint": "/api/founders-plot/expedition-map/move-unit",
+        "actor": "HUMAN",
+        "unitId": "expedition_unit_pathfinder_scout_v1",
+        "initialTargetCellId": "cell_q1_r0",
+        "allowedFogStates": [
+          "discovered",
+          "known"
+        ],
+        "movementRevealsFog": false,
+        "routeCreation": false
+      }
+    },
+    "surveyorAndSettlerCommands": {
+      "prepareConvoyCovered": true,
+      "prepareConvoyEndpoint": "/api/founders-plot/prepare-settler-convoy",
+      "prepareConvoyPayloadGuardedBySpec": {
+        "actor": "HUMAN",
+        "sitePlanId": "site_plan_hq12b_forest",
+        "noUnitIdInPayload": true,
+        "noRouteCreationPayload": true
+      },
+      "foundOutpostCovered": true,
+      "foundOutpostEndpoint": "/api/founders-plot/found-settlement",
+      "foundOutpostPayloadGuardedBySpec": {
+        "actor": "HUMAN",
+        "claimId": "claim_hq12b_arrived",
+        "noUnitIdInPayload": true,
+        "noRouteCreationPayload": true
+      }
+    },
+    "targetRings": {
+      "enabled": true,
+      "count": 2,
+      "visualOnly": true,
+      "readOnly": true,
+      "authority": false,
+      "targets": [
+        {
+          "commandId": "move_unit",
+          "cellId": "cell_q1_r0",
+          "fogState": "known",
+          "movementMutation": true,
+          "serverMutationImplemented": true,
+          "visualOnly": true,
+          "readOnly": true,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0
+        },
+        {
+          "commandId": "scout_sector",
+          "cellId": "cell_q0_r1",
+          "fogState": "hinted",
+          "movementMutation": false,
+          "serverMutationImplemented": true,
+          "visualOnly": true,
+          "readOnly": true,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0
+        }
+      ]
+    },
+    "inspectorDrawers": {
+      "fogLedgerCollapsed": true,
+      "fogLedgerActions": 0,
+      "sectorActionAliasesCollapsed": true,
+      "visibleSectorAliasButtonCountBeforeReveal": 0,
+      "sectorAliasButtonCountAfterReveal": 0,
+      "selectedDetailsCollapsed": true,
+      "evidencePacketCollapsed": true,
+      "revealedSectorLedgerCollapsed": true,
+      "unitCommandBarPrimary": true
+    },
+    "ergonomics": {
+      "desktopPanelScreenshotSource": "fresh FP-E2E-022 run, copied from HQ15M screenshot path into HQ15N evidence path",
+      "mobilePanelScreenshotSource": "fresh FP-E2E-022 run, copied from HQ15M screenshot path into HQ15N evidence path",
+      "mobileHorizontalOverflowItems": 0,
+      "mobileCommandClippedItems": 0,
+      "mobileCommandItems": [
+        "Mira Trailmark selected",
+        "Move",
+        "Move cell_origin",
+        "Move",
+        "Move cell_q1_r-1",
+        "Scout Sector",
+        "Target cell_q0_r1",
+        "2 move targets",
+        "server movement active"
+      ],
+      "primaryScoutCommandVisibleOnDesktop": true
+    }
+  },
+  "authorityBoundaries": {
+    "scoutSectorOnlyFogRevealMutation": true,
+    "scoutMovementLimitedToAdjacentDiscoveredKnownSamePlotCells": true,
+    "commandTargetRingsVisualOnly": true,
+    "commandTargetRingsReadOnly": true,
+    "commandTargetRingAuthority": false,
+    "surveyorSettlerUseExistingGuardedEndpointsOnly": true,
+    "noNewServerMutationPath": true,
+    "hiddenTruthLeakage": false,
+    "atlasExecution": false,
+    "publicSharing": false,
+    "deploy": false,
+    "merge": false,
+    "push": false,
+    "generatedUniverseRuntimeExpansion": false,
+    "hiddenAutonomy": false,
+    "routeTradeEconomyResourceRewardCombatSchedulerBehavior": false,
+    "crossPlotMutation": false,
+    "externalEffects": false,
+    "wildWestGenreDrift": false,
+    "hiddenCellsUseOnlyFogAssets": true,
+    "eventObjectiveMarkersVisualOnly": true,
+    "eventObjectiveMarkersReadOnly": true,
+    "markerAuthority": false
+  },
+  "sideEffects": {
+    "sourceEditsMadeInHQ15N": false,
+    "serverEdited": false,
+    "packageMetadataEdited": false,
+    "generatedAssetPacksEdited": false,
+    "committed": false,
+    "pushed": false,
+    "deployed": false,
+    "playwrightReportRewritesObserved": [
+      "FP-E2E-022 rewrites existing HQ12B/HQ12O/HQ14D/HQ15C/HQ15L/HQ15M screenshots and several HQ12/HQ14 proof JSON files by design.",
+      "FP-E2E-023 rewrites existing HQ14T and HQ15D screenshots/proof JSON by design.",
+      "HQ15N evidence paths are separate and were intentionally created for this QA pass."
+    ]
+  }
+}

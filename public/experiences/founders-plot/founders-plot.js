@@ -26,6 +26,7 @@
     worldGrid:'/api/founders-plot/world-grid',
     expeditionMap:'/api/founders-plot/expedition-map',
     scoutSector:'/api/founders-plot/expedition-map/scout-sector',
+    moveExpeditionUnit:'/api/founders-plot/expedition-map/move-unit',
     civicProposals:'/api/founders-plot/civic-proposals',
     overlayPacks:'/api/founders-plot/overlay-packs',
     civicProjects:'/api/founders-plot/civic-projects',
@@ -171,8 +172,10 @@
     workOrderDraftPendingTemplateId: '',
     workOrderExecutePendingId: '',
     scoutSectorPendingCellId: '',
+    expeditionUnitMovePendingId: '',
     scoutSectorReceipt: null,
     expeditionSelectedCellId: '',
+    expeditionSelectedUnitId: '',
     expeditionMapThreeInfo: null,
     rewardClaimPendingId: '',
     civicProjectInspectionPendingId: '',
@@ -1006,25 +1009,41 @@
     return initials || 'ET';
   }
 
+  function expeditionPartyRoleCode(role = '') {
+    const value = String(role || '').toLowerCase();
+    if (/scout|pathfinder/.test(value)) return 'SCT';
+    if (/messenger|courier|signal/.test(value)) return 'MSG';
+    if (/hq|desk|operator/.test(value)) return 'HQ';
+    return 'FLD';
+  }
+
   function appendExpeditionPartyBadges(card, members, scope = 'map') {
     if (!card || !members.length) return null;
     const row = document.createElement('div');
     row.className = 'fp-expedition-party-badges';
     row.dataset.testid = `fp-expedition-party-badges-${safeTestId(scope)}`;
+    row.dataset.partyCount = String(members.length);
+    row.setAttribute('aria-label', `${countLabel(members.length, 'party member')} in the read-only expedition party manifest.`);
     members.slice(0, 5).forEach((member) => {
       const badge = document.createElement('span');
       badge.dataset.memberId = member.memberId;
+      badge.dataset.role = member.role;
+      badge.dataset.roleCode = expeditionPartyRoleCode(member.role);
       badge.title = `${member.displayName} - ${expeditionPartyRoleText(member.role)}`;
+      badge.setAttribute('aria-label', badge.title);
       const avatar = document.createElement('i');
       avatar.textContent = expeditionPartyInitials(member.displayName);
       avatar.setAttribute('aria-hidden', 'true');
-      const label = document.createElement('small');
-      label.textContent = expeditionPartyRoleText(member.role);
-      badge.append(avatar, label);
+      badge.appendChild(avatar);
       row.appendChild(badge);
     });
     card.appendChild(row);
     return row;
+  }
+
+  function expeditionReceiptCount(cell = {}, packet = null) {
+    const receipts = Array.isArray(cell?.receipts) ? cell.receipts.length : 0;
+    return receipts + (packet?.packetId ? 1 : 0);
   }
 
   function expeditionReceiptTraceItems(cell = {}, packet = null, hidden = false) {
@@ -1049,18 +1068,23 @@
     if (!card || !cell) return null;
     const fogState = String(cell.fogState || 'locked_unknown');
     const hidden = !['discovered', 'known'].includes(fogState);
+    const items = expeditionReceiptTraceItems(cell, packet, hidden);
+    const receiptCount = expeditionReceiptCount(cell, packet);
     const trace = document.createElement('div');
     trace.className = 'fp-expedition-receipt-trace';
     trace.dataset.testid = `fp-expedition-receipt-trace-${safeTestId(scope)}`;
     trace.dataset.fogState = fogState;
+    trace.dataset.receiptCount = String(receiptCount);
+    trace.title = `${hidden ? 'Provenance sealed' : 'Receipt trace'}: ${items.join('; ')}`;
+    trace.setAttribute('aria-label', trace.title);
     const label = document.createElement('small');
-    label.textContent = hidden ? 'Provenance sealed' : 'Receipt trace';
+    label.textContent = '⚿';
+    label.title = hidden ? 'Provenance sealed' : 'Receipt trace';
+    label.setAttribute('aria-hidden', 'true');
     trace.appendChild(label);
-    expeditionReceiptTraceItems(cell, packet, hidden).forEach((text) => {
-      const chip = document.createElement('span');
-      chip.textContent = text;
-      trace.appendChild(chip);
-    });
+    const chip = document.createElement('span');
+    chip.textContent = receiptCount ? countLabel(receiptCount, 'receipt') : '0 receipts';
+    trace.appendChild(chip);
     card.appendChild(trace);
     return trace;
   }
@@ -1088,6 +1112,9 @@
       const pip = document.createElement('span');
       pip.className = `fp-expedition-fog-pip fp-expedition-fog-pip--${safeTestId(stateKey)}`;
       pip.dataset.fogState = stateKey;
+      pip.dataset.label = info.label;
+      pip.title = `${info.label}: ${info.meaning}`;
+      pip.setAttribute('aria-label', `${info.label}: ${Number(counts?.[stateKey] || 0)}. ${info.meaning}`);
       if (stateKey === fogState) pip.dataset.selected = 'true';
       const swatch = document.createElement('i');
       swatch.textContent = info.token;
@@ -1095,7 +1122,7 @@
       const count = document.createElement('strong');
       count.textContent = String(Number(counts?.[stateKey] || 0));
       const label = document.createElement('small');
-      label.textContent = info.label;
+      label.textContent = info.token;
       pip.append(swatch, count, label);
       fogRail.appendChild(pip);
     });
@@ -1107,6 +1134,16 @@
     selected.dataset.cellId = String(selectedCell.cellId || '');
     selected.dataset.fogState = fogState;
     selected.dataset.scoutable = selectedScoutable ? 'true' : 'false';
+    selected.dataset.receiptCount = String(expeditionReceiptCount(selectedCell, packet));
+    selected.dataset.partyCount = String(partyMembers.length);
+    selected.title = [
+      `Selected ${selectedCell.cellId || 'cell'}`,
+      `${friendlyToken(fogState)} fog`,
+      selectedScoutable ? 'Scout Sector eligible' : 'read-only selection',
+      `${countLabel(expeditionReceiptCount(selectedCell, packet), 'receipt')}`,
+      `${countLabel(partyMembers.length, 'party member')}`,
+    ].join(' - ');
+    selected.setAttribute('aria-label', selected.title);
 
     const head = document.createElement('div');
     head.className = 'fp-expedition-map-selected-summary__head';
@@ -1117,7 +1154,7 @@
     const title = document.createElement('strong');
     title.textContent = selectedCell.title || friendlyToken(selectedCell.kind || selectedCell.cellId);
     const meta = document.createElement('small');
-    meta.textContent = `${selectedCell.cellId} - ${friendlyToken(fogState)}`;
+    meta.textContent = `${expeditionCompactCellLabel(selectedCell.cellId)} · ${expeditionFogShortLabel(fogState)}`;
     titleWrap.append(title, meta);
     head.append(marker, titleWrap);
     selected.appendChild(head);
@@ -1125,40 +1162,368 @@
     const chipRow = document.createElement('div');
     chipRow.className = 'fp-expedition-map-selected-summary__chips';
     [
-      `fog ${friendlyToken(fogState)}`,
-      selectedScoutable ? 'Scout Sector eligible' : 'read-only selection',
-      packet ? 'packet filed' : '',
-      ['discovered', 'known'].includes(fogState) && expeditionResourceHintsText(selectedCell.resourceHints)
-        ? `resources ${expeditionResourceHintsText(selectedCell.resourceHints)}`
-        : '',
-    ].filter(Boolean).forEach((text) => {
+      ['fog', expeditionFogShortLabel(fogState), `${friendlyToken(fogState)} fog state`],
+      ['scout', selectedScoutable ? '⌖' : '○', selectedScoutable ? 'Scout Sector eligible' : 'read-only selection'],
+      ['receipt', expeditionReceiptCount(selectedCell, packet) ? `${expeditionReceiptCount(selectedCell, packet)} ⚿` : '0 ⚿', `${countLabel(expeditionReceiptCount(selectedCell, packet), 'receipt')}`],
+      ['party', partyMembers.length ? `${partyMembers.length} ◉` : '0 ◉', `${countLabel(partyMembers.length, 'party member')}`],
+    ].forEach(([kind, text, fullText]) => {
       const chip = document.createElement('span');
+      chip.dataset.kind = kind;
+      chip.title = fullText;
+      chip.setAttribute('aria-label', fullText);
       chip.textContent = text;
       chipRow.appendChild(chip);
     });
     selected.appendChild(chipRow);
-
-    if (selectedScoutable) {
-      const pending = state.scoutSectorPendingCellId === String(selectedCell.cellId || '');
-      const button = brassBtn(pending ? 'Scouting...' : 'Scout Sector', `fp-btn-scout-sector-map-chip-${safeTestId(selectedCell.cellId)}`, () => doScoutExpeditionSector(selectedCell.cellId));
-      button.classList.add('fp-brass-btn--small', 'fp-expedition-map-selected-summary__scout');
-      button.dataset.testid = `fp-btn-scout-sector-map-chip-${safeTestId(selectedCell.cellId)}`;
-      button.dataset.cellId = String(selectedCell.cellId || '');
-      button.dataset.idempotencyKey = scoutSectorIdempotencyKey(bundle, model, selectedCell);
-      button.disabled = !!state.scoutSectorPendingCellId;
-      selected.appendChild(button);
-    } else {
-      const stateChip = document.createElement('span');
-      stateChip.className = 'fp-expedition-map-selected-summary__state';
-      stateChip.textContent = scoutableCells.length ? `${scoutableCells.length} hinted sector eligible` : 'no scout action';
-      selected.appendChild(stateChip);
-    }
 
     appendExpeditionReceiptTrace(selected, selectedCell, packet, 'map-selected');
     appendExpeditionPartyBadges(selected, partyMembers, 'map-selected');
     hud.appendChild(selected);
     card.appendChild(hud);
     return hud;
+  }
+
+  const EXPEDITION_UNIT_SPRITE_ASSET_BASE = '/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1';
+  const EXPEDITION_UNIT_SPRITE_PATHS = {
+    scout: `${EXPEDITION_UNIT_SPRITE_ASSET_BASE}/scout-pathfinder-v1.png`,
+    courier: `${EXPEDITION_UNIT_SPRITE_ASSET_BASE}/courier-signal-runner-v1.png`,
+    surveyor: `${EXPEDITION_UNIT_SPRITE_ASSET_BASE}/surveyor-beacon-v1.png`,
+    field_support: `${EXPEDITION_UNIT_SPRITE_ASSET_BASE}/surveyor-beacon-v1.png`,
+    settler_convoy: `${EXPEDITION_UNIT_SPRITE_ASSET_BASE}/settler-convoy-v1.png`,
+    outpost_crew: `${EXPEDITION_UNIT_SPRITE_ASSET_BASE}/outpost-crew-v1.png`
+  };
+
+  function expeditionUnitSpritePath(unit = {}) {
+    const type = String(unit.unitType || '').toLowerCase();
+    return EXPEDITION_UNIT_SPRITE_PATHS[type] || '';
+  }
+
+  function expeditionCompactCellLabel(cellId = '') {
+    const id = String(cellId || '');
+    if (!id) return 'UNPLACED';
+    if (id === 'cell_origin') return 'ORIGIN';
+    const match = id.match(/^cell_q(-?\d+)_r(-?\d+)$/);
+    if (match) return `Q${match[1]} R${match[2]}`;
+    return friendlyToken(id).replace(/^Cell\s+/i, '').toUpperCase();
+  }
+
+  function expeditionFogShortLabel(fogState = '') {
+    switch (String(fogState || '').toLowerCase()) {
+      case 'discovered': return 'DISC';
+      case 'known': return 'KNOWN';
+      case 'hinted': return 'HINT';
+      case 'locked_unknown': return 'LOCK';
+      default: return String(fogState || 'TARGET').replace(/[^a-z0-9]+/gi, ' ').trim().slice(0, 6).toUpperCase() || 'TARGET';
+    }
+  }
+
+  function expeditionUnitRoleCode(unit = {}) {
+    switch (String(unit.unitType || '').toLowerCase()) {
+      case 'scout': return 'SCT';
+      case 'courier': return 'MSG';
+      case 'surveyor': return 'SVY';
+      case 'settler_convoy': return 'CNV';
+      case 'outpost_crew': return 'OUT';
+      case 'field_support': return 'SUP';
+      default: return 'UNIT';
+    }
+  }
+
+  function expeditionMapCommandActions(unit = {}) {
+    const commandHints = Array.isArray(unit.commandHints) ? unit.commandHints : [];
+    return commandHints.filter((command) => {
+      const commandId = String(command.commandId || '');
+      if (command.enabled === false) return false;
+      if (commandId === 'prepare_settler_convoy') return !!(command.sourcePlanId || unit.sourcePlanId);
+      if (commandId === 'found_settlement') return !!(command.claimId || unit.sourceClaimId);
+      return false;
+    });
+  }
+
+  function expeditionUnitActionCount(unit = {}, model = {}, selectedCell = null) {
+    const scoutAction = expeditionUnitScoutCommandTarget(unit, selectedCell, model).targetCell?.cellId ? 1 : 0;
+    return scoutAction + expeditionUnitMoveTargets(unit, model).length + expeditionMapCommandActions(unit).length;
+  }
+
+  function expeditionShortCommandLabel(commandId = '', fallback = '') {
+    const id = String(commandId || '');
+    if (id === 'scout_sector') return 'Scout';
+    if (id === 'prepare_settler_convoy') return 'Convoy';
+    if (id === 'found_settlement') return 'Found';
+    if (id === 'move_unit') return 'Move';
+    if (/inspect/i.test(fallback)) return 'Inspect';
+    return String(fallback || friendlyToken(id || 'Command')).replace(/\s+sector$/i, '').slice(0, 14);
+  }
+
+  function setCommandButtonA11y(button, icon, label, fullLabel) {
+    if (!button) return;
+    button.dataset.commandIcon = icon;
+    button.title = fullLabel;
+    button.setAttribute('aria-label', fullLabel);
+    if (label) button.textContent = label;
+  }
+
+  function appendExpeditionUnitRoster(card, model, selectedCell) {
+    const units = expeditionUnits(model);
+    if (!card || !units.length) return null;
+    const selectedUnit = selectedExpeditionUnit(model, selectedCell);
+    if (selectedUnit?.unitId) state.expeditionSelectedUnitId = String(selectedUnit.unitId);
+    const movementReady = units.some((unit) => unit.movement?.movementMutationImplemented === true);
+
+    const roster = document.createElement('section');
+    roster.className = 'fp-expedition-unit-roster';
+    roster.dataset.testid = 'fp-expedition-unit-roster';
+    roster.dataset.readOnly = 'true';
+    roster.dataset.actions = '0';
+    roster.dataset.movementMutation = movementReady ? 'true' : 'false';
+
+    const head = document.createElement('div');
+    head.className = 'fp-expedition-unit-roster__head';
+    const title = document.createElement('strong');
+    title.textContent = 'Map units';
+    const meta = document.createElement('small');
+    meta.textContent = movementReady
+      ? `${units.length} units - Scout move ready`
+      : `${units.length} units - move locked`;
+    head.append(title, meta);
+    roster.appendChild(head);
+
+    const rail = document.createElement('div');
+    rail.className = 'fp-expedition-unit-rail';
+    units.forEach((unit) => {
+      const selected = String(unit.unitId || '') === String(state.expeditionSelectedUnitId || selectedUnit?.unitId || '');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `fp-expedition-unit-token fp-expedition-unit-token--${safeTestId(unit.unitType)}${selected ? ' fp-expedition-unit-token--selected' : ''}`;
+      button.dataset.testid = `fp-expedition-unit-token-${safeTestId(unit.unitId)}`;
+      button.dataset.unitId = String(unit.unitId || '');
+      button.dataset.unitType = String(unit.unitType || '');
+      button.dataset.cellId = String(unit.cellId || '');
+      button.dataset.readOnly = unit.readOnly === false ? 'false' : 'true';
+      button.dataset.movementMutation = unit.movement?.movementMutationImplemented === true ? 'true' : 'false';
+      const unitActionCount = expeditionUnitActionCount(unit, model, selected ? selectedCell : null);
+      button.dataset.actions = String(unitActionCount);
+      const unitTitle = `${unit.displayName || expeditionUnitTypeLabel(unit)} - ${expeditionUnitTypeLabel(unit)} at ${unit.cellId || 'unplaced'}; ${unitActionCount ? countLabel(unitActionCount, 'ready command') : 'no ready commands'}.`;
+      button.title = unitTitle;
+      button.setAttribute('aria-label', `${unitTitle}${selected ? ' Selected.' : ''}`);
+      button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+      button.addEventListener('click', () => {
+        selectExpeditionUnit(unit, model, unit.cellId);
+        renderExpeditionMap(state.bundle || {});
+      });
+      const icon = document.createElement('i');
+      icon.className = 'fp-expedition-unit-token__sprite';
+      const spritePath = expeditionUnitSpritePath(unit);
+      if (spritePath) icon.style.setProperty('--unit-sprite', `url("${spritePath}")`);
+      icon.textContent = expeditionUnitToken(unit);
+      icon.setAttribute('aria-hidden', 'true');
+      const label = document.createElement('span');
+      label.className = 'fp-expedition-unit-token__meta';
+      const name = document.createElement('strong');
+      name.textContent = expeditionUnitRoleCode(unit);
+      name.title = unit.displayName || expeditionUnitTypeLabel(unit);
+      const role = document.createElement('small');
+      role.textContent = expeditionCompactCellLabel(unit.cellId);
+      role.title = unit.cellId || 'unplaced';
+      const ready = document.createElement('b');
+      ready.className = 'fp-expedition-unit-token__ready';
+      ready.dataset.actions = String(unitActionCount);
+      ready.title = unitActionCount ? countLabel(unitActionCount, 'ready command') : 'No ready commands';
+      ready.textContent = unitActionCount ? String(unitActionCount) : '0';
+      label.append(name, role, ready);
+      button.append(icon, label);
+      rail.appendChild(button);
+    });
+    roster.appendChild(rail);
+
+    if (selectedUnit) {
+      const scoutCommandTarget = expeditionUnitScoutCommandTarget(selectedUnit, selectedCell, model);
+      const moveTargets = expeditionUnitMoveTargets(selectedUnit, model);
+      const commandHints = Array.isArray(selectedUnit.commandHints) ? selectedUnit.commandHints : [];
+      const mapCommandActions = expeditionMapCommandActions(selectedUnit);
+      const actionCount = (scoutCommandTarget.targetCell?.cellId ? 1 : 0) + moveTargets.length + mapCommandActions.length;
+      roster.dataset.actions = String(actionCount);
+      const commandBar = document.createElement('div');
+      commandBar.className = 'fp-expedition-unit-command-bar';
+      commandBar.dataset.testid = 'fp-expedition-unit-command-bar';
+      commandBar.dataset.unitId = String(selectedUnit.unitId || '');
+      commandBar.dataset.cellId = String(selectedUnit.cellId || '');
+      commandBar.dataset.readOnly = 'true';
+      commandBar.dataset.movementMutation = selectedUnit.movement?.movementMutationImplemented === true ? 'true' : 'false';
+      commandBar.dataset.actions = String(actionCount);
+      const label = document.createElement('small');
+      label.className = 'fp-expedition-unit-command-bar__unit';
+      label.dataset.testid = 'fp-expedition-unit-command-selected';
+      label.dataset.unitName = String(selectedUnit.displayName || '');
+      label.title = `${selectedUnit.displayName || expeditionUnitTypeLabel(selectedUnit)} selected at ${selectedUnit.cellId || 'unplaced'}`;
+      label.setAttribute('aria-label', label.title);
+      label.textContent = `${expeditionUnitToken(selectedUnit)} ${expeditionUnitRoleCode(selectedUnit)}`;
+      commandBar.appendChild(label);
+      commandHints.slice(0, 4).forEach((command) => {
+        const commandId = String(command.commandId || '');
+        if (commandId === 'move_unit' && moveTargets.length) {
+          moveTargets.slice(0, 3).forEach((targetCell) => {
+            const targetCellId = String(targetCell.cellId || '');
+            const pending = state.expeditionUnitMovePendingId === `${selectedUnit.unitId}:${targetCellId}`;
+            const button = brassBtn(pending ? 'Moving' : 'Move', `fp-btn-move-expedition-unit-${safeTestId(selectedUnit.unitId)}-${safeTestId(targetCellId)}`, () => {
+              state.expeditionSelectedUnitId = String(selectedUnit.unitId || '');
+              state.expeditionSelectedCellId = targetCellId;
+              doMoveExpeditionUnit(selectedUnit.unitId, targetCellId);
+            });
+            button.classList.add('fp-brass-btn--small', 'fp-expedition-unit-command-bar__button');
+            setCommandButtonA11y(button, '↦', pending ? 'Moving' : 'Move', `Move ${selectedUnit.displayName || expeditionUnitTypeLabel(selectedUnit)} to ${targetCellId}`);
+            button.dataset.testid = `fp-btn-move-expedition-unit-${safeTestId(selectedUnit.unitId)}-${safeTestId(targetCellId)}`;
+            button.dataset.unitId = String(selectedUnit.unitId || '');
+            button.dataset.cellId = targetCellId;
+            button.dataset.commandId = commandId;
+            button.dataset.serverMutationImplemented = 'true';
+            button.dataset.idempotencyKey = expeditionUnitMoveIdempotencyKey(state.bundle || {}, model, selectedUnit, targetCell);
+            button.disabled = !!state.expeditionUnitMovePendingId;
+            commandBar.appendChild(button);
+            const target = document.createElement('span');
+            target.className = 'fp-expedition-unit-command-chip fp-expedition-unit-command-chip--target';
+            target.dataset.testid = 'fp-expedition-unit-move-target';
+            target.dataset.cellId = targetCellId;
+            target.dataset.fogState = String(targetCell.fogState || '');
+            target.title = `Move target ${targetCellId}`;
+            target.setAttribute('aria-label', `Move target ${targetCellId}, ${friendlyToken(targetCell.fogState || '')}`);
+            target.textContent = `↦ ${expeditionFogShortLabel(targetCell.fogState)}`;
+            commandBar.appendChild(target);
+          });
+          return;
+        }
+        if (commandId === 'scout_sector' && scoutCommandTarget.targetCell?.cellId) {
+          const targetCell = scoutCommandTarget.targetCell;
+          const targetCellId = String(targetCell.cellId || '');
+          const pending = state.scoutSectorPendingCellId === targetCellId;
+          const button = brassBtn(pending ? 'Scouting' : 'Scout', `fp-btn-scout-sector-unit-command-${safeTestId(targetCellId)}`, () => {
+            state.expeditionSelectedUnitId = String(selectedUnit.unitId || '');
+            state.expeditionSelectedCellId = targetCellId;
+            doScoutExpeditionSector(targetCellId);
+          });
+          button.classList.add('fp-brass-btn--small', 'fp-expedition-unit-command-bar__button');
+          setCommandButtonA11y(button, '⌖', pending ? 'Scouting' : 'Scout', `Scout Sector with ${selectedUnit.displayName || expeditionUnitTypeLabel(selectedUnit)} at ${targetCellId}`);
+          button.dataset.testid = `fp-btn-scout-sector-unit-command-${safeTestId(targetCellId)}`;
+          button.dataset.unitId = String(selectedUnit.unitId || '');
+          button.dataset.cellId = targetCellId;
+          button.dataset.commandId = commandId;
+          button.dataset.serverMutationImplemented = 'true';
+          button.dataset.idempotencyKey = scoutSectorIdempotencyKey(state.bundle || {}, model, targetCell);
+          button.disabled = !!state.scoutSectorPendingCellId;
+          commandBar.appendChild(button);
+          const target = document.createElement('span');
+          target.className = 'fp-expedition-unit-command-chip fp-expedition-unit-command-chip--target';
+          target.dataset.testid = 'fp-expedition-unit-command-target';
+          target.dataset.cellId = targetCellId;
+          target.dataset.fogState = String(targetCell.fogState || '');
+          target.title = `Scout target ${targetCellId}`;
+          target.setAttribute('aria-label', `Scout Sector target ${targetCellId}, ${friendlyToken(targetCell.fogState || '')}`);
+          target.textContent = `◎ ${expeditionFogShortLabel(targetCell.fogState)}`;
+          commandBar.appendChild(target);
+          return;
+        }
+        if (commandId === 'prepare_settler_convoy' && command.enabled !== false) {
+          const planId = String(command.sourcePlanId || selectedUnit.sourcePlanId || '');
+          if (planId) {
+            const pending = state.convoyPendingPlanId === planId;
+            const button = brassBtn(pending ? 'Preparing' : 'Convoy', `fp-btn-prepare-settler-convoy-unit-command-${safeTestId(planId)}`, () => {
+              state.expeditionSelectedUnitId = String(selectedUnit.unitId || '');
+              if (selectedUnit.cellId) state.expeditionSelectedCellId = String(selectedUnit.cellId || '');
+              doPrepareSettlerConvoy(planId);
+            });
+            button.classList.add('fp-brass-btn--small', 'fp-expedition-unit-command-bar__button');
+            setCommandButtonA11y(button, '▣', pending ? 'Preparing' : 'Convoy', `Prepare Convoy from site plan ${planId}`);
+            button.dataset.testid = `fp-btn-prepare-settler-convoy-unit-command-${safeTestId(planId)}`;
+            button.dataset.unitId = String(selectedUnit.unitId || '');
+            button.dataset.planId = planId;
+            button.dataset.cellId = String(selectedUnit.cellId || '');
+            button.dataset.commandId = commandId;
+            button.dataset.serverMutationImplemented = 'true';
+            button.disabled = !!state.convoyPendingPlanId;
+            commandBar.appendChild(button);
+            const target = document.createElement('span');
+            target.className = 'fp-expedition-unit-command-chip fp-expedition-unit-command-chip--target';
+            target.dataset.testid = 'fp-expedition-unit-command-plan-target';
+            target.dataset.planId = planId;
+            target.dataset.cellId = String(selectedUnit.cellId || '');
+            target.title = `Site plan ${planId}`;
+            target.setAttribute('aria-label', `Site plan target ${planId}`);
+            target.textContent = 'PLAN';
+            commandBar.appendChild(target);
+            return;
+          }
+        }
+        if (commandId === 'found_settlement' && command.enabled !== false) {
+          const claimId = String(command.claimId || selectedUnit.sourceClaimId || '');
+          if (claimId) {
+            const pending = state.foundingPendingClaimId === claimId;
+            const button = brassBtn(pending ? 'Founding' : 'Found', `fp-btn-found-settlement-unit-command-${safeTestId(claimId)}`, () => {
+              state.expeditionSelectedUnitId = String(selectedUnit.unitId || '');
+              if (selectedUnit.cellId) state.expeditionSelectedCellId = String(selectedUnit.cellId || '');
+              doFoundSettlement(claimId);
+            });
+            button.classList.add('fp-brass-btn--small', 'fp-expedition-unit-command-bar__button');
+            setCommandButtonA11y(button, '⌂', pending ? 'Founding' : 'Found', `Found Outpost from claim ${claimId}`);
+            button.dataset.testid = `fp-btn-found-settlement-unit-command-${safeTestId(claimId)}`;
+            button.dataset.unitId = String(selectedUnit.unitId || '');
+            button.dataset.claimId = claimId;
+            button.dataset.cellId = String(selectedUnit.cellId || '');
+            button.dataset.commandId = commandId;
+            button.dataset.serverMutationImplemented = 'true';
+            button.disabled = !!state.foundingPendingClaimId;
+            commandBar.appendChild(button);
+            const target = document.createElement('span');
+            target.className = 'fp-expedition-unit-command-chip fp-expedition-unit-command-chip--target';
+            target.dataset.testid = 'fp-expedition-unit-command-claim-target';
+            target.dataset.claimId = claimId;
+            target.dataset.cellId = String(selectedUnit.cellId || '');
+            target.title = `Outpost claim ${claimId}`;
+            target.setAttribute('aria-label', `Outpost claim target ${claimId}`);
+            target.textContent = 'CLAIM';
+            commandBar.appendChild(target);
+            return;
+          }
+        }
+        const chip = document.createElement('span');
+        chip.className = 'fp-expedition-unit-command-chip';
+        chip.dataset.testid = `fp-expedition-unit-command-${safeTestId(command.commandId || command.label || 'command')}`;
+        chip.dataset.commandId = commandId;
+        chip.dataset.serverMutationImplemented = command.serverMutationImplemented === true ? 'true' : 'false';
+        const commandEnabled = commandId === 'scout_sector'
+          ? false
+          : command.enabled !== false;
+        chip.dataset.enabled = commandEnabled ? 'true' : 'false';
+        chip.textContent = commandId === 'scout_sector'
+          ? 'Scout off'
+          : expeditionShortCommandLabel(commandId, command.label || friendlyToken(command.commandId || 'unit command'));
+        chip.title = command.label || friendlyToken(command.commandId || 'unit command');
+        chip.setAttribute('aria-label', chip.title);
+        commandBar.appendChild(chip);
+      });
+      const move = document.createElement('span');
+      move.className = 'fp-expedition-unit-command-chip fp-expedition-unit-command-chip--count';
+      move.dataset.testid = 'fp-expedition-unit-command-move-preview';
+      move.dataset.enabled = moveTargets.length ? 'true' : 'false';
+      move.dataset.count = String(moveTargets.length);
+      move.title = moveTargets.length ? countLabel(moveTargets.length, 'move target') : 'Move locked';
+      move.setAttribute('aria-label', move.title);
+      move.textContent = moveTargets.length ? `${moveTargets.length} ↦` : '0 ↦';
+      commandBar.appendChild(move);
+      const movement = document.createElement('span');
+      movement.className = 'fp-expedition-unit-command-chip fp-expedition-unit-command-chip--authority';
+      movement.dataset.testid = 'fp-expedition-unit-movement-boundary';
+      movement.dataset.enabled = selectedUnit.movement?.movementMutationImplemented === true ? 'true' : 'false';
+      movement.title = selectedUnit.movement?.movementMutationImplemented === true
+        ? 'Server movement active'
+        : 'Movement pending server slice';
+      movement.setAttribute('aria-label', movement.title);
+      movement.textContent = selectedUnit.movement?.movementMutationImplemented === true ? 'SRV' : 'WAIT';
+      commandBar.appendChild(movement);
+      roster.appendChild(commandBar);
+    }
+
+    card.appendChild(roster);
+    return roster;
   }
 
   function expeditionResourceHintsText(resourceHints = {}) {
@@ -1190,6 +1555,15 @@
     const cellId = safeTestId(cell?.cellId || 'cell');
     const projection = safeTestId(model?.projectionHash || bundle?.stateHash || cell?.sourceIds?.adjacentCellId || 'projection');
     return `fp-scout-sector-${plotId}-${cellId}-${projection}`;
+  }
+
+  function expeditionUnitMoveIdempotencyKey(bundle, model, unit, targetCell) {
+    const plotId = safeTestId(bundle?.plotId || state.plotId || 'plot');
+    const unitId = safeTestId(unit?.unitId || 'unit');
+    const sourceCellId = safeTestId(unit?.cellId || unit?.location?.cellId || 'source');
+    const targetCellId = safeTestId(targetCell?.cellId || 'target');
+    const projection = safeTestId(model?.projectionHash || bundle?.stateHash || 'projection');
+    return `fp-expedition-unit-move-${plotId}-${unitId}-${sourceCellId}-${targetCellId}-${projection}`;
   }
 
   function expeditionCellBounds(cells) {
@@ -1267,7 +1641,7 @@
         mode: 'scout',
         eyebrow: 'Current focus',
         title: 'Scout an eligible hinted sector',
-        body: `${scoutTarget.cellId} is an eligible server-hinted map edge. Scout Sector can reveal that one sector as known map truth; hidden resources and routes stay sealed until the server returns a receipt.`,
+        body: `${scoutTarget.cellId} is the current server-hinted objective marker. Scout Sector is the only mutation; hidden resources and routes stay sealed.`,
         selectedCellId: selectedCell?.cellId || scoutTarget.cellId,
         targetCellId: scoutTarget.cellId,
         packetId: latestPacket?.packetId || '',
@@ -1286,7 +1660,7 @@
         mode: 'packet',
         eyebrow: 'Current focus',
         title: 'Review the latest packet',
-        body: `${latestPacket.packetId} is the latest Scout Sector receipt packet. It is evidence for ${latestPacket.cellId || latestPacket.receiptLink?.cellId || 'a revealed sector'} only, with zero executable actions.`,
+        body: `${latestPacket.packetId} marks ${latestPacket.cellId || latestPacket.receiptLink?.cellId || 'a revealed sector'} as receipt evidence with zero executable actions.`,
         selectedCellId: selectedCell?.cellId || latestPacket.cellId || '',
         targetCellId: latestPacket.cellId || latestPacket.receiptLink?.cellId || '',
         packetId: latestPacket.packetId,
@@ -1305,7 +1679,7 @@
       eyebrow: 'Current focus',
       title: revealedCount ? 'Inspect revealed sectors' : 'Read the private map',
       body: revealedCount
-        ? `${countLabel(revealedCount, 'revealed sector')} can be inspected from the selected card and sector list. Locked silhouettes remain private fog.`
+        ? `${countLabel(revealedCount, 'revealed sector')} can be inspected from the optional ledger. Locked silhouettes remain private fog.`
         : 'The server read model is present, but no revealed frontier sector is available yet.',
       selectedCellId: selectedCell?.cellId || '',
       targetCellId: selectedCell?.cellId || '',
@@ -1320,6 +1694,27 @@
     };
   }
 
+  function expeditionObjectiveShortLabel(mode = '') {
+    const key = String(mode || '').toLowerCase();
+    if (key === 'scout') return 'SCOUT';
+    if (key === 'packet') return 'PKT';
+    if (key === 'inspect') return 'LEDGER';
+    return 'MAP';
+  }
+
+  function expeditionObjectiveFactCode(labelText = '') {
+    const label = String(labelText || '').toLowerCase();
+    if (label.startsWith('scout')) return 'SCT';
+    if (label.startsWith('packet')) return 'PKT';
+    if (label.startsWith('revealed')) return 'REV';
+    if (label.startsWith('hidden')) return 'HID';
+    if (label.startsWith('hinted')) return 'HNT';
+    if (label.startsWith('locked')) return 'LCK';
+    if (label.startsWith('party')) return 'PTY';
+    if (label.startsWith('actions')) return 'ACT';
+    return String(labelText || '').slice(0, 3).toUpperCase();
+  }
+
   function appendExpeditionObjectiveStrip(body, objective) {
     if (!body || !objective) return null;
     const strip = document.createElement('article');
@@ -1332,16 +1727,19 @@
     if (objective.targetCellId) strip.dataset.targetCellId = String(objective.targetCellId);
     if (objective.packetId) strip.dataset.packetId = String(objective.packetId);
     if (objective.partyId) strip.dataset.partyId = String(objective.partyId);
+    strip.title = `${objective.title || 'Expedition Map focus'}: ${objective.body || 'Server-owned read model only.'}`;
+    strip.setAttribute('aria-label', strip.title);
 
     const copy = document.createElement('div');
     copy.className = 'fp-expedition-objective-strip__copy';
     const eyebrow = document.createElement('small');
-    eyebrow.textContent = objective.eyebrow || 'Current focus';
+    eyebrow.textContent = 'FOCUS';
     const title = document.createElement('strong');
-    title.textContent = objective.title || 'Read the Expedition Map';
+    title.textContent = expeditionObjectiveShortLabel(objective.mode);
     const bodyCopy = document.createElement('p');
     bodyCopy.textContent = objective.body || 'Server-owned read model only.';
-    copy.append(eyebrow, title, bodyCopy);
+    bodyCopy.dataset.testid = 'fp-expedition-objective-copy';
+    copy.append(eyebrow, title);
 
     const facts = document.createElement('div');
     facts.className = 'fp-expedition-objective-strip__facts';
@@ -1350,9 +1748,12 @@
       if (valueText == null || valueText === '') return;
       const item = document.createElement('span');
       const label = document.createElement('small');
-      label.textContent = labelText;
+      label.textContent = expeditionObjectiveFactCode(labelText);
+      label.title = labelText;
       const value = document.createElement('strong');
       value.textContent = String(valueText);
+      item.title = `${labelText}: ${valueText}`;
+      item.setAttribute('aria-label', item.title);
       item.append(label, value);
       facts.appendChild(item);
     });
@@ -1360,9 +1761,16 @@
     const boundary = document.createElement('small');
     boundary.className = 'fp-expedition-objective-strip__boundary';
     boundary.dataset.testid = 'fp-expedition-objective-strip-boundary';
-    boundary.textContent = 'Read-only focus from existing map, packet, and party state. No new server objectives, hidden truth, resources, routes, assignments, timers, rewards, Atlas execution, sharing, or external effects.';
+    boundary.textContent = 'Read-only marker. No new server objectives, hidden truth, or actions.';
 
-    strip.append(copy, facts, boundary);
+    strip.append(copy, facts);
+    const ledgerCopy = document.createElement('small');
+    ledgerCopy.textContent = 'Ledger detail: focus markers are derived only from existing map cells, event packets, and party state. They cannot create resources, routes, assignments, timers, rewards, Atlas execution, sharing, or external effects.';
+    const ledger = appendExpeditionAuditDetails(strip, 'Receipts', [bodyCopy, boundary, ledgerCopy], 'fp-expedition-objective-ledger-details');
+    if (ledger) {
+      ledger.dataset.readOnly = 'true';
+      ledger.dataset.actions = '0';
+    }
     body.appendChild(strip);
     return strip;
   }
@@ -1379,26 +1787,30 @@
     chrome.dataset.fogState = fogState;
     chrome.dataset.readOnly = 'true';
     chrome.dataset.actions = '0';
+    chrome.title = `Visual inspector: ${selectedCell?.cellId || 'no selected cell'} - ${friendlyToken(fogState)}; ${countLabel(revealed, 'revealed sector')}; ${countLabel(hidden, 'hidden silhouette')}.`;
+    chrome.setAttribute('aria-label', chrome.title);
 
     const label = document.createElement('small');
-    label.textContent = 'Visual inspector';
+    label.textContent = 'VIS';
     const title = document.createElement('strong');
     title.textContent = selectedCell?.title || model?.title || 'Expedition Map';
     const meta = document.createElement('span');
-    meta.textContent = `${selectedCell?.cellId || 'no selected cell'} - ${friendlyToken(fogState)}`;
+    meta.textContent = `${expeditionCompactCellLabel(selectedCell?.cellId)} · ${expeditionFogShortLabel(fogState)}`;
     chrome.append(label, title, meta);
 
     const chips = document.createElement('div');
     chips.className = 'fp-expedition-inspector-drawer__chips';
     chips.dataset.testid = 'fp-expedition-inspector-chips';
     [
-      'read-only',
-      `${countLabel(revealed, 'revealed sector')}`,
-      `${countLabel(hidden, 'hidden silhouette')}`,
-      selectedCell && isExpeditionScoutSectorEligible(selectedCell) ? 'Scout Sector eligible' : 'no drawer actions',
-    ].forEach((text) => {
+      ['SRV', 'read-only server map projection'],
+      [`R${revealed}`, `${countLabel(revealed, 'revealed sector')}`],
+      [`H${hidden}`, `${countLabel(hidden, 'hidden silhouette')}`],
+      [selectedCell && isExpeditionScoutSectorEligible(selectedCell) ? '⌖' : '0 ACT', selectedCell && isExpeditionScoutSectorEligible(selectedCell) ? 'Scout Sector eligible' : 'no drawer actions'],
+    ].forEach(([text, fullText]) => {
       const chip = document.createElement('i');
       chip.textContent = text;
+      chip.title = fullText;
+      chip.setAttribute('aria-label', fullText);
       chips.appendChild(chip);
     });
     chrome.appendChild(chips);
@@ -1416,10 +1828,32 @@
     if (options.open) section.open = true;
 
     const summary = document.createElement('summary');
+    const fullMeta = options.meta || 'compact read-only drawer';
+    const visibleLabel = options.shortLabel || ({
+      'Selected-sector proof': 'Sector proof',
+      'Evidence packet': 'Evidence',
+      'Fog ledger': 'Fog',
+      'Sector action aliases': 'Aliases',
+      'Revealed-sector ledger': 'Revealed',
+    }[labelText] || labelText);
+    const visibleMeta = options.shortMeta || (() => {
+      const meta = String(fullMeta || '');
+      const privateFog = meta.match(/(\d+)\s+private fog/i);
+      const readOnly = meta.match(/(\d+)\s+read-only/i);
+      if (privateFog) return `${privateFog[1]} fog`;
+      if (readOnly) return `${readOnly[1]} receipt`;
+      if (/pending/i.test(meta)) return 'pending';
+      if (/secondary/i.test(meta)) return 'alias';
+      if (/receipt/i.test(meta)) return 'receipts';
+      if (/details|visual/i.test(meta)) return 'details';
+      return 'ledger';
+    })();
+    summary.title = `${labelText}: ${fullMeta}`;
+    summary.setAttribute('aria-label', summary.title);
     const label = document.createElement('strong');
-    label.textContent = labelText;
+    label.textContent = visibleLabel;
     const meta = document.createElement('small');
-    meta.textContent = options.meta || 'compact read-only drawer';
+    meta.textContent = visibleMeta;
     summary.append(label, meta);
     section.append(summary, contentNode);
     drawer.appendChild(section);
@@ -1551,6 +1985,86 @@
     const normalized = String(role || '').trim();
     if (!normalized) return 'Field operator';
     return friendlyToken(normalized).replace(/\bhq\b/i, 'HQ');
+  }
+
+  function expeditionUnits(model = {}) {
+    return (Array.isArray(model?.units?.items) ? model.units.items : [])
+      .filter((unit) => unit && typeof unit === 'object' && unit.unitId)
+      .map((unit) => ({
+        ...unit,
+        unitId: String(unit.unitId || ''),
+        unitType: String(unit.unitType || unit.role || 'field_support'),
+        displayName: String(unit.displayName || friendlyToken(unit.role || unit.unitType || 'field unit')),
+        role: String(unit.role || unit.unitType || 'field_support'),
+        cellId: String(unit.location?.cellId || ''),
+        commandHints: Array.isArray(unit.commandHints) ? unit.commandHints : []
+      }));
+  }
+
+  function expeditionUnitsForCell(model = {}, cell = {}) {
+    const cellId = String(cell?.cellId || '');
+    return expeditionUnits(model).filter((unit) => String(unit.cellId || '') === cellId);
+  }
+
+  function selectedExpeditionUnit(model = {}, selectedCell = null) {
+    const units = expeditionUnits(model);
+    if (!units.length) return null;
+    const selectedId = String(state.expeditionSelectedUnitId || '');
+    return units.find((unit) => String(unit.unitId || '') === selectedId)
+      || (selectedCell ? units.find((unit) => String(unit.cellId || '') === String(selectedCell.cellId || '')) : null)
+      || units[0];
+  }
+
+  function expeditionUnitScoutCommandTarget(unit = {}, selectedCell = null, model = {}) {
+    const command = (Array.isArray(unit.commandHints) ? unit.commandHints : [])
+      .find((entry) => String(entry.commandId || '') === 'scout_sector');
+    if (!command || command.enabled === false) return { command: null, targetCell: null };
+    const targetCellIds = Array.isArray(command.targetCellIds)
+      ? command.targetCellIds.map((cellId) => String(cellId || '')).filter(Boolean)
+      : [];
+    if (!targetCellIds.length) return { command, targetCell: null };
+    const selectedCellId = String(selectedCell?.cellId || '');
+    const eligibleTargets = expeditionCells(model)
+      .filter((cell) => targetCellIds.includes(String(cell.cellId || '')) && isExpeditionScoutSectorEligible(cell));
+    const targetCell = eligibleTargets.find((cell) => String(cell.cellId || '') === selectedCellId)
+      || eligibleTargets[0]
+      || null;
+    return { command, targetCell };
+  }
+
+  function expeditionUnitMoveTargets(unit = {}, model = {}) {
+    const targetCellIds = Array.isArray(unit.movement?.allowedTargetCellIds)
+      ? unit.movement.allowedTargetCellIds.map((cellId) => String(cellId || '')).filter(Boolean)
+      : [];
+    if (!targetCellIds.length) return [];
+    return expeditionCells(model)
+      .filter((cell) => targetCellIds.includes(String(cell.cellId || '')))
+      .filter((cell) => ['discovered', 'known'].includes(String(cell.fogState || '')));
+  }
+
+  function selectExpeditionUnit(unit = {}, model = {}, preferredCellId = '') {
+    if (!unit?.unitId) return;
+    state.expeditionSelectedUnitId = String(unit.unitId || '');
+    const preferredCell = expeditionCells(model)
+      .find((cell) => String(cell.cellId || '') === String(preferredCellId || '')) || null;
+    const scoutCommandTarget = expeditionUnitScoutCommandTarget(unit, preferredCell, model);
+    const nextCellId = scoutCommandTarget.targetCell?.cellId || preferredCellId || unit.cellId || '';
+    if (nextCellId) state.expeditionSelectedCellId = String(nextCellId);
+  }
+
+  function expeditionUnitTypeLabel(unit = {}) {
+    return friendlyToken(unit.unitType || unit.role || 'field unit')
+      .replace(/\bhq\b/i, 'HQ');
+  }
+
+  function expeditionUnitToken(unit = {}) {
+    const type = String(unit.unitType || '').toLowerCase();
+    if (type === 'scout') return '⌖';
+    if (type === 'courier') return '⚑';
+    if (type === 'surveyor') return '⌗';
+    if (type === 'settler_convoy') return '▣';
+    if (type === 'outpost_crew') return '⌂';
+    return '◈';
   }
 
   function expeditionPartyMemberByRole(members, patterns) {
@@ -1801,10 +2315,11 @@
     const card = document.createElement('article');
     card.className = 'fp-expedition-map-card fp-expedition-map-card--scout';
     card.dataset.testid = 'fp-scout-sector-card';
+    card.dataset.primary = 'false';
     const title = document.createElement('strong');
-    title.textContent = 'Scout Sector';
+    title.textContent = 'Scout Sector aliases';
     const copy = document.createElement('p');
-    copy.textContent = 'Select one server-hinted map-edge sector to reveal it as known map truth only.';
+    copy.textContent = 'Scout-unit commands above are primary; these sector rows mirror the same receipt route.';
     card.append(title, copy);
 
     const list = document.createElement('div');
@@ -1833,7 +2348,7 @@
     });
     card.appendChild(list);
     const boundary = document.createElement('small');
-    boundary.textContent = 'Only hinted frontier_hint cells get this action; known, discovered, and locked cells remain read-only here.';
+    boundary.textContent = 'Alias only. Only hinted frontier_hint cells get this action; known, discovered, and locked cells remain read-only here.';
     card.appendChild(boundary);
     body.appendChild(card);
     return card;
@@ -1856,7 +2371,10 @@
     }
 
     const updateSemanticZoom = appendExpeditionSemanticZoomOverlay(host, renderer, model, cells, selectedCellId);
-    state.expeditionMapThreeInfo = renderer.renderExpeditionMap(host, { ...model, cells }, { selectedCellId });
+    state.expeditionMapThreeInfo = renderer.renderExpeditionMap(host, { ...model, cells }, {
+      selectedCellId,
+      selectedUnitId: state.expeditionSelectedUnitId,
+    });
     const controls = document.createElement('div');
     controls.className = 'fp-expedition-map-controls';
     controls.dataset.testid = 'fp-expedition-map-controls';
@@ -1888,20 +2406,20 @@
     if (value >= 2.25) {
       return {
         key: 'detail',
-        label: 'Detail view',
+        label: 'Detail',
         copy: 'Selected-cell facts stay below; close zoom does not unlock extra truth.',
       };
     }
     if (value >= 1.35) {
       return {
         key: 'sector',
-        label: 'Sector view',
+        label: 'Sector',
         copy: 'Hex labels and fog edges carry the readable sector layer.',
       };
     }
     return {
       key: 'survey',
-      label: 'Survey view',
+      label: 'Survey',
       copy: 'Broad region silhouette from discovered, known, hinted, and locked cells.',
     };
   }
@@ -1910,6 +2428,9 @@
     if (!cell) return 'No selected cell in this read model.';
     const fogState = String(cell.fogState || 'locked_unknown');
     const title = cell.title || friendlyToken(cell.kind || cell.cellId);
+    if (fogState === 'locked_unknown') {
+      return `Selected: ${title} stays sealed; no resources, routes, or action data.`;
+    }
     if (tier.key === 'survey') {
       const revealed = Number(counts.discovered || 0) + Number(counts.known || 0);
       const hidden = Number(counts.hinted || 0) + Number(counts.locked_unknown || 0);
@@ -1917,9 +2438,6 @@
     }
     if (fogState === 'hinted') {
       return `Selected: ${title} is a hinted edge; only Scout Sector can make it known.`;
-    }
-    if (fogState === 'locked_unknown') {
-      return `Selected: ${title} stays sealed; no resources, routes, or action data.`;
     }
     if (tier.key === 'detail') {
       const resources = expeditionResourceHintsText(cell.resourceHints);
@@ -1929,6 +2447,7 @@
   }
 
   function appendExpeditionSemanticZoomOverlay(host, renderer, model, cells, selectedCellId) {
+    document.querySelectorAll('[data-testid="fp-expedition-semantic-zoom"]').forEach((node) => node.remove());
     const overlay = document.createElement('div');
     overlay.className = 'fp-expedition-semantic-zoom';
     overlay.dataset.testid = 'fp-expedition-semantic-zoom';
@@ -1952,8 +2471,17 @@
       host.dataset.zoomTier = tier.key;
       overlay.dataset.zoomTier = tier.key;
       tierLabel.textContent = tier.label;
-      tierCopy.textContent = tier.copy;
-      selectedHint.textContent = expeditionSemanticSelectedHint(selected, tier, counts);
+      tierLabel.title = tier.copy;
+      tierLabel.setAttribute('aria-label', `${tier.label} zoom: ${tier.copy}`);
+      const revealed = Number(counts.discovered || 0) + Number(counts.known || 0);
+      const hidden = Number(counts.hinted || 0) + Number(counts.locked_unknown || 0);
+      tierCopy.textContent = `R${revealed} H${hidden}`;
+      tierCopy.title = tier.copy;
+      tierCopy.setAttribute('aria-label', `${countLabel(revealed, 'revealed cell')} and ${countLabel(hidden, 'hidden silhouette')}. ${tier.copy}`);
+      const selectedDetail = expeditionSemanticSelectedHint(selected, tier, counts);
+      selectedHint.textContent = `${expeditionCompactCellLabel(selected?.cellId)} · ${expeditionFogShortLabel(selected?.fogState)}`;
+      selectedHint.title = selectedDetail;
+      selectedHint.setAttribute('aria-label', selectedDetail);
       selectedHint.dataset.fogState = String(selected?.fogState || '');
     };
 
@@ -1969,6 +2497,7 @@
     host.addEventListener('pointermove', schedule);
     host.addEventListener('pointerup', schedule);
     host.addEventListener('pointercancel', schedule);
+    host.addEventListener('founders-plot-expedition-map-view-change', update);
     return update;
   }
 
@@ -2112,22 +2641,52 @@
     const statusCard = document.createElement('article');
     statusCard.className = `fp-expedition-map-card${model.status === 'FOG_READ_MODEL_READY' ? ' fp-expedition-map-card--ready' : ''}`;
     statusCard.dataset.testid = 'fp-expedition-map-status';
+    statusCard.dataset.status = String(model.status || '');
+    statusCard.dataset.readOnly = model.readOnly ? 'true' : 'false';
+    statusCard.dataset.revealed = String(revealedCells.length);
+    statusCard.dataset.hidden = String(hiddenCells.length);
+    statusCard.title = `${status}; ${countLabel(revealedCells.length, 'revealed sector')} and ${countLabel(hiddenCells.length, 'hidden silhouette')} from server-owned fog state.`;
+    statusCard.setAttribute('aria-label', statusCard.title);
     const title = document.createElement('strong');
     title.textContent = model.title || 'Private Expedition Map';
     statusCard.appendChild(title);
+
+    const statusSymbols = document.createElement('div');
+    statusSymbols.className = 'fp-expedition-map-status-symbols';
+    statusSymbols.dataset.testid = 'fp-expedition-map-status-symbols';
+    [
+      ['SRV', model.readOnly ? 'private read-only server projection' : status],
+      [`R${revealedCells.length}`, countLabel(revealedCells.length, 'revealed sector')],
+      [`H${hiddenCells.length}`, countLabel(hiddenCells.length, 'hidden silhouette')],
+    ].forEach(([text, fullText]) => {
+      const chip = document.createElement('span');
+      chip.textContent = text;
+      chip.title = fullText;
+      chip.setAttribute('aria-label', fullText);
+      statusSymbols.appendChild(chip);
+    });
+    statusCard.appendChild(statusSymbols);
+
+    const statusLedgerBody = document.createElement('div');
+    statusLedgerBody.className = 'fp-expedition-inspector-section__body';
     const stateLine = document.createElement('div');
     stateLine.className = `fp-site-plan__status${model.readOnly ? ' fp-site-plan__status--reviewed' : ''}`;
     stateLine.textContent = model.readOnly ? `${status} - private read-only` : status;
-    statusCard.appendChild(stateLine);
+    statusLedgerBody.appendChild(stateLine);
     const summary = document.createElement('p');
     summary.textContent = `${countLabel(revealedCells.length, 'revealed sector')} and ${countLabel(hiddenCells.length, 'hidden silhouette')} from server-owned fog state.`;
-    statusCard.appendChild(summary);
-    appendExpeditionMetrics(statusCard, counts, model.scope || {});
-    appendExpeditionFogLegend(statusCard, counts, selectedCell?.fogState);
+    statusLedgerBody.appendChild(summary);
+    appendExpeditionMetrics(statusLedgerBody, counts, model.scope || {});
+    appendExpeditionFogLegend(statusLedgerBody, counts, selectedCell?.fogState);
     const boundary = document.createElement('small');
     boundary.dataset.testid = 'fp-expedition-map-boundary';
     boundary.textContent = `${friendlyToken(model.authorityBoundary || 'server-owned read-only expedition map projection')}. No autonomous movement, resource gathering, routes, trades, combat, public sharing, Atlas execution, or external effects.`;
-    appendExpeditionAuditDetails(statusCard, 'Authority guardrails', [boundary], 'fp-expedition-map-authority-details');
+    statusLedgerBody.appendChild(boundary);
+    const statusLedger = appendExpeditionAuditDetails(statusCard, 'Ledger / fog', [statusLedgerBody], 'fp-expedition-map-authority-details');
+    if (statusLedger) {
+      statusLedger.dataset.readOnly = 'true';
+      statusLedger.dataset.actions = '0';
+    }
     hud.appendChild(statusCard);
     appendExpeditionObjectiveStrip(hud, objective);
     const inspector = hud;
@@ -2138,7 +2697,7 @@
     const boardTitle = document.createElement('strong');
     boardTitle.textContent = 'Zoomable sectors';
     boardCard.appendChild(boardTitle);
-    const threeRendered = renderExpeditionMapThreeSurface(boardCard, model, cells, state.expeditionSelectedCellId);
+    const threeRendered = renderExpeditionMapThreeSurface(boardCard, { ...model, objective }, cells, state.expeditionSelectedCellId);
     const board = document.createElement('div');
     board.className = `fp-expedition-map-board${threeRendered ? ' fp-expedition-map-board--fallback' : ''}`;
     board.dataset.testid = 'fp-expedition-map-board';
@@ -2172,6 +2731,7 @@
       : 'No hidden silhouettes are present in this read model.';
     boardCard.appendChild(boardCopy);
     appendExpeditionMapVisualHud(boardCard, model, counts, selectedCell, scoutableCells, bundle);
+    appendExpeditionUnitRoster(boardCard, model, selectedCell);
     runtimeShell.insertBefore(boardCard, hud);
     const selectedDetails = document.createElement('div');
     selectedDetails.className = 'fp-expedition-inspector-section__body';
@@ -2198,6 +2758,8 @@
       },
     );
 
+    const hiddenDetails = document.createElement('div');
+    hiddenDetails.className = 'fp-expedition-inspector-section__body';
     const hiddenCard = document.createElement('article');
     hiddenCard.className = 'fp-expedition-map-card fp-expedition-map-card--hidden';
     hiddenCard.dataset.testid = 'fp-expedition-map-hidden-summary';
@@ -2208,9 +2770,31 @@
     hiddenCopy.textContent = `${countLabel(counts.hinted, 'hinted silhouette')} and ${countLabel(counts.locked_unknown, 'locked unknown sector')} remain private fog.`;
     hiddenCard.appendChild(hiddenCopy);
     appendChipSet(hiddenCard, hiddenCells.slice(0, 8).map((cell) => `${friendlyToken(cell.fogState)} ${cell.cellId}`));
-    inspector.appendChild(hiddenCard);
+    hiddenDetails.appendChild(hiddenCard);
+    appendExpeditionInspectorSection(
+      inspector,
+      'Fog ledger',
+      hiddenDetails,
+      'fp-expedition-inspector-fog-ledger',
+      {
+        meta: `${countLabel(hiddenCells.length, 'private fog cell')} - tucked away`,
+      },
+    );
     appendScoutSectorResult(inspector);
-    appendScoutSectorActions(inspector, scoutableCells, model, bundle);
+    const scoutAliasDetails = document.createElement('div');
+    scoutAliasDetails.className = 'fp-expedition-inspector-section__body';
+    appendScoutSectorActions(scoutAliasDetails, scoutableCells, model, bundle);
+    if (scoutAliasDetails.childElementCount) {
+      appendExpeditionInspectorSection(
+        inspector,
+        'Sector action aliases',
+        scoutAliasDetails,
+        'fp-expedition-inspector-scout-aliases',
+        {
+          meta: 'secondary to unit commands',
+        },
+      );
+    }
 
     const sectorList = document.createElement('div');
     sectorList.className = 'fp-expedition-sector-list';
@@ -4856,6 +5440,38 @@
     await loadState();
   }
 
+  async function doMoveExpeditionUnit(unitId, targetCellId) {
+    const safeUnitId = String(unitId || '').trim();
+    const safeTargetCellId = String(targetCellId || '').trim();
+    if (!safeUnitId || !safeTargetCellId) return;
+    const bundle = state.bundle || {};
+    const model = expeditionMapModel(bundle);
+    const unit = expeditionUnits(model).find((entry) => String(entry.unitId || '') === safeUnitId);
+    const targetCell = expeditionCells(model).find((entry) => String(entry.cellId || '') === safeTargetCellId);
+    const allowed = expeditionUnitMoveTargets(unit, model).some((entry) => String(entry.cellId || '') === safeTargetCellId);
+    if (!unit || !targetCell || !allowed) {
+      return toast('Scout movement only targets adjacent discovered or known map cells.', 'danger');
+    }
+    state.expeditionUnitMovePendingId = `${safeUnitId}:${safeTargetCellId}`;
+    renderExpeditionMap(bundle);
+    const { data } = await api(API.moveExpeditionUnit, 'POST', {
+      plotId: state.plotId,
+      unitId: safeUnitId,
+      targetCellId: safeTargetCellId,
+      actor: 'HUMAN',
+      idempotencyKey: expeditionUnitMoveIdempotencyKey(bundle, model, unit, targetCell),
+    });
+    state.expeditionUnitMovePendingId = '';
+    if (!data.ok) {
+      renderExpeditionMap(state.bundle || {});
+      return toast(data.error?.message || 'Could not move that unit.', 'danger');
+    }
+    state.expeditionSelectedUnitId = safeUnitId;
+    state.expeditionSelectedCellId = String(data.targetCellId || safeTargetCellId);
+    toast(data.alreadyMoved ? 'Scout is already there.' : 'Scout moved.');
+    await loadState();
+  }
+
   async function doInspectCivicProject(projectId) {
     const safeProjectId = String(projectId || '').trim();
     if (!safeProjectId) return;
@@ -5116,11 +5732,23 @@
     renderExpeditionMap(state.bundle || {});
   }
 
+  function handleExpeditionUnitSelect(ev) {
+    const unitId = String(ev?.detail?.unitId || '').trim();
+    const cellId = String(ev?.detail?.cellId || '').trim();
+    if (!unitId) return;
+    const model = expeditionMapModel(state.bundle || {});
+    const unit = expeditionUnits(model).find((entry) => String(entry.unitId || '') === unitId);
+    if (!unit) return;
+    selectExpeditionUnit(unit, model, cellId || unit.cellId);
+    renderExpeditionMap(state.bundle || {});
+  }
+
   // --- Boot -----------------------------------------------------------------
 
   function bind() {
     window.addEventListener('founders-plot-scene-pick', handleScenePick);
     window.addEventListener('founders-plot-expedition-map-select', handleExpeditionMapSelect);
+    window.addEventListener('founders-plot-expedition-unit-select', handleExpeditionUnitSelect);
     if (els.policyForm) els.policyForm.addEventListener('submit', savePolicy);
     if (els.drawerOpen) els.drawerOpen.addEventListener('click', () => toggleDrawer(true));
     if (els.drawerClose) els.drawerClose.addEventListener('click', () => acknowledgeRecap());

@@ -1,0 +1,220 @@
+{
+  "slice": "HQ15Q",
+  "title": "Agent Town HQ15Q Symbol-First Text Replacement Plan",
+  "date": "2026-06-02",
+  "status": "PLAN_READY_FOR_HQ15R_HQ15S_HQ15T",
+  "reportOnly": true,
+  "committed": false,
+  "pushed": false,
+  "deployed": false,
+  "inputsInspected": {
+    "screenshots": [
+      {
+        "path": "reports/agent-town-hq15n-command-surface-live-qa-desktop-2026-06-02.png",
+        "dimensions": "1232x625"
+      },
+      {
+        "path": "reports/agent-town-hq15n-command-surface-live-qa-mobile-2026-06-02.png",
+        "dimensions": "366x757"
+      },
+      {
+        "path": "reports/agent-town-hq15n-command-surface-live-qa-contact-sheet-2026-06-02.png",
+        "dimensions": "1598x757"
+      }
+    ],
+    "hq15nReport": "reports/agent-town-hq15n-command-surface-live-qa-2026-06-02.md",
+    "hq15nProof": "reports/agent-town-hq15n-command-surface-live-qa-proof-2026-06-02.json",
+    "sourceHotspots": [
+      {
+        "path": "public/experiences/founders-plot/founders-plot.js",
+        "ranges": [
+          "60-90",
+          "965-1003",
+          "1071-1377",
+          "1547-1658",
+          "2021-2060",
+          "2201-2289",
+          "2329-2375",
+          "2390-2505",
+          "2520-2555"
+        ]
+      },
+      {
+        "path": "public/experiences/founders-plot/founders-plot.css",
+        "ranges": [
+          "1040-1439",
+          "1492-1583",
+          "1858-1965",
+          "3083-3234"
+        ]
+      }
+    ]
+  },
+  "screenshotFindings": {
+    "desktopDominantTextBlocks": [
+      "unit roster",
+      "unit command bar",
+      "right visual inspector",
+      "selected-sector summary",
+      "semantic zoom copy"
+    ],
+    "mobileDominantTextBlocks": [
+      "unit roster",
+      "unit command bar",
+      "selected-sector summary"
+    ],
+    "visibleRawIdentifiers": [
+      "cell_origin",
+      "cell_q0_r1",
+      "cell_q1_r-1"
+    ],
+    "primaryIssue": "The gameplay model exists as tokens and command targets, but primary UI still explains nearly every token with prose."
+  },
+  "rankedTargets": [
+    {
+      "rank": 1,
+      "id": "unit_roster_command_bar",
+      "screenshotImpact": "very_high",
+      "implementationRisk": "medium",
+      "recommendedLane": "HQ15R",
+      "replacement": "Compact icon rail plus icon-first command tray; move raw target IDs and server-state strings to accessible labels, tooltips, data attributes, or ledger detail.",
+      "acceptanceGate": "No visible raw cell IDs or server movement prose in primary command chips; all existing endpoint payload guards still pass."
+    },
+    {
+      "rank": 2,
+      "id": "mobile_top_stack_height",
+      "screenshotImpact": "very_high",
+      "implementationRisk": "medium",
+      "recommendedLane": "HQ15R",
+      "replacement": "Use a single compressed command row or bottom command dock over the map; keep horizontal unit rail but reduce cards to symbols.",
+      "acceptanceGate": "At 390px and 366px, the map is visible in the first viewport and command items are not clipped."
+    },
+    {
+      "rank": 3,
+      "id": "fog_pips_legend",
+      "screenshotImpact": "high",
+      "implementationRisk": "low",
+      "recommendedLane": "HQ15S",
+      "replacement": "Glyph-count counters only in primary HUD; explanatory fog meanings move to collapsed Fog ledger and accessible labels.",
+      "acceptanceGate": "Primary HUD shows no explanatory fog prose; hidden and locked truth remains sealed."
+    },
+    {
+      "rank": 4,
+      "id": "selected_sector_summary",
+      "screenshotImpact": "high",
+      "implementationRisk": "medium",
+      "recommendedLane": "HQ15S",
+      "replacement": "Symbol tray for selected cell, fog state, Scout eligibility, receipt count, and party avatars.",
+      "acceptanceGate": "No repeated fog, provenance, or Scout-eligibility prose is visible in the default selected summary."
+    },
+    {
+      "rank": 5,
+      "id": "semantic_zoom_overlay",
+      "screenshotImpact": "medium_high",
+      "implementationRisk": "low",
+      "recommendedLane": "HQ15S",
+      "replacement": "Compact zoom glyph cluster with current tier and mini count strip; explanatory copy moves to title/aria-label/help drawer.",
+      "acceptanceGate": "Desktop screenshot has no long semantic zoom sentence over the map."
+    },
+    {
+      "rank": 6,
+      "id": "right_visual_inspector",
+      "screenshotImpact": "medium",
+      "implementationRisk": "low_medium",
+      "recommendedLane": "HQ15S",
+      "replacement": "Default inspector becomes icon rail plus selected title; status, objective, metrics, fog legend, and authority copy collapse into Ledger/Receipts.",
+      "acceptanceGate": "Visible inspector no longer reads like a prose sidebar; proof details remain available when opened."
+    },
+    {
+      "rank": 7,
+      "id": "drawer_interiors",
+      "screenshotImpact": "medium_when_open",
+      "implementationRisk": "low",
+      "recommendedLane": "HQ15S",
+      "replacement": "Receipt cards use symbols first when opened; drawers remain audit views and add no actions.",
+      "acceptanceGate": "Drawers are collapsed by default and opening them exposes no executable actions or hidden truth."
+    },
+    {
+      "rank": 8,
+      "id": "fallback_board_copy",
+      "screenshotImpact": "low",
+      "implementationRisk": "low",
+      "recommendedLane": "HQ15S",
+      "replacement": "Hide fallback prose when Three.js renders; fallback keeps accessible map description.",
+      "acceptanceGate": "Three.js screenshots do not show fallback board prose."
+    }
+  ],
+  "laneSplit": {
+    "HQ15R": {
+      "name": "unit/command compaction",
+      "goal": "Remove the largest visible text block by compacting unit roster and command bar into symbols and icon controls.",
+      "mustPreserve": [
+        "five server-owned unit tokens",
+        "Scout move route payload guard",
+        "Scout Sector route payload guard",
+        "Surveyor Prepare Convoy existing endpoint",
+        "Settler Found Outpost existing endpoint"
+      ]
+    },
+    "HQ15S": {
+      "name": "fog/selected/inspector compaction",
+      "goal": "Collapse secondary proof language and make fog, selected-sector, inspector, and zoom surfaces symbol-first.",
+      "mustPreserve": [
+        "hidden truth redaction",
+        "Fog ledger collapsed by default",
+        "Selected-sector proof collapsed by default",
+        "Event packet evidence collapsed by default",
+        "Sector action aliases secondary/collapsed"
+      ]
+    },
+    "HQ15T": {
+      "name": "screenshot QA",
+      "goal": "Prove with desktop/mobile screenshots and guardrail JSON that the default viewport no longer reads like a transcript.",
+      "mustCheck": [
+        "no visible raw cell IDs in primary command bar",
+        "no visible long semantic zoom sentence in default viewport",
+        "no visible server movement prose in primary command bar",
+        "no clipped mobile command items",
+        "existing endpoint payload assertions still pass"
+      ]
+    }
+  },
+  "guardrails": {
+    "noServerAuthorityExpansion": true,
+    "noHiddenTruthLeakage": true,
+    "noNewMutationPaths": true,
+    "scoutSectorOnlyFogRevealPath": true,
+    "scoutMovementAdjacentRevealedOnly": true,
+    "scoutMovementRevealedFogStates": [
+      "discovered",
+      "known"
+    ],
+    "surveyorSettlerUseExistingEndpoints": true,
+    "existingSurveyorSettlerEndpoints": [
+      "/api/founders-plot/prepare-settler-convoy",
+      "/api/founders-plot/found-settlement"
+    ],
+    "noResourceGathering": true,
+    "noRouteTradeEconomyRewardCombatSchedulerBehavior": true,
+    "noCrossPlotMutation": true,
+    "noAtlasExecution": true,
+    "noPublicSharing": true,
+    "noGeneratedUniverseRuntimeExpansion": true,
+    "noHiddenAutonomy": true,
+    "noExternalEffects": true,
+    "noCommit": true,
+    "noPush": true,
+    "noDeploy": true,
+    "noMerge": true,
+    "noUnrelatedCleanup": true,
+    "noRevertOthersEdits": true
+  },
+  "deliverables": {
+    "report": "reports/agent-town-hq15q-symbol-first-text-replacement-plan-2026-06-02.md",
+    "proof": "reports/agent-town-hq15q-symbol-first-text-replacement-plan-proof-2026-06-02.json"
+  },
+  "verificationPlanned": {
+    "jsonParse": "jq empty reports/agent-town-hq15q-symbol-first-text-replacement-plan-proof-2026-06-02.json",
+    "focusedDiffCheck": "git diff --check -- reports/agent-town-hq15q-symbol-first-text-replacement-plan-2026-06-02.md reports/agent-town-hq15q-symbol-first-text-replacement-plan-proof-2026-06-02.json"
+  }
+}

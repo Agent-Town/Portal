@@ -740,6 +740,23 @@ test('FP-UT-014 foundSettlement waits for arrival then creates one owned outpost
   });
   assert.equal(advanced.ok, true);
   assert.equal(advanced.state.settlementClaims[0].status, 'CONVOY_ARRIVED');
+  const arrivedMap = engine.getExpeditionMapStatus({
+    pairId: ctx.pairId,
+    plotId: ctx.plotId,
+    nowMs: 1700_000_299_000
+  });
+  assert.equal(arrivedMap.ok, true, arrivedMap.error?.message);
+  const arrivedConvoyUnit = arrivedMap.expeditionMap.units.items.find((unit) => (
+    unit.unitType === 'settler_convoy'
+    && unit.sourceClaimId === prepared.settlementClaim.claimId
+  ));
+  assert.ok(arrivedConvoyUnit, 'expected arrived Settler Convoy map unit');
+  assert.ok(arrivedConvoyUnit.commandHints.some((command) => (
+    command.commandId === 'found_settlement'
+    && command.actionName === 'et.plot.found_settlement'
+    && command.claimId === prepared.settlementClaim.claimId
+    && command.serverMutationImplemented === true
+  )));
   const founded = engine.foundSettlement({
     pairId: ctx.pairId,
     plotId: ctx.plotId,
@@ -1416,6 +1433,47 @@ test('FP-UT-027 HQ12A Expedition Map read model exposes fog cells from server tr
   assert.equal(status.expeditionMap.expeditionParty.boundaryFlags.crossPlotMutation, false);
   assert.equal(status.expeditionMap.expeditionParty.boundaryFlags.atlasExecution, false);
   assert.equal(status.expeditionMap.expeditionParty.boundaryFlags.externalEffects, false);
+  assert.equal(status.expeditionMap.units.authorityBoundary, engine.EXPEDITION_UNIT_ROSTER_AUTHORITY_BOUNDARY);
+  assert.equal(status.expeditionMap.units.version, engine.EXPEDITION_UNIT_ROSTER_VERSION);
+  assert.equal(status.expeditionMap.units.readOnly, true);
+  assert.deepEqual(status.expeditionMap.units.executableActions, []);
+  assert.equal(status.expeditionMap.units.interactionModel.mapTokens, true);
+  assert.equal(status.expeditionMap.units.interactionModel.movementPreviewOnly, false);
+  assert.equal(status.expeditionMap.units.interactionModel.movementCommandReady, true);
+  assert.equal(status.expeditionMap.units.boundaryFlags.movementMutation, true);
+  assert.equal(status.expeditionMap.units.boundaryFlags.movementRevealsFog, false);
+  assert.equal(status.expeditionMap.units.boundaryFlags.autonomousMovement, false);
+  assert.equal(status.expeditionMap.units.boundaryFlags.routeCreation, false);
+  assert.equal(status.expeditionMap.units.boundaryFlags.atlasExecution, false);
+  assert.equal(status.expeditionMap.units.boundaryFlags.externalEffects, false);
+  assert.ok(status.expeditionMap.units.items.length >= 4);
+  assert.ok(status.expeditionMap.units.items.some((unit) => unit.unitType === 'scout' && unit.location.cellId));
+  assert.ok(status.expeditionMap.units.items.some((unit) => unit.unitType === 'courier'));
+  assert.ok(status.expeditionMap.units.items.some((unit) => unit.unitType === 'surveyor'));
+  assert.ok(status.expeditionMap.units.items.some((unit) => unit.unitType === 'field_support'));
+  assert.ok(status.expeditionMap.units.items.some((unit) => unit.unitType === 'outpost_crew'));
+  assert.equal(status.expeditionMap.units.items.every((unit) => unit.readOnly === true), true);
+  assert.equal(status.expeditionMap.units.items.every((unit) => unit.selectable === true), true);
+  assert.equal(status.expeditionMap.units.items.some((unit) => unit.unitType === 'scout' && unit.movement.movementMutationImplemented === true), true);
+  assert.equal(status.expeditionMap.units.items.filter((unit) => unit.unitType !== 'scout').every((unit) => unit.movement.movementMutationImplemented === false), true);
+  assert.equal(status.expeditionMap.units.items.every((unit) => unit.boundaryFlags.resourceHarvesting === false), true);
+  assert.equal(status.expeditionMap.units.items.every((unit) => unit.boundaryFlags.combat === false), true);
+  const scoutUnit = status.expeditionMap.units.items.find((unit) => unit.unitType === 'scout');
+  assert.ok(scoutUnit.commandHints.some((command) => command.commandId === 'move_unit' && command.actionName === 'et.plot.move_expedition_unit'));
+  assert.ok(scoutUnit.movement.allowedTargetCellIds.length >= 1);
+  assert.ok(scoutUnit.commandHints.some((command) => command.commandId === 'scout_sector' && command.actionName === 'et.plot.scout_sector'));
+  assert.ok((status.expeditionMap.units.byCellId[scoutUnit.location.cellId] || []).includes(scoutUnit.unitId));
+  const unclaimedSurveyor = status.expeditionMap.units.items.find((unit) => unit.unitId === 'expedition_unit_surveyor_site_plan_unit_river');
+  assert.ok(unclaimedSurveyor, 'expected unclaimed reviewed Site Plan surveyor');
+  assert.ok(unclaimedSurveyor.commandHints.some((command) => (
+    command.commandId === 'prepare_settler_convoy'
+    && command.actionName === 'et.plot.prepare_settler_convoy'
+    && command.sourcePlanId === 'site_plan_unit_river'
+    && command.serverMutationImplemented === true
+  )));
+  const claimedSurveyor = status.expeditionMap.units.items.find((unit) => unit.unitId === 'expedition_unit_surveyor_site_plan_unit_forest');
+  assert.ok(claimedSurveyor, 'expected claimed reviewed Site Plan surveyor');
+  assert.equal(claimedSurveyor.commandHints.some((command) => command.commandId === 'prepare_settler_convoy'), false);
   assert.ok(status.expeditionMap.fog.counts.discovered >= 2);
   assert.ok(status.expeditionMap.fog.counts.known >= 1);
   assert.ok(status.expeditionMap.fog.counts.hinted >= 1);
@@ -1605,6 +1663,120 @@ test('FP-UT-028 HQ12C Scout Sector reveals one same-plot hinted sector with appr
   assert.equal(agentScout.ok, true, agentScout.error?.message);
   assert.equal(agentScout.scoutSector.approvedBy, 'HUMAN_APPROVAL');
   assert.equal(agentScout.worldDelta.some((entry) => entry.type === 'AGENT_ACTION_EXECUTED'), true);
+});
+
+test('FP-UT-029 HQ15G Move Expedition Unit moves one Scout between revealed adjacent cells only', () => {
+  const ctx = seedFoundedOutpostFixture('pair-hq15g-move-human');
+  const before = engine.getExpeditionMapStatus({
+    pairId: ctx.pairId,
+    plotId: ctx.plotId,
+    nowMs: 1700_000_330_000
+  });
+  assert.equal(before.ok, true, before.error?.message);
+  const scoutUnit = before.expeditionMap.units.items.find((unit) => unit.unitType === 'scout');
+  assert.ok(scoutUnit, 'expected Scout unit');
+  assert.equal(scoutUnit.movement.movementMutationImplemented, true);
+  assert.equal(scoutUnit.boundaryFlags.movementMutation, true);
+  assert.equal(scoutUnit.boundaryFlags.autonomousMovement, false);
+  assert.equal(scoutUnit.boundaryFlags.routeCreation, false);
+  const targetCellId = scoutUnit.movement.allowedTargetCellIds[0];
+  assert.ok(targetCellId, 'expected one adjacent revealed move target');
+  const targetCell = before.expeditionMap.cells.find((cell) => cell.cellId === targetCellId);
+  assert.ok(['discovered', 'known'].includes(targetCell.fogState));
+  const hiddenCell = before.expeditionMap.cells.find((cell) => ['hinted', 'locked_unknown'].includes(cell.fogState));
+  assert.ok(hiddenCell, 'expected hidden cell for negative fixture');
+  const inventoryBefore = engine.getFoundersPlotState({
+    pairId: ctx.pairId,
+    plotId: ctx.plotId,
+    nowMs: 1700_000_330_000
+  }).state.plot.inventory;
+
+  const moved = engine.moveExpeditionUnit({
+    pairId: ctx.pairId,
+    plotId: ctx.plotId,
+    unitId: scoutUnit.unitId,
+    targetCellId,
+    actor: 'HUMAN',
+    idempotencyKey: 'ut-29-move-scout',
+    nowMs: 1700_000_331_000
+  });
+  assert.equal(moved.ok, true, moved.error?.message);
+  assert.equal(moved.movedUnitId, scoutUnit.unitId);
+  assert.equal(moved.sourceCellId, scoutUnit.location.cellId);
+  assert.equal(moved.targetCellId, targetCellId);
+  assert.equal(moved.alreadyMoved, false);
+  assert.equal(moved.move.receipt.actionName, 'et.plot.move_expedition_unit');
+  assert.equal(moved.move.receipt.authorityBoundary, engine.EXPEDITION_UNIT_MOVE_AUTHORITY_BOUNDARY);
+  assert.equal(moved.move.receipt.movementRevealsFog, false);
+  assert.equal(moved.move.receipt.routeCreation, false);
+  assert.equal(moved.move.receipt.atlasExecution, false);
+  assert.equal(moved.move.receipt.externalEffects, false);
+  assert.equal(moved.proof.fogCountsUnchanged, true);
+  assert.equal(moved.proof.boundaryFlags.movementMutation, true);
+  assert.equal(moved.proof.boundaryFlags.movementRevealsFog, false);
+  assert.equal(moved.proof.boundaryFlags.resourceHarvesting, false);
+  assert.equal(moved.proof.boundaryFlags.routeCreation, false);
+  assert.equal(moved.proof.boundaryFlags.atlasExecution, false);
+  assert.equal(moved.worldDelta.some((entry) => entry.type === 'EXPEDITION_UNIT_MOVED'), true);
+  assert.deepEqual(moved.state.plot.inventory, inventoryBefore);
+
+  const later = engine.getExpeditionMapStatus({
+    pairId: ctx.pairId,
+    plotId: ctx.plotId,
+    nowMs: 1700_000_332_000
+  });
+  const movedScout = later.expeditionMap.units.items.find((unit) => unit.unitId === scoutUnit.unitId);
+  assert.equal(movedScout.location.cellId, targetCellId);
+  assert.equal(movedScout.location.source, 'expedition_unit_move_receipt');
+  assert.equal(movedScout.lastMove.moveId, moved.move.moveId);
+  assert.ok((later.expeditionMap.units.byCellId[targetCellId] || []).includes(scoutUnit.unitId));
+  assert.equal(later.expeditionMap.sourceSummary.expeditionUnitMoveIds.includes(moved.move.moveId), true);
+  assert.deepEqual(later.expeditionMap.fog.counts, before.expeditionMap.fog.counts);
+
+  const repeated = engine.moveExpeditionUnit({
+    pairId: ctx.pairId,
+    plotId: ctx.plotId,
+    unitId: scoutUnit.unitId,
+    targetCellId,
+    actor: 'HUMAN',
+    idempotencyKey: 'ut-29-move-scout',
+    nowMs: 1700_000_333_000
+  });
+  assert.equal(repeated.move.moveId, moved.move.moveId);
+  assert.equal(repeated.targetCellId, moved.targetCellId);
+
+  const blockedHidden = engine.moveExpeditionUnit({
+    pairId: ctx.pairId,
+    plotId: ctx.plotId,
+    unitId: scoutUnit.unitId,
+    targetCellId: hiddenCell.cellId,
+    actor: 'HUMAN',
+    idempotencyKey: 'ut-29-hidden-blocked',
+    nowMs: 1700_000_334_000
+  });
+  assert.equal(blockedHidden.ok, false);
+  assert.equal(blockedHidden.error.details.allowedFogStates.includes('known'), true);
+
+  const agentCtx = seedFoundedOutpostFixture('pair-hq15g-move-agent');
+  const agentBefore = engine.getExpeditionMapStatus({
+    pairId: agentCtx.pairId,
+    plotId: agentCtx.plotId,
+    nowMs: 1700_000_335_000
+  });
+  const agentScout = agentBefore.expeditionMap.units.items.find((unit) => unit.unitType === 'scout');
+  const agentTargetCellId = agentScout.movement.allowedTargetCellIds[0];
+  const blockedAgent = engine.moveExpeditionUnit({
+    pairId: agentCtx.pairId,
+    plotId: agentCtx.plotId,
+    unitId: agentScout.unitId,
+    targetCellId: agentTargetCellId,
+    actorType: 'AGENT',
+    idempotencyKey: 'ut-29-agent-blocked',
+    nowMs: 1700_000_336_000
+  });
+  assert.equal(blockedAgent.ok, false);
+  assert.equal(blockedAgent.error.code, 'FORBIDDEN_POLICY');
+  assert.equal(blockedAgent.error.details.requiresApproval, true);
 });
 
 test('FP-UT-024 HQ10B civic proposal records are persisted, gated, and proposal-only', () => {

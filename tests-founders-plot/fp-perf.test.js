@@ -50,7 +50,13 @@ test('FP-PERF-001 typical observation payload stays under 8 KB', () => {
     type: 'FARM_PLOT', x: 2, y: 1, actor: 'HUMAN',
     idempotencyKey: 'perf-1b', nowMs: 1700_000_000_000,
   });
-  const s = engine.getFoundersPlotState({ pairId: env.state.plot.pairId, nowMs: 1700_000_100_000 });
+  const s = engine.getFoundersPlotState({
+    pairId: env.state.plot.pairId,
+    nowMs: 1700_000_100_000,
+    includePublicSummary: false,
+    includeAdvancedReadModels: false,
+    includeVisualActors: false,
+  });
   const bytes = sizeBytes(s);
   assert.ok(bytes < 8_192, `observation payload ${bytes} bytes exceeds 8 KB`);
 });

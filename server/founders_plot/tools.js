@@ -108,7 +108,7 @@ const FOUNDERS_PLOT_TOOL_SPECS = [
   },
   {
     name: 'et.plot.get_expedition_map',
-    description: 'Returns the server-owned Expedition Map fog-of-war read model for discovered, known, hinted, and locked/unknown frontier cells, including public terrain/fog asset slots for presentation binding plus the HQ12G read-only Expedition Party manifest. Read-only: no movement, operator assignment, resource gathering, routes, trade, combat, public sharing, Atlas execution, or external effects.',
+    description: 'Returns the server-owned Expedition Map fog-of-war read model for discovered, known, hinted, and locked/unknown frontier cells, including public terrain/fog asset slots for presentation binding, the HQ12G read-only Expedition Party manifest, and the HQ15A read-only selectable unit roster for map tokens and command hints. Read-only: no movement, operator assignment, resource gathering, routes, trade, combat, public sharing, Atlas execution, or external effects.',
     argsSchema: {
       type: 'object',
       properties: {
@@ -142,6 +142,34 @@ const FOUNDERS_PLOT_TOOL_SPECS = [
       eventPacket: { type: ['object', 'null'] },
       alreadyScouted: { type: 'boolean' },
       revealedCellId: { type: ['string', 'null'] },
+      proof: { type: ['object', 'null'] },
+      expeditionMap: { type: ['object', 'null'] },
+      stateHash: { type: ['string', 'null'] }
+    })
+  },
+  {
+    name: 'et.plot.move_expedition_unit',
+    description: 'Moves one selected Scout unit token between adjacent discovered/known Expedition Map cells on the current plot, then returns a server-owned movement receipt and refreshed read model. This does not reveal fog, gather resources, create routes/trade, schedule background work, start combat, publish/share, render Generated Universe assets, mutate another plot, execute Atlas, or call external systems. Agent callers require matching human approval.',
+    argsSchema: {
+      type: 'object',
+      properties: {
+        ...plotIdProperty,
+        unitId: { type: 'string' },
+        targetCellId: { type: 'string' },
+        actor: { type: 'string' },
+        actorType: { type: 'string' },
+        ...idempotencyProperty
+      },
+      required: ['unitId', 'targetCellId', 'idempotencyKey'],
+      additionalProperties: false
+    },
+    resultSchema: worldDeltaResultSchema({
+      move: { type: ['object', 'null'] },
+      movement: { type: ['object', 'null'] },
+      movedUnitId: { type: ['string', 'null'] },
+      sourceCellId: { type: ['string', 'null'] },
+      targetCellId: { type: ['string', 'null'] },
+      alreadyMoved: { type: 'boolean' },
       proof: { type: ['object', 'null'] },
       expeditionMap: { type: ['object', 'null'] },
       stateHash: { type: ['string', 'null'] }

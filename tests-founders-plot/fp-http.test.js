@@ -1605,6 +1605,78 @@ test('FP-HT-011d3 POST /api/founders-plot/expedition-map/scout-sector reveals on
   } finally { await close(); }
 });
 
+test('FP-HT-011d4 POST /api/founders-plot/expedition-map/move-unit moves Scout between revealed cells', async () => {
+  const { server, close } = await fresh('move-expedition-unit');
+  try {
+    const seeded = await seedResearchReadyPlot(server, 'move_unit');
+    const before = await request(server, 'GET', `/api/founders-plot/expedition-map?plotId=${encodeURIComponent(seeded.plotId)}`);
+    assert.equal(before.status, 200);
+    const scout = before.body.expeditionMap.units.items.find((unit) => unit.unitType === 'scout');
+    assert.ok(scout, 'expected Scout unit');
+    const targetCellId = scout.movement.allowedTargetCellIds[0];
+    assert.ok(targetCellId, 'expected adjacent revealed target');
+    const stateBefore = await request(server, 'GET', `/api/founders-plot/state?plotId=${encodeURIComponent(seeded.plotId)}`);
+
+    const moved = await request(server, 'POST', '/api/founders-plot/expedition-map/move-unit', {
+      plotId: seeded.plotId,
+      unitId: scout.unitId,
+      targetCellId,
+      actor: 'HUMAN',
+      idempotencyKey: 'ht-11d4-move'
+    });
+    assert.equal(moved.status, 200, moved.body?.error?.message || 'move unit');
+    assert.equal(moved.body.ok, true);
+    assert.equal(moved.body.movedUnitId, scout.unitId);
+    assert.equal(moved.body.targetCellId, targetCellId);
+    assert.equal(moved.body.move.receipt.actionName, 'et.plot.move_expedition_unit');
+    assert.equal(moved.body.move.receipt.movementRevealsFog, false);
+    assert.equal(moved.body.move.receipt.routeCreation, false);
+    assert.equal(moved.body.move.receipt.atlasExecution, false);
+    assert.equal(moved.body.proof.fogCountsUnchanged, true);
+    assert.equal(moved.body.proof.boundaryFlags.resourceHarvesting, false);
+    assert.equal(moved.body.worldDelta.some((entry) => entry.type === 'EXPEDITION_UNIT_MOVED'), true);
+    assert.deepEqual(moved.body.state.plot.inventory, stateBefore.body.state.plot.inventory);
+
+    const repeat = await request(server, 'POST', '/api/founders-plot/expedition-map/move-unit', {
+      plotId: seeded.plotId,
+      unitId: scout.unitId,
+      targetCellId,
+      actor: 'HUMAN',
+      idempotencyKey: 'ht-11d4-move'
+    });
+    assert.equal(repeat.status, 200);
+    assert.equal(repeat.body.move.moveId, moved.body.move.moveId);
+
+    const later = await request(server, 'GET', `/api/founders-plot/expedition-map?plotId=${encodeURIComponent(seeded.plotId)}`);
+    const movedScout = later.body.expeditionMap.units.items.find((unit) => unit.unitId === scout.unitId);
+    assert.equal(movedScout.location.cellId, targetCellId);
+    assert.equal(movedScout.lastMove.moveId, moved.body.move.moveId);
+    assert.deepEqual(later.body.expeditionMap.fog.counts, before.body.expeditionMap.fog.counts);
+
+    const hidden = later.body.expeditionMap.cells.find((cell) => ['hinted', 'locked_unknown'].includes(cell.fogState));
+    const blockedHidden = await request(server, 'POST', '/api/founders-plot/expedition-map/move-unit', {
+      plotId: seeded.plotId,
+      unitId: scout.unitId,
+      targetCellId: hidden.cellId,
+      actor: 'HUMAN',
+      idempotencyKey: 'ht-11d4-hidden'
+    });
+    assert.equal(blockedHidden.status, 400);
+    assert.equal(blockedHidden.body.error.details.allowedFogStates.includes('known'), true);
+
+    const agentTargetCellId = movedScout.movement.allowedTargetCellIds[0];
+    const blockedAgent = await request(server, 'POST', '/api/founders-plot/expedition-map/move-unit', {
+      plotId: seeded.plotId,
+      unitId: scout.unitId,
+      targetCellId: agentTargetCellId,
+      actorType: 'AGENT',
+      idempotencyKey: 'ht-11d4-agent'
+    });
+    assert.equal(blockedAgent.status, 403);
+    assert.equal(blockedAgent.body.error.details.requiresApproval, true);
+  } finally { await close(); }
+});
+
 test('FP-HT-011e HQ10B civic proposal records are persisted, gated, and Atlas-visible', async () => {
   const { server, close } = await fresh('civic-proposals');
   try {

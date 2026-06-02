@@ -1,0 +1,45 @@
+{
+  "ok": true,
+  "lane": "HQ15L",
+  "title": "Command target playtest screenshots",
+  "generatedAt": "2026-06-02T02:35:00+07:00",
+  "playtest": {
+    "focusedSpec": "FP-E2E-022",
+    "result": "1/1 passed",
+    "desktopScreenshot": "reports/agent-town-hq15l-command-target-playtest-desktop-2026-06-02.png",
+    "mobileScreenshot": "reports/agent-town-hq15l-command-target-playtest-mobile-2026-06-02.png",
+    "contactSheet": "reports/agent-town-hq15l-command-target-playtest-contact-sheet-2026-06-02.png",
+    "mobileCommandChipsVisible": true,
+    "mobileCommandChipsUnclipped": true,
+    "arrivedSettlerFoundOutpostCommandCovered": true
+  },
+  "findings": {
+    "runtimeFixNeeded": false,
+    "cssFixNeeded": false,
+    "legacyReportSideEffectsRestored": true
+  },
+  "guardrails": {
+    "runtimeSourceBehaviorChanged": false,
+    "newServerMutationPath": false,
+    "commandTargetRingsVisualOnly": true,
+    "commandTargetRingsReadOnly": true,
+    "scoutSectorRemainsOnlyFogRevealMutation": true,
+    "routeCreation": false,
+    "tradeEconomy": false,
+    "resourceRewardLoop": false,
+    "combat": false,
+    "scheduler": false,
+    "atlasExecution": false,
+    "publicSharing": false,
+    "generatedUniverseRuntimeExpansion": false,
+    "crossPlotMutation": false,
+    "hiddenAutonomy": false,
+    "hiddenTruthLeakage": false,
+    "externalEffects": false
+  },
+  "validation": [
+    "npx playwright test e2e/200_founders_plot.spec.js -g \"FP-E2E-022\" (1/1)",
+    "file reports/agent-town-hq15l-command-target-playtest-desktop-2026-06-02.png reports/agent-town-hq15l-command-target-playtest-mobile-2026-06-02.png",
+    "magick ... +append reports/agent-town-hq15l-command-target-playtest-contact-sheet-2026-06-02.png"
+  ]
+}

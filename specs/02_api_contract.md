@@ -2131,10 +2131,252 @@ Response includes:
           "atlasExecution": false,
           "externalEffects": false
         }
+      },
+      "units": {
+        "unitRosterId": "expedition_unit_roster_current_plot_v1",
+        "kind": "expedition_unit_roster",
+        "version": "hq15a_server_owned_expedition_unit_roster_v1",
+        "readOnly": true,
+        "executableActions": [],
+        "authorityBoundary": "server_owned_read_only_expedition_unit_roster_v1",
+        "interactionModel": {
+          "selectable": true,
+          "mapTokens": true,
+          "commandBarReady": true,
+          "movementPreviewOnly": false,
+          "movementCommandReady": true,
+          "serverAuthoritativeMovementRequiredForMutation": true
+        },
+        "items": [
+          {
+            "unitId": "expedition_unit_pathfinder_scout_v1",
+            "kind": "expedition_map_unit",
+            "unitType": "scout",
+            "displayName": "Mira Trailmark",
+            "role": "scout",
+            "readOnly": true,
+            "selectable": true,
+            "executableActions": [],
+            "location": {
+              "cellId": "cell_origin",
+              "q": 0,
+              "r": 0,
+              "fogState": "discovered"
+            },
+            "movement": {
+              "canMove": true,
+              "movementMutationImplemented": true,
+              "allowedTargetCellIds": ["cell_q1_r0"],
+              "authority": "server_owned_scout_unit_revealed_cell_move_receipt_v1",
+              "allowedFogStates": ["discovered", "known"],
+              "revealsFog": false,
+              "routeCreation": false
+            },
+            "commandHints": [
+              {
+                "commandId": "move_unit",
+                "actionName": "et.plot.move_expedition_unit",
+                "serverMutationImplemented": true,
+                "requiresHumanApprovalForAgent": true,
+                "targetCellIds": ["cell_q1_r0"]
+              },
+              {
+                "commandId": "scout_sector",
+                "actionName": "et.plot.scout_sector",
+                "serverMutationImplemented": true,
+                "requiresHumanApprovalForAgent": true
+              }
+            ]
+          },
+          {
+            "unitId": "expedition_unit_surveyor_site_plan_...",
+            "kind": "expedition_map_unit",
+            "unitType": "surveyor",
+            "displayName": "Surveyor Crew",
+            "role": "surveyor",
+            "readOnly": true,
+            "selectable": true,
+            "executableActions": [],
+            "location": {
+              "cellId": "cell_q1_r0",
+              "q": 1,
+              "r": 0,
+              "fogState": "known"
+            },
+            "movement": {
+              "canMove": false,
+              "movementMutationImplemented": false,
+              "allowedTargetCellIds": [],
+              "authority": "future_server_authoritative_slice_required"
+            },
+            "commandHints": [
+              {
+                "commandId": "inspect_survey",
+                "label": "Inspect survey",
+                "serverMutationImplemented": false
+              },
+              {
+                "commandId": "prepare_settler_convoy",
+                "label": "Prepare Convoy",
+                "actionName": "et.plot.prepare_settler_convoy",
+                "sourcePlanId": "site_plan_...",
+                "targetCellIds": ["cell_q1_r0"],
+                "serverMutationImplemented": true,
+                "requiresHumanApprovalForAgent": true,
+                "routeCreation": false
+              }
+            ]
+          },
+          {
+            "unitId": "expedition_unit_settler_convoy_claim_...",
+            "kind": "expedition_map_unit",
+            "unitType": "settler_convoy",
+            "displayName": "Settler Convoy",
+            "role": "settler",
+            "state": "CONVOY_ARRIVED",
+            "readOnly": true,
+            "selectable": true,
+            "executableActions": [],
+            "location": {
+              "cellId": "cell_q1_r0",
+              "q": 1,
+              "r": 0,
+              "fogState": "known"
+            },
+            "movement": {
+              "canMove": false,
+              "movementMutationImplemented": false,
+              "allowedTargetCellIds": [],
+              "authority": "future_server_authoritative_slice_required"
+            },
+            "commandHints": [
+              {
+                "commandId": "found_settlement",
+                "label": "Found Outpost",
+                "actionName": "et.plot.found_settlement",
+                "claimId": "claim_...",
+                "targetCellIds": ["cell_q1_r0"],
+                "serverMutationImplemented": true,
+                "requiresHumanApprovalForAgent": true,
+                "movementMutation": false,
+                "routeCreation": false
+              }
+            ]
+          }
+        ],
+        "boundaryFlags": {
+          "serverOwnedPositions": true,
+          "readOnlySelection": true,
+          "movementMutation": true,
+          "movementRevealsFog": false,
+          "autonomousMovement": false,
+          "operatorAssignment": false,
+          "resourceHarvesting": false,
+          "resourceDelta": {},
+          "routeCreation": false,
+          "tradeRouteCreation": false,
+          "backgroundScheduling": false,
+          "combat": false,
+          "publicSharing": false,
+          "generatedUniverseRendering": false,
+          "crossPlotMutation": false,
+          "atlasExecution": false,
+          "externalEffects": false
+        }
       }
-	  }
-	}
+		  }
+		}
 	```
+
+### POST `/api/founders-plot/expedition-map/move-unit`
+Moves one server-owned Scout unit token between adjacent revealed Expedition Map
+cells. This is a bounded unit-position mutation only; it does not reveal fog,
+create routes, harvest resources, schedule work, or move non-Scout party members.
+
+Request shape:
+```json
+{
+  "plotId": "<plot id>",
+  "unitId": "expedition_unit_pathfinder_scout_v1",
+  "targetCellId": "<adjacent discovered|known cell id>",
+  "actor": "HUMAN|AGENT",
+  "actorType": "HUMAN|AGENT",
+  "idempotencyKey": "<stable caller key>"
+}
+```
+
+Success response includes:
+```json
+{
+  "ok": true,
+  "alreadyMoved": false,
+  "move": {
+    "moveId": "expedition_unit_move_...",
+    "unitId": "expedition_unit_pathfinder_scout_v1",
+    "unitType": "scout",
+    "fromCellId": "cell_origin",
+    "toCellId": "cell_q1_r0",
+    "authorityBoundary": "server_owned_scout_unit_revealed_cell_move_receipt_v1",
+    "receipt": {
+      "kind": "expedition_unit_move_receipt",
+      "actionName": "et.plot.move_expedition_unit",
+      "routeCreation": false,
+      "resourceHarvesting": false,
+      "atlasExecution": false,
+      "crossPlotMutation": false
+    }
+  },
+  "proof": {
+    "unitId": "expedition_unit_pathfinder_scout_v1",
+    "unitType": "scout",
+    "fromCellId": "cell_origin",
+    "toCellId": "cell_q1_r0",
+    "targetFogState": "known",
+    "beforeFogCounts": { "discovered": 1, "known": 1, "hinted": 1, "locked_unknown": 8 },
+    "afterFogCounts": { "discovered": 1, "known": 1, "hinted": 1, "locked_unknown": 8 },
+    "fogCountsUnchanged": true,
+    "boundaryFlags": {
+      "serverOwnedPositions": true,
+      "samePlotOnly": true,
+      "scoutOnly": true,
+      "targetMustBeRevealed": true,
+      "adjacentMoveOnly": true,
+      "movementRevealsFog": false,
+      "autonomousMovement": false,
+      "resourceHarvesting": false,
+      "routeCreation": false,
+      "tradeRouteCreation": false,
+      "backgroundScheduling": false,
+      "combat": false,
+      "publicSharing": false,
+      "generatedUniverseRendering": false,
+      "crossPlotMutation": false,
+      "atlasExecution": false,
+      "externalEffects": false
+    }
+  },
+  "expeditionMap": { "units": { "items": [] } },
+  "worldDelta": [
+    { "type": "EXPEDITION_UNIT_MOVED", "unitId": "expedition_unit_pathfinder_scout_v1" }
+  ]
+}
+```
+
+Boundaries:
+- mutates only the current owned plot after session/plot access checks
+- requires idempotency; key reuse with different arguments returns `IDEMPOTENCY_CONFLICT`
+- only the Scout unit can move in this slice
+- target cells must be adjacent to the unit's current cell and already `discovered` or `known`
+- `hinted` and `locked_unknown` cells are blocked; movement never reveals fog or hidden truth
+- agent callers require matching human approval for `move_expedition_unit` with `{ "unitId": "<unit>", "targetCellId": "<target>" }`
+- writes only server-owned Scout position/receipt state and refreshes the Expedition Map read model
+- does not gather resources, create routes, create trade, schedule background work, start combat, publish/share, render Generated Universe assets, mutate another plot, execute Atlas, or call external systems
+
+Errors include:
+- `INVALID_STATE`
+- `UNAUTHORIZED`
+- `FORBIDDEN_POLICY`
+- `IDEMPOTENCY_CONFLICT`
 
 ### POST `/api/founders-plot/expedition-map/scout-sector`
 Reveals exactly one eligible same-plot `hinted` frontier sector as known
@@ -2230,8 +2472,8 @@ Boundaries:
 - agent callers require matching human approval for `scout_sector` with `{ "cellId": "<target>" }`
 - writes only server-owned discovery/receipt state and deterministic read-only event packet metadata for the read model
 - event packets are receipt-linked flavor/read-model metadata only and expose no executable actions
-- Expedition Party members are read-model/presentation metadata only; they cannot be selected, assigned, dispatched, scheduled, moved, or used for stats
-- does not move actors, gather resources, create routes, create trade, schedule background work, start combat, publish/share, render Generated Universe assets, mutate another plot, execute Atlas, or call external systems
+- Expedition Party members are read-model/presentation metadata only; they cannot be assigned, dispatched, scheduled, or used for stats
+- Scout Sector itself does not move actors, gather resources, create routes, create trade, schedule background work, start combat, publish/share, render Generated Universe assets, mutate another plot, execute Atlas, or call external systems
 
 Errors include:
 - `INVALID_STATE`

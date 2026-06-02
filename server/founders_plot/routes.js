@@ -66,7 +66,9 @@ function createFoundersPlotRouter({
       plotId: typeof req.query?.plotId === 'string' ? req.query.plotId.trim() : null,
       nowMs: nowMsFn(),
       includeReplay: String(req.query?.includeReplay || '').trim() === '1',
-      includePublicSummary: String(req.query?.includePublicSummary || '1').trim() !== '0'
+      includePublicSummary: String(req.query?.includePublicSummary || '1').trim() !== '0',
+      includeAdvancedReadModels: String(req.query?.includeAdvancedReadModels || '1').trim() !== '0',
+      includeVisualActors: String(req.query?.includeVisualActors || '1').trim() !== '0'
     });
     return sendEnvelope(res, envelope);
   });
@@ -111,6 +113,22 @@ function createFoundersPlotRouter({
       houseId: identity.houseId || null,
       plotId: typeof req.body?.plotId === 'string' ? req.body.plotId.trim() : null,
       cellId: req.body?.cellId,
+      actor: req.body?.actor,
+      actorType: req.body?.actorType,
+      idempotencyKey: req.body?.idempotencyKey,
+      nowMs: nowMsFn()
+    });
+    return sendEnvelope(res, envelope);
+  });
+
+  router.post('/api/founders-plot/expedition-map/move-unit', (req, res) => {
+    const identity = identityFor(req, res);
+    const envelope = engine.moveExpeditionUnit({
+      pairId: identity.pairId,
+      houseId: identity.houseId || null,
+      plotId: typeof req.body?.plotId === 'string' ? req.body.plotId.trim() : null,
+      unitId: req.body?.unitId,
+      targetCellId: req.body?.targetCellId,
       actor: req.body?.actor,
       actorType: req.body?.actorType,
       idempotencyKey: req.body?.idempotencyKey,

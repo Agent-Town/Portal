@@ -1,0 +1,234 @@
+{
+  "ok": true,
+  "generatedAt": "2026-06-02T02:24:12.534Z",
+  "source": "FP-E2E-022 mocked server-owned Expedition Map, Event Packet, Expedition Party, and Expedition Unit read models; HQ15S verifies symbol-first fog, selected summary, objective, and inspector surfaces",
+  "changeScope": [
+    "public/experiences/founders-plot/founders-plot.js",
+    "public/experiences/founders-plot/founders-plot.css",
+    "e2e/200_founders_plot.spec.js"
+  ],
+  "initialMapFirstHud": {
+    "visible": true,
+    "selectedCellId": "cell_q0_r1",
+    "fogState": "hinted",
+    "scoutable": "true",
+    "selectedSummaryText": "...Unresolved Frontier HintQ0 R1 · HINTHINT⌖1 ⚿3 ◉⚿1 receiptMTRSVD",
+    "selectedSummaryLabel": "Selected cell_q0_r1 - hinted fog - Scout Sector eligible - 1 receipt - 3 party members",
+    "receiptTraceText": "⚿1 receipt",
+    "receiptTraceLabel": "Provenance sealed: 1 server receipt",
+    "partyBadgesText": "MTRSVD",
+    "partyBadgesLabel": "3 party members in the read-only expedition party manifest.",
+    "fogPipCount": 4,
+    "fogPipTexts": [
+      "DISC2DISC",
+      "KNOWN1KNOWN",
+      "HINT1HINT",
+      "LOCK1LOCK"
+    ],
+    "fogPipLabels": [
+      "Discovered: 2. Owned plot or founded outpost truth is visible.",
+      "Known: 1. Reviewed or scouted sector truth is recorded.",
+      "Hinted: 1. A server-hinted frontier edge exists.",
+      "Locked: 1. A sealed placeholder beyond the current frontier."
+    ]
+  },
+  "postScoutMapFirstHud": {
+    "visible": true,
+    "selectedCellId": "cell_q0_r1",
+    "fogState": "known",
+    "scoutable": "false",
+    "selectedSummaryText": "SITEScouted Frontier SectorQ0 R1 · KNOWNKNOWN○3 ⚿3 ◉⚿3 receiptsMTRSVD",
+    "selectedSummaryLabel": "Selected cell_q0_r1 - known fog - read-only selection - 3 receipts - 3 party members",
+    "receiptTraceText": "⚿3 receipts",
+    "receiptTraceLabel": "Receipt trace: derived frontier hint cell; scout sector known cell - scout scout_sector_ui_001; packet expedition_event_packet_hq12f_cell_q0_r1",
+    "partyBadgesText": "MTRSVD",
+    "partyBadgesLabel": "3 party members in the read-only expedition party manifest.",
+    "fogPipCount": 4
+  },
+  "objectiveStrip": {
+    "visible": true,
+    "mode": "packet",
+    "readOnly": "true",
+    "actions": 0,
+    "targetCellId": "cell_q0_r1",
+    "packetId": "expedition_event_packet_hq12f_cell_q0_r1",
+    "partyId": "expedition_party_current_plot_v1",
+    "label": "Review the latest packet: expedition_event_packet_hq12f_cell_q0_r1 marks cell_q0_r1 as receipt evidence with zero executable actions.",
+    "text": "FOCUSPKTPKT1ACT0REV4PTY3Receiptsexpedition_event_packet_hq12f_cell_q0_r1 marks cell_q0_r1 as receipt evidence with zero executable actions.Read-only marker. No new server objectives, hidden truth, or actions.Ledger detail: focus markers are derived only from existing map cells, event packets, and party state. They cannot create resources, routes, assignments, timers, rewards, Atlas execution, sharing, or external effects.",
+    "visibleText": "FOCUSPKT PKT1ACT0REV4PTY3",
+    "factsText": "PKT1ACT0REV4PTY3",
+    "boundaryText": "Read-only marker. No new server objectives, hidden truth, or actions.",
+    "buttons": 0,
+    "ledger": {
+      "present": true,
+      "collapsed": true,
+      "readOnly": "true",
+      "actions": 0,
+      "text": "Receiptsexpedition_event_packet_hq12f_cell_q0_r1 marks cell_q0_r1 as receipt evidence with zero executable actions.Read-only marker. No new server objectives, hidden truth, or actions.Ledger detail: focus markers are derived only from existing map cells, event packets, and party state. They cannot create resources, routes, assignments, timers, rewards, Atlas execution, sharing, or external effects."
+    }
+  },
+  "inspectorDrawer": {
+    "visible": true,
+    "drawerKind": "visual-inspector",
+    "readOnly": "true",
+    "actions": 0,
+    "chromeText": "VISScouted Frontier SectorQ0 R1 · KNOWNSRVR4H10 ACT",
+    "chromeLabel": "Visual inspector: cell_q0_r1 - known; 4 revealed sectors; 1 hidden silhouette.",
+    "chipsText": "SRVR4H10 ACT",
+    "containsStatus": true,
+    "containsObjective": true,
+    "containsSelectedSector": true,
+    "containsEventPacket": true,
+    "containsSectorLedger": true,
+    "selectedDetailsCollapsed": true,
+    "fogLedgerCollapsed": true,
+    "scoutAliasesCollapsed": true,
+    "scoutAliasButtonCount": 0,
+    "ledgerCollapsed": true,
+    "ledgerActions": 0,
+    "boardBeforeDrawer": true,
+    "rect": {
+      "top": 224,
+      "left": 34,
+      "width": 332,
+      "height": 54
+    }
+  },
+  "mobileFit": {
+    "viewport": 390,
+    "documentScrollWidth": 390,
+    "bodyScrollWidth": 390,
+    "clipped": [],
+    "surfaces": {
+      "panel": {
+        "top": 90,
+        "left": 12,
+        "right": 378,
+        "width": 366,
+        "height": 756
+      },
+      "inspectorDrawer": {
+        "top": 224,
+        "left": 34,
+        "right": 366,
+        "width": 332,
+        "height": 54
+      },
+      "inspectorChrome": {
+        "top": 232,
+        "left": 42,
+        "right": 358,
+        "width": 316,
+        "height": 93
+      },
+      "objectiveStrip": {
+        "top": 427,
+        "left": 42,
+        "right": 358,
+        "width": 316,
+        "height": 85
+      },
+      "threeHost": {
+        "top": 92,
+        "left": 14,
+        "right": 376,
+        "width": 362,
+        "height": 752
+      },
+      "mapVisualHud": {
+        "top": 601,
+        "left": 24,
+        "right": 366,
+        "width": 342,
+        "height": 232
+      },
+      "mapSelectedSummary": {
+        "top": 696,
+        "left": 24,
+        "right": 366,
+        "width": 342,
+        "height": 138
+      },
+      "selectedSector": {
+        "top": 0,
+        "left": 0,
+        "right": 0,
+        "width": 0,
+        "height": 0
+      },
+      "eventPacket": {
+        "top": 0,
+        "left": 0,
+        "right": 0,
+        "width": 0,
+        "height": 0
+      },
+      "eventPacketChips": {
+        "top": 0,
+        "left": 0,
+        "right": 0,
+        "width": 0,
+        "height": 0
+      },
+      "partyPacket": {
+        "top": 0,
+        "left": 0,
+        "right": 0,
+        "width": 0,
+        "height": 0
+      },
+      "partyRoster": {
+        "top": 0,
+        "left": 0,
+        "right": 0,
+        "width": 0,
+        "height": 0
+      }
+    },
+    "gridColumns": {
+      "metrics": 2,
+      "objectiveFacts": 3,
+      "packetFacts": 3,
+      "partyFacts": 3
+    },
+    "buttons": {
+      "packetButtons": 0,
+      "partyButtons": 0,
+      "scoutButtons": 0
+    }
+  },
+  "screenshots": [
+    "reports/agent-town-hq15s-fog-selected-inspector-symbol-compaction-desktop-2026-06-02.png",
+    "reports/agent-town-hq15s-fog-selected-inspector-symbol-compaction-mobile-2026-06-02.png"
+  ],
+  "guardrails": {
+    "frontendOnly": true,
+    "serverAuthorityUnchanged": true,
+    "fogPipsSymbolFirst": true,
+    "fogMeaningsAccessible": true,
+    "selectedSummaryNoRawCellOrProse": true,
+    "selectedSummaryAccessibilityKeepsFacts": true,
+    "receiptTraceCompactVisible": true,
+    "partyBadgesCompactVisible": true,
+    "semanticObjectiveCompact": true,
+    "objectiveLedgerCollapsed": true,
+    "inspectorChromeCompact": true,
+    "inspectorLedgersCollapsed": true,
+    "scoutSectorOnlyMutationPathBeforeReveal": true,
+    "scoutSectorOnlyMutationPathAfterReveal": true,
+    "eventPacketButtons": 0,
+    "partyActions": 0,
+    "objectiveActions": 0,
+    "objectiveButtons": 0,
+    "executableActions": [],
+    "routeCreation": false,
+    "tradeRouteCreation": false,
+    "resourceHarvesting": false,
+    "atlasExecution": false,
+    "publicSharing": false,
+    "generatedUniverseRendering": false,
+    "crossPlotMutation": false,
+    "externalEffects": false,
+    "mobileHorizontalOverflow": 0
+  }
+}

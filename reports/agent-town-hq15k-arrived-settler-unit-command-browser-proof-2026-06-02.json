@@ -1,0 +1,42 @@
+{
+  "ok": true,
+  "lane": "HQ15K",
+  "title": "Arrived Settler Convoy unit command browser proof",
+  "generatedAt": "2026-06-02T02:28:00+07:00",
+  "browserProof": {
+    "test": "FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only",
+    "settlerConvoyUnitToken": "fp-expedition-unit-token-expedition_unit_settler_convoy_claim_hq12b_arrived",
+    "foundOutpostCommandButton": "fp-btn-found-settlement-unit-command-claim_hq12b_arrived",
+    "existingEndpoint": "/api/founders-plot/found-settlement",
+    "capturedPayload": {
+      "plotId": "plot_hq12b_expedition_map_ui",
+      "claimId": "claim_hq12b_arrived",
+      "actor": "HUMAN",
+      "unitId": null,
+      "routeCreation": null
+    }
+  },
+  "guardrails": {
+    "runtimeSourceBehaviorChanged": false,
+    "newServerMutationPath": false,
+    "usesExistingFoundSettlementEndpoint": true,
+    "unitIdPayloadSmuggling": false,
+    "routeCreation": false,
+    "tradeEconomy": false,
+    "resourceRewardLoop": false,
+    "combat": false,
+    "scheduler": false,
+    "atlasExecution": false,
+    "publicSharing": false,
+    "generatedUniverseRuntimeExpansion": false,
+    "crossPlotMutation": false,
+    "hiddenAutonomy": false,
+    "hiddenTruthLeakage": false,
+    "externalEffects": false
+  },
+  "validation": [
+    "node --check e2e/200_founders_plot.spec.js",
+    "git diff --check -- e2e/200_founders_plot.spec.js",
+    "npx playwright test e2e/200_founders_plot.spec.js -g \"FP-E2E-022\" (1/1)"
+  ]
+}

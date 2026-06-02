@@ -72,6 +72,7 @@ function ensureDb() {
 	      site_plans_json TEXT NOT NULL DEFAULT '[]',
 	      doctrine_state_json TEXT NOT NULL DEFAULT '{}',
 	      expedition_scouts_json TEXT NOT NULL DEFAULT '[]',
+	      expedition_unit_moves_json TEXT NOT NULL DEFAULT '[]',
 	      last_daily_bonus_day TEXT,
       daily_sold_coin INTEGER NOT NULL DEFAULT 0,
       daily_sell_day TEXT,
@@ -341,6 +342,10 @@ function ensureDb() {
 	    if (!hasExpeditionScouts) {
 	      db.exec("ALTER TABLE founder_plots ADD COLUMN expedition_scouts_json TEXT NOT NULL DEFAULT '[]';");
 	    }
+	    const hasExpeditionUnitMoves = cols.some((c) => c.name === 'expedition_unit_moves_json');
+	    if (!hasExpeditionUnitMoves) {
+	      db.exec("ALTER TABLE founder_plots ADD COLUMN expedition_unit_moves_json TEXT NOT NULL DEFAULT '[]';");
+	    }
 	  } catch {
 	    /* ignore migration check errors; fresh DBs created above already have the columns */
 	  }
@@ -356,12 +361,12 @@ function buildStatements(database) {
       INSERT INTO founder_plots (
         plot_id, pair_id, house_id, status, hq_level, town_xp, inventory_json, storage_caps_json,
         construction_slots, next_build_buff_pct, claimed_rewards_json, seen_building_types_json,
-        collected_building_types_json, agent_tiers_xp_awarded_json, scout_reports_json, site_plans_json, doctrine_state_json, expedition_scouts_json, last_daily_bonus_day, daily_sold_coin, daily_sell_day,
+        collected_building_types_json, agent_tiers_xp_awarded_json, scout_reports_json, site_plans_json, doctrine_state_json, expedition_scouts_json, expedition_unit_moves_json, last_daily_bonus_day, daily_sold_coin, daily_sell_day,
 	        last_viewed_at, pending_recap_from, pending_recap_to, created_at, updated_at, last_simulated_at
 	      ) VALUES (
 	        @plot_id, @pair_id, @house_id, @status, @hq_level, @town_xp, @inventory_json, @storage_caps_json,
 	        @construction_slots, @next_build_buff_pct, @claimed_rewards_json, @seen_building_types_json,
-        @collected_building_types_json, @agent_tiers_xp_awarded_json, @scout_reports_json, @site_plans_json, @doctrine_state_json, @expedition_scouts_json, @last_daily_bonus_day, @daily_sold_coin, @daily_sell_day,
+        @collected_building_types_json, @agent_tiers_xp_awarded_json, @scout_reports_json, @site_plans_json, @doctrine_state_json, @expedition_scouts_json, @expedition_unit_moves_json, @last_daily_bonus_day, @daily_sold_coin, @daily_sell_day,
 	        @last_viewed_at, @pending_recap_from, @pending_recap_to, @created_at, @updated_at, @last_simulated_at
 	      )
       ON CONFLICT(plot_id) DO UPDATE SET
@@ -382,6 +387,7 @@ function buildStatements(database) {
 	        site_plans_json = excluded.site_plans_json,
 	        doctrine_state_json = excluded.doctrine_state_json,
 	        expedition_scouts_json = excluded.expedition_scouts_json,
+	        expedition_unit_moves_json = excluded.expedition_unit_moves_json,
 	        last_daily_bonus_day = excluded.last_daily_bonus_day,
         daily_sold_coin = excluded.daily_sold_coin,
         daily_sell_day = excluded.daily_sell_day,
@@ -825,6 +831,7 @@ function hydratePlot(row) {
 	    sitePlans: parseJson(row.site_plans_json, []),
 	    doctrineState: parseJson(row.doctrine_state_json, {}),
 	    expeditionScouts: parseJson(row.expedition_scouts_json, []),
+	    expeditionUnitMoves: parseJson(row.expedition_unit_moves_json, []),
 	    lastDailyBonusDay: row.last_daily_bonus_day || null,
     dailySoldCoin: Number(row.daily_sold_coin || 0),
     dailySellDay: row.daily_sell_day || null,
@@ -857,6 +864,7 @@ function dehydratePlot(plot) {
 	    site_plans_json: toJson(plot.sitePlans || [], []),
 	    doctrine_state_json: toJson(plot.doctrineState || {}, {}),
 	    expedition_scouts_json: toJson(plot.expeditionScouts || [], []),
+	    expedition_unit_moves_json: toJson(plot.expeditionUnitMoves || [], []),
 	    last_daily_bonus_day: plot.lastDailyBonusDay || null,
     daily_sold_coin: Number(plot.dailySoldCoin || 0),
     daily_sell_day: plot.dailySellDay || null,

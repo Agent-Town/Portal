@@ -1,0 +1,54 @@
+{
+  "assetPackId": "hq15e_expedition_unit_marker_sprites_v1",
+  "version": "hq15e_expedition_unit_marker_sprites_v1",
+  "source": {
+    "kind": "gpt_image_2_review_sheet_crop",
+    "reviewSheet": "reports/media/agent-town-hq15e-expedition-unit-marker-asset-sheet-review-2026-06-02/agent-town-hq15e-expedition-unit-marker-asset-sheet-review-2026-06-02.png",
+    "runtimeAuthority": "presentation_only_no_gameplay_truth"
+  },
+  "guardrails": {
+    "serverOwnedReadModelRequired": true,
+    "visualOnly": true,
+    "readOnly": true,
+    "movementAuthority": false,
+    "routeAuthority": false,
+    "resourceTruth": false,
+    "combat": false,
+    "atlasExecution": false,
+    "externalEffects": false
+  },
+  "sprites": {
+    "scout": {
+      "path": "/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1/scout-pathfinder-v1.png",
+      "sourceCrop": "410x520+45+75"
+    },
+    "settler_convoy": {
+      "path": "/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1/settler-convoy-v1.png",
+      "sourceCrop": "520x520+505+70"
+    },
+    "surveyor": {
+      "path": "/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1/surveyor-beacon-v1.png",
+      "sourceCrop": "500x520+1065+70"
+    },
+    "courier": {
+      "path": "/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1/courier-signal-runner-v1.png",
+      "sourceCrop": "420x520+1610+70"
+    },
+    "outpost_crew": {
+      "path": "/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1/outpost-crew-v1.png",
+      "sourceCrop": "570x500+25+635"
+    },
+    "objective_beacon": {
+      "path": "/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1/objective-beacon-v1.png",
+      "sourceCrop": "330x430+670+650"
+    },
+    "event_packet": {
+      "path": "/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1/event-packet-v1.png",
+      "sourceCrop": "430x330+1105+760"
+    },
+    "receipt_ledger": {
+      "path": "/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1/receipt-ledger-v1.png",
+      "sourceCrop": "390x450+1620+675"
+    }
+  }
+}
