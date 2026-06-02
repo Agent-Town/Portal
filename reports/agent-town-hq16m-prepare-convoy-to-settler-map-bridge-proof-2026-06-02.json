@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "generatedAt": "2026-06-02T11:33:59.927Z",
+  "generatedAt": "2026-06-02T11:52:35.179Z",
   "title": "HQ16M Prepare Convoy to Settler Convoy map bridge",
   "source": "FP-E2E-022M mocked server-owned Prepare Convoy response and reloaded expeditionMap.units.items",
   "screenshots": [
@@ -11,13 +11,13 @@
     "plotId": "plot_hq16m_prepare_to_settler_bridge",
     "sitePlanId": "site_plan_hq16m_ridge",
     "actor": "HUMAN",
-    "idempotencyKey": "fp-prepare-settler-convoy-site_plan_hq16m_ridge-mpwk7g0i-1"
+    "idempotencyKey": "fp-prepare-settler-convoy-site_plan_hq16m_ridge-mpwkvboc-1"
   },
   "capturedFound": {
     "plotId": "plot_hq16m_prepare_to_settler_bridge",
     "claimId": "claim_hq16m_ridge",
     "actor": "HUMAN",
-    "idempotencyKey": "fp-found-settlement-claim_hq16m_ridge-mpwk7p8o-1"
+    "idempotencyKey": "fp-found-settlement-claim_hq16m_ridge-mpwkvlmj-1"
   },
   "foundBeforeArrivalCount": 0,
   "preArrivalProof": {
@@ -39,6 +39,11 @@
       "unitId": "expedition_unit_settler_convoy_claim_hq16m_ridge",
       "cellId": "cell_q0_r1",
       "text": "▣RollingCNV · Q0 R1 · KNOWN"
+    },
+    "primarySurfaceText": {
+      "objective": "FOCUS\nCNV\nCON\nQ0 R1\nCLA\nPreparing\nCMD\nLocked\nACT\n0\nOBJ\n⚿\nCNV\nQ0 R1\nCMD\n⚿\nMarker\nMRK · Q0 R1\nRES\n▣\nDone\nQ0 R1\nFX\n⚿\nConvoy\nQ0 R1\nNXT\n⚿\nMarker\nQ0 R1 · SRV\nMRK\nScout\nQ0 R1\nSVY\nSite\nREADY\nCMD\nWait\nWAIT\nDETAILS",
+      "commandBar": "▣ CNV\nInspect\n0 ↦\nWAIT",
+      "outcome": "▣\nRolling\nCNV · Q0 R1 · KNOWN"
     }
   },
   "proof": {
@@ -126,7 +131,7 @@
       ],
       "commandOutcomeFeedback": [
         {
-          "feedbackId": "found_settlement-cell_q0_r1-mpwk7p8z",
+          "feedbackId": "found_settlement-cell_q0_r1-mpwkvlmp",
           "unitId": "expedition_unit_settler_convoy_claim_hq16m_ridge",
           "unitType": "settler_convoy",
           "commandId": "found_settlement",
@@ -238,6 +243,12 @@
       "targetCellId": "cell_q0_r1",
       "primaryOutcomeText": "⌂FoundedCNV · Q0 R1 · KNOWN"
     },
+    "primarySurfaceText": {
+      "objective": "FOCUS\nCNV\nCON\nQ0 R1\nCLA\nArrived\nCMD\nFound\nACT\n1\nOBJ\n⌂\nCNV\nQ0 R1\nCMD\n⌂\nFound\nCNV · Q0 R1\nRES\n⌂\nDone\nQ0 R1\nFX\n⚿\nFound\nQ0 R1\nNXT\n⌂\nFound\nQ0 R1 · KNOWN\nMRK\nScout\nQ0 R1\nSVY\nSite\nREADY\nCMD\nWait\nWAIT\nDETAILS",
+      "commandBar": "▣ CNV\nFound\nCLAIM\n0 ↦\nWAIT",
+      "outcome": "⌂\nFounded\nCNV · Q0 R1 · KNOWN",
+      "preview": ""
+    },
     "mobileFit": {
       "viewport": {
         "width": 390,
@@ -255,6 +266,7 @@
     "mapNativePrimaryResult": true,
     "immediateFoundOutpostBlockedUntilArrival": true,
     "foundOutpostAvailableWhenArrived": true,
+    "primarySurfacePaperworkHidden": true,
     "rendererCreatedNoActions": true,
     "commandTargetRingsPreviewOnly": true,
     "unitTokensReadOnly": true,

@@ -1065,7 +1065,7 @@
         ids.claimId || ids.originClaimId ? `claim ${ids.claimId || ids.originClaimId}` : '',
       ].filter(Boolean).join(' - ');
     });
-    if (packet?.packetId) items.push(`packet ${packet.packetId}`);
+    if (packet?.packetId) items.push(`marker ${packet.packetId}`);
     return items.length ? items : ['server read model'];
   }
 
@@ -1088,7 +1088,7 @@
     label.setAttribute('aria-hidden', 'true');
     trace.appendChild(label);
     const chip = document.createElement('span');
-    chip.textContent = receiptCount ? countLabel(receiptCount, 'receipt') : '0 receipts';
+    chip.textContent = receiptCount ? `${receiptCount} ⚿` : '0 ⚿';
     trace.appendChild(chip);
     card.appendChild(trace);
     return trace;
@@ -2074,16 +2074,16 @@
 
     if (latestPacket) {
       return {
-        mode: 'packet',
+        mode: 'marker',
         eyebrow: 'Current focus',
         title: 'Scout Result Ready',
-        body: `${expeditionCompactCellLabel(latestPacket.cellId || latestPacket.receiptLink?.cellId || '') || 'A revealed sector'} has a new map marker. Open Receipts for proof.`,
+        body: `${expeditionCompactCellLabel(latestPacket.cellId || latestPacket.receiptLink?.cellId || '') || 'A revealed sector'} has a new map marker. Select it for the next step.`,
         selectedCellId: selectedCell?.cellId || latestPacket.cellId || '',
         targetCellId: latestPacket.cellId || latestPacket.receiptLink?.cellId || '',
         packetId: latestPacket.packetId,
         partyId: partySource?.partyId || latestPacket.partyId || '',
         facts: [
-          ['Packets', expeditionEventPackets(model).length],
+          ['Markers', expeditionEventPackets(model).length],
           ['Actions', Array.isArray(latestPacket.executableActions) ? latestPacket.executableActions.length : 0],
           ['Revealed', revealedCount],
           ['Party', partyMembers.length || null],
@@ -2096,7 +2096,7 @@
       eyebrow: 'Current focus',
       title: revealedCount ? 'Explore Revealed Sectors' : 'Open the Map',
       body: revealedCount
-        ? `${countLabel(revealedCount, 'revealed sector')} can be selected on the map. Receipts stay behind the ledger.`
+        ? `${countLabel(revealedCount, 'revealed sector')} can be selected on the map.`
         : 'No revealed frontier sector is available yet.',
       selectedCellId: selectedCell?.cellId || '',
       targetCellId: selectedCell?.cellId || '',
@@ -2114,16 +2114,16 @@
   function expeditionObjectiveShortLabel(mode = '') {
     const key = String(mode || '').toLowerCase();
     if (key === 'scout') return 'SCOUT';
-    if (key === 'packet') return 'PKT';
+    if (key === 'packet' || key === 'marker') return 'MRK';
     if (key === 'convoy') return 'CNV';
-    if (key === 'inspect') return 'LEDGER';
+    if (key === 'inspect') return 'MAP';
     return 'MAP';
   }
 
   function expeditionObjectiveFactCode(labelText = '') {
     const label = String(labelText || '').toLowerCase();
     if (label.startsWith('scout')) return 'SCT';
-    if (label.startsWith('packet')) return 'PKT';
+    if (label.startsWith('packet') || label.startsWith('marker')) return 'MRK';
     if (label.startsWith('revealed')) return 'REV';
     if (label.startsWith('hidden')) return 'HID';
     if (label.startsWith('hinted')) return 'HNT';
@@ -2153,7 +2153,7 @@
       case 'found_settlement':
         return 'Found';
       case 'review_packet':
-        return 'Packet';
+        return 'Marker';
       case 'survey_site_plan_contract_required':
         return 'Survey';
       default:
@@ -2242,11 +2242,11 @@
       actionName: String(latestPacket.receiptLink?.actionName || 'et.plot.scout_sector'),
       unitId: '',
       unitType: 'receipt',
-      unitCode: 'PKT',
+      unitCode: 'MRK',
       targetCellId: String(latestPacket.cellId || latestPacket.receiptLink?.cellId || objective?.targetCellId || ''),
       targetLabel: expeditionCompactCellLabel(latestPacket.cellId || latestPacket.receiptLink?.cellId || objective?.targetCellId || ''),
       fogLabel: 'SRV',
-      label: 'Packet',
+      label: 'Marker',
       icon: '⚿',
       packetId: String(latestPacket.packetId || ''),
       serverMutationImplemented: false,
@@ -2254,7 +2254,7 @@
     const active = found || convoy || scout || move || packet || null;
     const receiptLabel = outcome
       ? expeditionGuidedCommandLabel(outcome.commandId, outcome.label)
-      : (packet ? 'Packet' : 'Ledger');
+      : (packet ? 'Marker' : 'Map');
     const receiptCellId = outcome?.cellId || packet?.targetCellId || objective?.targetCellId || selectedCell?.cellId || '';
     const receiptKind = outcome?.receiptKind || (packet ? 'event_packet_receipt' : 'map_focus_receipt');
     const fallbackTarget = objective?.targetCellId || selectedCell?.cellId || active?.targetCellId || '';
@@ -2276,7 +2276,7 @@
           phase: 'objective',
           code: 'OBJ',
           label: expeditionObjectiveShortLabel(objective?.mode || ''),
-          icon: expeditionGuidedCommandIcon(objective?.mode === 'packet' ? 'review_packet' : active?.commandId),
+          icon: expeditionGuidedCommandIcon(['packet', 'marker'].includes(String(objective?.mode || '')) ? 'review_packet' : active?.commandId),
           meta: targetLabel || 'MAP',
           commandId: String(objective?.mode || ''),
           targetCellId: String(objective?.targetCellId || active?.targetCellId || ''),
@@ -2303,10 +2303,10 @@
         },
         {
           phase: 'receipt',
-          code: 'RCP',
+          code: 'FX',
           label: receiptLabel,
           icon: '⚿',
-          meta: expeditionCompactCellLabel(receiptCellId) || 'LEDGER',
+          meta: expeditionCompactCellLabel(receiptCellId) || 'MAP',
           commandId: String(outcome?.commandId || packet?.commandId || ''),
           targetCellId: String(receiptCellId || ''),
           receiptKind,
@@ -2316,14 +2316,14 @@
         {
           phase: 'next',
           code: 'NXT',
-          label: active ? active.label : (packet ? 'Packet' : 'Map'),
+          label: active ? active.label : (packet ? 'Marker' : 'Map'),
           icon: active?.icon || packet?.icon || '◎',
           meta: active ? `${targetLabel || 'MAP'} · ${targetFog || 'SRV'}` : 'READ',
           commandId: String(active?.commandId || packet?.commandId || 'inspect_map'),
           targetCellId: String(active?.targetCellId || packet?.targetCellId || selectedCell?.cellId || ''),
         },
       ],
-      ledgerText: 'Ledger detail: guided loop rows are derived from existing Expedition Map cells, unit command hints, event packets, and the latest local server result. They do not create commands, costs, rewards, routes, hidden truth, Atlas execution, or external effects.',
+      ledgerText: 'Ledger detail: guided loop rows are derived from existing Expedition Map cells, unit command hints, map markers, and the latest local server result. They do not create commands, costs, rewards, routes, hidden truth, Atlas execution, or external effects.',
     };
   }
 
@@ -2437,7 +2437,7 @@
     [
       {
         phase: 'packet',
-        code: 'PKT',
+        code: 'MRK',
         label: 'Scout',
         meta: cellLabel,
         testId: `${testId}-step-packet`,
@@ -2594,10 +2594,10 @@
     appendExpeditionSurveyBridge(strip, surveyBridge);
     const ledgerCopy = document.createElement('small');
     ledgerCopy.textContent = [
-      guidedLoop?.ledgerText || 'Ledger detail: focus markers are derived only from existing map cells, event packets, and party state. They cannot create resources, routes, assignments, timers, rewards, Atlas execution, sharing, or external effects.',
+      guidedLoop?.ledgerText || 'Ledger detail: focus markers are derived only from existing map cells, map markers, and party state. They cannot create resources, routes, assignments, timers, rewards, Atlas execution, sharing, or external effects.',
       surveyBridge?.ledgerText || '',
     ].filter(Boolean).join(' ');
-    const ledger = appendExpeditionAuditDetails(strip, 'Receipts', [bodyCopy, boundary, ledgerCopy], 'fp-expedition-objective-ledger-details');
+    const ledger = appendExpeditionAuditDetails(strip, 'Details', [bodyCopy, boundary, ledgerCopy], 'fp-expedition-objective-ledger-details');
     if (ledger) {
       ledger.dataset.readOnly = 'true';
       ledger.dataset.actions = '0';
@@ -2675,7 +2675,7 @@
       if (readOnly) return `${readOnly[1]} receipt`;
       if (/pending/i.test(meta)) return 'pending';
       if (/secondary/i.test(meta)) return 'alias';
-      if (/receipt/i.test(meta)) return 'receipts';
+      if (/receipt/i.test(meta)) return 'details';
       if (/details|visual/i.test(meta)) return 'details';
       return 'ledger';
     })();
@@ -2772,7 +2772,7 @@
     const scoutId = link.scoutId || packet.scoutId || '';
     const cellId = link.cellId || packet.cellId || '';
     return [
-      `receipt ${friendlyToken(action)}`,
+      `source ${friendlyToken(action)}`,
       scoutId ? `scout ${scoutId}` : '',
       cellId ? `cell ${cellId}` : '',
       link.via ? `via ${link.via}` : '',
@@ -2780,7 +2780,13 @@
   }
 
   function expeditionPacketTypeText(packet = {}) {
-    return friendlyToken(packet.templateId || packet.kind || 'event packet evidence');
+    return friendlyToken(packet.templateId || packet.kind || 'event marker details')
+      .replace(/\bpacket\b/gi, 'marker');
+  }
+
+  function expeditionPacketDisplayName(packet = {}, fallback = 'Expedition Marker') {
+    return String(packet?.discoveryFlavor || fallback || 'Expedition Marker')
+      .replace(/\bpacket\b/gi, 'marker');
   }
 
   function expeditionPacketSourceText(packet = {}) {
@@ -2788,7 +2794,7 @@
     return [
       link.actionName || 'et.plot.scout_sector',
       packet.scoutId || link.scoutId || '',
-      packet.boundaryFlags?.receiptMetadataOnly ? 'receipt metadata only' : '',
+      packet.boundaryFlags?.receiptMetadataOnly ? 'marker metadata only' : '',
     ].filter(Boolean).map(friendlyToken).join(' - ');
   }
 
@@ -2930,10 +2936,10 @@
       ? `${operatorName} field party`
       : (fogState === 'hinted' ? 'Scout Sector watch party' : 'Map desk field party');
     const mode = packet
-      ? 'Packet filed'
-      : (fogState === 'hinted' ? 'Awaiting Scout Sector receipt' : 'Reading known map truth');
+      ? 'Marker placed'
+      : (fogState === 'hinted' ? 'Scout target ready' : 'Reading known map truth');
     const note = packet
-      ? `${operatorName} and ${deskMember.displayName} keep this packet as named receipt flavor for ${cell.cellId}; it does not unlock routes, resources, or actions.`
+      ? `${operatorName} and ${deskMember.displayName} keep this marker as named field color for ${cell.cellId}; it does not unlock routes, resources, or actions.`
       : `${deskMember.displayName} and ${operatorName} keep this sector as read-only map context from the server party manifest.`;
     return {
       title,
@@ -3017,8 +3023,8 @@
     facts.className = 'fp-expedition-event-packet-facts';
     facts.dataset.testid = `fp-expedition-event-packet-facts-${safeTestId(packet.packetId)}`;
     [
-      ['Packet', packet.packetId],
-      ['Receipt', expeditionPacketReceiptText(packet)],
+      ['Marker', expeditionPacketDisplayName(packet)],
+      ['Origin', expeditionPacketReceiptText(packet)],
       ['Read-only', packet.readOnly ? 'true' : 'false'],
       ['Actions', Array.isArray(packet.executableActions) ? String(packet.executableActions.length) : '0'],
     ].forEach(([labelText, valueText]) => {
@@ -3039,10 +3045,10 @@
     const chips = appendChipSet(card, [
       `type ${expeditionPacketTypeText(packet)}`,
       `source ${expeditionPacketSourceText(packet)}`,
-      `receipt ${packet.receiptLink?.scoutId || packet.scoutId || 'scout sector'}`,
+      `scout ${packet.receiptLink?.scoutId || packet.scoutId || 'scout sector'}`,
       `cell ${packet.cellId || cell?.cellId || 'selected'}`,
       packet.boundaryFlags?.readModelOnly ? 'read model only' : 'read only',
-      packet.boundaryFlags?.receiptMetadataOnly ? 'receipt metadata only' : '',
+      packet.boundaryFlags?.receiptMetadataOnly ? 'marker metadata only' : '',
       'zero executable actions',
     ]);
     if (chips) {
@@ -3135,7 +3141,7 @@
     sceneIcon.setAttribute('aria-hidden', 'true');
     const sceneCopy = document.createElement('span');
     const sceneTitle = document.createElement('strong');
-    sceneTitle.textContent = visit.packet.discoveryFlavor || 'Scout packet overlook';
+    sceneTitle.textContent = expeditionPacketDisplayName(visit.packet, 'Scout marker overlook');
     const sceneMeta = document.createElement('small');
     sceneMeta.textContent = `${expeditionCompactCellLabel(visit.cellId)} · ${expeditionFogShortLabel(visit.fogState)} · ${friendlyToken(visit.terrainSlot)}`;
     sceneCopy.append(sceneTitle, sceneMeta);
@@ -3147,8 +3153,8 @@
     facts.dataset.testid = `fp-expedition-location-visit-facts-${slug}`;
     [
       ['Cell', expeditionCompactCellLabel(visit.cellId)],
-      ['Packet', 'PKT'],
-      ['Receipt', 'Scout'],
+      ['Marker', 'MRK'],
+      ['Effect', 'Scout'],
       ['Actions', '0'],
     ].forEach(([labelText, valueText]) => {
       const item = document.createElement('span');
@@ -3164,7 +3170,7 @@
     card.appendChild(facts);
 
     const copy = document.createElement('p');
-    copy.textContent = 'Map-local place view from the Scout Sector packet. The selected cell stays anchored to the map; details stay in the ledger.';
+    copy.textContent = 'Map-local place view from the Scout marker. The selected cell stays anchored to the map; details stay tucked away.';
     card.appendChild(copy);
     appendExpeditionPartyBadges(card, visit.party?.members || [], 'visit');
 
@@ -3195,29 +3201,29 @@
     header.className = 'fp-expedition-event-packet__header';
     const titleWrap = document.createElement('div');
     const eyebrow = document.createElement('small');
-    eyebrow.textContent = packet ? 'Map evidence packet' : 'Map evidence packet pending';
+    eyebrow.textContent = packet ? 'Map marker' : 'Map marker pending';
     const title = document.createElement('strong');
-    title.textContent = packet?.discoveryFlavor || 'Expedition Event Packet';
+    title.textContent = expeditionPacketDisplayName(packet, 'Expedition Marker');
     titleWrap.append(eyebrow, title);
     header.appendChild(titleWrap);
     const seal = document.createElement('span');
     seal.className = 'fp-expedition-event-packet__seal';
-    seal.textContent = packet ? 'Read-only' : 'No packet';
+    seal.textContent = packet ? 'Locked' : 'No marker';
     header.appendChild(seal);
     card.appendChild(header);
 
     const stateLine = document.createElement('div');
     stateLine.className = `fp-site-plan__status${packet ? ' fp-site-plan__status--reviewed' : ''}`;
     stateLine.textContent = packet
-      ? `Receipt-linked packet - ${packet.packetId}`
-      : (packets.length ? 'No packet on selected sector' : 'Locked until Scout Sector receipt');
+      ? `Map marker - ${expeditionCompactCellLabel(packet.cellId || packet.receiptLink?.cellId || cell?.cellId || '')}`
+      : (packets.length ? 'No marker on selected sector' : 'Scout a hinted edge to place one');
     card.appendChild(stateLine);
 
     if (packet) {
       appendExpeditionPacketEvidenceChips(card, packet, cell);
       const evidenceCopy = document.createElement('p');
       evidenceCopy.className = 'fp-expedition-event-packet__lede';
-      evidenceCopy.textContent = 'Selected-sector map evidence only. The packet records what the Scout Sector receipt revealed; it cannot be executed, assigned, traded, shared, or routed.';
+      evidenceCopy.textContent = 'Selected-sector marker only. It points to what Scout revealed; commands stay on units and target rings.';
       card.appendChild(evidenceCopy);
       appendExpeditionPartyFlavor(card, cell, model, packet, 'packet');
       [
@@ -3232,13 +3238,13 @@
       appendExpeditionPacketFacts(card, packet);
       const boundary = document.createElement('small');
       boundary.dataset.testid = `fp-expedition-event-packet-boundary-${slug}`;
-      boundary.textContent = 'Read-only receipt metadata. No packet actions, route/trade creation, resource changes, combat, scheduler work, public sharing, Generated Universe rendering, Atlas execution, cross-plot mutation, or external effects.';
+      boundary.textContent = 'Marker details only. No route/trade creation, resource changes, combat, scheduler work, public sharing, Generated Universe rendering, Atlas execution, cross-plot mutation, or external effects.';
       card.appendChild(boundary);
     } else {
       const copy = document.createElement('p');
       copy.textContent = packets.length
-        ? 'This selected sector was already known from existing map truth. Expedition Event Packets only appear on sectors revealed by Scout Sector receipts.'
-        : 'No event packets have been issued yet. Scout Sector is the only way to create one from a server-hinted map-edge sector.';
+        ? 'This selected sector was already known from existing map truth. Scout markers appear on sectors revealed from hinted edges.'
+        : 'No map markers are placed yet. Scout a server-hinted edge to create the next spatial clue.';
       const boundary = document.createElement('small');
       boundary.textContent = 'This panel is read-only and cannot create, apply, render, share, route, trade, schedule, fight, execute Atlas, or mutate any plot.';
       card.append(copy, boundary);
@@ -3258,12 +3264,17 @@
     card.className = 'fp-expedition-map-card fp-expedition-map-card--scout-result';
     card.dataset.testid = 'fp-scout-sector-result';
     const title = document.createElement('strong');
-    title.textContent = receipt.alreadyScouted ? 'Scout Sector receipt reused' : 'Scout Sector receipt';
+    title.textContent = receipt.alreadyScouted ? 'Sector Already Known' : 'Sector Scouted';
     const copy = document.createElement('p');
-    copy.textContent = `${cellId} moved from ${friendlyToken(proof.targetBeforeFogState || 'hinted')} to ${friendlyToken(proof.targetAfterFogState || 'known')} map truth. Hinted ${Number(before.hinted || 0)} -> ${Number(after.hinted || 0)}; known ${Number(before.known || 0)} -> ${Number(after.known || 0)}.`;
+    copy.textContent = `${expeditionCompactCellLabel(cellId)} is now ${friendlyToken(proof.targetAfterFogState || 'known')}. The map gained one playable marker.`;
     const boundary = document.createElement('small');
-    boundary.textContent = 'Receipt-only map update. No movement, harvesting, routes, trades, scheduler, Atlas execution, public sharing, or external effects.';
-    card.append(title, copy, boundary);
+    boundary.textContent = `Audit: ${cellId} changed from ${friendlyToken(proof.targetBeforeFogState || 'hinted')} to ${friendlyToken(proof.targetAfterFogState || 'known')}; hinted ${Number(before.hinted || 0)} -> ${Number(after.hinted || 0)}, known ${Number(before.known || 0)} -> ${Number(after.known || 0)}. No movement, harvesting, routes, trades, scheduler, Atlas execution, public sharing, or external effects.`;
+    card.append(title, copy);
+    const details = appendExpeditionAuditDetails(card, 'Details', [boundary], 'fp-scout-sector-result-details');
+    if (details) {
+      details.dataset.readOnly = 'true';
+      details.dataset.actions = '0';
+    }
     body.appendChild(card);
     return card;
   }
@@ -3277,7 +3288,7 @@
     const title = document.createElement('strong');
     title.textContent = 'Scout Sector aliases';
     const copy = document.createElement('p');
-    copy.textContent = 'Scout-unit commands above are primary; these sector rows mirror the same receipt route.';
+    copy.textContent = 'Scout-unit commands above are primary; these sector rows mirror the same Scout action.';
     card.append(title, copy);
 
     const list = document.createElement('div');
@@ -3524,7 +3535,7 @@
     const copy = document.createElement('p');
     if (hidden) {
       copy.textContent = fogState === 'hinted'
-        ? 'Server-provided frontier hint. Resources and hidden gameplay truth remain unrevealed until a verified Scout Sector receipt changes this cell.'
+        ? 'Server-provided frontier hint. Resources and hidden gameplay truth remain unrevealed until Scout makes this cell known.'
         : 'Locked unknown sector. No resources, routes, or hidden truth are exposed by this renderer.';
     } else {
       const resources = expeditionResourceHintsText(cell.resourceHints);
@@ -3709,7 +3720,7 @@
     appendSelectedExpeditionDetails(selectedDetails, selectedCell, model);
     appendExpeditionInspectorSection(
       inspector,
-      'Selected-sector proof',
+      'Selected details',
       selectedDetails,
       'fp-expedition-inspector-selected-details',
       {
@@ -3721,11 +3732,11 @@
     appendExpeditionEventPacketSurface(evidenceDetails, selectedCell, model);
     appendExpeditionInspectorSection(
       inspector,
-      'Evidence packet',
+      'Marker details',
       evidenceDetails,
       'fp-expedition-inspector-evidence',
       {
-        meta: expeditionPacketForCell(model, selectedCell) ? 'receipt details tucked away' : 'pending Scout Sector receipt',
+        meta: expeditionPacketForCell(model, selectedCell) ? 'details tucked away' : 'pending Scout result',
       },
     );
 
@@ -3808,7 +3819,7 @@
       if (packet) {
         const packetLine = document.createElement('small');
         packetLine.dataset.testid = `fp-expedition-sector-packet-${slug}`;
-        packetLine.textContent = `${packet.discoveryFlavor || 'Event packet'} - ${packet.packetId} via Scout Sector receipt; read-only, no actions.`;
+        packetLine.textContent = `${expeditionPacketDisplayName(packet, 'Map marker')} - ${expeditionCompactCellLabel(packet.cellId || packet.receiptLink?.cellId || cell.cellId)}; no actions.`;
         card.appendChild(packetLine);
       }
       const next = document.createElement('small');
@@ -6536,7 +6547,7 @@
       receiptKind: data.eventPacket?.packetId ? 'scout_sector_event_packet' : 'scout_sector_receipt',
     });
     await loadState();
-    toast(data.alreadyScouted ? 'Scout Sector receipt already exists.' : 'Scout Sector recorded.');
+    toast(data.alreadyScouted ? 'Sector already known.' : 'Sector scouted.');
   }
 
   async function doMoveExpeditionUnit(unitId, targetCellId) {

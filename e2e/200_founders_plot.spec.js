@@ -1762,7 +1762,7 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
     target.title = 'Scouted Frontier Sector';
     target.status = 'SCOUTED_SECTOR_KNOWN';
     target.sourceTruth = 'scout_sector_receipt';
-    target.summary = 'Scout Sector receipt made this map-edge cell known without movement or harvesting.';
+    target.summary = 'Scout made this map-edge cell known without movement or harvesting.';
     target.recommendedNext = 'Use future bounded expedition packets for any follow-up; this panel only reveals map truth.';
     target.receipts = [
       ...(Array.isArray(target.receipts) ? target.receipts : []),
@@ -2407,7 +2407,9 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   await expect(page.getByTestId('fp-expedition-command-preview')).toHaveAttribute('data-cell-id', 'cell_q0_r1');
   await expect(page.getByTestId('fp-expedition-command-preview')).toContainText('Scout');
   await page.getByTestId('fp-btn-expedition-command-preview-confirm').click();
-  await expect(page.getByTestId('fp-scout-sector-result')).toContainText('cell_q0_r1 moved from hinted to known');
+  await expect(page.getByTestId('fp-scout-sector-result')).toContainText('Q0 R1 is now known');
+  await expect(page.getByTestId('fp-scout-sector-result')).not.toContainText('receipt');
+  await expect(page.getByTestId('fp-scout-sector-result-details')).not.toHaveAttribute('open', '');
   await expect(page.getByTestId('fp-expedition-cell-cell_q0_r1')).toHaveAttribute('data-fog-state', 'known');
   await expect(page.getByTestId('fp-expedition-command-outcome-chip')).toHaveAttribute('data-command-id', 'scout_sector');
   await expect(page.getByTestId('fp-expedition-command-outcome-chip')).toHaveAttribute('data-cell-id', 'cell_q0_r1');
@@ -2426,14 +2428,14 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
     executableActions: 0,
   });
   await expect(page.getByTestId('fp-expedition-sector-cell_q0_r1')).toContainText('Scouted Frontier Sector');
-  await expect(page.getByTestId('fp-expedition-sector-packet-cell_q0_r1')).toContainText('Ridge Lantern packet');
-  await expect(page.getByTestId('fp-expedition-event-packet-cell_q0_r1')).toContainText('Ridge Lantern packet');
-  await expect(page.getByTestId('fp-expedition-event-packet-cell_q0_r1')).toContainText('Receipt-linked packet - expedition_event_packet_hq12f_cell_q0_r1');
-  await expect(page.getByTestId('fp-expedition-event-packet-cell_q0_r1')).toContainText('Map evidence packet');
-  await expect(page.getByTestId('fp-expedition-event-packet-cell_q0_r1')).toContainText('Selected-sector map evidence only');
-  await expect(page.getByTestId('fp-expedition-event-packet-chips-expedition_event_packet_hq12f_cell_q0_r1')).toContainText('type ridge lantern packet v1');
+  await expect(page.getByTestId('fp-expedition-sector-packet-cell_q0_r1')).toContainText('Ridge Lantern marker');
+  await expect(page.getByTestId('fp-expedition-event-packet-cell_q0_r1')).toContainText('Ridge Lantern marker');
+  await expect(page.getByTestId('fp-expedition-event-packet-cell_q0_r1')).toContainText('Map marker - Q0 R1');
+  await expect(page.getByTestId('fp-expedition-event-packet-cell_q0_r1')).toContainText('Map marker');
+  await expect(page.getByTestId('fp-expedition-event-packet-cell_q0_r1')).toContainText('Selected-sector marker only');
+  await expect(page.getByTestId('fp-expedition-event-packet-chips-expedition_event_packet_hq12f_cell_q0_r1')).toContainText('type ridge lantern marker v1');
   await expect(page.getByTestId('fp-expedition-event-packet-chips-expedition_event_packet_hq12f_cell_q0_r1')).toContainText('source scout sector');
-  await expect(page.getByTestId('fp-expedition-event-packet-chips-expedition_event_packet_hq12f_cell_q0_r1')).toContainText('receipt scout_sector_ui_001');
+  await expect(page.getByTestId('fp-expedition-event-packet-chips-expedition_event_packet_hq12f_cell_q0_r1')).toContainText('scout scout_sector_ui_001');
   await expect(page.getByTestId('fp-expedition-event-packet-chips-expedition_event_packet_hq12f_cell_q0_r1')).toContainText('zero executable actions');
   await expect(page.getByTestId('fp-expedition-event-packet-cell_q0_r1')).toContainText('Mira Trailmark field party');
   await expect(page.getByTestId('fp-expedition-event-packet-cell_q0_r1')).toContainText('Vale-Desk 7');
@@ -2446,18 +2448,18 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   await expect(page.getByTestId('fp-expedition-party-packet-cell_q0_r1')).toHaveAttribute('data-read-only', 'true');
   await expect(page.getByTestId('fp-expedition-objective-strip')).toHaveAttribute('data-read-only', 'true');
   await expect(page.getByTestId('fp-expedition-objective-strip')).toHaveAttribute('data-actions', '0');
-  await expect(page.getByTestId('fp-expedition-objective-strip')).toHaveAttribute('data-mode', 'packet');
-  await expect(page.getByTestId('fp-expedition-objective-strip')).toHaveAttribute('aria-label', /Review the latest packet/);
-  await expect(page.getByTestId('fp-expedition-objective-strip').locator('.fp-expedition-objective-strip__copy')).toContainText('PKT');
+  await expect(page.getByTestId('fp-expedition-objective-strip')).toHaveAttribute('data-mode', 'marker');
+  await expect(page.getByTestId('fp-expedition-objective-strip')).toHaveAttribute('aria-label', /Scout Result Ready/);
+  await expect(page.getByTestId('fp-expedition-objective-strip').locator('.fp-expedition-objective-strip__copy')).toContainText('MRK');
   await expect(page.getByTestId('fp-expedition-objective-strip-boundary')).toContainText('No new server objectives');
   await expect(page.getByTestId('fp-expedition-guided-loop')).toHaveAttribute('data-read-only', 'true');
   await expect(page.getByTestId('fp-expedition-guided-loop')).toHaveAttribute('data-actions', '0');
-  await expect(page.getByTestId('fp-expedition-guided-loop')).toHaveAttribute('data-objective-mode', 'packet');
+  await expect(page.getByTestId('fp-expedition-guided-loop')).toHaveAttribute('data-objective-mode', 'marker');
   await expect(page.getByTestId('fp-expedition-guided-loop')).toHaveAttribute('data-next-command-id', 'found_settlement');
   await expect(page.getByTestId('fp-expedition-guided-loop-step-objective')).toContainText('OBJ');
   await expect(page.getByTestId('fp-expedition-guided-loop-step-command')).toContainText('CMD');
   await expect(page.getByTestId('fp-expedition-guided-loop-step-resolve')).toContainText('RES');
-  await expect(page.getByTestId('fp-expedition-guided-loop-step-receipt')).toContainText('RCP');
+  await expect(page.getByTestId('fp-expedition-guided-loop-step-receipt')).toContainText('FX');
   await expect(page.getByTestId('fp-expedition-guided-loop-step-next')).toContainText('NXT');
   await expect(page.getByTestId('fp-expedition-guided-loop-primary-command')).toContainText('Found');
   await expect(page.getByTestId('fp-expedition-guided-loop-receipt-chip')).toContainText('Scout');
@@ -2465,7 +2467,7 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   await expect(page.getByTestId('fp-expedition-event-packet-facts-expedition_event_packet_hq12f_cell_q0_r1')).toContainText('true');
   await expect(page.getByTestId('fp-expedition-event-packet-facts-expedition_event_packet_hq12f_cell_q0_r1')).toContainText('Actions');
   await expect(page.getByTestId('fp-expedition-event-packet-facts-expedition_event_packet_hq12f_cell_q0_r1')).toContainText('0');
-  await expect(page.getByTestId('fp-expedition-event-packet-boundary-cell_q0_r1')).toContainText('No packet actions');
+  await expect(page.getByTestId('fp-expedition-event-packet-boundary-cell_q0_r1')).toContainText('Marker details only');
   await expect(page.getByTestId('fp-expedition-event-packet-boundary-cell_q0_r1')).toContainText('Atlas execution');
   await expect(page.getByTestId('fp-expedition-location-visit-cell_q0_r1')).toHaveAttribute('data-read-only', 'true');
   await expect(page.getByTestId('fp-expedition-location-visit-cell_q0_r1')).toHaveAttribute('data-actions', '0');
@@ -2473,7 +2475,7 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   await expect(page.getByTestId('fp-expedition-location-visit-cell_q0_r1')).toHaveAttribute('data-packet-id', 'expedition_event_packet_hq12f_cell_q0_r1');
   await expect(page.getByTestId('fp-expedition-location-visit-cell_q0_r1')).toHaveAttribute('data-source-action', 'et.plot.scout_sector');
   await expect(page.getByTestId('fp-expedition-location-visit-cell_q0_r1')).toHaveAttribute('data-hidden-visit-count', '0');
-  await expect(page.getByTestId('fp-expedition-location-visit-scene-cell_q0_r1')).toContainText('Ridge Lantern packet');
+  await expect(page.getByTestId('fp-expedition-location-visit-scene-cell_q0_r1')).toContainText('Ridge Lantern marker');
   await expect(page.getByTestId('fp-expedition-location-visit-facts-cell_q0_r1')).toContainText('Actions');
   await expect(page.getByTestId('fp-expedition-location-visit-cell_q0_r1').locator('button')).toHaveCount(0);
   await page.getByTestId('fp-expedition-map-panel').screenshot({ path: hq16bScreenshot });
@@ -2562,13 +2564,13 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   await page.reload();
   await expect(page.getByTestId('fp-expedition-map-panel')).toBeVisible();
   await expect(page.getByTestId('fp-expedition-cell-cell_q0_r1')).toHaveAttribute('data-fog-state', 'known');
-  await expect(page.getByTestId('fp-expedition-event-packet-cell_q0_r1')).toContainText('Ridge Lantern packet');
-  await expect(page.getByTestId('fp-expedition-event-packet-cell_q0_r1')).toContainText('Selected-sector map evidence only');
+  await expect(page.getByTestId('fp-expedition-event-packet-cell_q0_r1')).toContainText('Ridge Lantern marker');
+  await expect(page.getByTestId('fp-expedition-event-packet-cell_q0_r1')).toContainText('Selected-sector marker only');
   await expect(page.getByTestId('fp-expedition-event-packet-chips-expedition_event_packet_hq12f_cell_q0_r1')).toContainText('zero executable actions');
   await expect(page.getByTestId('fp-expedition-party-packet-cell_q0_r1')).toContainText('Mira Trailmark field party');
   await expect(page.getByTestId('fp-expedition-party-roster-packet-cell_q0_r1')).toContainText('Rook Signalpost');
-  await expect(page.getByTestId('fp-expedition-event-packet-boundary-cell_q0_r1')).toContainText('Read-only receipt metadata');
-  await expect(page.getByTestId('fp-expedition-objective-strip')).toHaveAttribute('aria-label', /Review the latest packet/);
+  await expect(page.getByTestId('fp-expedition-event-packet-boundary-cell_q0_r1')).toContainText('Marker details only');
+  await expect(page.getByTestId('fp-expedition-objective-strip')).toHaveAttribute('aria-label', /Scout Result Ready/);
   await expect(page.getByTestId('fp-expedition-objective-strip-boundary')).toContainText('No new server objectives');
   await expect(page.getByTestId('fp-expedition-guided-loop')).toHaveAttribute('data-read-only', 'true');
   await expect(page.getByTestId('fp-expedition-guided-loop')).toHaveAttribute('data-actions', '0');
@@ -2872,13 +2874,13 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   expect(scoutDomProof.partyRosterText).toContain('messenger');
   expect(scoutDomProof.partyRosterText).toContain('Vale-Desk 7');
   expect(scoutDomProof.objectiveStrip.visible).toBe(true);
-  expect(scoutDomProof.objectiveStrip.mode).toBe('packet');
+  expect(scoutDomProof.objectiveStrip.mode).toBe('marker');
   expect(scoutDomProof.objectiveStrip.readOnly).toBe('true');
   expect(scoutDomProof.objectiveStrip.actions).toBe(0);
   expect(scoutDomProof.objectiveStrip.buttons).toBe(0);
   expect(scoutDomProof.objectiveStrip.packetId).toBe(hq12fEventPacket.packetId);
-  expect(scoutDomProof.objectiveStrip.label).toContain('Review the latest packet');
-  expect(scoutDomProof.objectiveStrip.visibleText).toContain('PKT');
+  expect(scoutDomProof.objectiveStrip.label).toContain('Scout Result Ready');
+  expect(scoutDomProof.objectiveStrip.visibleText).toContain('MRK');
   expect(scoutDomProof.objectiveStrip.visibleText).not.toContain('zero executable actions');
   expect(scoutDomProof.objectiveStrip.boundaryText).toContain('No new server objectives');
   expect(scoutDomProof.objectiveStrip.ledger.present).toBe(true);
@@ -2890,11 +2892,11 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   expect(scoutDomProof.guidedLoop.readOnly).toBe('true');
   expect(scoutDomProof.guidedLoop.actions).toBe(0);
   expect(scoutDomProof.guidedLoop.buttons).toBe(0);
-  expect(scoutDomProof.guidedLoop.objectiveMode).toBe('packet');
+  expect(scoutDomProof.guidedLoop.objectiveMode).toBe('marker');
   expect(scoutDomProof.guidedLoop.nextCommandId).toBe('found_settlement');
   expect(scoutDomProof.guidedLoop.phases).toEqual(['objective', 'command', 'resolve', 'receipt', 'next']);
   expect(scoutDomProof.guidedLoop.primaryCommandText).toBe('Found');
-  expect(scoutDomProof.guidedLoop.receiptChipText).toBe('Packet');
+  expect(scoutDomProof.guidedLoop.receiptChipText).toBe('Scout');
   expect(scoutDomProof.guidedLoop.visibleText).toContain('OBJ');
   expect(scoutDomProof.guidedLoop.visibleText).toContain('NXT');
   expect(scoutDomProof.guidedLoop.visibleText).not.toContain('hidden truth');
@@ -2908,7 +2910,7 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
   expect(scoutDomProof.locationVisit.packetId).toBe(hq12fEventPacket.packetId);
   expect(scoutDomProof.locationVisit.sourceAction).toBe('et.plot.scout_sector');
   expect(scoutDomProof.locationVisit.hiddenVisitCount).toBe(0);
-  expect(scoutDomProof.locationVisit.sceneText).toContain('Ridge Lantern packet');
+  expect(scoutDomProof.locationVisit.sceneText).toContain('Ridge Lantern marker');
   expect(scoutDomProof.locationVisit.factsText).toContain('Actions');
   expect(scoutDomProof.locationVisit.factsText).toContain('0');
   expect(scoutDomProof.locationVisit.ledger.present).toBe(true);
@@ -3372,7 +3374,7 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
       selectedSummaryAccessibilityKeepsFacts: /Scout Sector eligible/.test(domProof.mapFirstHud.selectedSummaryLabel) && /Provenance sealed/.test(domProof.mapFirstHud.receiptTraceLabel),
       receiptTraceCompactVisible: !/Provenance sealed|scout scout_sector_ui_001/i.test([domProof.mapFirstHud.receiptTraceText, scoutDomProof.mapFirstHud.receiptTraceText].join(' ')),
       partyBadgesCompactVisible: /MT/.test(domProof.mapFirstHud.partyBadgesText) && !/HQ civic operator|messenger|scout/i.test(domProof.mapFirstHud.partyBadgesText),
-      semanticObjectiveCompact: /PKT/.test(scoutDomProof.objectiveStrip.visibleText) && !/zero executable actions|No new server objectives/.test(scoutDomProof.objectiveStrip.visibleText),
+      semanticObjectiveCompact: /MRK/.test(scoutDomProof.objectiveStrip.visibleText) && !/zero executable actions|No new server objectives/.test(scoutDomProof.objectiveStrip.visibleText),
       objectiveLedgerCollapsed: scoutDomProof.objectiveStrip.ledger.collapsed && scoutDomProof.objectiveStrip.ledger.actions === 0,
       inspectorChromeCompact: /VIS/.test(scoutDomProof.inspectorDrawer.chromeText) && /SRV/.test(scoutDomProof.inspectorDrawer.chipsText),
       inspectorLedgersCollapsed: [

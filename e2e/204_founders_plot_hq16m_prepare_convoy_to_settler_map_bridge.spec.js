@@ -122,7 +122,7 @@ test('FP-E2E-022M Prepare Convoy lands as selected Settler Convoy map unit', asy
       ...(settlementClaim.receipt || {}),
       kind: arrived ? 'settler_convoy_arrived' : 'settler_convoy_prepared',
       summary: arrived
-        ? 'Settler Convoy arrived; Found Outpost is now available through the existing guarded endpoint.'
+        ? 'Settler Convoy arrived; Found Outpost is now available from the map target.'
         : settlementClaim.receipt.summary,
     },
   });
@@ -398,8 +398,8 @@ test('FP-E2E-022M Prepare Convoy lands as selected Settler Convoy map unit', asy
                 ? (arrived ? 'A server-owned Settler Convoy has arrived here.' : 'A server-owned Settler Convoy is rolling here.')
                 : 'Reviewed Site Plan stays map-local.',
               recommendedNext: isPrepared
-                ? (arrived ? 'Found Outpost through the existing guarded endpoint.' : 'Wait for arrival, then Found Outpost.')
-                : 'Prepare Convoy through the existing guarded endpoint.',
+                ? (arrived ? 'Found Outpost from the map target.' : 'Wait for arrival, then Found Outpost.')
+                : 'Send a convoy from the map target.',
               readOnly: true,
             },
             {
@@ -521,6 +521,9 @@ test('FP-E2E-022M Prepare Convoy lands as selected Settler Convoy map unit', asy
   await expect(page.getByTestId('fp-expedition-command-outcome-chip')).toHaveAttribute('data-command-id', 'prepare_settler_convoy');
   await expect(page.getByTestId('fp-expedition-command-outcome-chip')).toHaveAttribute('data-unit-id', convoyUnitId);
   await expect(page.getByTestId('fp-expedition-command-outcome-chip')).toContainText('Rolling');
+  await expect(page.getByTestId('fp-expedition-objective-strip')).not.toContainText(/guarded endpoint|approval|review|packet|proof/i);
+  await expect(page.getByTestId('fp-expedition-unit-command-bar')).not.toContainText(/guarded endpoint|approval|review|packet|proof/i);
+  await expect(page.getByTestId('fp-expedition-command-outcome-chip')).not.toContainText(/guarded endpoint|approval|review|packet|proof/i);
   foundBeforeArrivalCount = await page.getByTestId(`fp-btn-found-settlement-unit-command-${claimId}`).count();
   expect(foundBeforeArrivalCount).toBe(0);
 
@@ -552,6 +555,11 @@ test('FP-E2E-022M Prepare Convoy lands as selected Settler Convoy map unit', asy
         cellId: outcome?.getAttribute('data-cell-id') || '',
         text: outcome?.textContent || '',
       },
+      primarySurfaceText: {
+        objective: document.querySelector('[data-testid="fp-expedition-objective-strip"]')?.innerText || '',
+        commandBar: commandBar?.innerText || '',
+        outcome: outcome?.innerText || '',
+      },
     };
   }, { convoyUnitId });
 
@@ -559,7 +567,8 @@ test('FP-E2E-022M Prepare Convoy lands as selected Settler Convoy map unit', asy
   await page.reload();
   await page.getByTestId(`fp-expedition-unit-token-${convoyUnitId}`).click();
   await expect(page.getByTestId('fp-expedition-objective-copy')).toContainText('Pick Found to place the outpost');
-  await expect(page.getByTestId('fp-expedition-objective-copy')).not.toContainText('guarded endpoint');
+  await expect(page.getByTestId('fp-expedition-objective-strip')).not.toContainText(/guarded endpoint|approval|review|packet|proof/i);
+  await expect(page.getByTestId('fp-expedition-unit-command-bar')).not.toContainText(/guarded endpoint|approval|review|packet|proof/i);
   await expect(page.getByTestId(`fp-btn-found-settlement-unit-command-${claimId}`)).toHaveAttribute('data-command-id', 'found_settlement');
   await expect(page.getByTestId(`fp-btn-found-settlement-unit-command-${claimId}`)).toHaveAttribute('data-server-mutation-implemented', 'true');
   await expect(page.getByTestId('fp-expedition-guided-loop')).toHaveAttribute('data-next-command-id', 'found_settlement');
@@ -644,6 +653,12 @@ test('FP-E2E-022M Prepare Convoy lands as selected Settler Convoy map unit', asy
         targetCellId: cellId,
         primaryOutcomeText: outcome?.textContent || '',
       },
+      primarySurfaceText: {
+        objective: document.querySelector('[data-testid="fp-expedition-objective-strip"]')?.innerText || '',
+        commandBar: commandBar?.innerText || '',
+        outcome: outcome?.innerText || '',
+        preview: document.querySelector('[data-testid="fp-expedition-command-preview"]')?.innerText || '',
+      },
       mobileFit: {
         viewport: { width: window.innerWidth, height: window.innerHeight },
         documentScrollWidth: document.documentElement.scrollWidth,
@@ -651,6 +666,14 @@ test('FP-E2E-022M Prepare Convoy lands as selected Settler Convoy map unit', asy
       },
     };
   }, { convoyUnitId, cellId });
+
+  const primaryPaperworkPattern = /guarded endpoint|approval|review|packet|proof/i;
+  for (const text of Object.values(preArrivalProof.primarySurfaceText)) {
+    expect(text).not.toMatch(primaryPaperworkPattern);
+  }
+  for (const text of Object.values(proof.primarySurfaceText)) {
+    expect(text).not.toMatch(primaryPaperworkPattern);
+  }
 
   fs.writeFileSync('reports/agent-town-hq16m-prepare-convoy-to-settler-map-bridge-proof-2026-06-02.json', JSON.stringify({
     ok: true,
@@ -674,6 +697,8 @@ test('FP-E2E-022M Prepare Convoy lands as selected Settler Convoy map unit', asy
       mapNativePrimaryResult: preArrivalProof.convoyToken.unitId === convoyUnitId && /Rolling/.test(preArrivalProof.outcome.text),
       immediateFoundOutpostBlockedUntilArrival: foundBeforeArrivalCount === 0,
       foundOutpostAvailableWhenArrived: proof.foundButton.commandId === 'found_settlement' && proof.foundButton.serverMutationImplemented === 'true',
+      primarySurfacePaperworkHidden: [...Object.values(preArrivalProof.primarySurfaceText), ...Object.values(proof.primarySurfaceText)]
+        .every((text) => !primaryPaperworkPattern.test(text)),
       rendererCreatedNoActions: proof.renderer.visualLayers.clientAuthority === false,
       commandTargetRingsPreviewOnly: proof.renderer.commandTargets.every((target) => target.previewOnly === true && target.visualOnly === true && target.readOnly === true),
       unitTokensReadOnly: proof.renderer.visualLayers.unitTokensReadOnly === true,

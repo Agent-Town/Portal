@@ -1,0 +1,78 @@
+{
+  "ok": true,
+  "generatedAt": "2026-06-02T11:46:55Z",
+  "title": "HQ16N paperwork-to-play primary surface sweep",
+  "branch": "neo/progression-atlas-editor-next-2026-05-29",
+  "baseCheckpoint": "c5e823a Add AgentTown prepare-convoy map bridge",
+  "sourceProof": "reports/agent-town-hq16m-prepare-convoy-to-settler-map-bridge-proof-2026-06-02.json",
+  "screenshots": [
+    "reports/agent-town-hq16m-prepare-convoy-to-settler-map-bridge-2026-06-02-desktop.png",
+    "reports/agent-town-hq16m-prepare-convoy-to-settler-map-bridge-2026-06-02-mobile.png"
+  ],
+  "changedPrimarySurface": {
+    "objectivePacketModeRenamed": true,
+    "visibleObjectiveMode": "marker",
+    "visibleObjectiveCode": "MRK",
+    "visibleReceiptStepLabel": "FX",
+    "eventPacketDisplayNameAdaptedToMarker": true,
+    "scoutResultVisibleAsMapOutcome": true,
+    "detailsSummaryLabel": "Details",
+    "serverAuthorityPreservedInAuditContext": true
+  },
+  "primarySurfaceText": {
+    "afterPrepare": {
+      "objectiveContains": ["FOCUS", "CNV", "Marker", "FX", "Convoy", "DETAILS"],
+      "commandBarContains": ["CNV", "Inspect", "WAIT"],
+      "outcomeContains": ["Rolling"]
+    },
+    "afterArrival": {
+      "objectiveContains": ["FOCUS", "CNV", "Found", "FX", "DETAILS"],
+      "commandBarContains": ["CNV", "Found", "CLAIM", "WAIT"],
+      "outcomeContains": ["Founded"]
+    }
+  },
+  "negativeVisiblePrimarySurfaceAssertions": [
+    "guarded endpoint",
+    "approval",
+    "review",
+    "packet",
+    "proof"
+  ],
+  "guardrails": {
+    "primarySurfacePaperworkHidden": true,
+    "prepareEndpointUsed": true,
+    "foundEndpointUsed": true,
+    "serverOwnedSettlerConvoyUnit": true,
+    "commandTargetRingsPreviewOnly": true,
+    "unitTokensReadOnly": true,
+    "rendererCreatedNoActions": true,
+    "routeAuthority": false,
+    "resourceHarvesting": false,
+    "rewardCreation": false,
+    "backgroundScheduling": false,
+    "combat": false,
+    "hiddenTruthLeakage": false,
+    "crossPlotMutation": false,
+    "atlasExecution": false,
+    "externalEffects": false,
+    "newServerRoutes": false,
+    "newApiPayloads": false,
+    "newToolActions": false,
+    "deploy": false,
+    "merge": false,
+    "push": false,
+    "commit": false,
+    "publicShare": false
+  },
+  "verification": {
+    "nodeCheck": [
+      "public/experiences/founders-plot/founders-plot.js",
+      "e2e/200_founders_plot.spec.js",
+      "e2e/204_founders_plot_hq16m_prepare_convoy_to_settler_map_bridge.spec.js"
+    ],
+    "playwright": "npx playwright test e2e/204_founders_plot_hq16m_prepare_convoy_to_settler_map_bridge.spec.js --project=chromium --grep \"FP-E2E-022M\"",
+    "playwrightPassed": true,
+    "jqProofJson": true,
+    "gitDiffCheck": true
+  }
+}
