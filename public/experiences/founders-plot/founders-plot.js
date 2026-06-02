@@ -1298,18 +1298,23 @@
     const unitType = String(unit.unitType || '').toLowerCase();
     const cellStatus = String(selectedCell?.status || '').toUpperCase();
     const cellKind = String(selectedCell?.kind || '').toLowerCase();
-    const isOutpost = unitType === 'outpost_crew'
-      || cellStatus === 'OWNED_OUTPOST'
-      || cellKind === 'owned_outpost';
-    if (!isOutpost) return null;
-    const sourceIds = selectedCell?.sourceIds || {};
-    const nextCell = expeditionNearestScoutableCell(selectedCell, model);
+    const selectedIsOutpost = cellStatus === 'OWNED_OUTPOST' || cellKind === 'owned_outpost';
+    const unitCellId = String(unit.cellId || unit.location?.cellId || '').trim();
+    const unitCell = unitCellId
+      ? expeditionCells(model).find((cell) => String(cell.cellId || '') === unitCellId) || null
+      : null;
+    const outpostCell = unitType === 'outpost_crew'
+      ? (unitCell || (selectedIsOutpost ? selectedCell : null))
+      : (selectedIsOutpost ? selectedCell : null);
+    if (!outpostCell) return null;
+    const sourceIds = outpostCell?.sourceIds || {};
+    const nextCell = expeditionNearestScoutableCell(outpostCell, model);
     const claimId = String(unit.sourceClaimId || sourceIds.claimId || sourceIds.originClaimId || '');
     const foundedPlotId = String(sourceIds.plotId || sourceIds.foundedPlotId || '');
-    const stateText = friendlyToken(unit.state || selectedCell?.status || 'stationed');
+    const stateText = friendlyToken(unit.state || outpostCell?.status || 'stationed');
     return {
       unitId: String(unit.unitId || ''),
-      cellId: String(selectedCell?.cellId || unit.cellId || unit.location?.cellId || ''),
+      cellId: String(outpostCell?.cellId || unit.cellId || unit.location?.cellId || ''),
       claimId,
       foundedPlotId,
       stateText,
@@ -1332,6 +1337,11 @@
     surface.dataset.foundedPlotId = outpost.foundedPlotId;
     surface.dataset.readOnly = 'true';
     surface.dataset.actions = '0';
+    surface.dataset.nextCellId = String(outpost.nextCell?.cellId || '');
+    surface.dataset.bridgeTargetCellId = String(outpost.nextCell?.cellId || '');
+    surface.dataset.bridgeCommandId = outpost.nextCell ? 'scout_sector' : '';
+    surface.dataset.bridgeReadOnly = 'true';
+    surface.dataset.bridgeActions = '0';
 
     const chips = document.createElement('div');
     chips.className = 'fp-expedition-outpost-status__chips';
@@ -1339,14 +1349,21 @@
       ['⌂', outpost.stateShort, `Outpost crew ${outpost.stateText}`],
       ['●', expeditionCompactCellLabel(outpost.cellId), `Owned outpost cell ${outpost.cellId}`],
       outpost.nextCell
-        ? ['◇', expeditionCompactCellLabel(outpost.nextCell.cellId), `Next spatial step: frontier hint ${outpost.nextCell.cellId}`]
+        ? ['◇', expeditionCompactCellLabel(outpost.nextCell.cellId), `Next spatial step: Scout Sector target ${outpost.nextCell.cellId}`]
         : ['◎', 'Hold', 'No adjacent server-exposed frontier hint in this read model'],
       ['0', '✦', 'No outpost command authority exposed'],
-    ].forEach(([icon, text, fullText]) => {
+    ].forEach(([icon, text, fullText], index) => {
       const chip = document.createElement('span');
       chip.textContent = `${icon} ${text}`;
       chip.title = fullText;
       chip.setAttribute('aria-label', fullText);
+      if (index === 2) {
+        chip.dataset.testid = 'fp-expedition-outpost-next-frontier';
+        chip.dataset.cellId = String(outpost.nextCell?.cellId || '');
+        chip.dataset.commandId = outpost.nextCell ? 'scout_sector' : '';
+        chip.dataset.readOnly = 'true';
+        chip.dataset.actions = '0';
+      }
       chips.appendChild(chip);
     });
     surface.appendChild(chips);

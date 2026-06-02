@@ -213,6 +213,15 @@ test('FP-E2E-022Q selected outpost crew shows read-only outpost status surface',
   await expect(page.getByTestId('fp-expedition-outpost-status')).toHaveAttribute('data-read-only', 'true');
   await expect(page.getByTestId('fp-expedition-outpost-status')).toHaveAttribute('data-actions', '0');
   await expect(page.getByTestId('fp-expedition-outpost-status')).toHaveAttribute('data-cell-id', cellId);
+  await expect(page.getByTestId('fp-expedition-outpost-status')).toHaveAttribute('data-next-cell-id', 'cell_q1_r1');
+  await expect(page.getByTestId('fp-expedition-outpost-status')).toHaveAttribute('data-bridge-target-cell-id', 'cell_q1_r1');
+  await expect(page.getByTestId('fp-expedition-outpost-status')).toHaveAttribute('data-bridge-command-id', 'scout_sector');
+  await expect(page.getByTestId('fp-expedition-outpost-status')).toHaveAttribute('data-bridge-read-only', 'true');
+  await expect(page.getByTestId('fp-expedition-outpost-status')).toHaveAttribute('data-bridge-actions', '0');
+  await expect(page.getByTestId('fp-expedition-outpost-next-frontier')).toHaveAttribute('data-cell-id', 'cell_q1_r1');
+  await expect(page.getByTestId('fp-expedition-outpost-next-frontier')).toHaveAttribute('data-command-id', 'scout_sector');
+  await expect(page.getByTestId('fp-expedition-outpost-next-frontier')).toHaveAttribute('data-read-only', 'true');
+  await expect(page.getByTestId('fp-expedition-outpost-next-frontier')).toHaveAttribute('data-actions', '0');
   await expect(page.getByTestId('fp-expedition-outpost-status')).toContainText('⌂ Set');
   await expect(page.getByTestId('fp-expedition-outpost-status')).toContainText('◇ Q1 R1');
   await expect(page.getByTestId('fp-expedition-outpost-status-details')).not.toHaveAttribute('open', '');
@@ -233,6 +242,18 @@ test('FP-E2E-022Q selected outpost crew shows read-only outpost status surface',
     actionAuthority: false,
     executableActions: 0,
     hiddenTruthLeakage: false,
+  });
+  expect(desktopRenderer.objectiveMarkers).toHaveLength(1);
+  expect(desktopRenderer.objectiveMarkers[0]).toMatchObject({
+    mode: 'scout',
+    targetCellId: 'cell_q1_r1',
+    visualOnly: true,
+    readOnly: true,
+    selectable: true,
+    inspectable: true,
+    routeAuthority: false,
+    actionAuthority: false,
+    executableActions: 0,
   });
   expect(desktopRenderer.visualLayers.outpostNextFrontierBeaconCount).toBe(1);
   expect(desktopRenderer.visualLayers.outpostNextFrontierBeaconVisualOnly).toBe(true);
@@ -400,6 +421,162 @@ test('FP-E2E-022Q selected outpost crew shows read-only outpost status surface',
       noMovementRouteTradeResourcesSchedulesCombatAtlasGeneratedUniverseExternalEffects: true,
       mobileHorizontalOverflow: proof.mobileFit.clipped.length,
       mobileVerticalClipping: proof.mobileFit.verticallyClipped.length,
+    },
+  }, null, 2));
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.getByTestId(`fp-expedition-unit-token-${outpostUnitId}`).click({ force: true });
+  await expect(page.getByTestId('fp-expedition-outpost-status')).toHaveAttribute('data-cell-id', cellId);
+  await expect(page.getByTestId('fp-expedition-outpost-status')).toHaveAttribute('data-bridge-target-cell-id', 'cell_q1_r1');
+  const bridgeBefore = await page.evaluate(() => window.__foundersPlotTest.getExpeditionMapInfo());
+  expect(bridgeBefore.outpostNextFrontierBeacons).toHaveLength(1);
+  expect(bridgeBefore.objectiveMarkers).toHaveLength(1);
+  expect(bridgeBefore.outpostNextFrontierBeacons[0].targetCellId).toBe(bridgeBefore.objectiveMarkers[0].targetCellId);
+  expect(bridgeBefore.objectiveMarkers[0]).toMatchObject({
+    mode: 'scout',
+    targetCellId: 'cell_q1_r1',
+    visualOnly: true,
+    readOnly: true,
+    selectable: true,
+    executableActions: 0,
+  });
+
+  await page.getByTestId('fp-expedition-three-canvas').click({ position: bridgeBefore.objectiveMarkers[0].canvas, force: true });
+  await expect(page.getByTestId('fp-expedition-map-selected-summary')).toHaveAttribute('data-cell-id', 'cell_q1_r1');
+  await expect(page.getByTestId('fp-expedition-map-selected-summary')).toHaveAttribute('data-scoutable', 'true');
+  await expect(page.getByTestId('fp-expedition-outpost-status')).toHaveAttribute('data-cell-id', cellId);
+  await expect(page.getByTestId('fp-expedition-outpost-status')).toHaveAttribute('data-bridge-target-cell-id', 'cell_q1_r1');
+  await expect(page.getByTestId('fp-btn-scout-sector-cell_q1_r1')).toHaveAttribute('data-cell-id', 'cell_q1_r1');
+  await page.getByTestId('fp-expedition-map-panel').screenshot({
+    path: 'reports/agent-town-hq16t-outpost-beacon-to-scout-objective-bridge-2026-06-02-desktop.png',
+  });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByTestId('fp-expedition-map-selected-summary')).toHaveAttribute('data-cell-id', 'cell_q1_r1');
+  await expect(page.getByTestId('fp-expedition-outpost-status')).toHaveAttribute('data-cell-id', cellId);
+  await page.getByTestId('fp-expedition-map-panel').screenshot({
+    path: 'reports/agent-town-hq16t-outpost-beacon-to-scout-objective-bridge-2026-06-02-mobile.png',
+  });
+
+  const bridgeProof = await page.evaluate(({ outpostUnitId, cellId }) => {
+    const renderer = window.__foundersPlotTest.getExpeditionMapInfo();
+    const outpost = document.querySelector('[data-testid="fp-expedition-outpost-status"]');
+    const next = document.querySelector('[data-testid="fp-expedition-outpost-next-frontier"]');
+    const objective = document.querySelector('[data-testid="fp-expedition-objective-strip"]');
+    const selectedSummary = document.querySelector('[data-testid="fp-expedition-map-selected-summary"]');
+    const scoutAlias = document.querySelector('[data-testid="fp-btn-scout-sector-cell_q1_r1"]');
+    const commandBar = document.querySelector('[data-testid="fp-expedition-unit-command-bar"]');
+    const clipped = Array.from(document.querySelectorAll('[data-testid="fp-expedition-outpost-status"], [data-testid="fp-expedition-objective-strip"], [data-testid="fp-expedition-unit-command-bar"]'))
+      .filter((node) => node.scrollWidth > node.clientWidth + 1)
+      .map((node) => node.getAttribute('data-testid') || node.className || node.tagName);
+    return {
+      outpost: {
+        unitId: outpost?.getAttribute('data-unit-id') || '',
+        cellId: outpost?.getAttribute('data-cell-id') || '',
+        nextCellId: outpost?.getAttribute('data-next-cell-id') || '',
+        bridgeTargetCellId: outpost?.getAttribute('data-bridge-target-cell-id') || '',
+        bridgeCommandId: outpost?.getAttribute('data-bridge-command-id') || '',
+        bridgeReadOnly: outpost?.getAttribute('data-bridge-read-only') || '',
+        bridgeActions: Number(outpost?.getAttribute('data-bridge-actions') || 0),
+        text: outpost?.innerText || '',
+      },
+      nextFrontierChip: {
+        cellId: next?.getAttribute('data-cell-id') || '',
+        commandId: next?.getAttribute('data-command-id') || '',
+        readOnly: next?.getAttribute('data-read-only') || '',
+        actions: Number(next?.getAttribute('data-actions') || 0),
+        label: next?.textContent || '',
+      },
+      objective: {
+        mode: objective?.getAttribute('data-mode') || '',
+        targetCellId: objective?.getAttribute('data-target-cell-id') || '',
+        readOnly: objective?.getAttribute('data-read-only') || '',
+        actions: Number(objective?.getAttribute('data-actions') || 0),
+        buttons: objective ? objective.querySelectorAll('button').length : 0,
+      },
+      selectedSummary: {
+        cellId: selectedSummary?.getAttribute('data-cell-id') || '',
+        scoutable: selectedSummary?.getAttribute('data-scoutable') || '',
+        text: selectedSummary?.innerText || '',
+      },
+      scoutAlias: {
+        present: !!scoutAlias,
+        cellId: scoutAlias?.getAttribute('data-cell-id') || '',
+        idempotencyKey: scoutAlias?.getAttribute('data-idempotency-key') || '',
+        text: scoutAlias?.textContent || '',
+      },
+      commandBar: {
+        unitId: commandBar?.getAttribute('data-unit-id') || '',
+        actions: Number(commandBar?.getAttribute('data-actions') || 0),
+        text: commandBar?.innerText || '',
+      },
+      renderer: {
+        selectedCellId: renderer.selectedCellId,
+        visualLayers: renderer.visualLayers,
+        outpostNextFrontierBeacons: renderer.outpostNextFrontierBeacons,
+        objectiveMarkers: renderer.objectiveMarkers,
+        commandTargets: renderer.commandTargets,
+      },
+      mobileFit: {
+        viewport: { width: window.innerWidth, height: window.innerHeight },
+        documentScrollWidth: document.documentElement.scrollWidth,
+        clipped,
+      },
+      expected: { outpostUnitId, cellId, targetCellId: 'cell_q1_r1' },
+    };
+  }, { outpostUnitId, cellId });
+
+  expect(bridgeProof.outpost.cellId).toBe(cellId);
+  expect(bridgeProof.outpost.bridgeTargetCellId).toBe('cell_q1_r1');
+  expect(bridgeProof.nextFrontierChip.cellId).toBe('cell_q1_r1');
+  expect(bridgeProof.objective.mode).toBe('scout');
+  expect(bridgeProof.objective.targetCellId).toBe('cell_q1_r1');
+  expect(bridgeProof.objective.buttons).toBe(0);
+  expect(bridgeProof.selectedSummary.cellId).toBe('cell_q1_r1');
+  expect(bridgeProof.selectedSummary.scoutable).toBe('true');
+  expect(bridgeProof.scoutAlias.present).toBe(true);
+  expect(bridgeProof.scoutAlias.cellId).toBe('cell_q1_r1');
+  expect(bridgeProof.commandBar.unitId).toBe(outpostUnitId);
+  expect(bridgeProof.commandBar.actions).toBe(0);
+  expect(bridgeProof.renderer.outpostNextFrontierBeacons[0].targetCellId).toBe('cell_q1_r1');
+  expect(bridgeProof.renderer.objectiveMarkers[0].targetCellId).toBe('cell_q1_r1');
+  expect(bridgeProof.renderer.commandTargets).toEqual([]);
+  expect(bridgeProof.mobileFit.clipped).toEqual([]);
+
+  fs.writeFileSync('reports/agent-town-hq16t-outpost-beacon-to-scout-objective-bridge-2026-06-02.json', JSON.stringify({
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    title: 'HQ16T Outpost Beacon to Scout Objective Bridge',
+    source: 'FP-E2E-022Q mocked server-owned owned_outpost cell, outpost_crew unit, and hinted frontier_hint read-model cell',
+    screenshots: [
+      'reports/agent-town-hq16t-outpost-beacon-to-scout-objective-bridge-2026-06-02-desktop.png',
+      'reports/agent-town-hq16t-outpost-beacon-to-scout-objective-bridge-2026-06-02-mobile.png',
+    ],
+    proof: bridgeProof,
+    guardrails: {
+      serverAuthorityUnchanged: true,
+      serverOwnedReadModelFieldsOnly: true,
+      outpostCrewOriginCellPreservedDuringScoutFocus: bridgeProof.outpost.cellId === cellId,
+      bridgeTargetMatchesOutpostBeacon: bridgeProof.renderer.outpostNextFrontierBeacons[0]?.targetCellId === bridgeProof.outpost.bridgeTargetCellId,
+      bridgeTargetMatchesScoutObjectiveMarker: bridgeProof.renderer.objectiveMarkers[0]?.targetCellId === bridgeProof.outpost.bridgeTargetCellId,
+      bridgeTargetSelectedByExistingObjectiveMarker: bridgeProof.selectedSummary.cellId === bridgeProof.outpost.bridgeTargetCellId && bridgeProof.selectedSummary.scoutable === 'true',
+      scoutSectorAffordanceExistingAndGuarded: bridgeProof.scoutAlias.present === true && bridgeProof.scoutAlias.cellId === bridgeProof.outpost.bridgeTargetCellId,
+      outpostStatusReadOnly: bridgeProof.outpost.bridgeReadOnly === 'true' && bridgeProof.outpost.bridgeActions === 0,
+      objectiveReadOnly: bridgeProof.objective.readOnly === 'true' && bridgeProof.objective.actions === 0 && bridgeProof.objective.buttons === 0,
+      noOutpostCommandsCreated: bridgeProof.commandBar.actions === 0 && bridgeProof.renderer.commandTargets.length === 0,
+      beaconVisualOnly: bridgeProof.renderer.visualLayers.outpostNextFrontierBeaconVisualOnly === true,
+      beaconReadOnly: bridgeProof.renderer.visualLayers.outpostNextFrontierBeaconReadOnly === true,
+      objectiveMarkerVisualOnly: bridgeProof.renderer.visualLayers.eventObjectiveMarkersVisualOnly === true,
+      objectiveMarkerReadOnly: bridgeProof.renderer.visualLayers.eventObjectiveMarkersReadOnly === true,
+      routeAuthority: false,
+      movementAuthority: false,
+      revealAuthority: false,
+      scoutSectorOnlyFogRevealMutation: true,
+      hiddenTruthLeakage: false,
+      atlasExecution: false,
+      generatedUniverseRuntimeExpansion: false,
+      externalEffects: false,
+      mobileHorizontalOverflow: bridgeProof.mobileFit.clipped.length,
     },
   }, null, 2));
 });

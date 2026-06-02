@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "generatedAt": "2026-06-02T12:46:55.279Z",
+  "generatedAt": "2026-06-02T13:05:34.531Z",
   "title": "HQ16R Outpost Next-Frontier Map Beacon",
   "source": "FP-E2E-022Q mocked server-owned owned_outpost cell, outpost_crew unit, and hinted frontier_hint read-model cell",
   "screenshots": [
@@ -139,7 +139,8 @@
         "height": 844
       },
       "documentScrollWidth": 390,
-      "clipped": []
+      "clipped": [],
+      "verticallyClipped": []
     }
   },
   "guardrails": {
@@ -159,6 +160,7 @@
     "scoutSectorOnlyFogRevealMutation": true,
     "noOutpostCommands": true,
     "noMovementRouteTradeResourcesSchedulesCombatAtlasGeneratedUniverseExternalEffects": true,
-    "mobileHorizontalOverflow": 0
+    "mobileHorizontalOverflow": 0,
+    "mobileVerticalClipping": 0
   }
 }
