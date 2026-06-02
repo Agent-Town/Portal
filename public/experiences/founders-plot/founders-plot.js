@@ -1278,6 +1278,94 @@
     return scoutAction + expeditionUnitMoveTargets(unit, model).length + expeditionMapCommandActions(unit).length;
   }
 
+  function expeditionNearestScoutableCell(sourceCell = null, model = {}) {
+    const targets = expeditionCells(model).filter(isExpeditionScoutSectorEligible);
+    if (!targets.length) return null;
+    if (!sourceCell) return targets[0];
+    const sourceQ = Number(sourceCell.q || 0);
+    const sourceR = Number(sourceCell.r || 0);
+    return targets
+      .map((cell) => ({
+        cell,
+        distance: Math.abs(Number(cell.q || 0) - sourceQ)
+          + Math.abs(Number(cell.r || 0) - sourceR)
+          + Math.abs((Number(cell.q || 0) + Number(cell.r || 0)) - (sourceQ + sourceR)),
+      }))
+      .sort((a, b) => a.distance - b.distance)[0]?.cell || targets[0];
+  }
+
+  function expeditionOutpostStatusModel(unit = {}, selectedCell = null, model = {}) {
+    const unitType = String(unit.unitType || '').toLowerCase();
+    const cellStatus = String(selectedCell?.status || '').toUpperCase();
+    const cellKind = String(selectedCell?.kind || '').toLowerCase();
+    const isOutpost = unitType === 'outpost_crew'
+      || cellStatus === 'OWNED_OUTPOST'
+      || cellKind === 'owned_outpost';
+    if (!isOutpost) return null;
+    const sourceIds = selectedCell?.sourceIds || {};
+    const nextCell = expeditionNearestScoutableCell(selectedCell, model);
+    const claimId = String(unit.sourceClaimId || sourceIds.claimId || sourceIds.originClaimId || '');
+    const foundedPlotId = String(sourceIds.plotId || sourceIds.foundedPlotId || '');
+    const stateText = friendlyToken(unit.state || selectedCell?.status || 'stationed');
+    return {
+      unitId: String(unit.unitId || ''),
+      cellId: String(selectedCell?.cellId || unit.cellId || unit.location?.cellId || ''),
+      claimId,
+      foundedPlotId,
+      stateText,
+      stateShort: /stationed|owned|founded/i.test(stateText) ? 'Set' : stateText.slice(0, 8),
+      nextCell,
+      sourceIds,
+      authorityBoundary: unit.authorityBoundary || model.units?.authorityBoundary || model.authorityBoundary || '',
+    };
+  }
+
+  function appendExpeditionOutpostStatusSurface(parent, unit = {}, selectedCell = null, model = {}) {
+    const outpost = expeditionOutpostStatusModel(unit, selectedCell, model);
+    if (!parent || !outpost) return null;
+    const surface = document.createElement('section');
+    surface.className = 'fp-expedition-outpost-status';
+    surface.dataset.testid = 'fp-expedition-outpost-status';
+    surface.dataset.unitId = outpost.unitId;
+    surface.dataset.cellId = outpost.cellId;
+    surface.dataset.claimId = outpost.claimId;
+    surface.dataset.foundedPlotId = outpost.foundedPlotId;
+    surface.dataset.readOnly = 'true';
+    surface.dataset.actions = '0';
+
+    const chips = document.createElement('div');
+    chips.className = 'fp-expedition-outpost-status__chips';
+    [
+      ['⌂', outpost.stateShort, `Outpost crew ${outpost.stateText}`],
+      ['●', expeditionCompactCellLabel(outpost.cellId), `Owned outpost cell ${outpost.cellId}`],
+      outpost.nextCell
+        ? ['◇', expeditionCompactCellLabel(outpost.nextCell.cellId), `Next spatial step: frontier hint ${outpost.nextCell.cellId}`]
+        : ['◎', 'Hold', 'No adjacent server-exposed frontier hint in this read model'],
+      ['0', '✦', 'No outpost command authority exposed'],
+    ].forEach(([icon, text, fullText]) => {
+      const chip = document.createElement('span');
+      chip.textContent = `${icon} ${text}`;
+      chip.title = fullText;
+      chip.setAttribute('aria-label', fullText);
+      chips.appendChild(chip);
+    });
+    surface.appendChild(chips);
+
+    const detailBody = document.createElement('div');
+    detailBody.className = 'fp-expedition-inspector-section__body';
+    const copy = document.createElement('p');
+    copy.textContent = 'Server-owned outpost status projected from the selected owned cell and outpost_crew unit. It adds no client command or gameplay authority.';
+    detailBody.appendChild(copy);
+    appendChipSet(detailBody, [
+      outpost.claimId ? `claim ${outpost.claimId}` : '',
+      outpost.foundedPlotId ? `plot ${outpost.foundedPlotId}` : '',
+      outpost.authorityBoundary ? `authority ${friendlyToken(outpost.authorityBoundary)}` : '',
+    ]);
+    appendExpeditionAuditDetails(surface, 'Details', [detailBody], 'fp-expedition-outpost-status-details');
+    parent.appendChild(surface);
+    return surface;
+  }
+
   function expeditionShortCommandLabel(commandId = '', fallback = '') {
     const id = String(commandId || '');
     if (id === 'scout_sector') return 'Scout';
@@ -1563,6 +1651,7 @@
       movement.textContent = selectedUnit.movement?.movementMutationImplemented === true ? '↦' : '⏳';
       commandBar.appendChild(movement);
       roster.appendChild(commandBar);
+      appendExpeditionOutpostStatusSurface(roster, selectedUnit, selectedCell, model);
     }
 
     card.appendChild(roster);

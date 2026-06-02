@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "generatedAt": "2026-06-02T12:24:03.353Z",
+  "generatedAt": "2026-06-02T12:35:16.360Z",
   "title": "HQ16P Expedition Map Game HUD Shell",
   "source": "FP-E2E-022M extended after server-owned Found Outpost result to verify symbol-first HUD shell and collapsed debug details",
   "screenshots": [
@@ -12,7 +12,7 @@
       "[data-testid=\"fp-expedition-map-status\"]": "◎\n◎\n◆2\n□2\nLEDGER / FOG",
       "[data-testid=\"fp-expedition-objective-strip\"]": "⌾\n⌖\n⌖\n1\n◆\n2\n□\n2\n◎\n⚿\n⌖\nQ0 R1\n✦\n⚿\nMarker\n⚿ · Q0 R1\n✓\n⌂\nDone\nQ0 R1\n⚿\n⚿\nFound\nQ0 R1\n➜\n⚿\nMarker\nQ0 R1 · ⚿\n⚑\nScout\nQ0 R1\n▧\nSite\nReady\n✦\nWait\nWait\nDETAILS",
       "[data-testid=\"fp-expedition-guided-loop\"]": "◎\n⚿\n⌖\nQ0 R1\n✦\n⚿\nMarker\n⚿ · Q0 R1\n✓\n⌂\nDone\nQ0 R1\n⚿\n⚿\nFound\nQ0 R1\n➜\n⚿\nMarker\nQ0 R1 · ⚿",
-      "[data-testid=\"fp-expedition-unit-roster\"]": "◉\n2 ◉\n⌗\n▧\n●\n0\n⌂\n⌂\n◆\n0\n⌂ ⌂\n◎\n0 ↦\n⏳",
+      "[data-testid=\"fp-expedition-unit-roster\"]": "◉\n2 ◉\n⌗\n▧\n●\n0\n⌂\n⌂\n◆\n0\n⌂ ⌂\n◎\n0 ↦\n⏳\n⌂ Set\n● Q0 R1\n◇ Q1 R1\n0 ✦\nDETAILS",
       "[data-testid=\"fp-expedition-unit-command-bar\"]": "⌂ ⌂\n◎\n0 ↦\n⏳",
       "[data-testid=\"fp-expedition-command-outcome-chip\"]": "⌂\nFounded\nOUT · Q0 R1 · ◆",
       "[data-testid=\"fp-expedition-map-visual-hud\"]": "◆\n1\n●\n1\n◇\n1\n□\n1\n⌂\n⌂\n◆\n◆\n○\n2 ⚿\n0 ◉\n⚑\nScout\nQ0 R1\n▧\nSite\nReady\n✦\nWait\nWait\n⚿\n2 ⚿",
@@ -20,9 +20,9 @@
       "[data-testid=\"fp-expedition-fog-pips\"]": "◆\n1\n●\n1\n◇\n1\n□\n1"
     },
     "visiblePhaseText": "◎\n⚿\n⌖\nQ0 R1\n✦\n⚿\nMarker\n⚿ · Q0 R1\n✓\n⌂\nDone\nQ0 R1\n⚿\n⚿\nFound\nQ0 R1\n➜\n⚿\nMarker\nQ0 R1 · ⚿",
-    "unitDockText": "◉\n2 ◉\n⌗\n▧\n●\n0\n⌂\n⌂\n◆\n0\n⌂ ⌂\n◎\n0 ↦\n⏳",
-    "detailsDrawerCount": 5,
-    "closedDrawerCount": 5,
+    "unitDockText": "◉\n2 ◉\n⌗\n▧\n●\n0\n⌂\n⌂\n◆\n0\n⌂ ⌂\n◎\n0 ↦\n⏳\n⌂ Set\n● Q0 R1\n◇ Q1 R1\n0 ✦\nDETAILS",
+    "detailsDrawerCount": 6,
+    "closedDrawerCount": 6,
     "authorityDatasets": {
       "objectiveReadOnly": "true",
       "objectiveActions": "0",

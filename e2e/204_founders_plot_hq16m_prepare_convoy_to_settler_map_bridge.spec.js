@@ -637,6 +637,11 @@ test('FP-E2E-022M Prepare Convoy lands as selected Settler Convoy map unit', asy
   await expect(page.getByTestId('fp-expedition-command-outcome-chip')).toHaveAttribute('data-command-id', 'found_settlement');
   await expect(page.getByTestId('fp-expedition-command-outcome-chip')).toHaveAttribute('data-unit-id', outpostUnitId);
   await expect(page.getByTestId('fp-expedition-command-outcome-chip')).toContainText('Founded');
+  await expect(page.getByTestId('fp-expedition-outpost-status')).toBeVisible();
+  await expect(page.getByTestId('fp-expedition-outpost-status')).toHaveAttribute('data-read-only', 'true');
+  await expect(page.getByTestId('fp-expedition-outpost-status')).toHaveAttribute('data-actions', '0');
+  await expect(page.getByTestId('fp-expedition-outpost-status')).toHaveAttribute('data-unit-id', outpostUnitId);
+  await expect(page.getByTestId('fp-expedition-outpost-status')).toHaveAttribute('data-cell-id', cellId);
   await expect(page.getByTestId('fp-expedition-objective-strip')).not.toContainText(/guarded endpoint|approval|review|packet|proof/i);
   await expect(page.getByTestId('fp-expedition-unit-command-bar')).not.toContainText(/guarded endpoint|approval|review|packet|proof/i);
   await expect(page.getByTestId('fp-expedition-command-outcome-chip')).not.toContainText(/guarded endpoint|approval|review|packet|proof/i);
@@ -646,6 +651,9 @@ test('FP-E2E-022M Prepare Convoy lands as selected Settler Convoy map unit', asy
   await page.getByTestId('fp-expedition-map-panel').screenshot({
     path: 'reports/agent-town-hq16p-expedition-map-game-hud-shell-2026-06-02-desktop.png',
   });
+  await page.getByTestId('fp-expedition-map-panel').screenshot({
+    path: 'reports/agent-town-hq16q-outpost-status-map-surface-2026-06-02-desktop.png',
+  });
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByTestId(`fp-expedition-unit-token-${outpostUnitId}`)).toBeVisible();
@@ -653,6 +661,8 @@ test('FP-E2E-022M Prepare Convoy lands as selected Settler Convoy map unit', asy
   await expect(page.getByTestId('fp-expedition-unit-command-bar')).toHaveAttribute('data-unit-id', outpostUnitId);
   await expect(page.getByTestId('fp-expedition-command-outcome-chip')).toHaveAttribute('data-unit-id', outpostUnitId);
   await expect(page.getByTestId(`fp-btn-found-settlement-unit-command-${claimId}`)).toHaveCount(0);
+  await expect(page.getByTestId('fp-expedition-outpost-status')).toBeVisible();
+  await expect(page.getByTestId('fp-expedition-outpost-status')).toHaveAttribute('data-actions', '0');
   const primaryDebugPattern = /\b(?:OBJ|CMD|RES|FX|NXT|DISC|KNOWN|HINT|LOCK|CLAIM|STATUS)\b|guarded endpoint|approval|review|packet|proof|endpoint/i;
   for (const visibleSurface of [
     page.getByTestId('fp-expedition-objective-strip'),
@@ -670,6 +680,9 @@ test('FP-E2E-022M Prepare Convoy lands as selected Settler Convoy map unit', asy
   await page.getByTestId('fp-expedition-map-panel').screenshot({
     path: 'reports/agent-town-hq16p-expedition-map-game-hud-shell-2026-06-02-mobile.png',
   });
+  await page.getByTestId('fp-expedition-map-panel').screenshot({
+    path: 'reports/agent-town-hq16q-outpost-status-map-surface-2026-06-02-mobile.png',
+  });
 
   const proof = await page.evaluate(({ convoyUnitId, outpostUnitId, cellId }) => {
     const renderer = window.__foundersPlotTest.getExpeditionMapInfo();
@@ -678,6 +691,7 @@ test('FP-E2E-022M Prepare Convoy lands as selected Settler Convoy map unit', asy
     const commandBar = document.querySelector('[data-testid="fp-expedition-unit-command-bar"]');
     const outcome = document.querySelector('[data-testid="fp-expedition-command-outcome-chip"]');
     const foundButton = document.querySelector('[data-testid="fp-btn-found-settlement-unit-command-claim_hq16m_ridge"]');
+    const outpostStatus = document.querySelector('[data-testid="fp-expedition-outpost-status"]');
     const clipped = Array.from(document.querySelectorAll('[data-testid="fp-expedition-unit-roster"], [data-testid="fp-expedition-unit-command-bar"], [data-testid="fp-expedition-objective-strip"]'))
       .filter((node) => node.scrollWidth > node.clientWidth + 1)
       .map((node) => node.getAttribute('data-testid') || node.className || node.tagName);
@@ -707,6 +721,17 @@ test('FP-E2E-022M Prepare Convoy lands as selected Settler Convoy map unit', asy
         unitId: outcome?.getAttribute('data-unit-id') || '',
         cellId: outcome?.getAttribute('data-cell-id') || '',
         text: outcome?.textContent || '',
+      },
+      outpostStatus: {
+        present: !!outpostStatus,
+        unitId: outpostStatus?.getAttribute('data-unit-id') || '',
+        cellId: outpostStatus?.getAttribute('data-cell-id') || '',
+        claimId: outpostStatus?.getAttribute('data-claim-id') || '',
+        foundedPlotId: outpostStatus?.getAttribute('data-founded-plot-id') || '',
+        readOnly: outpostStatus?.getAttribute('data-read-only') || '',
+        actions: Number(outpostStatus?.getAttribute('data-actions') || 0),
+        text: outpostStatus?.innerText || '',
+        detailsOpen: outpostStatus?.querySelector('details')?.hasAttribute('open') || false,
       },
       foundButton: {
         present: !!foundButton,
@@ -858,6 +883,11 @@ test('FP-E2E-022M Prepare Convoy lands as selected Settler Convoy map unit', asy
       focusedOwnedOutpostCell: proof.renderer.selectedCellId === cellId && proof.outpostToken.cellId === cellId,
       outcomePulseServerOwnedOutpostResult: proof.outcome.commandId === 'found_settlement' && proof.outcome.unitId === outpostUnitId && /Founded/.test(proof.outcome.text),
       oldConvoyCommandGoneAfterFounding: proof.foundButton.present === false,
+      outpostStatusReadOnlySurface: proof.outpostStatus.present === true
+        && proof.outpostStatus.unitId === outpostUnitId
+        && proof.outpostStatus.cellId === cellId
+        && proof.outpostStatus.readOnly === 'true'
+        && proof.outpostStatus.actions === 0,
       primarySurfacePaperworkHidden: Object.values(proof.primarySurfaceText).every((text) => !primaryPaperworkPattern.test(text)),
       rendererCreatedNoActions: proof.renderer.visualLayers.clientAuthority === false,
       unitTokensReadOnly: proof.renderer.visualLayers.unitTokensReadOnly === true,
@@ -869,6 +899,51 @@ test('FP-E2E-022M Prepare Convoy lands as selected Settler Convoy map unit', asy
       combat: false,
       hiddenTruthLeakage: false,
       crossPlotMutationBeyondFoundSettlementContract: false,
+      atlasExecution: false,
+      generatedUniverseRuntimeExpansion: false,
+      externalEffects: false,
+      mobileHorizontalOverflow: proof.mobileFit.clipped.length,
+    },
+  }, null, 2));
+
+  fs.writeFileSync('reports/agent-town-hq16q-outpost-status-map-surface-proof-2026-06-02.json', JSON.stringify({
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    title: 'HQ16Q Outpost Status Map Surface',
+    source: 'FP-E2E-022M extended after server-owned Found Outpost result to verify selected outpost status surface',
+    screenshots: [
+      'reports/agent-town-hq16q-outpost-status-map-surface-2026-06-02-desktop.png',
+      'reports/agent-town-hq16q-outpost-status-map-surface-2026-06-02-mobile.png',
+    ],
+    result: {
+      outpostUnitId,
+      outpostPlotId,
+      cellId,
+      outpostStatus: proof.outpostStatus,
+      outpostToken: proof.outpostToken,
+      commandBar: proof.commandBar,
+      renderer: proof.renderer,
+      mobileFit: proof.mobileFit,
+    },
+    guardrails: {
+      frontendCssE2eOnly: true,
+      serverAuthorityUnchanged: true,
+      selectedServerOwnedOutpostCrew: proof.outpostToken.unitId === outpostUnitId && proof.outpostToken.unitType === 'outpost_crew',
+      selectedOwnedOutpostCell: proof.renderer.selectedCellId === cellId && proof.outpostStatus.cellId === cellId,
+      outpostStatusReadOnlySurface: proof.outpostStatus.present === true
+        && proof.outpostStatus.unitId === outpostUnitId
+        && proof.outpostStatus.readOnly === 'true'
+        && proof.outpostStatus.actions === 0,
+      noOutpostCommandsAdded: proof.outpostStatus.actions === 0 && proof.commandBar.actions === 0,
+      statusDetailsCollapsedByDefault: proof.outpostStatus.detailsOpen === false,
+      routeAuthority: false,
+      tradeRouteCreation: false,
+      resourceHarvesting: false,
+      rewardCreation: false,
+      backgroundScheduling: false,
+      combat: false,
+      hiddenTruthLeakage: false,
+      crossPlotMutationBeyondExistingFoundSettlementContract: false,
       atlasExecution: false,
       generatedUniverseRuntimeExpansion: false,
       externalEffects: false,

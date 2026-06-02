@@ -1713,6 +1713,50 @@ html, body {
   color: rgba(61, 44, 29, 0.72);
 }
 
+.fp-expedition-outpost-status {
+  display: grid;
+  gap: 5px;
+  padding: 6px;
+  border: 1px solid rgba(27, 106, 100, 0.22);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(223, 245, 241, 0.80), rgba(255, 248, 232, 0.72)),
+    repeating-linear-gradient(90deg, rgba(27, 106, 100, 0.028) 0 1px, transparent 1px 12px);
+}
+
+.fp-expedition-outpost-status__chips {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.fp-expedition-outpost-status__chips span {
+  display: inline-grid;
+  min-width: 0;
+  place-items: center;
+  padding: 4px 5px;
+  border: 1px solid rgba(27, 106, 100, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 248, 232, 0.78);
+  color: #173f39;
+  font-family: Wellfleet, Georgia, serif;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fp-expedition-outpost-status .fp-expedition-audit-details {
+  margin: 0;
+}
+
+.fp-expedition-outpost-status .fp-expedition-audit-details > summary {
+  font-size: 9px;
+}
+
 .fp-expedition-command-preview {
   position: absolute;
   z-index: 9;
@@ -3854,6 +3898,15 @@ html, body {
     min-height: 25px;
     padding: 4px 7px;
     font-size: 9px;
+  }
+
+  .fp-expedition-map-panel .fp-expedition-outpost-status {
+    gap: 4px;
+    padding: 5px;
+  }
+
+  .fp-expedition-map-panel .fp-expedition-outpost-status__chips {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .fp-expedition-map-panel .fp-expedition-command-preview {

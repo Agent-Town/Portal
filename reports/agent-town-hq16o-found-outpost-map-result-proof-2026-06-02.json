@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "generatedAt": "2026-06-02T12:24:03.353Z",
+  "generatedAt": "2026-06-02T12:35:16.360Z",
   "title": "HQ16O Found Outpost to Outpost Map Result bridge",
   "source": "FP-E2E-022M extended Found Outpost result proof using mocked server-owned founded outpost read model",
   "screenshots": [
@@ -11,7 +11,7 @@
     "plotId": "plot_hq16m_prepare_to_settler_bridge",
     "claimId": "claim_hq16m_ridge",
     "actor": "HUMAN",
-    "idempotencyKey": "fp-found-settlement-claim_hq16m_ridge-mpwm01n0-1"
+    "idempotencyKey": "fp-found-settlement-claim_hq16m_ridge-mpwmegyf-1"
   },
   "result": {
     "claimId": "claim_hq16m_ridge",
@@ -76,7 +76,7 @@
       "commandTargets": [],
       "commandOutcomeFeedback": [
         {
-          "feedbackId": "found_settlement-cell_q0_r1-mpwm01pk",
+          "feedbackId": "found_settlement-cell_q0_r1-mpwmeh0o",
           "unitId": "expedition_unit_outpost_crew_claim_hq16m_ridge",
           "unitType": "outpost_crew",
           "commandId": "found_settlement",
@@ -210,6 +210,7 @@
     "focusedOwnedOutpostCell": true,
     "outcomePulseServerOwnedOutpostResult": true,
     "oldConvoyCommandGoneAfterFounding": true,
+    "outpostStatusReadOnlySurface": true,
     "primarySurfacePaperworkHidden": true,
     "rendererCreatedNoActions": true,
     "unitTokensReadOnly": true,
